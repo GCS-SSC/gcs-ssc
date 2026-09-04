@@ -21,6 +21,7 @@ const email = ref('')
 const password = ref('')
 const loading = ref(false)
 const loginError = ref('')
+const isDemoBuild = import.meta.env.VITE_GCS_DEMO === 'true'
 
 /** Shows the same safe localized feedback for provider and transport failures. */
 const showLoginError = () => {
@@ -32,7 +33,7 @@ const showLoginError = () => {
   })
 }
 
-if (import.meta.dev) {
+if (import.meta.dev || isDemoBuild) {
   email.value = 'root@example.com'
   password.value = 'password123'
 }

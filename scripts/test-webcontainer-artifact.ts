@@ -965,7 +965,7 @@ export const testGeneratedWebContainerPreview = async (
       args: ['.output/server/index.mjs'],
       options: {
         env: {
-          PGLITE_DATA_DIR: 'idb://gcs-ssc',
+          PGLITE_DATA_DIR: 'memory://gcs-ssc',
           NITRO_PORT: '3000',
           NITRO_HOST: '0.0.0.0',
           BETTER_AUTH_SECRET: 'a_very_secret_string_for_demo_purposes',

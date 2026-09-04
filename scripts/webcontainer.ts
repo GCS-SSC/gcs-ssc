@@ -1164,7 +1164,7 @@ export const generateWebContainerPreview = async (
                 stepEl.textContent = 'Starting Nitro server...';
                 const process = await webcontainerInstance.spawn('node', ['.output/server/index.mjs'], {
                     env: {
-                        PGLITE_DATA_DIR: 'idb://gcs-ssc',
+                        PGLITE_DATA_DIR: 'memory://gcs-ssc',
                         NITRO_PORT: '3000',
                         NITRO_HOST: '0.0.0.0',
                         BETTER_AUTH_SECRET: 'a_very_secret_string_for_demo_purposes',
@@ -1290,7 +1290,7 @@ const main = async () => {
     if (!process.env.BETTER_AUTH_SECRET) {
       process.env.BETTER_AUTH_SECRET = 'a_very_secret_string_for_demo_purposes'
     }
-    execSync('NITRO_PRESET=node-server bun run build', { stdio: 'inherit' })
+    execSync('bun run build:demo', { stdio: 'inherit' })
   }
 
   let artifactDirectory = outputDirectory

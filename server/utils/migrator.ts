@@ -44,7 +44,7 @@ export const resolveProductionMigrationProvider = async (
   demoMigrationLoader: DemoMigrationLoader = loadPackagedDemoMigration,
   moduleUrl: string = resolveRuntimeModuleUrl()
 ): Promise<MigrationProvider> => {
-  const isDemoMode = migrationMode === 'webcontainer-demo' || migrationMode === 'hosted-demo'
+  const isDemoMode = migrationMode === 'webcontainer-demo' || migrationMode === 'demo'
   if (!isDemoMode || demoMigrationSuffix !== 'seed') {
     return productionCoreMigrationProvider
   }
@@ -66,8 +66,8 @@ export const resolveProductionMigrationProvider = async (
  */
 export const resolveRuntimeMigrationProvider = async (): Promise<MigrationProvider> => {
   if (process.env.NODE_ENV === 'production') {
-    if (process.env.ENVIRONMENT_TYPE === 'development') {
-      return await resolveProductionMigrationProvider('hosted-demo', 'seed')
+    if (process.env.ENVIRONMENT_TYPE === 'demo') {
+      return await resolveProductionMigrationProvider('demo', 'seed')
     }
 
     return await resolveProductionMigrationProvider(

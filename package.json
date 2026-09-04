@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "build": "bun run build:extension-sdk && bun run build:app",
+    "build:demo": "VITE_GCS_DEMO=true NITRO_PRESET=node-server bun run build",
     "build:app": "bun run scripts/nuxt-artifact-lock.ts -- bun run build:app:unlocked",
     "build:app:unlocked": "bun run scripts/build-nuxt-with-warning-gate.ts && bun build server/workers/admin-sql-dump.ts --target node --format esm --external '@electric-sql/*' --external kysely --outfile .output/server/admin-sql-dump-worker.mjs && bun run scripts/build-storage-cleanup-worker.ts",
     "storage:cleanup:drain": "bun run server/workers/storage-cleanup-drain.ts",
@@ -38,7 +39,7 @@
     "quality:deps:graph": "bash .agents/skills/gcs-ssc/scripts/dependency-reports.sh dot",
     "quality:lint:fast": "bun run lint && oxlint --ignore-pattern 'extensions/*/client/worker.js' --ignore-pattern 'extensions/*/client/ort-*' .",
     "quality:artifact": "bun run scripts/test-production-artifact.ts",
-    "quality:webcontainer": "bun x playwright install chromium && NITRO_PRESET=node-server bun run build && bun run scripts/webcontainer.ts --from-output --stage-demo .output .agent/reports/webcontainer-preview && bun run scripts/test-webcontainer-artifact.ts .agent/reports/webcontainer-output .agent/reports/webcontainer-preview",
+    "quality:webcontainer": "bun x playwright install chromium && bun run build:demo && bun run scripts/webcontainer.ts --from-output --stage-demo .output .agent/reports/webcontainer-preview && bun run scripts/test-webcontainer-artifact.ts .agent/reports/webcontainer-output .agent/reports/webcontainer-preview",
     "quality:scan": "bash .agents/skills/gcs-ssc/scripts/quality-whole.sh",
     "quality:whole": "bash .agents/skills/gcs-ssc/scripts/quality-whole.sh",
     "quality:whole:ledger": "bash .agents/skills/gcs-ssc/scripts/run-whole-review-ledger-pipeline.sh",

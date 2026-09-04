@@ -17,10 +17,10 @@ Generate a public Railway domain, then configure these service variables:
 
 `ENVIRONMENT_TYPE` is required and accepts exactly one of these values:
 
-- `development`: packages and applies the demo seed
+- `demo`: packages and applies the demo seed
 - `production`: excludes demo data and credentials
 
-For `development`, the Docker build packages the demo migration and the runtime
+For `demo`, the Docker build packages the demo migration and the runtime
 applies `9999_seed`, including the documented demo users. Changing
 `ENVIRONMENT_TYPE` requires a rebuild and redeploy because the seed is
 intentionally absent from production images.
@@ -53,5 +53,5 @@ replicas while using PGlite: a single database directory must not be shared by
 multiple application processes.
 
 Production migrations create the schema but intentionally exclude local demo
-seed data and demo credentials unless `ENVIRONMENT_TYPE=development` was set at
+seed data and demo credentials unless `ENVIRONMENT_TYPE=demo` was set at
 both image build and runtime.

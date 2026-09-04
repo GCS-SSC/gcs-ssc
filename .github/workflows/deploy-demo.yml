@@ -41,7 +41,7 @@ jobs:
 
       - name: Build, stage, and verify WebContainer Preview
         run: |
-          bun run build
+          bun run build:demo
           bun run scripts/webcontainer.ts --from-output --stage-demo .output webcontainer-preview
           bun run scripts/test-webcontainer-artifact.ts .agent/reports/webcontainer-output webcontainer-preview
         env:

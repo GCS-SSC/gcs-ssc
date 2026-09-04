@@ -270,7 +270,7 @@ export const runManagedExtensionE2e = async (
       BETTER_AUTH_SECRET: 'abcdefghijklmnopqrstuvwxyz123456',
       BETTER_AUTH_TRUSTED_ORIGINS: baseUrl,
       BETTER_AUTH_URL: baseUrl,
-      ENVIRONMENT_TYPE: 'development',
+      ENVIRONMENT_TYPE: 'demo',
       GCS_E2E_EXTENSION_WORKSPACE: config.extensionKey,
       GCS_E2E_SERVER_MODE: 'production',
       GCS_E2E_SUITE: config.suite,

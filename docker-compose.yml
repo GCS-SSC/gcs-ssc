@@ -4,12 +4,12 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        ENVIRONMENT_TYPE: ${ENVIRONMENT_TYPE:?ENVIRONMENT_TYPE must be development or production}
+        ENVIRONMENT_TYPE: ${ENVIRONMENT_TYPE:?ENVIRONMENT_TYPE must be demo or production}
     ports:
       - '${APP_PORT:-8995}:3000'
     environment:
       NODE_ENV: production
-      ENVIRONMENT_TYPE: ${ENVIRONMENT_TYPE:?ENVIRONMENT_TYPE must be development or production}
+      ENVIRONMENT_TYPE: ${ENVIRONMENT_TYPE:?ENVIRONMENT_TYPE must be demo or production}
       PGLITE_DATA_DIR: /app/.data/pglite
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:8995}
       BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS:-http://localhost:8995}

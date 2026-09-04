@@ -173,7 +173,7 @@ const runInheritedCommand: E2eCommandRunner = async command =>
   await runInheritedCommandWithEnv(command, process.env)
 
 /**
- * Stages the demo migration required by a development-flavoured production E2E server.
+ * Stages the demo migration required by an explicit demo production E2E server.
  * Plain production artifacts remain demo-free; this runs only inside the managed test runner.
  *
  * @param serverMode - Managed server mode selected for this E2E run.
@@ -188,7 +188,7 @@ export const stageManagedProductionDemoMigration = async (
   runCommand: E2eCommandRunner = runInheritedCommand,
   outputPath = '.output/server/demo-migrations/demo.mjs'
 ): Promise<boolean> => {
-  if (serverMode !== 'production' || environmentType !== 'development') return false
+  if (serverMode !== 'production' || environmentType !== 'demo') return false
   await mkdir(dirname(outputPath), { recursive: true })
   const exitCode = await runCommand(['bun', 'run', 'scripts/build-demo-migration.ts', outputPath])
   if (exitCode !== 0) throw new Error(`Could not stage the demo migration for production E2E (exit ${exitCode}).`)
@@ -832,7 +832,7 @@ const buildE2eEnv = (
     BETTER_AUTH_TRUSTED_ORIGINS: getProcessEnvValue('BETTER_AUTH_TRUSTED_ORIGINS', baseUrl),
     BETTER_AUTH_DISABLE_LOGGER: getProcessEnvValue('BETTER_AUTH_DISABLE_LOGGER', 'true'),
     NUXT_DISABLE_SOURCEMAPS: getProcessEnvValue('NUXT_DISABLE_SOURCEMAPS', 'true'),
-    ENVIRONMENT_TYPE: getProcessEnvValue('ENVIRONMENT_TYPE', 'development'),
+    ENVIRONMENT_TYPE: getProcessEnvValue('ENVIRONMENT_TYPE', 'demo'),
     PLAYWRIGHT_WORKERS: getProcessEnvValue('PLAYWRIGHT_WORKERS', DEFAULT_PLAYWRIGHT_WORKERS)
   }
   Object.assign(env, { GCS_E2E_SUITE: suite, GCS_E2E_SERVER_MODE: resolveManagedE2eServerMode(suite, process.env.E2E_SERVER_MODE) })

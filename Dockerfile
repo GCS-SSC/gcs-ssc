@@ -5,8 +5,8 @@ WORKDIR /app
 ARG ENVIRONMENT_TYPE
 
 RUN case "$ENVIRONMENT_TYPE" in \
-    development|production) ;; \
-    *) echo "ENVIRONMENT_TYPE must be development or production" >&2; exit 1 ;; \
+    demo|production) ;; \
+    *) echo "ENVIRONMENT_TYPE must be demo or production" >&2; exit 1 ;; \
   esac
 
 RUN apt-get update \
@@ -53,7 +53,7 @@ ENV NITRO_PRESET=node-server
 
 RUN bun run build
 
-RUN if [ "$ENVIRONMENT_TYPE" = "development" ]; then \
+RUN if [ "$ENVIRONMENT_TYPE" = "demo" ]; then \
     mkdir -p .output/server/demo-migrations .output/demo-assets \
     && bun run scripts/build-demo-migration.ts .output/server/demo-migrations/demo.mjs \
     && cp "demo-assets/Contribution Agreement.docx" ".output/demo-assets/Contribution Agreement.docx"; \
@@ -75,7 +75,7 @@ WORKDIR /app
 COPY --from=build --chown=node:node /app/.output ./.output
 
 RUN npm install --omit=dev --ignore-scripts --legacy-peer-deps --no-audit --no-fund --prefix /app/.output/server \
-  && if [ "$ENVIRONMENT_TYPE" = "development" ]; then \
+  && if [ "$ENVIRONMENT_TYPE" = "demo" ]; then \
     mkdir -p /app/demo-assets \
     && cp "/app/.output/demo-assets/Contribution Agreement.docx" "/app/demo-assets/Contribution Agreement.docx"; \
   fi \
