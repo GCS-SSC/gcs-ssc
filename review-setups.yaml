@@ -1,0 +1,39 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e4]:
+    - generic [ref=e6]:
+      - img "GCS-SSC" [ref=e7]
+      - heading "GCS-SSC" [level=1] [ref=e8]
+    - generic [ref=e10]:
+      - generic [ref=e11]:
+        - generic [ref=e14]: Email
+        - textbox "Email" [ref=e17]:
+          - /placeholder: email.example.com
+          - text: root@example.com
+      - generic [ref=e18]:
+        - generic [ref=e21]: Password
+        - textbox "Password" [ref=e24]:
+          - /placeholder: "********"
+          - text: password123
+      - button "Login" [ref=e25]:
+        - generic [ref=e26]: Login
+      - button "Login with GitHub" [disabled] [ref=e27]:
+        - generic [ref=e29]: Login with GitHub
+      - paragraph [ref=e30]: GitHub login is currently unavailable.
+  - generic:
+    - img
+  - generic:
+    - generic:
+      - generic:
+        - button "Go to parent" [disabled]
+        - button "Open in editor"
+        - button "Close"
+  - generic [ref=e31]:
+    - button "Toggle Nuxt DevTools" [ref=e32] [cursor=pointer]:
+      - img [ref=e33]
+    - generic "Page load time" [ref=e36]:
+      - generic [ref=e37]: "23"
+      - generic [ref=e38]: ms
+    - button "Toggle Component Inspector" [ref=e40] [cursor=pointer]:
+      - img [ref=e41]
+  - region "Notifications (F8)":
+    - list

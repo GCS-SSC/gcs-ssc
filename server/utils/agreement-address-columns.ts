@@ -1,0 +1,21 @@
+export const AGREEMENT_ADDRESS_SELECT_COLUMNS = [
+  'Funding_Case_Agreement_Address.id as id',
+  'Funding_Case_Agreement_Address.egcs_fc_fundingagreement as egcs_fc_fundingagreement',
+  'Funding_Case_Agreement_Address.egcs_fc_addresstype as egcs_fc_addresstype',
+  'Funding_Case_Agreement_Address.egcs_fc_address as egcs_fc_address',
+  'Agency_Address_Type.egcs_ay_typename_en as address_type_name_en',
+  'Agency_Address_Type.egcs_ay_typename_fr as address_type_name_fr',
+  'Common_Address.egcs_cn_federalridingid as egcs_cn_federalridingid',
+  'Common_Address.egcs_cn_addresscity as egcs_cn_addresscity',
+  'Common_Address.egcs_cn_addresscountry as egcs_cn_addresscountry',
+  'Common_Address.egcs_cn_addresssubdivision as egcs_cn_addresssubdivision',
+  'Common_Address.egcs_cn_gc_addressid as egcs_cn_gc_addressid',
+  'Common_Address.egcs_cn_latitude as egcs_cn_latitude',
+  'Common_Address.egcs_cn_longitude as egcs_cn_longitude',
+  'Common_Address.egcs_cn_mainphone as egcs_cn_mainphone',
+  'Common_Address.egcs_cn_mainphoneextension as egcs_cn_mainphoneextension',
+  'Common_Address.egcs_cn_postalcodezipcode as egcs_cn_postalcodezipcode',
+  'Common_Address.egcs_cn_street1 as egcs_cn_street1',
+  'Common_Address.egcs_cn_street2 as egcs_cn_street2',
+  'Common_Address.egcs_cn_street3 as egcs_cn_street3'
+] as const

@@ -1,0 +1,92 @@
+{
+  "$schema": "./node_modules/fallow/schema.json",
+  "ignorePatterns": [
+    // Bundled browser workers and WASM loader shims are generated artifacts.
+    "extensions/*/client/worker.js",
+    "extensions/*/client/ort-wasm-simd-threaded.asyncify.mjs",
+    "webcontainer-preview/**"
+  ],
+  "dynamicallyLoaded": [
+    // The extension loader discovers these files by convention.
+    "extensions/*/extension.config.ts",
+    "extensions/*/server/migrations/**/*.ts",
+    "extensions/*/server/runtime.ts",
+    "extensions/*/server/nitro-plugin.ts",
+    // Nuxt i18n and the admin SQL dump route load these files by configured path.
+    "i18n/locale-detector.ts",
+    "scripts/admin-sql-dump.ts"
+  ],
+  "ignoreDependencies": [
+    // Nuxt UI resolves icon collections from string icon names.
+    "@iconify-json/simple-icons",
+    // Used by an extension worker build/runtime path that Fallow cannot see from the bundled output.
+    "onnxruntime-web",
+    // Invoked by extensions/gcs-narrative-quality/scripts/check-vue-language-server.mjs.
+    "@vue/language-server",
+    // Fallow traces test imports but still reports this devDependency in the workspace summary.
+    "@vue/test-utils"
+  ],
+  "ignoreExports": [
+    {
+      "file": "server/database/migrations/**/*.ts",
+      "exports": ["up", "down"]
+    },
+    {
+      "file": "extensions/*/server/migrations/**/*.ts",
+      "exports": ["up", "down"]
+    },
+    {
+      "file": "shared/types/schemas/**/*.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "shared/constants/enums.ts",
+      "exports": ["*"]
+    },
+    {
+      "file": "extensions/**/*.{ts,vue,js}",
+      "exports": ["*"]
+    }
+  ],
+  "usedClassMembers": [
+    "getFormTemplate",
+    "getDecryptedSubmission",
+    "confirmSubmission",
+    "reportSubmissionProblem"
+  ],
+  "overrides": [
+    {
+      "files": ["vitest.config.ts"],
+      "rules": {
+        "unresolved-imports": "off"
+      }
+    }
+  ],
+  "health": {
+    "ignore": [
+      "tests/**",
+      "extensions/*/tests/**",
+      "server/database/migrations/**",
+      "extensions/*/server/migrations/**",
+      "shared/types/database.d.ts",
+      "shared/constants/enums.ts",
+      "extensions/*/client/worker.js",
+      "extensions/*/client/ort-wasm-simd-threaded.asyncify.mjs",
+      "webcontainer-preview/**"
+    ]
+  },
+  "duplicates": {
+    "ignore": [
+      "tests/**",
+      "extensions/*/tests/**",
+      "server/database/migrations/**",
+      "extensions/*/server/migrations/**",
+      "shared/types/database.d.ts",
+      "shared/constants/enums.ts",
+      "extensions/*/client/worker.js",
+      "extensions/*/client/ort-wasm-simd-threaded.asyncify.mjs",
+      "webcontainer-preview/**"
+    ],
+    "ignoreImports": true
+  }
+}

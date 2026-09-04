@@ -1,0 +1,8 @@
+# 1. Ignore the entire contents of the folder
+egcs-erd/*
+
+# 2. Un-ignore the specific file you want to keep
+!egcs-erd/EGCS.dbml
+
+# worktrees
+worktree/*

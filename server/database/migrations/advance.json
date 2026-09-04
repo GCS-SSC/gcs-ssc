@@ -1,0 +1,1450 @@
+{
+  "scoringMatrix": [
+    {
+      "max": 2,
+      "label": {
+        "en": "Compliant",
+        "fr": "Conforme"
+      },
+      "indicator": "#16A34A"
+    },
+    {
+      "max": 3.5,
+      "label": {
+        "en": "Conditionally Compliant",
+        "fr": "Conditionnellement conforme"
+      },
+      "indicator": "#EAB308"
+    },
+    {
+      "max": 5,
+      "label": {
+        "en": "Non-Compliant",
+        "fr": "Non conforme"
+      },
+      "indicator": "#DC2626"
+    }
+  ],
+  "sectionMatrix": [
+    {
+      "max": 1,
+      "label": {
+        "en": "Negligible",
+        "fr": "Négligeable"
+      },
+      "indicator": "#16A34A"
+    },
+    {
+      "max": 2,
+      "label": {
+        "en": "Low",
+        "fr": "Faible"
+      },
+      "indicator": "#16A34A"
+    },
+    {
+      "max": 3,
+      "label": {
+        "en": "Moderate",
+        "fr": "Modéré"
+      },
+      "indicator": "#EAB308"
+    },
+    {
+      "max": 4,
+      "label": {
+        "en": "Significant",
+        "fr": "Important"
+      },
+      "indicator": "#EAB308"
+    },
+    {
+      "max": 5,
+      "label": {
+        "en": "High",
+        "fr": "Élevé"
+      },
+      "indicator": "#DC2626"
+    }
+  ],
+  "outcomes": [
+    {
+      "label": {
+        "en": "Advance Payment Decision",
+        "fr": "Décision de paiement anticipé"
+      },
+      "name": "advanceDecision",
+      "strategies": [
+        {
+          "name": "disbursementApproach",
+          "label": {
+            "en": "Disbursement Approach",
+            "fr": "Approche de décaissement"
+          },
+          "options": [
+            {
+              "max": 2,
+              "value": "permitted",
+              "label": {
+                "en": "Advance Payment Permitted",
+                "fr": "Paiement anticipé autorisé"
+              }
+            },
+            {
+              "max": 3.5,
+              "value": "conditional",
+              "label": {
+                "en": "Conditional – Deficiencies Must Be Remediated",
+                "fr": "Conditionnel – les lacunes doivent être corrigées"
+              }
+            },
+            {
+              "max": 5,
+              "value": "denied",
+              "label": {
+                "en": "Advance Payment Not Recommended",
+                "fr": "Paiement anticipé non recommandé"
+              }
+            }
+          ]
+        },
+        {
+          "name": "reconciliationFrequency",
+          "label": {
+            "en": "Reconciliation Schedule",
+            "fr": "Calendrier de réconciliation"
+          },
+          "options": [
+            {
+              "max": 2,
+              "value": "annual",
+              "label": {
+                "en": "Annual Reconciliation",
+                "fr": "Réconciliation annuelle"
+              }
+            },
+            {
+              "max": 3.5,
+              "value": "quarterly",
+              "label": {
+                "en": "Quarterly Reconciliation",
+                "fr": "Réconciliation trimestrielle"
+              }
+            },
+            {
+              "max": 5,
+              "value": "monthly",
+              "label": {
+                "en": "Monthly Reconciliation Required",
+                "fr": "Réconciliation mensuelle requise"
+              }
+            }
+          ]
+        },
+        {
+          "name": "recoveryControls",
+          "label": {
+            "en": "Recovery Monitoring Level",
+            "fr": "Niveau de surveillance du recouvrement"
+          },
+          "options": [
+            {
+              "max": 2,
+              "value": "standard",
+              "label": {
+                "en": "Standard Monitoring",
+                "fr": "Surveillance standard"
+              }
+            },
+            {
+              "max": 3.5,
+              "value": "enhanced",
+              "label": {
+                "en": "Enhanced Monitoring",
+                "fr": "Surveillance renforcée"
+              }
+            },
+            {
+              "max": 5,
+              "value": "intensive",
+              "label": {
+                "en": "Intensive Monitoring and Recovery Controls",
+                "fr": "Surveillance intensive et contrôles de recouvrement"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "sections": [
+    {
+      "weight": 0.40,
+      "number": "1",
+      "label": {
+        "en": "Pre-Authorization Justification",
+        "fr": "Justification de pré-autorisation"
+      },
+      "name": "preAuthorization",
+      "icon": "i-lucide-file-check",
+      "subSections": [
+        {
+          "name": "exceptionalCircumstances",
+          "weight": {
+            "adjustable": false,
+            "weight": 0.45
+          },
+          "label": {
+            "en": "Exceptional Circumstances",
+            "fr": "Circonstances exceptionnelles"
+          },
+          "questions": [
+            {
+              "type": "question",
+              "name": "essentialToObjectives",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.40
+              },
+              "question": {
+                "en": "Has the department documented that the advance payment is considered essential to achieving program objectives? (Directive s. 4.1.1.1)",
+                "fr": "Le ministère a-t-il documenté que le paiement anticipé est essentiel à la réalisation des objectifs du programme? (Directive art. 4.1.1.1)"
+              },
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Fully Documented",
+                    "fr": "Pleinement documenté"
+                  },
+                  "description": {
+                    "en": "Clear written justification is on file demonstrating the advance is essential to program delivery and cannot wait until post-receipt.",
+                    "fr": "Une justification écrite claire est au dossier démontrant que l'avance est essentielle à la prestation du programme."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Substantially Documented",
+                    "fr": "Substantiellement documenté"
+                  },
+                  "description": {
+                    "en": "Justification exists and establishes essentiality, though some detail or specificity could be strengthened.",
+                    "fr": "La justification existe et établit l'essentialité, bien que certains détails pourraient être renforcés."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Partially Documented",
+                    "fr": "Partiellement documenté"
+                  },
+                  "description": {
+                    "en": "Documentation is generic or incomplete; essentiality to program objectives is not clearly established.",
+                    "fr": "La documentation est générique ou incomplète; l'essentialité aux objectifs du programme n'est pas clairement établie."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Minimally Documented",
+                    "fr": "Minimalement documenté"
+                  },
+                  "description": {
+                    "en": "Only cursory reference to program necessity; the justification would not withstand scrutiny.",
+                    "fr": "Seule une référence sommaire à la nécessité du programme; la justification ne résisterait pas à un examen approfondi."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Not Documented",
+                    "fr": "Non documenté"
+                  },
+                  "description": {
+                    "en": "No documentation found to support essentiality to program objectives. Advance payment cannot be justified under s. 4.1.1.1 of the Directive.",
+                    "fr": "Aucune documentation trouvée pour appuyer l'essentialité aux objectifs du programme. Le paiement anticipé ne peut être justifié en vertu de l'art. 4.1.1.1."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Under s. 4.1.1.1 of the Directive on Payments, advance payments may only be made when the CFO has ensured they are essential to achieving program objectives. The rationale must be documented on file and should explain why deferring payment until post-receipt would impair program delivery.",
+                    "fr": "En vertu de l'art. 4.1.1.1 de la Directive sur les paiements, les paiements anticipés ne peuvent être effectués que lorsque le DPF s'est assuré qu'ils sont essentiels à la réalisation des objectifs du programme."
+                  }
+                }
+              ]
+            },
+            {
+              "type": "question",
+              "name": "noAlternativeExists",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.40
+              },
+              "question": {
+                "en": "Has the department confirmed and documented that no other reasonable payment alternative exists prior to approving the advance? (Directive s. 4.1.1.2)",
+                "fr": "Le ministère a-t-il confirmé et documenté qu'aucune autre solution de paiement raisonnable n'existe avant d'approuver l'avance? (Directive art. 4.1.1.2)"
+              },
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Alternatives Explored and Ruled Out",
+                    "fr": "Alternatives examinées et écartées"
+                  },
+                  "description": {
+                    "en": "The file contains evidence that alternative payment methods were actively considered (e.g., post-delivery payment, other suppliers) and none were available or feasible.",
+                    "fr": "Le dossier contient des preuves que des méthodes de paiement alternatives ont été activement considérées et qu'aucune n'était disponible ou réalisable."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Alternatives Referenced",
+                    "fr": "Alternatives mentionnées"
+                  },
+                  "description": {
+                    "en": "Some consideration of alternatives is evident in the file but the analysis is not comprehensive.",
+                    "fr": "Une certaine considération des alternatives est évidente dans le dossier mais l'analyse n'est pas exhaustive."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Partially Addressed",
+                    "fr": "Partiellement traité"
+                  },
+                  "description": {
+                    "en": "Limited evidence that alternatives were systematically considered before the advance was approved.",
+                    "fr": "Preuves limitées que des alternatives ont été systématiquement considérées avant l'approbation de l'avance."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Alternatives Not Considered",
+                    "fr": "Alternatives non considérées"
+                  },
+                  "description": {
+                    "en": "No evidence that other payment methods were considered prior to approving the advance.",
+                    "fr": "Aucune preuve que d'autres méthodes de paiement ont été considérées avant l'approbation de l'avance."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Non-Compliant – Alternative Was Available",
+                    "fr": "Non conforme – une alternative était disponible"
+                  },
+                  "description": {
+                    "en": "A viable alternative payment method was available and not used, or the advance was issued without any consideration of alternatives, contrary to s. 4.1.1.2.",
+                    "fr": "Une méthode de paiement alternative viable était disponible et n'a pas été utilisée, contrairement à l'art. 4.1.1.2."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "The Guide to Advance Payments (s. 4.1) explains that before agreeing to an advance, departments should verify whether there are other suppliers that will accept post-delivery payment. In industries where advance payment is an entrenched norm (e.g., certain IT services, training, flights), this may constitute sufficient basis, but must still be documented.",
+                    "fr": "Le Guide sur les paiements anticipés (art. 4.1) explique qu'avant d'accepter une avance, les ministères doivent vérifier s'il existe d'autres fournisseurs acceptant le paiement après livraison."
+                  }
+                }
+              ]
+            },
+            {
+              "type": "question",
+              "name": "entrenchedPracticeDocumented",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.20
+              },
+              "question": {
+                "en": "Where the advance reflects an entrenched industry practice (e.g., IT services, training registrations, airline tickets), has this been identified and documented as the basis for the 'no other alternative' finding?",
+                "fr": "Lorsque l'avance reflète une pratique industrielle établie (ex. services TI, inscriptions à des formations, billets d'avion), cela a-t-il été documenté comme base pour l'absence d'alternative raisonnable?"
+              },
+              "commentThreshold": {
+                "min": 1,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Industry Practice Confirmed and Documented",
+                    "fr": "Pratique industrielle confirmée et documentée"
+                  },
+                  "description": {
+                    "en": "The file identifies the relevant industry norm as the basis for the advance and this is clearly tied to the 'no other alternative' finding.",
+                    "fr": "Le dossier identifie la norme industrielle pertinente comme base de l'avance et la lie clairement à l'absence d'alternative."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Referenced but Not Formally Documented",
+                    "fr": "Mentionné mais non formellement documenté"
+                  },
+                  "description": {
+                    "en": "Industry practice is referenced but has not been formally documented as the explicit basis for proceeding with an advance.",
+                    "fr": "La pratique industrielle est mentionnée mais n'a pas été formellement documentée comme base explicite pour procéder avec une avance."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Not Applicable – Other Exceptional Circumstances Apply",
+                    "fr": "Sans objet – d'autres circonstances exceptionnelles s'appliquent"
+                  },
+                  "description": {
+                    "en": "The advance does not relate to an entrenched industry practice; other documented exceptional circumstances provide the basis.",
+                    "fr": "L'avance ne se rapporte pas à une pratique industrielle établie; d'autres circonstances exceptionnelles documentées servent de base."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Practice Likely Applies – Not Referenced",
+                    "fr": "Pratique probablement applicable – non mentionnée"
+                  },
+                  "description": {
+                    "en": "An entrenched industry practice likely applies but was not referenced or documented in the advance payment justification.",
+                    "fr": "Une pratique industrielle établie s'applique probablement mais n'a pas été mentionnée ou documentée dans la justification."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Non-Compliant – No Industry Practice and No Other Basis",
+                    "fr": "Non conforme – aucune pratique industrielle et aucune autre base"
+                  },
+                  "description": {
+                    "en": "No entrenched practice exists in this sector, and no other valid exceptional circumstance has been documented.",
+                    "fr": "Aucune pratique établie n'existe dans ce secteur et aucune autre circonstance exceptionnelle valide n'a été documentée."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "The Guide to Advance Payments (s. 4.1) notes that in certain industries or sectors, advance payments are an entrenched tradition or practice. In such cases, this constitutes the basis for the 'no other reasonable alternative' finding and must be documented in the file.",
+                    "fr": "Le Guide sur les paiements anticipés (art. 4.1) note que dans certains secteurs, les paiements anticipés sont une pratique établie, ce qui constitue la base pour l'absence d'alternative raisonnable et doit être documenté."
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "contractualAuthorization",
+          "weight": {
+            "adjustable": false,
+            "weight": 0.55
+          },
+          "label": {
+            "en": "Contractual and Legal Authorization",
+            "fr": "Autorisation contractuelle et légale"
+          },
+          "questions": [
+            {
+              "type": "question",
+              "name": "contractClausePresent",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.45
+              },
+              "question": {
+                "en": "Does a written contract, agreement, or legally binding instrument exist that explicitly contains an advance payment clause? (Directive s. 4.1.1.3; Guide s. 4.3 and 6.3)",
+                "fr": "Existe-t-il un contrat écrit, un accord ou un instrument juridiquement contraignant contenant explicitement une clause de paiement anticipé? (Directive art. 4.1.1.3; Guide art. 4.3 et 6.3)"
+              },
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Confirmed – Explicit Clause Present",
+                    "fr": "Confirmé – clause explicite présente"
+                  },
+                  "description": {
+                    "en": "A written contract, agreement, or legally binding instrument containing a clear advance payment clause is on file.",
+                    "fr": "Un contrat écrit, un accord ou un instrument juridiquement contraignant contenant une clause de paiement anticipé claire est au dossier."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Contract Present – Clause Implicit",
+                    "fr": "Contrat présent – clause implicite"
+                  },
+                  "description": {
+                    "en": "A contract exists and advance payment terms are implicit from context (e.g., online purchase T&Cs accepted at checkout), but the clause is not drafted as a standalone provision.",
+                    "fr": "Un contrat existe et les conditions de paiement anticipé sont implicites dans le contexte, mais la clause n'est pas rédigée comme disposition distincte."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Clause Ambiguous or Incomplete",
+                    "fr": "Clause ambiguë ou incomplète"
+                  },
+                  "description": {
+                    "en": "A contract exists but the advance payment clause is ambiguous, insufficiently specific, or does not address all required elements.",
+                    "fr": "Un contrat existe mais la clause de paiement anticipé est ambiguë, insuffisamment précise, ou ne traite pas de tous les éléments requis."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Contract Exists – No Advance Clause",
+                    "fr": "Contrat existe – aucune clause d'avance"
+                  },
+                  "description": {
+                    "en": "A contract exists but does not contain an advance payment clause. Section 34 FAA certification cannot be provided.",
+                    "fr": "Un contrat existe mais ne contient pas de clause de paiement anticipé. La certification de l'art. 34 LGFP ne peut être fournie."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "No Contract – Advance Cannot Be Issued",
+                    "fr": "Aucun contrat – l'avance ne peut être émise"
+                  },
+                  "description": {
+                    "en": "No written contract or legally binding instrument exists. Without a contract containing an advance payment clause, s. 34 FAA certification cannot be provided and the advance payment cannot be lawfully issued.",
+                    "fr": "Aucun contrat écrit ou instrument juridiquement contraignant n'existe. Sans contrat contenant une clause de paiement anticipé, la certification art. 34 ne peut être fournie."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Per Guide s. 4.3 and 6.3, the contract is the legal basis for s. 34 FAA certification. Without a contract containing an advance payment clause, the advance cannot be issued. Acceptable forms include goods/services contracts, leases, training registration forms, and online T&Cs accepted at checkout.",
+                    "fr": "Selon le Guide art. 4.3 et 6.3, le contrat est la base légale de la certification art. 34 LGFP. Sans contrat contenant une clause de paiement anticipé, l'avance ne peut être émise."
+                  }
+                }
+              ]
+            },
+            {
+              "type": "question",
+              "name": "lawfulAppropriationCharge",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.30
+              },
+              "question": {
+                "en": "Does the advance payment clause confirm that the payment is a lawful charge against the departmental appropriation? (Directive s. 4.1.2.1)",
+                "fr": "La clause de paiement anticipé confirme-t-elle que le paiement est une charge licite contre le crédit ministériel? (Directive art. 4.1.2.1)"
+              },
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Confirmed – Appropriation Authority Verified",
+                    "fr": "Confirmé – autorité d'affectation vérifiée"
+                  },
+                  "description": {
+                    "en": "The advance payment clause confirms lawful appropriation authority and this has been verified.",
+                    "fr": "La clause de paiement anticipé confirme l'autorité d'affectation licite et cela a été vérifié."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Assumed – Not Explicitly Verified",
+                    "fr": "Présumé – non explicitement vérifié"
+                  },
+                  "description": {
+                    "en": "Appropriation authority has not been formally confirmed in the file; it is assumed rather than verified.",
+                    "fr": "L'autorité d'affectation n'a pas été formellement confirmée dans le dossier; elle est présumée plutôt que vérifiée."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Not Confirmed or Compliance Issue Identified",
+                    "fr": "Non confirmé ou problème de conformité identifié"
+                  },
+                  "description": {
+                    "en": "No confirmation that the charge is lawful against the appropriation, or a compliance issue was identified. This is a prerequisite under s. 4.1.2.1 of the Directive.",
+                    "fr": "Aucune confirmation que la charge est licite contre le crédit, ou un problème de conformité a été identifié, contrairement à l'art. 4.1.2.1."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Section 4.1.2.1 of the Directive requires that advance payment clauses address the fact that the payment is a lawful charge against the appropriation. This is a prerequisite that must be addressed in the contract or agreement before the advance is issued.",
+                    "fr": "L'article 4.1.2.1 de la Directive exige que les clauses de paiement anticipé précisent que le paiement est une charge licite contre le crédit."
+                  }
+                }
+              ]
+            },
+            {
+              "type": "question",
+              "name": "section34CertificationObtained",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.25
+              },
+              "question": {
+                "en": "Was certification under section 34 of the Financial Administration Act obtained by a delegated manager prior to issuance of the advance payment? (FAA s. 34(1)(a)(ii); Guide s. 6.3)",
+                "fr": "La certification en vertu de l'article 34 de la Loi sur la gestion des finances publiques a-t-elle été obtenue par un gestionnaire délégué avant l'émission du paiement anticipé? (LGFP art. 34(1)(a)(ii); Guide art. 6.3)"
+              },
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Certified Prior to Issuance",
+                    "fr": "Certifié avant l'émission"
+                  },
+                  "description": {
+                    "en": "Section 34 certification was obtained from a delegated manager before the advance payment was issued.",
+                    "fr": "La certification art. 34 a été obtenue d'un gestionnaire délégué avant l'émission du paiement anticipé."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Certified – Timing Unclear",
+                    "fr": "Certifié – délai peu clair"
+                  },
+                  "description": {
+                    "en": "Certification exists but documentation does not clearly confirm it preceded issuance of the advance.",
+                    "fr": "La certification existe mais la documentation ne confirme pas clairement qu'elle a précédé l'émission de l'avance."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Certified After Issuance",
+                    "fr": "Certifié après l'émission"
+                  },
+                  "description": {
+                    "en": "Section 34 certification was obtained after the advance was already issued, contrary to FAA requirements.",
+                    "fr": "La certification art. 34 a été obtenue après l'émission de l'avance, contrairement aux exigences de la LGFP."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Not Certified",
+                    "fr": "Non certifié"
+                  },
+                  "description": {
+                    "en": "No section 34 certification is on file. The advance was issued without the mandatory FAA authority.",
+                    "fr": "Aucune certification art. 34 n'est au dossier. L'avance a été émise sans l'autorisation obligatoire de la LGFP."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Under FAA s. 34(1)(a)(ii) and Guide s. 6.3, a delegated manager must certify the advance before it is issued. Before certifying, the manager must confirm the contract contains advance payment terms. Without prior certification, the advance cannot be lawfully issued.",
+                    "fr": "En vertu de l'art. 34(1)(a)(ii) de la LGFP et du Guide art. 6.3, un gestionnaire délégué doit certifier l'avance avant son émission."
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "weight": 0.35,
+      "number": "2",
+      "label": {
+        "en": "Fiscal Controls and Payment Structure",
+        "fr": "Contrôles fiscaux et structure de paiement"
+      },
+      "name": "fiscalControls",
+      "icon": "i-lucide-landmark",
+      "subSections": [
+        {
+          "name": "fiscalYearAlignment",
+          "weight": {
+            "adjustable": false,
+            "weight": 0.55
+          },
+          "label": {
+            "en": "Fiscal Year Constraints and Value Alignment",
+            "fr": "Contraintes de l'exercice financier et alignement de la valeur"
+          },
+          "questions": [
+            {
+              "type": "question",
+              "name": "advanceAlignedToFiscalYear",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.45
+              },
+              "question": {
+                "en": "Does the advance payment relate to and not exceed the reasonably expected value of work performed, goods delivered, or services rendered during the current fiscal year? (Directive s. 4.1.3.1)",
+                "fr": "Le paiement anticipé est-il lié et ne dépasse-t-il pas la valeur raisonnablement attendue des travaux effectués, des biens livrés ou des services rendus au cours de l'exercice financier en cours? (Directive art. 4.1.3.1)"
+              },
+              "commentThreshold": {
+                "min": 2,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Fully Aligned",
+                    "fr": "Pleinement aligné"
+                  },
+                  "description": {
+                    "en": "The advance amount is demonstrably proportionate to and does not exceed the expected fiscal year value of goods or services.",
+                    "fr": "Le montant de l'avance est démontrablement proportionnel et ne dépasse pas la valeur attendue des biens ou services pour l'exercice financier."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Substantially Aligned – Minor Variance Documented",
+                    "fr": "Substantiellement aligné – légère variance documentée"
+                  },
+                  "description": {
+                    "en": "Minor variance exists between the advance and expected fiscal year value, but is documented and justified per s. 4.1.3.1.",
+                    "fr": "Une légère variance existe entre l'avance et la valeur attendue de l'exercice, mais est documentée et justifiée."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Partially Aligned – Justification Incomplete",
+                    "fr": "Partiellement aligné – justification incomplète"
+                  },
+                  "description": {
+                    "en": "The advance may exceed expected fiscal year value; justification is present but insufficient.",
+                    "fr": "L'avance peut dépasser la valeur attendue de l'exercice; la justification est présente mais insuffisante."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Exceeds Expected Value – Justification Documented",
+                    "fr": "Dépasse la valeur attendue – justification documentée"
+                  },
+                  "description": {
+                    "en": "The advance exceeds the expected fiscal year value and the required justification under s. 4.1.3.1 has been documented.",
+                    "fr": "L'avance dépasse la valeur attendue de l'exercice et la justification requise en vertu de l'art. 4.1.3.1 a été documentée."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Exceeds Expected Value – No Justification",
+                    "fr": "Dépasse la valeur attendue – aucune justification"
+                  },
+                  "description": {
+                    "en": "The advance exceeds the expected fiscal year value with no documented justification, contrary to s. 4.1.3.1 of the Directive.",
+                    "fr": "L'avance dépasse la valeur attendue de l'exercice sans justification documentée, contrairement à l'art. 4.1.3.1 de la Directive."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Section 4.1.3.1 of the Directive requires the CFO to ensure justification is documented when the expected value of work or goods and services received is less than the amount paid in advance for a given fiscal year. Advance payments must not be used as a mechanism to spend down appropriations at year-end.",
+                    "fr": "L'article 4.1.3.1 de la Directive exige que le DPF s'assure que la justification est documentée lorsque la valeur attendue est inférieure au montant payé d'avance pour un exercice donné."
+                  }
+                }
+              ]
+            },
+            {
+              "type": "question",
+              "name": "noCarryForwardMechanism",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.30
+              },
+              "question": {
+                "en": "Is there any evidence the advance payment was structured to carry funds forward into a future fiscal year (e.g., via transfer to specified purpose money, a revolving fund, or pre-payment from a revolving fund)? (Directive s. 4.1.2.3)",
+                "fr": "Y a-t-il des preuves que le paiement anticipé a été structuré pour reporter des fonds à un exercice financier futur (ex. transfert à des fonds à affectation spéciale, un fonds renouvelable, ou un prépaiement d'un fonds renouvelable)? (Directive art. 4.1.2.3)"
+              },
+              "commentThreshold": {
+                "min": 1,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "No Evidence of Carry-Forward",
+                    "fr": "Aucune preuve de report"
+                  },
+                  "description": {
+                    "en": "No evidence that funds were improperly structured to carry forward into a future fiscal year; the advance was used in the fiscal year as intended.",
+                    "fr": "Aucune preuve que les fonds ont été structurés de manière inappropriée pour être reportés à un exercice futur."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Indeterminate – Further Review Required",
+                    "fr": "Indéterminé – examen complémentaire requis"
+                  },
+                  "description": {
+                    "en": "Insufficient information to definitively confirm whether a carry-forward mechanism was employed; additional review is recommended.",
+                    "fr": "Information insuffisante pour confirmer définitivement si un mécanisme de report a été utilisé; un examen supplémentaire est recommandé."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Non-Compliant – Carry-Forward Mechanism Identified",
+                    "fr": "Non conforme – mécanisme de report identifié"
+                  },
+                  "description": {
+                    "en": "Evidence indicates funds were transferred to specified purpose money, a revolving fund, or otherwise used to carry appropriation authority forward, contrary to s. 4.1.2.3 of the Directive.",
+                    "fr": "Des preuves indiquent que des fonds ont été transférés à des fins déterminées ou autrement utilisés pour reporter l'autorité de crédit, contrairement à l'art. 4.1.2.3."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Section 4.1.2.3 of the Directive and the Guide (Appendix B reminder) explicitly prohibit using advance payments to avoid lapsing funds at fiscal year-end or to carry appropriated funds forward through transfers to specified purpose money, revolving funds, or pre-payments from revolving funds.",
+                    "fr": "L'article 4.1.2.3 de la Directive interdit explicitement l'utilisation de paiements anticipés pour éviter la péremption des fonds ou reporter les crédits à travers des transferts à des fonds à affectation spéciale."
+                  }
+                }
+              ]
+            },
+            {
+              "type": "question",
+              "name": "crossYearRecoveryJustification",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.25
+              },
+              "question": {
+                "en": "Where recovery of excess advance amounts will not be received in the same fiscal year as the advance, has justification been developed and documented? (Directive s. 4.1.3.2)",
+                "fr": "Lorsque le recouvrement des montants d'avance excédentaires ne sera pas reçu dans le même exercice financier que l'avance, une justification a-t-elle été élaborée et documentée? (Directive art. 4.1.3.2)"
+              },
+              "commentThreshold": {
+                "min": 1,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Justification on File",
+                    "fr": "Justification au dossier"
+                  },
+                  "description": {
+                    "en": "A justification for cross-year recovery has been developed and documented, as required by s. 4.1.3.2.",
+                    "fr": "Une justification pour le recouvrement interexercices a été élaborée et documentée, conformément à l'art. 4.1.3.2."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Not Applicable – Recovery Anticipated in Same Fiscal Year",
+                    "fr": "Sans objet – recouvrement prévu dans le même exercice"
+                  },
+                  "description": {
+                    "en": "Recovery of any excess advance amounts is expected to occur within the current fiscal year; cross-year recovery is not anticipated.",
+                    "fr": "Le recouvrement de tout montant d'avance excédentaire est prévu dans l'exercice financier en cours; un recouvrement interexercices n'est pas anticipé."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Cross-Year Recovery Anticipated – Justification Incomplete",
+                    "fr": "Recouvrement interexercices prévu – justification incomplète"
+                  },
+                  "description": {
+                    "en": "Recovery will not occur within the same fiscal year and justification exists but is insufficient or lacks required detail.",
+                    "fr": "Le recouvrement n'aura pas lieu dans le même exercice et une justification existe mais est insuffisante."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Non-Compliant – Cross-Year Recovery, No Justification",
+                    "fr": "Non conforme – recouvrement interexercices, aucune justification"
+                  },
+                  "description": {
+                    "en": "Recovery will not occur in the same fiscal year and no justification has been documented, contrary to s. 4.1.3.2 of the Directive.",
+                    "fr": "Le recouvrement n'aura pas lieu dans le même exercice et aucune justification n'a été documentée, contrairement à l'art. 4.1.3.2."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Section 4.1.3.2 of the Directive requires the CFO to ensure that where recovery of advance payment amounts in excess of expected value will not be received in the same fiscal year, justification is developed and documented. This is distinct from whether recovery is technically possible.",
+                    "fr": "L'article 4.1.3.2 de la Directive exige que le DPF s'assure que lorsque le recouvrement n'est pas reçu dans le même exercice, une justification soit élaborée et documentée."
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "multiYearContractRequirements",
+          "weight": {
+            "adjustable": false,
+            "weight": 0.45
+          },
+          "label": {
+            "en": "Multi-Year Contract and Licensing Agreement Requirements",
+            "fr": "Exigences relatives aux contrats pluriannuels et aux contrats de licence"
+          },
+          "questions": [
+            {
+              "type": "question",
+              "name": "multiYearApplicability",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.30
+              },
+              "question": {
+                "en": "Does this advance payment relate to a multi-year maintenance contract or licensing agreement?",
+                "fr": "Ce paiement anticipé est-il lié à un contrat d'entretien pluriannuel ou à un contrat de licence?"
+              },
+              "commentThreshold": {
+                "min": 5,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Yes – Multi-Year Contract or Licensing Agreement",
+                    "fr": "Oui – contrat pluriannuel ou contrat de licence"
+                  },
+                  "description": {
+                    "en": "The advance relates to a multi-year maintenance contract or licensing agreement subject to s. 4.1.2.2 requirements.",
+                    "fr": "L'avance se rapporte à un contrat d'entretien pluriannuel ou à un contrat de licence assujetti aux exigences de l'art. 4.1.2.2."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "No – Single-Year Contract or Other Instrument",
+                    "fr": "Non – contrat d'un an ou autre instrument"
+                  },
+                  "description": {
+                    "en": "The advance relates to a single-year contract or other instrument; multi-year requirements do not apply.",
+                    "fr": "L'avance se rapporte à un contrat d'un an ou à un autre instrument; les exigences pluriannuelles ne s'appliquent pas."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Section 4.1.2.2 of the Directive imposes additional requirements for multi-year maintenance contracts and licensing agreements. This question establishes whether those requirements apply.",
+                    "fr": "L'article 4.1.2.2 de la Directive impose des exigences supplémentaires pour les contrats d'entretien pluriannuels et les contrats de licence."
+                  }
+                }
+              ]
+            },
+            {
+              "type": "question",
+              "name": "annualPaymentStructure",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.70
+              },
+              "question": {
+                "en": "For multi-year maintenance contracts and licensing agreements, does the contract include at least one scheduled annual payment for each year of the contract's duration? (Directive s. 4.1.2.2)",
+                "fr": "Pour les contrats d'entretien pluriannuels et les contrats de licence, le contrat comprend-il au moins un paiement annuel prévu pour chaque année de la durée du contrat? (Directive art. 4.1.2.2)"
+              },
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Compliant – Annual Payments Scheduled for Each Year",
+                    "fr": "Conforme – paiements annuels prévus pour chaque année"
+                  },
+                  "description": {
+                    "en": "The contract includes at least one clearly scheduled payment per year for each year of the contract, as required by s. 4.1.2.2.",
+                    "fr": "Le contrat comprend au moins un paiement clairement prévu par an pour chaque année du contrat, conformément à l'art. 4.1.2.2."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Substantially Compliant – Minor Gap in Scheduling",
+                    "fr": "Substantiellement conforme – légère lacune dans l'échéancier"
+                  },
+                  "description": {
+                    "en": "Annual payment structure is present for most years but one or more years lack a clearly defined scheduled payment.",
+                    "fr": "La structure de paiement annuel est présente pour la plupart des années mais une ou plusieurs années n'ont pas de paiement clairement défini."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Not Applicable – Single-Year Contract",
+                    "fr": "Sans objet – contrat d'un an"
+                  },
+                  "description": {
+                    "en": "This contract is not a multi-year maintenance or licensing agreement; this requirement does not apply.",
+                    "fr": "Ce contrat n'est pas un contrat d'entretien pluriannuel ou de licence; cette exigence ne s'applique pas."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Partially Compliant – Annual Structure Absent for Some Years",
+                    "fr": "Partiellement conforme – structure annuelle absente pour certaines années"
+                  },
+                  "description": {
+                    "en": "Annual payments are missing for one or more contract years; the contract structure does not fully meet the s. 4.1.2.2 requirement.",
+                    "fr": "Des paiements annuels manquent pour une ou plusieurs années du contrat; la structure ne respecte pas entièrement l'art. 4.1.2.2."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Non-Compliant – Lump Sum Across Multiple Years",
+                    "fr": "Non conforme – somme forfaitaire sur plusieurs années"
+                  },
+                  "description": {
+                    "en": "The contract uses a single lump-sum or upfront payment covering multiple contract years without at least one annual payment per year, contrary to s. 4.1.2.2 of the Directive.",
+                    "fr": "Le contrat utilise un paiement forfaitaire ou initial couvrant plusieurs années sans au moins un paiement annuel par année, contrairement à l'art. 4.1.2.2."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Section 4.1.2.2 of the Directive requires that multi-year maintenance contracts and licensing agreements include at least one annual payment per year. This prevents the use of large upfront lump-sum payments that span multiple fiscal years and reduces the risk of overpayment if the contract is terminated early.",
+                    "fr": "L'article 4.1.2.2 de la Directive exige que les contrats d'entretien pluriannuels et les contrats de licence comprennent au moins un paiement annuel par année, ce qui prévient les paiements forfaitaires initiaux couvrant plusieurs exercices."
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "weight": 0.25,
+      "number": "3",
+      "label": {
+        "en": "Monitoring, Reconciliation and Recovery",
+        "fr": "Surveillance, réconciliation et recouvrement"
+      },
+      "name": "monitoringAndRecovery",
+      "icon": "i-lucide-shield-check",
+      "subSections": [
+        {
+          "name": "reconciliationAndAccounting",
+          "weight": {
+            "adjustable": false,
+            "weight": 0.50
+          },
+          "label": {
+            "en": "Reconciliation and Accounting Treatment",
+            "fr": "Réconciliation et traitement comptable"
+          },
+          "questions": [
+            {
+              "type": "question",
+              "name": "reconciliationProcess",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.60
+              },
+              "question": {
+                "en": "Has the department established and applied a process to regularly reconcile the advance payment amount against the value of goods and services received? (Guide s. 7.3)",
+                "fr": "Le ministère a-t-il établi et appliqué un processus pour réconcilier régulièrement le montant du paiement anticipé par rapport à la valeur des biens et services reçus? (Guide art. 7.3)"
+              },
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Formal Process – Consistently Applied",
+                    "fr": "Processus formel – appliqué de façon cohérente"
+                  },
+                  "description": {
+                    "en": "A documented reconciliation process is in place and evidence of regular, consistent application is on file.",
+                    "fr": "Un processus de réconciliation documenté est en place et des preuves d'application régulière et cohérente sont au dossier."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Process Exists – Partially Applied",
+                    "fr": "Processus existant – partiellement appliqué"
+                  },
+                  "description": {
+                    "en": "A reconciliation process is documented but application has been inconsistent or gaps are present.",
+                    "fr": "Un processus de réconciliation est documenté mais son application a été incohérente ou des lacunes sont présentes."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Informal Process – No Documentation",
+                    "fr": "Processus informel – aucune documentation"
+                  },
+                  "description": {
+                    "en": "Reconciliation is conducted informally without documented procedures or a consistent schedule.",
+                    "fr": "La réconciliation est effectuée de manière informelle sans procédures documentées ni calendrier cohérent."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Process Not Yet Established",
+                    "fr": "Processus non encore établi"
+                  },
+                  "description": {
+                    "en": "A reconciliation process has not been formally established; this represents a control gap.",
+                    "fr": "Un processus de réconciliation n'a pas été formellement établi; il s'agit d'une lacune de contrôle."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "No Reconciliation Performed",
+                    "fr": "Aucune réconciliation effectuée"
+                  },
+                  "description": {
+                    "en": "No reconciliation has been performed and no process exists, contrary to the CFO's obligations under Guide s. 7.3.",
+                    "fr": "Aucune réconciliation n'a été effectuée et aucun processus n'existe, contrairement aux obligations du DPF selon le Guide art. 7.3."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Section 7.3 of the Guide to Advance Payments requires CFOs to ensure controls are in place to monitor advance payments, including regular reconciliation against the value of goods or services received. Regular monitoring is critical for promptly identifying and recovering excess advance payment amounts.",
+                    "fr": "L'article 7.3 du Guide sur les paiements anticipés exige que les DPF s'assurent que des contrôles sont en place pour surveiller les paiements anticipés, y compris une réconciliation régulière par rapport à la valeur des biens ou services reçus."
+                  }
+                }
+              ]
+            },
+            {
+              "type": "question",
+              "name": "accountingTreatment",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.40
+              },
+              "question": {
+                "en": "Has the advance payment been correctly recorded as a prepaid expense (prepayment) in accordance with the Financial Information Strategy Accounting Manual, subsection 3.4? (Guide s. 7.1)",
+                "fr": "Le paiement anticipé a-t-il été correctement enregistré comme dépense payée d'avance (prépaiement) conformément au Manuel de la stratégie d'information financière, sous-section 3.4? (Guide art. 7.1)"
+              },
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Correctly Recorded as Prepaid Expense",
+                    "fr": "Correctement enregistré comme dépense payée d'avance"
+                  },
+                  "description": {
+                    "en": "The advance has been recorded as a prepayment (prepaid expense) and will be expensed upon receipt of goods or services, consistent with the applicable basis of accounting.",
+                    "fr": "L'avance a été enregistrée comme prépaiement (dépense payée d'avance) et sera imputée à la réception des biens ou services."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Accounting Treatment Uncertain or Unverified",
+                    "fr": "Traitement comptable incertain ou non vérifié"
+                  },
+                  "description": {
+                    "en": "The accounting treatment has not been confirmed or the documentation does not clearly establish proper recording.",
+                    "fr": "Le traitement comptable n'a pas été confirmé ou la documentation n'établit pas clairement un enregistrement adéquat."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Non-Compliant – Incorrectly Recorded",
+                    "fr": "Non conforme – enregistrement incorrect"
+                  },
+                  "description": {
+                    "en": "The advance was not recorded as a prepaid expense, or was charged directly to expenditure before goods and services were received, contrary to Guide s. 7.1.",
+                    "fr": "L'avance n'a pas été enregistrée comme dépense payée d'avance, ou a été imputée directement aux dépenses avant la réception des biens et services, contrairement au Guide art. 7.1."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Guide s. 7.1 requires advance payments to be recorded as prepaid expenses. On a cash basis, the advance is charged to the appropriation when issued. On an accrual basis, it is recorded as a prepayment asset and expensed only when goods and services are received. Refer to FISAM s. 3.4.",
+                    "fr": "Le Guide art. 7.1 exige que les paiements anticipés soient enregistrés comme dépenses payées d'avance. Sur une base de trésorerie, l'avance est imputée au crédit lors de l'émission. Sur une base d'exercice, elle est enregistrée comme actif de prépaiement."
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "recoveryControls",
+          "weight": {
+            "adjustable": false,
+            "weight": 0.50
+          },
+          "label": {
+            "en": "Recovery of Excess Advance Payments and Non-Delivery",
+            "fr": "Recouvrement des paiements anticipés excédentaires et non-livraison"
+          },
+          "questions": [
+            {
+              "type": "question",
+              "name": "excessRecoveryAction",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.55
+              },
+              "question": {
+                "en": "Where the advance payment amount exceeds the value of work performed, goods delivered, or services rendered, has the excess been recovered or is a documented recovery action underway? (Directive s. 4.1.3.2; Guide s. 7.3)",
+                "fr": "Lorsque le montant du paiement anticipé dépasse la valeur des travaux effectués, des biens livrés ou des services rendus, l'excédent a-t-il été recouvré ou une action de recouvrement documentée est-elle en cours? (Directive art. 4.1.3.2; Guide art. 7.3)"
+              },
+              "commentThreshold": {
+                "min": 2,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Excess Recovered – Same Fiscal Year",
+                    "fr": "Excédent recouvré – même exercice financier"
+                  },
+                  "description": {
+                    "en": "Any excess advance amounts have been recovered within the same fiscal year, consistent with the Directive's requirements.",
+                    "fr": "Tout montant d'avance excédentaire a été recouvré dans le même exercice financier, conformément aux exigences de la Directive."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Recovery Initiated – On Track Within Fiscal Year",
+                    "fr": "Recouvrement initié – en bonne voie dans l'exercice"
+                  },
+                  "description": {
+                    "en": "Recovery has been initiated and is on track to be completed within the current fiscal year.",
+                    "fr": "Le recouvrement a été initié et est en bonne voie d'achèvement dans l'exercice financier en cours."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "No Excess Identified – Reconciliation Current",
+                    "fr": "Aucun excédent identifié – réconciliation à jour"
+                  },
+                  "description": {
+                    "en": "Current reconciliation confirms no excess; the advance aligns with the value of goods and services received to date.",
+                    "fr": "La réconciliation actuelle confirme l'absence d'excédent; l'avance correspond à la valeur des biens et services reçus à ce jour."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Excess Identified – Recovery Delayed",
+                    "fr": "Excédent identifié – recouvrement retardé"
+                  },
+                  "description": {
+                    "en": "An excess has been identified but recovery has not commenced or is delayed; documented justification required under s. 4.1.3.2.",
+                    "fr": "Un excédent a été identifié mais le recouvrement n'a pas commencé ou est retardé; une justification documentée est requise en vertu de l'art. 4.1.3.2."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Non-Compliant – Excess Identified, No Recovery Action",
+                    "fr": "Non conforme – excédent identifié, aucune action de recouvrement"
+                  },
+                  "description": {
+                    "en": "An excess advance payment has been identified and no recovery action has been taken and no justification documented, contrary to s. 4.1.3.2 of the Directive and Guide s. 7.3.",
+                    "fr": "Un paiement anticipé excédentaire a été identifié et aucune action de recouvrement n'a été prise, contrairement à l'art. 4.1.3.2 de la Directive et au Guide art. 7.3."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Guide s. 7.3 requires prompt recovery when advance payment amounts exceed the value of goods or services received. Section 4.1.3.2 of the Directive requires documented justification when recovery will not occur in the same fiscal year. CFOs must ensure monitoring controls are in place to identify excess amounts early.",
+                    "fr": "Le Guide art. 7.3 exige un recouvrement rapide lorsque les montants d'avance dépassent la valeur reçue. L'art. 4.1.3.2 exige une justification documentée lorsque le recouvrement n'aura pas lieu dans le même exercice."
+                  }
+                }
+              ]
+            },
+            {
+              "type": "question",
+              "name": "nonDeliveryContingencyAction",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.45
+              },
+              "question": {
+                "en": "Where the contractor or supplier has failed to deliver the goods or services for which the advance was issued, has the department reviewed contract terms and initiated recovery in consultation with legal services? (Guide s. 7.3)",
+                "fr": "Lorsque le contractant ou le fournisseur n'a pas livré les biens ou services pour lesquels l'avance a été émise, le ministère a-t-il examiné les conditions du contrat et initié un recouvrement en consultation avec les services juridiques? (Guide art. 7.3)"
+              },
+              "commentThreshold": {
+                "min": 2,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Recovery Initiated with Legal Consultation",
+                    "fr": "Recouvrement initié avec consultation juridique"
+                  },
+                  "description": {
+                    "en": "The department has reviewed contract terms and initiated recovery action in consultation with legal services, as required.",
+                    "fr": "Le ministère a examiné les conditions du contrat et initié une action de recouvrement en consultation avec les services juridiques, tel que requis."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Recovery in Progress – Legal Review Pending",
+                    "fr": "Recouvrement en cours – examen juridique en attente"
+                  },
+                  "description": {
+                    "en": "Recovery action is underway but legal consultation has not yet been completed.",
+                    "fr": "L'action de recouvrement est en cours mais la consultation juridique n'a pas encore été complétée."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Not Applicable – Delivery On Track or Completed",
+                    "fr": "Sans objet – livraison en bonne voie ou complétée"
+                  },
+                  "description": {
+                    "en": "The recipient has delivered or is on track to deliver; non-delivery is not a current concern.",
+                    "fr": "Le bénéficiaire a livré ou est en bonne voie de livrer; la non-livraison n'est pas une préoccupation actuelle."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Non-Delivery Identified – Recovery Not Yet Initiated",
+                    "fr": "Non-livraison identifiée – recouvrement pas encore initié"
+                  },
+                  "description": {
+                    "en": "Non-delivery or partial delivery has been identified but no recovery action or legal review has been initiated.",
+                    "fr": "Une non-livraison ou une livraison partielle a été identifiée mais aucune action de recouvrement n'a été initiée."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Non-Compliant – Non-Delivery Unaddressed",
+                    "fr": "Non conforme – non-livraison non traitée"
+                  },
+                  "description": {
+                    "en": "Non-delivery has been identified and there is no evidence of any corrective or recovery action, contrary to the mandatory obligations in Guide s. 7.3.",
+                    "fr": "Une non-livraison a été identifiée et il n'y a aucune preuve d'action corrective ou de recouvrement, contrairement aux obligations du Guide art. 7.3."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Guide s. 7.3 states that if a contractor does not deliver the goods or services for which an advance was issued, the manager must review the contract terms and conditions and take the necessary action to recover the advance, in consultation with the department's legal services unit.",
+                    "fr": "Le Guide art. 7.3 indique que si un contractant ne livre pas les biens ou services, le gestionnaire doit examiner les conditions du contrat et prendre les mesures nécessaires pour recouvrer l'avance, en consultation avec les services juridiques."
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

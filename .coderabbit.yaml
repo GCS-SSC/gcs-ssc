@@ -1,0 +1,4 @@
+reviews:
+  path_filters:
+    - "!scripts/**/*spreadsheet*.ts"
+    - "!scripts/google-sheets-workbook.ts"

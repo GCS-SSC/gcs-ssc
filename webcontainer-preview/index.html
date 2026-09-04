@@ -1,0 +1,115 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GCS-SSC WebContainer Preview</title>
+    <script src="coi-serviceworker.js"></script>
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: sans-serif; background: #000; color: #fff; }
+        #status { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; width: 100%; padding: 20px; box-sizing: border-box; }
+        iframe { width: 100%; height: 100%; border: none; display: none; background: #fff; }
+        .spinner { border: 4px solid rgba(255,255,255,.1); border-left-color: #fff; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        pre { text-align: left; background: #111; padding: 15px; border-radius: 8px; max-height: 300px; overflow: auto; font-size: 11px; margin-top: 20px; color: #aaa; border: 1px solid #333; }
+        h2 { margin: 0 0 10px; font-weight: 300; letter-spacing: -0.5px; }
+        p { color: #888; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div id="status">
+        <div class="spinner"></div>
+        <h2>Initializing WebContainer</h2>
+        <p id="step">Fetching filesystem...</p>
+        <pre id="logs"></pre>
+    </div>
+    <iframe id="preview"></iframe>
+
+    <script type="module">
+        import { WebContainer } from 'https://unpkg.com/@webcontainer/api@1.5.1/dist/index.js';
+
+        const stepEl = document.getElementById('step');
+        const statusEl = document.getElementById('status');
+        const iframeEl = document.getElementById('preview');
+        const logsEl = document.getElementById('logs');
+
+        function log(msg) {
+            if (!msg) return;
+            const text = typeof msg === 'string' ? msg : JSON.stringify(msg);
+            logsEl.textContent += text + '\n';
+            logsEl.scrollTop = logsEl.scrollHeight;
+            console.log('[WebContainer]', text);
+        }
+
+        function decodeTree(node) {
+            if (node.directory) {
+                for (const key in node.directory) {
+                    decodeTree(node.directory[key]);
+                }
+            } else if (node.file && typeof node.file.contents === 'string') {
+                const binaryString = atob(node.file.contents);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                node.file.contents = bytes;
+            }
+        }
+
+        async function init() {
+            try {
+                stepEl.textContent = 'Fetching filesystem tree...';
+                const response = await fetch('./files.json');
+                if (!response.ok) throw new Error('Failed to fetch files.json: ' + response.statusText);
+                const fullTree = await response.json();
+
+                stepEl.textContent = 'Decoding binaries...';
+                decodeTree({ directory: fullTree });
+
+                stepEl.textContent = 'Booting WebContainer...';
+                const webcontainerInstance = await WebContainer.boot();
+
+                stepEl.textContent = 'Mounting virtual filesystem...';
+                await webcontainerInstance.mount(fullTree);
+
+                stepEl.textContent = 'Starting Nitro server...';
+                const process = await webcontainerInstance.spawn('node', ['.output/server/index.mjs'], {
+                    env: {
+                        PGLITE_DATA_DIR: 'idb://gcs-ssc',
+                        NITRO_PORT: '3000',
+                        NITRO_HOST: '0.0.0.0',
+                        BETTER_AUTH_SECRET: 'a_very_secret_string_for_demo_purposes',
+                        NODE_ENV: 'production',
+                        // BETTER_AUTH_URL left unset to allow auto-detection from request origin
+                    }
+                });
+
+                process.output.pipeTo(new WritableStream({
+                    write(data) {
+                        log(data);
+                    }
+                }));
+
+                webcontainerInstance.on('server-ready', (port, url) => {
+                    if (port === 3000) {
+                        stepEl.textContent = 'Server ready!';
+                        setTimeout(() => {
+                            statusEl.style.display = 'none';
+                            iframeEl.style.display = 'block';
+                            iframeEl.src = url;
+                        }, 500);
+                    }
+                });
+
+            } catch (err) {
+                console.error(err);
+                stepEl.textContent = 'Error: ' + err.message;
+                log('FATAL ERROR: ' + err.stack);
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

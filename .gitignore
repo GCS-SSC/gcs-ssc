@@ -1,0 +1,61 @@
+# Nuxt dev/build outputs
+.output
+.data
+.nuxt
+.nitro
+.cache
+dist
+
+# Node dependencies
+node_modules
+
+# Logs
+logs
+*.log
+
+# Misc
+.DS_Store
+.fleet
+.idea
+.codex
+
+# Local env files
+.env
+.env.*
+!.env.example
+*.env
+
+# Coverage
+coverage
+test-results
+.playwright
+.playwright-cli
+.playwright-mcp
+.tmp-pgdump-repro
+.tools
+/memory:/
+
+# Agent-generated quality reports
+.agent/reports/**
+.agent/findings/**
+!.agent/
+!.agent/reports/
+!.agent/reports/pr/
+!.agent/reports/whole/
+!.agent/findings/
+!.agent/reports/.gitkeep
+!.agent/reports/pr/.gitkeep
+!.agent/reports/whole/.gitkeep
+!.agent/findings/.gitkeep
+
+# VSC
+.history
+test-results/.last-run.json
+
+#worktree
+worktree
+
+# Private tooling checkout bridges created by bun run tooling:setup
+/tests
+/architecture
+/.agents/skills/gcs-ssc

@@ -1,0 +1,40 @@
+[submodule "extensions/gcs-narrative-quality"]
+	path = extensions/gcs-narrative-quality
+	url = https://github.com/GCS-SSC/gcs-narrative-quality.git
+	branch = main
+	ignore = untracked
+[submodule "extensions/gcs-narrative-tags"]
+	path = extensions/gcs-narrative-tags
+	url = https://github.com/GCS-SSC/gcs-narrative-tags.git
+	branch = main
+	ignore = untracked
+[submodule "packages/gcs-ssc-extensions"]
+	path = packages/gcs-ssc-extensions
+	url = https://github.com/GCS-SSC/gcs-ssc-extensions.git
+	branch = main
+	ignore = untracked
+[submodule "extensions/gcs-gcforms-integration"]
+	path = extensions/gcs-gcforms-integration
+	url = https://github.com/GCS-SSC/gcs-gcforms-integration.git
+	branch = main
+	ignore = untracked
+[submodule "extensions/gcs-outcome-cost-allocation"]
+	path = extensions/gcs-outcome-cost-allocation
+	url = https://github.com/GCS-SSC/gcs-outcome-cost-allocation.git
+	branch = main
+[submodule "extensions/gcs-automated-payments"]
+	path = extensions/gcs-automated-payments
+	url = https://github.com/GCS-SSC/gcs-automated-payments.git
+	branch = main
+[submodule "extensions/gcs-storage-local"]
+	path = extensions/gcs-storage-local
+	url = https://github.com/GCS-SSC/gcs-storage-local.git
+	branch = main
+[submodule "extensions/gcs-storage-s3"]
+	path = extensions/gcs-storage-s3
+	url = https://github.com/GCS-SSC/gcs-storage-s3.git
+	branch = main
+[submodule "tooling/gcs-ssc"]
+	path = tooling/gcs-ssc
+	url = https://github.com/GCS-SSC/gcs-ssc-tooling.git
+	branch = main

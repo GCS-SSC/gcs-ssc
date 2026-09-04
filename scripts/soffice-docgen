@@ -1,0 +1,19 @@
+#!/usr/bin/env sh
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+
+if [ ! -d "$REPO_ROOT/.tools/docgen/libreoffice" ]; then
+  echo "Local LibreOffice was not found. Run: bun run scripts/setup-docgen-tools.ts" >&2
+  exit 127
+fi
+
+SOFFICE=$(find "$REPO_ROOT/.tools/docgen/libreoffice" -path '*/program/soffice' -type f | sort | head -n 1)
+
+if [ -z "$SOFFICE" ]; then
+  echo "Local LibreOffice was not found. Run: bun run scripts/setup-docgen-tools.ts" >&2
+  exit 127
+fi
+
+exec "$SOFFICE" "$@"

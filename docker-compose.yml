@@ -1,0 +1,32 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        ENVIRONMENT_TYPE: ${ENVIRONMENT_TYPE:?ENVIRONMENT_TYPE must be development or production}
+    ports:
+      - '${APP_PORT:-8995}:3000'
+    environment:
+      NODE_ENV: production
+      ENVIRONMENT_TYPE: ${ENVIRONMENT_TYPE:?ENVIRONMENT_TYPE must be development or production}
+      PGLITE_DATA_DIR: /app/.data/pglite
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:8995}
+      BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS:-http://localhost:8995}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-dev_only_local_secret_abcdefghijklmnopqrstuvwxyz123456}
+    volumes:
+      - pglite-data:/app/.data/pglite
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000/api/health').then(response=>{if(!response.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
+volumes:
+  pglite-data:

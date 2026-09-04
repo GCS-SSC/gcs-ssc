@@ -1,0 +1,3065 @@
+{
+  "scoringMatrix": [
+    {
+      "max": 2,
+      "label": {
+        "en": "Minimal",
+        "fr": "Minimal"
+      },
+      "indicator": "#16A34A"
+    },
+    {
+      "max": 3.5,
+      "label": {
+        "en": "Low",
+        "fr": "Faible"
+      },
+      "indicator": "#EAB308"
+    },
+    {
+      "max": 5,
+      "label": {
+        "en": "Moderate",
+        "fr": "Modéré"
+      },
+      "indicator": "#DC2626"
+    }
+  ],
+  "sectionMatrix": [
+    {
+      "max": 1,
+      "label": {
+        "en": "Negligible",
+        "fr": "Négligeable"
+      },
+      "indicator": "#16A34A"
+    },
+    {
+      "max": 2,
+      "label": {
+        "en": "Low",
+        "fr": "Faible"
+      },
+      "indicator": "#16A34A"
+    },
+    {
+      "max": 3,
+      "label": {
+        "en": "Moderate",
+        "fr": "Modéré"
+      },
+      "indicator": "#EAB308"
+    },
+    {
+      "max": 4,
+      "label": {
+        "en": "Significant",
+        "fr": "Important"
+      },
+      "indicator": "#EAB308"
+    },
+    {
+      "max": 5,
+      "label": {
+        "en": "High",
+        "fr": "Élevé"
+      },
+      "indicator": "#DC2626"
+    }
+  ],
+  "impactors": [
+    {
+      "weight": 0.05,
+      "on": {
+        "type": "helpers",
+        "field": "fiscalYearValue"
+      },
+      "scoringMatrix": [
+        {
+          "max": 0,
+          "value": 0
+        },
+        {
+          "max": 20000000,
+          "value": 1
+        },
+        {
+          "max": 100000000,
+          "value": 3
+        },
+        {
+          "max": 9007199254740991,
+          "value": 5
+        }
+      ],
+      "label": {
+        "en": "Total Contracted Value",
+        "fr": "Valeur totale contractée"
+      }
+    },
+    {
+      "weight": 0.05,
+      "on": {
+        "type": "helpers",
+        "field": "averageValue"
+      },
+      "scoringMatrix": [
+        {
+          "max": 0,
+          "value": 0
+        },
+        {
+          "max": 20000000,
+          "value": 1
+        },
+        {
+          "max": 100000000,
+          "value": 3
+        },
+        {
+          "max": 9007199254740991,
+          "value": 5
+        }
+      ],
+      "label": {
+        "en": "Average Transaction Size",
+        "fr": "Taille moyenne des transactions"
+      }
+    }
+  ],
+  "outcomes": [
+    {
+      "label": {
+        "en": "Payment and Claims Management",
+        "fr": "Gestion des paiements et réclamations"
+      },
+      "name": "paymentStrategyAndClaims",
+      "strategies": [
+        {
+          "label": {
+            "en": "Disbursement Approach",
+            "fr": "Approche de décaissement"
+          },
+          "name": "advancePayment",
+          "options": [
+            {
+              "max": 2,
+              "value": "always",
+              "label": {
+                "en": "Fully Demonstrated",
+                "fr": "Pleinement démontré"
+              }
+            },
+            {
+              "max": 3.5,
+              "value": "need",
+              "label": {
+                "en": "Substantially Demonstrated",
+                "fr": "Substantiellement démontré"
+              }
+            },
+            {
+              "max": 5,
+              "value": "none",
+              "label": {
+                "en": "Partially Demonstrated",
+                "fr": "Partiellement démontré"
+              }
+            }
+          ]
+        },
+        {
+          "label": {
+            "en": "Reconciliation Schedule",
+            "fr": "Calendrier de réconciliation"
+          },
+          "name": "claimSchedule",
+          "options": [
+            {
+              "max": 2,
+              "value": "semi",
+              "label": {
+                "en": "Not Demonstrated",
+                "fr": "Non démontré"
+              }
+            },
+            {
+              "max": 3.5,
+              "value": "quarterly",
+              "label": {
+                "en": "Exceeds Requirements",
+                "fr": "Dépasse les exigences"
+              }
+            },
+            {
+              "max": 5,
+              "value": "monthly",
+              "label": {
+                "en": "Meets Requirements",
+                "fr": "Satisfait aux exigences"
+              }
+            }
+          ]
+        },
+        {
+          "label": {
+            "en": "Withholding Controls",
+            "fr": "Contrôles de retenue"
+          },
+          "name": "holdback",
+          "options": [
+            {
+              "max": 2,
+              "value": "0",
+              "label": {
+                "en": "Does Not Meet Requirements",
+                "fr": "Ne satisfait pas aux exigences"
+              }
+            },
+            {
+              "max": 3.5,
+              "value": "10",
+              "label": {
+                "en": "Low Risk",
+                "fr": "Risque faible"
+              }
+            },
+            {
+              "max": 5,
+              "value": "15",
+              "label": {
+                "en": "Moderate Risk",
+                "fr": "Risque modéré"
+              }
+            }
+          ]
+        },
+        {
+          "label": {
+            "en": "Transaction Review",
+            "fr": "Examen des transactions"
+          },
+          "name": "claimReview",
+          "options": [
+            {
+              "max": 3.5,
+              "value": "sample",
+              "label": {
+                "en": "High Risk",
+                "fr": "Risque important"
+              }
+            },
+            {
+              "max": 5,
+              "value": "all",
+              "label": {
+                "en": "Critical Risk",
+                "fr": "Risque critique"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": {
+        "en": "Financial Disbursement Controls",
+        "fr": "Contrôles de décaissement financier"
+      },
+      "name": "reportingReq",
+      "strategies": [
+        {
+          "label": {
+            "en": "Transaction Review",
+            "fr": "Examen des transactions"
+          },
+          "name": "progressReport",
+          "options": [
+            {
+              "max": 2,
+              "value": "semi",
+              "label": {
+                "en": "Fully Demonstrated",
+                "fr": "Pleinement démontré"
+              }
+            },
+            {
+              "max": 3.5,
+              "value": "quarterly",
+              "label": {
+                "en": "Substantially Demonstrated",
+                "fr": "Substantiellement démontré"
+              }
+            },
+            {
+              "max": 5,
+              "value": "monthly",
+              "label": {
+                "en": "Partially Demonstrated",
+                "fr": "Partiellement démontré"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": {
+        "en": "Reporting and Oversight Requirements",
+        "fr": "Exigences de rapport et de surveillance"
+      },
+      "name": "monitoring",
+      "strategies": [
+        {
+          "name": "audit",
+          "label": {
+            "en": "Site Monitoring",
+            "fr": "Surveillance sur site"
+          },
+          "options": [
+            {
+              "max": 3.5,
+              "value": "notreq",
+              "label": {
+                "en": "Fully Demonstrated",
+                "fr": "Pleinement démontré"
+              }
+            },
+            {
+              "max": 5,
+              "value": "monthly",
+              "label": {
+                "en": "Substantially Demonstrated",
+                "fr": "Substantiellement démontré"
+              }
+            }
+          ]
+        },
+        {
+          "name": "activityMonitoring",
+          "label": {
+            "en": "Financial Oversight Visits",
+            "fr": "Visites de surveillance financière"
+          },
+          "options": [
+            {
+              "max": 2,
+              "value": "onepertwoyears",
+              "label": {
+                "en": "Not Demonstrated",
+                "fr": "Non démontré"
+              }
+            },
+            {
+              "max": 3.5,
+              "value": "oneperyear",
+              "label": {
+                "en": "Exceeds Requirements",
+                "fr": "Dépasse les exigences"
+              }
+            },
+            {
+              "max": 5,
+              "value": "twoperyear",
+              "label": {
+                "en": "Meets Requirements",
+                "fr": "Satisfait aux exigences"
+              }
+            }
+          ]
+        },
+        {
+          "name": "financialMonitor",
+          "label": {
+            "en": "Disbursement Approach",
+            "fr": "Approche de décaissement"
+          },
+          "options": [
+            {
+              "max": 2,
+              "value": "oneperthreeyears",
+              "label": {
+                "en": "Does Not Meet Requirements",
+                "fr": "Ne satisfait pas aux exigences"
+              }
+            },
+            {
+              "max": 3.5,
+              "value": "onepertwoyers",
+              "label": {
+                "en": "Low Risk",
+                "fr": "Risque faible"
+              }
+            },
+            {
+              "max": 5,
+              "value": "oneperyear",
+              "label": {
+                "en": "Moderate Risk",
+                "fr": "Risque modéré"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "sections": [
+    {
+      "weight": 0.445,
+      "number": "1",
+      "label": {
+        "en": "Organizational Risk Assessment",
+        "fr": "Évaluation des risques organisationnels"
+      },
+      "name": "recipientRisk",
+      "subSections": [
+        {
+          "name": "pastPerformance",
+          "weight": [
+            0.13,
+            [
+              {
+                "adjustable": true,
+                "on": {
+                  "type": "answers",
+                  "section": "recipientRisk",
+                  "subsection": "pastPerformance",
+                  "question": "previousFunding"
+                },
+                "weights": {
+                  "1": 1,
+                  "2": 1,
+                  "3": 1,
+                  "5": 0
+                }
+              },
+              {
+                "adjustable": true,
+                "on": {
+                  "type": "answers",
+                  "section": "recipientRisk",
+                  "subsection": "pastPerformance",
+                  "question": "pastIssues"
+                },
+                "weights": {
+                  "5": 3.6154
+                }
+              }
+            ]
+          ],
+          "label": {
+            "en": "Prior Performance Indicators",
+            "fr": "Indicateurs de performance antérieurs"
+          },
+          "questions": [
+            {
+              "name": "previousFunding",
+              "weight": {
+                "adjustable": false,
+                "weight": 0
+              },
+              "assistance": "fundingHistory",
+              "question": {
+                "en": "To what extent are project milestones realistic given the proposed timeline?",
+                "fr": "L'organisation dispose-t-elle de politiques documentées en matière de conflits d'intérêts?"
+              },
+              "commentThreshold": {
+                "min": 1,
+                "max": 1
+              },
+              "options": [
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Meets Requirements",
+                    "fr": "En dessous des exigences"
+                  },
+                  "description": {
+                    "en": "The organization has demonstrated consistent improvement in this area over successive review periods.",
+                    "fr": "Aucune preuve de conformité n'a été trouvée lors de l'examen; ceci représente un domaine de risque critique."
+                  }
+                },
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Meets Requirements",
+                    "fr": "Substantiellement démontré"
+                  },
+                  "description": {
+                    "en": "All required documentation was submitted and reviewed; no material exceptions were identified.",
+                    "fr": "Les résultats suggèrent que l'organisation pourrait bénéficier d'un renforcement des capacités ciblé."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Elevated Risk",
+                    "fr": "Risque faible"
+                  },
+                  "description": {
+                    "en": "All required documentation was submitted and reviewed; no material exceptions were identified.",
+                    "fr": "Les preuves examinées indiquent un niveau élevé de conformité aux normes et attentes pertinentes."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Fully Demonstrated",
+                    "fr": "Risque important"
+                  },
+                  "description": {
+                    "en": "Findings suggest the organization may benefit from targeted capacity building in this area.",
+                    "fr": "Toute la documentation requise a été soumise et examinée; aucune exception importante n'a été identifiée."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Consider whether the organization has taken concrete steps to address deficiencies identified in prior assessments. Demonstrated corrective action is a positive indicator.",
+                    "fr": "Lorsque les informations sont incomplètes ou indisponibles, les agents doivent le noter dans le champ commentaires et attribuer une cote prudente."
+                  }
+                }
+              ],
+              "type": "question"
+            },
+            {
+              "name": "currentIssues",
+              "weight": {
+                "adjustable": true,
+                "on": {
+                  "type": "answers",
+                  "section": "recipientRisk",
+                  "subsection": "pastPerformance",
+                  "question": "previousFunding"
+                },
+                "weights": {
+                  "1": 0.5,
+                  "2": 1,
+                  "3": 0,
+                  "5": 0
+                }
+              },
+              "depends": [
+                [
+                  {
+                    "on": {
+                      "type": "answers",
+                      "section": "recipientRisk",
+                      "subsection": "pastPerformance",
+                      "question": "previousFunding"
+                    },
+                    "value": 1
+                  },
+                  {
+                    "on": {
+                      "type": "answers",
+                      "section": "recipientRisk",
+                      "subsection": "pastPerformance",
+                      "question": "previousFunding"
+                    },
+                    "value": 2
+                  }
+                ]
+              ],
+              "question": {
+                "en": "Has the organization demonstrated capacity to deliver comparable initiatives previously?",
+                "fr": "L'entité a-t-elle connu un roulement important de la direction au cours des deux dernières années?"
+              },
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Under Review",
+                    "fr": "Confirmé"
+                  },
+                  "description": {
+                    "en": "Minor gaps have been identified but do not materially affect overall performance or risk exposure.",
+                    "fr": "Les résultats suggèrent que l'organisation pourrait bénéficier d'un renforcement des capacités ciblé."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Minimally Demonstrated",
+                    "fr": "Sans objet"
+                  },
+                  "description": {
+                    "en": "Significant deficiencies have been noted that may affect the organization's ability to deliver outcomes.",
+                    "fr": "Les informations disponibles étaient limitées; une diligence raisonnable supplémentaire est conseillée."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Minimally Demonstrated",
+                    "fr": "Pleinement démontré"
+                  },
+                  "description": {
+                    "en": "The organization meets baseline expectations with limited areas requiring follow-up.",
+                    "fr": "La performance dans ce domaine est adéquate avec une certaine marge d'amélioration."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Below Requirements",
+                    "fr": "Partiellement démontré"
+                  },
+                  "description": {
+                    "en": "The organization does not meet the minimum threshold; immediate remediation is required.",
+                    "fr": "Les informations disponibles étaient limitées; une diligence raisonnable supplémentaire est conseillée."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Below Requirements",
+                    "fr": "Risque critique"
+                  },
+                  "description": {
+                    "en": "The organization demonstrates strong capability with documented processes and experienced personnel.",
+                    "fr": "Les informations disponibles étaient limitées; une diligence raisonnable supplémentaire est conseillée."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Consider whether the organization has taken concrete steps to address deficiencies identified in prior assessments. Demonstrated corrective action is a positive indicator.",
+                    "fr": "La documentation examinée doit être conservée conformément aux exigences applicables de gestion des documents."
+                  }
+                }
+              ],
+              "type": "question"
+            },
+            {
+              "name": "fundingDuration",
+              "question": {
+                "en": "Has the entity provided audited financial statements for the most recent period?",
+                "fr": "L'entité dispose-t-elle de politiques adéquates en matière de protection des données et de la vie privée?"
+              },
+              "weight": {
+                "adjustable": true,
+                "on": {
+                  "type": "answers",
+                  "section": "recipientRisk",
+                  "subsection": "pastPerformance",
+                  "question": "previousFunding"
+                },
+                "weights": {
+                  "1": 0.17,
+                  "2": 0.17,
+                  "3": 0.17,
+                  "5": 0
+                }
+              },
+              "depends": [
+                [
+                  {
+                    "on": {
+                      "type": "answers",
+                      "section": "recipientRisk",
+                      "subsection": "pastPerformance",
+                      "question": "previousFunding"
+                    },
+                    "value": 1
+                  },
+                  {
+                    "on": {
+                      "type": "answers",
+                      "section": "recipientRisk",
+                      "subsection": "pastPerformance",
+                      "question": "previousFunding"
+                    },
+                    "value": 3
+                  }
+                ]
+              ],
+              "commentThreshold": {
+                "min": 1,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Partially Demonstrated",
+                    "fr": "Risque élevé"
+                  },
+                  "description": {
+                    "en": "Significant deficiencies have been noted that may affect the organization's ability to deliver outcomes.",
+                    "fr": "L'organisation a pleinement satisfait à toutes les exigences applicables sans préoccupations en suspens."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Moderate Risk",
+                    "fr": "Risque important"
+                  },
+                  "description": {
+                    "en": "All required documentation was submitted and reviewed; no material exceptions were identified.",
+                    "fr": "Les preuves examinées indiquent un niveau élevé de conformité aux normes et attentes pertinentes."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Critical Risk",
+                    "fr": "Confirmé"
+                  },
+                  "description": {
+                    "en": "The organization demonstrates strong capability with documented processes and experienced personnel.",
+                    "fr": "L'organisation ne satisfait pas au seuil minimum; une remédiation immédiate est requise."
+                  }
+                },
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Low Risk",
+                    "fr": "Pleinement démontré"
+                  },
+                  "description": {
+                    "en": "The organization demonstrates strong capability with documented processes and experienced personnel.",
+                    "fr": "L'organisation a démontré une amélioration constante dans ce domaine au fil des périodes d'examen."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "The rating assigned here will contribute to the overall risk score. Officers should ensure consistency with ratings assigned to related criteria within the same subsection.",
+                    "fr": "Ce critère évalue la robustesse des mécanismes de contrôle interne. Les examinateurs doivent considérer la fréquence des audits internes et la séparation des tâches."
+                  }
+                }
+              ],
+              "type": "question"
+            },
+            {
+              "name": "pastIssues",
+              "question": {
+                "en": "Has an independent review of financial statements been completed within the last fiscal year?",
+                "fr": "L'entité a-t-elle connu un roulement important de la direction au cours des deux dernières années?"
+              },
+              "weight": {
+                "adjustable": true,
+                "on": {
+                  "type": "answers",
+                  "section": "recipientRisk",
+                  "subsection": "pastPerformance",
+                  "question": "previousFunding"
+                },
+                "weights": {
+                  "1": 0.33,
+                  "2": 0.33,
+                  "3": 0.33,
+                  "5": 0
+                }
+              },
+              "depends": [
+                [
+                  {
+                    "on": {
+                      "type": "answers",
+                      "section": "recipientRisk",
+                      "subsection": "pastPerformance",
+                      "question": "previousFunding"
+                    },
+                    "value": 1
+                  },
+                  {
+                    "on": {
+                      "type": "answers",
+                      "section": "recipientRisk",
+                      "subsection": "pastPerformance",
+                      "question": "previousFunding"
+                    },
+                    "value": 3
+                  }
+                ]
+              ],
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Partially Demonstrated",
+                    "fr": "Non démontré"
+                  },
+                  "description": {
+                    "en": "No evidence of compliance was found during the review; this represents a critical risk area.",
+                    "fr": "L'exposition au risque est jugée gérable compte tenu des mesures d'atténuation actuelles."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Below Requirements",
+                    "fr": "Risque élevé"
+                  },
+                  "description": {
+                    "en": "No evidence of compliance was found during the review; this represents a critical risk area.",
+                    "fr": "Cet élément n'était pas applicable à la portée du projet actuel et a été évalué en conséquence."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Not Applicable",
+                    "fr": "Partiellement démontré"
+                  },
+                  "description": {
+                    "en": "Performance in this area is adequate with some scope for improvement in documentation practices.",
+                    "fr": "Les informations disponibles étaient limitées; une diligence raisonnable supplémentaire est conseillée."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Minimally Demonstrated",
+                    "fr": "Satisfait aux exigences"
+                  },
+                  "description": {
+                    "en": "Significant deficiencies have been noted that may affect the organization's ability to deliver outcomes.",
+                    "fr": "L'évaluation indique une performance satisfaisante par rapport aux critères établis."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Pending",
+                    "fr": "Risque élevé"
+                  },
+                  "description": {
+                    "en": "The organization has fully satisfied all applicable requirements with no outstanding concerns identified.",
+                    "fr": "Les preuves examinées indiquent un niveau élevé de conformité aux normes et attentes pertinentes."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "This question is intended to assess readiness at the time of application. Post-award monitoring should revisit these areas as appropriate.",
+                    "fr": "Les agents doivent recouper les informations fournies dans la demande avec les sources publiquement disponibles et les dossiers d'évaluation antérieurs."
+                  }
+                }
+              ],
+              "type": "question"
+            }
+          ]
+        },
+        {
+          "name": "organizationRisk",
+          "weight": {
+            "adjustable": true,
+            "on": {
+              "type": "answers",
+              "section": "recipientRisk",
+              "subsection": "pastPerformance",
+              "question": "previousFunding"
+            },
+            "weights": {
+              "1": 0.13,
+              "2": 0.13,
+              "3": 0.13,
+              "5": 0.26
+            }
+          },
+          "label": {
+            "en": "Organizational Governance",
+            "fr": "Gouvernance organisationnelle"
+          },
+          "questions": [
+            {
+              "name": "soundGovernance",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.3333333333333333
+              },
+              "question": {
+                "en": "To what degree does the project scope align with the organization's core mandate?",
+                "fr": "Dans quelle mesure l'entité maintient-elle des procédures documentées de gestion des risques?"
+              },
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "High Risk",
+                    "fr": "Sans objet"
+                  },
+                  "description": {
+                    "en": "Risk in this area is low based on available evidence; standard oversight measures are sufficient.",
+                    "fr": "Une conformité partielle est évidente; des actions correctives sont recommandées pour combler les lacunes."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Pending",
+                    "fr": "Risque faible"
+                  },
+                  "description": {
+                    "en": "This item was not applicable to the current project scope and has been assessed accordingly.",
+                    "fr": "La performance dans ce domaine est adéquate avec une certaine marge d'amélioration."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Not Applicable",
+                    "fr": "Dépasse les exigences"
+                  },
+                  "description": {
+                    "en": "Performance in this area is adequate with some scope for improvement in documentation practices.",
+                    "fr": "La performance dans ce domaine est adéquate avec une certaine marge d'amélioration."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Elevated Risk",
+                    "fr": "Partiellement démontré"
+                  },
+                  "description": {
+                    "en": "Significant deficiencies have been noted that may affect the organization's ability to deliver outcomes.",
+                    "fr": "Toute la documentation requise a été soumise et examinée; aucune exception importante n'a été identifiée."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "This assessment area is closely linked to organizational governance. Weak performance here often correlates with broader structural or oversight deficiencies.",
+                    "fr": "La documentation examinée doit être conservée conformément aux exigences applicables de gestion des documents."
+                  }
+                }
+              ],
+              "type": "question"
+            },
+            {
+              "name": "financialInfrastructure",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.3333333333333333
+              },
+              "question": {
+                "en": "Has the organization completed a formal risk assessment for this project?",
+                "fr": "L'organisation a-t-elle démontré des contrôles internes adéquats au cours de la dernière période d'évaluation?"
+              },
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "High Risk",
+                    "fr": "Risque faible"
+                  },
+                  "description": {
+                    "en": "Elevated risk has been identified; enhanced monitoring and reporting controls are recommended.",
+                    "fr": "La performance dans ce domaine est adéquate avec une certaine marge d'amélioration."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Substantially Demonstrated",
+                    "fr": "Partiellement démontré"
+                  },
+                  "description": {
+                    "en": "All required documentation was submitted and reviewed; no material exceptions were identified.",
+                    "fr": "L'organisation a démontré une amélioration constante dans ce domaine au fil des périodes d'examen."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Critical Risk",
+                    "fr": "Risque critique"
+                  },
+                  "description": {
+                    "en": "Minor gaps have been identified but do not materially affect overall performance or risk exposure.",
+                    "fr": "Une conformité partielle est évidente; des actions correctives sont recommandées pour combler les lacunes."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Risk in this category is assessed on a five-point scale from very low to very high. Ratings should be supported by specific evidence and documented in the assessment narrative.",
+                    "fr": "Examinez si l'organisation a pris des mesures concrètes pour remédier aux lacunes identifiées lors des évaluations antérieures."
+                  }
+                }
+              ],
+              "type": "question"
+            },
+            {
+              "name": "keyPositions",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.3333333333333333
+              },
+              "question": {
+                "en": "To what degree has the organization demonstrated sound procurement practices?",
+                "fr": "Dans quelle mesure les jalons du projet sont-ils réalistes compte tenu de l'échéancier proposé?"
+              },
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Minimally Demonstrated",
+                    "fr": "Non démontré"
+                  },
+                  "description": {
+                    "en": "Performance in this area is adequate with some scope for improvement in documentation practices.",
+                    "fr": "L'organisation démontre une forte capacité avec des processus documentés et du personnel expérimenté."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Substantially Demonstrated",
+                    "fr": "Substantiellement démontré"
+                  },
+                  "description": {
+                    "en": "The organization has demonstrated consistent improvement in this area over successive review periods.",
+                    "fr": "L'organisation ne satisfait pas au seuil minimum; une remédiation immédiate est requise."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Low Risk",
+                    "fr": "En dessous des exigences"
+                  },
+                  "description": {
+                    "en": "The organization meets baseline expectations with limited areas requiring follow-up.",
+                    "fr": "Toute la documentation requise a été soumise et examinée; aucune exception importante n'a été identifiée."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Moderate Risk",
+                    "fr": "Confirmé"
+                  },
+                  "description": {
+                    "en": "The organization does not meet the minimum threshold; immediate remediation is required.",
+                    "fr": "Les résultats suggèrent que l'organisation pourrait bénéficier d'un renforcement des capacités ciblé."
+                  }
+                }
+              ],
+              "help": [],
+              "type": "question"
+            }
+          ]
+        },
+        {
+          "name": "reputational",
+          "weight": {
+            "adjustable": false,
+            "weight": 0.06
+          },
+          "label": {
+            "en": "Financial Health",
+            "fr": "Santé financière"
+          },
+          "questions": [
+            {
+              "name": "reputational",
+              "weight": {
+                "adjustable": false,
+                "weight": 1
+              },
+              "question": {
+                "en": "To what extent does the proposed budget reflect realistic cost estimates?",
+                "fr": "L'entité maintient-elle une couverture d'assurance adéquate par rapport à l'exposition du projet?"
+              },
+              "commentThreshold": {
+                "min": 2,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Confirmed",
+                    "fr": "Partiellement démontré"
+                  },
+                  "description": {
+                    "en": "Minor gaps have been identified but do not materially affect overall performance or risk exposure.",
+                    "fr": "Cet élément n'était pas applicable à la portée du projet actuel et a été évalué en conséquence."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "High Risk",
+                    "fr": "Satisfait aux exigences"
+                  },
+                  "description": {
+                    "en": "No evidence of compliance was found during the review; this represents a critical risk area.",
+                    "fr": "L'organisation a pleinement satisfait à toutes les exigences applicables sans préoccupations en suspens."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Not Applicable",
+                    "fr": "Risque critique"
+                  },
+                  "description": {
+                    "en": "Performance in this area is adequate with some scope for improvement in documentation practices.",
+                    "fr": "Un risque élevé a été identifié; des contrôles de surveillance et de rapport renforcés sont recommandés."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Minimally Demonstrated",
+                    "fr": "Minimalement démontré"
+                  },
+                  "description": {
+                    "en": "Partial compliance is evident; corrective actions are recommended to address identified gaps.",
+                    "fr": "Toute la documentation requise a été soumise et examinée; aucune exception importante n'a été identifiée."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Under Review",
+                    "fr": "En attente"
+                  },
+                  "description": {
+                    "en": "The organization has demonstrated consistent improvement in this area over successive review periods.",
+                    "fr": "Une conformité partielle est évidente; des actions correctives sont recommandées pour combler les lacunes."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Any flags raised during this assessment should be escalated to senior officers for review prior to finalizing the overall risk determination.",
+                    "fr": "Une forte performance dans ce domaine peut compenser les risques identifiés ailleurs dans l'évaluation."
+                  }
+                }
+              ],
+              "type": "question"
+            }
+          ]
+        },
+        {
+          "name": "financialStability",
+          "weight": [
+            0.68,
+            [
+              {
+                "adjustable": true,
+                "on": {
+                  "type": "helpers",
+                  "field": "guarantor"
+                },
+                "weights": {
+                  "0": 1,
+                  "1": 0
+                }
+              },
+              {
+                "adjustable": true,
+                "on": {
+                  "type": "answers",
+                  "section": "recipientRisk",
+                  "subsection": "pastPerformance",
+                  "question": "pastIssues"
+                },
+                "weights": {
+                  "5": 0.5
+                }
+              }
+            ]
+          ],
+          "label": {
+            "en": "Delivery Capacity",
+            "fr": "Capacité de livraison"
+          },
+          "questions": [
+            {
+              "name": "financialStability",
+              "weight": {
+                "adjustable": true,
+                "on": {
+                  "type": "helpers",
+                  "field": "repayable"
+                },
+                "weights": {
+                  "0": 0.5,
+                  "1": 0.4
+                }
+              },
+              "question": {
+                "en": "To what extent does the proposed budget reflect realistic cost estimates?",
+                "fr": "L'organisation a-t-elle démontré une expérience antérieure dans la gestion de projets de valeur similaire?"
+              },
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Does Not Meet Requirements",
+                    "fr": "Risque critique"
+                  },
+                  "description": {
+                    "en": "No evidence of compliance was found during the review; this represents a critical risk area.",
+                    "fr": "Un risque modéré est présent; un suivi et un soutien ciblé sont conseillés tout au long du projet."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Minimally Demonstrated",
+                    "fr": "Risque modéré"
+                  },
+                  "description": {
+                    "en": "The organization demonstrates strong capability with documented processes and experienced personnel.",
+                    "fr": "Une conformité partielle est évidente; des actions correctives sont recommandées pour combler les lacunes."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "High Risk",
+                    "fr": "Ne satisfait pas aux exigences"
+                  },
+                  "description": {
+                    "en": "Partial compliance is evident; corrective actions are recommended to address identified gaps.",
+                    "fr": "Des lacunes mineures ont été identifiées mais n'affectent pas matériellement la performance globale."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Critical Risk",
+                    "fr": "En attente"
+                  },
+                  "description": {
+                    "en": "Elevated risk has been identified; enhanced monitoring and reporting controls are recommended.",
+                    "fr": "La performance dans ce domaine est adéquate avec une certaine marge d'amélioration."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Pending",
+                    "fr": "En cours d'examen"
+                  },
+                  "description": {
+                    "en": "Moderate risk is present; monitoring and targeted support are advised throughout the project period.",
+                    "fr": "L'évaluation indique une performance satisfaisante par rapport aux critères établis."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "If the entity is unable to provide supporting documentation, this should be treated as an indicator of elevated risk in the relevant area.",
+                    "fr": "Examinez si l'organisation a pris des mesures concrètes pour remédier aux lacunes identifiées lors des évaluations antérieures."
+                  }
+                }
+              ],
+              "type": "question"
+            },
+            {
+              "name": "abilityToRepay",
+              "weight": {
+                "adjustable": true,
+                "on": {
+                  "type": "helpers",
+                  "field": "repayable"
+                },
+                "weights": {
+                  "0": 0,
+                  "1": 0.1
+                }
+              },
+              "depends": [
+                {
+                  "on": {
+                    "type": "helpers",
+                    "field": "repayable"
+                  },
+                  "value": true
+                }
+              ],
+              "question": {
+                "en": "Does the entity have adequate data protection and privacy policies in place?",
+                "fr": "L'organisation dispose-t-elle d'un cadre formel de surveillance de la conformité?"
+              },
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Moderate Risk",
+                    "fr": "Ne satisfait pas aux exigences"
+                  },
+                  "description": {
+                    "en": "Significant deficiencies have been noted that may affect the organization's ability to deliver outcomes.",
+                    "fr": "Les preuves examinées indiquent un niveau élevé de conformité aux normes et attentes pertinentes."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Confirmed",
+                    "fr": "En cours d'examen"
+                  },
+                  "description": {
+                    "en": "Limited information was available to support a definitive assessment; further due diligence is advised.",
+                    "fr": "L'évaluation indique une performance satisfaisante par rapport aux critères établis."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Below Requirements",
+                    "fr": "En dessous des exigences"
+                  },
+                  "description": {
+                    "en": "Evidence reviewed indicates a strong level of compliance with relevant standards and expectations.",
+                    "fr": "Une conformité partielle est évidente; des actions correctives sont recommandées pour combler les lacunes."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Fully Demonstrated",
+                    "fr": "Dépasse les exigences"
+                  },
+                  "description": {
+                    "en": "The organization has demonstrated consistent improvement in this area over successive review periods.",
+                    "fr": "Aucune preuve de conformité n'a été trouvée lors de l'examen; ceci représente un domaine de risque critique."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Substantially Demonstrated",
+                    "fr": "Dépasse les exigences"
+                  },
+                  "description": {
+                    "en": "No evidence of compliance was found during the review; this represents a critical risk area.",
+                    "fr": "L'organisation ne satisfait pas au seuil minimum; une remédiation immédiate est requise."
+                  }
+                }
+              ],
+              "help": [],
+              "type": "question"
+            },
+            {
+              "name": "additionalFunds",
+              "weight": {
+                "adjustable": false,
+                "weight": 0
+              },
+              "question": {
+                "en": "To what extent does the entity maintain documented risk management procedures?",
+                "fr": "L'organisation dispose-t-elle de politiques documentées en matière de conflits d'intérêts?"
+              },
+              "commentThreshold": {
+                "min": 5,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Not Demonstrated",
+                    "fr": "Confirmé"
+                  },
+                  "description": {
+                    "en": "No evidence of compliance was found during the review; this represents a critical risk area.",
+                    "fr": "Cet élément n'était pas applicable à la portée du projet actuel et a été évalué en conséquence."
+                  }
+                },
+                {
+                  "value": 0,
+                  "label": {
+                    "en": "Substantially Demonstrated",
+                    "fr": "Minimalement démontré"
+                  },
+                  "description": {
+                    "en": "The organization has demonstrated consistent improvement in this area over successive review periods.",
+                    "fr": "Des lacunes mineures ont été identifiées mais n'affectent pas matériellement la performance globale."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Officers should cross-reference information provided in the application with publicly available sources and any prior assessment records held on file.",
+                    "fr": "La documentation examinée doit être conservée conformément aux exigences applicables de gestion des documents."
+                  }
+                }
+              ],
+              "type": "question"
+            },
+            {
+              "name": "externalFunding",
+              "weight": {
+                "adjustable": true,
+                "on": {
+                  "type": "answers",
+                  "section": "recipientRisk",
+                  "subsection": "financialStability",
+                  "question": "additionalFunds"
+                },
+                "weights": {
+                  "0": 0,
+                  "5": 0.25
+                }
+              },
+              "depends": [
+                {
+                  "on": {
+                    "type": "answers",
+                    "section": "recipientRisk",
+                    "subsection": "financialStability",
+                    "question": "additionalFunds"
+                  },
+                  "value": 5
+                }
+              ],
+              "question": {
+                "en": "Has the entity experienced significant leadership turnover in the past two years?",
+                "fr": "L'organisation dispose-t-elle d'un processus établi pour la gestion des sous-traitants?"
+              },
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Moderate Risk",
+                    "fr": "Risque important"
+                  },
+                  "description": {
+                    "en": "Risk exposure is considered manageable given current outcome measures and organizational capacity.",
+                    "fr": "Le risque dans ce domaine est faible selon les preuves disponibles; des mesures de surveillance standard suffisent."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Does Not Meet Requirements",
+                    "fr": "Minimalement démontré"
+                  },
+                  "description": {
+                    "en": "This item was not applicable to the current project scope and has been assessed accordingly.",
+                    "fr": "L'organisation ne satisfait pas au seuil minimum; une remédiation immédiate est requise."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Moderate Risk",
+                    "fr": "Risque important"
+                  },
+                  "description": {
+                    "en": "The organization has demonstrated consistent improvement in this area over successive review periods.",
+                    "fr": "L'exposition au risque est jugée gérable compte tenu des mesures d'atténuation actuelles."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Partially Demonstrated",
+                    "fr": "Sans objet"
+                  },
+                  "description": {
+                    "en": "The organization meets baseline expectations with limited areas requiring follow-up.",
+                    "fr": "L'organisation a pleinement satisfait à toutes les exigences applicables sans préoccupations en suspens."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Fully Demonstrated",
+                    "fr": "En dessous des exigences"
+                  },
+                  "description": {
+                    "en": "All required documentation was submitted and reviewed; no material exceptions were identified.",
+                    "fr": "Un risque élevé a été identifié; des contrôles de surveillance et de rapport renforcés sont recommandés."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Historical performance data, where available, should be weighted alongside current capacity assessments to produce a balanced overall rating.",
+                    "fr": "Tout signalement soulevé lors de cette évaluation doit être transmis aux agents supérieurs avant de finaliser la détermination du risque."
+                  }
+                }
+              ],
+              "type": "question"
+            },
+            {
+              "name": "fincialProjectScope",
+              "weight": {
+                "adjustable": true,
+                "on": {
+                  "type": "answers",
+                  "section": "deliveryRisk",
+                  "subsection": "projectManagement",
+                  "question": "additionalFunds"
+                },
+                "weights": {
+                  "0": 0.5,
+                  "5": 0.25
+                }
+              },
+              "depends": [
+                {
+                  "on": {
+                    "type": "answers",
+                    "section": "deliveryRisk",
+                    "subsection": "projectManagement",
+                    "question": "additionalFunds"
+                  },
+                  "value": 5
+                }
+              ],
+              "question": {
+                "en": "Has the organization demonstrated capacity to deliver comparable initiatives previously?",
+                "fr": "L'organisation a-t-elle réalisé une évaluation formelle des risques pour ce projet?"
+              },
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Minimally Demonstrated",
+                    "fr": "Risque modéré"
+                  },
+                  "description": {
+                    "en": "Evidence reviewed indicates a strong level of compliance with relevant standards and expectations.",
+                    "fr": "L'organisation ne satisfait pas au seuil minimum; une remédiation immédiate est requise."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Moderate Risk",
+                    "fr": "Dépasse les exigences"
+                  },
+                  "description": {
+                    "en": "The organization demonstrates strong capability with documented processes and experienced personnel.",
+                    "fr": "Les informations disponibles étaient limitées; une diligence raisonnable supplémentaire est conseillée."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Not Applicable",
+                    "fr": "Satisfait aux exigences"
+                  },
+                  "description": {
+                    "en": "The organization meets baseline expectations with limited areas requiring follow-up.",
+                    "fr": "Les résultats suggèrent que l'organisation pourrait bénéficier d'un renforcement des capacités ciblé."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Does Not Meet Requirements",
+                    "fr": "Risque important"
+                  },
+                  "description": {
+                    "en": "Findings suggest the organization may benefit from targeted capacity building in this area.",
+                    "fr": "L'organisation a démontré une amélioration constante dans ce domaine au fil des périodes d'examen."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Partially Demonstrated",
+                    "fr": "Confirmé"
+                  },
+                  "description": {
+                    "en": "Significant deficiencies have been noted that may affect the organization's ability to deliver outcomes.",
+                    "fr": "Cet élément n'était pas applicable à la portée du projet actuel et a été évalué en conséquence."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "When assessing this factor, reviewers should consider all available documentation including audited statements, organizational charts, and prior assessment reports. Evidence of continuous improvement is viewed favourably.",
+                    "fr": "Une cote élevée dans ce domaine nécessite des politiques documentées, des preuves de mise en œuvre et une adhérence démontrée sur au moins deux cycles d'examen consécutifs."
+                  }
+                }
+              ],
+              "type": "question"
+            }
+          ]
+        },
+        {
+          "name": "guarantor",
+          "weight": [
+            0.68,
+            [
+              {
+                "adjustable": true,
+                "on": {
+                  "type": "helpers",
+                  "field": "guarantor"
+                },
+                "weights": {
+                  "0": 0,
+                  "1": 1
+                }
+              },
+              {
+                "adjustable": true,
+                "on": {
+                  "type": "answers",
+                  "section": "recipientRisk",
+                  "subsection": "pastPerformance",
+                  "question": "pastIssues"
+                },
+                "weights": {
+                  "5": 0.5
+                }
+              }
+            ]
+          ],
+          "label": {
+            "en": "Compliance History",
+            "fr": "Historique de conformité"
+          },
+          "depends": [
+            {
+              "on": {
+                "type": "helpers",
+                "field": "guarantor"
+              },
+              "value": true
+            }
+          ],
+          "questions": [
+            {
+              "name": "financialStability",
+              "weight": {
+                "adjustable": true,
+                "on": {
+                  "type": "helpers",
+                  "field": "repayable"
+                },
+                "weights": {
+                  "0": 0.5,
+                  "1": 0.4
+                }
+              },
+              "question": {
+                "en": "Has the organization demonstrated prior experience managing projects of similar value?",
+                "fr": "L'organisation dispose-t-elle de politiques documentées en matière de conflits d'intérêts?"
+              },
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Partially Demonstrated",
+                    "fr": "Risque modéré"
+                  },
+                  "description": {
+                    "en": "Evidence reviewed indicates a strong level of compliance with relevant standards and expectations.",
+                    "fr": "Des déficiences importantes ont été notées pouvant affecter la capacité de l'organisation à livrer."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Meets Requirements",
+                    "fr": "Dépasse les exigences"
+                  },
+                  "description": {
+                    "en": "All required documentation was submitted and reviewed; no material exceptions were identified.",
+                    "fr": "L'organisation a démontré une amélioration constante dans ce domaine au fil des périodes d'examen."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Not Applicable",
+                    "fr": "En cours d'examen"
+                  },
+                  "description": {
+                    "en": "Evidence reviewed indicates a strong level of compliance with relevant standards and expectations.",
+                    "fr": "L'organisation démontre une forte capacité avec des processus documentés et du personnel expérimenté."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Exceeds Requirements",
+                    "fr": "Substantiellement démontré"
+                  },
+                  "description": {
+                    "en": "The organization does not meet the minimum threshold; immediate remediation is required.",
+                    "fr": "L'organisation démontre une forte capacité avec des processus documentés et du personnel expérimenté."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Does Not Meet Requirements",
+                    "fr": "Risque important"
+                  },
+                  "description": {
+                    "en": "Moderate risk is present; monitoring and targeted support are advised throughout the project period.",
+                    "fr": "Une conformité partielle est évidente; des actions correctives sont recommandées pour combler les lacunes."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Risk in this category is assessed on a five-point scale from very low to very high. Ratings should be supported by specific evidence and documented in the assessment narrative.",
+                    "fr": "Une cote élevée dans ce domaine nécessite des politiques documentées, des preuves de mise en œuvre et une adhérence démontrée sur au moins deux cycles d'examen consécutifs."
+                  }
+                }
+              ],
+              "type": "question"
+            },
+            {
+              "name": "abilityToRepay",
+              "weight": {
+                "adjustable": true,
+                "on": {
+                  "type": "helpers",
+                  "field": "repayable"
+                },
+                "weights": {
+                  "0": 0,
+                  "1": 0.1
+                }
+              },
+              "depends": [
+                {
+                  "on": {
+                    "type": "helpers",
+                    "field": "repayable"
+                  },
+                  "value": true
+                }
+              ],
+              "question": {
+                "en": "Does the entity maintain adequate insurance coverage relative to project exposure?",
+                "fr": "L'entité dispose-t-elle de politiques adéquates en matière de protection des données et de la vie privée?"
+              },
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Not Demonstrated",
+                    "fr": "Ne satisfait pas aux exigences"
+                  },
+                  "description": {
+                    "en": "Limited information was available to support a definitive assessment; further due diligence is advised.",
+                    "fr": "L'organisation a pleinement satisfait à toutes les exigences applicables sans préoccupations en suspens."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Critical Risk",
+                    "fr": "Risque important"
+                  },
+                  "description": {
+                    "en": "This item was not applicable to the current project scope and has been assessed accordingly.",
+                    "fr": "L'organisation démontre une forte capacité avec des processus documentés et du personnel expérimenté."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Below Requirements",
+                    "fr": "Non démontré"
+                  },
+                  "description": {
+                    "en": "Evidence reviewed indicates a strong level of compliance with relevant standards and expectations.",
+                    "fr": "Les preuves examinées indiquent un niveau élevé de conformité aux normes et attentes pertinentes."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Not Demonstrated",
+                    "fr": "Satisfait aux exigences"
+                  },
+                  "description": {
+                    "en": "The organization demonstrates strong capability with documented processes and experienced personnel.",
+                    "fr": "La performance dans ce domaine est adéquate avec une certaine marge d'amélioration."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Confirmed",
+                    "fr": "Ne satisfait pas aux exigences"
+                  },
+                  "description": {
+                    "en": "No evidence of compliance was found during the review; this represents a critical risk area.",
+                    "fr": "Les informations disponibles étaient limitées; une diligence raisonnable supplémentaire est conseillée."
+                  }
+                }
+              ],
+              "help": [],
+              "type": "question"
+            },
+            {
+              "name": "additionalFunds",
+              "weight": {
+                "adjustable": false,
+                "weight": 0
+              },
+              "question": {
+                "en": "To what degree has the organization demonstrated sound procurement practices?",
+                "fr": "L'entité maintient-elle une couverture d'assurance adéquate par rapport à l'exposition du projet?"
+              },
+              "commentThreshold": {
+                "min": 5,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Elevated Risk",
+                    "fr": "Risque faible"
+                  },
+                  "description": {
+                    "en": "No evidence of compliance was found during the review; this represents a critical risk area.",
+                    "fr": "Des déficiences importantes ont été notées pouvant affecter la capacité de l'organisation à livrer."
+                  }
+                },
+                {
+                  "value": 0,
+                  "label": {
+                    "en": "Does Not Meet Requirements",
+                    "fr": "Non démontré"
+                  },
+                  "description": {
+                    "en": "Risk exposure is considered manageable given current outcome measures and organizational capacity.",
+                    "fr": "L'organisation a démontré une amélioration constante dans ce domaine au fil des périodes d'examen."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Strong performance in this area may offset risk identified elsewhere in the assessment; conversely, significant gaps here may elevate the overall risk profile.",
+                    "fr": "Ce critère évalue la robustesse des mécanismes de contrôle interne. Les examinateurs doivent considérer la fréquence des audits internes et la séparation des tâches."
+                  }
+                }
+              ],
+              "type": "question"
+            },
+            {
+              "name": "externalFunding",
+              "weight": {
+                "adjustable": true,
+                "on": {
+                  "type": "answers",
+                  "section": "recipientRisk",
+                  "subsection": "financialStability",
+                  "question": "additionalFunds"
+                },
+                "weights": {
+                  "0": 0,
+                  "5": 0.25
+                }
+              },
+              "depends": [
+                {
+                  "on": {
+                    "type": "answers",
+                    "section": "recipientRisk",
+                    "subsection": "financialStability",
+                    "question": "additionalFunds"
+                  },
+                  "value": 5
+                }
+              ],
+              "question": {
+                "en": "To what degree does the project scope align with the organization's core mandate?",
+                "fr": "L'organisation dispose-t-elle d'un processus établi pour la gestion des sous-traitants?"
+              },
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Under Review",
+                    "fr": "Risque important"
+                  },
+                  "description": {
+                    "en": "Limited information was available to support a definitive assessment; further due diligence is advised.",
+                    "fr": "L'organisation démontre une forte capacité avec des processus documentés et du personnel expérimenté."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Under Review",
+                    "fr": "Satisfait aux exigences"
+                  },
+                  "description": {
+                    "en": "Findings suggest the organization may benefit from targeted capacity building in this area.",
+                    "fr": "La performance dans ce domaine est adéquate avec une certaine marge d'amélioration."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Pending",
+                    "fr": "Risque critique"
+                  },
+                  "description": {
+                    "en": "Significant deficiencies have been noted that may affect the organization's ability to deliver outcomes.",
+                    "fr": "Le risque dans ce domaine est faible selon les preuves disponibles; des mesures de surveillance standard suffisent."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Does Not Meet Requirements",
+                    "fr": "En dessous des exigences"
+                  },
+                  "description": {
+                    "en": "The organization does not meet the minimum threshold; immediate remediation is required.",
+                    "fr": "L'évaluation indique une performance satisfaisante par rapport aux critères établis."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Does Not Meet Requirements",
+                    "fr": "Risque élevé"
+                  },
+                  "description": {
+                    "en": "The organization meets baseline expectations with limited areas requiring follow-up.",
+                    "fr": "Les informations disponibles étaient limitées; une diligence raisonnable supplémentaire est conseillée."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Consider whether the organization has taken concrete steps to address deficiencies identified in prior assessments. Demonstrated corrective action is a positive indicator.",
+                    "fr": "La documentation examinée doit être conservée conformément aux exigences applicables de gestion des documents."
+                  }
+                }
+              ],
+              "type": "question"
+            },
+            {
+              "name": "fincialProjectScope",
+              "weight": {
+                "adjustable": true,
+                "on": {
+                  "type": "answers",
+                  "section": "deliveryRisk",
+                  "subsection": "projectManagement",
+                  "question": "additionalFunds"
+                },
+                "weights": {
+                  "0": 0.5,
+                  "5": 0.25
+                }
+              },
+              "depends": [
+                {
+                  "on": {
+                    "type": "answers",
+                    "section": "deliveryRisk",
+                    "subsection": "projectManagement",
+                    "question": "additionalFunds"
+                  },
+                  "value": 5
+                }
+              ],
+              "question": {
+                "en": "To what degree has the organization experienced operational disruptions in recent periods?",
+                "fr": "Dans quelle mesure les jalons du projet sont-ils réalistes compte tenu de l'échéancier proposé?"
+              },
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "High Risk",
+                    "fr": "Ne satisfait pas aux exigences"
+                  },
+                  "description": {
+                    "en": "Elevated risk has been identified; enhanced monitoring and reporting controls are recommended.",
+                    "fr": "Aucune preuve de conformité n'a été trouvée lors de l'examen; ceci représente un domaine de risque critique."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Fully Demonstrated",
+                    "fr": "En cours d'examen"
+                  },
+                  "description": {
+                    "en": "The organization demonstrates strong capability with documented processes and experienced personnel.",
+                    "fr": "Un risque élevé a été identifié; des contrôles de surveillance et de rapport renforcés sont recommandés."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "High Risk",
+                    "fr": "Non démontré"
+                  },
+                  "description": {
+                    "en": "Risk exposure is considered manageable given current outcome measures and organizational capacity.",
+                    "fr": "Les preuves examinées indiquent un niveau élevé de conformité aux normes et attentes pertinentes."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Minimally Demonstrated",
+                    "fr": "Minimalement démontré"
+                  },
+                  "description": {
+                    "en": "Risk exposure is considered manageable given current outcome measures and organizational capacity.",
+                    "fr": "Aucune preuve de conformité n'a été trouvée lors de l'examen; ceci représente un domaine de risque critique."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Fully Demonstrated",
+                    "fr": "En dessous des exigences"
+                  },
+                  "description": {
+                    "en": "Partial compliance is evident; corrective actions are recommended to address identified gaps.",
+                    "fr": "Aucune preuve de conformité n'a été trouvée lors de l'examen; ceci représente un domaine de risque critique."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Reviewers should note whether identified risks are inherent to the project type or are specific to the entity's current organizational context.",
+                    "fr": "Les examinateurs doivent noter si les risques identifiés sont inhérents au type de projet ou spécifiques au contexte organisationnel actuel."
+                  }
+                }
+              ],
+              "type": "question"
+            }
+          ]
+        }
+      ],
+      "icon": "i-lucide-building-2"
+    },
+    {
+      "weight": 0.455,
+      "number": "2",
+      "label": {
+        "en": "Delivery and Operational Risk",
+        "fr": "Risque de livraison et opérationnel"
+      },
+      "name": "deliveryRisk",
+      "subSections": [
+        {
+          "name": "capacity",
+          "weight": {
+            "adjustable": false,
+            "weight": 0.13
+          },
+          "label": {
+            "en": "Project Complexity",
+            "fr": "Complexité du projet"
+          },
+          "questions": [
+            {
+              "name": "teamOrganization",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.5
+              },
+              "question": {
+                "en": "Does the organization have documented conflict of interest policies in place?",
+                "fr": "Dans quelle mesure les rôles du personnel clé sont-ils clairement définis et dotés de ressources appropriées?"
+              },
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Under Review",
+                    "fr": "Risque critique"
+                  },
+                  "description": {
+                    "en": "The organization does not meet the minimum threshold; immediate remediation is required.",
+                    "fr": "La performance dans ce domaine est adéquate avec une certaine marge d'amélioration."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Fully Demonstrated",
+                    "fr": "Risque faible"
+                  },
+                  "description": {
+                    "en": "Significant deficiencies have been noted that may affect the organization's ability to deliver outcomes.",
+                    "fr": "Des déficiences importantes ont été notées pouvant affecter la capacité de l'organisation à livrer."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Confirmed",
+                    "fr": "Risque modéré"
+                  },
+                  "description": {
+                    "en": "The organization demonstrates strong capability with documented processes and experienced personnel.",
+                    "fr": "Les résultats suggèrent que l'organisation pourrait bénéficier d'un renforcement des capacités ciblé."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Meets Requirements",
+                    "fr": "Risque important"
+                  },
+                  "description": {
+                    "en": "The organization demonstrates strong capability with documented processes and experienced personnel.",
+                    "fr": "Cet élément n'était pas applicable à la portée du projet actuel et a été évalué en conséquence."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Does Not Meet Requirements",
+                    "fr": "Risque élevé"
+                  },
+                  "description": {
+                    "en": "Findings suggest the organization may benefit from targeted capacity building in this area.",
+                    "fr": "La performance dans ce domaine est adéquate avec une certaine marge d'amélioration."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Reviewers are encouraged to engage directly with the entity to clarify any discrepancies between submitted documentation and observed practices.",
+                    "fr": "Les agents doivent recouper les informations fournies dans la demande avec les sources publiquement disponibles et les dossiers d'évaluation antérieurs."
+                  }
+                }
+              ],
+              "type": "question"
+            },
+            {
+              "name": "financialOrganization",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.5
+              },
+              "question": {
+                "en": "Has the organization completed a formal risk assessment for this project?",
+                "fr": "Dans quelle mesure le budget proposé reflète-t-il des estimations de coûts réalistes?"
+              },
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Does Not Meet Requirements",
+                    "fr": "Risque faible"
+                  },
+                  "description": {
+                    "en": "Partial compliance is evident; corrective actions are recommended to address identified gaps.",
+                    "fr": "Des déficiences importantes ont été notées pouvant affecter la capacité de l'organisation à livrer."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Not Applicable",
+                    "fr": "Dépasse les exigences"
+                  },
+                  "description": {
+                    "en": "Elevated risk has been identified; enhanced monitoring and reporting controls are recommended.",
+                    "fr": "Un risque élevé a été identifié; des contrôles de surveillance et de rapport renforcés sont recommandés."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Low Risk",
+                    "fr": "Risque élevé"
+                  },
+                  "description": {
+                    "en": "The organization meets baseline expectations with limited areas requiring follow-up.",
+                    "fr": "Des déficiences importantes ont été notées pouvant affecter la capacité de l'organisation à livrer."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Under Review",
+                    "fr": "Ne satisfait pas aux exigences"
+                  },
+                  "description": {
+                    "en": "Moderate risk is present; monitoring and targeted support are advised throughout the project period.",
+                    "fr": "Aucune preuve de conformité n'a été trouvée lors de l'examen; ceci représente un domaine de risque critique."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Exceeds Requirements",
+                    "fr": "Satisfait aux exigences"
+                  },
+                  "description": {
+                    "en": "This item was not applicable to the current project scope and has been assessed accordingly.",
+                    "fr": "Des lacunes mineures ont été identifiées mais n'affectent pas matériellement la performance globale."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "If the entity is unable to provide supporting documentation, this should be treated as an indicator of elevated risk in the relevant area.",
+                    "fr": "Les demandeurs opérant dans des environnements fortement réglementés peuvent être soumis à des exigences de vérification supplémentaires."
+                  }
+                }
+              ],
+              "type": "question"
+            }
+          ]
+        },
+        {
+          "name": "feasibility",
+          "weight": {
+            "adjustable": true,
+            "on": {
+              "type": "helpers",
+              "field": "furtherDistro"
+            },
+            "weights": {
+              "0": 0.73,
+              "1": 0.48
+            }
+          },
+          "label": {
+            "en": "Reputational Factors",
+            "fr": "Facteurs de réputation"
+          },
+          "questions": [
+            {
+              "name": "interdependantSequential",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.1
+              },
+              "question": {
+                "en": "Does the entity have adequate data protection and privacy policies in place?",
+                "fr": "L'organisation dispose-t-elle d'un processus établi pour la gestion des sous-traitants?"
+              },
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Under Review",
+                    "fr": "En cours d'examen"
+                  },
+                  "description": {
+                    "en": "Significant deficiencies have been noted that may affect the organization's ability to deliver outcomes.",
+                    "fr": "La performance dans ce domaine est adéquate avec une certaine marge d'amélioration."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Meets Requirements",
+                    "fr": "En cours d'examen"
+                  },
+                  "description": {
+                    "en": "Moderate risk is present; monitoring and targeted support are advised throughout the project period.",
+                    "fr": "L'organisation a pleinement satisfait à toutes les exigences applicables sans préoccupations en suspens."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Confirmed",
+                    "fr": "En cours d'examen"
+                  },
+                  "description": {
+                    "en": "This item was not applicable to the current project scope and has been assessed accordingly.",
+                    "fr": "Des déficiences importantes ont été notées pouvant affecter la capacité de l'organisation à livrer."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Not Demonstrated",
+                    "fr": "Minimalement démontré"
+                  },
+                  "description": {
+                    "en": "Partial compliance is evident; corrective actions are recommended to address identified gaps.",
+                    "fr": "Des déficiences importantes ont été notées pouvant affecter la capacité de l'organisation à livrer."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Pending",
+                    "fr": "Dépasse les exigences"
+                  },
+                  "description": {
+                    "en": "The organization meets baseline expectations with limited areas requiring follow-up.",
+                    "fr": "Aucune preuve de conformité n'a été trouvée lors de l'examen; ceci représente un domaine de risque critique."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "When assessing this factor, reviewers should consider all available documentation including audited statements, organizational charts, and prior assessment reports. Evidence of continuous improvement is viewed favourably.",
+                    "fr": "Une cote élevée dans ce domaine nécessite des politiques documentées, des preuves de mise en œuvre et une adhérence démontrée sur au moins deux cycles d'examen consécutifs."
+                  }
+                }
+              ],
+              "type": "question"
+            },
+            {
+              "name": "complex",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.9
+              },
+              "question": {
+                "en": "Does the organization have an established process for managing subcontractors?",
+                "fr": "L'organisation dispose-t-elle d'un processus établi pour la gestion des sous-traitants?"
+              },
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Exceeds Requirements",
+                    "fr": "En cours d'examen"
+                  },
+                  "description": {
+                    "en": "Minor gaps have been identified but do not materially affect overall performance or risk exposure.",
+                    "fr": "L'organisation a démontré une amélioration constante dans ce domaine au fil des périodes d'examen."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Partially Demonstrated",
+                    "fr": "Minimalement démontré"
+                  },
+                  "description": {
+                    "en": "Risk in this area is low based on available evidence; standard oversight measures are sufficient.",
+                    "fr": "L'organisation ne satisfait pas au seuil minimum; une remédiation immédiate est requise."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Not Applicable",
+                    "fr": "Minimalement démontré"
+                  },
+                  "description": {
+                    "en": "Performance in this area is adequate with some scope for improvement in documentation practices.",
+                    "fr": "L'organisation a pleinement satisfait à toutes les exigences applicables sans préoccupations en suspens."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Moderate Risk",
+                    "fr": "Risque élevé"
+                  },
+                  "description": {
+                    "en": "The organization has fully satisfied all applicable requirements with no outstanding concerns identified.",
+                    "fr": "L'organisation a pleinement satisfait à toutes les exigences applicables sans préoccupations en suspens."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Substantially Demonstrated",
+                    "fr": "Substantiellement démontré"
+                  },
+                  "description": {
+                    "en": "Partial compliance is evident; corrective actions are recommended to address identified gaps.",
+                    "fr": "L'organisation ne satisfait pas au seuil minimum; une remédiation immédiate est requise."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Historical performance data, where available, should be weighted alongside current capacity assessments to produce a balanced overall rating.",
+                    "fr": "La documentation examinée doit être conservée conformément aux exigences applicables de gestion des documents."
+                  }
+                }
+              ],
+              "type": "question"
+            }
+          ]
+        },
+        {
+          "name": "reputational",
+          "weight": {
+            "adjustable": false,
+            "weight": 0.05
+          },
+          "label": {
+            "en": "Management Controls",
+            "fr": "Contrôles de gestion"
+          },
+          "questions": [
+            {
+              "name": "reputational",
+              "weight": {
+                "adjustable": false,
+                "weight": 1
+              },
+              "question": {
+                "en": "To what degree does the project scope align with the organization's core mandate?",
+                "fr": "Dans quelle mesure l'organisation a-t-elle démontré de bonnes pratiques d'approvisionnement?"
+              },
+              "commentThreshold": {
+                "min": 2,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "High Risk",
+                    "fr": "Satisfait aux exigences"
+                  },
+                  "description": {
+                    "en": "Risk in this area is low based on available evidence; standard oversight measures are sufficient.",
+                    "fr": "L'organisation ne satisfait pas au seuil minimum; une remédiation immédiate est requise."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Elevated Risk",
+                    "fr": "En cours d'examen"
+                  },
+                  "description": {
+                    "en": "Partial compliance is evident; corrective actions are recommended to address identified gaps.",
+                    "fr": "L'organisation démontre une forte capacité avec des processus documentés et du personnel expérimenté."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Not Applicable",
+                    "fr": "En cours d'examen"
+                  },
+                  "description": {
+                    "en": "Significant deficiencies have been noted that may affect the organization's ability to deliver outcomes.",
+                    "fr": "Cet élément n'était pas applicable à la portée du projet actuel et a été évalué en conséquence."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "High Risk",
+                    "fr": "Non démontré"
+                  },
+                  "description": {
+                    "en": "All required documentation was submitted and reviewed; no material exceptions were identified.",
+                    "fr": "L'organisation ne satisfait pas au seuil minimum; une remédiation immédiate est requise."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Does Not Meet Requirements",
+                    "fr": "Confirmé"
+                  },
+                  "description": {
+                    "en": "Elevated risk has been identified; enhanced monitoring and reporting controls are recommended.",
+                    "fr": "Un risque modéré est présent; un suivi et un soutien ciblé sont conseillés tout au long du projet."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Historical performance data, where available, should be weighted alongside current capacity assessments to produce a balanced overall rating.",
+                    "fr": "La cote attribuée ici contribuera au score de risque global. Les agents doivent assurer la cohérence avec les cotes des critères connexes."
+                  }
+                }
+              ],
+              "type": "question"
+            }
+          ]
+        },
+        {
+          "name": "projectManagement",
+          "weight": {
+            "adjustable": false,
+            "weight": 0.09
+          },
+          "label": {
+            "en": "Stakeholder Risk",
+            "fr": "Risque des parties prenantes"
+          },
+          "questions": [
+            {
+              "name": "governanceFactors",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.5
+              },
+              "question": {
+                "en": "To what degree has the organization experienced operational disruptions in recent periods?",
+                "fr": "L'entité maintient-elle une couverture d'assurance adéquate par rapport à l'exposition du projet?"
+              },
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Not Demonstrated",
+                    "fr": "Satisfait aux exigences"
+                  },
+                  "description": {
+                    "en": "All required documentation was submitted and reviewed; no material exceptions were identified.",
+                    "fr": "L'exposition au risque est jugée gérable compte tenu des mesures d'atténuation actuelles."
+                  }
+                },
+                {
+                  "value": 2,
+                  "label": {
+                    "en": "Exceeds Requirements",
+                    "fr": "Satisfait aux exigences"
+                  },
+                  "description": {
+                    "en": "The organization has fully satisfied all applicable requirements with no outstanding concerns identified.",
+                    "fr": "Des lacunes mineures ont été identifiées mais n'affectent pas matériellement la performance globale."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Not Applicable",
+                    "fr": "Partiellement démontré"
+                  },
+                  "description": {
+                    "en": "No evidence of compliance was found during the review; this represents a critical risk area.",
+                    "fr": "Le risque dans ce domaine est faible selon les preuves disponibles; des mesures de surveillance standard suffisent."
+                  }
+                },
+                {
+                  "value": 4,
+                  "label": {
+                    "en": "Does Not Meet Requirements",
+                    "fr": "En cours d'examen"
+                  },
+                  "description": {
+                    "en": "The organization meets baseline expectations with limited areas requiring follow-up.",
+                    "fr": "Aucune preuve de conformité n'a été trouvée lors de l'examen; ceci représente un domaine de risque critique."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Not Demonstrated",
+                    "fr": "Confirmé"
+                  },
+                  "description": {
+                    "en": "The organization has fully satisfied all applicable requirements with no outstanding concerns identified.",
+                    "fr": "L'organisation a pleinement satisfait à toutes les exigences applicables sans préoccupations en suspens."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Documentation reviewed as part of this assessment should be retained on file in accordance with applicable records management requirements.",
+                    "fr": "Ce domaine d'évaluation est étroitement lié à la gouvernance organisationnelle. Une performance faible ici est souvent associée à des lacunes structurelles plus larges."
+                  }
+                }
+              ],
+              "type": "question"
+            },
+            {
+              "name": "enviromentalHealthSafety",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.5
+              },
+              "question": {
+                "en": "To what degree does the project scope align with the organization's core mandate?",
+                "fr": "Le demandeur a-t-il fourni des états financiers vérifiés pour la période la plus récente?"
+              },
+              "commentThreshold": {
+                "min": 3,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Not Applicable",
+                    "fr": "Risque critique"
+                  },
+                  "description": {
+                    "en": "Evidence reviewed indicates a strong level of compliance with relevant standards and expectations.",
+                    "fr": "L'organisation satisfait aux attentes de base avec quelques domaines nécessitant un suivi."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Substantially Demonstrated",
+                    "fr": "Risque important"
+                  },
+                  "description": {
+                    "en": "The organization does not meet the minimum threshold; immediate remediation is required.",
+                    "fr": "Le risque dans ce domaine est faible selon les preuves disponibles; des mesures de surveillance standard suffisent."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Pending",
+                    "fr": "Dépasse les exigences"
+                  },
+                  "description": {
+                    "en": "All required documentation was submitted and reviewed; no material exceptions were identified.",
+                    "fr": "Un risque élevé a été identifié; des contrôles de surveillance et de rapport renforcés sont recommandés."
+                  }
+                },
+                {
+                  "value": 0,
+                  "label": {
+                    "en": "Not Applicable",
+                    "fr": "Minimalement démontré"
+                  },
+                  "description": {
+                    "en": "The organization does not meet the minimum threshold; immediate remediation is required.",
+                    "fr": "Aucune preuve de conformité n'a été trouvée lors de l'examen; ceci représente un domaine de risque critique."
+                  }
+                }
+              ],
+              "help": [
+                {
+                  "title": {
+                    "en": "Guidance",
+                    "fr": "Orientation"
+                  },
+                  "description": {
+                    "en": "Officers should cross-reference information provided in the application with publicly available sources and any prior assessment records held on file.",
+                    "fr": "Une forte performance dans ce domaine peut compenser les risques identifiés ailleurs dans l'évaluation."
+                  }
+                }
+              ],
+              "type": "question"
+            }
+          ]
+        },
+        {
+          "name": "furtherDistribution",
+          "weight": {
+            "adjustable": true,
+            "on": {
+              "type": "helpers",
+              "field": "furtherDistro"
+            },
+            "weights": {
+              "0": 0,
+              "1": 0.25
+            }
+          },
+          "label": {
+            "en": "Operational Readiness",
+            "fr": "Préparation opérationnelle"
+          },
+          "depends": [
+            {
+              "on": {
+                "type": "helpers",
+                "field": "furtherDistro"
+              },
+              "value": true
+            }
+          ],
+          "questions": [
+            {
+              "name": "projectSelectionProcess",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.4
+              },
+              "question": {
+                "en": "To what degree has the organization experienced operational disruptions in recent periods?",
+                "fr": "Dans quelle mesure l'entité maintient-elle des procédures documentées de gestion des risques?"
+              },
+              "commentThreshold": {
+                "min": 2,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Substantially Demonstrated",
+                    "fr": "Dépasse les exigences"
+                  },
+                  "description": {
+                    "en": "Findings suggest the organization may benefit from targeted capacity building in this area.",
+                    "fr": "Un risque modéré est présent; un suivi et un soutien ciblé sont conseillés tout au long du projet."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Meets Requirements",
+                    "fr": "Partiellement démontré"
+                  },
+                  "description": {
+                    "en": "Partial compliance is evident; corrective actions are recommended to address identified gaps.",
+                    "fr": "L'organisation a pleinement satisfait à toutes les exigences applicables sans préoccupations en suspens."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Not Applicable",
+                    "fr": "Ne satisfait pas aux exigences"
+                  },
+                  "description": {
+                    "en": "The assessment indicates satisfactory performance relative to established benchmarks.",
+                    "fr": "Les informations disponibles étaient limitées; une diligence raisonnable supplémentaire est conseillée."
+                  }
+                }
+              ],
+              "help": [],
+              "type": "question"
+            },
+            {
+              "name": "projectSelectionPublic",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.1
+              },
+              "question": {
+                "en": "To what degree has the organization experienced operational disruptions in recent periods?",
+                "fr": "L'organisation maintient-elle un plan stratégique actuel et approuvé?"
+              },
+              "commentThreshold": {
+                "min": 2,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Fully Demonstrated",
+                    "fr": "Risque critique"
+                  },
+                  "description": {
+                    "en": "Performance in this area is adequate with some scope for improvement in documentation practices.",
+                    "fr": "L'organisation satisfait aux attentes de base avec quelques domaines nécessitant un suivi."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Minimally Demonstrated",
+                    "fr": "Ne satisfait pas aux exigences"
+                  },
+                  "description": {
+                    "en": "All required documentation was submitted and reviewed; no material exceptions were identified.",
+                    "fr": "Des déficiences importantes ont été notées pouvant affecter la capacité de l'organisation à livrer."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Elevated Risk",
+                    "fr": "Ne satisfait pas aux exigences"
+                  },
+                  "description": {
+                    "en": "Elevated risk has been identified; enhanced monitoring and reporting controls are recommended.",
+                    "fr": "L'organisation ne satisfait pas au seuil minimum; une remédiation immédiate est requise."
+                  }
+                }
+              ],
+              "help": [],
+              "type": "question"
+            },
+            {
+              "name": "financialFramework",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.25
+              },
+              "question": {
+                "en": "Does the organization have an established process for managing subcontractors?",
+                "fr": "L'entité a-t-elle connu un roulement important de la direction au cours des deux dernières années?"
+              },
+              "commentThreshold": {
+                "min": 2,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Elevated Risk",
+                    "fr": "Risque élevé"
+                  },
+                  "description": {
+                    "en": "No evidence of compliance was found during the review; this represents a critical risk area.",
+                    "fr": "Le risque dans ce domaine est faible selon les preuves disponibles; des mesures de surveillance standard suffisent."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Critical Risk",
+                    "fr": "Risque faible"
+                  },
+                  "description": {
+                    "en": "Significant deficiencies have been noted that may affect the organization's ability to deliver outcomes.",
+                    "fr": "L'organisation ne satisfait pas au seuil minimum; une remédiation immédiate est requise."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Confirmed",
+                    "fr": "Satisfait aux exigences"
+                  },
+                  "description": {
+                    "en": "Elevated risk has been identified; enhanced monitoring and reporting controls are recommended.",
+                    "fr": "Les informations disponibles étaient limitées; une diligence raisonnable supplémentaire est conseillée."
+                  }
+                }
+              ],
+              "help": [],
+              "type": "question"
+            },
+            {
+              "name": "activityFramework",
+              "weight": {
+                "adjustable": false,
+                "weight": 0.25
+              },
+              "question": {
+                "en": "Has the organization completed a formal risk assessment for this project?",
+                "fr": "L'organisation a-t-elle réalisé une évaluation formelle des risques pour ce projet?"
+              },
+              "commentThreshold": {
+                "min": 2,
+                "max": 5
+              },
+              "options": [
+                {
+                  "value": 1,
+                  "label": {
+                    "en": "Partially Demonstrated",
+                    "fr": "Dépasse les exigences"
+                  },
+                  "description": {
+                    "en": "Risk exposure is considered manageable given current outcome measures and organizational capacity.",
+                    "fr": "Toute la documentation requise a été soumise et examinée; aucune exception importante n'a été identifiée."
+                  }
+                },
+                {
+                  "value": 3,
+                  "label": {
+                    "en": "Moderate Risk",
+                    "fr": "Sans objet"
+                  },
+                  "description": {
+                    "en": "This item was not applicable to the current project scope and has been assessed accordingly.",
+                    "fr": "Cet élément n'était pas applicable à la portée du projet actuel et a été évalué en conséquence."
+                  }
+                },
+                {
+                  "value": 5,
+                  "label": {
+                    "en": "Fully Demonstrated",
+                    "fr": "Risque important"
+                  },
+                  "description": {
+                    "en": "The assessment indicates satisfactory performance relative to established benchmarks.",
+                    "fr": "La performance dans ce domaine est adéquate avec une certaine marge d'amélioration."
+                  }
+                }
+              ],
+              "help": [],
+              "type": "question"
+            }
+          ]
+        }
+      ],
+      "icon": "i-lucide-briefcase-business"
+    }
+  ]
+}
