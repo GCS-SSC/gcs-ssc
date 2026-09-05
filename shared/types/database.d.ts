@@ -418,6 +418,11 @@ export interface Database extends ExtensionsDatabase {
   Applicant_Recipient_Funding_History: ApplicantRecipientFundingHistoryTable
   Applicant_Recipient_Funding_History_Recipient: ApplicantRecipientFundingHistoryRecipientTable
   Transfer_Payment_Profile: TransferPaymentProfileTable
+  Common_Workflow_Member_Condition: WorkflowMemberConditionTable
+  Common_Workflow_Publication_Condition: WorkflowPublicationConditionTable
+  Transfer_Payment_Stream_Field_Section: TransferPaymentStreamFieldSectionTable
+  Transfer_Payment_Stream_Field: TransferPaymentStreamFieldTable
+  Transfer_Payment_Stream_Field_Option: TransferPaymentStreamFieldOptionTable
   Funding_Case_Agreement_Profile: FundingCaseAgreementProfileTable
   Funding_Case_Agreement_Closeout: FundingCaseAgreementCloseoutTable
   Funding_Case_Agreement_Closeout_Snapshot: FundingCaseAgreementCloseoutSnapshotTable
@@ -1218,6 +1223,7 @@ export interface CommonEntityAssignmentTable {
 }
 
 export interface FundingCaseAgreementProfileTable {
+  egcs_fc_customfields: Generated<Record<string, string>>
   id: Generated<string>
   egcs_fc_agreementnumber: string
   egcs_fc_transferpaymentstream: string
@@ -1828,6 +1834,7 @@ export interface CommonWorkflowSetupMemberOwnerTable {
 }
 
 export interface CommonWorkflowRunTable {
+  egcs_cn_routing?: JsonValue | null
   id: string
   egcs_cn_completion?: string | null
 }
@@ -2175,3 +2182,48 @@ export interface TransferPaymentStreamRiskRatingTable {
 }
 
 export type DBTable<T> = T
+
+export interface TransferPaymentStreamFieldSectionTable {
+  id: Generated<string>
+  egcs_tp_transferpaymentstream: string
+  name_en: string
+  name_fr: string
+  display_order: Generated<number>
+  _deleted: Generated<boolean>
+}
+export interface TransferPaymentStreamFieldTable {
+  section_id: string
+  id: Generated<string>
+  egcs_tp_transferpaymentstream: string
+  name_en: string
+  name_fr: string
+  kind: 'text' | 'relational'
+  presentation: Generated<'single_line' | 'multiline'>
+  required: Generated<boolean>
+  discriminator: Generated<boolean>
+  active: Generated<boolean>
+  display_order: Generated<number>
+  _deleted: Generated<boolean>
+}
+export interface TransferPaymentStreamFieldOptionTable {
+  id: Generated<string>
+  field_id: string
+  name_en: string
+  name_fr: string
+  category_en: string | null
+  category_fr: string | null
+  active: Generated<boolean>
+  display_order: Generated<number>
+  _deleted: Generated<boolean>
+}
+
+export interface WorkflowMemberConditionTable {
+  id: Generated<string>
+  member_id: string
+  field_id: string
+  option_id: string
+  _deleted: Generated<boolean>
+}
+export interface WorkflowPublicationConditionTable extends WorkflowMemberConditionTable {
+  version_id: string
+}

@@ -277,6 +277,9 @@ const submit = async () => {
       can_delete_child_records: _canDeleteChildRecords,
       ...body
     } = selectedProfile.value
+    const currentFields = profile.value?.egcs_fc_customfields ?? {}
+    const changedFields = Object.fromEntries(Object.entries(body.egcs_fc_customfields ?? {}).filter(([key, value]) => value !== currentFields[key]))
+    body.egcs_fc_customfields = Object.keys(changedFields).length ? changedFields : undefined
     const streamId = body.egcs_fc_transferpaymentstream
     const agreementNumber = body.egcs_fc_agreementnumber
     if (streamId === undefined || typeof agreementNumber !== 'string') return

@@ -28,6 +28,7 @@ type WorkflowSetupDetail = WorkflowSetupItem & {
   members: WorkflowMember[]
 }
 type WorkflowMember = {
+  conditions?: import('~~/shared/types/schemas/agreement-custom-fields').WorkflowMemberCondition[]
   id: string
   egcs_cn_sequence: number
   egcs_cn_kind: 'review_set' | 'recommendation_set' | 'approval_template'
@@ -596,6 +597,7 @@ const deleteMember = async (member: WorkflowMember) => {
               <CommonStatusSelect v-model="selectedMember.egcs_cn_failurestatus" :agency-id="agencyId" allow-empty :empty-label="t('workflow.no_change')" class="w-full" />
             </UFormField>
           </div>
+          <TransferPaymentWorkflowConditions v-model="selectedMember.conditions" :profile-id="transferPaymentId" :stream-id="streamId" />
           <UFormField v-if="selectedMember.egcs_cn_kind !== 'approval_template'" :label="t('workflow.allow_owner_redirect')">
             <USwitch v-model="selectedMember.egcs_cn_allowownerredirect" />
           </UFormField>

@@ -87,6 +87,8 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
     .addColumn('egcs_fc_transferpaymentstream', 'bigint', col =>
       col.notNull().references('Transfer_Payment_Stream.id').onDelete('restrict')
     )
+    .addColumn('egcs_fc_customfields', 'jsonb', col => col.notNull().defaultTo(sql`'{}'::jsonb`))
+    .addCheckConstraint('fc_chk_customfields_object', sql`jsonb_typeof(egcs_fc_customfields) = 'object'`)
     .addColumn('egcs_fc_financialsystemnumber', 'bigint', col => col.notNull())
     .addColumn('egcs_fc_title_en', 'varchar(255)', col => col.notNull())
     .addColumn('egcs_fc_title_fr', 'varchar(255)', col => col.notNull())
@@ -119,6 +121,20 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
       constraint => constraint.onDelete('restrict')
     )
     .execute()
+
+  await sql`
+    CREATE FUNCTION protect_agreement_stream() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN
+      IF NEW.egcs_fc_transferpaymentstream IS DISTINCT FROM OLD.egcs_fc_transferpaymentstream THEN
+        RAISE EXCEPTION 'Agreement stream is immutable' USING ERRCODE = '23514', CONSTRAINT = 'fc_agreement_stream_immutable';
+      END IF;
+      RETURN NEW;
+    END $$
+  `.execute(db)
+  await sql`
+    CREATE TRIGGER protect_agreement_stream BEFORE UPDATE ON "Funding_Case_Agreement_Profile"
+      FOR EACH ROW EXECUTE FUNCTION protect_agreement_stream()
+  `.execute(db)
 
   await sql`
     CREATE UNIQUE INDEX ${sql.raw(INDEX_NAMES.profileStreamAgreementNumber)}
@@ -2179,5 +2195,6 @@ export const down = async (db: Kysely<Database>): Promise<void> => {
   await db.schema.alterTable('Transfer_Payment_Stream_Chart_of_Account').dropConstraint('fc_unq_chartofaccountidstream').execute()
   await db.schema.dropIndex(INDEX_NAMES.profileStreamAgreementNumber).execute()
   await db.schema.dropTable('Funding_Case_Agreement_Profile').execute()
+  await sql`DROP FUNCTION protect_agreement_stream()`.execute(db)
   await sql`DROP FUNCTION IF EXISTS trg_fn_validate_funding_status_agency()`.execute(db)
 }

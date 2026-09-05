@@ -1,3 +1,6 @@
+import { readWorkflowConditions } from './workflow-conditions'
+import { readAgreementCustomFieldDefinitions } from './agreement-custom-fields'
+import { workflowConditionsOverlap, type WorkflowMemberCondition } from '~~/shared/types/schemas/agreement-custom-fields'
 /* eslint-disable jsdoc/require-jsdoc -- typed workflow publication primitives */
 import type { Kysely, Selectable, Transaction } from 'kysely'
 import type { PublicationKind } from '~~/shared/constants/system-lifecycle'
@@ -29,6 +32,7 @@ type DbClient = Kysely<Database> | Transaction<Database>
 
 export type PublishedWorkflowOwner = { nestedMemberId: string, defaultOwner?: string }
 export type PublishedWorkflowMember = {
+  conditions?: Array<WorkflowMemberCondition & { name_en: string, name_fr: string, options: Array<{ id: string, name_en: string, name_fr: string }> }>
   memberId: string
   sequence: number
   kind: Workflow_Setup_Member_Kind
@@ -209,7 +213,20 @@ export const buildWorkflowSetupPublication = async (
       publicationVersionId,
       publicationVersion
     })
+    const conditions = await readWorkflowConditions(db, String(row.id))
+    const fields = conditions.length ? await readAgreementCustomFieldDefinitions(db, String(setup.egcs_cn_scopeid)) : []
+    const resolvedConditions = conditions.map(condition => {
+      const field = fields.find(candidate => candidate.id === condition.fieldId)
+      if (!field?.active || !field.discriminator || field.kind !== 'relational') throw new Error('Workflow discriminator must be active')
+      const options = condition.optionIds.map(id => {
+        const option = field.options.find(candidate => candidate.id === id && candidate.active)
+        if (!option) throw new Error('Workflow discriminator option must be active')
+        return { id, name_en: option.name_en, name_fr: option.name_fr }
+      })
+      return { ...condition, name_en: field.name_en, name_fr: field.name_fr, options }
+    })
     members.push({
+      ...(resolvedConditions.length ? { conditions: resolvedConditions } : {}),
       memberId: String(row.id), sequence: row.egcs_cn_sequence, kind: row.egcs_cn_kind,
       referenceId, publicationVersionId,
       publicationVersion,
@@ -349,7 +366,8 @@ export const validatePublishedWorkflowStatusGraph = (
     if (member.materializationStatus && requireDefinition(member.materializationStatus).terminal) {
       throw new Error('Terminal statuses cannot be workflow materialization statuses')
     }
-    if (member.successStatus && requireDefinition(member.successStatus).terminal && index !== lastIndex) {
+    if (member.successStatus && requireDefinition(member.successStatus).terminal && index !== lastIndex
+      && configuration.members.slice(index + 1).some(later => workflowConditionsOverlap(member.conditions ?? [], later.conditions ?? []))) {
       throw new Error('A terminal workflow output must immediately end the run')
     }
     if (member.failureStatus) requireDefinition(member.failureStatus)

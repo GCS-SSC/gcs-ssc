@@ -252,6 +252,7 @@ watch(selectedStreamId, value => {
     riskScoreSelection.value = undefined
     model.value = {
       ...model.value,
+      egcs_fc_customfields: {},
       egcs_fc_agreementsubtype: undefined,
       egcs_fc_agreementtype: undefined,
       egcs_fc_holdbackbasis: undefined,
@@ -270,6 +271,7 @@ watch(selectedStreamId, value => {
     riskScoreSelection.value = undefined
     model.value = {
       ...model.value,
+      egcs_fc_customfields: {},
       egcs_fc_agreementsubtype: undefined,
       egcs_fc_agreementtype: undefined,
       egcs_fc_holdbackbasis: undefined,
@@ -319,6 +321,7 @@ watch(selectedSubtype, value => {
       <UFormField :label="t('agreement.stream')" :name="field('egcs_fc_transferpaymentstream')">
         <CommonServerLookupSelect
           v-model="model.egcs_fc_transferpaymentstream"
+          :disabled="permissionAction === 'update'"
           fetch-url="/api/agreements/lookups/streams"
           value-key="id"
           label-en-key="label_en"
@@ -544,4 +547,11 @@ watch(selectedSubtype, value => {
     :stream-id="selectedStreamId"
     :permission-action="permissionAction"
     :context="agreementProfileExtensionContext" />
+  <AgreementFieldsCustomFields
+    v-if="selectedStreamId"
+    :key="`${agreementId ?? 'new'}:${selectedStreamId}`"
+    v-model="model.egcs_fc_customfields"
+    :stream-id="selectedStreamId"
+    :agreement-id="agreementId"
+    :permission-action="permissionAction" />
 </template>

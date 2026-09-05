@@ -1,3 +1,4 @@
+import { readAgreementCustomFieldDefinitions } from './agreement-custom-fields'
 /* eslint-disable jsdoc/require-jsdoc, @stylistic/multiline-ternary -- compact snapshot normalization and query fallbacks */
 import { createHash } from 'node:crypto'
 import { sql, type Kysely, type Transaction } from 'kysely'
@@ -283,9 +284,21 @@ export const buildAgreementApprovalSnapshot = async (
           .where('Funding_Case_Agreement_Applicant_Recipient._deleted', '=', false)
           .where('Applicant_Recipient_Profile._deleted', '=', false).orderBy('Applicant_Recipient_Profile.id').execute()
       ])
+  const customFieldDefinitions = await readAgreementCustomFieldDefinitions(trx, String(agreement.egcs_fc_transferpaymentstream))
+  const customFields = customFieldDefinitions.filter(field => Boolean(agreement.egcs_fc_customfields[field.id])).map(field => ({
+    fieldId: field.id,
+    section: field.section ? { id: field.section.id, label: bilingualValue(field.section.name_en, field.section.name_fr), order: field.section.display_order } : null,
+    label: bilingualValue(field.name_en, field.name_fr),
+    value: agreement.egcs_fc_customfields[field.id],
+    display: field.kind === 'text' ? agreement.egcs_fc_customfields[field.id] : (() => {
+      const option = field.options.find(candidate => candidate.id === agreement.egcs_fc_customfields[field.id])
+      return option ? bilingualValue(option.name_en, option.name_fr) : agreement.egcs_fc_customfields[field.id]
+    })()
+  }))
   const packet: AgreementApprovalSnapshotV1 = {
     schemaVersion: 1,
     agreement: amendment ? null : normalizeRow({
+      customFields,
       agreementNumber: agreement.egcs_fc_agreementnumber,
       financialSystemNumber: agreement.egcs_fc_financialsystemnumber,
       title: bilingualValue(agreement.egcs_fc_title_en, agreement.egcs_fc_title_fr),

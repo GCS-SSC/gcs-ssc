@@ -1,3 +1,4 @@
+import { mergeAgreementCustomFields } from './agreement-custom-fields'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Temporary coverage while agreement profile helpers receive complete documentation. */
 import { readBody, type H3Event } from 'h3'
 import type { Kysely } from 'kysely'
@@ -270,6 +271,10 @@ const patchValidatedAgreementProfile = async (
   if (holdbackBasisError) return holdbackBasisError
 
   const values = mapAgreementWriteValues(sanitized, subtypeContext.agreementType)
+  if (validated.egcs_fc_customfields !== undefined) {
+    const stored = await db.selectFrom('Funding_Case_Agreement_Profile').select('egcs_fc_customfields').where('id', '=', agreementId).executeTakeFirstOrThrow()
+    values.egcs_fc_customfields = await mergeAgreementCustomFields(event, db, nextStreamId, stored.egcs_fc_customfields, validated.egcs_fc_customfields)
+  }
 
   try {
     if (Object.keys(values).length === 1 && Object.hasOwn(values, 'egcs_fc_agreementtype')) {
@@ -316,8 +321,7 @@ export const patchAgreementProfile = async (
     try {
       return await db.transaction().execute(async trx => {
         const authContext = await requireFreshAuthContext(event, trx)
-        const lockTargetStreamId = resolveNextAgreementStreamId(validated, lockContext)
-        const targetStreamIds = [...new Set([lockContext.streamId, lockTargetStreamId])].sort()
+        const targetStreamIds = [lockContext.streamId]
         await lockRegisteredExtensionAgreementScopes(
           trx,
           lockContext.agencyId,
@@ -366,6 +370,10 @@ export const patchAgreementProfile = async (
         await assertAgreementApprovalSubmissionUnlocked(event, trx, agreementId)
         const context = authContext
         const nextStreamId = resolveNextAgreementStreamId(validated, existingContext)
+
+        if (nextStreamId !== existingContext.streamId) {
+          return await badRequest(event, 'AGREEMENT_STREAM_IMMUTABLE', 'apiErrors.agreement.stream_immutable')
+        }
 
         const streamError = await validateAgreementProfileStream(
           event,

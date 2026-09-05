@@ -263,5 +263,15 @@ const packetActivityRows = computed<FundingCaseAgreementActivityRow[]>(() => act
         :can-delete="false"
         :snapshot-items="packetActivityRows" />
     </CommonSection>
+    <CommonSection v-if="agreement && asRecords(agreement.customFields).length" :title="t('custom_fields.title')" :grid-cols="1">
+      <div v-for="field in asRecords(agreement.customFields)" :key="String(field.fieldId)" class="space-y-1">
+        <dt class="text-sm text-muted">
+          {{ bilingual(field.label) }}
+        </dt>
+        <dd class="whitespace-pre-wrap">
+          {{ display(field.display) }}
+        </dd>
+      </div>
+    </CommonSection>
   </CommonWorkflowPacket>
 </template>

@@ -1,3 +1,4 @@
+import { captureWorkflowRouting, WorkflowRouteValidationError, type WorkflowRoutingEvidence } from './workflow-routing'
 /* eslint-disable jsdoc/require-jsdoc -- canonical workflow orchestration is covered by focused lifecycle tests */
 import { sql, type Kysely, type Selectable, type Transaction } from 'kysely'
 import type { H3Event } from 'h3'
@@ -78,7 +79,7 @@ import { requireQualifiedRuntimeLockEvidence } from './qualified-runtime-transac
 
 type DbClient = Kysely<Database> | Transaction<Database>
 type RuntimeRow = Selectable<Database['Common_Runtime']>
-type WorkflowRun = RuntimeRow & { egcs_cn_completion: string | null | undefined }
+type WorkflowRun = RuntimeRow & { egcs_cn_routing?: JsonValue | null, egcs_cn_completion: string | null | undefined }
 export const requiresAgreementApprovalSubmissionPromotion = (
   run: Pick<WorkflowRun, 'egcs_cn_purpose' | 'egcs_cn_entitytype'>
 ): boolean => run.egcs_cn_purpose === 'approval_submission'
@@ -156,7 +157,7 @@ const selectWorkflowRunById = async (
   let query = db.selectFrom('Common_Runtime')
     .innerJoin('Common_Workflow_Run', 'Common_Workflow_Run.id', 'Common_Runtime.id')
     .selectAll('Common_Runtime')
-    .select('Common_Workflow_Run.egcs_cn_completion')
+    .select(['Common_Workflow_Run.egcs_cn_completion', 'Common_Workflow_Run.egcs_cn_routing'])
     .where('Common_Runtime.id', '=', runId)
     .where('Common_Runtime.egcs_cn_kind', '=', 'workflow')
     .where('Common_Runtime._deleted', '=', false)
@@ -172,7 +173,11 @@ export const readWorkflowRuntimeConfiguration = async (db: DbClient, run: Workfl
     .where('egcs_cn_kind', '=', 'workflow_setup')
     .where('egcs_cn_version', '=', Number(run.egcs_cn_sourceversion))
     .executeTakeFirstOrThrow()
-  return readPublishedWorkflowConfiguration(version.egcs_cn_definition)
+  const definition = readPublishedWorkflowConfiguration(version.egcs_cn_definition)
+  if (!definition.members.some(member => member.conditions?.length)) return definition
+  const routing = run.egcs_cn_routing as WorkflowRoutingEvidence | null
+  if (!routing) throw new WorkflowRouteValidationError('Conditional workflow runtime is missing captured routing evidence')
+  return { ...definition, members: definition.members.filter(member => routing.decisions.some(decision => decision.memberId === member.memberId && decision.eligible)) }
 }
 
 export const isWorkflowStartStatusAllowed = (allowedStatuses: StatusId[], currentStatus: StatusId): boolean =>
@@ -993,7 +998,8 @@ const createWorkflowRuntime = async (
   context: ReviewRuntimeEntityContext,
   initiatedBy: string,
   purpose: Workflow_Purpose,
-  completionId?: string
+  completionId?: string,
+  routing?: WorkflowRoutingEvidence
 ): Promise<WorkflowRun> => {
   let metadata: RuntimeMetadata
   let resolvedCompletionId = completionId ?? null
@@ -1025,6 +1031,7 @@ const createWorkflowRuntime = async (
   }
   await trx.insertInto('Common_Workflow_Run').values({
     id: metadata.runtimeId,
+    egcs_cn_routing: routing as unknown as JsonValue,
     egcs_cn_completion: resolvedCompletionId
   }).execute()
   return await selectWorkflowRunById(trx, metadata.runtimeId, true) as WorkflowRun
@@ -1082,7 +1089,7 @@ const startWorkflowUnchecked = async (
   const existing = await trx.selectFrom('Common_Runtime')
     .innerJoin('Common_Workflow_Run', 'Common_Workflow_Run.id', 'Common_Runtime.id')
     .selectAll('Common_Runtime')
-    .select('Common_Workflow_Run.egcs_cn_completion')
+    .select(['Common_Workflow_Run.egcs_cn_completion', 'Common_Workflow_Run.egcs_cn_routing'])
     .where('Common_Runtime.egcs_cn_entitytype', '=', context.entityType)
     .where('Common_Runtime.egcs_cn_entityid', '=', context.entityId)
     .where('Common_Runtime.egcs_cn_kind', '=', 'workflow')
@@ -1141,7 +1148,14 @@ const startWorkflowUnchecked = async (
         })
       })()
     : null
-  const run = await createWorkflowRuntime(trx, setup, context, initiatedBy, purpose, completionId)
+  let routing: WorkflowRoutingEvidence
+  try {
+    routing = await captureWorkflowRouting(trx, context, setup.publicationDefinition)
+  } catch (error) {
+    if (!(error instanceof WorkflowRouteValidationError)) throw error
+    return await badRequest(event, 'WORKFLOW_ROUTE_INVALID', 'apiErrors.workflow.route_invalid')
+  }
+  const run = await createWorkflowRuntime(trx, setup, context, initiatedBy, purpose, completionId, routing)
   if (closeoutReadiness) {
     await trx.insertInto('Funding_Case_Agreement_Closeout_Snapshot').values({
       egcs_fc_fundingagreement: closeoutReadiness.agreementId,
@@ -1176,7 +1190,7 @@ const startWorkflowUnchecked = async (
     reason: retry ? 'workflow_retried' : 'workflow_started'
   })
   const activeRun = await selectWorkflowRunById(trx, String(run.id), true)
-  const firstMember = setup.publicationDefinition.members[0]
+  const firstMember = setup.publicationDefinition.members.find(member => routing.decisions.some(decision => decision.memberId === member.memberId && decision.eligible))
   return activeRun && firstMember
     ? await materializeWorkflowMember(trx, activeRun, firstMember, initiatedBy)
     : await finishWorkflowRun(trx, String(run.id), 'succeeded', undefined, initiatedBy)
@@ -1268,7 +1282,7 @@ export const advanceWorkflowItem = async (
   const configuration = await readWorkflowRuntimeConfiguration(trx, run)
   const member = findMemberForItem(configuration, item)
   if (!member) return await finishWorkflowRun(trx, String(run.id), 'failed', 'execution_failed', actorId)
-  const nextMember = configuration.members.find(candidateMember => candidateMember.sequence === member.sequence + 1)
+  const nextMember = configuration.members.find(candidateMember => candidateMember.sequence > member.sequence)
   if (nextMember) {
     const alreadyAdvanced = await trx.selectFrom('Common_Runtime_Item').select('id')
       .where('egcs_cn_runtime', '=', String(run.id))
@@ -1570,7 +1584,7 @@ const getWorkflowRuntimeInSnapshot = async (
   const runs = await db.selectFrom('Common_Runtime')
     .innerJoin('Common_Workflow_Run', 'Common_Workflow_Run.id', 'Common_Runtime.id')
     .selectAll('Common_Runtime')
-    .select('Common_Workflow_Run.egcs_cn_completion')
+    .select(['Common_Workflow_Run.egcs_cn_completion', 'Common_Workflow_Run.egcs_cn_routing'])
     .where('Common_Runtime.egcs_cn_kind', '=', 'workflow')
     .where('Common_Runtime.egcs_cn_entitytype', '=', entityType)
     .where('Common_Runtime.egcs_cn_entityid', '=', entityId)
@@ -1697,7 +1711,14 @@ const getWorkflowRuntimeInSnapshot = async (
     .orderBy('id', 'asc')
     .execute()
   const topLevelItems = workflowItems.filter(item => item.egcs_cn_parentruntimeitem === null)
-  const steps = configuration.members.map(member => ({
+  const routing = selected.egcs_cn_routing as WorkflowRoutingEvidence | null
+  const sourceVersion = routing
+    ? await db.selectFrom('Common_Publication_Version').select('egcs_cn_definition')
+        .where('id', '=', String(selected.egcs_cn_sourcepublicationversion)).executeTakeFirstOrThrow()
+    : null
+  const allMembers = sourceVersion ? readPublishedWorkflowConfiguration(sourceVersion.egcs_cn_definition).members : configuration.members
+  const steps = allMembers.map(member => ({
+    eligibility: routing?.decisions.find(decision => decision.memberId === member.memberId) ?? { memberId: member.memberId, eligible: true, unmatchedFieldIds: [] },
     ...member,
     runtimeItem: topLevelItems.find(item => item.egcs_cn_order === member.sequence)
       ? runtimeItemSummary(topLevelItems.find(item => item.egcs_cn_order === member.sequence)!)
@@ -1743,6 +1764,7 @@ const getWorkflowRuntimeInSnapshot = async (
     canCancel: Boolean(activeRun && String(activeRun.id) === String(selected.id)),
     submission: submission ?? null,
     steps,
+    routing,
     transitions,
     runtimeTransitions,
     ownerBlockers,

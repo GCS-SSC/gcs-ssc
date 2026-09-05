@@ -1,3 +1,4 @@
+import { readWorkflowConditions } from '~~/server/utils/workflow-conditions'
 import { authorize } from '~~/server/utils/authorize'
 import { authorizeTransferPaymentStreamResource, createTransferPaymentScopedAuthorizeHandler } from '~~/server/utils/transfer-payment-route-authorization'
 import { readWorkflowSetupPublicationMetadata } from '~~/server/utils/workflow-setup-versioning'
@@ -37,8 +38,9 @@ export default defineEventHandler(async event => {
     : await db.selectFrom('Common_Workflow_Setup_Member_Owner').selectAll()
         .where('egcs_cn_workflowsetupmember', 'in', members.map(member => String(member.id)))
         .where('_deleted', '=', false).orderBy('id', 'asc').execute()
-  return { ...setup, egcs_cn_scopeid: String(setup.egcs_cn_scopeid), ...await readWorkflowSetupPublicationMetadata(db, setup), egcs_cn_allowedstartstatuses: allowedStartStatuses.map(row => String(row.egcs_cn_status)), members: members.map(member => ({
+  return { ...setup, egcs_cn_scopeid: String(setup.egcs_cn_scopeid), ...await readWorkflowSetupPublicationMetadata(db, setup), egcs_cn_allowedstartstatuses: allowedStartStatuses.map(row => String(row.egcs_cn_status)), members: await Promise.all(members.map(async member => ({
+    conditions: await readWorkflowConditions(db, String(member.id)),
     ...member,
     owners: owners.filter(owner => String(owner.egcs_cn_workflowsetupmember) === String(member.id))
-  })) }
+  }))) }
 })

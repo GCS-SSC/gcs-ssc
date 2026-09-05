@@ -1,3 +1,4 @@
+import { replaceWorkflowConditions } from '~~/server/utils/workflow-conditions'
 import { sql } from 'kysely'
 import { CommonWorkflowSetupMemberCreateSchema } from '~~/shared/types/schemas'
 import { authorize } from '~~/server/utils/authorize'
@@ -27,7 +28,7 @@ export default defineEventHandler(async event => {
         statusCode: 409, code: 'PUBLICATION_RETIRED', key: 'apiErrors.request.invalid_status'
       })
     }
-    const { owners = [], ...memberValues } = body
+    const { owners = [], conditions = [], ...memberValues } = body
     if (!await isValidWorkflowSetupMemberReference(trx, setup, memberValues)) {
       return await badRequest(event, 'WORKFLOW_MEMBER_REFERENCE_INVALID', 'apiErrors.request.invalid_resource')
     }
@@ -50,6 +51,9 @@ export default defineEventHandler(async event => {
       const nextSequence = index + 1 >= sequence ? index + 2 : index + 1
       await trx.updateTable('Common_Workflow_Setup_Member').set({ egcs_cn_sequence: nextSequence })
         .where('id', '=', String(member.id)).execute()
+    }
+    if (conditions && !await replaceWorkflowConditions(trx, streamId, String(created.id), conditions)) {
+      return await badRequest(event, 'WORKFLOW_CONDITIONS_INVALID', 'apiErrors.request.invalid_resource')
     }
     return created
   })

@@ -1,3 +1,4 @@
+import CustomFieldsTab from '~/components/TransferPayment/CustomFieldsTab.vue'
 import type { FetchError } from 'ofetch'
 import type { TransferPaymentProfileItem, TransferPaymentStreamItem } from '~~/shared/types/schemas'
 import type { TabMap } from '~~/shared/types/ui'
@@ -26,6 +27,7 @@ import { useRouteTabMap } from '~/composables/useRouteTabMap'
 import { appRouteLocations } from '~/utils/route-locations'
 
 export const TRANSFER_PAYMENT_STREAM_TAB_KEYS = {
+  customFields: 'custom_fields.title',
   general: 'agency.tabs.general',
   holdbackBases: 'transfer_payment.holdback_bases',
   budgets: 'transfer_payment.budgets',
@@ -154,6 +156,7 @@ export const useTransferPaymentStreamDetailState = (
       'monitorTypes',
       { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.monitorTypes, icon: 'i-lucide-clipboard-check', component: TransferPaymentMonitorTypesTab, getProps: () => ({ transferPaymentId: id, streamId, canCreateChild: canCreateChild.value, canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }
     ],
+    ['customFields', { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.customFields, value: 'custom-fields', icon: 'i-lucide-list-filter', component: CustomFieldsTab, getProps: () => ({ transferPaymentId: id, streamId, canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }],
     [
       'riskRatings',
       { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.riskRatings, icon: 'i-lucide-gauge', component: TransferPaymentStreamRiskRatingsTab, getProps: () => ({ transferPaymentId: id, streamId, canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }

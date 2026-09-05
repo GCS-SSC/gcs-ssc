@@ -2259,10 +2259,90 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
   `.execute(db)
 
   await sql`
+    CREATE TABLE "Common_Workflow_Member_Condition" (
+      id bigserial PRIMARY KEY,
+      member_id bigint NOT NULL REFERENCES "Common_Workflow_Setup_Member"(id) ON DELETE RESTRICT,
+      field_id bigint NOT NULL REFERENCES "Transfer_Payment_Stream_Field"(id) ON DELETE RESTRICT,
+      option_id bigint NOT NULL,
+      _deleted boolean NOT NULL DEFAULT false,
+      FOREIGN KEY (option_id, field_id) REFERENCES "Transfer_Payment_Stream_Field_Option"(id, field_id) ON DELETE RESTRICT
+    )
+  `.execute(db)
+  await sql`
+    CREATE UNIQUE INDEX workflow_condition_unique ON "Common_Workflow_Member_Condition" (member_id, field_id, option_id) WHERE NOT _deleted
+  `.execute(db)
+  await sql`
+    CREATE TABLE "Common_Workflow_Publication_Condition" (
+      id bigserial PRIMARY KEY,
+      version_id bigint NOT NULL REFERENCES "Common_Publication_Version"(id) ON DELETE RESTRICT,
+      member_id bigint NOT NULL REFERENCES "Common_Workflow_Setup_Member"(id) ON DELETE RESTRICT,
+      field_id bigint NOT NULL REFERENCES "Transfer_Payment_Stream_Field"(id) ON DELETE RESTRICT,
+      option_id bigint NOT NULL,
+      _deleted boolean NOT NULL DEFAULT false,
+      FOREIGN KEY (option_id, field_id) REFERENCES "Transfer_Payment_Stream_Field_Option"(id, field_id) ON DELETE RESTRICT,
+      UNIQUE (version_id, member_id, field_id, option_id)
+    )
+  `.execute(db)
+  await sql`
+    CREATE FUNCTION validate_workflow_condition_scope() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM "Common_Workflow_Setup_Member" member
+        JOIN "Common_Workflow_Setup" setup ON setup.id = member.egcs_cn_workflowsetup
+        JOIN "Transfer_Payment_Stream_Field" field ON field.id = NEW.field_id
+        WHERE member.id = NEW.member_id AND setup.egcs_cn_scopetype = 'transferpaymentstream'
+          AND setup.egcs_cn_scopeid = field.egcs_tp_transferpaymentstream AND field.kind = 'relational'
+      ) THEN
+        RAISE EXCEPTION 'Workflow condition must reference a relational field in its stream' USING ERRCODE = '23514';
+      END IF;
+      RETURN NEW;
+    END $$
+  `.execute(db)
+  await sql`
+    CREATE TRIGGER validate_workflow_condition_scope BEFORE INSERT OR UPDATE ON "Common_Workflow_Member_Condition"
+      FOR EACH ROW EXECUTE FUNCTION validate_workflow_condition_scope()
+  `.execute(db)
+  await sql`
+    CREATE TRIGGER protect_workflow_publication_conditions BEFORE UPDATE OR DELETE ON "Common_Workflow_Publication_Condition"
+      FOR EACH ROW EXECUTE FUNCTION trg_fn_lock_publication_evidence()
+  `.execute(db)
+  await sql`
+    CREATE FUNCTION capture_workflow_publication_conditions() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN
+      IF NEW.egcs_cn_kind = 'workflow_setup' THEN
+        INSERT INTO "Common_Workflow_Publication_Condition" (version_id, member_id, field_id, option_id)
+        SELECT NEW.id, (member->>'memberId')::bigint, (condition->>'fieldId')::bigint, option_id::bigint
+        FROM jsonb_array_elements(NEW.egcs_cn_definition->'members') member,
+          jsonb_array_elements(COALESCE(member->'conditions', '[]'::jsonb)) condition,
+          jsonb_array_elements_text(condition->'optionIds') option_id;
+      END IF;
+      RETURN NEW;
+    END $$
+  `.execute(db)
+  await sql`
+    CREATE TRIGGER capture_workflow_publication_conditions AFTER INSERT ON "Common_Publication_Version"
+      FOR EACH ROW EXECUTE FUNCTION capture_workflow_publication_conditions()
+  `.execute(db)
+
+  await sql`
     CREATE TABLE IF NOT EXISTS "Common_Workflow_Run" (
       id bigint PRIMARY KEY REFERENCES "Common_Runtime"(id) ON DELETE RESTRICT,
-      egcs_cn_completion bigint
+      egcs_cn_completion bigint,
+      egcs_cn_routing jsonb
     )
+  `.execute(db)
+  await sql`
+    CREATE FUNCTION protect_workflow_routing() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN
+      IF NEW.egcs_cn_routing IS DISTINCT FROM OLD.egcs_cn_routing THEN
+        RAISE EXCEPTION 'Workflow routing is immutable' USING ERRCODE = '23514';
+      END IF;
+      RETURN NEW;
+    END $$
+  `.execute(db)
+  await sql`
+    CREATE TRIGGER protect_workflow_routing BEFORE UPDATE ON "Common_Workflow_Run"
+      FOR EACH ROW EXECUTE FUNCTION protect_workflow_routing()
   `.execute(db)
   await sql`
     CREATE OR REPLACE FUNCTION trg_fn_validate_workflow_runtime_extension() RETURNS trigger AS $$
@@ -3702,6 +3782,12 @@ export const down = async (db: Kysely<Database>): Promise<void> => {
   await sql`DROP TABLE IF EXISTS "Common_Runtime" CASCADE`.execute(db)
   await sql`DROP FUNCTION IF EXISTS trg_fn_preserve_retryable_workflow_status CASCADE`.execute(db)
   await sql`DROP TABLE IF EXISTS "Common_Workflow_Setup_Member_Owner" CASCADE`.execute(db)
+  await sql`DROP TRIGGER IF EXISTS capture_workflow_publication_conditions ON "Common_Publication_Version"`.execute(db)
+  await sql`DROP FUNCTION IF EXISTS validate_workflow_condition_scope() CASCADE`.execute(db)
+  await sql`DROP FUNCTION IF EXISTS capture_workflow_publication_conditions()`.execute(db)
+  await sql`DROP FUNCTION IF EXISTS protect_workflow_routing() CASCADE`.execute(db)
+  await sql`DROP TABLE IF EXISTS "Common_Workflow_Publication_Condition"`.execute(db)
+  await sql`DROP TABLE IF EXISTS "Common_Workflow_Member_Condition"`.execute(db)
   await sql`DROP TABLE IF EXISTS "Common_Workflow_Setup_Member" CASCADE`.execute(db)
   await sql`DROP TABLE IF EXISTS "Common_Workflow_Setup_Allowed_Start_Status" CASCADE`.execute(db)
   await sql`DROP TABLE IF EXISTS "Common_Workflow_Setup" CASCADE`.execute(db)

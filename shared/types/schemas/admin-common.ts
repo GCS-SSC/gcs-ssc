@@ -1,3 +1,4 @@
+import { WorkflowMemberConditionsSchema } from './agreement-custom-fields'
 import { z } from 'zod'
 import { RecommendationDefinitionSchema } from './recommendation/recommendation'
 import {
@@ -528,6 +529,7 @@ const CommonWorkflowSetupPatchBaseSchema = CommonWorkflowSetupBaseSchema.partial
 export const CommonWorkflowSetupPatchSchema = CommonWorkflowSetupPatchBaseSchema
 
 const CommonWorkflowSetupMemberBaseSchema = z.object({
+  conditions: WorkflowMemberConditionsSchema.optional(),
   egcs_cn_sequence: z.number().int().positive({ error: 'validation.workflow_member_sequence_positive' }),
   egcs_cn_materializationstatus: NullableOptionalIdSchema,
   egcs_cn_successstatus: NullableOptionalIdSchema,
@@ -557,6 +559,7 @@ export const CommonWorkflowSetupMemberCreateSchema = z.discriminatedUnion('egcs_
   CommonWorkflowSetupMemberBaseSchema.extend({ egcs_cn_kind: z.literal('approval_template'), egcs_cn_approvaltemplate: IdSchema, owners: z.array(z.never()).max(0).optional() })
 ])
 export const CommonWorkflowSetupMemberPatchSchema = z.object({
+  conditions: WorkflowMemberConditionsSchema.optional(),
   egcs_cn_sequence: z.number().int().positive({ error: 'validation.workflow_member_sequence_positive' }).optional(),
   egcs_cn_materializationstatus: NullableOptionalIdSchema,
   egcs_cn_successstatus: NullableOptionalIdSchema,

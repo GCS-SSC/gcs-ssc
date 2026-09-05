@@ -76,6 +76,7 @@ export default defineEventHandler(async event => {
       .where('Agency_Agreement_Type._deleted', '=', false)
       .select([
         'Funding_Case_Agreement_Profile.id as id',
+        'Funding_Case_Agreement_Profile.egcs_fc_customfields',
         'Funding_Case_Agreement_Profile.egcs_fc_status as egcs_fc_status',
         'Funding_Case_Agreement_Profile.egcs_fc_agreementnumber as egcs_fc_agreementnumber',
         'Funding_Case_Agreement_Profile.egcs_fc_transferpaymentstream as egcs_fc_transferpaymentstream',

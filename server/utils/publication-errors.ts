@@ -4,6 +4,8 @@ import { throwApiError } from './api-errors'
 import { PublicationLifecycleConflictError } from './system-publication'
 
 const publicationFailurePatterns = [
+  /Workflow discriminator/i,
+  /Workflow approval-submission success/i,
   /members are not contiguous/i,
   /review setup members must use contiguous ordering beginning at 1/i,
   /review schemas must be published before activating a review setup/i,

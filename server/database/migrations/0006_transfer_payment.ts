@@ -810,9 +810,69 @@ export async function up(db: Kysely<Database>): Promise<void> {
     )
     WHERE "_deleted" = false
   `.execute(db)
+  await sql`
+    CREATE TABLE "Transfer_Payment_Stream_Field_Section" (
+      id bigserial PRIMARY KEY,
+      egcs_tp_transferpaymentstream bigint NOT NULL REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT,
+      name_en text NOT NULL, name_fr text NOT NULL,
+      display_order integer NOT NULL DEFAULT 0 CHECK (display_order >= 0),
+      _deleted boolean NOT NULL DEFAULT false,
+      UNIQUE (id, egcs_tp_transferpaymentstream)
+    )
+  `.execute(db)
+  await sql`
+    CREATE TABLE "Transfer_Payment_Stream_Field" (
+      id bigserial PRIMARY KEY,
+      egcs_tp_transferpaymentstream bigint NOT NULL REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT,
+      name_en text NOT NULL, name_fr text NOT NULL,
+      section_id bigint NOT NULL,
+      FOREIGN KEY (section_id, egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream_Field_Section"(id, egcs_tp_transferpaymentstream) ON DELETE RESTRICT,
+      kind text NOT NULL CHECK (kind IN ('text', 'relational')),
+      presentation text NOT NULL DEFAULT 'single_line' CHECK (presentation IN ('single_line', 'multiline')),
+      required boolean NOT NULL DEFAULT false,
+      discriminator boolean NOT NULL DEFAULT false,
+      active boolean NOT NULL DEFAULT true,
+      display_order integer NOT NULL DEFAULT 0 CHECK (display_order >= 0),
+      _deleted boolean NOT NULL DEFAULT false,
+      CHECK (NOT discriminator OR kind = 'relational'),
+      CHECK (kind = 'text' OR presentation = 'single_line'),
+      UNIQUE (id, egcs_tp_transferpaymentstream)
+    )
+  `.execute(db)
+  await sql`
+    CREATE TABLE "Transfer_Payment_Stream_Field_Option" (
+      id bigserial PRIMARY KEY,
+      field_id bigint NOT NULL REFERENCES "Transfer_Payment_Stream_Field"(id) ON DELETE RESTRICT,
+      name_en text NOT NULL, name_fr text NOT NULL,
+      category_en text, category_fr text,
+      active boolean NOT NULL DEFAULT true,
+      display_order integer NOT NULL DEFAULT 0 CHECK (display_order >= 0),
+      _deleted boolean NOT NULL DEFAULT false,
+      CHECK ((category_en IS NULL) = (category_fr IS NULL)),
+      UNIQUE (id, field_id)
+    )
+  `.execute(db)
+  await sql`
+    CREATE FUNCTION protect_stream_field_identity() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN
+      IF NEW.kind IS DISTINCT FROM OLD.kind OR NEW.egcs_tp_transferpaymentstream IS DISTINCT FROM OLD.egcs_tp_transferpaymentstream THEN
+        RAISE EXCEPTION 'Stream field identity is immutable' USING ERRCODE = '23514';
+      END IF;
+      RETURN NEW;
+    END $$
+  `.execute(db)
+  await sql`
+    CREATE TRIGGER protect_stream_field_identity BEFORE UPDATE ON "Transfer_Payment_Stream_Field"
+      FOR EACH ROW EXECUTE FUNCTION protect_stream_field_identity()
+  `.execute(db)
+
 }
 
 export async function down(db: Kysely<Database>): Promise<void> {
+  await db.schema.dropTable('Transfer_Payment_Stream_Field_Option').execute()
+  await db.schema.dropTable('Transfer_Payment_Stream_Field').execute()
+  await db.schema.dropTable('Transfer_Payment_Stream_Field_Section').execute()
+  await sql`DROP FUNCTION protect_stream_field_identity()`.execute(db)
   await db.schema.dropIndex(STREAM_HOLDBACK_BASIS_UNIQUE).execute()
   await db.schema.dropIndex(INDEX_NAMES.streamAreaOfExpertiseFr).execute()
   await db.schema.dropIndex(INDEX_NAMES.streamAreaOfExpertiseEn).execute()

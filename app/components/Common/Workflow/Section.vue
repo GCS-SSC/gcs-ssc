@@ -61,6 +61,7 @@ type AvailableStandardWorkflow = {
   ineligibleReason: 'active_workflow' | 'closed_target' | 'terminal_status' | 'status_ineligible' | 'unsupported' | null
 }
 type RuntimeResponse = {
+  routing?: { hash: string, fields: Array<{ fieldId: string, name_en: string, name_fr: string, option_en: string, option_fr: string }> } | null
   current: { runtimeId: string, runtimeState: RuntimeState, attempt: number, previousRuntimeId: string | null } | null
   reviewSet: { id: string, runtimeState: RuntimeState, runtimeItemId: string } | null
   sourceApprovalStage: { runtimeItemId: string, runtimeState: RuntimeState, order: number, routingSlipId?: string | null } | null
@@ -68,6 +69,7 @@ type RuntimeResponse = {
   reviews: RuntimeReview[]
   workflowItems: Array<{ runtimeItemId: string, runtimeState: RuntimeState }>
   steps?: Array<{
+    eligibility?: { eligible: boolean, unmatchedFieldIds: string[] }
     memberId: string
     sequence: number
     kind: 'review_set' | 'recommendation_set' | 'approval_template'
@@ -111,7 +113,7 @@ type WorkflowDisplayStep = {
   id: string
   ordinal: number
   name: string
-  status: RuntimeState | 'upcoming' | 'not_reached'
+  status: RuntimeState | 'upcoming' | 'not_reached' | 'skipped'
   outcome: string | null
   hasApproval: boolean
   kind: 'review' | 'recommendation' | 'final_approval'
@@ -224,6 +226,7 @@ const currentRecommendation = computed(() => data.value?.recommendations?.find(
 ) ?? null)
 type PublishedWorkflowPreview = {
   members: Array<{
+    eligibility?: { eligible: boolean, unmatchedFieldIds: string[] }
     memberId: string
     sequence: number
     kind: 'review_set' | 'recommendation_set' | 'approval_template'
@@ -343,6 +346,10 @@ const workflowSteps = computed<WorkflowDisplayStep[]>(() => {
     let ordinal = 0
     const steps: WorkflowDisplayStep[] = []
     for (const member of data.value.steps) {
+      if (member.eligibility?.eligible === false) {
+        steps.push({ id: `skipped-${member.memberId}`, ordinal: ++ordinal, name: t(`workflow.${member.kind}`), status: 'skipped', outcome: null, hasApproval: false, kind: 'review' })
+        continue
+      }
       if (member.kind === 'review_set') {
         steps.push({
           id: `review-${member.memberId}`, ordinal: ++ordinal,
@@ -431,7 +438,7 @@ const selectedRecommendation = computed(() => data.value?.recommendations?.find(
 const canEditSelectedRecommendation = computed(() => canEdit && selectedRecommendation.value?.canUpdate === true)
 const selectedStep = computed(() => workflowSteps.value.find(step => step.id === selectedStepId.value) ?? null)
 const isStepViewable = (step: WorkflowDisplayStep): boolean =>
-  step.status !== 'upcoming' && step.status !== 'not_reached'
+  step.status !== 'upcoming' && step.status !== 'not_reached' && step.status !== 'skipped'
 const previousAttempts = computed(() => (data.value?.previous ?? []).map(attempt => ({
   ...attempt,
   id: attempt.runtimeId
@@ -609,6 +616,16 @@ const handleApprovalChanged = async () => {
       color="warning"
       icon="i-lucide-lock-keyhole"
       :title="t('workflow.active_target_blocker')" />
+    <CommonWorkflowPacket v-if="data?.routing?.fields.length" :title="t('custom_fields.routing')" :packet-id="`routing-${data.current?.runtimeId}`" :hash="data.routing.hash" :hash-label="t('workflow.packet.hash')">
+      <dl class="space-y-3">
+        <div v-for="field in data.routing.fields" :key="field.fieldId">
+          <dt class="text-sm text-muted">
+            {{ locale === 'fr' ? field.name_fr : field.name_en }}
+          </dt>
+          <dd>{{ locale === 'fr' ? field.option_fr : field.option_en }}</dd>
+        </div>
+      </dl>
+    </CommonWorkflowPacket>
     <CommonWorkflowApprovalPacket v-if="data?.submission" :submission="data.submission" />
     <CommonTranslatedTabs
       v-if="data?.current || data?.previous?.length"
@@ -781,13 +798,13 @@ const handleApprovalChanged = async () => {
             <td class="px-4 py-4">
               <div class="flex flex-wrap gap-2">
                 <CommonLifecycleBadge
-                  v-if="step.status !== 'upcoming' && step.status !== 'not_reached'"
+                  v-if="step.status !== 'upcoming' && step.status !== 'not_reached' && step.status !== 'skipped'"
                   engine="runtime"
                   :state="step.status" />
                 <CommonStatusBadge
                   v-else
                   variant="count"
-                  :label="t(step.status === 'not_reached' ? 'workflow.not_reached' : 'workflow.upcoming')" />
+                  :label="t(step.status === 'skipped' ? 'custom_fields.skipped' : step.status === 'not_reached' ? 'workflow.not_reached' : 'workflow.upcoming')" />
                 <CommonStatusBadge
                   v-if="step.outcome"
                   enum-name="recommendation_outcome"

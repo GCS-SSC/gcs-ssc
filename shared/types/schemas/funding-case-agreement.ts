@@ -1,5 +1,6 @@
 /* eslint-disable jsdoc/require-jsdoc -- Existing schemas use descriptive exports and inferred metadata. */
 import { z } from 'zod'
+import { AgreementCustomFieldValuesSchema } from './agreement-custom-fields'
 import type { Agreement_Type, Follow_Up_Status, Monitor_Action_Type, Monitor_Responsible_Party } from '~~/shared/types/database'
 import type { StatusId } from '~~/shared/types/status'
 import {
@@ -68,6 +69,7 @@ const RequiredUniqueBigintSelectionIdsSchema = () => z.array(RequiredBigintSelec
   .superRefine(addDuplicateSelectionIssues)
 
 export const FundingCaseAgreementProfileBaseSchema = z.object({
+  egcs_fc_customfields: AgreementCustomFieldValuesSchema.optional(),
   egcs_fc_agreementnumber: RequiredString().max(15, { error: 'validation.max_length' }),
   egcs_fc_transferpaymentstream: RequiredBigintSelectionId(),
   egcs_fc_financialsystemnumber: RequiredBigintLike(),

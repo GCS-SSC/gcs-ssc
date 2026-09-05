@@ -33,7 +33,7 @@ export const AgreementStreamLookupQuerySchema = PaginationSchema.extend({
     const trimmedValue = value.trim()
     return trimmedValue.length > 0 ? trimmedValue : undefined
   }, PositivePostgresBigintIdSchema.optional()),
-  permission_action: z.enum(['create', 'update']).default('create')
+  permission_action: z.enum(['create', 'update', 'read']).default('create')
 })
 
 const routeBadRequest = async (
@@ -62,10 +62,10 @@ export const prepareAgreementStreamLookupRoute = async (
     return await routeBadRequest(event, 'INVALID_AGREEMENT_STREAM', 'apiErrors.agreement.invalid_stream')
   }
 
-  const agreementContext = permission_action === 'update' && agreement_id
+  const agreementContext = permission_action !== 'create' && agreement_id
     ? await resolveAgreementScopeContext(agreement_id, db)
     : null
-  if (permission_action === 'update' && agreement_id && !agreementContext) {
+  if (permission_action !== 'create' && agreement_id && !agreementContext) {
     return await routeBadRequest(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
   }
 
@@ -83,17 +83,17 @@ export const prepareAgreementStreamLookupRoute = async (
 
 export const authorizeAgreementStreamLookupRoute = async (
   db: Kysely<Database>,
-  action: 'create' | 'update',
+  action: 'create' | 'update' | 'read',
   streamId: string,
   scope: Scope,
   agreementContext: AgreementScopeContext | null,
   context: Parameters<typeof canAccessAgreementStream>[0]
 ) => {
   if (
-    action === 'update'
+    action !== 'create'
     && agreementContext
     && agreementContext.streamId === streamId
-    && await canAccessAgreement(context, 'update', agreementContext.scope, db)
+    && await canAccessAgreement(context, action, agreementContext.scope, db)
   ) {
     return { bypass: true } as const
   }

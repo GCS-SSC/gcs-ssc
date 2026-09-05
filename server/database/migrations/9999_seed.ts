@@ -3978,6 +3978,40 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
       .execute()
   }
 
+  for (const stream of await db.selectFrom('Transfer_Payment_Stream').select('id').where('_deleted', '=', false).execute()) {
+    const section = await db.insertInto('Transfer_Payment_Stream_Field_Section').values({
+      egcs_tp_transferpaymentstream: String(stream.id), name_en: 'Project delivery', name_fr: 'Prestation du projet', display_order: 0
+    }).returning('id').executeTakeFirstOrThrow()
+    const field = await db.insertInto('Transfer_Payment_Stream_Field').values({
+      section_id: String(section.id), egcs_tp_transferpaymentstream: String(stream.id), name_en: 'Delivery model', name_fr: 'Mode de prestation',
+      kind: 'relational', discriminator: true, display_order: 0
+    }).returningAll().executeTakeFirstOrThrow()
+    const option = await db.insertInto('Transfer_Payment_Stream_Field_Option').values({
+      field_id: String(field.id), name_en: 'Direct delivery', name_fr: 'Prestation directe',
+      category_en: 'Delivery', category_fr: 'Prestation', display_order: 0
+    }).returningAll().executeTakeFirstOrThrow()
+    await db.insertInto('Transfer_Payment_Stream_Field').values({
+      section_id: String(section.id), egcs_tp_transferpaymentstream: String(stream.id), name_en: 'Delivery notes', name_fr: 'Notes sur la prestation',
+      kind: 'text', presentation: 'multiline', display_order: 1
+    }).execute()
+    const referencesSection = await db.insertInto('Transfer_Payment_Stream_Field_Section').values({
+      egcs_tp_transferpaymentstream: String(stream.id), name_en: 'Project references', name_fr: 'Références du projet', display_order: 1
+    }).returning('id').executeTakeFirstOrThrow()
+    await db.insertInto('Transfer_Payment_Stream_Field').values({
+      section_id: String(referencesSection.id), egcs_tp_transferpaymentstream: String(stream.id), name_en: 'Local project reference', name_fr: 'Référence locale du projet',
+      kind: 'text', presentation: 'single_line', display_order: 2
+    }).execute()
+    const members = await db.selectFrom('Common_Workflow_Setup_Member as member')
+      .innerJoin('Common_Workflow_Setup as setup', 'setup.id', 'member.egcs_cn_workflowsetup')
+      .select('member.id').where('setup.egcs_cn_scopeid', '=', String(stream.id))
+      .where('setup.egcs_cn_scopetype', '=', 'transferpaymentstream').where('setup.egcs_cn_entitytype', '=', 'fundingcaseagreement')
+      .where('setup.egcs_cn_purpose', '=', 'approval_submission').where('member.egcs_cn_sequence', '=', 1)
+      .where('member._deleted', '=', false).execute()
+    if (members.length) await db.insertInto('Common_Workflow_Member_Condition').values(members.map(member => ({
+      member_id: String(member.id), field_id: String(field.id), option_id: String(option.id)
+    }))).execute()
+  }
+
   await publishSeedWorkflowDependencies(db)
   const actor = await db.selectFrom('Common_User').select('id')
     .where('egcs_cn_email', '=', 'root@example.com').where('_deleted', '=', false).executeTakeFirstOrThrow()
@@ -6087,6 +6121,14 @@ const seedDatabase = async (db: Kysely<Database>): Promise<void> => {
   await seedTransferPaymentData(db)
   await seedRootProgramApprovalRole(db)
   await seedAgreementData(db)
+  const deliveryOptions = await db.selectFrom('Transfer_Payment_Stream_Field as field')
+    .innerJoin('Transfer_Payment_Stream_Field_Option as option', 'option.field_id', 'field.id')
+    .select(['field.id as fieldId', 'field.egcs_tp_transferpaymentstream as streamId', 'option.id as optionId'])
+    .where('field.name_en', '=', 'Delivery model').execute()
+  for (const option of deliveryOptions) {
+    await db.updateTable('Funding_Case_Agreement_Profile').set({ egcs_fc_customfields: { [String(option.fieldId)]: String(option.optionId) } })
+      .where('egcs_fc_transferpaymentstream', '=', option.streamId).execute()
+  }
   await seedAgreement51Closeout(db)
   await seedAgreementMonitorData(db)
   await seedContributionAgreementDocumentTemplates(db)
@@ -6152,7 +6194,8 @@ export const down = async (db: Kysely<Database>): Promise<void> => {
     ['Common_Recommendation_Setup', 'trg_guard_recommendation_setup_authoring'],
     ['Common_Workflow_Setup_Allowed_Start_Status', 'trg_guard_workflow_status_authoring'],
     ['Common_Workflow_Setup_Member', 'trg_guard_workflow_member_authoring'],
-    ['Common_Workflow_Setup_Member_Owner', 'trg_guard_workflow_owner_authoring']
+    ['Common_Workflow_Setup_Member_Owner', 'trg_guard_workflow_owner_authoring'],
+    ['Common_Workflow_Publication_Condition', 'protect_workflow_publication_conditions']
   ] as const
   for (const [table, trigger] of lifecycleResetTriggers) {
     await sql.raw(`ALTER TABLE "${table}" DISABLE TRIGGER ${trigger}`).execute(db)
@@ -6160,6 +6203,8 @@ export const down = async (db: Kysely<Database>): Promise<void> => {
   await sql`ALTER TABLE "Common_Entity_Assignment" DISABLE TRIGGER trg_enforce_entity_assignment_roster`.execute(db)
   await db.deleteFrom('Common_Entity_Assignment').execute()
   await sql`ALTER TABLE "Common_Entity_Assignment" ENABLE TRIGGER trg_enforce_entity_assignment_roster`.execute(db)
+  await db.deleteFrom('Common_Workflow_Publication_Condition').execute()
+  await db.deleteFrom('Common_Workflow_Member_Condition').execute()
   await db.deleteFrom('Funding_Case_Agreement_Generated_Document').execute()
   await db.deleteFrom('Transfer_Payment_Stream_Document_Template').execute()
   await db.deleteFrom('Common_Assessment_Custom_Outcome').execute()
@@ -6296,6 +6341,9 @@ export const down = async (db: Kysely<Database>): Promise<void> => {
   await db.deleteFrom('Transfer_Payment_Objective').execute()
   await db.deleteFrom('Transfer_Payment_Outcome').execute()
   await db.deleteFrom('Transfer_Payment_Financial_Limits').execute()
+  await db.deleteFrom('Transfer_Payment_Stream_Field_Option').execute()
+  await db.deleteFrom('Transfer_Payment_Stream_Field').execute()
+  await db.deleteFrom('Transfer_Payment_Stream_Field_Section').execute()
   await db.deleteFrom('Transfer_Payment_Stream').execute()
   await db.deleteFrom('Transfer_Payment_Fiscal_Year_Budget').execute()
   await db.deleteFrom('role_transfer_payment_scope').execute()

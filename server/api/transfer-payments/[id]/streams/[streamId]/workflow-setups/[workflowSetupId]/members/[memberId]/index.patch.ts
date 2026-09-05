@@ -1,3 +1,4 @@
+import { replaceWorkflowConditions } from '~~/server/utils/workflow-conditions'
 import { sql } from 'kysely'
 import { CommonWorkflowSetupMemberPatchSchema } from '~~/shared/types/schemas'
 import { authorize } from '~~/server/utils/authorize'
@@ -39,7 +40,7 @@ export default defineEventHandler(async event => {
     const current = members.find(member => String(member.id) === memberId)
     if (!current) return await notFound(event, 'WORKFLOW_MEMBER_NOT_FOUND', 'apiErrors.admin_common.not_found')
     const requestedSequence = body.egcs_cn_sequence
-    const { egcs_cn_sequence: _sequence, owners, ...values } = body
+    const { egcs_cn_sequence: _sequence, owners, conditions, ...values } = body
     if (requestedSequence && requestedSequence !== current.egcs_cn_sequence) {
       const ordered = members.filter(member => String(member.id) !== memberId)
       ordered.splice(Math.min(requestedSequence, members.length) - 1, 0, current)
@@ -57,6 +58,9 @@ export default defineEventHandler(async event => {
           .where('egcs_cn_workflowsetup', '=', workflowSetupId).where('_deleted', '=', false).returningAll().executeTakeFirstOrThrow()
     if (owners && !await replaceWorkflowSetupMemberOwners(trx, updated, owners)) {
       return await badRequest(event, 'WORKFLOW_MEMBER_OWNERS_INVALID', 'apiErrors.request.invalid_resource')
+    }
+    if (conditions && !await replaceWorkflowConditions(trx, streamId, String(updated.id), conditions)) {
+      return await badRequest(event, 'WORKFLOW_CONDITIONS_INVALID', 'apiErrors.request.invalid_resource')
     }
     return updated
   })

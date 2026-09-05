@@ -1,4 +1,31 @@
 {
+  "custom_fields": {
+    "section": "Section",
+    "add_section": "Ajouter une section",
+    "add_field": "Ajouter un champ",
+    "configuration": "Configuration",
+    "routing": "Valeurs de routage enregistrées",
+    "title": "Champs personnalisés",
+    "inactive": "Inactif",
+    "clear": "Effacer la valeur",
+    "conditions": "Conditions",
+    "conditions_help": "Tous les champs configurés doivent correspondre. Sélectionnez une ou plusieurs options par champ; laissez un champ vide pour l’ignorer.",
+    "skipped": "Ignoré — conditions non remplies",
+    "add_option": "Ajouter une option",
+    "name_en": "Libellé anglais",
+    "name_fr": "Libellé français",
+    "text": "Texte",
+    "relational": "Sélection unique",
+    "presentation": "Présentation du texte",
+    "single_line": "Une ligne",
+    "multiline": "Plusieurs lignes",
+    "active": "Actif",
+    "required": "Obligatoire",
+    "discriminator": "Utiliser dans les conditions de flux de travail",
+    "order": "Ordre d’affichage",
+    "category_en": "Catégorie anglaise",
+    "category_fr": "Catégorie française"
+  },
   "nav": {
     "home": "Accueil",
     "agencies": "Agences",
@@ -786,6 +813,7 @@
     "return_home": "Retourner au tableau de bord"
   },
   "apiErrors": {
+    "custom_fields": {"section_in_use": "Déplacez ou supprimez les champs de cette section avant de la supprimer.", "in_use": "Ce champ ou cette option contient des valeurs d’entente enregistrées ou des références de flux de travail."},
     "health": {
       "unavailable": "Le service est temporairement indisponible."
     },
@@ -813,6 +841,7 @@
       "definition_invalid": "La définition enregistrée de cette évaluation est invalide et ne peut pas être chargée. Communiquez avec le soutien en indiquant le numéro de l’examen."
     },
     "workflow": {
+      "route_invalid": "Renseignez des valeurs de sélection valides et vérifiez que le parcours comprend toutes les étapes obligatoires.",
       "recommendation_invalid": "Répondez à toutes les questions obligatoires de la recommandation avant de la soumettre.",
       "recommendation_revision_conflict": "Cette recommandation a changé depuis son ouverture. Actualisez-la et examinez les réponses les plus récentes avant de l’enregistrer de nouveau.",
       "recommendation_result_required": "Sélectionnez une réponse à la question décisionnelle avant de soumettre la recommandation.",
@@ -964,6 +993,7 @@
       "libreoffice_unavailable": "LibreOffice est requis pour convertir les modèles DOCX en PDF. Installez LibreOffice sur le serveur ou utilisez un modèle PDF HTML."
     },
     "agreement": {
+      "stream_immutable": "Le volet de l’entente ne peut pas être modifié après sa création.",
       "not_found": "Entente introuvable.",
       "closed": "Cette entente est fermée et ne peut plus être modifiée.",
       "closeout_not_found": "Clôture d’entente introuvable.",
@@ -1647,6 +1677,8 @@
     }
   },
   "validation": {
+    "custom_field_inactive": "Les champs inactifs peuvent uniquement être effacés.",
+    "custom_field_single_line": "Saisissez du texte sans saut de ligne.",
     "required": "Ce champ est obligatoire",
     "bilingual_value_required": "Fournissez une valeur anglaise ou française",
     "checklist_answer_option_required": "Sélectionnez l'une des options de réponse configurées",

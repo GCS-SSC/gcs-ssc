@@ -1,3 +1,4 @@
+import { mergeAgreementCustomFields } from '~~/server/utils/agreement-custom-fields'
 import type { Insertable } from 'kysely'
 import { FundingCaseAgreementCreateSchema } from '~~/shared/types/schemas'
 import {
@@ -150,6 +151,7 @@ export default defineEventHandler(async event => {
             validated,
             subtypeContext.agreementType
           ) as Insertable<FundingCaseAgreementProfileTable>
+          values.egcs_fc_customfields = await mergeAgreementCustomFields(event, trx, streamId, {}, validated.egcs_fc_customfields ?? {})
           values.egcs_fc_status = await lockAgencyDraftStatus(trx, currentStreamContext.agencyId)
           const createdAgreement = await trx
             .insertInto('Funding_Case_Agreement_Profile')
