@@ -271,10 +271,10 @@ const patchValidatedAgreementProfile = async (
   if (holdbackBasisError) return holdbackBasisError
 
   const values = mapAgreementWriteValues(sanitized, subtypeContext.agreementType)
-  if (validated.egcs_fc_customfields !== undefined) {
-    const stored = await db.selectFrom('Funding_Case_Agreement_Profile').select('egcs_fc_customfields').where('id', '=', agreementId).executeTakeFirstOrThrow()
-    values.egcs_fc_customfields = await mergeAgreementCustomFields(event, db, nextStreamId, stored.egcs_fc_customfields, validated.egcs_fc_customfields)
-  }
+  const stored = await db.selectFrom('Funding_Case_Agreement_Profile').select('egcs_fc_customfields').where('id', '=', agreementId).executeTakeFirstOrThrow()
+  values.egcs_fc_customfields = await mergeAgreementCustomFields(
+    event, db, nextStreamId, stored.egcs_fc_customfields, validated.egcs_fc_customfields ?? {}
+  )
 
   try {
     if (Object.keys(values).length === 1 && Object.hasOwn(values, 'egcs_fc_agreementtype')) {

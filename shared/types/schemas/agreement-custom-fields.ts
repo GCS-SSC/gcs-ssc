@@ -2,6 +2,10 @@ import { z } from 'zod'
 import { PositivePostgresBigintIdSchema } from './common'
 
 const Label = z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' })
+const CategoryLabel = z.preprocess(
+  value => typeof value === 'string' && value.trim() === '' ? null : value,
+  Label.nullable()
+)
 export const AgreementCustomFieldValuesSchema = z.record(
   PositivePostgresBigintIdSchema,
   z.union([z.string(), z.number({ error: 'validation.custom_field_number' }), z.array(PositivePostgresBigintIdSchema), z.null()], { error: 'validation.invalid_selection' })
@@ -46,8 +50,8 @@ export const StreamFieldPatchSchema = StreamFieldBaseSchema.extend({
 export const StreamFieldOptionBaseSchema = z.object({
   name_en: Label,
   name_fr: Label,
-  category_en: Label.nullable().default(null),
-  category_fr: Label.nullable().default(null),
+  category_en: CategoryLabel.default(null),
+  category_fr: CategoryLabel.default(null),
   active: z.boolean().default(true),
   display_order: z.number().int().nonnegative().default(0)
 })

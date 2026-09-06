@@ -1,5 +1,5 @@
 import { customFieldHasValue, customFieldOptionIds } from '~~/shared/types/schemas/agreement-custom-fields'
-import { readAgreementCustomFieldDefinitions } from './agreement-custom-fields'
+import { mergeAgreementCustomFields, readAgreementCustomFieldDefinitions } from './agreement-custom-fields'
 /* eslint-disable jsdoc/require-jsdoc, @stylistic/multiline-ternary -- compact snapshot normalization and query fallbacks */
 import { createHash } from 'node:crypto'
 import { sql, type Kysely, type Transaction } from 'kysely'
@@ -113,6 +113,9 @@ export const buildAgreementApprovalSnapshot = async (
     : null
   const agreementId = amendment ? String(amendment.egcs_fc_fundingagreement) : entityId
   const agreement = await trx.selectFrom('Funding_Case_Agreement_Profile').selectAll().where('id', '=', agreementId).where('_deleted', '=', false).forUpdate().executeTakeFirstOrThrow()
+  if (!amendment) {
+    await mergeAgreementCustomFields(event, trx, String(agreement.egcs_fc_transferpaymentstream), agreement.egcs_fc_customfields, {})
+  }
   const agreementReferences = amendment ? null : await trx.selectFrom('Funding_Case_Agreement_Profile')
     .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Funding_Case_Agreement_Profile.egcs_fc_transferpaymentstream')
     .innerJoin('Transfer_Payment_Profile', 'Transfer_Payment_Profile.id', 'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile')
