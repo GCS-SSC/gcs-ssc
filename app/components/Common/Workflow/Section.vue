@@ -61,7 +61,7 @@ type AvailableStandardWorkflow = {
   ineligibleReason: 'active_workflow' | 'closed_target' | 'terminal_status' | 'status_ineligible' | 'unsupported' | null
 }
 type RuntimeResponse = {
-  routing?: { hash: string, fields: Array<{ fieldId: string, name_en: string, name_fr: string, option_en: string, option_fr: string }> } | null
+  routing?: { hash: string, fields: Array<{ fieldId: string, optionId: string, name_en: string, name_fr: string, option_en: string, option_fr: string }> } | null
   current: { runtimeId: string, runtimeState: RuntimeState, attempt: number, previousRuntimeId: string | null } | null
   reviewSet: { id: string, runtimeState: RuntimeState, runtimeItemId: string } | null
   sourceApprovalStage: { runtimeItemId: string, runtimeState: RuntimeState, order: number, routingSlipId?: string | null } | null
@@ -618,7 +618,7 @@ const handleApprovalChanged = async () => {
       :title="t('workflow.active_target_blocker')" />
     <CommonWorkflowPacket v-if="data?.routing?.fields.length" :title="t('custom_fields.routing')" :packet-id="`routing-${data.current?.runtimeId}`" :hash="data.routing.hash" :hash-label="t('workflow.packet.hash')">
       <dl class="space-y-3">
-        <div v-for="field in data.routing.fields" :key="field.fieldId">
+        <div v-for="field in data.routing.fields" :key="`${field.fieldId}:${field.optionId}`">
           <dt class="text-sm text-muted">
             {{ locale === 'fr' ? field.name_fr : field.name_en }}
           </dt>

@@ -21,7 +21,17 @@ const { data, refresh, status } = await useAsyncData<{ items: AgreementCustomFie
 })
 type FieldForm = Partial<AgreementCustomFieldDefinition>
 type Option = AgreementCustomFieldDefinition['options'][number]
-const fieldModal = useCrudModal<FieldForm>({ createState: () => ({ kind: 'text', presentation: 'single_line', active: true, required: false, discriminator: false, display_order: 0 }), updateState: field => ({ ...field }) })
+const fieldModal = useCrudModal<FieldForm>({ createState: () => ({ kind: 'text', multiple: false, presentation: 'single_line', active: true, required: false, discriminator: false, display_order: 0 }), updateState: field => ({ ...field }) })
+watch(() => fieldModal.selected.value?.kind, kind => {
+  const selected = fieldModal.selected.value
+  if (!selected) return
+  if (kind !== 'text') selected.presentation = 'single_line'
+  if (kind !== 'relational') {
+    selected.discriminator = false
+    selected.multiple = false
+  }
+})
+const multipleSelectionLocked = computed(() => Boolean(data.value?.items.find(field => field.id === fieldModal.selected.value?.id)?.multiple))
 const optionModal = useCrudModal<Partial<Option>>({ createState: () => ({ active: true, display_order: 0, category_en: null, category_fr: null }), updateState: option => ({ ...option }) })
 const optionFieldId: Ref<string | null> = ref(null)
 const sectionModal = useCrudModal<Partial<AgreementCustomFieldSection>>({ createState: () => ({ display_order: 0 }), updateState: section => ({ ...section }) })
@@ -53,10 +63,11 @@ const search = ref('')
 const pagination = ref({ pageIndex: 0, pageSize: 10 })
 const expandedRows: Ref<ExpandedState> = ref({})
 const { getGroupedDisclosureControlsId, getGroupedDisclosureContentId } = useGroupedDisclosureIds()
-type FieldRow = { id: string, sectionGroup: string, section: AgreementCustomFieldSection, fieldGroup: string, field: AgreementCustomFieldDefinition | null, option: Option | null }
+type FieldRow = { id: string, sectionGroup: string, section: AgreementCustomFieldSection, fieldGroup: string, categoryGroup: string, field: AgreementCustomFieldDefinition | null, option: Option | null }
 const columns: TableColumnInput<FieldRow>[] = [
   { id: 'sectionGroup', accessorKey: 'sectionGroup', headerKey: 'custom_fields.section' },
   { id: 'fieldGroup', accessorKey: 'fieldGroup', headerKey: 'custom_fields.title' },
+  { id: 'categoryGroup', accessorKey: 'categoryGroup', headerKey: 'custom_fields.category' },
   { id: 'name', headerKey: 'common.name' },
   { id: 'type', headerKey: 'common.type' },
   { id: 'configuration', headerKey: 'custom_fields.configuration' },
@@ -64,10 +75,10 @@ const columns: TableColumnInput<FieldRow>[] = [
   { id: 'status', headerKey: 'common.status' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
-const grouping = ['sectionGroup', 'fieldGroup']
+const grouping = ['sectionGroup', 'fieldGroup', 'categoryGroup']
 const groupingOptions = { getGroupedRowModel: getGroupedRowModel() }
 const expandedOptions = { autoResetExpanded: false }
-const columnVisibility = { sectionGroup: false, fieldGroup: false }
+const columnVisibility = { sectionGroup: false, fieldGroup: false, categoryGroup: false }
 const filteredSections = computed(() => {
   const query = search.value.trim().toLocaleLowerCase()
   return (data.value?.sections ?? []).map(section => {
@@ -83,9 +94,9 @@ const tableRows = computed<FieldRow[]>(() => filteredSections.value
   .slice(pagination.value.pageIndex * pagination.value.pageSize, (pagination.value.pageIndex + 1) * pagination.value.pageSize)
   .flatMap((section): FieldRow[] => section.fields.length
     ? section.fields.flatMap((field): FieldRow[] => field.options.length
-        ? field.options.map(option => ({ id: `option:${option.id}`, sectionGroup: section.id, section, fieldGroup: field.id, field, option }))
-        : [{ id: `field:${field.id}`, sectionGroup: section.id, section, fieldGroup: field.id, field, option: null }])
-    : [{ id: `section:${section.id}`, sectionGroup: section.id, section, fieldGroup: `empty:${section.id}`, field: null, option: null }]))
+        ? field.options.map(option => ({ id: `option:${option.id}`, sectionGroup: section.id, section, fieldGroup: field.id, categoryGroup: JSON.stringify([option.category_en, option.category_fr]), field, option }))
+        : [{ id: `field:${field.id}`, sectionGroup: section.id, section, fieldGroup: field.id, categoryGroup: 'empty', field, option: null }])
+    : [{ id: `section:${section.id}`, sectionGroup: section.id, section, fieldGroup: `empty:${section.id}`, categoryGroup: 'empty', field: null, option: null }]))
 watch(search, () => {
   pagination.value.pageIndex = 0
 })
@@ -182,9 +193,9 @@ watch(url, () => {
               <CommonBilingualName :name-en="row.original.section.name_en" :name-fr="row.original.section.name_fr" />
             </CommonGroupedDisclosureButton>
           </div>
-          <div v-else-if="row.getIsGrouped() && row.original.field" class="flex items-center gap-3 py-1 pl-6">
+          <div v-else-if="row.groupingColumnId === 'fieldGroup' && row.original.field" class="flex items-center gap-3 py-1 pl-6">
             <CommonGroupedDisclosureButton
-              v-if="row.original.field.kind === 'relational'"
+              v-if="row.original.field.kind === 'relational' && row.original.field.options.length"
               class="group flex min-w-0 items-center gap-3 text-left font-bold text-zinc-900 transition-colors hover:text-primary dark:text-white"
               :expanded="row.getIsExpanded()"
               :controls="getGroupedDisclosureControlsId(row.id)"
@@ -197,7 +208,22 @@ watch(url, () => {
             </CommonGroupedDisclosureButton>
             <CommonBilingualName v-else class="pl-7" :name-en="row.original.field.name_en" :name-fr="row.original.field.name_fr" />
           </div>
-          <div v-else-if="row.original.option" class="flex items-center gap-3 py-1 pl-12">
+          <div v-else-if="row.groupingColumnId === 'categoryGroup' && row.original.option" class="flex items-center gap-3 py-1 pl-12">
+            <CommonGroupedDisclosureButton
+              class="group flex min-w-0 items-center gap-3 text-left font-semibold"
+              :expanded="row.getIsExpanded()"
+              :controls="getGroupedDisclosureControlsId(row.id)"
+              :label="row.original.option.category_en ? undefined : t('custom_fields.uncategorized')"
+              :label-en="row.original.option.category_en ?? undefined"
+              :label-fr="row.original.option.category_fr ?? undefined"
+              @toggle="row.toggleExpanded()">
+              <UIcon :name="row.getIsExpanded() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" class="size-4 text-zinc-400" />
+              <CommonBilingualName v-if="row.original.option.category_en" :name-en="row.original.option.category_en" :name-fr="row.original.option.category_fr ?? ''" />
+              <span v-else>{{ t('custom_fields.uncategorized') }}</span>
+              <CommonStatusBadge variant="count" size="sm" :label="String(row.subRows.length)" />
+            </CommonGroupedDisclosureButton>
+          </div>
+          <div v-else-if="!row.getIsGrouped() && row.original.option" class="flex items-center gap-3 py-1 pl-18">
             <UIcon name="i-lucide-corner-down-right" class="size-4 text-zinc-400" />
             <CommonBilingualName :name-en="row.original.option.name_en" :name-fr="row.original.option.name_fr" />
           </div>
@@ -206,7 +232,8 @@ watch(url, () => {
       </template>
       <template #type-cell="{ row }">
         <span v-if="row.groupingColumnId === 'sectionGroup'">{{ t('custom_fields.section') }}</span>
-        <span v-else-if="row.getIsGrouped() && row.original.field">{{ t(`custom_fields.${row.original.field.kind === 'relational' ? 'relational' : row.original.field.presentation}`) }}</span>
+        <span v-else-if="row.groupingColumnId === 'categoryGroup'">{{ t('custom_fields.category') }}</span>
+        <span v-else-if="row.groupingColumnId === 'fieldGroup' && row.original.field">{{ t(`custom_fields.${row.original.field.kind === 'text' ? row.original.field.presentation : row.original.field.kind === 'relational' ? (row.original.field.multiple ? 'multiple_selection' : 'single_selection') : 'number'}`) }}</span>
       </template>
       <template #configuration-cell="{ row }">
         <div v-if="row.groupingColumnId === 'fieldGroup' && row.original.field" class="flex flex-wrap gap-2">
@@ -216,10 +243,10 @@ watch(url, () => {
         <CommonBilingualName v-else-if="!row.getIsGrouped() && row.original.option?.category_en" :name-en="row.original.option.category_en" :name-fr="row.original.option.category_fr ?? ''" />
       </template>
       <template #order-cell="{ row }">
-        {{ row.groupingColumnId === 'sectionGroup' ? row.original.section.display_order : row.getIsGrouped() ? row.original.field?.display_order : row.original.option?.display_order }}
+        <span v-if="row.groupingColumnId !== 'categoryGroup'">{{ row.groupingColumnId === 'sectionGroup' ? row.original.section.display_order : row.getIsGrouped() ? row.original.field?.display_order : row.original.option?.display_order }}</span>
       </template>
       <template #status-cell="{ row }">
-        <UBadge v-if="row.groupingColumnId !== 'sectionGroup' && (row.original.field || row.original.option)" color="neutral" variant="subtle" :label="t((row.getIsGrouped() ? row.original.field?.active : row.original.option?.active) ? 'custom_fields.active' : 'custom_fields.inactive')" />
+        <UBadge v-if="(row.groupingColumnId === 'fieldGroup' || !row.getIsGrouped()) && (row.original.field || row.original.option)" color="neutral" variant="subtle" :label="t((row.getIsGrouped() ? row.original.field?.active : row.original.option?.active) ? 'custom_fields.active' : 'custom_fields.inactive')" />
       </template>
       <template #actions-cell="{ row }">
         <div v-if="row.groupingColumnId === 'sectionGroup'" class="flex items-center gap-2">
@@ -227,12 +254,12 @@ watch(url, () => {
           <UButton v-if="canUpdateChild" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" :aria-label="t('common.edit')" @click="sectionModal.openUpdate(row.original.section)" />
           <UButton v-if="canDeleteChild" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('common.delete')" @click="remove(`sections/${row.original.section.id}`)" />
         </div>
-        <div v-else-if="row.getIsGrouped() && row.original.field" class="flex items-center gap-2">
+        <div v-else-if="row.groupingColumnId === 'fieldGroup' && row.original.field" class="flex items-center gap-2">
           <UButton v-if="canUpdateChild && row.original.field.kind === 'relational'" icon="i-lucide-plus" color="neutral" variant="ghost" size="sm" :aria-label="t('custom_fields.add_option')" @click="openOption(row.original.field.id)" />
           <UButton v-if="canUpdateChild" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" :aria-label="t('common.edit')" @click="fieldModal.openUpdate(row.original.field)" />
           <UButton v-if="canDeleteChild" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('common.delete')" @click="remove(row.original.field.id)" />
         </div>
-        <div v-else-if="row.original.option && row.original.field" class="flex items-center gap-2">
+        <div v-else-if="!row.getIsGrouped() && row.original.option && row.original.field" class="flex items-center gap-2">
           <UButton v-if="canUpdateChild" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" :aria-label="t('common.edit')" @click="openOption(row.original.field.id, row.original.option)" />
           <UButton v-if="canDeleteChild" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('common.delete')" @click="remove(`${row.original.field.id}/options/${row.original.option.id}`)" />
         </div>
@@ -267,11 +294,12 @@ watch(url, () => {
             <CommonBilingualSelectMenu v-model="fieldModal.selected.value.section_id" :items="data?.sections ?? []" value-key="id" />
           </UFormField>
           <UFormField :label="t('common.type')" name="kind">
-            <USelect v-model="fieldModal.selected.value.kind" :disabled="Boolean(fieldModal.selected.value.id)" :items="[{ value: 'text', label: t('custom_fields.text') }, { value: 'relational', label: t('custom_fields.relational') }]" />
+            <USelect v-model="fieldModal.selected.value.kind" :disabled="Boolean(fieldModal.selected.value.id)" :items="[{ value: 'text', label: t('custom_fields.text') }, { value: 'number', label: t('custom_fields.number') }, { value: 'relational', label: t('custom_fields.relational') }]" />
           </UFormField>
           <UFormField v-if="fieldModal.selected.value.kind === 'text'" :label="t('custom_fields.presentation')" name="presentation">
             <USelect v-model="fieldModal.selected.value.presentation" :items="[{ value: 'single_line', label: t('custom_fields.single_line') }, { value: 'multiline', label: t('custom_fields.multiline') }]" />
           </UFormField>
+          <UCheckbox v-if="fieldModal.selected.value.kind === 'relational'" v-model="fieldModal.selected.value.multiple" :disabled="multipleSelectionLocked" :label="t('custom_fields.allow_multiple')" :description="t('custom_fields.multiple_help')" />
           <UCheckbox v-model="fieldModal.selected.value.active" :label="t('custom_fields.active')" />
           <UCheckbox v-model="fieldModal.selected.value.required" :label="t('custom_fields.required')" />
           <UCheckbox v-if="fieldModal.selected.value.kind === 'relational'" v-model="fieldModal.selected.value.discriminator" :label="t('custom_fields.discriminator')" />

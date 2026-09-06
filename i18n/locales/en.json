@@ -1,5 +1,7 @@
 {
   "custom_fields": {
+    "category": "Category",
+    "uncategorized": "Uncategorized",
     "section": "Section",
     "add_section": "Add section",
     "add_field": "Add field",
@@ -9,13 +11,18 @@
     "inactive": "Inactive",
     "clear": "Clear value",
     "conditions": "Conditions",
-    "conditions_help": "All configured fields must match. Select one or more options per field; leave a field empty to ignore it.",
+    "conditions_help": "All configured fields must match. Each field matches when any Agreement selection is among its configured options. Leave a field empty to ignore it.",
     "skipped": "Skipped—conditions not met",
     "add_option": "Add option",
     "name_en": "English label",
     "name_fr": "French label",
     "text": "Text",
-    "relational": "Single selection",
+    "relational": "Selection",
+    "single_selection": "Single selection",
+    "multiple_selection": "Multiple selections",
+    "allow_multiple": "Allow multiple selections",
+    "multiple_help": "Once saved with multiple selections, this field cannot return to single selection.",
+    "number": "Number",
     "presentation": "Text presentation",
     "single_line": "Single line",
     "multiline": "Multiple lines",
@@ -813,7 +820,7 @@
     "return_home": "Return to dashboard"
   },
   "apiErrors": {
-    "custom_fields": {"section_in_use": "Move or delete the fields in this section before deleting it.", "in_use": "This field or option has saved Agreement values or workflow references."},
+    "custom_fields": {"multiple_to_single": "A multiple-selection field cannot be changed to single selection.", "section_in_use": "Move or delete the fields in this section before deleting it.", "in_use": "This field or option has saved Agreement values or workflow references."},
     "health": {
       "unavailable": "The service is temporarily unavailable."
     },
@@ -1678,6 +1685,8 @@
   },
   "validation": {
     "custom_field_inactive": "Inactive fields can only be cleared.",
+    "custom_field_single_selection": "Select only one option for this field.",
+    "custom_field_number": "Enter a valid number.",
     "custom_field_single_line": "Enter text without line breaks.",
     "required": "This field is required",
     "bilingual_value_required": "Provide an English or French value",

@@ -10,6 +10,8 @@ const {
   labelKey,
   labelEnKey = 'name_en',
   labelFrKey = 'name_fr',
+  categoryEnKey,
+  categoryFrKey,
   prependOptions = []
 } = defineProps<{
   items?: unknown[]
@@ -17,6 +19,8 @@ const {
   labelKey?: string
   labelEnKey?: string
   labelFrKey?: string
+  categoryEnKey?: string
+  categoryFrKey?: string
   prependOptions?: Array<{ label: string; value: string | null }>
 }>()
 
@@ -25,7 +29,7 @@ const model = defineModel<string | null | undefined>({ default: undefined })
 const { locale } = useI18n()
 const selectMenuRef = useSelectMenuTriggerName()
 
-const mappedItems = computed<Array<{ label: string; value: string | null; raw: unknown }>>(() => {
+const mappedItems = computed(() => {
   const baseItems = items.map(item => {
     const record = item as Record<string, unknown>
     const value = record[valueKey]
@@ -36,12 +40,13 @@ const mappedItems = computed<Array<{ label: string; value: string | null; raw: u
 
     return {
       label: String(label ?? ''),
+      ...(record.disabled === true ? { disabled: true } : {}),
       value: value === undefined || value === null ? null : String(value),
       raw: item
     }
   })
 
-  return [
+  const options = [
     ...prependOptions.map(option => ({
       label: option.label,
       value: option.value,
@@ -49,6 +54,17 @@ const mappedItems = computed<Array<{ label: string; value: string | null; raw: u
     })),
     ...baseItems
   ]
+  if (!categoryEnKey && !categoryFrKey) return options
+  const groups = new Map<string, typeof options>()
+  const categoryKey = locale.value === 'fr' ? categoryFrKey : categoryEnKey
+  for (const option of options) {
+    const record = option.raw as Record<string, unknown>
+    const category = categoryKey ? String(record[categoryKey] ?? '') : ''
+    groups.set(category, [...(groups.get(category) ?? []), option])
+  }
+  return [...groups.entries()].map(([category, entries]) => category
+    ? [{ type: 'label' as const, label: category }, ...entries]
+    : entries)
 })
 </script>
 

@@ -1223,7 +1223,7 @@ export interface CommonEntityAssignmentTable {
 }
 
 export interface FundingCaseAgreementProfileTable {
-  egcs_fc_customfields: Generated<Record<string, string>>
+  egcs_fc_customfields: Generated<Record<string, string | number | string[]>>
   id: Generated<string>
   egcs_fc_agreementnumber: string
   egcs_fc_transferpaymentstream: string
@@ -2197,7 +2197,8 @@ export interface TransferPaymentStreamFieldTable {
   egcs_tp_transferpaymentstream: string
   name_en: string
   name_fr: string
-  kind: 'text' | 'relational'
+  kind: 'text' | 'number' | 'relational'
+  multiple: Generated<boolean>
   presentation: Generated<'single_line' | 'multiline'>
   required: Generated<boolean>
   discriminator: Generated<boolean>

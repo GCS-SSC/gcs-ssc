@@ -1,6 +1,6 @@
 import { readWorkflowConditions } from './workflow-conditions'
 import { readAgreementCustomFieldDefinitions } from './agreement-custom-fields'
-import { workflowConditionsOverlap, type WorkflowMemberCondition } from '~~/shared/types/schemas/agreement-custom-fields'
+import type { WorkflowMemberCondition } from '~~/shared/types/schemas/agreement-custom-fields'
 /* eslint-disable jsdoc/require-jsdoc -- typed workflow publication primitives */
 import type { Kysely, Selectable, Transaction } from 'kysely'
 import type { PublicationKind } from '~~/shared/constants/system-lifecycle'
@@ -366,8 +366,7 @@ export const validatePublishedWorkflowStatusGraph = (
     if (member.materializationStatus && requireDefinition(member.materializationStatus).terminal) {
       throw new Error('Terminal statuses cannot be workflow materialization statuses')
     }
-    if (member.successStatus && requireDefinition(member.successStatus).terminal && index !== lastIndex
-      && configuration.members.slice(index + 1).some(later => workflowConditionsOverlap(member.conditions ?? [], later.conditions ?? []))) {
+    if (member.successStatus && requireDefinition(member.successStatus).terminal && index !== lastIndex) {
       throw new Error('A terminal workflow output must immediately end the run')
     }
     if (member.failureStatus) requireDefinition(member.failureStatus)

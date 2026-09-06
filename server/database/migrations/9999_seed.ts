@@ -3984,7 +3984,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
     }).returning('id').executeTakeFirstOrThrow()
     const field = await db.insertInto('Transfer_Payment_Stream_Field').values({
       section_id: String(section.id), egcs_tp_transferpaymentstream: String(stream.id), name_en: 'Delivery model', name_fr: 'Mode de prestation',
-      kind: 'relational', discriminator: true, display_order: 0
+      kind: 'relational', multiple: true, discriminator: true, display_order: 0
     }).returningAll().executeTakeFirstOrThrow()
     const option = await db.insertInto('Transfer_Payment_Stream_Field_Option').values({
       field_id: String(field.id), name_en: 'Direct delivery', name_fr: 'Prestation directe',
@@ -6126,7 +6126,7 @@ const seedDatabase = async (db: Kysely<Database>): Promise<void> => {
     .select(['field.id as fieldId', 'field.egcs_tp_transferpaymentstream as streamId', 'option.id as optionId'])
     .where('field.name_en', '=', 'Delivery model').execute()
   for (const option of deliveryOptions) {
-    await db.updateTable('Funding_Case_Agreement_Profile').set({ egcs_fc_customfields: { [String(option.fieldId)]: String(option.optionId) } })
+    await db.updateTable('Funding_Case_Agreement_Profile').set({ egcs_fc_customfields: { [String(option.fieldId)]: [String(option.optionId)] } })
       .where('egcs_fc_transferpaymentstream', '=', option.streamId).execute()
   }
   await seedAgreement51Closeout(db)

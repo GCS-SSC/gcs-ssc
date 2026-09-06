@@ -1,5 +1,7 @@
 {
   "custom_fields": {
+    "category": "Catégorie",
+    "uncategorized": "Sans catégorie",
     "section": "Section",
     "add_section": "Ajouter une section",
     "add_field": "Ajouter un champ",
@@ -9,13 +11,18 @@
     "inactive": "Inactif",
     "clear": "Effacer la valeur",
     "conditions": "Conditions",
-    "conditions_help": "Tous les champs configurés doivent correspondre. Sélectionnez une ou plusieurs options par champ; laissez un champ vide pour l’ignorer.",
+    "conditions_help": "Tous les champs configurés doivent correspondre. Chaque champ correspond si au moins une sélection de l’entente figure parmi ses options configurées. Laissez un champ vide pour l’ignorer.",
     "skipped": "Ignoré — conditions non remplies",
     "add_option": "Ajouter une option",
     "name_en": "Libellé anglais",
     "name_fr": "Libellé français",
     "text": "Texte",
-    "relational": "Sélection unique",
+    "relational": "Sélection",
+    "single_selection": "Sélection unique",
+    "multiple_selection": "Sélections multiples",
+    "allow_multiple": "Autoriser plusieurs sélections",
+    "multiple_help": "Une fois enregistré avec plusieurs sélections, ce champ ne peut plus revenir à une sélection unique.",
+    "number": "Nombre",
     "presentation": "Présentation du texte",
     "single_line": "Une ligne",
     "multiline": "Plusieurs lignes",
@@ -813,7 +820,7 @@
     "return_home": "Retourner au tableau de bord"
   },
   "apiErrors": {
-    "custom_fields": {"section_in_use": "Déplacez ou supprimez les champs de cette section avant de la supprimer.", "in_use": "Ce champ ou cette option contient des valeurs d’entente enregistrées ou des références de flux de travail."},
+    "custom_fields": {"multiple_to_single": "Un champ à sélections multiples ne peut pas être converti en champ à sélection unique.", "section_in_use": "Déplacez ou supprimez les champs de cette section avant de la supprimer.", "in_use": "Ce champ ou cette option contient des valeurs d’entente enregistrées ou des références de flux de travail."},
     "health": {
       "unavailable": "Le service est temporairement indisponible."
     },
@@ -1678,6 +1685,8 @@
   },
   "validation": {
     "custom_field_inactive": "Les champs inactifs peuvent uniquement être effacés.",
+    "custom_field_single_selection": "Sélectionnez une seule option pour ce champ.",
+    "custom_field_number": "Saisissez un nombre valide.",
     "custom_field_single_line": "Saisissez du texte sans saut de ligne.",
     "required": "Ce champ est obligatoire",
     "bilingual_value_required": "Fournissez une valeur anglaise ou française",

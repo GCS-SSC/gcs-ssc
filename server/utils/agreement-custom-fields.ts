@@ -3,7 +3,7 @@ import { z } from 'zod'
 import type { Kysely } from 'kysely'
 import type { H3Event } from 'h3'
 import type { Database } from '~~/shared/types/database'
-import { agreementCustomFieldMergeSchema, type AgreementCustomFieldSection, type AgreementCustomFieldDefinition, type AgreementCustomFieldPatch } from '~~/shared/types/schemas/agreement-custom-fields'
+import { agreementCustomFieldMergeSchema, type AgreementCustomFieldSection, type AgreementCustomFieldDefinition, type AgreementCustomFieldPatch, type AgreementCustomFieldValues } from '~~/shared/types/schemas/agreement-custom-fields'
 import { parseI18n } from './api-validate'
 
 export const readAgreementCustomFieldSections = async (db: Kysely<Database>, streamId: string): Promise<AgreementCustomFieldSection[]> =>
@@ -42,8 +42,8 @@ export const readAgreementCustomFieldDefinitions = async (
  */
 export const mergeAgreementCustomFields = async (
   event: H3Event, db: Kysely<Database>, streamId: string,
-  current: Record<string, string>, patch: AgreementCustomFieldPatch
-): Promise<Record<string, string>> => {
+  current: AgreementCustomFieldValues, patch: AgreementCustomFieldPatch
+): Promise<AgreementCustomFieldValues> => {
   const definitions = await readAgreementCustomFieldDefinitions(db, streamId)
   const result = await parseI18n(event, z.object({
     egcs_fc_customfields: agreementCustomFieldMergeSchema(definitions, current)

@@ -1,3 +1,4 @@
+import { customFieldHasValue, customFieldOptionIds } from '~~/shared/types/schemas/agreement-custom-fields'
 import { readAgreementCustomFieldDefinitions } from './agreement-custom-fields'
 /* eslint-disable jsdoc/require-jsdoc, @stylistic/multiline-ternary -- compact snapshot normalization and query fallbacks */
 import { createHash } from 'node:crypto'
@@ -285,14 +286,14 @@ export const buildAgreementApprovalSnapshot = async (
           .where('Applicant_Recipient_Profile._deleted', '=', false).orderBy('Applicant_Recipient_Profile.id').execute()
       ])
   const customFieldDefinitions = await readAgreementCustomFieldDefinitions(trx, String(agreement.egcs_fc_transferpaymentstream))
-  const customFields = customFieldDefinitions.filter(field => Boolean(agreement.egcs_fc_customfields[field.id])).map(field => ({
+  const customFields = customFieldDefinitions.filter(field => customFieldHasValue(agreement.egcs_fc_customfields[field.id])).map(field => ({
     fieldId: field.id,
     section: field.section ? { id: field.section.id, label: bilingualValue(field.section.name_en, field.section.name_fr), order: field.section.display_order } : null,
     label: bilingualValue(field.name_en, field.name_fr),
     value: agreement.egcs_fc_customfields[field.id],
-    display: field.kind === 'text' ? agreement.egcs_fc_customfields[field.id] : (() => {
-      const option = field.options.find(candidate => candidate.id === agreement.egcs_fc_customfields[field.id])
-      return option ? bilingualValue(option.name_en, option.name_fr) : agreement.egcs_fc_customfields[field.id]
+    display: field.kind !== 'relational' ? String(agreement.egcs_fc_customfields[field.id]) : (() => {
+      const selections = customFieldOptionIds(agreement.egcs_fc_customfields[field.id]).map(optionId => field.options.find(candidate => candidate.id === optionId) ?? { name_en: optionId, name_fr: optionId })
+      return bilingualValue(selections.map(option => option.name_en).join(', '), selections.map(option => option.name_fr).join(', '))
     })()
   }))
   const packet: AgreementApprovalSnapshotV1 = {

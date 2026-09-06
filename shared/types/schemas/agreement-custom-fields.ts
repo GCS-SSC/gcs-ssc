@@ -4,7 +4,7 @@ import { PositivePostgresBigintIdSchema } from './common'
 const Label = z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' })
 export const AgreementCustomFieldValuesSchema = z.record(
   PositivePostgresBigintIdSchema,
-  z.union([z.string(), z.number().int().safe().positive(), z.null()], { error: 'validation.invalid_selection' })
+  z.union([z.string(), z.number({ error: 'validation.custom_field_number' }), z.array(PositivePostgresBigintIdSchema), z.null()], { error: 'validation.invalid_selection' })
 )
 export const StreamFieldSectionCreateSchema = z.object({
   name_en: Label,
@@ -19,7 +19,8 @@ export const StreamFieldBaseSchema = z.object({
   section_id: PositivePostgresBigintIdSchema,
   name_en: Label,
   name_fr: Label,
-  kind: z.enum(['text', 'relational']),
+  kind: z.enum(['text', 'number', 'relational']),
+  multiple: z.boolean().default(false),
   presentation: z.enum(['single_line', 'multiline']).default('single_line'),
   required: z.boolean().default(false),
   discriminator: z.boolean().default(false),
@@ -27,11 +28,15 @@ export const StreamFieldBaseSchema = z.object({
   display_order: z.number().int().nonnegative().default(0)
 })
 export const StreamFieldCreateSchema = StreamFieldBaseSchema.superRefine((value, ctx) => {
-  if ((value.discriminator && value.kind !== 'relational') || (value.kind === 'relational' && value.presentation !== 'single_line')) {
+  if (value.multiple && value.kind !== 'relational') {
+    ctx.addIssue({ code: 'custom', path: ['multiple'], message: 'validation.invalid_selection' })
+  }
+  if ((value.discriminator && value.kind !== 'relational') || (value.kind !== 'text' && value.presentation !== 'single_line')) {
     ctx.addIssue({ code: 'custom', path: ['kind'], message: 'validation.invalid_selection' })
   }
 })
 export const StreamFieldPatchSchema = StreamFieldBaseSchema.extend({
+  multiple: StreamFieldBaseSchema.shape.multiple.removeDefault(),
   presentation: StreamFieldBaseSchema.shape.presentation.removeDefault(),
   required: StreamFieldBaseSchema.shape.required.removeDefault(),
   discriminator: StreamFieldBaseSchema.shape.discriminator.removeDefault(),
@@ -56,6 +61,14 @@ export const StreamFieldOptionPatchSchema = StreamFieldOptionBaseSchema.extend({
   active: StreamFieldOptionBaseSchema.shape.active.removeDefault(),
   display_order: StreamFieldOptionBaseSchema.shape.display_order.removeDefault()
 }).partial()
+export type AgreementCustomFieldValues = Record<string, string | number | string[]>
+
+export const customFieldOptionIds = (value: string | number | string[] | null | undefined): string[] =>
+  Array.isArray(value) ? value : typeof value === 'string' && value.trim() ? [value] : []
+
+export const customFieldHasValue = (value: string | number | string[] | null | undefined): boolean =>
+  Array.isArray(value) ? value.length > 0 : typeof value === 'string' ? value.trim().length > 0 : typeof value === 'number'
+
 export type AgreementCustomFieldPatch = z.infer<typeof AgreementCustomFieldValuesSchema>
 export type AgreementCustomFieldDefinition = z.infer<typeof StreamFieldCreateSchema> & {
   id: string
@@ -71,8 +84,8 @@ export type AgreementCustomFieldDefinition = z.infer<typeof StreamFieldCreateSch
  */
 export const agreementCustomFieldMergeSchema = (
   definitions: AgreementCustomFieldDefinition[],
-  current: Record<string, string>
-) => AgreementCustomFieldValuesSchema.transform((patch, ctx): Record<string, string> => {
+  current: AgreementCustomFieldValues
+) => AgreementCustomFieldValuesSchema.transform((patch, ctx): AgreementCustomFieldValues => {
   const merged = { ...current }
   const fields = new Map(definitions.map(field => [field.id, field]))
   const issue = (id: string, message: string) => ctx.addIssue({ code: 'custom', path: [id], message })
@@ -83,11 +96,15 @@ export const agreementCustomFieldMergeSchema = (
       continue
     }
     const blank = supplied === null || (typeof supplied === 'string' && supplied.trim() === '')
+      || (field.kind === 'relational' && Array.isArray(supplied) && supplied.length === 0)
     if (blank) {
       Reflect.deleteProperty(merged, id)
       continue
     }
-    if (!field.active && supplied !== current[id]) {
+    const unchanged = field.kind === 'relational'
+      ? JSON.stringify([...customFieldOptionIds(supplied)].sort()) === JSON.stringify([...customFieldOptionIds(current[id])].sort())
+      : supplied === current[id]
+    if (!field.active && !unchanged) {
       issue(id, 'validation.custom_field_inactive')
       continue
     }
@@ -95,15 +112,25 @@ export const agreementCustomFieldMergeSchema = (
       if (typeof supplied !== 'string') issue(id, 'validation.invalid_selection')
       else if (field.presentation === 'single_line' && /[\r\n\u2028\u2029]/u.test(supplied)) issue(id, 'validation.custom_field_single_line')
       else merged[id] = supplied
+    } else if (field.kind === 'number') {
+      if (typeof supplied !== 'number' || !Number.isFinite(supplied)) issue(id, 'validation.custom_field_number')
+      else merged[id] = supplied
     } else {
-      const parsed = PositivePostgresBigintIdSchema.safeParse(supplied)
-      const option = parsed.success ? field.options.find(item => item.id === parsed.data) : undefined
-      if (!option || (!option.active && option.id !== current[id])) issue(id, 'validation.invalid_selection')
-      else merged[id] = option.id
+      const parsed = z.array(PositivePostgresBigintIdSchema).safeParse(Array.isArray(supplied) ? supplied : [supplied])
+      if (parsed.success && !field.multiple && parsed.data.length > 1) {
+        issue(id, 'validation.custom_field_single_selection')
+        continue
+      }
+      const previous = customFieldOptionIds(current[id])
+      if (!parsed.success || new Set(parsed.data).size !== parsed.data.length || parsed.data.some(optionId => {
+        const option = field.options.find(item => item.id === optionId)
+        return !option || (!option.active && !previous.includes(optionId))
+      })) issue(id, 'validation.invalid_selection')
+      else merged[id] = parsed.data
     }
   }
   for (const field of definitions) {
-    if (field.active && field.required && !merged[field.id]?.trim()) issue(field.id, 'validation.required')
+    if (field.active && field.required && !customFieldHasValue(merged[field.id])) issue(field.id, 'validation.required')
   }
   return merged
 })
@@ -123,17 +150,5 @@ export const WorkflowMemberConditionsSchema = z.array(z.object({
 })
 export type WorkflowMemberCondition = z.infer<typeof WorkflowMemberConditionsSchema>[number]
 
-export const workflowConditionsMatch = (conditions: WorkflowMemberCondition[], values: Record<string, string>): boolean =>
-  conditions.every(condition => condition.optionIds.includes(values[condition.fieldId] ?? ''))
-
-/**
- * Two members can coexist unless a shared discriminator makes their predicates disjoint.
- * @returns Whether both members can be eligible together.
- * @param left - First member predicates.
- * @param right - Second member predicates.
- */
-export const workflowConditionsOverlap = (left: WorkflowMemberCondition[], right: WorkflowMemberCondition[]): boolean =>
-  !left.some(condition => {
-    const other = right.find(candidate => candidate.fieldId === condition.fieldId)
-    return other && !condition.optionIds.some(optionId => other.optionIds.includes(optionId))
-  })
+export const workflowConditionsMatch = (conditions: WorkflowMemberCondition[], values: AgreementCustomFieldValues): boolean =>
+  conditions.every(condition => customFieldOptionIds(values[condition.fieldId]).some(optionId => condition.optionIds.includes(optionId)))

@@ -827,7 +827,8 @@ export async function up(db: Kysely<Database>): Promise<void> {
       name_en text NOT NULL, name_fr text NOT NULL,
       section_id bigint NOT NULL,
       FOREIGN KEY (section_id, egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream_Field_Section"(id, egcs_tp_transferpaymentstream) ON DELETE RESTRICT,
-      kind text NOT NULL CHECK (kind IN ('text', 'relational')),
+      kind text NOT NULL CHECK (kind IN ('text', 'number', 'relational')),
+      multiple boolean NOT NULL DEFAULT false CHECK (NOT multiple OR kind = 'relational'),
       presentation text NOT NULL DEFAULT 'single_line' CHECK (presentation IN ('single_line', 'multiline')),
       required boolean NOT NULL DEFAULT false,
       discriminator boolean NOT NULL DEFAULT false,
@@ -857,6 +858,9 @@ export async function up(db: Kysely<Database>): Promise<void> {
     BEGIN
       IF NEW.kind IS DISTINCT FROM OLD.kind OR NEW.egcs_tp_transferpaymentstream IS DISTINCT FROM OLD.egcs_tp_transferpaymentstream THEN
         RAISE EXCEPTION 'Stream field identity is immutable' USING ERRCODE = '23514';
+      END IF;
+      IF OLD.multiple AND NOT NEW.multiple THEN
+        RAISE EXCEPTION 'Multiple selection cannot be changed to single selection' USING ERRCODE = '23514';
       END IF;
       RETURN NEW;
     END $$

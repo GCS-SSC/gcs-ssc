@@ -4,7 +4,7 @@ import type { Transaction } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import type { ReviewRuntimeEntityContext } from './review-runtime-access'
 import { readAgreementCustomFieldDefinitions } from './agreement-custom-fields'
-import { workflowConditionsMatch } from '~~/shared/types/schemas/agreement-custom-fields'
+import { customFieldOptionIds, workflowConditionsMatch, type AgreementCustomFieldValues } from '~~/shared/types/schemas/agreement-custom-fields'
 import { validatePublishedWorkflowStatusGraph, type PublishedWorkflowConfiguration } from './workflow-setup-versioning'
 
 export class WorkflowRouteValidationError extends Error {}
@@ -13,7 +13,7 @@ export type WorkflowRoutingEvidence = {
   hash: string
   fields: Array<{ fieldId: string, name_en: string, name_fr: string, optionId: string, option_en: string, option_fr: string }>
   agreementId: string | null
-  values: Record<string, string>
+  values: AgreementCustomFieldValues
   decisions: Array<{ memberId: string, eligible: boolean, unmatchedFieldIds: string[] }>
 }
 export const captureWorkflowRouting = async (
@@ -21,7 +21,7 @@ export const captureWorkflowRouting = async (
 ): Promise<WorkflowRoutingEvidence> => {
   const referencedIds = [...new Set(definition.members.flatMap(member => (member.conditions ?? []).map(condition => condition.fieldId)))]
   const agreementId = context.entityType === 'fundingcaseagreement' ? context.entityId : context.agreementId ?? null
-  const values: Record<string, string> = {}
+  const values: AgreementCustomFieldValues = {}
   const capturedFields: WorkflowRoutingEvidence['fields'] = []
   if (referencedIds.length) {
     if (!agreementId) throw new WorkflowRouteValidationError('Conditional workflow requires an owning Agreement')
@@ -30,13 +30,15 @@ export const captureWorkflowRouting = async (
     const fields = await readAgreementCustomFieldDefinitions(trx, agreement.egcs_fc_transferpaymentstream)
     for (const fieldId of referencedIds) {
       const field = fields.find(candidate => candidate.id === fieldId)
-      const value = agreement.egcs_fc_customfields[fieldId]
-      if (!field || field.kind !== 'relational' || !value || !field.options.some(option => option.id === value)) {
+      const value = customFieldOptionIds(agreement.egcs_fc_customfields[fieldId])
+      if (!field || field.kind !== 'relational' || !value.length || value.some(optionId => !field.options.some(option => option.id === optionId))) {
         throw new WorkflowRouteValidationError('Workflow discriminator value is missing or invalid')
       }
       values[fieldId] = value
-      const option = field.options.find(candidate => candidate.id === value)!
-      capturedFields.push({ fieldId, name_en: field.name_en, name_fr: field.name_fr, optionId: value, option_en: option.name_en, option_fr: option.name_fr })
+      for (const optionId of value) {
+        const option = field.options.find(candidate => candidate.id === optionId)!
+        capturedFields.push({ fieldId, name_en: field.name_en, name_fr: field.name_fr, optionId, option_en: option.name_en, option_fr: option.name_fr })
+      }
     }
   }
   const decisions = definition.members.map(member => ({

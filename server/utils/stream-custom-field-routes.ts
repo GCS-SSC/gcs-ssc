@@ -7,7 +7,7 @@ import { executeFreshAuthorizedTransferPaymentStreamWrite } from './transfer-pay
 import { badRequest, notFound, throwApiError } from './api-errors'
 import { readValidatedBodyI18n, parseI18n } from './api-validate'
 import { readAgreementCustomFieldDefinitions, readAgreementCustomFieldSections } from './agreement-custom-fields'
-import { StreamFieldSectionCreateSchema, StreamFieldSectionPatchSchema, StreamFieldCreateSchema, StreamFieldPatchSchema, StreamFieldOptionCreateSchema, StreamFieldOptionPatchSchema } from '~~/shared/types/schemas/agreement-custom-fields'
+import { customFieldHasValue, customFieldOptionIds, StreamFieldSectionCreateSchema, StreamFieldSectionPatchSchema, StreamFieldCreateSchema, StreamFieldPatchSchema, StreamFieldOptionCreateSchema, StreamFieldOptionPatchSchema } from '~~/shared/types/schemas/agreement-custom-fields'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 export const streamCustomFieldRoute = async (event: H3Event, operation: 'read' | 'create' | 'update' | 'delete', resource: 'field' | 'option' | 'section') => {
@@ -71,7 +71,7 @@ export const streamCustomFieldRoute = async (event: H3Event, operation: 'read' |
       }
       const agreements = await trx.selectFrom('Funding_Case_Agreement_Profile').select('egcs_fc_customfields')
         .where('egcs_fc_transferpaymentstream', '=', streamId).execute()
-      if (agreements.some(agreement => option ? agreement.egcs_fc_customfields[field.id] === option.id : Boolean(agreement.egcs_fc_customfields[field.id]?.trim()))) {
+      if (agreements.some(agreement => option ? customFieldOptionIds(agreement.egcs_fc_customfields[field.id]).includes(option.id) : customFieldHasValue(agreement.egcs_fc_customfields[field.id]))) {
         return await throwApiError(event, { statusCode: 409, code: 'CUSTOM_FIELD_IN_USE', key: 'apiErrors.custom_fields.in_use' })
       }
       if (option) return await trx.updateTable('Transfer_Payment_Stream_Field_Option').set({ _deleted: true }).where('id', '=', option.id).returningAll().executeTakeFirstOrThrow()
@@ -87,6 +87,9 @@ export const streamCustomFieldRoute = async (event: H3Event, operation: 'read' |
     }
     const patch = await readValidatedBodyI18n(event, StreamFieldPatchSchema)
     if (patch.kind !== undefined && patch.kind !== field.kind) return await badRequest(event, 'CUSTOM_FIELD_KIND_IMMUTABLE', 'apiErrors.request.invalid_resource')
+    if (field.multiple && patch.multiple === false) {
+      return await badRequest(event, 'CUSTOM_FIELD_SELECTION_MODE_IRREVERSIBLE', 'apiErrors.custom_fields.multiple_to_single')
+    }
     const merged = await parseI18n(event, StreamFieldCreateSchema, { ...field, ...patch })
     const section = await trx.selectFrom('Transfer_Payment_Stream_Field_Section').select('id').where('id', '=', merged.section_id).where('egcs_tp_transferpaymentstream', '=', streamId).where('_deleted', '=', false).executeTakeFirst()
     if (!section) return await badRequest(event, 'INVALID_SECTION', 'apiErrors.request.invalid_resource')
