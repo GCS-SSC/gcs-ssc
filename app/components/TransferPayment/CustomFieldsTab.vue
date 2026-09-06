@@ -34,6 +34,7 @@ watch(() => fieldModal.selected.value?.kind, kind => {
 const multipleSelectionLocked = computed(() => Boolean(data.value?.items.find(field => field.id === fieldModal.selected.value?.id)?.multiple))
 const optionModal = useCrudModal<Partial<Option>>({ createState: () => ({ active: true, display_order: 0, category_en: null, category_fr: null }), updateState: option => ({ ...option }) })
 const optionFieldId: Ref<string | null> = ref(null)
+const optionCategoryLocked = ref(false)
 const sectionModal = useCrudModal<Partial<AgreementCustomFieldSection>>({ createState: () => ({ display_order: 0 }), updateState: section => ({ ...section }) })
 const openField = (sectionId: string) => {
   fieldModal.openCreate()
@@ -129,8 +130,22 @@ const saveField = async () => {
  */
 const openOption = (fieldId: string, option?: Option) => {
   optionFieldId.value = fieldId
+  optionCategoryLocked.value = false
   if (option) optionModal.openUpdate(option)
   else optionModal.openCreate()
+}
+/**
+ * Opens a new entry within the selected category.
+ * @param fieldId - Owning selection field.
+ * @param category - Bilingual category labels from an existing entry.
+ */
+const openCategoryOption = (fieldId: string, category: Option) => {
+  openOption(fieldId)
+  if (optionModal.selected.value) {
+    optionModal.selected.value.category_en = category.category_en
+    optionModal.selected.value.category_fr = category.category_fr
+    optionCategoryLocked.value = true
+  }
 }
 /**
  *
@@ -162,6 +177,7 @@ watch(url, () => {
   fieldModal.close()
   optionModal.close()
   optionFieldId.value = null
+  optionCategoryLocked.value = false
 })
 </script>
 
@@ -259,6 +275,9 @@ watch(url, () => {
           <UButton v-if="canUpdateChild" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" :aria-label="t('common.edit')" @click="fieldModal.openUpdate(row.original.field)" />
           <UButton v-if="canDeleteChild" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('common.delete')" @click="remove(row.original.field.id)" />
         </div>
+        <div v-else-if="row.groupingColumnId === 'categoryGroup' && row.original.option && row.original.field" class="flex items-center gap-2">
+          <UButton v-if="canUpdateChild" icon="i-lucide-plus" color="neutral" variant="ghost" size="sm" :aria-label="t('custom_fields.add_option')" @click="openCategoryOption(row.original.field.id, row.original.option)" />
+        </div>
         <div v-else-if="!row.getIsGrouped() && row.original.option && row.original.field" class="flex items-center gap-2">
           <UButton v-if="canUpdateChild" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" :aria-label="t('common.edit')" @click="openOption(row.original.field.id, row.original.option)" />
           <UButton v-if="canDeleteChild" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('common.delete')" @click="remove(`${row.original.field.id}/options/${row.original.option.id}`)" />
@@ -320,10 +339,10 @@ watch(url, () => {
             <UInput v-model="optionModal.selected.value.name_fr" />
           </UFormField>
           <UFormField :label="t('custom_fields.category_en')" name="category_en">
-            <UInput v-model="optionModal.selected.value.category_en" />
+            <UInput v-model="optionModal.selected.value.category_en" :readonly="optionCategoryLocked" />
           </UFormField>
           <UFormField :label="t('custom_fields.category_fr')" name="category_fr">
-            <UInput v-model="optionModal.selected.value.category_fr" />
+            <UInput v-model="optionModal.selected.value.category_fr" :readonly="optionCategoryLocked" />
           </UFormField>
           <UCheckbox v-model="optionModal.selected.value.active" :label="t('custom_fields.active')" />
           <UFormField :label="t('custom_fields.order')" name="display_order">
