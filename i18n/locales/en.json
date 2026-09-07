@@ -1684,6 +1684,7 @@
     }
   },
   "validation": {
+    "custom_field_display_order_max": "Display order must not exceed {max}.",
     "custom_field_inactive": "Inactive fields can only be cleared.",
     "custom_field_single_selection": "Select only one option for this field.",
     "custom_field_number": "Enter a valid number.",

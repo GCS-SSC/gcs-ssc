@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { PositivePostgresBigintIdSchema } from './common'
 
 const Label = z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' })
+const DisplayOrder = z.number().int().nonnegative().max(2147483647, { error: 'validation.custom_field_display_order_max' })
 const CategoryLabel = z.preprocess(
   value => typeof value === 'string' && value.trim() === '' ? null : value,
   Label.nullable()
@@ -13,7 +14,7 @@ export const AgreementCustomFieldValuesSchema = z.record(
 export const StreamFieldSectionCreateSchema = z.object({
   name_en: Label,
   name_fr: Label,
-  display_order: z.number().int().nonnegative().default(0)
+  display_order: DisplayOrder.default(0)
 })
 export const StreamFieldSectionPatchSchema = StreamFieldSectionCreateSchema.extend({
   display_order: StreamFieldSectionCreateSchema.shape.display_order.removeDefault()
@@ -29,7 +30,7 @@ export const StreamFieldBaseSchema = z.object({
   required: z.boolean().default(false),
   discriminator: z.boolean().default(false),
   active: z.boolean().default(true),
-  display_order: z.number().int().nonnegative().default(0)
+  display_order: DisplayOrder.default(0)
 })
 export const StreamFieldCreateSchema = StreamFieldBaseSchema.superRefine((value, ctx) => {
   if (value.multiple && value.kind !== 'relational') {
@@ -53,7 +54,7 @@ export const StreamFieldOptionBaseSchema = z.object({
   category_en: CategoryLabel.default(null),
   category_fr: CategoryLabel.default(null),
   active: z.boolean().default(true),
-  display_order: z.number().int().nonnegative().default(0)
+  display_order: DisplayOrder.default(0)
 })
 export const StreamFieldOptionCreateSchema = StreamFieldOptionBaseSchema.refine(
   value => (value.category_en === null) === (value.category_fr === null),

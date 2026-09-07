@@ -1684,6 +1684,7 @@
     }
   },
   "validation": {
+    "custom_field_display_order_max": "L'ordre d'affichage ne doit pas dépasser {max}.",
     "custom_field_inactive": "Les champs inactifs peuvent uniquement être effacés.",
     "custom_field_single_selection": "Sélectionnez une seule option pour ce champ.",
     "custom_field_number": "Saisissez un nombre valide.",
