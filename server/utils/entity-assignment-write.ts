@@ -9,8 +9,11 @@ import { requireFreshAuthContext } from '~~/server/utils/authorize'
 import {
   isEntityAssignmentRosterWorkable,
   canManageEntityAssignmentsWithContext,
-  resolveEntityAssignmentOwner
+  resolveEntityAssignmentOwner,
+  resolveQualifiedEntityAssignmentSource
 } from '~~/server/utils/entity-assignment'
+import { executeQualifiedRuntimeTransaction, resolveQualifiedRuntimeTransactionPlan } from './qualified-runtime-transaction'
+import { lockReviewRuntimeTarget } from './review-runtime-access'
 import { getActiveStructuralRoleAssignments } from '~~/server/utils/active-user-scopes'
 import { defineUserAbilities } from '~~/server/utils/rbac'
 import type { AssignableEntityType, Database, Entity_Type } from '~~/shared/types/database'
@@ -246,6 +249,45 @@ export const executeEntityAssignmentManagement = async <T>(
   const owner = await resolveEntityAssignmentOwner(db, coreTarget.entityType, coreTarget.entityId)
   if (!owner) return await notFound(event, 'ASSIGNMENT_TARGET_NOT_FOUND', 'apiErrors.request.not_found')
   const assigneeApplicationUserId = await resolveAssigneeApplicationUserId(db, options.assigneeUserId)
+
+  const qualifiedSource = await resolveQualifiedEntityAssignmentSource(db, coreTarget.entityType, coreTarget.entityId)
+  if (qualifiedSource) {
+    const initial = await resolveQualifiedRuntimeTransactionPlan(event, qualifiedSource.entityType, qualifiedSource.entityId)
+    if (!initial) return await notFound(event, 'ASSIGNMENT_TARGET_NOT_FOUND', 'apiErrors.request.not_found')
+    const result = await executeQualifiedRuntimeTransaction(event, initial, {
+      lockUserIds: assigneeApplicationUserId ? [assigneeApplicationUserId] : [],
+      missingOwner: 'identity_changed',
+      work: async ({ trx, auth, runtime }) => {
+        // Preserve the canonical owner → runtime → artifact lock order for every ancestor.
+        for (const ancestor of [...qualifiedSource.lineage].reverse()) {
+          await lockReviewRuntimeTarget(trx, {
+            entityType: qualifiedSource.entityType,
+            entityId: qualifiedSource.entityId,
+            applicantRecipientLeadAgencyId: null,
+            schemaAgencyId: null,
+            reviewSetId: ancestor.reviewSetId ?? null,
+            reviewId: ancestor.entityType === 'commonreview' ? ancestor.entityId : null,
+            approvalEntityType: ancestor.entityType === 'commonrecommendation' ? 'commonrecommendation' : null,
+            approvalEntityId: ancestor.entityType === 'commonrecommendation' ? ancestor.entityId : null
+          })
+        }
+        const currentSource = await resolveQualifiedEntityAssignmentSource(trx, coreTarget.entityType, coreTarget.entityId)
+        if (JSON.stringify(currentSource) !== JSON.stringify(qualifiedSource)
+          || currentSource?.entityType !== runtime.context.entityType
+          || currentSource?.entityId !== runtime.context.entityId) {
+          return await throwApiError(event, {
+            statusCode: 409, code: 'ASSIGNMENT_OWNER_CHANGED', key: 'apiErrors.assignments.owner_changed'
+          })
+        }
+        if (!await canManageEntityAssignmentsWithContext(auth, trx, coreTarget.entityType, coreTarget.entityId)) {
+          return await throwApiError(event, { statusCode: 403, code: 'FORBIDDEN', key: 'apiErrors.auth.forbidden' })
+        }
+        return await executeLockedAssignmentManagement(event, trx, coreTarget, owner, callback, options)
+      }
+    })
+    if (result === null) return await notFound(event, 'ASSIGNMENT_TARGET_NOT_FOUND', 'apiErrors.request.not_found')
+    return result
+  }
 
   if (owner.kind === 'agreement') {
     const agreement = await resolveAgreementScopeContext(owner.agreementId, db)

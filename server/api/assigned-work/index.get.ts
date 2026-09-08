@@ -1,3 +1,4 @@
+import { buildAssignedWorkExtensionSources } from '~~/server/utils/assigned-work-extension-sources'
 import { sql, type RawBuilder } from 'kysely'
 import { requireAuthContext, requireFreshAuthContext } from '~~/server/utils/authorize'
 import { resolveCurrentCommonUser } from '~~/server/utils/additional-reviewer-runtime'
@@ -71,6 +72,7 @@ export default defineEventHandler(async event => {
     const businessEntityTypes = [...WORKFLOW_TARGET_ENTITY_TYPE_ENUM]
     // These sources have an explicit owner; a missing parent must not change their subject.
     const typedOwnerSources = [...ASSIGNABLE_ENTITY_TYPE_ENUM, 'transferpaymentstream']
+    const qualifiedBindings = await buildAssignedWorkExtensionSources()
     const offset = (query.page - 1) * query.limit
     /**
    * Executes one authorized queue page.
@@ -145,6 +147,12 @@ export default defineEventHandler(async event => {
       JOIN "Transfer_Payment_Stream" stream ON stream.id = agreement.egcs_fc_transferpaymentstream AND stream._deleted = false
       JOIN "Transfer_Payment_Profile" program ON program.id = stream.egcs_tp_transferpaymentprofile AND program._deleted = false
       WHERE amendment._deleted = false
+    ), qualified_bindings AS (${qualifiedBindings}), source_owners AS (
+      SELECT * FROM base_work
+      UNION ALL
+      SELECT binding.entity_id, binding.entity_type, owner.status, owner.identifier_en, owner.identifier_fr, owner.agreement_id, owner.variant, owner.owner_subject, owner.agency_id, owner.program_id
+      FROM qualified_bindings binding
+      JOIN base_work owner ON owner.id = binding.owner_id AND owner.entity_type = binding.owner_type
     ), review_work AS (
       SELECT review.id, 'commonreview'::text entity_type, runtime_item.egcs_cn_state::text status,
         '#' || review.id::text identifier_en, '#' || review.id::text identifier_fr, source.agreement_id,
@@ -156,7 +164,7 @@ export default defineEventHandler(async event => {
       JOIN "Common_Runtime_Item" runtime_item ON runtime_item.id = review.egcs_cn_runtimeitem
       JOIN "Common_Review_Set" review_set ON review_set.id = review.egcs_cn_reviewset AND review_set._deleted = false
       JOIN "Common_Review_Schema" schema ON schema.id = review.egcs_cn_reviewschema AND schema._deleted = false
-      LEFT JOIN base_work source ON source.id = review_set.egcs_cn_entityid
+      LEFT JOIN source_owners source ON source.id = review_set.egcs_cn_entityid
         AND source.entity_type = review_set.egcs_cn_entitytype::text
       LEFT JOIN "Transfer_Payment_Stream" stream ON review_set.egcs_cn_entitytype::text = 'transferpaymentstream'
         AND stream.id = review_set.egcs_cn_entityid AND stream._deleted = false
@@ -165,11 +173,12 @@ export default defineEventHandler(async event => {
       WHERE review._deleted = false AND (
         source.id IS NOT NULL
         OR (stream.id IS NOT NULL AND program.id IS NOT NULL)
-        OR (review_set.egcs_cn_entitytype::text NOT IN (${sql.join(typedOwnerSources)})
+        OR (position(':' in review_set.egcs_cn_entitytype::text) = 0
+          AND review_set.egcs_cn_entitytype::text NOT IN (${sql.join(typedOwnerSources)})
           AND schema.egcs_cn_agency IS NOT NULL)
       )
     ), source_work AS (
-      SELECT * FROM base_work UNION ALL SELECT * FROM review_work
+      SELECT * FROM source_owners UNION ALL SELECT * FROM review_work
     ), recommendation_work AS (
       SELECT recommendation.id, 'commonrecommendation'::text entity_type, runtime_item.egcs_cn_state::text status,
         '#' || recommendation.id::text identifier_en, '#' || recommendation.id::text identifier_fr,
@@ -190,11 +199,12 @@ export default defineEventHandler(async event => {
         AND (
           source.id IS NOT NULL
           OR (stream.id IS NOT NULL AND program.id IS NOT NULL)
-          OR (recommendation.egcs_cn_entitytype::text NOT IN (${sql.join(typedOwnerSources)})
+          OR (position(':' in recommendation.egcs_cn_entitytype::text) = 0
+            AND recommendation.egcs_cn_entitytype::text NOT IN (${sql.join(typedOwnerSources)})
             AND schema.egcs_cn_agency IS NOT NULL)
         )
     ), work AS (
-      SELECT * FROM source_work UNION ALL SELECT * FROM recommendation_work
+      SELECT * FROM base_work UNION ALL SELECT * FROM review_work UNION ALL SELECT * FROM recommendation_work
     )
     SELECT work.id::text entity_id, work.entity_type, work.status, work.identifier_en, work.identifier_fr,
       work.agreement_id::text agreement_id, work.variant, assignment.egcs_cn_isprimary is_primary,

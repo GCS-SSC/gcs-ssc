@@ -12,6 +12,8 @@ import { ASSIGNABLE_ENGINE_OPEN_QUEUE_STATUSES, isAssignableEntityType } from '~
 import { getEntityAuthorizationPolicy } from '~~/server/utils/entity-authorization-policy'
 import { defineUsersAbilities } from '~~/server/utils/rbac'
 import { resolveCompletionEvidenceId } from '~~/server/utils/completion-runtime-core'
+import { resolveCanonicalLifecycleIdentity } from './extension-lifecycle-identity'
+import { loadExtensionLifecycleEntity, isExtensionEnabledForAgency, isExtensionEnabledForStream } from './extensions'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 export const createPrimaryEntityAssignment = async (
@@ -127,6 +129,7 @@ type RuntimeAssignmentSource = {
   entityType: Entity_Type
   entityId: string
   fallbackAgencyId: string | null
+  reviewSetId?: string
 }
 
 const resolveRuntimeAssignmentSource = async (
@@ -139,6 +142,7 @@ const resolveRuntimeAssignmentSource = async (
       .innerJoin('Common_Review_Set', 'Common_Review_Set.id', 'Common_Review.egcs_cn_reviewset')
       .innerJoin('Common_Review_Schema', 'Common_Review_Schema.id', 'Common_Review.egcs_cn_reviewschema')
       .select([
+        'Common_Review_Set.id as review_set_id',
         'Common_Review_Set.egcs_cn_entitytype as entity_type',
         'Common_Review_Set.egcs_cn_entityid as entity_id',
         'Common_Review_Schema.egcs_cn_agency as agency_id'
@@ -153,6 +157,7 @@ const resolveRuntimeAssignmentSource = async (
       target: isAssignableEntityType(review.entity_type)
         ? { entityType: review.entity_type, entityId: sourceEntityId }
         : null,
+      reviewSetId: String(review.review_set_id),
       entityType: review.entity_type,
       entityId: sourceEntityId,
       fallbackAgencyId: review.agency_id ? String(review.agency_id) : null
@@ -186,6 +191,17 @@ const resolveSourceOwner = async (
   db: Kysely<Database>,
   source: RuntimeAssignmentSource
 ): Promise<AuthorizationResourceOwner | null> => {
+  if (source.entityType.includes(':')) {
+    const identity = await resolveCanonicalLifecycleIdentity(db, source.entityType, source.entityId)
+    if (!identity) return null
+    const loaded = await loadExtensionLifecycleEntity(source.entityType)
+    if (!loaded || loaded.definition.ownerKind !== identity.owner.owner) return null
+    if (!await isExtensionEnabledForAgency(db, loaded.extension.key, identity.owner.agencyId)) return null
+    if (identity.scope.streamId && !await isExtensionEnabledForStream(db, loaded.extension.key, identity.scope.streamId)) return null
+    return identity.owner.owner === 'agreement'
+      ? { kind: 'agreement', agreementId: identity.owner.ownerId, agencyId: identity.owner.agencyId }
+      : { kind: 'applicant_recipient', applicantRecipientId: identity.owner.ownerId, agencyId: identity.owner.agencyId }
+  }
   if (source.entityType === 'applicantrecipient') {
     return await resolveApplicantRecipientOwner(db, source.entityId)
   }
@@ -229,6 +245,31 @@ export const resolveEntityAssignmentSourceTarget = async (
   if (!isPositivePostgresBigintText(entityId)) return null
   if (entityType !== 'commonreview' && entityType !== 'commonrecommendation') return null
   return (await resolveRuntimeAssignmentSource(db, entityType, entityId))?.target ?? null
+}
+
+/** Resolves and records every source-bearing runtime row before a qualified roster write. */
+export const resolveQualifiedEntityAssignmentSource = async (
+  db: Kysely<Database>,
+  entityType: AssignableEntityType,
+  entityId: string
+) => {
+  const lineage: Array<{ entityType: 'commonreview' | 'commonrecommendation'; entityId: string; reviewSetId?: string }> = []
+  const visited = new Set<string>()
+  let currentType: Entity_Type = entityType
+  let currentId = entityId
+  while (currentType === 'commonreview' || currentType === 'commonrecommendation') {
+    const key = `${currentType}:${currentId}`
+    if (visited.has(key)) return null
+    visited.add(key)
+    const source = await resolveRuntimeAssignmentSource(db, currentType, currentId)
+    if (!source) return null
+    lineage.push({ entityType: currentType, entityId: currentId, reviewSetId: source.reviewSetId })
+    currentType = source.entityType
+    currentId = source.entityId
+  }
+  return currentType.includes(':')
+    ? { entityType: currentType, entityId: currentId, lineage }
+    : null
 }
 
 /** Compatibility resolver for Agreement-only callers. */

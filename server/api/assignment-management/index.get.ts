@@ -1,3 +1,4 @@
+import { buildAssignedWorkExtensionSources } from '~~/server/utils/assigned-work-extension-sources'
 import { sql, type RawBuilder } from 'kysely'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { requireAuthContext } from '~~/server/utils/authorize'
@@ -47,6 +48,7 @@ export default defineEventHandler(async event => {
   }
 
   const search = `%${escapeLikePattern(query.search ?? '')}%`
+  const qualifiedBindings = await buildAssignedWorkExtensionSources()
   const offset = (query.page - 1) * query.limit
   const businessEntityTypes = [...WORKFLOW_TARGET_ENTITY_TYPE_ENUM]
   /**
@@ -161,6 +163,12 @@ export default defineEventHandler(async event => {
       JOIN "Transfer_Payment_Profile" program ON program.id = stream.egcs_tp_transferpaymentprofile AND program._deleted = false
       JOIN "Agency_Profile" agency ON agency.id = program.egcs_tp_agency AND agency._deleted = false
       WHERE closeout._deleted = false
+    ), qualified_bindings AS (${qualifiedBindings}), source_owners AS (
+      SELECT * FROM base_work
+      UNION ALL
+      SELECT binding.entity_id, binding.entity_type, owner.status, owner.stable_reference, owner.label_en, owner.label_fr, owner.owner_subject, owner.agency_id, owner.program_id, owner.agency_name_en, owner.agency_name_fr, owner.program_name_en, owner.program_name_fr
+      FROM qualified_bindings binding
+      JOIN base_work owner ON owner.id = binding.owner_id AND owner.entity_type = binding.owner_type
     ), review_work AS (
       SELECT review.id, 'commonreview'::text entity_type, runtime_item.egcs_cn_state::text status, review.id::text stable_reference,
         '#' || review.id::text label_en, '#' || review.id::text label_fr, source.owner_subject, source.agency_id,
@@ -168,11 +176,11 @@ export default defineEventHandler(async event => {
       FROM "Common_Review" review
       JOIN "Common_Runtime_Item" runtime_item ON runtime_item.id = review.egcs_cn_runtimeitem
       JOIN "Common_Review_Set" review_set ON review_set.id = review.egcs_cn_reviewset AND review_set._deleted = false
-      JOIN base_work source ON source.id = review_set.egcs_cn_entityid
+      JOIN source_owners source ON source.id = review_set.egcs_cn_entityid
         AND source.entity_type = review_set.egcs_cn_entitytype::text
       WHERE review._deleted = false
     ), source_work AS (
-      SELECT * FROM base_work UNION ALL SELECT * FROM review_work
+      SELECT * FROM source_owners UNION ALL SELECT * FROM review_work
     ), recommendation_work AS (
       SELECT recommendation.id, 'commonrecommendation'::text entity_type, runtime_item.egcs_cn_state::text status,
         recommendation.id::text stable_reference, '#' || recommendation.id::text label_en,
@@ -184,7 +192,7 @@ export default defineEventHandler(async event => {
         AND source.entity_type = recommendation.egcs_cn_entitytype::text
       WHERE recommendation._deleted = false
     ), work AS (
-      SELECT * FROM source_work UNION ALL SELECT * FROM recommendation_work
+      SELECT * FROM base_work UNION ALL SELECT * FROM review_work UNION ALL SELECT * FROM recommendation_work
     ), roster AS (
       SELECT work.id::text entity_id, work.entity_type, work.stable_reference, work.label_en, work.label_fr,
         work.status, work.owner_subject, work.agency_id, work.program_id, work.agency_name_en, work.agency_name_fr,

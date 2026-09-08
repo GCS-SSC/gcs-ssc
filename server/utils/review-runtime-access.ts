@@ -1041,7 +1041,7 @@ const agreementRuntimeOwnerTables = {
 } as const
 
 /** Locks the concrete runtime owner and its review artifacts after the root entity lock. */
-const lockReviewRuntimeTarget = async (
+export const lockReviewRuntimeTarget = async (
   trx: Transaction<Database>,
   entityContext: ReviewRuntimeEntityContext
 ): Promise<void> => {
