@@ -1,4 +1,5 @@
 import { sql, type RawBuilder } from 'kysely'
+import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { requireAuthContext } from '~~/server/utils/authorize'
 import { AssignedWorkQuerySchema } from '~~/shared/types/schemas'
 import type { AssignableEntityType } from '~~/shared/types/database'
@@ -45,6 +46,7 @@ export default defineEventHandler(async event => {
     return { items: [], total: 0, stats: { total: 0, active: 0 }, page: query.page, limit: query.limit }
   }
 
+  const search = `%${escapeLikePattern(query.search ?? '')}%`
   const offset = (query.page - 1) * query.limit
   const businessEntityTypes = [...WORKFLOW_TARGET_ENTITY_TYPE_ENUM]
   /**
@@ -197,9 +199,9 @@ export default defineEventHandler(async event => {
         AND primary_assignment.egcs_cn_isprimary = true AND primary_assignment._deleted = false
       JOIN "Common_User" primary_user ON primary_user.id = primary_assignment.egcs_cn_user
       WHERE (${query.entityType ?? null}::text IS NULL OR work.entity_type = ${query.entityType ?? null})
-        AND (${query.search ?? ''} = '' OR work.stable_reference ILIKE ${`%${query.search ?? ''}%`}
-          OR work.label_en ILIKE ${`%${query.search ?? ''}%`} OR work.label_fr ILIKE ${`%${query.search ?? ''}%`}
-          OR work.status ILIKE ${`%${query.search ?? ''}%`})
+        AND (${query.search ?? ''} = '' OR work.stable_reference ILIKE ${search}
+          OR work.label_en ILIKE ${search} OR work.label_fr ILIKE ${search}
+          OR work.status ILIKE ${search})
         AND (${sql.join(authorizationPredicates, sql` OR `)})
       GROUP BY work.id, work.entity_type, work.stable_reference, work.label_en, work.label_fr, work.status,
         work.owner_subject, work.agency_id, work.program_id, work.agency_name_en, work.agency_name_fr,
