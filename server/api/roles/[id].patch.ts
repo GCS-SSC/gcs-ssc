@@ -64,17 +64,21 @@ export default defineEventHandler(async event => {
     const abilityError = await rejectInvalidRoleScopePermissions(event, persistedAbilities, roleScopeType)
     if (abilityError) return abilityError
 
-    await trx
-      .updateTable('role')
-      .set({
-        name_en: roleData.name_en,
-        name_fr: roleData.name_fr,
-        description_en: roleData.description_en === null ? sql<string>`NULL` : roleData.description_en,
-        description_fr: roleData.description_fr === null ? sql<string>`NULL` : roleData.description_fr
-      })
-      .where('id', '=', id)
-      .where('_deleted', '=', false)
-      .execute()
+    const hasProfileChanges = (['name_en', 'name_fr', 'description_en', 'description_fr'] as const)
+      .some(key => roleData[key] !== undefined)
+    if (hasProfileChanges) {
+      await trx
+        .updateTable('role')
+        .set({
+          name_en: roleData.name_en,
+          name_fr: roleData.name_fr,
+          description_en: roleData.description_en === null ? sql<string>`NULL` : roleData.description_en,
+          description_fr: roleData.description_fr === null ? sql<string>`NULL` : roleData.description_fr
+        })
+        .where('id', '=', id)
+        .where('_deleted', '=', false)
+        .execute()
+    }
 
     if (transfer_payment_ids !== undefined) {
       await trx
