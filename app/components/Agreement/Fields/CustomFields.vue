@@ -24,9 +24,10 @@ const { data, status, error, refresh } = await useAsyncData<{ items: AgreementCu
 const fields = computed(() => (data.value?.items ?? []).filter(field => field.active || customFieldHasValue(model.value[field.id])))
 const sections = computed(() => (data.value?.sections ?? []).map(section => ({ ...section, fields: fields.value.filter(field => field.section_id === section.id) })))
 const label = (value: { name_en: string, name_fr: string }) => locale.value === 'fr' ? value.name_fr : value.name_en
+/** Formats a custom-field value for read-only display. */
 const valueLabel = (field: AgreementCustomFieldDefinition) => {
   const value = model.value[field.id]
-  if (field.kind === 'number') return typeof value === 'number' ? n(value) : ''
+  if (field.kind === 'number') return typeof value === 'number' ? n(value, { maximumSignificantDigits: 21 }) : ''
   return field.kind !== 'relational'
     ? String(value ?? '')
     : customFieldOptionIds(value).map(optionId => label(field.options.find(option => option.id === optionId) ?? { name_en: '', name_fr: '' })).join(', ')

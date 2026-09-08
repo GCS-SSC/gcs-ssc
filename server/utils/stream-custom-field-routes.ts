@@ -1,13 +1,14 @@
 import { customFieldHasWorkflowReferences } from './workflow-conditions'
 /* eslint-disable jsdoc/require-jsdoc -- Stream-owned configuration adapters. */
 import { getRouterParam, type H3Event } from 'h3'
+import { sql } from 'kysely'
 import { authorize } from './authorize'
 import { authorizeTransferPaymentStreamResource } from './transfer-payment-route-authorization'
 import { executeFreshAuthorizedTransferPaymentStreamWrite } from './transfer-payment-write-transaction'
 import { badRequest, notFound, throwApiError } from './api-errors'
 import { readValidatedBodyI18n, parseI18n } from './api-validate'
 import { readAgreementCustomFieldDefinitions, readAgreementCustomFieldSections } from './agreement-custom-fields'
-import { customFieldHasValue, customFieldOptionIds, StreamFieldSectionCreateSchema, StreamFieldSectionPatchSchema, StreamFieldCreateSchema, StreamFieldPatchSchema, StreamFieldOptionCreateSchema, StreamFieldOptionPatchSchema } from '~~/shared/types/schemas/agreement-custom-fields'
+import { StreamFieldSectionCreateSchema, StreamFieldSectionPatchSchema, StreamFieldCreateSchema, StreamFieldPatchSchema, StreamFieldOptionCreateSchema, StreamFieldOptionPatchSchema } from '~~/shared/types/schemas/agreement-custom-fields'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 export const streamCustomFieldRoute = async (event: H3Event, operation: 'read' | 'create' | 'update' | 'delete', resource: 'field' | 'option' | 'section') => {
@@ -69,9 +70,20 @@ export const streamCustomFieldRoute = async (event: H3Event, operation: 'read' |
       if (await customFieldHasWorkflowReferences(trx, field.id, { optionId: option?.id, includeHistory: true })) {
         return await throwApiError(event, { statusCode: 409, code: 'CUSTOM_FIELD_IN_USE', key: 'apiErrors.custom_fields.in_use' })
       }
-      const agreements = await trx.selectFrom('Funding_Case_Agreement_Profile').select('egcs_fc_customfields')
-        .where('egcs_fc_transferpaymentstream', '=', streamId).execute()
-      if (agreements.some(agreement => option ? customFieldOptionIds(agreement.egcs_fc_customfields[field.id]).includes(option.id) : customFieldHasValue(agreement.egcs_fc_customfields[field.id]))) {
+      const value = sql`egcs_fc_customfields -> ${field.id}`
+      // Match String.trim() when checking persisted text, including Unicode whitespace.
+      const whitespace = '\u0009\u000A\u000B\u000C\u000D\u0020\u00A0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF'
+      const referenced = option
+        ? sql<boolean>`(${value} @> ${JSON.stringify([option.id])}::jsonb OR ${value} = ${JSON.stringify(option.id)}::jsonb)`
+        : sql<boolean>`CASE jsonb_typeof(${value})
+            WHEN 'number' THEN true
+            WHEN 'array' THEN ${value} <> '[]'::jsonb
+            WHEN 'string' THEN btrim(egcs_fc_customfields ->> ${field.id}, ${whitespace}) <> ''
+            ELSE false
+          END`
+      const agreement = await trx.selectFrom('Funding_Case_Agreement_Profile').select('id')
+        .where('egcs_fc_transferpaymentstream', '=', streamId).where(referenced).limit(1).executeTakeFirst()
+      if (agreement) {
         return await throwApiError(event, { statusCode: 409, code: 'CUSTOM_FIELD_IN_USE', key: 'apiErrors.custom_fields.in_use' })
       }
       if (option) return await trx.updateTable('Transfer_Payment_Stream_Field_Option').set({ _deleted: true }).where('id', '=', option.id).returningAll().executeTakeFirstOrThrow()
