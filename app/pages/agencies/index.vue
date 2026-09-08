@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { getClientRequestUrl } from '~/utils/client-request-url'
-import type { Ref } from 'vue'
+import { useCrudModal, useCrudModalPending } from '~/composables/useCrudModal'
 import type { AgencyProfileItem } from '~~/shared/types/schemas'
 import { buildAgencyHeroStats, saveAgencyProfile } from '~/utils/agency-page'
 
@@ -35,9 +35,19 @@ const {
   fetchUrl: '/api/agency'
 })
 
-const isModalOpen: Ref<boolean> = ref(false)
-const selectedAgency: Ref<Partial<AgencyProfileItem> | null> = ref(null)
-const isSavingAgency: Ref<boolean> = ref(false)
+const {
+  isOpen: isModalOpen,
+  selected: selectedAgency,
+  openCreate: openAgencyCreate,
+  openUpdate: openAgencyUpdate,
+  captureSession,
+  closeSession
+} = useCrudModal<AgencyProfileItem>({
+  createState: () => ({}),
+  updateState: agency => ({ ...agency })
+})
+const agencyPending = useCrudModalPending(captureSession)
+const isSavingAgency = agencyPending.isPending
 
 /**
  * Persists the selected agency from the create/update modal.
@@ -46,8 +56,9 @@ const isSavingAgency: Ref<boolean> = ref(false)
  */
 const saveAgency = async () => saveAgencyProfile({
   selectedAgency,
-  isSavingAgency,
-  isModalOpen,
+  captureSession,
+  closeSession,
+  pending: agencyPending,
   buildRequestUrl: getClientRequestUrl,
   refresh,
   refreshStatusCatalogAgency: statusCatalog.refreshAgency,
@@ -59,8 +70,7 @@ const saveAgency = async () => saveAgencyProfile({
  */
 const openCreateModal = () => {
   if (!canCreateAgency.value) return
-  selectedAgency.value = {}
-  isModalOpen.value = true
+  openAgencyCreate()
 }
 
 /**
@@ -70,8 +80,7 @@ const openCreateModal = () => {
  */
 const openUpdateModal = (agency: AgencyProfileItem) => {
   if (!canUpdateAgency(agency)) return
-  selectedAgency.value = { ...agency }
-  isModalOpen.value = true
+  openAgencyUpdate(agency)
 }
 
 const { getHeroCollapsed } = useDashboard()

@@ -1,11 +1,13 @@
 import type { Ref } from 'vue'
+import type { CrudModalSession, useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import type { AgencyProfileItem } from '~~/shared/types/schemas'
 
 export interface AgencySaveOptions {
   selectedAgency: Ref<Partial<AgencyProfileItem> | null>
-  isSavingAgency: Ref<boolean>
-  isModalOpen: Ref<boolean>
+  captureSession: () => CrudModalSession | null
+  closeSession: (session: CrudModalSession | null) => boolean
+  pending: Pick<ReturnType<typeof useCrudModalPending>, 'begin' | 'end'>
   buildRequestUrl: (path: string) => RequestInfo | URL
   refresh: () => Promise<void>
   refreshStatusCatalogAgency?: (agencyId: string) => Promise<void>
@@ -60,13 +62,13 @@ export const buildAgencyHeroStats = (
  * @param options - Save state and dependencies from the agencies page.
  */
 export const saveAgencyProfile = async (options: AgencySaveOptions) => {
-  if (!options.selectedAgency.value || options.isSavingAgency.value) {
+  const session = options.captureSession()
+  if (!options.selectedAgency.value || session === null || !options.pending.begin(session)) {
     return
   }
 
+  const request = buildAgencySaveRequest({ ...options.selectedAgency.value })
   try {
-    options.isSavingAgency.value = true
-    const request = buildAgencySaveRequest(options.selectedAgency.value)
     const response = await fetch(options.buildRequestUrl(request.path), {
       method: request.method,
       headers: { 'content-type': 'application/json' },
@@ -87,7 +89,7 @@ export const saveAgencyProfile = async (options: AgencySaveOptions) => {
       }
     }
 
-    options.isModalOpen.value = false
+    options.closeSession(session)
     try {
       await options.refresh()
     } catch (refreshError) {
@@ -96,6 +98,6 @@ export const saveAgencyProfile = async (options: AgencySaveOptions) => {
   } catch (error: unknown) {
     options.showError(error)
   } finally {
-    options.isSavingAgency.value = false
+    options.pending.end(session)
   }
 }

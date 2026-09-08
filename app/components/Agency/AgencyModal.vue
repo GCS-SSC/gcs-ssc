@@ -52,7 +52,7 @@ const onSubmit = () => {
           />
         </UFormField>
         <UFormField :label="t('agency.financial_id')" name="egcs_ay_agencyfinancialsystemid">
-          <UInput v-model="state.egcs_ay_agencyfinancialsystemid" type="number" />
+          <UInput v-model="state.egcs_ay_agencyfinancialsystemid" inputmode="numeric" />
         </UFormField>
         <UFormField :label="t('agency.name_en')" name="egcs_ay_name_en">
           <UInput v-model="state.egcs_ay_name_en" />
