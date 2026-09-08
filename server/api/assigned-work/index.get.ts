@@ -10,7 +10,8 @@ import {
   ASSIGNED_WORK_ENGINE_STATUS_SEARCH_LABELS,
   buildAssignedWorkRoute
 } from '~~/shared/utils/entity-assignments'
-import { WORKFLOW_TARGET_ENTITY_TYPE_ENUM } from '~~/shared/constants/enums'
+import { ASSIGNABLE_ENTITY_TYPE_ENUM, WORKFLOW_TARGET_ENTITY_TYPE_ENUM } from '~~/shared/constants/enums'
+import { escapeLikePattern } from '~~/server/utils/sql-like'
 
 type AssignedWorkRow = {
   entity_id: string
@@ -45,7 +46,7 @@ export default defineEventHandler(async event => {
     if (authorizationPredicates.length === 0) {
       return { items: [], page: query.page, limit: query.limit, total: 0 }
     }
-    const search = `%${query.search ?? ''}%`
+    const search = `%${escapeLikePattern(query.search ?? '')}%`
     const normalizedSearch = query.search?.trim().toLocaleLowerCase() ?? ''
     const matchesSearch = (labels: readonly string[]): boolean => labels.some(label =>
       label.toLocaleLowerCase().includes(normalizedSearch)
@@ -68,6 +69,8 @@ export default defineEventHandler(async event => {
       localizedLabelPredicate = sql`(${sql.join(localizedLabelPredicates, sql` OR `)})`
     }
     const businessEntityTypes = [...WORKFLOW_TARGET_ENTITY_TYPE_ENUM]
+    // These sources have an explicit owner; a missing parent must not change their subject.
+    const typedOwnerSources = [...ASSIGNABLE_ENTITY_TYPE_ENUM, 'transferpaymentstream']
     const offset = (query.page - 1) * query.limit
     /**
    * Executes one authorized queue page.
@@ -159,7 +162,12 @@ export default defineEventHandler(async event => {
         AND stream.id = review_set.egcs_cn_entityid AND stream._deleted = false
       LEFT JOIN "Transfer_Payment_Profile" program ON program.id = stream.egcs_tp_transferpaymentprofile AND program._deleted = false
       LEFT JOIN "Common_Checklist" checklist ON checklist.egcs_cn_review = review.id AND checklist._deleted = false
-      WHERE review._deleted = false AND (source.id IS NOT NULL OR stream.id IS NOT NULL OR schema.egcs_cn_agency IS NOT NULL)
+      WHERE review._deleted = false AND (
+        source.id IS NOT NULL
+        OR (stream.id IS NOT NULL AND program.id IS NOT NULL)
+        OR (review_set.egcs_cn_entitytype::text NOT IN (${sql.join(typedOwnerSources)})
+          AND schema.egcs_cn_agency IS NOT NULL)
+      )
     ), source_work AS (
       SELECT * FROM base_work UNION ALL SELECT * FROM review_work
     ), recommendation_work AS (
@@ -179,7 +187,12 @@ export default defineEventHandler(async event => {
         AND stream.id = recommendation.egcs_cn_entityid AND stream._deleted = false
       LEFT JOIN "Transfer_Payment_Profile" program ON program.id = stream.egcs_tp_transferpaymentprofile AND program._deleted = false
       WHERE recommendation._deleted = false
-        AND (source.id IS NOT NULL OR stream.id IS NOT NULL OR schema.egcs_cn_agency IS NOT NULL)
+        AND (
+          source.id IS NOT NULL
+          OR (stream.id IS NOT NULL AND program.id IS NOT NULL)
+          OR (recommendation.egcs_cn_entitytype::text NOT IN (${sql.join(typedOwnerSources)})
+            AND schema.egcs_cn_agency IS NOT NULL)
+        )
     ), work AS (
       SELECT * FROM source_work UNION ALL SELECT * FROM recommendation_work
     )
@@ -189,6 +202,7 @@ export default defineEventHandler(async event => {
       count(*) OVER ()::int total_count
     FROM work JOIN "Common_Entity_Assignment" assignment
       ON assignment.egcs_cn_entityid = work.id AND assignment.egcs_cn_entitytype::text = work.entity_type
+    JOIN "Agency_Profile" owner_agency ON owner_agency.id = work.agency_id AND owner_agency._deleted = false
     LEFT JOIN "Common_Status" business_status
       ON business_status.id::text = work.status
       AND work.entity_type IN (${sql.join(businessEntityTypes)})

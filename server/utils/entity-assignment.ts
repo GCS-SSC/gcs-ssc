@@ -65,6 +65,7 @@ const resolveAgreementIdFromEntity = async (
       .select('Funding_Case_Agreement_Claim.egcs_fc_fundingagreement')
       .where('Funding_Case_Agreement_Claim_Reconcile.id', '=', entityId)
       .where('Funding_Case_Agreement_Claim_Reconcile._deleted', '=', false)
+      .where('Funding_Case_Agreement_Claim._deleted', '=', false)
       .executeTakeFirst()
     return row ? String(row.egcs_fc_fundingagreement) : null
   }
@@ -196,6 +197,8 @@ const resolveSourceOwner = async (
   if (source.target && (source.target.entityType === 'commonreview' || source.target.entityType === 'commonrecommendation')) {
     return await resolveEntityAssignmentOwner(db, source.target.entityType, source.target.entityId)
   }
+  // A missing typed business owner must never become schema-agency authority.
+  if (source.target) return null
   return source.fallbackAgencyId ? { kind: 'agency', agencyId: source.fallbackAgencyId } : null
 }
 
