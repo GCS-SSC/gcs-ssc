@@ -57,6 +57,10 @@ const {
   disabled?: boolean
 }>()
 
+const emit = defineEmits<{
+  'resolved-items': [items: AdminCommonLookupResponseItem[]]
+}>()
+
 const singleModel = defineModel<string | undefined>()
 const valuesModel = defineModel<string[]>('values', { default: () => [] })
 const { t, locale } = useI18n()
@@ -72,6 +76,7 @@ const autoSelectionAvailable: Ref<boolean> = ref(autoSelectSingle)
 const selectedItemSequenceByValue = new Map<string, number>()
 let operationSequence = 0
 let hydrateRequestId = 0
+let disposed = false
 let hydrationAbortControllers: AbortController[] = []
 let deferredHydrationFailure: DeferredHydrationFailure | null = null
 
@@ -305,6 +310,7 @@ const fetchHydrationChunk = async (
  * @param values - Selected lookup values to resolve.
  */
 const hydrateSelectedItems = async (values: string[]) => {
+  if (disposed) return
   cancelSelectedItemHydration()
   const currentRequestId = hydrateRequestId
   const currentSignature = selectedHydrationSignature.value
@@ -390,8 +396,17 @@ const applyAutomaticSingleSelection = () => {
  * Retries both the visible collection and any unresolved selected-id hydration.
  */
 const retryLookup = async () => {
-  unavailableSelectedValues.value = new Set()
-  await refreshCollection()
+  if (disposed) return
+  const signature = selectedHydrationSignature.value
+  try {
+    await refreshCollection()
+  } catch (error: unknown) {
+    if (disposed || signature !== selectedHydrationSignature.value) return
+    collectionError.value = error
+    showError(error)
+    return
+  }
+  if (disposed || signature !== selectedHydrationSignature.value) return
   await hydrateSelectedItems(normalizedValues.value)
 }
 
@@ -410,6 +425,7 @@ watch(selectedHydrationScopeSignature, () => {
 }, { flush: 'sync' })
 
 onBeforeUnmount(() => {
+  disposed = true
   cancelSelectedItemHydration()
 })
 
@@ -497,6 +513,12 @@ const selectedOptions = computed(() => {
     return option ? [option] : []
   })
 })
+const resolvedSelectedItems = computed(() => normalizedValues.value.flatMap(value => {
+  const item = selectedItemsByValue.value[value]
+  return item ? [item] : []
+}))
+watch(resolvedSelectedItems, items => emit('resolved-items', items), { immediate: true, flush: 'sync' })
+const hasUnavailableSelection = computed(() => unavailableSelectedValues.value.size > 0)
 const isCollectionError = computed(() => status.value === 'error' || Boolean(collectionError.value))
 const showEmptyState = computed(() =>
   status.value === 'success'
@@ -534,7 +556,7 @@ const removeSelectedValue = (value: string) => {
         @update:model-value="onModelUpdate" />
     </div>
 
-    <div v-if="isCollectionError" role="alert" class="flex flex-wrap items-center gap-2 text-sm text-error">
+    <div v-if="isCollectionError || hasUnavailableSelection" role="alert" class="flex flex-wrap items-center gap-2 text-sm text-error">
       <span>{{ t('common.lookup_load_failed') }}</span>
       <UButton
         type="button"
