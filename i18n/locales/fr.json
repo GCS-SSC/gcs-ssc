@@ -922,6 +922,7 @@
       "gwcoa_not_found": "Numéro CGOA pangouvernemental introuvable.",
       "invalid_gwcoa_number": "Sélectionnez un numéro CGOA pangouvernemental valide.",
       "duplicate_gwcoa_number": "Une entrée CGOA pangouvernementale portant ce numéro existe déjà.",
+      "gwcoa_number_in_use": "Ce numéro CGOA pangouvernemental est utilisé par une agence et ne peut pas être modifié.",
       "address_type_not_found": "Type d'adresse introuvable.",
       "attachment_type_not_found": "Type de pièce jointe introuvable.",
       "approval_behalf_type_not_found": "Type d'approbation au nom de introuvable.",

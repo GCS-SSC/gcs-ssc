@@ -922,6 +922,7 @@
       "gwcoa_not_found": "GWCOA number not found.",
       "invalid_gwcoa_number": "Select a valid GWCOA number.",
       "duplicate_gwcoa_number": "A GWCOA entry with this number already exists.",
+      "gwcoa_number_in_use": "This GWCOA number is used by an Agency and cannot be changed.",
       "address_type_not_found": "Address type not found.",
       "attachment_type_not_found": "Attachment type not found.",
       "approval_behalf_type_not_found": "Approval behalf type not found.",

@@ -111,13 +111,23 @@ export const AdminCommonListQuerySchema = z.object({
 // unlike editable schemas such as CommonGwcoaCreateSchema and CommonGwcoaPatchSchema.
 export const CommonReadOnlySchema = z.object({})
 
+/** Builds a required GWCOA name with PostgreSQL varchar character-count semantics.
+ * @param requiredKey Localized validation key for an empty name.
+ * @returns Name schema limited to 255 Unicode code points.
+ */
+const GwcoaNameSchema = (requiredKey: string) => RequiredString(requiredKey).superRefine((value, context) => {
+  if (Array.from(value).length > 255) {
+    context.addIssue({ code: 'too_big', origin: 'string', maximum: 255, inclusive: true, message: 'validation.max_length' })
+  }
+})
+
 export const CommonGwcoaCreateSchema = z.object({
   egcs_cn_number: z.coerce.number({ error: 'validation.required' })
     .int({ error: 'validation.invalid_number' })
     .min(0, { error: 'validation.invalid_number' })
     .max(32767, { error: 'validation.invalid_number' }),
-  egcs_cn_name_en: RequiredString('validation.name_en_required'),
-  egcs_cn_name_fr: RequiredString('validation.name_fr_required')
+  egcs_cn_name_en: GwcoaNameSchema('validation.name_en_required'),
+  egcs_cn_name_fr: GwcoaNameSchema('validation.name_fr_required')
 })
 export const CommonGwcoaPatchSchema = CommonGwcoaCreateSchema.partial().extend({ _deleted: z.boolean().optional() })
 
