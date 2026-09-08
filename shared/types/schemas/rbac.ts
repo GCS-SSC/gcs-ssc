@@ -78,11 +78,6 @@ const RolePatchBaseSchema = z.object({
   ...RoleCoreFields
 })
 
-export const RolePatchSchema = RolePatchBaseSchema
-  .superRefine((value, context) => validateUniquePermissions(value.permissions, context))
-
-export type RolePatchInput = z.infer<typeof RolePatchSchema>
-
 export const RoleProfilePatchSchema = RolePatchBaseSchema
   .omit({ permissions: true, agency_id: true })
   .partial()

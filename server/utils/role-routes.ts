@@ -2,7 +2,7 @@
 import type { H3Event } from 'h3'
 import type { Kysely } from 'kysely'
 import type { Database } from '~~/shared/types/database'
-import type { RoleInput, RolePatchInput, RolePermissionInput } from '~~/shared/types/schemas/rbac'
+import type { RoleInput, RolePermissionInput } from '~~/shared/types/schemas/rbac'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import { isRoleAbilitySubject } from '@gcs-ssc/authorization'
 import { getRoleScopeType, isAbilityAllowedForRoleScope, type RoleScopeType } from '~~/shared/utils/role-scope'
@@ -58,7 +58,7 @@ const routeNotFound = async (
 }
 
 /** Deduplicates role permissions by subject. */
-export const normalizeRolePermissions = (permissions: RoleInput['permissions'] | RolePatchInput['permissions'] | undefined) => {
+export const normalizeRolePermissions = (permissions: RoleInput['permissions'] | undefined) => {
   if (!Array.isArray(permissions)) {
     return []
   }
@@ -75,7 +75,7 @@ export const normalizeRolePermissions = (permissions: RoleInput['permissions'] |
 }
 
 /** Converts, filters, and deduplicates transfer payment scope identifiers. */
-export const normalizeRoleTransferPaymentIds = (transferPaymentIds: RoleInput['transfer_payment_ids'] | RolePatchInput['transfer_payment_ids'] | undefined) => {
+export const normalizeRoleTransferPaymentIds = (transferPaymentIds: RoleInput['transfer_payment_ids'] | undefined) => {
   if (!Array.isArray(transferPaymentIds)) {
     return []
   }
