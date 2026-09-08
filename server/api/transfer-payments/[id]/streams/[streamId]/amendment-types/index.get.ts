@@ -44,9 +44,9 @@ export default defineEventHandler(async event => {
   if (search) {
     baseQuery = baseQuery.where(eb =>
       eb.or([
-        eb(sql<string>`CAST(${eb.ref('id')} AS TEXT)`, '=', search),
-        eb('egcs_tp_name_en', 'ilike', `%${escapeLikePattern(search)}%`),
-        eb('egcs_tp_name_fr', 'ilike', `%${escapeLikePattern(search)}%`)
+        eb(sql<string>`CAST(${eb.ref('Transfer_Payment_Amendment_Type.id')} AS TEXT)`, '=', search),
+        eb('Transfer_Payment_Amendment_Type.egcs_tp_name_en', 'ilike', `%${escapeLikePattern(search)}%`),
+        eb('Transfer_Payment_Amendment_Type.egcs_tp_name_fr', 'ilike', `%${escapeLikePattern(search)}%`)
       ])
     )
   }

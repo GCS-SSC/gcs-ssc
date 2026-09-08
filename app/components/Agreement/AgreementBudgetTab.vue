@@ -712,7 +712,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
       </template>
 
       <template #actions-cell="{ row }">
-        <div v-if="isFiscalYearGroupRow(row as GroupedBudgetRow)" class="flex items-center gap-2">
+        <div v-if="isFiscalYearGroupRow(row as GroupedBudgetRow)" class="flex flex-wrap items-center gap-2">
           <UButton
             v-if="canCreate"
             icon="i-lucide-plus"
@@ -961,7 +961,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
 }
 
 :deep(.agreement-budget-table th:nth-child(1)) {
-  width: 48%;
+  width: auto;
 }
 
 :deep(.agreement-budget-table th:nth-child(2)),
@@ -971,6 +971,6 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
 }
 
 :deep(.agreement-budget-table th:nth-child(5)) {
-  width: 10%;
+  width: 10rem;
 }
 </style>

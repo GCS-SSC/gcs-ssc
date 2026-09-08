@@ -373,7 +373,7 @@ const fetchAssessmentSetItemResponseSchema = async (
     'Common_Publication.egcs_cn_currentversion as publicationVersionId',
     'Common_Publication_Version.egcs_cn_version as publicationVersion'
   ])
-  .where('id', '=', schemaId)
+  .where('Common_Review_Schema.id', '=', schemaId)
   .executeTakeFirstOrThrow()
 
 const formatAssessmentSetItemResponse = async (

@@ -2,17 +2,25 @@
 import type { H3Event } from 'h3'
 import type { Kysely, Transaction, Updateable } from 'kysely'
 import { badRequest } from '~~/server/utils/api-errors'
-import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
+import { parseI18n, readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import {
   AGREEMENT_CHILD_ERROR_KEYS,
   assertAgreementChildExists,
   assertAgreementExists
 } from '~~/server/utils/agreement-child-resources'
-import { FundingCaseAgreementActivityPatchSchema } from '~~/shared/types/schemas'
+import { FundingCaseAgreementActivityBaseSchema, FundingCaseAgreementActivityPatchSchema } from '~~/shared/types/schemas'
 import type { Database, FundingCaseAgreementActivityTable } from '~~/shared/types/database'
 import type { FundingCaseAgreementActivityPatch } from '~~/shared/types/schemas'
 
 type AgreementDb = Kysely<Database> | Transaction<Database>
+
+const activityDateRangeSchema = FundingCaseAgreementActivityBaseSchema.pick({
+  egcs_fc_startdate: true,
+  egcs_fc_enddate: true
+}).refine(data => data.egcs_fc_startdate <= data.egcs_fc_enddate, {
+  message: 'validation.date_range',
+  path: ['egcs_fc_enddate']
+})
 
 export type AgreementActivityOutcomeTag = {
   id: string
@@ -389,7 +397,11 @@ const assertAgreementActivityExists = async (
     .where('Funding_Case_Agreement_Activity._deleted', '=', false)
     .where('Funding_Case_Agreement_Activity_Version.egcs_fc_iscurrent', '=', true)
     .where('Funding_Case_Agreement_Activity_Version._deleted', '=', false)
-    .select('Funding_Case_Agreement_Activity.id as id')
+    .select([
+      'Funding_Case_Agreement_Activity.id as id',
+      'Funding_Case_Agreement_Activity.egcs_fc_startdate as egcs_fc_startdate',
+      'Funding_Case_Agreement_Activity.egcs_fc_enddate as egcs_fc_enddate'
+    ])
     .executeTakeFirst(),
   ...AGREEMENT_CHILD_ERROR_KEYS.activityNotFound
 )
@@ -460,6 +472,17 @@ export const patchAgreementActivity = async (
   const validated = await readAgreementActivityPatchBody(event)
   if (Object.keys(validated).length === 0) {
     return await loadAgreementActivityRow(db, agreementId, activityId)
+  }
+
+  if (Object.hasOwn(validated, 'egcs_fc_startdate') || Object.hasOwn(validated, 'egcs_fc_enddate')) {
+    await parseI18n(event, activityDateRangeSchema, {
+      egcs_fc_startdate: Object.hasOwn(validated, 'egcs_fc_startdate')
+        ? validated.egcs_fc_startdate
+        : existing.egcs_fc_startdate,
+      egcs_fc_enddate: Object.hasOwn(validated, 'egcs_fc_enddate')
+        ? validated.egcs_fc_enddate
+        : existing.egcs_fc_enddate
+    })
   }
 
   const selectionError = await validateAgreementActivityPatchSelections(

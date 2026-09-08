@@ -670,7 +670,7 @@ const removeSelectedId = (id: string) => {
   </UFormField>
 
   <UModal v-model:open="isOpen" :title="t('agreement.applicant_recipients.select')" :description="t('agreement.applicant_recipients.search')">
-    <template #content>
+    <template #body>
       <UCommandPalette
         v-model="draftSelectedIds"
         v-model:search-term="searchTerm"

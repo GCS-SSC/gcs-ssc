@@ -11,6 +11,18 @@ import {
 import { AGREEMENT_ADDRESS_SELECT_COLUMNS } from '~~/server/utils/agreement-address-columns'
 import { FundingCaseAgreementAddressPatchSchema } from '~~/shared/types/schemas'
 import type { Database } from '~~/shared/types/database'
+import { z } from 'zod'
+
+export const AgreementAddressPatchRequestSchema = z.preprocess(input => {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return input
+  const address = { ...input } as Record<string, unknown>
+  if (address.egcs_cn_street2 === null) address.egcs_cn_street2 = undefined
+  if (address.egcs_cn_street3 === null) address.egcs_cn_street3 = undefined
+  if (address.egcs_cn_latitude === null) address.egcs_cn_latitude = undefined
+  if (address.egcs_cn_longitude === null) address.egcs_cn_longitude = undefined
+  if (address.egcs_cn_mainphoneextension === null) address.egcs_cn_mainphoneextension = undefined
+  return address
+}, FundingCaseAgreementAddressPatchSchema)
 
 type AgreementAddressDb = Kysely<Database> | Transaction<Database>
 
@@ -141,7 +153,7 @@ export const patchAgreementAddress = async (
   }
 
   const readBody = (globalThis as { readValidatedBodyI18n?: typeof readValidatedBodyI18n }).readValidatedBodyI18n ?? readValidatedBodyI18n
-  const validated = await readBody(event, FundingCaseAgreementAddressPatchSchema)
+  const validated = await readBody(event, AgreementAddressPatchRequestSchema)
   const values = Object.fromEntries(Object.entries(validated).filter(([, value]) => value !== undefined))
 
   if (!Object.keys(values).length) {

@@ -156,12 +156,19 @@ export type FundingCaseAgreementApplicantRecipient = z.infer<typeof FundingCaseA
 export type FundingCaseAgreementApplicantRecipientPatch = z.infer<typeof FundingCaseAgreementApplicantRecipientPatchSchema>
 export type FundingCaseAgreementApplicantRecipientItem = WithId<FundingCaseAgreementApplicantRecipient>
 
-export const FundingCaseAgreementAddressCreateSchema = z.intersection(
+export const FundingCaseAgreementAddressCreateSchema = z.preprocess(input => {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return input
+  const address = { ...input } as Record<string, unknown>
+  for (const field of ['egcs_cn_street2', 'egcs_cn_street3', 'egcs_cn_latitude', 'egcs_cn_longitude', 'egcs_cn_mainphoneextension']) {
+    if (address[field] === null) address[field] = undefined
+  }
+  return address
+}, z.intersection(
   CommonAddressCreateSchema,
   z.object({
     egcs_fc_addresstype: RequiredBigintSelectionId()
   })
-)
+))
 export const FundingCaseAgreementAddressPatchSchema = z.intersection(
   CommonAddressPatchSchema,
   z.object({

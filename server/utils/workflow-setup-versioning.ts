@@ -90,6 +90,13 @@ export type WorkflowSetupPublicationPlan = {
 export type RuntimeWorkflowSetup = WorkflowSetupRow & { egcs_cn_allowedstartstatuses: StatusId[] }
 export type WorkflowStatusGraphDefinition = { id: StatusId, terminal: boolean }
 
+class InvalidWorkflowMemberSequenceError extends Error {
+  constructor() {
+    super('Workflow requires at least one contiguously ordered member')
+    this.name = 'InvalidWorkflowMemberSequenceError'
+  }
+}
+
 const causedByUnavailablePublishedDefinition = (error: unknown): boolean => {
   let current = error
   while (current instanceof Error) {
@@ -160,7 +167,7 @@ export const buildWorkflowSetupPublication = async (
       .orderBy('egcs_cn_order', 'asc').execute()
   ])
   if (rows.length === 0 || rows.some((member, index) => member.egcs_cn_sequence !== index + 1)) {
-    throw new Error('Workflow requires at least one contiguously ordered member')
+    throw new InvalidWorkflowMemberSequenceError()
   }
 
   const references: PublicationVersionReference[] = []
@@ -414,7 +421,7 @@ export const readWorkflowSetupPublicationMetadata = async (
     const { definition } = await buildWorkflowSetupPublication(db, setup)
     return await readPublicationMetadata(db, String(setup.id), definition as unknown as JsonValue)
   } catch (error) {
-    if (!causedByUnavailablePublishedDefinition(error)) throw error
+    if (!(error instanceof InvalidWorkflowMemberSequenceError) && !causedByUnavailablePublishedDefinition(error)) throw error
     const metadata = await readPublicationMetadata(db, String(setup.id))
     return { ...metadata, hasUnpublishedChanges: metadata.publicationState !== 'retired' }
   }

@@ -68,6 +68,9 @@ export const resolveQualifiedRuntimeTransactionPlan = async (
   if (!entityType.includes(':')) return null
   const actor = await resolveCurrentCommonUser(event)
   if (!actor) return null
+  if (event.context.$db.isTransaction) {
+    return await resolveExtensionLifecycleRuntimeInTransaction(event.context.$db as Transaction<Database>, entityType, entityId, actor.id, event)
+  }
   return await event.context.$db.transaction().execute(async trx =>
     await resolveExtensionLifecycleRuntimeInTransaction(trx, entityType, entityId, actor.id, event))
 }

@@ -47,7 +47,7 @@ const NullableOptionalIdSchema = z.preprocess(value => {
   if (value === undefined || value === '') return undefined
   if (value === null) return null
   return value
-}, z.union([z.coerce.string().min(1), z.null()]).optional())
+}, z.union([z.null(), z.coerce.string().min(1)]).optional())
 const RequiredString = (key: string) => z.string({ error: key }).min(1, { error: key })
 const OptionalNumericString = z.coerce.number().optional()
 const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
