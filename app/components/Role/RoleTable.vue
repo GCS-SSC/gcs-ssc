@@ -52,6 +52,8 @@ const canUpdateRole = (role: RoleRow) => {
   return can('role', 'update', roleScope(role))
 }
 
+const canReadRole = (role: RoleRow) => can('role', 'read', roleScope(role))
+
 const canDeleteRole = (role: RoleRow) => {
   return can('role', 'delete', roleScope(role))
 }
@@ -103,7 +105,7 @@ const buttonLabel: ComputedRef<string | undefined> = computed(() => (canCreate ?
       <CommonBilingualName
         :name-en="row.original.name_en"
         :name-fr="row.original.name_fr"
-        :to="localePath(appRouteLocations.roleDetail(row.original.id))" />
+        :to="canReadRole(row.original) ? localePath(appRouteLocations.roleDetail(row.original.id)) : undefined" />
     </template>
 
     <template #permissions-cell="{ row }">
