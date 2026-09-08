@@ -15,6 +15,7 @@ const AgencyGwcoaDetailQuerySchema = z.object({
 const AgencyGwcoaNumberSchema = z.coerce.number({ error: 'validation.invalid_number' })
   .int({ error: 'validation.invalid_number' })
   .nonnegative({ error: 'validation.invalid_number' })
+  .max(32767, { error: 'validation.invalid_number' })
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
