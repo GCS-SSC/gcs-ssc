@@ -33,10 +33,10 @@ RUN set -eux; \
     git -C "$destination" checkout --detach FETCH_HEAD; \
     rm -rf "$destination/.git"; \
   }; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-ssc-extensions.git packages/gcs-ssc-extensions eecd92d3a49a6b822313124c4954a4be77ed3cb2; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-ssc-extensions.git packages/gcs-ssc-extensions 09309322185649535621bd8b086937b82f65059d; \
   fetch_workspace https://github.com/GCS-SSC/gcs-automated-payments.git extensions/gcs-automated-payments bf78be2b484c6c0ea6692aa255f96824f4f9ad13; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-gcforms-integration.git extensions/gcs-gcforms-integration 4a5eda68862733ebf83ffc8de83ab90f852004d0; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-narrative-quality.git extensions/gcs-narrative-quality 34f24088b5d5aeb74358dda2eed8dec9464cce1e; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-gcforms-integration.git extensions/gcs-gcforms-integration 69279d37e4c0a8051e007be685cea677a1265416; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-narrative-quality.git extensions/gcs-narrative-quality 83df2ce0869bb91b9cdaeb7deecb2097c2620711; \
   fetch_workspace https://github.com/GCS-SSC/gcs-narrative-tags.git extensions/gcs-narrative-tags aaaad20d0ae65a097b6cba4a5bb7f25b0c9e5656; \
   fetch_workspace https://github.com/GCS-SSC/gcs-outcome-cost-allocation.git extensions/gcs-outcome-cost-allocation 265d1ce9aab9b8ddcf22a456cc220e04f1a20c9b; \
   fetch_workspace https://github.com/GCS-SSC/gcs-storage-local.git extensions/gcs-storage-local 6add3d9f5517481cb47c3be12b6592b4e98f0fb3; \
