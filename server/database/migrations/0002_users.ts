@@ -47,7 +47,7 @@ export async function up(db: Kysely<Database>): Promise<void> {
 
       IF active_user IS DISTINCT FROM true THEN
         RAISE EXCEPTION 'session user must be active'
-          USING ERRCODE = '23514';
+          USING ERRCODE = '23514', CONSTRAINT = 'session_user_active';
       END IF;
 
       RETURN NEW;

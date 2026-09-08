@@ -1,4 +1,5 @@
 import { betterAuth } from 'better-auth'
+import { APIError } from 'better-auth/api'
 import { kyselyAdapter } from '@better-auth/kysely-adapter'
 import { useDb } from './db'
 
@@ -271,6 +272,39 @@ const resolveTrustedOriginsForRequest = async (
 }
 
 /**
+ * Preserves adapter behavior while translating the atomic deleted-user session guard.
+ * @param db - Application database connection.
+ * @returns Better Auth adapter factory with session eligibility error translation.
+ */
+const createAuthDatabaseAdapter = (db: ReturnType<typeof useDb>): ReturnType<typeof kyselyAdapter> => {
+  const factory = kyselyAdapter(db, { type: 'postgres' })
+  return options => {
+    const adapter = factory(options)
+    /**
+     * Creates an adapter record and preserves native authentication rejection semantics.
+     * @param input - Adapter model and record data.
+     * @returns The created record.
+     */
+    const create: typeof adapter.create = async input => {
+      try {
+        return await adapter.create(input)
+      } catch (error: unknown) {
+        if (input.model === 'session' && typeof error === 'object' && error !== null
+          && 'code' in error && error.code === '23514'
+          && 'constraint' in error && error.constraint === 'session_user_active') {
+          throw new APIError('UNAUTHORIZED', {
+            code: 'INVALID_EMAIL_OR_PASSWORD',
+            message: 'Invalid email or password'
+          })
+        }
+        throw error
+      }
+    }
+    return { ...adapter, create }
+  }
+}
+
+/**
  * Creates the Better Auth instance after runtime config and database setup are available.
  *
  * @returns A configured Better Auth instance.
@@ -290,9 +324,7 @@ const createAuth = () => {
     : undefined
 
   return betterAuth({
-    database: kyselyAdapter(useDb(), {
-      type: 'postgres'
-    }),
+    database: createAuthDatabaseAdapter(useDb()),
     secret: runtimeConfig.authSecret,
     baseURL: runtimeConfig.authUrl,
     logger,
