@@ -10,13 +10,13 @@ export default defineEventHandler(async event => {
   event.node?.req.once('aborted', abortDump)
   event.node?.res.once('close', abortDump)
 
-  setHeaders(event, {
-    'Content-Type': 'application/sql',
-    'Content-Disposition': `attachment; filename="migrations-${new Date().toISOString().slice(0, 10)}.sql"`
-  })
-
   try {
-    return await runAdminSqlDump({ signal: abortController.signal })
+    const dump = await runAdminSqlDump({ signal: abortController.signal })
+    setHeaders(event, {
+      'Content-Type': 'application/sql',
+      'Content-Disposition': `attachment; filename="migrations-${new Date().toISOString().slice(0, 10)}.sql"`
+    })
+    return dump
   } catch {
     return await throwApiError(event, {
       statusCode: 500,
