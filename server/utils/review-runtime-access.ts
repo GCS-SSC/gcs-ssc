@@ -35,6 +35,7 @@ import {
 import {
   authorizeQualifiedRuntimeMutation,
   executeQualifiedRuntimeTransaction,
+  requireQualifiedRuntimeLockEvidence,
   resolveQualifiedRuntimeTransactionPlan,
   type QualifiedRuntimeLockEvidence
 } from '~~/server/utils/qualified-runtime-transaction'
@@ -433,6 +434,13 @@ const resolveExtensionAuthorizationRuntime = async (
   entityContext: ReviewRuntimeEntityContext
 ): Promise<ResolvedExtensionLifecycleRuntime | null> => {
   if (!entityContext.entityType?.includes(':')) return null
+  if (event.context.$db.isTransaction) {
+    return requireQualifiedRuntimeLockEvidence(
+      event.context.$db as Transaction<Database>,
+      entityContext.entityType,
+      entityContext.entityId
+    ).runtime
+  }
   const actor = await resolveCurrentCommonUser(event)
   if (!actor) return null
   return await event.context.$db.transaction().execute(async trx =>
@@ -1710,6 +1718,18 @@ const executeFreshAuthorizedReviewActorMutation = async <T>(
     ) {
       return await forbidden(event)
     }
+  }
+
+  if (entityContext.entityType.includes(':')) {
+    return await executeQualifiedRuntimeArtifactMutation(
+      event,
+      entityContext,
+      async (evidence, current) => {
+        await authorizeFreshReviewRuntimeReadAccess(event, evidence.trx, evidence.auth, current)
+        await authorizeActor(evidence.trx, current)
+      },
+      callback
+    )
   }
 
   if (isAgreementRuntimeEntityType(entityContext.entityType) && entityContext.agreementId) {
