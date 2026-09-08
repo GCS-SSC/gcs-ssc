@@ -3,7 +3,7 @@ import { z } from 'zod'
 export const UserProfileSchema = z.object({
   id: z.string().optional(),
   name: z.string({ error: 'validation.name_en_required' }).min(1, { error: 'validation.name_en_required' }),
-  email: z.string({ error: 'validation.invalid_email' }).email({ error: 'validation.invalid_email' }),
+  email: z.string({ error: 'validation.invalid_email' }).email({ error: 'validation.invalid_email' }).toLowerCase(),
   image: z.string().nullable().optional()
 })
 

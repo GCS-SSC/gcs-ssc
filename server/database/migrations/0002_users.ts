@@ -3,12 +3,13 @@ import type { Database } from '../../../shared/types/database'
 
 export async function up(db: Kysely<Database>): Promise<void> {
   await sql`CREATE EXTENSION IF NOT EXISTS plpgsql`.execute(db)
+  await sql`CREATE EXTENSION IF NOT EXISTS citext`.execute(db)
 
   await db.schema
     .createTable('user')
     .addColumn('id', 'bigserial', col => col.primaryKey())
     .addColumn('name', 'text', col => col.notNull())
-    .addColumn('email', 'text', col => col.notNull().unique())
+    .addColumn('email', sql`citext`, col => col.notNull().unique())
     .addColumn('emailVerified', 'boolean', col => col.notNull())
     .addColumn('image', 'text')
     .addColumn('createdAt', 'timestamp', col => col.notNull())
