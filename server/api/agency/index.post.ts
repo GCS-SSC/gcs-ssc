@@ -22,7 +22,9 @@ export default defineEventHandler(async event => {
       const authContext = await requireFreshAuthContext(event, trx)
       await authorizeWithFreshAuthContext(event, authContext, 'agency', 'create', { type: 'global' })
       const gwcoa = await trx.selectFrom('Common_GWCOA').select('id')
-        .where('egcs_cn_number', '=', Number(validated.egcs_ay_gwcoa_number)).forShare().executeTakeFirst()
+        .where('egcs_cn_number', '=', Number(validated.egcs_ay_gwcoa_number))
+        .where('_deleted', '=', false)
+        .forShare().executeTakeFirst()
       if (!gwcoa) {
         return await badRequest(event, 'INVALID_GWCOA', 'validation.invalid_selection')
       }
