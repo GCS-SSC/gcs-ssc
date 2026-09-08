@@ -27,7 +27,7 @@ const {
   prevStep,
   errorsByStep,
   currentStepErrors,
-  agencies,
+  onAgencyResolved,
   fiscalYears,
   fiscalYearLabelById,
   isAgencyLocked,
@@ -111,14 +111,14 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentWizard>) => {
             <div v-if="slotProps.currentStep === 'general'" class="space-y-4">
               <TransferPaymentFieldsTransferPaymentProfileFields
                 v-model:model="state.profile"
-                :agencies="agencies"
                 :is-agency-locked="isAgencyLocked"
                 is-stacked
                 name-prefix="profile"
                 :start-date-value="toDateInput(state.profile.egcs_tp_datestart)"
                 :end-date-value="toDateInput(state.profile.egcs_tp_dateend)"
                 :on-update-start-date="updateStartDate"
-                :on-update-end-date="updateEndDate" />
+                :on-update-end-date="updateEndDate"
+                @agency-resolved="onAgencyResolved" />
             </div>
 
             <div v-if="slotProps.currentStep === 'outcomes'" class="space-y-6">

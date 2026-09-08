@@ -8,7 +8,7 @@ import {
   type AgencyFiscalYearItem,
   type TransferPaymentWizard
 } from '~~/shared/types/schemas'
-import { useAgencyOptions } from '~/composables/useAgencyOptions'
+import type { AgencyOptionItem } from '~~/shared/types/admin'
 import { useWizardFlow, type WizardStepItem } from '~/composables/useWizardFlow'
 
 export type TransferPaymentWizardStepValue =
@@ -154,11 +154,15 @@ export const useTransferPaymentWizardModal = ({
     excludedErrorSummarySteps: ['review']
   })
 
-  const selectedAgencyId = computed(() => state.value?.profile.egcs_tp_agency ?? resolvedDefaultAgencyId.value)
-  const { agencies } = useAgencyOptions({ selectedAgencyId })
-  const selectedAgency = computed(() =>
-    agencies.value.find(agency => String(agency.id) === state.value?.profile.egcs_tp_agency)
-  )
+  const selectedAgency: Ref<AgencyOptionItem | null> = ref(null)
+  const onAgencyResolved = (agency: AgencyOptionItem | null) => {
+    if (!open.value) return
+    if (agency && agency.id !== state.value?.profile.egcs_tp_agency) return
+    selectedAgency.value = agency
+  }
+  watch(() => state.value?.profile.egcs_tp_agency, () => {
+    selectedAgency.value = null
+  }, { flush: 'sync' })
   const isAgencyLocked = computed(() => Boolean(toValue(fixedAgencyId)))
 
   const { data: fiscalYearsResponse } = useAgencyReferenceData<AgencyFiscalYearItem>({
@@ -289,6 +293,7 @@ export const useTransferPaymentWizardModal = ({
   watch(
     open,
     isOpen => {
+      selectedAgency.value = null
       if (isOpen) {
         initializeState()
         return
@@ -359,7 +364,7 @@ export const useTransferPaymentWizardModal = ({
 
   const getSelectedAgencyLabel = () => {
     const agency = selectedAgency.value
-    return getBilingualValue(agency, 'egcs_ay_name', t('common.none'))
+    return getBilingualValue(agency, 'egcs_ay_name', t(state.value?.profile.egcs_tp_agency ? 'common.unavailable' : 'common.none'))
   }
 
   const onCurrentStepUpdate = (step: string) => {
@@ -377,7 +382,7 @@ export const useTransferPaymentWizardModal = ({
     prevStep,
     errorsByStep,
     currentStepErrors,
-    agencies,
+    onAgencyResolved,
     fiscalYears,
     fiscalYearLabelById,
     isAgencyLocked,

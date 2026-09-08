@@ -1,9 +1,11 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- local date handlers are self-documenting and not public APIs */
+import type { AdminCommonLookupResponseItem } from '~~/shared/types/admin-common-ui'
 import type { AgencyOptionItem } from '~~/shared/types/admin'
 import type { TransferPaymentProfile } from '~~/shared/types/schemas'
 
 type TransferPaymentProfileFormModel = Partial<Omit<TransferPaymentProfile, 'egcs_tp_datestart' | 'egcs_tp_dateend'> & {
+  id?: string
   egcs_tp_datestart?: string | Date
   egcs_tp_dateend?: string | Date
 }>
@@ -11,7 +13,6 @@ type TransferPaymentProfileFormModel = Partial<Omit<TransferPaymentProfile, 'egc
 const model = defineModel<TransferPaymentProfileFormModel>('model', { required: true })
 
 const {
-  agencies = [],
   isAgencyLocked = false,
   namePrefix = '',
   startDateValue,
@@ -20,7 +21,6 @@ const {
   onUpdateEndDate,
   isStacked = false
 } = defineProps<{
-  agencies?: AgencyOptionItem[]
   isAgencyLocked?: boolean
   namePrefix?: string
   startDateValue?: string
@@ -29,6 +29,22 @@ const {
   onUpdateEndDate?: (value: string) => void
   isStacked?: boolean
 }>()
+
+const emit = defineEmits<{ 'agency-resolved': [agency: AgencyOptionItem | null] }>()
+const agencyLookupQuery = computed((): Record<string, string> => model.value.id
+  ? { permission_action: 'update', transfer_payment_id: model.value.id }
+  : { permission_action: 'create' })
+const selectedAgencyUrl = computed(() => {
+  if (!model.value.egcs_tp_agency) return undefined
+  const query = new URLSearchParams(agencyLookupQuery.value)
+  return `/api/transfer-payments/lookups/agencies/${model.value.egcs_tp_agency}?${query.toString()}`
+})
+const onAgencyResolved = (items: AdminCommonLookupResponseItem[]) => {
+  const agency = items.find(item => String(item.id) === model.value.egcs_tp_agency)
+  emit('agency-resolved', agency && typeof agency.egcs_ay_name_en === 'string' && typeof agency.egcs_ay_name_fr === 'string'
+    ? { id: String(agency.id), egcs_ay_name_en: agency.egcs_ay_name_en, egcs_ay_name_fr: agency.egcs_ay_name_fr }
+    : null)
+}
 
 const { t } = useI18n()
 const field = useFormFieldPath(() => namePrefix)
@@ -92,15 +108,18 @@ const onEndDateInput = (value: string | Date | null | undefined) => {
 <template>
   <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }">
     <UFormField :label="t('transfer_payment.agency')" :name="field('egcs_tp_agency')">
-      <CommonBilingualSelectMenu
+      <CommonServerLookupSelect
         v-model="model.egcs_tp_agency"
-        :items="agencies"
+        fetch-url="/api/transfer-payments/lookups/agencies"
+        :query="agencyLookupQuery"
+        :selected-fetch-url="selectedAgencyUrl"
+        :show-value-in-label="false"
         value-key="id"
         label-en-key="egcs_ay_name_en"
         label-fr-key="egcs_ay_name_fr"
         :aria-label="t('transfer_payment.agency')"
-        searchable
-        :disabled="isAgencyLocked" />
+        :disabled="isAgencyLocked"
+        @resolved-items="onAgencyResolved" />
     </UFormField>
     <div class="grid gap-2" :class="{ 'grid-cols-2': isStacked, 'grid-cols-1': !isStacked }">
       <UFormField :label="t('transfer_payment.start_date')" :name="field('egcs_tp_datestart')">

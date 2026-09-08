@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { useAgencyOptions } from '~/composables/useAgencyOptions'
 import { TransferPaymentProfileSchema, type TransferPaymentProfileItem } from '~~/shared/types/schemas'
 
 type TransferPaymentProfileForm = Partial<Omit<TransferPaymentProfileItem, 'egcs_tp_datestart' | 'egcs_tp_dateend'> & {
@@ -23,17 +22,6 @@ const { t } = useI18n()
 const { createValidator } = useZodI18n()
 const validate = createValidator(TransferPaymentProfileSchema)
 
-const selectedAgencyId = computed(() => {
-  if (state.value?.egcs_tp_agency) {
-    return String(state.value.egcs_tp_agency)
-  }
-  if (fixedAgencyId) {
-    return fixedAgencyId
-  }
-  return ''
-})
-const { agencies } = useAgencyOptions({ selectedAgencyId })
-
 const isEditing = computed(() => !!state.value?.id)
 const isAgencyLocked = computed(() => isEditing.value || !!fixedAgencyId)
 
@@ -51,10 +39,9 @@ const onSubmit = () => {
 <template>
   <UModal v-model:open="open" :title="title" :description="t('common.form_dialog_description')">
     <template #body>
-      <UForm :state="state" :validate="validate" class="space-y-4" @submit="onSubmit">
+      <UForm v-if="open" :state="state" :validate="validate" class="space-y-4" @submit="onSubmit">
         <TransferPaymentFieldsTransferPaymentProfileFields
           v-model:model="state"
-          :agencies="agencies"
           :is-agency-locked="isAgencyLocked" />
         <UFormField :label="t('common.active')" name="egcs_tp_active">
           <USwitch v-model="state.egcs_tp_active" :label="t('common.active')" />
