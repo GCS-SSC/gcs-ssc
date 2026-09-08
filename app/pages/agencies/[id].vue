@@ -2,7 +2,7 @@
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
-import { ref } from 'vue'
+import { onBeforeUnmount, ref } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
 import { useRouteTabMap } from '~/composables/useRouteTabMap'
@@ -93,21 +93,29 @@ const tabMap: TabMap = new Map([
 const agency: Ref<AgencyProfileItem | null> = ref(null)
 const isLoadingAgency = ref(false)
 const agencyLoadError = ref<unknown>(null)
-/**
- *
- */
+let agencyLoadGeneration = 0
+let isAgencyPageDisposed = false
+onBeforeUnmount(() => {
+  isAgencyPageDisposed = true
+  agencyLoadGeneration += 1
+})
+/** Refreshes the profile while accepting only the latest mounted-page request. */
 const refresh = async () => {
+  if (isAgencyPageDisposed) return
+  const generation = ++agencyLoadGeneration
   isLoadingAgency.value = true
   agencyLoadError.value = null
   try {
     const response = await fetch(getClientRequestUrl(`/api/agency/${id}`))
     if (!response.ok) await throwFetchResponseError(response)
-    agency.value = await response.json() as AgencyProfileItem
+    const profile = await response.json() as AgencyProfileItem
+    if (generation === agencyLoadGeneration) agency.value = profile
   } catch (error: unknown) {
+    if (generation !== agencyLoadGeneration) return
     agencyLoadError.value = error
     showError(error)
   } finally {
-    isLoadingAgency.value = false
+    if (generation === agencyLoadGeneration) isLoadingAgency.value = false
   }
 }
 void refresh()
@@ -215,7 +223,7 @@ const isHeroCollapsed = getHeroCollapsed('agency-detail')
     <template #body>
       <CommonLoadingState v-if="isLoadingAgency && !agency" :label="t('common.loading')" />
       <UAlert
-        v-else-if="agencyLoadError && !agency"
+        v-else-if="agencyLoadError"
         color="error"
         icon="i-lucide-circle-alert"
         :title="t('common.load_failed')"
@@ -224,7 +232,7 @@ const isHeroCollapsed = getHeroCollapsed('agency-detail')
           <UButton :label="t('common.retry')" color="error" variant="soft" @click="() => refresh()" />
         </template>
       </UAlert>
-      <div v-else-if="agency" class="flex flex-1 flex-col">
+      <div v-if="agency" class="flex flex-1 flex-col">
         <AgencyDetailHero :agency="agency" :is-collapsed="isHeroCollapsed" :can-update="canUpdateAgency" @edit="openUpdateModal" />
 
         <div class="flex min-h-0 flex-1 flex-col gap-6 overflow-visible px-6 pt-0 pb-6 lg:flex-row lg:gap-0">
