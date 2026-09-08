@@ -620,7 +620,7 @@ const resolveUserScopeAccess = async (
  * @param db - Database used to resolve target scopes.
  * @param context - Authenticated caller and abilities.
  * @param action - User action to authorize.
- * @returns Whether any resolved target scope is authorized.
+ * @returns Whether every resolved target scope is authorized, or global authority applies.
  */
 export const canAuthorizeUserScopes = async (
   targetUserId: string,
