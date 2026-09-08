@@ -64,6 +64,7 @@ const orderedCertifications = computed(() => (step.value?.certifications ?? [])
         <CommonServerLookupSelect
           v-model="step.egcs_cn_defaultuser"
           :fetch-url="`/api/users/lookups?approvalTemplateId=${approvalTemplateId}`"
+          selected-values-query-key="selectedIds"
           value-key="id"
           label-en-key="egcs_cn_name_en"
           label-fr-key="egcs_cn_name_fr" />

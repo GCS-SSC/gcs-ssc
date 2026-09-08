@@ -1,9 +1,19 @@
 import { sql } from 'kysely'
+import { z } from 'zod'
 import { authorize, requireAuthContext } from '~~/server/utils/authorize'
-import { AdminCommonListQuerySchema } from '~~/shared/types/schemas'
+import { AdminCommonListQuerySchema, PositivePostgresBigintIdSchema } from '~~/shared/types/schemas'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { selectActiveStructuralRoleIds } from '~~/server/utils/active-user-scopes'
+
+const UserLookupQuerySchema = AdminCommonListQuerySchema.extend({
+  selectedIds: z.union([
+    PositivePostgresBigintIdSchema,
+    z.array(PositivePostgresBigintIdSchema)
+      .min(1, { error: 'validation.required' })
+      .max(100, { error: 'validation.max_items' })
+  ]).transform(value => [...new Set(Array.isArray(value) ? value : [value])]).optional()
+})
 
 type CountResult = { total?: number | string }
 type StatsResult = { total?: number | string, active?: number | string }
@@ -100,8 +110,8 @@ const buildCommonUserListResponse = (
 export default defineEventHandler(async event => {
   await requireAuthContext(event)
   const db = event.context.$db
-  const query = await getValidatedQueryI18n(event, AdminCommonListQuerySchema)
-  const { page, limit, search } = query
+  const query = await getValidatedQueryI18n(event, UserLookupQuerySchema)
+  const { page, limit, search, selectedIds } = query
   const offset = (page - 1) * limit
 
   let agencyId: string | undefined
@@ -195,6 +205,11 @@ export default defineEventHandler(async event => {
 
   if (deletedFilter !== undefined) {
     baseQuery = baseQuery.where('Common_User._deleted', '=', deletedFilter)
+  }
+
+  if (selectedIds) {
+    baseQuery = baseQuery.where('Common_User.id', 'in', selectedIds)
+    statsQuery = statsQuery.where('Common_User_Stats.id', 'in', selectedIds)
   }
 
   if (search) {

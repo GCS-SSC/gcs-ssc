@@ -612,6 +612,7 @@ const deleteMember = async (member: WorkflowMember) => {
               <CommonServerLookupSelect
                 v-model="selectedMember.owners![index]!.egcs_cn_defaultowner"
                 :fetch-url="`/api/users/lookups?workflowSetupId=${workflowSetupId}&status=active`"
+                selected-values-query-key="selectedIds"
                 value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" />
             </UFormField>
           </div>
