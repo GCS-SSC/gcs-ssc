@@ -67,7 +67,6 @@ export const executeBoundedPostgresHealthQuery = async (
   const timer = setTimeout(() => {
     deadlineExpired = true
     if (client) destroyUnderlyingConnection(client, deadlineError)
-    release(deadlineError)
   }, timeoutMs)
   timer.unref?.()
 
@@ -86,7 +85,9 @@ export const executeBoundedPostgresHealthQuery = async (
     throw error
   } finally {
     clearTimeout(timer)
-    release()
+    // Keep the client checked out until its forced-close error has settled;
+    // releasing it earlier attaches pg-pool's idle error listener to active I/O.
+    release(deadlineExpired ? deadlineError : undefined)
     client?.removeListener('error', handleClientError)
   }
 }
