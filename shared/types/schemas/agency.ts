@@ -23,7 +23,13 @@ const createAgencyBigintIdSchema = (requiredError: string) => z.preprocess(
 
 const AgencyRequiredIdSchema = createAgencyBigintIdSchema('validation.id_required')
 
-const AgencyGwcoaIdSchema = createAgencyBigintIdSchema('validation.gwcoa_required')
+const AgencyGwcoaIdSchema = z.preprocess(
+  value => typeof value === 'number' && Number.isSafeInteger(value) ? String(value) : value,
+  z.string({ error: 'validation.gwcoa_required' })
+    .trim()
+    .min(1, { error: 'validation.gwcoa_required' })
+    .refine(value => /^(0|[1-9][0-9]*)$/.test(value) && Number(value) <= 32767, { error: 'validation.invalid_selection' })
+)
 
 const AgencyOptionalIdSchema = createAgencyBigintIdSchema('validation.invalid_selection').nullable()
 
@@ -33,20 +39,28 @@ export const AgencyClaimReconciliationStatusConfigurationSchema = z.object({
 })
 export type AgencyClaimReconciliationStatusConfiguration = z.infer<typeof AgencyClaimReconciliationStatusConfigurationSchema>
 
+/**
+ * Builds a profile label with PostgreSQL varchar character-count semantics.
+ * @param requiredKey Localized validation key for an empty label.
+ * @returns Trimmed label schema limited to 255 Unicode code points.
+ */
+const AgencyProfileLabelSchema = (requiredKey: string) => z.string({ error: requiredKey })
+  .trim()
+  .min(1, { error: requiredKey })
+  .superRefine((value, context) => {
+    if (Array.from(value).length > 255) {
+      context.addIssue({ code: 'too_big', origin: 'string', maximum: 255, inclusive: true, message: 'validation.max_length' })
+    }
+  })
+
 // --- Agency Profile ---
 export const AgencyProfileSchema = z.object({
   egcs_ay_gwcoa_number: AgencyGwcoaIdSchema,
   egcs_ay_agencyfinancialsystemid: AgencyRequiredIdSchema,
-  egcs_ay_name_en: z.string({ error: 'validation.name_en_required' }).trim().min(1, { error: 'validation.name_en_required' }),
-  egcs_ay_name_fr: z.string({ error: 'validation.name_fr_required' }).trim().min(1, { error: 'validation.name_fr_required' }),
-  egcs_ay_abbreviation_en: z
-    .string({ error: 'validation.abbr_en_required' })
-    .trim()
-    .min(1, { error: 'validation.abbr_en_required' }),
-  egcs_ay_abbreviation_fr: z
-    .string({ error: 'validation.abbr_fr_required' })
-    .trim()
-    .min(1, { error: 'validation.abbr_fr_required' }),
+  egcs_ay_name_en: AgencyProfileLabelSchema('validation.name_en_required'),
+  egcs_ay_name_fr: AgencyProfileLabelSchema('validation.name_fr_required'),
+  egcs_ay_abbreviation_en: AgencyProfileLabelSchema('validation.abbr_en_required'),
+  egcs_ay_abbreviation_fr: AgencyProfileLabelSchema('validation.abbr_fr_required'),
   egcs_ay_active: z.boolean().default(false)
 })
 export const AgencyProfilePatchSchema = AgencyProfileSchema.partial().extend({
