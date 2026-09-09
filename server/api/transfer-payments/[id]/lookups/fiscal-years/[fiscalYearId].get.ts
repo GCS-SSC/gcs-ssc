@@ -25,7 +25,11 @@ export default defineEventHandler(async event => {
       authContext,
       'transfer_payment',
       'read',
-      createTransferPaymentScopedAuthorizeHandler('read', { type: 'agency', agencyId: access.agencyId }, trx)
+      createTransferPaymentScopedAuthorizeHandler('read', {
+        type: 'entity',
+        agencyId: access.agencyId,
+        path: [{ type: 'transfer_payment', id: profileId }]
+      }, trx)
     )
     return await trx.selectFrom('Agency_Fiscal_Year')
       .innerJoin('Agency_Profile', 'Agency_Profile.id', 'Agency_Fiscal_Year.egcs_ay_organizationagency')

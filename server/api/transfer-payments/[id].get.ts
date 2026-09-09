@@ -25,14 +25,20 @@ export default defineEventHandler(async event => {
       authContext,
       'transfer_payment',
       'read',
-      createTransferPaymentScopedAuthorizeHandler('read', { type: 'agency', agencyId: access.agencyId }, trx)
+      createTransferPaymentScopedAuthorizeHandler('read', {
+        type: 'entity',
+        agencyId: access.agencyId,
+        path: [{ type: 'transfer_payment', id }]
+      }, trx)
     )
     return await trx
       .selectFrom('Transfer_Payment_Profile')
-      .where('id', '=', id)
-      .where('egcs_tp_agency', '=', access.agencyId)
-      .where('_deleted', '=', false)
-      .selectAll()
+      .innerJoin('Agency_Profile', 'Agency_Profile.id', 'Transfer_Payment_Profile.egcs_tp_agency')
+      .where('Transfer_Payment_Profile.id', '=', id)
+      .where('Transfer_Payment_Profile.egcs_tp_agency', '=', access.agencyId)
+      .where('Transfer_Payment_Profile._deleted', '=', false)
+      .where('Agency_Profile._deleted', '=', false)
+      .selectAll('Transfer_Payment_Profile')
       .executeTakeFirst()
   })
 
