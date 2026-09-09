@@ -7,6 +7,12 @@ import { assertAgreementExists } from '~~/server/utils/agreement-child-resources
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 
+const QuerySchema = PaginationSchema.extend({
+  search: PaginationSchema.shape.search.refine(value => value === undefined || !value.includes('\u0000'), {
+    error: 'validation.invalid_text_character'
+  })
+})
+
 export default defineEventHandler(async event => {
   const agreementId = getRouterParam(event, 'id')
 
@@ -24,7 +30,7 @@ export default defineEventHandler(async event => {
       return agreement
     }
 
-    const { page, limit, search } = await getValidatedQueryI18n(event, PaginationSchema)
+    const { page, limit, search } = await getValidatedQueryI18n(event, QuerySchema)
     const offset = (page - 1) * limit
 
     let baseQuery = db
