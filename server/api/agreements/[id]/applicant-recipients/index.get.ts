@@ -38,10 +38,6 @@ export default defineEventHandler(async event => {
       .where('Funding_Case_Agreement_Applicant_Recipient.egcs_fc_fundingagreement', '=', agreementId)
       .where('Funding_Case_Agreement_Applicant_Recipient._deleted', '=', false)
       .where('Applicant_Recipient_Profile._deleted', '=', false)
-      .where(eb => eb.or([
-        eb('Agency_Profile._deleted', '=', false),
-        eb('Agency_Profile.id', 'is', null)
-      ]))
 
     if (search) {
       const escapedSearch = escapeLikePattern(search)
