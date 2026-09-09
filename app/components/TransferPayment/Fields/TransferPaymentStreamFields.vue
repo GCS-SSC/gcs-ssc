@@ -1,19 +1,37 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import type { TransferPaymentStreamRow } from '~~/shared/types/transfer-payment-ui'
 import type { TransferPaymentStreamItem } from '~~/shared/types/schemas'
 
 const model = defineModel<Partial<TransferPaymentStreamItem>>('model', { required: true })
 
 const {
   programId,
+  persistedStream,
+  persistedProgramId,
   namePrefix = '',
   isStacked = false
 } = defineProps<{
   programId: string
+  persistedStream?: TransferPaymentStreamRow
+  persistedProgramId?: string
   namePrefix?: string
   isStacked?: boolean
 }>()
 
 const { t } = useI18n()
+const { getBilingualValue } = useBilingualValue()
+// The native combobox reserves empty string for clearing, not an option value.
+const noParentValue = 'none'
+const parentOptions = computed(() => {
+  const options = [{ label: t('common.none'), value: noParentValue }]
+  const parentId = persistedStream?.egcs_tp_parentstream
+  if (parentId && persistedProgramId === programId && model.value.id === persistedStream?.id
+    && model.value.egcs_tp_parentstream === parentId) {
+    options.push({ label: getBilingualValue(persistedStream, 'parent_name', String(parentId)), value: parentId })
+  }
+  return options
+})
 const field = useFormFieldPath(() => namePrefix)
 </script>
 
@@ -44,11 +62,11 @@ const field = useFormFieldPath(() => namePrefix)
       value-key="id"
       label-en-key="egcs_tp_name_en"
       label-fr-key="egcs_tp_name_fr"
-      :prepend-items="[{ label: t('common.none'), value: '' }]"
+      :prepend-items="parentOptions"
       :placeholder="t('common.none')"
       :show-value-in-label="false"
       :exclude-values="model.id ? [model.id] : []"
-      @update:model-value="model.egcs_tp_parentstream = $event ?? null" />
+      @update:model-value="model.egcs_tp_parentstream = $event === noParentValue ? null : $event ?? null" />
   </UFormField>
 
   <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }">

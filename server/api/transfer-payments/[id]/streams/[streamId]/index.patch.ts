@@ -1,7 +1,9 @@
-import { TransferPaymentStreamSchema } from '~~/shared/types/schemas'
+import { sql } from 'kysely'
+import { TransferPaymentStreamPatchSchema } from '~~/shared/types/schemas'
 import { authorizeTransferPaymentStreamResource } from '~~/server/utils/transfer-payment-route-authorization'
 import { throwIfTransferPaymentUniqueConstraintError } from '~~/server/utils/transfer-payment-unique-constraint-errors'
 import { executeFreshAuthorizedTransferPaymentStreamWrite } from '~~/server/utils/transfer-payment-write-transaction'
+import { normalizeTextKey } from '~~/server/utils/transfer-payment-uniqueness'
 
 /**
  *  * Event handler for this server API route. Handles the incoming request payload, performs necessary business logic and authorization operations, and returns the expected endpoint response array or object.
@@ -22,12 +24,25 @@ export default defineEventHandler(async event => {
   if (!access) {
     return await notFound(event, 'TRANSFER_PAYMENT_STREAM_NOT_FOUND', 'apiErrors.transfer_payment.stream_not_found')
   }
-  const validated = await readValidatedBodyI18n(event, TransferPaymentStreamSchema.partial())
+  const validated = await readValidatedBodyI18n(event, TransferPaymentStreamPatchSchema)
 
   try {
     return await executeFreshAuthorizedTransferPaymentStreamWrite(
       event, db, profileId, access.agencyId, streamId, 'update', async trx => {
-        if (validated.egcs_tp_parentstream) {
+        if (Object.keys(validated).length === 0) {
+          return await badRequest(event, 'NO_UPDATABLE_FIELDS', 'apiErrors.request.no_updatable_fields')
+        }
+        // The shared transaction already holds the Program and target Stream locks.
+        const current = await trx.selectFrom('Transfer_Payment_Stream')
+          .select(['egcs_tp_parentstream', 'egcs_tp_name_en', 'egcs_tp_name_fr', 'egcs_tp_active'])
+          .where('id', '=', streamId)
+          .where('egcs_tp_transferpaymentprofile', '=', profileId)
+          .where('_deleted', '=', false)
+          .executeTakeFirstOrThrow()
+
+        // A deleted parent remains supported history. Only a replacement must
+        // satisfy current live membership and cycle checks.
+        if (validated.egcs_tp_parentstream && validated.egcs_tp_parentstream !== current.egcs_tp_parentstream) {
           if (String(validated.egcs_tp_parentstream) === String(streamId)) {
             return await badRequest(event, 'TRANSFER_PAYMENT_PARENT_STREAM_INVALID', 'apiErrors.transfer_payment.parent_stream_invalid')
           }
@@ -58,8 +73,31 @@ export default defineEventHandler(async event => {
             ? String(validated.egcs_tp_parentstream)
             : null
         }
-        if (Object.keys(updatePayload).length === 0) {
-          return await badRequest(event, 'NO_UPDATABLE_FIELDS', 'apiErrors.request.no_updatable_fields')
+        const nameEn = normalizeTextKey(validated.egcs_tp_name_en ?? current.egcs_tp_name_en)
+        const nameFr = normalizeTextKey(validated.egcs_tp_name_fr ?? current.egcs_tp_name_fr)
+        const isActive = validated.egcs_tp_active ?? current.egcs_tp_active
+        const changesActiveName = !current.egcs_tp_active
+          || nameEn !== normalizeTextKey(current.egcs_tp_name_en)
+          || nameFr !== normalizeTextKey(current.egcs_tp_name_fr)
+        // Match creation's bilingual rule without rejecting unrelated edits to
+        // historical case variants allowed by the existing database index.
+        if (isActive && changesActiveName) {
+          const duplicate = await trx.selectFrom('Transfer_Payment_Stream')
+            .select('id')
+            .where('id', '!=', streamId)
+            .where('egcs_tp_transferpaymentprofile', '=', profileId)
+            .where('egcs_tp_active', '=', true)
+            .where('_deleted', '=', false)
+            .where(sql<boolean>`lower(btrim(egcs_tp_name_en)) = ${nameEn}`)
+            .where(sql<boolean>`lower(btrim(egcs_tp_name_fr)) = ${nameFr}`)
+            .executeTakeFirst()
+          if (duplicate) {
+            return await badRequest(
+              event,
+              'TRANSFER_PAYMENT_DUPLICATE_PROGRAM_STREAM_NAME',
+              'apiErrors.transfer_payment.duplicate_program_stream_name'
+            )
+          }
         }
         return await trx.updateTable('Transfer_Payment_Stream')
           .set(updatePayload)

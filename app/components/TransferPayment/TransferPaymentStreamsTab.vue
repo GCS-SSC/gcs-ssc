@@ -72,9 +72,28 @@ let contextGeneration = 0
 let disposed = false
 const isCurrentContext = (generation: number) => !disposed && generation === contextGeneration
 
+const persistedStream: Ref<TransferPaymentStreamRow | null> = ref(null)
+const persistedProgramId: Ref<string | null> = ref(null)
 const streamModal = useCrudModal<TransferPaymentStreamRow, Partial<TransferPaymentStreamItem>>({
-  createState: () => ({ egcs_tp_allowsfurtherdistribution: false, egcs_tp_active: false }),
-  updateState: stream => ({ ...stream })
+  /**
+   * Starts a new draft without a saved parent reference.
+   * @returns Default flags for a new Stream.
+   */
+  createState: () => {
+    persistedStream.value = null
+    persistedProgramId.value = null
+    return { egcs_tp_allowsfurtherdistribution: false, egcs_tp_active: false }
+  },
+  /**
+   * Captures the saved parent independently of the editable draft.
+   * @param stream - Saved row whose parent label belongs to this edit session.
+   * @returns A separate editable Stream draft.
+   */
+  updateState: stream => {
+    persistedStream.value = { ...stream }
+    persistedProgramId.value = programId
+    return { ...stream }
+  }
 })
 
 const isStreamModalOpen: Ref<boolean> = streamModal.isOpen
@@ -251,6 +270,8 @@ onBeforeUnmount(() => {
       :title="selectedStream.id ? t('common.update') : t('common.add')"
       :submit-label="selectedStream.id ? t('common.update') : t('common.add')"
       :program-id="programId"
+      :persisted-stream="persistedStream ?? undefined"
+      :persisted-program-id="persistedProgramId ?? undefined"
       :pending="isSavingStream"
       @submit="saveStream" />
 

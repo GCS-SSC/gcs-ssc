@@ -101,6 +101,12 @@ export const TransferPaymentStreamSchema = z.object({
   egcs_tp_active: z.boolean().default(false)
 })
 
+// PATCH omission must preserve stored flags rather than apply create defaults.
+export const TransferPaymentStreamPatchSchema = TransferPaymentStreamSchema.partial().extend({
+  egcs_tp_allowsfurtherdistribution: z.boolean().optional(),
+  egcs_tp_active: z.boolean().optional()
+})
+
 export type TransferPaymentStream = z.infer<typeof TransferPaymentStreamSchema>
 export type TransferPaymentStreamItem = WithId<TransferPaymentStream>
 
