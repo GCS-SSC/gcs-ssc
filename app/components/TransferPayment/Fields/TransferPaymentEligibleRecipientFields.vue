@@ -4,7 +4,7 @@ import type { AgencyApplicantRecipientSubtypeItem, TransferPaymentEligibleRecipi
 const model = defineModel<Partial<TransferPaymentEligibleRecipient>>('model', { required: true })
 
 const { recipientOptions = [], namePrefix = '' } = defineProps<{
-  recipientOptions?: AgencyApplicantRecipientSubtypeItem[]
+  recipientOptions?: Array<Pick<AgencyApplicantRecipientSubtypeItem, 'id' | 'egcs_ay_name_en' | 'egcs_ay_name_fr'>>
   namePrefix?: string
 }>()
 

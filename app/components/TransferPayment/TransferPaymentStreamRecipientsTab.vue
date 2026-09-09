@@ -2,8 +2,8 @@
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
-import { watch } from 'vue'
-import type { Ref } from 'vue'
+import { onBeforeUnmount, watch } from 'vue'
+import type { ComputedRef, Ref } from 'vue'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 import type { TransferPaymentEligibleRecipientItem, AgencyApplicantRecipientSubtypeItem } from '~~/shared/types/schemas'
 import { TransferPaymentEligibleRecipientSchema } from '~~/shared/types/schemas'
@@ -12,6 +12,8 @@ interface TransferPaymentEligibleRecipientRow extends TransferPaymentEligibleRec
   recipient_name_en?: string
   recipient_name_fr?: string
 }
+
+type RecipientReferenceOption = Pick<AgencyApplicantRecipientSubtypeItem, 'id' | 'egcs_ay_name_en' | 'egcs_ay_name_fr'>
 
 const {
   transferPaymentId,
@@ -53,9 +55,16 @@ const recipientBilingualColumns: BilingualColumnConfig<TransferPaymentEligibleRe
   { id: 'recipient', accessorKey: { en: 'recipient_name_en', fr: 'recipient_name_fr' } }
 ]
 
+const persistedRecipient: Ref<TransferPaymentEligibleRecipientRow | null> = ref(null)
 const recipientModal = useCrudModal<TransferPaymentEligibleRecipientRow, Partial<TransferPaymentEligibleRecipientItem>>({
-  createState: () => ({}),
-  updateState: row => ({ ...row })
+  createState: () => {
+    persistedRecipient.value = null
+    return {}
+  },
+  updateState: row => {
+    persistedRecipient.value = { ...row }
+    return { ...row }
+  }
 })
 
 const isRecipientModalOpen: Ref<boolean> = recipientModal.isOpen
@@ -71,7 +80,17 @@ const { getBilingualValue } = useBilingualValue()
 const getRecipientActionTarget = (recipient: TransferPaymentEligibleRecipientRow) =>
   `${getBilingualValue(recipient, 'recipient_name', String(recipient.id))} [${recipient.id}]`
 
-watch([() => transferPaymentId, () => streamId], () => recipientModal.close())
+let contextGeneration = 0
+let disposed = false
+const isCurrentContext = (generation: number) => !disposed && generation === contextGeneration
+watch([() => transferPaymentId, () => streamId], () => {
+  contextGeneration += 1
+  recipientModal.close()
+}, { flush: 'sync' })
+onBeforeUnmount(() => {
+  disposed = true
+  contextGeneration += 1
+})
 
 /**
  * Saves the currently selected eligible recipient record.
@@ -79,10 +98,12 @@ watch([() => transferPaymentId, () => streamId], () => recipientModal.close())
  * Closes the modal, refreshes the dataset, and provides success feedback.
  */
 const saveRecipient = async () => {
-  if (!selectedRecipient.value || !canUpdateChild) return
+  if (disposed || !selectedRecipient.value || !canUpdateChild) return
   const session = recipientModal.captureSession()
   if (!recipientPending.begin(session)) return
+  const generation = contextGeneration
   const isUpdate = Boolean(selectedRecipient.value.id)
+  let closedSession = false
   try {
     const response = await fetch(getClientRequestUrl(selectedRecipient.value.id
       ? `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/eligible-recipients/${selectedRecipient.value.id}`
@@ -92,23 +113,25 @@ const saveRecipient = async () => {
       body: JSON.stringify(selectedRecipient.value)
     })
     if (!response.ok) await throwFetchResponseError(response)
-    if (!recipientModal.closeSession(session)) return
+    if (!isCurrentContext(generation)) return
+    closedSession = recipientModal.closeSession(session)
   } catch (error: unknown) {
-    if (recipientModal.captureSession() === session) showError(error)
+    if (isCurrentContext(generation) && recipientModal.captureSession() === session) showError(error)
     return
   } finally {
     recipientPending.end(session)
   }
 
-  toast.add({
-    title: t('common.success'),
-    description: t(isUpdate ? 'common.updated_success' : 'common.added_success'),
-    color: 'success'
-  })
   try {
     await refreshRecipients()
+    if (!isCurrentContext(generation) || !closedSession || recipientModal.captureSession() !== null || recipientStatusState.value === 'error') return
+    toast.add({
+      title: t('common.success'),
+      description: t(isUpdate ? 'common.updated_success' : 'common.added_success'),
+      color: 'success'
+    })
   } catch (error: unknown) {
-    showError(error)
+    if (isCurrentContext(generation)) showError(error)
   }
 }
 
@@ -141,6 +164,20 @@ const { data: recipientResponse, error: recipientReferenceError, refresh: refres
   agencyId,
   buildUrl: id => `/api/agency/${id}/applicant-recipient-subtypes`,
   query: { page: 1, limit: 100 }
+})
+// Preserve only the original saved selection; never pair an edited ID with old labels.
+const recipientOptions: ComputedRef<RecipientReferenceOption[]> = computed(() => {
+  const options = recipientResponse.value?.items ?? []
+  const original = persistedRecipient.value
+  const draft = selectedRecipient.value
+  if (!original || draft?.id !== original.id
+    || draft.egcs_tp_applicantrecipientsubtype !== original.egcs_tp_applicantrecipientsubtype
+    || options.some(option => option.id === original.egcs_tp_applicantrecipientsubtype)) return options
+  return [{
+    id: original.egcs_tp_applicantrecipientsubtype,
+    egcs_ay_name_en: original.recipient_name_en ?? '',
+    egcs_ay_name_fr: original.recipient_name_fr ?? ''
+  }, ...options]
 })
 const isRetryingRecipientReferences: Ref<boolean> = ref(false)
 
@@ -220,7 +257,7 @@ const retryRecipientReferences = async () => {
         </div>
         <TransferPaymentFieldsTransferPaymentEligibleRecipientFields
           :model="selectedRecipient"
-          :recipient-options="recipientResponse?.items" />
+          :recipient-options="recipientOptions" />
         <div class="flex justify-end gap-2 pt-4">
           <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isRecipientModalOpen = false" />
           <CommonSaveButton
