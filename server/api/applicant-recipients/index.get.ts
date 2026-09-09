@@ -1,4 +1,5 @@
 import { sql } from 'kysely'
+import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 import { authorize } from '~~/server/utils/authorize'
 import { resolveApplicantRecipientMutationPermissions, resolveApplicantRecipientVisibility, type ApplicantRecipientVisibility } from '~~/server/utils/applicant-recipient-auth'
 import { forbidden } from '~~/server/utils/api-errors'
@@ -6,11 +7,11 @@ import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { PaginationSchema, PositivePostgresBigintIdSchema } from '~~/shared/types/schemas'
 
 const ApplicantRecipientPaginationSchema = PaginationSchema.extend({
+  search: PaginationSchema.shape.search.refine(value => !value?.includes('\u0000'), { error: 'validation.invalid_text_character' }),
   agency_id: PositivePostgresBigintIdSchema.optional()
 })
 
-export default defineEventHandler(async event => {
-  const db = event.context.$db
+export default defineEventHandler(async event => await executeFreshReadSnapshot(event, async db => {
   const context = await authorize<'read', ApplicantRecipientVisibility>(
     event,
     'applicant_recipient',
@@ -34,9 +35,7 @@ export default defineEventHandler(async event => {
 
   let baseQuery = db
     .selectFrom('Applicant_Recipient_Profile')
-    .leftJoin('Agency_Applicant_Recipient_Subtype', join => join
-      .onRef('Agency_Applicant_Recipient_Subtype.id', '=', 'Applicant_Recipient_Profile.egcs_ar_applicantrecipientsubtypes')
-      .on('Agency_Applicant_Recipient_Subtype._deleted', '=', false))
+    .leftJoin('Agency_Applicant_Recipient_Subtype', 'Agency_Applicant_Recipient_Subtype.id', 'Applicant_Recipient_Profile.egcs_ar_applicantrecipientsubtypes')
     .leftJoin('Agency_Profile', 'Agency_Profile.id', 'Applicant_Recipient_Profile.egcs_ar_leadagency')
     .where('Applicant_Recipient_Profile._deleted', '=', false)
     .where('Agency_Profile._deleted', '=', false)
@@ -136,4 +135,4 @@ export default defineEventHandler(async event => {
     page,
     limit
   }
-})
+}))
