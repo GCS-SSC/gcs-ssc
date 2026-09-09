@@ -43,13 +43,10 @@ export default defineEventHandler(async event => {
 
       const applicantRecipient = await trx
         .selectFrom('Applicant_Recipient_Profile')
-        .leftJoin('Agency_Profile', 'Agency_Profile.id', 'Applicant_Recipient_Profile.egcs_ar_leadagency')
+        .innerJoin('Agency_Profile', 'Agency_Profile.id', 'Applicant_Recipient_Profile.egcs_ar_leadagency')
         .where('Applicant_Recipient_Profile.id', '=', applicantRecipientId)
         .where('Applicant_Recipient_Profile._deleted', '=', false)
-        .where(eb => eb.or([
-          eb('Agency_Profile._deleted', '=', false),
-          eb('Agency_Profile.id', 'is', null)
-        ]))
+        .where('Agency_Profile._deleted', '=', false)
         .select([
           'Applicant_Recipient_Profile.id as id',
           sql<string | null>`COALESCE("Applicant_Recipient_Profile"."egcs_ar_legalname_en", "Applicant_Recipient_Profile"."egcs_ar_operatingname_en")`.as('applicant_recipient_name_en'),
@@ -57,6 +54,7 @@ export default defineEventHandler(async event => {
           'Agency_Profile.egcs_ay_name_en as lead_agency_name_en',
           'Agency_Profile.egcs_ay_name_fr as lead_agency_name_fr'
         ])
+        .forShare('Agency_Profile')
         .executeTakeFirst()
 
       if (!applicantRecipient) {

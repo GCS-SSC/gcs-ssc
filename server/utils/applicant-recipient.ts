@@ -473,7 +473,9 @@ const lockApplicantRecipientLeadAgencies = async (
     .where('id', 'in', agencyIds)
     .select(['id', 'egcs_ay_active', '_deleted'])
     .orderBy('id', 'asc')
-    .forUpdate()
+    // Keep parent state stable without conflicting with Agreement readers
+    // that hold Agency SHARE before waiting for this Proponent's row.
+    .forShare()
     .execute()
   const destination = agencies.find(agency => String(agency.id) === destinationAgencyId)
   if (!destination || destination._deleted || !destination.egcs_ay_active) {
