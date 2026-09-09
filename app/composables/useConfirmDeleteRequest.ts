@@ -26,12 +26,13 @@ export const useConfirmDeleteRequest = () => {
    * @param options - Optional configuration for the confirmation dialog.
    * @returns Promise resolving to true if the deletion was confirmed and completed, false otherwise.
    */
-  const confirmDeleteRequest: (url: string, options?: Partial<ConfirmDialogOptions>) => Promise<boolean> = async (
+  const confirmDeleteRequest: (url: string, options?: Partial<ConfirmDialogOptions> & { shouldProceed?: () => boolean }) => Promise<boolean> = async (
     url,
     options = {}
   ) => {
-    const confirmed = await confirmDelete(options)
-    if (!confirmed) return false
+    const { shouldProceed, ...dialogOptions } = options
+    const confirmed = await confirmDelete(dialogOptions)
+    if (!confirmed || (shouldProceed && !shouldProceed())) return false
     const response = await fetch(getClientRequestUrl(url), { method: 'DELETE' })
     if (!response.ok) {
       await throwFetchResponseError(response)

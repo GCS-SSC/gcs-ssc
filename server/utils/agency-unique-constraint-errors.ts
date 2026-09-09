@@ -45,6 +45,14 @@ const CONSTRAINT_ERROR_MAP: Record<string, ConstraintErrorMapping> = {
     code: 'AGENCY_DUPLICATE_ADDRESS_TYPE_NAME_FR',
     key: 'apiErrors.agency.duplicate_address_type_name_fr'
   },
+  ay_uq_address_type_name_en_normalized: {
+    code: 'AGENCY_DUPLICATE_ADDRESS_TYPE_NAME_EN',
+    key: 'apiErrors.agency.duplicate_address_type_name_en'
+  },
+  ay_uq_address_type_name_fr_normalized: {
+    code: 'AGENCY_DUPLICATE_ADDRESS_TYPE_NAME_FR',
+    key: 'apiErrors.agency.duplicate_address_type_name_fr'
+  },
   ay_idx_uniqueartypeen: {
     code: 'AGENCY_DUPLICATE_APPLICANT_RECIPIENT_SUBTYPE_NAME_EN',
     key: 'apiErrors.agency.duplicate_applicant_recipient_subtype_name_en'

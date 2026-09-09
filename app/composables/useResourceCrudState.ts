@@ -1,6 +1,6 @@
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- generic CRUD helpers are documented by their option and return types */
 import type { z } from 'zod'
-import { computed, ref, watch, toValue } from 'vue'
+import { computed, onBeforeUnmount, ref, watch, toValue } from 'vue'
 import type { ComputedRef, MaybeRef, MaybeRefOrGetter, Ref } from 'vue'
 import { useCrudModal, useCrudModalPending } from '~/composables/useCrudModal'
 import type { ResourceTableStatus } from '~~/shared/types/resource-table'
@@ -9,6 +9,7 @@ interface UseResourceCrudStateOptions<T extends { id: string } & Record<string, 
   title: MaybeRefOrGetter<string>
   fetchUrl: MaybeRef<string>
   staticItems?: MaybeRefOrGetter<T[] | undefined>
+  createAllowed?: MaybeRefOrGetter<boolean>
   postUrl?: MaybeRefOrGetter<string | undefined>
   updateUrlBase?: MaybeRefOrGetter<string | undefined>
   deleteUrlBase?: MaybeRefOrGetter<string | undefined>
@@ -31,6 +32,7 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
   fetchUrl,
   staticItems,
   postUrl,
+  createAllowed = true,
   updateUrlBase,
   deleteUrlBase,
   updateMethod = 'PATCH',
@@ -138,6 +140,21 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
   const savePending = useCrudModalPending(captureSession)
   const isSaving = savePending.isPending
 
+  let generation = 0
+  let disposed = false
+  watch(() => toValue(fetchUrl), () => {
+    generation++
+    closeModal()
+    isDeleting.value = false
+  }, { flush: 'sync' })
+  onBeforeUnmount(() => {
+    disposed = true
+    generation++
+  })
+  const canSave = computed(() => !disposed && !isStaticResource && (isEditing.value
+    ? Boolean(toValue(updateUrlBase))
+    : toValue(createAllowed)))
+
   const canUpdate: ComputedRef<boolean> = computed(() => Boolean(toValue(updateUrlBase)))
   const resolvedModalTitle: ComputedRef<string> = computed(() => {
     if (isEditing.value) {
@@ -155,12 +172,13 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
   })
 
   const openCreate = () => {
+    if (disposed || isStaticResource || !toValue(createAllowed)) return
     isEditing.value = false
     modal.openCreate()
   }
 
   const openUpdate = (item: T) => {
-    if (!toValue(updateUrlBase)) {
+    if (disposed || !toValue(updateUrlBase)) {
       return
     }
 
@@ -171,12 +189,14 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
   /** Creates or updates the modal item, emits the matching event, and refreshes the list. */
   const saveItem = async () => {
     const currentState = formState.value
-    if (!currentState) {
+    if (disposed || !currentState || !canSave.value) {
       return
     }
     const session = captureSession()
     if (!isCurrentSession(session) || !savePending.begin(session)) return
     const editing = isEditing.value
+    const requestedGeneration = generation
+    const isCurrentTarget = () => !disposed && requestedGeneration === generation
 
     try {
       if (editing) {
@@ -195,9 +215,9 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
         await saveJson(url, 'POST', currentState)
       }
 
-      if (!closeSession(session)) return
+      if (!isCurrentTarget() || !closeSession(session)) return
     } catch (error: unknown) {
-      if (isCurrentSession(session)) {
+      if (isCurrentTarget() && isCurrentSession(session)) {
         showError(error)
       }
       return
@@ -224,14 +244,16 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
     try {
       await refresh()
     } catch (error: unknown) {
-      showError(error)
+      if (isCurrentTarget()) showError(error)
     }
   }
 
-  /** Confirms deletion and emits success only after the refreshed list reflects the request. */
+  /** Confirms deletion, scopes settlement to the resource identity, and refreshes after success. */
   const deleteItem = async (id: string) => {
+    const requestedGeneration = generation
+    const isCurrentTarget = () => !disposed && requestedGeneration === generation
     const resolvedDeleteUrlBase = toValue(deleteUrlBase)
-    if (!resolvedDeleteUrlBase || isDeleting.value) {
+    if (disposed || !resolvedDeleteUrlBase || isDeleting.value) {
       return
     }
 
@@ -239,9 +261,10 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
       isDeleting.value = true
 
       const deleted = await confirmDeleteRequest(`${resolvedDeleteUrlBase}/${id}`, {
-        description: t(toValue(deleteConfirmKey))
+        description: t(toValue(deleteConfirmKey)),
+        shouldProceed: () => isCurrentTarget() && toValue(deleteUrlBase) === resolvedDeleteUrlBase
       })
-      if (!deleted) {
+      if (!deleted || !isCurrentTarget()) {
         return
       }
 
@@ -252,16 +275,16 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
         color: 'success'
       })
     } catch (error: unknown) {
-      showError(error)
+      if (isCurrentTarget()) showError(error)
       return
     } finally {
-      isDeleting.value = false
+      if (isCurrentTarget()) isDeleting.value = false
     }
 
     try {
       await refresh()
     } catch (error: unknown) {
-      showError(error)
+      if (isCurrentTarget()) showError(error)
     }
   }
 
@@ -281,6 +304,7 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
     isDeleting,
     formState,
     canUpdate,
+    canSave,
     resolvedModalTitle,
     submitLabel,
     closeModal,

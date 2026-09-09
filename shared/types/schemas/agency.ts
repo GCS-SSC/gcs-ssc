@@ -40,11 +40,11 @@ export const AgencyClaimReconciliationStatusConfigurationSchema = z.object({
 export type AgencyClaimReconciliationStatusConfiguration = z.infer<typeof AgencyClaimReconciliationStatusConfigurationSchema>
 
 /**
- * Builds a profile label with PostgreSQL varchar character-count semantics.
+ * Builds an Agency label with PostgreSQL varchar character-count semantics.
  * @param requiredKey Localized validation key for an empty label.
  * @returns Trimmed label schema limited to 255 Unicode code points.
  */
-const AgencyProfileLabelSchema = (requiredKey: string) => z.string({ error: requiredKey })
+const AgencyLabelSchema = (requiredKey: string) => z.string({ error: requiredKey })
   .trim()
   .min(1, { error: requiredKey })
   .superRefine((value, context) => {
@@ -57,10 +57,10 @@ const AgencyProfileLabelSchema = (requiredKey: string) => z.string({ error: requ
 export const AgencyProfileSchema = z.object({
   egcs_ay_gwcoa_number: AgencyGwcoaIdSchema,
   egcs_ay_agencyfinancialsystemid: AgencyRequiredIdSchema,
-  egcs_ay_name_en: AgencyProfileLabelSchema('validation.name_en_required'),
-  egcs_ay_name_fr: AgencyProfileLabelSchema('validation.name_fr_required'),
-  egcs_ay_abbreviation_en: AgencyProfileLabelSchema('validation.abbr_en_required'),
-  egcs_ay_abbreviation_fr: AgencyProfileLabelSchema('validation.abbr_fr_required'),
+  egcs_ay_name_en: AgencyLabelSchema('validation.name_en_required'),
+  egcs_ay_name_fr: AgencyLabelSchema('validation.name_fr_required'),
+  egcs_ay_abbreviation_en: AgencyLabelSchema('validation.abbr_en_required'),
+  egcs_ay_abbreviation_fr: AgencyLabelSchema('validation.abbr_fr_required'),
   egcs_ay_active: z.boolean().default(false)
 })
 export const AgencyProfilePatchSchema = AgencyProfileSchema.partial().extend({
@@ -167,15 +167,14 @@ export const createAgencyFiscalYearInitial = (): Partial<AgencyFiscalYearItem> =
 }
 
 // --- Address Type ---
+// PostgreSQL text cannot persist NUL; other Unicode characters retain the shared
+// label's character-count and whitespace semantics.
+const AgencyAddressTypeNameSchema = (requiredKey: string) => AgencyLabelSchema(requiredKey)
+  .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' })
+
 export const AgencyAddressTypeSchema = z.object({
-  egcs_ay_typename_en: z
-    .string({ error: 'validation.type_en_required' })
-    .trim()
-    .min(1, { error: 'validation.type_en_required' }),
-  egcs_ay_typename_fr: z
-    .string({ error: 'validation.type_fr_required' })
-    .trim()
-    .min(1, { error: 'validation.type_fr_required' })
+  egcs_ay_typename_en: AgencyAddressTypeNameSchema('validation.type_en_required'),
+  egcs_ay_typename_fr: AgencyAddressTypeNameSchema('validation.type_fr_required')
 })
 export type AgencyAddressType = z.infer<typeof AgencyAddressTypeSchema>
 export type AgencyAddressTypeItem = WithId<AgencyAddressType>

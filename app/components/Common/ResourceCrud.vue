@@ -90,6 +90,7 @@ const {
   isModalOpen,
   formState,
   canUpdate,
+  canSave,
   resolvedModalTitle,
   submitLabel,
   isSaving,
@@ -100,7 +101,8 @@ const {
   deleteItem
 } = useResourceCrudState<T>({
   title,
-  fetchUrl,
+  fetchUrl: computed(() => fetchUrl),
+  createAllowed: () => createAllowed && !staticMode,
   staticItems: staticMode ? () => staticItems : undefined,
   postUrl: effectivePostUrl,
   updateUrlBase: effectiveUpdateUrlBase,
@@ -190,7 +192,7 @@ defineExpose({
 
           <div class="flex justify-end gap-2 pt-4">
             <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="closeModal" />
-            <CommonSaveButton :label="submitLabel" :loading="isSaving" :disabled="isSaving" />
+            <CommonSaveButton :label="submitLabel" :loading="isSaving" :disabled="isSaving || !canSave" />
           </div>
         </UForm>
       </template>

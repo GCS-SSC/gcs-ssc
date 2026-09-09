@@ -53,6 +53,7 @@ export default defineEventHandler(async event => {
         'egcs_ay_typename_en as address_type_name_en',
         'egcs_ay_typename_fr as address_type_name_fr'
       ])
+      .forShare()
       .executeTakeFirst()
     if (!addressType) {
       return await badRequest(event, 'INVALID_AGREEMENT_ADDRESS_TYPE', 'apiErrors.agreement.invalid_address_type')
