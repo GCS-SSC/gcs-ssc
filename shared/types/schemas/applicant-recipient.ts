@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { WithId } from './common'
 import { REGISTRY_TYPE_ENUM } from '~~/shared/constants/enums'
-import { CommonAddressCreateSchema, CommonAddressPatchSchema, CommonContactCreateSchema, CommonContactPatchSchema } from './admin-common'
+import { CommonAddressBaseSchema, CommonAddressCreateSchema, CommonContactCreateSchema, CommonContactPatchSchema } from './admin-common'
 import { isCanonicalPostgresBigintText } from '~~/shared/utils/database-id'
 
 /**
@@ -195,8 +195,22 @@ export type ApplicantRecipientOtherName = z.infer<typeof ApplicantRecipientOther
 export type ApplicantRecipientOtherNamePatch = z.infer<typeof ApplicantRecipientOtherNamePatchSchema>
 export type ApplicantRecipientOtherNameItem = WithId<ApplicantRecipientOtherName>
 
-export const ApplicantRecipientAddressCreateSchema = CommonAddressCreateSchema
-export const ApplicantRecipientAddressPatchSchema = CommonAddressPatchSchema
+/**
+ * Treats optional null readback fields as omitted while preserving explicit zero and empty-string edits.
+ * @param input Address input, including a complete row returned by the collection.
+ * @returns An independent request object with optional nulls omitted.
+ */
+const normalizeApplicantRecipientAddressInput = (input: unknown): unknown => {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return input
+  const address = { ...input } as Record<string, unknown>
+  for (const field of ['egcs_cn_street2', 'egcs_cn_street3', 'egcs_cn_latitude', 'egcs_cn_longitude', 'egcs_cn_mainphoneextension']) {
+    if (address[field] === null) address[field] = undefined
+  }
+  return address
+}
+
+export const ApplicantRecipientAddressCreateSchema = z.preprocess(normalizeApplicantRecipientAddressInput, CommonAddressCreateSchema)
+export const ApplicantRecipientAddressPatchSchema = z.preprocess(normalizeApplicantRecipientAddressInput, CommonAddressBaseSchema.partial())
 export type ApplicantRecipientAddress = z.infer<typeof ApplicantRecipientAddressCreateSchema>
 export type ApplicantRecipientAddressPatch = z.infer<typeof ApplicantRecipientAddressPatchSchema>
 export type ApplicantRecipientAddressItem = WithId<ApplicantRecipientAddress>

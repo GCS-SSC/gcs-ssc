@@ -1,6 +1,9 @@
 import { authorize } from '~~/server/utils/authorize'
-import { ApplicantRecipientAddressPatchSchema } from '~~/shared/types/schemas'
-import { badRequest } from '~~/server/utils/api-errors'
+import { ApplicantRecipientAddressPatchSchema, CommonAddressSubdivisionSchema } from '~~/shared/types/schemas'
+import type { CommonAddressTable } from '~~/shared/types/database'
+import { badRequest, notFound } from '~~/server/utils/api-errors'
+import { parseI18n } from '~~/server/utils/api-validate'
+import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import {
   APPLICANT_RECIPIENT_CHILD_ERROR_KEYS,
   assertApplicantRecipientChildExists
@@ -24,6 +27,9 @@ export default defineEventHandler(async event => {
   await authorize(event, 'applicant_recipient', 'update', async ({ context }) =>
     await resolveApplicantRecipientAuthorization(context, applicantRecipientId, 'update', db)
   )
+  if (!isPositivePostgresBigintText(childId)) {
+    return await notFound(event, ...APPLICANT_RECIPIENT_CHILD_ERROR_KEYS.addressNotFound)
+  }
   const validated = await readValidatedBodyI18n(event, ApplicantRecipientAddressPatchSchema)
   const values = Object.fromEntries(Object.entries(validated).filter(([, value]) => value !== undefined))
 
@@ -53,6 +59,24 @@ export default defineEventHandler(async event => {
       if (!Object.keys(values).length) {
         return existing
       }
+
+      if (validated.egcs_cn_addresscountry !== undefined || validated.egcs_cn_addresssubdivision !== undefined) {
+        await parseI18n(event, CommonAddressSubdivisionSchema, {
+          egcs_cn_addresscountry: validated.egcs_cn_addresscountry ?? existing.egcs_cn_addresscountry,
+          egcs_cn_addresssubdivision: validated.egcs_cn_addresssubdivision ?? existing.egcs_cn_addresssubdivision
+        })
+      }
+
+      // Compare under the existing physical-row lock using PostgreSQL column
+      // types, preserving exact bigint text and avoiding false shared-row edits.
+      const hasAddressChanges = Boolean(await trx.selectFrom('Common_Address')
+        .select('id')
+        .where('id', '=', existing.egcs_ar_address)
+        .where('_deleted', '=', false)
+        .where(eb => eb.or(Object.entries(values).map(([key, value]) =>
+          eb(key as keyof CommonAddressTable, 'is distinct from', value))))
+        .executeTakeFirst())
+      if (!hasAddressChanges) return existing
 
       const addressIsShared = await hasOtherActiveCommonAddressReferences(
         trx,
