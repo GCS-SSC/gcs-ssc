@@ -31,17 +31,42 @@ const OptionalText = () =>
     z.string().optional()
   )
 
+/**
+ * Preserves required errors while rejecting unsafe numeric IDs before conversion.
+ * @param errorKey Field-specific required validation key.
+ * @returns Canonical positive PostgreSQL bigint reference schema.
+ */
+const ProfileReferenceId = (errorKey: string) => z.union([
+  z.string(),
+  z.number().int({ error: 'validation.invalid_selection' }).safe({ error: 'validation.invalid_selection' })
+], { error: errorKey }).pipe(RequiredId(errorKey)).refine(isPositivePostgresBigintText, { error: 'validation.invalid_selection' })
+
+/**
+ * Keeps optional clearing semantics and checks PostgreSQL text/character limits.
+ * @param maxCharacters Optional PostgreSQL character limit.
+ * @returns Optional trimmed text schema with storage validation.
+ */
+const ProfileText = (maxCharacters?: number) => OptionalText().superRefine((value, context) => {
+  if (value === undefined) return
+  if (value.includes('\u0000')) {
+    context.addIssue({ code: 'custom', message: 'validation.invalid_text_character' })
+  }
+  if (maxCharacters !== undefined && Array.from(value).length > maxCharacters) {
+    context.addIssue({ code: 'too_big', origin: 'string', maximum: maxCharacters, inclusive: true, message: 'validation.max_length' })
+  }
+})
+
 export const ApplicantRecipientProfileBaseSchema = z.object({
-  egcs_ar_description_en: OptionalText(),
-  egcs_ar_description_fr: OptionalText(),
-  egcs_ar_operatingname_en: OptionalText(),
-  egcs_ar_operatingname_fr: OptionalText(),
-  egcs_ar_applicantrecipientsubtypes: RequiredId('validation.applicant_recipient_subtype_required'),
-  egcs_ar_leadagency: RequiredId('validation.lead_agency_required'),
-  egcs_ar_legalname_en: OptionalText(),
-  egcs_ar_legalname_fr: OptionalText(),
-  egcs_ar_researchorganization_en: OptionalText(),
-  egcs_ar_researchorganization_fr: OptionalText(),
+  egcs_ar_description_en: ProfileText(),
+  egcs_ar_description_fr: ProfileText(),
+  egcs_ar_operatingname_en: ProfileText(255),
+  egcs_ar_operatingname_fr: ProfileText(255),
+  egcs_ar_applicantrecipientsubtypes: ProfileReferenceId('validation.applicant_recipient_subtype_required'),
+  egcs_ar_leadagency: ProfileReferenceId('validation.lead_agency_required'),
+  egcs_ar_legalname_en: ProfileText(255),
+  egcs_ar_legalname_fr: ProfileText(255),
+  egcs_ar_researchorganization_en: ProfileText(255),
+  egcs_ar_researchorganization_fr: ProfileText(255),
   egcs_ar_active: z.boolean().optional()
 })
 
@@ -106,43 +131,7 @@ export const ApplicantRecipientProfileCreateSchema = ApplicantRecipientProfileBa
 
 export const ApplicantRecipientProfileSchema = ApplicantRecipientProfileCreateSchema
 
-/**
- * Preserves required errors while rejecting unsafe numeric IDs before conversion.
- * @param errorKey Field-specific required validation key.
- * @returns Canonical positive PostgreSQL bigint reference schema.
- */
-const ProfilePatchReferenceId = (errorKey: string) => z.union([
-  z.string(),
-  z.number().int({ error: 'validation.invalid_selection' }).safe({ error: 'validation.invalid_selection' })
-], { error: errorKey }).pipe(RequiredId(errorKey)).refine(isPositivePostgresBigintText, { error: 'validation.invalid_selection' })
-
-/**
- * Keeps optional clearing semantics and checks PostgreSQL text/character limits.
- * @param maxCharacters Optional PostgreSQL character limit.
- * @returns Optional trimmed text schema with storage validation.
- */
-const ProfilePatchText = (maxCharacters?: number) => OptionalText().superRefine((value, context) => {
-  if (value === undefined) return
-  if (value.includes('\u0000')) {
-    context.addIssue({ code: 'custom', message: 'validation.invalid_text_character' })
-  }
-  if (maxCharacters !== undefined && Array.from(value).length > maxCharacters) {
-    context.addIssue({ code: 'too_big', origin: 'string', maximum: maxCharacters, inclusive: true, message: 'validation.max_length' })
-  }
-})
-
-export const ApplicantRecipientProfilePatchSchema = ApplicantRecipientProfileBaseSchema.extend({
-  egcs_ar_leadagency: ProfilePatchReferenceId('validation.lead_agency_required'),
-  egcs_ar_applicantrecipientsubtypes: ProfilePatchReferenceId('validation.applicant_recipient_subtype_required'),
-  egcs_ar_description_en: ProfilePatchText(),
-  egcs_ar_description_fr: ProfilePatchText(),
-  egcs_ar_operatingname_en: ProfilePatchText(255),
-  egcs_ar_operatingname_fr: ProfilePatchText(255),
-  egcs_ar_legalname_en: ProfilePatchText(255),
-  egcs_ar_legalname_fr: ProfilePatchText(255),
-  egcs_ar_researchorganization_en: ProfilePatchText(255),
-  egcs_ar_researchorganization_fr: ProfilePatchText(255)
-}).partial()
+export const ApplicantRecipientProfilePatchSchema = ApplicantRecipientProfileBaseSchema.partial()
 
 export type ApplicantRecipientProfile = z.infer<typeof ApplicantRecipientProfileSchema>
 export type ApplicantRecipientProfileItem = WithId<ApplicantRecipientProfile>

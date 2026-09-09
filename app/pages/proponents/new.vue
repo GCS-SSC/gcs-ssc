@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Ref } from 'vue'
-import { ref } from 'vue'
+import { onBeforeUnmount, ref } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
 import type { ApplicantRecipientProfileForm } from '~~/shared/types/applicant-recipient-ui'
 
@@ -19,14 +19,18 @@ const localePath = useLocalePath()
 const { showError } = useApiErrorToast()
 const { getHeroCollapsed } = useDashboard()
 const { sendJson } = useJsonRequest()
-const { can } = useCan()
+const { canAny } = useCan()
 
 const createForm = (): ApplicantRecipientProfileForm => ({ egcs_ar_active: false })
 
 const form: Ref<ApplicantRecipientProfileForm | null> = ref(null)
 
 const isSaving: Ref<boolean> = ref(false)
-const canCreateProfile = computed(() => can('applicant_recipient', 'create', { type: 'global' }))
+let disposed = false
+onBeforeUnmount(() => {
+  disposed = true
+})
+const canCreateProfile = computed(() => canAny('applicant_recipient', 'create', ['global', 'agency']))
 const isHeroCollapsed = getHeroCollapsed('applicant-recipient-create')
 
 const breadcrumbItems = computed(() => [
@@ -38,13 +42,14 @@ const breadcrumbItems = computed(() => [
  * Creates a new applicant recipient profile and redirects to the edit page.
  */
 const submit = async () => {
-  if (!form.value || isSaving.value) {
+  if (disposed || !canCreateProfile.value || !form.value || isSaving.value) {
     return
   }
 
   try {
     isSaving.value = true
     const created = await sendJson<{ id: string }>('/api/applicant-recipients', 'POST', form.value)
+    if (disposed) return
 
     toast.add({
       title: t('common.success'),
@@ -54,7 +59,7 @@ const submit = async () => {
 
     await navigateTo(localePath(appRouteLocations.proponentEdit(created.id)))
   } catch (error: unknown) {
-    showError(error)
+    if (!disposed) showError(error)
   } finally {
     isSaving.value = false
   }

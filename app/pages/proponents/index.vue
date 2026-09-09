@@ -14,7 +14,7 @@ definePageMeta({
 
 const { t } = useI18n()
 const toast = useToast()
-const { can } = useCan()
+const { canAny } = useCan()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const localePath = useLocalePath()
@@ -80,7 +80,7 @@ const proponentHeroStats = computed(() => [
     visible: response.value?.stats?.active !== undefined
   }
 ])
-const canCreateProfile: ComputedRef<boolean> = computed(() => can('applicant_recipient', 'create', { type: 'global' }))
+const canCreateProfile: ComputedRef<boolean> = computed(() => canAny('applicant_recipient', 'create', ['global', 'agency']))
 
 /**
  * Evaluates whether the current user can edit the provided profile.
