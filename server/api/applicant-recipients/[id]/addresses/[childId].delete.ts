@@ -47,6 +47,16 @@ export default defineEventHandler(async event => {
         return existing
       }
 
+      // Serialize the last-reference decision across independently owned
+      // Proponent and Agreement links before retiring this link.
+      await trx
+        .selectFrom('Common_Address')
+        .where('id', '=', existing.egcs_ar_address)
+        .where('_deleted', '=', false)
+        .select('id')
+        .forUpdate()
+        .executeTakeFirst()
+
       await trx
         .updateTable('Applicant_Recipient_Address')
         .set({ _deleted: true })

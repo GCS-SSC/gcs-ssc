@@ -3,7 +3,7 @@ import type { H3Event } from 'h3'
 import type { Kysely, Transaction } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import type { AbilityAction } from '~~/shared/utils/abilities'
-import { notFound } from '~~/server/utils/api-errors'
+import { forbidden, notFound } from '~~/server/utils/api-errors'
 import { authorizeFreshAssignedItem, requireFreshAuthContext, type AuthContext } from '~~/server/utils/authorize'
 import { getUserAssignmentAgencyScopes } from '~~/server/utils/rbac'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
@@ -157,8 +157,14 @@ export const executeFreshAuthorizedApplicantRecipientWrite = async <T>(
 ): Promise<T> => await db.transaction().execute(async trx => {
   const context = await requireFreshAuthContext(event, trx)
   const profile = await trx.selectFrom('Applicant_Recipient_Profile').where('id', '=', applicantRecipientId)
-    .where('_deleted', '=', false).select('id').forUpdate().executeTakeFirst()
+    .where('_deleted', '=', false).select(['id', 'egcs_ar_leadagency']).forUpdate().executeTakeFirst()
   if (!profile) return await notFound(event, 'APPLICANT_RECIPIENT_PROFILE_NOT_FOUND', 'apiErrors.applicant_recipient.profile_not_found')
+  // Read the owner from the locked profile: supported lead-Agency moves lock the profile before its Agencies.
+  const agency = profile.egcs_ar_leadagency === null || profile.egcs_ar_leadagency === undefined
+    ? undefined
+    : await trx.selectFrom('Agency_Profile').where('id', '=', profile.egcs_ar_leadagency)
+        .where('_deleted', '=', false).select('id').forShare().executeTakeFirst()
   await authorizeFreshAssignedItem(event, trx, context, 'applicantrecipient', applicantRecipientId, action)
+  if (!agency) return await forbidden(event)
   return await callback(trx, context)
 })
