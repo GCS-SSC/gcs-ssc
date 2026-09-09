@@ -28,7 +28,7 @@ const {
   errorsByStep,
   currentStepErrors,
   onAgencyResolved,
-  fiscalYears,
+  onFiscalYearResolved,
   fiscalYearLabelById,
   isAgencyLocked,
   toDateInput,
@@ -218,14 +218,15 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentWizard>) => {
                   type="button"
                   :aria-label="t('transfer_payment.wizard.remove_budget_named', {
                     position: index + 1,
-                    name: fiscalYearLabelById.get(String(budget.egcs_tp_fiscalyear)) || String(budget.egcs_tp_fiscalyear)
+                    name: fiscalYearLabelById.get(String(budget.egcs_tp_fiscalyear)) || t(budget.egcs_tp_fiscalyear ? 'common.unavailable' : 'common.none')
                   })"
                   @click="removeBudget(index)" />
 
                 <TransferPaymentFieldsTransferPaymentBudgetFields
                   :model="budget"
-                  :fiscal-years="fiscalYears"
-                  :name-prefix="`budgets.${index}`" />
+                  :agency-id="state.profile.egcs_tp_agency"
+                  :name-prefix="`budgets.${index}`"
+                  @fiscal-year-resolved="payload => onFiscalYearResolved(budget.tempId, payload)" />
               </div>
 
               <UButton
@@ -372,7 +373,7 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentWizard>) => {
                     :key="budget.tempId"
                     class="flex items-center justify-between rounded-lg bg-zinc-50 p-4 dark:bg-zinc-900/50">
                     <span class="font-bold">
-                      {{ fiscalYearLabelById.get(budget.egcs_tp_fiscalyear) || t('common.none') }}
+                      {{ fiscalYearLabelById.get(budget.egcs_tp_fiscalyear) || t(budget.egcs_tp_fiscalyear ? 'common.unavailable' : 'common.none') }}
                     </span>
                     <span class="text-primary font-mono font-black">
                       {{ formatMoneyText(parseMoney(budget.egcs_tp_totalbudget), locale, 'CAD') }}

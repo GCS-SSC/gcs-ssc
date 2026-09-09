@@ -5,9 +5,9 @@ import { toValue } from 'vue'
 import type { MaybeRefOrGetter, Ref } from 'vue'
 import {
   TransferPaymentWizardSchema,
-  type AgencyFiscalYearItem,
   type TransferPaymentWizard
 } from '~~/shared/types/schemas'
+import type { AdminCommonLookupResponseItem } from '~~/shared/types/admin-common-ui'
 import type { AgencyOptionItem } from '~~/shared/types/admin'
 import { useWizardFlow, type WizardStepItem } from '~/composables/useWizardFlow'
 
@@ -165,14 +165,25 @@ export const useTransferPaymentWizardModal = ({
   }, { flush: 'sync' })
   const isAgencyLocked = computed(() => Boolean(toValue(fixedAgencyId)))
 
-  const { data: fiscalYearsResponse } = useAgencyReferenceData<AgencyFiscalYearItem>({
-    agencyId: computed(() => state.value?.profile.egcs_tp_agency ?? ''),
-    buildUrl: id => `/api/agency/${id}/fiscal-years`
-  })
-  const fiscalYears = computed(() => fiscalYearsResponse.value?.items ?? [])
-  const fiscalYearLabelById = computed(
-    () => new Map(fiscalYears.value.map((item: AgencyFiscalYearItem) => [String(item.id), item.egcs_ay_fiscalyeardisplay]))
-  )
+  const fiscalYearLabels: Ref<Record<string, { agencyId: string, fiscalYearId: string, label: string }>> = ref({})
+  const onFiscalYearResolved = (budgetTempId: string, payload: { agencyId: string, items: AdminCommonLookupResponseItem[] }) => {
+    if (!open.value || payload.agencyId !== state.value?.profile.egcs_tp_agency) return
+    const budget = state.value.budgets.find(item => item.tempId === budgetTempId)
+    if (!budget) return
+    const item = payload.items.find(item => String(item.id) === budget.egcs_tp_fiscalyear)
+    const next = Object.fromEntries(Object.entries(fiscalYearLabels.value).filter(([tempId]) => tempId !== budgetTempId))
+    if (item && typeof item.egcs_ay_fiscalyeardisplay === 'string') {
+      next[budgetTempId] = { agencyId: payload.agencyId, fiscalYearId: String(item.id), label: item.egcs_ay_fiscalyeardisplay }
+    }
+    fiscalYearLabels.value = next
+  }
+  watch(() => state.value?.budgets.map(budget => ({ tempId: budget.tempId, fiscalYearId: budget.egcs_tp_fiscalyear })) ?? [], budgets => {
+    fiscalYearLabels.value = Object.fromEntries(Object.entries(fiscalYearLabels.value).filter(([tempId, item]) =>
+      item.agencyId === state.value?.profile.egcs_tp_agency
+      && budgets.some(budget => budget.tempId === tempId && budget.fiscalYearId === item.fiscalYearId)))
+  }, { flush: 'sync' })
+  const fiscalYearLabelById = computed(() => new Map(Object.values(fiscalYearLabels.value)
+    .map(item => [item.fiscalYearId, item.label])))
 
   const initializeState = () => {
     state.value = createTransferPaymentWizardInitialState(resolvedDefaultAgencyId.value)
@@ -283,17 +294,18 @@ export const useTransferPaymentWizardModal = ({
     () => state.value?.profile.egcs_tp_agency,
     (agencyId, previousAgencyId) => {
       if (!state.value) return
-      if (!agencyId || agencyId === previousAgencyId || previousAgencyId === undefined || previousAgencyId === '') return
-      if (state.value.budgets.length === 0) return
-
+      if (agencyId === previousAgencyId) return
+      fiscalYearLabels.value = {}
       state.value.budgets = []
-    }
+    },
+    { flush: 'sync' }
   )
 
   watch(
     open,
     isOpen => {
       selectedAgency.value = null
+      fiscalYearLabels.value = {}
       if (isOpen) {
         initializeState()
         return
@@ -383,7 +395,7 @@ export const useTransferPaymentWizardModal = ({
     errorsByStep,
     currentStepErrors,
     onAgencyResolved,
-    fiscalYears,
+    onFiscalYearResolved,
     fiscalYearLabelById,
     isAgencyLocked,
     toDateInput,
