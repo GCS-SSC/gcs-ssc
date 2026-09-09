@@ -2,6 +2,7 @@
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
+import { onBeforeUnmount, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 import type {
@@ -47,7 +48,7 @@ const {
   refresh,
   status
 } = useResourceTable<AgreementSubtypeRow>({
-  fetchUrl: `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/agreement-subtypes`
+  fetchUrl: computed(() => `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/agreement-subtypes`)
 })
 
 const columns: TableColumnInput<AgreementSubtypeRow>[] = [
@@ -73,16 +74,30 @@ const validateAgreementSubtype = createValidator(TransferPaymentAgreementSubtype
 const modalPending = useCrudModalPending(modal.captureSession)
 const isSaving = modalPending.isPending
 
+let contextGeneration = 0
+let disposed = false
+const isCurrentContext = (generation: number) => !disposed && generation === contextGeneration
+watch([() => transferPaymentId, () => streamId], () => {
+  contextGeneration += 1
+  modal.close()
+}, { flush: 'sync' })
+onBeforeUnmount(() => {
+  disposed = true
+  contextGeneration += 1
+})
+
 /**
  * Persists the selected stream agreement subtype and refreshes the table.
  */
 const save = async () => {
-  if (!selected.value || !canUpdateChild) return
+  if (disposed || !selected.value || !canUpdateChild) return
   const session = modal.captureSession()
   if (!modalPending.begin(session)) return
+  const generation = contextGeneration
+  const isUpdate = Boolean(selected.value.id)
+  let closedSession = false
 
   try {
-    const isUpdate = !!selected.value.id
     const response = await fetch(getClientRequestUrl(isUpdate
       ? `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/agreement-subtypes/${selected.value.id}`
       : `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/agreement-subtypes`), {
@@ -95,17 +110,25 @@ const save = async () => {
     if (!response.ok) {
       await throwFetchResponseError(response)
     }
-    if (!modal.closeSession(session)) return
+    if (!isCurrentContext(generation)) return
+    closedSession = modal.closeSession(session)
+  } catch (error: unknown) {
+    if (isCurrentContext(generation) && modal.captureSession() === session) showError(error)
+    return
+  } finally {
+    modalPending.end(session)
+  }
+
+  try {
     await refresh()
+    if (!isCurrentContext(generation) || !closedSession || modal.captureSession() !== null || status.value === 'error') return
     toast.add({
       title: t('common.success'),
       description: isUpdate ? t('common.updated_success') : t('common.added_success'),
       color: 'success'
     })
   } catch (error: unknown) {
-    showError(error)
-  } finally {
-    modalPending.end(session)
+    if (isCurrentContext(generation)) showError(error)
   }
 }
 
@@ -129,7 +152,7 @@ const remove = async (row: AgreementSubtypeRow) => {
 
 const { data: agreementTypeResponse, error: agreementTypeError, refresh: refreshAgreementTypes } = await useAgencyReferenceData<AgencyAgreementTypeItem>({
   agencyId,
-  buildUrl: id => `/api/agency/${id}/agreement-types`,
+  buildUrl: () => `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/lookups/agreement-types`,
   query: { page: 1, limit: 100 }
 })
 const isRetryingAgreementTypes: Ref<boolean> = ref(false)

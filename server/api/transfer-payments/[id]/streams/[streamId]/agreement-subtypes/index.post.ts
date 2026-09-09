@@ -1,8 +1,12 @@
-import { TransferPaymentAgreementSubtypeSchema } from '~~/shared/types/schemas'
+import { PositivePostgresBigintIdSchema, TransferPaymentAgreementSubtypeSchema } from '~~/shared/types/schemas'
 import { authorize } from '~~/server/utils/authorize'
 import { authorizeTransferPaymentStreamResource, createTransferPaymentScopedAuthorizeHandler } from '~~/server/utils/transfer-payment-route-authorization'
 import { throwIfTransferPaymentUniqueConstraintError } from '~~/server/utils/transfer-payment-unique-constraint-errors'
 import { executeFreshAuthorizedTransferPaymentStreamWrite } from '~~/server/utils/transfer-payment-write-transaction'
+
+const AgreementSubtypeCreateSchema = TransferPaymentAgreementSubtypeSchema.extend({
+  egcs_tp_agreementtype: PositivePostgresBigintIdSchema
+})
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -19,7 +23,7 @@ export default defineEventHandler(async event => {
 
   await authorize(event, 'transfer_payment', 'create', createTransferPaymentScopedAuthorizeHandler('create', streamContext.scope, db))
 
-  const body = await readValidatedBodyI18n(event, TransferPaymentAgreementSubtypeSchema)
+  const body = await readValidatedBodyI18n(event, AgreementSubtypeCreateSchema)
 
   try {
     return await executeFreshAuthorizedTransferPaymentStreamWrite(
