@@ -935,6 +935,7 @@
       "fiscal_year_not_found": "Fiscal year not found.",
       "line_item_not_found": "Line item not found.",
       "cost_category_line_item_in_use": "Remove this line item from all active program streams before deleting it.",
+      "applicant_recipient_subtype_in_use": "This proponent subtype is still referenced by a stream eligibility entry or a proponent profile and cannot be deleted.",
       "applicant_recipient_subtype_not_found": "Proponent subtype not found.",
       "category_not_found": "Category not found.",
       "duplicate_profile": "An agency with the same financial system id, bilingual name, and status already exists.",

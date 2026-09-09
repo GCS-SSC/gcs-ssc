@@ -935,6 +935,7 @@
       "fiscal_year_not_found": "Année budgétaire introuvable.",
       "line_item_not_found": "Poste budgétaire introuvable.",
       "cost_category_line_item_in_use": "Retirez ce poste de tous les volets de programme actifs avant de le supprimer.",
+      "applicant_recipient_subtype_in_use": "Ce sous-type de promoteur est encore référencé par une entrée d’admissibilité de volet ou un profil de promoteur et ne peut pas être supprimé.",
       "applicant_recipient_subtype_not_found": "Sous-type de promoteur introuvable.",
       "category_not_found": "Catégorie introuvable.",
       "duplicate_profile": "Une agence avec le même identifiant financier, nom bilingue et statut existe déjà.",

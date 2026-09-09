@@ -2,6 +2,7 @@ import {
   authorizeActiveAgencySubentity,
   softDeleteActiveAgencySubentity
 } from '~~/server/utils/agency-auth'
+import { assertAgencyRecipientSubtypeNotInUse } from '~~/server/utils/agency-recipient-subtype-integrity'
 
 /**
  *  * Event handler for this server API route. Handles the incoming request payload, performs necessary business logic and authorization operations, and returns the expected endpoint response array or object.
@@ -31,7 +32,8 @@ export default defineEventHandler(async event => {
       trx,
       'Agency_Applicant_Recipient_Subtype',
       id,
-      agencyId
+      agencyId,
+      async lockedTrx => await assertAgencyRecipientSubtypeNotInUse(event, lockedTrx, id)
     )
   )
   if (!deleted) {

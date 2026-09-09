@@ -89,7 +89,7 @@ const setDefinedApplicantRecipientField = (
 /**
  * Verifies applicant recipient foreign key references when they are present in the payload.
  *
- * @param db - Database instance.
+ * @param db - Active write transaction.
  * @param payload - Create or patch payload.
  * @param options - Availability exceptions for preserving an existing reference.
  * @param options.allowInactiveLeadAgencyId - Existing inactive Agency ID that may remain selected.
@@ -100,17 +100,11 @@ export const validateApplicantRecipientReferences = async (
   payload: ApplicantRecipientCreateInput | ApplicantRecipientPatchInput,
   options: { allowInactiveLeadAgencyId?: string } = {}
 ) => {
-  const subtypePromise = hasOwn(payload, 'egcs_ar_applicantrecipientsubtypes') && payload.egcs_ar_applicantrecipientsubtypes
-    ? db
-        .selectFrom('Agency_Applicant_Recipient_Subtype')
-        .where('id', '=', String(payload.egcs_ar_applicantrecipientsubtypes))
-        .where('_deleted', '=', false)
-        .select(['id', 'egcs_ay_organizationagency'])
-        .executeTakeFirst()
-    : Promise.resolve(undefined)
-
-  const leadAgencyPromise = hasOwn(payload, 'egcs_ar_leadagency') && payload.egcs_ar_leadagency
-    ? db
+  // Both callers run in a write transaction. Lock parent before subtype so
+  // catalogue retirement cannot pass its reference check before this write,
+  // and a profile INSERT never inverts the Agency foreign-key lock order.
+  const leadAgency = hasOwn(payload, 'egcs_ar_leadagency') && payload.egcs_ar_leadagency
+    ? await db
         .selectFrom('Agency_Profile')
         .where('id', '=', String(payload.egcs_ar_leadagency))
         .where('_deleted', '=', false)
@@ -121,10 +115,19 @@ export const validateApplicantRecipientReferences = async (
             ])
           : eb('egcs_ay_active', '=', true))
         .select('id')
+        .forShare()
         .executeTakeFirst()
-    : Promise.resolve(undefined)
+    : undefined
 
-  const [subtype, leadAgency] = await Promise.all([subtypePromise, leadAgencyPromise])
+  const subtype = hasOwn(payload, 'egcs_ar_applicantrecipientsubtypes') && payload.egcs_ar_applicantrecipientsubtypes
+    ? await db
+        .selectFrom('Agency_Applicant_Recipient_Subtype')
+        .where('id', '=', String(payload.egcs_ar_applicantrecipientsubtypes))
+        .where('_deleted', '=', false)
+        .select(['id', 'egcs_ay_organizationagency'])
+        .forShare()
+        .executeTakeFirst()
+    : undefined
 
   const subtypeMatchesLeadAgency = hasOwn(payload, 'egcs_ar_applicantrecipientsubtypes') && payload.egcs_ar_applicantrecipientsubtypes
     ? hasOwn(payload, 'egcs_ar_leadagency') && payload.egcs_ar_leadagency
