@@ -77,6 +77,14 @@ const CONSTRAINT_ERROR_MAP: Record<string, ConstraintErrorMapping> = {
     code: 'AGENCY_DUPLICATE_AGREEMENT_TYPE_NAME_FR',
     key: 'apiErrors.agency.duplicate_agreement_type_name_fr'
   },
+  ay_uq_agreement_type_name_en_normalized: {
+    code: 'AGENCY_DUPLICATE_AGREEMENT_TYPE_NAME_EN',
+    key: 'apiErrors.agency.duplicate_agreement_type_name_en'
+  },
+  ay_uq_agreement_type_name_fr_normalized: {
+    code: 'AGENCY_DUPLICATE_AGREEMENT_TYPE_NAME_FR',
+    key: 'apiErrors.agency.duplicate_agreement_type_name_fr'
+  },
   ay_idx_holdbackbasisorganizationagencycode: {
     code: 'AGENCY_DUPLICATE_HOLDBACK_BASIS_CODE',
     key: 'apiErrors.agency.duplicate_holdback_basis_code'

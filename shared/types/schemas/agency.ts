@@ -228,10 +228,13 @@ export const AgencyApprovalBehalfTypeInitial: AgencyApprovalBehalfTypeItem = {
 }
 
 // --- Agreement Type ---
+const AgencyAgreementTypeNameSchema = (requiredKey: string) => AgencyLabelSchema(requiredKey)
+  .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' })
+
 export const AgencyAgreementTypeSchema = z.object({
   egcs_ay_agreementtype: z.enum(AGREEMENT_TYPE_ENUM),
-  egcs_ay_name_en: z.string({ error: 'validation.name_en_required' }).trim().min(1, { error: 'validation.name_en_required' }),
-  egcs_ay_name_fr: z.string({ error: 'validation.name_fr_required' }).trim().min(1, { error: 'validation.name_fr_required' })
+  egcs_ay_name_en: AgencyAgreementTypeNameSchema('validation.name_en_required'),
+  egcs_ay_name_fr: AgencyAgreementTypeNameSchema('validation.name_fr_required')
 })
 export type AgencyAgreementType = z.infer<typeof AgencyAgreementTypeSchema>
 export type AgencyAgreementTypeItem = WithId<AgencyAgreementType>
