@@ -3,7 +3,7 @@ import {
   resolveAdditionalReviewerExecutableContextFromReview,
   resolveCurrentCommonUser
 } from '~~/server/utils/additional-reviewer-runtime'
-import { authorizeReviewRuntimeAction } from '~~/server/utils/review-runtime-access'
+import { authorizeReviewRuntimeAction, canAuthorizeReviewRuntimeAction } from '~~/server/utils/review-runtime-access'
 import { isReviewLockedStatus } from '~~/server/utils/review-runtime-state'
 import { requireAuthContext } from '~~/server/utils/authorize'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
@@ -16,6 +16,7 @@ type AdditionalReviewerItem = {
   egcs_cn_completedat: string | null
   can_update: boolean
   can_complete: boolean
+  can_delete: boolean
 }
 
 type AdditionalReviewersResponse = {
@@ -49,6 +50,9 @@ export default defineEventHandler(async (event): Promise<AdditionalReviewersResp
   // Additional reviewers are stored against the executable runtime entity, but visibility still
   // resolves through the same parent-entity read gate as the assessment itself.
   await authorizeReviewRuntimeAction(event, 'read_assessment', executableContext.runtimeEntity)
+
+  const canDelete = !isReviewLockedStatus(executableContext.reviewRuntimeState, executableContext.reviewSetRuntimeState)
+    && await canAuthorizeReviewRuntimeAction(event, 'delete_assessment_child', executableContext.runtimeEntity)
 
   const currentCommonUser = await resolveCurrentCommonUser(event)
   const rows = await db
@@ -85,7 +89,8 @@ export default defineEventHandler(async (event): Promise<AdditionalReviewersResp
       egcs_cn_user_name: row.assigned_user_name,
       egcs_cn_completedat: completedAt,
       can_update: canUpdate,
-      can_complete: canUpdate
+      can_complete: canUpdate,
+      can_delete: canDelete
     }
   })
 

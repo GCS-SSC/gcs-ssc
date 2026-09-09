@@ -522,6 +522,7 @@ const handleApprovalChanged = async () => {
                 :review-id="String(assessment.id)"
                 :can-update-assessment="canUpdateAssessment"
                 :reviewers-disabled="assessment.egcs_cn_disablereviewers === true"
+                :runtime-locked="assessment.reviewRuntime?.is_locked === true"
                 @progress-change="setAdditionalReviewerProgress" />
 
               <CommonAssignedUsers entity-type="commonreview" :entity-id="String(assessment.id)" />

@@ -223,6 +223,7 @@ const handleApprovalChanged = async () => {
                 :review-id="String(checklist.id)"
                 :can-update-assessment="canUpdate"
                 :reviewers-disabled="checklist.egcs_cn_disablereviewers === true"
+                :runtime-locked="checklist.reviewRuntime?.is_locked === true"
                 @progress-change="setAdditionalReviewerProgress" />
               <CommonAssignedUsers entity-type="commonreview" :entity-id="String(checklist.id)" />
               <CommonCompletionSection

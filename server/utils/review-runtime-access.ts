@@ -469,6 +469,25 @@ const authorizeExtensionOwnerAction = async (
   return allowed ? auth : await forbidden(event)
 }
 
+/** Applies the qualified business owner's role ceiling; exact artifacts authorize their own assignment separately. */
+const authorizeExtensionOwnerRole = async (
+  event: H3Event,
+  action: 'update' | 'delete',
+  runtime: ResolvedExtensionLifecycleRuntime
+): Promise<AuthContext> => {
+  const auth = await requireAuthContext(event)
+  const owner = runtime.lockedEntity.owner
+  const allowed = owner.owner === 'agreement'
+    ? await (async () => {
+        const agreement = await resolveAgreementScopeContext(owner.ownerId, event.context.$db)
+        return Boolean(agreement && auth.userAbilities.authorize('agreement', action, agreement.scope))
+      })()
+    : auth.userAbilities.authorize('applicant_recipient', action, {
+        type: 'agency', agencyId: owner.agencyId
+      })
+  return allowed ? auth : await forbidden(event)
+}
+
 /** Requires inherited Viewer access or approval-specific read authority before workflow eligibility is considered. */
 const authorizeReviewRuntimeReadAccess = async (
   event: H3Event,
@@ -1000,7 +1019,7 @@ export const authorizeReviewRuntimeAction = async (
     } else if (agreementReviewRuntimeEntityTypes.has(entityContext.entityType)) {
       await authorizeAgreementRuntimeAction(event, resolvedAction, entityContext)
     } else if (extensionRuntime) {
-      await authorizeExtensionOwnerAction(
+      await authorizeExtensionOwnerRole(
         event,
         resolvedAction === 'delete_assessment_child' ? 'delete' : 'update',
         extensionRuntime

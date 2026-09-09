@@ -18,16 +18,18 @@ type AdditionalReviewerRow = {
   egcs_cn_completedat: string | null
   can_update: boolean
   can_complete: boolean
+  can_delete: boolean
 }
 
 type AdditionalReviewerModalState = AdditionalReviewerInput & {
   id?: string
 }
 
-const { reviewId, canUpdateAssessment = false, reviewersDisabled = false } = defineProps<{
+const { reviewId, canUpdateAssessment = false, reviewersDisabled = false, runtimeLocked = false } = defineProps<{
   reviewId: string
   canUpdateAssessment?: boolean
   reviewersDisabled?: boolean
+  runtimeLocked?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -309,7 +311,7 @@ const completeRow = async (rowId: string) => {
  * @param rowId - Reviewer row identifier.
  */
 const deleteRow = async (rowId: string) => {
-  if (deletingRowId.value || !canUpdateAssessment) {
+  if (deletingRowId.value || runtimeLocked || !rows.value.some(row => row.id === rowId && row.can_delete)) {
     return
   }
 
@@ -436,7 +438,7 @@ const deleteRow = async (rowId: string) => {
               :loading="completingRowId === row.original.id"
               @click="completeRow(row.original.id)" />
             <UButton
-              v-if="canUpdateAssessment"
+              v-if="row.original.can_delete && !runtimeLocked"
               icon="i-lucide-trash-2"
               color="error"
               variant="ghost"
