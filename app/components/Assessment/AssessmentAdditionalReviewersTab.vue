@@ -4,7 +4,7 @@ import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 /* eslint-disable jsdoc/require-param-description -- Legacy component callbacks omit redundant parameter prose. */
 import type { Ref } from 'vue'
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { refDebounced } from '@vueuse/core'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import type { ListResponse, UserOptionItem } from '~~/shared/types/admin'
@@ -156,6 +156,11 @@ const reviewerModal = useCrudModal<AdditionalReviewerRow, AdditionalReviewerModa
 
 const isReviewerModalOpen: Ref<boolean> = reviewerModal.isOpen
 const selectedReviewer: Ref<AdditionalReviewerModalState | null> = reviewerModal.selected
+const canSaveReviewer = computed(() => {
+  const selected = selectedReviewer.value
+  return Boolean(selected && !runtimeLocked
+    && (!selected.id || rows.value.some(row => row.id === selected.id && row.can_update)))
+})
 const selectedUserOption: Ref<UserOptionItem | null> = ref(null)
 
 // Keep the selected identity readable when paging/search replaces the option list.
@@ -179,7 +184,15 @@ const retainedUserOptions = computed(() => {
 })
 
 const openCreateReviewer = reviewerModal.openCreate
-const openUpdateReviewer = reviewerModal.openUpdate
+/**
+ * Opens the current editable row while the Review remains unlocked.
+ * @param row - Row selected by the action control.
+ */
+const openUpdateReviewer = (row: AdditionalReviewerRow) => {
+  const current = rows.value.find(item => item.id === row.id && item.can_update)
+  if (runtimeLocked || !current) return
+  reviewerModal.openUpdate(current)
+}
 /**
  *
  * @param url
@@ -204,9 +217,15 @@ const requestJson = async (url: string, method: 'DELETE' | 'PATCH' | 'POST', bod
 const reviewerPending = useCrudModalPending(reviewerModal.captureSession)
 const completingRowId = ref<string | null>(null)
 const deletingRowId = ref<string | null>(null)
+let reviewGeneration = 0
+let completionGeneration = 0
+let deletionGeneration = 0
 const isReviewerSaving = reviewerPending.isPending
 
 watch(() => reviewId, (_nextReviewId, previousReviewId) => {
+  reviewGeneration += 1
+  completionGeneration += 1
+  deletionGeneration += 1
   rowsRequestGeneration += 1
   userLookupGeneration += 1
   rowsResponse.value = null
@@ -218,6 +237,14 @@ watch(() => reviewId, (_nextReviewId, previousReviewId) => {
   deletingRowId.value = null
   void Promise.all([refreshRows(), refreshUserLookup()])
 }, { immediate: true, flush: 'sync' })
+
+onUnmounted(() => {
+  reviewGeneration += 1
+  completionGeneration += 1
+  deletionGeneration += 1
+  rowsRequestGeneration += 1
+  userLookupGeneration += 1
+})
 
 watch(rows, value => {
   emit('progressChange', {
@@ -241,11 +268,12 @@ const openCreate = () => {
  * Creates or updates the selected reviewer entry.
  */
 const saveReviewer = async () => {
-  if (!selectedReviewer.value) {
+  if (!selectedReviewer.value || !canSaveReviewer.value) {
     return
   }
 
   const isCreate = !selectedReviewer.value.id
+  const requestedReviewGeneration = reviewGeneration
   const session = reviewerModal.captureSession()
   const requestedReviewId = reviewId
   if (!reviewerPending.begin(session)) return
@@ -265,15 +293,16 @@ const saveReviewer = async () => {
       await requestJson(`/api/additional-reviewers/${reviewerId}`, 'PATCH', selectedReviewer.value)
     }
 
-    if (requestedReviewId !== reviewId || !reviewerModal.closeSession(session)) return
+    if (requestedReviewId !== reviewId || requestedReviewGeneration !== reviewGeneration || !reviewerModal.closeSession(session)) return
     await refreshRows()
+    if (requestedReviewId !== reviewId || requestedReviewGeneration !== reviewGeneration) return
     toast.add({
       title: t('common.success'),
       description: isCreate ? t('assessment.additional_reviewers.created_success') : t('common.updated_success'),
       color: 'success'
     })
   } catch (error) {
-    showError(error)
+    if (requestedReviewId === reviewId && requestedReviewGeneration === reviewGeneration && reviewerModal.captureSession() === session) showError(error)
   } finally {
     reviewerPending.end(session)
   }
@@ -285,23 +314,28 @@ const saveReviewer = async () => {
  * @param rowId - Reviewer row identifier.
  */
 const completeRow = async (rowId: string) => {
-  if (completingRowId.value) {
+  if (completingRowId.value || runtimeLocked || !rows.value.some(row => row.id === rowId && row.can_complete)) {
     return
   }
 
+  const requestGeneration = ++completionGeneration
+  const requestedReviewId = reviewId
+  const isCurrent = () => requestGeneration === completionGeneration && requestedReviewId === reviewId
   try {
     completingRowId.value = rowId
     await requestJson(`/api/additional-reviewers/${rowId}/complete`, 'POST')
+    if (!isCurrent()) return
     await refreshRows()
+    if (!isCurrent()) return
     toast.add({
       title: t('common.success'),
       description: t('assessment.additional_reviewers.completed_success'),
       color: 'success'
     })
   } catch (error) {
-    showError(error)
+    if (isCurrent()) showError(error)
   } finally {
-    completingRowId.value = null
+    if (isCurrent()) completingRowId.value = null
   }
 }
 
@@ -315,19 +349,24 @@ const deleteRow = async (rowId: string) => {
     return
   }
 
+  const requestGeneration = ++deletionGeneration
+  const requestedReviewId = reviewId
+  const isCurrent = () => requestGeneration === deletionGeneration && requestedReviewId === reviewId
   try {
     deletingRowId.value = rowId
     await requestJson(`/api/additional-reviewers/${rowId}`, 'DELETE')
+    if (!isCurrent()) return
     await refreshRows()
+    if (!isCurrent()) return
     toast.add({
       title: t('common.success'),
       description: t('common.deleted_success'),
       color: 'success'
     })
   } catch (error) {
-    showError(error)
+    if (isCurrent()) showError(error)
   } finally {
-    deletingRowId.value = null
+    if (isCurrent()) deletingRowId.value = null
   }
 }
 </script>
@@ -417,7 +456,7 @@ const deleteRow = async (rowId: string) => {
         <template #actions-cell="{ row }">
           <div class="flex items-center gap-2">
             <UButton
-              v-if="row.original.can_update"
+              v-if="row.original.can_update && !runtimeLocked"
               icon="i-lucide-edit-3"
               color="neutral"
               variant="ghost"
@@ -427,7 +466,7 @@ const deleteRow = async (rowId: string) => {
               :title="t('common.edit_named', { name: row.original.egcs_cn_user_name || row.original.id })"
               @click="openUpdateReviewer(row.original)" />
             <UButton
-              v-if="row.original.can_complete"
+              v-if="row.original.can_complete && !runtimeLocked"
               icon="i-lucide-circle-check-big"
               color="primary"
               variant="ghost"
@@ -504,7 +543,7 @@ const deleteRow = async (rowId: string) => {
             <CommonSaveButton
               :label="selectedReviewer.id ? t('common.save') : t('common.add')"
               :loading="isReviewerSaving"
-              :disabled="isReviewerSaving" />
+              :disabled="isReviewerSaving || !canSaveReviewer" />
           </div>
         </UForm>
       </template>
