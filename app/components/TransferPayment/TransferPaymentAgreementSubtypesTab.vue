@@ -74,11 +74,13 @@ const validateAgreementSubtype = createValidator(TransferPaymentAgreementSubtype
 const modalPending = useCrudModalPending(modal.captureSession)
 const isSaving = modalPending.isPending
 
+const isDeleting: Ref<boolean> = ref(false)
 let contextGeneration = 0
 let disposed = false
 const isCurrentContext = (generation: number) => !disposed && generation === contextGeneration
 watch([() => transferPaymentId, () => streamId], () => {
   contextGeneration += 1
+  isDeleting.value = false
   modal.close()
 }, { flush: 'sync' })
 onBeforeUnmount(() => {
@@ -138,15 +140,22 @@ const save = async () => {
  * @param row - Row targeted for removal.
  */
 const remove = async (row: AgreementSubtypeRow) => {
+  if (disposed || !canDeleteChild || isDeleting.value) return
+  const generation = contextGeneration
+  isDeleting.value = true
   try {
     const ok = await confirmDeleteRequest(
-      `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/agreement-subtypes/${row.id}`
+      `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/agreement-subtypes/${row.id}`,
+      { shouldProceed: () => isCurrentContext(generation) && canDeleteChild }
     )
-    if (!ok) return
+    if (!ok || !isCurrentContext(generation)) return
     await refresh()
+    if (!isCurrentContext(generation) || status.value !== 'success') return
     toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (isCurrentContext(generation)) showError(error)
+  } finally {
+    if (isCurrentContext(generation)) isDeleting.value = false
   }
 }
 
@@ -210,7 +219,7 @@ const retryAgreementTypes = async () => {
           color="error"
           variant="ghost"
           size="sm"
-          :disabled="!canDeleteChild"
+          :disabled="!canDeleteChild || isDeleting"
           :aria-label="t('common.delete_named', { name: getAgreementSubtypeActionTarget(row.original) })"
           @click="remove(row.original)" />
       </div>
