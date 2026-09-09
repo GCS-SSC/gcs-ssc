@@ -1,5 +1,7 @@
 import { WorkflowMemberConditionsSchema } from './agreement-custom-fields'
 import { z } from 'zod'
+import { isCanonicalPostgresBigintText } from '../../utils/database-id'
+import { isRepresentableByNumeric } from '../../utils/decimal'
 import { RecommendationDefinitionSchema } from './recommendation/recommendation'
 import {
   createWorkflowTargetEntityTypeIdentitySchema,
@@ -80,10 +82,6 @@ const normalizeDeletedFilterValue = (value: unknown) => {
 }
 
 const DeletedFilterSchema = z.preprocess(normalizeDeletedFilterValue, z.boolean().optional())
-const OptionalNumberSchema = z.preprocess(value => {
-  if (isEmptyFilterValue(value)) return undefined
-  return value
-}, z.coerce.number().optional())
 const OptionalIdFilterSchema = z.preprocess(value => {
   if (isEmptyFilterValue(value)) return undefined
   return value
@@ -144,20 +142,56 @@ export const CommonContactCreateSchema = z.object({
 })
 export const CommonContactPatchSchema = CommonContactCreateSchema.partial().extend({ _deleted: z.boolean().optional() })
 
-const CommonAddressBaseSchema = z.object({
-  egcs_cn_federalridingid: z.coerce.number({ error: 'validation.federal_riding_id_required' }).int(),
-  egcs_cn_addresscity: RequiredString('validation.city_required'),
+/** Preserves all signed PostgreSQL bigint values without passing text through Number.
+ * @param requiredKey Localized required-field error.
+ * @returns Canonical text with safe numeric compatibility input.
+ */
+const AddressBigintSchema = (requiredKey: string) => z.union([
+  z.string(),
+  z.bigint().transform(value => String(value)),
+  z.number().int({ error: 'validation.invalid_number' }).safe({ error: 'validation.invalid_number' })
+    .transform(value => String(value))
+], { error: requiredKey })
+  .transform(value => value.trim())
+  .refine(value => value.length > 0, { error: requiredKey })
+  .refine(isCanonicalPostgresBigintText, { error: 'validation.invalid_number' })
+
+/** Applies the existing varchar storage boundary without changing whitespace semantics.
+ * @param schema Required or optional-content string schema.
+ * @returns A string that PostgreSQL can persist in the address column.
+ */
+const AddressTextSchema = (schema: z.ZodString) => schema.superRefine((value, context) => {
+  if (Array.from(value).length > 255) {
+    context.addIssue({ code: 'too_big', origin: 'string', maximum: 255, inclusive: true, message: 'validation.max_length' })
+  }
+  if (value.includes('\u0000')) {
+    context.addIssue({ code: 'custom', message: 'validation.invalid_text_character' })
+  }
+})
+
+const AddressCoordinateSchema = z.coerce.number()
+  .refine(value => isRepresentableByNumeric(value, 10, 7), { error: 'validation.numeric_not_representable' })
+
+export const CommonAddressBaseSchema = z.object({
+  egcs_cn_federalridingid: z.coerce.number({ error: 'validation.federal_riding_id_required' })
+    .int({ error: 'validation.invalid_number' })
+    .min(-2147483648, { error: 'validation.invalid_number' })
+    .max(2147483647, { error: 'validation.invalid_number' }),
+  egcs_cn_addresscity: AddressTextSchema(RequiredString('validation.city_required')),
   egcs_cn_addresscountry: z.enum(COUNTRIES_ENUM),
-  egcs_cn_addresssubdivision: RequiredString('validation.required'),
-  egcs_cn_gc_addressid: OptionalNumberSchema,
-  egcs_cn_latitude: z.coerce.number().optional(),
-  egcs_cn_longitude: z.coerce.number().optional(),
-  egcs_cn_mainphone: z.coerce.number({ error: 'validation.main_phone_required' }),
-  egcs_cn_mainphoneextension: z.coerce.number().int().optional(),
-  egcs_cn_postalcodezipcode: RequiredString('validation.postal_code_required'),
-  egcs_cn_street1: RequiredString('validation.street1_required'),
-  egcs_cn_street2: z.string().optional(),
-  egcs_cn_street3: z.string().optional()
+  egcs_cn_addresssubdivision: AddressTextSchema(RequiredString('validation.required')),
+  egcs_cn_gc_addressid: z.preprocess(value => isEmptyFilterValue(value) ? undefined : value,
+    AddressBigintSchema('validation.invalid_number').optional()),
+  egcs_cn_latitude: AddressCoordinateSchema.optional(),
+  egcs_cn_longitude: AddressCoordinateSchema.optional(),
+  egcs_cn_mainphone: AddressBigintSchema('validation.main_phone_required'),
+  egcs_cn_mainphoneextension: z.coerce.number().int({ error: 'validation.invalid_number' })
+    .min(-32768, { error: 'validation.invalid_number' })
+    .max(32767, { error: 'validation.invalid_number' }).optional(),
+  egcs_cn_postalcodezipcode: AddressTextSchema(RequiredString('validation.postal_code_required')),
+  egcs_cn_street1: AddressTextSchema(RequiredString('validation.street1_required')),
+  egcs_cn_street2: AddressTextSchema(z.string()).optional(),
+  egcs_cn_street3: AddressTextSchema(z.string()).optional()
 })
 
 // eslint-disable-next-line jsdoc/require-jsdoc -- local refinement helper has explicit typed parameters
@@ -180,6 +214,15 @@ const validateAddressSubdivision = (
 }
 
 export const CommonAddressCreateSchema = CommonAddressBaseSchema.superRefine((data, ctx) => {
+  validateAddressSubdivision(data.egcs_cn_addresscountry, data.egcs_cn_addresssubdivision, ctx)
+})
+
+// Agreement partial updates validate these effective fields after loading the
+// current address, without parsing or coercing unrelated persisted columns.
+export const CommonAddressSubdivisionSchema = CommonAddressBaseSchema.pick({
+  egcs_cn_addresscountry: true,
+  egcs_cn_addresssubdivision: true
+}).superRefine((data, ctx) => {
   validateAddressSubdivision(data.egcs_cn_addresscountry, data.egcs_cn_addresssubdivision, ctx)
 })
 

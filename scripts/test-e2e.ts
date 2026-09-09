@@ -21,6 +21,7 @@ export const postgresE2eSpecPaths = [
   'tests/e2e/agreement-budget-legacy-fiscal-year.spec.ts',
   'tests/e2e/agreement-activity-readonly-lock.spec.ts',
   'tests/e2e/agreement-address-readonly-lock.spec.ts',
+  'tests/e2e/agreement-address-review.spec.ts',
   'tests/e2e/agreement-budget-terminal-lock.spec.ts',
   'tests/e2e/agreement-child-id-search-boundaries.spec.ts',
   'tests/e2e/agreement-proponent-relationships.spec.ts',

@@ -1,4 +1,4 @@
-import type { Generated } from 'kysely'
+import type { ColumnType, Generated } from 'kysely'
 import type { CoreEntityType, CoreLifecycleEntityType } from '../constants/entity-registry'
 import type {
   CompletionDisposition,
@@ -1026,10 +1026,10 @@ export interface CommonAddressTable {
   egcs_cn_addresscity: string
   egcs_cn_addresscountry: Countries
   egcs_cn_addresssubdivision: string
-  egcs_cn_gc_addressid?: number
+  egcs_cn_gc_addressid?: ColumnType<string, string | number, string | number>
   egcs_cn_latitude?: number
   egcs_cn_longitude?: number
-  egcs_cn_mainphone: number
+  egcs_cn_mainphone: ColumnType<string, string | number, string | number>
   egcs_cn_mainphoneextension?: number
   egcs_cn_postalcodezipcode: string
   egcs_cn_street1: string

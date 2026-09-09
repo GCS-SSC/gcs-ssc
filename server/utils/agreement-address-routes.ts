@@ -2,20 +2,21 @@
 import type { H3Event } from 'h3'
 import type { Kysely, Transaction } from 'kysely'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
-import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
+import { parseI18n, readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import {
   AGREEMENT_CHILD_ERROR_KEYS,
   assertAgreementChildExists,
   assertAgreementExists
 } from '~~/server/utils/agreement-child-resources'
 import { AGREEMENT_ADDRESS_SELECT_COLUMNS } from '~~/server/utils/agreement-address-columns'
-import { FundingCaseAgreementAddressPatchSchema } from '~~/shared/types/schemas'
-import type { Database } from '~~/shared/types/database'
+import { CommonAddressSubdivisionSchema, FundingCaseAgreementAddressPatchSchema } from '~~/shared/types/schemas'
+import type { CommonAddressTable, Database } from '~~/shared/types/database'
 import { z } from 'zod'
 
 export const AgreementAddressPatchRequestSchema = z.preprocess(input => {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return input
   const address = { ...input } as Record<string, unknown>
+  delete address._deleted
   if (address.egcs_cn_street2 === null) address.egcs_cn_street2 = undefined
   if (address.egcs_cn_street3 === null) address.egcs_cn_street3 = undefined
   if (address.egcs_cn_latitude === null) address.egcs_cn_latitude = undefined
@@ -40,7 +41,7 @@ export const lockActiveAgreementCommonAddress = async (
   .selectFrom('Common_Address')
   .where('id', '=', commonAddressId)
   .where('_deleted', '=', false)
-  .select('id')
+  .select(['id', 'egcs_cn_addresscountry', 'egcs_cn_addresssubdivision'])
   .forUpdate()
   .executeTakeFirst()
 
@@ -81,7 +82,8 @@ export const hasOtherActiveAgreementCommonAddressReferences = async (
 const selectAgreementAddress = (
   db: AgreementAddressDb,
   agreementId: string,
-  childId: string
+  childId: string,
+  agencyId: string
 ) => db
   .selectFrom('Funding_Case_Agreement_Address')
   .innerJoin('Common_Address', 'Common_Address.id', 'Funding_Case_Agreement_Address.egcs_fc_address')
@@ -90,20 +92,22 @@ const selectAgreementAddress = (
   .where('Funding_Case_Agreement_Address.egcs_fc_fundingagreement', '=', agreementId)
   .where('Funding_Case_Agreement_Address._deleted', '=', false)
   .where('Common_Address._deleted', '=', false)
-  .where('Agency_Address_Type._deleted', '=', false)
+  .where('Agency_Address_Type.egcs_ay_organizationagency', '=', agencyId)
   .select(AGREEMENT_ADDRESS_SELECT_COLUMNS)
 
 const fetchAgreementAddress = async (
   db: AgreementAddressDb,
   agreementId: string,
-  childId: string
-) => await selectAgreementAddress(db, agreementId, childId).executeTakeFirst()
+  childId: string,
+  agencyId: string
+) => await selectAgreementAddress(db, agreementId, childId, agencyId).executeTakeFirst()
 
 const fetchAgreementAddressOrThrow = async (
   db: AgreementAddressDb,
   agreementId: string,
-  childId: string
-) => await selectAgreementAddress(db, agreementId, childId).executeTakeFirstOrThrow()
+  childId: string,
+  agencyId: string
+) => await selectAgreementAddress(db, agreementId, childId, agencyId).executeTakeFirstOrThrow()
 
 const assertAgreementAddressType = async (
   event: H3Event,
@@ -145,7 +149,7 @@ export const patchAgreementAddress = async (
 
   const existing = await assertAgreementChildExists(
     event,
-    fetchAgreementAddress(db, agreementId, childId),
+    fetchAgreementAddress(db, agreementId, childId, agencyId),
     ...AGREEMENT_CHILD_ERROR_KEYS.addressNotFound
   )
   if (!existing || typeof existing !== 'object' || !('id' in existing)) {
@@ -160,30 +164,54 @@ export const patchAgreementAddress = async (
     return existing
   }
 
-  const addressTypeGuard = await assertAgreementAddressType(event, db, agencyId, validated.egcs_fc_addresstype)
-  if (addressTypeGuard) {
-    return addressTypeGuard
+  // A previously retired type remains the exact reference of this locked
+  // Agreement address. Only a new selection needs current catalog eligibility.
+  if (validated.egcs_fc_addresstype !== existing.egcs_fc_addresstype) {
+    const addressTypeGuard = await assertAgreementAddressType(event, db, agencyId, validated.egcs_fc_addresstype)
+    if (addressTypeGuard) {
+      return addressTypeGuard
+    }
   }
 
   const { egcs_fc_addresstype: addressTypeId, ...addressValues } = values
 
+  let hasAddressChanges = false
   if (Object.keys(addressValues).length) {
     const commonAddress = await lockActiveAgreementCommonAddress(db, existing.egcs_fc_address)
     if (!commonAddress) {
       return await notFound(event, ...AGREEMENT_CHILD_ERROR_KEYS.addressNotFound)
     }
 
-    const addressIsShared = await hasOtherActiveAgreementCommonAddressReferences(
-      db,
-      existing.egcs_fc_address,
-      childId
-    )
-    if (addressIsShared) {
-      return await badRequest(
-        event,
-        'AGREEMENT_ADDRESS_SHARED',
-        'apiErrors.applicant_recipient.address_shared'
+    if (validated.egcs_cn_addresscountry !== undefined || validated.egcs_cn_addresssubdivision !== undefined) {
+      await parseI18n(event, CommonAddressSubdivisionSchema, {
+        egcs_cn_addresscountry: validated.egcs_cn_addresscountry ?? commonAddress.egcs_cn_addresscountry,
+        egcs_cn_addresssubdivision: validated.egcs_cn_addresssubdivision ?? commonAddress.egcs_cn_addresssubdivision
+      })
+    }
+
+    // Compare validated physical fields using their database types. In
+    // particular, bigint and numeric readbacks must not pass through Number.
+    hasAddressChanges = Boolean(await db.selectFrom('Common_Address')
+      .select('id')
+      .where('id', '=', existing.egcs_fc_address)
+      .where('_deleted', '=', false)
+      .where(eb => eb.or(Object.entries(addressValues).map(([key, value]) =>
+        eb(key as keyof CommonAddressTable, 'is distinct from', value))))
+      .executeTakeFirst())
+
+    if (hasAddressChanges) {
+      const addressIsShared = await hasOtherActiveAgreementCommonAddressReferences(
+        db,
+        existing.egcs_fc_address,
+        childId
       )
+      if (addressIsShared) {
+        return await badRequest(
+          event,
+          'AGREEMENT_ADDRESS_SHARED',
+          'apiErrors.applicant_recipient.address_shared'
+        )
+      }
     }
   }
 
@@ -197,7 +225,7 @@ export const patchAgreementAddress = async (
       .execute()
   }
 
-  if (Object.keys(addressValues).length) {
+  if (hasAddressChanges) {
     await db
       .updateTable('Common_Address')
       .set(addressValues)
@@ -206,5 +234,5 @@ export const patchAgreementAddress = async (
       .execute()
   }
 
-  return await fetchAgreementAddressOrThrow(db, agreementId, childId)
+  return await fetchAgreementAddressOrThrow(db, agreementId, childId, agencyId)
 }

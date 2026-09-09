@@ -11,7 +11,7 @@ import {
   PAYMENT_TYPE_ENUM
 } from '~~/shared/constants/enums'
 import { PositivePostgresBigintIdSchema, type WithId } from './common'
-import { CommonAddressCreateSchema, CommonAddressPatchSchema } from './admin-common'
+import { CommonAddressBaseSchema, CommonAddressCreateSchema } from './admin-common'
 import { isRepresentableByNumeric } from '~~/shared/utils/decimal'
 import { isCanonicalNonNegativePostgresBigintText } from '~~/shared/utils/database-id'
 import { MoneySchema, OptionalMoneySchema, PositiveMoneySchema } from './money'
@@ -170,7 +170,7 @@ export const FundingCaseAgreementAddressCreateSchema = z.preprocess(input => {
   })
 ))
 export const FundingCaseAgreementAddressPatchSchema = z.intersection(
-  CommonAddressPatchSchema,
+  CommonAddressBaseSchema.partial(),
   z.object({
     egcs_fc_addresstype: RequiredBigintSelectionId().optional()
   })

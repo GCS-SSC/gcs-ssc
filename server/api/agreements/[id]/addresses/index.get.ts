@@ -33,7 +33,7 @@ export default defineEventHandler(async event => {
       .where('Funding_Case_Agreement_Address.egcs_fc_fundingagreement', '=', agreementId)
       .where('Funding_Case_Agreement_Address._deleted', '=', false)
       .where('Common_Address._deleted', '=', false)
-      .where('Agency_Address_Type._deleted', '=', false)
+      .where('Agency_Address_Type.egcs_ay_organizationagency', '=', agreementContext.agencyId)
 
     if (search) {
       const escapedSearch = escapeLikePattern(search)
