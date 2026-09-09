@@ -928,7 +928,7 @@
       "attachment_type_not_found": "Type de pièce jointe introuvable.",
       "approval_behalf_type_not_found": "Type d'approbation au nom de introuvable.",
       "agreement_type_not_found": "Type d'entente introuvable.",
-      "agreement_type_in_use": "Retirez ce type d'entente de tous les volets de programme actifs avant de le supprimer.",
+      "agreement_type_in_use": "Ce type d'entente est encore référencé par un sous-type d'entente de programme et ne peut pas être supprimé.",
       "fiscal_year_in_use": "Cet exercice financier est utilisé par un budget de programme, un budget d'entente ou un suivi et ne peut pas être supprimé.",
       "cost_category_not_found": "Catégorie de coûts introuvable.",
       "cost_category_in_use": "Supprimez toutes les lignes actives avant de supprimer cette catégorie de coûts.",
