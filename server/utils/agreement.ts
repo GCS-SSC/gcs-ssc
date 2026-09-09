@@ -1,6 +1,6 @@
 /* eslint-disable jsdoc/require-jsdoc -- Agreement authorization helpers expose typed contracts covered by focused tests. */
 import type { H3Event } from 'h3'
-import type { Insertable, Kysely, Transaction, Updateable } from 'kysely'
+import type { Insertable, Kysely, RawBuilder, Transaction } from 'kysely'
 import {
   authorize,
   authorizeWithFreshAuthContext,
@@ -26,6 +26,7 @@ import type { AbilityAction } from '~~/shared/utils/abilities'
 import type { ExactEntityTarget } from '@gcs-ssc/authorization'
 import { resolveAssignmentTargetAgreementId } from './agreement-assignment-target'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+import { dateOnlySql } from './database-date'
 
 type AgreementAction = Extract<AbilityAction, 'create' | 'read' | 'update' | 'delete'>
 type AgreementDb = Kysely<Database> | Transaction<Database>
@@ -388,11 +389,17 @@ export const resolveAgreementRiskRatingContext = async (
   }
 }
 
+export type AgreementWriteValues = Omit<Insertable<FundingCaseAgreementProfileTable>,
+  'egcs_fc_authorizedassistancestartdate' | 'egcs_fc_authorizedassistanceenddate'> & {
+    egcs_fc_authorizedassistancestartdate: Date | RawBuilder<Date>
+    egcs_fc_authorizedassistanceenddate: Date | RawBuilder<Date>
+  }
+
 export const mapAgreementWriteValues = (
   input: FundingCaseAgreementProfile | FundingCaseAgreementProfilePatch,
   agreementType: Agreement_Type
-): Insertable<FundingCaseAgreementProfileTable> | Updateable<FundingCaseAgreementProfileTable> => {
-  const values: Partial<Insertable<FundingCaseAgreementProfileTable>> = {}
+): Partial<AgreementWriteValues> => {
+  const values: Partial<AgreementWriteValues> = {}
 
   if (Object.hasOwn(input, 'egcs_fc_agreementnumber')) {
     values.egcs_fc_agreementnumber = input.egcs_fc_agreementnumber
@@ -430,16 +437,16 @@ export const mapAgreementWriteValues = (
   if (Object.hasOwn(input, 'egcs_fc_riskscore')) {
     values.egcs_fc_riskscore = input.egcs_fc_riskscore ?? null
   }
-  if (Object.hasOwn(input, 'egcs_fc_authorizedassistancestartdate')) {
-    values.egcs_fc_authorizedassistancestartdate = input.egcs_fc_authorizedassistancestartdate
+  if (Object.hasOwn(input, 'egcs_fc_authorizedassistancestartdate') && input.egcs_fc_authorizedassistancestartdate !== undefined) {
+    values.egcs_fc_authorizedassistancestartdate = dateOnlySql(input.egcs_fc_authorizedassistancestartdate)
   }
-  if (Object.hasOwn(input, 'egcs_fc_authorizedassistanceenddate')) {
-    values.egcs_fc_authorizedassistanceenddate = input.egcs_fc_authorizedassistanceenddate
+  if (Object.hasOwn(input, 'egcs_fc_authorizedassistanceenddate') && input.egcs_fc_authorizedassistanceenddate !== undefined) {
+    values.egcs_fc_authorizedassistanceenddate = dateOnlySql(input.egcs_fc_authorizedassistanceenddate)
   }
 
   values.egcs_fc_agreementtype = agreementType
 
-  return values as Insertable<FundingCaseAgreementProfileTable> | Updateable<FundingCaseAgreementProfileTable>
+  return values
 }
 
 export const isAgreementHoldbackBasisValid = async (

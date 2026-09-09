@@ -12,12 +12,12 @@ import {
   mapAgreementWriteValues,
   resolveAgreementRiskRatingContext,
   resolveAgreementStreamScopeContext,
-  resolveAgreementSubtypeContext
+  resolveAgreementSubtypeContext,
+  type AgreementWriteValues
 } from '~~/server/utils/agreement'
 import { throwIfAgreementUniqueConstraintError } from '~~/server/utils/agreement-unique-constraint-errors'
 import type {
-  FundingCaseAgreementApplicantRecipientTable,
-  FundingCaseAgreementProfileTable
+  FundingCaseAgreementApplicantRecipientTable
 } from '~~/shared/types/database'
 import { z } from 'zod'
 import {
@@ -75,6 +75,18 @@ export default defineEventHandler(async event => {
         return await db.transaction().execute(async trx => {
           const authContext = await requireFreshAuthContext(event, trx)
           await lockRegisteredExtensionAgreementScopes(trx, lockContext.agencyId, [streamId])
+          const agency = await trx.selectFrom('Agency_Profile')
+            .select('id')
+            .where('id', '=', lockContext.agencyId)
+            .where('_deleted', '=', false)
+            .forShare('Agency_Profile')
+            .executeTakeFirst()
+          const program = await trx.selectFrom('Transfer_Payment_Profile')
+            .select('id')
+            .where('id', '=', lockContext.profileId)
+            .where('_deleted', '=', false)
+            .forShare('Transfer_Payment_Profile')
+            .executeTakeFirst()
           const lockedStreams = await lockTransferPaymentStreams(trx, [streamId])
           if (!lockedStreams.has(streamId)) {
             return await badRequest(event, 'INVALID_AGREEMENT_STREAM', 'apiErrors.agreement.invalid_stream')
@@ -83,8 +95,11 @@ export default defineEventHandler(async event => {
           if (!currentStreamContext) {
             return await badRequest(event, 'INVALID_AGREEMENT_STREAM', 'apiErrors.agreement.invalid_stream')
           }
-          if (currentStreamContext.agencyId !== lockContext.agencyId) {
+          if (currentStreamContext.agencyId !== lockContext.agencyId || currentStreamContext.profileId !== lockContext.profileId) {
             throw new AgreementCreateScopeChanged(currentStreamContext)
+          }
+          if (!agency || !program) {
+            return await badRequest(event, 'INVALID_AGREEMENT_STREAM', 'apiErrors.agreement.invalid_stream')
           }
 
           await authorizeWithFreshAuthContext(event, authContext, 'agreement', 'create', async ({ context }) => {
@@ -111,6 +126,19 @@ export default defineEventHandler(async event => {
             return await badRequest(event, 'INVALID_AGREEMENT_APPLICANT_RECIPIENT', 'apiErrors.agreement.invalid_applicant_recipient')
           }
           if (!await canAccessApplicantRecipientIds(authContext, applicantRecipientIds, 'read', trx)) {
+            return await badRequest(event, 'INVALID_AGREEMENT_APPLICANT_RECIPIENT', 'apiErrors.agreement.invalid_applicant_recipient')
+          }
+          const liveApplicantRecipients = await trx.selectFrom('Applicant_Recipient_Profile')
+            .innerJoin('Agency_Profile', 'Agency_Profile.id', 'Applicant_Recipient_Profile.egcs_ar_leadagency')
+            .select('Applicant_Recipient_Profile.id')
+            .where('Applicant_Recipient_Profile.id', 'in', applicantRecipientIds)
+            .where('Applicant_Recipient_Profile._deleted', '=', false)
+            .where('Agency_Profile._deleted', '=', false)
+            .orderBy('Agency_Profile.id', 'asc')
+            .orderBy('Applicant_Recipient_Profile.id', 'asc')
+            .forShare('Agency_Profile')
+            .execute()
+          if (liveApplicantRecipients.length !== applicantRecipientIds.length) {
             return await badRequest(event, 'INVALID_AGREEMENT_APPLICANT_RECIPIENT', 'apiErrors.agreement.invalid_applicant_recipient')
           }
 
@@ -150,7 +178,7 @@ export default defineEventHandler(async event => {
           const values = mapAgreementWriteValues(
             validated,
             subtypeContext.agreementType
-          ) as Insertable<FundingCaseAgreementProfileTable>
+          ) as AgreementWriteValues
           values.egcs_fc_customfields = await mergeAgreementCustomFields(event, trx, streamId, {}, validated.egcs_fc_customfields ?? {})
           values.egcs_fc_status = await lockAgencyDraftStatus(trx, currentStreamContext.agencyId)
           const createdAgreement = await trx

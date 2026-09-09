@@ -18,6 +18,23 @@ import { MoneySchema, OptionalMoneySchema, PositiveMoneySchema } from './money'
 import { addMoney, compareMoney, isCanonicalMoney, parseMoney, type Money } from '~~/shared/utils/money'
 
 const RequiredString = () => z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' })
+const AgreementProfileText = (maximum?: number) => RequiredString().superRefine((value, context) => {
+  if (maximum !== undefined && Array.from(value).length > maximum) {
+    context.addIssue({ code: 'too_big', origin: 'string', maximum, inclusive: true, message: 'validation.max_length' })
+  }
+  if (value.includes('\u0000')) {
+    context.addIssue({ code: 'custom', message: 'validation.invalid_text_character' })
+  }
+})
+const RequiredAgreementDate = () => z.union([z.date(), z.string()], { error: 'validation.required' })
+  .refine(value => {
+    if (typeof value !== 'string') return true
+    const calendar = /^\d{4}-\d{2}-\d{2}(?=T|$)/.exec(value)?.[0]
+    if (!calendar) return true
+    const parsed = new Date(`${calendar}T00:00:00.000Z`)
+    return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === calendar
+  }, { error: 'validation.required' })
+  .pipe(z.coerce.date({ error: 'validation.required' }))
 const OptionalBilingualName = () => z.preprocess(
   value => typeof value === 'string' && value.trim() === '' ? null : value,
   z.string().trim().max(255, { error: 'validation.max_length' }).nullable().optional()
@@ -70,13 +87,13 @@ const RequiredUniqueBigintSelectionIdsSchema = () => z.array(RequiredBigintSelec
 
 export const FundingCaseAgreementProfileBaseSchema = z.object({
   egcs_fc_customfields: AgreementCustomFieldValuesSchema.optional(),
-  egcs_fc_agreementnumber: RequiredString().max(15, { error: 'validation.max_length' }),
+  egcs_fc_agreementnumber: AgreementProfileText(15),
   egcs_fc_transferpaymentstream: RequiredBigintSelectionId(),
   egcs_fc_financialsystemnumber: RequiredBigintLike(),
-  egcs_fc_title_en: RequiredString().max(255, { error: 'validation.max_length' }),
-  egcs_fc_title_fr: RequiredString().max(255, { error: 'validation.max_length' }),
-  egcs_fc_description_en: RequiredString(),
-  egcs_fc_description_fr: RequiredString(),
+  egcs_fc_title_en: AgreementProfileText(255),
+  egcs_fc_title_fr: AgreementProfileText(255),
+  egcs_fc_description_en: AgreementProfileText(),
+  egcs_fc_description_fr: AgreementProfileText(),
   egcs_fc_agreementsubtype: RequiredBigintSelectionId(),
   egcs_fc_furtherdistribution: z.boolean(),
   egcs_fc_holdback: z.coerce.number({ error: 'validation.required' })
@@ -86,8 +103,8 @@ export const FundingCaseAgreementProfileBaseSchema = z.object({
     .refine(value => isRepresentableByNumeric(value, 5, 2), { error: 'validation.numeric_not_representable' }),
   egcs_fc_holdbackbasis: RequiredBigintSelectionId(),
   egcs_fc_riskscore: OptionalDecimal(8, 2),
-  egcs_fc_authorizedassistancestartdate: z.coerce.date({ error: 'validation.required' }),
-  egcs_fc_authorizedassistanceenddate: z.coerce.date({ error: 'validation.required' })
+  egcs_fc_authorizedassistancestartdate: RequiredAgreementDate(),
+  egcs_fc_authorizedassistanceenddate: RequiredAgreementDate()
 })
 
 const FundingCaseAgreementExtensionPayloadSchema = z.object({
