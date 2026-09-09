@@ -31,7 +31,8 @@ const riskRatingLabel = computed(() => {
     return label
   }
 
-  return displayValue(profile.egcs_fc_riskscore)
+  const score = displayValue(profile.egcs_fc_riskscore)
+  return score === '-' ? score : n(Number(score))
 })
 
 const formatPercent = (value: string | number | null | undefined) => {
