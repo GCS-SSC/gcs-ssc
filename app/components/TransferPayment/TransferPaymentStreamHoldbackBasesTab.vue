@@ -57,11 +57,13 @@ const openCreate = () => {
   if (canCreateChild) modal.openCreate()
 }
 
+const isDeleting: Ref<boolean> = ref(false)
 let contextGeneration = 0
 let disposed = false
 const isCurrentContext = (generation: number) => !disposed && generation === contextGeneration
 watch([() => transferPaymentId, () => streamId], () => {
   contextGeneration += 1
+  isDeleting.value = false
   modal.close()
 }, { flush: 'sync' })
 onBeforeUnmount(() => {
@@ -109,18 +111,21 @@ const save = async () => {
  * @param row - Row targeted for removal.
  */
 const remove = async (row: HoldbackBasisRow) => {
+  if (disposed || !canDeleteChild || isDeleting.value) return
+  const generation = contextGeneration
+  isDeleting.value = true
   try {
-    const ok = await confirmDeleteRequest(`${fetchUrl.value}/${row.id}`)
-    if (!ok) return
+    const ok = await confirmDeleteRequest(`${fetchUrl.value}/${row.id}`, {
+      shouldProceed: () => isCurrentContext(generation) && canDeleteChild
+    })
+    if (!ok || !isCurrentContext(generation)) return
+    await refresh()
+    if (!isCurrentContext(generation) || status.value !== 'success') return
     toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
-    return
-  }
-  try {
-    await refresh()
-  } catch (error: unknown) {
-    showError(error)
+    if (isCurrentContext(generation)) showError(error)
+  } finally {
+    if (isCurrentContext(generation)) isDeleting.value = false
   }
 }
 
@@ -168,7 +173,7 @@ const retryAgencyHoldbacks = async () => {
     <template #actions-cell="{ row }">
       <div class="flex items-center gap-2">
         <UButton icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" :aria-label="t('common.edit_named', { name: getActionTarget(row.original) })" :disabled="!canUpdateChild" @click="modal.openUpdate(row.original)" />
-        <UButton icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('common.delete_named', { name: getActionTarget(row.original) })" :disabled="!canDeleteChild" @click="remove(row.original)" />
+        <UButton icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('common.delete_named', { name: getActionTarget(row.original) })" :disabled="!canDeleteChild || isDeleting" @click="remove(row.original)" />
       </div>
     </template>
   </CommonResourceLayoutCard>

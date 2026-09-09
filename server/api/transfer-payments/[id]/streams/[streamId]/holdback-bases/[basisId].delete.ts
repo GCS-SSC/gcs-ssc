@@ -15,6 +15,10 @@ export default defineEventHandler(async event => {
   await authorize(event, 'transfer_payment', 'delete', createTransferPaymentScopedAuthorizeHandler('delete', context.scope, db))
   return await executeFreshAuthorizedTransferPaymentStreamWrite(
     event, db, profileId, context.agencyId, streamId, 'delete', async trx => {
+      const current = await trx.selectFrom('Transfer_Payment_Stream_Holdback_Basis').select('id')
+        .where('id', '=', basisId).where('egcs_tp_transferpaymentstream', '=', streamId)
+        .where('_deleted', '=', false).forUpdate().executeTakeFirst()
+      if (!current) return await notFound(event, 'HOLDBACK_BASIS_NOT_FOUND', 'apiErrors.transfer_payment.holdback_basis_not_found')
       const reference = await trx.selectFrom('Funding_Case_Agreement_Profile').select('id')
         .where('egcs_fc_holdbackbasis', '=', basisId).where('_deleted', '=', false)
         .forUpdate().executeTakeFirst()
