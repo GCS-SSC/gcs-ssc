@@ -81,6 +81,7 @@ const saveBudget = async () => {
   const session = budgetModal.captureSession()
   if (!budgetPending.begin(session)) return
   const isUpdate = Boolean(selectedBudget.value.id)
+  let closedCurrentSession = false
   try {
     const response = await fetch(getClientRequestUrl(selectedBudget.value.id
       ? `/api/transfer-payments/${programId}/budgets/${selectedBudget.value.id}`
@@ -94,7 +95,7 @@ const saveBudget = async () => {
     if (!response.ok) {
       await throwFetchResponseError(response)
     }
-    if (!budgetModal.closeSession(session)) return
+    closedCurrentSession = budgetModal.closeSession(session)
   } catch (error: unknown) {
     showError(error)
     return
@@ -102,11 +103,13 @@ const saveBudget = async () => {
     budgetPending.end(session)
   }
 
-  toast.add({
-    title: t('common.success'),
-    description: t(isUpdate ? 'common.updated_success' : 'common.added_success'),
-    color: 'success'
-  })
+  if (closedCurrentSession) {
+    toast.add({
+      title: t('common.success'),
+      description: t(isUpdate ? 'common.updated_success' : 'common.added_success'),
+      color: 'success'
+    })
+  }
   try {
     await refreshBudgets()
   } catch (error: unknown) {

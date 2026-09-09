@@ -21,66 +21,68 @@ export default defineEventHandler(async event => {
   const { page, limit, search } = query
   const offset = (page - 1) * limit
 
-  let baseQuery = db
-    .selectFrom('Transfer_Payment_Fiscal_Year_Budget')
-    .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_fiscalyear')
-    .innerJoin(
-      'Transfer_Payment_Profile',
-      'Transfer_Payment_Profile.id',
-      'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_transferpaymentprofile'
-    )
-    .innerJoin('Agency_Profile', 'Agency_Profile.id', 'Transfer_Payment_Profile.egcs_tp_agency')
-    .where('Transfer_Payment_Fiscal_Year_Budget.egcs_tp_transferpaymentprofile', '=', resolvedProfileId)
-    .where('Transfer_Payment_Profile.egcs_tp_agency', '=', agencyId)
-    .where('Agency_Fiscal_Year.egcs_ay_organizationagency', '=', agencyId)
-    .where('Transfer_Payment_Fiscal_Year_Budget._deleted', '=', false)
-    .where('Transfer_Payment_Profile._deleted', '=', false)
-    .where('Agency_Profile._deleted', '=', false)
-    .where('Agency_Fiscal_Year._deleted', '=', false)
+  return await db.transaction().setIsolationLevel('repeatable read').setAccessMode('read only').execute(async trx => {
+    let baseQuery = trx
+      .selectFrom('Transfer_Payment_Fiscal_Year_Budget')
+      .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_fiscalyear')
+      .innerJoin(
+        'Transfer_Payment_Profile',
+        'Transfer_Payment_Profile.id',
+        'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_transferpaymentprofile'
+      )
+      .innerJoin('Agency_Profile', 'Agency_Profile.id', 'Transfer_Payment_Profile.egcs_tp_agency')
+      .where('Transfer_Payment_Fiscal_Year_Budget.egcs_tp_transferpaymentprofile', '=', resolvedProfileId)
+      .where('Transfer_Payment_Profile.egcs_tp_agency', '=', agencyId)
+      .where('Agency_Fiscal_Year.egcs_ay_organizationagency', '=', agencyId)
+      .where('Transfer_Payment_Fiscal_Year_Budget._deleted', '=', false)
+      .where('Transfer_Payment_Profile._deleted', '=', false)
+      .where('Agency_Profile._deleted', '=', false)
+      .where('Agency_Fiscal_Year._deleted', '=', false)
 
-  if (search) {
-    baseQuery = baseQuery.where(eb =>
-      eb.or([
-        eb('Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay', 'ilike', `%${escapeLikePattern(search)}%`),
-        eb(sql<string>`CAST(${sql.ref('Agency_Fiscal_Year.egcs_ay_fiscalyear')} AS TEXT)`, 'ilike', `%${escapeLikePattern(search)}%`)
-      ])
-    )
-  }
+    if (search) {
+      baseQuery = baseQuery.where(eb =>
+        eb.or([
+          eb('Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay', 'ilike', `%${escapeLikePattern(search)}%`),
+          eb(sql<string>`CAST(${sql.ref('Agency_Fiscal_Year.egcs_ay_fiscalyear')} AS TEXT)`, 'ilike', `%${escapeLikePattern(search)}%`)
+        ])
+      )
+    }
 
-  const [items, countResult] = await Promise.all([
-    baseQuery
-      .select([
-        'Transfer_Payment_Fiscal_Year_Budget.id as id',
-        'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_transferpaymentprofile as egcs_tp_transferpaymentprofile',
-        'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_fiscalyear as egcs_tp_fiscalyear',
-        databaseMoneyText(sql.ref('Transfer_Payment_Fiscal_Year_Budget.egcs_tp_totalbudget')).as('egcs_tp_totalbudget'),
-        'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_overcommitthreshold as egcs_tp_overcommitthreshold',
-        'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display',
-        'Agency_Fiscal_Year.egcs_ay_fiscalyear as fiscal_year'
-      ])
-      .orderBy('Transfer_Payment_Fiscal_Year_Budget.id', 'asc')
-      .limit(limit)
-      .offset(offset)
-      .execute(),
-    baseQuery.select(eb => eb.fn.count('Transfer_Payment_Fiscal_Year_Budget.id').as('total')).executeTakeFirst()
-  ])
+    const [items, countResult] = await Promise.all([
+      baseQuery
+        .select([
+          'Transfer_Payment_Fiscal_Year_Budget.id as id',
+          'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_transferpaymentprofile as egcs_tp_transferpaymentprofile',
+          'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_fiscalyear as egcs_tp_fiscalyear',
+          databaseMoneyText(sql.ref('Transfer_Payment_Fiscal_Year_Budget.egcs_tp_totalbudget')).as('egcs_tp_totalbudget'),
+          'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_overcommitthreshold as egcs_tp_overcommitthreshold',
+          'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display',
+          'Agency_Fiscal_Year.egcs_ay_fiscalyear as fiscal_year'
+        ])
+        .orderBy('Transfer_Payment_Fiscal_Year_Budget.id', 'asc')
+        .limit(limit)
+        .offset(offset)
+        .execute(),
+      baseQuery.select(eb => eb.fn.count('Transfer_Payment_Fiscal_Year_Budget.id').as('total')).executeTakeFirst()
+    ])
 
-  const total = Number(countResult?.total || 0)
+    const total = Number(countResult?.total || 0)
 
-  return {
-    items: items.map(item => ({
-      ...item,
-      id: String(item.id),
-      egcs_tp_transferpaymentprofile: String(item.egcs_tp_transferpaymentprofile),
-      egcs_tp_fiscalyear: String(item.egcs_tp_fiscalyear),
-      egcs_tp_totalbudget: parseDatabaseMoney(item.egcs_tp_totalbudget)
-    })),
-    total,
-    stats: {
+    return {
+      items: items.map(item => ({
+        ...item,
+        id: String(item.id),
+        egcs_tp_transferpaymentprofile: String(item.egcs_tp_transferpaymentprofile),
+        egcs_tp_fiscalyear: String(item.egcs_tp_fiscalyear),
+        egcs_tp_totalbudget: parseDatabaseMoney(item.egcs_tp_totalbudget)
+      })),
       total,
-      active: total
-    },
-    page,
-    limit
-  }
+      stats: {
+        total,
+        active: total
+      },
+      page,
+      limit
+    }
+  })
 })

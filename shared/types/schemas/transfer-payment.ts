@@ -12,7 +12,7 @@ import {
   validateApprovalTemplatePatchCertifications,
   validateApprovalTemplateStepSequences
 } from './approval-template-common'
-import { DirectReviewEntityTypeIdentitySchema, PaginationSchema, RequiredStringId, type WithId } from './common'
+import { DirectReviewEntityTypeIdentitySchema, PaginationSchema, PositivePostgresBigintIdSchema, RequiredStringId, type WithId } from './common'
 import { MoneySchema } from './money'
 import {
   AMENDED_TYPE_ENUM,
@@ -124,7 +124,7 @@ export type TransferPaymentOutcome = z.infer<typeof TransferPaymentOutcomeSchema
 export type TransferPaymentOutcomeItem = WithId<TransferPaymentOutcome>
 
 export const TransferPaymentBudgetSchema = z.object({
-  egcs_tp_fiscalyear: RequiredId(),
+  egcs_tp_fiscalyear: PositivePostgresBigintIdSchema,
   egcs_tp_totalbudget: MoneySchema,
   egcs_tp_overcommitthreshold: RequiredNumeric(5, 2)
     .min(0, { error: 'validation.invalid_number' })
