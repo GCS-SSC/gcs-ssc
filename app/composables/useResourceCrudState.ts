@@ -197,6 +197,14 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
     const editing = isEditing.value
     const requestedGeneration = generation
     const isCurrentTarget = () => !disposed && requestedGeneration === generation
+    const refreshCurrentTarget = async () => {
+      if (!isCurrentTarget()) return
+      try {
+        await refresh()
+      } catch (error: unknown) {
+        if (isCurrentTarget()) showError(error)
+      }
+    }
 
     try {
       if (editing) {
@@ -215,7 +223,15 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
         await saveJson(url, 'POST', currentState)
       }
 
-      if (!isCurrentTarget() || !closeSession(session)) return
+      if (!isCurrentTarget()) return
+      if (!closeSession(session)) {
+        // Closing a modal does not undo an already committed write. Refresh
+        // its current collection without settling a replacement modal session.
+        if (editing) emitUpdated()
+        else emitAdded()
+        await refreshCurrentTarget()
+        return
+      }
     } catch (error: unknown) {
       if (isCurrentTarget() && isCurrentSession(session)) {
         showError(error)
@@ -241,11 +257,7 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
       })
     }
 
-    try {
-      await refresh()
-    } catch (error: unknown) {
-      if (isCurrentTarget()) showError(error)
-    }
+    await refreshCurrentTarget()
   }
 
   /** Confirms deletion, scopes settlement to the resource identity, and refreshes after success. */

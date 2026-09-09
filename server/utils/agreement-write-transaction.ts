@@ -165,6 +165,13 @@ export const executeFreshAuthorizedAgreementWrite = async <T>(
           lockContext.agencyId,
           [lockContext.streamId]
         )
+        const agency = await trx
+          .selectFrom('Agency_Profile')
+          .select('id')
+          .where('id', '=', lockContext.agencyId)
+          .where('_deleted', '=', false)
+          .forShare('Agency_Profile')
+          .executeTakeFirst()
         const lockedStreams = await lockTransferPaymentStreams(trx, [lockContext.streamId])
         if (!lockedStreams.has(lockContext.streamId)) {
           return await throwApiError(event, {
@@ -203,6 +210,15 @@ export const executeFreshAuthorizedAgreementWrite = async <T>(
         }
         if (!agreementScopeMatches(lockContext, currentContext)) {
           throw new AgreementWriteScopeChanged(currentContext)
+        }
+        // Resolve stale owner hints before rejecting the matched Agency. Its
+        // share lock keeps the nondeleted parent stable through the callback.
+        if (!agency) {
+          return await throwApiError(event, {
+            statusCode: 404,
+            code: 'AGREEMENT_NOT_FOUND',
+            key: 'apiErrors.agreement.not_found'
+          })
         }
 
         try {
