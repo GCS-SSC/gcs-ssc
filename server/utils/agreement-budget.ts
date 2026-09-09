@@ -249,7 +249,7 @@ const fetchStreamBudgetFiscalYear = async (
   .where('Transfer_Payment_Fiscal_Year_Budget._deleted', '=', false)
   .where('Agency_Fiscal_Year._deleted', '=', false)
   .select(['Agency_Fiscal_Year.id as id', 'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display'])
-  .forShare('Agency_Fiscal_Year')
+  .forShare(['Agency_Fiscal_Year', 'Transfer_Payment_Fiscal_Year_Budget'])
   .executeTakeFirst()
 
 export const patchAgreementBudgetFiscalYear = async (

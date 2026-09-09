@@ -1185,6 +1185,7 @@
       "duplicate_program_stream_name": "A stream with this English and French name already exists for the program.",
       "duplicate_program_outcome_name": "An outcome with this English and French name already exists for the program.",
       "duplicate_program_objective": "An objective with this English and French value already exists for the program.",
+      "budget_fiscal_year_in_use": "This budget’s fiscal year is used by an agreement budget. Remove or change the agreement budget year before changing this fiscal year.",
       "duplicate_program_budget_fiscal_year": "A program budget already exists for this fiscal year.",
       "duplicate_outcome_performance_indicator_name": "A performance indicator with this English and French name already exists for the outcome.",
       "duplicate_assessment_members": "Duplicate assessment members are not allowed.",

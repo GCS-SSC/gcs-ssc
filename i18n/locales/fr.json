@@ -1185,6 +1185,7 @@
       "duplicate_program_stream_name": "Un volet avec ce nom en anglais et en français existe déjà pour le programme.",
       "duplicate_program_outcome_name": "Un résultat avec ce nom en anglais et en français existe déjà pour le programme.",
       "duplicate_program_objective": "Un objectif avec cette valeur en anglais et en français existe déjà pour le programme.",
+      "budget_fiscal_year_in_use": "L’exercice de ce budget est utilisé par un budget d’entente. Supprimez ou modifiez l’exercice du budget d’entente avant de modifier cet exercice.",
       "duplicate_program_budget_fiscal_year": "Un budget de programme existe déjà pour cet exercice financier.",
       "duplicate_outcome_performance_indicator_name": "Un indicateur de rendement avec ce nom en anglais et en français existe déjà pour le résultat.",
       "duplicate_assessment_members": "Les membres d'évaluation en double ne sont pas autorisés.",

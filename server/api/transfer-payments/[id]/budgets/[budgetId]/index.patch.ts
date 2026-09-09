@@ -5,6 +5,7 @@ import { executeFreshAuthorizedTransferPaymentWrite } from '~~/server/utils/tran
 import { sql } from 'kysely'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { compareMoney } from '~~/shared/utils/money'
+import { isProgramBudgetFiscalYearInUse } from '~~/server/utils/program-budget-fiscal-year-integrity'
 
 /**
  *  * Event handler for this server API route. Handles the incoming request payload, performs necessary business logic and authorization operations, and returns the expected endpoint response array or object.
@@ -82,6 +83,10 @@ export default defineEventHandler(async event => {
 
           if (!fiscalYear) {
             return await badRequest(event, 'INVALID_FISCAL_YEAR', 'apiErrors.transfer_payment.invalid_fiscal_year')
+          }
+          if (validated.egcs_tp_fiscalyear !== String(lockedBudget.egcs_tp_fiscalyear)
+            && await isProgramBudgetFiscalYearInUse(trx, budgetId, String(lockedBudget.egcs_tp_fiscalyear))) {
+            return await badRequest(event, 'TRANSFER_PAYMENT_BUDGET_FISCAL_YEAR_IN_USE', 'apiErrors.transfer_payment.budget_fiscal_year_in_use')
           }
         }
 
