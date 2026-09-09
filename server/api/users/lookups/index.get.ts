@@ -1,3 +1,4 @@
+import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 import { sql } from 'kysely'
 import { z } from 'zod'
 import { authorize, requireAuthContext } from '~~/server/utils/authorize'
@@ -109,145 +110,146 @@ const buildCommonUserListResponse = (
 
 export default defineEventHandler(async event => {
   await requireAuthContext(event)
-  const db = event.context.$db
   const query = await getValidatedQueryI18n(event, UserLookupQuerySchema)
-  const { page, limit, search, selectedIds } = query
-  const offset = (page - 1) * limit
+  return await executeFreshReadSnapshot(event, async db => {
+    const { page, limit, search, selectedIds } = query
+    const offset = (page - 1) * limit
 
-  let agencyId: string | undefined
-  const scopedLookup = query.approvalTemplateId
-    ? { kind: 'approval_template' as const, id: query.approvalTemplateId }
-    : query.workflowSetupId
-      ? { kind: 'workflow_setup' as const, id: query.workflowSetupId }
-      : null
-  if (scopedLookup) {
-    const { data: authorizedAgencyId } = await authorize(
-      event,
-      'user',
-      'read',
-      async () => {
-        const templateScope = scopedLookup.kind === 'approval_template'
-          ? await db
-              .selectFrom('Common_Approval_Template')
-              .innerJoin(
-                'Transfer_Payment_Stream',
-                'Transfer_Payment_Stream.id',
-                'Common_Approval_Template.egcs_cn_scopeid'
-              )
-              .innerJoin(
-                'Transfer_Payment_Profile',
-                'Transfer_Payment_Profile.id',
-                'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile'
-              )
-              .select('Transfer_Payment_Profile.egcs_tp_agency as agencyId')
-              .where('Common_Approval_Template.id', '=', scopedLookup.id)
-              .where('Common_Approval_Template.egcs_cn_scopetype', '=', 'transferpaymentstream')
-              .where('Common_Approval_Template._deleted', '=', false)
-              .where('Transfer_Payment_Stream._deleted', '=', false)
-              .where('Transfer_Payment_Profile._deleted', '=', false)
-              .executeTakeFirst()
-          : await db
-              .selectFrom('Common_Workflow_Setup')
-              .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Common_Workflow_Setup.egcs_cn_scopeid')
-              .innerJoin('Transfer_Payment_Profile', 'Transfer_Payment_Profile.id', 'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile')
-              .select('Transfer_Payment_Profile.egcs_tp_agency as agencyId')
-              .where('Common_Workflow_Setup.id', '=', scopedLookup.id)
-              .where('Common_Workflow_Setup.egcs_cn_scopetype', '=', 'transferpaymentstream')
-              .where('Common_Workflow_Setup._deleted', '=', false)
-              .where('Transfer_Payment_Stream._deleted', '=', false)
-              .where('Transfer_Payment_Profile._deleted', '=', false)
-              .executeTakeFirst()
+    let agencyId: string | undefined
+    const scopedLookup = query.approvalTemplateId
+      ? { kind: 'approval_template' as const, id: query.approvalTemplateId }
+      : query.workflowSetupId
+        ? { kind: 'workflow_setup' as const, id: query.workflowSetupId }
+        : null
+    if (scopedLookup) {
+      const { data: authorizedAgencyId } = await authorize(
+        event,
+        'user',
+        'read',
+        async () => {
+          const templateScope = scopedLookup.kind === 'approval_template'
+            ? await db
+                .selectFrom('Common_Approval_Template')
+                .innerJoin(
+                  'Transfer_Payment_Stream',
+                  'Transfer_Payment_Stream.id',
+                  'Common_Approval_Template.egcs_cn_scopeid'
+                )
+                .innerJoin(
+                  'Transfer_Payment_Profile',
+                  'Transfer_Payment_Profile.id',
+                  'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile'
+                )
+                .select('Transfer_Payment_Profile.egcs_tp_agency as agencyId')
+                .where('Common_Approval_Template.id', '=', scopedLookup.id)
+                .where('Common_Approval_Template.egcs_cn_scopetype', '=', 'transferpaymentstream')
+                .where('Common_Approval_Template._deleted', '=', false)
+                .where('Transfer_Payment_Stream._deleted', '=', false)
+                .where('Transfer_Payment_Profile._deleted', '=', false)
+                .executeTakeFirst()
+            : await db
+                .selectFrom('Common_Workflow_Setup')
+                .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Common_Workflow_Setup.egcs_cn_scopeid')
+                .innerJoin('Transfer_Payment_Profile', 'Transfer_Payment_Profile.id', 'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile')
+                .select('Transfer_Payment_Profile.egcs_tp_agency as agencyId')
+                .where('Common_Workflow_Setup.id', '=', scopedLookup.id)
+                .where('Common_Workflow_Setup.egcs_cn_scopetype', '=', 'transferpaymentstream')
+                .where('Common_Workflow_Setup._deleted', '=', false)
+                .where('Transfer_Payment_Stream._deleted', '=', false)
+                .where('Transfer_Payment_Profile._deleted', '=', false)
+                .executeTakeFirst()
 
-        if (!templateScope) {
-          return await notFound(
-            event,
-            scopedLookup.kind === 'workflow_setup' ? 'WORKFLOW_SETUP_NOT_FOUND' : 'TRANSFER_PAYMENT_APPROVAL_TEMPLATE_NOT_FOUND',
-            scopedLookup.kind === 'workflow_setup' ? 'apiErrors.admin_common.not_found' : 'apiErrors.transfer_payment.approval_template_not_found'
-          )
+          if (!templateScope) {
+            return await notFound(
+              event,
+              scopedLookup.kind === 'workflow_setup' ? 'WORKFLOW_SETUP_NOT_FOUND' : 'TRANSFER_PAYMENT_APPROVAL_TEMPLATE_NOT_FOUND',
+              scopedLookup.kind === 'workflow_setup' ? 'apiErrors.admin_common.not_found' : 'apiErrors.transfer_payment.approval_template_not_found'
+            )
+          }
+
+          const templateAgencyId = String(templateScope.agencyId)
+          return {
+            scope: { type: 'agency' as const, agencyId: templateAgencyId },
+            data: templateAgencyId
+          }
         }
+      )
+      agencyId = authorizedAgencyId
+    } else {
+      await authorize(event, 'system', 'read', { type: 'global' })
+    }
 
-        const templateAgencyId = String(templateScope.agencyId)
-        return {
-          scope: { type: 'agency' as const, agencyId: templateAgencyId },
-          data: templateAgencyId
-        }
-      }
+    let baseQuery = db.selectFrom('Common_User')
+    let statsQuery = db.selectFrom('Common_User as Common_User_Stats')
+
+    if (agencyId) {
+      baseQuery = baseQuery
+        .innerJoin('user', 'user.id', 'Common_User.egcs_cn_auth_user_id')
+        .innerJoin('user_role_assignment', 'user_role_assignment.user_id', 'user.id')
+        .innerJoin('role', 'role.id', 'user_role_assignment.role_id')
+        .where('user._deleted', '=', false)
+        .where('user_role_assignment._deleted', '=', false)
+        .where('role.id', 'in', selectActiveStructuralRoleIds(db))
+        .where('role.agency_id', '=', agencyId)
+
+      statsQuery = statsQuery
+        .innerJoin('user', 'user.id', 'Common_User_Stats.egcs_cn_auth_user_id')
+        .innerJoin('user_role_assignment', 'user_role_assignment.user_id', 'user.id')
+        .innerJoin('role', 'role.id', 'user_role_assignment.role_id')
+        .where('user._deleted', '=', false)
+        .where('user_role_assignment._deleted', '=', false)
+        .where('role.id', 'in', selectActiveStructuralRoleIds(db))
+        .where('role.agency_id', '=', agencyId)
+    }
+
+    const deletedFilter = resolveUserDeletedFilter(query)
+
+    if (deletedFilter !== undefined) {
+      baseQuery = baseQuery.where('Common_User._deleted', '=', deletedFilter)
+    }
+
+    if (selectedIds) {
+      baseQuery = baseQuery.where('Common_User.id', 'in', selectedIds)
+      statsQuery = statsQuery.where('Common_User_Stats.id', 'in', selectedIds)
+    }
+
+    if (search) {
+      baseQuery = applyUserSearchFilter(baseQuery, search, 'Common_User.')
+      statsQuery = applyUserSearchFilter(statsQuery, search, 'Common_User_Stats.')
+    }
+
+    const [items, countResult, statsResult] = await Promise.all([
+      baseQuery
+        .select([
+          'Common_User.id as id',
+          'Common_User.egcs_cn_name as egcs_cn_name',
+          // Common_User currently stores a single non-localized name field; keep exposing
+          // the standard bilingual shape until separate EN/FR columns exist.
+          'Common_User.egcs_cn_name as egcs_cn_name_en',
+          'Common_User.egcs_cn_name as egcs_cn_name_fr',
+          'Common_User.egcs_cn_email as egcs_cn_email',
+          'Common_User._deleted as _deleted'
+        ])
+        .distinctOn('Common_User.id')
+        .orderBy('Common_User.id', 'asc')
+        .limit(limit)
+        .offset(offset)
+        .execute(),
+      baseQuery.select(sql<number>`count(DISTINCT "Common_User"."id")`.as('total')).executeTakeFirst(),
+      statsQuery
+        .select([
+          sql<number>`count(DISTINCT "Common_User_Stats"."id")`.as('total'),
+          sql<number>`count(DISTINCT CASE WHEN "Common_User_Stats"."_deleted" = false THEN "Common_User_Stats"."id" END)`.as('active')
+        ])
+        .executeTakeFirst()
+    ])
+
+    return buildCommonUserListResponse(
+      items,
+      countResult as CountResult | undefined,
+      statsResult as StatsResult | undefined,
+      page,
+      limit
     )
-    agencyId = authorizedAgencyId
-  } else {
-    await authorize(event, 'system', 'read', { type: 'global' })
-  }
-
-  let baseQuery = db.selectFrom('Common_User')
-  let statsQuery = db.selectFrom('Common_User as Common_User_Stats')
-
-  if (agencyId) {
-    baseQuery = baseQuery
-      .innerJoin('user', 'user.id', 'Common_User.egcs_cn_auth_user_id')
-      .innerJoin('user_role_assignment', 'user_role_assignment.user_id', 'user.id')
-      .innerJoin('role', 'role.id', 'user_role_assignment.role_id')
-      .where('user._deleted', '=', false)
-      .where('user_role_assignment._deleted', '=', false)
-      .where('role.id', 'in', selectActiveStructuralRoleIds(db))
-      .where('role.agency_id', '=', agencyId)
-
-    statsQuery = statsQuery
-      .innerJoin('user', 'user.id', 'Common_User_Stats.egcs_cn_auth_user_id')
-      .innerJoin('user_role_assignment', 'user_role_assignment.user_id', 'user.id')
-      .innerJoin('role', 'role.id', 'user_role_assignment.role_id')
-      .where('user._deleted', '=', false)
-      .where('user_role_assignment._deleted', '=', false)
-      .where('role.id', 'in', selectActiveStructuralRoleIds(db))
-      .where('role.agency_id', '=', agencyId)
-  }
-
-  const deletedFilter = resolveUserDeletedFilter(query)
-
-  if (deletedFilter !== undefined) {
-    baseQuery = baseQuery.where('Common_User._deleted', '=', deletedFilter)
-  }
-
-  if (selectedIds) {
-    baseQuery = baseQuery.where('Common_User.id', 'in', selectedIds)
-    statsQuery = statsQuery.where('Common_User_Stats.id', 'in', selectedIds)
-  }
-
-  if (search) {
-    baseQuery = applyUserSearchFilter(baseQuery, search, 'Common_User.')
-    statsQuery = applyUserSearchFilter(statsQuery, search, 'Common_User_Stats.')
-  }
-
-  const [items, countResult, statsResult] = await Promise.all([
-    baseQuery
-      .select([
-        'Common_User.id as id',
-        'Common_User.egcs_cn_name as egcs_cn_name',
-        // Common_User currently stores a single non-localized name field; keep exposing
-        // the standard bilingual shape until separate EN/FR columns exist.
-        'Common_User.egcs_cn_name as egcs_cn_name_en',
-        'Common_User.egcs_cn_name as egcs_cn_name_fr',
-        'Common_User.egcs_cn_email as egcs_cn_email',
-        'Common_User._deleted as _deleted'
-      ])
-      .distinctOn('Common_User.id')
-      .orderBy('Common_User.id', 'asc')
-      .limit(limit)
-      .offset(offset)
-      .execute(),
-    baseQuery.select(sql<number>`count(DISTINCT "Common_User"."id")`.as('total')).executeTakeFirst(),
-    statsQuery
-      .select([
-        sql<number>`count(DISTINCT "Common_User_Stats"."id")`.as('total'),
-        sql<number>`count(DISTINCT CASE WHEN "Common_User_Stats"."_deleted" = false THEN "Common_User_Stats"."id" END)`.as('active')
-      ])
-      .executeTakeFirst()
-  ])
-
-  return buildCommonUserListResponse(
-    items,
-    countResult as CountResult | undefined,
-    statsResult as StatsResult | undefined,
-    page,
-    limit
-  )
+  })
 })
