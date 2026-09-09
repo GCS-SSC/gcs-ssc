@@ -1,3 +1,4 @@
+import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 import { PositivePostgresBigintIdSchema, TransferPaymentListQuerySchema } from '~~/shared/types/schemas'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { RoleIdSchema } from '~~/shared/types/schemas/rbac'
@@ -10,24 +11,25 @@ const RoleTransferPaymentLookupQuerySchema = TransferPaymentListQuerySchema.exte
 })
 
 export default defineEventHandler(async event => {
-  const db = event.context.$db
   await requireAuthContext(event)
   const query = await getValidatedQueryI18n(event, RoleTransferPaymentLookupQuerySchema)
-  let agencyId: string
+  return await executeFreshReadSnapshot(event, async db => {
+    let agencyId: string
 
-  if (query.role_id !== undefined) {
-    const { data: role } = await authorize(event, 'role', 'update', resolveRoleScope(query.role_id, db))
-    if (!role?.agency_id) {
-      return { items: [], total: 0, page: query.page, limit: query.limit }
+    if (query.role_id !== undefined) {
+      const { data: role } = await authorize(event, 'role', 'update', resolveRoleScope(query.role_id, db))
+      if (!role?.agency_id) {
+        return { items: [], total: 0, page: query.page, limit: query.limit }
+      }
+      agencyId = String(role.agency_id)
+    } else {
+      if (query.agency_id === undefined) {
+        return await badRequest(event, 'MISSING_AGENCY_ID', 'apiErrors.request.missing_agency_id')
+      }
+      agencyId = query.agency_id
+      await authorize(event, 'role', 'create', { type: 'agency', agencyId })
     }
-    agencyId = String(role.agency_id)
-  } else {
-    if (query.agency_id === undefined) {
-      return await badRequest(event, 'MISSING_AGENCY_ID', 'apiErrors.request.missing_agency_id')
-    }
-    agencyId = query.agency_id
-    await authorize(event, 'role', 'create', { type: 'agency', agencyId })
-  }
 
-  return await listRoleLookupTransferPayments(db, agencyId, query)
+    return await listRoleLookupTransferPayments(db, agencyId, query)
+  })
 })
