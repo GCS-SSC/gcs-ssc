@@ -5,6 +5,13 @@ import type { Database } from '~~/shared/types/database'
 import { buildListRouteResponse } from '~~/server/utils/list-route-response'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { authorizeTransferPaymentProfileResource } from '~~/server/utils/transfer-payment-route-authorization'
+import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
+
+const StreamListQuerySchema = TransferPaymentListQuerySchema.extend({
+  search: TransferPaymentListQuerySchema.shape.search.refine(value => value === undefined || !value.includes('\u0000'), {
+    error: 'validation.invalid_text_character'
+  })
+})
 
 type StreamListQuery = {
   page: number
@@ -106,17 +113,18 @@ const listTransferPaymentStreams = async (
  *
  */
 export default defineEventHandler(async event => {
-  const db = event.context.$db
   const profileId = getRouterParam(event, 'id')
   if (!profileId) {
     return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')
   }
 
-  const profileAccess = await authorizeTransferPaymentProfileResource(event, 'read', profileId)
-  if (!profileAccess) {
-    return await notFound(event, 'TRANSFER_PAYMENT_PROFILE_NOT_FOUND', 'apiErrors.transfer_payment.profile_not_found')
-  }
+  return await executeFreshReadSnapshot(event, async db => {
+    const profileAccess = await authorizeTransferPaymentProfileResource(event, 'read', profileId)
+    if (!profileAccess) {
+      return await notFound(event, 'TRANSFER_PAYMENT_PROFILE_NOT_FOUND', 'apiErrors.transfer_payment.profile_not_found')
+    }
 
-  const query = await getValidatedQueryI18n(event, TransferPaymentListQuerySchema)
-  return await listTransferPaymentStreams(db, profileId, query)
+    const query = await getValidatedQueryI18n(event, StreamListQuerySchema)
+    return await listTransferPaymentStreams(db, profileId, query)
+  })
 })
