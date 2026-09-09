@@ -64,6 +64,13 @@ export const executeFreshAuthorizedTransferPaymentWrite = async <T>(
       return await db.transaction().execute(async trx => {
         const authContext = await requireFreshAuthContext(event, trx)
         await lockRegisteredExtensionAgreementScopes(trx, lockAgencyId, [])
+        const agency = await trx
+          .selectFrom('Agency_Profile')
+          .select('id')
+          .where('id', '=', lockAgencyId)
+          .where('_deleted', '=', false)
+          .forShare('Agency_Profile')
+          .executeTakeFirst()
         const profile = await trx
           .selectFrom('Transfer_Payment_Profile')
           .select('egcs_tp_agency')
@@ -83,6 +90,15 @@ export const executeFreshAuthorizedTransferPaymentWrite = async <T>(
         const currentAgencyId = String(profile.egcs_tp_agency)
         if (currentAgencyId !== lockAgencyId) {
           throw new TransferPaymentWriteScopeChanged(currentAgencyId)
+        }
+        // Resolve stale owner hints before rejecting a missing Agency. The
+        // matching active parent remains share-locked through the callback.
+        if (!agency) {
+          return await notFound(
+            event,
+            'TRANSFER_PAYMENT_PROFILE_NOT_FOUND',
+            'apiErrors.transfer_payment.profile_not_found'
+          )
         }
 
         const context = buildTransferPaymentWriteContext(profileId, currentAgencyId)
@@ -150,6 +166,13 @@ export const executeFreshAuthorizedTransferPaymentStreamWrite = async <T>(
       return await db.transaction().execute(async trx => {
         const authContext = await requireFreshAuthContext(event, trx)
         await lockRegisteredExtensionAgreementScopes(trx, lockAgencyId, [streamId])
+        const agency = await trx
+          .selectFrom('Agency_Profile')
+          .select('id')
+          .where('id', '=', lockAgencyId)
+          .where('_deleted', '=', false)
+          .forShare('Agency_Profile')
+          .executeTakeFirst()
         const profile = await trx
           .selectFrom('Transfer_Payment_Profile')
           .select('egcs_tp_agency')
@@ -169,6 +192,13 @@ export const executeFreshAuthorizedTransferPaymentStreamWrite = async <T>(
         const currentAgencyId = String(profile.egcs_tp_agency)
         if (currentAgencyId !== lockAgencyId) {
           throw new TransferPaymentWriteScopeChanged(currentAgencyId)
+        }
+        if (!agency) {
+          return await notFound(
+            event,
+            'TRANSFER_PAYMENT_PROFILE_NOT_FOUND',
+            'apiErrors.transfer_payment.profile_not_found'
+          )
         }
 
         const stream = await trx
