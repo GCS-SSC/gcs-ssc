@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AgreementProponentLookupField from './AgreementProponentLookupField.vue'
 import type { FundingCaseAgreementApplicantRecipientForm } from '~~/shared/types/funding-case-agreement-ui'
 import { FundingCaseAgreementApplicantRecipientCreateSchema } from '~~/shared/types/schemas'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
@@ -72,15 +73,12 @@ const getApplicantRecipientLookupUrl = (state: FundingCaseAgreementApplicantReci
     :search-placeholder="t('agreement.applicant_recipients.search')">
     <template #form="{ state }">
       <UFormField :label="t('agreement.applicant_recipients.applicant_recipient')" name="egcs_fc_applicantrecipient">
-        <CommonServerLookupSelect
-          :model-value="(state as FundingCaseAgreementApplicantRecipientForm).egcs_fc_applicantrecipient"
+        <AgreementProponentLookupField
+          :key="`${agreementId}:${state.id ?? 'create'}`"
+          :state="state as FundingCaseAgreementApplicantRecipientForm"
           :fetch-url="getApplicantRecipientLookupUrl(state as FundingCaseAgreementApplicantRecipientForm)"
-          value-key="id"
-          label-en-key="label_en"
-          label-fr-key="label_fr"
-          searchable
-          :aria-label="t('agreement.applicant_recipients.applicant_recipient')"
-          @update:model-value="value => (state as FundingCaseAgreementApplicantRecipientForm).egcs_fc_applicantrecipient = value as string | undefined" />
+          :label="t('agreement.applicant_recipients.applicant_recipient')"
+          @update:model-value="value => (state as FundingCaseAgreementApplicantRecipientForm).egcs_fc_applicantrecipient = value" />
       </UFormField>
     </template>
   </CommonResourceCrud>

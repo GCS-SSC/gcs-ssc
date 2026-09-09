@@ -102,7 +102,7 @@ export interface FundingCaseAgreementApplicantRecipientLookupItem {
   description_fr?: string | null
 }
 
-export type FundingCaseAgreementApplicantRecipientForm = Partial<FundingCaseAgreementApplicantRecipientItem>
+export type FundingCaseAgreementApplicantRecipientForm = Partial<FundingCaseAgreementApplicantRecipientRow>
 
 export interface FundingCaseAgreementAddressRow extends FundingCaseAgreementAddressItem {
   egcs_fc_fundingagreement: string
