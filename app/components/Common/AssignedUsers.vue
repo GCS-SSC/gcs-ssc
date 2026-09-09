@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- concise component-local action handlers are self-documenting */
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { AssignableEntityType } from '~~/shared/types/schemas'
 
@@ -25,42 +25,64 @@ const {
   status: rosterStatus,
   refresh
 } = useEntityAssignmentRoster(() => entityType, () => entityId)
+const canManage = computed(() => rosterStatus.value === 'success' && !rosterError.value
+  && roster.value?.can_manage_assignments === true)
 const users: Ref<UserOption[]> = ref([])
 const isLoadingUsers: Ref<boolean> = ref(false)
 let usersRequestGeneration = 0
-watch(baseUrl, async requestedBaseUrl => {
+let targetGeneration = 0
+let disposed = false
+const usersError: Ref<boolean> = ref(false)
+const loadUsers = async () => {
+  const requestedBaseUrl = baseUrl.value
   const requestGeneration = ++usersRequestGeneration
-  selectedUserId.value = null
   users.value = []
+  usersError.value = false
 
   isLoadingUsers.value = true
   try {
     await refresh()
-    if (requestGeneration !== usersRequestGeneration || requestedBaseUrl !== baseUrl.value) return
-    if (roster.value?.can_manage_assignments !== true) return
+    if (disposed || requestGeneration !== usersRequestGeneration || requestedBaseUrl !== baseUrl.value) return
+    if (!canManage.value) return
     const nextUsers = await fetchUserOptions(`${requestedBaseUrl}/users`)
-    if (requestGeneration !== usersRequestGeneration || requestedBaseUrl !== baseUrl.value) return
+    if (disposed || requestGeneration !== usersRequestGeneration || requestedBaseUrl !== baseUrl.value) return
     users.value = nextUsers
   } catch (error: unknown) {
-    if (requestGeneration !== usersRequestGeneration || requestedBaseUrl !== baseUrl.value) return
+    if (disposed || requestGeneration !== usersRequestGeneration || requestedBaseUrl !== baseUrl.value) return
     users.value = []
+    usersError.value = true
     showError(error)
   } finally {
     if (requestGeneration === usersRequestGeneration) isLoadingUsers.value = false
   }
-}, { immediate: true })
+}
+watch(baseUrl, () => {
+  targetGeneration++
+  isSaving.value = false
+  selectedUserId.value = null
+  void loadUsers()
+}, { immediate: true, flush: 'sync' })
+onBeforeUnmount(() => {
+  disposed = true
+  targetGeneration++
+  usersRequestGeneration++
+})
 const availableUsers = computed(() => users.value
   .filter(user => !roster.value?.assignments.some(assignment => assignment.user_id === user.id))
   .map(user => ({ label: user.name, value: user.id })))
 const assignmentCount = computed(() => roster.value?.assignments.length ?? 0)
 
 const runAction = async (action: () => Promise<unknown>, successMessage: string) => {
-  if (isSaving.value) return
+  if (disposed || isSaving.value || !canManage.value) return
+  const generation = targetGeneration
+  const isCurrent = () => !disposed && generation === targetGeneration
   isSaving.value = true
   try {
     await action()
+    if (!isCurrent()) return
     selectedUserId.value = null
     await refresh()
+    if (!isCurrent() || rosterError.value || rosterStatus.value !== 'success') return
     emit('changed')
     toast.add({
       title: t('common.success'),
@@ -68,13 +90,13 @@ const runAction = async (action: () => Promise<unknown>, successMessage: string)
       color: 'success'
     })
   } catch (error: unknown) {
-    showError(error)
+    if (isCurrent()) showError(error)
   } finally {
-    isSaving.value = false
+    if (isCurrent()) isSaving.value = false
   }
 }
 const addUser = async () => {
-  if (!selectedUserId.value) return
+  if (!selectedUserId.value || !availableUsers.value.some(user => user.value === selectedUserId.value)) return
   const userId = selectedUserId.value
   await runAction(
     () => mutateAssignment(baseUrl.value, { method: 'POST', body: { userId } }),
@@ -86,6 +108,9 @@ const promote = async (userId: string) => await runAction(
   t('assignments.primary_updated_success')
 )
 const remove = async (userId: string, name: string) => {
+  const generation = targetGeneration
+  const requestedBaseUrl = baseUrl.value
+  if (disposed || !canManage.value) return
   const confirmed = await confirm({
     title: t('assignments.remove_title'),
     description: t('assignments.remove_description', { name }),
@@ -93,7 +118,7 @@ const remove = async (userId: string, name: string) => {
     cancelLabel: t('common.cancel'),
     confirmColor: 'error'
   })
-  if (!confirmed) return
+  if (!confirmed || disposed || generation !== targetGeneration || requestedBaseUrl !== baseUrl.value) return
 
   await runAction(
     () => mutateAssignment(`${baseUrl.value}/${userId}`, { method: 'DELETE' }),
@@ -133,7 +158,7 @@ const remove = async (userId: string, name: string) => {
       :title="t('assignments.load_failed')"
       :description="t('assignments.load_failed_description')">
       <template #actions>
-        <UButton color="error" variant="soft" size="sm" icon="i-lucide-refresh-cw" :label="t('common.retry')" @click="() => refresh()" />
+        <UButton color="error" variant="soft" size="sm" icon="i-lucide-refresh-cw" :label="t('common.retry')" @click="loadUsers" />
       </template>
     </UAlert>
 
@@ -166,7 +191,7 @@ const remove = async (userId: string, name: string) => {
             {{ assignment.email }}
           </p>
         </div>
-        <div v-if="roster?.can_manage_assignments" class="flex gap-1">
+        <div v-if="canManage" class="flex gap-1">
           <UButton
             v-if="!assignment.is_primary"
             size="xs"
@@ -189,7 +214,12 @@ const remove = async (userId: string, name: string) => {
       </li>
     </ul>
 
-    <div v-if="roster?.can_manage_assignments" class="flex flex-col gap-3 rounded-sm bg-elevated p-4 sm:flex-row sm:items-end">
+    <UAlert v-if="usersError && canManage" color="error" :title="t('assignments.load_failed')">
+      <template #actions>
+        <UButton :label="t('common.retry')" :disabled="isLoadingUsers" @click="loadUsers" />
+      </template>
+    </UAlert>
+    <div v-if="canManage" class="flex flex-col gap-3 rounded-sm bg-elevated p-4 sm:flex-row sm:items-end">
       <UFormField :label="t('assignments.add_assignee')" class="min-w-0 flex-1">
         <USelectMenu
           :model-value="selectedUserId ?? undefined"
@@ -207,7 +237,7 @@ const remove = async (userId: string, name: string) => {
         icon="i-lucide-user-plus"
         :label="t('assignments.add')"
         :loading="isSaving"
-        :disabled="!selectedUserId || isSaving"
+        :disabled="!selectedUserId || isSaving || isLoadingUsers || usersError"
         @click="addUser" />
     </div>
   </section>

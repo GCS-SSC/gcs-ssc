@@ -130,7 +130,7 @@ const columns: TableColumnInput<Row>[] = [
             <div class="space-y-1">
               <CommonBilingualName :name-en="row.original.agency_name_en" :name-fr="row.original.agency_name_fr" />
               <p v-if="row.original.program_name_en && row.original.program_name_fr" class="text-xs text-muted">
-                {{ getBilingualValue(row.original, 'program', '') }}
+                {{ getBilingualValue(row.original, 'program_name', '') }}
               </p>
             </div>
           </template>
