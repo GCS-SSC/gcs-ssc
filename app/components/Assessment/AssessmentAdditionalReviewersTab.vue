@@ -159,7 +159,9 @@ const selectedReviewer: Ref<AdditionalReviewerModalState | null> = reviewerModal
 const canSaveReviewer = computed(() => {
   const selected = selectedReviewer.value
   return Boolean(selected && !runtimeLocked
-    && (!selected.id || rows.value.some(row => row.id === selected.id && row.can_update)))
+    && (selected.id
+      ? rows.value.some(row => row.id === selected.id && row.can_update)
+      : canUpdateAssessment && !reviewersDisabled))
 })
 const selectedUserOption: Ref<UserOptionItem | null> = ref(null)
 
@@ -257,7 +259,7 @@ watch(rows, value => {
  * Opens the create modal when assessment updates are allowed.
  */
 const openCreate = () => {
-  if (!canUpdateAssessment || reviewersDisabled) {
+  if (!canUpdateAssessment || reviewersDisabled || runtimeLocked) {
     return
   }
 
@@ -377,7 +379,7 @@ const deleteRow = async (rowId: string) => {
       <AssessmentSchemaSectionTitle :title="t('assessment.additional_reviewers.title')" variant="indicator">
         <template #actions>
           <UButton
-            v-if="canUpdateAssessment && !reviewersDisabled"
+            v-if="canUpdateAssessment && !reviewersDisabled && !runtimeLocked"
             color="neutral"
             variant="outline"
             icon="i-lucide-plus"
