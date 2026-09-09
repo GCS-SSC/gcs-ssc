@@ -2,6 +2,7 @@ import {
   authorizeActiveAgencySubentity,
   softDeleteActiveAgencySubentity
 } from '~~/server/utils/agency-auth'
+import { assertAgencyFiscalYearNotInUse } from '~~/server/utils/agency-fiscal-year-integrity'
 
 /**
  *  * Event handler for this server API route. Handles the incoming request payload, performs necessary business logic and authorization operations, and returns the expected endpoint response array or object.
@@ -23,7 +24,10 @@ export default defineEventHandler(async event => {
     { code: 'FISCAL_YEAR_NOT_FOUND', key: 'apiErrors.agency.fiscal_year_not_found' }
   )
   const deleted = await db.transaction().execute(async trx =>
-    await softDeleteActiveAgencySubentity(event, trx, 'Agency_Fiscal_Year', id, agencyId)
+    await softDeleteActiveAgencySubentity(
+      event, trx, 'Agency_Fiscal_Year', id, agencyId,
+      async lockedTrx => await assertAgencyFiscalYearNotInUse(event, lockedTrx, id)
+    )
   )
   if (!deleted) {
     return await notFound(event, 'FISCAL_YEAR_NOT_FOUND', 'apiErrors.agency.fiscal_year_not_found')

@@ -928,6 +928,7 @@
       "approval_behalf_type_not_found": "Approval behalf type not found.",
       "agreement_type_not_found": "Agreement type not found.",
       "agreement_type_in_use": "Remove this agreement type from all active program streams before deleting it.",
+      "fiscal_year_in_use": "This fiscal year is referenced by a program budget, agreement budget or monitor and cannot be deleted.",
       "cost_category_not_found": "Cost category not found.",
       "cost_category_in_use": "Remove all active line items before deleting this cost category.",
       "fiscal_year_not_found": "Fiscal year not found.",

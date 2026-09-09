@@ -56,7 +56,7 @@ export default defineEventHandler(async event => {
           'Agency_Fiscal_Year.egcs_ay_startdate',
           'Agency_Fiscal_Year.egcs_ay_enddate'
         ])
-        .executeTakeFirst()
+        .forShare('Agency_Fiscal_Year').executeTakeFirst()
       if (!fiscalYear) {
         return await badRequest(event, 'INVALID_AGREEMENT_BUDGET_FISCAL_YEAR', 'apiErrors.agreement.invalid_budget_fiscal_year')
       }

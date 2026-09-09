@@ -32,7 +32,7 @@ export default defineEventHandler(async event => {
         ])
         .where('Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentstream', '=', context.streamId)
         .where('Agency_Fiscal_Year.id', '=', body.egcs_fc_fiscalyear).where('Transfer_Payment_Stream_Budget._deleted', '=', false)
-        .where('Transfer_Payment_Fiscal_Year_Budget._deleted', '=', false).where('Agency_Fiscal_Year._deleted', '=', false).executeTakeFirst()
+        .where('Transfer_Payment_Fiscal_Year_Budget._deleted', '=', false).where('Agency_Fiscal_Year._deleted', '=', false).forShare('Agency_Fiscal_Year').executeTakeFirst()
       if (!fiscalYear) return await badRequest(event, 'INVALID_AGREEMENT_BUDGET_FISCAL_YEAR', 'apiErrors.agreement.invalid_budget_fiscal_year')
       const durationError = await assertFiscalYearOverlapsAmendmentDuration(event, trx, amendmentId, fiscalYear)
       if (durationError) return durationError
