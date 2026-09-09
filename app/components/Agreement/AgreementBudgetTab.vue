@@ -943,6 +943,12 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
 </template>
 
 <style scoped>
+/* Grouping expands data rows, not detail slots. Nuxt UI's empty expanded rows
+   span hidden grouping columns too, creating phantom fixed-layout columns. */
+:deep(.agreement-budget-table tbody > tr:has(> td[colspan]:empty)) {
+  display: none;
+}
+
 :deep(.agreement-budget-table) {
   min-width: 64rem;
   width: 100%;
