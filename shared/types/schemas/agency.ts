@@ -186,18 +186,23 @@ export const AgencyAddressTypeInitial: AgencyAddressTypeItem = {
 }
 
 // --- Applicant/Recipient Subtype ---
+const AgencyRecipientSubtypeNameSchema = (requiredKey: string) => AgencyLabelSchema(requiredKey)
+  .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' })
+
 export const AgencyApplicantRecipientSubtypeSchema = z.object({
   egcs_ay_applicantrecipienttype: z.enum(APPLICANT_RECIPIENT_TYPE_ENUM),
-  egcs_ay_name_en: z.string({ error: 'validation.name_en_required' }).trim().min(1, { error: 'validation.name_en_required' }),
-  egcs_ay_name_fr: z.string({ error: 'validation.name_fr_required' }).trim().min(1, { error: 'validation.name_fr_required' }),
+  egcs_ay_name_en: AgencyRecipientSubtypeNameSchema('validation.name_en_required'),
+  egcs_ay_name_fr: AgencyRecipientSubtypeNameSchema('validation.name_fr_required'),
   egcs_ay_description_en: z
     .string({ error: 'validation.desc_en_required' })
     .trim()
-    .min(1, { error: 'validation.desc_en_required' }),
+    .min(1, { error: 'validation.desc_en_required' })
+    .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' }),
   egcs_ay_description_fr: z
     .string({ error: 'validation.desc_fr_required' })
     .trim()
     .min(1, { error: 'validation.desc_fr_required' })
+    .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' })
 })
 export type AgencyApplicantRecipientSubtype = z.infer<typeof AgencyApplicantRecipientSubtypeSchema>
 export type AgencyApplicantRecipientSubtypeItem = WithId<AgencyApplicantRecipientSubtype>
