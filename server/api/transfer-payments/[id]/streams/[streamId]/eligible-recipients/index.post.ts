@@ -1,7 +1,11 @@
-import { TransferPaymentEligibleRecipientSchema } from '~~/shared/types/schemas'
+import { PositivePostgresBigintIdSchema, TransferPaymentEligibleRecipientSchema } from '~~/shared/types/schemas'
 import { throwIfTransferPaymentUniqueConstraintError } from '~~/server/utils/transfer-payment-unique-constraint-errors'
 import { authorizeTransferPaymentStreamResource } from '~~/server/utils/transfer-payment-route-authorization'
 import { executeFreshAuthorizedTransferPaymentStreamWrite } from '~~/server/utils/transfer-payment-write-transaction'
+
+const EligibleRecipientCreateSchema = TransferPaymentEligibleRecipientSchema.extend({
+  egcs_tp_applicantrecipientsubtype: PositivePostgresBigintIdSchema
+})
 
 /**
  *  * Event handler for this server API route. Handles the incoming request payload, performs necessary business logic and authorization operations, and returns the expected endpoint response array or object.
@@ -20,7 +24,7 @@ export default defineEventHandler(async event => {
 
   const access = await authorizeTransferPaymentStreamResource(event, 'create', profileId, streamId)
   if (!access) return await notFound(event, 'TRANSFER_PAYMENT_STREAM_NOT_FOUND', 'apiErrors.transfer_payment.stream_not_found')
-  const validated = await readValidatedBodyI18n(event, TransferPaymentEligibleRecipientSchema)
+  const validated = await readValidatedBodyI18n(event, EligibleRecipientCreateSchema)
 
   return await executeFreshAuthorizedTransferPaymentStreamWrite(
     event, db, profileId, access.agencyId, streamId, 'create', async (trx, context) => {
