@@ -154,6 +154,28 @@ const reviewerModal = useCrudModal<AdditionalReviewerRow, AdditionalReviewerModa
 
 const isReviewerModalOpen: Ref<boolean> = reviewerModal.isOpen
 const selectedReviewer: Ref<AdditionalReviewerModalState | null> = reviewerModal.selected
+const selectedUserOption: Ref<UserOptionItem | null> = ref(null)
+
+// Keep the selected identity readable when paging/search replaces the option list.
+watch([() => selectedReviewer.value?.egcs_cn_user, userOptions, rows], ([userId, options, reviewers]) => {
+  if (!userId) {
+    selectedUserOption.value = null
+    return
+  }
+  const option = options.find(item => String(item.id) === String(userId))
+  const reviewer = reviewers.find(item => String(item.egcs_cn_user) === String(userId))
+  if (option) selectedUserOption.value = option
+  else if (reviewer) selectedUserOption.value = { id: String(userId), name: reviewer.egcs_cn_user_name }
+  else if (selectedUserOption.value?.id !== String(userId)) selectedUserOption.value = null
+}, { immediate: true, flush: 'sync' })
+
+const retainedUserOptions = computed(() => {
+  const option = selectedUserOption.value
+  return option && !userOptions.value.some(item => String(item.id) === String(option.id))
+    ? [{ value: String(option.id), label: option.name }]
+    : []
+})
+
 const openCreateReviewer = reviewerModal.openCreate
 const openUpdateReviewer = reviewerModal.openUpdate
 /**
@@ -188,6 +210,7 @@ watch(() => reviewId, (_nextReviewId, previousReviewId) => {
   rowsResponse.value = null
   userLookupResponse.value = { items: [], total: 0, stats: { total: 0, active: 0 }, page: 1, limit: 20 }
   userSearchTerm.value = ''
+  selectedUserOption.value = null
   if (previousReviewId !== undefined) isReviewerModalOpen.value = false
   completingRowId.value = null
   deletingRowId.value = null
@@ -451,6 +474,7 @@ const deleteRow = async (rowId: string) => {
             <CommonBilingualSelectMenu
               v-model="selectedReviewer.egcs_cn_user"
               :items="userOptions"
+              :prepend-options="retainedUserOptions"
               :search-term="userSearchTerm"
               value-key="id"
               label-key="name"

@@ -1,5 +1,5 @@
 import type { H3Event } from 'h3'
-import { sql, type Kysely } from 'kysely'
+import type { Kysely } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import { requireAuthContext } from '~~/server/utils/authorize'
 import { resolveAgreementCommitmentRuntimeContext } from '~~/server/utils/agreement-commitment'
@@ -321,16 +321,25 @@ export const listAgencyScopedCommonUsersPage = async (
     const escapedSearch = escapeLikePattern(search.trim())
     query = query.where('Common_User.egcs_cn_name', 'ilike', `%${escapedSearch}%`)
   }
-  const [rows, count] = await Promise.all([
-    query.select(['Common_User.id', 'Common_User.egcs_cn_name as name'])
-      .distinctOn('Common_User.id')
-      .orderBy('Common_User.id', 'asc')
-      .limit(limit).offset((page - 1) * limit).execute(),
-    query.select(sql<number>`count(DISTINCT "Common_User"."id")`.as('total')).executeTakeFirst()
-  ])
+  // One statement keeps the page and count coherent without changing the caller's
+  // core/qualified runtime authorization transaction protocol.
+  const rows = await db
+    .with('eligible_users', () => query
+      .select(['Common_User.id', 'Common_User.egcs_cn_name as name']).distinct())
+    .with('user_page', builder => builder.selectFrom('eligible_users').selectAll()
+      .orderBy('id', 'asc').limit(limit).offset((page - 1) * limit))
+    .with('user_total', builder => builder.selectFrom('eligible_users')
+      .select(eb => eb.fn.countAll().as('total')))
+    .selectFrom('user_total')
+    .leftJoin('user_page', join => join.onTrue())
+    .select(['user_page.id', 'user_page.name', 'user_total.total'])
+    .orderBy('user_page.id', 'asc')
+    .execute()
   return {
-    items: rows.map(row => ({ id: String(row.id), name: row.name })),
-    total: Number(count?.total ?? 0)
+    items: rows.flatMap(row => row.id === null || row.name === null
+      ? []
+      : [{ id: String(row.id), name: row.name }]),
+    total: Number(rows[0]?.total ?? 0)
   }
 }
 
