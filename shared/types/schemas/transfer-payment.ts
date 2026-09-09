@@ -23,11 +23,11 @@ import { SYSTEM_LIFECYCLE, type PublicationState } from '~~/shared/constants/sys
 
 const RequiredString = () => z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' })
 /**
- * Validates only wizard-authored persisted text, using PostgreSQL character counts.
+ * Validates Stream and wizard-authored persisted text using PostgreSQL character counts.
  * @param maxCharacters Optional PostgreSQL character limit.
- * @returns Required trimmed text with wizard storage validation.
+ * @returns Required trimmed text with Stream storage validation.
  */
-const StreamWizardText = (maxCharacters?: number) => RequiredString().superRefine((value, context) => {
+const StreamStorageText = (maxCharacters?: number) => RequiredString().superRefine((value, context) => {
   if (value.includes('\u0000')) {
     context.addIssue({ code: 'custom', message: 'validation.invalid_text_character' })
   }
@@ -89,14 +89,14 @@ export type TransferPaymentProfileItem = WithId<TransferPaymentProfile>
 
 export const TransferPaymentStreamSchema = z.object({
   egcs_tp_parentstream: z.preprocess(value => value === '' ? null : value, PositivePostgresBigintIdSchema.nullable()).optional(),
-  egcs_tp_name_en: RequiredString(),
-  egcs_tp_name_fr: RequiredString(),
-  egcs_tp_description_en: RequiredString(),
-  egcs_tp_description_fr: RequiredString(),
-  egcs_tp_abbreviation_en: RequiredString(),
-  egcs_tp_abbreviation_fr: RequiredString(),
-  egcs_tp_objective_en: RequiredString(),
-  egcs_tp_objective_fr: RequiredString(),
+  egcs_tp_name_en: StreamStorageText(255),
+  egcs_tp_name_fr: StreamStorageText(255),
+  egcs_tp_description_en: StreamStorageText(),
+  egcs_tp_description_fr: StreamStorageText(),
+  egcs_tp_abbreviation_en: StreamStorageText(255),
+  egcs_tp_abbreviation_fr: StreamStorageText(255),
+  egcs_tp_objective_en: StreamStorageText(),
+  egcs_tp_objective_fr: StreamStorageText(),
   egcs_tp_allowsfurtherdistribution: z.boolean().default(false),
   egcs_tp_active: z.boolean().default(false)
 })
@@ -113,8 +113,8 @@ export type TransferPaymentStreamHoldbackBasis = z.infer<typeof TransferPaymentS
 export type TransferPaymentStreamHoldbackBasisItem = WithId<TransferPaymentStreamHoldbackBasis>
 export const TransferPaymentStreamWizardHoldbackBasisSchema = TransferPaymentStreamHoldbackBasisSchema.extend({
   egcs_tp_agencyholdback: PositivePostgresBigintIdSchema,
-  egcs_tp_name_en: StreamWizardText(255),
-  egcs_tp_name_fr: StreamWizardText(255),
+  egcs_tp_name_en: StreamStorageText(255),
+  egcs_tp_name_fr: StreamStorageText(255),
   tempId: RequiredString()
 })
 
@@ -673,8 +673,8 @@ export type TransferPaymentStreamWizardCostCategoryLineItem = z.infer<
 export const TransferPaymentStreamWizardAmendmentTypeSchema = TransferPaymentAmendmentTypeSchema.omit({
   egcs_tp_transferpaymentstream: true
 }).extend({
-  egcs_tp_name_en: StreamWizardText(255),
-  egcs_tp_name_fr: StreamWizardText(255),
+  egcs_tp_name_en: StreamStorageText(255),
+  egcs_tp_name_fr: StreamStorageText(255),
   tempId: RequiredString()
 })
 
@@ -684,10 +684,10 @@ export const TransferPaymentStreamWizardAmendmentSubtypeSchema = TransferPayment
   egcs_tp_transferpaymentstream: true,
   amendment_type_ids: true
 }).extend({
-  egcs_tp_name_en: StreamWizardText(255),
-  egcs_tp_name_fr: StreamWizardText(255),
-  egcs_tp_description_en: StreamWizardText(),
-  egcs_tp_description_fr: StreamWizardText(),
+  egcs_tp_name_en: StreamStorageText(255),
+  egcs_tp_name_fr: StreamStorageText(255),
+  egcs_tp_description_en: StreamStorageText(),
+  egcs_tp_description_fr: StreamStorageText(),
   tempId: RequiredString(),
   tempAmendmentTypeIds: z.array(RequiredString()).min(1, { error: 'validation.required' })
     .refine(ids => new Set(ids).size === ids.length, { error: 'validation.duplicate' })
@@ -709,9 +709,9 @@ export type TransferPaymentStreamWizardAgreementSubtype = z.infer<
 >
 
 export const TransferPaymentStreamWizardChartOfAccountDimensionSchema = TransferPaymentStreamChartOfAccountDimensionSchema.extend({
-  label_en: StreamWizardText(),
-  label_fr: StreamWizardText(),
-  value: StreamWizardText(),
+  label_en: StreamStorageText(),
+  label_fr: StreamStorageText(),
+  value: StreamStorageText(),
   tempId: RequiredString()
 })
 
@@ -727,16 +727,16 @@ export type TransferPaymentStreamWizardChartOfAccount = z.infer<typeof TransferP
 export const TransferPaymentStreamWizardMonitorTypeSchema = TransferPaymentMonitorTypeSchema.omit({
   egcs_tp_transferpaymentstream: true
 }).extend({
-  egcs_tp_name_en: StreamWizardText(255),
-  egcs_tp_name_fr: StreamWizardText(255),
+  egcs_tp_name_en: StreamStorageText(255),
+  egcs_tp_name_fr: StreamStorageText(255),
   tempId: RequiredString()
 })
 
 export type TransferPaymentStreamWizardMonitorType = z.infer<typeof TransferPaymentStreamWizardMonitorTypeSchema>
 
 export const TransferPaymentStreamWizardCommitmentTypeSchema = TransferPaymentStreamCommitmentTypeSchema.extend({
-  egcs_tp_name_en: StreamWizardText(255),
-  egcs_tp_name_fr: StreamWizardText(255),
+  egcs_tp_name_en: StreamStorageText(255),
+  egcs_tp_name_fr: StreamStorageText(255),
   tempId: RequiredString()
 })
 
@@ -745,10 +745,10 @@ export type TransferPaymentStreamWizardCommitmentType = z.infer<typeof TransferP
 export const TransferPaymentStreamWizardAreaOfExpertiseSchema = TransferPaymentStreamAreaOfExpertiseSchema.omit({
   egcs_tp_transferpaymentstream: true
 }).extend({
-  egcs_tp_name_en: StreamWizardText(255),
-  egcs_tp_name_fr: StreamWizardText(255),
-  egcs_tp_description_en: StreamWizardText(),
-  egcs_tp_description_fr: StreamWizardText(),
+  egcs_tp_name_en: StreamStorageText(255),
+  egcs_tp_name_fr: StreamStorageText(255),
+  egcs_tp_description_en: StreamStorageText(),
+  egcs_tp_description_fr: StreamStorageText(),
   tempId: RequiredString()
 })
 
@@ -1218,10 +1218,10 @@ export const TransferPaymentStreamWizardReviewSetupSchema = TransferPaymentStrea
   egcs_cn_order: TransferPaymentStreamReviewSetupBaseSchema.shape.egcs_cn_order
     .min(-32768, { error: 'validation.numeric_not_representable' })
     .max(32767, { error: 'validation.numeric_not_representable' }),
-  egcs_cn_name_en: StreamWizardText(255),
-  egcs_cn_name_fr: StreamWizardText(255),
-  egcs_cn_description_en: StreamWizardText(),
-  egcs_cn_description_fr: StreamWizardText(),
+  egcs_cn_name_en: StreamStorageText(255),
+  egcs_cn_name_fr: StreamStorageText(255),
+  egcs_cn_description_en: StreamStorageText(),
+  egcs_cn_description_fr: StreamStorageText(),
   tempId: RequiredString(),
   members: z.array(TransferPaymentStreamWizardReviewSetupMemberSchema)
 }).superRefine((data, ctx) => {
@@ -1235,10 +1235,10 @@ export const TransferPaymentStreamWizardReviewSetupSchema = TransferPaymentStrea
 export type TransferPaymentStreamWizardReviewSetup = z.infer<typeof TransferPaymentStreamWizardReviewSetupSchema>
 
 export const TransferPaymentStreamWizardRecommendationSetupSchema = TransferPaymentStreamRecommendationSetupBaseSchema.extend({
-  egcs_cn_name_en: StreamWizardText(255),
-  egcs_cn_name_fr: StreamWizardText(255),
-  egcs_cn_description_en: StreamWizardText(),
-  egcs_cn_description_fr: StreamWizardText(),
+  egcs_cn_name_en: StreamStorageText(255),
+  egcs_cn_name_fr: StreamStorageText(255),
+  egcs_cn_description_en: StreamStorageText(),
+  egcs_cn_description_fr: StreamStorageText(),
   tempId: RequiredString(),
   members: z.array(TransferPaymentStreamRecommendationSetupMemberSchema.extend({
     tempId: RequiredString(),
@@ -1267,16 +1267,7 @@ export type TransferPaymentStreamWizardRecommendationSetup = z.infer<
 >
 
 export const TransferPaymentStreamPolymorphicWizardSchema = z.object({
-  stream: TransferPaymentStreamSchema.extend({
-    egcs_tp_name_en: StreamWizardText(255),
-    egcs_tp_name_fr: StreamWizardText(255),
-    egcs_tp_abbreviation_en: StreamWizardText(255),
-    egcs_tp_abbreviation_fr: StreamWizardText(255),
-    egcs_tp_description_en: StreamWizardText(),
-    egcs_tp_description_fr: StreamWizardText(),
-    egcs_tp_objective_en: StreamWizardText(),
-    egcs_tp_objective_fr: StreamWizardText()
-  }),
+  stream: TransferPaymentStreamSchema,
   holdbackBases: z.array(TransferPaymentStreamWizardHoldbackBasisSchema).default([]),
   budgets: z.array(TransferPaymentStreamWizardBudgetSchema),
   eligibleRecipients: z.array(TransferPaymentStreamWizardEligibleRecipientSchema),
