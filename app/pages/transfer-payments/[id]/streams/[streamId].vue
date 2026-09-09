@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { watch } from 'vue'
+import { useLoadRecoveryFocus } from '~/composables/useLoadRecoveryFocus'
+
 definePageMeta({
   key: route => route.fullPath,
   i18n: {
@@ -53,13 +56,15 @@ const hasLoadError = computed(() =>
   || Boolean(profileError.value)
   || Boolean(streamError.value)
 )
+const { recoveryFocusTarget, focusRecoveredContent } = useLoadRecoveryFocus()
 const retryLoad = async () => {
   await Promise.all([refreshProfile(), refreshStream()])
+  if (profile.value && stream.value && !hasLoadError.value) await focusRecoveredContent()
 }
 
-watchEffect(() => {
-  if (!isNestedDetailRoute.value && hasLoadError.value) showError(profileError.value ?? streamError.value)
-})
+watch([hasLoadError, profileError, streamError, isNestedDetailRoute], ([failed, profileFailure, streamFailure, nested]) => {
+  if (!nested && failed) showError(profileFailure ?? streamFailure)
+}, { immediate: true })
 </script>
 
 <template>
@@ -101,12 +106,17 @@ watchEffect(() => {
       </template>
 
       <template #body>
-        <div class="flex flex-1 flex-col">
+        <div ref="recoveryFocusTarget" tabindex="-1" class="flex flex-1 flex-col outline-none">
           <CommonEntityHero
             :is-collapsed="isHeroCollapsed"
             icon="i-lucide-layers"
             :title="getBilingualValue(stream, 'egcs_tp_name', '')"
-            :description="getBilingualValue(stream, 'egcs_tp_description', '')" />
+            :description="getBilingualValue(stream, 'egcs_tp_description', '')"
+            :meta-items="[
+              `${t('agreement.program')}: ${getBilingualValue(profile, 'egcs_tp_name', '')}`,
+              `${t('transfer_payment.abbreviation')}: ${getBilingualValue(stream, 'egcs_tp_abbreviation', '')}`
+            ]"
+            :badges="[{ variant: stream.egcs_tp_active ? 'active' : 'inactive' }]" />
 
           <div class="flex min-h-0 flex-1 flex-col gap-6 overflow-visible px-6 pt-0 pb-6 lg:flex-row lg:gap-0">
             <aside class="w-full shrink-0 lg:w-72 lg:border-r lg:border-zinc-200 lg:pr-4 dark:lg:border-zinc-800">
