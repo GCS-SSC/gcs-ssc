@@ -65,6 +65,10 @@ const debouncedRoleSearchTerm = refDebounced(roleSearchTerm, 250)
 const usersResponse: Ref<ListResponse<UserOptionItem> | null> = ref(null)
 const rolesResponse: Ref<ListResponse<RoleOptionItem> | null> = ref(null)
 const selectedRole: Ref<RoleOptionItem | null> = ref(null)
+const rolesLoading: Ref<boolean> = ref(false)
+const rolesLoadFailed: Ref<boolean> = ref(false)
+const usersLoading: Ref<boolean> = ref(false)
+const usersLoadFailed: Ref<boolean> = ref(false)
 let roleRequestId = 0
 let userRequestId = 0
 
@@ -85,31 +89,46 @@ const fetchList = async <T,>(url: string, search: string) => {
 const refreshUsers = async () => {
   const requestId = ++userRequestId
   const search = debouncedUserSearchTerm.value
-  const response = await fetchList<UserOptionItem>('/api/users', search)
-  if (requestId === userRequestId && open.value && debouncedUserSearchTerm.value === search) {
-    usersResponse.value = response
+  usersLoading.value = true
+  usersLoadFailed.value = false
+  try {
+    const response = await fetchList<UserOptionItem>('/api/users', search)
+    if (requestId === userRequestId && open.value && debouncedUserSearchTerm.value === search) {
+      usersResponse.value = response
+    }
+  } catch {
+    if (requestId === userRequestId && open.value && debouncedUserSearchTerm.value === search) {
+      usersResponse.value = null
+      usersLoadFailed.value = true
+    }
+  } finally {
+    if (requestId === userRequestId) usersLoading.value = false
   }
 }
 
 const refreshRoles = async () => {
   const requestId = ++roleRequestId
   const userId = state.value.user_id
+  rolesLoadFailed.value = false
   if (!userId) {
     rolesResponse.value = { items: [], total: 0, page: 1, limit: 20 }
+    rolesLoading.value = false
     return
   }
   const search = debouncedRoleSearchTerm.value
-  const response = await fetchList<RoleOptionItem>(
-    `/api/users/${userId}/assignable-roles`,
-    search
-  )
-  if (
-    requestId === roleRequestId
-    && open.value
-    && state.value.user_id === userId
-    && debouncedRoleSearchTerm.value === search
-  ) {
-    rolesResponse.value = response
+  rolesLoading.value = true
+  try {
+    const response = await fetchList<RoleOptionItem>(`/api/users/${userId}/assignable-roles`, search)
+    if (requestId === roleRequestId && open.value && state.value.user_id === userId && debouncedRoleSearchTerm.value === search) {
+      rolesResponse.value = response
+    }
+  } catch {
+    if (requestId === roleRequestId && open.value && state.value.user_id === userId && debouncedRoleSearchTerm.value === search) {
+      rolesResponse.value = null
+      rolesLoadFailed.value = true
+    }
+  } finally {
+    if (requestId === roleRequestId) rolesLoading.value = false
   }
 }
 
@@ -208,6 +227,7 @@ watch(
 )
 
 const onSubmit = () => {
+  if (rolesLoading.value || rolesLoadFailed.value || pending || submitDisabled) return
   if (!state.value.role_id) {
     roleRequiredError.value = true
     return
@@ -232,22 +252,32 @@ const onSubmit = () => {
           <CommonBilingualSelectMenu
             v-model="state.user_id"
             :items="usersResponse?.items"
+            :disabled="usersLoading || usersLoadFailed"
             :search-term="userSearchTerm"
             value-key="id"
             label-key="name"
             searchable
             @update:search-term="userSearchTerm = $event" />
+          <div v-if="usersLoadFailed" role="alert" class="mt-2 space-y-2">
+            <p>{{ t('common.lookup_load_failed') }}</p>
+            <UButton :label="t('common.retry')" variant="outline" @click="refreshUsers" />
+          </div>
         </UFormField>
         <UFormField :label="t('role.assignment.role')" name="role_id">
           <CommonBilingualSelectMenu
             v-model="state.role_id"
             :items="roleItems"
+            :disabled="rolesLoading || rolesLoadFailed"
             :search-term="roleSearchTerm"
             value-key="id"
             label-en-key="name_en"
             label-fr-key="name_fr"
             searchable
             @update:search-term="roleSearchTerm = $event" />
+          <div v-if="rolesLoadFailed" role="alert" class="mt-2 space-y-2">
+            <p>{{ t('common.lookup_load_failed') }}</p>
+            <UButton :label="t('common.retry')" variant="outline" @click="refreshRoles" />
+          </div>
           <p v-if="roleRequiredError" class="text-error mt-1 text-sm">
             {{ t('validation.required') }}
           </p>
@@ -257,7 +287,7 @@ const onSubmit = () => {
         </UFormField>
         <div class="flex justify-end gap-2 pt-4">
           <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="open = false" />
-          <CommonSaveButton :label="submitLabel" :loading="pending" :disabled="submitDisabled || pending" />
+          <CommonSaveButton :label="submitLabel" :loading="pending" :disabled="submitDisabled || pending || rolesLoading || rolesLoadFailed" />
         </div>
       </UForm>
     </template>
