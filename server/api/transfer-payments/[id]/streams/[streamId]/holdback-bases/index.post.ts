@@ -1,4 +1,4 @@
-import { TransferPaymentStreamHoldbackBasisSchema } from '~~/shared/types/schemas'
+import { TransferPaymentStreamHoldbackBasisCreateSchema } from '~~/shared/types/schemas'
 import { authorize } from '~~/server/utils/authorize'
 import { authorizeTransferPaymentStreamResource, createTransferPaymentScopedAuthorizeHandler } from '~~/server/utils/transfer-payment-route-authorization'
 import { executeFreshAuthorizedTransferPaymentStreamWrite } from '~~/server/utils/transfer-payment-write-transaction'
@@ -12,7 +12,7 @@ export default defineEventHandler(async event => {
   const context = await authorizeTransferPaymentStreamResource(event, 'create', profileId, streamId)
   if (!context) return await notFound(event, 'TRANSFER_PAYMENT_STREAM_NOT_FOUND', 'apiErrors.transfer_payment.stream_not_found')
   await authorize(event, 'transfer_payment', 'create', createTransferPaymentScopedAuthorizeHandler('create', context.scope, db))
-  const body = await readValidatedBodyI18n(event, TransferPaymentStreamHoldbackBasisSchema)
+  const body = await readValidatedBodyI18n(event, TransferPaymentStreamHoldbackBasisCreateSchema)
   return await executeFreshAuthorizedTransferPaymentStreamWrite(
     event, db, profileId, context.agencyId, streamId, 'create', async (trx, freshContext) => {
       const agencyBasis = await trx.selectFrom('Agency_Holdback_Basis').select('id')

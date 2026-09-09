@@ -2,11 +2,11 @@
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
-import { watch } from 'vue'
+import { onBeforeUnmount, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 import type { AgencyHoldbackBasisItem, TransferPaymentStreamHoldbackBasisItem } from '~~/shared/types/schemas'
-import { TransferPaymentStreamHoldbackBasisSchema } from '~~/shared/types/schemas'
+import { TransferPaymentStreamHoldbackBasisCreateSchema } from '~~/shared/types/schemas'
 
 interface HoldbackBasisRow extends TransferPaymentStreamHoldbackBasisItem, Record<string, unknown> {
   agency_holdback_name_en?: string
@@ -49,7 +49,7 @@ const isOpen: Ref<boolean> = modal.isOpen
 const selected: Ref<Partial<TransferPaymentStreamHoldbackBasisItem> | null> = modal.selected
 const pending = useCrudModalPending(modal.captureSession)
 const isSaving = pending.isPending
-const validate = createValidator(TransferPaymentStreamHoldbackBasisSchema)
+const validate = createValidator(TransferPaymentStreamHoldbackBasisCreateSchema)
 const { getBilingualValue } = useBilingualValue()
 const getActionTarget = (row: HoldbackBasisRow) =>
   `${getBilingualValue(row, 'egcs_tp_name', String(row.id))} [${row.id}]`
@@ -57,14 +57,26 @@ const openCreate = () => {
   if (canCreateChild) modal.openCreate()
 }
 
-watch([() => transferPaymentId, () => streamId], () => modal.close())
+let contextGeneration = 0
+let disposed = false
+const isCurrentContext = (generation: number) => !disposed && generation === contextGeneration
+watch([() => transferPaymentId, () => streamId], () => {
+  contextGeneration += 1
+  modal.close()
+}, { flush: 'sync' })
+onBeforeUnmount(() => {
+  disposed = true
+  contextGeneration += 1
+})
 
 /** Persists the selected stream holdback basis and refreshes the table. */
 const save = async () => {
-  if (!selected.value || (!selected.value.id && !canCreateChild) || (selected.value.id && !canUpdateChild)) return
+  if (disposed || !selected.value || (!selected.value.id && !canCreateChild) || (selected.value.id && !canUpdateChild)) return
   const session = modal.captureSession()
   if (!pending.begin(session)) return
   const isUpdate = Boolean(selected.value.id)
+  const generation = contextGeneration
+  let closedSession = false
   try {
     const url = fetchUrl.value
     const response = await fetch(getClientRequestUrl(isUpdate ? `${url}/${selected.value.id}` : url), {
@@ -73,19 +85,21 @@ const save = async () => {
       body: JSON.stringify(selected.value)
     })
     if (!response.ok) await throwFetchResponseError(response)
-    if (!modal.closeSession(session)) return
+    if (!isCurrentContext(generation)) return
+    closedSession = modal.closeSession(session)
   } catch (error: unknown) {
-    if (modal.captureSession() === session) showError(error)
+    if (isCurrentContext(generation) && modal.captureSession() === session) showError(error)
     return
   } finally {
     pending.end(session)
   }
 
-  toast.add({ title: t('common.success'), description: t(isUpdate ? 'common.updated_success' : 'common.added_success'), color: 'success' })
   try {
     await refresh()
+    if (!isCurrentContext(generation) || !closedSession || modal.captureSession() !== null || status.value !== 'success') return
+    toast.add({ title: t('common.success'), description: t(isUpdate ? 'common.updated_success' : 'common.added_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (isCurrentContext(generation)) showError(error)
   }
 }
 
@@ -110,11 +124,25 @@ const remove = async (row: HoldbackBasisRow) => {
   }
 }
 
-const { data: agencyHoldbackResponse } = await useAgencyReferenceData<AgencyHoldbackBasisItem>({
+const { data: agencyHoldbackResponse, error: agencyHoldbackError, refresh: refreshAgencyHoldbacks } = await useAgencyReferenceData<AgencyHoldbackBasisItem>({
   agencyId,
-  buildUrl: id => `/api/agency/${id}/holdback-bases`,
+  buildUrl: () => `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/lookups/holdback-bases`,
   query: { page: 1, limit: 100 }
 })
+const isRetryingAgencyHoldbacks: Ref<boolean> = ref(false)
+
+/** Retries the selected Stream reference catalogue without clearing the current draft. */
+const retryAgencyHoldbacks = async () => {
+  if (isRetryingAgencyHoldbacks.value) return
+  isRetryingAgencyHoldbacks.value = true
+  try {
+    await refreshAgencyHoldbacks()
+  } catch (error: unknown) {
+    showError(error)
+  } finally {
+    isRetryingAgencyHoldbacks.value = false
+  }
+}
 </script>
 
 <template>
@@ -148,6 +176,18 @@ const { data: agencyHoldbackResponse } = await useAgencyReferenceData<AgencyHold
   <UModal v-if="selected && (selected.id ? canUpdateChild : canCreateChild)" v-model:open="isOpen" :title="selected.id ? t('common.update') : t('common.add')">
     <template #body>
       <UForm :state="selected" :validate="validate" class="space-y-4" @submit="save">
+        <div v-if="agencyHoldbackError" role="alert" class="flex flex-wrap items-center gap-2 text-sm text-error">
+          <span>{{ t('common.lookup_load_failed') }}</span>
+          <UButton
+            type="button"
+            color="neutral"
+            variant="outline"
+            size="xs"
+            icon="i-lucide-refresh-cw"
+            :label="t('common.retry')"
+            :loading="isRetryingAgencyHoldbacks"
+            @click="retryAgencyHoldbacks" />
+        </div>
         <TransferPaymentFieldsTransferPaymentStreamHoldbackBasisFields
           :model="selected"
           :agency-holdback-bases="agencyHoldbackResponse?.items" />

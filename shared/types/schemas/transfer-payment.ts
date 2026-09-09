@@ -117,10 +117,12 @@ export const TransferPaymentStreamHoldbackBasisSchema = z.object({
 })
 export type TransferPaymentStreamHoldbackBasis = z.infer<typeof TransferPaymentStreamHoldbackBasisSchema>
 export type TransferPaymentStreamHoldbackBasisItem = WithId<TransferPaymentStreamHoldbackBasis>
-export const TransferPaymentStreamWizardHoldbackBasisSchema = TransferPaymentStreamHoldbackBasisSchema.extend({
+export const TransferPaymentStreamHoldbackBasisCreateSchema = TransferPaymentStreamHoldbackBasisSchema.extend({
   egcs_tp_agencyholdback: PositivePostgresBigintIdSchema,
   egcs_tp_name_en: StreamStorageText(255),
-  egcs_tp_name_fr: StreamStorageText(255),
+  egcs_tp_name_fr: StreamStorageText(255)
+})
+export const TransferPaymentStreamWizardHoldbackBasisSchema = TransferPaymentStreamHoldbackBasisCreateSchema.extend({
   tempId: RequiredString()
 })
 
