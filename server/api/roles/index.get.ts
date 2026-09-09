@@ -1,3 +1,4 @@
+import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 /* eslint-disable jsdoc/require-jsdoc -- Query-construction callbacks are local and covered by route tests. */
 import type { H3Event } from 'h3'
 import { PaginationSchema } from '~~/shared/types/schemas'
@@ -84,8 +85,7 @@ const attachRoleListDetails = <Role extends RoleListRow>(
   }
 })
 
-export default defineEventHandler(async event => {
-  const db = event.context.$db
+export default defineEventHandler(async event => await executeFreshReadSnapshot(event, async db => {
   const { agencyIds = [], hasGlobalAccess = false } = await authorize(
     event,
     'role',
@@ -98,7 +98,7 @@ export default defineEventHandler(async event => {
   }
 
   return await listRolesForScopes(event, db, agencyIds)
-})
+}))
 
 /**
  * Lists roles filtered by agency scopes.
