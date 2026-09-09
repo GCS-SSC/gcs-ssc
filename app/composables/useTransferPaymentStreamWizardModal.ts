@@ -194,21 +194,6 @@ export const useTransferPaymentStreamWizardModal = ({
   })
 
   const {
-    data: parentStreamsResponse,
-    error: parentStreamsError,
-    refresh: refreshParentStreams
-  } = useFetch<{
-    items: Array<{ id: string, egcs_tp_name_en: string, egcs_tp_name_fr: string }>
-  }, FetchError, string>(`/api/transfer-payments/${programId}/streams`, {
-    query: {
-      page: 1,
-      limit: 100
-    },
-    immediate: false
-  })
-  const parentStreams = computed(() => parentStreamsResponse.value?.items ?? [])
-
-  const {
     data: budgetsResponse,
     error: budgetsError,
     refresh: refreshBudgets
@@ -620,7 +605,6 @@ export const useTransferPaymentStreamWizardModal = ({
 
     try {
       await Promise.all([
-        refreshParentStreams(),
         refreshBudgets(),
         refreshApplicantRecipientOptions(),
         refreshLineItemOptions(),
@@ -628,8 +612,7 @@ export const useTransferPaymentStreamWizardModal = ({
         refreshAgencyHoldbackOptions()
       ])
 
-      const requestError = parentStreamsError.value
-        ?? budgetsError.value
+      const requestError = budgetsError.value
         ?? applicantRecipientError.value
         ?? lineItemError.value
         ?? agreementTypeError.value
@@ -705,7 +688,6 @@ export const useTransferPaymentStreamWizardModal = ({
     prevStep,
     errorsByStep,
     currentStepErrors,
-    parentStreams,
     budgets,
     budgetLabelById,
     chartOfAccountBudgetOptions,

@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import type { TransferPaymentStream } from '~~/shared/types/schemas'
+import type { TransferPaymentStreamItem } from '~~/shared/types/schemas'
 
-const model = defineModel<Partial<TransferPaymentStream>>('model', { required: true })
+const model = defineModel<Partial<TransferPaymentStreamItem>>('model', { required: true })
 
 const {
-  parentStreams = [],
+  programId,
   namePrefix = '',
   isStacked = false
 } = defineProps<{
-  parentStreams?: Array<{ id: string; egcs_tp_name_en: string; egcs_tp_name_fr: string }>
+  programId: string
   namePrefix?: string
   isStacked?: boolean
 }>()
@@ -37,14 +37,18 @@ const field = useFormFieldPath(() => namePrefix)
   </div>
 
   <UFormField :label="t('transfer_payment.parent_stream')" :name="field('egcs_tp_parentstream')">
-    <CommonBilingualSelectMenu
-      v-model="model.egcs_tp_parentstream"
-      :items="parentStreams"
+    <CommonServerLookupSelect
+      :model-value="model.egcs_tp_parentstream ?? undefined"
+      :fetch-url="`/api/transfer-payments/${programId}/streams`"
+      :selected-fetch-url="model.egcs_tp_parentstream ? `/api/transfer-payments/${programId}/streams/${model.egcs_tp_parentstream}` : undefined"
       value-key="id"
       label-en-key="egcs_tp_name_en"
       label-fr-key="egcs_tp_name_fr"
-      :prepend-options="[{ label: t('common.none'), value: null }]"
-      searchable />
+      :prepend-items="[{ label: t('common.none'), value: '' }]"
+      :placeholder="t('common.none')"
+      :show-value-in-label="false"
+      :exclude-values="model.id ? [model.id] : []"
+      @update:model-value="model.egcs_tp_parentstream = $event ?? null" />
   </UFormField>
 
   <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }">

@@ -2,11 +2,11 @@
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
-import { watch } from 'vue'
+import { onBeforeUnmount, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 import { appRouteLocations } from '~/utils/route-locations'
-import type { TransferPaymentStreamItem } from '~~/shared/types/schemas'
+import type { TransferPaymentStreamItem, TransferPaymentStreamPolymorphicWizard } from '~~/shared/types/schemas'
 import type { TransferPaymentStreamRow } from '~~/shared/types/transfer-payment-ui'
 
 const { programId, agencyId, canUpdateChild, canDeleteChild } = defineProps<{
@@ -43,8 +43,16 @@ const {
 })
 const { isStreamWizardOpen, isSavingStreamWizard, saveStreamWizard } = useTransferPaymentStreamWizard(
   () => programId,
-  refreshStreams
+  async () => {
+    await refreshStreams()
+    return streamStatusState.value === 'success'
+  }
 )
+
+const submitStreamWizard = async (data: TransferPaymentStreamPolymorphicWizard) => {
+  if (disposed || !canUpdateChild) return
+  await saveStreamWizard(data)
+}
 
 const streamColumns: TableColumnInput<TransferPaymentStreamRow>[] = [
   { id: 'name', accessorKey: 'egcs_tp_name_en', headerKey: 'transfer_payment.name_en' },
@@ -60,27 +68,9 @@ const streamBilingualColumns: BilingualColumnConfig<TransferPaymentStreamRow>[] 
   { id: 'parent', accessorKey: { en: 'parent_name_en', fr: 'parent_name_fr' } }
 ]
 
-const streamOptionsResponse: Ref<{ items: TransferPaymentStreamRow[] }> = ref({ items: [] })
-const streamOptionsStatus = ref<'idle' | 'pending' | 'success' | 'error'>('idle')
-/**
- *
- */
-const refreshStreamOptions = async () => {
-  streamOptionsStatus.value = 'pending'
-  try {
-    const requestUrl = getClientRequestUrl(`/api/transfer-payments/${programId}/streams`)
-    requestUrl.searchParams.set('page', '1')
-    requestUrl.searchParams.set('limit', '100')
-    const response = await fetch(requestUrl)
-    if (!response.ok) await throwFetchResponseError(response)
-    streamOptionsResponse.value = await response.json() as { items: TransferPaymentStreamRow[] }
-    streamOptionsStatus.value = 'success'
-  } catch (error) {
-    streamOptionsStatus.value = 'error'
-    throw error
-  }
-}
-await refreshStreamOptions()
+let contextGeneration = 0
+let disposed = false
+const isCurrentContext = (generation: number) => !disposed && generation === contextGeneration
 
 const streamModal = useCrudModal<TransferPaymentStreamRow, Partial<TransferPaymentStreamItem>>({
   createState: () => ({ egcs_tp_allowsfurtherdistribution: false, egcs_tp_active: false }),
@@ -90,9 +80,14 @@ const streamModal = useCrudModal<TransferPaymentStreamRow, Partial<TransferPayme
 const isStreamModalOpen: Ref<boolean> = streamModal.isOpen
 const selectedStream: Ref<Partial<TransferPaymentStreamItem> | null> = streamModal.selected
 const openCreateStream = () => {
-  if (canUpdateChild && streamOptionsStatus.value === 'success') streamModal.openCreate()
+  if (!disposed && canUpdateChild) streamModal.openCreate()
 }
-const openUpdateStream = streamModal.openUpdate
+/** @param stream - Current table row to edit. */
+const openUpdateStream = (stream: TransferPaymentStreamRow) => {
+  if (disposed || !canUpdateChild) return
+  const current = streams.value.find(row => String(row.id) === String(stream.id))
+  if (current) streamModal.openUpdate(current)
+}
 const streamPending = useCrudModalPending(streamModal.captureSession)
 const isSavingStream = streamPending.isPending
 
@@ -102,40 +97,45 @@ const isSavingStream = streamPending.isPending
  * Corrects the parent stream reference, closes the modal, refreshes data, and provides success feedback.
  */
 const saveStream = async () => {
-  if (!selectedStream.value || !canUpdateChild) return
+  if (disposed || !selectedStream.value || !canUpdateChild) return
   const session = streamModal.captureSession()
   if (!streamPending.begin(session)) return
+  const generation = contextGeneration
+  const requestedProgramId = programId
   const payload = {
     ...selectedStream.value,
     egcs_tp_parentstream: selectedStream.value.egcs_tp_parentstream || null
   }
-  const isUpdate = Boolean(selectedStream.value.id)
+  const isUpdate = Boolean(payload.id)
+  let closedSession = false
   try {
-    const response = await fetch(getClientRequestUrl(selectedStream.value.id
-      ? `/api/transfer-payments/${programId}/streams/${selectedStream.value.id}`
-      : `/api/transfer-payments/${programId}/streams`), {
-      method: selectedStream.value.id ? 'PATCH' : 'POST',
+    const response = await fetch(getClientRequestUrl(payload.id
+      ? `/api/transfer-payments/${requestedProgramId}/streams/${payload.id}`
+      : `/api/transfer-payments/${requestedProgramId}/streams`), {
+      method: isUpdate ? 'PATCH' : 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload)
     })
     if (!response.ok) await throwFetchResponseError(response)
-    if (!streamModal.closeSession(session)) return
+    if (!isCurrentContext(generation)) return
+    closedSession = streamModal.closeSession(session)
   } catch (error: unknown) {
-    if (streamModal.captureSession() === session) showError(error)
+    if (isCurrentContext(generation) && streamModal.captureSession() === session) showError(error)
     return
   } finally {
     streamPending.end(session)
   }
 
-  toast.add({
-    title: t('common.success'),
-    description: t(isUpdate ? 'common.updated_success' : 'common.added_success'),
-    color: 'success'
-  })
   try {
-    await Promise.all([refreshStreams(), refreshStreamOptions()])
+    await refreshStreams()
+    if (!isCurrentContext(generation) || !closedSession || streamModal.captureSession() !== null || streamStatusState.value === 'error') return
+    toast.add({
+      title: t('common.success'),
+      description: t(isUpdate ? 'common.updated_success' : 'common.added_success'),
+      color: 'success'
+    })
   } catch (error: unknown) {
-    showError(error)
+    if (isCurrentContext(generation)) showError(error)
   }
 }
 
@@ -147,29 +147,28 @@ const saveStream = async () => {
  * @param {TransferPaymentStreamRow} stream - The stream record to be deleted.
  */
 const deleteStream = async (stream: TransferPaymentStreamRow) => {
+  if (disposed || !canDeleteChild || !streams.value.some(row => String(row.id) === String(stream.id))) return
+  const generation = contextGeneration
+  const requestedProgramId = programId
   try {
-    const ok = await confirmDeleteRequest(`/api/transfer-payments/${programId}/streams/${stream.id}`)
-    if (!ok) return
+    const ok = await confirmDeleteRequest(`/api/transfer-payments/${requestedProgramId}/streams/${stream.id}`)
+    if (!ok || !isCurrentContext(generation)) return
+    await refreshStreams()
+    if (!isCurrentContext(generation) || streamStatusState.value === 'error') return
     toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
-    return
-  }
-  try {
-    await Promise.all([refreshStreams(), refreshStreamOptions()])
-  } catch (error: unknown) {
-    showError(error)
+    if (isCurrentContext(generation)) showError(error)
   }
 }
 
-watch(() => programId, async () => {
+watch(() => programId, () => {
+  contextGeneration += 1
   streamModal.close()
   isStreamWizardOpen.value = false
-  try {
-    await refreshStreamOptions()
-  } catch (error: unknown) {
-    showError(error)
-  }
+}, { flush: 'sync' })
+onBeforeUnmount(() => {
+  disposed = true
+  contextGeneration += 1
 })
 </script>
 
@@ -185,7 +184,7 @@ watch(() => programId, async () => {
       :total-records="streamTotal"
       :loading="streamStatusState === 'pending'"
       :request-status="streamStatusState"
-      :show-button="canUpdateChild && streamOptionsStatus === 'success'"
+      :show-button="canUpdateChild"
       :button-label="t('common.add')"
       @add="openCreateStream"
       @retry="refreshStreams">
@@ -202,7 +201,7 @@ watch(() => programId, async () => {
           icon="i-lucide-wand-sparkles"
           color="neutral"
           variant="outline"
-          :disabled="!canUpdateChild || streamOptionsStatus !== 'success'"
+          :disabled="!canUpdateChild"
           @click="isStreamWizardOpen = true" />
       </template>
 
@@ -251,16 +250,17 @@ watch(() => programId, async () => {
       v-model:state="selectedStream"
       :title="selectedStream.id ? t('common.update') : t('common.add')"
       :submit-label="selectedStream.id ? t('common.update') : t('common.add')"
-      :parent-streams="streamOptionsResponse?.items || []"
+      :program-id="programId"
       :pending="isSavingStream"
       @submit="saveStream" />
 
     <TransferPaymentStreamWizardModal
       v-if="canUpdateChild"
+      :key="programId"
       v-model:open="isStreamWizardOpen"
       :program-id="programId"
       :agency-id="agencyId"
       :pending="isSavingStreamWizard"
-      @submit="saveStreamWizard" />
+      @submit="submitStreamWizard" />
   </div>
 </template>

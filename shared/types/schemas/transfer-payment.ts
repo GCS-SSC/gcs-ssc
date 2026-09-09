@@ -74,7 +74,7 @@ export type TransferPaymentProfile = z.infer<typeof TransferPaymentProfileSchema
 export type TransferPaymentProfileItem = WithId<TransferPaymentProfile>
 
 export const TransferPaymentStreamSchema = z.object({
-  egcs_tp_parentstream: z.coerce.string().optional().nullable(),
+  egcs_tp_parentstream: z.preprocess(value => value === '' ? null : value, PositivePostgresBigintIdSchema.nullable()).optional(),
   egcs_tp_name_en: RequiredString(),
   egcs_tp_name_fr: RequiredString(),
   egcs_tp_description_en: RequiredString(),

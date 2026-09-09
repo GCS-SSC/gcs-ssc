@@ -93,7 +93,7 @@ const deleteScope = (
   path: [{ type: 'transfer_payment', id: profileId }]
 })
 
-/** Soft-deletes a transfer-payment profile after locking authorization, extension, stream, and profile scope. */
+/** Soft-deletes a transfer-payment profile after locking authorization, extension, profile, and stream scope. */
 export default defineEventHandler(async event => {
   const db = event.context.$db
   const profileId = getRouterParam(event, 'id')
@@ -126,8 +126,6 @@ export default defineEventHandler(async event => {
           .where('_deleted', '=', false)
           .forShare('Agency_Profile')
           .executeTakeFirst()
-        await lockTransferPaymentStreams(trx, lockContext.streamIds)
-
         const profile = await trx
           .selectFrom('Transfer_Payment_Profile')
           .select('id')
@@ -138,6 +136,9 @@ export default defineEventHandler(async event => {
         if (!profile) {
           return await notFound(event, 'TRANSFER_PAYMENT_PROFILE_NOT_FOUND', 'apiErrors.transfer_payment.profile_not_found')
         }
+
+        // Match Stream writers: lock the Program before any of its Streams.
+        await lockTransferPaymentStreams(trx, lockContext.streamIds)
 
         const currentContext = await resolveDeleteContext(trx, profileId)
         if (!currentContext) {

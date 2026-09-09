@@ -28,7 +28,6 @@ const {
   prevStep,
   errorsByStep,
   currentStepErrors,
-  parentStreams,
   budgets,
   chartOfAccountBudgetOptions,
   applicantRecipientOptions,
@@ -128,7 +127,7 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentStreamPolymorphicWizard>
             <div v-if="slotProps.currentStep === 'general'" class="space-y-4">
               <TransferPaymentFieldsTransferPaymentStreamFields
                 :model="state.stream"
-                :parent-streams="parentStreams"
+                :program-id="programId"
                 is-stacked
                 name-prefix="stream" />
             </div>
