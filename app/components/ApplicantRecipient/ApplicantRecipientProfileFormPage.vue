@@ -1,19 +1,21 @@
 <script setup lang="ts">
 import { ApplicantRecipientProfileSchema } from '~~/shared/types/schemas'
-import type { ApplicantRecipientProfileForm } from '~~/shared/types/applicant-recipient-ui'
+import type { ApplicantRecipientProfileForm, ApplicantRecipientProfileRow } from '~~/shared/types/applicant-recipient-ui'
 
 const {
   submitLabel,
   cancelLabel,
   leadAgencyPermissionAction,
   compact = false,
-  pending = false
+  pending = false,
+  persistedProfile
 } = defineProps<{
   submitLabel: string
   cancelLabel: string
   leadAgencyPermissionAction: 'create' | 'update'
   compact?: boolean
   pending?: boolean
+  persistedProfile?: ApplicantRecipientProfileRow
 }>()
 
 const model = defineModel<ApplicantRecipientProfileForm>('model', { required: true })
@@ -35,6 +37,7 @@ const onSubmit = () => {
     <UForm :state="model" :validate="validate" class="space-y-8" @submit="onSubmit">
       <ApplicantRecipientFieldsApplicantRecipientProfileFields
         v-model:model="model"
+        :persisted-profile="persistedProfile"
         :lead-agency-permission-action="leadAgencyPermissionAction" />
 
       <div class="flex flex-col-reverse justify-end gap-3 border-t border-zinc-200 pt-6 sm:flex-row dark:border-zinc-800">

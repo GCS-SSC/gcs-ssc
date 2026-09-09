@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { ApplicantRecipientProfileForm } from '~~/shared/types/applicant-recipient-ui'
 
@@ -43,6 +43,10 @@ const {
 
 const selectedProfile: Ref<ApplicantRecipientDetailForm | null> = ref(null)
 const isSaving: Ref<boolean> = ref(false)
+let disposed = false
+onBeforeUnmount(() => {
+  disposed = true
+})
 const hasLoadError = computed(() => Boolean(error.value) || status.value === 'error')
 const isLoadingProfile = computed(() => status.value === 'pending' && !profile.value)
 const isGeneralTab = computed(() => selectedTab.value === 'general')
@@ -60,7 +64,7 @@ watch(profile, value => {
  * Saves applicant recipient changes from the inline edit view and refreshes the detail page.
  */
 const submit = async () => {
-  if (!selectedProfile.value || isSaving.value) {
+  if (disposed || !selectedProfile.value || !profile.value?.can_update || isSaving.value) {
     return
   }
 
@@ -82,7 +86,9 @@ const submit = async () => {
     })
     if (!response.ok) await throwFetchResponseError(response)
 
+    if (disposed) return
     await refreshProfile()
+    if (disposed) return
 
     toast.add({
       title: t('common.success'),
@@ -90,7 +96,7 @@ const submit = async () => {
       color: 'success'
     })
   } catch (caughtError: unknown) {
-    showError(caughtError)
+    if (!disposed) showError(caughtError)
   } finally {
     isSaving.value = false
   }
@@ -173,6 +179,7 @@ const retryProfile = async () => {
             <ApplicantRecipientProfileFormPage
               v-if="isGeneralTab && selectedProfile && profile.can_update"
               v-model:model="selectedProfile"
+              :persisted-profile="profile"
               :submit-label="t('common.update')"
               :cancel-label="t('common.cancel')"
               :pending="isSaving"

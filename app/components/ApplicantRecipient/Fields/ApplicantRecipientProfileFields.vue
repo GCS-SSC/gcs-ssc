@@ -1,18 +1,30 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- local field helpers are self-documenting and not public APIs */
 import { computed, watch } from 'vue'
-import type { ApplicantRecipientProfileForm } from '~~/shared/types/applicant-recipient-ui'
+import type { ApplicantRecipientProfileForm, ApplicantRecipientProfileRow } from '~~/shared/types/applicant-recipient-ui'
 
 const model = defineModel<ApplicantRecipientProfileForm>('model', { required: true })
 const {
   namePrefix = '',
-  leadAgencyPermissionAction = 'update'
+  leadAgencyPermissionAction = 'update',
+  persistedProfile
 } = defineProps<{
   namePrefix?: string
   leadAgencyPermissionAction?: 'create' | 'update'
+  persistedProfile?: ApplicantRecipientProfileRow
 }>()
 
 const { t } = useI18n()
+const { getBilingualValue } = useBilingualValue()
+const retainedSubtypeOptions = computed(() => {
+  if (!persistedProfile || model.value.id !== persistedProfile.id
+    || model.value.egcs_ar_leadagency !== persistedProfile.egcs_ar_leadagency
+    || model.value.egcs_ar_applicantrecipientsubtypes !== persistedProfile.egcs_ar_applicantrecipientsubtypes) return []
+  return [{
+    value: persistedProfile.egcs_ar_applicantrecipientsubtypes,
+    label: getBilingualValue(persistedProfile, 'subtype_name', String(persistedProfile.egcs_ar_applicantrecipientsubtypes))
+  }]
+})
 const field = useFormFieldPath(() => namePrefix)
 
 const bilingualErrorPattern = (fieldBase: 'egcs_ar_legalname' | 'egcs_ar_operatingname' | 'egcs_ar_description') => {
@@ -121,6 +133,7 @@ watch(() => model.value?.egcs_ar_leadagency, (currentAgencyId, previousAgencyId)
         <CommonServerLookupSelect
           v-model="model.egcs_ar_applicantrecipientsubtypes"
           fetch-url="/api/applicant-recipients/lookups/subtypes"
+          :prepend-items="retainedSubtypeOptions"
           :query="{
             agency_id: model.egcs_ar_leadagency ? String(model.egcs_ar_leadagency) : '',
             applicant_recipient_id: selectedProponentId,
