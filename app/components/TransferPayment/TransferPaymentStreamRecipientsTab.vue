@@ -137,11 +137,25 @@ const deleteRecipient = async (row: TransferPaymentEligibleRecipientRow) => {
   }
 }
 
-const { data: recipientResponse } = await useAgencyReferenceData<AgencyApplicantRecipientSubtypeItem>({
+const { data: recipientResponse, error: recipientReferenceError, refresh: refreshRecipientReferences } = await useAgencyReferenceData<AgencyApplicantRecipientSubtypeItem>({
   agencyId,
   buildUrl: id => `/api/agency/${id}/applicant-recipient-subtypes`,
   query: { page: 1, limit: 100 }
 })
+const isRetryingRecipientReferences: Ref<boolean> = ref(false)
+
+/** Retries failed subtype options without changing the selected eligible recipient. */
+const retryRecipientReferences = async () => {
+  if (isRetryingRecipientReferences.value) return
+  isRetryingRecipientReferences.value = true
+  try {
+    await refreshRecipientReferences()
+  } catch (error: unknown) {
+    showError(error)
+  } finally {
+    isRetryingRecipientReferences.value = false
+  }
+}
 </script>
 
 <template>
@@ -192,6 +206,18 @@ const { data: recipientResponse } = await useAgencyReferenceData<AgencyApplicant
     :title="selectedRecipient?.id ? t('common.update') : t('common.add')">
     <template #body>
       <UForm :state="selectedRecipient" :validate="validateRecipient" class="space-y-4" @submit="saveRecipient">
+        <div v-if="recipientReferenceError" role="alert" class="flex flex-wrap items-center gap-2 text-sm text-error">
+          <span>{{ t('common.lookup_load_failed') }}</span>
+          <UButton
+            type="button"
+            color="neutral"
+            variant="outline"
+            size="xs"
+            icon="i-lucide-refresh-cw"
+            :label="t('common.retry')"
+            :loading="isRetryingRecipientReferences"
+            @click="retryRecipientReferences" />
+        </div>
         <TransferPaymentFieldsTransferPaymentEligibleRecipientFields
           :model="selectedRecipient"
           :recipient-options="recipientResponse?.items" />

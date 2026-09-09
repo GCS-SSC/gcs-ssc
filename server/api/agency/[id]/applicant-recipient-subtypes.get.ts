@@ -5,6 +5,12 @@ import { fetchAgencyScopedList } from '~~/server/utils/agency-scoped-list'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
+const ApplicantRecipientSubtypeListQuerySchema = PaginationSchema.extend({
+  search: PaginationSchema.shape.search.refine(value => value === undefined || !value.includes('\u0000'), {
+    error: 'validation.invalid_text_character'
+  })
+})
+
 type ApplicantRecipientSubtypeStatus =
   | 'aboriginalrecipients'
   | 'forprofitorganizations'
@@ -46,7 +52,7 @@ export default defineEventHandler(async event => {
   }
   await authorize(event, 'agency', 'read', { type: 'agency', agencyId })
 
-  const query = await getValidatedQueryI18n(event, PaginationSchema)
+  const query = await getValidatedQueryI18n(event, ApplicantRecipientSubtypeListQuerySchema)
   const { page, limit, search, status } = query
   const offset = (page - 1) * limit
 
