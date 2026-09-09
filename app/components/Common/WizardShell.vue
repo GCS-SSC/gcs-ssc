@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { FormError } from '#ui/types'
 
 interface WizardStepItem {
@@ -52,6 +53,12 @@ const {
   pending?: boolean
 }>()
 
+const { t } = useI18n()
+const progressAnnouncement = computed(() => t('common.wizard_step_progress', {
+  current: steps.findIndex(step => step.value === currentStep) + 1,
+  total: steps.length
+}))
+
 const emit = defineEmits<{
   'update:currentStep': [value: string]
   'cancel': []
@@ -94,8 +101,12 @@ const onJumpToStep = (value: string) => {
         :model-value="currentStep"
         :items="steps"
         :disabled="pending"
-        class="mb-8"
+        class="wizard-stepper mb-8"
         @update:model-value="onStepperUpdate" />
+
+      <div data-testid="wizard-progress-announcement" class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {{ progressAnnouncement }}
+      </div>
 
       <div class="flex-1 overflow-y-auto pr-2">
         <slot :current-step="currentStep" />
@@ -195,3 +206,11 @@ const onJumpToStep = (value: string) => {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Nuxt UI supplies a zero-based index to Reka's hardcoded live announcement.
+   Keep its interactive stepper and replace only that direct-child status. */
+.wizard-stepper :deep(> [role="status"]) {
+  display: none;
+}
+</style>

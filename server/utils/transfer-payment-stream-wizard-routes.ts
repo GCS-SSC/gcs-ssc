@@ -393,6 +393,16 @@ export const validateTransferPaymentStreamWizardReferences = async ({
   agencyId,
   payload
 }: ValidateStreamWizardReferencesOptions): Promise<unknown | null> => {
+  // Templates must belong to their setup's Stream. A new Stream cannot own an
+  // existing template; configure approvals after creating the Stream instead.
+  const hasExistingApprovalTemplate = [...(payload.reviewSetups ?? []), ...(payload.recommendationSetups ?? [])].some(setup =>
+    setup.egcs_cn_approvaltemplate !== undefined
+    || setup.members.some(member => member.egcs_cn_approvaltemplate !== undefined)
+  )
+  if (hasExistingApprovalTemplate) {
+    return await routeBadRequest(event, 'APPROVAL_TEMPLATE_NOT_FOUND', 'apiErrors.transfer_payment.approval_template_not_found')
+  }
+
   const validators = [
     () => assertParentStreamReference(event, db, profileId, payload),
     () => assertBudgetReferences(event, db, profileId, payload),
@@ -663,16 +673,18 @@ const insertStreamWizardReviewSetups = async (
       .returning('id')
       .executeTakeFirstOrThrow()
 
-    await trx.insertInto('Common_Review_Setup').values(setItem.members.map(member => ({
-      egcs_cn_entitytype: setItem.egcs_cn_entitytype,
-      egcs_cn_order: member.egcs_cn_order,
-      egcs_cn_reviewset: String(createdReviewSet.id),
-      egcs_cn_approvaltemplate: member.egcs_cn_approvaltemplate,
-      egcs_cn_reviewschema: member.egcs_cn_reviewschema,
-      egcs_cn_failonchecklistfailure: member.egcs_cn_failonchecklistfailure,
-      egcs_cn_failurethreshold: member.egcs_cn_failurethreshold,
-      _deleted: false
-    }))).execute()
+    if (setItem.members.length > 0) {
+      await trx.insertInto('Common_Review_Setup').values(setItem.members.map(member => ({
+        egcs_cn_entitytype: setItem.egcs_cn_entitytype,
+        egcs_cn_order: member.egcs_cn_order,
+        egcs_cn_reviewset: String(createdReviewSet.id),
+        egcs_cn_approvaltemplate: member.egcs_cn_approvaltemplate,
+        egcs_cn_reviewschema: member.egcs_cn_reviewschema,
+        egcs_cn_failonchecklistfailure: member.egcs_cn_failonchecklistfailure,
+        egcs_cn_failurethreshold: member.egcs_cn_failurethreshold,
+        _deleted: false
+      }))).execute()
+    }
   }
 }
 

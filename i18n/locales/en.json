@@ -150,6 +150,7 @@
     "total": "Managed rosters"
   },
   "common": {
+    "wizard_step_progress": "Step {current} of {total}",
     "general": "General",
     "actions": "Actions",
     "account_menu": "Account menu",

@@ -150,6 +150,7 @@
     "total": "Listes gérées"
   },
   "common": {
+    "wizard_step_progress": "Étape {current} sur {total}",
     "general": "Général",
     "actions": "Actions",
     "account_menu": "Menu du compte",
