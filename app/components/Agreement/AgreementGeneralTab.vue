@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { agreementCalendarDate } from '~/utils/agreement-calendar-date'
 /* eslint-disable jsdoc/require-jsdoc -- local display helpers are self-documenting and not public APIs */
 import { computed } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
@@ -68,8 +69,8 @@ const displayValue = (value: string | number | boolean | null | undefined) => {
       <CommonValueCard :label="t('agreement.agreement_number')" :value="displayValue(profile.egcs_fc_agreementnumber)" />
       <CommonValueCard :label="t('agreement.financial_system_number')" :value="displayValue(profile.egcs_fc_financialsystemnumber)" />
       <CommonValueCard :label="t('agreement.further_distribution')" :value="displayValue(profile.egcs_fc_furtherdistribution)" />
-      <CommonValueCard :label="t('agreement.authorized_assistance_start_date')" :value="formatDate(profile.egcs_fc_authorizedassistancestartdate)" />
-      <CommonValueCard :label="t('agreement.authorized_assistance_end_date')" :value="formatDate(profile.egcs_fc_authorizedassistanceenddate)" />
+      <CommonValueCard :label="t('agreement.authorized_assistance_start_date')" :value="formatDate(agreementCalendarDate(profile.egcs_fc_authorizedassistancestartdate))" />
+      <CommonValueCard :label="t('agreement.authorized_assistance_end_date')" :value="formatDate(agreementCalendarDate(profile.egcs_fc_authorizedassistanceenddate))" />
       <NuxtLink
         :to="localePath(appRouteLocations.transferPaymentDetail(String(profile.program_id)))"
         class="rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">

@@ -3,6 +3,12 @@ import type { H3Event } from 'h3'
 import { sql, type Kysely, type Transaction } from 'kysely'
 import { badRequest } from '~~/server/utils/api-errors'
 import type { Database } from '~~/shared/types/database'
+import { dateOnlySql } from './database-date'
+
+type FiscalYearDurationOptions = {
+  dateRepresentation?: 'utc-calendar'
+  includeRetiredFiscalYears?: boolean
+}
 
 export const fiscalYearOverlapsDuration = (
   fiscalYearStart: Date,
@@ -71,13 +77,15 @@ export const assertAgreementBudgetFiscalYearsOverlapDuration = async (
   db: Kysely<Database> | Transaction<Database>,
   agreementId: string,
   duration: { startDate: Date, endDate: Date },
-  budgetVersionId?: string
+  budgetVersionId?: string,
+  options: FiscalYearDurationOptions = {}
 ) => {
   const fiscalYearsOverlap = await agreementBudgetFiscalYearsOverlapDuration(
     db,
     agreementId,
     duration,
-    budgetVersionId
+    budgetVersionId,
+    options
   )
 
   return fiscalYearsOverlap
@@ -89,7 +97,8 @@ export const agreementBudgetFiscalYearsOverlapDuration = async (
   db: Kysely<Database> | Transaction<Database>,
   agreementId: string,
   duration: { startDate: Date, endDate: Date },
-  budgetVersionId?: string
+  budgetVersionId?: string,
+  options: FiscalYearDurationOptions = {}
 ): Promise<boolean> => {
   let query = db.selectFrom('Funding_Case_Agreement_Budget_Fiscal_Year')
     .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fiscalyear')
@@ -101,14 +110,23 @@ export const agreementBudgetFiscalYearsOverlapDuration = async (
     .select(['Agency_Fiscal_Year.egcs_ay_startdate', 'Agency_Fiscal_Year.egcs_ay_enddate'])
     .where('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fundingagreement', '=', agreementId)
     .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
-    .where('Agency_Fiscal_Year._deleted', '=', false)
     .where('Funding_Case_Agreement_Budget_Version._deleted', '=', false)
+
+  if (!options.includeRetiredFiscalYears) query = query.where('Agency_Fiscal_Year._deleted', '=', false)
 
   if (budgetVersionId) {
     query = query.where('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_budgetversion', '=', budgetVersionId)
   } else {
     query = query
       .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)
+  }
+
+  if (options.dateRepresentation === 'utc-calendar') {
+    const invalidFiscalYear = await query.where(eb => eb.or([
+      eb('Agency_Fiscal_Year.egcs_ay_startdate', '>', dateOnlySql(duration.endDate)),
+      eb('Agency_Fiscal_Year.egcs_ay_enddate', '<', dateOnlySql(duration.startDate))
+    ])).executeTakeFirst()
+    return !invalidFiscalYear
   }
 
   const fiscalYears = await query.execute()

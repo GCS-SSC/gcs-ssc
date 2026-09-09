@@ -1,7 +1,7 @@
 import { mergeAgreementCustomFields } from './agreement-custom-fields'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Temporary coverage while agreement profile helpers receive complete documentation. */
 import { readBody, type H3Event } from 'h3'
-import type { Kysely } from 'kysely'
+import { sql, type Kysely } from 'kysely'
 import { badRequest, forbidden, notFound, throwApiError } from '~~/server/utils/api-errors'
 import { parseI18n } from '~~/server/utils/api-validate'
 import {
@@ -248,7 +248,7 @@ const patchValidatedAgreementProfile = async (
     .where('id', '=', agreementId).executeTakeFirstOrThrow()
   const streamChanged = String(current.egcs_fc_transferpaymentstream) !== nextStreamId
   const includesRiskScore = Object.hasOwn(validated, 'egcs_fc_riskscore')
-  const echoesCurrentRiskScore = validated.egcs_fc_riskscore === current.egcs_fc_riskscore
+  const echoesCurrentRiskScore = (validated.egcs_fc_riskscore ?? null) === (current.egcs_fc_riskscore ?? null)
     || (current.egcs_fc_riskscore !== null && current.egcs_fc_riskscore !== undefined
       && validated.egcs_fc_riskscore !== null && validated.egcs_fc_riskscore !== undefined
       && Number(validated.egcs_fc_riskscore) === Number(current.egcs_fc_riskscore))
@@ -262,9 +262,9 @@ const patchValidatedAgreementProfile = async (
   const sanitized = { ...validated }
   if (riskWorkflowManaged) delete sanitized.egcs_fc_riskscore
   if (streamChanged) sanitized.egcs_fc_riskscore = null
-  const riskScoreError = await validateAgreementProfileRiskScore(event, db, agreementId, nextStreamId, sanitized)
-  if (riskScoreError) {
-    return riskScoreError
+  if (includesRiskScore && !echoesCurrentRiskScore) {
+    const riskScoreError = await validateAgreementProfileRiskScore(event, db, agreementId, nextStreamId, sanitized)
+    if (riskScoreError) return riskScoreError
   }
 
   const holdbackBasisError = await validateAgreementProfileHoldbackBasis(event, db, agreementId, nextStreamId, validated)
@@ -327,6 +327,12 @@ export const patchAgreementProfile = async (
           lockContext.agencyId,
           targetStreamIds
         )
+        const agency = await trx.selectFrom('Agency_Profile')
+          .select('id')
+          .where('id', '=', lockContext.agencyId)
+          .where('_deleted', '=', false)
+          .forShare('Agency_Profile')
+          .executeTakeFirst()
         await lockTransferPaymentStreams(trx, targetStreamIds)
         await lockRegisteredExtensionAgreementLifecycle(event, trx, {
           agreementId,
@@ -357,6 +363,9 @@ export const patchAgreementProfile = async (
         }
         if (!agreementScopeMatches(lockContext, existingContext)) {
           throw new AgreementProfileScopeChanged(existingContext)
+        }
+        if (!agency) {
+          return await notFound(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
         }
 
         await authorizeFreshAssignedItem(
@@ -428,13 +437,28 @@ export const patchAgreementProfile = async (
           || Object.hasOwn(validated, 'egcs_fc_authorizedassistanceenddate')
         ) {
           const currentDuration = await trx.selectFrom('Funding_Case_Agreement_Profile')
-            .select(['egcs_fc_authorizedassistancestartdate', 'egcs_fc_authorizedassistanceenddate'])
+            .select([
+              sql<Date>`egcs_fc_authorizedassistancestartdate::timestamp AT TIME ZONE 'UTC'`.as('egcs_fc_authorizedassistancestartdate'),
+              sql<Date>`egcs_fc_authorizedassistanceenddate::timestamp AT TIME ZONE 'UTC'`.as('egcs_fc_authorizedassistanceenddate')
+            ])
             .where('id', '=', agreementId).executeTakeFirstOrThrow()
-          const durationError = await assertAgreementBudgetFiscalYearsOverlapDuration(event, trx, agreementId, {
-            startDate: validated.egcs_fc_authorizedassistancestartdate ?? currentDuration.egcs_fc_authorizedassistancestartdate,
-            endDate: validated.egcs_fc_authorizedassistanceenddate ?? currentDuration.egcs_fc_authorizedassistanceenddate
+          const startDate = new Date(validated.egcs_fc_authorizedassistancestartdate ?? currentDuration.egcs_fc_authorizedassistancestartdate)
+          const endDate = new Date(validated.egcs_fc_authorizedassistanceenddate ?? currentDuration.egcs_fc_authorizedassistanceenddate)
+          startDate.setUTCHours(0, 0, 0, 0)
+          endDate.setUTCHours(0, 0, 0, 0)
+          await parseI18n(event, FundingCaseAgreementProfilePatchSchema, {
+            egcs_fc_authorizedassistancestartdate: startDate,
+            egcs_fc_authorizedassistanceenddate: endDate
           })
-          if (durationError) return durationError
+          const durationChanged = startDate.getTime() !== currentDuration.egcs_fc_authorizedassistancestartdate.getTime()
+            || endDate.getTime() !== currentDuration.egcs_fc_authorizedassistanceenddate.getTime()
+          if (durationChanged) {
+            const durationError = await assertAgreementBudgetFiscalYearsOverlapDuration(event, trx, agreementId, {
+              startDate,
+              endDate
+            }, undefined, { dateRepresentation: 'utc-calendar', includeRetiredFiscalYears: true })
+            if (durationError) return durationError
+          }
         }
 
         return await patchValidatedAgreementProfile(

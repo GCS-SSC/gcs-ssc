@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { agreementCalendarDate } from '~/utils/agreement-calendar-date'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { computed, ref, watch } from 'vue'
@@ -90,7 +91,9 @@ const profile: Ref<AgreementDetailProfile | null> = ref(null)
 const error: Ref<unknown | null> = ref(null)
 const status: Ref<'idle' | 'pending' | 'success' | 'error'> = ref('idle')
 /**
+ * Refreshes the current Agreement profile.
  *
+ * @returns Whether the readback succeeded.
  */
 const refreshProfile = async () => {
   try {
@@ -100,9 +103,11 @@ const refreshProfile = async () => {
     if (!response.ok) await throwFetchResponseError(response)
     profile.value = await response.json() as AgreementDetailProfile
     status.value = 'success'
+    return true
   } catch (fetchError: unknown) {
     error.value = fetchError
     status.value = 'error'
+    return false
   }
 }
 if (!isChildDetailRoute.value) void refreshProfile()
@@ -249,8 +254,8 @@ watch(profile, value => {
 
   selectedProfile.value = {
     ...value,
-    egcs_fc_authorizedassistancestartdate: toDateInput(value.egcs_fc_authorizedassistancestartdate),
-    egcs_fc_authorizedassistanceenddate: toDateInput(value.egcs_fc_authorizedassistanceenddate)
+    egcs_fc_authorizedassistancestartdate: toDateInput(agreementCalendarDate(value.egcs_fc_authorizedassistancestartdate)),
+    egcs_fc_authorizedassistanceenddate: toDateInput(agreementCalendarDate(value.egcs_fc_authorizedassistanceenddate))
   }
 }, { immediate: true })
 
@@ -300,7 +305,7 @@ const submit = async () => {
     })
     if (!response.ok) await throwFetchResponseError(response)
 
-    await refreshProfile()
+    if (!await refreshProfile()) return
 
     toast.add({
       title: t('common.success'),
@@ -333,8 +338,8 @@ const cancel = () => {
 
   selectedProfile.value = {
     ...profile.value,
-    egcs_fc_authorizedassistancestartdate: toDateInput(profile.value.egcs_fc_authorizedassistancestartdate),
-    egcs_fc_authorizedassistanceenddate: toDateInput(profile.value.egcs_fc_authorizedassistanceenddate)
+    egcs_fc_authorizedassistancestartdate: toDateInput(agreementCalendarDate(profile.value.egcs_fc_authorizedassistancestartdate)),
+    egcs_fc_authorizedassistanceenddate: toDateInput(agreementCalendarDate(profile.value.egcs_fc_authorizedassistanceenddate))
   }
 }
 </script>
@@ -348,7 +353,7 @@ const cancel = () => {
     </div>
     <UAlert v-else-if="status === 'error'" color="error" icon="i-lucide-circle-alert" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
       <template #actions>
-        <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" @click="refreshProfile" />
+        <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" @click="() => { void refreshProfile() }" />
       </template>
     </UAlert>
     <UDashboardPanel v-if="profile" id="agreement-detail" class="w-full">
