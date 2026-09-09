@@ -244,7 +244,7 @@ const patchValidatedAgreementProfile = async (
   }
 
   const current = await db.selectFrom('Funding_Case_Agreement_Profile')
-    .select(['egcs_fc_transferpaymentstream', 'egcs_fc_riskscore'])
+    .select(['egcs_fc_transferpaymentstream', 'egcs_fc_riskscore', 'egcs_fc_agreementsubtype', 'egcs_fc_agreementtype'])
     .where('id', '=', agreementId).executeTakeFirstOrThrow()
   const streamChanged = String(current.egcs_fc_transferpaymentstream) !== nextStreamId
   const includesRiskScore = Object.hasOwn(validated, 'egcs_fc_riskscore')
@@ -270,7 +270,9 @@ const patchValidatedAgreementProfile = async (
   const holdbackBasisError = await validateAgreementProfileHoldbackBasis(event, db, agreementId, nextStreamId, validated)
   if (holdbackBasisError) return holdbackBasisError
 
-  const values = mapAgreementWriteValues(sanitized, subtypeContext.agreementType)
+  const subtypeChanged = String(current.egcs_fc_agreementsubtype) !== subtypeContext.id
+  const agreementType = streamChanged || subtypeChanged ? subtypeContext.agreementType : current.egcs_fc_agreementtype
+  const values = mapAgreementWriteValues(sanitized, agreementType)
   const stored = await db.selectFrom('Funding_Case_Agreement_Profile').select('egcs_fc_customfields').where('id', '=', agreementId).executeTakeFirstOrThrow()
   values.egcs_fc_customfields = await mergeAgreementCustomFields(
     event, db, nextStreamId, stored.egcs_fc_customfields, validated.egcs_fc_customfields ?? {}
