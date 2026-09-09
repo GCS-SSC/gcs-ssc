@@ -8,7 +8,10 @@ import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 const AgencyAgreementTypeListQuerySchema = PaginationSchema.extend({
-  status: z.enum(['all', ...AGREEMENT_TYPE_ENUM]).optional()
+  status: z.enum(['all', ...AGREEMENT_TYPE_ENUM]).optional(),
+  search: PaginationSchema.shape.search.refine(value => value === undefined || !value.includes('\u0000'), {
+    error: 'validation.invalid_text_character'
+  })
 })
 
 /**

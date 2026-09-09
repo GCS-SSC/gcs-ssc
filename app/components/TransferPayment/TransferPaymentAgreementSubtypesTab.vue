@@ -127,11 +127,25 @@ const remove = async (row: AgreementSubtypeRow) => {
   }
 }
 
-const { data: agreementTypeResponse } = await useAgencyReferenceData<AgencyAgreementTypeItem>({
+const { data: agreementTypeResponse, error: agreementTypeError, refresh: refreshAgreementTypes } = await useAgencyReferenceData<AgencyAgreementTypeItem>({
   agencyId,
   buildUrl: id => `/api/agency/${id}/agreement-types`,
   query: { page: 1, limit: 100 }
 })
+const isRetryingAgreementTypes: Ref<boolean> = ref(false)
+
+/** Retries the failed reference request without changing the selected subtype. */
+const retryAgreementTypes = async () => {
+  if (isRetryingAgreementTypes.value) return
+  isRetryingAgreementTypes.value = true
+  try {
+    await refreshAgreementTypes()
+  } catch (error: unknown) {
+    showError(error)
+  } finally {
+    isRetryingAgreementTypes.value = false
+  }
+}
 </script>
 
 <template>
@@ -183,6 +197,18 @@ const { data: agreementTypeResponse } = await useAgencyReferenceData<AgencyAgree
   <UModal v-if="selected && canUpdateChild" v-model:open="isOpen" :title="selected.id ? t('common.update') : t('common.add')">
     <template #body>
       <UForm :state="selected" :validate="validateAgreementSubtype" class="space-y-4" @submit="save">
+        <div v-if="agreementTypeError" role="alert" class="flex flex-wrap items-center gap-2 text-sm text-error">
+          <span>{{ t('common.lookup_load_failed') }}</span>
+          <UButton
+            type="button"
+            color="neutral"
+            variant="outline"
+            size="xs"
+            icon="i-lucide-refresh-cw"
+            :label="t('common.retry')"
+            :loading="isRetryingAgreementTypes"
+            @click="retryAgreementTypes" />
+        </div>
         <TransferPaymentFieldsTransferPaymentAgreementSubtypeFields
           :model="selected"
           :agreement-types="agreementTypeResponse?.items" />
