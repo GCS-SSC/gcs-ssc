@@ -48,6 +48,13 @@ export default defineEventHandler(async event => {
         return await db.transaction().execute(async trx => {
           const authContext = await requireFreshAuthContext(event, trx)
           await lockRegisteredExtensionAgreementScopes(trx, lockAgencyId, [])
+          const agency = await trx
+            .selectFrom('Agency_Profile')
+            .select('id')
+            .where('id', '=', lockAgencyId)
+            .where('_deleted', '=', false)
+            .forShare('Agency_Profile')
+            .executeTakeFirst()
           const profile = await trx
             .selectFrom('Transfer_Payment_Profile')
             .select('egcs_tp_agency')
@@ -61,6 +68,9 @@ export default defineEventHandler(async event => {
           const currentAgencyId = String(profile.egcs_tp_agency)
           if (currentAgencyId !== lockAgencyId) {
             throw new TransferPaymentStreamCreateScopeChanged(currentAgencyId)
+          }
+          if (!agency) {
+            return await notFound(event, 'TRANSFER_PAYMENT_PROFILE_NOT_FOUND', 'apiErrors.transfer_payment.profile_not_found')
           }
           const parentStream = validated.egcs_tp_parentstream
             ? await trx

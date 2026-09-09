@@ -62,6 +62,13 @@ export default defineEventHandler(async event => {
       transactionResult = await db.transaction().execute(async trx => {
         const authContext = await requireFreshAuthContext(event, trx)
         await lockRegisteredExtensionAgreementScopes(trx, lockAgencyId, [streamId])
+        const agency = await trx
+          .selectFrom('Agency_Profile')
+          .select('id')
+          .where('id', '=', lockAgencyId)
+          .where('_deleted', '=', false)
+          .forShare('Agency_Profile')
+          .executeTakeFirst()
         const lockedStreams = await lockTransferPaymentStreams(trx, [streamId])
         if (!lockedStreams.has(streamId)) {
           return await notFound(event, 'TRANSFER_PAYMENT_STREAM_NOT_FOUND', 'apiErrors.transfer_payment.stream_not_found')
@@ -86,6 +93,9 @@ export default defineEventHandler(async event => {
         const currentAgencyId = String(currentStream.agency_id)
         if (currentAgencyId !== lockAgencyId) {
           throw new TransferPaymentStreamScopeChanged(currentAgencyId)
+        }
+        if (!agency) {
+          return await notFound(event, 'TRANSFER_PAYMENT_STREAM_NOT_FOUND', 'apiErrors.transfer_payment.stream_not_found')
         }
 
         const currentScope: Scope = {

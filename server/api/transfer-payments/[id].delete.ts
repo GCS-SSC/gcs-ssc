@@ -119,6 +119,13 @@ export default defineEventHandler(async event => {
       return await db.transaction().execute(async trx => {
         const authContext = await requireFreshAuthContext(event, trx)
         await lockRegisteredExtensionAgreementScopes(trx, lockContext.agencyId, lockContext.streamIds)
+        const agency = await trx
+          .selectFrom('Agency_Profile')
+          .select('id')
+          .where('id', '=', lockContext.agencyId)
+          .where('_deleted', '=', false)
+          .forShare('Agency_Profile')
+          .executeTakeFirst()
         await lockTransferPaymentStreams(trx, lockContext.streamIds)
 
         const profile = await trx
@@ -138,6 +145,9 @@ export default defineEventHandler(async event => {
         }
         if (!contextsMatch(lockContext, currentContext)) {
           throw new TransferPaymentProfileDeleteScopeChanged(currentContext)
+        }
+        if (!agency) {
+          return await notFound(event, 'TRANSFER_PAYMENT_PROFILE_NOT_FOUND', 'apiErrors.transfer_payment.profile_not_found')
         }
 
         await authorizeWithFreshAuthContext(
