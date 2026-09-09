@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useCrudModalPending } from '~/composables/useCrudModal'
 /* eslint-disable jsdoc/require-jsdoc -- Budget table callbacks are exercised by focused component tests. */
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 import { useGroupedTableExpansion, type GroupedTableRow } from '~/composables/useGroupedTableExpansion'
@@ -101,7 +101,6 @@ const {
   staticMode?: boolean
   embedded?: boolean
 }>()
-const agreementIdRef = computed(() => agreementId)
 
 const { t, locale } = useI18n()
 const { getGroupedDisclosureControlsId, getGroupedDisclosureContentId } = useGroupedDisclosureIds()
@@ -151,15 +150,22 @@ const fiscalYearPending = useCrudModalPending(fiscalYearModal.captureSession)
 const lineItemPending = useCrudModalPending(lineItemModal.captureSession)
 const isSavingFiscalYear = fiscalYearPending.isPending
 const isSavingLineItem = lineItemPending.isPending
-watch(agreementIdRef, () => {
-  fiscalYearModal.close()
-  lineItemModal.close()
-}, { flush: 'sync' })
 const isLineItemCostCategoryLocked: Ref<boolean> = ref(false)
 const isLineItemCostSubsectionLocked: Ref<boolean> = ref(false)
 const resourceBase = computed<string>(() => apiBase ?? `/api/agreements/${agreementId}`)
 const overviewEndpoint = computed<string>(() => `${resourceBase.value}/budget-overview`)
 const fiscalYearLookupEndpoint = computed<string>(() => fiscalYearLookupUrl ?? `/api/agreements/${agreementId}/budget-fiscal-years/lookups/fiscal-years`)
+let fiscalYearContextGeneration = 0
+watch([() => agreementId, resourceBase, fiscalYearLookupEndpoint, () => staticMode], () => {
+  fiscalYearContextGeneration += 1
+  fiscalYearModal.close()
+  lineItemModal.close()
+}, { flush: 'sync' })
+onUnmounted(() => {
+  fiscalYearContextGeneration += 1
+})
+const canSaveFiscalYear = computed(() => !staticMode && Boolean(selectedFiscalYear.value)
+  && (selectedFiscalYear.value?.id ? canUpdateFiscalYear : canCreateFiscalYear))
 const useOverviewFetch = useFetch as unknown as (url: Ref<string>) => {
   data: Ref<FundingCaseAgreementBudgetOverviewRow | null>
   refresh: () => Promise<void>
@@ -229,6 +235,17 @@ const fiscalYearDisplayById = computed(() => new Map(
     String(item.label_en ?? item.id)
   ])
 ))
+const selectedFiscalYearOptions = computed(() => {
+  const selected = selectedFiscalYear.value
+  if (!selected?.egcs_fc_fiscalyear) return []
+  const value = String(selected.egcs_fc_fiscalyear)
+  const persisted = fiscalYears.value.find(row => String(row.id) === String(selected.id)
+    && String(row.egcs_fc_fiscalyear) === value)
+  const candidate = fiscalYearLookupResponse.value?.items.find(item => String(item.id) === value)
+  const label = persisted?.fiscal_year_display
+    || (locale.value === 'fr' ? candidate?.label_fr : candidate?.label_en)
+  return label ? [{ value, label: String(label) }] : []
+})
 const getFiscalYearDisplay = (fiscalYearId: unknown, display?: string | null) => {
   if (typeof display === 'string' && display.trim().length > 0) {
     return display
@@ -421,10 +438,12 @@ const getFiscalYearById = (id: string) => fiscalYears.value.find((fiscalYear: Fu
 const getLineItemById = (id: string) => lineItems.value.find((lineItem: FundingCaseAgreementBudgetLineItemRow) => lineItem.id === id)
 
 const openCreateFiscalYear = () => {
+  if (staticMode || !canCreateFiscalYear) return
   fiscalYearModal.openCreate()
 }
 
 const openUpdateFiscalYear = (fiscalYear: FundingCaseAgreementBudgetFiscalYearRow) => {
+  if (staticMode || !canUpdateFiscalYear) return
   fiscalYearModal.openUpdate(fiscalYear)
 }
 
@@ -467,33 +486,35 @@ const saveJson = async (url: string, method: 'PATCH' | 'POST', body: Record<stri
 }
 
 const saveFiscalYear = async () => {
-  if (!selectedFiscalYear.value) {
+  if (!selectedFiscalYear.value || !canSaveFiscalYear.value) {
     return
   }
   const fiscalYearState = selectedFiscalYear.value
   const isUpdate = Boolean(fiscalYearState.id)
+  const requestedContextGeneration = fiscalYearContextGeneration
+  const requestedBase = resourceBase.value
   const session = fiscalYearModal.captureSession()
   if (!fiscalYearPending.begin(session)) return
 
   try {
     await saveJson(
       isUpdate
-        ? `${resourceBase.value}/budget-fiscal-years/${fiscalYearState.id}`
-        : `${resourceBase.value}/budget-fiscal-years`,
+        ? `${requestedBase}/budget-fiscal-years/${fiscalYearState.id}`
+        : `${requestedBase}/budget-fiscal-years`,
       isUpdate ? 'PATCH' : 'POST',
       fiscalYearState
     )
 
-    if (!fiscalYearModal.closeSession(session)) return
+    if (requestedContextGeneration !== fiscalYearContextGeneration || !fiscalYearModal.closeSession(session)) return
     await refreshOverview()
-    if (overviewStatus.value === 'error') return
+    if (requestedContextGeneration !== fiscalYearContextGeneration || overviewStatus.value === 'error') return
     toast.add({
       title: t('common.success'),
       description: isUpdate ? t('common.updated_success') : t('common.added_success'),
       color: 'success'
     })
   } catch (error: unknown) {
-    showError(error)
+    if (requestedContextGeneration === fiscalYearContextGeneration && fiscalYearModal.captureSession() === session) showError(error)
   } finally {
     fiscalYearPending.end(session)
   }
@@ -587,7 +608,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
       :request-status="overviewStatus"
       table-class="agreement-budget-table"
       :button-label="t('agreement.budget.add_fiscal_year')"
-      :show-button="canCreateFiscalYear"
+      :show-button="canCreateFiscalYear && !staticMode"
       :search-placeholder="t('agreement.budget.search')"
       @add="openCreateFiscalYear"
       @retry="refreshOverview"
@@ -723,7 +744,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
             :aria-label="t('agreement.budget.add_line_item')"
             @click="openCreateLineItem(row.original.fiscalYearId)" />
           <UButton
-            v-if="canUpdateFiscalYear && getFiscalYearById(row.original.fiscalYearId)"
+            v-if="!staticMode && canUpdateFiscalYear && getFiscalYearById(row.original.fiscalYearId)"
             icon="i-lucide-pencil"
             color="neutral"
             variant="ghost"
@@ -821,6 +842,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
             <CommonServerLookupSelect
               v-model="selectedFiscalYear.egcs_fc_fiscalyear"
               :fetch-url="fiscalYearLookupEndpoint"
+              :prepend-items="selectedFiscalYearOptions"
               value-key="id"
               label-en-key="label_en"
               label-fr-key="label_fr"
@@ -834,7 +856,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
             <CommonSaveButton
               :label="selectedFiscalYear.id ? t('common.update') : t('common.add')"
               :loading="isSavingFiscalYear"
-              :disabled="isSavingFiscalYear" />
+              :disabled="isSavingFiscalYear || !canSaveFiscalYear" />
           </div>
         </UForm>
       </template>

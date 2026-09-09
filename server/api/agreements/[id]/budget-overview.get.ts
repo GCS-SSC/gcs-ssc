@@ -36,7 +36,7 @@ export default defineEventHandler(async event => {
         .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
         .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)
         .where('Funding_Case_Agreement_Budget_Version._deleted', '=', false)
-        .where('Agency_Fiscal_Year._deleted', '=', false)
+        .where('Agency_Fiscal_Year.egcs_ay_organizationagency', '=', agreementContext.agencyId)
         .select([
           budgetFiscalYearStableId.as('id'),
           'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fiscalyear as egcs_fc_fiscalyear',
@@ -77,7 +77,7 @@ export default defineEventHandler(async event => {
         .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
         .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)
         .where('Funding_Case_Agreement_Budget_Version._deleted', '=', false)
-        .where('Agency_Fiscal_Year._deleted', '=', false)
+        .where('Agency_Fiscal_Year.egcs_ay_organizationagency', '=', agreementContext.agencyId)
         .where('Transfer_Payment_Stream_Cost_Category_Line_Item._deleted', '=', false)
         .where('Agency_Cost_Category_Line_Item._deleted', '=', false)
         .where('Agency_Cost_Category._deleted', '=', false)

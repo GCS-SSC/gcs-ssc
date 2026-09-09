@@ -17,6 +17,7 @@ import {
 import type { Database } from '~~/shared/types/database'
 import type { AgreementScopeContext } from '~~/server/utils/agreement'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
+import { assertFiscalYearOverlapsDuration } from '~~/server/utils/agreement-fiscal-year-duration'
 import { budgetFiscalYearStableId, budgetLineItemStableId } from '~~/server/utils/agreement-budget-lineage'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { moneyToCents, type Money } from '~~/shared/utils/money'
@@ -221,14 +222,20 @@ export const assertAgreementBudgetProgramFundingCapacity = async (
   return null
 }
 
-const fetchBudgetFiscalYearDisplay = async (
+export const resolveRetainedAgreementBudgetFiscalYear = async (
   db: DbClient,
+  streamId: string,
   fiscalYearId: string
 ) => await db
   .selectFrom('Agency_Fiscal_Year')
+  .innerJoin('Transfer_Payment_Profile', 'Transfer_Payment_Profile.egcs_tp_agency', 'Agency_Fiscal_Year.egcs_ay_organizationagency')
+  .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile', 'Transfer_Payment_Profile.id')
   .where('Agency_Fiscal_Year.id', '=', fiscalYearId)
-  .where('Agency_Fiscal_Year._deleted', '=', false)
+  .where('Transfer_Payment_Stream.id', '=', streamId)
+  .where('Transfer_Payment_Stream._deleted', '=', false)
+  .where('Transfer_Payment_Profile._deleted', '=', false)
   .select('Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display')
+  .forShare('Agency_Fiscal_Year')
   .executeTakeFirst()
 
 const fetchStreamBudgetFiscalYear = async (
@@ -248,7 +255,12 @@ const fetchStreamBudgetFiscalYear = async (
   .where('Transfer_Payment_Stream_Budget._deleted', '=', false)
   .where('Transfer_Payment_Fiscal_Year_Budget._deleted', '=', false)
   .where('Agency_Fiscal_Year._deleted', '=', false)
-  .select(['Agency_Fiscal_Year.id as id', 'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display'])
+  .select([
+    'Agency_Fiscal_Year.id as id',
+    'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display',
+    'Agency_Fiscal_Year.egcs_ay_startdate',
+    'Agency_Fiscal_Year.egcs_ay_enddate'
+  ])
   .forShare(['Agency_Fiscal_Year', 'Transfer_Payment_Fiscal_Year_Budget'])
   .executeTakeFirst()
 
@@ -281,6 +293,7 @@ export const patchAgreementBudgetFiscalYear = async (
       .select([
         'Funding_Case_Agreement_Budget_Fiscal_Year.id as version_row_id',
         budgetFiscalYearStableId.as('id'),
+        'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_originalbudgetfiscalyear',
         'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fiscalyear as egcs_fc_fiscalyear'
       ])
       .executeTakeFirst(),
@@ -292,12 +305,18 @@ export const patchAgreementBudgetFiscalYear = async (
 
   const readBody = (globalThis as { readValidatedBodyI18n?: typeof readValidatedBodyI18n }).readValidatedBodyI18n ?? readValidatedBodyI18n
   const validated = await readBody(event, FundingCaseAgreementBudgetFiscalYearPatchSchema)
-  if (!Object.hasOwn(validated, 'egcs_fc_fiscalyear')) {
-    const fiscalYear = await fetchBudgetFiscalYearDisplay(db, existing.egcs_fc_fiscalyear)
+  if (!Object.hasOwn(validated, 'egcs_fc_fiscalyear') || String(validated.egcs_fc_fiscalyear) === String(existing.egcs_fc_fiscalyear)) {
+    const fiscalYear = await resolveRetainedAgreementBudgetFiscalYear(db, streamId, existing.egcs_fc_fiscalyear)
+    if (!fiscalYear) {
+      return await routeBadRequest(event, 'INVALID_AGREEMENT_BUDGET_FISCAL_YEAR', 'apiErrors.agreement.invalid_budget_fiscal_year')
+    }
     return {
       id: existing.id,
+      ...(Object.hasOwn(validated, 'egcs_fc_fiscalyear')
+        ? { egcs_fc_originalbudgetfiscalyear: existing.egcs_fc_originalbudgetfiscalyear }
+        : {}),
       egcs_fc_fiscalyear: existing.egcs_fc_fiscalyear,
-      fiscal_year_display: fiscalYear?.fiscal_year_display ?? null
+      fiscal_year_display: fiscalYear.fiscal_year_display
     }
   }
 
@@ -317,6 +336,14 @@ export const patchAgreementBudgetFiscalYear = async (
   const fiscalYear = await fetchStreamBudgetFiscalYear(db, streamId, validated.egcs_fc_fiscalyear as string)
   if (!fiscalYear) {
     return await routeBadRequest(event, 'INVALID_AGREEMENT_BUDGET_FISCAL_YEAR', 'apiErrors.agreement.invalid_budget_fiscal_year')
+  }
+
+  if (String(validated.egcs_fc_fiscalyear) !== String(existing.egcs_fc_fiscalyear)) {
+    const agreementDuration = await db.selectFrom('Funding_Case_Agreement_Profile')
+      .select(['egcs_fc_authorizedassistancestartdate as startDate', 'egcs_fc_authorizedassistanceenddate as endDate'])
+      .where('id', '=', agreementId).where('_deleted', '=', false).executeTakeFirstOrThrow()
+    const durationError = await assertFiscalYearOverlapsDuration(event, fiscalYear, agreementDuration)
+    if (durationError) return durationError
   }
 
   try {

@@ -6,6 +6,7 @@ import { throwIfAgreementUniqueConstraintError } from '~~/server/utils/agreement
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
 import { assertFiscalYearOverlapsAmendmentDuration } from '~~/server/utils/agreement-fiscal-year-duration'
 import { budgetFiscalYearStableId } from '~~/server/utils/agreement-budget-lineage'
+import { resolveRetainedAgreementBudgetFiscalYear } from '~~/server/utils/agreement-budget'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 export default defineEventHandler(async event => {
@@ -13,7 +14,9 @@ export default defineEventHandler(async event => {
   const agreementId = getRouterParam(event, 'id'), amendmentId = getRouterParam(event, 'amendmentId'), childId = getRouterParam(event, 'childId')
   if (!agreementId || !amendmentId || !childId) return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')
   if (!isPositivePostgresBigintText(childId)) return await notFound(event, 'AGREEMENT_BUDGET_FISCAL_YEAR_NOT_FOUND', 'apiErrors.agreement.budget_fiscal_year_not_found')
-  const context = await authorizeAgreementResource(event, 'update', agreementId, db)
+  const context = await authorizeAgreementResource(event, 'update', agreementId, db, {
+    assignmentTarget: { entityType: 'fundingcaseamendment', entityId: amendmentId }
+  })
   if (!context) return await badRequest(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
 
   const body = await readValidatedBodyI18n(event, FundingCaseAgreementBudgetFiscalYearPatchSchema)
@@ -26,7 +29,11 @@ export default defineEventHandler(async event => {
       const existing = await trx.selectFrom('Funding_Case_Agreement_Budget_Fiscal_Year').selectAll().where(budgetFiscalYearStableId, '=', childId)
         .where('egcs_fc_budgetversion', '=', versionId).where('_deleted', '=', false).executeTakeFirst()
       if (!existing) return await notFound(event, 'AGREEMENT_BUDGET_FISCAL_YEAR_NOT_FOUND', 'apiErrors.agreement.budget_fiscal_year_not_found')
-      if (!body.egcs_fc_fiscalyear) return { ...existing, id: existing.egcs_fc_originalbudgetfiscalyear ?? existing.id }
+      if (!body.egcs_fc_fiscalyear || String(body.egcs_fc_fiscalyear) === String(existing.egcs_fc_fiscalyear)) {
+        const retainedFiscalYear = await resolveRetainedAgreementBudgetFiscalYear(trx, context.streamId, String(existing.egcs_fc_fiscalyear))
+        if (!retainedFiscalYear) return await badRequest(event, 'INVALID_AGREEMENT_BUDGET_FISCAL_YEAR', 'apiErrors.agreement.invalid_budget_fiscal_year')
+        return { ...existing, id: existing.egcs_fc_originalbudgetfiscalyear ?? existing.id }
+      }
       const fiscalYear = await trx.selectFrom('Transfer_Payment_Stream_Budget')
         .innerJoin('Transfer_Payment_Fiscal_Year_Budget', 'Transfer_Payment_Fiscal_Year_Budget.id', 'Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentbudget')
         .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_fiscalyear')
