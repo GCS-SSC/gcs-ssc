@@ -103,14 +103,23 @@ const addUser = async () => {
     t('assignments.added_success')
   )
 }
-const promote = async (userId: string) => await runAction(
-  () => mutateAssignment(`${baseUrl.value}/primary`, { method: 'PATCH', body: { userId } }),
-  t('assignments.primary_updated_success')
-)
+const canPromote = (userId: string) => canManage.value && roster.value?.assignments.some(
+  assignment => assignment.user_id === userId && !assignment.is_primary && assignment.is_eligible
+) === true
+const canRemove = (userId: string) => canManage.value && assignmentCount.value > 1
+  && roster.value?.assignments.some(assignment => assignment.user_id === userId && !assignment.is_primary) === true
+const promote = async (userId: string) => {
+  if (!canPromote(userId)) return
+  await runAction(
+    () => mutateAssignment(`${baseUrl.value}/primary`, { method: 'PATCH', body: { userId } }),
+    t('assignments.primary_updated_success')
+  )
+}
+
 const remove = async (userId: string, name: string) => {
   const generation = targetGeneration
   const requestedBaseUrl = baseUrl.value
-  if (disposed || !canManage.value) return
+  if (disposed || !canRemove(userId)) return
   const confirmed = await confirm({
     title: t('assignments.remove_title'),
     description: t('assignments.remove_description', { name }),
@@ -118,7 +127,7 @@ const remove = async (userId: string, name: string) => {
     cancelLabel: t('common.cancel'),
     confirmColor: 'error'
   })
-  if (!confirmed || disposed || generation !== targetGeneration || requestedBaseUrl !== baseUrl.value) return
+  if (!confirmed || disposed || generation !== targetGeneration || requestedBaseUrl !== baseUrl.value || !canRemove(userId)) return
 
   await runAction(
     () => mutateAssignment(`${baseUrl.value}/${userId}`, { method: 'DELETE' }),
@@ -199,10 +208,10 @@ const remove = async (userId: string, name: string) => {
             variant="ghost"
             icon="i-lucide-star"
             :label="t('assignments.make_primary')"
-            :disabled="isSaving || !assignment.is_eligible"
+            :disabled="isSaving || !canPromote(assignment.user_id)"
             @click="promote(assignment.user_id)" />
           <UButton
-            v-if="!assignment.is_primary && assignmentCount > 1"
+            v-if="canRemove(assignment.user_id)"
             size="xs"
             color="error"
             variant="ghost"

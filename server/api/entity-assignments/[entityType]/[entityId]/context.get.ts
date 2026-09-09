@@ -23,12 +23,13 @@ export default defineEventHandler(async event => {
   const extensionRuntime = target.entityType.includes(':')
     ? await resolveExtensionEntityAssignmentRuntime(event, target.entityType, target.entityId)
     : null
+  if (target.entityType.includes(':') && !extensionRuntime) return await forbidden(event)
   if (extensionRuntime) await authorizeExtensionEntityAssignmentRead(event, extensionRuntime)
   else if (!await canReadEntityAssignments(event, target.entityType as AssignableEntityType, target.entityId)) return await forbidden(event)
 
   const extensionOwner = extensionRuntime ? resolveExtensionEntityAssignmentOwner(extensionRuntime) : null
-  const agreementId = extensionOwner?.kind === 'agreement'
-    ? extensionOwner.agreementId
+  const agreementId = extensionOwner
+    ? (extensionOwner.kind === 'agreement' ? extensionOwner.agreementId : null)
     : await resolveAssignmentAgreementId(event.context.$db, target.entityType as AssignableEntityType, target.entityId)
   if (!agreementId) return await notFound(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
   const agreement = await event.context.$db.selectFrom('Funding_Case_Agreement_Profile')

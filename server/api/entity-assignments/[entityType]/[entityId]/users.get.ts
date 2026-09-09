@@ -18,6 +18,7 @@ export default defineEventHandler(async event => {
   const extensionRuntime = target.entityType.includes(':')
     ? await resolveExtensionEntityAssignmentRuntime(event, target.entityType, target.entityId)
     : null
+  if (target.entityType.includes(':') && !extensionRuntime) return await notFound(event, 'ASSIGNMENT_TARGET_NOT_FOUND', 'apiErrors.request.not_found')
   const owner = extensionRuntime
     ? resolveExtensionEntityAssignmentOwner(extensionRuntime)
     : await resolveEntityAssignmentOwner(event.context.$db, target.entityType as AssignableEntityType, target.entityId)

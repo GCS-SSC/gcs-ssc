@@ -8,6 +8,7 @@ import type {
   GcsLockedLifecycleEntity
 } from '@gcs-ssc/extensions/server'
 import type { Database, Entity_Type } from '~~/shared/types/database'
+import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import type { ReviewRuntimeEntityContext } from './review-runtime-access'
 import { resolveCanonicalLifecycleIdentity } from './extension-lifecycle-identity'
 import { throwApiError } from './api-errors'
@@ -124,6 +125,7 @@ export const resolveExtensionLifecycleRuntimeInTransaction = async (
   actorUserId: string,
   event: H3Event | null = null
 ): Promise<ResolvedExtensionLifecycleRuntime | null> => {
+  if (!isPositivePostgresBigintText(entityId)) return null
   const loaded = await loadExtensionLifecycleEntity(entityType)
   if (!loaded) return null
   const identity = await trx.selectFrom('Common_Entity').select('id')
