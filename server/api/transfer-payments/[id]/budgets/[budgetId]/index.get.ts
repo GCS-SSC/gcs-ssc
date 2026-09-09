@@ -45,7 +45,6 @@ export default defineEventHandler(async event => {
     .where('Transfer_Payment_Fiscal_Year_Budget._deleted', '=', false)
     .where('Transfer_Payment_Profile._deleted', '=', false)
     .where('Agency_Profile._deleted', '=', false)
-    .where('Agency_Fiscal_Year._deleted', '=', false)
     .select([
       'Transfer_Payment_Fiscal_Year_Budget.id as id',
       'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_transferpaymentprofile as egcs_tp_transferpaymentprofile',

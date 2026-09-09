@@ -43,7 +43,14 @@ export default defineEventHandler(async event => {
       .where('Agency_Fiscal_Year.egcs_ay_organizationagency', '=', access.agencyId)
       .where('Transfer_Payment_Profile._deleted', '=', false)
       .where('Agency_Profile._deleted', '=', false)
-      .where('Agency_Fiscal_Year._deleted', '=', false)
+      .where(eb => eb.or([
+        eb('Agency_Fiscal_Year._deleted', '=', false),
+        eb.exists(eb.selectFrom('Transfer_Payment_Fiscal_Year_Budget')
+          .select('Transfer_Payment_Fiscal_Year_Budget.id')
+          .where('Transfer_Payment_Fiscal_Year_Budget.egcs_tp_transferpaymentprofile', '=', profileId)
+          .whereRef('Transfer_Payment_Fiscal_Year_Budget.egcs_tp_fiscalyear', '=', 'Agency_Fiscal_Year.id')
+          .where('Transfer_Payment_Fiscal_Year_Budget._deleted', '=', false))
+      ]))
       .select([
         'Agency_Fiscal_Year.id as id',
         'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as egcs_ay_fiscalyeardisplay',

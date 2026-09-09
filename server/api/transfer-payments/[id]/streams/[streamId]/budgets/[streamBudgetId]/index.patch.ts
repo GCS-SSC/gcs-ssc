@@ -69,7 +69,10 @@ export default defineEventHandler(async event => {
           .where('Transfer_Payment_Fiscal_Year_Budget.id', 'in', budgetIds)
           .where('Transfer_Payment_Fiscal_Year_Budget.egcs_tp_transferpaymentprofile', '=', profileId)
           .where('Transfer_Payment_Fiscal_Year_Budget._deleted', '=', false)
-          .where('Agency_Fiscal_Year._deleted', '=', false)
+          .where(eb => eb.or([
+            eb('Agency_Fiscal_Year._deleted', '=', false),
+            eb('Transfer_Payment_Fiscal_Year_Budget.id', '=', String(lockedStreamBudget.budget_id))
+          ]))
           .select([
             'Transfer_Payment_Fiscal_Year_Budget.id as id',
             'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_fiscalyear as fiscal_year_id',

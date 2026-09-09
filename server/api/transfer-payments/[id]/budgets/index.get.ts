@@ -1,5 +1,5 @@
 import { sql } from 'kysely'
-import { PaginationSchema } from '~~/shared/types/schemas'
+import { TransferPaymentBudgetListQuerySchema } from '~~/shared/types/schemas'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { authorizeTransferPaymentProfileResource } from '~~/server/utils/transfer-payment-route-authorization'
 import { databaseMoneyText, parseDatabaseMoney } from '~~/server/utils/database-money'
@@ -17,7 +17,7 @@ export default defineEventHandler(async event => {
   const agencyId = access.agencyId
   const resolvedProfileId = profileId
 
-  const query = await getValidatedQueryI18n(event, PaginationSchema)
+  const query = await getValidatedQueryI18n(event, TransferPaymentBudgetListQuerySchema)
   const { page, limit, search } = query
   const offset = (page - 1) * limit
 
@@ -37,7 +37,10 @@ export default defineEventHandler(async event => {
       .where('Transfer_Payment_Fiscal_Year_Budget._deleted', '=', false)
       .where('Transfer_Payment_Profile._deleted', '=', false)
       .where('Agency_Profile._deleted', '=', false)
-      .where('Agency_Fiscal_Year._deleted', '=', false)
+
+    if (query.purpose === 'allocation') {
+      baseQuery = baseQuery.where('Agency_Fiscal_Year._deleted', '=', false)
+    }
 
     if (search) {
       baseQuery = baseQuery.where(eb =>

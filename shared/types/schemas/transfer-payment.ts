@@ -123,6 +123,10 @@ export const TransferPaymentOutcomeSchema = z.object({
 export type TransferPaymentOutcome = z.infer<typeof TransferPaymentOutcomeSchema>
 export type TransferPaymentOutcomeItem = WithId<TransferPaymentOutcome>
 
+export const TransferPaymentBudgetListQuerySchema = PaginationSchema.extend({
+  purpose: z.literal('allocation', { error: 'validation.invalid_selection' }).optional()
+})
+
 export const TransferPaymentBudgetSchema = z.object({
   egcs_tp_fiscalyear: PositivePostgresBigintIdSchema,
   egcs_tp_totalbudget: MoneySchema,

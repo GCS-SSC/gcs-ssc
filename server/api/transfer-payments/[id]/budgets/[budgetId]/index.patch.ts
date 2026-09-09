@@ -41,7 +41,7 @@ export default defineEventHandler(async event => {
       async (trx, currentContext) => {
         const lockedBudget = await trx
           .selectFrom('Transfer_Payment_Fiscal_Year_Budget')
-          .select(['id', databaseMoneyText(sql.ref('egcs_tp_totalbudget')).as('egcs_tp_totalbudget')])
+          .select(['id', 'egcs_tp_fiscalyear', databaseMoneyText(sql.ref('egcs_tp_totalbudget')).as('egcs_tp_totalbudget')])
           .where('id', '=', budgetId)
           .where('egcs_tp_transferpaymentprofile', '=', profileId)
           .where('_deleted', '=', false)
@@ -72,7 +72,10 @@ export default defineEventHandler(async event => {
             .selectFrom('Agency_Fiscal_Year')
             .where('id', '=', validated.egcs_tp_fiscalyear)
             .where('egcs_ay_organizationagency', '=', currentContext.agencyId)
-            .where('_deleted', '=', false)
+            .where(eb => eb.or([
+              eb('_deleted', '=', false),
+              eb.val(validated.egcs_tp_fiscalyear === String(lockedBudget.egcs_tp_fiscalyear))
+            ]))
             .select('id')
             .forShare('Agency_Fiscal_Year')
             .executeTakeFirst()

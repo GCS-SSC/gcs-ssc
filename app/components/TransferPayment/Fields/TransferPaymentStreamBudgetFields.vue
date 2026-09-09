@@ -40,6 +40,7 @@ const budgetPrependItems = computed<AdminCommonSelectOption[]>(() =>
     <CommonServerLookupSelect
       v-model="model.egcs_tp_transferpaymentbudget"
       :fetch-url="budgetFetchUrl"
+      :query="{ purpose: 'allocation' }"
       value-key="id"
       label-en-key="fiscal_year_display"
       label-fr-key="fiscal_year_display"

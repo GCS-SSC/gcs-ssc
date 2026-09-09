@@ -26,6 +26,7 @@ export const postgresE2eSpecPaths = [
   'tests/e2e/applicant-recipient-cross-agency.spec.ts',
   'tests/e2e/agreement-extension-persistence.spec.ts',
   'tests/e2e/transfer-payment-stream-identity.spec.ts',
+  'tests/e2e/program-budget-legacy-fiscal-year.spec.ts',
   'tests/e2e/workflow-owner-recovery.spec.ts'
 ] as const
 
@@ -446,7 +447,7 @@ const assertSpecBelongsToSuite = (suite: E2eSuite, selectedSpec: string): void =
     throw new Error('The review-scratch suite accepts only *.tmp.spec.ts files.')
   }
   if (suite === 'postgres' && !isPostgresSpec) {
-    throw new Error('The postgres suite accepts only the seven managed PostgreSQL E2E specs.')
+    throw new Error('The postgres suite accepts only registered managed PostgreSQL E2E specs.')
   }
   if (suite === 'amendment-refresh' && !isAmendmentRefreshSpec) {
     throw new Error('The amendment-refresh suite accepts only its exact managed Amendment refresh spec.')

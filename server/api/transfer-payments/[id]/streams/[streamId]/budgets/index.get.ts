@@ -38,7 +38,6 @@ export default defineEventHandler(async event => {
     .where('Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentstream', '=', streamId)
     .where('Transfer_Payment_Stream_Budget._deleted', '=', false)
     .where('Transfer_Payment_Fiscal_Year_Budget._deleted', '=', false)
-    .where('Agency_Fiscal_Year._deleted', '=', false)
 
   if (search) {
     baseQuery = baseQuery.where(eb =>
