@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AgencyHoldbackBasisSchema, type AgencyHoldbackBasisItem } from '~~/shared/types/schemas'
+import { AgencyHoldbackBasisWriteSchema, type AgencyHoldbackBasisItem } from '~~/shared/types/schemas'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 
 const { agencyId, canCreate, canUpdate, canDelete } = defineProps<{ agencyId: string, canCreate: boolean, canUpdate: boolean, canDelete: boolean }>()
@@ -27,7 +27,7 @@ const bilingualColumns: BilingualColumnConfig<AgencyHoldbackBasisItem>[] = [
     :can-create="canCreate"
     :can-update="canUpdate"
     :can-delete="canDelete"
-    :schema="AgencyHoldbackBasisSchema"
+    :schema="AgencyHoldbackBasisWriteSchema"
     :initial-new-item="{}"
     :columns="columns"
     :bilingual-columns="bilingualColumns">

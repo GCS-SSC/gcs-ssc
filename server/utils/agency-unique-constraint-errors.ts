@@ -97,6 +97,10 @@ const CONSTRAINT_ERROR_MAP: Record<string, ConstraintErrorMapping> = {
     code: 'AGENCY_DUPLICATE_HOLDBACK_BASIS_CODE',
     key: 'apiErrors.agency.duplicate_holdback_basis_code'
   },
+  ay_uq_holdback_code_normalized: {
+    code: 'AGENCY_DUPLICATE_HOLDBACK_BASIS_CODE',
+    key: 'apiErrors.agency.duplicate_holdback_basis_code'
+  },
   cn_idx_attachmenttypesagencynameen: {
     code: 'AGENCY_DUPLICATE_ATTACHMENT_TYPE_NAME_EN',
     key: 'apiErrors.agency.duplicate_attachment_type_name_en'

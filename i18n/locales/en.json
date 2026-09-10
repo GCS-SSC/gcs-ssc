@@ -919,7 +919,7 @@
     "agency": {
       "not_found": "Agency not found.",
       "holdback_basis_not_found": "Agency holdback basis not found.",
-      "holdback_basis_in_use": "Remove this holdback basis from all active program streams before deleting it.",
+      "holdback_basis_in_use": "Remove all program stream references to this holdback basis before changing its code or deleting it.",
       "gwcoa_not_found": "GWCOA number not found.",
       "invalid_gwcoa_number": "Select a valid GWCOA number.",
       "duplicate_gwcoa_number": "A GWCOA entry with this number already exists.",

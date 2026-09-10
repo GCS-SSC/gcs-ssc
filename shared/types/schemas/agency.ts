@@ -105,6 +105,14 @@ export const AgencyHoldbackBasisSchema = z.object({
   egcs_ay_name_en: z.string({ error: 'validation.name_en_required' }).trim().min(1, { error: 'validation.name_en_required' }),
   egcs_ay_name_fr: z.string({ error: 'validation.name_fr_required' }).trim().min(1, { error: 'validation.name_fr_required' })
 })
+const AgencyHoldbackBasisFieldSchema = (requiredKey: string) => AgencyLabelSchema(requiredKey)
+  .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' })
+
+export const AgencyHoldbackBasisWriteSchema = AgencyHoldbackBasisSchema.extend({
+  egcs_ay_languageindependentcode: AgencyHoldbackBasisFieldSchema('validation.required'),
+  egcs_ay_name_en: AgencyHoldbackBasisFieldSchema('validation.name_en_required'),
+  egcs_ay_name_fr: AgencyHoldbackBasisFieldSchema('validation.name_fr_required')
+})
 export type AgencyHoldbackBasis = z.infer<typeof AgencyHoldbackBasisSchema>
 export type AgencyHoldbackBasisItem = WithId<AgencyHoldbackBasis>
 

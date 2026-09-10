@@ -919,7 +919,7 @@
     "agency": {
       "not_found": "Agence introuvable.",
       "holdback_basis_not_found": "Base de retenue de l'agence introuvable.",
-      "holdback_basis_in_use": "Retirez cette base de retenue de tous les volets de programme actifs avant de la supprimer.",
+      "holdback_basis_in_use": "Retirez toutes les références à cette base de retenue dans les volets de programme avant de modifier son code ou de la supprimer.",
       "gwcoa_not_found": "Numéro CGOA pangouvernemental introuvable.",
       "invalid_gwcoa_number": "Sélectionnez un numéro CGOA pangouvernemental valide.",
       "duplicate_gwcoa_number": "Une entrée CGOA pangouvernementale portant ce numéro existe déjà.",
