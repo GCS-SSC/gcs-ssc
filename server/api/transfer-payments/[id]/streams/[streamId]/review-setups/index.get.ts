@@ -1,5 +1,6 @@
 /* eslint-disable jsdoc/require-jsdoc */
 import { PaginationSchema } from '~~/shared/types/schemas'
+import { EntityTypeIdentitySchema } from '~~/shared/types/schemas/common'
 import { REVIEW_TYPE_ENUM } from '~~/shared/constants/enums'
 import { z } from 'zod'
 import { authorize } from '~~/server/utils/authorize'
@@ -17,6 +18,8 @@ import { readReviewSetupPublicationMetadata } from '~~/server/utils/review-setup
 const IN_FILTER_CHUNK_SIZE = 500
 type ReviewType = (typeof REVIEW_TYPE_ENUM)[number]
 export const ReviewSetupListQuerySchema = PaginationSchema.extend({
+  deleted: z.literal('false', { error: 'validation.invalid_selection' }).optional(),
+  entityType: EntityTypeIdentitySchema.optional(),
   reviewType: z.enum(REVIEW_TYPE_ENUM, { error: 'validation.invalid_selection' }).optional()
 }).strict()
 type QueryWithWhere = { where: (...args: unknown[]) => unknown }
@@ -284,7 +287,7 @@ export default defineEventHandler(async event => {
   }
 
   const { profileId, streamId } = routeParams
-  const { page, limit, search, reviewType } = await readReviewSetupListQuery(event)
+  const { page, limit, search, reviewType, entityType } = await readReviewSetupListQuery(event)
   const authorizationResult = await authorizeReviewSetupListRoute(event, db, profileId, streamId)
   if (authorizationResult) {
     return authorizationResult
@@ -293,6 +296,9 @@ export default defineEventHandler(async event => {
   const offset = (page - 1) * limit
 
   let baseQuery = createReviewSetupBaseQuery(db, streamId)
+  if (entityType) {
+    baseQuery = baseQuery.where('Common_Review_Set_Setup.egcs_cn_entitytype', '=', entityType)
+  }
   const typeFilterResult = await applyReviewSetupTypeFilter(db, streamId, baseQuery, reviewType)
   if (!typeFilterResult.hasMatches) {
     return createEmptyReviewSetupListResponse(page, limit)
