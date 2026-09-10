@@ -1,4 +1,4 @@
-import { AgencyHoldbackBasisSchema } from '~~/shared/types/schemas'
+import { AgencyHoldbackBasisWriteSchema } from '~~/shared/types/schemas'
 import { authorize } from '~~/server/utils/authorize'
 import { assertActiveAgencyProfile, withActiveAgencyMutationTransaction } from '~~/server/utils/agency-auth'
 import { throwIfAgencyUniqueConstraintError } from '~~/server/utils/agency-unique-constraint-errors'
@@ -12,7 +12,7 @@ export default defineEventHandler(async event => {
   }
   await authorize(event, 'agency', 'update', { type: 'agency', agencyId })
   await assertActiveAgencyProfile(event, agencyId)
-  const body = await readValidatedBodyI18n(event, AgencyHoldbackBasisSchema)
+  const body = await readValidatedBodyI18n(event, AgencyHoldbackBasisWriteSchema)
   try {
     return await withActiveAgencyMutationTransaction(event, agencyId, async trx => await trx
       .insertInto('Agency_Holdback_Basis').values({ ...body, egcs_ay_organizationagency: agencyId })
