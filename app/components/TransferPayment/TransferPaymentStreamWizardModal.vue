@@ -3,9 +3,8 @@ import type { FormSubmitEvent } from '#ui/types'
 import type { TransferPaymentStreamPolymorphicWizard } from '~~/shared/types/schemas'
 import { useTransferPaymentStreamWizardModal } from '~/composables/useTransferPaymentStreamWizardModal'
 
-const { programId, agencyId, pending = false } = defineProps<{
+const { programId, pending = false } = defineProps<{
   programId: string
-  agencyId?: string | null
   pending?: boolean
 }>()
 
@@ -19,6 +18,9 @@ const { t } = useI18n()
 const { getBilingualValue } = useBilingualValue()
 const {
   state,
+  referenceDataError,
+  isReferenceDataLoading,
+  retryReferenceData,
   wizardErrors,
   steps,
   currentStep,
@@ -70,8 +72,7 @@ const {
   onCurrentStepUpdate
 } = useTransferPaymentStreamWizardModal({
   open,
-  programId,
-  agencyId
+  programId
 })
 
 /**
@@ -124,6 +125,18 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentStreamPolymorphicWizard>
           @next="nextStep"
           @jump-to-step="onCurrentStepUpdate">
           <template #default="slotProps">
+            <div v-if="referenceDataError" role="alert" class="mb-4 flex flex-wrap items-center gap-2 text-sm text-error">
+              <span>{{ t('common.lookup_load_failed') }}</span>
+              <UButton
+                type="button"
+                color="neutral"
+                variant="outline"
+                size="xs"
+                icon="i-lucide-refresh-cw"
+                :label="t('common.retry')"
+                :loading="isReferenceDataLoading"
+                @click="retryReferenceData" />
+            </div>
             <div v-if="slotProps.currentStep === 'general'" class="space-y-4">
               <TransferPaymentFieldsTransferPaymentStreamFields
                 :model="state.stream"

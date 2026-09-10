@@ -9,9 +9,8 @@ import { appRouteLocations } from '~/utils/route-locations'
 import type { TransferPaymentStreamItem, TransferPaymentStreamPolymorphicWizard } from '~~/shared/types/schemas'
 import type { TransferPaymentStreamRow } from '~~/shared/types/transfer-payment-ui'
 
-const { programId, agencyId, canUpdateChild, canDeleteChild } = defineProps<{
+const { programId, canUpdateChild, canDeleteChild } = defineProps<{
   programId: string
-  agencyId?: string | null
   canUpdateChild: boolean
   canDeleteChild: boolean
 }>()
@@ -280,7 +279,6 @@ onBeforeUnmount(() => {
       :key="programId"
       v-model:open="isStreamWizardOpen"
       :program-id="programId"
-      :agency-id="agencyId"
       :pending="isSavingStreamWizard"
       @submit="submitStreamWizard" />
   </div>

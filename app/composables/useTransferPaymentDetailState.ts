@@ -79,7 +79,7 @@ export const useTransferPaymentDetailState = (id: string) => {
     ],
     [
       'streams',
-      { key: TRANSFER_PAYMENT_DETAIL_TAB_KEYS.streams, icon: 'i-lucide-layers', component: TransferPaymentStreamsTab, getProps: () => ({ programId: id, agencyId: agencyId.value, canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }
+      { key: TRANSFER_PAYMENT_DETAIL_TAB_KEYS.streams, icon: 'i-lucide-layers', component: TransferPaymentStreamsTab, getProps: () => ({ programId: id, canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }
     ],
     [
       'outcomes',

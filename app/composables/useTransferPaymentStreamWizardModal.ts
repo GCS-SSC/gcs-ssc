@@ -131,7 +131,6 @@ export const createTransferPaymentStreamWizardInitialState = (): TransferPayment
 interface UseTransferPaymentStreamWizardModalOptions {
   open: Ref<boolean>
   programId: string
-  agencyId?: string | null
 }
 
 type WizardListKey = {
@@ -145,8 +144,7 @@ type WizardListItem<K extends WizardListKey> =
 
 export const useTransferPaymentStreamWizardModal = ({
   open,
-  programId,
-  agencyId
+  programId
 }: UseTransferPaymentStreamWizardModalOptions) => {
   const { t, locale } = useI18n()
   const toast = useToast()
@@ -225,8 +223,8 @@ export const useTransferPaymentStreamWizardModal = ({
     refresh: refreshApplicantRecipientOptions
   } =
     useAgencyReferenceData<AgencyApplicantRecipientSubtypeItem>({
-      agencyId: computed(() => (open.value ? agencyId ?? '' : '')),
-      buildUrl: id => `/api/agency/${id}/applicant-recipient-subtypes`,
+      agencyId: computed(() => (open.value ? programId : '')),
+      buildUrl: id => `/api/transfer-payments/${id}/streams/lookups/applicant-recipient-subtypes`,
       query: { page: 1, limit: 100 }
     })
   const applicantRecipientOptions = computed(() => applicantRecipientResponse.value?.items ?? [])
@@ -237,8 +235,8 @@ export const useTransferPaymentStreamWizardModal = ({
     refresh: refreshLineItemOptions
   } =
     useAgencyReferenceData<AgencyCostCategoryLineItemItem>({
-      agencyId: computed(() => (open.value ? agencyId ?? '' : '')),
-      buildUrl: id => `/api/agency/${id}/line-items`,
+      agencyId: computed(() => (open.value ? programId : '')),
+      buildUrl: id => `/api/transfer-payments/${id}/streams/lookups/line-items`,
       query: { page: 1, limit: 100 }
     })
   const lineItemOptions = computed(() => lineItemResponse.value?.items ?? [])
@@ -249,8 +247,8 @@ export const useTransferPaymentStreamWizardModal = ({
     refresh: refreshAgreementTypeOptions
   } =
     useAgencyReferenceData<AgencyAgreementTypeItem>({
-      agencyId: computed(() => (open.value ? agencyId ?? '' : '')),
-      buildUrl: id => `/api/agency/${id}/agreement-types`,
+      agencyId: computed(() => (open.value ? programId : '')),
+      buildUrl: id => `/api/transfer-payments/${id}/streams/lookups/agreement-types`,
       query: { page: 1, limit: 100 }
     })
   const agreementTypeOptions = computed(() => agreementTypeResponse.value?.items ?? [])
@@ -260,8 +258,8 @@ export const useTransferPaymentStreamWizardModal = ({
     error: agencyHoldbackError,
     refresh: refreshAgencyHoldbackOptions
   } = useAgencyReferenceData<AgencyHoldbackBasisItem>({
-    agencyId: computed(() => (open.value ? agencyId ?? '' : '')),
-    buildUrl: id => `/api/agency/${id}/holdback-bases`,
+    agencyId: computed(() => (open.value ? programId : '')),
+    buildUrl: id => `/api/transfer-payments/${id}/streams/lookups/holdback-bases`,
     query: { page: 1, limit: 100 }
   })
   const agencyHoldbackOptions = computed(() => agencyHoldbackResponse.value?.items ?? [])
@@ -598,13 +596,22 @@ export const useTransferPaymentStreamWizardModal = ({
       .filter((item): item is AgencyAgreementTypeItem => item !== null)
   })
 
+  const referenceLoadError: Ref<unknown> = ref(null)
+  const referenceDataError = computed(() => referenceLoadError.value
+    ?? budgetsError.value
+    ?? applicantRecipientError.value
+    ?? lineItemError.value
+    ?? agreementTypeError.value
+    ?? agencyHoldbackError.value
+    ?? null)
+
   const preloadReferenceData = async () => {
     const loadId = latestReferenceLoadId.value + 1
     latestReferenceLoadId.value = loadId
     isReferenceDataLoading.value = true
 
     try {
-      await Promise.all([
+      const results = await Promise.allSettled([
         refreshBudgets(),
         refreshApplicantRecipientOptions(),
         refreshLineItemOptions(),
@@ -612,6 +619,8 @@ export const useTransferPaymentStreamWizardModal = ({
         refreshAgencyHoldbackOptions()
       ])
 
+      const rejected = results.find(result => result.status === 'rejected')
+      if (rejected?.status === 'rejected') throw rejected.reason
       const requestError = budgetsError.value
         ?? applicantRecipientError.value
         ?? lineItemError.value
@@ -620,9 +629,11 @@ export const useTransferPaymentStreamWizardModal = ({
       if (requestError) {
         throw requestError
       }
+      if (latestReferenceLoadId.value === loadId && open.value) referenceLoadError.value = null
     } catch (error: unknown) {
       if (latestReferenceLoadId.value !== loadId || !open.value) return
 
+      referenceLoadError.value = error
       console.error('Failed to preload stream wizard reference data', error)
       toast.add({
         title: t('common.error'),
@@ -636,6 +647,11 @@ export const useTransferPaymentStreamWizardModal = ({
     }
   }
 
+  const retryReferenceData = async () => {
+    if (!open.value || isReferenceDataLoading.value) return
+    await preloadReferenceData()
+  }
+
   const initializeState = () => {
     state.value = createTransferPaymentStreamWizardInitialState()
     reset()
@@ -646,6 +662,7 @@ export const useTransferPaymentStreamWizardModal = ({
   const clearState = () => {
     latestReferenceLoadId.value += 1
     isReferenceDataLoading.value = false
+    referenceLoadError.value = null
     clearErrors()
     state.value = null
   }
@@ -680,6 +697,8 @@ export const useTransferPaymentStreamWizardModal = ({
     state,
     wizardErrors,
     isReferenceDataLoading,
+    referenceDataError,
+    retryReferenceData,
     steps,
     currentStep,
     isFirstStep,

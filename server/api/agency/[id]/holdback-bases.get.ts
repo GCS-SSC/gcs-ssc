@@ -5,6 +5,12 @@ import { fetchAgencyScopedList } from '~~/server/utils/agency-scoped-list'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
+const AgencyHoldbackBasisListQuerySchema = PaginationSchema.extend({
+  search: PaginationSchema.shape.search.refine(value => value === undefined || !value.includes('\u0000'), {
+    error: 'validation.invalid_text_character'
+  })
+})
+
 export default defineEventHandler(async event => {
   const agencyId = getRouterParam(event, 'id')
   if (!agencyId) return await badRequest(event, 'MISSING_AGENCY_ID', 'apiErrors.request.missing_agency_id')
@@ -12,7 +18,7 @@ export default defineEventHandler(async event => {
     return await notFound(event, 'AGENCY_NOT_FOUND', 'apiErrors.agency.not_found')
   }
   await authorize(event, 'agency', 'read', { type: 'agency', agencyId })
-  const { page, limit, search } = await getValidatedQueryI18n(event, PaginationSchema)
+  const { page, limit, search } = await getValidatedQueryI18n(event, AgencyHoldbackBasisListQuerySchema)
   return await withActiveAgencyReadTransaction(event, agencyId, async trx => {
     const scopedQuery = trx.selectFrom('Agency_Holdback_Basis')
       .where('egcs_ay_organizationagency', '=', agencyId).where('_deleted', '=', false)
