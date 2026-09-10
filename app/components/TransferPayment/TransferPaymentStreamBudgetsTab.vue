@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
-import { computed, onBeforeUnmount, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { useCrudModalPending } from '~/composables/useCrudModal'
@@ -60,11 +60,13 @@ const isSavingStreamBudget = streamBudgetPending.isPending
 const getStreamBudgetActionTarget = (row: TransferPaymentStreamBudgetRow) =>
   `${row.fiscal_year_display || row.fiscal_year || row.id} [${row.id}]`
 
+const isDeletingStreamBudget: Ref<boolean> = ref(false)
 let contextGeneration = 0
 let disposed = false
 const isCurrentContext = (generation: number) => !disposed && generation === contextGeneration
 watch([() => transferPaymentId, () => streamId], () => {
   contextGeneration += 1
+  isDeletingStreamBudget.value = false
   streamBudgetModal.close()
 }, { flush: 'sync' })
 onBeforeUnmount(() => {
@@ -126,20 +128,22 @@ const saveStreamBudget = async () => {
  * @param row - The stream budget to delete.
  */
 const deleteStreamBudget = async (row: TransferPaymentStreamBudgetRow) => {
+  if (disposed || !canDeleteChild || isDeletingStreamBudget.value) return
+  const generation = contextGeneration
+  isDeletingStreamBudget.value = true
   try {
     const ok = await confirmDeleteRequest(
-      `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/budgets/${row.id}`
+      `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/budgets/${row.id}`,
+      { shouldProceed: () => isCurrentContext(generation) && canDeleteChild }
     )
-    if (!ok) return
+    if (!ok || !isCurrentContext(generation)) return
+    await refreshStreamBudgets()
+    if (!isCurrentContext(generation) || streamBudgetStatusState.value !== 'success') return
     toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
-    return
-  }
-  try {
-    await refreshStreamBudgets()
-  } catch (error: unknown) {
-    showError(error)
+    if (isCurrentContext(generation)) showError(error)
+  } finally {
+    if (isCurrentContext(generation)) isDeletingStreamBudget.value = false
   }
 }
 </script>
@@ -194,7 +198,7 @@ const deleteStreamBudget = async (row: TransferPaymentStreamBudgetRow) => {
           variant="ghost"
           size="sm"
           :aria-label="t('common.delete_named', { name: getStreamBudgetActionTarget(row.original) })"
-          :disabled="!canDeleteChild"
+          :disabled="!canDeleteChild || isDeletingStreamBudget"
           @click="deleteStreamBudget(row.original)" />
       </div>
     </template>
