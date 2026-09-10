@@ -89,11 +89,16 @@ const assertBudgetReferences = async (
   const budgetIds = uniqueStrings(payload.budgets, item => item.egcs_tp_transferpaymentbudget)
   const budgets = await db
     .selectFrom('Transfer_Payment_Fiscal_Year_Budget')
-    .where('id', 'in', budgetIds)
-    .where('egcs_tp_transferpaymentprofile', '=', profileId)
-    .where('_deleted', '=', false)
-    .select(['id', databaseMoneyText(sql.ref('egcs_tp_totalbudget')).as('egcs_tp_totalbudget')])
-    .orderBy('id', 'asc')
+    .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_fiscalyear')
+    .where('Transfer_Payment_Fiscal_Year_Budget.id', 'in', budgetIds)
+    .where('Transfer_Payment_Fiscal_Year_Budget.egcs_tp_transferpaymentprofile', '=', profileId)
+    .where('Transfer_Payment_Fiscal_Year_Budget._deleted', '=', false)
+    .where('Agency_Fiscal_Year._deleted', '=', false)
+    .select([
+      'Transfer_Payment_Fiscal_Year_Budget.id as id',
+      databaseMoneyText(sql.ref('Transfer_Payment_Fiscal_Year_Budget.egcs_tp_totalbudget')).as('egcs_tp_totalbudget')
+    ])
+    .orderBy('Transfer_Payment_Fiscal_Year_Budget.id', 'asc')
     .forUpdate('Transfer_Payment_Fiscal_Year_Budget')
     .execute()
 

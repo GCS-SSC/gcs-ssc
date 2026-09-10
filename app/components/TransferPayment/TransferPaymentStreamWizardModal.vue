@@ -30,7 +30,7 @@ const {
   prevStep,
   errorsByStep,
   currentStepErrors,
-  budgets,
+  onBudgetResolved,
   chartOfAccountBudgetOptions,
   applicantRecipientOptions,
   lineItemOptions,
@@ -168,9 +168,9 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentStreamPolymorphicWizard>
                 <TransferPaymentFieldsTransferPaymentStreamBudgetFields
                   :model="budget"
                   :transfer-payment-id="programId"
-                  :budget-options="budgets"
                   :name-prefix="`budgets.${index}`"
-                  @update:model="updatedBudget => onBudgetModelUpdate(index, updatedBudget)" />
+                  @update:model="updatedBudget => onBudgetModelUpdate(index, updatedBudget)"
+                  @budget-resolved="payload => onBudgetResolved(budget.tempId, payload)" />
               </div>
               <UButton type="button" :label="t('common.add')" icon="i-lucide-plus" variant="outline" block @click="addBudget" />
             </div>

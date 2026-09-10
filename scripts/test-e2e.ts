@@ -18,6 +18,7 @@ const DEFAULT_PLAYWRIGHT_WORKERS = '1'
 const E2E_POSTGRES_TEST_URL_ENV = 'E2E_POSTGRES_TEST_URL'
 
 export const postgresE2eSpecPaths = [
+  'tests/e2e/stream-wizard-budget-reference-review.spec.ts',
   'tests/e2e/proponent-profile-list-review.spec.ts',
   'tests/e2e/proponent-profile-historical-subtype-update-review.spec.ts',
   'tests/e2e/stream-eligible-recipients-update-review.spec.ts',

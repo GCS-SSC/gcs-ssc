@@ -1,14 +1,12 @@
 /* eslint-disable jsdoc/require-jsdoc -- wizard callbacks use self-descriptive local signatures */
 import { nanoid } from 'nanoid'
 import type { FormError } from '#ui/types'
-import type { FetchError } from 'ofetch'
 import type { Ref } from 'vue'
 import type {
   AgencyAgreementTypeItem,
   AgencyHoldbackBasisItem,
   AgencyApplicantRecipientSubtypeItem,
   AgencyCostCategoryLineItemItem,
-  TransferPaymentBudgetItem,
   TransferPaymentStreamPolymorphicWizard
 } from '~~/shared/types/schemas'
 import {
@@ -17,9 +15,7 @@ import {
 import { useWizardFlow, type WizardStepItem } from '~/composables/useWizardFlow'
 import { formatMoneyText, parseMoney } from '~~/shared/utils/money'
 
-interface ProgramBudgetOption extends TransferPaymentBudgetItem, Record<string, unknown> {
-  fiscal_year_display?: string
-}
+import type { AdminCommonLookupResponseItem } from '~~/shared/types/admin-common-ui'
 
 type StreamBudgetState = Omit<TransferPaymentStreamPolymorphicWizard['budgets'][number], 'egcs_tp_totalbudget'> & {
   egcs_tp_totalbudget: string
@@ -191,29 +187,28 @@ export const useTransferPaymentStreamWizardModal = ({
     excludedErrorSummarySteps: ['review']
   })
 
-  const {
-    data: budgetsResponse,
-    error: budgetsError,
-    refresh: refreshBudgets
-  } = useFetch<{ items: ProgramBudgetOption[] }, FetchError, string>(`/api/transfer-payments/${programId}/budgets`, {
-    query: {
-      page: 1,
-      limit: 100
-    },
-    immediate: false
-  })
-  const budgets = computed(() => budgetsResponse.value?.items ?? [])
-  const budgetLabelById = computed(
-    () =>
-      new Map(
-        budgets.value.map((item: ProgramBudgetOption) => [
-          String(item.id),
-          String(item.fiscal_year_display ?? item.egcs_tp_fiscalyear ?? item.id)
-        ])
-      )
-  )
+  const budgetLabels: Ref<Record<string, { programId: string, budgetId: string, label: string }>> = ref({})
+  const onBudgetResolved = (budgetTempId: string, payload: { programId: string, items: AdminCommonLookupResponseItem[] }) => {
+    if (!open.value || payload.programId !== programId) return
+    const budget = state.value?.budgets.find(item => item.tempId === budgetTempId)
+    if (!budget) return
+    const item = payload.items.find(item => String(item.id) === String(budget.egcs_tp_transferpaymentbudget))
+    if (!item && payload.items.length > 0) return
+    const next = Object.fromEntries(Object.entries(budgetLabels.value).filter(([tempId]) => tempId !== budgetTempId))
+    if (item && typeof item.fiscal_year_display === 'string') {
+      next[budgetTempId] = { programId, budgetId: String(item.id), label: item.fiscal_year_display }
+    }
+    budgetLabels.value = next
+  }
+  watch(() => state.value?.budgets.map(budget => ({ tempId: budget.tempId, budgetId: budget.egcs_tp_transferpaymentbudget })) ?? [], budgets => {
+    budgetLabels.value = Object.fromEntries(Object.entries(budgetLabels.value).filter(([tempId, item]) =>
+      item.programId === programId && budgets.some(budget => budget.tempId === tempId && String(budget.budgetId) === item.budgetId)))
+  }, { flush: 'sync' })
+  const budgetLabelById = computed(() => new Map(Object.values(budgetLabels.value).map(item => [item.budgetId, item.label])))
+  const getBudgetLabel = (budgetId: string) => budgetLabelById.value.get(String(budgetId))
+    ?? t(budgetId ? 'common.unavailable' : 'common.none')
   const chartOfAccountBudgetOptions = computed(() => (state.value?.budgets ?? []).map(budget => ({
-    label: budgetLabelById.value.get(String(budget.egcs_tp_transferpaymentbudget)) ?? String(budget.egcs_tp_transferpaymentbudget),
+    label: getBudgetLabel(budget.egcs_tp_transferpaymentbudget),
     value: budget.tempId
   })))
 
@@ -565,12 +560,12 @@ export const useTransferPaymentStreamWizardModal = ({
 
     return state.value.budgets.map((budget, index) => ({
       key: budget.tempId,
-      title: budgetLabelById.value.get(String(budget.egcs_tp_transferpaymentbudget)) || t('common.none'),
+      title: getBudgetLabel(budget.egcs_tp_transferpaymentbudget),
       items: [
         {
           key: `budget-${index}`,
           label: t('transfer_payment.program_budget'),
-          value: budgetLabelById.value.get(String(budget.egcs_tp_transferpaymentbudget)) || t('common.none')
+          value: getBudgetLabel(budget.egcs_tp_transferpaymentbudget)
         },
         {
           key: `total-${index}`,
@@ -598,7 +593,6 @@ export const useTransferPaymentStreamWizardModal = ({
 
   const referenceLoadError: Ref<unknown> = ref(null)
   const referenceDataError = computed(() => referenceLoadError.value
-    ?? budgetsError.value
     ?? applicantRecipientError.value
     ?? lineItemError.value
     ?? agreementTypeError.value
@@ -612,7 +606,6 @@ export const useTransferPaymentStreamWizardModal = ({
 
     try {
       const results = await Promise.allSettled([
-        refreshBudgets(),
         refreshApplicantRecipientOptions(),
         refreshLineItemOptions(),
         refreshAgreementTypeOptions(),
@@ -621,8 +614,7 @@ export const useTransferPaymentStreamWizardModal = ({
 
       const rejected = results.find(result => result.status === 'rejected')
       if (rejected?.status === 'rejected') throw rejected.reason
-      const requestError = budgetsError.value
-        ?? applicantRecipientError.value
+      const requestError = applicantRecipientError.value
         ?? lineItemError.value
         ?? agreementTypeError.value
         ?? agencyHoldbackError.value
@@ -707,7 +699,7 @@ export const useTransferPaymentStreamWizardModal = ({
     prevStep,
     errorsByStep,
     currentStepErrors,
-    budgets,
+    onBudgetResolved,
     budgetLabelById,
     chartOfAccountBudgetOptions,
     applicantRecipientOptions,
