@@ -1,5 +1,5 @@
 import { sql } from 'kysely'
-import { TransferPaymentStreamBudgetSchema } from '~~/shared/types/schemas'
+import { TransferPaymentStreamBudgetCreateSchema } from '~~/shared/types/schemas'
 import { throwIfTransferPaymentUniqueConstraintError } from '~~/server/utils/transfer-payment-unique-constraint-errors'
 import { authorizeTransferPaymentStreamResource } from '~~/server/utils/transfer-payment-route-authorization'
 import { executeFreshAuthorizedTransferPaymentWrite } from '~~/server/utils/transfer-payment-write-transaction'
@@ -23,7 +23,7 @@ export default defineEventHandler(async event => {
 
   const access = await authorizeTransferPaymentStreamResource(event, 'create', profileId, streamId)
   if (!access) return await notFound(event, 'TRANSFER_PAYMENT_STREAM_NOT_FOUND', 'apiErrors.transfer_payment.stream_not_found')
-  const validated = await readValidatedBodyI18n(event, TransferPaymentStreamBudgetSchema)
+  const validated = await readValidatedBodyI18n(event, TransferPaymentStreamBudgetCreateSchema)
 
   try {
     return await executeFreshAuthorizedTransferPaymentWrite(

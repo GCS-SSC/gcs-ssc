@@ -174,6 +174,10 @@ export const TransferPaymentStreamBudgetSchema = z.object({
 export type TransferPaymentStreamBudget = z.infer<typeof TransferPaymentStreamBudgetSchema>
 export type TransferPaymentStreamBudgetItem = WithId<TransferPaymentStreamBudget>
 
+export const TransferPaymentStreamBudgetCreateSchema = TransferPaymentStreamBudgetSchema.extend({
+  egcs_tp_transferpaymentbudget: PositivePostgresBigintIdSchema
+})
+
 export const TransferPaymentEligibleRecipientSchema = z.object({
   egcs_tp_applicantrecipientsubtype: RequiredId()
 })
@@ -653,8 +657,7 @@ export const TransferPaymentStreamRiskRatingSchema = z.object({
 export type TransferPaymentStreamRiskRating = z.infer<typeof TransferPaymentStreamRiskRatingSchema>
 export type TransferPaymentStreamRiskRatingItem = WithId<TransferPaymentStreamRiskRating>
 
-export const TransferPaymentStreamWizardBudgetSchema = TransferPaymentStreamBudgetSchema.extend({
-  egcs_tp_transferpaymentbudget: PositivePostgresBigintIdSchema,
+export const TransferPaymentStreamWizardBudgetSchema = TransferPaymentStreamBudgetCreateSchema.extend({
   tempId: RequiredString()
 })
 

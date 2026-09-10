@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
-import { computed, watch } from 'vue'
+import { computed, onBeforeUnmount, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { useCrudModalPending } from '~/composables/useCrudModal'
-import { TransferPaymentStreamBudgetSchema } from '~~/shared/types/schemas'
+import { TransferPaymentStreamBudgetCreateSchema } from '~~/shared/types/schemas'
 import type { TransferPaymentStreamBudgetForm, TransferPaymentStreamBudgetRow } from '~~/shared/types/transfer-payment-ui'
 import { formatMoneyText } from '~~/shared/utils/money'
 
@@ -54,13 +54,23 @@ const streamBudgetModal = useCrudModal<TransferPaymentStreamBudgetRow, TransferP
 const isStreamBudgetModalOpen: Ref<boolean> = streamBudgetModal.isOpen
 const selectedStreamBudget: Ref<TransferPaymentStreamBudgetForm | null> = streamBudgetModal.selected
 const openUpdateStreamBudget = streamBudgetModal.openUpdate
-const validateStreamBudget = createValidator(TransferPaymentStreamBudgetSchema)
+const validateStreamBudget = createValidator(TransferPaymentStreamBudgetCreateSchema)
 const streamBudgetPending = useCrudModalPending(streamBudgetModal.captureSession)
 const isSavingStreamBudget = streamBudgetPending.isPending
 const getStreamBudgetActionTarget = (row: TransferPaymentStreamBudgetRow) =>
   `${row.fiscal_year_display || row.fiscal_year || row.id} [${row.id}]`
 
-watch([() => transferPaymentId, () => streamId], () => streamBudgetModal.close())
+let contextGeneration = 0
+let disposed = false
+const isCurrentContext = (generation: number) => !disposed && generation === contextGeneration
+watch([() => transferPaymentId, () => streamId], () => {
+  contextGeneration += 1
+  streamBudgetModal.close()
+}, { flush: 'sync' })
+onBeforeUnmount(() => {
+  disposed = true
+  contextGeneration += 1
+})
 
 const openCreateStreamBudget = () => {
   if (!canUpdateChild) return
@@ -69,10 +79,12 @@ const openCreateStreamBudget = () => {
 
 /** Persists the selected stream budget and refreshes the table. */
 const saveStreamBudget = async () => {
-  if (!selectedStreamBudget.value || !canUpdateChild) return
+  if (disposed || !selectedStreamBudget.value || !canUpdateChild) return
   const session = streamBudgetModal.captureSession()
   if (!streamBudgetPending.begin(session)) return
   const isUpdate = Boolean(selectedStreamBudget.value.id)
+  const generation = contextGeneration
+  let closedSession = false
   try {
     const response = await fetch(getClientRequestUrl(selectedStreamBudget.value.id
       ? `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/budgets/${selectedStreamBudget.value.id}`
@@ -86,23 +98,25 @@ const saveStreamBudget = async () => {
     if (!response.ok) {
       await throwFetchResponseError(response)
     }
-    if (!streamBudgetModal.closeSession(session)) return
+    if (!isCurrentContext(generation)) return
+    closedSession = streamBudgetModal.closeSession(session)
   } catch (error: unknown) {
-    if (streamBudgetModal.captureSession() === session) showError(error)
+    if (isCurrentContext(generation) && streamBudgetModal.captureSession() === session) showError(error)
     return
   } finally {
     streamBudgetPending.end(session)
   }
 
-  toast.add({
-    title: t('common.success'),
-    description: t(isUpdate ? 'common.updated_success' : 'common.added_success'),
-    color: 'success'
-  })
   try {
     await refreshStreamBudgets()
+    if (!isCurrentContext(generation) || !closedSession || streamBudgetModal.captureSession() !== null || streamBudgetStatusState.value !== 'success') return
+    toast.add({
+      title: t('common.success'),
+      description: t(isUpdate ? 'common.updated_success' : 'common.added_success'),
+      color: 'success'
+    })
   } catch (error: unknown) {
-    showError(error)
+    if (isCurrentContext(generation)) showError(error)
   }
 }
 
