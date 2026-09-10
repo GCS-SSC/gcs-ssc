@@ -1,8 +1,8 @@
 import { sql } from 'kysely'
-import { TransferPaymentStreamBudgetSchema } from '~~/shared/types/schemas'
+import { TransferPaymentStreamBudgetCreateSchema } from '~~/shared/types/schemas'
 import { authorizeTransferPaymentStreamBudgetResource } from '~~/server/utils/transfer-payment-route-authorization'
 import { throwIfTransferPaymentUniqueConstraintError } from '~~/server/utils/transfer-payment-unique-constraint-errors'
-import { executeFreshAuthorizedTransferPaymentWrite } from '~~/server/utils/transfer-payment-write-transaction'
+import { executeFreshAuthorizedTransferPaymentStreamWrite } from '~~/server/utils/transfer-payment-write-transaction'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { addMoney, compareMoney } from '~~/shared/utils/money'
 
@@ -31,17 +31,18 @@ export default defineEventHandler(async event => {
     )
   }
 
-  const validated = await readValidatedBodyI18n(event, TransferPaymentStreamBudgetSchema.partial())
+  const validated = await readValidatedBodyI18n(event, TransferPaymentStreamBudgetCreateSchema.partial())
   if (Object.keys(validated).length === 0) {
     return await badRequest(event, 'NO_UPDATABLE_FIELDS', 'apiErrors.request.no_updatable_fields')
   }
 
   try {
-    return await executeFreshAuthorizedTransferPaymentWrite(
+    return await executeFreshAuthorizedTransferPaymentStreamWrite(
       event,
       db,
       profileId,
       access.agencyId,
+      streamId,
       'update',
       async trx => {
         const lockedStreamBudget = await trx.selectFrom('Transfer_Payment_Stream_Budget')
