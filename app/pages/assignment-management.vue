@@ -140,7 +140,14 @@ const columns: TableColumnInput<Row>[] = [
             </UBadge>
           </template>
           <template #actions-cell="{ row }">
-            <UButton icon="i-lucide-users" variant="soft" :label="`${t('assignments.manage')}: ${getBilingualValue(row.original, 'label', row.original.stable_reference)}`" @click="selected = row.original" />
+            <div class="flex justify-end gap-2">
+              <UButton
+                icon="i-lucide-users"
+                color="neutral"
+                variant="ghost"
+                :aria-label="`${t('assignments.manage')}: ${getBilingualValue(row.original, 'label', row.original.stable_reference)}`"
+                @click="selected = row.original" />
+            </div>
           </template>
         </CommonResourceLayoutPage>
       </div>

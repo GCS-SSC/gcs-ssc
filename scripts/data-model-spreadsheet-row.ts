@@ -1,5 +1,6 @@
 /* eslint-disable jsdoc/require-jsdoc, @typescript-eslint/no-explicit-any */
 import { readFile } from 'node:fs/promises'
+import { buildFillBlankRowsRequest } from './google-sheets-fill-blank'
 import {
   DATA_MODEL_SPREADSHEET_ID,
   getGoogleSheetsAccessToken,
@@ -8,7 +9,7 @@ import {
   sheetsRequest
 } from './google-sheets-workbook'
 
-type Action = 'cell' | 'color' | 'delete' | 'insert' | 'move' | 'read' | 'update'
+type Action = 'cell' | 'color' | 'delete' | 'fill-blank' | 'insert' | 'move' | 'read' | 'update'
 type Request = Record<string, unknown>
 
 const AUDIT_COLORS = {
@@ -24,6 +25,7 @@ const usage = (): never => {
     '  data-model-spreadsheet-row.ts read --sheet TITLE --row N [--count N]',
     '  data-model-spreadsheet-row.ts cell --sheet TITLE --row N --column A --expected-value TEXT --value-file PATH',
     '  data-model-spreadsheet-row.ts update --sheet TITLE --row N --expected-first-cell TEXT (--values-file PATH | --values-json JSON)',
+    '  data-model-spreadsheet-row.ts fill-blank --sheet TITLE --row N --count N --expected-first-cell-empty --values-file PATH',
     '  data-model-spreadsheet-row.ts insert --sheet TITLE --row N --count N --expected-first-cell TEXT',
     '  data-model-spreadsheet-row.ts delete --sheet TITLE --row N --count N --expected-first-cell TEXT',
     '  data-model-spreadsheet-row.ts color --sheet TITLE --row N --count N --color yellow|red|purple|blue (--expected-first-cell TEXT | --expected-first-cell-empty)',
@@ -32,7 +34,7 @@ const usage = (): never => {
 }
 
 const action = process.argv[2] as Action | undefined
-if (!action || !['cell', 'color', 'delete', 'insert', 'move', 'read', 'update'].includes(action)) usage()
+if (!action || !['cell', 'color', 'delete', 'fill-blank', 'insert', 'move', 'read', 'update'].includes(action)) usage()
 
 const args = new Map<string, string>()
 for (let index = 3; index < process.argv.length; index += 1) {
@@ -157,7 +159,10 @@ if (actualFirstCell !== expectedFirstCell) {
 }
 
 let request: Request
-if (action === 'update') {
+if (action === 'fill-blank') {
+  const input: unknown = JSON.parse(await readFile(required('--values-file'), 'utf8'))
+  request = buildFillBlankRowsRequest(sheet, startRowIndex, count, input)
+} else if (action === 'update') {
   if (count !== 1) throw new Error('The update operation changes exactly one row; omit --count')
   const valuesFile = args.get('--values-file')
   const valuesJson = args.get('--values-json')
