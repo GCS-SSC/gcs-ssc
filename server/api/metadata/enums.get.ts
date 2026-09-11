@@ -1,4 +1,3 @@
-import { sql } from 'kysely'
 import { z } from 'zod'
 import {
   APPROVAL_TYPE_ENUM,
@@ -109,13 +108,17 @@ export default defineEventHandler(async event => {
   }
   const enumTypeName = enumTypeNameByKey[requestedEnum] ?? requestedEnum
 
-  const result = await sql<{ enumlabel: string }>`
-    SELECT e.enumlabel
-    FROM pg_type t
-    JOIN pg_enum e ON t.oid = e.enumtypid
-    WHERE LOWER(t.typname) = LOWER(${enumTypeName})
-    ORDER BY e.enumsortorder
-  `.execute(db)
+  // A structured catalog read is safe before authentication and remains audited.
+  const result = await db.withTables<{
+    'pg_catalog.pg_type': { oid: number; typname: string }
+    'pg_catalog.pg_enum': { enumtypid: number; enumlabel: string; enumsortorder: number }
+  }>()
+    .selectFrom('pg_catalog.pg_type as t')
+    .innerJoin('pg_catalog.pg_enum as e', 't.oid', 'e.enumtypid')
+    .select('e.enumlabel')
+    .where('t.typname', 'ilike', enumTypeName.replaceAll('_', '\\_'))
+    .orderBy('e.enumsortorder')
+    .execute()
 
-  return result.rows.map(row => row.enumlabel)
+  return result.map(row => row.enumlabel)
 })

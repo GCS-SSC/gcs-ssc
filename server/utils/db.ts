@@ -1,3 +1,6 @@
+import { createAuditDialect, type AuditControl } from './audit-driver'
+import { auditScope, withoutAuditCapture } from './audit-context'
+import { registerAuditControl, resolveAuditRetention } from './audit-runtime'
 import nodeProcess from 'node:process'
 import { Kysely, PostgresDialect, sql } from 'kysely'
 import { KyselyPGlite } from 'kysely-pglite'
@@ -14,6 +17,8 @@ import {
 } from './database-config'
 import { executeBoundedPostgresHealthQuery } from './database-health'
 import { clearMigrationStateForDatabaseGeneration } from './migration-readiness'
+
+declare const useEvent: typeof import('nitropack/runtime').useEvent
 
 declare module 'h3' {
   interface H3EventContext {
@@ -93,6 +98,28 @@ export const resolveDatabaseConfig = (
  * @returns The Kysely database instance.
  */
 const createDatabase = (): Omit<DatabaseGeneration, 'id' | 'leases'> => {
+  resolveAuditRetention()
+  const audit: AuditControl = {
+    enabled: false,
+    report: event => console.error(event),
+    /**
+     *
+     */
+    /** @returns Immutable query attribution from the verified request context. */
+    identity: () => {
+      const scoped = auditScope.getStore()?.identity
+      if (scoped) return scoped
+      let event
+      try {
+        event = useEvent()
+      } catch { /* Background work has system attribution. */ }
+      if (!event) return { actorUserId: null, actorKind: 'system', requestId: null, protected: false }
+      const actorUserId = event.context.$authContext?.userId ?? event.context.auditActorUserId ?? null
+      return { actorUserId, actorKind: actorUserId ? 'user' : 'anonymous',
+        requestId: event.context.auditRequestId ?? null,
+        protected: event.path.startsWith('/api/') && !event.path.startsWith('/api/auth/') }
+    }
+  }
   const config = useRuntimeConfig()
   const {
     databaseUrl,
@@ -112,9 +139,10 @@ const createDatabase = (): Omit<DatabaseGeneration, 'id' | 'leases'> => {
     const applicationPool = new pg.Pool(buildPostgresPoolConfig(databaseUrl, timeouts))
     const healthPool = new pg.Pool(buildPostgresHealthPoolConfig(databaseUrl, timeouts.healthQueryTimeoutMs))
     const database = new Kysely<Database>({
-      dialect: new PostgresDialect({ pool: applicationPool })
+      dialect: createAuditDialect(new PostgresDialect({ pool: applicationPool }), false, audit)
     })
 
+    registerAuditControl(database, audit)
     return {
       database,
       healthCheck: async () => await executeBoundedPostgresHealthQuery(
@@ -140,12 +168,13 @@ const createDatabase = (): Omit<DatabaseGeneration, 'id' | 'leases'> => {
       [pgliteTypes.NUMERIC]: parseSafeDecimal
     }
   }).dialect
-  const database = new Kysely<Database>({ dialect })
+  const database = new Kysely<Database>({ dialect: createAuditDialect(dialect, true, audit) })
+  registerAuditControl(database, audit)
 
   return {
     database,
     healthCheck: async () => {
-      await sql`SELECT 1`.execute(database)
+      await withoutAuditCapture(() => sql`SELECT 1`.execute(database))
     },
     destroy: async () => await database.destroy()
   }

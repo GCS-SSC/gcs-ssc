@@ -578,6 +578,7 @@
       "manager": "Gestionnaire"
     },
     "subjects": {
+      "audit": "Audit",
       "system": "Système",
       "agency": "Agence",
       "transfer_payment": "Paiement de transfert",
@@ -3262,6 +3263,50 @@
       "status_locked": "Cet examen est en lecture seule parce qu'il est dans un statut de flux verrouillé.",
       "empty_comment": "Aucun commentaire de complétion n'a été fourni.",
       "completed_success": "L'examen a été terminé avec succès."
+    }
+  },
+  "audit": {
+    "title": "Audit",
+    "access": "Accès",
+    "description": "Modifications validées, événements de sécurité et requêtes de la base de données de l’application.",
+    "retention": "Audit : {audit} jours. Accès : {access} jours. Les paramètres de déploiement s’appliquent après le redémarrage.",
+    "actor": "ID de l’acteur",
+    "table": "Table",
+    "recordId": "ID de l’enregistrement",
+    "operation": "Opération / résultat",
+    "requestId": "ID de la requête",
+    "from": "Du",
+    "to": "Au",
+    "date": "Date",
+    "details": "Détails",
+    "retry": "Réessayer",
+    "error": "Impossible de charger les preuves.",
+    "field": "Champ",
+    "old": "Ancienne valeur",
+    "new": "Nouvelle valeur",
+    "evidence": {
+      "created_at": "Date",
+      "actor_user_id": "ID de l’acteur",
+      "request_id": "ID de la requête",
+      "table_name": "Table",
+      "operation": "Opération",
+      "sql": "SQL",
+      "parameters": "Paramètres",
+      "returned_identities": "Identités retournées",
+      "limitations": "Limites de capture",
+      "outcome": "Résultat de la requête",
+      "transaction_outcome": "Résultat de la transaction",
+      "duration_ms": "Durée (ms)",
+      "row_count": "Nombre de lignes",
+      "actor_kind": "Type d’acteur",
+      "query_id": "ID de la requête SQL"
+    },
+    "limitations": {
+      "parameters_redacted": "Les valeurs des paramètres sont masquées, car leur sensibilité est inconnue.",
+      "returned_identities_unavailable": "Cette projection ne permet pas de déterminer les identités des enregistrements de façon fiable.",
+      "returned_identities_truncated": "Les identités retournées dépassent la limite de capture.",
+      "sql_truncated": "La requête SQL dépasse la limite de capture.",
+      "parameters_truncated": "Le nombre de paramètres dépasse la limite de capture."
     }
   }
 }

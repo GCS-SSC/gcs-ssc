@@ -20,7 +20,7 @@ export const recordSecurityAuditEvent = async (
   event: SecurityAuditEventInput
 ): Promise<void> => {
   await db
-    .insertInto('security_audit_event')
+    .insertInto('audit.security_audit_event')
     .values({
       actor_user_id: event.actorUserId,
       event_type: event.eventType,

@@ -12,6 +12,7 @@ import {
 export { AUTHORIZATION_SUBJECTS, isAuthorizationSubject }
 
 export const ABILITIES = [
+  { action: 'read', subject: 'audit', name_en: 'Read Audit', name_fr: 'Consulter l’audit', desc_en: 'Read change and access logs.', desc_fr: 'Consulter les journaux de modification et d’accès.' },
   {
     action: 'create',
     subject: 'system',

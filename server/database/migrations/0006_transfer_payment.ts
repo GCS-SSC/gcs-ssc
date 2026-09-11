@@ -328,7 +328,7 @@ export async function up(db: Kysely<Database>): Promise<void> {
       scope_type := CASE WHEN role_agency_id IS NULL THEN 'global' WHEN has_program_scope THEN 'program' ELSE 'agency' END;
       SELECT count(*) INTO invalid_count FROM role_permission
       WHERE role_id = target_role_id AND _deleted = false AND (
-        (subject = 'system' AND scope_type <> 'global')
+        (subject IN ('system', 'audit') AND scope_type <> 'global')
         OR (subject IN ('agency', 'role', 'user', 'applicant_recipient') AND scope_type = 'program')
       );
       IF invalid_count > 0 THEN

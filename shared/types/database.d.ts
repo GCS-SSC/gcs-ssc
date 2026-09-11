@@ -399,7 +399,13 @@ export interface ExtensionsDatabase {
   'extensions.gcs_gcforms_credentials': ExtensionsGcsGcFormsCredentialTable
 }
 
-export interface Database extends ExtensionsDatabase {
+export interface AuditDatabase {
+  'audit.security_audit_event': SecurityAuditEventTable
+  'audit.change_event': AuditChangeEventTable
+  'audit.access_event': AuditAccessEventTable
+}
+
+export interface Database extends ExtensionsDatabase, AuditDatabase {
   Agency_Profile: AgencyProfileTable
   Agency_Cost_Category: AgencyCostCategoryTable
   Agency_Cost_Category_Line_Item: AgencyCostCategoryLineItemTable
@@ -542,7 +548,6 @@ export interface Database extends ExtensionsDatabase {
   account: AccountTable
   verification: VerificationTable
   user_role_assignment: UserRoleAssignmentTable
-  security_audit_event: SecurityAuditEventTable
   role: RoleTable
   role_permission: RolePermissionTable
   role_transfer_payment_scope: RoleTransferPaymentScopeTable
@@ -675,7 +680,7 @@ export interface RoleTable {
 export interface RolePermissionTable {
   id: Generated<string>
   role_id: string
-  subject: 'system' | 'agency' | 'transfer_payment' | 'role' | 'user' | 'agreement' | 'applicant_recipient'
+  subject: 'audit' | 'system' | 'agency' | 'transfer_payment' | 'role' | 'user' | 'agreement' | 'applicant_recipient'
   access_level: 'viewer' | 'contributor' | 'manager' | null
   can_manage_assignments: Generated<boolean>
   _deleted: Generated<boolean>
@@ -697,6 +702,7 @@ export interface UserRoleAssignmentTable {
 }
 
 export interface SecurityAuditEventTable {
+  request_id: Generated<string | null>
   id: Generated<string>
   actor_user_id: string
   event_type:
@@ -2227,4 +2233,36 @@ export interface WorkflowMemberConditionTable {
 }
 export interface WorkflowPublicationConditionTable extends WorkflowMemberConditionTable {
   version_id: string
+}
+
+export interface AuditChangeEventTable {
+  id: Generated<string>
+  created_at: Generated<Date>
+  actor_user_id: string | null
+  actor_kind: string
+  request_id: string | null
+  query_id: string | null
+  table_name: string
+  record_id: string | null
+  record_keys: JsonValue
+  operation: string
+  delta: JsonValue
+}
+
+export interface AuditAccessEventTable {
+  id: string
+  created_at: Date
+  actor_user_id: string | null
+  actor_kind: string
+  request_id: string | null
+  sql: string
+  parameters: JsonValue
+  duration_ms: number
+  outcome: string
+  transaction_outcome: string
+  row_count: string | null
+  returned_identities: JsonValue
+  limitations: JsonValue
+  table_name: string | null
+  error_code: string | null
 }

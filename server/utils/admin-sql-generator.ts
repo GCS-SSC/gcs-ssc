@@ -3,6 +3,7 @@ import { citext } from '@electric-sql/pglite/contrib/citext'
 import { pgDump } from '@electric-sql/pglite-tools/pg_dump'
 import {
   CompiledQuery,
+  sql,
   Kysely,
   Migrator,
   PostgresAdapter,
@@ -157,6 +158,7 @@ export const generateAdminSqlDump = async (): Promise<string> => {
       throw error
     }
 
+    await sql`SELECT audit.reconcile_capture()`.execute(db)
     const dump = await pgDump({
       pg,
       args: ['--no-owner', '--no-privileges']

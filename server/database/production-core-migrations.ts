@@ -12,6 +12,8 @@ import * as extensionsMigration from './migrations/0010_extensions'
 import * as storageCleanupOutboxMigration from './migrations/0011_storage_cleanup_outbox'
 import * as recommendationRevisionMigration from './migrations/0012_recommendation_revision'
 
+import * as auditMigration from './migrations/0013_audit'
+
 export const productionCoreMigrations = {
   '0001_common': commonMigration,
   '0002_users': usersMigration,
@@ -24,7 +26,8 @@ export const productionCoreMigrations = {
   '0009_funding_case_agreement': fundingCaseAgreementMigration,
   '0010_extensions': extensionsMigration,
   '0011_storage_cleanup_outbox': storageCleanupOutboxMigration,
-  '0012_recommendation_revision': recommendationRevisionMigration
+  '0012_recommendation_revision': recommendationRevisionMigration,
+  '0013_audit': auditMigration
 } satisfies Record<string, Migration>
 
 export const productionCoreMigrationProvider: MigrationProvider = {

@@ -1,3 +1,4 @@
+import { withAnonymousAudit } from './audit-context'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Temporary coverage while authorization APIs receive complete documentation. */
 import type { H3Event } from 'h3'
 import type { Kysely, Selectable } from 'kysely'
@@ -272,8 +273,9 @@ export const requireAuthContext = async (event: H3Event): Promise<AuthContext> =
     return event.context.$authContext
   }
 
-  const userId = await requireSessionUserId(event)
+  const userId = await withAnonymousAudit(event.context.auditRequestId ?? null, () => requireSessionUserId(event))
   await requireActiveUser(event, userId, event.context.$db)
+  event.context.auditActorUserId = userId
 
   const context = {
     userId,
@@ -296,7 +298,7 @@ export const requireFreshAuthContext = async (
   db: Kysely<Database>,
   options: FreshAuthorizationOptions = {}
 ): Promise<AuthContext> => {
-  const userId = await requireSessionUserId(event)
+  const userId = await withAnonymousAudit(event.context.auditRequestId ?? null, () => requireSessionUserId(event))
   await lockFreshAuthorizationRows(
     event,
     db,

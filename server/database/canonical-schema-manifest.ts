@@ -455,7 +455,8 @@ export const extractCanonicalSchemaManifest = async <DatabaseSchema>(
     foreignKeys: foreignKeysForTable(constraintsResult.rows, tableName)
   }))
 
-  return {
+  const auditManifest = schemaName === 'public' ? await extractCanonicalSchemaManifest(db, 'audit') : null
+  const manifest: CanonicalSchemaManifest = {
     schema: schemaName,
     tables,
     enums: enumsResult.rows.map(row => ({
@@ -482,6 +483,13 @@ export const extractCanonicalSchemaManifest = async <DatabaseSchema>(
       definition: row.definition
     }))
   }
+  if (auditManifest) {
+    manifest.tables.push(...auditManifest.tables)
+    manifest.functions.push(...auditManifest.functions)
+    manifest.triggers.push(...auditManifest.triggers)
+    manifest.enums.push(...auditManifest.enums)
+  }
+  return manifest
 }
 
 /**
@@ -496,6 +504,7 @@ export const createProductionCoreSchemaManifest = async (): Promise<CanonicalSch
     for (const migration of Object.values(productionCoreMigrations)) {
       await migration.up(db)
     }
+    await sql`SELECT audit.reconcile_capture()`.execute(db)
     return await extractCanonicalSchemaManifest(db)
   } finally {
     await db.destroy()

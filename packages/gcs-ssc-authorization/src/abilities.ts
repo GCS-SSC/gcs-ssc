@@ -4,6 +4,7 @@ import { isAuthorizationAction } from './actions'
 
 /** Subjects that may be stored on a role permission. */
 export const ROLE_PERMISSION_SUBJECTS = [
+  'audit',
   'system',
   'agency',
   'transfer_payment',

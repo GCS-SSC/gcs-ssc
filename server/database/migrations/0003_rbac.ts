@@ -35,7 +35,7 @@ export async function up(db: Kysely<Database>): Promise<void> {
     ADD CONSTRAINT ${sql.raw(ROLE_PERMISSION_LEVEL_CHECK)}
     CHECK (access_level IS NULL OR access_level IN ('viewer', 'contributor', 'manager')),
     ADD CONSTRAINT ${sql.raw(ROLE_PERMISSION_SUBJECT_CHECK)}
-    CHECK (subject IN ('system', 'agency', 'transfer_payment', 'role', 'user', 'agreement', 'applicant_recipient')),
+    CHECK (subject IN ('audit', 'system', 'agency', 'transfer_payment', 'role', 'user', 'agreement', 'applicant_recipient')),
     ADD CONSTRAINT ${sql.raw(ROLE_PERMISSION_EFFECTIVE_CHECK)}
     CHECK (access_level IS NOT NULL OR can_manage_assignments = true),
     ADD CONSTRAINT role_permission_assignment_subject_check

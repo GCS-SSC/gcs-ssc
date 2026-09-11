@@ -25,6 +25,7 @@ export type StaticAuthorizationGrantInput = {
 const normalizeStaticGrant = (
   grant: StaticAuthorizationGrantInput
 ): StaticAuthorizationGrant | null => {
+  if (grant.subject === 'audit' && grant.action !== 'read') return null
   if (grant.source !== 'role') return null
   if (grant.scope.type === 'entity') return null
 

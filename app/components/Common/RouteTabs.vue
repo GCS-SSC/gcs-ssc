@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { TranslatedTabItem } from '~~/shared/types/ui'
 
 const {
@@ -22,12 +23,26 @@ const {
 }>()
 
 const modelValue = defineModel<string>({ required: true })
+const { t, locale } = useI18n()
+
+const sortedItems = computed(() => {
+  const collator = new Intl.Collator(locale.value, { sensitivity: 'base' })
+
+  return [...items].sort((left, right) => {
+    const leftIsGeneral = left.value === 'general' || left.key.endsWith('.general')
+    const rightIsGeneral = right.value === 'general' || right.key.endsWith('.general')
+
+    if (leftIsGeneral !== rightIsGeneral) return leftIsGeneral ? -1 : 1
+
+    return collator.compare(left.label ?? t(left.key), right.label ?? t(right.key))
+  })
+})
 </script>
 
 <template>
   <CommonTranslatedTabs
     v-model="modelValue"
-    :items="items"
+    :items="sortedItems"
     :variant="variant"
     :size="size"
     :orientation="orientation"

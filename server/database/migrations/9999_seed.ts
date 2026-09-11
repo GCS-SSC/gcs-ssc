@@ -915,6 +915,7 @@ const ABILITIES = [
 ] as const
 
 const ROOT_ROLE_SUBJECTS: readonly RoleAbilitySubject[] = [
+  'audit',
   'system',
   'agency',
   'transfer_payment',

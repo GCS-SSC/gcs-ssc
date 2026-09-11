@@ -578,6 +578,7 @@
       "manager": "Manager"
     },
     "subjects": {
+      "audit": "Audit",
       "system": "System",
       "agency": "Agency",
       "transfer_payment": "Transfer payment",
@@ -3262,6 +3263,50 @@
       "status_locked": "This review is read-only because it is in a locked workflow status.",
       "empty_comment": "No completion comment was provided.",
       "completed_success": "Review completed successfully."
+    }
+  },
+  "audit": {
+    "title": "Audit",
+    "access": "Access",
+    "description": "Committed changes, security events and application database queries.",
+    "retention": "Audit: {audit} days. Access: {access} days. Deployment settings apply after restart.",
+    "actor": "Actor ID",
+    "table": "Table",
+    "recordId": "Record ID",
+    "operation": "Operation / outcome",
+    "requestId": "Request ID",
+    "from": "From",
+    "to": "To",
+    "date": "Date",
+    "details": "Details",
+    "retry": "Retry",
+    "error": "Unable to load evidence.",
+    "field": "Field",
+    "old": "Old value",
+    "new": "New value",
+    "evidence": {
+      "created_at": "Date",
+      "actor_user_id": "Actor ID",
+      "request_id": "Request ID",
+      "table_name": "Table",
+      "operation": "Operation",
+      "sql": "SQL",
+      "parameters": "Parameters",
+      "returned_identities": "Returned identities",
+      "limitations": "Capture limitations",
+      "outcome": "Query outcome",
+      "transaction_outcome": "Transaction outcome",
+      "duration_ms": "Duration (ms)",
+      "row_count": "Row count",
+      "actor_kind": "Actor type",
+      "query_id": "Query ID"
+    },
+    "limitations": {
+      "parameters_redacted": "Parameter values are redacted because their sensitivity is not known.",
+      "returned_identities_unavailable": "Record identities could not be determined safely from this projection.",
+      "returned_identities_truncated": "Returned identities exceed the capture limit.",
+      "sql_truncated": "SQL exceeds the capture limit.",
+      "parameters_truncated": "The parameter count exceeds the capture limit."
     }
   }
 }

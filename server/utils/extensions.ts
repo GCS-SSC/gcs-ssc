@@ -1,3 +1,4 @@
+import { reconcileAuditCapture } from './audit-runtime'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Temporary coverage while extension runtime APIs receive complete documentation. */
 import { createHash } from 'node:crypto'
 import { createError, type H3Event } from 'h3'
@@ -1190,6 +1191,7 @@ export const runExtensionMigrations = async (
     throw error
   }
 
+  await reconcileAuditCapture(db)
   return results ?? []
 }
 
