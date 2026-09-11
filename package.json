@@ -148,6 +148,7 @@
     "picomatch": "^4.0.5",
     "playwright": "^1.58.2",
     "prettier-plugin-tailwindcss": "^0.7.2",
+    "railway": "3.11.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18",

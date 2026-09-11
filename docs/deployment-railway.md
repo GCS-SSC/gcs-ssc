@@ -1,5 +1,10 @@
 # Railway deployment
 
+For a PostgreSQL deployment managed as code, use
+[`.railway/railway.ts`](../.railway/railway.ts) and follow the
+[IaC setup guide](../.railway/README.md). Existing projects must import their
+resources and migrate their legacy Config File association before applying it.
+
 Railway uses the repository's canonical `Dockerfile`, selected by `railway.json`.
 Remote Docker build contexts may not include initialized Git submodules, so the
 Dockerfile fetches each workspace repository at the exact commit pinned by the
