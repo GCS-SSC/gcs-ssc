@@ -46,7 +46,7 @@ const selectIcon = (icon: string): void => {
         <UInput v-model="search" :placeholder="t('common.search_icons')" icon="i-lucide-search" autofocus />
         <div
           v-if="filteredIcons.length"
-          class="grid max-h-72 grid-cols-2 gap-1 overflow-y-auto pr-1 sm:grid-cols-3"
+          class="grid max-h-72 grid-cols-1 gap-1 overflow-y-auto pr-1"
           role="group"
           :aria-label="t('common.choose_icon')">
           <UButton
@@ -55,14 +55,14 @@ const selectIcon = (icon: string): void => {
             type="button"
             color="neutral"
             :variant="icon === model ? 'soft' : 'ghost'"
-            class="justify-start text-xs"
+            class="min-w-0 justify-start text-left text-xs"
             :aria-label="icon.replace('i-lucide-', '')"
             :aria-pressed="icon === model"
             @click="selectIcon(icon)">
             <template #leading>
-              <UIcon :name="icon" class="size-4" />
+              <UIcon :name="icon" class="size-4 shrink-0" />
             </template>
-            <span class="truncate">{{ icon.replace('i-lucide-', '') }}</span>
+            <span class="whitespace-normal break-words">{{ icon.replace('i-lucide-', '') }}</span>
           </UButton>
         </div>
         <p v-else class="py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
