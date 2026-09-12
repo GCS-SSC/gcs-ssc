@@ -37,11 +37,12 @@ const onSubmit = () => {
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="title" :description="t('common.form_dialog_description')">
+  <UModal v-model:open="open" :title="title" :description="t('common.form_dialog_description')" :ui="{ content: 'sm:max-w-4xl' }">
     <template #body>
       <UForm v-if="open" :state="state" :validate="validate" class="space-y-4" @submit="onSubmit">
         <TransferPaymentFieldsTransferPaymentProfileFields
           v-model:model="state"
+          is-stacked
           :is-agency-locked="isAgencyLocked" />
         <UFormField :label="t('common.active')" name="egcs_tp_active">
           <USwitch v-model="state.egcs_tp_active" :label="t('common.active')" />
