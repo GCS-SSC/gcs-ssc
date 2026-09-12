@@ -25,6 +25,7 @@ const initialNewItem = createAgencyFiscalYearInitial()
     :fetch-url="`/api/agency/${agencyId}/fiscal-years`"
     :post-url="canCreate ? `/api/agency/${agencyId}/fiscal-years` : undefined"
     :delete-url-base="canDelete ? '/api/agency/fiscal-years' : undefined"
+    :update-url-base="canUpdate ? '/api/agency/fiscal-years' : undefined"
     :can-create="canCreate"
     :can-update="canUpdate"
     :can-delete="canDelete"

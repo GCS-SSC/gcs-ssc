@@ -22,6 +22,7 @@ const initialNewItem = { ...AgencyApprovalBehalfTypeInitial }
     :fetch-url="`/api/agency/${agencyId}/approval-behalf-types`"
     :post-url="canCreate ? `/api/agency/${agencyId}/approval-behalf-types` : undefined"
     :delete-url-base="canDelete ? '/api/agency/approval-behalf-types' : undefined"
+    :update-url-base="canUpdate ? '/api/agency/approval-behalf-types' : undefined"
     :can-create="canCreate"
     :can-update="canUpdate"
     :can-delete="canDelete"

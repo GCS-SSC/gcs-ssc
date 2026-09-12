@@ -22,6 +22,7 @@ const initialNewItem = { ...AgencyAgreementTypeInitial }
     :fetch-url="`/api/agency/${agencyId}/agreement-types`"
     :post-url="canCreate ? `/api/agency/${agencyId}/agreement-types` : undefined"
     :delete-url-base="canDelete ? '/api/agency/agreement-types' : undefined"
+    :update-url-base="canUpdate ? '/api/agency/agreement-types' : undefined"
     :can-create="canCreate"
     :can-update="canUpdate"
     :can-delete="canDelete"

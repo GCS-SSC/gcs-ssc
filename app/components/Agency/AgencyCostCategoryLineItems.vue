@@ -31,6 +31,7 @@ const initialNewItem = { ...AgencyCostCategoryLineItemInitial }
     :fetch-url="`/api/agency/cost-categories/${categoryId}/line-items`"
     :post-url="canCreate ? `/api/agency/cost-categories/${categoryId}/line-items` : undefined"
     :delete-url-base="canDelete ? '/api/agency/line-items' : undefined"
+    :update-url-base="canUpdate ? '/api/agency/line-items' : undefined"
     :can-create="canCreate"
     :can-update="canUpdate"
     :can-delete="canDelete"

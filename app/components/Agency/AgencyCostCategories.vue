@@ -11,9 +11,7 @@ import { throwFetchResponseError } from '~/utils/fetch-error'
 import {
   AgencyCostCategoryLineItemSchema,
   AgencyCostCategorySchema,
-  type AgencyCostCategory,
   type AgencyCostCategoryItem,
-  type AgencyCostCategoryLineItem,
   type AgencyCostCategoryLineItemItem
 } from '~~/shared/types/schemas'
 
@@ -43,7 +41,7 @@ type GroupedCostCategoryRow = GroupedTableRow<CostCategoryTableRow>
 const COST_CATEGORY_GROUP_COLUMN_ID = 'costCategoryGroup'
 const LIST_PAGE_SIZE = 100
 
-const { agencyId, canCreate, canDelete } = defineProps<{
+const { agencyId, canCreate, canUpdate, canDelete } = defineProps<{
   agencyId: string
   canCreate: boolean
   canUpdate: boolean
@@ -61,8 +59,8 @@ const { search, pagination } = useTableListState()
 const categories: Ref<AgencyCostCategoryItem[]> = ref([])
 const lineItems: Ref<AgencyCostCategoryLineItemRow[]> = ref([])
 const status: Ref<'idle' | 'pending' | 'success' | 'error'> = ref('idle')
-const selectedCategory: Ref<Partial<AgencyCostCategory> | null> = ref(null)
-const selectedLineItem: Ref<Partial<AgencyCostCategoryLineItem> | null> = ref(null)
+const selectedCategory: Ref<Partial<AgencyCostCategoryItem> | null> = ref(null)
+const selectedLineItem: Ref<Partial<AgencyCostCategoryLineItemItem> | null> = ref(null)
 const selectedLineItemCategoryId: Ref<string | null> = ref(null)
 const isCategoryModalOpen: Ref<boolean> = ref(false)
 const isLineItemModalOpen: Ref<boolean> = ref(false)
@@ -106,9 +104,9 @@ const getAllPages = async <T,>(url: string): Promise<T[]> => {
   }
 }
 
-const postJson = async (url: string, body: unknown) => {
+const saveJson = async (url: string, method: 'POST' | 'PATCH', body: unknown) => {
   const response = await fetch(getClientRequestUrl(url), {
-    method: 'POST',
+    method,
     headers: {
       'content-type': 'application/json'
     },
@@ -242,6 +240,21 @@ const openCreateCategory = () => {
   isCategoryModalOpen.value = true
 }
 
+const openEditCategory = (categoryId: string) => {
+  const category = categories.value.find(item => item.id === categoryId)
+  if (!canUpdate || !category) return
+  selectedCategory.value = { ...category }
+  isCategoryModalOpen.value = true
+}
+
+const openEditLineItem = (lineItemId: string) => {
+  const lineItem = lineItems.value.find(item => item.id === lineItemId)
+  if (!canUpdate || !lineItem) return
+  selectedLineItem.value = { ...lineItem }
+  selectedLineItemCategoryId.value = lineItem.egcs_ay_organizationcostcategory
+  isLineItemModalOpen.value = true
+}
+
 const openCreateLineItem = (categoryId: string) => {
   selectedLineItem.value = {}
   selectedLineItemCategoryId.value = categoryId
@@ -274,12 +287,21 @@ const saveCategory = async () => {
   }
 
   let committed = false
+  const updating = Boolean(selectedCategory.value.id)
+  if (updating ? !canUpdate : !canCreate) return
+  const requestedGeneration = refreshGeneration
+  const requestedState = selectedCategory.value
   try {
     isSavingCategory.value = true
-    await postJson(`/api/agency/${agencyId}/cost-categories`, selectedCategory.value)
+    await saveJson(
+      updating ? `/api/agency/cost-categories/${requestedState.id}` : `/api/agency/${agencyId}/cost-categories`,
+      updating ? 'PATCH' : 'POST',
+      requestedState
+    )
     committed = true
-    closeCategoryModal()
-    toast.add({ title: t('common.success'), description: t('common.added_success'), color: 'success' })
+    if (requestedGeneration !== refreshGeneration) return
+    if (selectedCategory.value === requestedState) closeCategoryModal()
+    toast.add({ title: t('common.success'), description: t(updating ? 'common.updated_success' : 'common.added_success'), color: 'success' })
     await refresh()
   } catch (error: unknown) {
     if (!committed) showError(error)
@@ -294,12 +316,21 @@ const saveLineItem = async () => {
   }
 
   let committed = false
+  const updating = Boolean(selectedLineItem.value.id)
+  if (updating ? !canUpdate : !canCreate) return
+  const requestedGeneration = refreshGeneration
+  const requestedState = selectedLineItem.value
   try {
     isSavingLineItem.value = true
-    await postJson(`/api/agency/cost-categories/${selectedLineItemCategoryId.value}/line-items`, selectedLineItem.value)
+    await saveJson(
+      updating ? `/api/agency/line-items/${requestedState.id}` : `/api/agency/cost-categories/${selectedLineItemCategoryId.value}/line-items`,
+      updating ? 'PATCH' : 'POST',
+      requestedState
+    )
     committed = true
-    closeLineItemModal()
-    toast.add({ title: t('common.success'), description: t('common.added_success'), color: 'success' })
+    if (requestedGeneration !== refreshGeneration) return
+    if (selectedLineItem.value === requestedState) closeLineItemModal()
+    toast.add({ title: t('common.success'), description: t(updating ? 'common.updated_success' : 'common.added_success'), color: 'success' })
     await refresh()
   } catch (error: unknown) {
     if (!committed) showError(error)
@@ -406,6 +437,14 @@ const deleteLineItem = async (lineItemId: string) => {
         <div class="flex items-center justify-end gap-2">
           <template v-if="isCostCategoryGroupRow(row as GroupedCostCategoryRow)">
             <UButton
+              v-if="canUpdate"
+              icon="i-lucide-edit-3"
+              color="neutral"
+              variant="ghost"
+              size="sm"
+              :aria-label="t('common.edit')"
+              @click="openEditCategory(row.original.costCategoryId)" />
+            <UButton
               v-if="canCreate"
               icon="i-lucide-plus"
               color="primary"
@@ -425,8 +464,17 @@ const deleteLineItem = async (lineItemId: string) => {
               @click="deleteCategory(row.original.costCategoryId)" />
           </template>
 
-          <template v-else-if="canDelete && !row.original.isPlaceholder && row.original.lineItemId">
+          <template v-else-if="!row.original.isPlaceholder && row.original.lineItemId">
             <UButton
+              v-if="canUpdate"
+              icon="i-lucide-edit-3"
+              color="neutral"
+              variant="ghost"
+              size="sm"
+              :aria-label="t('common.edit')"
+              @click="openEditLineItem(row.original.lineItemId)" />
+            <UButton
+              v-if="canDelete"
               icon="i-lucide-trash"
               color="error"
               variant="ghost"
@@ -461,7 +509,7 @@ const deleteLineItem = async (lineItemId: string) => {
 
           <div class="flex justify-end gap-2 pt-4">
             <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="closeCategoryModal" />
-            <CommonSaveButton :label="t('common.add')" :loading="isSavingCategory" :disabled="isSavingCategory" />
+            <CommonSaveButton :label="t(selectedCategory.id ? 'common.update' : 'common.add')" :loading="isSavingCategory" :disabled="isSavingCategory" />
           </div>
         </UForm>
       </template>
@@ -479,7 +527,7 @@ const deleteLineItem = async (lineItemId: string) => {
 
           <div class="flex justify-end gap-2 pt-4">
             <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="closeLineItemModal" />
-            <CommonSaveButton :label="t('common.add')" :loading="isSavingLineItem" :disabled="isSavingLineItem" />
+            <CommonSaveButton :label="t(selectedLineItem.id ? 'common.update' : 'common.add')" :loading="isSavingLineItem" :disabled="isSavingLineItem" />
           </div>
         </UForm>
       </template>

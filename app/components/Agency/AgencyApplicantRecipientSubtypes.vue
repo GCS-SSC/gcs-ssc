@@ -20,6 +20,7 @@ const columns: TableColumnInput<AgencyApplicantRecipientSubtypeItem>[] = [
     :fetch-url="`/api/agency/${agencyId}/applicant-recipient-subtypes`"
     :post-url="canCreate ? `/api/agency/${agencyId}/applicant-recipient-subtypes` : undefined"
     :delete-url-base="canDelete ? '/api/agency/applicant-recipient-subtypes' : undefined"
+    :update-url-base="canUpdate ? '/api/agency/applicant-recipient-subtypes' : undefined"
     :can-create="canCreate"
     :can-update="canUpdate"
     :can-delete="canDelete"

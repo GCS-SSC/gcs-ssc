@@ -159,6 +159,7 @@ export const AgencyFiscalYearSchema = AgencyFiscalYearBaseSchema.refine(
   value => value.egcs_ay_startdate <= value.egcs_ay_enddate,
   { message: 'validation.date_range', path: ['egcs_ay_enddate'] }
 )
+export const AgencyFiscalYearPatchSchema = AgencyFiscalYearBaseSchema.partial()
 export type AgencyFiscalYear = z.infer<typeof AgencyFiscalYearSchema>
 export type AgencyFiscalYearItem = WithId<AgencyFiscalYear>
 
