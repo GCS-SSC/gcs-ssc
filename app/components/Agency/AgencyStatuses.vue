@@ -179,27 +179,6 @@ const setDeleted = async (definition: StatusDefinition, deleted: boolean) => {
       </div>
       <UButton v-if="canCreate" icon="i-lucide-plus" :label="t('agency.statuses.add')" @click="openCreate" />
     </div>
-    <div class="space-y-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
-      <div>
-        <h3 class="font-semibold">
-          {{ t('agency.statuses.reconciliation_title') }}
-        </h3>
-        <p class="text-sm text-zinc-500 dark:text-zinc-400">
-          {{ t('agency.statuses.reconciliation_description') }}
-        </p>
-      </div>
-      <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <UFormField :label="t('agency.statuses.reconciliation_start_status')">
-          <CommonStatusSelect v-model="reconciliationStatuses.startStatusId" :agency-id="agencyId" allow-empty :empty-label="t('workflow.no_change')" :disabled="!canEdit" class="w-full" />
-        </UFormField>
-        <UFormField :label="t('agency.statuses.reconciliation_final_status')">
-          <CommonStatusSelect v-model="reconciliationStatuses.finalStatusId" :agency-id="agencyId" allow-empty :empty-label="t('workflow.no_change')" :disabled="!canEdit" class="w-full" />
-        </UFormField>
-      </div>
-      <div v-if="canEdit" class="flex justify-end">
-        <CommonSaveButton :label="t('common.save')" :loading="reconciliationStatusesPending" @click="saveReconciliationStatuses" />
-      </div>
-    </div>
     <div class="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
       <div v-for="definition in definitions" :key="definition.id" class="flex flex-wrap items-center gap-3 px-4 py-3" :class="{ 'opacity-60': definition.deleted }">
         <div class="min-w-0 flex-1 space-y-1">
@@ -235,6 +214,27 @@ const setDeleted = async (definition: StatusDefinition, deleted: boolean) => {
             :aria-label="t(definition.deleted ? 'agency.statuses.restore' : 'common.delete')"
             @click="setDeleted(definition, !definition.deleted)" />
         </div>
+      </div>
+    </div>
+    <div class="space-y-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+      <div>
+        <h3 class="font-semibold">
+          {{ t('agency.statuses.reconciliation_title') }}
+        </h3>
+        <p class="text-sm text-zinc-500 dark:text-zinc-400">
+          {{ t('agency.statuses.reconciliation_description') }}
+        </p>
+      </div>
+      <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <UFormField :label="t('agency.statuses.reconciliation_start_status')">
+          <CommonStatusSelect v-model="reconciliationStatuses.startStatusId" :agency-id="agencyId" allow-empty :empty-label="t('workflow.no_change')" :disabled="!canEdit" class="w-full" />
+        </UFormField>
+        <UFormField :label="t('agency.statuses.reconciliation_final_status')">
+          <CommonStatusSelect v-model="reconciliationStatuses.finalStatusId" :agency-id="agencyId" allow-empty :empty-label="t('workflow.no_change')" :disabled="!canEdit" class="w-full" />
+        </UFormField>
+      </div>
+      <div v-if="canEdit" class="flex justify-end">
+        <CommonSaveButton :label="t('common.save')" :loading="reconciliationStatusesPending" @click="saveReconciliationStatuses" />
       </div>
     </div>
 
