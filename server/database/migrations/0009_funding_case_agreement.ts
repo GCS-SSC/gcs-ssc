@@ -700,6 +700,16 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
     .addColumn('egcs_fc_othergovfunding', 'numeric(19, 2)')
     .addColumn('egcs_fc_otherfunding', 'numeric(19, 2)')
     .addColumn('egcs_fc_currency', sql`currency_codes`, col => col.notNull())
+    .addColumn('egcs_fc_calculationmode', 'varchar(16)', col => col.notNull().defaultTo('manual'))
+    .addColumn('egcs_fc_sourcecategory', 'bigint', col => col.references('Agency_Cost_Category.id').onDelete('restrict'))
+    .addColumn('egcs_fc_percentage', 'numeric(5, 2)')
+    .addColumn('egcs_fc_allowpercentageoverride', 'boolean', col => col.notNull().defaultTo(false))
+    .addCheckConstraint('fc_chk_lineitemcalculation', sql`
+      (egcs_fc_calculationmode = 'manual' AND egcs_fc_sourcecategory IS NULL AND egcs_fc_percentage IS NULL AND NOT egcs_fc_allowpercentageoverride)
+      OR (egcs_fc_calculationmode IN ('category', 'all_other') AND egcs_fc_percentage IS NOT NULL
+        AND egcs_fc_percentage BETWEEN 0 AND 100
+        AND ((egcs_fc_calculationmode = 'category' AND egcs_fc_sourcecategory IS NOT NULL)
+          OR (egcs_fc_calculationmode = 'all_other' AND egcs_fc_sourcecategory IS NULL)))`)
     .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
     .addUniqueConstraint('fc_unq_budgetlineitemidfundingagreement', ['id', 'egcs_fc_fundingagreement'])
     .addCheckConstraint(
@@ -727,6 +737,8 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
       constraint => constraint.onDelete('restrict')
     )
     .execute()
+
+  await sql`CREATE UNIQUE INDEX fc_unq_budget_all_other ON "Funding_Case_Agreement_Budget_Line_Item" (egcs_fc_budgetversion, egcs_fc_fundingagreementbudgetfiscalyear, egcs_fc_currency) WHERE NOT _deleted AND egcs_fc_calculationmode = 'all_other'`.execute(db)
 
   await sql`
     CREATE OR REPLACE FUNCTION trg_fn_resolve_budget_line_item_identity()

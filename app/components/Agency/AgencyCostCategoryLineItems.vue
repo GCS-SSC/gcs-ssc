@@ -50,6 +50,7 @@ const initialNewItem = { ...AgencyCostCategoryLineItemInitial }
       <UFormField :label="t('agency.name_fr')" name="egcs_ay_name_fr">
         <UInput v-model="state.egcs_ay_name_fr" />
       </UFormField>
+      <AgencyBudgetCalculationFields :model-value="state" :category-id="categoryId" />
     </template>
   </CommonResourceCrud>
 </template>

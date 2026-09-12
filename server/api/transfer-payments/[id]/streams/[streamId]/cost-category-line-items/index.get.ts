@@ -70,6 +70,11 @@ export default defineEventHandler(async event => {
         'Transfer_Payment_Stream_Cost_Category_Line_Item.egcs_tp_organizationcostcategory as egcs_tp_organizationcostcategory',
         'Transfer_Payment_Stream_Cost_Category_Line_Item.egcs_tp_costsharingratio as egcs_tp_costsharingratio',
         'Agency_Cost_Category_Line_Item.egcs_ay_name_en as line_item_name_en',
+        'Agency_Cost_Category_Line_Item.egcs_ay_calculationmode',
+        'Agency_Cost_Category_Line_Item.egcs_ay_sourcecategory',
+        'Agency_Cost_Category_Line_Item.egcs_ay_percentage',
+        'Agency_Cost_Category_Line_Item.egcs_ay_allowpercentageoverride',
+        'Agency_Cost_Category_Line_Item.egcs_ay_organizationcostcategory as calculation_category_id',
         'Agency_Cost_Category_Line_Item.egcs_ay_name_fr as line_item_name_fr'
       ])
       .orderBy('Transfer_Payment_Stream_Cost_Category_Line_Item.id', 'asc')

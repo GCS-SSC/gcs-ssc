@@ -1,3 +1,4 @@
+import { BudgetPercentageSchema } from './budget-calculation'
 /* eslint-disable jsdoc/require-jsdoc -- Existing schemas use descriptive exports and inferred metadata. */
 import { z } from 'zod'
 import { AgreementCustomFieldValuesSchema } from './agreement-custom-fields'
@@ -368,7 +369,8 @@ export const FundingCaseAgreementBudgetLineItemBaseSchema = z.object({
   egcs_fc_costsubsection: RequiredString().max(255, { error: 'validation.max_length' }),
   egcs_fc_description: RequiredString(),
   egcs_fc_totalamount: MoneySchema,
-  egcs_fc_programfunding: MoneySchema,
+  egcs_fc_programfunding: MoneySchema.optional(),
+  egcs_fc_percentage: BudgetPercentageSchema.optional(),
   egcs_fc_otherfederalfunding: OptionalMoneySchema,
   egcs_fc_othergovfunding: OptionalMoneySchema,
   egcs_fc_otherfunding: OptionalMoneySchema,

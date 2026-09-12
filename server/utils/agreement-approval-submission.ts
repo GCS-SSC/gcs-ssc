@@ -249,6 +249,13 @@ export const buildAgreementApprovalSnapshot = async (
       .innerJoin('Funding_Case_Agreement_Budget_Fiscal_Year', 'Funding_Case_Agreement_Budget_Fiscal_Year.id', 'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreementbudgetfiscalyear')
       .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fiscalyear')
       .select([
+        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_calculationmode',
+        sql<string | null>`(SELECT source.egcs_ay_name_en FROM "Agency_Cost_Category" source WHERE source.id = "Funding_Case_Agreement_Budget_Line_Item".egcs_fc_sourcecategory)`.as('calculation_source_name_en'),
+        sql<string | null>`(SELECT source.egcs_ay_name_fr FROM "Agency_Cost_Category" source WHERE source.id = "Funding_Case_Agreement_Budget_Line_Item".egcs_fc_sourcecategory)`.as('calculation_source_name_fr'),
+        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_sourcecategory',
+        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_percentage',
+        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_allowpercentageoverride',
+        'Agency_Cost_Category_Line_Item.egcs_ay_organizationcostcategory as calculation_category_id',
         'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection',
         'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description',
         databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_totalamount')).as('egcs_fc_totalamount'),
@@ -348,6 +355,11 @@ export const buildAgreementApprovalSnapshot = async (
         fiscalYear: row.fiscal_year_display,
         organizationCostCategory: bilingualValue(row.organization_cost_category_name_en, row.organization_cost_category_name_fr),
         lineItem: bilingualValue(row.line_item_name_en, row.line_item_name_fr),
+        calculationMode: row.egcs_fc_calculationmode,
+        sourceCategoryId: row.egcs_fc_sourcecategory,
+        sourceCategory: bilingualValue(row.calculation_source_name_en, row.calculation_source_name_fr),
+        percentage: row.egcs_fc_percentage,
+        allowPercentageOverride: row.egcs_fc_allowpercentageoverride,
         costSubsection: row.egcs_fc_costsubsection,
         description: row.egcs_fc_description,
         totalAmount: parseDatabaseMoney(row.egcs_fc_totalamount),

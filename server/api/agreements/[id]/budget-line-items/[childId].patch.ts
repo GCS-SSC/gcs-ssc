@@ -1,3 +1,4 @@
+import { prepareBudgetCalculation, recalculateAgreementBudget } from '~~/server/utils/agreement-budget-calculation'
 /* eslint-disable jsdoc/require-jsdoc -- Budget line-item route behavior is covered by focused route tests. */
 import type { H3Event } from 'h3'
 import { authorize } from '~~/server/utils/authorize'
@@ -10,16 +11,12 @@ import {
   assertAgreementChildExists,
   assertAgreementExists
 } from '~~/server/utils/agreement-child-resources'
-import {
-  assertAgreementBudgetProgramFundingCapacity
-} from '~~/server/utils/agreement-budget'
 import { sql, type Kysely, type Transaction } from 'kysely'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
 import { budgetFiscalYearStableId, budgetLineItemStableId } from '~~/server/utils/agreement-budget-lineage'
 import { validateMergedBudgetLineItemFundingPatch } from '~~/server/utils/agreement-financial-patch-validation'
 import { throwIfAgreementUniqueConstraintError } from '~~/server/utils/agreement-unique-constraint-errors'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
-import type { Money } from '~~/shared/utils/money'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 type AgreementBudgetLineDb = Kysely<Database> | Transaction<Database>
@@ -165,32 +162,11 @@ const assertBudgetLinePatchReferences = async (
   return { fiscalYearRowId }
 }
 
-const updateBudgetLineItemWithCapacityCheck = async (
-  event: H3Event,
+const updateBudgetLineItem = async (
   db: AgreementBudgetLineDb,
-  streamId: string,
   childRowId: string,
-  lineItemIdentityId: string,
-  patchValues: FundingCaseAgreementBudgetLineItemPatch,
-  targetAgreementBudgetFiscalYearId: string,
-  targetProgramFunding: Money
+  patchValues: FundingCaseAgreementBudgetLineItemPatch
 ) => {
-  const capacityGuard = await assertAgreementBudgetProgramFundingCapacity(
-    event,
-    db,
-    streamId,
-    targetAgreementBudgetFiscalYearId,
-    targetProgramFunding,
-    {
-      excludeLineItemId: lineItemIdentityId,
-      lockStreamBudget: true
-    }
-  )
-
-  if (capacityGuard) {
-    return capacityGuard
-  }
-
   const {
     egcs_fc_totalamount,
     egcs_fc_programfunding,
@@ -241,6 +217,10 @@ const fetchBudgetLineItemResponse = async (
     budgetLineItemStableId.as('id'),
     budgetFiscalYearStableId.as('egcs_fc_fundingagreementbudgetfiscalyear'),
     'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_organizationcostcategory as egcs_fc_organizationcostcategory',
+    'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_calculationmode',
+    'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_sourcecategory',
+    'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_percentage',
+    'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_allowpercentageoverride',
     'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection as egcs_fc_costsubsection',
     'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description as egcs_fc_description',
     databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_totalamount')).as('egcs_fc_totalamount'),
@@ -310,19 +290,6 @@ const assertClaimLinkedBudgetLineCanMove = async (
     : null
 }
 
-const getBudgetLinePatchTargetValues = (
-  patchValues: FundingCaseAgreementBudgetLineItemPatch,
-  existing: {
-    egcs_fc_fundingagreementbudgetfiscalyear: string | number
-    egcs_fc_programfunding: string
-  }
-) => ({
-  targetAgreementBudgetFiscalYearId: String(
-    patchValues.egcs_fc_fundingagreementbudgetfiscalyear ?? existing.egcs_fc_fundingagreementbudgetfiscalyear
-  ),
-  targetProgramFunding: patchValues.egcs_fc_programfunding ?? parseDatabaseMoney(existing.egcs_fc_programfunding)
-})
-
 const resolveBudgetLinePatchInput = async (
   event: H3Event,
   db: AgreementBudgetLineDb,
@@ -336,7 +303,6 @@ const resolveBudgetLinePatchInput = async (
   }
 
   const patchValues = await readValidatedBodyI18n(event, FundingCaseAgreementBudgetLineItemPatchSchema)
-  await validateMergedBudgetLineItemFundingPatch(event, existing, patchValues)
   const referenceGuard = await assertBudgetLinePatchReferences(event, db, agreementId, streamId, patchValues)
   if ('response' in referenceGuard) {
     return { response: referenceGuard.response }
@@ -347,6 +313,10 @@ const resolveBudgetLinePatchInput = async (
     return { response: claimMoveGuard }
   }
 
+  const calculation = await prepareBudgetCalculation(event, db, patchValues, String(existing.id))
+  if (calculation.egcs_fc_programfunding !== undefined) patchValues.egcs_fc_programfunding = calculation.egcs_fc_programfunding
+  await validateMergedBudgetLineItemFundingPatch(event, existing, patchValues)
+
   const persistedPatchValues: FundingCaseAgreementBudgetLineItemPatch = { ...patchValues }
   if (Object.hasOwn(patchValues, 'egcs_fc_fundingagreementbudgetfiscalyear') && referenceGuard.fiscalYearRowId) {
     persistedPatchValues.egcs_fc_fundingagreementbudgetfiscalyear = referenceGuard.fiscalYearRowId
@@ -354,12 +324,7 @@ const resolveBudgetLinePatchInput = async (
 
   return {
     childRowId: String(existing.id),
-    lineItemIdentityId: String(existing.egcs_fc_budgetlineitemidentity),
-    patchValues: persistedPatchValues,
-    ...getBudgetLinePatchTargetValues(patchValues, {
-      ...existing,
-      egcs_fc_fundingagreementbudgetfiscalyear: existing.egcs_fc_budgetfiscalyearidentity
-    })
+    patchValues: persistedPatchValues
   }
 }
 
@@ -369,23 +334,16 @@ const applyBudgetLinePatch = async (
   streamId: string,
   input: {
     childRowId: string
-    lineItemIdentityId: string
     patchValues: FundingCaseAgreementBudgetLineItemPatch
-    targetAgreementBudgetFiscalYearId: string
-    targetProgramFunding: Money
   }
 ) => {
-  const updated = await updateBudgetLineItemWithCapacityCheck(
-    event,
+  const updated = await updateBudgetLineItem(
     db,
-    streamId,
     input.childRowId,
-    input.lineItemIdentityId,
-    input.patchValues,
-    input.targetAgreementBudgetFiscalYearId,
-    input.targetProgramFunding
+    input.patchValues
   )
 
+  if (isEntityResponse(updated)) await recalculateAgreementBudget(event, db, String(updated.id), streamId)
   return isEntityResponse(updated)
     ? await fetchBudgetLineItemResponse(db, String(updated.id))
     : updated

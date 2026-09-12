@@ -1,7 +1,9 @@
+import { FundingCaseAgreementBudgetLineItemFundingTotalsSchema, FundingCaseAgreementBudgetLineItemCreateSchema } from '~~/shared/types/schemas'
+import { parseI18n } from '~~/server/utils/api-validate'
+import { prepareBudgetCalculation, recalculateAgreementBudget } from '~~/server/utils/agreement-budget-calculation'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import { assertDraftAgreementAmendmentCapability, resolveDraftAgreementAmendmentBudgetVersion } from '~~/server/utils/agreement-amendment'
-import { FundingCaseAgreementBudgetLineItemCreateSchema } from '~~/shared/types/schemas'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
 import { budgetFiscalYearStableId } from '~~/server/utils/agreement-budget-lineage'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
@@ -27,16 +29,20 @@ export default defineEventHandler(async event => {
       .where('id', '=', body.egcs_fc_organizationcostcategory).where('egcs_tp_transferpaymentstream', '=', context.streamId).where('_deleted', '=', false)
       .forUpdate().executeTakeFirst()
     if (!category) return await badRequest(event, 'INVALID_AGREEMENT_BUDGET_LINE_ITEM', 'apiErrors.agreement.invalid_cost_category_line_item')
+    const calculation = await prepareBudgetCalculation(event, trx, body, undefined, String(year.id))
+    await parseI18n(event, FundingCaseAgreementBudgetLineItemFundingTotalsSchema, { ...body, egcs_fc_programfunding: calculation.egcs_fc_programfunding ?? body.egcs_fc_programfunding })
     const inserted = await trx.insertInto('Funding_Case_Agreement_Budget_Line_Item').values({
       ...body,
+      ...calculation,
       egcs_fc_totalamount: databaseMoneyValue(body.egcs_fc_totalamount),
-      egcs_fc_programfunding: databaseMoneyValue(body.egcs_fc_programfunding),
+      egcs_fc_programfunding: databaseMoneyValue(calculation.egcs_fc_programfunding ?? body.egcs_fc_programfunding!),
       egcs_fc_otherfederalfunding: body.egcs_fc_otherfederalfunding === undefined ? undefined : databaseMoneyValue(body.egcs_fc_otherfederalfunding),
       egcs_fc_othergovfunding: body.egcs_fc_othergovfunding === undefined ? undefined : databaseMoneyValue(body.egcs_fc_othergovfunding),
       egcs_fc_otherfunding: body.egcs_fc_otherfunding === undefined ? undefined : databaseMoneyValue(body.egcs_fc_otherfunding),
       egcs_fc_fundingagreement: agreementId,
       egcs_fc_fundingagreementbudgetfiscalyear: String(year.id)
     }).returning([
+      'egcs_fc_calculationmode', 'egcs_fc_sourcecategory', 'egcs_fc_percentage', 'egcs_fc_allowpercentageoverride',
       'id', 'egcs_fc_originalbudgetlineitem', 'egcs_fc_fundingagreementbudgetfiscalyear',
       'egcs_fc_organizationcostcategory', 'egcs_fc_costsubsection', 'egcs_fc_description',
       databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('egcs_fc_totalamount'),
@@ -46,10 +52,11 @@ export default defineEventHandler(async event => {
       databaseMoneyText(sql.ref('egcs_fc_otherfunding')).as('egcs_fc_otherfunding'),
       'egcs_fc_currency'
     ]).executeTakeFirstOrThrow()
+    const amounts = await recalculateAgreementBudget(event, trx, inserted.id, context.streamId)
     return {
       ...inserted,
       egcs_fc_totalamount: parseDatabaseMoney(inserted.egcs_fc_totalamount),
-      egcs_fc_programfunding: parseDatabaseMoney(inserted.egcs_fc_programfunding),
+      egcs_fc_programfunding: amounts.get(inserted.id) ?? parseDatabaseMoney(inserted.egcs_fc_programfunding),
       egcs_fc_otherfederalfunding: inserted.egcs_fc_otherfederalfunding === null ? null : parseDatabaseMoney(inserted.egcs_fc_otherfederalfunding),
       egcs_fc_othergovfunding: inserted.egcs_fc_othergovfunding === null ? null : parseDatabaseMoney(inserted.egcs_fc_othergovfunding),
       egcs_fc_otherfunding: inserted.egcs_fc_otherfunding === null ? null : parseDatabaseMoney(inserted.egcs_fc_otherfunding),

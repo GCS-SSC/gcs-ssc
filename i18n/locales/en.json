@@ -1006,6 +1006,10 @@
       "libreoffice_unavailable": "LibreOffice is required to convert DOCX templates to PDF. Install LibreOffice on the server or use an HTML PDF template."
     },
     "agreement": {
+      "invalid_budget_calculation": "Invalid calculation configuration or duplicate all-other-items charge.",
+      "budget_calculation_read_only": "This calculated amount or percentage cannot be changed.",
+      "program_funding_required": "Program funding is required for a manual line item.",
+      "calculated_funding_exceeds_total": "Total Amount must cover the recalculated funding for “{row}”.",
       "stream_immutable": "The Agreement stream cannot be changed after creation.",
       "not_found": "Agreement not found.",
       "closed": "This Agreement is closed and cannot be changed.",
@@ -1691,6 +1695,8 @@
     }
   },
   "validation": {
+    "budget_percentage": "Enter a percentage from 0 to 100 with at most two decimal places.",
+    "budget_calculation": "Select a valid calculation mode and source category.",
     "custom_field_display_order_max": "Display order must not exceed {max}.",
     "custom_field_inactive": "Inactive fields can only be cleared.",
     "custom_field_single_selection": "Select only one option for this field.",
@@ -3308,5 +3314,17 @@
       "sql_truncated": "SQL exceeds the capture limit.",
       "parameters_truncated": "The parameter count exceeds the capture limit."
     }
+  },
+  "budget_calculation": {
+    "mode": "Calculation",
+    "manual": "Manual amount",
+    "category": "Percentage of a cost category",
+    "all_other": "Percentage of all other items",
+    "percentage": "Percentage",
+    "source": "Source cost category",
+    "allow_override": "Allow percentage changes on agreements",
+    "program_only": "Based on program funding only",
+    "preview": "Calculated program funding: {amount}",
+    "percent_symbol": " %"
   }
 }

@@ -1,3 +1,4 @@
+import { AgencyCalculationFields, validateAgencyCalculationFields } from './budget-calculation'
 import { z } from 'zod'
 import lucideIcons from '@iconify-json/lucide/icons.json'
 import type { WithId } from './common'
@@ -131,10 +132,13 @@ export const AgencyCostCategoryInitial: AgencyCostCategoryItem = {
 }
 
 // --- Cost Category Line Item ---
-export const AgencyCostCategoryLineItemSchema = z.object({
+export const AgencyCostCategoryLineItemBaseSchema = z.object({
+  ...AgencyCalculationFields,
   egcs_ay_name_en: z.string({ error: 'validation.name_en_required' }).trim().min(1, { error: 'validation.name_en_required' }),
   egcs_ay_name_fr: z.string({ error: 'validation.name_fr_required' }).trim().min(1, { error: 'validation.name_fr_required' })
 })
+export const AgencyCostCategoryLineItemSchema = AgencyCostCategoryLineItemBaseSchema.superRefine(validateAgencyCalculationFields)
+export const AgencyCostCategoryLineItemPatchSchema = AgencyCostCategoryLineItemBaseSchema.partial()
 export type AgencyCostCategoryLineItem = z.infer<typeof AgencyCostCategoryLineItemSchema>
 export type AgencyCostCategoryLineItemItem = WithId<AgencyCostCategoryLineItem>
 

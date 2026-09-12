@@ -1006,6 +1006,10 @@
       "libreoffice_unavailable": "LibreOffice est requis pour convertir les modèles DOCX en PDF. Installez LibreOffice sur le serveur ou utilisez un modèle PDF HTML."
     },
     "agreement": {
+      "invalid_budget_calculation": "Configuration de calcul invalide ou frais sur tous les autres postes en double.",
+      "budget_calculation_read_only": "Ce montant calculé ou ce pourcentage ne peut pas être modifié.",
+      "program_funding_required": "Le financement du programme est requis pour un poste manuel.",
+      "calculated_funding_exceeds_total": "Le montant total doit couvrir le financement recalculé du poste « {row} ».",
       "stream_immutable": "Le volet de l’entente ne peut pas être modifié après sa création.",
       "not_found": "Entente introuvable.",
       "closed": "Cette entente est fermée et ne peut plus être modifiée.",
@@ -1691,6 +1695,8 @@
     }
   },
   "validation": {
+    "budget_percentage": "Saisissez un pourcentage de 0 à 100 avec au plus deux décimales.",
+    "budget_calculation": "Sélectionnez un mode de calcul et une catégorie source valides.",
     "custom_field_display_order_max": "L'ordre d'affichage ne doit pas dépasser {max}.",
     "custom_field_inactive": "Les champs inactifs peuvent uniquement être effacés.",
     "custom_field_single_selection": "Sélectionnez une seule option pour ce champ.",
@@ -3308,5 +3314,17 @@
       "sql_truncated": "La requête SQL dépasse la limite de capture.",
       "parameters_truncated": "Le nombre de paramètres dépasse la limite de capture."
     }
+  },
+  "budget_calculation": {
+    "mode": "Calcul",
+    "manual": "Montant manuel",
+    "category": "Pourcentage d’une catégorie de coûts",
+    "all_other": "Pourcentage de tous les autres postes",
+    "percentage": "Pourcentage",
+    "source": "Catégorie de coûts source",
+    "allow_override": "Permettre la modification du pourcentage dans les ententes",
+    "program_only": "Calculé uniquement sur le financement du programme",
+    "preview": "Financement du programme calculé : {amount}",
+    "percent_symbol": " %"
   }
 }

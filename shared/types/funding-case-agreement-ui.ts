@@ -1,3 +1,4 @@
+import type { BudgetCalculationMode } from '../utils/budget-percentage'
 import type { Agreement_Type } from './database'
 import type { BusinessRecordStateFields } from './business-record-state'
 import type { StatusId } from './status'
@@ -118,8 +119,18 @@ export interface FundingCaseAgreementBudgetFiscalYearRow extends FundingCaseAgre
   fiscal_year_display?: string | null
 }
 
+export interface BudgetCalculationMetadata {
+  egcs_fc_percentage?: number | null
+  egcs_fc_calculationmode?: BudgetCalculationMode
+  egcs_fc_sourcecategory?: string | null
+  egcs_fc_allowpercentageoverride?: boolean
+  calculation_source_name_en?: string | null
+  calculation_source_name_fr?: string | null
+  calculation_category_id?: string
+}
+
 export interface FundingCaseAgreementBudgetLineItemRow extends Omit<FundingCaseAgreementBudgetLineItemItem,
-  'egcs_fc_totalamount' | 'egcs_fc_programfunding' | 'egcs_fc_otherfederalfunding' | 'egcs_fc_othergovfunding' | 'egcs_fc_otherfunding'> {
+  'egcs_fc_percentage' | 'egcs_fc_totalamount' | 'egcs_fc_programfunding' | 'egcs_fc_otherfederalfunding' | 'egcs_fc_othergovfunding' | 'egcs_fc_otherfunding'>, BudgetCalculationMetadata {
   egcs_fc_totalamount: Money
   egcs_fc_programfunding: Money
   egcs_fc_otherfederalfunding?: Money | null
@@ -147,8 +158,8 @@ export interface FundingCaseAgreementBudgetDifference {
 }
 
 export type FundingCaseAgreementBudgetFiscalYearForm = Partial<FundingCaseAgreementBudgetFiscalYearItem>
-export type FundingCaseAgreementBudgetLineItemForm = Partial<Omit<FundingCaseAgreementBudgetLineItemItem,
-  'egcs_fc_totalamount' | 'egcs_fc_programfunding' | 'egcs_fc_otherfederalfunding' | 'egcs_fc_othergovfunding' | 'egcs_fc_otherfunding'> & {
+export type FundingCaseAgreementBudgetLineItemForm = BudgetCalculationMetadata & Partial<Omit<FundingCaseAgreementBudgetLineItemItem,
+  'egcs_fc_percentage' | 'egcs_fc_totalamount' | 'egcs_fc_programfunding' | 'egcs_fc_otherfederalfunding' | 'egcs_fc_othergovfunding' | 'egcs_fc_otherfunding'> & {
     egcs_fc_totalamount: string
     egcs_fc_programfunding: string
     egcs_fc_otherfederalfunding: string | null

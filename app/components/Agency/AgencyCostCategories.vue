@@ -256,7 +256,12 @@ const openEditLineItem = (lineItemId: string) => {
 }
 
 const openCreateLineItem = (categoryId: string) => {
-  selectedLineItem.value = {}
+  selectedLineItem.value = {
+    egcs_ay_calculationmode: 'manual',
+    egcs_ay_sourcecategory: null,
+    egcs_ay_percentage: null,
+    egcs_ay_allowpercentageoverride: false
+  }
   selectedLineItemCategoryId.value = categoryId
   isLineItemModalOpen.value = true
 }
@@ -524,6 +529,11 @@ const deleteLineItem = async (lineItemId: string) => {
           <UFormField :label="t('agency.name_fr')" name="egcs_ay_name_fr">
             <UInput v-model="selectedLineItem.egcs_ay_name_fr" />
           </UFormField>
+
+          <AgencyBudgetCalculationFields
+            v-if="selectedLineItemCategoryId"
+            v-model="selectedLineItem"
+            :category-id="selectedLineItemCategoryId" />
 
           <div class="flex justify-end gap-2 pt-4">
             <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="closeLineItemModal" />

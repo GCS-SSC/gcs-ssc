@@ -46,7 +46,14 @@ export default defineEventHandler(async event => {
       .where('Agency_Cost_Category._deleted', '=', false)
       .select([
         budgetLineItemStableId.as('id'), budgetFiscalYearStableId.as('egcs_fc_fundingagreementbudgetfiscalyear'),
-        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_organizationcostcategory as egcs_fc_organizationcostcategory', 'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection as egcs_fc_costsubsection',
+        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_organizationcostcategory as egcs_fc_organizationcostcategory', 'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_calculationmode',
+        sql<string | null>`(SELECT source.egcs_ay_name_en FROM "Agency_Cost_Category" source WHERE source.id = "Funding_Case_Agreement_Budget_Line_Item".egcs_fc_sourcecategory)`.as('calculation_source_name_en'),
+        sql<string | null>`(SELECT source.egcs_ay_name_fr FROM "Agency_Cost_Category" source WHERE source.id = "Funding_Case_Agreement_Budget_Line_Item".egcs_fc_sourcecategory)`.as('calculation_source_name_fr'),
+        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_sourcecategory',
+        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_percentage',
+        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_allowpercentageoverride',
+        'Agency_Cost_Category_Line_Item.egcs_ay_organizationcostcategory as calculation_category_id',
+        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection as egcs_fc_costsubsection',
         'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description as egcs_fc_description', databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_totalamount')).as('egcs_fc_totalamount'),
         databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_programfunding')).as('egcs_fc_programfunding'), databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_otherfederalfunding')).as('egcs_fc_otherfederalfunding'),
         databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_othergovfunding')).as('egcs_fc_othergovfunding'), databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_otherfunding')).as('egcs_fc_otherfunding'),

@@ -242,8 +242,49 @@ export async function up(db: Kysely<Database>): Promise<void> {
     .addColumn('egcs_ay_organizationcostcategory', 'bigint', col =>
       col.notNull().references('Agency_Cost_Category.id').onDelete('restrict')
     )
+    .addColumn('egcs_ay_calculationmode', 'varchar(16)', col => col.notNull().defaultTo('manual'))
+    .addColumn('egcs_ay_sourcecategory', 'bigint', col => col.references('Agency_Cost_Category.id').onDelete('restrict'))
+    .addColumn('egcs_ay_percentage', 'numeric(5, 2)')
+    .addColumn('egcs_ay_allowpercentageoverride', 'boolean', col => col.notNull().defaultTo(false))
+    .addCheckConstraint('ay_chk_lineitemcalculation', sql`
+      (egcs_ay_calculationmode = 'manual' AND egcs_ay_sourcecategory IS NULL AND egcs_ay_percentage IS NULL AND NOT egcs_ay_allowpercentageoverride)
+      OR (egcs_ay_calculationmode IN ('category', 'all_other') AND egcs_ay_percentage IS NOT NULL
+        AND egcs_ay_percentage BETWEEN 0 AND 100
+        AND ((egcs_ay_calculationmode = 'category' AND egcs_ay_sourcecategory IS NOT NULL)
+          OR (egcs_ay_calculationmode = 'all_other' AND egcs_ay_sourcecategory IS NULL)))`)
     .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
     .execute()
+
+  await sql`
+    CREATE FUNCTION trg_fn_agency_line_calculation() RETURNS trigger LANGUAGE plpgsql AS $fn$
+    DECLARE owner_id bigint;
+    BEGIN
+      SELECT egcs_ay_organizationagency INTO owner_id FROM "Agency_Cost_Category" WHERE id = NEW.egcs_ay_organizationcostcategory;
+      PERFORM id FROM "Agency_Profile" WHERE id = owner_id FOR UPDATE;
+      IF NEW._deleted THEN RETURN NEW; END IF;
+      IF NEW.egcs_ay_calculationmode <> 'manual' AND EXISTS (
+        SELECT 1 FROM "Agency_Cost_Category_Line_Item" WHERE NOT _deleted
+          AND egcs_ay_sourcecategory = NEW.egcs_ay_organizationcostcategory AND id <> NEW.id
+      ) THEN RAISE EXCEPTION 'Referenced category must contain only manual items' USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_lineitemcalculation'; END IF;
+      IF NEW.egcs_ay_calculationmode = 'category' AND (
+        NEW.egcs_ay_sourcecategory = NEW.egcs_ay_organizationcostcategory
+        OR NOT EXISTS (SELECT 1 FROM "Agency_Cost_Category" WHERE id = NEW.egcs_ay_sourcecategory AND NOT _deleted AND egcs_ay_organizationagency = owner_id)
+        OR EXISTS (SELECT 1 FROM "Agency_Cost_Category_Line_Item" WHERE NOT _deleted AND egcs_ay_organizationcostcategory = NEW.egcs_ay_sourcecategory AND egcs_ay_calculationmode <> 'manual' AND id <> NEW.id)
+      ) THEN RAISE EXCEPTION 'Invalid percentage source category' USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_lineitemcalculation'; END IF;
+      RETURN NEW;
+    END $fn$
+  `.execute(db)
+  await sql`CREATE TRIGGER agency_line_calculation BEFORE INSERT OR UPDATE ON "Agency_Cost_Category_Line_Item" FOR EACH ROW EXECUTE FUNCTION trg_fn_agency_line_calculation()`.execute(db)
+  await sql`CREATE FUNCTION trg_fn_agency_calculation_source() RETURNS trigger LANGUAGE plpgsql AS $fn$
+    BEGIN
+      IF (NEW._deleted OR NEW.egcs_ay_organizationagency <> OLD.egcs_ay_organizationagency) AND EXISTS (
+        SELECT 1 FROM "Agency_Cost_Category_Line_Item" WHERE NOT _deleted AND egcs_ay_sourcecategory = NEW.id
+      ) THEN RAISE EXCEPTION 'Cost category is a calculation source' USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_lineitemcalculation'; END IF;
+      RETURN NEW;
+    END $fn$
+  `.execute(db)
+  await sql`CREATE TRIGGER agency_calculation_source BEFORE UPDATE ON "Agency_Cost_Category" FOR EACH ROW EXECUTE FUNCTION trg_fn_agency_calculation_source();
+  `.execute(db)
 
   await db.schema
     .createTable('Agency_Fiscal_Year')
@@ -484,6 +525,10 @@ export async function up(db: Kysely<Database>): Promise<void> {
 }
 
 export async function down(db: Kysely<Database>): Promise<void> {
+  await sql`DROP TRIGGER IF EXISTS agency_line_calculation ON "Agency_Cost_Category_Line_Item"`.execute(db)
+  await sql`DROP TRIGGER IF EXISTS agency_calculation_source ON "Agency_Cost_Category"`.execute(db)
+  await sql`DROP FUNCTION IF EXISTS trg_fn_agency_line_calculation()`.execute(db)
+  await sql`DROP FUNCTION IF EXISTS trg_fn_agency_calculation_source()`.execute(db)
   await sql`DROP TRIGGER IF EXISTS trg_protect_agency_claim_reconciliation_status_refs ON "Common_Status"`.execute(db)
   await sql`DROP FUNCTION IF EXISTS protect_agency_claim_reconciliation_status_refs()`.execute(db)
   await sql`DROP TRIGGER IF EXISTS trg_enforce_agency_claim_reconciliation_statuses ON "Agency_Profile"`.execute(db)

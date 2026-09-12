@@ -1,19 +1,20 @@
+import { FundingCaseAgreementBudgetLineItemFundingTotalsSchema,
+  FundingCaseAgreementBudgetFiscalYearPatchSchema,
+  FundingCaseAgreementBudgetLineItemCreateSchema
+} from '~~/shared/types/schemas'
+import { parseI18n, readValidatedBodyI18n } from '~~/server/utils/api-validate'
+import { prepareBudgetCalculation, recalculateAgreementBudget } from '~~/server/utils/agreement-budget-calculation'
 /* eslint-disable jsdoc/require-jsdoc -- Existing helpers use descriptive names and narrow types. */
 import { sql } from 'kysely'
 import type { Kysely, Transaction } from 'kysely'
 import type { H3Event } from 'h3'
 import { badRequest } from '~~/server/utils/api-errors'
-import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import {
   AGREEMENT_CHILD_ERROR_KEYS,
   assertAgreementChildExists,
   assertAgreementExists
 } from '~~/server/utils/agreement-child-resources'
 import { throwIfAgreementUniqueConstraintError } from '~~/server/utils/agreement-unique-constraint-errors'
-import {
-  FundingCaseAgreementBudgetFiscalYearPatchSchema,
-  FundingCaseAgreementBudgetLineItemCreateSchema
-} from '~~/shared/types/schemas'
 import type { Database } from '~~/shared/types/database'
 import type { AgreementScopeContext } from '~~/server/utils/agreement'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
@@ -459,25 +460,17 @@ export const createAgreementBudgetLineItem = async (
       return await routeBadRequest(event, 'INVALID_AGREEMENT_BUDGET_LINE_ITEM', 'apiErrors.agreement.invalid_cost_category_line_item')
     }
 
-    const capacityGuard = await assertAgreementBudgetProgramFundingCapacity(
-      event,
-      trx,
-      currentContext.streamId,
-      validated.egcs_fc_fundingagreementbudgetfiscalyear,
-      validated.egcs_fc_programfunding,
-      { lockStreamBudget: true }
-    )
+    const calculation = await prepareBudgetCalculation(event, trx, validated, undefined, String(fiscalYear.id))
+    const programFunding = calculation.egcs_fc_programfunding ?? validated.egcs_fc_programfunding!
 
-    if (capacityGuard) {
-      return capacityGuard
-    }
-
+    await parseI18n(event, FundingCaseAgreementBudgetLineItemFundingTotalsSchema, { ...validated, egcs_fc_programfunding: calculation.egcs_fc_programfunding ?? validated.egcs_fc_programfunding })
     const inserted = await trx
       .insertInto('Funding_Case_Agreement_Budget_Line_Item')
       .values({
         ...validated,
+        ...calculation,
         egcs_fc_totalamount: databaseMoneyValue(validated.egcs_fc_totalamount),
-        egcs_fc_programfunding: databaseMoneyValue(validated.egcs_fc_programfunding),
+        egcs_fc_programfunding: databaseMoneyValue(programFunding),
         egcs_fc_otherfederalfunding: validated.egcs_fc_otherfederalfunding === undefined
           ? undefined
           : databaseMoneyValue(validated.egcs_fc_otherfederalfunding),
@@ -491,6 +484,7 @@ export const createAgreementBudgetLineItem = async (
         egcs_fc_fundingagreementbudgetfiscalyear: String(fiscalYear.id)
       })
       .returning([
+        'egcs_fc_calculationmode', 'egcs_fc_sourcecategory', 'egcs_fc_percentage', 'egcs_fc_allowpercentageoverride',
         'id', 'egcs_fc_originalbudgetlineitem', 'egcs_fc_fundingagreementbudgetfiscalyear',
         'egcs_fc_organizationcostcategory', 'egcs_fc_costsubsection', 'egcs_fc_description',
         databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('egcs_fc_totalamount'),
@@ -502,6 +496,7 @@ export const createAgreementBudgetLineItem = async (
       ])
       .executeTakeFirstOrThrow()
 
+    const amounts = await recalculateAgreementBudget(event, trx, inserted.id, currentContext.streamId)
     const fiscalYearLabel = await fetchAgreementBudgetLineFiscalYearLabel(
       trx,
       inserted.egcs_fc_fundingagreementbudgetfiscalyear
@@ -510,7 +505,7 @@ export const createAgreementBudgetLineItem = async (
     return {
       ...inserted,
       egcs_fc_totalamount: parseDatabaseMoney(inserted.egcs_fc_totalamount),
-      egcs_fc_programfunding: parseDatabaseMoney(inserted.egcs_fc_programfunding),
+      egcs_fc_programfunding: amounts.get(inserted.id) ?? parseDatabaseMoney(inserted.egcs_fc_programfunding),
       egcs_fc_otherfederalfunding: inserted.egcs_fc_otherfederalfunding === null ? null : parseDatabaseMoney(inserted.egcs_fc_otherfederalfunding),
       egcs_fc_othergovfunding: inserted.egcs_fc_othergovfunding === null ? null : parseDatabaseMoney(inserted.egcs_fc_othergovfunding),
       egcs_fc_otherfunding: inserted.egcs_fc_otherfunding === null ? null : parseDatabaseMoney(inserted.egcs_fc_otherfunding),

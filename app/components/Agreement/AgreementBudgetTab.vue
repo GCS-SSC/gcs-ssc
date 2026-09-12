@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useBudgetCalculationPreview } from '~/composables/useBudgetCalculationPreview'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 /* eslint-disable jsdoc/require-jsdoc -- Budget table callbacks are exercised by focused component tests. */
 import { computed, onUnmounted, ref, watch } from 'vue'
@@ -126,6 +127,7 @@ const lineItemModal = useCrudModal<FundingCaseAgreementBudgetLineItemRow, Fundin
     egcs_fc_currency: 'cad'
   }),
   updateState: lineItem => ({
+    ...lineItem,
     id: lineItem.id,
     egcs_fc_fundingagreementbudgetfiscalyear: lineItem.egcs_fc_fundingagreementbudgetfiscalyear,
     egcs_fc_organizationcostcategory: lineItem.egcs_fc_organizationcostcategory,
@@ -145,7 +147,11 @@ const isFiscalYearModalOpen = fiscalYearModal.isOpen
 const selectedLineItem = lineItemModal.selected
 const isLineItemModalOpen = lineItemModal.isOpen
 const validateFiscalYear = createValidator(FundingCaseAgreementBudgetFiscalYearCreateSchema)
-const validateLineItem = createValidator(FundingCaseAgreementBudgetLineItemCreateSchema)
+const lineItemValidator = createValidator(FundingCaseAgreementBudgetLineItemCreateSchema)
+const validateLineItem = (state: FundingCaseAgreementBudgetLineItemForm) => lineItemValidator({ ...state,
+  egcs_fc_percentage: state.egcs_fc_percentage ?? undefined,
+  egcs_fc_programfunding: state.egcs_fc_calculationmode && state.egcs_fc_calculationmode !== 'manual' ? undefined : state.egcs_fc_programfunding
+} as Parameters<typeof lineItemValidator>[0])
 const fiscalYearPending = useCrudModalPending(fiscalYearModal.captureSession)
 const lineItemPending = useCrudModalPending(lineItemModal.captureSession)
 const isSavingFiscalYear = fiscalYearPending.isPending
@@ -229,6 +235,25 @@ const bilingualColumns: BilingualColumnConfig<BudgetLeafRow>[] = [
 
 const fiscalYears = computed<FundingCaseAgreementBudgetFiscalYearRow[]>(() => overview.value?.fiscalYears ?? [])
 const lineItems = computed<FundingCaseAgreementBudgetLineItemRow[]>(() => overview.value?.lineItems ?? [])
+const calculationPreview = useBudgetCalculationPreview(selectedLineItem, lineItems)
+/**
+ * Captures the selected agency defaults for a new budget row.
+ * @param items - Selected lookup records.
+ */
+const hydrateCalculation = (items: Record<string, unknown>[]) => {
+  const state = selectedLineItem.value
+  if (!state || state.id) return
+  const definition = items.find(item => String(item.id) === state.egcs_fc_organizationcostcategory)
+  if (!definition) return
+  state.egcs_fc_calculationmode = definition.egcs_ay_calculationmode as 'manual' | 'category' | 'all_other'
+  state.egcs_fc_sourcecategory = definition.egcs_ay_sourcecategory as string | null
+  state.egcs_fc_percentage = definition.egcs_ay_percentage as number | null
+  state.egcs_fc_allowpercentageoverride = definition.egcs_ay_allowpercentageoverride as boolean
+  state.calculation_source_name_en = definition.calculation_source_name_en as string | null
+  state.calculation_source_name_fr = definition.calculation_source_name_fr as string | null
+  state.calculation_category_id = definition.calculation_category_id as string
+}
+
 const fiscalYearDisplayById = computed(() => new Map(
   (fiscalYearLookupResponse.value?.items ?? []).map((item: LookupItem) => [
     String(item.id),
@@ -535,7 +560,11 @@ const saveLineItem = async () => {
         ? `${resourceBase.value}/budget-line-items/${lineItemState.id}`
         : `${resourceBase.value}/budget-line-items`,
       isUpdate ? 'PATCH' : 'POST',
-      lineItemState
+      {
+        ...lineItemState,
+        egcs_fc_programfunding: lineItemState.egcs_fc_calculationmode && lineItemState.egcs_fc_calculationmode !== 'manual' ? undefined : lineItemState.egcs_fc_programfunding,
+        egcs_fc_percentage: lineItemState.egcs_fc_allowpercentageoverride ? lineItemState.egcs_fc_percentage ?? undefined : undefined
+      }
     )
 
     if (!lineItemModal.closeSession(session)) return
@@ -695,6 +724,11 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
             <CommonBilingualName
               :name-en="row.original.lineItemNameEn"
               :name-fr="row.original.lineItemNameFr" />
+            <p v-if="getLineItemById(row.original.id)?.egcs_fc_calculationmode && getLineItemById(row.original.id)?.egcs_fc_calculationmode !== 'manual'" class="text-xs text-muted">
+              {{ t(`budget_calculation.${getLineItemById(row.original.id)?.egcs_fc_calculationmode}`) }}
+              {{ getLineItemById(row.original.id)?.egcs_fc_percentage }}{{ t('budget_calculation.percent_symbol') }}
+              {{ locale === 'fr' ? getLineItemById(row.original.id)?.calculation_source_name_fr : getLineItemById(row.original.id)?.calculation_source_name_en }}
+            </p>
             <p class="min-w-0 max-w-full whitespace-normal break-words text-sm text-zinc-500 dark:text-zinc-400">
               {{ row.original.description }}
             </p>
@@ -890,11 +924,13 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
               <CommonServerLookupSelect
                 v-model="selectedLineItem.egcs_fc_organizationcostcategory"
                 :fetch-url="`/api/agreements/${agreementId}/budget-line-items/lookups/organization-cost-categories`"
+                selected-values-query-key="selected_ids"
                 value-key="id"
                 label-en-key="label_en"
                 label-fr-key="label_fr"
                 :query="{ page: 1, limit: 100, permission_action: selectedLineItem.id ? 'update' : 'create' }"
-                :disabled="isLineItemCostCategoryLocked" />
+                :disabled="isLineItemCostCategoryLocked"
+                @resolved-items="hydrateCalculation" />
             </UFormField>
 
             <UFormField :label="t('agreement.budget.cost_subsection')" name="egcs_fc_costsubsection">
@@ -911,6 +947,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
                 class="w-full" />
             </UFormField>
 
+            <AgreementBudgetCalculationFields v-model="selectedLineItem" :preview="calculationPreview" />
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:col-span-2 xl:grid-cols-5">
               <UFormField :label="t('agreement.budget.total_amount')" name="egcs_fc_totalamount">
                 <UInput
@@ -920,8 +957,10 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
 
               <UFormField :label="t('agreement.budget.program_funding')" name="egcs_fc_programfunding">
                 <UInput
-                  v-model="selectedLineItem.egcs_fc_programfunding"
-                  inputmode="decimal" />
+                  :model-value="selectedLineItem.egcs_fc_calculationmode && selectedLineItem.egcs_fc_calculationmode !== 'manual' ? calculationPreview : selectedLineItem.egcs_fc_programfunding"
+                  :readonly="Boolean(selectedLineItem.egcs_fc_calculationmode && selectedLineItem.egcs_fc_calculationmode !== 'manual')"
+                  inputmode="decimal"
+                  @update:model-value="selectedLineItem.egcs_fc_programfunding = String($event)" />
               </UFormField>
 
               <UFormField :label="t('agreement.budget.other_federal_funding')" name="egcs_fc_otherfederalfunding">

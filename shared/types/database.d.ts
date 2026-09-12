@@ -767,6 +767,10 @@ export interface AgencyCostCategoryTable {
 }
 
 export interface AgencyCostCategoryLineItemTable {
+  egcs_ay_calculationmode: Generated<'manual' | 'category' | 'all_other'>
+  egcs_ay_sourcecategory: Generated<string | null>
+  egcs_ay_percentage: Generated<number | null>
+  egcs_ay_allowpercentageoverride: Generated<boolean>
   id: Generated<string>
   egcs_ay_name_en: string
   egcs_ay_name_fr: string
@@ -1341,6 +1345,10 @@ export interface FundingCaseAgreementBudgetFiscalYearTable {
 }
 
 export interface FundingCaseAgreementBudgetLineItemTable {
+  egcs_fc_calculationmode: Generated<'manual' | 'category' | 'all_other'>
+  egcs_fc_sourcecategory: Generated<string | null>
+  egcs_fc_percentage: Generated<number | null>
+  egcs_fc_allowpercentageoverride: Generated<boolean>
   id: Generated<string>
   egcs_fc_fundingagreement: Generated<string>
   egcs_fc_budgetversion: Generated<string>

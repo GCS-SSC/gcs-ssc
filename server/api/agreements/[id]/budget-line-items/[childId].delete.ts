@@ -1,3 +1,4 @@
+import { recalculateAgreementBudget } from '~~/server/utils/agreement-budget-calculation'
 import { authorize } from '~~/server/utils/authorize'
 import { badRequest } from '~~/server/utils/api-errors'
 import { canAccessAgreement, resolveAgreementScopeContext } from '~~/server/utils/agreement'
@@ -106,6 +107,7 @@ export default defineEventHandler(async event => {
         .where('_deleted', '=', false)
         .execute()
 
+      await recalculateAgreementBudget(event, trx, String(existing.id), agreementContext.streamId)
       return { success: true }
     }, { action: 'delete', blocksApprovalSubmission: true })
   } catch (error: unknown) {

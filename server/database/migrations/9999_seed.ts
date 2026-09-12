@@ -1074,11 +1074,19 @@ const seedAgencies = async (db: Kysely<Database>, gwcoaNumbers: number[]): Promi
       .insertInto('Agency_Cost_Category_Line_Item')
       .values([
         {
+          egcs_ay_calculationmode: 'manual',
+          egcs_ay_sourcecategory: null,
+          egcs_ay_percentage: null,
+          egcs_ay_allowpercentageoverride: false,
           egcs_ay_organizationcostcategory: String(category.id),
           egcs_ay_name_en: 'Travel',
           egcs_ay_name_fr: 'Deplacement'
         },
         {
+          egcs_ay_calculationmode: 'manual',
+          egcs_ay_sourcecategory: null,
+          egcs_ay_percentage: null,
+          egcs_ay_allowpercentageoverride: false,
           egcs_ay_organizationcostcategory: String(category.id),
           egcs_ay_name_en: 'Equipment',
           egcs_ay_name_fr: 'Equipement'
@@ -4368,6 +4376,10 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
               ]
 
               return {
+                egcs_fc_calculationmode: 'manual',
+                egcs_fc_sourcecategory: null,
+                egcs_fc_percentage: null,
+                egcs_fc_allowpercentageoverride: false,
                 egcs_fc_fundingagreementbudgetfiscalyear: String(year.id),
                 egcs_fc_organizationcostcategory: String(lineItem.id),
                 egcs_fc_costsubsection: isDelivery ? 'Delivery' : 'Administration',
@@ -4839,6 +4851,10 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
       ).returning('id').execute()
       await db.insertInto('Funding_Case_Agreement_Budget_Line_Item').values(
         budgetYears.flatMap((budgetYear, yearIndex) => costLineItems.map((costLineItem, lineIndex) => ({
+          egcs_fc_calculationmode: 'manual',
+          egcs_fc_sourcecategory: null,
+          egcs_fc_percentage: null,
+          egcs_fc_allowpercentageoverride: false,
           egcs_fc_fundingagreementbudgetfiscalyear: String(budgetYear.id),
           egcs_fc_organizationcostcategory: String(costLineItem.id),
           egcs_fc_costsubsection: lineIndex === 0 ? 'Project delivery' : 'Project administration',
@@ -4854,6 +4870,29 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
         })))
       ).execute()
     }
+  }
+}
+
+/** Seeds selectable percentage definitions after the stable manual demo fixtures. */
+const seedPercentageBudgetDefinitions = async (db: Kysely<Database>): Promise<void> => {
+  const agencies = await db.selectFrom('Agency_Profile').select('id').where('_deleted', '=', false).orderBy('id').execute()
+  for (const agency of agencies) {
+    const source = await db.selectFrom('Agency_Cost_Category').select('id')
+      .where('egcs_ay_organizationagency', '=', agency.id).where('_deleted', '=', false).orderBy('id').executeTakeFirstOrThrow()
+    const category = await db.insertInto('Agency_Cost_Category').values({
+      egcs_ay_organizationagency: agency.id, egcs_ay_name_en: 'Calculated charges', egcs_ay_name_fr: 'Frais calculés'
+    }).returning('id').executeTakeFirstOrThrow()
+    const definitions = await db.insertInto('Agency_Cost_Category_Line_Item').values([
+      { egcs_ay_organizationcostcategory: category.id, egcs_ay_name_en: 'Operating support (15%)', egcs_ay_name_fr: 'Soutien opérationnel (15 %)',
+        egcs_ay_calculationmode: 'category', egcs_ay_sourcecategory: source.id, egcs_ay_percentage: 15, egcs_ay_allowpercentageoverride: true },
+      { egcs_ay_organizationcostcategory: category.id, egcs_ay_name_en: 'Administration (10%)', egcs_ay_name_fr: 'Administration (10 %)',
+        egcs_ay_calculationmode: 'all_other', egcs_ay_sourcecategory: null, egcs_ay_percentage: 10, egcs_ay_allowpercentageoverride: false }
+    ]).returning('id').execute()
+    const streams = await db.selectFrom('Transfer_Payment_Stream').innerJoin('Transfer_Payment_Profile', 'Transfer_Payment_Profile.id', 'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile')
+      .select('Transfer_Payment_Stream.id').where('Transfer_Payment_Profile.egcs_tp_agency', '=', agency.id).where('Transfer_Payment_Stream._deleted', '=', false).execute()
+    for (const stream of streams) await db.insertInto('Transfer_Payment_Stream_Cost_Category_Line_Item').values(definitions.map(definition => ({
+      egcs_tp_transferpaymentstream: stream.id, egcs_tp_organizationcostcategory: definition.id, egcs_tp_costsharingratio: 1
+    }))).execute()
   }
 }
 
@@ -6122,6 +6161,7 @@ const seedDatabase = async (db: Kysely<Database>): Promise<void> => {
   await seedTransferPaymentData(db)
   await seedRootProgramApprovalRole(db)
   await seedAgreementData(db)
+  await seedPercentageBudgetDefinitions(db)
   const deliveryOptions = await db.selectFrom('Transfer_Payment_Stream_Field as field')
     .innerJoin('Transfer_Payment_Stream_Field_Option as option', 'option.field_id', 'field.id')
     .select(['field.id as fieldId', 'field.egcs_tp_transferpaymentstream as streamId', 'option.id as optionId'])

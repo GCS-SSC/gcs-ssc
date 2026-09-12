@@ -5,6 +5,7 @@ const UNIQUE_VIOLATION_CODE = '23505'
 const FOREIGN_KEY_VIOLATION_CODE = '23503'
 
 const CONSTRAINT_ERROR_MAP: Record<string, ConstraintErrorMapping> = {
+  ay_chk_lineitemcalculation: { code: 'INVALID_BUDGET_CALCULATION', key: 'apiErrors.agreement.invalid_budget_calculation' },
   ay_ref_profilegwcoanumber: {
     code: 'AGENCY_INVALID_GWCOA_NUMBER',
     key: 'apiErrors.agency.invalid_gwcoa_number'
@@ -123,7 +124,7 @@ export const throwIfAgencyUniqueConstraintError = async (event: H3Event, error: 
   return await throwIfMappedConstraintError(
     event,
     error,
-    [UNIQUE_VIOLATION_CODE, FOREIGN_KEY_VIOLATION_CODE],
+    [UNIQUE_VIOLATION_CODE, FOREIGN_KEY_VIOLATION_CODE, '23514'],
     CONSTRAINT_ERROR_MAP
   )
 }

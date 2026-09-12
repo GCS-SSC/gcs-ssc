@@ -1,3 +1,4 @@
+import { recalculateAgreementBudget } from '~~/server/utils/agreement-budget-calculation'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import { assertDraftAgreementAmendmentCapability, resolveDraftAgreementAmendmentBudgetVersion } from '~~/server/utils/agreement-amendment'
@@ -32,6 +33,7 @@ export default defineEventHandler(async event => {
       .executeTakeFirst()
     if (activeClaimLine) return await badRequest(event, 'AGREEMENT_BUDGET_LINE_ITEM_CLAIM_IN_USE', 'apiErrors.agreement.budget_line_item_claim_in_use')
     await trx.updateTable('Funding_Case_Agreement_Budget_Line_Item').set({ _deleted: true }).where('id', '=', String(existing.id)).where('_deleted', '=', false).execute()
+    await recalculateAgreementBudget(event, trx, String(existing.id), context.streamId)
     return { success: true }
   }, {
     action: 'delete',

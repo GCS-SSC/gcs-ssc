@@ -1,3 +1,4 @@
+import { validateAgencyBudgetCalculation } from '~~/server/utils/agency-budget-calculation'
 import { AgencyCostCategoryLineItemSchema } from '~~/shared/types/schemas'
 import {
   authorizeActiveAgencyCostCategory,
@@ -30,12 +31,12 @@ export default defineEventHandler(async event => {
       agencyId,
       categoryId,
       async trx => {
+        await validateAgencyBudgetCalculation(event, trx, agencyId, categoryId, validated)
         return await trx
           .insertInto('Agency_Cost_Category_Line_Item')
           .values({
             egcs_ay_organizationcostcategory: categoryId,
-            egcs_ay_name_en: validated.egcs_ay_name_en,
-            egcs_ay_name_fr: validated.egcs_ay_name_fr
+            ...validated
           })
           .returningAll()
           .executeTakeFirstOrThrow()

@@ -1,4 +1,5 @@
 export type EnumKey =
+  | 'budget_calculation_mode'
   | 'agreement_applicant_recipient_type'
   | 'applicant_recipient_type'
   | 'registry_type'
