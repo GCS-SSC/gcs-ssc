@@ -2,6 +2,8 @@ import { createServer } from 'node:http'
 import { randomBytes } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
+import { createInterface } from 'node:readline'
+import { Writable } from 'node:stream'
 
 interface OAuthClient {
   client_id?: string
@@ -56,7 +58,7 @@ const server = createServer((request, response) => {
   if (oauthError || !code) {
     response.writeHead(400, { 'content-type': 'text/plain; charset=utf-8' })
     response.end('Google authorization was not completed. Return to the terminal.')
-    rejectAuthorization(new Error(`Google authorization failed: ${oauthError ?? 'authorization code missing'}`))
+    rejectAuthorization(new Error('Google authorization failed or the authorization code is missing'))
     return
   }
 
@@ -88,7 +90,47 @@ authorizationUrl.search = new URLSearchParams({
 
 console.log('Open this link to authorize Google Sheets access:')
 console.log(authorizationUrl.toString())
-console.log('\nWaiting for the local callback...')
+console.log('\nWaiting for the local callback, or paste the entire callback URL here and press Enter.')
+console.log('For a remote session, copy the URL from the browser address bar even if the callback page cannot load.')
+console.log('Pasted input is hidden. Keep this command running until authorization completes.')
+
+// Suppress readline echo so authorization codes never appear in terminal output.
+const input = createInterface({
+  input: process.stdin,
+  output: new Writable({ write: (_chunk, _encoding, done) => done() }),
+  terminal: Boolean(process.stdin.isTTY),
+  historySize: 0
+})
+input.on('line', (line) => {
+  if (!line.trim()) return
+  let callbackUrl: URL
+  try {
+    callbackUrl = new URL(line.trim())
+  } catch {
+    console.log('Invalid callback URL. Paste the entire URL from this authorization attempt and try again.')
+    return
+  }
+  const expectedCallback = new URL(redirectUri)
+  if (callbackUrl.origin !== expectedCallback.origin
+    || callbackUrl.pathname !== expectedCallback.pathname
+    || callbackUrl.username || callbackUrl.password || callbackUrl.hash
+    || callbackUrl.searchParams.getAll('state').length !== 1
+    || callbackUrl.searchParams.get('state') !== state) {
+    console.log('Invalid callback URL or state. Paste the URL from this authorization attempt and try again.')
+    return
+  }
+  if (callbackUrl.searchParams.has('error')) {
+    rejectAuthorization(new Error('Google authorization was not completed'))
+    return
+  }
+  const code = callbackUrl.searchParams.get('code')
+  if (!code || callbackUrl.searchParams.getAll('code').length !== 1) {
+    console.log('Callback URL must contain one authorization code. Paste the entire URL and try again.')
+    return
+  }
+  resolveAuthorization(code)
+})
+input.on('SIGINT', () => rejectAuthorization(new Error('Authorization cancelled')))
 
 const timeout = setTimeout(() => {
   rejectAuthorization(new Error('Authorization timed out after 10 minutes'))
@@ -118,5 +160,7 @@ try {
   console.log(`Authorization complete. Token saved securely to ${tokenPath}.`)
 } finally {
   clearTimeout(timeout)
+  input.close()
+  process.stdin.pause()
   server.close()
 }
