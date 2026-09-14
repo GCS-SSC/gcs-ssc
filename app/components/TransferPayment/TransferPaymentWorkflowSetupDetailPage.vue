@@ -598,7 +598,7 @@ const deleteMember = async (member: WorkflowMember) => {
             </UFormField>
           </div>
           <TransferPaymentWorkflowConditions v-model="selectedMember.conditions" :profile-id="transferPaymentId" :stream-id="streamId" />
-          <UFormField v-if="selectedMember.egcs_cn_kind !== 'approval_template'" :label="t('workflow.allow_owner_redirect')">
+          <UFormField v-if="selectedMember.egcs_cn_kind !== 'approval_template'" :label="t('workflow.allow_owner_redirect')" name="egcs_cn_allowownerredirect">
             <USwitch v-model="selectedMember.egcs_cn_allowownerredirect" />
           </UFormField>
           <div v-if="selectedMember.egcs_cn_kind !== 'approval_template' && nestedMembers.length" class="space-y-3">
@@ -608,7 +608,7 @@ const deleteMember = async (member: WorkflowMember) => {
             <UFormField
               v-for="(nested, index) in nestedMembers" :key="nested.id"
               :label="getBilingualValue(nested, 'egcs_cn_name') || `${t('workflow.step')} ${index + 1}`"
-              :description="t('workflow.default_owner_help')">
+              :description="t('workflow.default_owner_help')" :name="`owners.${index}.egcs_cn_defaultowner`">
               <CommonServerLookupSelect
                 v-model="selectedMember.owners![index]!.egcs_cn_defaultowner"
                 :fetch-url="`/api/users/lookups?workflowSetupId=${workflowSetupId}&status=active`"

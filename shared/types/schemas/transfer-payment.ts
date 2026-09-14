@@ -1,3 +1,4 @@
+import { RequiredDateSchema } from './form-input'
 import { z } from 'zod'
 import { isRepresentableByNumeric } from '~~/shared/utils/decimal'
 import type {
@@ -39,7 +40,7 @@ const StreamStorageText = (maxCharacters?: number) => RequiredString().superRefi
 const RequiredId = RequiredStringId
 const RequiredNumeric = (precision: number, scale: number) => z.coerce.number({ error: 'validation.required' })
   .finite({ error: 'validation.invalid_number' })
-  .refine(value => isRepresentableByNumeric(value, precision, scale), { error: 'validation.numeric_not_representable' })
+  .refine(value => isRepresentableByNumeric(value, precision, scale), { error: 'validation.numeric_not_representable' }).meta({ formRequired: false })
 const RequiredUniqueSelectionIdsSchema = () => z.array(RequiredId(), { error: 'validation.required' })
   .min(1, { error: 'validation.required' })
   .refine(values => new Set(values).size === values.length, { error: 'validation.duplicate' })
@@ -62,8 +63,8 @@ export type TransferPaymentListQuery = z.infer<typeof TransferPaymentListQuerySc
 
 export const TransferPaymentProfileBaseSchema = z.object({
   egcs_tp_agency: RequiredId(),
-  egcs_tp_datestart: z.coerce.date({ error: 'validation.required' }),
-  egcs_tp_dateend: z.coerce.date({ error: 'validation.required' }),
+  egcs_tp_datestart: RequiredDateSchema,
+  egcs_tp_dateend: RequiredDateSchema,
   egcs_tp_name_en: RequiredString(),
   egcs_tp_name_fr: RequiredString(),
   egcs_tp_abbreviation_en: RequiredString(),
@@ -649,7 +650,7 @@ export const TransferPaymentStreamRiskRatingSchema = z.object({
   egcs_tp_riskscore: z.coerce.number({ error: 'validation.required' })
     .finite({ error: 'validation.invalid_number' })
     .nonnegative({ error: 'validation.invalid_number' })
-    .refine(value => isRepresentableByNumeric(value, 8, 2), { error: 'validation.numeric_not_representable' }),
+    .refine(value => isRepresentableByNumeric(value, 8, 2), { error: 'validation.numeric_not_representable' }).meta({ formRequired: false }),
   egcs_tp_name_en: RequiredString(),
   egcs_tp_name_fr: RequiredString()
 })

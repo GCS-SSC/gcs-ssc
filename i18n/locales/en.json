@@ -150,6 +150,7 @@
     "total": "Managed rosters"
   },
   "common": {
+    "field_required": "required",
     "wizard_step_progress": "Step {current} of {total}",
     "general": "General",
     "actions": "Actions",
@@ -3229,6 +3230,8 @@
       "no_comments": "No comments yet."
     },
     "approvals": {
+      "comment_required_for_denial": "A comment is required to deny this approval.",
+      "certification_required_for_approval": "Required to approve.",
       "title": "Approvals",
       "routing_slip": "Routing slip",
       "none_configured": "No approval workflow is configured for this review.",

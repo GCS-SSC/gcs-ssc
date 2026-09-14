@@ -211,10 +211,13 @@ const saveConfiguration = async (item: ExtensionStreamTableRow, enabled = item.s
               <CommonTextarea
                 v-else
                 :model-value="fallbackConfigText"
+                :aria-label="t('extensions.configure')"
+                :aria-invalid="!!fallbackConfigError"
+                :aria-describedby="fallbackConfigError ? 'extension-config-error' : undefined"
                 :rows="18"
                 class="w-full"
                 @update:model-value="updateFallbackConfig" />
-              <p v-if="fallbackConfigError" class="text-sm text-error">
+              <p v-if="fallbackConfigError" id="extension-config-error" class="text-sm text-error">
                 {{ fallbackConfigError }}
               </p>
             </div>

@@ -8,13 +8,13 @@ const { t } = useI18n()
 
 <template>
   <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-    <UFormField :label="t('transfer_payment.name_en')" name="egcs_cn_name_en">
+    <UFormField :label="t('transfer_payment.name_en')" name="egcs_cn_name_en" required>
       <UInput
         :model-value="String(state.egcs_cn_name_en ?? '')"
         @update:model-value="value => (state.egcs_cn_name_en = value)" />
     </UFormField>
 
-    <UFormField :label="t('transfer_payment.name_fr')" name="egcs_cn_name_fr">
+    <UFormField :label="t('transfer_payment.name_fr')" name="egcs_cn_name_fr" required>
       <UInput
         :model-value="String(state.egcs_cn_name_fr ?? '')"
         @update:model-value="value => (state.egcs_cn_name_fr = value)" />
@@ -22,13 +22,13 @@ const { t } = useI18n()
   </div>
 
   <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-    <UFormField :label="t('admin_common.fields.egcs_cn_outcomename_en')" name="egcs_cn_outcomename_en">
+    <UFormField :label="t('admin_common.fields.egcs_cn_outcomename_en')" name="egcs_cn_outcomename_en" required>
       <UInput
         :model-value="String(state.egcs_cn_outcomename_en ?? '')"
         @update:model-value="value => (state.egcs_cn_outcomename_en = value)" />
     </UFormField>
 
-    <UFormField :label="t('admin_common.fields.egcs_cn_outcomename_fr')" name="egcs_cn_outcomename_fr">
+    <UFormField :label="t('admin_common.fields.egcs_cn_outcomename_fr')" name="egcs_cn_outcomename_fr" required>
       <UInput
         :model-value="String(state.egcs_cn_outcomename_fr ?? '')"
         @update:model-value="value => (state.egcs_cn_outcomename_fr = value)" />

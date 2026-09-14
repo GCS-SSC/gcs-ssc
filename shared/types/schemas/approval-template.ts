@@ -18,7 +18,7 @@ const RequiredId = () => z.preprocess(value => {
   }
 
   return value
-}, z.coerce.string({ error: 'validation.id_required' }).min(1, { error: 'validation.id_required' }))
+}, z.coerce.string({ error: 'validation.id_required' }).min(1, { error: 'validation.id_required' })).meta({ formRequired: true })
 
 const RequiredString = () => z.string({ error: 'validation.required' }).min(1, { error: 'validation.required' })
 

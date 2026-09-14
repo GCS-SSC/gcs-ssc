@@ -88,10 +88,10 @@ const addQuestion = (sectionIndex: number, subSectionIndex: number) => {
       :title="getNavigationLabel(section.label, section.key)">
       <div class="space-y-5">
         <div class="grid gap-4 md:grid-cols-2">
-          <UFormField :label="t('transfer_payment.name_en')">
+          <UFormField :label="t('transfer_payment.name_en')" required>
             <UInput v-model="section.label.en" class="w-full" />
           </UFormField>
-          <UFormField :label="t('transfer_payment.name_fr')">
+          <UFormField :label="t('transfer_payment.name_fr')" required>
             <UInput v-model="section.label.fr" class="w-full" />
           </UFormField>
         </div>
@@ -108,10 +108,10 @@ const addQuestion = (sectionIndex: number, subSectionIndex: number) => {
           level="sub">
           <div class="space-y-5">
             <div class="grid gap-4 md:grid-cols-2">
-              <UFormField :label="t('transfer_payment.name_en')">
+              <UFormField :label="t('transfer_payment.name_en')" required>
                 <UInput v-model="subSection.label.en" class="w-full" />
               </UFormField>
-              <UFormField :label="t('transfer_payment.name_fr')">
+              <UFormField :label="t('transfer_payment.name_fr')" required>
                 <UInput v-model="subSection.label.fr" class="w-full" />
               </UFormField>
             </div>

@@ -1,3 +1,4 @@
+import { RequiredDateSchema } from './form-input'
 import { AgencyCalculationFields, validateAgencyCalculationFields } from './budget-calculation'
 import { z } from 'zod'
 import lucideIcons from '@iconify-json/lucide/icons.json'
@@ -20,7 +21,7 @@ const createAgencyBigintIdSchema = (requiredError: string) => z.preprocess(
     .trim()
     .min(1, { error: requiredError })
     .refine(isPositivePostgresBigintText, { error: 'validation.invalid_selection' })
-)
+).meta({ formRequired: true })
 
 const AgencyRequiredIdSchema = createAgencyBigintIdSchema('validation.id_required')
 
@@ -30,7 +31,7 @@ const AgencyGwcoaIdSchema = z.preprocess(
     .trim()
     .min(1, { error: 'validation.gwcoa_required' })
     .refine(value => /^(0|[1-9][0-9]*)$/.test(value) && Number(value) <= 32767, { error: 'validation.invalid_selection' })
-)
+).meta({ formRequired: true })
 
 const AgencyOptionalIdSchema = createAgencyBigintIdSchema('validation.invalid_selection').nullable()
 
@@ -76,11 +77,11 @@ export type AgencyProfileItem = WithId<AgencyProfile>
 const StatusNameSchema = z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' }).max(255, { error: 'validation.max_length' })
 const LucideIconSchema = z.string({ error: 'validation.required' })
   .regex(/^i-lucide-[a-z0-9]+(?:-[a-z0-9]+)*$/, { error: 'validation.invalid_lucide_icon' })
-  .refine(value => Object.hasOwn(lucideIcons.icons, value.slice('i-lucide-'.length)), { error: 'validation.invalid_lucide_icon' })
+  .refine(value => Object.hasOwn(lucideIcons.icons, value.slice('i-lucide-'.length)), { error: 'validation.invalid_lucide_icon' }).meta({ formRequired: true })
 const StatusDefinitionFields = {
   nameEn: StatusNameSchema,
   nameFr: StatusNameSchema,
-  color: z.string({ error: 'validation.required' }).regex(/^#[0-9a-f]{6}$/i, { error: 'validation.invalid_hex_color' }),
+  color: z.string({ error: 'validation.required' }).regex(/^#[0-9a-f]{6}$/i, { error: 'validation.invalid_hex_color' }).meta({ formRequired: true }),
   icon: LucideIconSchema,
   readOnly: z.boolean(),
   terminal: z.boolean()
@@ -156,8 +157,8 @@ const AgencyFiscalYearBaseSchema = z.object({
     .min(1, { error: 'validation.display_required' })
     .max(9, { error: 'validation.max_length' }),
   egcs_ay_fiscalyear: z.coerce.number().int().min(1900).max(2100),
-  egcs_ay_startdate: z.coerce.date({ error: 'validation.required' }),
-  egcs_ay_enddate: z.coerce.date({ error: 'validation.required' })
+  egcs_ay_startdate: RequiredDateSchema,
+  egcs_ay_enddate: RequiredDateSchema
 })
 export const AgencyFiscalYearSchema = AgencyFiscalYearBaseSchema.refine(
   value => value.egcs_ay_startdate <= value.egcs_ay_enddate,

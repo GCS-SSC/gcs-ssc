@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { z } from 'zod'
+import { ApprovalTemplateStepSchema } from '~~/shared/types/schemas/approval-template'
 import type { ApprovalTemplateEditorStep } from '~/types/approval-template-editor'
 
 const open = defineModel<boolean>('open', { default: false })
@@ -15,6 +18,9 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const { createValidator } = useZodI18n()
+const validate = createValidator(z.object({ step: ApprovalTemplateStepSchema }))
+const validationState = computed(() => ({ step: step.value }))
 
 const modalTitle = computed(() => mode === 'create' ? t('common.add') : t('common.edit'))
 
@@ -37,7 +43,7 @@ const saveEditor = () => {
     fullscreen
     :ui="{ content: 'rounded-none shadow-none ring-0' }">
     <template #body>
-      <div v-if="step" class="flex h-full flex-col">
+      <UForm v-if="step" :state="validationState" :validate="validate" class="flex h-full flex-col" @submit="saveEditor">
         <div class="flex-1 overflow-y-auto p-6 lg:p-8">
           <div class="mx-auto w-full max-w-6xl space-y-8 pb-12">
             <CommonApprovalTemplatesStepFields v-model:step="step" :approval-template-id="approvalTemplateId" />
@@ -46,9 +52,9 @@ const saveEditor = () => {
 
         <div class="border-default flex items-center justify-end gap-3 border-t bg-white px-6 py-4 dark:bg-zinc-950 lg:px-8">
           <UButton :label="t('common.cancel')" color="neutral" variant="ghost" class="cursor-default" @click="closeEditor" />
-          <CommonSaveButton :label="t('common.save')" class="cursor-default" @click="saveEditor" />
+          <CommonSaveButton :label="t('common.save')" class="cursor-default" type="submit" />
         </div>
-      </div>
+      </UForm>
     </template>
   </UModal>
 </template>

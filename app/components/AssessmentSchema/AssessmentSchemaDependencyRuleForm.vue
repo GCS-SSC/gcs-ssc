@@ -146,7 +146,7 @@ watch(
       </div>
 
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <UFormField :label="t('transfer_payment.dependency_type')">
+        <UFormField :label="t('transfer_payment.dependency_type')" required>
           <USelect
             :model-value="clause.onType"
             :items="dependencyOnTypeItems"
@@ -160,13 +160,13 @@ watch(
         </UFormField>
       </div>
 
-      <UFormField v-if="clause.onType === 'helpers'" :label="t('transfer_payment.helper_field')">
+      <UFormField v-if="clause.onType === 'helpers'" :label="t('transfer_payment.helper_field')" required>
         <AssessmentSchemaHelperFieldSelect
           :model-value="clause.field"
           @update:model-value="value => updateClauseField(clause, String(value ?? ''))" />
       </UFormField>
 
-      <UFormField v-else :label="t('transfer_payment.assessment_item')">
+      <UFormField v-else :label="t('transfer_payment.assessment_item')" required>
         <AssessmentSchemaAnswerPathTreeSelect
           :model-value="createAnswersDependencyValue(clause)"
           :tree="answerPathTree"

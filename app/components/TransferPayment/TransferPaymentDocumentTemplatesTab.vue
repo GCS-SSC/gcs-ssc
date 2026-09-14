@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { withFormRequirements } from '~~/shared/utils/form-requirements'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 /* eslint-disable jsdoc/require-jsdoc -- component-local callbacks are self-descriptive */
@@ -79,7 +80,16 @@ const selectedTemplate: Ref<TemplateFormState | null> = selected
 const templatePending = useCrudModalPending(captureSession)
 const isSaving = templatePending.isPending
 const fileInputVersion: Ref<number> = ref(0)
-const validate = createValidator(TransferPaymentStreamDocumentTemplateCreateSchema)
+const validateMetadata = createValidator(TransferPaymentStreamDocumentTemplateCreateSchema)
+const validate = withFormRequirements(async (state: TemplateFormState) => {
+  const errors = await validateMetadata(state)
+  if (!state.id) {
+    for (const name of ['fileEn', 'fileFr'] as const) {
+      if (!state[name]) errors.push({ name, message: t('validation.required') })
+    }
+  }
+  return errors
+}, TransferPaymentStreamDocumentTemplateCreateSchema)
 const outputFormatOptions = TRANSFER_PAYMENT_DOCUMENT_TEMPLATE_OUTPUT_FORMAT_ENUM
 const fileAccept = computed(() => selectedTemplate.value?.egcs_tp_templatekind === 'html' ? '.html,.htm' : '.docx')
 const compatibleOutputFormats: Record<'docx' | 'html', TransferPaymentDocumentTemplateOutputFormat[]> = {
@@ -92,8 +102,6 @@ const getTemplateActionTarget = (template: TransferPaymentStreamDocumentTemplate
 const getDownloadActionName = (template: TransferPaymentStreamDocumentTemplateItem, language: 'eng' | 'fra') =>
   `${t('common.download')}: ${getTemplateActionTarget(template)} (${t(`enums.language_preference.${language}`)})`
 
-const hasOutputFormat = (format: TransferPaymentDocumentTemplateOutputFormat) => Boolean(selectedTemplate.value?.egcs_tp_outputformats?.includes(format))
-
 const getTemplateDownloadUrl = (template: TransferPaymentStreamDocumentTemplateItem, language: 'eng' | 'fra') => {
   return `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/document-templates/${template.id}/download?language=${language}`
 }
@@ -101,17 +109,6 @@ const getTemplateDownloadUrl = (template: TransferPaymentStreamDocumentTemplateI
 const canSelectOutputFormat = (format: TransferPaymentDocumentTemplateOutputFormat) => {
   const kind = selectedTemplate.value?.egcs_tp_templatekind
   return kind ? compatibleOutputFormats[kind].includes(format) : false
-}
-
-const toggleOutputFormat = (format: TransferPaymentDocumentTemplateOutputFormat, enabled: boolean) => {
-  if (!selectedTemplate.value) return
-  if (!canSelectOutputFormat(format)) return
-  const current = selectedTemplate.value.egcs_tp_outputformats || []
-  if (enabled) {
-    selectedTemplate.value.egcs_tp_outputformats = [...new Set([...current, format])]
-    return
-  }
-  selectedTemplate.value.egcs_tp_outputformats = current.filter(item => item !== format)
 }
 
 const clearSelectedTemplateFiles = () => {
@@ -307,19 +304,14 @@ const deleteTemplate = async (row: TransferPaymentStreamDocumentTemplateItem) =>
           <UFormField :label="t('transfer_payment.description_fr')" name="egcs_tp_description_fr">
             <UTextarea v-model="selectedTemplate.egcs_tp_description_fr" class="w-full" />
           </UFormField>
-          <UFormField :label="t('transfer_payment.document_templates.output_formats')" name="egcs_tp_outputformats">
-            <div class="flex flex-wrap gap-4">
-              <UCheckbox
-                v-for="format in outputFormatOptions"
-                :key="format"
-                :model-value="hasOutputFormat(format)"
-                :label="t(`enums.transfer_payment_document_template_output_format.${format}`)"
-                :disabled="!canSelectOutputFormat(format)"
-                @update:model-value="value => toggleOutputFormat(format, Boolean(value))" />
-            </div>
+          <UFormField :label="t('transfer_payment.document_templates.output_formats')" name="egcs_tp_outputformats" required>
+            <UCheckboxGroup
+              v-model="selectedTemplate.egcs_tp_outputformats"
+              :items="outputFormatOptions.map(format => ({ value: format, label: t(`enums.transfer_payment_document_template_output_format.${format}`), disabled: !canSelectOutputFormat(format) }))"
+              orientation="horizontal" />
           </UFormField>
           <div class="grid gap-4 md:grid-cols-2">
-            <UFormField :label="t('transfer_payment.document_templates.file_en')" name="fileEn">
+            <UFormField :label="t('transfer_payment.document_templates.file_en')" name="fileEn" :required="!selectedTemplate.id">
               <UInput
                 :key="`file-en-${fileInputVersion}`"
                 type="file"
@@ -327,7 +319,7 @@ const deleteTemplate = async (row: TransferPaymentStreamDocumentTemplateItem) =>
                 class="w-full"
                 @change="onFileChange($event, 'en')" />
             </UFormField>
-            <UFormField :label="t('transfer_payment.document_templates.file_fr')" name="fileFr">
+            <UFormField :label="t('transfer_payment.document_templates.file_fr')" name="fileFr" :required="!selectedTemplate.id">
               <UInput
                 :key="`file-fr-${fileInputVersion}`"
                 type="file"

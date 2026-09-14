@@ -313,7 +313,7 @@ const handleApprovalChanged = async () => {
                         </p>
                       </div>
 
-                      <UFormField :label="t('transfer_payment.selected_strategy')" class="mt-4">
+                      <UFormField :label="t('transfer_payment.selected_strategy')" class="mt-4" required>
                         <URadioGroup
                           :color="getOutcomeSelectionColor(outcome.section, outcome.subsection, outcome.nameEn, outcome.nameFr)"
                           :model-value="getOutcomeResponse(outcome.section, outcome.subsection, outcome.nameEn, outcome.nameFr)?.selectedStrategy"
@@ -334,16 +334,9 @@ const handleApprovalChanged = async () => {
 
                       <UFormField
                         class="mt-3"
-                        :name="getOutcomeJustificationFieldName(outcome.section, outcome.subsection, outcome.nameEn, outcome.nameFr)">
-                        <template #label>
-                          <span>
-                            {{ t('transfer_payment.justification') }}
-                            <span
-                              v-if="isOutcomeJustificationRequired(outcome.section, outcome.subsection, outcome.nameEn, outcome.nameFr)"
-                              class="text-red-600 dark:text-red-400">*</span>
-                          </span>
-                        </template>
-
+                        :name="getOutcomeJustificationFieldName(outcome.section, outcome.subsection, outcome.nameEn, outcome.nameFr)"
+                        :label="t('transfer_payment.justification')"
+                        :required="isOutcomeJustificationRequired(outcome.section, outcome.subsection, outcome.nameEn, outcome.nameFr)">
                         <CommonTextarea
                           :rows="3"
                           :model-value="getOutcomeResponse(outcome.section, outcome.subsection, outcome.nameEn, outcome.nameFr)?.justification ?? ''"
@@ -426,14 +419,14 @@ const handleApprovalChanged = async () => {
                           </UButton>
                         </div>
 
-                        <UFormField :label="t('applicant_recipient.name')" class="mt-4">
+                        <UFormField :label="t('applicant_recipient.name')" :name="`customOutcomes.${customOutcomeIndex}.name`" class="mt-4" required>
                           <UInput
                             :disabled="!canUpdateAssessment"
                             :model-value="customOutcome.name"
                             @update:model-value="value => updateCustomOutcome(customOutcomeIndex, 'name', String(value ?? ''))" />
                         </UFormField>
 
-                        <UFormField :label="t('transfer_payment.custom_outcome_content')" class="mt-3">
+                        <UFormField :label="t('transfer_payment.custom_outcome_content')" :name="`customOutcomes.${customOutcomeIndex}.outcome`" class="mt-3" required>
                           <CommonTextarea
                             :rows="5"
                             :disabled="!canUpdateAssessment"
@@ -482,7 +475,8 @@ const handleApprovalChanged = async () => {
                     <UFormField
                       v-if="assessmentResponse.egcs_cn_reviewalignment"
                       :label="t('assessment.review_alignment_result')"
-                      name="egcs_cn_reviewalignresult">
+                      name="egcs_cn_reviewalignresult"
+                      required>
                       <CommonBilingualSelectMenu
                         :model-value="reviewAlignResultValue"
                         :items="reviewAlignResultItems"
@@ -495,7 +489,8 @@ const handleApprovalChanged = async () => {
                     <UFormField
                       v-if="assessmentResponse.egcs_cn_reviewalignment"
                       :label="t('assessment.review_alignment_narrative')"
-                      name="egcs_cn_reviewalignmentnarrative">
+                      name="egcs_cn_reviewalignmentnarrative"
+                      required>
                       <CommonTextarea
                         :rows="4"
                         :disabled="!canUpdateAssessment"

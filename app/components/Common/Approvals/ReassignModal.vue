@@ -50,7 +50,7 @@ const assignedDiffersFromDefault = computed(() => (
           </p>
         </div>
 
-        <UFormField :label="t('assessment.approvals.assigned_approver')">
+        <UFormField :label="t('assessment.approvals.assigned_approver')" required>
           <CommonBilingualSelectMenu
             v-model="state.egcs_cn_assigneduser"
             :items="userOptions"
@@ -62,7 +62,8 @@ const assignedDiffersFromDefault = computed(() => (
 
         <UFormField
           v-if="assignedDiffersFromDefault"
-          :label="t('assessment.approvals.on_behalf_type')">
+          :label="t('assessment.approvals.on_behalf_type')"
+          required>
           <CommonBilingualSelectMenu
             v-model="state.egcs_cn_onbehalf"
             :items="behalfTypeOptions"

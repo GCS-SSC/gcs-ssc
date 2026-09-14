@@ -1,5 +1,5 @@
 export default defineNuxtConfig({
-  modules: ['./modules/gcs-extensions', '@nuxt/eslint', '@nuxt/ui', '@vueuse/nuxt', '@nuxtjs/i18n'],
+  modules: ['./modules/gcs-extensions', '@nuxt/eslint', '@nuxt/ui', './modules/form-requirements', '@vueuse/nuxt', '@nuxtjs/i18n'],
 
   ssr: false,
 

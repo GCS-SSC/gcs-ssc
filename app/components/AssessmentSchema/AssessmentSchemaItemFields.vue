@@ -61,16 +61,16 @@ const getOptionName = (option: AssessmentOptionRow) => getAssessmentLocaleLabel(
   <div class="space-y-6">
     <AssessmentSchemaAccordionSection :title="t('agency.tabs.general')" :default-open="true">
       <div class="space-y-6">
-        <UFormField :label="t('transfer_payment.language_independent_code')" name="item.name">
+        <UFormField :label="t('transfer_payment.language_independent_code')" name="item.name" required>
           <UInput v-model="item.name" />
         </UFormField>
 
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <UFormField :label="t('transfer_payment.name_en')" name="item.question.en">
+          <UFormField :label="t('transfer_payment.name_en')" name="item.question.en" required>
             <UInput v-model="item.question.en" />
           </UFormField>
 
-          <UFormField :label="t('transfer_payment.name_fr')" name="item.question.fr">
+          <UFormField :label="t('transfer_payment.name_fr')" name="item.question.fr" required>
             <UInput v-model="item.question.fr" />
           </UFormField>
         </div>

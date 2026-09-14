@@ -307,10 +307,10 @@ const retire = async () => {
               <div class="w-full space-y-10 pb-12">
                 <AssessmentSchemaPageSection section-id="recommendation-general" :title="t('recommendation_schema.general')">
                   <div class="grid gap-5 md:grid-cols-2">
-                    <UFormField :label="t('transfer_payment.name_en')">
+                    <UFormField :label="t('transfer_payment.name_en')" required>
                       <UInput v-model="state.egcs_cn_name_en" class="w-full" />
                     </UFormField>
-                    <UFormField :label="t('transfer_payment.name_fr')">
+                    <UFormField :label="t('transfer_payment.name_fr')" required>
                       <UInput v-model="state.egcs_cn_name_fr" class="w-full" />
                     </UFormField>
                   </div>

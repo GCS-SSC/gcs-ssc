@@ -119,6 +119,7 @@ const getCategoryLines = (category: ReconciliationCategoryGroup) => category.sub
           </th>
           <th class="min-w-44 px-4 py-4">
             {{ t('agreement.claims.reconciled_amount') }}
+            <span v-if="editMode === 'inline'" class="ml-1 text-xs font-normal text-muted">({{ t('common.field_required') }})</span>
           </th>
           <th class="min-w-44 px-4 py-4">
             {{ t('agreement.claims.sampled_amount') }}
@@ -220,11 +221,17 @@ const getCategoryLines = (category: ReconciliationCategoryGroup) => category.sub
                   <UInput
                     v-if="line.editable && editMode === 'inline'"
                     :model-value="line.reconciledAmount"
+                    required
+                    :aria-invalid="tryParseMoney(line.reconciledAmount) === null"
+                    :aria-describedby="tryParseMoney(line.reconciledAmount) === null ? `reconciled-error-${line.id}` : undefined"
                     inputmode="decimal"
                     :aria-label="t('agreement.claims.reconciled_amount_for', { name: line.name })"
                     class="w-40"
                     @update:model-value="value => emit('update:reconciled', line.id, value)" />
                   <span v-else>{{ formatMoney(tryParseMoney(line.reconciledAmount) ?? parseMoney('0')) }}</span>
+                  <p v-if="line.editable && editMode === 'inline' && tryParseMoney(line.reconciledAmount) === null" :id="`reconciled-error-${line.id}`" class="mt-1 text-xs text-error">
+                    {{ t('validation.invalid_number') }}
+                  </p>
                 </td>
                 <td class="px-4 py-4">
                   <UInput

@@ -1,3 +1,4 @@
+import { withFormRequirements } from '~~/shared/utils/form-requirements'
 /* eslint-disable jsdoc/require-jsdoc -- wizard callbacks use self-descriptive local signatures */
 import { nanoid } from 'nanoid'
 import type { FormError } from '#ui/types'
@@ -472,11 +473,11 @@ export const useTransferPaymentStreamWizardModal = ({
 
   const validateWizardSchema = createValidator(TransferPaymentStreamPolymorphicWizardSchema)
 
-  const validateWizard = async (wizardState: TransferPaymentStreamPolymorphicWizard) => {
+  const validateWizard = withFormRequirements(async (wizardState: TransferPaymentStreamPolymorphicWizard) => {
     const result = await validateWizardSchema(wizardState)
     wizardErrors.value = result
     return result
-  }
+  }, TransferPaymentStreamPolymorphicWizardSchema)
 
   const currentGuidance = computed(() => t(guidanceKeyByStep[currentStep.value]))
 

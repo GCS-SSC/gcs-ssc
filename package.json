@@ -50,10 +50,10 @@
     "review:fallow:broad": "fallow --format json --quiet --summary",
     "review:fallow:human": "fallow audit --gate new-only --format human",
     "test": "bun run test:unit && bun run test:e2e",
-    "test:unit": "bun x vitest run",
+    "test:unit": "bun run forms:check && bun x vitest run",
     "test:integration:postgres": "bun run scripts/test-postgres.ts",
     "test:integration:postgres:root": "bun x vitest run --config vitest.postgres.config.ts",
-    "test:coverage": "bun x vitest run --coverage",
+    "test:coverage": "bun run forms:check && bun x vitest run --coverage",
     "test:coverage:host-critical": "bun run test:coverage:host:workflow && bun run test:coverage:host:extension-lifecycle",
     "test:coverage:host:workflow": "bun x vitest run --coverage --config vitest.workflow-runtime.config.ts",
     "test:coverage:host:extension-lifecycle": "bun x vitest run --coverage --config vitest.extension-lifecycle-runtime.config.ts",
@@ -86,7 +86,10 @@
     "test:e2e:light:spec": "PLAYWRIGHT_WORKERS=1 bun run scripts/test-e2e.ts --suite pglite --spec",
     "test:e2e:fast": "PLAYWRIGHT_WORKERS=1 bun run scripts/test-e2e.ts --suite pglite",
     "test:all:manual": "bun run lint && bun run typecheck && bun run test:coverage && bun run test:integration:postgres && bun run test:e2e:pglite && bun run test:e2e:amendment-refresh && bun run test:e2e:agreement-closeout && bun run test:e2e:workflow-recommendation && bun run test:e2e:workflow-setup-retired && bun run test:e2e:agreement-amendments && bun run test:e2e:attachments && bun run test:e2e:agency-statuses && bun run test:e2e:fresh-reset && bun run test:e2e:postgres",
-    "webcontainer:preview": "bun scripts/webcontainer.ts --stage-demo && npx serve .agent/reports/webcontainer-preview"
+    "webcontainer:preview": "bun scripts/webcontainer.ts --stage-demo && npx serve .agent/reports/webcontainer-preview",
+    "forms:inventory": "bun scripts/form-field-inventory.ts",
+    "forms:audit": "bun --tsconfig-override scripts/tsconfig.form-fields.json scripts/form-field-contract-audit.ts",
+    "forms:check": "bun run forms:audit --check"
   },
   "dependencies": {
     "@better-auth/kysely-adapter": "^1.5.0-beta.9",

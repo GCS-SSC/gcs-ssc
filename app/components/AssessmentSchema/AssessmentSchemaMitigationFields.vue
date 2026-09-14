@@ -58,17 +58,17 @@ const getOptionKey = (option: AssessmentOutcomeOptionRow) => option._key
 <template>
   <div class="space-y-6">
     <div class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
-      <UFormField :label="t('transfer_payment.language_independent_code')" name="outcome.name">
+      <UFormField :label="t('transfer_payment.language_independent_code')" name="outcome.name" required>
         <UInput v-model="outcome.name" />
       </UFormField>
       <div />
     </div>
 
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <UFormField :label="t('transfer_payment.name_en')" name="outcome.label.en">
+      <UFormField :label="t('transfer_payment.name_en')" name="outcome.label.en" required>
         <UInput v-model="outcome.label.en" />
       </UFormField>
-      <UFormField :label="t('transfer_payment.name_fr')" name="outcome.label.fr">
+      <UFormField :label="t('transfer_payment.name_fr')" name="outcome.label.fr" required>
         <UInput v-model="outcome.label.fr" />
       </UFormField>
     </div>
@@ -85,7 +85,7 @@ const getOptionKey = (option: AssessmentOutcomeOptionRow) => option._key
           :title="getStrategyTitle(strategy, strategyIndex)">
           <div class="space-y-6">
             <div class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
-              <UFormField :label="t('transfer_payment.language_independent_code')" :name="`outcome.strategies.${strategyIndex}.name`">
+              <UFormField :label="t('transfer_payment.language_independent_code')" :name="`outcome.strategies.${strategyIndex}.name`" required>
                 <UInput v-model="strategy.name" />
               </UFormField>
               <div class="flex items-end">
@@ -103,10 +103,10 @@ const getOptionKey = (option: AssessmentOutcomeOptionRow) => option._key
             </div>
 
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <UFormField :label="t('transfer_payment.name_en')" :name="`outcome.strategies.${strategyIndex}.label.en`">
+              <UFormField :label="t('transfer_payment.name_en')" :name="`outcome.strategies.${strategyIndex}.label.en`" required>
                 <UInput v-model="strategy.label.en" />
               </UFormField>
-              <UFormField :label="t('transfer_payment.name_fr')" :name="`outcome.strategies.${strategyIndex}.label.fr`">
+              <UFormField :label="t('transfer_payment.name_fr')" :name="`outcome.strategies.${strategyIndex}.label.fr`" required>
                 <UInput v-model="strategy.label.fr" />
               </UFormField>
             </div>

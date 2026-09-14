@@ -1,3 +1,4 @@
+import { RequiredDateSchema } from './form-input'
 /* eslint-disable jsdoc/require-jsdoc -- Exported schemas and inferred types are self-describing. */
 import { z } from 'zod'
 import { CURRENCY_CODES_ENUM } from '~~/shared/constants/enums'
@@ -15,12 +16,12 @@ const OptionalText = (maximumLength?: number) => z.preprocess(
   maximumLength === undefined
     ? z.string().optional()
     : z.string().max(maximumLength, { error: 'validation.max_length' }).optional()
-)
+).meta({ formRequired: false })
 
 const RequiredId = () => z.union([z.string(), z.number()], { error: 'validation.id_required' })
   .transform(value => typeof value === 'number' ? String(value) : value.trim())
   .refine(value => value.length > 0, { error: 'validation.id_required' })
-  .refine(isPositivePostgresBigintText, { error: 'validation.invalid_selection' })
+  .refine(isPositivePostgresBigintText, { error: 'validation.invalid_selection' }).meta({ formRequired: true })
 
 const RequiredText = (maximumLength?: number) => {
   const schema = z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' })
@@ -78,8 +79,8 @@ export const FundingHistoryExternalBaseSchema = z.object({
   egcs_ar_title_fr: OptionalText(255),
   egcs_ar_description_en: OptionalText(),
   egcs_ar_description_fr: OptionalText(),
-  egcs_ar_startdate: z.coerce.date({ error: 'validation.required' }),
-  egcs_ar_enddate: z.coerce.date({ error: 'validation.required' }),
+  egcs_ar_startdate: RequiredDateSchema,
+  egcs_ar_enddate: RequiredDateSchema,
   egcs_ar_fundingamount: NonNegativeMoneySchema,
   egcs_ar_currency: z.enum(CURRENCY_CODES_ENUM, { error: 'validation.required' })
 })

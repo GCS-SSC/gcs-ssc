@@ -12,7 +12,7 @@ const field = useFormFieldPath(() => namePrefix)
 </script>
 
 <template>
-  <UFormField :label="t('transfer_payment.risk_rating_score')" :name="field('egcs_tp_riskscore')">
+  <UFormField :label="t('transfer_payment.risk_rating_score')" :name="field('egcs_tp_riskscore')" required>
     <UInputNumber v-model="model.egcs_tp_riskscore" :step="0.01" :min="0" />
   </UFormField>
 

@@ -1,10 +1,20 @@
 <script setup lang="ts">
 import lucideIcons from '@iconify-json/lucide/icons.json'
-import { computed, ref, watch } from 'vue'
+import { computed, inject, provide, ref, useId, watch } from 'vue'
+import { useI18n } from '#imports'
+import { useFormField } from '@nuxt/ui/composables/useFormField'
+import { fieldLabelKey, fieldRequirementKey } from '~/utils/form-requirement-context'
 import type { Ref } from 'vue'
 
 const model = defineModel<string>({ required: true })
-const { disabled = false } = defineProps<{ disabled?: boolean }>()
+const { disabled = false, required = undefined } = defineProps<{ disabled?: boolean, required?: boolean }>()
+const inheritedRequirement = inject(fieldRequirementKey, undefined)
+const fieldLabel = inject(fieldLabelKey, undefined)
+const isRequired = computed(() => required ?? inheritedRequirement?.value ?? false)
+provide(fieldRequirementKey, computed(() => false))
+const { id, ariaAttrs, disabled: formDisabled, emitFormChange, emitFormInput, emitFormBlur } = useFormField({})
+const isDisabled = computed(() => disabled || formDisabled.value)
+const pickerId = `icon-picker-${useId()}`
 const { t } = useI18n()
 const isOpen: Ref<boolean> = ref(false)
 const search: Ref<string> = ref('')
@@ -19,8 +29,14 @@ watch(isOpen, open => {
   if (!open) search.value = ''
 })
 
+/**
+ *
+ * @param icon Selected canonical Lucide icon identifier.
+ */
 const selectIcon = (icon: string): void => {
   model.value = icon
+  emitFormChange()
+  emitFormInput()
   isOpen.value = false
 }
 </script>
@@ -28,11 +44,21 @@ const selectIcon = (icon: string): void => {
 <template>
   <UPopover v-model:open="isOpen">
     <UButton
+      :id="id"
       type="button"
       color="neutral"
       variant="outline"
       class="w-full justify-start"
-      :disabled="disabled">
+      role="combobox"
+      aria-haspopup="dialog"
+      :aria-expanded="isOpen"
+      :aria-controls="pickerId"
+      :aria-required="isRequired && !isDisabled ? true : undefined"
+      :aria-labelledby="fieldLabel"
+      :aria-label="fieldLabel ? undefined : t('common.choose_icon')"
+      v-bind="ariaAttrs"
+      :disabled="isDisabled"
+      @blur="emitFormBlur">
       <template #leading>
         <UIcon :name="model || 'i-lucide-circle'" class="size-4" />
       </template>
@@ -42,8 +68,8 @@ const selectIcon = (icon: string): void => {
     </UButton>
 
     <template #content>
-      <div class="w-[min(26rem,calc(100vw-2rem))] space-y-3 p-3">
-        <UInput v-model="search" :placeholder="t('common.search_icons')" icon="i-lucide-search" autofocus />
+      <div :id="pickerId" class="w-[min(26rem,calc(100vw-2rem))] space-y-3 p-3">
+        <UInput v-model="search" :placeholder="t('common.search_icons')" :aria-label="t('common.search_icons')" :required="false" icon="i-lucide-search" autofocus />
         <div
           v-if="filteredIcons.length"
           class="grid max-h-72 grid-cols-1 gap-1 overflow-y-auto pr-1"

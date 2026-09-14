@@ -79,7 +79,7 @@ const updateResponse = (questionKey: string, value: string) => {
               :show-options="question.type === 'radio'"
               :error-message="getQuestionIssue(question.key) ? t(getQuestionIssue(question.key)!.message) : undefined"
               @update:model-value="value => updateResponse(question.key, String(value))">
-              <template v-if="question.type === 'text'" #answer="{ labelledby }">
+              <template v-if="question.type === 'text'" #answer="{ labelledby, describedby, invalid }">
                 <div class="space-y-2">
                   <p class="text-xs text-muted">
                     {{ t('recommendation.characters_max', { count: question.maxLength }) }}
@@ -90,6 +90,8 @@ const updateResponse = (questionKey: string, value: string) => {
                     :readonly="readonly"
                     :rows="4"
                     :aria-labelledby="labelledby"
+                    :aria-describedby="describedby"
+                    :aria-invalid="invalid || undefined"
                     :required="question.required"
                     class="w-full"
                     @update:model-value="value => updateResponse(question.key, String(value))" />

@@ -150,6 +150,7 @@
     "total": "Listes gérées"
   },
   "common": {
+    "field_required": "obligatoire",
     "wizard_step_progress": "Étape {current} sur {total}",
     "general": "Général",
     "actions": "Actions",
@@ -3229,6 +3230,8 @@
       "no_comments": "Aucun commentaire."
     },
     "approvals": {
+      "comment_required_for_denial": "Un commentaire est obligatoire pour refuser cette approbation.",
+      "certification_required_for_approval": "Obligatoire pour approuver.",
       "title": "Approbations",
       "routing_slip": "Feuille d'acheminement",
       "none_configured": "Aucun flux d'approbation n'est configuré pour cet examen.",

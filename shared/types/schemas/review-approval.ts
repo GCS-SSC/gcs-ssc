@@ -22,7 +22,7 @@ const OptionalNullableId = () =>
       z.string({ error: 'validation.required' }).min(1, { error: 'validation.required' }),
       z.null()
     ]).optional()
-  )
+  ).meta({ formRequired: false })
 export const ReviewApprovalActionCertificationSchema = z.object({
   id: RequiredStringId(),
   egcs_cn_value: z.boolean({ error: 'validation.required' })

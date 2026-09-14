@@ -1,3 +1,4 @@
+import { withFormRequirements } from '~~/shared/utils/form-requirements'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 /* eslint-disable jsdoc/require-jsdoc */
@@ -40,7 +41,7 @@ export const useTransferPaymentRecommendationSetupModal = ({
   const isUpdate = computed(() => Boolean(state.value?.id))
   const validateCreate = createValidator(TransferPaymentStreamRecommendationSetupCreateSchema)
   const validatePatch = createValidator(TransferPaymentStreamRecommendationSetupPatchSchema)
-  const validate = async (
+  const validate = withFormRequirements(async (
     payload:
       | z.infer<typeof TransferPaymentStreamRecommendationSetupCreateSchema>
       | z.infer<typeof TransferPaymentStreamRecommendationSetupPatchSchema>
@@ -50,7 +51,7 @@ export const useTransferPaymentRecommendationSetupModal = ({
     }
 
     return await validateCreate(payload as z.infer<typeof TransferPaymentStreamRecommendationSetupCreateSchema>)
-  }
+  }, TransferPaymentStreamRecommendationSetupCreateSchema)
   const modalTitle = computed(() => (
     isUpdate.value ? t('transfer_payment.recommendation_setup_update') : t('transfer_payment.recommendation_setup_create')
   ))

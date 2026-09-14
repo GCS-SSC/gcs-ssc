@@ -10,7 +10,7 @@ const MoneyInputValueSchema = z.union([
   z.string({ error: 'validation.required' }),
   z.number({ error: 'validation.required' })
 ], { error: 'validation.required' })
-  .refine(value => value !== '', { error: 'validation.required' })
+  .refine(value => value !== '', { error: 'validation.required' }).meta({ formRequired: true })
 
 /** Accepts exact decimal text or a safe compatibility number and emits canonical money text. */
 export const MoneySchema = MoneyInputValueSchema.transform((value, ctx): Money => {
@@ -28,7 +28,7 @@ export const MoneySchema = MoneyInputValueSchema.transform((value, ctx): Money =
 /** Validates values that are already in canonical fixed-scale money form. */
 export const CanonicalMoneySchema = z.custom<Money>(isCanonicalMoney, {
   error: 'validation.invalid_number'
-})
+}).meta({ formRequired: true })
 
 /** Exact positive money input, preserving existing positive-only domain rules. */
 export const PositiveMoneySchema = MoneySchema.refine(
@@ -46,4 +46,4 @@ export const NonNegativeMoneySchema = MoneySchema.refine(
 export const OptionalMoneySchema = z.preprocess(
   value => value === '' || value === null || value === undefined ? undefined : value,
   MoneySchema.optional()
-)
+).meta({ formRequired: false })

@@ -257,7 +257,7 @@ const setDeleted = async (definition: StatusDefinition, deleted: boolean) => {
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <UFormField :label="t('agency.statuses.color')" name="color">
               <UPopover>
-                <UButton type="button" color="neutral" variant="outline" class="w-full justify-start">
+                <UButton type="button" color="neutral" variant="outline" class="w-full justify-start" :aria-label="`${t('agency.statuses.color')}: ${state.color} (${t('common.field_required')})`">
                   <template #leading>
                     <span :style="{ backgroundColor: state.color }" class="size-3 rounded-full ring-1 ring-black/10" />
                   </template>

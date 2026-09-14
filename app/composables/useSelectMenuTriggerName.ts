@@ -1,5 +1,6 @@
-import { isRef, nextTick, onMounted, onUpdated, ref, useAttrs } from 'vue'
+import { inject, isRef, nextTick, onMounted, onUpdated, ref, useAttrs } from 'vue'
 import type { Ref } from 'vue'
+import { fieldLabelKey } from '~/utils/form-requirement-context'
 
 type TriggerReference = HTMLElement | Readonly<Ref<HTMLElement | null>>
 
@@ -39,6 +40,7 @@ const resolveTrigger = (selectMenu: SelectMenuTriggerExpose | null): HTMLElement
  */
 export const useSelectMenuTriggerName = (): Ref<SelectMenuTriggerExpose | null> => {
   const attrs = useAttrs()
+  const fieldLabelId = inject(fieldLabelKey, undefined)
   const selectMenuRef: Ref<SelectMenuTriggerExpose | null> = ref(null)
 
   /** Applies inherited accessible-name attributes to the focusable trigger. */
@@ -50,7 +52,7 @@ export const useSelectMenuTriggerName = (): Ref<SelectMenuTriggerExpose | null> 
     trigger.removeAttribute('aria-label')
     trigger.removeAttribute('aria-labelledby')
 
-    const labelledBy = readAttribute(attrs['aria-labelledby'])
+    const labelledBy = readAttribute(attrs['aria-labelledby']) ?? (readAttribute(attrs['aria-label']) ? undefined : fieldLabelId?.value)
     const label = readAttribute(attrs['aria-label'])
     if (labelledBy) {
       trigger.setAttribute('aria-labelledby', labelledBy)

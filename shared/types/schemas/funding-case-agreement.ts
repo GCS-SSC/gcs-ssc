@@ -1,3 +1,4 @@
+import { RequiredDateSchema } from './form-input'
 import { BudgetPercentageSchema } from './budget-calculation'
 /* eslint-disable jsdoc/require-jsdoc -- Existing schemas use descriptive exports and inferred metadata. */
 import { z } from 'zod'
@@ -35,17 +36,17 @@ const RequiredAgreementDate = () => z.union([z.date(), z.string()], { error: 'va
     const parsed = new Date(`${calendar}T00:00:00.000Z`)
     return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === calendar
   }, { error: 'validation.required' })
-  .pipe(z.coerce.date({ error: 'validation.required' }))
+  .pipe(z.coerce.date({ error: 'validation.required' })).meta({ formRequired: true })
 const OptionalBilingualName = () => z.preprocess(
   value => typeof value === 'string' && value.trim() === '' ? null : value,
   z.string().trim().max(255, { error: 'validation.max_length' }).nullable().optional()
-)
+).meta({ formRequired: false })
 const RequiredBigintSelectionId = () => PositivePostgresBigintIdSchema
 const NullableBigintSelectionId = () =>
   z.preprocess(
     value => value === '' ? null : value,
     z.union([RequiredBigintSelectionId(), z.null()], { error: 'validation.required' })
-  )
+  ).meta({ formRequired: false })
 const RequiredBigintLike = () =>
   z.union([
     z.string(),
@@ -54,7 +55,7 @@ const RequiredBigintLike = () =>
   ], { error: 'validation.required' })
     .transform(value => value.trim())
     .refine(value => value.length > 0, { error: 'validation.required' })
-    .refine(isCanonicalNonNegativePostgresBigintText, { error: 'validation.invalid_number' })
+    .refine(isCanonicalNonNegativePostgresBigintText, { error: 'validation.invalid_number' }).meta({ formRequired: true })
 const OptionalDecimal = (precision: number, scale: number) => z.preprocess(
   value => value === '' || value === null || value === undefined ? undefined : value,
   z.coerce.number()
@@ -63,7 +64,7 @@ const OptionalDecimal = (precision: number, scale: number) => z.preprocess(
     .refine(value => isRepresentableByNumeric(value, precision, scale), { error: 'validation.numeric_not_representable' })
     .nullable()
     .optional()
-)
+).meta({ formRequired: false })
 const ForbiddenBusinessStatusMutation = () => z.never({ error: 'validation.business_status_workflow_only' }).optional()
 
 const addDuplicateSelectionIssues = (values: string[], ctx: z.RefinementCtx) => {
@@ -101,7 +102,7 @@ export const FundingCaseAgreementProfileBaseSchema = z.object({
     .finite({ error: 'validation.invalid_number' })
     .min(0, { error: 'validation.invalid_number' })
     .max(100, { error: 'validation.invalid_number' })
-    .refine(value => isRepresentableByNumeric(value, 5, 2), { error: 'validation.numeric_not_representable' }),
+    .refine(value => isRepresentableByNumeric(value, 5, 2), { error: 'validation.numeric_not_representable' }).meta({ formRequired: false }),
   egcs_fc_holdbackbasis: RequiredBigintSelectionId(),
   egcs_fc_riskscore: OptionalDecimal(8, 2),
   egcs_fc_authorizedassistancestartdate: RequiredAgreementDate(),
@@ -186,7 +187,7 @@ export const FundingCaseAgreementAddressCreateSchema = z.preprocess(input => {
   z.object({
     egcs_fc_addresstype: RequiredBigintSelectionId()
   })
-))
+)).meta({ formPreservesInputPaths: true })
 export const FundingCaseAgreementAddressPatchSchema = z.intersection(
   CommonAddressBaseSchema.partial(),
   z.object({
@@ -267,8 +268,8 @@ export type FundingCaseAgreementAmendmentItem = WithId<{
 export const FundingCaseAgreementActivityBaseSchema = z.object({
   egcs_fc_description_en: RequiredString(),
   egcs_fc_description_fr: RequiredString(),
-  egcs_fc_startdate: z.coerce.date({ error: 'validation.required' }),
-  egcs_fc_enddate: z.coerce.date({ error: 'validation.required' }),
+  egcs_fc_startdate: RequiredDateSchema,
+  egcs_fc_enddate: RequiredDateSchema,
   egcs_fc_expectedresults_en: RequiredString(),
   egcs_fc_expectedresults_fr: RequiredString(),
   egcs_fc_name_en: RequiredString().max(255, { error: 'validation.max_length' }),
@@ -307,7 +308,7 @@ export type FundingCaseAgreementActivityItem = WithId<Omit<FundingCaseAgreementA
 const RequiredNumberInput = () => z.union([z.string(), z.number()], { error: 'validation.required' })
   .transform(value => typeof value === 'number' ? value : value.trim())
   .refine(value => value !== '', { error: 'validation.required' })
-  .transform(value => typeof value === 'number' ? value : Number(value))
+  .transform(value => typeof value === 'number' ? value : Number(value)).meta({ formRequired: true })
 const addBudgetLineItemFundingTotalsIssue = (
   ctx: z.RefinementCtx
 ) => {
@@ -410,7 +411,7 @@ const RequiredForecastVersion = () => z.union([z.string(), z.number()], { error:
   .refine(value => value !== '', { error: 'validation.required' })
   .refine(value => Number.isInteger(typeof value === 'number' ? value : Number(value)), { error: 'validation.invalid_number' })
   .refine(value => (typeof value === 'number' ? value : Number(value)) >= 0, { error: 'validation.invalid_number' })
-  .transform(value => String(value))
+  .transform(value => String(value)).meta({ formRequired: true })
 
 const OptionalText = () => z.preprocess(
   value => {
@@ -425,7 +426,7 @@ const OptionalText = () => z.preprocess(
     return value
   },
   z.string().trim().nullable().optional()
-)
+).meta({ formRequired: false })
 
 export const FundingCaseAgreementCommitmentBaseSchema = z.object({
   egcs_fc_type: RequiredBigintSelectionId()
@@ -575,7 +576,7 @@ export const FundingCaseAgreementClaimBaseSchema = z.object({
   egcs_fc_isfinalforyear: z.boolean(),
   egcs_fc_periodstart: RequiredForecastMonth(),
   egcs_fc_periodend: RequiredForecastMonth(),
-  egcs_fc_receiveddate: z.coerce.date({ error: 'validation.required' })
+  egcs_fc_receiveddate: RequiredDateSchema
 })
 
 export const FundingCaseAgreementClaimCreateSchema = FundingCaseAgreementClaimBaseSchema.refine(
@@ -680,7 +681,7 @@ const OptionalDate = () => z.preprocess(
     return value
   },
   z.coerce.date().optional()
-)
+).meta({ formRequired: false })
 
 export const FundingCaseAgreementMonitorBaseSchema = z.object({
   egcs_fc_type: RequiredBigintSelectionId(),
@@ -719,8 +720,8 @@ export type FundingCaseAgreementMonitorPlanningItem = WithId<FundingCaseAgreemen
 export const FundingCaseAgreementMonitorItemsBaseSchema = z.object({
   egcs_fc_fundingagreementmonitor: RequiredBigintSelectionId(),
   egcs_fc_item: RequiredString().max(255, { error: 'validation.max_length' }),
-  egcs_fc_plannedstart: z.coerce.date({ error: 'validation.required' }),
-  egcs_fc_plannedend: z.coerce.date({ error: 'validation.required' }),
+  egcs_fc_plannedstart: RequiredDateSchema,
+  egcs_fc_plannedend: RequiredDateSchema,
   egcs_fc_detail: RequiredString(),
   egcs_fc_monitored: z.boolean(),
   egcs_fc_actualstart: OptionalDate(),
@@ -821,7 +822,7 @@ export const FundingCaseAgreementMonitorFollowupBaseSchema = z.object({
   egcs_fc_fundingagreementmonitor: RequiredBigintSelectionId(),
   egcs_fc_followupname: RequiredString().max(255, { error: 'validation.max_length' }),
   egcs_fc_responsibleparty: z.enum(MONITOR_RESPONSIBLE_PARTY_ENUM, { error: 'validation.required' }),
-  egcs_fc_duedate: z.coerce.date({ error: 'validation.required' })
+  egcs_fc_duedate: RequiredDateSchema
 })
 
 export const FundingCaseAgreementMonitorFollowupCreateSchema = FundingCaseAgreementMonitorFollowupBaseSchema
@@ -841,7 +842,7 @@ export const FundingCaseAgreementMonitorFollowupUpdateBaseSchema = z.object({
   egcs_fc_fundingagreementmonitorfollowup: RequiredBigintSelectionId(),
   egcs_fc_update: RequiredString(),
   egcs_fc_status: z.enum(FOLLOW_UP_STATUS_ENUM, { error: 'validation.required' }),
-  egcs_fc_updatedate: z.coerce.date({ error: 'validation.required' })
+  egcs_fc_updatedate: RequiredDateSchema
 })
 
 export const FundingCaseAgreementMonitorFollowupUpdateCreateSchema = FundingCaseAgreementMonitorFollowupUpdateBaseSchema

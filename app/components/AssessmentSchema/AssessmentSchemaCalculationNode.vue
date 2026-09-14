@@ -221,7 +221,7 @@ watchEffect(() => {
       {{ nodeLabel }}
     </legend>
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <UFormField :label="t('common.type')">
+      <UFormField :label="t('common.type')" required>
         <USelect
           :model-value="currentKind"
           :items="expressionTypeItems"
@@ -230,7 +230,7 @@ watchEffect(() => {
           @update:model-value="updateKind" />
       </UFormField>
 
-      <UFormField v-if="expression.kind === 'operation'" :label="t('transfer_payment.calculation_operator')">
+      <UFormField v-if="expression.kind === 'operation'" :label="t('transfer_payment.calculation_operator')" required>
         <USelect
           :model-value="expression.operator"
           :items="operatorItems"
@@ -248,7 +248,7 @@ watchEffect(() => {
       <USelect v-model="expression.value" :items="booleanItems" value-key="value" label-key="label" />
     </UFormField>
 
-    <UFormField v-else-if="expression.kind === 'answer'" :label="t('transfer_payment.assessment_item')">
+    <UFormField v-else-if="expression.kind === 'answer'" :label="t('transfer_payment.assessment_item')" required>
       <AssessmentSchemaAnswerPathTreeSelect
         :model-value="getAnswerReferenceValue()"
         :tree="answerPathTree"
@@ -257,7 +257,7 @@ watchEffect(() => {
         @update:model-value="value => updateAnswerReference(String(value ?? ''))" />
     </UFormField>
 
-    <UFormField v-else-if="expression.kind === 'helper'" :label="t('transfer_payment.helper_field')">
+    <UFormField v-else-if="expression.kind === 'helper'" :label="t('transfer_payment.helper_field')" required>
       <AssessmentSchemaHelperFieldSelect v-model="expression.field" />
     </UFormField>
 

@@ -67,7 +67,7 @@ const onSubmit = async (event: FormSubmitEvent<z.infer<typeof TransferPaymentStr
           <UFormField :label="t('transfer_payment.review_type')" name="egcs_cn_reviewtype">
             <CommonEnumSelect v-model="state.egcs_cn_reviewtype" name="review_type" class="w-full" />
           </UFormField>
-          <UFormField :label="t('common.order')" name="egcs_cn_order">
+          <UFormField :label="t('common.order')" name="egcs_cn_order" required>
             <UInputNumber v-model="state.egcs_cn_order" :min="1" class="w-full" />
           </UFormField>
           <AdminCommonLookupField

@@ -462,16 +462,16 @@ const retire = async () => {
                 <div class="w-full space-y-10 pb-12">
                   <AssessmentSchemaPageSection section-id="checklist-general" :title="t('checklist_schema.general')">
                     <div class="grid gap-5 md:grid-cols-2">
-                      <UFormField :label="t('transfer_payment.name_en')" name="egcs_cn_name_en">
+                      <UFormField :label="t('transfer_payment.name_en')" name="egcs_cn_name_en" required>
                         <UInput v-model="state.egcs_cn_name_en" class="w-full" />
                       </UFormField>
-                      <UFormField :label="t('transfer_payment.name_fr')" name="egcs_cn_name_fr">
+                      <UFormField :label="t('transfer_payment.name_fr')" name="egcs_cn_name_fr" required>
                         <UInput v-model="state.egcs_cn_name_fr" class="w-full" />
                       </UFormField>
-                      <UFormField :label="t('checklist_schema.result_name_en')" name="egcs_cn_outcomename_en">
+                      <UFormField :label="t('checklist_schema.result_name_en')" name="egcs_cn_outcomename_en" required>
                         <UInput v-model="state.egcs_cn_outcomename_en" class="w-full" />
                       </UFormField>
-                      <UFormField :label="t('checklist_schema.result_name_fr')" name="egcs_cn_outcomename_fr">
+                      <UFormField :label="t('checklist_schema.result_name_fr')" name="egcs_cn_outcomename_fr" required>
                         <UInput v-model="state.egcs_cn_outcomename_fr" class="w-full" />
                       </UFormField>
                     </div>
@@ -496,13 +496,13 @@ const retire = async () => {
                             <UButton icon="i-lucide-trash" color="error" variant="ghost" class="cursor-default" @click="removeSection(sectionIndex)" />
                           </div>
                           <div class="grid gap-4 md:grid-cols-2">
-                            <UFormField :label="t('checklist_schema.section_name_en')">
+                            <UFormField :label="t('checklist_schema.section_name_en')" required>
                               <UInput v-model="section.label.en" />
                             </UFormField>
-                            <UFormField :label="t('checklist_schema.section_name_fr')">
+                            <UFormField :label="t('checklist_schema.section_name_fr')" required>
                               <UInput v-model="section.label.fr" />
                             </UFormField>
-                            <UFormField :label="t('checklist_schema.language_independent_code')">
+                            <UFormField :label="t('checklist_schema.language_independent_code')" required>
                               <UInput v-model="section.key" class="font-mono" />
                             </UFormField>
                           </div>
@@ -529,13 +529,13 @@ const retire = async () => {
                                     <UButton icon="i-lucide-trash" color="error" variant="ghost" class="cursor-default" @click="removeSubSection(section, subSectionIndex)" />
                                   </div>
                                   <div class="grid gap-4 md:grid-cols-2">
-                                    <UFormField :label="t('checklist_schema.subsection_name_en')">
+                                    <UFormField :label="t('checklist_schema.subsection_name_en')" required>
                                       <UInput v-model="subSection.label.en" />
                                     </UFormField>
-                                    <UFormField :label="t('checklist_schema.subsection_name_fr')">
+                                    <UFormField :label="t('checklist_schema.subsection_name_fr')" required>
                                       <UInput v-model="subSection.label.fr" />
                                     </UFormField>
-                                    <UFormField :label="t('checklist_schema.language_independent_code')">
+                                    <UFormField :label="t('checklist_schema.language_independent_code')" required>
                                       <UInput v-model="subSection.key" class="font-mono" />
                                     </UFormField>
                                   </div>

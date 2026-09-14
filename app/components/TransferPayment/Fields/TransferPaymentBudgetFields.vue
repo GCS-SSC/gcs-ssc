@@ -43,7 +43,7 @@ const field = useFormFieldPath(() => namePrefix)
       v-model="model.egcs_tp_totalbudget"
       inputmode="decimal" />
   </UFormField>
-  <UFormField :label="t('transfer_payment.overcommit_threshold')" :name="field('egcs_tp_overcommitthreshold')">
+  <UFormField :label="t('transfer_payment.overcommit_threshold')" :name="field('egcs_tp_overcommitthreshold')" required>
     <UInputNumber
       v-model="model.egcs_tp_overcommitthreshold"
       :step="0.01"

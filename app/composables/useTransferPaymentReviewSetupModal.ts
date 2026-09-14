@@ -1,3 +1,4 @@
+import { withFormRequirements } from '~~/shared/utils/form-requirements'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import type { FormSubmitEvent } from '#ui/types'
@@ -65,7 +66,7 @@ export const useTransferPaymentReviewSetupModal = ({
    * @param payload - Form payload emitted by the review setup modal.
    * @returns Validation issues from the active Zod validator.
    */
-  const validate = async (
+  const validate = withFormRequirements(async (
     payload:
       | z.infer<typeof TransferPaymentStreamReviewSetupCreateSchema>
       | z.infer<typeof TransferPaymentStreamReviewSetupPatchSchema>
@@ -75,7 +76,7 @@ export const useTransferPaymentReviewSetupModal = ({
     }
 
     return await validateCreate(payload as z.infer<typeof TransferPaymentStreamReviewSetupCreateSchema>)
-  }
+  }, TransferPaymentStreamReviewSetupCreateSchema)
   const modalTitle = computed(() => (
     isUpdate.value ? t('transfer_payment.review_setup_update') : t('transfer_payment.review_setup_create')
   ))

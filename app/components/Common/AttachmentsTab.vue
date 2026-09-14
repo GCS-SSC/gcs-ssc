@@ -7,6 +7,7 @@ import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getGcsExtensionComponent } from '#gcs-extensions/registry'
 import { AttachmentMetadataBaseSchema } from '~~/shared/types/schemas'
+import { withFormRequirements } from '~~/shared/utils/form-requirements'
 
 type JsonObject = Record<string, unknown>
 
@@ -75,7 +76,7 @@ const { formatDate } = useDateHelpers({
   fallback: ''
 })
 const { createValidator } = useZodI18n()
-const validateMetadata = createValidator(AttachmentMetadataBaseSchema)
+const validateHostMetadata = createValidator(AttachmentMetadataBaseSchema)
 const toast = useToast()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
@@ -102,6 +103,11 @@ const attachmentResponse = computed(() => response.value as AttachmentListRespon
 const hasAttachmentListError = computed(() => status.value === 'error' || error.value !== undefined)
 const canUpload = computed(() => status.value === 'success' && attachmentResponse.value?.can_upload === true)
 const isEditing = computed(() => selectedAttachment.value !== null)
+const validateMetadata = withFormRequirements(async (state: AttachmentFormState) => {
+  const errors = await validateHostMetadata(state)
+  if (!isEditing.value && !state.file) errors.push({ name: 'file', message: t('validation.required') })
+  return errors
+}, AttachmentMetadataBaseSchema)
 const uploadMetadataDeclaration = computed(() => attachmentResponse.value?.provider_metadata ?? null)
 const metadataComponentName = computed(() => {
   if (!isEditing.value) return uploadMetadataDeclaration.value?.componentName
@@ -405,7 +411,7 @@ const retryAttachmentList = async () => {
       <template #body>
         <UForm :state="formState" :validate="validateMetadata" class="space-y-4" @submit="save">
           <UFormField v-if="!isEditing" :label="t('attachments.file')" name="file" required>
-            <input type="file" class="block w-full text-sm" required @change="onFileChange">
+            <UInput type="file" class="block w-full text-sm" required @change="onFileChange" />
           </UFormField>
           <UFormField :label="t('attachments.type')" name="attachmentTypeId" required>
             <CommonServerLookupSelect v-model="formState.attachmentTypeId" :fetch-url="`${baseUrl}/types`" value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" :show-value-in-label="false" class="w-full" />
@@ -439,7 +445,7 @@ const retryAttachmentList = async () => {
             :read-only="!metadataEditable" />
           <div class="flex justify-end gap-2 pt-2">
             <UButton :label="t('common.cancel')" color="neutral" variant="ghost" :disabled="isSaving" @click="closeModal" />
-            <CommonSaveButton :label="t('common.save')" :loading="isSaving" :disabled="isSaving || !formState.attachmentTypeId || (!isEditing && !formState.file)" />
+            <CommonSaveButton :label="t('common.save')" :loading="isSaving" :disabled="isSaving" />
           </div>
         </UForm>
       </template>

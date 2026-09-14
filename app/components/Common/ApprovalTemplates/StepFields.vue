@@ -45,22 +45,22 @@ const orderedCertifications = computed(() => (step.value?.certifications ?? [])
       <UFormField :label="t('common.order')" name="step.egcs_cn_sequence">
         <UInput v-model="step.egcs_cn_sequence" type="number" />
       </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_approvertitle')" name="step.egcs_cn_approvertitle">
+      <UFormField :label="t('admin_common.fields.egcs_cn_approvertitle')" name="step.egcs_cn_approvertitle" required>
         <UInput v-model="step.egcs_cn_approvertitle" />
       </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_name_en')" name="step.egcs_cn_name_en">
+      <UFormField :label="t('admin_common.fields.egcs_cn_name_en')" name="step.egcs_cn_name_en" required>
         <UInput v-model="step.egcs_cn_name_en" />
       </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_name_fr')" name="step.egcs_cn_name_fr">
+      <UFormField :label="t('admin_common.fields.egcs_cn_name_fr')" name="step.egcs_cn_name_fr" required>
         <UInput v-model="step.egcs_cn_name_fr" />
       </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_description_en')" name="step.egcs_cn_description_en">
+      <UFormField :label="t('admin_common.fields.egcs_cn_description_en')" name="step.egcs_cn_description_en" required>
         <CommonTextarea v-model="step.egcs_cn_description_en" :rows="3" />
       </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_description_fr')" name="step.egcs_cn_description_fr">
+      <UFormField :label="t('admin_common.fields.egcs_cn_description_fr')" name="step.egcs_cn_description_fr" required>
         <CommonTextarea v-model="step.egcs_cn_description_fr" :rows="3" />
       </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_defaultuser')" name="step.egcs_cn_defaultuser">
+      <UFormField :label="t('admin_common.fields.egcs_cn_defaultuser')" name="step.egcs_cn_defaultuser" required>
         <CommonServerLookupSelect
           v-model="step.egcs_cn_defaultuser"
           :fetch-url="`/api/users/lookups?approvalTemplateId=${approvalTemplateId}`"
@@ -110,22 +110,22 @@ const orderedCertifications = computed(() => (step.value?.certifications ?? [])
             </div>
 
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <UFormField :label="t('admin_common.fields.egcs_cn_name_en')" :name="`step.certifications.${sourceIndex}.egcs_cn_name_en`">
+              <UFormField :label="t('admin_common.fields.egcs_cn_name_en')" :name="`step.certifications.${sourceIndex}.egcs_cn_name_en`" required>
                 <UInput v-model="certification.egcs_cn_name_en" />
               </UFormField>
-              <UFormField :label="t('admin_common.fields.egcs_cn_name_fr')" :name="`step.certifications.${sourceIndex}.egcs_cn_name_fr`">
+              <UFormField :label="t('admin_common.fields.egcs_cn_name_fr')" :name="`step.certifications.${sourceIndex}.egcs_cn_name_fr`" required>
                 <UInput v-model="certification.egcs_cn_name_fr" />
               </UFormField>
-              <UFormField :label="t('admin_common.fields.egcs_cn_description_en')" :name="`step.certifications.${sourceIndex}.egcs_cn_description_en`">
+              <UFormField :label="t('admin_common.fields.egcs_cn_description_en')" :name="`step.certifications.${sourceIndex}.egcs_cn_description_en`" required>
                 <CommonTextarea v-model="certification.egcs_cn_description_en" :rows="2" />
               </UFormField>
-              <UFormField :label="t('admin_common.fields.egcs_cn_description_fr')" :name="`step.certifications.${sourceIndex}.egcs_cn_description_fr`">
+              <UFormField :label="t('admin_common.fields.egcs_cn_description_fr')" :name="`step.certifications.${sourceIndex}.egcs_cn_description_fr`" required>
                 <CommonTextarea v-model="certification.egcs_cn_description_fr" :rows="2" />
               </UFormField>
-              <UFormField :label="t('admin_common.fields.egcs_cn_certification_en')" :name="`step.certifications.${sourceIndex}.egcs_cn_certification_en`">
+              <UFormField :label="t('admin_common.fields.egcs_cn_certification_en')" :name="`step.certifications.${sourceIndex}.egcs_cn_certification_en`" required>
                 <CommonTextarea v-model="certification.egcs_cn_certification_en" :rows="3" />
               </UFormField>
-              <UFormField :label="t('admin_common.fields.egcs_cn_certification_fr')" :name="`step.certifications.${sourceIndex}.egcs_cn_certification_fr`">
+              <UFormField :label="t('admin_common.fields.egcs_cn_certification_fr')" :name="`step.certifications.${sourceIndex}.egcs_cn_certification_fr`" required>
                 <CommonTextarea v-model="certification.egcs_cn_certification_fr" :rows="3" />
               </UFormField>
             </div>

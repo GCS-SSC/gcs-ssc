@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useBilingualValue } from '~/composables/useBilingualValue'
+import { AddApprovalStepSchema } from '~~/shared/types/schemas/review-approval'
 import type {
   AddApprovalModalState,
   AdditionalApprovalCertificationState,
@@ -39,24 +40,9 @@ const { getBilingualValue } = useBilingualValue()
 const canEditNames = computed(() => routingSlip?.allow_added_approval_name_changes === true)
 const canEditCertifications = computed(() => routingSlip?.allow_added_approval_certification_changes === true)
 const orderedCertifications = computed(() => state.value?.certifications ?? [])
-const submitDisabled = computed(() => {
-  if (!state.value) {
-    return true
-  }
-
-  if (!state.value.egcs_cn_assigneduser || !state.value.egcs_cn_name_en.trim() || !state.value.egcs_cn_name_fr.trim()) {
-    return true
-  }
-
-  return state.value.certifications.some(certification => (
-    !certification.egcs_cn_name_en.trim()
-    || !certification.egcs_cn_name_fr.trim()
-    || !certification.egcs_cn_description_en.trim()
-    || !certification.egcs_cn_description_fr.trim()
-    || !certification.egcs_cn_certification_en.trim()
-    || !certification.egcs_cn_certification_fr.trim()
-  ))
-})
+const { createValidator } = useZodI18n()
+const validate = createValidator(AddApprovalStepSchema)
+const validationState = computed(() => ({ ...state.value, entityType, entityId }))
 
 const getCertificationLabel = (certification: AdditionalApprovalCertificationState, index: number) => {
   return getBilingualValue(certification, 'egcs_cn_name', t('assessment.approvals.certification_number', { number: index + 1 }))
@@ -71,7 +57,7 @@ const getCertificationLabel = (certification: AdditionalApprovalCertificationSta
     :description="t('assessment.approvals.add_step_description')"
     @update:open="value => value ? (open = true) : emit('close')">
     <template #body>
-      <UForm v-if="state && anchorStep && routingSlip" :state="state" class="space-y-6" @submit.prevent="emit('submit')">
+      <UForm v-if="state && anchorStep && routingSlip" :state="validationState" :validate="validate" class="space-y-6" @submit="emit('submit')">
         <div class="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/60">
           <p class="text-xs font-medium tracking-wide text-zinc-500 uppercase dark:text-zinc-400">
             {{ state.position === 'before' ? t('assessment.approvals.add_before') : t('assessment.approvals.add_after') }}
@@ -221,11 +207,10 @@ const getCertificationLabel = (certification: AdditionalApprovalCertificationSta
             :label="t('common.cancel')"
             @click="emit('close')" />
           <CommonSaveButton
-            type="button"
+            type="submit"
             :label="t('assessment.approvals.add_step')"
             :loading="isSubmitting"
-            :disabled="submitDisabled || isSubmitting"
-            @click="emit('submit')" />
+            :disabled="isSubmitting" />
         </div>
       </UForm>
     </template>

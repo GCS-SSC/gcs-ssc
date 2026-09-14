@@ -1,4 +1,5 @@
 import type { z } from 'zod'
+import { FORM_VALIDATOR_SCHEMA } from '~~/shared/utils/form-requirements'
 import { en, frCA } from 'zod/locales'
 import { localizeBilingualIssueParams, translateZodIssueMessage } from '~~/shared/utils/zod-i18n'
 
@@ -33,7 +34,12 @@ export const useZodI18n = () => {
    * @returns A function that takes form state and returns a list of formatted validation errors.
    */
   const createValidator = <T extends z.ZodType<unknown, unknown>>(schema: T) => {
-    return async (state: z.input<T>) => {
+    /**
+     * Validates current form values with the active interface locale.
+     * @param state Untrusted, possibly incomplete form input.
+     * @returns Localized field errors for Nuxt UI.
+     */
+    const validate = async (state: unknown) => {
       // We use standard safeParseAsync.
       // If the schema has { error: 'validation.key' },
       // Zod will put 'validation.key' into issue.message automatically.
@@ -47,6 +53,7 @@ export const useZodI18n = () => {
         message: translateMessage(issue.message, issue)
       }))
     }
+    return Object.assign(validate, { [FORM_VALIDATOR_SCHEMA]: schema })
   }
 
   return { createValidator, translateMessage }

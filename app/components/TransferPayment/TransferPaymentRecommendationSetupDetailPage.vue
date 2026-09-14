@@ -1,11 +1,12 @@
 <script setup lang="ts">
+import { withFormRequirements } from '~~/shared/utils/form-requirements'
+import { TransferPaymentStreamRecommendationSetupCreateSchema, TransferPaymentStreamRecommendationSetupPatchSchema } from '~~/shared/types/schemas'
 /* eslint-disable jsdoc/require-jsdoc -- page-local handlers */
 import type { FetchError } from 'ofetch'
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { Scope } from '~~/shared/utils/scopes'
 import type { TransferPaymentProfileItem, TransferPaymentStreamItem, TransferPaymentStreamRecommendationSetupItem, TransferPaymentStreamRecommendationSetupMemberItem } from '~~/shared/types/schemas'
-import { TransferPaymentStreamRecommendationSetupPatchSchema } from '~~/shared/types/schemas'
 import { appRouteLocations } from '~/utils/route-locations'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
@@ -55,7 +56,7 @@ const selectedMember: Ref<Partial<TransferPaymentStreamRecommendationSetupMember
 const schemaCreateState: Ref<Record<string, unknown> | null> = ref(null)
 const formRef = useTemplateRef<{ validate: () => Promise<unknown> }>('recommendationSetupForm')
 const isHeroCollapsed = getHeroCollapsed('transfer-payment-recommendation-setup-detail')
-const validate = createValidator(TransferPaymentStreamRecommendationSetupPatchSchema)
+const validate = withFormRequirements(createValidator(TransferPaymentStreamRecommendationSetupPatchSchema), TransferPaymentStreamRecommendationSetupCreateSchema)
 const profileScope = computed<Scope>(() => ({ type: 'entity', agencyId: String(profile.value?.egcs_tp_agency), path: [{ type: 'transfer_payment', id: transferPaymentId }] }))
 const canManagePublication = computed(() => Boolean(profile.value) && can('transfer_payment', 'update', profileScope.value))
 const isEditable = computed(() => state.value?.publicationState !== 'retired')

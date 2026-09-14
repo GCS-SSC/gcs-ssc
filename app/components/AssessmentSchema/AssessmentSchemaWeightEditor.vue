@@ -386,7 +386,7 @@ watch(
 
     <div v-else-if="weightMode === 'adjustable'" class="space-y-4">
       <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <UFormField :label="t('transfer_payment.dependency_type')">
+        <UFormField :label="t('transfer_payment.dependency_type')" required>
           <USelect
             :model-value="getAdjustableWeight().on.type"
             :items="[
@@ -400,13 +400,13 @@ watch(
 
         <UFormField
           v-if="getAdjustableWeight().on.type === 'helpers'"
-          :label="t('transfer_payment.helper_field')">
+          :label="t('transfer_payment.helper_field')" required>
           <AssessmentSchemaHelperFieldSelect v-model="getAdjustableWeight().on.field" />
         </UFormField>
       </div>
 
       <div v-if="getAdjustableWeight().on.type === 'answers'" class="grid grid-cols-1 gap-3">
-        <UFormField :label="t('transfer_payment.assessment_item')">
+        <UFormField :label="t('transfer_payment.assessment_item')" required>
           <AssessmentSchemaAnswerPathTreeSelect
             :model-value="getAnswersDependencyValue(getAdjustableWeight().on)"
             :tree="answerPathTree"
@@ -430,8 +430,12 @@ watch(
           v-for="(row, rowIndex) in adjustableWeightRows"
           :key="row.id"
           class="grid grid-cols-[1fr_1fr_auto] gap-2">
-          <UInput v-model="row.score" :placeholder="t('transfer_payment.score_key')" />
-          <UInput v-model.number="row.value" type="number" :placeholder="t('common.weight')" />
+          <UFormField :label="t('transfer_payment.score_key')">
+            <UInput v-model="row.score" />
+          </UFormField>
+          <UFormField :label="t('common.weight')">
+            <UInput v-model.number="row.value" type="number" />
+          </UFormField>
           <UButton
             icon="i-lucide-trash" color="error" variant="ghost" class="cursor-default"
             :aria-label="t('transfer_payment.delete_score_weight', { position: rowIndex + 1 })"
@@ -468,7 +472,7 @@ watch(
         </div>
 
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <UFormField :label="t('transfer_payment.dependency_type')">
+          <UFormField :label="t('transfer_payment.dependency_type')" required>
             <USelect
               :model-value="scenario.on.type"
               :items="[
@@ -480,13 +484,13 @@ watch(
               @update:model-value="value => updateScenarioAdjustableType(scenarioIndex, value)" />
           </UFormField>
 
-          <UFormField v-if="scenario.on.type === 'helpers'" :label="t('transfer_payment.helper_field')">
+          <UFormField v-if="scenario.on.type === 'helpers'" :label="t('transfer_payment.helper_field')" required>
             <AssessmentSchemaHelperFieldSelect v-model="scenario.on.field" />
           </UFormField>
         </div>
 
         <div v-if="scenario.on.type === 'answers'" class="grid grid-cols-1 gap-3">
-          <UFormField :label="t('transfer_payment.assessment_item')">
+          <UFormField :label="t('transfer_payment.assessment_item')" required>
             <AssessmentSchemaAnswerPathTreeSelect
               :model-value="getAnswersDependencyValue(scenario.on)"
               :tree="answerPathTree"
@@ -511,8 +515,12 @@ watch(
             v-for="(row, rowIndex) in ensureScenarioRows(scenario)"
             :key="row.id"
             class="grid grid-cols-[1fr_1fr_auto] gap-2">
-            <UInput v-model="row.score" :placeholder="t('transfer_payment.score_key')" @update:model-value="updateArrayWeightRows(scenario)" />
-            <UInput v-model.number="row.value" type="number" :placeholder="t('common.weight')" @update:model-value="updateArrayWeightRows(scenario)" />
+            <UFormField :label="t('transfer_payment.score_key')">
+              <UInput v-model="row.score" @update:model-value="updateArrayWeightRows(scenario)" />
+            </UFormField>
+            <UFormField :label="t('common.weight')">
+              <UInput v-model.number="row.value" type="number" @update:model-value="updateArrayWeightRows(scenario)" />
+            </UFormField>
             <UButton
               icon="i-lucide-trash" color="error" variant="ghost" class="cursor-default"
               :aria-label="t('transfer_payment.delete_scenario_score_weight', { position: rowIndex + 1, scenario: scenarioIndex + 1 })"

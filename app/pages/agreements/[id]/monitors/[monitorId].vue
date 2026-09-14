@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param-description, jsdoc/require-returns -- page-local callbacks use self-descriptive signatures */
 import type { FetchError } from 'ofetch'
+import { withFormRequirements } from '~~/shared/utils/form-requirements'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 import { computed, ref, shallowReactive, watch, watchEffect } from 'vue'
 import type { Ref } from 'vue'
@@ -35,6 +36,7 @@ import {
   FundingCaseAgreementMonitorFollowupUpdateCreateSchema,
   FundingCaseAgreementMonitorItemsCreateSchema,
   FundingCaseAgreementMonitorPatchSchema,
+  FundingCaseAgreementMonitorCreateSchema,
   FundingCaseAgreementMonitorPlanningCreateSchema,
   FundingCaseAgreementMonitorPromisingPracticeCreateSchema
 } from '~~/shared/types/schemas'
@@ -180,7 +182,7 @@ const validateFinding = createValidator(FundingCaseAgreementMonitorFindingCreate
 const validateFollowup = createValidator(FundingCaseAgreementMonitorFollowupCreateSchema)
 const validateUpdate = createValidator(FundingCaseAgreementMonitorFollowupUpdateCreateSchema)
 const validatePractice = createValidator(FundingCaseAgreementMonitorPromisingPracticeCreateSchema)
-const validateMonitorMetadata = createValidator(FundingCaseAgreementMonitorPatchSchema)
+const validateMonitorMetadata = withFormRequirements(createValidator(FundingCaseAgreementMonitorPatchSchema), FundingCaseAgreementMonitorCreateSchema)
 
 const isMonitorLocked = computed(() => isRecordLocked(monitor.value))
 const canUpdateMonitor = computed(() =>

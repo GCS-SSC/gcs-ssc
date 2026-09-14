@@ -13,7 +13,7 @@ import { isCanonicalPostgresBigintText, isPositivePostgresBigintText } from '~~/
 const RequiredId = (errorKey: string) =>
   z.union([z.string(), z.number()], { error: errorKey })
     .transform(value => typeof value === 'number' ? String(value) : value.trim())
-    .refine(value => value.length > 0, { error: errorKey })
+    .refine(value => value.length > 0, { error: errorKey }).meta({ formRequired: true })
 
 /**
  * Creates an optional trimmed text schema that collapses blank strings.
@@ -29,7 +29,7 @@ const OptionalText = () =>
       return trimmedValue.length > 0 ? trimmedValue : undefined
     },
     z.string().optional()
-  )
+  ).meta({ formRequired: false })
 
 /**
  * Preserves required errors while rejecting unsafe numeric IDs before conversion.
@@ -39,7 +39,7 @@ const OptionalText = () =>
 const ProfileReferenceId = (errorKey: string) => z.union([
   z.string(),
   z.number().int({ error: 'validation.invalid_selection' }).safe({ error: 'validation.invalid_selection' })
-], { error: errorKey }).pipe(RequiredId(errorKey)).refine(isPositivePostgresBigintText, { error: 'validation.invalid_selection' })
+], { error: errorKey }).pipe(RequiredId(errorKey)).refine(isPositivePostgresBigintText, { error: 'validation.invalid_selection' }).meta({ formRequired: true })
 
 /**
  * Keeps optional clearing semantics and checks PostgreSQL text/character limits.
@@ -54,7 +54,7 @@ const ProfileText = (maxCharacters?: number) => OptionalText().superRefine((valu
   if (maxCharacters !== undefined && Array.from(value).length > maxCharacters) {
     context.addIssue({ code: 'too_big', origin: 'string', maximum: maxCharacters, inclusive: true, message: 'validation.max_length' })
   }
-})
+}).meta({ formRequired: false })
 
 export const ApplicantRecipientProfileBaseSchema = z.object({
   egcs_ar_description_en: ProfileText(),
@@ -191,7 +191,7 @@ export type ApplicantRecipientRegistryItem = WithId<ApplicantRecipientRegistry>
 export const ApplicantRecipientAgencyFinancialIdBaseSchema = z.object({
   egcs_ar_agency: z.union([z.string(), z.number()]).optional()
     .transform(value => value === undefined ? undefined : String(value).trim())
-    .refine(value => value === undefined || value.length > 0, { error: 'validation.id_required' }),
+    .refine(value => value === undefined || value.length > 0, { error: 'validation.id_required' }).meta({ formRequired: false }),
   egcs_ar_financialsystemid: z.union([
     z.string(),
     z.bigint().transform(value => String(value)),
@@ -199,7 +199,7 @@ export const ApplicantRecipientAgencyFinancialIdBaseSchema = z.object({
   ], { error: 'validation.required' })
     .transform(value => value.trim())
     .refine(value => value.length > 0, { error: 'validation.required' })
-    .refine(isCanonicalPostgresBigintText, { error: 'validation.invalid_number' })
+    .refine(isCanonicalPostgresBigintText, { error: 'validation.invalid_number' }).meta({ formRequired: true })
 })
 
 export const ApplicantRecipientAgencyFinancialIdCreateSchema = ApplicantRecipientAgencyFinancialIdBaseSchema
@@ -234,8 +234,8 @@ const normalizeApplicantRecipientAddressInput = (input: unknown): unknown => {
   return address
 }
 
-export const ApplicantRecipientAddressCreateSchema = z.preprocess(normalizeApplicantRecipientAddressInput, CommonAddressCreateSchema)
-export const ApplicantRecipientAddressPatchSchema = z.preprocess(normalizeApplicantRecipientAddressInput, CommonAddressBaseSchema.partial())
+export const ApplicantRecipientAddressCreateSchema = z.preprocess(normalizeApplicantRecipientAddressInput, CommonAddressCreateSchema).meta({ formPreservesInputPaths: true })
+export const ApplicantRecipientAddressPatchSchema = z.preprocess(normalizeApplicantRecipientAddressInput, CommonAddressBaseSchema.partial()).meta({ formPreservesInputPaths: true })
 export type ApplicantRecipientAddress = z.infer<typeof ApplicantRecipientAddressCreateSchema>
 export type ApplicantRecipientAddressPatch = z.infer<typeof ApplicantRecipientAddressPatchSchema>
 export type ApplicantRecipientAddressItem = WithId<ApplicantRecipientAddress>

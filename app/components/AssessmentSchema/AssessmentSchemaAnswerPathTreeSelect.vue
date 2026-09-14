@@ -1,7 +1,8 @@
 <!-- eslint-disable jsdoc/require-jsdoc, jsdoc/require-param -->
 <script setup lang="ts">
 import type { TreeItem } from '@nuxt/ui'
-import { computed, ref } from 'vue'
+import { computed, inject, ref, useId } from 'vue'
+import { fieldRequirementKey } from '~/utils/form-requirement-context'
 import type { AssessmentAnswerPathTreeNode } from '~/utils/assessment-schema'
 
 const modelValue = defineModel<string>({ required: true })
@@ -10,15 +11,20 @@ const {
   tree = [],
   label,
   placeholder = '',
-  buttonClass = ''
+  buttonClass = '',
+  required = undefined
 } = defineProps<{
   tree?: AssessmentAnswerPathTreeNode[]
   label?: string
   placeholder?: string
   buttonClass?: string
+  required?: boolean
 }>()
 
 const open = ref(false)
+const treeId = `assessment-answer-path-${useId()}`
+const inheritedRequirement = inject(fieldRequirementKey, undefined)
+const isRequired = computed(() => required ?? inheritedRequirement?.value ?? false)
 
 /** Maps the normalized answer-path tree into Nuxt UI tree items. */
 const treeItems = computed<TreeItem[]>(() => tree)
@@ -70,6 +76,12 @@ const handleSelection = (item: TreeItem | undefined) => {
     <UButton
       color="neutral"
       variant="outline"
+      role="combobox"
+      aria-haspopup="tree"
+      :aria-expanded="open"
+      :aria-controls="open ? treeId : undefined"
+      :aria-label="label || placeholder"
+      :aria-required="isRequired || undefined"
       class="w-full cursor-default justify-between text-left font-medium normal-case tracking-normal"
       :class="buttonClass">
       <span class="truncate">{{ selectedLabel || placeholder }}</span>
@@ -86,6 +98,8 @@ const handleSelection = (item: TreeItem | undefined) => {
 
         <div class="max-h-[28rem] overflow-y-auto rounded-lg border border-zinc-200 p-2 dark:border-zinc-800">
           <UTree
+            :id="treeId"
+            :aria-label="label || placeholder"
             :items="treeItems"
             :model-value="undefined"
             :default-expanded="expanded"

@@ -229,7 +229,7 @@ const remove = async (userId: string, name: string) => {
       </template>
     </UAlert>
     <div v-if="canManage" class="flex flex-col gap-3 rounded-sm bg-elevated p-4 sm:flex-row sm:items-end">
-      <UFormField :label="t('assignments.add_assignee')" class="min-w-0 flex-1">
+      <UFormField :label="t('assignments.add_assignee')" required class="min-w-0 flex-1">
         <USelectMenu
           :model-value="selectedUserId ?? undefined"
           :items="availableUsers"

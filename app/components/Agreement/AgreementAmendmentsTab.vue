@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- concise amendment UI callbacks are covered by focused tests. */
-import { computed, ref, watch } from 'vue'
+import { computed, ref, useId, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { FetchError } from 'ofetch'
 import type { TableColumnInput } from '~/composables/useTableColumns'
@@ -16,6 +16,7 @@ const { agreementId, canCreate } = defineProps<{
   canCreate: boolean
 }>()
 
+const nameRequirementId = useId()
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
 const toast = useToast()
@@ -230,13 +231,13 @@ const createAmendment = async () => {
         <form class="space-y-4" @submit.prevent="createAmendment">
           <div class="grid gap-4 md:grid-cols-2">
             <UFormField :label="t('agreement.amendments.name_en')">
-              <UInput v-model="amendmentNameEn" class="w-full" />
+              <UInput v-model="amendmentNameEn" :aria-describedby="nameRequirementId" class="w-full" />
             </UFormField>
             <UFormField :label="t('agreement.amendments.name_fr')">
-              <UInput v-model="amendmentNameFr" class="w-full" />
+              <UInput v-model="amendmentNameFr" :aria-describedby="nameRequirementId" class="w-full" />
             </UFormField>
           </div>
-          <p class="text-sm text-zinc-500 dark:text-zinc-400">
+          <p :id="nameRequirementId" class="text-sm text-zinc-500 dark:text-zinc-400">
             {{ t('agreement.amendments.name_help') }}
           </p>
           <p class="text-sm text-zinc-600 dark:text-zinc-300">

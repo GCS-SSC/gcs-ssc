@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, shallowReactive, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, shallowReactive, useId, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { FundingCaseAgreementApplicantRecipientLookupItem } from '~~/shared/types/funding-case-agreement-ui'
 
@@ -45,6 +45,8 @@ const model = defineModel<string[]>('model', {
 })
 
 const { t, locale } = useI18n()
+const pickerId = useId()
+const pickerDialogContent = { id: `${pickerId}-dialog`, disableOutsidePointerEvents: true }
 const { showError } = useApiErrorToast()
 
 const isOpen: Ref<boolean> = ref(false)
@@ -579,7 +581,7 @@ const removeSelectedId = (id: string) => {
 </script>
 
 <template>
-  <UFormField :label="t('agreement.applicant_recipients.title')" :name="name">
+  <UFormField v-slot="fieldState" :label="t('agreement.applicant_recipients.title')" :name="name" required>
     <div class="space-y-3">
       <div v-if="selectedItems.length > 0" class="flex flex-wrap gap-2">
         <div
@@ -614,13 +616,23 @@ const removeSelectedId = (id: string) => {
           variant="outline"
           icon="i-lucide-users-round"
           class="cursor-default"
+          role="combobox"
+          aria-haspopup="dialog"
+          aria-required="true"
+          :aria-expanded="isOpen"
+          :aria-controls="`${pickerId}-dialog`"
+          :aria-label="t('agreement.applicant_recipients.title')"
+          :aria-invalid="Boolean(fieldState?.error)"
+          :aria-describedby="fieldState?.error ? `${pickerId}-error` : undefined"
           :label="selectedIds.length > 0 ? t('agreement.applicant_recipients.edit_selection') : t('agreement.applicant_recipients.select')"
           @click="isOpen = true" />
+        <span v-if="fieldState?.error" :id="`${pickerId}-error`" class="sr-only">{{ fieldState?.error }}</span>
+
       </div>
     </div>
   </UFormField>
 
-  <UModal v-model:open="isOpen" :title="t('agreement.applicant_recipients.select')" :description="t('agreement.applicant_recipients.search')">
+  <UModal v-model:open="isOpen" :content="pickerDialogContent" :title="t('agreement.applicant_recipients.select')" :description="t('agreement.applicant_recipients.search')">
     <template #body>
       <UCommandPalette
         v-model="draftSelectedIds"

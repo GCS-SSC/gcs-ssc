@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- local wizard event helpers are self-documenting and not public APIs */
-import { computed, ref, watch } from 'vue'
+import { computed, ref, useId, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { FormError, FormSubmitEvent } from '#ui/types'
 import type {
@@ -111,6 +111,8 @@ watch(open, isOpen => {
   state.value = history ? stateFromHistory(history) : newState()
   currentStep.value = 'recipients'
 })
+
+const requirementId = useId()
 
 const isBlank = (value?: string): boolean => !value || value.trim().length === 0
 const addError = (list: FormError[], name: string, messageKey = 'validation.required') => {
@@ -455,52 +457,64 @@ const save = async (_event: FormSubmitEvent<FundingHistoryFormState>) => {
 
             <div v-if="slotProps.currentStep === 'agency'" class="mx-auto max-w-3xl space-y-6">
               <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <p :id="`${requirementId}-agencyname`" class="text-sm text-muted md:col-span-2">
+                  {{ t('applicant_recipient.funding_history.validation.bilingual_agency') }}
+                </p>
                 <UFormField :label="t('applicant_recipient.funding_history.fields.agency_name_en')" name="egcs_ar_agencyname_en">
-                  <UInput v-model="state.egcs_ar_agencyname_en" @update:model-value="invalidateConfirmations" />
+                  <UInput v-model="state.egcs_ar_agencyname_en" :aria-describedby="`${requirementId}-agencyname`" @update:model-value="invalidateConfirmations" />
                 </UFormField>
                 <UFormField :label="t('applicant_recipient.funding_history.fields.agency_name_fr')" name="egcs_ar_agencyname_fr">
-                  <UInput v-model="state.egcs_ar_agencyname_fr" @update:model-value="invalidateConfirmations" />
+                  <UInput v-model="state.egcs_ar_agencyname_fr" :aria-describedby="`${requirementId}-agencyname`" @update:model-value="invalidateConfirmations" />
                 </UFormField>
               </div>
             </div>
 
             <div v-if="slotProps.currentStep === 'program'" class="mx-auto max-w-3xl space-y-6">
               <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <p :id="`${requirementId}-programname`" class="text-sm text-muted md:col-span-2">
+                  {{ t('applicant_recipient.funding_history.validation.bilingual_program') }}
+                </p>
                 <UFormField :label="t('applicant_recipient.funding_history.fields.program_name_en')" name="egcs_ar_programname_en">
-                  <UInput v-model="state.egcs_ar_programname_en" @update:model-value="invalidateConfirmations" />
+                  <UInput v-model="state.egcs_ar_programname_en" :aria-describedby="`${requirementId}-programname`" @update:model-value="invalidateConfirmations" />
                 </UFormField>
                 <UFormField :label="t('applicant_recipient.funding_history.fields.program_name_fr')" name="egcs_ar_programname_fr">
-                  <UInput v-model="state.egcs_ar_programname_fr" @update:model-value="invalidateConfirmations" />
+                  <UInput v-model="state.egcs_ar_programname_fr" :aria-describedby="`${requirementId}-programname`" @update:model-value="invalidateConfirmations" />
                 </UFormField>
               </div>
             </div>
 
             <div v-if="slotProps.currentStep === 'agreement'" class="mx-auto grid max-w-4xl grid-cols-1 gap-5 md:grid-cols-2">
-              <UFormField class="md:col-span-2" :label="t('applicant_recipient.funding_history.fields.agreement_number')" name="egcs_ar_agreementnumber">
+              <UFormField class="md:col-span-2" :label="t('applicant_recipient.funding_history.fields.agreement_number')" name="egcs_ar_agreementnumber" required>
                 <UInput v-model="state.egcs_ar_agreementnumber" @update:model-value="invalidateConfirmations" />
               </UFormField>
+              <p :id="`${requirementId}-title`" class="text-sm text-muted md:col-span-2">
+                {{ t('applicant_recipient.funding_history.validation.bilingual_title') }}
+              </p>
               <UFormField :label="t('applicant_recipient.funding_history.fields.title_en')" name="egcs_ar_title_en">
-                <UInput v-model="state.egcs_ar_title_en" />
+                <UInput v-model="state.egcs_ar_title_en" :aria-describedby="`${requirementId}-title`" />
               </UFormField>
               <UFormField :label="t('applicant_recipient.funding_history.fields.title_fr')" name="egcs_ar_title_fr">
-                <UInput v-model="state.egcs_ar_title_fr" />
+                <UInput v-model="state.egcs_ar_title_fr" :aria-describedby="`${requirementId}-title`" />
               </UFormField>
+              <p :id="`${requirementId}-description`" class="text-sm text-muted md:col-span-2">
+                {{ t('applicant_recipient.funding_history.validation.bilingual_description') }}
+              </p>
               <UFormField :label="t('applicant_recipient.funding_history.fields.description_en')" name="egcs_ar_description_en">
-                <UTextarea v-model="state.egcs_ar_description_en" autoresize />
+                <UTextarea v-model="state.egcs_ar_description_en" :aria-describedby="`${requirementId}-description`" autoresize />
               </UFormField>
               <UFormField :label="t('applicant_recipient.funding_history.fields.description_fr')" name="egcs_ar_description_fr">
-                <UTextarea v-model="state.egcs_ar_description_fr" autoresize />
+                <UTextarea v-model="state.egcs_ar_description_fr" :aria-describedby="`${requirementId}-description`" autoresize />
               </UFormField>
-              <UFormField :label="t('applicant_recipient.funding_history.fields.start_date')" name="egcs_ar_startdate">
+              <UFormField :label="t('applicant_recipient.funding_history.fields.start_date')" name="egcs_ar_startdate" required>
                 <UInput v-model="state.egcs_ar_startdate" type="date" />
               </UFormField>
-              <UFormField :label="t('applicant_recipient.funding_history.fields.end_date')" name="egcs_ar_enddate">
+              <UFormField :label="t('applicant_recipient.funding_history.fields.end_date')" name="egcs_ar_enddate" required>
                 <UInput v-model="state.egcs_ar_enddate" type="date" />
               </UFormField>
-              <UFormField :label="t('applicant_recipient.funding_history.fields.amount')" name="egcs_ar_fundingamount">
+              <UFormField :label="t('applicant_recipient.funding_history.fields.amount')" name="egcs_ar_fundingamount" required>
                 <UInput v-model="state.egcs_ar_fundingamount" inputmode="decimal" />
               </UFormField>
-              <UFormField :label="t('applicant_recipient.funding_history.fields.currency')" name="egcs_ar_currency">
+              <UFormField :label="t('applicant_recipient.funding_history.fields.currency')" name="egcs_ar_currency" required>
                 <CommonEnumSelect v-model="state.egcs_ar_currency" name="currency_codes" :items="currencyOptions" />
               </UFormField>
             </div>

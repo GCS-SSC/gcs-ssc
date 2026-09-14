@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { withFormRequirements } from '~~/shared/utils/form-requirements'
+import { TransferPaymentStreamReviewSetupCreateSchema } from '~~/shared/types/schemas'
 /* eslint-disable jsdoc/require-jsdoc -- page-local navigation and persistence handlers */
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import type { Ref } from 'vue'
@@ -70,7 +72,7 @@ const associateState: Ref<Record<string, unknown> | null> = ref(null)
 const isSchemaCreateModalOpen: Ref<boolean> = ref(false)
 const schemaCreateState: Ref<Record<string, unknown> | null> = ref(null)
 const isHeroCollapsed = getHeroCollapsed('transfer-payment-review-setup-detail')
-const validateSet = createValidator(TransferPaymentStreamReviewSetupPatchSchema)
+const validateSet = withFormRequirements(createValidator(TransferPaymentStreamReviewSetupPatchSchema), TransferPaymentStreamReviewSetupCreateSchema)
 
 const profileScope = computed<Scope>(() => ({
   type: 'entity',

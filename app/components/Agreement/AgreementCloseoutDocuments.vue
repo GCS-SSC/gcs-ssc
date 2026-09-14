@@ -129,13 +129,13 @@ const download = async (item: AgreementGeneratedDocumentItem) => {
       </template>
     </UAlert>
     <div v-if="templates.length" class="grid gap-4 rounded-lg border border-default p-4 md:grid-cols-[minmax(0,2fr)_1fr_1fr_auto] md:items-end">
-      <UFormField :label="t('transfer_payment.document_templates.title')">
+      <UFormField :label="t('transfer_payment.document_templates.title')" required>
         <CommonBilingualSelectMenu v-model="selectedTemplateId" :items="templates" value-key="id" label-en-key="egcs_tp_name_en" label-fr-key="egcs_tp_name_fr" class="w-full" />
       </UFormField>
-      <UFormField :label="t('agency.detail.language')">
+      <UFormField :label="t('agency.detail.language')" required>
         <CommonEnumSelect v-model="language" name="language_preference" class="w-full" />
       </UFormField>
-      <UFormField :label="t('transfer_payment.document_templates.output_format')">
+      <UFormField :label="t('transfer_payment.document_templates.output_format')" required>
         <CommonEnumSelect v-model="outputFormat" name="transfer_payment_document_template_output_format" :items="outputFormats.map(value => ({ value, label: t(`enums.transfer_payment_document_template_output_format.${value}`) }))" class="w-full" />
       </UFormField>
       <div class="flex gap-2">

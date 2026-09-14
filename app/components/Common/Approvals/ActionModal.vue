@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-param-description, jsdoc/require-returns -- legacy local callbacks remain concise during state isolation */
-import { computed, ref, watch } from 'vue'
+import { computed, ref, useId, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { ActionModalState, ApprovalLookupBehalfType, ApprovalStepItem } from './types'
 
@@ -35,6 +35,7 @@ const emit = defineEmits<{
 }>()
 
 const { locale, t } = useI18n()
+const requirementHelpId = `approval-requirement-${useId()}`
 const denialAttempted: Ref<boolean> = ref(false)
 watch(open, isOpen => {
   if (!isOpen) denialAttempted.value = false
@@ -118,6 +119,7 @@ const getLocalizedText = (value: { en?: string, fr?: string }) => {
             class="rounded-md border border-zinc-200 px-3 py-3 dark:border-zinc-800">
             <UCheckbox
               :model-value="certification.egcs_cn_value"
+              :aria-describedby="certification.egcs_cn_optional ? undefined : `${requirementHelpId}-${certification.id}`"
               :disabled="isSubmittingAction"
               @update:model-value="value => updateCertification(certification.id, value === true)">
               <template #label>
@@ -126,6 +128,12 @@ const getLocalizedText = (value: { en?: string, fr?: string }) => {
                 </span>
               </template>
             </UCheckbox>
+            <p
+              v-if="!certification.egcs_cn_optional"
+              :id="`${requirementHelpId}-${certification.id}`"
+              class="mt-1 text-sm text-muted">
+              {{ t('assessment.approvals.certification_required_for_approval') }}
+            </p>
           </div>
 
           <UFormField :label="t('assessment.approvals.default_approver')">
@@ -153,7 +161,8 @@ const getLocalizedText = (value: { en?: string, fr?: string }) => {
 
           <UFormField
             v-if="state.isOnBehalf"
-            :label="t('assessment.approvals.on_behalf_type')">
+            :label="t('assessment.approvals.on_behalf_type')"
+            required>
             <CommonBilingualSelectMenu
               :model-value="state.egcs_cn_onbehalf"
               :items="behalfTypeOptions"
@@ -163,7 +172,7 @@ const getLocalizedText = (value: { en?: string, fr?: string }) => {
               @update:model-value="value => updateState('egcs_cn_onbehalf', value === undefined ? null : value)" />
           </UFormField>
 
-          <UFormField :label="t('assessment.approvals.position_title')">
+          <UFormField :label="t('assessment.approvals.position_title')" :required="requiresActual">
             <UInput
               v-if="requiresActual"
               :model-value="state.egcs_cn_approvalpositiontitle"
@@ -178,7 +187,8 @@ const getLocalizedText = (value: { en?: string, fr?: string }) => {
 
           <UFormField
             v-if="requiresActual"
-            :label="t('assessment.approvals.decision_date')">
+            :label="t('assessment.approvals.decision_date')"
+            required>
             <UInput
               :model-value="state.egcs_cn_approvaldate"
               type="date"
@@ -188,7 +198,8 @@ const getLocalizedText = (value: { en?: string, fr?: string }) => {
 
           <UFormField
             :label="t('admin_common.fields.egcs_cn_comment')"
-            :error="denialCommentError">
+            :error="denialCommentError"
+            :help="t('assessment.approvals.comment_required_for_denial')">
             <CommonTextarea
               :model-value="state.egcs_cn_comment"
               :rows="4"

@@ -696,12 +696,16 @@ const saveForecastBreakdown = async () => {
                         :disabled="isSavingBreakdown"
                         type="text"
                         inputmode="decimal"
+                        required
+                        aria-required="true"
+                        :aria-describedby="isDraftAmountInvalid(row.original.budgetLineId, period.months[0] ?? 0) ? `forecast-amount-error-${row.original.budgetLineId}-${period.columnId}` : undefined"
                         :aria-invalid="isDraftAmountInvalid(row.original.budgetLineId, period.months[0] ?? 0)"
                         :aria-label="`${period.label} ${row.original.lineItemNameEn}`"
                         class="w-full rounded-md border bg-default px-2.5 py-1.5 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-75"
                         :class="isDraftAmountInvalid(row.original.budgetLineId, period.months[0] ?? 0) ? 'border-error focus:ring-2 focus:ring-error/40' : 'border-default focus:ring-2 focus:ring-primary/40'"
                         @input="event => setDraftAmount(row.original.budgetLineId, period.months[0] ?? 0, getInputValue(event))">
-                      <p v-if="isDraftAmountInvalid(row.original.budgetLineId, period.months[0] ?? 0)" class="mt-1 text-xs text-error">
+                      <span class="mt-1 block text-xs text-muted">({{ t('common.field_required') }})</span>
+                      <p v-if="isDraftAmountInvalid(row.original.budgetLineId, period.months[0] ?? 0)" :id="`forecast-amount-error-${row.original.budgetLineId}-${period.columnId}`" class="mt-1 text-xs text-error">
                         {{ t('validation.invalid_number') }}
                       </p>
                     </div>

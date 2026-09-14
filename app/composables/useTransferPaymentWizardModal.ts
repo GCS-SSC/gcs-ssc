@@ -1,3 +1,4 @@
+import { withFormRequirements } from '~~/shared/utils/form-requirements'
 /* eslint-disable jsdoc/require-jsdoc -- Wizard helpers use typed contracts covered by focused composable tests. */
 import { nanoid } from 'nanoid'
 import type { FormError } from '#ui/types'
@@ -277,12 +278,12 @@ export const useTransferPaymentWizardModal = ({
 
   const validateWizardSchema = createValidator(TransferPaymentWizardSchema)
 
-  const validateWizard = async (wizardState: TransferPaymentWizardForm) => {
+  const validateWizard = withFormRequirements(async (wizardState: TransferPaymentWizardForm) => {
     clearErrors()
     const result = await validateWizardSchema(wizardState)
     wizardErrors.value = result
     return result
-  }
+  }, TransferPaymentWizardSchema)
 
   const clearErrors = () => {
     wizardErrors.value = []

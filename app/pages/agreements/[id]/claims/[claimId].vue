@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { parseOptionalMoneyInput } from '~/utils/optional-money-input'
+import { MoneySchema } from '~~/shared/types/schemas/money'
 import type { FetchError } from 'ofetch'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 /* eslint-disable jsdoc/require-jsdoc -- page-local callbacks use self-descriptive signatures */
@@ -483,6 +485,7 @@ const claimHeroBadges = computed(() => activeClaim.value
 )
 
 const getDraftClaimAmount = (budgetLineId: string) => draftClaimAmounts.value[budgetLineId] ?? '0.00'
+const isDraftClaimAmountInvalid = (budgetLineId: string) => !MoneySchema.safeParse(getDraftClaimAmount(budgetLineId)).success
 const setDraftClaimAmount = (budgetLineId: string, value: string | null | undefined) => {
   draftClaimAmounts.value = { ...draftClaimAmounts.value, [budgetLineId]: value ?? '' }
 }
@@ -878,14 +881,14 @@ const saveReconcile = async (showSuccess = true): Promise<boolean> => {
   const desiredIsFinal = draftReconcileIsFinal.value
   let lineRequests: Array<{
     line: ReconciliationEditorLine
-    body: { egcs_fc_reconciled: Money, egcs_fc_sampled: Money, egcs_fc_rationale: string | null }
+    body: { egcs_fc_reconciled: Money, egcs_fc_sampled: Money | null, egcs_fc_rationale: string | null }
   }>
   try {
     lineRequests = detail.lines.map(line => ({
       line,
       body: {
         egcs_fc_reconciled: parseMoney(getDraftReconciledAmount(line.claim_line_id)),
-        egcs_fc_sampled: parseMoney(getDraftSampledAmount(line.claim_line_id)),
+        egcs_fc_sampled: parseOptionalMoneyInput(getDraftSampledAmount(line.claim_line_id)),
         egcs_fc_rationale: getDraftRationale(line.claim_line_id) || null
       }
     }))
@@ -930,14 +933,14 @@ const saveReconcileLine = async () => {
           claim_line_id: item.claim_line_id,
           reconcile_line_id: item.reconcile_line_id,
           egcs_fc_reconciled: parseMoney(line.reconciledAmount),
-          egcs_fc_sampled: line.sampledAmount == null || line.sampledAmount === '' ? null : parseMoney(line.sampledAmount),
+          egcs_fc_sampled: parseOptionalMoneyInput(line.sampledAmount),
           egcs_fc_rationale: line.rationale.trim() || null
         }
       : {
           claim_line_id: item.claim_line_id,
           reconcile_line_id: item.reconcile_line_id,
           egcs_fc_reconciled: parseMoney(getDraftReconciledAmount(item.claim_line_id)),
-          egcs_fc_sampled: parseMoney(getDraftSampledAmount(item.claim_line_id)),
+          egcs_fc_sampled: parseOptionalMoneyInput(getDraftSampledAmount(item.claim_line_id)),
           egcs_fc_rationale: getDraftRationale(item.claim_line_id) || null
         })
     await sendJson(`/api/claim-reconciliations/${reconcile.id}/lines/bulk`, 'PATCH', {
@@ -1101,7 +1104,7 @@ const cancelReconciliation = async () => {
                             {{ row.original.description }}
                           </p>
                           <div v-if="row.original.isUnallocated && row.original.claimLine && canAllocateClaimLines" class="flex flex-wrap items-end gap-2 pt-1">
-                            <UFormField :label="t('agreement.claims.allocate_to_budget_line')" :name="`allocation-${row.original.claimLine.id}`" class="min-w-72">
+                            <UFormField :label="t('agreement.claims.allocate_to_budget_line')" :name="`allocation-${row.original.claimLine.id}`" required class="min-w-72">
                               <CommonBilingualSelectMenu
                                 :model-value="draftAllocations[String(row.original.claimLine.id)]"
                                 :items="allocationOptions"
@@ -1129,13 +1132,21 @@ const cancelReconciliation = async () => {
                       <span v-if="isGroupedSubmissionRow(row as GroupedClaimSubmissionRow)" class="font-medium text-zinc-700 dark:text-zinc-200">
                         {{ formatMoney(getSubmissionGroupedTotal(row as GroupedClaimSubmissionRow, 'submittedAmount')) }}
                       </span>
-                      <UInput
-                        v-else-if="row.original.budgetLineId && canEditClaimSubmissionAmount(row.original.budgetLineId)"
-                        :model-value="getDraftClaimAmount(row.original.budgetLineId)"
-                        inputmode="decimal"
-                        :aria-label="t('agreement.claims.submitted_amount_for', { name: row.original.lineItemNameEn })"
-                        class="w-44"
-                        @update:model-value="value => setDraftClaimAmount(row.original.budgetLineId!, value)" />
+                      <div v-else-if="row.original.budgetLineId && canEditClaimSubmissionAmount(row.original.budgetLineId)" class="space-y-1">
+                        <UInput
+                          :model-value="getDraftClaimAmount(row.original.budgetLineId)"
+                          inputmode="decimal"
+                          required
+                          :aria-label="t('agreement.claims.submitted_amount_for', { name: row.original.lineItemNameEn })"
+                          :aria-invalid="isDraftClaimAmountInvalid(row.original.budgetLineId)"
+                          :aria-describedby="isDraftClaimAmountInvalid(row.original.budgetLineId) ? `claim-amount-error-${row.original.budgetLineId}` : undefined"
+                          class="w-44"
+                          @update:model-value="value => setDraftClaimAmount(row.original.budgetLineId!, value)" />
+                        <span class="block text-xs text-muted">({{ t('common.field_required') }})</span>
+                        <p v-if="isDraftClaimAmountInvalid(row.original.budgetLineId)" :id="`claim-amount-error-${row.original.budgetLineId}`" class="text-xs text-error">
+                          {{ t('validation.invalid_number') }}
+                        </p>
+                      </div>
                       <span v-else class="font-medium text-zinc-700 dark:text-zinc-200">
                         {{ formatMoney(row.original.submittedAmount) }}
                       </span>
@@ -1458,7 +1469,7 @@ const cancelReconciliation = async () => {
           </div>
 
           <div class="grid gap-4 sm:grid-cols-2">
-            <UFormField :label="t('agreement.claims.reconciled_amount')">
+            <UFormField :label="t('agreement.claims.reconciled_amount')" required>
               <UInput
                 v-model="selectedReconcileLine.reconciledAmount"
                 inputmode="decimal"

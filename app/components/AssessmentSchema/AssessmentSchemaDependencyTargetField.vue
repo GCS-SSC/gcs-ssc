@@ -75,7 +75,7 @@ watch(
 
 <template>
   <div class="space-y-4">
-    <UFormField :label="t('transfer_payment.dependency_type')" name="dependency.type">
+    <UFormField :label="t('transfer_payment.dependency_type')" name="dependency.type" required>
       <USelect
         :model-value="modelValue.type"
         :items="dependencyOnTypeItems"
@@ -84,11 +84,11 @@ watch(
         @update:model-value="value => updateType(value)" />
     </UFormField>
 
-    <UFormField v-if="modelValue.type === 'helpers'" :label="t('transfer_payment.helper_field')" name="dependency.field">
+    <UFormField v-if="modelValue.type === 'helpers'" :label="t('transfer_payment.helper_field')" name="dependency.field" required>
       <AssessmentSchemaHelperFieldSelect v-model="modelValue.field" />
     </UFormField>
 
-    <UFormField v-else :label="t('transfer_payment.assessment_item')" name="dependency.question">
+    <UFormField v-else :label="t('transfer_payment.assessment_item')" name="dependency.question" required>
       <AssessmentSchemaAnswerPathTreeSelect
         :model-value="answerPathValue"
         :tree="answerPathTree"

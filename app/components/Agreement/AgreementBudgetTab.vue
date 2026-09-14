@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { withFormRequirements } from '~~/shared/utils/form-requirements'
 import { useBudgetCalculationPreview } from '~/composables/useBudgetCalculationPreview'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 /* eslint-disable jsdoc/require-jsdoc -- Budget table callbacks are exercised by focused component tests. */
@@ -148,10 +149,18 @@ const selectedLineItem = lineItemModal.selected
 const isLineItemModalOpen = lineItemModal.isOpen
 const validateFiscalYear = createValidator(FundingCaseAgreementBudgetFiscalYearCreateSchema)
 const lineItemValidator = createValidator(FundingCaseAgreementBudgetLineItemCreateSchema)
-const validateLineItem = (state: FundingCaseAgreementBudgetLineItemForm) => lineItemValidator({ ...state,
-  egcs_fc_percentage: state.egcs_fc_percentage ?? undefined,
-  egcs_fc_programfunding: state.egcs_fc_calculationmode && state.egcs_fc_calculationmode !== 'manual' ? undefined : state.egcs_fc_programfunding
-} as Parameters<typeof lineItemValidator>[0])
+const validateLineItem = withFormRequirements(async (state: FundingCaseAgreementBudgetLineItemForm) => {
+  const isManual = !state.egcs_fc_calculationmode || state.egcs_fc_calculationmode === 'manual'
+  const errors = await lineItemValidator({
+    ...state,
+    egcs_fc_percentage: state.egcs_fc_percentage ?? undefined,
+    egcs_fc_programfunding: isManual ? state.egcs_fc_programfunding : undefined
+  } as Parameters<typeof lineItemValidator>[0])
+  if (isManual && state.egcs_fc_programfunding === undefined) {
+    errors.push({ name: 'egcs_fc_programfunding', message: t('validation.required') })
+  }
+  return errors
+}, FundingCaseAgreementBudgetLineItemCreateSchema)
 const fiscalYearPending = useCrudModalPending(fiscalYearModal.captureSession)
 const lineItemPending = useCrudModalPending(lineItemModal.captureSession)
 const isSavingFiscalYear = fiscalYearPending.isPending
@@ -955,7 +964,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
                   inputmode="decimal" />
               </UFormField>
 
-              <UFormField :label="t('agreement.budget.program_funding')" name="egcs_fc_programfunding">
+              <UFormField :label="t('agreement.budget.program_funding')" name="egcs_fc_programfunding" :required="!selectedLineItem.egcs_fc_calculationmode || selectedLineItem.egcs_fc_calculationmode === 'manual'">
                 <UInput
                   :model-value="selectedLineItem.egcs_fc_calculationmode && selectedLineItem.egcs_fc_calculationmode !== 'manual' ? calculationPreview : selectedLineItem.egcs_fc_programfunding"
                   :readonly="Boolean(selectedLineItem.egcs_fc_calculationmode && selectedLineItem.egcs_fc_calculationmode !== 'manual')"

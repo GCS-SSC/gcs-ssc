@@ -179,21 +179,21 @@ const questionLabel = (questionKey: string) => {
 
     <div v-if="isExpanded" class="space-y-5 pb-6">
       <div class="grid gap-4 md:grid-cols-2">
-        <UFormField :label="t('checklist_schema.policy.group_name_en')">
+        <UFormField :label="t('checklist_schema.policy.group_name_en')" required>
           <UInput v-model="currentGroup.label.en" class="w-full" @blur="updateLabel('en', currentGroup.label.en)" />
         </UFormField>
-        <UFormField :label="t('checklist_schema.policy.group_name_fr')">
+        <UFormField :label="t('checklist_schema.policy.group_name_fr')" required>
           <UInput v-model="currentGroup.label.fr" class="w-full" @blur="updateLabel('fr', currentGroup.label.fr)" />
         </UFormField>
-        <UFormField :label="t('checklist_schema.policy.result')">
+        <UFormField :label="t('checklist_schema.policy.result')" required>
           <CommonEnumSelect :model-value="currentGroup.result" name="review_type" :items="resultOptions" class="w-full" @update:model-value="updateResult($event)" />
         </UFormField>
-        <UFormField :label="t('checklist_schema.policy.mode')">
+        <UFormField :label="t('checklist_schema.policy.mode')" required>
           <CommonEnumSelect :model-value="currentGroup.mode" name="review_type" :items="modeOptions" class="w-full" @update:model-value="updateMode($event)" />
         </UFormField>
         <UFormField
           v-if="currentGroup.mode === 'at_least_count' || currentGroup.mode === 'at_least_rate'"
-          :label="currentGroup.mode === 'at_least_rate' ? t('checklist_schema.policy.rate_threshold') : t('checklist_schema.policy.count_threshold')">
+          :label="currentGroup.mode === 'at_least_rate' ? t('checklist_schema.policy.rate_threshold') : t('checklist_schema.policy.count_threshold')" required>
           <UInput
             :model-value="currentGroup.threshold"
             type="number"

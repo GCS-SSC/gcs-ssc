@@ -238,7 +238,7 @@ const getDependencyValueTypeItems = (rule: DependencyRuleUi, clauseId: string) =
         </div>
 
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <UFormField :label="t('transfer_payment.dependency_type')">
+          <UFormField :label="t('transfer_payment.dependency_type')" required>
             <USelect
               :model-value="clause.onType"
               :items="dependencyOnTypeItems"
@@ -252,7 +252,7 @@ const getDependencyValueTypeItems = (rule: DependencyRuleUi, clauseId: string) =
         </div>
 
         <div v-if="clause.onType === 'helpers'" class="grid grid-cols-1 gap-3">
-          <UFormField :label="t('transfer_payment.helper_field')">
+          <UFormField :label="t('transfer_payment.helper_field')" required>
             <AssessmentSchemaHelperFieldSelect
               :model-value="clause.field"
               @update:model-value="value => updateClauseField(clause, String(value ?? ''))" />
@@ -260,7 +260,7 @@ const getDependencyValueTypeItems = (rule: DependencyRuleUi, clauseId: string) =
         </div>
 
         <div v-else class="grid grid-cols-1 gap-3">
-          <UFormField :label="t('transfer_payment.assessment_item')">
+          <UFormField :label="t('transfer_payment.assessment_item')" required>
             <AssessmentSchemaAnswerPathTreeSelect
               :model-value="createAnswersDependencyValue(clause)"
               :tree="answerPathTree"

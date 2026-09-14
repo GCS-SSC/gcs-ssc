@@ -88,10 +88,10 @@ const onLogin = async () => {
       </template>
 
       <form class="space-y-4" @submit.prevent="onLogin">
-        <UFormField :label="t('login.email')">
+        <UFormField :label="t('login.email')" required>
           <UInput v-model="email" type="email" autocomplete="username" :placeholder="t('login.email_placeholder')" :disabled="loading" />
         </UFormField>
-        <UFormField :label="t('login.password')">
+        <UFormField :label="t('login.password')" required>
           <UInput
             v-model="password"
             type="password"

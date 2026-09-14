@@ -1,3 +1,4 @@
+import { RequiredDateSchema } from './form-input'
 import { WorkflowMemberConditionsSchema } from './agreement-custom-fields'
 import { z } from 'zod'
 import { isCanonicalPostgresBigintText } from '../../utils/database-id'
@@ -36,26 +37,26 @@ const IdSchema = z.preprocess(value => {
   }
 
   return value
-}, z.coerce.string({ error: 'validation.id_required' }).min(1, { error: 'validation.id_required' }))
+}, z.coerce.string({ error: 'validation.id_required' }).min(1, { error: 'validation.id_required' })).meta({ formRequired: true })
 const RequiredIdSchema = (key: string) => z.preprocess(value => {
   if (value === undefined || value === null) return ''
   return value
-}, z.coerce.string({ error: key }).min(1, { error: key }))
+}, z.coerce.string({ error: key }).min(1, { error: key })).meta({ formRequired: true })
 const OptionalIdSchema = z.preprocess(value => {
   if (value === undefined || value === null || value === '') return undefined
   return value
-}, z.coerce.string().min(1).optional())
+}, z.coerce.string().min(1).optional()).meta({ formRequired: false })
 const NullableOptionalIdSchema = z.preprocess(value => {
   if (value === undefined || value === '') return undefined
   if (value === null) return null
   return value
-}, z.union([z.null(), z.coerce.string().min(1)]).optional())
+}, z.union([z.null(), z.coerce.string().min(1)]).optional()).meta({ formRequired: false })
 const RequiredString = (key: string) => z.string({ error: key }).min(1, { error: key })
 const OptionalNumericString = z.coerce.number().optional()
 const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
   z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(JsonValueSchema), z.record(z.string(), JsonValueSchema)])
 )
-const JsonObjectSchema = z.record(z.string(), JsonValueSchema)
+const JsonObjectSchema = z.record(z.string(), JsonValueSchema).meta({ formRequired: true })
 export const COMMON_APPROVAL_TEMPLATE_SCOPE_TYPE_ENUM = ['fundingopportunity', 'transferpaymentstream'] as const
 export const COMMON_ENTITY_TYPE_ENUM = ENTITY_TYPE_ENUM
 export const REVIEW_TYPES = REVIEW_TYPE_ENUM
@@ -154,7 +155,7 @@ const AddressBigintSchema = (requiredKey: string) => z.union([
 ], { error: requiredKey })
   .transform(value => value.trim())
   .refine(value => value.length > 0, { error: requiredKey })
-  .refine(isCanonicalPostgresBigintText, { error: 'validation.invalid_number' })
+  .refine(isCanonicalPostgresBigintText, { error: 'validation.invalid_number' }).meta({ formRequired: true })
 
 /** Applies the existing varchar storage boundary without changing whitespace semantics.
  * @param schema Required or optional-content string schema.
@@ -181,7 +182,7 @@ export const CommonAddressBaseSchema = z.object({
   egcs_cn_addresscountry: z.enum(COUNTRIES_ENUM),
   egcs_cn_addresssubdivision: AddressTextSchema(RequiredString('validation.required')),
   egcs_cn_gc_addressid: z.preprocess(value => isEmptyFilterValue(value) ? undefined : value,
-    AddressBigintSchema('validation.invalid_number').optional()),
+    AddressBigintSchema('validation.invalid_number').optional()).meta({ formRequired: false }),
   egcs_cn_latitude: AddressCoordinateSchema.optional(),
   egcs_cn_longitude: AddressCoordinateSchema.optional(),
   egcs_cn_mainphone: AddressBigintSchema('validation.main_phone_required'),
@@ -248,7 +249,7 @@ export const CommonCompletionCreateSchema = z.object({
   egcs_cn_entityid: IdSchema,
   egcs_cn_comments: z.string().optional(),
   egcs_cn_user: IdSchema,
-  egcs_cn_completedat: z.coerce.date({ error: 'validation.required' })
+  egcs_cn_completedat: RequiredDateSchema
 })
 export const CommonCompletionPatchSchema = CommonCompletionCreateSchema.partial().extend({ _deleted: z.boolean().optional() })
 

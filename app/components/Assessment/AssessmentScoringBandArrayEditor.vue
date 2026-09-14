@@ -56,9 +56,9 @@ const removeRow = (index: number) => {
           <UInput v-model="row.label.fr" />
         </UFormField>
 
-        <UFormField :label="t('transfer_payment.indicator_color')" :name="`${fieldPath}.${index}.indicator`">
+        <UFormField :label="t('transfer_payment.indicator_color')" :name="`${fieldPath}.${index}.indicator`" required>
           <UPopover>
-            <UButton color="neutral" variant="outline" class="w-full cursor-default justify-start">
+            <UButton color="neutral" variant="outline" class="w-full cursor-default justify-start" :aria-label="`${t('transfer_payment.indicator_color')}: ${row.indicator} (${t('validation.required')})`">
               <template #leading>
                 <span :style="{ backgroundColor: row.indicator }" class="size-3 rounded-full" />
               </template>

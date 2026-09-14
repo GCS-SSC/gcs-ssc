@@ -6,7 +6,7 @@ const IdSchema = z.preprocess(value => {
   }
 
   return value
-}, z.coerce.string({ error: 'validation.id_required' }).min(1, { error: 'validation.id_required' }))
+}, z.coerce.string({ error: 'validation.id_required' }).min(1, { error: 'validation.id_required' })).meta({ formRequired: true })
 
 export const AdditionalReviewerInputSchema = z.object({
   egcs_cn_user: IdSchema,

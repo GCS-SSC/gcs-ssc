@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { withFormRequirements } from '~~/shared/utils/form-requirements'
 /* eslint-disable jsdoc/require-jsdoc -- request closure is local to the coordinated submit */
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -53,7 +54,7 @@ const validatePatch = createValidator(TransferPaymentStreamReviewSetupMemberPatc
  * @param payload - Review-setup member form payload from the modal.
  * @returns Validation issues from the active schema validator.
  */
-const validate = async (
+const validate = withFormRequirements(async (
   payload:
     | z.infer<typeof TransferPaymentStreamReviewSetupMemberCreateSchema>
     | z.infer<typeof TransferPaymentStreamReviewSetupMemberPatchSchema>
@@ -64,7 +65,8 @@ const validate = async (
   }
 
   return await validateCreate(editablePayload as z.infer<typeof TransferPaymentStreamReviewSetupMemberCreateSchema>)
-}
+}, TransferPaymentStreamReviewSetupMemberCreateSchema)
+
 const modalTitle = computed(() => (
   isUpdate.value ? t('transfer_payment.review_setup_member_update') : t('transfer_payment.review_setup_member_create')
 ))

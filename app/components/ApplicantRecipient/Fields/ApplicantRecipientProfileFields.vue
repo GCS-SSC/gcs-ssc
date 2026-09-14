@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- local field helpers are self-documenting and not public APIs */
-import { computed, watch } from 'vue'
+import { computed, useId, watch } from 'vue'
 import type { ApplicantRecipientProfileForm, ApplicantRecipientProfileRow } from '~~/shared/types/applicant-recipient-ui'
 
 const model = defineModel<ApplicantRecipientProfileForm>('model', { required: true })
@@ -15,6 +15,7 @@ const {
 }>()
 
 const { t } = useI18n()
+const requirementId = useId()
 const { getBilingualValue } = useBilingualValue()
 const retainedSubtypeOptions = computed(() => {
   if (!persistedProfile || model.value.id !== persistedProfile.id
@@ -176,6 +177,7 @@ watch(() => model.value?.egcs_ar_leadagency, (currentAgencyId, previousAgencyId)
   <CommonSection :title="t('applicant_recipient.sections.identity')" badge="02" :grid-cols="1">
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-12">
       <p
+        :id="`${requirementId}-legal-name`"
         class="text-sm text-zinc-600 md:col-span-2 xl:col-span-12 dark:text-zinc-400"
         data-testid="legal-name-language-requirement">
         {{ t('applicant_recipient.requirements.legal_name') }}
@@ -189,7 +191,7 @@ watch(() => model.value?.egcs_ar_leadagency, (currentAgencyId, previousAgencyId)
             :label="getFieldText('legal_name_en').fieldName"
             :tooltip="getFieldText('legal_name_en').tooltip" />
         </template>
-        <UInput v-model="model.egcs_ar_legalname_en" :placeholder="getFieldText('legal_name_en').placeholder" />
+        <UInput v-model="model.egcs_ar_legalname_en" :aria-describedby="`${requirementId}-legal-name`" :placeholder="getFieldText('legal_name_en').placeholder" />
       </UFormField>
       <UFormField
         class="xl:col-span-6"
@@ -201,9 +203,10 @@ watch(() => model.value?.egcs_ar_leadagency, (currentAgencyId, previousAgencyId)
             :label="getFieldText('legal_name_fr').fieldName"
             :tooltip="getFieldText('legal_name_fr').tooltip" />
         </template>
-        <UInput v-model="model.egcs_ar_legalname_fr" :placeholder="getFieldText('legal_name_fr').placeholder" />
+        <UInput v-model="model.egcs_ar_legalname_fr" :aria-describedby="`${requirementId}-legal-name`" :placeholder="getFieldText('legal_name_fr').placeholder" />
       </UFormField>
       <p
+        :id="`${requirementId}-operating-name`"
         class="text-sm text-zinc-600 md:col-span-2 xl:col-span-12 dark:text-zinc-400"
         data-testid="operating-name-language-requirement">
         {{ t('applicant_recipient.requirements.operating_name') }}
@@ -217,7 +220,7 @@ watch(() => model.value?.egcs_ar_leadagency, (currentAgencyId, previousAgencyId)
             :label="getFieldText('operating_name_en').fieldName"
             :tooltip="getFieldText('operating_name_en').tooltip" />
         </template>
-        <UInput v-model="model.egcs_ar_operatingname_en" :placeholder="getFieldText('operating_name_en').placeholder" />
+        <UInput v-model="model.egcs_ar_operatingname_en" :aria-describedby="`${requirementId}-operating-name`" :placeholder="getFieldText('operating_name_en').placeholder" />
       </UFormField>
       <UFormField
         class="xl:col-span-6"
@@ -229,7 +232,7 @@ watch(() => model.value?.egcs_ar_leadagency, (currentAgencyId, previousAgencyId)
             :label="getFieldText('operating_name_fr').fieldName"
             :tooltip="getFieldText('operating_name_fr').tooltip" />
         </template>
-        <UInput v-model="model.egcs_ar_operatingname_fr" :placeholder="getFieldText('operating_name_fr').placeholder" />
+        <UInput v-model="model.egcs_ar_operatingname_fr" :aria-describedby="`${requirementId}-operating-name`" :placeholder="getFieldText('operating_name_fr').placeholder" />
       </UFormField>
       <UFormField
         class="xl:col-span-6"
@@ -252,6 +255,7 @@ watch(() => model.value?.egcs_ar_leadagency, (currentAgencyId, previousAgencyId)
         <UInput v-model="model.egcs_ar_researchorganization_fr" :placeholder="getFieldText('research_organization_fr').placeholder" />
       </UFormField>
       <p
+        :id="`${requirementId}-description`"
         class="text-sm text-zinc-600 md:col-span-2 xl:col-span-12 dark:text-zinc-400"
         data-testid="description-language-requirement">
         {{ t('applicant_recipient.requirements.description') }}
@@ -266,7 +270,7 @@ watch(() => model.value?.egcs_ar_leadagency, (currentAgencyId, previousAgencyId)
             :tooltip="getFieldText('description_en').tooltip" />
         </template>
         <CommonTextarea
-          v-model="model.egcs_ar_description_en"
+          v-model="model.egcs_ar_description_en" :aria-describedby="`${requirementId}-description`"
           :placeholder="getFieldText('description_en').placeholder"
           :rows="4" />
       </UFormField>
@@ -281,7 +285,7 @@ watch(() => model.value?.egcs_ar_leadagency, (currentAgencyId, previousAgencyId)
             :tooltip="getFieldText('description_fr').tooltip" />
         </template>
         <CommonTextarea
-          v-model="model.egcs_ar_description_fr"
+          v-model="model.egcs_ar_description_fr" :aria-describedby="`${requirementId}-description`"
           :placeholder="getFieldText('description_fr').placeholder"
           :rows="4" />
       </UFormField>

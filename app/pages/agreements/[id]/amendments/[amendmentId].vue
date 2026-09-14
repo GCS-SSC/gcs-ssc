@@ -1,9 +1,9 @@
 <script setup lang="ts">
+import { useId, computed, ref, watch } from 'vue'
 import CommonCompletionPanel from '~/components/Common/Completions/Panel.vue'
 /* eslint-disable jsdoc/require-jsdoc -- concise detail-page actions are covered by focused tests. */
 import type { FetchError } from 'ofetch'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
-import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import AgreementActivitiesTab from '~/components/Agreement/AgreementActivitiesTab.vue'
 import AgreementBudgetTab from '~/components/Agreement/AgreementBudgetTab.vue'
@@ -25,6 +25,7 @@ definePageMeta({
 })
 
 const route = useRoute()
+const nameRequirementId = useId()
 const { t } = useI18n()
 const localePath = useLocalePath()
 const toast = useToast()
@@ -324,13 +325,13 @@ const cancelAmendment = async () => {
               <div class="space-y-4">
                 <div class="grid gap-4 md:grid-cols-2">
                   <UFormField :label="t('agreement.amendments.name_en')">
-                    <UInput v-model="amendmentNameEn" class="w-full" :disabled="!canEditAmendmentScope" />
+                    <UInput v-model="amendmentNameEn" :aria-describedby="nameRequirementId" class="w-full" :disabled="!canEditAmendmentScope" />
                   </UFormField>
                   <UFormField :label="t('agreement.amendments.name_fr')">
-                    <UInput v-model="amendmentNameFr" class="w-full" :disabled="!canEditAmendmentScope" />
+                    <UInput v-model="amendmentNameFr" :aria-describedby="nameRequirementId" class="w-full" :disabled="!canEditAmendmentScope" />
                   </UFormField>
                 </div>
-                <p class="text-sm text-zinc-500 dark:text-zinc-400">
+                <p :id="nameRequirementId" class="text-sm text-zinc-500 dark:text-zinc-400">
                   {{ t('agreement.amendments.name_help') }}
                 </p>
               </div>

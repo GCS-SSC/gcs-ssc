@@ -134,28 +134,27 @@ const handleModelValueUpdate = (value: string | number | null | undefined) => {
           :model-value="localModelValue"
           :items="options"
           :aria-labelledby="questionHeadingId"
+          :aria-describedby="errorMessage ? `${questionHeadingId}-error` : undefined"
+          :aria-invalid="errorMessage ? true : undefined"
           :aria-required="questionRequired"
+          :required="questionRequired"
           variant="card"
           size="lg"
           class="w-full"
           :disabled="disabled"
           @update:model-value="handleModelValueUpdate" />
 
-        <slot name="answer" :labelledby="questionHeadingId" />
+        <slot name="answer" :labelledby="questionHeadingId" :describedby="errorMessage ? `${questionHeadingId}-error` : undefined" :invalid="Boolean(errorMessage)" />
 
-        <p v-if="errorMessage" class="text-sm font-medium text-error" role="alert">
+        <p v-if="errorMessage" :id="`${questionHeadingId}-error`" class="text-sm font-medium text-error" role="alert">
           {{ errorMessage }}
         </p>
 
-        <UFormField v-if="showComment" :name="commentFieldName">
-          <template #label>
-            <span>
-              {{ commentLabel }}
-              <span v-if="commentRequired" class="text-red-600 dark:text-red-400">*</span>
-              <span v-if="commentRequired" class="sr-only">{{ t('validation.required') }}</span>
-            </span>
-          </template>
-
+        <UFormField
+          v-if="showComment"
+          :name="commentFieldName"
+          :label="commentLabel"
+          :required="commentRequired">
           <CommonTextarea
             :model-value="commentValue"
             :rows="4"

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { withFormRequirements } from '~~/shared/utils/form-requirements'
 /* eslint-disable jsdoc/require-jsdoc -- local modal helpers are self-documenting and not public APIs */
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { buildAssessmentSetItemSubmitRequest, submitAssessmentModalRequest } from '~/utils/transfer-payment-assessment-modal'
@@ -35,7 +36,7 @@ watch(open, () => {
 const isUpdate = computed(() => Boolean(state.value?.id))
 const validateCreate = createValidator(TransferPaymentAssessmentSetItemCreateSchema)
 const validatePatch = createValidator(TransferPaymentAssessmentSetItemPatchSchema)
-const validate = async (
+const validate = withFormRequirements(async (
   payload:
     | z.infer<typeof TransferPaymentAssessmentSetItemCreateSchema>
     | z.infer<typeof TransferPaymentAssessmentSetItemPatchSchema>
@@ -45,7 +46,7 @@ const validate = async (
   }
 
   return await validateCreate(payload as z.infer<typeof TransferPaymentAssessmentSetItemCreateSchema>)
-}
+}, TransferPaymentAssessmentSetItemCreateSchema)
 
 const modalTitle = computed(() => (
   isUpdate.value ? t('transfer_payment.assessment_item_update') : t('transfer_payment.assessment_item_create')

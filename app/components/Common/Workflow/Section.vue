@@ -151,6 +151,7 @@ const isCancelling: Ref<boolean> = ref(false)
 const responses: Ref<RecommendationResponse[]> = ref([])
 const validationIssues: Ref<Array<{ questionKey: string, message: string }>> = ref([])
 const replacementOwners: Ref<Record<string, string>> = ref({})
+const resumeAttempted: Ref<boolean> = ref(false)
 const isResuming: Ref<boolean> = ref(false)
 const selectedStepId: Ref<string | null> = ref(null)
 const activeWorkflowTab: Ref<string> = ref('current')
@@ -171,6 +172,7 @@ watch(runtimeIdentity, () => {
   responses.value = []
   validationIssues.value = []
   replacementOwners.value = {}
+  resumeAttempted.value = false
   selectedStepId.value = null
   selectedAttemptId.value = null
   activeWorkflowTab.value = 'current'
@@ -547,6 +549,7 @@ const cancel = async () => {
 }
 const resume = async () => {
   const blockers = data.value?.ownerBlockers?.filter(blocker => !blocker.egcs_cn_resolvedat) ?? []
+  resumeAttempted.value = true
   if (!data.value?.current || blockers.some(blocker => !replacementOwners.value[blocker.id])) return
   const generation = captureRuntimeIdentity()
   try {
@@ -749,7 +752,7 @@ const handleApprovalChanged = async () => {
       <div v-if="data.current.runtimeState === 'paused'" class="space-y-4 rounded-lg border border-warning/40 bg-warning/5 p-4">
         <UAlert color="warning" icon="i-lucide-pause-circle" :title="t('workflow.owner_pause_title')" :description="t(data.canResumeOwners ? 'workflow.owner_pause_help' : 'workflow.owner_pause_readonly_help')" />
         <template v-if="data.canResumeOwners">
-          <UFormField v-for="blocker in data.ownerBlockers?.filter(item => !item.egcs_cn_resolvedat)" :key="blocker.id" :label="t('workflow.replacement_owner')">
+          <UFormField v-for="blocker in data.ownerBlockers?.filter(item => !item.egcs_cn_resolvedat)" :key="blocker.id" :label="t('workflow.replacement_owner')" required :error="resumeAttempted && !replacementOwners[blocker.id] ? t('validation.required') : undefined">
             <CommonServerLookupSelect
               v-model="replacementOwners[blocker.id]"
               :fetch-url="ownerCandidatesUrl"

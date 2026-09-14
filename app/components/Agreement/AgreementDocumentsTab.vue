@@ -5,6 +5,7 @@ import { getClientRequestUrl } from '~/utils/client-request-url'
 import { computed, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
+import { AgreementDocumentGenerateSchema } from '~~/shared/types/schemas'
 import type { AgreementGeneratedDocumentItem, TransferPaymentStreamDocumentTemplateItem } from '~~/shared/types/schemas'
 import type { TransferPaymentDocumentTemplateOutputFormat } from '~~/shared/types/database'
 
@@ -16,6 +17,7 @@ const { agreementId, canCreate = false, canDelete = false } = defineProps<{
 const agreementIdRef = computed(() => agreementId)
 
 const { t, locale } = useI18n()
+const validateGenerate = useZodI18n().createValidator(AgreementDocumentGenerateSchema)
 const toast = useToast()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
@@ -217,7 +219,7 @@ const deleteDocument = async (generatedDocument: AgreementGeneratedDocumentItem)
 
     <UModal v-if="canCreate && generateState" v-model:open="isGenerateOpen" :title="t('agreement.documents.generate')">
       <template #body>
-        <UForm :state="generateState" class="space-y-4" @submit="generateDocument">
+        <UForm :state="generateState" :validate="validateGenerate" class="space-y-4" @submit="generateDocument">
           <UFormField :label="t('transfer_payment.document_templates.title')" name="templateId">
             <CommonBilingualSelectMenu
               v-model="generateState.templateId"

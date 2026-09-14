@@ -95,16 +95,16 @@ const updateTextDescription = (language: 'en' | 'fr', value: string) => {
 <template>
   <div v-if="question" class="space-y-6">
     <div class="grid gap-4 md:grid-cols-2">
-      <UFormField :label="t('recommendation_schema.question_en')">
+      <UFormField :label="t('recommendation_schema.question_en')" required>
         <CommonTextarea v-model="question.question.en" :rows="3" />
       </UFormField>
-      <UFormField :label="t('recommendation_schema.question_fr')">
+      <UFormField :label="t('recommendation_schema.question_fr')" required>
         <CommonTextarea v-model="question.question.fr" :rows="3" />
       </UFormField>
-      <UFormField :label="t('recommendation_schema.language_independent_code')">
+      <UFormField :label="t('recommendation_schema.language_independent_code')" required>
         <UInput v-model="question.key" class="w-full font-mono" />
       </UFormField>
-      <UFormField :label="t('recommendation_schema.question_type')">
+      <UFormField :label="t('recommendation_schema.question_type')" required>
         <CommonEnumSelect
           :model-value="question.type"
           name="review_type"
@@ -114,7 +114,9 @@ const updateTextDescription = (language: 'en' | 'fr', value: string) => {
       </UFormField>
     </div>
     <div class="flex flex-wrap gap-6">
-      <UCheckbox v-model="question.required" :label="t('recommendation_schema.required_question')" />
+      <UFormField :label="t('recommendation_schema.required_question')" :required="question.isResult">
+        <UCheckbox v-model="question.required" />
+      </UFormField>
       <UCheckbox
         v-if="question.type === 'radio'"
         :model-value="question.isResult"
@@ -125,20 +127,20 @@ const updateTextDescription = (language: 'en' | 'fr', value: string) => {
 
     <div v-if="question.type === 'text'" class="space-y-4">
       <div class="grid gap-4 md:grid-cols-2">
-        <UFormField :label="t('recommendation_schema.subtitle_en')">
+        <UFormField :label="t('recommendation_schema.subtitle_en')" :required="question.description !== undefined">
           <CommonTextarea
             :model-value="question.description?.en ?? ''"
             :rows="2"
             @update:model-value="value => updateTextDescription('en', value)" />
         </UFormField>
-        <UFormField :label="t('recommendation_schema.subtitle_fr')">
+        <UFormField :label="t('recommendation_schema.subtitle_fr')" :required="question.description !== undefined">
           <CommonTextarea
             :model-value="question.description?.fr ?? ''"
             :rows="2"
             @update:model-value="value => updateTextDescription('fr', value)" />
         </UFormField>
       </div>
-      <UFormField :label="t('recommendation_schema.max_length')">
+      <UFormField :label="t('recommendation_schema.max_length')" required>
         <UInputNumber v-model="question.maxLength" :min="1" :max="10000" />
       </UFormField>
     </div>
@@ -151,13 +153,13 @@ const updateTextDescription = (language: 'en' | 'fr', value: string) => {
         <UButton icon="i-lucide-plus" variant="outline" :label="t('recommendation_schema.add_option')" class="cursor-default" @click="addOption" />
       </div>
       <div v-for="(option, optionIndex) in question.options" :key="option.key" class="grid items-end gap-3" :class="question.isResult ? 'md:grid-cols-[1fr_1fr_minmax(12rem,0.7fr)_auto]' : 'md:grid-cols-[1fr_1fr_auto]'">
-        <UFormField :label="t('transfer_payment.name_en')">
+        <UFormField :label="t('transfer_payment.name_en')" required>
           <UInput v-model="option.label.en" class="w-full" />
         </UFormField>
-        <UFormField :label="t('transfer_payment.name_fr')">
+        <UFormField :label="t('transfer_payment.name_fr')" required>
           <UInput v-model="option.label.fr" class="w-full" />
         </UFormField>
-        <UFormField v-if="question.isResult" :label="t('recommendation_schema.canonical_outcome')">
+        <UFormField v-if="question.isResult" :label="t('recommendation_schema.canonical_outcome')" required>
           <CommonEnumSelect v-model="option.outcome" name="recommendation_outcome" :items="outcomeOptions" class="w-full" />
         </UFormField>
         <UButton
@@ -185,16 +187,16 @@ const updateTextDescription = (language: 'en' | 'fr', value: string) => {
       </div>
       <div v-for="(helpItem, helpIndex) in question.help" :key="helpItem.key" class="space-y-4 rounded-md border border-default p-4">
         <div class="grid gap-4 md:grid-cols-2">
-          <UFormField :label="t('recommendation_schema.help_title_en')">
+          <UFormField :label="t('recommendation_schema.help_title_en')" required>
             <UInput v-model="helpItem.title.en" class="w-full" />
           </UFormField>
-          <UFormField :label="t('recommendation_schema.help_title_fr')">
+          <UFormField :label="t('recommendation_schema.help_title_fr')" required>
             <UInput v-model="helpItem.title.fr" class="w-full" />
           </UFormField>
-          <UFormField :label="t('recommendation_schema.help_description_en')">
+          <UFormField :label="t('recommendation_schema.help_description_en')" required>
             <CommonTextarea v-model="helpItem.description.en" :rows="3" />
           </UFormField>
-          <UFormField :label="t('recommendation_schema.help_description_fr')">
+          <UFormField :label="t('recommendation_schema.help_description_fr')" required>
             <CommonTextarea v-model="helpItem.description.fr" :rows="3" />
           </UFormField>
         </div>

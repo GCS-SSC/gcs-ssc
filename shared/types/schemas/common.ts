@@ -29,7 +29,7 @@ export const RequiredStringId = () =>
       return value
     },
     z.string({ error: 'validation.required' }).min(1, { error: 'validation.required' })
-  )
+  ).meta({ formRequired: true })
 
 /** Canonical positive decimal identifier accepted by PostgreSQL signed bigint columns. */
 export const PositivePostgresBigintIdSchema = z.preprocess(
@@ -42,12 +42,12 @@ export const PositivePostgresBigintIdSchema = z.preprocess(
   z.string({ error: 'validation.required' })
     .min(1, { error: 'validation.required' })
     .refine(isPositivePostgresBigintText, { error: 'validation.invalid_selection' })
-)
+).meta({ formRequired: true })
 
 /** Stable core or extension-qualified polymorphic entity identity. */
 export const EntityTypeIdentitySchema = z.string({ error: 'validation.required' })
   .regex(/^[a-z][a-z0-9-]{0,62}(?::[a-z][a-z0-9-]{0,62})?$/, { error: 'validation.invalid_selection' })
-  .transform(value => value as Entity_Type)
+  .transform(value => value as Entity_Type).meta({ formRequired: true })
 
 /**
  * Applies the shared core-bigint versus qualified-extension identity rule.
@@ -84,7 +84,7 @@ const createRestrictedEntityTypeIdentitySchema = (
 ) => z.string({ error: requiredError })
   .regex(/^[a-z][a-z0-9-]{0,62}(?::[a-z][a-z0-9-]{0,62})?$/, { error: 'validation.invalid_selection' })
   .refine(value => value.includes(':') || coreTypes.includes(value), { error: 'validation.invalid_selection' })
-  .transform(value => value as Entity_Type)
+  .transform(value => value as Entity_Type).meta({ formRequired: true })
 
 /**
  * Builds the Workflow target identity schema with a caller-specific required-field error.
@@ -132,7 +132,7 @@ export const OptionalNullableTrimmedString = (emptyValue: '' | null = null) => z
     return nextValue === '' ? emptyValue : nextValue
   },
   z.union([z.string(), z.null()]).optional()
-)
+).meta({ formRequired: false })
 
 // --- Pagination ---
 export const PaginationSchema = z.object({

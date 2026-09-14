@@ -23,7 +23,7 @@ const field = useFormFieldPath(() => namePrefix)
       :aria-label="t('transfer_payment.cost_category_line_items')"
       searchable />
   </UFormField>
-  <UFormField :label="t('transfer_payment.cost_sharing_ratio')" :name="field('egcs_tp_costsharingratio')">
+  <UFormField :label="t('transfer_payment.cost_sharing_ratio')" :name="field('egcs_tp_costsharingratio')" required>
     <UInputNumber
       v-model="model.egcs_tp_costsharingratio"
       :step="0.01"
