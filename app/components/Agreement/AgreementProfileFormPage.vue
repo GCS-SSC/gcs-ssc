@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import {
   FundingCaseAgreementCreateSchema,
+  FundingCaseAgreementGeneratedCreateSchema,
   FundingCaseAgreementProfileSchema
 } from '~~/shared/types/schemas'
 import type { FundingCaseAgreementProfileForm } from '~~/shared/types/funding-case-agreement-ui'
@@ -11,7 +13,8 @@ const {
   permissionAction,
   agreementId,
   compact = false,
-  pending = false
+  pending = false,
+  numberMode = 'manual'
 } = defineProps<{
   submitLabel: string
   cancelLabel: string
@@ -19,6 +22,7 @@ const {
   agreementId?: string
   compact?: boolean
   pending?: boolean
+  numberMode?: 'manual' | 'generated' | null
 }>()
 
 const model = defineModel<FundingCaseAgreementProfileForm>('model', { required: true })
@@ -28,7 +32,9 @@ const emit = defineEmits<{
 }>()
 
 const { createValidator } = useZodI18n()
-const validate = createValidator(permissionAction === 'create' ? FundingCaseAgreementCreateSchema : FundingCaseAgreementProfileSchema)
+const validate = computed(() => createValidator(permissionAction === 'create'
+  ? numberMode === 'generated' ? FundingCaseAgreementGeneratedCreateSchema : FundingCaseAgreementCreateSchema
+  : FundingCaseAgreementProfileSchema))
 
 const onSubmit = () => {
   emit('submit')
@@ -46,7 +52,8 @@ const onSubmit = () => {
       <AgreementFieldsAgreementProfileFields
         v-model:model="model"
         :agreement-id="agreementId"
-        :permission-action="permissionAction" />
+        :permission-action="permissionAction"
+        :number-generated="permissionAction === 'create' && numberMode === 'generated'" />
 
       <AgreementFieldsAgreementApplicantRecipientsField
         v-if="permissionAction === 'create'"
@@ -59,7 +66,7 @@ const onSubmit = () => {
           :label="cancelLabel"
           :disabled="pending"
           @click="emit('cancel')" />
-        <CommonSaveButton :label="submitLabel" :loading="pending" :disabled="pending" />
+        <CommonSaveButton :label="submitLabel" :loading="pending" :disabled="pending || (permissionAction === 'create' && !!model.egcs_fc_transferpaymentstream && !numberMode)" />
       </div>
     </UForm>
   </div>

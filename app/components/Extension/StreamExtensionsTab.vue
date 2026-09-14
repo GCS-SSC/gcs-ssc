@@ -19,6 +19,7 @@ const { t, locale } = useI18n()
 const toast = useToast()
 const localePath = useLocalePath()
 const { showError } = useApiErrorToast()
+const canConfigure = (item: ExtensionStreamRegistryItem) => canUpdateChild && item.canConfigure
 const {
   isModalOpen,
   isDiscardConfirmOpen,
@@ -75,6 +76,7 @@ const selectedConfigComponent = computed(() => {
 })
 
 const openConfiguration = async (item: ExtensionStreamTableRow) => {
+  if (!canConfigure(item)) return
   const extension = item.extension
   if (extension?.admin.streamConfigPage?.componentName) {
     await navigateTo(localePath(appRouteLocations.extensionStreamConfig(extension.key, {
@@ -96,7 +98,7 @@ const saveConfiguration = async (item: ExtensionStreamTableRow, enabled = item.s
     return
   }
 
-  if (isRowBusy(item)) {
+  if (!canConfigure(item) || isRowBusy(item)) {
     return
   }
 
@@ -169,7 +171,7 @@ const saveConfiguration = async (item: ExtensionStreamTableRow, enabled = item.s
         <div class="flex items-center gap-2">
           <USwitch
             :model-value="row.original.streamEnabled"
-            :disabled="!canUpdateChild || isRowBusy(row.original)"
+            :disabled="!canConfigure(row.original) || isRowBusy(row.original)"
             :aria-label="t('extensions.enable_extension')"
             @update:model-value="value => saveConfiguration(row.original, value)" />
           <UTooltip :text="t('extensions.configure')">
@@ -179,7 +181,7 @@ const saveConfiguration = async (item: ExtensionStreamTableRow, enabled = item.s
               variant="ghost"
               size="sm"
               class="cursor-default"
-              :disabled="!canUpdateChild || isRowBusy(row.original)"
+              :disabled="!canConfigure(row.original) || isRowBusy(row.original)"
               :aria-label="t('extensions.configure')"
               :title="t('extensions.configure')"
               @click="openConfiguration(row.original)" />
@@ -235,7 +237,7 @@ const saveConfiguration = async (item: ExtensionStreamTableRow, enabled = item.s
               v-if="selectedItem"
               :label="t('common.save')"
               :loading="isSavingConfiguration"
-              :disabled="isSavingConfiguration || !!fallbackConfigError"
+              :disabled="!canConfigure(selectedItem) || isSavingConfiguration || !!fallbackConfigError"
               @click="saveConfiguration(selectedItem)" />
           </div>
 

@@ -1009,6 +1009,10 @@
       "libreoffice_unavailable": "LibreOffice est requis pour convertir les modèles DOCX en PDF. Installez LibreOffice sur le serveur ou utilisez un modèle PDF HTML."
     },
     "agreement": {
+      "number_provider_conflict": "Plusieurs fournisseurs de numéros d’entente sont activés pour ce volet.",
+      "invalid_generated_number": "Le numéro d’entente généré doit contenir de 1 à 15 caractères sans espaces au début ou à la fin.",
+      "number_managed": "Le numéro d’entente est attribué automatiquement. Retirez le numéro fourni et réessayez.",
+      "number_exhausted": "Impossible de générer un numéro d’entente disponible. Demandez à un gestionnaire de vérifier la configuration.",
       "invalid_budget_calculation": "Configuration de calcul invalide ou frais sur tous les autres postes en double.",
       "budget_calculation_read_only": "Ce montant calculé ou ce pourcentage ne peut pas être modifié.",
       "program_funding_required": "Le financement du programme est requis pour un poste manuel.",
@@ -1858,6 +1862,8 @@
     "workflow_member_owner_duplicate": "Chaque membre de flux imbriqué ne peut avoir qu’une seule association de propriétaire"
   },
   "agreement": {
+    "number_generated": "Attribué à la création",
+    "number_mode_error": "Impossible de déterminer la numérotation. Réessayez.",
     "list_views": {
       "all": "Toutes les ententes",
       "mine": "Mes ententes",

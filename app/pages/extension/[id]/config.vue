@@ -58,6 +58,7 @@ const extensionDescription = computed(() => {
 })
 
 const configComponent = computed(() => {
+  if (item.value?.extension.configurationAccess === 'manager' && !item.value.canConfigure) return null
   const componentName = item.value?.extension.admin.streamConfigPage?.componentName
     || item.value?.extension.admin.streamConfig?.componentName
   return componentName ? getGcsExtensionComponent(componentName) : null

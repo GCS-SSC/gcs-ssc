@@ -2,7 +2,7 @@
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import type { Ref } from 'vue'
-import { ref } from 'vue'
+import { ref, watch, onBeforeUnmount } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
 import { useAgreementSimilarityConfirmation } from '~/composables/useAgreementSimilarityConfirmation'
 import type { FundingCaseAgreementProfileForm } from '~~/shared/types/funding-case-agreement-ui'
@@ -65,6 +65,34 @@ const createForm = (): FundingCaseAgreementProfileForm => ({
 
 const form: Ref<FundingCaseAgreementProfileForm | null> = ref(null)
 const isSaving: Ref<boolean> = ref(false)
+const numberMode: Ref<'manual' | 'generated' | null> = ref(null)
+const numberModeFailed: Ref<boolean> = ref(false)
+let numberModeGeneration = 0
+/** Refreshes presentation only; the create transaction resolves the authoritative mode again. */
+const loadNumberMode = async () => {
+  const generation = ++numberModeGeneration
+  numberMode.value = null
+  numberModeFailed.value = false
+  const streamId = form.value?.egcs_fc_transferpaymentstream
+  if (!streamId) return
+  try {
+    const url = getClientRequestUrl('/api/agreements/number-mode')
+    url.searchParams.set('streamId', streamId)
+    const response = await fetch(url)
+    if (!response.ok) await throwFetchResponseError(response)
+    const result = await response.json() as { mode: 'manual' | 'generated' }
+    if (generation !== numberModeGeneration) return
+    numberMode.value = result.mode
+    if (result.mode === 'generated' && form.value) delete form.value.egcs_fc_agreementnumber
+  } catch {
+    if (generation === numberModeGeneration) numberModeFailed.value = true
+  }
+}
+watch(() => form.value?.egcs_fc_transferpaymentstream, loadNumberMode)
+onBeforeUnmount(() => {
+  numberModeGeneration += 1
+})
+
 const isHeroCollapsed = getHeroCollapsed('agreement-create')
 
 const breadcrumbItems = computed(() => [
@@ -76,7 +104,7 @@ const breadcrumbItems = computed(() => [
  * Creates a new agreement profile and redirects to the detail page.
  */
 const submit = async () => {
-  if (!form.value || isSaving.value) {
+  if (!form.value || isSaving.value || !numberMode.value) {
     return
   }
 
@@ -84,9 +112,12 @@ const submit = async () => {
     isSaving.value = true
     const streamId = form.value.egcs_fc_transferpaymentstream
     const agreementNumber = form.value.egcs_fc_agreementnumber
-    if (streamId === undefined || typeof agreementNumber !== 'string') return
-    const canContinue = await requestSimilarityPreview({ streamId, agreementNumber })
-    if (!canContinue) return
+    if (streamId === undefined) return
+    if (numberMode.value === 'manual') {
+      if (typeof agreementNumber !== 'string') return
+      const canContinue = await requestSimilarityPreview({ streamId, agreementNumber })
+      if (!canContinue) return
+    }
 
     const response = await fetch(getClientRequestUrl('/api/agreements'), {
       method: 'POST',
@@ -109,6 +140,7 @@ const submit = async () => {
   } catch (error: unknown) {
     if (handleSimilarityMutationError(error)) return
     showError(error)
+    await loadNumberMode()
   } finally {
     isSaving.value = false
   }
@@ -175,6 +207,10 @@ onMounted(() => {
           :subtitle="t('agreement.description')" />
 
         <CommonEntityEditorWorkspace>
+          <p v-if="numberModeFailed" role="alert" class="text-error">
+            {{ t('agreement.number_mode_error') }}
+            <UButton :label="t('common.retry')" variant="link" @click="loadNumberMode" />
+          </p>
           <AgreementProfileFormPage
             v-model:model="form"
             compact
@@ -182,6 +218,7 @@ onMounted(() => {
             :cancel-label="t('common.cancel')"
             permission-action="create"
             :pending="isSaving"
+            :number-mode="numberMode"
             @submit="submit"
             @cancel="cancel" />
         </CommonEntityEditorWorkspace>

@@ -1009,6 +1009,10 @@
       "libreoffice_unavailable": "LibreOffice is required to convert DOCX templates to PDF. Install LibreOffice on the server or use an HTML PDF template."
     },
     "agreement": {
+      "number_provider_conflict": "More than one agreement number provider is enabled for this stream.",
+      "invalid_generated_number": "The generated agreement number must contain 1–15 characters without surrounding spaces.",
+      "number_managed": "The agreement number is assigned automatically. Remove the supplied number and try again.",
+      "number_exhausted": "An available agreement number could not be generated. Ask a manager to review the numbering configuration.",
       "invalid_budget_calculation": "Invalid calculation configuration or duplicate all-other-items charge.",
       "budget_calculation_read_only": "This calculated amount or percentage cannot be changed.",
       "program_funding_required": "Program funding is required for a manual line item.",
@@ -1858,6 +1862,8 @@
     "workflow_member_owner_duplicate": "Each nested workflow member can have only one owner mapping"
   },
   "agreement": {
+    "number_generated": "Assigned on creation",
+    "number_mode_error": "Unable to determine numbering. Retry.",
     "list_views": {
       "all": "All Agreements",
       "mine": "My Agreements",

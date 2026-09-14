@@ -2,6 +2,7 @@ import type { ExtensionStreamRegistryItem } from '~~/shared/types/schemas/extens
 import { authorizeWithFreshAuthContext, requireAuthContext, requireFreshAuthContext } from '~~/server/utils/authorize'
 import { getRegisteredExtensions, resolveExtensionStreamContext, toClientExtensionManifest } from '~~/server/utils/extensions'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+import { getExtensionConfigurationAction } from '~~/shared/utils/extensions'
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -55,6 +56,7 @@ export default defineEventHandler(async event => {
         const row = streamConfig.get(extension.key)
         return {
           extension: toClientExtensionManifest(extension),
+          canConfigure: auth.userAbilities.authorize('transfer_payment', getExtensionConfigurationAction(extension), streamContext.scope),
           agencyEnabled: true,
           streamEnabled: row?.enabled === true,
           config: (row?.config ?? {}) as Record<string, never>

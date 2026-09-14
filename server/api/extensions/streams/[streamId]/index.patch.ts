@@ -16,6 +16,7 @@ import {
 } from '~~/server/utils/extensions'
 import type { Database } from '~~/shared/types/database'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+import { getExtensionConfigurationAction } from '~~/shared/utils/extensions'
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -45,9 +46,12 @@ export default defineEventHandler(async event => {
 
   const body = await readValidatedBodyI18n(event, ExtensionStreamConfigurationSchema)
   const extensions = await getRegisteredExtensions()
-  if (!extensions.some(extension => extension.key === body.extensionKey)) {
+  const extension = extensions.find(item => item.key === body.extensionKey)
+  if (!extension) {
     return await notFound(event, 'EXTENSION_NOT_FOUND', 'apiErrors.extensions.not_found')
   }
+  const configurationAction = getExtensionConfigurationAction(extension)
+  await authorize(event, 'transfer_payment', configurationAction, streamContext.scope)
 
   const persistConfiguration = async (
     writeDb: Kysely<Database> | Transaction<Database>
@@ -97,10 +101,10 @@ export default defineEventHandler(async event => {
     if (!currentStreamContext) {
       return await notFound(event, 'TRANSFER_PAYMENT_STREAM_NOT_FOUND', 'apiErrors.transfer_payment.stream_not_found')
     }
-    await authorizeWithFreshAuthContext(event, authContext, 'transfer_payment', 'update', async ({ context }) => {
+    await authorizeWithFreshAuthContext(event, authContext, 'transfer_payment', configurationAction, async ({ context }) => {
       const canAccess = context.userAbilities.authorize(
         'transfer_payment',
-        'update',
+        configurationAction,
         currentStreamContext.scope
       )
       if (canAccess) return { bypass: true }

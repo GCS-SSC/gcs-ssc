@@ -17,6 +17,7 @@ import {
   runExtensionMigrations
 } from '~~/server/utils/extensions'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+import { getExtensionConfigurationAction } from '~~/shared/utils/extensions'
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -47,6 +48,8 @@ export default defineEventHandler(async event => {
   if (!extension) {
     return await notFound(event, 'EXTENSION_NOT_FOUND', 'apiErrors.extensions.not_found')
   }
+  const configurationAction = getExtensionConfigurationAction(extension)
+  await authorize(event, 'agency', configurationAction, scope)
   let normalizedConfig = body.config
   if (extension.fileStorageProvider && body.config !== undefined) {
     try {
@@ -127,7 +130,7 @@ export default defineEventHandler(async event => {
     if (!currentAgency) {
       return await notFound(event, 'AGENCY_NOT_FOUND', 'apiErrors.agency.not_found')
     }
-    await authorizeWithFreshAuthContext(event, authContext, 'agency', 'update', scope)
+    await authorizeWithFreshAuthContext(event, authContext, 'agency', configurationAction, scope)
 
     if (body.enabled) {
       try {

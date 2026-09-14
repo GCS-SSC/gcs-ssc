@@ -38,3 +38,7 @@
 	path = tooling/gcs-ssc
 	url = https://github.com/GCS-SSC/gcs-ssc-tooling.git
 	branch = main
+[submodule "extensions/gcs-agreement-number"]
+	path = extensions/gcs-agreement-number
+	url = https://github.com/GCS-SSC/gcs-agreement-number.git
+	branch = feature/feat/agreement-number

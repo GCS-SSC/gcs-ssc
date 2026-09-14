@@ -132,6 +132,16 @@ export const FundingCaseAgreementCreateSchema = FundingCaseAgreementProfileBaseS
   }
 )
 
+/** Structural create contract; the host enforces numbering mode under the scope locks. */
+export const FundingCaseAgreementGeneratedCreateSchema = FundingCaseAgreementProfileBaseSchema.extend({
+  egcs_fc_agreementnumber: AgreementProfileText(15).optional(),
+  applicant_recipient_ids: RequiredUniqueBigintSelectionIdsSchema(),
+  extensions: FundingCaseAgreementExtensionPayloadSchema.shape.extensions
+}).refine(
+  data => data.egcs_fc_authorizedassistancestartdate <= data.egcs_fc_authorizedassistanceenddate,
+  { message: 'validation.date_range', path: ['egcs_fc_authorizedassistanceenddate'] }
+)
+
 export const FundingCaseAgreementProfilePatchSchema = FundingCaseAgreementProfileBaseSchema
   .extend({
     extensions: FundingCaseAgreementExtensionPayloadSchema.shape.extensions,

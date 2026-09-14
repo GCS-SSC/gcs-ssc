@@ -53,6 +53,7 @@ export type ExtensionStreamConfigurationItem = WithId<{
 
 export interface ExtensionAgencyRegistryItem {
   extension: GcsClientExtensionManifest
+  canConfigure: boolean
   hasMigrations: boolean
   enabled: boolean
   config: GcsExtensionJsonConfig
@@ -63,6 +64,7 @@ export interface ExtensionAgencyRegistryItem {
 
 export interface ExtensionStreamRegistryItem {
   extension: GcsClientExtensionManifest
+  canConfigure: boolean
   agencyEnabled: boolean
   streamEnabled: boolean
   config: GcsExtensionJsonConfig

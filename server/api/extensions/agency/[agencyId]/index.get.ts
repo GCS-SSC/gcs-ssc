@@ -3,6 +3,7 @@ import type { ExtensionAgencyRegistryItem } from '~~/shared/types/schemas/extens
 import { authorizeWithFreshAuthContext, requireAuthContext, requireFreshAuthContext } from '~~/server/utils/authorize'
 import { getRegisteredExtensions, toClientExtensionManifest } from '~~/server/utils/extensions'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+import { getExtensionConfigurationAction } from '~~/shared/utils/extensions'
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -51,6 +52,7 @@ export default defineEventHandler(async event => {
       .select('provider_key').where('agency_id', '=', agencyId).where('_deleted', '=', false).executeTakeFirst()
     const items: ExtensionAgencyRegistryItem[] = extensions.map(extension => ({
       extension: toClientExtensionManifest(extension),
+      canConfigure: auth.userAbilities.authorize('agency', getExtensionConfigurationAction(extension), scope),
       hasMigrations: extension.migrations.length > 0,
       enabled: enabledByKey.get(extension.key) === true,
       config: (configByKey.get(extension.key) ?? {}) as ExtensionAgencyRegistryItem['config'],

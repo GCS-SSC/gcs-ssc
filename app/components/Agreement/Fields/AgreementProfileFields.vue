@@ -11,11 +11,13 @@ import type {
 const {
   permissionAction,
   agreementId,
-  namePrefix = ''
+  namePrefix = '',
+  numberGenerated = false
 } = defineProps<{
   permissionAction: 'create' | 'update'
   agreementId?: string
   namePrefix?: string
+  numberGenerated?: boolean
 }>()
 
 const model = defineModel<FundingCaseAgreementProfileForm>('model', {
@@ -411,7 +413,15 @@ watch(selectedSubtype, value => {
         <USelectMenu v-else :items="[]" disabled :placeholder="t('agreement.agreement_subtype_placeholder')" />
       </UFormField>
 
-      <UFormField :label="t('agreement.agreement_number')" :name="field('egcs_fc_agreementnumber')">
+      <div v-if="numberGenerated" class="space-y-1">
+        <p class="text-sm font-medium">
+          {{ t('agreement.agreement_number') }}
+        </p>
+        <p class="text-sm text-muted" role="status">
+          {{ t('agreement.number_generated') }}
+        </p>
+      </div>
+      <UFormField v-else :label="t('agreement.agreement_number')" :name="field('egcs_fc_agreementnumber')">
         <UInput
           v-model="model.egcs_fc_agreementnumber"
           :placeholder="t('agreement.agreement_number_placeholder')" />

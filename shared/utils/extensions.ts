@@ -24,6 +24,17 @@ export const getExtensionEntityAuthorizationSubject = (
   target: GcsExtensionEntityTabTarget
 ): 'agreement' | 'applicant_recipient' => EXTENSION_ENTITY_AUTHORIZATION_SUBJECTS[target]
 
+/**
+ * Resolves declarative configuration access to the host's cumulative role action.
+ * Only Manager includes delete; this check grants no deletion operation itself.
+ *
+ * @param extension - Validated extension metadata.
+ * @returns The action required for enablement and configuration writes.
+ */
+export const getExtensionConfigurationAction = (
+  extension: Pick<GcsClientExtensionManifest, 'configurationAccess'>
+): 'update' | 'delete' => extension.configurationAccess === 'manager' ? 'delete' : 'update'
+
 export type GcsRegisteredExtensionServerHandler = Omit<GcsExtensionServerHandlerDefinition, 'path'> & {
   id: string
 }
@@ -42,6 +53,7 @@ export interface GcsRegisteredExtensionRuntime {
  * contributions deliberately never cross this runtime boundary.
  */
 export interface GcsRegisteredExtension extends GcsClientExtensionManifest {
+  agreementNumberProvider?: { id: string }
   packageName: string
   requiredHostCapabilities: GcsExtensionHostCapability[]
   serverHandlers: GcsRegisteredExtensionServerHandler[]
@@ -55,6 +67,7 @@ export type {
   GcsExtensionAssetDefinition,
   GcsClientExtensionManifest,
   GcsExtensionComponentDefinition,
+  GcsExtensionConfigurationAccess,
   GcsExtensionCreateActionDefinition,
   GcsExtensionCreateActionMode,
   GcsExtensionCreateOperation,

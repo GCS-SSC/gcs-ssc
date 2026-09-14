@@ -64,6 +64,8 @@ const EXTENSION_HOST_CAPABILITIES = new Set([
   'extension-create-operation-hooks',
   'extension-lifecycle-hooks',
   'lifecycle-entities',
+  'agreement-number-provider',
+  'configuration-access',
   'file-storage-provider'
 ])
 const EXTENSION_LIFECYCLE_COMPLETION_CAPABILITIES = new Set(['supported', 'none'])
@@ -325,6 +327,8 @@ const inferRequiredHostCapabilities = (definition: GcsExtensionDefinition): Set<
   addImpliedCapability(capabilities, Boolean(definition.admin || definition.client), 'extension-ui')
   addImpliedCapability(capabilities, Boolean(definition.nitroPlugin), 'extension-lifecycle-hooks')
   addImpliedCapability(capabilities, (definition.entities ?? []).length > 0, 'lifecycle-entities')
+  addImpliedCapability(capabilities, Boolean(definition.agreementNumberProvider), 'agreement-number-provider')
+  addImpliedCapability(capabilities, definition.configurationAccess !== undefined, 'configuration-access')
   addImpliedCapability(capabilities, Boolean(definition.fileStorageProvider), 'file-storage-provider')
 
   return capabilities
@@ -458,6 +462,11 @@ const validateFileStorageProviderDefinition = (definition: GcsExtensionDefinitio
 
 /** Validates extension identity, bilingual naming, SDK compatibility, and host capabilities. */
 export const validateExtensionDefinition = (definition: GcsExtensionDefinition, extensionDir: string): void => {
+  if (definition.configurationAccess !== undefined
+    && definition.configurationAccess !== 'contributor'
+    && definition.configurationAccess !== 'manager') {
+    throw new Error(`Extension ${definition.key} configurationAccess must be contributor or manager`)
+  }
   if (!EXTENSION_KEY_PATTERN.test(definition.key)) {
     throw new Error(`Extension at ${extensionDir} has invalid key "${definition.key}". Use lowercase kebab-case.`)
   }
@@ -1035,10 +1044,14 @@ const resolveExtensionDirectory = async (
   const entities = await resolveExtensionEntities(canonicalExtensionDir, definition, state)
   const runtime = await resolveExtensionRuntime(canonicalExtensionDir, definition)
   const nitroPlugin = await resolveExtensionNitroPlugin(canonicalExtensionDir, definition)
+  const agreementNumberProvider = definition.agreementNumberProvider
+    ? { path: await assertContainedPath(canonicalExtensionDir, definition.agreementNumberProvider.path, 'agreementNumberProvider.path') }
+    : undefined
   const fileStorageProvider = await resolveFileStorageProvider(canonicalExtensionDir, definition)
 
   return {
     key: definition.key,
+    configurationAccess: definition.configurationAccess,
     name: definition.name,
     description: definition.description,
     sdkVersion: definition.sdkVersion,
@@ -1054,6 +1067,7 @@ const resolveExtensionDirectory = async (
     ...(entities.length > 0 ? { entities } : {}),
     runtime,
     nitroPlugin,
+    agreementNumberProvider,
     fileStorageProvider
   }
 }
@@ -1124,6 +1138,7 @@ const withoutComponentPath = <T extends { path: string }>(
 /** Builds browser-safe extension metadata with stable generated component names. */
 const buildClientExtensionMetadata = (extension: GcsResolvedExtension): GcsClientExtensionManifest => ({
   key: extension.key,
+  configurationAccess: extension.configurationAccess,
   name: extension.name,
   description: extension.description,
   sdkVersion: extension.sdkVersion,
@@ -1178,7 +1193,7 @@ const serializeClientExtension = (extension: GcsResolvedExtension): string =>
   JSON.stringify(buildClientExtensionMetadata(extension))
 
 const registryContributionId = (
-  contributionType: 'handler' | 'migration' | 'runtime' | 'entity_adapter' | 'storage_adapter' | 'storage_metadata_validator',
+  contributionType: 'handler' | 'migration' | 'runtime' | 'entity_adapter' | 'storage_adapter' | 'storage_metadata_validator' | 'agreement_number',
   extension: GcsResolvedExtension,
   identityParts: string[]
 ): string => {
@@ -1281,6 +1296,12 @@ export const buildExtensionServerRegistry = (
       }
     })
 
+    const agreementNumberProvider = extension.agreementNumberProvider
+      ? { id: registryContributionId('agreement_number', extension, [extensionRelativePath(extension, extension.agreementNumberProvider.path)]) }
+      : undefined
+    if (agreementNumberProvider && extension.agreementNumberProvider) {
+      registerContributionLoader(agreementNumberProvider.id, extension.agreementNumberProvider.path)
+    }
     const fileStorageProvider = extension.fileStorageProvider
       ? (() => {
           const adapterId = registryContributionId('storage_adapter', extension, [
@@ -1317,6 +1338,7 @@ export const buildExtensionServerRegistry = (
       migrations,
       ...(entities.length > 0 ? { entities } : {}),
       fileStorageProvider,
+      agreementNumberProvider,
       runtime
     }
   })

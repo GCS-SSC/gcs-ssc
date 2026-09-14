@@ -12,6 +12,7 @@ const { agencyId, canUpdate } = defineProps<{ agencyId: string, canCreate: boole
 const { t, locale } = useI18n()
 const toast = useToast()
 const canEdit = computed(() => canUpdate)
+const canConfigure = (item: ExtensionAgencyRegistryItem) => canEdit.value && item.canConfigure
 const { showError } = useApiErrorToast()
 const {
   isModalOpen,
@@ -61,7 +62,7 @@ const selectedConfigComponent = computed(() => {
 })
 
 const updateEnablement = async (item: ExtensionAgencyRegistryItem, enabled: boolean) => {
-  if (!canEdit.value || isRowBusy(item) || (item.storageProvider?.selected && !enabled)) {
+  if (!canConfigure(item) || isRowBusy(item) || (item.storageProvider?.selected && !enabled)) {
     return
   }
 
@@ -81,7 +82,7 @@ const updateEnablement = async (item: ExtensionAgencyRegistryItem, enabled: bool
 }
 
 const saveConfiguration = async (item: ExtensionAgencyTableRow) => {
-  if (!canEdit.value || isRowBusy(item) || isSavingConfiguration.value) {
+  if (!canConfigure(item) || isRowBusy(item) || isSavingConfiguration.value) {
     return
   }
 
@@ -232,7 +233,7 @@ const selectStorageProvider = async (item: ExtensionAgencyRegistryItem) => {
           </UTooltip>
           <USwitch
             :model-value="row.original.enabled"
-            :disabled="!canEdit || isRowBusy(row.original) || row.original.storageProvider?.selected"
+            :disabled="!canConfigure(row.original) || isRowBusy(row.original) || row.original.storageProvider?.selected"
             :aria-label="`${t('extensions.enable_extension')}: ${extensionName(row.original)}`"
             @update:model-value="value => updateEnablement(row.original, value)" />
           <UTooltip
@@ -290,8 +291,8 @@ const selectStorageProvider = async (item: ExtensionAgencyRegistryItem) => {
                 :agency-id="agencyId"
                 :enabled="selectedItem.enabled"
                 :persisted-config="selectedItem.config"
-                :disabled="!canEdit"
-                :read-only="!canEdit" />
+                :disabled="!canConfigure(selectedItem)"
+                :read-only="!canConfigure(selectedItem)" />
               <CommonTextarea
                 v-else
                 :model-value="fallbackConfigText"
@@ -300,7 +301,7 @@ const selectStorageProvider = async (item: ExtensionAgencyRegistryItem) => {
                 :aria-describedby="fallbackConfigError ? 'extension-config-error' : undefined"
                 :rows="18"
                 class="w-full"
-                :disabled="!canEdit"
+                :disabled="!canConfigure(selectedItem)"
                 @update:model-value="updateFallbackConfig" />
               <p v-if="fallbackConfigError" id="extension-config-error" class="text-sm text-error">
                 {{ fallbackConfigError }}
@@ -317,7 +318,7 @@ const selectStorageProvider = async (item: ExtensionAgencyRegistryItem) => {
               :disabled="isSavingConfiguration"
               @click="closeConfigure" />
             <CommonSaveButton
-              v-if="canEdit"
+              v-if="canConfigure(selectedItem)"
               :label="t('common.save')"
               :loading="isSavingConfiguration"
               :disabled="isSavingConfiguration || !!fallbackConfigError"
