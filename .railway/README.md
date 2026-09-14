@@ -39,51 +39,98 @@ changes are deployed from GitHub `main`; `railway redeploy --service gcs-ssc`
 redeploys the most recent deployment. Committing an IaC file alone does not run
 `config apply`; use the CLI after infrastructure changes.
 
-## Wipe the disposable database
+## Reset the disposable demo, including attachments
 
-This deletes the application database and its migration history, while retaining
-the Railway database service, credentials, domains, and volumes. Stop the app
-and wait until its deployment is down before running SQL. Avoid overlapping
-GitHub deployments while resetting.
+From the host repository, preview or execute the complete reset:
 
 ```sh
-railway status
-railway down --service gcs-ssc
-railway connect Postgres
+bun run railway:demo:reset
+bun run railway:demo:reset --execute
 ```
 
-`connect` requires a local `psql` client. With no public database endpoint, it
-uses an SSH tunnel; register a local SSH key with `railway ssh keys add` if
-prompted.
+The default is a local preview with no Railway calls or deployment changes.
+`--execute` permanently deletes the `railway` database, its migration history,
+and `/files` inside `gcs-ssc-volume` (the application's `/app/.data/files`).
+It retains the services, credentials, domain, and both volumes. External object
+storage and the unused `/app/.data/pglite` directory are outside this reset.
 
-In `psql`, inspect `\conninfo`. If the application database is `railway`, run:
+Run execution yourself in a terminal. Railway CLI refuses volume file deletion
+by AI agents; the script also rejects common agent sessions before making changes.
+Do not unset agent markers to bypass that restriction.
 
-```sql
-\connect postgres
-DROP DATABASE railway WITH (FORCE);
-CREATE DATABASE railway;
-\quit
-```
+Prerequisites:
 
-Use the actual application database name if different. Do not drop the database
-while connected to it. After successful recreation:
+- Bun and Git, with access to `GCS-SSC/gcs-ssc`.
+- Railway CLI **5.54.1 or newer within major 5**, installed separately from the IaC SDK:
+  `npm install -g @railway/cli@5.54.1`.
+- `railway login` and an SSH key registered with Railway. Establish SSH access
+  interactively before the reset, for example:
+  `railway ssh --project 8705eadd-788e-4efb-b070-f03b6a1cdc3d --environment demo --service Postgres -- true`.
+  This uses the database container's `psql`; no local PostgreSQL client or public database endpoint is needed.
+- Keep GitHub pushes and other deployments paused throughout the operation.
+  The script rejects competing deployments when observed; it does not disable GitHub autodeploys.
+
+Execution takes a fresh shallow checkout of GitHub `main`, prints its commit,
+and links that temporary directory to the fixed demo project. Local source edits
+and the current checkout's Railway link are not uploaded or modified.
+
+The script first verifies the app/database configuration and PostgreSQL access.
+It then deploys a temporary maintenance container on the existing app service.
+Only `/api/health` returns success; other requests receive HTTP 503. After this
+deployment is healthy and every previous app deployment is down, the script:
+
+1. Checks the exact volume name and mount path, then recursively deletes `/files`.
+2. Drops and recreates the dedicated `railway` database as `postgres`, using separate SQL commands.
+3. Restores the canonical Dockerfile in the temporary checkout and deploys the captured `main` commit.
+4. Waits for application readiness and verifies all twelve seeded English/French
+   template attachments have corresponding files of the recorded sizes on the volume.
+
+The demo seed regenerates Contribution Agreement, Schedules 1–4, and Agreement
+Closeout Report templates in both languages. The English source DOCX is packaged
+from `demo-assets/Contribution Agreement.docx`; the seed writes fresh template
+files and database references. The seed, rather than a file backup, restores these.
+
+The temporary maintenance image contains no database-reset code or startup reset
+flag. Restarting or redeploying that image cannot repeat deletion. The final app
+uses the original `main` Dockerfile. Railway pre-deploy commands cannot perform
+this task because the attachment volume is mounted only at runtime.
+
+### Failure and recovery
+
+Failures stop the sequence immediately. During file or database reset failures,
+the service remains in maintenance mode; the script does not automatically start
+the app against partially reset storage. A failed final app deployment or template
+verification requires inspecting that deployment's logs and state.
+
+The script always restores the original Dockerfile and retains the temporary
+checkout at the path printed at startup. After resolving the failure, either run
+`--execute` again for a fresh complete reset, or, if both deletion steps succeeded,
+deploy the retained clean checkout without another wipe:
 
 ```sh
-railway redeploy --service gcs-ssc
+railway up /tmp/gcs-demo-reset-REPLACE_WITH_PRINTED_PATH --path-as-root --project 8705eadd-788e-4efb-b070-f03b6a1cdc3d --environment demo --service gcs-ssc
 ```
 
-The demo image recreates the schema and seed. Check `/api/health` and login after
-startup. Uploaded files remain on `/app/.data/files` (and any configured external
-object storage); a database reset does not erase them. PGlite data on the old
-app volume is no longer used while `DATABASE_URL` is set.
+Check `/api/health` and the demo templates after manual recovery. Do not use
+`railway redeploy` to fetch a newer `main`: it reuses the most recent deployment's
+code, which could still be the maintenance image. Remove the temporary checkout
+when recovery is no longer needed.
 
 ## Local validation
 
 ```sh
 bun x tsc --noEmit --strict --skipLibCheck --target ES2022 --module NodeNext --moduleResolution NodeNext .railway/railway.ts
 bun x eslint .railway/railway.ts
+bun x vitest run tooling/gcs-ssc/tests/unit/railway-demo-reset.test.ts
+GCS_RAILWAY_RESET_DOCKER_TEST=1 bun x vitest run --config vitest.postgres.config.ts tooling/gcs-ssc/tests/integration/railway-demo-reset-postgres.test.ts
 ```
+
+The focused PostgreSQL test requires Docker and creates/removes its own PostgreSQL
+18 container. It never reads `DATABASE_URL` or touches the shared integration database.
 
 References: [Railway IaC](https://docs.railway.com/infrastructure-as-code),
 [database shell](https://docs.railway.com/cli/connect),
+[volume file commands](https://docs.railway.com/cli/volume),
+[volume runtime availability](https://docs.railway.com/volumes),
+[CLI deployments](https://docs.railway.com/cli/up),
 [app deployment notes](../docs/deployment-railway.md).
