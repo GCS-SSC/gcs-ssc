@@ -348,7 +348,7 @@ watch(selectedSubtype, value => {
 <template>
   <CommonSection :title="t('agreement.sections.classification')" badge="01" :grid-cols="1">
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <UFormField :label="t('agreement.program')">
+      <UFormField :label="t('agreement.program')" :required="permissionAction === 'create'">
         <CommonServerLookupSelect
           :model-value="selectedProgramId"
           :disabled="permissionAction === 'update'"

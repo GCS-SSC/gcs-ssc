@@ -35,12 +35,12 @@ RUN set -eux; \
   }; \
   fetch_workspace https://github.com/GCS-SSC/gcs-ssc-extensions.git packages/gcs-ssc-extensions 09309322185649535621bd8b086937b82f65059d; \
   fetch_workspace https://github.com/GCS-SSC/gcs-automated-payments.git extensions/gcs-automated-payments bf78be2b484c6c0ea6692aa255f96824f4f9ad13; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-gcforms-integration.git extensions/gcs-gcforms-integration 69279d37e4c0a8051e007be685cea677a1265416; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-gcforms-integration.git extensions/gcs-gcforms-integration 9449c36fc7ae35262bcf6449afa75cbf84097e7c; \
   fetch_workspace https://github.com/GCS-SSC/gcs-narrative-quality.git extensions/gcs-narrative-quality 83df2ce0869bb91b9cdaeb7deecb2097c2620711; \
   fetch_workspace https://github.com/GCS-SSC/gcs-narrative-tags.git extensions/gcs-narrative-tags aaaad20d0ae65a097b6cba4a5bb7f25b0c9e5656; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-outcome-cost-allocation.git extensions/gcs-outcome-cost-allocation 265d1ce9aab9b8ddcf22a456cc220e04f1a20c9b; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-outcome-cost-allocation.git extensions/gcs-outcome-cost-allocation 2aa69f592bcbcf395fa15d9f203bba179d8a5211; \
   fetch_workspace https://github.com/GCS-SSC/gcs-storage-local.git extensions/gcs-storage-local 6add3d9f5517481cb47c3be12b6592b4e98f0fb3; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-storage-s3.git extensions/gcs-storage-s3 0f523cd54f43a628e47662ec315f238d6905b441
+  fetch_workspace https://github.com/GCS-SSC/gcs-storage-s3.git extensions/gcs-storage-s3 c9e202f0129fb56500f13170cd0bc4d878eecc05
 
 RUN bun install --frozen-lockfile
 

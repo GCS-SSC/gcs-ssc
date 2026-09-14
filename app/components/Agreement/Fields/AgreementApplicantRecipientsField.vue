@@ -627,7 +627,6 @@ const removeSelectedId = (id: string) => {
           :label="selectedIds.length > 0 ? t('agreement.applicant_recipients.edit_selection') : t('agreement.applicant_recipients.select')"
           @click="isOpen = true" />
         <span v-if="fieldState?.error" :id="`${pickerId}-error`" class="sr-only">{{ fieldState?.error }}</span>
-
       </div>
     </div>
   </UFormField>
