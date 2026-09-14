@@ -824,6 +824,8 @@
   "apiErrors": {
     "custom_fields": {"multiple_to_single": "Un champ à sélections multiples ne peut pas être converti en champ à sélection unique.", "section_in_use": "Déplacez ou supprimez les champs de cette section avant de la supprimer.", "in_use": "Ce champ ou cette option contient des valeurs d’entente enregistrées ou des références de flux de travail."},
     "health": {
+      "starting": "Le service démarre et ne peut pas encore traiter les demandes. Il est peut-être en train de sortir de veille. Veuillez patienter quelques secondes et réessayer.",
+      "startup_failed": "Le service n’a pas pu terminer son démarrage et est temporairement indisponible. Veuillez réessayer sous peu. Si le problème persiste, contactez le soutien technique.",
       "unavailable": "Le service est temporairement indisponible."
     },
     "auth": {

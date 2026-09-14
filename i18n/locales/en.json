@@ -824,6 +824,8 @@
   "apiErrors": {
     "custom_fields": {"multiple_to_single": "A multiple-selection field cannot be changed to single selection.", "section_in_use": "Move or delete the fields in this section before deleting it.", "in_use": "This field or option has saved Agreement values or workflow references."},
     "health": {
+      "starting": "The service is starting and cannot accept requests yet. It may be waking from sleep. Please wait a few seconds and try again.",
+      "startup_failed": "The service could not finish starting and is temporarily unavailable. Please try again shortly. If this continues, contact support.",
       "unavailable": "The service is temporarily unavailable."
     },
     "auth": {

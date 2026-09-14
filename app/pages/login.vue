@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { appRouteLocations } from '~/utils/route-locations'
 import { resolveAuthReturnTarget } from '~/utils/auth-return-target'
+import { resolveLoginError } from '~/utils/login-error'
 
 definePageMeta({
   layout: false,
@@ -23,12 +24,15 @@ const loading = ref(false)
 const loginError = ref('')
 const isDemoBuild = import.meta.env.VITE_GCS_DEMO === 'true'
 
-/** Shows the same safe localized feedback for provider and transport failures. */
-const showLoginError = () => {
-  loginError.value = t('login.error_description')
+/**
+ * Preserves startup guidance while redacting authentication and transport details.
+ * @param error - Authentication response or transport failure.
+ */
+const showLoginError = (error: unknown) => {
+  loginError.value = resolveLoginError(error, t('login.error_description'))
   toast.add({
     title: t('login.error_title'),
-    description: t('login.error_description'),
+    description: loginError.value,
     color: 'error'
   })
 }
@@ -53,7 +57,7 @@ const onLogin = async () => {
     })
 
     if (error) {
-      showLoginError()
+      showLoginError(error)
     } else {
       const homePath = localePath(appRouteLocations.home())
       const target = resolveAuthReturnTarget(
@@ -63,8 +67,8 @@ const onLogin = async () => {
       )
       await navigateTo(target)
     }
-  } catch {
-    showLoginError()
+  } catch (error) {
+    showLoginError(error)
   } finally {
     loading.value = false
   }

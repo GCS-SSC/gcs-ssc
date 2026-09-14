@@ -1,6 +1,7 @@
 import { defineEventHandler, type H3Event } from 'h3'
 import { throwApiError } from '../utils/api-errors'
 import { getMigrationReadiness } from '../utils/migration-readiness'
+import { startupUnavailable } from '../utils/startup-unavailable'
 
 /**
  * Throws the stable localized readiness failure without exposing its cause.
@@ -18,7 +19,7 @@ const healthUnavailable = async (event: H3Event): Promise<never> => await throwA
 export default defineEventHandler(async (event) => {
   const readiness = getMigrationReadiness()
   if (readiness !== 'ready') {
-    return await healthUnavailable(event)
+    return await startupUnavailable(event)
   }
   try {
     await event.context.$dbHealthCheck()

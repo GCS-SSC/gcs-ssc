@@ -6,6 +6,7 @@ import {
   setMigrationReadiness
 } from '../utils/migration-readiness'
 import type { DatabaseLease } from '../utils/db'
+import { recoverStartup } from '../utils/startup-recovery'
 
 /**
  * Runs core and enabled-extension migrations in canonical startup order.
@@ -66,18 +67,19 @@ export default defineNitroPlugin(async () => {
       return
     }
 
-    const migrationPromise = runMigrations(dbLease.database)
-    registerMigrationPromise(dbLease.generationId, migrationPromise)
-    try {
-      await migrationPromise
-      const stopAudit = await startAuditRuntime(dbLease.database)
-      const auditControl = auditControls.get(dbLease.database)
-      if (auditControl) auditControl.stop = stopAudit
+    // Defer execution until the complete startup promise has been registered.
+    // Reloaded/concurrent hooks must also wait for audit initialization.
+    const migrationPromise = Promise.resolve().then(async () => {
+      await recoverStartup(async () => {
+        await runMigrations(dbLease.database)
+        const stopAudit = await startAuditRuntime(dbLease.database)
+        const auditControl = auditControls.get(dbLease.database)
+        if (auditControl) auditControl.stop = stopAudit
+      }, () => setMigrationReadiness(dbLease.generationId, migrationPromise, 'failed'))
       setMigrationReadiness(dbLease.generationId, migrationPromise, 'ready')
-    } catch (error) {
-      setMigrationReadiness(dbLease.generationId, migrationPromise, 'failed')
-      throw error
-    }
+    })
+    registerMigrationPromise(dbLease.generationId, migrationPromise)
+    await migrationPromise
   } finally {
     await dbLease.release()
   }

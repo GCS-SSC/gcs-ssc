@@ -1,6 +1,6 @@
 import { requireAuthContext } from '~~/server/utils/authorize'
 import { getMigrationReadiness } from '~~/server/utils/migration-readiness'
-import { throwApiError } from '~~/server/utils/api-errors'
+import { startupUnavailable } from '~~/server/utils/startup-unavailable'
 
 /**
  * Establishes an active authenticated user before any protected API handler runs.
@@ -17,11 +17,7 @@ export default defineEventHandler(async event => {
   // Failed startup leaves the driver in bootstrap mode, with audit capture disabled.
   // Block even authentication and public metadata before they can use that driver.
   if (path !== '/api/health' && getMigrationReadiness() !== 'ready') {
-    return await throwApiError(event, {
-      statusCode: 503,
-      code: 'HEALTH_UNAVAILABLE',
-      key: 'apiErrors.health.unavailable'
-    })
+    return await startupUnavailable(event)
   }
 
   const isBetterAuthProtocol = path === '/api/auth' || path.startsWith('/api/auth/')
