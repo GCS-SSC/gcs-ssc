@@ -57,6 +57,10 @@ storage and the unused `/app/.data/pglite` directory are outside this reset.
 Run execution yourself in a terminal. Railway CLI refuses volume file deletion
 by AI agents; the script also rejects common agent sessions before making changes.
 Do not unset agent markers to bypass that restriction.
+The file-delete subprocess inherits your real terminal; JSON reads remain captured.
+Do not pipe the reset command through `tee` or redirect its input/output: execution
+requires terminal input and output and rejects redirected runs before maintenance.
+Railway's own environment and process-tree checks still apply.
 
 Prerequisites:
 
@@ -127,6 +131,7 @@ when recovery is no longer needed.
 bun x tsc --noEmit --strict --skipLibCheck --target ES2022 --module NodeNext --moduleResolution NodeNext .railway/railway.ts
 bun x eslint .railway/railway.ts
 bun x vitest run tooling/gcs-ssc/tests/unit/railway-demo-reset.test.ts
+bun x vitest run tooling/gcs-ssc/tests/unit/railway-reset-terminal.test.ts
 GCS_RAILWAY_RESET_DOCKER_TEST=1 bun x vitest run --config vitest.postgres.config.ts tooling/gcs-ssc/tests/integration/railway-demo-reset-postgres.test.ts
 ```
 

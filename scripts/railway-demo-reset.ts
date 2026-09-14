@@ -1,5 +1,5 @@
 /* eslint-disable jsdoc/require-jsdoc -- Standalone operational script; typed helpers and runbook describe its contract. */
-import { execFile } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -26,6 +26,26 @@ type Deployment = z.infer<typeof deploymentsSchema>[number]
 export type RunCommand = (command: string, args: string[], cwd: string) => Promise<string>
 
 const execFileAsync = promisify(execFile)
+export const assertTerminal = (stdinIsTTY: boolean | undefined, stdoutIsTTY: boolean | undefined) => {
+  if (!stdinIsTTY || !stdoutIsTTY) {
+    throw new Error('Run --execute directly in your terminal without piping or redirecting its input/output. Railway file deletion requires the real terminal.')
+  }
+}
+
+export const runTerminalCommand: RunCommand = async (command, args, cwd) => {
+  assertTerminal(process.stdin.isTTY, process.stdout.isTTY)
+  return new Promise((resolve, reject) => {
+    // Inherit the human caller's actual terminal. Do not create a pseudo-terminal,
+    // override Railway caller detection, or remove agent environment markers.
+    const child = spawn(command, args, { cwd, stdio: 'inherit', timeout: 1_800_000 })
+    child.once('error', () => reject(new Error(`Could not start ${command}; check that it is installed.`)))
+    child.once('close', (code, signal) => {
+      if (code === 0) resolve('')
+      else reject(new Error(`${command} failed (${signal ?? `exit ${code}`}). See its terminal output above. Reset stopped; inspect Railway before continuing.`))
+    })
+  })
+}
+
 export const sshFailureHint = (stderr: string): string => {
   if (stderr.includes('No SSH keys found')) return 'No local SSH key was found. Generate one with ssh-keygen -t ed25519, then register it with railway ssh keys add.'
   if (stderr.includes('Host key verification failed')) return 'SSH host verification failed. Connect interactively to inspect and verify the Railway host key before retrying.'
@@ -34,7 +54,10 @@ export const sshFailureHint = (stderr: string): string => {
   return 'The Railway SSH/database check failed. Run the read-only SSH diagnostic below to see the underlying error.'
 }
 
-const runCommand: RunCommand = async (command, args, cwd) => {
+export const runCommand: RunCommand = async (command, args, cwd) => {
+  if (command === 'railway' && args[0] === 'volume' && args.includes('files') && args.includes('delete')) {
+    return runTerminalCommand(command, args, cwd)
+  }
   try {
     const result = await execFileAsync(command, args, { cwd, timeout: 1_800_000, maxBuffer: 16 * 1024 * 1024 })
     return result.stdout.trim()
@@ -275,6 +298,7 @@ const main = async () => {
     return
   }
   assertHumanExecution(process.env)
+  assertTerminal(process.stdin.isTTY, process.stdout.isTTY)
   const directory = await mkdtemp(join(tmpdir(), 'gcs-demo-reset-'))
   console.info(`Deployment checkout: ${directory} (retained for recovery).`)
   await runCommand('git', ['clone', '--depth', '1', '--branch', 'main', '--single-branch', TARGET.repository, directory], process.cwd())
