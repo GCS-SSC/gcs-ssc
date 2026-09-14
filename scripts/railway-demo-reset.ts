@@ -143,6 +143,33 @@ export const postgresCommand = (sql: string, database: 'postgres' | 'railway' = 
   `test "$RAILWAY_PROJECT_ID" = ${shellQuote(TARGET.project)}; test "$RAILWAY_ENVIRONMENT_NAME" = demo; test "$RAILWAY_SERVICE_NAME" = Postgres; test "$PGDATABASE" = railway; test "$PGUSER" = postgres; export PGPASSWORD; psql -X -h 127.0.0.1 -U postgres -d ${database} -v ON_ERROR_STOP=1 -At -c ${shellQuote(sql)}`
 ]
 
+export const postgresWakeCommand = (): string[] => [
+  'ssh', '--project', TARGET.project, '--environment', 'demo', '--service', TARGET.service, '--', 'node', '-e',
+  `const net=require('node:net');
+const url=new URL(process.env.DATABASE_URL);
+if(process.env.RAILWAY_PROJECT_ID!==${JSON.stringify(TARGET.project)}||process.env.RAILWAY_ENVIRONMENT_NAME!=='demo'||url.hostname!=='postgres.railway.internal'||url.pathname!=='/railway')throw Error('Unexpected database wake target');
+(async()=>{
+  for(let attempt=0;attempt<12;attempt++){
+    const connected=await new Promise(resolve=>{
+      const socket=net.connect({host:url.hostname,port:Number(url.port||5432)});
+      const finish=ok=>{socket.destroy();resolve(ok)};
+      socket.setTimeout(5000,()=>finish(false));
+      socket.once('connect',()=>finish(true));
+      socket.once('error',()=>finish(false));
+    });
+    if(connected){console.log('GCS_POSTGRES_TCP_READY');return}
+    await new Promise(resolve=>setTimeout(resolve,1000));
+  }
+  console.error('Postgres did not accept a private-network connection');process.exitCode=1;
+})().catch(()=>{console.error('Database wake failed');process.exitCode=1});`
+]
+
+export const requirePostgresOutput = (output: string, expected: string) => {
+  if (output !== expected) {
+    throw new Error('Railway SSH did not return the expected PostgreSQL result. The command may have reached the SSH gateway instead of the database; reset stopped.')
+  }
+}
+
 export const TEMPLATE_SQL = `SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (
   SELECT a.egcs_cn_filename AS filename, a.egcs_cn_providerobjectid AS object, a.egcs_cn_filesize AS size
   FROM "Common_Attachment" a
@@ -206,7 +233,12 @@ export const resetDemo = async (options: {
   validateVariables(app, database)
   const initialDeployments = await deployments()
   assertQuiescent(initialDeployments)
-  if (initialDeployments.some(deployment => deployment.status === 'SLEEPING')) {
+  const databaseDeployments = deploymentsSchema.parse(JSON.parse(await cli([
+    'deployment', 'list', '--project', TARGET.project, '--environment', 'demo', '--service', 'Postgres', '--limit', '100', '--json'
+  ])))
+  assertQuiescent(databaseDeployments)
+  const databaseSleeping = databaseDeployments.some(deployment => deployment.status === 'SLEEPING')
+  if (databaseSleeping || initialDeployments.some(deployment => deployment.status === 'SLEEPING')) {
     console.info('Sending a health request to wake the sleeping demo before checking database SSH access.')
     try {
       await health()
@@ -215,9 +247,21 @@ export const resetDemo = async (options: {
       // require application readiness; the request only wakes the existing service.
     }
   }
-  if (await cli(postgresCommand('SELECT rolsuper FROM pg_roles WHERE rolname = current_user')) !== 't') {
+  if (databaseSleeping) {
+    console.info('Waking Postgres through the app private network before checking SSH access.')
+    requirePostgresOutput(await cli(postgresWakeCommand()), 'GCS_POSTGRES_TCP_READY')
+  }
+  let roleOutput = ''
+  // SSH routing may lag the private TCP wake. Retry only this read, never DDL.
+  for (let attempt = 0; attempt < (databaseSleeping ? 12 : 1); attempt++) {
+    roleOutput = await cli(postgresCommand('SELECT rolsuper FROM pg_roles WHERE rolname = current_user'))
+    if (roleOutput === 't' || roleOutput === 'f') break
+    if (databaseSleeping && attempt < 11) await sleep()
+  }
+  if (roleOutput === 'f') {
     throw new Error('The demo database reset requires the dedicated Postgres superuser.')
   }
+  requirePostgresOutput(roleOutput, 't')
   const files = async (path: string) => filesSchema.parse(JSON.parse(await cli([
     'volume', ...targetArgs, 'files', '--volume', TARGET.volume, 'list', path, '--json'
   ])))
@@ -266,8 +310,8 @@ export const resetDemo = async (options: {
     assertQuiescent(await deployments(), maintenanceId)
     console.info('Recreating the demo database and migration history.')
     // Separate commands: CREATE/DROP DATABASE cannot run inside an implicit multi-statement transaction.
-    await cli(postgresCommand('DROP DATABASE IF EXISTS railway WITH (FORCE)'))
-    await cli(postgresCommand('CREATE DATABASE railway OWNER postgres'))
+    requirePostgresOutput(await cli(postgresCommand('DROP DATABASE IF EXISTS railway WITH (FORCE)')), 'DROP DATABASE')
+    requirePostgresOutput(await cli(postgresCommand('CREATE DATABASE railway OWNER postgres')), 'CREATE DATABASE')
     assertQuiescent(await deployments(), maintenanceId)
     await writeFile(join(options.cwd, 'Dockerfile'), originalDockerfile)
     console.info('Deploying the captured main commit; startup will run demo migrations and restore templates.')

@@ -144,3 +144,10 @@ References: [Railway IaC](https://docs.railway.com/infrastructure-as-code),
 [volume runtime availability](https://docs.railway.com/volumes),
 [CLI deployments](https://docs.railway.com/cli/up),
 [app deployment notes](../docs/deployment-railway.md).
+
+The reset also checks whether Postgres is sleeping. When it is, the app opens a
+bounded private TCP connection to wake it before the read-only superuser check.
+Maintenance health alone does not wake the database. PostgreSQL SSH routing may
+briefly return gateway output with exit code zero; the role check retries this
+after wake-up, while database DROP/CREATE require their exact PostgreSQL command
+tags and never retry uncertain mutations. Gateway output is not a privilege error.
