@@ -64,6 +64,8 @@ Prerequisites:
 - Railway CLI **5.54.1 or newer within major 5**, installed separately from the IaC SDK:
   `npm install -g @railway/cli@5.54.1`.
 - `railway login` and an SSH key registered with Railway. Establish SSH access
+  (generate a key with `ssh-keygen -t ed25519` if none exists, then register it with
+  `railway ssh keys add`). Complete first-use SSH host verification
   interactively before the reset, for example:
   `railway ssh --project 8705eadd-788e-4efb-b070-f03b6a1cdc3d --environment demo --service Postgres -- true`.
   This uses the database container's `psql`; no local PostgreSQL client or public database endpoint is needed.
@@ -75,6 +77,9 @@ and links that temporary directory to the fixed demo project. Local source edits
 and the current checkout's Railway link are not uploaded or modified.
 
 The script first verifies the app/database configuration and PostgreSQL access.
+If the existing app is sleeping, it sends a health request before the SSH check
+to wake the demo. A cold-start or migration-error health response does not block
+the reset. SSH setup failures include a specific hint and a read-only diagnostic command.
 It then deploys a temporary maintenance container on the existing app service.
 Only `/api/health` returns success; other requests receive HTTP 503. After this
 deployment is healthy and every previous app deployment is down, the script:

@@ -26,6 +26,14 @@ type Deployment = z.infer<typeof deploymentsSchema>[number]
 export type RunCommand = (command: string, args: string[], cwd: string) => Promise<string>
 
 const execFileAsync = promisify(execFile)
+export const sshFailureHint = (stderr: string): string => {
+  if (stderr.includes('No SSH keys found')) return 'No local SSH key was found. Generate one with ssh-keygen -t ed25519, then register it with railway ssh keys add.'
+  if (stderr.includes('Host key verification failed')) return 'SSH host verification failed. Connect interactively to inspect and verify the Railway host key before retrying.'
+  if (stderr.includes('Permission denied')) return 'Railway SSH authentication was denied. Check the registered key and your project access.'
+  if (stderr.includes('No target found')) return 'Railway SSH could not find a running target. Check whether Postgres is sleeping or unavailable.'
+  return 'The Railway SSH/database check failed. Run the read-only SSH diagnostic below to see the underlying error.'
+}
+
 const runCommand: RunCommand = async (command, args, cwd) => {
   try {
     const result = await execFileAsync(command, args, { cwd, timeout: 1_800_000, maxBuffer: 16 * 1024 * 1024 })
@@ -35,6 +43,9 @@ const runCommand: RunCommand = async (command, args, cwd) => {
     const stderr = (error as { stderr?: string }).stderr ?? ''
     if (stderr.includes('agents cannot delete files')) {
       throw new Error('Railway refuses file deletion by AI agents. Run this command yourself in a terminal; do not bypass the restriction.')
+    }
+    if (command === 'railway' && args[0] === 'ssh') {
+      throw new Error(`${sshFailureHint(stderr)}\nrailway ssh --project ${TARGET.project} --environment demo --service Postgres -- true`)
     }
     throw new Error(`${command} ${args[0] ?? ''} failed. Check authentication/CLI access and Railway deployment logs. Remote state may have changed.`)
   }
@@ -170,7 +181,17 @@ export const resetDemo = async (options: {
   const app = z.record(z.string(), z.string()).parse(JSON.parse(await cli(['variable', 'list', '--service', TARGET.service, '--environment', 'demo', '--json'])))
   const database = z.record(z.string(), z.string()).parse(JSON.parse(await cli(['variable', 'list', '--service', 'Postgres', '--environment', 'demo', '--json'])))
   validateVariables(app, database)
-  assertQuiescent(await deployments())
+  const initialDeployments = await deployments()
+  assertQuiescent(initialDeployments)
+  if (initialDeployments.some(deployment => deployment.status === 'SLEEPING')) {
+    console.info('Sending a health request to wake the sleeping demo before checking database SSH access.')
+    try {
+      await health()
+    } catch {
+      // A cold start or broken migrations may return 502/503. The reset must not
+      // require application readiness; the request only wakes the existing service.
+    }
+  }
   if (await cli(postgresCommand('SELECT rolsuper FROM pg_roles WHERE rolname = current_user')) !== 't') {
     throw new Error('The demo database reset requires the dedicated Postgres superuser.')
   }
