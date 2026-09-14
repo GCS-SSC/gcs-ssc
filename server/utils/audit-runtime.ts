@@ -25,6 +25,13 @@ const refreshAuditKeys = async (db: Kysely<Database>): Promise<void> => {
     WHERE i.indisprimary AND n.nspname NOT LIKE 'pg_%' GROUP BY n.nspname, c.relname`.execute(db)
   control.keys = new Map(keys.rows.map(row => [row.table_name, row.columns]))
 }
+export const resolveAccessLogEnabled = (env: NodeJS.ProcessEnv = process.env): boolean => {
+  const value = env.GCS_ACCESS_LOG_ENABLED
+  if (value === undefined || value === 'true') return true
+  if (value === 'false') return false
+  throw new Error('GCS_ACCESS_LOG_ENABLED must be true or false')
+}
+
 export const resolveAuditRetention = (env: NodeJS.ProcessEnv = process.env) => {
   const days = (key: string, fallback: number): number => {
     const value = env[key]
@@ -65,7 +72,6 @@ export const startAuditRuntime = async (db: Kysely<Database>): Promise<() => Pro
       } catch {
         console.error({ event: 'audit.retention_failed' })
       }
-      await control?.flush?.()
     }).finally(() => {
       running = undefined
     })
@@ -84,6 +90,5 @@ export const startAuditRuntime = async (db: Kysely<Database>): Promise<() => Pro
     clearInterval(interval)
     clearInterval(retry)
     await running
-    await control?.flush?.()
   }
 }

@@ -1,6 +1,6 @@
 import { createAuditDialect, type AuditControl } from './audit-driver'
 import { auditScope, withoutAuditCapture } from './audit-context'
-import { registerAuditControl, resolveAuditRetention } from './audit-runtime'
+import { registerAuditControl, resolveAccessLogEnabled, resolveAuditRetention } from './audit-runtime'
 import nodeProcess from 'node:process'
 import { Kysely, PostgresDialect, sql } from 'kysely'
 import { KyselyPGlite } from 'kysely-pglite'
@@ -101,7 +101,19 @@ const createDatabase = (): Omit<DatabaseGeneration, 'id' | 'leases'> => {
   resolveAuditRetention()
   const audit: AuditControl = {
     enabled: false,
-    report: event => console.error(event),
+    accessEnabled: resolveAccessLogEnabled(),
+    /** @returns The response lifecycle captured separately from anonymous audit identity. */
+    accessRequest: () => {
+      try {
+        return useEvent().context.accessLogRequest
+      } catch {
+        return undefined
+      }
+    },
+    report: event => {
+      if (event.event === 'audit.access_queue') console.info(event)
+      else console.error(event)
+    },
     /**
      *
      */
