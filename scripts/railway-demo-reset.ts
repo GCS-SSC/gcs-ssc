@@ -88,8 +88,11 @@ export const assertQuiescent = (deployments: Deployment[], activeId?: string) =>
     if (deployments[0]?.id !== activeId || active.length !== 1 || active[0]?.id !== activeId || active[0]?.status !== 'SUCCESS') {
       throw new Error('Expected only our successful deployment; another deployment is running or teardown is incomplete.')
     }
-  } else if (active.some(deployment => deployment.status !== 'SUCCESS') || active.length > 1) {
-    throw new Error('A deployment is in progress. Wait for it to finish before resetting.')
+  } else if (active.some(deployment => !['SUCCESS', 'SLEEPING'].includes(deployment.status)) || active.length > 1) {
+    // A sleeping service is an existing release, not an in-flight deployment.
+    // Keep it in the active set: it must still be removed before any deletion.
+    const states = active.map(deployment => `${deployment.id}: ${deployment.status}`).join(', ')
+    throw new Error(`Deployment state is not ready for reset (${states}). Wait for in-progress deployments to finish.`)
   }
 }
 
