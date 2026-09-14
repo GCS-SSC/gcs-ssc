@@ -138,3 +138,28 @@ export const resolveAssignedItemTargetGrant = async (
   const repository = new AssignedItemAuthorizationRepository(db)
   return await repository.resolveTarget(applicationUserId, target, options)
 }
+
+/**
+ * Builds a typed active-assignment subquery; collection read permissions remain mandatory.
+ * @param db - Database snapshot used for collection reads.
+ * @param applicationUserId - Authenticated application user.
+ * @param entityType - Explicit assignment root type.
+ * @returns Subquery selecting active assigned entity IDs.
+ */
+export const assignedEntityIdsQuery = (
+  db: Kysely<Database>,
+  applicationUserId: string,
+  entityType: Entity_Type
+) => db.selectFrom('Common_Entity_Assignment')
+  .innerJoin('Common_User', 'Common_User.id', 'Common_Entity_Assignment.egcs_cn_user')
+  .innerJoin('user', 'user.id', 'Common_User.egcs_cn_auth_user_id')
+  .innerJoin('Common_Entity', join => join
+    .onRef('Common_Entity.id', '=', 'Common_Entity_Assignment.egcs_cn_entityid')
+    .onRef('Common_Entity.egcs_cn_entitytype', '=', 'Common_Entity_Assignment.egcs_cn_entitytype'))
+  .where('user.id', '=', applicationUserId)
+  .where('user._deleted', '=', false)
+  .where('Common_User._deleted', '=', false)
+  .where('Common_Entity._deleted', '=', false)
+  .where('Common_Entity_Assignment._deleted', '=', false)
+  .where('Common_Entity_Assignment.egcs_cn_entitytype', '=', entityType)
+  .select('Common_Entity_Assignment.egcs_cn_entityid')

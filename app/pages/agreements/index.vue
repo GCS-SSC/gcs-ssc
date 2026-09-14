@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue'
 import type { ComputedRef } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
 import type { FundingCaseAgreementProfileRow } from '~~/shared/types/funding-case-agreement-ui'
@@ -20,6 +21,9 @@ const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const { isRecordLocked } = useBusinessStatusState()
 const localePath = useLocalePath()
 
+const listView = ref('all')
+const listViewQuery = computed(() => ({ list_view: listView.value }))
+
 const {
   search,
   pagination,
@@ -30,6 +34,7 @@ const {
   retry,
   status
 } = useResourceTable<FundingCaseAgreementProfileRow>({
+  query: listViewQuery,
   fetchUrl: '/api/agreements'
 })
 
@@ -133,7 +138,11 @@ const canDeleteAgreement = (agreement: FundingCaseAgreementProfileRow) =>
           @retry="retry"
           @add="openCreateAgreement"
           @edit="openUpdateAgreement"
-          @delete="deleteAgreement" />
+          @delete="deleteAgreement">
+          <template #filters>
+            <CommonAssignedListViewSelect v-model="listView" resource="agreement" />
+          </template>
+        </AgreementProfilesTable>
       </div>
     </template>
   </UDashboardPanel>

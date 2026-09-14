@@ -1,3 +1,5 @@
+import { assignedEntityIdsQuery } from '@gcs-ssc/authorization/server'
+import { AssignedListViewSchema } from '~~/shared/types/schemas/assigned-list-view'
 import { z } from 'zod'
 import { authorize, requireAuthContext } from '~~/server/utils/authorize'
 import { resolveAgreementPageMutationPermissions, resolveAgreementVisibility } from '~~/server/utils/agreement'
@@ -20,6 +22,7 @@ const AgencyFilterSchema = z.coerce.string().transform((value, ctx) => {
 })
 
 const AgreementsPaginationSchema = PaginationSchema.extend({
+  list_view: AssignedListViewSchema,
   agency_id: AgencyFilterSchema.optional(),
   search: PaginationSchema.shape.search.refine(value => value === undefined || !value.includes('\u0000'), {
     error: 'validation.invalid_text_character'
@@ -43,7 +46,7 @@ export default defineEventHandler(async event => {
     })
 
     const query = await getValidatedQueryI18n(event, AgreementsPaginationSchema)
-    const { page, limit, search, agency_id } = query
+    const { page, limit, search, agency_id, list_view } = query
     const offset = (page - 1) * limit
     const escapedSearch = search ? escapeLikePattern(search) : ''
 
@@ -108,6 +111,12 @@ export default defineEventHandler(async event => {
           ? [eb('Funding_Case_Agreement_Profile.id', 'in', visibility.agreementIds)]
           : [])
       ]))
+    }
+
+    if (list_view === 'mine') {
+      baseQuery = baseQuery.where('Funding_Case_Agreement_Profile.id', 'in', assignedEntityIdsQuery(db, (await requireAuthContext(event)).userId, 'fundingcaseagreement'))
+    } else if (list_view !== 'all') {
+      baseQuery = baseQuery.where('Transfer_Payment_Profile.egcs_tp_agency', '=', list_view)
     }
 
     if (agency_id) {

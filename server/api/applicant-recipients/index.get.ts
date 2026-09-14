@@ -1,3 +1,6 @@
+import { getUserAssignmentAgencyScopes } from '~~/server/utils/rbac'
+import { assignedEntityIdsQuery } from '@gcs-ssc/authorization/server'
+import { AssignedListViewSchema } from '~~/shared/types/schemas/assigned-list-view'
 import { sql } from 'kysely'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 import { authorize } from '~~/server/utils/authorize'
@@ -7,6 +10,7 @@ import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { PaginationSchema, PositivePostgresBigintIdSchema } from '~~/shared/types/schemas'
 
 const ApplicantRecipientPaginationSchema = PaginationSchema.extend({
+  list_view: AssignedListViewSchema,
   search: PaginationSchema.shape.search.refine(value => !value?.includes('\u0000'), { error: 'validation.invalid_text_character' }),
   agency_id: PositivePostgresBigintIdSchema.optional()
 })
@@ -30,7 +34,7 @@ export default defineEventHandler(async event => await executeFreshReadSnapshot(
     return await forbidden(event)
   }
 
-  const { page, limit, search, status, agency_id } = await getValidatedQueryI18n(event, ApplicantRecipientPaginationSchema)
+  const { page, limit, search, status, agency_id, list_view } = await getValidatedQueryI18n(event, ApplicantRecipientPaginationSchema)
   const offset = (page - 1) * limit
 
   let baseQuery = db
@@ -46,6 +50,20 @@ export default defineEventHandler(async event => await executeFreshReadSnapshot(
 
   if (agency_id) {
     baseQuery = baseQuery.where('Applicant_Recipient_Profile.egcs_ar_leadagency', '=', agency_id)
+  }
+
+  if (list_view === 'mine') {
+    baseQuery = baseQuery.where('Applicant_Recipient_Profile.id', 'in', assignedEntityIdsQuery(db, context.userId, 'applicantrecipient'))
+  } else if (list_view !== 'all') {
+    const scopes = await getUserAssignmentAgencyScopes(context.userId, db)
+    baseQuery = baseQuery.where(eb => eb.and([
+      eb.val(scopes.some(scope => scope.agencyId === list_view)),
+      eb.exists(eb.selectFrom('Applicant_Recipient_Agency_Financial_Id')
+        .whereRef('egcs_ar_applicantrecipient', '=', 'Applicant_Recipient_Profile.id')
+        .where('egcs_ar_agency', '=', list_view)
+        .where('_deleted', '=', false)
+        .select('id'))
+    ]))
   }
 
   if (status && status !== 'all') {

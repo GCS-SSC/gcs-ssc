@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- local navigation helpers are self-documenting and not public APIs */
 import { getPaginationRowModel } from '@tanstack/table-core'
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { ComputedRef } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { appRouteLocations } from '~/utils/route-locations'
@@ -16,6 +16,12 @@ const localePath = useLocalePath()
 const permissions = useCan()
 const { getBilingualValue } = useBilingualValue()
 
+const listView = ref('all')
+watch(() => applicantRecipientId, () => {
+  listView.value = 'all'
+})
+const listViewQuery = computed(() => ({ list_view: listView.value }))
+
 const {
   search,
   pagination,
@@ -24,7 +30,8 @@ const {
   status,
   refresh
 } = useResourceTable<FundingCaseAgreementProfileRow>({
-  fetchUrl: `/api/applicant-recipients/${applicantRecipientId}/agreements`
+  query: listViewQuery,
+  fetchUrl: computed(() => `/api/applicant-recipients/${applicantRecipientId}/agreements`)
 })
 
 const canCreateAgreement: ComputedRef<boolean> = computed(() => {
@@ -82,6 +89,9 @@ const openAgreement = async (agreement: FundingCaseAgreementProfileRow) => {
     :search-placeholder="t('applicant_recipient.agreements.search')"
     @add="openCreateAgreement"
     @retry="refresh">
+    <template #filters>
+      <CommonAssignedListViewSelect v-model="listView" resource="agreement" />
+    </template>
     <template #egcs_fc_title_en-cell="{ row }">
       <CommonBilingualName
         :name-en="row.original.egcs_fc_title_en"

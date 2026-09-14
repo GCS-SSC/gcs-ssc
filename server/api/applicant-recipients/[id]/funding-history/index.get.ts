@@ -1,3 +1,5 @@
+import { assignedEntityIdsQuery } from '@gcs-ssc/authorization/server'
+import { AssignedListViewSchema } from '~~/shared/types/schemas/assigned-list-view'
 import { sql } from 'kysely'
 import { authorizeWithFreshAuthContext, requireFreshAuthContext, type AuthContext } from '~~/server/utils/authorize'
 import { badRequest, throwApiError } from '~~/server/utils/api-errors'
@@ -43,7 +45,7 @@ export default defineEventHandler(async event => {
       await resolveApplicantRecipientAuthorization(context, applicantRecipientId, 'read', db))
     const profile = await assertApplicantRecipientProfileExists(event, applicantRecipientId, db)
     if (!profile || typeof profile !== 'object' || !('id' in profile)) return profile
-    const query = await getValidatedQueryI18n(event, PaginationSchema)
+    const query = await getValidatedQueryI18n(event, PaginationSchema.extend({ list_view: AssignedListViewSchema }))
 
     const [systemRecords, externalRecords] = await Promise.all([
       db
@@ -67,6 +69,10 @@ export default defineEventHandler(async event => {
         .where('Funding_Case_Agreement_Applicant_Recipient.egcs_fc_applicantrecipient', '=', applicantRecipientId)
         .where('Funding_Case_Agreement_Applicant_Recipient._deleted', '=', false)
         .where('Funding_Case_Agreement_Profile._deleted', '=', false)
+        .$if(query.list_view === 'mine', builder => builder.where('Funding_Case_Agreement_Profile.id', 'in',
+          assignedEntityIdsQuery(db, authContext.userId, 'fundingcaseagreement')))
+        .$if(query.list_view !== 'all' && query.list_view !== 'mine', builder =>
+          builder.where('Transfer_Payment_Profile.egcs_tp_agency', '=', query.list_view))
         .select([
           'Funding_Case_Agreement_Profile.id as agreementId',
           'Funding_Case_Agreement_Profile.egcs_fc_transferpaymentstream as streamId',
@@ -97,6 +103,7 @@ export default defineEventHandler(async event => {
         .where('Applicant_Recipient_Funding_History_Recipient.egcs_ar_applicantrecipient', '=', applicantRecipientId)
         .where('Applicant_Recipient_Funding_History_Recipient._deleted', '=', false)
         .where('Applicant_Recipient_Funding_History._deleted', '=', false)
+        .where(eb => eb.val(query.list_view === 'all'))
         .select([
           'Applicant_Recipient_Funding_History.id as historyId',
           'Applicant_Recipient_Funding_History.egcs_ar_agencyname_en as agencyNameEn',
@@ -272,6 +279,7 @@ export default defineEventHandler(async event => {
     const normalizedSearch = (query.search || '').trim().toLocaleLowerCase('en-CA')
     const rows = [...systemRows, ...externalRows]
       .filter(row => {
+        if (query.list_view !== 'all' && row.restricted) return false
         if (!normalizedSearch || row.restricted) return true
         return [row.agencyNameEn, row.agencyNameFr, row.programNameEn, row.programNameFr,
           row.agreementNumber, row.titleEn, row.titleFr]

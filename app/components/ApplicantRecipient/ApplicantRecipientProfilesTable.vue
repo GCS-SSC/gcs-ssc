@@ -97,6 +97,7 @@ const canDeleteProfile = (profile: ApplicantRecipientProfileRow) => {
     @add="emit('add')"
     @retry="emit('retry')">
     <template #filters>
+      <slot name="filters" />
       <USelect v-model="statusFilter" :items="availabilityItems" :aria-label="t('common.status_filter')" class="min-w-40" />
     </template>
     <template #id-cell="{ row }">

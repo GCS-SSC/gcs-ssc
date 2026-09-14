@@ -1857,6 +1857,12 @@
     "workflow_member_owner_duplicate": "Chaque membre de flux imbriqué ne peut avoir qu’une seule association de propriétaire"
   },
   "agreement": {
+    "list_views": {
+      "all": "Toutes les ententes",
+      "mine": "Mes ententes",
+      "agency": "Mes ententes — {agency}",
+      "label": "Vue des ententes"
+    },
     "title": "Ententes",
     "description": "Créer et gérer les profils d'entente de dossier de financement pour les volets autorisés.",
     "risk_rating_workflow": "Évaluation du risque",
@@ -2456,6 +2462,12 @@
     }
   },
   "applicant_recipient": {
+    "list_views": {
+      "all": "Tous les promoteurs",
+      "mine": "Mes promoteurs",
+      "agency": "Mes promoteurs — {agency}",
+      "label": "Vue des promoteurs"
+    },
     "title": "Promoteurs",
     "description": "Créer et gérer les profils des promoteurs.",
     "new": "Nouveau promoteur",

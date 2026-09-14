@@ -1857,6 +1857,12 @@
     "workflow_member_owner_duplicate": "Each nested workflow member can have only one owner mapping"
   },
   "agreement": {
+    "list_views": {
+      "all": "All Agreements",
+      "mine": "My Agreements",
+      "agency": "My {agency} Agreements",
+      "label": "Agreements view"
+    },
     "title": "Agreements",
     "description": "Create and manage funding case agreement profiles for authorized program streams.",
     "risk_rating_workflow": "Risk Rating",
@@ -2456,6 +2462,12 @@
     }
   },
   "applicant_recipient": {
+    "list_views": {
+      "all": "All Proponents",
+      "mine": "My Proponents",
+      "agency": "My {agency} Proponents",
+      "label": "Proponents view"
+    },
     "title": "Proponents",
     "description": "Create and manage proponent organization profiles.",
     "new": "New Proponent",

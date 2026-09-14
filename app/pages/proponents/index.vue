@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue'
 import type { ComputedRef } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
 import type { ApplicantRecipientProfileRow } from '~~/shared/types/applicant-recipient-ui'
@@ -19,6 +20,9 @@ const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const localePath = useLocalePath()
 
+const listView = ref('all')
+const listViewQuery = computed(() => ({ list_view: listView.value }))
+
 const {
   search,
   statusFilter,
@@ -33,6 +37,7 @@ const {
   retry,
   status
 } = useResourceTable<ApplicantRecipientProfileRow>({
+  query: listViewQuery,
   fetchUrl: '/api/applicant-recipients'
 })
 
@@ -150,7 +155,11 @@ const canDeleteProfile = (profile: ApplicantRecipientProfileRow) => {
           @retry="retry"
           @add="openCreateProfile"
           @edit="openUpdateProfile"
-          @delete="deleteProfile" />
+          @delete="deleteProfile">
+          <template #filters>
+            <CommonAssignedListViewSelect v-model="listView" resource="applicant_recipient" />
+          </template>
+        </ApplicantRecipientProfilesTable>
       </div>
     </template>
   </UDashboardPanel>

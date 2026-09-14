@@ -82,6 +82,9 @@ const getAgreementActionTarget = (agreement: FundingCaseAgreementProfileRow) => 
     v-bind="$attrs"
     @add="emit('add')"
     @retry="emit('retry')">
+    <template #filters>
+      <slot name="filters" />
+    </template>
     <template #id-cell="{ row }">
       <span class="font-mono text-xs font-bold text-zinc-400 dark:text-zinc-500">
         {{ row.original.id }}

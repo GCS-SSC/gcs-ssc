@@ -1,3 +1,5 @@
+import { assignedEntityIdsQuery } from '@gcs-ssc/authorization/server'
+import { AssignedListViewSchema } from '~~/shared/types/schemas/assigned-list-view'
 import { authorizeWithFreshAuthContext, requireFreshAuthContext, type AuthContext } from '~~/server/utils/authorize'
 import { badRequest } from '~~/server/utils/api-errors'
 import { resolveAgreementPageMutationPermissions, resolveAgreementVisibility } from '~~/server/utils/agreement'
@@ -46,7 +48,7 @@ export default defineEventHandler(async event => {
       return { scope: { type: 'global' } }
     })
 
-    const { page, limit, search } = await getValidatedQueryI18n(event, PaginationSchema)
+    const { page, limit, search, list_view } = await getValidatedQueryI18n(event, PaginationSchema.extend({ list_view: AssignedListViewSchema }))
     const offset = (page - 1) * limit
     const escapedSearch = search ? escapeLikePattern(search) : ''
 
@@ -104,6 +106,12 @@ export default defineEventHandler(async event => {
           ? [eb('Funding_Case_Agreement_Profile.id', 'in', visibility.agreementIds)]
           : [])
       ]))
+    }
+
+    if (list_view === 'mine') {
+      baseQuery = baseQuery.where('Funding_Case_Agreement_Profile.id', 'in', assignedEntityIdsQuery(db, freshContext.userId, 'fundingcaseagreement'))
+    } else if (list_view !== 'all') {
+      baseQuery = baseQuery.where('Transfer_Payment_Profile.egcs_tp_agency', '=', list_view)
     }
 
     if (escapedSearch) {

@@ -27,6 +27,12 @@ const localePath = useLocalePath()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 
+const listView = ref('all')
+watch(() => applicantRecipientId, () => {
+  listView.value = 'all'
+})
+const listViewQuery = computed(() => ({ list_view: listView.value }))
+
 const {
   search,
   pagination,
@@ -35,6 +41,7 @@ const {
   status,
   refresh
 } = useResourceTable<FundingHistoryRow>({
+  query: listViewQuery,
   fetchUrl: fundingHistoryUrl
 })
 
@@ -156,6 +163,9 @@ const visibleRows = computed(() => items.value)
       table-class="min-w-[1100px]"
       @add="openCreate"
       @retry="refresh">
+      <template #filters>
+        <CommonAssignedListViewSelect v-model="listView" resource="agreement" />
+      </template>
       <template #source-cell="{ row }">
         <CommonStatusBadge
           :variant="row.original.source === 'system' ? 'info' : 'meta'"
