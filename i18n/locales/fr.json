@@ -1952,6 +1952,7 @@
     "program": "Programme",
     "program_link": "Route du programme",
     "stream": "Volet",
+    "program_placeholder": "Sélectionner le programme de l’entente",
     "stream_placeholder": "Sélectionner le volet d'entente",
     "stream_link": "Volet",
     "stream_route": "Route du volet",
@@ -1989,7 +1990,6 @@
       "select": "Sélectionner des promoteurs",
       "edit_selection": "Modifier les promoteurs",
       "none_selected": "Aucun promoteur sélectionné.",
-      "select_stream_first": "Sélectionnez un volet d'entente avant de choisir des promoteurs.",
       "unavailable": "Promoteur indisponible",
       "invalid_removed": "Un ou plusieurs promoteurs ne sont plus disponibles et ont été retirés.",
       "selected_count": "{count} promoteurs sélectionnés"

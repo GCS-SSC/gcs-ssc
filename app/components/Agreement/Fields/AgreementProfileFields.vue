@@ -2,6 +2,7 @@
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
+import type { AdminCommonLookupResponseItem } from '~~/shared/types/admin-common-ui'
 import type {
   FundingCaseAgreementProfileForm,
   FundingCaseAgreementSubtypeLookupItem
@@ -26,6 +27,35 @@ const model = defineModel<FundingCaseAgreementProfileForm>('model', {
 
 const { t } = useI18n()
 const field = useFormFieldPath(() => namePrefix)
+
+const selectedProgramId: Ref<string | undefined> = ref(undefined)
+
+/**
+ * Clears the dependent stream after an explicit program selection.
+ *
+ * @param programId - Selected program id.
+ */
+const selectProgram = (programId: string | undefined) => {
+  if (permissionAction === 'update' || selectedProgramId.value === programId) return
+  selectedProgramId.value = programId
+  model.value = { ...model.value, egcs_fc_transferpaymentstream: undefined }
+}
+
+/**
+ * Restores the parent program from the saved stream lookup.
+ *
+ * @param items - Resolved selected stream records.
+ */
+const resolveStreamProgram = (items: AdminCommonLookupResponseItem[]) => {
+  const stream = items.find(item => String(item.id) === selectedStreamId.value)
+  if (stream?.program_id && !selectedProgramId.value) {
+    selectedProgramId.value = String(stream.program_id)
+  }
+}
+
+watch(() => agreementId, () => {
+  selectedProgramId.value = undefined
+})
 
 const previousStreamId = ref<string | undefined>(undefined)
 const riskScoreSelection: Ref<string | undefined> = ref(undefined)
@@ -318,9 +348,9 @@ watch(selectedSubtype, value => {
 <template>
   <CommonSection :title="t('agreement.sections.classification')" badge="01" :grid-cols="1">
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <UFormField :label="t('agreement.stream')" :name="field('egcs_fc_transferpaymentstream')">
+      <UFormField :label="t('agreement.program')">
         <CommonServerLookupSelect
-          v-model="model.egcs_fc_transferpaymentstream"
+          :model-value="selectedProgramId"
           :disabled="permissionAction === 'update'"
           fetch-url="/api/agreements/lookups/streams"
           value-key="id"
@@ -328,10 +358,33 @@ watch(selectedSubtype, value => {
           label-fr-key="label_fr"
           :query="{
             ...(agreementId ? { agreement_id: agreementId } : {}),
-            permission_action: permissionAction
+            permission_action: permissionAction,
+            group_by: 'program'
+          }"
+          :placeholder="t('agreement.program_placeholder')"
+          searchable
+          @update:model-value="selectProgram" />
+      </UFormField>
+
+      <UFormField :label="t('agreement.stream')" :name="field('egcs_fc_transferpaymentstream')">
+        <CommonServerLookupSelect
+          v-if="selectedProgramId || selectedStreamId"
+          :key="`${agreementId ?? 'create'}:${selectedProgramId ?? 'hydrate'}`"
+          v-model="model.egcs_fc_transferpaymentstream"
+          :disabled="!selectedProgramId || permissionAction === 'update'"
+          fetch-url="/api/agreements/lookups/streams"
+          value-key="id"
+          label-en-key="label_en"
+          label-fr-key="label_fr"
+          :query="{
+            ...(agreementId ? { agreement_id: agreementId } : {}),
+            permission_action: permissionAction,
+            ...(selectedProgramId ? { program_id: selectedProgramId } : {})
           }"
           :placeholder="t('agreement.stream_placeholder')"
-          searchable />
+          searchable
+          @resolved-items="resolveStreamProgram" />
+        <USelectMenu v-else :items="[]" disabled :placeholder="t('agreement.stream_placeholder')" />
       </UFormField>
 
       <UFormField :label="t('agreement.agreement_subtype')" :name="field('egcs_fc_agreementsubtype')">
@@ -355,7 +408,7 @@ watch(selectedSubtype, value => {
           :disabled="!selectedStreamId || subtypeStatus === 'pending'"
           :placeholder="t('agreement.agreement_subtype_placeholder')"
           searchable />
-        <UButton v-else block color="neutral" variant="outline" disabled :label="t('agreement.agreement_subtype_placeholder')" />
+        <USelectMenu v-else :items="[]" disabled :placeholder="t('agreement.agreement_subtype_placeholder')" />
       </UFormField>
 
       <UFormField :label="t('agreement.agreement_number')" :name="field('egcs_fc_agreementnumber')">
@@ -481,7 +534,7 @@ watch(selectedSubtype, value => {
           :disabled="!selectedStreamId"
           :placeholder="t('agreement.holdback_basis_placeholder')"
           searchable />
-        <UButton v-else block color="neutral" variant="outline" disabled :label="t('agreement.holdback_basis_placeholder')" />
+        <USelectMenu v-else :items="[]" disabled :placeholder="t('agreement.holdback_basis_placeholder')" />
       </UFormField>
 
       <UFormField :label="t('agreement.risk_score')" :name="field('egcs_fc_riskscore')">
@@ -507,7 +560,7 @@ watch(selectedSubtype, value => {
           :disabled="!selectedStreamId || riskWorkflowManaged || riskManagementStatus !== 'success'"
           :placeholder="t('agreement.risk_score_placeholder')"
           searchable />
-        <UButton v-else block color="neutral" variant="outline" disabled :label="t('agreement.risk_score_placeholder')" />
+        <USelectMenu v-else :items="[]" disabled :placeholder="t('agreement.risk_score_placeholder')" />
         <div
           v-if="hasRiskManagementError"
           data-testid="risk-management-error"

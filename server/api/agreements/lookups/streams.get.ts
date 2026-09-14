@@ -11,12 +11,14 @@ import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 
 const QuerySchema = PaginationSchema.extend({
   agreement_id: z.coerce.string().optional(),
+  program_id: z.coerce.string().optional(),
+  group_by: z.enum(['program']).optional(),
   permission_action: z.enum(['create', 'update']).default('create')
 })
 
 const readRoute = defineEventHandler(async event => {
   const db = event.context.$db
-  const { page, limit, search, agreement_id, permission_action } = await getValidatedQueryI18n(event, QuerySchema)
+  const { page, limit, search, agreement_id, permission_action, program_id, group_by } = await getValidatedQueryI18n(event, QuerySchema)
   const offset = (page - 1) * limit
   const escapedSearch = search ? escapeLikePattern(search) : ''
 
@@ -95,6 +97,31 @@ const readRoute = defineEventHandler(async event => {
         ? [eb('Transfer_Payment_Profile.id', 'in', access.visibility.transferPaymentIds)]
         : [])
     ]))
+  }
+
+  if (program_id) {
+    baseQuery = baseQuery.where('Transfer_Payment_Profile.id', '=', program_id)
+  }
+
+  if (group_by === 'program') {
+    if (escapedSearch) {
+      baseQuery = baseQuery.where(eb => eb.or([
+        eb('Transfer_Payment_Profile.id', '=', escapedSearch),
+        eb('Transfer_Payment_Profile.egcs_tp_name_en', 'ilike', `%${escapedSearch}%`),
+        eb('Transfer_Payment_Profile.egcs_tp_name_fr', 'ilike', `%${escapedSearch}%`)
+      ]))
+    }
+
+    const [items, countResult] = await Promise.all([
+      baseQuery.select([
+        'Transfer_Payment_Profile.id as id',
+        'Transfer_Payment_Profile.egcs_tp_name_en as label_en',
+        'Transfer_Payment_Profile.egcs_tp_name_fr as label_fr'
+      ]).distinct().orderBy('Transfer_Payment_Profile.id', 'asc').limit(limit).offset(offset).execute(),
+      baseQuery.select(eb => eb.fn.count('Transfer_Payment_Profile.id').distinct().as('total')).executeTakeFirst()
+    ])
+    const total = Number(countResult?.total ?? 0)
+    return { items, total, stats: { total, active: total }, page, limit }
   }
 
   if (escapedSearch) {

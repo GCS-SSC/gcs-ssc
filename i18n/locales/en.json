@@ -1952,6 +1952,7 @@
     "program": "Program",
     "program_link": "Program route",
     "stream": "Stream",
+    "program_placeholder": "Select the agreement program",
     "stream_placeholder": "Select the agreement stream",
     "stream_link": "Stream",
     "stream_route": "Stream route",
@@ -1989,7 +1990,6 @@
       "select": "Select proponents",
       "edit_selection": "Edit proponents",
       "none_selected": "No proponents selected.",
-      "select_stream_first": "Select an agreement stream before choosing proponents.",
       "unavailable": "Proponent unavailable",
       "invalid_removed": "One or more proponents are no longer available and were removed.",
       "selected_count": "{count} proponents selected"

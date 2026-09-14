@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import {
   FundingCaseAgreementCreateSchema,
   FundingCaseAgreementProfileSchema
@@ -29,13 +28,6 @@ const emit = defineEmits<{
 }>()
 
 const { createValidator } = useZodI18n()
-const selectedStreamId = computed(() => {
-  if (!model.value.egcs_fc_transferpaymentstream) {
-    return ''
-  }
-
-  return String(model.value.egcs_fc_transferpaymentstream)
-})
 const validate = createValidator(permissionAction === 'create' ? FundingCaseAgreementCreateSchema : FundingCaseAgreementProfileSchema)
 
 const onSubmit = () => {
@@ -58,8 +50,7 @@ const onSubmit = () => {
 
       <AgreementFieldsAgreementApplicantRecipientsField
         v-if="permissionAction === 'create'"
-        v-model:model="model.applicant_recipient_ids"
-        :stream-id="selectedStreamId" />
+        v-model:model="model.applicant_recipient_ids" />
 
       <div class="flex flex-col-reverse justify-end gap-3 border-t border-zinc-200 pt-6 sm:flex-row dark:border-zinc-800">
         <UButton

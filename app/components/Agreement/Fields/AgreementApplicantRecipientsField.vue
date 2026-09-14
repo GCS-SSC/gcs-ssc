@@ -35,10 +35,8 @@ type SelectedHydrationRequest = {
 const HYDRATION_REQUEST_LIMIT = 100
 
 const {
-  streamId = '',
   name = 'applicant_recipient_ids'
 } = defineProps<{
-  streamId?: string
   name?: string
 }>()
 
@@ -64,8 +62,6 @@ let hydrationLifecycleGeneration = 0
 let lookupOperationSequence = 0
 let lastReportedLookupErrorSequence: number | null = null
 let currentVisibleSearchAttempt: VisibleSearchAttempt | null = null
-let hasResolvedStream = streamId.length > 0
-let authoritativeStreamId = streamId
 const pendingHydrationById: Map<string, SelectedHydrationRequest> = shallowReactive(new Map())
 
 /**
@@ -483,51 +479,11 @@ watch(() => model.value, value => {
 }, { immediate: true })
 
 watch(selectedIds, value => {
-  if (areIdsEqual(model.value ?? [], value)) {
-    if (streamId) {
-      void hydrateSelectedItems(value)
-    }
-    return
+  if (!areIdsEqual(model.value ?? [], value)) {
+    model.value = [...value]
   }
-
-  model.value = [...value]
-  if (streamId) {
-    void hydrateSelectedItems(value)
-  }
+  void hydrateSelectedItems(value)
 }, { immediate: true })
-
-watch(() => streamId, (value, previousValue) => {
-  if (value === previousValue) {
-    return
-  }
-
-  teardownLookupRequests()
-  lookupItems.value = []
-  cachedItemsById.value = {}
-  cachedItemSequenceById.clear()
-  invalidSelectedIds.value = []
-  searchTerm.value = ''
-  isOpen.value = false
-
-  const nextStreamId = String(value)
-  const isInitialStreamResolution = !hasResolvedStream && nextStreamId.length > 0
-  const isActualStreamReplacement = hasResolvedStream
-    && authoritativeStreamId !== nextStreamId
-
-  if (!nextStreamId) {
-    authoritativeStreamId = ''
-    if (isActualStreamReplacement) {
-      selectedIds.value = []
-    }
-    return
-  }
-
-  authoritativeStreamId = nextStreamId
-  hasResolvedStream = true
-  if (isInitialStreamResolution || isActualStreamReplacement) {
-    void hydrateSelectedItems(selectedIds.value)
-  }
-})
 
 watch(isOpen, value => {
   if (!value) {
@@ -545,7 +501,7 @@ watch(isOpen, value => {
 })
 
 watch(draftSelectedIds, value => {
-  if (isOpen.value && streamId) void hydrateSelectedItems(value)
+  if (isOpen.value) void hydrateSelectedItems(value)
 })
 
 const saveSelection = () => {
@@ -658,13 +614,8 @@ const removeSelectedId = (id: string) => {
           variant="outline"
           icon="i-lucide-users-round"
           class="cursor-default"
-          :disabled="!streamId"
           :label="selectedIds.length > 0 ? t('agreement.applicant_recipients.edit_selection') : t('agreement.applicant_recipients.select')"
           @click="isOpen = true" />
-
-        <p v-if="!streamId" class="text-sm text-zinc-500 dark:text-zinc-400">
-          {{ t('agreement.applicant_recipients.select_stream_first') }}
-        </p>
       </div>
     </div>
   </UFormField>
