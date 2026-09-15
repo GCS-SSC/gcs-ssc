@@ -35,15 +35,15 @@ RUN set -eux; \
     git -C "$destination" checkout --detach FETCH_HEAD; \
     rm -rf "$destination/.git"; \
   }; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-ssc-extensions.git packages/gcs-ssc-extensions 11cb79ab42f9b42012ad366cb094a1a71e8e00f0; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-agreement-number.git extensions/gcs-agreement-number 58bbc5661ef13273eedf1d4a57359680affadfb0; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-automated-payments.git extensions/gcs-automated-payments bf78be2b484c6c0ea6692aa255f96824f4f9ad13; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-gcforms-integration.git extensions/gcs-gcforms-integration 9449c36fc7ae35262bcf6449afa75cbf84097e7c; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-narrative-quality.git extensions/gcs-narrative-quality 83df2ce0869bb91b9cdaeb7deecb2097c2620711; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-narrative-tags.git extensions/gcs-narrative-tags aaaad20d0ae65a097b6cba4a5bb7f25b0c9e5656; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-outcome-cost-allocation.git extensions/gcs-outcome-cost-allocation 2aa69f592bcbcf395fa15d9f203bba179d8a5211; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-storage-local.git extensions/gcs-storage-local 6add3d9f5517481cb47c3be12b6592b4e98f0fb3; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-storage-s3.git extensions/gcs-storage-s3 c9e202f0129fb56500f13170cd0bc4d878eecc05
+  fetch_workspace https://github.com/GCS-SSC/gcs-ssc-extensions.git packages/gcs-ssc-extensions 073ae6f03ef413bbb4d2ffe361600463a7ce9a01; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-agreement-number.git extensions/gcs-agreement-number 1dffffd22336f4c0ce32ba3cfcfb1f0b516cdc47; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-automated-payments.git extensions/gcs-automated-payments edd99ef095eb3e8f196670a42cdc55e677ec7fdf; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-gcforms-integration.git extensions/gcs-gcforms-integration e480d35125987e2678254c15e5da0a04853f75ad; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-narrative-quality.git extensions/gcs-narrative-quality bb0f2225950d172c82085cd8e0d561b8d7142f1a; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-narrative-tags.git extensions/gcs-narrative-tags 4fdc61f535b11fc61973653cb0a6184da344f2d6; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-outcome-cost-allocation.git extensions/gcs-outcome-cost-allocation 6f80f1b036593b61a958e70bfffb1b0125cfc894; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-storage-local.git extensions/gcs-storage-local edb1afed57d6e13143610e5a8b20e6f0340d2291; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-storage-s3.git extensions/gcs-storage-s3 883098eb41f4a3d9dac5a725e4ae55264590d98a
 
 RUN bun install --frozen-lockfile
 

@@ -2749,33 +2749,7 @@
     "discard_changes_description": "Your unsaved extension configuration changes will be lost.",
     "discard_changes_confirm": "Discard changes",
     "create_operation_conflict": "Multiple extensions are trying to replace this create action.",
-    "payment_amount_calculator_conflict": "Multiple extensions are configured to calculate payment amounts.",
-    "gcs_automated_payments": {
-      "stream_defaults_title": "Automated payment defaults",
-      "stream_defaults_description": "Configure which host payment types use the calculator.",
-      "agreement_inputs_title": "Automated payment inputs",
-      "agreement_inputs_description": "Payment amount rules are applied by the payment calculator when creating a payment.",
-      "enabled_payment_types": "Enabled payment types",
-      "release_holdback": "Release holdback",
-      "release_holdback_label": "Release holdback on this payment",
-      "holdback_release_amount": "Holdback release amount",
-      "save_settings": "Save settings",
-      "calculator_title": "Automated payment ceiling",
-      "calculator_description": "The amount can be reduced before saving.",
-      "calculating": "Calculating",
-      "calculation_details": "Calculation details",
-      "calculation_error": "Unable to calculate the automated payment. Check the payment fields and try again.",
-      "details": {
-        "base_amount": "Base amount",
-        "commitment_remaining": "Commitment remaining",
-        "available_before_holdback": "Available before holdback",
-        "holdback_release_amount": "Holdback release amount",
-        "total_claims_to_last_claim_month": "Claims to last claim month",
-        "total_forecast_to_last_claim_month": "Forecast to last claim month",
-        "total_forecast_to_period_end": "Forecast to period end",
-        "total_payments_to_date": "Payments to date"
-      }
-    }
+    "payment_amount_calculator_conflict": "Multiple extensions are configured to calculate payment amounts."
   },
   "approval_templates": {
     "template_type": "Approval template",

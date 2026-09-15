@@ -119,9 +119,6 @@ const extensionHostComposables = {
     const i18n = useI18n()
     return {
       locale: i18n.locale,
-      t: (key: string, values?: Record<string, unknown>) => values === undefined
-        ? i18n.t(key)
-        : i18n.t(key, values),
       n: (value: number, options?: Intl.NumberFormatOptions) => options === undefined
         ? i18n.n(value)
         : i18n.n(value, options)

@@ -2749,33 +2749,7 @@
     "discard_changes_description": "Vos changements non enregistres dans la configuration de l'extension seront perdus.",
     "discard_changes_confirm": "Abandonner les changements",
     "create_operation_conflict": "Plusieurs extensions tentent de remplacer cette action de creation.",
-    "payment_amount_calculator_conflict": "Plusieurs extensions sont configurees pour calculer les montants de paiement.",
-    "gcs_automated_payments": {
-      "stream_defaults_title": "Parametres par defaut des paiements automatises",
-      "stream_defaults_description": "Configurez les types de paiement de l hote qui utilisent le calculateur.",
-      "agreement_inputs_title": "Intrants des paiements automatises",
-      "agreement_inputs_description": "Les regles de montant de paiement sont appliquees par le calculateur lors de la creation d un paiement.",
-      "enabled_payment_types": "Types de paiement actives",
-      "release_holdback": "Liberer la retenue",
-      "release_holdback_label": "Liberer la retenue sur ce paiement",
-      "holdback_release_amount": "Montant de retenue a liberer",
-      "save_settings": "Enregistrer les parametres",
-      "calculator_title": "Plafond du paiement automatise",
-      "calculator_description": "Le montant peut etre reduit avant l enregistrement.",
-      "calculating": "Calcul en cours",
-      "calculation_details": "Details du calcul",
-      "calculation_error": "Impossible de calculer le paiement automatise. Verifiez les champs du paiement et reessayez.",
-      "details": {
-        "base_amount": "Montant de base",
-        "commitment_remaining": "Engagement restant",
-        "available_before_holdback": "Disponible avant retenue",
-        "holdback_release_amount": "Montant de retenue a liberer",
-        "total_claims_to_last_claim_month": "Reclamations jusqu au dernier mois de reclamation",
-        "total_forecast_to_last_claim_month": "Previsions jusqu au dernier mois de reclamation",
-        "total_forecast_to_period_end": "Previsions jusqu a la fin de la periode",
-        "total_payments_to_date": "Paiements a ce jour"
-      }
-    }
+    "payment_amount_calculator_conflict": "Plusieurs extensions sont configurees pour calculer les montants de paiement."
   },
   "approval_templates": {
     "template_type": "Modèle d’approbation",
