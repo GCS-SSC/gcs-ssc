@@ -76,7 +76,7 @@
       "name": "@gcs-ssc/gcs-agreement-number",
       "version": "0.1.0",
       "dependencies": {
-        "@gcs-ssc/extensions": "^0.2.2",
+        "@gcs-ssc/extensions": "^0.3.1",
         "kysely": "^0.28.11",
         "re2js": "^1.0.0",
         "zod": "^4.3.6",
