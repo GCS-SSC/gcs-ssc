@@ -768,6 +768,7 @@ export interface AgencyCostCategoryTable {
 }
 
 export interface AgencyCostCategoryLineItemTable {
+  egcs_ay_active: Generated<boolean>
   egcs_ay_calculationmode: Generated<'manual' | 'category' | 'all_other'>
   egcs_ay_sourcecategory: Generated<string | null>
   egcs_ay_percentage: Generated<number | null>

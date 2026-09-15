@@ -32,6 +32,7 @@ type CostCategoryTableRow = {
   costCategoryNameEn: string
   costCategoryNameFr: string
   lineItemId?: string
+  lineItemActive?: boolean
   lineItemNameEn: string
   lineItemNameFr: string
   isPlaceholder: boolean
@@ -74,6 +75,7 @@ const validateLineItem = createValidator(AgencyCostCategoryLineItemSchema)
 const columns: TableColumnInput<CostCategoryTableRow>[] = [
   { id: COST_CATEGORY_GROUP_COLUMN_ID, accessorKey: COST_CATEGORY_GROUP_COLUMN_ID, headerKey: 'agency.tabs.cost_categories' },
   { id: 'name', accessorKey: 'lineItemNameEn', headerKey: 'agency.name_en' },
+  { id: 'availability', headerKey: 'common.status' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
 
@@ -211,6 +213,7 @@ const tableRows = computed<CostCategoryTableRow[]>(() => filteredCategories.valu
     costCategoryNameEn: category.egcs_ay_name_en,
     costCategoryNameFr: category.egcs_ay_name_fr,
     lineItemId: item.id,
+    lineItemActive: item.egcs_ay_active !== false,
     lineItemNameEn: item.egcs_ay_name_en,
     lineItemNameFr: item.egcs_ay_name_fr,
     isPlaceholder: false
@@ -260,6 +263,7 @@ const openEditLineItem = (lineItemId: string) => {
 
 const openCreateLineItem = (categoryId: string) => {
   selectedLineItem.value = {
+    egcs_ay_active: true,
     egcs_ay_calculationmode: 'manual',
     egcs_ay_sourcecategory: null,
     egcs_ay_percentage: null,
@@ -421,7 +425,6 @@ const deleteLineItem = async (lineItemId: string) => {
               </span>
               <CommonStatusBadge variant="count" size="sm" :label="String(getGroupedRowCount(row as GroupedCostCategoryRow))" />
             </div>
-            <CommonStatusBadge v-if="!row.original.costCategoryActive" variant="inactive" />
           </div>
 
           <div
@@ -440,6 +443,12 @@ const deleteLineItem = async (lineItemId: string) => {
             </span>
           </div>
         </div>
+      </template>
+
+      <template #availability-cell="{ row }">
+        <CommonStatusBadge
+          v-if="isCostCategoryGroupRow(row as GroupedCostCategoryRow) || !row.original.isPlaceholder"
+          :variant="row.original.costCategoryActive && (isCostCategoryGroupRow(row as GroupedCostCategoryRow) || row.original.lineItemActive !== false) ? 'enabled' : 'disabled'" />
       </template>
 
       <template #actions-cell="{ row }">
@@ -517,7 +526,7 @@ const deleteLineItem = async (lineItemId: string) => {
           </UFormField>
 
           <UFormField name="egcs_ay_active" :description="t('agency.cost_category_active_help')">
-            <UCheckbox v-model="selectedCategory.egcs_ay_active" :label="t('common.active')" />
+            <USwitch v-model="selectedCategory.egcs_ay_active" :label="t('common.active')" />
           </UFormField>
 
           <div class="flex justify-end gap-2 pt-4">
@@ -536,6 +545,10 @@ const deleteLineItem = async (lineItemId: string) => {
           </UFormField>
           <UFormField :label="t('agency.name_fr')" name="egcs_ay_name_fr">
             <UInput v-model="selectedLineItem.egcs_ay_name_fr" />
+          </UFormField>
+
+          <UFormField name="egcs_ay_active" :description="t('agency.cost_line_active_help')">
+            <USwitch v-model="selectedLineItem.egcs_ay_active" :label="t('common.active')" />
           </UFormField>
 
           <AgencyBudgetCalculationFields

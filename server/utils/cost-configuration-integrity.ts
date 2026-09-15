@@ -90,6 +90,7 @@ export const fetchAgreementBudgetCostCategory = async (
   if (costCategoryId !== options.retainedCostCategoryId) {
     query = query.where('Transfer_Payment_Stream_Cost_Category_Line_Item.egcs_tp_active', '=', true)
       .where('Agency_Cost_Category.egcs_ay_active', '=', true)
+      .where('Agency_Cost_Category_Line_Item.egcs_ay_active', '=', true)
   }
   return await query.select([
     'Transfer_Payment_Stream_Cost_Category_Line_Item.id as id',

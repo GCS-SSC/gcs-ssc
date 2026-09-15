@@ -464,6 +464,7 @@
     }
   },
   "agency": {
+    "cost_line_active_help": "Les postes inactifs restent dans les budgets existants, mais ne peuvent pas être utilisés pour de nouvelles lignes budgétaires.",
     "cost_category_active_help": "Les catégories inactives restent dans les budgets existants, mais ne peuvent pas être utilisées pour de nouvelles lignes budgétaires.",
     "title": "Agences",
     "new": "Nouvelle agence",
@@ -1249,7 +1250,7 @@
     }
   },
   "transfer_payment": {
-    "cost_line_active_help": "Les postes inactifs restent dans les budgets existants, mais ne peuvent pas être utilisés pour de nouvelles lignes budgétaires. La catégorie de coûts de l’organisme doit également être active.",
+    "cost_line_active_help": "Les postes inactifs restent dans les budgets existants, mais ne peuvent pas être utilisés pour de nouvelles lignes budgétaires. La catégorie de coûts et le poste de l’organisme doivent également être actifs.",
     "holdback_bases": "Bases de retenue",
     "holdback_basis": "Base de retenue",
     "agency_holdback_basis": "Base de retenue de l'agence",

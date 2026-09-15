@@ -10,6 +10,7 @@ import { TransferPaymentCostCategoryLineItemSchema } from '~~/shared/types/schem
 
 interface TransferPaymentCostCategoryLineRow extends TransferPaymentCostCategoryLineItemItem, Record<string, unknown> {
   category_active?: boolean
+  agency_line_item_active?: boolean
   line_item_name_en?: string
   line_item_name_fr?: string
 }
@@ -173,7 +174,7 @@ const { data: costLineItemResponse } = await useAgencyReferenceData<AgencyCostCa
     </template>
 
     <template #availability-cell="{ row }">
-      <CommonStatusBadge :variant="row.original.egcs_tp_active !== false && row.original.category_active !== false ? 'active' : 'inactive'" />
+      <CommonStatusBadge :variant="row.original.egcs_tp_active !== false && row.original.category_active !== false && row.original.agency_line_item_active !== false ? 'enabled' : 'disabled'" />
     </template>
 
     <template #actions-cell="{ row }">
