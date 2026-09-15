@@ -46,7 +46,9 @@ export default defineEventHandler(async event => {
       .where('Agency_Cost_Category._deleted', '=', false)
       .select([
         budgetLineItemStableId.as('id'), budgetFiscalYearStableId.as('egcs_fc_fundingagreementbudgetfiscalyear'),
-        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_organizationcostcategory as egcs_fc_organizationcostcategory', 'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_calculationmode',
+        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_organizationcostcategory as egcs_fc_organizationcostcategory',
+        sql<boolean>`"Agency_Cost_Category".egcs_ay_active AND "Transfer_Payment_Stream_Cost_Category_Line_Item".egcs_tp_active`.as('cost_category_available'),
+        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_calculationmode',
         sql<string | null>`(SELECT source.egcs_ay_name_en FROM "Agency_Cost_Category" source WHERE source.id = "Funding_Case_Agreement_Budget_Line_Item".egcs_fc_sourcecategory)`.as('calculation_source_name_en'),
         sql<string | null>`(SELECT source.egcs_ay_name_fr FROM "Agency_Cost_Category" source WHERE source.id = "Funding_Case_Agreement_Budget_Line_Item".egcs_fc_sourcecategory)`.as('calculation_source_name_fr'),
         'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_sourcecategory',

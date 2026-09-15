@@ -29,4 +29,7 @@ const field = useFormFieldPath(() => namePrefix)
       :step="0.01"
       :format-options="{ style: 'percent' }" />
   </UFormField>
+  <UFormField :name="field('egcs_tp_active')" :description="t('transfer_payment.cost_line_active_help')">
+    <UCheckbox v-model="model.egcs_tp_active" :label="t('common.active')" />
+  </UFormField>
 </template>

@@ -9,6 +9,7 @@ import type { TransferPaymentCostCategoryLineItemItem, AgencyCostCategoryLineIte
 import { TransferPaymentCostCategoryLineItemSchema } from '~~/shared/types/schemas'
 
 interface TransferPaymentCostCategoryLineRow extends TransferPaymentCostCategoryLineItemItem, Record<string, unknown> {
+  category_active?: boolean
   line_item_name_en?: string
   line_item_name_fr?: string
 }
@@ -47,6 +48,7 @@ const {
 const costLineColumns: TableColumnInput<TransferPaymentCostCategoryLineRow>[] = [
   { id: 'line_item', accessorKey: 'line_item_name_en', headerKey: 'transfer_payment.cost_category_line_items' },
   { accessorKey: 'egcs_tp_costsharingratio', headerKey: 'transfer_payment.cost_sharing_ratio' },
+  { id: 'availability', headerKey: 'common.status' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
 
@@ -55,7 +57,7 @@ const costLineBilingualColumns: BilingualColumnConfig<TransferPaymentCostCategor
 ]
 
 const costCategoryModal = useCrudModal<TransferPaymentCostCategoryLineRow, Partial<TransferPaymentCostCategoryLineItemItem>>({
-  createState: () => ({}),
+  createState: () => ({ egcs_tp_active: true }),
   updateState: row => ({ ...row })
 })
 
@@ -168,6 +170,10 @@ const { data: costLineItemResponse } = await useAgencyReferenceData<AgencyCostCa
       <span class="font-semibold text-zinc-700 dark:text-zinc-300">
         {{ n(row.original.egcs_tp_costsharingratio, { style: 'percent' }) }}
       </span>
+    </template>
+
+    <template #availability-cell="{ row }">
+      <CommonStatusBadge :variant="row.original.egcs_tp_active !== false && row.original.category_active !== false ? 'active' : 'inactive'" />
     </template>
 
     <template #actions-cell="{ row }">

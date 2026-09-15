@@ -1,3 +1,4 @@
+import { fetchAgreementBudgetCostCategory } from '~~/server/utils/cost-configuration-integrity'
 import { FundingCaseAgreementBudgetLineItemFundingTotalsSchema,
   FundingCaseAgreementBudgetFiscalYearPatchSchema,
   FundingCaseAgreementBudgetLineItemCreateSchema
@@ -395,30 +396,6 @@ const assertAgreementBudgetFiscalYearForAgreement = async (
   )
 
   return fiscalYear
-}
-
-const fetchAgreementBudgetCostCategory = async (
-  db: DbClient,
-  streamId: string,
-  costCategoryId: string
-) => {
-  return await db.selectFrom('Transfer_Payment_Stream_Cost_Category_Line_Item')
-    .innerJoin(
-      'Agency_Cost_Category_Line_Item',
-      'Agency_Cost_Category_Line_Item.id',
-      'Transfer_Payment_Stream_Cost_Category_Line_Item.egcs_tp_organizationcostcategory'
-    )
-    .where(sql<string>`"Transfer_Payment_Stream_Cost_Category_Line_Item"."id"::text`, '=', costCategoryId)
-    .where('Transfer_Payment_Stream_Cost_Category_Line_Item.egcs_tp_transferpaymentstream', '=', streamId)
-    .where('Transfer_Payment_Stream_Cost_Category_Line_Item._deleted', '=', false)
-    .where('Agency_Cost_Category_Line_Item._deleted', '=', false)
-    .select([
-      'Transfer_Payment_Stream_Cost_Category_Line_Item.id as id',
-      'Agency_Cost_Category_Line_Item.egcs_ay_name_en as line_item_name_en',
-      'Agency_Cost_Category_Line_Item.egcs_ay_name_fr as line_item_name_fr'
-    ])
-    .forUpdate('Transfer_Payment_Stream_Cost_Category_Line_Item')
-    .executeTakeFirst()
 }
 
 const fetchAgreementBudgetLineFiscalYearLabel = async (

@@ -188,10 +188,14 @@ export type TransferPaymentEligibleRecipient = z.infer<typeof TransferPaymentEli
 export type TransferPaymentEligibleRecipientItem = WithId<TransferPaymentEligibleRecipient>
 
 export const TransferPaymentCostCategoryLineItemSchema = z.object({
+  egcs_tp_active: z.boolean({ error: 'validation.required' }).default(true),
   egcs_tp_organizationcostcategory: RequiredId(),
   egcs_tp_costsharingratio: RequiredNumeric(5, 2)
 })
 
+export const TransferPaymentCostCategoryLineItemPatchSchema = TransferPaymentCostCategoryLineItemSchema.omit({ egcs_tp_active: true }).partial().extend({
+  egcs_tp_active: z.boolean({ error: 'validation.required' }).optional()
+})
 export type TransferPaymentCostCategoryLineItem = z.infer<typeof TransferPaymentCostCategoryLineItemSchema>
 export type TransferPaymentCostCategoryLineItemItem = WithId<TransferPaymentCostCategoryLineItem>
 

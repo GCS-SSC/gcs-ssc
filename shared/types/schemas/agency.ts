@@ -120,13 +120,18 @@ export type AgencyHoldbackBasisItem = WithId<AgencyHoldbackBasis>
 
 // --- Cost Category ---
 export const AgencyCostCategorySchema = z.object({
+  egcs_ay_active: z.boolean({ error: 'validation.required' }).default(true),
   egcs_ay_name_en: z.string({ error: 'validation.name_en_required' }).trim().min(1, { error: 'validation.name_en_required' }),
   egcs_ay_name_fr: z.string({ error: 'validation.name_fr_required' }).trim().min(1, { error: 'validation.name_fr_required' })
+})
+export const AgencyCostCategoryPatchSchema = AgencyCostCategorySchema.omit({ egcs_ay_active: true }).partial().extend({
+  egcs_ay_active: z.boolean({ error: 'validation.required' }).optional()
 })
 export type AgencyCostCategory = z.infer<typeof AgencyCostCategorySchema>
 export type AgencyCostCategoryItem = WithId<AgencyCostCategory>
 
 export const AgencyCostCategoryInitial: AgencyCostCategoryItem = {
+  egcs_ay_active: true,
   id: '',
   egcs_ay_name_en: '',
   egcs_ay_name_fr: ''

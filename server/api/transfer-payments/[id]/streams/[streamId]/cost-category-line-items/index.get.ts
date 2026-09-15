@@ -66,6 +66,8 @@ export default defineEventHandler(async event => {
     baseQuery
       .select([
         'Transfer_Payment_Stream_Cost_Category_Line_Item.id as id',
+        'Transfer_Payment_Stream_Cost_Category_Line_Item.egcs_tp_active',
+        'Agency_Cost_Category.egcs_ay_active as category_active',
         'Transfer_Payment_Stream_Cost_Category_Line_Item.egcs_tp_transferpaymentstream as egcs_tp_transferpaymentstream',
         'Transfer_Payment_Stream_Cost_Category_Line_Item.egcs_tp_organizationcostcategory as egcs_tp_organizationcostcategory',
         'Transfer_Payment_Stream_Cost_Category_Line_Item.egcs_tp_costsharingratio as egcs_tp_costsharingratio',

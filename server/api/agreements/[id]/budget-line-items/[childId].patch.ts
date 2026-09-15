@@ -1,3 +1,4 @@
+import { fetchAgreementBudgetCostCategory } from '~~/server/utils/cost-configuration-integrity'
 import { prepareBudgetCalculation, recalculateAgreementBudget } from '~~/server/utils/agreement-budget-calculation'
 /* eslint-disable jsdoc/require-jsdoc -- Budget line-item route behavior is covered by focused route tests. */
 import type { H3Event } from 'h3'
@@ -92,6 +93,7 @@ const getExistingBudgetLineItem = async (
     .select([
       'Funding_Case_Agreement_Budget_Line_Item.id as id',
       budgetLineItemStableId.as('egcs_fc_budgetlineitemidentity'),
+      'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_organizationcostcategory',
       'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreementbudgetfiscalyear as egcs_fc_fundingagreementbudgetfiscalyear',
       budgetFiscalYearStableId.as('egcs_fc_budgetfiscalyearidentity'),
       databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_totalamount')).as('egcs_fc_totalamount'),
@@ -110,7 +112,8 @@ const assertBudgetLinePatchReferences = async (
   db: AgreementBudgetLineDb,
   agreementId: string,
   streamId: string,
-  patchValues: FundingCaseAgreementBudgetLineItemPatch
+  patchValues: FundingCaseAgreementBudgetLineItemPatch,
+  retainedCostCategoryId: string
 ) => {
   let fiscalYearRowId: string | undefined
   if (Object.hasOwn(patchValues, 'egcs_fc_fundingagreementbudgetfiscalyear')) {
@@ -139,20 +142,9 @@ const assertBudgetLinePatchReferences = async (
   }
 
   if (Object.hasOwn(patchValues, 'egcs_fc_organizationcostcategory')) {
-    const costCategory = await db
-      .selectFrom('Transfer_Payment_Stream_Cost_Category_Line_Item')
-      .innerJoin(
-        'Agency_Cost_Category_Line_Item',
-        'Agency_Cost_Category_Line_Item.id',
-        'Transfer_Payment_Stream_Cost_Category_Line_Item.egcs_tp_organizationcostcategory'
-      )
-      .where(sql<string>`"Transfer_Payment_Stream_Cost_Category_Line_Item"."id"::text`, '=', patchValues.egcs_fc_organizationcostcategory as string)
-      .where('Transfer_Payment_Stream_Cost_Category_Line_Item.egcs_tp_transferpaymentstream', '=', streamId)
-      .where('Transfer_Payment_Stream_Cost_Category_Line_Item._deleted', '=', false)
-      .where('Agency_Cost_Category_Line_Item._deleted', '=', false)
-      .select('Transfer_Payment_Stream_Cost_Category_Line_Item.id')
-      .forUpdate('Transfer_Payment_Stream_Cost_Category_Line_Item')
-      .executeTakeFirst()
+    const costCategory = await fetchAgreementBudgetCostCategory(db, streamId, patchValues.egcs_fc_organizationcostcategory as string, {
+      retainedCostCategoryId
+    })
 
     if (!costCategory) {
       return { response: await badRequest(event, 'INVALID_AGREEMENT_BUDGET_LINE_ITEM', 'apiErrors.agreement.invalid_cost_category_line_item') }
@@ -303,7 +295,7 @@ const resolveBudgetLinePatchInput = async (
   }
 
   const patchValues = await readValidatedBodyI18n(event, FundingCaseAgreementBudgetLineItemPatchSchema)
-  const referenceGuard = await assertBudgetLinePatchReferences(event, db, agreementId, streamId, patchValues)
+  const referenceGuard = await assertBudgetLinePatchReferences(event, db, agreementId, streamId, patchValues, String(existing.egcs_fc_organizationcostcategory))
   if ('response' in referenceGuard) {
     return { response: referenceGuard.response }
   }

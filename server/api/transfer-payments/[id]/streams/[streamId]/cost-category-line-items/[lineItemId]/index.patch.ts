@@ -1,5 +1,5 @@
 import type { Scope } from '~~/shared/utils/scopes'
-import { TransferPaymentCostCategoryLineItemSchema } from '~~/shared/types/schemas'
+import { TransferPaymentCostCategoryLineItemPatchSchema } from '~~/shared/types/schemas'
 import { authorize } from '~~/server/utils/authorize'
 import { authorizeTransferPaymentCostCategoryLineItemResource, createTransferPaymentScopedAuthorizeHandler } from '~~/server/utils/transfer-payment-route-authorization'
 import { throwIfTransferPaymentUniqueConstraintError } from '~~/server/utils/transfer-payment-unique-constraint-errors'
@@ -66,7 +66,7 @@ export default defineEventHandler(async event => {
   }
 
   await authorize(event, 'transfer_payment', 'update', createTransferPaymentScopedAuthorizeHandler('update', scope, db))
-  const validated = await readValidatedBodyI18n(event, TransferPaymentCostCategoryLineItemSchema.partial())
+  const validated = await readValidatedBodyI18n(event, TransferPaymentCostCategoryLineItemPatchSchema)
   if (Object.keys(validated).length === 0) {
     return await badRequest(event, 'NO_UPDATABLE_FIELDS', 'apiErrors.request.no_updatable_fields')
   }

@@ -759,6 +759,7 @@ export interface AgencyHoldbackBasisTable {
 }
 
 export interface AgencyCostCategoryTable {
+  egcs_ay_active: Generated<boolean>
   id: Generated<string>
   egcs_ay_organizationagency: string
   egcs_ay_name_en: string
@@ -2087,6 +2088,7 @@ export interface TransferPaymentStreamEligibleRecipientTable {
 }
 
 export interface TransferPaymentStreamCostCategoryLineItemTable {
+  egcs_tp_active: Generated<boolean>
   id: Generated<string>
   egcs_tp_transferpaymentstream: string
   egcs_tp_organizationcostcategory: string

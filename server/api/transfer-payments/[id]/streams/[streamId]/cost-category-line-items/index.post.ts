@@ -44,6 +44,7 @@ export default defineEventHandler(async event => {
           .insertInto('Transfer_Payment_Stream_Cost_Category_Line_Item')
           .values({
             egcs_tp_transferpaymentstream: streamId,
+            egcs_tp_active: validated.egcs_tp_active,
             egcs_tp_organizationcostcategory: validated.egcs_tp_organizationcostcategory,
             egcs_tp_costsharingratio: validated.egcs_tp_costsharingratio
           })

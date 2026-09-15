@@ -50,6 +50,7 @@ type BudgetLeafRow = {
   costSubsectionGroup: string
   fiscalYearId: string
   fiscalYearDisplay: string
+  costCategoryAvailable?: boolean
   costCategoryId?: string
   costCategoryNameEn: string
   costCategoryNameFr: string
@@ -244,6 +245,15 @@ const bilingualColumns: BilingualColumnConfig<BudgetLeafRow>[] = [
 
 const fiscalYears = computed<FundingCaseAgreementBudgetFiscalYearRow[]>(() => overview.value?.fiscalYears ?? [])
 const lineItems = computed<FundingCaseAgreementBudgetLineItemRow[]>(() => overview.value?.lineItems ?? [])
+// Saved labels keep inactive references readable without adding them to new-line lookups.
+const retainedCostCategoryOptions = computed(() => {
+  const current = selectedLineItem.value
+  const saved = current?.id ? lineItems.value.find(item => item.id === current.id) : undefined
+  if (!saved || saved.cost_category_available !== false || current?.egcs_fc_organizationcostcategory !== saved.egcs_fc_organizationcostcategory) return []
+  const name = locale.value === 'fr' ? saved.line_item_name_fr : saved.line_item_name_en
+  return [{ value: saved.egcs_fc_organizationcostcategory, label: `${name ?? saved.egcs_fc_organizationcostcategory} (${t('common.inactive')})` }]
+})
+
 const calculationPreview = useBudgetCalculationPreview(selectedLineItem, lineItems)
 /**
  * Captures the selected agency defaults for a new budget row.
@@ -367,6 +377,7 @@ const tableRows = computed<BudgetLeafRow[]>(() => filteredFiscalYears.value.flat
     fiscalYearId: fiscalYear.id,
     fiscalYearDisplay: getFiscalYearDisplay(fiscalYear.egcs_fc_fiscalyear, fiscalYear.fiscal_year_display),
     costCategoryId: lineItem.egcs_fc_organizationcostcategory,
+    costCategoryAvailable: lineItem.cost_category_available,
     costCategoryNameEn: lineItem.organization_cost_category_name_en ?? '',
     costCategoryNameFr: lineItem.organization_cost_category_name_fr ?? '',
     costCategoryLabel: getCostCategoryDisplay(lineItem),
@@ -482,6 +493,7 @@ const openUpdateFiscalYear = (fiscalYear: FundingCaseAgreementBudgetFiscalYearRo
 }
 
 const openCreateLineItem = (fiscalYearId?: string, organizationCostCategoryId?: string, costSubsection?: string) => {
+  if (organizationCostCategoryId && lineItems.value.some(item => item.egcs_fc_organizationcostcategory === organizationCostCategoryId && item.cost_category_available === false)) return
   lineItemModal.openCreate()
   isLineItemCostCategoryLocked.value = false
   isLineItemCostSubsectionLocked.value = false
@@ -699,6 +711,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
               </span>
               <CommonStatusBadge variant="count" size="sm" :label="String(getGroupedRowCount(row as GroupedBudgetRow))" />
             </div>
+            <CommonStatusBadge v-if="row.original.costCategoryAvailable === false" variant="inactive" />
           </div>
 
           <div v-else-if="isCostSubsectionGroupRow(row as GroupedBudgetRow)" class="flex w-full items-center gap-3 py-1 pl-12">
@@ -815,6 +828,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
             size="sm"
             class="cursor-default"
             :aria-label="t('agreement.budget.add_line_item')"
+            :disabled="row.original.costCategoryAvailable === false"
             @click="openCreateLineItem(row.original.fiscalYearId, row.original.costCategoryId)" />
         </div>
 
@@ -827,6 +841,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
             size="sm"
             class="cursor-default"
             :aria-label="t('agreement.budget.add_line_item')"
+            :disabled="row.original.costCategoryAvailable === false"
             @click="openCreateLineItem(row.original.fiscalYearId, row.original.costCategoryId, row.original.costSubsectionGroup === '__all__' ? '' : row.original.costSubsectionLabel)" />
         </div>
 
@@ -934,6 +949,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
                 v-model="selectedLineItem.egcs_fc_organizationcostcategory"
                 :fetch-url="`/api/agreements/${agreementId}/budget-line-items/lookups/organization-cost-categories`"
                 selected-values-query-key="selected_ids"
+                :prepend-items="retainedCostCategoryOptions"
                 value-key="id"
                 label-en-key="label_en"
                 label-fr-key="label_fr"

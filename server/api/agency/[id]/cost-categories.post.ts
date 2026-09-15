@@ -27,6 +27,7 @@ export default defineEventHandler(async event => {
         .insertInto('Agency_Cost_Category')
         .values({
           egcs_ay_organizationagency: agencyId,
+          egcs_ay_active: validated.egcs_ay_active,
           egcs_ay_name_en: validated.egcs_ay_name_en,
           egcs_ay_name_fr: validated.egcs_ay_name_fr
         })

@@ -28,6 +28,7 @@ type CostCategoryTableRow = {
   id: string
   costCategoryGroup: string
   costCategoryId: string
+  costCategoryActive: boolean
   costCategoryNameEn: string
   costCategoryNameFr: string
   lineItemId?: string
@@ -191,6 +192,7 @@ const tableRows = computed<CostCategoryTableRow[]>(() => filteredCategories.valu
       id: `placeholder:${category.id}`,
       costCategoryGroup: category.id,
       costCategoryId: category.id,
+      costCategoryActive: category.egcs_ay_active !== false,
       costCategoryNameEn: category.egcs_ay_name_en,
       costCategoryNameFr: category.egcs_ay_name_fr,
       lineItemNameEn: '',
@@ -205,6 +207,7 @@ const tableRows = computed<CostCategoryTableRow[]>(() => filteredCategories.valu
     id: item.id,
     costCategoryGroup: category.id,
     costCategoryId: category.id,
+    costCategoryActive: category.egcs_ay_active !== false,
     costCategoryNameEn: category.egcs_ay_name_en,
     costCategoryNameFr: category.egcs_ay_name_fr,
     lineItemId: item.id,
@@ -236,7 +239,7 @@ const {
 const isCostCategoryGroupRow = (row: GroupedCostCategoryRow) => isGroupRow(row, COST_CATEGORY_GROUP_COLUMN_ID)
 
 const openCreateCategory = () => {
-  selectedCategory.value = {}
+  selectedCategory.value = { egcs_ay_active: true }
   isCategoryModalOpen.value = true
 }
 
@@ -418,6 +421,7 @@ const deleteLineItem = async (lineItemId: string) => {
               </span>
               <CommonStatusBadge variant="count" size="sm" :label="String(getGroupedRowCount(row as GroupedCostCategoryRow))" />
             </div>
+            <CommonStatusBadge v-if="!row.original.costCategoryActive" variant="inactive" />
           </div>
 
           <div
@@ -510,6 +514,10 @@ const deleteLineItem = async (lineItemId: string) => {
           </UFormField>
           <UFormField :label="t('agency.name_fr')" name="egcs_ay_name_fr">
             <UInput v-model="selectedCategory.egcs_ay_name_fr" />
+          </UFormField>
+
+          <UFormField name="egcs_ay_active" :description="t('agency.cost_category_active_help')">
+            <UCheckbox v-model="selectedCategory.egcs_ay_active" :label="t('common.active')" />
           </UFormField>
 
           <div class="flex justify-end gap-2 pt-4">

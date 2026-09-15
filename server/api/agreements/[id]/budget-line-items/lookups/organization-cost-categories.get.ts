@@ -41,6 +41,10 @@ export default defineEventHandler(async event => {
       'Agency_Cost_Category_Line_Item.id',
       'Transfer_Payment_Stream_Cost_Category_Line_Item.egcs_tp_organizationcostcategory'
     )
+    .innerJoin('Agency_Cost_Category', 'Agency_Cost_Category.id', 'Agency_Cost_Category_Line_Item.egcs_ay_organizationcostcategory')
+    .where('Agency_Cost_Category._deleted', '=', false)
+    .where('Agency_Cost_Category.egcs_ay_active', '=', true)
+    .where('Transfer_Payment_Stream_Cost_Category_Line_Item.egcs_tp_active', '=', true)
     .where('Transfer_Payment_Stream_Cost_Category_Line_Item.egcs_tp_transferpaymentstream', '=', agreementContext.streamId)
     .where('Transfer_Payment_Stream_Cost_Category_Line_Item._deleted', '=', false)
     .where('Agency_Cost_Category_Line_Item._deleted', '=', false)

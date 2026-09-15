@@ -504,6 +504,7 @@ const insertSimpleStreamWizardChildren = async (
     await trx.insertInto('Transfer_Payment_Stream_Cost_Category_Line_Item').values(payload.costCategoryLineItems.map(item => ({
       egcs_tp_transferpaymentstream: streamId,
       egcs_tp_organizationcostcategory: item.egcs_tp_organizationcostcategory,
+      egcs_tp_active: item.egcs_tp_active,
       egcs_tp_costsharingratio: item.egcs_tp_costsharingratio
     }))).execute()
   }

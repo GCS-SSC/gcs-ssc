@@ -340,6 +340,7 @@ export const useTransferPaymentStreamWizardModal = ({
     addListItem('costCategoryLineItems', () => ({
       tempId: nanoid(),
       egcs_tp_organizationcostcategory: '',
+      egcs_tp_active: true,
       egcs_tp_costsharingratio: 0
     }))
   }

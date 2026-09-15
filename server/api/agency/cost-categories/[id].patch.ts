@@ -1,4 +1,4 @@
-import { AgencyCostCategorySchema } from '~~/shared/types/schemas'
+import { AgencyCostCategoryPatchSchema } from '~~/shared/types/schemas'
 import { authorizeActiveAgencyCostCategory, withActiveAgencyCostCategoryMutationTransaction } from '~~/server/utils/agency-auth'
 import { throwIfAgencyUniqueConstraintError } from '~~/server/utils/agency-unique-constraint-errors'
 
@@ -11,7 +11,7 @@ export default defineEventHandler(async event => {
     'update',
     { code: 'CATEGORY_NOT_FOUND', key: 'apiErrors.agency.category_not_found' }
   )
-  const body = await readValidatedBodyI18n(event, AgencyCostCategorySchema.partial())
+  const body = await readValidatedBodyI18n(event, AgencyCostCategoryPatchSchema)
   if (Object.keys(body).length === 0) {
     return await badRequest(event, 'NO_UPDATABLE_FIELDS', 'apiErrors.request.no_updatable_fields')
   }

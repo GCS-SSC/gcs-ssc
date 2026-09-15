@@ -464,6 +464,7 @@
     }
   },
   "agency": {
+    "cost_category_active_help": "Inactive categories remain on existing budgets but cannot be used for new budget lines.",
     "title": "Agencies",
     "new": "New Agency",
     "create_title": "Add Agency",
@@ -1248,6 +1249,7 @@
     }
   },
   "transfer_payment": {
+    "cost_line_active_help": "Inactive line items remain on existing budgets but cannot be used for new budget lines. The agency cost category must also be active.",
     "holdback_bases": "Holdback Bases",
     "holdback_basis": "Holdback basis",
     "agency_holdback_basis": "Agency holdback basis",

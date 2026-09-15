@@ -1,3 +1,4 @@
+import { fetchAgreementBudgetCostCategory } from '~~/server/utils/cost-configuration-integrity'
 import { FundingCaseAgreementBudgetLineItemFundingTotalsSchema, FundingCaseAgreementBudgetLineItemCreateSchema } from '~~/shared/types/schemas'
 import { parseI18n } from '~~/server/utils/api-validate'
 import { prepareBudgetCalculation, recalculateAgreementBudget } from '~~/server/utils/agreement-budget-calculation'
@@ -25,9 +26,7 @@ export default defineEventHandler(async event => {
     const year = await trx.selectFrom('Funding_Case_Agreement_Budget_Fiscal_Year').select('id')
       .where(budgetFiscalYearStableId, '=', body.egcs_fc_fundingagreementbudgetfiscalyear).where('egcs_fc_budgetversion', '=', versionId).where('_deleted', '=', false).executeTakeFirst()
     if (!year) return await notFound(event, 'AGREEMENT_BUDGET_FISCAL_YEAR_NOT_FOUND', 'apiErrors.agreement.budget_fiscal_year_not_found')
-    const category = await trx.selectFrom('Transfer_Payment_Stream_Cost_Category_Line_Item').select('id')
-      .where('id', '=', body.egcs_fc_organizationcostcategory).where('egcs_tp_transferpaymentstream', '=', context.streamId).where('_deleted', '=', false)
-      .forUpdate().executeTakeFirst()
+    const category = await fetchAgreementBudgetCostCategory(trx, context.streamId, body.egcs_fc_organizationcostcategory)
     if (!category) return await badRequest(event, 'INVALID_AGREEMENT_BUDGET_LINE_ITEM', 'apiErrors.agreement.invalid_cost_category_line_item')
     const calculation = await prepareBudgetCalculation(event, trx, body, undefined, String(year.id))
     await parseI18n(event, FundingCaseAgreementBudgetLineItemFundingTotalsSchema, { ...body, egcs_fc_programfunding: calculation.egcs_fc_programfunding ?? body.egcs_fc_programfunding })

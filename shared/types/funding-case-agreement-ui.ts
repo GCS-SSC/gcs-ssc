@@ -136,6 +136,7 @@ export interface FundingCaseAgreementBudgetLineItemRow extends Omit<FundingCaseA
   egcs_fc_otherfederalfunding?: Money | null
   egcs_fc_othergovfunding?: Money | null
   egcs_fc_otherfunding?: Money | null
+  cost_category_available?: boolean
   fiscal_year_id: string
   fiscal_year_display?: string | null
   organization_cost_category_name_en?: string | null
