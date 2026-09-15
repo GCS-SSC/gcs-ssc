@@ -73,7 +73,8 @@ export const TransferPaymentProfileBaseSchema = z.object({
   egcs_tp_description_fr: RequiredString(),
   egcs_tp_purpose_en: RequiredString(),
   egcs_tp_purpose_fr: RequiredString(),
-  egcs_tp_tclink: RequiredString().url({ message: 'validation.invalid_url' }),
+  egcs_tp_tclink_en: RequiredString().url({ message: 'validation.invalid_url' }),
+  egcs_tp_tclink_fr: RequiredString().url({ message: 'validation.invalid_url' }),
   egcs_tp_active: z.boolean().default(false)
 })
 

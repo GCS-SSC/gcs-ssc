@@ -153,9 +153,14 @@ const onEndDateInput = (value: string | Date | null | undefined) => {
     </UFormField>
   </div>
 
-  <UFormField :label="t('transfer_payment.terms_link')" :name="field('egcs_tp_tclink')">
-    <UInput v-model="model.egcs_tp_tclink" placeholder="https://..." />
-  </UFormField>
+  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }">
+    <UFormField :label="t('transfer_payment.terms_link_en')" :name="field('egcs_tp_tclink_en')">
+      <UInput v-model="model.egcs_tp_tclink_en" placeholder="https://..." />
+    </UFormField>
+    <UFormField :label="t('transfer_payment.terms_link_fr')" :name="field('egcs_tp_tclink_fr')">
+      <UInput v-model="model.egcs_tp_tclink_fr" placeholder="https://..." />
+    </UFormField>
+  </div>
 
   <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }">
     <UFormField :label="t('transfer_payment.description_en')" :name="field('egcs_tp_description_en')">

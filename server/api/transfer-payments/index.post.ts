@@ -53,7 +53,8 @@ export default defineEventHandler(async event => {
         egcs_tp_description_fr: validated.egcs_tp_description_fr,
         egcs_tp_purpose_en: validated.egcs_tp_purpose_en,
         egcs_tp_purpose_fr: validated.egcs_tp_purpose_fr,
-        egcs_tp_tclink: validated.egcs_tp_tclink,
+        egcs_tp_tclink_en: validated.egcs_tp_tclink_en,
+        egcs_tp_tclink_fr: validated.egcs_tp_tclink_fr,
         egcs_tp_active: validated.egcs_tp_active
       })
       .returningAll()

@@ -64,6 +64,7 @@ const EXPECTED_CORE_MIGRATIONS = [
   '0011_storage_cleanup_outbox',
   '0012_recommendation_revision',
   '0013_audit',
+  '0014_program_terms_links',
   '9999_seed'
 ] as const
 

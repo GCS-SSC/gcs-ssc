@@ -23,15 +23,30 @@ const { t } = useI18n()
       <UCard class="border-none bg-white shadow-sm ring-1 ring-zinc-100 dark:bg-zinc-900 dark:ring-zinc-800">
         <div class="space-y-1">
           <p class="mb-2 text-xs leading-none font-black tracking-widest text-zinc-400 uppercase dark:text-zinc-500">
-            {{ t('transfer_payment.terms_link') }}
+            {{ t('transfer_payment.terms_link_en') }}
           </p>
           <a
             class="text-primary text-sm font-black break-all underline underline-offset-2"
-            :href="profile.egcs_tp_tclink"
+            :href="profile.egcs_tp_tclink_en"
             target="_blank"
             rel="noopener noreferrer"
-            :aria-label="t('transfer_payment.terms_link')">
-            {{ profile.egcs_tp_tclink }}
+            :aria-label="t('transfer_payment.terms_link_en')">
+            {{ profile.egcs_tp_tclink_en }}
+          </a>
+        </div>
+      </UCard>
+      <UCard class="border-none bg-white shadow-sm ring-1 ring-zinc-100 dark:bg-zinc-900 dark:ring-zinc-800">
+        <div class="space-y-1">
+          <p class="mb-2 text-xs leading-none font-black tracking-widest text-zinc-400 uppercase dark:text-zinc-500">
+            {{ t('transfer_payment.terms_link_fr') }}
+          </p>
+          <a
+            class="text-primary text-sm font-black break-all underline underline-offset-2"
+            :href="profile.egcs_tp_tclink_fr"
+            target="_blank"
+            rel="noopener noreferrer"
+            :aria-label="t('transfer_payment.terms_link_fr')">
+            {{ profile.egcs_tp_tclink_fr }}
           </a>
         </div>
       </UCard>

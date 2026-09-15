@@ -94,7 +94,8 @@ export const listTransferPayments = async (
         'Transfer_Payment_Profile.egcs_tp_description_fr as egcs_tp_description_fr',
         'Transfer_Payment_Profile.egcs_tp_purpose_en as egcs_tp_purpose_en',
         'Transfer_Payment_Profile.egcs_tp_purpose_fr as egcs_tp_purpose_fr',
-        'Transfer_Payment_Profile.egcs_tp_tclink as egcs_tp_tclink',
+        'Transfer_Payment_Profile.egcs_tp_tclink_en as egcs_tp_tclink_en',
+        'Transfer_Payment_Profile.egcs_tp_tclink_fr as egcs_tp_tclink_fr',
         'Transfer_Payment_Profile.egcs_tp_active as egcs_tp_active',
         'Agency_Profile.egcs_ay_name_en as agency_name_en',
         'Agency_Profile.egcs_ay_name_fr as agency_name_fr'
