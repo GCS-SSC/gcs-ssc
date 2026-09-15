@@ -20,20 +20,23 @@ COPY package.json bun.lock ./
 # and Nuxt's install-time preparation can load its source exports.
 COPY packages/gcs-ssc-authorization ./packages/gcs-ssc-authorization
 
-# Remote Docker build contexts may omit Git submodule contents. Fetch every
-# workspace at the exact gitlink commit recorded by this repository. The later
-# source copy overlays these with local checkouts when they are available.
+# Prefer complete source checkouts, including private extension repositories.
+# Remote contexts without submodule contents fall back to the pinned commits.
+COPY packages/gcs-ssc-extensions/ ./packages/gcs-ssc-extensions/
+COPY extensions/ ./extensions/
 RUN set -eux; \
   fetch_workspace() { \
     repository="$1"; destination="$2"; commit="$3"; \
+    if [ -f "$destination/package.json" ] && { [ -f "$destination/extension.config.ts" ] || [ -f "$destination/src/index.ts" ]; }; then return; fi; \
     mkdir -p "$destination"; \
     git -C "$destination" init; \
     git -C "$destination" remote add origin "$repository"; \
-    git -C "$destination" fetch --depth 1 origin "$commit"; \
+    git -C "$destination" fetch --depth 1 origin "$commit" || { echo "Unable to fetch $destination; provide its complete authenticated checkout in the build context." >&2; exit 1; }; \
     git -C "$destination" checkout --detach FETCH_HEAD; \
     rm -rf "$destination/.git"; \
   }; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-ssc-extensions.git packages/gcs-ssc-extensions 09309322185649535621bd8b086937b82f65059d; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-ssc-extensions.git packages/gcs-ssc-extensions 11cb79ab42f9b42012ad366cb094a1a71e8e00f0; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-agreement-number.git extensions/gcs-agreement-number 58bbc5661ef13273eedf1d4a57359680affadfb0; \
   fetch_workspace https://github.com/GCS-SSC/gcs-automated-payments.git extensions/gcs-automated-payments bf78be2b484c6c0ea6692aa255f96824f4f9ad13; \
   fetch_workspace https://github.com/GCS-SSC/gcs-gcforms-integration.git extensions/gcs-gcforms-integration 9449c36fc7ae35262bcf6449afa75cbf84097e7c; \
   fetch_workspace https://github.com/GCS-SSC/gcs-narrative-quality.git extensions/gcs-narrative-quality 83df2ce0869bb91b9cdaeb7deecb2097c2620711; \
