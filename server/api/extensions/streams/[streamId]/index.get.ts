@@ -51,7 +51,7 @@ export default defineEventHandler(async event => {
     const agencyEnabled = new Map(agencyRows.map(row => [row.extension_key, row.enabled === true]))
     const streamConfig = new Map(streamRows.map(row => [row.extension_key, row]))
     const items: ExtensionStreamRegistryItem[] = extensions
-      .filter(extension => agencyEnabled.get(extension.key) === true)
+      .filter(extension => extension.configurationScope !== 'agency' && agencyEnabled.get(extension.key) === true)
       .map(extension => {
         const row = streamConfig.get(extension.key)
         return {

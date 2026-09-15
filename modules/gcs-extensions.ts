@@ -66,6 +66,7 @@ const EXTENSION_HOST_CAPABILITIES = new Set([
   'lifecycle-entities',
   'agreement-number-provider',
   'configuration-access',
+  'agency-only-configuration',
   'file-storage-provider'
 ])
 const EXTENSION_LIFECYCLE_COMPLETION_CAPABILITIES = new Set(['supported', 'none'])
@@ -329,6 +330,7 @@ const inferRequiredHostCapabilities = (definition: GcsExtensionDefinition): Set<
   addImpliedCapability(capabilities, (definition.entities ?? []).length > 0, 'lifecycle-entities')
   addImpliedCapability(capabilities, Boolean(definition.agreementNumberProvider), 'agreement-number-provider')
   addImpliedCapability(capabilities, definition.configurationAccess !== undefined, 'configuration-access')
+  addImpliedCapability(capabilities, definition.configurationScope !== undefined, 'agency-only-configuration')
   addImpliedCapability(capabilities, Boolean(definition.fileStorageProvider), 'file-storage-provider')
 
   return capabilities
@@ -462,6 +464,12 @@ const validateFileStorageProviderDefinition = (definition: GcsExtensionDefinitio
 
 /** Validates extension identity, bilingual naming, SDK compatibility, and host capabilities. */
 export const validateExtensionDefinition = (definition: GcsExtensionDefinition, extensionDir: string): void => {
+  if (definition.configurationScope !== undefined && definition.configurationScope !== 'agency') {
+    throw new Error(`Extension ${definition.key} configurationScope must be agency`)
+  }
+  if (definition.configurationScope === 'agency' && (definition.admin?.streamConfig || definition.admin?.streamConfigPage)) {
+    throw new Error(`Extension ${definition.key} agency-only configuration cannot declare stream editors`)
+  }
   if (definition.configurationAccess !== undefined
     && definition.configurationAccess !== 'contributor'
     && definition.configurationAccess !== 'manager') {
@@ -1052,6 +1060,7 @@ const resolveExtensionDirectory = async (
   return {
     key: definition.key,
     configurationAccess: definition.configurationAccess,
+    configurationScope: definition.configurationScope,
     name: definition.name,
     description: definition.description,
     sdkVersion: definition.sdkVersion,
@@ -1139,6 +1148,7 @@ const withoutComponentPath = <T extends { path: string }>(
 const buildClientExtensionMetadata = (extension: GcsResolvedExtension): GcsClientExtensionManifest => ({
   key: extension.key,
   configurationAccess: extension.configurationAccess,
+  configurationScope: extension.configurationScope,
   name: extension.name,
   description: extension.description,
   sdkVersion: extension.sdkVersion,

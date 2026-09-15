@@ -19,7 +19,9 @@ export const resolveAgreementNumberProvider = async (event: H3Event, db: Kysely<
   const providers = []
   for (const extension of await getGcsExtensions()) {
     if (!extension.agreementNumberProvider || !await isExtensionEnabledForAgency(db, extension.key, agencyId)) continue
-    const stream = await getExtensionStreamConfiguration(db, extension.key, streamId)
+    const stream = extension.configurationScope === 'agency'
+      ? { enabled: true, config: {} }
+      : await getExtensionStreamConfiguration(db, extension.key, streamId)
     if (!stream.enabled) continue
     const agency = await db.selectFrom('extensions.agency_enablement').select('config')
       .where('extension_key', '=', extension.key).where('agency_id', '=', agencyId).where('_deleted', '=', false).executeTakeFirstOrThrow()

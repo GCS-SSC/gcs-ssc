@@ -392,6 +392,7 @@ export const toClientExtensionManifest = (
 ): GcsClientExtensionManifest => ({
   key: extension.key,
   configurationAccess: extension.configurationAccess,
+  configurationScope: extension.configurationScope,
   name: extension.name,
   description: extension.description,
   sdkVersion: extension.sdkVersion,
