@@ -236,9 +236,10 @@ export const runManagedExtensionE2e = async (
     server?.kill()
     await Promise.allSettled([
       playwright?.exited,
-      server?.exited,
-      dataPaths.cleanup()
-    ].filter((value): value is Promise<number> | Promise<void> => value !== undefined))
+      server?.exited
+    ].filter((value): value is Promise<number> => value !== undefined))
+    // Keep PGlite files available until the server has drained audit evidence and closed.
+    await dataPaths.cleanup()
   }
   /**
    * Cleans up before exiting for a process signal.
