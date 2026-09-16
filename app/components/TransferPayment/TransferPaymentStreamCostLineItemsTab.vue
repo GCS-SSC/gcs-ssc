@@ -174,7 +174,23 @@ const { data: costLineItemResponse } = await useAgencyReferenceData<AgencyCostCa
     </template>
 
     <template #availability-cell="{ row }">
-      <CommonStatusBadge :variant="row.original.egcs_tp_active !== false && row.original.category_active !== false && row.original.agency_line_item_active !== false ? 'enabled' : 'disabled'" />
+      <div class="flex flex-wrap gap-2">
+        <CommonStatusBadge
+          v-if="row.original.egcs_tp_active !== false && row.original.category_active !== false && row.original.agency_line_item_active !== false"
+          variant="active" />
+        <CommonStatusBadge
+          v-if="row.original.egcs_tp_active === false"
+          variant="inactive"
+          label-key="transfer_payment.cost_line_stream_inactive" />
+        <CommonStatusBadge
+          v-if="row.original.category_active === false"
+          variant="inactive"
+          label-key="transfer_payment.cost_line_category_inactive" />
+        <CommonStatusBadge
+          v-if="row.original.agency_line_item_active === false"
+          variant="inactive"
+          label-key="transfer_payment.cost_line_agency_inactive" />
+      </div>
     </template>
 
     <template #actions-cell="{ row }">

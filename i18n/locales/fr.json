@@ -1250,6 +1250,9 @@
     }
   },
   "transfer_payment": {
+    "cost_line_stream_inactive": "Volet inactif",
+    "cost_line_category_inactive": "Catégorie inactive",
+    "cost_line_agency_inactive": "Organisme inactif",
     "cost_line_active_help": "Les postes inactifs restent dans les budgets existants, mais ne peuvent pas être utilisés pour de nouvelles lignes budgétaires. La catégorie de coûts et le poste de l’organisme doivent également être actifs.",
     "holdback_bases": "Bases de retenue",
     "holdback_basis": "Base de retenue",

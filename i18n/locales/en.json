@@ -1250,6 +1250,9 @@
     }
   },
   "transfer_payment": {
+    "cost_line_stream_inactive": "Stream Inactive",
+    "cost_line_category_inactive": "Category Inactive",
+    "cost_line_agency_inactive": "Agency Inactive",
     "cost_line_active_help": "Inactive line items remain on existing budgets but cannot be used for new budget lines. The agency cost category and line item must also be active.",
     "holdback_bases": "Holdback Bases",
     "holdback_basis": "Holdback basis",
