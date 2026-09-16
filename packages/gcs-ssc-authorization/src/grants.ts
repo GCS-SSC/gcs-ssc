@@ -25,12 +25,13 @@ export type StaticAuthorizationGrantInput = {
 const normalizeStaticGrant = (
   grant: StaticAuthorizationGrantInput
 ): StaticAuthorizationGrant | null => {
-  if (grant.subject === 'audit' && grant.action !== 'read') return null
+  if (grant.subject === 'audit' && !['read', 'view_audit_inputs'].includes(grant.action)) return null
+  if (grant.action === 'view_audit_inputs' && grant.subject !== 'audit') return null
   if (grant.source !== 'role') return null
   if (grant.scope.type === 'entity') return null
 
   if (grant.action === 'manage_assignments' && !canSubjectManageAssignments(grant.subject)) return null
-  if (grant.action !== 'manage_assignments' && !isRoleAbility(grant)) return null
+  if (grant.action !== 'manage_assignments' && grant.action !== 'view_audit_inputs' && !isRoleAbility(grant)) return null
   if (!isAbilityAllowedForRoleScope(grant.subject, grant.scope.type)) return null
   return { ...grant, scope: grant.scope }
 }
@@ -63,6 +64,12 @@ export class UserAbilities {
     return this.grants
       .map(grant => ({ ...grant, scope: { ...grant.scope } }))
       .sort((left, right) => buildStaticGrantKey(left).localeCompare(buildStaticGrantKey(right)))
+  }
+
+  canViewAuditInputs(requiredScope: AuthorizationScope): boolean {
+    return this.grants.some(grant => grant.subject === 'audit'
+      && grant.action === 'view_audit_inputs'
+      && isAuthorizationScopeCovered(grant.scope, requiredScope))
   }
 
   canManageAssignments(subject: AuthorizationSubject, requiredScope: AuthorizationScope): boolean {

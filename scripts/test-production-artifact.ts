@@ -65,7 +65,8 @@ export const PRODUCTION_CORE_MIGRATIONS = [
   '0012_recommendation_revision',
   '0013_audit',
   '0014_program_terms_links',
-  '0015_cost_category_availability'
+  '0015_cost_category_availability',
+  '0016_agency_audit'
 ] as const
 
 export const PROHIBITED_PRODUCTION_BUNDLE_VALUES = [
@@ -619,7 +620,7 @@ const waitForProductionMigrations = async (
   artifact: RunningArtifact,
   timeoutMs: number = DEFAULT_START_TIMEOUT_MS
 ): Promise<void> => {
-  const expectedLine = 'migration "0015_cost_category_availability" was executed successfully'
+  const expectedLine = 'migration "0016_agency_audit" was executed successfully'
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     const output = artifact.output()
@@ -652,7 +653,7 @@ const waitForDatabaseUrlPrecedence = async (
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     const output = artifact.output()
-    if (output.includes('migration "0015_cost_category_availability" was executed successfully')) {
+    if (output.includes('migration "0016_agency_audit" was executed successfully')) {
       throw new Error(`PGLite unexpectedly won precedence over runtime DATABASE_URL.\n${output}`)
     }
     if (output.includes('failed to migrate')) {
@@ -898,7 +899,7 @@ export const runProductionArtifactTest = async (
     await verifyCoreMigrations(pgliteDataDir)
     assert.equal(await pathExists(ignoredNuxtPgliteDir), false, 'NUXT_PGLITE_DATA_DIR unexpectedly won precedence')
     assert.deepEqual(await readdir(storageDir), [], 'Production migrations unexpectedly wrote seed assets')
-    console.info('[artifact] Verified plain PGLITE_DATA_DIR precedence and 10 production migrations without seed assets.')
+    console.info(`[artifact] Verified plain PGLITE_DATA_DIR precedence and ${PRODUCTION_CORE_MIGRATIONS.length} production migrations without seed assets.`)
 
     port = await acquireEphemeralPort()
     baseUrl = `http://127.0.0.1:${String(port)}`

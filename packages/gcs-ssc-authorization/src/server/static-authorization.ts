@@ -56,6 +56,13 @@ const buildRoleGrant = (
     assignment.transferPaymentId ?? undefined
   )
   if (!scope) return []
+  if (row.subject === 'audit') {
+    if (!row.access_level) return []
+    return [
+      { source: 'role', action: 'read', subject: 'audit', scope },
+      ...(row.access_level === 'manager' ? [{ source: 'role', action: 'view_audit_inputs', subject: 'audit', scope } as StaticAuthorizationGrant] : [])
+    ]
+  }
   const grants: StaticAuthorizationGrant[] = (row.access_level ? ACCESS_LEVEL_ACTIONS[row.access_level] ?? [] : [])
     .map(action => ({ source: 'role', action, subject: row.subject, scope }))
   if (row.can_manage_assignments && canSubjectManageAssignments(row.subject)) {

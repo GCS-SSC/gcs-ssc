@@ -1,3 +1,4 @@
+import { captureParsedAuditRequestBody } from './audit-request'
 import { getQuery, readBody, type H3Event } from 'h3'
 import type { z } from 'zod'
 import { ZodError } from 'zod'
@@ -41,6 +42,7 @@ export const readValidatedBodyI18n = async <TSchema extends z.ZodTypeAny>(
   schema: TSchema
 ): Promise<z.infer<TSchema>> => {
   const body = await readBody(event)
+  await captureParsedAuditRequestBody(event, body)
   return await parseI18n(event, schema, body)
 }
 

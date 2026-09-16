@@ -1,3 +1,4 @@
+import { publishExtensionAuditOwnership } from '../database/extension-audit-ownership'
 import { reconcileAuditCapture } from './audit-runtime'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Temporary coverage while extension runtime APIs receive complete documentation. */
 import { createHash } from 'node:crypto'
@@ -1160,9 +1161,12 @@ export const runExtensionMigrations = async (
   db: Kysely<Database>,
   extension: GcsRegisteredExtension
 ): Promise<MigrationResult[]> => {
+  if (!db.isTransaction) return await db.transaction().execute(trx => runExtensionMigrations(trx, extension))
   await synchronizeExtensionLifecycleEntityTypes(db, extension)
   const migrations = extension.migrations ?? []
   if (migrations.length === 0) {
+    await publishExtensionAuditOwnership(db, extension)
+    await reconcileAuditCapture(db)
     return []
   }
 
@@ -1193,6 +1197,7 @@ export const runExtensionMigrations = async (
     throw error
   }
 
+  await publishExtensionAuditOwnership(db, extension)
   await reconcileAuditCapture(db)
   return results ?? []
 }

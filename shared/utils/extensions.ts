@@ -1,5 +1,6 @@
 import type {
   GcsClientExtensionManifest,
+  GcsAuditTableOwnership,
   GcsExtensionEntityTabTarget,
   GcsExtensionHostCapability,
   GcsRegisteredFileStorageProviderDefinition,
@@ -53,6 +54,7 @@ export interface GcsRegisteredExtensionRuntime {
  * contributions deliberately never cross this runtime boundary.
  */
 export interface GcsRegisteredExtension extends GcsClientExtensionManifest {
+  auditOwnership?: GcsAuditTableOwnership[]
   agreementNumberProvider?: { id: string }
   packageName: string
   requiredHostCapabilities: GcsExtensionHostCapability[]

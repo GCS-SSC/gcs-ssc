@@ -1,3 +1,4 @@
+import { withAuditExecution } from './audit-context'
 import type { H3Event } from 'h3'
 import {
   authorize,
@@ -312,7 +313,7 @@ export const withActiveAgencyReadTransaction = async <T>(
       { type: 'agency', agencyId }
     )
 
-    return await read(trx)
+    return await withAuditExecution({ type: 'agency', agencyId }, () => read(trx))
   })
 }
 
@@ -356,7 +357,7 @@ export const withActiveAgencyMutationTransaction = async <T>(
       { type: 'agency', agencyId }
     )
 
-    return await mutate(trx)
+    return await withAuditExecution({ type: 'agency', agencyId }, () => mutate(trx))
   })
 }
 
@@ -412,7 +413,7 @@ export const withActiveAgencyCostCategoryReadTransaction = async <T>(
       { type: 'agency', agencyId }
     )
 
-    return await read(trx)
+    return await withAuditExecution({ type: 'agency', agencyId }, () => read(trx))
   })
 }
 
@@ -463,7 +464,7 @@ export const withActiveAgencyCostCategoryMutationTransaction = async <T>(
       'update',
       { type: 'agency', agencyId }
     )
-    return await mutate(trx)
+    return await withAuditExecution({ type: 'agency', agencyId }, () => mutate(trx))
   })
 }
 

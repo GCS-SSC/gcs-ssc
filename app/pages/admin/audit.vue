@@ -11,18 +11,48 @@ const query = computed(() => ({
   ...Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== '').map(([key, value]) =>
     [key, key === 'from' || key === 'to' ? new Date(value).toISOString() : value]))
 }))
-const { items: rows, totalRecords, status, refresh, pagination, search } = useResourceTable<AuditSummary>({ fetchUrl: computed(() => `/api/admin/audit/${tab.value}`), query, initialPageSize: 20 })
+const { permissionRevision } = useAuth()
+const { items: rows, totalRecords, status, refresh, pagination, search } = useResourceTable<AuditSummary>({ fetchUrl: computed(() => `/api/admin/audit/${tab.value}`), query, contextKey: permissionRevision, initialPageSize: 20 })
 const { data: retention, error: retentionError, refresh: refreshRetention } = await useFetch<{ auditDays: number; accessDays: number }, Error, string>('/api/admin/audit/config' as string)
 const selected: Ref<{ id: string; kind: string } | null> = ref(null)
-const detailUrl = computed(() => selected.value?.kind === 'access'
-  ? `/api/admin/audit/access/${selected.value.id}`
-  : `/api/admin/audit/events/${selected.value?.kind}/${selected.value?.id}`)
-const { data: detail, status: detailStatus, execute: loadDetail, clear: clearDetail } = await useFetch<AuditDetail, Error, string>(detailUrl as Ref<string>, { immediate: false, watch: false })
-watch([tab, filters], () => {
+const detail: Ref<AuditDetail | null> = ref(null)
+const detailStatus: Ref<'idle' | 'pending' | 'success' | 'error'> = ref('idle')
+let detailGeneration = 0
+let detailAbort: AbortController | null = null
+/** Cancels requests and clears evidence when its view or authorization changes. */
+const clearDetail = () => {
+  detailGeneration++
+  detailAbort?.abort()
+  detailAbort = null
+  detail.value = null
+  detailStatus.value = 'idle'
+}
+/** Accepts evidence only for the current selection and request generation. */
+const loadDetail = async () => {
+  clearDetail()
+  const selection = selected.value
+  if (!selection) return
+  const generation = detailGeneration
+  detailAbort = new AbortController()
+  detailStatus.value = 'pending'
+  const url = selection.kind === 'access'
+    ? `/api/admin/audit/access/${selection.id}`
+    : `/api/admin/audit/events/${selection.kind}/${selection.id}`
+  try {
+    const response = await $fetch<AuditDetail, string>(url, { signal: detailAbort.signal })
+    if (generation !== detailGeneration) return
+    detail.value = response
+    detailStatus.value = 'success'
+  } catch {
+    if (generation === detailGeneration) detailStatus.value = 'error'
+  }
+}
+watch([tab, filters, search, permissionRevision], () => {
   pagination.value.pageIndex = 0
   selected.value = null
   clearDetail()
-})
+}, { flush: 'sync' })
+onBeforeUnmount(clearDetail)
 /** Loads the selected immutable evidence.
  * @param row - Selected event identity.
  * @param row.id - Event key.
@@ -30,7 +60,6 @@ watch([tab, filters], () => {
  */
 const openDetail = async (row: { id: string; kind: string }) => {
   selected.value = row
-  clearDetail()
   await loadDetail()
 }
 const columns = computed(() => [
@@ -47,8 +76,8 @@ const changes = computed(() => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return []
   return Object.entries(value).map(([field, entry]) => {
     const pair = entry && typeof entry === 'object' && !Array.isArray(entry) && 'old' in entry && 'new' in entry ? entry : null
-    return { field, old: displayValue(pair ? pair.old : detail.value?.operation === 'delete' ? entry : undefined),
-      new: displayValue(pair ? pair.new : detail.value?.operation === 'delete' ? undefined : entry) }
+    return { field, old: displayValue(pair ? pair.old : ['delete', 'departure'].includes(String(detail.value?.operation)) ? entry : undefined),
+      new: displayValue(pair ? pair.new : ['delete', 'departure'].includes(String(detail.value?.operation)) ? undefined : entry) }
   })
 })
 const { getHeroCollapsed } = useDashboard()
@@ -122,14 +151,21 @@ const isHeroCollapsed = getHeroCollapsed('admin-audit')
           </div>
           <div v-else-if="detail" class="space-y-4">
             <dl class="grid grid-cols-2 gap-2">
-              <template v-for="key in ['created_at', 'actor_user_id', 'actor_kind', 'request_id', 'query_id', 'table_name', 'operation']" :key="key">
+              <template v-for="key in ['created_at', 'actor_user_id', 'actor_kind', 'request_id', 'query_id', 'table_name', 'operation', 'scope_type', 'agency_ids', 'transaction_id']" :key="key">
                 <dt>{{ t(`audit.evidence.${key}`) }}</dt><dd class="break-all">
-                  {{ detail[key] ?? '—' }}
+                  {{ key === 'scope_type' ? t(`audit.scopes.${String(detail[key])}`) : detail[key] ?? '—' }}
                 </dd>
               </template>
             </dl>
+            <section>
+              <h3 class="font-bold">
+                {{ t('audit.inputs') }}
+              </h3>
+              <p>{{ t(`audit.inputVisibility.${String(detail.input_visibility)}`) }}</p>
+              <pre v-if="detail.inputs" class="overflow-auto whitespace-pre-wrap break-all">{{ displayValue(detail.inputs) }}</pre>
+            </section>
             <template v-if="selected?.kind === 'access'">
-              <div v-for="key in ['sql', 'parameters', 'returned_identities', 'limitations', 'outcome', 'transaction_outcome', 'duration_ms', 'row_count']" :key="key">
+              <div v-for="key in ['sql', 'returned_identities', 'limitations', 'outcome', 'transaction_outcome', 'duration_ms', 'row_count']" :key="key">
                 <h3 class="font-bold">
                   {{ t(`audit.evidence.${key}`) }}
                 </h3>

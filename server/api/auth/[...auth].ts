@@ -1,3 +1,4 @@
+import { withAnonymousAudit } from '~~/server/utils/audit-context'
 import { toWebRequest } from 'h3'
 
 /**
@@ -8,5 +9,5 @@ import { toWebRequest } from 'h3'
  */
 // eslint-disable-next-line local/require-authorize -- Better Auth owns this delegated authentication protocol surface.
 export default defineEventHandler((event) => {
-  return auth.handler(toWebRequest(event))
+  return withAnonymousAudit(event.context.auditRequestId ?? null, () => auth.handler(toWebRequest(event)))
 })

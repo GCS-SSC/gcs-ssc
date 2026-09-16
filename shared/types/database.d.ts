@@ -390,12 +390,16 @@ export type Countries =
   | 'zm'
   | 'zw'
 
-export interface ExtensionsDatabase {
+export interface HostManagedExtensionsDatabase {
   'extensions.agency_enablement': ExtensionsAgencyEnablementTable
   'extensions.agency_storage_selection': ExtensionsAgencyStorageSelectionTable
   'extensions.stream_configuration': ExtensionsStreamConfigurationTable
   'extensions.kv_entry': ExtensionsKvEntryTable
   'extensions.secret_entry': ExtensionsSecretEntryTable
+}
+
+/** Extension tables referenced by demo seeding; ownership is declared by the extension SDK. */
+export interface ExtensionsDatabase extends HostManagedExtensionsDatabase {
   'extensions.gcs_gcforms_credentials': ExtensionsGcsGcFormsCredentialTable
 }
 
@@ -701,7 +705,7 @@ export interface UserRoleAssignmentTable {
   _deleted: Generated<boolean>
 }
 
-export interface SecurityAuditEventTable {
+export interface SecurityAuditEventTable extends AuditAttributionColumns {
   request_id: Generated<string | null>
   id: Generated<string>
   actor_user_id: string
@@ -2249,7 +2253,7 @@ export interface WorkflowPublicationConditionTable extends WorkflowMemberConditi
   version_id: string
 }
 
-export interface AuditChangeEventTable {
+export interface AuditChangeEventTable extends AuditAttributionColumns {
   id: Generated<string>
   created_at: Generated<Date>
   actor_user_id: string | null
@@ -2263,7 +2267,7 @@ export interface AuditChangeEventTable {
   delta: JsonValue
 }
 
-export interface AuditAccessEventTable {
+export interface AuditAccessEventTable extends AuditAttributionColumns {
   id: string
   created_at: Date
   actor_user_id: string | null
@@ -2279,4 +2283,13 @@ export interface AuditAccessEventTable {
   limitations: JsonValue
   table_name: string | null
   error_code: string | null
+}
+
+export interface AuditAttributionColumns {
+  scope_type: Generated<'historical' | 'global' | 'agency' | 'unresolved'>
+  agency_id: Generated<string | null>
+  agency_ids: Generated<string[]>
+  attribution_error: Generated<string | null>
+  transaction_id: Generated<string | null>
+  inputs: Generated<JsonValue | null>
 }

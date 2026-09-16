@@ -88,11 +88,11 @@ export const resolveRuntimeMigrationProvider = async (): Promise<MigrationProvid
 export const useMigrator = async () => {
   const db = useDb()
   const provider = await resolveRuntimeMigrationProvider()
-  const migrations = await provider.getMigrations()
   return new Migrator({
     db,
-    // Existing demo databases have already recorded 9999_seed. Apply new core migrations without reseeding.
-    allowUnorderedMigrations: Object.hasOwn(migrations, '9999_seed'),
+    // Only demo providers include a terminal seed migration. Later core upgrades
+    // may precede it; the canonical production provider keeps strict ordering.
+    allowUnorderedMigrations: provider !== productionCoreMigrationProvider,
     provider
   })
 }

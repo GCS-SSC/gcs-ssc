@@ -1,3 +1,4 @@
+import { captureAuditRequestBody } from './audit-request'
 /* eslint-disable jsdoc/require-jsdoc -- Typed multipart primitives use descriptive names. */
 import Busboy from '@fastify/busboy'
 import type { BusboyInstance } from '@fastify/busboy'
@@ -117,6 +118,17 @@ export const readBoundedMultipartFormData = async (
     await completed
     if (limitExceeded) throw new MultipartLimitError()
     if (fileStreamError) throw new MultipartParseError()
+    const capturedParts = new Map<string, unknown[]>()
+    for (const part of parts) {
+      const name = part.name ?? ''
+      const values = capturedParts.get(name) ?? []
+      values.push(part.filename !== undefined
+        ? { filename: part.filename, type: part.type, size: part.data.byteLength }
+        : part.data.toString('utf8'))
+      capturedParts.set(name, values)
+    }
+    captureAuditRequestBody(event, Object.fromEntries([...capturedParts].map(([name, values]) =>
+      [name, values.length === 1 ? values[0] : values])))
     return parts
   } catch (error: unknown) {
     if (limitExceeded) throw new MultipartLimitError()

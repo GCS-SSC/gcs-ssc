@@ -1,3 +1,4 @@
+import { defineGcsAuditOwnership } from '@gcs-ssc/extensions'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Generated registry helpers require a temporary documentation migration window. */
 import { createHash } from 'node:crypto'
 import { access, cp, mkdir, mkdtemp, readdir, readFile, realpath, rm, stat } from 'node:fs/promises'
@@ -67,6 +68,7 @@ const EXTENSION_HOST_CAPABILITIES = new Set([
   'agreement-number-provider',
   'configuration-access',
   'agency-only-configuration',
+  'audit-ownership',
   'file-storage-provider'
 ])
 const EXTENSION_LIFECYCLE_COMPLETION_CAPABILITIES = new Set(['supported', 'none'])
@@ -330,6 +332,7 @@ const inferRequiredHostCapabilities = (definition: GcsExtensionDefinition): Set<
   addImpliedCapability(capabilities, (definition.entities ?? []).length > 0, 'lifecycle-entities')
   addImpliedCapability(capabilities, Boolean(definition.agreementNumberProvider), 'agreement-number-provider')
   addImpliedCapability(capabilities, definition.configurationAccess !== undefined, 'configuration-access')
+  addImpliedCapability(capabilities, Boolean(definition.auditOwnership?.length), 'audit-ownership')
   addImpliedCapability(capabilities, definition.configurationScope !== undefined, 'agency-only-configuration')
   addImpliedCapability(capabilities, Boolean(definition.fileStorageProvider), 'file-storage-provider')
 
@@ -1061,6 +1064,7 @@ const resolveExtensionDirectory = async (
     key: definition.key,
     configurationAccess: definition.configurationAccess,
     configurationScope: definition.configurationScope,
+    auditOwnership: definition.auditOwnership ? defineGcsAuditOwnership(definition.auditOwnership) : undefined,
     name: definition.name,
     description: definition.description,
     sdkVersion: definition.sdkVersion,
@@ -1342,6 +1346,7 @@ export const buildExtensionServerRegistry = (
 
     return {
       ...buildClientExtensionMetadata(extension),
+      auditOwnership: extension.auditOwnership,
       packageName: extension.packageName,
       requiredHostCapabilities: extension.requiredHostCapabilities,
       serverHandlers,

@@ -3309,7 +3309,11 @@
       "duration_ms": "Duration (ms)",
       "row_count": "Row count",
       "actor_kind": "Actor type",
-      "query_id": "Query ID"
+      "query_id": "Query ID",
+      "scope_type": "Scope",
+      "agency_id": "Agency",
+      "agency_ids": "Agencies",
+      "transaction_id": "Transaction ID"
     },
     "limitations": {
       "parameters_redacted": "Parameter values are redacted because their sensitivity is not known.",
@@ -3317,6 +3321,18 @@
       "returned_identities_truncated": "Returned identities exceed the capture limit.",
       "sql_truncated": "SQL exceeds the capture limit.",
       "parameters_truncated": "The parameter count exceeds the capture limit."
+    },
+    "inputs": "SQL and HTTP inputs",
+    "inputVisibility": {
+      "restricted": "Restricted to Audit Managers",
+      "unavailable": "Inputs unavailable",
+      "captured": "Captured inputs (credentials redacted)"
+    },
+    "scopes": {
+      "unresolved": "Unresolved ownership (global access required)",
+      "global": "Global",
+      "agency": "Agency",
+      "historical": "Historical (global access required)"
     }
   },
   "budget_calculation": {

@@ -1,3 +1,4 @@
+import { withAuditExecution } from './audit-context'
 /* eslint-disable jsdoc/require-jsdoc -- Transaction boundary is covered by focused authorization tests. */
 import type { H3Event } from 'h3'
 import type { Kysely, Transaction } from 'kysely'
@@ -118,7 +119,7 @@ export const executeFreshAuthorizedTransferPaymentWrite = async <T>(
           }
         )
 
-        return await callback(trx, context, authContext)
+        return await withAuditExecution({ type: 'agency', agencyId: context.agencyId }, () => callback(trx, context, authContext))
       })
     } catch (error: unknown) {
       const workflowStatusConstraint = getDatabaseConstraintName(error)
@@ -226,7 +227,7 @@ export const executeFreshAuthorizedTransferPaymentStreamWrite = async <T>(
           action,
           context.scope
         )
-        return await callback(trx, context, authContext)
+        return await withAuditExecution({ type: 'agency', agencyId: context.agencyId }, () => callback(trx, context, authContext))
       })
     } catch (error: unknown) {
       const workflowStatusConstraint = getDatabaseConstraintName(error)

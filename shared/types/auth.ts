@@ -13,7 +13,7 @@ export interface SocialLoginResult {
 }
 
 export type StaticPermissionSource = 'role'
-export type StaticPermissionAction = AbilityAction | 'manage_assignments'
+export type StaticPermissionAction = AbilityAction | 'manage_assignments' | 'view_audit_inputs'
 export type StaticPermissionScope = RoleScope
 
 export interface StaticPermissionGrant {
@@ -43,10 +43,14 @@ const StaticPermissionScopeSchema = z.discriminatedUnion('type', [
 
 export const StaticPermissionGrantSchema = z.object({
   source: z.literal('role'),
-  action: z.enum([...AUTHORIZATION_ACTIONS, 'manage_assignments']),
+  action: z.enum([...AUTHORIZATION_ACTIONS, 'manage_assignments', 'view_audit_inputs']),
   subject: z.enum(AUTHORIZATION_SUBJECTS),
   scope: StaticPermissionScopeSchema
 }).superRefine((grant, context) => {
+  if ((grant.subject === 'audit' && !['read', 'view_audit_inputs'].includes(grant.action))
+    || (grant.action === 'view_audit_inputs' && grant.subject !== 'audit')) {
+    context.addIssue({ code: 'custom', path: ['action'], message: 'validation.invalid_selection' })
+  }
   if (!isAuthorizationSubject(grant.subject)) {
     context.addIssue({
       code: 'custom',

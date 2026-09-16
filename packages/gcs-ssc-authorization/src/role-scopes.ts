@@ -6,7 +6,7 @@ export const ROLE_SCOPE_TYPES = ['global', 'agency', 'program'] as const
 export type RoleScopeType = (typeof ROLE_SCOPE_TYPES)[number]
 
 export const ROLE_ABILITY_SCOPE_MATRIX: Record<RoleAbilitySubject, readonly RoleScopeType[]> = {
-  audit: ['global'],
+  audit: ['global', 'agency'],
   system: ['global'],
   agency: ['global', 'agency'],
   transfer_payment: ['global', 'agency', 'program'],

@@ -118,8 +118,8 @@ export default defineEventHandler(async event => {
         'Agency_Cost_Category_Line_Item.egcs_ay_name_fr as line_item_name_fr'
       ])
       .orderBy('Agency_Fiscal_Year.egcs_ay_fiscalyear', 'asc')
-      .orderBy(sql`LOWER("Agency_Cost_Category"."egcs_ay_name_en")`, 'asc')
-      .orderBy(sql`LOWER("Agency_Cost_Category_Line_Item"."egcs_ay_name_en")`, 'asc')
+      .orderBy(sql`LOWER(${sql.ref('Agency_Cost_Category.egcs_ay_name_en')})`, 'asc')
+      .orderBy(sql`LOWER(${sql.ref('Agency_Cost_Category_Line_Item.egcs_ay_name_en')})`, 'asc')
       .execute(),
     db
       .selectFrom('Funding_Case_Agreement_Claim_Line_Item')

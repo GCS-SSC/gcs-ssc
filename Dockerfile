@@ -35,10 +35,10 @@ RUN set -eux; \
     git -C "$destination" checkout --detach FETCH_HEAD; \
     rm -rf "$destination/.git"; \
   }; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-ssc-extensions.git packages/gcs-ssc-extensions cf3d67196498657f80c7f42f1b9e8e026894b812; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-agreement-number.git extensions/gcs-agreement-number 7d752f4ef6290e9d4f32bb5985865b175bb1ed44; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-ssc-extensions.git packages/gcs-ssc-extensions becaa2343cd4eddda15c14e32cd8d46901bf6664; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-agreement-number.git extensions/gcs-agreement-number b77331de9a0c34c16d3720bf7f3cecbb6ac98849; \
   fetch_workspace https://github.com/GCS-SSC/gcs-automated-payments.git extensions/gcs-automated-payments edd99ef095eb3e8f196670a42cdc55e677ec7fdf; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-gcforms-integration.git extensions/gcs-gcforms-integration e480d35125987e2678254c15e5da0a04853f75ad; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-gcforms-integration.git extensions/gcs-gcforms-integration 195a1a6aad33edae3ea0a9840f3db88c3ae7060c; \
   fetch_workspace https://github.com/GCS-SSC/gcs-narrative-quality.git extensions/gcs-narrative-quality bb0f2225950d172c82085cd8e0d561b8d7142f1a; \
   fetch_workspace https://github.com/GCS-SSC/gcs-narrative-tags.git extensions/gcs-narrative-tags 4fdc61f535b11fc61973653cb0a6184da344f2d6; \
   fetch_workspace https://github.com/GCS-SSC/gcs-outcome-cost-allocation.git extensions/gcs-outcome-cost-allocation 6f80f1b036593b61a958e70bfffb1b0125cfc894; \

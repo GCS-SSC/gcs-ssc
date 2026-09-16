@@ -21,7 +21,7 @@ export default defineNuxtRouteMiddleware(async () => {
       return parsedPermission.success
         && parsedPermission.data.subject === 'audit'
         && parsedPermission.data.action === 'read'
-        && parsedPermission.data.scope.type === 'global'
+        && ['global', 'agency'].includes(parsedPermission.data.scope.type)
     })
 
     if (!hasAuditRead) {

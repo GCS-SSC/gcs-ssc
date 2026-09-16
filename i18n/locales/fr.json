@@ -3309,7 +3309,11 @@
       "duration_ms": "Durée (ms)",
       "row_count": "Nombre de lignes",
       "actor_kind": "Type d’acteur",
-      "query_id": "ID de la requête SQL"
+      "query_id": "ID de la requête SQL",
+      "scope_type": "Portée",
+      "agency_id": "Agence",
+      "agency_ids": "Agences",
+      "transaction_id": "Identifiant de transaction"
     },
     "limitations": {
       "parameters_redacted": "Les valeurs des paramètres sont masquées, car leur sensibilité est inconnue.",
@@ -3317,6 +3321,18 @@
       "returned_identities_truncated": "Les identités retournées dépassent la limite de capture.",
       "sql_truncated": "La requête SQL dépasse la limite de capture.",
       "parameters_truncated": "Le nombre de paramètres dépasse la limite de capture."
+    },
+    "inputs": "Entrées SQL et HTTP",
+    "inputVisibility": {
+      "restricted": "Réservées aux gestionnaires de l’audit",
+      "unavailable": "Entrées indisponibles",
+      "captured": "Entrées capturées (identifiants secrets masqués)"
+    },
+    "scopes": {
+      "unresolved": "Propriété non résolue (accès global requis)",
+      "global": "Globale",
+      "agency": "Agence",
+      "historical": "Historique (accès global requis)"
     }
   },
   "budget_calculation": {

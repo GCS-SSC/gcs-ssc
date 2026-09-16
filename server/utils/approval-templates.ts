@@ -593,7 +593,7 @@ const syncAdditionalApprovalCertifications = async (
   if (existingIds.size > 0) {
     await db
       .updateTable('Common_Certification')
-      .set({ egcs_cn_order: sql<number>`-egcs_cn_order` })
+      .set(eb => ({ egcs_cn_order: eb('egcs_cn_order', '*', -1) }))
       .where('egcs_cn_approvaltemplate', '=', templateId)
       .where('_deleted', '=', false)
       .execute()

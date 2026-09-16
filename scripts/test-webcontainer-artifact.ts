@@ -66,6 +66,7 @@ const EXPECTED_CORE_MIGRATIONS = [
   '0013_audit',
   '0014_program_terms_links',
   '0015_cost_category_availability',
+  '0016_agency_audit',
   '9999_seed'
 ] as const
 

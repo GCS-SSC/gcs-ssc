@@ -1,9 +1,11 @@
-import { sql, type Expression, type RawBuilder } from 'kysely'
+import { expressionBuilder, type Expression, type ExpressionWrapper } from 'kysely'
 import {
   isNumeric19Money,
   parseMoneyText,
   type Money
 } from '~~/shared/utils/money'
+
+const expressions = expressionBuilder<never>()
 
 /**
  * Casts a PostgreSQL/PGlite NUMERIC expression to exact text before a driver parser can coerce it.
@@ -14,8 +16,8 @@ import {
  * @param expression - Kysely numeric expression or column reference.
  * @returns A text-valued SQL expression.
  */
-export const databaseMoneyText = (expression: Expression<unknown>): RawBuilder<string> =>
-  sql<string>`CAST(${expression} AS text)`
+export const databaseMoneyText = (expression: Expression<unknown>): ExpressionWrapper<never, never, string> =>
+  expressions.cast<string>(expression, 'text')
 
 /**
  * Produces a numeric(19,2) write expression from exact canonical money.
@@ -23,11 +25,11 @@ export const databaseMoneyText = (expression: Expression<unknown>): RawBuilder<s
  * @param value - Canonical monetary value for one persisted row.
  * @returns A numeric-valued Kysely expression.
  */
-export const databaseMoneyValue = (value: Money): RawBuilder<number> => {
+export const databaseMoneyValue = (value: Money): ExpressionWrapper<never, never, number> => {
   if (!isNumeric19Money(value)) {
     throw new RangeError('Money exceeds PostgreSQL numeric(19,2).')
   }
-  return sql<number>`CAST(${value} AS numeric(19, 2))`
+  return expressions.cast<number>(expressions.val(value), 'numeric(19, 2)')
 }
 
 /**

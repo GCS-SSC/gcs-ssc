@@ -46,7 +46,7 @@ export default defineEventHandler(async event => {
       baseQuery = baseQuery.where(eb =>
         eb.or([
           eb('Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay', 'ilike', `%${escapeLikePattern(search)}%`),
-          eb(sql<string>`CAST(${sql.ref('Agency_Fiscal_Year.egcs_ay_fiscalyear')} AS TEXT)`, 'ilike', `%${escapeLikePattern(search)}%`)
+          eb(eb.cast<string>('Agency_Fiscal_Year.egcs_ay_fiscalyear', 'text'), 'ilike', `%${escapeLikePattern(search)}%`)
         ])
       )
     }

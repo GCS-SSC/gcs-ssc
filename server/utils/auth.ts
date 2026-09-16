@@ -1,3 +1,4 @@
+import { auditScope } from './audit-context'
 import { betterAuth } from 'better-auth'
 import { APIError } from 'better-auth/api'
 import { kyselyAdapter } from '@better-auth/kysely-adapter'
@@ -287,6 +288,21 @@ const createAuthDatabaseAdapter = (db: ReturnType<typeof useDb>): ReturnType<typ
      */
     const create: typeof adapter.create = async input => {
       try {
+        if (input.model === 'session' && typeof input.data.userId === 'string') {
+          // Better Auth only asks its adapter to create a session after verifying the login.
+          // Keep an existing actor for delegated flows; otherwise this verified user is the actor.
+          const scope = auditScope.getStore()
+          return await auditScope.run({
+            ...scope,
+            identity: {
+              ...scope?.identity,
+              actorUserId: scope?.identity?.actorUserId ?? input.data.userId,
+              actorKind: 'user',
+              requestId: scope?.identity?.requestId ?? null,
+              protected: false
+            }
+          }, async () => await adapter.create(input))
+        }
         return await adapter.create(input)
       } catch (error: unknown) {
         if (input.model === 'session' && typeof error === 'object' && error !== null

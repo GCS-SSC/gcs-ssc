@@ -1,7 +1,7 @@
 import { authorize } from '~~/server/utils/authorize'
-import { auditEventDetail } from '~~/server/utils/audit-browser'
+import { auditEventDetail, resolveAuditReadAccess } from '~~/server/utils/audit-browser'
 
 export default defineEventHandler(async event => {
-  await authorize(event, 'audit', 'read', { type: 'global' })
+  await authorize(event, 'audit', 'read', resolveAuditReadAccess)
   return await auditEventDetail(event, true)
 })

@@ -25,6 +25,7 @@ import type {
 
 declare module 'h3' {
   interface H3EventContext {
+    auditRequestBody?: unknown
     $db: Kysely<Database>
     $statusCatalog: StatusCatalogService
     $authContext?: AuthContext

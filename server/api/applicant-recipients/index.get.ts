@@ -1,7 +1,6 @@
 import { getUserAssignmentAgencyScopes } from '~~/server/utils/rbac'
 import { assignedEntityIdsQuery } from '@gcs-ssc/authorization/server'
 import { AssignedListViewSchema } from '~~/shared/types/schemas/assigned-list-view'
-import { sql } from 'kysely'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 import { authorize } from '~~/server/utils/authorize'
 import { resolveApplicantRecipientMutationPermissions, resolveApplicantRecipientVisibility, type ApplicantRecipientVisibility } from '~~/server/utils/applicant-recipient-auth'
@@ -58,11 +57,10 @@ export default defineEventHandler(async event => await executeFreshReadSnapshot(
     const scopes = await getUserAssignmentAgencyScopes(context.userId, db)
     baseQuery = baseQuery.where(eb => eb.and([
       eb.val(scopes.some(scope => scope.agencyId === list_view)),
-      eb.exists(eb.selectFrom('Applicant_Recipient_Agency_Financial_Id')
-        .whereRef('egcs_ar_applicantrecipient', '=', 'Applicant_Recipient_Profile.id')
-        .where('egcs_ar_agency', '=', list_view)
-        .where('_deleted', '=', false)
-        .select('id'))
+      eb('Applicant_Recipient_Profile.id', 'in', eb.selectFrom('Applicant_Recipient_Agency_Financial_Id')
+        .where('Applicant_Recipient_Agency_Financial_Id.egcs_ar_agency', '=', list_view)
+        .where('Applicant_Recipient_Agency_Financial_Id._deleted', '=', false)
+        .select('Applicant_Recipient_Agency_Financial_Id.egcs_ar_applicantrecipient'))
     ]))
   }
 
@@ -74,7 +72,7 @@ export default defineEventHandler(async event => await executeFreshReadSnapshot(
     const escapedSearch = escapeLikePattern(search)
     baseQuery = baseQuery.where(eb =>
       eb.or([
-        eb(sql<string>`CAST("Applicant_Recipient_Profile"."id" AS TEXT)`, 'ilike', `%${escapedSearch}%`),
+        eb(eb.cast<string>('Applicant_Recipient_Profile.id', 'text'), 'ilike', `%${escapedSearch}%`),
         eb('Applicant_Recipient_Profile.egcs_ar_legalname_en', 'ilike', `%${escapedSearch}%`),
         eb('Applicant_Recipient_Profile.egcs_ar_legalname_fr', 'ilike', `%${escapedSearch}%`),
         eb('Applicant_Recipient_Profile.egcs_ar_operatingname_en', 'ilike', `%${escapedSearch}%`),

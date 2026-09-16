@@ -1,5 +1,4 @@
 import { replaceWorkflowConditions } from '~~/server/utils/workflow-conditions'
-import { sql } from 'kysely'
 import { CommonWorkflowSetupMemberPatchSchema } from '~~/shared/types/schemas'
 import { authorize } from '~~/server/utils/authorize'
 import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
@@ -45,7 +44,7 @@ export default defineEventHandler(async event => {
       const ordered = members.filter(member => String(member.id) !== memberId)
       ordered.splice(Math.min(requestedSequence, members.length) - 1, 0, current)
       await trx.updateTable('Common_Workflow_Setup_Member')
-        .set({ egcs_cn_sequence: sql<number>`egcs_cn_sequence + 100000` })
+        .set(eb => ({ egcs_cn_sequence: eb('egcs_cn_sequence', '+', 100000) }))
         .where('id', 'in', members.map(member => String(member.id))).execute()
       for (const [index, member] of ordered.entries()) {
         await trx.updateTable('Common_Workflow_Setup_Member').set({ egcs_cn_sequence: index + 1 })

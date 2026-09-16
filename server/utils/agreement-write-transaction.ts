@@ -1,3 +1,4 @@
+import { withAuditExecution } from './audit-context'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Temporary coverage while transaction helpers receive complete API documentation. */
 import type { H3Event } from 'h3'
 import type { Kysely, Transaction } from 'kysely'
@@ -284,7 +285,7 @@ export const executeFreshAuthorizedAgreementWrite = async <T>(
           await assertAgreementApprovalSubmissionUnlocked(event, trx, agreementId)
         }
 
-        return await callback(trx, currentContext, authContext)
+        return await withAuditExecution({ type: 'agency', agencyId: currentContext.agencyId }, () => callback(trx, currentContext, authContext))
       })
     } catch (error: unknown) {
       if (!(error instanceof AgreementWriteScopeChanged)) {

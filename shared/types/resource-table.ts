@@ -7,6 +7,8 @@ export type ResourceTableStatus = 'idle' | 'pending' | 'success' | 'error'
 export interface UseResourceTableOptions {
   fetchUrl: string | Ref<string> | ComputedRef<string>
   query?: Record<string, unknown> | Ref<Record<string, unknown>> | ComputedRef<Record<string, unknown>>
+  /** Local context that invalidates evidence without becoming an API parameter. */
+  contextKey?: string | Ref<string> | ComputedRef<string>
   initialPageSize?: number
   initialStatusFilter?: string
   enabled?: boolean | Ref<boolean> | ComputedRef<boolean>

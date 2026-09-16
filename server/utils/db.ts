@@ -1,3 +1,4 @@
+import { auditRequestSnapshot } from './audit-request'
 import { createAuditDialect, type AuditControl } from './audit-driver'
 import { auditScope, withoutAuditCapture } from './audit-context'
 import { registerAuditControl, resolveAccessLogEnabled, resolveAuditRetention } from './audit-runtime'
@@ -127,7 +128,7 @@ const createDatabase = (): Omit<DatabaseGeneration, 'id' | 'leases'> => {
       } catch { /* Background work has system attribution. */ }
       if (!event) return { actorUserId: null, actorKind: 'system', requestId: null, protected: false }
       const actorUserId = event.context.$authContext?.userId ?? event.context.auditActorUserId ?? null
-      return { actorUserId, actorKind: actorUserId ? 'user' : 'anonymous',
+      return { execution: { type: 'global' }, http: auditRequestSnapshot(event), actorUserId, actorKind: actorUserId ? 'user' : 'anonymous',
         requestId: event.context.auditRequestId ?? null,
         protected: event.path.startsWith('/api/') && !event.path.startsWith('/api/auth/') }
     }

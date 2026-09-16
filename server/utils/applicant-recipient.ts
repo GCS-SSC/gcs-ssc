@@ -1,3 +1,4 @@
+import { captureParsedAuditRequestBody } from './audit-request'
 /* eslint-disable jsdoc/require-jsdoc -- Applicant-recipient CRUD helpers are covered by route and integration tests. */
 import type { GcsExtensionAgreementAccess } from '@gcs-ssc/extensions/server'
 import { runBoundedExtensionOperation } from './extension-admission'
@@ -400,6 +401,7 @@ const readApplicantRecipientPatchBody = async (event: H3Event) => {
     readBody?: typeof readBody
   }).readBody ?? readBody
   const rawBody = await bodyReader<Record<string, unknown>>(event) as Record<string, unknown>
+  await captureParsedAuditRequestBody(event, rawBody)
   const validated = await parseI18n(event, ApplicantRecipientProfilePatchSchema, rawBody)
 
   return { rawBody, validated }

@@ -1,3 +1,4 @@
+import { insertOwnedAddress } from '~~/server/utils/audit-owned-address'
 import type { Insertable } from 'kysely'
 import { authorize } from '~~/server/utils/authorize'
 import { ApplicantRecipientAddressCreateSchema } from '~~/shared/types/schemas'
@@ -43,11 +44,7 @@ export default defineEventHandler(async event => {
     applicantRecipientId,
     'create',
     async tx => {
-      const address = await tx
-        .insertInto('Common_Address')
-        .values(addressValues)
-        .returning('id')
-        .executeTakeFirstOrThrow()
+      const address = await insertOwnedAddress(tx, addressValues, { entityType: 'applicantrecipient', entityId: applicantRecipientId })
 
       const linkValues: Insertable<ApplicantRecipientAddressTable> = {
         egcs_ar_applicantrecipient: applicantRecipientId,

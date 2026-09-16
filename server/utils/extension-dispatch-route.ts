@@ -1,3 +1,5 @@
+import { classifyExtensionAuditInputs } from './audit-request'
+import { withAuditExecution } from './audit-context'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Temporary coverage while extension dispatch helpers receive complete documentation. */
 import type { H3Event } from 'h3'
 import { createError, getMethod } from 'h3'
@@ -502,6 +504,7 @@ export const dispatchExtensionServerRoute = async (
     throwExtensionDispatchError(404, 'EXTENSION_ROUTE_NOT_FOUND', 'Extension route not found.')
   }
   const handler = resolvedHandler as NonNullable<typeof resolvedHandler>
+  classifyExtensionAuditInputs(event, handler.extension)
 
   await assertExtensionStreamEnabled(event, extensionKey, handler.params.streamId)
   if (!handler.params.streamId) {
@@ -527,7 +530,9 @@ export const dispatchExtensionServerRoute = async (
   event.context.$authContext = authContext
 
   try {
-    return await handler.handler(event)
+    return await withAuditExecution((event.context.gcsExtension?.stream?.agencyId ?? event.context.gcsExtension?.agency?.agencyId)
+      ? { type: 'agency', agencyId: (event.context.gcsExtension?.stream?.agencyId ?? event.context.gcsExtension?.agency?.agencyId)! }
+      : { type: 'global' }, async () => await handler.handler(event))
   } catch (error: unknown) {
     return await handleExtensionDispatchError(event, error)
   } finally {

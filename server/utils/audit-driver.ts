@@ -1,19 +1,27 @@
+import type { AuditOwnership } from './audit-ownership'
+import { instrumentAuditRead, extractAuditRead, isSimpleAuditWrite } from './audit-read-statement'
+import { combinedScope, auditWritePredicate } from './audit-query-ownership'
+import { isGlobalAuditQuery, type AuditCapturePolicy } from './audit-inputs'
+import { finalizeAuditInputs, prepareAuditInputCandidate, type AuditStatementMetadata } from './audit-statement-metadata'
 import { createAccessLogQueue, type AccessEvidence, type AccessLogRequest } from './access-log-queue'
 import { auditProjection, returnedAuditIdentities } from './audit-projection'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Driver methods implement Kysely's documented connection contract. */
 import { auditScope } from './audit-context'
 import { randomUUID } from 'node:crypto'
-import { CompiledQuery, type DatabaseConnection, type Dialect, type Driver, type QueryResult } from 'kysely'
+import { AliasNode, CompiledQuery, TableNode, type DatabaseConnection, type Dialect, type Driver, type QueryResult } from 'kysely'
 
 export interface AuditIdentity {
   actorUserId: string | null
   actorKind: 'user' | 'anonymous' | 'system'
   requestId: string | null
   protected: boolean
+  execution?: import('./audit-context').AuditExecutionScope
+  http?: unknown
 }
 interface Lease {
   raw: DatabaseConnection
   transaction: boolean
+  transactionId: string | null
   events: AccessEvidence[]
   access: { released: boolean }
   savepoints: Map<string, number>
@@ -21,7 +29,10 @@ interface Lease {
 }
 export interface AuditControl {
   keys?: ReadonlyMap<string, string[]>
+  policies?: AuditCapturePolicy
   enabled: boolean
+  ownershipRegistry?: Readonly<Record<string, import('../database/audit-ownership-registry').AuditOwnershipRule>>
+  ownershipEnabled?: boolean
   accessEnabled?: boolean
   accessRequest?: () => AccessLogRequest | undefined
   identity: () => AuditIdentity
@@ -53,16 +64,29 @@ export const redactAuditSql = (statement: string): string => {
         } else offset++
       }
       result += ' '
+    } else if (statement[offset] === '"') {
+      const start = offset++
+      while (offset < statement.length) {
+        if (statement[offset] === '"' && statement[offset + 1] === '"') offset += 2
+        else if (statement[offset++] === '"') break
+      }
+      result += statement.slice(start, offset)
     } else if (statement[offset] === '\'') {
+      const escaped = /(?:^|[^\w$])[eE]$/.test(statement.slice(0, offset))
       offset++
       while (offset < statement.length) {
-        if (statement[offset] === '\\') offset += 2
+        if (statement[offset] === '\\' && !escaped) {
+          // Ordinary strings depend on standard_conforming_strings. Never guess the
+          // connection setting and accidentally retain a following literal.
+          return result + '\'[REDACTED SQL TAIL]\''
+        }
+        if (statement[offset] === '\\' && escaped) offset += 2
         else if (statement[offset] === '\'' && statement[offset + 1] === '\'') offset += 2
         else if (statement[offset++] === '\'') break
       }
       result += '\'[REDACTED]\''
     } else {
-      const dollar = /^\$(?:[a-z_][a-z_0-9]*)?\$/i.exec(remaining)?.[0]
+      const dollar = /^\$(?:[a-z_\u0080-\uffff][a-z_0-9\u0080-\uffff]*)?\$/i.exec(remaining)?.[0]
       if (dollar) {
         const end = statement.indexOf(dollar, offset + dollar.length)
         offset = end < 0 ? statement.length : end + dollar.length
@@ -80,6 +104,23 @@ export const isKnownAuditRead = (query: CompiledQuery): boolean => query.query.k
 const errorCode = (error: unknown): string | null => {
   if (typeof error === 'object' && error !== null && 'code' in error && /^[A-Z0-9]{5}$/.test(String(error.code))) return String(error.code)
   return null
+}
+
+/** Retain a single physical target for diagnostics without resolving its current owner. */
+const statementTable = (query: CompiledQuery): string | null => {
+  const root = query.query
+  if (root.kind === 'SelectQueryNode' && (root.with || root.setOperations || root.joins?.length)) return null
+  if (root.kind === 'UpdateQueryNode' && (root.with || root.from || root.joins?.length)) return null
+  if (root.kind === 'DeleteQueryNode' && (root.with || root.using || root.joins?.length)) return null
+  if (root.kind === 'InsertQueryNode' && root.with) return null
+  const sources = root.kind === 'SelectQueryNode' || root.kind === 'DeleteQueryNode'
+    ? root.from?.froms
+    : root.kind === 'InsertQueryNode'
+      ? root.into ? [root.into] : []
+      : root.kind === 'UpdateQueryNode' ? [root.table] : []
+  if (sources?.length !== 1 || !sources[0]) return null
+  const table = AliasNode.is(sources[0]) ? sources[0].node : sources[0]
+  return TableNode.is(table) ? `${table.table.schema?.name ?? 'public'}.${table.table.identifier.name}` : null
 }
 
 /** Wraps either dialect while keeping a complete PGlite lease exclusive. */
@@ -133,13 +174,14 @@ export const createAuditDialect = (dialect: Dialect, serialize: boolean, control
     const finish = (lease: Lease, outcome: string) => {
       for (const event of lease.events) if (event.transaction_outcome === 'pending') event.transaction_outcome = outcome
       lease.transaction = false
+      lease.transactionId = null
       lease.savepoints.clear()
     }
     const wrapper: Driver = {
       init: () => driver.init(),
       acquireConnection: async () => {
         const { raw, unlock } = await rawLease()
-        const lease: Lease = { raw, unlock, transaction: false, events: [], access: { released: false }, savepoints: new Map() }
+        const lease: Lease = { raw, unlock, transaction: false, transactionId: null, events: [], access: { released: false }, savepoints: new Map() }
         let queryTail = Promise.resolve()
         const connection: DatabaseConnection = {
           executeQuery: async <R>(query: CompiledQuery): Promise<QueryResult<R>> => {
@@ -158,6 +200,13 @@ export const createAuditDialect = (dialect: Dialect, serialize: boolean, control
             }
             if (auditScope.getStore()?.bypass) return await raw.executeQuery<R>(query)
             const identity = Object.freeze({ ...control.identity() })
+            const execution = Object.freeze(isGlobalAuditQuery(query)
+              ? { type: 'global' as const }
+              : { ...(auditScope.getStore()?.execution ?? identity.execution ?? { type: 'global' as const }) })
+            const creationOwner = auditScope.getStore()?.creationOwner
+            const inputCandidate = prepareAuditInputCandidate(query, identity.http)
+            const failedInputs = finalizeAuditInputs(inputCandidate)
+            const transactionId = lease.transactionId ?? randomUUID()
             const request = control.accessRequest?.()
             const queryId = randomUUID()
             const previous = queryTail
@@ -174,7 +223,10 @@ export const createAuditDialect = (dialect: Dialect, serialize: boolean, control
                   parameters: query.parameters.slice(0, 1000).map(() => '[REDACTED: unclassified parameter]'), duration_ms: 0,
                   outcome: 'failed', transaction_outcome: 'pending', row_count: null,
                   returned_identities: [], limitations: ['parameters_redacted', 'returned_identities_unavailable'],
-                  table_name: null, error_code: null
+                  table_name: null, error_code: null,
+                  scope_type: execution.type === 'transfer' ? 'global' : execution.type, agency_id: execution.type === 'agency' ? execution.agencyId : null,
+                  agency_ids: execution.type === 'agency' ? [execution.agencyId] : [],
+                  transaction_id: transactionId, inputs: failedInputs
                 }
             const started = performance.now()
             const standalone = !lease.transaction
@@ -189,13 +241,106 @@ export const createAuditDialect = (dialect: Dialect, serialize: boolean, control
                 await driver.beginTransaction(raw, {})
                 began = true
               }
+              const readStatement = control.ownershipEnabled && event
+                ? instrumentAuditRead(query, identity.actorUserId, queryId)
+                : undefined
+              // Only the business statement can prove ownership. A preflight lookup
+              // has an earlier snapshot and is superseded on success and failure.
+              const scopeName = control.ownershipEnabled ? 'unresolved' : execution.type === 'transfer' ? 'global' : execution.type
+              const audience = !control.ownershipEnabled && execution.type === 'agency' ? [execution.agencyId] : []
+              if (event && control.ownershipEnabled) {
+                event.scope_type = scopeName
+                event.agency_id = audience[0] ?? null
+                event.agency_ids = audience
+                event.attribution_error = 'statement_ownership_unavailable'
+                event.table_name = statementTable(query)
+              }
+              const simpleWrite = event && control.ownershipEnabled && isSimpleAuditWrite(query)
+              const writePredicate = simpleWrite ? auditWritePredicate(query) : null
               await raw.executeQuery(CompiledQuery.raw(`SELECT set_config('app.audit_actor_user_id', $1, true),
                 set_config('app.audit_request_id', $2, true), set_config('app.audit_actor_kind', $3, true),
-                set_config('app.audit_query_id', $4, true)`, [identity.actorUserId ?? '', identity.requestId ?? '', identity.actorKind, queryId]))
-              const result = await raw.executeQuery<R>(query)
+                set_config('app.audit_query_id', $4, true),
+                set_config('app.audit_scope', $5, true), set_config('app.audit_agency_id', $6, true),
+                set_config('app.audit_transaction_id', $7, true), set_config('app.audit_inputs', $8, true),
+                set_config('app.audit_transfer', $9, true), set_config('app.audit_creation_owner', $10, true),
+                set_config('app.audit_agency_ids', ARRAY(SELECT jsonb_array_elements_text($11::jsonb))::text, true),
+                set_config('app.audit_actor_agencies', $12, true),
+                set_config('app.audit_statement_audience', '', true),
+                set_config('app.audit_capture_access_ownership', $13, true),
+                set_config('app.audit_input_candidate', $14, true),
+                set_config('app.audit_statement_metadata', $15, true),
+                set_config('app.audit_write_predicate', $16, true),
+                set_config('app.audit_write_predicate_scopes', '', true)`,
+              [identity.actorUserId ?? '', identity.requestId ?? '', identity.actorKind, queryId, scopeName,
+                audience[0] ?? '', transactionId, JSON.stringify(failedInputs), execution.type === 'transfer' ? JSON.stringify(execution) : '', creationOwner ? JSON.stringify(creationOwner) : '', JSON.stringify(audience),
+                '', event && control.ownershipEnabled ? 'on' : 'off', JSON.stringify(inputCandidate), '',
+                JSON.stringify(writePredicate)]))
+              let result = await raw.executeQuery<R>(readStatement?.query ?? query)
+              let currentMetadata: AuditStatementMetadata | null = null
+              let statementOwnership = false
+              if (readStatement && event) {
+                statementOwnership = true
+                const captured = extractAuditRead(result.rows, readStatement.field)
+                result = { ...result, rows: captured.rows }
+                currentMetadata = captured.metadata
+                event.inputs = finalizeAuditInputs(inputCandidate, captured.metadata)
+                const resolved = combinedScope(captured.scopes)
+                event.scope_type = resolved.type
+                event.agency_ids = resolved.type === 'agency' ? resolved.agencyIds : []
+                event.agency_id = event.agency_ids[0] ?? null
+                event.attribution_error = resolved.type === 'unresolved' ? resolved.reason : null
+              }
+              if (event && !readStatement && control.ownershipEnabled !== true && inputCandidate.table) {
+                const exclusions = control.policies?.get(inputCandidate.table)
+                currentMetadata = { table: inputCandidate.table, excludedColumns: exclusions ? [...exclusions] : null,
+                  primaryKey: [...(control.keys?.get(inputCandidate.table) ?? [])] }
+                event.inputs = finalizeAuditInputs(inputCandidate, currentMetadata)
+              }
+              if (event && simpleWrite) {
+                statementOwnership = true
+                const captured = await raw.executeQuery<{ audience: {
+                  scope?: AuditOwnership; attemptedScope?: AuditOwnership; attempts?: number; inserted?: number
+                } | null; predicate_scopes: AuditOwnership[] | null; metadata: AuditStatementMetadata | null; inputs: AccessEvidence['inputs'] }>(CompiledQuery.raw(`SELECT
+                  nullif(current_setting('app.audit_statement_audience',true),'')::jsonb AS audience,
+                  nullif(current_setting('app.audit_statement_metadata',true),'')::jsonb AS metadata,
+                  nullif(current_setting('app.audit_inputs',true),'')::jsonb AS inputs,
+                  nullif(current_setting('app.audit_write_predicate_scopes',true),'')::jsonb AS predicate_scopes`))
+                const statement = captured.rows[0]?.audience
+                const statementMetadata = captured.rows[0]?.metadata
+                if (statementMetadata?.queryId === queryId && statementMetadata.table === inputCandidate.table) {
+                  currentMetadata = statementMetadata
+                  if (captured.rows[0]?.inputs) event.inputs = captured.rows[0]!.inputs
+                }
+                const scopes: AuditOwnership[] = statement?.scope ? [statement.scope] : []
+                if ((statement?.attempts ?? 0) > (statement?.inserted ?? 0) && statement?.attemptedScope) {
+                  scopes.push(statement.attemptedScope)
+                }
+                if (!scopes.length && statementMetadata?.queryId === queryId && statementMetadata.table === writePredicate?.table) {
+                  scopes.push(...(captured.rows[0]?.predicate_scopes ?? []))
+                }
+                const resolved = scopes.length
+                  ? combinedScope(scopes)
+                  : { type: 'unresolved' as const, reason: 'statement_matched_no_owned_rows' }
+                event.scope_type = resolved.type
+                event.agency_ids = resolved.type === 'agency' ? resolved.agencyIds : []
+                event.agency_id = event.agency_ids[0] ?? null
+                event.attribution_error = resolved.type === 'unresolved' ? resolved.reason : null
+              }
               if (event) {
-                const projection = auditProjection(query, control.keys ?? new Map())
-                event.table_name = projection?.table ?? null
+                if (control.ownershipEnabled && !statementOwnership) {
+                  event.scope_type = 'unresolved'
+                  event.agency_id = null
+                  event.agency_ids = []
+                  event.attribution_error = 'statement_ownership_unavailable'
+                }
+                if (!currentMetadata && !readStatement) {
+                  const stored = (await raw.executeQuery<{ metadata: AuditStatementMetadata | null }>(CompiledQuery.raw(
+                    `SELECT nullif(current_setting('app.audit_statement_metadata',true),'')::jsonb AS metadata`))).rows[0]?.metadata
+                  currentMetadata = stored?.queryId === queryId && stored.table === inputCandidate.table ? stored : null
+                }
+                const keys = currentMetadata?.table && currentMetadata.primaryKey ? new Map([[currentMetadata.table, currentMetadata.primaryKey]]) : new Map()
+                const projection = auditProjection(query, keys)
+                event.table_name = projection?.table ?? event.table_name
                 const captured = returnedAuditIdentities(result.rows, projection)
                 const identities = JSON.stringify(captured).length <= 16384 ? captured : null
                 if (identities) {
@@ -214,7 +359,16 @@ export const createAuditDialect = (dialect: Dialect, serialize: boolean, control
               }
               return result
             } catch (error) {
-              if (event) event.error_code = errorCode(error)
+              if (event) {
+                event.error_code = errorCode(error)
+                event.inputs = failedInputs
+                if (control.ownershipEnabled) {
+                  event.scope_type = 'unresolved'
+                  event.agency_id = null
+                  event.agency_ids = []
+                  event.attribution_error = 'failed_statement_ownership_unavailable'
+                }
+              }
               if (standalone) {
                 if (event) event.transaction_outcome = 'rolled_back'
                 if (began) await driver.rollbackTransaction(raw)
@@ -246,6 +400,7 @@ export const createAuditDialect = (dialect: Dialect, serialize: boolean, control
         } else await driver.beginTransaction(lease.raw, settings)
         if (!control.enabled) await lease.raw.executeQuery(CompiledQuery.raw('SELECT set_config(\'app.audit_bootstrap\', \'on\', true)'))
         lease.transaction = true
+        lease.transactionId = randomUUID()
       },
       commitTransaction: async connection => {
         const lease = state(connection)
@@ -287,8 +442,8 @@ export const createAuditDialect = (dialect: Dialect, serialize: boolean, control
         } finally {
           leases.delete(connection)
           lease.unlock()
+          lease.access.released = true
         }
-        lease.access.released = true
       },
       destroy: async () => {
         await control.stop?.()

@@ -1,3 +1,4 @@
+import { captureParsedAuditRequestBody } from './audit-request'
 import { mergeAgreementCustomFields } from './agreement-custom-fields'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Temporary coverage while agreement profile helpers receive complete documentation. */
 import { readBody, type H3Event } from 'h3'
@@ -45,6 +46,7 @@ const readAgreementProfilePatchBody = async (event: H3Event) => {
     readBody?: typeof readBody
   }).readBody ?? readBody
   const rawBody = await bodyReader<Record<string, unknown>>(event) as Record<string, unknown>
+  await captureParsedAuditRequestBody(event, rawBody)
   const validated = await parseI18n(event, FundingCaseAgreementProfilePatchSchema, rawBody)
 
   return { rawBody, validated }

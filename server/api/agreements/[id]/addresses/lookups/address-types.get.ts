@@ -47,16 +47,19 @@ export default defineEventHandler(async event => {
     if (selectedIds.length > 0 && permission_action === 'update' && address_id) {
       // Historical labels belong only to the exact selected reference of this
       // Agreement address. Supplying address_id never broadens ordinary browse.
+      // The surrounding repeatable-read transaction keeps this ownership lookup
+      // and the label/count queries on the same authorized snapshot.
+      const historicalAddress = await db.selectFrom('Funding_Case_Agreement_Address')
+        .innerJoin('Common_Address', 'Common_Address.id', 'Funding_Case_Agreement_Address.egcs_fc_address')
+        .select('Funding_Case_Agreement_Address.egcs_fc_addresstype')
+        .where('Funding_Case_Agreement_Address.id', '=', address_id)
+        .where('Funding_Case_Agreement_Address.egcs_fc_fundingagreement', '=', agreementId)
+        .where('Funding_Case_Agreement_Address._deleted', '=', false)
+        .where('Common_Address._deleted', '=', false)
+        .executeTakeFirst()
       baseQuery = baseQuery.where(eb => eb.or([
         eb('Agency_Address_Type._deleted', '=', false),
-        eb.exists(eb.selectFrom('Funding_Case_Agreement_Address')
-          .innerJoin('Common_Address', 'Common_Address.id', 'Funding_Case_Agreement_Address.egcs_fc_address')
-          .select('Funding_Case_Agreement_Address.id')
-          .where('Funding_Case_Agreement_Address.id', '=', address_id)
-          .where('Funding_Case_Agreement_Address.egcs_fc_fundingagreement', '=', agreementId)
-          .where('Funding_Case_Agreement_Address._deleted', '=', false)
-          .where('Common_Address._deleted', '=', false)
-          .whereRef('Funding_Case_Agreement_Address.egcs_fc_addresstype', '=', 'Agency_Address_Type.id'))
+        ...(historicalAddress ? [eb('Agency_Address_Type.id', '=', historicalAddress.egcs_fc_addresstype)] : [])
       ]))
     } else {
       baseQuery = baseQuery.where('Agency_Address_Type._deleted', '=', false)

@@ -1,3 +1,4 @@
+import { withAuditCreationOwner } from '~~/server/utils/audit-context'
 import { authorizeAttachmentTarget, executeFreshAuthorizedAttachmentWrite } from '~~/server/utils/attachment-target'
 import { getAttachmentRouteTarget } from '~~/server/utils/attachment-route'
 import { readAttachmentUpload } from '~~/server/utils/attachment-upload'
@@ -67,25 +68,27 @@ export default defineEventHandler(async event => {
       if (!attachmentType) return await badRequest(event, 'ATTACHMENT_TYPE_INVALID', 'apiErrors.attachments.type_invalid')
       if (!commonUserId) return await forbidden(event)
       const metadataDeclaration = provider.extension.fileStorageProvider?.metadata
-      const attachment = await trx.insertInto('Common_Attachment').values({
-        egcs_cn_attachmenttype: upload.metadata.attachmentTypeId,
-        egcs_cn_name_en: upload.metadata.nameEn,
-        egcs_cn_name_fr: upload.metadata.nameFr,
-        egcs_cn_description_en: upload.metadata.descriptionEn,
-        egcs_cn_description_fr: upload.metadata.descriptionFr,
-        egcs_cn_filename: upload.file.filename,
-        egcs_cn_provider: provider.extension.key,
-        egcs_cn_providerobjectid: reference.objectId,
-        egcs_cn_providerlocator: reference.locator,
-        egcs_cn_providermetadata: metadataDeclaration?.persistence === 'provider'
-          ? null
-          : namespaceProviderMetadata(provider.extension.key, providerMetadata),
-        egcs_cn_metadatapersistence: metadataDeclaration?.persistence ?? null,
-        egcs_cn_metadatacontractversion: metadataDeclaration?.contractVersion ?? null,
-        egcs_cn_mimetype: upload.file.contentType,
-        egcs_cn_createdat: new Date(),
-        egcs_cn_filesize: upload.file.bytes.byteLength
-      }).returning('id').executeTakeFirstOrThrow()
+      const attachment = await withAuditCreationOwner('public.Common_Attachment',
+        { egcs_cn_provider: provider.extension.key, egcs_cn_providerobjectid: reference.objectId },
+        target, async () => await trx.insertInto('Common_Attachment').values({
+          egcs_cn_attachmenttype: upload.metadata.attachmentTypeId,
+          egcs_cn_name_en: upload.metadata.nameEn,
+          egcs_cn_name_fr: upload.metadata.nameFr,
+          egcs_cn_description_en: upload.metadata.descriptionEn,
+          egcs_cn_description_fr: upload.metadata.descriptionFr,
+          egcs_cn_filename: upload.file.filename,
+          egcs_cn_provider: provider.extension.key,
+          egcs_cn_providerobjectid: reference.objectId,
+          egcs_cn_providerlocator: reference.locator,
+          egcs_cn_providermetadata: metadataDeclaration?.persistence === 'provider'
+            ? null
+            : namespaceProviderMetadata(provider.extension.key, providerMetadata),
+          egcs_cn_metadatapersistence: metadataDeclaration?.persistence ?? null,
+          egcs_cn_metadatacontractversion: metadataDeclaration?.contractVersion ?? null,
+          egcs_cn_mimetype: upload.file.contentType,
+          egcs_cn_createdat: new Date(),
+          egcs_cn_filesize: upload.file.bytes.byteLength
+        }).returning('id').executeTakeFirstOrThrow())
       const link = await trx.insertInto('Common_Entity_Attachment').values({
         egcs_cn_attachment: String(attachment.id),
         egcs_cn_entityid: target.entityId,

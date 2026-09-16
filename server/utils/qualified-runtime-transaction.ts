@@ -1,3 +1,4 @@
+import { withAuditExecution } from './audit-context'
 /* eslint-disable jsdoc/require-jsdoc -- canonical qualified-runtime orchestration is covered by focused lifecycle tests */
 import type { H3Event } from 'h3'
 import type { Transaction } from 'kysely'
@@ -131,7 +132,7 @@ export const executeQualifiedRuntimeTransaction = async <Result>(
     lockedQualifiedRuntimeTransactions.set(trx, evidence)
     try {
       await options.authorize?.(evidence)
-      return await options.work(evidence)
+      return await withAuditExecution({ type: 'agency', agencyId: current.lockedEntity.owner.agencyId }, () => options.work(evidence))
     } finally {
       lockedQualifiedRuntimeTransactions.delete(trx)
     }

@@ -14,7 +14,8 @@ export const AuditAccessParamsSchema = z.object({ id: z.uuid({ error: 'validatio
 export const AuditSummarySchema = z.object({
   id: z.string(), kind: z.enum(['change', 'security', 'access']), created_at: z.string(),
   actor_user_id: z.string().nullable(), request_id: z.string().nullable(), table_name: z.string().nullable(),
-  record_id: z.string().nullable(), operation: z.string()
+  record_id: z.string().nullable(), operation: z.string(),
+  scope_type: z.enum(['historical', 'global', 'agency', 'unresolved']), agency_id: z.string().nullable(), agency_ids: z.array(z.string())
 })
 export const AuditListResponseSchema = z.object({
   items: z.array(AuditSummarySchema), total: z.number(), page: z.number(), limit: z.number()

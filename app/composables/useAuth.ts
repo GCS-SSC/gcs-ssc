@@ -183,6 +183,7 @@ export const useAuth = () => {
     authorize,
     hasAbility,
     canManageAssignments,
+    permissionRevision: computed(() => JSON.stringify(permissionState.value)),
     can: authorize,
     canAny: hasAbility,
     signOut: () => authClient.signOut()

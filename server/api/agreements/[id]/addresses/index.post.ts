@@ -1,3 +1,4 @@
+import { insertOwnedAddress } from '~~/server/utils/audit-owned-address'
 import type { Insertable } from 'kysely'
 import { badRequest } from '~~/server/utils/api-errors'
 import { FundingCaseAgreementAddressCreateSchema } from '~~/shared/types/schemas'
@@ -59,11 +60,7 @@ export default defineEventHandler(async event => {
       return await badRequest(event, 'INVALID_AGREEMENT_ADDRESS_TYPE', 'apiErrors.agreement.invalid_address_type')
     }
 
-    const address = await trx
-      .insertInto('Common_Address')
-      .values(addressValues)
-      .returning('id')
-      .executeTakeFirstOrThrow()
+    const address = await insertOwnedAddress(trx, addressValues, { entityType: 'fundingcaseagreement', entityId: agreementId })
 
     const linkValues: Insertable<FundingCaseAgreementAddressTable> = {
       egcs_fc_fundingagreement: agreementId,

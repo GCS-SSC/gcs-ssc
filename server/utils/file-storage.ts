@@ -1,6 +1,7 @@
 /* eslint-disable jsdoc/require-jsdoc -- Storage facade helpers use explicit typed contracts. */
 import type { Insertable, Kysely } from 'kysely'
 import { nanoid } from 'nanoid'
+import { withAuditCreationOwner } from './audit-context'
 import type { GcsFileStoragePurpose, GcsFileStorageTarget } from '@gcs-ssc/extensions/server'
 import type { Database, CommonAttachmentTable, JsonValue } from '~~/shared/types/database'
 import { deleteProviderObject, readProviderObject, resolveAgencyStorageProvider, writeProviderObject } from './file-storage-provider'
@@ -153,7 +154,10 @@ export const writeStoredFile = async (db: Kysely<Database>, input: StoredFileInp
 
   let attachment: { id: string | number }
   try {
-    attachment = await db.insertInto('Common_Attachment').values(values).returning('id').executeTakeFirstOrThrow()
+    attachment = await withAuditCreationOwner('public.Common_Attachment',
+      { egcs_cn_provider: provider.extension.key, egcs_cn_providerobjectid: reference.objectId },
+      input.target ?? { entityType: 'agency', entityId: input.agencyId },
+      async () => await db.insertInto('Common_Attachment').values(values).returning('id').executeTakeFirstOrThrow())
   } catch (error: unknown) {
     await bestEffortStorageCleanup(
       async () => await deleteProviderObject({ provider, reference, purpose, target: input.target }),

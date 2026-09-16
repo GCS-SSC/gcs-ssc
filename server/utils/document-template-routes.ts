@@ -252,7 +252,8 @@ export const storeTemplateUpload = async (
     nameFr: metadata.egcs_tp_name_fr || file.filename,
     descriptionEn: metadata.egcs_tp_description_en || metadata.egcs_tp_name_en || file.filename,
     descriptionFr: metadata.egcs_tp_description_fr || metadata.egcs_tp_name_fr || file.filename,
-    folder: `stream-${streamId}`
+    folder: `stream-${streamId}`,
+    target: { entityType: 'transferpaymentstream', entityId: streamId }
   })
 
   return stored

@@ -274,7 +274,7 @@
     },
     "packages/gcs-ssc-extensions": {
       "name": "@gcs-ssc/extensions",
-      "version": "0.3.1",
+      "version": "0.3.2",
       "devDependencies": {
         "@types/node": "^25.3.0",
         "h3": "^1.15.5",

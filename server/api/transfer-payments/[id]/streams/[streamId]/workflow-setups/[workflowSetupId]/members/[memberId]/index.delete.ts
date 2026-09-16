@@ -1,4 +1,3 @@
-import { sql } from 'kysely'
 import { authorize } from '~~/server/utils/authorize'
 import { authorizeTransferPaymentStreamResource, createTransferPaymentScopedAuthorizeHandler } from '~~/server/utils/transfer-payment-route-authorization'
 import { executeFreshAuthorizedTransferPaymentStreamWrite } from '~~/server/utils/transfer-payment-write-transaction'
@@ -32,7 +31,7 @@ export default defineEventHandler(async event => {
       .where('egcs_cn_workflowsetup', '=', workflowSetupId).where('_deleted', '=', false)
       .orderBy('egcs_cn_sequence', 'asc').forUpdate().execute()
     if (remaining.length > 0) {
-      await trx.updateTable('Common_Workflow_Setup_Member').set({ egcs_cn_sequence: sql<number>`egcs_cn_sequence + 100000` })
+      await trx.updateTable('Common_Workflow_Setup_Member').set(eb => ({ egcs_cn_sequence: eb('egcs_cn_sequence', '+', 100000) }))
         .where('id', 'in', remaining.map(member => String(member.id))).execute()
       for (const [index, member] of remaining.entries()) {
         await trx.updateTable('Common_Workflow_Setup_Member').set({ egcs_cn_sequence: index + 1 })

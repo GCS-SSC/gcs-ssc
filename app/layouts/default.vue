@@ -13,7 +13,7 @@ const canManageAssignments = abilityHelpers.canManageAssignments ?? (() => false
 const { user, signOut } = useAuth()
 
 const open: Ref<boolean> = ref(false)
-const canViewAudit = computed(() => can('audit', 'read', { type: 'global' }))
+const canViewAudit = computed(() => canAny('audit', 'read', ['global', 'agency']))
 const canViewAdminGwcoa = computed(() => can('system', 'read', { type: 'global' }))
 const canViewAgencies = computed(() => canAny('agency', 'read'))
 const canViewUsers = computed(() => canAny('user', 'read'))

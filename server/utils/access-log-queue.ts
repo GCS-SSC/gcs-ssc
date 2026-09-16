@@ -15,6 +15,12 @@ export interface AccessEvidence {
   limitations: string[]
   table_name: string | null
   error_code: string | null
+  scope_type?: 'global' | 'agency' | 'unresolved'
+  agency_id?: string | null
+  agency_ids?: string[]
+  attribution_error?: string | null
+  transaction_id?: string
+  inputs?: unknown
 }
 
 export interface AccessLogRequest { complete: boolean }
