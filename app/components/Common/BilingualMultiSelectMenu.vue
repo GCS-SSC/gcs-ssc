@@ -31,7 +31,8 @@ const mappedItems = computed(() => {
     const record = item as Record<string, unknown>
     const value = record[valueKey]
     if (value === undefined || value === null) continue
-    const label = locale.value === 'fr' ? record[labelFrKey] : record[labelEnKey]
+    const preferredLabel = locale.value === 'fr' ? record[labelFrKey] : record[labelEnKey]
+    const label = preferredLabel || record[labelEnKey] || record[labelFrKey]
     const categoryKey = locale.value === 'fr' ? categoryFrKey : categoryEnKey
     const category = categoryKey ? String(record[categoryKey] ?? '') : ''
     const option = { label: String(label ?? ''), value: String(value), disabled: record.disabled === true }

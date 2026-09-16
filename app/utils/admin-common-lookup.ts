@@ -16,7 +16,7 @@ export interface AdminCommonLookupOption {
  * Resolves the localized label value for a lookup item.
  *
  * @remarks
- * Uses French key when locale is `fr`, otherwise English key.
+ * Uses the active language, falling back to the other language when its label is empty.
  *
  * @param item - Raw lookup item from API.
  * @param options - Lookup field configuration.
@@ -32,9 +32,9 @@ export const resolveLookupLabel = (
   options: AdminCommonLookupLabelOptions
 ): string => {
   const localizedKey = options.locale === 'fr' ? options.labelFrKey : options.labelEnKey
-  const localizedValue = item[localizedKey]
-
-  return typeof localizedValue === 'string' ? localizedValue : String(localizedValue ?? '')
+  const alternateKey = options.locale === 'fr' ? options.labelEnKey : options.labelFrKey
+  const localizedLabel = String(item[localizedKey] ?? '')
+  return localizedLabel.trim() ? localizedLabel : String(item[alternateKey] ?? '')
 }
 
 /**

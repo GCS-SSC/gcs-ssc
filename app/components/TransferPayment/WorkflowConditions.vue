@@ -13,7 +13,11 @@ const { data, error, refresh } = await useAsyncData<{ items: AgreementCustomFiel
   if (!response.ok) await throwFetchResponseError(response)
   return await response.json() as { items: AgreementCustomFieldDefinition[] }
 })
-const fields = computed(() => (data.value?.items ?? []).filter(field => field.active && field.discriminator && field.kind === 'relational'))
+const selectedOptionIds = (fieldId: string) => model.value.find(condition => condition.fieldId === fieldId)?.optionIds ?? []
+const fields = computed(() => (data.value?.items ?? []).filter(field => field.discriminator && field.kind === 'relational' && (field.active || selectedOptionIds(field.id).length > 0)))
+const options = (field: AgreementCustomFieldDefinition) => field.options
+  .filter(option => (field.active && option.active) || selectedOptionIds(field.id).includes(option.id))
+  .map(option => ({ value: option.id, label: label(option) }))
 const label = (value: { name_en: string, name_fr: string }) => locale.value === 'fr' ? value.name_fr : value.name_en
 const update = (fieldId: string, optionIds: string[]) => {
   model.value = [...model.value.filter(condition => condition.fieldId !== fieldId), ...(optionIds.length ? [{ fieldId, optionIds }] : [])]
@@ -27,7 +31,7 @@ const update = (fieldId: string, optionIds: string[]) => {
       {{ t('custom_fields.conditions_help') }}
     </p>
     <UFormField v-for="field in fields" :key="field.id" :label="label(field)">
-      <USelectMenu :model-value="model.find(condition => condition.fieldId === field.id)?.optionIds ?? []" :items="field.options.filter(option => option.active).map(option => ({ value: option.id, label: label(option) }))" value-key="value" multiple class="w-full" @update:model-value="update(field.id, $event)" />
+      <USelectMenu :model-value="selectedOptionIds(field.id)" :items="options(field)" value-key="value" multiple class="w-full" @update:model-value="update(field.id, $event)" />
     </UFormField>
   </CommonSection>
 </template>

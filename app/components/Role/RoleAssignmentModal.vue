@@ -65,6 +65,7 @@ const debouncedRoleSearchTerm = refDebounced(roleSearchTerm, 250)
 const usersResponse: Ref<ListResponse<UserOptionItem> | null> = ref(null)
 const rolesResponse: Ref<ListResponse<RoleOptionItem> | null> = ref(null)
 const selectedRole: Ref<RoleOptionItem | null> = ref(null)
+const selectedUser: Ref<UserOptionItem | null> = ref(null)
 const rolesLoading: Ref<boolean> = ref(false)
 const rolesLoadFailed: Ref<boolean> = ref(false)
 const usersLoading: Ref<boolean> = ref(false)
@@ -205,14 +206,28 @@ watch(
   roleId => {
     if (roleId) {
       const matchingRole = roleItems.value.find(role => String(role.id) === String(roleId))
-      if (matchingRole) selectedRole.value = matchingRole
+      selectedRole.value = matchingRole ?? (String(selectedRole.value?.id) === String(roleId) ? selectedRole.value : null)
       roleRequiredError.value = false
       roleAuthorizationError.value = false
     } else {
       selectedRole.value = null
     }
-  }
+  },
+  { flush: 'sync' }
 )
+
+watch(() => state.value.user_id, userId => {
+  selectedUser.value = usersResponse.value?.items.find(user => String(user.id) === String(userId)) ?? null
+}, { flush: 'sync' })
+
+const retainedUserOptions = computed(() => selectedUser.value && String(selectedUser.value.id) === String(state.value.user_id)
+  && !usersResponse.value?.items.some(user => String(user.id) === String(state.value.user_id))
+  ? [{ value: String(selectedUser.value.id), label: selectedUser.value.name }]
+  : [])
+const retainedRoleOptions = computed(() => selectedRole.value && String(selectedRole.value.id) === String(state.value.role_id)
+  && canAssignRole(selectedRole.value) && !roleItems.value.some(role => String(role.id) === String(state.value.role_id))
+  ? [{ value: String(selectedRole.value.id), label: i18n.locale.value === 'fr' ? selectedRole.value.name_fr : selectedRole.value.name_en }]
+  : [])
 
 watch(
   () => open.value,
@@ -222,6 +237,7 @@ watch(
       roleAuthorizationError.value = false
     } else {
       selectedRole.value = null
+      selectedUser.value = null
     }
   }
 )
@@ -252,6 +268,8 @@ const onSubmit = () => {
           <CommonBilingualSelectMenu
             v-model="state.user_id"
             :items="usersResponse?.items"
+            :prepend-options="retainedUserOptions"
+            ignore-filter
             :disabled="usersLoading || usersLoadFailed"
             :search-term="userSearchTerm"
             value-key="id"
@@ -267,6 +285,8 @@ const onSubmit = () => {
           <CommonBilingualSelectMenu
             v-model="state.role_id"
             :items="roleItems"
+            :prepend-options="retainedRoleOptions"
+            ignore-filter
             :disabled="rolesLoading || rolesLoadFailed"
             :search-term="roleSearchTerm"
             value-key="id"

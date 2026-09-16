@@ -21,18 +21,18 @@ const {
   emptyLabel?: string
 }>()
 const model = defineModel<string | string[] | null | undefined>({ default: undefined })
-const { locale } = useI18n()
+const { locale, t } = useI18n()
 const catalog = useStatusCatalog()
 void catalog.load()
 
+const selectedIds = computed(() => Array.isArray(model.value)
+  ? model.value
+  : typeof model.value === 'string' ? [model.value] : [])
 const availableDefinitions = computed(() => {
   const definitions = catalog.getForAgency(agencyId, includeDeleted)
     .filter(definition => !draftOnly || definition.isDraft)
-  const selectedIds = Array.isArray(model.value)
-    ? model.value
-    : typeof model.value === 'string' ? [model.value] : []
   const existingIds = new Set(definitions.map(definition => definition.id))
-  const selectedDefinitions = selectedIds
+  const selectedDefinitions = selectedIds.value
     .map(id => catalog.getById(id))
     .filter((definition): definition is StatusDefinition => Boolean(
       definition
@@ -50,6 +50,11 @@ const items = computed(() => [
     value: status.id,
     icon: status.icon,
     disabled: status.deleted
+  })),
+  ...selectedIds.value.filter(id => !availableDefinitions.value.some(status => status.id === id)).map(id => ({
+    label: t(loading.value ? 'common.loading' : 'common.unavailable'),
+    value: id,
+    disabled: true
   }))
 ])
 </script>
