@@ -1,3 +1,4 @@
+import { assertAgreementProponentType } from './agreement-proponent-type'
 import { captureParsedAuditRequestBody } from './audit-request'
 import { mergeAgreementCustomFields } from './agreement-custom-fields'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Temporary coverage while agreement profile helpers receive complete documentation. */
@@ -249,6 +250,15 @@ const patchValidatedAgreementProfile = async (
     .select(['egcs_fc_transferpaymentstream', 'egcs_fc_riskscore', 'egcs_fc_agreementsubtype', 'egcs_fc_agreementtype'])
     .where('id', '=', agreementId).executeTakeFirstOrThrow()
   const streamChanged = String(current.egcs_fc_transferpaymentstream) !== nextStreamId
+  if (streamChanged) {
+    const relationships = await db.selectFrom('Funding_Case_Agreement_Applicant_Recipient')
+      .select(['egcs_fc_applicantrecipient', 'egcs_fc_applicantrecipientsubtype'])
+      .where('egcs_fc_fundingagreement', '=', agreementId).where('_deleted', '=', false).execute()
+    for (const relationship of relationships) {
+      if (relationship.egcs_fc_applicantrecipientsubtype) await assertAgreementProponentType(event, db, nextStreamId,
+        relationship.egcs_fc_applicantrecipient, relationship.egcs_fc_applicantrecipientsubtype, ['egcs_fc_transferpaymentstream'])
+    }
+  }
   const includesRiskScore = Object.hasOwn(validated, 'egcs_fc_riskscore')
   const echoesCurrentRiskScore = (validated.egcs_fc_riskscore ?? null) === (current.egcs_fc_riskscore ?? null)
     || (current.egcs_fc_riskscore !== null && current.egcs_fc_riskscore !== undefined

@@ -40,6 +40,7 @@ export default defineEventHandler(async event => {
         'Applicant_Recipient_Profile.id',
         'Funding_Case_Agreement_Applicant_Recipient.egcs_fc_applicantrecipient'
       )
+      .leftJoin('Agency_Applicant_Recipient_Subtype as subtype', 'subtype.id', 'Funding_Case_Agreement_Applicant_Recipient.egcs_fc_applicantrecipientsubtype')
       .leftJoin('Agency_Profile', 'Agency_Profile.id', 'Applicant_Recipient_Profile.egcs_ar_leadagency')
       .where('Funding_Case_Agreement_Applicant_Recipient.egcs_fc_fundingagreement', '=', agreementId)
       .where('Funding_Case_Agreement_Applicant_Recipient._deleted', '=', false)
@@ -64,6 +65,9 @@ export default defineEventHandler(async event => {
       baseQuery
         .select([
           'Funding_Case_Agreement_Applicant_Recipient.id as id',
+          'Funding_Case_Agreement_Applicant_Recipient.egcs_fc_applicantrecipientsubtype',
+          'subtype.egcs_ay_name_en as subtype_name_en',
+          'subtype.egcs_ay_name_fr as subtype_name_fr',
           'Funding_Case_Agreement_Applicant_Recipient.egcs_fc_applicantrecipient as egcs_fc_applicantrecipient',
           sql<string | null>`COALESCE("Applicant_Recipient_Profile"."egcs_ar_legalname_en", "Applicant_Recipient_Profile"."egcs_ar_operatingname_en")`.as('applicant_recipient_name_en'),
           sql<string | null>`COALESCE("Applicant_Recipient_Profile"."egcs_ar_legalname_fr", "Applicant_Recipient_Profile"."egcs_ar_operatingname_fr")`.as('applicant_recipient_name_fr'),

@@ -10,6 +10,7 @@ export type AssessmentEntityHelperDefinition = {
   field: string
   dataType: AssessmentHelperDataType
   labelKey: string
+  retired?: boolean
   referenceTable?: string
 }
 
@@ -17,7 +18,7 @@ type AssessmentEntityHelperRegistry = Partial<Record<Entity_Type, AssessmentEnti
 
 const APPLICANT_RECIPIENT_HELPER_DEFINITIONS: AssessmentEntityHelperDefinition[] = [
   { field: 'id', dataType: 'id', labelKey: 'common.id', referenceTable: 'Applicant_Recipient_Profile' },
-  { field: 'egcs_ar_applicantrecipientsubtypes', dataType: 'id', labelKey: 'applicant_recipient.subtype', referenceTable: 'Agency_Applicant_Recipient_Subtype' },
+  { retired: true, field: 'egcs_ar_applicantrecipientsubtypes', dataType: 'id', labelKey: 'applicant_recipient.subtype', referenceTable: 'Agency_Applicant_Recipient_Subtype' },
   { field: 'egcs_ar_leadagency', dataType: 'id', labelKey: 'applicant_recipient.lead_agency', referenceTable: 'Agency_Profile' },
   { field: 'egcs_ar_leadofficer', dataType: 'id', labelKey: 'applicant_recipient.lead_officer', referenceTable: 'Common_User' },
   { field: 'egcs_ar_legalname_en', dataType: 'string', labelKey: 'applicant_recipient.legal_name_en' },
@@ -32,13 +33,13 @@ const assessmentEntityHelperRegistry: AssessmentEntityHelperRegistry = {
 }
 
 export const getAssessmentHelperDefinitionsForEntityType = (entityType: Entity_Type): AssessmentEntityHelperDefinition[] =>
-  assessmentEntityHelperRegistry[entityType] ?? []
+  (assessmentEntityHelperRegistry[entityType] ?? []).filter(definition => !definition.retired)
 
 export const getAssessmentHelperDefinition = (
   entityType: Entity_Type,
   field: string
 ): AssessmentEntityHelperDefinition | null =>
-  getAssessmentHelperDefinitionsForEntityType(entityType).find(definition => definition.field === field) ?? null
+  (assessmentEntityHelperRegistry[entityType] ?? []).find(definition => definition.field === field) ?? null
 
 export const getAssessmentHelperComparableValueType = (
   definition: AssessmentEntityHelperDefinition

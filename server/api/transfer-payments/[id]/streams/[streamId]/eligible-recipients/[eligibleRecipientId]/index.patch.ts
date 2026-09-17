@@ -1,3 +1,4 @@
+import { assertEligibleProponentTypeNotInUse } from '~~/server/utils/agreement-proponent-type'
 import { PositivePostgresBigintIdSchema, TransferPaymentEligibleRecipientSchema } from '~~/shared/types/schemas'
 import { authorizeTransferPaymentEligibleRecipientResource } from '~~/server/utils/transfer-payment-route-authorization'
 import { throwIfTransferPaymentUniqueConstraintError } from '~~/server/utils/transfer-payment-unique-constraint-errors'
@@ -56,6 +57,9 @@ export default defineEventHandler(async event => {
         const applicantRecipientSubtype = await subtypeQuery.executeTakeFirst()
 
         if (!applicantRecipientSubtype) return await badRequest(event, 'INVALID_APPLICANT_RECIPIENT_SUBTYPE', 'apiErrors.transfer_payment.invalid_applicant_recipient_subtype')
+      }
+      if (validated.egcs_tp_applicantrecipientsubtype && validated.egcs_tp_applicantrecipientsubtype !== current.egcs_tp_applicantrecipientsubtype) {
+        await assertEligibleProponentTypeNotInUse(event, trx, streamId, current.egcs_tp_applicantrecipientsubtype)
       }
       try {
         return await trx

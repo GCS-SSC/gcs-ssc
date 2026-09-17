@@ -82,6 +82,7 @@ const listTransferPaymentStreams = async (
         'Transfer_Payment_Stream.egcs_tp_abbreviation_fr as egcs_tp_abbreviation_fr',
         'Transfer_Payment_Stream.egcs_tp_objective_en as egcs_tp_objective_en',
         'Transfer_Payment_Stream.egcs_tp_objective_fr as egcs_tp_objective_fr',
+        'Transfer_Payment_Stream.egcs_tp_requireconsistentproponenttype',
         'Transfer_Payment_Stream.egcs_tp_allowsfurtherdistribution as egcs_tp_allowsfurtherdistribution',
         'Transfer_Payment_Stream.egcs_tp_active as egcs_tp_active',
         'parent.egcs_tp_name_en as parent_name_en',

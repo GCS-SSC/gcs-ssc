@@ -1,3 +1,4 @@
+import { assertEligibleProponentTypeNotInUse } from '~~/server/utils/agreement-proponent-type'
 import { authorizeTransferPaymentEligibleRecipientResource } from '~~/server/utils/transfer-payment-route-authorization'
 import { executeFreshAuthorizedTransferPaymentStreamWrite } from '~~/server/utils/transfer-payment-write-transaction'
 
@@ -28,6 +29,10 @@ export default defineEventHandler(async event => {
 
   return await executeFreshAuthorizedTransferPaymentStreamWrite(
     event, db, profileId, access.agencyId, streamId, 'delete', async trx => {
+      const current = await trx.selectFrom('Transfer_Payment_Stream_Eligible_Recipient')
+        .select('egcs_tp_applicantrecipientsubtype').where('id', '=', recipientId)
+        .where('egcs_tp_transferpaymentstream', '=', streamId).where('_deleted', '=', false).executeTakeFirst()
+      if (current) await assertEligibleProponentTypeNotInUse(event, trx, streamId, current.egcs_tp_applicantrecipientsubtype)
       const deleted = await trx.updateTable('Transfer_Payment_Stream_Eligible_Recipient')
         .set({ _deleted: true }).where('id', '=', recipientId)
         .where('egcs_tp_transferpaymentstream', '=', streamId).where('_deleted', '=', false)

@@ -60,7 +60,6 @@ const nullableApplicantRecipientFields = [
 ] as const
 
 const definedApplicantRecipientFields = [
-  'egcs_ar_applicantrecipientsubtypes',
   'egcs_ar_active'
 ] as const
 
@@ -94,13 +93,12 @@ const setDefinedApplicantRecipientField = (
  * @param payload - Create or patch payload.
  * @param options - Availability exceptions for preserving an existing reference.
  * @param options.allowInactiveLeadAgencyId - Existing inactive Agency ID that may remain selected.
- * @param options.allowRetiredSubtypeId - Locked current subtype retained under its unchanged owner.
  * @returns Presence flags for subtype and lead agency.
  */
 export const validateApplicantRecipientReferences = async (
   db: Kysely<Database>,
   payload: ApplicantRecipientCreateInput | ApplicantRecipientPatchInput,
-  options: { allowInactiveLeadAgencyId?: string; allowRetiredSubtypeId?: string } = {}
+  options: { allowInactiveLeadAgencyId?: string } = {}
 ) => {
   // Both callers run in a write transaction. Lock parent before subtype so
   // catalogue retirement cannot pass its reference check before this write,
@@ -121,31 +119,7 @@ export const validateApplicantRecipientReferences = async (
         .executeTakeFirst()
     : undefined
 
-  let subtype: { id: string; egcs_ay_organizationagency: string } | undefined
-  if (hasOwn(payload, 'egcs_ar_applicantrecipientsubtypes') && payload.egcs_ar_applicantrecipientsubtypes) {
-    let subtypeQuery = db.selectFrom('Agency_Applicant_Recipient_Subtype')
-      .where('id', '=', String(payload.egcs_ar_applicantrecipientsubtypes))
-    const retainedSubtypeId = options.allowRetiredSubtypeId
-    subtypeQuery = retainedSubtypeId
-      ? subtypeQuery.where(eb => eb.or([
-          eb('_deleted', '=', false),
-          eb('id', '=', retainedSubtypeId)
-        ]))
-      : subtypeQuery.where('_deleted', '=', false)
-    subtype = await subtypeQuery.select(['id', 'egcs_ay_organizationagency']).forShare().executeTakeFirst()
-  }
-
-  const subtypeMatchesLeadAgency = hasOwn(payload, 'egcs_ar_applicantrecipientsubtypes') && payload.egcs_ar_applicantrecipientsubtypes
-    ? hasOwn(payload, 'egcs_ar_leadagency') && payload.egcs_ar_leadagency
-      ? String(subtype?.egcs_ay_organizationagency ?? '') === String(payload.egcs_ar_leadagency)
-      : true
-    : true
-
   return {
-    subtypeExists: hasOwn(payload, 'egcs_ar_applicantrecipientsubtypes') && payload.egcs_ar_applicantrecipientsubtypes
-      ? !!subtype
-      : true,
-    subtypeMatchesLeadAgency,
     leadAgencyExists: hasOwn(payload, 'egcs_ar_leadagency') && payload.egcs_ar_leadagency ? !!leadAgency : true
   }
 }
@@ -420,7 +394,6 @@ const getApplicantRecipientProfileForPatch = async (
     .select([
       'id',
       'egcs_ar_leadagency',
-      'egcs_ar_applicantrecipientsubtypes',
       'egcs_ar_description_en',
       'egcs_ar_description_fr',
       'egcs_ar_operatingname_en',
@@ -441,41 +414,22 @@ const getApplicantRecipientProfileForPatch = async (
 const validateApplicantRecipientPatchReferences = async (
   event: H3Event,
   db: Kysely<Database>,
-  existing: { egcs_ar_leadagency: string | null | undefined; egcs_ar_applicantrecipientsubtypes: string },
+  existing: { egcs_ar_leadagency: string | null | undefined },
   validated: ApplicantRecipientProfilePatch
 ) => {
   const referencePayload: ApplicantRecipientPatchInput = {
     ...validated,
     ...(hasOwn(validated, 'egcs_ar_leadagency') ? {} : { egcs_ar_leadagency: existing.egcs_ar_leadagency ?? undefined })
   }
-  if (hasOwn(validated, 'egcs_ar_leadagency')
-    && validated.egcs_ar_leadagency !== existing.egcs_ar_leadagency
-    && !hasOwn(validated, 'egcs_ar_applicantrecipientsubtypes')) {
-    referencePayload.egcs_ar_applicantrecipientsubtypes = existing.egcs_ar_applicantrecipientsubtypes
-  }
   const nextLeadAgencyId = referencePayload.egcs_ar_leadagency
     ? String(referencePayload.egcs_ar_leadagency)
     : undefined
   const currentLeadAgencyId = existing.egcs_ar_leadagency ? String(existing.egcs_ar_leadagency) : undefined
   const references = await validateApplicantRecipientReferences(db, referencePayload, {
-    allowInactiveLeadAgencyId: nextLeadAgencyId === currentLeadAgencyId ? currentLeadAgencyId : undefined,
-    allowRetiredSubtypeId: nextLeadAgencyId === currentLeadAgencyId
-      && referencePayload.egcs_ar_applicantrecipientsubtypes === existing.egcs_ar_applicantrecipientsubtypes
-      ? existing.egcs_ar_applicantrecipientsubtypes
-      : undefined
+    allowInactiveLeadAgencyId: nextLeadAgencyId === currentLeadAgencyId ? currentLeadAgencyId : undefined
   })
-  if (!references.subtypeExists) {
-    return await badRequest(event, 'INVALID_APPLICANT_RECIPIENT_SUBTYPE', 'apiErrors.applicant_recipient.invalid_subtype')
-  }
   if (!references.leadAgencyExists) {
     return await badRequest(event, 'INVALID_APPLICANT_RECIPIENT_LEAD_AGENCY', 'apiErrors.applicant_recipient.invalid_lead_agency')
-  }
-  if (!references.subtypeMatchesLeadAgency) {
-    return await badRequest(
-      event,
-      'INVALID_APPLICANT_RECIPIENT_SUBTYPE_FOR_LEAD_AGENCY',
-      'apiErrors.applicant_recipient.invalid_subtype_for_lead_agency'
-    )
   }
 
   return null

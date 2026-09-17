@@ -1250,6 +1250,11 @@
     }
   },
   "transfer_payment": {
+    "proponent_consistency_confirm_title": "Change proponent type consistency?",
+    "proponent_consistency_enable_description": "Align existing proponent classifications through a data migration before enabling this option. Changing this setting on its own can have unexpected impacts: historical differences will remain, while future additions and type changes must match the proponent’s most recent eligible type in this stream (highest agreement ID). Unchanged saved types remain allowed. This takes effect when you save the stream.",
+    "proponent_consistency_disable_description": "Disabling this option allows future proponent types to differ between agreements. It does not change existing types. Before enabling it again, align existing classifications through a data migration. Re-enabling the option on its own can have unexpected impacts because it only enforces future additions and type changes, using the most recent eligible type (highest agreement ID). This takes effect when you save the stream.",
+    "proponent_consistency_confirm": "I understand, continue",
+    "require_consistent_proponent_type": "Require each proponent to use the same type across agreements",
     "cost_line_stream_inactive": "Stream Inactive",
     "cost_line_category_inactive": "Category Inactive",
     "cost_line_agency_inactive": "Agency Inactive",
@@ -1709,6 +1714,8 @@
     }
   },
   "validation": {
+    "proponent_type_in_use": "This type is used by an agreement proponent.",
+    "proponent_type_conflict": "Select the proponent’s most recent eligible type in this stream.",
     "budget_percentage": "Enter a percentage from 0 to 100 with at most two decimal places.",
     "budget_calculation": "Select a valid calculation mode and source category.",
     "custom_field_display_order_max": "Display order must not exceed {max}.",
@@ -2003,6 +2010,8 @@
     "description_en_placeholder": "Enter the agreement description in English",
     "description_fr_placeholder": "Enter the agreement description in French",
     "applicant_recipients": {
+      "type": "Proponent type",
+      "not_selected": "Not selected",
       "title": "Proponents",
       "add": "Add Proponent",
       "edit": "Update Proponent",

@@ -451,6 +451,7 @@ const insertStreamWizardRoot = async (
       egcs_tp_abbreviation_fr: payload.stream.egcs_tp_abbreviation_fr,
       egcs_tp_objective_en: payload.stream.egcs_tp_objective_en,
       egcs_tp_objective_fr: payload.stream.egcs_tp_objective_fr,
+      egcs_tp_requireconsistentproponenttype: payload.stream.egcs_tp_requireconsistentproponenttype,
       egcs_tp_allowsfurtherdistribution: payload.stream.egcs_tp_allowsfurtherdistribution,
       egcs_tp_active: payload.stream.egcs_tp_active
     })

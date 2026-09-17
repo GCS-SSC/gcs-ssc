@@ -87,6 +87,21 @@ const RequiredUniqueBigintSelectionIdsSchema = () => z.array(RequiredBigintSelec
   .min(1, { error: 'validation.required' })
   .superRefine(addDuplicateSelectionIssues)
 
+export const FundingCaseAgreementApplicantRecipientBaseSchema = z.object({
+  egcs_fc_applicantrecipient: RequiredBigintSelectionId(),
+  egcs_fc_applicantrecipientsubtype: RequiredBigintSelectionId()
+})
+
+const RequiredProponentsSchema = () => z.array(FundingCaseAgreementApplicantRecipientBaseSchema, { error: 'validation.required' })
+  .min(1, { error: 'validation.required' })
+  .superRefine((values, ctx) => {
+    const seen = new Set<string>()
+    values.forEach((value, index) => {
+      if (seen.has(value.egcs_fc_applicantrecipient)) ctx.addIssue({ code: 'custom', message: 'validation.duplicate', path: [index, 'egcs_fc_applicantrecipient'] })
+      seen.add(value.egcs_fc_applicantrecipient)
+    })
+  })
+
 export const FundingCaseAgreementProfileBaseSchema = z.object({
   egcs_fc_customfields: AgreementCustomFieldValuesSchema.optional(),
   egcs_fc_agreementnumber: AgreementProfileText(15),
@@ -122,7 +137,7 @@ export const FundingCaseAgreementProfileSchema = FundingCaseAgreementProfileBase
 )
 
 export const FundingCaseAgreementCreateSchema = FundingCaseAgreementProfileBaseSchema.extend({
-  applicant_recipient_ids: RequiredUniqueBigintSelectionIdsSchema(),
+  egcs_fc_applicantrecipients: RequiredProponentsSchema(),
   extensions: FundingCaseAgreementExtensionPayloadSchema.shape.extensions
 }).refine(
   data => data.egcs_fc_authorizedassistancestartdate <= data.egcs_fc_authorizedassistanceenddate,
@@ -135,7 +150,7 @@ export const FundingCaseAgreementCreateSchema = FundingCaseAgreementProfileBaseS
 /** Structural create contract; the host enforces numbering mode under the scope locks. */
 export const FundingCaseAgreementGeneratedCreateSchema = FundingCaseAgreementProfileBaseSchema.extend({
   egcs_fc_agreementnumber: AgreementProfileText(15).optional(),
-  applicant_recipient_ids: RequiredUniqueBigintSelectionIdsSchema(),
+  egcs_fc_applicantrecipients: RequiredProponentsSchema(),
   extensions: FundingCaseAgreementExtensionPayloadSchema.shape.extensions
 }).refine(
   data => data.egcs_fc_authorizedassistancestartdate <= data.egcs_fc_authorizedassistanceenddate,
@@ -173,10 +188,6 @@ export type FundingCaseAgreementProfileItem = WithId<FundingCaseAgreementProfile
   egcs_fc_agreementtype: Agreement_Type
 }>
 export type FundingCaseAgreementProfilePatch = z.infer<typeof FundingCaseAgreementProfilePatchSchema>
-
-export const FundingCaseAgreementApplicantRecipientBaseSchema = z.object({
-  egcs_fc_applicantrecipient: RequiredBigintSelectionId()
-})
 
 export const FundingCaseAgreementApplicantRecipientCreateSchema = FundingCaseAgreementApplicantRecipientBaseSchema
 export const FundingCaseAgreementApplicantRecipientPatchSchema = FundingCaseAgreementApplicantRecipientBaseSchema.partial().superRefine(() => undefined)

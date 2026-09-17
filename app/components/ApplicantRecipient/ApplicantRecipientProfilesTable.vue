@@ -46,7 +46,6 @@ const columns: TableColumnInput<ApplicantRecipientProfileRow>[] = [
   { id: 'select' },
   { accessorKey: 'id', headerKey: 'common.id' },
   { id: 'name', accessorKey: 'egcs_ar_legalname_en', headerKey: 'applicant_recipient.name' },
-  { id: 'subtype', headerKey: 'applicant_recipient.subtype' },
   { id: 'lead_agency', headerKey: 'applicant_recipient.lead_agency' },
   { accessorKey: 'egcs_ar_active', headerKey: 'applicant_recipient.status' },
   { id: 'actions', headerKey: 'common.actions' }
@@ -54,7 +53,6 @@ const columns: TableColumnInput<ApplicantRecipientProfileRow>[] = [
 
 const bilingualColumns: BilingualColumnConfig<ApplicantRecipientProfileRow>[] = [
   { id: 'name', accessorKey: { en: 'egcs_ar_legalname_en', fr: 'egcs_ar_legalname_fr' } },
-  { id: 'subtype', accessorKey: { en: 'subtype_name_en', fr: 'subtype_name_fr' } },
   { id: 'lead_agency', accessorKey: { en: 'lead_agency_name_en', fr: 'lead_agency_name_fr' } }
 ]
 
@@ -112,12 +110,6 @@ const canDeleteProfile = (profile: ApplicantRecipientProfileRow) => {
         class="font-bold text-zinc-900 transition-colors hover:text-primary dark:text-white">
         {{ getDisplayName(row.original) }}
       </NuxtLink>
-    </template>
-
-    <template #subtype-cell="{ row }">
-      <span class="font-semibold text-zinc-700 dark:text-zinc-300">
-        {{ getBilingualValue(row.original, 'subtype_name', '-') }}
-      </span>
     </template>
 
     <template #lead_agency-cell="{ row }">

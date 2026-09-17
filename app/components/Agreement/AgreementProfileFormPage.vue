@@ -57,7 +57,8 @@ const onSubmit = () => {
 
       <AgreementFieldsAgreementApplicantRecipientsField
         v-if="permissionAction === 'create'"
-        v-model:model="model.applicant_recipient_ids" />
+        v-model:model="model.egcs_fc_applicantrecipients"
+        :stream-id="model.egcs_fc_transferpaymentstream" />
 
       <div class="flex flex-col-reverse justify-end gap-3 border-t border-zinc-200 pt-6 sm:flex-row dark:border-zinc-800">
         <UButton

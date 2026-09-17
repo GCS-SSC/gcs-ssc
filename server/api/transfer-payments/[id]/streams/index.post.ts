@@ -146,6 +146,7 @@ export default defineEventHandler(async event => {
               egcs_tp_abbreviation_fr: validated.egcs_tp_abbreviation_fr,
               egcs_tp_objective_en: validated.egcs_tp_objective_en,
               egcs_tp_objective_fr: validated.egcs_tp_objective_fr,
+              egcs_tp_requireconsistentproponenttype: validated.egcs_tp_requireconsistentproponenttype,
               egcs_tp_allowsfurtherdistribution: validated.egcs_tp_allowsfurtherdistribution,
               egcs_tp_active: validated.egcs_tp_active
             })

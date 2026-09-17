@@ -12,10 +12,12 @@ const { agreementId, canCreate, canUpdate, canDelete } = defineProps<{
 }>()
 
 const { t } = useI18n()
+const { getBilingualValue } = useBilingualValue()
 
 const columns: TableColumnInput<{ id: string } & Record<string, unknown>>[] = [
   { id: 'applicant_recipient_name', accessorKey: 'applicant_recipient_name_en', headerKey: 'agreement.applicant_recipients.applicant_recipient' },
   { id: 'lead_agency_name', accessorKey: 'lead_agency_name_en', headerKey: 'agreement.applicant_recipients.lead_agency' },
+  { id: 'subtype', headerKey: 'agreement.applicant_recipients.type' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
 
@@ -71,6 +73,9 @@ const getApplicantRecipientLookupUrl = (state: FundingCaseAgreementApplicantReci
     :modal-title="t('agreement.applicant_recipients.add')"
     :update-title="t('agreement.applicant_recipients.edit')"
     :search-placeholder="t('agreement.applicant_recipients.search')">
+    <template #subtype-cell="{ row }">
+      {{ getBilingualValue(row.original, 'subtype_name', t('agreement.applicant_recipients.not_selected')) }}
+    </template>
     <template #form="{ state }">
       <UFormField :label="t('agreement.applicant_recipients.applicant_recipient')" name="egcs_fc_applicantrecipient">
         <AgreementProponentLookupField
@@ -80,6 +85,11 @@ const getApplicantRecipientLookupUrl = (state: FundingCaseAgreementApplicantReci
           :label="t('agreement.applicant_recipients.applicant_recipient')"
           @update:model-value="value => (state as FundingCaseAgreementApplicantRecipientForm).egcs_fc_applicantrecipient = value" />
       </UFormField>
+      <AgreementProponentTypeField
+        v-model="(state as FundingCaseAgreementApplicantRecipientForm).egcs_fc_applicantrecipientsubtype"
+        :proponent-id="(state as FundingCaseAgreementApplicantRecipientForm).egcs_fc_applicantrecipient"
+        :agreement-id="agreementId"
+        :permission-action="state.id ? 'update' : 'create'" />
     </template>
   </CommonResourceCrud>
 </template>

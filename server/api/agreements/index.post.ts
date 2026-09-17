@@ -1,3 +1,4 @@
+import { assertAgreementProponentType } from '~~/server/utils/agreement-proponent-type'
 import { resolveAgreementNumberProvider, generateAgreementNumber } from '~~/server/utils/agreement-number-provider'
 import { mergeAgreementCustomFields } from '~~/server/utils/agreement-custom-fields'
 import type { Insertable } from 'kysely'
@@ -120,7 +121,7 @@ export default defineEventHandler(async event => {
             await parseI18n(event, FundingCaseAgreementCreateSchema, validated)
           }
 
-          const applicantRecipientIds = validated.applicant_recipient_ids.map(String)
+          const applicantRecipientIds = validated.egcs_fc_applicantrecipients.map(item => String(item.egcs_fc_applicantrecipient))
           if (!await lockActiveApplicantRecipientIds(trx, applicantRecipientIds)) {
             return await badRequest(event, 'INVALID_AGREEMENT_APPLICANT_RECIPIENT', 'apiErrors.agreement.invalid_applicant_recipient')
           }
@@ -139,6 +140,11 @@ export default defineEventHandler(async event => {
             .execute()
           if (liveApplicantRecipients.length !== applicantRecipientIds.length) {
             return await badRequest(event, 'INVALID_AGREEMENT_APPLICANT_RECIPIENT', 'apiErrors.agreement.invalid_applicant_recipient')
+          }
+
+          for (const [index, relationship] of validated.egcs_fc_applicantrecipients.entries()) {
+            await assertAgreementProponentType(event, trx, streamId, relationship.egcs_fc_applicantrecipient,
+              relationship.egcs_fc_applicantrecipientsubtype, ['egcs_fc_applicantrecipients', index, 'egcs_fc_applicantrecipientsubtype'])
           }
 
           const subtypeId = String(validated.egcs_fc_agreementsubtype)
@@ -249,9 +255,9 @@ export default defineEventHandler(async event => {
 
           await trx
             .insertInto('Funding_Case_Agreement_Applicant_Recipient')
-            .values(validated.applicant_recipient_ids.map(applicantRecipientId => ({
+            .values(validated.egcs_fc_applicantrecipients.map(relationship => ({
               egcs_fc_fundingagreement: createdAgreement.id,
-              egcs_fc_applicantrecipient: applicantRecipientId
+              ...relationship
             } satisfies Insertable<FundingCaseAgreementApplicantRecipientTable>)))
             .execute()
 

@@ -63,7 +63,7 @@ export type FundingCaseAgreementProfileForm = Partial<
     egcs_fc_authorizedassistanceenddate?: string
     egcs_fc_agreementtype?: Agreement_Type
     egcs_fc_riskscore?: string | number | null
-    applicant_recipient_ids?: string[]
+    egcs_fc_applicantrecipients?: { egcs_fc_applicantrecipient: string; egcs_fc_applicantrecipientsubtype?: string | null }[]
     extensions?: Record<string, Record<string, unknown>>
   }
 >
@@ -88,7 +88,10 @@ export interface FundingCaseAgreementSubtypeLookupItem {
   agreement_type?: Agreement_Type
 }
 
-export interface FundingCaseAgreementApplicantRecipientRow extends FundingCaseAgreementApplicantRecipientItem {
+export interface FundingCaseAgreementApplicantRecipientRow extends Omit<FundingCaseAgreementApplicantRecipientItem, 'egcs_fc_applicantrecipientsubtype'> {
+  egcs_fc_applicantrecipientsubtype: string | null
+  subtype_name_en?: string | null
+  subtype_name_fr?: string | null
   applicant_recipient_name_en?: string | null
   applicant_recipient_name_fr?: string | null
   lead_agency_name_en?: string | null

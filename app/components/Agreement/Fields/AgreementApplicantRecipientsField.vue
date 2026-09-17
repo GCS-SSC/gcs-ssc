@@ -35,12 +35,14 @@ type SelectedHydrationRequest = {
 const HYDRATION_REQUEST_LIMIT = 100
 
 const {
-  name = 'applicant_recipient_ids'
+  name = 'egcs_fc_applicantrecipients',
+  streamId
 } = defineProps<{
   name?: string
+  streamId?: string
 }>()
 
-const model = defineModel<string[]>('model', {
+const model = defineModel<{ egcs_fc_applicantrecipient: string; egcs_fc_applicantrecipientsubtype?: string | null }[]>('model', {
   default: () => []
 })
 
@@ -470,7 +472,7 @@ const hydrateSelectedItems = async (ids: string[]) => {
 }
 
 watch(() => model.value, value => {
-  const normalizedValue = Array.isArray(value) ? value.map(item => String(item)) : []
+  const normalizedValue = Array.isArray(value) ? value.map(item => String(item.egcs_fc_applicantrecipient)) : []
 
   if (areIdsEqual(selectedIds.value, normalizedValue)) {
     return
@@ -481,8 +483,8 @@ watch(() => model.value, value => {
 }, { immediate: true })
 
 watch(selectedIds, value => {
-  if (!areIdsEqual(model.value ?? [], value)) {
-    model.value = [...value]
+  if (!areIdsEqual(model.value.map(item => item.egcs_fc_applicantrecipient), value)) {
+    model.value = value.map(id => model.value.find(item => item.egcs_fc_applicantrecipient === id) ?? { egcs_fc_applicantrecipient: id })
   }
   void hydrateSelectedItems(value)
 }, { immediate: true })
@@ -630,6 +632,15 @@ const removeSelectedId = (id: string) => {
       </div>
     </div>
   </UFormField>
+
+  <AgreementProponentTypeField
+    v-for="(relationship, index) in model"
+    :key="relationship.egcs_fc_applicantrecipient"
+    v-model="relationship.egcs_fc_applicantrecipientsubtype"
+    :proponent-id="relationship.egcs_fc_applicantrecipient"
+    :stream-id="streamId"
+    :name="`${name}.${index}.egcs_fc_applicantrecipientsubtype`"
+    :label="`${getSelectedLabel(cachedItemsById[relationship.egcs_fc_applicantrecipient] ?? { id: relationship.egcs_fc_applicantrecipient })} — ${t('agreement.applicant_recipients.type')}`" />
 
   <UModal v-model:open="isOpen" :content="pickerDialogContent" :title="t('agreement.applicant_recipients.select')" :description="t('agreement.applicant_recipients.search')">
     <template #body>

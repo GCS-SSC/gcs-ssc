@@ -146,9 +146,17 @@ export const buildAgreementApprovalSnapshot = async (
     .where('Funding_Case_Agreement_Profile.id', '=', agreementId)
     .where('Funding_Case_Agreement_Profile._deleted', '=', false)
     .executeTakeFirstOrThrow()
+  if (!amendment) {
+    const subtypeRows = await trx.selectFrom('Funding_Case_Agreement_Applicant_Recipient')
+      .select('egcs_fc_applicantrecipientsubtype').where('egcs_fc_fundingagreement', '=', agreementId)
+      .where('_deleted', '=', false).execute()
+    const subtypeIds = subtypeRows.flatMap(row => row.egcs_fc_applicantrecipientsubtype ? [row.egcs_fc_applicantrecipientsubtype] : [])
+    if (subtypeIds.length) await trx.selectFrom('Agency_Applicant_Recipient_Subtype').select('id')
+      .where('id', 'in', subtypeIds).orderBy('id').forShare().execute()
+  }
   const proponents = amendment ? [] : await trx.selectFrom('Funding_Case_Agreement_Applicant_Recipient')
     .innerJoin('Applicant_Recipient_Profile', 'Applicant_Recipient_Profile.id', 'Funding_Case_Agreement_Applicant_Recipient.egcs_fc_applicantrecipient')
-    .innerJoin('Agency_Applicant_Recipient_Subtype', 'Agency_Applicant_Recipient_Subtype.id', 'Applicant_Recipient_Profile.egcs_ar_applicantrecipientsubtypes')
+    .leftJoin('Agency_Applicant_Recipient_Subtype', 'Agency_Applicant_Recipient_Subtype.id', 'Funding_Case_Agreement_Applicant_Recipient.egcs_fc_applicantrecipientsubtype')
     .leftJoin('Agency_Profile', 'Agency_Profile.id', 'Applicant_Recipient_Profile.egcs_ar_leadagency')
     .select([
       'Applicant_Recipient_Profile.id',
@@ -171,8 +179,7 @@ export const buildAgreementApprovalSnapshot = async (
     .orderBy('Applicant_Recipient_Profile.id')
     .forUpdate([
       'Funding_Case_Agreement_Applicant_Recipient',
-      'Applicant_Recipient_Profile',
-      'Agency_Applicant_Recipient_Subtype'
+      'Applicant_Recipient_Profile'
     ])
     .execute()
   const proponentIds = proponents.map(proponent => String(proponent.id))

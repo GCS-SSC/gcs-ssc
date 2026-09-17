@@ -1,6 +1,8 @@
+import { assertAgreementProponentType } from '~~/server/utils/agreement-proponent-type'
+import { parseI18n } from '~~/server/utils/api-validate'
 import { sql } from 'kysely'
 import { badRequest, throwApiError } from '~~/server/utils/api-errors'
-import { FundingCaseAgreementApplicantRecipientPatchSchema } from '~~/shared/types/schemas'
+import { FundingCaseAgreementApplicantRecipientPatchSchema, FundingCaseAgreementApplicantRecipientCreateSchema } from '~~/shared/types/schemas'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import {
   AGREEMENT_CHILD_ERROR_KEYS,
@@ -47,7 +49,7 @@ export default defineEventHandler(async event => {
           .where('id', '=', childId)
           .where('egcs_fc_fundingagreement', '=', agreementId)
           .where('_deleted', '=', false)
-          .select(['id', 'egcs_fc_applicantrecipient'])
+          .select(['id', 'egcs_fc_applicantrecipient', 'egcs_fc_applicantrecipientsubtype'])
           .executeTakeFirst(),
         ...AGREEMENT_CHILD_ERROR_KEYS.applicantRecipientNotFound
       )
@@ -56,10 +58,21 @@ export default defineEventHandler(async event => {
       }
 
       const validated = await readValidatedBodyI18n(event, FundingCaseAgreementApplicantRecipientPatchSchema)
-      if (
-        !Object.hasOwn(validated, 'egcs_fc_applicantrecipient')
-        || String(validated.egcs_fc_applicantrecipient) === String(existing.egcs_fc_applicantrecipient)
-      ) {
+      const changedProponent = validated.egcs_fc_applicantrecipient !== undefined
+        && validated.egcs_fc_applicantrecipient !== existing.egcs_fc_applicantrecipient
+      const merged = await parseI18n(event, FundingCaseAgreementApplicantRecipientCreateSchema, {
+        ...existing, ...validated,
+        egcs_fc_applicantrecipientsubtype: changedProponent
+          ? validated.egcs_fc_applicantrecipientsubtype
+          : validated.egcs_fc_applicantrecipientsubtype ?? existing.egcs_fc_applicantrecipientsubtype
+      })
+      if (!changedProponent) {
+        await assertAgreementProponentType(event, trx, _currentContext.streamId, merged.egcs_fc_applicantrecipient, merged.egcs_fc_applicantrecipientsubtype, undefined, {
+          preserveSavedType: merged.egcs_fc_applicantrecipientsubtype === existing.egcs_fc_applicantrecipientsubtype
+        })
+        await trx.updateTable('Funding_Case_Agreement_Applicant_Recipient')
+          .set({ egcs_fc_applicantrecipientsubtype: merged.egcs_fc_applicantrecipientsubtype })
+          .where('id', '=', childId).where('egcs_fc_fundingagreement', '=', agreementId).execute()
         return await trx
           .selectFrom('Funding_Case_Agreement_Applicant_Recipient')
           .innerJoin(
@@ -71,6 +84,7 @@ export default defineEventHandler(async event => {
           .where('Funding_Case_Agreement_Applicant_Recipient.id', '=', childId)
           .select([
             'Funding_Case_Agreement_Applicant_Recipient.id as id',
+            'Funding_Case_Agreement_Applicant_Recipient.egcs_fc_applicantrecipientsubtype',
             'Funding_Case_Agreement_Applicant_Recipient.egcs_fc_applicantrecipient as egcs_fc_applicantrecipient',
             sql<string | null>`COALESCE("Applicant_Recipient_Profile"."egcs_ar_legalname_en", "Applicant_Recipient_Profile"."egcs_ar_operatingname_en")`.as('applicant_recipient_name_en'),
             sql<string | null>`COALESCE("Applicant_Recipient_Profile"."egcs_ar_legalname_fr", "Applicant_Recipient_Profile"."egcs_ar_operatingname_fr")`.as('applicant_recipient_name_fr'),
@@ -80,8 +94,8 @@ export default defineEventHandler(async event => {
           .executeTakeFirstOrThrow()
       }
 
-      const applicantRecipientId = String(validated.egcs_fc_applicantrecipient)
-      if (await isAgreementApplicantRecipientInUse(trx, agreementId, childId)) {
+      const applicantRecipientId = merged.egcs_fc_applicantrecipient
+      if (changedProponent && await isAgreementApplicantRecipientInUse(trx, agreementId, childId)) {
         return await throwApiError(event, {
           statusCode: 409,
           code: 'AGREEMENT_APPLICANT_RECIPIENT_IN_USE',
@@ -115,15 +129,17 @@ export default defineEventHandler(async event => {
         return await badRequest(event, 'INVALID_AGREEMENT_APPLICANT_RECIPIENT', 'apiErrors.agreement.invalid_applicant_recipient')
       }
 
+      await assertAgreementProponentType(event, trx, _currentContext.streamId, applicantRecipientId, merged.egcs_fc_applicantrecipientsubtype)
+
       const updated = await trx
         .updateTable('Funding_Case_Agreement_Applicant_Recipient')
         .set({
-          egcs_fc_applicantrecipient: validated.egcs_fc_applicantrecipient
+          ...merged
         })
         .where('id', '=', childId)
         .where('egcs_fc_fundingagreement', '=', agreementId)
         .where('_deleted', '=', false)
-        .returning(['id', 'egcs_fc_applicantrecipient'])
+        .returning(['id', 'egcs_fc_applicantrecipient', 'egcs_fc_applicantrecipientsubtype'])
         .executeTakeFirstOrThrow()
 
       return {

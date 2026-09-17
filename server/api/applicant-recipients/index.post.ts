@@ -23,14 +23,8 @@ export default defineEventHandler(async event => {
       const authContext = await authorizeFresh(event, 'applicant_recipient', 'create', creationScope, trx)
 
       const references = await validateApplicantRecipientReferences(trx, validated)
-      if (!references.subtypeExists) {
-        return await badRequest(event, 'INVALID_APPLICANT_RECIPIENT_SUBTYPE', 'apiErrors.applicant_recipient.invalid_subtype')
-      }
       if (!references.leadAgencyExists) {
         return await badRequest(event, 'INVALID_APPLICANT_RECIPIENT_LEAD_AGENCY', 'apiErrors.applicant_recipient.invalid_lead_agency')
-      }
-      if (!references.subtypeMatchesLeadAgency) {
-        return await badRequest(event, 'INVALID_APPLICANT_RECIPIENT_SUBTYPE_FOR_LEAD_AGENCY', 'apiErrors.applicant_recipient.invalid_subtype_for_lead_agency')
       }
 
       const creatorId = await resolveAssignmentCommonUserId(trx, authContext.userId)
@@ -39,7 +33,6 @@ export default defineEventHandler(async event => {
       const mappedValues = mapApplicantRecipientWriteValues(validated)
       const values: Insertable<ApplicantRecipientProfileTable> = {
         ...mappedValues,
-        egcs_ar_applicantrecipientsubtypes: validated.egcs_ar_applicantrecipientsubtypes,
         egcs_ar_active: validated.egcs_ar_active
       }
 

@@ -22,6 +22,10 @@ import * as agencyAuditMigration from './migrations/0016_agency_audit'
 
 import * as customFieldNamespacesMigration from './migrations/0017_custom_field_namespaces'
 
+import * as agreementProponentTypeMigration from './migrations/0018_agreement_proponent_type'
+
+import * as proponentTypeCleanupMigration from './migrations/9999_z_proponent_type_cleanup'
+
 export const productionCoreMigrations = {
   '0001_common': commonMigration,
   '0002_users': usersMigration,
@@ -39,7 +43,9 @@ export const productionCoreMigrations = {
   '0014_program_terms_links': programTermsLinksMigration,
   '0015_cost_category_availability': costCategoryAvailabilityMigration,
   '0016_agency_audit': agencyAuditMigration,
-  '0017_custom_field_namespaces': customFieldNamespacesMigration
+  '0017_custom_field_namespaces': customFieldNamespacesMigration,
+  '0018_agreement_proponent_type': agreementProponentTypeMigration,
+  '9999_z_proponent_type_cleanup': proponentTypeCleanupMigration
 } satisfies Record<string, Migration>
 
 export const productionCoreMigrationProvider: MigrationProvider = {

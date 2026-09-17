@@ -1,11 +1,11 @@
 import type { Migration, MigrationProvider } from 'kysely'
 import { productionCoreMigrations } from './production-core-migrations'
-import * as seedMigration from './migrations/9999_seed'
+import * as seedMigration from './historical-demo-seed'
 
-export const coreMigrations = {
+export const coreMigrations = Object.fromEntries(Object.entries({
   ...productionCoreMigrations,
   '9999_seed': seedMigration
-} satisfies Record<string, Migration>
+}).sort(([left], [right]) => left.localeCompare(right))) satisfies Record<string, Migration>
 
 export const coreMigrationProvider: MigrationProvider = {
   getMigrations: async () => coreMigrations

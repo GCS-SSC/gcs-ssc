@@ -106,6 +106,7 @@ export const createTransferPaymentStreamWizardInitialState = (): TransferPayment
     egcs_tp_abbreviation_fr: '',
     egcs_tp_objective_en: '',
     egcs_tp_objective_fr: '',
+    egcs_tp_requireconsistentproponenttype: false,
     egcs_tp_allowsfurtherdistribution: false,
     egcs_tp_active: false
   },

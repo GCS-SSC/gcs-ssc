@@ -837,7 +837,6 @@ export interface ApplicantRecipientProfileTable {
   egcs_ar_description_fr?: string | null
   egcs_ar_operatingname_en?: string | null
   egcs_ar_operatingname_fr?: string | null
-  egcs_ar_applicantrecipientsubtypes: string
   egcs_ar_leadagency?: string | null
   egcs_ar_legalname_en?: string | null
   egcs_ar_legalname_fr?: string | null
@@ -1327,6 +1326,7 @@ export interface FundingCaseAgreementApprovalSubmissionTable {
 }
 
 export interface FundingCaseAgreementApplicantRecipientTable {
+  egcs_fc_applicantrecipientsubtype: string | null
   id: Generated<string>
   egcs_fc_fundingagreement: string
   egcs_fc_applicantrecipient: string
@@ -1978,6 +1978,7 @@ export interface TransferPaymentFiscalYearBudgetTable {
 }
 
 export interface TransferPaymentStreamTable {
+  egcs_tp_requireconsistentproponenttype: Generated<boolean>
   id: Generated<string>
   egcs_tp_transferpaymentprofile: string
   egcs_tp_parentstream: string | null

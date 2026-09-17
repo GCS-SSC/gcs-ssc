@@ -8,9 +8,6 @@ import type {
 } from './schemas'
 
 export interface ApplicantRecipientProfileRow extends ApplicantRecipientProfileItem {
-  subtype_name_en?: string
-  subtype_name_fr?: string
-  subtype_type?: string
   lead_agency_name_en?: string
   lead_agency_name_fr?: string
   can_update?: boolean

@@ -60,7 +60,7 @@ const getInitialApplicantRecipientIds = () => {
 const createForm = (): FundingCaseAgreementProfileForm => ({
   egcs_fc_furtherdistribution: false,
   egcs_fc_holdback: 10,
-  applicant_recipient_ids: getInitialApplicantRecipientIds()
+  egcs_fc_applicantrecipients: getInitialApplicantRecipientIds().map(id => ({ egcs_fc_applicantrecipient: id }))
 })
 
 const form: Ref<FundingCaseAgreementProfileForm | null> = ref(null)

@@ -38,7 +38,6 @@ export default defineEventHandler(async event => await executeFreshReadSnapshot(
 
   let baseQuery = db
     .selectFrom('Applicant_Recipient_Profile')
-    .leftJoin('Agency_Applicant_Recipient_Subtype', 'Agency_Applicant_Recipient_Subtype.id', 'Applicant_Recipient_Profile.egcs_ar_applicantrecipientsubtypes')
     .leftJoin('Agency_Profile', 'Agency_Profile.id', 'Applicant_Recipient_Profile.egcs_ar_leadagency')
     .where('Applicant_Recipient_Profile._deleted', '=', false)
     .where('Agency_Profile._deleted', '=', false)
@@ -77,8 +76,6 @@ export default defineEventHandler(async event => await executeFreshReadSnapshot(
         eb('Applicant_Recipient_Profile.egcs_ar_legalname_fr', 'ilike', `%${escapedSearch}%`),
         eb('Applicant_Recipient_Profile.egcs_ar_operatingname_en', 'ilike', `%${escapedSearch}%`),
         eb('Applicant_Recipient_Profile.egcs_ar_operatingname_fr', 'ilike', `%${escapedSearch}%`),
-        eb('Agency_Applicant_Recipient_Subtype.egcs_ay_name_en', 'ilike', `%${escapedSearch}%`),
-        eb('Agency_Applicant_Recipient_Subtype.egcs_ay_name_fr', 'ilike', `%${escapedSearch}%`),
         eb('Agency_Profile.egcs_ay_name_en', 'ilike', `%${escapedSearch}%`),
         eb('Agency_Profile.egcs_ay_name_fr', 'ilike', `%${escapedSearch}%`)
       ])
@@ -103,16 +100,12 @@ export default defineEventHandler(async event => await executeFreshReadSnapshot(
         'Applicant_Recipient_Profile.egcs_ar_description_fr as egcs_ar_description_fr',
         'Applicant_Recipient_Profile.egcs_ar_operatingname_en as egcs_ar_operatingname_en',
         'Applicant_Recipient_Profile.egcs_ar_operatingname_fr as egcs_ar_operatingname_fr',
-        'Applicant_Recipient_Profile.egcs_ar_applicantrecipientsubtypes as egcs_ar_applicantrecipientsubtypes',
         'Applicant_Recipient_Profile.egcs_ar_leadagency as egcs_ar_leadagency',
         'Applicant_Recipient_Profile.egcs_ar_legalname_en as egcs_ar_legalname_en',
         'Applicant_Recipient_Profile.egcs_ar_legalname_fr as egcs_ar_legalname_fr',
         'Applicant_Recipient_Profile.egcs_ar_researchorganization_en as egcs_ar_researchorganization_en',
         'Applicant_Recipient_Profile.egcs_ar_researchorganization_fr as egcs_ar_researchorganization_fr',
         'Applicant_Recipient_Profile.egcs_ar_active as egcs_ar_active',
-        'Agency_Applicant_Recipient_Subtype.egcs_ay_name_en as subtype_name_en',
-        'Agency_Applicant_Recipient_Subtype.egcs_ay_name_fr as subtype_name_fr',
-        'Agency_Applicant_Recipient_Subtype.egcs_ay_applicantrecipienttype as subtype_type',
         'Agency_Profile.egcs_ay_name_en as lead_agency_name_en',
         'Agency_Profile.egcs_ay_name_fr as lead_agency_name_fr'
       ])

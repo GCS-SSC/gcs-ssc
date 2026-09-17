@@ -4,7 +4,7 @@ import type { Database } from '~~/shared/types/database'
 import { badRequest } from '~~/server/utils/api-errors'
 
 /**
- * Preserves subtypes referenced by live eligibility links or Proponent profiles.
+ * Preserves subtypes referenced by live eligibility links or Agreement relationships.
  * @param event - Authorized deletion request.
  * @param trx - Transaction holding the Agency and subtype locks.
  * @param subtypeId - Locked subtype identity.
@@ -22,10 +22,11 @@ export const assertAgencyRecipientSubtypeNotInUse = async (
     .where('egcs_tp_applicantrecipientsubtype', '=', subtypeId)
     .where('_deleted', '=', false)
     .executeTakeFirst()
-  const proponent = await trx.selectFrom('Applicant_Recipient_Profile')
-    .select('id')
-    .where('egcs_ar_applicantrecipientsubtypes', '=', subtypeId)
-    .where('_deleted', '=', false)
+  const proponent = await trx.selectFrom('Funding_Case_Agreement_Applicant_Recipient as r')
+    .innerJoin('Funding_Case_Agreement_Profile as a', 'a.id', 'r.egcs_fc_fundingagreement')
+    .select('r.id')
+    .where('r.egcs_fc_applicantrecipientsubtype', '=', subtypeId)
+    .where('r._deleted', '=', false).where('a._deleted', '=', false)
     .executeTakeFirst()
   if (eligibleRecipient || proponent) {
     return await badRequest(event, 'AGENCY_APPLICANT_RECIPIENT_SUBTYPE_IN_USE', 'apiErrors.agency.applicant_recipient_subtype_in_use')

@@ -31,7 +31,7 @@ const nuxtAliasesPlugin: BunPlugin = {
 }
 
 const result = await Bun.build({
-  entrypoints: [path.resolve(repositoryRoot, 'server/database/migrations/9999_seed.ts')],
+  entrypoints: [path.resolve(repositoryRoot, 'server/database/historical-demo-seed.ts')],
   outdir: path.dirname(outputPath),
   naming: path.basename(outputPath),
   target: 'node',

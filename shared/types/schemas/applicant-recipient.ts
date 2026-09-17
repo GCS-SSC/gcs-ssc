@@ -61,7 +61,6 @@ export const ApplicantRecipientProfileBaseSchema = z.object({
   egcs_ar_description_fr: ProfileText(),
   egcs_ar_operatingname_en: ProfileText(255),
   egcs_ar_operatingname_fr: ProfileText(255),
-  egcs_ar_applicantrecipientsubtypes: ProfileReferenceId('validation.applicant_recipient_subtype_required'),
   egcs_ar_leadagency: ProfileReferenceId('validation.lead_agency_required'),
   egcs_ar_legalname_en: ProfileText(255),
   egcs_ar_legalname_fr: ProfileText(255),

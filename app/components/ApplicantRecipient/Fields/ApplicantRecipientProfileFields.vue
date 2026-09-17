@@ -1,13 +1,12 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- local field helpers are self-documenting and not public APIs */
-import { computed, useId, watch } from 'vue'
+import { computed, useId } from 'vue'
 import type { ApplicantRecipientProfileForm, ApplicantRecipientProfileRow } from '~~/shared/types/applicant-recipient-ui'
 
 const model = defineModel<ApplicantRecipientProfileForm>('model', { required: true })
 const {
   namePrefix = '',
-  leadAgencyPermissionAction = 'update',
-  persistedProfile
+  leadAgencyPermissionAction = 'update'
 } = defineProps<{
   namePrefix?: string
   leadAgencyPermissionAction?: 'create' | 'update'
@@ -16,16 +15,6 @@ const {
 
 const { t } = useI18n()
 const requirementId = useId()
-const { getBilingualValue } = useBilingualValue()
-const retainedSubtypeOptions = computed(() => {
-  if (!persistedProfile || model.value.id !== persistedProfile.id
-    || model.value.egcs_ar_leadagency !== persistedProfile.egcs_ar_leadagency
-    || model.value.egcs_ar_applicantrecipientsubtypes !== persistedProfile.egcs_ar_applicantrecipientsubtypes) return []
-  return [{
-    value: persistedProfile.egcs_ar_applicantrecipientsubtypes,
-    label: getBilingualValue(persistedProfile, 'subtype_name', String(persistedProfile.egcs_ar_applicantrecipientsubtypes))
-  }]
-})
 const field = useFormFieldPath(() => namePrefix)
 
 const bilingualErrorPattern = (fieldBase: 'egcs_ar_legalname' | 'egcs_ar_operatingname' | 'egcs_ar_description') => {
@@ -106,47 +95,11 @@ const getFieldText = (key: ApplicantRecipientFieldKey) => ({
   placeholder: t(`applicant_recipient.fields.${key}.placeholder`),
   tooltip: t(`applicant_recipient.fields.${key}.tooltip`)
 })
-
-watch(() => model.value?.egcs_ar_leadagency, (currentAgencyId, previousAgencyId) => {
-  if (!previousAgencyId || currentAgencyId === previousAgencyId) {
-    return
-  }
-
-  if (!model.value) {
-    return
-  }
-
-  model.value.egcs_ar_applicantrecipientsubtypes = undefined
-})
 </script>
 
 <template>
   <CommonSection :title="t('applicant_recipient.sections.classification')" badge="01" :grid-cols="1">
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-12">
-      <UFormField
-        class="xl:col-span-6"
-        :name="field('egcs_ar_applicantrecipientsubtypes')">
-        <template #label>
-          <CommonFormFieldLabel
-            :label="getFieldText('subtype').fieldName"
-            :tooltip="getFieldText('subtype').tooltip" />
-        </template>
-        <CommonServerLookupSelect
-          v-model="model.egcs_ar_applicantrecipientsubtypes"
-          fetch-url="/api/applicant-recipients/lookups/subtypes"
-          :prepend-items="retainedSubtypeOptions"
-          :query="{
-            agency_id: model.egcs_ar_leadagency ? String(model.egcs_ar_leadagency) : '',
-            applicant_recipient_id: selectedProponentId,
-            permission_action: leadAgencyPermissionAction
-          }"
-          value-key="id"
-          label-en-key="egcs_ay_name_en"
-          label-fr-key="egcs_ay_name_fr"
-          :placeholder="getFieldText('subtype').placeholder"
-          searchable />
-      </UFormField>
-
       <UFormField class="xl:col-span-6" :name="field('egcs_ar_leadagency')">
         <template #label>
           <CommonFormFieldLabel

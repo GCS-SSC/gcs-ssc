@@ -1250,6 +1250,11 @@
     }
   },
   "transfer_payment": {
+    "proponent_consistency_confirm_title": "Modifier la cohérence du type de promoteur?",
+    "proponent_consistency_enable_description": "Harmonisez les classifications existantes des promoteurs au moyen d’une migration des données avant d’activer cette option. Modifier ce paramètre seul peut avoir des effets inattendus : les différences antérieures subsisteront, tandis que les ajouts et changements de type futurs devront correspondre au dernier type admissible du promoteur dans ce volet (identifiant d’entente le plus élevé). Les types enregistrés inchangés resteront permis. La modification prendra effet à l’enregistrement du volet.",
+    "proponent_consistency_disable_description": "Désactiver cette option permet aux types de promoteur de différer entre les ententes à l’avenir, sans modifier les types existants. Avant de la réactiver, harmonisez les classifications au moyen d’une migration des données. Réactiver l’option seule peut avoir des effets inattendus, car elle régit uniquement les ajouts et changements de type futurs selon le dernier type admissible (identifiant d’entente le plus élevé). La modification prendra effet à l’enregistrement du volet.",
+    "proponent_consistency_confirm": "Je comprends, continuer",
+    "require_consistent_proponent_type": "Exiger que chaque promoteur utilise le même type pour toutes ses ententes",
     "cost_line_stream_inactive": "Volet inactif",
     "cost_line_category_inactive": "Catégorie inactive",
     "cost_line_agency_inactive": "Organisme inactif",
@@ -1709,6 +1714,8 @@
     }
   },
   "validation": {
+    "proponent_type_in_use": "Ce type est utilisé par un promoteur d’une entente.",
+    "proponent_type_conflict": "Sélectionnez le dernier type admissible du promoteur dans ce volet.",
     "budget_percentage": "Saisissez un pourcentage de 0 à 100 avec au plus deux décimales.",
     "budget_calculation": "Sélectionnez un mode de calcul et une catégorie source valides.",
     "custom_field_display_order_max": "L'ordre d'affichage ne doit pas dépasser {max}.",
@@ -2003,6 +2010,8 @@
     "description_en_placeholder": "Saisir la description de l'entente en anglais",
     "description_fr_placeholder": "Saisir la description de l'entente en français",
     "applicant_recipients": {
+      "type": "Type de promoteur",
+      "not_selected": "Non sélectionné",
       "title": "Promoteurs",
       "add": "Ajouter un promoteur",
       "edit": "Mettre à jour le promoteur",

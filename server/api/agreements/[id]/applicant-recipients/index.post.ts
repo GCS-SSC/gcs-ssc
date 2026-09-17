@@ -1,3 +1,4 @@
+import { assertAgreementProponentType } from '~~/server/utils/agreement-proponent-type'
 import type { Insertable } from 'kysely'
 import { sql } from 'kysely'
 import { badRequest } from '~~/server/utils/api-errors'
@@ -61,15 +62,16 @@ export default defineEventHandler(async event => {
         return await badRequest(event, 'INVALID_AGREEMENT_APPLICANT_RECIPIENT', 'apiErrors.agreement.invalid_applicant_recipient')
       }
 
+      await assertAgreementProponentType(event, trx, _currentContext.streamId, applicantRecipientId, validated.egcs_fc_applicantrecipientsubtype)
       const values: Insertable<FundingCaseAgreementApplicantRecipientTable> = {
         egcs_fc_fundingagreement: agreementId,
-        egcs_fc_applicantrecipient: validated.egcs_fc_applicantrecipient
+        ...validated
       }
 
       const inserted = await trx
         .insertInto('Funding_Case_Agreement_Applicant_Recipient')
         .values(values)
-        .returning(['id', 'egcs_fc_applicantrecipient'])
+        .returning(['id', 'egcs_fc_applicantrecipient', 'egcs_fc_applicantrecipientsubtype'])
         .executeTakeFirstOrThrow()
       return {
         ...inserted,
