@@ -19,6 +19,10 @@ interface OAuthToken {
 const homeDirectory = process.env.HOME
 if (!homeDirectory) throw new Error('HOME is not set')
 
+const includeAppsScript = process.argv.includes('--apps-script')
+const scopes = ['https://www.googleapis.com/auth/spreadsheets']
+if (includeAppsScript) scopes.push('https://www.googleapis.com/auth/script.projects.readonly')
+
 const clientPath = `${homeDirectory}/.config/gcs-ssc/google-oauth-client.json`
 const tokenPath = `${homeDirectory}/.config/gcs-ssc/google-sheets-token.json`
 const clientDocument = JSON.parse(await readFile(clientPath, 'utf8')) as {
@@ -84,11 +88,11 @@ authorizationUrl.search = new URLSearchParams({
   prompt: 'consent',
   redirect_uri: redirectUri,
   response_type: 'code',
-  scope: 'https://www.googleapis.com/auth/spreadsheets',
+  scope: scopes.join(' '),
   state
 }).toString()
 
-console.log('Open this link to authorize Google Sheets access:')
+console.log(`Open this link to authorize Google Sheets access${includeAppsScript ? ' and read-only Apps Script access' : ''}:`)
 console.log(authorizationUrl.toString())
 console.log('\nWaiting for the local callback, or paste the entire callback URL here and press Enter.')
 console.log('For a remote session, copy the URL from the browser address bar even if the callback page cannot load.')
