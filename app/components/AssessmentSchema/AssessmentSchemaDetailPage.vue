@@ -3,6 +3,9 @@ import { computed, ref } from 'vue'
 import { useAssessmentSchemaDetailPage } from '~/composables/useAssessmentSchemaDetailPage'
 import { provideAssessmentSchemaHelperDefinitions } from '~/composables/useAssessmentSchemaHelpers'
 import type { Ref } from 'vue'
+import { AssessmentDefinitionSchema } from '~~/shared/types/schemas/assessment/assessment'
+import type { AssessmentDefinition } from '~~/shared/types/schemas/assessment/assessment'
+import { normalizeAssessmentDefinitionEditorState } from '~/composables/useAssessmentSchemaEditorState'
 
 const {
   schema,
@@ -32,6 +35,15 @@ const {
 } = await useAssessmentSchemaDetailPage()
 
 const { t } = useI18n()
+const isImportOpen: Ref<boolean> = ref(false)
+/**
+ * Replaces the editable definition while preserving metadata and the overall scoring matrix.
+ * @param definition Validated schema definition.
+ */
+const importDefinition = (definition: AssessmentDefinition) => {
+  if (!canEditFields.value) return
+  assessmentDefinitionState.value = normalizeAssessmentDefinitionEditorState(definition)
+}
 
 const outcomesEditor: Ref<{ openCreateEditor: () => void } | null> = ref(null)
 const impactorsEditor: Ref<{ openCreateEditor: () => void } | null> = ref(null)
@@ -85,8 +97,16 @@ provideAssessmentSchemaHelperDefinitions(helperDefinitions)
           :is-retiring="isRetiring"
           :is-mutation-pending="isMutationPending"
           :can-manage="canManagePublication"
+          :can-import="canEdit"
+          @import="isImportOpen = true"
           @publish="publishSchema"
           @retire="retireSchema" />
+
+        <ReviewSchemaImportModal
+          v-model:open="isImportOpen"
+          :schema="AssessmentDefinitionSchema"
+          :disabled="!canEditFields"
+          @imported="importDefinition" />
 
         <div class="flex min-h-0 flex-1 flex-col gap-6 overflow-visible px-6 pt-0 pb-6 lg:flex-row lg:gap-0">
           <AssessmentSchemaDetailSidebar

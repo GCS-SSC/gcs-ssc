@@ -1,4 +1,10 @@
 {
+  "review_schema_import": {
+    "title": "Importer le schéma",
+    "description": "Collez la définition du schéma en JSON pour remplacer le contenu de l’éditeur. Enregistrez vos modifications après l’importation.",
+    "json": "Schéma JSON",
+    "invalid_json": "Saisissez un JSON valide."
+  },
   "custom_fields": {
     "category": "Catégorie",
     "uncategorized": "Sans catégorie",

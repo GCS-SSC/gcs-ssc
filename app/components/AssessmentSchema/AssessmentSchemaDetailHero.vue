@@ -13,6 +13,7 @@ const {
   isRetiring = false,
   isMutationPending = false,
   canManage = false,
+  canImport = false,
   reviewType = 'assessment'
 } = defineProps<{
   name?: string
@@ -24,12 +25,13 @@ const {
   isPublishing?: boolean
   isRetiring?: boolean
   isMutationPending?: boolean
+  canImport?: boolean
   canManage?: boolean
   reviewType?: 'assessment' | 'checklist' | 'recommendation'
 }>()
 
 const emit = defineEmits<{
-  (event: 'publish' | 'retire'): void
+  (event: 'publish' | 'retire' | 'import'): void
 }>()
 
 const typeLabelKey = computed(() => reviewType === 'checklist'
@@ -53,8 +55,10 @@ const typeLabelKey = computed(() => reviewType === 'checklist'
     :is-retiring="isRetiring"
     :is-mutation-pending="isMutationPending"
     :can-manage="canManage"
+    :can-import="canImport"
     publish-label-key="transfer_payment.publish_schema"
     retire-label-key="transfer_payment.retire_schema"
+    @import="emit('import')"
     @publish="emit('publish')"
     @retire="emit('retire')" />
 </template>

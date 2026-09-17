@@ -5,7 +5,7 @@ import type { PublicationState } from '~~/shared/constants/system-lifecycle'
 const {
   name, description, icon, entityType, entityTypeLabelEn, entityTypeLabelFr, typeLabelKey, publicationState, publicationVersion = null,
   hasUnpublishedChanges = false, isCollapsed = false, isPublishing = false, isRetiring = false,
-  isMutationPending = false, canManage = false, publishLabelKey, retireLabelKey
+  isMutationPending = false, canManage = false, canImport = false, publishLabelKey, retireLabelKey
 } = defineProps<{
   name: string
   description?: string
@@ -21,11 +21,12 @@ const {
   isPublishing?: boolean
   isRetiring?: boolean
   isMutationPending?: boolean
+  canImport?: boolean
   canManage?: boolean
   publishLabelKey: string
   retireLabelKey: string
 }>()
-const emit = defineEmits<{ publish: [], retire: [] }>()
+const emit = defineEmits<{ publish: [], retire: [], import: [] }>()
 const { locale, t } = useI18n()
 const confirmRetire = useDeleteConfirm()
 /** Confirms the irreversible lifecycle action before notifying the resource adapter. */
@@ -52,6 +53,7 @@ const badges = computed(() => [
   ...(publicationVersion === null ? [] : [{ variant: 'code' as const, label: String(publicationVersion), prefixLabel: t('transfer_payment.schema_version') }])
 ])
 const actions = computed(() => [
+  { label: t('review_schema_import.title'), icon: 'i-lucide-import', color: 'neutral' as const, variant: 'outline' as const, disabled: isMutationPending, visible: canImport && canManage && publicationState !== 'retired', onClick: () => emit('import') },
   { label: t(publishLabelKey), icon: 'i-lucide-upload', loading: isPublishing, disabled: isMutationPending, visible: canManage && (publicationState === 'draft' || (publicationState === 'published' && hasUnpublishedChanges)), onClick: () => emit('publish') },
   { label: t(retireLabelKey), icon: 'i-lucide-archive', color: 'neutral' as const, variant: 'outline' as const, loading: isRetiring, disabled: isMutationPending, visible: canManage && publicationState === 'published', onClick: requestRetirement }
 ])

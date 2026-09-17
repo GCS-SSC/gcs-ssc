@@ -70,6 +70,7 @@ const { data: profile, error: profileError, refresh: refreshProfile } = await us
 const { data: stream, error: streamError, refresh: refreshStream } = await useFetch<TransferPaymentNameResponse, FetchError, string>(`/api/transfer-payments/${transferPaymentId}/streams/${streamId}`)
 const state: Ref<SchemaPayload | null> = ref(null)
 const definition: Ref<EditorDefinition | null> = ref(null)
+const isImportOpen: Ref<boolean> = ref(false)
 const loadError: Ref<unknown | null> = ref(null)
 const contextLoadError = computed(() => profileError.value ?? streamError.value ?? loadError.value)
 const detailContent = useTemplateRef<HTMLElement>('detailContent')
@@ -189,6 +190,10 @@ const ChecklistMetadataSchema = z.object({
   egcs_cn_outcomename_en: z.string().trim().min(1, 'validation.required'),
   egcs_cn_outcomename_fr: z.string().trim().min(1, 'validation.required')
 })
+const importDefinition = (value: ChecklistDefinition) => {
+  if (!canEditFields.value) return
+  definition.value = toEditorDefinition(value)
+}
 const applyPayload = (payload: SchemaPayload) => {
   state.value = structuredClone(payload)
   definition.value = toEditorDefinition(payload.egcs_cn_checklistschema ?? {
@@ -438,9 +443,17 @@ const retire = async () => {
           :is-retiring="isRetiring"
           :is-mutation-pending="mutation.isPending.value"
           :can-manage="canManagePublication"
+          :can-import="canEdit"
           review-type="checklist"
+          @import="isImportOpen = true"
           @publish="publish"
           @retire="retire" />
+
+        <ReviewSchemaImportModal
+          v-model:open="isImportOpen"
+          :schema="ChecklistDefinitionSchema"
+          :disabled="!canEditFields"
+          @imported="importDefinition" />
 
         <div class="flex min-h-0 flex-1 flex-col gap-6 overflow-visible px-6 pt-0 pb-6 lg:flex-row lg:gap-0">
           <AssessmentSchemaDetailSidebar

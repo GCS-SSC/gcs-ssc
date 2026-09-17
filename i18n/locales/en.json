@@ -1,4 +1,10 @@
 {
+  "review_schema_import": {
+    "title": "Import Schema",
+    "description": "Paste the schema definition JSON to replace the current editor contents. Save your changes after importing.",
+    "json": "Schema JSON",
+    "invalid_json": "Enter valid JSON."
+  },
   "custom_fields": {
     "category": "Category",
     "uncategorized": "Uncategorized",
