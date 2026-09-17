@@ -159,5 +159,8 @@
     "vitest": "^4.0.18",
     "vue-tsc": "^3.2.4"
   },
-  "packageManager": "bun@1.3.13"
+  "packageManager": "bun@1.3.13",
+  "patchedDependencies": {
+    "nitropack@2.13.1": "patches/nitropack@2.13.1.patch"
+  }
 }

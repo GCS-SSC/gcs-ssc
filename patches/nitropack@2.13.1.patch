@@ -1,0 +1,109 @@
+diff --git a/node_modules/nitropack/.bun-tag-2476f47e63785585 b/.bun-tag-2476f47e63785585
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/dist/core/index.mjs b/dist/core/index.mjs
+index 5433d5a2c4e1570ad0db3eab0dea11beaae9d1ba..d2ba3f6189aa510f9173596225e3b16718521b0b 100644
+--- a/dist/core/index.mjs
++++ b/dist/core/index.mjs
+@@ -2239,6 +2239,7 @@ function createHTTPProxy(defaults = {}) {
+ 
+ class NodeDevWorker {
+   closed = false;
++  closePromise;
+   #id;
+   #workerDir;
+   #hooks;
+@@ -2304,17 +2305,18 @@ class NodeDevWorker {
+     });
+     this.#worker = worker;
+   }
+-  async close(cause) {
+-    if (this.closed) {
+-      return;
+-    }
++  close(cause) {
++    if (this.closePromise) return this.closePromise;
+     this.closed = true;
+-    this.#hooks.onClose?.(this, cause);
+-    this.#hooks = {};
+-    const onError = (error) => consola.error(error);
+-    await this.#closeWorker().catch(onError);
+-    await this.#closeProxy().catch(onError);
+-    await this.#closeSocket().catch(onError);
++    this.closePromise = (async () => {
++      const onError = (error) => consola.error(error);
++      await this.#closeWorker().catch(onError);
++      await this.#closeProxy().catch(onError);
++      await this.#closeSocket().catch(onError);
++      this.#hooks.onClose?.(this, cause);
++      this.#hooks = {};
++    })();
++    return this.closePromise;
+   }
+   async #closeProxy() {
+     this.#proxy?.proxy?.close(() => {
+@@ -2334,7 +2336,7 @@ class NodeDevWorker {
+       return;
+     }
+     this.#worker.postMessage({ event: "shutdown" });
+-    if (!this.#worker._exitCode && !isTest && !isCI) {
++    if (this.#worker._exitCode === void 0 && !isTest && !isCI) {
+       await new Promise((resolve) => {
+         const gracefulShutdownTimeoutSec = Number.parseInt(process.env.NITRO_SHUTDOWN_TIMEOUT || "", 10) || 5;
+         const timeout = setTimeout(() => {
+@@ -2342,11 +2344,13 @@ class NodeDevWorker {
+             consola.warn(`force closing dev worker...`);
+           }
+         }, gracefulShutdownTimeoutSec * 1e3);
++        const finish = () => {
++          clearTimeout(timeout);
++          resolve();
++        };
++        this.#worker?.once("exit", finish);
+         this.#worker?.on("message", (message) => {
+-          if (message.event === "exit") {
+-            clearTimeout(timeout);
+-            resolve();
+-          }
++          if (message.event === "exit") finish();
+         });
+       });
+     }
+@@ -2662,6 +2666,7 @@ class DevServer {
+   app;
+   listeners = [];
+   reloadPromise;
++  closing = false;
+   watcher;
+   workers = [];
+   workerError;
+@@ -2710,6 +2715,8 @@ class DevServer {
+     return listener;
+   }
+   async close() {
++    this.closing = true;
++    await this.reloadPromise;
+     await Promise.all(
+       [
+         Promise.all(this.listeners.map((l) => l.close())).then(() => {
+@@ -2729,9 +2736,17 @@ class DevServer {
+     );
+   }
+   reload() {
+-    for (const worker2 of this.workers) {
+-      worker2.close();
+-    }
++    const pending = (this.reloadPromise || Promise.resolve()).then(() => this.reloadWorker());
++    this.reloadPromise = pending.catch((error) => {
++      this.workerError = error;
++      consola.error(error);
++    });
++    return this.reloadPromise;
++  }
++  async reloadWorker() {
++    if (this.closing) return;
++    await Promise.all(this.workers.map((worker) => worker.close()));
++    if (this.closing) return;
+     const worker = new NodeDevWorker(++workerIdCtr, this.workerDir, {
+       onClose: (worker2, cause) => {
+         this.workerError = cause;

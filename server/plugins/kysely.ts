@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { getMigrationPromise } from '../utils/migration-readiness'
 import type { AccessLogRequest } from '../utils/access-log-queue'
 
 export default defineNitroPlugin(async nitroApp => {
@@ -22,6 +23,11 @@ export default defineNitroPlugin(async nitroApp => {
   })
 
   nitroApp.hooks.hookOnce('close', async () => {
+    // Nitro can request shutdown before its asynchronous startup plugins finish.
+    // Keep this lease until startup settles so the worker cannot exit mid-migration.
+    await getMigrationPromise(dbLease.generationId)?.catch(() => {
+      // Startup already reports its failure; shutdown must still release the lease.
+    })
     await dbLease.release()
   })
 })

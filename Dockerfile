@@ -14,6 +14,7 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 COPY package.json bun.lock ./
+COPY patches/ ./patches/
 
 # This core workspace is stored in the main repository rather than a submodule.
 # Stage it before installation so Bun can resolve the root workspace dependency
