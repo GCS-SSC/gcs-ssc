@@ -61,7 +61,7 @@ type AvailableStandardWorkflow = {
   ineligibleReason: 'active_workflow' | 'closed_target' | 'terminal_status' | 'status_ineligible' | 'unsupported' | null
 }
 type RuntimeResponse = {
-  routing?: { hash: string, fields: Array<{ fieldId: string, optionId: string, name_en: string, name_fr: string, option_en: string, option_fr: string }> } | null
+  routing?: import('~~/server/utils/workflow-routing').WorkflowRoutingEvidence | null
   current: { runtimeId: string, runtimeState: RuntimeState, attempt: number, previousRuntimeId: string | null } | null
   reviewSet: { id: string, runtimeState: RuntimeState, runtimeItemId: string } | null
   sourceApprovalStage: { runtimeItemId: string, runtimeState: RuntimeState, order: number, routingSlipId?: string | null } | null
@@ -619,7 +619,7 @@ const handleApprovalChanged = async () => {
       color="warning"
       icon="i-lucide-lock-keyhole"
       :title="t('workflow.active_target_blocker')" />
-    <CommonWorkflowPacket v-if="data?.routing?.fields.length" :title="t('custom_fields.routing')" :packet-id="`routing-${data.current?.runtimeId}`" :hash="data.routing.hash" :hash-label="t('workflow.packet.hash')">
+    <CommonWorkflowPacket v-if="data?.routing && (data.routing.fields.length || data.routing.decisions.some(decision => decision.conditions?.length))" :title="t('custom_fields.routing')" :packet-id="`routing-${data.current?.runtimeId}`" :hash="data.routing.hash" :hash-label="t('workflow.packet.hash')">
       <dl class="space-y-3">
         <div v-for="field in data.routing.fields" :key="`${field.fieldId}:${field.optionId}`">
           <dt class="text-sm text-muted">
@@ -628,6 +628,17 @@ const handleApprovalChanged = async () => {
           <dd>{{ locale === 'fr' ? field.option_fr : field.option_en }}</dd>
         </div>
       </dl>
+      <div v-for="(decision, index) in data.routing.decisions" :key="decision.memberId" class="mt-4 space-y-2">
+        <p class="font-medium">
+          {{ t('workflow.conditions.step', { number: index + 1 }) }}: {{ t(decision.eligible ? 'workflow.conditions.included' : 'custom_fields.skipped') }}
+        </p>
+        <p v-for="condition in decision.conditions" :key="condition.key" class="text-sm">
+          {{ locale === 'fr' ? condition.name_fr : condition.name_en }}:
+          {{ condition.options.map(option => locale === 'fr' ? option.name_fr : option.name_en).join(', ') }}
+          <span v-if="condition.quantifier">({{ t(`workflow.conditions.${condition.quantifier}`) }})</span>
+          : {{ t(condition.matched ? 'workflow.conditions.matched' : 'workflow.conditions.unmatched') }}
+        </p>
+      </div>
     </CommonWorkflowPacket>
     <CommonWorkflowApprovalPacket v-if="data?.submission" :submission="data.submission" />
     <CommonTranslatedTabs

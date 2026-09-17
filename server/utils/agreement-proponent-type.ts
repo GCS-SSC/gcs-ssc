@@ -5,16 +5,20 @@ import { z } from 'zod'
 import type { Database } from '~~/shared/types/database'
 import { parseI18n } from './api-validate'
 
-export const listAgreementProponentTypes = async (db: Kysely<Database>, streamId: string) => db
-  .selectFrom('Transfer_Payment_Stream_Eligible_Recipient as e')
-  .innerJoin('Agency_Applicant_Recipient_Subtype as t', 't.id', 'e.egcs_tp_applicantrecipientsubtype')
-  .innerJoin('Transfer_Payment_Stream as s', 's.id', 'e.egcs_tp_transferpaymentstream')
-  .innerJoin('Transfer_Payment_Profile as p', 'p.id', 's.egcs_tp_transferpaymentprofile')
-  .where('s.id', '=', streamId)
-  .whereRef('t.egcs_ay_organizationagency', '=', 'p.egcs_tp_agency')
-  .where('e._deleted', '=', false).where('t._deleted', '=', false)
-  .select(['t.id', 't.egcs_ay_name_en', 't.egcs_ay_name_fr'])
-  .orderBy('t.id').execute().then(rows => rows.map(row => ({ ...row, id: String(row.id) })))
+export const listAgreementProponentTypes = async (db: Kysely<Database>, streamId: string, options: { lockForAuthoring?: boolean } = {}) => {
+  let query = db
+    .selectFrom('Transfer_Payment_Stream_Eligible_Recipient as e')
+    .innerJoin('Agency_Applicant_Recipient_Subtype as t', 't.id', 'e.egcs_tp_applicantrecipientsubtype')
+    .innerJoin('Transfer_Payment_Stream as s', 's.id', 'e.egcs_tp_transferpaymentstream')
+    .innerJoin('Transfer_Payment_Profile as p', 'p.id', 's.egcs_tp_transferpaymentprofile')
+    .where('s.id', '=', streamId)
+    .whereRef('t.egcs_ay_organizationagency', '=', 'p.egcs_tp_agency')
+    .where('e._deleted', '=', false).where('t._deleted', '=', false)
+    .select(['t.id', 't.egcs_ay_name_en', 't.egcs_ay_name_fr'])
+    .orderBy('t.id')
+  if (options.lockForAuthoring) query = query.forShare(['t'])
+  return await query.execute().then(rows => rows.map(row => ({ ...row, id: String(row.id) })))
+}
 
 export const getAgreementProponentTypeSelection = async (db: Kysely<Database>, streamId: string, proponentId: string) => {
   const items = await listAgreementProponentTypes(db, streamId)

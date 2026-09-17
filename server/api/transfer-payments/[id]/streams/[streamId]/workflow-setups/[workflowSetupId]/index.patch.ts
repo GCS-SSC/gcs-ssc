@@ -1,10 +1,11 @@
+import { resolveEntityTypeLifecycleDefinition, supportsWorkflowConfiguration } from '~~/server/utils/entity-type-registry'
+import { readWorkflowConditions } from '~~/server/utils/workflow-conditions'
 import { CommonWorkflowSetupCreateSchema, CommonWorkflowSetupPatchSchema } from '~~/shared/types/schemas'
 import { authorize } from '~~/server/utils/authorize'
 import { parseI18n, readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import { authorizeTransferPaymentStreamResource, createTransferPaymentScopedAuthorizeHandler } from '~~/server/utils/transfer-payment-route-authorization'
 import { lockWorkflowSetupForMutation, readWorkflowSetupPublicationMetadata } from '~~/server/utils/workflow-setup-versioning'
 import { executeFreshAuthorizedTransferPaymentStreamWrite } from '~~/server/utils/transfer-payment-write-transaction'
-import { supportsWorkflowConfiguration } from '~~/server/utils/entity-type-registry'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 export default defineEventHandler(async event => {
@@ -52,6 +53,15 @@ export default defineEventHandler(async event => {
       const nextPurpose = values.egcs_cn_purpose ?? current.egcs_cn_purpose
       if (!await supportsWorkflowConfiguration(trx, nextEntityType, nextPurpose)) {
         return await badRequest(event, 'UNSUPPORTED_WORKFLOW_ENTITY_TYPE', 'apiErrors.request.invalid')
+      }
+      if (nextEntityType !== current.egcs_cn_entitytype && (await resolveEntityTypeLifecycleDefinition(trx, nextEntityType))?.ownerKind !== 'agreement') {
+        const members = await trx.selectFrom('Common_Workflow_Setup_Member').select('id')
+          .where('egcs_cn_workflowsetup', '=', workflowSetupId).where('_deleted', '=', false).execute()
+        for (const member of members) {
+          if ((await readWorkflowConditions(trx, String(member.id))).length) {
+            return await badRequest(event, 'WORKFLOW_CONDITIONS_INVALID', 'apiErrors.request.invalid_resource')
+          }
+        }
       }
       if (allowedStartStatuses) {
         await trx.updateTable('Common_Workflow_Setup_Allowed_Start_Status').set({ _deleted: true })

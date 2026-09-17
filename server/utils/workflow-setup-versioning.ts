@@ -1,3 +1,5 @@
+import { resolveEntityTypeLifecycleDefinition } from './entity-type-registry'
+import { readWorkflowProfileChoices, resolveWorkflowProfileCondition } from './workflow-profile-conditions'
 import { readWorkflowConditions } from './workflow-conditions'
 import { readAgreementCustomFieldDefinitions } from './agreement-custom-fields'
 import type { WorkflowMemberCondition } from '~~/shared/types/schemas/agreement-custom-fields'
@@ -222,7 +224,10 @@ export const buildWorkflowSetupPublication = async (
     })
     const conditions = await readWorkflowConditions(db, String(row.id))
     const fields = conditions.length ? await readAgreementCustomFieldDefinitions(db, String(setup.egcs_cn_scopeid)) : []
+    if (conditions.length && (await resolveEntityTypeLifecycleDefinition(db, setup.egcs_cn_entitytype))?.ownerKind !== 'agreement') throw new Error('Workflow conditions require an Agreement owner')
+    const choices = conditions.some(condition => 'source' in condition) ? await readWorkflowProfileChoices(db, String(setup.egcs_cn_scopeid)) : null
     const resolvedConditions = conditions.map(condition => {
+      if ('source' in condition) return resolveWorkflowProfileCondition(condition, choices!)
       const field = fields.find(candidate => candidate.id === condition.fieldId)
       if (!field?.egcs_tp_active || !field.egcs_tp_discriminator || field.egcs_tp_kind !== 'relational') throw new Error('Workflow discriminator must be active')
       const options = condition.optionIds.map(id => {

@@ -140,20 +140,57 @@ export const agreementCustomFieldMergeSchema = (
   return merged
 })
 
-export const WorkflowMemberConditionsSchema = z.array(z.object({
+export const CustomFieldConditionSchema = z.object({
   fieldId: PositivePostgresBigintIdSchema,
   optionIds: z.array(PositivePostgresBigintIdSchema).min(1, { error: 'validation.required' })
-})).superRefine((conditions, ctx) => {
+}).strict()
+export const AgreementProfileConditionSchema = z.union([
+  z.object({ source: z.enum(['agreement_subtype', 'holdback_basis']), optionIds: z.array(PositivePostgresBigintIdSchema).min(1, { error: 'validation.required' }) }).strict(),
+  z.object({ source: z.literal('further_distribution'), value: z.boolean({ error: 'validation.required' }) }).strict(),
+  z.object({ source: z.literal('proponent_type'), quantifier: z.enum(['any', 'all'], { error: 'validation.required' }), optionIds: z.array(PositivePostgresBigintIdSchema).min(1, { error: 'validation.required' }) }).strict()
+])
+export const WorkflowMemberConditionsSchema = z.array(z.union([CustomFieldConditionSchema, AgreementProfileConditionSchema])).superRefine((conditions, ctx) => {
   const seen = new Set<string>()
   conditions.forEach((condition, index) => {
-    if (seen.has(condition.fieldId)) ctx.addIssue({ code: 'custom', path: [index, 'fieldId'], message: 'validation.duplicate' })
-    seen.add(condition.fieldId)
-    if (new Set(condition.optionIds).size !== condition.optionIds.length) {
+    const key = 'fieldId' in condition ? condition.fieldId : condition.source
+    if (seen.has(key)) ctx.addIssue({ code: 'custom', path: [index], message: 'validation.duplicate' })
+    seen.add(key)
+    if ('optionIds' in condition && new Set(condition.optionIds).size !== condition.optionIds.length) {
       ctx.addIssue({ code: 'custom', path: [index, 'optionIds'], message: 'validation.duplicate' })
     }
   })
 })
+export type CustomFieldCondition = z.infer<typeof CustomFieldConditionSchema>
+export type AgreementProfileCondition = z.infer<typeof AgreementProfileConditionSchema>
 export type WorkflowMemberCondition = z.infer<typeof WorkflowMemberConditionsSchema>[number]
-
-export const workflowConditionsMatch = (conditions: WorkflowMemberCondition[], values: AgreementCustomFieldValues): boolean =>
-  conditions.every(condition => customFieldOptionIds(values[condition.fieldId]).some(optionId => condition.optionIds.includes(optionId)))
+export type AgreementRoutingValues = {
+  agreement_subtype: string | null
+  holdback_basis: string | null
+  further_distribution: boolean
+  proponent_type: Array<string | null>
+}
+/**
+ * Stable identity shared by legacy and Agreement profile predicates.
+ * @returns Stable field or profile source key.
+ * @param condition - Saved workflow predicate.
+ */
+export const workflowConditionKey = (condition: WorkflowMemberCondition): string => 'fieldId' in condition ? condition.fieldId : condition.source
+/**
+ *
+ * @returns Whether every predicate matches.
+ * @param conditions - Predicates combined with AND.
+ * @param values - Captured custom selections.
+ * @param profile - Captured Agreement values.
+ */
+export const workflowConditionsMatch = (conditions: WorkflowMemberCondition[], values: AgreementCustomFieldValues, profile?: AgreementRoutingValues): boolean =>
+  conditions.every(condition => {
+    if ('fieldId' in condition) return customFieldOptionIds(values[condition.fieldId]).some(optionId => condition.optionIds.includes(optionId))
+    if (!profile) return false
+    if (condition.source === 'further_distribution') return profile.further_distribution === condition.value
+    if (condition.source === 'proponent_type') {
+      const matches = (id: string | null) => id !== null && condition.optionIds.includes(id)
+      return profile.proponent_type.length > 0 && (condition.quantifier === 'all' ? profile.proponent_type.every(matches) : profile.proponent_type.some(matches))
+    }
+    const selected = profile[condition.source]
+    return selected !== null && condition.optionIds.includes(selected)
+  })

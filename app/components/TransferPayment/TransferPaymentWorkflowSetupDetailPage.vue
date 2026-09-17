@@ -3,7 +3,9 @@
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { FetchError } from 'ofetch'
-import type { z } from 'zod'
+import { z } from 'zod'
+import { WorkflowMemberConditionsSchema } from '~~/shared/types/schemas/agreement-custom-fields'
+import type { AgreementCustomFieldDefinition, AgreementProfileCondition, WorkflowMemberCondition } from '~~/shared/types/schemas/agreement-custom-fields'
 import type { Scope } from '~~/shared/utils/scopes'
 import type { TranslatedTabItem } from '~~/shared/types/ui'
 import type { TransferPaymentProfileItem, TransferPaymentStreamItem } from '~~/shared/types/schemas'
@@ -28,7 +30,7 @@ type WorkflowSetupDetail = WorkflowSetupItem & {
   members: WorkflowMember[]
 }
 type WorkflowMember = {
-  conditions?: import('~~/shared/types/schemas/agreement-custom-fields').WorkflowMemberCondition[]
+  conditions?: WorkflowMemberCondition[]
   id: string
   egcs_cn_sequence: number
   egcs_cn_kind: 'review_set' | 'recommendation_set' | 'approval_template'
@@ -62,6 +64,12 @@ const endpoint = `/api/transfer-payments/${transferPaymentId}/streams/${streamId
 const { data: profile } = await useFetch<TransferPaymentProfileItem, FetchError, string>(`/api/transfer-payments/${transferPaymentId}`)
 const { data: stream } = await useFetch<TransferPaymentStreamItem, FetchError, string>(`/api/transfer-payments/${transferPaymentId}/streams/${streamId}`)
 const { data: setup, error: loadError, status: loadStatus, refresh } = await useFetch<WorkflowSetupDetail, FetchError, string>(endpoint)
+const conditionCatalogBase = `/api/transfer-payments/${transferPaymentId}/streams/${streamId}`
+const { data: conditionFields, error: conditionFieldsError, refresh: refreshConditionFields } = await useFetch<{ items: AgreementCustomFieldDefinition[] }, FetchError, string>(`${conditionCatalogBase}/custom-fields`)
+const { data: conditionChoices, error: conditionChoicesError, refresh: refreshConditionChoices } = await useFetch<
+  Record<Exclude<AgreementProfileCondition['source'], 'further_distribution'>, { id: string, name_en: string, name_fr: string }[]>, FetchError, string
+>(`${conditionCatalogBase}/workflow-condition-choices`)
+const retryConditionCatalogs = () => Promise.all([refreshConditionFields(), refreshConditionChoices()])
 const detailContent = useTemplateRef<HTMLElement>('detailContent')
 const cloneSetup = (value: WorkflowSetupDetail): WorkflowSetupDetail => ({
   ...value,
@@ -74,6 +82,12 @@ const cloneSetup = (value: WorkflowSetupDetail): WorkflowSetupDetail => ({
 const state: Ref<WorkflowSetupDetail | null> = ref(setup.value ? cloneSetup(setup.value) : null)
 const isMemberOpen: Ref<boolean> = ref(false)
 const selectedMember: Ref<WorkflowMemberForm | null> = ref(null)
+const isConditionsOpen: Ref<boolean> = ref(false)
+const selectedConditions: Ref<{ id: string, sequence: number, conditions: WorkflowMemberCondition[] } | null> = ref(null)
+const validateConditions = createValidator(z.object({ conditions: WorkflowMemberConditionsSchema }))
+watch(isConditionsOpen, open => {
+  if (!open) selectedConditions.value = null
+})
 const nestedMembers: Ref<NestedMember[]> = ref([])
 const selectedSection: Ref<string> = ref('workflow-identity')
 const isHeroCollapsed = getHeroCollapsed('transfer-payment-workflow-setup-detail')
@@ -270,7 +284,7 @@ const memberKinds = computed(() => [
 const openMember = (member?: WorkflowMember) => {
   if (!canUpdate.value || mutation.isPending.value || blockDirtyAction()) return
   selectedMember.value = member
-    ? { ...member }
+    ? { ...member, conditions: undefined }
     : {
         egcs_cn_sequence: (state.value?.members.length ?? 0) + 1,
         egcs_cn_kind: 'review_set', egcs_cn_allowownerredirect: false
@@ -347,6 +361,30 @@ const saveMember = async () => {
     } catch (error) {
       showError(error)
     }
+  })
+}
+const openConditions = (member: WorkflowMember) => {
+  if (!canUpdate.value || mutation.isPending.value || blockDirtyAction()) return
+  selectedConditions.value = {
+    id: member.id,
+    sequence: member.egcs_cn_sequence,
+    conditions: JSON.parse(JSON.stringify(member.conditions ?? [])) as WorkflowMemberCondition[]
+  }
+  isConditionsOpen.value = true
+}
+const saveConditions = async () => {
+  const draft = selectedConditions.value
+  if (!draft || !canUpdate.value || mutation.isPending.value || blockDirtyAction()) return
+  await mutation.run('save-conditions', async token => {
+    try {
+      const response = await fetch(getClientRequestUrl(`${endpoint}/members/${draft.id}`), {
+        method: 'PATCH', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ conditions: draft.conditions })
+      })
+      if (!response.ok) await throwFetchResponseError(response)
+      if (!await refreshForMutation(token)) return
+      if (selectedConditions.value === draft) isConditionsOpen.value = false
+    } catch (error) { showError(error) }
   })
 }
 const moveMember = async (member: WorkflowMember, sequence: number) => {
@@ -497,32 +535,47 @@ const deleteMember = async (member: WorkflowMember) => {
                     <UButton v-if="canUpdate" icon="i-lucide-plus" :label="t('workflow.add_member')" :disabled="!canEditFields" @click="openMember()" />
                   </div>
                   <div v-if="state.members.length" class="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
-                    <div v-for="member in state.members" :key="member.id" class="flex items-center gap-3 p-3">
-                      <span class="w-8 text-sm text-zinc-500">{{ member.egcs_cn_sequence }}</span>
-                      <span class="min-w-0 flex-1">{{ memberKinds.find(item => item.value === member.egcs_cn_kind)?.label }}</span>
-                      <CommonStatusBadge v-if="member.egcs_cn_materializationstatus" :status-id="member.egcs_cn_materializationstatus" />
-                      <CommonStatusBadge v-if="member.egcs_cn_successstatus" :status-id="member.egcs_cn_successstatus" />
-                      <CommonStatusBadge v-if="member.egcs_cn_failurestatus" :status-id="member.egcs_cn_failurestatus" />
-                      <template v-if="canUpdate">
-                        <UButton
-                          icon="i-lucide-arrow-up" color="neutral" variant="ghost"
-                          :aria-label="t('workflow.move_member_up', { sequence: member.egcs_cn_sequence })"
-                          :disabled="mutation.isPending.value || member.egcs_cn_sequence === 1" @click="moveMember(member, member.egcs_cn_sequence - 1)" />
-                        <UButton
-                          icon="i-lucide-arrow-down" color="neutral" variant="ghost"
-                          :aria-label="t('workflow.move_member_down', { sequence: member.egcs_cn_sequence })"
-                          :disabled="mutation.isPending.value || member.egcs_cn_sequence === state.members.length" @click="moveMember(member, member.egcs_cn_sequence + 1)" />
-                        <UButton
-                          icon="i-lucide-pencil" color="neutral" variant="ghost"
-                          :aria-label="t('workflow.edit_member_sequence', { sequence: member.egcs_cn_sequence })"
-                          :disabled="mutation.isPending.value"
-                          @click="openMember(member)" />
-                        <UButton
-                          v-if="canDelete" icon="i-lucide-trash-2" color="error" variant="ghost"
-                          :aria-label="t('workflow.delete_member', { sequence: member.egcs_cn_sequence })"
-                          :disabled="mutation.isPending.value"
-                          @click="deleteMember(member)" />
-                      </template>
+                    <div v-for="member in state.members" :key="member.id" class="p-3" data-testid="workflow-member">
+                      <div class="flex flex-wrap items-center gap-3">
+                        <span class="w-8 text-sm text-zinc-500">{{ member.egcs_cn_sequence }}</span>
+                        <span class="min-w-0 flex-1">{{ memberKinds.find(item => item.value === member.egcs_cn_kind)?.label }}</span>
+                        <CommonStatusBadge v-if="member.egcs_cn_materializationstatus" :status-id="member.egcs_cn_materializationstatus" />
+                        <CommonStatusBadge v-if="member.egcs_cn_successstatus" :status-id="member.egcs_cn_successstatus" />
+                        <CommonStatusBadge v-if="member.egcs_cn_failurestatus" :status-id="member.egcs_cn_failurestatus" />
+                        <template v-if="canUpdate">
+                          <UButton
+                            icon="i-lucide-arrow-up" color="neutral" variant="ghost"
+                            :aria-label="t('workflow.move_member_up', { sequence: member.egcs_cn_sequence })"
+                            :disabled="mutation.isPending.value || member.egcs_cn_sequence === 1" @click="moveMember(member, member.egcs_cn_sequence - 1)" />
+                          <UButton
+                            icon="i-lucide-arrow-down" color="neutral" variant="ghost"
+                            :aria-label="t('workflow.move_member_down', { sequence: member.egcs_cn_sequence })"
+                            :disabled="mutation.isPending.value || member.egcs_cn_sequence === state.members.length" @click="moveMember(member, member.egcs_cn_sequence + 1)" />
+                          <UButton
+                            icon="i-lucide-pencil" color="neutral" variant="ghost"
+                            :aria-label="t('workflow.edit_member_sequence', { sequence: member.egcs_cn_sequence })"
+                            :disabled="mutation.isPending.value"
+                            @click="openMember(member)" />
+                          <UButton
+                            icon="i-lucide-list-filter" color="neutral" variant="ghost"
+                            :label="t('custom_fields.conditions')"
+                            :aria-label="t('workflow.conditions.edit_member', { sequence: member.egcs_cn_sequence })"
+                            :disabled="mutation.isPending.value"
+                            @click="openConditions(member)" />
+                          <UButton
+                            v-if="canDelete" icon="i-lucide-trash-2" color="error" variant="ghost"
+                            :aria-label="t('workflow.delete_member', { sequence: member.egcs_cn_sequence })"
+                            :disabled="mutation.isPending.value"
+                            @click="deleteMember(member)" />
+                        </template>
+                      </div>
+                      <div class="mt-3 border-t border-zinc-200 pt-3 dark:border-zinc-800">
+                        <TransferPaymentWorkflowConditions
+                          :model-value="member.conditions ?? []" readonly
+                          :entity-type="state.egcs_cn_entitytype" :custom-fields="conditionFields?.items ?? []"
+                          :choices="conditionChoices ?? {}" :load-error="Boolean(conditionFieldsError || conditionChoicesError)"
+                          @retry="retryConditionCatalogs" />
+                      </div>
                     </div>
                   </div>
                   <p v-else class="text-sm text-zinc-500">
@@ -597,7 +650,6 @@ const deleteMember = async (member: WorkflowMember) => {
               <CommonStatusSelect v-model="selectedMember.egcs_cn_failurestatus" :agency-id="agencyId" allow-empty :empty-label="t('workflow.no_change')" class="w-full" />
             </UFormField>
           </div>
-          <TransferPaymentWorkflowConditions v-model="selectedMember.conditions" :profile-id="transferPaymentId" :stream-id="streamId" />
           <UFormField v-if="selectedMember.egcs_cn_kind !== 'approval_template'" :label="t('workflow.allow_owner_redirect')" name="egcs_cn_allowownerredirect">
             <USwitch v-model="selectedMember.egcs_cn_allowownerredirect" />
           </UFormField>
@@ -619,6 +671,26 @@ const deleteMember = async (member: WorkflowMember) => {
           <div class="flex justify-end gap-2">
             <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isMemberOpen = false" />
             <CommonSaveButton :label="t('common.save')" :loading="isMemberSaving || isNestedMembersLoading" :disabled="mutation.isPending.value || isNestedMembersLoading || Boolean(nestedMembersError)" />
+          </div>
+        </fieldset>
+      </UForm>
+    </template>
+  </UModal>
+  <UModal
+    v-if="!loadError"
+    v-model:open="isConditionsOpen"
+    :title="t('workflow.conditions.edit_member', { sequence: selectedConditions?.sequence ?? '' })"
+    :ui="{ content: 'sm:max-w-2xl' }">
+    <template #body>
+      <UForm v-if="selectedConditions" :state="selectedConditions" :validate="validateConditions" @submit="saveConditions">
+        <fieldset :disabled="mutation.isPending.value" class="space-y-4">
+          <TransferPaymentWorkflowConditions
+            v-model="selectedConditions.conditions" :entity-type="state?.egcs_cn_entitytype ?? ''"
+            :custom-fields="conditionFields?.items ?? []" :choices="conditionChoices ?? {}"
+            :load-error="Boolean(conditionFieldsError || conditionChoicesError)" @retry="retryConditionCatalogs" />
+          <div class="flex justify-end gap-2">
+            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isConditionsOpen = false" />
+            <CommonSaveButton :label="t('common.save')" :loading="mutation.isActionPending('save-conditions')" :disabled="mutation.isPending.value" />
           </div>
         </fieldset>
       </UForm>

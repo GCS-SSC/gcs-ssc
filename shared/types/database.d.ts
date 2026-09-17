@@ -1830,6 +1830,7 @@ export interface CommonWorkflowSetupAllowedStartStatusTable {
 }
 
 export interface CommonWorkflowSetupMemberTable {
+  egcs_cn_profileconditions: Generated<import('./schemas/agreement-custom-fields').AgreementProfileCondition[]>
   id: Generated<string>
   egcs_cn_workflowsetup: string
   egcs_cn_sequence: number

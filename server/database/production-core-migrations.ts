@@ -26,6 +26,8 @@ import * as agreementProponentTypeMigration from './migrations/0018_agreement_pr
 
 import * as proponentTypeCleanupMigration from './migrations/9999_z_proponent_type_cleanup'
 
+import * as workflowProfileConditionsMigration from './migrations/9999_zz_workflow_profile_conditions'
+
 export const productionCoreMigrations = {
   '0001_common': commonMigration,
   '0002_users': usersMigration,
@@ -45,7 +47,8 @@ export const productionCoreMigrations = {
   '0016_agency_audit': agencyAuditMigration,
   '0017_custom_field_namespaces': customFieldNamespacesMigration,
   '0018_agreement_proponent_type': agreementProponentTypeMigration,
-  '9999_z_proponent_type_cleanup': proponentTypeCleanupMigration
+  '9999_z_proponent_type_cleanup': proponentTypeCleanupMigration,
+  '9999_zz_workflow_profile_conditions': workflowProfileConditionsMigration
 } satisfies Record<string, Migration>
 
 export const productionCoreMigrationProvider: MigrationProvider = {

@@ -2886,6 +2886,26 @@
     "retired": "La configuration d’examen a été retirée."
   },
   "workflow": {
+    "conditions": {
+      "field": "Champ de condition",
+      "edit_member": "Conditions du membre {sequence} du flux",
+      "badge": "{field} : {value}",
+      "badge_rule_separator": "; Promoteurs à faire correspondre : ",
+      "unconditional": "Aucune condition — toujours inclus",
+      "unavailable": "Sélection indisponible",
+      "agreement_subtype": "Sous-type d’entente",
+      "further_distribution": "Redistribution",
+      "holdback_basis": "Base de retenue",
+      "proponent_type": "Type de relation entre l’entente et le promoteur",
+      "add": "Ajouter une condition",
+      "quantifier": "Promoteurs à faire correspondre",
+      "step": "Étape {number}",
+      "included": "Incluse",
+      "matched": "Correspondance",
+      "unmatched": "Aucune correspondance",
+      "any": "Au moins un promoteur",
+      "all": "Tous les promoteurs"
+    },
     "active_target_blocker": "Un flux de travail est déjà actif pour cet élément. Terminez-le ou annulez-le avant d’en ajouter un autre.",
     "completion_error_details": "Éléments à régler",
     "title": "Flux de travail",

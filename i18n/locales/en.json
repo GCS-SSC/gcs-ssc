@@ -2886,6 +2886,26 @@
     "retired": "Review setup retired."
   },
   "workflow": {
+    "conditions": {
+      "field": "Condition field",
+      "edit_member": "Conditions for workflow member {sequence}",
+      "badge": "{field}: {value}",
+      "badge_rule_separator": "; Proponents to match: ",
+      "unconditional": "No conditions — always included",
+      "unavailable": "Unavailable selection",
+      "agreement_subtype": "Agreement subtype",
+      "further_distribution": "Further distribution",
+      "holdback_basis": "Holdback basis",
+      "proponent_type": "Agreement–Proponent relationship type",
+      "add": "Add a condition",
+      "quantifier": "Proponents to match",
+      "step": "Step {number}",
+      "included": "Included",
+      "matched": "Matched",
+      "unmatched": "Did not match",
+      "any": "Any proponent",
+      "all": "All proponents"
+    },
     "active_target_blocker": "A workflow is already active for this item. Finish or cancel it before adding another workflow.",
     "completion_error_details": "Items to resolve",
     "title": "Workflows",

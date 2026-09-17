@@ -122,6 +122,9 @@ export const executeFreshAuthorizedTransferPaymentWrite = async <T>(
         return await withAuditExecution({ type: 'agency', agencyId: context.agencyId }, () => callback(trx, context, authContext))
       })
     } catch (error: unknown) {
+      if (getDatabaseConstraintName(error) === 'workflow_profile_condition_reference') {
+        return await throwApiError(event, { statusCode: 409, code: 'WORKFLOW_CONDITION_REFERENCE_IN_USE', key: 'apiErrors.request.resource_in_use' })
+      }
       const workflowStatusConstraint = getDatabaseConstraintName(error)
       if (['cn_idx_workflowallowedstartstatus', 'cn_idx_workflowallowedstartorder', 'cn_ref_workflowstatusagency'].includes(workflowStatusConstraint ?? '')) {
         return await throwApiError(event, {
@@ -230,6 +233,9 @@ export const executeFreshAuthorizedTransferPaymentStreamWrite = async <T>(
         return await withAuditExecution({ type: 'agency', agencyId: context.agencyId }, () => callback(trx, context, authContext))
       })
     } catch (error: unknown) {
+      if (getDatabaseConstraintName(error) === 'workflow_profile_condition_reference') {
+        return await throwApiError(event, { statusCode: 409, code: 'WORKFLOW_CONDITION_REFERENCE_IN_USE', key: 'apiErrors.request.resource_in_use' })
+      }
       const workflowStatusConstraint = getDatabaseConstraintName(error)
       if (['cn_idx_workflowallowedstartstatus', 'cn_idx_workflowallowedstartorder', 'cn_ref_workflowstatusagency'].includes(workflowStatusConstraint ?? '')) {
         return await throwApiError(event, {
