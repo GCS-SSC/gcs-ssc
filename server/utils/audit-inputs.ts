@@ -2,6 +2,7 @@
 import type { CompiledQuery } from 'kysely'
 
 const REDACTED = '[REDACTED]'
+const auditMarkers = new Set([REDACTED, '[UNAVAILABLE]', '[TRUNCATED]', '[REDACTED: malformed document]'])
 const sensitive = /password|passwd|token|cookie|authorization|api.?key|secret|credential|encrypted|cipher|private.?key|(^|_)salt($|_)/i
 export type AuditCapturePolicy = ReadonlyMap<string, readonly string[]>
 
@@ -20,7 +21,7 @@ export const sanitizeAuditInput = (value: unknown, depth = 0, budget = { remaini
       return '[TRUNCATED]'
     }
     // Encoded documents may contain credentials under otherwise innocuous column names.
-    if (/^\s*[[{]/.test(value)) {
+    if (!auditMarkers.has(value) && /^\s*[[{]/.test(value)) {
       try {
         const exact = value.replace(/"(?:\\.|[^"\\])*"|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g, token => token.startsWith('"') ? token : JSON.stringify(token))
         return sanitizeAuditInput(JSON.parse(exact), depth + 1, budget)
@@ -53,7 +54,8 @@ export const sanitizeAuditInput = (value: unknown, depth = 0, budget = { remaini
         : '[UNAVAILABLE]'
     })
   }
-  if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+  if (value && typeof value === 'object'
+    && (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null)) {
     if (Object.keys(value).length > 1000) return '[TRUNCATED]'
     return Object.fromEntries(Object.entries(Object.getOwnPropertyDescriptors(value))
       .filter(([, descriptor]) => descriptor.enumerable).map(([key, descriptor]) => {
