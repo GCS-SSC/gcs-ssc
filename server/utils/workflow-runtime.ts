@@ -1,4 +1,6 @@
-import { captureWorkflowRouting, WorkflowRouteValidationError, type WorkflowRoutingEvidence } from './workflow-routing'
+import { resolveWorkflowExecutionPlan } from './workflow-execution-plan'
+import { captureWorkflowRouting } from './workflow-routing'
+import { WorkflowRouteValidationError, type WorkflowRoutingEvidence } from './workflow-routing-contract'
 /* eslint-disable jsdoc/require-jsdoc -- canonical workflow orchestration is covered by focused lifecycle tests */
 import { sql, type Kysely, type Selectable, type Transaction } from 'kysely'
 import type { H3Event } from 'h3'
@@ -174,10 +176,7 @@ export const readWorkflowRuntimeConfiguration = async (db: DbClient, run: Workfl
     .where('egcs_cn_version', '=', Number(run.egcs_cn_sourceversion))
     .executeTakeFirstOrThrow()
   const definition = readPublishedWorkflowConfiguration(version.egcs_cn_definition)
-  if (!definition.members.some(member => member.conditions?.length)) return definition
-  const routing = run.egcs_cn_routing as WorkflowRoutingEvidence | null
-  if (!routing) throw new WorkflowRouteValidationError('Conditional workflow runtime is missing captured routing evidence')
-  return { ...definition, members: definition.members.filter(member => routing.decisions.some(decision => decision.memberId === member.memberId && decision.eligible)) }
+  return resolveWorkflowExecutionPlan(definition, run.egcs_cn_routing as WorkflowRoutingEvidence | null)
 }
 
 export const isWorkflowStartStatusAllowed = (allowedStatuses: StatusId[], currentStatus: StatusId): boolean =>
@@ -1190,7 +1189,7 @@ const startWorkflowUnchecked = async (
     reason: retry ? 'workflow_retried' : 'workflow_started'
   })
   const activeRun = await selectWorkflowRunById(trx, String(run.id), true)
-  const firstMember = setup.publicationDefinition.members.find(member => routing.decisions.some(decision => decision.memberId === member.memberId && decision.eligible))
+  const firstMember = resolveWorkflowExecutionPlan(setup.publicationDefinition, routing).members[0]
   return activeRun && firstMember
     ? await materializeWorkflowMember(trx, activeRun, firstMember, initiatedBy)
     : await finishWorkflowRun(trx, String(run.id), 'succeeded', undefined, initiatedBy)

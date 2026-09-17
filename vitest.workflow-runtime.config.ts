@@ -1,13 +1,20 @@
 import { defineCriticalCoverageProject } from './vitest.host-critical-base'
 
 export const WORKFLOW_RUNTIME_COVERAGE_INCLUDE = [
-  'server/utils/workflow-runtime.ts'
+  'server/utils/workflow-runtime.ts',
+  'server/utils/workflow-routing.ts',
+  'server/utils/workflow-routing-capture.ts',
+  'server/utils/workflow-condition-evaluation.ts',
+  'server/utils/workflow-execution-plan.ts'
 ]
 
 export default defineCriticalCoverageProject({
   include: WORKFLOW_RUNTIME_COVERAGE_INCLUDE,
   reportsDirectory: 'coverage/workflow-runtime',
   tests: [
+    'tests/unit/workflow-routing.test.ts',
+    'tests/unit/workflow-routing-contracts.test.ts',
+    'tests/unit/workflow-profile-database.test.ts',
     'tests/unit/agreement-amendment-cancel-route-coverage.test.ts',
     'tests/unit/agreement-approval-submission-locking.test.ts',
     'tests/unit/agreement-claim-completion.test.ts',

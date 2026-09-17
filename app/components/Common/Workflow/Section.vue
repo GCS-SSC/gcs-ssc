@@ -61,7 +61,7 @@ type AvailableStandardWorkflow = {
   ineligibleReason: 'active_workflow' | 'closed_target' | 'terminal_status' | 'status_ineligible' | 'unsupported' | null
 }
 type RuntimeResponse = {
-  routing?: import('~~/server/utils/workflow-routing').WorkflowRoutingEvidence | null
+  routing?: import('~~/server/utils/workflow-routing-contract').WorkflowRoutingEvidence | null
   current: { runtimeId: string, runtimeState: RuntimeState, attempt: number, previousRuntimeId: string | null } | null
   reviewSet: { id: string, runtimeState: RuntimeState, runtimeItemId: string } | null
   sourceApprovalStage: { runtimeItemId: string, runtimeState: RuntimeState, order: number, routingSlipId?: string | null } | null
