@@ -9,25 +9,25 @@ import { parseI18n } from './api-validate'
 export const readAgreementCustomFieldSections = async (db: Kysely<Database>, streamId: string): Promise<AgreementCustomFieldSection[]> =>
   (await db.selectFrom('Transfer_Payment_Stream_Field_Section').selectAll()
     .where('egcs_tp_transferpaymentstream', '=', streamId).where('_deleted', '=', false)
-    .orderBy('display_order').orderBy('id').execute()).map(section => ({ ...section, id: String(section.id) }))
+    .orderBy('egcs_tp_displayorder').orderBy('id').execute()).map(section => ({ ...section, id: String(section.id) }))
 
 export const readAgreementCustomFieldDefinitions = async (
   db: Kysely<Database>, streamId: string
 ): Promise<AgreementCustomFieldDefinition[]> => {
   const fields = await db.selectFrom('Transfer_Payment_Stream_Field').selectAll()
     .where('egcs_tp_transferpaymentstream', '=', streamId).where('_deleted', '=', false)
-    .orderBy('display_order').orderBy('id').execute()
+    .orderBy('egcs_tp_displayorder').orderBy('id').execute()
   if (!fields.length) return []
   const sections = await readAgreementCustomFieldSections(db, streamId)
   const options = await db.selectFrom('Transfer_Payment_Stream_Field_Option').selectAll()
-    .where('field_id', 'in', fields.map(field => field.id)).where('_deleted', '=', false)
-    .orderBy('display_order').orderBy('id').execute()
+    .where('egcs_tp_field', 'in', fields.map(field => field.id)).where('_deleted', '=', false)
+    .orderBy('egcs_tp_displayorder').orderBy('id').execute()
   return fields.map(field => ({
     ...field,
     id: String(field.id),
-    section_id: String(field.section_id),
-    section: sections.find(section => section.id === String(field.section_id)),
-    options: options.filter(option => String(option.field_id) === String(field.id)).map(option => ({ ...option, id: String(option.id) }))
+    egcs_tp_section: String(field.egcs_tp_section),
+    section: sections.find(section => section.id === String(field.egcs_tp_section)),
+    options: options.filter(option => String(option.egcs_tp_field) === String(field.id)).map(option => ({ ...option, id: String(option.id) }))
   }))
 }
 

@@ -224,13 +224,13 @@ export const buildWorkflowSetupPublication = async (
     const fields = conditions.length ? await readAgreementCustomFieldDefinitions(db, String(setup.egcs_cn_scopeid)) : []
     const resolvedConditions = conditions.map(condition => {
       const field = fields.find(candidate => candidate.id === condition.fieldId)
-      if (!field?.active || !field.discriminator || field.kind !== 'relational') throw new Error('Workflow discriminator must be active')
+      if (!field?.egcs_tp_active || !field.egcs_tp_discriminator || field.egcs_tp_kind !== 'relational') throw new Error('Workflow discriminator must be active')
       const options = condition.optionIds.map(id => {
-        const option = field.options.find(candidate => candidate.id === id && candidate.active)
+        const option = field.options.find(candidate => candidate.id === id && candidate.egcs_tp_active)
         if (!option) throw new Error('Workflow discriminator option must be active')
-        return { id, name_en: option.name_en, name_fr: option.name_fr }
+        return { id, name_en: option.egcs_tp_name_en, name_fr: option.egcs_tp_name_fr }
       })
-      return { ...condition, name_en: field.name_en, name_fr: field.name_fr, options }
+      return { ...condition, name_en: field.egcs_tp_name_en, name_fr: field.egcs_tp_name_fr, options }
     })
     members.push({
       ...(resolvedConditions.length ? { conditions: resolvedConditions } : {}),

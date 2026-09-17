@@ -14,11 +14,11 @@ const { data, error, refresh } = await useAsyncData<{ items: AgreementCustomFiel
   return await response.json() as { items: AgreementCustomFieldDefinition[] }
 })
 const selectedOptionIds = (fieldId: string) => model.value.find(condition => condition.fieldId === fieldId)?.optionIds ?? []
-const fields = computed(() => (data.value?.items ?? []).filter(field => field.discriminator && field.kind === 'relational' && (field.active || selectedOptionIds(field.id).length > 0)))
+const fields = computed(() => (data.value?.items ?? []).filter(field => field.egcs_tp_discriminator && field.egcs_tp_kind === 'relational' && (field.egcs_tp_active || selectedOptionIds(field.id).length > 0)))
 const options = (field: AgreementCustomFieldDefinition) => field.options
-  .filter(option => (field.active && option.active) || selectedOptionIds(field.id).includes(option.id))
+  .filter(option => (field.egcs_tp_active && option.egcs_tp_active) || selectedOptionIds(field.id).includes(option.id))
   .map(option => ({ value: option.id, label: label(option) }))
-const label = (value: { name_en: string, name_fr: string }) => locale.value === 'fr' ? value.name_fr : value.name_en
+const label = (value: { egcs_tp_name_en: string, egcs_tp_name_fr: string }) => locale.value === 'fr' ? value.egcs_tp_name_fr : value.egcs_tp_name_en
 const update = (fieldId: string, optionIds: string[]) => {
   model.value = [...model.value.filter(condition => condition.fieldId !== fieldId), ...(optionIds.length ? [{ fieldId, optionIds }] : [])]
 }

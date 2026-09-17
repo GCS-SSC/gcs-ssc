@@ -21,24 +21,24 @@ const { data, refresh, status } = await useAsyncData<{ items: AgreementCustomFie
 })
 type FieldForm = Partial<AgreementCustomFieldDefinition>
 type Option = AgreementCustomFieldDefinition['options'][number]
-const fieldModal = useCrudModal<FieldForm>({ createState: () => ({ kind: 'text', multiple: false, presentation: 'single_line', active: true, required: false, discriminator: false, display_order: 0 }), updateState: field => ({ ...field }) })
-watch(() => fieldModal.selected.value?.kind, kind => {
+const fieldModal = useCrudModal<FieldForm>({ createState: () => ({ egcs_tp_kind: 'text', egcs_tp_multiple: false, egcs_tp_presentation: 'single_line', egcs_tp_active: true, egcs_tp_required: false, egcs_tp_discriminator: false, egcs_tp_displayorder: 0 }), updateState: field => ({ ...field }) })
+watch(() => fieldModal.selected.value?.egcs_tp_kind, egcs_tp_kind => {
   const selected = fieldModal.selected.value
   if (!selected) return
-  if (kind !== 'text') selected.presentation = 'single_line'
-  if (kind !== 'relational') {
-    selected.discriminator = false
-    selected.multiple = false
+  if (egcs_tp_kind !== 'text') selected.egcs_tp_presentation = 'single_line'
+  if (egcs_tp_kind !== 'relational') {
+    selected.egcs_tp_discriminator = false
+    selected.egcs_tp_multiple = false
   }
 })
-const multipleSelectionLocked = computed(() => Boolean(data.value?.items.find(field => field.id === fieldModal.selected.value?.id)?.multiple))
-const optionModal = useCrudModal<Partial<Option>>({ createState: () => ({ active: true, display_order: 0, category_en: null, category_fr: null }), updateState: option => ({ ...option }) })
+const multipleSelectionLocked = computed(() => Boolean(data.value?.items.find(field => field.id === fieldModal.selected.value?.id)?.egcs_tp_multiple))
+const optionModal = useCrudModal<Partial<Option>>({ createState: () => ({ egcs_tp_active: true, egcs_tp_displayorder: 0, egcs_tp_category_en: null, egcs_tp_category_fr: null }), updateState: option => ({ ...option }) })
 const optionFieldId: Ref<string | null> = ref(null)
 const optionCategoryLocked = ref(false)
-const sectionModal = useCrudModal<Partial<AgreementCustomFieldSection>>({ createState: () => ({ display_order: 0 }), updateState: section => ({ ...section }) })
+const sectionModal = useCrudModal<Partial<AgreementCustomFieldSection>>({ createState: () => ({ egcs_tp_displayorder: 0 }), updateState: section => ({ ...section }) })
 const openField = (sectionId: string) => {
   fieldModal.openCreate()
-  if (fieldModal.selected.value) fieldModal.selected.value.section_id = sectionId
+  if (fieldModal.selected.value) fieldModal.selected.value.egcs_tp_section = sectionId
 }
 /**
  *
@@ -83,19 +83,19 @@ const columnVisibility = { sectionGroup: false, fieldGroup: false, categoryGroup
 const filteredSections = computed(() => {
   const query = search.value.trim().toLocaleLowerCase()
   return (data.value?.sections ?? []).map(section => {
-    const allFields = (data.value?.items ?? []).filter(field => field.section_id === section.id)
-    const sectionMatches = [section.name_en, section.name_fr].some(label => label.toLocaleLowerCase().includes(query))
-    const fields = allFields.filter(field => sectionMatches || [field.name_en, field.name_fr,
-      ...field.options.flatMap(option => [option.name_en, option.name_fr, option.category_en ?? '', option.category_fr ?? ''])]
+    const allFields = (data.value?.items ?? []).filter(field => field.egcs_tp_section === section.id)
+    const sectionMatches = [section.egcs_tp_name_en, section.egcs_tp_name_fr].some(label => label.toLocaleLowerCase().includes(query))
+    const fields = allFields.filter(field => sectionMatches || [field.egcs_tp_name_en, field.egcs_tp_name_fr,
+      ...field.options.flatMap(option => [option.egcs_tp_name_en, option.egcs_tp_name_fr, option.egcs_tp_category_en ?? '', option.egcs_tp_category_fr ?? ''])]
       .some(label => label.toLocaleLowerCase().includes(query)))
     return { ...section, fields }
-  }).filter(section => !query || section.fields.length || [section.name_en, section.name_fr].some(label => label.toLocaleLowerCase().includes(query)))
+  }).filter(section => !query || section.fields.length || [section.egcs_tp_name_en, section.egcs_tp_name_fr].some(label => label.toLocaleLowerCase().includes(query)))
 })
 const tableRows = computed<FieldRow[]>(() => filteredSections.value
   .slice(pagination.value.pageIndex * pagination.value.pageSize, (pagination.value.pageIndex + 1) * pagination.value.pageSize)
   .flatMap((section): FieldRow[] => section.fields.length
     ? section.fields.flatMap((field): FieldRow[] => field.options.length
-        ? field.options.map(option => ({ id: `option:${option.id}`, sectionGroup: section.id, section, fieldGroup: field.id, categoryGroup: JSON.stringify([option.category_en, option.category_fr]), field, option }))
+        ? field.options.map(option => ({ id: `option:${option.id}`, sectionGroup: section.id, section, fieldGroup: field.id, categoryGroup: JSON.stringify([option.egcs_tp_category_en, option.egcs_tp_category_fr]), field, option }))
         : [{ id: `field:${field.id}`, sectionGroup: section.id, section, fieldGroup: field.id, categoryGroup: 'empty', field, option: null }])
     : [{ id: `section:${section.id}`, sectionGroup: section.id, section, fieldGroup: `empty:${section.id}`, categoryGroup: 'empty', field: null, option: null }]))
 watch(search, () => {
@@ -142,8 +142,8 @@ const openOption = (fieldId: string, option?: Option) => {
 const openCategoryOption = (fieldId: string, category: Option) => {
   openOption(fieldId)
   if (optionModal.selected.value) {
-    optionModal.selected.value.category_en = category.category_en
-    optionModal.selected.value.category_fr = category.category_fr
+    optionModal.selected.value.egcs_tp_category_en = category.egcs_tp_category_en
+    optionModal.selected.value.egcs_tp_category_fr = category.egcs_tp_category_fr
     optionCategoryLocked.value = true
   }
 }
@@ -204,44 +204,44 @@ watch(url, () => {
       <template #name-cell="{ row }">
         <div :id="getGroupedDisclosureContentId(row)" class="contents">
           <div v-if="row.groupingColumnId === 'sectionGroup'" class="flex items-center gap-3 py-1">
-            <CommonGroupedDisclosureButton class="group flex min-w-0 items-center gap-3 text-left font-bold" :expanded="row.getIsExpanded()" :controls="getGroupedDisclosureControlsId(row.id)" :label-en="row.original.section.name_en" :label-fr="row.original.section.name_fr" @toggle="row.toggleExpanded()">
+            <CommonGroupedDisclosureButton class="group flex min-w-0 items-center gap-3 text-left font-bold" :expanded="row.getIsExpanded()" :controls="getGroupedDisclosureControlsId(row.id)" :label-en="row.original.section.egcs_tp_name_en" :label-fr="row.original.section.egcs_tp_name_fr" @toggle="row.toggleExpanded()">
               <UIcon :name="row.getIsExpanded() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" class="size-4 text-zinc-400" />
-              <CommonBilingualName :name-en="row.original.section.name_en" :name-fr="row.original.section.name_fr" />
+              <CommonBilingualName :name-en="row.original.section.egcs_tp_name_en" :name-fr="row.original.section.egcs_tp_name_fr" />
             </CommonGroupedDisclosureButton>
           </div>
           <div v-else-if="row.groupingColumnId === 'fieldGroup' && row.original.field" class="flex items-center gap-3 py-1 pl-6">
             <CommonGroupedDisclosureButton
-              v-if="row.original.field.kind === 'relational' && row.original.field.options.length"
+              v-if="row.original.field.egcs_tp_kind === 'relational' && row.original.field.options.length"
               class="group flex min-w-0 items-center gap-3 text-left font-bold text-zinc-900 transition-colors hover:text-primary dark:text-white"
               :expanded="row.getIsExpanded()"
               :controls="getGroupedDisclosureControlsId(row.id)"
-              :label-en="row.original.field.name_en"
-              :label-fr="row.original.field.name_fr"
+              :label-en="row.original.field.egcs_tp_name_en"
+              :label-fr="row.original.field.egcs_tp_name_fr"
               @toggle="row.toggleExpanded()">
               <UIcon :name="row.getIsExpanded() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" class="size-4 text-zinc-400" />
-              <CommonBilingualName :name-en="row.original.field.name_en" :name-fr="row.original.field.name_fr" />
+              <CommonBilingualName :name-en="row.original.field.egcs_tp_name_en" :name-fr="row.original.field.egcs_tp_name_fr" />
               <CommonStatusBadge variant="count" size="sm" :label="String(row.original.field.options.length)" />
             </CommonGroupedDisclosureButton>
-            <CommonBilingualName v-else class="pl-7" :name-en="row.original.field.name_en" :name-fr="row.original.field.name_fr" />
+            <CommonBilingualName v-else class="pl-7" :name-en="row.original.field.egcs_tp_name_en" :name-fr="row.original.field.egcs_tp_name_fr" />
           </div>
           <div v-else-if="row.groupingColumnId === 'categoryGroup' && row.original.option" class="flex items-center gap-3 py-1 pl-12">
             <CommonGroupedDisclosureButton
               class="group flex min-w-0 items-center gap-3 text-left font-semibold"
               :expanded="row.getIsExpanded()"
               :controls="getGroupedDisclosureControlsId(row.id)"
-              :label="row.original.option.category_en ? undefined : t('custom_fields.uncategorized')"
-              :label-en="row.original.option.category_en ?? undefined"
-              :label-fr="row.original.option.category_fr ?? undefined"
+              :label="row.original.option.egcs_tp_category_en ? undefined : t('custom_fields.uncategorized')"
+              :label-en="row.original.option.egcs_tp_category_en ?? undefined"
+              :label-fr="row.original.option.egcs_tp_category_fr ?? undefined"
               @toggle="row.toggleExpanded()">
               <UIcon :name="row.getIsExpanded() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" class="size-4 text-zinc-400" />
-              <CommonBilingualName v-if="row.original.option.category_en" :name-en="row.original.option.category_en" :name-fr="row.original.option.category_fr ?? ''" />
+              <CommonBilingualName v-if="row.original.option.egcs_tp_category_en" :name-en="row.original.option.egcs_tp_category_en" :name-fr="row.original.option.egcs_tp_category_fr ?? ''" />
               <span v-else>{{ t('custom_fields.uncategorized') }}</span>
               <CommonStatusBadge variant="count" size="sm" :label="String(row.subRows.length)" />
             </CommonGroupedDisclosureButton>
           </div>
           <div v-else-if="!row.getIsGrouped() && row.original.option" class="flex items-center gap-3 py-1 pl-18">
             <UIcon name="i-lucide-corner-down-right" class="size-4 text-zinc-400" />
-            <CommonBilingualName :name-en="row.original.option.name_en" :name-fr="row.original.option.name_fr" />
+            <CommonBilingualName :name-en="row.original.option.egcs_tp_name_en" :name-fr="row.original.option.egcs_tp_name_fr" />
           </div>
           <span v-else class="pl-6 text-sm text-muted">{{ t('common.no_data') }}</span>
         </div>
@@ -249,20 +249,20 @@ watch(url, () => {
       <template #type-cell="{ row }">
         <span v-if="row.groupingColumnId === 'sectionGroup'">{{ t('custom_fields.section') }}</span>
         <span v-else-if="row.groupingColumnId === 'categoryGroup'">{{ t('custom_fields.category') }}</span>
-        <span v-else-if="row.groupingColumnId === 'fieldGroup' && row.original.field">{{ t(`custom_fields.${row.original.field.kind === 'text' ? row.original.field.presentation : row.original.field.kind === 'relational' ? (row.original.field.multiple ? 'multiple_selection' : 'single_selection') : 'number'}`) }}</span>
+        <span v-else-if="row.groupingColumnId === 'fieldGroup' && row.original.field">{{ t(`custom_fields.${row.original.field.egcs_tp_kind === 'text' ? row.original.field.egcs_tp_presentation : row.original.field.egcs_tp_kind === 'relational' ? (row.original.field.egcs_tp_multiple ? 'multiple_selection' : 'single_selection') : 'number'}`) }}</span>
       </template>
       <template #configuration-cell="{ row }">
         <div v-if="row.groupingColumnId === 'fieldGroup' && row.original.field" class="flex flex-wrap gap-2">
-          <UBadge v-if="row.original.field.required" color="neutral" variant="subtle" :label="t('custom_fields.required')" />
-          <UBadge v-if="row.original.field.discriminator" color="neutral" variant="subtle" :label="t('custom_fields.discriminator')" />
+          <UBadge v-if="row.original.field.egcs_tp_required" color="neutral" variant="subtle" :label="t('custom_fields.required')" />
+          <UBadge v-if="row.original.field.egcs_tp_discriminator" color="neutral" variant="subtle" :label="t('custom_fields.discriminator')" />
         </div>
-        <CommonBilingualName v-else-if="!row.getIsGrouped() && row.original.option?.category_en" :name-en="row.original.option.category_en" :name-fr="row.original.option.category_fr ?? ''" />
+        <CommonBilingualName v-else-if="!row.getIsGrouped() && row.original.option?.egcs_tp_category_en" :name-en="row.original.option.egcs_tp_category_en" :name-fr="row.original.option.egcs_tp_category_fr ?? ''" />
       </template>
       <template #order-cell="{ row }">
-        <span v-if="row.groupingColumnId !== 'categoryGroup'">{{ row.groupingColumnId === 'sectionGroup' ? row.original.section.display_order : row.getIsGrouped() ? row.original.field?.display_order : row.original.option?.display_order }}</span>
+        <span v-if="row.groupingColumnId !== 'categoryGroup'">{{ row.groupingColumnId === 'sectionGroup' ? row.original.section.egcs_tp_displayorder : row.getIsGrouped() ? row.original.field?.egcs_tp_displayorder : row.original.option?.egcs_tp_displayorder }}</span>
       </template>
       <template #status-cell="{ row }">
-        <UBadge v-if="(row.groupingColumnId === 'fieldGroup' || !row.getIsGrouped()) && (row.original.field || row.original.option)" color="neutral" variant="subtle" :label="t((row.getIsGrouped() ? row.original.field?.active : row.original.option?.active) ? 'custom_fields.active' : 'custom_fields.inactive')" />
+        <UBadge v-if="(row.groupingColumnId === 'fieldGroup' || !row.getIsGrouped()) && (row.original.field || row.original.option)" color="neutral" variant="subtle" :label="t((row.getIsGrouped() ? row.original.field?.egcs_tp_active : row.original.option?.egcs_tp_active) ? 'custom_fields.active' : 'custom_fields.inactive')" />
       </template>
       <template #actions-cell="{ row }">
         <div v-if="row.groupingColumnId === 'sectionGroup'" class="flex items-center gap-2">
@@ -271,7 +271,7 @@ watch(url, () => {
           <UButton v-if="canDeleteChild" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('common.delete')" @click="remove(`sections/${row.original.section.id}`)" />
         </div>
         <div v-else-if="row.groupingColumnId === 'fieldGroup' && row.original.field" class="flex items-center gap-2">
-          <UButton v-if="canUpdateChild && row.original.field.kind === 'relational'" icon="i-lucide-plus" color="neutral" variant="ghost" size="sm" :aria-label="t('custom_fields.add_option')" @click="openOption(row.original.field.id)" />
+          <UButton v-if="canUpdateChild && row.original.field.egcs_tp_kind === 'relational'" icon="i-lucide-plus" color="neutral" variant="ghost" size="sm" :aria-label="t('custom_fields.add_option')" @click="openOption(row.original.field.id)" />
           <UButton v-if="canUpdateChild" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" :aria-label="t('common.edit')" @click="fieldModal.openUpdate(row.original.field)" />
           <UButton v-if="canDeleteChild" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('common.delete')" @click="remove(row.original.field.id)" />
         </div>
@@ -287,14 +287,14 @@ watch(url, () => {
     <UModal v-model:open="sectionModal.isOpen.value" :title="t('custom_fields.section')">
       <template #body>
         <UForm v-if="sectionModal.selected.value" :state="sectionModal.selected.value" :validate="createValidator(StreamFieldSectionCreateSchema)" class="space-y-4" @submit="saveSection">
-          <UFormField :label="t('custom_fields.name_en')" name="name_en">
-            <UInput v-model="sectionModal.selected.value.name_en" class="w-full" />
+          <UFormField :label="t('custom_fields.name_en')" name="egcs_tp_name_en">
+            <UInput v-model="sectionModal.selected.value.egcs_tp_name_en" class="w-full" />
           </UFormField>
-          <UFormField :label="t('custom_fields.name_fr')" name="name_fr">
-            <UInput v-model="sectionModal.selected.value.name_fr" class="w-full" />
+          <UFormField :label="t('custom_fields.name_fr')" name="egcs_tp_name_fr">
+            <UInput v-model="sectionModal.selected.value.egcs_tp_name_fr" class="w-full" />
           </UFormField>
-          <UFormField :label="t('custom_fields.order')" name="display_order">
-            <UInput v-model.number="sectionModal.selected.value.display_order" type="number" min="0" />
+          <UFormField :label="t('custom_fields.order')" name="egcs_tp_displayorder">
+            <UInput v-model.number="sectionModal.selected.value.egcs_tp_displayorder" type="number" min="0" />
           </UFormField>
           <CommonSaveButton :label="t('common.save')" :loading="saving" />
         </UForm>
@@ -303,27 +303,27 @@ watch(url, () => {
     <UModal v-model:open="fieldModal.isOpen.value" :title="t('custom_fields.title')">
       <template #body>
         <UForm v-if="fieldModal.selected.value" :state="fieldModal.selected.value" :validate="createValidator(StreamFieldCreateSchema)" class="space-y-4" @submit="saveField">
-          <UFormField :label="t('custom_fields.name_en')" name="name_en">
-            <UInput v-model="fieldModal.selected.value.name_en" class="w-full" />
+          <UFormField :label="t('custom_fields.name_en')" name="egcs_tp_name_en">
+            <UInput v-model="fieldModal.selected.value.egcs_tp_name_en" class="w-full" />
           </UFormField>
-          <UFormField :label="t('custom_fields.name_fr')" name="name_fr">
-            <UInput v-model="fieldModal.selected.value.name_fr" class="w-full" />
+          <UFormField :label="t('custom_fields.name_fr')" name="egcs_tp_name_fr">
+            <UInput v-model="fieldModal.selected.value.egcs_tp_name_fr" class="w-full" />
           </UFormField>
-          <UFormField :label="t('custom_fields.section')" name="section_id">
-            <CommonBilingualSelectMenu v-model="fieldModal.selected.value.section_id" :items="data?.sections ?? []" value-key="id" />
+          <UFormField :label="t('custom_fields.section')" name="egcs_tp_section">
+            <CommonBilingualSelectMenu v-model="fieldModal.selected.value.egcs_tp_section" label-en-key="egcs_tp_name_en" label-fr-key="egcs_tp_name_fr" :items="data?.sections ?? []" value-key="id" />
           </UFormField>
-          <UFormField :label="t('common.type')" name="kind">
-            <USelect v-model="fieldModal.selected.value.kind" :disabled="Boolean(fieldModal.selected.value.id)" :items="[{ value: 'text', label: t('custom_fields.text') }, { value: 'number', label: t('custom_fields.number') }, { value: 'relational', label: t('custom_fields.relational') }]" />
+          <UFormField :label="t('common.type')" name="egcs_tp_kind">
+            <USelect v-model="fieldModal.selected.value.egcs_tp_kind" :disabled="Boolean(fieldModal.selected.value.id)" :items="[{ value: 'text', label: t('custom_fields.text') }, { value: 'number', label: t('custom_fields.number') }, { value: 'relational', label: t('custom_fields.relational') }]" />
           </UFormField>
-          <UFormField v-if="fieldModal.selected.value.kind === 'text'" :label="t('custom_fields.presentation')" name="presentation">
-            <USelect v-model="fieldModal.selected.value.presentation" :items="[{ value: 'single_line', label: t('custom_fields.single_line') }, { value: 'multiline', label: t('custom_fields.multiline') }]" />
+          <UFormField v-if="fieldModal.selected.value.egcs_tp_kind === 'text'" :label="t('custom_fields.presentation')" name="egcs_tp_presentation">
+            <USelect v-model="fieldModal.selected.value.egcs_tp_presentation" :items="[{ value: 'single_line', label: t('custom_fields.single_line') }, { value: 'multiline', label: t('custom_fields.multiline') }]" />
           </UFormField>
-          <UCheckbox v-if="fieldModal.selected.value.kind === 'relational'" v-model="fieldModal.selected.value.multiple" :disabled="multipleSelectionLocked" :label="t('custom_fields.allow_multiple')" :description="t('custom_fields.multiple_help')" />
-          <UCheckbox v-model="fieldModal.selected.value.active" :label="t('custom_fields.active')" />
-          <UCheckbox v-model="fieldModal.selected.value.required" :label="t('custom_fields.required')" />
-          <UCheckbox v-if="fieldModal.selected.value.kind === 'relational'" v-model="fieldModal.selected.value.discriminator" :label="t('custom_fields.discriminator')" />
-          <UFormField :label="t('custom_fields.order')" name="display_order">
-            <UInput v-model.number="fieldModal.selected.value.display_order" type="number" min="0" />
+          <UCheckbox v-if="fieldModal.selected.value.egcs_tp_kind === 'relational'" v-model="fieldModal.selected.value.egcs_tp_multiple" :disabled="multipleSelectionLocked" :label="t('custom_fields.allow_multiple')" :description="t('custom_fields.multiple_help')" />
+          <UCheckbox v-model="fieldModal.selected.value.egcs_tp_active" :label="t('custom_fields.active')" />
+          <UCheckbox v-model="fieldModal.selected.value.egcs_tp_required" :label="t('custom_fields.required')" />
+          <UCheckbox v-if="fieldModal.selected.value.egcs_tp_kind === 'relational'" v-model="fieldModal.selected.value.egcs_tp_discriminator" :label="t('custom_fields.discriminator')" />
+          <UFormField :label="t('custom_fields.order')" name="egcs_tp_displayorder">
+            <UInput v-model.number="fieldModal.selected.value.egcs_tp_displayorder" type="number" min="0" />
           </UFormField>
           <CommonSaveButton :label="t('common.save')" :loading="saving" />
         </UForm>
@@ -332,21 +332,21 @@ watch(url, () => {
     <UModal v-model:open="optionModal.isOpen.value" :title="t('custom_fields.add_option')">
       <template #body>
         <UForm v-if="optionModal.selected.value" :state="optionModal.selected.value" :validate="createValidator(StreamFieldOptionCreateSchema)" class="space-y-4" @submit="saveOption">
-          <UFormField :label="t('custom_fields.name_en')" name="name_en">
-            <UInput v-model="optionModal.selected.value.name_en" />
+          <UFormField :label="t('custom_fields.name_en')" name="egcs_tp_name_en">
+            <UInput v-model="optionModal.selected.value.egcs_tp_name_en" />
           </UFormField>
-          <UFormField :label="t('custom_fields.name_fr')" name="name_fr">
-            <UInput v-model="optionModal.selected.value.name_fr" />
+          <UFormField :label="t('custom_fields.name_fr')" name="egcs_tp_name_fr">
+            <UInput v-model="optionModal.selected.value.egcs_tp_name_fr" />
           </UFormField>
-          <UFormField :label="t('custom_fields.category_en')" name="category_en">
-            <UInput v-model="optionModal.selected.value.category_en" :readonly="optionCategoryLocked" />
+          <UFormField :label="t('custom_fields.category_en')" name="egcs_tp_category_en">
+            <UInput v-model="optionModal.selected.value.egcs_tp_category_en" :readonly="optionCategoryLocked" />
           </UFormField>
-          <UFormField :label="t('custom_fields.category_fr')" name="category_fr">
-            <UInput v-model="optionModal.selected.value.category_fr" :readonly="optionCategoryLocked" />
+          <UFormField :label="t('custom_fields.category_fr')" name="egcs_tp_category_fr">
+            <UInput v-model="optionModal.selected.value.egcs_tp_category_fr" :readonly="optionCategoryLocked" />
           </UFormField>
-          <UCheckbox v-model="optionModal.selected.value.active" :label="t('custom_fields.active')" />
-          <UFormField :label="t('custom_fields.order')" name="display_order">
-            <UInput v-model.number="optionModal.selected.value.display_order" type="number" min="0" />
+          <UCheckbox v-model="optionModal.selected.value.egcs_tp_active" :label="t('custom_fields.active')" />
+          <UFormField :label="t('custom_fields.order')" name="egcs_tp_displayorder">
+            <UInput v-model.number="optionModal.selected.value.egcs_tp_displayorder" type="number" min="0" />
           </UFormField>
           <CommonSaveButton :label="t('common.save')" :loading="saving" />
         </UForm>

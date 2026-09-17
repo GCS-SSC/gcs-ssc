@@ -298,12 +298,12 @@ export const buildAgreementApprovalSnapshot = async (
   const customFieldDefinitions = await readAgreementCustomFieldDefinitions(trx, String(agreement.egcs_fc_transferpaymentstream))
   const customFields = customFieldDefinitions.filter(field => customFieldHasValue(agreement.egcs_fc_customfields[field.id])).map(field => ({
     fieldId: field.id,
-    section: field.section ? { id: field.section.id, label: bilingualValue(field.section.name_en, field.section.name_fr), order: field.section.display_order } : null,
-    label: bilingualValue(field.name_en, field.name_fr),
+    section: field.section ? { id: field.section.id, label: bilingualValue(field.section.egcs_tp_name_en, field.section.egcs_tp_name_fr), order: field.section.egcs_tp_displayorder } : null,
+    label: bilingualValue(field.egcs_tp_name_en, field.egcs_tp_name_fr),
     value: agreement.egcs_fc_customfields[field.id],
-    display: field.kind !== 'relational' ? String(agreement.egcs_fc_customfields[field.id]) : (() => {
-      const selections = customFieldOptionIds(agreement.egcs_fc_customfields[field.id]).map(optionId => field.options.find(candidate => candidate.id === optionId) ?? { name_en: optionId, name_fr: optionId })
-      return bilingualValue(selections.map(option => option.name_en).join(', '), selections.map(option => option.name_fr).join(', '))
+    display: field.egcs_tp_kind !== 'relational' ? String(agreement.egcs_fc_customfields[field.id]) : (() => {
+      const selections = customFieldOptionIds(agreement.egcs_fc_customfields[field.id]).map(optionId => field.options.find(candidate => candidate.id === optionId) ?? { egcs_tp_name_en: optionId, egcs_tp_name_fr: optionId })
+      return bilingualValue(selections.map(option => option.egcs_tp_name_en).join(', '), selections.map(option => option.egcs_tp_name_fr).join(', '))
     })()
   }))
   const packet: AgreementApprovalSnapshotV1 = {

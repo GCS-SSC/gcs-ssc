@@ -21,9 +21,9 @@ const { data, status, error, refresh } = await useAsyncData<{ items: AgreementCu
   if (!response.ok) await throwFetchResponseError(response)
   return await response.json() as { items: AgreementCustomFieldDefinition[], sections: AgreementCustomFieldSection[] }
 })
-const fields = computed(() => (data.value?.items ?? []).filter(field => field.active || customFieldHasValue(model.value[field.id])))
-const sections = computed(() => (data.value?.sections ?? []).map(section => ({ ...section, fields: fields.value.filter(field => field.section_id === section.id) })))
-const label = (value: { name_en: string, name_fr: string }) => locale.value === 'fr' ? value.name_fr : value.name_en
+const fields = computed(() => (data.value?.items ?? []).filter(field => field.egcs_tp_active || customFieldHasValue(model.value[field.id])))
+const sections = computed(() => (data.value?.sections ?? []).map(section => ({ ...section, fields: fields.value.filter(field => field.egcs_tp_section === section.id) })))
+const label = (value: { egcs_tp_name_en: string, egcs_tp_name_fr: string }) => locale.value === 'fr' ? value.egcs_tp_name_fr : value.egcs_tp_name_en
 /**
  * Formats a custom-field value for read-only display.
  * @param field - The definition of the field to format.
@@ -31,13 +31,13 @@ const label = (value: { name_en: string, name_fr: string }) => locale.value === 
  */
 const valueLabel = (field: AgreementCustomFieldDefinition) => {
   const value = model.value[field.id]
-  if (field.kind === 'number') return typeof value === 'number' ? n(value, { maximumSignificantDigits: 21 }) : ''
-  return field.kind !== 'relational'
+  if (field.egcs_tp_kind === 'number') return typeof value === 'number' ? n(value, { maximumSignificantDigits: 21 }) : ''
+  return field.egcs_tp_kind !== 'relational'
     ? String(value ?? '')
-    : customFieldOptionIds(value).map(optionId => label(field.options.find(option => option.id === optionId) ?? { name_en: '', name_fr: '' })).join(', ')
+    : customFieldOptionIds(value).map(optionId => label(field.options.find(option => option.id === optionId) ?? { egcs_tp_name_en: '', egcs_tp_name_fr: '' })).join(', ')
 }
 // Retired selections can be removed; once removed, the filter prevents adding them again.
-const options = (field: AgreementCustomFieldDefinition) => field.options.filter(option => option.active || customFieldOptionIds(model.value[field.id]).includes(option.id))
+const options = (field: AgreementCustomFieldDefinition) => field.options.filter(option => option.egcs_tp_active || customFieldOptionIds(model.value[field.id]).includes(option.id))
 const update = (id: string, value: unknown) => {
   model.value = { ...model.value, [id]: typeof value === 'string' || typeof value === 'number' || Array.isArray(value) ? value as string | number | string[] : null }
 }
@@ -52,24 +52,24 @@ const update = (id: string, value: unknown) => {
     </UAlert>
     <CommonSection v-for="(section, index) in sections" :key="section.id" :title="label(section)" :badge="String(index + 4).padStart(2, '0')" :grid-cols="2">
       <div v-for="field in section.fields" :key="field.id" class="space-y-2">
-        <CommonValueCard v-if="readonly" :label="label(field)" :value="valueLabel(field) || t('common.not_available')" :sub-value="field.active ? undefined : t('custom_fields.inactive')" class="whitespace-pre-wrap" />
-        <UFormField v-else :label="label(field)" :name="`egcs_fc_customfields.${field.id}`" :required="field.active && field.required" :ui="field.kind === 'relational' ? { labelWrapper: 'justify-start gap-2 mb-1.5', label: 'mb-0', hint: 'flex items-center' } : undefined">
-          <template v-if="field.kind === 'relational' && customFieldHasValue(model[field.id])" #hint>
+        <CommonValueCard v-if="readonly" :label="label(field)" :value="valueLabel(field) || t('common.not_available')" :sub-value="field.egcs_tp_active ? undefined : t('custom_fields.inactive')" class="whitespace-pre-wrap" />
+        <UFormField v-else :label="label(field)" :name="`egcs_fc_customfields.${field.id}`" :required="field.egcs_tp_active && field.egcs_tp_required" :ui="field.egcs_tp_kind === 'relational' ? { labelWrapper: 'justify-start gap-2 mb-1.5', label: 'mb-0', hint: 'flex items-center' } : undefined">
+          <template v-if="field.egcs_tp_kind === 'relational' && customFieldHasValue(model[field.id])" #hint>
             <UButton type="button" size="xs" variant="soft" color="warning" class="bg-amber-100 text-amber-700 ring-1 ring-inset ring-amber-300 hover:bg-amber-200 dark:bg-amber-400/10 dark:text-amber-300 dark:ring-amber-400/30 dark:hover:bg-amber-400/20" icon="i-lucide-x" :disabled="status === 'pending'" :label="t('custom_fields.clear')" @click="update(field.id, null)" />
           </template>
-          <div v-if="readonly || !field.active" class="flex items-start justify-between gap-4">
+          <div v-if="readonly || !field.egcs_tp_active" class="flex items-start justify-between gap-4">
             <p class="whitespace-pre-wrap text-sm">
               {{ valueLabel(field) }}
             </p>
-            <UBadge v-if="!field.active" color="neutral" :label="t('custom_fields.inactive')" />
+            <UBadge v-if="!field.egcs_tp_active" color="neutral" :label="t('custom_fields.inactive')" />
           </div>
-          <UTextarea v-else-if="field.kind === 'text' && field.presentation === 'multiline'" :model-value="String(model[field.id] ?? '')" class="w-full" @update:model-value="update(field.id, $event)" />
-          <UInput v-else-if="field.kind === 'text'" :model-value="String(model[field.id] ?? '')" class="w-full" @update:model-value="update(field.id, $event)" />
-          <UInput v-else-if="field.kind === 'number'" type="number" step="any" :model-value="typeof model[field.id] === 'number' ? model[field.id] as number : ''" class="w-full" @update:model-value="update(field.id, $event === '' ? null : Number($event))" />
-          <CommonBilingualSelectMenu v-else-if="!field.multiple" :model-value="customFieldOptionIds(model[field.id])[0] ?? null" :items="options(field)" category-en-key="category_en" category-fr-key="category_fr" :aria-label="label(field)" class="w-full" @update:model-value="update(field.id, $event ? [$event] : null)" />
-          <CommonBilingualMultiSelectMenu v-else :model-value="customFieldOptionIds(model[field.id])" :items="options(field)" category-en-key="category_en" category-fr-key="category_fr" :aria-label="label(field)" class="w-full" @update:model-value="update(field.id, $event)" />
+          <UTextarea v-else-if="field.egcs_tp_kind === 'text' && field.egcs_tp_presentation === 'multiline'" :model-value="String(model[field.id] ?? '')" class="w-full" @update:model-value="update(field.id, $event)" />
+          <UInput v-else-if="field.egcs_tp_kind === 'text'" :model-value="String(model[field.id] ?? '')" class="w-full" @update:model-value="update(field.id, $event)" />
+          <UInput v-else-if="field.egcs_tp_kind === 'number'" type="number" step="any" :model-value="typeof model[field.id] === 'number' ? model[field.id] as number : ''" class="w-full" @update:model-value="update(field.id, $event === '' ? null : Number($event))" />
+          <CommonBilingualSelectMenu v-else-if="!field.egcs_tp_multiple" label-en-key="egcs_tp_name_en" label-fr-key="egcs_tp_name_fr" :model-value="customFieldOptionIds(model[field.id])[0] ?? null" :items="options(field)" category-en-key="egcs_tp_category_en" category-fr-key="egcs_tp_category_fr" :aria-label="label(field)" class="w-full" @update:model-value="update(field.id, $event ? [$event] : null)" />
+          <CommonBilingualMultiSelectMenu v-else label-en-key="egcs_tp_name_en" label-fr-key="egcs_tp_name_fr" :model-value="customFieldOptionIds(model[field.id])" :items="options(field)" category-en-key="egcs_tp_category_en" category-fr-key="egcs_tp_category_fr" :aria-label="label(field)" class="w-full" @update:model-value="update(field.id, $event)" />
         </UFormField>
-        <UButton v-if="!readonly && field.kind !== 'relational' && customFieldHasValue(model[field.id])" variant="link" color="neutral" :disabled="status === 'pending'" :label="t('custom_fields.clear')" @click="update(field.id, null)" />
+        <UButton v-if="!readonly && field.egcs_tp_kind !== 'relational' && customFieldHasValue(model[field.id])" variant="link" color="neutral" :disabled="status === 'pending'" :label="t('custom_fields.clear')" @click="update(field.id, null)" />
       </div>
     </CommonSection>
   </div>

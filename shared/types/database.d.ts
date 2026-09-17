@@ -2210,47 +2210,47 @@ export type DBTable<T> = T
 export interface TransferPaymentStreamFieldSectionTable {
   id: Generated<string>
   egcs_tp_transferpaymentstream: string
-  name_en: string
-  name_fr: string
-  display_order: Generated<number>
+  egcs_tp_name_en: string
+  egcs_tp_name_fr: string
+  egcs_tp_displayorder: Generated<number>
   _deleted: Generated<boolean>
 }
 export interface TransferPaymentStreamFieldTable {
-  section_id: string
+  egcs_tp_section: string
   id: Generated<string>
   egcs_tp_transferpaymentstream: string
-  name_en: string
-  name_fr: string
-  kind: 'text' | 'number' | 'relational'
-  multiple: Generated<boolean>
-  presentation: Generated<'single_line' | 'multiline'>
-  required: Generated<boolean>
-  discriminator: Generated<boolean>
-  active: Generated<boolean>
-  display_order: Generated<number>
+  egcs_tp_name_en: string
+  egcs_tp_name_fr: string
+  egcs_tp_kind: 'text' | 'number' | 'relational'
+  egcs_tp_multiple: Generated<boolean>
+  egcs_tp_presentation: Generated<'single_line' | 'multiline'>
+  egcs_tp_required: Generated<boolean>
+  egcs_tp_discriminator: Generated<boolean>
+  egcs_tp_active: Generated<boolean>
+  egcs_tp_displayorder: Generated<number>
   _deleted: Generated<boolean>
 }
 export interface TransferPaymentStreamFieldOptionTable {
   id: Generated<string>
-  field_id: string
-  name_en: string
-  name_fr: string
-  category_en: string | null
-  category_fr: string | null
-  active: Generated<boolean>
-  display_order: Generated<number>
+  egcs_tp_field: string
+  egcs_tp_name_en: string
+  egcs_tp_name_fr: string
+  egcs_tp_category_en: string | null
+  egcs_tp_category_fr: string | null
+  egcs_tp_active: Generated<boolean>
+  egcs_tp_displayorder: Generated<number>
   _deleted: Generated<boolean>
 }
 
 export interface WorkflowMemberConditionTable {
   id: Generated<string>
-  member_id: string
-  field_id: string
-  option_id: string
+  egcs_cn_workflowsetupmember: string
+  egcs_cn_field: string
+  egcs_cn_option: string
   _deleted: Generated<boolean>
 }
 export interface WorkflowPublicationConditionTable extends WorkflowMemberConditionTable {
-  version_id: string
+  egcs_cn_publicationversion: string
 }
 
 export interface AuditChangeEventTable extends AuditAttributionColumns {

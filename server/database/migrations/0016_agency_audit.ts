@@ -1,4 +1,5 @@
 import { sql, type Kysely } from 'kysely'
+import { AUDIT_TABLE_OWNERSHIP } from '../audit-ownership-registry'
 import { installAuditOwnershipFunctions } from '../audit-ownership-functions'
 import { installAuditOwnershipCapture, installAuditCaptureReconciliation } from '../audit-ownership-capture'
 import { installEnvironmentAuditRetention } from '../audit-retention'
@@ -65,7 +66,13 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
   await sql`CREATE INDEX user_role_assignment_audit_actor_active
     ON public.user_role_assignment ((user_id::text)) WHERE NOT _deleted`.execute(db)
   await installEnvironmentAuditRetention(db)
-  await installAuditOwnershipFunctions(db)
+  await installAuditOwnershipFunctions(db, {
+    ...AUDIT_TABLE_OWNERSHIP,
+    // These columns are renamed only by 0017; stopped/older schemas retain their original ownership paths.
+    'public.Transfer_Payment_Stream_Field_Option': { kind: 'parent', column: 'field_id', table: 'public.Transfer_Payment_Stream_Field', targetColumn: 'id' },
+    'public.Common_Workflow_Member_Condition': { kind: 'parent', column: 'member_id', table: 'public.Common_Workflow_Setup_Member', targetColumn: 'id' },
+    'public.Common_Workflow_Publication_Condition': { kind: 'parent', column: 'version_id', table: 'public.Common_Publication_Version', targetColumn: 'id' }
+  })
   await sql`CREATE FUNCTION audit.installed_extension_ownership() RETURNS jsonb
     LANGUAGE sql IMMUTABLE AS 'SELECT ''{}''::jsonb'`.execute(db)
   await installAuditOwnershipCapture(db)

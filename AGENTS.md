@@ -8,7 +8,8 @@ Before working in this repository:
 2. Read `tooling/gcs-ssc/AGENTS.md` completely and follow it for all repository work.
 3. For every added or changed form field (including fields introduced by merges/rebases), follow `tooling/gcs-ssc/architecture/required-fields.md`: keep validation, visible bilingual required indicators, and accessible control semantics consistent. Run `bun run forms:check` and resolve every uncovered or stale contract before considering the work complete.
 4. Extensions own all extension-authored translations and tests. Follow `tooling/gcs-ssc/architecture/extension-translations.md`; use package-local catalogs and the catalog-backed SDK translator. Never expose or consume host message lookup through the extension SDK.
-5. Author tests and architecture documentation in `tooling/gcs-ssc/tests/` and `tooling/gcs-ssc/architecture/`, commit them in the private repository first, and then update the host repository's pinned gitlink.
+5. Core business columns must use their owning `egcs_<namespace>_` prefix throughout migrations, database types, CRUD API payloads, validation paths, and UI models; only `id` and `_deleted` are standard column exceptions. Follow `tooling/gcs-ssc/architecture/database-naming.md`. Preserve deployed data with an ordered incremental migration when upgrading an existing schema; verify populated upgrades, dependent functions, audit ownership, affected routes, and browser flows.
+6. Author tests and architecture documentation in `tooling/gcs-ssc/tests/` and `tooling/gcs-ssc/architecture/`, commit them in the private repository first, and then update the host repository's pinned gitlink.
 
 The generated `tests/`, `architecture/`, and `.agents/skills/gcs-ssc` paths are local compatibility links and must never be committed to this repository. The `$gcs-ssc` skill remains explicit-only; this bootstrap does not invoke its stateful workflows automatically.
 

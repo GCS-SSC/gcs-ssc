@@ -37,7 +37,7 @@ export const streamCustomFieldRoute = async (event: H3Event, operation: 'read' |
         .where('id', '=', sectionId).where('egcs_tp_transferpaymentstream', '=', streamId).where('_deleted', '=', false).forUpdate().executeTakeFirst()
       if (!section) return await notFound(event, 'SECTION_NOT_FOUND', 'apiErrors.admin_common.not_found')
       if (operation === 'delete') {
-        const field = await trx.selectFrom('Transfer_Payment_Stream_Field').select('id').where('section_id', '=', sectionId).where('_deleted', '=', false).executeTakeFirst()
+        const field = await trx.selectFrom('Transfer_Payment_Stream_Field').select('id').where('egcs_tp_section', '=', sectionId).where('_deleted', '=', false).executeTakeFirst()
         if (field) return await throwApiError(event, { statusCode: 409, code: 'CUSTOM_FIELD_SECTION_IN_USE', key: 'apiErrors.custom_fields.section_in_use' })
         return await trx.updateTable('Transfer_Payment_Stream_Field_Section').set({ _deleted: true }).where('id', '=', sectionId).returningAll().executeTakeFirstOrThrow()
       }
@@ -47,7 +47,7 @@ export const streamCustomFieldRoute = async (event: H3Event, operation: 'read' |
     }
     if (resource === 'field' && operation === 'create') {
       const body = await readValidatedBodyI18n(event, StreamFieldCreateSchema)
-      const section = await trx.selectFrom('Transfer_Payment_Stream_Field_Section').select('id').where('id', '=', body.section_id).where('egcs_tp_transferpaymentstream', '=', streamId).where('_deleted', '=', false).executeTakeFirst()
+      const section = await trx.selectFrom('Transfer_Payment_Stream_Field_Section').select('id').where('id', '=', body.egcs_tp_section).where('egcs_tp_transferpaymentstream', '=', streamId).where('_deleted', '=', false).executeTakeFirst()
       if (!section) return await badRequest(event, 'INVALID_SECTION', 'apiErrors.request.invalid_resource')
       return await trx.insertInto('Transfer_Payment_Stream_Field').values({ ...body, egcs_tp_transferpaymentstream: streamId }).returningAll().executeTakeFirstOrThrow()
     }
@@ -56,14 +56,14 @@ export const streamCustomFieldRoute = async (event: H3Event, operation: 'read' |
           .where('id', '=', fieldId).where('egcs_tp_transferpaymentstream', '=', streamId).where('_deleted', '=', false).forUpdate().executeTakeFirst()
       : null
     if (!field) return await notFound(event, 'FIELD_NOT_FOUND', 'apiErrors.admin_common.not_found')
-    if (resource === 'option' && field.kind !== 'relational') return await badRequest(event, 'INVALID_FIELD_KIND', 'apiErrors.request.invalid_resource')
+    if (resource === 'option' && field.egcs_tp_kind !== 'relational') return await badRequest(event, 'INVALID_FIELD_KIND', 'apiErrors.request.invalid_resource')
     if (resource === 'option' && operation === 'create') {
       const body = await readValidatedBodyI18n(event, StreamFieldOptionCreateSchema)
-      return await trx.insertInto('Transfer_Payment_Stream_Field_Option').values({ ...body, field_id: field.id }).returningAll().executeTakeFirstOrThrow()
+      return await trx.insertInto('Transfer_Payment_Stream_Field_Option').values({ ...body, egcs_tp_field: field.id }).returningAll().executeTakeFirstOrThrow()
     }
     const option = resource === 'option' && optionId
       ? await trx.selectFrom('Transfer_Payment_Stream_Field_Option').selectAll()
-          .where('id', '=', optionId).where('field_id', '=', field.id).where('_deleted', '=', false).forUpdate().executeTakeFirst()
+          .where('id', '=', optionId).where('egcs_tp_field', '=', field.id).where('_deleted', '=', false).forUpdate().executeTakeFirst()
       : null
     if (resource === 'option' && !option) return await notFound(event, 'OPTION_NOT_FOUND', 'apiErrors.admin_common.not_found')
     if (operation === 'delete') {
@@ -92,20 +92,20 @@ export const streamCustomFieldRoute = async (event: H3Event, operation: 'read' |
     if (option) {
       const patch = await readValidatedBodyI18n(event, StreamFieldOptionPatchSchema)
       const merged = await parseI18n(event, StreamFieldOptionCreateSchema, { ...option, ...patch })
-      if (!merged.active && await customFieldHasWorkflowReferences(trx, field.id, { optionId: option.id, includeHistory: false })) {
+      if (!merged.egcs_tp_active && await customFieldHasWorkflowReferences(trx, field.id, { optionId: option.id, includeHistory: false })) {
         return await throwApiError(event, { statusCode: 409, code: 'CUSTOM_FIELD_IN_USE', key: 'apiErrors.custom_fields.in_use' })
       }
       return await trx.updateTable('Transfer_Payment_Stream_Field_Option').set(merged).where('id', '=', option.id).returningAll().executeTakeFirstOrThrow()
     }
     const patch = await readValidatedBodyI18n(event, StreamFieldPatchSchema)
-    if (patch.kind !== undefined && patch.kind !== field.kind) return await badRequest(event, 'CUSTOM_FIELD_KIND_IMMUTABLE', 'apiErrors.request.invalid_resource')
-    if (field.multiple && patch.multiple === false) {
+    if (patch.egcs_tp_kind !== undefined && patch.egcs_tp_kind !== field.egcs_tp_kind) return await badRequest(event, 'CUSTOM_FIELD_KIND_IMMUTABLE', 'apiErrors.request.invalid_resource')
+    if (field.egcs_tp_multiple && patch.egcs_tp_multiple === false) {
       return await badRequest(event, 'CUSTOM_FIELD_SELECTION_MODE_IRREVERSIBLE', 'apiErrors.custom_fields.multiple_to_single')
     }
     const merged = await parseI18n(event, StreamFieldCreateSchema, { ...field, ...patch })
-    const section = await trx.selectFrom('Transfer_Payment_Stream_Field_Section').select('id').where('id', '=', merged.section_id).where('egcs_tp_transferpaymentstream', '=', streamId).where('_deleted', '=', false).executeTakeFirst()
+    const section = await trx.selectFrom('Transfer_Payment_Stream_Field_Section').select('id').where('id', '=', merged.egcs_tp_section).where('egcs_tp_transferpaymentstream', '=', streamId).where('_deleted', '=', false).executeTakeFirst()
     if (!section) return await badRequest(event, 'INVALID_SECTION', 'apiErrors.request.invalid_resource')
-    if ((!merged.active || (field.discriminator && !merged.discriminator)) && await customFieldHasWorkflowReferences(trx, field.id, { includeHistory: false })) {
+    if ((!merged.egcs_tp_active || (field.egcs_tp_discriminator && !merged.egcs_tp_discriminator)) && await customFieldHasWorkflowReferences(trx, field.id, { includeHistory: false })) {
       return await throwApiError(event, { statusCode: 409, code: 'CUSTOM_FIELD_IN_USE', key: 'apiErrors.custom_fields.in_use' })
     }
     return await trx.updateTable('Transfer_Payment_Stream_Field').set(merged).where('id', '=', field.id).returningAll().executeTakeFirstOrThrow()

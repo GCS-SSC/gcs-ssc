@@ -20,6 +20,8 @@ import * as costCategoryAvailabilityMigration from './migrations/0015_cost_categ
 
 import * as agencyAuditMigration from './migrations/0016_agency_audit'
 
+import * as customFieldNamespacesMigration from './migrations/0017_custom_field_namespaces'
+
 export const productionCoreMigrations = {
   '0001_common': commonMigration,
   '0002_users': usersMigration,
@@ -36,7 +38,8 @@ export const productionCoreMigrations = {
   '0013_audit': auditMigration,
   '0014_program_terms_links': programTermsLinksMigration,
   '0015_cost_category_availability': costCategoryAvailabilityMigration,
-  '0016_agency_audit': agencyAuditMigration
+  '0016_agency_audit': agencyAuditMigration,
+  '0017_custom_field_namespaces': customFieldNamespacesMigration
 } satisfies Record<string, Migration>
 
 export const productionCoreMigrationProvider: MigrationProvider = {

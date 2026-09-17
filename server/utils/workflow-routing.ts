@@ -31,13 +31,13 @@ export const captureWorkflowRouting = async (
     for (const fieldId of referencedIds) {
       const field = fields.find(candidate => candidate.id === fieldId)
       const value = customFieldOptionIds(agreement.egcs_fc_customfields[fieldId])
-      if (!field || field.kind !== 'relational' || !value.length || value.some(optionId => !field.options.some(option => option.id === optionId))) {
+      if (!field || field.egcs_tp_kind !== 'relational' || !value.length || value.some(optionId => !field.options.some(option => option.id === optionId))) {
         throw new WorkflowRouteValidationError('Workflow discriminator value is missing or invalid')
       }
       values[fieldId] = value
       for (const optionId of value) {
         const option = field.options.find(candidate => candidate.id === optionId)!
-        capturedFields.push({ fieldId, name_en: field.name_en, name_fr: field.name_fr, optionId, option_en: option.name_en, option_fr: option.name_fr })
+        capturedFields.push({ fieldId, name_en: field.egcs_tp_name_en, name_fr: field.egcs_tp_name_fr, optionId, option_en: option.egcs_tp_name_en, option_fr: option.egcs_tp_name_fr })
       }
     }
   }

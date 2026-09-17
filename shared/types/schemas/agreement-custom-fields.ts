@@ -12,59 +12,59 @@ export const AgreementCustomFieldValuesSchema = z.record(
   z.union([z.string(), z.number({ error: 'validation.custom_field_number' }), z.array(PositivePostgresBigintIdSchema), z.null()], { error: 'validation.invalid_selection' })
 )
 export const StreamFieldSectionCreateSchema = z.object({
-  name_en: Label,
-  name_fr: Label,
-  display_order: DisplayOrder.default(0)
+  egcs_tp_name_en: Label,
+  egcs_tp_name_fr: Label,
+  egcs_tp_displayorder: DisplayOrder.default(0)
 })
 export const StreamFieldSectionPatchSchema = StreamFieldSectionCreateSchema.extend({
-  display_order: StreamFieldSectionCreateSchema.shape.display_order.removeDefault()
+  egcs_tp_displayorder: StreamFieldSectionCreateSchema.shape.egcs_tp_displayorder.removeDefault()
 }).partial()
 export type AgreementCustomFieldSection = z.infer<typeof StreamFieldSectionCreateSchema> & { id: string }
 export const StreamFieldBaseSchema = z.object({
-  section_id: PositivePostgresBigintIdSchema,
-  name_en: Label,
-  name_fr: Label,
-  kind: z.enum(['text', 'number', 'relational']),
-  multiple: z.boolean().default(false),
-  presentation: z.enum(['single_line', 'multiline']).default('single_line'),
-  required: z.boolean().default(false),
-  discriminator: z.boolean().default(false),
-  active: z.boolean().default(true),
-  display_order: DisplayOrder.default(0)
+  egcs_tp_section: PositivePostgresBigintIdSchema,
+  egcs_tp_name_en: Label,
+  egcs_tp_name_fr: Label,
+  egcs_tp_kind: z.enum(['text', 'number', 'relational']),
+  egcs_tp_multiple: z.boolean().default(false),
+  egcs_tp_presentation: z.enum(['single_line', 'multiline']).default('single_line'),
+  egcs_tp_required: z.boolean().default(false),
+  egcs_tp_discriminator: z.boolean().default(false),
+  egcs_tp_active: z.boolean().default(true),
+  egcs_tp_displayorder: DisplayOrder.default(0)
 })
 export const StreamFieldCreateSchema = StreamFieldBaseSchema.superRefine((value, ctx) => {
-  if (value.multiple && value.kind !== 'relational') {
-    ctx.addIssue({ code: 'custom', path: ['multiple'], message: 'validation.invalid_selection' })
+  if (value.egcs_tp_multiple && value.egcs_tp_kind !== 'relational') {
+    ctx.addIssue({ code: 'custom', path: ['egcs_tp_multiple'], message: 'validation.invalid_selection' })
   }
-  if ((value.discriminator && value.kind !== 'relational') || (value.kind !== 'text' && value.presentation !== 'single_line')) {
-    ctx.addIssue({ code: 'custom', path: ['kind'], message: 'validation.invalid_selection' })
+  if ((value.egcs_tp_discriminator && value.egcs_tp_kind !== 'relational') || (value.egcs_tp_kind !== 'text' && value.egcs_tp_presentation !== 'single_line')) {
+    ctx.addIssue({ code: 'custom', path: ['egcs_tp_kind'], message: 'validation.invalid_selection' })
   }
 })
 export const StreamFieldPatchSchema = StreamFieldBaseSchema.extend({
-  multiple: StreamFieldBaseSchema.shape.multiple.removeDefault(),
-  presentation: StreamFieldBaseSchema.shape.presentation.removeDefault(),
-  required: StreamFieldBaseSchema.shape.required.removeDefault(),
-  discriminator: StreamFieldBaseSchema.shape.discriminator.removeDefault(),
-  active: StreamFieldBaseSchema.shape.active.removeDefault(),
-  display_order: StreamFieldBaseSchema.shape.display_order.removeDefault()
+  egcs_tp_multiple: StreamFieldBaseSchema.shape.egcs_tp_multiple.removeDefault(),
+  egcs_tp_presentation: StreamFieldBaseSchema.shape.egcs_tp_presentation.removeDefault(),
+  egcs_tp_required: StreamFieldBaseSchema.shape.egcs_tp_required.removeDefault(),
+  egcs_tp_discriminator: StreamFieldBaseSchema.shape.egcs_tp_discriminator.removeDefault(),
+  egcs_tp_active: StreamFieldBaseSchema.shape.egcs_tp_active.removeDefault(),
+  egcs_tp_displayorder: StreamFieldBaseSchema.shape.egcs_tp_displayorder.removeDefault()
 }).partial()
 export const StreamFieldOptionBaseSchema = z.object({
-  name_en: Label,
-  name_fr: Label,
-  category_en: CategoryLabel.default(null),
-  category_fr: CategoryLabel.default(null),
-  active: z.boolean().default(true),
-  display_order: DisplayOrder.default(0)
+  egcs_tp_name_en: Label,
+  egcs_tp_name_fr: Label,
+  egcs_tp_category_en: CategoryLabel.default(null),
+  egcs_tp_category_fr: CategoryLabel.default(null),
+  egcs_tp_active: z.boolean().default(true),
+  egcs_tp_displayorder: DisplayOrder.default(0)
 })
 export const StreamFieldOptionCreateSchema = StreamFieldOptionBaseSchema.refine(
-  value => (value.category_en === null) === (value.category_fr === null),
-  { error: 'validation.required', path: ['category_fr'] }
+  value => (value.egcs_tp_category_en === null) === (value.egcs_tp_category_fr === null),
+  { error: 'validation.required', path: ['egcs_tp_category_fr'] }
 )
 export const StreamFieldOptionPatchSchema = StreamFieldOptionBaseSchema.extend({
-  category_en: StreamFieldOptionBaseSchema.shape.category_en.removeDefault(),
-  category_fr: StreamFieldOptionBaseSchema.shape.category_fr.removeDefault(),
-  active: StreamFieldOptionBaseSchema.shape.active.removeDefault(),
-  display_order: StreamFieldOptionBaseSchema.shape.display_order.removeDefault()
+  egcs_tp_category_en: StreamFieldOptionBaseSchema.shape.egcs_tp_category_en.removeDefault(),
+  egcs_tp_category_fr: StreamFieldOptionBaseSchema.shape.egcs_tp_category_fr.removeDefault(),
+  egcs_tp_active: StreamFieldOptionBaseSchema.shape.egcs_tp_active.removeDefault(),
+  egcs_tp_displayorder: StreamFieldOptionBaseSchema.shape.egcs_tp_displayorder.removeDefault()
 }).partial()
 export type AgreementCustomFieldValues = Record<string, string | number | string[]>
 
@@ -101,41 +101,41 @@ export const agreementCustomFieldMergeSchema = (
       continue
     }
     const blank = supplied === null || (typeof supplied === 'string' && supplied.trim() === '')
-      || (field.kind === 'relational' && Array.isArray(supplied) && supplied.length === 0)
+      || (field.egcs_tp_kind === 'relational' && Array.isArray(supplied) && supplied.length === 0)
     if (blank) {
       Reflect.deleteProperty(merged, id)
       continue
     }
-    const unchanged = field.kind === 'relational'
+    const unchanged = field.egcs_tp_kind === 'relational'
       ? JSON.stringify([...customFieldOptionIds(supplied)].sort()) === JSON.stringify([...customFieldOptionIds(current[id])].sort())
       : supplied === current[id]
-    if (!field.active && !unchanged) {
+    if (!field.egcs_tp_active && !unchanged) {
       issue(id, 'validation.custom_field_inactive')
       continue
     }
-    if (field.kind === 'text') {
+    if (field.egcs_tp_kind === 'text') {
       if (typeof supplied !== 'string') issue(id, 'validation.invalid_selection')
-      else if (field.presentation === 'single_line' && /[\r\n\u2028\u2029]/u.test(supplied)) issue(id, 'validation.custom_field_single_line')
+      else if (field.egcs_tp_presentation === 'single_line' && /[\r\n\u2028\u2029]/u.test(supplied)) issue(id, 'validation.custom_field_single_line')
       else merged[id] = supplied
-    } else if (field.kind === 'number') {
+    } else if (field.egcs_tp_kind === 'number') {
       if (typeof supplied !== 'number' || !Number.isFinite(supplied)) issue(id, 'validation.custom_field_number')
       else merged[id] = supplied
     } else {
       const parsed = z.array(PositivePostgresBigintIdSchema).safeParse(Array.isArray(supplied) ? supplied : [supplied])
-      if (parsed.success && !field.multiple && parsed.data.length > 1) {
+      if (parsed.success && !field.egcs_tp_multiple && parsed.data.length > 1) {
         issue(id, 'validation.custom_field_single_selection')
         continue
       }
       const previous = customFieldOptionIds(current[id])
       if (!parsed.success || new Set(parsed.data).size !== parsed.data.length || parsed.data.some(optionId => {
         const option = field.options.find(item => item.id === optionId)
-        return !option || (!option.active && !previous.includes(optionId))
+        return !option || (!option.egcs_tp_active && !previous.includes(optionId))
       })) issue(id, 'validation.invalid_selection')
       else merged[id] = parsed.data
     }
   }
   for (const field of definitions) {
-    if (field.active && field.required && !customFieldHasValue(merged[field.id])) issue(field.id, 'validation.required')
+    if (field.egcs_tp_active && field.egcs_tp_required && !customFieldHasValue(merged[field.id])) issue(field.id, 'validation.required')
   }
   return merged
 })
