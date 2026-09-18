@@ -2,9 +2,9 @@
 import { z } from 'zod'
 import { HelpSchema } from '../help'
 
-export const CHECKLIST_ANSWERS = ['pass', 'fail'] as const
+export const CHECKLIST_ANSWERS = ['pass', 'fail', 'not_applicable'] as const
 export const CHECKLIST_RESULTS = ['pass', 'pass_with_considerations', 'fail'] as const
-export const CHECKLIST_COMMENT_POLICIES = ['optional', 'required', 'required_on_fail'] as const
+export const CHECKLIST_COMMENT_POLICIES = ['optional', 'required', 'required_on_fail', 'required_on_not_applicable', 'required_on_fail_or_not_applicable'] as const
 export const CHECKLIST_RESULT_GROUP_MODES = ['any', 'all', 'at_least_count', 'at_least_rate'] as const
 
 const RequiredTextSchema = z.string().trim().min(1, { error: 'validation.required' })
@@ -36,13 +36,16 @@ const ChecklistOptionSchema = z.object({
 })
 
 const ChecklistOptionsSchema = z.array(ChecklistOptionSchema)
-  .length(CHECKLIST_ANSWERS.length)
-  .default(DEFAULT_CHECKLIST_OPTIONS.map(option => ({
+  .min(2).max(3)
+  .default(() => DEFAULT_CHECKLIST_OPTIONS.map(option => ({
     value: option.value,
     description: { ...option.description }
   })))
   .superRefine((options, ctx) => {
-    CHECKLIST_ANSWERS.forEach(answer => {
+    if (new Set(options.map(option => option.value)).size !== options.length) {
+      ctx.addIssue({ code: 'custom', message: 'validation.checklist_duplicate_key' })
+    }
+    (['pass', 'fail'] as const).forEach(answer => {
       if (!options.some(option => option.value === answer)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -60,6 +63,10 @@ export const ChecklistQuestionSchema = z.object({
   options: ChecklistOptionsSchema,
   required: z.boolean(),
   commentPolicy: z.enum(CHECKLIST_COMMENT_POLICIES)
+}).refine(question => question.options.some(option => option.value === 'not_applicable')
+  || !['required_on_not_applicable', 'required_on_fail_or_not_applicable'].includes(question.commentPolicy), {
+  error: 'validation.checklist_na_policy_requires_option',
+  path: ['commentPolicy']
 })
 
 export const ChecklistSubSectionSchema = z.object({

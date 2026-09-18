@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { isChecklistCommentRequired } from '~~/shared/utils/checklist-evaluation'
 import { computed } from 'vue'
 import type { ChecklistAnswerValue } from '~/composables/useChecklistDetailPage'
 import { DEFAULT_CHECKLIST_OPTIONS } from '~~/shared/types/schemas/checklist/checklist'
@@ -42,8 +43,7 @@ const helpItems = computed(() => question.help.map((helpItem, helpIndex) => ({
   content: getBilingualValue({ content_en: helpItem.description.en, content_fr: helpItem.description.fr }, 'content'),
   value: `${question.key}-help-${helpIndex}`
 })))
-const commentRequired = computed(() => question.commentPolicy === 'required'
-  || (question.commentPolicy === 'required_on_fail' && modelValue === 'fail'))
+const commentRequired = computed(() => isChecklistCommentRequired(question.commentPolicy, modelValue))
 const options = computed(() => question.options.map(option => ({
   label: t(`checklist.answer.${option.value}`),
   description: getBilingualValue({
@@ -53,7 +53,7 @@ const options = computed(() => question.options.map(option => ({
   value: option.value
 })))
 const handleAnswer = (value: string | null) => {
-  emit('update:modelValue', value === 'pass' || value === 'fail' ? value : null)
+  emit('update:modelValue', value === 'pass' || value === 'fail' || value === 'not_applicable' ? value : null)
 }
 </script>
 
@@ -61,12 +61,12 @@ const handleAnswer = (value: string | null) => {
   <ReviewRuntimeQuestionCard
     :question-label="questionLabel"
     :question-number="number"
-    :question-required="question.required"
+    :question-required="question.required && !disabled"
     :options="options"
     :help-items="helpItems"
     :model-value="modelValue"
     :comment-value="commentValue"
-    :comment-required="commentRequired"
+    :comment-required="commentRequired && !disabled && modelValue !== null"
     :comment-label="t('admin_common.fields.egcs_cn_comments')"
     :comment-placeholder="t('checklist.comment_placeholder')"
     :test-id="`checklist-question:${question.key}`"

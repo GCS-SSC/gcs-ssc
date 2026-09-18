@@ -35,6 +35,9 @@ const isOpen: Ref<boolean> = ref(false)
       @click="isOpen = true" />
 
     <template #body>
+      <p class="text-sm">
+        {{ t('checklist.result_policy.na_help') }}
+      </p>
       <section class="space-y-2 border-l-2 border-success pl-4">
         <h3 class="font-semibold text-zinc-900 dark:text-white">
           {{ t('checklist.result_policy.default_pass_title') }}

@@ -1879,7 +1879,9 @@
     "workflow_execution_failure_status_required": "Select the parent status used when workflow execution fails",
     "workflow_member_sequence_positive": "Workflow member sequence must be positive",
     "workflow_member_owner_reference": "Select exactly one nested review or recommendation member",
-    "workflow_member_owner_duplicate": "Each nested workflow member can have only one owner mapping"
+    "workflow_member_owner_duplicate": "Each nested workflow member can have only one owner mapping",
+    "checklist_na_policy_requires_option": "Enable N/A before requiring an N/A explanation.",
+    "checklist_answer_not_allowed": "This answer is not offered by the pinned question."
   },
   "agreement": {
     "number_generated": "Assigned on creation",
@@ -2808,7 +2810,7 @@
     "results": "Results",
     "why_result": "Why this result?",
     "explain": "Explain",
-    "section_answer_summary": "{passed} passed, {failed} failed",
+    "section_answer_summary": "{passed} passed, {failed} failed · {notApplicable} N/A",
     "matched_rule_counts": "{matched} of {total} items matched",
     "evaluated_rule_tree": "How the result rules evaluated",
     "rule_matched": "Matched",
@@ -2823,7 +2825,8 @@
     "completion_description": "Finalize this review once all required checklist questions and reviewer follow-ups are complete.",
     "answer": {
       "pass": "Pass",
-      "fail": "Fail"
+      "fail": "Fail",
+      "not_applicable": "N/A"
     },
     "result": {
       "pass": "Pass",
@@ -2857,8 +2860,12 @@
       "runtime_shortcut_passed": "No question has failed, so the checklist currently passes under the any-failure override.",
       "runtime_group_matched": "Matched result group: {group}",
       "runtime_no_group_matched": "No configured result group matched, so the checklist currently passes.",
-      "triggering_questions": "Triggering questions"
-    }
+      "triggering_questions": "Triggering questions",
+      "na_help": "N/A counts as answered and follows the question’s comment policy. It is excluded from pass/fail percentages and all/percentage rule denominators. Groups with no applicable conditions never match. Count thresholds stay unchanged. An all-N/A checklist passes."
+    },
+    "na_summary": "{count} N/A answers excluded from calculations.",
+    "no_applicable_answers": "No applicable answers",
+    "excluded": "Excluded (N/A)"
   },
   "recommendation": {
     "characters_max": "{count} characters maximum",
@@ -3209,7 +3216,13 @@
     "operator": "Comparison",
     "threshold": "Threshold",
     "results": { "pass": "Pass", "pass_with_considerations": "Pass with considerations", "fail": "Fail" },
-    "comment_policies": { "optional": "Optional", "required": "Required", "required_on_fail": "Required on fail" },
+    "comment_policies": {
+      "optional": "Optional",
+      "required": "Required",
+      "required_on_fail": "Required on fail",
+      "required_on_not_applicable": "Required on N/A",
+      "required_on_fail_or_not_applicable": "Required on Fail or N/A"
+    },
     "metrics": { "pass_count": "Pass count", "fail_count": "Fail count", "pass_rate": "Pass rate (%)", "fail_rate": "Fail rate (%)" },
     "operators": { "eq": "Equals", "gt": "Greater than", "gte": "At least", "lt": "Less than", "lte": "At most" },
     "saved": "Checklist schema saved.",
@@ -3218,7 +3231,10 @@
     "retire_confirm_title": "Retire checklist schema?",
     "retire_confirm_description": "Retirement is permanent. Existing reviews can still use their pinned version, but this schema cannot be published or selected again.",
     "activate": "Activate",
-    "publish": "Publish changes"
+    "publish": "Publish changes",
+    "allow_na": "Allow N/A",
+    "na_description_en": "The requirement does not apply.",
+    "na_description_fr": "L’exigence ne s’applique pas."
   },
   "assessment": {
     "runtime_status": {

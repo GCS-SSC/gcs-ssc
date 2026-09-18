@@ -115,6 +115,7 @@ const sectionAnswerSummary = (section: ChecklistSection) => {
   const questions = getChecklistSectionQuestions(section)
   return {
     passed: questions.filter(question => responseByKey.value.get(question.key)?.answer === 'pass').length,
+    notApplicable: questions.filter(question => responseByKey.value.get(question.key)?.answer === 'not_applicable').length,
     failed: questions.filter(question => responseByKey.value.get(question.key)?.answer === 'fail').length
   }
 }
@@ -300,6 +301,12 @@ const handleApprovalChanged = async () => {
                         {{ t('checklist.results') }}: {{ t(`checklist.result.${result}`) }}
                       </p>
                     </div>
+                    <p v-if="evaluationTrace" class="text-sm">
+                      {{ t('checklist.na_summary', { count: evaluationTrace.overall.notApplicable ?? 0 }) }}
+                    </p>
+                    <p v-if="evaluationTrace && evaluationTrace.overall.pass + evaluationTrace.overall.fail === 0" class="text-sm">
+                      {{ t('checklist.no_applicable_answers') }}
+                    </p>
                     <UModal
                       v-model:open="isResultExplanationOpen"
                       :title="t('checklist.why_result')"
@@ -316,6 +323,7 @@ const handleApprovalChanged = async () => {
                         <div class="space-y-2">
                           <UBadge :color="resultColor" variant="subtle">{{ t(`checklist.result.${result}`) }}</UBadge>
                           <p class="text-sm leading-6 text-zinc-700 dark:text-zinc-300">{{ resultExplanation }}</p>
+                          <p class="text-sm">{{ t('checklist.result_policy.na_help') }}</p>
                         </div>
                         <div
                           v-if="evaluationTrace?.groups.length && checklist?.checklistDefinition"

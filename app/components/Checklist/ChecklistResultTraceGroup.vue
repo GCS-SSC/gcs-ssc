@@ -63,7 +63,7 @@ const resultColor = computed(() => group.result === 'fail'
       </div>
       <div class="flex flex-wrap items-center gap-2">
         <UBadge :color="group.matched ? 'primary' : 'neutral'" variant="subtle">
-          {{ t(group.matched ? 'checklist.rule_matched' : 'checklist.rule_not_matched') }}
+          {{ group.excluded ? t('checklist.excluded') : t(group.matched ? 'checklist.rule_matched' : 'checklist.rule_not_matched') }}
         </UBadge>
         <UBadge :color="resultColor" variant="outline">
           {{ t('checklist.rule_result', { result: t(`checklist.result.${group.result}`) }) }}
@@ -91,7 +91,7 @@ const resultColor = computed(() => group.result === 'fail'
             </span>
           </div>
           <span class="shrink-0 text-zinc-600 dark:text-zinc-300">
-            {{ child.actualAnswer ? t(`checklist.answer.${child.actualAnswer}`) : t('checklist.unanswered') }}
+            {{ child.actualAnswer === 'not_applicable' ? t('checklist.excluded') : child.actualAnswer ? t(`checklist.answer.${child.actualAnswer}`) : t('checklist.unanswered') }}
           </span>
         </div>
       </template>

@@ -71,7 +71,8 @@ const EXPECTED_CORE_MIGRATIONS = [
   '0018_agreement_proponent_type',
   '9999_seed',
   '9999_z_proponent_type_cleanup',
-  '9999_zz_workflow_profile_conditions'
+  '9999_zz_workflow_profile_conditions',
+  '9999_zzz_checklist_not_applicable'
 ] as const
 
 const EXPECTED_SEEDED_EXTENSION_KEYS = [
@@ -419,7 +420,7 @@ const waitForCoreMigrationResult = async (
   child: ChildProcessWithoutNullStreams,
   getOutput: () => string
 ): Promise<void> => {
-  const successMarker = 'migration "9999_zz_workflow_profile_conditions" was executed successfully'
+  const successMarker = 'migration "9999_zzz_checklist_not_applicable" was executed successfully'
   const deadline = Date.now() + 30_000
 
   while (Date.now() < deadline) {

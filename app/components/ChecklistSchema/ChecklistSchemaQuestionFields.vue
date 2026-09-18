@@ -6,7 +6,27 @@ import { CHECKLIST_COMMENT_POLICIES } from '~~/shared/types/schemas/checklist/ch
 const question = defineModel<ChecklistEditorQuestion>('question', { required: true })
 
 const { t } = useI18n()
-const commentPolicyOptions = computed(() => CHECKLIST_COMMENT_POLICIES.map(value => ({
+const allowsNotApplicable = computed(() => question.value.options.some(option => option.value === 'not_applicable'))
+/**
+ * Updates the offered answers and removes comment requirements for unavailable answers.
+ * @param enabled Whether the question offers N/A.
+ */
+const setAllowsNotApplicable = (enabled: boolean | 'indeterminate') => {
+  if (enabled === true && !allowsNotApplicable.value) {
+    question.value.options.push({
+      value: 'not_applicable',
+      description: {
+        en: t('checklist_schema.na_description_en'),
+        fr: t('checklist_schema.na_description_fr')
+      }
+    })
+  } else if (enabled !== true) {
+    question.value.options = question.value.options.filter(option => option.value !== 'not_applicable')
+    if (question.value.commentPolicy === 'required_on_not_applicable') question.value.commentPolicy = 'optional'
+    if (question.value.commentPolicy === 'required_on_fail_or_not_applicable') question.value.commentPolicy = 'required_on_fail'
+  }
+}
+const commentPolicyOptions = computed(() => CHECKLIST_COMMENT_POLICIES.filter(value => allowsNotApplicable.value || !value.includes('not_applicable')).map(value => ({
   label: t(`checklist_schema.comment_policies.${value}`),
   value
 })))
@@ -34,6 +54,7 @@ const commentPolicyOptions = computed(() => CHECKLIST_COMMENT_POLICIES.map(value
           </UFormField>
         </div>
 
+        <UCheckbox :model-value="allowsNotApplicable" :label="t('checklist_schema.allow_na')" @update:model-value="setAllowsNotApplicable" />
         <UCheckbox v-model="question.required" :label="t('checklist_schema.required_question')" />
       </div>
     </AssessmentSchemaAccordionSection>

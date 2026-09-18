@@ -61,6 +61,7 @@ const createChecklistMutationSchema = (definition: ChecklistDefinition, enforceC
       const messageByType = {
         missing_required_answer: 'validation.checklist_answer_required',
         missing_required_comment: 'validation.checklist_comment_required',
+        answer_not_allowed: 'validation.checklist_answer_not_allowed',
         unknown_question: 'validation.checklist_unknown_question'
       } as const
       const responseIndex = value.responses.findIndex(response => response.questionKey === issue.questionKey)

@@ -1879,7 +1879,9 @@
     "workflow_execution_failure_status_required": "Sélectionnez l’état parent utilisé lors d’un échec d’exécution",
     "workflow_member_sequence_positive": "La séquence du membre doit être positive",
     "workflow_member_owner_reference": "Sélectionnez exactement un membre de revue ou de recommandation imbriqué",
-    "workflow_member_owner_duplicate": "Chaque membre de flux imbriqué ne peut avoir qu’une seule association de propriétaire"
+    "workflow_member_owner_duplicate": "Chaque membre de flux imbriqué ne peut avoir qu’une seule association de propriétaire",
+    "checklist_na_policy_requires_option": "Autorisez S. O. avant d’exiger une explication pour S. O.",
+    "checklist_answer_not_allowed": "Cette réponse n’est pas offerte par la question de la version publiée utilisée."
   },
   "agreement": {
     "number_generated": "Attribué à la création",
@@ -2808,7 +2810,7 @@
     "results": "Résultats",
     "why_result": "Pourquoi ce résultat?",
     "explain": "Expliquer",
-    "section_answer_summary": "{passed} réussies, {failed} échouées",
+    "section_answer_summary": "{passed} réussies, {failed} échouées · {notApplicable} S. O.",
     "matched_rule_counts": "{matched} éléments correspondants sur {total}",
     "evaluated_rule_tree": "Évaluation des règles de résultat",
     "rule_matched": "Correspondance",
@@ -2823,7 +2825,8 @@
     "completion_description": "Finalisez cet examen une fois que toutes les questions obligatoires et les suivis des examinateurs sont terminés.",
     "answer": {
       "pass": "Réussite",
-      "fail": "Échec"
+      "fail": "Échec",
+      "not_applicable": "S. O."
     },
     "result": {
       "pass": "Réussite",
@@ -2857,8 +2860,12 @@
       "runtime_shortcut_passed": "Aucune question n’a échoué; la liste réussit actuellement selon le remplacement pour tout échec.",
       "runtime_group_matched": "Groupe de résultats correspondant : {group}",
       "runtime_no_group_matched": "Aucun groupe de résultats configuré ne correspond; la liste réussit donc actuellement.",
-      "triggering_questions": "Questions déterminantes"
-    }
+      "triggering_questions": "Questions déterminantes",
+      "na_help": "S. O. compte comme une réponse et respecte la politique de commentaire de la question. Ces réponses sont exclues des pourcentages de réussite et d’échec et des dénominateurs des règles « toutes » et de pourcentage. Les groupes sans condition applicable ne correspondent jamais. Les seuils de nombre restent inchangés. Une liste entièrement S. O. réussit."
+    },
+    "na_summary": "{count} réponses S. O. exclues des calculs.",
+    "no_applicable_answers": "Aucune réponse applicable",
+    "excluded": "Exclu (S. O.)"
   },
   "recommendation": {
     "characters_max": "{count} caractères maximum",
@@ -3209,7 +3216,13 @@
     "operator": "Comparaison",
     "threshold": "Seuil",
     "results": { "pass": "Réussite", "pass_with_considerations": "Réussite avec considérations", "fail": "Échec" },
-    "comment_policies": { "optional": "Facultatif", "required": "Obligatoire", "required_on_fail": "Obligatoire en cas d'échec" },
+    "comment_policies": {
+      "optional": "Facultatif",
+      "required": "Obligatoire",
+      "required_on_fail": "Obligatoire en cas d'échec",
+      "required_on_not_applicable": "Obligatoire si S. O.",
+      "required_on_fail_or_not_applicable": "Obligatoire en cas d’échec ou si S. O."
+    },
     "metrics": { "pass_count": "Nombre de réussites", "fail_count": "Nombre d'échecs", "pass_rate": "Taux de réussite (%)", "fail_rate": "Taux d'échec (%)" },
     "operators": { "eq": "Égal à", "gt": "Supérieur à", "gte": "Au moins", "lt": "Inférieur à", "lte": "Au plus" },
     "saved": "Le schéma de la liste a été enregistré.",
@@ -3218,7 +3231,10 @@
     "retire_confirm_title": "Retirer le schéma de la liste?",
     "retire_confirm_description": "Le retrait est permanent. Les examens existants peuvent continuer d’utiliser leur version épinglée, mais ce schéma ne pourra plus être publié ni sélectionné.",
     "activate": "Activer",
-    "publish": "Publier les modifications"
+    "publish": "Publier les modifications",
+    "allow_na": "Autoriser S. O.",
+    "na_description_en": "The requirement does not apply.",
+    "na_description_fr": "L’exigence ne s’applique pas."
   },
   "assessment": {
     "runtime_status": {

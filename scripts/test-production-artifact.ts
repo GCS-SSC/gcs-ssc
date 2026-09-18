@@ -70,7 +70,8 @@ export const PRODUCTION_CORE_MIGRATIONS = [
   '0017_custom_field_namespaces',
   '0018_agreement_proponent_type',
   '9999_z_proponent_type_cleanup',
-  '9999_zz_workflow_profile_conditions'
+  '9999_zz_workflow_profile_conditions',
+  '9999_zzz_checklist_not_applicable'
 ] as const
 
 export const PROHIBITED_PRODUCTION_BUNDLE_VALUES = [
@@ -624,7 +625,7 @@ const waitForProductionMigrations = async (
   artifact: RunningArtifact,
   timeoutMs: number = DEFAULT_START_TIMEOUT_MS
 ): Promise<void> => {
-  const expectedLine = 'migration "9999_zz_workflow_profile_conditions" was executed successfully'
+  const expectedLine = 'migration "9999_zzz_checklist_not_applicable" was executed successfully'
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     const output = artifact.output()
@@ -657,7 +658,7 @@ const waitForDatabaseUrlPrecedence = async (
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     const output = artifact.output()
-    if (output.includes('migration "9999_zz_workflow_profile_conditions" was executed successfully')) {
+    if (output.includes('migration "9999_zzz_checklist_not_applicable" was executed successfully')) {
       throw new Error(`PGLite unexpectedly won precedence over runtime DATABASE_URL.\n${output}`)
     }
     if (output.includes('failed to migrate')) {

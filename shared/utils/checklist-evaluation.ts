@@ -9,6 +9,7 @@ import type {
   ChecklistResultPolicyItem
 } from '../types/schemas/checklist/checklist'
 import {
+  DEFAULT_CHECKLIST_OPTIONS,
   ChecklistDefinitionSchema,
   ChecklistResponsesSchema
 } from '../types/schemas/checklist/checklist'
@@ -18,6 +19,7 @@ export type ChecklistAggregateSummary = {
   answered: number
   pass: number
   fail: number
+  notApplicable?: number
   passRate: number
   failRate: number
 }
@@ -25,6 +27,7 @@ export type ChecklistAggregateSummary = {
 export type ChecklistQuestionFailureTrace = {
   kind: 'question_failed'
   questionKey: string
+  excluded?: boolean
   matched: boolean
   actualAnswer?: ChecklistAnswer
 }
@@ -34,6 +37,7 @@ export type ChecklistResultGroupTrace = {
   key: string
   mode: ChecklistResultGroupMode
   result: ChecklistResult
+  excluded?: boolean
   matched: boolean
   matchedItemCount: number
   totalItemCount: number
@@ -61,8 +65,15 @@ export type ChecklistEvaluation = {
 
 export type ChecklistResponseValidationIssue = {
   questionKey: string
-  type: 'missing_required_answer' | 'missing_required_comment' | 'unknown_question'
+  type: 'missing_required_answer' | 'missing_required_comment' | 'unknown_question' | 'answer_not_allowed'
 }
+
+export const isChecklistCommentRequired = (
+  policy: ChecklistDefinition['sections'][number]['questions'][number]['commentPolicy'],
+  answer: ChecklistAnswer | null
+) => policy === 'required'
+  || (answer === 'fail' && ['required_on_fail', 'required_on_fail_or_not_applicable'].includes(policy))
+  || (answer === 'not_applicable' && ['required_on_not_applicable', 'required_on_fail_or_not_applicable'].includes(policy))
 
 export const isChecklistQuestionResponseComplete = (
   question: ChecklistDefinition['sections'][number]['questions'][number],
@@ -72,8 +83,8 @@ export const isChecklistQuestionResponseComplete = (
     return false
   }
 
-  const commentRequired = question.commentPolicy === 'required'
-    || (question.commentPolicy === 'required_on_fail' && response.answer === 'fail')
+  if (!(question.options ?? DEFAULT_CHECKLIST_OPTIONS).some(option => option.value === response.answer)) return false
+  const commentRequired = isChecklistCommentRequired(question.commentPolicy, response.answer)
 
   return !commentRequired || String(response.comment ?? '').trim().length > 0
 }
@@ -119,32 +130,36 @@ const buildAggregate = (
   const pass = responses.filter(response => response.answer === 'pass').length
   const fail = responses.filter(response => response.answer === 'fail').length
   const answered = responses.length
+  const applicable = pass + fail
 
   return {
     total: questions.length,
     answered,
     pass,
     fail,
-    passRate: answered === 0 ? 0 : roundRate((pass / answered) * 100),
-    failRate: answered === 0 ? 0 : roundRate((fail / answered) * 100)
+    notApplicable: answered - applicable,
+    passRate: applicable === 0 ? 0 : roundRate((pass / applicable) * 100),
+    failRate: applicable === 0 ? 0 : roundRate((fail / applicable) * 100)
   }
 }
 
 const isGroupMatched = (
   group: ChecklistResultGroup,
-  matchedItemCount: number
+  matchedItemCount: number,
+  applicableItemCount: number
 ) => {
+  if (applicableItemCount === 0) return false
   if (group.mode === 'any') {
     return matchedItemCount > 0
   }
   if (group.mode === 'all') {
-    return matchedItemCount === group.items.length
+    return matchedItemCount === applicableItemCount
   }
   if (group.mode === 'at_least_count') {
     return group.threshold !== undefined && matchedItemCount >= group.threshold
   }
 
-  return group.threshold !== undefined && (matchedItemCount / group.items.length) * 100 >= group.threshold
+  return group.threshold !== undefined && (matchedItemCount / applicableItemCount) * 100 >= group.threshold
 }
 
 const uniqueQuestionKeys = (keys: string[]) => [...new Set(keys)]
@@ -160,6 +175,7 @@ const evaluatePolicyItem = (
         kind: item.kind,
         questionKey: item.questionKey,
         matched: actualAnswer === 'fail',
+        excluded: actualAnswer === 'not_applicable',
         ...(actualAnswer === undefined ? {} : { actualAnswer })
       },
       exposedResults: []
@@ -169,7 +185,8 @@ const evaluatePolicyItem = (
   const evaluatedChildren = item.items.map(child => evaluatePolicyItem(child, responsesByQuestionKey))
   const children = evaluatedChildren.map(child => child.trace)
   const matchedChildren = children.filter(child => child.matched)
-  const matched = isGroupMatched(item, matchedChildren.length)
+  const applicableChildren = children.filter(child => !child.excluded)
+  const matched = isGroupMatched(item, matchedChildren.length, applicableChildren.length)
   const triggeringQuestionKeys = matched
     ? uniqueQuestionKeys(matchedChildren.flatMap(child => (
         child.kind === 'question_failed' ? [child.questionKey] : child.triggeringQuestionKeys
@@ -190,7 +207,8 @@ const evaluatePolicyItem = (
       result: item.result,
       matched,
       matchedItemCount: matchedChildren.length,
-      totalItemCount: children.length,
+      totalItemCount: applicableChildren.length,
+      excluded: applicableChildren.length === 0,
       ...(item.threshold === undefined ? {} : { threshold: item.threshold }),
       children,
       exposedResults: exposedResults.map(exposed => exposed.result),
@@ -236,6 +254,10 @@ export const validateChecklistResponses = (
       return
     }
 
+    if (!(question.options ?? DEFAULT_CHECKLIST_OPTIONS).some(option => option.value === response.answer)) {
+      issues.push({ questionKey: question.key, type: 'answer_not_allowed' })
+      return
+    }
     if (!isChecklistQuestionResponseComplete(question, response)) {
       issues.push({ questionKey: question.key, type: 'missing_required_comment' })
     }
