@@ -1,5 +1,11 @@
 # Railway deployment
 
+For the shared public image built by GitHub Actions, follow
+[the container image runbook](container-images.md). Promoting its digest in
+`deployment/demo-image.json` switches the existing Railway IaC app to that image
+and lets AWS consume the same artifact. The source-build instructions below
+apply while the manifest's `image` is `null` or to legacy deployments.
+
 For a PostgreSQL deployment managed as code, use
 [`.railway/railway.ts`](../.railway/railway.ts) and follow the
 [IaC setup guide](../.railway/README.md). Existing projects must import their

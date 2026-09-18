@@ -2,7 +2,8 @@
 
 This configuration manages the existing **GCS Demo / demo** environment:
 
-- App: `gcs-ssc`, GitHub `GCS-SSC/gcs-ssc` branch `main`, canonical Dockerfile.
+- App: `gcs-ssc`, the shared GHCR digest in `deployment/demo-image.json` when
+  populated, otherwise GitHub `GCS-SSC/gcs-ssc` branch `main` and the canonical Dockerfile.
 - Database: existing `Postgres` service (PostgreSQL 18), referenced by `DATABASE_URL`.
 - Domain: https://gcs-ssc-demo.up.railway.app, retained by Railway on the existing service.
 - Volumes: existing `gcs-ssc-volume` at `/app/.data` and `postgres-volume`, each 5000 MB.
@@ -35,11 +36,18 @@ Do not run `config pull --force` or `config migrate --force` unless you intend
 to replace this file.
 
 `config apply` reconciles infrastructure and can trigger deployments. Source
-changes are deployed from GitHub `main`; `railway redeploy --service gcs-ssc`
+changes are deployed from GitHub `main` in source mode; image mode uses the
+pinned public GHCR digest and disables image auto-updates. Follow the
+[shared image runbook](../docs/container-images.md) to promote the same image to
+AWS and Railway without rebuilding. `railway redeploy --service gcs-ssc`
 redeploys the most recent deployment. Committing an IaC file alone does not run
 `config apply`; use the CLI after infrastructure changes.
 
 ## Reset the disposable demo, including attachments
+
+This helper supports **source mode only** and rejects a populated shared image
+manifest before making Railway calls. Follow the shared image runbook's reset
+section before attempting to reset a service that has switched to image mode.
 
 From the host repository, preview or execute the complete reset:
 

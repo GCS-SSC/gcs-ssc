@@ -1,0 +1,8 @@
+{
+  "app": "npx tsx src/app.ts",
+  "context": {
+    "@aws-cdk/aws-ecs:arnFormatIncludesClusterName": true,
+    "@aws-cdk/aws-rds:databaseProxyUniqueResourceName": true,
+    "@aws-cdk/aws-efs:denyAnonymousAccess": true
+  }
+}

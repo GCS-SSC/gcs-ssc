@@ -19,6 +19,9 @@ dist
 *.log
 .env
 .env.*
+**/.env
+**/.env.*
+.codex
 .gitignore
 README.md
 Dockerfile
@@ -27,3 +30,4 @@ tooling/gcs-ssc
 tests
 architecture
 .agents/skills/gcs-ssc
+infra

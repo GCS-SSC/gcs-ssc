@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { z } from 'zod'
+import { parseDemoImage } from '../deployment/demo-image'
 
 export const TARGET = {
   project: '8705eadd-788e-4efb-b070-f03b6a1cdc3d',
@@ -200,6 +201,10 @@ export const resetDemo = async (options: {
   sleep?: () => Promise<void>
   health?: () => Promise<unknown>
 }) => {
+  const releaseManifest = JSON.parse(await readFile(join(options.cwd, 'deployment/demo-image.json'), 'utf8'))
+  if (parseDemoImage(releaseManifest)) {
+    throw new Error('This reset deploys source Dockerfiles and cannot reset an image-based Railway service. Restore source mode and apply its Railway configuration before resetting.')
+  }
   const run = options.run ?? runCommand
   const sleep = options.sleep ?? (() => new Promise(resolve => setTimeout(resolve, 5000)))
   const health = options.health ?? (async () => {

@@ -19,6 +19,7 @@ export default withNuxt(
       'data/*',
       'tests/*',
       'server/database/migrations/*',
+      'infra/aws/cdk.out/**',
       'extensions/*/client/worker.js',
       // The frozen whole-review analyzers have their own hostile contract fixtures.
       '.agents/skills/gcs-ssc/scripts/whole-review/**'

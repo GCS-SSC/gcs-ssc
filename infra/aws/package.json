@@ -1,0 +1,21 @@
+{
+  "name": "gcs-ssc-aws",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "cdk": "cdk",
+    "synth": "cdk synth",
+    "test": "tsx --test ../../tooling/gcs-ssc/tests/aws/*.test.ts"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "2.270.0",
+    "constructs": "10.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "aws-cdk": "2.1142.0",
+    "tsx": "4.23.13",
+    "typescript": "5.9.3"
+  }
+}

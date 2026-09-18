@@ -3,6 +3,7 @@ FROM oven/bun:1.3.13 AS build
 WORKDIR /app
 
 ARG ENVIRONMENT_TYPE
+ARG AWS_RDS_CA_BUNDLE=false
 
 RUN case "$ENVIRONMENT_TYPE" in \
     demo|production) ;; \
@@ -56,6 +57,13 @@ ENV NODE_ENV=production
 ENV NITRO_PRESET=node-server
 
 RUN bun run build
+
+# ECS uses the same application image and an AWS-specific startup command.
+# Only AWS builds fetch the RDS trust bundle; Railway builds stay independent.
+RUN cp scripts/aws-start.mjs .output/server/aws-start.mjs \
+  && if [ "$AWS_RDS_CA_BUNDLE" = "true" ]; then \
+    bun -e 'const r = await fetch("https://truststore.pki.rds.amazonaws.com/ca-central-1/ca-central-1-bundle.pem"); if (!r.ok) throw new Error("RDS CA download failed"); const pem = await r.text(); if (!pem.includes("-----BEGIN CERTIFICATE-----")) throw new Error("Invalid RDS CA bundle"); await Bun.write(".output/rds-ca.pem", pem)'; \
+  fi
 
 RUN if [ "$ENVIRONMENT_TYPE" = "demo" ]; then \
     mkdir -p .output/server/demo-migrations .output/demo-assets \
