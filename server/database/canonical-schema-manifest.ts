@@ -1,6 +1,6 @@
 /* eslint-disable jsdoc/require-jsdoc -- Exported manifest types are self-describing data contracts. */
 import { citext } from '@electric-sql/pglite/contrib/citext'
-import { Kysely, sql } from 'kysely'
+import { Kysely, sql, type Migration } from 'kysely'
 import { KyselyPGlite } from 'kysely-pglite'
 import type { Database } from '../../shared/types/database'
 import { productionCoreMigrations } from './production-core-migrations'
@@ -501,7 +501,7 @@ export const createProductionCoreSchemaManifest = async (): Promise<CanonicalSch
   const pglite = await KyselyPGlite.create('memory://', { extensions: { citext } })
   const db = new Kysely<Database>({ dialect: pglite.dialect })
   try {
-    for (const migration of Object.values(productionCoreMigrations)) {
+    for (const migration of Object.values<Migration>(productionCoreMigrations)) {
       await migration.up(db)
     }
     await sql`SELECT audit.reconcile_capture()`.execute(db)

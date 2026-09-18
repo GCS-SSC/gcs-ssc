@@ -3,7 +3,7 @@ import { watch } from 'vue'
 import { useLoadRecoveryFocus } from '~/composables/useLoadRecoveryFocus'
 
 definePageMeta({
-  key: route => route.fullPath,
+  key: route => route.path,
   i18n: {
     paths: {
       en: '/transfer-payments/[id]/streams/[streamId]',

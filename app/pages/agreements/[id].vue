@@ -24,7 +24,7 @@ import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 import { useAgreementSimilarityConfirmation } from '~/composables/useAgreementSimilarityConfirmation'
 
 definePageMeta({
-  key: route => route.fullPath,
+  key: route => route.path,
   i18n: {
     paths: {
       en: '/agreements/[id]',

@@ -15,7 +15,7 @@ import type {
 } from '~~/shared/types/funding-case-agreement-ui'
 
 definePageMeta({
-  key: route => route.fullPath,
+  key: route => route.path,
   i18n: {
     paths: {
       en: '/agreements/[id]/amendments/[amendmentId]',

@@ -6,7 +6,7 @@ import type { Ref } from 'vue'
 import type { TransferPaymentProfileForm } from '~~/shared/types/transfer-payment-ui'
 
 definePageMeta({
-  key: route => route.fullPath,
+  key: route => route.path,
   i18n: {
     paths: {
       en: '/transfer-payments/[id]',

@@ -17,7 +17,7 @@ import type {
 import { formatMoneyText, parseMoney, sumMoney, type Money } from '~~/shared/utils/money'
 
 definePageMeta({
-  key: route => route.fullPath,
+  key: route => `${route.path}?version=${String(route.query.version ?? '0')}`,
   i18n: {
     paths: {
       en: '/agreements/[id]/forecasts/[forecastId]',

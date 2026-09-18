@@ -283,6 +283,8 @@ export const useUrlTabState = ({
     })
   }
 
+  let pendingNavigation: { signature: string } | null = null
+
   /**
    * Writes the normalized tab value back to the URL query.
    *
@@ -298,7 +300,7 @@ export const useUrlTabState = ({
     }
 
     const currentTab = resolveQueryParamValue(route.query[queryKey])
-    if (currentTab === nextTab) {
+    if (currentTab === nextTab && !pendingNavigation) {
       return
     }
 
@@ -307,12 +309,21 @@ export const useUrlTabState = ({
       [queryKey]: nextTab
     }
 
-    if (historyMode === 'push') {
-      await router.push({ query: nextQuery })
-      return
-    }
+    const target = { path: route.path, query: nextQuery, hash: route.hash }
+    const signature = JSON.stringify(target)
+    if (pendingNavigation?.signature === signature) return
 
-    await router.replace({ query: nextQuery })
+    const navigation = { signature }
+    pendingNavigation = navigation
+    try {
+      if (historyMode === 'push') {
+        await router.push(target)
+      } else {
+        await router.replace(target)
+      }
+    } finally {
+      if (pendingNavigation === navigation) pendingNavigation = null
+    }
   }
 
   watch(

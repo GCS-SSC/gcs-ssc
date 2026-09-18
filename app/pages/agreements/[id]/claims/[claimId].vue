@@ -65,7 +65,7 @@ type ReconciliationEditorDetail = {
 const fetchReconciliationEditorDetail = $fetch as unknown as (url: string) => Promise<ReconciliationEditorDetail>
 
 definePageMeta({
-  key: route => route.fullPath,
+  key: route => route.path,
   i18n: {
     paths: {
       en: '/agreements/[id]/claims/[claimId]',

@@ -19,7 +19,7 @@ import { formatAccountingDimension, getAccountingDimensionSearchValues } from '~
 import { formatMoneyText, sumMoney, type Money } from '~~/shared/utils/money'
 
 definePageMeta({
-  key: route => route.fullPath,
+  key: route => route.path,
   i18n: {
     paths: {
       en: '/agreements/[id]/payments/[paymentId]',

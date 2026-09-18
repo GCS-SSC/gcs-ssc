@@ -12,7 +12,7 @@ import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import CommonCompletionWorkflowPreAction from '~/components/Common/Completions/WorkflowPreAction.vue'
 
-definePageMeta({ key: route => route.fullPath, i18n: { paths: { en: '/agreements/[id]/closeouts/[closeoutId]', fr: '/ententes/[id]/clotures/[closeoutId]' } } })
+definePageMeta({ key: route => route.path, i18n: { paths: { en: '/agreements/[id]/closeouts/[closeoutId]', fr: '/ententes/[id]/clotures/[closeoutId]' } } })
 
 type CloseoutDetail = Selectable<FundingCaseAgreementCloseoutTable> & BusinessRecordStateFields & {
   snapshots: Selectable<FundingCaseAgreementCloseoutSnapshotTable>[]
