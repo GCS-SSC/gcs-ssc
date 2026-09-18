@@ -80,7 +80,7 @@ used for the fixed calculations are
 
 ## Prerequisites
 
-1. Node.js 24, npm, and AWS CLI v2.
+1. Bun 1.3.13, Node.js (for the CDK CLI), and AWS CLI v2.
 2. An authenticated AWS profile with CDK bootstrap/deployment permissions,
    including CloudFormation, IAM, CloudFront VPC origins and service-linked roles,
    ECS, RDS, EFS, S3, Secrets Manager, EC2 networking, ECR, logs, and Budgets.
@@ -94,10 +94,10 @@ From the repository root:
 ```bash
 git submodule update --init --recursive
 cd infra/aws
-npm ci
-npm run typecheck
-npm test
-npm run synth -- --quiet
+bun install --frozen-lockfile
+bun run typecheck
+bun run test
+bun run synth --quiet
 ```
 
 Synthesis and the focused tests need no AWS credentials or Docker daemon.
@@ -105,16 +105,30 @@ GitHub builds the application image; deployment does not require local Docker.
 
 ## Deploy
 
-```bash
-export AWS_PROFILE=your-profile
-export AWS_REGION=ca-central-1
-aws sts get-caller-identity
+From `infra/aws`, copy `.env.example` to `.env` once and set `AWS_PROFILE`
+and optionally `AWS_BUDGET_EMAIL` / `AWS_MONTHLY_BUDGET_USD`. Bun loads this
+file for every command below, including the AWS CLI and CDK subprocesses.
+Shell environment values take precedence. `.env` is gitignored; the committed
+example contains no credentials. Prefer an AWS SSO profile over static keys.
+The application region remains fixed to `ca-central-1`.
 
-# Replace YOUR_ACCOUNT_ID with the account reported above.
-npm run cdk -- bootstrap aws://YOUR_ACCOUNT_ID/ca-central-1
-npm run cdk -- diff GcsSscDemo -c budgetEmail=you@example.com
-npm run cdk -- deploy GcsSscDemo -c budgetEmail=you@example.com
+```bash
+cp -n .env.example .env
+# Edit .env with your profile and budget email.
+
+# For an SSO profile:
+bun run aws sso login
+bun run aws sts get-caller-identity
+
+# Uses the account resolved by the profile and the app's Canada Central region.
+bun run bootstrap
+bun run diff
+bun run deploy
 ```
+
+Explicit `-c budgetEmail=…` and `-c monthlyBudgetUsd=…` options override the
+env-file budget defaults. AWS generates the database password, authentication
+secret, and extension seed; do not put application secrets in this deployment file.
 
 Keep the same stack name for updates. Bootstrap creates supporting resources
 with their own lifecycle. CloudFront VPC origin provisioning can take several
@@ -129,7 +143,7 @@ After deployment:
 
 ```bash
 curl --fail https://YOUR_DISTRIBUTION.cloudfront.net/api/health
-aws logs tail YOUR_LOG_GROUP --since 10m --region ca-central-1
+bun run aws logs tail YOUR_LOG_GROUP --since 10m --region ca-central-1
 ```
 
 Open `/en` and `/fr`; sign in with the existing demo fixture accounts, open an
@@ -172,10 +186,10 @@ attachments still require their EFS files.
 
 ## Verification boundaries
 
-`npm test` in `infra/aws` runs infrastructure and startup-contract tests from
+`bun run test` in `infra/aws` runs infrastructure and startup-contract tests from
 `tooling/gcs-ssc/tests/aws/`. These tests check the synthesized access boundaries,
 published image consumption, persistent storage, retention, secret references, budget,
-and credential encoding. `npm run typecheck` checks the independent CDK package.
+and credential encoding. `bun run typecheck` checks the independent CDK package.
 Synthesis validates the CloudFormation dependency graph; it does not prove live
 AWS resource availability, Docker build success, application startup on RDS, or
 browser behavior. Complete the post-deployment smoke checks above.

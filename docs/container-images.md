@@ -80,8 +80,8 @@ digest pin does not protect an image from registry deletion.
 
 ### AWS
 
-From `infra/aws`, run the usual `npm run cdk -- diff GcsSscDemo` and
-`npm run cdk -- deploy GcsSscDemo`, preserving any budget context values. CDK
+From `infra/aws`, run the usual `bun run cdk diff GcsSscDemo` and
+`bun run cdk deploy GcsSscDemo`, preserving any budget context values. CDK
 uses the manifest digest directly. No Docker daemon, ECR image publication,
 registry credentials, or GHCR token is required on the deploying machine or ECS.
 Before the first manifest promotion, supply
@@ -136,9 +136,9 @@ Do not use the old upload-based recovery command against an image-mode service.
 bash -n scripts/test-container-image.sh
 bun x vitest run tooling/gcs-ssc/tests/unit/shared-demo-image.test.ts tooling/gcs-ssc/tests/unit/railway-config.test.ts tooling/gcs-ssc/tests/unit/railway-demo-reset.test.ts
 cd infra/aws
-npm run typecheck
-npm test
-npm run synth -- --quiet
+bun run typecheck
+bun run test
+bun run synth --quiet
 ```
 
 With Docker available, build using the workflow's arguments and run

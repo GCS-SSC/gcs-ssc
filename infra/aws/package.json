@@ -6,7 +6,11 @@
     "typecheck": "tsc --noEmit",
     "cdk": "cdk",
     "synth": "cdk synth",
-    "test": "tsx --test ../../tooling/gcs-ssc/tests/aws/*.test.ts"
+    "test": "tsx --test ../../tooling/gcs-ssc/tests/aws/*.test.ts",
+    "aws": "aws",
+    "bootstrap": "cdk bootstrap",
+    "diff": "cdk diff GcsSscDemo",
+    "deploy": "cdk deploy GcsSscDemo"
   },
   "dependencies": {
     "aws-cdk-lib": "2.270.0",
@@ -17,5 +21,6 @@
     "aws-cdk": "2.1142.0",
     "tsx": "4.23.13",
     "typescript": "5.9.3"
-  }
+  },
+  "packageManager": "bun@1.3.13"
 }
