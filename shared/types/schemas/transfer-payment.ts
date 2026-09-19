@@ -1083,6 +1083,7 @@ const TransferPaymentReviewSetupBaseFields = {
   egcs_cn_description_en: RequiredString(),
   egcs_cn_description_fr: RequiredString(),
   egcs_cn_order: z.coerce.number({ error: 'validation.required' }).int(),
+  egcs_cn_directreview: z.boolean({ error: 'validation.required' }).default(false),
   egcs_cn_sequential: z.boolean({ error: 'validation.required' }),
   egcs_cn_approvaltemplate: RequiredId().optional()
 }
@@ -1108,6 +1109,7 @@ export const TransferPaymentStreamReviewSetupCreateSchema = TransferPaymentStrea
 export const TransferPaymentStreamReviewSetupPatchSchema = TransferPaymentStreamReviewSetupBaseSchema
   .partial()
   .extend({
+    egcs_cn_directreview: z.boolean({ error: 'validation.required' }).optional(),
     members: z.array(TransferPaymentStreamReviewSetupMemberSchema).optional(),
     _deleted: z.boolean().optional()
   })
@@ -1128,6 +1130,7 @@ const TransferPaymentAssessmentSetBaseSchema = z.object(TransferPaymentReviewSet
 export const TransferPaymentAssessmentSetSchema = TransferPaymentAssessmentSetBaseSchema
 export const TransferPaymentAssessmentSetCreateSchema = TransferPaymentAssessmentSetSchema
 export const TransferPaymentAssessmentSetPatchSchema = TransferPaymentAssessmentSetBaseSchema.partial().extend({
+  egcs_cn_directreview: z.boolean({ error: 'validation.required' }).optional(),
   _deleted: z.boolean().optional()
 })
 

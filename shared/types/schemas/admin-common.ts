@@ -383,9 +383,11 @@ export const CommonReviewSetSetupCreateSchema = z.object({
   egcs_cn_name_en: RequiredString('validation.name_en_required'),
   egcs_cn_name_fr: RequiredString('validation.name_fr_required'),
   egcs_cn_order: z.coerce.number({ error: 'validation.required' }).int(),
+  egcs_cn_directreview: z.boolean({ error: 'validation.required' }).default(false),
   egcs_cn_sequential: z.boolean({ error: 'validation.required' })
 })
 export const CommonReviewSetSetupPatchSchema = CommonReviewSetSetupCreateSchema.partial().extend({
+  egcs_cn_directreview: z.boolean({ error: 'validation.required' }).optional(),
   _deleted: z.boolean().optional()
 })
 

@@ -1,4 +1,5 @@
 import { sql } from 'kysely'
+import { assignedEntityIdsQuery } from '@gcs-ssc/authorization/server'
 import { PaginationSchema } from '~~/shared/types/schemas'
 import {
   CoreOrExtensionEntityTargetSchema,
@@ -8,6 +9,7 @@ import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import {
   assertDirectReviewRuntimeEntitySupported,
   authorizeReviewRuntimeAction,
+  canAuthorizeReviewRuntimeWorkOwnerRole,
   resolveReviewRuntimeEntityFromEntity,
   respondReviewRuntimeEntityNotFound
 } from '~~/server/utils/review-runtime-access'
@@ -21,7 +23,7 @@ const ReviewSetListQuerySchema = PaginationSchema.safeExtend(CoreOrExtensionEnti
   .superRefine(validateCoreOrExtensionEntityTarget)
 
 export default defineEventHandler(async event => {
-  await requireAuthContext(event)
+  const auth = await requireAuthContext(event)
   const db = event.context.$db
   const { entityType, entityId, page, limit, search } = await getValidatedQueryI18n(event, ReviewSetListQuerySchema)
   const unsupportedEntityResult = await assertDirectReviewRuntimeEntitySupported(event, entityType)
@@ -69,6 +71,7 @@ export default defineEventHandler(async event => {
         'Common_Review_Set.id as id',
         'Common_Review_Set.egcs_cn_reviewsetsetup as egcs_cn_reviewsetsetup',
         'Common_Runtime.id as runtimeId',
+        'Common_Runtime.egcs_cn_kind as runtimeKind',
         'Set_Item.id as runtimeItemId',
         'Set_Item.egcs_cn_state as runtimeState',
         'Common_Runtime.egcs_cn_attempt as attempt',
@@ -109,10 +112,19 @@ export default defineEventHandler(async event => {
           'Agency_Profile.egcs_ay_name_en as agency_name_en',
           'Agency_Profile.egcs_ay_name_fr as agency_name_fr'
         ])
+        .select(eb => eb('Common_Review.id', 'in', assignedEntityIdsQuery(db, auth.userId, 'commonreview')).as('is_assigned'))
         .where('Common_Review.egcs_cn_reviewset', 'in', reviewSetIds)
         .where('Common_Review._deleted', '=', false)
         .orderBy('Common_Review.id', 'asc')
         .execute()
+
+  const firstReview = reviews[0]
+  const canRetryReview = firstReview
+    ? await canAuthorizeReviewRuntimeWorkOwnerRole(event, 'clone_review', {
+        ...runtimeEntity,
+        reviewId: String(firstReview.id)
+      })
+    : false
 
   const reviewsBySetId = reviews.reduce<Map<string, typeof reviews>>((acc, review) => {
     const key = String(review.egcs_cn_reviewset)
@@ -138,6 +150,7 @@ export default defineEventHandler(async event => {
       return {
         id: String(set.id),
         runtimeId: String(set.runtimeId),
+        runtimeKind: set.runtimeKind,
         runtimeItemId: String(set.runtimeItemId),
         runtimeState: set.runtimeState,
         attempt: Number(set.attempt),
@@ -158,6 +171,7 @@ export default defineEventHandler(async event => {
             egcs_cn_reviewschema: String(review.egcs_cn_reviewschema),
             runtimeItemId: String(review.runtimeItemId),
             runtimeState: review.runtimeState,
+            can_retry: canRetryReview && review.is_assigned,
             egcs_cn_name_en: definition.name.en,
             egcs_cn_name_fr: definition.name.fr,
             egcs_cn_reviewtype: definition.reviewType

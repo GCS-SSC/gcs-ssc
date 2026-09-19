@@ -36,6 +36,8 @@ export type PublishedReviewSetupConfiguration = {
   description: { en: string, fr: string }
   order: number
   sequential: boolean
+  /** Missing only in immutable publications authored before direct-review eligibility. */
+  directReview?: boolean
   finalApproval?: PublishedPublicationReference
   members: PublishedReviewSetupMember[]
 }
@@ -153,6 +155,8 @@ export const buildReviewSetupPublication = async (
       description: { en: setup.egcs_cn_description_en, fr: setup.egcs_cn_description_fr },
       order: setup.egcs_cn_order,
       sequential: setup.egcs_cn_sequential,
+      // Historical seed migrations run before the column is introduced.
+      directReview: setup.egcs_cn_directreview ?? true,
       ...(finalApproval ? { finalApproval } : {}),
       members: publishedMembers
     },

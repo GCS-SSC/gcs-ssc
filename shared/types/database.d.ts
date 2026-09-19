@@ -1642,6 +1642,7 @@ export interface CommonReviewSetSetupTable {
   egcs_cn_description_fr: Generated<string>
   egcs_cn_order: number
   egcs_cn_sequential: boolean
+  egcs_cn_directreview: Generated<boolean>
   egcs_cn_approvaltemplate?: string
   _deleted: Generated<boolean>
 }

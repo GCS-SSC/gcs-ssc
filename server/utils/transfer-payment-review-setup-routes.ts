@@ -41,6 +41,7 @@ const reviewSetupPatchColumns = [
   'egcs_cn_description_fr',
   'egcs_cn_order',
   'egcs_cn_sequential',
+  'egcs_cn_directreview',
   'egcs_cn_approvaltemplate'
 ] as const
 
@@ -448,6 +449,7 @@ const mapReviewSetupPatchResponse = async (
     egcs_cn_name_en: updatedSet.egcs_cn_name_en,
     egcs_cn_name_fr: updatedSet.egcs_cn_name_fr,
     egcs_cn_order: updatedSet.egcs_cn_order,
+    egcs_cn_directreview: updatedSet.egcs_cn_directreview,
     egcs_cn_sequential: updatedSet.egcs_cn_sequential,
     egcs_cn_approvaltemplate: updatedSet.egcs_cn_approvaltemplate
       ? String(updatedSet.egcs_cn_approvaltemplate)

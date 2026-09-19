@@ -62,6 +62,7 @@ const { data: setup, error: loadError, status: loadStatus, refresh } = await use
 const detailContent = useTemplateRef<HTMLElement>('detailContent')
 const cloneSetup = (value: ReviewSetupDetail): ReviewSetupDetail => ({
   ...value,
+  egcs_cn_approvaltemplate: value.egcs_cn_approvaltemplate ?? undefined,
   members: Array.isArray(value.members) ? value.members.map(member => ({ ...member })) : []
 })
 const state: Ref<ReviewSetupDetail | null> = ref(setup.value ? cloneSetup(setup.value) : null)
@@ -109,6 +110,7 @@ const getDraft = () => state.value
       egcs_cn_description_fr: state.value.egcs_cn_description_fr,
       egcs_cn_entitytype: state.value.egcs_cn_entitytype,
       egcs_cn_order: state.value.egcs_cn_order,
+      egcs_cn_directreview: state.value.egcs_cn_directreview,
       egcs_cn_sequential: state.value.egcs_cn_sequential,
       egcs_cn_approvaltemplate: state.value.egcs_cn_approvaltemplate
     }
@@ -180,6 +182,7 @@ const persistSet = async (token: EditorMutationToken, showSuccess: boolean) => {
     egcs_cn_description_fr: state.value.egcs_cn_description_fr,
     egcs_cn_entitytype: state.value.egcs_cn_entitytype,
     egcs_cn_order: state.value.egcs_cn_order,
+    egcs_cn_directreview: state.value.egcs_cn_directreview,
     egcs_cn_sequential: state.value.egcs_cn_sequential,
     egcs_cn_approvaltemplate: state.value.egcs_cn_approvaltemplate
   }

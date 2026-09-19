@@ -108,6 +108,7 @@ export default defineEventHandler(async event => {
       egcs_cn_name_en: item.egcs_cn_name_en,
       egcs_cn_name_fr: item.egcs_cn_name_fr,
       egcs_cn_order: item.egcs_cn_order,
+      egcs_cn_directreview: item.egcs_cn_directreview,
       egcs_cn_sequential: item.egcs_cn_sequential,
       egcs_cn_approvaltemplate: item.egcs_cn_approvaltemplate ? String(item.egcs_cn_approvaltemplate) : undefined,
       _deleted: item._deleted,

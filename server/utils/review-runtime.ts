@@ -132,7 +132,7 @@ export const listEligibleRuntimeReviewSetSetupIds = async (
   const eligible: string[] = []
   for (const row of rows) {
     const definition = readPublishedReviewSetup(row.definition)
-    if (definition.entityType !== entityType
+    if (definition.directReview === false || definition.entityType !== entityType
       || !setupScopes.some(scope => scope.scopeType === definition.scopeType && scope.scopeId === definition.scopeId)) continue
     const members = await Promise.all(definition.members.map(member => readSchemaVersion(db, member, true)))
     if (members.length > 0 && members.every(member => member?.schemaDefinition.agencyId === ownerAgencyId
@@ -330,6 +330,9 @@ export const createRuntimeReviewSetInTransaction = async (input: CreateRuntimeRe
     Boolean(input.runtimeId)
   )
   if (!snapshot) return null
+  // Workflow materialization validates its runtime and pinned publication below.
+  // Direct starts cannot use workflow-only sets, even through a crafted API request.
+  if (!input.runtimeId && snapshot.publication.directReview === false) return null
   const existing = await input.db.selectFrom('Common_Review_Set')
     .innerJoin('Common_Runtime_Item', 'Common_Runtime_Item.id', 'Common_Review_Set.egcs_cn_runtimeitem')
     .select('Common_Review_Set.id').where('Common_Review_Set.egcs_cn_reviewsetsetup', '=', input.reviewSetSetupId)

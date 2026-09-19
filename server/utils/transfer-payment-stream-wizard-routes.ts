@@ -673,6 +673,7 @@ const insertStreamWizardReviewSetups = async (
         egcs_cn_description_en: setItem.egcs_cn_description_en,
         egcs_cn_description_fr: setItem.egcs_cn_description_fr,
         egcs_cn_order: setItem.egcs_cn_order,
+        egcs_cn_directreview: setItem.egcs_cn_directreview,
         egcs_cn_sequential: setItem.egcs_cn_sequential,
         egcs_cn_approvaltemplate: setItem.egcs_cn_approvaltemplate,
         _deleted: false

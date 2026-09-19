@@ -1,4 +1,13 @@
 {
+  "reviews": {
+    "direct_review": "Disponible pour un examen direct",
+    "direct_review_help": "Permettre aux utilisateurs d’ajouter cet ensemble depuis l’onglet Examens d’une entité. L’utilisation dans les flux de travail reste permise. Publiez les modifications pour appliquer ce paramètre.",
+    "title": "Examens",
+    "generated_set": "Ensemble généré no {id}",
+    "create_title": "Ajouter un ensemble d'examen",
+    "setup_placeholder": "Sélectionnez une configuration d'ensemble d'examen",
+    "clone_denied_review": "Réessayer l'examen"
+  },
   "review_schema_import": {
     "title": "Importer le schéma",
     "description": "Collez la définition du schéma en JSON pour remplacer le contenu de l’éditeur. Enregistrez vos modifications après l’importation.",

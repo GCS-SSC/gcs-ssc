@@ -106,6 +106,7 @@ const { isOpen, selected, openCreate, captureSession, closeSession } = useCrudMo
    * @returns Initial review-setup form state.
    */
   createState: () => ({
+    egcs_cn_directreview: false,
     egcs_cn_sequential: false,
     members: []
   }),

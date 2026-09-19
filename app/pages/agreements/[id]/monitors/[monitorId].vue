@@ -239,6 +239,7 @@ const monitorTabs = computed(() => [
     value: 'workflow',
     icon: 'i-lucide-circle-check-big'
   },
+  { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-clipboard-check' },
   {
     key: 'workflow.title',
     value: 'workflows',
@@ -706,6 +707,13 @@ const handleCompleted = async () => {
                 :refresh-key="approvalsRefreshKey"
                 @changed="handleCompleted" />
             </section>
+
+            <CommonReviewsTab
+              v-else-if="selectedMonitorTab === 'reviews'"
+              entity-type="fundingcasemonitor"
+              :entity-id="monitorId"
+              :can-update="canUpdateMonitor"
+              @changed="handleCompleted" />
 
             <CommonWorkflowSection
               v-else-if="selectedMonitorTab === 'workflows'"

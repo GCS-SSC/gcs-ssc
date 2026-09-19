@@ -105,6 +105,7 @@ const selectedTab: Ref<string> = ref('breakdown')
 const tabs = [
   { key: 'agreement.forecasts.breakdown_title', value: 'breakdown', icon: 'i-lucide-chart-no-axes-column-increasing' },
   { key: 'agreement.forecasts.completion.title', value: 'completion', icon: 'i-lucide-circle-check-big' },
+  { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-clipboard-check' },
   { key: 'workflow.title', value: 'workflows', icon: 'i-lucide-workflow' },
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
   { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users' }
@@ -752,6 +753,13 @@ const saveForecastBreakdown = async () => {
                 :refresh-key="approvalsRefreshKey"
                 @changed="refreshPage" />
             </section>
+
+            <CommonReviewsTab
+              v-else-if="selectedTab === 'reviews'"
+              entity-type="fundingcaseforecast"
+              :entity-id="forecastId"
+              :can-update="canUpdateForecast"
+              @changed="refreshPage" />
 
             <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcaseforecast" :entity-id="forecastId" purpose="standard" :can-edit="isAssigned" :refresh-key="approvalsRefreshKey" @changed="refreshPage" />
             <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcaseforecast" :entity-id="forecastId" />

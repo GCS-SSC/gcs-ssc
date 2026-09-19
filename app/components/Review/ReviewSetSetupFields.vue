@@ -96,6 +96,14 @@ const approvalTemplateValue = computed(() => {
     @update:model-value="value => (state.egcs_cn_approvaltemplate = value)" />
 
   <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+    <UFormField
+      :label="t('reviews.direct_review')"
+      :description="t('reviews.direct_review_help')"
+      name="egcs_cn_directreview">
+      <USwitch
+        :model-value="Boolean(state.egcs_cn_directreview)"
+        @update:model-value="value => (state.egcs_cn_directreview = value)" />
+    </UFormField>
     <UFormField :label="t('transfer_payment.sequential')" name="egcs_cn_sequential">
       <USwitch
         :model-value="Boolean(state.egcs_cn_sequential)"

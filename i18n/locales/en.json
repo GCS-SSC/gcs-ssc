@@ -1,4 +1,13 @@
 {
+  "reviews": {
+    "direct_review": "Available for direct review",
+    "direct_review_help": "Allow users to add this review set from an entity’s Reviews tab. Workflow use is always allowed. Publish changes to apply this setting.",
+    "title": "Reviews",
+    "generated_set": "Generated Set {id}",
+    "create_title": "Add Review Set",
+    "setup_placeholder": "Select a review set setup",
+    "clone_denied_review": "Retry review"
+  },
   "review_schema_import": {
     "title": "Import Schema",
     "description": "Paste the schema definition JSON to replace the current editor contents. Save your changes after importing.",

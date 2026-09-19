@@ -74,6 +74,7 @@ const breadcrumbs = computed(() => [
 ])
 const tabs = [
   { key: 'agreement.closeout.workflow', value: 'workflow', icon: 'i-lucide-git-pull-request-arrow' },
+  { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-clipboard-check' },
   { key: 'workflow.title', value: 'workflows', icon: 'i-lucide-workflow' },
   { key: 'agreement.documents.title', value: 'documents', icon: 'i-lucide-files' },
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
@@ -147,6 +148,13 @@ const tabs = [
               </template>
             </CommonCompletionWorkflowPreAction>
           </section>
+
+          <CommonReviewsTab
+            v-else-if="selectedTab === 'reviews'"
+            entity-type="fundingcaseagreementcloseout"
+            :entity-id="closeoutId"
+            :can-update="isAssigned && !isRecordLocked(closeout)"
+            @changed="refresh" />
 
           <CommonWorkflowSection
             v-else-if="selectedTab === 'workflows'"

@@ -94,6 +94,7 @@ const selectedTab: Ref<string> = ref('reconciliation')
 const tabs = [
   { key: 'agreement.claims.reconcile_selected_title', value: 'reconciliation', icon: 'i-lucide-list-checks' },
   { key: 'agreement.claims.reconcile_completion.title', value: 'completion', icon: 'i-lucide-circle-check-big' },
+  { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-clipboard-check' },
   { key: 'workflow.title', value: 'workflows', icon: 'i-lucide-workflow' },
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
   { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users' }
@@ -401,6 +402,13 @@ const cancelReconciliation = async () => {
                 @changed="handleRuntimeChanged" />
             </div>
           </CommonSection>
+
+          <CommonReviewsTab
+            v-else-if="selectedTab === 'reviews'"
+            entity-type="fundingclaimreconcile"
+            :entity-id="reconcileId"
+            :can-update="data.can_update"
+            @changed="handleRuntimeChanged" />
 
           <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingclaimreconcile" :entity-id="reconcileId" purpose="standard" :can-edit="data.is_assigned" :refresh-key="approvalsRefreshKey" @changed="handleRuntimeChanged" />
           <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingclaimreconcile" :entity-id="reconcileId" />

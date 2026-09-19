@@ -116,6 +116,7 @@ const openCreateAssessmentSet = () => {
   selectedAssessmentSet.value = {
     egcs_cn_entitytype: 'fundingcasepayment',
     egcs_cn_order: totalRecords.value + 1,
+    egcs_cn_directreview: false,
     egcs_cn_sequential: false
   }
   isAssessmentSetModalOpen.value = true

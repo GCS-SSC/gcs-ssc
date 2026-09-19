@@ -53,6 +53,7 @@ const selectedTab: Ref<string> = ref('lines')
 const tabs = [
   { key: 'agreement.commitments.lines_title', value: 'lines', icon: 'i-lucide-list' },
   { key: 'agreement.commitments.completion.title', value: 'completion', icon: 'i-lucide-circle-check-big' },
+  { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-clipboard-check' },
   { key: 'workflow.title', value: 'workflows', icon: 'i-lucide-workflow' },
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
   { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users' }
@@ -386,6 +387,13 @@ const handleCompleted = async () => {
                 :refresh-key="approvalsRefreshKey"
                 @changed="handleCompleted" />
             </section>
+
+            <CommonReviewsTab
+              v-else-if="selectedTab === 'reviews'"
+              entity-type="fundingcaseagreementcommitment"
+              :entity-id="commitmentId"
+              :can-update="canUpdateCommitment"
+              @changed="refreshPage" />
 
             <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcaseagreementcommitment" :entity-id="commitmentId" purpose="standard" :can-edit="isAssigned" :refresh-key="approvalsRefreshKey" @changed="refreshPage" />
             <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcaseagreementcommitment" :entity-id="commitmentId" />

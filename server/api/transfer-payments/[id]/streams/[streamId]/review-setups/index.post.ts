@@ -132,6 +132,7 @@ export default defineEventHandler(async event => {
           egcs_cn_description_en: body.egcs_cn_description_en,
           egcs_cn_description_fr: body.egcs_cn_description_fr,
           egcs_cn_order: body.egcs_cn_order,
+          egcs_cn_directreview: body.egcs_cn_directreview,
           egcs_cn_sequential: body.egcs_cn_sequential,
           egcs_cn_approvaltemplate: body.egcs_cn_approvaltemplate,
           _deleted: false
@@ -162,6 +163,7 @@ export default defineEventHandler(async event => {
         egcs_cn_name_en: createdSet.egcs_cn_name_en,
         egcs_cn_name_fr: createdSet.egcs_cn_name_fr,
         egcs_cn_order: createdSet.egcs_cn_order,
+        egcs_cn_directreview: createdSet.egcs_cn_directreview,
         egcs_cn_sequential: createdSet.egcs_cn_sequential,
         egcs_cn_approvaltemplate: createdSet.egcs_cn_approvaltemplate ? String(createdSet.egcs_cn_approvaltemplate) : undefined,
         _deleted: createdSet._deleted,

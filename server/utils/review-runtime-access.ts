@@ -974,6 +974,49 @@ export const assertDirectReviewRuntimeEntitySupported = async (
   return await badRequest(event, 'UNSUPPORTED_REVIEW_ENTITY_TYPE', 'apiErrors.request.invalid')
 }
 
+/** Applies the existing owner role ceiling without an artifact or source assignment grant. */
+const authorizeReviewRuntimeWorkOwnerRole = async (
+  event: H3Event,
+  action: ReviewRuntimeAction,
+  entityContext: ReviewRuntimeEntityContext
+): Promise<void> => {
+  const workTarget = getReviewRuntimeReadTarget(entityContext)
+  const extensionRuntime = await resolveExtensionAuthorizationRuntime(event, entityContext)
+  if (entityContext.entityType === 'applicantrecipient') {
+    if (isIndependentProponentReviewTarget(entityContext, workTarget)) {
+      await authorizeApplicantRecipientOwnerRole(event, action, entityContext)
+    } else {
+      await authorizeApplicantRecipientRuntimeAction(event, action, entityContext)
+    }
+  } else if (agreementReviewRuntimeEntityTypes.has(entityContext.entityType)) {
+    await authorizeAgreementRuntimeAction(event, action, entityContext)
+  } else if (extensionRuntime) {
+    await authorizeExtensionOwnerRole(
+      event,
+      action === 'delete_assessment_child' ? 'delete' : 'update',
+      extensionRuntime
+    )
+  } else {
+    const agencyContext = await authorizeSchemaAgencyRuntimeAction(event, action, entityContext)
+    if (!agencyContext) return await forbidden(event)
+  }
+}
+
+/** Projects the same role ceiling used for independently assigned Review mutations. */
+export const canAuthorizeReviewRuntimeWorkOwnerRole = async (
+  event: H3Event,
+  action: ReviewRuntimeAction,
+  entityContext: ReviewRuntimeEntityContext
+): Promise<boolean> => {
+  try {
+    await authorizeReviewRuntimeWorkOwnerRole(event, action, entityContext)
+    return true
+  } catch (error) {
+    if (getErrorStatusCode(error) === 403) return false
+    throw error
+  }
+}
+
 /**
  * Applies review-specific authorization against the resolved owning entity.
  *
@@ -997,7 +1040,6 @@ export const authorizeReviewRuntimeAction = async (
   entityContext: ReviewRuntimeEntityContext
 ): Promise<AuthContext> => {
   const resolvedAction = reviewRuntimeActionAliases[action] ?? action
-  const extensionRuntime = await resolveExtensionAuthorizationRuntime(event, entityContext)
 
   if (resolvedAction === 'read_assessment' || resolvedAction === 'list_review_sets') {
     return await authorizeReviewRuntimeReadAccess(event, entityContext)
@@ -1010,24 +1052,7 @@ export const authorizeReviewRuntimeAction = async (
 
   const workTarget = getReviewRuntimeReadTarget(entityContext)
   if (isAssignableEntityType(workTarget.entityType)) {
-    if (entityContext.entityType === 'applicantrecipient') {
-      if (isIndependentProponentReviewTarget(entityContext, workTarget)) {
-        await authorizeApplicantRecipientOwnerRole(event, resolvedAction, entityContext)
-      } else {
-        await authorizeApplicantRecipientRuntimeAction(event, resolvedAction, entityContext)
-      }
-    } else if (agreementReviewRuntimeEntityTypes.has(entityContext.entityType)) {
-      await authorizeAgreementRuntimeAction(event, resolvedAction, entityContext)
-    } else if (extensionRuntime) {
-      await authorizeExtensionOwnerRole(
-        event,
-        resolvedAction === 'delete_assessment_child' ? 'delete' : 'update',
-        extensionRuntime
-      )
-    } else {
-      const agencyContext = await authorizeSchemaAgencyRuntimeAction(event, resolvedAction, entityContext)
-      if (!agencyContext) return await forbidden(event)
-    }
+    await authorizeReviewRuntimeWorkOwnerRole(event, resolvedAction, entityContext)
     return await authorizeAssignedItem(event, workTarget.entityType, workTarget.entityId)
   }
 
@@ -1039,6 +1064,7 @@ export const authorizeReviewRuntimeAction = async (
     return await authorizeAgreementRuntimeAction(event, resolvedAction, entityContext)
   }
 
+  const extensionRuntime = await resolveExtensionAuthorizationRuntime(event, entityContext)
   if (extensionRuntime) {
     return await authorizeExtensionOwnerAction(
       event,

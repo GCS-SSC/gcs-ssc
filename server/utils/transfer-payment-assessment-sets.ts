@@ -234,6 +234,7 @@ const ASSESSMENT_SET_PATCH_FIELDS = [
   'egcs_cn_description_fr',
   'egcs_cn_order',
   'egcs_cn_sequential',
+  'egcs_cn_directreview',
   'egcs_cn_approvaltemplate',
   '_deleted'
 ] satisfies readonly (keyof TransferPaymentAssessmentSetPatch)[]
@@ -258,6 +259,7 @@ const formatAssessmentSetResponse = async (
   egcs_cn_name_en: updated.egcs_cn_name_en,
   egcs_cn_name_fr: updated.egcs_cn_name_fr,
   egcs_cn_order: updated.egcs_cn_order,
+  egcs_cn_directreview: updated.egcs_cn_directreview,
   egcs_cn_sequential: updated.egcs_cn_sequential,
   egcs_cn_approvaltemplate: updated.egcs_cn_approvaltemplate != null
     ? String(updated.egcs_cn_approvaltemplate)

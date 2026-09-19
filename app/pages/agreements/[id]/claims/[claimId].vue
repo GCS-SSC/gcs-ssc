@@ -269,6 +269,7 @@ const claimTabs = computed(() => [
     value: 'reconciliation',
     icon: 'i-lucide-list-checks'
   },
+  { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-clipboard-check' },
   {
     key: 'workflow.title',
     value: 'workflows',
@@ -1205,6 +1206,13 @@ const cancelReconciliation = async () => {
                 </div>
               </div>
             </div>
+
+            <CommonReviewsTab
+              v-else-if="selectedClaimTab === 'reviews'"
+              entity-type="fundingcaseagreementclaim"
+              :entity-id="claimId"
+              :can-update="canUpdateClaim"
+              @changed="refreshPage" />
 
             <CommonWorkflowSection
               v-else-if="selectedClaimTab === 'workflows'"

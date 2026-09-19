@@ -30,6 +30,8 @@ import * as workflowProfileConditionsMigration from './migrations/9999_zz_workfl
 
 import * as checklistNotApplicableMigration from './migrations/9999_zzz_checklist_not_applicable'
 
+import * as reviewSetDirectReviewMigration from './migrations/9999_zzzz_review_set_direct_review'
+
 export const productionCoreMigrations = {
   '0001_common': commonMigration,
   '0002_users': usersMigration,
@@ -51,7 +53,8 @@ export const productionCoreMigrations = {
   '0018_agreement_proponent_type': agreementProponentTypeMigration,
   '9999_z_proponent_type_cleanup': proponentTypeCleanupMigration,
   '9999_zz_workflow_profile_conditions': workflowProfileConditionsMigration,
-  '9999_zzz_checklist_not_applicable': checklistNotApplicableMigration
+  '9999_zzz_checklist_not_applicable': checklistNotApplicableMigration,
+  '9999_zzzz_review_set_direct_review': reviewSetDirectReviewMigration
 } satisfies Record<string, Migration>
 
 export const productionCoreMigrationProvider: MigrationProvider = {

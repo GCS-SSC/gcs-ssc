@@ -171,6 +171,7 @@ const tabs = computed(() => {
       value: 'risk-rating',
       icon: 'i-lucide-gauge'
     })
+    nextTabs.push({ key: 'reviews.title', value: 'reviews', icon: 'i-lucide-clipboard-check' })
     nextTabs.push({
       key: 'workflow.title',
       value: 'workflows',
@@ -500,6 +501,13 @@ const cancel = () => {
                 :can-edit="Boolean(profile.can_update)"
                 @changed="refreshProfile" />
             </div>
+
+            <CommonReviewsTab
+              v-else-if="selectedTab === 'reviews'"
+              entity-type="fundingcaseagreement"
+              :entity-id="id"
+              :can-update="canUpdateBusinessRecord"
+              @changed="refreshProfile" />
 
             <CommonWorkflowSection
               v-else-if="selectedTab === 'workflows'"

@@ -143,6 +143,7 @@ const tabs = computed(() => [
   { key: 'agreement.budget.title', value: 'budget', icon: 'i-lucide-wallet-cards' },
   { key: 'agreement.activities.title', value: 'activities', icon: 'i-lucide-list-checks' },
   { key: 'agreement.amendments.recommendation', value: 'recommendation', icon: 'i-lucide-git-pull-request-arrow' },
+  { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-clipboard-check' },
   { key: 'workflow.title', value: 'workflows', icon: 'i-lucide-workflow' },
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
   { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users' }
@@ -495,6 +496,13 @@ const cancelAmendment = async () => {
               completed-success-key="agreement.amendments.completion.completed_success"
               @changed="refreshPage" />
           </section>
+
+          <CommonReviewsTab
+            v-else-if="selectedTab === 'reviews'"
+            entity-type="fundingcaseamendment"
+            :entity-id="amendmentId"
+            :can-update="canEditAmendment"
+            @changed="refreshPage" />
 
           <CommonWorkflowSection
             v-else-if="selectedTab === 'workflows'"
