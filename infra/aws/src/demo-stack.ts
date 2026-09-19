@@ -171,7 +171,7 @@ export const createDemoStack = (scope: Construct, id: string, props: StackProps)
   const accessPoint = files.addAccessPoint('ApplicationFiles', {
     path: '/files',
     posixUser: { uid: '1000', gid: '1000' },
-    createAcl: { ownerUid: '1000', ownerGid: '1000', permissions: '750' }
+    createAcl: { ownerUid: '1000', ownerGid: '1000', permissions: '700' }
   })
   files.connections.allowDefaultPortFrom(appSecurityGroup)
 
@@ -246,9 +246,9 @@ export const createDemoStack = (scope: Construct, id: string, props: StackProps)
   if (budgetEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(budgetEmail)) {
     throw new Error('budgetEmail must be an email address')
   }
-  new budgets.CfnBudget(stack, 'MonthlyBudget', {
+  const monthlyBudget = new budgets.CfnBudget(stack, 'MonthlyBudget', {
     budget: {
-      budgetName: `${stack.stackName}-monthly-account`,
+      // Notification changes replace this resource; let AWS allocate a unique name.
       budgetType: 'COST', timeUnit: 'MONTHLY',
       budgetLimit: { amount: monthlyBudgetUsd, unit: 'USD' }
     },
@@ -269,5 +269,6 @@ export const createDemoStack = (scope: Construct, id: string, props: StackProps)
   new CfnOutput(stack, 'FileSystemId', { value: files.fileSystemId })
   new CfnOutput(stack, 'S3BucketName', { value: futureStorage.bucketName })
   new CfnOutput(stack, 'S3BucketArn', { value: futureStorage.bucketArn })
+  new CfnOutput(stack, 'BudgetName', { value: monthlyBudget.ref })
   return stack
 }
