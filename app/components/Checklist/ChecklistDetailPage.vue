@@ -6,6 +6,7 @@ import AssessmentAdditionalReviewersTab from '~/components/Assessment/Assessment
 import AssessmentApprovalsSection from '~/components/Common/Approvals/Section.vue'
 import CommonCompletionSection from '~/components/Common/Completions/Section.vue'
 import ReviewRuntimeSidebar from '~/components/Review/ReviewRuntimeSidebar.vue'
+import { scrollReviewPageToTop } from '~/utils/scrollReviewPageToTop'
 import { useChecklistDetailPage } from '~/composables/useChecklistDetailPage'
 import type { ReviewRuntimeNavigationItem, ReviewRuntimeStatus } from '~/types/review-runtime'
 import type { ChecklistDefinition, ChecklistSection } from '~~/shared/types/schemas/checklist/checklist'
@@ -19,6 +20,8 @@ const { t } = useI18n()
 const { getBilingualValue } = useBilingualValue()
 const approvalsRefreshKey: Ref<number> = ref(0)
 const selectedValue: Ref<string> = ref('')
+const sectionContent: Ref<HTMLElement | null> = ref(null)
+watch(selectedValue, () => scrollReviewPageToTop(sectionContent.value), { flush: 'post' })
 const isResultExplanationOpen: Ref<boolean> = ref(false)
 const {
   checklist, loadError, loadStatus, responses, sections, canUpdate, isSaving, heroName, entityName, breadcrumbItems, liveEvaluation,
@@ -218,7 +221,7 @@ const handleApprovalChanged = async () => {
           ]" />
 
         <div class="flex min-h-0 flex-1 flex-col gap-6 overflow-visible px-6 pt-0 pb-6 lg:flex-row lg:items-start lg:gap-8">
-          <main class="min-h-0 min-w-0 flex-1 pt-6">
+          <main ref="sectionContent" class="min-h-0 min-w-0 flex-1 pt-6">
             <div v-if="selectedValue === REVIEW_VALUE && checklist?.id" class="space-y-8">
               <AssessmentAdditionalReviewersTab
                 :review-id="String(checklist.id)"

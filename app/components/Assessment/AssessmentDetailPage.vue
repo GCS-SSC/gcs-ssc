@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-param, jsdoc/require-returns -- concise local helpers remain clear without repetitive tags */
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { AssessmentQuestionRow, AssessmentSubSectionRow } from '~/composables/useAssessmentSchemaEditorState'
 import { useAssessmentDetailPage } from '~/composables/useAssessmentDetailPage'
@@ -9,6 +9,7 @@ import { commentsRequired, questionSubsectionNeedsAnswering } from '~~/shared/ut
 import AssessmentAdditionalReviewersTab from '~/components/Assessment/AssessmentAdditionalReviewersTab.vue'
 import AssessmentApprovalsSection from '~/components/Common/Approvals/Section.vue'
 import CommonCompletionSection from '~/components/Common/Completions/Section.vue'
+import { scrollReviewPageToTop } from '~/utils/scrollReviewPageToTop'
 
 const { locale, t } = useI18n()
 const { getBilingualValue } = useBilingualValue()
@@ -66,6 +67,8 @@ const sectionForm: Ref<ValidatableForm | null> = ref(null)
 const outcomesForm: Ref<ValidatableForm | null> = ref(null)
 const reviewAlignmentForm: Ref<ValidatableForm | null> = ref(null)
 const approvalsRefreshKey: Ref<number> = ref(0)
+const sectionContent: Ref<HTMLElement | null> = ref(null)
+watch(selectedTab, () => scrollReviewPageToTop(sectionContent.value), { flush: 'post' })
 const reviewAlignResultValue = computed(() => {
   const value = assessmentResponse.value.egcs_cn_reviewalignresult
   return value === null || value === undefined ? undefined : String(value)
@@ -281,7 +284,7 @@ const handleApprovalChanged = async () => {
           :is-collapsed="isHeroCollapsed" />
 
         <div class="flex min-h-0 flex-1 flex-col gap-6 overflow-visible px-6 pt-0 pb-6 lg:flex-row lg:items-start lg:gap-8">
-          <div class="min-h-0 min-w-0 flex-1 pt-6">
+          <div ref="sectionContent" class="min-h-0 min-w-0 flex-1 pt-6">
             <UForm
               v-if="isOutcomesTab"
               ref="outcomesForm"
