@@ -2021,10 +2021,8 @@ export interface TransferPaymentProfileTable {
   egcs_tp_description_fr: string
   egcs_tp_purpose_en: string
   egcs_tp_purpose_fr: string
-  /** Legacy seed compatibility; current authoring uses both language-specific columns. */
-  egcs_tp_tclink: Generated<string>
-  egcs_tp_tclink_en: Generated<string>
-  egcs_tp_tclink_fr: Generated<string>
+  egcs_tp_tclink_en: string
+  egcs_tp_tclink_fr: string
   egcs_tp_active: Generated<boolean>
   _deleted: Generated<boolean>
 }

@@ -4,7 +4,7 @@ import * as seedMigration from './historical-demo-seed'
 
 export const coreMigrations = Object.fromEntries(Object.entries({
   ...productionCoreMigrations,
-  '9999_seed': seedMigration
+  '0240_seed': seedMigration
 }).sort(([left], [right]) => left.localeCompare(right))) satisfies Record<string, Migration>
 
 export const coreMigrationProvider: MigrationProvider = {

@@ -219,6 +219,7 @@ export async function up(db: Kysely<Database>): Promise<void> {
     )
     .addColumn('egcs_ay_name_en', 'varchar(255)', col => col.notNull())
     .addColumn('egcs_ay_name_fr', 'varchar(255)', col => col.notNull())
+    .addColumn('egcs_ay_active', 'boolean', col => col.notNull().defaultTo(true))
     .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
     .execute()
 
@@ -239,6 +240,7 @@ export async function up(db: Kysely<Database>): Promise<void> {
     .addColumn('id', 'bigserial', col => col.primaryKey())
     .addColumn('egcs_ay_name_en', 'varchar(255)', col => col.notNull())
     .addColumn('egcs_ay_name_fr', 'varchar(255)', col => col.notNull())
+    .addColumn('egcs_ay_active', 'boolean', col => col.notNull().defaultTo(true))
     .addColumn('egcs_ay_organizationcostcategory', 'bigint', col =>
       col.notNull().references('Agency_Cost_Category.id').onDelete('restrict')
     )

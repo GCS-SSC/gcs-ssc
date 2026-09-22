@@ -2435,7 +2435,8 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
         egcs_tp_description_fr: `Programme de paiements de transfert pour ${agency.egcs_ay_name_fr}.`,
         egcs_tp_purpose_en: `Purpose for ${agency.egcs_ay_name_en} transfer payment program.`,
         egcs_tp_purpose_fr: `Objectif du programme de paiements de transfert pour ${agency.egcs_ay_name_fr}.`,
-        egcs_tp_tclink: 'https://example.com/terms',
+        egcs_tp_tclink_en: 'https://example.com/terms',
+        egcs_tp_tclink_fr: 'https://example.com/terms',
         egcs_tp_active: true
       })
       .returning(['id'])

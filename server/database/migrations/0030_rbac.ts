@@ -72,6 +72,16 @@ export async function up(db: Kysely<Database>): Promise<void> {
     .addColumn('target_id', 'varchar', col => col.notNull())
     .addColumn('metadata', 'jsonb', col => col.notNull().defaultTo(sql`'{}'::jsonb`))
     .addColumn('created_at', 'timestamptz', col => col.notNull().defaultTo(sql`CURRENT_TIMESTAMP`))
+    .addColumn('request_id', 'text', col => col.defaultTo(sql`nullif(current_setting('app.audit_request_id', true), '')`))
+    .addColumn('scope_type', 'text', col => col.notNull().defaultTo(sql`coalesce(nullif(current_setting('app.audit_scope', true), ''), 'global')`))
+    .addColumn('agency_id', 'text', col => col.defaultTo(sql`nullif(current_setting('app.audit_agency_id', true), '')`))
+    .addColumn('agency_ids', sql`text[]`, col => col.notNull().defaultTo(sql`coalesce(nullif(current_setting('app.audit_agency_ids', true), '')::text[], CASE WHEN nullif(current_setting('app.audit_agency_id', true), '') IS NOT NULL THEN ARRAY[current_setting('app.audit_agency_id', true)] ELSE '{}'::text[] END)`))
+    .addColumn('transaction_id', 'text', col => col.defaultTo(sql`nullif(current_setting('app.audit_transaction_id', true), '')`))
+    .addColumn('attribution_error', 'text')
+    .addColumn('inputs', 'jsonb', col => col.defaultTo(sql`nullif(current_setting('app.audit_inputs', true), '')::jsonb`))
+    .addCheckConstraint('security_audit_event_scope_type', sql`scope_type IN ('historical', 'global', 'agency', 'unresolved')`)
+    .addCheckConstraint('security_audit_event_agency_scope', sql`(scope_type = 'agency') = (agency_id IS NOT NULL)`)
+    .addCheckConstraint('security_audit_event_inputs_bound', sql`octet_length(inputs::text) <= 32768`)
     .execute()
 
   await sql`

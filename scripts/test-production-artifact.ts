@@ -51,33 +51,24 @@ export const BUILD_RUNTIME_CONFIG_CANARIES = [
 ] as const
 
 export const PRODUCTION_CORE_MIGRATIONS = [
-  '0001_common',
-  '0002_users',
-  '0003_rbac',
-  '0004_agency',
-  '0005_common_agency',
-  '0006_transfer_payment',
-  '0007_polymorphic_common_tp',
-  '0008_applicant_recipient',
-  '0009_funding_case_agreement',
-  '0010_extensions',
-  '0011_storage_cleanup_outbox',
-  '0012_recommendation_revision',
-  '0013_audit',
-  '0014_program_terms_links',
-  '0015_cost_category_availability',
-  '0016_agency_audit',
-  '0017_custom_field_namespaces',
-  '0018_agreement_proponent_type',
-  '0019_notes',
-  '0020_extension_proponent_agency',
-  '0021_administrative_groups',
-  '0022_approval_group_evidence'
-
+  '0010_common',
+  '0020_users',
+  '0030_rbac',
+  '0040_agency',
+  '0050_common_agency',
+  '0060_transfer_payment',
+  '0070_polymorphic_common_tp',
+  '0080_applicant_recipient',
+  '0090_funding_case_agreement',
+  '0100_extensions',
+  '0110_storage_cleanup_outbox',
+  '0120_audit',
+  '0130_notes',
+  '0140_administrative_groups'
 ] as const
 
 export const PROHIBITED_PRODUCTION_BUNDLE_VALUES = [
-  '9999_seed',
+  '0240_seed',
   'root@example.com',
   'agency@example.com',
   'password123',
@@ -627,7 +618,7 @@ const waitForProductionMigrations = async (
   artifact: RunningArtifact,
   timeoutMs: number = DEFAULT_START_TIMEOUT_MS
 ): Promise<void> => {
-  const expectedLine = 'migration "0022_approval_group_evidence" was executed successfully'
+  const expectedLine = 'migration "0140_administrative_groups" was executed successfully'
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     const output = artifact.output()
@@ -660,7 +651,7 @@ const waitForDatabaseUrlPrecedence = async (
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     const output = artifact.output()
-    if (output.includes('migration "0022_approval_group_evidence" was executed successfully')) {
+    if (output.includes('migration "0140_administrative_groups" was executed successfully')) {
       throw new Error(`PGLite unexpectedly won precedence over runtime DATABASE_URL.\n${output}`)
     }
     if (output.includes('failed to migrate')) {
@@ -765,7 +756,7 @@ const verifyAdminDump = async (
     match => match[1]
   )
   assert.deepEqual(dumpMigrations, PRODUCTION_CORE_MIGRATIONS)
-  assert.doesNotMatch(dump, /9999_seed|root@example\.com|agency@example\.com/)
+  assert.doesNotMatch(dump, /0240_seed|root@example\.com|agency@example\.com/)
   assert.doesNotMatch(dump, / OWNER TO |\n(?:GRANT|REVOKE) /)
   await verifyAdminSqlDumpRestorable(dump)
 }

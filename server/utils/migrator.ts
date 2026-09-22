@@ -54,7 +54,7 @@ export const resolveProductionMigrationProvider = async (
   return {
     getMigrations: async () => ({
       ...await productionCoreMigrationProvider.getMigrations(),
-      [`9999_${demoMigrationSuffix}`]: demoMigration
+      [`0240_${demoMigrationSuffix}`]: demoMigration
     })
   }
 }

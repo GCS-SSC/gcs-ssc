@@ -48,7 +48,7 @@ export default defineNuxtConfig({
 
   nitro: {
     experimental: { asyncContext: true },
-    typescript: { tsConfig: { exclude: ['../server/database/migrations/9999_seed.ts'] } }
+    typescript: { tsConfig: { exclude: ['../server/database/migrations/0240_seed.ts'] } }
   },
 
   vite: {
@@ -68,7 +68,7 @@ export default defineNuxtConfig({
     'prepare:types': ({ tsConfig, nodeTsConfig, sharedTsConfig }) => {
       for (const config of [tsConfig, nodeTsConfig, sharedTsConfig]) {
         config.exclude ??= []
-        config.exclude.push('../server/database/migrations/9999_seed.ts')
+        config.exclude.push('../server/database/migrations/0240_seed.ts')
       }
     }
   },

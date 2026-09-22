@@ -177,6 +177,7 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
       egcs_cn_entitytype varchar(128) NOT NULL,
       egcs_cn_ownerid bigint NOT NULL,
       egcs_cn_ownertype varchar(128) NOT NULL,
+      egcs_cn_agency bigint REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT,
       CONSTRAINT cn_pk_extensionentityowner PRIMARY KEY (egcs_cn_entityid, egcs_cn_entitytype),
       CONSTRAINT cn_chk_extensionentityownertype CHECK (
         egcs_cn_ownertype IN ('fundingcaseagreement', 'applicantrecipient')
@@ -191,7 +192,7 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
   `.execute(db)
   await sql`
     CREATE OR REPLACE FUNCTION bind_extension_entity_owner() RETURNS trigger AS $$
-    DECLARE target_id bigint; owner_id bigint;
+    DECLARE target_id bigint; owner_id bigint; agency_id bigint;
     BEGIN
       target_id := (to_jsonb(NEW) ->> TG_ARGV[1])::bigint;
       owner_id := (to_jsonb(NEW) ->> TG_ARGV[3])::bigint;
@@ -199,12 +200,24 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
         RAISE EXCEPTION 'Extension lifecycle entity owner binding requires non-null target and owner identities'
           USING ERRCODE = '23502';
       END IF;
+      IF TG_ARGV[2] = 'applicantrecipient' THEN
+        IF TG_NARGS < 5 THEN
+          RAISE EXCEPTION 'Proponent extension lifecycle identity requires an explicit agency column'
+            USING ERRCODE = '23502';
+        END IF;
+        agency_id := (to_jsonb(NEW) ->> TG_ARGV[4])::bigint;
+        IF agency_id IS NULL THEN
+          RAISE EXCEPTION 'Proponent extension lifecycle identity requires an explicit agency'
+            USING ERRCODE = '23502';
+        END IF;
+      END IF;
       INSERT INTO "Common_Extension_Entity_Owner" (
         egcs_cn_entityid,
         egcs_cn_entitytype,
         egcs_cn_ownerid,
-        egcs_cn_ownertype
-      ) VALUES (target_id, TG_ARGV[0], owner_id, TG_ARGV[2]);
+        egcs_cn_ownertype,
+        egcs_cn_agency
+      ) VALUES (target_id, TG_ARGV[0], owner_id, TG_ARGV[2], agency_id);
       RETURN NEW;
     END;
     $$ LANGUAGE plpgsql;
@@ -2263,26 +2276,26 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
   await sql`
     CREATE TABLE "Common_Workflow_Member_Condition" (
       id bigserial PRIMARY KEY,
-      member_id bigint NOT NULL REFERENCES "Common_Workflow_Setup_Member"(id) ON DELETE RESTRICT,
-      field_id bigint NOT NULL REFERENCES "Transfer_Payment_Stream_Field"(id) ON DELETE RESTRICT,
-      option_id bigint NOT NULL,
+      egcs_cn_workflowsetupmember bigint NOT NULL REFERENCES "Common_Workflow_Setup_Member"(id) ON DELETE RESTRICT,
+      egcs_cn_field bigint NOT NULL REFERENCES "Transfer_Payment_Stream_Field"(id) ON DELETE RESTRICT,
+      egcs_cn_option bigint NOT NULL,
       _deleted boolean NOT NULL DEFAULT false,
-      FOREIGN KEY (option_id, field_id) REFERENCES "Transfer_Payment_Stream_Field_Option"(id, field_id) ON DELETE RESTRICT
+      FOREIGN KEY (egcs_cn_option, egcs_cn_field) REFERENCES "Transfer_Payment_Stream_Field_Option"(id, egcs_tp_field) ON DELETE RESTRICT
     )
   `.execute(db)
   await sql`
-    CREATE UNIQUE INDEX workflow_condition_unique ON "Common_Workflow_Member_Condition" (member_id, field_id, option_id) WHERE NOT _deleted
+    CREATE UNIQUE INDEX workflow_condition_unique ON "Common_Workflow_Member_Condition" (egcs_cn_workflowsetupmember, egcs_cn_field, egcs_cn_option) WHERE NOT _deleted
   `.execute(db)
   await sql`
     CREATE TABLE "Common_Workflow_Publication_Condition" (
       id bigserial PRIMARY KEY,
-      version_id bigint NOT NULL REFERENCES "Common_Publication_Version"(id) ON DELETE RESTRICT,
-      member_id bigint NOT NULL REFERENCES "Common_Workflow_Setup_Member"(id) ON DELETE RESTRICT,
-      field_id bigint NOT NULL REFERENCES "Transfer_Payment_Stream_Field"(id) ON DELETE RESTRICT,
-      option_id bigint NOT NULL,
+      egcs_cn_publicationversion bigint NOT NULL REFERENCES "Common_Publication_Version"(id) ON DELETE RESTRICT,
+      egcs_cn_workflowsetupmember bigint NOT NULL REFERENCES "Common_Workflow_Setup_Member"(id) ON DELETE RESTRICT,
+      egcs_cn_field bigint NOT NULL REFERENCES "Transfer_Payment_Stream_Field"(id) ON DELETE RESTRICT,
+      egcs_cn_option bigint NOT NULL,
       _deleted boolean NOT NULL DEFAULT false,
-      FOREIGN KEY (option_id, field_id) REFERENCES "Transfer_Payment_Stream_Field_Option"(id, field_id) ON DELETE RESTRICT,
-      UNIQUE (version_id, member_id, field_id, option_id)
+      FOREIGN KEY (egcs_cn_option, egcs_cn_field) REFERENCES "Transfer_Payment_Stream_Field_Option"(id, egcs_tp_field) ON DELETE RESTRICT,
+      UNIQUE (egcs_cn_publicationversion, egcs_cn_workflowsetupmember, egcs_cn_field, egcs_cn_option)
     )
   `.execute(db)
   await sql`
@@ -2291,9 +2304,9 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
       IF NOT EXISTS (
         SELECT 1 FROM "Common_Workflow_Setup_Member" member
         JOIN "Common_Workflow_Setup" setup ON setup.id = member.egcs_cn_workflowsetup
-        JOIN "Transfer_Payment_Stream_Field" field ON field.id = NEW.field_id
-        WHERE member.id = NEW.member_id AND setup.egcs_cn_scopetype = 'transferpaymentstream'
-          AND setup.egcs_cn_scopeid = field.egcs_tp_transferpaymentstream AND field.kind = 'relational'
+        JOIN "Transfer_Payment_Stream_Field" field ON field.id = NEW.egcs_cn_field
+        WHERE member.id = NEW.egcs_cn_workflowsetupmember AND setup.egcs_cn_scopetype = 'transferpaymentstream'
+          AND setup.egcs_cn_scopeid = field.egcs_tp_transferpaymentstream AND field.egcs_tp_kind = 'relational'
       ) THEN
         RAISE EXCEPTION 'Workflow condition must reference a relational field in its stream' USING ERRCODE = '23514';
       END IF;
@@ -2312,11 +2325,11 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
     CREATE FUNCTION capture_workflow_publication_conditions() RETURNS trigger LANGUAGE plpgsql AS $$
     BEGIN
       IF NEW.egcs_cn_kind = 'workflow_setup' THEN
-        INSERT INTO "Common_Workflow_Publication_Condition" (version_id, member_id, field_id, option_id)
-        SELECT NEW.id, (member->>'memberId')::bigint, (condition->>'fieldId')::bigint, option_id::bigint
+        INSERT INTO "Common_Workflow_Publication_Condition" (egcs_cn_publicationversion, egcs_cn_workflowsetupmember, egcs_cn_field, egcs_cn_option)
+        SELECT NEW.id, (member->>'memberId')::bigint, (condition->>'fieldId')::bigint, egcs_cn_option::bigint
         FROM jsonb_array_elements(NEW.egcs_cn_definition->'members') member,
           jsonb_array_elements(COALESCE(member->'conditions', '[]'::jsonb)) condition,
-          jsonb_array_elements_text(condition->'optionIds') option_id
+          jsonb_array_elements_text(condition->'optionIds') egcs_cn_option
         WHERE condition ? 'fieldId' AND NOT condition ? 'source';
       END IF;
       RETURN NEW;
@@ -2374,6 +2387,7 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
       egcs_cn_response jsonb NOT NULL DEFAULT '{"responses":[]}'::jsonb,
       egcs_cn_resultoptionkey varchar(255),
       egcs_cn_outcome varchar(32),
+      egcs_cn_revision integer NOT NULL DEFAULT 1,
       _deleted boolean NOT NULL DEFAULT false,
       CONSTRAINT cn_chk_recommendationoutcome CHECK (egcs_cn_outcome IS NULL OR egcs_cn_outcome IN ('recommended', 'not_recommended')),
       CONSTRAINT cn_ref_recommendationid FOREIGN KEY (id) REFERENCES "Common_Entity"(id) ON DELETE RESTRICT,
@@ -2852,6 +2866,7 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
       egcs_cn_approvaltemplate bigint NOT NULL REFERENCES "Common_Approval_Template"(id) ON DELETE RESTRICT,
       egcs_cn_defaultuser bigint NOT NULL REFERENCES "Common_User"(id) ON DELETE RESTRICT,
       egcs_cn_approvertitle varchar(255) NOT NULL,
+      egcs_cn_requiregroupdetails boolean NOT NULL DEFAULT false,
       _deleted boolean NOT NULL DEFAULT false
     )
   `.execute(db)
@@ -3135,6 +3150,7 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
       egcs_cn_routingslip bigint NOT NULL REFERENCES "Common_Routing_Slip"(id) ON DELETE RESTRICT,
       egcs_cn_defaultuser bigint NOT NULL REFERENCES "Common_User"(id) ON DELETE RESTRICT,
       egcs_cn_assigneduser bigint REFERENCES "Common_User"(id) ON DELETE RESTRICT,
+      egcs_cn_requiregroupdetails boolean NOT NULL DEFAULT false,
       egcs_cn_onbehalf bigint REFERENCES "Agency_Approval_Behalf_Type"(id) ON DELETE RESTRICT,
       egcs_cn_approvalpositiontitle text,
       egcs_cn_isadded boolean NOT NULL,

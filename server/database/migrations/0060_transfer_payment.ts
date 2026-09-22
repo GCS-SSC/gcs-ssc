@@ -64,7 +64,8 @@ export async function up(db: Kysely<Database>): Promise<void> {
     .addColumn('egcs_tp_description_fr', 'text', col => col.notNull())
     .addColumn('egcs_tp_purpose_en', 'text', col => col.notNull())
     .addColumn('egcs_tp_purpose_fr', 'text', col => col.notNull())
-    .addColumn('egcs_tp_tclink', 'varchar(2000)', col => col.notNull())
+    .addColumn('egcs_tp_tclink_en', 'varchar(2000)', col => col.notNull())
+    .addColumn('egcs_tp_tclink_fr', 'varchar(2000)', col => col.notNull())
     .addColumn('egcs_tp_active', 'boolean', col => col.notNull().defaultTo(false))
     .addCheckConstraint('tp_chk_profiledatestartdateend', sql`egcs_tp_dateend >= egcs_tp_datestart`)
     .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
@@ -102,6 +103,7 @@ export async function up(db: Kysely<Database>): Promise<void> {
     .addColumn('egcs_tp_objective_en', 'text', col => col.notNull())
     .addColumn('egcs_tp_objective_fr', 'text', col => col.notNull())
     .addColumn('egcs_tp_allowsfurtherdistribution', 'boolean', col => col.defaultTo(false).notNull())
+    .addColumn('egcs_tp_requireconsistentproponenttype', 'boolean', col => col.notNull().defaultTo(false))
     .addColumn('egcs_tp_active', 'boolean', col => col.notNull().defaultTo(false))
     .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
     .execute()
@@ -253,6 +255,7 @@ export async function up(db: Kysely<Database>): Promise<void> {
       col.notNull().references('Agency_Cost_Category_Line_Item.id').onDelete('restrict')
     )
     .addColumn('egcs_tp_costsharingratio', THRESHOLD_TYPE, col => col.notNull())
+    .addColumn('egcs_tp_active', 'boolean', col => col.notNull().defaultTo(true))
     .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
     .execute()
 
@@ -429,6 +432,7 @@ export async function up(db: Kysely<Database>): Promise<void> {
     .addColumn('egcs_tp_transferpaymentstream', 'bigint', col =>
       col.notNull().references('Transfer_Payment_Stream.id').onDelete('restrict')
     )
+    .addUniqueConstraint('fc_unq_chartofaccountidstream', ['id', 'egcs_tp_transferpaymentstream'])
     .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
     .addForeignKeyConstraint(
       'tp_ref_chartofaccountbudgetstream',
@@ -814,8 +818,8 @@ export async function up(db: Kysely<Database>): Promise<void> {
     CREATE TABLE "Transfer_Payment_Stream_Field_Section" (
       id bigserial PRIMARY KEY,
       egcs_tp_transferpaymentstream bigint NOT NULL REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT,
-      name_en text NOT NULL, name_fr text NOT NULL,
-      display_order integer NOT NULL DEFAULT 0 CHECK (display_order >= 0),
+      egcs_tp_name_en text NOT NULL, egcs_tp_name_fr text NOT NULL,
+      egcs_tp_displayorder integer NOT NULL DEFAULT 0 CHECK (egcs_tp_displayorder >= 0),
       _deleted boolean NOT NULL DEFAULT false,
       UNIQUE (id, egcs_tp_transferpaymentstream)
     )
@@ -824,42 +828,42 @@ export async function up(db: Kysely<Database>): Promise<void> {
     CREATE TABLE "Transfer_Payment_Stream_Field" (
       id bigserial PRIMARY KEY,
       egcs_tp_transferpaymentstream bigint NOT NULL REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT,
-      name_en text NOT NULL, name_fr text NOT NULL,
-      section_id bigint NOT NULL,
-      FOREIGN KEY (section_id, egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream_Field_Section"(id, egcs_tp_transferpaymentstream) ON DELETE RESTRICT,
-      kind text NOT NULL CHECK (kind IN ('text', 'number', 'relational')),
-      multiple boolean NOT NULL DEFAULT false CHECK (NOT multiple OR kind = 'relational'),
-      presentation text NOT NULL DEFAULT 'single_line' CHECK (presentation IN ('single_line', 'multiline')),
-      required boolean NOT NULL DEFAULT false,
-      discriminator boolean NOT NULL DEFAULT false,
-      active boolean NOT NULL DEFAULT true,
-      display_order integer NOT NULL DEFAULT 0 CHECK (display_order >= 0),
+      egcs_tp_name_en text NOT NULL, egcs_tp_name_fr text NOT NULL,
+      egcs_tp_section bigint NOT NULL,
+      FOREIGN KEY (egcs_tp_section, egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream_Field_Section"(id, egcs_tp_transferpaymentstream) ON DELETE RESTRICT,
+      egcs_tp_kind text NOT NULL CHECK (egcs_tp_kind IN ('text', 'number', 'relational')),
+      egcs_tp_multiple boolean NOT NULL DEFAULT false CHECK (NOT egcs_tp_multiple OR egcs_tp_kind = 'relational'),
+      egcs_tp_presentation text NOT NULL DEFAULT 'single_line' CHECK (egcs_tp_presentation IN ('single_line', 'multiline')),
+      egcs_tp_required boolean NOT NULL DEFAULT false,
+      egcs_tp_discriminator boolean NOT NULL DEFAULT false,
+      egcs_tp_active boolean NOT NULL DEFAULT true,
+      egcs_tp_displayorder integer NOT NULL DEFAULT 0 CHECK (egcs_tp_displayorder >= 0),
       _deleted boolean NOT NULL DEFAULT false,
-      CHECK (NOT discriminator OR kind = 'relational'),
-      CHECK (kind = 'text' OR presentation = 'single_line'),
+      CHECK (NOT egcs_tp_discriminator OR egcs_tp_kind = 'relational'),
+      CHECK (egcs_tp_kind = 'text' OR egcs_tp_presentation = 'single_line'),
       UNIQUE (id, egcs_tp_transferpaymentstream)
     )
   `.execute(db)
   await sql`
     CREATE TABLE "Transfer_Payment_Stream_Field_Option" (
       id bigserial PRIMARY KEY,
-      field_id bigint NOT NULL REFERENCES "Transfer_Payment_Stream_Field"(id) ON DELETE RESTRICT,
-      name_en text NOT NULL, name_fr text NOT NULL,
-      category_en text, category_fr text,
-      active boolean NOT NULL DEFAULT true,
-      display_order integer NOT NULL DEFAULT 0 CHECK (display_order >= 0),
+      egcs_tp_field bigint NOT NULL REFERENCES "Transfer_Payment_Stream_Field"(id) ON DELETE RESTRICT,
+      egcs_tp_name_en text NOT NULL, egcs_tp_name_fr text NOT NULL,
+      egcs_tp_category_en text, egcs_tp_category_fr text,
+      egcs_tp_active boolean NOT NULL DEFAULT true,
+      egcs_tp_displayorder integer NOT NULL DEFAULT 0 CHECK (egcs_tp_displayorder >= 0),
       _deleted boolean NOT NULL DEFAULT false,
-      CHECK ((category_en IS NULL) = (category_fr IS NULL)),
-      UNIQUE (id, field_id)
+      CHECK ((egcs_tp_category_en IS NULL) = (egcs_tp_category_fr IS NULL)),
+      UNIQUE (id, egcs_tp_field)
     )
   `.execute(db)
   await sql`
     CREATE FUNCTION protect_stream_field_identity() RETURNS trigger LANGUAGE plpgsql AS $$
     BEGIN
-      IF NEW.kind IS DISTINCT FROM OLD.kind OR NEW.egcs_tp_transferpaymentstream IS DISTINCT FROM OLD.egcs_tp_transferpaymentstream THEN
+      IF NEW.egcs_tp_kind IS DISTINCT FROM OLD.egcs_tp_kind OR NEW.egcs_tp_transferpaymentstream IS DISTINCT FROM OLD.egcs_tp_transferpaymentstream THEN
         RAISE EXCEPTION 'Stream field identity is immutable' USING ERRCODE = '23514';
       END IF;
-      IF OLD.multiple AND NOT NEW.multiple THEN
+      IF OLD.egcs_tp_multiple AND NOT NEW.egcs_tp_multiple THEN
         RAISE EXCEPTION 'Multiple selection cannot be changed to single selection' USING ERRCODE = '23514';
       END IF;
       RETURN NEW;
