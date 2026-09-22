@@ -2,7 +2,7 @@
 /* eslint-disable jsdoc/require-jsdoc -- local request helpers are self-documenting and not public APIs */
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import type { Ref } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
 import type { Scope } from '~~/shared/utils/scopes'
@@ -33,7 +33,6 @@ const loadStatus: Ref<'pending' | 'success' | 'error'> = ref('pending')
 
 const loadDetail = async () => {
   loadStatus.value = 'pending'
-  loadError.value = null
   try {
     // Resolve the parent before child resources so a denied parent does not
     // fan out additional requests or expose child-resource existence.
@@ -45,6 +44,7 @@ const loadDetail = async () => {
     profile.value = nextProfile
     stream.value = nextStream
     template.value = nextTemplate
+    loadError.value = null
     loadStatus.value = 'success'
   } catch (error: unknown) {
     profile.value = null
@@ -55,9 +55,7 @@ const loadDetail = async () => {
   }
 }
 
-onMounted(() => {
-  void loadDetail()
-})
+await loadDetail()
 
 const profileScope = computed<Scope>(() => ({
   type: 'entity', agencyId: String(profile.value?.egcs_tp_agency ?? ''),
@@ -80,10 +78,8 @@ const breadcrumbItems = computed(() => [
 </script>
 
 <template>
-  <CommonLoadingState v-if="loadStatus === 'pending'" :label="t('common.loading')" />
-
   <UAlert
-    v-else-if="loadError || loadStatus === 'error'"
+    v-if="loadError || loadStatus === 'error'"
     role="alert"
     aria-live="assertive"
     color="error"
@@ -96,7 +92,7 @@ const breadcrumbItems = computed(() => [
   </UAlert>
 
   <CommonApprovalTemplatesDetailPage
-    v-else
+    v-else-if="loadStatus === 'success'"
     :template-id="templateId"
     :breadcrumb-items="breadcrumbItems"
     :can-manage-publication="canManagePublication"

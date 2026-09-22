@@ -73,6 +73,9 @@ const columnVisibility = ref<Record<string, boolean>>({ [SETUP_GROUP]: false, [M
 const isItemModalOpen: Ref<boolean> = ref(false)
 const selectedItem: Ref<Partial<TransferPaymentStreamRecommendationSetupMemberItem> | null> = ref(null)
 const selectedItemParent: Ref<RecommendationSetupWithMembers | null> = ref(null)
+const isSchemaCreateModalOpen: Ref<boolean> = ref(false)
+const schemaCreateState: Ref<Record<string, unknown> | null> = ref(null)
+const schemaCreateParent: Ref<RecommendationSetupWithMembers | null> = ref(null)
 
 const { isOpen, selected, openCreate, captureSession, closeSession } = useCrudModal<RecommendationSetupWithMembers>({
   createState: () => ({ members: [] }),
@@ -179,6 +182,20 @@ const onAddMember = (setup: RecommendationSetupWithMembers) => {
   }
   isItemModalOpen.value = true
 }
+const onCreateSchema = (setup: RecommendationSetupWithMembers) => {
+  if (!canUpdateChild) return
+  const members = setup.members ?? []
+  schemaCreateParent.value = setup
+  schemaCreateState.value = {
+    egcs_cn_order: members.length === 0 ? 1 : Math.max(...members.map(member => member.egcs_cn_order)) + 1,
+    egcs_cn_failonnotrecommended: false
+  }
+  isSchemaCreateModalOpen.value = true
+}
+const onSchemaCreated = async (payload: { schemaId: string }) => {
+  await refresh()
+  await router.push(localePath(appRouteLocations.transferPaymentRecommendationSchemaDetail(transferPaymentId, streamId, payload.schemaId)))
+}
 const onEditMember = (row: RecommendationRow) => {
   const setup = setupById.value.get(row.setupId)
   const member = setup?.members?.find(item => String(item.id) === row.memberId)
@@ -263,6 +280,7 @@ const onDeleteMember = async (row: RecommendationRow) => {
       </template>
       <template #actions-cell="{ row }">
         <div v-if="isSetupGroup(row) && setupForRow(row)" class="flex items-center gap-2">
+          <UButton v-if="canUpdateChild" icon="i-lucide-plus" color="primary" variant="ghost" size="sm" class="cursor-default" :aria-label="t('transfer_payment.recommendation_schema_create')" @click="onCreateSchema(setupForRow(row)!)" />
           <UButton v-if="canUpdateChild" icon="i-lucide-link" color="neutral" variant="ghost" size="sm" class="cursor-default" :aria-label="t('transfer_payment.recommendation_schema_associate')" @click="onAddMember(setupForRow(row)!)" />
           <UButton icon="i-lucide-arrow-right" color="neutral" variant="ghost" size="sm" class="cursor-default" :aria-label="t('common.open')" @click="onEdit(setupForRow(row)!)" />
           <UButton v-if="canDeleteChild" icon="i-lucide-trash" color="error" variant="ghost" size="sm" class="cursor-default" :disabled="isDeleting" :aria-label="t('common.delete')" @click="onDelete(setupForRow(row)!)" />
@@ -276,5 +294,6 @@ const onDeleteMember = async (row: RecommendationRow) => {
     </CommonResourceLayoutCard>
     <TransferPaymentRecommendationSetupModal v-if="selected && canUpdateChild" v-model:open="isOpen" v-model:state="selected" :transfer-payment-id="transferPaymentId" :stream-id="streamId" :agency-id="agencyId" :capture-session="captureSession" :close-session="closeSession" @saved="refresh" />
     <TransferPaymentRecommendationSetupItemModal v-if="selectedItem && selectedItemParent && canUpdateChild" v-model:open="isItemModalOpen" v-model:state="selectedItem" :transfer-payment-id="transferPaymentId" :stream-id="streamId" :recommendation-setup-id="String(selectedItemParent.id)" :agency-id="agencyId" @saved="refresh" />
+    <TransferPaymentRecommendationSetupSchemaCreateModal v-if="schemaCreateState && schemaCreateParent && canUpdateChild" v-model:open="isSchemaCreateModalOpen" v-model:state="schemaCreateState" :transfer-payment-id="transferPaymentId" :stream-id="streamId" :recommendation-setup-id="String(schemaCreateParent.id)" @created="onSchemaCreated" />
   </div>
 </template>

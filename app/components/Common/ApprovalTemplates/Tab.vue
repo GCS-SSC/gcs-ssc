@@ -137,13 +137,10 @@ const deleteTemplate = async (templateId: string) => {
           type="button"
           class="group flex w-full items-center gap-3 py-1 text-left"
           @click="openTemplateDetail(row.original.templateId)">
-          <span class="flex min-w-0 items-center gap-2">
-            <UIcon name="i-lucide-corner-down-right" class="size-4 text-zinc-400" />
-            <span class="[&_p:first-child]:transition-colors group-hover:[&_p:first-child]:text-primary">
-              <CommonBilingualName
-                :name-en="row.original.templateNameEn"
-                :name-fr="row.original.templateNameFr" />
-            </span>
+          <span class="[&_p:first-child]:transition-colors group-hover:[&_p:first-child]:text-primary">
+            <CommonBilingualName
+              :name-en="row.original.templateNameEn"
+              :name-fr="row.original.templateNameFr" />
           </span>
         </button>
       </template>
