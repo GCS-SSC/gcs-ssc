@@ -1,6 +1,7 @@
 import type { Kysely } from 'kysely'
 import { sql } from 'kysely'
 import type { Database } from '../../../shared/types/database'
+import { installWorkflowProfileReferenceGuards } from './0007_polymorphic_common_tp'
 
 const INDEX_NAMES = {
   profileStreamAgreementNumber: 'fc_idx_profiletransferpaymentstreamagreementnumber',
@@ -2069,9 +2070,16 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
   for (const [table, entityType, triggerKey] of assignmentEntities) {
     await createAssignmentLifecycleTriggers(db, table, entityType, triggerKey)
   }
+  await installWorkflowProfileReferenceGuards(db)
 }
 
 export const down = async (db: Kysely<Database>): Promise<void> => {
+  for (const table of ['Transfer_Payment_Agreement_Subtype', 'Transfer_Payment_Stream_Holdback_Basis',
+    'Transfer_Payment_Stream_Eligible_Recipient', 'Agency_Agreement_Type', 'Agency_Holdback_Basis',
+    'Agency_Applicant_Recipient_Subtype', 'Transfer_Payment_Stream', 'Transfer_Payment_Profile']) {
+    await sql.raw(`DROP TRIGGER IF EXISTS protect_workflow_profile_conditions ON "${table}"`).execute(db)
+  }
+  await sql`DROP FUNCTION IF EXISTS validate_workflow_profile_references()`.execute(db)
   await sql`DROP TRIGGER IF EXISTS trg_immutable_agreement_closeout_snapshot ON "Funding_Case_Agreement_Closeout_Snapshot"`.execute(db)
   await sql`DROP TRIGGER IF EXISTS trg_validate_agreement_closeout_snapshot ON "Funding_Case_Agreement_Closeout_Snapshot"`.execute(db)
   await sql`DROP FUNCTION IF EXISTS trg_fn_immutable_agreement_closeout_snapshot()`.execute(db)

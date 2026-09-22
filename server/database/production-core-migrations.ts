@@ -28,15 +28,6 @@ import * as extensionProponentAgencyMigration from './migrations/0020_extension_
 import * as administrativeGroupsMigration from './migrations/0021_administrative_groups'
 import * as approvalGroupEvidenceMigration from './migrations/0022_approval_group_evidence'
 
-import * as proponentTypeCleanupMigration from './migrations/9999_z_proponent_type_cleanup'
-
-import * as workflowProfileConditionsMigration from './migrations/9999_zz_workflow_profile_conditions'
-
-import * as checklistNotApplicableMigration from './migrations/9999_zzz_checklist_not_applicable'
-
-import * as reviewSetDirectReviewMigration from './migrations/9999_zzzz_review_set_direct_review'
-import * as groupPermissionsMigration from './migrations/9999_zzzzz_group_permissions'
-
 export const productionCoreMigrations = {
   '0001_common': commonMigration,
   '0002_users': usersMigration,
@@ -59,12 +50,7 @@ export const productionCoreMigrations = {
   '0019_notes': notesMigration,
   '0020_extension_proponent_agency': extensionProponentAgencyMigration,
   '0021_administrative_groups': administrativeGroupsMigration,
-  '0022_approval_group_evidence': approvalGroupEvidenceMigration,
-  '9999_z_proponent_type_cleanup': proponentTypeCleanupMigration,
-  '9999_zz_workflow_profile_conditions': workflowProfileConditionsMigration,
-  '9999_zzz_checklist_not_applicable': checklistNotApplicableMigration,
-  '9999_zzzz_review_set_direct_review': reviewSetDirectReviewMigration,
-  '9999_zzzzz_group_permissions': groupPermissionsMigration
+  '0022_approval_group_evidence': approvalGroupEvidenceMigration
 } satisfies Record<string, Migration>
 
 export const productionCoreMigrationProvider: MigrationProvider = {

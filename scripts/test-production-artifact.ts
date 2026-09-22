@@ -72,12 +72,8 @@ export const PRODUCTION_CORE_MIGRATIONS = [
   '0019_notes',
   '0020_extension_proponent_agency',
   '0021_administrative_groups',
-  '0022_approval_group_evidence',
-  '9999_z_proponent_type_cleanup',
-  '9999_zz_workflow_profile_conditions',
-  '9999_zzz_checklist_not_applicable',
-  '9999_zzzz_review_set_direct_review',
-  '9999_zzzzz_group_permissions'
+  '0022_approval_group_evidence'
+
 ] as const
 
 export const PROHIBITED_PRODUCTION_BUNDLE_VALUES = [
@@ -622,7 +618,7 @@ const startArtifact = (
 }
 
 /**
- * Waits for the seed migration or surfaces captured startup failures.
+ * Waits for the final production migration or surfaces captured startup failures.
  *
  * @param artifact - Running production artifact.
  * @param timeoutMs - Bounded startup timeout.
@@ -631,7 +627,7 @@ const waitForProductionMigrations = async (
   artifact: RunningArtifact,
   timeoutMs: number = DEFAULT_START_TIMEOUT_MS
 ): Promise<void> => {
-  const expectedLine = 'migration "9999_zzzz_review_set_direct_review" was executed successfully'
+  const expectedLine = 'migration "0022_approval_group_evidence" was executed successfully'
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     const output = artifact.output()
@@ -643,7 +639,7 @@ const waitForProductionMigrations = async (
     }
     if (artifact.child.exitCode !== null) {
       throw new Error(
-        `Production artifact exited with code ${String(artifact.child.exitCode)} before seeding.\n${artifact.output()}`
+        `Production artifact exited with code ${String(artifact.child.exitCode)} before migrations completed.\n${artifact.output()}`
       )
     }
     await delay(100)
@@ -664,7 +660,7 @@ const waitForDatabaseUrlPrecedence = async (
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     const output = artifact.output()
-    if (output.includes('migration "9999_zzzz_review_set_direct_review" was executed successfully')) {
+    if (output.includes('migration "0022_approval_group_evidence" was executed successfully')) {
       throw new Error(`PGLite unexpectedly won precedence over runtime DATABASE_URL.\n${output}`)
     }
     if (output.includes('failed to migrate')) {

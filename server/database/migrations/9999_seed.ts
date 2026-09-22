@@ -921,6 +921,7 @@ const ROOT_ROLE_SUBJECTS: readonly RoleAbilitySubject[] = [
   'transfer_payment',
   'role',
   'user',
+  'group',
   'agreement',
   'applicant_recipient'
 ]
@@ -1191,6 +1192,8 @@ function buildRoleSeeds(agencies: AgencyRecord[]): RoleSeed[] {
     }
     const proponentPermission = PROPONENT_ROLE_PERMISSIONS.get(roleIndex)
     permissionBySubject.delete('applicant_recipient')
+    const userAccess = permissionBySubject.get('user')
+    if (userAccess) permissionBySubject.set('group', userAccess)
     seeds.push({
       key: `seed_role_${roleIndex}`,
       nameEn: roleLabel.en,
@@ -1940,7 +1943,6 @@ async function seedApplicantRecipientData(db: Kysely<Database>): Promise<void> {
         egcs_ar_description_fr: `Profil de ${recipient.operatingNameFr} initialise pour les essais d interface et de flux de travail.`,
         egcs_ar_operatingname_en: recipient.operatingNameEn,
         egcs_ar_operatingname_fr: recipient.operatingNameFr,
-        egcs_ar_applicantrecipientsubtypes: String(subtype.subtypeId),
         egcs_ar_leadagency: String(subtype.agencyId),
         egcs_ar_legalname_en: recipient.legalNameEn,
         egcs_ar_legalname_fr: recipient.legalNameFr,
@@ -2109,7 +2111,7 @@ const seedAgreementApprovalSubmissionWorkflows = async (
       egcs_cn_name_fr: `Ensemble de revues rapides de ${target.labelFrOf}`,
       egcs_cn_description_en: `A quick checklist and assessment for the seeded ${target.labelEn.toLocaleLowerCase()} workflow.`,
       egcs_cn_description_fr: `Une liste de contrôle et une évaluation rapides pour le flux initialisé de ${target.labelFrOf}.`,
-      egcs_cn_order: 1, egcs_cn_sequential: true, _deleted: false
+      egcs_cn_order: 1, egcs_cn_sequential: true, egcs_cn_directreview: true, _deleted: false
     }).returning('id').executeTakeFirstOrThrow()
     await db.insertInto('Common_Review_Setup').values([
       {
@@ -2257,6 +2259,7 @@ const seedAgreementRiskRatingWorkflow = async (
     egcs_cn_description_fr: 'Contient l’évaluation officielle utilisée pour calculer la cote de risque de l’entente.',
     egcs_cn_order: 1,
     egcs_cn_sequential: true,
+    egcs_cn_directreview: true,
     _deleted: false
   }).returning('id').executeTakeFirstOrThrow()
   await db.insertInto('Common_Review_Setup').values({
@@ -3519,6 +3522,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
           egcs_cn_description_fr: 'Ensemble d’évaluations de la préparation au paiement.',
           egcs_cn_order: 1,
           egcs_cn_sequential: true,
+          egcs_cn_directreview: true,
           _deleted: false
         })
         .returning('id')
@@ -3550,6 +3554,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
           egcs_cn_description_fr: 'Ensemble d’évaluations de la préparation au paiement anticipé.',
           egcs_cn_order: 3,
           egcs_cn_sequential: true,
+          egcs_cn_directreview: true,
           _deleted: false
         })
         .returning('id')
@@ -3581,6 +3586,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
           egcs_cn_description_fr: 'Ensemble de listes de contrôle pour l’achèvement du paiement.',
           egcs_cn_order: 2,
           egcs_cn_sequential: false,
+          egcs_cn_directreview: true,
           _deleted: false
         })
         .returning('id')
@@ -3612,6 +3618,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
           egcs_cn_description_fr: 'Ensemble combiné d’évaluations et de listes de contrôle pour la préparation au paiement.',
           egcs_cn_order: 4,
           egcs_cn_sequential: false,
+          egcs_cn_directreview: true,
           _deleted: false
         })
         .returning('id')
@@ -3720,7 +3727,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
           egcs_cn_name_en: 'Payment workflow review', egcs_cn_name_fr: 'Revue du flux de paiement',
           egcs_cn_description_en: 'Quick checklist review before the payment recommendation workflow.',
           egcs_cn_description_fr: 'Revue rapide par liste de contrôle avant le flux de recommandation du paiement.',
-          egcs_cn_order: 1, egcs_cn_sequential: true, _deleted: false
+          egcs_cn_order: 1, egcs_cn_sequential: true, egcs_cn_directreview: true, _deleted: false
         }).returning('id').executeTakeFirstOrThrow()
         await db.insertInto('Common_Review_Setup').values({
           egcs_cn_entitytype: 'fundingcasepayment', egcs_cn_order: 1,
@@ -4152,6 +4159,32 @@ async function seedAmendmentSubtypes(db: Kysely<Database>): Promise<void> {
   }
 }
 
+const seededAgreementProponentType = async (db: Kysely<Database>, streamId: string, agencyId: string): Promise<string> => {
+  const eligible = await db.selectFrom('Transfer_Payment_Stream_Eligible_Recipient as eligible')
+    .innerJoin('Agency_Applicant_Recipient_Subtype as subtype', 'subtype.id', 'eligible.egcs_tp_applicantrecipientsubtype')
+    .select('subtype.id')
+    .where('eligible.egcs_tp_transferpaymentstream', '=', streamId)
+    .where('eligible._deleted', '=', false)
+    .where('subtype.egcs_ay_organizationagency', '=', agencyId)
+    .where('subtype._deleted', '=', false)
+    .orderBy('eligible.id', 'asc')
+    .executeTakeFirst()
+  if (eligible) return String(eligible.id)
+
+  const subtype = await db.selectFrom('Agency_Applicant_Recipient_Subtype')
+    .select('id')
+    .where('egcs_ay_organizationagency', '=', agencyId)
+    .where('_deleted', '=', false)
+    .orderBy('id', 'asc')
+    .executeTakeFirstOrThrow()
+  await db.insertInto('Transfer_Payment_Stream_Eligible_Recipient').values({
+    egcs_tp_transferpaymentstream: streamId,
+    egcs_tp_applicantrecipientsubtype: String(subtype.id),
+    _deleted: false
+  }).execute()
+  return String(subtype.id)
+}
+
 async function seedAgreementData(db: Kysely<Database>): Promise<void> {
   const streams = await db
     .selectFrom('Transfer_Payment_Stream')
@@ -4282,6 +4315,7 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
           .values({
             egcs_fc_fundingagreement: String(agreement.id),
             egcs_fc_applicantrecipient: String(applicantRecipient.id),
+            egcs_fc_applicantrecipientsubtype: await seededAgreementProponentType(db, String(stream.streamId), String(stream.agencyId)),
             _deleted: false
           })
           .returning('id')
@@ -4812,6 +4846,7 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
       const agreementRecipient = await db.insertInto('Funding_Case_Agreement_Applicant_Recipient').values({
         egcs_fc_fundingagreement: String(agreement.id),
         egcs_fc_applicantrecipient: String(applicantRecipient.id),
+        egcs_fc_applicantrecipientsubtype: await seededAgreementProponentType(db, String(stream.streamId), String(stream.agencyId)),
         _deleted: false
       }).returning('id').executeTakeFirstOrThrow()
       const activities = await db.insertInto('Funding_Case_Agreement_Activity').values([

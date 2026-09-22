@@ -13,9 +13,6 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
     .addColumn('egcs_ar_description_fr', 'text')
     .addColumn('egcs_ar_operatingname_en', 'varchar(255)')
     .addColumn('egcs_ar_operatingname_fr', 'varchar(255)')
-    .addColumn('egcs_ar_applicantrecipientsubtypes', 'bigint', col =>
-      col.notNull().references('Agency_Applicant_Recipient_Subtype.id').onDelete('restrict')
-    )
     .addColumn('egcs_ar_leadagency', 'bigint', col => col.references('Agency_Profile.id').onDelete('restrict'))
     .addColumn('egcs_ar_legalname_en', 'varchar(255)')
     .addColumn('egcs_ar_legalname_fr', 'varchar(255)')

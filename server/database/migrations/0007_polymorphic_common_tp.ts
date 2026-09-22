@@ -37,7 +37,7 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
         CREATE TYPE "Checklist_Result" AS ENUM ('pass', 'pass_with_considerations', 'fail');
       END IF;
       IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'Checklist_Answer' AND typnamespace = current_schema()::regnamespace) THEN
-        CREATE TYPE "Checklist_Answer" AS ENUM ('pass', 'fail');
+        CREATE TYPE "Checklist_Answer" AS ENUM ('pass', 'fail', 'not_applicable');
       END IF;
       IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'Monitor_Action_Type' AND typnamespace = current_schema()::regnamespace) THEN
         CREATE TYPE "Monitor_Action_Type" AS ENUM ('amendment', 'mandatoryaction', 'suggestedaction', 'none');
@@ -1368,6 +1368,7 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
     .addColumn('egcs_cn_description_fr', 'text', col => col.notNull().defaultTo(''))
     .addColumn('egcs_cn_order', 'smallint', col => col.notNull())
     .addColumn('egcs_cn_sequential', 'boolean', col => col.notNull())
+    .addColumn('egcs_cn_directreview', 'boolean', col => col.notNull().defaultTo(false))
     .addColumn('egcs_cn_approvaltemplate', 'bigint', col =>
       col.references('Common_Approval_Template.id').onDelete('restrict')
     )
@@ -2060,6 +2061,7 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
       egcs_cn_successstatus bigint REFERENCES "Common_Status"(id) ON DELETE RESTRICT,
       egcs_cn_failurestatus bigint REFERENCES "Common_Status"(id) ON DELETE RESTRICT,
       egcs_cn_allowownerredirect boolean NOT NULL DEFAULT false,
+      egcs_cn_profileconditions jsonb NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(egcs_cn_profileconditions) = 'array'),
       _deleted boolean NOT NULL DEFAULT false,
       CONSTRAINT cn_chk_workflowsetupmemberreference CHECK (
         (egcs_cn_reviewset IS NOT NULL)::integer
@@ -2314,7 +2316,8 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
         SELECT NEW.id, (member->>'memberId')::bigint, (condition->>'fieldId')::bigint, option_id::bigint
         FROM jsonb_array_elements(NEW.egcs_cn_definition->'members') member,
           jsonb_array_elements(COALESCE(member->'conditions', '[]'::jsonb)) condition,
-          jsonb_array_elements_text(condition->'optionIds') option_id;
+          jsonb_array_elements_text(condition->'optionIds') option_id
+        WHERE condition ? 'fieldId' AND NOT condition ? 'source';
       END IF;
       RETURN NEW;
     END $$
@@ -3869,4 +3872,81 @@ export const down = async (db: Kysely<Database>): Promise<void> => {
   await sql`DROP FUNCTION IF EXISTS trg_fn_enforce_entity_attachment_identity_immutable() CASCADE`.execute(db)
   await sql`DROP TABLE IF EXISTS "Common_Attachment" CASCADE`.execute(db)
   await sql`DROP TABLE IF EXISTS "Common_Attachment_Types" CASCADE`.execute(db)
+}
+
+/** Keep profile references valid when an owning stream or option changes. */
+export const installWorkflowProfileReferenceGuards = async (db: Kysely<Database>): Promise<void> => {
+  await sql`CREATE FUNCTION validate_workflow_profile_references() RETURNS trigger LANGUAGE plpgsql AS $$
+    DECLARE ref record; option_id text; valid boolean;
+    BEGIN
+      FOR ref IN
+        SELECT s.egcs_cn_scopeid AS stream_id, c AS condition
+        FROM "Common_Workflow_Setup_Member" m JOIN "Common_Workflow_Setup" s ON s.id = m.egcs_cn_workflowsetup,
+          jsonb_array_elements(m.egcs_cn_profileconditions) c
+        WHERE NOT m._deleted AND NOT s._deleted
+        UNION ALL
+        SELECT s.egcs_cn_scopeid, c
+        FROM "Common_Publication_Version" v JOIN "Common_Workflow_Setup" s ON s.id = v.egcs_cn_publication,
+          jsonb_array_elements(v.egcs_cn_definition->'members') m,
+          jsonb_array_elements(COALESCE(m->'conditions', '[]'::jsonb)) c
+        WHERE v.egcs_cn_kind = 'workflow_setup' AND c ? 'source'
+      LOOP
+        FOR option_id IN SELECT jsonb_array_elements_text(ref.condition->'optionIds') LOOP
+          IF TG_OP = 'UPDATE' AND (
+            (TG_TABLE_NAME = 'Transfer_Payment_Agreement_Subtype' AND ref.condition->>'source' = 'agreement_subtype'
+              AND option_id = to_jsonb(OLD)->>'id' AND to_jsonb(NEW)->'egcs_tp_agreementtype' IS DISTINCT FROM to_jsonb(OLD)->'egcs_tp_agreementtype')
+            OR (TG_TABLE_NAME = 'Transfer_Payment_Stream_Holdback_Basis' AND ref.condition->>'source' = 'holdback_basis'
+              AND option_id = to_jsonb(OLD)->>'id' AND to_jsonb(NEW)->'egcs_tp_agencyholdback' IS DISTINCT FROM to_jsonb(OLD)->'egcs_tp_agencyholdback')
+          ) THEN
+            RAISE EXCEPTION 'Workflow condition reference is in use' USING ERRCODE = '23514', CONSTRAINT = 'workflow_profile_condition_reference';
+          END IF;
+          valid := false;
+          IF ref.condition->>'source' = 'agreement_subtype' THEN
+            SELECT EXISTS (
+              SELECT 1 FROM "Transfer_Payment_Agreement_Subtype" b
+              JOIN "Agency_Agreement_Type" t ON t.id = b.egcs_tp_agreementtype
+              JOIN "Transfer_Payment_Stream" s ON s.id = b.egcs_tp_transferpaymentstream
+              JOIN "Transfer_Payment_Profile" p ON p.id = s.egcs_tp_transferpaymentprofile
+              WHERE b.id = option_id::bigint AND s.id = ref.stream_id AND NOT b._deleted AND NOT t._deleted
+                AND t.egcs_ay_organizationagency = p.egcs_tp_agency
+            ) INTO valid;
+          ELSIF ref.condition->>'source' = 'holdback_basis' THEN
+            SELECT EXISTS (
+              SELECT 1 FROM "Transfer_Payment_Stream_Holdback_Basis" b
+              JOIN "Agency_Holdback_Basis" t ON t.id = b.egcs_tp_agencyholdback
+              JOIN "Transfer_Payment_Stream" s ON s.id = b.egcs_tp_transferpaymentstream
+              JOIN "Transfer_Payment_Profile" p ON p.id = s.egcs_tp_transferpaymentprofile
+              WHERE b.id = option_id::bigint AND s.id = ref.stream_id AND NOT b._deleted AND NOT t._deleted
+                AND t.egcs_ay_organizationagency = p.egcs_tp_agency
+            ) INTO valid;
+          ELSIF ref.condition->>'source' = 'proponent_type' THEN
+            SELECT EXISTS (
+              SELECT 1 FROM "Transfer_Payment_Stream_Eligible_Recipient" b
+              JOIN "Agency_Applicant_Recipient_Subtype" t ON t.id = b.egcs_tp_applicantrecipientsubtype
+              JOIN "Transfer_Payment_Stream" s ON s.id = b.egcs_tp_transferpaymentstream
+              JOIN "Transfer_Payment_Profile" p ON p.id = s.egcs_tp_transferpaymentprofile
+              WHERE t.id = option_id::bigint AND s.id = ref.stream_id AND NOT b._deleted AND NOT t._deleted
+                AND t.egcs_ay_organizationagency = p.egcs_tp_agency
+            ) INTO valid;
+          END IF;
+          IF NOT valid THEN
+            RAISE EXCEPTION 'Workflow condition reference is in use' USING ERRCODE = '23514', CONSTRAINT = 'workflow_profile_condition_reference';
+          END IF;
+        END LOOP;
+      END LOOP;
+      RETURN NULL;
+    END $$`.execute(db)
+  const protectedColumns = {
+    Transfer_Payment_Agreement_Subtype: ['_deleted', 'egcs_tp_transferpaymentstream', 'egcs_tp_agreementtype'],
+    Transfer_Payment_Stream_Holdback_Basis: ['_deleted', 'egcs_tp_transferpaymentstream', 'egcs_tp_agencyholdback'],
+    Transfer_Payment_Stream_Eligible_Recipient: ['_deleted', 'egcs_tp_transferpaymentstream', 'egcs_tp_applicantrecipientsubtype'],
+    Agency_Agreement_Type: ['_deleted', 'egcs_ay_organizationagency'],
+    Agency_Holdback_Basis: ['_deleted', 'egcs_ay_organizationagency'],
+    Agency_Applicant_Recipient_Subtype: ['_deleted', 'egcs_ay_organizationagency'],
+    Transfer_Payment_Stream: ['egcs_tp_transferpaymentprofile'],
+    Transfer_Payment_Profile: ['egcs_tp_agency']
+  }
+  for (const [table, columns] of Object.entries(protectedColumns)) {
+    await sql.raw(`CREATE TRIGGER protect_workflow_profile_conditions AFTER UPDATE OF ${columns.join(', ')} OR DELETE ON "${table}" FOR EACH ROW EXECUTE FUNCTION validate_workflow_profile_references()`).execute(db)
+  }
 }

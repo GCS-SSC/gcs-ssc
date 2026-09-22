@@ -84,7 +84,8 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
         SELECT NEW.id, (member->>'memberId')::bigint, (condition->>'fieldId')::bigint, egcs_cn_option::bigint
         FROM jsonb_array_elements(NEW.egcs_cn_definition->'members') member,
           jsonb_array_elements(COALESCE(member->'conditions', '[]'::jsonb)) condition,
-          jsonb_array_elements_text(condition->'optionIds') egcs_cn_option;
+          jsonb_array_elements_text(condition->'optionIds') egcs_cn_option
+        WHERE condition ? 'fieldId' AND NOT condition ? 'source';
       END IF;
       RETURN NEW;
     END $$
@@ -140,7 +141,8 @@ export const down = async (db: Kysely<Database>): Promise<void> => {
         SELECT NEW.id, (member->>'memberId')::bigint, (condition->>'fieldId')::bigint, option_id::bigint
         FROM jsonb_array_elements(NEW.egcs_cn_definition->'members') member,
           jsonb_array_elements(COALESCE(member->'conditions', '[]'::jsonb)) condition,
-          jsonb_array_elements_text(condition->'optionIds') option_id;
+          jsonb_array_elements_text(condition->'optionIds') option_id
+        WHERE condition ? 'fieldId' AND NOT condition ? 'source';
       END IF;
       RETURN NEW;
     END $$
