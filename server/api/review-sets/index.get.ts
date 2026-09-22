@@ -18,6 +18,7 @@ import { readRuntimeReviewConfiguration } from '~~/server/utils/review-runtime'
 import { authorizeExtensionLifecycleRead, resolveExtensionLifecycleRuntime } from '~~/server/utils/extension-lifecycle-runtime'
 import { RUNTIME_TERMINAL_STATES } from '~~/shared/constants/system-lifecycle'
 import { requireAuthContext } from '~~/server/utils/authorize'
+import { resolveApplicantRecipientVisibility } from '~~/server/utils/applicant-recipient-auth'
 
 const ReviewSetListQuerySchema = PaginationSchema.safeExtend(CoreOrExtensionEntityTargetSchema.shape)
   .superRefine(validateCoreOrExtensionEntityTarget)
@@ -46,6 +47,14 @@ export default defineEventHandler(async event => {
   if (extensionRuntime) await authorizeExtensionLifecycleRead(event, extensionRuntime)
   else await authorizeReviewRuntimeAction(event, 'list_review_sets', runtimeEntity)
 
+  const proponentVisibility = entityType === 'applicantrecipient'
+    ? await resolveApplicantRecipientVisibility(auth, 'read', db)
+    : null
+  const readableAgencyIds = proponentVisibility?.agencyIds ?? []
+  if (proponentVisibility && !proponentVisibility.hasGlobalAccess && readableAgencyIds.length === 0) {
+    return { items: [], total: 0, stats: { total: 0, active: 0 }, page, limit }
+  }
+
   const offset = (page - 1) * limit
   let baseQuery = db
     .selectFrom('Common_Review_Set')
@@ -55,6 +64,16 @@ export default defineEventHandler(async event => {
     .where('Common_Review_Set.egcs_cn_entitytype', '=', entityType)
     .where('Common_Review_Set.egcs_cn_entityid', '=', entityId)
     .where('Common_Review_Set._deleted', '=', false)
+
+  if (proponentVisibility && !proponentVisibility.hasGlobalAccess) {
+    baseQuery = baseQuery.where(eb => eb.exists(eb.selectFrom('Common_Review')
+      .innerJoin('Common_Review_Schema', 'Common_Review_Schema.id', 'Common_Review.egcs_cn_reviewschema')
+      .select('Common_Review.id')
+      .whereRef('Common_Review.egcs_cn_reviewset', '=', 'Common_Review_Set.id')
+      .where('Common_Review._deleted', '=', false)
+      .where('Common_Review_Schema._deleted', '=', false)
+      .where('Common_Review_Schema.egcs_cn_agency', 'in', readableAgencyIds)))
+  }
 
   if (search) {
     const escapedSearch = escapeLikePattern(search)
@@ -94,29 +113,30 @@ export default defineEventHandler(async event => {
   ])
 
   const reviewSetIds = sets.map(set => String(set.id))
-  const reviews = reviewSetIds.length === 0
-    ? []
-    : await db
-        .selectFrom('Common_Review')
-        .innerJoin('Common_Runtime_Item as Review_Item', 'Review_Item.id', 'Common_Review.egcs_cn_runtimeitem')
-        .innerJoin('Common_Publication_Version as Schema_Version', 'Schema_Version.id', 'Review_Item.egcs_cn_publicationversion')
-        .innerJoin('Common_Review_Schema', 'Common_Review_Schema.id', 'Common_Review.egcs_cn_reviewschema')
-        .innerJoin('Agency_Profile', 'Agency_Profile.id', 'Common_Review_Schema.egcs_cn_agency')
-        .select([
-          'Common_Review.id as id',
-          'Common_Review.egcs_cn_reviewset as egcs_cn_reviewset',
-          'Common_Review.egcs_cn_reviewschema as egcs_cn_reviewschema',
-          'Review_Item.id as runtimeItemId',
-          'Review_Item.egcs_cn_state as runtimeState',
-          'Schema_Version.egcs_cn_definition as definition',
-          'Agency_Profile.egcs_ay_name_en as agency_name_en',
-          'Agency_Profile.egcs_ay_name_fr as agency_name_fr'
-        ])
-        .select(eb => eb('Common_Review.id', 'in', assignedEntityIdsQuery(db, auth.userId, 'commonreview')).as('is_assigned'))
-        .where('Common_Review.egcs_cn_reviewset', 'in', reviewSetIds)
-        .where('Common_Review._deleted', '=', false)
-        .orderBy('Common_Review.id', 'asc')
-        .execute()
+  let reviewQuery = db
+    .selectFrom('Common_Review')
+    .innerJoin('Common_Runtime_Item as Review_Item', 'Review_Item.id', 'Common_Review.egcs_cn_runtimeitem')
+    .innerJoin('Common_Publication_Version as Schema_Version', 'Schema_Version.id', 'Review_Item.egcs_cn_publicationversion')
+    .innerJoin('Common_Review_Schema', 'Common_Review_Schema.id', 'Common_Review.egcs_cn_reviewschema')
+    .innerJoin('Agency_Profile', 'Agency_Profile.id', 'Common_Review_Schema.egcs_cn_agency')
+    .select([
+      'Common_Review.id as id',
+      'Common_Review.egcs_cn_reviewset as egcs_cn_reviewset',
+      'Common_Review.egcs_cn_reviewschema as egcs_cn_reviewschema',
+      'Review_Item.id as runtimeItemId',
+      'Review_Item.egcs_cn_state as runtimeState',
+      'Schema_Version.egcs_cn_definition as definition',
+      'Agency_Profile.egcs_ay_name_en as agency_name_en',
+      'Agency_Profile.egcs_ay_name_fr as agency_name_fr'
+    ])
+    .select(eb => eb('Common_Review.id', 'in', assignedEntityIdsQuery(db, auth.userId, 'commonreview')).as('is_assigned'))
+    .where('Common_Review.egcs_cn_reviewset', 'in', reviewSetIds)
+    .where('Common_Review._deleted', '=', false)
+    .orderBy('Common_Review.id', 'asc')
+  if (proponentVisibility && !proponentVisibility.hasGlobalAccess) {
+    reviewQuery = reviewQuery.where('Common_Review_Schema.egcs_cn_agency', 'in', readableAgencyIds)
+  }
+  const reviews = reviewSetIds.length === 0 ? [] : await reviewQuery.execute()
 
   const firstReview = reviews[0]
   const canRetryReview = firstReview

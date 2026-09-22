@@ -314,7 +314,12 @@ const authorizeApplicantRecipientRuntimeAction = async (
   if (action === 'read_assessment') {
     return await authorize(event, 'applicant_recipient', 'read', async ({ context }) => {
       const canRead = await canAccessApplicantRecipient(context, entityContext.entityId, 'read', db)
-      return canRead ? { bypass: true } : { denied: true }
+      const agencyId = entityContext.proponentAgencyContextId ?? entityContext.schemaAgencyId
+      return canRead && agencyId !== null && context.userAbilities.authorize('applicant_recipient', 'read', {
+        type: 'agency', agencyId
+      })
+        ? { bypass: true }
+        : { denied: true }
     })
   }
 
@@ -489,7 +494,8 @@ const authorizeExtensionOwnerRole = async (
 /** Requires inherited Viewer access or approval-specific read authority before workflow eligibility is considered. */
 const authorizeReviewRuntimeReadAccess = async (
   event: H3Event,
-  entityContext: ReviewRuntimeEntityContext
+  entityContext: ReviewRuntimeEntityContext,
+  action: 'read_assessment' | 'list_review_sets' = 'read_assessment'
 ): Promise<AuthContext> => {
   const authContext = await requireAuthContext(event)
   const db = event.context.$db
@@ -526,7 +532,7 @@ const authorizeReviewRuntimeReadAccess = async (
   let hasInheritedOwnerRead = false
   try {
     if (entityContext.entityType === 'applicantrecipient') {
-      await authorizeApplicantRecipientRuntimeAction(event, 'read_assessment', entityContext)
+      await authorizeApplicantRecipientRuntimeAction(event, action, entityContext)
       hasInheritedOwnerRead = true
     } else if (agreementReviewRuntimeEntityTypes.has(entityContext.entityType)) {
       await authorizeAgreementRuntimeAction(event, 'read_assessment', entityContext)
@@ -1038,7 +1044,7 @@ export const authorizeReviewRuntimeAction = async (
   const resolvedAction = reviewRuntimeActionAliases[action] ?? action
 
   if (resolvedAction === 'read_assessment' || resolvedAction === 'list_review_sets') {
-    return await authorizeReviewRuntimeReadAccess(event, entityContext)
+    return await authorizeReviewRuntimeReadAccess(event, entityContext, resolvedAction)
   }
 
   if (resolvedAction === 'action_review_approval') {

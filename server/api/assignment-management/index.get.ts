@@ -35,7 +35,12 @@ export default defineEventHandler(async event => {
       ? 'applicant_recipient'
       : grant.subject === 'agreement' ? 'agreement' : null
     if (!subject) return []
-    if (subject === 'applicant_recipient') return [sql`work.owner_subject = 'applicant_recipient'`]
+    if (subject === 'applicant_recipient') {
+      if (grant.scope.type === 'global') return [sql`work.owner_subject = 'applicant_recipient'`]
+      return [sql`work.owner_subject = 'applicant_recipient' AND (
+        work.entity_type = 'applicantrecipient' OR work.agency_id = ${grant.scope.agencyId}::bigint
+      )`]
+    }
     if (grant.scope.type === 'global') return [sql`work.owner_subject = ${subject}`]
     if (grant.scope.type === 'agency') {
       return [sql`work.owner_subject = ${subject} AND work.agency_id = ${grant.scope.agencyId}::bigint`]
@@ -167,16 +172,24 @@ export default defineEventHandler(async event => {
     ), qualified_bindings AS (${qualifiedBindings}), source_owners AS (
       SELECT * FROM base_work
       UNION ALL
-      SELECT binding.entity_id, binding.entity_type, owner.status, owner.stable_reference, owner.label_en, owner.label_fr, owner.owner_subject, binding.agency_id, owner.program_id, owner.agency_name_en, owner.agency_name_fr, owner.program_name_en, owner.program_name_fr
+      SELECT binding.entity_id, binding.entity_type, owner.status, owner.stable_reference, owner.label_en, owner.label_fr, owner.owner_subject, binding.agency_id, owner.program_id,
+        binding_agency.egcs_ay_name_en, binding_agency.egcs_ay_name_fr, owner.program_name_en, owner.program_name_fr
       FROM qualified_bindings binding
       JOIN base_work owner ON owner.id = binding.owner_id AND owner.entity_type = binding.owner_type
+      JOIN "Agency_Profile" binding_agency ON binding_agency.id = binding.agency_id AND binding_agency._deleted = false
     ), review_work AS (
       SELECT review.id, 'commonreview'::text entity_type, runtime_item.egcs_cn_state::text status, review.id::text stable_reference,
-        '#' || review.id::text label_en, '#' || review.id::text label_fr, source.owner_subject, source.agency_id,
-        source.program_id, source.agency_name_en, source.agency_name_fr, source.program_name_en, source.program_name_fr
+        '#' || review.id::text label_en, '#' || review.id::text label_fr, source.owner_subject,
+        CASE WHEN source.entity_type = 'applicantrecipient' THEN schema.egcs_cn_agency ELSE source.agency_id END agency_id,
+        source.program_id,
+        CASE WHEN source.entity_type = 'applicantrecipient' THEN schema_agency.egcs_ay_name_en ELSE source.agency_name_en END agency_name_en,
+        CASE WHEN source.entity_type = 'applicantrecipient' THEN schema_agency.egcs_ay_name_fr ELSE source.agency_name_fr END agency_name_fr,
+        source.program_name_en, source.program_name_fr
       FROM "Common_Review" review
       JOIN "Common_Runtime_Item" runtime_item ON runtime_item.id = review.egcs_cn_runtimeitem
       JOIN "Common_Review_Set" review_set ON review_set.id = review.egcs_cn_reviewset AND review_set._deleted = false
+      LEFT JOIN "Common_Review_Schema" schema ON schema.id = review.egcs_cn_reviewschema AND schema._deleted = false
+      LEFT JOIN "Agency_Profile" schema_agency ON schema_agency.id = schema.egcs_cn_agency AND schema_agency._deleted = false
       JOIN source_owners source ON source.id = review_set.egcs_cn_entityid
         AND source.entity_type = review_set.egcs_cn_entitytype::text
       WHERE review._deleted = false
@@ -185,10 +198,17 @@ export default defineEventHandler(async event => {
     ), recommendation_work AS (
       SELECT recommendation.id, 'commonrecommendation'::text entity_type, runtime_item.egcs_cn_state::text status,
         recommendation.id::text stable_reference, '#' || recommendation.id::text label_en,
-        '#' || recommendation.id::text label_fr, source.owner_subject, source.agency_id, source.program_id,
-        source.agency_name_en, source.agency_name_fr, source.program_name_en, source.program_name_fr
+        '#' || recommendation.id::text label_fr, source.owner_subject,
+        CASE WHEN source.entity_type = 'applicantrecipient' THEN schema.egcs_cn_agency ELSE source.agency_id END agency_id,
+        source.program_id,
+        CASE WHEN source.entity_type = 'applicantrecipient' THEN schema_agency.egcs_ay_name_en ELSE source.agency_name_en END agency_name_en,
+        CASE WHEN source.entity_type = 'applicantrecipient' THEN schema_agency.egcs_ay_name_fr ELSE source.agency_name_fr END agency_name_fr,
+        source.program_name_en, source.program_name_fr
       FROM "Common_Recommendation" recommendation
       JOIN "Common_Runtime_Item" runtime_item ON runtime_item.id = recommendation.egcs_cn_runtimeitem
+      LEFT JOIN "Common_Recommendation_Schema" schema
+        ON schema.id = runtime_item.egcs_cn_publication AND schema._deleted = false
+      LEFT JOIN "Agency_Profile" schema_agency ON schema_agency.id = schema.egcs_cn_agency AND schema_agency._deleted = false
       JOIN source_work source ON source.id = recommendation.egcs_cn_entityid
         AND source.entity_type = recommendation.egcs_cn_entitytype::text
       WHERE recommendation._deleted = false

@@ -202,7 +202,10 @@ const resolveSourceOwner = async (
       : { kind: 'applicant_recipient', applicantRecipientId: identity.owner.ownerId, agencyId: identity.owner.agencyId }
   }
   if (source.entityType === 'applicantrecipient') {
-    return await resolveApplicantRecipientOwner(db, source.entityId)
+    const owner = await resolveApplicantRecipientOwner(db, source.entityId)
+    return owner && source.fallbackAgencyId
+      ? { ...owner, agencyId: source.fallbackAgencyId }
+      : null
   }
   if (source.entityType === 'transferpaymentstream') {
     return await resolveStreamOwner(db, source.entityId)
@@ -210,7 +213,10 @@ const resolveSourceOwner = async (
   const agreementId = await resolveAgreementIdFromEntity(db, source.entityType, source.entityId)
   if (agreementId) return await resolveAgreementOwner(db, agreementId)
   if (source.target && (source.target.entityType === 'commonreview' || source.target.entityType === 'commonrecommendation')) {
-    return await resolveEntityAssignmentOwner(db, source.target.entityType, source.target.entityId)
+    const owner = await resolveEntityAssignmentOwner(db, source.target.entityType, source.target.entityId)
+    return owner?.kind === 'applicant_recipient' && source.fallbackAgencyId
+      ? { ...owner, agencyId: source.fallbackAgencyId }
+      : owner
   }
   // A missing typed business owner must never become schema-agency authority.
   if (source.target) return null
@@ -288,7 +294,10 @@ export const canAccessEntityAssignmentOwner = async (
   db: Kysely<Database>
 ): Promise<boolean> => {
   if (owner.kind === 'applicant_recipient') {
-    return await canAccessApplicantRecipient(context, owner.applicantRecipientId, action, db)
+    if (!await canAccessApplicantRecipient(context, owner.applicantRecipientId, 'read', db)) return false
+    return owner.agencyId
+      ? context.userAbilities.authorize('applicant_recipient', action, { type: 'agency', agencyId: owner.agencyId })
+      : await canAccessApplicantRecipient(context, owner.applicantRecipientId, action, db)
   }
   if (owner.kind === 'agreement') {
     const agreement = await resolveAgreementScopeContext(owner.agreementId, db)
@@ -316,6 +325,11 @@ export const canManageEntityAssignmentsWithContext = async (
   const owner = await resolveEntityAssignmentOwner(db, entityType, entityId)
   if (!owner) return false
   if (owner.kind === 'applicant_recipient') {
+    if (owner.agencyId) {
+      return context.userAbilities.canManageAssignments('applicant_recipient', {
+        type: 'agency', agencyId: owner.agencyId
+      })
+    }
     const { getUserAssignmentAgencyScopes } = await import('./rbac')
     if (context.userAbilities.canManageAssignments('applicant_recipient', { type: 'global' })) return true
     const scopes = await getUserAssignmentAgencyScopes(context.userId, db)
@@ -449,6 +463,12 @@ export const resolveAgencyValidEntityAssigneeIdsWithDb = async (
   let subject: 'agency' | 'agreement' | 'applicant_recipient' | 'transfer_payment'
   let scope: AuthorizationScope
   if (owner.kind === 'applicant_recipient') {
+    if (owner.agencyId) {
+      return new Set(applicationUsers.filter(user => abilitiesByUserId
+        .get(String(user.application_user_id))
+        ?.authorize('applicant_recipient', 'update', { type: 'agency', agencyId: owner.agencyId }))
+        .map(user => String(user.common_user_id)))
+    }
     const activeAssignments = await getActiveStructuralRoleAssignments(db, applicationUsers.map(user => String(user.application_user_id)))
     const agencyIdsByUser = new Map<string, Set<string>>()
     for (const assignment of activeAssignments) {

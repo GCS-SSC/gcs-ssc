@@ -37,7 +37,12 @@ export default defineEventHandler(async event => {
     const actor = { auth, commonUserId: commonUser.id }
     const readGrants = actor.auth.userAbilities.getGrants().filter(grant => grant.action === 'read')
     const authorizationPredicates: RawBuilder<unknown>[] = readGrants.map(grant => {
-      if (grant.subject === 'applicant_recipient') return sql`work.owner_subject = 'applicant_recipient'`
+      if (grant.subject === 'applicant_recipient') {
+        if (grant.scope.type === 'global') return sql`work.owner_subject = 'applicant_recipient'`
+        return sql`work.owner_subject = 'applicant_recipient' AND (
+          work.entity_type = 'applicantrecipient' OR work.agency_id = ${grant.scope.agencyId}::bigint
+        )`
+      }
       if (grant.scope.type === 'global') return sql`work.owner_subject = ${grant.subject}`
       if (grant.scope.type === 'agency') {
         return sql`work.owner_subject = ${grant.subject} AND work.agency_id = ${grant.scope.agencyId}::bigint`
@@ -159,7 +164,8 @@ export default defineEventHandler(async event => {
         '#' || review.id::text identifier_en, '#' || review.id::text identifier_fr, source.agreement_id,
         CASE WHEN checklist.id IS NULL THEN 'assessment' ELSE 'checklist' END variant,
         COALESCE(source.owner_subject, CASE WHEN stream.id IS NOT NULL THEN 'transfer_payment' ELSE 'agency' END) owner_subject,
-        COALESCE(source.agency_id, program.egcs_tp_agency, schema.egcs_cn_agency) agency_id,
+        CASE WHEN source.entity_type = 'applicantrecipient' THEN schema.egcs_cn_agency
+          ELSE COALESCE(source.agency_id, program.egcs_tp_agency, schema.egcs_cn_agency) END agency_id,
         COALESCE(source.program_id, program.id) program_id
       FROM "Common_Review" review
       JOIN "Common_Runtime_Item" runtime_item ON runtime_item.id = review.egcs_cn_runtimeitem
@@ -185,7 +191,8 @@ export default defineEventHandler(async event => {
         '#' || recommendation.id::text identifier_en, '#' || recommendation.id::text identifier_fr,
         source.agreement_id, NULL::text variant,
         COALESCE(source.owner_subject, CASE WHEN stream.id IS NOT NULL THEN 'transfer_payment' ELSE 'agency' END) owner_subject,
-        COALESCE(source.agency_id, program.egcs_tp_agency, schema.egcs_cn_agency) agency_id,
+        CASE WHEN source.entity_type = 'applicantrecipient' THEN schema.egcs_cn_agency
+          ELSE COALESCE(source.agency_id, program.egcs_tp_agency, schema.egcs_cn_agency) END agency_id,
         COALESCE(source.program_id, program.id) program_id
       FROM "Common_Recommendation" recommendation
       JOIN "Common_Runtime_Item" runtime_item ON runtime_item.id = recommendation.egcs_cn_runtimeitem

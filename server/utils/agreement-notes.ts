@@ -22,7 +22,8 @@ export const listAgreementNotes = async (event: H3Event) => await executeFreshRe
   await assertAgreementExists(event, agreementId, db)
   const { page, limit, search } = await getValidatedQueryI18n(event, PaginationSchema)
   const base = db.selectFrom('Funding_Case_Agreement_Note')
-    .where('egcs_fc_fundingagreement', '=', agreementId).where('_deleted', '=', false)
+    .where('Funding_Case_Agreement_Note.egcs_fc_fundingagreement', '=', agreementId)
+    .where('Funding_Case_Agreement_Note._deleted', '=', false)
   const filtered = search
     ? base.where(eb => eb.or([
         eb('egcs_fc_subject_en', 'ilike', `%${escapeLikePattern(search)}%`),

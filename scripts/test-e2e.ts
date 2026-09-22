@@ -633,6 +633,7 @@ const POSTGRES_E2E_UNLOCK_QUERY = 'SELECT pg_advisory_unlock(hashtext(\'gcs-ssc-
 
 const resetPostgresE2eSchemas = async (client: PostgresSchemaClient): Promise<void> => {
   await client.query('DROP SCHEMA IF EXISTS extensions CASCADE')
+  await client.query('DROP SCHEMA IF EXISTS audit CASCADE')
   await client.query('DROP SCHEMA IF EXISTS public CASCADE')
   await client.query('CREATE SCHEMA public')
 }
