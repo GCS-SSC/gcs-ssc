@@ -17,6 +17,7 @@ export type EntityAssignmentRoster = {
   can_manage_assignments: boolean
   is_assigned: boolean
   is_primary: boolean
+  group?: { id: string | null, claimed_by: string | null, name_en: string, name_fr: string } | null
 }
 
 /**

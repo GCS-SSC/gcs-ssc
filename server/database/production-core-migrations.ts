@@ -25,6 +25,7 @@ import * as customFieldNamespacesMigration from './migrations/0017_custom_field_
 import * as agreementProponentTypeMigration from './migrations/0018_agreement_proponent_type'
 import * as notesMigration from './migrations/0019_notes'
 import * as extensionProponentAgencyMigration from './migrations/0020_extension_proponent_agency'
+import * as administrativeGroupsMigration from './migrations/0021_administrative_groups'
 
 import * as proponentTypeCleanupMigration from './migrations/9999_z_proponent_type_cleanup'
 
@@ -33,6 +34,7 @@ import * as workflowProfileConditionsMigration from './migrations/9999_zz_workfl
 import * as checklistNotApplicableMigration from './migrations/9999_zzz_checklist_not_applicable'
 
 import * as reviewSetDirectReviewMigration from './migrations/9999_zzzz_review_set_direct_review'
+import * as groupPermissionsMigration from './migrations/9999_zzzzz_group_permissions'
 
 export const productionCoreMigrations = {
   '0001_common': commonMigration,
@@ -55,10 +57,12 @@ export const productionCoreMigrations = {
   '0018_agreement_proponent_type': agreementProponentTypeMigration,
   '0019_notes': notesMigration,
   '0020_extension_proponent_agency': extensionProponentAgencyMigration,
+  '0021_administrative_groups': administrativeGroupsMigration,
   '9999_z_proponent_type_cleanup': proponentTypeCleanupMigration,
   '9999_zz_workflow_profile_conditions': workflowProfileConditionsMigration,
   '9999_zzz_checklist_not_applicable': checklistNotApplicableMigration,
-  '9999_zzzz_review_set_direct_review': reviewSetDirectReviewMigration
+  '9999_zzzz_review_set_direct_review': reviewSetDirectReviewMigration,
+  '9999_zzzzz_group_permissions': groupPermissionsMigration
 } satisfies Record<string, Migration>
 
 export const productionCoreMigrationProvider: MigrationProvider = {

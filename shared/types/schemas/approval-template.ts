@@ -57,6 +57,9 @@ export const ApprovalTemplateStepBaseSchema = createApprovalTemplateStepBaseSche
 
 export const ApprovalTemplateStepSchema = ApprovalTemplateStepBaseSchema.superRefine((data, ctx) => {
   validateApprovalTemplateCertifications(data.certifications, ctx)
+  if (Number(Boolean(data.egcs_cn_defaultuser)) + Number(Boolean(data.egcs_cn_defaultgroup)) !== 1) {
+    ctx.addIssue({ code: 'custom', message: 'validation.invalid_selection', path: ['egcs_cn_defaultuser'] })
+  }
 })
 
 export const ApprovalTemplateStepPatchSchema = ApprovalTemplateStepBaseSchema
@@ -174,6 +177,9 @@ const ApprovalTemplatePersistenceStepActiveSchema = createApprovalTemplateStepBa
   _deleted: z.literal(false).optional()
 }).superRefine((data, ctx) => {
   validateApprovalTemplatePatchCertifications(data.certifications, ctx)
+  if (Number(Boolean(data.egcs_cn_defaultuser)) + Number(Boolean(data.egcs_cn_defaultgroup)) !== 1) {
+    ctx.addIssue({ code: 'custom', message: 'validation.invalid_selection', path: ['egcs_cn_defaultuser'] })
+  }
 })
 
 const ApprovalTemplatePersistenceStepSchema = z.union([

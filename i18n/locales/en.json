@@ -48,6 +48,19 @@
     "category_en": "English category",
     "category_fr": "French category"
   },
+  "groups": {
+    "title": "Administrative groups",
+    "group": "Group",
+    "user": "User",
+    "assignee_type": "Assignee type",
+    "members": "Members",
+    "email": "Group email",
+    "available": "Available group work",
+    "mine": "My claimed group work",
+    "claim": "Assign to me",
+    "loading": "Loading group work",
+    "delete_confirm": "Delete this group and its membership?"
+  },
   "nav": {
     "home": "Home",
     "agencies": "Agencies",
@@ -55,6 +68,7 @@
     "agreements": "Agreements",
     "roles": "Roles",
     "users": "Users",
+    "groups": "Groups",
     "language_toggle": "Switch language",
     "admin_common": "Common",
     "assignment_management": "Assignment",
@@ -604,6 +618,7 @@
       "transfer_payment": "Transfer payment",
       "role": "Roles",
       "user": "Users",
+      "group": "Groups",
       "agreement": "Agreements",
       "applicant_recipient": "Proponents"
     },

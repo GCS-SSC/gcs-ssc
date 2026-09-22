@@ -9,6 +9,7 @@ import {
   validateReviewSchemasForAgency
 } from '~~/server/utils/transfer-payment-polymorphic'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+import { isAssignableGroup } from '~~/server/utils/groups'
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -67,6 +68,9 @@ export default defineEventHandler(async event => {
         if (!hasValidReviewSchema) {
           return await badRequest(event, 'REVIEW_SCHEMA_NOT_FOUND', 'apiErrors.transfer_payment.review_schema_not_found')
         }
+        if (body.egcs_cn_defaultgroup && !await isAssignableGroup(trx, body.egcs_cn_defaultgroup, freshContext.agencyId)) {
+          return await badRequest(event, 'REVIEW_GROUP_INVALID', 'apiErrors.request.invalid')
+        }
 
         const existingMembers = await trx
           .selectFrom('Common_Review_Setup')
@@ -108,6 +112,7 @@ export default defineEventHandler(async event => {
             egcs_cn_reviewset: reviewSetupId,
             egcs_cn_approvaltemplate: body.egcs_cn_approvaltemplate,
             egcs_cn_reviewschema: body.egcs_cn_reviewschema,
+            egcs_cn_defaultgroup: body.egcs_cn_defaultgroup,
             egcs_cn_failonchecklistfailure: body.egcs_cn_failonchecklistfailure,
             egcs_cn_failurethreshold: body.egcs_cn_failurethreshold,
             _deleted: false

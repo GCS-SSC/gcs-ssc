@@ -18,10 +18,12 @@ import type { H3Event } from 'h3'
 import type { Kysely } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+import { isAssignableGroup } from '~~/server/utils/groups'
 
 type AdditionalReviewerPatchBody = {
   egcs_cn_comments: string
-  egcs_cn_user: string
+  egcs_cn_user?: string
+  egcs_cn_group?: string
 }
 
 type AdditionalReviewerUser = {
@@ -95,12 +97,15 @@ const assertAdditionalReviewerAssigneeAllowed = async (
 const updateAdditionalReviewerRow = async (
   db: Kysely<Database>,
   additionalReviewerId: string,
-  body: AdditionalReviewerPatchBody
+  body: AdditionalReviewerPatchBody,
+  rowContext: AdditionalReviewerRowContext
 ) => await db
   .updateTable('Common_Additional_Reviewers')
   .set({
     egcs_cn_comments: body.egcs_cn_comments,
-    egcs_cn_user: body.egcs_cn_user
+    egcs_cn_user: body.egcs_cn_user ?? null,
+    egcs_cn_group: body.egcs_cn_group
+      ?? (body.egcs_cn_user === rowContext.row.assignedUserId ? rowContext.row.assignedGroupId : null)
   })
   .where('id', '=', additionalReviewerId)
   .where('_deleted', '=', false)
@@ -108,6 +113,7 @@ const updateAdditionalReviewerRow = async (
     'id',
     'egcs_cn_comments',
     'egcs_cn_user',
+    'egcs_cn_group',
     'egcs_cn_completedat'
   ])
   .executeTakeFirstOrThrow()
@@ -119,13 +125,16 @@ const mapAdditionalReviewerPatchResponse = (
   allowedUsers: AdditionalReviewerUser[],
   currentCommonUserId: string
 ) => {
-  const assignedUserName = allowedUsers.find(user => user.id === body.egcs_cn_user)?.name ?? rowContext.row.assignedUserName
+  const assignedUserName = body.egcs_cn_user
+    ? allowedUsers.find(user => user.id === body.egcs_cn_user)?.name ?? rowContext.row.assignedUserName
+    : ''
   const currentOwnsRow = body.egcs_cn_user === currentCommonUserId
 
   return {
     id: String(updated.id),
     egcs_cn_comments: updated.egcs_cn_comments ?? '',
-    egcs_cn_user: String(updated.egcs_cn_user),
+    egcs_cn_user: updated.egcs_cn_user ? String(updated.egcs_cn_user) : null,
+    egcs_cn_group: updated.egcs_cn_group ? String(updated.egcs_cn_group) : null,
     egcs_cn_user_name: assignedUserName,
     egcs_cn_completedat: updated.egcs_cn_completedat ? new Date(updated.egcs_cn_completedat).toISOString() : null,
     can_update: currentOwnsRow,
@@ -179,14 +188,18 @@ export default defineEventHandler(async event => {
     if (!Array.isArray(allowedUsers)) {
       return allowedUsers
     }
-    const assigneeError = body.egcs_cn_user === currentRowContext.row.assignedUserId
+    const assigneeError = !body.egcs_cn_user || body.egcs_cn_user === currentRowContext.row.assignedUserId
       ? null
       : await assertAdditionalReviewerAssigneeAllowed(event, allowedUsers, body.egcs_cn_user)
     if (assigneeError) {
       return assigneeError
     }
+    if (body.egcs_cn_group && (!currentRowContext.runtimeEntity.schemaAgencyId
+      || !await isAssignableGroup(trx, body.egcs_cn_group, currentRowContext.runtimeEntity.schemaAgencyId))) {
+      return await badRequest(event, 'ADDITIONAL_REVIEWER_ASSIGNEE_INVALID', 'apiErrors.request.invalid')
+    }
 
-    const updated = await updateAdditionalReviewerRow(trx, additionalReviewerId, body)
+    const updated = await updateAdditionalReviewerRow(trx, additionalReviewerId, body, currentRowContext)
     return mapAdditionalReviewerPatchResponse(
       updated,
       body,

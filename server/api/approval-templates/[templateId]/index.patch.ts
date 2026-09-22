@@ -12,6 +12,7 @@ import {
   syncApprovalTemplate
 } from '~~/server/utils/approval-templates'
 import { requireAuthContext } from '~~/server/utils/authorize'
+import { assertApprovalTemplateGroups } from '~~/server/utils/approval-template-groups'
 
 export default defineEventHandler(async event => {
   await requireAuthContext(event)
@@ -41,6 +42,7 @@ export default defineEventHandler(async event => {
       return await notFound(event, 'APPROVAL_TEMPLATE_NOT_FOUND', 'apiErrors.admin_common.not_found')
     }
     const merged = await parseI18n(event, ApprovalTemplatePersistenceSchema, mergedPatch)
+    await assertApprovalTemplateGroups(event, trx, scopeContext.agencyId, merged.steps.map(step => 'egcs_cn_defaultgroup' in step ? step.egcs_cn_defaultgroup : null))
 
     await syncApprovalTemplate(trx, {
       scopeType: scopeContext.scopeType,

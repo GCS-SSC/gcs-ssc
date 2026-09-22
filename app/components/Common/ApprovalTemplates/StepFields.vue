@@ -1,5 +1,6 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc */
+import { ref, watch } from 'vue'
 import type {
   ApprovalTemplateEditorCertification,
   ApprovalTemplateEditorStep
@@ -37,6 +38,26 @@ const getCertificationActionTarget = (certification: ApprovalTemplateEditorCerti
 const orderedCertifications = computed(() => (step.value?.certifications ?? [])
   .map((certification, sourceIndex) => ({ certification, sourceIndex }))
   .toSorted((left, right) => left.certification.egcs_cn_order - right.certification.egcs_cn_order))
+const selectedAssigneeKind = ref<'user' | 'group'>(step.value?.egcs_cn_defaultgroup ? 'group' : 'user')
+watch(() => step.value?.id, () => {
+  selectedAssigneeKind.value = step.value?.egcs_cn_defaultgroup ? 'group' : 'user'
+})
+const assigneeKind = computed({
+  get: () => selectedAssigneeKind.value,
+  set: (kind: string) => {
+    selectedAssigneeKind.value = kind === 'group' ? 'group' : 'user'
+    step.value.egcs_cn_defaultuser = kind === 'user' ? '' : null
+    step.value.egcs_cn_defaultgroup = kind === 'group' ? '' : null
+  }
+})
+const selectedUser = computed({
+  get: () => step.value.egcs_cn_defaultuser ?? '',
+  set: (value: string) => { step.value.egcs_cn_defaultuser = value }
+})
+const selectedGroup = computed({
+  get: () => step.value.egcs_cn_defaultgroup ?? '',
+  set: (value: string) => { step.value.egcs_cn_defaultgroup = value }
+})
 </script>
 
 <template>
@@ -60,14 +81,20 @@ const orderedCertifications = computed(() => (step.value?.certifications ?? [])
       <UFormField :label="t('admin_common.fields.egcs_cn_description_fr')" name="step.egcs_cn_description_fr" required>
         <CommonTextarea v-model="step.egcs_cn_description_fr" :rows="3" />
       </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_defaultuser')" name="step.egcs_cn_defaultuser" required>
+      <UFormField :label="t('groups.assignee_type')" required>
+        <USelect v-model="assigneeKind" :items="[{ label: t('groups.user'), value: 'user' }, { label: t('groups.group'), value: 'group' }]" />
+      </UFormField>
+      <UFormField v-if="assigneeKind === 'user'" :label="t('admin_common.fields.egcs_cn_defaultuser')" name="step.egcs_cn_defaultuser" required>
         <CommonServerLookupSelect
-          v-model="step.egcs_cn_defaultuser"
+          v-model="selectedUser"
           :fetch-url="`/api/users/lookups?approvalTemplateId=${approvalTemplateId}`"
           selected-values-query-key="selectedIds"
           value-key="id"
           label-en-key="egcs_cn_name_en"
           label-fr-key="egcs_cn_name_fr" />
+      </UFormField>
+      <UFormField v-else :label="t('groups.group')" name="step.egcs_cn_defaultgroup" required>
+        <CommonServerLookupSelect v-model="selectedGroup" fetch-url="/api/groups/lookups" value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" :query="{ approvalTemplateId }" />
       </UFormField>
     </div>
 

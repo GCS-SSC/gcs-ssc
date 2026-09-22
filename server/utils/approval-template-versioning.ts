@@ -33,7 +33,8 @@ export type PublishedApprovalTemplate = {
     sequence: number
     nameEn: string
     nameFr: string
-    defaultUser: string
+    defaultUser?: string
+    defaultGroup?: string
     certifications: Array<{ optional: boolean, certificationEn: string, certificationFr: string }>
   }>
 }
@@ -83,7 +84,8 @@ export const buildApprovalTemplateConfiguration = async (
       sequence: Number(step.egcs_cn_sequence),
       nameEn: step.egcs_cn_name_en,
       nameFr: step.egcs_cn_name_fr,
-      defaultUser: String(step.egcs_cn_defaultuser),
+      ...(step.egcs_cn_defaultuser ? { defaultUser: String(step.egcs_cn_defaultuser) } : {}),
+      ...(step.egcs_cn_defaultgroup ? { defaultGroup: String(step.egcs_cn_defaultgroup) } : {}),
       certifications: certifications
         .filter(item => String(item.egcs_cn_approvalstep) === String(step.id))
         .map(item => ({

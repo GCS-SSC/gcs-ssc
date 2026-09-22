@@ -515,6 +515,8 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Common_Assessment_Outcome: CommonAssessmentOutcomeTable
   Common_Assessment_Custom_Outcome: CommonAssessmentCustomOutcomeTable
   Common_User: CommonUserTable
+  Common_Group: CommonGroupTable
+  Common_Group_Member: CommonGroupMemberTable
   Common_GWCOA: CommonGwcoaTable
   Common_Entity_Type: CommonEntityTypeTable
   Common_Entity: CommonEntityTable
@@ -686,7 +688,7 @@ export interface RoleTable {
 export interface RolePermissionTable {
   id: Generated<string>
   role_id: string
-  subject: 'audit' | 'system' | 'agency' | 'transfer_payment' | 'role' | 'user' | 'agreement' | 'applicant_recipient'
+  subject: 'audit' | 'system' | 'agency' | 'transfer_payment' | 'role' | 'user' | 'group' | 'agreement' | 'applicant_recipient'
   access_level: 'viewer' | 'contributor' | 'manager' | null
   can_manage_assignments: Generated<boolean>
   _deleted: Generated<boolean>
@@ -1138,7 +1140,8 @@ export interface CommonApprovalStepTable {
   egcs_cn_name_en: string
   egcs_cn_name_fr: string
   egcs_cn_approvaltemplate: string
-  egcs_cn_defaultuser: string
+  egcs_cn_defaultuser?: string | null
+  egcs_cn_defaultgroup?: string | null
   egcs_cn_approvertitle: string
   _deleted: Generated<boolean>
 }
@@ -1166,9 +1169,11 @@ export interface CommonApprovalTable {
   egcs_cn_name_en: string
   egcs_cn_name_fr: string
   egcs_cn_routingslip: string
-  egcs_cn_defaultuser: string
-  egcs_cn_assigneduser?: string
-  egcs_cn_onbehalf?: string
+  egcs_cn_defaultuser?: string | null
+  egcs_cn_defaultgroup?: string | null
+  egcs_cn_assigneduser?: string | null
+  egcs_cn_assignedgroup?: string | null
+  egcs_cn_onbehalf?: string | null
   egcs_cn_approvalpositiontitle?: string
   egcs_cn_isadded: boolean
   egcs_cn_approvalvalue?: boolean
@@ -1219,6 +1224,22 @@ export interface CommonUserTable {
   egcs_cn_image?: string
   egcs_cn_created_at: Date
   egcs_cn_updated_at: Date
+  _deleted: Generated<boolean>
+}
+
+export interface CommonGroupTable {
+  id: Generated<string>
+  egcs_cn_agency: string
+  egcs_cn_name_en: string
+  egcs_cn_name_fr: string
+  egcs_cn_email: string
+  _deleted: Generated<boolean>
+}
+
+export interface CommonGroupMemberTable {
+  id: Generated<string>
+  egcs_cn_group: string
+  egcs_cn_user: string
   _deleted: Generated<boolean>
 }
 
@@ -1620,7 +1641,8 @@ export interface CommonAdditionalReviewersTable {
   egcs_cn_entitytype: Entity_Type
   egcs_cn_entityid: string
   egcs_cn_comments?: string
-  egcs_cn_user: string
+  egcs_cn_user?: string | null
+  egcs_cn_group?: string | null
   egcs_cn_completedat?: Date | null
   _deleted: Generated<boolean>
 }
@@ -1686,6 +1708,7 @@ export interface CommonReviewSetupTable {
   egcs_cn_reviewset: string
   egcs_cn_approvaltemplate?: string
   egcs_cn_reviewschema: string
+  egcs_cn_defaultgroup?: string | null
   egcs_cn_failonchecklistfailure: Generated<boolean>
   egcs_cn_failurethreshold: number | null
   _deleted: Generated<boolean>
@@ -1714,6 +1737,8 @@ export interface CommonReviewTable {
   egcs_cn_reviewset: string
   egcs_cn_reviewschema: string
   egcs_cn_runtimeitem: string
+  egcs_cn_group?: string | null
+  egcs_cn_groupclaimedby?: string | null
   egcs_cn_disablecustomoutcomes: boolean
   egcs_cn_disablealignment: boolean
   egcs_cn_disablereviewers: boolean

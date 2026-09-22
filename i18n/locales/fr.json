@@ -48,6 +48,19 @@
     "category_en": "Catégorie anglaise",
     "category_fr": "Catégorie française"
   },
+  "groups": {
+    "title": "Groupes administratifs",
+    "group": "Groupe",
+    "user": "Utilisateur",
+    "assignee_type": "Type de responsable",
+    "members": "Membres",
+    "email": "Courriel du groupe",
+    "available": "Travail de groupe disponible",
+    "mine": "Travail de groupe que j’ai pris en charge",
+    "claim": "M’assigner",
+    "loading": "Chargement du travail de groupe",
+    "delete_confirm": "Supprimer ce groupe et ses membres?"
+  },
   "nav": {
     "home": "Accueil",
     "agencies": "Agences",
@@ -55,6 +68,7 @@
     "agreements": "Ententes",
     "roles": "Rôles",
     "users": "Utilisateurs",
+    "groups": "Groupes",
     "language_toggle": "Changer de langue",
     "admin_common": "Commun",
     "assignment_management": "Affectations",
@@ -604,6 +618,7 @@
       "transfer_payment": "Paiement de transfert",
       "role": "Rôles",
       "user": "Utilisateurs",
+      "group": "Groupes",
       "agreement": "Ententes",
       "applicant_recipient": "Promoteurs"
     },

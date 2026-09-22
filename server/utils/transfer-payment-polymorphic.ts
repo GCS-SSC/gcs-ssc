@@ -12,6 +12,7 @@ export type ReviewSetupMemberRow = {
   egcs_cn_approvaltemplate?: string | number | null
   egcs_cn_failonchecklistfailure?: boolean | null
   egcs_cn_failurethreshold?: number | null
+  egcs_cn_defaultgroup?: string | number | null
   egcs_cn_name_en?: string | null
   egcs_cn_name_fr?: string | null
   egcs_cn_outcomename_en?: string | null
@@ -207,6 +208,7 @@ export const mapReviewSetupMembers = (members: ReviewSetupMemberRow[]) => member
   egcs_cn_order: member.egcs_cn_order,
   ...(member.egcs_cn_approvaltemplate ? { egcs_cn_approvaltemplate: String(member.egcs_cn_approvaltemplate) } : {}),
   egcs_cn_failonchecklistfailure: member.egcs_cn_failonchecklistfailure === true,
+  egcs_cn_defaultgroup: member.egcs_cn_defaultgroup ? String(member.egcs_cn_defaultgroup) : null,
   ...(member.egcs_cn_failurethreshold !== null && member.egcs_cn_failurethreshold !== undefined
     ? { egcs_cn_failurethreshold: member.egcs_cn_failurethreshold }
     : {}),

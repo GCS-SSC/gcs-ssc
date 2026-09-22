@@ -71,6 +71,10 @@ const modalTitle = computed(() => (
   isUpdate.value ? t('transfer_payment.review_setup_member_update') : t('transfer_payment.review_setup_member_create')
 ))
 const submitLabel = computed(() => (isUpdate.value ? t('common.update') : t('common.save')))
+const selectedGroup = computed({
+  get: (): string => typeof state.value?.egcs_cn_defaultgroup === 'string' ? state.value.egcs_cn_defaultgroup : '',
+  set: (value: string) => { if (state.value) state.value.egcs_cn_defaultgroup = value || null }
+})
 
 /**
  * Persists editable review-setup member fields for the selected stream-scoped review set.
@@ -129,6 +133,14 @@ const onSubmit = async (
             :entity-type="entityType"
             :review-type="typeof state.egcs_cn_reviewtype === 'string' ? state.egcs_cn_reviewtype : undefined"
             stacked-layout />
+          <UFormField :label="t('groups.group')" name="egcs_cn_defaultgroup">
+            <CommonServerLookupSelect
+              v-model="selectedGroup"
+              :fetch-url="`/api/transfer-payments/${transferPaymentId}/streams/${streamId}/review-setups/${reviewSetupId}/groups`"
+              value-key="id"
+              label-en-key="egcs_cn_name_en"
+              label-fr-key="egcs_cn_name_fr" />
+          </UFormField>
           <UFormField
             v-if="state.egcs_cn_reviewtype === 'checklist'"
             :label="t('transfer_payment.fail_on_checklist_failure')"

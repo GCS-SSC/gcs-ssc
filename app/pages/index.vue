@@ -1,10 +1,14 @@
 <script setup lang="ts">
+/* eslint-disable jsdoc/require-jsdoc -- Page-local queue handlers are clear from their names. */
 import { computed, ref } from 'vue'
 import type { Ref } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { appRouteLocations } from '~/utils/route-locations'
+import { getClientRequestUrl } from '~/utils/client-request-url'
+import { throwFetchResponseError } from '~/utils/fetch-error'
 import { ASSIGNABLE_ENTITY_TYPE_ENUM } from '~~/shared/constants/enums'
+import { buildAssignedWorkRoute } from '~~/shared/utils/entity-assignments'
 import type { AssignableEntityType } from '~~/shared/types/schemas'
 import type { BusinessRecordStateFields } from '~~/shared/types/business-record-state'
 
@@ -17,6 +21,19 @@ type AssignedWorkItem = BusinessRecordStateFields & {
   is_primary: boolean
   agreement_id: string | null
   variant: string | null
+}
+type GroupWorkItem = {
+  kind: 'review' | 'additional_reviewer' | 'approval'
+  id: string
+  entity_type: string
+  entity_id: string
+  review_id: string | null
+  variant: 'checklist' | 'assessment' | null
+  name_en: string
+  name_fr: string
+  group_name_en: string
+  group_name_fr: string
+  agreement_id: string | null
 }
 
 type AssignedWorkLocationBuilder = (item: AssignedWorkItem) => RouteLocationRaw
@@ -47,13 +64,56 @@ const assignedWorkLocationBuilders = {
 } satisfies Record<AssignableEntityType, AssignedWorkLocationBuilder>
 
 const getAssignedWorkLocation = (item: AssignedWorkItem) => assignedWorkLocationBuilders[item.entity_type](item)
+const getGroupWorkLocation = (item: GroupWorkItem): RouteLocationRaw | null => {
+  if (item.entity_type === 'commonreview') return item.variant === 'checklist'
+    ? appRouteLocations.checklistDetail(item.entity_id)
+    : appRouteLocations.assessmentDetail(item.entity_id)
+  if (item.entity_type === 'commonrecommendation') return appRouteLocations.recommendationDetail(item.entity_id)
+  if (item.entity_type === 'fundingcaseagreement') return appRouteLocations.agreementDetail(item.entity_id)
+  if (item.entity_type === 'applicantrecipient') return appRouteLocations.proponentEdit(item.entity_id)
+  if (item.entity_type === 'fundingclaimreconcile') return appRouteLocations.claimReconciliationDetail(item.entity_id)
+  if (item.agreement_id && ASSIGNABLE_ENTITY_TYPE_ENUM.includes(item.entity_type as AssignableEntityType))
+    return buildAssignedWorkRoute(item.entity_type as AssignableEntityType, item.entity_id, item.agreement_id, item.variant)
+  return null
+}
 
 const { t } = useI18n()
 const localePath = useLocalePath()
 const { canAny } = useCan()
 const { getBilingualValue } = useBilingualValue()
+const { showError } = useApiErrorToast()
 const { getHeroCollapsed } = useDashboard()
 const isHeroCollapsed = getHeroCollapsed('home')
+const groupWorkView: Ref<'available' | 'mine'> = ref('available')
+const { data: groupWork, status: groupWorkStatus, refresh: refreshGroupWork } = useAsyncData(
+  'home-group-work', async (): Promise<{ items: GroupWorkItem[], total: number }> => {
+    const requestUrl = getClientRequestUrl('/api/group-work')
+    requestUrl.searchParams.set('view', groupWorkView.value)
+    requestUrl.searchParams.set('page', '1')
+    requestUrl.searchParams.set('limit', '50')
+    const response = await fetch(requestUrl)
+    if (!response.ok) await throwFetchResponseError(response)
+    return await response.json() as { items: GroupWorkItem[], total: number }
+  }, { watch: [groupWorkView] }
+)
+const claimingGroupWorkId: Ref<string | null> = ref(null)
+const claimGroupWork = async (item: GroupWorkItem) => {
+  const url = item.kind === 'review'
+    ? `/api/reviews/${item.id}/claim`
+    : item.kind === 'additional_reviewer'
+      ? `/api/additional-reviewers/${item.id}/claim`
+      : `/api/approvals/${item.id}/claim`
+  try {
+    claimingGroupWorkId.value = item.id
+    const response = await fetch(getClientRequestUrl(url), { method: 'POST' })
+    if (!response.ok) await throwFetchResponseError(response)
+    await Promise.all([refreshGroupWork(), refresh()])
+  } catch (error) {
+    showError(error)
+  } finally {
+    claimingGroupWorkId.value = null
+  }
+}
 const entityTypeFilter: Ref<'all' | AssignableEntityType> = ref('all')
 const assignedWorkQuery = computed(() => entityTypeFilter.value === 'all'
   ? {}
@@ -140,6 +200,35 @@ const getIdentifier = (item: AssignedWorkItem) => getBilingualValue(item, 'ident
           </div>
 
           <HomeStats />
+
+          <section class="mt-12 space-y-4" aria-labelledby="group-work-heading">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <h2 id="group-work-heading" class="text-xl font-semibold text-highlighted">
+                {{ t('groups.title') }}
+              </h2>
+              <USelect v-model="groupWorkView" :items="[{ label: t('groups.available'), value: 'available' }, { label: t('groups.mine'), value: 'mine' }]" :aria-label="t('groups.title')" />
+            </div>
+            <div v-if="groupWorkStatus === 'pending'" class="text-sm text-muted">
+              {{ t('groups.loading') }}
+            </div>
+            <ul v-else class="divide-y divide-default rounded-lg border border-default">
+              <li v-for="item in groupWork?.items ?? []" :key="`${item.kind}:${item.id}`" class="flex flex-wrap items-center justify-between gap-3 p-4">
+                <div class="min-w-0">
+                  <NuxtLink v-if="getGroupWorkLocation(item)" :to="localePath(getGroupWorkLocation(item)!)" class="font-medium text-primary hover:underline">
+                    {{ getBilingualValue(item, 'name', item.id) }}
+                  </NuxtLink>
+                  <span v-else class="font-medium">{{ getBilingualValue(item, 'name', item.id) }}</span>
+                  <p class="text-sm text-muted">
+                    {{ getBilingualValue(item, 'group_name', item.id) }}
+                  </p>
+                </div>
+                <UButton v-if="groupWorkView === 'available'" :label="t('groups.claim')" :loading="claimingGroupWorkId === item.id" @click="claimGroupWork(item)" />
+              </li>
+              <li v-if="!groupWork?.items?.length" class="p-4 text-sm text-muted">
+                {{ t('home.no_assigned_work') }}
+              </li>
+            </ul>
+          </section>
 
           <div class="mt-12 grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
             <CommonInfoCard

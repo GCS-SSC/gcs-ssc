@@ -55,6 +55,7 @@ export const buildApprovalTemplateDetailPayload = (
       egcs_cn_name_en: step.egcs_cn_name_en,
       egcs_cn_name_fr: step.egcs_cn_name_fr,
       egcs_cn_defaultuser: step.egcs_cn_defaultuser,
+      egcs_cn_defaultgroup: step.egcs_cn_defaultgroup,
       egcs_cn_approvertitle: step.egcs_cn_approvertitle,
       certifications: step.certifications
         .toSorted((left, right) => left.egcs_cn_order - right.egcs_cn_order)

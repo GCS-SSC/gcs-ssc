@@ -71,10 +71,12 @@ export const PRODUCTION_CORE_MIGRATIONS = [
   '0018_agreement_proponent_type',
   '0019_notes',
   '0020_extension_proponent_agency',
+  '0021_administrative_groups',
   '9999_z_proponent_type_cleanup',
   '9999_zz_workflow_profile_conditions',
   '9999_zzz_checklist_not_applicable',
-  '9999_zzzz_review_set_direct_review'
+  '9999_zzzz_review_set_direct_review',
+  '9999_zzzzz_group_permissions'
 ] as const
 
 export const PROHIBITED_PRODUCTION_BUNDLE_VALUES = [

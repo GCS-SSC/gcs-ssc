@@ -27,8 +27,13 @@ const getLocalizedText = (value: { en?: string, fr?: string }) => {
     : value.en ?? value.fr ?? ''
 }
 
-const defaultApproverDisplay = computed(() => `${step.egcs_cn_defaultuser}: ${step.default_user_name}`)
+const defaultApproverDisplay = computed(() => step.egcs_cn_defaultgroup
+  ? getLocalizedText({ en: step.default_group_name_en, fr: step.default_group_name_fr }) || step.egcs_cn_defaultgroup
+  : `${step.egcs_cn_defaultuser}: ${step.default_user_name}`)
 const assignedApproverDisplay = computed(() => {
+  if (!step.egcs_cn_assigneduser && step.egcs_cn_assignedgroup) {
+    return getLocalizedText({ en: step.assigned_group_name_en, fr: step.assigned_group_name_fr }) || step.egcs_cn_assignedgroup
+  }
   const assignedUserId = step.egcs_cn_assigneduser ?? step.egcs_cn_defaultuser
   const assignedUserName = step.assigned_user_name || step.default_user_name
   return `${assignedUserId}: ${assignedUserName}`

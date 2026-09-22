@@ -4,6 +4,7 @@ import { RUNTIME_TERMINAL_STATES } from '~~/shared/constants/system-lifecycle'
 import type { CommonScopeEntityType, Database, Entity_Type, JsonValue } from '~~/shared/types/database'
 import { badRequest, notFound } from './api-errors'
 import { createPrimaryEntityAssignment } from './entity-assignment'
+import { isAssignableGroup } from './groups'
 import { readPublishedReviewSetup, type PublishedReviewSetupConfiguration, type PublishedReviewSetupMember } from './review-setup-versioning'
 import { readPublishedReviewSchema, type PublishedReviewSchemaDefinition } from './review-schema-versioning'
 import { createRuntime, createRuntimeItem, reduceRuntimeState, retryRuntime, transitionRuntime, transitionRuntimeItem } from './system-runtime'
@@ -17,6 +18,7 @@ type CreateRuntimeReviewSetInput = {
   creatorCommonUserId: string
   workflowSetupMemberId?: string
   ownerByMemberId?: Map<string, string>
+  groupAssignmentMode?: 'creator_primary' | 'group_only'
 }
 type CreateRuntimeReviewSetTransactionInput = Omit<CreateRuntimeReviewSetInput, 'db'> & {
   db: Transaction<Database>
@@ -41,6 +43,7 @@ type LockedMember = {
   failOnChecklistFailure: boolean
   failureThreshold: number | null
   defaultOwnerId?: string
+  defaultGroupId?: string
 }
 type LockedSetup = {
   reviewSetSetup: Selectable<Database['Common_Review_Set_Setup']>
@@ -91,7 +94,8 @@ const readSchemaVersion = async (
         }
       : {}),
     failOnChecklistFailure: member.failOnChecklistFailure,
-    failureThreshold: member.failureThreshold
+    failureThreshold: member.failureThreshold,
+    ...(member.defaultGroupId ? { defaultGroupId: member.defaultGroupId } : {})
   }
 }
 
@@ -331,7 +335,7 @@ export const fetchRuntimeReviewSetWithReviews = async (
 
 const insertReview = async (
   db: Transaction<Database>,
-  input: { runtimeId: string, setItemId: string, setId: string, member: LockedMember, actorId: string }
+  input: { runtimeId: string, setItemId: string, setId: string, member: LockedMember, actorId: string, groupAssignmentMode?: 'creator_primary' | 'group_only' }
 ) => {
   const runtimeItemId = await createRuntimeItem(db, {
     egcs_cn_runtime: input.runtimeId,
@@ -350,6 +354,7 @@ const insertReview = async (
     egcs_cn_reviewset: input.setId,
     egcs_cn_reviewschema: input.member.schemaId,
     egcs_cn_runtimeitem: runtimeItemId,
+    egcs_cn_group: input.member.defaultGroupId ?? null,
     egcs_cn_disablecustomoutcomes: definition.disableCustomOutcomes,
     egcs_cn_disablealignment: definition.disableAlignment,
     egcs_cn_disablereviewers: definition.disableReviewers,
@@ -357,7 +362,9 @@ const insertReview = async (
     egcs_cn_failurethreshold: input.member.failureThreshold,
     _deleted: false
   }).returning('id').executeTakeFirstOrThrow()
-  await createPrimaryEntityAssignment(db, 'commonreview', String(review.id), input.member.defaultOwnerId ?? input.actorId)
+  if (input.groupAssignmentMode !== 'group_only' || !input.member.defaultGroupId || input.member.defaultOwnerId) {
+    await createPrimaryEntityAssignment(db, 'commonreview', String(review.id), input.member.defaultOwnerId ?? input.actorId)
+  }
   if (definition.reviewType === 'checklist') {
     await db.insertInto('Common_Checklist').values({ egcs_cn_review: String(review.id), _deleted: false }).execute()
   } else {
@@ -377,6 +384,9 @@ export const createRuntimeReviewSetInTransaction = async (input: CreateRuntimeRe
     Boolean(input.runtimeId)
   )
   if (!snapshot) return null
+  for (const member of snapshot.members) {
+    if (member.defaultGroupId && !await isAssignableGroup(input.db, member.defaultGroupId, input.ownerAgencyId)) return null
+  }
   // Workflow materialization validates its runtime and pinned publication below.
   // Direct starts cannot use workflow-only sets, even through a crafted API request.
   if (!input.runtimeId && snapshot.publication.directReview === false) return null
@@ -437,7 +447,8 @@ export const createRuntimeReviewSetInTransaction = async (input: CreateRuntimeRe
       member: { ...member, ...(input.ownerByMemberId?.get(member.memberId)
         ? { defaultOwnerId: input.ownerByMemberId.get(member.memberId) }
         : {}) },
-      actorId: input.creatorCommonUserId
+      actorId: input.creatorCommonUserId,
+      groupAssignmentMode: input.groupAssignmentMode
     }))
   }
   if (!runtime) await transitionRuntime(input.db, {

@@ -903,6 +903,7 @@ export type TransferPaymentStreamApprovalSetupItem = TransferPaymentStreamApprov
 
 export const TransferPaymentStreamReviewSetupMemberSchema = z.object({
   egcs_cn_reviewschema: RequiredId(),
+  egcs_cn_defaultgroup: PositivePostgresBigintIdSchema.nullable().optional(),
   egcs_cn_reviewtype: z.enum(REVIEW_TYPE_ENUM).optional(),
   egcs_cn_order: z.coerce.number({ error: 'validation.required' }).int(),
   egcs_cn_approvaltemplate: RequiredId().optional(),

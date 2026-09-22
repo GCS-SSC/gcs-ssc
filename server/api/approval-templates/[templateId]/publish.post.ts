@@ -4,6 +4,7 @@ import { authorizeApprovalTemplateById, executeApprovalTemplateScopeWrite } from
 import { buildApprovalTemplateConfiguration, publishApprovalTemplate } from '~~/server/utils/approval-template-versioning'
 import { getApprovalTemplate } from '~~/server/utils/approval-templates'
 import { requireAuthContext } from '~~/server/utils/authorize'
+import { assertApprovalTemplateGroups } from '~~/server/utils/approval-template-groups'
 
 export default defineEventHandler(async event => {
   await requireAuthContext(event)
@@ -17,6 +18,7 @@ export default defineEventHandler(async event => {
       .where('_deleted', '=', false).executeTakeFirst()
     if (!template) return await notFound(event, 'APPROVAL_TEMPLATE_NOT_FOUND', 'apiErrors.admin_common.not_found')
     const definition = await buildApprovalTemplateConfiguration(trx, template)
+    await assertApprovalTemplateGroups(event, trx, context.agencyId, definition.steps.map(step => step.defaultGroup))
     if (definition.steps.length === 0) {
       return await badRequest(event, 'APPROVAL_TEMPLATE_STEPS_REQUIRED', 'validation.approval_template_steps_required')
     }

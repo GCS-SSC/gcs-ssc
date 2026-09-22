@@ -10,6 +10,7 @@ export const ROLE_PERMISSION_SUBJECTS = [
   'transfer_payment',
   'role',
   'user',
+  'group',
   'agreement',
   'applicant_recipient'
 ] as const

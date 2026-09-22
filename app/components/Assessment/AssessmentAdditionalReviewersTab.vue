@@ -2,7 +2,7 @@
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
-/* eslint-disable jsdoc/require-param-description -- Legacy component callbacks omit redundant parameter prose. */
+/* eslint-disable jsdoc/require-param-description, jsdoc/require-jsdoc -- Page-local callbacks are clear from their use. */
 import type { Ref } from 'vue'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { refDebounced } from '@vueuse/core'
@@ -13,7 +13,9 @@ import { AdditionalReviewerInputSchema, type AdditionalReviewerInput } from '~~/
 type AdditionalReviewerRow = {
   id: string
   egcs_cn_comments: string
-  egcs_cn_user: string
+  egcs_cn_user: string | null
+  egcs_cn_group: string | null
+  egcs_cn_group_name: string | null
   egcs_cn_user_name: string
   egcs_cn_completedat: string | null
   can_update: boolean
@@ -139,6 +141,7 @@ const resolvedColumns = useTableColumns<AdditionalReviewerRow>(columns)
 const reviewerModal = useCrudModal<AdditionalReviewerRow, AdditionalReviewerModalState>({
   createState: () => ({
     egcs_cn_user: '',
+    egcs_cn_group: undefined,
     egcs_cn_comments: ''
   }),
   /**
@@ -149,13 +152,28 @@ const reviewerModal = useCrudModal<AdditionalReviewerRow, AdditionalReviewerModa
    */
   updateState: row => ({
     id: row.id,
-    egcs_cn_user: row.egcs_cn_user,
+    egcs_cn_user: row.egcs_cn_user ?? undefined,
+    egcs_cn_group: row.egcs_cn_group ?? undefined,
     egcs_cn_comments: row.egcs_cn_comments
   })
 })
 
 const isReviewerModalOpen: Ref<boolean> = reviewerModal.isOpen
 const selectedReviewer: Ref<AdditionalReviewerModalState | null> = reviewerModal.selected
+const selectedAssigneeKind: Ref<'user' | 'group'> = ref('user')
+const assigneeKind = computed({
+  get: () => selectedAssigneeKind.value,
+  set: (kind: string) => {
+    if (!selectedReviewer.value) return
+    selectedAssigneeKind.value = kind === 'group' ? 'group' : 'user'
+    selectedReviewer.value.egcs_cn_user = kind === 'user' ? '' : undefined
+    selectedReviewer.value.egcs_cn_group = kind === 'group' ? '' : undefined
+  }
+})
+const selectedGroup = computed({
+  get: () => selectedReviewer.value?.egcs_cn_group ?? '',
+  set: (value: string) => { if (selectedReviewer.value) selectedReviewer.value.egcs_cn_group = value }
+})
 const canSaveReviewer = computed(() => {
   const selected = selectedReviewer.value
   return Boolean(selected && !runtimeLocked
@@ -193,6 +211,7 @@ const openCreateReviewer = reviewerModal.openCreate
 const openUpdateReviewer = (row: AdditionalReviewerRow) => {
   const current = rows.value.find(item => item.id === row.id && item.can_update)
   if (runtimeLocked || !current) return
+  selectedAssigneeKind.value = row.egcs_cn_user ? 'user' : 'group'
   reviewerModal.openUpdate(current)
 }
 /**
@@ -264,6 +283,7 @@ const openCreate = () => {
   }
 
   openCreateReviewer()
+  selectedAssigneeKind.value = 'user'
 }
 
 /**
@@ -284,6 +304,7 @@ const saveReviewer = async () => {
     if (isCreate) {
       await requestJson(`/api/reviews/${requestedReviewId}/additional-reviewers`, 'POST', {
         egcs_cn_user: selectedReviewer.value.egcs_cn_user,
+        egcs_cn_group: selectedReviewer.value.egcs_cn_group,
         egcs_cn_comments: ''
       })
     } else {
@@ -429,7 +450,7 @@ const deleteRow = async (rowId: string) => {
 
         <template #assignee-cell="{ row }">
           <span class="text-sm text-zinc-900 dark:text-zinc-100">
-            {{ row.original.egcs_cn_user_name }}
+            {{ row.original.egcs_cn_user_name || row.original.egcs_cn_group_name }}
           </span>
         </template>
 
@@ -504,7 +525,10 @@ const deleteRow = async (rowId: string) => {
           :validate="validate"
           class="space-y-4"
           @submit="saveReviewer">
-          <UFormField :label="t('assessment.additional_reviewers.assigned_to')" name="egcs_cn_user">
+          <UFormField :label="t('groups.assignee_type')" required>
+            <USelect v-model="assigneeKind" :items="[{ label: t('groups.user'), value: 'user' }, { label: t('groups.group'), value: 'group' }]" />
+          </UFormField>
+          <UFormField v-if="assigneeKind === 'user'" :label="t('assessment.additional_reviewers.assigned_to')" name="egcs_cn_user" required>
             <UAlert
               v-if="userLookupStatus === 'error'"
               color="error"
@@ -524,6 +548,9 @@ const deleteRow = async (rowId: string) => {
               :disabled="userLookupStatus === 'pending' || userLookupStatus === 'error'"
               searchable
               @update:search-term="userSearchTerm = String($event ?? '')" />
+          </UFormField>
+          <UFormField v-else :label="t('groups.group')" name="egcs_cn_group" required>
+            <CommonServerLookupSelect v-model="selectedGroup" :fetch-url="`/api/reviews/${reviewId}/additional-reviewers/lookups/groups`" value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" />
           </UFormField>
 
           <UFormField

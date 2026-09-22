@@ -11,12 +11,15 @@ const toast = useToast()
 const confirm = useConfirmDialog()
 const { showError } = useApiErrorToast()
 type UserOption = { id: string; name: string }
+type GroupOption = { id: string, egcs_cn_name_en: string, egcs_cn_name_fr: string }
 const fetchUserOptions = $fetch as unknown as (url: string) => Promise<UserOption[]>
 const mutateAssignment = $fetch as unknown as (
   url: string,
   options: { method: 'POST' | 'PATCH' | 'DELETE'; body?: { userId: string } }
 ) => Promise<unknown>
 const selectedUserId: Ref<string | null> = ref(null)
+const selectedGroupId: Ref<string> = ref('')
+const groups: Ref<GroupOption[]> = ref([])
 const isSaving: Ref<boolean> = ref(false)
 const baseUrl = computed(() => `/api/entity-assignments/${entityType}/${entityId}`)
 const {
@@ -43,10 +46,15 @@ const loadUsers = async () => {
   try {
     await refresh()
     if (disposed || requestGeneration !== usersRequestGeneration || requestedBaseUrl !== baseUrl.value) return
+    selectedGroupId.value = roster.value?.group?.id ?? ''
     if (!canManage.value) return
     const nextUsers = await fetchUserOptions(`${requestedBaseUrl}/users`)
+    const nextGroups = entityType === 'commonreview'
+      ? await ($fetch as unknown as (url: string) => Promise<{ items: GroupOption[] }>)(`/api/reviews/${entityId}/groups`)
+      : null
     if (disposed || requestGeneration !== usersRequestGeneration || requestedBaseUrl !== baseUrl.value) return
     users.value = nextUsers
+    groups.value = nextGroups?.items ?? []
   } catch (error: unknown) {
     if (disposed || requestGeneration !== usersRequestGeneration || requestedBaseUrl !== baseUrl.value) return
     users.value = []
@@ -60,6 +68,7 @@ watch(baseUrl, () => {
   targetGeneration++
   isSaving.value = false
   selectedUserId.value = null
+  selectedGroupId.value = ''
   void loadUsers()
 }, { immediate: true, flush: 'sync' })
 onBeforeUnmount(() => {
@@ -101,6 +110,15 @@ const addUser = async () => {
   await runAction(
     () => mutateAssignment(baseUrl.value, { method: 'POST', body: { userId } }),
     t('assignments.added_success')
+  )
+}
+const saveGroup = async () => {
+  if (entityType !== 'commonreview') return
+  await runAction(
+    () => ($fetch as unknown as (url: string, options: { method: 'PATCH', body: { egcs_cn_group: string | null } }) => Promise<unknown>)(
+      `/api/reviews/${entityId}/group`, { method: 'PATCH', body: { egcs_cn_group: selectedGroupId.value || null } }
+    ),
+    t('common.updated_success')
   )
 }
 const canPromote = (userId: string) => canManage.value && roster.value?.assignments.some(
@@ -222,6 +240,16 @@ const remove = async (userId: string, name: string) => {
         </div>
       </li>
     </ul>
+
+    <div v-if="entityType === 'commonreview' && rosterStatus === 'success'" class="flex flex-wrap items-end gap-3">
+      <UFormField v-if="canManage" :label="t('groups.group')" name="egcs_cn_group" class="min-w-64">
+        <USelect v-model="selectedGroupId" :items="[{ label: t('common.none'), value: '' }, ...groups.map(group => ({ label: group.egcs_cn_name_en, value: group.id }))]" :disabled="!canManage || isSaving" />
+      </UFormField>
+      <p v-else class="text-sm text-muted">
+        {{ t('groups.group') }}: {{ roster?.group?.name_en || t('common.none') }}
+      </p>
+      <UButton v-if="canManage" :label="t('common.save')" :disabled="isSaving || selectedGroupId === (roster?.group?.id ?? '')" @click="saveGroup" />
+    </div>
 
     <UAlert v-if="usersError && canManage" color="error" :title="t('assignments.load_failed')">
       <template #actions>

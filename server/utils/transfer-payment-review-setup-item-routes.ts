@@ -9,6 +9,7 @@ import type {
 } from '~~/shared/types/database'
 import type { TransferPaymentStreamReviewSetupMemberPatchSchema } from '~~/shared/types/schemas'
 import { badRequest, notFound, throwApiError } from './api-errors'
+import { isAssignableGroup } from './groups'
 import {
   validateApprovalTemplateForScope,
   validateReviewSchemasForAgency
@@ -161,6 +162,9 @@ const validateReviewSetupItemPatch = async (
   parentSet: ReviewSetSetupRow,
   currentItem: ReviewSetupItemRow
 ) => {
+  if (options.body.egcs_cn_defaultgroup && !await isAssignableGroup(db, options.body.egcs_cn_defaultgroup, options.agencyId)) {
+    return await badRequest(event, 'REVIEW_GROUP_INVALID', 'apiErrors.request.invalid')
+  }
   const schemaError = await validateReviewSetupItemSchema(event, db, options.agencyId, parentSet, options.body)
   if (schemaError) return schemaError
 
@@ -184,6 +188,7 @@ const buildReviewSetupItemUpdatePayload = (body: ReviewSetupMemberPatchBody): Re
   if (body.egcs_cn_reviewschema !== undefined) updatePayload.egcs_cn_reviewschema = body.egcs_cn_reviewschema
   if (body.egcs_cn_failonchecklistfailure !== undefined) updatePayload.egcs_cn_failonchecklistfailure = body.egcs_cn_failonchecklistfailure
   if (body.egcs_cn_failurethreshold !== undefined) updatePayload.egcs_cn_failurethreshold = body.egcs_cn_failurethreshold
+  if (body.egcs_cn_defaultgroup !== undefined) updatePayload.egcs_cn_defaultgroup = body.egcs_cn_defaultgroup
   return updatePayload
 }
 

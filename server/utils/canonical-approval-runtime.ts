@@ -11,6 +11,7 @@ import {
 } from '~~/shared/types/schemas/review-approval'
 import { readPublishedApprovalTemplate, type PublishedApprovalTemplate } from './approval-template-versioning'
 import { listAgencyScopedCommonUsers, resolveCurrentCommonUser } from './additional-reviewer-runtime'
+import { isAssignableGroup } from './groups'
 import { badRequest, forbidden, notFound } from './api-errors'
 import { parseI18n } from './api-validate'
 import {
@@ -249,7 +250,9 @@ export const materializeCanonicalApprovalRuntime = async (
       egcs_cn_name_fr: step.nameFr,
       egcs_cn_routingslip: String(routingSlip.id),
       egcs_cn_defaultuser: step.defaultUser,
+      egcs_cn_defaultgroup: step.defaultGroup,
       egcs_cn_assigneduser: step.defaultUser,
+      egcs_cn_assignedgroup: step.defaultGroup,
       egcs_cn_isadded: false
     }).returning('id').executeTakeFirstOrThrow()
     await insertApprovalCertifications(trx, String(approval.id), step)
@@ -615,6 +618,7 @@ export const decideCanonicalApproval = async (
       'Common_Approval.id',
       'Common_Approval.egcs_cn_assigneduser',
       'Common_Approval.egcs_cn_defaultuser',
+      'Common_Approval.egcs_cn_defaultgroup',
       'Common_Approval.egcs_cn_approvalvalue',
       'Common_Approval.egcs_cn_sequence',
       'Common_Routing_Slip.id as routingSlipId',
@@ -647,6 +651,7 @@ export const decideCanonicalApproval = async (
     ReviewApprovalDecisionEvidenceSchema,
     {
       egcs_cn_defaultuser: approval.egcs_cn_defaultuser,
+      egcs_cn_defaultgroup: approval.egcs_cn_defaultgroup,
       egcs_cn_assigneduser: assignedUserId,
       egcs_cn_onbehalf: body.egcs_cn_onbehalf,
       egcs_ay_require_actual: behalfType?.egcs_ay_require_actual === true,
@@ -747,7 +752,7 @@ export const reassignCanonicalApproval = async (
     .innerJoin('Common_Routing_Slip', 'Common_Routing_Slip.id', 'Common_Approval.egcs_cn_routingslip')
     .innerJoin('Common_Runtime_Item as Routing_Item', 'Routing_Item.id', 'Common_Routing_Slip.egcs_cn_runtimeitem')
     .select([
-      'Common_Approval.id', 'Common_Approval.egcs_cn_defaultuser', 'Common_Approval.egcs_cn_approvalvalue',
+      'Common_Approval.id', 'Common_Approval.egcs_cn_defaultuser', 'Common_Approval.egcs_cn_defaultgroup', 'Common_Approval.egcs_cn_approvalvalue',
       'Approval_Item.egcs_cn_state as approvalState', 'Routing_Item.egcs_cn_state as routingState'
     ])
     .where('Common_Approval.id', '=', approvalId)
@@ -763,20 +768,26 @@ export const reassignCanonicalApproval = async (
       'apiErrors.request.invalid_status'
     )
   }
-  if (String(body.egcs_cn_assigneduser) !== String(approval.egcs_cn_defaultuser) && !body.egcs_cn_onbehalf) {
+  const namedDefault = approval.egcs_cn_defaultuser !== null
+  const isOriginalUser = namedDefault && body.egcs_cn_assigneduser === String(approval.egcs_cn_defaultuser)
+  if (namedDefault && !isOriginalUser && !body.egcs_cn_onbehalf) {
     return await badRequest(event, 'REVIEW_APPROVAL_ON_BEHALF_REQUIRED', 'apiErrors.review.review_approval_on_behalf_required')
   }
+  if ((!namedDefault || isOriginalUser) && body.egcs_cn_onbehalf) return await badRequest(event, 'REVIEW_APPROVAL_ON_BEHALF_NOT_ALLOWED', 'apiErrors.request.invalid')
   if (!options.agencyId) return await forbidden(event)
-  const agencyUsers = await listAgencyScopedCommonUsers(trx, options.agencyId)
-  if (!agencyUsers.some(user => user.id === String(body.egcs_cn_assigneduser))) {
-    return await badRequest(event, 'REVIEW_APPROVAL_USER_OUTSIDE_AGENCY', 'apiErrors.request.invalid')
+  if (body.egcs_cn_assigneduser) {
+    const agencyUsers = await listAgencyScopedCommonUsers(trx, options.agencyId)
+    if (!agencyUsers.some(user => user.id === String(body.egcs_cn_assigneduser))) {
+      return await badRequest(event, 'REVIEW_APPROVAL_USER_OUTSIDE_AGENCY', 'apiErrors.request.invalid')
+    }
+  } else if (!body.egcs_cn_assignedgroup || !await isAssignableGroup(trx, body.egcs_cn_assignedgroup, options.agencyId)) {
+    return await badRequest(event, 'REVIEW_APPROVAL_GROUP_OUTSIDE_AGENCY', 'apiErrors.request.invalid')
   }
   await assertAgencyBehalfType(event, trx, body.egcs_cn_onbehalf, options.agencyId)
   await trx.updateTable('Common_Approval').set({
-    egcs_cn_assigneduser: body.egcs_cn_assigneduser,
-    egcs_cn_onbehalf: String(body.egcs_cn_assigneduser) === String(approval.egcs_cn_defaultuser)
-      ? sql`null`
-      : body.egcs_cn_onbehalf ?? sql`null`,
+    egcs_cn_assigneduser: body.egcs_cn_assigneduser ?? null,
+    egcs_cn_assignedgroup: body.egcs_cn_assignedgroup ?? null,
+    egcs_cn_onbehalf: isOriginalUser ? null : body.egcs_cn_onbehalf ?? null,
     egcs_cn_approvalpositiontitle: sql`null`,
     egcs_cn_approvaldate: sql`null`,
     egcs_cn_comment: sql`null`,

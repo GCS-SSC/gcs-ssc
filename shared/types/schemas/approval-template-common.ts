@@ -62,7 +62,8 @@ export const createApprovalTemplateStepBaseSchema = <TCertificationSchema extend
   egcs_cn_description_fr: requiredString(),
   egcs_cn_name_en: requiredString(),
   egcs_cn_name_fr: requiredString(),
-  egcs_cn_defaultuser: requiredId(),
+  egcs_cn_defaultuser: requiredId().nullable().optional(),
+  egcs_cn_defaultgroup: requiredId().nullable().optional(),
   egcs_cn_approvertitle: requiredString(),
   certifications: z.array(certificationSchema).default([])
 })

@@ -47,6 +47,7 @@ export const appRouteLocations = {
     params: { id, monitorId }
   }),
   roles: () => ({ name: 'roles' }),
+  groups: () => ({ name: 'groups' }),
   roleDetail: (id: string) => ({ name: 'roles-id', params: { id } }),
   transferPayments: () => ({ name: 'transfer-payments' }),
   transferPaymentDetail: (id: string) => ({ name: 'transfer-payments-id', params: { id } }),

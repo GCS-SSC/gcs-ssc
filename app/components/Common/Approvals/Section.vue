@@ -180,7 +180,7 @@ const selectedReassignUserOptions = computed(() => {
   const selectedUserName = step.assigned_user_name || step.default_user_name
   const hasSelectedUser = options.some(user => user.id === selectedUserId)
 
-  if (!hasSelectedUser) {
+  if (selectedUserId && !hasSelectedUser) {
     options.unshift({
       id: selectedUserId,
       name: `${selectedUserId}: ${selectedUserName}`
@@ -253,10 +253,16 @@ const tableRows = computed<ApprovalTableRow[]>(() => routingSlips.value.flatMap(
     stepDisplayOrder: step.display_order,
     stepNameEn: step.egcs_cn_name_en,
     stepNameFr: step.egcs_cn_name_fr,
-    assignedApproverLabel: step.assigned_user_name || step.default_user_name,
+    assignedApproverLabel: step.assigned_user_name || step.assigned_group_name_en || step.default_user_name,
     sequence: step.sequence,
     egcs_cn_defaultuser: step.egcs_cn_defaultuser,
+    egcs_cn_defaultgroup: step.egcs_cn_defaultgroup,
     egcs_cn_assigneduser: step.egcs_cn_assigneduser,
+    egcs_cn_assignedgroup: step.egcs_cn_assignedgroup,
+    default_group_name_en: step.default_group_name_en,
+    default_group_name_fr: step.default_group_name_fr,
+    assigned_group_name_en: step.assigned_group_name_en,
+    assigned_group_name_fr: step.assigned_group_name_fr,
     egcs_cn_onbehalf: step.egcs_cn_onbehalf,
     egcs_cn_approvalpositiontitle: step.egcs_cn_approvalpositiontitle,
     egcs_cn_approvalvalue: step.egcs_cn_approvalvalue,
@@ -438,7 +444,13 @@ const openActionModal = (row: ApprovalTableRow) => {
     egcs_cn_name_en: row.stepNameEn,
     egcs_cn_name_fr: row.stepNameFr,
     egcs_cn_defaultuser: row.egcs_cn_defaultuser,
+    egcs_cn_defaultgroup: row.egcs_cn_defaultgroup,
     egcs_cn_assigneduser: row.egcs_cn_assigneduser,
+    egcs_cn_assignedgroup: row.egcs_cn_assignedgroup,
+    default_group_name_en: row.default_group_name_en,
+    default_group_name_fr: row.default_group_name_fr,
+    assigned_group_name_en: row.assigned_group_name_en,
+    assigned_group_name_fr: row.assigned_group_name_fr,
     egcs_cn_onbehalf: row.egcs_cn_onbehalf,
     egcs_cn_approvalpositiontitle: row.egcs_cn_approvalpositiontitle,
     egcs_cn_approvalvalue: row.egcs_cn_approvalvalue,
@@ -460,8 +472,8 @@ const openActionModal = (row: ApprovalTableRow) => {
   }
   selectedActionState.value = {
     approvalId: row.stepId,
-    assignedDiffersFromDefault: row.egcs_cn_assigneduser !== row.egcs_cn_defaultuser,
-    isOnBehalf: row.egcs_cn_assigneduser !== row.egcs_cn_defaultuser || Boolean(row.egcs_cn_onbehalf),
+    assignedDiffersFromDefault: Boolean(row.egcs_cn_defaultuser) && row.egcs_cn_assigneduser !== row.egcs_cn_defaultuser,
+    isOnBehalf: Boolean(row.egcs_cn_onbehalf),
     egcs_cn_onbehalf: row.egcs_cn_onbehalf,
     egcs_cn_approvalpositiontitle: row.egcs_cn_approvalpositiontitle || row.assigned_user_position_title || row.default_user_position_title,
     egcs_cn_approvaldate: row.egcs_cn_approvaldate ? row.egcs_cn_approvaldate.slice(0, 10) : '',
@@ -528,13 +540,19 @@ const openReassignModal = (row: ApprovalTableRow) => {
     egcs_cn_name_en: row.stepNameEn,
     egcs_cn_name_fr: row.stepNameFr,
     egcs_cn_defaultuser: row.egcs_cn_defaultuser,
+    egcs_cn_defaultgroup: row.egcs_cn_defaultgroup,
     egcs_cn_assigneduser: row.egcs_cn_assigneduser,
+    egcs_cn_assignedgroup: row.egcs_cn_assignedgroup,
     egcs_cn_onbehalf: row.egcs_cn_onbehalf,
     egcs_cn_approvalpositiontitle: row.egcs_cn_approvalpositiontitle,
     egcs_cn_approvalvalue: row.egcs_cn_approvalvalue,
     egcs_cn_approvaldate: row.egcs_cn_approvaldate,
     egcs_cn_comment: row.egcs_cn_comment,
     default_user_name: row.default_user_name,
+    default_group_name_en: row.default_group_name_en,
+    default_group_name_fr: row.default_group_name_fr,
+    assigned_group_name_en: row.assigned_group_name_en,
+    assigned_group_name_fr: row.assigned_group_name_fr,
     default_user_position_title: row.default_user_position_title,
     assigned_user_name: row.assigned_user_name,
     assigned_user_position_title: row.assigned_user_position_title,
@@ -550,7 +568,8 @@ const openReassignModal = (row: ApprovalTableRow) => {
   }
   selectedReassignState.value = {
     approvalId: row.stepId,
-    egcs_cn_assigneduser: row.egcs_cn_assigneduser ?? row.egcs_cn_defaultuser,
+    egcs_cn_assigneduser: row.egcs_cn_assigneduser ?? row.egcs_cn_defaultuser ?? '',
+    egcs_cn_assignedgroup: row.egcs_cn_assignedgroup,
     egcs_cn_onbehalf: row.egcs_cn_onbehalf
   }
   isReassignModalOpen.value = true
@@ -617,6 +636,7 @@ const openAddStepModal = (row: ApprovalTableRow, position: AddApprovalPosition) 
     anchorApprovalId: row.stepId,
     position,
     egcs_cn_assigneduser: '',
+    egcs_cn_assignedgroup: null,
     egcs_cn_name_en: routingSlip.default_added_approval_name_en,
     egcs_cn_name_fr: routingSlip.default_added_approval_name_fr,
     certifications: (routingSlip.additional_approval_certifications ?? [])
@@ -727,7 +747,8 @@ const submitAddStep = async () => {
     entityId,
     anchorApprovalId: state.anchorApprovalId,
     position: state.position,
-    egcs_cn_assigneduser: state.egcs_cn_assigneduser,
+    egcs_cn_assigneduser: state.egcs_cn_assignedgroup ? null : state.egcs_cn_assigneduser,
+    egcs_cn_assignedgroup: state.egcs_cn_assignedgroup ?? null,
     ...(routingSlip.allow_added_approval_name_changes
       ? {
           egcs_cn_name_en: state.egcs_cn_name_en,
@@ -800,6 +821,7 @@ const defaultApproverDisplay = computed(() => {
     return ''
   }
 
+  if (selectedActionStep.value.egcs_cn_defaultgroup) return selectedActionStep.value.default_group_name_en ?? selectedActionStep.value.egcs_cn_defaultgroup
   return `${selectedActionStep.value.egcs_cn_defaultuser}: ${selectedActionStep.value.default_user_name}`
 })
 const assignedApproverDisplay = computed(() => {
@@ -920,14 +942,17 @@ const submitReassign = async () => {
     return
   }
 
-  const assignedDiffersFromDefault = selectedReassignState.value.egcs_cn_assigneduser !== selectedReassignStep.value.egcs_cn_defaultuser
+  const assignedDiffersFromDefault = Boolean(selectedReassignStep.value.egcs_cn_defaultuser)
+    && (Boolean(selectedReassignState.value.egcs_cn_assignedgroup)
+      || selectedReassignState.value.egcs_cn_assigneduser !== selectedReassignStep.value.egcs_cn_defaultuser)
 
   try {
     const submittedGeneration = entityGeneration
     isSubmittingReassign.value = true
     await saveJson('/api/approvals/reassign', 'POST', {
       approvalId: selectedReassignState.value.approvalId,
-      egcs_cn_assigneduser: selectedReassignState.value.egcs_cn_assigneduser,
+      egcs_cn_assigneduser: selectedReassignState.value.egcs_cn_assignedgroup ? null : selectedReassignState.value.egcs_cn_assigneduser,
+      egcs_cn_assignedgroup: selectedReassignState.value.egcs_cn_assignedgroup ?? null,
       egcs_cn_onbehalf: assignedDiffersFromDefault ? selectedReassignState.value.egcs_cn_onbehalf : null
     } satisfies ReviewApprovalReassignInput)
     if (submittedGeneration !== entityGeneration) return
@@ -1065,7 +1090,13 @@ const submitReassign = async () => {
                 egcs_cn_name_en: row.original.stepNameEn,
                 egcs_cn_name_fr: row.original.stepNameFr,
                 egcs_cn_defaultuser: row.original.egcs_cn_defaultuser,
+                egcs_cn_defaultgroup: row.original.egcs_cn_defaultgroup,
                 egcs_cn_assigneduser: row.original.egcs_cn_assigneduser,
+                egcs_cn_assignedgroup: row.original.egcs_cn_assignedgroup,
+                default_group_name_en: row.original.default_group_name_en,
+                default_group_name_fr: row.original.default_group_name_fr,
+                assigned_group_name_en: row.original.assigned_group_name_en,
+                assigned_group_name_fr: row.original.assigned_group_name_fr,
                 egcs_cn_onbehalf: row.original.egcs_cn_onbehalf,
                 egcs_cn_approvalpositiontitle: row.original.egcs_cn_approvalpositiontitle,
                 egcs_cn_approvalvalue: row.original.egcs_cn_approvalvalue,
@@ -1129,6 +1160,8 @@ const submitReassign = async () => {
       v-model:open="isReassignModalOpen"
       :state="selectedReassignState"
       :step="selectedReassignStep"
+      :entity-type="entityType"
+      :entity-id="entityId"
       :user-options="selectedReassignUserOptions"
       :behalf-type-options="behalfTypeOptions"
       :is-submitting="isSubmittingReassign"

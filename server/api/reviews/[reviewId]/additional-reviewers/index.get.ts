@@ -11,7 +11,9 @@ import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 type AdditionalReviewerItem = {
   id: string
   egcs_cn_comments: string
-  egcs_cn_user: string
+  egcs_cn_user: string | null
+  egcs_cn_group: string | null
+  egcs_cn_group_name: string | null
   egcs_cn_user_name: string
   egcs_cn_completedat: string | null
   can_update: boolean
@@ -57,23 +59,29 @@ export default defineEventHandler(async (event): Promise<AdditionalReviewersResp
   const currentCommonUser = await resolveCurrentCommonUser(event)
   const rows = await db
     .selectFrom('Common_Additional_Reviewers')
-    .innerJoin('Common_User', 'Common_User.id', 'Common_Additional_Reviewers.egcs_cn_user')
+    .leftJoin('Common_User', 'Common_User.id', 'Common_Additional_Reviewers.egcs_cn_user')
+    .leftJoin('Common_Group', 'Common_Group.id', 'Common_Additional_Reviewers.egcs_cn_group')
     .select([
       'Common_Additional_Reviewers.id as id',
       'Common_Additional_Reviewers.egcs_cn_comments as comments',
       'Common_Additional_Reviewers.egcs_cn_user as assigned_user_id',
+      'Common_Additional_Reviewers.egcs_cn_group as assigned_group_id',
       'Common_Additional_Reviewers.egcs_cn_completedat as completed_at',
-      'Common_User.egcs_cn_name as assigned_user_name'
+      'Common_User.egcs_cn_name as assigned_user_name',
+      'Common_Group.egcs_cn_name_en as assigned_group_name'
     ])
     .where('Common_Additional_Reviewers.egcs_cn_entitytype', '=', 'commonreview')
     .where('Common_Additional_Reviewers.egcs_cn_entityid', '=', reviewId)
     .where('Common_Additional_Reviewers._deleted', '=', false)
-    .where('Common_User._deleted', '=', false)
+    .where(eb => eb.or([
+      eb('Common_User._deleted', '=', false),
+      eb('Common_Group._deleted', '=', false)
+    ]))
     .orderBy('Common_Additional_Reviewers.id', 'asc')
     .execute()
 
   const items: AdditionalReviewerItem[] = rows.map(row => {
-    const assignedUserId = String(row.assigned_user_id)
+    const assignedUserId = row.assigned_user_id ? String(row.assigned_user_id) : null
     const completedAt = row.completed_at ? new Date(row.completed_at).toISOString() : null
     const canUpdate = currentCommonUser?.id === assignedUserId
       && completedAt === null
@@ -86,7 +94,9 @@ export default defineEventHandler(async (event): Promise<AdditionalReviewersResp
       id: String(row.id),
       egcs_cn_comments: row.comments ?? '',
       egcs_cn_user: assignedUserId,
-      egcs_cn_user_name: row.assigned_user_name,
+      egcs_cn_group: row.assigned_group_id ? String(row.assigned_group_id) : null,
+      egcs_cn_group_name: row.assigned_group_name,
+      egcs_cn_user_name: row.assigned_user_name ?? '',
       egcs_cn_completedat: completedAt,
       can_update: canUpdate,
       can_complete: canUpdate,

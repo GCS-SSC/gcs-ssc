@@ -23,6 +23,7 @@ export type PublishedReviewSetupMember = {
   schema: PublishedPublicationReference
   failOnChecklistFailure: boolean
   failureThreshold: number | null
+  defaultGroupId?: string
   approval?: PublishedPublicationReference
 }
 
@@ -106,6 +107,7 @@ export const buildReviewSetupPublication = async (
       'Common_Review_Setup.egcs_cn_approvaltemplate',
       'Common_Review_Setup.egcs_cn_failonchecklistfailure',
       'Common_Review_Setup.egcs_cn_failurethreshold',
+      'Common_Review_Setup.egcs_cn_defaultgroup',
       'Common_Review_Schema.egcs_cn_reviewtype'
     ])
     .where('Common_Review_Setup.egcs_cn_reviewset', '=', String(setup.id))
@@ -136,6 +138,7 @@ export const buildReviewSetupPublication = async (
       schema,
       failOnChecklistFailure: member.egcs_cn_failonchecklistfailure === true,
       failureThreshold: member.egcs_cn_failurethreshold === null ? null : Number(member.egcs_cn_failurethreshold),
+      ...(member.egcs_cn_defaultgroup ? { defaultGroupId: String(member.egcs_cn_defaultgroup) } : {}),
       ...(approval ? { approval } : {})
     }
   }))

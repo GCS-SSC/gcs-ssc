@@ -13,6 +13,7 @@ import {
 import { assertReviewNotLocked } from '~~/server/utils/review-runtime-state'
 import { requireAuthContext } from '~~/server/utils/authorize'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+import { isAssignableGroup } from '~~/server/utils/groups'
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -56,7 +57,10 @@ export default defineEventHandler(async event => {
         trx,
         currentExecutableContext.runtimeEntity.schemaAgencyId
       )
-      if (!allowedUsers.some(user => user.id === body.egcs_cn_user)) {
+      if (body.egcs_cn_user && !allowedUsers.some(user => user.id === body.egcs_cn_user)) {
+        return await badRequest(event, 'ADDITIONAL_REVIEWER_ASSIGNEE_INVALID', 'apiErrors.request.invalid')
+      }
+      if (body.egcs_cn_group && !await isAssignableGroup(trx, body.egcs_cn_group, currentExecutableContext.runtimeEntity.schemaAgencyId)) {
         return await badRequest(event, 'ADDITIONAL_REVIEWER_ASSIGNEE_INVALID', 'apiErrors.request.invalid')
       }
 
@@ -73,7 +77,8 @@ export default defineEventHandler(async event => {
           // Comments belong to the reviewer after assignment, so create always starts blank even if
           // a caller submits comment text in the payload.
           egcs_cn_comments: '',
-          egcs_cn_user: body.egcs_cn_user,
+          egcs_cn_user: body.egcs_cn_user ?? null,
+          egcs_cn_group: body.egcs_cn_group ?? null,
           egcs_cn_completedat: null,
           _deleted: false
         })
@@ -81,6 +86,7 @@ export default defineEventHandler(async event => {
           'id',
           'egcs_cn_comments',
           'egcs_cn_user',
+          'egcs_cn_group',
           'egcs_cn_completedat'
         ])
         .executeTakeFirstOrThrow()
@@ -96,7 +102,8 @@ export default defineEventHandler(async event => {
   return {
     id: String(result.created.id),
     egcs_cn_comments: result.created.egcs_cn_comments ?? '',
-    egcs_cn_user: String(result.created.egcs_cn_user),
+    egcs_cn_user: result.created.egcs_cn_user ? String(result.created.egcs_cn_user) : null,
+    egcs_cn_group: result.created.egcs_cn_group ? String(result.created.egcs_cn_group) : null,
     egcs_cn_user_name: result.assignedUserName,
     egcs_cn_completedat: result.created.egcs_cn_completedat ? new Date(result.created.egcs_cn_completedat).toISOString() : null,
     can_update: result.currentOwnsRow,

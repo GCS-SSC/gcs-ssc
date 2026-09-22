@@ -7,6 +7,7 @@ import {
 } from '~~/server/utils/approval-template-scope'
 import { getApprovalTemplate, syncApprovalTemplate } from '~~/server/utils/approval-templates'
 import { requireAuthContext } from '~~/server/utils/authorize'
+import { assertApprovalTemplateGroups } from '~~/server/utils/approval-template-groups'
 
 export default defineEventHandler(async event => {
   await requireAuthContext(event)
@@ -20,6 +21,7 @@ export default defineEventHandler(async event => {
   const scopeContext = await authorizeApprovalTemplateScope(event, 'create', body.scopeType, body.scopeId)
 
   const saved = await executeApprovalTemplateScopeWrite(event, 'create', scopeContext, async trx => {
+    await assertApprovalTemplateGroups(event, trx, scopeContext.agencyId, body.steps.map(step => step.egcs_cn_defaultgroup))
     const template = await syncApprovalTemplate(trx, {
       scopeType: body.scopeType,
       scopeId: body.scopeId,

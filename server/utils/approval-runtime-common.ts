@@ -8,6 +8,7 @@ import type { AddApprovalStepInput } from '~~/shared/types/schemas/review-approv
 import type { RuntimeState } from '~~/shared/constants/system-lifecycle'
 import { RUNTIME_TERMINAL_STATES } from '~~/shared/constants/system-lifecycle'
 import { createRuntimeItem, transitionRuntimeItem } from './system-runtime'
+import { isAssignableGroup } from './groups'
 
 export class ApprovalTemplatePublicationMissingError extends Error {
   constructor(public readonly approvalTemplateId: string) {
@@ -23,8 +24,10 @@ export type RuntimeApprovalRow = {
   egcs_cn_sequence: number
   egcs_cn_name_en: string
   egcs_cn_name_fr: string
-  egcs_cn_defaultuser: string
+  egcs_cn_defaultuser: string | null
+  egcs_cn_defaultgroup: string | null
   egcs_cn_assigneduser: string | null | undefined
+  egcs_cn_assignedgroup: string | null
   egcs_cn_onbehalf: string | null | undefined
   egcs_cn_approvalpositiontitle: string | null | undefined
   egcs_cn_isadded: boolean
@@ -32,8 +35,12 @@ export type RuntimeApprovalRow = {
   egcs_cn_approvaldate: string | Date | null | undefined
   egcs_cn_attachment: string | null | undefined
   egcs_cn_comment: string | null | undefined
-  default_user_name: string
+  default_user_name: string | null
   default_user_position_title: string | null
+  default_group_name_en: string | null
+  default_group_name_fr: string | null
+  assigned_group_name_en: string | null
+  assigned_group_name_fr: string | null
   assigned_user_name: string | null
   assigned_user_position_title: string | null
   onbehalf_name_en: string | null
@@ -107,7 +114,9 @@ export const getRuntimeApprovals = async (
   const approvalRows = await db
     .selectFrom('Common_Approval')
     .innerJoin('Common_Runtime_Item', 'Common_Runtime_Item.id', 'Common_Approval.egcs_cn_runtimeitem')
-    .innerJoin('Common_User as DefaultUser', 'DefaultUser.id', 'Common_Approval.egcs_cn_defaultuser')
+    .leftJoin('Common_User as DefaultUser', 'DefaultUser.id', 'Common_Approval.egcs_cn_defaultuser')
+    .leftJoin('Common_Group as DefaultGroup', 'DefaultGroup.id', 'Common_Approval.egcs_cn_defaultgroup')
+    .leftJoin('Common_Group as AssignedGroup', 'AssignedGroup.id', 'Common_Approval.egcs_cn_assignedgroup')
     .leftJoin('Common_User as AssignedUser', 'AssignedUser.id', 'Common_Approval.egcs_cn_assigneduser')
     .leftJoin('Agency_Approval_Behalf_Type', 'Agency_Approval_Behalf_Type.id', 'Common_Approval.egcs_cn_onbehalf')
     .select([
@@ -116,7 +125,9 @@ export const getRuntimeApprovals = async (
       'Common_Approval.egcs_cn_name_en as egcs_cn_name_en',
       'Common_Approval.egcs_cn_name_fr as egcs_cn_name_fr',
       'Common_Approval.egcs_cn_defaultuser as egcs_cn_defaultuser',
+      'Common_Approval.egcs_cn_defaultgroup as egcs_cn_defaultgroup',
       'Common_Approval.egcs_cn_assigneduser as egcs_cn_assigneduser',
+      'Common_Approval.egcs_cn_assignedgroup as egcs_cn_assignedgroup',
       'Common_Approval.egcs_cn_onbehalf as egcs_cn_onbehalf',
       'Common_Approval.egcs_cn_approvalpositiontitle as egcs_cn_approvalpositiontitle',
       'Common_Approval.egcs_cn_isadded as egcs_cn_isadded',
@@ -126,6 +137,10 @@ export const getRuntimeApprovals = async (
       'Common_Approval.egcs_cn_comment as egcs_cn_comment',
       'DefaultUser.egcs_cn_name as default_user_name',
       'DefaultUser.egcs_cn_position_title as default_user_position_title',
+      'DefaultGroup.egcs_cn_name_en as default_group_name_en',
+      'DefaultGroup.egcs_cn_name_fr as default_group_name_fr',
+      'AssignedGroup.egcs_cn_name_en as assigned_group_name_en',
+      'AssignedGroup.egcs_cn_name_fr as assigned_group_name_fr',
       'AssignedUser.egcs_cn_name as assigned_user_name',
       'AssignedUser.egcs_cn_position_title as assigned_user_position_title',
       'Agency_Approval_Behalf_Type.egcs_ay_name_en as onbehalf_name_en',
@@ -136,7 +151,6 @@ export const getRuntimeApprovals = async (
     ])
     .where('Common_Approval.egcs_cn_routingslip', '=', routingSlipId)
     .where('Common_Runtime_Item._deleted', '=', false)
-    .where('DefaultUser._deleted', '=', false)
     .orderBy('Common_Approval.egcs_cn_sequence', 'asc')
     .orderBy('Common_Approval.id', 'asc')
     .execute()
@@ -144,8 +158,10 @@ export const getRuntimeApprovals = async (
   const approvals: RuntimeApprovalRow[] = approvalRows.map(approval => ({
     ...approval,
     id: String(approval.id),
-    egcs_cn_defaultuser: String(approval.egcs_cn_defaultuser),
+    egcs_cn_defaultuser: normalizeId(approval.egcs_cn_defaultuser),
+    egcs_cn_defaultgroup: normalizeId(approval.egcs_cn_defaultgroup),
     egcs_cn_assigneduser: normalizeId(approval.egcs_cn_assigneduser),
+    egcs_cn_assignedgroup: normalizeId(approval.egcs_cn_assignedgroup),
     egcs_cn_onbehalf: normalizeId(approval.egcs_cn_onbehalf),
     egcs_cn_attachment: normalizeId(approval.egcs_cn_attachment),
     runtimeItemId: String(approval.runtimeItemId)
@@ -284,7 +300,9 @@ export const buildRuntimeApprovalSteps = ({
     egcs_cn_name_en: approval.egcs_cn_name_en,
     egcs_cn_name_fr: approval.egcs_cn_name_fr,
     egcs_cn_defaultuser: approval.egcs_cn_defaultuser,
+    egcs_cn_defaultgroup: approval.egcs_cn_defaultgroup,
     egcs_cn_assigneduser: approval.egcs_cn_assigneduser,
+    egcs_cn_assignedgroup: approval.egcs_cn_assignedgroup,
     egcs_cn_onbehalf: approval.egcs_cn_onbehalf,
     egcs_cn_approvalpositiontitle: approval.egcs_cn_approvalpositiontitle ?? '',
     egcs_cn_isadded: approval.egcs_cn_isadded,
@@ -294,8 +312,12 @@ export const buildRuntimeApprovalSteps = ({
     egcs_cn_comment: approval.egcs_cn_comment ?? '',
     runtimeItemId: approval.runtimeItemId,
     runtimeState: approval.runtimeState,
-    default_user_name: approval.default_user_name,
+    default_user_name: approval.default_user_name ?? '',
     default_user_position_title: approval.default_user_position_title ?? '',
+    default_group_name_en: approval.default_group_name_en ?? '',
+    default_group_name_fr: approval.default_group_name_fr ?? '',
+    assigned_group_name_en: approval.assigned_group_name_en ?? '',
+    assigned_group_name_fr: approval.assigned_group_name_fr ?? '',
     assigned_user_name: approval.assigned_user_name ?? '',
     assigned_user_position_title: approval.assigned_user_position_title ?? '',
     onbehalf_name_en: approval.onbehalf_name_en ?? '',
@@ -489,8 +511,11 @@ export const addRuntimeApprovalStep = async (
   }
 
   const agencyUsers = await listAgencyScopedCommonUsers(trx, schemaAgencyId)
-  if (!agencyUsers.some(user => user.id === body.egcs_cn_assigneduser)) {
+  if (body.egcs_cn_assigneduser && !agencyUsers.some(user => user.id === body.egcs_cn_assigneduser)) {
     return await badRequest(event, 'ADDITIONAL_APPROVAL_USER_OUTSIDE_AGENCY', 'apiErrors.request.invalid')
+  }
+  if (body.egcs_cn_assignedgroup && !await isAssignableGroup(trx, body.egcs_cn_assignedgroup, schemaAgencyId)) {
+    return await badRequest(event, 'ADDITIONAL_APPROVAL_GROUP_OUTSIDE_AGENCY', 'apiErrors.request.invalid')
   }
   if (!routingSlip.egcs_cn_allowaddedapprovalnamechanges
     && (body.egcs_cn_name_en !== undefined || body.egcs_cn_name_fr !== undefined)) {
@@ -579,7 +604,9 @@ export const addRuntimeApprovalStep = async (
       egcs_cn_name_fr: body.egcs_cn_name_fr ?? routingSlip.egcs_cn_defaultaddedapprovalname_fr ?? '',
       egcs_cn_routingslip: routingSlipId,
       egcs_cn_defaultuser: body.egcs_cn_assigneduser,
+      egcs_cn_defaultgroup: body.egcs_cn_assignedgroup,
       egcs_cn_assigneduser: body.egcs_cn_assigneduser,
+      egcs_cn_assignedgroup: body.egcs_cn_assignedgroup,
       egcs_cn_isadded: true
     })
     .returningAll()

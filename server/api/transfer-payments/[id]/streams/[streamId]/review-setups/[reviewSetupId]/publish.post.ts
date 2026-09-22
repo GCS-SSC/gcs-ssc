@@ -6,6 +6,7 @@ import { isExpectedPublicationFailure } from '~~/server/utils/publication-errors
 import { publishDefinition } from '~~/server/utils/system-publication'
 import { executeFreshAuthorizedTransferPaymentStreamWrite } from '~~/server/utils/transfer-payment-write-transaction'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+import { isAssignableGroup } from '~~/server/utils/groups'
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -30,6 +31,11 @@ export default defineEventHandler(async event => {
         throw error
       })
       if (!plan) return await badRequest(event, 'REVIEW_SETUP_INVALID_PUBLICATION', 'apiErrors.request.invalid_resource')
+      for (const member of plan.definition.members) {
+        if (member.defaultGroupId && !await isAssignableGroup(trx, member.defaultGroupId, context.agencyId)) {
+          return await badRequest(event, 'REVIEW_SETUP_GROUP_INVALID', 'apiErrors.request.invalid')
+        }
+      }
       return await publishDefinition(trx, {
         publicationId: setupId,
         kind: 'review_set_setup',

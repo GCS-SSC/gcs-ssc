@@ -57,6 +57,8 @@ export const AUDIT_TABLE_OWNERSHIP: Readonly<Record<string, AuditOwnershipRule>>
   'public.Applicant_Recipient_Profile': actorAgencies,
   'public.Applicant_Recipient_Registry': parent('egcs_ar_applicantrecipient', 'public.Applicant_Recipient_Profile'),
   'public.Common_Additional_Reviewers': entity('egcs_cn_entityid', 'egcs_cn_entitytype'),
+  'public.Common_Group': agency('egcs_cn_agency'),
+  'public.Common_Group_Member': parent('egcs_cn_group', 'public.Common_Group'),
   'public.Common_Address': { kind: 'references', links: [
     { table: 'public.Applicant_Recipient_Address', column: 'egcs_ar_address' },
     { table: 'public.Funding_Case_Agreement_Address', column: 'egcs_fc_address' }

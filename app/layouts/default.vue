@@ -17,6 +17,7 @@ const canViewAudit = computed(() => canAny('audit', 'read', ['global', 'agency']
 const canViewAdminGwcoa = computed(() => can('system', 'read', { type: 'global' }))
 const canViewAgencies = computed(() => canAny('agency', 'read'))
 const canViewUsers = computed(() => canAny('user', 'read'))
+const canViewGroups = computed(() => canAny('group', 'read'))
 const canViewApplicantRecipients = computed(() => canAny('applicant_recipient', 'read'))
 const canViewAgreements = computed(() => canAny('agreement', 'read'))
 const canViewTransferPayments = computed(() => canAny('transfer_payment', 'read'))
@@ -150,6 +151,9 @@ const items = computed(
                 to: localePath(appRouteLocations.users())
               }
             ]
+          : []),
+        ...(canViewGroups.value
+          ? [{ label: t('nav.groups'), icon: 'i-lucide-users', to: localePath(appRouteLocations.groups()) }]
           : []),
         ...(canViewAudit.value ? [{ label: t('audit.title'), icon: 'i-lucide-history', to: localePath('/admin/audit') }] : []),
         ...(canViewAdminGwcoa.value

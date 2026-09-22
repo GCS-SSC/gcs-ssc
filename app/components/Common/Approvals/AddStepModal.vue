@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+/* eslint-disable jsdoc/require-jsdoc -- Modal-local event handlers are clear from their use. */
+import { computed, ref, watch } from 'vue'
 import { useBilingualValue } from '~/composables/useBilingualValue'
 import { AddApprovalStepSchema } from '~~/shared/types/schemas/review-approval'
 import type {
@@ -43,6 +44,20 @@ const orderedCertifications = computed(() => state.value?.certifications ?? [])
 const { createValidator } = useZodI18n()
 const validate = createValidator(AddApprovalStepSchema)
 const validationState = computed(() => ({ ...state.value, entityType, entityId }))
+const assigneeKind = ref<'user' | 'group'>('user')
+watch(() => state.value?.anchorApprovalId, () => {
+  assigneeKind.value = state.value?.egcs_cn_assignedgroup ? 'group' : 'user'
+})
+const chooseKind = (kind: 'user' | 'group') => {
+  assigneeKind.value = kind
+  if (!state.value) return
+  state.value.egcs_cn_assigneduser = ''
+  state.value.egcs_cn_assignedgroup = kind === 'group' ? '' : null
+}
+const selectedGroup = computed({
+  get: () => state.value?.egcs_cn_assignedgroup ?? '',
+  set: (value: string) => { if (state.value) state.value.egcs_cn_assignedgroup = value }
+})
 
 const getCertificationLabel = (certification: AdditionalApprovalCertificationState, index: number) => {
   return getBilingualValue(certification, 'egcs_cn_name', t('assessment.approvals.certification_number', { number: index + 1 }))
@@ -67,7 +82,10 @@ const getCertificationLabel = (certification: AdditionalApprovalCertificationSta
             :name-fr="anchorStep.egcs_cn_name_fr" />
         </div>
 
-        <UFormField :label="t('assessment.approvals.assigned_approver')" name="egcs_cn_assigneduser" required>
+        <UFormField :label="t('groups.assignee_type')" required>
+          <USelect :model-value="assigneeKind" :items="[{ label: t('groups.user'), value: 'user' }, { label: t('groups.group'), value: 'group' }]" @update:model-value="value => chooseKind(value === 'group' ? 'group' : 'user')" />
+        </UFormField>
+        <UFormField v-if="assigneeKind === 'user'" :label="t('assessment.approvals.assigned_approver')" name="egcs_cn_assigneduser" required>
           <CommonServerLookupSelect
             v-model="state.egcs_cn_assigneduser"
             :aria-label="t('assessment.approvals.assigned_approver')"
@@ -76,6 +94,9 @@ const getCertificationLabel = (certification: AdditionalApprovalCertificationSta
             label-en-key="name"
             label-fr-key="name"
             :query="{ entityType, entityId }" />
+        </UFormField>
+        <UFormField v-else :label="t('groups.group')" name="egcs_cn_assignedgroup" required>
+          <CommonServerLookupSelect v-model="selectedGroup" fetch-url="/api/approvals/lookups/groups" value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" :query="{ entityType, entityId }" />
         </UFormField>
 
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">

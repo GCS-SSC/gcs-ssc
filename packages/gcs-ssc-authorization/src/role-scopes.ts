@@ -12,6 +12,7 @@ export const ROLE_ABILITY_SCOPE_MATRIX: Record<RoleAbilitySubject, readonly Role
   transfer_payment: ['global', 'agency', 'program'],
   role: ['global', 'agency'],
   user: ['global', 'agency'],
+  group: ['global', 'agency'],
   agreement: ['global', 'agency', 'program'],
   applicant_recipient: ['global', 'agency']
 }

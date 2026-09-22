@@ -17,6 +17,7 @@ import {
 } from './transfer-payment-polymorphic'
 import { readReviewSetupPublicationMetadata } from './review-setup-versioning'
 import { supportsDirectReviewConfiguration } from './entity-type-registry'
+import { isAssignableGroup } from './groups'
 
 type ReviewSetupPatchBody = z.infer<typeof TransferPaymentStreamReviewSetupPatchSchema>
 type ReviewSetupMember = NonNullable<ReviewSetupPatchBody['members']>[number]
@@ -53,6 +54,7 @@ const reviewSetupMemberSelectFields = [
   'Common_Review_Setup.egcs_cn_approvaltemplate as egcs_cn_approvaltemplate',
   'Common_Review_Setup.egcs_cn_failonchecklistfailure as egcs_cn_failonchecklistfailure',
   'Common_Review_Setup.egcs_cn_failurethreshold as egcs_cn_failurethreshold',
+  'Common_Review_Setup.egcs_cn_defaultgroup as egcs_cn_defaultgroup',
   'Common_Review_Schema.egcs_cn_name_en as egcs_cn_name_en',
   'Common_Review_Schema.egcs_cn_name_fr as egcs_cn_name_fr',
   'Common_Review_Schema.egcs_cn_outcomename_en as egcs_cn_outcomename_en',
@@ -268,6 +270,7 @@ const mapExistingMembersForValidation = (members: ReviewSetupMemberRow[]): Revie
     egcs_cn_failurethreshold: member.egcs_cn_failurethreshold !== undefined
       ? member.egcs_cn_failurethreshold
       : null,
+    egcs_cn_defaultgroup: member.egcs_cn_defaultgroup ? String(member.egcs_cn_defaultgroup) : null,
     egcs_cn_approvaltemplate: member.egcs_cn_approvaltemplate
       ? String(member.egcs_cn_approvaltemplate)
       : undefined
@@ -312,6 +315,12 @@ const validateReviewSetupPatch = async (
 
   const memberApprovalTemplateError = await validateReviewSetupMemberApprovalTemplates(event, db, options.streamId, members)
   if (memberApprovalTemplateError) return memberApprovalTemplateError
+
+  for (const member of members) {
+    if (member.egcs_cn_defaultgroup && !await isAssignableGroup(db, member.egcs_cn_defaultgroup, options.agencyId)) {
+      return await badRequest(event, 'REVIEW_SETUP_GROUP_INVALID', 'apiErrors.request.invalid')
+    }
+  }
 
   return null
 }
@@ -386,6 +395,7 @@ const buildReviewSetupMemberInsertPayload = (
     egcs_cn_approvaltemplate: member.egcs_cn_approvaltemplate,
     egcs_cn_failonchecklistfailure: member.egcs_cn_failonchecklistfailure,
     egcs_cn_failurethreshold: member.egcs_cn_failurethreshold,
+    egcs_cn_defaultgroup: member.egcs_cn_defaultgroup ?? null,
     egcs_cn_reviewschema: member.egcs_cn_reviewschema,
     _deleted: false
   }))
@@ -431,7 +441,7 @@ const replaceReviewSetupMembers = async (
       resolveReviewSetupEntityType(body, currentSet),
       body.members
     ))
-    .returning(['id', 'egcs_cn_reviewset', 'egcs_cn_reviewschema', 'egcs_cn_order', 'egcs_cn_approvaltemplate', 'egcs_cn_failonchecklistfailure', 'egcs_cn_failurethreshold', '_deleted'])
+    .returning(['id', 'egcs_cn_reviewset', 'egcs_cn_reviewschema', 'egcs_cn_order', 'egcs_cn_approvaltemplate', 'egcs_cn_failonchecklistfailure', 'egcs_cn_failurethreshold', 'egcs_cn_defaultgroup', '_deleted'])
     .execute()
   const insertedIds = insertedMembers.map(member => String(member.id))
 

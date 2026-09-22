@@ -72,8 +72,10 @@ export type AdditionalReviewerRowContext = AdditionalReviewerExecutableContext &
   row: {
     id: string
     comments: string
-    assignedUserId: string
+    assignedUserId: string | null
     assignedUserName: string
+    assignedGroupId: string | null
+    assignedGroupName: string | null
     completedAt: string | null
   }
 }
@@ -162,19 +164,21 @@ export const resolveAdditionalReviewerRowContext = async (
 ): Promise<AdditionalReviewerRowContext | null> => {
   const row = await db
     .selectFrom('Common_Additional_Reviewers')
-    .innerJoin('Common_User', 'Common_User.id', 'Common_Additional_Reviewers.egcs_cn_user')
+    .leftJoin('Common_User', 'Common_User.id', 'Common_Additional_Reviewers.egcs_cn_user')
+    .leftJoin('Common_Group', 'Common_Group.id', 'Common_Additional_Reviewers.egcs_cn_group')
     .select([
       'Common_Additional_Reviewers.id as id',
       'Common_Additional_Reviewers.egcs_cn_entitytype as entityType',
       'Common_Additional_Reviewers.egcs_cn_entityid as entityId',
       'Common_Additional_Reviewers.egcs_cn_comments as comments',
       'Common_Additional_Reviewers.egcs_cn_user as assignedUserId',
+      'Common_Additional_Reviewers.egcs_cn_group as assignedGroupId',
       'Common_Additional_Reviewers.egcs_cn_completedat as completedAt',
-      'Common_User.egcs_cn_name as assignedUserName'
+      'Common_User.egcs_cn_name as assignedUserName',
+      'Common_Group.egcs_cn_name_en as assignedGroupName'
     ])
     .where('Common_Additional_Reviewers.id', '=', additionalReviewerId)
     .where('Common_Additional_Reviewers._deleted', '=', false)
-    .where('Common_User._deleted', '=', false)
     .executeTakeFirst()
 
   if (!row || row.entityType !== 'commonreview') {
@@ -192,8 +196,10 @@ export const resolveAdditionalReviewerRowContext = async (
     row: {
       id: String(row.id),
       comments: row.comments ?? '',
-      assignedUserId: String(row.assignedUserId),
-      assignedUserName: row.assignedUserName,
+      assignedUserId: row.assignedUserId ? String(row.assignedUserId) : null,
+      assignedUserName: row.assignedUserName ?? '',
+      assignedGroupId: row.assignedGroupId ? String(row.assignedGroupId) : null,
+      assignedGroupName: row.assignedGroupName ?? null,
       completedAt: row.completedAt ? new Date(row.completedAt).toISOString() : null
     }
   }

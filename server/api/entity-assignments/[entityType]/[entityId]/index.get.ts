@@ -39,6 +39,12 @@ export default defineEventHandler(async event => {
         target.entityId,
         assignmentUserIds
       )
+  const reviewGroup = target.entityType === 'commonreview'
+    ? await event.context.$db.selectFrom('Common_Review')
+        .leftJoin('Common_Group', 'Common_Group.id', 'Common_Review.egcs_cn_group')
+        .select(['Common_Review.egcs_cn_group', 'Common_Review.egcs_cn_groupclaimedby', 'Common_Group.egcs_cn_name_en', 'Common_Group.egcs_cn_name_fr'])
+        .where('Common_Review.id', '=', target.entityId).where('Common_Review._deleted', '=', false).executeTakeFirst()
+    : null
   return {
     assignments: assignments.map(row => ({
       ...row,
@@ -53,6 +59,14 @@ export default defineEventHandler(async event => {
       && !row.is_inactive
       && eligibleUserIds.has(String(row.user_id))
     ),
-    is_primary: assignments.some(row => String(row.user_id) === actor.commonUserId && row.is_primary)
+    is_primary: assignments.some(row => String(row.user_id) === actor.commonUserId && row.is_primary),
+    group: reviewGroup
+      ? {
+          id: reviewGroup.egcs_cn_group ? String(reviewGroup.egcs_cn_group) : null,
+          claimed_by: reviewGroup.egcs_cn_groupclaimedby ? String(reviewGroup.egcs_cn_groupclaimedby) : null,
+          name_en: reviewGroup.egcs_cn_name_en ?? '',
+          name_fr: reviewGroup.egcs_cn_name_fr ?? ''
+        }
+      : null
   }
 })
