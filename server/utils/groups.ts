@@ -66,3 +66,21 @@ export const isAssignableGroup = async (db: Db, groupId: string, agencyId: strin
   .where('Common_User._deleted', '=', false)
   .where('user._deleted', '=', false)
   .executeTakeFirst())
+
+/** Users with an active role explicitly owned by this agency can join its groups. */
+export const listAgencyGroupUsers = async (db: Db, agencyId: string): Promise<Array<{ id: string; name: string }>> => {
+  const users = await db.selectFrom('Common_User')
+    .innerJoin('user', 'user.id', 'Common_User.egcs_cn_auth_user_id')
+    .innerJoin('user_role_assignment', 'user_role_assignment.user_id', 'user.id')
+    .innerJoin('role', 'role.id', 'user_role_assignment.role_id')
+    .select(['Common_User.id as id', 'Common_User.egcs_cn_name as name'])
+    .where('Common_User._deleted', '=', false)
+    .where('user._deleted', '=', false)
+    .where('user_role_assignment._deleted', '=', false)
+    .where('role._deleted', '=', false)
+    .where('role.agency_id', '=', agencyId)
+    .distinct()
+    .orderBy('Common_User.egcs_cn_name')
+    .execute()
+  return users.map(user => ({ id: String(user.id), name: user.name }))
+}

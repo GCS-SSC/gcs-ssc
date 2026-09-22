@@ -30,6 +30,7 @@ const emits = defineEmits<{
           @click="emits('close', false)" />
         <UButton
           :label="confirmLabel || t('common.confirm')"
+          :icon="confirmColor === 'primary' ? 'i-lucide-check' : undefined"
           :color="confirmColor"
           @click="emits('close', true)" />
       </div>

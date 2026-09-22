@@ -3,6 +3,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { AssignableEntityType } from '~~/shared/types/schemas'
+import { useBilingualValue } from '~/composables/useBilingualValue'
 
 const { entityType, entityId } = defineProps<{ entityType: AssignableEntityType; entityId: string }>()
 const emit = defineEmits<{ changed: [] }>()
@@ -18,16 +19,16 @@ const mutateAssignment = $fetch as unknown as (
   options: { method: 'POST' | 'PATCH' | 'DELETE'; body?: { userId: string } }
 ) => Promise<unknown>
 const selectedUserId: Ref<string | null> = ref(null)
-const selectedGroupId: Ref<string> = ref('')
 const groups: Ref<GroupOption[]> = ref([])
 const isSaving: Ref<boolean> = ref(false)
+const isGroupConfirming: Ref<boolean> = ref(false)
 const baseUrl = computed(() => `/api/entity-assignments/${entityType}/${entityId}`)
 const {
   roster,
   error: rosterError,
   status: rosterStatus,
   refresh
-} = useEntityAssignmentRoster(() => entityType, () => entityId)
+} = useEntityAssignmentRoster(() => entityType, () => entityId, { enabled: false })
 const canManage = computed(() => rosterStatus.value === 'success' && !rosterError.value
   && roster.value?.can_manage_assignments === true)
 const users: Ref<UserOption[]> = ref([])
@@ -46,7 +47,6 @@ const loadUsers = async () => {
   try {
     await refresh()
     if (disposed || requestGeneration !== usersRequestGeneration || requestedBaseUrl !== baseUrl.value) return
-    selectedGroupId.value = roster.value?.group?.id ?? ''
     if (!canManage.value) return
     const nextUsers = await fetchUserOptions(`${requestedBaseUrl}/users`)
     const nextGroups = entityType === 'commonreview'
@@ -67,8 +67,8 @@ const loadUsers = async () => {
 watch(baseUrl, () => {
   targetGeneration++
   isSaving.value = false
+  isGroupConfirming.value = false
   selectedUserId.value = null
-  selectedGroupId.value = ''
   void loadUsers()
 }, { immediate: true, flush: 'sync' })
 onBeforeUnmount(() => {
@@ -79,6 +79,18 @@ onBeforeUnmount(() => {
 const availableUsers = computed(() => users.value
   .filter(user => !roster.value?.assignments.some(assignment => assignment.user_id === user.id))
   .map(user => ({ label: user.name, value: user.id })))
+const currentGroupId = computed(() => roster.value?.group?.id ?? null)
+const { getBilingualValue } = useBilingualValue()
+const groupOptions = computed(() => {
+  const options = groups.value.map(group => ({
+    label: getBilingualValue(group, 'egcs_cn_name', group.id), value: group.id
+  }))
+  const current = roster.value?.group
+  if (current?.id && !options.some(option => option.value === current.id)) {
+    options.push({ label: getBilingualValue({ egcs_cn_name_en: current.name_en, egcs_cn_name_fr: current.name_fr }, 'egcs_cn_name', current.id), value: current.id })
+  }
+  return options
+})
 const assignmentCount = computed(() => roster.value?.assignments.length ?? 0)
 
 const runAction = async (action: () => Promise<unknown>, successMessage: string) => {
@@ -112,14 +124,31 @@ const addUser = async () => {
     t('assignments.added_success')
   )
 }
-const saveGroup = async () => {
-  if (entityType !== 'commonreview') return
-  await runAction(
-    () => ($fetch as unknown as (url: string, options: { method: 'PATCH', body: { egcs_cn_group: string | null } }) => Promise<unknown>)(
-      `/api/reviews/${entityId}/group`, { method: 'PATCH', body: { egcs_cn_group: selectedGroupId.value || null } }
-    ),
-    t('common.updated_success')
-  )
+const changeGroup = async (groupId: string | null) => {
+  if (entityType !== 'commonreview' || !canManage.value || isSaving.value || isGroupConfirming.value
+    || groupId === currentGroupId.value || (groupId && !groups.value.some(group => group.id === groupId))) return
+  const generation = targetGeneration
+  const reviewId = entityId
+  const name = groupOptions.value.find(option => option.value === groupId)?.label ?? ''
+  isGroupConfirming.value = true
+  try {
+    const confirmed = await confirm({
+      title: t(groupId ? 'groups.assign_confirm_title' : 'groups.clear_confirm_title'),
+      description: groupId ? t('groups.assign_confirm_description', { name }) : t('groups.clear_confirm_description'),
+      confirmLabel: t('common.confirm'),
+      cancelLabel: t('common.cancel'),
+      confirmColor: 'primary'
+    })
+    if (!confirmed || disposed || generation !== targetGeneration || !canManage.value) return
+    await runAction(
+      () => ($fetch as unknown as (url: string, options: { method: 'PATCH', body: { egcs_cn_group: string | null } }) => Promise<unknown>)(
+        `/api/reviews/${reviewId}/group`, { method: 'PATCH', body: { egcs_cn_group: groupId } }
+      ),
+      t('common.updated_success')
+    )
+  } finally {
+    if (generation === targetGeneration) isGroupConfirming.value = false
+  }
 }
 const canPromote = (userId: string) => canManage.value && roster.value?.assignments.some(
   assignment => assignment.user_id === userId && !assignment.is_primary && assignment.is_eligible
@@ -241,16 +270,6 @@ const remove = async (userId: string, name: string) => {
       </li>
     </ul>
 
-    <div v-if="entityType === 'commonreview' && rosterStatus === 'success'" class="flex flex-wrap items-end gap-3">
-      <UFormField v-if="canManage" :label="t('groups.group')" name="egcs_cn_group" class="min-w-64">
-        <USelect v-model="selectedGroupId" :items="[{ label: t('common.none'), value: '' }, ...groups.map(group => ({ label: group.egcs_cn_name_en, value: group.id }))]" :disabled="!canManage || isSaving" />
-      </UFormField>
-      <p v-else class="text-sm text-muted">
-        {{ t('groups.group') }}: {{ roster?.group?.name_en || t('common.none') }}
-      </p>
-      <UButton v-if="canManage" :label="t('common.save')" :disabled="isSaving || selectedGroupId === (roster?.group?.id ?? '')" @click="saveGroup" />
-    </div>
-
     <UAlert v-if="usersError && canManage" color="error" :title="t('assignments.load_failed')">
       <template #actions>
         <UButton :label="t('common.retry')" :disabled="isLoadingUsers" @click="loadUsers" />
@@ -276,6 +295,33 @@ const remove = async (userId: string, name: string) => {
         :loading="isSaving"
         :disabled="!selectedUserId || isSaving || isLoadingUsers || usersError"
         @click="addUser" />
+    </div>
+    <div v-if="entityType === 'commonreview' && rosterStatus === 'success'" class="flex flex-col gap-3 rounded-sm bg-slate-200/60 p-4 dark:bg-slate-700/35 sm:flex-row sm:items-end">
+      <UFormField v-if="canManage" :label="t('groups.group')" name="egcs_cn_group" class="min-w-0 flex-1">
+        <USelectMenu
+          :model-value="currentGroupId ?? undefined"
+          :items="groupOptions"
+          value-key="value"
+          label-key="label"
+          searchable
+          :search-input="{ placeholder: t('groups.search_groups') }"
+          :placeholder="t('common.none')"
+          :disabled="isSaving || isGroupConfirming || isLoadingUsers || usersError"
+          class="w-full"
+          @update:model-value="value => changeGroup(value ?? null)" />
+      </UFormField>
+      <p v-else class="text-sm text-muted">
+        {{ t('groups.group') }}: {{ roster?.group?.name_en || t('common.none') }}
+      </p>
+      <UButton
+        v-if="canManage && currentGroupId"
+        color="warning"
+        variant="soft"
+        icon="i-lucide-x"
+        :label="t('groups.clear_group')"
+        :disabled="isSaving || isGroupConfirming"
+        class="w-full bg-amber-100 text-amber-700 ring-1 ring-inset ring-amber-300 hover:bg-amber-200 dark:bg-amber-400/10 dark:text-amber-300 dark:ring-amber-400/30 dark:hover:bg-amber-400/20 sm:w-auto sm:self-end"
+        @click="changeGroup(null)" />
     </div>
   </section>
 </template>

@@ -1,7 +1,6 @@
 import { GroupMemberSchema } from '~~/shared/types/schemas/group'
 import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
-import { authorizeGroup, authorizeFreshGroup } from '~~/server/utils/groups'
-import { listAgencyScopedCommonUsers } from '~~/server/utils/additional-reviewer-runtime'
+import { authorizeGroup, authorizeFreshGroup, listAgencyGroupUsers } from '~~/server/utils/groups'
 import { badRequest } from '~~/server/utils/api-errors'
 
 // eslint-disable-next-line local/require-authorize -- authorizeGroup applies the agency-scoped group grant.
@@ -11,7 +10,7 @@ export default defineEventHandler(async event => {
   const body = await readValidatedBodyI18n(event, GroupMemberSchema)
   return await event.context.$db.transaction().execute(async trx => {
     await authorizeFreshGroup(event, trx, id, 'update')
-    const eligible = await listAgencyScopedCommonUsers(trx, String(group.egcs_cn_agency))
+    const eligible = await listAgencyGroupUsers(trx, String(group.egcs_cn_agency))
     if (!eligible.some(user => user.id === body.egcs_cn_user)) {
       return await badRequest(event, 'GROUP_MEMBER_INVALID', 'apiErrors.request.invalid')
     }
