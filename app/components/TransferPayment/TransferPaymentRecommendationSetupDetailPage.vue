@@ -295,10 +295,17 @@ const runMemberMutation: EditorMutationRunner = async request => {
         :aria-label="getBilingualValue(state, 'egcs_cn_name')"
         tabindex="-1">
         <TransferPaymentRecommendationSetupDetailHero :name="getBilingualValue(state, 'egcs_cn_name')" :publication-version="state.publicationVersion" :publication-state="state.publicationState" :has-unpublished-changes="state.hasUnpublishedChanges" :is-collapsed="isHeroCollapsed" :is-publishing="isPublishing" :is-retiring="isRetiring" :is-mutation-pending="mutation.isPending.value" :can-manage="canManagePublication" @publish="publish" @retire="retire" />
-        <UForm ref="recommendationSetupForm" :state="state" :validate="validate" class="flex min-h-0 flex-1 flex-col gap-6 px-6 pb-6 lg:flex-row lg:gap-0" @submit="save">
-          <AssessmentSchemaDetailSidebar v-if="canUpdate" v-model="selectedSection" :section-tabs="sectionTabs" :is-saving="isSaving" :disabled="mutation.isPending.value" :ui="{ trigger: 'w-full justify-start whitespace-normal break-words text-left' }" @save="save" />
-          <main class="min-w-0 flex-1 pt-6 lg:pl-6">
-            <div class="space-y-10 pb-12">
+        <UForm ref="recommendationSetupForm" :state="state" :validate="validate" class="flex min-h-0 flex-1 flex-col" @submit="save">
+          <CommonDesignTimeEditorShell>
+            <template #sidebar>
+              <AssessmentSchemaDetailSidebar v-if="canUpdate" v-model="selectedSection" :section-tabs="sectionTabs" :is-saving="isSaving" :disabled="mutation.isPending.value" :ui="{ trigger: 'w-full justify-start whitespace-normal break-words text-left' }" @save="save" />
+              <aside v-else class="w-full shrink-0 lg:sticky lg:top-6 lg:self-start lg:w-72 lg:border-r lg:border-zinc-200 lg:pr-4 dark:lg:border-zinc-800">
+                <div class="pt-6">
+                  <CommonRouteTabs v-model="selectedSection" :items="sectionTabs" orientation="vertical" />
+                </div>
+              </aside>
+            </template>
+            <CommonDesignTimeEditorSections>
               <AssessmentSchemaPageSection section-id="recommendation-identity" :title="t('workflow.identity')">
                 <div class="grid gap-5 md:grid-cols-2">
                   <UFormField :label="t('transfer_payment.name_en')" name="egcs_cn_name_en">
@@ -360,8 +367,8 @@ const runMemberMutation: EditorMutationRunner = async request => {
                   </div>
                 </div>
               </AssessmentSchemaPageSection>
-            </div>
-          </main>
+            </CommonDesignTimeEditorSections>
+          </CommonDesignTimeEditorShell>
         </UForm>
         <TransferPaymentRecommendationSetupItemModal v-if="selectedMember && canUpdate" v-model:open="isMemberModalOpen" v-model:state="selectedMember" :transfer-payment-id="transferPaymentId" :stream-id="streamId" :recommendation-setup-id="setupId" :agency-id="String(profile?.egcs_tp_agency ?? '')" :mutation-pending="mutation.isPending.value" :run-mutation="runMemberMutation" />
         <TransferPaymentRecommendationSetupSchemaCreateModal v-if="schemaCreateState && canCreate" v-model:open="isSchemaCreateModalOpen" v-model:state="schemaCreateState" :transfer-payment-id="transferPaymentId" :stream-id="streamId" :recommendation-setup-id="setupId" :mutation-pending="mutation.isPending.value" :run-mutation="runMemberMutation" @created="onSchemaCreated" />

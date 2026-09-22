@@ -339,75 +339,75 @@ const runMemberMutation: EditorMutationRunner = async request => {
         tabindex="-1">
         <TransferPaymentReviewSetupDetailHero :name="getBilingualValue(state, 'egcs_cn_name')" :entity-type="state.egcs_cn_entitytype" :entity-type-label-en="state.entityTypeLabelEn" :entity-type-label-fr="state.entityTypeLabelFr" :publication-state="state.publicationState" :publication-version="state.publicationVersion" :has-unpublished-changes="state.hasUnpublishedChanges" :is-collapsed="isHeroCollapsed" :is-publishing="isPublishing" :is-retiring="isRetiring" :is-mutation-pending="mutation.isPending.value" :can-manage="canManagePublication" @publish="publish" @retire="retire" />
 
-        <div class="flex min-h-0 flex-1 flex-col gap-6 overflow-visible px-6 pt-0 pb-6 lg:flex-row lg:gap-0">
-          <AssessmentSchemaDetailSidebar
-            v-if="canUpdate"
-            v-model="selectedSection"
-            :section-tabs="sectionTabs"
-            :is-saving="isSavingSet"
-            :disabled="mutation.isPending.value"
-            :ui="{ trigger: 'w-full justify-start whitespace-normal break-words text-left' }"
-            @save="saveSet" />
-          <aside v-else class="w-full shrink-0 lg:sticky lg:top-6 lg:self-start lg:w-72 lg:border-r lg:border-zinc-200 lg:pr-4 dark:lg:border-zinc-800">
-            <div class="pt-6">
-              <CommonRouteTabs v-model="selectedSection" :items="sectionTabs" orientation="vertical" />
-            </div>
-          </aside>
+        <CommonDesignTimeEditorShell>
+          <template #sidebar>
+            <AssessmentSchemaDetailSidebar
+              v-if="canUpdate"
+              v-model="selectedSection"
+              :section-tabs="sectionTabs"
+              :is-saving="isSavingSet"
+              :disabled="mutation.isPending.value"
+              :ui="{ trigger: 'w-full justify-start whitespace-normal break-words text-left' }"
+              @save="saveSet" />
+            <aside v-else class="w-full shrink-0 lg:sticky lg:top-6 lg:self-start lg:w-72 lg:border-r lg:border-zinc-200 lg:pr-4 dark:lg:border-zinc-800">
+              <div class="pt-6">
+                <CommonRouteTabs v-model="selectedSection" :items="sectionTabs" orientation="vertical" />
+              </div>
+            </aside>
+          </template>
 
-          <main class="min-h-0 min-w-0 flex-1 pt-6 lg:pl-6">
-            <div class="w-full space-y-10 pb-12">
-              <AssessmentSchemaPageSection section-id="review-set-general" :title="t('common.general')">
-                <UForm :state="state" :validate="validateSet" class="space-y-5" @submit="saveSet">
-                  <fieldset :disabled="!canUpdateFields" class="space-y-5">
-                    <ReviewSetSetupFields
-                      v-model:state="state"
-                      :transfer-payment-id="transferPaymentId"
-                      :stream-id="streamId"
-                      :entity-type-items="entityTypeItems"
-                      entity-type-disabled />
-                    <div v-if="canUpdate" class="flex justify-end">
-                      <CommonSaveButton :label="t('common.save')" :loading="isSavingSet" :disabled="mutation.isPending.value" />
-                    </div>
-                  </fieldset>
-                </UForm>
-              </AssessmentSchemaPageSection>
-
-              <AssessmentSchemaPageSection section-id="review-set-members" :title="t('transfer_payment.review_setup_members')">
-                <div class="mb-5 flex flex-wrap justify-end gap-2">
-                  <UButton v-if="canCreate" icon="i-lucide-plus" :label="t('transfer_payment.review_schema_create')" :disabled="mutation.isPending.value" class="cursor-default" @click="openCreateSchema" />
-                  <UButton v-if="canUpdate" icon="i-lucide-link" :label="t('transfer_payment.review_schema_associate')" color="neutral" variant="outline" :disabled="mutation.isPending.value" class="cursor-default" @click="openAssociate" />
-                </div>
-
-                <div v-if="state.members.length" class="divide-y divide-zinc-200 border-y border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
-                  <div v-for="member in state.members" :key="member.id" class="flex w-full items-center gap-2 px-2 py-4">
-                    <button v-if="canUpdate" type="button" :disabled="mutation.isPending.value" class="flex min-w-0 flex-1 items-center gap-4 text-left disabled:opacity-50" @click="editMember(member)">
-                      <span class="w-8 text-sm font-semibold text-zinc-500">{{ member.egcs_cn_order }}</span>
-                      <CommonBilingualName :name-en="member.egcs_cn_name_en" :name-fr="member.egcs_cn_name_fr" />
-                      <div class="ml-auto flex items-center gap-2">
-                        <CommonStatusBadge enum-name="review_type" :status="member.egcs_cn_reviewtype" />
-                        <CommonLifecycleBadge v-if="member.publicationState" engine="publication" :state="member.publicationState" />
-                      </div>
-                      <UIcon name="i-lucide-chevron-right" class="size-4 text-zinc-400" />
-                    </button>
-                    <div v-else class="flex min-w-0 flex-1 items-center gap-4">
-                      <span class="w-8 text-sm font-semibold text-zinc-500">{{ member.egcs_cn_order }}</span>
-                      <CommonBilingualName :name-en="member.egcs_cn_name_en" :name-fr="member.egcs_cn_name_fr" />
-                      <div class="ml-auto flex items-center gap-2">
-                        <CommonStatusBadge enum-name="review_type" :status="member.egcs_cn_reviewtype" />
-                        <CommonLifecycleBadge v-if="member.publicationState" engine="publication" :state="member.publicationState" />
-                      </div>
-                    </div>
-                    <UButton icon="i-lucide-arrow-up-right" color="neutral" variant="ghost" size="sm" class="cursor-default" :disabled="mutation.isPending.value" :aria-label="t('transfer_payment.review_schema')" @click="openSchemaEditor(member)" />
-                    <UButton v-if="canDelete" icon="i-lucide-trash" color="error" variant="ghost" size="sm" class="cursor-default" :loading="deletingMemberId === member.id" :disabled="mutation.isPending.value" :aria-label="t('common.delete')" @click="deleteMember(member)" />
+          <CommonDesignTimeEditorSections>
+            <AssessmentSchemaPageSection section-id="review-set-general" :title="t('common.general')">
+              <UForm :state="state" :validate="validateSet" class="space-y-5" @submit="saveSet">
+                <fieldset :disabled="!canUpdateFields" class="space-y-5">
+                  <ReviewSetSetupFields
+                    v-model:state="state"
+                    :transfer-payment-id="transferPaymentId"
+                    :stream-id="streamId"
+                    :entity-type-items="entityTypeItems"
+                    entity-type-disabled />
+                  <div v-if="canUpdate" class="flex justify-end">
+                    <CommonSaveButton :label="t('common.save')" :loading="isSavingSet" :disabled="mutation.isPending.value" />
                   </div>
+                </fieldset>
+              </UForm>
+            </AssessmentSchemaPageSection>
+
+            <AssessmentSchemaPageSection section-id="review-set-members" :title="t('transfer_payment.review_setup_members')">
+              <div class="mb-5 flex flex-wrap justify-end gap-2">
+                <UButton v-if="canCreate" icon="i-lucide-plus" :label="t('transfer_payment.review_schema_create')" :disabled="mutation.isPending.value" class="cursor-default" @click="openCreateSchema" />
+                <UButton v-if="canUpdate" icon="i-lucide-link" :label="t('transfer_payment.review_schema_associate')" color="neutral" variant="outline" :disabled="mutation.isPending.value" class="cursor-default" @click="openAssociate" />
+              </div>
+
+              <div v-if="state.members.length" class="divide-y divide-zinc-200 border-y border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+                <div v-for="member in state.members" :key="member.id" class="flex w-full items-center gap-2 px-2 py-4">
+                  <button v-if="canUpdate" type="button" :disabled="mutation.isPending.value" class="flex min-w-0 flex-1 items-center gap-4 text-left disabled:opacity-50" @click="editMember(member)">
+                    <span class="w-8 text-sm font-semibold text-zinc-500">{{ member.egcs_cn_order }}</span>
+                    <CommonBilingualName :name-en="member.egcs_cn_name_en" :name-fr="member.egcs_cn_name_fr" />
+                    <div class="ml-auto flex items-center gap-2">
+                      <CommonStatusBadge enum-name="review_type" :status="member.egcs_cn_reviewtype" />
+                      <CommonLifecycleBadge v-if="member.publicationState" engine="publication" :state="member.publicationState" />
+                    </div>
+                    <UIcon name="i-lucide-chevron-right" class="size-4 text-zinc-400" />
+                  </button>
+                  <div v-else class="flex min-w-0 flex-1 items-center gap-4">
+                    <span class="w-8 text-sm font-semibold text-zinc-500">{{ member.egcs_cn_order }}</span>
+                    <CommonBilingualName :name-en="member.egcs_cn_name_en" :name-fr="member.egcs_cn_name_fr" />
+                    <div class="ml-auto flex items-center gap-2">
+                      <CommonStatusBadge enum-name="review_type" :status="member.egcs_cn_reviewtype" />
+                      <CommonLifecycleBadge v-if="member.publicationState" engine="publication" :state="member.publicationState" />
+                    </div>
+                  </div>
+                  <UButton icon="i-lucide-arrow-up-right" color="neutral" variant="ghost" size="sm" class="cursor-default" :disabled="mutation.isPending.value" :aria-label="t('transfer_payment.review_schema')" @click="openSchemaEditor(member)" />
+                  <UButton v-if="canDelete" icon="i-lucide-trash" color="error" variant="ghost" size="sm" class="cursor-default" :loading="deletingMemberId === member.id" :disabled="mutation.isPending.value" :aria-label="t('common.delete')" @click="deleteMember(member)" />
                 </div>
-                <p v-else class="py-10 text-center text-sm text-zinc-500 dark:text-zinc-400">
-                  {{ t('transfer_payment.no_review_setup_members') }}
-                </p>
-              </AssessmentSchemaPageSection>
-            </div>
-          </main>
-        </div>
+              </div>
+              <p v-else class="py-10 text-center text-sm text-zinc-500 dark:text-zinc-400">
+                {{ t('transfer_payment.no_review_setup_members') }}
+              </p>
+            </AssessmentSchemaPageSection>
+          </CommonDesignTimeEditorSections>
+        </CommonDesignTimeEditorShell>
       </div>
 
       <TransferPaymentReviewSetupItemModal

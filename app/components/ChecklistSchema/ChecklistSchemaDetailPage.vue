@@ -455,139 +455,140 @@ const retire = async () => {
           :disabled="!canEditFields"
           @imported="importDefinition" />
 
-        <div class="flex min-h-0 flex-1 flex-col gap-6 overflow-visible px-6 pt-0 pb-6 lg:flex-row lg:gap-0">
-          <AssessmentSchemaDetailSidebar
-            v-if="canEdit"
-            v-model="selectedSection"
-            :section-tabs="sectionTabs"
-            :is-saving="isSaving"
-            :disabled="mutation.isPending.value"
-            :ui="{ trigger: 'w-full justify-start whitespace-normal break-words text-left' }"
-            @save="save" />
-          <aside v-else class="w-full shrink-0 lg:sticky lg:top-6 lg:self-start lg:w-72 lg:border-r lg:border-zinc-200 lg:pr-4 dark:lg:border-zinc-800">
-            <div class="pt-6">
-              <CommonRouteTabs v-model="selectedSection" :items="sectionTabs" orientation="vertical" />
-            </div>
-          </aside>
-          <main class="min-h-0 min-w-0 flex-1 pt-6 lg:pl-6">
-            <UForm ref="checklistForm" :state="state" :schema="ChecklistMetadataSchema">
-              <fieldset :disabled="!canEditFields">
-                <div class="w-full space-y-10 pb-12">
-                  <AssessmentSchemaPageSection section-id="checklist-general" :title="t('checklist_schema.general')">
-                    <div class="grid gap-5 md:grid-cols-2">
-                      <UFormField :label="t('transfer_payment.name_en')" name="egcs_cn_name_en" required>
-                        <UInput v-model="state.egcs_cn_name_en" class="w-full" />
-                      </UFormField>
-                      <UFormField :label="t('transfer_payment.name_fr')" name="egcs_cn_name_fr" required>
-                        <UInput v-model="state.egcs_cn_name_fr" class="w-full" />
-                      </UFormField>
-                      <UFormField :label="t('checklist_schema.result_name_en')" name="egcs_cn_outcomename_en" required>
-                        <UInput v-model="state.egcs_cn_outcomename_en" class="w-full" />
-                      </UFormField>
-                      <UFormField :label="t('checklist_schema.result_name_fr')" name="egcs_cn_outcomename_fr" required>
-                        <UInput v-model="state.egcs_cn_outcomename_fr" class="w-full" />
-                      </UFormField>
-                    </div>
-                    <UCheckbox v-model="state.egcs_cn_disablereviewers" :label="t('checklist_schema.disable_reviewers')" />
-                  </AssessmentSchemaPageSection>
+        <CommonDesignTimeEditorShell>
+          <template #sidebar>
+            <AssessmentSchemaDetailSidebar
+              v-if="canEdit"
+              v-model="selectedSection"
+              :section-tabs="sectionTabs"
+              :is-saving="isSaving"
+              :disabled="mutation.isPending.value"
+              :ui="{ trigger: 'w-full justify-start whitespace-normal break-words text-left' }"
+              @save="save" />
+            <aside v-else class="w-full shrink-0 lg:sticky lg:top-6 lg:self-start lg:w-72 lg:border-r lg:border-zinc-200 lg:pr-4 dark:lg:border-zinc-800">
+              <div class="pt-6">
+                <CommonRouteTabs v-model="selectedSection" :items="sectionTabs" orientation="vertical" />
+              </div>
+            </aside>
+          </template>
 
-                  <AssessmentSchemaPageSection section-id="checklist-sections" :title="t('checklist_schema.sections')">
-                    <template #actions>
-                      <UButton icon="i-lucide-plus" :label="t('checklist_schema.add_section')" variant="outline" class="cursor-default" @click="addSection" />
-                    </template>
-                    <div v-if="definition.sections.length === 0" class="border-default border-t pt-4 text-sm text-zinc-500 dark:text-zinc-400">
-                      {{ t('checklist_schema.no_sections') }}
-                    </div>
-                    <div v-for="(section, sectionIndex) in definition.sections" :key="section._key" class="space-y-0">
-                      <AssessmentSchemaAccordionSection
-                        :title="getNavigationLabel(section.label, t('checklist_schema.section'))"
-                        :persistence-key="`checklist:${section.key}`">
-                        <div class="space-y-6">
-                          <div class="flex justify-end gap-1">
-                            <UButton icon="i-lucide-arrow-up" color="neutral" variant="ghost" class="cursor-default" :disabled="sectionIndex === 0" @click="moveItem(definition.sections, sectionIndex, -1)" />
-                            <UButton icon="i-lucide-arrow-down" color="neutral" variant="ghost" class="cursor-default" :disabled="sectionIndex === definition.sections.length - 1" @click="moveItem(definition.sections, sectionIndex, 1)" />
-                            <UButton icon="i-lucide-trash" color="error" variant="ghost" class="cursor-default" @click="removeSection(sectionIndex)" />
-                          </div>
-                          <div class="grid gap-4 md:grid-cols-2">
-                            <UFormField :label="t('checklist_schema.section_name_en')" required>
-                              <UInput v-model="section.label.en" />
-                            </UFormField>
-                            <UFormField :label="t('checklist_schema.section_name_fr')" required>
-                              <UInput v-model="section.label.fr" />
-                            </UFormField>
-                            <UFormField :label="t('checklist_schema.language_independent_code')" required>
-                              <UInput v-model="section.key" class="font-mono" />
-                            </UFormField>
-                          </div>
+          <UForm ref="checklistForm" :state="state" :schema="ChecklistMetadataSchema">
+            <fieldset :disabled="!canEditFields">
+              <CommonDesignTimeEditorSections>
+                <AssessmentSchemaPageSection section-id="checklist-general" :title="t('checklist_schema.general')">
+                  <div class="grid gap-5 md:grid-cols-2">
+                    <UFormField :label="t('transfer_payment.name_en')" name="egcs_cn_name_en" required>
+                      <UInput v-model="state.egcs_cn_name_en" class="w-full" />
+                    </UFormField>
+                    <UFormField :label="t('transfer_payment.name_fr')" name="egcs_cn_name_fr" required>
+                      <UInput v-model="state.egcs_cn_name_fr" class="w-full" />
+                    </UFormField>
+                    <UFormField :label="t('checklist_schema.result_name_en')" name="egcs_cn_outcomename_en" required>
+                      <UInput v-model="state.egcs_cn_outcomename_en" class="w-full" />
+                    </UFormField>
+                    <UFormField :label="t('checklist_schema.result_name_fr')" name="egcs_cn_outcomename_fr" required>
+                      <UInput v-model="state.egcs_cn_outcomename_fr" class="w-full" />
+                    </UFormField>
+                  </div>
+                  <UCheckbox v-model="state.egcs_cn_disablereviewers" :label="t('checklist_schema.disable_reviewers')" />
+                </AssessmentSchemaPageSection>
 
-                          <AssessmentSchemaAccordionSection
-                            :title="t('checklist_schema.subsections')"
-                            :persistence-key="`checklist:${section.key}:subsections`"
-                            default-open
-                            level="sub">
-                            <div class="space-y-4">
-                              <div class="flex justify-end">
-                                <UButton icon="i-lucide-plus" :label="t('checklist_schema.add_subsection')" variant="outline" class="cursor-default" @click="addSubSection(section)" />
-                              </div>
-                              <AssessmentSchemaAccordionSection
-                                v-for="(subSection, subSectionIndex) in section.subSections"
-                                :key="subSection._key"
-                                :title="getNavigationLabel(subSection.label, t('checklist_schema.subsection'))"
-                                :persistence-key="`checklist:${section.key}:${subSection.key}`"
-                                level="sub">
-                                <div class="space-y-6">
-                                  <div class="flex justify-end gap-1">
-                                    <UButton icon="i-lucide-arrow-up" color="neutral" variant="ghost" class="cursor-default" :disabled="subSectionIndex === 0" @click="moveItem(section.subSections, subSectionIndex, -1)" />
-                                    <UButton icon="i-lucide-arrow-down" color="neutral" variant="ghost" class="cursor-default" :disabled="subSectionIndex === section.subSections.length - 1" @click="moveItem(section.subSections, subSectionIndex, 1)" />
-                                    <UButton icon="i-lucide-trash" color="error" variant="ghost" class="cursor-default" @click="removeSubSection(section, subSectionIndex)" />
-                                  </div>
-                                  <div class="grid gap-4 md:grid-cols-2">
-                                    <UFormField :label="t('checklist_schema.subsection_name_en')" required>
-                                      <UInput v-model="subSection.label.en" />
-                                    </UFormField>
-                                    <UFormField :label="t('checklist_schema.subsection_name_fr')" required>
-                                      <UInput v-model="subSection.label.fr" />
-                                    </UFormField>
-                                    <UFormField :label="t('checklist_schema.language_independent_code')" required>
-                                      <UInput v-model="subSection.key" class="font-mono" />
-                                    </UFormField>
-                                  </div>
-
-                                  <AssessmentSchemaAccordionSection
-                                    :title="t('checklist_schema.checklist_questions')"
-                                    :persistence-key="`checklist:${section.key}:${subSection.key}:questions`"
-                                    default-open
-                                    level="sub">
-                                    <ChecklistSchemaQuestionsTable v-model:questions="subSection.questions" />
-                                  </AssessmentSchemaAccordionSection>
-                                </div>
-                              </AssessmentSchemaAccordionSection>
-                            </div>
-                          </AssessmentSchemaAccordionSection>
+                <AssessmentSchemaPageSection section-id="checklist-sections" :title="t('checklist_schema.sections')">
+                  <template #actions>
+                    <UButton icon="i-lucide-plus" :label="t('checklist_schema.add_section')" variant="outline" class="cursor-default" @click="addSection" />
+                  </template>
+                  <div v-if="definition.sections.length === 0" class="border-default border-t pt-4 text-sm text-zinc-500 dark:text-zinc-400">
+                    {{ t('checklist_schema.no_sections') }}
+                  </div>
+                  <div v-for="(section, sectionIndex) in definition.sections" :key="section._key" class="space-y-0">
+                    <AssessmentSchemaAccordionSection
+                      :title="getNavigationLabel(section.label, t('checklist_schema.section'))"
+                      :persistence-key="`checklist:${section.key}`">
+                      <div class="space-y-6">
+                        <div class="flex justify-end gap-1">
+                          <UButton icon="i-lucide-arrow-up" color="neutral" variant="ghost" class="cursor-default" :disabled="sectionIndex === 0" @click="moveItem(definition.sections, sectionIndex, -1)" />
+                          <UButton icon="i-lucide-arrow-down" color="neutral" variant="ghost" class="cursor-default" :disabled="sectionIndex === definition.sections.length - 1" @click="moveItem(definition.sections, sectionIndex, 1)" />
+                          <UButton icon="i-lucide-trash" color="error" variant="ghost" class="cursor-default" @click="removeSection(sectionIndex)" />
                         </div>
-                      </AssessmentSchemaAccordionSection>
-                    </div>
-                  </AssessmentSchemaPageSection>
+                        <div class="grid gap-4 md:grid-cols-2">
+                          <UFormField :label="t('checklist_schema.section_name_en')" required>
+                            <UInput v-model="section.label.en" />
+                          </UFormField>
+                          <UFormField :label="t('checklist_schema.section_name_fr')" required>
+                            <UInput v-model="section.label.fr" />
+                          </UFormField>
+                          <UFormField :label="t('checklist_schema.language_independent_code')" required>
+                            <UInput v-model="section.key" class="font-mono" />
+                          </UFormField>
+                        </div>
 
-                  <AssessmentSchemaPageSection section-id="checklist-rules" :title="t('checklist_schema.rules')">
-                    <template #actions>
-                      <ChecklistResultRulesHelp
-                        v-if="ruleHelpDefinition"
-                        :definition="ruleHelpDefinition"
-                        context="setup" />
-                    </template>
-                    <p class="text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-                      {{ t('checklist_schema.policy.help') }}
-                    </p>
-                    <ChecklistSchemaResultPolicyEditor
-                      v-model="definition.resultPolicy"
-                      :question-options="questionOptions" />
-                  </AssessmentSchemaPageSection>
-                </div>
-              </fieldset>
-            </UForm>
-          </main>
-        </div>
+                        <AssessmentSchemaAccordionSection
+                          :title="t('checklist_schema.subsections')"
+                          :persistence-key="`checklist:${section.key}:subsections`"
+                          default-open
+                          level="sub">
+                          <div class="space-y-4">
+                            <div class="flex justify-end">
+                              <UButton icon="i-lucide-plus" :label="t('checklist_schema.add_subsection')" variant="outline" class="cursor-default" @click="addSubSection(section)" />
+                            </div>
+                            <AssessmentSchemaAccordionSection
+                              v-for="(subSection, subSectionIndex) in section.subSections"
+                              :key="subSection._key"
+                              :title="getNavigationLabel(subSection.label, t('checklist_schema.subsection'))"
+                              :persistence-key="`checklist:${section.key}:${subSection.key}`"
+                              level="sub">
+                              <div class="space-y-6">
+                                <div class="flex justify-end gap-1">
+                                  <UButton icon="i-lucide-arrow-up" color="neutral" variant="ghost" class="cursor-default" :disabled="subSectionIndex === 0" @click="moveItem(section.subSections, subSectionIndex, -1)" />
+                                  <UButton icon="i-lucide-arrow-down" color="neutral" variant="ghost" class="cursor-default" :disabled="subSectionIndex === section.subSections.length - 1" @click="moveItem(section.subSections, subSectionIndex, 1)" />
+                                  <UButton icon="i-lucide-trash" color="error" variant="ghost" class="cursor-default" @click="removeSubSection(section, subSectionIndex)" />
+                                </div>
+                                <div class="grid gap-4 md:grid-cols-2">
+                                  <UFormField :label="t('checklist_schema.subsection_name_en')" required>
+                                    <UInput v-model="subSection.label.en" />
+                                  </UFormField>
+                                  <UFormField :label="t('checklist_schema.subsection_name_fr')" required>
+                                    <UInput v-model="subSection.label.fr" />
+                                  </UFormField>
+                                  <UFormField :label="t('checklist_schema.language_independent_code')" required>
+                                    <UInput v-model="subSection.key" class="font-mono" />
+                                  </UFormField>
+                                </div>
+
+                                <AssessmentSchemaAccordionSection
+                                  :title="t('checklist_schema.checklist_questions')"
+                                  :persistence-key="`checklist:${section.key}:${subSection.key}:questions`"
+                                  default-open
+                                  level="sub">
+                                  <ChecklistSchemaQuestionsTable v-model:questions="subSection.questions" />
+                                </AssessmentSchemaAccordionSection>
+                              </div>
+                            </AssessmentSchemaAccordionSection>
+                          </div>
+                        </AssessmentSchemaAccordionSection>
+                      </div>
+                    </AssessmentSchemaAccordionSection>
+                  </div>
+                </AssessmentSchemaPageSection>
+
+                <AssessmentSchemaPageSection section-id="checklist-rules" :title="t('checklist_schema.rules')">
+                  <template #actions>
+                    <ChecklistResultRulesHelp
+                      v-if="ruleHelpDefinition"
+                      :definition="ruleHelpDefinition"
+                      context="setup" />
+                  </template>
+                  <p class="text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+                    {{ t('checklist_schema.policy.help') }}
+                  </p>
+                  <ChecklistSchemaResultPolicyEditor
+                    v-model="definition.resultPolicy"
+                    :question-options="questionOptions" />
+                </AssessmentSchemaPageSection>
+              </CommonDesignTimeEditorSections>
+            </fieldset>
+          </UForm>
+        </CommonDesignTimeEditorShell>
       </div>
     </template>
   </UDashboardPanel>

@@ -287,47 +287,47 @@ const retire = async () => {
           @publish="publish"
           @retire="retire" />
 
-        <div class="flex min-h-0 flex-1 flex-col gap-6 overflow-visible px-6 pt-0 pb-6 lg:flex-row lg:gap-0">
-          <AssessmentSchemaDetailSidebar
-            v-if="canEdit"
-            v-model="selectedSection"
-            :section-tabs="sectionTabs"
-            :is-saving="isSaving"
-            :disabled="mutation.isPending.value"
-            :ui="{ trigger: 'w-full justify-start whitespace-normal break-words text-left' }"
-            @save="save" />
-          <aside v-else class="w-full shrink-0 lg:sticky lg:top-6 lg:self-start lg:w-72 lg:border-r lg:border-zinc-200 lg:pr-4 dark:lg:border-zinc-800">
-            <div class="pt-6">
-              <CommonRouteTabs v-model="selectedSection" :items="sectionTabs" orientation="vertical" />
-            </div>
-          </aside>
-
-          <main class="min-h-0 min-w-0 flex-1 pt-6 lg:pl-6">
-            <fieldset :disabled="!canEditFields">
-              <div class="w-full space-y-10 pb-12">
-                <AssessmentSchemaPageSection section-id="recommendation-general" :title="t('recommendation_schema.general')">
-                  <div class="grid gap-5 md:grid-cols-2">
-                    <UFormField :label="t('transfer_payment.name_en')" required>
-                      <UInput v-model="state.egcs_cn_name_en" class="w-full" />
-                    </UFormField>
-                    <UFormField :label="t('transfer_payment.name_fr')" required>
-                      <UInput v-model="state.egcs_cn_name_fr" class="w-full" />
-                    </UFormField>
-                  </div>
-                </AssessmentSchemaPageSection>
-
-                <AssessmentSchemaPageSection section-id="recommendation-definition" :title="t('recommendation_schema.form_sections')">
-                  <UAlert
-                    v-if="definitionErrors.length > 0"
-                    icon="i-lucide-circle-alert" color="warning" variant="subtle"
-                    :title="t('recommendation_schema.validation_title')"
-                    :description="definitionErrors.join(' ')" class="mb-5" />
-                  <RecommendationSchemaRecommendationDefinitionEditor v-model="definition" />
-                </AssessmentSchemaPageSection>
+        <CommonDesignTimeEditorShell>
+          <template #sidebar>
+            <AssessmentSchemaDetailSidebar
+              v-if="canEdit"
+              v-model="selectedSection"
+              :section-tabs="sectionTabs"
+              :is-saving="isSaving"
+              :disabled="mutation.isPending.value"
+              :ui="{ trigger: 'w-full justify-start whitespace-normal break-words text-left' }"
+              @save="save" />
+            <aside v-else class="w-full shrink-0 lg:sticky lg:top-6 lg:self-start lg:w-72 lg:border-r lg:border-zinc-200 lg:pr-4 dark:lg:border-zinc-800">
+              <div class="pt-6">
+                <CommonRouteTabs v-model="selectedSection" :items="sectionTabs" orientation="vertical" />
               </div>
-            </fieldset>
-          </main>
-        </div>
+            </aside>
+          </template>
+
+          <fieldset :disabled="!canEditFields">
+            <CommonDesignTimeEditorSections>
+              <AssessmentSchemaPageSection section-id="recommendation-general" :title="t('recommendation_schema.general')">
+                <div class="grid gap-5 md:grid-cols-2">
+                  <UFormField :label="t('transfer_payment.name_en')" required>
+                    <UInput v-model="state.egcs_cn_name_en" class="w-full" />
+                  </UFormField>
+                  <UFormField :label="t('transfer_payment.name_fr')" required>
+                    <UInput v-model="state.egcs_cn_name_fr" class="w-full" />
+                  </UFormField>
+                </div>
+              </AssessmentSchemaPageSection>
+
+              <AssessmentSchemaPageSection section-id="recommendation-definition" :title="t('recommendation_schema.form_sections')">
+                <UAlert
+                  v-if="definitionErrors.length > 0"
+                  icon="i-lucide-circle-alert" color="warning" variant="subtle"
+                  :title="t('recommendation_schema.validation_title')"
+                  :description="definitionErrors.join(' ')" class="mb-5" />
+                <RecommendationSchemaRecommendationDefinitionEditor v-model="definition" />
+              </AssessmentSchemaPageSection>
+            </CommonDesignTimeEditorSections>
+          </fieldset>
+        </CommonDesignTimeEditorShell>
       </div>
     </template>
   </UDashboardPanel>

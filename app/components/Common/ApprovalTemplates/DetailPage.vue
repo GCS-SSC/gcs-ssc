@@ -235,7 +235,7 @@ watch(selectedSection, value => {
           @publish="publish"
           @retire="retire" />
 
-        <CommonEntityEditorWorkspace content-test-id="approval-template-detail-content">
+        <CommonDesignTimeEditorShell content-test-id="approval-template-detail-content">
           <template #sidebar>
             <AssessmentSchemaDetailSidebar
               v-if="canEdit"
@@ -258,53 +258,54 @@ watch(selectedSection, value => {
             v-if="state"
             :state="state"
             :validate="validate"
-            class="space-y-10"
             @submit.prevent="() => { void saveTemplate() }">
             <fieldset :disabled="!canEditFields">
-              <AssessmentSchemaPageSection section-id="approval-template-general" :title="t('agency.tabs.general')">
-                <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-                  <UFormField :label="t('admin_common.fields.egcs_cn_name_en')" name="egcs_cn_name_en">
-                    <UInput v-model="state.egcs_cn_name_en" />
-                  </UFormField>
-                  <UFormField :label="t('admin_common.fields.egcs_cn_name_fr')" name="egcs_cn_name_fr">
-                    <UInput v-model="state.egcs_cn_name_fr" />
-                  </UFormField>
-                  <UFormField :label="t('admin_common.fields.egcs_cn_description_en')" name="egcs_cn_description_en">
-                    <CommonTextarea v-model="state.egcs_cn_description_en" :rows="4" />
-                  </UFormField>
-                  <UFormField :label="t('admin_common.fields.egcs_cn_description_fr')" name="egcs_cn_description_fr">
-                    <CommonTextarea v-model="state.egcs_cn_description_fr" :rows="4" />
-                  </UFormField>
-                </div>
-              </AssessmentSchemaPageSection>
+              <CommonDesignTimeEditorSections>
+                <AssessmentSchemaPageSection section-id="approval-template-general" :title="t('agency.tabs.general')">
+                  <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+                    <UFormField :label="t('admin_common.fields.egcs_cn_name_en')" name="egcs_cn_name_en">
+                      <UInput v-model="state.egcs_cn_name_en" />
+                    </UFormField>
+                    <UFormField :label="t('admin_common.fields.egcs_cn_name_fr')" name="egcs_cn_name_fr">
+                      <UInput v-model="state.egcs_cn_name_fr" />
+                    </UFormField>
+                    <UFormField :label="t('admin_common.fields.egcs_cn_description_en')" name="egcs_cn_description_en">
+                      <CommonTextarea v-model="state.egcs_cn_description_en" :rows="4" />
+                    </UFormField>
+                    <UFormField :label="t('admin_common.fields.egcs_cn_description_fr')" name="egcs_cn_description_fr">
+                      <CommonTextarea v-model="state.egcs_cn_description_fr" :rows="4" />
+                    </UFormField>
+                  </div>
+                </AssessmentSchemaPageSection>
 
-              <AssessmentSchemaPageSection
-                section-id="approval-template-additional-approvals"
-                :title="t('approval_templates.additional_approvals.title')">
-                <CommonApprovalTemplatesAdditionalApprovalsFields v-model:state="state" />
-              </AssessmentSchemaPageSection>
+                <AssessmentSchemaPageSection
+                  section-id="approval-template-additional-approvals"
+                  :title="t('approval_templates.additional_approvals.title')">
+                  <CommonApprovalTemplatesAdditionalApprovalsFields v-model:state="state" />
+                </AssessmentSchemaPageSection>
 
-              <AssessmentSchemaPageSection
-                section-id="approval-template-steps"
-                :title="t('admin_common.resources.approval_steps')">
-                <template #actions>
-                  <UButton
-                    icon="i-lucide-plus"
-                    :label="t('common.add')"
-                    variant="outline"
-                    class="cursor-default"
-                    @click="stepsTableRef?.openCreateEditor()" />
-                </template>
+                <AssessmentSchemaPageSection
+                  section-id="approval-template-steps"
+                  :title="t('admin_common.resources.approval_steps')">
+                  <template #actions>
+                    <UButton
+                      icon="i-lucide-plus"
+                      :label="t('common.add')"
+                      variant="outline"
+                      class="cursor-default"
+                      @click="stepsTableRef?.openCreateEditor()" />
+                  </template>
 
-                <CommonApprovalTemplatesStepsTable
-                  ref="stepsTableRef"
-                  v-model:steps="state.steps"
-                  :approval-template-id="props.templateId"
-                  @save="saveTemplate" />
-              </AssessmentSchemaPageSection>
+                  <CommonApprovalTemplatesStepsTable
+                    ref="stepsTableRef"
+                    v-model:steps="state.steps"
+                    :approval-template-id="props.templateId"
+                    @save="saveTemplate" />
+                </AssessmentSchemaPageSection>
+              </CommonDesignTimeEditorSections>
             </fieldset>
           </UForm>
-        </CommonEntityEditorWorkspace>
+        </CommonDesignTimeEditorShell>
       </div>
     </template>
   </UDashboardPanel>
