@@ -60,6 +60,7 @@ const addQuestion = (sectionIndex: number, subSectionIndex: number) => {
   const question: RecommendationQuestion = {
     key: `question-${nanoid(6)}`,
     type: 'radio',
+    commentPolicy: 'none',
     question: { en: t('recommendation_schema.new_question_en'), fr: t('recommendation_schema.new_question_fr') },
     required: true,
     isResult: false,

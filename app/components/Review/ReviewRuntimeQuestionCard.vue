@@ -18,6 +18,7 @@ const {
   showComment = true,
   showOptions = true,
   errorMessage,
+  commentErrorMessage,
   commentFieldName,
   commentLabel,
   commentPlaceholder,
@@ -40,6 +41,7 @@ const {
   showComment?: boolean
   showOptions?: boolean
   errorMessage?: string
+  commentErrorMessage?: string
   commentFieldName?: string
   commentLabel: string
   commentPlaceholder?: string
@@ -162,11 +164,16 @@ const handleModelValueUpdate = (value: string | number | null | undefined) => {
             :disabled="disabled || commentDisabled"
             :required="commentRequired"
             :aria-required="commentRequired"
+            :aria-invalid="commentErrorMessage ? true : undefined"
+            :aria-describedby="commentErrorMessage ? `${questionHeadingId}-comment-error` : undefined"
             :placeholder="commentPlaceholder"
             :stream-id="streamId"
             :extension-slot-name="extensionSlotName"
             :extension-context="extensionContext"
             @update:model-value="value => emit('update:commentValue', value)" />
+          <p v-if="commentErrorMessage" :id="`${questionHeadingId}-comment-error`" class="text-sm font-medium text-error" role="alert">
+            {{ commentErrorMessage }}
+          </p>
         </UFormField>
       </div>
     </div>

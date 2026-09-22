@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 export const RECOMMENDATION_QUESTION_TYPES = ['radio', 'text'] as const
 export const RECOMMENDATION_OUTCOMES = ['recommended', 'not_recommended'] as const
+export const RECOMMENDATION_COMMENT_POLICIES = ['none', 'optional', 'required'] as const
 
 const RequiredTextSchema = z.string().trim().min(1, { error: 'validation.required' })
 const BilingualTextSchema = z.object({
@@ -32,6 +33,7 @@ const RecommendationQuestionBaseSchema = z.object({
 
 export const RecommendationRadioQuestionSchema = RecommendationQuestionBaseSchema.extend({
   type: z.literal('radio'),
+  commentPolicy: z.enum(RECOMMENDATION_COMMENT_POLICIES).default('none'),
   options: z.array(RecommendationRadioOptionSchema).min(2, { error: 'validation.recommendation_options_required' })
     .superRefine((options, ctx) => {
       const keys = new Set<string>()
@@ -131,7 +133,8 @@ export const RecommendationDefinitionSchema = RecommendationDefinitionBaseSchema
 
 export const RecommendationResponseSchema = z.object({
   questionKey: RequiredTextSchema,
-  value: z.string()
+  value: z.string(),
+  comment: z.string().optional()
 })
 
 export const RecommendationResponsesSchema = z.array(RecommendationResponseSchema).superRefine((responses, ctx) => {
@@ -158,8 +161,8 @@ export const validateRecommendationResponses = (
   definition: RecommendationDefinition,
   responses: RecommendationResponse[]
 ) => {
-  const responseByQuestion = new Map(responses.map(response => [response.questionKey, response.value]))
-  const issues: Array<{ questionKey: string, message: string }> = []
+  const responseByQuestion = new Map(responses.map(response => [response.questionKey, response]))
+  const issues: Array<{ questionKey: string, message: string, field?: 'comment' }> = []
   const knownQuestionKeys = new Set(definition.sections
     .flatMap(section => section.subSections)
     .flatMap(subSection => subSection.questions)
@@ -173,14 +176,19 @@ export const validateRecommendationResponses = (
 
   definition.sections.forEach(section => section.subSections.forEach(subSection => {
     subSection.questions.forEach(question => {
-      const value = responseByQuestion.get(question.key)
+      const response = responseByQuestion.get(question.key)
+      const value = response?.value
       if (question.required && (value === undefined || value.trim().length === 0)) {
         issues.push({ questionKey: question.key, message: 'validation.required' })
         return
       }
       if (value === undefined || value.length === 0) return
-      if (question.type === 'radio' && !question.options.some(option => option.key === value)) {
-        issues.push({ questionKey: question.key, message: 'validation.recommendation_invalid_option' })
+      if (question.type === 'radio') {
+        if (!question.options.some(option => option.key === value)) {
+          issues.push({ questionKey: question.key, message: 'validation.recommendation_invalid_option' })
+        } else if (question.commentPolicy === 'required' && !response?.comment?.trim()) {
+          issues.push({ questionKey: question.key, message: 'validation.comment_required', field: 'comment' })
+        }
       }
       if (question.type === 'text' && value.length > question.maxLength) {
         issues.push({ questionKey: question.key, message: 'validation.recommendation_max_length' })

@@ -72,7 +72,7 @@ const {
   () => fetchRecommendationDetail(`/api/recommendations/${recommendationId}`)
 )
 const responses: Ref<RecommendationResponse[]> = ref([])
-const validationIssues: Ref<Array<{ questionKey: string; message: string }>> = ref([])
+const validationIssues: Ref<Array<{ questionKey: string; message: string; field?: 'comment' }>> = ref([])
 const isSaving: Ref<boolean> = ref(false)
 
 watch(data, value => {

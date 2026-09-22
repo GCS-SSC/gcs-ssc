@@ -3094,6 +3094,12 @@
     "subtitle_fr": "Optional subtitle (French)",
     "language_independent_code": "Language-independent code",
     "question_type": "Answer type",
+    "comment_policy": "Comment",
+    "comment_policies": {
+      "none": "No comment",
+      "optional": "Optional comment",
+      "required": "Required comment"
+    },
     "required_question": "Response required",
     "result_question": "Deciding question",
     "result_question_help": "This is the only question whose selected option determines the recommendation outcome.",

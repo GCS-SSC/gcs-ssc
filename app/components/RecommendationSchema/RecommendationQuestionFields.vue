@@ -14,6 +14,11 @@ const outcomeOptions = computed(() => [
   { value: 'recommended', label: t('recommendation.outcomes.recommended') },
   { value: 'not_recommended', label: t('recommendation.outcomes.not_recommended') }
 ])
+const commentPolicyOptions = computed(() => [
+  { value: 'none', label: t('recommendation_schema.comment_policies.none') },
+  { value: 'optional', label: t('recommendation_schema.comment_policies.optional') },
+  { value: 'required', label: t('recommendation_schema.comment_policies.required') }
+])
 /**
  * Changes the question type while preserving its shared identity and bilingual prompt.
  * @param value Selected question type.
@@ -28,7 +33,7 @@ const setType = (value: string) => {
   }
   question.value = value === 'text'
     ? { ...base, type: 'text', maxLength: 1000 }
-    : { ...base, type: 'radio', options: [
+    : { ...base, type: 'radio', commentPolicy: 'none', options: [
         { key: `option-${nanoid(6)}`, label: { en: t('recommendation_schema.new_option_en'), fr: t('recommendation_schema.new_option_fr') } },
         { key: `option-${nanoid(6)}`, label: { en: t('recommendation_schema.new_option_en'), fr: t('recommendation_schema.new_option_fr') } }
       ] }
@@ -146,6 +151,14 @@ const updateTextDescription = (language: 'en' | 'fr', value: string) => {
     </div>
 
     <div v-else class="space-y-4">
+      <UFormField :label="t('recommendation_schema.comment_policy')" name="commentPolicy" required>
+        <CommonEnumSelect
+          :model-value="question.commentPolicy ?? 'none'"
+          name="review_type"
+          :items="commentPolicyOptions"
+          class="w-full"
+          @update:model-value="value => { if (question.type === 'radio') question.commentPolicy = value as 'none' | 'optional' | 'required' }" />
+      </UFormField>
       <div class="flex items-center justify-between border-default border-b pb-3">
         <h4 class="font-semibold text-highlighted">
           {{ t('recommendation_schema.radio_options') }}

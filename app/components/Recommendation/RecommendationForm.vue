@@ -7,7 +7,7 @@ import ReviewRuntimeQuestionCard from '~/components/Review/ReviewRuntimeQuestion
 const { definition, readonly = false, issues = [] } = defineProps<{
   definition: RecommendationDefinition
   readonly?: boolean
-  issues?: Array<{ questionKey: string, message: string }>
+  issues?: Array<{ questionKey: string, message: string, field?: 'comment' }>
 }>()
 const responses = defineModel<RecommendationResponse[]>('responses', { required: true })
 const { locale, t } = useI18n()
@@ -15,8 +15,11 @@ const { locale, t } = useI18n()
 const responseValues = computed<Record<string, string>>(() => Object.fromEntries(
   responses.value.map(response => [response.questionKey, response.value])
 ))
+const responseComments = computed<Record<string, string>>(() => Object.fromEntries(
+  responses.value.map(response => [response.questionKey, response.comment ?? ''])
+))
 const localized = (value: { en: string, fr: string }) => locale.value === 'fr' ? value.fr : value.en
-const getQuestionIssue = (questionKey: string) => issues.find(issue => issue.questionKey === questionKey)
+const getQuestionIssue = (questionKey: string, field?: 'comment') => issues.find(issue => issue.questionKey === questionKey && issue.field === field)
 /**
  * Maps stored bilingual guidance to the shared question-card help contract.
  * @param question Recommendation question with optional guidance.
@@ -40,6 +43,19 @@ const updateResponse = (questionKey: string, value: string) => {
     return
   }
   responses.value.push({ questionKey, value })
+}
+/**
+ * Updates a radio response comment while retaining its selected option.
+ * @param questionKey Stable question key.
+ * @param comment New comment text.
+ */
+const updateComment = (questionKey: string, comment: string) => {
+  const existing = responses.value.find(response => response.questionKey === questionKey)
+  if (existing) {
+    existing.comment = comment
+    return
+  }
+  responses.value.push({ questionKey, value: '', comment })
 }
 </script>
 
@@ -73,12 +89,17 @@ const updateResponse = (questionKey: string, value: string) => {
               })) : []"
               :help-items="getQuestionHelp(question)"
               :model-value="responseValues[question.key]"
+              :comment-value="responseComments[question.key]"
               :disabled="readonly"
               :comment-label="t('admin_common.fields.egcs_cn_comments')"
-              :show-comment="false"
+              :show-comment="question.type === 'radio' && (question.commentPolicy ?? 'none') !== 'none'"
+              :comment-required="question.type === 'radio' && question.commentPolicy === 'required' && Boolean(responseValues[question.key]?.trim()) && !readonly"
+              :comment-disabled="!responseValues[question.key]?.trim()"
               :show-options="question.type === 'radio'"
               :error-message="getQuestionIssue(question.key) ? t(getQuestionIssue(question.key)!.message) : undefined"
-              @update:model-value="value => updateResponse(question.key, String(value))">
+              :comment-error-message="getQuestionIssue(question.key, 'comment') ? t(getQuestionIssue(question.key, 'comment')!.message) : undefined"
+              @update:model-value="value => updateResponse(question.key, String(value))"
+              @update:comment-value="value => updateComment(question.key, value)">
               <template v-if="question.type === 'text'" #answer="{ labelledby, describedby, invalid }">
                 <div class="space-y-2">
                   <p class="text-xs text-muted">

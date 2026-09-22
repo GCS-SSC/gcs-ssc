@@ -3094,6 +3094,12 @@
     "subtitle_fr": "Sous-titre facultatif (français)",
     "language_independent_code": "Code indépendant de la langue",
     "question_type": "Type de réponse",
+    "comment_policy": "Commentaire",
+    "comment_policies": {
+      "none": "Aucun commentaire",
+      "optional": "Commentaire facultatif",
+      "required": "Commentaire obligatoire"
+    },
     "required_question": "Réponse obligatoire",
     "result_question": "Question décisionnelle",
     "result_question_help": "Il s’agit de la seule question dont l’option sélectionnée détermine le résultat de la recommandation.",
