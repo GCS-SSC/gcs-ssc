@@ -23,13 +23,7 @@ const bilingualErrorPattern = (fieldBase: 'egcs_ar_legalname' | 'egcs_ar_operati
   return new RegExp(`^(?:${englishPath}|${frenchPath})$`)
 }
 
-const selectedAgencyId = computed(() => {
-  if (!model.value?.egcs_ar_leadagency) {
-    return ''
-  }
-
-  return String(model.value.egcs_ar_leadagency)
-})
+const selectedAgencyId = defineModel<string>('extensionAgencyId', { default: '' })
 
 const selectedProponentId = computed(() => {
   if (!model.value?.id) {
@@ -243,6 +237,20 @@ const getFieldText = (key: ApplicantRecipientFieldKey) => ({
           :rows="4" />
       </UFormField>
       <div class="xl:col-span-12">
+        <div>
+          <label for="proponent-profile-extension-agency-context" class="mb-1 block text-sm font-medium">{{ t('applicant_recipient.extension_agency_context') }}</label>
+          <CommonServerLookupSelect
+            id="proponent-profile-extension-agency-context"
+            :model-value="selectedAgencyId"
+            fetch-url="/api/applicant-recipients/lookups/agencies"
+            value-key="id"
+            label-en-key="egcs_ay_name_en"
+            label-fr-key="egcs_ay_name_fr"
+            :placeholder="t('applicant_recipient.extension_agency_context_placeholder')"
+            :query="{ applicant_recipient_id: selectedProponentId, permission_action: leadAgencyPermissionAction, role_scoped: 'true' }"
+            searchable
+            @update:model-value="value => selectedAgencyId = String(value ?? '')" />
+        </div>
         <ExtensionSlotHost
           v-if="selectedAgencyId"
           slot-name="proponent.descriptions.after"

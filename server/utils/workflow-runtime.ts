@@ -39,7 +39,8 @@ import {
 import { materializeCanonicalApprovalRuntime } from './canonical-approval-runtime'
 import { resolveAgencyValidEntityAssigneeIdsWithDb } from './entity-assignment'
 import {
-  createRuntimeRecommendationSetInTransaction
+  createRuntimeRecommendationSetInTransaction,
+  getPinnedRuntimeRecommendationSetAgencyId
 } from './recommendation-runtime'
 import { readPublishedRecommendationSchema } from './recommendation-setup-versioning'
 import {
@@ -50,6 +51,7 @@ import {
 } from './review-runtime-access'
 import {
   createRuntimeReviewSetInTransaction,
+  getPinnedRuntimeReviewSetAgencyId,
   resumeSequentialRuntimeReviewSet
 } from './review-runtime'
 import { cancelRuntimeTree, createRuntime, retryRuntime, transitionRuntime, type RuntimeMetadata } from './system-runtime'
@@ -904,7 +906,9 @@ const materializeWorkflowMember = async (
   if (member.kind === 'review_set') {
     if (!member.reviewPlan) result = { kind: 'failed' }
     else {
-      const ownerAgencyId = getReviewRuntimeOwnerAgencyId(context)
+      const ownerAgencyId = context.entityType === 'applicantrecipient'
+        ? await getPinnedRuntimeReviewSetAgencyId(trx, member.reviewPlan)
+        : getReviewRuntimeOwnerAgencyId(context)
       const setupScopes = await resolveReviewRuntimeSetupScopes(trx, context, true)
       const owners = ownerAgencyId
         ? await pauseForInvalidOwners(trx, run, member, member.reviewPlan.members.map(item => item.memberId), actorId)
@@ -934,7 +938,9 @@ const materializeWorkflowMember = async (
   } else if (member.kind === 'recommendation_set') {
     if (!member.recommendationPlan) result = { kind: 'failed' }
     else {
-      const ownerAgencyId = getReviewRuntimeOwnerAgencyId(context)
+      const ownerAgencyId = context.entityType === 'applicantrecipient'
+        ? await getPinnedRuntimeRecommendationSetAgencyId(trx, member.recommendationPlan)
+        : getReviewRuntimeOwnerAgencyId(context)
       const setupScopes = await resolveReviewRuntimeSetupScopes(trx, context, true)
       const owners = ownerAgencyId
         ? await pauseForInvalidOwners(trx, run, member, member.recommendationPlan.members.map(item => item.memberId), actorId)

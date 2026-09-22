@@ -119,8 +119,17 @@ export const listEligibleRuntimeReviewSetSetupIds = async (
   entityType: Entity_Type,
   ownerAgencyId: string,
   setupScopes: ReviewRuntimeSetupScope[]
-): Promise<string[]> => {
-  if (setupScopes.length === 0) return []
+): Promise<string[]> => [...(await listEligibleRuntimeReviewSetSetupAgencyIds(db, entityType, [ownerAgencyId], setupScopes)).keys()]
+
+export const listEligibleRuntimeReviewSetSetupAgencyIds = async (
+  db: DbClient,
+  entityType: Entity_Type,
+  allowedAgencyIds: string[],
+  setupScopes: ReviewRuntimeSetupScope[]
+): Promise<Map<string, string>> => {
+  if (setupScopes.length === 0) return new Map()
+  const allowed = new Set(allowedAgencyIds)
+  if (allowed.size === 0) return new Map()
   const rows = await db.selectFrom('Common_Review_Set_Setup')
     .innerJoin('Common_Publication', 'Common_Publication.id', 'Common_Review_Set_Setup.id')
     .innerJoin('Common_Publication_Version', 'Common_Publication_Version.id', 'Common_Publication.egcs_cn_currentversion')
@@ -129,16 +138,54 @@ export const listEligibleRuntimeReviewSetSetupIds = async (
     .where('Common_Publication.egcs_cn_state', '=', 'published')
     .where('Common_Publication._deleted', '=', false)
     .execute()
-  const eligible: string[] = []
+  const eligible = new Map<string, string>()
+  const schemaVersions = new Map<string, ReturnType<typeof readSchemaVersion>>()
   for (const row of rows) {
     const definition = readPublishedReviewSetup(row.definition)
     if (definition.directReview === false || definition.entityType !== entityType
       || !setupScopes.some(scope => scope.scopeType === definition.scopeType && scope.scopeId === definition.scopeId)) continue
-    const members = await Promise.all(definition.members.map(member => readSchemaVersion(db, member, true)))
-    if (members.length > 0 && members.every(member => member?.schemaDefinition.agencyId === ownerAgencyId
-      && member.schemaDefinition.entityType === entityType)) eligible.push(String(row.id))
+    const members = await Promise.all(definition.members.map(async member => {
+      const key = `${member.schema.publicationVersionId}:${member.schema.publicationVersion}`
+      if (!schemaVersions.has(key)) schemaVersions.set(key, readSchemaVersion(db, member, true))
+      return await schemaVersions.get(key)
+    }))
+    const agencyId = members[0]?.schemaDefinition.agencyId
+    if (agencyId && allowed.has(agencyId) && members.every(member => member?.schemaDefinition.agencyId === agencyId
+      && member.schemaDefinition.entityType === entityType)) eligible.set(String(row.id), agencyId)
   }
   return eligible
+}
+
+/** Resolves the agency pinned by the first published schema member of a direct setup.
+ * @param db Database client.
+ * @param reviewSetSetupId Published setup ID.
+ * @param entityType Runtime entity type.
+ * @returns Pinned agency ID, if available.
+ */
+export const getPublishedRuntimeReviewSetSetupAgencyId = async (
+  db: DbClient,
+  reviewSetSetupId: string,
+  entityType: Entity_Type
+): Promise<string | null> => {
+  const setup = await fetchRuntimeReviewSetSetup(db, reviewSetSetupId, entityType)
+  if (!setup) return null
+  const definition = readPublishedReviewSetup(setup.publicationDefinition)
+  if (definition.entityType !== entityType || definition.directReview === false) return null
+  const first = definition.members[0] ? await readSchemaVersion(db, definition.members[0], true) : null
+  return first?.schemaDefinition.agencyId ?? null
+}
+
+/** Resolves the agency pinned in the first member of a workflow's review plan.
+ * @param db Database client.
+ * @param publication Pinned review plan.
+ * @returns Pinned agency ID, if available.
+ */
+export const getPinnedRuntimeReviewSetAgencyId = async (
+  db: DbClient,
+  publication: PublishedReviewSetupConfiguration
+): Promise<string | null> => {
+  const first = publication.members[0] ? await readSchemaVersion(db, publication.members[0], false) : null
+  return first?.schemaDefinition.agencyId ?? null
 }
 
 export const lockEligibleRuntimeReviewSetSetupSnapshot = async (

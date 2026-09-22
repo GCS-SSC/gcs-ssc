@@ -129,14 +129,12 @@ export default defineEventHandler(async event => {
             return await badRequest(event, 'INVALID_AGREEMENT_APPLICANT_RECIPIENT', 'apiErrors.agreement.invalid_applicant_recipient')
           }
           const liveApplicantRecipients = await trx.selectFrom('Applicant_Recipient_Profile')
-            .innerJoin('Agency_Profile', 'Agency_Profile.id', 'Applicant_Recipient_Profile.egcs_ar_leadagency')
+            .leftJoin('Agency_Profile', 'Agency_Profile.id', 'Applicant_Recipient_Profile.egcs_ar_leadagency')
             .select('Applicant_Recipient_Profile.id')
             .where('Applicant_Recipient_Profile.id', 'in', applicantRecipientIds)
             .where('Applicant_Recipient_Profile._deleted', '=', false)
-            .where('Agency_Profile._deleted', '=', false)
-            .orderBy('Agency_Profile.id', 'asc')
             .orderBy('Applicant_Recipient_Profile.id', 'asc')
-            .forShare('Agency_Profile')
+            .forShare('Applicant_Recipient_Profile')
             .execute()
           if (liveApplicantRecipients.length !== applicantRecipientIds.length) {
             return await badRequest(event, 'INVALID_AGREEMENT_APPLICANT_RECIPIENT', 'apiErrors.agreement.invalid_applicant_recipient')

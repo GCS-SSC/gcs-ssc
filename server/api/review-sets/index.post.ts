@@ -15,7 +15,8 @@ import {
 } from '~~/server/utils/review-runtime-access'
 import {
   assertRuntimeReviewSetCreationResult,
-  createRuntimeReviewSetInTransaction
+  createRuntimeReviewSetInTransaction,
+  getPublishedRuntimeReviewSetSetupAgencyId
 } from '~~/server/utils/review-runtime'
 import { resolveCurrentCommonUser } from '~~/server/utils/additional-reviewer-runtime'
 import { notFound } from '~~/server/utils/api-errors'
@@ -24,7 +25,8 @@ import {
   executeExtensionLifecycleWrite,
   resolveExtensionLifecycleRuntime
 } from '~~/server/utils/extension-lifecycle-runtime'
-import { requireAuthContext } from '~~/server/utils/authorize'
+import { requireAuthContext, requireFreshAuthContext } from '~~/server/utils/authorize'
+import { resolveApplicantRecipientVisibility } from '~~/server/utils/applicant-recipient-auth'
 
 const CreateReviewSetSchema = CoreOrExtensionEntityTargetSchema.safeExtend({
   reviewSetSetupId: PositivePostgresBigintIdSchema
@@ -77,8 +79,15 @@ export default defineEventHandler(async event => {
     event,
     runtimeEntity,
     async (trx, currentEntity) => {
-      const ownerAgencyId = getReviewRuntimeOwnerAgencyId(currentEntity)
+      const ownerAgencyId = currentEntity.entityType === 'applicantrecipient'
+        ? await getPublishedRuntimeReviewSetSetupAgencyId(trx, body.reviewSetSetupId, currentEntity.entityType)
+        : getReviewRuntimeOwnerAgencyId(currentEntity)
       if (!ownerAgencyId) return null
+      if (currentEntity.entityType === 'applicantrecipient') {
+        const freshAuth = await requireFreshAuthContext(event, trx)
+        const visibility = await resolveApplicantRecipientVisibility(freshAuth, 'update', trx)
+        if (!visibility.hasGlobalAccess && !visibility.agencyIds.includes(ownerAgencyId)) return null
+      }
       const setupScopes = await resolveReviewRuntimeSetupScopes(trx, currentEntity, true)
 
       return await createRuntimeReviewSetInTransaction({

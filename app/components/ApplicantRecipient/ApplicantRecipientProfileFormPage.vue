@@ -19,6 +19,7 @@ const {
 }>()
 
 const model = defineModel<ApplicantRecipientProfileForm>('model', { required: true })
+const extensionAgencyId = defineModel<string>('extensionAgencyId', { default: '' })
 
 const emit = defineEmits<{
   (event: 'submit' | 'cancel'): void
@@ -37,6 +38,7 @@ const onSubmit = () => {
     <UForm :state="model" :validate="validate" class="space-y-8" @submit="onSubmit">
       <ApplicantRecipientFieldsApplicantRecipientProfileFields
         v-model:model="model"
+        v-model:extension-agency-id="extensionAgencyId"
         :persisted-profile="persistedProfile"
         :lead-agency-permission-action="leadAgencyPermissionAction" />
 

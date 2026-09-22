@@ -420,6 +420,7 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Agency_Agreement_Type: AgencyAgreementTypeTable
   Agency_Holdback_Basis: AgencyHoldbackBasisTable
   Applicant_Recipient_Profile: ApplicantRecipientProfileTable
+  Applicant_Recipient_Note: ApplicantRecipientNoteTable
   Applicant_Recipient_Registry: ApplicantRecipientRegistryTable
   Applicant_Recipient_Agency_Financial_Id: ApplicantRecipientAgencyFinancialIdTable
   Applicant_Recipient_Other_Name: ApplicantRecipientOtherNameTable
@@ -434,6 +435,7 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Transfer_Payment_Stream_Field: TransferPaymentStreamFieldTable
   Transfer_Payment_Stream_Field_Option: TransferPaymentStreamFieldOptionTable
   Funding_Case_Agreement_Profile: FundingCaseAgreementProfileTable
+  Funding_Case_Agreement_Note: FundingCaseAgreementNoteTable
   Funding_Case_Agreement_Closeout: FundingCaseAgreementCloseoutTable
   Funding_Case_Agreement_Closeout_Snapshot: FundingCaseAgreementCloseoutSnapshotTable
   Funding_Case_Agreement_Amendment: FundingCaseAgreementAmendmentTable
@@ -846,6 +848,21 @@ export interface ApplicantRecipientProfileTable {
   _deleted: Generated<boolean>
 }
 
+export interface ApplicantRecipientNoteTable {
+  id: Generated<string>
+  egcs_ar_applicantrecipient: string
+  egcs_ar_agency: string
+  egcs_ar_subject_en?: string | null
+  egcs_ar_subject_fr?: string | null
+  egcs_ar_body_en?: string | null
+  egcs_ar_body_fr?: string | null
+  egcs_ar_createdby: string
+  egcs_ar_updatedby: string
+  egcs_ar_createdat: Generated<Date>
+  egcs_ar_updatedat: Generated<Date>
+  _deleted: Generated<boolean>
+}
+
 export interface ApplicantRecipientRegistryTable {
   id: Generated<string>
   egcs_ar_applicantrecipient: string
@@ -1224,6 +1241,7 @@ export interface CommonExtensionEntityOwnerTable {
   egcs_cn_entitytype: Entity_Type
   egcs_cn_ownerid: string
   egcs_cn_ownertype: 'fundingcaseagreement' | 'applicantrecipient'
+  egcs_cn_agency?: string | null
 }
 
 export interface CommonEntityAssignmentTable {
@@ -1256,6 +1274,20 @@ export interface FundingCaseAgreementProfileTable {
   egcs_fc_status: StatusId
   egcs_fc_authorizedassistancestartdate: Date
   egcs_fc_authorizedassistanceenddate: Date
+  _deleted: Generated<boolean>
+}
+
+export interface FundingCaseAgreementNoteTable {
+  id: Generated<string>
+  egcs_fc_fundingagreement: string
+  egcs_fc_subject_en?: string | null
+  egcs_fc_subject_fr?: string | null
+  egcs_fc_body_en?: string | null
+  egcs_fc_body_fr?: string | null
+  egcs_fc_createdby: string
+  egcs_fc_updatedby: string
+  egcs_fc_createdat: Generated<Date>
+  egcs_fc_updatedat: Generated<Date>
   _deleted: Generated<boolean>
 }
 

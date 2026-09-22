@@ -9,6 +9,7 @@ import type { FundingCaseAgreementProfileForm, FundingCaseAgreementProfileRow } 
 import type { RuntimeState } from '~~/shared/constants/system-lifecycle'
 import AgreementActivitiesTab from '~/components/Agreement/AgreementActivitiesTab.vue'
 import AgreementAddressesTab from '~/components/Agreement/AgreementAddressesTab.vue'
+import AgreementNotesTab from '~/components/Agreement/AgreementNotesTab.vue'
 import AgreementApplicantRecipientsTab from '~/components/Agreement/AgreementApplicantRecipientsTab.vue'
 import AgreementBudgetTab from '~/components/Agreement/AgreementBudgetTab.vue'
 import AgreementCommitmentsTab from '~/components/Agreement/AgreementCommitmentsTab.vue'
@@ -151,6 +152,7 @@ const tabs = computed(() => {
       value: 'addresses',
       icon: 'i-lucide-map-pinned'
     })
+    nextTabs.push({ key: 'notes.title', value: 'notes', icon: 'i-lucide-sticky-note' })
     nextTabs.push({
       key: 'agreement.applicant_recipients.title',
       value: 'applicant-recipients',
@@ -417,6 +419,13 @@ const cancel = () => {
 
             <AgreementAddressesTab
               v-else-if="selectedTab === 'addresses'"
+              :agreement-id="id"
+              :can-create="canCreateChildRecords"
+              :can-update="canUpdateChildRecords"
+              :can-delete="canDeleteChildRecords" />
+
+            <AgreementNotesTab
+              v-else-if="selectedTab === 'notes'"
               :agreement-id="id"
               :can-create="canCreateChildRecords"
               :can-update="canUpdateChildRecords"

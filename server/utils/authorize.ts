@@ -105,7 +105,8 @@ export const authorizeFreshAssignedItem = async (
   const owner = await resolveEntityAssignmentOwner(trx, entityType, entityId)
   if (!owner) return await forbidden(event)
   if (owner.kind === 'applicant_recipient') {
-    if (!context.userAbilities.authorize('applicant_recipient', action, { type: 'agency', agencyId: owner.agencyId })) {
+    const { canAccessApplicantRecipient } = await import('./applicant-recipient-auth')
+    if (!await canAccessApplicantRecipient(context, owner.applicantRecipientId, action, trx)) {
       return await forbidden(event)
     }
     return

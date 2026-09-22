@@ -81,6 +81,12 @@ const toast = useToast()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const baseUrl = computed(() => `/api/attachments/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}`)
+const selectedAgencyId: Ref<string> = ref('')
+const agencyRequired = computed(() => entityType === 'applicantrecipient')
+const withAgency = (path: string): string => agencyRequired.value && selectedAgencyId.value
+  ? `${path}?agencyId=${encodeURIComponent(selectedAgencyId.value)}`
+  : path
+const requestUrl = computed(() => withAgency(baseUrl.value))
 const selectedAttachment: Ref<AttachmentItem | null> = ref(null)
 const formState: Ref<AttachmentFormState | null> = ref(null)
 const isModalOpen: Ref<boolean> = ref(false)
@@ -96,7 +102,8 @@ const {
   pagination,
   response
 } = useResourceTable<AttachmentItem>({
-  fetchUrl: baseUrl
+  fetchUrl: requestUrl,
+  enabled: computed(() => !agencyRequired.value || Boolean(selectedAgencyId.value))
 })
 
 const attachmentResponse = computed(() => response.value as AttachmentListResponse | null | undefined)
@@ -181,6 +188,11 @@ const resetModalState = () => {
   formState.value = null
 }
 
+const selectAgency = (value: string | number | undefined) => {
+  resetModalState()
+  selectedAgencyId.value = String(value ?? '')
+}
+
 const closeModal = () => {
   if (isSaving.value) return
   resetModalState()
@@ -195,7 +207,7 @@ const onFileChange = (event: Event) => {
 const cloneJsonObject = (value: JsonObject): JsonObject => JSON.parse(JSON.stringify(value)) as JsonObject
 
 const patchAttachment = async (attachmentId: string, patchBody: AttachmentHostPatch | { providerMetadata: JsonObject }) => {
-  const responseValue = await fetch(getClientRequestUrl(`${baseUrl.value}/${attachmentId}`), {
+  const responseValue = await fetch(getClientRequestUrl(withAgency(`${baseUrl.value}/${attachmentId}`)), {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(patchBody)
@@ -288,7 +300,7 @@ const save = async () => {
       body.set('descriptionEn', formState.value.descriptionEn)
       body.set('descriptionFr', formState.value.descriptionFr)
       body.set('providerMetadata', JSON.stringify(formState.value.providerMetadata))
-      const responseValue = await fetch(getClientRequestUrl(baseUrl.value), { method: 'POST', body })
+      const responseValue = await fetch(getClientRequestUrl(requestUrl.value), { method: 'POST', body })
       if (!responseValue.ok) await throwFetchResponseError(responseValue)
     }
     resetModalState()
@@ -316,7 +328,7 @@ const save = async () => {
 const download = async (item: AttachmentItem) => {
   if (status.value !== 'success') return
   try {
-    const responseValue = await fetch(getClientRequestUrl(`${baseUrl.value}/${item.id}/download`))
+    const responseValue = await fetch(getClientRequestUrl(withAgency(`${baseUrl.value}/${item.id}/download`)))
     if (!responseValue.ok) await throwFetchResponseError(responseValue)
     const blob = await responseValue.blob()
     const url = URL.createObjectURL(blob)
@@ -332,7 +344,7 @@ const download = async (item: AttachmentItem) => {
 
 const remove = async (item: AttachmentItem) => {
   if (status.value !== 'success' || item.can_delete !== true) return
-  const deleted = await confirmDeleteRequest(`${baseUrl.value}/${item.id}`)
+  const deleted = await confirmDeleteRequest(withAgency(`${baseUrl.value}/${item.id}`))
   if (!deleted) return
   toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
   try {
@@ -353,6 +365,20 @@ const retryAttachmentList = async () => {
 
 <template>
   <div class="w-full">
+    <div v-if="agencyRequired" class="mb-4">
+      <label for="attachment-agency-context" class="mb-1 block text-sm font-medium">{{ t('attachments.agency_context') }}</label>
+      <CommonServerLookupSelect
+        id="attachment-agency-context"
+        :model-value="selectedAgencyId"
+        fetch-url="/api/applicant-recipients/lookups/agencies"
+        value-key="id"
+        label-en-key="egcs_ay_name_en"
+        label-fr-key="egcs_ay_name_fr"
+        :query="{ applicant_recipient_id: entityId, permission_action: 'read', role_scoped: 'true' }"
+        :placeholder="t('attachments.agency_context_placeholder')"
+        searchable
+        @update:model-value="selectAgency" />
+    </div>
     <UAlert
       v-if="hasAttachmentListError"
       color="error"
@@ -366,7 +392,7 @@ const retryAttachmentList = async () => {
     </UAlert>
 
     <CommonResourceLayoutCard
-      v-else
+      v-else-if="!agencyRequired || selectedAgencyId"
       v-model:search="search"
       v-model:pagination="pagination"
       :data="items"
@@ -414,7 +440,7 @@ const retryAttachmentList = async () => {
             <UInput type="file" class="block w-full text-sm" required @change="onFileChange" />
           </UFormField>
           <UFormField :label="t('attachments.type')" name="attachmentTypeId" required>
-            <CommonServerLookupSelect v-model="formState.attachmentTypeId" :fetch-url="`${baseUrl}/types`" value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" :show-value-in-label="false" class="w-full" />
+            <CommonServerLookupSelect v-model="formState.attachmentTypeId" :fetch-url="withAgency(`${baseUrl}/types`)" value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" :show-value-in-label="false" class="w-full" />
           </UFormField>
           <div class="grid gap-4 md:grid-cols-2">
             <UFormField :label="t('attachments.name_en')" name="nameEn">

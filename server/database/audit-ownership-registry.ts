@@ -53,6 +53,7 @@ export const AUDIT_TABLE_OWNERSHIP: Readonly<Record<string, AuditOwnershipRule>>
   'public.Applicant_Recipient_Funding_History': actorAgencies,
   'public.Applicant_Recipient_Funding_History_Recipient': parent('egcs_ar_applicantrecipient', 'public.Applicant_Recipient_Profile'),
   'public.Applicant_Recipient_Other_Name': parent('egcs_ar_applicantrecipient', 'public.Applicant_Recipient_Profile'),
+  'public.Applicant_Recipient_Note': agency('egcs_ar_agency'),
   'public.Applicant_Recipient_Profile': actorAgencies,
   'public.Applicant_Recipient_Registry': parent('egcs_ar_applicantrecipient', 'public.Applicant_Recipient_Profile'),
   'public.Common_Additional_Reviewers': entity('egcs_cn_entityid', 'egcs_cn_entitytype'),
@@ -87,7 +88,10 @@ export const AUDIT_TABLE_OWNERSHIP: Readonly<Record<string, AuditOwnershipRule>>
   'public.Common_Entity_Assignment': entity('egcs_cn_entityid', 'egcs_cn_entitytype'),
   'public.Common_Entity_Attachment': entity('egcs_cn_entityid', 'egcs_cn_entitytype'),
   'public.Common_Entity_Type': global('Polymorphic type catalog'),
-  'public.Common_Extension_Entity_Owner': entity('egcs_cn_ownerid', 'egcs_cn_ownertype'),
+  'public.Common_Extension_Entity_Owner': { kind: 'switch', column: 'egcs_cn_ownertype', cases: {
+    applicantrecipient: agency('egcs_cn_agency'),
+    fundingcaseagreement: parent('egcs_cn_ownerid', 'public.Funding_Case_Agreement_Profile')
+  } },
   'public.Common_GWCOA': actorAgencies,
   'public.Common_Publication': publicationOwner,
   'public.Common_Publication_Selection': parent('egcs_cn_publication', 'public.Common_Publication'),
@@ -125,6 +129,7 @@ export const AUDIT_TABLE_OWNERSHIP: Readonly<Record<string, AuditOwnershipRule>>
   'public.Funding_Case_Agreement_Activity': parent('egcs_fc_fundingagreement', 'public.Funding_Case_Agreement_Profile'),
   'public.Funding_Case_Agreement_Activity_Version': parent('egcs_fc_fundingagreement', 'public.Funding_Case_Agreement_Profile'),
   'public.Funding_Case_Agreement_Address': parent('egcs_fc_fundingagreement', 'public.Funding_Case_Agreement_Profile'),
+  'public.Funding_Case_Agreement_Note': parent('egcs_fc_fundingagreement', 'public.Funding_Case_Agreement_Profile'),
   'public.Funding_Case_Agreement_Amendment': parent('egcs_fc_fundingagreement', 'public.Funding_Case_Agreement_Profile'),
   'public.Funding_Case_Agreement_Amendment_Subtype': parent('egcs_fc_amendment', 'public.Funding_Case_Agreement_Amendment'),
   'public.Funding_Case_Agreement_Amendment_Type': parent('egcs_fc_amendment', 'public.Funding_Case_Agreement_Amendment'),

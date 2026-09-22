@@ -13,10 +13,12 @@ export const loadTargetAttachment = async (
   if (!isPositivePostgresBigintText(linkId)) return undefined
   let query = db.selectFrom('Common_Entity_Attachment')
     .innerJoin('Common_Attachment', 'Common_Attachment.id', 'Common_Entity_Attachment.egcs_cn_attachment')
+    .innerJoin('Common_Attachment_Types', 'Common_Attachment_Types.id', 'Common_Attachment.egcs_cn_attachmenttype')
     .select([
       'Common_Entity_Attachment.id as link_id',
       'Common_Attachment.id as attachment_id',
       'Common_Attachment.egcs_cn_attachmenttype as attachment_type_id',
+      'Common_Attachment_Types.egcs_cn_agency as agency_id',
       'Common_Attachment.egcs_cn_provider as provider_id',
       'Common_Attachment.egcs_cn_providerobjectid as provider_object_id',
       'Common_Attachment.egcs_cn_providerlocator as provider_locator',

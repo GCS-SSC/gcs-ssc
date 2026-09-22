@@ -44,7 +44,7 @@ export default defineEventHandler(async event => {
           entityType: 'fundingcaseamendment',
           entityId: amendmentId,
           agreementId: runtimeContext.agreementId,
-          applicantRecipientLeadAgencyId: null,
+          proponentAgencyContextId: null,
           schemaAgencyId: runtimeContext.agencyId,
           reviewSetId: null
         }, 'approval_submission', true)

@@ -6,20 +6,18 @@ import { z } from 'zod'
 
 const QuerySchema = PaginationSchema.extend({
   applicant_recipient_id: z.coerce.string().optional(),
-  permission_action: z.enum(['create', 'update']).default('create')
+  permission_action: z.enum(['create', 'read', 'update']).default('create'),
+  role_scoped: z.enum(['true', 'false']).default('false')
 })
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
   await requireAuthContext(event)
-  const { page, limit, search, applicant_recipient_id, permission_action } = await getValidatedQueryI18n(event, QuerySchema)
-  const access = await authorize<'create' | 'update', ApplicantRecipientVisibility>(event, 'applicant_recipient', permission_action, async ({ context }) => {
+  const { page, limit, search, applicant_recipient_id, permission_action, role_scoped } = await getValidatedQueryI18n(event, QuerySchema)
+  const access = await authorize<'create' | 'read' | 'update', ApplicantRecipientVisibility>(event, 'applicant_recipient', permission_action, async ({ context }) => {
     const data = await resolveApplicantRecipientVisibility(context, permission_action, db)
-    if (
-      permission_action === 'update'
-      && applicant_recipient_id
-      && await canAccessApplicantRecipient(context, applicant_recipient_id, 'update', db)
-    ) {
+    if (permission_action !== 'create' && applicant_recipient_id
+      && await canAccessApplicantRecipient(context, applicant_recipient_id, permission_action, db)) {
       return { bypass: true, data }
     }
     if (data.hasGlobalAccess || data.agencyIds.length > 0) return { bypass: true, data }
@@ -51,7 +49,7 @@ export default defineEventHandler(async event => {
         ])
       : eb('egcs_ay_active', '=', true))
 
-  if (!visibility.hasGlobalAccess) {
+  if (role_scoped === 'true' && !visibility.hasGlobalAccess) {
     baseQuery = baseQuery.where('id', 'in', visibility.agencyIds)
   }
 

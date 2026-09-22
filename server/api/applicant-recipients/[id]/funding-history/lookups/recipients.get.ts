@@ -2,8 +2,7 @@ import { z } from 'zod'
 import { authorize, requireAuthContext } from '~~/server/utils/authorize'
 import { badRequest } from '~~/server/utils/api-errors'
 import {
-  resolveApplicantRecipientAuthorization,
-  resolveApplicantRecipientVisibility
+  resolveApplicantRecipientAuthorization
 } from '~~/server/utils/applicant-recipient-auth'
 import { assertApplicantRecipientProfileExists } from '~~/server/utils/applicant-recipient-child-resources'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
@@ -21,7 +20,7 @@ export default defineEventHandler(async event => {
   if (!isValidFundingHistoryId(applicantRecipientId)) return await badRequest(event, 'INVALID_ID', 'apiErrors.request.invalid_id')
 
   const query = await getValidatedQueryI18n(event, QuerySchema)
-  const { data: visibility } = await authorize(
+  await authorize(
     event,
     'applicant_recipient',
     query.permission_action,
@@ -32,10 +31,9 @@ export default defineEventHandler(async event => {
         query.permission_action,
         db
       )
-      const resolved = await resolveApplicantRecipientVisibility(context, query.permission_action, db)
       return 'bypass' in canAccessCurrent
-        ? { bypass: true, data: resolved }
-        : { denied: true, data: resolved }
+        ? { bypass: true }
+        : { denied: true }
     }
   )
   const profile = await assertApplicantRecipientProfileExists(event, applicantRecipientId, db)
@@ -46,12 +44,6 @@ export default defineEventHandler(async event => {
     .selectFrom('Applicant_Recipient_Profile')
     .where('_deleted', '=', false)
     .where('egcs_ar_active', '=', true)
-  if (!visibility?.hasGlobalAccess) {
-    if (!visibility?.agencyIds.length) {
-      return { items: [], total: 0, stats: { total: 0, active: 0 }, page: query.page, limit: query.limit }
-    }
-    baseQuery = baseQuery.where('egcs_ar_leadagency', 'in', visibility.agencyIds)
-  }
   if (query.search) {
     const search = escapeLikePattern(query.search)
     baseQuery = baseQuery.where(eb => eb.or([

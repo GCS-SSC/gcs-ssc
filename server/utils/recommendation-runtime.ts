@@ -68,6 +68,16 @@ type CreateRuntimeRecommendationSetTransactionInput = {
 export const readRuntimeRecommendationConfiguration = (value: JsonValue): PublishedRecommendationPlan =>
   readPublishedRecommendationPlan(value)
 
+export const getPinnedRuntimeRecommendationSetAgencyId = async (
+  db: DbClient,
+  publication: PublishedRecommendationPlan
+): Promise<string | null> => {
+  const first = publication.members[0]
+  if (!first) return null
+  const schema = await readPinnedRecommendationSchema(db, first, false)
+  return schema?.schemaAgencyId ?? null
+}
+
 const readPinnedRecommendationSchema = async (
   db: DbClient,
   member: PublishedRecommendationPlan['members'][number],

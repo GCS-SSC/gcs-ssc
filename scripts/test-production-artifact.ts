@@ -69,6 +69,8 @@ export const PRODUCTION_CORE_MIGRATIONS = [
   '0016_agency_audit',
   '0017_custom_field_namespaces',
   '0018_agreement_proponent_type',
+  '0019_notes',
+  '0020_extension_proponent_agency',
   '9999_z_proponent_type_cleanup',
   '9999_zz_workflow_profile_conditions',
   '9999_zzz_checklist_not_applicable',

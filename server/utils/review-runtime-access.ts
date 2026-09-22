@@ -57,7 +57,7 @@ export type ReviewRuntimeEntityContext = {
   entityType: Entity_Type
   entityId: string
   agreementId?: string | null
-  applicantRecipientLeadAgencyId: string | null
+  proponentAgencyContextId: string | null
   schemaAgencyId: string | null
   reviewSetId: string | null
   reviewId?: string | null
@@ -74,17 +74,17 @@ export const isReviewRuntimeEntityWorkable = async (
 ): Promise<boolean> => !isBusinessStatusEntityType(context.entityType)
   || !await isBusinessStatusLineageLocked(db, context.entityType, context.entityId)
 
-/** Resolves the owning agency used to constrain review setup selection and creation. */
+/** Resolves the agency pinned by an existing review or qualified lifecycle context. */
 export const getReviewRuntimeOwnerAgencyId = (
   entityContext: ReviewRuntimeEntityContext
 ): string | null => entityContext.entityType === 'applicantrecipient'
-  ? entityContext.applicantRecipientLeadAgencyId
+  ? entityContext.proponentAgencyContextId ?? entityContext.schemaAgencyId
   : entityContext.schemaAgencyId
 
 /**
  * Resolves the exact entity and active stream scopes where a review setup may apply.
  *
- * Proponent stream scopes require an active Agreement link in the Proponent's lead agency.
+ * Proponent stream scopes include active Agreement links across agencies.
  * Agreement-owned children inherit only their exact Agreement and current active stream. Write
  * callers lock the complete ownership graph so a concurrent relink cannot change applicability
  * between validation and review-set materialization.
@@ -101,8 +101,6 @@ export const resolveReviewRuntimeSetupScopes = async (
 ): Promise<ReviewRuntimeSetupScope[]> => {
   if (entityContext.setupScopes) return entityContext.setupScopes
   if (entityContext.entityType === 'applicantrecipient') {
-    if (!entityContext.applicantRecipientLeadAgencyId) return []
-
     let linkedStreamsQuery = db
       .selectFrom('Funding_Case_Agreement_Applicant_Recipient')
       .innerJoin(
@@ -123,7 +121,6 @@ export const resolveReviewRuntimeSetupScopes = async (
       .innerJoin('Agency_Profile', 'Agency_Profile.id', 'Transfer_Payment_Profile.egcs_tp_agency')
       .select('Transfer_Payment_Stream.id as stream_id')
       .where('Funding_Case_Agreement_Applicant_Recipient.egcs_fc_applicantrecipient', '=', entityContext.entityId)
-      .where('Transfer_Payment_Profile.egcs_tp_agency', '=', entityContext.applicantRecipientLeadAgencyId)
       .where('Funding_Case_Agreement_Applicant_Recipient._deleted', '=', false)
       .where('Funding_Case_Agreement_Profile._deleted', '=', false)
       .where('Transfer_Payment_Stream._deleted', '=', false)
@@ -334,15 +331,16 @@ const authorizeApplicantRecipientOwnerRole = async (
   action: ReviewRuntimeAction,
   entityContext: ReviewRuntimeEntityContext
 ): Promise<AuthContext> => {
-  if (!entityContext.applicantRecipientLeadAgencyId) {
-    return await forbidden(event)
-  }
-
   const entityAction = action === 'delete_assessment_child' ? 'delete' : 'update'
-  return await authorize(event, 'applicant_recipient', entityAction, {
-    type: 'agency',
-    agencyId: entityContext.applicantRecipientLeadAgencyId
-  })
+  if (entityContext.proponentAgencyContextId) {
+    return await authorize(event, 'applicant_recipient', entityAction, {
+      type: 'agency', agencyId: entityContext.proponentAgencyContextId
+    })
+  }
+  return await authorize(event, 'applicant_recipient', entityAction, async ({ context }) =>
+    await canAccessApplicantRecipient(context, entityContext.entityId, entityAction, event.context.$db)
+      ? { bypass: true as const }
+      : { denied: true as const })
 }
 
 /**
@@ -667,7 +665,7 @@ const resolveAgreementReviewRuntimeEntity = async (
     entityType,
     entityId: String(context[resolver.idKey]),
     agreementId: String(context.agreementId),
-    applicantRecipientLeadAgencyId: null,
+    proponentAgencyContextId: null,
     schemaAgencyId: String(context.agencyId),
     reviewSetId: null,
     reviewId: null,
@@ -705,7 +703,7 @@ export const resolveReviewRuntimeEntityFromEntity = async (
           entityType,
           entityId,
           agreementId: null,
-          applicantRecipientLeadAgencyId: null,
+          proponentAgencyContextId: null,
           schemaAgencyId: null,
           reviewSetId: null,
           reviewId: null
@@ -719,10 +717,7 @@ export const resolveReviewRuntimeEntityFromEntity = async (
 
   const profile = await db
     .selectFrom('Applicant_Recipient_Profile')
-    .select([
-      'id',
-      'egcs_ar_leadagency'
-    ])
+    .select('id')
     .where('id', '=', entityId)
     .where('_deleted', '=', false)
     .executeTakeFirst()
@@ -735,7 +730,7 @@ export const resolveReviewRuntimeEntityFromEntity = async (
     entityType,
     entityId: String(profile.id),
     agreementId: null,
-    applicantRecipientLeadAgencyId: profile.egcs_ar_leadagency ? String(profile.egcs_ar_leadagency) : null,
+    proponentAgencyContextId: null,
     schemaAgencyId: null,
     reviewSetId: null,
     reviewId: null
@@ -765,11 +760,15 @@ export const resolveReviewRuntimeEntityFromReviewSet = async (
       .onRef('Applicant_Recipient_Profile.id', '=', 'Common_Review_Set.egcs_cn_entityid')
       .on('Common_Review_Set.egcs_cn_entitytype', '=', 'applicantrecipient')
       .on('Applicant_Recipient_Profile._deleted', '=', false))
+    .leftJoin('Common_Review', join => join
+      .onRef('Common_Review.egcs_cn_reviewset', '=', 'Common_Review_Set.id')
+      .on('Common_Review._deleted', '=', false))
+    .leftJoin('Common_Review_Schema', 'Common_Review_Schema.id', 'Common_Review.egcs_cn_reviewschema')
     .select([
       'Common_Review_Set.egcs_cn_entitytype as entity_type',
       'Common_Review_Set.egcs_cn_entityid as entity_id',
       'Applicant_Recipient_Profile.id as applicant_recipient_id',
-      'Applicant_Recipient_Profile.egcs_ar_leadagency as applicant_recipient_lead_agency'
+      'Common_Review_Schema.egcs_cn_agency as proponent_schema_agency'
     ])
     .where('Common_Review_Set.id', '=', reviewSetId)
     .where('Common_Review_Set._deleted', '=', false)
@@ -798,10 +797,8 @@ export const resolveReviewRuntimeEntityFromReviewSet = async (
     entityType: reviewSet.entity_type,
     entityId: String(reviewSet.entity_id),
     agreementId: agreementEntity?.agreementId ?? null,
-    applicantRecipientLeadAgencyId: reviewSet.applicant_recipient_lead_agency
-      ? String(reviewSet.applicant_recipient_lead_agency)
-      : null,
-    schemaAgencyId: null,
+    proponentAgencyContextId: reviewSet.proponent_schema_agency ? String(reviewSet.proponent_schema_agency) : null,
+    schemaAgencyId: reviewSet.proponent_schema_agency ? String(reviewSet.proponent_schema_agency) : null,
     reviewSetId,
     reviewId: null
   }
@@ -862,8 +859,7 @@ export const resolveReviewRuntimeEntityFromReview = async (
       'Common_Review_Set.egcs_cn_entityid as entity_id',
       'Common_Review_Set.id as review_set_id',
       'Common_Review_Schema.egcs_cn_agency as schema_agency_id',
-      'Applicant_Recipient_Profile.id as applicant_recipient_id',
-      'Applicant_Recipient_Profile.egcs_ar_leadagency as applicant_recipient_lead_agency'
+      'Applicant_Recipient_Profile.id as applicant_recipient_id'
     ])
     .where('Common_Review.id', '=', reviewId)
     .where('Common_Review._deleted', '=', false)
@@ -894,8 +890,8 @@ export const resolveReviewRuntimeEntityFromReview = async (
     entityType: review.entity_type,
     entityId: String(review.entity_id),
     agreementId: agreementEntity?.agreementId ?? null,
-    applicantRecipientLeadAgencyId: review.applicant_recipient_lead_agency
-      ? String(review.applicant_recipient_lead_agency)
+    proponentAgencyContextId: review.entity_type === 'applicantrecipient' && review.schema_agency_id
+      ? String(review.schema_agency_id)
       : null,
     schemaAgencyId: review.schema_agency_id ? String(review.schema_agency_id) : null,
     reviewSetId: String(review.review_set_id),
@@ -1187,7 +1183,7 @@ const reviewRuntimeTargetMatches = (
 ): boolean => initial.entityType === current.entityType
   && initial.entityId === current.entityId
   && (initial.agreementId ?? null) === (current.agreementId ?? null)
-  && (initial.applicantRecipientLeadAgencyId ?? null) === (current.applicantRecipientLeadAgencyId ?? null)
+  && (initial.proponentAgencyContextId ?? null) === (current.proponentAgencyContextId ?? null)
   && (initial.schemaAgencyId ?? null) === (current.schemaAgencyId ?? null)
   && (initial.reviewSetId ?? null) === (current.reviewSetId ?? null)
   && (initial.reviewId ?? null) === (current.reviewId ?? null)
@@ -1202,7 +1198,7 @@ const lockApplicantRecipientRuntimeOwner = async (
 ): Promise<ReviewRuntimeEntityContext> => {
   const profile = await trx
     .selectFrom('Applicant_Recipient_Profile')
-    .select(['id', 'egcs_ar_leadagency'])
+    .select('id')
     .where('id', '=', entityContext.entityId)
     .where('_deleted', '=', false)
     .forUpdate()
@@ -1210,13 +1206,9 @@ const lockApplicantRecipientRuntimeOwner = async (
   if (!profile) {
     return await respondReviewRuntimeEntityNotFound(event, 'applicantrecipient')
   }
-  if (!profile.egcs_ar_leadagency) {
-    return await forbidden(event)
-  }
   return {
     ...entityContext,
-    entityId: String(profile.id),
-    applicantRecipientLeadAgencyId: String(profile.egcs_ar_leadagency)
+    entityId: String(profile.id)
   }
 }
 
@@ -1259,7 +1251,7 @@ const projectQualifiedRuntimeOwner = (
   return {
     ...entityContext,
     agreementId: owner.owner === 'agreement' ? owner.ownerId : null,
-    applicantRecipientLeadAgencyId: owner.owner === 'proponent' ? owner.agencyId : null,
+    proponentAgencyContextId: owner.owner === 'proponent' ? owner.agencyId : null,
     schemaAgencyId: owner.agencyId
   }
 }

@@ -209,7 +209,7 @@ const resolveProponentRuntimeResponse = async (
 
   const profile = await db
     .selectFrom('Applicant_Recipient_Profile')
-    .select(['id', 'egcs_ar_leadagency'])
+    .select('id')
     .where('id', '=', query.applicantRecipientId)
     .where('_deleted', '=', false)
     .executeTakeFirst()
@@ -217,10 +217,14 @@ const resolveProponentRuntimeResponse = async (
     return await notFound(event, 'APPLICANT_RECIPIENT_PROFILE_NOT_FOUND', 'apiErrors.applicant_recipient.profile_not_found')
   }
 
-  const agencyId = profile.egcs_ar_leadagency ? String(profile.egcs_ar_leadagency) : ''
-  if (!agencyId || (query.agencyId && query.agencyId !== agencyId)) {
+  const agencyId = query.agencyId
+  if (!agencyId) {
     return await notFound(event, 'APPLICANT_RECIPIENT_PROFILE_NOT_FOUND', 'apiErrors.applicant_recipient.profile_not_found')
   }
+
+  const agency = await db.selectFrom('Agency_Profile').select('id')
+    .where('id', '=', agencyId).where('_deleted', '=', false).executeTakeFirst()
+  if (!agency) return await notFound(event, 'AGENCY_NOT_FOUND', 'apiErrors.agency.not_found')
 
   await authorize(event, 'applicant_recipient', query.permissionAction, async ({ context }) => {
     const canAccess = await canAccessApplicantRecipient(
@@ -229,7 +233,10 @@ const resolveProponentRuntimeResponse = async (
       query.permissionAction,
       db
     )
-    return canAccess ? { bypass: true } : { denied: true }
+    const canAccessAgency = context.userAbilities.authorize('applicant_recipient', query.permissionAction, {
+      type: 'agency', agencyId
+    })
+    return canAccess && canAccessAgency ? { bypass: true } : { denied: true }
   })
 
   return await resolveAgencyRuntimeResponse(event, db, { ...query, agencyId })

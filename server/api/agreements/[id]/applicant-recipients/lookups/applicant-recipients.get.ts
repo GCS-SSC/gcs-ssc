@@ -53,10 +53,9 @@ export default defineEventHandler(async event => {
 
     let baseQuery = db
       .selectFrom('Applicant_Recipient_Profile')
-      .innerJoin('Agency_Profile', 'Agency_Profile.id', 'Applicant_Recipient_Profile.egcs_ar_leadagency')
+      .leftJoin('Agency_Profile', 'Agency_Profile.id', 'Applicant_Recipient_Profile.egcs_ar_leadagency')
       .where('Applicant_Recipient_Profile._deleted', '=', false)
       .where('Applicant_Recipient_Profile.egcs_ar_active', '=', true)
-      .where('Agency_Profile._deleted', '=', false)
 
     const linkedApplicantRecipients = db.selectFrom('Funding_Case_Agreement_Applicant_Recipient')
       .select('egcs_fc_applicantrecipient')
@@ -65,10 +64,6 @@ export default defineEventHandler(async event => {
       .$if(Boolean(permission_action === 'update' && relationship_id && isPositivePostgresBigintText(relationship_id)), query =>
         query.where('id', '!=', relationship_id!))
     baseQuery = baseQuery.where('Applicant_Recipient_Profile.id', 'not in', linkedApplicantRecipients)
-
-    if (!proponentVisibility.hasGlobalAccess) {
-      baseQuery = baseQuery.where('Applicant_Recipient_Profile.egcs_ar_leadagency', 'in', proponentVisibility.agencyIds)
-    }
 
     if (search) {
       const escapedSearch = escapeLikePattern(search)

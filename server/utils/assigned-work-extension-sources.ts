@@ -21,14 +21,14 @@ export const buildAssignedWorkExtensionSources = async (): Promise<RawBuilder<un
   const available = definitions.filter(definition => definition !== null)
   if (available.length === 0) {
     return sql`SELECT NULL::bigint entity_id, NULL::text entity_type,
-      NULL::bigint owner_id, NULL::text owner_type WHERE FALSE`
+      NULL::bigint owner_id, NULL::text owner_type, NULL::bigint agency_id WHERE FALSE`
   }
   const metadata = sql.join(available.map(definition => sql`(
     ${definition.type}::text, ${definition.extensionKey}::text, ${definition.ownerType}::text
   )`))
   return sql`
     SELECT target.id entity_id, target.egcs_cn_entitytype::text entity_type,
-      owner.id owner_id, owner.entity_type owner_type
+      owner.id owner_id, owner.entity_type owner_type, agency.id agency_id
     FROM (VALUES ${metadata}) installed(entity_type, extension_key, owner_type)
     JOIN "Common_Extension_Entity_Owner" binding
       ON binding.egcs_cn_entitytype = installed.entity_type
@@ -39,10 +39,12 @@ export const buildAssignedWorkExtensionSources = async (): Promise<RawBuilder<un
       AND identity_owner.egcs_cn_entitytype = binding.egcs_cn_ownertype AND identity_owner._deleted = false
     JOIN base_work owner ON owner.id = binding.egcs_cn_ownerid
       AND owner.entity_type = binding.egcs_cn_ownertype
-    JOIN "Agency_Profile" agency ON agency.id = owner.agency_id AND agency._deleted = false
+    JOIN "Agency_Profile" agency ON agency.id = CASE
+      WHEN installed.owner_type = 'applicantrecipient' THEN binding.egcs_cn_agency
+      ELSE owner.agency_id END AND agency._deleted = false
     WHERE EXISTS (
       SELECT 1 FROM extensions.agency_enablement enabled
-      WHERE enabled.extension_key = installed.extension_key AND enabled.agency_id = owner.agency_id
+      WHERE enabled.extension_key = installed.extension_key AND enabled.agency_id = agency.id
         AND enabled.enabled = true AND enabled._deleted = false
     ) AND (installed.owner_type = 'applicantrecipient' OR EXISTS (
       SELECT 1 FROM "Funding_Case_Agreement_Profile" agreement

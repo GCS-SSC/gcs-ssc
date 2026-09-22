@@ -40,11 +40,6 @@ export default defineEventHandler(async event => await executeFreshReadSnapshot(
     .selectFrom('Applicant_Recipient_Profile')
     .leftJoin('Agency_Profile', 'Agency_Profile.id', 'Applicant_Recipient_Profile.egcs_ar_leadagency')
     .where('Applicant_Recipient_Profile._deleted', '=', false)
-    .where('Agency_Profile._deleted', '=', false)
-
-  if (!visibility.hasGlobalAccess) {
-    baseQuery = baseQuery.where('Applicant_Recipient_Profile.egcs_ar_leadagency', 'in', visibility.agencyIds)
-  }
 
   if (agency_id) {
     baseQuery = baseQuery.where('Applicant_Recipient_Profile.egcs_ar_leadagency', '=', agency_id)
@@ -82,15 +77,10 @@ export default defineEventHandler(async event => await executeFreshReadSnapshot(
     )
   }
 
-  let statsBaseQuery = db
+  const statsBaseQuery = db
     .selectFrom('Applicant_Recipient_Profile')
-    .innerJoin('Agency_Profile', 'Agency_Profile.id', 'Applicant_Recipient_Profile.egcs_ar_leadagency')
+    .leftJoin('Agency_Profile', 'Agency_Profile.id', 'Applicant_Recipient_Profile.egcs_ar_leadagency')
     .where('Applicant_Recipient_Profile._deleted', '=', false)
-    .where('Agency_Profile._deleted', '=', false)
-
-  if (!visibility.hasGlobalAccess) {
-    statsBaseQuery = statsBaseQuery.where('Applicant_Recipient_Profile.egcs_ar_leadagency', 'in', visibility.agencyIds)
-  }
 
   const [items, countResult, statsResult] = await Promise.all([
     baseQuery

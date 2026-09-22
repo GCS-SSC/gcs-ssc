@@ -12,6 +12,7 @@ interface ExtensionEntityTabsOptions {
   target: GcsExtensionEntityTabTarget
   agreementId?: MaybeRefString
   applicantRecipientId?: MaybeRefString
+  agencyId?: MaybeRefString
   claimId?: MaybeRefString
   monitorId?: MaybeRefString
 }
@@ -53,6 +54,7 @@ export const useExtensionEntityTabs = (options: ExtensionEntityTabsOptions) => {
     target: options.target,
     agreementId: resolveMaybeRefString(options.agreementId),
     applicantRecipientId: resolveMaybeRefString(options.applicantRecipientId),
+    agencyId: resolveMaybeRefString(options.agencyId),
     claimId: resolveMaybeRefString(options.claimId),
     monitorId: resolveMaybeRefString(options.monitorId)
   }))

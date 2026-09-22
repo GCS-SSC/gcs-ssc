@@ -4,13 +4,12 @@ import type { GcsExtensionAgreementAccess } from '@gcs-ssc/extensions/server'
 import { runBoundedExtensionOperation } from './extension-admission'
 import { canonicalizeAuthorizationLockIds } from '@gcs-ssc/authorization/server'
 import type { H3Event } from 'h3'
-import { readBody } from 'h3'
+import { getQuery, readBody } from 'h3'
 import type { Kysely, Transaction, Updateable } from 'kysely'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import { parseI18n, readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import {
   authorizeFreshAssignedItem,
-  authorizeWithFreshAuthContext,
   requireFreshAuthContext
 } from '~~/server/utils/authorize'
 import { executeFreshAuthorizedApplicantRecipientWrite } from '~~/server/utils/applicant-recipient-auth'
@@ -32,6 +31,7 @@ import type {
   ApplicantRecipientProfilePatch
 } from '~~/shared/types/schemas'
 import type { ApplicantRecipientProfileTable, Database } from '~~/shared/types/database'
+import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 export type ApplicantRecipientCreateInput = ApplicantRecipientProfile
 export type ApplicantRecipientPatchInput = ApplicantRecipientProfilePatch
@@ -502,7 +502,7 @@ class ApplicantRecipientExtensionScopeChanged extends Error {
 const resolveApplicantRecipientExtensionScopes = async (
   db: Kysely<Database>,
   applicantRecipientId: string,
-  leadAgencyId: string
+  selectedAgencyId?: string
 ): Promise<ApplicantRecipientExtensionScope[]> => {
   const rows = await db
     .selectFrom('Funding_Case_Agreement_Applicant_Recipient')
@@ -531,7 +531,8 @@ const resolveApplicantRecipientExtensionScopes = async (
       'Transfer_Payment_Stream.id as stream_id'
     ])
     .execute()
-  const streamsByAgency = new Map<string, Set<string>>([[leadAgencyId, new Set()]])
+  const streamsByAgency = new Map<string, Set<string>>()
+  if (selectedAgencyId) streamsByAgency.set(selectedAgencyId, new Set())
   for (const row of rows) {
     const agencyId = String(row.agency_id)
     const streamIds = streamsByAgency.get(agencyId) ?? new Set<string>()
@@ -555,15 +556,18 @@ export const patchApplicantRecipientProfile = async (
 ) => {
   const { rawBody, validated } = await readApplicantRecipientPatchBody(event)
   const mapped = mapApplicantRecipientWriteValues(validated)
+  const selectedAgency = getQuery(event).agencyId
+  const selectedAgencyId = typeof selectedAgency === 'string' && isPositivePostgresBigintText(selectedAgency)
+    ? selectedAgency
+    : undefined
+  if (selectedAgency !== undefined && !selectedAgencyId) {
+    return await badRequest(event, 'INVALID_ID', 'apiErrors.request.invalid_id')
+  }
 
   try {
     const initial = await getApplicantRecipientProfileForPatch(event, db, id)
     if (!hasKey(initial, 'id')) return initial
-    const initialAgencyId = String(initial.egcs_ar_leadagency ?? '')
-    const requestedAgencyId = hasOwn(validated, 'egcs_ar_leadagency') && validated.egcs_ar_leadagency
-      ? String(validated.egcs_ar_leadagency)
-      : initialAgencyId
-    let plannedScopes = await resolveApplicantRecipientExtensionScopes(db, id, requestedAgencyId)
+    let plannedScopes = await resolveApplicantRecipientExtensionScopes(db, id, selectedAgencyId)
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
@@ -577,7 +581,7 @@ export const patchApplicantRecipientProfile = async (
           const destinationAgencyId = hasOwn(validated, 'egcs_ar_leadagency') && validated.egcs_ar_leadagency
             ? String(validated.egcs_ar_leadagency)
             : currentAgencyId
-          const currentScopes = await resolveApplicantRecipientExtensionScopes(trx, id, destinationAgencyId)
+          const currentScopes = await resolveApplicantRecipientExtensionScopes(trx, id, selectedAgencyId)
           if (!extensionScopesMatch(plannedScopes, currentScopes)) {
             throw new ApplicantRecipientExtensionScopeChanged(currentScopes)
           }
@@ -592,16 +596,13 @@ export const patchApplicantRecipientProfile = async (
           }
 
           await authorizeFreshAssignedItem(event, trx, context, 'applicantrecipient', id, 'update')
-          if (destinationAgencyId !== currentAgencyId) {
-            await authorizeWithFreshAuthContext(
-              event,
-              context,
-              'applicant_recipient',
-              'update',
-              { type: 'agency', agencyId: destinationAgencyId }
-            )
+          if (selectedAgencyId) {
+            const agency = await trx.selectFrom('Agency_Profile').select('id')
+              .where('id', '=', selectedAgencyId).where('_deleted', '=', false).executeTakeFirst()
+            if (!agency || !context.userAbilities.authorize('applicant_recipient', 'update', {
+              type: 'agency', agencyId: selectedAgencyId
+            })) return await badRequest(event, 'INVALID_ID', 'apiErrors.request.invalid_id')
           }
-
           await parseI18n(event, ApplicantRecipientProfileBilingualSchema, {
             egcs_ar_description_en: existing.egcs_ar_description_en,
             egcs_ar_description_fr: existing.egcs_ar_description_fr,
@@ -627,7 +628,7 @@ export const patchApplicantRecipientProfile = async (
                 .where('_deleted', '=', false).returningAll().executeTakeFirstOrThrow()
 
           await emitApplicantRecipientProfileUpdated(
-            event, trx, id, String(profile.egcs_ar_leadagency ?? existing.egcs_ar_leadagency ?? ''),
+            event, trx, id, selectedAgencyId ?? '',
             rawBody, validated, profile as Record<string, unknown>
           )
 

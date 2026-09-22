@@ -3,7 +3,7 @@ import type { H3Event } from 'h3'
 import type { Kysely, Transaction } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import type { AbilityAction } from '~~/shared/utils/abilities'
-import { forbidden, notFound } from '~~/server/utils/api-errors'
+import { notFound } from '~~/server/utils/api-errors'
 import { authorizeFreshAssignedItem, requireFreshAuthContext, type AuthContext } from '~~/server/utils/authorize'
 import { getUserAssignmentAgencyScopes } from '~~/server/utils/rbac'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
@@ -28,7 +28,6 @@ export const lockActiveApplicantRecipientIds = async (
 }
 
 interface ApplicantRecipientAccess {
-  agencyId: string
   isAssigned: boolean
 }
 
@@ -43,14 +42,9 @@ const resolveApplicantRecipientAccess = async (
   if (uniqueIds.some(id => !isPositivePostgresBigintText(id))) return new Map()
 
   const profiles = await db.selectFrom('Applicant_Recipient_Profile')
-    .innerJoin('Agency_Profile', 'Agency_Profile.id', 'Applicant_Recipient_Profile.egcs_ar_leadagency')
     .where('Applicant_Recipient_Profile.id', 'in', uniqueIds)
     .where('Applicant_Recipient_Profile._deleted', '=', false)
-    .where('Agency_Profile._deleted', '=', false)
-    .select([
-      'Applicant_Recipient_Profile.id as id',
-      'Applicant_Recipient_Profile.egcs_ar_leadagency as agency_id'
-    ]).execute()
+    .select('Applicant_Recipient_Profile.id as id').execute()
 
   let assignedIds = new Set<string>()
   if (includeAssignments) {
@@ -73,17 +67,16 @@ const resolveApplicantRecipientAccess = async (
   }
 
   return new Map(profiles.map(row => [String(row.id), {
-    agencyId: String(row.agency_id),
     isAssigned: assignedIds.has(String(row.id))
   }]))
 }
 
 const allowsApplicantRecipientAction = (
-  context: AuthContext,
+  visibility: ApplicantRecipientVisibility,
   access: ApplicantRecipientAccess | undefined,
   action: AbilityAction
 ): boolean => access !== undefined
-  && context.userAbilities.authorize('applicant_recipient', action, { type: 'agency', agencyId: access.agencyId })
+  && (visibility.hasGlobalAccess || visibility.agencyIds.length > 0)
   && (action === 'read' || access.isAssigned)
 
 export const resolveApplicantRecipientVisibility = async (
@@ -109,8 +102,11 @@ export const canAccessApplicantRecipient = async (
   action: AbilityAction,
   db: Kysely<Database>
 ): Promise<boolean> => {
-  const access = await resolveApplicantRecipientAccess(context, db, [applicantRecipientId], action !== 'read')
-  return allowsApplicantRecipientAction(context, access.get(String(applicantRecipientId)), action)
+  const [access, visibility] = await Promise.all([
+    resolveApplicantRecipientAccess(context, db, [applicantRecipientId], action !== 'read'),
+    resolveApplicantRecipientVisibility(context, action, db)
+  ])
+  return allowsApplicantRecipientAction(visibility, access.get(String(applicantRecipientId)), action)
 }
 
 export const canAccessApplicantRecipientIds = async (
@@ -119,8 +115,11 @@ export const canAccessApplicantRecipientIds = async (
   action: AbilityAction,
   db: Kysely<Database>
 ): Promise<boolean> => {
-  const access = await resolveApplicantRecipientAccess(context, db, applicantRecipientIds, action !== 'read')
-  return applicantRecipientIds.every(id => allowsApplicantRecipientAction(context, access.get(String(id)), action))
+  const [access, visibility] = await Promise.all([
+    resolveApplicantRecipientAccess(context, db, applicantRecipientIds, action !== 'read'),
+    resolveApplicantRecipientVisibility(context, action, db)
+  ])
+  return applicantRecipientIds.every(id => allowsApplicantRecipientAction(visibility, access.get(String(id)), action))
 }
 
 export const resolveApplicantRecipientMutationPermissions = async (
@@ -128,13 +127,18 @@ export const resolveApplicantRecipientMutationPermissions = async (
   applicantRecipientIds: string[],
   db: Kysely<Database>
 ): Promise<Map<string, { canCreate: boolean; canUpdate: boolean; canDelete: boolean }>> => {
-  const access = await resolveApplicantRecipientAccess(context, db, applicantRecipientIds, true)
+  const [access, createVisibility, updateVisibility, deleteVisibility] = await Promise.all([
+    resolveApplicantRecipientAccess(context, db, applicantRecipientIds, true),
+    resolveApplicantRecipientVisibility(context, 'create', db),
+    resolveApplicantRecipientVisibility(context, 'update', db),
+    resolveApplicantRecipientVisibility(context, 'delete', db)
+  ])
   return new Map(applicantRecipientIds.map(id => {
     const itemAccess = access.get(String(id))
     return [String(id), {
-      canCreate: allowsApplicantRecipientAction(context, itemAccess, 'create'),
-      canUpdate: allowsApplicantRecipientAction(context, itemAccess, 'update'),
-      canDelete: allowsApplicantRecipientAction(context, itemAccess, 'delete')
+      canCreate: allowsApplicantRecipientAction(createVisibility, itemAccess, 'create'),
+      canUpdate: allowsApplicantRecipientAction(updateVisibility, itemAccess, 'update'),
+      canDelete: allowsApplicantRecipientAction(deleteVisibility, itemAccess, 'delete')
     }]
   }))
 }
@@ -157,14 +161,8 @@ export const executeFreshAuthorizedApplicantRecipientWrite = async <T>(
 ): Promise<T> => await db.transaction().execute(async trx => {
   const context = await requireFreshAuthContext(event, trx)
   const profile = await trx.selectFrom('Applicant_Recipient_Profile').where('id', '=', applicantRecipientId)
-    .where('_deleted', '=', false).select(['id', 'egcs_ar_leadagency']).forUpdate().executeTakeFirst()
+    .where('_deleted', '=', false).select('id').forUpdate().executeTakeFirst()
   if (!profile) return await notFound(event, 'APPLICANT_RECIPIENT_PROFILE_NOT_FOUND', 'apiErrors.applicant_recipient.profile_not_found')
-  // Read the owner from the locked profile: supported lead-Agency moves lock the profile before its Agencies.
-  const agency = profile.egcs_ar_leadagency === null || profile.egcs_ar_leadagency === undefined
-    ? undefined
-    : await trx.selectFrom('Agency_Profile').where('id', '=', profile.egcs_ar_leadagency)
-        .where('_deleted', '=', false).select('id').forShare().executeTakeFirst()
   await authorizeFreshAssignedItem(event, trx, context, 'applicantrecipient', applicantRecipientId, action)
-  if (!agency) return await forbidden(event)
   return await callback(trx, context)
 })

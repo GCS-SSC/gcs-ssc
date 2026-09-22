@@ -23,6 +23,8 @@ import * as agencyAuditMigration from './migrations/0016_agency_audit'
 import * as customFieldNamespacesMigration from './migrations/0017_custom_field_namespaces'
 
 import * as agreementProponentTypeMigration from './migrations/0018_agreement_proponent_type'
+import * as notesMigration from './migrations/0019_notes'
+import * as extensionProponentAgencyMigration from './migrations/0020_extension_proponent_agency'
 
 import * as proponentTypeCleanupMigration from './migrations/9999_z_proponent_type_cleanup'
 
@@ -51,6 +53,8 @@ export const productionCoreMigrations = {
   '0016_agency_audit': agencyAuditMigration,
   '0017_custom_field_namespaces': customFieldNamespacesMigration,
   '0018_agreement_proponent_type': agreementProponentTypeMigration,
+  '0019_notes': notesMigration,
+  '0020_extension_proponent_agency': extensionProponentAgencyMigration,
   '9999_z_proponent_type_cleanup': proponentTypeCleanupMigration,
   '9999_zz_workflow_profile_conditions': workflowProfileConditionsMigration,
   '9999_zzz_checklist_not_applicable': checklistNotApplicableMigration,

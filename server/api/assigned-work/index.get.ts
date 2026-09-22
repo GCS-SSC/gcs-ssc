@@ -37,6 +37,7 @@ export default defineEventHandler(async event => {
     const actor = { auth, commonUserId: commonUser.id }
     const readGrants = actor.auth.userAbilities.getGrants().filter(grant => grant.action === 'read')
     const authorizationPredicates: RawBuilder<unknown>[] = readGrants.map(grant => {
+      if (grant.subject === 'applicant_recipient') return sql`work.owner_subject = 'applicant_recipient'`
       if (grant.scope.type === 'global') return sql`work.owner_subject = ${grant.subject}`
       if (grant.scope.type === 'agency') {
         return sql`work.owner_subject = ${grant.subject} AND work.agency_id = ${grant.scope.agencyId}::bigint`
@@ -89,7 +90,7 @@ export default defineEventHandler(async event => {
         NULL::bigint agreement_id, NULL::text variant, 'applicant_recipient'::text owner_subject,
         profile.egcs_ar_leadagency agency_id, NULL::bigint program_id
       FROM "Applicant_Recipient_Profile" profile
-      JOIN "Agency_Profile" agency ON agency.id = profile.egcs_ar_leadagency AND agency._deleted = false
+      LEFT JOIN "Agency_Profile" agency ON agency.id = profile.egcs_ar_leadagency
       WHERE profile._deleted = false
       UNION ALL
       SELECT agreement.id, 'fundingcaseagreement', agreement.egcs_fc_status::text,
@@ -150,7 +151,7 @@ export default defineEventHandler(async event => {
     ), qualified_bindings AS (${qualifiedBindings}), source_owners AS (
       SELECT * FROM base_work
       UNION ALL
-      SELECT binding.entity_id, binding.entity_type, owner.status, owner.identifier_en, owner.identifier_fr, owner.agreement_id, owner.variant, owner.owner_subject, owner.agency_id, owner.program_id
+      SELECT binding.entity_id, binding.entity_type, owner.status, owner.identifier_en, owner.identifier_fr, owner.agreement_id, owner.variant, owner.owner_subject, binding.agency_id, owner.program_id
       FROM qualified_bindings binding
       JOIN base_work owner ON owner.id = binding.owner_id AND owner.entity_type = binding.owner_type
     ), review_work AS (
@@ -212,7 +213,7 @@ export default defineEventHandler(async event => {
       count(*) OVER ()::int total_count
     FROM work JOIN "Common_Entity_Assignment" assignment
       ON assignment.egcs_cn_entityid = work.id AND assignment.egcs_cn_entitytype::text = work.entity_type
-    JOIN "Agency_Profile" owner_agency ON owner_agency.id = work.agency_id AND owner_agency._deleted = false
+    LEFT JOIN "Agency_Profile" owner_agency ON owner_agency.id = work.agency_id AND owner_agency._deleted = false
     LEFT JOIN "Common_Status" business_status
       ON business_status.id::text = work.status
       AND work.entity_type IN (${sql.join(businessEntityTypes)})
@@ -221,6 +222,7 @@ export default defineEventHandler(async event => {
       AND completion.egcs_cn_entitytype::text = work.entity_type
       AND completion._deleted = false
     WHERE assignment.egcs_cn_user = ${actor.commonUserId}::bigint AND assignment._deleted = false
+      AND (work.owner_subject = 'applicant_recipient' OR owner_agency.id IS NOT NULL)
       AND (${sql.join(authorizationPredicates, sql` OR `)})
       AND (
         (work.entity_type = 'applicantrecipient' AND work.status = 'active')

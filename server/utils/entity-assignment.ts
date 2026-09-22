@@ -11,6 +11,7 @@ import type { AssignableEntityType, Database, Entity_Type } from '~~/shared/type
 import { ASSIGNABLE_ENGINE_OPEN_QUEUE_STATUSES, isAssignableEntityType } from '~~/shared/utils/entity-assignments'
 import { getEntityAuthorizationPolicy } from '~~/server/utils/entity-authorization-policy'
 import { defineUsersAbilities } from '~~/server/utils/rbac'
+import { getActiveStructuralRoleAssignments } from '~~/server/utils/active-user-scopes'
 import { resolveCompletionEvidenceId } from '~~/server/utils/completion-runtime-core'
 import { resolveCanonicalLifecycleIdentity } from './extension-lifecycle-identity'
 import { loadExtensionLifecycleEntity, isExtensionEnabledForAgency, isExtensionEnabledForStream } from './extensions'
@@ -85,17 +86,15 @@ const resolveApplicantRecipientOwner = async (
   applicantRecipientId: string
 ): Promise<AuthorizationResourceOwner | null> => {
   const profile = await db.selectFrom('Applicant_Recipient_Profile')
-    .innerJoin('Agency_Profile', 'Agency_Profile.id', 'Applicant_Recipient_Profile.egcs_ar_leadagency')
-    .select('Applicant_Recipient_Profile.egcs_ar_leadagency as agency_id')
+    .select('Applicant_Recipient_Profile.id')
     .where('Applicant_Recipient_Profile.id', '=', applicantRecipientId)
     .where('Applicant_Recipient_Profile._deleted', '=', false)
-    .where('Agency_Profile._deleted', '=', false)
     .executeTakeFirst()
-  if (!profile?.agency_id) return null
+  if (!profile) return null
   return {
     kind: 'applicant_recipient',
     applicantRecipientId,
-    agencyId: String(profile.agency_id)
+    agencyId: ''
   }
 }
 
@@ -317,9 +316,12 @@ export const canManageEntityAssignmentsWithContext = async (
   const owner = await resolveEntityAssignmentOwner(db, entityType, entityId)
   if (!owner) return false
   if (owner.kind === 'applicant_recipient') {
-    return context.userAbilities.canManageAssignments('applicant_recipient', {
-      type: 'agency', agencyId: owner.agencyId
-    })
+    const { getUserAssignmentAgencyScopes } = await import('./rbac')
+    if (context.userAbilities.canManageAssignments('applicant_recipient', { type: 'global' })) return true
+    const scopes = await getUserAssignmentAgencyScopes(context.userId, db)
+    return scopes.some(scope => context.userAbilities.canManageAssignments('applicant_recipient', {
+      type: 'agency', agencyId: scope.agencyId
+    }))
   }
   if (owner.kind === 'agreement') {
     const agreement = await resolveAgreementScopeContext(owner.agreementId, db)
@@ -447,8 +449,24 @@ export const resolveAgencyValidEntityAssigneeIdsWithDb = async (
   let subject: 'agency' | 'agreement' | 'applicant_recipient' | 'transfer_payment'
   let scope: AuthorizationScope
   if (owner.kind === 'applicant_recipient') {
-    subject = 'applicant_recipient'
-    scope = { type: 'agency', agencyId: owner.agencyId } as const
+    const activeAssignments = await getActiveStructuralRoleAssignments(db, applicationUsers.map(user => String(user.application_user_id)))
+    const agencyIdsByUser = new Map<string, Set<string>>()
+    for (const assignment of activeAssignments) {
+      if (!assignment.agencyId) continue
+      const userId = String(assignment.userId)
+      const agencies = agencyIdsByUser.get(userId) ?? new Set<string>()
+      agencies.add(String(assignment.agencyId))
+      agencyIdsByUser.set(userId, agencies)
+    }
+    return new Set(applicationUsers.map(user => {
+      const abilities = abilitiesByUserId.get(String(user.application_user_id))
+      if (!abilities) return null
+      if (abilities.authorize('applicant_recipient', 'update', { type: 'global' })) return String(user.common_user_id)
+      const agencyIds = agencyIdsByUser.get(String(user.application_user_id)) ?? new Set<string>()
+      return [...agencyIds].some(agencyId => abilities.authorize('applicant_recipient', 'update', { type: 'agency', agencyId }))
+        ? String(user.common_user_id)
+        : null
+    }).filter((id): id is string => id !== null))
   } else if (owner.kind === 'agreement') {
     const agreement = await resolveAgreementScopeContext(owner.agreementId, db)
     if (!agreement) return new Set()
@@ -471,3 +489,16 @@ export const resolveAgencyValidEntityAssigneeIdsWithDb = async (
     .get(String(user.application_user_id))
     ?.authorize(subject, 'update', scope)).map(user => String(user.common_user_id)))
 }
+
+/** Lists active users before checking Proponent role eligibility across all agencies.
+ * @param db Database connection.
+ * @returns Active Common User identities and names.
+ */
+export const listActiveCommonUsersForProponentAssignments = async (db: Kysely<Database>): Promise<Array<{ id: string; name: string }>> =>
+  (await db.selectFrom('Common_User')
+    .innerJoin('user', 'user.id', 'Common_User.egcs_cn_auth_user_id')
+    .select(['Common_User.id as id', 'Common_User.egcs_cn_name as name'])
+    .where('Common_User._deleted', '=', false)
+    .where('user._deleted', '=', false)
+    .orderBy('Common_User.egcs_cn_name', 'asc')
+    .execute()).map(user => ({ id: String(user.id), name: user.name }))

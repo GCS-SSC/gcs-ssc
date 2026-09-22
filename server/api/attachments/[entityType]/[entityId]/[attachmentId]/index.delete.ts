@@ -11,7 +11,7 @@ export default defineEventHandler(async event => {
   if (!linkId) return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')
   const deleted = await executeFreshAuthorizedAttachmentWrite(event, target, 'delete', async (trx, _auth, resolved) => {
     const attachment = await loadTargetAttachment(trx, target, linkId, true)
-    if (!attachment) return await notFound(event, 'ATTACHMENT_NOT_FOUND', 'apiErrors.attachments.not_found')
+    if (!attachment || String(attachment.agency_id) !== resolved.agencyId) return await notFound(event, 'ATTACHMENT_NOT_FOUND', 'apiErrors.attachments.not_found')
     await trx.updateTable('Common_Entity_Attachment').set({ _deleted: true, egcs_cn_updatedat: new Date() })
       .where('id', '=', linkId).where('_deleted', '=', false).execute()
     await trx.updateTable('Common_Attachment').set({ _deleted: true })

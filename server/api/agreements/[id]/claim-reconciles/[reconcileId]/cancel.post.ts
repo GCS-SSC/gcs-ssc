@@ -65,7 +65,7 @@ export default defineEventHandler(async event => {
         ? await resolveActiveWorkflowSetup(trx, {
             entityType: 'fundingclaimreconcile', entityId: reconcileId,
             agreementId: runtimeContext.agreementId,
-            applicantRecipientLeadAgencyId: null, schemaAgencyId: runtimeContext.agencyId,
+            proponentAgencyContextId: null, schemaAgencyId: runtimeContext.agencyId,
             reviewSetId: null, isOpen: runtimeContext.isOpen
           }, 'approval_submission', true)
         : null

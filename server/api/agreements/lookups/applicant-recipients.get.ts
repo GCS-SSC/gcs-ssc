@@ -55,20 +55,12 @@ export default defineEventHandler(async event => {
     .selectFrom('Applicant_Recipient_Profile')
     .leftJoin('Agency_Profile', 'Agency_Profile.id', 'Applicant_Recipient_Profile.egcs_ar_leadagency')
     .where('Applicant_Recipient_Profile._deleted', '=', false)
-    .where(eb => eb.or([
-      eb('Agency_Profile._deleted', '=', false),
-      eb('Agency_Profile.id', 'is', null)
-    ]))
     .where(eb => selectedIds.length > 0
       ? eb.or([
           eb('Applicant_Recipient_Profile.egcs_ar_active', '=', true),
           eb('Applicant_Recipient_Profile.id', 'in', selectedIds)
         ])
       : eb('Applicant_Recipient_Profile.egcs_ar_active', '=', true))
-
-  if (!visibility.hasGlobalAccess) {
-    baseQuery = baseQuery.where('Applicant_Recipient_Profile.egcs_ar_leadagency', 'in', visibility.agencyIds)
-  }
 
   if (selectedIds.length > 0) baseQuery = baseQuery.where('Applicant_Recipient_Profile.id', 'in', selectedIds)
 

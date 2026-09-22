@@ -108,7 +108,6 @@ export const resolveAdditionalReviewerExecutableContextFromReview = async (
       'Set_Item.egcs_cn_state as reviewSetRuntimeState',
       'Common_Review_Schema.egcs_cn_agency as schema_agency_id',
       'Applicant_Recipient_Profile.id as applicant_recipient_id',
-      'Applicant_Recipient_Profile.egcs_ar_leadagency as applicant_recipient_lead_agency',
       'Review_Item.egcs_cn_state as reviewRuntimeState'
     ])
     .where('Common_Review.id', '=', reviewId)
@@ -139,8 +138,8 @@ export const resolveAdditionalReviewerExecutableContextFromReview = async (
       entityType: review.entity_type,
       entityId: String(review.entity_id),
       agreementId,
-      applicantRecipientLeadAgencyId: review.applicant_recipient_lead_agency
-        ? String(review.applicant_recipient_lead_agency)
+      proponentAgencyContextId: review.entity_type === 'applicantrecipient' && review.schema_agency_id
+        ? String(review.schema_agency_id)
         : null,
       schemaAgencyId: review.schema_agency_id ? String(review.schema_agency_id) : null,
       reviewSetId: String(review.review_set_id),

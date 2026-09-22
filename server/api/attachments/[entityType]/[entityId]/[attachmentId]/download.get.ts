@@ -11,7 +11,7 @@ export default defineEventHandler(async event => {
   if (!attachmentId) return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')
   const { resolved } = await authorizeAttachmentTarget(event, target, 'read')
   const attachment = await loadTargetAttachment(event.context.$db, target, attachmentId)
-  if (!attachment) return await notFound(event, 'ATTACHMENT_NOT_FOUND', 'apiErrors.attachments.not_found')
+  if (!attachment || String(attachment.agency_id) !== resolved.agencyId) return await notFound(event, 'ATTACHMENT_NOT_FOUND', 'apiErrors.attachments.not_found')
   const provider = await resolveAgencyStorageProvider(event.context.$db, resolved.agencyId, attachment.provider_id)
   if (!provider) return await throwApiError(event, {
     statusCode: 503, code: 'STORAGE_PROVIDER_UNAVAILABLE', key: 'apiErrors.attachments.provider_unavailable'
@@ -32,6 +32,7 @@ export default defineEventHandler(async event => {
   const { resolved: freshTarget } = await authorizeFreshAttachmentTarget(event, target, 'read', event.context.$db)
   const freshAttachment = await loadTargetAttachment(event.context.$db, target, attachmentId)
   if (!freshAttachment
+    || String(freshAttachment.agency_id) !== freshTarget.agencyId
     || freshTarget.agencyId !== resolved.agencyId
     || freshAttachment.provider_id !== attachment.provider_id
     || freshAttachment.provider_object_id !== attachment.provider_object_id

@@ -4,6 +4,7 @@ import { listAgencyScopedCommonUsers, resolveCurrentCommonUser } from '~~/server
 import { resolveCompletionRuntimeEntityFromEntity, respondCompletionRuntimeEntityNotFound } from '~~/server/utils/completion-runtime'
 import {
   canManageEntityAssignments,
+  listActiveCommonUsersForProponentAssignments,
   resolveAgencyValidEntityAssigneeIdsWithDb,
   resolveEntityAssignmentOwner
 } from '~~/server/utils/entity-assignment'
@@ -73,7 +74,9 @@ export default defineEventHandler(async event => {
     ? resolveExtensionEntityAssignmentOwner(extensionRuntime)
     : await resolveEntityAssignmentOwner(event.context.$db, context.entityType as AssignableEntityType, context.entityId)
   if (!owner) return await notFound(event, 'ASSIGNMENT_TARGET_NOT_FOUND', 'apiErrors.request.not_found')
-  const users = await listAgencyScopedCommonUsers(event.context.$db, owner.agencyId)
+  const users = !extensionRuntime && owner.kind === 'applicant_recipient'
+    ? await listActiveCommonUsersForProponentAssignments(event.context.$db)
+    : await listAgencyScopedCommonUsers(event.context.$db, owner.agencyId)
   const eligibleIds = extensionRuntime
     ? await resolveExtensionEligibleAssigneeIds(event.context.$db, extensionRuntime, users.map(user => user.id))
     : await resolveAgencyValidEntityAssigneeIdsWithDb(

@@ -35,6 +35,7 @@ export default defineEventHandler(async event => {
       ? 'applicant_recipient'
       : grant.subject === 'agreement' ? 'agreement' : null
     if (!subject) return []
+    if (subject === 'applicant_recipient') return [sql`work.owner_subject = 'applicant_recipient'`]
     if (grant.scope.type === 'global') return [sql`work.owner_subject = ${subject}`]
     if (grant.scope.type === 'agency') {
       return [sql`work.owner_subject = ${subject} AND work.agency_id = ${grant.scope.agencyId}::bigint`]
@@ -68,7 +69,7 @@ export default defineEventHandler(async event => {
         agency.egcs_ay_name_en agency_name_en, agency.egcs_ay_name_fr agency_name_fr,
         NULL::varchar program_name_en, NULL::varchar program_name_fr
       FROM "Applicant_Recipient_Profile" profile
-      JOIN "Agency_Profile" agency ON agency.id = profile.egcs_ar_leadagency AND agency._deleted = false
+      LEFT JOIN "Agency_Profile" agency ON agency.id = profile.egcs_ar_leadagency
       WHERE profile._deleted = false
       UNION ALL
       SELECT agreement.id, 'fundingcaseagreement', agreement.egcs_fc_status::text,
@@ -166,7 +167,7 @@ export default defineEventHandler(async event => {
     ), qualified_bindings AS (${qualifiedBindings}), source_owners AS (
       SELECT * FROM base_work
       UNION ALL
-      SELECT binding.entity_id, binding.entity_type, owner.status, owner.stable_reference, owner.label_en, owner.label_fr, owner.owner_subject, owner.agency_id, owner.program_id, owner.agency_name_en, owner.agency_name_fr, owner.program_name_en, owner.program_name_fr
+      SELECT binding.entity_id, binding.entity_type, owner.status, owner.stable_reference, owner.label_en, owner.label_fr, owner.owner_subject, binding.agency_id, owner.program_id, owner.agency_name_en, owner.agency_name_fr, owner.program_name_en, owner.program_name_fr
       FROM qualified_bindings binding
       JOIN base_work owner ON owner.id = binding.owner_id AND owner.entity_type = binding.owner_type
     ), review_work AS (
@@ -236,6 +237,7 @@ export default defineEventHandler(async event => {
         WHERE application_user.id = roster.primary_auth_user_id AND application_user._deleted = false
           AND (
             assigned_role.agency_id IS NULL
+            OR (roster.owner_subject = 'applicant_recipient' AND assigned_role.agency_id IS NOT NULL)
             OR (assigned_role.agency_id = roster.agency_id AND (
               NOT EXISTS (
                 SELECT 1 FROM role_transfer_payment_scope role_scope

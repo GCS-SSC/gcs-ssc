@@ -15,7 +15,7 @@ import {
 import { executeQualifiedRuntimeTransaction, resolveQualifiedRuntimeTransactionPlan } from './qualified-runtime-transaction'
 import { lockReviewRuntimeTarget } from './review-runtime-access'
 import { getActiveStructuralRoleAssignments } from '~~/server/utils/active-user-scopes'
-import { defineUserAbilities } from '~~/server/utils/rbac'
+import { defineUserAbilities, getUserAssignmentAgencyScopes } from '~~/server/utils/rbac'
 import type { AssignableEntityType, Database, Entity_Type } from '~~/shared/types/database'
 import { ENTITY_AUTHORIZATION_POLICIES } from '~~/shared/utils/entity-assignments'
 import {
@@ -191,7 +191,9 @@ const lockAndValidateAssignee = async (
   const abilities = await defineUserAbilities(String(applicationUser.id), trx)
   let eligible = false
   if (owner?.kind === 'applicant_recipient') {
-    eligible = abilities.authorize('applicant_recipient', 'update', { type: 'agency', agencyId: owner.agencyId })
+    eligible = abilities.authorize('applicant_recipient', 'update', { type: 'global' })
+      || (await getUserAssignmentAgencyScopes(String(applicationUser.id), trx))
+        .some(scope => abilities.authorize('applicant_recipient', 'update', { type: 'agency', agencyId: scope.agencyId }))
   } else if (owner?.kind === 'agreement') {
     const agreement = await resolveAgreementScopeContext(owner.agreementId, trx)
     eligible = Boolean(agreement && abilities.authorize('agreement', 'update', agreement.scope))
@@ -263,7 +265,7 @@ export const executeEntityAssignmentManagement = async <T>(
           await lockReviewRuntimeTarget(trx, {
             entityType: qualifiedSource.entityType,
             entityId: qualifiedSource.entityId,
-            applicantRecipientLeadAgencyId: null,
+            proponentAgencyContextId: null,
             schemaAgencyId: null,
             reviewSetId: ancestor.reviewSetId ?? null,
             reviewId: ancestor.entityType === 'commonreview' ? ancestor.entityId : null,

@@ -1,5 +1,6 @@
 /* eslint-disable jsdoc/require-jsdoc -- Authorization helpers use explicit typed names. */
 import type { H3Event } from 'h3'
+import { getQuery } from 'h3'
 import type { Kysely, Transaction } from 'kysely'
 import type { AbilityAction } from '~~/shared/utils/abilities'
 import type { Database } from '~~/shared/types/database'
@@ -9,7 +10,8 @@ import { resolveEntityAssignmentOwner } from './entity-assignment'
 import { authorizeAssignedTarget, requireAuthContext, requireFreshAuthContext, type AuthContext } from './authorize'
 import { resolveAgreementScopeContext, type AgreementScopeContext } from './agreement'
 import { executeFreshAuthorizedAgreementWrite } from './agreement-write-transaction'
-import { executeFreshAuthorizedApplicantRecipientWrite, lockActiveApplicantRecipientIds } from './applicant-recipient-auth'
+import { canAccessApplicantRecipient, executeFreshAuthorizedApplicantRecipientWrite, lockActiveApplicantRecipientIds } from './applicant-recipient-auth'
+import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 export interface ResolvedAttachmentTarget {
   target: AttachmentTarget
@@ -19,12 +21,16 @@ export interface ResolvedAttachmentTarget {
 
 export const resolveAttachmentTarget = async (
   db: Kysely<Database>,
-  target: AttachmentTarget
+  target: AttachmentTarget,
+  selectedAgencyId?: string
 ): Promise<ResolvedAttachmentTarget | null> => {
   const owner = await resolveEntityAssignmentOwner(db, target.entityType, target.entityId)
   if (!owner) return null
   if (owner.kind === 'applicant_recipient') {
-    return { target, agencyId: owner.agencyId }
+    if (!selectedAgencyId || !isPositivePostgresBigintText(selectedAgencyId)) return null
+    const agency = await db.selectFrom('Agency_Profile').select('id')
+      .where('id', '=', selectedAgencyId).where('_deleted', '=', false).executeTakeFirst()
+    return agency ? { target, agencyId: selectedAgencyId } : null
   }
   if (owner.kind !== 'agreement') return null
   const agreementContext = await resolveAgreementScopeContext(owner.agreementId, db)
@@ -38,11 +44,15 @@ export const authorizeAttachmentTarget = async (
   action: AbilityAction
 ): Promise<{ auth: AuthContext; resolved: ResolvedAttachmentTarget }> => {
   const auth = await requireAuthContext(event)
-  const resolved = await resolveAttachmentTarget(event.context.$db, target)
+  const selectedAgencyId = getQuery(event).agencyId
+  const resolved = await resolveAttachmentTarget(event.context.$db, target,
+    typeof selectedAgencyId === 'string' ? selectedAgencyId : undefined)
   if (!resolved) return await notFound(event, 'ATTACHMENT_TARGET_NOT_FOUND', 'apiErrors.attachments.target_not_found')
   const permitted = resolved.agreementContext
     ? auth.userAbilities.authorize('agreement', action, resolved.agreementContext.scope)
-    : auth.userAbilities.authorize('applicant_recipient', action, { type: 'agency', agencyId: resolved.agencyId })
+    : await canAccessApplicantRecipient(auth, target.entityId, action, event.context.$db)
+      && auth.userAbilities.authorize('applicant_recipient', action,
+        { type: 'agency', agencyId: resolved.agencyId })
   if (!permitted) return await forbidden(event)
   if (action !== 'read') await authorizeAssignedTarget(event, target)
   return { auth, resolved }
@@ -55,11 +65,15 @@ export const authorizeFreshAttachmentTarget = async (
   db: Kysely<Database>
 ): Promise<{ auth: AuthContext; resolved: ResolvedAttachmentTarget }> => {
   const auth = await requireFreshAuthContext(event, db)
-  const resolved = await resolveAttachmentTarget(db, target)
+  const selectedAgencyId = getQuery(event).agencyId
+  const resolved = await resolveAttachmentTarget(db, target,
+    typeof selectedAgencyId === 'string' ? selectedAgencyId : undefined)
   if (!resolved) return await notFound(event, 'ATTACHMENT_TARGET_NOT_FOUND', 'apiErrors.attachments.target_not_found')
   const permitted = resolved.agreementContext
     ? auth.userAbilities.authorize('agreement', action, resolved.agreementContext.scope)
-    : auth.userAbilities.authorize('applicant_recipient', action, { type: 'agency', agencyId: resolved.agencyId })
+    : await canAccessApplicantRecipient(auth, target.entityId, action, db)
+      && auth.userAbilities.authorize('applicant_recipient', action,
+        { type: 'agency', agencyId: resolved.agencyId })
   if (!permitted) return await forbidden(event)
   return { auth, resolved }
 }
@@ -74,7 +88,9 @@ export const executeFreshAuthorizedAttachmentWrite = async <T>(
     resolved: ResolvedAttachmentTarget
   ) => Promise<T>
 ): Promise<T> => {
-  const initial = await resolveAttachmentTarget(event.context.$db, target)
+  const selectedAgencyId = getQuery(event).agencyId
+  const agencyId = typeof selectedAgencyId === 'string' ? selectedAgencyId : undefined
+  const initial = await resolveAttachmentTarget(event.context.$db, target, agencyId)
   if (!initial) return await notFound(event, 'ATTACHMENT_TARGET_NOT_FOUND', 'apiErrors.attachments.target_not_found')
 
   if (target.entityType === 'applicantrecipient') {
@@ -87,8 +103,11 @@ export const executeFreshAuthorizedAttachmentWrite = async <T>(
         if (!await lockActiveApplicantRecipientIds(trx, [target.entityId])) {
           return await forbidden(event)
         }
-        const fresh = await resolveAttachmentTarget(trx, target)
+        const fresh = await resolveAttachmentTarget(trx, target, agencyId)
         if (!fresh) return await notFound(event, 'ATTACHMENT_TARGET_NOT_FOUND', 'apiErrors.attachments.target_not_found')
+        if (!auth.userAbilities.authorize('applicant_recipient', action, {
+          type: 'agency', agencyId: fresh.agencyId
+        })) return await forbidden(event)
         return await callback(trx, auth, fresh)
       }
     )

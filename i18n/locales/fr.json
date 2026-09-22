@@ -139,6 +139,8 @@
     }
   },
   "attachments": {
+    "agency_context": "Agence des pièces jointes",
+    "agency_context_placeholder": "Sélectionnez une agence pour voir les pièces jointes",
     "title": "Pièces jointes",
     "upload": "Téléverser une pièce jointe",
     "edit": "Modifier la pièce jointe",
@@ -1729,6 +1731,8 @@
     }
   },
   "validation": {
+    "note_subject_required": "Saisissez un sujet en anglais ou en français",
+    "note_body_required": "Saisissez une note en anglais ou en français",
     "proponent_type_in_use": "Ce type est utilisé par un promoteur d’une entente.",
     "proponent_type_conflict": "Sélectionnez le dernier type admissible du promoteur dans ce volet.",
     "budget_percentage": "Saisissez un pourcentage de 0 à 100 avec au plus deux décimales.",
@@ -1891,6 +1895,26 @@
     "workflow_member_owner_duplicate": "Chaque membre de flux imbriqué ne peut avoir qu’une seule association de propriétaire",
     "checklist_na_policy_requires_option": "Autorisez S. O. avant d’exiger une explication pour S. O.",
     "checklist_answer_not_allowed": "Cette réponse n’est pas offerte par la question de la version publiée utilisée."
+  },
+  "notes": {
+    "title": "Notes au dossier",
+    "add": "Ajouter une note",
+    "edit": "Modifier la note",
+    "search": "Rechercher des notes",
+    "agency": "Agence",
+    "agency_placeholder": "Sélectionnez une agence",
+    "agency_immutable": "L’agence de cette note ne peut pas être modifiée.",
+    "subject": "Sujet",
+    "body": "Note",
+    "subject_en": "Sujet (anglais)",
+    "subject_fr": "Sujet (français)",
+    "body_en": "Note (anglais)",
+    "body_fr": "Note (français)",
+    "subject_instruction": "Indiquez le sujet dans au moins une langue : anglais ou français.",
+    "body_instruction": "Rédigez la note dans au moins une langue : anglais ou français.",
+    "author": "Auteur",
+    "created_at": "Créée",
+    "modified_at": "Modifiée"
   },
   "agreement": {
     "number_generated": "Attribué à la création",
@@ -2502,6 +2526,8 @@
     }
   },
   "applicant_recipient": {
+    "extension_agency_context": "Contexte d’agence pour les extensions",
+    "extension_agency_context_placeholder": "Sélectionnez une agence pour les fonctions propres à l’agence",
     "list_views": {
       "all": "Tous les promoteurs",
       "mine": "Mes promoteurs",

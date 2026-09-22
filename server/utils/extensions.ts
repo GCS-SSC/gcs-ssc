@@ -521,21 +521,23 @@ const extendEntityScope = (scope: Scope, type: string, id: string): Scope => {
 /** Loads applicant-recipient ownership identifiers used by extension authorization. */
 const resolveApplicantRecipientExtensionContext = async (
   db: Kysely<Database>,
-  applicantRecipientId: string
+  applicantRecipientId: string,
+  agencyId: string | undefined
 ): Promise<ExtensionEntityContext | null> => {
-  if (!isPositivePostgresBigintText(applicantRecipientId)) return null
+  if (!isPositivePostgresBigintText(applicantRecipientId) || !agencyId || !isPositivePostgresBigintText(agencyId)) return null
   const row = await db
     .selectFrom('Applicant_Recipient_Profile')
-    .select(['id', 'egcs_ar_leadagency'])
+    .select('id')
     .where('id', '=', applicantRecipientId)
     .where('_deleted', '=', false)
     .executeTakeFirst()
 
-  if (!row?.id || !row.egcs_ar_leadagency) {
+  const agency = await db.selectFrom('Agency_Profile').select('id')
+    .where('id', '=', agencyId).where('_deleted', '=', false).executeTakeFirst()
+  if (!row?.id || !agency) {
     return null
   }
 
-  const agencyId = String(row.egcs_ar_leadagency)
   const ownerId = String(row.id)
 
   return {
@@ -556,7 +558,8 @@ const resolveApplicantRecipientExtensionContext = async (
 export const resolveExtensionEntityContext = async (
   db: Kysely<Database>,
   target: GcsExtensionEntityTabTarget,
-  entityId: string
+  entityId: string,
+  agencyId?: string
 ): Promise<ExtensionEntityContext | null> => {
   if (target === 'agreement') {
     const context = await resolveAgreementScopeContext(entityId, db)
@@ -606,7 +609,7 @@ export const resolveExtensionEntityContext = async (
     }
   }
 
-  return await resolveApplicantRecipientExtensionContext(db, entityId)
+  return await resolveApplicantRecipientExtensionContext(db, entityId, agencyId)
 }
 
 /** Checks entity access through the appropriate agreement or recipient authorization path. */
@@ -632,7 +635,9 @@ export const canAccessExtensionEntity = async (
       return false
     }
 
-    return await canAccessApplicantRecipient(
+    return authContext.userAbilities.authorize('applicant_recipient', action, {
+      type: 'agency', agencyId: entityContext.agencyId
+    }) && await canAccessApplicantRecipient(
       authContext,
       entityContext.applicantRecipientId,
       action,

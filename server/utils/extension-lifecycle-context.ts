@@ -103,7 +103,7 @@ const toRuntimeContext = (entity: GcsLockedLifecycleEntity): ReviewRuntimeEntity
   entityType: entity.target.entityType,
   entityId: entity.target.entityId,
   agreementId: entity.owner.owner === 'agreement' ? entity.owner.ownerId : null,
-  applicantRecipientLeadAgencyId: entity.owner.owner === 'proponent' ? entity.owner.agencyId : null,
+  proponentAgencyContextId: entity.owner.owner === 'proponent' ? entity.owner.agencyId : null,
   schemaAgencyId: entity.owner.agencyId,
   reviewSetId: null,
   reviewId: null,

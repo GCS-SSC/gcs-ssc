@@ -2,7 +2,7 @@ import { classifyExtensionAuditInputs } from './audit-request'
 import { withAuditExecution } from './audit-context'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Temporary coverage while extension dispatch helpers receive complete documentation. */
 import type { H3Event } from 'h3'
-import { createError, getMethod } from 'h3'
+import { createError, getMethod, getQuery } from 'h3'
 import {
   isGcsExtensionUserError,
   type GcsExtensionAgreementAccess,
@@ -225,7 +225,11 @@ const prepareExtensionRbacContext = async (
   }
   const resolvedEntityId = entityId as string
 
-  const entityContext = await resolveExtensionEntityContext(event.context.$db, rbac.entity.target, resolvedEntityId)
+  const requestedAgencyId = rbac.entity.target === 'proponent'
+    ? resolvedHandler.params.agencyId ?? getQuery(event).agencyId
+    : undefined
+  const entityContext = await resolveExtensionEntityContext(event.context.$db, rbac.entity.target, resolvedEntityId,
+    typeof requestedAgencyId === 'string' ? requestedAgencyId : undefined)
   if (entityContext === null) {
     throwExtensionDispatchError(404, 'EXTENSION_RBAC_ENTITY_NOT_FOUND', 'Extension RBAC entity not found.')
   }
@@ -357,7 +361,12 @@ const createExtensionWriteAuthorization = (
         const entityContext = await resolveExtensionEntityContext(
           db,
           rbac.entity.target,
-          String(entityId)
+          String(entityId),
+          rbac.entity.target === 'proponent'
+            ? typeof (resolvedHandler.params.agencyId ?? getQuery(event).agencyId) === 'string'
+              ? String(resolvedHandler.params.agencyId ?? getQuery(event).agencyId)
+              : undefined
+            : undefined
         )
         if (!entityContext) {
           throwExtensionDispatchError(404, 'EXTENSION_RBAC_ENTITY_NOT_FOUND', 'Extension RBAC entity not found.')

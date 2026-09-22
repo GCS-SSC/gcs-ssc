@@ -30,7 +30,7 @@ export default defineEventHandler(async event => {
   try {
     const result = await executeFreshAuthorizedAttachmentWrite(event, target, 'update', async (trx, _auth, resolved) => {
       const attachment = await loadTargetAttachment(trx, target, linkId, true)
-      if (!attachment) return await notFound(event, 'ATTACHMENT_NOT_FOUND', 'apiErrors.attachments.not_found')
+      if (!attachment || String(attachment.agency_id) !== resolved.agencyId) return await notFound(event, 'ATTACHMENT_NOT_FOUND', 'apiErrors.attachments.not_found')
       const effectiveAttachmentTypeId = body.attachmentTypeId ?? String(attachment.attachment_type_id)
       {
         const type = await trx.selectFrom('Common_Attachment_Types').select('id')

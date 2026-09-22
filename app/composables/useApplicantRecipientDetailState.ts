@@ -7,6 +7,7 @@ import CommonAttachmentsTab from '~/components/Common/AttachmentsTab.vue'
 import ApplicantRecipientAgencyFinancialIdsTab from '~/components/ApplicantRecipient/ApplicantRecipientAgencyFinancialIdsTab.vue'
 import ApplicantRecipientRegistriesTab from '~/components/ApplicantRecipient/ApplicantRecipientRegistriesTab.vue'
 import ApplicantRecipientOtherNamesTab from '~/components/ApplicantRecipient/ApplicantRecipientOtherNamesTab.vue'
+import ApplicantRecipientNotesTab from '~/components/ApplicantRecipient/ApplicantRecipientNotesTab.vue'
 import ApplicantRecipientAddressesTab from '~/components/ApplicantRecipient/ApplicantRecipientAddressesTab.vue'
 import ApplicantRecipientContactsTab from '~/components/ApplicantRecipient/ApplicantRecipientContactsTab.vue'
 import ApplicantRecipientReviewsTab from '~/components/ApplicantRecipient/ApplicantRecipientReviewsTab.vue'
@@ -25,6 +26,7 @@ export const APPLICANT_RECIPIENT_DETAIL_TAB_KEYS = {
   agencyFinancialIds: 'applicant_recipient.agency_financial_ids.title',
   registries: 'applicant_recipient.registries.title',
   otherNames: 'applicant_recipient.other_names.title',
+  notes: 'notes.title',
   addresses: 'applicant_recipient.addresses.title',
   contacts: 'applicant_recipient.contacts.title',
   reviews: 'applicant_recipient.reviews.title',
@@ -69,9 +71,11 @@ export const useApplicantRecipientDetailState = (id: string) => {
   queueMicrotask(() => {
     void refreshProfile()
   })
+  const selectedExtensionAgencyId = ref('')
   const { items: extensionItems, tabs: extensionTabs } = useExtensionEntityTabs({
     target: 'proponent',
-    applicantRecipientId: id
+    applicantRecipientId: id,
+    agencyId: selectedExtensionAgencyId
   })
 
   /**
@@ -145,6 +149,12 @@ export const useApplicantRecipientDetailState = (id: string) => {
         key: APPLICANT_RECIPIENT_DETAIL_TAB_KEYS.otherNames,
         icon: 'i-lucide-badge-info',
         component: ApplicantRecipientOtherNamesTab,
+        getProps: getChildRecordTabProps
+      })
+      nextTabMap.set('notes', {
+        key: APPLICANT_RECIPIENT_DETAIL_TAB_KEYS.notes,
+        icon: 'i-lucide-sticky-note',
+        component: ApplicantRecipientNotesTab,
         getProps: getChildRecordTabProps
       })
       nextTabMap.set('addresses', {
@@ -237,6 +247,7 @@ export const useApplicantRecipientDetailState = (id: string) => {
     activeTabComponent,
     activeTabProps,
     breadcrumbItems,
-    isHeroCollapsed
+    isHeroCollapsed,
+    selectedExtensionAgencyId
   }
 }

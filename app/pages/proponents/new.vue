@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Ref } from 'vue'
-import { onBeforeUnmount, ref } from 'vue'
+import { onBeforeUnmount, ref, watch } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
 import type { ApplicantRecipientProfileForm } from '~~/shared/types/applicant-recipient-ui'
 
@@ -24,6 +24,13 @@ const { canAny } = useCan()
 const createForm = (): ApplicantRecipientProfileForm => ({ egcs_ar_active: false })
 
 const form: Ref<ApplicantRecipientProfileForm | null> = ref(null)
+const selectedExtensionAgencyId: Ref<string> = ref('')
+
+watch(selectedExtensionAgencyId, (next, previous) => {
+  if (next !== previous && form.value?.extensions) {
+    form.value = { ...form.value, extensions: {} }
+  }
+})
 
 const isSaving: Ref<boolean> = ref(false)
 let disposed = false
@@ -48,7 +55,10 @@ const submit = async () => {
 
   try {
     isSaving.value = true
-    const created = await sendJson<{ id: string }>('/api/applicant-recipients', 'POST', form.value)
+    const createUrl = selectedExtensionAgencyId.value
+      ? `/api/applicant-recipients?agencyId=${encodeURIComponent(selectedExtensionAgencyId.value)}`
+      : '/api/applicant-recipients'
+    const created = await sendJson<{ id: string }>(createUrl, 'POST', form.value)
     if (disposed) return
 
     toast.add({
@@ -127,6 +137,7 @@ onMounted(() => {
         <CommonEntityEditorWorkspace>
           <ApplicantRecipientProfileFormPage
             v-model:model="form"
+            v-model:extension-agency-id="selectedExtensionAgencyId"
             compact
             :submit-label="t('common.add')"
             :cancel-label="t('common.cancel')"

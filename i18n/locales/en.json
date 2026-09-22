@@ -139,6 +139,8 @@
     }
   },
   "attachments": {
+    "agency_context": "Agency for attachments",
+    "agency_context_placeholder": "Select an agency to view attachments",
     "title": "Attachments",
     "upload": "Upload attachment",
     "edit": "Edit attachment",
@@ -1729,6 +1731,8 @@
     }
   },
   "validation": {
+    "note_subject_required": "Enter a subject in English or French",
+    "note_body_required": "Enter a note in English or French",
     "proponent_type_in_use": "This type is used by an agreement proponent.",
     "proponent_type_conflict": "Select the proponent’s most recent eligible type in this stream.",
     "budget_percentage": "Enter a percentage from 0 to 100 with at most two decimal places.",
@@ -1891,6 +1895,26 @@
     "workflow_member_owner_duplicate": "Each nested workflow member can have only one owner mapping",
     "checklist_na_policy_requires_option": "Enable N/A before requiring an N/A explanation.",
     "checklist_answer_not_allowed": "This answer is not offered by the pinned question."
+  },
+  "notes": {
+    "title": "Notes to file",
+    "add": "Add note",
+    "edit": "Edit note",
+    "search": "Search notes",
+    "agency": "Agency",
+    "agency_placeholder": "Select an agency",
+    "agency_immutable": "The agency for this note cannot be changed.",
+    "subject": "Subject",
+    "body": "Note",
+    "subject_en": "Subject (English)",
+    "subject_fr": "Subject (French)",
+    "body_en": "Note (English)",
+    "body_fr": "Note (French)",
+    "subject_instruction": "Provide the subject in at least one language: English or French.",
+    "body_instruction": "Provide the note in at least one language: English or French.",
+    "author": "Author",
+    "created_at": "Created",
+    "modified_at": "Modified"
   },
   "agreement": {
     "number_generated": "Assigned on creation",
@@ -2502,6 +2526,8 @@
     }
   },
   "applicant_recipient": {
+    "extension_agency_context": "Agency context for extensions",
+    "extension_agency_context_placeholder": "Select an agency for agency specific features",
     "list_views": {
       "all": "All Proponents",
       "mine": "My Proponents",

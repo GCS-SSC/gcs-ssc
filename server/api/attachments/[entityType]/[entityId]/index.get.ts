@@ -25,6 +25,7 @@ export default defineEventHandler(async event => {
     .where('Common_Entity_Attachment.egcs_cn_entityid', '=', target.entityId)
     .where('Common_Entity_Attachment._deleted', '=', false)
     .where('Common_Attachment._deleted', '=', false)
+    .where('Common_Attachment_Types.egcs_cn_agency', '=', resolved.agencyId)
   if (query.attachmentTypeId) base = base.where('Common_Attachment.egcs_cn_attachmenttype', '=', query.attachmentTypeId)
   if (query.search) {
     const search = `%${escapeLikePattern(query.search)}%`

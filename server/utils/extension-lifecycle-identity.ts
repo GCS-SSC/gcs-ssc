@@ -28,7 +28,7 @@ export const resolveCanonicalLifecycleIdentity = async (
   if (!target) return null
 
   const binding = await trx.selectFrom('Common_Extension_Entity_Owner')
-    .select(['egcs_cn_ownerid as ownerId', 'egcs_cn_ownertype as ownerType'])
+    .select(['egcs_cn_ownerid as ownerId', 'egcs_cn_ownertype as ownerType', 'egcs_cn_agency as agencyId'])
     .where('egcs_cn_entityid', '=', entityId)
     .where('egcs_cn_entitytype', '=', entityType)
     .executeTakeFirst()
@@ -66,15 +66,16 @@ export const resolveCanonicalLifecycleIdentity = async (
     }
   }
 
+  if (!binding.agencyId) return null
   const profile = await trx.selectFrom('Applicant_Recipient_Profile')
-    .innerJoin('Agency_Profile', 'Agency_Profile.id', 'Applicant_Recipient_Profile.egcs_ar_leadagency')
-    .select('Applicant_Recipient_Profile.egcs_ar_leadagency as agencyId')
+    .select('id')
     .where('Applicant_Recipient_Profile.id', '=', ownerId)
     .where('Applicant_Recipient_Profile._deleted', '=', false)
-    .where('Agency_Profile._deleted', '=', false)
     .executeTakeFirst()
-  if (!profile?.agencyId) return null
-  const agencyId = String(profile.agencyId)
+  const agency = await trx.selectFrom('Agency_Profile').select('id')
+    .where('id', '=', String(binding.agencyId)).where('_deleted', '=', false).executeTakeFirst()
+  if (!profile || !agency) return null
+  const agencyId = String(binding.agencyId)
   return {
     owner: { owner: 'proponent', ownerId, agencyId },
     scope: { agencyId, scope: { type: 'agency', agencyId } }

@@ -38,7 +38,8 @@ const {
   activeTabComponent,
   activeTabProps,
   breadcrumbItems,
-  isHeroCollapsed
+  isHeroCollapsed,
+  selectedExtensionAgencyId
 } = useApplicantRecipientDetailState(id)
 
 const selectedProfile: Ref<ApplicantRecipientDetailForm | null> = ref(null)
@@ -60,6 +61,12 @@ watch(profile, value => {
   selectedProfile.value = { ...value }
 }, { immediate: true })
 
+watch(selectedExtensionAgencyId, (next, previous) => {
+  if (next !== previous && selectedProfile.value?.extensions) {
+    selectedProfile.value = { ...selectedProfile.value, extensions: {} }
+  }
+})
+
 /**
  * Saves applicant recipient changes from the inline edit view and refreshes the detail page.
  */
@@ -79,7 +86,9 @@ const submit = async () => {
       ...body
     } = selectedProfile.value
 
-    const response = await fetch(getClientRequestUrl(`/api/applicant-recipients/${id}`), {
+    const updateUrl = getClientRequestUrl(`/api/applicant-recipients/${id}`)
+    if (selectedExtensionAgencyId.value) updateUrl.searchParams.set('agencyId', selectedExtensionAgencyId.value)
+    const response = await fetch(updateUrl, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body)
@@ -163,6 +172,21 @@ const retryProfile = async () => {
             show-status
             show-lead-agency />
 
+          <div class="mx-auto w-full max-w-5xl px-4 py-3">
+            <label for="proponent-extension-agency-context" class="mb-1 block text-sm font-medium">{{ t('applicant_recipient.extension_agency_context') }}</label>
+            <CommonServerLookupSelect
+              id="proponent-extension-agency-context"
+              :model-value="selectedExtensionAgencyId"
+              fetch-url="/api/applicant-recipients/lookups/agencies"
+              value-key="id"
+              label-en-key="egcs_ay_name_en"
+              label-fr-key="egcs_ay_name_fr"
+              :placeholder="t('applicant_recipient.extension_agency_context_placeholder')"
+              :query="{ applicant_recipient_id: id, permission_action: 'read', role_scoped: 'true' }"
+              searchable
+              @update:model-value="value => selectedExtensionAgencyId = String(value ?? '')" />
+          </div>
+
           <CommonEntityEditorWorkspace content-test-id="proponent-detail-content">
             <template #sidebar>
               <CommonRouteTabs
@@ -179,6 +203,7 @@ const retryProfile = async () => {
             <ApplicantRecipientProfileFormPage
               v-if="isGeneralTab && selectedProfile && profile.can_update"
               v-model:model="selectedProfile"
+              v-model:extension-agency-id="selectedExtensionAgencyId"
               :persisted-profile="profile"
               :submit-label="t('common.update')"
               :cancel-label="t('common.cancel')"

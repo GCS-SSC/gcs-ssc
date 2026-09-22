@@ -18,6 +18,7 @@ const EntityTabQuerySchema = z.object({
   target: z.enum(['agreement', 'proponent', 'claim', 'monitor']),
   agreementId: z.string().optional(),
   applicantRecipientId: z.string().optional(),
+  agencyId: z.string().optional(),
   claimId: z.string().optional(),
   monitorId: z.string().optional()
 })
@@ -129,6 +130,7 @@ export default defineEventHandler(async event => {
   const rawEntityIds = [
     rawQuery.agreementId,
     rawQuery.applicantRecipientId,
+    rawQuery.agencyId,
     rawQuery.claimId,
     rawQuery.monitorId
   ]
@@ -143,7 +145,7 @@ export default defineEventHandler(async event => {
     return emptyEntityTabsResponse(query.target)
   }
 
-  const entityContext = await resolveExtensionEntityContext(db, query.target, entityId)
+  const entityContext = await resolveExtensionEntityContext(db, query.target, entityId, query.agencyId)
   if (!entityContext) {
     return emptyEntityTabsResponse(query.target)
   }

@@ -1,6 +1,6 @@
 import { forbidden, notFound } from '~~/server/utils/api-errors'
 import { listAgencyScopedCommonUsers } from '~~/server/utils/additional-reviewer-runtime'
-import { canManageEntityAssignments, resolveAgencyValidEntityAssigneeIdsWithDb, resolveEntityAssignmentOwner } from '~~/server/utils/entity-assignment'
+import { canManageEntityAssignments, listActiveCommonUsersForProponentAssignments, resolveAgencyValidEntityAssigneeIdsWithDb, resolveEntityAssignmentOwner } from '~~/server/utils/entity-assignment'
 import { EntityAssignmentTargetSchema } from '~~/shared/types/schemas'
 import { parseI18n } from '~~/server/utils/api-validate'
 import type { AssignableEntityType } from '~~/shared/types/database'
@@ -27,7 +27,9 @@ export default defineEventHandler(async event => {
     ? await canManageExtensionEntityAssignments(event, extensionRuntime)
     : await canManageEntityAssignments(event, target.entityType as AssignableEntityType, target.entityId)
   if (!canManage) return await forbidden(event)
-  const users = await listAgencyScopedCommonUsers(event.context.$db, owner.agencyId)
+  const users = !extensionRuntime && owner.kind === 'applicant_recipient'
+    ? await listActiveCommonUsersForProponentAssignments(event.context.$db)
+    : await listAgencyScopedCommonUsers(event.context.$db, owner.agencyId)
   const eligibleUserIds = extensionRuntime
     ? await resolveExtensionEligibleAssigneeIds(event.context.$db, extensionRuntime, users.map(user => user.id))
     : await resolveAgencyValidEntityAssigneeIdsWithDb(
