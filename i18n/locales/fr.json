@@ -3101,6 +3101,7 @@
       "required": "Commentaire obligatoire"
     },
     "required_question": "Réponse obligatoire",
+    "required_question_help": "Il faut répondre à cette question avant de soumettre la recommandation.",
     "result_question": "Question décisionnelle",
     "result_question_help": "Il s’agit de la seule question dont l’option sélectionnée détermine le résultat de la recommandation.",
     "canonical_outcome": "Résultat canonique",

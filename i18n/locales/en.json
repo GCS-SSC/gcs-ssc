@@ -3101,6 +3101,7 @@
       "required": "Required comment"
     },
     "required_question": "Response required",
+    "required_question_help": "This question must be answered before submitting the recommendation.",
     "result_question": "Deciding question",
     "result_question_help": "This is the only question whose selected option determines the recommendation outcome.",
     "canonical_outcome": "Canonical outcome",

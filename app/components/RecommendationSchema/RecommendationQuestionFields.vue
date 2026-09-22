@@ -118,16 +118,22 @@ const updateTextDescription = (language: 'en' | 'fr', value: string) => {
           @update:model-value="value => setType(String(value))" />
       </UFormField>
     </div>
-    <div class="flex flex-wrap gap-6">
-      <UFormField :label="t('recommendation_schema.required_question')" :required="question.isResult">
-        <UCheckbox v-model="question.required" />
+    <div class="grid gap-4 md:grid-cols-2">
+      <UFormField
+        :label="t('recommendation_schema.required_question')"
+        :description="t('recommendation_schema.required_question_help')"
+        name="required">
+        <USwitch v-model="question.required" />
       </UFormField>
-      <UCheckbox
+      <UFormField
         v-if="question.type === 'radio'"
-        :model-value="question.isResult"
         :label="t('recommendation_schema.result_question')"
         :description="t('recommendation_schema.result_question_help')"
-        @update:model-value="setDecidingQuestion(Boolean($event))" />
+        name="isResult">
+        <USwitch
+          :model-value="question.isResult"
+          @update:model-value="setDecidingQuestion(Boolean($event))" />
+      </UFormField>
     </div>
 
     <div v-if="question.type === 'text'" class="space-y-4">
