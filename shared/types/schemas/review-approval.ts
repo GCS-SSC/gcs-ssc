@@ -38,19 +38,6 @@ const ReviewApprovalActionBaseSchema = z.object({
   ),
   egcs_cn_comment: OptionalNullableTrimmedString(),
   certifications: z.array(ReviewApprovalActionCertificationSchema).default([])
-}).transform((data) => {
-  if (data.egcs_cn_onbehalf) {
-    return data
-  }
-
-  const {
-    egcs_cn_approvalpositiontitle: _approvalPositionTitle,
-    ...nextData
-  } = data
-
-  return {
-    ...nextData
-  }
 })
 
 export const ReviewApprovalApproveSchema = ReviewApprovalActionBaseSchema
@@ -69,12 +56,15 @@ export const ReviewApprovalDecisionEvidenceSchema = z.object({
   egcs_cn_defaultuser: OptionalNullableId(),
   egcs_cn_defaultgroup: OptionalNullableId(),
   egcs_cn_assigneduser: RequiredStringId(),
+  egcs_cn_claimantmatchesdefault: z.boolean(),
   egcs_cn_onbehalf: OptionalNullableId(),
   egcs_ay_require_actual: z.boolean(),
+  egcs_cn_requiregroupdetails: z.boolean().default(false),
   egcs_cn_approvalpositiontitle: OptionalNullableTrimmedString(),
   egcs_cn_approvaldate: z.date().optional()
 }).superRefine((data, ctx) => {
-  const isDelegated = Boolean(data.egcs_cn_defaultuser) && data.egcs_cn_assigneduser !== data.egcs_cn_defaultuser
+  const isDelegated = !data.egcs_cn_claimantmatchesdefault
+    && Boolean(data.egcs_cn_defaultuser || data.egcs_cn_defaultgroup)
   if (isDelegated && !data.egcs_cn_onbehalf) {
     ctx.addIssue({
       code: 'custom',
@@ -91,7 +81,7 @@ export const ReviewApprovalDecisionEvidenceSchema = z.object({
     })
     return
   }
-  if (!data.egcs_ay_require_actual) {
+  if (!data.egcs_ay_require_actual && !(data.egcs_cn_defaultgroup && data.egcs_cn_requiregroupdetails && !isDelegated)) {
     return
   }
   if (!data.egcs_cn_approvalpositiontitle) {
@@ -113,8 +103,7 @@ export const ReviewApprovalDecisionEvidenceSchema = z.object({
 export const ReviewApprovalReassignSchema = z.object({
   approvalId: RequiredStringId(),
   egcs_cn_assigneduser: OptionalNullableId(),
-  egcs_cn_assignedgroup: OptionalNullableId(),
-  egcs_cn_onbehalf: OptionalNullableId()
+  egcs_cn_assignedgroup: OptionalNullableId()
 }).superRefine((data, ctx) => {
   if (Number(Boolean(data.egcs_cn_assigneduser)) + Number(Boolean(data.egcs_cn_assignedgroup)) !== 1) {
     ctx.addIssue({ code: 'custom', message: 'validation.invalid_selection', path: ['egcs_cn_assigneduser'] })
@@ -136,12 +125,16 @@ export const AddApprovalStepSchema = z.object({
   position: z.enum(['before', 'after'], { error: 'validation.required' }),
   egcs_cn_assigneduser: OptionalNullableId(),
   egcs_cn_assignedgroup: OptionalNullableId(),
+  egcs_cn_requiregroupdetails: z.boolean().default(false),
   egcs_cn_name_en: z.string().trim().min(1, { error: 'validation.required' }).optional(),
   egcs_cn_name_fr: z.string().trim().min(1, { error: 'validation.required' }).optional(),
   certifications: z.array(AdditionalApprovalInputCertificationSchema).optional()
 }).superRefine((data, ctx) => {
   if (Number(Boolean(data.egcs_cn_assigneduser)) + Number(Boolean(data.egcs_cn_assignedgroup)) !== 1) {
     ctx.addIssue({ code: 'custom', message: 'validation.invalid_selection', path: ['egcs_cn_assigneduser'] })
+  }
+  if (data.egcs_cn_requiregroupdetails && !data.egcs_cn_assignedgroup) {
+    ctx.addIssue({ code: 'custom', message: 'validation.invalid_selection', path: ['egcs_cn_requiregroupdetails'] })
   }
   const orders = new Set<number>()
   for (const [index, certification] of (data.certifications ?? []).entries()) {

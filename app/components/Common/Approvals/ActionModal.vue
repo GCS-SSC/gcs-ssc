@@ -60,6 +60,15 @@ const updateState = <Key extends keyof ActionModalState>(key: Key, value: Action
   }
 }
 
+const positionTitleModel = computed({
+  get: () => state.value?.egcs_cn_approvalpositiontitle ?? '',
+  set: value => updateState('egcs_cn_approvalpositiontitle', value)
+})
+const decisionDateModel = computed({
+  get: () => state.value?.egcs_cn_approvaldate ?? '',
+  set: value => updateState('egcs_cn_approvaldate', value)
+})
+
 /** Validates the denial comment before delegating submission to the approval section. */
 const submitDenial = () => {
   denialAttempted.value = true
@@ -152,15 +161,6 @@ const getLocalizedText = (value: { en?: string, fr?: string }) => {
 
           <UFormField
             v-if="state.assignedDiffersFromDefault"
-            :label="t('assessment.approvals.on_behalf_of_default_user')">
-            <USwitch
-              :model-value="state.isOnBehalf"
-              :disabled="isSubmittingAction"
-              @update:model-value="value => updateState('isOnBehalf', value === true)" />
-          </UFormField>
-
-          <UFormField
-            v-if="state.isOnBehalf"
             :label="t('assessment.approvals.on_behalf_type')"
             required>
             <CommonBilingualSelectMenu
@@ -169,15 +169,18 @@ const getLocalizedText = (value: { en?: string, fr?: string }) => {
               label-en-key="egcs_ay_name_en"
               label-fr-key="egcs_ay_name_fr"
               :disabled="isSubmittingAction"
+              required
+              aria-required="true"
               @update:model-value="value => updateState('egcs_cn_onbehalf', value === undefined ? null : value)" />
           </UFormField>
 
           <UFormField :label="t('assessment.approvals.position_title')" :required="requiresActual">
             <UInput
               v-if="requiresActual"
-              :model-value="state.egcs_cn_approvalpositiontitle"
+              v-model="positionTitleModel"
               :disabled="isSubmittingAction"
-              @update:model-value="value => updateState('egcs_cn_approvalpositiontitle', String(value))" />
+              required
+              aria-required="true" />
             <UInput
               v-else
               :model-value="assignedApproverPositionTitle"
@@ -190,10 +193,11 @@ const getLocalizedText = (value: { en?: string, fr?: string }) => {
             :label="t('assessment.approvals.decision_date')"
             required>
             <UInput
-              :model-value="state.egcs_cn_approvaldate"
+              v-model="decisionDateModel"
               type="date"
               :disabled="isSubmittingAction"
-              @update:model-value="value => updateState('egcs_cn_approvaldate', String(value))" />
+              required
+              aria-required="true" />
           </UFormField>
 
           <UFormField

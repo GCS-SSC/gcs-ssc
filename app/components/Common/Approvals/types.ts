@@ -41,6 +41,8 @@ export type ApprovalStepItem = {
   egcs_cn_name_fr: string
   egcs_cn_defaultuser: string
   egcs_cn_defaultgroup?: string | null
+  egcs_cn_requiregroupdetails?: boolean
+  claimant_matches_default?: boolean
   egcs_cn_assigneduser: string | null
   egcs_cn_assignedgroup?: string | null
   assigned_group_name_en?: string
@@ -121,6 +123,8 @@ export type ApprovalTableRow = {
   sequence: number
   egcs_cn_defaultuser: string
   egcs_cn_defaultgroup?: string | null
+  egcs_cn_requiregroupdetails?: boolean
+  claimant_matches_default?: boolean
   egcs_cn_assigneduser: string | null
   egcs_cn_assignedgroup?: string | null
   default_group_name_en?: string
@@ -182,7 +186,6 @@ export type ReassignModalState = {
   approvalId: string
   egcs_cn_assigneduser: string
   egcs_cn_assignedgroup?: string | null
-  egcs_cn_onbehalf: string | null
 }
 
 export type AddApprovalPosition = 'after' | 'before'
@@ -192,6 +195,7 @@ export type AddApprovalModalState = {
   position: AddApprovalPosition
   egcs_cn_assigneduser: string
   egcs_cn_assignedgroup?: string | null
+  egcs_cn_requiregroupdetails: boolean
   egcs_cn_name_en: string
   egcs_cn_name_fr: string
   certifications: AdditionalApprovalCertificationState[]

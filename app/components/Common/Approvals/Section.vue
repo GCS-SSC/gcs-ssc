@@ -257,6 +257,8 @@ const tableRows = computed<ApprovalTableRow[]>(() => routingSlips.value.flatMap(
     sequence: step.sequence,
     egcs_cn_defaultuser: step.egcs_cn_defaultuser,
     egcs_cn_defaultgroup: step.egcs_cn_defaultgroup,
+    egcs_cn_requiregroupdetails: step.egcs_cn_requiregroupdetails,
+    claimant_matches_default: step.claimant_matches_default,
     egcs_cn_assigneduser: step.egcs_cn_assigneduser,
     egcs_cn_assignedgroup: step.egcs_cn_assignedgroup,
     default_group_name_en: step.default_group_name_en,
@@ -376,6 +378,8 @@ const getStepStatus = (row: ApprovalTableRow) => row.stepRuntimeState
 const isActionedStep = (row: ApprovalTableRow) => row.egcs_cn_approvalvalue !== null
 const getApprovalActorName = (row: ApprovalTableRow) => row.assigned_user_name || row.default_user_name
 const hasApprovalDecisionDetails = (row: ApprovalTableRow) => row.egcs_cn_approvalvalue !== null && Boolean(row.egcs_cn_approvaldate)
+const claimantMatchesDefault = (row: ApprovalTableRow) => row.claimant_matches_default
+  ?? (row.egcs_cn_defaultuser ? row.egcs_cn_assigneduser === row.egcs_cn_defaultuser : !row.egcs_cn_defaultgroup)
 /**
  *
  * @param row
@@ -445,6 +449,8 @@ const openActionModal = (row: ApprovalTableRow) => {
     egcs_cn_name_fr: row.stepNameFr,
     egcs_cn_defaultuser: row.egcs_cn_defaultuser,
     egcs_cn_defaultgroup: row.egcs_cn_defaultgroup,
+    egcs_cn_requiregroupdetails: row.egcs_cn_requiregroupdetails,
+    claimant_matches_default: row.claimant_matches_default,
     egcs_cn_assigneduser: row.egcs_cn_assigneduser,
     egcs_cn_assignedgroup: row.egcs_cn_assignedgroup,
     default_group_name_en: row.default_group_name_en,
@@ -472,10 +478,10 @@ const openActionModal = (row: ApprovalTableRow) => {
   }
   selectedActionState.value = {
     approvalId: row.stepId,
-    assignedDiffersFromDefault: Boolean(row.egcs_cn_defaultuser) && row.egcs_cn_assigneduser !== row.egcs_cn_defaultuser,
-    isOnBehalf: Boolean(row.egcs_cn_onbehalf),
+    assignedDiffersFromDefault: Boolean(row.egcs_cn_defaultuser || row.egcs_cn_defaultgroup) && !claimantMatchesDefault(row),
+    isOnBehalf: Boolean(row.egcs_cn_defaultuser || row.egcs_cn_defaultgroup) && !claimantMatchesDefault(row),
     egcs_cn_onbehalf: row.egcs_cn_onbehalf,
-    egcs_cn_approvalpositiontitle: row.egcs_cn_approvalpositiontitle || row.assigned_user_position_title || row.default_user_position_title,
+    egcs_cn_approvalpositiontitle: row.egcs_cn_requiregroupdetails && claimantMatchesDefault(row) ? '' : row.egcs_cn_approvalpositiontitle || row.assigned_user_position_title || row.default_user_position_title,
     egcs_cn_approvaldate: row.egcs_cn_approvaldate ? row.egcs_cn_approvaldate.slice(0, 10) : '',
     egcs_cn_comment: row.egcs_cn_comment ?? '',
     certifications: row.certifications.map(certification => ({
@@ -569,8 +575,7 @@ const openReassignModal = (row: ApprovalTableRow) => {
   selectedReassignState.value = {
     approvalId: row.stepId,
     egcs_cn_assigneduser: row.egcs_cn_assigneduser ?? row.egcs_cn_defaultuser ?? '',
-    egcs_cn_assignedgroup: row.egcs_cn_assignedgroup,
-    egcs_cn_onbehalf: row.egcs_cn_onbehalf
+    egcs_cn_assignedgroup: row.egcs_cn_assignedgroup
   }
   isReassignModalOpen.value = true
 }
@@ -637,6 +642,7 @@ const openAddStepModal = (row: ApprovalTableRow, position: AddApprovalPosition) 
     position,
     egcs_cn_assigneduser: '',
     egcs_cn_assignedgroup: null,
+    egcs_cn_requiregroupdetails: false,
     egcs_cn_name_en: routingSlip.default_added_approval_name_en,
     egcs_cn_name_fr: routingSlip.default_added_approval_name_fr,
     certifications: (routingSlip.additional_approval_certifications ?? [])
@@ -749,6 +755,7 @@ const submitAddStep = async () => {
     position: state.position,
     egcs_cn_assigneduser: state.egcs_cn_assignedgroup ? null : state.egcs_cn_assigneduser,
     egcs_cn_assignedgroup: state.egcs_cn_assignedgroup ?? null,
+    egcs_cn_requiregroupdetails: state.egcs_cn_assignedgroup ? state.egcs_cn_requiregroupdetails : false,
     ...(routingSlip.allow_added_approval_name_changes
       ? {
           egcs_cn_name_en: state.egcs_cn_name_en,
@@ -840,7 +847,9 @@ const assignedApproverPositionTitle = computed(() => {
 
   return selectedActionStep.value.assigned_user_position_title || selectedActionStep.value.default_user_position_title
 })
-const requiresActual = computed(() => selectedActionState.value?.isOnBehalf === true && selectedBehalfType.value?.egcs_ay_require_actual === true)
+const requiresActual = computed(() => Boolean((selectedActionState.value?.isOnBehalf === true && selectedBehalfType.value?.egcs_ay_require_actual === true)
+  || (selectedActionStep.value?.egcs_cn_defaultgroup && selectedActionStep.value.egcs_cn_requiregroupdetails === true
+    && selectedActionStep.value.claimant_matches_default === true)))
 
 const approveDisabled = computed(() => {
   if (!selectedActionState.value) {
@@ -936,15 +945,11 @@ const submitAction = async (decision: 'approve' | 'deny') => {
   }
 }
 
-/** Reassigns an approval step and clears on-behalf data when the default assignee is restored. */
+/** Reassigns an approval step; the claimant supplies on-behalf evidence at decision time. */
 const submitReassign = async () => {
   if (!selectedReassignState.value || !selectedReassignStep.value || isSubmittingReassign.value) {
     return
   }
-
-  const assignedDiffersFromDefault = Boolean(selectedReassignStep.value.egcs_cn_defaultuser)
-    && (Boolean(selectedReassignState.value.egcs_cn_assignedgroup)
-      || selectedReassignState.value.egcs_cn_assigneduser !== selectedReassignStep.value.egcs_cn_defaultuser)
 
   try {
     const submittedGeneration = entityGeneration
@@ -952,8 +957,7 @@ const submitReassign = async () => {
     await saveJson('/api/approvals/reassign', 'POST', {
       approvalId: selectedReassignState.value.approvalId,
       egcs_cn_assigneduser: selectedReassignState.value.egcs_cn_assignedgroup ? null : selectedReassignState.value.egcs_cn_assigneduser,
-      egcs_cn_assignedgroup: selectedReassignState.value.egcs_cn_assignedgroup ?? null,
-      egcs_cn_onbehalf: assignedDiffersFromDefault ? selectedReassignState.value.egcs_cn_onbehalf : null
+      egcs_cn_assignedgroup: selectedReassignState.value.egcs_cn_assignedgroup ?? null
     } satisfies ReviewApprovalReassignInput)
     if (submittedGeneration !== entityGeneration) return
     emit('changed')
@@ -1163,7 +1167,6 @@ const submitReassign = async () => {
       :entity-type="entityType"
       :entity-id="entityId"
       :user-options="selectedReassignUserOptions"
-      :behalf-type-options="behalfTypeOptions"
       :is-submitting="isSubmittingReassign"
       @close="closeReassignModal"
       @submit="submitReassign" />

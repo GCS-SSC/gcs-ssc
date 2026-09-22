@@ -60,6 +60,9 @@ export const ApprovalTemplateStepSchema = ApprovalTemplateStepBaseSchema.superRe
   if (Number(Boolean(data.egcs_cn_defaultuser)) + Number(Boolean(data.egcs_cn_defaultgroup)) !== 1) {
     ctx.addIssue({ code: 'custom', message: 'validation.invalid_selection', path: ['egcs_cn_defaultuser'] })
   }
+  if (!data.egcs_cn_defaultgroup && data.egcs_cn_requiregroupdetails) {
+    ctx.addIssue({ code: 'custom', message: 'validation.invalid_selection', path: ['egcs_cn_requiregroupdetails'] })
+  }
 })
 
 export const ApprovalTemplateStepPatchSchema = ApprovalTemplateStepBaseSchema
@@ -179,6 +182,9 @@ const ApprovalTemplatePersistenceStepActiveSchema = createApprovalTemplateStepBa
   validateApprovalTemplatePatchCertifications(data.certifications, ctx)
   if (Number(Boolean(data.egcs_cn_defaultuser)) + Number(Boolean(data.egcs_cn_defaultgroup)) !== 1) {
     ctx.addIssue({ code: 'custom', message: 'validation.invalid_selection', path: ['egcs_cn_defaultuser'] })
+  }
+  if (!data.egcs_cn_defaultgroup && data.egcs_cn_requiregroupdetails) {
+    ctx.addIssue({ code: 'custom', message: 'validation.invalid_selection', path: ['egcs_cn_requiregroupdetails'] })
   }
 })
 

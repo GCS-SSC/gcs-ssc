@@ -35,6 +35,7 @@ export type PublishedApprovalTemplate = {
     nameFr: string
     defaultUser?: string
     defaultGroup?: string
+    requireGroupDetails?: boolean
     certifications: Array<{ optional: boolean, certificationEn: string, certificationFr: string }>
   }>
 }
@@ -86,6 +87,7 @@ export const buildApprovalTemplateConfiguration = async (
       nameFr: step.egcs_cn_name_fr,
       ...(step.egcs_cn_defaultuser ? { defaultUser: String(step.egcs_cn_defaultuser) } : {}),
       ...(step.egcs_cn_defaultgroup ? { defaultGroup: String(step.egcs_cn_defaultgroup) } : {}),
+      ...(step.egcs_cn_defaultgroup && step.egcs_cn_requiregroupdetails ? { requireGroupDetails: true } : {}),
       certifications: certifications
         .filter(item => String(item.egcs_cn_approvalstep) === String(step.id))
         .map(item => ({

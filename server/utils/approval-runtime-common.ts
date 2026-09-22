@@ -8,7 +8,7 @@ import type { AddApprovalStepInput } from '~~/shared/types/schemas/review-approv
 import type { RuntimeState } from '~~/shared/constants/system-lifecycle'
 import { RUNTIME_TERMINAL_STATES } from '~~/shared/constants/system-lifecycle'
 import { createRuntimeItem, transitionRuntimeItem } from './system-runtime'
-import { isAssignableGroup } from './groups'
+import { isActiveGroupMember, isAssignableGroup } from './groups'
 
 export class ApprovalTemplatePublicationMissingError extends Error {
   constructor(public readonly approvalTemplateId: string) {
@@ -26,6 +26,7 @@ export type RuntimeApprovalRow = {
   egcs_cn_name_fr: string
   egcs_cn_defaultuser: string | null
   egcs_cn_defaultgroup: string | null
+  egcs_cn_requiregroupdetails: boolean
   egcs_cn_assigneduser: string | null | undefined
   egcs_cn_assignedgroup: string | null
   egcs_cn_onbehalf: string | null | undefined
@@ -66,6 +67,7 @@ type BuildRuntimeApprovalStepsOptions = {
   certificationsByApprovalId: Map<string, RuntimeApprovalCertificationRow[]>
   routingSlipStatus: RuntimeRoutingSlipStatus
   currentCommonUserId: string | null
+  currentUserDefaultGroupIds?: Set<string>
   canManage: boolean
   isTerminal: boolean
   canReassignTerminal?: boolean
@@ -126,6 +128,7 @@ export const getRuntimeApprovals = async (
       'Common_Approval.egcs_cn_name_fr as egcs_cn_name_fr',
       'Common_Approval.egcs_cn_defaultuser as egcs_cn_defaultuser',
       'Common_Approval.egcs_cn_defaultgroup as egcs_cn_defaultgroup',
+      'Common_Approval.egcs_cn_requiregroupdetails as egcs_cn_requiregroupdetails',
       'Common_Approval.egcs_cn_assigneduser as egcs_cn_assigneduser',
       'Common_Approval.egcs_cn_assignedgroup as egcs_cn_assignedgroup',
       'Common_Approval.egcs_cn_onbehalf as egcs_cn_onbehalf',
@@ -205,6 +208,20 @@ const formatApprovalDate = (value: string | Date | null | undefined): string | n
   return value ? new Date(value).toISOString() : null
 }
 
+export const getCurrentUserDefaultGroupIds = async (
+  db: ApprovalRuntimeDbClient,
+  approvals: RuntimeApprovalRow[],
+  currentCommonUserId: string | null
+): Promise<Set<string>> => {
+  if (!currentCommonUserId) return new Set()
+  const groupIds = [...new Set(approvals.map(approval => approval.egcs_cn_defaultgroup).filter((id): id is string => id !== null))]
+  const memberships = await Promise.all(groupIds.map(async id => ({
+    id,
+    active: await isActiveGroupMember(db, id, currentCommonUserId)
+  })))
+  return new Set(memberships.filter(item => item.active).map(item => item.id))
+}
+
 const canActionRuntimeApprovalStep = ({
   approval,
   currentPendingApprovalId,
@@ -273,6 +290,7 @@ export const buildRuntimeApprovalSteps = ({
   certificationsByApprovalId,
   routingSlipStatus,
   currentCommonUserId,
+  currentUserDefaultGroupIds = new Set<string>(),
   canManage,
   isTerminal,
   canReassignTerminal = false,
@@ -301,6 +319,12 @@ export const buildRuntimeApprovalSteps = ({
     egcs_cn_name_fr: approval.egcs_cn_name_fr,
     egcs_cn_defaultuser: approval.egcs_cn_defaultuser,
     egcs_cn_defaultgroup: approval.egcs_cn_defaultgroup,
+    egcs_cn_requiregroupdetails: approval.egcs_cn_requiregroupdetails,
+    claimant_matches_default: approval.egcs_cn_defaultuser
+      ? approval.egcs_cn_defaultuser === currentCommonUserId
+      : approval.egcs_cn_defaultgroup
+        ? currentUserDefaultGroupIds.has(approval.egcs_cn_defaultgroup)
+        : true,
     egcs_cn_assigneduser: approval.egcs_cn_assigneduser,
     egcs_cn_assignedgroup: approval.egcs_cn_assignedgroup,
     egcs_cn_onbehalf: approval.egcs_cn_onbehalf,
@@ -605,6 +629,7 @@ export const addRuntimeApprovalStep = async (
       egcs_cn_routingslip: routingSlipId,
       egcs_cn_defaultuser: body.egcs_cn_assigneduser,
       egcs_cn_defaultgroup: body.egcs_cn_assignedgroup,
+      egcs_cn_requiregroupdetails: body.egcs_cn_assignedgroup ? body.egcs_cn_requiregroupdetails : false,
       egcs_cn_assigneduser: body.egcs_cn_assigneduser,
       egcs_cn_assignedgroup: body.egcs_cn_assignedgroup,
       egcs_cn_isadded: true

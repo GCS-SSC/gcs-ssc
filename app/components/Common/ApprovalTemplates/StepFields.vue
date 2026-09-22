@@ -48,6 +48,7 @@ const assigneeKind = computed({
     selectedAssigneeKind.value = kind === 'group' ? 'group' : 'user'
     step.value.egcs_cn_defaultuser = kind === 'user' ? '' : null
     step.value.egcs_cn_defaultgroup = kind === 'group' ? '' : null
+    if (kind === 'user') step.value.egcs_cn_requiregroupdetails = false
   }
 })
 const selectedUser = computed({
@@ -95,6 +96,9 @@ const selectedGroup = computed({
       </UFormField>
       <UFormField v-else :label="t('groups.group')" name="step.egcs_cn_defaultgroup" required>
         <CommonServerLookupSelect v-model="selectedGroup" fetch-url="/api/groups/lookups" value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" :query="{ approvalTemplateId }" />
+      </UFormField>
+      <UFormField v-if="assigneeKind === 'group'" :label="t('assessment.approvals.require_group_details')" name="step.egcs_cn_requiregroupdetails">
+        <USwitch v-model="step.egcs_cn_requiregroupdetails" />
       </UFormField>
     </div>
 

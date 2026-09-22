@@ -3,7 +3,7 @@ import type { H3Event } from 'h3'
 import type { Kysely } from 'kysely'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import { listAgencyScopedCommonUsers, resolveCurrentCommonUser } from '~~/server/utils/additional-reviewer-runtime'
-import { buildRuntimeApprovalSteps, getRuntimeAdditionalApprovalPolicy, getRuntimeApprovals } from '~~/server/utils/approval-runtime-common'
+import { buildRuntimeApprovalSteps, getCurrentUserDefaultGroupIds, getRuntimeAdditionalApprovalPolicy, getRuntimeApprovals } from '~~/server/utils/approval-runtime-common'
 import {
   listReviewApprovalBehalfTypes,
   listReviewApprovalRuntime
@@ -196,6 +196,7 @@ export const listApprovalRuntime = async (
     const runtimeRoutingSlips = await Promise.all(routingSlips.map(async (routingSlip, index) => {
       const { approvals, certificationsByApprovalId } = await getRuntimeApprovals(event.context.$db, String(routingSlip.id))
       const policy = await getRuntimeAdditionalApprovalPolicy(event.context.$db, routingSlip)
+      const currentUserDefaultGroupIds = await getCurrentUserDefaultGroupIds(event.context.$db, approvals, currentUser?.id ?? null)
       return {
         id: String(routingSlip.id),
         approvalRuntimeId: String(routingSlip.runtimeId),
@@ -211,6 +212,7 @@ export const listApprovalRuntime = async (
         steps: buildRuntimeApprovalSteps({
           approvals, certificationsByApprovalId, routingSlipStatus: routingSlip.routingSlipState,
           currentCommonUserId: currentUser?.id ?? null, canManage: options.canManage,
+          currentUserDefaultGroupIds,
           isTerminal: RUNTIME_TERMINAL_STATES.has(routingSlip.routingSlipState), canReassignTerminal: false,
           allowAdditionalApprovals: routingSlip.egcs_cn_allowadditionalapprovals
         })

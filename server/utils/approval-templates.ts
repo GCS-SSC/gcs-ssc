@@ -26,6 +26,7 @@ type ApprovalStepRow = {
   egcs_cn_name_fr: string
   egcs_cn_defaultuser?: string | number | null
   egcs_cn_defaultgroup?: string | number | null
+  egcs_cn_requiregroupdetails?: boolean
   egcs_cn_approvertitle: string
 }
 
@@ -78,6 +79,7 @@ type ApprovalTemplateStepInput = {
   egcs_cn_name_fr?: string
   egcs_cn_defaultuser?: string | null
   egcs_cn_defaultgroup?: string | null
+  egcs_cn_requiregroupdetails?: boolean
   egcs_cn_approvertitle?: string
   certifications?: ApprovalTemplateCertificationInput[]
 }
@@ -227,6 +229,7 @@ export const listApprovalTemplates = async (
         egcs_cn_name_fr: step.egcs_cn_name_fr,
         egcs_cn_defaultuser: step.egcs_cn_defaultuser ? String(step.egcs_cn_defaultuser) : null,
         egcs_cn_defaultgroup: step.egcs_cn_defaultgroup ? String(step.egcs_cn_defaultgroup) : null,
+        egcs_cn_requiregroupdetails: step.egcs_cn_requiregroupdetails ?? false,
         egcs_cn_approvertitle: step.egcs_cn_approvertitle,
         certifications: (certificationsByStepId.get(String(step.id)) ?? []).map(certification => ({
           id: String(certification.id),
@@ -275,6 +278,7 @@ export const listApprovalTemplates = async (
         nameFr: step.egcs_cn_name_fr,
         ...(step.egcs_cn_defaultuser ? { defaultUser: step.egcs_cn_defaultuser } : {}),
         ...(step.egcs_cn_defaultgroup ? { defaultGroup: step.egcs_cn_defaultgroup } : {}),
+        ...(step.egcs_cn_defaultgroup && step.egcs_cn_requiregroupdetails ? { requireGroupDetails: true } : {}),
         certifications: step.certifications.map(certification => ({
           optional: certification.egcs_cn_optional === true,
           certificationEn: certification.egcs_cn_certification_en,
@@ -730,6 +734,7 @@ const getApprovalStepWriteValues = (
   egcs_cn_name_fr: step.egcs_cn_name_fr ?? '',
   egcs_cn_defaultuser: step.egcs_cn_defaultuser ?? null,
   egcs_cn_defaultgroup: step.egcs_cn_defaultgroup ?? null,
+  egcs_cn_requiregroupdetails: step.egcs_cn_requiregroupdetails ?? false,
   egcs_cn_approvertitle: step.egcs_cn_approvertitle ?? '',
   egcs_cn_approvaltemplate: templateId,
   _deleted: false
@@ -754,6 +759,7 @@ const saveApprovalStep = async (
       ...(step.egcs_cn_name_fr === undefined ? {} : { egcs_cn_name_fr: step.egcs_cn_name_fr }),
       ...(step.egcs_cn_defaultuser === undefined ? {} : { egcs_cn_defaultuser: step.egcs_cn_defaultuser }),
       ...(step.egcs_cn_defaultgroup === undefined ? {} : { egcs_cn_defaultgroup: step.egcs_cn_defaultgroup }),
+      ...(step.egcs_cn_requiregroupdetails === undefined ? {} : { egcs_cn_requiregroupdetails: step.egcs_cn_requiregroupdetails }),
       ...(step.egcs_cn_approvertitle === undefined ? {} : { egcs_cn_approvertitle: step.egcs_cn_approvertitle })
     }
 

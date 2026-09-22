@@ -11,7 +11,7 @@ import {
 } from '~~/shared/types/schemas/review-approval'
 import { readPublishedApprovalTemplate, type PublishedApprovalTemplate } from './approval-template-versioning'
 import { listAgencyScopedCommonUsers, resolveCurrentCommonUser } from './additional-reviewer-runtime'
-import { isAssignableGroup } from './groups'
+import { isActiveGroupMember, isAssignableGroup } from './groups'
 import { badRequest, forbidden, notFound } from './api-errors'
 import { parseI18n } from './api-validate'
 import {
@@ -19,7 +19,8 @@ import {
   buildRuntimeApprovalSteps,
   getCurrentApprovalRoutingSlip,
   getRuntimeAdditionalApprovalPolicy,
-  getRuntimeApprovals
+  getRuntimeApprovals,
+  getCurrentUserDefaultGroupIds
 } from './approval-runtime-common'
 import { setAppUserDbSession } from './db-session'
 import {
@@ -251,6 +252,7 @@ export const materializeCanonicalApprovalRuntime = async (
       egcs_cn_routingslip: String(routingSlip.id),
       egcs_cn_defaultuser: step.defaultUser,
       egcs_cn_defaultgroup: step.defaultGroup,
+      egcs_cn_requiregroupdetails: step.requireGroupDetails === true,
       egcs_cn_assigneduser: step.defaultUser,
       egcs_cn_assignedgroup: step.defaultGroup,
       egcs_cn_isadded: false
@@ -351,6 +353,7 @@ export const listCanonicalApprovalRuntime = async (
       String(routingSlip.id)
     )
     const policy = await getRuntimeAdditionalApprovalPolicy(event.context.$db, routingSlip)
+    const currentUserDefaultGroupIds = await getCurrentUserDefaultGroupIds(event.context.$db, approvals, currentUser?.id ?? null)
     return {
       id: String(routingSlip.id),
       approvalRuntimeId: String(routingSlip.runtimeId),
@@ -371,6 +374,7 @@ export const listCanonicalApprovalRuntime = async (
         certificationsByApprovalId,
         routingSlipStatus: routingSlip.routingSlipState,
         currentCommonUserId: currentUser?.id ?? null,
+        currentUserDefaultGroupIds,
         canManage,
         isTerminal: RUNTIME_TERMINAL_STATES.has(routingSlip.routingSlipState),
         canReassignTerminal: false,
@@ -619,6 +623,7 @@ export const decideCanonicalApproval = async (
       'Common_Approval.egcs_cn_assigneduser',
       'Common_Approval.egcs_cn_defaultuser',
       'Common_Approval.egcs_cn_defaultgroup',
+      'Common_Approval.egcs_cn_requiregroupdetails',
       'Common_Approval.egcs_cn_approvalvalue',
       'Common_Approval.egcs_cn_sequence',
       'Common_Routing_Slip.id as routingSlipId',
@@ -646,6 +651,11 @@ export const decideCanonicalApproval = async (
     return await badRequest(event, 'REVIEW_APPROVAL_INVALID_STATUS', 'apiErrors.request.invalid_status')
   }
   const behalfType = await assertAgencyBehalfType(event, trx, body.egcs_cn_onbehalf, options.agencyId)
+  const claimantMatchesDefault = approval.egcs_cn_defaultuser !== null
+    ? String(approval.egcs_cn_defaultuser) === actorId
+    : approval.egcs_cn_defaultgroup !== null
+      ? await isActiveGroupMember(trx, String(approval.egcs_cn_defaultgroup), actorId)
+      : true
   const decisionEvidence: ReviewApprovalDecisionEvidenceInput = await parseI18n(
     event,
     ReviewApprovalDecisionEvidenceSchema,
@@ -653,8 +663,10 @@ export const decideCanonicalApproval = async (
       egcs_cn_defaultuser: approval.egcs_cn_defaultuser,
       egcs_cn_defaultgroup: approval.egcs_cn_defaultgroup,
       egcs_cn_assigneduser: assignedUserId,
+      egcs_cn_claimantmatchesdefault: claimantMatchesDefault,
       egcs_cn_onbehalf: body.egcs_cn_onbehalf,
       egcs_ay_require_actual: behalfType?.egcs_ay_require_actual === true,
+      egcs_cn_requiregroupdetails: approval.egcs_cn_requiregroupdetails,
       egcs_cn_approvalpositiontitle: body.egcs_cn_approvalpositiontitle,
       egcs_cn_approvaldate: body.egcs_cn_approvaldate
     }
@@ -664,7 +676,8 @@ export const decideCanonicalApproval = async (
     ? decisionEvidence.egcs_cn_approvalpositiontitle ?? actor.positionTitle
     : actor.positionTitle
   let approvalDate = decisionEvidence.egcs_cn_approvaldate ?? new Date()
-  if (decisionEvidence.egcs_ay_require_actual) {
+  if (decisionEvidence.egcs_ay_require_actual
+    || (approval.egcs_cn_defaultgroup && approval.egcs_cn_requiregroupdetails && claimantMatchesDefault)) {
     if (!decisionEvidence.egcs_cn_approvalpositiontitle || !decisionEvidence.egcs_cn_approvaldate) {
       throw new Error('Actual on-behalf decision evidence passed validation without explicit title and date')
     }
@@ -768,12 +781,6 @@ export const reassignCanonicalApproval = async (
       'apiErrors.request.invalid_status'
     )
   }
-  const namedDefault = approval.egcs_cn_defaultuser !== null
-  const isOriginalUser = namedDefault && body.egcs_cn_assigneduser === String(approval.egcs_cn_defaultuser)
-  if (namedDefault && !isOriginalUser && !body.egcs_cn_onbehalf) {
-    return await badRequest(event, 'REVIEW_APPROVAL_ON_BEHALF_REQUIRED', 'apiErrors.review.review_approval_on_behalf_required')
-  }
-  if ((!namedDefault || isOriginalUser) && body.egcs_cn_onbehalf) return await badRequest(event, 'REVIEW_APPROVAL_ON_BEHALF_NOT_ALLOWED', 'apiErrors.request.invalid')
   if (!options.agencyId) return await forbidden(event)
   if (body.egcs_cn_assigneduser) {
     const agencyUsers = await listAgencyScopedCommonUsers(trx, options.agencyId)
@@ -783,11 +790,10 @@ export const reassignCanonicalApproval = async (
   } else if (!body.egcs_cn_assignedgroup || !await isAssignableGroup(trx, body.egcs_cn_assignedgroup, options.agencyId)) {
     return await badRequest(event, 'REVIEW_APPROVAL_GROUP_OUTSIDE_AGENCY', 'apiErrors.request.invalid')
   }
-  await assertAgencyBehalfType(event, trx, body.egcs_cn_onbehalf, options.agencyId)
   await trx.updateTable('Common_Approval').set({
     egcs_cn_assigneduser: body.egcs_cn_assigneduser ?? null,
     egcs_cn_assignedgroup: body.egcs_cn_assignedgroup ?? null,
-    egcs_cn_onbehalf: isOriginalUser ? null : body.egcs_cn_onbehalf ?? null,
+    egcs_cn_onbehalf: null,
     egcs_cn_approvalpositiontitle: sql`null`,
     egcs_cn_approvaldate: sql`null`,
     egcs_cn_comment: sql`null`,

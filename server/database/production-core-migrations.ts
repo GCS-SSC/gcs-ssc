@@ -26,6 +26,7 @@ import * as agreementProponentTypeMigration from './migrations/0018_agreement_pr
 import * as notesMigration from './migrations/0019_notes'
 import * as extensionProponentAgencyMigration from './migrations/0020_extension_proponent_agency'
 import * as administrativeGroupsMigration from './migrations/0021_administrative_groups'
+import * as approvalGroupEvidenceMigration from './migrations/0022_approval_group_evidence'
 
 import * as proponentTypeCleanupMigration from './migrations/9999_z_proponent_type_cleanup'
 
@@ -58,6 +59,7 @@ export const productionCoreMigrations = {
   '0019_notes': notesMigration,
   '0020_extension_proponent_agency': extensionProponentAgencyMigration,
   '0021_administrative_groups': administrativeGroupsMigration,
+  '0022_approval_group_evidence': approvalGroupEvidenceMigration,
   '9999_z_proponent_type_cleanup': proponentTypeCleanupMigration,
   '9999_zz_workflow_profile_conditions': workflowProfileConditionsMigration,
   '9999_zzz_checklist_not_applicable': checklistNotApplicableMigration,

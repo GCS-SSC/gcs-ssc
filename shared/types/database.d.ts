@@ -1142,6 +1142,7 @@ export interface CommonApprovalStepTable {
   egcs_cn_approvaltemplate: string
   egcs_cn_defaultuser?: string | null
   egcs_cn_defaultgroup?: string | null
+  egcs_cn_requiregroupdetails: Generated<boolean>
   egcs_cn_approvertitle: string
   _deleted: Generated<boolean>
 }
@@ -1171,6 +1172,7 @@ export interface CommonApprovalTable {
   egcs_cn_routingslip: string
   egcs_cn_defaultuser?: string | null
   egcs_cn_defaultgroup?: string | null
+  egcs_cn_requiregroupdetails: Generated<boolean>
   egcs_cn_assigneduser?: string | null
   egcs_cn_assignedgroup?: string | null
   egcs_cn_onbehalf?: string | null

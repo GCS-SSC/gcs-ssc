@@ -53,6 +53,7 @@ const chooseKind = (kind: 'user' | 'group') => {
   if (!state.value) return
   state.value.egcs_cn_assigneduser = ''
   state.value.egcs_cn_assignedgroup = kind === 'group' ? '' : null
+  if (kind === 'user') state.value.egcs_cn_requiregroupdetails = false
 }
 const selectedGroup = computed({
   get: () => state.value?.egcs_cn_assignedgroup ?? '',
@@ -97,6 +98,9 @@ const getCertificationLabel = (certification: AdditionalApprovalCertificationSta
         </UFormField>
         <UFormField v-else :label="t('groups.group')" name="egcs_cn_assignedgroup" required>
           <CommonServerLookupSelect v-model="selectedGroup" fetch-url="/api/approvals/lookups/groups" value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" :query="{ entityType, entityId }" />
+        </UFormField>
+        <UFormField v-if="assigneeKind === 'group'" :label="t('assessment.approvals.require_group_details')" name="egcs_cn_requiregroupdetails">
+          <USwitch v-model="state.egcs_cn_requiregroupdetails" :aria-label="t('assessment.approvals.require_group_details')" :disabled="isSubmitting" />
         </UFormField>
 
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">

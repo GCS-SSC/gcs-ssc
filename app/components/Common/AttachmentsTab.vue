@@ -366,7 +366,7 @@ const retryAttachmentList = async () => {
 <template>
   <div class="w-full">
     <div v-if="agencyRequired" class="mb-4">
-      <label for="attachment-agency-context" class="mb-1 block text-sm font-medium">{{ t('attachments.agency_context') }}</label>
+      <label for="attachment-agency-context" class="mb-1 block text-sm font-medium">{{ t('attachments.agency_context') }} ({{ t('common.field_required') }})</label>
       <CommonServerLookupSelect
         id="attachment-agency-context"
         :model-value="selectedAgencyId"
@@ -376,6 +376,8 @@ const retryAttachmentList = async () => {
         label-fr-key="egcs_ay_name_fr"
         :query="{ applicant_recipient_id: entityId, permission_action: 'read', role_scoped: 'true' }"
         :placeholder="t('attachments.agency_context_placeholder')"
+        required
+        aria-required="true"
         searchable
         @update:model-value="selectAgency" />
     </div>

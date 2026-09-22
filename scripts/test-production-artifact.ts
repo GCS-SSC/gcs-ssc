@@ -72,6 +72,7 @@ export const PRODUCTION_CORE_MIGRATIONS = [
   '0019_notes',
   '0020_extension_proponent_agency',
   '0021_administrative_groups',
+  '0022_approval_group_evidence',
   '9999_z_proponent_type_cleanup',
   '9999_zz_workflow_profile_conditions',
   '9999_zzz_checklist_not_applicable',
