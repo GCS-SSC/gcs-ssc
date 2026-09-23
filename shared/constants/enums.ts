@@ -75,6 +75,7 @@ export type AssignableEntityType = (typeof ASSIGNABLE_ENTITY_TYPE_ENUM)[number]
 
 export const AMENDED_TYPE_ENUM = ['articles', 'activities', 'budget', 'duration', 'other'] as const
 export const AGREEMENT_TYPE_ENUM = ['grant', 'nonrepayable', 'repayable', 'partiallyrepayable', 'other'] as const
+export const HOLDBACK_BASES_ENUM = ['fullagreement', 'finalfiscal'] as const
 export const APPLICANT_RECIPIENT_TYPE_ENUM = [
   'aboriginalrecipients',
   'forprofitorganizations',

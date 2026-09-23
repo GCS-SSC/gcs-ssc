@@ -50,10 +50,10 @@ const columns: TableColumnInput<AgencyApplicantRecipientSubtypeItem>[] = [
         <UInput v-model="state.egcs_ay_name_fr" />
       </UFormField>
 
-      <UFormField :label="t('agency.name_en') + ' (' + t('common.description') + ')'" name="egcs_ay_description_en">
+      <UFormField :label="t('agency.description_en')" name="egcs_ay_description_en">
         <CommonTextarea v-model="state.egcs_ay_description_en" />
       </UFormField>
-      <UFormField :label="t('agency.name_fr') + ' (' + t('common.description') + ')'" name="egcs_ay_description_fr">
+      <UFormField :label="t('agency.description_fr')" name="egcs_ay_description_fr">
         <CommonTextarea v-model="state.egcs_ay_description_fr" />
       </UFormField>
     </template>

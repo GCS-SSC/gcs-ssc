@@ -69,7 +69,7 @@ const onSubmit = async () => {
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="modalTitle">
+  <UModal v-model:open="open" :title="modalTitle" :ui="{ content: 'sm:max-w-4xl' }">
     <template #body>
       <UForm v-if="state" :state="state" :validate="validate" class="space-y-4" @submit="onSubmit">
         <UFormField :label="t('admin_common.fields.egcs_cn_name_en')" name="egcs_cn_name_en">

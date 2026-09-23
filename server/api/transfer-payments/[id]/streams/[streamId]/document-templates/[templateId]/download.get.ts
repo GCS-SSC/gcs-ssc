@@ -1,7 +1,7 @@
 import { create as contentDisposition } from 'content-disposition'
 import { setResponseHeader } from 'h3'
 import { authorize } from '~~/server/utils/authorize'
-import { notFound, throwApiError } from '~~/server/utils/api-errors'
+import { badRequest, notFound, throwApiError } from '~~/server/utils/api-errors'
 import { readStoredFile } from '~~/server/utils/file-storage'
 import { createTransferPaymentScopedAuthorizeHandler } from '~~/server/utils/transfer-payment-route-authorization'
 import { resolveTransferPaymentAgreementSubtypeStreamScopeContext } from '~~/server/utils/transfer-payment-agreement-subtypes'

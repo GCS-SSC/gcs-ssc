@@ -4,6 +4,7 @@ export type EnumKey =
   | 'applicant_recipient_type'
   | 'registry_type'
   | 'agreement_type'
+  | 'holdback_bases'
   | 'publication_state'
   | 'runtime_state'
   | 'amended_type'

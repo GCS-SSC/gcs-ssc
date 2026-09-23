@@ -30,6 +30,7 @@ export type RuntimeApprovalRow = {
   egcs_cn_assigneduser: string | null | undefined
   egcs_cn_assignedgroup: string | null
   egcs_cn_onbehalf: string | null | undefined
+  egcs_cn_approvername: string | null | undefined
   egcs_cn_approvalpositiontitle: string | null | undefined
   egcs_cn_isadded: boolean
   egcs_cn_approvalvalue: boolean | null | undefined
@@ -132,6 +133,7 @@ export const getRuntimeApprovals = async (
       'Common_Approval.egcs_cn_assigneduser as egcs_cn_assigneduser',
       'Common_Approval.egcs_cn_assignedgroup as egcs_cn_assignedgroup',
       'Common_Approval.egcs_cn_onbehalf as egcs_cn_onbehalf',
+      'Common_Approval.egcs_cn_approvername as egcs_cn_approvername',
       'Common_Approval.egcs_cn_approvalpositiontitle as egcs_cn_approvalpositiontitle',
       'Common_Approval.egcs_cn_isadded as egcs_cn_isadded',
       'Common_Approval.egcs_cn_approvalvalue as egcs_cn_approvalvalue',
@@ -328,6 +330,7 @@ export const buildRuntimeApprovalSteps = ({
     egcs_cn_assigneduser: approval.egcs_cn_assigneduser,
     egcs_cn_assignedgroup: approval.egcs_cn_assignedgroup,
     egcs_cn_onbehalf: approval.egcs_cn_onbehalf,
+    egcs_cn_approvername: approval.egcs_cn_approvername ?? '',
     egcs_cn_approvalpositiontitle: approval.egcs_cn_approvalpositiontitle ?? '',
     egcs_cn_isadded: approval.egcs_cn_isadded,
     egcs_cn_approvalvalue: approval.egcs_cn_approvalvalue,

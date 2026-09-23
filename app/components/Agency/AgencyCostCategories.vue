@@ -71,6 +71,15 @@ const isSavingLineItem: Ref<boolean> = ref(false)
 let refreshGeneration = 0
 const validateCategory = createValidator(AgencyCostCategorySchema)
 const validateLineItem = createValidator(AgencyCostCategoryLineItemSchema)
+const selectedLineItemCategoryName = computed(() => {
+  const category = categories.value.find(item => item.id === selectedLineItemCategoryId.value)
+  return category ? getBilingualValue(category, 'egcs_ay_name', category.id) : ''
+})
+const lineItemModalTitle = computed(() => selectedLineItem.value?.id
+  ? t('agency.tabs.budget_line_items')
+  : selectedLineItemCategoryName.value
+    ? t('agency.add_line_item_named', { name: selectedLineItemCategoryName.value })
+    : t('agency.tabs.budget_line_items'))
 
 const columns: TableColumnInput<CostCategoryTableRow>[] = [
   { id: COST_CATEGORY_GROUP_COLUMN_ID, accessorKey: COST_CATEGORY_GROUP_COLUMN_ID, headerKey: 'agency.tabs.cost_categories' },
@@ -537,9 +546,12 @@ const deleteLineItem = async (lineItemId: string) => {
       </template>
     </UModal>
 
-    <UModal v-if="selectedLineItem" v-model:open="isLineItemModalOpen" :title="t('agency.tabs.budget_line_items')">
+    <UModal v-if="selectedLineItem" v-model:open="isLineItemModalOpen" :title="lineItemModalTitle">
       <template #body>
         <UForm :state="selectedLineItem" :validate="validateLineItem" :validate-on="[]" class="space-y-4" @submit="saveLineItem">
+          <p v-if="selectedLineItemCategoryName" class="text-sm text-muted">
+            {{ t('agency.budget_category_context', { name: selectedLineItemCategoryName }) }}
+          </p>
           <UFormField :label="t('agency.name_en')" name="egcs_ay_name_en">
             <UInput v-model="selectedLineItem.egcs_ay_name_en" />
           </UFormField>

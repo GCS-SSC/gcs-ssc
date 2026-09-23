@@ -7,7 +7,8 @@ import { isPositivePostgresBigintText } from '../../utils/database-id'
 import type { StatusDefinition } from '../status'
 import {
   APPLICANT_RECIPIENT_TYPE_ENUM,
-  AGREEMENT_TYPE_ENUM
+  AGREEMENT_TYPE_ENUM,
+  HOLDBACK_BASES_ENUM
 } from '~~/shared/constants/enums'
 
 /**
@@ -103,6 +104,7 @@ export type StatusDefinitionInput = z.infer<typeof StatusDefinitionCreateSchema>
 export type StatusDefinitionItem = StatusDefinition
 
 export const AgencyHoldbackBasisSchema = z.object({
+  egcs_ay_holdbackbasis: z.enum(HOLDBACK_BASES_ENUM).default('fullagreement'),
   egcs_ay_languageindependentcode: z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' }),
   egcs_ay_name_en: z.string({ error: 'validation.name_en_required' }).trim().min(1, { error: 'validation.name_en_required' }),
   egcs_ay_name_fr: z.string({ error: 'validation.name_fr_required' }).trim().min(1, { error: 'validation.name_fr_required' })
@@ -114,6 +116,9 @@ export const AgencyHoldbackBasisWriteSchema = AgencyHoldbackBasisSchema.extend({
   egcs_ay_languageindependentcode: AgencyHoldbackBasisFieldSchema('validation.required'),
   egcs_ay_name_en: AgencyHoldbackBasisFieldSchema('validation.name_en_required'),
   egcs_ay_name_fr: AgencyHoldbackBasisFieldSchema('validation.name_fr_required')
+})
+export const AgencyHoldbackBasisPatchSchema = AgencyHoldbackBasisWriteSchema.partial().extend({
+  egcs_ay_holdbackbasis: z.enum(HOLDBACK_BASES_ENUM).optional()
 })
 export type AgencyHoldbackBasis = z.infer<typeof AgencyHoldbackBasisSchema>
 export type AgencyHoldbackBasisItem = WithId<AgencyHoldbackBasis>

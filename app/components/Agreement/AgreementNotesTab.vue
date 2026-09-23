@@ -53,24 +53,34 @@ const bilingualColumns: BilingualColumnConfig<Note>[] = [
       {{ formatDate(row.original.egcs_fc_updatedat) }}
     </template>
     <template #form="{ state }">
-      <p id="agreement-note-subject-instruction" class="text-sm text-muted">
-        {{ t('notes.subject_instruction') }}
-      </p>
-      <UFormField :label="t('notes.subject_en')" name="egcs_fc_subject_en">
-        <UInput v-model="state.egcs_fc_subject_en" aria-describedby="agreement-note-subject-instruction" />
-      </UFormField>
-      <UFormField :label="t('notes.subject_fr')" name="egcs_fc_subject_fr">
-        <UInput v-model="state.egcs_fc_subject_fr" aria-describedby="agreement-note-subject-instruction" />
-      </UFormField>
-      <p id="agreement-note-body-instruction" class="text-sm text-muted">
-        {{ t('notes.body_instruction') }}
-      </p>
-      <UFormField :label="t('notes.body_en')" name="egcs_fc_body_en">
-        <UTextarea v-model="state.egcs_fc_body_en" aria-describedby="agreement-note-body-instruction" />
-      </UFormField>
-      <UFormField :label="t('notes.body_fr')" name="egcs_fc_body_fr">
-        <UTextarea v-model="state.egcs_fc_body_fr" aria-describedby="agreement-note-body-instruction" />
-      </UFormField>
+      <fieldset class="space-y-4" aria-describedby="agreement-note-subject-instruction">
+        <legend class="font-medium">
+          {{ t('notes.subject') }} <span aria-hidden="true" class="text-error">*</span> <span class="text-sm text-muted">({{ t('common.field_required') }})</span>
+        </legend>
+        <p id="agreement-note-subject-instruction" class="text-sm text-muted">
+          {{ t('notes.subject_instruction') }}
+        </p>
+        <UFormField :label="t('notes.subject_en')" name="egcs_fc_subject_en">
+          <UInput v-model="state.egcs_fc_subject_en" aria-describedby="agreement-note-subject-instruction" />
+        </UFormField>
+        <UFormField :label="t('notes.subject_fr')" name="egcs_fc_subject_fr">
+          <UInput v-model="state.egcs_fc_subject_fr" aria-describedby="agreement-note-subject-instruction" />
+        </UFormField>
+      </fieldset>
+      <fieldset class="space-y-4" aria-describedby="agreement-note-body-instruction">
+        <legend class="font-medium">
+          {{ t('notes.body') }} <span aria-hidden="true" class="text-error">*</span> <span class="text-sm text-muted">({{ t('common.field_required') }})</span>
+        </legend>
+        <p id="agreement-note-body-instruction" class="text-sm text-muted">
+          {{ t('notes.body_instruction') }}
+        </p>
+        <UFormField :label="t('notes.body_en')" name="egcs_fc_body_en">
+          <UTextarea v-model="state.egcs_fc_body_en" aria-describedby="agreement-note-body-instruction" />
+        </UFormField>
+        <UFormField :label="t('notes.body_fr')" name="egcs_fc_body_fr">
+          <UTextarea v-model="state.egcs_fc_body_fr" aria-describedby="agreement-note-body-instruction" />
+        </UFormField>
+      </fieldset>
     </template>
   </CommonResourceCrud>
 </template>

@@ -17,6 +17,7 @@ export type Decision_Type = 'fundingcaseintakeassessment'
 export type Amended_Type = 'articles' | 'activities' | 'budget' | 'duration' | 'other'
 export type Registry_Type = 'provincialbusinessnumber' | 'federalbusinessnumber' | 'craprogramaccountnumber' | 'noc' | 'naics' | 'other'
 export type Agreement_Type = 'grant' | 'nonrepayable' | 'repayable' | 'partiallyrepayable' | 'other'
+export type Holdback_Bases = 'fullagreement' | 'finalfiscal'
 export type Applicant_Recipient_Type =
   | 'aboriginalrecipients'
   | 'forprofitorganizations'
@@ -766,6 +767,7 @@ export interface AgencyHoldbackBasisTable {
   id: Generated<string>
   egcs_ay_organizationagency: string
   egcs_ay_languageindependentcode: string
+  egcs_ay_holdbackbasis: Generated<Holdback_Bases>
   egcs_ay_name_en: string
   egcs_ay_name_fr: string
   _deleted: Generated<boolean>
@@ -1190,6 +1192,7 @@ export interface CommonApprovalTable {
   egcs_cn_assigneduser?: string | null
   egcs_cn_assignedgroup?: string | null
   egcs_cn_onbehalf?: string | null
+  egcs_cn_approvername?: string | null
   egcs_cn_approvalpositiontitle?: string
   egcs_cn_isadded: boolean
   egcs_cn_approvalvalue?: boolean

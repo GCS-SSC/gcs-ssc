@@ -13,10 +13,8 @@ import AgencyApplicantRecipientSubtypes from '~/components/Agency/AgencyApplican
 import AgencyApprovalBehalfTypes from '~/components/Agency/AgencyApprovalBehalfTypes.vue'
 import AgencyApprovalTemplates from '~/components/Agency/AgencyApprovalTemplates.vue'
 import AgencyWorkflowSetups from '~/components/Agency/AgencyWorkflowSetups.vue'
-import AgencyReviewSchemas from '~/components/Agency/AgencyReviewSchemas.vue'
 import AgencyReviewSets from '~/components/Agency/AgencyReviewSets.vue'
 import AgencyRecommendationSets from '~/components/Agency/AgencyRecommendationSets.vue'
-import AgencyRecommendationSchemas from '~/components/Agency/AgencyRecommendationSchemas.vue'
 import AgencyCostCategories from '~/components/Agency/AgencyCostCategories.vue'
 import AgencyCustomFields from '~/components/Agency/AgencyCustomFields.vue'
 import AgencyDetailGeneralTab from '~/components/Agency/AgencyDetailGeneralTab.vue'
@@ -77,10 +75,8 @@ const tabMap: TabMap = new Map([
   }) }],
   ['approvalTemplates', { key: 'agency.tabs.approval_templates', icon: 'i-lucide-stamp', component: AgencyApprovalTemplates, getProps: agencyResourceCapabilities }],
   ['workflowSetups', { key: 'agency.tabs.workflow_setups', icon: 'i-lucide-git-branch', component: AgencyWorkflowSetups, getProps: () => ({ agencyId: id, canUpdateChild: canUpdateAgency.value, canDeleteChild: canUpdateAgency.value }) }],
-  ['reviewSchemas', { key: 'agency.tabs.review_schemas', icon: 'i-lucide-file-check', component: AgencyReviewSchemas, getProps: () => ({ agencyId: id, canUpdateChild: canUpdateAgency.value }) }],
   ['reviewSets', { key: 'transfer_payment.review_setups', icon: 'i-lucide-clipboard-list', component: AgencyReviewSets, getProps: () => ({ agencyId: id, canUpdateChild: canUpdateAgency.value, canDeleteChild: canUpdateAgency.value }) }],
   ['recommendationSets', { key: 'transfer_payment.recommendation_setups', icon: 'i-lucide-list-checks', component: AgencyRecommendationSets, getProps: () => ({ agencyId: id, canUpdateChild: canUpdateAgency.value, canDeleteChild: canUpdateAgency.value }) }],
-  ['recommendationSchemas', { key: 'admin_common.resources.recommendation_schemas', icon: 'i-lucide-file-output', component: AgencyRecommendationSchemas, getProps: () => ({ agencyId: id, canUpdateChild: canUpdateAgency.value }) }],
   ['programs', { key: 'agency.tabs.programs', icon: 'i-lucide-banknote', component: AgencyTransferPayments, getProps: () => ({ agencyId: id }) }],
   ['costCategories', { key: 'agency.tabs.cost_categories', icon: 'i-lucide-layers', component: AgencyCostCategories, getProps: agencyResourceCapabilities }],
   ['fiscalYears', { key: 'agency.tabs.fiscal_years', icon: 'i-lucide-calendar', component: AgencyFiscalYears, getProps: agencyResourceCapabilities }],

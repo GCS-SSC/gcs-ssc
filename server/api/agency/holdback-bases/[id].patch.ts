@@ -1,4 +1,4 @@
-import { AgencyHoldbackBasisWriteSchema } from '~~/shared/types/schemas'
+import { AgencyHoldbackBasisPatchSchema } from '~~/shared/types/schemas'
 import {
   authorizeActiveAgencySubentity,
   withActiveAgencyMutationTransaction
@@ -16,7 +16,7 @@ export default defineEventHandler(async event => {
     'update',
     { code: 'HOLDBACK_BASIS_NOT_FOUND', key: 'apiErrors.agency.holdback_basis_not_found' }
   )
-  const body = await readValidatedBodyI18n(event, AgencyHoldbackBasisWriteSchema.partial())
+  const body = await readValidatedBodyI18n(event, AgencyHoldbackBasisPatchSchema)
   if (Object.keys(body).length === 0) {
     return await badRequest(event, 'NO_UPDATABLE_FIELDS', 'apiErrors.request.no_updatable_fields')
   }
@@ -27,8 +27,12 @@ export default defineEventHandler(async event => {
         .where('id', '=', id).where('egcs_ay_organizationagency', '=', agencyId)
         .where('_deleted', '=', false).forUpdate().executeTakeFirst()
       if (!current) return await notFound(event, 'HOLDBACK_BASIS_NOT_FOUND', 'apiErrors.agency.holdback_basis_not_found')
-      if (body.egcs_ay_languageindependentcode !== undefined
-        && body.egcs_ay_languageindependentcode !== current.egcs_ay_languageindependentcode) {
+      if (
+        (body.egcs_ay_languageindependentcode !== undefined
+          && body.egcs_ay_languageindependentcode !== current.egcs_ay_languageindependentcode)
+        || (body.egcs_ay_holdbackbasis !== undefined
+          && body.egcs_ay_holdbackbasis !== current.egcs_ay_holdbackbasis)
+      ) {
         await assertAgencyHoldbackBasisNotInUse(event, trx, id)
       }
       return await trx

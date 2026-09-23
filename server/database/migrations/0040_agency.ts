@@ -230,6 +230,7 @@ export async function up(db: Kysely<Database>): Promise<void> {
       col.notNull().references('Agency_Profile.id').onDelete('restrict')
     )
     .addColumn('egcs_ay_languageindependentcode', 'varchar(255)', col => col.notNull())
+    .addColumn('egcs_ay_holdbackbasis', sql`Holdback_Bases`, col => col.notNull().defaultTo('fullagreement'))
     .addColumn('egcs_ay_name_en', 'varchar(255)', col => col.notNull())
     .addColumn('egcs_ay_name_fr', 'varchar(255)', col => col.notNull())
     .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())

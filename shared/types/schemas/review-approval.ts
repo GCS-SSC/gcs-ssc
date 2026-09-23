@@ -31,6 +31,7 @@ export const ReviewApprovalActionCertificationSchema = z.object({
 const ReviewApprovalActionBaseSchema = z.object({
   approvalId: RequiredStringId(),
   egcs_cn_onbehalf: OptionalNullableId(),
+  egcs_cn_approvername: OptionalNullableTrimmedString(),
   egcs_cn_approvalpositiontitle: OptionalNullableTrimmedString(),
   egcs_cn_approvaldate: z.preprocess(
     value => (value === undefined || value === null || value === '' ? undefined : value),
@@ -60,6 +61,7 @@ export const ReviewApprovalDecisionEvidenceSchema = z.object({
   egcs_cn_onbehalf: OptionalNullableId(),
   egcs_ay_require_actual: z.boolean(),
   egcs_cn_requiregroupdetails: z.boolean().default(false),
+  egcs_cn_approvername: OptionalNullableTrimmedString(),
   egcs_cn_approvalpositiontitle: OptionalNullableTrimmedString(),
   egcs_cn_approvaldate: z.date().optional()
 }).superRefine((data, ctx) => {
@@ -83,6 +85,9 @@ export const ReviewApprovalDecisionEvidenceSchema = z.object({
   }
   if (!data.egcs_ay_require_actual && !(data.egcs_cn_defaultgroup && data.egcs_cn_requiregroupdetails && !isDelegated)) {
     return
+  }
+  if (!data.egcs_cn_approvername) {
+    ctx.addIssue({ code: 'custom', message: 'validation.approval_name_required', path: ['egcs_cn_approvername'] })
   }
   if (!data.egcs_cn_approvalpositiontitle) {
     ctx.addIssue({

@@ -154,8 +154,10 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
         RAISE EXCEPTION 'Approval % requires on-behalf evidence for its claimant', NEW.id;
       END IF;
       IF NEW.egcs_cn_defaultgroup IS NOT NULL AND matches_default AND NEW.egcs_cn_requiregroupdetails
-        AND (NULLIF(BTRIM(NEW.egcs_cn_approvalpositiontitle), '') IS NULL OR NEW.egcs_cn_approvaldate IS NULL) THEN
-        RAISE EXCEPTION 'Approval % requires group claimant title and date', NEW.id;
+        AND (NULLIF(BTRIM(NEW.egcs_cn_approvername), '') IS NULL
+          OR NULLIF(BTRIM(NEW.egcs_cn_approvalpositiontitle), '') IS NULL
+          OR NEW.egcs_cn_approvaldate IS NULL) THEN
+        RAISE EXCEPTION 'Approval % requires group claimant name, title and date', NEW.id;
       END IF;
       RETURN NEW;
     END;

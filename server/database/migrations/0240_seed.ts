@@ -1075,7 +1075,7 @@ const seedAgencies = async (db: Kysely<Database>, gwcoaNumbers: number[]): Promi
         egcs_ay_name_fr: base.fr,
         egcs_ay_abbreviation_en: base.abEn,
         egcs_ay_abbreviation_fr: base.abFr,
-        egcs_ay_active: i % 7 !== 0
+        egcs_ay_active: base.en === 'Health Canada' || i % 7 !== 0
       })
       .returning(['id', 'egcs_ay_name_en', 'egcs_ay_name_fr'])
       .executeTakeFirstOrThrow()
@@ -4392,8 +4392,8 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
     const isDraftApprovalAgreement = String(stream.streamId) === '33'
     const agencyStatusIds = await resolveAgencyStatusIds(db, String(stream.agencyId))
     const holdbackBasisSeeds = [
-      { code: 'agreement-total', nameEn: 'Total agreement value', nameFr: "Valeur totale de l'entente" },
-      { code: 'final-fiscal-year', nameEn: 'Final fiscal year value', nameFr: 'Valeur du dernier exercice financier' }
+      { code: 'agreement-total', basis: 'fullagreement' as const, nameEn: 'Total agreement value', nameFr: "Valeur totale de l'entente" },
+      { code: 'final-fiscal-year', basis: 'finalfiscal' as const, nameEn: 'Final fiscal year value', nameFr: 'Valeur du dernier exercice financier' }
     ]
     let agreementTotalStreamHoldbackId = ''
     for (const basisSeed of holdbackBasisSeeds) {
@@ -4405,6 +4405,7 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
       agencyHoldback ??= await db.insertInto('Agency_Holdback_Basis').values({
         egcs_ay_organizationagency: String(stream.agencyId),
         egcs_ay_languageindependentcode: basisSeed.code,
+        egcs_ay_holdbackbasis: basisSeed.basis,
         egcs_ay_name_en: basisSeed.nameEn,
         egcs_ay_name_fr: basisSeed.nameFr
       }).returning('id').executeTakeFirstOrThrow()

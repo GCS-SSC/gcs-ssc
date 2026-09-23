@@ -3618,6 +3618,7 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
       egcs_cn_assigneduser bigint REFERENCES "Common_User"(id) ON DELETE RESTRICT,
       egcs_cn_requiregroupdetails boolean NOT NULL DEFAULT false,
       egcs_cn_onbehalf bigint REFERENCES "Agency_Approval_Behalf_Type"(id) ON DELETE RESTRICT,
+      egcs_cn_approvername text,
       egcs_cn_approvalpositiontitle text,
       egcs_cn_isadded boolean NOT NULL,
       egcs_cn_approvalvalue boolean,
@@ -3812,10 +3813,12 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
       WHERE id = NEW.egcs_cn_onbehalf;
 
       IF requires_actual = true AND (
+        NULLIF(BTRIM(NEW.egcs_cn_approvername), '') IS NULL
+        OR
         NEW.egcs_cn_approvalpositiontitle IS NULL
         OR NEW.egcs_cn_approvaldate IS NULL
       ) THEN
-        RAISE EXCEPTION 'Approval % requires full delegation detail (position title, date)',
+        RAISE EXCEPTION 'Approval % requires full delegation detail (approver name, position title, date)',
           NEW.id;
       END IF;
 

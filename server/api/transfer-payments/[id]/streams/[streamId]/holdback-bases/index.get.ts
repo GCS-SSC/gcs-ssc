@@ -41,6 +41,7 @@ export default defineEventHandler(async event => {
         'Transfer_Payment_Stream_Holdback_Basis.id', 'egcs_tp_transferpaymentstream', 'egcs_tp_agencyholdback',
         'Agency_Holdback_Basis.egcs_ay_name_en', 'Agency_Holdback_Basis.egcs_ay_name_fr',
         'Agency_Holdback_Basis.egcs_ay_languageindependentcode',
+        'Agency_Holdback_Basis.egcs_ay_holdbackbasis',
         'Agency_Holdback_Basis.egcs_ay_name_en as agency_holdback_name_en',
         'Agency_Holdback_Basis.egcs_ay_name_fr as agency_holdback_name_fr'
       ]).orderBy('Transfer_Payment_Stream_Holdback_Basis.id', 'asc').limit(limit).offset((page - 1) * limit).execute(),

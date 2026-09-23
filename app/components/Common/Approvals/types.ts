@@ -50,6 +50,7 @@ export type ApprovalStepItem = {
   default_group_name_en?: string
   default_group_name_fr?: string
   egcs_cn_onbehalf: string | null
+  egcs_cn_approvername: string
   egcs_cn_approvalpositiontitle: string
   egcs_cn_approvalvalue: boolean | null
   egcs_cn_approvaldate: string | null
@@ -132,6 +133,7 @@ export type ApprovalTableRow = {
   assigned_group_name_en?: string
   assigned_group_name_fr?: string
   egcs_cn_onbehalf: string | null
+  egcs_cn_approvername: string
   egcs_cn_approvalpositiontitle: string
   egcs_cn_approvalvalue: boolean | null
   egcs_cn_approvaldate: string | null
@@ -176,6 +178,7 @@ export type ActionModalState = {
   assignedDiffersFromDefault: boolean
   isOnBehalf: boolean
   egcs_cn_onbehalf: string | null
+  egcs_cn_approvername: string
   egcs_cn_approvalpositiontitle: string
   egcs_cn_approvaldate: string
   egcs_cn_comment: string

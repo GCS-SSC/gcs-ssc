@@ -355,6 +355,10 @@
       "partiallyrepayable": "Partially Repayable",
       "other": "Other"
     },
+    "holdback_bases": {
+      "fullagreement": "Full agreement",
+      "finalfiscal": "Final fiscal year"
+    },
     "applicant_recipient_type": {
       "aboriginalrecipients": "Aboriginal Recipients",
       "forprofitorganizations": "For-Profit Organizations",
@@ -516,6 +520,7 @@
     "update_title": "Update Agency",
     "edit_named": "Edit {name}",
     "add_line_item_named": "Add a line item to {name}",
+    "budget_category_context": "Budget category: {name}",
     "delete_category_named": "Delete cost category {name}",
     "delete_line_item_named": "Delete cost line item {name}",
     "info": "Agency Information",
@@ -529,6 +534,7 @@
     "gwcoa_placeholder": "Select a GWCOA number",
     "financial_id": "Financial System ID",
     "holdback_basis_code": "Language-independent code",
+    "holdback_basis_type": "Holdback basis type",
     "fiscal_year_placeholder": "e.g. 2025-2026",
     "delete_confirm": "Are you sure you want to delete this?",
     "description": "Manage and oversee all partner agencies and their configurations in a centralized dashboard.",
@@ -756,6 +762,7 @@
     },
     "fields": {
       "_deleted": "Deleted",
+      "publicationState": "Publication state",
       "egcs_cn_number": "GWCOA Number",
       "egcs_cn_title": "Title",
       "egcs_cn_name": "Name",
@@ -1833,6 +1840,7 @@
     "desc_fr_required": "French description is required",
     "accepted_required": "Accepted is required",
     "approval_date_required": "Approval decision date is required",
+    "approval_name_required": "Approver name is required",
     "approval_position_required": "Approval position title is required",
     "approval_value_required": "Approval value is required",
     "review_approval_on_behalf_required": "Select an on-behalf type when the claimant differs from the default assignee",
@@ -3361,9 +3369,10 @@
       "assigned_approver": "Assigned Approver",
       "decision": "Decision",
       "decision_date": "Decision Date",
+      "approver_name": "Approver Name",
       "position_title": "Position Title",
       "on_behalf_type": "On Behalf Type",
-      "require_group_details": "Require position title and date from default group members",
+      "require_group_details": "Require approver name, position title and date from default group members",
       "on_behalf_of_default_user": "On behalf of the default approver",
       "view": "View",
       "details_title": "Approval Details",

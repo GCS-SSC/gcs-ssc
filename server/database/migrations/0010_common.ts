@@ -5,6 +5,7 @@ import {
   AMENDED_TYPE_ENUM,
   AGREEMENT_APPLICANT_RECIPIENT_TYPE_ENUM,
   AGREEMENT_TYPE_ENUM,
+  HOLDBACK_BASES_ENUM,
   APPLICANT_RECIPIENT_TYPE_ENUM,
   COUNTRIES_ENUM,
   CURRENCY_CODES_ENUM,
@@ -26,6 +27,7 @@ export async function up(db: Kysely<Database>): Promise<void> {
   await sql`CREATE TYPE Decision_Type AS ENUM (${sql.join(DECISION_TYPES_ENUM.map(val => sql.lit(val)))})`.execute(db)
   await sql`CREATE TYPE Amended_Type AS ENUM (${sql.join(AMENDED_TYPE_ENUM.map(val => sql.lit(val)))})`.execute(db)
   await sql`CREATE TYPE Agreement_Type AS ENUM (${sql.join(AGREEMENT_TYPE_ENUM.map(val => sql.lit(val)))})`.execute(db)
+  await sql`CREATE TYPE Holdback_Bases AS ENUM (${sql.join(HOLDBACK_BASES_ENUM.map(val => sql.lit(val)))})`.execute(db)
   await sql`CREATE TYPE Applicant_Recipient_Type AS ENUM (${sql.join(APPLICANT_RECIPIENT_TYPE_ENUM.map(val => sql.lit(val)))})`.execute(
     db
   )
@@ -112,6 +114,7 @@ export async function down(db: Kysely<Database>): Promise<void> {
   await sql`DROP TYPE Payment_Type`.execute(db)
   await sql`DROP TYPE Applicant_Recipient_Type`.execute(db)
   await sql`DROP TYPE Agreement_Type`.execute(db)
+  await sql`DROP TYPE Holdback_Bases`.execute(db)
   await sql`DROP TYPE Amended_Type`.execute(db)
   await sql`DROP TYPE Decision_Type`.execute(db)
   await sql`DROP TYPE Agreement_Applicant_Recipient_Type`.execute(db)

@@ -215,6 +215,7 @@ const tableRows = computed<ApprovalTableRow[]>(() => routingSlips.value.flatMap(
       egcs_cn_defaultuser: '',
       egcs_cn_assigneduser: null,
       egcs_cn_onbehalf: null,
+      egcs_cn_approvername: '',
       egcs_cn_approvalpositiontitle: '',
       egcs_cn_approvalvalue: null,
       egcs_cn_approvaldate: null,
@@ -266,6 +267,7 @@ const tableRows = computed<ApprovalTableRow[]>(() => routingSlips.value.flatMap(
     assigned_group_name_en: step.assigned_group_name_en,
     assigned_group_name_fr: step.assigned_group_name_fr,
     egcs_cn_onbehalf: step.egcs_cn_onbehalf,
+    egcs_cn_approvername: step.egcs_cn_approvername,
     egcs_cn_approvalpositiontitle: step.egcs_cn_approvalpositiontitle,
     egcs_cn_approvalvalue: step.egcs_cn_approvalvalue,
     egcs_cn_approvaldate: step.egcs_cn_approvaldate,
@@ -458,6 +460,7 @@ const openActionModal = (row: ApprovalTableRow) => {
     assigned_group_name_en: row.assigned_group_name_en,
     assigned_group_name_fr: row.assigned_group_name_fr,
     egcs_cn_onbehalf: row.egcs_cn_onbehalf,
+    egcs_cn_approvername: row.egcs_cn_approvername,
     egcs_cn_approvalpositiontitle: row.egcs_cn_approvalpositiontitle,
     egcs_cn_approvalvalue: row.egcs_cn_approvalvalue,
     egcs_cn_approvaldate: row.egcs_cn_approvaldate,
@@ -481,6 +484,7 @@ const openActionModal = (row: ApprovalTableRow) => {
     assignedDiffersFromDefault: Boolean(row.egcs_cn_defaultuser || row.egcs_cn_defaultgroup) && !claimantMatchesDefault(row),
     isOnBehalf: Boolean(row.egcs_cn_defaultuser || row.egcs_cn_defaultgroup) && !claimantMatchesDefault(row),
     egcs_cn_onbehalf: row.egcs_cn_onbehalf,
+    egcs_cn_approvername: row.egcs_cn_approvername || '',
     egcs_cn_approvalpositiontitle: row.egcs_cn_requiregroupdetails && claimantMatchesDefault(row) ? '' : row.egcs_cn_approvalpositiontitle || row.assigned_user_position_title || row.default_user_position_title,
     egcs_cn_approvaldate: row.egcs_cn_approvaldate ? row.egcs_cn_approvaldate.slice(0, 10) : '',
     egcs_cn_comment: row.egcs_cn_comment ?? '',
@@ -550,6 +554,7 @@ const openReassignModal = (row: ApprovalTableRow) => {
     egcs_cn_assigneduser: row.egcs_cn_assigneduser,
     egcs_cn_assignedgroup: row.egcs_cn_assignedgroup,
     egcs_cn_onbehalf: row.egcs_cn_onbehalf,
+    egcs_cn_approvername: row.egcs_cn_approvername,
     egcs_cn_approvalpositiontitle: row.egcs_cn_approvalpositiontitle,
     egcs_cn_approvalvalue: row.egcs_cn_approvalvalue,
     egcs_cn_approvaldate: row.egcs_cn_approvaldate,
@@ -618,6 +623,7 @@ const openAddStepModal = (row: ApprovalTableRow, position: AddApprovalPosition) 
     egcs_cn_defaultuser: row.egcs_cn_defaultuser,
     egcs_cn_assigneduser: row.egcs_cn_assigneduser,
     egcs_cn_onbehalf: row.egcs_cn_onbehalf,
+    egcs_cn_approvername: row.egcs_cn_approvername,
     egcs_cn_approvalpositiontitle: row.egcs_cn_approvalpositiontitle,
     egcs_cn_approvalvalue: row.egcs_cn_approvalvalue,
     egcs_cn_approvaldate: row.egcs_cn_approvaldate,
@@ -860,7 +866,7 @@ const approveDisabled = computed(() => {
     return true
   }
 
-  if (requiresActual.value && (!selectedActionState.value.egcs_cn_approvalpositiontitle.trim() || !selectedActionState.value.egcs_cn_approvaldate)) {
+  if (requiresActual.value && (!selectedActionState.value.egcs_cn_approvername.trim() || !selectedActionState.value.egcs_cn_approvalpositiontitle.trim() || !selectedActionState.value.egcs_cn_approvaldate)) {
     return true
   }
 
@@ -876,7 +882,7 @@ const denyDisabled = computed(() => {
     return true
   }
 
-  return requiresActual.value && (!selectedActionState.value.egcs_cn_approvalpositiontitle.trim() || !selectedActionState.value.egcs_cn_approvaldate)
+  return requiresActual.value && (!selectedActionState.value.egcs_cn_approvername.trim() || !selectedActionState.value.egcs_cn_approvalpositiontitle.trim() || !selectedActionState.value.egcs_cn_approvaldate)
 })
 
 /**
@@ -910,6 +916,7 @@ const submitAction = async (decision: 'approve' | 'deny') => {
   const actionPayload = requiresActual.value
     ? {
         ...basePayload,
+        egcs_cn_approvername: selectedActionState.value.egcs_cn_approvername,
         egcs_cn_approvalpositiontitle: selectedActionState.value.egcs_cn_approvalpositiontitle
       }
     : basePayload
@@ -1102,6 +1109,7 @@ const submitReassign = async () => {
                 assigned_group_name_en: row.original.assigned_group_name_en,
                 assigned_group_name_fr: row.original.assigned_group_name_fr,
                 egcs_cn_onbehalf: row.original.egcs_cn_onbehalf,
+                egcs_cn_approvername: row.original.egcs_cn_approvername,
                 egcs_cn_approvalpositiontitle: row.original.egcs_cn_approvalpositiontitle,
                 egcs_cn_approvalvalue: row.original.egcs_cn_approvalvalue,
                 egcs_cn_approvaldate: row.original.egcs_cn_approvaldate,

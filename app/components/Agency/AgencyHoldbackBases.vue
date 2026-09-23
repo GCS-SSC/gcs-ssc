@@ -6,6 +6,7 @@ const { agencyId, canCreate, canUpdate, canDelete } = defineProps<{ agencyId: st
 const { t } = useI18n()
 
 const columns: TableColumnInput<AgencyHoldbackBasisItem>[] = [
+  { accessorKey: 'egcs_ay_holdbackbasis', headerKey: 'agency.holdback_basis_type' },
   { accessorKey: 'egcs_ay_languageindependentcode', headerKey: 'agency.holdback_basis_code' },
   { id: 'name', headerKey: 'common.name' },
   { id: 'actions', headerKey: 'common.actions' }
@@ -28,14 +29,20 @@ const bilingualColumns: BilingualColumnConfig<AgencyHoldbackBasisItem>[] = [
     :can-update="canUpdate"
     :can-delete="canDelete"
     :schema="AgencyHoldbackBasisWriteSchema"
-    :initial-new-item="{}"
+    :initial-new-item="{ egcs_ay_holdbackbasis: 'fullagreement' }"
     :columns="columns"
     :bilingual-columns="bilingualColumns">
+    <template #egcs_ay_holdbackbasis-cell="{ row }">
+      <CommonStatusBadge variant="meta" :label="t(`enums.holdback_bases.${row.original.egcs_ay_holdbackbasis}`)" />
+    </template>
     <template #name-cell="{ row }">
       <CommonBilingualName :name-en="row.original.egcs_ay_name_en" :name-fr="row.original.egcs_ay_name_fr" />
     </template>
 
     <template #form="{ state }">
+      <UFormField :label="t('agency.holdback_basis_type')" name="egcs_ay_holdbackbasis">
+        <CommonEnumSelect v-model="state.egcs_ay_holdbackbasis" name="holdback_bases" />
+      </UFormField>
       <UFormField :label="t('agency.holdback_basis_code')" name="egcs_ay_languageindependentcode">
         <UInput v-model="state.egcs_ay_languageindependentcode" />
       </UFormField>

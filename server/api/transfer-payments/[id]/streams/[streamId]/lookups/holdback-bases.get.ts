@@ -34,7 +34,7 @@ export default defineEventHandler(async event => {
       ]))
     }
     const [items, count] = await Promise.all([
-      baseQuery.select(['id', 'egcs_ay_organizationagency', 'egcs_ay_languageindependentcode', 'egcs_ay_name_en', 'egcs_ay_name_fr', '_deleted'])
+      baseQuery.select(['id', 'egcs_ay_organizationagency', 'egcs_ay_holdbackbasis', 'egcs_ay_languageindependentcode', 'egcs_ay_name_en', 'egcs_ay_name_fr', '_deleted'])
         .orderBy('id', 'asc').limit(limit).offset((page - 1) * limit).execute(),
       baseQuery.select(eb => eb.fn.count('id').as('total')).executeTakeFirst()
     ])

@@ -60,6 +60,10 @@ const updateState = <Key extends keyof ActionModalState>(key: Key, value: Action
   }
 }
 
+const approverNameModel = computed({
+  get: () => state.value?.egcs_cn_approvername ?? '',
+  set: value => updateState('egcs_cn_approvername', value)
+})
 const positionTitleModel = computed({
   get: () => state.value?.egcs_cn_approvalpositiontitle ?? '',
   set: value => updateState('egcs_cn_approvalpositiontitle', value)
@@ -174,10 +178,15 @@ const getLocalizedText = (value: { en?: string, fr?: string }) => {
               @update:model-value="value => updateState('egcs_cn_onbehalf', value === undefined ? null : value)" />
           </UFormField>
 
-          <UFormField :label="t('assessment.approvals.position_title')" :required="requiresActual">
+          <UFormField v-if="requiresActual" :label="t('assessment.approvals.approver_name')" name="egcs_cn_approvername" required>
+            <UInput v-model="approverNameModel" name="egcs_cn_approvername" :disabled="isSubmittingAction" required aria-required="true" />
+          </UFormField>
+
+          <UFormField :label="t('assessment.approvals.position_title')" name="egcs_cn_approvalpositiontitle" :required="requiresActual">
             <UInput
               v-if="requiresActual"
               v-model="positionTitleModel"
+              name="egcs_cn_approvalpositiontitle"
               :disabled="isSubmittingAction"
               required
               aria-required="true" />

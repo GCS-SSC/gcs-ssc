@@ -49,6 +49,7 @@ const onBehalfTypeDisplay = computed(() => {
   }) || t('common.none')
 })
 const decisionDateDisplay = computed(() => step.egcs_cn_approvaldate ? formatDate(step.egcs_cn_approvaldate) : t('common.none'))
+const approverNameDisplay = computed(() => step.egcs_cn_approvername || step.assigned_user_name || t('common.none'))
 const positionTitleDisplay = computed(() => step.egcs_cn_approvalpositiontitle || step.assigned_user_position_title || step.default_user_position_title || t('common.none'))
 const commentDisplay = computed(() => step.egcs_cn_comment || t('assessment.approvals.no_comment'))
 /**
@@ -152,6 +153,15 @@ const certificationStatus = (value: boolean | null) => {
             </div>
             <p class="text-sm text-zinc-900 dark:text-zinc-50">
               {{ decisionDateDisplay }}
+            </p>
+          </div>
+
+          <div class="space-y-1">
+            <div class="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">
+              {{ t('assessment.approvals.approver_name') }}
+            </div>
+            <p class="text-sm text-zinc-900 dark:text-zinc-50">
+              {{ approverNameDisplay }}
             </p>
           </div>
 

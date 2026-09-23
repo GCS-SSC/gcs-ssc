@@ -355,6 +355,10 @@
       "partiallyrepayable": "Partiellement remboursable",
       "other": "Autre"
     },
+    "holdback_bases": {
+      "fullagreement": "Entente complète",
+      "finalfiscal": "Dernier exercice financier"
+    },
     "applicant_recipient_type": {
       "aboriginalrecipients": "Destinataires autochtones",
       "forprofitorganizations": "Organisations à but lucratif",
@@ -516,6 +520,7 @@
     "update_title": "Mettre à jour l'agence",
     "edit_named": "Modifier {name}",
     "add_line_item_named": "Ajouter un poste à {name}",
+    "budget_category_context": "Catégorie budgétaire : {name}",
     "delete_category_named": "Supprimer la catégorie de coûts {name}",
     "delete_line_item_named": "Supprimer le poste de coûts {name}",
     "info": "Informations sur l'agence",
@@ -529,6 +534,7 @@
     "gwcoa_placeholder": "Sélectionner un numéro CGOA pangouvernemental",
     "financial_id": "ID du système financier",
     "holdback_basis_code": "Code indépendant de la langue",
+    "holdback_basis_type": "Type de base de retenue",
     "fiscal_year_placeholder": "ex. 2025-2026",
     "delete_confirm": "Êtes-vous sûr de vouloir supprimer ceci ?",
     "description": "Gérez et supervisez toutes les agences partenaires et leurs configurations dans un tableau de bord centralisé.",
@@ -756,6 +762,7 @@
     },
     "fields": {
       "_deleted": "Supprimé",
+      "publicationState": "État de publication",
       "egcs_cn_number": "Numéro GWCOA",
       "egcs_cn_title": "Titre",
       "egcs_cn_name": "Nom",
@@ -1833,6 +1840,7 @@
     "desc_fr_required": "La description française est requise",
     "accepted_required": "Le champ accepté est requis",
     "approval_date_required": "La date de décision d'approbation est requise",
+    "approval_name_required": "Le nom de la personne approbatrice est requis",
     "approval_position_required": "Le titre du poste d'approbation est requis",
     "approval_value_required": "La valeur d'approbation est requise",
     "review_approval_on_behalf_required": "Sélectionnez un type d'approbation au nom de lorsque la personne qui réclame l'approbation diffère de la personne ou du groupe désigné par défaut",
@@ -3361,9 +3369,10 @@
       "assigned_approver": "Approbatrice ou approbateur assigné",
       "decision": "Décision",
       "decision_date": "Date de décision",
+      "approver_name": "Nom de la personne approbatrice",
       "position_title": "Titre du poste",
       "on_behalf_type": "Type d'approbation au nom de",
-      "require_group_details": "Exiger le titre du poste et la date des membres du groupe désigné par défaut",
+      "require_group_details": "Exiger le nom, le titre du poste et la date des membres du groupe désigné par défaut",
       "on_behalf_of_default_user": "Au nom de l'approbatrice ou de l'approbateur par défaut",
       "view": "Voir",
       "details_title": "Détails de l'approbation",

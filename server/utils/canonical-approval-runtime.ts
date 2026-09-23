@@ -451,6 +451,7 @@ const persistDecisionEvidence = async (
   approvalId: string,
   body: ReviewApprovalApproveInput | ReviewApprovalDenyInput,
   approvalValue: boolean,
+  approverName: string | null,
   positionTitle: string | null,
   approvalDate: Date
 ) => {
@@ -463,6 +464,7 @@ const persistDecisionEvidence = async (
   }
   await trx.updateTable('Common_Approval').set({
     egcs_cn_onbehalf: body.egcs_cn_onbehalf ?? sql`null`,
+    egcs_cn_approvername: approverName ?? sql`null`,
     egcs_cn_approvalpositiontitle: positionTitle ?? sql`null`,
     egcs_cn_approvaldate: approvalDate,
     egcs_cn_comment: body.egcs_cn_comment ?? sql`null`,
@@ -667,6 +669,7 @@ export const decideCanonicalApproval = async (
       egcs_cn_onbehalf: body.egcs_cn_onbehalf,
       egcs_ay_require_actual: behalfType?.egcs_ay_require_actual === true,
       egcs_cn_requiregroupdetails: approval.egcs_cn_requiregroupdetails,
+      egcs_cn_approvername: body.egcs_cn_approvername,
       egcs_cn_approvalpositiontitle: body.egcs_cn_approvalpositiontitle,
       egcs_cn_approvaldate: body.egcs_cn_approvaldate
     }
@@ -676,15 +679,18 @@ export const decideCanonicalApproval = async (
     ? decisionEvidence.egcs_cn_approvalpositiontitle ?? actor.positionTitle
     : actor.positionTitle
   let approvalDate = decisionEvidence.egcs_cn_approvaldate ?? new Date()
-  if (decisionEvidence.egcs_ay_require_actual
-    || (approval.egcs_cn_defaultgroup && approval.egcs_cn_requiregroupdetails && claimantMatchesDefault)) {
-    if (!decisionEvidence.egcs_cn_approvalpositiontitle || !decisionEvidence.egcs_cn_approvaldate) {
-      throw new Error('Actual on-behalf decision evidence passed validation without explicit title and date')
+  const requiresAdditionalDetails = Boolean(decisionEvidence.egcs_ay_require_actual
+    || (approval.egcs_cn_defaultgroup && approval.egcs_cn_requiregroupdetails && claimantMatchesDefault))
+  if (requiresAdditionalDetails) {
+    if (!decisionEvidence.egcs_cn_approvername || !decisionEvidence.egcs_cn_approvalpositiontitle || !decisionEvidence.egcs_cn_approvaldate) {
+      throw new Error('Approval decision evidence passed validation without explicit name, title and date')
     }
     positionTitle = decisionEvidence.egcs_cn_approvalpositiontitle
     approvalDate = decisionEvidence.egcs_cn_approvaldate
   }
-  await persistDecisionEvidence(trx, approvalId, body, approvalValue, positionTitle, approvalDate)
+  await persistDecisionEvidence(trx, approvalId, body, approvalValue,
+    requiresAdditionalDetails ? decisionEvidence.egcs_cn_approvername ?? null : null,
+    positionTitle, approvalDate)
   const outcome = approvalValue ? 'approved' : 'denied'
   await transitionRuntimeItem(trx, {
     runtimeId: String(approval.runtimeId),
@@ -794,6 +800,7 @@ export const reassignCanonicalApproval = async (
     egcs_cn_assigneduser: body.egcs_cn_assigneduser ?? null,
     egcs_cn_assignedgroup: body.egcs_cn_assignedgroup ?? null,
     egcs_cn_onbehalf: null,
+    egcs_cn_approvername: sql`null`,
     egcs_cn_approvalpositiontitle: sql`null`,
     egcs_cn_approvaldate: sql`null`,
     egcs_cn_comment: sql`null`,
