@@ -15,6 +15,9 @@
     "invalid_json": "Saisissez un JSON valide."
   },
   "custom_fields": {
+    "assign_field": "Associer un champ de l’organisme",
+    "agency_field": "Champ de l’organisme",
+    "unsectioned": "Sans section",
     "category": "Catégorie",
     "uncategorized": "Sans catégorie",
     "section": "Section",
@@ -596,7 +599,10 @@
       "attachment_types": "Types de pièces jointes",
       "applicant_recipient_subtypes": "Sous-types de promoteurs",
       "approval_behalf": "Approbation au nom de",
-      "agreement_types": "Types d'ententes"
+      "agreement_types": "Types d'ententes",
+      "approval_templates": "Modèles d’approbation",
+      "workflow_setups": "Flux de travail",
+      "review_schemas": "Schémas de révision"
     }
   },
   "role": {
@@ -2962,15 +2968,14 @@
       "field": "Champ de condition",
       "edit_member": "Conditions du membre {sequence} du flux",
       "badge": "{field} : {value}",
-      "badge_rule_separator": "; Promoteurs à faire correspondre : ",
+      "badge_rule_separator": "; Bénéficiaires à faire correspondre : ",
       "unconditional": "Aucune condition — toujours inclus",
       "unavailable": "Sélection indisponible",
       "agreement_subtype": "Sous-type d’entente",
       "further_distribution": "Redistribution",
-      "holdback_basis": "Base de retenue",
-      "proponent_type": "Type de relation entre l’entente et le promoteur",
+      "recipient_subtype": "Sous-type de bénéficiaire",
       "add": "Ajouter une condition",
-      "quantifier": "Promoteurs à faire correspondre",
+      "quantifier": "Bénéficiaires à faire correspondre",
       "step": "Étape {number}",
       "included": "Incluse",
       "matched": "Correspondance",

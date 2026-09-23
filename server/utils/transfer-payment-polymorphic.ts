@@ -33,7 +33,7 @@ type ReviewSchemaValidationTarget = {
   schemaId: string
 }
 
-/** Confirms the published approval template belongs to the same stream scope. */
+/** Confirms the published approval template belongs to the Stream's Agency. */
 export const validateApprovalTemplateForScope = async (
   db: Kysely<Database>,
   streamId: string,
@@ -44,14 +44,22 @@ export const validateApprovalTemplateForScope = async (
     return true
   }
 
+  const stream = await db.selectFrom('Transfer_Payment_Stream')
+    .innerJoin('Transfer_Payment_Profile', 'Transfer_Payment_Profile.id', 'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile')
+    .select('Transfer_Payment_Profile.egcs_tp_agency as agencyId')
+    .where('Transfer_Payment_Stream.id', '=', streamId)
+    .where('Transfer_Payment_Stream._deleted', '=', false)
+    .where('Transfer_Payment_Profile._deleted', '=', false)
+    .executeTakeFirst()
+  if (!stream) return false
+
   const query = db
     .selectFrom('Common_Approval_Template')
     .innerJoin('Common_Publication', 'Common_Publication.id', 'Common_Approval_Template.id')
     .select('Common_Approval_Template.id')
     .where('Common_Approval_Template.id', '=', approvalTemplateId)
     .where('Common_Approval_Template._deleted', '=', false)
-    .where('Common_Approval_Template.egcs_cn_scopetype', '=', 'transferpaymentstream')
-    .where('Common_Approval_Template.egcs_cn_scopeid', '=', streamId)
+    .where('Common_Approval_Template.egcs_cn_agency', '=', stream.agencyId)
     .where('Common_Publication.egcs_cn_kind', '=', 'approval_template')
     .where('Common_Publication.egcs_cn_state', '=', 'published')
     .where('Common_Publication._deleted', '=', false)
@@ -59,7 +67,7 @@ export const validateApprovalTemplateForScope = async (
   return Boolean(await (options.forUpdate ? query.forUpdate() : query).executeTakeFirst())
 }
 
-/** Ensures every requested published approval template exists for the same stream scope. */
+/** Ensures every requested published approval template belongs to the Stream's Agency. */
 export const validateApprovalTemplatesForScope = async (
   db: Kysely<Database>,
   streamId: string,
@@ -70,14 +78,22 @@ export const validateApprovalTemplatesForScope = async (
     return true
   }
 
+  const stream = await db.selectFrom('Transfer_Payment_Stream')
+    .innerJoin('Transfer_Payment_Profile', 'Transfer_Payment_Profile.id', 'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile')
+    .select('Transfer_Payment_Profile.egcs_tp_agency as agencyId')
+    .where('Transfer_Payment_Stream.id', '=', streamId)
+    .where('Transfer_Payment_Stream._deleted', '=', false)
+    .where('Transfer_Payment_Profile._deleted', '=', false)
+    .executeTakeFirst()
+  if (!stream) return false
+
   const query = db
     .selectFrom('Common_Approval_Template')
     .innerJoin('Common_Publication', 'Common_Publication.id', 'Common_Approval_Template.id')
     .select('Common_Approval_Template.id')
     .where('Common_Approval_Template.id', 'in', uniqueApprovalTemplateIds)
     .where('Common_Approval_Template._deleted', '=', false)
-    .where('Common_Approval_Template.egcs_cn_scopetype', '=', 'transferpaymentstream')
-    .where('Common_Approval_Template.egcs_cn_scopeid', '=', streamId)
+    .where('Common_Approval_Template.egcs_cn_agency', '=', stream.agencyId)
     .where('Common_Publication.egcs_cn_kind', '=', 'approval_template')
     .where('Common_Publication.egcs_cn_state', '=', 'published')
     .where('Common_Publication._deleted', '=', false)

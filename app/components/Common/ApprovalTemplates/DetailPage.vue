@@ -14,6 +14,7 @@ import { useEditorMutationCoordinator } from '~/composables/useEditorMutationCoo
 
 const props = withDefaults(defineProps<{
   templateId: string
+  agencyId: string
   breadcrumbItems: Array<Record<string, unknown>>
   heroCollapsedKey: string
   canManagePublication?: boolean
@@ -36,7 +37,7 @@ const isHeroCollapsed = computed({
 const state: Ref<ApprovalTemplateEditorTemplate | null> = ref(null)
 const stepsTableRef: Ref<{ openCreateEditor: () => void } | null> = ref(null)
 const template: Ref<ApprovalTemplateItem | null> = ref(null)
-const templateEndpoint = computed(() => `/api/approval-templates/${props.templateId}`)
+const templateEndpoint = computed(() => `/api/agency/${props.agencyId}/approval-templates/${props.templateId}`)
 const canEdit = computed(() => props.canManagePublication && template.value?.publicationState !== 'retired')
 const mutation = useEditorMutationCoordinator({
   getDraft: () => state.value ? buildApprovalTemplateDetailPayload(state.value) : null
@@ -75,7 +76,7 @@ const refreshForMutation = async (token: EditorMutationToken) => {
   })
 }
 let loadGeneration = 0
-watch(() => props.templateId, async () => {
+watch(() => [props.agencyId, props.templateId], async () => {
   const generation = ++loadGeneration
   const endpoint = templateEndpoint.value
   template.value = null

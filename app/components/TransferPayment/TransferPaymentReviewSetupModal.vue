@@ -11,10 +11,8 @@ const emit = defineEmits<{ saved: [] }>()
 const open = defineModel<boolean>('open', { default: false })
 const state = defineModel<ReviewSetupFormState | null>('state', { required: true })
 
-const { transferPaymentId, streamId, captureSession, closeSession } = defineProps<{
-  transferPaymentId: string
-  streamId: string
-  agencyId?: string
+const { agencyId, captureSession, closeSession } = defineProps<{
+  agencyId: string
 } & CrudModalSessionLifecycle>()
 
 const { t } = useI18n()
@@ -35,8 +33,7 @@ const {
 } = useTransferPaymentReviewSetupModal({
   open,
   state,
-  transferPaymentId,
-  streamId,
+  agencyId,
   emitSaved: () => emit('saved'),
   ...sessionLifecycle
 })
@@ -48,8 +45,7 @@ const {
       <UForm v-if="state" :state="state" :validate="validate" class="space-y-4" @submit="onSubmit">
         <ReviewSetSetupFields
           v-model:state="state"
-          :transfer-payment-id="transferPaymentId"
-          :stream-id="streamId"
+          :agency-id="agencyId"
           :entity-type-disabled="entityTypeDisabled"
           :entity-type-items="transferPaymentEntityTypeItems" />
 

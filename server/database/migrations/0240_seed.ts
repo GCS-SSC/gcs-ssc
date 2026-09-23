@@ -118,6 +118,40 @@ const insertWorkflowAllowedStartStatuses = async (
   }))).execute()
 }
 
+type PendingSeedCatalogLinks = { reviewSets: Array<[string, string]>, workflows: Array<[string, string]> }
+const pendingSeedCatalogLinks = new WeakMap<Kysely<Database>, PendingSeedCatalogLinks>()
+
+const seedCatalogLinks = (db: Kysely<Database>): PendingSeedCatalogLinks => {
+  let links = pendingSeedCatalogLinks.get(db)
+  if (!links) {
+    links = { reviewSets: [], workflows: [] }
+    pendingSeedCatalogLinks.set(db, links)
+  }
+  return links
+}
+
+const linkSeedReviewSetToStream = async (db: Kysely<Database>, streamId: string, reviewSetId: string): Promise<void> => {
+  seedCatalogLinks(db).reviewSets.push([streamId, reviewSetId])
+}
+
+const linkSeedWorkflowToStream = async (db: Kysely<Database>, streamId: string, workflowId: string): Promise<void> => {
+  seedCatalogLinks(db).workflows.push([streamId, workflowId])
+}
+
+const flushSeedCatalogLinks = async (db: Kysely<Database>): Promise<void> => {
+  const links = seedCatalogLinks(db)
+  for (const [streamId, reviewSetId] of links.reviewSets.splice(0)) {
+    await db.insertInto('Transfer_Payment_Stream_Review_Set').values({
+      egcs_tp_transferpaymentstream: streamId, egcs_tp_reviewset: reviewSetId, _deleted: false
+    }).execute()
+  }
+  for (const [streamId, workflowId] of links.workflows.splice(0)) {
+    await db.insertInto('Transfer_Payment_Stream_Workflow').values({
+      egcs_tp_transferpaymentstream: streamId, egcs_tp_workflow: workflowId, _deleted: false
+    }).execute()
+  }
+}
+
 const publishSeedWorkflowDependencies = async (db: Kysely<Database>): Promise<void> => {
   const trx = db as Transaction<Database>
   const actor = await db.selectFrom('Common_User').select('id')
@@ -740,18 +774,19 @@ const createSeedRuntimeReviewSet = async (
     .where('_deleted', '=', false).executeTakeFirstOrThrow()
   const published = await readCurrentPublishedDefinition(db, reviewSetSetupId, 'review_set_setup')
   const publication = readPublishedReviewSetup(published.definition)
-  const firstSchema = await db.selectFrom('Common_Review_Schema').select('egcs_cn_agency')
-    .where('id', '=', publication.members[0]!.schema.publicationId).where('_deleted', '=', false).executeTakeFirstOrThrow()
+  const streamLink = await db.selectFrom('Transfer_Payment_Stream_Review_Set')
+    .select('egcs_tp_transferpaymentstream')
+    .where('egcs_tp_reviewset', '=', reviewSetSetupId).where('_deleted', '=', false).executeTakeFirstOrThrow()
   const creator = await db.selectFrom('Common_User').select('id').where('_deleted', '=', false).orderBy('id').executeTakeFirstOrThrow()
   const reviewSet = await createRuntimeReviewSetInTransaction({
     db: db as Transaction<Database>,
     reviewSetSetupId,
     entityType,
     entityId,
-    ownerAgencyId: String(firstSchema.egcs_cn_agency),
+    ownerAgencyId: String(reviewSetSetup.egcs_cn_agency),
     setupScopes: [{
-      scopeType: reviewSetSetup.egcs_cn_scopetype,
-      scopeId: String(reviewSetSetup.egcs_cn_scopeid)
+      scopeType: 'transferpaymentstream',
+      scopeId: String(streamLink.egcs_tp_transferpaymentstream)
     }],
     publication,
     publicationVersionId: published.publicationVersionId,
@@ -786,7 +821,6 @@ const seedAdvanceAssessmentRuntimeReview = async (db: Kysely<Database>): Promise
   const advanceAssessmentSetSetup = await db
     .selectFrom('Common_Review_Set_Setup')
     .select('id')
-    .where('egcs_cn_scopetype', '=', 'transferpaymentstream')
     .where('egcs_cn_entitytype', '=', 'applicantrecipient')
     .where('egcs_cn_name_en', '=', 'Advance Payment Assessment Set')
     .where('_deleted', '=', false)
@@ -2058,7 +2092,7 @@ const seedAgreementApprovalSubmissionWorkflows = async (
 
   for (const target of targets) {
     const finalApprovalTemplate = await db.insertInto('Common_Approval_Template').values({
-      egcs_cn_scopetype: 'transferpaymentstream', egcs_cn_scopeid: streamId,
+      egcs_cn_agency: agencyId,
       egcs_cn_name_en: `${target.labelEn} Final Approval`,
       egcs_cn_name_fr: `Approbation finale de ${target.labelFrOf}`,
       egcs_cn_description_en: `Final approval for the seeded ${target.labelEn.toLocaleLowerCase()} workflow.`,
@@ -2105,7 +2139,7 @@ const seedAgreementApprovalSubmissionWorkflows = async (
       _deleted: false
     }).execute()
     const reviewSet = await db.insertInto('Common_Review_Set_Setup').values({
-      egcs_cn_scopetype: 'transferpaymentstream', egcs_cn_scopeid: streamId,
+      egcs_cn_agency: agencyId,
       egcs_cn_entitytype: target.entityType,
       egcs_cn_name_en: `Quick ${target.labelEn} Review Set`,
       egcs_cn_name_fr: `Ensemble de revues rapides de ${target.labelFrOf}`,
@@ -2113,6 +2147,7 @@ const seedAgreementApprovalSubmissionWorkflows = async (
       egcs_cn_description_fr: `Une liste de contrôle et une évaluation rapides pour le flux initialisé de ${target.labelFrOf}.`,
       egcs_cn_order: 1, egcs_cn_sequential: true, egcs_cn_directreview: true, _deleted: false
     }).returning('id').executeTakeFirstOrThrow()
+    await linkSeedReviewSetToStream(db, streamId, String(reviewSet.id))
     await db.insertInto('Common_Review_Setup').values([
       {
         egcs_cn_entitytype: target.entityType, egcs_cn_order: 1, egcs_cn_reviewset: String(reviewSet.id),
@@ -2129,7 +2164,7 @@ const seedAgreementApprovalSubmissionWorkflows = async (
     ]).execute()
 
     const recommendationSet = await db.insertInto('Common_Recommendation_Set_Setup').values({
-      egcs_cn_scopetype: 'transferpaymentstream', egcs_cn_scopeid: streamId,
+      egcs_cn_agency: agencyId,
       egcs_cn_name_en: `${target.labelEn} Recommendation Set`,
       egcs_cn_name_fr: `Ensemble de recommandations de ${target.labelFrOf}`,
       egcs_cn_description_en: `Two sequential recommendations for the seeded ${target.labelEn.toLocaleLowerCase()} workflow.`,
@@ -2155,7 +2190,7 @@ const seedAgreementApprovalSubmissionWorkflows = async (
 
     await publishSeedWorkflowDependencies(db)
     const workflow = await db.insertInto('Common_Workflow_Setup').values({
-      egcs_cn_scopetype: 'transferpaymentstream', egcs_cn_scopeid: streamId,
+      egcs_cn_agency: agencyId,
       egcs_cn_entitytype: target.entityType,
       egcs_cn_purpose: 'approval_submission',
       egcs_cn_name_en: `${target.labelEn} review and recommendation workflow`,
@@ -2166,6 +2201,7 @@ const seedAgreementApprovalSubmissionWorkflows = async (
       egcs_cn_executionfailurestatus: agencyStatusIds.denied,
       egcs_cn_allowretry: true, _deleted: false
     }).returning('id').executeTakeFirstOrThrow()
+    await linkSeedWorkflowToStream(db, streamId, String(workflow.id))
     await insertWorkflowAllowedStartStatuses(db, String(workflow.id), [
       agencyStatusIds.draft,
       agencyStatusIds.denied
@@ -2250,8 +2286,7 @@ const seedAgreementRiskRatingWorkflow = async (
     _deleted: false
   }).returning('id').executeTakeFirstOrThrow()
   const reviewSet = await db.insertInto('Common_Review_Set_Setup').values({
-    egcs_cn_scopetype: 'transferpaymentstream',
-    egcs_cn_scopeid: streamId,
+    egcs_cn_agency: agencyId,
     egcs_cn_entitytype: 'fundingcaseagreement',
     egcs_cn_name_en: 'Agreement Risk Rating Review Set',
     egcs_cn_name_fr: 'Ensemble de revues de la cote de risque de l’entente',
@@ -2262,6 +2297,7 @@ const seedAgreementRiskRatingWorkflow = async (
     egcs_cn_directreview: true,
     _deleted: false
   }).returning('id').executeTakeFirstOrThrow()
+  await linkSeedReviewSetToStream(db, streamId, String(reviewSet.id))
   await db.insertInto('Common_Review_Setup').values({
     egcs_cn_entitytype: 'fundingcaseagreement',
     egcs_cn_order: 1,
@@ -2271,8 +2307,7 @@ const seedAgreementRiskRatingWorkflow = async (
   }).execute()
   await publishSeedWorkflowDependencies(db)
   const workflow = await db.insertInto('Common_Workflow_Setup').values({
-    egcs_cn_scopetype: 'transferpaymentstream',
-    egcs_cn_scopeid: streamId,
+    egcs_cn_agency: agencyId,
     egcs_cn_entitytype: 'fundingcaseagreement',
     egcs_cn_purpose: 'risk_rating',
     egcs_cn_name_en: 'Agreement Risk Rating Workflow',
@@ -2284,6 +2319,7 @@ const seedAgreementRiskRatingWorkflow = async (
     egcs_cn_allowretry: true,
     _deleted: false
   }).returning('id').executeTakeFirstOrThrow()
+  await linkSeedWorkflowToStream(db, streamId, String(workflow.id))
   await insertWorkflowAllowedStartStatuses(db, String(workflow.id), [
     agencyStatusIds.draft,
     agencyStatusIds.active,
@@ -2314,7 +2350,7 @@ const seedAgreement51WorkflowCatalog = async (
 
   for (const target of targets) {
     const approvalTemplate = await db.insertInto('Common_Approval_Template').values({
-      egcs_cn_scopetype: 'transferpaymentstream', egcs_cn_scopeid: streamId,
+      egcs_cn_agency: agencyId,
       egcs_cn_name_en: `${target.labelEn} standard workflow decision`,
       egcs_cn_name_fr: `Décision du flux standard - ${target.labelFr}`,
       egcs_cn_description_en: `Decision step for manually testing the seeded ${target.labelEn.toLocaleLowerCase()} standard workflow.`,
@@ -2332,7 +2368,7 @@ const seedAgreement51WorkflowCatalog = async (
     }).execute()
     await publishSeedWorkflowDependencies(db)
     const workflow = await db.insertInto('Common_Workflow_Setup').values({
-      egcs_cn_scopetype: 'transferpaymentstream', egcs_cn_scopeid: streamId,
+      egcs_cn_agency: agencyId,
       egcs_cn_entitytype: target.entityType, egcs_cn_purpose: 'standard',
       egcs_cn_name_en: `${target.labelEn} manual test workflow`,
       egcs_cn_name_fr: `Flux d’essai manuel - ${target.labelFr}`,
@@ -2342,6 +2378,7 @@ const seedAgreement51WorkflowCatalog = async (
       egcs_cn_executionfailurestatus: agencyStatusIds.denied,
       egcs_cn_allowretry: true, _deleted: false
     }).returning('id').executeTakeFirstOrThrow()
+    await linkSeedWorkflowToStream(db, streamId, String(workflow.id))
     await insertWorkflowAllowedStartStatuses(db, String(workflow.id), [
       agencyStatusIds.draft, agencyStatusIds.inProgress, agencyStatusIds.active,
       agencyStatusIds.inReview, agencyStatusIds.pendingApproval, agencyStatusIds.approved,
@@ -2359,7 +2396,7 @@ const seedAgreement51WorkflowCatalog = async (
     { entityType: 'fundingcaseagreementcloseout' as const, labelEn: 'Closeout', labelFr: 'Clôture', successStatus: agencyStatusIds.closed }
   ]) {
     const approvalTemplate = await db.insertInto('Common_Approval_Template').values({
-      egcs_cn_scopetype: 'transferpaymentstream', egcs_cn_scopeid: streamId,
+      egcs_cn_agency: agencyId,
       egcs_cn_name_en: `${target.labelEn} Approval Submission Template`,
       egcs_cn_name_fr: `Modèle de soumission pour approbation - ${target.labelFr}`,
       egcs_cn_description_en: `Final decision for the seeded ${target.labelEn.toLocaleLowerCase()} approval-submission workflow.`,
@@ -2376,7 +2413,7 @@ const seedAgreement51WorkflowCatalog = async (
     }).execute()
     await publishSeedWorkflowDependencies(db)
     const workflow = await db.insertInto('Common_Workflow_Setup').values({
-      egcs_cn_scopetype: 'transferpaymentstream', egcs_cn_scopeid: streamId,
+      egcs_cn_agency: agencyId,
       egcs_cn_entitytype: target.entityType, egcs_cn_purpose: 'approval_submission',
       egcs_cn_name_en: `${target.labelEn} completion and approval`,
       egcs_cn_name_fr: `Achèvement et approbation - ${target.labelFr}`,
@@ -2386,6 +2423,7 @@ const seedAgreement51WorkflowCatalog = async (
       egcs_cn_executionfailurestatus: agencyStatusIds.denied,
       egcs_cn_allowretry: true, _deleted: false
     }).returning('id').executeTakeFirstOrThrow()
+    await linkSeedWorkflowToStream(db, streamId, String(workflow.id))
     await insertWorkflowAllowedStartStatuses(db, String(workflow.id), [agencyStatusIds.draft, agencyStatusIds.denied])
     await db.insertInto('Common_Workflow_Setup_Member').values({
       egcs_cn_workflowsetup: String(workflow.id), egcs_cn_sequence: 1,
@@ -2760,8 +2798,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
     let approvalTemplate = await db
       .selectFrom('Common_Approval_Template')
       .select('id')
-      .where('egcs_cn_scopetype', '=', 'transferpaymentstream')
-      .where('egcs_cn_scopeid', '=', String(stream.id))
+      .where('egcs_cn_agency', '=', String(agency.id))
       .where('egcs_cn_name_en', '=', 'Transfer Payment Approval Template')
       .where('_deleted', '=', false)
       .orderBy('id', 'asc')
@@ -2785,8 +2822,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
       approvalTemplate = await db
         .insertInto('Common_Approval_Template')
         .values({
-          egcs_cn_scopetype: 'transferpaymentstream',
-          egcs_cn_scopeid: String(stream.id),
+          egcs_cn_agency: String(agency.id),
           egcs_cn_name_en: 'Transfer Payment Approval Template',
           egcs_cn_name_fr: "Modèle d'approbation de paiement de transfert",
           egcs_cn_description_en: 'Seeded approval template for transfer payment workflows.',
@@ -2830,8 +2866,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
     let commonReviewApprovalTemplate = await db
       .selectFrom('Common_Approval_Template')
       .select('id')
-      .where('egcs_cn_scopetype', '=', 'transferpaymentstream')
-      .where('egcs_cn_scopeid', '=', String(stream.id))
+      .where('egcs_cn_agency', '=', String(agency.id))
       .where('egcs_cn_name_en', '=', 'Common Review Approval Template')
       .where('_deleted', '=', false)
       .orderBy('id', 'asc')
@@ -2841,8 +2876,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
       commonReviewApprovalTemplate = await db
         .insertInto('Common_Approval_Template')
         .values({
-          egcs_cn_scopetype: 'transferpaymentstream',
-          egcs_cn_scopeid: String(stream.id),
+          egcs_cn_agency: String(agency.id),
           egcs_cn_name_en: 'Common Review Approval Template',
           egcs_cn_name_fr: "Modèle d'approbation pour revue commune",
           egcs_cn_description_en: 'Seeded approval template for stream-scoped common review workflows.',
@@ -2978,8 +3012,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
     let commitmentApprovalTemplate = await db
       .selectFrom('Common_Approval_Template')
       .select('id')
-      .where('egcs_cn_scopetype', '=', 'transferpaymentstream')
-      .where('egcs_cn_scopeid', '=', String(stream.id))
+      .where('egcs_cn_agency', '=', String(agency.id))
       .where('egcs_cn_name_en', '=', 'Agreement Commitment Approval Template')
       .where('_deleted', '=', false)
       .orderBy('id', 'asc')
@@ -2989,8 +3022,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
       commitmentApprovalTemplate = await db
         .insertInto('Common_Approval_Template')
         .values({
-          egcs_cn_scopetype: 'transferpaymentstream',
-          egcs_cn_scopeid: String(stream.id),
+          egcs_cn_agency: String(agency.id),
           egcs_cn_name_en: 'Agreement Commitment Approval Template',
           egcs_cn_name_fr: "Modèle d'approbation des engagements d'entente",
           egcs_cn_description_en: 'Seeded approval template for funding agreement commitment workflows.',
@@ -3079,8 +3111,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
     let forecastApprovalTemplate = await db
       .selectFrom('Common_Approval_Template')
       .select('id')
-      .where('egcs_cn_scopetype', '=', 'transferpaymentstream')
-      .where('egcs_cn_scopeid', '=', String(stream.id))
+      .where('egcs_cn_agency', '=', String(agency.id))
       .where('egcs_cn_name_en', '=', 'Agreement Forecast Approval Template')
       .where('_deleted', '=', false)
       .orderBy('id', 'asc')
@@ -3089,8 +3120,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
     let monitorApprovalTemplate = await db
       .selectFrom('Common_Approval_Template')
       .select('id')
-      .where('egcs_cn_scopetype', '=', 'transferpaymentstream')
-      .where('egcs_cn_scopeid', '=', String(stream.id))
+      .where('egcs_cn_agency', '=', String(agency.id))
       .where('egcs_cn_name_en', '=', 'Agreement Monitor Approval Template')
       .where('_deleted', '=', false)
       .orderBy('id', 'asc')
@@ -3100,8 +3130,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
       monitorApprovalTemplate = await db
         .insertInto('Common_Approval_Template')
         .values({
-          egcs_cn_scopetype: 'transferpaymentstream',
-          egcs_cn_scopeid: String(stream.id),
+          egcs_cn_agency: String(agency.id),
           egcs_cn_name_en: 'Agreement Monitor Approval Template',
           egcs_cn_name_fr: "Modèle d'approbation des surveillances d'entente",
           egcs_cn_description_en: 'Seeded approval template for funding agreement monitor workflows.',
@@ -3148,8 +3177,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
       forecastApprovalTemplate = await db
         .insertInto('Common_Approval_Template')
         .values({
-          egcs_cn_scopetype: 'transferpaymentstream',
-          egcs_cn_scopeid: String(stream.id),
+          egcs_cn_agency: String(agency.id),
           egcs_cn_name_en: 'Agreement Forecast Approval Template',
           egcs_cn_name_fr: "Modèle d'approbation des prévisions d'entente",
           egcs_cn_description_en: 'Seeded approval template for funding agreement forecast workflows.',
@@ -3225,8 +3253,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
     let claimReconcileApprovalTemplate = await db
       .selectFrom('Common_Approval_Template')
       .select('id')
-      .where('egcs_cn_scopetype', '=', 'transferpaymentstream')
-      .where('egcs_cn_scopeid', '=', String(stream.id))
+      .where('egcs_cn_agency', '=', String(agency.id))
       .where('egcs_cn_name_en', '=', 'Claim Reconciliation Approval Template')
       .where('_deleted', '=', false)
       .orderBy('id', 'asc')
@@ -3236,8 +3263,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
       claimReconcileApprovalTemplate = await db
         .insertInto('Common_Approval_Template')
         .values({
-          egcs_cn_scopetype: 'transferpaymentstream',
-          egcs_cn_scopeid: String(stream.id),
+          egcs_cn_agency: String(agency.id),
           egcs_cn_name_en: 'Claim Reconciliation Approval Template',
           egcs_cn_name_fr: "Modèle d'approbation du rapprochement de réclamation",
           egcs_cn_description_en: 'Seeded approval template for claim reconciliation workflows.',
@@ -3514,8 +3540,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
       const assessmentSetSetup = await db
         .insertInto('Common_Review_Set_Setup')
         .values({
-          egcs_cn_scopetype: 'transferpaymentstream',
-          egcs_cn_scopeid: String(stream.id),
+          egcs_cn_agency: String(agency.id),
           egcs_cn_entitytype: 'applicantrecipient',
           egcs_cn_name_en: 'Payment Assessment Set',
           egcs_cn_name_fr: 'Ensemble d evaluations de paiement',
@@ -3529,6 +3554,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
         .returning('id')
         .executeTakeFirstOrThrow()
 
+      await linkSeedReviewSetToStream(db, String(stream.id), String(assessmentSetSetup.id))
       await db
         .insertInto('Common_Review_Setup')
         .values({
@@ -3546,8 +3572,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
       const advanceAssessmentSetSetup = await db
         .insertInto('Common_Review_Set_Setup')
         .values({
-          egcs_cn_scopetype: 'transferpaymentstream',
-          egcs_cn_scopeid: String(stream.id),
+          egcs_cn_agency: String(agency.id),
           egcs_cn_entitytype: 'applicantrecipient',
           egcs_cn_name_en: 'Advance Payment Assessment Set',
           egcs_cn_name_fr: 'Ensemble d évaluations de paiement anticipé',
@@ -3561,6 +3586,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
         .returning('id')
         .executeTakeFirstOrThrow()
 
+      await linkSeedReviewSetToStream(db, String(stream.id), String(advanceAssessmentSetSetup.id))
       await db
         .insertInto('Common_Review_Setup')
         .values({
@@ -3578,8 +3604,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
       const checklistSetSetup = await db
         .insertInto('Common_Review_Set_Setup')
         .values({
-          egcs_cn_scopetype: 'transferpaymentstream',
-          egcs_cn_scopeid: String(stream.id),
+          egcs_cn_agency: String(agency.id),
           egcs_cn_entitytype: 'applicantrecipient',
           egcs_cn_name_en: 'Payment Checklist Set',
           egcs_cn_name_fr: 'Ensemble de listes de verification de paiement',
@@ -3593,6 +3618,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
         .returning('id')
         .executeTakeFirstOrThrow()
 
+      await linkSeedReviewSetToStream(db, String(stream.id), String(checklistSetSetup.id))
       await db
         .insertInto('Common_Review_Setup')
         .values({
@@ -3610,8 +3636,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
       const mixedReviewSetSetup = await db
         .insertInto('Common_Review_Set_Setup')
         .values({
-          egcs_cn_scopetype: 'transferpaymentstream',
-          egcs_cn_scopeid: String(stream.id),
+          egcs_cn_agency: String(agency.id),
           egcs_cn_entitytype: 'applicantrecipient',
           egcs_cn_name_en: 'Payment Readiness Review Set',
           egcs_cn_name_fr: 'Ensemble de revues de préparation au paiement',
@@ -3625,6 +3650,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
         .returning('id')
         .executeTakeFirstOrThrow()
 
+      await linkSeedReviewSetToStream(db, String(stream.id), String(mixedReviewSetSetup.id))
       await db
         .insertInto('Common_Review_Setup')
         .values([
@@ -3650,7 +3676,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
 
     if (approvalTemplate && recommendationSchema) {
       const recommendationApprovalTemplate = await db.insertInto('Common_Approval_Template').values({
-        egcs_cn_scopetype: 'transferpaymentstream', egcs_cn_scopeid: String(stream.id),
+        egcs_cn_agency: String(agency.id),
         egcs_cn_name_en: 'Recommendation Approval', egcs_cn_name_fr: 'Approbation de recommandation',
         egcs_cn_description_en: 'Approves each recommendation outcome before the workflow advances.',
         egcs_cn_description_fr: 'Approuve chaque résultat de recommandation avant la poursuite du flux.',
@@ -3665,8 +3691,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
       const recommendationSet = await db
         .insertInto('Common_Recommendation_Set_Setup')
         .values({
-          egcs_cn_scopetype: 'transferpaymentstream',
-          egcs_cn_scopeid: String(stream.id),
+          egcs_cn_agency: String(agency.id),
           egcs_cn_name_en: 'Payment Recommendation Setup',
           egcs_cn_name_fr: 'Configuration de recommandation de paiement',
           egcs_cn_description_en: 'Recommendation captured when payment review completes.',
@@ -3723,13 +3748,14 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
           egcs_cn_checklistschema: SEEDED_CHECKLIST_DEFINITION, _deleted: false
         }).execute()
         const paymentReviewSet = await db.insertInto('Common_Review_Set_Setup').values({
-          egcs_cn_scopetype: 'transferpaymentstream', egcs_cn_scopeid: String(stream.id),
+          egcs_cn_agency: String(agency.id),
           egcs_cn_entitytype: 'fundingcasepayment',
           egcs_cn_name_en: 'Payment workflow review', egcs_cn_name_fr: 'Revue du flux de paiement',
           egcs_cn_description_en: 'Quick checklist review before the payment recommendation workflow.',
           egcs_cn_description_fr: 'Revue rapide par liste de contrôle avant le flux de recommandation du paiement.',
           egcs_cn_order: 1, egcs_cn_sequential: true, egcs_cn_directreview: true, _deleted: false
         }).returning('id').executeTakeFirstOrThrow()
+        await linkSeedReviewSetToStream(db, String(stream.id), String(paymentReviewSet.id))
         await db.insertInto('Common_Review_Setup').values({
           egcs_cn_entitytype: 'fundingcasepayment', egcs_cn_order: 1,
           egcs_cn_reviewset: String(paymentReviewSet.id), egcs_cn_reviewschema: String(paymentChecklistSchema.id),
@@ -3737,7 +3763,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
         }).execute()
         await publishSeedWorkflowDependencies(db)
         const paymentWorkflow = await db.insertInto('Common_Workflow_Setup').values({
-          egcs_cn_scopetype: 'transferpaymentstream', egcs_cn_scopeid: String(stream.id),
+          egcs_cn_agency: String(agency.id),
           egcs_cn_entitytype: 'fundingcasepayment',
           egcs_cn_purpose: 'approval_submission',
           egcs_cn_name_en: 'Payment completion and recommendation',
@@ -3748,6 +3774,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
           egcs_cn_executionfailurestatus: agencyStatusIds.denied,
           egcs_cn_allowretry: true, _deleted: false
         }).returning('id').executeTakeFirstOrThrow()
+        await linkSeedWorkflowToStream(db, String(stream.id), String(paymentWorkflow.id))
         await insertWorkflowAllowedStartStatuses(db, String(paymentWorkflow.id), [
           agencyStatusIds.draft,
           agencyStatusIds.denied
@@ -3822,7 +3849,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
             _deleted: false
           }).returning('id').executeTakeFirstOrThrow()
           const approvalRecommendationSet = await db.insertInto('Common_Recommendation_Set_Setup').values({
-            egcs_cn_scopetype: 'transferpaymentstream', egcs_cn_scopeid: String(stream.id),
+            egcs_cn_agency: String(agency.id),
             egcs_cn_name_en: approvalSubmissionSeed.schemaNameEn,
             egcs_cn_name_fr: approvalSubmissionSeed.schemaNameFr,
             egcs_cn_description_en: 'Captures and approves the immutable Agreement submission packet.',
@@ -3837,7 +3864,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
           }).execute()
           await publishSeedWorkflowDependencies(db)
           const approvalWorkflow = await db.insertInto('Common_Workflow_Setup').values({
-            egcs_cn_scopetype: 'transferpaymentstream', egcs_cn_scopeid: String(stream.id),
+            egcs_cn_agency: String(agency.id),
             egcs_cn_entitytype: approvalSubmissionSeed.entityType,
             egcs_cn_purpose: 'approval_submission',
             egcs_cn_name_en: approvalSubmissionSeed.setupNameEn,
@@ -3848,6 +3875,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
             egcs_cn_executionfailurestatus: agencyStatusIds.denied,
             egcs_cn_allowretry: true, _deleted: false
           }).returning('id').executeTakeFirstOrThrow()
+          await linkSeedWorkflowToStream(db, String(stream.id), String(approvalWorkflow.id))
           await insertWorkflowAllowedStartStatuses(db, String(approvalWorkflow.id), [
             agencyStatusIds.draft,
             agencyStatusIds.denied,
@@ -3865,7 +3893,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
         await publishSeedWorkflowDependencies(db)
         const approvalOnlyWorkflows = await db.insertInto('Common_Workflow_Setup').values([
           {
-            egcs_cn_scopetype: 'transferpaymentstream', egcs_cn_scopeid: String(stream.id),
+            egcs_cn_agency: String(agency.id),
             egcs_cn_entitytype: 'fundingcaseagreementcommitment',
             egcs_cn_purpose: 'approval_submission',
             egcs_cn_name_en: 'Commitment completion and approval',
@@ -3877,7 +3905,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
             egcs_cn_allowretry: true, _deleted: false
           },
           {
-            egcs_cn_scopetype: 'transferpaymentstream', egcs_cn_scopeid: String(stream.id),
+            egcs_cn_agency: String(agency.id),
             egcs_cn_entitytype: 'fundingcaseforecast',
             egcs_cn_purpose: 'approval_submission',
             egcs_cn_name_en: 'Forecast completion and approval',
@@ -3889,7 +3917,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
             egcs_cn_allowretry: true, _deleted: false
           },
           {
-            egcs_cn_scopetype: 'transferpaymentstream', egcs_cn_scopeid: String(stream.id),
+            egcs_cn_agency: String(agency.id),
             egcs_cn_entitytype: 'fundingcasemonitor',
             egcs_cn_purpose: 'approval_submission',
             egcs_cn_name_en: 'Monitor completion and approval',
@@ -3901,7 +3929,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
             egcs_cn_allowretry: true, _deleted: false
           },
           {
-            egcs_cn_scopetype: 'transferpaymentstream', egcs_cn_scopeid: String(stream.id),
+            egcs_cn_agency: String(agency.id),
             egcs_cn_entitytype: 'fundingclaimreconcile',
             egcs_cn_purpose: 'approval_submission',
             egcs_cn_name_en: 'Claim reconciliation completion and approval',
@@ -3914,6 +3942,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
           }
         ]).returning(['id', 'egcs_cn_entitytype']).execute()
         for (const workflow of approvalOnlyWorkflows) {
+          await linkSeedWorkflowToStream(db, String(stream.id), String(workflow.id))
           await insertWorkflowAllowedStartStatuses(db, String(workflow.id), [
             agencyStatusIds.draft,
             ...(workflow.egcs_cn_entitytype === 'fundingcaseforecast' ? [agencyStatusIds.inProgress] : []),
@@ -3995,37 +4024,61 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
       .execute()
   }
 
-  for (const stream of await db.selectFrom('Transfer_Payment_Stream').select('id').where('_deleted', '=', false).execute()) {
+  const agencySeedFields = new Map<string, { deliveryFieldId: string, deliveryOptionId: string, notesFieldId: string, referenceFieldId: string }>()
+  for (const stream of await db.selectFrom('Transfer_Payment_Stream')
+    .innerJoin('Transfer_Payment_Profile', 'Transfer_Payment_Profile.id', 'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile')
+    .select(['Transfer_Payment_Stream.id', 'Transfer_Payment_Profile.egcs_tp_agency as agencyId'])
+    .where('Transfer_Payment_Stream._deleted', '=', false).execute()) {
+    const agencyId = String(stream.agencyId)
+    let fields = agencySeedFields.get(agencyId)
+    if (!fields) {
+      const deliveryField = await db.insertInto('Agency_Custom_Field').values({
+        egcs_ay_agency: agencyId, egcs_ay_name_en: 'Delivery model', egcs_ay_name_fr: 'Mode de prestation',
+        egcs_ay_kind: 'relational', egcs_ay_multiple: true, egcs_ay_discriminator: true
+      }).returning('id').executeTakeFirstOrThrow()
+      const deliveryOption = await db.insertInto('Agency_Custom_Field_Option').values({
+        egcs_ay_field: String(deliveryField.id), egcs_ay_name_en: 'Direct delivery', egcs_ay_name_fr: 'Prestation directe',
+        egcs_ay_category_en: 'Delivery', egcs_ay_category_fr: 'Prestation'
+      }).returning('id').executeTakeFirstOrThrow()
+      const notesField = await db.insertInto('Agency_Custom_Field').values({
+        egcs_ay_agency: agencyId, egcs_ay_name_en: 'Delivery notes', egcs_ay_name_fr: 'Notes sur la prestation',
+        egcs_ay_kind: 'text', egcs_ay_presentation: 'multiline'
+      }).returning('id').executeTakeFirstOrThrow()
+      const referenceField = await db.insertInto('Agency_Custom_Field').values({
+        egcs_ay_agency: agencyId, egcs_ay_name_en: 'Local project reference', egcs_ay_name_fr: 'Référence locale du projet',
+        egcs_ay_kind: 'text', egcs_ay_presentation: 'single_line'
+      }).returning('id').executeTakeFirstOrThrow()
+      fields = {
+        deliveryFieldId: String(deliveryField.id), deliveryOptionId: String(deliveryOption.id),
+        notesFieldId: String(notesField.id), referenceFieldId: String(referenceField.id)
+      }
+      agencySeedFields.set(agencyId, fields)
+    }
     const section = await db.insertInto('Transfer_Payment_Stream_Field_Section').values({
       egcs_tp_transferpaymentstream: String(stream.id), egcs_tp_name_en: 'Project delivery', egcs_tp_name_fr: 'Prestation du projet', egcs_tp_displayorder: 0
     }).returning('id').executeTakeFirstOrThrow()
-    const field = await db.insertInto('Transfer_Payment_Stream_Field').values({
-      egcs_tp_section: String(section.id), egcs_tp_transferpaymentstream: String(stream.id), egcs_tp_name_en: 'Delivery model', egcs_tp_name_fr: 'Mode de prestation',
-      egcs_tp_kind: 'relational', egcs_tp_multiple: true, egcs_tp_discriminator: true, egcs_tp_displayorder: 0
-    }).returningAll().executeTakeFirstOrThrow()
-    const option = await db.insertInto('Transfer_Payment_Stream_Field_Option').values({
-      egcs_tp_field: String(field.id), egcs_tp_name_en: 'Direct delivery', egcs_tp_name_fr: 'Prestation directe',
-      egcs_tp_category_en: 'Delivery', egcs_tp_category_fr: 'Prestation', egcs_tp_displayorder: 0
-    }).returningAll().executeTakeFirstOrThrow()
-    await db.insertInto('Transfer_Payment_Stream_Field').values({
-      egcs_tp_section: String(section.id), egcs_tp_transferpaymentstream: String(stream.id), egcs_tp_name_en: 'Delivery notes', egcs_tp_name_fr: 'Notes sur la prestation',
-      egcs_tp_kind: 'text', egcs_tp_presentation: 'multiline', egcs_tp_displayorder: 1
-    }).execute()
+    await db.insertInto('Transfer_Payment_Stream_Field_Assignment').values([
+      { egcs_tp_section: String(section.id), egcs_tp_transferpaymentstream: String(stream.id), egcs_tp_agencyfield: fields.deliveryFieldId, egcs_tp_displayorder: 0 },
+      { egcs_tp_section: String(section.id), egcs_tp_transferpaymentstream: String(stream.id), egcs_tp_agencyfield: fields.notesFieldId, egcs_tp_displayorder: 1 }
+    ]).execute()
     const referencesSection = await db.insertInto('Transfer_Payment_Stream_Field_Section').values({
       egcs_tp_transferpaymentstream: String(stream.id), egcs_tp_name_en: 'Project references', egcs_tp_name_fr: 'Références du projet', egcs_tp_displayorder: 1
     }).returning('id').executeTakeFirstOrThrow()
-    await db.insertInto('Transfer_Payment_Stream_Field').values({
-      egcs_tp_section: String(referencesSection.id), egcs_tp_transferpaymentstream: String(stream.id), egcs_tp_name_en: 'Local project reference', egcs_tp_name_fr: 'Référence locale du projet',
-      egcs_tp_kind: 'text', egcs_tp_presentation: 'single_line', egcs_tp_displayorder: 2
+    await db.insertInto('Transfer_Payment_Stream_Field_Assignment').values({
+      egcs_tp_section: String(referencesSection.id), egcs_tp_transferpaymentstream: String(stream.id),
+      egcs_tp_agencyfield: fields.referenceFieldId, egcs_tp_displayorder: 2
     }).execute()
+    const streamWorkflowIds = seedCatalogLinks(db).workflows
+      .filter(([streamId]) => streamId === String(stream.id)).map(([, workflowId]) => workflowId)
+    if (streamWorkflowIds.length === 0) continue
     const members = await db.selectFrom('Common_Workflow_Setup_Member as member')
       .innerJoin('Common_Workflow_Setup as setup', 'setup.id', 'member.egcs_cn_workflowsetup')
-      .select('member.id').where('setup.egcs_cn_scopeid', '=', String(stream.id))
-      .where('setup.egcs_cn_scopetype', '=', 'transferpaymentstream').where('setup.egcs_cn_entitytype', '=', 'fundingcaseagreement')
+      .select('member.id').where('setup.id', 'in', streamWorkflowIds)
+      .where('setup.egcs_cn_entitytype', '=', 'fundingcaseagreement')
       .where('setup.egcs_cn_purpose', '=', 'approval_submission').where('member.egcs_cn_sequence', '=', 1)
       .where('member._deleted', '=', false).execute()
     if (members.length) await db.insertInto('Common_Workflow_Member_Condition').values(members.map(member => ({
-      egcs_cn_workflowsetupmember: String(member.id), egcs_cn_field: String(field.id), egcs_cn_option: String(option.id)
+      egcs_cn_workflowsetupmember: String(member.id), egcs_cn_field: fields.deliveryFieldId, egcs_cn_option: fields.deliveryOptionId
     }))).execute()
   }
 
@@ -4039,11 +4092,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
     const plan = await buildWorkflowSetupPublication(db, setup)
     await publishDefinition(db as Transaction<Database>, {
       publicationId: String(setup.id), kind: 'workflow_setup', definition: plan.definition as unknown as JsonValue,
-      references: plan.references, workflowStatuses: plan.statuses, actorId: String(actor.id),
-      selections: setup.egcs_cn_purpose === 'standard' ? [] : [{
-        dimension: 'scope_entity_purpose',
-        key: `${setup.egcs_cn_scopetype}:${setup.egcs_cn_scopeid}:${setup.egcs_cn_entitytype}:${setup.egcs_cn_purpose}`
-      }]
+      references: plan.references, workflowStatuses: plan.statuses, actorId: String(actor.id)
     })
   }
 }
@@ -4474,8 +4523,7 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
             .execute()
           const commitmentApprovalTemplate = await db.selectFrom('Common_Approval_Template')
             .select('id')
-            .where('egcs_cn_scopetype', '=', 'transferpaymentstream')
-            .where('egcs_cn_scopeid', '=', String(stream.streamId))
+            .where('egcs_cn_agency', '=', String(stream.agencyId))
             .where('egcs_cn_name_en', '=', 'Agreement Commitment Approval Template')
             .where('_deleted', '=', false)
             .executeTakeFirstOrThrow()
@@ -4593,13 +4641,13 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
 
         const claimStandardTemplates = await db.insertInto('Common_Approval_Template').values([
           {
-            egcs_cn_scopetype: 'transferpaymentstream', egcs_cn_scopeid: String(stream.streamId),
+            egcs_cn_agency: String(stream.agencyId),
             egcs_cn_name_en: 'Claim quality assurance', egcs_cn_name_fr: 'Assurance de la qualité de la réclamation',
             egcs_cn_description_en: 'Optional post-completion quality assurance for a Claim.',
             egcs_cn_description_fr: 'Assurance de la qualité facultative après l’achèvement d’une réclamation.', _deleted: false
           },
           {
-            egcs_cn_scopetype: 'transferpaymentstream', egcs_cn_scopeid: String(stream.streamId),
+            egcs_cn_agency: String(stream.agencyId),
             egcs_cn_name_en: 'Claim compliance follow-up', egcs_cn_name_fr: 'Suivi de la conformité de la réclamation',
             egcs_cn_description_en: 'Optional post-completion compliance follow-up for a Claim.',
             egcs_cn_description_fr: 'Suivi facultatif de la conformité après l’achèvement d’une réclamation.', _deleted: false
@@ -4614,7 +4662,7 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
         }))).execute()
         await publishSeedWorkflowDependencies(db)
         const claimStandardWorkflows = await db.insertInto('Common_Workflow_Setup').values(claimStandardTemplates.map(template => ({
-          egcs_cn_scopetype: 'transferpaymentstream' as const, egcs_cn_scopeid: String(stream.streamId),
+          egcs_cn_agency: String(stream.agencyId),
           egcs_cn_entitytype: 'fundingcaseagreementclaim' as const, egcs_cn_purpose: 'standard' as const,
           egcs_cn_name_en: template.egcs_cn_name_en, egcs_cn_name_fr: template.egcs_cn_name_fr,
           egcs_cn_description_en: `Run ${template.egcs_cn_name_en.toLocaleLowerCase()} against the completed demo Claim.`,
@@ -4623,6 +4671,7 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
           egcs_cn_allowretry: true, _deleted: false
         }))).returning('id').execute()
         for (const workflow of claimStandardWorkflows) {
+          await linkSeedWorkflowToStream(db, String(stream.streamId), String(workflow.id))
           await insertWorkflowAllowedStartStatuses(db, String(workflow.id), [agencyStatusIds.inReview])
         }
         await db.insertInto('Common_Workflow_Setup_Member').values(claimStandardWorkflows.map((workflow, index) => ({
@@ -4639,7 +4688,7 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
           await publishDefinition(db as Transaction<Database>, {
             publicationId: String(setup.id), kind: 'workflow_setup', definition: plan.definition as unknown as JsonValue,
             references: plan.references, workflowStatuses: plan.statuses,
-            actorId: String(standardWorkflowActor.id), selections: []
+            actorId: String(standardWorkflowActor.id)
           })
         }
 
@@ -4667,8 +4716,7 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
         const claimReconcileApprovalTemplate = await db
           .selectFrom('Common_Approval_Template')
           .select('id')
-          .where('egcs_cn_scopetype', '=', 'transferpaymentstream')
-          .where('egcs_cn_scopeid', '=', String(stream.streamId))
+          .where('egcs_cn_agency', '=', String(stream.agencyId))
           .where('egcs_cn_name_en', '=', 'Claim Reconciliation Approval Template')
           .where('_deleted', '=', false)
           .executeTakeFirstOrThrow()
@@ -6195,13 +6243,16 @@ const seedDatabase = async (db: Kysely<Database>): Promise<void> => {
   await seedAgreementAbilities(db)
   await seedApplicantRecipientData(db)
   await seedTransferPaymentData(db)
+  await flushSeedCatalogLinks(db)
   await seedRootProgramApprovalRole(db)
   await seedAgreementData(db)
+  await flushSeedCatalogLinks(db)
   await seedPercentageBudgetDefinitions(db)
-  const deliveryOptions = await db.selectFrom('Transfer_Payment_Stream_Field as field')
-    .innerJoin('Transfer_Payment_Stream_Field_Option as option', 'option.egcs_tp_field', 'field.id')
-    .select(['field.id as fieldId', 'field.egcs_tp_transferpaymentstream as streamId', 'option.id as optionId'])
-    .where('field.egcs_tp_name_en', '=', 'Delivery model').execute()
+  const deliveryOptions = await db.selectFrom('Transfer_Payment_Stream_Field_Assignment as assignment')
+    .innerJoin('Agency_Custom_Field as field', 'field.id', 'assignment.egcs_tp_agencyfield')
+    .innerJoin('Agency_Custom_Field_Option as option', 'option.egcs_ay_field', 'field.id')
+    .select(['field.id as fieldId', 'assignment.egcs_tp_transferpaymentstream as streamId', 'option.id as optionId'])
+    .where('field.egcs_ay_name_en', '=', 'Delivery model').where('assignment._deleted', '=', false).execute()
   for (const option of deliveryOptions) {
     await db.updateTable('Funding_Case_Agreement_Profile').set({ egcs_fc_customfields: { [String(option.fieldId)]: [String(option.optionId)] } })
       .where('egcs_fc_transferpaymentstream', '=', option.streamId).execute()
@@ -6323,6 +6374,8 @@ export const down = async (db: Kysely<Database>): Promise<void> => {
   await db.deleteFrom('Common_Workflow_Setup_Member_Owner').execute()
   await db.deleteFrom('Common_Workflow_Setup_Member').execute()
   await db.deleteFrom('Common_Workflow_Setup_Allowed_Start_Status').execute()
+  await db.deleteFrom('Transfer_Payment_Stream_Workflow').execute()
+  await db.deleteFrom('Transfer_Payment_Stream_Review_Set').execute()
   await db.deleteFrom('Common_Workflow_Setup').execute()
   await db.deleteFrom('Common_Recommendation_Setup').execute()
   await db.deleteFrom('Common_Recommendation_Set_Setup').execute()
@@ -6342,7 +6395,6 @@ export const down = async (db: Kysely<Database>): Promise<void> => {
   await sql`ALTER TABLE "Common_Workflow_Publication_Status" DISABLE TRIGGER trg_lock_workflow_publication_status`.execute(db)
   await db.deleteFrom('Common_Workflow_Publication_Status').execute()
   await sql`ALTER TABLE "Common_Workflow_Publication_Status" ENABLE TRIGGER trg_lock_workflow_publication_status`.execute(db)
-  await db.deleteFrom('Common_Publication_Selection').execute()
   await sql`ALTER TABLE "Common_Publication_Version_Reference" DISABLE TRIGGER trg_lock_publication_version_reference`.execute(db)
   await db.deleteFrom('Common_Publication_Version_Reference').execute()
   await sql`ALTER TABLE "Common_Publication_Version_Reference" ENABLE TRIGGER trg_lock_publication_version_reference`.execute(db)
@@ -6418,9 +6470,10 @@ export const down = async (db: Kysely<Database>): Promise<void> => {
   await db.deleteFrom('Transfer_Payment_Objective').execute()
   await db.deleteFrom('Transfer_Payment_Outcome').execute()
   await db.deleteFrom('Transfer_Payment_Financial_Limits').execute()
-  await db.deleteFrom('Transfer_Payment_Stream_Field_Option').execute()
-  await db.deleteFrom('Transfer_Payment_Stream_Field').execute()
+  await db.deleteFrom('Transfer_Payment_Stream_Field_Assignment').execute()
   await db.deleteFrom('Transfer_Payment_Stream_Field_Section').execute()
+  await db.deleteFrom('Agency_Custom_Field_Option').execute()
+  await db.deleteFrom('Agency_Custom_Field').execute()
   await db.deleteFrom('Transfer_Payment_Stream').execute()
   await db.deleteFrom('Transfer_Payment_Fiscal_Year_Budget').execute()
   await db.deleteFrom('role_transfer_payment_scope').execute()

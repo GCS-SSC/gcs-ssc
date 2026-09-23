@@ -65,6 +65,7 @@ const columns: TableColumnInput<FundingHistoryRow>[] = [
 ]
 
 const isVisible = (row: FundingHistoryRow): row is VisibleFundingHistoryRow => !row.restricted
+const hasSummary = (row: FundingHistoryRow): boolean => typeof row.agreementNumber === 'string'
 const localized = (english?: string | null, french?: string | null): string => {
   const primary = locale.value === 'fr' ? french : english
   const secondary = locale.value === 'fr' ? english : french
@@ -173,7 +174,7 @@ const visibleRows = computed(() => items.value)
       </template>
 
       <template #agency-cell="{ row }">
-        <span v-if="isVisible(row.original)" class="font-medium text-zinc-800 dark:text-zinc-200">
+        <span v-if="hasSummary(row.original)" class="font-medium text-zinc-800 dark:text-zinc-200">
           {{ localized(row.original.agencyNameEn, row.original.agencyNameFr) }}
         </span>
         <span v-else class="inline-flex items-center gap-2 font-medium text-red-700 dark:text-red-300">
@@ -183,14 +184,14 @@ const visibleRows = computed(() => items.value)
       </template>
 
       <template #program-cell="{ row }">
-        <span v-if="isVisible(row.original)" class="font-medium text-zinc-700 dark:text-zinc-300">
+        <span v-if="hasSummary(row.original)" class="font-medium text-zinc-700 dark:text-zinc-300">
           {{ localized(row.original.programNameEn, row.original.programNameFr) }}
         </span>
         <span v-else aria-hidden="true">{{ t('common.none') }}</span>
       </template>
 
       <template #agreementNumber-cell="{ row }">
-        <span v-if="isVisible(row.original)" class="font-mono text-sm font-semibold">
+        <span v-if="hasSummary(row.original)" class="font-mono text-sm font-semibold">
           {{ row.original.agreementNumber }}
         </span>
         <span v-else aria-hidden="true">{{ t('common.none') }}</span>
@@ -203,14 +204,14 @@ const visibleRows = computed(() => items.value)
           class="font-bold text-zinc-900 transition-colors hover:text-primary dark:text-white">
           {{ localized(row.original.titleEn, row.original.titleFr) }}
         </ULink>
-        <span v-else-if="isVisible(row.original)" class="font-medium">
+        <span v-else-if="hasSummary(row.original)" class="font-medium">
           {{ localized(row.original.titleEn, row.original.titleFr) }}
         </span>
         <span v-else aria-hidden="true">{{ t('common.none') }}</span>
       </template>
 
       <template #dates-cell="{ row }">
-        <span v-if="isVisible(row.original)" class="text-sm leading-5 text-zinc-600 dark:text-zinc-400">
+        <span v-if="hasSummary(row.original)" class="text-sm leading-5 text-zinc-600 dark:text-zinc-400">
           {{ formatDate(row.original.startDate) }}<br>
           {{ formatDate(row.original.endDate) }}
         </span>
@@ -218,7 +219,7 @@ const visibleRows = computed(() => items.value)
       </template>
 
       <template #amount-cell="{ row }">
-        <div v-if="isVisible(row.original)" class="space-y-1 whitespace-nowrap">
+        <div v-if="hasSummary(row.original)" class="space-y-1 whitespace-nowrap">
           <div v-for="total in row.original.totals || []" :key="total.currency" class="font-mono text-sm font-semibold">
             {{ formatMoney(total.amount, total.currency) }}
           </div>

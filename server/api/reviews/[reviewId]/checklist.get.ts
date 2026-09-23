@@ -33,7 +33,14 @@ export default defineEventHandler(async event => {
   if (!review || !runtimeEntity) {
     return await notFound(event, 'CHECKLIST_NOT_FOUND', 'apiErrors.admin_common.not_found')
   }
-  await authorizeReviewRuntimeAction(event, 'read_assessment', runtimeEntity)
+  try {
+    await authorizeReviewRuntimeAction(event, 'read_assessment', runtimeEntity)
+  } catch (error: unknown) {
+    if (typeof error === 'object' && error !== null && 'statusCode' in error && Number(error.statusCode) === 403) {
+      return await notFound(event, 'CHECKLIST_NOT_FOUND', 'apiErrors.admin_common.not_found')
+    }
+    throw error
+  }
 
   const entityNamesPromise = runtimeEntity.entityType === 'applicantrecipient'
     ? db.selectFrom('Applicant_Recipient_Profile').select([

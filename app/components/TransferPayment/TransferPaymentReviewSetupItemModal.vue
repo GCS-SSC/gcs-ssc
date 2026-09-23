@@ -23,18 +23,14 @@ type ReviewSetupMemberState = Partial<z.input<typeof TransferPaymentStreamReview
 const state = defineModel<ReviewSetupMemberState | null>('state', { required: true })
 
 const {
-  transferPaymentId,
-  streamId,
   reviewSetupId,
   agencyId,
   entityType,
   mutationPending = false,
   runMutation
 } = defineProps<{
-  transferPaymentId: string
-  streamId: string
   reviewSetupId: string
-  agencyId?: string
+  agencyId: string
   entityType: string
   mutationPending?: boolean
   runMutation?: EditorMutationRunner
@@ -98,8 +94,8 @@ const onSubmit = async (
 
     const request = async () => {
       const response = await fetch(getClientRequestUrl(itemId
-        ? `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/review-setups/${reviewSetupId}/items/${itemId}`
-        : `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/review-setups/${reviewSetupId}/items`), {
+        ? `/api/agency/${agencyId}/review-sets/${reviewSetupId}/items/${itemId}`
+        : `/api/agency/${agencyId}/review-sets/${reviewSetupId}/items`), {
         method: itemId ? 'PATCH' : 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body)
@@ -127,8 +123,6 @@ const onSubmit = async (
         <fieldset :disabled="isSubmitting || mutationPending" class="space-y-4">
           <ReviewAssessmentSetItemFields
             v-model:state="state"
-            :transfer-payment-id="transferPaymentId"
-            :stream-id="streamId"
             :agency-id="agencyId"
             :entity-type="entityType"
             :review-type="typeof state.egcs_cn_reviewtype === 'string' ? state.egcs_cn_reviewtype : undefined"
@@ -136,7 +130,7 @@ const onSubmit = async (
           <UFormField :label="t('groups.group')" name="egcs_cn_defaultgroup">
             <CommonServerLookupSelect
               v-model="selectedGroup"
-              :fetch-url="`/api/transfer-payments/${transferPaymentId}/streams/${streamId}/review-setups/${reviewSetupId}/groups`"
+              :fetch-url="`/api/agency/${agencyId}/review-sets/${reviewSetupId}/groups`"
               value-key="id"
               label-en-key="egcs_cn_name_en"
               label-fr-key="egcs_cn_name_fr" />

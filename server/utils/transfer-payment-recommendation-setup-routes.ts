@@ -4,52 +4,60 @@ import type { z } from 'zod'
 import type { Database } from '~~/shared/types/database'
 import type { TransferPaymentStreamRecommendationSetupPatchSchema } from '~~/shared/types/schemas'
 import { badRequest, notFound, throwApiError } from './api-errors'
-import { validateApprovalTemplateForScope, validateRecommendationSchemasForAgency } from './transfer-payment-polymorphic'
+import { validateRecommendationSchemasForAgency } from './transfer-payment-polymorphic'
 import { lockRecommendationSetupForMutation, readRecommendationSetupPublicationMetadata } from './recommendation-setup-versioning'
 
-/* eslint-disable jsdoc/require-jsdoc -- Transaction helper has a typed internal contract. */
+/* eslint-disable jsdoc/require-jsdoc -- Transaction helpers have typed internal contracts. */
 
 type PatchBody = z.infer<typeof TransferPaymentStreamRecommendationSetupPatchSchema>
 
-interface PatchOptions {
-  agencyId: string
-  streamId: string
-  recommendationSetupId: string
-  body: PatchBody
+export const validateRecommendationApprovalForAgency = async (
+  db: Kysely<Database>, agencyId: string, templateId?: string | null
+): Promise<boolean> => {
+  if (!templateId) return true
+  const template = await db.selectFrom('Common_Approval_Template')
+    .innerJoin('Common_Publication', 'Common_Publication.id', 'Common_Approval_Template.id')
+    .select('Common_Approval_Template.id')
+    .where('Common_Approval_Template.id', '=', templateId)
+    .where('Common_Approval_Template.egcs_cn_agency', '=', agencyId)
+    .where('Common_Approval_Template._deleted', '=', false)
+    .where('Common_Publication._deleted', '=', false)
+    .where('Common_Publication.egcs_cn_state', '=', 'published')
+    .executeTakeFirst()
+  return Boolean(template)
 }
 
-export const patchTransferPaymentRecommendationSetup = async (
-  event: H3Event,
-  db: Kysely<Database>,
-  options: PatchOptions
+export const validateRecommendationDependencies = async (
+  event: H3Event, db: Kysely<Database>, agencyId: string,
+  schemaIds: string[], approvalIds: Array<string | null | undefined>
+): Promise<void> => {
+  if (!await validateRecommendationSchemasForAgency(db, agencyId, schemaIds, { forUpdate: true })) {
+    await badRequest(event, 'RECOMMENDATION_SCHEMA_NOT_FOUND', 'apiErrors.transfer_payment.recommendation_schema_not_found')
+  }
+  for (const templateId of approvalIds) {
+    if (!await validateRecommendationApprovalForAgency(db, agencyId, templateId)) {
+      await badRequest(event, 'APPROVAL_TEMPLATE_NOT_FOUND', 'apiErrors.transfer_payment.approval_template_not_found')
+    }
+  }
+}
+
+export const patchAgencyRecommendationSetup = async (
+  event: H3Event, db: Kysely<Database>,
+  options: { agencyId: string, recommendationSetupId: string, body: PatchBody }
 ) => {
-  const current = await lockRecommendationSetupForMutation(db, options.recommendationSetupId, options.streamId)
+  const current = await lockRecommendationSetupForMutation(db, options.recommendationSetupId, options.agencyId)
   if (!current) return await notFound(event, 'RECOMMENDATION_SETUP_NOT_FOUND', 'apiErrors.transfer_payment.recommendation_setup_not_found')
   if (current.publicationState === 'retired') {
     return await throwApiError(event, {
       statusCode: 409, code: 'PUBLICATION_RETIRED', key: 'apiErrors.request.invalid_status'
     })
   }
-
-  if (options.body.members) {
-    const schemaIds = options.body.members.map(member => String(member.egcs_cn_recommendationschema))
-    if (!await validateRecommendationSchemasForAgency(db, options.agencyId, schemaIds)) {
-      return await badRequest(event, 'RECOMMENDATION_SCHEMA_NOT_FOUND', 'apiErrors.transfer_payment.recommendation_schema_not_found')
-    }
-  }
-
-  const approvalIds = [
-    options.body.egcs_cn_approvaltemplate,
-    ...(options.body.members ?? []).map(member => member.egcs_cn_approvaltemplate)
-  ]
-    .filter((value): value is string => Boolean(value))
-  for (const approvalId of approvalIds) {
-    if (!await validateApprovalTemplateForScope(db, options.streamId, String(approvalId))) {
-      return await badRequest(event, 'APPROVAL_TEMPLATE_NOT_FOUND', 'apiErrors.transfer_payment.approval_template_not_found')
-    }
-  }
-
   const members = options.body.members
+  await validateRecommendationDependencies(
+    event, db, options.agencyId,
+    members?.map(member => String(member.egcs_cn_recommendationschema)) ?? [],
+    [options.body.egcs_cn_approvaltemplate, ...(members ?? []).map(member => member.egcs_cn_approvaltemplate)]
+  )
   const bodyFields: Record<string, unknown> = { ...options.body }
   delete bodyFields.members
   delete bodyFields._deleted
@@ -57,9 +65,8 @@ export const patchTransferPaymentRecommendationSetup = async (
     ? current
     : await db.updateTable('Common_Recommendation_Set_Setup')
         .set(bodyFields as Updateable<Database['Common_Recommendation_Set_Setup']>)
-        .where('id', '=', options.recommendationSetupId).where('_deleted', '=', false)
-        .returningAll().executeTakeFirstOrThrow()
-
+        .where('id', '=', options.recommendationSetupId).where('egcs_cn_agency', '=', options.agencyId)
+        .where('_deleted', '=', false).returningAll().executeTakeFirstOrThrow()
   let hydratedMembers
   if (members) {
     await db.updateTable('Common_Recommendation_Setup').set({ _deleted: true })
@@ -79,12 +86,9 @@ export const patchTransferPaymentRecommendationSetup = async (
       .where('egcs_cn_recommendationset', '=', options.recommendationSetupId).where('_deleted', '=', false)
       .orderBy('egcs_cn_order', 'asc').execute()
   }
-
   const metadata = await readRecommendationSetupPublicationMetadata(db, updated)
-  return { ...updated, id: String(updated.id), egcs_cn_scopeid: String(updated.egcs_cn_scopeid), ...metadata, members: hydratedMembers.map(member => ({
-    ...member,
-    id: String(member.id),
-    egcs_cn_recommendationset: String(member.egcs_cn_recommendationset),
-    egcs_cn_recommendationschema: String(member.egcs_cn_recommendationschema)
-  })) }
+  return { ...updated, id: String(updated.id), egcs_cn_agency: String(updated.egcs_cn_agency), ...metadata,
+    members: hydratedMembers.map(member => ({ ...member, id: String(member.id),
+      egcs_cn_recommendationset: String(member.egcs_cn_recommendationset),
+      egcs_cn_recommendationschema: String(member.egcs_cn_recommendationschema) })) }
 }

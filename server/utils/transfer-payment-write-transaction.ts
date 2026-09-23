@@ -8,7 +8,7 @@ import {
   requireFreshAuthContext
 } from '~~/server/utils/authorize'
 import type { AuthContext } from '~~/server/utils/authorize'
-import { lockRegisteredExtensionAgreementScopes } from '~~/server/utils/extensions'
+import { lockRegisteredExtensionAgreementScopes, lockRegisteredExtensionScopes } from '~~/server/utils/extensions'
 import type { Database } from '~~/shared/types/database'
 import type { AbilityAction } from '~~/shared/utils/abilities'
 import type { Scope } from '~~/shared/utils/scopes'
@@ -150,6 +150,97 @@ export const executeFreshAuthorizedTransferPaymentWrite = async <T>(
   })
 }
 
+/**
+ * Authorizes and locks both Agency scopes before changing a Program owner.
+ * @param event - Request event.
+ * @param db - Database connection.
+ * @param profileId - Program being transferred.
+ * @param initialAgencyId - Source Agency observed before the transaction.
+ * @param destinationAgencyId - Requested destination Agency.
+ * @param callback - Mutation to perform under the locks.
+ * @returns Callback result.
+ */
+export const executeFreshAuthorizedTransferPaymentAgencyTransfer = async <T>(
+  event: H3Event,
+  db: Kysely<Database>,
+  profileId: string,
+  initialAgencyId: string,
+  destinationAgencyId: string,
+  callback: (trx: Transaction<Database>) => Promise<T>
+): Promise<T> => {
+  let sourceAgencyId = initialAgencyId
+
+  for (let attempt = 0; attempt < TRANSFER_PAYMENT_WRITE_SCOPE_LOCK_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      return await db.transaction().execute(async trx => {
+        const authContext = await requireFreshAuthContext(event, trx)
+        const agencyIds = [...new Set([sourceAgencyId, destinationAgencyId])]
+          .sort((left, right) => left.localeCompare(right, 'en', { numeric: true }))
+        await lockRegisteredExtensionScopes(trx, agencyIds.map(agencyId => ({ agencyId, streamIds: [] })))
+        const agencies = await trx.selectFrom('Agency_Profile')
+          .select('id')
+          .where('id', 'in', agencyIds)
+          .where('_deleted', '=', false)
+          .orderBy('id', 'asc')
+          .forShare('Agency_Profile')
+          .execute()
+        const profile = await trx.selectFrom('Transfer_Payment_Profile')
+          .select('egcs_tp_agency')
+          .where('id', '=', profileId)
+          .where('_deleted', '=', false)
+          .forUpdate('Transfer_Payment_Profile')
+          .executeTakeFirst()
+        if (!profile) {
+          return await notFound(event, 'TRANSFER_PAYMENT_PROFILE_NOT_FOUND', 'apiErrors.transfer_payment.profile_not_found')
+        }
+        const currentAgencyId = String(profile.egcs_tp_agency)
+        if (currentAgencyId !== sourceAgencyId) {
+          throw new TransferPaymentWriteScopeChanged(currentAgencyId)
+        }
+        const activeAgencies = new Set(agencies.map(agency => String(agency.id)))
+        if (!activeAgencies.has(sourceAgencyId)) {
+          return await notFound(event, 'TRANSFER_PAYMENT_PROFILE_NOT_FOUND', 'apiErrors.transfer_payment.profile_not_found')
+        }
+        if (!activeAgencies.has(destinationAgencyId)) {
+          return await throwApiError(event, {
+            statusCode: 400, code: 'INVALID_AGENCY', key: 'apiErrors.request.invalid_agency'
+          })
+        }
+
+        const context = buildTransferPaymentWriteContext(profileId, sourceAgencyId)
+        await authorizeWithFreshAuthContext(event, authContext, 'transfer_payment', 'update', context.scope)
+        await authorizeWithFreshAuthContext(event, authContext, 'transfer_payment', 'create', {
+          type: 'agency', agencyId: destinationAgencyId
+        })
+        return await withAuditExecution({
+          type: 'transfer', table: 'Transfer_Payment_Profile', recordId: profileId,
+          sourceAgencyId, destinationAgencyId
+        }, () => callback(trx))
+      })
+    } catch (error: unknown) {
+      const constraint = getDatabaseConstraintName(error)
+      if ([
+        'tp_chk_profile_agency_field_associations',
+        'tp_chk_profile_agency_catalog_links',
+        'agreement_proponent_type_eligible'
+      ].includes(constraint ?? '')) {
+        return await throwApiError(event, {
+          statusCode: 409,
+          code: 'TRANSFER_PAYMENT_AGENCY_ASSOCIATIONS_IN_USE',
+          key: 'apiErrors.request.resource_in_use'
+        })
+      }
+      if (!(error instanceof TransferPaymentWriteScopeChanged)) throw error
+      sourceAgencyId = error.agencyId
+    }
+  }
+  return await throwApiError(event, {
+    statusCode: 409,
+    code: 'TRANSFER_PAYMENT_PROFILE_SCOPE_CHANGED',
+    key: 'apiErrors.transfer_payment.profile_scope_changed'
+  })
+}
+
 export const executeFreshAuthorizedTransferPaymentStreamWrite = async <T>(
   event: H3Event,
   db: Kysely<Database>,
@@ -262,3 +353,26 @@ export const executeFreshAuthorizedTransferPaymentStreamWrite = async <T>(
     key: 'apiErrors.transfer_payment.profile_scope_changed'
   })
 }
+
+/**
+ * Reads Stream configuration under the same scope locks and fresh authority as writes.
+ * This keeps a Program Agency transfer from changing the owner between authorization
+ * and projection of linked Agency catalog rows.
+ * @param event - Active request.
+ * @param db - Database connection.
+ * @param profileId - Owning Program.
+ * @param initialAgencyId - Owner observed during preliminary authorization.
+ * @param streamId - Stream being read.
+ * @param callback - Projection performed inside the fresh authorized transaction.
+ * @returns Projected Stream configuration.
+ */
+export const executeFreshAuthorizedTransferPaymentStreamRead = async <T>(
+  event: H3Event,
+  db: Kysely<Database>,
+  profileId: string,
+  initialAgencyId: string,
+  streamId: string,
+  callback: (trx: Transaction<Database>, context: TransferPaymentStreamWriteContext) => Promise<T>
+): Promise<T> => await executeFreshAuthorizedTransferPaymentStreamWrite(
+  event, db, profileId, initialAgencyId, streamId, 'read', callback
+)

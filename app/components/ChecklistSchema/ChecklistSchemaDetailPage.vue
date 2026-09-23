@@ -49,10 +49,9 @@ type SchemaPayload = {
   egcs_cn_disablereviewers: boolean
   egcs_cn_checklistschema: ChecklistDefinition
 }
-type TransferPaymentNameResponse = {
-  egcs_tp_name_en: string
-  egcs_tp_name_fr: string
-  egcs_tp_agency?: string
+type AgencyNameResponse = {
+  egcs_ay_name_en: string
+  egcs_ay_name_fr: string
 }
 
 const route = useRoute()
@@ -62,28 +61,23 @@ const { getBilingualValue } = useBilingualValue()
 const { showError } = useApiErrorToast()
 const toast = useToast()
 const { can } = useCan()
-const transferPaymentId = String(route.params.id)
-const streamId = String(route.params.streamId)
+const agencyId = String(route.params.id)
 const schemaId = String(route.params.schemaId)
-const endpoint = `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/checklist-schemas/${schemaId}`
-const { data: profile, error: profileError, refresh: refreshProfile } = await useFetch<TransferPaymentNameResponse, FetchError, string>(`/api/transfer-payments/${transferPaymentId}`)
-const { data: stream, error: streamError, refresh: refreshStream } = await useFetch<TransferPaymentNameResponse, FetchError, string>(`/api/transfer-payments/${transferPaymentId}/streams/${streamId}`)
+const endpoint = `/api/agency/${agencyId}/review-schemas/${schemaId}`
+const { data: agency, error: agencyError, refresh: refreshAgency } = await useFetch<AgencyNameResponse, FetchError, string>(`/api/agency/${agencyId}`)
 const state: Ref<SchemaPayload | null> = ref(null)
 const definition: Ref<EditorDefinition | null> = ref(null)
 const isImportOpen: Ref<boolean> = ref(false)
 const loadError: Ref<unknown | null> = ref(null)
-const contextLoadError = computed(() => profileError.value ?? streamError.value ?? loadError.value)
+const contextLoadError = computed(() => agencyError.value ?? loadError.value)
 const detailContent = useTemplateRef<HTMLElement>('detailContent')
 const checklistForm = useTemplateRef<{ validate: () => Promise<void> }>('checklistForm')
 const isLoadRetrying: Ref<boolean> = ref(false)
 const selectedSection: Ref<string> = ref('checklist-general')
 const { getHeroCollapsed } = useDashboard()
 const isHeroCollapsed = getHeroCollapsed('transfer-payment-checklist-schema-detail')
-const profileScope = computed<Scope>(() => ({
-  type: 'entity', agencyId: String(profile.value?.egcs_tp_agency ?? ''),
-  path: [{ type: 'transfer_payment', id: transferPaymentId }]
-}))
-const canManagePublication = computed(() => Boolean(profile.value) && can('transfer_payment', 'update', profileScope.value))
+const profileScope = computed<Scope>(() => ({ type: 'agency', agencyId }))
+const canManagePublication = computed(() => Boolean(agency.value) && can('agency', 'update', profileScope.value))
 const canEdit = computed(() => canManagePublication.value && state.value?.publicationState !== 'retired')
 const activeLocale = computed<'en' | 'fr'>(() => locale.value === 'fr' ? 'fr' : 'en')
 const getNavigationLabel = (label: { en?: string; fr?: string }, fallback: string) => getAssessmentLocaleLabel(label, activeLocale.value, fallback)
@@ -107,14 +101,10 @@ const questionOptions = computed(() => definition.value?.sections.flatMap(sectio
 )) ?? [])
 const title = computed(() => getBilingualValue(state.value, 'egcs_cn_name', t('checklist_schema.title')))
 const breadcrumbItems = computed(() => [
-  { label: t('transfer_payment.title'), to: localePath(appRouteLocations.transferPayments()) },
+  { label: t('agency.title'), to: localePath(appRouteLocations.agencies()) },
   {
-    label: getBilingualValue(profile.value, 'egcs_tp_name'),
-    to: localePath(appRouteLocations.transferPaymentDetail(transferPaymentId))
-  },
-  {
-    label: getBilingualValue(stream.value, 'egcs_tp_name'),
-    to: localePath(appRouteLocations.transferPaymentStreamDetail(transferPaymentId, streamId, { section: 'review-setups' }))
+    label: getBilingualValue(agency.value, 'egcs_ay_name'),
+    to: localePath(appRouteLocations.agencyDetail(agencyId))
   },
   { label: title.value }
 ])
@@ -233,9 +223,8 @@ const loadSession = async () => {
 }
 const retryLoad = async () => {
   try {
-    await Promise.all([refreshProfile(), refreshStream()])
-    if (profileError.value) throw profileError.value
-    if (streamError.value) throw streamError.value
+    await refreshAgency()
+    if (agencyError.value) throw agencyError.value
     await loadSession()
     await nextTick()
     detailContent.value?.focus()

@@ -49,14 +49,9 @@ export default defineEventHandler(async event => {
 
   const [setups, agencies] = await Promise.all([
     db.selectFrom('Common_Review_Set_Setup')
-      .leftJoin('Transfer_Payment_Stream', join => join
-        .onRef('Transfer_Payment_Stream.id', '=', 'Common_Review_Set_Setup.egcs_cn_scopeid')
-        .on('Common_Review_Set_Setup.egcs_cn_scopetype', '=', 'transferpaymentstream'))
       .select([
         'Common_Review_Set_Setup.id', 'Common_Review_Set_Setup.egcs_cn_name_en',
-        'Common_Review_Set_Setup.egcs_cn_name_fr', 'Common_Review_Set_Setup.egcs_cn_scopetype',
-        'Transfer_Payment_Stream.egcs_tp_name_en as stream_name_en',
-        'Transfer_Payment_Stream.egcs_tp_name_fr as stream_name_fr'
+        'Common_Review_Set_Setup.egcs_cn_name_fr'
       ])
       .where('Common_Review_Set_Setup.id', 'in', eligibleSetupIds)
       .where('Common_Review_Set_Setup._deleted', '=', false)
@@ -70,8 +65,8 @@ export default defineEventHandler(async event => {
     const agencyId = agencyBySetup.get(String(row.id))
     const agency = agencyId ? agencyNames.get(agencyId) : null
     if (!agency) return []
-    const descriptionEn = [agency.egcs_ay_name_en, row.egcs_cn_scopetype === 'transferpaymentstream' ? row.stream_name_en : null].filter(Boolean).join(' | ')
-    const descriptionFr = [agency.egcs_ay_name_fr, row.egcs_cn_scopetype === 'transferpaymentstream' ? row.stream_name_fr : null].filter(Boolean).join(' | ')
+    const descriptionEn = agency.egcs_ay_name_en
+    const descriptionFr = agency.egcs_ay_name_fr
     if (term && ![row.egcs_cn_name_en, row.egcs_cn_name_fr, descriptionEn, descriptionFr]
       .some(value => value?.toLocaleLowerCase().includes(term))) return []
     return [{ id: String(row.id), egcs_cn_name_en: row.egcs_cn_name_en,

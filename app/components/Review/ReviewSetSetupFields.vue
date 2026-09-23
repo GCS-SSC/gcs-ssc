@@ -4,19 +4,15 @@ import type { TransferPaymentReviewSetupEntityType } from '~~/shared/types/schem
 
 const state = defineModel<Record<string, unknown>>('state', { required: true, default: () => ({}) })
 
-const { streamId, approvalTemplateLabelKey = 'transfer_payment.approval_template_id', entityTypeDisabled = false } = defineProps<{
-  transferPaymentId: string
-  streamId: string
+const { agencyId, approvalTemplateLabelKey = 'transfer_payment.approval_template_id', entityTypeDisabled = false } = defineProps<{
+  agencyId: string
   approvalTemplateLabelKey?: string
   entityTypeDisabled?: boolean
   entityTypeItems: Array<{ label: string; value: TransferPaymentReviewSetupEntityType }>
 }>()
 
 const { t } = useI18n()
-const approvalTemplateQuery = computed(() => ({
-  scopeType: 'transferpaymentstream',
-  scopeId: streamId
-}))
+const approvalTemplateFetchUrl = computed(() => agencyId ? `/api/agency/${agencyId}/approval-templates` : null)
 
 const entityTypeValue = computed(() => {
   const value = state.value.egcs_cn_entitytype
@@ -85,14 +81,14 @@ const approvalTemplateValue = computed(() => {
   </UFormField>
 
   <AdminCommonLookupField
+    v-if="approvalTemplateFetchUrl"
     :model-value="approvalTemplateValue"
     :label="t(approvalTemplateLabelKey)"
     name="egcs_cn_approvaltemplate"
-    fetch-url="/api/approval-templates"
+    :fetch-url="approvalTemplateFetchUrl" :include-deleted-query="false"
     value-key="id"
     label-en-key="egcs_cn_name_en"
     label-fr-key="egcs_cn_name_fr"
-    :query="approvalTemplateQuery"
     @update:model-value="value => (state.egcs_cn_approvaltemplate = value)" />
 
   <div class="grid grid-cols-1 gap-4 md:grid-cols-2">

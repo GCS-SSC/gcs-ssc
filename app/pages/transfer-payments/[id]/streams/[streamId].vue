@@ -21,14 +21,10 @@ const streamId = route.params.streamId as string
 const isNestedAssessmentSchemaRoute = computed(() => typeof route.params.schemaId === 'string')
 const isNestedApprovalTemplateRoute = computed(() => typeof route.params.templateId === 'string')
 const isNestedRecommendationSetupRoute = computed(() => typeof route.params.recommendationSetupId === 'string')
-const isNestedWorkflowSetupRoute = computed(() => typeof route.params.workflowSetupId === 'string')
-const isNestedReviewSetupRoute = computed(() => typeof route.params.reviewSetupId === 'string')
 const isNestedDetailRoute = computed(() => (
   isNestedAssessmentSchemaRoute.value
   || isNestedApprovalTemplateRoute.value
   || isNestedRecommendationSetupRoute.value
-  || isNestedWorkflowSetupRoute.value
-  || isNestedReviewSetupRoute.value
 ))
 
 const {

@@ -1,4 +1,4 @@
-import { streamCustomFieldRoute } from '~~/server/utils/stream-custom-field-routes'
+import { streamFieldAssignmentRoute } from '~~/server/utils/stream-field-assignment-routes'
 
-// eslint-disable-next-line local/require-authorize -- Adapter authorizes and freshly reauthorizes the stream configuration scope.
-export default defineEventHandler(async event => await streamCustomFieldRoute(event, 'create', 'field'))
+// eslint-disable-next-line local/require-authorize -- The shared route freshly authorizes the Stream scope.
+export default defineEventHandler(async event => await streamFieldAssignmentRoute(event, 'create'))

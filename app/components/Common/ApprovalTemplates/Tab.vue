@@ -5,8 +5,7 @@ import type { TableColumnInput } from '~/composables/useTableColumns'
 import { useApprovalTemplateTable } from '~/composables/useApprovalTemplateTable'
 import type {
   ApprovalTemplate,
-  ApprovalTemplateItem,
-  ApprovalTemplateScopeType
+  ApprovalTemplateItem
 } from '~~/shared/types/schemas'
 
 type ApprovalTemplateRow = {
@@ -19,14 +18,12 @@ type ApprovalTemplateRow = {
 }
 
 const {
-  scopeType,
-  scopeId,
+  agencyId,
   canUpdateChild,
   canDeleteChild,
   openTemplateDetail = async () => {}
 } = defineProps<{
-  scopeType: ApprovalTemplateScopeType
-  scopeId: string
+  agencyId: string
   canUpdateChild: boolean
   canDeleteChild: boolean
   openTemplateDetail?: (templateId: string) => void | Promise<void>
@@ -72,8 +69,7 @@ const { isOpen, selected, openCreate, captureSession, closeSession } = useCrudMo
 })
 
 const { search, pagination, items, totalRecords, refresh, status } = useApprovalTemplateTable({
-  scopeType: () => scopeType,
-  scopeId: () => scopeId
+  agencyId: () => agencyId
 })
 
 const columns: TableColumnInput<ApprovalTemplateRow>[] = [
@@ -104,7 +100,7 @@ const deleteTemplate = async (templateId: string) => {
 
   try {
     isDeleting.value = true
-    const ok = await confirmDeleteRequest(`/api/approval-templates/${templateId}`)
+    const ok = await confirmDeleteRequest(`/api/agency/${agencyId}/approval-templates/${templateId}`)
     if (!ok) {
       return
     }
@@ -182,8 +178,7 @@ const deleteTemplate = async (templateId: string) => {
     <CommonApprovalTemplatesModal
       v-model:open="isOpen"
       v-model:state="selected"
-      :scope-type="scopeType"
-      :scope-id="scopeId"
+      :agency-id="agencyId"
       :capture-session="captureSession"
       :close-session="closeSession"
       @saved="refresh" />

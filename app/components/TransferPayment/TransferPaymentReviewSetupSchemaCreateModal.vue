@@ -14,10 +14,9 @@ const emit = defineEmits<{
 const open = defineModel<boolean>('open', { default: false })
 type SchemaCreateState = Partial<z.infer<typeof TransferPaymentStreamReviewSetupSchemaCreateSchema>>
 const state = defineModel<SchemaCreateState | null>('state', { required: true })
-const { transferPaymentId, streamId, reviewSetupId, mutationPending = false, runMutation } = defineProps<{
-  transferPaymentId: string
-  streamId: string
+const { reviewSetupId, agencyId, mutationPending = false, runMutation } = defineProps<{
   reviewSetupId: string
+  agencyId: string
   mutationPending?: boolean
   runMutation?: EditorMutationRunner
 }>()
@@ -37,7 +36,7 @@ const onSubmit = async (event: FormSubmitEvent<z.infer<typeof TransferPaymentStr
   try {
     isSubmitting.value = true
     const request = async () => {
-      const response = await fetch(getClientRequestUrl(`/api/transfer-payments/${transferPaymentId}/streams/${streamId}/review-setups/${reviewSetupId}/items/create-schema`), {
+      const response = await fetch(getClientRequestUrl(`/api/agency/${agencyId}/review-sets/${reviewSetupId}/items/create-schema`), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(event.data)
@@ -74,11 +73,11 @@ const onSubmit = async (event: FormSubmitEvent<z.infer<typeof TransferPaymentStr
             v-model="state.egcs_cn_approvaltemplate"
             :label="t('transfer_payment.approval_template_id')"
             name="egcs_cn_approvaltemplate"
-            fetch-url="/api/approval-templates"
+            :fetch-url="`/api/agency/${agencyId}/approval-templates`" :include-deleted-query="false"
             value-key="id"
             label-en-key="egcs_cn_name_en"
             label-fr-key="egcs_cn_name_fr"
-            :query="{ scopeType: 'transferpaymentstream', scopeId: streamId }" />
+          />
           <p class="text-sm text-zinc-500 dark:text-zinc-400">
             {{ t('transfer_payment.review_schema_create_help') }}
           </p>

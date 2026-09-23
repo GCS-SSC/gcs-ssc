@@ -44,35 +44,6 @@ export type PublicationVersionReference = {
   publicationVersion: number
 }
 
-/** Serializes publication selection and point-in-time runtime selection for exact keys. */
-export const lockPublicationSelectionKeys = async (
-  db: Transaction<Database>,
-  kind: PublicationKind,
-  selections: ReadonlyArray<{ dimension: string, key: string }>
-): Promise<void> => {
-  const unique = [...new Map(selections.map(selection => [
-    `${selection.dimension}\u0000${selection.key}`,
-    selection
-  ])).values()].sort((left, right) => left.dimension.localeCompare(right.dimension) || left.key.localeCompare(right.key))
-  if (unique.length === 0) return
-  await db.insertInto('Common_Publication_Selection_Lock').values(unique.map(selection => ({
-    egcs_cn_kind: kind,
-    egcs_cn_dimension: selection.dimension,
-    egcs_cn_key: selection.key
-  }))).onConflict(conflict => conflict.doNothing()).execute()
-  await db.selectFrom('Common_Publication_Selection_Lock')
-    .select('egcs_cn_key')
-    .where('egcs_cn_kind', '=', kind)
-    .where(eb => eb.or(unique.map(selection => eb.and([
-      eb('egcs_cn_dimension', '=', selection.dimension),
-      eb('egcs_cn_key', '=', selection.key)
-    ]))))
-    .orderBy('egcs_cn_dimension', 'asc')
-    .orderBy('egcs_cn_key', 'asc')
-    .forUpdate()
-    .execute()
-}
-
 type PublicationWorkflowStatusReference = {
   statusId: string
   role: Database['Common_Workflow_Publication_Status']['egcs_cn_role']
@@ -210,7 +181,6 @@ export const publishDefinition = async (
     actorId: string
     references?: PublicationVersionReference[]
     workflowStatuses?: PublicationWorkflowStatusReference[]
-    selections?: Array<{ dimension: string, key: string }>
   }
 ): Promise<PublishedDefinition> => {
   if (input.references && input.references.length > 0) {
@@ -231,15 +201,6 @@ export const publishDefinition = async (
       }
     }
   }
-  const existingSelections = await db.selectFrom('Common_Publication_Selection')
-    .select(['egcs_cn_dimension as dimension', 'egcs_cn_key as key'])
-    .where('egcs_cn_publication', '=', input.publicationId)
-    .execute()
-  await lockPublicationSelectionKeys(db, input.kind, [
-    ...existingSelections,
-    ...(input.selections ?? [])
-  ])
-
   const publication = await db.selectFrom('Common_Publication')
     .leftJoin('Common_Publication_Version', 'Common_Publication_Version.id', 'Common_Publication.egcs_cn_currentversion')
     .select([
@@ -301,17 +262,6 @@ export const publishDefinition = async (
       egcs_cn_order: status.order
     }))).execute()
   }
-  await db.deleteFrom('Common_Publication_Selection')
-    .where('egcs_cn_publication', '=', input.publicationId)
-    .execute()
-  if (input.selections && input.selections.length > 0) {
-    await db.insertInto('Common_Publication_Selection').values(input.selections.map(selection => ({
-      egcs_cn_publication: input.publicationId,
-      egcs_cn_kind: input.kind,
-      egcs_cn_dimension: selection.dimension,
-      egcs_cn_key: selection.key
-    }))).execute()
-  }
   await db.insertInto('Common_Publication_Transition').values({
     egcs_cn_publication: input.publicationId,
     egcs_cn_fromstate: publication.egcs_cn_state,
@@ -357,8 +307,5 @@ export const retirePublication = async (
     egcs_cn_publicationversion: String(publication.egcs_cn_currentversion),
     egcs_cn_actor: input.actorId
   }).execute()
-  await db.deleteFrom('Common_Publication_Selection')
-    .where('egcs_cn_publication', '=', input.publicationId)
-    .execute()
   return readPublicationMetadata(db, input.publicationId)
 }

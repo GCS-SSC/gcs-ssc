@@ -121,9 +121,7 @@ export const createTransferPaymentStreamWizardInitialState = (): TransferPayment
   commitmentTypes: [],
   monitorTypes: [],
   areasOfExpertise: [],
-  financialLimit: null,
-  reviewSetups: [],
-  recommendationSetups: []
+  financialLimit: null
 })
 
 interface UseTransferPaymentStreamWizardModalOptions {

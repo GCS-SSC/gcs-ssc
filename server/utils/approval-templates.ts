@@ -6,8 +6,7 @@ import type {
   ApprovalTemplate,
   ApprovalTemplateCreateInput,
   ApprovalTemplatePatch,
-  ApprovalTemplateItem,
-  ApprovalTemplateScopeType
+  ApprovalTemplateItem
 } from '~~/shared/types/schemas'
 
 type DbClient = Kysely<Database> | Transaction<Database>
@@ -84,10 +83,9 @@ type ApprovalTemplateStepInput = {
   certifications?: ApprovalTemplateCertificationInput[]
 }
 
-type ApprovalTemplateScopeRecord = {
+type ApprovalTemplateAgencyRecord = {
   id: string
-  scopeType: ApprovalTemplateScopeType
-  scopeId: string
+  agencyId: string
 }
 
 type ApprovalTemplateMergedPatch = Omit<ApprovalTemplate, 'steps' | 'additionalApprovalCertifications'> & {
@@ -103,14 +101,12 @@ const sortTemplates = (left: ApprovalTemplateRow, right: ApprovalTemplateRow) =>
 
 export const listApprovalTemplates = async (
   db: DbClient,
-  scopeType: ApprovalTemplateScopeType,
-  scopeId: string
+  agencyId: string
 ): Promise<CanonicalApprovalTemplateItem[]> => {
   const templates = await db
     .selectFrom('Common_Approval_Template')
     .selectAll()
-    .where('egcs_cn_scopetype', '=', scopeType)
-    .where('egcs_cn_scopeid', '=', scopeId)
+    .where('egcs_cn_agency', '=', agencyId)
     .where('_deleted', '=', false)
     .execute()
 
@@ -290,16 +286,15 @@ export const listApprovalTemplates = async (
   return items.map(item => ({ ...item, ...metadata.get(item.id)! }))
 }
 
-export const getApprovalTemplateScopeRecord = async (
+export const getApprovalTemplateAgencyRecord = async (
   db: DbClient,
   templateId: string
-): Promise<ApprovalTemplateScopeRecord | null> => {
+): Promise<ApprovalTemplateAgencyRecord | null> => {
   const template = await db
     .selectFrom('Common_Approval_Template')
     .select([
       'id',
-      'egcs_cn_scopetype as scopeType',
-      'egcs_cn_scopeid as scopeId'
+      'egcs_cn_agency as agencyId'
     ])
     .where('id', '=', templateId)
     .where('_deleted', '=', false)
@@ -311,8 +306,7 @@ export const getApprovalTemplateScopeRecord = async (
 
   return {
     id: String(template.id),
-    scopeType: template.scopeType as ApprovalTemplateScopeType,
-    scopeId: String(template.scopeId)
+    agencyId: String(template.agencyId)
   }
 }
 
@@ -320,12 +314,12 @@ export const getApprovalTemplate = async (
   db: DbClient,
   templateId: string
 ): Promise<CanonicalApprovalTemplateItem | null> => {
-  const scopeRecord = await getApprovalTemplateScopeRecord(db, templateId)
-  if (!scopeRecord) {
+  const agencyRecord = await getApprovalTemplateAgencyRecord(db, templateId)
+  if (!agencyRecord) {
     return null
   }
 
-  const templates = await listApprovalTemplates(db, scopeRecord.scopeType, scopeRecord.scopeId)
+  const templates = await listApprovalTemplates(db, agencyRecord.agencyId)
   return templates.find(item => String(item.id) === templateId) ?? null
 }
 
@@ -677,13 +671,11 @@ const syncAdditionalApprovalCertifications = async (
 
 const getApprovalTemplateWriteValues = (
   input: {
-    scopeType: ApprovalTemplateScopeType
-    scopeId: string
+    agencyId: string
     payload: ApprovalTemplate | ApprovalTemplatePatch | ApprovalTemplateCreateInput
   }
 ) => ({
-  egcs_cn_scopetype: input.scopeType,
-  egcs_cn_scopeid: input.scopeId,
+  egcs_cn_agency: input.agencyId,
   egcs_cn_description_en: input.payload.egcs_cn_description_en ?? '',
   egcs_cn_description_fr: input.payload.egcs_cn_description_fr ?? '',
   egcs_cn_name_en: input.payload.egcs_cn_name_en ?? '',
@@ -699,8 +691,7 @@ const getApprovalTemplateWriteValues = (
 const saveApprovalTemplate = async (
   db: DbClient,
   input: {
-    scopeType: ApprovalTemplateScopeType
-    scopeId: string
+    agencyId: string
     payload: ApprovalTemplate | ApprovalTemplatePatch | ApprovalTemplateCreateInput
     templateId?: string
   }
@@ -712,8 +703,7 @@ const saveApprovalTemplate = async (
         .updateTable('Common_Approval_Template')
         .set(values)
         .where('id', '=', input.templateId)
-        .where('egcs_cn_scopetype', '=', input.scopeType)
-        .where('egcs_cn_scopeid', '=', input.scopeId)
+        .where('egcs_cn_agency', '=', input.agencyId)
         .returningAll()
         .executeTakeFirstOrThrow()
     : await db
@@ -813,8 +803,7 @@ const syncApprovalStep = async (
 export const syncApprovalTemplate = async (
   db: DbClient,
   input: {
-    scopeType: ApprovalTemplateScopeType
-    scopeId: string
+    agencyId: string
     payload: ApprovalTemplate | ApprovalTemplatePatch | ApprovalTemplateCreateInput
     templateId?: string
   }

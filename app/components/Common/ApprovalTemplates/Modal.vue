@@ -7,10 +7,7 @@ import { computed } from 'vue'
 import {
   ApprovalTemplateSchema
 } from '~~/shared/types/schemas'
-import type {
-  ApprovalTemplate,
-  ApprovalTemplateScopeType
-} from '~~/shared/types/schemas'
+import type { ApprovalTemplate } from '~~/shared/types/schemas'
 import type { CrudModalSession } from '~/composables/useCrudModal'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 
@@ -20,13 +17,11 @@ const open = defineModel<boolean>('open', { default: false })
 const state = defineModel<(ApprovalTemplate & { id?: string }) | null>('state', { required: true })
 
 const {
-  scopeType,
-  scopeId,
+  agencyId,
   captureSession,
   closeSession
 } = defineProps<{
-  scopeType: ApprovalTemplateScopeType
-  scopeId: string
+  agencyId: string
   captureSession: () => CrudModalSession | null
   closeSession: (session: CrudModalSession | null) => boolean
 }>()
@@ -49,7 +44,7 @@ const onSubmit = async () => {
   if (!pending.begin(session)) return
 
   try {
-    const request = buildApprovalTemplateModalSubmitRequest(state.value, scopeType, scopeId)
+    const request = buildApprovalTemplateModalSubmitRequest(state.value, agencyId)
     const response = await fetch(getClientRequestUrl(request.url), {
       method: request.method,
       headers: {

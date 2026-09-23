@@ -5,12 +5,10 @@ import type { TabMap } from '~~/shared/types/ui'
 import type { Scope } from '~~/shared/utils/scopes'
 import TransferPaymentAmendmentSubtypesTab from '~/components/TransferPayment/TransferPaymentAmendmentSubtypesTab.vue'
 import TransferPaymentAgreementSubtypesTab from '~/components/TransferPayment/TransferPaymentAgreementSubtypesTab.vue'
-import TransferPaymentApprovalTemplatesTab from '~/components/TransferPayment/TransferPaymentApprovalTemplatesTab.vue'
 import TransferPaymentDocumentTemplatesTab from '~/components/TransferPayment/TransferPaymentDocumentTemplatesTab.vue'
 import TransferPaymentAreasOfExpertiseTab from '~/components/TransferPayment/AreasOfExpertiseTab.vue'
 import TransferPaymentFinancialLimitsTab from '~/components/TransferPayment/TransferPaymentFinancialLimitsTab.vue'
 import TransferPaymentMonitorTypesTab from '~/components/TransferPayment/TransferPaymentMonitorTypesTab.vue'
-import TransferPaymentRecommendationSetupTab from '~/components/TransferPayment/TransferPaymentRecommendationSetupTab.vue'
 import TransferPaymentWorkflowSetupsTab from '~/components/TransferPayment/TransferPaymentWorkflowSetupsTab.vue'
 import TransferPaymentReviewSetupsTab from '~/components/TransferPayment/TransferPaymentReviewSetupsTab.vue'
 import TransferPaymentStreamAmendmentTypesTab from '~/components/TransferPayment/TransferPaymentStreamAmendmentTypesTab.vue'
@@ -43,9 +41,7 @@ export const TRANSFER_PAYMENT_STREAM_TAB_KEYS = {
   expertise: 'transfer_payment.areas_of_expertise',
   financialLimits: 'transfer_payment.financial_limits',
   reviewSetups: 'transfer_payment.review_setups',
-  approvalTemplates: 'transfer_payment.approval_templates',
   documentTemplates: 'transfer_payment.document_templates.title',
-  recommendationSetups: 'transfer_payment.recommendation_setups',
   workflowSetups: 'workflow.title',
   extensions: 'extensions.tab'
 } as const
@@ -174,16 +170,8 @@ export const useTransferPaymentStreamDetailState = (
       { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.reviewSetups, icon: 'i-lucide-clipboard-list', component: TransferPaymentReviewSetupsTab, getProps: () => ({ transferPaymentId: id, streamId, agencyId: agencyId.value ?? undefined, canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }
     ],
     [
-      'approvalTemplates',
-      { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.approvalTemplates, icon: 'i-lucide-stamp', component: TransferPaymentApprovalTemplatesTab, getProps: () => ({ transferPaymentId: id, streamId, agencyId: agencyId.value ?? undefined, canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }
-    ],
-    [
       'document-templates',
       { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.documentTemplates, value: 'document-templates', icon: 'i-lucide-files', component: TransferPaymentDocumentTemplatesTab, getProps: () => ({ transferPaymentId: id, streamId, canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }
-    ],
-    [
-      'recommendationSetups',
-      { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.recommendationSetups, icon: 'i-lucide-message-square-quote', component: TransferPaymentRecommendationSetupTab, getProps: () => ({ transferPaymentId: id, streamId, agencyId: agencyId.value ?? undefined, canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }
     ],
     [
       'workflowSetups',
@@ -201,8 +189,6 @@ export const useTransferPaymentStreamDetailState = (
       typeof route.params.schemaId !== 'string'
       && typeof route.params.templateId !== 'string'
       && typeof route.params.recommendationSetupId !== 'string'
-      && typeof route.params.workflowSetupId !== 'string'
-      && typeof route.params.reviewSetupId !== 'string'
     )),
     queryKey: 'section'
   })

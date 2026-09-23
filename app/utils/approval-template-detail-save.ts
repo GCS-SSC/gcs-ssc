@@ -54,8 +54,8 @@ export const buildApprovalTemplateDetailPayload = (
       egcs_cn_description_fr: step.egcs_cn_description_fr,
       egcs_cn_name_en: step.egcs_cn_name_en,
       egcs_cn_name_fr: step.egcs_cn_name_fr,
-      egcs_cn_defaultuser: step.egcs_cn_defaultuser,
-      egcs_cn_defaultgroup: step.egcs_cn_defaultgroup,
+      egcs_cn_defaultuser: step.egcs_cn_defaultuser || null,
+      egcs_cn_defaultgroup: step.egcs_cn_defaultgroup || null,
       egcs_cn_requiregroupdetails: step.egcs_cn_requiregroupdetails,
       egcs_cn_approvertitle: step.egcs_cn_approvertitle,
       certifications: step.certifications

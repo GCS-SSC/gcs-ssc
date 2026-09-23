@@ -20,7 +20,13 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const { createValidator } = useZodI18n()
 const validate = createValidator(z.object({ step: ApprovalTemplateStepSchema }))
-const validationState = computed(() => ({ step: step.value }))
+const validationState = computed(() => ({
+  step: step.value && {
+    ...step.value,
+    egcs_cn_defaultuser: step.value.egcs_cn_defaultuser || null,
+    egcs_cn_defaultgroup: step.value.egcs_cn_defaultgroup || null
+  }
+}))
 
 const modalTitle = computed(() => mode === 'create' ? t('common.add') : t('common.edit'))
 

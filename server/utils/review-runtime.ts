@@ -16,6 +16,7 @@ type CreateRuntimeReviewSetInput = {
   entityType: Entity_Type
   entityId: string
   creatorCommonUserId: string
+  setupScopes: ReviewRuntimeSetupScope[]
   workflowSetupMemberId?: string
   ownerByMemberId?: Map<string, string>
   groupAssignmentMode?: 'creator_primary' | 'group_only'
@@ -131,13 +132,17 @@ export const listEligibleRuntimeReviewSetSetupAgencyIds = async (
   allowedAgencyIds: string[],
   setupScopes: ReviewRuntimeSetupScope[]
 ): Promise<Map<string, string>> => {
-  if (setupScopes.length === 0) return new Map()
+  const streamIds = setupScopes.filter(scope => scope.scopeType === 'transferpaymentstream').map(scope => scope.scopeId)
+  if (streamIds.length === 0) return new Map()
   const allowed = new Set(allowedAgencyIds)
   if (allowed.size === 0) return new Map()
   const rows = await db.selectFrom('Common_Review_Set_Setup')
+    .innerJoin('Transfer_Payment_Stream_Review_Set', 'Transfer_Payment_Stream_Review_Set.egcs_tp_reviewset', 'Common_Review_Set_Setup.id')
     .innerJoin('Common_Publication', 'Common_Publication.id', 'Common_Review_Set_Setup.id')
     .innerJoin('Common_Publication_Version', 'Common_Publication_Version.id', 'Common_Publication.egcs_cn_currentversion')
-    .select(['Common_Review_Set_Setup.id', 'Common_Publication_Version.egcs_cn_definition as definition'])
+    .select(['Common_Review_Set_Setup.id', 'Common_Review_Set_Setup.egcs_cn_agency', 'Common_Publication_Version.egcs_cn_definition as definition'])
+    .where('Transfer_Payment_Stream_Review_Set.egcs_tp_transferpaymentstream', 'in', streamIds)
+    .where('Transfer_Payment_Stream_Review_Set._deleted', '=', false)
     .where('Common_Review_Set_Setup._deleted', '=', false)
     .where('Common_Publication.egcs_cn_state', '=', 'published')
     .where('Common_Publication._deleted', '=', false)
@@ -147,14 +152,14 @@ export const listEligibleRuntimeReviewSetSetupAgencyIds = async (
   for (const row of rows) {
     const definition = readPublishedReviewSetup(row.definition)
     if (definition.directReview === false || definition.entityType !== entityType
-      || !setupScopes.some(scope => scope.scopeType === definition.scopeType && scope.scopeId === definition.scopeId)) continue
+      || definition.agencyId !== String(row.egcs_cn_agency) || !allowed.has(definition.agencyId)) continue
     const members = await Promise.all(definition.members.map(async member => {
       const key = `${member.schema.publicationVersionId}:${member.schema.publicationVersion}`
       if (!schemaVersions.has(key)) schemaVersions.set(key, readSchemaVersion(db, member, true))
       return await schemaVersions.get(key)
     }))
     const agencyId = members[0]?.schemaDefinition.agencyId
-    if (agencyId && allowed.has(agencyId) && members.every(member => member?.schemaDefinition.agencyId === agencyId
+    if (agencyId && agencyId === definition.agencyId && members.every(member => member?.schemaDefinition.agencyId === agencyId
       && member.schemaDefinition.entityType === entityType)) eligible.set(String(row.id), agencyId)
   }
   return eligible
@@ -228,8 +233,17 @@ export const lockEligibleRuntimeReviewSetSetupSnapshot = async (
   if (pinnedPublicationVersion !== undefined && Number(version.version) !== pinnedPublicationVersion) return null
   const publication = pinnedPublication ?? readPublishedReviewSetup(version.definition)
   if (publication.kind !== 'review_set_setup' || publication.reviewSetupId !== reviewSetSetupId
-    || publication.entityType !== entityType
-    || !setupScopes.some(scope => scope.scopeType === publication.scopeType && scope.scopeId === publication.scopeId)) return null
+    || publication.entityType !== entityType || publication.agencyId !== ownerAgencyId
+    || String(setup.egcs_cn_agency) !== ownerAgencyId) return null
+  if (!allowHistoricalVersions) {
+    const streamIds = setupScopes.filter(scope => scope.scopeType === 'transferpaymentstream').map(scope => scope.scopeId)
+    if (!streamIds.length) return null
+    const link = await db.selectFrom('Transfer_Payment_Stream_Review_Set').select('id')
+      .where('egcs_tp_reviewset', '=', reviewSetSetupId)
+      .where('egcs_tp_transferpaymentstream', 'in', streamIds)
+      .where('_deleted', '=', false).forUpdate().executeTakeFirst()
+    if (!link) return null
+  }
   const members = await Promise.all(publication.members.map(member => readSchemaVersion(
     db,
     member,
@@ -479,7 +493,7 @@ export const createRuntimeReviewSet = async (input: CreateRuntimeReviewSetInput)
     if (!first) return null
     return await createRuntimeReviewSetInTransaction({
       ...input, db: trx, ownerAgencyId: first.schemaDefinition.agencyId,
-      setupScopes: [{ scopeType: publication.scopeType, scopeId: publication.scopeId }],
+      setupScopes: input.setupScopes,
       publication, publicationVersionId: String(setup.publicationVersionId),
       publicationVersion: Number(setup.publicationVersion)
     })

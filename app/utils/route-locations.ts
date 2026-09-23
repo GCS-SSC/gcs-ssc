@@ -10,6 +10,30 @@ export const appRouteLocations = {
   adminGwcoa: () => ({ name: 'admin-gwcoa' }),
   agencies: () => ({ name: 'agencies' }),
   agencyDetail: (id: string) => ({ name: 'agencies-id', params: { id } }),
+  agencyReviewSetDetail: (id: string, reviewSetId: string) => ({
+    name: 'agencies-id-review-sets-reviewSetId',
+    params: { id, reviewSetId }
+  }),
+  agencyReviewSchemaDetail: (id: string, schemaId: string) => ({
+    name: 'agencies-id-review-schemas-schemaId',
+    params: { id, schemaId }
+  }),
+  agencyRecommendationSetDetail: (id: string, recommendationSetId: string) => ({
+    name: 'agencies-id-recommendation-sets-recommendationSetId',
+    params: { id, recommendationSetId }
+  }),
+  agencyRecommendationSchemaDetail: (id: string, schemaId: string) => ({
+    name: 'agencies-id-recommendation-schemas-schemaId',
+    params: { id, schemaId }
+  }),
+  agencyApprovalTemplateDetail: (id: string, templateId: string) => ({
+    name: 'agencies-id-approval-templates-templateId',
+    params: { id, templateId }
+  }),
+  agencyWorkflowSetupDetail: (id: string, workflowSetupId: string) => ({
+    name: 'agencies-id-workflows-workflowSetupId',
+    params: { id, workflowSetupId }
+  }),
   proponents: () => ({ name: 'proponents' }),
   proponentCreate: () => ({ name: 'proponents-new' }),
   proponentEdit: (id: string) => ({ name: 'proponents-edit-id', params: { id } }),
@@ -78,34 +102,6 @@ export const appRouteLocations = {
   claimReconciliationDetail: (reconcileId: string) => ({
     name: 'claim-reconciliations-reconcileId',
     params: { reconcileId }
-  }),
-  transferPaymentAssessmentSchemaDetail: (id: string, streamId: string, schemaId: string) => ({
-    name: 'transfer-payments-id-streams-streamId-assessment-schemas-schemaId',
-    params: { id, streamId, schemaId }
-  }),
-  transferPaymentChecklistSchemaDetail: (id: string, streamId: string, schemaId: string) => ({
-    name: 'transfer-payments-id-streams-streamId-checklist-schemas-schemaId',
-    params: { id, streamId, schemaId }
-  }),
-  transferPaymentRecommendationSchemaDetail: (id: string, streamId: string, schemaId: string) => ({
-    name: 'transfer-payments-id-streams-streamId-recommendation-schemas-schemaId',
-    params: { id, streamId, schemaId }
-  }),
-  transferPaymentRecommendationSetupDetail: (id: string, streamId: string, recommendationSetupId: string) => ({
-    name: 'transfer-payments-id-streams-streamId-recommendation-setups-recommendationSetupId',
-    params: { id, streamId, recommendationSetupId }
-  }),
-  transferPaymentApprovalTemplateDetail: (id: string, streamId: string, templateId: string) => ({
-    name: 'transfer-payments-id-streams-streamId-approval-templates-templateId',
-    params: { id, streamId, templateId }
-  }),
-  transferPaymentWorkflowSetupDetail: (id: string, streamId: string, workflowSetupId: string) => ({
-    name: 'transfer-payments-id-streams-streamId-workflow-setups-workflowSetupId',
-    params: { id, streamId, workflowSetupId }
-  }),
-  transferPaymentReviewSetupDetail: (id: string, streamId: string, reviewSetupId: string) => ({
-    name: 'transfer-payments-id-streams-streamId-review-setups-reviewSetupId',
-    params: { id, streamId, reviewSetupId }
   }),
   users: () => ({ name: 'users' }),
   userDetail: (id: string) => ({ name: 'users-id', params: { id } })

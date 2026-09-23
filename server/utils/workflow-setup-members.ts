@@ -5,14 +5,14 @@ import type { CommonWorkflowSetupMemberOwnersSchema } from '~~/shared/types/sche
 
 type WorkflowMember = Selectable<Database['Common_Workflow_Setup_Member']>
 type WorkflowMemberOwner = z.infer<typeof CommonWorkflowSetupMemberOwnersSchema>[number]
-type WorkflowSetupIdentity = Pick<Selectable<Database['Common_Workflow_Setup']>, 'id' | 'egcs_cn_scopetype' | 'egcs_cn_scopeid' | 'egcs_cn_entitytype'>
+type WorkflowSetupIdentity = Pick<Selectable<Database['Common_Workflow_Setup']>, 'id' | 'egcs_cn_agency' | 'egcs_cn_entitytype'>
 type WorkflowMemberReference = Pick<WorkflowMember, 'egcs_cn_kind'> & Partial<Pick<
   WorkflowMember,
   'egcs_cn_reviewset' | 'egcs_cn_recommendationset' | 'egcs_cn_approvaltemplate'
 >>
 
 /**
- * Confirms a selected workflow member belongs to the setup's exact scope; review sets also match target type.
+ * Confirms a selected workflow member belongs to the setup's Agency; review sets also match target type.
  * @param trx Transaction used to resolve the referenced setup.
  * @param setup Owning workflow setup identity.
  * @param member Proposed workflow member reference.
@@ -28,8 +28,7 @@ export const isValidWorkflowSetupMemberReference = async (
       .innerJoin('Common_Publication', 'Common_Publication.id', 'Common_Review_Set_Setup.id')
       .select('Common_Review_Set_Setup.id')
       .where('Common_Review_Set_Setup.id', '=', String(member.egcs_cn_reviewset))
-      .where('Common_Review_Set_Setup.egcs_cn_scopetype', '=', setup.egcs_cn_scopetype)
-      .where('Common_Review_Set_Setup.egcs_cn_scopeid', '=', String(setup.egcs_cn_scopeid))
+      .where('Common_Review_Set_Setup.egcs_cn_agency', '=', setup.egcs_cn_agency)
       .where('Common_Review_Set_Setup.egcs_cn_entitytype', '=', setup.egcs_cn_entitytype)
       .where('Common_Publication.egcs_cn_state', '=', 'published')
       .where('Common_Review_Set_Setup._deleted', '=', false).where('Common_Publication._deleted', '=', false)
@@ -40,22 +39,18 @@ export const isValidWorkflowSetupMemberReference = async (
       .innerJoin('Common_Publication', 'Common_Publication.id', 'Common_Recommendation_Set_Setup.id')
       .select('Common_Recommendation_Set_Setup.id')
       .where('Common_Recommendation_Set_Setup.id', '=', String(member.egcs_cn_recommendationset))
-      .where('Common_Recommendation_Set_Setup.egcs_cn_scopetype', '=', setup.egcs_cn_scopetype)
-      .where('Common_Recommendation_Set_Setup.egcs_cn_scopeid', '=', String(setup.egcs_cn_scopeid))
+      .where('Common_Recommendation_Set_Setup.egcs_cn_agency', '=', setup.egcs_cn_agency)
       .where('Common_Publication.egcs_cn_state', '=', 'published')
       .where('Common_Recommendation_Set_Setup._deleted', '=', false).where('Common_Publication._deleted', '=', false)
       .forUpdate().executeTakeFirst())
   }
   if (member.egcs_cn_kind === 'approval_template' && member.egcs_cn_approvaltemplate) {
-    if (!['fundingopportunity', 'transferpaymentstream'].includes(setup.egcs_cn_scopetype)) return false
-    const scopeType = setup.egcs_cn_scopetype as 'fundingopportunity' | 'transferpaymentstream'
     return Boolean(await trx.selectFrom('Common_Approval_Template')
       .innerJoin('Common_Publication', 'Common_Publication.id', 'Common_Approval_Template.id')
       .innerJoin('Common_Publication_Version', 'Common_Publication_Version.id', 'Common_Publication.egcs_cn_currentversion')
       .select('Common_Approval_Template.id')
       .where('Common_Approval_Template.id', '=', String(member.egcs_cn_approvaltemplate))
-      .where('Common_Approval_Template.egcs_cn_scopetype', '=', scopeType)
-      .where('Common_Approval_Template.egcs_cn_scopeid', '=', String(setup.egcs_cn_scopeid))
+      .where('Common_Approval_Template.egcs_cn_agency', '=', setup.egcs_cn_agency)
       .where('Common_Publication.egcs_cn_state', '=', 'published')
       .where('Common_Approval_Template._deleted', '=', false).where('Common_Publication._deleted', '=', false)
       .forUpdate().executeTakeFirst())

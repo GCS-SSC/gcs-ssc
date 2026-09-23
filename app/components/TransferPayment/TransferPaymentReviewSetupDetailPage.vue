@@ -5,11 +5,9 @@ import { TransferPaymentStreamReviewSetupCreateSchema } from '~~/shared/types/sc
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { FetchError } from 'ofetch'
-import type { Scope } from '~~/shared/utils/scopes'
 import type { TranslatedTabItem } from '~~/shared/types/ui'
 import type {
-  TransferPaymentProfileItem,
-  TransferPaymentStreamItem,
+  AgencyProfileItem,
   TransferPaymentStreamReviewSetupItem,
   TransferPaymentStreamReviewSetupMember
 } from '~~/shared/types/schemas'
@@ -51,13 +49,11 @@ const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const { createValidator } = useZodI18n()
 const toast = useToast()
 
-const transferPaymentId = route.params.id as string
-const streamId = route.params.streamId as string
-const reviewSetupId = route.params.reviewSetupId as string
-const endpoint = `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/review-setups/${reviewSetupId}`
+const agencyId = String(route.params.id)
+const reviewSetupId = String(route.params.reviewSetId)
+const endpoint = `/api/agency/${agencyId}/review-sets/${reviewSetupId}`
 
-const { data: profile } = await useFetch<TransferPaymentProfileItem, FetchError, string>(`/api/transfer-payments/${transferPaymentId}`)
-const { data: stream } = await useFetch<TransferPaymentStreamItem, FetchError, string>(`/api/transfer-payments/${transferPaymentId}/streams/${streamId}`)
+const { data: agency } = await useFetch<AgencyProfileItem, FetchError, string>(`/api/agency/${agencyId}`)
 const { data: setup, error: loadError, status: loadStatus, refresh } = await useFetch<ReviewSetupDetail, FetchError, string>(endpoint)
 const detailContent = useTemplateRef<HTMLElement>('detailContent')
 const cloneSetup = (value: ReviewSetupDetail): ReviewSetupDetail => ({
@@ -73,29 +69,26 @@ const associateState: Ref<Record<string, unknown> | null> = ref(null)
 const isSchemaCreateModalOpen: Ref<boolean> = ref(false)
 const schemaCreateState: Ref<Record<string, unknown> | null> = ref(null)
 const isHeroCollapsed = getHeroCollapsed('transfer-payment-review-setup-detail')
-const validateSet = withFormRequirements(createValidator(TransferPaymentStreamReviewSetupPatchSchema), TransferPaymentStreamReviewSetupCreateSchema)
+const validateDraft = createValidator(TransferPaymentStreamReviewSetupPatchSchema)
+const validateSet = withFormRequirements(
+  async () => await validateDraft(getDraft()),
+  TransferPaymentStreamReviewSetupCreateSchema
+)
 
-const profileScope = computed<Scope>(() => ({
-  type: 'entity',
-  agencyId: String(profile.value?.egcs_tp_agency),
-  path: [{ type: 'transfer_payment', id: transferPaymentId }]
-}))
-const canManagePublication = computed(() => Boolean(profile.value) && can('transfer_payment', 'update', profileScope.value))
+const canManagePublication = computed(() => can('agency', 'update', { type: 'agency', agencyId }))
 const isEditable = computed(() => state.value?.publicationState !== 'retired')
 const canUpdate = computed(() => canManagePublication.value && isEditable.value)
-const canCreate = computed(() => Boolean(profile.value) && isEditable.value && can('transfer_payment', 'create', profileScope.value))
-const canDelete = computed(() => Boolean(profile.value) && isEditable.value && can('transfer_payment', 'delete', profileScope.value))
+const canCreate = canUpdate
+const canDelete = canUpdate
 const isLoadRetrying = computed(() => loadStatus.value === 'pending')
-const agencyId = computed(() => String(profile.value?.egcs_tp_agency ?? ''))
 const entityTypeItems = computed(() => TRANSFER_PAYMENT_REVIEW_SETUP_ENTITY_TYPE_ENUM.map(value => ({
   label: t(`enums.entity_type.${value}`),
   value
 })))
-const backTo = computed(() => localePath(appRouteLocations.transferPaymentStreamDetail(transferPaymentId, streamId, { section: 'review-setups' })))
+const backTo = computed(() => localePath({ ...appRouteLocations.agencyDetail(agencyId), query: { section: 'reviewSets' } }))
 const breadcrumbItems = computed(() => [
-  { label: t('transfer_payment.title'), to: localePath(appRouteLocations.transferPayments()) },
-  { label: getBilingualValue(profile.value, 'egcs_tp_name'), to: localePath(appRouteLocations.transferPaymentDetail(transferPaymentId)) },
-  { label: getBilingualValue(stream.value, 'egcs_tp_name'), to: backTo.value },
+  { label: t('nav.agencies'), to: localePath(appRouteLocations.agencies()) },
+  { label: getBilingualValue(agency.value, 'egcs_ay_name'), to: backTo.value },
   { label: getBilingualValue(state.value, 'egcs_cn_name') }
 ])
 const sectionTabs = computed<TranslatedTabItem[]>(() => [
@@ -267,13 +260,13 @@ const deleteMember = async (member: ReviewSetupMember) => {
 const openSchemaEditor = async (member: ReviewSetupMember) => {
   if (mutation.isPending.value || blockDirtyAction()) return
   await router.push(localePath(member.egcs_cn_reviewtype === 'checklist'
-    ? appRouteLocations.transferPaymentChecklistSchemaDetail(transferPaymentId, streamId, member.egcs_cn_reviewschema)
-    : appRouteLocations.transferPaymentAssessmentSchemaDetail(transferPaymentId, streamId, member.egcs_cn_reviewschema)))
+    ? appRouteLocations.agencyReviewSchemaDetail(agencyId, member.egcs_cn_reviewschema)
+    : appRouteLocations.agencyReviewSchemaDetail(agencyId, member.egcs_cn_reviewschema)))
 }
 const onSchemaCreated = async (payload: { schemaId: string; reviewType: 'assessment' | 'checklist' }) => {
   await router.push(localePath(payload.reviewType === 'checklist'
-    ? appRouteLocations.transferPaymentChecklistSchemaDetail(transferPaymentId, streamId, payload.schemaId)
-    : appRouteLocations.transferPaymentAssessmentSchemaDetail(transferPaymentId, streamId, payload.schemaId)))
+    ? appRouteLocations.agencyReviewSchemaDetail(agencyId, payload.schemaId)
+    : appRouteLocations.agencyReviewSchemaDetail(agencyId, payload.schemaId)))
 }
 const runMemberMutation: EditorMutationRunner = async request => {
   if (mutation.isPending.value || blockDirtyAction()) return undefined
@@ -362,8 +355,7 @@ const runMemberMutation: EditorMutationRunner = async request => {
                 <fieldset :disabled="!canUpdateFields" class="space-y-5">
                   <ReviewSetSetupFields
                     v-model:state="state"
-                    :transfer-payment-id="transferPaymentId"
-                    :stream-id="streamId"
+                    :agency-id="agencyId"
                     :entity-type-items="entityTypeItems"
                     entity-type-disabled />
                   <div v-if="canUpdate" class="flex justify-end">
@@ -414,8 +406,6 @@ const runMemberMutation: EditorMutationRunner = async request => {
         v-if="!loadError && associateState && state && canUpdate"
         v-model:open="isAssociateModalOpen"
         v-model:state="associateState"
-        :transfer-payment-id="transferPaymentId"
-        :stream-id="streamId"
         :review-setup-id="reviewSetupId"
         :agency-id="agencyId"
         :entity-type="state.egcs_cn_entitytype"
@@ -425,9 +415,8 @@ const runMemberMutation: EditorMutationRunner = async request => {
         v-if="!loadError && schemaCreateState && canCreate"
         v-model:open="isSchemaCreateModalOpen"
         v-model:state="schemaCreateState"
-        :transfer-payment-id="transferPaymentId"
-        :stream-id="streamId"
         :review-setup-id="reviewSetupId"
+        :agency-id="agencyId"
         :mutation-pending="mutation.isPending.value"
         :run-mutation="runMemberMutation"
         @created="onSchemaCreated" />

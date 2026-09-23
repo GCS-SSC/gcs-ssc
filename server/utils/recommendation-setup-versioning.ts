@@ -38,8 +38,7 @@ export type PublishedRecommendationSchema = {
 
 export type PublishedRecommendationPlan = {
   recommendationSetId: string
-  scopeType: RecommendationSetRow['egcs_cn_scopetype']
-  scopeId: string
+  agencyId: string
   nameEn: string
   nameFr: string
   descriptionEn: string
@@ -75,14 +74,13 @@ export type RecommendationPlanPublication = {
 export const lockRecommendationSetupForMutation = async (
   db: DbClient,
   setupId: string,
-  streamId: string
+  agencyId: string
 ) => await db.selectFrom('Common_Recommendation_Set_Setup')
   .innerJoin('Common_Publication', 'Common_Publication.id', 'Common_Recommendation_Set_Setup.id')
   .selectAll('Common_Recommendation_Set_Setup')
   .select('Common_Publication.egcs_cn_state as publicationState')
   .where('Common_Recommendation_Set_Setup.id', '=', setupId)
-  .where('Common_Recommendation_Set_Setup.egcs_cn_scopetype', '=', 'transferpaymentstream')
-  .where('Common_Recommendation_Set_Setup.egcs_cn_scopeid', '=', streamId)
+  .where('Common_Recommendation_Set_Setup.egcs_cn_agency', '=', agencyId)
   .where('Common_Recommendation_Set_Setup._deleted', '=', false)
   .where('Common_Publication._deleted', '=', false)
   .forUpdate(['Common_Recommendation_Set_Setup', 'Common_Publication'])
@@ -213,8 +211,7 @@ export const buildRecommendationPlanPublication = async (
   return {
     definition: {
       recommendationSetId: String(setup.id),
-      scopeType: setup.egcs_cn_scopetype,
-      scopeId: String(setup.egcs_cn_scopeid),
+      agencyId: String(setup.egcs_cn_agency),
       nameEn: setup.egcs_cn_name_en,
       nameFr: setup.egcs_cn_name_fr,
       descriptionEn: setup.egcs_cn_description_en,

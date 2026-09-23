@@ -31,8 +31,7 @@ export type PublishedReviewSetupConfiguration = {
   kind: 'review_set_setup'
   reviewSetupId: string
   entityType: Entity_Type
-  scopeType: ReviewSetupRow['egcs_cn_scopetype']
-  scopeId: string
+  agencyId: string
   name: { en: string, fr: string }
   description: { en: string, fr: string }
   order: number
@@ -51,8 +50,17 @@ export type ReviewSetupPublicationPlan = {
 const resolvePublishedReference = async (
   db: DbClient,
   publicationId: string,
-  kind: PublicationKind
+  kind: PublicationKind,
+  agencyId: string
 ): Promise<PublishedPublicationReference & { definition: JsonValue }> => {
+  const owner = kind === 'review_schema'
+    ? await db.selectFrom('Common_Review_Schema').select('id')
+        .where('id', '=', publicationId).where('egcs_cn_agency', '=', agencyId)
+        .where('_deleted', '=', false).executeTakeFirst()
+    : await db.selectFrom('Common_Approval_Template').select('id')
+        .where('id', '=', publicationId).where('egcs_cn_agency', '=', agencyId)
+        .where('_deleted', '=', false).executeTakeFirst()
+  if (!owner) throw new Error('Review set dependency must belong to its Agency')
   const publication = await db.selectFrom('Common_Publication')
     .innerJoin('Common_Publication_Version', 'Common_Publication_Version.id', 'Common_Publication.egcs_cn_currentversion')
     .select([
@@ -121,14 +129,14 @@ export const buildReviewSetupPublication = async (
 
   const references: PublicationVersionReference[] = []
   const publishedMembers = await Promise.all(members.map(async member => {
-    const schema = await resolvePublishedReference(db, String(member.egcs_cn_reviewschema), 'review_schema')
+    const schema = await resolvePublishedReference(db, String(member.egcs_cn_reviewschema), 'review_schema', String(setup.egcs_cn_agency))
     const schemaDefinition = readPublishedReviewSchema(schema.definition)
     if (!schemaDefinition || schemaDefinition.entityType !== setup.egcs_cn_entitytype) {
       throw new Error('Review schema entity type must match its review setup')
     }
     references.push(toVersionReference(schema, 'members.schema', member.egcs_cn_order))
     const approval = member.egcs_cn_approvaltemplate
-      ? await resolvePublishedReference(db, String(member.egcs_cn_approvaltemplate), 'approval_template')
+      ? await resolvePublishedReference(db, String(member.egcs_cn_approvaltemplate), 'approval_template', String(setup.egcs_cn_agency))
       : undefined
     if (approval) references.push(toVersionReference(approval, 'members.approval', member.egcs_cn_order))
     return {
@@ -143,7 +151,7 @@ export const buildReviewSetupPublication = async (
     }
   }))
   const finalApproval = setup.egcs_cn_approvaltemplate
-    ? await resolvePublishedReference(db, String(setup.egcs_cn_approvaltemplate), 'approval_template')
+    ? await resolvePublishedReference(db, String(setup.egcs_cn_approvaltemplate), 'approval_template', String(setup.egcs_cn_agency))
     : undefined
   if (finalApproval) references.push(toVersionReference(finalApproval, 'finalApproval', null))
 
@@ -152,8 +160,7 @@ export const buildReviewSetupPublication = async (
       kind: 'review_set_setup',
       reviewSetupId: String(setup.id),
       entityType: setup.egcs_cn_entitytype,
-      scopeType: setup.egcs_cn_scopetype,
-      scopeId: String(setup.egcs_cn_scopeid),
+      agencyId: String(setup.egcs_cn_agency),
       name: { en: setup.egcs_cn_name_en, fr: setup.egcs_cn_name_fr },
       description: { en: setup.egcs_cn_description_en, fr: setup.egcs_cn_description_fr },
       order: setup.egcs_cn_order,

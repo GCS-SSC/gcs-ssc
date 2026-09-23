@@ -411,6 +411,8 @@ export interface AuditDatabase {
 
 export interface Database extends ExtensionsDatabase, AuditDatabase {
   Agency_Profile: AgencyProfileTable
+  Agency_Custom_Field: AgencyCustomFieldTable
+  Agency_Custom_Field_Option: AgencyCustomFieldOptionTable
   Agency_Cost_Category: AgencyCostCategoryTable
   Agency_Cost_Category_Line_Item: AgencyCostCategoryLineItemTable
   Agency_Fiscal_Year: AgencyFiscalYearTable
@@ -432,8 +434,7 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Common_Workflow_Member_Condition: WorkflowMemberConditionTable
   Common_Workflow_Publication_Condition: WorkflowPublicationConditionTable
   Transfer_Payment_Stream_Field_Section: TransferPaymentStreamFieldSectionTable
-  Transfer_Payment_Stream_Field: TransferPaymentStreamFieldTable
-  Transfer_Payment_Stream_Field_Option: TransferPaymentStreamFieldOptionTable
+  Transfer_Payment_Stream_Field_Assignment: TransferPaymentStreamFieldAssignmentTable
   Funding_Case_Agreement_Profile: FundingCaseAgreementProfileTable
   Funding_Case_Agreement_Note: FundingCaseAgreementNoteTable
   Funding_Case_Agreement_Closeout: FundingCaseAgreementCloseoutTable
@@ -481,6 +482,8 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Transfer_Payment_Outcome: TransferPaymentOutcomeTable
   Transfer_Payment_Outcome_Performance_Indicator: TransferPaymentOutcomePerformanceIndicatorTable
   Transfer_Payment_Stream_Outcome: TransferPaymentStreamOutcomeTable
+  Transfer_Payment_Stream_Review_Set: TransferPaymentStreamReviewSetTable
+  Transfer_Payment_Stream_Workflow: TransferPaymentStreamWorkflowTable
   Transfer_Payment_Amendment_Type: TransferPaymentAmendmentTypeTable
   Transfer_Payment_Amendment_Subtype: TransferPaymentAmendmentSubtypeTable
   Transfer_Payment_Amendment_Subtype_Type: TransferPaymentAmendmentSubtypeTypeTable
@@ -498,8 +501,6 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Common_Publication_Version: CommonPublicationVersionTable
   Common_Publication_Version_Reference: CommonPublicationVersionReferenceTable
   Common_Workflow_Publication_Status: CommonWorkflowPublicationStatusTable
-  Common_Publication_Selection: CommonPublicationSelectionTable
-  Common_Publication_Selection_Lock: CommonPublicationSelectionLockTable
   Common_Publication_Transition: CommonPublicationTransitionTable
   Common_Runtime: CommonRuntimeTable
   Common_Runtime_Item: CommonRuntimeItemTable
@@ -976,20 +977,6 @@ export interface CommonWorkflowPublicationStatusTable {
   egcs_cn_order: number
 }
 
-export interface CommonPublicationSelectionTable {
-  id: Generated<string>
-  egcs_cn_publication: string
-  egcs_cn_kind: PublicationKind
-  egcs_cn_dimension: string
-  egcs_cn_key: string
-}
-
-export interface CommonPublicationSelectionLockTable {
-  egcs_cn_kind: PublicationKind
-  egcs_cn_dimension: string
-  egcs_cn_key: string
-}
-
 export interface CommonRuntimeTable {
   id: Generated<string>
   egcs_cn_kind: RuntimeKind
@@ -1118,8 +1105,7 @@ export interface CommonCertificationTable {
 export interface CommonApprovalTemplateTable {
   id: Generated<string>
   egcs_cn_publicationkind: Generated<'approval_template'>
-  egcs_cn_scopetype: 'fundingopportunity' | 'transferpaymentstream'
-  egcs_cn_scopeid: string
+  egcs_cn_agency: string
   egcs_cn_description_en: string
   egcs_cn_description_fr: string
   egcs_cn_name_en: string
@@ -1689,8 +1675,7 @@ export interface CommonChecklistSchemaTable {
 export interface CommonReviewSetSetupTable {
   id: Generated<string>
   egcs_cn_publicationkind: Generated<'review_set_setup'>
-  egcs_cn_scopetype: CommonScopeEntityType
-  egcs_cn_scopeid: string
+  egcs_cn_agency: string
   egcs_cn_entitytype: Entity_Type
   egcs_cn_name_en: string
   egcs_cn_name_fr: string
@@ -1820,8 +1805,7 @@ export interface CommonRecommendationSchemaTable {
 export interface CommonRecommendationSetSetupTable {
   id: Generated<string>
   egcs_cn_publicationkind: Generated<'recommendation_set_setup'>
-  egcs_cn_scopetype: CommonScopeEntityType
-  egcs_cn_scopeid: string
+  egcs_cn_agency: string
   egcs_cn_name_en: string
   egcs_cn_name_fr: string
   egcs_cn_description_en: string
@@ -1867,8 +1851,7 @@ export interface CommonRecommendationTable {
 export interface CommonWorkflowSetupTable {
   id: Generated<string>
   egcs_cn_publicationkind: Generated<'workflow_setup'>
-  egcs_cn_scopetype: CommonScopeEntityType
-  egcs_cn_scopeid: string
+  egcs_cn_agency: string
   egcs_cn_entitytype: Entity_Type
   egcs_cn_name_en: string
   egcs_cn_name_fr: string
@@ -2275,30 +2258,48 @@ export interface TransferPaymentStreamFieldSectionTable {
   egcs_tp_displayorder: Generated<number>
   _deleted: Generated<boolean>
 }
-export interface TransferPaymentStreamFieldTable {
-  egcs_tp_section: string
+export interface AgencyCustomFieldTable {
+  id: Generated<string>
+  egcs_ay_agency: string
+  egcs_ay_name_en: string
+  egcs_ay_name_fr: string
+  egcs_ay_kind: 'text' | 'number' | 'relational'
+  egcs_ay_multiple: Generated<boolean>
+  egcs_ay_presentation: Generated<'single_line' | 'multiline'>
+  egcs_ay_discriminator: Generated<boolean>
+  _deleted: Generated<boolean>
+}
+export interface AgencyCustomFieldOptionTable {
+  id: Generated<string>
+  egcs_ay_field: string
+  egcs_ay_name_en: string
+  egcs_ay_name_fr: string
+  egcs_ay_category_en: string | null
+  egcs_ay_category_fr: string | null
+  egcs_ay_active: Generated<boolean>
+  egcs_ay_displayorder: Generated<number>
+  _deleted: Generated<boolean>
+}
+export interface TransferPaymentStreamFieldAssignmentTable {
   id: Generated<string>
   egcs_tp_transferpaymentstream: string
-  egcs_tp_name_en: string
-  egcs_tp_name_fr: string
-  egcs_tp_kind: 'text' | 'number' | 'relational'
-  egcs_tp_multiple: Generated<boolean>
-  egcs_tp_presentation: Generated<'single_line' | 'multiline'>
+  egcs_tp_agencyfield: string
+  egcs_tp_section: Generated<string | null>
   egcs_tp_required: Generated<boolean>
-  egcs_tp_discriminator: Generated<boolean>
   egcs_tp_active: Generated<boolean>
   egcs_tp_displayorder: Generated<number>
   _deleted: Generated<boolean>
 }
-export interface TransferPaymentStreamFieldOptionTable {
+export interface TransferPaymentStreamReviewSetTable {
   id: Generated<string>
-  egcs_tp_field: string
-  egcs_tp_name_en: string
-  egcs_tp_name_fr: string
-  egcs_tp_category_en: string | null
-  egcs_tp_category_fr: string | null
-  egcs_tp_active: Generated<boolean>
-  egcs_tp_displayorder: Generated<number>
+  egcs_tp_transferpaymentstream: string
+  egcs_tp_reviewset: string
+  _deleted: Generated<boolean>
+}
+export interface TransferPaymentStreamWorkflowTable {
+  id: Generated<string>
+  egcs_tp_transferpaymentstream: string
+  egcs_tp_workflow: string
   _deleted: Generated<boolean>
 }
 

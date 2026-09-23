@@ -15,6 +15,9 @@
     "invalid_json": "Enter valid JSON."
   },
   "custom_fields": {
+    "assign_field": "Assign agency field",
+    "agency_field": "Agency field",
+    "unsectioned": "No section",
     "category": "Category",
     "uncategorized": "Uncategorized",
     "section": "Section",
@@ -596,7 +599,10 @@
       "attachment_types": "Attachment Types",
       "applicant_recipient_subtypes": "Proponent Subtypes",
       "approval_behalf": "Approval Behalf",
-      "agreement_types": "Agreement Types"
+      "agreement_types": "Agreement Types",
+      "approval_templates": "Approval Templates",
+      "workflow_setups": "Workflows",
+      "review_schemas": "Review Schemas"
     }
   },
   "role": {
@@ -2962,15 +2968,14 @@
       "field": "Condition field",
       "edit_member": "Conditions for workflow member {sequence}",
       "badge": "{field}: {value}",
-      "badge_rule_separator": "; Proponents to match: ",
+      "badge_rule_separator": "; Recipients to match: ",
       "unconditional": "No conditions — always included",
       "unavailable": "Unavailable selection",
       "agreement_subtype": "Agreement subtype",
       "further_distribution": "Further distribution",
-      "holdback_basis": "Holdback basis",
-      "proponent_type": "Agreement–Proponent relationship type",
+      "recipient_subtype": "Recipient subtype",
       "add": "Add a condition",
-      "quantifier": "Proponents to match",
+      "quantifier": "Recipients to match",
       "step": "Step {number}",
       "included": "Included",
       "matched": "Matched",

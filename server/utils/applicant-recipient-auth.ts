@@ -3,7 +3,7 @@ import type { H3Event } from 'h3'
 import type { Kysely, Transaction } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import type { AbilityAction } from '~~/shared/utils/abilities'
-import { notFound } from '~~/server/utils/api-errors'
+import { badRequest, forbidden, notFound } from '~~/server/utils/api-errors'
 import { authorizeFreshAssignedItem, requireFreshAuthContext, type AuthContext } from '~~/server/utils/authorize'
 import { getUserAssignmentAgencyScopes } from '~~/server/utils/rbac'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
@@ -158,11 +158,43 @@ export const executeFreshAuthorizedApplicantRecipientWrite = async <T>(
   applicantRecipientId: string,
   action: AbilityAction,
   callback: (trx: Transaction<Database>, context: AuthContext) => Promise<T>
-): Promise<T> => await db.transaction().execute(async trx => {
-  const context = await requireFreshAuthContext(event, trx)
-  const profile = await trx.selectFrom('Applicant_Recipient_Profile').where('id', '=', applicantRecipientId)
-    .where('_deleted', '=', false).select('id').forUpdate().executeTakeFirst()
-  if (!profile) return await notFound(event, 'APPLICANT_RECIPIENT_PROFILE_NOT_FOUND', 'apiErrors.applicant_recipient.profile_not_found')
-  await authorizeFreshAssignedItem(event, trx, context, 'applicantrecipient', applicantRecipientId, action)
-  return await callback(trx, context)
-})
+): Promise<T> => {
+  class LeadAgencyChanged extends Error {}
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const hint = await db.selectFrom('Applicant_Recipient_Profile')
+      .where('id', '=', applicantRecipientId)
+      .where('_deleted', '=', false)
+      .select('egcs_ar_leadagency')
+      .executeTakeFirst()
+    if (!hint) return await notFound(event, 'APPLICANT_RECIPIENT_PROFILE_NOT_FOUND', 'apiErrors.applicant_recipient.profile_not_found')
+    try {
+      return await db.transaction().execute(async trx => {
+        const context = await requireFreshAuthContext(event, trx)
+        // Agency deletion locks its parent row before it can revoke ownership.
+        // Hold that row before locking the Proponent to preserve the lock order
+        // used by lead-agency moves and reject a completed deletion.
+        if (hint.egcs_ar_leadagency) {
+          const agency = await trx.selectFrom('Agency_Profile')
+            .where('id', '=', hint.egcs_ar_leadagency)
+            .where('_deleted', '=', false)
+            .select('id')
+            .forShare()
+            .executeTakeFirst()
+          if (!agency) return await forbidden(event)
+        }
+        const profile = await trx.selectFrom('Applicant_Recipient_Profile').where('id', '=', applicantRecipientId)
+          .where('_deleted', '=', false).select(['id', 'egcs_ar_leadagency']).forUpdate().executeTakeFirst()
+        if (!profile) return await notFound(event, 'APPLICANT_RECIPIENT_PROFILE_NOT_FOUND', 'apiErrors.applicant_recipient.profile_not_found')
+        if (profile.egcs_ar_leadagency !== hint.egcs_ar_leadagency) throw new LeadAgencyChanged()
+        await authorizeFreshAssignedItem(event, trx, context, 'applicantrecipient', applicantRecipientId, action)
+        return await callback(trx, context)
+      })
+    } catch (error) {
+      if (!(error instanceof LeadAgencyChanged)) throw error
+      if (attempt === 2) {
+        return await badRequest(event, 'APPLICANT_RECIPIENT_LEAD_AGENCY_CHANGED', 'apiErrors.request.invalid_status')
+      }
+    }
+  }
+  return await badRequest(event, 'APPLICANT_RECIPIENT_LEAD_AGENCY_CHANGED', 'apiErrors.request.invalid_status')
+}

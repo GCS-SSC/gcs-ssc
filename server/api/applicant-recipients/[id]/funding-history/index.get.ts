@@ -205,7 +205,21 @@ export default defineEventHandler(async event => {
         agreementId
       )
       if (!await canAccessAgreement(authContext, 'read', scope, db)) {
-        return { rowKey: `system:${agreementId}`, source: 'system' as const, restricted: true }
+        return {
+          rowKey: `system:${agreementId}`,
+          source: 'system' as const,
+          restricted: true,
+          agencyNameEn: record.agencyNameEn,
+          agencyNameFr: record.agencyNameFr,
+          programNameEn: record.programNameEn,
+          programNameFr: record.programNameFr,
+          agreementNumber: record.agreementNumber,
+          titleEn: record.titleEn,
+          titleFr: record.titleFr,
+          startDate: record.startDate,
+          endDate: record.endDate,
+          totals: toTotals(totalsByAgreement.get(agreementId))
+        }
       }
       const [canUpdate, canDelete] = await Promise.all([
         canAccessAgreement(authContext, 'update', scope, db),

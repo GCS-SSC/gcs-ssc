@@ -825,62 +825,171 @@ export async function up(db: Kysely<Database>): Promise<void> {
     )
   `.execute(db)
   await sql`
-    CREATE TABLE "Transfer_Payment_Stream_Field" (
+    CREATE TABLE "Agency_Custom_Field" (
       id bigserial PRIMARY KEY,
-      egcs_tp_transferpaymentstream bigint NOT NULL REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT,
-      egcs_tp_name_en text NOT NULL, egcs_tp_name_fr text NOT NULL,
-      egcs_tp_section bigint NOT NULL,
-      FOREIGN KEY (egcs_tp_section, egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream_Field_Section"(id, egcs_tp_transferpaymentstream) ON DELETE RESTRICT,
-      egcs_tp_kind text NOT NULL CHECK (egcs_tp_kind IN ('text', 'number', 'relational')),
-      egcs_tp_multiple boolean NOT NULL DEFAULT false CHECK (NOT egcs_tp_multiple OR egcs_tp_kind = 'relational'),
-      egcs_tp_presentation text NOT NULL DEFAULT 'single_line' CHECK (egcs_tp_presentation IN ('single_line', 'multiline')),
-      egcs_tp_required boolean NOT NULL DEFAULT false,
-      egcs_tp_discriminator boolean NOT NULL DEFAULT false,
-      egcs_tp_active boolean NOT NULL DEFAULT true,
-      egcs_tp_displayorder integer NOT NULL DEFAULT 0 CHECK (egcs_tp_displayorder >= 0),
+      egcs_ay_agency bigint NOT NULL REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT,
+      egcs_ay_name_en text NOT NULL,
+      egcs_ay_name_fr text NOT NULL,
+      egcs_ay_kind text NOT NULL CHECK (egcs_ay_kind IN ('text', 'number', 'relational')),
+      egcs_ay_multiple boolean NOT NULL DEFAULT false,
+      egcs_ay_presentation text NOT NULL DEFAULT 'single_line'
+        CHECK (egcs_ay_presentation IN ('single_line', 'multiline')),
+      egcs_ay_discriminator boolean NOT NULL DEFAULT false,
       _deleted boolean NOT NULL DEFAULT false,
-      CHECK (NOT egcs_tp_discriminator OR egcs_tp_kind = 'relational'),
-      CHECK (egcs_tp_kind = 'text' OR egcs_tp_presentation = 'single_line'),
-      UNIQUE (id, egcs_tp_transferpaymentstream)
+      CONSTRAINT ay_chk_custom_field_multiple_kind CHECK (NOT egcs_ay_multiple OR egcs_ay_kind = 'relational'),
+      CONSTRAINT ay_chk_custom_field_discriminator_kind CHECK (NOT egcs_ay_discriminator OR egcs_ay_kind = 'relational'),
+      CONSTRAINT ay_chk_custom_field_presentation_kind CHECK (egcs_ay_kind = 'text' OR egcs_ay_presentation = 'single_line')
     )
   `.execute(db)
   await sql`
-    CREATE TABLE "Transfer_Payment_Stream_Field_Option" (
-      id bigserial PRIMARY KEY,
-      egcs_tp_field bigint NOT NULL REFERENCES "Transfer_Payment_Stream_Field"(id) ON DELETE RESTRICT,
-      egcs_tp_name_en text NOT NULL, egcs_tp_name_fr text NOT NULL,
-      egcs_tp_category_en text, egcs_tp_category_fr text,
-      egcs_tp_active boolean NOT NULL DEFAULT true,
-      egcs_tp_displayorder integer NOT NULL DEFAULT 0 CHECK (egcs_tp_displayorder >= 0),
-      _deleted boolean NOT NULL DEFAULT false,
-      CHECK ((egcs_tp_category_en IS NULL) = (egcs_tp_category_fr IS NULL)),
-      UNIQUE (id, egcs_tp_field)
-    )
-  `.execute(db)
-  await sql`
-    CREATE FUNCTION protect_stream_field_identity() RETURNS trigger LANGUAGE plpgsql AS $$
+    CREATE FUNCTION protect_agency_custom_field_identity() RETURNS trigger LANGUAGE plpgsql AS $$
     BEGIN
-      IF NEW.egcs_tp_kind IS DISTINCT FROM OLD.egcs_tp_kind OR NEW.egcs_tp_transferpaymentstream IS DISTINCT FROM OLD.egcs_tp_transferpaymentstream THEN
-        RAISE EXCEPTION 'Stream field identity is immutable' USING ERRCODE = '23514';
+      IF NEW.egcs_ay_agency IS DISTINCT FROM OLD.egcs_ay_agency
+        OR NEW.egcs_ay_kind IS DISTINCT FROM OLD.egcs_ay_kind THEN
+        RAISE EXCEPTION 'Agency custom field identity is immutable'
+          USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_custom_field_identity_immutable';
       END IF;
-      IF OLD.egcs_tp_multiple AND NOT NEW.egcs_tp_multiple THEN
-        RAISE EXCEPTION 'Multiple selection cannot be changed to single selection' USING ERRCODE = '23514';
+      IF OLD.egcs_ay_multiple AND NOT NEW.egcs_ay_multiple THEN
+        RAISE EXCEPTION 'Multiple selection cannot be changed to single selection'
+          USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_custom_field_multiple_permanent';
       END IF;
       RETURN NEW;
     END $$
   `.execute(db)
   await sql`
-    CREATE TRIGGER protect_stream_field_identity BEFORE UPDATE ON "Transfer_Payment_Stream_Field"
-      FOR EACH ROW EXECUTE FUNCTION protect_stream_field_identity()
+    CREATE TRIGGER protect_agency_custom_field_identity
+    BEFORE UPDATE ON "Agency_Custom_Field"
+    FOR EACH ROW EXECUTE FUNCTION protect_agency_custom_field_identity()
+  `.execute(db)
+  await sql`
+    CREATE TABLE "Agency_Custom_Field_Option" (
+      id bigserial PRIMARY KEY,
+      egcs_ay_field bigint NOT NULL REFERENCES "Agency_Custom_Field"(id) ON DELETE RESTRICT,
+      egcs_ay_name_en text NOT NULL,
+      egcs_ay_name_fr text NOT NULL,
+      egcs_ay_category_en text,
+      egcs_ay_category_fr text,
+      egcs_ay_active boolean NOT NULL DEFAULT true,
+      egcs_ay_displayorder integer NOT NULL DEFAULT 0 CHECK (egcs_ay_displayorder >= 0),
+      _deleted boolean NOT NULL DEFAULT false,
+      CONSTRAINT ay_chk_custom_field_option_categories
+        CHECK ((egcs_ay_category_en IS NULL) = (egcs_ay_category_fr IS NULL)),
+      UNIQUE (id, egcs_ay_field)
+    )
+  `.execute(db)
+  await sql`
+    CREATE FUNCTION enforce_agency_custom_field_option() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN
+      IF TG_OP = 'UPDATE' AND NEW.egcs_ay_field IS DISTINCT FROM OLD.egcs_ay_field THEN
+        RAISE EXCEPTION 'Agency custom field option parent is immutable'
+          USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_custom_field_option_parent_immutable';
+      END IF;
+      IF NOT NEW._deleted AND (TG_OP = 'INSERT' OR OLD._deleted) AND NOT EXISTS (
+        SELECT 1 FROM "Agency_Custom_Field" field
+        WHERE field.id = NEW.egcs_ay_field AND field.egcs_ay_kind = 'relational' AND field._deleted = false
+        FOR SHARE
+      ) THEN
+        RAISE EXCEPTION 'Option requires an active relational Agency field'
+          USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_custom_field_option_parent_active';
+      END IF;
+      RETURN NEW;
+    END $$
+  `.execute(db)
+  await sql`
+    CREATE TRIGGER enforce_agency_custom_field_option
+    BEFORE INSERT OR UPDATE OF egcs_ay_field, _deleted
+    ON "Agency_Custom_Field_Option"
+    FOR EACH ROW EXECUTE FUNCTION enforce_agency_custom_field_option()
+  `.execute(db)
+  await sql`
+    CREATE TABLE "Transfer_Payment_Stream_Field_Assignment" (
+      id bigserial PRIMARY KEY,
+      egcs_tp_transferpaymentstream bigint NOT NULL REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT,
+      egcs_tp_agencyfield bigint NOT NULL REFERENCES "Agency_Custom_Field"(id) ON DELETE RESTRICT,
+      egcs_tp_section bigint,
+      egcs_tp_required boolean NOT NULL DEFAULT false,
+      egcs_tp_active boolean NOT NULL DEFAULT true,
+      egcs_tp_displayorder integer NOT NULL DEFAULT 0 CHECK (egcs_tp_displayorder >= 0),
+      _deleted boolean NOT NULL DEFAULT false,
+      CONSTRAINT tp_ref_field_assignment_section_stream
+        FOREIGN KEY (egcs_tp_section, egcs_tp_transferpaymentstream)
+        REFERENCES "Transfer_Payment_Stream_Field_Section"(id, egcs_tp_transferpaymentstream)
+        ON DELETE RESTRICT
+    )
+  `.execute(db)
+  await sql`
+    CREATE UNIQUE INDEX tp_idx_unique_live_field_assignment
+    ON "Transfer_Payment_Stream_Field_Assignment" (egcs_tp_transferpaymentstream, egcs_tp_agencyfield)
+    WHERE _deleted = false
+  `.execute(db)
+  await sql`
+    CREATE FUNCTION enforce_stream_field_assignment_agency() RETURNS trigger LANGUAGE plpgsql AS $$
+    DECLARE
+      owning_agency bigint;
+      field_agency bigint;
+    BEGIN
+      IF NEW._deleted AND TG_OP = 'UPDATE' THEN RETURN NEW; END IF;
+      SELECT profile.egcs_tp_agency INTO owning_agency
+      FROM "Transfer_Payment_Stream" stream
+      JOIN "Transfer_Payment_Profile" profile ON profile.id = stream.egcs_tp_transferpaymentprofile
+      WHERE stream.id = NEW.egcs_tp_transferpaymentstream AND stream._deleted = false AND profile._deleted = false
+      FOR SHARE OF stream, profile;
+      SELECT field.egcs_ay_agency INTO field_agency
+      FROM "Agency_Custom_Field" field
+      WHERE field.id = NEW.egcs_tp_agencyfield AND field._deleted = false
+      FOR SHARE;
+      IF owning_agency IS NULL OR field_agency IS NULL OR owning_agency <> field_agency THEN
+        RAISE EXCEPTION 'Assigned field must belong to the Stream Agency'
+          USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_field_assignment_agency';
+      END IF;
+      RETURN NEW;
+    END $$
+  `.execute(db)
+  await sql`
+    CREATE TRIGGER enforce_stream_field_assignment_agency
+    BEFORE INSERT OR UPDATE OF egcs_tp_transferpaymentstream, egcs_tp_agencyfield, _deleted
+    ON "Transfer_Payment_Stream_Field_Assignment"
+    FOR EACH ROW EXECUTE FUNCTION enforce_stream_field_assignment_agency()
+  `.execute(db)
+  await sql`
+    CREATE OR REPLACE FUNCTION trg_fn_protect_transfer_payment_ownership() RETURNS trigger AS $$
+    BEGIN
+      IF TG_TABLE_NAME = 'Transfer_Payment_Profile' THEN
+        IF NEW.egcs_tp_agency IS DISTINCT FROM OLD.egcs_tp_agency AND EXISTS (
+            SELECT 1 FROM "Transfer_Payment_Stream" stream
+            JOIN "Transfer_Payment_Stream_Field_Assignment" assignment
+              ON assignment.egcs_tp_transferpaymentstream = stream.id AND assignment._deleted = false
+            WHERE stream.egcs_tp_transferpaymentprofile = NEW.id AND stream._deleted = false
+          ) THEN
+          RAISE EXCEPTION 'Transfer-payment Agency cannot change while Stream fields are associated'
+            USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_profile_agency_field_associations';
+        END IF;
+      ELSIF TG_TABLE_NAME = 'Transfer_Payment_Stream' THEN
+        IF NEW.egcs_tp_transferpaymentprofile IS DISTINCT FROM OLD.egcs_tp_transferpaymentprofile THEN
+          RAISE EXCEPTION 'Transfer-payment Stream ownership is immutable'
+            USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_stream_profile_immutable';
+        END IF;
+      ELSIF TG_TABLE_NAME = 'Transfer_Payment_Fiscal_Year_Budget' THEN
+        IF NEW.egcs_tp_transferpaymentprofile IS DISTINCT FROM OLD.egcs_tp_transferpaymentprofile THEN
+          RAISE EXCEPTION 'Transfer-payment fiscal-year Budget ownership is immutable'
+            USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_fiscal_year_budget_profile_immutable';
+        END IF;
+      END IF;
+      RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql
   `.execute(db)
 
 }
 
 export async function down(db: Kysely<Database>): Promise<void> {
-  await db.schema.dropTable('Transfer_Payment_Stream_Field_Option').execute()
-  await db.schema.dropTable('Transfer_Payment_Stream_Field').execute()
+  await db.schema.dropTable('Transfer_Payment_Stream_Field_Assignment').execute()
+  await sql`DROP FUNCTION enforce_stream_field_assignment_agency()`.execute(db)
+  await db.schema.dropTable('Agency_Custom_Field_Option').execute()
+  await sql`DROP FUNCTION enforce_agency_custom_field_option()`.execute(db)
+  await db.schema.dropTable('Agency_Custom_Field').execute()
+  await sql`DROP FUNCTION protect_agency_custom_field_identity()`.execute(db)
   await db.schema.dropTable('Transfer_Payment_Stream_Field_Section').execute()
-  await sql`DROP FUNCTION protect_stream_field_identity()`.execute(db)
   await db.schema.dropIndex(STREAM_HOLDBACK_BASIS_UNIQUE).execute()
   await db.schema.dropIndex(INDEX_NAMES.streamAreaOfExpertiseFr).execute()
   await db.schema.dropIndex(INDEX_NAMES.streamAreaOfExpertiseEn).execute()

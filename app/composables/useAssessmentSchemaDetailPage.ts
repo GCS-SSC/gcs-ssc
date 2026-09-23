@@ -46,10 +46,9 @@ type AssessmentSchemaDetail = {
   egcs_cn_scoringmatrix: unknown
 }
 
-type TransferPaymentNameResponse = {
-  egcs_tp_name_en: string
-  egcs_tp_name_fr: string
-  egcs_tp_agency?: string
+type AgencyNameResponse = {
+  egcs_ay_name_en: string
+  egcs_ay_name_fr: string
 }
 
 /**
@@ -68,45 +67,34 @@ export const useAssessmentSchemaDetailPage = async () => {
   const { saveJson, sendJson } = useJsonRequest()
   const { can } = useCan()
 
-  const transferPaymentId = computed(() => String(route.params.id))
-  const streamId = computed(() => String(route.params.streamId))
+  const agencyId = computed(() => String(route.params.id))
   const schemaId = computed(() => String(route.params.schemaId))
 
   const selectedSection: Ref<string> = ref('schema-general')
 
-  const schemaEndpoint = computed(() => `/api/transfer-payments/${transferPaymentId.value}/streams/${streamId.value}/assessment-schemas/${schemaId.value}`)
-  const profileRequest = useFetch<TransferPaymentNameResponse, FetchError, string>(computed(() => `/api/transfer-payments/${transferPaymentId.value}`))
-  const streamRequest = useFetch<TransferPaymentNameResponse, FetchError, string>(computed(() => `/api/transfer-payments/${transferPaymentId.value}/streams/${streamId.value}`))
+  const schemaEndpoint = computed(() => `/api/agency/${agencyId.value}/review-schemas/${schemaId.value}`)
+  const agencyRequest = useFetch<AgencyNameResponse, FetchError, string>(computed(() => `/api/agency/${agencyId.value}`))
   const schemaRequest = useFetch<AssessmentSchemaDetail, FetchError, string>(schemaEndpoint)
-  const { data: profile } = profileRequest
-  const { data: stream } = streamRequest
+  const { data: agency } = agencyRequest
   const { data: schema, refresh: refreshSchemaRequest } = schemaRequest
-  const loadError = computed(() => profileRequest.error.value ?? streamRequest.error.value ?? schemaRequest.error.value)
-  const loadStatus = computed(() => [profileRequest.status.value, streamRequest.status.value, schemaRequest.status.value].includes('pending') ? 'pending' : loadError.value ? 'error' : 'success')
+  const loadError = computed(() => agencyRequest.error.value ?? schemaRequest.error.value)
+  const loadStatus = computed(() => [agencyRequest.status.value, schemaRequest.status.value].includes('pending') ? 'pending' : loadError.value ? 'error' : 'success')
   const retryLoad = async () => {
-    await Promise.all([profileRequest.refresh(), streamRequest.refresh(), schemaRequest.refresh()])
+    await Promise.all([agencyRequest.refresh(), schemaRequest.refresh()])
   }
 
   const generalState: Ref<Record<string, unknown> | null> = ref(null)
   const assessmentDefinitionState: Ref<AssessmentDefinitionEditorState | null> = ref(null)
   const overallScoringMatrixState: Ref<AssessmentBandRow[]> = ref([])
-  const profileScope = computed<Scope>(() => ({
-    type: 'entity',
-    agencyId: String(profile.value?.egcs_tp_agency ?? ''),
-    path: [{ type: 'transfer_payment', id: transferPaymentId.value }]
-  }))
-  const canManagePublication = computed(() => Boolean(profile.value) && can('transfer_payment', 'update', profileScope.value))
+  const profileScope = computed<Scope>(() => ({ type: 'agency', agencyId: agencyId.value }))
+  const canManagePublication = computed(() => Boolean(agency.value) && can('agency', 'update', profileScope.value))
   const canEdit = computed(() => canManagePublication.value && schema.value?.publicationState !== 'retired')
 
   const breadcrumbItems = computed(() => [
-    { label: t('transfer_payment.title'), to: localePath(appRouteLocations.transferPayments()) },
+    { label: t('agency.title'), to: localePath(appRouteLocations.agencies()) },
     {
-      label: getBilingualValue(profile.value, 'egcs_tp_name'),
-      to: localePath(appRouteLocations.transferPaymentDetail(transferPaymentId.value))
-    },
-    {
-      label: getBilingualValue(stream.value, 'egcs_tp_name'),
-      to: localePath(appRouteLocations.transferPaymentStreamDetail(transferPaymentId.value, streamId.value, { section: 'assessment-sets' }))
+      label: getBilingualValue(agency.value, 'egcs_ay_name'),
+      to: localePath(appRouteLocations.agencyDetail(agencyId.value))
     },
     { label: String(schema.value?.egcs_cn_name_en ?? '') }
   ])
@@ -225,7 +213,7 @@ export const useAssessmentSchemaDetailPage = async () => {
   watch(schema, value => {
     if (value && !mutation.isDirty.value) mutation.replaceSessionDraft(() => applySchemaDraft(value))
   }, { immediate: true })
-  watch([transferPaymentId, streamId, schemaId], () => {
+  watch([agencyId, schemaId], () => {
     selectedSection.value = 'schema-general'
     mutation.replaceSessionDraft(() => {
       generalState.value = null

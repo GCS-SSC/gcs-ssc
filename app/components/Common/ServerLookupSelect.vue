@@ -30,6 +30,7 @@ const {
   labelFrKey,
   showValueInLabel = true,
   deleted = false,
+  includeDeletedQuery = true,
   limit = 25,
   query = {},
   prependItems = [],
@@ -46,6 +47,7 @@ const {
   labelFrKey: string
   showValueInLabel?: boolean
   deleted?: boolean
+  includeDeletedQuery?: boolean
   limit?: number
   query?: Record<string, string | number | boolean>
   prependItems?: AdminCommonSelectOption[]
@@ -122,7 +124,7 @@ const requestQuery = computed(() => ({
   page: 1,
   limit,
   search: debouncedSearchTerm.value,
-  deleted,
+  ...(includeDeletedQuery ? { deleted } : {}),
   ...stableQuery.value
 }))
 const collectionRequestSignature = computed(() => JSON.stringify({
@@ -135,6 +137,7 @@ const selectedHydrationScopeSignature = computed(() => JSON.stringify({
   selectedValuesQueryKey: selectedValuesQueryKey ?? null,
   query: stableQuerySignature.value,
   deleted,
+  includeDeletedQuery,
   prependValues: prependValueSignature.value,
   valueKey,
   multiple,
@@ -280,7 +283,7 @@ const fetchHydrationChunk = async (
     const queryWithValues: LookupRequestQuery = {
       page: 1,
       limit: values.length,
-      deleted,
+      ...(includeDeletedQuery ? { deleted } : {}),
       ...stableQuery.value,
       [selectedValuesQueryKey]: values
     }
@@ -297,7 +300,7 @@ const fetchHydrationChunk = async (
       page: 1,
       limit: 1,
       search: value,
-      deleted,
+      ...(includeDeletedQuery ? { deleted } : {}),
       ...stableQuery.value
     }
   })))

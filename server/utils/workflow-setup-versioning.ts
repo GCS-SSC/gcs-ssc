@@ -1,7 +1,7 @@
 import { resolveEntityTypeLifecycleDefinition } from './entity-type-registry'
 import { readWorkflowProfileChoices, resolveWorkflowProfileCondition } from './workflow-profile-conditions'
 import { readWorkflowConditions } from './workflow-conditions'
-import { readAgreementCustomFieldDefinitions } from './agreement-custom-fields'
+import { readAgencyCustomFieldDefinitions } from './agreement-custom-fields'
 import type { WorkflowMemberCondition } from '~~/shared/types/schemas/agreement-custom-fields'
 /* eslint-disable jsdoc/require-jsdoc -- typed workflow publication primitives */
 import type { Kysely, Selectable, Transaction } from 'kysely'
@@ -66,9 +66,7 @@ export type PublishedWorkflowConfiguration = {
 }
 export type PublishedRiskRatingBand = {
   maximumScore: number
-  riskRatingId: string
   riskScore: number
-  label: { en: string, fr: string }
 }
 export type PublishedRiskRatingEffect = {
   workflowMemberId: string
@@ -108,14 +106,13 @@ const causedByUnavailablePublishedDefinition = (error: unknown): boolean => {
   return false
 }
 
-export const lockWorkflowSetupForMutation = async (db: DbClient, setupId: string, streamId: string) =>
+export const lockWorkflowSetupForMutation = async (db: DbClient, setupId: string, agencyId: string) =>
   await db.selectFrom('Common_Workflow_Setup')
     .innerJoin('Common_Publication', 'Common_Publication.id', 'Common_Workflow_Setup.id')
     .selectAll('Common_Workflow_Setup')
     .select('Common_Publication.egcs_cn_state as publicationState')
     .where('Common_Workflow_Setup.id', '=', setupId)
-    .where('Common_Workflow_Setup.egcs_cn_scopetype', '=', 'transferpaymentstream')
-    .where('Common_Workflow_Setup.egcs_cn_scopeid', '=', streamId)
+    .where('Common_Workflow_Setup.egcs_cn_agency', '=', agencyId)
     .where('Common_Workflow_Setup._deleted', '=', false)
     .where('Common_Publication._deleted', '=', false)
     .forUpdate(['Common_Workflow_Setup', 'Common_Publication'])
@@ -178,6 +175,14 @@ export const buildWorkflowSetupPublication = async (
     const ownerRows = await db.selectFrom('Common_Workflow_Setup_Member_Owner').selectAll()
       .where('egcs_cn_workflowsetupmember', '=', String(row.id)).where('_deleted', '=', false).orderBy('id', 'asc').execute()
     const referenceId = String(row.egcs_cn_reviewset ?? row.egcs_cn_recommendationset ?? row.egcs_cn_approvaltemplate)
+    const owner = row.egcs_cn_reviewset
+      ? await db.selectFrom('Common_Review_Set_Setup').select('egcs_cn_agency').where('id', '=', referenceId).where('_deleted', '=', false).executeTakeFirst()
+      : row.egcs_cn_recommendationset
+        ? await db.selectFrom('Common_Recommendation_Set_Setup').select('egcs_cn_agency').where('id', '=', referenceId).where('_deleted', '=', false).executeTakeFirst()
+        : await db.selectFrom('Common_Approval_Template').select('egcs_cn_agency').where('id', '=', referenceId).where('_deleted', '=', false).executeTakeFirst()
+    if (!owner || String(owner.egcs_cn_agency) !== String(setup.egcs_cn_agency)) {
+      throw new Error('Workflow member must belong to the same Agency')
+    }
     let kind: PublicationKind
     let publicationId: string
     let publicationVersionId: string
@@ -223,19 +228,21 @@ export const buildWorkflowSetupPublication = async (
       publicationVersion
     })
     const conditions = await readWorkflowConditions(db, String(row.id))
-    const fields = conditions.length ? await readAgreementCustomFieldDefinitions(db, String(setup.egcs_cn_scopeid)) : []
+    const fields = conditions.some(condition => 'fieldId' in condition)
+      ? await readAgencyCustomFieldDefinitions(db, String(setup.egcs_cn_agency))
+      : []
     if (conditions.length && (await resolveEntityTypeLifecycleDefinition(db, setup.egcs_cn_entitytype))?.ownerKind !== 'agreement') throw new Error('Workflow conditions require an Agreement owner')
-    const choices = conditions.some(condition => 'source' in condition) ? await readWorkflowProfileChoices(db, String(setup.egcs_cn_scopeid)) : null
+    const choices = conditions.some(condition => 'source' in condition) ? await readWorkflowProfileChoices(db, String(setup.egcs_cn_agency)) : null
     const resolvedConditions = conditions.map(condition => {
       if ('source' in condition) return resolveWorkflowProfileCondition(condition, choices!)
       const field = fields.find(candidate => candidate.id === condition.fieldId)
-      if (!field?.egcs_tp_active || !field.egcs_tp_discriminator || field.egcs_tp_kind !== 'relational') throw new Error('Workflow discriminator must be active')
+      if (!field?.egcs_ay_discriminator || field.egcs_ay_kind !== 'relational') throw new Error('Workflow discriminator must be active')
       const options = condition.optionIds.map(id => {
-        const option = field.options.find(candidate => candidate.id === id && candidate.egcs_tp_active)
+        const option = field.options.find(candidate => candidate.id === id && candidate.egcs_ay_active)
         if (!option) throw new Error('Workflow discriminator option must be active')
-        return { id, name_en: option.egcs_tp_name_en, name_fr: option.egcs_tp_name_fr }
+        return { id, name_en: option.egcs_ay_name_en, name_fr: option.egcs_ay_name_fr }
       })
-      return { ...condition, name_en: field.egcs_tp_name_en, name_fr: field.egcs_tp_name_fr, options }
+      return { ...condition, name_en: field.egcs_ay_name_en, name_fr: field.egcs_ay_name_fr, options }
     })
     members.push({
       ...(resolvedConditions.length ? { conditions: resolvedConditions } : {}),
@@ -295,8 +302,8 @@ const buildRiskRatingEffect = async (
   setup: WorkflowSetupRow,
   members: PublishedWorkflowMember[]
 ): Promise<PublishedRiskRatingEffect> => {
-  if (setup.egcs_cn_entitytype !== 'fundingcaseagreement' || setup.egcs_cn_scopetype !== 'transferpaymentstream') {
-    throw new Error('Risk Rating workflow must target an Agreement in a Stream')
+  if (setup.egcs_cn_entitytype !== 'fundingcaseagreement') {
+    throw new Error('Risk Rating workflow must target an Agreement')
   }
   const sources = members.flatMap(workflowMember => (workflowMember.reviewPlan?.members ?? [])
     .filter(reviewMember => reviewMember.reviewType === 'assessment')
@@ -315,28 +322,13 @@ const buildRiskRatingEffect = async (
   if (maxima.some((maximum, index) => !Number.isFinite(maximum) || (index > 0 && maximum <= maxima[index - 1]!))) {
     throw new Error('Risk Rating assessment bands must have strictly increasing maxima')
   }
-  const ratings = await db.selectFrom('Transfer_Payment_Stream_Risk_Rating')
-    .select(['id', 'egcs_tp_riskscore', 'egcs_tp_name_en', 'egcs_tp_name_fr'])
-    .where('egcs_tp_transferpaymentstream', '=', String(setup.egcs_cn_scopeid))
-    .where('_deleted', '=', false)
-    .orderBy('egcs_tp_riskscore', 'asc')
-    .forUpdate()
-    .execute()
-  if (ratings.length !== maxima.length || ratings.some((rating, index) => Number(rating.egcs_tp_riskscore) !== maxima[index])) {
-    throw new Error('Risk Rating assessment maxima must match active Stream risk-rating scores')
-  }
   return {
     workflowMemberId: source.workflowMember.memberId,
     reviewSetupMemberId: source.reviewMember.memberId,
     assessmentSchemaPublicationId: source.reviewMember.schema.publicationId,
     assessmentSchemaVersionId: source.reviewMember.schema.publicationVersionId,
     assessmentSchemaVersion: source.reviewMember.schema.publicationVersion,
-    bands: ratings.map((rating, index) => ({
-      maximumScore: maxima[index]!,
-      riskRatingId: String(rating.id),
-      riskScore: Number(rating.egcs_tp_riskscore),
-      label: { en: rating.egcs_tp_name_en, fr: rating.egcs_tp_name_fr }
-    }))
+    bands: maxima.map(maximumScore => ({ maximumScore, riskScore: maximumScore }))
   }
 }
 
@@ -398,14 +390,6 @@ const readLockedWorkflowStatusDefinitions = async (
   setup: WorkflowSetupRow,
   configuration: PublishedWorkflowConfiguration
 ): Promise<Map<StatusId, WorkflowStatusGraphDefinition>> => {
-  if (setup.egcs_cn_scopetype !== 'transferpaymentstream') throw new Error('Agency status workflows require a Stream scope')
-  const stream = await db.selectFrom('Transfer_Payment_Stream')
-    .innerJoin('Transfer_Payment_Profile', 'Transfer_Payment_Profile.id', 'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile')
-    .select('Transfer_Payment_Profile.egcs_tp_agency as agencyId')
-    .where('Transfer_Payment_Stream.id', '=', String(setup.egcs_cn_scopeid))
-    .where('Transfer_Payment_Stream._deleted', '=', false).where('Transfer_Payment_Profile._deleted', '=', false)
-    .executeTakeFirst()
-  if (!stream) throw new Error('Workflow Stream Agency is unavailable')
   const statusIds = [...new Set([
     ...configuration.allowedStartStatuses,
     configuration.cancellationStatus,
@@ -413,7 +397,7 @@ const readLockedWorkflowStatusDefinitions = async (
     ...configuration.members.flatMap(member => [member.materializationStatus, member.successStatus, member.failureStatus])
   ].filter((value): value is StatusId => Boolean(value)))]
   const statuses = await db.selectFrom('Common_Status').select(['id', 'egcs_cn_terminal'])
-    .where('id', 'in', statusIds).where('egcs_cn_agency', '=', String(stream.agencyId))
+    .where('id', 'in', statusIds).where('egcs_cn_agency', '=', String(setup.egcs_cn_agency))
     .where('_deleted', '=', false).forUpdate().execute()
   return new Map(statuses.map(status => [String(status.id), { id: String(status.id), terminal: status.egcs_cn_terminal }]))
 }

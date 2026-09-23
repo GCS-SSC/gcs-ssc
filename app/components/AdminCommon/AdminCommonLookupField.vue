@@ -7,6 +7,7 @@ const {
   labelEnKey,
   labelFrKey,
   deleted = false,
+  includeDeletedQuery = true,
   query,
   disabled = false
 } = defineProps<{
@@ -17,6 +18,7 @@ const {
   labelEnKey: string
   labelFrKey: string
   deleted?: boolean
+  includeDeletedQuery?: boolean
   query?: Record<string, string | number | boolean>
   disabled?: boolean
 }>()
@@ -33,6 +35,7 @@ const model = defineModel<string | undefined>()
       :label-en-key="labelEnKey"
       :label-fr-key="labelFrKey"
       :deleted="deleted"
+      :include-deleted-query="includeDeletedQuery"
       :query="query"
       :disabled="disabled" />
   </UFormField>

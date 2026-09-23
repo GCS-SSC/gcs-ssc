@@ -2,12 +2,10 @@
 import type { H3Event } from 'h3'
 import { sql } from 'kysely'
 import type { Kysely, Selectable, Transaction } from 'kysely'
-import type { Database, Entity_Type, TransferPaymentStreamTable } from '~~/shared/types/database'
+import type { Database, TransferPaymentStreamTable } from '~~/shared/types/database'
 import type { TransferPaymentStreamPolymorphicWizard } from '~~/shared/types/schemas'
 import { badRequest as badRequestApiError } from './api-errors'
-import { validateRecommendationSchemasForAgency, validateReviewSchemasForAgency } from './transfer-payment-polymorphic'
 import { buildAmendmentTypeKey } from './transfer-payment-stream-uniqueness'
-import { supportsDirectReviewConfiguration } from './entity-type-registry'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from './database-money'
 import { addMoney, compareMoney, parseMoney, type Money } from '~~/shared/utils/money'
 
@@ -295,101 +293,6 @@ const assertChartOfAccountBudgetReferences = async (
   return null
 }
 
-/** Builds de-duplicated review schema targets for batch validation. */
-const buildReviewSchemaTargets = (
-  payload: StreamWizardPayload
-): Array<{ entityType: Entity_Type, schemaId: string }> => {
-  const targets = new Map<string, { entityType: Entity_Type, schemaId: string }>()
-
-  for (const reviewSetup of payload.reviewSetups ?? []) {
-    for (const member of reviewSetup.members) {
-      const schemaId = String(member.egcs_cn_reviewschema)
-      targets.set(
-        `${reviewSetup.egcs_cn_entitytype}:${schemaId}`,
-        { entityType: reviewSetup.egcs_cn_entitytype as Entity_Type, schemaId }
-      )
-    }
-  }
-
-  return Array.from(targets.values())
-}
-
-/** Validates all review schemas referenced by wizard review setups. */
-const assertReviewSchemaReferences = async (
-  event: H3Event,
-  db: StreamWizardTransaction,
-  agencyId: string,
-  payload: StreamWizardPayload
-): Promise<unknown | null> => {
-  const targets = buildReviewSchemaTargets(payload)
-  if (targets.length === 0) {
-    return null
-  }
-
-  const schemaIds = [...new Set(targets.map(target => target.schemaId))].sort()
-  await db
-    .selectFrom('Common_Review_Schema')
-    .select('id')
-    .where('id', 'in', schemaIds)
-    .orderBy('id', 'asc')
-    .forUpdate('Common_Review_Schema')
-    .execute()
-
-  const hasValidReviewSchemas = await validateReviewSchemasForAgency(db, agencyId, targets)
-  if (!hasValidReviewSchemas) {
-    return await routeBadRequest(event, 'REVIEW_SCHEMA_NOT_FOUND', 'apiErrors.transfer_payment.review_schema_not_found')
-  }
-
-  return null
-}
-
-/** Ensures every wizard Review Set target explicitly supports direct Reviews. */
-const assertReviewTargetCapabilities = async (
-  event: H3Event,
-  db: StreamWizardTransaction,
-  payload: StreamWizardPayload
-): Promise<unknown | null> => {
-  const entityTypes = [...new Set((payload.reviewSetups ?? []).map(setup => setup.egcs_cn_entitytype))]
-  for (const entityType of entityTypes) {
-    if (!await supportsDirectReviewConfiguration(db, entityType)) {
-      return await routeBadRequest(event, 'UNSUPPORTED_REVIEW_ENTITY_TYPE', 'apiErrors.request.invalid')
-    }
-  }
-
-  return null
-}
-
-/** Validates all recommendation schemas referenced by wizard recommendation setups. */
-const assertRecommendationSchemaReferences = async (
-  event: H3Event,
-  db: StreamWizardTransaction,
-  agencyId: string,
-  payload: StreamWizardPayload
-): Promise<unknown | null> => {
-  const schemaIds = [...new Set((payload.recommendationSetups ?? []).flatMap(recommendationSetup =>
-    recommendationSetup.members.map(member => String(member.egcs_cn_recommendationschema))))].sort()
-  if (schemaIds.length > 0) {
-    await db
-      .selectFrom('Common_Recommendation_Schema')
-      .select('id')
-      .where('id', 'in', schemaIds)
-      .orderBy('id', 'asc')
-      .forUpdate('Common_Recommendation_Schema')
-      .execute()
-  }
-  const hasValidRecommendationSchemas = await validateRecommendationSchemasForAgency(db, agencyId, schemaIds)
-
-  if (!hasValidRecommendationSchemas) {
-    return await routeBadRequest(
-      event,
-      'RECOMMENDATION_SCHEMA_NOT_FOUND',
-      'apiErrors.transfer_payment.recommendation_schema_not_found'
-    )
-  }
-
-  return null
-}
-
 /** Validates all external references in the stream wizard payload before inserts. */
 export const validateTransferPaymentStreamWizardReferences = async ({
   event,
@@ -398,16 +301,6 @@ export const validateTransferPaymentStreamWizardReferences = async ({
   agencyId,
   payload
 }: ValidateStreamWizardReferencesOptions): Promise<unknown | null> => {
-  // Templates must belong to their setup's Stream. A new Stream cannot own an
-  // existing template; configure approvals after creating the Stream instead.
-  const hasExistingApprovalTemplate = [...(payload.reviewSetups ?? []), ...(payload.recommendationSetups ?? [])].some(setup =>
-    setup.egcs_cn_approvaltemplate !== undefined
-    || setup.members.some(member => member.egcs_cn_approvaltemplate !== undefined)
-  )
-  if (hasExistingApprovalTemplate) {
-    return await routeBadRequest(event, 'APPROVAL_TEMPLATE_NOT_FOUND', 'apiErrors.transfer_payment.approval_template_not_found')
-  }
-
   const validators = [
     () => assertParentStreamReference(event, db, profileId, payload),
     () => assertBudgetReferences(event, db, profileId, payload),
@@ -416,10 +309,7 @@ export const validateTransferPaymentStreamWizardReferences = async ({
     () => assertHoldbackBasisReferences(event, db, agencyId, payload),
     () => assertAgreementTypeReferences(event, db, agencyId, payload),
     () => assertAmendmentSubtypeTempReferences(event, payload),
-    () => assertChartOfAccountBudgetReferences(event, payload),
-    () => assertReviewTargetCapabilities(event, db, payload),
-    () => assertReviewSchemaReferences(event, db, agencyId, payload),
-    () => assertRecommendationSchemaReferences(event, db, agencyId, payload)
+    () => assertChartOfAccountBudgetReferences(event, payload)
   ]
 
   for (const validate of validators) {
@@ -655,78 +545,6 @@ const insertRemainingStreamWizardChildren = async (
   }
 }
 
-/** Inserts review set setup rows and their member setup rows. */
-const insertStreamWizardReviewSetups = async (
-  trx: StreamWizardTransaction,
-  streamId: string,
-  payload: StreamWizardPayload
-): Promise<void> => {
-  for (const setItem of payload.reviewSetups ?? []) {
-    const createdReviewSet = await trx
-      .insertInto('Common_Review_Set_Setup')
-      .values({
-        egcs_cn_scopetype: 'transferpaymentstream',
-        egcs_cn_scopeid: streamId,
-        egcs_cn_entitytype: setItem.egcs_cn_entitytype,
-        egcs_cn_name_en: setItem.egcs_cn_name_en,
-        egcs_cn_name_fr: setItem.egcs_cn_name_fr,
-        egcs_cn_description_en: setItem.egcs_cn_description_en,
-        egcs_cn_description_fr: setItem.egcs_cn_description_fr,
-        egcs_cn_order: setItem.egcs_cn_order,
-        egcs_cn_directreview: setItem.egcs_cn_directreview,
-        egcs_cn_sequential: setItem.egcs_cn_sequential,
-        egcs_cn_approvaltemplate: setItem.egcs_cn_approvaltemplate,
-        _deleted: false
-      })
-      .returning('id')
-      .executeTakeFirstOrThrow()
-
-    if (setItem.members.length > 0) {
-      await trx.insertInto('Common_Review_Setup').values(setItem.members.map(member => ({
-        egcs_cn_entitytype: setItem.egcs_cn_entitytype,
-        egcs_cn_order: member.egcs_cn_order,
-        egcs_cn_reviewset: String(createdReviewSet.id),
-        egcs_cn_approvaltemplate: member.egcs_cn_approvaltemplate,
-        egcs_cn_reviewschema: member.egcs_cn_reviewschema,
-        egcs_cn_failonchecklistfailure: member.egcs_cn_failonchecklistfailure,
-        egcs_cn_failurethreshold: member.egcs_cn_failurethreshold,
-        _deleted: false
-      }))).execute()
-    }
-  }
-}
-
-/** Inserts recommendation setup rows for the new stream. */
-const insertStreamWizardRecommendationSetups = async (
-  trx: StreamWizardTransaction,
-  streamId: string,
-  payload: StreamWizardPayload
-): Promise<void> => {
-  for (const item of payload.recommendationSetups ?? []) {
-    const createdSet = await trx.insertInto('Common_Recommendation_Set_Setup').values({
-      egcs_cn_scopetype: 'transferpaymentstream',
-      egcs_cn_scopeid: streamId,
-      egcs_cn_name_en: item.egcs_cn_name_en,
-      egcs_cn_name_fr: item.egcs_cn_name_fr,
-      egcs_cn_description_en: item.egcs_cn_description_en,
-      egcs_cn_description_fr: item.egcs_cn_description_fr,
-      egcs_cn_approvaltemplate: item.egcs_cn_approvaltemplate,
-      _deleted: false
-    }).returning('id').executeTakeFirstOrThrow()
-
-    if (item.members.length > 0) {
-      await trx.insertInto('Common_Recommendation_Setup').values(item.members.map(member => ({
-        egcs_cn_order: member.egcs_cn_order,
-        egcs_cn_recommendationset: String(createdSet.id),
-        egcs_cn_approvaltemplate: member.egcs_cn_approvaltemplate,
-        egcs_cn_recommendationschema: member.egcs_cn_recommendationschema,
-        egcs_cn_failonnotrecommended: member.egcs_cn_failonnotrecommended,
-        _deleted: false
-      }))).execute()
-    }
-  }
-}
-
 /** Inserts the optional financial limit row for the new stream. */
 const insertStreamWizardFinancialLimit = async (
   trx: StreamWizardTransaction,
@@ -765,8 +583,6 @@ export const createTransferPaymentStreamFromWizardInTransaction = async (
   const amendmentTypeIdMap = await insertAmendmentTypes(trx, streamId, payload)
   await insertAmendmentSubtypes(trx, streamId, payload, amendmentTypeIdMap)
   await insertRemainingStreamWizardChildren(trx, streamId, payload, streamBudgetIdByTempId)
-  await insertStreamWizardReviewSetups(trx, streamId, payload)
-  await insertStreamWizardRecommendationSetups(trx, streamId, payload)
   await insertStreamWizardFinancialLimit(trx, streamId, payload)
 
   return createdStream

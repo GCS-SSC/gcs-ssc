@@ -1,3 +1,4 @@
+import { validateReviewSetApprovalTemplateForAgency, validateReviewSetApprovalTemplatesForAgency } from './agency-review-set-dependencies'
 /* eslint-disable jsdoc/require-jsdoc */
 import type { H3Event } from 'h3'
 import type { Insertable, Kysely, Selectable } from 'kysely'
@@ -11,8 +12,6 @@ import type { TransferPaymentStreamReviewSetupPatchSchema } from '~~/shared/type
 import { badRequest, notFound, throwApiError } from './api-errors'
 import {
   mapReviewSetupMembers,
-  validateApprovalTemplateForScope,
-  validateApprovalTemplatesForScope,
   validateReviewSchemasForAgency
 } from './transfer-payment-polymorphic'
 import { readReviewSetupPublicationMetadata } from './review-setup-versioning'
@@ -29,7 +28,6 @@ type ReviewSetupMemberRow = Parameters<typeof mapReviewSetupMembers>[0][number]
 
 interface PatchTransferPaymentReviewSetupOptions {
   agencyId: string
-  streamId: string
   reviewSetupId: string
   body: ReviewSetupPatchBody
 }
@@ -108,7 +106,7 @@ const buildReviewSetupUpdatePayload = (body: ReviewSetupPatchBody): ReviewSetupU
 
 const findReviewSetup = async (
   db: Kysely<Database>,
-  streamId: string,
+  agencyId: string,
   reviewSetupId: string
 ) => {
   return await db
@@ -118,8 +116,7 @@ const findReviewSetup = async (
     .select('Common_Publication.egcs_cn_state as publicationState')
     .where(eb => eb.and([
       eb('Common_Review_Set_Setup.id', '=', reviewSetupId),
-      eb('Common_Review_Set_Setup.egcs_cn_scopetype', '=', 'transferpaymentstream'),
-      eb('Common_Review_Set_Setup.egcs_cn_scopeid', '=', streamId),
+      eb('Common_Review_Set_Setup.egcs_cn_agency', '=', agencyId),
       eb('Common_Review_Set_Setup._deleted', '=', false)
     ]))
     .forUpdate(['Common_Review_Set_Setup', 'Common_Publication'])
@@ -175,14 +172,14 @@ const validateReviewSetupMemberSchemas = async (
 const validateReviewSetupApprovalTemplate = async (
   event: H3Event,
   db: Kysely<Database>,
-  streamId: string,
+  agencyId: string,
   body: ReviewSetupPatchBody,
   currentSet: ReviewSetSetupRow
 ) => {
   const targetSetApprovalTemplateId = resolveReviewSetupApprovalTemplateId(body, currentSet)
-  const hasValidSetApprovalTemplate = await validateApprovalTemplateForScope(
+  const hasValidSetApprovalTemplate = await validateReviewSetApprovalTemplateForAgency(
     db,
-    streamId,
+    agencyId,
     targetSetApprovalTemplateId
   )
 
@@ -211,7 +208,7 @@ const collectReviewSetupMemberApprovalTemplateIds = (members: ReviewSetupMember[
 
 const checkReviewSetupMemberApprovalTemplate = async (
   db: Kysely<Database>,
-  streamId: string,
+  agencyId: string,
   member: ReviewSetupMember
 ) => {
   const approvalTemplateId = member.egcs_cn_approvaltemplate
@@ -219,18 +216,18 @@ const checkReviewSetupMemberApprovalTemplate = async (
   return {
     member,
     isValid: approvalTemplateId
-      ? await validateApprovalTemplateForScope(db, streamId, String(approvalTemplateId))
+      ? await validateReviewSetApprovalTemplateForAgency(db, agencyId, String(approvalTemplateId))
       : true
   }
 }
 
 const findInvalidMemberApprovalTemplate = async (
   db: Kysely<Database>,
-  streamId: string,
+  agencyId: string,
   members: ReviewSetupMember[]
 ) => {
   const checkedMembers = await Promise.all(
-    members.map(member => checkReviewSetupMemberApprovalTemplate(db, streamId, member))
+    members.map(member => checkReviewSetupMemberApprovalTemplate(db, agencyId, member))
   )
 
   return checkedMembers.find(checkedMember => !checkedMember.isValid)?.member ?? null
@@ -239,13 +236,13 @@ const findInvalidMemberApprovalTemplate = async (
 const validateReviewSetupMemberApprovalTemplates = async (
   event: H3Event,
   db: Kysely<Database>,
-  streamId: string,
+  agencyId: string,
   members: ReviewSetupMember[]
 ) => {
   const memberApprovalTemplateIds = collectReviewSetupMemberApprovalTemplateIds(members)
-  const hasValidMemberApprovalTemplates = await validateApprovalTemplatesForScope(
+  const hasValidMemberApprovalTemplates = await validateReviewSetApprovalTemplatesForAgency(
     db,
-    streamId,
+    agencyId,
     memberApprovalTemplateIds
   )
 
@@ -253,7 +250,7 @@ const validateReviewSetupMemberApprovalTemplates = async (
     return null
   }
 
-  const invalidMember = await findInvalidMemberApprovalTemplate(db, streamId, members)
+  const invalidMember = await findInvalidMemberApprovalTemplate(db, agencyId, members)
   return await badRequest(
     event,
     'REVIEW_SETUP_MEMBER_APPROVAL_TEMPLATE_NOT_FOUND',
@@ -310,10 +307,10 @@ const validateReviewSetupPatch = async (
   const schemaError = await validateReviewSetupMemberSchemas(event, db, options.agencyId, options.body, currentSet, members)
   if (schemaError) return schemaError
 
-  const setApprovalTemplateError = await validateReviewSetupApprovalTemplate(event, db, options.streamId, options.body, currentSet)
+  const setApprovalTemplateError = await validateReviewSetupApprovalTemplate(event, db, options.agencyId, options.body, currentSet)
   if (setApprovalTemplateError) return setApprovalTemplateError
 
-  const memberApprovalTemplateError = await validateReviewSetupMemberApprovalTemplates(event, db, options.streamId, members)
+  const memberApprovalTemplateError = await validateReviewSetupMemberApprovalTemplates(event, db, options.agencyId, members)
   if (memberApprovalTemplateError) return memberApprovalTemplateError
 
   for (const member of members) {
@@ -475,7 +472,7 @@ export const patchTransferPaymentReviewSetup = async (
   db: Kysely<Database>,
   options: PatchTransferPaymentReviewSetupOptions
 ) => {
-  const currentSet = await findReviewSetup(db, options.streamId, options.reviewSetupId)
+  const currentSet = await findReviewSetup(db, options.agencyId, options.reviewSetupId)
   if (!currentSet) {
     return await notFound(event, 'REVIEW_SETUP_NOT_FOUND', 'apiErrors.transfer_payment.review_setup_not_found')
   }

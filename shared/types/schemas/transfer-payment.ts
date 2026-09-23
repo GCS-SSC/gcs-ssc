@@ -47,13 +47,6 @@ const RequiredUniqueSelectionIdsSchema = () => z.array(RequiredId(), { error: 'v
 const normalizeBilingual = (value: string) => value.trim().toLowerCase()
 const TRANSFER_PAYMENT_LIST_STATUS_ENUM = ['all', 'active', 'inactive'] as const
 
-type TransferPaymentSetupNameItem = {
-  publicationState?: PublicationState
-  egcs_cn_entitytype?: string
-  egcs_cn_name_en: string
-  egcs_cn_name_fr: string
-}
-
 export const TransferPaymentListQuerySchema = PaginationSchema.extend({
   status: z.enum(TRANSFER_PAYMENT_LIST_STATUS_ENUM).default('all'),
   agency_id: RequiredId().optional()
@@ -983,71 +976,6 @@ const validateUniqueByKey = <T>(
 }
 
 /**
- * Runs duplicate detection against active items only.
- *
- * @param items - Collection to validate.
- * @param isActive - Returns whether the item participates in uniqueness checks.
- * @param getKey - Produces a duplicate-detection key for each item.
- * @param getPath - Maps the duplicate item index to the schema path.
- * @param ctx - Active Zod refinement context.
- */
-const validateActiveUniqueByKey = <T>(
-  items: T[],
-  isActive: (item: T) => boolean,
-  getKey: (item: T) => string,
-  getPath: (index: number) => (string | number)[],
-  ctx: z.RefinementCtx
-) => {
-  const seen = new Set<string>()
-  for (const [index, item] of items.entries()) {
-    if (!isActive(item)) {
-      continue
-    }
-
-    const key = getKey(item)
-    if (seen.has(key)) {
-      addInvalidSelectionIssue(ctx, getPath(index))
-      continue
-    }
-
-    seen.add(key)
-  }
-}
-
-/**
- * Builds the duplicate-detection key for setup names within an entity type.
- *
- * @param item - Setup row being validated.
- * @returns Normalized setup name key.
- */
-const getTransferPaymentSetupNameKey = (item: TransferPaymentSetupNameItem) => [
-  item.egcs_cn_entitytype,
-  normalizeBilingual(item.egcs_cn_name_en),
-  normalizeBilingual(item.egcs_cn_name_fr)
-].join('|')
-
-/**
- * Validates active setup rows for duplicate names.
- *
- * @param items - Setup rows to validate.
- * @param pathName - Wizard payload collection path.
- * @param ctx - Active Zod refinement context.
- */
-const validateActiveUniqueSetupNames = <T extends TransferPaymentSetupNameItem>(
-  items: T[],
-  pathName: 'reviewSetups' | 'recommendationSetups',
-  ctx: z.RefinementCtx
-) => {
-  validateActiveUniqueByKey(
-    items,
-    () => true,
-    getTransferPaymentSetupNameKey,
-    index => [pathName, index, 'egcs_cn_name_en'],
-    ctx
-  )
-}
-
-/**
  * Ensures review setup members have unique review schemas and unique execution order.
  *
  * @param members - Review setup members to validate.
@@ -1092,7 +1020,7 @@ const TransferPaymentReviewSetupBaseFields = {
 const TransferPaymentStreamReviewSetupBaseSchema = z.object({
   ...TransferPaymentReviewSetupBaseFields,
   members: z.array(TransferPaymentStreamReviewSetupMemberSchema)
-})
+}).strict()
 
 export const TransferPaymentStreamReviewSetupSchema = TransferPaymentStreamReviewSetupBaseSchema.superRefine((data, ctx) => {
   validateUniqueReviewSetupMembers(
@@ -1183,7 +1111,7 @@ const TransferPaymentStreamRecommendationSetupBaseSchema = z.object({
   egcs_cn_description_fr: RequiredString(),
   egcs_cn_approvaltemplate: RequiredId().optional(),
   members: z.array(TransferPaymentStreamRecommendationSetupMemberSchema)
-})
+}).strict()
 
 export const TransferPaymentStreamRecommendationSetupSchema = TransferPaymentStreamRecommendationSetupBaseSchema.superRefine((data, ctx) => {
   validateUniqueByKey(
@@ -1227,68 +1155,6 @@ export const TransferPaymentStreamRecommendationSetupPatchSchema = TransferPayme
   )
 })
 
-export const TransferPaymentStreamWizardReviewSetupMemberSchema = TransferPaymentStreamReviewSetupMemberSchema.extend({
-  egcs_cn_order: TransferPaymentStreamReviewSetupMemberSchema.shape.egcs_cn_order
-    .min(-32768, { error: 'validation.numeric_not_representable' })
-    .max(32767, { error: 'validation.numeric_not_representable' }),
-  egcs_cn_reviewschema: PositivePostgresBigintIdSchema,
-  tempId: RequiredString()
-})
-
-export type TransferPaymentStreamWizardReviewSetupMember = z.infer<typeof TransferPaymentStreamWizardReviewSetupMemberSchema>
-
-export const TransferPaymentStreamWizardReviewSetupSchema = TransferPaymentStreamReviewSetupBaseSchema.extend({
-  egcs_cn_order: TransferPaymentStreamReviewSetupBaseSchema.shape.egcs_cn_order
-    .min(-32768, { error: 'validation.numeric_not_representable' })
-    .max(32767, { error: 'validation.numeric_not_representable' }),
-  egcs_cn_name_en: StreamStorageText(255),
-  egcs_cn_name_fr: StreamStorageText(255),
-  egcs_cn_description_en: StreamStorageText(),
-  egcs_cn_description_fr: StreamStorageText(),
-  tempId: RequiredString(),
-  members: z.array(TransferPaymentStreamWizardReviewSetupMemberSchema)
-}).superRefine((data, ctx) => {
-  validateUniqueReviewSetupMembers(
-    data.members,
-    ctx,
-    (memberIndex, fieldName) => ['members', memberIndex, fieldName]
-  )
-})
-
-export type TransferPaymentStreamWizardReviewSetup = z.infer<typeof TransferPaymentStreamWizardReviewSetupSchema>
-
-export const TransferPaymentStreamWizardRecommendationSetupSchema = TransferPaymentStreamRecommendationSetupBaseSchema.extend({
-  egcs_cn_name_en: StreamStorageText(255),
-  egcs_cn_name_fr: StreamStorageText(255),
-  egcs_cn_description_en: StreamStorageText(),
-  egcs_cn_description_fr: StreamStorageText(),
-  tempId: RequiredString(),
-  members: z.array(TransferPaymentStreamRecommendationSetupMemberSchema.extend({
-    tempId: RequiredString(),
-    egcs_cn_recommendationschema: PositivePostgresBigintIdSchema,
-    egcs_cn_order: TransferPaymentStreamRecommendationSetupMemberSchema.shape.egcs_cn_order
-      .min(-32768, { error: 'validation.numeric_not_representable' })
-      .max(32767, { error: 'validation.numeric_not_representable' })
-  }))
-}).superRefine((data, ctx) => {
-  validateUniqueByKey(
-    data.members,
-    member => String(member.egcs_cn_recommendationschema),
-    memberIndex => ['members', memberIndex, 'egcs_cn_recommendationschema'],
-    ctx
-  )
-  validateUniqueByKey(
-    data.members,
-    member => String(member.egcs_cn_order),
-    memberIndex => ['members', memberIndex, 'egcs_cn_order'],
-    ctx
-  )
-})
-
-export type TransferPaymentStreamWizardRecommendationSetup = z.infer<
-  typeof TransferPaymentStreamWizardRecommendationSetupSchema
->
-
 export const TransferPaymentStreamPolymorphicWizardSchema = z.object({
   stream: TransferPaymentStreamSchema,
   holdbackBases: z.array(TransferPaymentStreamWizardHoldbackBasisSchema).default([]),
@@ -1302,10 +1168,8 @@ export const TransferPaymentStreamPolymorphicWizardSchema = z.object({
   commitmentTypes: z.array(TransferPaymentStreamWizardCommitmentTypeSchema).default([]),
   monitorTypes: z.array(TransferPaymentStreamWizardMonitorTypeSchema),
   areasOfExpertise: z.array(TransferPaymentStreamWizardAreaOfExpertiseSchema),
-  financialLimit: TransferPaymentStreamWizardFinancialLimitSchema.nullable().optional().default(null),
-  reviewSetups: z.array(TransferPaymentStreamWizardReviewSetupSchema).default([]),
-  recommendationSetups: z.array(TransferPaymentStreamWizardRecommendationSetupSchema).default([])
-}).superRefine((data, ctx) => {
+  financialLimit: TransferPaymentStreamWizardFinancialLimitSchema.nullable().optional().default(null)
+}).strict().superRefine((data, ctx) => {
   validateUniqueByKey(
     data.budgets,
     item => String(item.egcs_tp_transferpaymentbudget),
@@ -1398,20 +1262,6 @@ export const TransferPaymentStreamPolymorphicWizardSchema = z.object({
     index => ['areasOfExpertise', index, 'egcs_tp_name_en'],
     ctx
   )
-
-  validateActiveUniqueByKey(
-    data.reviewSetups,
-    () => true,
-    item => [
-      item.egcs_cn_entitytype,
-      item.egcs_cn_order
-    ].join('|'),
-    index => ['reviewSetups', index, 'egcs_cn_order'],
-    ctx
-  )
-
-  validateActiveUniqueSetupNames(data.reviewSetups, 'reviewSetups', ctx)
-  validateActiveUniqueSetupNames(data.recommendationSetups, 'recommendationSetups', ctx)
 })
 
 export type TransferPaymentStreamPolymorphicWizard = z.infer<typeof TransferPaymentStreamPolymorphicWizardSchema>

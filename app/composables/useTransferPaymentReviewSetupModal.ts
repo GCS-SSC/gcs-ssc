@@ -24,8 +24,7 @@ export type ReviewSetupFormState = Partial<TransferPaymentStreamReviewSetupItem>
 type UseTransferPaymentReviewSetupModalOptions = CrudModalSessionLifecycle & {
   open: Ref<boolean>
   state: Ref<ReviewSetupFormState | null>
-  transferPaymentId: string
-  streamId: string
+  agencyId: string
   emitSaved: () => void
 }
 
@@ -35,8 +34,7 @@ type UseTransferPaymentReviewSetupModalOptions = CrudModalSessionLifecycle & {
  * @param root0 - Modal configuration and parent-owned state bindings.
  * @param root0.open - Two-way bound modal visibility state.
  * @param root0.state - Current review setup form state.
- * @param root0.transferPaymentId - Parent transfer payment identifier.
- * @param root0.streamId - Parent transfer payment stream identifier.
+ * @param root0.agencyId - Owning Agency identifier.
  * @param root0.emitSaved - Callback invoked after a successful save.
  * @param root0.captureSession - Captures the parent CRUD modal session before saving.
  * @param root0.closeSession - Closes the parent CRUD modal only for the captured session.
@@ -45,8 +43,7 @@ type UseTransferPaymentReviewSetupModalOptions = CrudModalSessionLifecycle & {
 export const useTransferPaymentReviewSetupModal = ({
   open,
   state,
-  transferPaymentId,
-  streamId,
+  agencyId,
   emitSaved,
   captureSession,
   closeSession
@@ -107,8 +104,8 @@ export const useTransferPaymentReviewSetupModal = ({
       const currentState = state.value
       const reviewSetupId = isUpdate.value && currentState?.id ? String(currentState.id) : null
       const url = reviewSetupId
-        ? `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/review-setups/${reviewSetupId}`
-        : `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/review-setups`
+        ? `/api/agency/${agencyId}/review-sets/${reviewSetupId}`
+        : `/api/agency/${agencyId}/review-sets`
       const method = reviewSetupId ? 'PATCH' : 'POST'
 
       const response = await fetch(getClientRequestUrl(url), {

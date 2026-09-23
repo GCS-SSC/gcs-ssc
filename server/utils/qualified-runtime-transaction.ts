@@ -11,6 +11,7 @@ import { resolveCurrentCommonUser } from './additional-reviewer-runtime'
 import { requireFreshAuthContext } from './authorize'
 import { resolveAgreementScopeContext } from './agreement'
 import { resolveAssignedItemGrant } from './rbac'
+import { lockRegisteredExtensionAgreementLifecycle } from './extensions'
 import {
   resolveExtensionLifecycleRuntimeInTransaction,
   type ResolvedExtensionLifecycleRuntime
@@ -92,6 +93,22 @@ export const executeQualifiedRuntimeTransaction = async <Result>(
       initial.lockedEntity.owner.agencyId,
       initial.lockedEntity.scope.streamId
     )
+    if (initial.lockedEntity.owner.owner === 'agreement') {
+      const streamId = initial.lockedEntity.owner.streamId
+      if (!streamId) {
+        return await throwApiError(event, {
+          statusCode: 409,
+          code: 'EXTENSION_LIFECYCLE_IDENTITY_CHANGED',
+          key: 'apiErrors.request.invalid_status'
+        })
+      }
+      await lockRegisteredExtensionAgreementLifecycle(event, trx, {
+        agreementId: initial.lockedEntity.owner.ownerId,
+        agencyId: initial.lockedEntity.owner.agencyId,
+        currentStreamId: streamId,
+        targetStreamIds: [streamId]
+      })
+    }
     if (!await lockHostOwner(trx, initial.lockedEntity)) {
       if (options.missingOwner !== 'identity_changed') return null
       return await throwApiError(event, {

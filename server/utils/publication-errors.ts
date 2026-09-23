@@ -1,5 +1,4 @@
 import type { H3Event } from 'h3'
-import { getDatabaseConstraintName } from './database-constraint-errors'
 import { throwApiError } from './api-errors'
 import { PublicationLifecycleConflictError } from './system-publication'
 
@@ -46,28 +45,6 @@ export const isExpectedPublicationFailure = (error: unknown): boolean =>
   error instanceof Error && publicationFailurePatterns.some(pattern => pattern.test(error.message))
 
 /**
- * Maps the canonical published-selection uniqueness constraint to a stable API conflict.
- * @param event Active request used to localize the response.
- * @param error Database error raised by publication selection insertion.
- * @returns Never; throws either the mapped conflict or the original error.
- */
-export const throwIfPublicationSelectionConflict = async (
-  event: H3Event,
-  error: unknown
-): Promise<never> => {
-  if (error && typeof error === 'object'
-    && (error as { code?: unknown }).code === '23505'
-    && getDatabaseConstraintName(error) === 'cn_uq_publicationselectionkey') {
-    return await throwApiError(event, {
-      statusCode: 409,
-      code: 'PUBLICATION_SELECTION_CONFLICT',
-      key: 'apiErrors.request.publication_selection_conflict'
-    })
-  }
-  throw error
-}
-
-/**
  * Maps canonical publication domain and selection conflicts to localized API responses.
  * @param event Active request used to localize the response.
  * @param error Domain or database conflict raised by publication.
@@ -81,5 +58,5 @@ export const throwIfPublicationConflict = async (event: H3Event, error: unknown)
       key: 'apiErrors.request.invalid_status'
     })
   }
-  return await throwIfPublicationSelectionConflict(event, error)
+  throw error
 }

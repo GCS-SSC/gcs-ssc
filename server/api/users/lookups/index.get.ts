@@ -130,33 +130,19 @@ export default defineEventHandler(async event => {
           const templateScope = scopedLookup.kind === 'approval_template'
             ? await db
                 .selectFrom('Common_Approval_Template')
-                .innerJoin(
-                  'Transfer_Payment_Stream',
-                  'Transfer_Payment_Stream.id',
-                  'Common_Approval_Template.egcs_cn_scopeid'
-                )
-                .innerJoin(
-                  'Transfer_Payment_Profile',
-                  'Transfer_Payment_Profile.id',
-                  'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile'
-                )
-                .select('Transfer_Payment_Profile.egcs_tp_agency as agencyId')
+                .innerJoin('Agency_Profile', 'Agency_Profile.id', 'Common_Approval_Template.egcs_cn_agency')
+                .select('Common_Approval_Template.egcs_cn_agency as agencyId')
                 .where('Common_Approval_Template.id', '=', scopedLookup.id)
-                .where('Common_Approval_Template.egcs_cn_scopetype', '=', 'transferpaymentstream')
                 .where('Common_Approval_Template._deleted', '=', false)
-                .where('Transfer_Payment_Stream._deleted', '=', false)
-                .where('Transfer_Payment_Profile._deleted', '=', false)
+                .where('Agency_Profile._deleted', '=', false)
                 .executeTakeFirst()
             : await db
                 .selectFrom('Common_Workflow_Setup')
-                .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Common_Workflow_Setup.egcs_cn_scopeid')
-                .innerJoin('Transfer_Payment_Profile', 'Transfer_Payment_Profile.id', 'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile')
-                .select('Transfer_Payment_Profile.egcs_tp_agency as agencyId')
+                .innerJoin('Agency_Profile', 'Agency_Profile.id', 'Common_Workflow_Setup.egcs_cn_agency')
+                .select('Common_Workflow_Setup.egcs_cn_agency as agencyId')
                 .where('Common_Workflow_Setup.id', '=', scopedLookup.id)
-                .where('Common_Workflow_Setup.egcs_cn_scopetype', '=', 'transferpaymentstream')
                 .where('Common_Workflow_Setup._deleted', '=', false)
-                .where('Transfer_Payment_Stream._deleted', '=', false)
-                .where('Transfer_Payment_Profile._deleted', '=', false)
+                .where('Agency_Profile._deleted', '=', false)
                 .executeTakeFirst()
 
           if (!templateScope) {

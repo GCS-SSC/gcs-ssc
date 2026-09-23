@@ -33,6 +33,9 @@ const translatedItems = computed(() =>
     label: item.label ?? t(item.key)
   }))
 )
+// Nuxt UI keys triggers by array index. Remount when ordered values change so
+// Reka's roving-focus collection stays paired with their visible triggers.
+const itemsIdentity = computed(() => translatedItems.value.map(item => item.value).join('\u0000'))
 
 const isMobileExpanded = ref(false)
 const mobileToggleContainer: Ref<HTMLElement | null> = ref(null)
@@ -101,6 +104,8 @@ const onMobilePanelClick = async (event: MouseEvent) => {
 
       <div v-if="isMobileExpanded" :id="mobilePanelId" class="mt-3" @click.capture="onMobilePanelClick">
         <UTabs
+          :key="itemsIdentity"
+          activation-mode="manual"
           :model-value="modelValue"
           :items="translatedItems"
           :variant="variant"
@@ -121,7 +126,9 @@ const onMobilePanelClick = async (event: MouseEvent) => {
 
     <div class="hidden lg:block">
       <UTabs
+        :key="itemsIdentity"
         v-model="modelValue"
+        activation-mode="manual"
         :items="translatedItems"
         :variant="variant"
         :size="size"
@@ -140,7 +147,9 @@ const onMobilePanelClick = async (event: MouseEvent) => {
 
   <UTabs
     v-else
+    :key="itemsIdentity"
     v-model="modelValue"
+    activation-mode="manual"
     :items="translatedItems"
     :variant="variant"
     :size="size"

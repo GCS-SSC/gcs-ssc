@@ -135,10 +135,7 @@ export const ApprovalTemplateSchema = ApprovalTemplateBaseSchema.superRefine((da
 })
 
 export const ApprovalTemplateCreateSchema = ApprovalTemplateBaseSchema
-  .extend({
-    scopeType: ApprovalTemplateScopeTypeSchema,
-    scopeId: RequiredId()
-  })
+  .strict()
   .superRefine((data, ctx) => {
     validateApprovalTemplateStepSequences(data, ctx)
     validateAdditionalApprovalPolicy(data, ctx)
@@ -219,10 +216,7 @@ export const ApprovalTemplatePersistenceSchema = ApprovalTemplateBaseSchema
     validateAdditionalApprovalPolicy(data, ctx)
   })
 
-export const ApprovalTemplateListQuerySchema = PaginationSchema.extend({
-  scopeType: ApprovalTemplateScopeTypeSchema,
-  scopeId: RequiredId()
-})
+export const ApprovalTemplateListQuerySchema = PaginationSchema.strict()
 
 export type ApprovalTemplate = z.infer<typeof ApprovalTemplateSchema>
 export type ApprovalTemplateScopeType = z.infer<typeof ApprovalTemplateScopeTypeSchema>

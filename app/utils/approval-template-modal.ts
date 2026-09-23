@@ -1,4 +1,4 @@
-import type { ApprovalTemplate, ApprovalTemplateScopeType } from '~~/shared/types/schemas'
+import type { ApprovalTemplate } from '~~/shared/types/schemas'
 
 export interface ApprovalTemplateModalSubmitRequest {
   url: string
@@ -10,7 +10,7 @@ export interface ApprovalTemplateModalSubmitRequest {
  * Builds the shared approval template payload used by create and update requests.
  *
  * @param state - Current approval template form state.
- * @returns API request body without create-only scope fields.
+ * @returns API request body.
  */
 const buildApprovalTemplateBody = (state: ApprovalTemplate & { id?: string }) => ({
   egcs_cn_name_en: state.egcs_cn_name_en,
@@ -30,31 +30,25 @@ const buildApprovalTemplateBody = (state: ApprovalTemplate & { id?: string }) =>
  * Builds the submit request for the approval template modal.
  *
  * @param state - Current modal form state.
- * @param scopeType - Scope type for create requests.
- * @param scopeId - Scope id for create requests.
+ * @param agencyId - Agency that owns the template.
  * @returns Request URL, method, and body.
  */
 export const buildApprovalTemplateModalSubmitRequest = (
   state: ApprovalTemplate & { id?: string },
-  scopeType: ApprovalTemplateScopeType,
-  scopeId: string
+  agencyId: string
 ): ApprovalTemplateModalSubmitRequest => {
   const body = buildApprovalTemplateBody(state)
   if (state.id) {
     return {
-      url: `/api/approval-templates/${state.id}`,
+      url: `/api/agency/${agencyId}/approval-templates/${state.id}`,
       method: 'PATCH',
       body
     }
   }
 
   return {
-    url: '/api/approval-templates',
+    url: `/api/agency/${agencyId}/approval-templates`,
     method: 'POST',
-    body: {
-      scopeType,
-      scopeId,
-      ...body
-    }
+    body
   }
 }

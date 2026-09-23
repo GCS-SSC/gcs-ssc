@@ -19,15 +19,7 @@ interface FundingHistoryRowBase {
   restricted: boolean
 }
 
-export interface RestrictedFundingHistoryRow extends FundingHistoryRowBase {
-  source: FundingHistorySource
-  restricted: true
-}
-
-export interface VisibleFundingHistoryRow extends FundingHistoryRowBase {
-  restricted: false
-  historyId?: string
-  agreementId?: string
+export interface FundingHistorySummary {
   agencyNameEn?: string | null
   agencyNameFr?: string | null
   programNameEn?: string | null
@@ -35,11 +27,21 @@ export interface VisibleFundingHistoryRow extends FundingHistoryRowBase {
   agreementNumber: string
   titleEn?: string | null
   titleFr?: string | null
-  descriptionEn?: string | null
-  descriptionFr?: string | null
   startDate: string
   endDate: string
   totals: FundingHistoryMoneyTotal[]
+}
+
+export interface RestrictedFundingHistoryRow extends FundingHistoryRowBase, Partial<FundingHistorySummary> {
+  restricted: true
+}
+
+export interface VisibleFundingHistoryRow extends FundingHistoryRowBase, FundingHistorySummary {
+  restricted: false
+  historyId?: string
+  agreementId?: string
+  descriptionEn?: string | null
+  descriptionFr?: string | null
   recipients?: FundingHistoryRecipient[]
   canUpdate?: boolean
   canDelete?: boolean

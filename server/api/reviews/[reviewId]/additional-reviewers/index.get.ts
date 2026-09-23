@@ -51,7 +51,14 @@ export default defineEventHandler(async (event): Promise<AdditionalReviewersResp
 
   // Additional reviewers are stored against the executable runtime entity, but visibility still
   // resolves through the same parent-entity read gate as the assessment itself.
-  await authorizeReviewRuntimeAction(event, 'read_assessment', executableContext.runtimeEntity)
+  try {
+    await authorizeReviewRuntimeAction(event, 'read_assessment', executableContext.runtimeEntity)
+  } catch (error: unknown) {
+    if (typeof error === 'object' && error !== null && 'statusCode' in error && Number(error.statusCode) === 403) {
+      return await notFound(event, 'ASSESSMENT_NOT_FOUND', 'apiErrors.admin_common.not_found')
+    }
+    throw error
+  }
 
   const canDelete = !isReviewLockedStatus(executableContext.reviewRuntimeState, executableContext.reviewSetRuntimeState)
     && await canAuthorizeReviewRuntimeAction(event, 'delete_assessment_child', executableContext.runtimeEntity)

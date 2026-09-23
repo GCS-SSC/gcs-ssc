@@ -514,31 +514,6 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
     )
   `.execute(db)
   await sql`
-    CREATE TABLE IF NOT EXISTS "Common_Publication_Selection" (
-      id bigserial PRIMARY KEY,
-      egcs_cn_publication bigint NOT NULL,
-      egcs_cn_kind varchar(64) NOT NULL,
-      egcs_cn_dimension varchar(64) NOT NULL,
-      egcs_cn_key varchar(512) NOT NULL,
-      CONSTRAINT cn_ref_publicationselectionpublicationkind
-        FOREIGN KEY (egcs_cn_publication, egcs_cn_kind)
-        REFERENCES "Common_Publication"(id, egcs_cn_kind) ON DELETE RESTRICT,
-      CONSTRAINT cn_uq_publicationselectionkey UNIQUE (egcs_cn_kind, egcs_cn_dimension, egcs_cn_key),
-      CONSTRAINT cn_uq_publicationselectionpublication UNIQUE (egcs_cn_publication, egcs_cn_dimension)
-    )
-  `.execute(db)
-  await sql`
-    CREATE TABLE IF NOT EXISTS "Common_Publication_Selection_Lock" (
-      egcs_cn_kind varchar(64) NOT NULL,
-      egcs_cn_dimension varchar(64) NOT NULL,
-      egcs_cn_key varchar(512) NOT NULL,
-      CONSTRAINT cn_chk_publicationselectionlockkind CHECK (
-        egcs_cn_kind IN (${sql.join(PUBLICATION_KINDS.map(value => sql.lit(value)))})
-      ),
-      CONSTRAINT cn_pk_publicationselectionlock PRIMARY KEY (egcs_cn_kind, egcs_cn_dimension, egcs_cn_key)
-    )
-  `.execute(db)
-  await sql`
     CREATE OR REPLACE FUNCTION trg_fn_lock_publication_evidence() RETURNS trigger AS $$
     BEGIN
       RAISE EXCEPTION 'Publication versions and transition history are immutable'
@@ -1372,8 +1347,7 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
     .ifNotExists()
     .addColumn('id', 'bigint', col => col.primaryKey())
     .addColumn('egcs_cn_publicationkind', 'varchar(64)', col => col.notNull().defaultTo('review_set_setup'))
-    .addColumn('egcs_cn_scopetype', sql`varchar(128)`, col => col.notNull())
-    .addColumn('egcs_cn_scopeid', 'bigint', col => col.notNull())
+    .addColumn('egcs_cn_agency', 'bigint', col => col.notNull().references('Agency_Profile.id').onDelete('restrict'))
     .addColumn('egcs_cn_entitytype', sql`varchar(128)`, col => col.notNull())
     .addColumn('egcs_cn_name_en', 'varchar(255)', col => col.notNull())
     .addColumn('egcs_cn_name_fr', 'varchar(255)', col => col.notNull())
@@ -1386,10 +1360,6 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
       col.references('Common_Approval_Template.id').onDelete('restrict')
     )
     .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
-    .addCheckConstraint(
-      'cn_chk_reviewsetsetupscopetype',
-      sql`egcs_cn_scopetype IN ('fundingopportunity', 'fundingcaseintake', 'fundingcaseagreement', 'applicantrecipient', 'transferpaymentstream')`
-    )
     .addForeignKeyConstraint(
       'cn_ref_reviewsetsetupentitytype',
       ['egcs_cn_entitytype'],
@@ -1438,33 +1408,24 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
   `.execute(db)
 
   await sql`
-    CREATE INDEX IF NOT EXISTS cn_idx_reviewsetsetupscopeidentitytypenameen
-    ON "Common_Review_Set_Setup" (egcs_cn_scopeid, egcs_cn_entitytype, egcs_cn_name_en)
+    CREATE INDEX IF NOT EXISTS cn_idx_reviewsetsetupagencytypenameen
+    ON "Common_Review_Set_Setup" (egcs_cn_agency, egcs_cn_entitytype, egcs_cn_name_en)
     WHERE _deleted = false
   `.execute(db)
   await sql`
-    CREATE INDEX IF NOT EXISTS cn_idx_reviewsetsetupscopeidentitytypenamefr
-    ON "Common_Review_Set_Setup" (egcs_cn_scopeid, egcs_cn_entitytype, egcs_cn_name_fr)
+    CREATE INDEX IF NOT EXISTS cn_idx_reviewsetsetupagencytypenamefr
+    ON "Common_Review_Set_Setup" (egcs_cn_agency, egcs_cn_entitytype, egcs_cn_name_fr)
     WHERE _deleted = false
   `.execute(db)
   await sql`
-    CREATE INDEX IF NOT EXISTS cn_idx_reviewsetsetupscopeidentitytypeorder
-    ON "Common_Review_Set_Setup" (egcs_cn_scopeid, egcs_cn_entitytype, egcs_cn_order)
+    CREATE INDEX IF NOT EXISTS cn_idx_reviewsetsetupagencytypeorder
+    ON "Common_Review_Set_Setup" (egcs_cn_agency, egcs_cn_entitytype, egcs_cn_order)
     WHERE _deleted = false
   `.execute(db)
   await sql`
     CREATE UNIQUE INDEX IF NOT EXISTS cn_idx_reviewsetsetupidentitytype
     ON "Common_Review_Set_Setup" (id, egcs_cn_entitytype)
   `.execute(db)
-  await sql`
-    ALTER TABLE "Common_Review_Set_Setup"
-      DROP CONSTRAINT IF EXISTS cn_ref_reviewsetsetupscopeid,
-      DROP CONSTRAINT IF EXISTS cn_ref_reviewsetsetupscopeidscopetype,
-      ADD CONSTRAINT cn_ref_reviewsetsetupscopeidscopetype
-      FOREIGN KEY (egcs_cn_scopeid, egcs_cn_scopetype)
-      REFERENCES "Common_Entity"(id, egcs_cn_entitytype)
-  `.execute(db)
-
   await db.schema
     .createTable('Common_Review_Setup')
     .ifNotExists()
@@ -1510,8 +1471,7 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
 
   await sql`
     ALTER TABLE "Common_Approval_Template"
-      ADD COLUMN IF NOT EXISTS egcs_cn_scopetype varchar(128),
-      ADD COLUMN IF NOT EXISTS egcs_cn_scopeid bigint
+      ADD COLUMN IF NOT EXISTS egcs_cn_agency bigint NOT NULL REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT
   `.execute(db)
   await sql`
     ALTER TABLE "Common_Approval_Template"
@@ -1528,17 +1488,6 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
           AND NULLIF(BTRIM(egcs_cn_defaultaddedapprovalname_fr), '') IS NOT NULL
         )
       )
-  `.execute(db)
-
-  await sql`
-    ALTER TABLE "Common_Approval_Template"
-      DROP CONSTRAINT IF EXISTS cn_chk_approvaltemplatescopetype,
-      DROP CONSTRAINT IF EXISTS cn_ref_approvaltemplatescopeidscopetype,
-      ALTER COLUMN egcs_cn_scopetype SET NOT NULL,
-      ALTER COLUMN egcs_cn_scopeid SET NOT NULL,
-      ADD CONSTRAINT cn_chk_approvaltemplatescopetype CHECK (egcs_cn_scopetype IN ('fundingopportunity', 'transferpaymentstream')),
-      ADD CONSTRAINT cn_ref_approvaltemplatescopeidscopetype
-      FOREIGN KEY (egcs_cn_scopeid, egcs_cn_scopetype) REFERENCES "Common_Entity"(id, egcs_cn_entitytype)
   `.execute(db)
 
   await sql`
@@ -1781,16 +1730,13 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
     CREATE TABLE IF NOT EXISTS "Common_Recommendation_Set_Setup" (
       id bigint PRIMARY KEY,
       egcs_cn_publicationkind varchar(64) NOT NULL DEFAULT 'recommendation_set_setup' CHECK (egcs_cn_publicationkind = 'recommendation_set_setup'),
-      egcs_cn_scopetype varchar(128) NOT NULL,
-      egcs_cn_scopeid bigint NOT NULL,
+      egcs_cn_agency bigint NOT NULL REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT,
       egcs_cn_name_en varchar(255) NOT NULL,
       egcs_cn_name_fr varchar(255) NOT NULL,
       egcs_cn_description_en text NOT NULL,
       egcs_cn_description_fr text NOT NULL,
       egcs_cn_approvaltemplate bigint REFERENCES "Common_Approval_Template"(id) ON DELETE RESTRICT,
       _deleted boolean NOT NULL DEFAULT false,
-      CONSTRAINT cn_chk_recommendationsetsetupscopetype CHECK (egcs_cn_scopetype IN ('fundingopportunity', 'fundingcaseintake', 'fundingcaseagreement', 'applicantrecipient', 'transferpaymentstream')),
-      CONSTRAINT cn_ref_recommendationsetsetupscopeidscopetype FOREIGN KEY (egcs_cn_scopeid, egcs_cn_scopetype) REFERENCES "Common_Entity"(id, egcs_cn_entitytype),
       CONSTRAINT cn_ref_recommendationsetsetuppublication FOREIGN KEY (id, egcs_cn_publicationkind)
         REFERENCES "Common_Publication"(id, egcs_cn_kind)
     )
@@ -1801,13 +1747,13 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
     FOR EACH ROW EXECUTE FUNCTION trg_fn_register_publication('recommendation_set_setup')
   `.execute(db)
   await sql`
-    CREATE INDEX IF NOT EXISTS cn_idx_recommendationsetsetupscopeidnameen
-    ON "Common_Recommendation_Set_Setup" (egcs_cn_scopeid, egcs_cn_name_en)
+    CREATE INDEX IF NOT EXISTS cn_idx_recommendationsetsetupagencynameen
+    ON "Common_Recommendation_Set_Setup" (egcs_cn_agency, egcs_cn_name_en)
     WHERE _deleted = false
   `.execute(db)
   await sql`
-    CREATE INDEX IF NOT EXISTS cn_idx_recommendationsetsetupscopeidnamefr
-    ON "Common_Recommendation_Set_Setup" (egcs_cn_scopeid, egcs_cn_name_fr)
+    CREATE INDEX IF NOT EXISTS cn_idx_recommendationsetsetupagencynamefr
+    ON "Common_Recommendation_Set_Setup" (egcs_cn_agency, egcs_cn_name_fr)
     WHERE _deleted = false
   `.execute(db)
   await sql`
@@ -1827,6 +1773,62 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
         REFERENCES "Common_Recommendation_Schema"(id)
     )
   `.execute(db)
+  await sql`
+    CREATE FUNCTION validate_catalog_nested_agency() RETURNS trigger LANGUAGE plpgsql AS $$
+    DECLARE owner_agency bigint;
+    BEGIN
+      IF TG_TABLE_NAME = 'Common_Review_Set_Setup' THEN
+        owner_agency := NEW.egcs_cn_agency;
+      ELSIF TG_TABLE_NAME = 'Common_Review_Setup' THEN
+        SELECT egcs_cn_agency INTO owner_agency
+        FROM "Common_Review_Set_Setup" WHERE id = NEW.egcs_cn_reviewset;
+        IF NOT EXISTS (
+          SELECT 1 FROM "Common_Review_Schema"
+          WHERE id = NEW.egcs_cn_reviewschema AND egcs_cn_agency = owner_agency
+        ) THEN
+          RAISE EXCEPTION 'Review Schema must belong to the Review Set Agency'
+            USING ERRCODE = '23514', CONSTRAINT = 'cn_ref_reviewsetupagency';
+        END IF;
+      ELSIF TG_TABLE_NAME = 'Common_Recommendation_Set_Setup' THEN
+        owner_agency := NEW.egcs_cn_agency;
+      ELSIF TG_TABLE_NAME = 'Common_Recommendation_Setup' THEN
+        SELECT egcs_cn_agency INTO owner_agency
+        FROM "Common_Recommendation_Set_Setup" WHERE id = NEW.egcs_cn_recommendationset;
+        IF NOT EXISTS (
+          SELECT 1 FROM "Common_Recommendation_Schema"
+          WHERE id = NEW.egcs_cn_recommendationschema AND egcs_cn_agency = owner_agency
+        ) THEN
+          RAISE EXCEPTION 'Recommendation Schema must belong to the Recommendation Set Agency'
+            USING ERRCODE = '23514', CONSTRAINT = 'cn_ref_recommendationsetupagency';
+        END IF;
+      END IF;
+
+      IF NEW.egcs_cn_approvaltemplate IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM "Common_Approval_Template"
+        WHERE id = NEW.egcs_cn_approvaltemplate AND egcs_cn_agency = owner_agency
+      ) THEN
+        RAISE EXCEPTION 'Approval Template must belong to the catalog Agency'
+          USING ERRCODE = '23514', CONSTRAINT = 'cn_ref_catalogapprovaltemplateagency';
+      END IF;
+      RETURN NEW;
+    END $$
+  `.execute(db)
+  for (const table of ['Common_Review_Set_Setup', 'Common_Review_Setup', 'Common_Recommendation_Set_Setup', 'Common_Recommendation_Setup']) {
+    await sql.raw(`CREATE TRIGGER validate_catalog_nested_agency BEFORE INSERT OR UPDATE ON "${table}" FOR EACH ROW EXECUTE FUNCTION validate_catalog_nested_agency()`).execute(db)
+  }
+  await sql`
+    CREATE FUNCTION prevent_catalog_agency_change() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN
+      IF NEW.egcs_cn_agency IS DISTINCT FROM OLD.egcs_cn_agency THEN
+        RAISE EXCEPTION 'Catalog Agency cannot change'
+          USING ERRCODE = '23514', CONSTRAINT = 'cn_chk_catalogagencyimmutable';
+      END IF;
+      RETURN NEW;
+    END $$
+  `.execute(db)
+  for (const table of ['Common_Approval_Template', 'Common_Review_Schema', 'Common_Review_Set_Setup', 'Common_Recommendation_Schema', 'Common_Recommendation_Set_Setup']) {
+    await sql.raw(`CREATE TRIGGER prevent_catalog_agency_change BEFORE UPDATE OF egcs_cn_agency ON "${table}" FOR EACH ROW EXECUTE FUNCTION prevent_catalog_agency_change()`).execute(db)
+  }
 
   await sql`
     CREATE TABLE IF NOT EXISTS "Common_Recommendation_Set" (
@@ -1880,8 +1882,7 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
     CREATE TABLE IF NOT EXISTS "Common_Workflow_Setup" (
       id bigint PRIMARY KEY,
       egcs_cn_publicationkind varchar(64) NOT NULL DEFAULT 'workflow_setup' CHECK (egcs_cn_publicationkind = 'workflow_setup'),
-      egcs_cn_scopetype varchar(128) NOT NULL,
-      egcs_cn_scopeid bigint NOT NULL,
+      egcs_cn_agency bigint NOT NULL REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT,
       egcs_cn_entitytype varchar(128) NOT NULL,
       egcs_cn_name_en varchar(255) NOT NULL,
       egcs_cn_name_fr varchar(255) NOT NULL,
@@ -1896,8 +1897,6 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
       CONSTRAINT cn_unq_workflowsetuptargetpurpose UNIQUE (id, egcs_cn_entitytype, egcs_cn_purpose),
       CONSTRAINT cn_ref_workflowsetupentitytype FOREIGN KEY (egcs_cn_entitytype)
         REFERENCES "Common_Entity_Type"(egcs_cn_type) ON DELETE RESTRICT,
-      CONSTRAINT cn_ref_workflowsetupscope FOREIGN KEY (egcs_cn_scopeid, egcs_cn_scopetype)
-        REFERENCES "Common_Entity"(id, egcs_cn_entitytype),
       CONSTRAINT cn_ref_workflowsetuppublication FOREIGN KEY (id, egcs_cn_publicationkind)
         REFERENCES "Common_Publication"(id, egcs_cn_kind)
     )
@@ -2057,9 +2056,183 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
     WHERE _deleted = false
   `.execute(db)
   await sql`
-    CREATE INDEX IF NOT EXISTS cn_idx_workflowsetup_scope_entity
-    ON "Common_Workflow_Setup" (egcs_cn_scopetype, egcs_cn_scopeid, egcs_cn_entitytype, egcs_cn_purpose)
+    CREATE INDEX IF NOT EXISTS cn_idx_workflowsetup_agency_entity
+    ON "Common_Workflow_Setup" (egcs_cn_agency, egcs_cn_entitytype, egcs_cn_purpose)
     WHERE _deleted = false
+  `.execute(db)
+  await sql`
+    CREATE TABLE "Transfer_Payment_Stream_Review_Set" (
+      id bigserial PRIMARY KEY,
+      egcs_tp_transferpaymentstream bigint NOT NULL REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT,
+      egcs_tp_reviewset bigint NOT NULL REFERENCES "Common_Review_Set_Setup"(id) ON DELETE RESTRICT,
+      _deleted boolean NOT NULL DEFAULT false
+    )
+  `.execute(db)
+  await sql`
+    CREATE UNIQUE INDEX tp_idx_streamreviewset_livepair
+    ON "Transfer_Payment_Stream_Review_Set" (egcs_tp_transferpaymentstream, egcs_tp_reviewset)
+    WHERE _deleted = false
+  `.execute(db)
+  await sql`
+    CREATE TABLE "Transfer_Payment_Stream_Workflow" (
+      id bigserial PRIMARY KEY,
+      egcs_tp_transferpaymentstream bigint NOT NULL REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT,
+      egcs_tp_workflow bigint NOT NULL REFERENCES "Common_Workflow_Setup"(id) ON DELETE RESTRICT,
+      _deleted boolean NOT NULL DEFAULT false
+    )
+  `.execute(db)
+  await sql`
+    CREATE UNIQUE INDEX tp_idx_streamworkflow_livepair
+    ON "Transfer_Payment_Stream_Workflow" (egcs_tp_transferpaymentstream, egcs_tp_workflow)
+    WHERE _deleted = false
+  `.execute(db)
+  await sql`
+    CREATE FUNCTION protect_profile_stream_catalog_links() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN
+      IF NEW.egcs_tp_agency IS DISTINCT FROM OLD.egcs_tp_agency AND EXISTS (
+        SELECT 1 FROM "Transfer_Payment_Stream" stream
+        WHERE stream.egcs_tp_transferpaymentprofile = OLD.id
+          AND stream._deleted = false
+          AND (
+            EXISTS (
+              SELECT 1 FROM "Transfer_Payment_Stream_Review_Set" linked
+              WHERE linked.egcs_tp_transferpaymentstream = stream.id AND linked._deleted = false
+            ) OR EXISTS (
+              SELECT 1 FROM "Transfer_Payment_Stream_Workflow" linked
+              WHERE linked.egcs_tp_transferpaymentstream = stream.id AND linked._deleted = false
+            )
+          )
+      ) THEN
+        RAISE EXCEPTION 'Transfer-payment Agency cannot change while Stream catalogs are linked'
+          USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_profile_agency_catalog_links';
+      END IF;
+      RETURN NEW;
+    END $$
+  `.execute(db)
+  await sql`
+    CREATE TRIGGER protect_profile_stream_catalog_links
+    BEFORE UPDATE OF egcs_tp_agency ON "Transfer_Payment_Profile"
+    FOR EACH ROW EXECUTE FUNCTION protect_profile_stream_catalog_links()
+  `.execute(db)
+  await sql`
+    CREATE FUNCTION validate_stream_catalog_link() RETURNS trigger LANGUAGE plpgsql AS $$
+    DECLARE stream_agency bigint; stream_profile bigint; workflow_type varchar(128); workflow_purpose varchar(32);
+    BEGIN
+      IF TG_OP = 'UPDATE' THEN
+        IF NEW.egcs_tp_transferpaymentstream IS DISTINCT FROM OLD.egcs_tp_transferpaymentstream THEN
+          RAISE EXCEPTION 'Stream catalog link identity is immutable'
+            USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_streamcataloglinkidentity';
+        END IF;
+        IF TG_TABLE_NAME = 'Transfer_Payment_Stream_Review_Set' THEN
+          IF NEW.egcs_tp_reviewset IS DISTINCT FROM OLD.egcs_tp_reviewset THEN
+            RAISE EXCEPTION 'Stream catalog link identity is immutable'
+              USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_streamcataloglinkidentity';
+          END IF;
+        ELSE
+          IF NEW.egcs_tp_workflow IS DISTINCT FROM OLD.egcs_tp_workflow THEN
+            RAISE EXCEPTION 'Stream catalog link identity is immutable'
+              USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_streamcataloglinkidentity';
+          END IF;
+        END IF;
+        -- Retirement must not prevent removal of a link already in use.
+        IF NEW._deleted THEN RETURN NEW; END IF;
+      END IF;
+      SELECT stream.egcs_tp_transferpaymentprofile INTO stream_profile
+      FROM "Transfer_Payment_Stream" stream
+      WHERE stream.id = NEW.egcs_tp_transferpaymentstream AND stream._deleted = false;
+      IF stream_profile IS NOT NULL THEN
+        -- Lock the Program before its Stream so a concurrent Agency transfer
+        -- cannot commit between owner validation and link creation.
+        SELECT profile.egcs_tp_agency INTO stream_agency
+        FROM "Transfer_Payment_Profile" profile
+        WHERE profile.id = stream_profile AND profile._deleted = false
+        FOR SHARE OF profile;
+        PERFORM 1 FROM "Transfer_Payment_Stream" stream
+        WHERE stream.id = NEW.egcs_tp_transferpaymentstream
+          AND stream.egcs_tp_transferpaymentprofile = stream_profile
+          AND stream._deleted = false
+        FOR UPDATE OF stream;
+        IF NOT FOUND THEN stream_agency := NULL; END IF;
+      END IF;
+      IF stream_agency IS NULL THEN
+        RAISE EXCEPTION 'Stream is unavailable for a catalog link'
+          USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_streamcatalogstreamavailable';
+      END IF;
+      IF TG_TABLE_NAME = 'Transfer_Payment_Stream_Review_Set' THEN
+        IF NOT EXISTS (
+          SELECT 1 FROM "Common_Review_Set_Setup" catalog
+          JOIN "Common_Publication" publication ON publication.id = catalog.id
+          WHERE catalog.id = NEW.egcs_tp_reviewset
+            AND catalog.egcs_cn_agency = stream_agency
+            AND catalog._deleted = false
+            AND publication._deleted = false
+            AND publication.egcs_cn_state = 'published'
+        ) THEN
+          RAISE EXCEPTION 'Review Set must be published and belong to the Stream Agency'
+            USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_streamreviewsetpublishedagency';
+        END IF;
+      ELSE
+        SELECT catalog.egcs_cn_entitytype, catalog.egcs_cn_purpose
+        INTO workflow_type, workflow_purpose
+        FROM "Common_Workflow_Setup" catalog
+          JOIN "Common_Publication" publication ON publication.id = catalog.id
+          WHERE catalog.id = NEW.egcs_tp_workflow
+            AND catalog.egcs_cn_agency = stream_agency
+            AND catalog._deleted = false
+            AND publication._deleted = false
+            AND publication.egcs_cn_state = 'published'
+        FOR SHARE OF catalog;
+        IF NOT FOUND THEN
+          RAISE EXCEPTION 'Workflow must be published and belong to the Stream Agency'
+            USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_streamworkflowpublishedagency';
+        END IF;
+        IF workflow_purpose IN ('approval_submission', 'risk_rating') AND EXISTS (
+          SELECT 1 FROM "Transfer_Payment_Stream_Workflow" linked
+          JOIN "Common_Workflow_Setup" existing ON existing.id = linked.egcs_tp_workflow
+          WHERE linked.egcs_tp_transferpaymentstream = NEW.egcs_tp_transferpaymentstream
+            AND linked.id IS DISTINCT FROM NEW.id
+            AND linked._deleted = false
+            AND existing.egcs_cn_entitytype = workflow_type
+            AND existing.egcs_cn_purpose = workflow_purpose
+        ) THEN
+          RAISE EXCEPTION 'Stream already links a Workflow for this entity type and purpose'
+            USING ERRCODE = '23505', CONSTRAINT = 'tp_idx_streamworkflow_specialpurpose';
+        END IF;
+      END IF;
+      RETURN NEW;
+    END $$
+  `.execute(db)
+  await sql`
+    CREATE TRIGGER validate_stream_review_set_link
+    BEFORE INSERT OR UPDATE OF egcs_tp_transferpaymentstream, egcs_tp_reviewset, _deleted
+    ON "Transfer_Payment_Stream_Review_Set"
+    FOR EACH ROW EXECUTE FUNCTION validate_stream_catalog_link()
+  `.execute(db)
+  await sql`
+    CREATE TRIGGER validate_stream_workflow_link
+    BEFORE INSERT OR UPDATE OF egcs_tp_transferpaymentstream, egcs_tp_workflow, _deleted
+    ON "Transfer_Payment_Stream_Workflow"
+    FOR EACH ROW EXECUTE FUNCTION validate_stream_catalog_link()
+  `.execute(db)
+  await sql`
+    CREATE FUNCTION preserve_linked_workflow_target() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN
+      IF (NEW.egcs_cn_entitytype, NEW.egcs_cn_purpose)
+        IS DISTINCT FROM (OLD.egcs_cn_entitytype, OLD.egcs_cn_purpose)
+        AND EXISTS (
+          SELECT 1 FROM "Transfer_Payment_Stream_Workflow" linked
+          WHERE linked.egcs_tp_workflow = OLD.id AND linked._deleted = false
+        ) THEN
+        RAISE EXCEPTION 'A linked Workflow cannot change entity type or purpose'
+          USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_linkedworkflowtargetimmutable';
+      END IF;
+      RETURN NEW;
+    END $$
+  `.execute(db)
+  await sql`
+    CREATE TRIGGER preserve_linked_workflow_target
+    BEFORE UPDATE OF egcs_cn_entitytype, egcs_cn_purpose ON "Common_Workflow_Setup"
+    FOR EACH ROW EXECUTE FUNCTION preserve_linked_workflow_target()
   `.execute(db)
   await sql`
     CREATE TABLE IF NOT EXISTS "Common_Workflow_Setup_Member" (
@@ -2099,24 +2272,22 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
       IF NOT FOUND THEN RAISE EXCEPTION 'Workflow setup is unavailable'; END IF;
       IF NEW.egcs_cn_reviewset IS NOT NULL AND NOT EXISTS (
         SELECT 1 FROM "Common_Review_Set_Setup" candidate
-        WHERE candidate.id = NEW.egcs_cn_reviewset AND candidate.egcs_cn_scopetype = workflow.egcs_cn_scopetype
-          AND candidate.egcs_cn_scopeid = workflow.egcs_cn_scopeid AND candidate.egcs_cn_entitytype = workflow.egcs_cn_entitytype
+        WHERE candidate.id = NEW.egcs_cn_reviewset AND candidate.egcs_cn_agency = workflow.egcs_cn_agency
+          AND candidate.egcs_cn_entitytype = workflow.egcs_cn_entitytype
           AND candidate._deleted = false
           AND EXISTS (SELECT 1 FROM "Common_Publication" publication
             WHERE publication.id = candidate.id AND publication.egcs_cn_state = 'published' AND publication._deleted = false)
       ) THEN RAISE EXCEPTION 'Workflow review set scope or entity type mismatch'; END IF;
       IF NEW.egcs_cn_recommendationset IS NOT NULL AND NOT EXISTS (
         SELECT 1 FROM "Common_Recommendation_Set_Setup" candidate
-        WHERE candidate.id = NEW.egcs_cn_recommendationset AND candidate.egcs_cn_scopetype = workflow.egcs_cn_scopetype
-          AND candidate.egcs_cn_scopeid = workflow.egcs_cn_scopeid
+        WHERE candidate.id = NEW.egcs_cn_recommendationset AND candidate.egcs_cn_agency = workflow.egcs_cn_agency
           AND candidate._deleted = false
           AND EXISTS (SELECT 1 FROM "Common_Publication" publication
             WHERE publication.id = candidate.id AND publication.egcs_cn_state = 'published' AND publication._deleted = false)
       ) THEN RAISE EXCEPTION 'Workflow recommendation set scope mismatch'; END IF;
       IF NEW.egcs_cn_approvaltemplate IS NOT NULL AND NOT EXISTS (
         SELECT 1 FROM "Common_Approval_Template" candidate
-        WHERE candidate.id = NEW.egcs_cn_approvaltemplate AND candidate.egcs_cn_scopetype = workflow.egcs_cn_scopetype
-          AND candidate.egcs_cn_scopeid = workflow.egcs_cn_scopeid
+        WHERE candidate.id = NEW.egcs_cn_approvaltemplate AND candidate.egcs_cn_agency = workflow.egcs_cn_agency
           AND candidate._deleted = false
           AND EXISTS (SELECT 1 FROM "Common_Publication" publication
             WHERE publication.id = candidate.id AND publication.egcs_cn_state = 'published' AND publication._deleted = false)
@@ -2162,21 +2333,13 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
           USING ERRCODE = '23514', CONSTRAINT = 'cn_ref_workflowstatusagency';
       END IF;
 
-      IF workflow.egcs_cn_scopetype <> 'transferpaymentstream' THEN
-        RAISE EXCEPTION 'Agency status workflows require a transfer-payment Stream scope'
-          USING ERRCODE = '23514', CONSTRAINT = 'cn_ref_workflowstatusagency';
-      END IF;
-
-      SELECT profile.egcs_tp_agency INTO resolved_agency
-      FROM "Transfer_Payment_Stream" stream
-      JOIN "Transfer_Payment_Profile" profile
-        ON profile.id = stream.egcs_tp_transferpaymentprofile
-      WHERE stream.id = workflow.egcs_cn_scopeid
-        AND stream._deleted = false
-        AND profile._deleted = false;
+      SELECT agency.id INTO resolved_agency
+      FROM "Agency_Profile" agency
+      WHERE agency.id = workflow.egcs_cn_agency
+        AND agency._deleted = false;
 
       IF resolved_agency IS NULL THEN
-        RAISE EXCEPTION 'Workflow Stream Agency could not be resolved'
+        RAISE EXCEPTION 'Workflow Agency could not be resolved'
           USING ERRCODE = '23514', CONSTRAINT = 'cn_ref_workflowstatusagency';
       END IF;
 
@@ -2277,10 +2440,10 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
     CREATE TABLE "Common_Workflow_Member_Condition" (
       id bigserial PRIMARY KEY,
       egcs_cn_workflowsetupmember bigint NOT NULL REFERENCES "Common_Workflow_Setup_Member"(id) ON DELETE RESTRICT,
-      egcs_cn_field bigint NOT NULL REFERENCES "Transfer_Payment_Stream_Field"(id) ON DELETE RESTRICT,
+      egcs_cn_field bigint NOT NULL REFERENCES "Agency_Custom_Field"(id) ON DELETE RESTRICT,
       egcs_cn_option bigint NOT NULL,
       _deleted boolean NOT NULL DEFAULT false,
-      FOREIGN KEY (egcs_cn_option, egcs_cn_field) REFERENCES "Transfer_Payment_Stream_Field_Option"(id, egcs_tp_field) ON DELETE RESTRICT
+      FOREIGN KEY (egcs_cn_option, egcs_cn_field) REFERENCES "Agency_Custom_Field_Option"(id, egcs_ay_field) ON DELETE RESTRICT
     )
   `.execute(db)
   await sql`
@@ -2291,24 +2454,34 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
       id bigserial PRIMARY KEY,
       egcs_cn_publicationversion bigint NOT NULL REFERENCES "Common_Publication_Version"(id) ON DELETE RESTRICT,
       egcs_cn_workflowsetupmember bigint NOT NULL REFERENCES "Common_Workflow_Setup_Member"(id) ON DELETE RESTRICT,
-      egcs_cn_field bigint NOT NULL REFERENCES "Transfer_Payment_Stream_Field"(id) ON DELETE RESTRICT,
+      egcs_cn_field bigint NOT NULL REFERENCES "Agency_Custom_Field"(id) ON DELETE RESTRICT,
       egcs_cn_option bigint NOT NULL,
       _deleted boolean NOT NULL DEFAULT false,
-      FOREIGN KEY (egcs_cn_option, egcs_cn_field) REFERENCES "Transfer_Payment_Stream_Field_Option"(id, egcs_tp_field) ON DELETE RESTRICT,
+      FOREIGN KEY (egcs_cn_option, egcs_cn_field) REFERENCES "Agency_Custom_Field_Option"(id, egcs_ay_field) ON DELETE RESTRICT,
       UNIQUE (egcs_cn_publicationversion, egcs_cn_workflowsetupmember, egcs_cn_field, egcs_cn_option)
     )
   `.execute(db)
   await sql`
     CREATE FUNCTION validate_workflow_condition_scope() RETURNS trigger LANGUAGE plpgsql AS $$
     BEGIN
+      IF NEW._deleted THEN RETURN NEW; END IF;
       IF NOT EXISTS (
         SELECT 1 FROM "Common_Workflow_Setup_Member" member
         JOIN "Common_Workflow_Setup" setup ON setup.id = member.egcs_cn_workflowsetup
-        JOIN "Transfer_Payment_Stream_Field" field ON field.id = NEW.egcs_cn_field
-        WHERE member.id = NEW.egcs_cn_workflowsetupmember AND setup.egcs_cn_scopetype = 'transferpaymentstream'
-          AND setup.egcs_cn_scopeid = field.egcs_tp_transferpaymentstream AND field.egcs_tp_kind = 'relational'
+        JOIN "Agency_Custom_Field" field ON field.id = NEW.egcs_cn_field
+        JOIN "Agency_Custom_Field_Option" option
+          ON option.id = NEW.egcs_cn_option AND option.egcs_ay_field = field.id
+        WHERE member.id = NEW.egcs_cn_workflowsetupmember
+          AND member._deleted = false
+          AND setup._deleted = false
+          AND setup.egcs_cn_agency = field.egcs_ay_agency
+          AND field.egcs_ay_kind = 'relational'
+          AND field._deleted = false
+          AND option.egcs_ay_active = true
+          AND option._deleted = false
       ) THEN
-        RAISE EXCEPTION 'Workflow condition must reference a relational field in its stream' USING ERRCODE = '23514';
+        RAISE EXCEPTION 'Workflow condition must reference an active relational field and option in its Agency'
+          USING ERRCODE = '23514', CONSTRAINT = 'cn_ref_workflowconditionagency';
       END IF;
       RETURN NEW;
     END $$
@@ -2316,6 +2489,11 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
   await sql`
     CREATE TRIGGER validate_workflow_condition_scope BEFORE INSERT OR UPDATE ON "Common_Workflow_Member_Condition"
       FOR EACH ROW EXECUTE FUNCTION validate_workflow_condition_scope()
+  `.execute(db)
+  await sql`
+    CREATE TRIGGER validate_workflow_publication_condition_scope
+    BEFORE INSERT ON "Common_Workflow_Publication_Condition"
+    FOR EACH ROW EXECUTE FUNCTION validate_workflow_condition_scope()
   `.execute(db)
   await sql`
     CREATE TRIGGER protect_workflow_publication_conditions BEFORE UPDATE OR DELETE ON "Common_Workflow_Publication_Condition"
@@ -2580,13 +2758,13 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
     WHERE _deleted = false
   `.execute(db)
   await sql`
-    CREATE UNIQUE INDEX IF NOT EXISTS cn_idx_approvaltemplatescopenametypeen
-    ON "Common_Approval_Template" (egcs_cn_scopeid, egcs_cn_scopetype, egcs_cn_name_en)
+    CREATE UNIQUE INDEX IF NOT EXISTS cn_idx_approvaltemplateagencynameen
+    ON "Common_Approval_Template" (egcs_cn_agency, egcs_cn_name_en)
     WHERE _deleted = false
   `.execute(db)
   await sql`
-    CREATE UNIQUE INDEX IF NOT EXISTS cn_idx_approvaltemplatescopenametypefr
-    ON "Common_Approval_Template" (egcs_cn_scopeid, egcs_cn_scopetype, egcs_cn_name_fr)
+    CREATE UNIQUE INDEX IF NOT EXISTS cn_idx_approvaltemplateagencynamefr
+    ON "Common_Approval_Template" (egcs_cn_agency, egcs_cn_name_fr)
     WHERE _deleted = false
   `.execute(db)
   await sql`
@@ -2922,15 +3100,10 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
       previous_status_agency bigint;
       next_status_agency bigint;
     BEGIN
-      SELECT profile.egcs_tp_agency INTO resolved_agency
+      SELECT workflow.egcs_cn_agency INTO resolved_agency
       FROM "Common_Workflow_Run" run
       JOIN "Common_Runtime" runtime ON runtime.id = run.id
       JOIN "Common_Workflow_Setup" workflow ON workflow.id = runtime.egcs_cn_sourcepublication
-      JOIN "Transfer_Payment_Stream" stream
-        ON workflow.egcs_cn_scopetype = 'transferpaymentstream'
-        AND stream.id = workflow.egcs_cn_scopeid
-      JOIN "Transfer_Payment_Profile" profile
-        ON profile.id = stream.egcs_tp_transferpaymentprofile
       WHERE run.id = NEW.egcs_cn_workflowrun;
 
       IF resolved_agency IS NULL THEN
@@ -3809,6 +3982,12 @@ export const down = async (db: Kysely<Database>): Promise<void> => {
   await sql`DROP TABLE IF EXISTS "Common_Workflow_Member_Condition"`.execute(db)
   await sql`DROP TABLE IF EXISTS "Common_Workflow_Setup_Member" CASCADE`.execute(db)
   await sql`DROP TABLE IF EXISTS "Common_Workflow_Setup_Allowed_Start_Status" CASCADE`.execute(db)
+  await sql`DROP TABLE IF EXISTS "Transfer_Payment_Stream_Workflow" CASCADE`.execute(db)
+  await sql`DROP TABLE IF EXISTS "Transfer_Payment_Stream_Review_Set" CASCADE`.execute(db)
+  await sql`DROP TRIGGER IF EXISTS protect_profile_stream_catalog_links ON "Transfer_Payment_Profile"`.execute(db)
+  await sql`DROP FUNCTION IF EXISTS protect_profile_stream_catalog_links()`.execute(db)
+  await sql`DROP FUNCTION IF EXISTS preserve_linked_workflow_target() CASCADE`.execute(db)
+  await sql`DROP FUNCTION IF EXISTS validate_stream_catalog_link()`.execute(db)
   await sql`DROP TABLE IF EXISTS "Common_Workflow_Setup" CASCADE`.execute(db)
   await sql`DROP TABLE IF EXISTS "Common_Recommendation_Set" CASCADE`.execute(db)
   await sql`DROP TABLE IF EXISTS "Common_Recommendation_Setup" CASCADE`.execute(db)
@@ -3826,6 +4005,8 @@ export const down = async (db: Kysely<Database>): Promise<void> => {
   await sql`DROP TABLE IF EXISTS "Common_Review_Set" CASCADE`.execute(db)
   await sql`DROP TABLE IF EXISTS "Common_Review_Setup" CASCADE`.execute(db)
   await sql`DROP TABLE IF EXISTS "Common_Review_Set_Setup" CASCADE`.execute(db)
+  await sql`DROP FUNCTION IF EXISTS validate_catalog_nested_agency() CASCADE`.execute(db)
+  await sql`DROP FUNCTION IF EXISTS prevent_catalog_agency_change() CASCADE`.execute(db)
   await sql`DROP TABLE IF EXISTS "Common_Entity_Assignment" CASCADE`.execute(db)
   await sql`DROP TABLE IF EXISTS "Common_Extension_Entity_Owner" CASCADE`.execute(db)
   await sql`DROP FUNCTION IF EXISTS lock_extension_entity_owner_binding() CASCADE`.execute(db)
@@ -3842,10 +4023,11 @@ export const down = async (db: Kysely<Database>): Promise<void> => {
   await sql`ALTER TABLE "Common_Approval_Template" DROP CONSTRAINT IF EXISTS cn_ref_approvaltemplatepublication`.execute(db)
   await sql`ALTER TABLE "Common_Approval_Template" DROP CONSTRAINT IF EXISTS cn_chk_approvaltemplatepublicationkind`.execute(db)
   await sql`ALTER TABLE "Common_Approval_Template" DROP COLUMN IF EXISTS egcs_cn_publicationkind`.execute(db)
+  await sql`DROP INDEX IF EXISTS cn_idx_approvaltemplateagencynameen`.execute(db)
+  await sql`DROP INDEX IF EXISTS cn_idx_approvaltemplateagencynamefr`.execute(db)
+  await sql`ALTER TABLE "Common_Approval_Template" DROP COLUMN IF EXISTS egcs_cn_agency`.execute(db)
   await sql`ALTER TABLE "Common_Approval_Template" ALTER COLUMN id SET DEFAULT nextval('"Common_Approval_Template_id_seq"'::regclass)`.execute(db)
   await sql`DROP TABLE IF EXISTS "Common_Workflow_Publication_Status" CASCADE`.execute(db)
-  await sql`DROP TABLE IF EXISTS "Common_Publication_Selection" CASCADE`.execute(db)
-  await sql`DROP TABLE IF EXISTS "Common_Publication_Selection_Lock" CASCADE`.execute(db)
   await sql`DROP TABLE IF EXISTS "Common_Publication_Version_Reference" CASCADE`.execute(db)
   await sql`DROP TABLE IF EXISTS "Common_Publication_Transition" CASCADE`.execute(db)
   await sql`ALTER TABLE "Common_Publication" DROP CONSTRAINT IF EXISTS cn_ref_publicationcurrentversion`.execute(db)
@@ -3890,77 +4072,52 @@ export const down = async (db: Kysely<Database>): Promise<void> => {
   await sql`DROP TABLE IF EXISTS "Common_Attachment_Types" CASCADE`.execute(db)
 }
 
-/** Keep profile references valid when an owning stream or option changes. */
+/** Keep Agency profile-condition options available to authored and published workflows. */
 export const installWorkflowProfileReferenceGuards = async (db: Kysely<Database>): Promise<void> => {
   await sql`CREATE FUNCTION validate_workflow_profile_references() RETURNS trigger LANGUAGE plpgsql AS $$
-    DECLARE ref record; option_id text; valid boolean;
+    DECLARE condition_source text;
     BEGIN
-      FOR ref IN
-        SELECT s.egcs_cn_scopeid AS stream_id, c AS condition
-        FROM "Common_Workflow_Setup_Member" m JOIN "Common_Workflow_Setup" s ON s.id = m.egcs_cn_workflowsetup,
-          jsonb_array_elements(m.egcs_cn_profileconditions) c
-        WHERE NOT m._deleted AND NOT s._deleted
-        UNION ALL
-        SELECT s.egcs_cn_scopeid, c
-        FROM "Common_Publication_Version" v JOIN "Common_Workflow_Setup" s ON s.id = v.egcs_cn_publication,
-          jsonb_array_elements(v.egcs_cn_definition->'members') m,
-          jsonb_array_elements(COALESCE(m->'conditions', '[]'::jsonb)) c
-        WHERE v.egcs_cn_kind = 'workflow_setup' AND c ? 'source'
-      LOOP
-        FOR option_id IN SELECT jsonb_array_elements_text(ref.condition->'optionIds') LOOP
-          IF TG_OP = 'UPDATE' AND (
-            (TG_TABLE_NAME = 'Transfer_Payment_Agreement_Subtype' AND ref.condition->>'source' = 'agreement_subtype'
-              AND option_id = to_jsonb(OLD)->>'id' AND to_jsonb(NEW)->'egcs_tp_agreementtype' IS DISTINCT FROM to_jsonb(OLD)->'egcs_tp_agreementtype')
-            OR (TG_TABLE_NAME = 'Transfer_Payment_Stream_Holdback_Basis' AND ref.condition->>'source' = 'holdback_basis'
-              AND option_id = to_jsonb(OLD)->>'id' AND to_jsonb(NEW)->'egcs_tp_agencyholdback' IS DISTINCT FROM to_jsonb(OLD)->'egcs_tp_agencyholdback')
-          ) THEN
-            RAISE EXCEPTION 'Workflow condition reference is in use' USING ERRCODE = '23514', CONSTRAINT = 'workflow_profile_condition_reference';
-          END IF;
-          valid := false;
-          IF ref.condition->>'source' = 'agreement_subtype' THEN
-            SELECT EXISTS (
-              SELECT 1 FROM "Transfer_Payment_Agreement_Subtype" b
-              JOIN "Agency_Agreement_Type" t ON t.id = b.egcs_tp_agreementtype
-              JOIN "Transfer_Payment_Stream" s ON s.id = b.egcs_tp_transferpaymentstream
-              JOIN "Transfer_Payment_Profile" p ON p.id = s.egcs_tp_transferpaymentprofile
-              WHERE b.id = option_id::bigint AND s.id = ref.stream_id AND NOT b._deleted AND NOT t._deleted
-                AND t.egcs_ay_organizationagency = p.egcs_tp_agency
-            ) INTO valid;
-          ELSIF ref.condition->>'source' = 'holdback_basis' THEN
-            SELECT EXISTS (
-              SELECT 1 FROM "Transfer_Payment_Stream_Holdback_Basis" b
-              JOIN "Agency_Holdback_Basis" t ON t.id = b.egcs_tp_agencyholdback
-              JOIN "Transfer_Payment_Stream" s ON s.id = b.egcs_tp_transferpaymentstream
-              JOIN "Transfer_Payment_Profile" p ON p.id = s.egcs_tp_transferpaymentprofile
-              WHERE b.id = option_id::bigint AND s.id = ref.stream_id AND NOT b._deleted AND NOT t._deleted
-                AND t.egcs_ay_organizationagency = p.egcs_tp_agency
-            ) INTO valid;
-          ELSIF ref.condition->>'source' = 'proponent_type' THEN
-            SELECT EXISTS (
-              SELECT 1 FROM "Transfer_Payment_Stream_Eligible_Recipient" b
-              JOIN "Agency_Applicant_Recipient_Subtype" t ON t.id = b.egcs_tp_applicantrecipientsubtype
-              JOIN "Transfer_Payment_Stream" s ON s.id = b.egcs_tp_transferpaymentstream
-              JOIN "Transfer_Payment_Profile" p ON p.id = s.egcs_tp_transferpaymentprofile
-              WHERE t.id = option_id::bigint AND s.id = ref.stream_id AND NOT b._deleted AND NOT t._deleted
-                AND t.egcs_ay_organizationagency = p.egcs_tp_agency
-            ) INTO valid;
-          END IF;
-          IF NOT valid THEN
-            RAISE EXCEPTION 'Workflow condition reference is in use' USING ERRCODE = '23514', CONSTRAINT = 'workflow_profile_condition_reference';
-          END IF;
-        END LOOP;
-      END LOOP;
+      IF TG_OP = 'UPDATE' THEN
+        IF NOT (
+          (NOT OLD._deleted AND NEW._deleted)
+          OR NEW.egcs_ay_organizationagency IS DISTINCT FROM OLD.egcs_ay_organizationagency
+        ) THEN RETURN NULL; END IF;
+      END IF;
+
+      IF TG_TABLE_NAME = 'Agency_Agreement_Type' THEN
+        condition_source := 'agreement_subtype';
+      ELSE
+        condition_source := 'recipient_subtype';
+      END IF;
+
+      IF EXISTS (
+        SELECT 1
+        FROM "Common_Workflow_Setup_Member" member
+        JOIN "Common_Workflow_Setup" setup ON setup.id = member.egcs_cn_workflowsetup
+        CROSS JOIN LATERAL jsonb_array_elements(member.egcs_cn_profileconditions) AS condition(value)
+        CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(condition.value->'optionIds', '[]'::jsonb)) AS option_id(value)
+        WHERE member._deleted = false AND setup._deleted = false
+          AND condition.value->>'source' = condition_source
+          AND option_id.value = OLD.id::text
+      ) OR EXISTS (
+        SELECT 1
+        FROM "Common_Publication_Version" version
+        JOIN "Common_Workflow_Setup" setup ON setup.id = version.egcs_cn_publication
+        CROSS JOIN LATERAL jsonb_array_elements(COALESCE(version.egcs_cn_definition->'members', '[]'::jsonb)) AS member(value)
+        CROSS JOIN LATERAL jsonb_array_elements(COALESCE(member.value->'conditions', '[]'::jsonb)) AS condition(value)
+        CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(condition.value->'optionIds', '[]'::jsonb)) AS option_id(value)
+        WHERE version.egcs_cn_kind = 'workflow_setup'
+          AND condition.value->>'source' = condition_source
+          AND option_id.value = OLD.id::text
+      ) THEN
+        RAISE EXCEPTION 'Workflow condition reference is in use'
+          USING ERRCODE = '23514', CONSTRAINT = 'workflow_profile_condition_reference';
+      END IF;
       RETURN NULL;
     END $$`.execute(db)
   const protectedColumns = {
-    Transfer_Payment_Agreement_Subtype: ['_deleted', 'egcs_tp_transferpaymentstream', 'egcs_tp_agreementtype'],
-    Transfer_Payment_Stream_Holdback_Basis: ['_deleted', 'egcs_tp_transferpaymentstream', 'egcs_tp_agencyholdback'],
-    Transfer_Payment_Stream_Eligible_Recipient: ['_deleted', 'egcs_tp_transferpaymentstream', 'egcs_tp_applicantrecipientsubtype'],
     Agency_Agreement_Type: ['_deleted', 'egcs_ay_organizationagency'],
-    Agency_Holdback_Basis: ['_deleted', 'egcs_ay_organizationagency'],
-    Agency_Applicant_Recipient_Subtype: ['_deleted', 'egcs_ay_organizationagency'],
-    Transfer_Payment_Stream: ['egcs_tp_transferpaymentprofile'],
-    Transfer_Payment_Profile: ['egcs_tp_agency']
+    Agency_Applicant_Recipient_Subtype: ['_deleted', 'egcs_ay_organizationagency']
   }
   for (const [table, columns] of Object.entries(protectedColumns)) {
     await sql.raw(`CREATE TRIGGER protect_workflow_profile_conditions AFTER UPDATE OF ${columns.join(', ')} OR DELETE ON "${table}" FOR EACH ROW EXECUTE FUNCTION validate_workflow_profile_references()`).execute(db)

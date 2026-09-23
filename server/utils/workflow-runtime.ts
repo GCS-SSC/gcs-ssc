@@ -1,4 +1,6 @@
 import { resolveWorkflowExecutionPlan } from './workflow-execution-plan'
+import { captureRiskRatingMapping } from './agreement-risk-rating'
+import { hashPublicationDefinition } from './system-publication'
 import { captureWorkflowRouting } from './workflow-routing'
 import { WorkflowRouteValidationError, type WorkflowRoutingEvidence } from './workflow-routing-contract'
 /* eslint-disable jsdoc/require-jsdoc -- canonical workflow orchestration is covered by focused lifecycle tests */
@@ -62,7 +64,6 @@ import {
   type PublishedWorkflowMember,
   type RuntimeWorkflowSetup
 } from './workflow-setup-versioning'
-import { lockPublicationSelectionKeys } from './system-publication'
 import { isAssignableEntityType } from '~~/shared/utils/entity-assignments'
 import {
   getCoreEntityDefinition,
@@ -319,6 +320,18 @@ const applyRiskRatingEffect = async (
   if (!agreement || !lockedStreamId || String(agreement.streamId) !== lockedStreamId) {
     return await fail('risk_rating_target_stream_changed')
   }
+  const evidence = run.egcs_cn_routing as WorkflowRoutingEvidence | null
+  const mapping = evidence?.riskRatingMapping
+  if (!evidence || evidence.version !== 3 || !mapping || mapping.streamId !== lockedStreamId) {
+    return await fail('risk_rating_mapping_missing')
+  }
+  const { hash: capturedHash, ...capturedPayload } = evidence
+  if (hashPublicationDefinition(capturedPayload as JsonValue) !== capturedHash
+    || mapping.bands.length !== effect.bands.length
+    || mapping.bands.some((band, index) => band.maximumScore !== effect.bands[index]?.maximumScore
+      || band.riskScore !== effect.bands[index]?.riskScore)) {
+    return await fail('risk_rating_mapping_invalid')
+  }
   const review = await trx.selectFrom('Common_Review')
     .innerJoin('Common_Runtime_Item as Review_Item', 'Review_Item.id', 'Common_Review.egcs_cn_runtimeitem')
     .innerJoin('Common_Review_Set', 'Common_Review_Set.id', 'Common_Review.egcs_cn_reviewset')
@@ -337,16 +350,8 @@ const applyRiskRatingEffect = async (
   if (!review || !['succeeded', 'approved'].includes(review.egcs_cn_state) || !Number.isFinite(assessmentScore)) {
     return await fail('risk_rating_evidence_invalid')
   }
-  const band = effect.bands.find(candidate => assessmentScore <= candidate.maximumScore)
+  const band = mapping.bands.find(candidate => assessmentScore <= candidate.maximumScore)
   if (!band) return await fail('risk_rating_score_out_of_range')
-  const rating = await trx.selectFrom('Transfer_Payment_Stream_Risk_Rating')
-    .select(['id', 'egcs_tp_riskscore'])
-    .where('id', '=', band.riskRatingId)
-    .where('egcs_tp_transferpaymentstream', '=', String(agreement.streamId))
-    .where('_deleted', '=', false)
-    .forUpdate()
-    .executeTakeFirst()
-  if (!rating || Number(rating.egcs_tp_riskscore) !== band.riskScore) return await fail('risk_rating_configuration_stale')
   await trx.updateTable('Funding_Case_Agreement_Profile')
     .set({ egcs_fc_riskscore: band.riskScore })
     .where('id', '=', String(run.egcs_cn_entityid))
@@ -650,19 +655,12 @@ export const resolveActiveWorkflowSetup = async (
   lockRows = false
 ): Promise<WorkflowSetupSelection | null> => {
   const scopes = await resolveReviewRuntimeSetupScopes(db as Kysely<Database>, context, lockRows)
-  if (scopes.length === 0) return null
-  const selectionKeys = scopes.map(scope => `${scope.scopeType}:${scope.scopeId}:${context.entityType}:${purpose}`)
-  if (lockRows) {
-    await lockPublicationSelectionKeys(
-      db as Transaction<Database>,
-      'workflow_setup',
-      selectionKeys.map(key => ({ dimension: 'scope_entity_purpose', key }))
-    )
-  }
+  const streamIds = scopes.filter(scope => scope.scopeType === 'transferpaymentstream').map(scope => scope.scopeId)
+  if (streamIds.length === 0) return null
   let query = db.selectFrom('Common_Workflow_Setup')
+    .innerJoin('Transfer_Payment_Stream_Workflow', 'Transfer_Payment_Stream_Workflow.egcs_tp_workflow', 'Common_Workflow_Setup.id')
     .innerJoin('Common_Publication', 'Common_Publication.id', 'Common_Workflow_Setup.id')
     .innerJoin('Common_Publication_Version', 'Common_Publication_Version.id', 'Common_Publication.egcs_cn_currentversion')
-    .innerJoin('Common_Publication_Selection', 'Common_Publication_Selection.egcs_cn_publication', 'Common_Publication.id')
     .selectAll('Common_Workflow_Setup')
     .select([
       'Common_Publication.id as publicationId',
@@ -672,22 +670,19 @@ export const resolveActiveWorkflowSetup = async (
       'Common_Publication_Version.egcs_cn_definition as publicationDefinition'
     ])
     .where('Common_Workflow_Setup._deleted', '=', false)
+    .where('Common_Workflow_Setup.egcs_cn_entitytype', '=', context.entityType)
+    .where('Common_Workflow_Setup.egcs_cn_purpose', '=', purpose)
     .where('Common_Publication.egcs_cn_kind', '=', 'workflow_setup')
     .where('Common_Publication.egcs_cn_state', '=', 'published')
     .where('Common_Publication._deleted', '=', false)
-    .where('Common_Publication_Selection.egcs_cn_kind', '=', 'workflow_setup')
-    .where('Common_Publication_Selection.egcs_cn_dimension', '=', 'scope_entity_purpose')
-    .where('Common_Publication_Selection.egcs_cn_key', 'in', selectionKeys)
-    .where(eb => eb.or(scopes.map(scope => eb.and([
-      eb('Common_Workflow_Setup.egcs_cn_scopetype', '=', scope.scopeType),
-      eb('Common_Workflow_Setup.egcs_cn_scopeid', '=', scope.scopeId)
-    ]))))
+    .where('Transfer_Payment_Stream_Workflow.egcs_tp_transferpaymentstream', 'in', streamIds)
+    .where('Transfer_Payment_Stream_Workflow._deleted', '=', false)
     .orderBy('Common_Publication_Version.egcs_cn_version', 'desc')
   if (lockRows) query = query.forUpdate([
     'Common_Workflow_Setup',
     'Common_Publication',
     'Common_Publication_Version',
-    'Common_Publication_Selection'
+    'Transfer_Payment_Stream_Workflow'
   ])
   const row = await query.executeTakeFirst()
   if (!row) return null
@@ -719,8 +714,10 @@ export const resolvePublishedStandardWorkflowSetups = async (
   lockRows = false
 ): Promise<WorkflowSetupSelection[]> => {
   const scopes = await resolveReviewRuntimeSetupScopes(db as Kysely<Database>, context, lockRows)
-  if (scopes.length === 0) return []
+  const streamIds = scopes.filter(scope => scope.scopeType === 'transferpaymentstream').map(scope => scope.scopeId)
+  if (streamIds.length === 0) return []
   let query = db.selectFrom('Common_Workflow_Setup')
+    .innerJoin('Transfer_Payment_Stream_Workflow', 'Transfer_Payment_Stream_Workflow.egcs_tp_workflow', 'Common_Workflow_Setup.id')
     .innerJoin('Common_Publication', 'Common_Publication.id', 'Common_Workflow_Setup.id')
     .innerJoin('Common_Publication_Version', 'Common_Publication_Version.id', 'Common_Publication.egcs_cn_currentversion')
     .selectAll('Common_Workflow_Setup')
@@ -734,16 +731,14 @@ export const resolvePublishedStandardWorkflowSetups = async (
     .where('Common_Workflow_Setup._deleted', '=', false)
     .where('Common_Workflow_Setup.egcs_cn_entitytype', '=', context.entityType)
     .where('Common_Workflow_Setup.egcs_cn_purpose', '=', 'standard')
+    .where('Transfer_Payment_Stream_Workflow.egcs_tp_transferpaymentstream', 'in', streamIds)
+    .where('Transfer_Payment_Stream_Workflow._deleted', '=', false)
     .where('Common_Publication.egcs_cn_kind', '=', 'workflow_setup')
     .where('Common_Publication.egcs_cn_state', '=', 'published')
     .where('Common_Publication._deleted', '=', false)
-    .where(eb => eb.or(scopes.map(scope => eb.and([
-      eb('Common_Workflow_Setup.egcs_cn_scopetype', '=', scope.scopeType),
-      eb('Common_Workflow_Setup.egcs_cn_scopeid', '=', scope.scopeId)
-    ]))))
     .orderBy('Common_Workflow_Setup.egcs_cn_name_en')
   if (workflowSetupId) query = query.where('Common_Workflow_Setup.id', '=', workflowSetupId)
-  if (lockRows) query = query.forUpdate(['Common_Workflow_Setup', 'Common_Publication', 'Common_Publication_Version'])
+  if (lockRows) query = query.forUpdate(['Common_Workflow_Setup', 'Transfer_Payment_Stream_Workflow', 'Common_Publication', 'Common_Publication_Version'])
   const rows = await query.execute()
   return rows.flatMap(row => {
     const definition = readPublishedWorkflowConfiguration(row.publicationDefinition)
@@ -1156,6 +1151,27 @@ const startWorkflowUnchecked = async (
   let routing: WorkflowRoutingEvidence
   try {
     routing = await captureWorkflowRouting(trx, context, setup.publicationDefinition)
+    if (purpose === 'risk_rating') {
+      const effect = setup.publicationDefinition.riskRatingEffect
+      if (!effect || context.entityType !== 'fundingcaseagreement') {
+        throw new WorkflowRouteValidationError('Risk Rating publication is invalid')
+      }
+      const agreement = await trx.selectFrom('Funding_Case_Agreement_Profile')
+        .select('egcs_fc_transferpaymentstream')
+        .where('id', '=', context.entityId)
+        .where('_deleted', '=', false)
+        .executeTakeFirst()
+      if (!agreement) throw new WorkflowRouteValidationError('Risk Rating Agreement is unavailable')
+      let riskRatingMapping
+      try {
+        riskRatingMapping = await captureRiskRatingMapping(trx, String(agreement.egcs_fc_transferpaymentstream), effect)
+      } catch (error) {
+        throw new WorkflowRouteValidationError('Risk Rating Stream mapping is invalid', { cause: error })
+      }
+      const { hash: _hash, ...baseEvidence } = routing
+      const payload = { ...baseEvidence, version: 3 as const, riskRatingMapping }
+      routing = { ...payload, hash: hashPublicationDefinition(payload as JsonValue) }
+    }
   } catch (error) {
     if (!(error instanceof WorkflowRouteValidationError)) throw error
     return await badRequest(event, 'WORKFLOW_ROUTE_INVALID', 'apiErrors.workflow.route_invalid')

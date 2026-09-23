@@ -4,25 +4,19 @@ import { computed } from 'vue'
 const state = defineModel<Record<string, unknown>>('state', { required: true, default: () => ({}) })
 
 const {
-  streamId,
   agencyId,
   entityType,
   reviewType,
   stackedLayout = false
 } = defineProps<{
-  transferPaymentId: string
-  streamId: string
-  agencyId?: string
+  agencyId: string
   entityType?: string
   reviewType?: string
   stackedLayout?: boolean
 }>()
 
 const { t } = useI18n()
-const approvalTemplateQuery = computed(() => ({
-  scopeType: 'transferpaymentstream',
-  scopeId: streamId
-}))
+const approvalTemplateFetchUrl = computed(() => agencyId ? `/api/agency/${agencyId}/approval-templates` : null)
 
 const orderValue = computed(() => {
   const value = state.value.egcs_cn_order
@@ -63,14 +57,14 @@ const reviewSchemaQuery = computed(() => ({
     </UFormField>
 
     <AdminCommonLookupField
+      v-if="approvalTemplateFetchUrl"
       :model-value="approvalTemplateValue"
       :label="t('transfer_payment.approval_template_id')"
       name="egcs_cn_approvaltemplate"
-      fetch-url="/api/approval-templates"
+      :fetch-url="approvalTemplateFetchUrl" :include-deleted-query="false"
       value-key="id"
       label-en-key="egcs_cn_name_en"
       label-fr-key="egcs_cn_name_fr"
-      :query="approvalTemplateQuery"
       @update:model-value="value => (state.egcs_cn_approvaltemplate = value)" />
   </div>
 

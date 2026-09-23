@@ -4,7 +4,11 @@ import type { AgreementRoutingValues, AgreementCustomFieldValues } from '~~/shar
 export class WorkflowRouteValidationError extends Error {}
 
 export type WorkflowRoutingEvidence = {
-  version?: 2
+  version?: 2 | 3
+  riskRatingMapping?: {
+    streamId: string
+    bands: Array<{ maximumScore: number, riskScore: number, riskRatingId: string, label: { en: string, fr: string } }>
+  }
   profile?: AgreementRoutingValues
   relationships?: Array<{ relationshipId: string, proponentId: string, subtypeId: string | null, name_en: string | null, name_fr: string | null }>
   hash: string

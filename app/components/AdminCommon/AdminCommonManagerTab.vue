@@ -87,12 +87,6 @@ const canCreateResource = computed(() => !readOnly)
         :type="row.original.egcs_cn_entitytype" />
     </template>
 
-    <template #egcs_cn_scopetype-cell="{ row }">
-      <span>
-        {{ typeof row.original.egcs_cn_scopetype === 'string' ? t(`enums.scope_type.${row.original.egcs_cn_scopetype}`) : '' }}
-      </span>
-    </template>
-
     <template #egcs_cn_reviewtype-cell="{ row }">
       <span>
         {{ typeof row.original.egcs_cn_reviewtype === 'string' ? t(`enums.review_type.${row.original.egcs_cn_reviewtype}`) : '' }}

@@ -1222,7 +1222,8 @@ const lockApplicantRecipientRuntimeOwner = async (
 const requireLockedReviewRuntimeTarget = async (
   event: H3Event,
   trx: Transaction<Database>,
-  entityContext: ReviewRuntimeEntityContext
+  entityContext: ReviewRuntimeEntityContext,
+  qualifiedOwner?: ReviewRuntimeEntityContext
 ): Promise<ReviewRuntimeEntityContext> => {
   await lockReviewRuntimeTarget(trx, entityContext)
   const current = await resolveLockedReviewRuntimeTarget(trx, entityContext)
@@ -1231,10 +1232,25 @@ const requireLockedReviewRuntimeTarget = async (
   }
   const decoratedCurrent = {
     ...current,
+    ...(qualifiedOwner
+      ? {
+          agreementId: qualifiedOwner.agreementId,
+          proponentAgencyContextId: qualifiedOwner.proponentAgencyContextId,
+          schemaAgencyId: qualifiedOwner.schemaAgencyId
+        }
+      : {}),
     approvalEntityType: entityContext.approvalEntityType ?? null,
     approvalEntityId: entityContext.approvalEntityId ?? null
   }
-  if (!reviewRuntimeTargetMatches(entityContext, decoratedCurrent)) {
+  const expectedContext = qualifiedOwner
+    ? {
+        ...entityContext,
+        agreementId: qualifiedOwner.agreementId,
+        proponentAgencyContextId: qualifiedOwner.proponentAgencyContextId,
+        schemaAgencyId: qualifiedOwner.schemaAgencyId
+      }
+    : entityContext
+  if (!reviewRuntimeTargetMatches(expectedContext, decoratedCurrent)) {
     return await throwApiError(event, {
       statusCode: 409,
       code: 'REVIEW_RUNTIME_TARGET_CHANGED',
@@ -1296,7 +1312,7 @@ const executeQualifiedRuntimeArtifactMutation = async <T>(
   const result = await executeQualifiedRuntimeTransaction(event, initial, {
     missingOwner: 'identity_changed',
     work: async evidence => {
-      const locked = await requireLockedReviewRuntimeTarget(event, evidence.trx, entityContext)
+      const locked = await requireLockedReviewRuntimeTarget(event, evidence.trx, entityContext, evidence.runtime.context)
       const current = projectQualifiedRuntimeOwner(locked, evidence)
       await authorizeMutation(evidence, current)
       return await callback(evidence.trx, current)

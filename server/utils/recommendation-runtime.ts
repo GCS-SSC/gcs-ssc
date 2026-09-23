@@ -152,34 +152,18 @@ export const lockEligibleRuntimeRecommendationSetSetupSnapshot = async (
   recommendationSetSetupId: string,
   entityType: Entity_Type,
   ownerAgencyId: string,
-  setupScopes: RecommendationRuntimeSetupScope[],
+  _setupScopes: RecommendationRuntimeSetupScope[],
   pinnedPublication?: PublishedRecommendationPlan,
   pinnedPublicationVersionId?: string,
   pinnedPublicationVersion?: number,
   allowHistoricalVersions = false
 ): Promise<LockedRecommendationSetup | null> => {
-  const selectionKeys = setupScopes.map(scope => `${scope.scopeType}:${scope.scopeId}`)
-  const setup = pinnedPublication
-    ? await db.selectFrom('Common_Recommendation_Set_Setup')
-        .selectAll('Common_Recommendation_Set_Setup')
-        .where('Common_Recommendation_Set_Setup.id', '=', recommendationSetSetupId)
-        .where('Common_Recommendation_Set_Setup._deleted', '=', false)
-        .forUpdate()
-        .executeTakeFirst()
-    : await db.selectFrom('Common_Recommendation_Set_Setup')
-        .innerJoin(
-          'Common_Publication_Selection',
-          'Common_Publication_Selection.egcs_cn_publication',
-          'Common_Recommendation_Set_Setup.id'
-        )
-        .selectAll('Common_Recommendation_Set_Setup')
-        .where('Common_Recommendation_Set_Setup.id', '=', recommendationSetSetupId)
-        .where('Common_Recommendation_Set_Setup._deleted', '=', false)
-        .where('Common_Publication_Selection.egcs_cn_kind', '=', 'recommendation_set_setup')
-        .where('Common_Publication_Selection.egcs_cn_dimension', '=', 'scope')
-        .where('Common_Publication_Selection.egcs_cn_key', 'in', selectionKeys)
-        .forUpdate()
-        .executeTakeFirst()
+  const setup = await db.selectFrom('Common_Recommendation_Set_Setup')
+    .selectAll('Common_Recommendation_Set_Setup')
+    .where('Common_Recommendation_Set_Setup.id', '=', recommendationSetSetupId)
+    .where('Common_Recommendation_Set_Setup.egcs_cn_agency', '=', ownerAgencyId)
+    .where('Common_Recommendation_Set_Setup._deleted', '=', false)
+    .forUpdate().executeTakeFirst()
   if (!setup) return null
   if (pinnedPublication && !pinnedPublicationVersionId) return null
 
@@ -203,7 +187,7 @@ export const lockEligibleRuntimeRecommendationSetSetupSnapshot = async (
   if (pinnedPublicationVersion !== undefined && Number(version.version) !== pinnedPublicationVersion) return null
   const publication = pinnedPublication ?? readPublishedRecommendationPlan(version.definition)
   if (publication.recommendationSetId !== recommendationSetSetupId
-    || !setupScopes.some(scope => scope.scopeType === publication.scopeType && scope.scopeId === publication.scopeId)) return null
+    || publication.agencyId !== ownerAgencyId) return null
 
   const members = await Promise.all(publication.members.map(member => readPinnedRecommendationSchema(
     db,

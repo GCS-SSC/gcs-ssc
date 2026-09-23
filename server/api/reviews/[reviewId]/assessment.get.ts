@@ -66,8 +66,6 @@ export default defineEventHandler(async event => {
       'Common_Review.egcs_cn_reviewalignmentnarrative as egcs_cn_reviewalignmentnarrative',
       'Common_Review_Set.egcs_cn_entitytype as egcs_cn_entitytype',
       'Common_Review_Set.egcs_cn_entityid as egcs_cn_entityid',
-      'Common_Review_Set_Setup.egcs_cn_scopetype as egcs_cn_scopetype',
-      'Common_Review_Set_Setup.egcs_cn_scopeid as egcs_cn_scopeid',
       'Common_Review_Schema.egcs_cn_agency as egcs_cn_agency',
       'Common_Review_Schema.egcs_cn_name_en as egcs_cn_name_en',
       'Common_Review_Schema.egcs_cn_name_fr as egcs_cn_name_fr',
@@ -95,7 +93,14 @@ export default defineEventHandler(async event => {
     return await notFound(event, 'ASSESSMENT_NOT_FOUND', 'apiErrors.admin_common.not_found')
   }
 
-  await authorizeReviewRuntimeAction(event, 'read_assessment', runtimeEntity)
+  try {
+    await authorizeReviewRuntimeAction(event, 'read_assessment', runtimeEntity)
+  } catch (error: unknown) {
+    if (typeof error === 'object' && error !== null && 'statusCode' in error && Number(error.statusCode) === 403) {
+      return await notFound(event, 'ASSESSMENT_NOT_FOUND', 'apiErrors.admin_common.not_found')
+    }
+    throw error
+  }
   const isLocked = isReviewLockedStatus(review.runtimeState, review.reviewSetRuntimeState)
   const canUpdateAssessment = !isLocked
     && await canAuthorizeReviewRuntimeAction(event, 'save_assessment', runtimeEntity)
@@ -231,9 +236,7 @@ export default defineEventHandler(async event => {
     egcs_cn_reviewalignmentnarrative: egcsCnReviewAlignmentNarrative,
     egcs_cn_entitytype: review.egcs_cn_entitytype,
     egcs_cn_entityid: String(review.egcs_cn_entityid),
-    egcs_cn_transferpaymentstream: review.egcs_cn_scopetype === 'transferpaymentstream'
-      ? String(review.egcs_cn_scopeid)
-      : null,
+    egcs_cn_transferpaymentstream: null,
     egcs_cn_agency: publishedSchema.agencyId,
     egcs_cn_name_en: publishedSchema.name.en,
     egcs_cn_name_fr: publishedSchema.name.fr,

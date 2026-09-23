@@ -44,33 +44,36 @@ const fetchAgencySchemasInSnapshot = async (params: AgencySchemaListParams) => {
 
   const scopedQuery = db
     .selectFrom('Common_Review_Schema')
-    .where('egcs_cn_agency', '=', agencyId)
-    .where('_deleted', '=', false)
+    .innerJoin('Common_Publication', 'Common_Publication.id', 'Common_Review_Schema.id')
+    .where('Common_Review_Schema.egcs_cn_agency', '=', agencyId)
+    .where('Common_Review_Schema._deleted', '=', false)
+    .where('Common_Publication._deleted', '=', false)
 
   let baseQuery = scopedQuery
 
   if (reviewType) {
-    baseQuery = baseQuery.where('egcs_cn_reviewtype', '=', reviewType)
+    baseQuery = baseQuery.where('Common_Review_Schema.egcs_cn_reviewtype', '=', reviewType)
   }
 
   if (entityType) {
-    baseQuery = baseQuery.where('egcs_cn_entitytype', '=', entityType)
+    baseQuery = baseQuery.where('Common_Review_Schema.egcs_cn_entitytype', '=', entityType)
   }
 
   if (search) {
     const escapedSearch = escapeLikePattern(search)
     baseQuery = baseQuery.where(eb =>
       eb.or([
-        eb('egcs_cn_name_en', 'ilike', `%${escapedSearch}%`),
-        eb('egcs_cn_name_fr', 'ilike', `%${escapedSearch}%`)
+        eb('Common_Review_Schema.egcs_cn_name_en', 'ilike', `%${escapedSearch}%`),
+        eb('Common_Review_Schema.egcs_cn_name_fr', 'ilike', `%${escapedSearch}%`)
       ])
     )
   }
 
   const [items, countResult, statsResult] = await Promise.all([
-    baseQuery.selectAll().orderBy('id', 'asc').limit(limit).offset(offset).execute(),
-    baseQuery.select(eb => eb.fn.count('id').as('total')).executeTakeFirst(),
-    scopedQuery.select(eb => eb.fn.count('id').as('total')).executeTakeFirst()
+    baseQuery.selectAll('Common_Review_Schema').select('Common_Publication.egcs_cn_state as publicationState')
+      .orderBy('Common_Review_Schema.id', 'asc').limit(limit).offset(offset).execute(),
+    baseQuery.select(eb => eb.fn.count('Common_Review_Schema.id').as('total')).executeTakeFirst(),
+    scopedQuery.select(eb => eb.fn.count('Common_Review_Schema.id').as('total')).executeTakeFirst()
   ])
 
   const total = Number(countResult?.total || 0)

@@ -57,7 +57,6 @@ const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
   z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(JsonValueSchema), z.record(z.string(), JsonValueSchema)])
 )
 const JsonObjectSchema = z.record(z.string(), JsonValueSchema).meta({ formRequired: true })
-export const COMMON_APPROVAL_TEMPLATE_SCOPE_TYPE_ENUM = ['fundingopportunity', 'transferpaymentstream'] as const
 export const COMMON_ENTITY_TYPE_ENUM = ENTITY_TYPE_ENUM
 export const REVIEW_TYPES = REVIEW_TYPE_ENUM
 export type CommonEntityType = (typeof COMMON_ENTITY_TYPE_ENUM)[number]
@@ -269,13 +268,11 @@ export const CommonCertificationPatchSchema = CommonCertificationCreateSchema.pa
 })
 
 export const CommonApprovalTemplateCreateSchema = z.object({
-  egcs_cn_scopetype: z.enum(COMMON_APPROVAL_TEMPLATE_SCOPE_TYPE_ENUM, { error: 'validation.required' }),
-  egcs_cn_scopeid: IdSchema,
   egcs_cn_description_en: RequiredString('validation.desc_en_required'),
   egcs_cn_description_fr: RequiredString('validation.desc_fr_required'),
   egcs_cn_name_en: RequiredString('validation.name_en_required'),
   egcs_cn_name_fr: RequiredString('validation.name_fr_required')
-})
+}).strict()
 export const CommonApprovalTemplatePatchSchema = CommonApprovalTemplateCreateSchema.partial().extend({
   _deleted: z.boolean().optional()
 })
@@ -370,24 +367,17 @@ export const CommonReviewSchemaCreateSchema = z.object({
   egcs_cn_scoringmatrix: JsonObjectSchema,
   egcs_cn_assessmentschema: JsonObjectSchema
 })
+export const AgencyReviewSchemaCreateSchema = CommonReviewSchemaCreateSchema.pick({
+  egcs_cn_reviewtype: true,
+  egcs_cn_entitytype: true,
+  egcs_cn_name_en: true,
+  egcs_cn_name_fr: true,
+  egcs_cn_outcomename_en: true,
+  egcs_cn_outcomename_fr: true
+}).strict()
 export const CommonReviewSchemaPatchSchema = CommonReviewSchemaCreateSchema.omit({
   egcs_cn_entitytype: true
 }).partial().extend({
-  _deleted: z.boolean().optional()
-})
-
-export const CommonReviewSetSetupCreateSchema = z.object({
-  egcs_cn_scopetype: z.enum(SCOPE_ENTITY_TYPE_ENUM, { error: 'validation.required' }),
-  egcs_cn_scopeid: IdSchema,
-  egcs_cn_entitytype: DirectReviewEntityTypeIdentitySchema,
-  egcs_cn_name_en: RequiredString('validation.name_en_required'),
-  egcs_cn_name_fr: RequiredString('validation.name_fr_required'),
-  egcs_cn_order: z.coerce.number({ error: 'validation.required' }).int(),
-  egcs_cn_directreview: z.boolean({ error: 'validation.required' }).default(false),
-  egcs_cn_sequential: z.boolean({ error: 'validation.required' })
-})
-export const CommonReviewSetSetupPatchSchema = CommonReviewSetSetupCreateSchema.partial().extend({
-  egcs_cn_directreview: z.boolean({ error: 'validation.required' }).optional(),
   _deleted: z.boolean().optional()
 })
 
@@ -399,16 +389,6 @@ export const CommonReviewSetupCreateSchema = z.object({
   egcs_cn_reviewschema: IdSchema
 })
 export const CommonReviewSetupPatchSchema = CommonReviewSetupCreateSchema.partial().extend({
-  _deleted: z.boolean().optional()
-})
-
-export const CommonApprovalsSetupCreateSchema = z.object({
-  egcs_cn_scopetype: z.enum(SCOPE_ENTITY_TYPE_ENUM, { error: 'validation.required' }),
-  egcs_cn_scopeid: IdSchema,
-  egcs_cn_entitytype: z.enum(EXECUTION_ENTITY_TYPE_ENUM, { error: 'validation.required' }),
-  egcs_cn_approvaltemplate: IdSchema
-})
-export const CommonApprovalsSetupPatchSchema = CommonApprovalsSetupCreateSchema.partial().extend({
   _deleted: z.boolean().optional()
 })
 
@@ -501,19 +481,6 @@ export const CommonRecommendationSchemaPatchSchema = CommonRecommendationSchemaC
   _deleted: z.boolean().optional()
 })
 
-export const CommonRecommendationSetSetupCreateSchema = z.object({
-  egcs_cn_scopetype: z.enum(SCOPE_ENTITY_TYPE_ENUM, { error: 'validation.required' }),
-  egcs_cn_scopeid: IdSchema,
-  egcs_cn_name_en: RequiredString('validation.name_en_required'),
-  egcs_cn_name_fr: RequiredString('validation.name_fr_required'),
-  egcs_cn_description_en: RequiredString('validation.desc_en_required'),
-  egcs_cn_description_fr: RequiredString('validation.desc_fr_required'),
-  egcs_cn_approvaltemplate: IdSchema.optional()
-})
-export const CommonRecommendationSetSetupPatchSchema = CommonRecommendationSetSetupCreateSchema.partial().extend({
-  _deleted: z.boolean().optional()
-})
-
 const CommonRecommendationSetupBaseSchema = z.object({
   egcs_cn_order: z.coerce.number({ error: 'validation.required' }).int(),
   egcs_cn_recommendationset: IdSchema,
@@ -541,8 +508,6 @@ export const CommonRecommendationPatchSchema = CommonRecommendationCreateSchema.
 })
 
 const CommonWorkflowSetupBaseSchema = z.object({
-  egcs_cn_scopetype: z.enum(SCOPE_ENTITY_TYPE_ENUM, { error: 'validation.required' }),
-  egcs_cn_scopeid: IdSchema,
   egcs_cn_entitytype: createWorkflowTargetEntityTypeIdentitySchema('validation.workflow_entity_type_required'),
   egcs_cn_name_en: RequiredString('validation.name_en_required'),
   egcs_cn_name_fr: RequiredString('validation.name_fr_required'),
@@ -554,7 +519,7 @@ const CommonWorkflowSetupBaseSchema = z.object({
   egcs_cn_cancellationstatus: RequiredIdSchema('validation.workflow_cancellation_status_required'),
   egcs_cn_executionfailurestatus: RequiredIdSchema('validation.workflow_execution_failure_status_required'),
   egcs_cn_allowretry: z.boolean({ error: 'validation.required' })
-})
+}).strict()
 
 /**
  * Applies cross-field Workflow purpose constraints.
@@ -565,14 +530,6 @@ const validateWorkflowSetup = (
   data: Partial<z.infer<typeof CommonWorkflowSetupBaseSchema>>,
   ctx: z.RefinementCtx
 ) => {
-  if (data.egcs_cn_scopetype !== undefined && data.egcs_cn_scopetype !== 'transferpaymentstream') {
-    ctx.addIssue({ code: 'custom', message: 'validation.workflow_scope_transfer_payment_stream', path: ['egcs_cn_scopetype'] })
-  }
-  if (data.egcs_cn_purpose === 'approval_submission') {
-    if (data.egcs_cn_scopetype !== 'transferpaymentstream') {
-      ctx.addIssue({ code: 'custom', message: 'validation.workflow_approval_submission_scope', path: ['egcs_cn_scopetype'] })
-    }
-  }
   if (data.egcs_cn_purpose === 'risk_rating' && data.egcs_cn_entitytype !== 'fundingcaseagreement') {
     ctx.addIssue({ code: 'custom', message: 'validation.workflow_risk_rating_entity_type', path: ['egcs_cn_entitytype'] })
   }

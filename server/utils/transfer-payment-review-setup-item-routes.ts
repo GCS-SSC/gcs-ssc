@@ -1,3 +1,4 @@
+import { validateReviewSetApprovalTemplateForAgency } from './agency-review-set-dependencies'
 /* eslint-disable jsdoc/require-jsdoc */
 import type { H3Event } from 'h3'
 import type { Kysely, Selectable } from 'kysely'
@@ -11,7 +12,6 @@ import type { TransferPaymentStreamReviewSetupMemberPatchSchema } from '~~/share
 import { badRequest, notFound, throwApiError } from './api-errors'
 import { isAssignableGroup } from './groups'
 import {
-  validateApprovalTemplateForScope,
   validateReviewSchemasForAgency
 } from './transfer-payment-polymorphic'
 
@@ -21,7 +21,6 @@ type ReviewSetupItemRow = Selectable<CommonReviewSetupTable>
 
 interface PatchReviewSetupItemOptions {
   agencyId: string
-  streamId: string
   reviewSetupId: string
   itemId: string
   body: ReviewSetupMemberPatchBody
@@ -42,7 +41,7 @@ const reviewSetupItemSchemaSelectFields = [
 
 const findReviewSetupSet = async (
   db: Kysely<Database>,
-  streamId: string,
+  agencyId: string,
   reviewSetupId: string
 ) => {
   return await db
@@ -51,8 +50,7 @@ const findReviewSetupSet = async (
     .selectAll('Common_Review_Set_Setup')
     .select('Common_Publication.egcs_cn_state as publicationState')
     .where('Common_Review_Set_Setup.id', '=', reviewSetupId)
-    .where('Common_Review_Set_Setup.egcs_cn_scopetype', '=', 'transferpaymentstream')
-    .where('Common_Review_Set_Setup.egcs_cn_scopeid', '=', streamId)
+    .where('Common_Review_Set_Setup.egcs_cn_agency', '=', agencyId)
     .where('Common_Review_Set_Setup._deleted', '=', false)
     .forUpdate(['Common_Review_Set_Setup', 'Common_Publication'])
     .executeTakeFirst()
@@ -97,7 +95,7 @@ const validateReviewSetupItemSchema = async (
 const validateReviewSetupItemApprovalTemplate = async (
   event: H3Event,
   db: Kysely<Database>,
-  streamId: string,
+  agencyId: string,
   body: ReviewSetupMemberPatchBody,
   currentItem: ReviewSetupItemRow
 ) => {
@@ -108,9 +106,9 @@ const validateReviewSetupItemApprovalTemplate = async (
   const targetApprovalTemplateId = body.egcs_cn_approvaltemplate
     ? String(body.egcs_cn_approvaltemplate)
     : undefined
-  const hasValidApprovalTemplate = await validateApprovalTemplateForScope(
+  const hasValidApprovalTemplate = await validateReviewSetApprovalTemplateForAgency(
     db,
-    streamId,
+    agencyId,
     targetApprovalTemplateId
   )
 
@@ -168,7 +166,7 @@ const validateReviewSetupItemPatch = async (
   const schemaError = await validateReviewSetupItemSchema(event, db, options.agencyId, parentSet, options.body)
   if (schemaError) return schemaError
 
-  const approvalTemplateError = await validateReviewSetupItemApprovalTemplate(event, db, options.streamId, options.body, currentItem)
+  const approvalTemplateError = await validateReviewSetupItemApprovalTemplate(event, db, options.agencyId, options.body, currentItem)
   if (approvalTemplateError) return approvalTemplateError
 
   return await validateReviewSetupItemUniqueness(
@@ -233,7 +231,7 @@ export const patchTransferPaymentReviewSetupItem = async (
   db: Kysely<Database>,
   options: PatchReviewSetupItemOptions
 ) => {
-  const parentSet = await findReviewSetupSet(db, options.streamId, options.reviewSetupId)
+  const parentSet = await findReviewSetupSet(db, options.agencyId, options.reviewSetupId)
   if (!parentSet) {
     return await notFound(event, 'REVIEW_SETUP_NOT_FOUND', 'apiErrors.transfer_payment.review_setup_not_found')
   }
