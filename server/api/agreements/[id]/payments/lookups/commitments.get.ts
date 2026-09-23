@@ -29,7 +29,10 @@ export default defineEventHandler(async event => {
   let baseQuery = db
     .selectFrom('Funding_Case_Agreement_Commitment')
     .innerJoin('Transfer_Payment_Stream_Commitment_Type', 'Transfer_Payment_Stream_Commitment_Type.id', 'Funding_Case_Agreement_Commitment.egcs_fc_type')
+    .innerJoin('Agency_Commitment_Type', 'Agency_Commitment_Type.id', 'Transfer_Payment_Stream_Commitment_Type.egcs_tp_agencycommitmenttype')
     .where('Funding_Case_Agreement_Commitment.egcs_fc_fundingagreement', '=', agreementId)
+    .where('Transfer_Payment_Stream_Commitment_Type._deleted', '=', false)
+    .where('Agency_Commitment_Type._deleted', '=', false)
     .where(sql<boolean>`(
       EXISTS (
         SELECT 1 FROM "Common_Completion" AS completion
@@ -53,12 +56,11 @@ export default defineEventHandler(async event => {
       )
     )`)
     .where('Funding_Case_Agreement_Commitment._deleted', '=', false)
-    .where('Transfer_Payment_Stream_Commitment_Type._deleted', '=', false)
 
   if (search) {
     baseQuery = baseQuery.where(sql<boolean>`(
-      ${sql.ref('Transfer_Payment_Stream_Commitment_Type.egcs_tp_name_en')} ILIKE ${`%${escapeLikePattern(search)}%`}
-      OR ${sql.ref('Transfer_Payment_Stream_Commitment_Type.egcs_tp_name_fr')} ILIKE ${`%${escapeLikePattern(search)}%`}
+      ${sql.ref('Agency_Commitment_Type.egcs_ay_name_en')} ILIKE ${`%${escapeLikePattern(search)}%`}
+      OR ${sql.ref('Agency_Commitment_Type.egcs_ay_name_fr')} ILIKE ${`%${escapeLikePattern(search)}%`}
       OR ${sql.ref('Funding_Case_Agreement_Commitment.id')}::text ILIKE ${`%${escapeLikePattern(search)}%`}
       OR ${sql.ref('Funding_Case_Agreement_Commitment.egcs_fc_financialsystemnumber')}::text ILIKE ${`%${escapeLikePattern(search)}%`}
     )`)
@@ -69,8 +71,8 @@ export default defineEventHandler(async event => {
       .select([
         'Funding_Case_Agreement_Commitment.id as commitment_id',
         'Funding_Case_Agreement_Commitment.egcs_fc_type as id',
-        'Transfer_Payment_Stream_Commitment_Type.egcs_tp_name_en as label_en',
-        'Transfer_Payment_Stream_Commitment_Type.egcs_tp_name_fr as label_fr'
+        'Agency_Commitment_Type.egcs_ay_name_en as label_en',
+        'Agency_Commitment_Type.egcs_ay_name_fr as label_fr'
       ])
       .orderBy('Funding_Case_Agreement_Commitment.egcs_fc_type', 'asc')
       .orderBy('Funding_Case_Agreement_Commitment.id', 'asc')

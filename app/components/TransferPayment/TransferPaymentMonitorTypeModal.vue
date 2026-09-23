@@ -16,25 +16,23 @@ const emit = defineEmits<{ saved: [] }>()
 const open = defineModel<boolean>('open', { default: false })
 const state = defineModel<Partial<TransferPaymentMonitorTypeItem>>('state', { required: true })
 
-const { transferPaymentId, streamId, captureSession, closeSession } = defineProps<{
+const { transferPaymentId, streamId, agencyId, captureSession, closeSession } = defineProps<{
   transferPaymentId: string
   streamId: string
+  agencyId: string
 } & CrudModalSessionLifecycle>()
 
 if (Boolean(captureSession) !== Boolean(closeSession)) {
   throw new Error('TransferPaymentMonitorTypeModal requires captureSession and closeSession together')
 }
 
-const isUpdate = computed(() => !!state.value.id)
-
-const schema = TransferPaymentMonitorTypeSchema.omit({ egcs_tp_transferpaymentstream: true })
+const schema = TransferPaymentMonitorTypeSchema.strip()
 const validate = createValidator(schema)
 const pending = useCrudModalPending(() => captureSession ? captureSession() : null)
 const isSaving = pending.isPending
 
 /**
  * Handles the submission of the monitor type form.
- * Determines whether to perform a POST or PATCH request based on the current mode (create/edit).
  * Closes the modal and emits a 'saved' event upon successful completion.
  *
  * @param {FormSubmitEvent<z.infer<typeof schema>>} event - The form submission event containing validated data.
@@ -44,12 +42,10 @@ const onSubmit = async (event: FormSubmitEvent<z.infer<typeof schema>>) => {
   const session = captureSession ? captureSession() : null
   if (!pending.begin(session)) return
   try {
-    const url = isUpdate.value
-      ? `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/monitor-types/${state.value.id}`
-      : `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/monitor-types`
+    const url = `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/monitor-types`
 
     const response = await fetch(getClientRequestUrl(url), {
-      method: isUpdate.value ? 'PATCH' : 'POST',
+      method: 'POST',
       headers: {
         'content-type': 'application/json'
       },
@@ -71,10 +67,10 @@ const onSubmit = async (event: FormSubmitEvent<z.infer<typeof schema>>) => {
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="isUpdate ? t('transfer_payment.monitor_type_update') : t('transfer_payment.monitor_type_create')">
+  <UModal v-model:open="open" :title="t('transfer_payment.monitor_type_create')">
     <template #body>
       <UForm :state="state" :validate="validate" class="space-y-4" @submit="onSubmit">
-        <TransferPaymentFieldsTransferPaymentMonitorTypeFields :model="state" />
+        <TransferPaymentFieldsTransferPaymentMonitorTypeFields :model="state" :lookup-url="`/api/agency/${agencyId}/monitor-types`" />
 
         <div class="flex justify-end gap-2">
           <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="open = false" />

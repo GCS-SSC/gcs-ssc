@@ -7,7 +7,7 @@ import type { Database } from '~~/shared/types/database'
  * @param trx - The authorized Program write transaction.
  * @param budgetId - The locked Program Budget identity.
  * @param fiscalYearId - Its persisted fiscal year before reassignment.
- * @returns Whether a current or open-amendment Agreement budget depends on that year.
+ * @returns Whether a live chart link or Agreement budget depends on that year.
  */
 export const isProgramBudgetFiscalYearInUse = async (
   trx: Transaction<Database>,
@@ -22,6 +22,16 @@ export const isProgramBudgetFiscalYearInUse = async (
     .select('Transfer_Payment_Stream.id')
     .execute()
   if (!allocations.length) return false
+
+  const chartLink = await trx.selectFrom('Transfer_Payment_Stream_Chart_of_Account')
+    .innerJoin('Agency_Chart_of_Account', 'Agency_Chart_of_Account.id', 'Transfer_Payment_Stream_Chart_of_Account.egcs_tp_agencychartofaccount')
+    .where('Transfer_Payment_Stream_Chart_of_Account.egcs_tp_transferpaymentstream', 'in', allocations.map(row => String(row.id)))
+    .where('Agency_Chart_of_Account.egcs_ay_fiscalyear', '=', fiscalYearId)
+    .where('Transfer_Payment_Stream_Chart_of_Account._deleted', '=', false)
+    .select('Transfer_Payment_Stream_Chart_of_Account.id')
+    .limit(1)
+    .executeTakeFirst()
+  if (chartLink) return true
 
   // Current years and open amendment snapshots can receive new lines. Closed
   // historical snapshots alone are not a live funding dependency.

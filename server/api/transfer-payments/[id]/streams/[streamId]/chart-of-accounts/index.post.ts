@@ -1,4 +1,3 @@
-import { sql } from 'kysely'
 import { authorize } from '~~/server/utils/authorize'
 import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
@@ -6,6 +5,7 @@ import { authorizeTransferPaymentStreamResource, createTransferPaymentScopedAuth
 import { throwIfTransferPaymentUniqueConstraintError } from '~~/server/utils/transfer-payment-unique-constraint-errors'
 import { executeFreshAuthorizedTransferPaymentStreamWrite } from '~~/server/utils/transfer-payment-write-transaction'
 import { TransferPaymentStreamChartOfAccountSchema } from '~~/shared/types/schemas/transfer-payment'
+import { findEligibleAgencyChart } from '~~/server/utils/agency-finance-catalog'
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -31,20 +31,14 @@ export default defineEventHandler(async event => {
       streamId,
       'create',
       async trx => {
-        const streamBudget = await trx.selectFrom('Transfer_Payment_Stream_Budget').select('id')
-          .where('id', '=', String(body.egcs_tp_streambudget))
-          .where('egcs_tp_transferpaymentstream', '=', streamId)
-          .where('_deleted', '=', false)
-          .forUpdate()
-          .executeTakeFirst()
-        if (!streamBudget) {
-          return await notFound(event, 'TRANSFER_PAYMENT_STREAM_BUDGET_NOT_FOUND', 'apiErrors.transfer_payment.stream_budget_not_found')
+        const chart = await findEligibleAgencyChart(trx, String(body.egcs_tp_agencychartofaccount), streamContext.agencyId, streamId)
+        if (!chart) {
+          return await notFound(event, 'CHART_OF_ACCOUNT_NOT_FOUND', 'apiErrors.transfer_payment.chart_of_account_not_found')
         }
 
         return await trx.insertInto('Transfer_Payment_Stream_Chart_of_Account')
           .values({
             ...body,
-            egcs_tp_accountingdimensions: sql`${JSON.stringify(body.egcs_tp_accountingdimensions)}::jsonb`,
             egcs_tp_transferpaymentstream: streamId,
             _deleted: false
           })

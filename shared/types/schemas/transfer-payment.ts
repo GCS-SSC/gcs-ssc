@@ -108,16 +108,12 @@ export type TransferPaymentStream = z.infer<typeof TransferPaymentStreamSchema>
 export type TransferPaymentStreamItem = WithId<TransferPaymentStream>
 
 export const TransferPaymentStreamHoldbackBasisSchema = z.object({
-  egcs_tp_agencyholdback: RequiredId(),
-  egcs_tp_name_en: RequiredString(),
-  egcs_tp_name_fr: RequiredString()
-})
+  egcs_tp_agencyholdback: RequiredId()
+}).strict()
 export type TransferPaymentStreamHoldbackBasis = z.infer<typeof TransferPaymentStreamHoldbackBasisSchema>
 export type TransferPaymentStreamHoldbackBasisItem = WithId<TransferPaymentStreamHoldbackBasis>
 export const TransferPaymentStreamHoldbackBasisCreateSchema = TransferPaymentStreamHoldbackBasisSchema.extend({
-  egcs_tp_agencyholdback: PositivePostgresBigintIdSchema,
-  egcs_tp_name_en: StreamStorageText(255),
-  egcs_tp_name_fr: StreamStorageText(255)
+  egcs_tp_agencyholdback: PositivePostgresBigintIdSchema
 })
 export const TransferPaymentStreamWizardHoldbackBasisSchema = TransferPaymentStreamHoldbackBasisCreateSchema.extend({
   tempId: RequiredString()
@@ -442,14 +438,14 @@ const normalizeDocumentTemplateActive = (value: unknown): unknown => {
   return value
 }
 
-export const TransferPaymentStreamDocumentTemplateBaseSchema = z.object({
-  egcs_tp_entitytype: z.enum(TRANSFER_PAYMENT_DOCUMENT_TEMPLATE_ENTITY_TYPE_ENUM, { error: 'validation.required' }).default('fundingcaseagreement'),
-  egcs_tp_name_en: RequiredString(),
-  egcs_tp_name_fr: RequiredString(),
-  egcs_tp_description_en: RequiredString(),
-  egcs_tp_description_fr: RequiredString(),
-  egcs_tp_templatekind: z.enum(TRANSFER_PAYMENT_DOCUMENT_TEMPLATE_KIND_ENUM, { error: 'validation.required' }).default('docx'),
-  egcs_tp_outputformats: z.preprocess(value => {
+export const AgencyDocumentTemplateBaseSchema = z.object({
+  egcs_ay_entitytype: z.enum(TRANSFER_PAYMENT_DOCUMENT_TEMPLATE_ENTITY_TYPE_ENUM, { error: 'validation.required' }).default('fundingcaseagreement'),
+  egcs_ay_name_en: RequiredString(),
+  egcs_ay_name_fr: RequiredString(),
+  egcs_ay_description_en: RequiredString(),
+  egcs_ay_description_fr: RequiredString(),
+  egcs_ay_templatekind: z.enum(TRANSFER_PAYMENT_DOCUMENT_TEMPLATE_KIND_ENUM, { error: 'validation.required' }).default('docx'),
+  egcs_ay_outputformats: z.preprocess(value => {
     if (typeof value === 'string') {
       try {
         return JSON.parse(value) as unknown
@@ -459,7 +455,7 @@ export const TransferPaymentStreamDocumentTemplateBaseSchema = z.object({
     }
     return value
   }, z.array(z.enum(TRANSFER_PAYMENT_DOCUMENT_TEMPLATE_OUTPUT_FORMAT_ENUM), { error: 'validation.required' }).min(1, { error: 'validation.required' }).default(['docx'])),
-  egcs_tp_active: z.preprocess(normalizeDocumentTemplateActive, z.boolean()).default(true)
+  egcs_ay_active: z.preprocess(normalizeDocumentTemplateActive, z.boolean()).default(true)
 })
 
 /**
@@ -469,26 +465,26 @@ export const TransferPaymentStreamDocumentTemplateBaseSchema = z.object({
  * @param ctx - Zod refinement context.
  */
 const validateDocumentTemplateKindOutput = (
-  data: Pick<TransferPaymentStreamDocumentTemplate, 'egcs_tp_templatekind' | 'egcs_tp_outputformats'>,
+  data: Pick<AgencyDocumentTemplate, 'egcs_ay_templatekind' | 'egcs_ay_outputformats'>,
   ctx: z.RefinementCtx
 ) => {
-  const nativeFormat = data.egcs_tp_templatekind
-  if (data.egcs_tp_outputformats.some(format => format !== nativeFormat && format !== 'pdf')) {
+  const nativeFormat = data.egcs_ay_templatekind
+  if (data.egcs_ay_outputformats.some(format => format !== nativeFormat && format !== 'pdf')) {
     ctx.addIssue({
       code: 'custom',
       message: 'validation.invalid_selection',
-      path: ['egcs_tp_outputformats']
+      path: ['egcs_ay_outputformats']
     })
   }
 }
 
-export const TransferPaymentStreamDocumentTemplateCreateSchema = TransferPaymentStreamDocumentTemplateBaseSchema
+export const AgencyDocumentTemplateCreateSchema = AgencyDocumentTemplateBaseSchema
   .superRefine(validateDocumentTemplateKindOutput)
-export const TransferPaymentStreamDocumentTemplatePatchSchema = TransferPaymentStreamDocumentTemplateBaseSchema
+export const AgencyDocumentTemplatePatchSchema = AgencyDocumentTemplateBaseSchema
   .extend({
-    egcs_tp_entitytype: z.enum(TRANSFER_PAYMENT_DOCUMENT_TEMPLATE_ENTITY_TYPE_ENUM, { error: 'validation.required' }),
-    egcs_tp_templatekind: z.enum(TRANSFER_PAYMENT_DOCUMENT_TEMPLATE_KIND_ENUM, { error: 'validation.required' }),
-    egcs_tp_outputformats: z.preprocess(value => {
+    egcs_ay_entitytype: z.enum(TRANSFER_PAYMENT_DOCUMENT_TEMPLATE_ENTITY_TYPE_ENUM, { error: 'validation.required' }),
+    egcs_ay_templatekind: z.enum(TRANSFER_PAYMENT_DOCUMENT_TEMPLATE_KIND_ENUM, { error: 'validation.required' }),
+    egcs_ay_outputformats: z.preprocess(value => {
       if (typeof value === 'string') {
         try {
           return JSON.parse(value) as unknown
@@ -498,12 +494,12 @@ export const TransferPaymentStreamDocumentTemplatePatchSchema = TransferPaymentS
       }
       return value
     }, z.array(z.enum(TRANSFER_PAYMENT_DOCUMENT_TEMPLATE_OUTPUT_FORMAT_ENUM), { error: 'validation.required' }).min(1, { error: 'validation.required' })),
-    egcs_tp_active: z.preprocess(normalizeDocumentTemplateActive, z.boolean())
+    egcs_ay_active: z.preprocess(normalizeDocumentTemplateActive, z.boolean())
   })
   .partial()
   .superRefine((data, ctx) => {
-    if (data.egcs_tp_templatekind && data.egcs_tp_outputformats) {
-      validateDocumentTemplateKindOutput(data as Pick<TransferPaymentStreamDocumentTemplate, 'egcs_tp_templatekind' | 'egcs_tp_outputformats'>, ctx)
+    if (data.egcs_ay_templatekind && data.egcs_ay_outputformats) {
+      validateDocumentTemplateKindOutput(data as Pick<AgencyDocumentTemplate, 'egcs_ay_templatekind' | 'egcs_ay_outputformats'>, ctx)
     }
   })
 
@@ -513,13 +509,31 @@ export const AgreementDocumentGenerateSchema = z.object({
   outputFormat: z.enum(TRANSFER_PAYMENT_DOCUMENT_TEMPLATE_OUTPUT_FORMAT_ENUM, { error: 'validation.required' })
 })
 
-export type TransferPaymentStreamDocumentTemplate = z.infer<typeof TransferPaymentStreamDocumentTemplateBaseSchema>
-export type TransferPaymentStreamDocumentTemplateCreate = z.infer<typeof TransferPaymentStreamDocumentTemplateCreateSchema>
-export type TransferPaymentStreamDocumentTemplatePatch = z.infer<typeof TransferPaymentStreamDocumentTemplatePatchSchema>
-export type TransferPaymentStreamDocumentTemplateItem = WithId<TransferPaymentStreamDocumentTemplate & {
+export const TransferPaymentStreamDocumentTemplateLinkSchema = z.object({
+  egcs_tp_agencydocumenttemplate: PositivePostgresBigintIdSchema
+}).strict()
+export type TransferPaymentStreamDocumentTemplateLink = z.infer<typeof TransferPaymentStreamDocumentTemplateLinkSchema>
+export type AgencyDocumentTemplate = z.infer<typeof AgencyDocumentTemplateBaseSchema>
+export type AgencyDocumentTemplateCreate = z.infer<typeof AgencyDocumentTemplateCreateSchema>
+export type AgencyDocumentTemplatePatch = z.infer<typeof AgencyDocumentTemplatePatchSchema>
+export type AgencyDocumentTemplateItem = WithId<AgencyDocumentTemplate & {
+  egcs_ay_organizationagency: string
+  egcs_ay_templateattachment_en: string
+  egcs_ay_templateattachment_fr: string
+  attachment_en_name_en?: string
+  attachment_en_name_fr?: string
+  attachment_en_mimetype?: string
+  attachment_en_filesize?: number
+  attachment_fr_name_en?: string
+  attachment_fr_name_fr?: string
+  attachment_fr_mimetype?: string
+  attachment_fr_filesize?: number
+}>
+export type TransferPaymentStreamDocumentTemplateItem = WithId<AgencyDocumentTemplate & {
   egcs_tp_transferpaymentstream: string
-  egcs_tp_templateattachment_en: string
-  egcs_tp_templateattachment_fr: string
+  egcs_tp_agencydocumenttemplate: string
+  egcs_ay_templateattachment_en: string
+  egcs_ay_templateattachment_fr: string
   attachment_en_name_en?: string
   attachment_en_name_fr?: string
   attachment_en_mimetype?: string
@@ -576,14 +590,14 @@ const validateChartOfAccountDimensions = (
       ctx.addIssue({
         code: 'custom',
         message: 'validation.duplicate_chart_of_account_label_en',
-        path: ['egcs_tp_accountingdimensions', index, 'label_en']
+        path: ['egcs_ay_accountingdimensions', index, 'label_en']
       })
     }
     if (seenFrenchLabels.has(frenchLabel)) {
       ctx.addIssue({
         code: 'custom',
         message: 'validation.duplicate_chart_of_account_label_fr',
-        path: ['egcs_tp_accountingdimensions', index, 'label_fr']
+        path: ['egcs_ay_accountingdimensions', index, 'label_fr']
       })
     }
 
@@ -592,47 +606,72 @@ const validateChartOfAccountDimensions = (
   })
 }
 
-export const TransferPaymentStreamChartOfAccountBaseSchema = z.object({
-  egcs_tp_streambudget: RequiredId(),
-  egcs_tp_accountingdimensions: z.array(
+export const AgencyChartOfAccountBaseSchema = z.object({
+  egcs_ay_fiscalyear: PositivePostgresBigintIdSchema,
+  egcs_ay_accountingdimensions: z.array(
     TransferPaymentStreamChartOfAccountDimensionSchema,
     { error: 'validation.required' }
   ).min(1, { error: 'validation.chart_of_account_dimension_required' })
 })
 
-export const TransferPaymentStreamChartOfAccountSchema = TransferPaymentStreamChartOfAccountBaseSchema.superRefine(
-  (data, ctx) => validateChartOfAccountDimensions(data.egcs_tp_accountingdimensions, ctx)
+export const AgencyChartOfAccountSchema = AgencyChartOfAccountBaseSchema.superRefine(
+  (data, ctx) => validateChartOfAccountDimensions(data.egcs_ay_accountingdimensions, ctx)
 )
-export const TransferPaymentStreamChartOfAccountPatchSchema = TransferPaymentStreamChartOfAccountBaseSchema.partial().superRefine(
-  (data, ctx) => validateChartOfAccountDimensions(data.egcs_tp_accountingdimensions, ctx)
+export const AgencyChartOfAccountPatchSchema = AgencyChartOfAccountBaseSchema.partial().superRefine(
+  (data, ctx) => validateChartOfAccountDimensions(data.egcs_ay_accountingdimensions, ctx)
 )
+export type AgencyChartOfAccount = z.infer<typeof AgencyChartOfAccountSchema>
+export type AgencyChartOfAccountItem = WithId<AgencyChartOfAccount & { fiscal_year_display?: string }>
+
+export const TransferPaymentStreamChartOfAccountBaseSchema = z.object({
+  egcs_tp_agencychartofaccount: PositivePostgresBigintIdSchema
+}).strict()
+
+export const TransferPaymentStreamChartOfAccountSchema = TransferPaymentStreamChartOfAccountBaseSchema
+export const TransferPaymentStreamChartOfAccountPatchSchema = TransferPaymentStreamChartOfAccountBaseSchema.partial()
 
 export type TransferPaymentStreamChartOfAccount = z.infer<typeof TransferPaymentStreamChartOfAccountSchema>
 export type TransferPaymentStreamChartOfAccountPatch = z.infer<typeof TransferPaymentStreamChartOfAccountPatchSchema>
 export type TransferPaymentStreamChartOfAccountItem = WithId<TransferPaymentStreamChartOfAccount & {
   egcs_tp_transferpaymentstream: string
+  egcs_ay_fiscalyear: string
+  egcs_ay_accountingdimensions: TransferPaymentStreamChartOfAccountDimension[]
+  fiscal_year_display?: string
+  agency_definition_deleted?: boolean
 }>
 
-export const TransferPaymentStreamCommitmentTypeSchema = z.object({
-  egcs_tp_name_en: RequiredString(),
-  egcs_tp_name_fr: RequiredString()
+export const AgencyCommitmentTypeSchema = z.object({
+  egcs_ay_name_en: RequiredString(),
+  egcs_ay_name_fr: RequiredString()
 })
+export const AgencyCommitmentTypePatchSchema = AgencyCommitmentTypeSchema.partial()
+export type AgencyCommitmentType = z.infer<typeof AgencyCommitmentTypeSchema>
+export type AgencyCommitmentTypeItem = WithId<AgencyCommitmentType>
 
-export const TransferPaymentStreamCommitmentTypePatchSchema = TransferPaymentStreamCommitmentTypeSchema.partial().superRefine(() => undefined)
+export const TransferPaymentStreamCommitmentTypeSchema = z.object({
+  egcs_tp_agencycommitmenttype: PositivePostgresBigintIdSchema
+}).strict()
+
+export const TransferPaymentStreamCommitmentTypePatchSchema = TransferPaymentStreamCommitmentTypeSchema.partial()
 export type TransferPaymentStreamCommitmentType = z.infer<typeof TransferPaymentStreamCommitmentTypeSchema>
 export type TransferPaymentStreamCommitmentTypePatch = z.infer<typeof TransferPaymentStreamCommitmentTypePatchSchema>
 export type TransferPaymentStreamCommitmentTypeItem = WithId<TransferPaymentStreamCommitmentType & {
   egcs_tp_transferpaymentstream: string
+  egcs_ay_name_en: string
+  egcs_ay_name_fr: string
+  agency_definition_deleted?: boolean
 }>
 
 export const TransferPaymentMonitorTypeSchema = z.object({
-  egcs_tp_name_en: RequiredString(),
-  egcs_tp_name_fr: RequiredString(),
-  egcs_tp_transferpaymentstream: RequiredId()
-})
+  egcs_tp_agencymonitortype: PositivePostgresBigintIdSchema
+}).strict()
 
 export type TransferPaymentMonitorType = z.infer<typeof TransferPaymentMonitorTypeSchema>
-export type TransferPaymentMonitorTypeItem = WithId<TransferPaymentMonitorType>
+export type TransferPaymentMonitorTypeItem = WithId<TransferPaymentMonitorType & {
+  egcs_tp_transferpaymentstream: string
+  egcs_ay_name_en: string
+  egcs_ay_name_fr: string
+}>
 
 export const TransferPaymentStreamAreaOfExpertiseSchema = z.object({
   egcs_tp_transferpaymentstream: RequiredId(),
@@ -720,37 +759,22 @@ export type TransferPaymentStreamWizardAgreementSubtype = z.infer<
   typeof TransferPaymentStreamWizardAgreementSubtypeSchema
 >
 
-export const TransferPaymentStreamWizardChartOfAccountDimensionSchema = TransferPaymentStreamChartOfAccountDimensionSchema.extend({
-  label_en: StreamStorageText(),
-  label_fr: StreamStorageText(),
-  value: StreamStorageText(),
-  tempId: RequiredString()
-})
-
 export const TransferPaymentStreamWizardChartOfAccountSchema = z.object({
   tempId: RequiredString(),
-  tempStreamBudgetId: RequiredString(),
-  egcs_tp_accountingdimensions: z.array(TransferPaymentStreamWizardChartOfAccountDimensionSchema)
-    .min(1, { error: 'validation.chart_of_account_dimension_required' })
-}).superRefine((value, ctx) => validateChartOfAccountDimensions(value.egcs_tp_accountingdimensions, ctx))
+  egcs_tp_agencychartofaccount: PositivePostgresBigintIdSchema
+}).strict()
 
 export type TransferPaymentStreamWizardChartOfAccount = z.infer<typeof TransferPaymentStreamWizardChartOfAccountSchema>
 
-export const TransferPaymentStreamWizardMonitorTypeSchema = TransferPaymentMonitorTypeSchema.omit({
-  egcs_tp_transferpaymentstream: true
-}).extend({
-  egcs_tp_name_en: StreamStorageText(255),
-  egcs_tp_name_fr: StreamStorageText(255),
+export const TransferPaymentStreamWizardMonitorTypeSchema = TransferPaymentMonitorTypeSchema.extend({
   tempId: RequiredString()
 })
 
 export type TransferPaymentStreamWizardMonitorType = z.infer<typeof TransferPaymentStreamWizardMonitorTypeSchema>
 
 export const TransferPaymentStreamWizardCommitmentTypeSchema = TransferPaymentStreamCommitmentTypeSchema.extend({
-  egcs_tp_name_en: StreamStorageText(255),
-  egcs_tp_name_fr: StreamStorageText(255),
   tempId: RequiredString()
-})
+}).strict()
 
 export type TransferPaymentStreamWizardCommitmentType = z.infer<typeof TransferPaymentStreamWizardCommitmentTypeSchema>
 
@@ -1180,12 +1204,8 @@ export const TransferPaymentStreamPolymorphicWizardSchema = z.object({
   validateUniqueByKey(data.budgets, item => item.tempId, index => ['budgets', index, 'tempId'], ctx)
   validateUniqueByKey(data.amendmentTypes, item => item.tempId, index => ['amendmentTypes', index, 'tempId'], ctx)
 
-  const streamBudgetTempIds = new Set(data.budgets.map(item => item.tempId))
-  for (const [index, chartOfAccount] of data.chartOfAccounts.entries()) {
-    if (!streamBudgetTempIds.has(chartOfAccount.tempStreamBudgetId)) {
-      addInvalidSelectionIssue(ctx, ['chartOfAccounts', index, 'tempStreamBudgetId'])
-    }
-  }
+  validateUniqueByKey(data.chartOfAccounts, item => String(item.egcs_tp_agencychartofaccount),
+    index => ['chartOfAccounts', index, 'egcs_tp_agencychartofaccount'], ctx)
 
   validateUniqueByKey(
     data.eligibleRecipients,
@@ -1236,23 +1256,13 @@ export const TransferPaymentStreamPolymorphicWizardSchema = z.object({
     ctx
   )
 
-  validateUniqueByKey(
-    data.commitmentTypes,
-    item => normalizeBilingual(item.egcs_tp_name_en),
-    index => ['commitmentTypes', index, 'egcs_tp_name_en'],
-    ctx
-  )
-  validateUniqueByKey(
-    data.commitmentTypes,
-    item => normalizeBilingual(item.egcs_tp_name_fr),
-    index => ['commitmentTypes', index, 'egcs_tp_name_fr'],
-    ctx
-  )
+  validateUniqueByKey(data.commitmentTypes, item => String(item.egcs_tp_agencycommitmenttype),
+    index => ['commitmentTypes', index, 'egcs_tp_agencycommitmenttype'], ctx)
 
   validateUniqueByKey(
     data.monitorTypes,
-    item => [normalizeBilingual(item.egcs_tp_name_en), normalizeBilingual(item.egcs_tp_name_fr)].join('|'),
-    index => ['monitorTypes', index, 'egcs_tp_name_en'],
+    item => String(item.egcs_tp_agencymonitortype),
+    index => ['monitorTypes', index, 'egcs_tp_agencymonitortype'],
     ctx
   )
 

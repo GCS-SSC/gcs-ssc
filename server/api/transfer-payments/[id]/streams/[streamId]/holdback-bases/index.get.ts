@@ -33,13 +33,13 @@ export default defineEventHandler(async event => {
       .where('Agency_Profile._deleted', '=', false)
       .where('Agency_Holdback_Basis._deleted', '=', false)
     if (search) query = query.where(eb => eb.or([
-      eb('Transfer_Payment_Stream_Holdback_Basis.egcs_tp_name_en', 'ilike', `%${escapeLikePattern(search)}%`),
-      eb('Transfer_Payment_Stream_Holdback_Basis.egcs_tp_name_fr', 'ilike', `%${escapeLikePattern(search)}%`)
+      eb('Agency_Holdback_Basis.egcs_ay_name_en', 'ilike', `%${escapeLikePattern(search)}%`),
+      eb('Agency_Holdback_Basis.egcs_ay_name_fr', 'ilike', `%${escapeLikePattern(search)}%`)
     ]))
     const [items, count] = await Promise.all([
       query.select([
         'Transfer_Payment_Stream_Holdback_Basis.id', 'egcs_tp_transferpaymentstream', 'egcs_tp_agencyholdback',
-        'Transfer_Payment_Stream_Holdback_Basis.egcs_tp_name_en', 'Transfer_Payment_Stream_Holdback_Basis.egcs_tp_name_fr',
+        'Agency_Holdback_Basis.egcs_ay_name_en', 'Agency_Holdback_Basis.egcs_ay_name_fr',
         'Agency_Holdback_Basis.egcs_ay_languageindependentcode',
         'Agency_Holdback_Basis.egcs_ay_name_en as agency_holdback_name_en',
         'Agency_Holdback_Basis.egcs_ay_name_fr as agency_holdback_name_fr'

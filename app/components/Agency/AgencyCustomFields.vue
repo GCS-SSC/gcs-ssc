@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { computed, ref, watch, type Ref } from 'vue'
+import { getGroupedRowModel, type ExpandedState } from '@tanstack/vue-table'
 import type { z } from 'zod'
+import type { TableColumnInput } from '~/composables/useTableColumns'
 import { AgencyCustomFieldCreateSchema, AgencyCustomFieldOptionCreateSchema } from '~~/shared/types/schemas/agreement-custom-fields'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 
 type AgencyOption = z.infer<typeof AgencyCustomFieldOptionCreateSchema> & { id: string, egcs_ay_field: string }
 type AgencyField = z.infer<typeof AgencyCustomFieldCreateSchema> & { id: string, options: AgencyOption[] }
+type FieldRow = { id: string, fieldGroup: string, categoryGroup: string, field: AgencyField, option: AgencyOption | null }
 
 const { agencyId, canCreate, canUpdate, canDelete } = defineProps<{ agencyId: string, canCreate: boolean, canUpdate: boolean, canDelete: boolean }>()
 const { t, locale } = useI18n()
@@ -14,7 +17,7 @@ const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const { createValidator } = useZodI18n()
 const url = computed(() => `/api/agency/${agencyId}/custom-fields`)
-const { data, error, status, refresh } = await useAsyncData<{ items: AgencyField[] }>(url, async () => {
+const { data, status, refresh } = await useAsyncData<{ items: AgencyField[] }>(url, async () => {
   const response = await fetch(getClientRequestUrl(url.value))
   if (!response.ok) await throwFetchResponseError(response)
   return await response.json() as { items: AgencyField[] }
@@ -30,10 +33,46 @@ const optionModal = useCrudModal<Partial<AgencyOption>>({
 })
 const optionFieldId: Ref<string | null> = ref(null)
 const saving = ref(false)
+const search: Ref<string> = ref('')
+const pagination = ref({ pageIndex: 0, pageSize: 10 })
+const expandedRows: Ref<ExpandedState> = ref({})
+const { getGroupedDisclosureControlsId, getGroupedDisclosureContentId } = useGroupedDisclosureIds()
+const columns: TableColumnInput<FieldRow>[] = [
+  { id: 'fieldGroup', accessorKey: 'fieldGroup', headerKey: 'custom_fields.title' },
+  { id: 'categoryGroup', accessorKey: 'categoryGroup', headerKey: 'custom_fields.category' },
+  { id: 'name', headerKey: 'common.name' },
+  { id: 'type', headerKey: 'common.type' },
+  { id: 'configuration', headerKey: 'custom_fields.configuration' },
+  { id: 'order', headerKey: 'custom_fields.order' },
+  { id: 'status', headerKey: 'common.status' },
+  { id: 'actions', headerKey: 'common.actions' }
+]
+const grouping = ['fieldGroup', 'categoryGroup']
+const groupingOptions = { getGroupedRowModel: getGroupedRowModel() }
+const expandedOptions = { autoResetExpanded: false }
+const columnVisibility = { fieldGroup: false, categoryGroup: false }
 const multipleSelectionLocked = computed(() => Boolean(data.value?.items.find(field => field.id === fieldModal.selected.value?.id)?.egcs_ay_multiple))
 const label = (item: { egcs_ay_name_en: string, egcs_ay_name_fr: string }) => locale.value === 'fr' ? item.egcs_ay_name_fr : item.egcs_ay_name_en
-const category = (item: AgencyOption) => locale.value === 'fr' ? item.egcs_ay_category_fr : item.egcs_ay_category_en
 const typeLabel = (field: AgencyField) => t(`custom_fields.${field.egcs_ay_kind === 'text' ? field.egcs_ay_presentation : field.egcs_ay_kind === 'relational' ? (field.egcs_ay_multiple ? 'multiple_selection' : 'single_selection') : 'number'}`)
+const filteredFields = computed(() => {
+  const query = search.value.trim().toLocaleLowerCase()
+  if (!query) return data.value?.items ?? []
+  return (data.value?.items ?? []).filter(field => [field.egcs_ay_name_en, field.egcs_ay_name_fr,
+    ...field.options.flatMap(option => [option.egcs_ay_name_en, option.egcs_ay_name_fr, option.egcs_ay_category_en ?? '', option.egcs_ay_category_fr ?? ''])]
+    .some(value => value.toLocaleLowerCase().includes(query)))
+})
+const tableRows = computed<FieldRow[]>(() => filteredFields.value
+  .slice(pagination.value.pageIndex * pagination.value.pageSize, (pagination.value.pageIndex + 1) * pagination.value.pageSize)
+  .flatMap((field): FieldRow[] => field.options.length
+    ? field.options.map(option => ({ id: `option:${option.id}`, fieldGroup: field.id, categoryGroup: JSON.stringify([option.egcs_ay_category_en, option.egcs_ay_category_fr]), field, option }))
+    : [{ id: `field:${field.id}`, fieldGroup: field.id, categoryGroup: 'empty', field, option: null }]))
+
+watch(search, () => {
+  pagination.value.pageIndex = 0
+})
+watch(filteredFields, fields => {
+  pagination.value.pageIndex = Math.min(pagination.value.pageIndex, Math.max(0, Math.ceil(fields.length / pagination.value.pageSize) - 1))
+})
 
 watch(() => fieldModal.selected.value?.egcs_ay_kind, kind => {
   const selected = fieldModal.selected.value
@@ -45,6 +84,9 @@ watch(() => fieldModal.selected.value?.egcs_ay_kind, kind => {
   }
 })
 watch(url, () => {
+  search.value = ''
+  pagination.value.pageIndex = 0
+  expandedRows.value = {}
   fieldModal.close()
   optionModal.close()
   optionFieldId.value = null
@@ -132,41 +174,72 @@ const remove = async (path: string) => {
       </h2>
       <UButton v-if="canCreate" icon="i-lucide-plus" :label="t('custom_fields.add_field')" @click="fieldModal.openCreate()" />
     </div>
-    <CommonLoadingState v-if="status === 'pending' && !data" :label="t('common.loading')" />
-    <UAlert v-else-if="error" color="error" icon="i-lucide-circle-alert" :title="t('common.load_failed')" :description="t('common.try_again')">
-      <template #actions>
-        <UButton :label="t('common.retry')" color="error" variant="soft" @click="refresh()" />
+    <CommonResourceLayoutCard
+      v-model:search="search" v-model:pagination="pagination" :data="tableRows" :columns="columns"
+      :grouping="grouping" :grouping-options="groupingOptions" :expanded-options="expandedOptions"
+      :column-visibility="columnVisibility" :expanded="expandedRows" :total-records="filteredFields.length"
+      :loading="status === 'pending'" :request-status="status" :show-button="false"
+      @retry="refresh()" @update:expanded="expandedRows = $event">
+      <template #name-cell="{ row }">
+        <div :id="getGroupedDisclosureContentId(row)" class="contents">
+          <div v-if="row.groupingColumnId === 'fieldGroup'" class="flex items-center gap-3 py-1">
+            <CommonGroupedDisclosureButton
+              v-if="row.original.field.egcs_ay_kind === 'relational' && row.original.field.options.length"
+              class="group flex min-w-0 items-center gap-3 text-left font-bold"
+              :expanded="row.getIsExpanded()" :controls="getGroupedDisclosureControlsId(row.id)"
+              :label-en="row.original.field.egcs_ay_name_en" :label-fr="row.original.field.egcs_ay_name_fr"
+              @toggle="row.toggleExpanded()">
+              <UIcon :name="row.getIsExpanded() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" class="size-4 text-zinc-400" />
+              <CommonBilingualName :name-en="row.original.field.egcs_ay_name_en" :name-fr="row.original.field.egcs_ay_name_fr" />
+              <CommonStatusBadge variant="count" size="sm" :label="String(row.original.field.options.length)" />
+            </CommonGroupedDisclosureButton>
+            <CommonBilingualName v-else class="pl-7" :name-en="row.original.field.egcs_ay_name_en" :name-fr="row.original.field.egcs_ay_name_fr" />
+          </div>
+          <div v-else-if="row.groupingColumnId === 'categoryGroup' && row.original.option" class="flex items-center gap-3 py-1 pl-6">
+            <CommonGroupedDisclosureButton
+              class="group flex min-w-0 items-center gap-3 text-left font-semibold"
+              :expanded="row.getIsExpanded()" :controls="getGroupedDisclosureControlsId(row.id)"
+              :label="row.original.option.egcs_ay_category_en ? undefined : t('custom_fields.uncategorized')"
+              :label-en="row.original.option.egcs_ay_category_en ?? undefined"
+              :label-fr="row.original.option.egcs_ay_category_fr ?? undefined"
+              @toggle="row.toggleExpanded()">
+              <UIcon :name="row.getIsExpanded() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" class="size-4 text-zinc-400" />
+              <CommonBilingualName v-if="row.original.option.egcs_ay_category_en" :name-en="row.original.option.egcs_ay_category_en" :name-fr="row.original.option.egcs_ay_category_fr ?? ''" />
+              <span v-else>{{ t('custom_fields.uncategorized') }}</span>
+              <CommonStatusBadge variant="count" size="sm" :label="String(row.subRows.length)" />
+            </CommonGroupedDisclosureButton>
+          </div>
+          <div v-else-if="!row.getIsGrouped() && row.original.option" class="flex items-center gap-3 py-1 pl-12">
+            <UIcon name="i-lucide-corner-down-right" class="size-4 text-zinc-400" />
+            <CommonBilingualName :name-en="row.original.option.egcs_ay_name_en" :name-fr="row.original.option.egcs_ay_name_fr" />
+          </div>
+        </div>
       </template>
-    </UAlert>
-    <div v-else class="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
-      <div v-for="field in data?.items ?? []" :key="field.id" class="space-y-3 px-4 py-3">
-        <div class="flex flex-wrap items-start gap-3">
-          <div class="min-w-0 flex-1">
-            <div class="font-medium">
-              {{ label(field) }}
-            </div>
-            <div class="text-sm text-zinc-500">
-              {{ typeLabel(field) }}
-            </div>
-          </div>
-          <UBadge v-if="field.egcs_ay_discriminator" color="neutral" variant="subtle" :label="t('custom_fields.discriminator')" />
-          <UButton v-if="canUpdate" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${label(field)}`" @click="fieldModal.openUpdate(field)" />
-          <UButton v-if="canDelete" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="`${t('common.delete')}: ${label(field)}`" @click="remove(`${url}/${field.id}`)" />
-          <UButton v-if="canCreate && field.egcs_ay_kind === 'relational'" icon="i-lucide-plus" color="neutral" variant="ghost" :aria-label="`${t('custom_fields.add_option')}: ${label(field)}`" @click="openOption(field.id)" />
+      <template #type-cell="{ row }">
+        <span v-if="row.groupingColumnId === 'fieldGroup'">{{ typeLabel(row.original.field) }}</span>
+        <span v-else-if="row.groupingColumnId === 'categoryGroup'">{{ t('custom_fields.category') }}</span>
+      </template>
+      <template #configuration-cell="{ row }">
+        <UBadge v-if="row.groupingColumnId === 'fieldGroup' && row.original.field.egcs_ay_discriminator" color="neutral" variant="subtle" :label="t('custom_fields.discriminator')" />
+      </template>
+      <template #order-cell="{ row }">
+        <span v-if="!row.getIsGrouped() && row.original.option">{{ row.original.option.egcs_ay_displayorder }}</span>
+      </template>
+      <template #status-cell="{ row }">
+        <UBadge v-if="!row.getIsGrouped() && row.original.option" color="neutral" variant="subtle" :label="t(row.original.option.egcs_ay_active ? 'custom_fields.active' : 'custom_fields.inactive')" />
+      </template>
+      <template #actions-cell="{ row }">
+        <div v-if="row.groupingColumnId === 'fieldGroup'" class="flex justify-end gap-2">
+          <UButton v-if="canCreate && row.original.field.egcs_ay_kind === 'relational'" icon="i-lucide-plus" color="neutral" variant="ghost" size="sm" :aria-label="`${t('custom_fields.add_option')}: ${label(row.original.field)}`" @click="openOption(row.original.field.id)" />
+          <UButton v-if="canUpdate" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" :aria-label="`${t('common.edit')}: ${label(row.original.field)}`" @click="fieldModal.openUpdate(row.original.field)" />
+          <UButton v-if="canDelete" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="`${t('common.delete')}: ${label(row.original.field)}`" @click="remove(`${url}/${row.original.field.id}`)" />
         </div>
-        <div v-if="field.egcs_ay_kind === 'relational' && field.options.length" class="divide-y divide-zinc-100 border-t border-zinc-100 pl-4 dark:divide-zinc-800 dark:border-zinc-800">
-          <div v-for="option in field.options" :key="option.id" class="flex items-center gap-2 py-2 text-sm">
-            <span class="min-w-0 flex-1">{{ label(option) }} <span v-if="category(option)" class="text-zinc-500">· {{ category(option) }}</span></span>
-            <UBadge v-if="!option.egcs_ay_active" color="neutral" variant="subtle" :label="t('custom_fields.inactive')" />
-            <UButton v-if="canUpdate" icon="i-lucide-pencil" size="sm" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${label(option)}`" @click="openOption(field.id, option)" />
-            <UButton v-if="canDelete" icon="i-lucide-trash" size="sm" color="error" variant="ghost" :aria-label="`${t('common.delete')}: ${label(option)}`" @click="remove(`${url}/${field.id}/options/${option.id}`)" />
-          </div>
+        <div v-else-if="!row.getIsGrouped() && row.original.option" class="flex justify-end gap-2">
+          <UButton v-if="canUpdate" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" :aria-label="`${t('common.edit')}: ${label(row.original.option)}`" @click="openOption(row.original.field.id, row.original.option)" />
+          <UButton v-if="canDelete" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="`${t('common.delete')}: ${label(row.original.option)}`" @click="remove(`${url}/${row.original.field.id}/options/${row.original.option.id}`)" />
         </div>
-      </div>
-      <div v-if="!data?.items.length" class="px-4 py-6 text-sm text-zinc-500">
-        {{ t('common.no_data') }}
-      </div>
-    </div>
+      </template>
+    </CommonResourceLayoutCard>
 
     <UModal v-model:open="fieldModal.isOpen.value" :title="t('custom_fields.title')" :ui="{ content: 'sm:max-w-2xl' }">
       <template #body>

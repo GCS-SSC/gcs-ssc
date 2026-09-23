@@ -1,109 +1,43 @@
 <script setup lang="ts">
-import { nanoid } from 'nanoid'
-import type { Ref } from 'vue'
-import type {
-  TransferPaymentStreamChartOfAccountDimension,
-  TransferPaymentStreamChartOfAccountItem
-} from '~~/shared/types/schemas/transfer-payment'
+import type { FormSubmitEvent } from '#ui/types'
+import type { z } from 'zod'
 import { TransferPaymentStreamChartOfAccountSchema } from '~~/shared/types/schemas/transfer-payment'
 import type { CrudModalSessionLifecycle } from '~/composables/useCrudModal'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 
-type EditableDimension = TransferPaymentStreamChartOfAccountDimension & { uiKey: string }
-type ChartOfAccountFormState = {
-  id?: string
-  egcs_tp_streambudget?: string
-  egcs_tp_accountingdimensions: EditableDimension[]
-}
-
 const isOpen = defineModel<boolean>({ required: true })
-const { streamId, profileId, item, captureSession, closeSession } = defineProps<{
+const { streamId, profileId, captureSession, closeSession } = defineProps<{
   streamId: string
   profileId: string
-  item?: TransferPaymentStreamChartOfAccountItem | null
 } & CrudModalSessionLifecycle>()
-
-if (Boolean(captureSession) !== Boolean(closeSession)) {
-  throw new Error('TransferPaymentStreamChartOfAccountModal requires captureSession and closeSession together')
-}
-
-const emit = defineEmits<{ (e: 'save'): void }>()
+const emit = defineEmits<{ save: [] }>()
 const { t } = useI18n()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
 const pending = useCrudModalPending(() => captureSession ? captureSession() : null)
-const isSaving = pending.isPending
-const state: Ref<ChartOfAccountFormState> = ref({
-  egcs_tp_accountingdimensions: []
-})
-
-const budgetFetchUrl = `/api/transfer-payments/${profileId}/streams/${streamId}/budgets`
-const submitChartOfAccount = $fetch as unknown as (
-  url: string,
-  options: {
-    method: 'PATCH' | 'POST'
-    body: {
-      egcs_tp_streambudget?: string
-      egcs_tp_accountingdimensions: TransferPaymentStreamChartOfAccountDimension[]
-    }
-  }
-) => Promise<unknown>
-
-/**
- * Creates an editable accounting dimension with a stable UI identity.
- *
- * @param dimension - Optional persisted dimension values.
- * @returns Editable dimension state.
- */
-const createDimension = (
-  dimension: Partial<TransferPaymentStreamChartOfAccountDimension> = {}
-): EditableDimension => ({
-  uiKey: nanoid(),
-  label_en: dimension.label_en ?? '',
-  label_fr: dimension.label_fr ?? '',
-  value: dimension.value ?? ''
-})
-
-/** Rebuilds modal state for the active create or update session. */
-const resetState = () => {
-  state.value = item
-    ? {
-        id: item.id,
-        egcs_tp_streambudget: item.egcs_tp_streambudget,
-        egcs_tp_accountingdimensions: item.egcs_tp_accountingdimensions.map(createDimension)
-      }
-    : {
-        egcs_tp_accountingdimensions: [createDimension()]
-      }
-}
-
-watch([() => item, isOpen], ([, open]) => {
-  if (open) resetState()
+const state = ref<{ egcs_tp_agencychartofaccount?: string }>({})
+const submitChartLink = $fetch as unknown as (url: string, options: {
+  method: 'POST'
+  body: z.infer<typeof TransferPaymentStreamChartOfAccountSchema>
+}) => Promise<unknown>
+watch(isOpen, open => {
+  if (open) state.value = {}
 }, { immediate: true })
 
-/** Persists the current chart of accounts entry. */
-const onSubmit = async () => {
+/**
+ * Saves the selected Agency chart association for this Stream.
+ *
+ * @param event - Validated link form submission.
+ */
+const onSubmit = async (event: FormSubmitEvent<z.infer<typeof TransferPaymentStreamChartOfAccountSchema>>) => {
   const session = captureSession ? captureSession() : null
   if (!pending.begin(session)) return
-  const isUpdate = Boolean(state.value.id)
-  const url = isUpdate
-    ? `/api/transfer-payments/${profileId}/streams/${streamId}/chart-of-accounts/${state.value.id}`
-    : `/api/transfer-payments/${profileId}/streams/${streamId}/chart-of-accounts`
-
   try {
-    await submitChartOfAccount(url, {
-      method: isUpdate ? 'PATCH' : 'POST',
-      body: {
-        egcs_tp_streambudget: state.value.egcs_tp_streambudget,
-        egcs_tp_accountingdimensions: state.value.egcs_tp_accountingdimensions.map(({ label_en, label_fr, value }) => ({
-          label_en,
-          label_fr,
-          value
-        }))
-      }
+    await submitChartLink(`/api/transfer-payments/${profileId}/streams/${streamId}/chart-of-accounts`, {
+      method: 'POST', body: event.data
     })
-    if (closeSession) closeSession(session)
-    else isOpen.value = false
+    if (closeSession && !closeSession(session)) return
+    if (!closeSession) isOpen.value = false
     emit('save')
   } catch (error) {
     showError(error)
@@ -114,26 +48,20 @@ const onSubmit = async () => {
 </script>
 
 <template>
-  <UModal
-    v-model:open="isOpen"
-    :title="item ? t('transfer_payment.chart_of_accounts.update') : t('transfer_payment.chart_of_accounts.create')"
-    :description="t('transfer_payment.chart_of_accounts.description')"
-    :ui="{ content: 'sm:max-w-4xl' }">
+  <UModal v-model:open="isOpen" :title="t('transfer_payment.chart_of_accounts.create')">
     <template #body>
-      <UForm
-        :validate="createValidator(TransferPaymentStreamChartOfAccountSchema)"
-        :state="state"
-        class="space-y-6"
-        @submit="onSubmit">
-        <TransferPaymentFieldsTransferPaymentStreamChartOfAccountFields
-          v-model="state"
-          :budget-fetch-url="budgetFetchUrl" />
-
+      <UForm :state="state" :validate="createValidator(TransferPaymentStreamChartOfAccountSchema)" class="space-y-4" @submit="onSubmit">
+        <UFormField :label="t('transfer_payment.chart_of_accounts.title')" name="egcs_tp_agencychartofaccount" required>
+          <CommonServerLookupSelect
+            v-model="state.egcs_tp_agencychartofaccount"
+            :fetch-url="`/api/transfer-payments/${profileId}/streams/lookups/chart-of-accounts`"
+            value-key="id"
+            label-en-key="label_en"
+            label-fr-key="label_fr" />
+        </UFormField>
         <div class="flex justify-end gap-2">
-          <UButton color="neutral" variant="ghost" @click="isOpen = false">
-            {{ t('common.cancel') }}
-          </UButton>
-          <CommonSaveButton :label="t('common.save')" :loading="isSaving" :disabled="isSaving" />
+          <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isOpen = false" />
+          <CommonSaveButton :label="t('common.save')" :loading="pending.isPending.value" :disabled="pending.isPending.value" />
         </div>
       </UForm>
     </template>

@@ -20,6 +20,7 @@ export default defineEventHandler(async event => {
       'Funding_Case_Agreement_Payment.egcs_fc_fundingagreementcommitment'
     )
     .innerJoin('Transfer_Payment_Stream_Commitment_Type', 'Transfer_Payment_Stream_Commitment_Type.id', 'Funding_Case_Agreement_Commitment.egcs_fc_type')
+    .innerJoin('Agency_Commitment_Type', 'Agency_Commitment_Type.id', 'Transfer_Payment_Stream_Commitment_Type.egcs_tp_agencycommitmenttype')
     .innerJoin('Funding_Case_Agreement_Budget_Fiscal_Year', join => join.on(
       budgetFiscalYearStableId, '=', sql.ref('Funding_Case_Agreement_Payment.egcs_fc_fiscalyear')
     ))
@@ -40,8 +41,8 @@ export default defineEventHandler(async event => {
       'Funding_Case_Agreement_Payment.egcs_fc_comment as egcs_fc_comment',
       'Funding_Case_Agreement_Payment.egcs_fc_status as egcs_fc_status',
       'Funding_Case_Agreement_Commitment.egcs_fc_type as commitment_type',
-      'Transfer_Payment_Stream_Commitment_Type.egcs_tp_name_en as commitment_type_name_en',
-      'Transfer_Payment_Stream_Commitment_Type.egcs_tp_name_fr as commitment_type_name_fr',
+      'Agency_Commitment_Type.egcs_ay_name_en as commitment_type_name_en',
+      'Agency_Commitment_Type.egcs_ay_name_fr as commitment_type_name_fr',
       'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display',
       sql<number>`COUNT(${sql.ref('Funding_Case_Agreement_Payment_Line.id')})`.as('line_count'),
       databaseMoneyText(sql`COALESCE(SUM(${sql.ref('Funding_Case_Agreement_Payment_Line.egcs_fc_amount')}), 0)`).as('line_total')
@@ -49,7 +50,6 @@ export default defineEventHandler(async event => {
     .where('Funding_Case_Agreement_Commitment.egcs_fc_fundingagreement', '=', agreementId)
     .where('Funding_Case_Agreement_Payment._deleted', '=', false)
     .where('Funding_Case_Agreement_Commitment._deleted', '=', false)
-    .where('Transfer_Payment_Stream_Commitment_Type._deleted', '=', false)
     .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
     .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)
     .where('Funding_Case_Agreement_Budget_Version._deleted', '=', false)
@@ -57,8 +57,8 @@ export default defineEventHandler(async event => {
     .groupBy([
       'Funding_Case_Agreement_Payment.id',
       'Funding_Case_Agreement_Commitment.egcs_fc_type',
-      'Transfer_Payment_Stream_Commitment_Type.egcs_tp_name_en',
-      'Transfer_Payment_Stream_Commitment_Type.egcs_tp_name_fr',
+      'Agency_Commitment_Type.egcs_ay_name_en',
+      'Agency_Commitment_Type.egcs_ay_name_fr',
       'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay'
     ])
     .orderBy('Funding_Case_Agreement_Payment.id', 'asc')

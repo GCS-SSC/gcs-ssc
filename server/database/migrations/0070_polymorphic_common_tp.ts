@@ -2100,6 +2100,21 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
             ) OR EXISTS (
               SELECT 1 FROM "Transfer_Payment_Stream_Workflow" linked
               WHERE linked.egcs_tp_transferpaymentstream = stream.id AND linked._deleted = false
+            ) OR EXISTS (
+              SELECT 1 FROM "Transfer_Payment_Stream_Chart_of_Account" linked
+              WHERE linked.egcs_tp_transferpaymentstream = stream.id AND linked._deleted = false
+            ) OR EXISTS (
+              SELECT 1 FROM "Transfer_Payment_Stream_Commitment_Type" linked
+              WHERE linked.egcs_tp_transferpaymentstream = stream.id AND linked._deleted = false
+            ) OR EXISTS (
+              SELECT 1 FROM "Transfer_Payment_Monitor_Type" linked
+              WHERE linked.egcs_tp_transferpaymentstream = stream.id AND linked._deleted = false
+            ) OR EXISTS (
+              SELECT 1 FROM "Transfer_Payment_Stream_Holdback_Basis" linked
+              WHERE linked.egcs_tp_transferpaymentstream = stream.id AND linked._deleted = false
+            ) OR EXISTS (
+              SELECT 1 FROM "Transfer_Payment_Stream_Document_Template" linked
+              WHERE linked.egcs_tp_transferpaymentstream = stream.id AND linked._deleted = false
             )
           )
       ) THEN
@@ -2721,42 +2736,320 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
   `.execute(db)
 
   await sql`
-    CREATE TABLE IF NOT EXISTS "Transfer_Payment_Stream_Document_Template" (
+    CREATE TABLE IF NOT EXISTS "Agency_Document_Template" (
       id bigserial PRIMARY KEY,
-      egcs_tp_transferpaymentstream bigint NOT NULL REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT,
-      egcs_tp_entitytype varchar(128) NOT NULL,
-      egcs_tp_name_en varchar(255) NOT NULL,
-      egcs_tp_name_fr varchar(255) NOT NULL,
-      egcs_tp_description_en text NOT NULL,
-      egcs_tp_description_fr text NOT NULL,
-      egcs_tp_templateattachment_en bigint NOT NULL REFERENCES "Common_Attachment"(id) ON DELETE RESTRICT,
-      egcs_tp_templateattachment_fr bigint NOT NULL REFERENCES "Common_Attachment"(id) ON DELETE RESTRICT,
-      egcs_tp_templatekind varchar(16) NOT NULL,
-      egcs_tp_outputformats jsonb NOT NULL DEFAULT '["docx"]'::jsonb,
-      egcs_tp_active boolean NOT NULL DEFAULT true,
+      egcs_ay_organizationagency bigint NOT NULL REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT,
+      egcs_ay_entitytype varchar(128) NOT NULL,
+      egcs_ay_name_en varchar(255) NOT NULL,
+      egcs_ay_name_fr varchar(255) NOT NULL,
+      egcs_ay_description_en text NOT NULL,
+      egcs_ay_description_fr text NOT NULL,
+      egcs_ay_templateattachment_en bigint NOT NULL REFERENCES "Common_Attachment"(id) ON DELETE RESTRICT,
+      egcs_ay_templateattachment_fr bigint NOT NULL REFERENCES "Common_Attachment"(id) ON DELETE RESTRICT,
+      egcs_ay_templatekind varchar(16) NOT NULL,
+      egcs_ay_outputformats jsonb NOT NULL DEFAULT '["docx"]'::jsonb,
+      egcs_ay_active boolean NOT NULL DEFAULT true,
       _deleted boolean NOT NULL DEFAULT false,
-      CONSTRAINT tp_chk_documenttemplate_entitytype CHECK (egcs_tp_entitytype IN ('fundingcaseagreement', 'fundingcaseagreementcloseout')),
-      CONSTRAINT tp_chk_documenttemplate_kind CHECK (egcs_tp_templatekind IN ('docx', 'html')),
-      CONSTRAINT tp_chk_documenttemplate_outputs CHECK (
-        jsonb_typeof(egcs_tp_outputformats) = 'array'
-        AND jsonb_array_length(egcs_tp_outputformats) > 0
-        AND egcs_tp_outputformats <@ '["docx", "html", "pdf"]'::jsonb
+      CONSTRAINT ay_chk_documenttemplate_entitytype CHECK (egcs_ay_entitytype IN ('fundingcaseagreement', 'fundingcaseagreementcloseout')),
+      CONSTRAINT ay_chk_documenttemplate_kind CHECK (egcs_ay_templatekind IN ('docx', 'html')),
+      CONSTRAINT ay_chk_documenttemplate_outputs CHECK (
+        jsonb_typeof(egcs_ay_outputformats) = 'array'
+        AND jsonb_array_length(egcs_ay_outputformats) > 0
+        AND egcs_ay_outputformats <@ '["docx", "html", "pdf"]'::jsonb
       ),
-      CONSTRAINT tp_chk_documenttemplate_kindoutput CHECK (
-        (egcs_tp_templatekind = 'docx' AND egcs_tp_outputformats <@ '["docx", "pdf"]'::jsonb)
-        OR (egcs_tp_templatekind = 'html' AND egcs_tp_outputformats <@ '["html", "pdf"]'::jsonb)
+      CONSTRAINT ay_chk_documenttemplate_kindoutput CHECK (
+        (egcs_ay_templatekind = 'docx' AND egcs_ay_outputformats <@ '["docx", "pdf"]'::jsonb)
+        OR (egcs_ay_templatekind = 'html' AND egcs_ay_outputformats <@ '["html", "pdf"]'::jsonb)
       )
     )
   `.execute(db)
   await sql`
+    CREATE TABLE IF NOT EXISTS "Transfer_Payment_Stream_Document_Template" (
+      id bigserial PRIMARY KEY,
+      egcs_tp_transferpaymentstream bigint NOT NULL REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT,
+      egcs_tp_agencydocumenttemplate bigint NOT NULL REFERENCES "Agency_Document_Template"(id) ON DELETE RESTRICT,
+      _deleted boolean NOT NULL DEFAULT false,
+      CONSTRAINT tp_uq_streamdocumenttemplateidstream UNIQUE (id, egcs_tp_transferpaymentstream)
+    )
+  `.execute(db)
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS ay_idx_documenttemplateagencyentitynameen ON "Agency_Document_Template" (egcs_ay_organizationagency, egcs_ay_entitytype, egcs_ay_name_en) WHERE _deleted = false`.execute(db)
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS ay_idx_documenttemplateagencyentitynamefr ON "Agency_Document_Template" (egcs_ay_organizationagency, egcs_ay_entitytype, egcs_ay_name_fr) WHERE _deleted = false`.execute(db)
+  await sql`
     CREATE INDEX IF NOT EXISTS tp_idx_streamdocumenttemplate_entity
     ON "Transfer_Payment_Stream_Document_Template" (
       egcs_tp_transferpaymentstream,
-      egcs_tp_entitytype,
+      egcs_tp_agencydocumenttemplate,
       id
     )
     WHERE _deleted = false
   `.execute(db)
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS tp_idx_streamdocumenttemplate_unique ON "Transfer_Payment_Stream_Document_Template" (egcs_tp_transferpaymentstream, egcs_tp_agencydocumenttemplate) WHERE _deleted = false`.execute(db)
+  await sql`
+    CREATE FUNCTION validate_stream_operational_catalog_link() RETURNS trigger LANGUAGE plpgsql AS $$
+    DECLARE
+      catalog_id bigint;
+      catalog_agency bigint;
+      catalog_fiscalyear bigint;
+      stream_profile bigint;
+      stream_agency bigint;
+      old_catalog_id bigint;
+    BEGIN
+      catalog_id := CASE TG_TABLE_NAME
+        WHEN 'Transfer_Payment_Stream_Chart_of_Account' THEN (to_jsonb(NEW)->>'egcs_tp_agencychartofaccount')::bigint
+        WHEN 'Transfer_Payment_Stream_Commitment_Type' THEN (to_jsonb(NEW)->>'egcs_tp_agencycommitmenttype')::bigint
+        WHEN 'Transfer_Payment_Monitor_Type' THEN (to_jsonb(NEW)->>'egcs_tp_agencymonitortype')::bigint
+        WHEN 'Transfer_Payment_Stream_Holdback_Basis' THEN (to_jsonb(NEW)->>'egcs_tp_agencyholdback')::bigint
+        ELSE (to_jsonb(NEW)->>'egcs_tp_agencydocumenttemplate')::bigint
+      END;
+      IF TG_OP = 'UPDATE' THEN
+        old_catalog_id := CASE TG_TABLE_NAME
+          WHEN 'Transfer_Payment_Stream_Chart_of_Account' THEN (to_jsonb(OLD)->>'egcs_tp_agencychartofaccount')::bigint
+          WHEN 'Transfer_Payment_Stream_Commitment_Type' THEN (to_jsonb(OLD)->>'egcs_tp_agencycommitmenttype')::bigint
+          WHEN 'Transfer_Payment_Monitor_Type' THEN (to_jsonb(OLD)->>'egcs_tp_agencymonitortype')::bigint
+          WHEN 'Transfer_Payment_Stream_Holdback_Basis' THEN (to_jsonb(OLD)->>'egcs_tp_agencyholdback')::bigint
+          ELSE (to_jsonb(OLD)->>'egcs_tp_agencydocumenttemplate')::bigint
+        END;
+        IF NEW.egcs_tp_transferpaymentstream IS DISTINCT FROM OLD.egcs_tp_transferpaymentstream
+          OR catalog_id IS DISTINCT FROM old_catalog_id THEN
+          RAISE EXCEPTION 'Stream catalog link identity is immutable'
+            USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_operationalcataloglinkidentity';
+        END IF;
+        IF NEW._deleted THEN RETURN NEW; END IF;
+      END IF;
+      IF NEW._deleted THEN RETURN NEW; END IF;
+
+      SELECT stream.egcs_tp_transferpaymentprofile INTO stream_profile
+      FROM "Transfer_Payment_Stream" stream
+      WHERE stream.id = NEW.egcs_tp_transferpaymentstream AND stream._deleted = false;
+      IF stream_profile IS NOT NULL THEN
+        SELECT profile.egcs_tp_agency INTO stream_agency
+        FROM "Transfer_Payment_Profile" profile
+        WHERE profile.id = stream_profile AND profile._deleted = false
+        FOR SHARE OF profile;
+        PERFORM 1 FROM "Transfer_Payment_Stream" stream
+        WHERE stream.id = NEW.egcs_tp_transferpaymentstream
+          AND stream.egcs_tp_transferpaymentprofile = stream_profile
+          AND stream._deleted = false
+        FOR UPDATE OF stream;
+        IF NOT FOUND THEN stream_agency := NULL; END IF;
+      END IF;
+      IF stream_agency IS NULL THEN
+        RAISE EXCEPTION 'Stream is unavailable for a catalog link'
+          USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_operationalcatalogstreamavailable';
+      END IF;
+
+      IF TG_TABLE_NAME = 'Transfer_Payment_Stream_Chart_of_Account' THEN
+        SELECT catalog.egcs_ay_organizationagency, catalog.egcs_ay_fiscalyear
+        INTO catalog_agency, catalog_fiscalyear
+        FROM "Agency_Chart_of_Account" catalog
+        WHERE catalog.id = catalog_id AND catalog._deleted = false
+        FOR SHARE OF catalog;
+        PERFORM 1 FROM "Agency_Fiscal_Year" fiscal
+        WHERE fiscal.id = catalog_fiscalyear AND fiscal._deleted = false
+        FOR SHARE OF fiscal;
+        IF NOT FOUND THEN
+          RAISE EXCEPTION 'Chart fiscal year must be live'
+            USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_chartfiscalyearlive';
+        END IF;
+        PERFORM 1 FROM "Transfer_Payment_Stream_Budget" budget
+          JOIN "Transfer_Payment_Fiscal_Year_Budget" fiscal_budget
+            ON fiscal_budget.id = budget.egcs_tp_transferpaymentbudget
+          WHERE budget.egcs_tp_transferpaymentstream = NEW.egcs_tp_transferpaymentstream
+            AND budget._deleted = false AND fiscal_budget._deleted = false
+            AND fiscal_budget.egcs_tp_fiscalyear = catalog_fiscalyear
+          FOR SHARE OF fiscal_budget;
+        IF NOT FOUND THEN
+          RAISE EXCEPTION 'Chart fiscal year has no live Stream Budget'
+            USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_chartfiscalyearstreambudget';
+        END IF;
+      ELSIF TG_TABLE_NAME = 'Transfer_Payment_Stream_Commitment_Type' THEN
+        SELECT catalog.egcs_ay_organizationagency INTO catalog_agency
+        FROM "Agency_Commitment_Type" catalog
+        WHERE catalog.id = catalog_id AND catalog._deleted = false FOR SHARE OF catalog;
+      ELSIF TG_TABLE_NAME = 'Transfer_Payment_Monitor_Type' THEN
+        SELECT catalog.egcs_ay_organizationagency INTO catalog_agency
+        FROM "Agency_Monitor_Type" catalog
+        WHERE catalog.id = catalog_id AND catalog._deleted = false FOR SHARE OF catalog;
+      ELSIF TG_TABLE_NAME = 'Transfer_Payment_Stream_Holdback_Basis' THEN
+        SELECT catalog.egcs_ay_organizationagency INTO catalog_agency
+        FROM "Agency_Holdback_Basis" catalog
+        WHERE catalog.id = catalog_id AND catalog._deleted = false FOR SHARE OF catalog;
+      ELSE
+        SELECT catalog.egcs_ay_organizationagency INTO catalog_agency
+        FROM "Agency_Document_Template" catalog
+        WHERE catalog.id = catalog_id AND catalog._deleted = false AND catalog.egcs_ay_active = true
+        FOR SHARE OF catalog;
+      END IF;
+      IF catalog_agency IS DISTINCT FROM stream_agency THEN
+        RAISE EXCEPTION 'Catalog definition must belong to the Stream Agency'
+          USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_operationalcatalogsameagency';
+      END IF;
+      RETURN NEW;
+    END $$
+  `.execute(db)
+  for (const table of [
+    'Transfer_Payment_Stream_Chart_of_Account',
+    'Transfer_Payment_Stream_Commitment_Type',
+    'Transfer_Payment_Monitor_Type',
+    'Transfer_Payment_Stream_Holdback_Basis',
+    'Transfer_Payment_Stream_Document_Template'
+  ]) {
+    await sql`CREATE TRIGGER validate_stream_operational_catalog_link BEFORE INSERT OR UPDATE ON ${sql.table(table)} FOR EACH ROW EXECUTE FUNCTION validate_stream_operational_catalog_link()`.execute(db)
+  }
+  await sql`
+    CREATE FUNCTION validate_agency_operational_catalog() RETURNS trigger LANGUAGE plpgsql AS $$
+    DECLARE fiscal_agency bigint; attachment_agency bigint;
+    BEGIN
+      IF TG_OP = 'UPDATE' THEN
+        IF NEW.egcs_ay_organizationagency IS DISTINCT FROM OLD.egcs_ay_organizationagency THEN
+          RAISE EXCEPTION 'Agency catalog ownership is immutable'
+            USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_operationalcatalogownerimmutable';
+        END IF;
+        IF TG_TABLE_NAME = 'Agency_Chart_of_Account' AND
+          (to_jsonb(NEW)->>'egcs_ay_fiscalyear') IS DISTINCT FROM (to_jsonb(OLD)->>'egcs_ay_fiscalyear') THEN
+          RAISE EXCEPTION 'Chart fiscal year is immutable'
+            USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_chartfiscalyearimmutable';
+        END IF;
+      END IF;
+      IF TG_TABLE_NAME = 'Agency_Chart_of_Account' AND NOT NEW._deleted THEN
+        SELECT fiscal.egcs_ay_organizationagency INTO fiscal_agency
+        FROM "Agency_Fiscal_Year" fiscal
+        WHERE fiscal.id = (to_jsonb(NEW)->>'egcs_ay_fiscalyear')::bigint AND fiscal._deleted = false
+        FOR SHARE OF fiscal;
+        IF fiscal_agency IS DISTINCT FROM NEW.egcs_ay_organizationagency THEN
+          RAISE EXCEPTION 'Chart fiscal year must belong to its Agency'
+            USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_chartfiscalyearagency';
+        END IF;
+      ELSIF TG_TABLE_NAME = 'Agency_Document_Template' AND NOT NEW._deleted THEN
+        SELECT type.egcs_cn_agency INTO attachment_agency
+        FROM "Common_Attachment" attachment
+        JOIN "Common_Attachment_Types" type ON type.id = attachment.egcs_cn_attachmenttype
+        WHERE attachment.id = (to_jsonb(NEW)->>'egcs_ay_templateattachment_en')::bigint
+          AND attachment._deleted = false AND type._deleted = false;
+        IF attachment_agency IS DISTINCT FROM NEW.egcs_ay_organizationagency THEN
+          RAISE EXCEPTION 'English template attachment must belong to its Agency'
+            USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_documenttemplateattachmentenagency';
+        END IF;
+        attachment_agency := NULL;
+        SELECT type.egcs_cn_agency INTO attachment_agency
+        FROM "Common_Attachment" attachment
+        JOIN "Common_Attachment_Types" type ON type.id = attachment.egcs_cn_attachmenttype
+        WHERE attachment.id = (to_jsonb(NEW)->>'egcs_ay_templateattachment_fr')::bigint
+          AND attachment._deleted = false AND type._deleted = false;
+        IF attachment_agency IS DISTINCT FROM NEW.egcs_ay_organizationagency THEN
+          RAISE EXCEPTION 'French template attachment must belong to its Agency'
+            USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_documenttemplateattachmentfragency';
+        END IF;
+      END IF;
+      RETURN NEW;
+    END $$
+  `.execute(db)
+  for (const table of [
+    'Agency_Chart_of_Account', 'Agency_Commitment_Type',
+    'Agency_Monitor_Type', 'Agency_Document_Template', 'Agency_Holdback_Basis'
+  ]) {
+    await sql`CREATE TRIGGER validate_agency_operational_catalog BEFORE INSERT OR UPDATE ON ${sql.table(table)} FOR EACH ROW EXECUTE FUNCTION validate_agency_operational_catalog()`.execute(db)
+  }
+  await sql`
+    CREATE FUNCTION protect_chart_fiscal_year_owner() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN
+      IF NEW.egcs_ay_organizationagency IS DISTINCT FROM OLD.egcs_ay_organizationagency
+        AND EXISTS (SELECT 1 FROM "Agency_Chart_of_Account" chart WHERE chart.egcs_ay_fiscalyear = OLD.id) THEN
+        RAISE EXCEPTION 'Fiscal year Agency cannot change while Charts refer to it'
+          USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_chartfiscalyearownerimmutable';
+      END IF;
+      IF NEW._deleted AND NOT OLD._deleted AND EXISTS (
+        SELECT 1 FROM "Agency_Chart_of_Account" chart
+        JOIN "Transfer_Payment_Stream_Chart_of_Account" linked
+          ON linked.egcs_tp_agencychartofaccount = chart.id
+        WHERE chart.egcs_ay_fiscalyear = OLD.id
+          AND chart._deleted = false AND linked._deleted = false
+      ) THEN
+        RAISE EXCEPTION 'Fiscal year cannot retire while a live Stream Chart is linked'
+          USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_chartfiscalyearlinked';
+      END IF;
+      RETURN NEW;
+    END $$
+  `.execute(db)
+  await sql`CREATE TRIGGER protect_chart_fiscal_year_owner BEFORE UPDATE OF egcs_ay_organizationagency, _deleted ON "Agency_Fiscal_Year" FOR EACH ROW EXECUTE FUNCTION protect_chart_fiscal_year_owner()`.execute(db)
+  await sql`
+    CREATE FUNCTION protect_chart_program_budget() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN
+      IF (NEW._deleted AND NOT OLD._deleted)
+        OR NEW.egcs_tp_fiscalyear IS DISTINCT FROM OLD.egcs_tp_fiscalyear THEN
+        IF EXISTS (
+          SELECT 1 FROM "Transfer_Payment_Stream_Budget" stream_budget
+          JOIN "Transfer_Payment_Stream_Chart_of_Account" linked
+            ON linked.egcs_tp_transferpaymentstream = stream_budget.egcs_tp_transferpaymentstream
+          JOIN "Agency_Chart_of_Account" chart
+            ON chart.id = linked.egcs_tp_agencychartofaccount
+          WHERE stream_budget.egcs_tp_transferpaymentbudget = OLD.id
+            AND stream_budget._deleted = false AND linked._deleted = false
+            AND chart._deleted = false AND chart.egcs_ay_fiscalyear = OLD.egcs_tp_fiscalyear
+            AND NOT EXISTS (
+              SELECT 1 FROM "Transfer_Payment_Stream_Budget" other
+              JOIN "Transfer_Payment_Fiscal_Year_Budget" other_fiscal
+                ON other_fiscal.id = other.egcs_tp_transferpaymentbudget
+              WHERE other.egcs_tp_transferpaymentstream = stream_budget.egcs_tp_transferpaymentstream
+                AND other.id <> stream_budget.id AND other._deleted = false
+                AND other.egcs_tp_transferpaymentbudget <> OLD.id
+                AND other_fiscal._deleted = false
+                AND other_fiscal.egcs_tp_fiscalyear = OLD.egcs_tp_fiscalyear
+            )
+        ) THEN
+          RAISE EXCEPTION 'Program Budget cannot change fiscal year or retire while a live Stream Chart depends on it'
+            USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_chartprogrambudgetretained';
+        END IF;
+      END IF;
+      RETURN NEW;
+    END $$
+  `.execute(db)
+  await sql`CREATE TRIGGER protect_chart_program_budget BEFORE UPDATE OF egcs_tp_fiscalyear, _deleted ON "Transfer_Payment_Fiscal_Year_Budget" FOR EACH ROW EXECUTE FUNCTION protect_chart_program_budget()`.execute(db)
+  await sql`
+    CREATE FUNCTION protect_chart_stream_budget() RETURNS trigger LANGUAGE plpgsql AS $$
+    DECLARE replacement_fiscalyear bigint;
+    BEGIN
+      IF (NEW._deleted AND NOT OLD._deleted)
+        OR NEW.egcs_tp_transferpaymentbudget IS DISTINCT FROM OLD.egcs_tp_transferpaymentbudget
+        OR NEW.egcs_tp_transferpaymentstream IS DISTINCT FROM OLD.egcs_tp_transferpaymentstream THEN
+        PERFORM 1 FROM "Transfer_Payment_Stream" stream
+        WHERE stream.id = OLD.egcs_tp_transferpaymentstream
+        FOR UPDATE OF stream;
+        IF NOT NEW._deleted
+          AND NEW.egcs_tp_transferpaymentstream = OLD.egcs_tp_transferpaymentstream THEN
+          SELECT fiscal_budget.egcs_tp_fiscalyear INTO replacement_fiscalyear
+          FROM "Transfer_Payment_Fiscal_Year_Budget" fiscal_budget
+          WHERE fiscal_budget.id = NEW.egcs_tp_transferpaymentbudget
+            AND fiscal_budget._deleted = false
+          FOR SHARE OF fiscal_budget;
+        END IF;
+        IF EXISTS (
+          SELECT 1 FROM "Transfer_Payment_Stream_Chart_of_Account" linked
+          JOIN "Agency_Chart_of_Account" chart ON chart.id = linked.egcs_tp_agencychartofaccount
+          JOIN "Transfer_Payment_Fiscal_Year_Budget" fiscal_budget
+            ON fiscal_budget.egcs_tp_fiscalyear = chart.egcs_ay_fiscalyear
+          WHERE linked.egcs_tp_transferpaymentstream = OLD.egcs_tp_transferpaymentstream
+            AND linked._deleted = false AND chart._deleted = false
+            AND fiscal_budget.id = OLD.egcs_tp_transferpaymentbudget
+            AND replacement_fiscalyear IS DISTINCT FROM chart.egcs_ay_fiscalyear
+            AND NOT EXISTS (
+              SELECT 1 FROM "Transfer_Payment_Stream_Budget" other
+              JOIN "Transfer_Payment_Fiscal_Year_Budget" other_fiscal
+                ON other_fiscal.id = other.egcs_tp_transferpaymentbudget
+              WHERE other.egcs_tp_transferpaymentstream = OLD.egcs_tp_transferpaymentstream
+                AND other.id <> OLD.id AND other._deleted = false
+                AND other_fiscal._deleted = false
+                AND other_fiscal.egcs_tp_fiscalyear = chart.egcs_ay_fiscalyear
+            )
+        ) THEN
+          RAISE EXCEPTION 'Last eligible Stream Budget cannot be removed while a Chart is linked'
+            USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_chartfiscalyearbudgetretained';
+        END IF;
+      END IF;
+      RETURN NEW;
+    END $$
+  `.execute(db)
+  await sql`CREATE TRIGGER protect_chart_stream_budget BEFORE UPDATE ON "Transfer_Payment_Stream_Budget" FOR EACH ROW EXECUTE FUNCTION protect_chart_stream_budget()`.execute(db)
   await sql`
     CREATE UNIQUE INDEX IF NOT EXISTS cn_idx_approvaltemplateagencynameen
     ON "Common_Approval_Template" (egcs_cn_agency, egcs_cn_name_en)
@@ -3899,6 +4192,29 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
 
 export const down = async (db: Kysely<Database>): Promise<void> => {
   // This removes the polymorphic schema objects created by `up`.
+  await sql`DROP TRIGGER IF EXISTS protect_chart_program_budget ON "Transfer_Payment_Fiscal_Year_Budget"`.execute(db)
+  await sql`DROP FUNCTION IF EXISTS protect_chart_program_budget()`.execute(db)
+  await sql`DROP TRIGGER IF EXISTS protect_chart_stream_budget ON "Transfer_Payment_Stream_Budget"`.execute(db)
+  await sql`DROP FUNCTION IF EXISTS protect_chart_stream_budget()`.execute(db)
+  await sql`DROP TRIGGER IF EXISTS protect_chart_fiscal_year_owner ON "Agency_Fiscal_Year"`.execute(db)
+  await sql`DROP FUNCTION IF EXISTS protect_chart_fiscal_year_owner()`.execute(db)
+  for (const table of [
+    'Agency_Chart_of_Account', 'Agency_Commitment_Type',
+    'Agency_Monitor_Type', 'Agency_Document_Template', 'Agency_Holdback_Basis'
+  ]) {
+    await sql`DROP TRIGGER IF EXISTS validate_agency_operational_catalog ON ${sql.table(table)}`.execute(db)
+  }
+  await sql`DROP FUNCTION IF EXISTS validate_agency_operational_catalog()`.execute(db)
+  for (const table of [
+    'Transfer_Payment_Stream_Chart_of_Account',
+    'Transfer_Payment_Stream_Commitment_Type',
+    'Transfer_Payment_Monitor_Type',
+    'Transfer_Payment_Stream_Holdback_Basis',
+    'Transfer_Payment_Stream_Document_Template'
+  ]) {
+    await sql`DROP TRIGGER IF EXISTS validate_stream_operational_catalog_link ON ${sql.table(table)}`.execute(db)
+  }
+  await sql`DROP FUNCTION IF EXISTS validate_stream_operational_catalog_link()`.execute(db)
   await sql`DROP INDEX IF EXISTS cn_idx_routingslip_target_evidence`.execute(db)
   await sql`DROP TRIGGER IF EXISTS trg_lock_completion ON "Common_Completion"`.execute(db)
   await sql`DROP TRIGGER IF EXISTS trg_enforce_workflow_transition_mode ON "Common_Runtime"`.execute(db)
@@ -4066,6 +4382,7 @@ export const down = async (db: Kysely<Database>): Promise<void> => {
   await sql`DROP TABLE IF EXISTS "Common_GWCOA" CASCADE`.execute(db)
   await sql`DROP TABLE IF EXISTS "Common_User" CASCADE`.execute(db)
   await sql`DROP TABLE IF EXISTS "Transfer_Payment_Stream_Document_Template" CASCADE`.execute(db)
+  await sql`DROP TABLE IF EXISTS "Agency_Document_Template" CASCADE`.execute(db)
   await sql`DROP TABLE IF EXISTS "Common_Entity_Attachment" CASCADE`.execute(db)
   await sql`DROP FUNCTION IF EXISTS trg_fn_enforce_entity_attachment_identity_immutable() CASCADE`.execute(db)
   await sql`DROP TABLE IF EXISTS "Common_Attachment" CASCADE`.execute(db)

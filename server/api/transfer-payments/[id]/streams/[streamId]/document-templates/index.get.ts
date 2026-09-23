@@ -1,4 +1,5 @@
 import type { Scope } from '~~/shared/utils/scopes'
+import { sql } from 'kysely'
 import { PaginationSchema } from '~~/shared/types/schemas'
 import { authorize } from '~~/server/utils/authorize'
 import { createTransferPaymentScopedAuthorizeHandler } from '~~/server/utils/transfer-payment-route-authorization'
@@ -29,8 +30,9 @@ export default defineEventHandler(async event => {
   const offset = (page - 1) * limit
   let baseQuery = db
     .selectFrom('Transfer_Payment_Stream_Document_Template')
-    .innerJoin('Common_Attachment as AttachmentEn', 'AttachmentEn.id', 'Transfer_Payment_Stream_Document_Template.egcs_tp_templateattachment_en')
-    .innerJoin('Common_Attachment as AttachmentFr', 'AttachmentFr.id', 'Transfer_Payment_Stream_Document_Template.egcs_tp_templateattachment_fr')
+    .innerJoin('Agency_Document_Template', 'Agency_Document_Template.id', 'Transfer_Payment_Stream_Document_Template.egcs_tp_agencydocumenttemplate')
+    .innerJoin('Common_Attachment as AttachmentEn', 'AttachmentEn.id', 'Agency_Document_Template.egcs_ay_templateattachment_en')
+    .innerJoin('Common_Attachment as AttachmentFr', 'AttachmentFr.id', 'Agency_Document_Template.egcs_ay_templateattachment_fr')
     .where('Transfer_Payment_Stream_Document_Template.egcs_tp_transferpaymentstream', '=', streamId)
     .where('Transfer_Payment_Stream_Document_Template._deleted', '=', false)
     .where('AttachmentEn._deleted', '=', false)
@@ -39,8 +41,8 @@ export default defineEventHandler(async event => {
   if (search) {
     const pattern = `%${escapeLikePattern(search)}%`
     baseQuery = baseQuery.where(eb => eb.or([
-      eb('Transfer_Payment_Stream_Document_Template.egcs_tp_name_en', 'ilike', pattern),
-      eb('Transfer_Payment_Stream_Document_Template.egcs_tp_name_fr', 'ilike', pattern)
+      eb('Agency_Document_Template.egcs_ay_name_en', 'ilike', pattern),
+      eb('Agency_Document_Template.egcs_ay_name_fr', 'ilike', pattern)
     ]))
   }
 
@@ -49,16 +51,17 @@ export default defineEventHandler(async event => {
       .select([
         'Transfer_Payment_Stream_Document_Template.id as id',
         'Transfer_Payment_Stream_Document_Template.egcs_tp_transferpaymentstream as egcs_tp_transferpaymentstream',
-        'Transfer_Payment_Stream_Document_Template.egcs_tp_entitytype as egcs_tp_entitytype',
-        'Transfer_Payment_Stream_Document_Template.egcs_tp_name_en as egcs_tp_name_en',
-        'Transfer_Payment_Stream_Document_Template.egcs_tp_name_fr as egcs_tp_name_fr',
-        'Transfer_Payment_Stream_Document_Template.egcs_tp_description_en as egcs_tp_description_en',
-        'Transfer_Payment_Stream_Document_Template.egcs_tp_description_fr as egcs_tp_description_fr',
-        'Transfer_Payment_Stream_Document_Template.egcs_tp_templateattachment_en as egcs_tp_templateattachment_en',
-        'Transfer_Payment_Stream_Document_Template.egcs_tp_templateattachment_fr as egcs_tp_templateattachment_fr',
-        'Transfer_Payment_Stream_Document_Template.egcs_tp_templatekind as egcs_tp_templatekind',
-        'Transfer_Payment_Stream_Document_Template.egcs_tp_outputformats as egcs_tp_outputformats',
-        'Transfer_Payment_Stream_Document_Template.egcs_tp_active as egcs_tp_active',
+        'Transfer_Payment_Stream_Document_Template.egcs_tp_agencydocumenttemplate as egcs_tp_agencydocumenttemplate',
+        'Agency_Document_Template.egcs_ay_entitytype as egcs_ay_entitytype',
+        'Agency_Document_Template.egcs_ay_name_en as egcs_ay_name_en',
+        'Agency_Document_Template.egcs_ay_name_fr as egcs_ay_name_fr',
+        'Agency_Document_Template.egcs_ay_description_en as egcs_ay_description_en',
+        'Agency_Document_Template.egcs_ay_description_fr as egcs_ay_description_fr',
+        'Agency_Document_Template.egcs_ay_templateattachment_en as egcs_ay_templateattachment_en',
+        'Agency_Document_Template.egcs_ay_templateattachment_fr as egcs_ay_templateattachment_fr',
+        'Agency_Document_Template.egcs_ay_templatekind as egcs_ay_templatekind',
+        'Agency_Document_Template.egcs_ay_outputformats as egcs_ay_outputformats',
+        sql<boolean>`("Agency_Document_Template".egcs_ay_active AND NOT "Agency_Document_Template"._deleted)`.as('egcs_ay_active'),
         'AttachmentEn.egcs_cn_name_en as attachment_en_name_en',
         'AttachmentEn.egcs_cn_name_fr as attachment_en_name_fr',
         'AttachmentEn.egcs_cn_mimetype as attachment_en_mimetype',
@@ -68,14 +71,15 @@ export default defineEventHandler(async event => {
         'AttachmentFr.egcs_cn_mimetype as attachment_fr_mimetype',
         'AttachmentFr.egcs_cn_filesize as attachment_fr_filesize'
       ])
-      .orderBy('Transfer_Payment_Stream_Document_Template.egcs_tp_entitytype', 'asc')
+      .orderBy('Agency_Document_Template.egcs_ay_entitytype', 'asc')
       .orderBy('Transfer_Payment_Stream_Document_Template.id', 'asc')
       .limit(limit)
       .offset(offset)
       .execute(),
     baseQuery.select(eb => eb.fn.count('Transfer_Payment_Stream_Document_Template.id').as('total')).executeTakeFirst(),
     baseQuery
-      .where('Transfer_Payment_Stream_Document_Template.egcs_tp_active', '=', true)
+      .where('Agency_Document_Template.egcs_ay_active', '=', true)
+      .where('Agency_Document_Template._deleted', '=', false)
       .select(eb => eb.fn.count('Transfer_Payment_Stream_Document_Template.id').as('active'))
       .executeTakeFirst()
   ])

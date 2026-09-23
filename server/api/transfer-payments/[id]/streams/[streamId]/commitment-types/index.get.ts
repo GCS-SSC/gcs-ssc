@@ -18,6 +18,7 @@ export default defineEventHandler(async event => {
   const { page, limit, search } = await getValidatedQueryI18n(event, PaginationSchema)
   const offset = (page - 1) * limit
   let query = db.selectFrom('Transfer_Payment_Stream_Commitment_Type')
+    .innerJoin('Agency_Commitment_Type', 'Agency_Commitment_Type.id', 'Transfer_Payment_Stream_Commitment_Type.egcs_tp_agencycommitmenttype')
     .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Transfer_Payment_Stream_Commitment_Type.egcs_tp_transferpaymentstream')
     .innerJoin('Transfer_Payment_Profile', 'Transfer_Payment_Profile.id', 'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile')
     .innerJoin('Agency_Profile', 'Agency_Profile.id', 'Transfer_Payment_Profile.egcs_tp_agency')
@@ -27,18 +28,23 @@ export default defineEventHandler(async event => {
     .where('Transfer_Payment_Stream._deleted', '=', false)
     .where('Transfer_Payment_Profile._deleted', '=', false)
     .where('Agency_Profile._deleted', '=', false)
+    .where('Agency_Commitment_Type.egcs_ay_organizationagency', '=', streamContext.agencyId)
   if (search) {
     const pattern = `%${escapeLikePattern(search)}%`
     query = query.where(eb => eb.or([
-      eb('Transfer_Payment_Stream_Commitment_Type.egcs_tp_name_en', 'ilike', pattern),
-      eb('Transfer_Payment_Stream_Commitment_Type.egcs_tp_name_fr', 'ilike', pattern)
+      eb('Agency_Commitment_Type.egcs_ay_name_en', 'ilike', pattern),
+      eb('Agency_Commitment_Type.egcs_ay_name_fr', 'ilike', pattern)
     ]))
   }
 
-  const [items, count] = await Promise.all([
-    query.selectAll('Transfer_Payment_Stream_Commitment_Type').orderBy('Transfer_Payment_Stream_Commitment_Type.id').limit(limit).offset(offset).execute(),
-    query.select(eb => eb.fn.count('Transfer_Payment_Stream_Commitment_Type.id').as('total')).executeTakeFirst()
+  const [items, count, activeCount] = await Promise.all([
+    query.selectAll('Transfer_Payment_Stream_Commitment_Type')
+      .select(['Agency_Commitment_Type.egcs_ay_name_en', 'Agency_Commitment_Type.egcs_ay_name_fr', 'Agency_Commitment_Type._deleted as agency_definition_deleted'])
+      .orderBy('Transfer_Payment_Stream_Commitment_Type.id').limit(limit).offset(offset).execute(),
+    query.select(eb => eb.fn.count('Transfer_Payment_Stream_Commitment_Type.id').as('total')).executeTakeFirst(),
+    query.where('Agency_Commitment_Type._deleted', '=', false)
+      .select(eb => eb.fn.count('Transfer_Payment_Stream_Commitment_Type.id').as('total')).executeTakeFirst()
   ])
   const total = Number(count?.total ?? 0)
-  return { items, total, stats: { total, active: total }, page, limit }
+  return { items, total, stats: { total, active: Number(activeCount?.total ?? 0) }, page, limit }
 })

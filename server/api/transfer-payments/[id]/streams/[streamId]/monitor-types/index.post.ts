@@ -29,10 +29,15 @@ export default defineEventHandler(async event => {
 
   const body = await readValidatedBodyI18n(
     event,
-    TransferPaymentMonitorTypeSchema.omit({ egcs_tp_transferpaymentstream: true })
+    TransferPaymentMonitorTypeSchema
   )
   return await executeFreshAuthorizedTransferPaymentStreamWrite(
-    event, db, profileId, streamContext.agencyId, streamId, 'create', async trx => {
+    event, db, profileId, streamContext.agencyId, streamId, 'create', async (trx, freshContext) => {
+      const definition = await trx.selectFrom('Agency_Monitor_Type').select('id')
+        .where('id', '=', body.egcs_tp_agencymonitortype)
+        .where('egcs_ay_organizationagency', '=', freshContext.agencyId)
+        .where('_deleted', '=', false).forUpdate().executeTakeFirst()
+      if (!definition) return await badRequest(event, 'INVALID_MONITOR_TYPE', 'apiErrors.agreement.invalid_monitor_type')
       try {
         return await trx
           .insertInto('Transfer_Payment_Monitor_Type')

@@ -102,6 +102,13 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
     .addColumn('egcs_fc_holdbackbasis', 'bigint', col =>
       col.notNull().references('Transfer_Payment_Stream_Holdback_Basis.id').onDelete('restrict')
     )
+    .addForeignKeyConstraint(
+      'fc_ref_holdbackbasisstream',
+      ['egcs_fc_holdbackbasis', 'egcs_fc_transferpaymentstream'],
+      'Transfer_Payment_Stream_Holdback_Basis',
+      ['id', 'egcs_tp_transferpaymentstream'],
+      constraint => constraint.onDelete('restrict')
+    )
     .addColumn('egcs_fc_riskscore', 'numeric(8, 2)')
     .addColumn('egcs_fc_status', 'bigint', col => col.notNull().references('Common_Status.id').onDelete('restrict'))
     .addColumn('egcs_fc_authorizedassistancestartdate', 'date', col => col.notNull())
@@ -1685,8 +1692,23 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
     .addColumn('egcs_fc_fundingagreement', 'bigint', col =>
       col.notNull().references('Funding_Case_Agreement_Profile.id').onDelete('restrict')
     )
+    .addColumn('egcs_fc_transferpaymentstream', 'bigint', col => col.notNull())
     .addColumn('egcs_fc_type', 'bigint', col =>
       col.notNull().references('Transfer_Payment_Monitor_Type.id').onDelete('restrict')
+    )
+    .addForeignKeyConstraint(
+      'fc_ref_monitoragreementstream',
+      ['egcs_fc_fundingagreement', 'egcs_fc_transferpaymentstream'],
+      'Funding_Case_Agreement_Profile',
+      ['id', 'egcs_fc_transferpaymentstream'],
+      constraint => constraint.onDelete('restrict')
+    )
+    .addForeignKeyConstraint(
+      'fc_ref_monitortypestream',
+      ['egcs_fc_type', 'egcs_fc_transferpaymentstream'],
+      'Transfer_Payment_Monitor_Type',
+      ['id', 'egcs_tp_transferpaymentstream'],
+      constraint => constraint.onDelete('restrict')
     )
     .addColumn('egcs_fc_onsite', 'boolean', col => col.notNull())
     .addColumn('egcs_fc_tentativefiscalyear', 'bigint', col =>
@@ -1697,6 +1719,17 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
     .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
     .addCheckConstraint('fc_chk_monitorquarter', sql`"egcs_fc_tentativequarter" BETWEEN 1 AND 4`)
     .execute()
+
+  await sql`
+    CREATE FUNCTION trg_fn_resolve_monitor_stream() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN
+      SELECT agreement.egcs_fc_transferpaymentstream INTO NEW.egcs_fc_transferpaymentstream
+      FROM "Funding_Case_Agreement_Profile" agreement
+      WHERE agreement.id = NEW.egcs_fc_fundingagreement;
+      RETURN NEW;
+    END $$
+  `.execute(db)
+  await sql`CREATE TRIGGER trg_resolve_monitor_stream BEFORE INSERT OR UPDATE OF egcs_fc_fundingagreement, egcs_fc_transferpaymentstream ON "Funding_Case_Agreement_Monitor" FOR EACH ROW EXECUTE FUNCTION trg_fn_resolve_monitor_stream()`.execute(db)
 
   await sql`
     CREATE INDEX ${sql.raw(INDEX_NAMES.monitorAgreement)}
@@ -1844,6 +1877,7 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
     CREATE TABLE IF NOT EXISTS "Funding_Case_Agreement_Generated_Document" (
       id bigserial PRIMARY KEY,
       egcs_fc_fundingagreement bigint NOT NULL REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT,
+      egcs_fc_transferpaymentstream bigint NOT NULL,
       egcs_fc_closeout bigint,
       egcs_fc_documenttemplate bigint NOT NULL REFERENCES "Transfer_Payment_Stream_Document_Template"(id) ON DELETE RESTRICT,
       egcs_fc_generatedattachment bigint NOT NULL REFERENCES "Common_Attachment"(id) ON DELETE RESTRICT,
@@ -1854,10 +1888,24 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
       egcs_fc_generatedat timestamptz NOT NULL,
       _deleted boolean NOT NULL DEFAULT false,
       CONSTRAINT fc_chk_generateddocument_output CHECK (egcs_fc_outputformat IN ('docx', 'html', 'pdf')),
+      CONSTRAINT fc_ref_generateddocumentagreementstream FOREIGN KEY (egcs_fc_fundingagreement, egcs_fc_transferpaymentstream)
+        REFERENCES "Funding_Case_Agreement_Profile"(id, egcs_fc_transferpaymentstream) ON DELETE RESTRICT,
+      CONSTRAINT fc_ref_generateddocumenttemplatestream FOREIGN KEY (egcs_fc_documenttemplate, egcs_fc_transferpaymentstream)
+        REFERENCES "Transfer_Payment_Stream_Document_Template"(id, egcs_tp_transferpaymentstream) ON DELETE RESTRICT,
       CONSTRAINT fc_ref_generateddocumentcloseoutagreement FOREIGN KEY (egcs_fc_closeout, egcs_fc_fundingagreement)
         REFERENCES "Funding_Case_Agreement_Closeout"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT
     )
   `.execute(db)
+  await sql`
+    CREATE FUNCTION trg_fn_resolve_generated_document_stream() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN
+      SELECT agreement.egcs_fc_transferpaymentstream INTO NEW.egcs_fc_transferpaymentstream
+      FROM "Funding_Case_Agreement_Profile" agreement
+      WHERE agreement.id = NEW.egcs_fc_fundingagreement;
+      RETURN NEW;
+    END $$
+  `.execute(db)
+  await sql`CREATE TRIGGER trg_resolve_generated_document_stream BEFORE INSERT OR UPDATE OF egcs_fc_fundingagreement, egcs_fc_transferpaymentstream ON "Funding_Case_Agreement_Generated_Document" FOR EACH ROW EXECUTE FUNCTION trg_fn_resolve_generated_document_stream()`.execute(db)
   await sql`
     CREATE INDEX ${sql.raw(INDEX_NAMES.generatedDocumentAgreement)}
     ON "Funding_Case_Agreement_Generated_Document" (
@@ -2228,6 +2276,8 @@ export const down = async (db: Kysely<Database>): Promise<void> => {
   await sql`DROP FUNCTION IF EXISTS trg_fn_validate_agreement_closeout_snapshot()`.execute(db)
   await db.schema.dropTable('Funding_Case_Agreement_Closeout_Snapshot').execute()
   await db.schema.dropIndex(INDEX_NAMES.generatedDocumentAgreement).execute()
+  await sql`DROP TRIGGER IF EXISTS trg_resolve_generated_document_stream ON "Funding_Case_Agreement_Generated_Document"`.execute(db)
+  await sql`DROP FUNCTION IF EXISTS trg_fn_resolve_generated_document_stream()`.execute(db)
   await db.schema.dropTable('Funding_Case_Agreement_Generated_Document').execute()
   await db.schema.dropIndex(INDEX_NAMES.monitorPromisingPracticeMonitor).execute()
   await db.schema.dropTable('Funding_Case_Agreement_Monitor_Promising_Practice').execute()
@@ -2242,6 +2292,8 @@ export const down = async (db: Kysely<Database>): Promise<void> => {
   await db.schema.dropIndex(INDEX_NAMES.monitorPlanningMonitor).execute()
   await db.schema.dropTable('Funding_Case_Agreement_Monitor_Planning').execute()
   await sql`DROP TRIGGER IF EXISTS trg_register_fundingcasemonitor ON "Funding_Case_Agreement_Monitor"`.execute(db)
+  await sql`DROP TRIGGER IF EXISTS trg_resolve_monitor_stream ON "Funding_Case_Agreement_Monitor"`.execute(db)
+  await sql`DROP FUNCTION IF EXISTS trg_fn_resolve_monitor_stream()`.execute(db)
   await db.schema.dropIndex(INDEX_NAMES.monitorAgreement).execute()
   await db.schema.dropTable('Funding_Case_Agreement_Monitor').execute()
   await sql`DROP TRIGGER IF EXISTS trg_register_fundingcaseforecast ON "Funding_Case_Agreement_Forecast"`.execute(db)

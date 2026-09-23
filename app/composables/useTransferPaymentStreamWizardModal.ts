@@ -207,10 +207,6 @@ export const useTransferPaymentStreamWizardModal = ({
   const budgetLabelById = computed(() => new Map(Object.values(budgetLabels.value).map(item => [item.budgetId, item.label])))
   const getBudgetLabel = (budgetId: string) => budgetLabelById.value.get(String(budgetId))
     ?? t(budgetId ? 'common.unavailable' : 'common.none')
-  const chartOfAccountBudgetOptions = computed(() => (state.value?.budgets ?? []).map(budget => ({
-    label: getBudgetLabel(budget.egcs_tp_transferpaymentbudget),
-    value: budget.tempId
-  })))
 
   const {
     data: applicantRecipientResponse,
@@ -303,20 +299,13 @@ export const useTransferPaymentStreamWizardModal = ({
   }
 
   const removeBudget = (index: number) => {
-    const removedBudget = removeListItem('budgets', index)
-    if (!removedBudget || !state.value) return
-    state.value.chartOfAccounts = state.value.chartOfAccounts.filter(
-      chartOfAccount => chartOfAccount.tempStreamBudgetId !== removedBudget.tempId
-    )
+    removeListItem('budgets', index)
   }
 
   const addHoldbackBasis = () => {
     addListItem('holdbackBases', () => ({
       tempId: nanoid(),
-      egcs_tp_agencyholdback: '',
-      egcs_tp_name_en: '',
-      egcs_tp_name_fr: '',
-      egcs_tp_requiresamendmentsubtype: false
+      egcs_tp_agencyholdback: ''
     }))
   }
 
@@ -401,13 +390,7 @@ export const useTransferPaymentStreamWizardModal = ({
   const addChartOfAccount = () => {
     addListItem('chartOfAccounts', () => ({
       tempId: nanoid(),
-      tempStreamBudgetId: state.value?.budgets[0]?.tempId ?? '',
-      egcs_tp_accountingdimensions: [{
-        tempId: nanoid(),
-        label_en: '',
-        label_fr: '',
-        value: ''
-      }]
+      egcs_tp_agencychartofaccount: ''
     }))
   }
 
@@ -418,8 +401,7 @@ export const useTransferPaymentStreamWizardModal = ({
   const addCommitmentType = () => {
     addListItem('commitmentTypes', () => ({
       tempId: nanoid(),
-      egcs_tp_name_en: '',
-      egcs_tp_name_fr: ''
+      egcs_tp_agencycommitmenttype: ''
     }))
   }
 
@@ -430,8 +412,7 @@ export const useTransferPaymentStreamWizardModal = ({
   const addMonitorType = () => {
     addListItem('monitorTypes', () => ({
       tempId: nanoid(),
-      egcs_tp_name_en: '',
-      egcs_tp_name_fr: ''
+      egcs_tp_agencymonitortype: ''
     }))
   }
 
@@ -702,7 +683,6 @@ export const useTransferPaymentStreamWizardModal = ({
     currentStepErrors,
     onBudgetResolved,
     budgetLabelById,
-    chartOfAccountBudgetOptions,
     applicantRecipientOptions,
     lineItemOptions,
     agreementTypeOptions,

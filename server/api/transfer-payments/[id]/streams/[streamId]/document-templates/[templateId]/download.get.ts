@@ -36,12 +36,14 @@ export default defineEventHandler(async event => {
 
   const template = await db
     .selectFrom('Transfer_Payment_Stream_Document_Template')
-    .where('id', '=', templateId)
-    .where('egcs_tp_transferpaymentstream', '=', streamId)
-    .where('_deleted', '=', false)
+    .innerJoin('Agency_Document_Template', 'Agency_Document_Template.id', 'Transfer_Payment_Stream_Document_Template.egcs_tp_agencydocumenttemplate')
+    .where('Transfer_Payment_Stream_Document_Template.id', '=', templateId)
+    .where('Transfer_Payment_Stream_Document_Template.egcs_tp_transferpaymentstream', '=', streamId)
+    .where('Transfer_Payment_Stream_Document_Template._deleted', '=', false)
+    .where('Agency_Document_Template._deleted', '=', false)
     .select([
-      'egcs_tp_templateattachment_en',
-      'egcs_tp_templateattachment_fr'
+      'Agency_Document_Template.egcs_ay_templateattachment_en',
+      'Agency_Document_Template.egcs_ay_templateattachment_fr'
     ])
     .executeTakeFirst()
 
@@ -50,8 +52,8 @@ export default defineEventHandler(async event => {
   }
 
   const attachmentId = language === 'fra'
-    ? template.egcs_tp_templateattachment_fr
-    : template.egcs_tp_templateattachment_en
+    ? template.egcs_ay_templateattachment_fr
+    : template.egcs_ay_templateattachment_en
   const attachment = await db
     .selectFrom('Common_Attachment')
     .where('id', '=', attachmentId)

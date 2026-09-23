@@ -15,15 +15,15 @@ export default defineEventHandler(async event => {
     .where('Transfer_Payment_Stream_Holdback_Basis._deleted', '=', false)
     .where('Agency_Holdback_Basis._deleted', '=', false)
   if (lookup.escapedSearch) query = query.where(eb => eb.or([
-    eb('Transfer_Payment_Stream_Holdback_Basis.egcs_tp_name_en', 'ilike', `%${lookup.escapedSearch}%`),
-    eb('Transfer_Payment_Stream_Holdback_Basis.egcs_tp_name_fr', 'ilike', `%${lookup.escapedSearch}%`)
+    eb('Agency_Holdback_Basis.egcs_ay_name_en', 'ilike', `%${lookup.escapedSearch}%`),
+    eb('Agency_Holdback_Basis.egcs_ay_name_fr', 'ilike', `%${lookup.escapedSearch}%`)
   ]))
   const [items, count] = await Promise.all([
     query.select([
       'Transfer_Payment_Stream_Holdback_Basis.id', 'egcs_tp_transferpaymentstream', 'egcs_tp_agencyholdback',
-      'Transfer_Payment_Stream_Holdback_Basis.egcs_tp_name_en', 'Transfer_Payment_Stream_Holdback_Basis.egcs_tp_name_fr',
-      'Transfer_Payment_Stream_Holdback_Basis.egcs_tp_name_en as label_en',
-      'Transfer_Payment_Stream_Holdback_Basis.egcs_tp_name_fr as label_fr',
+      'Agency_Holdback_Basis.egcs_ay_name_en', 'Agency_Holdback_Basis.egcs_ay_name_fr',
+      'Agency_Holdback_Basis.egcs_ay_name_en as label_en',
+      'Agency_Holdback_Basis.egcs_ay_name_fr as label_fr',
       'Agency_Holdback_Basis.egcs_ay_languageindependentcode'
     ]).orderBy('Transfer_Payment_Stream_Holdback_Basis.id', 'asc').limit(lookup.limit).offset(lookup.offset).execute(),
     query.select(eb => eb.fn.count('Transfer_Payment_Stream_Holdback_Basis.id').as('total')).executeTakeFirst()

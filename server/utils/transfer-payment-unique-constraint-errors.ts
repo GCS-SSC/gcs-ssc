@@ -52,6 +52,10 @@ const CONSTRAINT_ERROR_MAP: Record<string, ConstraintErrorMapping> = {
     code: 'TRANSFER_PAYMENT_DUPLICATE_STREAM_HOLDBACK_BASIS',
     key: 'apiErrors.transfer_payment.duplicate_stream_holdback_basis'
   },
+  tp_idx_streamdocumenttemplate_unique: {
+    code: 'TRANSFER_PAYMENT_DUPLICATE_STREAM_DOCUMENT_TEMPLATE',
+    key: 'apiErrors.transfer_payment.duplicate_stream_document_template'
+  },
   tp_idx_amendmenttypetransferpaymentstreamnameen: {
     code: 'TRANSFER_PAYMENT_DUPLICATE_STREAM_AMENDMENT_TYPE',
     key: 'apiErrors.transfer_payment.duplicate_stream_amendment_type'
@@ -76,11 +80,7 @@ const CONSTRAINT_ERROR_MAP: Record<string, ConstraintErrorMapping> = {
     code: 'TRANSFER_PAYMENT_DUPLICATE_STREAM_MONITOR_TYPE',
     key: 'apiErrors.transfer_payment.duplicate_stream_monitor_type'
   },
-  tp_idx_commitmenttypetransferpaymentstreamnameen: {
-    code: 'TRANSFER_PAYMENT_DUPLICATE_STREAM_COMMITMENT_TYPE',
-    key: 'apiErrors.transfer_payment.duplicate_stream_commitment_type'
-  },
-  tp_idx_commitmenttypetransferpaymentstreamnamefr: {
+  tp_idx_commitmenttypetransferpaymentstreamagencytype: {
     code: 'TRANSFER_PAYMENT_DUPLICATE_STREAM_COMMITMENT_TYPE',
     key: 'apiErrors.transfer_payment.duplicate_stream_commitment_type'
   },

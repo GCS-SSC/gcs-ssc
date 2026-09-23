@@ -125,6 +125,7 @@ export const buildAgreementApprovalSnapshot = async (
       .onRef('Transfer_Payment_Agreement_Subtype.egcs_tp_transferpaymentstream', '=', 'Funding_Case_Agreement_Profile.egcs_fc_transferpaymentstream'))
     .innerJoin('Agency_Agreement_Type', 'Agency_Agreement_Type.id', 'Transfer_Payment_Agreement_Subtype.egcs_tp_agreementtype')
     .innerJoin('Transfer_Payment_Stream_Holdback_Basis', 'Transfer_Payment_Stream_Holdback_Basis.id', 'Funding_Case_Agreement_Profile.egcs_fc_holdbackbasis')
+    .innerJoin('Agency_Holdback_Basis', 'Agency_Holdback_Basis.id', 'Transfer_Payment_Stream_Holdback_Basis.egcs_tp_agencyholdback')
     .leftJoin('Transfer_Payment_Stream_Risk_Rating', join => join
       .onRef('Transfer_Payment_Stream_Risk_Rating.egcs_tp_transferpaymentstream', '=', 'Funding_Case_Agreement_Profile.egcs_fc_transferpaymentstream')
       .onRef('Transfer_Payment_Stream_Risk_Rating.egcs_tp_riskscore', '=', 'Funding_Case_Agreement_Profile.egcs_fc_riskscore')
@@ -138,8 +139,8 @@ export const buildAgreementApprovalSnapshot = async (
       'Transfer_Payment_Stream.egcs_tp_name_fr as stream_name_fr',
       'Agency_Agreement_Type.egcs_ay_name_en as subtype_name_en',
       'Agency_Agreement_Type.egcs_ay_name_fr as subtype_name_fr',
-      'Transfer_Payment_Stream_Holdback_Basis.egcs_tp_name_en as holdback_basis_name_en',
-      'Transfer_Payment_Stream_Holdback_Basis.egcs_tp_name_fr as holdback_basis_name_fr',
+      'Agency_Holdback_Basis.egcs_ay_name_en as holdback_basis_name_en',
+      'Agency_Holdback_Basis.egcs_ay_name_fr as holdback_basis_name_fr',
       'Transfer_Payment_Stream_Risk_Rating.egcs_tp_name_en as risk_rating_name_en',
       'Transfer_Payment_Stream_Risk_Rating.egcs_tp_name_fr as risk_rating_name_fr'
     ])

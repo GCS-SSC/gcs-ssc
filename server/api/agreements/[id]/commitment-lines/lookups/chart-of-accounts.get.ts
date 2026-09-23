@@ -28,28 +28,17 @@ export default defineEventHandler(async event => {
   const offset = (page - 1) * limit
   let baseQuery = db
     .selectFrom('Transfer_Payment_Stream_Chart_of_Account')
-    .innerJoin(
-      'Transfer_Payment_Stream_Budget',
-      'Transfer_Payment_Stream_Budget.id',
-      'Transfer_Payment_Stream_Chart_of_Account.egcs_tp_streambudget'
-    )
-    .innerJoin(
-      'Transfer_Payment_Fiscal_Year_Budget',
-      'Transfer_Payment_Fiscal_Year_Budget.id',
-      'Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentbudget'
-    )
-    .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_fiscalyear')
+    .innerJoin('Agency_Chart_of_Account', 'Agency_Chart_of_Account.id', 'Transfer_Payment_Stream_Chart_of_Account.egcs_tp_agencychartofaccount')
+    .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Agency_Chart_of_Account.egcs_ay_fiscalyear')
     .where('Transfer_Payment_Stream_Chart_of_Account.egcs_tp_transferpaymentstream', '=', agreementContext.streamId)
-    .where('Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentstream', '=', agreementContext.streamId)
     .where('Transfer_Payment_Stream_Chart_of_Account._deleted', '=', false)
-    .where('Transfer_Payment_Stream_Budget._deleted', '=', false)
-    .where('Transfer_Payment_Fiscal_Year_Budget._deleted', '=', false)
+    .where('Agency_Chart_of_Account._deleted', '=', false)
     .where('Agency_Fiscal_Year._deleted', '=', false)
 
   if (search) {
     const pattern = `%${escapeLikePattern(search)}%`
     baseQuery = baseQuery.where(sql<boolean>`(
-      CAST(${sql.ref('Transfer_Payment_Stream_Chart_of_Account.egcs_tp_accountingdimensions')} AS text) ILIKE ${pattern}
+      CAST(${sql.ref('Agency_Chart_of_Account.egcs_ay_accountingdimensions')} AS text) ILIKE ${pattern}
       OR ${sql.ref('Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay')} ILIKE ${pattern}
     )`)
   }
@@ -58,11 +47,11 @@ export default defineEventHandler(async event => {
     baseQuery
       .select([
         'Transfer_Payment_Stream_Chart_of_Account.id as id',
-        'Transfer_Payment_Stream_Chart_of_Account.egcs_tp_accountingdimensions as accounting_dimensions',
+        'Agency_Chart_of_Account.egcs_ay_accountingdimensions as accounting_dimensions',
         'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display'
       ])
       .orderBy('Agency_Fiscal_Year.egcs_ay_fiscalyear', 'asc')
-      .orderBy(sql`LOWER("Transfer_Payment_Stream_Chart_of_Account"."egcs_tp_accountingdimensions"->0->>'value')`, 'asc')
+      .orderBy(sql`LOWER("Agency_Chart_of_Account"."egcs_ay_accountingdimensions"->0->>'value')`, 'asc')
       .orderBy('Transfer_Payment_Stream_Chart_of_Account.id', 'asc')
       .limit(limit)
       .offset(offset)

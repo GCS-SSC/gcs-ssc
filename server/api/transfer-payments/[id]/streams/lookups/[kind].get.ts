@@ -4,9 +4,12 @@ import { authorizeTransferPaymentProfileResource } from '~~/server/utils/transfe
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 import { fetchAgencyScopedList } from '~~/server/utils/agency-scoped-list'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
+import { formatAccountingDimensions } from '~~/shared/utils/accounting-dimensions'
+import type { TransferPaymentStreamChartOfAccountDimension } from '~~/shared/types/schemas/transfer-payment'
 
 const WizardLookupKindSchema = z.enum([
-  'applicant-recipient-subtypes', 'line-items', 'agreement-types', 'holdback-bases'
+  'applicant-recipient-subtypes', 'line-items', 'agreement-types', 'holdback-bases', 'monitor-types',
+  'chart-of-accounts', 'commitment-types'
 ], { error: 'validation.invalid_selection' })
 const WizardLookupQuerySchema = PaginationSchema.omit({ status: true }).extend({
   search: PaginationSchema.shape.search.refine(value => value === undefined || !value.includes('\u0000'), {
@@ -26,6 +29,31 @@ export default defineEventHandler(async event => {
     const { page, limit, search } = await getValidatedQueryI18n(event, WizardLookupQuerySchema)
     const term = search ? `%${escapeLikePattern(search)}%` : null
     const offset = (page - 1) * limit
+
+    if (kind === 'chart-of-accounts') {
+      const scoped = db.selectFrom('Agency_Chart_of_Account')
+        .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Agency_Chart_of_Account.egcs_ay_fiscalyear')
+        .where('Agency_Chart_of_Account.egcs_ay_organizationagency', '=', access.agencyId)
+        .where('Agency_Chart_of_Account._deleted', '=', false)
+        .where('Agency_Fiscal_Year._deleted', '=', false)
+      const filtered = term ? scoped.where(eb => eb('Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay', 'ilike', term)) : scoped
+      const result = await fetchAgencyScopedList({
+        items: filtered.selectAll('Agency_Chart_of_Account')
+          .select('Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display')
+          .orderBy('Agency_Chart_of_Account.id').limit(limit).offset(offset).execute(),
+        filteredCount: filtered.select(eb => eb.fn.count('Agency_Chart_of_Account.id').as('total')).executeTakeFirst(),
+        scopedCount: scoped.select(eb => eb.fn.count('Agency_Chart_of_Account.id').as('total')).executeTakeFirst(),
+        page, limit
+      })
+      return { ...result, items: result.items.map(item => {
+        const dimensions = item.egcs_ay_accountingdimensions as TransferPaymentStreamChartOfAccountDimension[]
+        return {
+          ...item,
+          label_en: `${item.fiscal_year_display} - ${formatAccountingDimensions(dimensions, 'en', ' - ')}`,
+          label_fr: `${item.fiscal_year_display} - ${formatAccountingDimensions(dimensions, 'fr', ' - ')}`
+        }
+      }) }
+    }
 
     if (kind === 'line-items') {
       const scoped = db.selectFrom('Agency_Cost_Category_Line_Item')
@@ -52,7 +80,11 @@ export default defineEventHandler(async event => {
 
     const table = kind === 'applicant-recipient-subtypes'
       ? 'Agency_Applicant_Recipient_Subtype'
-      : kind === 'agreement-types' ? 'Agency_Agreement_Type' : 'Agency_Holdback_Basis'
+      : kind === 'agreement-types'
+        ? 'Agency_Agreement_Type'
+        : kind === 'monitor-types'
+          ? 'Agency_Monitor_Type'
+          : kind === 'commitment-types' ? 'Agency_Commitment_Type' : 'Agency_Holdback_Basis'
     const scoped = db.selectFrom(table).where('egcs_ay_organizationagency', '=', access.agencyId).where('_deleted', '=', false)
     let filtered = scoped
     if (term) {

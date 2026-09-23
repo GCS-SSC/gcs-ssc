@@ -6,14 +6,14 @@ import { watch } from 'vue'
 const {
   transferPaymentId,
   streamId,
+  agencyId,
   canCreateChild,
-  canUpdateChild,
   canDeleteChild
 } = defineProps<{
   transferPaymentId: string
   streamId: string
+  agencyId: string
   canCreateChild: boolean
-  canUpdateChild: boolean
   canDeleteChild: boolean
 }>()
 
@@ -24,13 +24,13 @@ const modal = useCrudModal<TransferPaymentMonitorTypeItem>({
   createState: () => ({}),
   updateState: item => ({ ...item })
 })
-const { isOpen, openUpdate, selected, captureSession, closeSession } = modal
+const { isOpen, selected, captureSession, closeSession } = modal
 const openCreate = () => {
   if (canCreateChild) modal.openCreate()
 }
 const { getBilingualValue } = useBilingualValue()
 const getActionTarget = (item: TransferPaymentMonitorTypeItem) =>
-  `${getBilingualValue(item, 'egcs_tp_name', String(item.id))} [${item.id}]`
+  `${getBilingualValue(item, 'egcs_ay_name', String(item.id))} [${item.id}]`
 
 const {
   search,
@@ -44,12 +44,12 @@ const {
 })
 
 const columns: TableColumnInput<TransferPaymentMonitorTypeItem>[] = [
-  { id: 'name', accessorKey: 'egcs_tp_name_en', headerKey: 'common.name' },
+  { id: 'name', accessorKey: 'egcs_ay_name_en', headerKey: 'common.name' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
 
 const bilingualColumns: BilingualColumnConfig<TransferPaymentMonitorTypeItem>[] = [
-  { id: 'name', accessorKey: { en: 'egcs_tp_name_en', fr: 'egcs_tp_name_fr' } }
+  { id: 'name', accessorKey: { en: 'egcs_ay_name_en', fr: 'egcs_ay_name_fr' } }
 ]
 
 /**
@@ -96,22 +96,13 @@ watch([() => transferPaymentId, () => streamId], () => modal.close())
   >
     <template #name-cell="{ row }">
       <CommonBilingualName
-        :name-en="row.original.egcs_tp_name_en"
-        :name-fr="row.original.egcs_tp_name_fr"
+        :name-en="row.original.egcs_ay_name_en"
+        :name-fr="row.original.egcs_ay_name_fr"
       />
     </template>
 
     <template #actions-cell="{ row }">
       <div class="flex items-center gap-2">
-        <UButton
-          v-if="canUpdateChild"
-          icon="i-lucide-pencil"
-          color="neutral"
-          variant="ghost"
-          size="sm"
-          :aria-label="t('common.edit_named', { name: getActionTarget(row.original) })"
-          @click="openUpdate(row.original)"
-        />
         <UButton
           v-if="canDeleteChild"
           icon="i-lucide-trash"
@@ -126,11 +117,12 @@ watch([() => transferPaymentId, () => streamId], () => modal.close())
   </CommonResourceLayoutCard>
 
   <TransferPaymentMonitorTypeModal
-    v-if="selected && (selected.id ? canUpdateChild : canCreateChild)"
+    v-if="selected && canCreateChild"
     v-model:open="isOpen"
     v-model:state="selected"
     :transfer-payment-id="transferPaymentId"
     :stream-id="streamId"
+    :agency-id="agencyId"
     :capture-session="captureSession"
     :close-session="closeSession"
     @saved="refresh"

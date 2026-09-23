@@ -31,12 +31,6 @@ export default defineEventHandler(async event => {
 
   return await executeFreshAuthorizedTransferPaymentStreamWrite(
     event, db, profileId, streamContext.agencyId, streamId, 'delete', async trx => {
-      const reference = await trx.selectFrom('Funding_Case_Agreement_Monitor').select('id')
-        .where('egcs_fc_type', '=', monitorTypeId).where('_deleted', '=', false)
-        .forUpdate().executeTakeFirst()
-      if (reference) {
-        return await badRequest(event, 'MONITOR_TYPE_IN_USE', 'apiErrors.transfer_payment.monitor_type_in_use')
-      }
       const deleted = await trx.updateTable('Transfer_Payment_Monitor_Type').set({ _deleted: true })
         .where('id', '=', monitorTypeId).where('egcs_tp_transferpaymentstream', '=', streamId)
         .where('_deleted', '=', false).returning('id').executeTakeFirst()

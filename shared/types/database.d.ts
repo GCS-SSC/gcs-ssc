@@ -416,6 +416,10 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Agency_Cost_Category: AgencyCostCategoryTable
   Agency_Cost_Category_Line_Item: AgencyCostCategoryLineItemTable
   Agency_Fiscal_Year: AgencyFiscalYearTable
+  Agency_Chart_of_Account: AgencyChartOfAccountTable
+  Agency_Commitment_Type: AgencyCommitmentTypeTable
+  Agency_Monitor_Type: AgencyMonitorTypeTable
+  Agency_Document_Template: AgencyDocumentTemplateTable
   Agency_Address_Type: AgencyAddressTypeTable
   Agency_Applicant_Recipient_Subtype: AgencyApplicantRecipientSubtypeTable
   Agency_Approval_Behalf_Type: AgencyApprovalBehalfTypeTable
@@ -796,6 +800,30 @@ export interface AgencyFiscalYearTable {
   egcs_ay_fiscalyear: number
   egcs_ay_startdate: Date
   egcs_ay_enddate: Date
+  _deleted: Generated<boolean>
+}
+
+export interface AgencyChartOfAccountTable {
+  id: Generated<string>
+  egcs_ay_organizationagency: string
+  egcs_ay_fiscalyear: string
+  egcs_ay_accountingdimensions: JsonValue
+  _deleted: Generated<boolean>
+}
+
+export interface AgencyCommitmentTypeTable {
+  id: Generated<string>
+  egcs_ay_organizationagency: string
+  egcs_ay_name_en: string
+  egcs_ay_name_fr: string
+  _deleted: Generated<boolean>
+}
+
+export interface AgencyMonitorTypeTable {
+  id: Generated<string>
+  egcs_ay_organizationagency: string
+  egcs_ay_name_en: string
+  egcs_ay_name_fr: string
   _deleted: Generated<boolean>
 }
 
@@ -1531,6 +1559,7 @@ export interface FundingCaseAgreementPaymentLineTable {
 export interface FundingCaseAgreementMonitorTable {
   id: Generated<string>
   egcs_fc_fundingagreement: string
+  egcs_fc_transferpaymentstream: Generated<string>
   egcs_fc_type: string
   egcs_fc_onsite: boolean
   egcs_fc_tentativefiscalyear: string
@@ -2041,8 +2070,6 @@ export interface TransferPaymentStreamHoldbackBasisTable {
   id: Generated<string>
   egcs_tp_transferpaymentstream: string
   egcs_tp_agencyholdback: string
-  egcs_tp_name_en: string
-  egcs_tp_name_fr: string
   _deleted: Generated<boolean>
 }
 
@@ -2050,25 +2077,33 @@ export type TransferPaymentDocumentTemplateEntityType = 'fundingcaseagreement' |
 export type TransferPaymentDocumentTemplateKind = 'docx' | 'html'
 export type TransferPaymentDocumentTemplateOutputFormat = 'docx' | 'html' | 'pdf'
 
+export interface AgencyDocumentTemplateTable {
+  id: Generated<string>
+  egcs_ay_organizationagency: string
+  egcs_ay_entitytype: TransferPaymentDocumentTemplateEntityType
+  egcs_ay_name_en: string
+  egcs_ay_name_fr: string
+  egcs_ay_description_en: string
+  egcs_ay_description_fr: string
+  egcs_ay_templateattachment_en: string
+  egcs_ay_templateattachment_fr: string
+  egcs_ay_templatekind: TransferPaymentDocumentTemplateKind
+  egcs_ay_outputformats: TransferPaymentDocumentTemplateOutputFormat[]
+  egcs_ay_active: Generated<boolean>
+  _deleted: Generated<boolean>
+}
+
 export interface TransferPaymentStreamDocumentTemplateTable {
   id: Generated<string>
   egcs_tp_transferpaymentstream: string
-  egcs_tp_entitytype: TransferPaymentDocumentTemplateEntityType
-  egcs_tp_name_en: string
-  egcs_tp_name_fr: string
-  egcs_tp_description_en: string
-  egcs_tp_description_fr: string
-  egcs_tp_templateattachment_en: string
-  egcs_tp_templateattachment_fr: string
-  egcs_tp_templatekind: TransferPaymentDocumentTemplateKind
-  egcs_tp_outputformats: TransferPaymentDocumentTemplateOutputFormat[]
-  egcs_tp_active: Generated<boolean>
+  egcs_tp_agencydocumenttemplate: string
   _deleted: Generated<boolean>
 }
 
 export interface FundingCaseAgreementGeneratedDocumentTable {
   id: Generated<string>
   egcs_fc_fundingagreement: string
+  egcs_fc_transferpaymentstream: Generated<string>
   egcs_fc_closeout?: string | null
   egcs_fc_documenttemplate: string
   egcs_fc_generatedattachment: string
@@ -2207,24 +2242,21 @@ export interface TransferPaymentAgreementSubtypeTable {
 
 export interface TransferPaymentStreamChartOfAccountTable {
   id: Generated<string>
-  egcs_tp_streambudget: string
-  egcs_tp_accountingdimensions: JsonValue
+  egcs_tp_agencychartofaccount: string
   egcs_tp_transferpaymentstream: string
   _deleted: Generated<boolean>
 }
 
 export interface TransferPaymentStreamCommitmentTypeTable {
   id: Generated<string>
-  egcs_tp_name_en: string
-  egcs_tp_name_fr: string
+  egcs_tp_agencycommitmenttype: string
   egcs_tp_transferpaymentstream: string
   _deleted: Generated<boolean>
 }
 
 export interface TransferPaymentMonitorTypeTable {
   id: Generated<string>
-  egcs_tp_name_en: string
-  egcs_tp_name_fr: string
+  egcs_tp_agencymonitortype: string
   egcs_tp_transferpaymentstream: string
   _deleted: Generated<boolean>
 }

@@ -103,6 +103,26 @@ const CONSTRAINT_ERROR_MAP: Record<string, ConstraintErrorMapping> = {
     code: 'AGENCY_DUPLICATE_HOLDBACK_BASIS_CODE',
     key: 'apiErrors.agency.duplicate_holdback_basis_code'
   },
+  ay_idx_chartfiscalyeardimensions: {
+    code: 'AGENCY_DUPLICATE_CHART_OF_ACCOUNT',
+    key: 'apiErrors.agency.duplicate_chart_of_account'
+  },
+  ay_idx_commitmenttypenameen: {
+    code: 'AGENCY_DUPLICATE_COMMITMENT_TYPE_NAME_EN',
+    key: 'apiErrors.agency.duplicate_commitment_type_name_en'
+  },
+  ay_idx_commitmenttypenamefr: {
+    code: 'AGENCY_DUPLICATE_COMMITMENT_TYPE_NAME_FR',
+    key: 'apiErrors.agency.duplicate_commitment_type_name_fr'
+  },
+  ay_idx_monitortypenameen: {
+    code: 'AGENCY_DUPLICATE_MONITOR_TYPE_NAME_EN',
+    key: 'apiErrors.agency.duplicate_monitor_type_name_en'
+  },
+  ay_idx_monitortypenamefr: {
+    code: 'AGENCY_DUPLICATE_MONITOR_TYPE_NAME_FR',
+    key: 'apiErrors.agency.duplicate_monitor_type_name_fr'
+  },
   cn_idx_attachmenttypesagencynameen: {
     code: 'AGENCY_DUPLICATE_ATTACHMENT_TYPE_NAME_EN',
     key: 'apiErrors.agency.duplicate_attachment_type_name_en'

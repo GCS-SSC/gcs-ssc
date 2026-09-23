@@ -17,10 +17,9 @@ const { t } = useI18n()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
 const pending = useCrudModalPending(() => captureSession ? captureSession() : null)
-const isUpdate = computed(() => Boolean(state.value?.id))
 const submitCommitmentType = $fetch as unknown as (
   url: string,
-  options: { method: 'PATCH' | 'POST', body: z.infer<typeof TransferPaymentStreamCommitmentTypeSchema> }
+  options: { method: 'POST', body: z.infer<typeof TransferPaymentStreamCommitmentTypeSchema> }
 ) => Promise<unknown>
 
 /**
@@ -31,14 +30,10 @@ const submitCommitmentType = $fetch as unknown as (
 const onSubmit = async (event: FormSubmitEvent<z.infer<typeof TransferPaymentStreamCommitmentTypeSchema>>) => {
   const session = captureSession ? captureSession() : null
   if (!pending.begin(session)) return
-  const commitmentTypeId = state.value?.id
   try {
-    await submitCommitmentType(
-      commitmentTypeId
-        ? `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/commitment-types/${commitmentTypeId}`
-        : `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/commitment-types`,
-      { method: commitmentTypeId ? 'PATCH' : 'POST', body: event.data }
-    )
+    await submitCommitmentType(`/api/transfer-payments/${transferPaymentId}/streams/${streamId}/commitment-types`, {
+      method: 'POST', body: event.data
+    })
     if (closeSession && !closeSession(session)) return
     if (!closeSession) open.value = false
     emit('saved')
@@ -51,14 +46,16 @@ const onSubmit = async (event: FormSubmitEvent<z.infer<typeof TransferPaymentStr
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="isUpdate ? t('transfer_payment.commitment_types.update') : t('transfer_payment.commitment_types.create')">
+  <UModal v-model:open="open" :title="t('transfer_payment.commitment_types.create')">
     <template #body>
       <UForm v-if="state" :state="state" :validate="createValidator(TransferPaymentStreamCommitmentTypeSchema)" class="space-y-4" @submit="onSubmit">
-        <UFormField :label="t('transfer_payment.name_en')" name="egcs_tp_name_en">
-          <UInput v-model="state.egcs_tp_name_en" class="w-full" />
-        </UFormField>
-        <UFormField :label="t('transfer_payment.name_fr')" name="egcs_tp_name_fr">
-          <UInput v-model="state.egcs_tp_name_fr" class="w-full" />
+        <UFormField :label="t('transfer_payment.commitment_types.title')" name="egcs_tp_agencycommitmenttype" required>
+          <CommonServerLookupSelect
+            v-model="state.egcs_tp_agencycommitmenttype"
+            :fetch-url="`/api/transfer-payments/${transferPaymentId}/streams/lookups/commitment-types`"
+            value-key="id"
+            label-en-key="egcs_ay_name_en"
+            label-fr-key="egcs_ay_name_fr" />
         </UFormField>
         <div class="flex justify-end gap-2">
           <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="open = false" />

@@ -45,20 +45,11 @@ export default defineEventHandler(async event => {
       'Transfer_Payment_Stream_Chart_of_Account.id',
       'Funding_Case_Agreement_Commitment_Line.egcs_fc_transferpaymentstreamchartofaccount'
     )
-    .innerJoin(
-      'Transfer_Payment_Stream_Budget',
-      'Transfer_Payment_Stream_Budget.id',
-      'Transfer_Payment_Stream_Chart_of_Account.egcs_tp_streambudget'
-    )
-    .innerJoin(
-      'Transfer_Payment_Fiscal_Year_Budget',
-      'Transfer_Payment_Fiscal_Year_Budget.id',
-      'Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentbudget'
-    )
+    .innerJoin('Agency_Chart_of_Account', 'Agency_Chart_of_Account.id', 'Transfer_Payment_Stream_Chart_of_Account.egcs_tp_agencychartofaccount')
     .innerJoin(
       'Funding_Case_Agreement_Budget_Fiscal_Year',
       'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fiscalyear',
-      'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_fiscalyear'
+      'Agency_Chart_of_Account.egcs_ay_fiscalyear'
     )
     .innerJoin(
       'Funding_Case_Agreement_Budget_Version',
@@ -70,15 +61,14 @@ export default defineEventHandler(async event => {
     .where('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fundingagreement', '=', agreementId)
     .where('Funding_Case_Agreement_Commitment_Line._deleted', '=', false)
     .where('Transfer_Payment_Stream_Chart_of_Account._deleted', '=', false)
-    .where('Transfer_Payment_Stream_Budget._deleted', '=', false)
-    .where('Transfer_Payment_Fiscal_Year_Budget._deleted', '=', false)
+    .where('Agency_Chart_of_Account._deleted', '=', false)
     .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
     .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)
     .where('Funding_Case_Agreement_Budget_Version._deleted', '=', false)
 
   if (search) {
     baseQuery = baseQuery.where(sql<boolean>`(
-      CAST(${sql.ref('Transfer_Payment_Stream_Chart_of_Account.egcs_tp_accountingdimensions')} AS text) ILIKE ${`%${escapeLikePattern(search)}%`}
+      CAST(${sql.ref('Agency_Chart_of_Account.egcs_ay_accountingdimensions')} AS text) ILIKE ${`%${escapeLikePattern(search)}%`}
     )`)
   }
 
@@ -88,7 +78,7 @@ export default defineEventHandler(async event => {
         'Funding_Case_Agreement_Commitment_Line.id as id',
         databaseMoneyText(sql.ref('Funding_Case_Agreement_Commitment_Line.egcs_fc_amount')).as('commitment_line_amount'),
         'Funding_Case_Agreement_Commitment_Line.egcs_fc_commitmentlinenumber as commitment_line_number',
-        'Transfer_Payment_Stream_Chart_of_Account.egcs_tp_accountingdimensions as accounting_dimensions'
+        'Agency_Chart_of_Account.egcs_ay_accountingdimensions as accounting_dimensions'
       ])
       .orderBy('Funding_Case_Agreement_Commitment_Line.egcs_fc_commitmentlinenumber', 'asc')
       .limit(limit)

@@ -21,7 +21,11 @@ import AgencyCostCategories from '~/components/Agency/AgencyCostCategories.vue'
 import AgencyCustomFields from '~/components/Agency/AgencyCustomFields.vue'
 import AgencyDetailGeneralTab from '~/components/Agency/AgencyDetailGeneralTab.vue'
 import AgencyFiscalYears from '~/components/Agency/AgencyFiscalYears.vue'
+import AgencyChartOfAccounts from '~/components/Agency/AgencyChartOfAccounts.vue'
+import AgencyCommitmentTypes from '~/components/Agency/AgencyCommitmentTypes.vue'
 import AgencyHoldbackBases from '~/components/Agency/AgencyHoldbackBases.vue'
+import AgencyMonitorTypes from '~/components/Agency/AgencyMonitorTypes.vue'
+import AgencyDocumentTemplates from '~/components/Agency/AgencyDocumentTemplates.vue'
 import AgencyTransferPayments from '~/components/Agency/AgencyTransferPayments.vue'
 import AgencyStatuses from '~/components/Agency/AgencyStatuses.vue'
 import AgencyExtensionsTab from '~/components/Extension/AgencyExtensionsTab.vue'
@@ -80,7 +84,11 @@ const tabMap: TabMap = new Map([
   ['programs', { key: 'agency.tabs.programs', icon: 'i-lucide-banknote', component: AgencyTransferPayments, getProps: () => ({ agencyId: id }) }],
   ['costCategories', { key: 'agency.tabs.cost_categories', icon: 'i-lucide-layers', component: AgencyCostCategories, getProps: agencyResourceCapabilities }],
   ['fiscalYears', { key: 'agency.tabs.fiscal_years', icon: 'i-lucide-calendar', component: AgencyFiscalYears, getProps: agencyResourceCapabilities }],
+  ['chartOfAccounts', { key: 'agency.tabs.chart_of_accounts', icon: 'i-lucide-table-properties', component: AgencyChartOfAccounts, getProps: agencyResourceCapabilities }],
+  ['commitmentTypes', { key: 'agency.tabs.commitment_types', icon: 'i-lucide-tags', component: AgencyCommitmentTypes, getProps: agencyResourceCapabilities }],
+  ['documentTemplates', { key: 'agency.tabs.document_templates', icon: 'i-lucide-file-text', component: AgencyDocumentTemplates, getProps: agencyResourceCapabilities }],
   ['holdbackBases', { key: 'agency.tabs.holdback_bases', icon: 'i-lucide-percent', component: AgencyHoldbackBases, getProps: agencyResourceCapabilities }],
+  ['monitorTypes', { key: 'agency.tabs.monitor_types', icon: 'i-lucide-clipboard-check', component: AgencyMonitorTypes, getProps: agencyResourceCapabilities }],
   ['addressTypes', { key: 'agency.tabs.address_types', icon: 'i-lucide-map-pin', component: AgencyAddressTypes, getProps: agencyResourceCapabilities }],
   ['attachmentTypes', { key: 'agency.tabs.attachment_types', icon: 'i-lucide-paperclip', component: AgencyAttachmentTypes, getProps: agencyResourceCapabilities }],
   [

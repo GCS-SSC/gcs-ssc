@@ -10,7 +10,7 @@ import { sql, type Insertable, type Kysely, type Selectable } from 'kysely'
 import { badRequest, notFound, throwApiError } from './api-errors'
 import { bestEffortStorageCleanup, deleteStoredAttachmentById, readStoredFile, writeStoredFile } from './file-storage'
 import { escapeLikePattern } from './sql-like'
-import type { Database, FundingCaseAgreementGeneratedDocumentTable, Language_Preference, TransferPaymentDocumentTemplateEntityType, TransferPaymentDocumentTemplateOutputFormat, TransferPaymentStreamDocumentTemplateTable } from '~~/shared/types/database'
+import type { AgencyDocumentTemplateTable, Database, FundingCaseAgreementGeneratedDocumentTable, Language_Preference, TransferPaymentDocumentTemplateEntityType, TransferPaymentDocumentTemplateOutputFormat } from '~~/shared/types/database'
 import { buildAgreementCloseoutReadiness } from './agreement-closeout'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { databaseMoneyText, parseDatabaseMoney } from './database-money'
@@ -28,7 +28,9 @@ export type DocumentGenerationContextProvider = (payload: {
   event: H3Event
 }) => Promise<Record<string, unknown>> | Record<string, unknown>
 
-type TemplateRow = TransferPaymentStreamDocumentTemplateTable & {
+type TemplateRow = AgencyDocumentTemplateTable & {
+  id: string
+  egcs_tp_transferpaymentstream: string
   egcs_cn_provider_en: string
   egcs_cn_providerobjectid_en: string
   egcs_cn_providerlocator_en: import('~~/shared/types/database').JsonValue
@@ -540,20 +542,24 @@ const loadAgreementDocumentTemplate = async (
 ): Promise<TemplateRow | undefined> => {
   const template = await db
     .selectFrom('Transfer_Payment_Stream_Document_Template')
-    .innerJoin('Common_Attachment as AttachmentEn', 'AttachmentEn.id', 'Transfer_Payment_Stream_Document_Template.egcs_tp_templateattachment_en')
-    .innerJoin('Common_Attachment as AttachmentFr', 'AttachmentFr.id', 'Transfer_Payment_Stream_Document_Template.egcs_tp_templateattachment_fr')
+    .innerJoin('Agency_Document_Template', 'Agency_Document_Template.id', 'Transfer_Payment_Stream_Document_Template.egcs_tp_agencydocumenttemplate')
+    .innerJoin('Common_Attachment as AttachmentEn', 'AttachmentEn.id', 'Agency_Document_Template.egcs_ay_templateattachment_en')
+    .innerJoin('Common_Attachment as AttachmentFr', 'AttachmentFr.id', 'Agency_Document_Template.egcs_ay_templateattachment_fr')
     .innerJoin('Funding_Case_Agreement_Profile', 'Funding_Case_Agreement_Profile.egcs_fc_transferpaymentstream', 'Transfer_Payment_Stream_Document_Template.egcs_tp_transferpaymentstream')
     .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Funding_Case_Agreement_Profile.egcs_fc_transferpaymentstream')
     .innerJoin('Transfer_Payment_Profile', 'Transfer_Payment_Profile.id', 'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile')
     .where('Funding_Case_Agreement_Profile.id', '=', agreementId)
     .where('Transfer_Payment_Stream_Document_Template.id', '=', templateId)
-    .where('Transfer_Payment_Stream_Document_Template.egcs_tp_entitytype', '=', entityType)
-    .where('Transfer_Payment_Stream_Document_Template.egcs_tp_active', '=', true)
+    .where('Agency_Document_Template.egcs_ay_entitytype', '=', entityType)
+    .where('Agency_Document_Template.egcs_ay_active', '=', true)
+    .where('Agency_Document_Template._deleted', '=', false)
     .where('Transfer_Payment_Stream_Document_Template._deleted', '=', false)
     .where('AttachmentEn._deleted', '=', false)
     .where('AttachmentFr._deleted', '=', false)
-    .selectAll('Transfer_Payment_Stream_Document_Template')
+    .selectAll('Agency_Document_Template')
     .select([
+      'Transfer_Payment_Stream_Document_Template.id as id',
+      'Transfer_Payment_Stream_Document_Template.egcs_tp_transferpaymentstream as egcs_tp_transferpaymentstream',
       'AttachmentEn.egcs_cn_provider as egcs_cn_provider_en',
       'AttachmentEn.egcs_cn_providerobjectid as egcs_cn_providerobjectid_en',
       'AttachmentEn.egcs_cn_providerlocator as egcs_cn_providerlocator_en',
@@ -582,7 +588,7 @@ const buildGeneratedDocumentBaseFilename = (
   agreementId: string,
   language: Language_Preference
 ) => {
-  const templateFilenamePart = language === 'fra' ? template.egcs_tp_name_fr : template.egcs_tp_name_en
+  const templateFilenamePart = language === 'fra' ? template.egcs_ay_name_fr : template.egcs_ay_name_en
   const agreementNumber = context.agreement && typeof context.agreement === 'object'
     ? (context.agreement as Record<string, unknown>).number
     : agreementId
@@ -599,11 +605,11 @@ export const renderGeneratedAgreementDocument = async (
   baseFilename: string,
   options: DocumentRenderingOptions = {}
 ): Promise<GeneratedAgreementDocument> => {
-  if (outputFormat !== template.egcs_tp_templatekind && outputFormat !== 'pdf') {
+  if (outputFormat !== template.egcs_ay_templatekind && outputFormat !== 'pdf') {
     return await badRequest(event, 'DOCUMENT_OUTPUT_NOT_ALLOWED', 'apiErrors.document_generation.output_not_allowed')
   }
 
-  if (template.egcs_tp_templatekind === 'html') {
+  if (template.egcs_ay_templatekind === 'html') {
     const html = renderHtmlTemplate(templateBytes.toString('utf-8'), context, language)
     return outputFormat === 'pdf'
       ? {
@@ -672,8 +678,8 @@ const insertGeneratedAgreementDocumentRecord = async (
     egcs_fc_documenttemplate: templateId,
     egcs_fc_generatedattachment: storedAttachmentId,
     egcs_fc_language: language,
-    egcs_fc_name_en: template.egcs_tp_name_en,
-    egcs_fc_name_fr: template.egcs_tp_name_fr,
+    egcs_fc_name_en: template.egcs_ay_name_en,
+    egcs_fc_name_fr: template.egcs_ay_name_fr,
     egcs_fc_outputformat: outputFormat,
     egcs_fc_generatedat: new Date(),
     _deleted: false
@@ -737,26 +743,28 @@ export const listAgreementDocumentTemplates = async (
 
   let query = db
     .selectFrom('Transfer_Payment_Stream_Document_Template')
-    .innerJoin('Common_Attachment as AttachmentEn', 'AttachmentEn.id', 'Transfer_Payment_Stream_Document_Template.egcs_tp_templateattachment_en')
-    .innerJoin('Common_Attachment as AttachmentFr', 'AttachmentFr.id', 'Transfer_Payment_Stream_Document_Template.egcs_tp_templateattachment_fr')
+    .innerJoin('Agency_Document_Template', 'Agency_Document_Template.id', 'Transfer_Payment_Stream_Document_Template.egcs_tp_agencydocumenttemplate')
+    .innerJoin('Common_Attachment as AttachmentEn', 'AttachmentEn.id', 'Agency_Document_Template.egcs_ay_templateattachment_en')
+    .innerJoin('Common_Attachment as AttachmentFr', 'AttachmentFr.id', 'Agency_Document_Template.egcs_ay_templateattachment_fr')
     .where('Transfer_Payment_Stream_Document_Template.egcs_tp_transferpaymentstream', '=', String(agreement.egcs_fc_transferpaymentstream))
-    .where('Transfer_Payment_Stream_Document_Template.egcs_tp_entitytype', '=', entityType)
+    .where('Agency_Document_Template.egcs_ay_entitytype', '=', entityType)
     .where('Transfer_Payment_Stream_Document_Template._deleted', '=', false)
     .where('AttachmentEn._deleted', '=', false)
     .where('AttachmentFr._deleted', '=', false)
     .select([
       'Transfer_Payment_Stream_Document_Template.id as id',
       'Transfer_Payment_Stream_Document_Template.egcs_tp_transferpaymentstream as egcs_tp_transferpaymentstream',
-      'Transfer_Payment_Stream_Document_Template.egcs_tp_entitytype as egcs_tp_entitytype',
-      'Transfer_Payment_Stream_Document_Template.egcs_tp_name_en as egcs_tp_name_en',
-      'Transfer_Payment_Stream_Document_Template.egcs_tp_name_fr as egcs_tp_name_fr',
-      'Transfer_Payment_Stream_Document_Template.egcs_tp_description_en as egcs_tp_description_en',
-      'Transfer_Payment_Stream_Document_Template.egcs_tp_description_fr as egcs_tp_description_fr',
-      'Transfer_Payment_Stream_Document_Template.egcs_tp_templateattachment_en as egcs_tp_templateattachment_en',
-      'Transfer_Payment_Stream_Document_Template.egcs_tp_templateattachment_fr as egcs_tp_templateattachment_fr',
-      'Transfer_Payment_Stream_Document_Template.egcs_tp_templatekind as egcs_tp_templatekind',
-      'Transfer_Payment_Stream_Document_Template.egcs_tp_outputformats as egcs_tp_outputformats',
-      'Transfer_Payment_Stream_Document_Template.egcs_tp_active as egcs_tp_active',
+      'Transfer_Payment_Stream_Document_Template.egcs_tp_agencydocumenttemplate as egcs_tp_agencydocumenttemplate',
+      'Agency_Document_Template.egcs_ay_entitytype as egcs_ay_entitytype',
+      'Agency_Document_Template.egcs_ay_name_en as egcs_ay_name_en',
+      'Agency_Document_Template.egcs_ay_name_fr as egcs_ay_name_fr',
+      'Agency_Document_Template.egcs_ay_description_en as egcs_ay_description_en',
+      'Agency_Document_Template.egcs_ay_description_fr as egcs_ay_description_fr',
+      'Agency_Document_Template.egcs_ay_templateattachment_en as egcs_ay_templateattachment_en',
+      'Agency_Document_Template.egcs_ay_templateattachment_fr as egcs_ay_templateattachment_fr',
+      'Agency_Document_Template.egcs_ay_templatekind as egcs_ay_templatekind',
+      'Agency_Document_Template.egcs_ay_outputformats as egcs_ay_outputformats',
+      'Agency_Document_Template.egcs_ay_active as egcs_ay_active',
       'AttachmentEn.egcs_cn_name_en as attachment_en_name_en',
       'AttachmentEn.egcs_cn_name_fr as attachment_en_name_fr',
       'AttachmentEn.egcs_cn_mimetype as attachment_en_mimetype',
@@ -769,7 +777,7 @@ export const listAgreementDocumentTemplates = async (
     .orderBy('Transfer_Payment_Stream_Document_Template.id', 'asc')
 
   if (activeOnly) {
-    query = query.where('Transfer_Payment_Stream_Document_Template.egcs_tp_active', '=', true)
+    query = query.where('Agency_Document_Template.egcs_ay_active', '=', true).where('Agency_Document_Template._deleted', '=', false)
   }
 
   return await query.execute()
@@ -806,8 +814,8 @@ export const buildAgreementDocumentContext = async (
       'Funding_Case_Agreement_Profile.egcs_fc_authorizedassistancestartdate as startDate',
       'Funding_Case_Agreement_Profile.egcs_fc_authorizedassistanceenddate as endDate',
       'Funding_Case_Agreement_Profile.egcs_fc_holdback as holdback',
-      'Transfer_Payment_Stream_Holdback_Basis.egcs_tp_name_en as holdbackBasisEn',
-      'Transfer_Payment_Stream_Holdback_Basis.egcs_tp_name_fr as holdbackBasisFr',
+      'Agency_Holdback_Basis.egcs_ay_name_en as holdbackBasisEn',
+      'Agency_Holdback_Basis.egcs_ay_name_fr as holdbackBasisFr',
       'Agency_Holdback_Basis.egcs_ay_languageindependentcode as holdbackBasisCode',
       'Agency_Profile.egcs_ay_name_en as agencyNameEn',
       'Agency_Profile.egcs_ay_name_fr as agencyNameFr',
@@ -1301,7 +1309,7 @@ export const loadAgreementDocumentRenderInput = async (
     return await notFound(event, 'DOCUMENT_TEMPLATE_NOT_FOUND', 'apiErrors.document_generation.template_not_found')
   }
 
-  if (!template.egcs_tp_outputformats.includes(outputFormat)) {
+  if (!template.egcs_ay_outputformats.includes(outputFormat)) {
     return await badRequest(event, 'DOCUMENT_OUTPUT_NOT_ALLOWED', 'apiErrors.document_generation.output_not_allowed')
   }
 
@@ -1403,7 +1411,7 @@ const renderCloseoutDocument = async (
   ])
   if (!template) return await notFound(event, 'DOCUMENT_TEMPLATE_NOT_FOUND', 'apiErrors.document_generation.template_not_found')
   if (!closeout || !readiness) return await notFound(event, 'AGREEMENT_CLOSEOUT_NOT_FOUND', 'apiErrors.agreement.closeout_not_found')
-  if (!template.egcs_tp_outputformats.includes(outputFormat)) {
+  if (!template.egcs_ay_outputformats.includes(outputFormat)) {
     return await badRequest(event, 'DOCUMENT_OUTPUT_NOT_ALLOWED', 'apiErrors.document_generation.output_not_allowed')
   }
 

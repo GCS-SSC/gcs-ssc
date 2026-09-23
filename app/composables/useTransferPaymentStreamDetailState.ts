@@ -114,7 +114,7 @@ export const useTransferPaymentStreamDetailState = (
     ],
     [
       'holdbackBases',
-      { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.holdbackBases, icon: 'i-lucide-percent', component: TransferPaymentStreamHoldbackBasesTab, getProps: () => ({ transferPaymentId: id, streamId, agencyId: agencyId.value, canCreateChild: canCreateChild.value, canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }
+      { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.holdbackBases, icon: 'i-lucide-percent', component: TransferPaymentStreamHoldbackBasesTab, getProps: () => ({ transferPaymentId: id, streamId, agencyId: agencyId.value, canCreateChild: canCreateChild.value, canDeleteChild: canDeleteChild.value }) }
     ],
     [
       'budgets',
@@ -150,7 +150,7 @@ export const useTransferPaymentStreamDetailState = (
     ],
     [
       'monitorTypes',
-      { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.monitorTypes, icon: 'i-lucide-clipboard-check', component: TransferPaymentMonitorTypesTab, getProps: () => ({ transferPaymentId: id, streamId, canCreateChild: canCreateChild.value, canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }
+      { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.monitorTypes, icon: 'i-lucide-clipboard-check', component: TransferPaymentMonitorTypesTab, getProps: () => ({ transferPaymentId: id, streamId, agencyId: agencyId.value ?? '', canCreateChild: canCreateChild.value, canDeleteChild: canDeleteChild.value }) }
     ],
     ['customFields', { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.customFields, value: 'custom-fields', icon: 'i-lucide-list-filter', component: CustomFieldsTab, getProps: () => ({ transferPaymentId: id, streamId, canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }],
     [
@@ -171,7 +171,7 @@ export const useTransferPaymentStreamDetailState = (
     ],
     [
       'document-templates',
-      { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.documentTemplates, value: 'document-templates', icon: 'i-lucide-files', component: TransferPaymentDocumentTemplatesTab, getProps: () => ({ transferPaymentId: id, streamId, canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }
+      { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.documentTemplates, value: 'document-templates', icon: 'i-lucide-files', component: TransferPaymentDocumentTemplatesTab, getProps: () => ({ transferPaymentId: id, streamId, agencyId: agencyId.value ?? '', canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }
     ],
     [
       'workflowSetups',

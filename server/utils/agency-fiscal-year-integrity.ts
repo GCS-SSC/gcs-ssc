@@ -20,18 +20,23 @@ export const assertAgencyFiscalYearNotInUse = async (
   const programBudget = await trx.selectFrom('Transfer_Payment_Fiscal_Year_Budget')
     .select('id').where('egcs_tp_fiscalyear', '=', fiscalYearId)
     .where('_deleted', '=', false).executeTakeFirst()
-  const agreementBudget = programBudget
+  const chartDefinition = programBudget
+    ? undefined
+    : await trx.selectFrom('Agency_Chart_of_Account')
+        .select('id').where('egcs_ay_fiscalyear', '=', fiscalYearId)
+        .where('_deleted', '=', false).executeTakeFirst()
+  const agreementBudget = programBudget || chartDefinition
     ? undefined
     : await trx.selectFrom('Funding_Case_Agreement_Budget_Fiscal_Year')
         .select('id').where('egcs_fc_fiscalyear', '=', fiscalYearId)
         .where('_deleted', '=', false).executeTakeFirst()
-  const monitor = programBudget || agreementBudget
+  const monitor = programBudget || chartDefinition || agreementBudget
     ? undefined
     : await trx.selectFrom('Funding_Case_Agreement_Monitor')
         .select('id').where('egcs_fc_tentativefiscalyear', '=', fiscalYearId)
         .where('_deleted', '=', false).executeTakeFirst()
 
-  if (programBudget || agreementBudget || monitor) {
+  if (programBudget || chartDefinition || agreementBudget || monitor) {
     return await badRequest(event, 'AGENCY_FISCAL_YEAR_IN_USE', 'apiErrors.agency.fiscal_year_in_use')
   }
 }

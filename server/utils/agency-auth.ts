@@ -20,6 +20,8 @@ export type AgencySubentityTable =
   | 'Agency_Approval_Behalf_Type'
   | 'Agency_Agreement_Type'
   | 'Agency_Holdback_Basis'
+  | 'Agency_Document_Template'
+  | 'Agency_Monitor_Type'
   | 'Agency_Fiscal_Year'
   | 'Agency_Applicant_Recipient_Subtype'
   | 'Common_Attachment_Types'

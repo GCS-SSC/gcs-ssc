@@ -38,10 +38,8 @@ const INDEX_NAMES = {
   streamAmendmentSubtypeType: 'tp_idx_amendmentsubtypetype',
   streamAgreementSubtype: 'tp_idx_agreementsubtypetransferpaymentstreamagreementtype',
   streamAgreementSubtypeIdStreamUnique: 'tp_idx_agreementsubtypeidtransferpaymentstream',
-  streamCommitmentTypeEn: 'tp_idx_commitmenttypetransferpaymentstreamnameen',
-  streamCommitmentTypeFr: 'tp_idx_commitmenttypetransferpaymentstreamnamefr',
-  streamMonitorTypeEn: 'tp_idx_monitortypetransferpaymentstreamnameen',
-  streamMonitorTypeFr: 'tp_idx_monitortypetransferpaymentstreamnamefr',
+  streamCommitmentTypeAgency: 'tp_idx_commitmenttypetransferpaymentstreamagencytype',
+  streamMonitorTypeAgency: 'tp_idx_monitortypetransferpaymentstreamagencytype',
   streamRiskRatingScore: 'tp_idx_streamriskratingtransferpaymentstreamriskscore',
   streamRiskRatingEn: 'tp_idx_streamriskratingtransferpaymentstreamnameen',
   streamRiskRatingFr: 'tp_idx_streamriskratingtransferpaymentstreamnamefr',
@@ -168,9 +166,8 @@ export async function up(db: Kysely<Database>): Promise<void> {
     .addColumn('egcs_tp_agencyholdback', 'bigint', col =>
       col.notNull().references('Agency_Holdback_Basis.id').onDelete('restrict')
     )
-    .addColumn('egcs_tp_name_en', 'varchar(255)', col => col.notNull())
-    .addColumn('egcs_tp_name_fr', 'varchar(255)', col => col.notNull())
     .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
+    .addUniqueConstraint('tp_uq_holdbackbasisidstream', ['id', 'egcs_tp_transferpaymentstream'])
     .execute()
 
   await db.schema
@@ -427,31 +424,22 @@ export async function up(db: Kysely<Database>): Promise<void> {
   await db.schema
     .createTable('Transfer_Payment_Stream_Chart_of_Account')
     .addColumn('id', 'bigserial', col => col.primaryKey())
-    .addColumn('egcs_tp_streambudget', 'bigint', col => col.notNull())
-    .addColumn('egcs_tp_accountingdimensions', 'jsonb', col => col.notNull())
+    .addColumn('egcs_tp_agencychartofaccount', 'bigint', col =>
+      col.notNull().references('Agency_Chart_of_Account.id').onDelete('restrict')
+    )
     .addColumn('egcs_tp_transferpaymentstream', 'bigint', col =>
       col.notNull().references('Transfer_Payment_Stream.id').onDelete('restrict')
     )
     .addUniqueConstraint('fc_unq_chartofaccountidstream', ['id', 'egcs_tp_transferpaymentstream'])
     .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
-    .addForeignKeyConstraint(
-      'tp_ref_chartofaccountbudgetstream',
-      ['egcs_tp_streambudget', 'egcs_tp_transferpaymentstream'],
-      'Transfer_Payment_Stream_Budget',
-      ['id', 'egcs_tp_transferpaymentstream'],
-      constraint => constraint.onDelete('restrict')
-    )
-    .addCheckConstraint(
-      'tp_chk_chartofaccountdimensions',
-      sql`jsonb_typeof(egcs_tp_accountingdimensions) = 'array' AND jsonb_array_length(egcs_tp_accountingdimensions) > 0`
-    )
     .execute()
 
   await db.schema
     .createTable('Transfer_Payment_Stream_Commitment_Type')
     .addColumn('id', 'bigserial', col => col.primaryKey())
-    .addColumn('egcs_tp_name_en', 'varchar(255)', col => col.notNull())
-    .addColumn('egcs_tp_name_fr', 'varchar(255)', col => col.notNull())
+    .addColumn('egcs_tp_agencycommitmenttype', 'bigint', col =>
+      col.notNull().references('Agency_Commitment_Type.id').onDelete('restrict')
+    )
     .addColumn('egcs_tp_transferpaymentstream', 'bigint', col =>
       col.notNull().references('Transfer_Payment_Stream.id').onDelete('restrict')
     )
@@ -462,12 +450,14 @@ export async function up(db: Kysely<Database>): Promise<void> {
   await db.schema
     .createTable('Transfer_Payment_Monitor_Type')
     .addColumn('id', 'bigserial', col => col.primaryKey())
-    .addColumn('egcs_tp_name_en', 'varchar(255)', col => col.notNull())
-    .addColumn('egcs_tp_name_fr', 'varchar(255)', col => col.notNull())
+    .addColumn('egcs_tp_agencymonitortype', 'bigint', col =>
+      col.notNull().references('Agency_Monitor_Type.id').onDelete('restrict')
+    )
     .addColumn('egcs_tp_transferpaymentstream', 'bigint', col =>
       col.notNull().references('Transfer_Payment_Stream.id').onDelete('restrict')
     )
     .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
+    .addUniqueConstraint('tp_uq_monitortypeidstream', ['id', 'egcs_tp_transferpaymentstream'])
     .execute()
 
   await db.schema
@@ -518,15 +508,9 @@ export async function up(db: Kysely<Database>): Promise<void> {
     .unique()
     .execute()
 
-  await db.schema.createIndex(INDEX_NAMES.streamCommitmentTypeEn)
+  await db.schema.createIndex(INDEX_NAMES.streamCommitmentTypeAgency)
     .on('Transfer_Payment_Stream_Commitment_Type')
-    .columns(['egcs_tp_transferpaymentstream', 'egcs_tp_name_en'])
-    .where(sql<SqlBool>`_deleted = false`)
-    .unique()
-    .execute()
-  await db.schema.createIndex(INDEX_NAMES.streamCommitmentTypeFr)
-    .on('Transfer_Payment_Stream_Commitment_Type')
-    .columns(['egcs_tp_transferpaymentstream', 'egcs_tp_name_fr'])
+    .columns(['egcs_tp_transferpaymentstream', 'egcs_tp_agencycommitmenttype'])
     .where(sql<SqlBool>`_deleted = false`)
     .unique()
     .execute()
@@ -536,8 +520,7 @@ export async function up(db: Kysely<Database>): Promise<void> {
     .on('Transfer_Payment_Stream_Chart_of_Account')
     .columns([
       'egcs_tp_transferpaymentstream',
-      'egcs_tp_streambudget',
-      'egcs_tp_accountingdimensions'
+      'egcs_tp_agencychartofaccount'
     ])
     .where(sql<SqlBool>`_deleted = false`)
     .unique()
@@ -752,19 +735,10 @@ export async function up(db: Kysely<Database>): Promise<void> {
   `.execute(db)
 
   await sql`
-    CREATE UNIQUE INDEX ${sql.raw(INDEX_NAMES.streamMonitorTypeEn)}
+    CREATE UNIQUE INDEX ${sql.raw(INDEX_NAMES.streamMonitorTypeAgency)}
     ON "Transfer_Payment_Monitor_Type" (
       "egcs_tp_transferpaymentstream",
-      "egcs_tp_name_en"
-    )
-    WHERE "_deleted" = false
-  `.execute(db)
-
-  await sql`
-    CREATE UNIQUE INDEX ${sql.raw(INDEX_NAMES.streamMonitorTypeFr)}
-    ON "Transfer_Payment_Monitor_Type" (
-      "egcs_tp_transferpaymentstream",
-      "egcs_tp_name_fr"
+      "egcs_tp_agencymonitortype"
     )
     WHERE "_deleted" = false
   `.execute(db)
@@ -996,8 +970,7 @@ export async function down(db: Kysely<Database>): Promise<void> {
   await db.schema.dropIndex(INDEX_NAMES.streamRiskRatingFr).execute()
   await db.schema.dropIndex(INDEX_NAMES.streamRiskRatingEn).execute()
   await db.schema.dropIndex(INDEX_NAMES.streamRiskRatingScore).execute()
-  await db.schema.dropIndex(INDEX_NAMES.streamMonitorTypeFr).execute()
-  await db.schema.dropIndex(INDEX_NAMES.streamMonitorTypeEn).execute()
+  await db.schema.dropIndex(INDEX_NAMES.streamMonitorTypeAgency).execute()
   await db.schema.dropIndex(INDEX_NAMES.streamAgreementSubtype).execute()
   await db.schema.dropIndex(INDEX_NAMES.streamAmendmentSubtypeFr).execute()
   await db.schema.dropIndex(INDEX_NAMES.streamAmendmentSubtypeEn).execute()
@@ -1022,8 +995,7 @@ export async function down(db: Kysely<Database>): Promise<void> {
   await db.schema.dropIndex(INDEX_NAMES.profileNameFr).execute()
   await db.schema.dropIndex(INDEX_NAMES.profileNameEn).execute()
   await db.schema.dropIndex(STREAM_CHART_OF_ACCOUNT_UNIQUE).execute()
-  await db.schema.dropIndex(INDEX_NAMES.streamCommitmentTypeFr).execute()
-  await db.schema.dropIndex(INDEX_NAMES.streamCommitmentTypeEn).execute()
+  await db.schema.dropIndex(INDEX_NAMES.streamCommitmentTypeAgency).execute()
   await db.schema.dropIndex(FINANCIAL_LIMITS_STREAM_STATUS_UNIQUE).execute()
 
   await sql`DROP INDEX IF EXISTS ${sql.raw(ROLE_TRANSFER_PAYMENT_SCOPE_UNIQUE_ACTIVE)}`.execute(db)

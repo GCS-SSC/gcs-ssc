@@ -118,6 +118,14 @@ export const AgencyHoldbackBasisWriteSchema = AgencyHoldbackBasisSchema.extend({
 export type AgencyHoldbackBasis = z.infer<typeof AgencyHoldbackBasisSchema>
 export type AgencyHoldbackBasisItem = WithId<AgencyHoldbackBasis>
 
+export const AgencyMonitorTypeSchema = z.object({
+  egcs_ay_name_en: AgencyLabelSchema('validation.name_en_required'),
+  egcs_ay_name_fr: AgencyLabelSchema('validation.name_fr_required')
+})
+export const AgencyMonitorTypePatchSchema = AgencyMonitorTypeSchema.partial()
+export type AgencyMonitorType = z.infer<typeof AgencyMonitorTypeSchema>
+export type AgencyMonitorTypeItem = WithId<AgencyMonitorType & { egcs_ay_organizationagency: string }>
+
 // --- Cost Category ---
 export const AgencyCostCategorySchema = z.object({
   egcs_ay_active: z.boolean({ error: 'validation.required' }).default(true),

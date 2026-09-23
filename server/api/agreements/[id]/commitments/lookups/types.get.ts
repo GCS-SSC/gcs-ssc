@@ -23,19 +23,21 @@ export default defineEventHandler(async event => {
   const { db, agreementContext } = prepared
   const offset = (page - 1) * limit
   let query = db.selectFrom('Transfer_Payment_Stream_Commitment_Type')
-    .where('egcs_tp_transferpaymentstream', '=', agreementContext.streamId)
-    .where('_deleted', '=', false)
+    .innerJoin('Agency_Commitment_Type', 'Agency_Commitment_Type.id', 'Transfer_Payment_Stream_Commitment_Type.egcs_tp_agencycommitmenttype')
+    .where('Transfer_Payment_Stream_Commitment_Type.egcs_tp_transferpaymentstream', '=', agreementContext.streamId)
+    .where('Transfer_Payment_Stream_Commitment_Type._deleted', '=', false)
+    .where('Agency_Commitment_Type._deleted', '=', false)
   if (search) {
     const pattern = `%${escapeLikePattern(search)}%`
     query = query.where(eb => eb.or([
-      eb('egcs_tp_name_en', 'ilike', pattern),
-      eb('egcs_tp_name_fr', 'ilike', pattern)
+      eb('Agency_Commitment_Type.egcs_ay_name_en', 'ilike', pattern),
+      eb('Agency_Commitment_Type.egcs_ay_name_fr', 'ilike', pattern)
     ]))
   }
   const [items, count] = await Promise.all([
-    query.select(['id', 'egcs_tp_name_en as label_en', 'egcs_tp_name_fr as label_fr'])
-      .orderBy('egcs_tp_name_en').limit(limit).offset(offset).execute(),
-    query.select(eb => eb.fn.count('id').as('total')).executeTakeFirst()
+    query.select(['Transfer_Payment_Stream_Commitment_Type.id as id', 'Agency_Commitment_Type.egcs_ay_name_en as label_en', 'Agency_Commitment_Type.egcs_ay_name_fr as label_fr'])
+      .orderBy('Agency_Commitment_Type.egcs_ay_name_en').limit(limit).offset(offset).execute(),
+    query.select(eb => eb.fn.count('Transfer_Payment_Stream_Commitment_Type.id').as('total')).executeTakeFirst()
   ])
   const total = Number(count?.total ?? 0)
   return { items, total, stats: { total, active: total }, page, limit }

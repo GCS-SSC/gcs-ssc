@@ -26,16 +26,18 @@ export default defineEventHandler(async event => {
   const search = query.search?.trim() ?? ''
   const baseQuery = db
     .selectFrom('Transfer_Payment_Monitor_Type')
-    .where('egcs_tp_transferpaymentstream', '=', agreementContext.streamId)
-    .where('_deleted', '=', false)
+    .innerJoin('Agency_Monitor_Type', 'Agency_Monitor_Type.id', 'Transfer_Payment_Monitor_Type.egcs_tp_agencymonitortype')
+    .where('Transfer_Payment_Monitor_Type.egcs_tp_transferpaymentstream', '=', agreementContext.streamId)
+    .where('Transfer_Payment_Monitor_Type._deleted', '=', false)
+    .where('Agency_Monitor_Type._deleted', '=', false)
     .$if(search.length > 0, qb => qb.where(eb => eb.or([
-      eb('egcs_tp_name_en', 'ilike', `%${search}%`),
-      eb('egcs_tp_name_fr', 'ilike', `%${search}%`)
+      eb('Agency_Monitor_Type.egcs_ay_name_en', 'ilike', `%${search}%`),
+      eb('Agency_Monitor_Type.egcs_ay_name_fr', 'ilike', `%${search}%`)
     ])))
 
   const [items, countResult] = await Promise.all([
-    baseQuery.select(['id', 'egcs_tp_name_en as label_en', 'egcs_tp_name_fr as label_fr']).orderBy('egcs_tp_name_en', 'asc').limit(limit).offset((page - 1) * limit).execute(),
-    baseQuery.select(eb => eb.fn.count('id').as('total')).executeTakeFirst()
+    baseQuery.select(['Transfer_Payment_Monitor_Type.id as id', 'Agency_Monitor_Type.egcs_ay_name_en as label_en', 'Agency_Monitor_Type.egcs_ay_name_fr as label_fr']).orderBy('Agency_Monitor_Type.egcs_ay_name_en', 'asc').limit(limit).offset((page - 1) * limit).execute(),
+    baseQuery.select(eb => eb.fn.count('Transfer_Payment_Monitor_Type.id').as('total')).executeTakeFirst()
   ])
 
   const total = Number(countResult?.total ?? 0)

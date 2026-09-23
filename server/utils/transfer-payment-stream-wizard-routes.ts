@@ -230,6 +230,24 @@ const assertHoldbackBasisReferences = async (
   return null
 }
 
+/** Validates Agency Monitor Type definitions selected for a new Stream. */
+const assertMonitorTypeReferences = async (
+  event: H3Event,
+  db: StreamWizardTransaction,
+  agencyId: string,
+  payload: StreamWizardPayload
+): Promise<unknown | null> => {
+  if (payload.monitorTypes.length === 0) return null
+  const ids = uniqueStrings(payload.monitorTypes, item => item.egcs_tp_agencymonitortype)
+  const rows = await db.selectFrom('Agency_Monitor_Type').select('id')
+    .where('id', 'in', ids).where('egcs_ay_organizationagency', '=', agencyId)
+    .where('_deleted', '=', false).orderBy('id', 'asc').forUpdate('Agency_Monitor_Type').execute()
+  if (hasMissingId(ids, rows)) {
+    return await routeBadRequest(event, 'INVALID_MONITOR_TYPE', 'apiErrors.agreement.invalid_monitor_type')
+  }
+  return null
+}
+
 /** Validates agreement subtype agreement-type references against the agency. */
 const assertAgreementTypeReferences = async (
   event: H3Event,
@@ -280,14 +298,38 @@ const assertAmendmentSubtypeTempReferences = async (
   return null
 }
 
-/** Validates wizard-local chart-of-account references to stream budgets. */
-const assertChartOfAccountBudgetReferences = async (
+/** Validates Agency finance selections against the Stream's proposed fiscal-year budgets. */
+const assertAgencyFinanceReferences = async (
   event: H3Event,
+  db: StreamWizardTransaction,
+  agencyId: string,
   payload: StreamWizardPayload
 ): Promise<unknown | null> => {
-  const budgetTempIds = new Set(payload.budgets.map(item => item.tempId))
-  if ((payload.chartOfAccounts ?? []).some(item => !budgetTempIds.has(item.tempStreamBudgetId))) {
-    return await routeBadRequest(event, 'TRANSFER_PAYMENT_BUDGET_NOT_FOUND', 'apiErrors.transfer_payment.budget_not_found')
+  const chartIds = uniqueStrings(payload.chartOfAccounts ?? [], item => item.egcs_tp_agencychartofaccount)
+  if (chartIds.length) {
+    const charts = await db.selectFrom('Agency_Chart_of_Account')
+      .where('id', 'in', chartIds).where('egcs_ay_organizationagency', '=', agencyId)
+      .where('_deleted', '=', false).select(['id', 'egcs_ay_fiscalyear'])
+      .forUpdate().execute()
+    const budgetIds = uniqueStrings(payload.budgets, item => item.egcs_tp_transferpaymentbudget)
+    const budgets = budgetIds.length
+      ? await db.selectFrom('Transfer_Payment_Fiscal_Year_Budget')
+          .where('id', 'in', budgetIds).where('_deleted', '=', false)
+          .select('egcs_tp_fiscalyear').forUpdate().execute()
+      : []
+    const eligibleYears = new Set(budgets.map(row => String(row.egcs_tp_fiscalyear)))
+    if (hasMissingId(chartIds, charts) || charts.some(row => !eligibleYears.has(String(row.egcs_ay_fiscalyear)))) {
+      return await routeBadRequest(event, 'CHART_OF_ACCOUNT_NOT_FOUND', 'apiErrors.transfer_payment.chart_of_account_not_found')
+    }
+  }
+  const typeIds = uniqueStrings(payload.commitmentTypes ?? [], item => item.egcs_tp_agencycommitmenttype)
+  if (typeIds.length) {
+    const types = await db.selectFrom('Agency_Commitment_Type')
+      .where('id', 'in', typeIds).where('egcs_ay_organizationagency', '=', agencyId)
+      .where('_deleted', '=', false).select('id').forUpdate().execute()
+    if (hasMissingId(typeIds, types)) {
+      return await routeBadRequest(event, 'COMMITMENT_TYPE_NOT_FOUND', 'apiErrors.transfer_payment.commitment_type_not_found')
+    }
   }
 
   return null
@@ -307,9 +349,10 @@ export const validateTransferPaymentStreamWizardReferences = async ({
     () => assertEligibleRecipientReferences(event, db, agencyId, payload),
     () => assertCostCategoryReferences(event, db, agencyId, payload),
     () => assertHoldbackBasisReferences(event, db, agencyId, payload),
+    () => assertMonitorTypeReferences(event, db, agencyId, payload),
     () => assertAgreementTypeReferences(event, db, agencyId, payload),
     () => assertAmendmentSubtypeTempReferences(event, payload),
-    () => assertChartOfAccountBudgetReferences(event, payload)
+    () => assertAgencyFinanceReferences(event, db, agencyId, payload)
   ]
 
   for (const validate of validators) {
@@ -359,9 +402,7 @@ const insertSimpleStreamWizardChildren = async (
   if (payload.holdbackBases.length > 0) {
     await trx.insertInto('Transfer_Payment_Stream_Holdback_Basis').values(payload.holdbackBases.map(item => ({
       egcs_tp_transferpaymentstream: streamId,
-      egcs_tp_agencyholdback: item.egcs_tp_agencyholdback,
-      egcs_tp_name_en: item.egcs_tp_name_en,
-      egcs_tp_name_fr: item.egcs_tp_name_fr
+      egcs_tp_agencyholdback: item.egcs_tp_agencyholdback
     }))).execute()
   }
   if (payload.budgets.length > 0) {
@@ -490,8 +531,7 @@ const insertAmendmentSubtypes = async (
 const insertRemainingStreamWizardChildren = async (
   trx: StreamWizardTransaction,
   streamId: string,
-  payload: StreamWizardPayload,
-  streamBudgetIdByTempId: Map<string, string>
+  payload: StreamWizardPayload
 ): Promise<void> => {
   if (payload.agreementSubtypes.length > 0) {
     await trx.insertInto('Transfer_Payment_Agreement_Subtype').values(payload.agreementSubtypes.map(item => ({
@@ -501,36 +541,23 @@ const insertRemainingStreamWizardChildren = async (
   }
 
   if ((payload.chartOfAccounts ?? []).length > 0) {
-    await trx.insertInto('Transfer_Payment_Stream_Chart_of_Account').values((payload.chartOfAccounts ?? []).map(item => {
-      const streamBudgetId = streamBudgetIdByTempId.get(item.tempStreamBudgetId)
-      if (!streamBudgetId) {
-        throw new Error(`Missing created stream budget for chart of account "${item.tempId}"`)
-      }
-      return {
-        egcs_tp_transferpaymentstream: streamId,
-        egcs_tp_streambudget: streamBudgetId,
-        egcs_tp_accountingdimensions: sql`${JSON.stringify(item.egcs_tp_accountingdimensions.map(({ label_en, label_fr, value }) => ({
-          label_en,
-          label_fr,
-          value
-        })))}::jsonb`
-      }
-    })).execute()
+    await trx.insertInto('Transfer_Payment_Stream_Chart_of_Account').values((payload.chartOfAccounts ?? []).map(item => ({
+      egcs_tp_transferpaymentstream: streamId,
+      egcs_tp_agencychartofaccount: item.egcs_tp_agencychartofaccount
+    }))).execute()
   }
 
   if ((payload.commitmentTypes ?? []).length > 0) {
     await trx.insertInto('Transfer_Payment_Stream_Commitment_Type').values(payload.commitmentTypes.map(item => ({
       egcs_tp_transferpaymentstream: streamId,
-      egcs_tp_name_en: item.egcs_tp_name_en,
-      egcs_tp_name_fr: item.egcs_tp_name_fr
+      egcs_tp_agencycommitmenttype: item.egcs_tp_agencycommitmenttype
     }))).execute()
   }
 
   if (payload.monitorTypes.length > 0) {
     await trx.insertInto('Transfer_Payment_Monitor_Type').values(payload.monitorTypes.map(item => ({
       egcs_tp_transferpaymentstream: streamId,
-      egcs_tp_name_en: item.egcs_tp_name_en,
-      egcs_tp_name_fr: item.egcs_tp_name_fr
+      egcs_tp_agencymonitortype: item.egcs_tp_agencymonitortype
     }))).execute()
   }
 
@@ -579,10 +606,10 @@ export const createTransferPaymentStreamFromWizardInTransaction = async (
   const createdStream = await insertStreamWizardRoot(trx, profileId, payload)
   const streamId = String(createdStream.id)
 
-  const streamBudgetIdByTempId = await insertSimpleStreamWizardChildren(trx, streamId, payload)
+  await insertSimpleStreamWizardChildren(trx, streamId, payload)
   const amendmentTypeIdMap = await insertAmendmentTypes(trx, streamId, payload)
   await insertAmendmentSubtypes(trx, streamId, payload, amendmentTypeIdMap)
-  await insertRemainingStreamWizardChildren(trx, streamId, payload, streamBudgetIdByTempId)
+  await insertRemainingStreamWizardChildren(trx, streamId, payload)
   await insertStreamWizardFinancialLimit(trx, streamId, payload)
 
   return createdStream

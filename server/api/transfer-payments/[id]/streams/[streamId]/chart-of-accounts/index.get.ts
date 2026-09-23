@@ -25,33 +25,21 @@ export default defineEventHandler(async event => {
   const offset = (page - 1) * limit
   let baseQuery = db
     .selectFrom('Transfer_Payment_Stream_Chart_of_Account')
-    .innerJoin(
-      'Transfer_Payment_Stream_Budget',
-      'Transfer_Payment_Stream_Budget.id',
-      'Transfer_Payment_Stream_Chart_of_Account.egcs_tp_streambudget'
-    )
-    .innerJoin(
-      'Transfer_Payment_Fiscal_Year_Budget',
-      'Transfer_Payment_Fiscal_Year_Budget.id',
-      'Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentbudget'
-    )
+    .innerJoin('Agency_Chart_of_Account', 'Agency_Chart_of_Account.id', 'Transfer_Payment_Stream_Chart_of_Account.egcs_tp_agencychartofaccount')
     .innerJoin(
       'Agency_Fiscal_Year',
       'Agency_Fiscal_Year.id',
-      'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_fiscalyear'
+      'Agency_Chart_of_Account.egcs_ay_fiscalyear'
     )
     .where('Transfer_Payment_Stream_Chart_of_Account.egcs_tp_transferpaymentstream', '=', streamId)
-    .where('Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentstream', '=', streamId)
+    .where('Agency_Chart_of_Account.egcs_ay_organizationagency', '=', streamContext.agencyId)
     .where('Transfer_Payment_Stream_Chart_of_Account._deleted', '=', false)
-    .where('Transfer_Payment_Stream_Budget._deleted', '=', false)
-    .where('Transfer_Payment_Fiscal_Year_Budget._deleted', '=', false)
-    .where('Agency_Fiscal_Year._deleted', '=', false)
 
   if (search) {
     const pattern = `%${escapeLikePattern(search)}%`
     baseQuery = baseQuery.where(eb => eb.or([
       eb('Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay', 'ilike', pattern),
-      sql<boolean>`CAST(${eb.ref('Transfer_Payment_Stream_Chart_of_Account.egcs_tp_accountingdimensions')} AS TEXT) ILIKE ${pattern}`
+      sql<boolean>`CAST(${eb.ref('Agency_Chart_of_Account.egcs_ay_accountingdimensions')} AS TEXT) ILIKE ${pattern}`
     ]))
   }
 
@@ -59,9 +47,11 @@ export default defineEventHandler(async event => {
     baseQuery
       .select([
         'Transfer_Payment_Stream_Chart_of_Account.id',
-        'Transfer_Payment_Stream_Chart_of_Account.egcs_tp_streambudget',
-        'Transfer_Payment_Stream_Chart_of_Account.egcs_tp_accountingdimensions',
+        'Transfer_Payment_Stream_Chart_of_Account.egcs_tp_agencychartofaccount',
         'Transfer_Payment_Stream_Chart_of_Account.egcs_tp_transferpaymentstream',
+        'Agency_Chart_of_Account.egcs_ay_fiscalyear',
+        'Agency_Chart_of_Account.egcs_ay_accountingdimensions',
+        'Agency_Chart_of_Account._deleted as agency_definition_deleted',
         'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display'
       ])
       .orderBy('Transfer_Payment_Stream_Chart_of_Account.id', 'asc')
@@ -69,18 +59,9 @@ export default defineEventHandler(async event => {
       .offset(offset)
       .execute(),
     baseQuery.select(eb => eb.fn.count('Transfer_Payment_Stream_Chart_of_Account.id').as('total')).executeTakeFirst(),
-    db.selectFrom('Transfer_Payment_Stream_Chart_of_Account')
-      .innerJoin('Transfer_Payment_Stream_Budget', 'Transfer_Payment_Stream_Budget.id', 'Transfer_Payment_Stream_Chart_of_Account.egcs_tp_streambudget')
-      .innerJoin('Transfer_Payment_Fiscal_Year_Budget', 'Transfer_Payment_Fiscal_Year_Budget.id', 'Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentbudget')
-      .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_fiscalyear')
-      .where('Transfer_Payment_Stream_Chart_of_Account.egcs_tp_transferpaymentstream', '=', streamId)
-      .where('Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentstream', '=', streamId)
-      .where('Transfer_Payment_Stream_Chart_of_Account._deleted', '=', false)
-      .where('Transfer_Payment_Stream_Budget._deleted', '=', false)
-      .where('Transfer_Payment_Fiscal_Year_Budget._deleted', '=', false)
+    baseQuery.where('Agency_Chart_of_Account._deleted', '=', false)
       .where('Agency_Fiscal_Year._deleted', '=', false)
-      .select(eb => eb.fn.count('Transfer_Payment_Stream_Chart_of_Account.id').as('total'))
-      .executeTakeFirst()
+      .select(eb => eb.fn.count('Transfer_Payment_Stream_Chart_of_Account.id').as('total')).executeTakeFirst()
   ])
 
   return {

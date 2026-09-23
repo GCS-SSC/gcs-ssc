@@ -229,11 +229,13 @@ export const assertCommitmentTypeBelongsToAgreementStream = async (
   streamId: string
 ) => {
   const commitmentType = await db.selectFrom('Transfer_Payment_Stream_Commitment_Type')
-    .select('id')
-    .where('id', '=', commitmentTypeId)
-    .where('egcs_tp_transferpaymentstream', '=', streamId)
-    .where('_deleted', '=', false)
-    .forUpdate()
+    .innerJoin('Agency_Commitment_Type', 'Agency_Commitment_Type.id', 'Transfer_Payment_Stream_Commitment_Type.egcs_tp_agencycommitmenttype')
+    .select('Transfer_Payment_Stream_Commitment_Type.id as id')
+    .where('Transfer_Payment_Stream_Commitment_Type.id', '=', commitmentTypeId)
+    .where('Transfer_Payment_Stream_Commitment_Type.egcs_tp_transferpaymentstream', '=', streamId)
+    .where('Transfer_Payment_Stream_Commitment_Type._deleted', '=', false)
+    .where('Agency_Commitment_Type._deleted', '=', false)
+    .forUpdate('Transfer_Payment_Stream_Commitment_Type')
     .executeTakeFirst()
   if (!commitmentType) {
     return await badRequest(event, 'INVALID_AGREEMENT_COMMITMENT_TYPE', 'apiErrors.agreement.invalid_commitment_type')
@@ -249,16 +251,11 @@ export const assertChartOfAccountBelongsToAgreementStream = async (
 ) => {
   const chartOfAccount = await db
     .selectFrom('Transfer_Payment_Stream_Chart_of_Account')
-    .innerJoin(
-      'Transfer_Payment_Stream_Budget',
-      'Transfer_Payment_Stream_Budget.id',
-      'Transfer_Payment_Stream_Chart_of_Account.egcs_tp_streambudget'
-    )
+    .innerJoin('Agency_Chart_of_Account', 'Agency_Chart_of_Account.id', 'Transfer_Payment_Stream_Chart_of_Account.egcs_tp_agencychartofaccount')
     .where('Transfer_Payment_Stream_Chart_of_Account.id', '=', chartOfAccountId)
     .where('Transfer_Payment_Stream_Chart_of_Account.egcs_tp_transferpaymentstream', '=', streamId)
-    .where('Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentstream', '=', streamId)
     .where('Transfer_Payment_Stream_Chart_of_Account._deleted', '=', false)
-    .where('Transfer_Payment_Stream_Budget._deleted', '=', false)
+    .where('Agency_Chart_of_Account._deleted', '=', false)
     .select('Transfer_Payment_Stream_Chart_of_Account.id as id')
     .forUpdate('Transfer_Payment_Stream_Chart_of_Account')
     .executeTakeFirst()

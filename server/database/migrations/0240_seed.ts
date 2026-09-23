@@ -2573,12 +2573,27 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
       ])
       .execute()
 
-    await db.insertInto('Transfer_Payment_Stream_Commitment_Type').values([
-      { egcs_tp_transferpaymentstream: String(stream.id), egcs_tp_name_en: 'Commitment', egcs_tp_name_fr: 'Engagement', _deleted: false },
-      { egcs_tp_transferpaymentstream: String(stream.id), egcs_tp_name_en: 'PAYE', egcs_tp_name_fr: 'PAYE', _deleted: false },
-      { egcs_tp_transferpaymentstream: String(stream.id), egcs_tp_name_en: 'PAYE2', egcs_tp_name_fr: 'PAYE2', _deleted: false },
-      { egcs_tp_transferpaymentstream: String(stream.id), egcs_tp_name_en: 'PYP', egcs_tp_name_fr: 'PYP', _deleted: false }
-    ]).execute()
+    for (const type of [
+      { nameEn: 'Commitment', nameFr: 'Engagement' },
+      { nameEn: 'PAYE', nameFr: 'PAYE' },
+      { nameEn: 'PAYE2', nameFr: 'PAYE2' },
+      { nameEn: 'PYP', nameFr: 'PYP' }
+    ]) {
+      let agencyType = await db.selectFrom('Agency_Commitment_Type').select('id')
+        .where('egcs_ay_organizationagency', '=', String(agency.id))
+        .where('egcs_ay_name_en', '=', type.nameEn)
+        .where('_deleted', '=', false)
+        .executeTakeFirst()
+      agencyType ??= await db.insertInto('Agency_Commitment_Type').values({
+        egcs_ay_organizationagency: String(agency.id),
+        egcs_ay_name_en: type.nameEn,
+        egcs_ay_name_fr: type.nameFr
+      }).returning('id').executeTakeFirstOrThrow()
+      await db.insertInto('Transfer_Payment_Stream_Commitment_Type').values({
+        egcs_tp_transferpaymentstream: String(stream.id),
+        egcs_tp_agencycommitmenttype: String(agencyType.id)
+      }).execute()
+    }
 
     if (String(stream.id) === '31') {
       const outcomeRows = await db
@@ -2673,22 +2688,30 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
               _deleted: false
             }
           ]
-        await db
-          .insertInto('Transfer_Payment_Stream_Chart_of_Account')
-          .values(streamCommitmentSeeds.map(commitment => ({
-            egcs_tp_transferpaymentstream: String(stream.id),
-            egcs_tp_streambudget: String(streamBudget.id),
-            egcs_tp_accountingdimensions: sql`${JSON.stringify([
+        for (const commitment of streamCommitmentSeeds) {
+          const dimensions = JSON.stringify([
               { label_en: 'Fund', label_fr: 'Fonds', value: String(commitment.egcs_tp_fund) },
               { label_en: 'G/L', label_fr: 'G/L', value: String(commitment.egcs_tp_gl) },
               { label_en: 'Fund Centre', label_fr: 'Centre financier', value: String(commitment.egcs_tp_fundcentre) },
               { label_en: 'Internal Order', label_fr: 'Ordre interne', value: String(commitment.egcs_tp_internalorder) },
               { label_en: 'Functional Area', label_fr: 'Domaine fonctionnel', value: String(commitment.egcs_tp_functionalarea) },
               { label_en: 'Cost Centre', label_fr: 'Centre de coûts', value: String(commitment.egcs_tp_costcentre) }
-            ] satisfies JsonValue)}::jsonb`,
-            _deleted: false
-          })))
-          .execute()
+            ] satisfies JsonValue)
+          let agencyChart = await db.selectFrom('Agency_Chart_of_Account').select('id')
+            .where('egcs_ay_fiscalyear', '=', String(agencyFiscalYear.id))
+            .where('egcs_ay_accountingdimensions', '=', sql`${dimensions}::jsonb`)
+            .where('_deleted', '=', false)
+            .executeTakeFirst()
+          agencyChart ??= await db.insertInto('Agency_Chart_of_Account').values({
+            egcs_ay_organizationagency: String(agency.id),
+            egcs_ay_fiscalyear: String(agencyFiscalYear.id),
+            egcs_ay_accountingdimensions: sql`${dimensions}::jsonb`
+          }).returning('id').executeTakeFirstOrThrow()
+          await db.insertInto('Transfer_Payment_Stream_Chart_of_Account').values({
+            egcs_tp_transferpaymentstream: String(stream.id),
+            egcs_tp_agencychartofaccount: String(agencyChart.id)
+          }).execute()
+        }
 
         return { streamBudgetId: String(streamBudget.id) }
       }))
@@ -4176,6 +4199,43 @@ const seedSharedAgencyCatalogStream = async (db: Kysely<Database>): Promise<void
     egcs_tp_active: true
   }).returning('id').executeTakeFirstOrThrow()
   const sharedStreamId = String(sharedStream.id)
+  const sourceBudget = await db.selectFrom('Transfer_Payment_Stream_Budget')
+    .select('egcs_tp_transferpaymentbudget')
+    .where('egcs_tp_transferpaymentstream', '=', '31')
+    .where('_deleted', '=', false)
+    .orderBy('id', 'asc').executeTakeFirstOrThrow()
+  await db.insertInto('Transfer_Payment_Stream_Budget').values({
+    egcs_tp_transferpaymentstream: sharedStreamId,
+    egcs_tp_transferpaymentbudget: String(sourceBudget.egcs_tp_transferpaymentbudget),
+    egcs_tp_totalbudget: seedMoney('42.00'),
+    egcs_tp_overcommitthreshold: 0.05
+  }).execute()
+  const sourceChart = await db.selectFrom('Transfer_Payment_Stream_Chart_of_Account as link')
+    .innerJoin('Agency_Chart_of_Account as chart', 'chart.id', 'link.egcs_tp_agencychartofaccount')
+    .innerJoin('Transfer_Payment_Fiscal_Year_Budget as budget', 'budget.egcs_tp_fiscalyear', 'chart.egcs_ay_fiscalyear')
+    .select('link.egcs_tp_agencychartofaccount as definitionId')
+    .where('link.egcs_tp_transferpaymentstream', '=', '31')
+    .where('budget.id', '=', String(sourceBudget.egcs_tp_transferpaymentbudget))
+    .where('link._deleted', '=', false).orderBy('link.id', 'asc').executeTakeFirstOrThrow()
+  await db.insertInto('Transfer_Payment_Stream_Chart_of_Account').values({
+    egcs_tp_transferpaymentstream: sharedStreamId,
+    egcs_tp_agencychartofaccount: String(sourceChart.definitionId)
+  }).execute()
+  const sharedCatalogLinks = [
+    { table: 'Transfer_Payment_Stream_Commitment_Type', column: 'egcs_tp_agencycommitmenttype' },
+    { table: 'Transfer_Payment_Monitor_Type', column: 'egcs_tp_agencymonitortype' },
+    { table: 'Transfer_Payment_Stream_Holdback_Basis', column: 'egcs_tp_agencyholdback' },
+    { table: 'Transfer_Payment_Stream_Document_Template', column: 'egcs_tp_agencydocumenttemplate' }
+  ] as const
+  for (const { table, column } of sharedCatalogLinks) {
+    const definition = await sql<{ definition_id: string }>`
+      SELECT ${sql.ref(column)} AS definition_id FROM ${sql.table(table)}
+      WHERE egcs_tp_transferpaymentstream = 31 AND _deleted = false ORDER BY id LIMIT 1
+    `.execute(db)
+    const definitionId = definition.rows[0]?.definition_id
+    if (!definitionId) throw new Error(`Missing seed definition for ${table}`)
+    await sql`INSERT INTO ${sql.table(table)} (egcs_tp_transferpaymentstream, ${sql.ref(column)}) VALUES (${sharedStreamId}::bigint, ${definitionId}::bigint)`.execute(db)
+  }
   const sourceField = await db.selectFrom('Transfer_Payment_Stream_Field_Assignment as assignment')
     .innerJoin('Agency_Custom_Field as field', 'field.id', 'assignment.egcs_tp_agencyfield')
     .select('field.id as fieldId')
@@ -4350,9 +4410,7 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
       }).returning('id').executeTakeFirstOrThrow()
       const streamHoldback = await db.insertInto('Transfer_Payment_Stream_Holdback_Basis').values({
         egcs_tp_transferpaymentstream: String(stream.streamId),
-        egcs_tp_agencyholdback: String(agencyHoldback.id),
-        egcs_tp_name_en: basisSeed.nameEn,
-        egcs_tp_name_fr: basisSeed.nameFr
+        egcs_tp_agencyholdback: String(agencyHoldback.id)
       }).returning('id').executeTakeFirstOrThrow()
       if (basisSeed.code === 'agreement-total') agreementTotalStreamHoldbackId = String(streamHoldback.id)
     }
@@ -4566,11 +4624,12 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
           .execute()
 
         const commitmentTypes = await db.selectFrom('Transfer_Payment_Stream_Commitment_Type')
-          .select(['id', 'egcs_tp_name_en'])
-          .where('egcs_tp_transferpaymentstream', '=', String(stream.streamId))
-          .where('_deleted', '=', false)
+          .innerJoin('Agency_Commitment_Type', 'Agency_Commitment_Type.id', 'Transfer_Payment_Stream_Commitment_Type.egcs_tp_agencycommitmenttype')
+          .select(['Transfer_Payment_Stream_Commitment_Type.id as id', 'Agency_Commitment_Type.egcs_ay_name_en as name_en'])
+          .where('Transfer_Payment_Stream_Commitment_Type.egcs_tp_transferpaymentstream', '=', String(stream.streamId))
+          .where('Transfer_Payment_Stream_Commitment_Type._deleted', '=', false)
           .execute()
-        const commitmentTypeByName = new Map(commitmentTypes.map(type => [type.egcs_tp_name_en, String(type.id)]))
+        const commitmentTypeByName = new Map(commitmentTypes.map(type => [type.name_en, String(type.id)]))
         const commitmentTypeId = commitmentTypeByName.get('Commitment')
         const payeTypeId = commitmentTypeByName.get('PAYE')
         const seededCaseworkUser = await db
@@ -4896,10 +4955,11 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
         ).execute()
 
         const allocationCommitmentType = await db.selectFrom('Transfer_Payment_Stream_Commitment_Type')
-          .select('id')
-          .where('egcs_tp_transferpaymentstream', '=', String(stream.streamId))
-          .where('egcs_tp_name_en', '=', 'Commitment')
-          .where('_deleted', '=', false)
+          .innerJoin('Agency_Commitment_Type', 'Agency_Commitment_Type.id', 'Transfer_Payment_Stream_Commitment_Type.egcs_tp_agencycommitmenttype')
+          .select('Transfer_Payment_Stream_Commitment_Type.id as id')
+          .where('Transfer_Payment_Stream_Commitment_Type.egcs_tp_transferpaymentstream', '=', String(stream.streamId))
+          .where('Agency_Commitment_Type.egcs_ay_name_en', '=', 'Commitment')
+          .where('Transfer_Payment_Stream_Commitment_Type._deleted', '=', false)
           .executeTakeFirstOrThrow()
         const allocationCoordinates = await db
           .selectFrom('Funding_Case_Agreement_Budget_Fiscal_Year as agreement_year')
@@ -4912,9 +4972,12 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
             .on('stream_budget.egcs_tp_transferpaymentstream', '=', String(stream.streamId))
             .on('stream_budget._deleted', '=', false))
           .innerJoin('Transfer_Payment_Stream_Chart_of_Account as chart', join => join
-            .onRef('chart.egcs_tp_streambudget', '=', 'stream_budget.id')
             .on('chart.egcs_tp_transferpaymentstream', '=', String(stream.streamId))
             .on('chart._deleted', '=', false))
+          .innerJoin('Agency_Chart_of_Account as agency_chart', join => join
+            .onRef('agency_chart.id', '=', 'chart.egcs_tp_agencychartofaccount')
+            .onRef('agency_chart.egcs_ay_fiscalyear', '=', 'fiscal_budget.egcs_tp_fiscalyear')
+            .on('agency_chart._deleted', '=', false))
           .select([
             'agreement_year.id as agreementYearId',
             'stream_budget.id as streamBudgetId',
@@ -5102,32 +5165,28 @@ const seedAgreementMonitorData = async (db: Kysely<Database>): Promise<void> => 
     return
   }
 
-  const monitorTypes = await db
-    .insertInto('Transfer_Payment_Monitor_Type')
-    .values([
-      {
-        egcs_tp_name_en: 'Financial desk review',
-        egcs_tp_name_fr: 'Examen financier sur dossier',
-        egcs_tp_transferpaymentstream: String(agreement.streamId),
-        _deleted: false
-      },
-      {
-        egcs_tp_name_en: 'Recipient site visit',
-        egcs_tp_name_fr: 'Visite sur place du bénéficiaire',
-        egcs_tp_transferpaymentstream: String(agreement.streamId),
-        _deleted: false
-      },
-      {
-        egcs_tp_name_en: 'Performance follow-up',
-        egcs_tp_name_fr: 'Suivi du rendement',
-        egcs_tp_transferpaymentstream: String(agreement.streamId),
-        _deleted: false
-      }
-    ])
-    .returning(['id', 'egcs_tp_name_en'])
-    .execute()
-
-  const monitorTypeByName = new Map(monitorTypes.map(monitorType => [monitorType.egcs_tp_name_en, String(monitorType.id)]))
+  const monitorTypeByName = new Map<string, string>()
+  for (const type of [
+    { nameEn: 'Financial desk review', nameFr: 'Examen financier sur dossier' },
+    { nameEn: 'Recipient site visit', nameFr: 'Visite sur place du bénéficiaire' },
+    { nameEn: 'Performance follow-up', nameFr: 'Suivi du rendement' }
+  ]) {
+    let agencyType = await db.selectFrom('Agency_Monitor_Type').select('id')
+      .where('egcs_ay_organizationagency', '=', String(agreement.agencyId))
+      .where('egcs_ay_name_en', '=', type.nameEn)
+      .where('_deleted', '=', false)
+      .executeTakeFirst()
+    agencyType ??= await db.insertInto('Agency_Monitor_Type').values({
+      egcs_ay_organizationagency: String(agreement.agencyId),
+      egcs_ay_name_en: type.nameEn,
+      egcs_ay_name_fr: type.nameFr
+    }).returning('id').executeTakeFirstOrThrow()
+    const streamType = await db.insertInto('Transfer_Payment_Monitor_Type').values({
+      egcs_tp_agencymonitortype: String(agencyType.id),
+      egcs_tp_transferpaymentstream: String(agreement.streamId)
+    }).returning('id').executeTakeFirstOrThrow()
+    monitorTypeByName.set(type.nameEn, String(streamType.id))
+  }
   const firstFiscalYear = getRequiredAt(fiscalYears, 0, 'agreement monitor first fiscal year')
   const secondFiscalYear = getRequiredAt(fiscalYears, 1, 'agreement monitor second fiscal year')
   const firstFiscalYearId = String(firstFiscalYear.id)
@@ -5849,6 +5908,11 @@ async function seedContributionAgreementDocumentTemplates(db: Kysely<Database>):
   if (!stream?.agencyId) {
     return
   }
+  const secondStream = await db.selectFrom('Transfer_Payment_Stream')
+    .innerJoin('Transfer_Payment_Profile', 'Transfer_Payment_Profile.id', 'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile')
+    .where('Transfer_Payment_Stream.id', '=', '32')
+    .select('Transfer_Payment_Profile.egcs_tp_agency as agencyId')
+    .executeTakeFirst()
 
   const templates: Array<{
     slug: string
@@ -6010,6 +6074,7 @@ async function seedContributionAgreementDocumentTemplates(db: Kysely<Database>):
 
   for (const template of templates) {
     const attachments: Record<'en' | 'fr', string> = { en: '', fr: '' }
+    const secondAttachments: Record<'en' | 'fr', string> = { en: '', fr: '' }
     for (const language of ['en', 'fr'] as const) {
       const languageBlocks = language === 'fr'
         ? template.blocksFr ?? [{ kind: 'heading' as const, text: template.nameFr }, ...template.blocks]
@@ -6033,27 +6098,56 @@ async function seedContributionAgreementDocumentTemplates(db: Kysely<Database>):
         purpose: 'document-template'
       })
       attachments[language] = String(attachment.id)
+      if (template.entityType === 'fundingcaseagreementcloseout' && secondStream?.agencyId
+        && String(secondStream.agencyId) !== String(stream.agencyId)) {
+        const secondAttachment = await writeStoredTemplateFile(db, {
+          agencyId: String(secondStream.agencyId),
+          bytes: file.bytes,
+          filename,
+          mimeType: file.mime,
+          nameEn: `${template.nameEn} ${language.toUpperCase()}.${file.extension}`,
+          nameFr: `${template.nameFr} ${language.toUpperCase()}.${file.extension}`,
+          descriptionEn: template.nameEn,
+          descriptionFr: template.nameFr,
+          folder: `document-templates/32/contribution-agreement/${template.slug}`,
+          purpose: 'document-template'
+        })
+        secondAttachments[language] = String(secondAttachment.id)
+      }
     }
 
     const documentTemplate = {
-      egcs_tp_transferpaymentstream: '31',
-      egcs_tp_entitytype: template.entityType ?? 'fundingcaseagreement',
-      egcs_tp_name_en: template.nameEn,
-      egcs_tp_name_fr: template.nameFr,
-      egcs_tp_description_en: template.nameEn,
-      egcs_tp_description_fr: template.nameFr,
-      egcs_tp_templateattachment_en: attachments.en,
-      egcs_tp_templateattachment_fr: attachments.fr,
-      egcs_tp_templatekind: 'docx',
-      egcs_tp_outputformats: sql<TransferPaymentDocumentTemplateOutputFormat[]>`${JSON.stringify(['docx', 'pdf'])}::jsonb`,
-      egcs_tp_active: true,
+      egcs_ay_organizationagency: String(stream.agencyId),
+      egcs_ay_entitytype: template.entityType ?? 'fundingcaseagreement',
+      egcs_ay_name_en: template.nameEn,
+      egcs_ay_name_fr: template.nameFr,
+      egcs_ay_description_en: template.nameEn,
+      egcs_ay_description_fr: template.nameFr,
+      egcs_ay_templateattachment_en: attachments.en,
+      egcs_ay_templateattachment_fr: attachments.fr,
+      egcs_ay_templatekind: 'docx',
+      egcs_ay_outputformats: sql<TransferPaymentDocumentTemplateOutputFormat[]>`${JSON.stringify(['docx', 'pdf'])}::jsonb`,
+      egcs_ay_active: true,
       _deleted: false
     } as const
-    await db.insertInto('Transfer_Payment_Stream_Document_Template').values(documentTemplate).execute()
+    const agencyTemplate = await db.insertInto('Agency_Document_Template').values(documentTemplate).returning('id').executeTakeFirstOrThrow()
+    await db.insertInto('Transfer_Payment_Stream_Document_Template').values({
+      egcs_tp_transferpaymentstream: '31',
+      egcs_tp_agencydocumenttemplate: String(agencyTemplate.id)
+    }).execute()
     if (template.entityType === 'fundingcaseagreementcloseout') {
+      const secondAgencyTemplateId = secondStream?.agencyId
+        && String(secondStream.agencyId) !== String(stream.agencyId)
+        ? String((await db.insertInto('Agency_Document_Template').values({
+          ...documentTemplate,
+          egcs_ay_organizationagency: String(secondStream.agencyId),
+          egcs_ay_templateattachment_en: secondAttachments.en,
+          egcs_ay_templateattachment_fr: secondAttachments.fr
+        }).returning('id').executeTakeFirstOrThrow()).id)
+        : String(agencyTemplate.id)
       await db.insertInto('Transfer_Payment_Stream_Document_Template').values({
-        ...documentTemplate,
-        egcs_tp_transferpaymentstream: '32'
+        egcs_tp_transferpaymentstream: '32',
+        egcs_tp_agencydocumenttemplate: secondAgencyTemplateId
       }).execute()
     }
   }
@@ -6405,6 +6499,7 @@ export const down = async (db: Kysely<Database>): Promise<void> => {
   await db.deleteFrom('Common_Workflow_Member_Condition').execute()
   await db.deleteFrom('Funding_Case_Agreement_Generated_Document').execute()
   await db.deleteFrom('Transfer_Payment_Stream_Document_Template').execute()
+  await db.deleteFrom('Agency_Document_Template').execute()
   await db.deleteFrom('Common_Assessment_Custom_Outcome').execute()
   await db.deleteFrom('Common_Assessment_Outcome').execute()
   await db.deleteFrom('Common_Review_Response').execute()
@@ -6560,7 +6655,10 @@ export const down = async (db: Kysely<Database>): Promise<void> => {
   await db.deleteFrom('Agency_Approval_Behalf_Type').execute()
   await db.deleteFrom('Agency_Applicant_Recipient_Subtype').execute()
   await db.deleteFrom('Agency_Address_Type').execute()
+  await db.deleteFrom('Agency_Chart_of_Account').execute()
   await db.deleteFrom('Agency_Fiscal_Year').execute()
+  await db.deleteFrom('Agency_Commitment_Type').execute()
+  await db.deleteFrom('Agency_Monitor_Type').execute()
   await db.deleteFrom('Agency_Cost_Category_Line_Item').execute()
   await db.deleteFrom('Agency_Cost_Category').execute()
   await db.deleteFrom('Agency_Holdback_Basis').execute()

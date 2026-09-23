@@ -87,6 +87,32 @@ export default defineEventHandler(async event => {
           return await badRequest(event, 'TRANSFER_PAYMENT_BUDGET_NOT_FOUND', 'apiErrors.transfer_payment.budget_not_found')
         }
 
+        const currentBudget = budgets.find(candidate => String(candidate.id) === String(lockedStreamBudget.budget_id))
+        if (currentBudget && currentBudget.fiscal_year_id !== budget.fiscal_year_id) {
+          const replacement = await trx.selectFrom('Transfer_Payment_Stream_Budget')
+            .innerJoin('Transfer_Payment_Fiscal_Year_Budget', 'Transfer_Payment_Fiscal_Year_Budget.id', 'Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentbudget')
+            .where('Transfer_Payment_Stream_Budget.id', '!=', streamBudgetId)
+            .where('Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentstream', '=', streamId)
+            .where('Transfer_Payment_Stream_Budget._deleted', '=', false)
+            .where('Transfer_Payment_Fiscal_Year_Budget.egcs_tp_fiscalyear', '=', currentBudget.fiscal_year_id)
+            .select('Transfer_Payment_Stream_Budget.id')
+            .forUpdate('Transfer_Payment_Stream_Budget')
+            .executeTakeFirst()
+          if (!replacement) {
+            const chart = await trx.selectFrom('Transfer_Payment_Stream_Chart_of_Account')
+              .innerJoin('Agency_Chart_of_Account', 'Agency_Chart_of_Account.id', 'Transfer_Payment_Stream_Chart_of_Account.egcs_tp_agencychartofaccount')
+              .where('Transfer_Payment_Stream_Chart_of_Account.egcs_tp_transferpaymentstream', '=', streamId)
+              .where('Transfer_Payment_Stream_Chart_of_Account._deleted', '=', false)
+              .where('Agency_Chart_of_Account.egcs_ay_fiscalyear', '=', currentBudget.fiscal_year_id)
+              .select('Transfer_Payment_Stream_Chart_of_Account.id')
+              .forUpdate('Transfer_Payment_Stream_Chart_of_Account')
+              .executeTakeFirst()
+            if (chart) {
+              return await badRequest(event, 'TRANSFER_PAYMENT_STREAM_BUDGET_IN_USE', 'apiErrors.transfer_payment.stream_budget_in_use')
+            }
+          }
+        }
+
         const sumResult = await trx.selectFrom('Transfer_Payment_Stream_Budget')
           .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentstream')
           .innerJoin('Transfer_Payment_Fiscal_Year_Budget', 'Transfer_Payment_Fiscal_Year_Budget.id', 'Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentbudget')

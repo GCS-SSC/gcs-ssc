@@ -3,7 +3,6 @@ import { authorize } from '~~/server/utils/authorize'
 import { authorizeTransferPaymentStreamResource, createTransferPaymentScopedAuthorizeHandler } from '~~/server/utils/transfer-payment-route-authorization'
 import { executeFreshAuthorizedTransferPaymentStreamWrite } from '~~/server/utils/transfer-payment-write-transaction'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
-import { throwIfTransferPaymentUniqueConstraintError } from '~~/server/utils/transfer-payment-unique-constraint-errors'
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -20,29 +19,15 @@ export default defineEventHandler(async event => {
     return await badRequest(event, 'NO_UPDATABLE_FIELDS', 'apiErrors.request.no_updatable_fields')
   }
   return await executeFreshAuthorizedTransferPaymentStreamWrite(
-    event, db, profileId, context.agencyId, streamId, 'update', async (trx, freshContext) => {
-      const current = await trx.selectFrom('Transfer_Payment_Stream_Holdback_Basis').select(['id', 'egcs_tp_agencyholdback'])
+    event, db, profileId, context.agencyId, streamId, 'update', async (trx) => {
+      const current = await trx.selectFrom('Transfer_Payment_Stream_Holdback_Basis').selectAll()
         .where('id', '=', basisId).where('egcs_tp_transferpaymentstream', '=', streamId)
         .where('_deleted', '=', false).forUpdate().executeTakeFirst()
       if (!current) return await notFound(event, 'HOLDBACK_BASIS_NOT_FOUND', 'apiErrors.transfer_payment.holdback_basis_not_found')
-      if (body.egcs_tp_agencyholdback) {
-        const valid = await trx.selectFrom('Agency_Holdback_Basis').select('id').where('id', '=', body.egcs_tp_agencyholdback)
-          .where('egcs_ay_organizationagency', '=', freshContext.agencyId).where('_deleted', '=', false).forUpdate().executeTakeFirst()
-        if (!valid) return await badRequest(event, 'INVALID_HOLDBACK_BASIS', 'apiErrors.transfer_payment.invalid_holdback_basis')
-        if (String(current.egcs_tp_agencyholdback) !== body.egcs_tp_agencyholdback) {
-          const reference = await trx.selectFrom('Funding_Case_Agreement_Profile').select('id')
-            .where('egcs_fc_holdbackbasis', '=', basisId).where('_deleted', '=', false)
-            .forUpdate().executeTakeFirst()
-          if (reference) return await badRequest(event, 'HOLDBACK_BASIS_IN_USE', 'apiErrors.transfer_payment.holdback_basis_in_use')
-        }
+      if (body.egcs_tp_agencyholdback && String(current.egcs_tp_agencyholdback) !== body.egcs_tp_agencyholdback) {
+        return await badRequest(event, 'TRANSFER_PAYMENT_CATALOG_LINK_IMMUTABLE', 'apiErrors.transfer_payment.catalog_link_immutable')
       }
-      try {
-        return await trx.updateTable('Transfer_Payment_Stream_Holdback_Basis').set(body)
-          .where('id', '=', basisId).where('egcs_tp_transferpaymentstream', '=', streamId)
-          .where('_deleted', '=', false).returningAll().executeTakeFirstOrThrow()
-      } catch (error) {
-        return await throwIfTransferPaymentUniqueConstraintError(event, error)
-      }
+      return current
     }
   )
 })

@@ -29,6 +29,7 @@ const readRoute = defineEventHandler(async event => {
       .innerJoin('Funding_Case_Agreement_Profile', 'Funding_Case_Agreement_Profile.id', 'Funding_Case_Agreement_Monitor.egcs_fc_fundingagreement')
       .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Funding_Case_Agreement_Profile.egcs_fc_transferpaymentstream')
       .innerJoin('Transfer_Payment_Monitor_Type', 'Transfer_Payment_Monitor_Type.id', 'Funding_Case_Agreement_Monitor.egcs_fc_type')
+      .innerJoin('Agency_Monitor_Type', 'Agency_Monitor_Type.id', 'Transfer_Payment_Monitor_Type.egcs_tp_agencymonitortype')
       .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Funding_Case_Agreement_Monitor.egcs_fc_tentativefiscalyear')
       .where('Funding_Case_Agreement_Monitor.id', '=', monitorId)
       .where('Funding_Case_Agreement_Monitor.egcs_fc_fundingagreement', '=', agreementId)
@@ -47,8 +48,8 @@ const readRoute = defineEventHandler(async event => {
         'Funding_Case_Agreement_Profile.egcs_fc_financialsystemnumber as agreement_financial_system_number',
         'Transfer_Payment_Stream.egcs_tp_name_en as stream_name_en',
         'Transfer_Payment_Stream.egcs_tp_name_fr as stream_name_fr',
-        'Transfer_Payment_Monitor_Type.egcs_tp_name_en as monitor_type_name_en',
-        'Transfer_Payment_Monitor_Type.egcs_tp_name_fr as monitor_type_name_fr',
+        'Agency_Monitor_Type.egcs_ay_name_en as monitor_type_name_en',
+        'Agency_Monitor_Type.egcs_ay_name_fr as monitor_type_name_fr',
         'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display'
       ])
       .executeTakeFirst(),

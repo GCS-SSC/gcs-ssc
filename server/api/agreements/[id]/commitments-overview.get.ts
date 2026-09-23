@@ -17,9 +17,9 @@ export default defineEventHandler(async event => {
       db
         .selectFrom('Funding_Case_Agreement_Commitment')
         .innerJoin('Transfer_Payment_Stream_Commitment_Type', 'Transfer_Payment_Stream_Commitment_Type.id', 'Funding_Case_Agreement_Commitment.egcs_fc_type')
+        .innerJoin('Agency_Commitment_Type', 'Agency_Commitment_Type.id', 'Transfer_Payment_Stream_Commitment_Type.egcs_tp_agencycommitmenttype')
         .where('egcs_fc_fundingagreement', '=', agreementId)
         .where('Funding_Case_Agreement_Commitment._deleted', '=', false)
-        .where('Transfer_Payment_Stream_Commitment_Type._deleted', '=', false)
         .select([
           'Funding_Case_Agreement_Commitment.id as id',
           'Funding_Case_Agreement_Commitment.egcs_fc_fundingagreement as egcs_fc_fundingagreement',
@@ -27,8 +27,8 @@ export default defineEventHandler(async event => {
           'Funding_Case_Agreement_Commitment.egcs_fc_status as egcs_fc_status',
           'Funding_Case_Agreement_Commitment.egcs_fc_active as egcs_fc_active',
           'Funding_Case_Agreement_Commitment.egcs_fc_financialsystemnumber as egcs_fc_financialsystemnumber',
-          'Transfer_Payment_Stream_Commitment_Type.egcs_tp_name_en as commitment_type_name_en',
-          'Transfer_Payment_Stream_Commitment_Type.egcs_tp_name_fr as commitment_type_name_fr'
+          'Agency_Commitment_Type.egcs_ay_name_en as commitment_type_name_en',
+          'Agency_Commitment_Type.egcs_ay_name_fr as commitment_type_name_fr'
         ])
         .orderBy('Funding_Case_Agreement_Commitment.id', 'asc')
         .execute(),
@@ -44,24 +44,11 @@ export default defineEventHandler(async event => {
           'Transfer_Payment_Stream_Chart_of_Account.id',
           'Funding_Case_Agreement_Commitment_Line.egcs_fc_transferpaymentstreamchartofaccount'
         )
-        .innerJoin(
-          'Transfer_Payment_Stream_Budget',
-          'Transfer_Payment_Stream_Budget.id',
-          'Transfer_Payment_Stream_Chart_of_Account.egcs_tp_streambudget'
-        )
-        .innerJoin(
-          'Transfer_Payment_Fiscal_Year_Budget',
-          'Transfer_Payment_Fiscal_Year_Budget.id',
-          'Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentbudget'
-        )
-        .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_fiscalyear')
+        .innerJoin('Agency_Chart_of_Account', 'Agency_Chart_of_Account.id', 'Transfer_Payment_Stream_Chart_of_Account.egcs_tp_agencychartofaccount')
+        .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Agency_Chart_of_Account.egcs_ay_fiscalyear')
         .where('Funding_Case_Agreement_Commitment.egcs_fc_fundingagreement', '=', agreementId)
         .where('Funding_Case_Agreement_Commitment_Line._deleted', '=', false)
         .where('Funding_Case_Agreement_Commitment._deleted', '=', false)
-        .where('Transfer_Payment_Stream_Chart_of_Account._deleted', '=', false)
-        .where('Transfer_Payment_Stream_Budget._deleted', '=', false)
-        .where('Transfer_Payment_Fiscal_Year_Budget._deleted', '=', false)
-        .where('Agency_Fiscal_Year._deleted', '=', false)
         .select([
           'Funding_Case_Agreement_Commitment_Line.id as id',
           'Funding_Case_Agreement_Commitment_Line.egcs_fc_commitment as egcs_fc_commitment',
@@ -69,11 +56,11 @@ export default defineEventHandler(async event => {
           'Funding_Case_Agreement_Commitment_Line.egcs_fc_transferpaymentstreamchartofaccount as egcs_fc_transferpaymentstreamchartofaccount',
           databaseMoneyText(sql.ref('Funding_Case_Agreement_Commitment_Line.egcs_fc_amount')).as('egcs_fc_amount'),
           'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display',
-          'Transfer_Payment_Stream_Chart_of_Account.egcs_tp_accountingdimensions as accounting_dimensions'
+          'Agency_Chart_of_Account.egcs_ay_accountingdimensions as accounting_dimensions'
         ])
         .orderBy('Funding_Case_Agreement_Commitment.id', 'asc')
         .orderBy('Funding_Case_Agreement_Commitment_Line.egcs_fc_commitmentlinenumber', 'asc')
-        .orderBy(sql`LOWER("Transfer_Payment_Stream_Chart_of_Account"."egcs_tp_accountingdimensions"->0->>'value')`, 'asc')
+        .orderBy(sql`LOWER("Agency_Chart_of_Account"."egcs_ay_accountingdimensions"->0->>'value')`, 'asc')
         .orderBy('Transfer_Payment_Stream_Chart_of_Account.id', 'asc')
         .execute()
     ])

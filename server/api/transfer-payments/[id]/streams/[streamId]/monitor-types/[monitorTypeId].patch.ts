@@ -3,7 +3,6 @@ import { authorize } from '~~/server/utils/authorize'
 import { authorizeTransferPaymentStreamResource, createTransferPaymentScopedAuthorizeHandler } from '~~/server/utils/transfer-payment-route-authorization'
 import {
   assertTransferPaymentStreamSetupExists,
-  executeTransferPaymentStreamSetupUpdate,
   isTransferPaymentStreamSetupPatchRouteContext,
   prepareTransferPaymentStreamSetupPatchRoute,
   readTransferPaymentStreamSetupPatchBody
@@ -41,34 +40,28 @@ export default defineEventHandler(async event => {
       .where('id', '=', monitorTypeId)
       .where('egcs_tp_transferpaymentstream', '=', streamId)
       .where('_deleted', '=', false)
-      .select(['id', 'egcs_tp_name_en', 'egcs_tp_name_fr'])
+      .select(['id', 'egcs_tp_agencymonitortype'])
       .executeTakeFirst(),
     'MONITOR_TYPE_NOT_FOUND',
     'apiErrors.transfer_payment.monitor_type_not_found'
   )
 
-  const patchSchema = TransferPaymentMonitorTypeSchema.omit({
-    egcs_tp_transferpaymentstream: true
-  }).partial()
+  const patchSchema = TransferPaymentMonitorTypeSchema.partial()
   const payload = await readTransferPaymentStreamSetupPatchBody(event, patchSchema)
 
   return await executeFreshAuthorizedTransferPaymentStreamWrite(
-    event, db, routeContext.profileId, streamContext.agencyId, streamId, 'update', async trx => {
-      await assertTransferPaymentStreamSetupExists(
+    event, db, routeContext.profileId, streamContext.agencyId, streamId, 'update', async (trx) => {
+      const current = await assertTransferPaymentStreamSetupExists(
         event,
-        trx.selectFrom('Transfer_Payment_Monitor_Type').select('id').where('id', '=', monitorTypeId)
+        trx.selectFrom('Transfer_Payment_Monitor_Type').selectAll().where('id', '=', monitorTypeId)
           .where('egcs_tp_transferpaymentstream', '=', streamId).where('_deleted', '=', false)
           .forUpdate().executeTakeFirst(),
         'MONITOR_TYPE_NOT_FOUND', 'apiErrors.transfer_payment.monitor_type_not_found'
       )
-      return await executeTransferPaymentStreamSetupUpdate(event, trx
-        .updateTable('Transfer_Payment_Monitor_Type')
-        .set(payload)
-        .where('id', '=', monitorTypeId)
-        .where('egcs_tp_transferpaymentstream', '=', streamId)
-        .where('_deleted', '=', false)
-        .returningAll()
-        .executeTakeFirstOrThrow())
+      if (payload.egcs_tp_agencymonitortype && String(current.egcs_tp_agencymonitortype) !== payload.egcs_tp_agencymonitortype) {
+        return await badRequest(event, 'TRANSFER_PAYMENT_CATALOG_LINK_IMMUTABLE', 'apiErrors.transfer_payment.catalog_link_immutable')
+      }
+      return current
     }
   )
 })

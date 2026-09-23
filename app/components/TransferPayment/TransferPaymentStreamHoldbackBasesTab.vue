@@ -9,16 +9,17 @@ import type { AgencyHoldbackBasisItem, TransferPaymentStreamHoldbackBasisItem } 
 import { TransferPaymentStreamHoldbackBasisCreateSchema } from '~~/shared/types/schemas'
 
 interface HoldbackBasisRow extends TransferPaymentStreamHoldbackBasisItem, Record<string, unknown> {
+  egcs_ay_name_en: string
+  egcs_ay_name_fr: string
   agency_holdback_name_en?: string
   agency_holdback_name_fr?: string
 }
 
-const { transferPaymentId, streamId, agencyId, canCreateChild, canUpdateChild, canDeleteChild } = defineProps<{
+const { transferPaymentId, streamId, agencyId, canCreateChild, canDeleteChild } = defineProps<{
   transferPaymentId: string
   streamId: string
   agencyId?: string | null
   canCreateChild: boolean
-  canUpdateChild: boolean
   canDeleteChild: boolean
 }>()
 
@@ -33,12 +34,10 @@ const { search, pagination, items, totalRecords, refresh, status } = useResource
 
 const columns: TableColumnInput<HoldbackBasisRow>[] = [
   { id: 'name', headerKey: 'transfer_payment.holdback_basis' },
-  { id: 'agencyBasis', headerKey: 'transfer_payment.agency_holdback_basis' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
 const bilingualColumns: BilingualColumnConfig<HoldbackBasisRow>[] = [
-  { id: 'name', accessorKey: { en: 'egcs_tp_name_en', fr: 'egcs_tp_name_fr' } },
-  { id: 'agencyBasis', accessorKey: { en: 'agency_holdback_name_en', fr: 'agency_holdback_name_fr' } }
+  { id: 'name', accessorKey: { en: 'egcs_ay_name_en', fr: 'egcs_ay_name_fr' } }
 ]
 
 const modal = useCrudModal<HoldbackBasisRow, Partial<TransferPaymentStreamHoldbackBasisItem>>({
@@ -49,10 +48,10 @@ const isOpen: Ref<boolean> = modal.isOpen
 const selected: Ref<Partial<TransferPaymentStreamHoldbackBasisItem> | null> = modal.selected
 const pending = useCrudModalPending(modal.captureSession)
 const isSaving = pending.isPending
-const validate = createValidator(TransferPaymentStreamHoldbackBasisCreateSchema)
+const validate = createValidator(TransferPaymentStreamHoldbackBasisCreateSchema.strip())
 const { getBilingualValue } = useBilingualValue()
 const getActionTarget = (row: HoldbackBasisRow) =>
-  `${getBilingualValue(row, 'egcs_tp_name', String(row.id))} [${row.id}]`
+  `${getBilingualValue(row, 'egcs_ay_name', String(row.id))} [${row.id}]`
 const openCreate = () => {
   if (canCreateChild) modal.openCreate()
 }
@@ -73,18 +72,17 @@ onBeforeUnmount(() => {
 
 /** Persists the selected stream holdback basis and refreshes the table. */
 const save = async () => {
-  if (disposed || !selected.value || (!selected.value.id && !canCreateChild) || (selected.value.id && !canUpdateChild)) return
+  if (disposed || !selected.value || !canCreateChild || selected.value.id) return
   const session = modal.captureSession()
   if (!pending.begin(session)) return
-  const isUpdate = Boolean(selected.value.id)
   const generation = contextGeneration
   let closedSession = false
   try {
     const url = fetchUrl.value
-    const response = await fetch(getClientRequestUrl(isUpdate ? `${url}/${selected.value.id}` : url), {
-      method: isUpdate ? 'PATCH' : 'POST',
+    const response = await fetch(getClientRequestUrl(url), {
+      method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(selected.value)
+      body: JSON.stringify({ egcs_tp_agencyholdback: selected.value.egcs_tp_agencyholdback })
     })
     if (!response.ok) await throwFetchResponseError(response)
     if (!isCurrentContext(generation)) return
@@ -99,7 +97,7 @@ const save = async () => {
   try {
     await refresh()
     if (!isCurrentContext(generation) || !closedSession || modal.captureSession() !== null || status.value !== 'success') return
-    toast.add({ title: t('common.success'), description: t(isUpdate ? 'common.updated_success' : 'common.added_success'), color: 'success' })
+    toast.add({ title: t('common.success'), description: t('common.added_success'), color: 'success' })
   } catch (error: unknown) {
     if (isCurrentContext(generation)) showError(error)
   }
@@ -165,20 +163,16 @@ const retryAgencyHoldbacks = async () => {
     @add="openCreate"
     @retry="refresh">
     <template #name-cell="{ row }">
-      <CommonBilingualName :name-en="row.original.egcs_tp_name_en" :name-fr="row.original.egcs_tp_name_fr" />
-    </template>
-    <template #agencyBasis-cell="{ row }">
-      <CommonBilingualName :name-en="row.original.agency_holdback_name_en" :name-fr="row.original.agency_holdback_name_fr" />
+      <CommonBilingualName :name-en="row.original.egcs_ay_name_en" :name-fr="row.original.egcs_ay_name_fr" />
     </template>
     <template #actions-cell="{ row }">
       <div class="flex items-center gap-2">
-        <UButton icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" :aria-label="t('common.edit_named', { name: getActionTarget(row.original) })" :disabled="!canUpdateChild" @click="modal.openUpdate(row.original)" />
         <UButton icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('common.delete_named', { name: getActionTarget(row.original) })" :disabled="!canDeleteChild || isDeleting" @click="remove(row.original)" />
       </div>
     </template>
   </CommonResourceLayoutCard>
 
-  <UModal v-if="selected && (selected.id ? canUpdateChild : canCreateChild)" v-model:open="isOpen" :title="selected.id ? t('common.update') : t('common.add')">
+  <UModal v-if="selected && canCreateChild" v-model:open="isOpen" :title="t('common.add')">
     <template #body>
       <UForm :state="selected" :validate="validate" class="space-y-4" @submit="save">
         <div v-if="agencyHoldbackError" role="alert" class="flex flex-wrap items-center gap-2 text-sm text-error">
@@ -195,10 +189,11 @@ const retryAgencyHoldbacks = async () => {
         </div>
         <TransferPaymentFieldsTransferPaymentStreamHoldbackBasisFields
           :model="selected"
+          :lookup-url="`/api/transfer-payments/${transferPaymentId}/streams/${streamId}/lookups/holdback-bases`"
           :agency-holdback-bases="agencyHoldbackResponse?.items" />
         <div class="flex justify-end gap-2 pt-4">
           <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isOpen = false" />
-          <CommonSaveButton :label="selected.id ? t('common.update') : t('common.add')" :loading="isSaving" :disabled="isSaving" />
+          <CommonSaveButton :label="t('common.add')" :loading="isSaving" :disabled="isSaving" />
         </div>
       </UForm>
     </template>

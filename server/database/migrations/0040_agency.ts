@@ -303,6 +303,48 @@ export async function up(db: Kysely<Database>): Promise<void> {
     .execute()
 
   await db.schema
+    .createTable('Agency_Chart_of_Account')
+    .addColumn('id', 'bigserial', col => col.primaryKey())
+    .addColumn('egcs_ay_organizationagency', 'bigint', col =>
+      col.notNull().references('Agency_Profile.id').onDelete('restrict')
+    )
+    .addColumn('egcs_ay_fiscalyear', 'bigint', col =>
+      col.notNull().references('Agency_Fiscal_Year.id').onDelete('restrict')
+    )
+    .addColumn('egcs_ay_accountingdimensions', 'jsonb', col => col.notNull())
+    .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
+    .addCheckConstraint('ay_chk_chartofaccountdimensions', sql`jsonb_typeof(egcs_ay_accountingdimensions) = 'array' AND jsonb_array_length(egcs_ay_accountingdimensions) > 0`)
+    .execute()
+
+  await db.schema
+    .createTable('Agency_Commitment_Type')
+    .addColumn('id', 'bigserial', col => col.primaryKey())
+    .addColumn('egcs_ay_organizationagency', 'bigint', col =>
+      col.notNull().references('Agency_Profile.id').onDelete('restrict')
+    )
+    .addColumn('egcs_ay_name_en', 'varchar(255)', col => col.notNull())
+    .addColumn('egcs_ay_name_fr', 'varchar(255)', col => col.notNull())
+    .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
+    .execute()
+
+  await db.schema
+    .createTable('Agency_Monitor_Type')
+    .addColumn('id', 'bigserial', col => col.primaryKey())
+    .addColumn('egcs_ay_organizationagency', 'bigint', col =>
+      col.notNull().references('Agency_Profile.id').onDelete('restrict')
+    )
+    .addColumn('egcs_ay_name_en', 'varchar(255)', col => col.notNull())
+    .addColumn('egcs_ay_name_fr', 'varchar(255)', col => col.notNull())
+    .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
+    .execute()
+
+  await sql`CREATE UNIQUE INDEX ay_idx_chartfiscalyeardimensions ON "Agency_Chart_of_Account" (egcs_ay_fiscalyear, egcs_ay_accountingdimensions) WHERE _deleted = false`.execute(db)
+  await sql`CREATE UNIQUE INDEX ay_idx_commitmenttypenameen ON "Agency_Commitment_Type" (egcs_ay_organizationagency, egcs_ay_name_en) WHERE _deleted = false`.execute(db)
+  await sql`CREATE UNIQUE INDEX ay_idx_commitmenttypenamefr ON "Agency_Commitment_Type" (egcs_ay_organizationagency, egcs_ay_name_fr) WHERE _deleted = false`.execute(db)
+  await sql`CREATE UNIQUE INDEX ay_idx_monitortypenameen ON "Agency_Monitor_Type" (egcs_ay_organizationagency, egcs_ay_name_en) WHERE _deleted = false`.execute(db)
+  await sql`CREATE UNIQUE INDEX ay_idx_monitortypenamefr ON "Agency_Monitor_Type" (egcs_ay_organizationagency, egcs_ay_name_fr) WHERE _deleted = false`.execute(db)
+
+  await db.schema
     .createTable('Agency_Address_Type')
     .addColumn('id', 'bigserial', col => col.primaryKey())
     .addColumn('egcs_ay_organizationagency', 'bigint', col =>
@@ -568,6 +610,9 @@ export async function down(db: Kysely<Database>): Promise<void> {
   await db.schema.dropTable('Agency_Approval_Behalf_Type').execute()
   await db.schema.dropTable('Agency_Applicant_Recipient_Subtype').execute()
   await db.schema.dropTable('Agency_Address_Type').execute()
+  await db.schema.dropTable('Agency_Monitor_Type').execute()
+  await db.schema.dropTable('Agency_Commitment_Type').execute()
+  await db.schema.dropTable('Agency_Chart_of_Account').execute()
   await db.schema.dropTable('Agency_Fiscal_Year').execute()
   await db.schema.dropTable('Agency_Cost_Category_Line_Item').execute()
   await db.schema.dropTable('Agency_Cost_Category').execute()

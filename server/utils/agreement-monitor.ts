@@ -227,10 +227,12 @@ export const assertMonitorTypeBelongsToAgreementStream = async (
 ) => {
   let query = db
     .selectFrom('Transfer_Payment_Monitor_Type')
-    .where('id', '=', monitorTypeId)
-    .where('egcs_tp_transferpaymentstream', '=', streamId)
-    .where('_deleted', '=', false)
-    .select('id')
+    .innerJoin('Agency_Monitor_Type', 'Agency_Monitor_Type.id', 'Transfer_Payment_Monitor_Type.egcs_tp_agencymonitortype')
+    .where('Transfer_Payment_Monitor_Type.id', '=', monitorTypeId)
+    .where('Transfer_Payment_Monitor_Type.egcs_tp_transferpaymentstream', '=', streamId)
+    .where('Transfer_Payment_Monitor_Type._deleted', '=', false)
+    .where('Agency_Monitor_Type._deleted', '=', false)
+    .select('Transfer_Payment_Monitor_Type.id')
   if (options.lockReference) query = query.forUpdate()
   const monitorType = await query.executeTakeFirst()
 

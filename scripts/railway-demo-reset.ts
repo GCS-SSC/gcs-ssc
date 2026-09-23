@@ -174,8 +174,17 @@ export const requirePostgresOutput = (output: string, expected: string) => {
 export const TEMPLATE_SQL = `SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (
   SELECT a.egcs_cn_filename AS filename, a.egcs_cn_providerobjectid AS object, a.egcs_cn_filesize AS size
   FROM "Common_Attachment" a
-  WHERE a.id IN (SELECT egcs_tp_templateattachment_en FROM "Transfer_Payment_Stream_Document_Template" WHERE egcs_tp_transferpaymentstream = 31 AND NOT _deleted
-    UNION SELECT egcs_tp_templateattachment_fr FROM "Transfer_Payment_Stream_Document_Template" WHERE egcs_tp_transferpaymentstream = 31 AND NOT _deleted)
+  WHERE a.id IN (
+    SELECT catalog.egcs_ay_templateattachment_en
+    FROM "Transfer_Payment_Stream_Document_Template" link
+    JOIN "Agency_Document_Template" catalog ON catalog.id = link.egcs_tp_agencydocumenttemplate
+    WHERE link.egcs_tp_transferpaymentstream = 31 AND NOT link._deleted AND NOT catalog._deleted
+    UNION
+    SELECT catalog.egcs_ay_templateattachment_fr
+    FROM "Transfer_Payment_Stream_Document_Template" link
+    JOIN "Agency_Document_Template" catalog ON catalog.id = link.egcs_tp_agencydocumenttemplate
+    WHERE link.egcs_tp_transferpaymentstream = 31 AND NOT link._deleted AND NOT catalog._deleted
+  )
     AND NOT a._deleted AND a.egcs_cn_provider = 'gcs-storage-local'
 ) t`
 

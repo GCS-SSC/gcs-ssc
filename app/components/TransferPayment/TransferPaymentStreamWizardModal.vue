@@ -31,7 +31,6 @@ const {
   errorsByStep,
   currentStepErrors,
   onBudgetResolved,
-  chartOfAccountBudgetOptions,
   applicantRecipientOptions,
   lineItemOptions,
   agreementTypeOptions,
@@ -154,6 +153,7 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentStreamPolymorphicWizard>
                 <TransferPaymentFieldsTransferPaymentStreamHoldbackBasisFields
                   :model="holdbackBasis"
                   :agency-holdback-bases="agencyHoldbackOptions"
+                  :lookup-url="`/api/transfer-payments/${programId}/streams/lookups/holdback-bases`"
                   :name-prefix="`holdbackBases.${index}`" />
               </div>
               <UButton type="button" :label="t('common.add')" icon="i-lucide-plus" variant="outline" block @click="addHoldbackBasis" />
@@ -259,11 +259,14 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentStreamPolymorphicWizard>
                 :key="chartOfAccount.tempId"
                 class="border-default relative space-y-4 rounded-xl border bg-zinc-50/50 p-4 dark:bg-zinc-900/50">
                 <UButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" :title="t('common.remove')" @click="removeChartOfAccount(index)" />
-                <TransferPaymentFieldsTransferPaymentStreamChartOfAccountFields
-                  :model-value="chartOfAccount"
-                  :budget-options="chartOfAccountBudgetOptions"
-                  budget-field="tempStreamBudgetId"
-                  :name-prefix="`chartOfAccounts.${index}`" />
+                <UFormField :label="t('transfer_payment.chart_of_accounts.title')" :name="`chartOfAccounts.${index}.egcs_tp_agencychartofaccount`" required>
+                  <CommonServerLookupSelect
+                    v-model="chartOfAccount.egcs_tp_agencychartofaccount"
+                    :fetch-url="`/api/transfer-payments/${programId}/streams/lookups/chart-of-accounts`"
+                    value-key="id"
+                    label-en-key="label_en"
+                    label-fr-key="label_fr" />
+                </UFormField>
               </div>
               <UButton v-if="state.budgets.length > 0" type="button" :label="t('common.add')" icon="i-lucide-plus" variant="outline" block @click="addChartOfAccount" />
             </div>
@@ -274,7 +277,7 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentStreamPolymorphicWizard>
                 :key="reviewType.tempId"
                 class="border-default relative space-y-4 rounded-xl border bg-zinc-50/50 p-4 dark:bg-zinc-900/50">
                 <UButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" :title="t('common.remove')" @click="removeMonitorType(index)" />
-                <TransferPaymentFieldsTransferPaymentMonitorTypeFields :model="reviewType" :name-prefix="`monitorTypes.${index}`" />
+                <TransferPaymentFieldsTransferPaymentMonitorTypeFields :model="reviewType" :lookup-url="`/api/transfer-payments/${programId}/streams/lookups/monitor-types`" :name-prefix="`monitorTypes.${index}`" />
               </div>
               <UButton type="button" :label="t('common.add')" icon="i-lucide-plus" variant="outline" block @click="addMonitorType" />
             </div>
@@ -285,11 +288,13 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentStreamPolymorphicWizard>
                 :key="commitmentType.tempId"
                 class="border-default relative space-y-4 rounded-xl border bg-zinc-50/50 p-4 dark:bg-zinc-900/50">
                 <UButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" :title="t('common.remove')" @click="removeCommitmentType(index)" />
-                <UFormField :label="t('transfer_payment.name_en')" :name="`commitmentTypes.${index}.egcs_tp_name_en`">
-                  <UInput v-model="commitmentType.egcs_tp_name_en" class="w-full" />
-                </UFormField>
-                <UFormField :label="t('transfer_payment.name_fr')" :name="`commitmentTypes.${index}.egcs_tp_name_fr`">
-                  <UInput v-model="commitmentType.egcs_tp_name_fr" class="w-full" />
+                <UFormField :label="t('transfer_payment.commitment_types.title')" :name="`commitmentTypes.${index}.egcs_tp_agencycommitmenttype`" required>
+                  <CommonServerLookupSelect
+                    v-model="commitmentType.egcs_tp_agencycommitmenttype"
+                    :fetch-url="`/api/transfer-payments/${programId}/streams/lookups/commitment-types`"
+                    value-key="id"
+                    label-en-key="egcs_ay_name_en"
+                    label-fr-key="egcs_ay_name_fr" />
                 </UFormField>
               </div>
               <UButton type="button" :label="t('common.add')" icon="i-lucide-plus" variant="outline" block @click="addCommitmentType" />

@@ -73,7 +73,7 @@ const columns: TableColumnInput<AgreementGeneratedDocumentItem>[] = [
 ]
 
 const selectedTemplate = computed(() => templates.value.find(template => template.id === generateState.value?.templateId))
-const outputFormatItems = computed(() => (selectedTemplate.value?.egcs_tp_outputformats || []).map(format => ({
+const outputFormatItems = computed(() => (selectedTemplate.value?.egcs_ay_outputformats || []).map(format => ({
   label: t(`enums.transfer_payment_document_template_output_format.${format}`),
   value: format
 })))
@@ -85,7 +85,7 @@ const openGenerate = () => {
   generateState.value = {
     templateId: initialTemplate?.id,
     language: locale.value === 'fr' ? 'fra' : 'eng',
-    outputFormat: initialTemplate?.egcs_tp_outputformats[0] || 'docx'
+    outputFormat: initialTemplate?.egcs_ay_outputformats[0] || 'docx'
   }
   isGenerateOpen.value = true
 }
@@ -225,13 +225,13 @@ const deleteDocument = async (generatedDocument: AgreementGeneratedDocumentItem)
               v-model="generateState.templateId"
               :items="templates"
               value-key="id"
-              label-en-key="egcs_tp_name_en"
-              label-fr-key="egcs_tp_name_fr"
+              label-en-key="egcs_ay_name_en"
+              label-fr-key="egcs_ay_name_fr"
               :searchable="templates.length > 5"
               class="w-full" />
           </UFormField>
           <p v-if="selectedTemplate" class="text-sm leading-5 text-muted">
-            {{ locale === 'fr' ? selectedTemplate.egcs_tp_description_fr : selectedTemplate.egcs_tp_description_en }}
+            {{ locale === 'fr' ? selectedTemplate.egcs_ay_description_fr : selectedTemplate.egcs_ay_description_en }}
           </p>
           <UFormField :label="t('agency.detail.language')" name="language">
             <CommonEnumSelect v-model="generateState.language" name="language_preference" class="w-full" />

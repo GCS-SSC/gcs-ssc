@@ -24,11 +24,12 @@ const {
 
 const columns = [
   { id: 'fiscal_year_display', accessorKey: 'fiscal_year_display', header: t('transfer_payment.chart_of_accounts.fiscal_year') },
-  { id: 'egcs_tp_accountingdimensions', accessorKey: 'egcs_tp_accountingdimensions', header: t('transfer_payment.chart_of_accounts.accounting_fields') },
+  { id: 'egcs_ay_accountingdimensions', accessorKey: 'egcs_ay_accountingdimensions', header: t('transfer_payment.chart_of_accounts.accounting_fields') },
+  { id: 'agency_definition_deleted', accessorKey: 'agency_definition_deleted', header: t('common.status') },
   { id: 'actions', header: '' }
 ]
 
-const { isOpen, selected, openCreate, openUpdate, close, captureSession, closeSession } = useCrudModal<
+const { isOpen, openCreate, close, captureSession, closeSession } = useCrudModal<
   TransferPaymentStreamChartOfAccountItem,
   TransferPaymentStreamChartOfAccountItem | null
 >({
@@ -39,7 +40,7 @@ const { isOpen, selected, openCreate, openUpdate, close, captureSession, closeSe
 watch(() => [profileId, streamId], close, { flush: 'sync' })
 
 const getActionTarget = (item: TransferPaymentStreamChartOfAccountItem & { fiscal_year_display: string }) =>
-  `${item.fiscal_year_display || String(item.egcs_tp_streambudget)} [${item.id}]`
+  `${item.fiscal_year_display || String(item.egcs_ay_fiscalyear)} [${item.id}]`
 
 /**
  * Soft-deletes a chart of accounts entry after confirmation.
@@ -69,10 +70,10 @@ const onDelete = async (id: string) => {
       :show-button="canUpdateChild"
       @add="openCreate"
       @retry="refresh">
-      <template #egcs_tp_accountingdimensions-cell="{ row }">
+      <template #egcs_ay_accountingdimensions-cell="{ row }">
         <div class="flex min-w-64 flex-wrap gap-1.5 py-1">
           <CommonStatusBadge
-            v-for="dimension in row.original.egcs_tp_accountingdimensions"
+            v-for="dimension in row.original.egcs_ay_accountingdimensions"
             :key="`${dimension.label_en}:${dimension.label_fr}`"
             variant="meta"
             size="sm"
@@ -80,15 +81,12 @@ const onDelete = async (id: string) => {
         </div>
       </template>
 
+      <template #agency_definition_deleted-cell="{ row }">
+        <CommonStatusBadge :variant="row.original.agency_definition_deleted ? 'inactive' : 'active'" />
+      </template>
+
       <template #actions-cell="{ row }">
         <div class="flex justify-end gap-2">
-          <UButton
-            v-if="canUpdateChild"
-            :aria-label="t('common.edit_named', { name: getActionTarget(row.original) })"
-            icon="i-lucide-pencil"
-            color="neutral"
-            variant="ghost"
-            @click="openUpdate(row.original)" />
           <UButton
             v-if="canDeleteChild"
             :aria-label="t('common.delete_named', { name: getActionTarget(row.original) })"
@@ -105,7 +103,6 @@ const onDelete = async (id: string) => {
       v-model="isOpen"
       :stream-id="streamId"
       :profile-id="profileId"
-      :item="selected"
       :capture-session="captureSession"
       :close-session="closeSession"
       @save="refresh" />
