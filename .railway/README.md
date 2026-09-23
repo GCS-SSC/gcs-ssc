@@ -4,14 +4,15 @@ This configuration manages the existing **GCS Demo / demo** environment:
 
 - App: `gcs-ssc`, the shared GHCR digest in `deployment/demo-image.json` when
   populated, otherwise GitHub `GCS-SSC/gcs-ssc` branch `main` and the canonical Dockerfile.
-- Database: existing `Postgres` service (PostgreSQL 18), referenced by `DATABASE_URL`.
+- Database: existing `GCS DB` service (PostgreSQL 18), with the application's existing `DATABASE_URL` preserved.
 - Domain: https://gcs-ssc-demo.up.railway.app, retained by Railway on the existing service.
-- Volumes: existing `gcs-ssc-volume` at `/app/.data` and `postgres-volume`, each 5000 MB.
+- Volumes: existing `gcs-ssc-volume` at `/app/.data` and replacement `postgres-volume-HXMv` on `GCS DB`, each 5000 MB.
+- Metabase, `Metabase DB`, and their `postgres-volume-4aPn` are included so an IaC apply preserves them.
 - Placement: one app replica in `us-east4-eqdc4a`, retaining existing resource limits.
 - Seed mode: `ENVIRONMENT_TYPE=demo` at build and runtime. Startup applies core,
   enabled-extension, and demo migrations before `/api/health` becomes ready.
 
-Secrets and auth URL/origin variables use `preserve()` to keep their current
+Secrets, database URL, and auth URL/origin variables use `preserve()` to keep their current
 Railway values. There are no secret values in this file. This is an imported
 configuration for the existing environment, not a fresh-project template.
 
@@ -37,7 +38,7 @@ to replace this file.
 
 `config apply` reconciles infrastructure and can trigger deployments. Source
 changes are deployed from GitHub `main` in source mode; image mode uses the
-pinned public GHCR digest and disables image auto-updates. Follow the
+pinned public GHCR digest. Follow the
 [shared image runbook](../docs/container-images.md) to promote the same image to
 AWS and Railway without rebuilding. `railway redeploy --service gcs-ssc`
 redeploys the most recent deployment. Committing an IaC file alone does not run
@@ -45,9 +46,9 @@ redeploys the most recent deployment. Committing an IaC file alone does not run
 
 ## Reset the disposable demo, including attachments
 
-This helper supports **source mode only** and rejects a populated shared image
-manifest before making Railway calls. Follow the shared image runbook's reset
-section before attempting to reset a service that has switched to image mode.
+This helper supports the former **source mode and `Postgres` service layout only**.
+It rejects the current populated shared image manifest before making Railway calls.
+It is not an executable reset path for the current `GCS DB` image deployment.
 
 From the host repository, preview or execute the complete reset:
 
@@ -136,7 +137,7 @@ when recovery is no longer needed.
 ## Local validation
 
 ```sh
-bun x tsc --noEmit --strict --skipLibCheck --target ES2022 --module NodeNext --moduleResolution NodeNext .railway/railway.ts
+bun x tsc --noEmit --strict --skipLibCheck --target ES2022 --module NodeNext --moduleResolution NodeNext --allowImportingTsExtensions .railway/railway.ts
 bun x eslint .railway/railway.ts
 bun x vitest run tooling/gcs-ssc/tests/unit/railway-demo-reset.test.ts
 bun x vitest run tooling/gcs-ssc/tests/unit/railway-reset-terminal.test.ts

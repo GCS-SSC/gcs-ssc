@@ -101,9 +101,9 @@ railway config plan
 railway config apply
 ```
 
-With a populated manifest, `.railway/railway.ts` changes the existing app service
-to an image source, clears its Dockerfile builder settings, and disables image
-auto-updates. The database, volumes, domain, environment, and preserved secrets
+With a populated manifest, `.railway/railway.ts` uses the pinned image source.
+Railway retains legacy Dockerfile build fields on this image service; they do not
+build the image. The database, volumes, domain, environment, and preserved secrets
 remain configured as before. The image's default command remains
 `node .output/server/index.mjs`; do not copy the AWS command override to Railway.
 The runtime must stay `ENVIRONMENT_TYPE=demo` to match the image.
@@ -122,13 +122,11 @@ platform's deployment command. Switching sources does not reset data.
 Restore a previously published manifest and apply both deployments. Image
 rollback does not reverse database migrations; check schema compatibility first.
 
-The Railway reset helper currently uploads temporary Dockerfiles. It refuses an
-image-pinned checkout before making Railway calls, preventing source/image
-confusion during a destructive reset. To use that helper, deliberately restore
-`image: null` in the `main` checkout it clones and apply Railway's source-mode
-configuration first. Run the documented human-only reset, then repin only an
-image compatible with the resulting database schema and apply Railway again.
-Do not use the old upload-based recovery command against an image-mode service.
+The Railway reset helper currently uploads temporary Dockerfiles and targets the
+former `Postgres` service layout. It refuses an image-pinned checkout before
+making Railway calls. It cannot reset the current `GCS DB` image deployment;
+update its target and recovery sequence before using it again. Do not use the old
+upload-based recovery command against an image-mode service.
 
 ## Local verification
 
