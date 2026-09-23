@@ -15,7 +15,7 @@ import { publishDefinition, retirePublication } from './system-publication'
 import { isExpectedPublicationFailure } from './publication-errors'
 
 const routeIds = async (event: H3Event, includeSet = false, includeItem = false) => {
-  const agencyId = getRouterParam(event, 'id') ?? ''
+  const agencyId = getRouterParam(event, 'agencyId') ?? ''
   const setId = getRouterParam(event, 'recommendationSetId') ?? ''
   const itemId = getRouterParam(event, 'itemId') ?? ''
   if (!isPositivePostgresBigintText(agencyId)) await notFound(event, 'AGENCY_NOT_FOUND', 'apiErrors.agency.not_found')

@@ -15,7 +15,7 @@ const createBodySchema = CommonRecommendationSchemaCreateSchema.omit({ egcs_cn_a
 const patchBodySchema = CommonRecommendationSchemaPatchSchema.omit({ egcs_cn_agency: true, _deleted: true }).strict()
 
 const ids = async (event: H3Event, detail = false) => {
-  const agencyId = getRouterParam(event, 'id') ?? ''
+  const agencyId = getRouterParam(event, 'agencyId') ?? ''
   const schemaId = getRouterParam(event, 'schemaId') ?? ''
   if (!isPositivePostgresBigintText(agencyId)) await notFound(event, 'AGENCY_NOT_FOUND', 'apiErrors.agency.not_found')
   if (detail && !isPositivePostgresBigintText(schemaId)) await notFound(event, 'RECOMMENDATION_SCHEMA_NOT_FOUND', 'apiErrors.transfer_payment.recommendation_schema_not_found')

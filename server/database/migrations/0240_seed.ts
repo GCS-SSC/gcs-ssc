@@ -4157,6 +4157,75 @@ const seedRootProgramApprovalRole = async (db: Kysely<Database>): Promise<void> 
     .execute()
 }
 
+const seedSharedAgencyCatalogStream = async (db: Kysely<Database>): Promise<void> => {
+  const sourceStream = await db.selectFrom('Transfer_Payment_Stream')
+    .select('egcs_tp_transferpaymentprofile')
+    .where('id', '=', '31').where('_deleted', '=', false).executeTakeFirstOrThrow()
+  const sharedStream = await db.insertInto('Transfer_Payment_Stream').values({
+    egcs_tp_transferpaymentprofile: sourceStream.egcs_tp_transferpaymentprofile,
+    egcs_tp_parentstream: null,
+    egcs_tp_name_en: 'Shared Catalog Stream',
+    egcs_tp_name_fr: 'Volet des catalogues partagés',
+    egcs_tp_description_en: 'Demonstrates Agency catalogs reused with distinct Stream settings.',
+    egcs_tp_description_fr: 'Démontre la réutilisation des catalogues de l’Agence avec des paramètres de volet distincts.',
+    egcs_tp_abbreviation_en: 'SHARED',
+    egcs_tp_abbreviation_fr: 'PARTAGE',
+    egcs_tp_objective_en: 'Demonstrate shared Agency catalog configuration.',
+    egcs_tp_objective_fr: 'Démontrer la configuration des catalogues partagés de l’Agence.',
+    egcs_tp_allowsfurtherdistribution: false,
+    egcs_tp_active: true
+  }).returning('id').executeTakeFirstOrThrow()
+  const sharedStreamId = String(sharedStream.id)
+  const sourceField = await db.selectFrom('Transfer_Payment_Stream_Field_Assignment as assignment')
+    .innerJoin('Agency_Custom_Field as field', 'field.id', 'assignment.egcs_tp_agencyfield')
+    .select('field.id as fieldId')
+    .where('assignment.egcs_tp_transferpaymentstream', '=', '31')
+    .where('field.egcs_ay_name_en', '=', 'Delivery model')
+    .where('assignment._deleted', '=', false).executeTakeFirstOrThrow()
+  const section = await db.insertInto('Transfer_Payment_Stream_Field_Section').values({
+    egcs_tp_transferpaymentstream: sharedStreamId,
+    egcs_tp_name_en: 'Project delivery',
+    egcs_tp_name_fr: 'Prestation du projet',
+    egcs_tp_displayorder: 0
+  }).returning('id').executeTakeFirstOrThrow()
+  await db.insertInto('Transfer_Payment_Stream_Field_Assignment').values({
+    egcs_tp_transferpaymentstream: sharedStreamId,
+    egcs_tp_section: String(section.id),
+    egcs_tp_agencyfield: String(sourceField.fieldId),
+    egcs_tp_required: true,
+    egcs_tp_displayorder: 0
+  }).execute()
+  const reviewSet = await db.selectFrom('Transfer_Payment_Stream_Review_Set as link')
+    .innerJoin('Common_Review_Set_Setup as setup', 'setup.id', 'link.egcs_tp_reviewset')
+    .innerJoin('Common_Publication as publication', 'publication.id', 'setup.id')
+    .select('setup.id as id')
+    .where('link.egcs_tp_transferpaymentstream', '=', '31')
+    .where('setup.egcs_cn_entitytype', '=', 'fundingcaseagreement')
+    .where('publication.egcs_cn_state', '=', 'published')
+    .where('link._deleted', '=', false).where('setup._deleted', '=', false)
+    .orderBy('link.id', 'asc').executeTakeFirstOrThrow()
+  await db.insertInto('Transfer_Payment_Stream_Review_Set').values({
+    egcs_tp_transferpaymentstream: sharedStreamId,
+    egcs_tp_reviewset: String(reviewSet.id),
+    _deleted: false
+  }).execute()
+  const workflow = await db.selectFrom('Transfer_Payment_Stream_Workflow as link')
+    .innerJoin('Common_Workflow_Setup as setup', 'setup.id', 'link.egcs_tp_workflow')
+    .innerJoin('Common_Publication as publication', 'publication.id', 'setup.id')
+    .select('setup.id as id')
+    .where('link.egcs_tp_transferpaymentstream', '=', '31')
+    .where('setup.egcs_cn_entitytype', '=', 'fundingcaseagreement')
+    .where('setup.egcs_cn_purpose', '=', 'standard')
+    .where('publication.egcs_cn_state', '=', 'published')
+    .where('link._deleted', '=', false).where('setup._deleted', '=', false)
+    .orderBy('link.id', 'asc').executeTakeFirstOrThrow()
+  await db.insertInto('Transfer_Payment_Stream_Workflow').values({
+    egcs_tp_transferpaymentstream: sharedStreamId,
+    egcs_tp_workflow: String(workflow.id),
+    _deleted: false
+  }).execute()
+}
+
 async function seedAmendmentSubtypes(db: Kysely<Database>): Promise<void> {
   const streams = await db.selectFrom('Transfer_Payment_Stream').where('_deleted', '=', false).select(['id']).execute()
 
@@ -6286,6 +6355,7 @@ const seedDatabase = async (db: Kysely<Database>): Promise<void> => {
 
   await seedSuccessfulAgreementApproval(db, '51')
   await seedSuccessfulAgreementApproval(db, '60')
+  await seedSharedAgencyCatalogStream(db)
 }
 
 export const up = async (db: Kysely<Database>): Promise<void> => {

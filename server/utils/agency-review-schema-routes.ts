@@ -35,7 +35,7 @@ const ChecklistPatchSchema = z.object({
 }).strict()
 
 export const agencyReviewSchemaRoute = async (event: H3Event, action: 'create' | 'read' | 'update' | 'publish' | 'retire' | 'delete') => {
-  const agencyId = getRouterParam(event, 'id') ?? ''
+  const agencyId = getRouterParam(event, 'agencyId') ?? ''
   const schemaId = getRouterParam(event, 'schemaId') ?? ''
   if (!isPositivePostgresBigintText(agencyId)) return await notFound(event, 'AGENCY_NOT_FOUND', 'apiErrors.agency.not_found')
   if (action !== 'create' && !isPositivePostgresBigintText(schemaId)) {
