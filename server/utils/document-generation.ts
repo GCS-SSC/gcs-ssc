@@ -8,6 +8,8 @@ import { badRequest, notFound, throwApiError } from './api-errors'
 import { bestEffortStorageCleanup, deleteStoredAttachmentById, readStoredFile, writeStoredFile } from './file-storage'
 import { escapeLikePattern } from './sql-like'
 import type { AgencyDocumentTemplateTable, Database, FundingCaseAgreementGeneratedDocumentTable, Language_Preference, TransferPaymentDocumentTemplateEntityType, TransferPaymentDocumentTemplateOutputFormat } from '~~/shared/types/database'
+import { readAssignedAgencyCustomFieldDefinitions } from './agreement-custom-fields'
+import { buildAgreementDocumentCustomFields } from './agreement-document-custom-fields'
 import { buildAgreementCloseoutReadiness } from './agreement-closeout'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { databaseMoneyText, parseDatabaseMoney } from './database-money'
@@ -369,6 +371,8 @@ export const buildAgreementDocumentContext = async (
     .where('Funding_Case_Agreement_Profile._deleted', '=', false)
     .select([
       'Funding_Case_Agreement_Profile.egcs_fc_agreementnumber as number',
+      'Funding_Case_Agreement_Profile.egcs_fc_transferpaymentstream as streamId',
+      'Funding_Case_Agreement_Profile.egcs_fc_customfields as customFieldValues',
       'Funding_Case_Agreement_Profile.egcs_fc_title_en as titleEn',
       'Funding_Case_Agreement_Profile.egcs_fc_title_fr as titleFr',
       'Funding_Case_Agreement_Profile.egcs_fc_description_en as descriptionEn',
@@ -392,7 +396,7 @@ export const buildAgreementDocumentContext = async (
     return {}
   }
 
-  const [recipients, recipientAddresses, activities, activityOutcomes, activityResponsibleParties, budgetYears, budgetItems, commitments, payments, claims, forecasts] = await Promise.all([
+  const [recipients, recipientAddresses, activities, activityOutcomes, activityResponsibleParties, budgetYears, budgetItems, commitments, payments, claims, forecasts, customFieldDefinitions] = await Promise.all([
     db.selectFrom('Funding_Case_Agreement_Applicant_Recipient')
       .innerJoin('Applicant_Recipient_Profile', 'Applicant_Recipient_Profile.id', 'Funding_Case_Agreement_Applicant_Recipient.egcs_fc_applicantrecipient')
       .where('Funding_Case_Agreement_Applicant_Recipient.egcs_fc_fundingagreement', '=', agreementId)
@@ -566,7 +570,8 @@ export const buildAgreementDocumentContext = async (
       .where('egcs_fc_fundingagreement', '=', agreementId)
       .where('_deleted', '=', false)
       .select(['egcs_fc_active as active'])
-      .execute()
+      .execute(),
+    readAssignedAgencyCustomFieldDefinitions(db, String(agreement.streamId))
   ])
 
   const zeroMoney = parseMoney('0')
@@ -748,6 +753,7 @@ export const buildAgreementDocumentContext = async (
 
   const baseContext: Record<string, unknown> = {
     agreement: {
+      ...buildAgreementDocumentCustomFields(customFieldDefinitions, agreement.customFieldValues, language),
       number: localizedValue(agreement.number),
       title: localizedValue(localized({ en: agreement.titleEn, fr: agreement.titleFr })),
       description: localizedValue(localized({ en: agreement.descriptionEn, fr: agreement.descriptionFr })),
