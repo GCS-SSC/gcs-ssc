@@ -29,7 +29,18 @@ export default defineEventHandler(async event => {
   return await event.context.$db.transaction().setIsolationLevel('repeatable read').execute(async trx => {
     await requireFreshAuthContext(event, trx)
     const actor = await resolveCurrentCommonUser(event, trx)
-    if (!actor) return { items: [], page: query.page, limit: query.limit, total: 0 }
+    if (!actor) return { items: [], page: query.page, limit: query.limit, total: 0, has_membership: false }
+    const membership = await trx.selectFrom('Common_Group_Member as member')
+      .innerJoin('Common_Group as grp', 'grp.id', 'member.egcs_cn_group')
+      .select('member.id')
+      .where('member.egcs_cn_user', '=', actor.id)
+      .where('member._deleted', '=', false)
+      .where('grp._deleted', '=', false)
+      .executeTakeFirst()
+    const hasMembership = Boolean(membership)
+    if (query.view === 'available' && !hasMembership) {
+      return { items: [], page: query.page, limit: query.limit, total: 0, has_membership: false }
+    }
     const work = await sql<GroupWorkRow>`
       WITH active_membership AS (
         SELECT member.egcs_cn_group FROM "Common_Group_Member" member
@@ -92,7 +103,8 @@ export default defineEventHandler(async event => {
       items: work.rows.map(row => ({ ...row, id: String(row.id), entity_id: String(row.entity_id), review_id: row.review_id ? String(row.review_id) : null,
         group_id: String(row.group_id), claimed_by: row.claimed_by ? String(row.claimed_by) : null,
         agreement_id: row.agreement_id ? String(row.agreement_id) : null })),
-      total: work.rows[0]?.total_count ?? 0, page: query.page, limit: query.limit
+      total: work.rows[0]?.total_count ?? 0, page: query.page, limit: query.limit,
+      has_membership: hasMembership
     }
   })
 })
