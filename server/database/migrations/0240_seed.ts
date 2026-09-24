@@ -5850,7 +5850,7 @@ const createContributionDocxTemplateFromSource = async (
     ['2025-03-31', '{{ agreement.endDate }}'],
     ['Fiscal Years:5', 'Fiscal Years: {{ budget.fiscalYearCount }}'],
     ['Settlement Program', '{{ program.name }}'],
-    ['495 Prospect Street Fredericton, NB, E3B 9M4 Canada', '{{ department.address }}']
+    ['495 Prospect Street Fredericton, NB, E3B 9M4 Canada', '365 Laurier Avenue West, Ottawa, ON K1A 1L1, Canada']
   ]
 
   let nextDocumentXml = documentXml.replace(
@@ -5933,8 +5933,8 @@ async function seedContributionAgreementDocumentTemplates(db: Kysely<Database>):
         { kind: 'paragraph', text: 'Recipient Name: {{ recipient.primary.legalName }}' },
         { kind: 'paragraph', text: 'Project: {{ agreement.title }}' },
         { kind: 'subheading', text: 'Parties' },
-        { kind: 'paragraph', text: '{{ department.legalName }}, hereinafter referred to as the "Department".' },
-        { kind: 'paragraph', text: '{{ department.address }}' },
+        { kind: 'paragraph', text: 'His Majesty the King in Right of Canada, as represented by the Minister of Health, hereinafter referred to as the "Department".' },
+        { kind: 'paragraph', text: '365 Laurier Avenue West, Ottawa, ON K1A 1L1, Canada' },
         { kind: 'paragraph', text: 'AND: {{ recipient.primary.legalName }}, hereinafter referred to as the "Recipient".' },
         { kind: 'paragraph', text: '{{ recipient.primary.address }}' },
         { kind: 'subheading', text: 'Recitals' },
