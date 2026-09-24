@@ -6,7 +6,7 @@ This configuration manages the existing **GCS Demo / demo** environment:
   populated, otherwise GitHub `GCS-SSC/gcs-ssc` branch `main` and the canonical Dockerfile.
 - Database: existing `GCS DB` service (PostgreSQL 18), with the application's existing `DATABASE_URL` preserved.
 - Domain: https://gcs-ssc-demo.up.railway.app, retained by Railway on the existing service.
-- Volumes: existing `gcs-ssc-volume` at `/app/.data` and replacement `postgres-volume-HXMv` on `GCS DB`, each 5000 MB.
+- Volumes: existing `gcs-ssc-volume` at `/app/.data` and replacement `gcs-db-volume` on `GCS DB`, each 5000 MB.
 - Metabase, `Metabase DB`, and their `postgres-volume-4aPn` are included so an IaC apply preserves them.
 - Placement: one app replica in `us-east4-eqdc4a`, retaining existing resource limits.
 - Seed mode: `ENVIRONMENT_TYPE=demo` at build and runtime. Startup applies core,
