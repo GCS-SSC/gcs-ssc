@@ -1,4 +1,5 @@
 /* eslint-disable jsdoc/require-jsdoc */
+import { DocumentConditionError } from './document-conditions'
 import { DocumentConversionError, getFallbackValue, valueOrFallback, renderDocument } from './document-rendering'
 import type { GeneratedDocument, DocumentRenderingOptions } from './document-rendering'
 import { createHash } from 'node:crypto'
@@ -195,6 +196,9 @@ export const renderGeneratedAgreementDocument = async (
   try {
     return await renderDocument(template.egcs_ay_templatekind, templateBytes, context, language, outputFormat, baseFilename, options)
   } catch (error) {
+    if (error instanceof DocumentConditionError) {
+      return await badRequest(event, 'DOCUMENT_CONDITION_INVALID', `apiErrors.document_generation.condition_${error.reason}`, { expression: error.expression })
+    }
     if (error instanceof DocumentConversionError) {
       return await badRequest(event, 'LIBREOFFICE_UNAVAILABLE', 'apiErrors.document_generation.libreoffice_unavailable')
     }

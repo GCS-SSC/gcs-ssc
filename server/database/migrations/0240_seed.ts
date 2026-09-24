@@ -1,3 +1,4 @@
+import { createDemoConditionTemplate } from '../demo-document-conditions'
 import { hashPassword } from 'better-auth/crypto'
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
@@ -6020,6 +6021,12 @@ async function seedContributionAgreementDocumentTemplates(db: Kysely<Database>):
       ]
     },
     {
+      slug: 'conditional-clauses',
+      nameEn: 'Conditional Clauses - Operator Examples',
+      nameFr: 'Clauses conditionnelles - Exemples d’opérateurs',
+      blocks: []
+    },
+    {
       slug: 'agreement-closeout-report',
       nameEn: 'Agreement Closeout Report',
       nameFr: 'Rapport de clôture de l’entente',
@@ -6082,7 +6089,7 @@ async function seedContributionAgreementDocumentTemplates(db: Kysely<Database>):
         : template.blocks
       const file = {
         extension: 'docx',
-        bytes: await createContributionDocxTemplate(languageBlocks),
+        bytes: template.slug === 'conditional-clauses' ? createDemoConditionTemplate(language) : await createContributionDocxTemplate(languageBlocks),
         mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
       }
       const filename = `${template.slug}-${language}.${file.extension}`

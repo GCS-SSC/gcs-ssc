@@ -1089,6 +1089,10 @@
       "provider_in_use": "This storage provider cannot be disabled while it is selected or referenced by active attachments."
     },
     "document_generation": {
+      "condition_syntax": "Invalid Word condition \"{expression}\". Use comparisons, and/or, and balanced parentheses on one line.",
+      "condition_type": "Invalid value types in Word condition \"{expression}\". Compare matching scalar types; ordering requires unformatted numbers.",
+      "condition_blocks": "Invalid Word conditional block near \"{expression}\". Match each opening if with /if; nested if blocks and else are not supported.",
+      "condition_limit": "Word condition \"{expression}\" exceeds the supported length, token count or parentheses depth.",
       "template_not_found": "Document template not found.",
       "invalid_multipart": "Upload the document template as multipart form data.",
       "file_required": "Choose a template file before saving.",

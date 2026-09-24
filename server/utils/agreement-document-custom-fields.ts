@@ -20,8 +20,9 @@ export const buildAgreementDocumentCustomFields = (
   definitions: AssignedAgencyCustomFieldDefinition[],
   values: AgreementCustomFieldValues,
   language: Language_Preference
-): { customFields: Record<string, string>, customFieldEntries: AgreementDocumentCustomFieldEntry[] } => {
+): { customFields: Record<string, string>, customFieldEntries: AgreementDocumentCustomFieldEntry[], customFieldValues: AgreementCustomFieldValues } => {
   const customFields: Record<string, string> = {}
+  const customFieldValues: AgreementCustomFieldValues = {}
   const customFieldEntries: AgreementDocumentCustomFieldEntry[] = []
   const numberFormatter = new Intl.NumberFormat(language === 'fra' ? 'fr-CA' : 'en-CA', { maximumSignificantDigits: 21 })
   for (const field of definitions) {
@@ -39,7 +40,10 @@ export const buildAgreementDocumentCustomFields = (
       value = String(savedValue)
     }
     customFields[field.id] = value
+    customFieldValues[field.id] = field.egcs_ay_kind === 'relational'
+      ? field.egcs_ay_multiple ? [...customFieldOptionIds(savedValue)] : customFieldOptionIds(savedValue)[0]!
+      : savedValue!
     customFieldEntries.push({ id: field.id, name: language === 'fra' ? field.egcs_ay_name_fr : field.egcs_ay_name_en, value })
   }
-  return { customFields, customFieldEntries }
+  return { customFields, customFieldEntries, customFieldValues }
 }

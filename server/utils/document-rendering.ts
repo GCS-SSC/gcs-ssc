@@ -1,5 +1,7 @@
 /* eslint-disable jsdoc/require-jsdoc */
 import Docxtemplater from 'docxtemplater'
+import { DocumentConditionError, evaluateDocumentCondition, resolveDocumentConditionPath } from './document-conditions'
+import { prepareWordConditionTags, type CompiledDocumentConditions } from './document-word-conditions'
 import PizZip from 'pizzip'
 import puppeteer, { type Browser } from 'puppeteer'
 import libreOfficeConvert from 'libreoffice-convert'
@@ -173,32 +175,51 @@ export const normalizeDocumentTemplateTags = (xml: string): string => xml
   .replace(/\{\{\s*\/\s*([\w.]+)\s*}}/g, '{/$1}')
   .replace(/\{\{\s*([\w.]+)\s*}}/g, '{$1}')
 
-const normalizeDocxMustacheTags = (zip: PizZip): void => {
-  for (const [path, file] of Object.entries(zip.files)) {
-    if (!path.startsWith('word/') || !path.endsWith('.xml') || file.dir) {
-      continue
-    }
-
-    zip.file(path, normalizeDocumentTemplateTags(file.asText()))
-  }
-}
-
 const renderDocxTemplate = (templateBytes: Buffer, context: Record<string, unknown>, language: Language_Preference): Buffer => {
   const zip = new PizZip(templateBytes)
-  normalizeDocxMustacheTags(zip)
-  const doc = new Docxtemplater(zip, {
-    paragraphLoop: true,
-    linebreaks: true,
-    nullGetter: () => getFallbackValue(language),
-    parser: (tag: string) => ({
-      get: (scope: unknown, parserContext: { scopeList?: unknown[] }) => getDocumentTemplateTagValue(
-        tag,
-        scope,
-        parserContext.scopeList
-      )
+  const conditions: CompiledDocumentConditions = new Map()
+  for (const [path, file] of Object.entries(zip.files)) {
+    if (path.startsWith('word/') && path.endsWith('.xml') && !file.dir) {
+      zip.file(path, prepareWordConditionTags(file.asText(), conditions))
+    }
+  }
+  let conditionError: DocumentConditionError | undefined
+  let doc: Docxtemplater
+  try {
+    doc = new Docxtemplater(zip, {
+      paragraphLoop: true,
+      linebreaks: true,
+      errorLogging: false,
+      nullGetter: () => getFallbackValue(language),
+      parser: (tag: string) => ({
+        get: (scope: unknown, parserContext: { scopeList?: unknown[] }) => {
+          const compiled = conditions.get(tag)
+          if (!compiled) return getDocumentTemplateTagValue(tag, scope, parserContext.scopeList)
+          try {
+            return evaluateDocumentCondition(compiled.condition, path => {
+              const normalized = path.startsWith('this.') ? path.slice(5) : path
+              for (const candidate of [scope, ...(parserContext.scopeList ?? []).slice().reverse()]) {
+                const value = resolveDocumentConditionPath(candidate, normalized)
+                if (value !== undefined) return value
+              }
+              return undefined
+            }, compiled.expression)
+          } catch (error) {
+            if (error instanceof DocumentConditionError) conditionError = error
+            throw error
+          }
+        }
+      })
     })
-  })
-  doc.render(context)
+  } catch (error) {
+    if (conditions.size) throw new DocumentConditionError('blocks', [...conditions.values()][0]!.expression)
+    throw error
+  }
+  try {
+    doc.render(context)
+  } catch (error) {
+    throw conditionError ?? error
+  }
   return doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' })
 }
 

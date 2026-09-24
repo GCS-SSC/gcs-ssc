@@ -1089,6 +1089,10 @@
       "provider_in_use": "Ce fournisseur de stockage ne peut pas être désactivé tant qu'il est sélectionné ou référencé par des pièces jointes actives."
     },
     "document_generation": {
+      "condition_syntax": "Condition Word non valide « {expression} ». Utilisez des comparaisons, and/or et des parenthèses équilibrées sur une seule ligne.",
+      "condition_type": "Types de valeurs non valides dans la condition Word « {expression} ». Comparez des types scalaires identiques ; les comparaisons d’ordre exigent des nombres non formatés.",
+      "condition_blocks": "Bloc conditionnel Word non valide près de « {expression} ». Fermez chaque if avec /if ; les blocs if imbriqués et else ne sont pas pris en charge.",
+      "condition_limit": "La condition Word « {expression} » dépasse la longueur, le nombre de jetons ou la profondeur de parenthèses pris en charge.",
       "template_not_found": "Modèle de document introuvable.",
       "invalid_multipart": "Téléversez le modèle de document comme données de formulaire multiparties.",
       "file_required": "Choisissez un fichier modèle avant d'enregistrer.",
