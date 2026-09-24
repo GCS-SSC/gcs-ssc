@@ -2055,7 +2055,7 @@
       "blocker_reasons": {
         "agreement_status": "Agreement status does not allow closeout",
         "amendment_not_terminal": "Amendment is not terminal",
-        "claim_not_terminal": "Claim lacks an approved final reconciliation",
+        "claim_not_terminal": "Claim status is not terminal",
         "claim_reconcile_not_terminal": "Claim reconciliation is not terminal",
         "claim_reconcile_approval_required": "Final claim reconciliation requires approved evidence",
         "payment_not_terminal": "Payment is not fully paid or otherwise terminal",

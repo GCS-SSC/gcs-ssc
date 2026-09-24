@@ -146,6 +146,9 @@ const totalAmount = computed(() =>
 )
 
 const formatMoney = (value: Money) => formatMoneyText(value, locale.value, 'CAD')
+const MONTH_KEYS = ['apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec', 'jan', 'feb', 'mar'] as const
+const paymentPeriodLabel = (start: number, end: number) =>
+  `${t(`agreement.payments.months.${MONTH_KEYS[start]}`)} - ${t(`agreement.payments.months.${MONTH_KEYS[end]}`)}`
 
 /**
  *
@@ -288,7 +291,7 @@ const handleCompleted = async () => {
               label: formatMoney(payment.egcs_fc_paymentamount)
             }, {
               variant: 'period',
-              label: `${t('agreement.payments.period')} ${payment.egcs_fc_periodstart}${t('common.separator')}${payment.egcs_fc_periodend}`
+              label: `${t('agreement.payments.period')} ${paymentPeriodLabel(payment.egcs_fc_periodstart, payment.egcs_fc_periodend)}`
             }, {
               statusId: payment.egcs_fc_status,
               isCompleted: payment.isCompleted

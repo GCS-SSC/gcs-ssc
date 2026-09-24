@@ -2055,7 +2055,7 @@
       "blocker_reasons": {
         "agreement_status": "Le statut de l’entente ne permet pas la clôture",
         "amendment_not_terminal": "La modification n’est pas terminale",
-        "claim_not_terminal": "La réclamation n’a pas de rapprochement final approuvé",
+        "claim_not_terminal": "Le statut de la réclamation n’est pas final",
         "claim_reconcile_not_terminal": "Le rapprochement de réclamation n’est pas terminal",
         "claim_reconcile_approval_required": "Le rapprochement final exige une preuve approuvée",
         "payment_not_terminal": "Le paiement n’est pas entièrement versé ou autrement terminal",

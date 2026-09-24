@@ -26,8 +26,8 @@ const catalog = useStatusCatalog()
 void catalog.load()
 
 const selectedIds = computed(() => Array.isArray(model.value)
-  ? model.value
-  : typeof model.value === 'string' ? [model.value] : [])
+  ? model.value.filter(id => id !== '')
+  : typeof model.value === 'string' && model.value !== '' ? [model.value] : [])
 const availableDefinitions = computed(() => {
   const definitions = catalog.getForAgency(agencyId, includeDeleted)
     .filter(definition => !draftOnly || definition.isDraft)

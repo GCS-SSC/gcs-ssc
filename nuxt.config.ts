@@ -94,5 +94,10 @@ export default defineNuxtConfig({
     experimental: {
       localeDetector: 'locale-detector.ts'
     }
+  },
+
+  icon: {
+    provider: 'server',
+    localApiEndpoint: '/_nuxt_icon'
   }
 })
