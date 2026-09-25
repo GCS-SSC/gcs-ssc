@@ -150,7 +150,19 @@
     "agreement_count_load_failed": "Assigned Agreements count could not be loaded",
     "previous": "Previous",
     "next": "Next",
-    "page": "Page {page}"
+    "page": "Page {page}",
+    "work_labels": {
+      "recommendation": "Recommendation",
+      "claim": "Claim",
+      "reconciliation": "Reconciliation",
+      "forecast": "Forecast",
+      "monitor": "Monitor",
+      "commitment": "Commitment",
+      "amendment": "Amendment",
+      "amendment_number": "Amendment #{number}",
+      "closeout": "Closeout",
+      "approval": "Approval"
+    }
   },
   "assignments": {
     "title": "Assigned users",

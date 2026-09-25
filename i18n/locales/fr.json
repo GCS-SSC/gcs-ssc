@@ -150,7 +150,19 @@
     "agreement_count_load_failed": "Impossible de charger le nombre d’ententes assignées",
     "previous": "Précédent",
     "next": "Suivant",
-    "page": "Page {page}"
+    "page": "Page {page}",
+    "work_labels": {
+      "recommendation": "Recommandation",
+      "claim": "Réclamation",
+      "reconciliation": "Rapprochement",
+      "forecast": "Prévision",
+      "monitor": "Surveillance",
+      "commitment": "Engagement",
+      "amendment": "Modification",
+      "amendment_number": "Modification no {number}",
+      "closeout": "Clôture",
+      "approval": "Approbation"
+    }
   },
   "assignments": {
     "title": "Utilisateurs assignés",

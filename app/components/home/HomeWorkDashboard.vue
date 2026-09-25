@@ -2,33 +2,12 @@
 /* eslint-disable jsdoc/require-jsdoc -- Page-local queue actions are named for their behavior. */
 import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
-import type { AssignableEntityType } from '~~/shared/types/schemas'
-import type { BusinessRecordStateFields } from '~~/shared/types/business-record-state'
+import type { AssignedWorkItem, GroupWorkItem } from '~~/shared/types/assigned-work'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 
-type AssignedItem = BusinessRecordStateFields & {
-  entity_id: string
-  entity_type: AssignableEntityType
-  status: string
-  identifier_en: string
-  identifier_fr: string
-  is_primary: boolean
-  agreement_id: string | null
-  variant: string | null
-}
-type GroupItem = {
-  kind: 'review' | 'additional_reviewer' | 'approval'
-  id: string
-  entity_type: string
-  entity_id: string
-  variant: 'checklist' | 'assessment' | null
-  name_en: string
-  name_fr: string
-  group_name_en: string
-  group_name_fr: string
-  agreement_id: string | null
-}
+type AssignedItem = AssignedWorkItem
+type GroupItem = GroupWorkItem
 type Section = 'direct' | 'shared' | 'proponents' | 'agreements'
 const assignedBatchSize = 100
 const sectionPageSize = 5

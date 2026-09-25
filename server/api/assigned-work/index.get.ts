@@ -22,6 +22,18 @@ type AssignedWorkRow = {
   identifier_fr: string
   agreement_id: string | null
   variant: string | null
+  parent_en: string | null
+  parent_fr: string | null
+  secondary_en: string | null
+  secondary_fr: string | null
+  detail_name_en: string | null
+  detail_name_fr: string | null
+  detail_number: number | null
+  claim_id: string | null
+  fiscal_year: string | null
+  period_start: number | null
+  period_end: number | null
+  payment_type: string | null
   is_primary: boolean
   isCompleted: boolean
   total_count: number
@@ -90,8 +102,10 @@ export default defineEventHandler(async event => {
     WITH base_work AS (
       SELECT profile.id, 'applicantrecipient'::text entity_type,
         CASE WHEN profile.egcs_ar_active THEN 'active' ELSE 'inactive' END status,
-        COALESCE(profile.egcs_ar_legalname_en, profile.egcs_ar_operatingname_en, profile.id::text) identifier_en,
-        COALESCE(profile.egcs_ar_legalname_fr, profile.egcs_ar_operatingname_fr, profile.id::text) identifier_fr,
+        COALESCE(profile.egcs_ar_legalname_en, profile.egcs_ar_operatingname_en,
+          profile.egcs_ar_legalname_fr, profile.egcs_ar_operatingname_fr, profile.id::text) identifier_en,
+        COALESCE(profile.egcs_ar_legalname_fr, profile.egcs_ar_operatingname_fr,
+          profile.egcs_ar_legalname_en, profile.egcs_ar_operatingname_en, profile.id::text) identifier_fr,
         NULL::bigint agreement_id, NULL::text variant, 'applicant_recipient'::text owner_subject,
         profile.egcs_ar_leadagency agency_id, NULL::bigint program_id
       FROM "Applicant_Recipient_Profile" profile
@@ -214,13 +228,99 @@ export default defineEventHandler(async event => {
     ), work AS (
       SELECT * FROM base_work UNION ALL SELECT * FROM review_work UNION ALL SELECT * FROM recommendation_work
     )
-    SELECT work.id::text entity_id, work.entity_type, work.status, work.identifier_en, work.identifier_fr,
-      work.agreement_id::text agreement_id, work.variant, assignment.egcs_cn_isprimary is_primary,
+    SELECT work.id::text entity_id, work.entity_type, work.status,
+      CASE WHEN work.entity_type = 'fundingcaseagreement' THEN COALESCE(to_jsonb(display_agreement)->>'egcs_fc_agreementnumber', work.identifier_en)
+        ELSE work.identifier_en END identifier_en,
+      CASE WHEN work.entity_type = 'fundingcaseagreement' THEN COALESCE(to_jsonb(display_agreement)->>'egcs_fc_agreementnumber', work.identifier_fr)
+        ELSE work.identifier_fr END identifier_fr,
+      work.agreement_id::text agreement_id, work.variant,
+      COALESCE(to_jsonb(display_agreement)->>'egcs_fc_agreementnumber',
+        to_jsonb(display_proponent)->>'egcs_ar_legalname_en', to_jsonb(display_proponent)->>'egcs_ar_operatingname_en',
+        to_jsonb(display_proponent)->>'egcs_ar_legalname_fr', to_jsonb(display_proponent)->>'egcs_ar_operatingname_fr',
+        '#' || display_proponent.id::text,
+        to_jsonb(display_stream)->>'egcs_tp_name_en', to_jsonb(owner_agency)->>'egcs_ay_name_en') parent_en,
+      COALESCE(to_jsonb(display_agreement)->>'egcs_fc_agreementnumber',
+        to_jsonb(display_proponent)->>'egcs_ar_legalname_fr', to_jsonb(display_proponent)->>'egcs_ar_operatingname_fr',
+        to_jsonb(display_proponent)->>'egcs_ar_legalname_en', to_jsonb(display_proponent)->>'egcs_ar_operatingname_en',
+        '#' || display_proponent.id::text,
+        to_jsonb(display_stream)->>'egcs_tp_name_fr', to_jsonb(owner_agency)->>'egcs_ay_name_fr') parent_fr,
+      CASE WHEN work.entity_type = 'fundingcaseagreement' THEN to_jsonb(display_agreement)->>'egcs_fc_title_en'
+        WHEN work.entity_type = 'applicantrecipient' THEN to_jsonb(display_proponent)->>'egcs_ar_operatingname_en' END secondary_en,
+      CASE WHEN work.entity_type = 'fundingcaseagreement' THEN to_jsonb(display_agreement)->>'egcs_fc_title_fr'
+        WHEN work.entity_type = 'applicantrecipient' THEN to_jsonb(display_proponent)->>'egcs_ar_operatingname_fr' END secondary_fr,
+      CASE work.entity_type
+        WHEN 'commonreview' THEN review_schema.egcs_cn_name_en
+        WHEN 'commonrecommendation' THEN recommendation_schema.egcs_cn_name_en
+        WHEN 'fundingcasemonitor' THEN monitor_type.egcs_ay_name_en
+        WHEN 'fundingcaseagreementcommitment' THEN commitment_type.egcs_ay_name_en
+        WHEN 'fundingcaseamendment' THEN to_jsonb(display_amendment)->>'egcs_fc_name_en'
+      END detail_name_en,
+      CASE work.entity_type
+        WHEN 'commonreview' THEN review_schema.egcs_cn_name_fr
+        WHEN 'commonrecommendation' THEN recommendation_schema.egcs_cn_name_fr
+        WHEN 'fundingcasemonitor' THEN monitor_type.egcs_ay_name_fr
+        WHEN 'fundingcaseagreementcommitment' THEN commitment_type.egcs_ay_name_fr
+        WHEN 'fundingcaseamendment' THEN to_jsonb(display_amendment)->>'egcs_fc_name_fr'
+      END detail_name_fr,
+      CASE WHEN work.entity_type = 'fundingcaseamendment' THEN (to_jsonb(display_amendment)->>'egcs_fc_amendmentnumber')::int END detail_number,
+      display_reconcile.egcs_fc_fundingagreementclaim::text claim_id,
+      fiscal_year.egcs_ay_fiscalyeardisplay fiscal_year,
+      COALESCE((to_jsonb(display_claim)->>'egcs_fc_periodstart')::int, (to_jsonb(display_payment)->>'egcs_fc_periodstart')::int) period_start,
+      COALESCE((to_jsonb(display_claim)->>'egcs_fc_periodend')::int, (to_jsonb(display_payment)->>'egcs_fc_periodend')::int) period_end,
+      to_jsonb(display_payment)->>'egcs_fc_paymenttype' payment_type,
+      assignment.egcs_cn_isprimary is_primary,
       (completion.id IS NOT NULL) AS "isCompleted",
       count(*) OVER ()::int total_count
     FROM work JOIN "Common_Entity_Assignment" assignment
       ON assignment.egcs_cn_entityid = work.id AND assignment.egcs_cn_entitytype::text = work.entity_type
     LEFT JOIN "Agency_Profile" owner_agency ON owner_agency.id = work.agency_id AND owner_agency._deleted = false
+    LEFT JOIN "Funding_Case_Agreement_Profile" display_agreement ON display_agreement.id = work.agreement_id
+      AND display_agreement._deleted = false
+    LEFT JOIN "Common_Review" display_review ON display_review.id = work.id AND work.entity_type = 'commonreview'
+    LEFT JOIN "Common_Review_Set" display_review_set ON display_review_set.id = display_review.egcs_cn_reviewset
+    LEFT JOIN "Common_Review_Schema" review_schema ON review_schema.id = display_review.egcs_cn_reviewschema
+    LEFT JOIN "Common_Recommendation" display_recommendation ON display_recommendation.id = work.id
+      AND work.entity_type = 'commonrecommendation'
+    LEFT JOIN "Common_Runtime_Item" display_recommendation_item ON display_recommendation_item.id = display_recommendation.egcs_cn_runtimeitem
+    LEFT JOIN "Common_Recommendation_Schema" recommendation_schema ON recommendation_schema.id = display_recommendation_item.egcs_cn_publication
+    LEFT JOIN "Common_Review" recommendation_review ON recommendation_review.id = display_recommendation.egcs_cn_entityid
+      AND display_recommendation.egcs_cn_entitytype::text = 'commonreview'
+    LEFT JOIN "Common_Review_Set" recommendation_review_set ON recommendation_review_set.id = recommendation_review.egcs_cn_reviewset
+    LEFT JOIN qualified_bindings display_binding ON display_binding.entity_id = COALESCE(
+      display_review_set.egcs_cn_entityid,
+      CASE WHEN display_recommendation.egcs_cn_entitytype::text <> 'commonreview' THEN display_recommendation.egcs_cn_entityid END,
+      recommendation_review_set.egcs_cn_entityid)
+      AND display_binding.entity_type = COALESCE(display_review_set.egcs_cn_entitytype::text,
+        CASE WHEN display_recommendation.egcs_cn_entitytype::text <> 'commonreview' THEN display_recommendation.egcs_cn_entitytype::text END,
+        recommendation_review_set.egcs_cn_entitytype::text)
+      AND display_binding.owner_type = 'applicantrecipient'
+    LEFT JOIN "Applicant_Recipient_Profile" display_proponent ON display_proponent.id = CASE
+      WHEN work.entity_type = 'applicantrecipient' THEN work.id
+      WHEN display_review_set.egcs_cn_entitytype::text = 'applicantrecipient' THEN display_review_set.egcs_cn_entityid
+      WHEN display_recommendation.egcs_cn_entitytype::text = 'applicantrecipient' THEN display_recommendation.egcs_cn_entityid
+      WHEN recommendation_review_set.egcs_cn_entitytype::text = 'applicantrecipient' THEN recommendation_review_set.egcs_cn_entityid
+      ELSE display_binding.owner_id END
+      AND display_proponent._deleted = false
+    LEFT JOIN "Transfer_Payment_Stream" display_stream ON display_stream.id = CASE
+      WHEN display_review_set.egcs_cn_entitytype::text = 'transferpaymentstream' THEN display_review_set.egcs_cn_entityid
+      WHEN display_recommendation.egcs_cn_entitytype::text = 'transferpaymentstream' THEN display_recommendation.egcs_cn_entityid
+      WHEN recommendation_review_set.egcs_cn_entitytype::text = 'transferpaymentstream' THEN recommendation_review_set.egcs_cn_entityid END
+      AND display_stream._deleted = false
+    LEFT JOIN "Funding_Case_Agreement_Claim" display_claim ON display_claim.id = work.id AND work.entity_type = 'fundingcaseagreementclaim'
+    LEFT JOIN "Funding_Case_Agreement_Claim_Reconcile" display_reconcile ON display_reconcile.id = work.id AND work.entity_type = 'fundingclaimreconcile'
+    LEFT JOIN "Funding_Case_Agreement_Payment" display_payment ON display_payment.id = work.id AND work.entity_type = 'fundingcasepayment'
+    LEFT JOIN "Funding_Case_Agreement_Forecast" display_forecast ON display_forecast.id = work.id AND work.entity_type = 'fundingcaseforecast'
+    LEFT JOIN "Funding_Case_Agreement_Monitor" display_monitor ON display_monitor.id = work.id AND work.entity_type = 'fundingcasemonitor'
+    LEFT JOIN "Transfer_Payment_Monitor_Type" stream_monitor_type ON stream_monitor_type.id::text = to_jsonb(display_monitor)->>'egcs_fc_type'
+    LEFT JOIN "Agency_Monitor_Type" monitor_type ON monitor_type.id = stream_monitor_type.egcs_tp_agencymonitortype
+    LEFT JOIN "Funding_Case_Agreement_Commitment" display_commitment ON display_commitment.id = work.id AND work.entity_type = 'fundingcaseagreementcommitment'
+    LEFT JOIN "Transfer_Payment_Stream_Commitment_Type" stream_commitment_type ON stream_commitment_type.id::text = to_jsonb(display_commitment)->>'egcs_fc_type'
+    LEFT JOIN "Agency_Commitment_Type" commitment_type ON commitment_type.id = stream_commitment_type.egcs_tp_agencycommitmenttype
+    LEFT JOIN "Funding_Case_Agreement_Amendment" display_amendment ON display_amendment.id = work.id AND work.entity_type = 'fundingcaseamendment'
+    LEFT JOIN "Agency_Fiscal_Year" fiscal_year ON fiscal_year.id = COALESCE(
+      (to_jsonb(display_claim)->>'egcs_fc_fiscalyear')::bigint,
+      (to_jsonb(display_payment)->>'egcs_fc_fiscalyear')::bigint,
+      (to_jsonb(display_forecast)->>'egcs_fc_fiscalyear')::bigint)
     LEFT JOIN "Common_Status" business_status
       ON business_status.id::text = work.status
       AND work.entity_type IN (${sql.join(businessEntityTypes)})
@@ -252,6 +352,15 @@ export default defineEventHandler(async event => {
         OR work.status ILIKE ${search}
         OR business_status.egcs_cn_name_en ILIKE ${search}
         OR business_status.egcs_cn_name_fr ILIKE ${search}
+        OR (to_jsonb(display_agreement)->>'egcs_fc_agreementnumber') ILIKE ${search}
+        OR review_schema.egcs_cn_name_en ILIKE ${search}
+        OR review_schema.egcs_cn_name_fr ILIKE ${search}
+        OR recommendation_schema.egcs_cn_name_en ILIKE ${search}
+        OR recommendation_schema.egcs_cn_name_fr ILIKE ${search}
+        OR monitor_type.egcs_ay_name_en ILIKE ${search}
+        OR monitor_type.egcs_ay_name_fr ILIKE ${search}
+        OR commitment_type.egcs_ay_name_en ILIKE ${search}
+        OR commitment_type.egcs_ay_name_fr ILIKE ${search}
         OR ${localizedLabelPredicate}
       )
     ORDER BY assignment.egcs_cn_isprimary DESC, work.entity_type, work.id

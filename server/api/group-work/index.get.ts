@@ -1,4 +1,4 @@
-import { sql } from 'kysely'
+import { sql, type RawBuilder } from 'kysely'
 import { z } from 'zod'
 import { requireAuthContext, requireFreshAuthContext } from '~~/server/utils/authorize'
 import { resolveCurrentCommonUser } from '~~/server/utils/additional-reviewer-runtime'
@@ -16,6 +16,10 @@ type GroupWorkRow = {
   group_id: string
   name_en: string
   name_fr: string
+  detail_name_en: string | null
+  detail_name_fr: string | null
+  parent_en: string | null
+  parent_fr: string | null
   group_name_en: string
   group_name_fr: string
   agreement_id: string | null
@@ -27,7 +31,7 @@ export default defineEventHandler(async event => {
   await requireAuthContext(event)
   const query = await getValidatedQueryI18n(event, Query)
   return await event.context.$db.transaction().setIsolationLevel('repeatable read').execute(async trx => {
-    await requireFreshAuthContext(event, trx)
+    const auth = await requireFreshAuthContext(event, trx)
     const actor = await resolveCurrentCommonUser(event, trx)
     if (!actor) return { items: [], page: query.page, limit: query.limit, total: 0, has_membership: false }
     const membership = await trx.selectFrom('Common_Group_Member as member')
@@ -41,6 +45,27 @@ export default defineEventHandler(async event => {
     if (query.view === 'available' && !hasMembership) {
       return { items: [], page: query.page, limit: query.limit, total: 0, has_membership: false }
     }
+    const readGrants = auth.userAbilities.getGrants().filter(grant => grant.action === 'read')
+    /**
+     * Builds the parent read predicate for one authorization subject.
+     * @param subject Authorization subject.
+     * @param agencyColumn SQL reference to the parent Agency.
+     * @param programColumn SQL reference to the parent Program.
+     * @returns Scoped read predicate.
+     */
+    const scopedRead = (subject: string, agencyColumn: string, programColumn: string): RawBuilder<boolean> => {
+      const predicates = readGrants.filter(grant => grant.subject === subject).map(grant => {
+        if (grant.scope.type === 'global') return sql`TRUE`
+        if (grant.scope.type === 'agency') return sql`${sql.ref(agencyColumn)} = ${grant.scope.agencyId}::bigint`
+        return sql`${sql.ref(agencyColumn)} = ${grant.scope.agencyId}::bigint
+          AND ${sql.ref(programColumn)} = ${grant.scope.transferPaymentId}::bigint`
+      })
+      return predicates.length > 0 ? sql<boolean>`(${sql.join(predicates, sql` OR `)})` : sql<boolean>`FALSE`
+    }
+    const agreementRead = scopedRead('agreement', 'agreement_program.egcs_tp_agency', 'agreement_program.id')
+    const proponentRead = readGrants.some(grant => grant.subject === 'applicant_recipient')
+    const streamRead = scopedRead('transfer_payment', 'stream_program.egcs_tp_agency', 'stream_program.id')
+    const agencyRead = scopedRead('agency', 'review_agency.id', 'review_agency.id')
     const work = await sql<GroupWorkRow>`
       WITH active_membership AS (
         SELECT member.egcs_cn_group FROM "Common_Group_Member" member
@@ -71,7 +96,11 @@ export default defineEventHandler(async event => {
         SELECT 'approval', approval.id,
           CASE WHEN slip.egcs_cn_entitytype = 'commonreview' THEN slip.egcs_cn_entityid ELSE NULL END,
           slip.egcs_cn_entitytype, slip.egcs_cn_entityid,
-          NULL, approval.egcs_cn_assignedgroup, approval.egcs_cn_assigneduser,
+          CASE WHEN slip.egcs_cn_entitytype = 'commonreview' THEN
+            CASE WHEN EXISTS (SELECT 1 FROM "Common_Checklist" checklist
+              WHERE checklist.egcs_cn_review = slip.egcs_cn_entityid AND checklist._deleted = false)
+              THEN 'checklist' ELSE 'assessment' END ELSE NULL END,
+          approval.egcs_cn_assignedgroup, approval.egcs_cn_assigneduser,
           approval.egcs_cn_name_en, approval.egcs_cn_name_fr
         FROM "Common_Approval" approval
         JOIN "Common_Routing_Slip" slip ON slip.id = approval.egcs_cn_routingslip AND slip._deleted = false
@@ -80,6 +109,24 @@ export default defineEventHandler(async event => {
           AND item.egcs_cn_state = 'awaiting_action'
       )
       SELECT work.*, grp.egcs_cn_name_en group_name_en, grp.egcs_cn_name_fr group_name_fr,
+        CASE WHEN work.kind = 'approval' THEN work.name_en ELSE review_schema.egcs_cn_name_en END detail_name_en,
+        CASE WHEN work.kind = 'approval' THEN work.name_fr ELSE review_schema.egcs_cn_name_fr END detail_name_fr,
+        COALESCE(
+          CASE WHEN ${agreementRead} THEN to_jsonb(agreement)->>'egcs_fc_agreementnumber' END,
+          CASE WHEN ${proponentRead} AND proponent.id IS NOT NULL THEN COALESCE(
+            to_jsonb(proponent)->>'egcs_ar_legalname_en', to_jsonb(proponent)->>'egcs_ar_operatingname_en',
+            to_jsonb(proponent)->>'egcs_ar_legalname_fr', to_jsonb(proponent)->>'egcs_ar_operatingname_fr', '#' || proponent.id::text) END,
+          CASE WHEN ${streamRead} THEN to_jsonb(stream)->>'egcs_tp_name_en' END,
+          CASE WHEN agreement.id IS NULL AND proponent.id IS NULL AND stream.id IS NULL
+            AND ${agencyRead} THEN to_jsonb(review_agency)->>'egcs_ay_name_en' END) parent_en,
+        COALESCE(
+          CASE WHEN ${agreementRead} THEN to_jsonb(agreement)->>'egcs_fc_agreementnumber' END,
+          CASE WHEN ${proponentRead} AND proponent.id IS NOT NULL THEN COALESCE(
+            to_jsonb(proponent)->>'egcs_ar_legalname_fr', to_jsonb(proponent)->>'egcs_ar_operatingname_fr',
+            to_jsonb(proponent)->>'egcs_ar_legalname_en', to_jsonb(proponent)->>'egcs_ar_operatingname_en', '#' || proponent.id::text) END,
+          CASE WHEN ${streamRead} THEN to_jsonb(stream)->>'egcs_tp_name_fr' END,
+          CASE WHEN agreement.id IS NULL AND proponent.id IS NULL AND stream.id IS NULL
+            AND ${agencyRead} THEN to_jsonb(review_agency)->>'egcs_ay_name_fr' END) parent_fr,
         CASE
           WHEN work.entity_type = 'fundingcaseagreement' THEN work.entity_id
           WHEN work.entity_type = 'fundingcaseagreementclaim' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Claim" WHERE id = work.entity_id)
@@ -94,6 +141,69 @@ export default defineEventHandler(async event => {
         count(*) OVER()::integer total_count
       FROM work LEFT JOIN active_membership member ON member.egcs_cn_group = work.group_id
       JOIN "Common_Group" grp ON grp.id = work.group_id
+      LEFT JOIN "Common_Recommendation" approval_recommendation ON approval_recommendation.id = work.entity_id
+        AND work.kind = 'approval' AND work.entity_type = 'commonrecommendation'
+      LEFT JOIN LATERAL (SELECT
+        CASE WHEN approval_recommendation.id IS NOT NULL THEN approval_recommendation.egcs_cn_entitytype::text ELSE work.entity_type END entity_type,
+        CASE WHEN approval_recommendation.id IS NOT NULL THEN approval_recommendation.egcs_cn_entityid ELSE work.entity_id END entity_id
+      ) target ON TRUE
+      LEFT JOIN "Common_Review" source_review ON source_review.id = COALESCE(work.review_id,
+        CASE WHEN target.entity_type = 'commonreview' THEN target.entity_id END)
+      LEFT JOIN "Common_Review_Schema" review_schema ON review_schema.id = source_review.egcs_cn_reviewschema
+      LEFT JOIN "Agency_Profile" review_agency ON review_agency.id = review_schema.egcs_cn_agency AND review_agency._deleted = false
+      LEFT JOIN "Common_Review_Set" source_review_set ON source_review_set.id = source_review.egcs_cn_reviewset
+      LEFT JOIN "Common_Extension_Entity_Owner" review_binding ON review_binding.egcs_cn_entityid = source_review_set.egcs_cn_entityid
+        AND review_binding.egcs_cn_entitytype::text = source_review_set.egcs_cn_entitytype::text
+      LEFT JOIN "Funding_Case_Agreement_Claim" review_claim ON review_claim.id = source_review_set.egcs_cn_entityid
+        AND source_review_set.egcs_cn_entitytype::text = 'fundingcaseagreementclaim'
+      LEFT JOIN "Funding_Case_Agreement_Claim_Reconcile" review_reconcile ON review_reconcile.id = source_review_set.egcs_cn_entityid
+        AND source_review_set.egcs_cn_entitytype::text = 'fundingclaimreconcile'
+      LEFT JOIN "Funding_Case_Agreement_Claim" reconciled_claim ON reconciled_claim.id = review_reconcile.egcs_fc_fundingagreementclaim
+      LEFT JOIN "Funding_Case_Agreement_Payment" review_payment ON review_payment.id = source_review_set.egcs_cn_entityid
+        AND source_review_set.egcs_cn_entitytype::text = 'fundingcasepayment'
+      LEFT JOIN "Funding_Case_Agreement_Forecast" review_forecast ON review_forecast.id = source_review_set.egcs_cn_entityid
+        AND source_review_set.egcs_cn_entitytype::text = 'fundingcaseforecast'
+      LEFT JOIN "Funding_Case_Agreement_Monitor" review_monitor ON review_monitor.id = source_review_set.egcs_cn_entityid
+        AND source_review_set.egcs_cn_entitytype::text = 'fundingcasemonitor'
+      LEFT JOIN "Funding_Case_Agreement_Commitment" review_commitment ON review_commitment.id = source_review_set.egcs_cn_entityid
+        AND source_review_set.egcs_cn_entitytype::text = 'fundingcaseagreementcommitment'
+      LEFT JOIN "Funding_Case_Agreement_Amendment" review_amendment ON review_amendment.id = source_review_set.egcs_cn_entityid
+        AND source_review_set.egcs_cn_entitytype::text = 'fundingcaseamendment'
+      LEFT JOIN "Funding_Case_Agreement_Closeout" review_closeout ON review_closeout.id = source_review_set.egcs_cn_entityid
+        AND source_review_set.egcs_cn_entitytype::text = 'fundingcaseagreementcloseout'
+      LEFT JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.id = COALESCE(
+        CASE WHEN target.entity_type = 'fundingcaseagreement' THEN target.entity_id END,
+        CASE WHEN source_review_set.egcs_cn_entitytype::text = 'fundingcaseagreement' THEN source_review_set.egcs_cn_entityid END,
+        CASE WHEN review_binding.egcs_cn_ownertype = 'fundingcaseagreement' THEN review_binding.egcs_cn_ownerid END,
+        review_claim.egcs_fc_fundingagreement, reconciled_claim.egcs_fc_fundingagreement,
+        review_payment.egcs_fc_fundingagreement, review_forecast.egcs_fc_fundingagreement,
+        review_monitor.egcs_fc_fundingagreement, review_commitment.egcs_fc_fundingagreement,
+        review_amendment.egcs_fc_fundingagreement, review_closeout.egcs_fc_fundingagreement,
+        CASE WHEN target.entity_type = 'fundingcaseagreementclaim' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Claim" WHERE id = target.entity_id) END,
+        CASE WHEN target.entity_type = 'fundingclaimreconcile' THEN (SELECT claim.egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Claim_Reconcile" reconcile
+          JOIN "Funding_Case_Agreement_Claim" claim ON claim.id = reconcile.egcs_fc_fundingagreementclaim WHERE reconcile.id = target.entity_id) END,
+        CASE WHEN target.entity_type = 'fundingcasepayment' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Payment" WHERE id = target.entity_id) END,
+        CASE WHEN target.entity_type = 'fundingcaseforecast' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Forecast" WHERE id = target.entity_id) END,
+        CASE WHEN target.entity_type = 'fundingcasemonitor' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Monitor" WHERE id = target.entity_id) END,
+        CASE WHEN target.entity_type = 'fundingcaseagreementcommitment' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Commitment" WHERE id = target.entity_id) END,
+        CASE WHEN target.entity_type = 'fundingcaseagreementcloseout' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Closeout" WHERE id = target.entity_id) END,
+        CASE WHEN target.entity_type = 'fundingcaseamendment' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Amendment" WHERE id = target.entity_id) END)
+        AND agreement._deleted = false
+      LEFT JOIN "Transfer_Payment_Stream" agreement_stream ON agreement_stream.id = agreement.egcs_fc_transferpaymentstream
+        AND agreement_stream._deleted = false
+      LEFT JOIN "Transfer_Payment_Profile" agreement_program ON agreement_program.id = agreement_stream.egcs_tp_transferpaymentprofile
+        AND agreement_program._deleted = false
+      LEFT JOIN "Applicant_Recipient_Profile" proponent ON proponent.id = CASE
+        WHEN target.entity_type = 'applicantrecipient' THEN target.entity_id
+        WHEN source_review_set.egcs_cn_entitytype::text = 'applicantrecipient' THEN source_review_set.egcs_cn_entityid
+        WHEN review_binding.egcs_cn_ownertype = 'applicantrecipient' THEN review_binding.egcs_cn_ownerid END
+        AND proponent._deleted = false
+      LEFT JOIN "Transfer_Payment_Stream" stream ON stream.id = CASE
+        WHEN target.entity_type = 'transferpaymentstream' THEN target.entity_id
+        WHEN source_review_set.egcs_cn_entitytype::text = 'transferpaymentstream' THEN source_review_set.egcs_cn_entityid END
+        AND stream._deleted = false
+      LEFT JOIN "Transfer_Payment_Profile" stream_program ON stream_program.id = stream.egcs_tp_transferpaymentprofile
+        AND stream_program._deleted = false
       WHERE (${query.view} = 'mine' AND work.claimed_by = ${actor.id}::bigint)
         OR (${query.view} = 'available' AND work.claimed_by IS NULL AND member.egcs_cn_group IS NOT NULL)
       ORDER BY work.kind, work.id

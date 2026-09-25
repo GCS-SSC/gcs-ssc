@@ -2,25 +2,36 @@
 import { ASSIGNABLE_ENTITY_TYPE_ENUM } from '~~/shared/constants/enums'
 import { buildAssignedWorkRoute } from '~~/shared/utils/entity-assignments'
 import type { AssignableEntityType } from '~~/shared/types/schemas'
+import type { GroupWorkItem } from '~~/shared/types/assigned-work'
 import { appRouteLocations } from '~/utils/route-locations'
 
-type GroupItem = {
-  kind: 'review' | 'additional_reviewer' | 'approval'
-  id: string
-  entity_type: string
-  entity_id: string
-  variant: 'checklist' | 'assessment' | null
-  name_en: string
-  name_fr: string
-  group_name_en: string
-  group_name_fr: string
-  agreement_id: string | null
-}
+type GroupItem = GroupWorkItem
 const { items, claimable = false, busyId = null } = defineProps<{ items: GroupItem[], claimable?: boolean, busyId?: string | null }>()
 const emit = defineEmits<{ claim: [item: GroupItem] }>()
 const { t } = useI18n()
 const localePath = useLocalePath()
 const { getBilingualValue } = useBilingualValue()
+/**
+ * Builds the group item's main line with its owning business identity.
+ * @param item Group work item.
+ * @returns Main line.
+ */
+const itemTitle = (item: GroupItem): string => {
+  const parent = getBilingualValue(item, 'parent', '')
+  const id = item.kind === 'additional_reviewer' ? item.entity_id : item.id
+  return parent ? `#${id} (${parent})` : `#${id}`
+}
+/**
+ * Builds the group item's localized work description.
+ * @param item Group work item.
+ * @returns Description line.
+ */
+const itemDescription = (item: GroupItem): string => {
+  let kind = t(`enums.review_type.${item.variant === 'checklist' ? 'checklist' : 'assessment'}`)
+  if (item.kind === 'approval') kind = t('home_dashboard.work_labels.approval')
+  const name = getBilingualValue(item, 'detail_name', '').trim()
+  return name ? `${kind} - ${name}` : kind
+}
 /**
  * Builds the route for a group work item when one is available.
  * @param item - Group work item.
@@ -42,8 +53,9 @@ const itemUrl = (item: GroupItem): string | null => {
     <li v-for="item in items" :key="`${item.kind}:${item.id}`" class="flex items-center gap-4 px-3 py-4 sm:px-5">
       <span class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><UIcon :name="item.kind === 'approval' ? 'i-lucide-stamp' : 'i-lucide-clipboard-check'" class="size-5" /></span>
       <span class="min-w-0 flex-1">
-        <NuxtLink v-if="itemUrl(item)" :to="itemUrl(item)!" class="block truncate font-semibold text-highlighted hover:text-primary hover:underline">{{ getBilingualValue(item, 'name', item.id) }}</NuxtLink>
-        <span v-else class="block truncate font-semibold text-highlighted">{{ getBilingualValue(item, 'name', item.id) }}</span>
+        <NuxtLink v-if="itemUrl(item)" :to="itemUrl(item)!" class="block break-words font-semibold text-highlighted hover:text-primary hover:underline">{{ itemTitle(item) }}</NuxtLink>
+        <span v-else class="block break-words font-semibold text-highlighted">{{ itemTitle(item) }}</span>
+        <span class="block break-words text-xs text-muted">{{ itemDescription(item) }}</span>
         <span class="block truncate text-xs text-muted">{{ getBilingualValue(item, 'group_name', item.id) }}</span>
       </span>
       <UButton v-if="claimable" size="sm" :label="t('groups.claim')" :loading="busyId === item.id" @click="emit('claim', item)" />
