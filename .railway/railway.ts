@@ -9,7 +9,7 @@ export default defineRailway((ctx) => {
   }
   const demoImage = readDemoImage()
   const database = postgres('GCS DB', { region: 'us-east4-eqdc4a' })
-  database.deploy = { limitOverride: { containers: { cpu: 2, memoryBytes: 3000000000 } } }
+  database.deploy = { sleepApplication: true, limitOverride: { containers: { cpu: 2, memoryBytes: 3000000000 } } }
   database.networking = { privateNetworkEndpoint: 'postgres' }
   const metabaseDatabase = postgres('Metabase DB', { region: 'us-east4-eqdc4a' })
   metabaseDatabase.deploy = { sleepApplication: true }
@@ -27,7 +27,7 @@ export default defineRailway((ctx) => {
     build: { builder: 'DOCKERFILE', dockerfilePath: 'Dockerfile' },
     preDeploy: [],
     replicas: { 'us-east4-eqdc4a': 1 },
-    deploy: { healthcheckPath: '/api/health', healthcheckTimeout: 300, limitOverride: { containers: { cpu: 8, memoryBytes: 8000000000 } } },
+    deploy: { healthcheckPath: '/api/health', healthcheckTimeout: 300, sleepApplication: true, limitOverride: { containers: { cpu: 8, memoryBytes: 8000000000 } } },
     volumeMounts: { '/app/.data': gcsSscVolume },
     env: { DATABASE_URL: preserve(), BETTER_AUTH_SECRET: preserve(), BETTER_AUTH_TRUSTED_ORIGINS: preserve(), BETTER_AUTH_URL: preserve(), ENVIRONMENT_TYPE: 'demo', GCS_EXTENSION_SECRETS_KEY: preserve(), RAILWAY_RUN_UID: preserve() }
   })
