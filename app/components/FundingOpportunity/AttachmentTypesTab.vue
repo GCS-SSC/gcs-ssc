@@ -209,7 +209,7 @@ const remove = async (id: string): Promise<void> => {
             color="error"
             variant="ghost"
             :disabled="pending"
-            :aria-label="t('common.remove_named', { name: label(row.original) })"
+            :aria-label="`${t('common.remove')}: ${label(row.original)}`"
             @click="remove(row.original.id)" />
         </div>
       </template>
