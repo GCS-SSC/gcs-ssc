@@ -238,8 +238,8 @@ const resolveTrustedOrigins = (
  * Dynamically resolves trusted origins for Better Auth.
  *
  * In development, this permits local-network access on the same configured port
- * so launching with a custom `--port` and then opening the app via a LAN IP does
- * not trigger Better Auth origin errors.
+ * and a browser request whose Origin is exactly the request URL's origin. The
+ * latter supports HTTPS forwarding URLs without trusting unrelated origins.
  *
  * @param runtimeConfig - Runtime authentication configuration.
  * @param request - Better Auth request context when available.
@@ -256,9 +256,7 @@ const resolveTrustedOriginsForRequest = async (
   }
 
   const requestOrigin = request.headers.get('origin')
-  const configuredAuthOrigin = resolveConfiguredAuthOrigin(runtimeConfig)
-
-  if (!requestOrigin || !configuredAuthOrigin) {
+  if (!requestOrigin) {
     return trustedOrigins
   }
 
@@ -267,7 +265,14 @@ const resolveTrustedOriginsForRequest = async (
     return trustedOrigins
   }
 
-  return isMatchingLocalDevelopmentOrigin(requestUrl, configuredAuthOrigin)
+  const configuredAuthOrigin = resolveConfiguredAuthOrigin(runtimeConfig)
+  const isLocalOrigin = configuredAuthOrigin !== null
+    && isMatchingLocalDevelopmentOrigin(requestUrl, configuredAuthOrigin)
+  const isSameOriginRequest = (requestUrl.protocol === 'http:' || requestUrl.protocol === 'https:')
+    && requestOrigin === requestUrl.origin
+    && requestUrl.origin === new URL(request.url).origin
+
+  return isLocalOrigin || isSameOriginRequest
     ? Array.from(new Set([...trustedOrigins, requestUrl.origin]))
     : trustedOrigins
 }
