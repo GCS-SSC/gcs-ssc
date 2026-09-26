@@ -22,6 +22,8 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
 }
 
 export const down = async (db: Kysely<Database>): Promise<void> => {
+  const existing = await db.selectFrom('Funding_Opportunity_Attachment_Type').select('id').limit(1).executeTakeFirst()
+  if (existing) throw new Error('Cannot roll back Opportunity attachment types while association evidence exists')
   await sql`DROP TABLE "Funding_Opportunity_Attachment_Type"`.execute(db)
   const previousRegistry = { ...AUDIT_TABLE_OWNERSHIP }
   delete previousRegistry['public.Funding_Opportunity_Attachment_Type']
