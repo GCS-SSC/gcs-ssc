@@ -43,6 +43,7 @@ const expandedGroupIds: Ref<string[]> = ref([])
 const membersByGroup: Ref<Record<string, Member[]>> = ref({})
 const userResponse: Ref<{ items: UserOption[] } | null> = ref(null)
 const memberModalOpen: Ref<boolean> = ref(false)
+const removingMemberIds = ref<string[]>([])
 const memberForm = reactive({ egcs_cn_user: '' })
 const validateMember = createValidator(GroupMemberSchema)
 const availableUsers = computed(() => (userResponse.value?.items ?? [])
@@ -168,10 +169,17 @@ const addMember = async () => {
  *
  */
 const removeMember = async (group: Group, member: Member) => {
+  const rowId = `member:${group.id}:${member.egcs_cn_user}`
+  if (removingMemberIds.value.includes(rowId)) return
+  removingMemberIds.value = [...removingMemberIds.value, rowId]
   try {
     await loadJson(`/api/groups/${group.id}/members/${member.egcs_cn_user}`, { method: 'DELETE' })
     await refreshMembers(group.id)
-  } catch (error) { showError(error) }
+  } catch (error) {
+    showError(error)
+  } finally {
+    removingMemberIds.value = removingMemberIds.value.filter(id => id !== rowId)
+  }
 }
 </script>
 
@@ -216,9 +224,9 @@ const removeMember = async (group: Group, member: Member) => {
               <template v-if="!row.original.member && !row.original.placeholder">
                 <UButton v-if="can('group', 'update', { type: 'agency', agencyId: row.original.group.egcs_cn_agency })" icon="i-lucide-user-plus" color="neutral" variant="ghost" :aria-label="t('groups.add_member')" @click="openMemberPicker(row.original.group)" />
                 <UButton v-if="can('group', 'update', { type: 'agency', agencyId: row.original.group.egcs_cn_agency })" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="t('common.edit')" @click="openEdit(row.original.group)" />
-                <UButton v-if="can('group', 'delete', { type: 'agency', agencyId: row.original.group.egcs_cn_agency })" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('common.delete')" @click="remove(row.original.group)" />
+                <UButton v-if="can('group', 'delete', { type: 'agency', agencyId: row.original.group.egcs_cn_agency })" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('common.delete_named', { name: row.original.name })" @click="remove(row.original.group)" />
               </template>
-              <UButton v-else-if="row.original.member && can('group', 'update', { type: 'agency', agencyId: row.original.group.egcs_cn_agency })" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('common.delete')" @click="removeMember(row.original.group, row.original.member)" />
+              <UButton v-else-if="row.original.member && can('group', 'update', { type: 'agency', agencyId: row.original.group.egcs_cn_agency })" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('common.delete_named', { name: row.original.name })" :loading="removingMemberIds.includes(row.original.id)" :disabled="removingMemberIds.includes(row.original.id)" @click="removeMember(row.original.group, row.original.member)" />
             </div>
           </template>
         </CommonResourceLayoutPage>

@@ -53,7 +53,23 @@ export const isActiveGroupMember = async (db: Db, groupId: string, commonUserId:
   .where('user._deleted', '=', false)
   .executeTakeFirst())
 
-export const isAssignableGroup = async (db: Db, groupId: string, agencyId: string) => Boolean(await db
+/** Serializes a work claim with group retirement and membership removal. */
+export const lockActiveGroupMember = async (trx: Transaction<Database>, groupId: string, commonUserId: string) => Boolean(await trx
+  .selectFrom('Common_Group_Member')
+  .innerJoin('Common_Group', 'Common_Group.id', 'Common_Group_Member.egcs_cn_group')
+  .innerJoin('Common_User', 'Common_User.id', 'Common_Group_Member.egcs_cn_user')
+  .innerJoin('user', 'user.id', 'Common_User.egcs_cn_auth_user_id')
+  .select('Common_Group_Member.id')
+  .where('Common_Group_Member.egcs_cn_group', '=', groupId)
+  .where('Common_Group_Member.egcs_cn_user', '=', commonUserId)
+  .where('Common_Group_Member._deleted', '=', false)
+  .where('Common_Group._deleted', '=', false)
+  .where('Common_User._deleted', '=', false)
+  .where('user._deleted', '=', false)
+  .forUpdate(['Common_Group_Member', 'Common_Group'])
+  .executeTakeFirst())
+
+export const isAssignableGroup = async (db: Db, groupId: string, agencyId: string) => isPositivePostgresBigintText(groupId) && Boolean(await db
   .selectFrom('Common_Group')
   .innerJoin('Common_Group_Member', 'Common_Group_Member.egcs_cn_group', 'Common_Group.id')
   .innerJoin('Common_User', 'Common_User.id', 'Common_Group_Member.egcs_cn_user')
@@ -66,6 +82,24 @@ export const isAssignableGroup = async (db: Db, groupId: string, agencyId: strin
   .where('Common_User._deleted', '=', false)
   .where('user._deleted', '=', false)
   .executeTakeFirst())
+
+/** Holds the group and an active member through an assignment write. */
+export const lockAssignableGroup = async (trx: Transaction<Database>, groupId: string, agencyId: string) => {
+  if (!isPositivePostgresBigintText(groupId)) return false
+  const group = await trx.selectFrom('Common_Group').select('id')
+    .where('id', '=', groupId).where('egcs_cn_agency', '=', agencyId)
+    .where('_deleted', '=', false).forUpdate().executeTakeFirst()
+  if (!group) return false
+  return Boolean(await trx.selectFrom('Common_Group_Member')
+    .innerJoin('Common_User', 'Common_User.id', 'Common_Group_Member.egcs_cn_user')
+    .innerJoin('user', 'user.id', 'Common_User.egcs_cn_auth_user_id')
+    .select('Common_Group_Member.id')
+    .where('Common_Group_Member.egcs_cn_group', '=', groupId)
+    .where('Common_Group_Member._deleted', '=', false)
+    .where('Common_User._deleted', '=', false)
+    .where('user._deleted', '=', false)
+    .forUpdate('Common_Group_Member').executeTakeFirst())
+}
 
 /** Users with an active role explicitly owned by this agency can join its groups. */
 export const listAgencyGroupUsers = async (db: Db, agencyId: string): Promise<Array<{ id: string; name: string }>> => {

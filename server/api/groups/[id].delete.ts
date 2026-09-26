@@ -1,5 +1,5 @@
 import { authorizeGroup, authorizeFreshGroup } from '~~/server/utils/groups'
-import { badRequest } from '~~/server/utils/api-errors'
+import { badRequest, notFound } from '~~/server/utils/api-errors'
 
 // eslint-disable-next-line local/require-authorize -- authorizeGroup applies the agency-scoped group grant.
 export default defineEventHandler(async event => {
@@ -7,6 +7,11 @@ export default defineEventHandler(async event => {
   await authorizeGroup(event, event.context.$db, id, 'delete')
   return await event.context.$db.transaction().execute(async trx => {
     await authorizeFreshGroup(event, trx, id, 'delete')
+    // Assignment writers lock this row before checking membership and writing a reference.
+    // Lock before scanning references so either operation sees the other's committed result.
+    const group = await trx.selectFrom('Common_Group').select('id')
+      .where('id', '=', id).where('_deleted', '=', false).forUpdate().executeTakeFirst()
+    if (!group) return await notFound(event, 'GROUP_NOT_FOUND', 'apiErrors.admin_common.not_found')
     const references = await Promise.all([
       trx.selectFrom('Common_Review').select('id').where('egcs_cn_group', '=', id).where('_deleted', '=', false).executeTakeFirst(),
       trx.selectFrom('Common_Review_Setup').select('id').where('egcs_cn_defaultgroup', '=', id).where('_deleted', '=', false).executeTakeFirst(),

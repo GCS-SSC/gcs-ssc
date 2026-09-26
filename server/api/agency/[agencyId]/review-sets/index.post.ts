@@ -9,6 +9,7 @@ import {
 } from '~~/server/utils/transfer-payment-polymorphic'
 import { readReviewSetupPublicationMetadata } from '~~/server/utils/review-setup-versioning'
 import { supportsDirectReviewConfiguration } from '~~/server/utils/entity-type-registry'
+import { lockAssignableGroup } from '~~/server/utils/groups'
 
 export default defineEventHandler(async event => {
   const agencyId = getRouterParam(event, 'agencyId') ?? ''
@@ -106,6 +107,15 @@ export default defineEventHandler(async event => {
       )
     }
 
+    const groupIds = [...new Set(members
+      .map(member => member.egcs_cn_defaultgroup)
+      .filter((id): id is string => Boolean(id)))].sort()
+    for (const groupId of groupIds) {
+      if (!await lockAssignableGroup(trx, groupId, agencyId)) {
+        return await badRequest(event, 'REVIEW_SETUP_GROUP_INVALID', 'apiErrors.request.invalid')
+      }
+    }
+
     const createdSet = await trx
       .insertInto('Common_Review_Set_Setup')
       .values({
@@ -134,10 +144,11 @@ export default defineEventHandler(async event => {
               egcs_cn_reviewset: String(createdSet.id),
               egcs_cn_approvaltemplate: member.egcs_cn_approvaltemplate,
               egcs_cn_reviewschema: member.egcs_cn_reviewschema,
+              egcs_cn_defaultgroup: member.egcs_cn_defaultgroup ?? null,
               _deleted: false
             }))
           )
-          .returning(['id', 'egcs_cn_reviewset', 'egcs_cn_reviewschema', 'egcs_cn_order', 'egcs_cn_approvaltemplate', '_deleted'])
+          .returning(['id', 'egcs_cn_reviewset', 'egcs_cn_reviewschema', 'egcs_cn_order', 'egcs_cn_approvaltemplate', 'egcs_cn_defaultgroup', '_deleted'])
           .execute()
       : []
 
