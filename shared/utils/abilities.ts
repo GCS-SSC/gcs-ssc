@@ -207,23 +207,23 @@ export const ABILITIES = [
   },
   {
     action: 'create', subject: 'funding_case',
-    name_en: 'Create Funding Cases', name_fr: 'Créer des dossiers de financement',
-    desc_en: 'Create funding case intakes.', desc_fr: 'Créer des dossiers de réception de financement.'
+    name_en: 'Create Intakes', name_fr: 'Créer des réceptions',
+    desc_en: 'Create intakes.', desc_fr: 'Créer des réceptions.'
   },
   {
     action: 'read', subject: 'funding_case',
-    name_en: 'Read Funding Cases', name_fr: 'Lire les dossiers de financement',
-    desc_en: 'Read funding case intakes.', desc_fr: 'Lire les dossiers de réception de financement.'
+    name_en: 'Read Intakes', name_fr: 'Lire les réceptions',
+    desc_en: 'Read intakes.', desc_fr: 'Lire les réceptions.'
   },
   {
     action: 'update', subject: 'funding_case',
-    name_en: 'Update Funding Cases', name_fr: 'Modifier les dossiers de financement',
-    desc_en: 'Work on assigned funding case intakes.', desc_fr: 'Traiter les dossiers de réception attribués.'
+    name_en: 'Update Intakes', name_fr: 'Modifier les réceptions',
+    desc_en: 'Work on assigned intakes.', desc_fr: 'Traiter les réceptions attribuées.'
   },
   {
     action: 'delete', subject: 'funding_case',
-    name_en: 'Delete Funding Cases', name_fr: 'Supprimer les dossiers de financement',
-    desc_en: 'Delete assigned funding case intakes.', desc_fr: 'Supprimer les dossiers de réception attribués.'
+    name_en: 'Delete Intakes', name_fr: 'Supprimer les réceptions',
+    desc_en: 'Delete assigned intakes.', desc_fr: 'Supprimer les réceptions attribuées.'
   }
 ] as const
 

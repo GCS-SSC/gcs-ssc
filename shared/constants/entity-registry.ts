@@ -86,7 +86,7 @@ export const CORE_ENTITY_REGISTRY = {
     assignmentMode: 'independent'
   },
   fundingcaseintake: {
-    label: { en: 'Funding Case Intake', fr: 'Réception du dossier de financement' },
+    label: { en: 'Intake', fr: 'Réception' },
     completion: 'none', approvalSubmission: 'explicit', standardWorkflow: 'explicit', riskRating: 'none',
     supportsDirectReviews: true,
     ownerKind: 'funding_case',
