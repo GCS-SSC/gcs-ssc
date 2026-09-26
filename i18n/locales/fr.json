@@ -39,6 +39,11 @@
     "application": "Données de la demande",
     "attachment_upload_failed": "La réception a été enregistrée, mais une pièce jointe n’a pas pu être téléversée. Réessayez pour terminer l’ajout des pièces jointes.",
     "select_opportunity_first": "Sélectionnez d’abord une possibilité de financement",
+    "inline_upload_idle": "Sélectionnez une possibilité de financement pour vérifier les options de pièces jointes.",
+    "inline_upload_checking": "Vérification des options de pièces jointes…",
+    "inline_upload_metadata_required": "Ajoutez les fichiers après avoir enregistré cette réception, dans l’onglet Pièces jointes. Le fournisseur de stockage demande des renseignements supplémentaires.",
+    "inline_upload_provider_unavailable": "Vous pouvez enregistrer cette réception maintenant. La configuration du stockage de l’agence est nécessaire avant d’ajouter des pièces jointes.",
+    "inline_upload_error": "Impossible de vérifier les options de pièces jointes. Enregistrez cette réception et utilisez ensuite son onglet Pièces jointes.",
     "approval_submission": "Soumission pour approbation"
   },
   "reviews": {

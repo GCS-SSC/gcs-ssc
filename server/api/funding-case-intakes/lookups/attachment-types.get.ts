@@ -7,6 +7,7 @@ import { authorizeWithFreshAuthContext, requireAuthContext, requireFreshAuthCont
 import { resolveFundingOpportunityScope } from '~~/server/utils/funding-case'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
+import { resolveAgencyStorageProvider } from '~~/server/utils/file-storage-provider'
 
 const QuerySchema = AttachmentTypeLookupQuerySchema.extend({
   egcs_fi_fundingopportunity: RequiredStringId().refine(isPositivePostgresBigintText, {
@@ -34,6 +35,12 @@ export default defineEventHandler(async event => {
     if (!opportunity || opportunity.egcs_fo_status !== 'open') {
       return await badRequest(event, 'FUNDING_OPPORTUNITY_CLOSED', 'apiErrors.request.invalid_status')
     }
+    const provider = await resolveAgencyStorageProvider(trx, scope.agencyId)
+    const inlineUploadReason = !provider
+      ? 'provider_unavailable' as const
+      : provider.extension.fileStorageProvider?.metadata
+        ? 'metadata_required' as const
+        : null
     let base = trx.selectFrom('Common_Attachment_Types')
       .where('egcs_cn_agency', '=', scope.agencyId).where('_deleted', '=', false)
     if (query.search) {
@@ -49,6 +56,11 @@ export default defineEventHandler(async event => {
         .limit(query.limit).offset(offset).execute(),
       base.clearSelect().select(sql<number>`count(*)::int`.as('count')).executeTakeFirstOrThrow()
     ])
-    return { items, stats: { total: Number(count.count), page: query.page, limit: query.limit } }
+    return {
+      items,
+      stats: { total: Number(count.count), page: query.page, limit: query.limit },
+      inline_upload_supported: inlineUploadReason === null,
+      inline_upload_reason: inlineUploadReason
+    }
   })
 })

@@ -4,8 +4,8 @@ import { AttachmentUploadMetadataSchema, type AttachmentUploadMetadata } from '~
 import { badRequest } from './api-errors'
 import { parseI18n } from './api-validate'
 import { MultipartLimitError, MultipartParseError, readBoundedMultipartFormData } from './bounded-multipart'
+import { MAX_ATTACHMENT_FILE_BYTES, MAX_ATTACHMENT_FILENAME_LENGTH } from '~~/shared/utils/attachment-limits'
 
-export const MAX_ATTACHMENT_FILE_BYTES = 10 * 1024 * 1024
 export const MAX_ATTACHMENT_MULTIPART_BYTES = MAX_ATTACHMENT_FILE_BYTES + (512 * 1024)
 
 export interface AttachmentUploadPayload {
@@ -48,7 +48,7 @@ export const readAttachmentUpload = async (event: H3Event): Promise<AttachmentUp
     return await badRequest(event, 'ATTACHMENT_SINGLE_FILE_REQUIRED', 'apiErrors.attachments.single_file_required')
   }
   const file = files[0]
-  if (!file.filename || file.filename.length > 255
+  if (!file.filename || file.filename.length > MAX_ATTACHMENT_FILENAME_LENGTH
     || [...file.filename].some(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)) {
     return await badRequest(event, 'ATTACHMENT_FILENAME_INVALID', 'apiErrors.attachments.filename_invalid')
   }

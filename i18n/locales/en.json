@@ -39,6 +39,11 @@
     "application": "Application data",
     "attachment_upload_failed": "The intake was saved, but an attachment could not be uploaded. Retry to finish adding attachments.",
     "select_opportunity_first": "Select a funding opportunity first",
+    "inline_upload_idle": "Select a funding opportunity to check attachment options.",
+    "inline_upload_checking": "Checking attachment options…",
+    "inline_upload_metadata_required": "Add files after saving this intake from its Attachments tab. The storage provider needs additional details.",
+    "inline_upload_provider_unavailable": "You can save this intake now. Attachments require agency storage setup before they can be added.",
+    "inline_upload_error": "Attachment options could not be checked. Save this intake and use its Attachments tab later.",
     "approval_submission": "Approval submission"
   },
   "reviews": {

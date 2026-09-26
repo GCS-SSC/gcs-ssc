@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { z } from 'zod'
 import { AttachmentMetadataBaseSchema, FundingCaseIntakeCreateSchema } from '~~/shared/types/schemas'
+import { MAX_ATTACHMENT_FILE_BYTES, MAX_ATTACHMENT_FILENAME_LENGTH } from '~~/shared/utils/attachment-limits'
+import { getClientRequestUrl } from '~/utils/client-request-url'
+
+type InlineUploadState = 'idle' | 'checking' | 'supported' | 'provider_unavailable' | 'metadata_required' | 'error'
+type AttachmentCapabilityResponse = {
+  inline_upload_supported: boolean
+  inline_upload_reason: 'provider_unavailable' | 'metadata_required' | null
+}
 
 export interface IntakeAttachmentDraft {
   key: string
@@ -30,6 +38,8 @@ const schema = FundingCaseIntakeCreateSchema.extend({
   attachments: z.array(AttachmentMetadataBaseSchema)
 })
 const validate = createValidator(schema)
+const inlineUploadState = ref<InlineUploadState>('idle')
+const fileError = ref<string | undefined>(undefined)
 let nextAttachmentKey = 0
 
 /**
@@ -39,7 +49,21 @@ let nextAttachmentKey = 0
  */
 const addFiles = (event: Event) => {
   const input = event.target as HTMLInputElement
-  for (const file of Array.from(input.files ?? [])) {
+  if (inlineUploadState.value !== 'supported') {
+    input.value = ''
+    return
+  }
+  const files = Array.from(input.files ?? [])
+  const oversized = files.find(file => file.size > MAX_ATTACHMENT_FILE_BYTES)
+  const invalidName = files.find(file => file.name.length > MAX_ATTACHMENT_FILENAME_LENGTH
+    || [...file.name].some(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127))
+  if (oversized || invalidName) {
+    fileError.value = t(oversized ? 'apiErrors.attachments.file_too_large' : 'apiErrors.attachments.filename_invalid')
+    input.value = ''
+    return
+  }
+  fileError.value = undefined
+  for (const file of files) {
     const name = file.name.slice(0, 255)
     state.value.attachments.push({
       key: String(++nextAttachmentKey), file, nameEn: name, nameFr: name,
@@ -58,11 +82,37 @@ const removeFile = (key: string) => {
   state.value.attachments = state.value.attachments.filter(draft => draft.key !== key)
 }
 
-watch(() => state.value.egcs_fi_fundingopportunity, (next, previous) => {
-  if (previous && next !== previous) {
-    for (const draft of state.value.attachments) draft.attachmentTypeId = undefined
+watch([() => state.value.egcs_fi_fundingopportunity, open], async ([opportunityId, isOpen], previous, onCleanup) => {
+  if (previous?.[0] && opportunityId !== previous[0]) {
+    state.value.attachments = []
+    fileError.value = undefined
   }
-})
+  if (!isOpen || !opportunityId) {
+    inlineUploadState.value = 'idle'
+    return
+  }
+  inlineUploadState.value = 'checking'
+  state.value.attachments = []
+  fileError.value = undefined
+  if (import.meta.server) return
+  const controller = new AbortController()
+  onCleanup(() => controller.abort())
+  try {
+    const url = getClientRequestUrl('/api/funding-case-intakes/lookups/attachment-types')
+    url.searchParams.set('egcs_fi_fundingopportunity', opportunityId)
+    url.searchParams.set('page', '1')
+    url.searchParams.set('limit', '1')
+    const response = await fetch(url, { signal: controller.signal })
+    if (!response.ok) throw new Error('Attachment capability lookup failed')
+    const capability = await response.json() as AttachmentCapabilityResponse
+    if (controller.signal.aborted) return
+    inlineUploadState.value = capability.inline_upload_supported
+      ? 'supported'
+      : capability.inline_upload_reason ?? 'error'
+  } catch {
+    if (!controller.signal.aborted) inlineUploadState.value = 'error'
+  }
+}, { immediate: true })
 </script>
 
 <template>
@@ -83,10 +133,16 @@ watch(() => state.value.egcs_fi_fundingopportunity, (next, previous) => {
           </div>
         </CommonSection>
         <CommonSection :title="t('attachments.title')" :grid-cols="1">
-          <UFormField :label="t('attachments.upload')" name="files" :required="false">
+          <UAlert
+            v-if="inlineUploadState !== 'supported'"
+            color="neutral"
+            variant="soft"
+            icon="i-lucide-info"
+            :title="t(`funding_case_intake.inline_upload_${inlineUploadState}`)" />
+          <UFormField v-else :label="t('attachments.upload')" name="files" :required="false" :error="fileError">
             <UInput type="file" multiple class="block w-full text-sm" :disabled="pending" @change="addFiles" />
           </UFormField>
-          <div v-for="(draft, index) in state.attachments" :key="draft.key" class="mt-4 rounded-md border border-default p-4">
+          <div v-for="(draft, index) in inlineUploadState === 'supported' ? state.attachments : []" :key="draft.key" class="mt-4 rounded-md border border-default p-4">
             <div class="mb-4 flex items-center justify-between gap-2">
               <p class="min-w-0 truncate text-sm font-medium">
                 {{ draft.file.name }}
@@ -115,7 +171,7 @@ watch(() => state.value.egcs_fi_fundingopportunity, (next, previous) => {
         </CommonSection>
         <div class="flex justify-end gap-2">
           <UButton :label="t('common.cancel')" color="neutral" variant="ghost" :disabled="pending" @click="open = false" />
-          <CommonSaveButton :label="t('common.add')" :loading="pending" :disabled="pending" />
+          <CommonSaveButton :label="t('common.add')" :loading="pending" :disabled="pending || Boolean(fileError)" />
         </div>
       </UForm>
     </template>

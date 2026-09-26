@@ -89,10 +89,7 @@ const submit = async () => {
     }
     modalOpen.value = false
     await refresh()
-    await navigateTo(localePath({
-      ...appRouteLocations.fundingCaseIntakeDetail(createdId),
-      ...(form.value.attachments.length ? { query: { tab: 'attachments' } } : {})
-    }))
+    await navigateTo(localePath({ ...appRouteLocations.fundingCaseIntakeDetail(createdId), query: { tab: 'attachments' } }))
     if (uploadError) {
       toast.add({ title: t('funding_case_intake.attachment_upload_failed'), color: 'error' })
     }
