@@ -18,6 +18,7 @@ import {
 } from '~~/server/utils/extensions'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { getExtensionConfigurationAction } from '~~/shared/utils/extensions'
+import { activateEnabledExtensionNitroPlugins } from '~~/server/utils/extension-nitro-plugins'
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -117,7 +118,7 @@ export default defineEventHandler(async event => {
     return row
   }
 
-  return await db.transaction().execute(async trx => {
+  const result = await db.transaction().execute(async trx => {
     const authContext = await requireFreshAuthContext(event, trx)
     await lockExtensionLifecycleScope(trx, body.extensionKey, agencyId)
     const currentAgency = await trx
@@ -179,4 +180,13 @@ export default defineEventHandler(async event => {
 
     return await persistEnablement(trx)
   })
+  if (body.enabled && result && 'enabled' in result && result.enabled === true) {
+    try {
+      await activateEnabledExtensionNitroPlugins(db, useNitroApp(), extensions)
+    } catch (error) {
+      // The Agency change is committed; the minute task retries hook activation.
+      console.error('Failed to activate enabled extension hooks', error)
+    }
+  }
+  return result
 })

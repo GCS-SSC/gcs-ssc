@@ -3,6 +3,8 @@ import { acquireDbLease, resolveDatabaseConfig } from '~~/server/utils/db'
 import { getMigrationPromise } from '~~/server/utils/migration-readiness'
 import { createScheduledExtensionWriteAuthorization } from '~~/server/utils/extension-scheduled-import'
 import { withAuditExecution } from '~~/server/utils/audit-context'
+import { getRegisteredExtensions } from '~~/server/utils/extensions'
+import { activateEnabledExtensionNitroPlugins } from '~~/server/utils/extension-nitro-plugins'
 import type { GcsExtensionScheduledMinutePayload } from '@gcs-ssc/extensions/server'
 import type { Database } from '~~/shared/types/database'
 
@@ -39,7 +41,9 @@ export default defineTask({
       if (!migration) throw new Error('Extension minute task ran before database migrations were registered.')
       await migration
       const database = lease.database
-      const hooks = useNitroApp().hooks as unknown as {
+      const app = useNitroApp()
+      await activateEnabledExtensionNitroPlugins(database, app, await getRegisteredExtensions())
+      const hooks = app.hooks as unknown as {
         callHook: (name: string, payload: GcsExtensionScheduledMinutePayload) => Promise<void>
       }
       /** @returns Task completion after registered extensions receive one minute tick. */

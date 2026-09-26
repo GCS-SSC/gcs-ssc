@@ -7,6 +7,7 @@ import {
 } from '../utils/migration-readiness'
 import type { DatabaseLease } from '../utils/db'
 import { recoverStartup } from '../utils/startup-recovery'
+import { activateEnabledExtensionNitroPlugins } from '../utils/extension-nitro-plugins'
 
 /**
  * Runs core and enabled-extension migrations in canonical startup order.
@@ -51,6 +52,7 @@ const runMigrations = async (db: DatabaseLease['database']): Promise<void> => {
       })
     })
     await assertReferencedFileStorageProvidersRegistered(db)
+    await activateEnabledExtensionNitroPlugins(db, useNitroApp(), extensions)
   } catch (extensionMigrationError) {
     console.error('failed to migrate enabled extensions')
     console.error(extensionMigrationError)

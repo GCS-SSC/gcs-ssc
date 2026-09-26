@@ -1000,6 +1000,15 @@ const resolveExtensionNitroPlugin = async (
   definition: GcsExtensionDefinition
 ) => definition.nitroPlugin ? await assertContainedPath(extensionDir, definition.nitroPlugin, 'nitroPlugin') : undefined
 
+/**
+ * Background import plugins wait for their enabled Agency migrations before registering hooks.
+ * @param extension - Validated extension contribution.
+ * @returns Whether its Nitro plugin requires lazy activation.
+ */
+export const isDeferredExtensionNitroPlugin = (
+  extension: Pick<GcsResolvedExtension, 'nitroPlugin' | 'requiredHostCapabilities'>
+): boolean => Boolean(extension.nitroPlugin && extension.requiredHostCapabilities.includes('scheduled-agreement-import'))
+
 export const resolveFileStorageProvider = async (
   extensionDir: string,
   definition: GcsExtensionDefinition
@@ -1208,7 +1217,7 @@ const serializeClientExtension = (extension: GcsResolvedExtension): string =>
   JSON.stringify(buildClientExtensionMetadata(extension))
 
 const registryContributionId = (
-  contributionType: 'handler' | 'migration' | 'runtime' | 'entity_adapter' | 'storage_adapter' | 'storage_metadata_validator' | 'agreement_number',
+  contributionType: 'handler' | 'migration' | 'runtime' | 'nitro_plugin' | 'entity_adapter' | 'storage_adapter' | 'storage_metadata_validator' | 'agreement_number',
   extension: GcsResolvedExtension,
   identityParts: string[]
 ): string => {
@@ -1298,6 +1307,13 @@ export const buildExtensionServerRegistry = (
       registerContributionLoader(runtime.id, extension.runtime.path)
     }
 
+    const nitroPlugin = isDeferredExtensionNitroPlugin(extension) && extension.nitroPlugin
+      ? { id: registryContributionId('nitro_plugin', extension, [extensionRelativePath(extension, extension.nitroPlugin)]) }
+      : undefined
+    if (nitroPlugin && extension.nitroPlugin) {
+      registerContributionLoader(nitroPlugin.id, extension.nitroPlugin)
+    }
+
     const entities = (extension.entities ?? []).map(entity => {
       const id = registryContributionId('entity_adapter', extension, [
         entity.type,
@@ -1355,7 +1371,8 @@ export const buildExtensionServerRegistry = (
       ...(entities.length > 0 ? { entities } : {}),
       fileStorageProvider,
       agreementNumberProvider,
-      runtime
+      runtime,
+      nitroPlugin
     }
   })
 
@@ -1535,7 +1552,9 @@ const configureExtensionNitro = (
     nitroConfig.publicAssets = nitroConfig.publicAssets ?? []
 
     for (const extension of extensions) {
-      if (extension.nitroPlugin) {
+      // Ordinary lifecycle guards must be present even before first enablement.
+      // Scheduled import plugins query their own tables and wait for migrations.
+      if (extension.nitroPlugin && !isDeferredExtensionNitroPlugin(extension)) {
         nitroConfig.plugins.push(extension.nitroPlugin)
       }
       for (const [assetIndex, asset] of extension.assets.entries()) {

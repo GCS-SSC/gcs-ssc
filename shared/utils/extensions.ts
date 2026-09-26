@@ -62,6 +62,7 @@ export interface GcsRegisteredExtension extends GcsClientExtensionManifest {
   migrations: GcsRegisteredExtensionMigration[]
   entities?: GcsRegisteredExtensionLifecycleEntityDefinition[]
   runtime?: GcsRegisteredExtensionRuntime
+  nitroPlugin?: { id: string }
   fileStorageProvider?: GcsRegisteredFileStorageProviderDefinition
 }
 
