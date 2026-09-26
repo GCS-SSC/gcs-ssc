@@ -61,7 +61,7 @@ export default defineEventHandler(async event => {
     egcs_fo_workflowsetups: workflows.map(row => String(row.egcs_fo_workflowsetup)),
     review_setups: reviews.map(row => ({ id: String(row.egcs_fo_reviewsetsetup), name_en: row.name_en, name_fr: row.name_fr })),
     workflow_setups: workflows.map(row => ({ id: String(row.egcs_fo_workflowsetup), name_en: row.name_en, name_fr: row.name_fr })),
-    attachment_types: attachmentTypes.map(row => ({ id: String(row.id), name_en: row.name_en,
+    egcs_fo_attachmenttypes: attachmentTypes.map(row => ({ id: String(row.id), name_en: row.name_en,
       name_fr: row.name_fr, egcs_fo_isinternal: row.egcs_fo_isinternal }))
   }
 })

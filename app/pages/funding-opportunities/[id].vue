@@ -15,7 +15,7 @@ type Opportunity = OpportunityForm & {
   streams: Array<{ id: string; name_en: string; name_fr: string }>
   review_setups: Array<{ id: string; name_en: string; name_fr: string }>
   workflow_setups: Array<{ id: string; name_en: string; name_fr: string }>
-  attachment_types: Array<{ id: string; name_en: string; name_fr: string; egcs_fo_isinternal: boolean }>
+  egcs_fo_attachmenttypes: Array<{ id: string; name_en: string; name_fr: string; egcs_fo_isinternal: boolean }>
 }
 const route = useRoute()
 const id = String(route.params.id)
@@ -208,7 +208,7 @@ const breadcrumbs = computed(() => [
           </CommonSection>
           <FundingOpportunitySetupRelationshipsTab v-else-if="selectedTab === 'workflows'" :opportunity-id="id" :stream-ids="profile.egcs_fo_transferpaymentstreams" :linked-setups="profile.workflow_setups" kind="workflow" :can-edit="canEdit" @refresh="refresh" />
           <FundingOpportunitySetupRelationshipsTab v-else-if="selectedTab === 'reviews'" :opportunity-id="id" :stream-ids="profile.egcs_fo_transferpaymentstreams" :linked-setups="profile.review_setups" kind="review" :can-edit="canEdit" @refresh="refresh" />
-          <FundingOpportunityAttachmentTypesTab v-else-if="selectedTab === 'attachments'" :opportunity-id="id" :attachment-types="profile.attachment_types" :can-edit="canEdit" @updated="refresh" />
+          <FundingOpportunityAttachmentTypesTab v-else-if="selectedTab === 'attachments'" :opportunity-id="id" :attachment-types="profile.egcs_fo_attachmenttypes" :can-edit="canEdit" @updated="refresh" />
         </CommonEntityEditorWorkspace>
       </div>
       <FundingOpportunityModal v-model:open="modalOpen" v-model:state="form" :pending="pending" @submit="submit" />
