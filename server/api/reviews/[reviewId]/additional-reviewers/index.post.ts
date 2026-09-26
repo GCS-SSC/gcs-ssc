@@ -13,7 +13,7 @@ import {
 import { assertReviewNotLocked } from '~~/server/utils/review-runtime-state'
 import { requireAuthContext } from '~~/server/utils/authorize'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
-import { isAssignableGroup } from '~~/server/utils/groups'
+import { lockAssignableGroup } from '~~/server/utils/groups'
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -60,7 +60,7 @@ export default defineEventHandler(async event => {
       if (body.egcs_cn_user && !allowedUsers.some(user => user.id === body.egcs_cn_user)) {
         return await badRequest(event, 'ADDITIONAL_REVIEWER_ASSIGNEE_INVALID', 'apiErrors.request.invalid')
       }
-      if (body.egcs_cn_group && !await isAssignableGroup(trx, body.egcs_cn_group, currentExecutableContext.runtimeEntity.schemaAgencyId)) {
+      if (body.egcs_cn_group && !await lockAssignableGroup(trx, body.egcs_cn_group, currentExecutableContext.runtimeEntity.schemaAgencyId)) {
         return await badRequest(event, 'ADDITIONAL_REVIEWER_ASSIGNEE_INVALID', 'apiErrors.request.invalid')
       }
 

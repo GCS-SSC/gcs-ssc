@@ -45,16 +45,17 @@ export default defineEventHandler(async event => {
     if (query.view === 'available' && !hasMembership) {
       return { items: [], page: query.page, limit: query.limit, total: 0, has_membership: false }
     }
-    const readGrants = auth.userAbilities.getGrants().filter(grant => grant.action === 'read')
+    const grants = auth.userAbilities.getGrants()
     /**
-     * Builds the parent read predicate for one authorization subject.
+     * Builds the parent access predicate for one authorization subject and action.
      * @param subject Authorization subject.
+     * @param action Required authorization action.
      * @param agencyColumn SQL reference to the parent Agency.
      * @param programColumn SQL reference to the parent Program.
      * @returns Scoped read predicate.
      */
-    const scopedRead = (subject: string, agencyColumn: string, programColumn: string): RawBuilder<boolean> => {
-      const predicates = readGrants.filter(grant => grant.subject === subject).map(grant => {
+    const scopedAccess = (subject: string, action: 'read' | 'update', agencyColumn: string, programColumn: string): RawBuilder<boolean> => {
+      const predicates = grants.filter(grant => grant.subject === subject && grant.action === action).map(grant => {
         if (grant.scope.type === 'global') return sql`TRUE`
         if (grant.scope.type === 'agency') return sql`${sql.ref(agencyColumn)} = ${grant.scope.agencyId}::bigint`
         return sql`${sql.ref(agencyColumn)} = ${grant.scope.agencyId}::bigint
@@ -62,11 +63,12 @@ export default defineEventHandler(async event => {
       })
       return predicates.length > 0 ? sql<boolean>`(${sql.join(predicates, sql` OR `)})` : sql<boolean>`FALSE`
     }
-    const agreementRead = scopedRead('agreement', 'agreement_program.egcs_tp_agency', 'agreement_program.id')
-    const proponentRead = readGrants.some(grant => grant.subject === 'applicant_recipient')
-    const streamRead = scopedRead('transfer_payment', 'stream_program.egcs_tp_agency', 'stream_program.id')
-    const intakeRead = scopedRead('funding_case', 'intake_program.egcs_tp_agency', 'intake_program.id')
-    const agencyRead = scopedRead('agency', 'review_agency.id', 'review_agency.id')
+    const agreementRead = scopedAccess('agreement', 'read', 'agreement_program.egcs_tp_agency', 'agreement_program.id')
+    const proponentRead = grants.some(grant => grant.action === 'read' && grant.subject === 'applicant_recipient')
+    const streamRead = scopedAccess('transfer_payment', 'read', 'stream_program.egcs_tp_agency', 'stream_program.id')
+    const intakeRead = scopedAccess('funding_case', 'read', 'intake_program.egcs_tp_agency', 'intake_program.id')
+    const intakeUpdate = scopedAccess('funding_case', 'update', 'intake_program.egcs_tp_agency', 'intake_program.id')
+    const agencyRead = scopedAccess('agency', 'read', 'review_agency.id', 'review_agency.id')
     const work = await sql<GroupWorkRow>`
       WITH active_membership AS (
         SELECT member.egcs_cn_group FROM "Common_Group_Member" member
@@ -228,7 +230,8 @@ export default defineEventHandler(async event => {
         AND intake_program._deleted = false
       WHERE ((${query.view} = 'mine' AND work.claimed_by = ${actor.id}::bigint)
         OR (${query.view} = 'available' AND work.claimed_by IS NULL AND member.egcs_cn_group IS NOT NULL))
-        AND (work.kind <> 'intake' OR ${intakeRead})
+        AND (work.kind <> 'intake' OR (${query.view} = 'mine' AND ${intakeRead})
+          OR (${query.view} = 'available' AND ${intakeUpdate}))
       ORDER BY work.kind, work.id
       LIMIT ${query.limit} OFFSET ${(query.page - 1) * query.limit}
     `.execute(trx)

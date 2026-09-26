@@ -13,7 +13,8 @@ type AdditionalReviewerItem = {
   egcs_cn_comments: string
   egcs_cn_user: string | null
   egcs_cn_group: string | null
-  egcs_cn_group_name: string | null
+  egcs_cn_group_name_en: string | null
+  egcs_cn_group_name_fr: string | null
   egcs_cn_user_name: string
   egcs_cn_completedat: string | null
   can_update: boolean
@@ -75,7 +76,8 @@ export default defineEventHandler(async (event): Promise<AdditionalReviewersResp
       'Common_Additional_Reviewers.egcs_cn_group as assigned_group_id',
       'Common_Additional_Reviewers.egcs_cn_completedat as completed_at',
       'Common_User.egcs_cn_name as assigned_user_name',
-      'Common_Group.egcs_cn_name_en as assigned_group_name'
+      'Common_Group.egcs_cn_name_en as assigned_group_name_en',
+      'Common_Group.egcs_cn_name_fr as assigned_group_name_fr'
     ])
     .where('Common_Additional_Reviewers.egcs_cn_entitytype', '=', 'commonreview')
     .where('Common_Additional_Reviewers.egcs_cn_entityid', '=', reviewId)
@@ -102,7 +104,8 @@ export default defineEventHandler(async (event): Promise<AdditionalReviewersResp
       egcs_cn_comments: row.comments ?? '',
       egcs_cn_user: assignedUserId,
       egcs_cn_group: row.assigned_group_id ? String(row.assigned_group_id) : null,
-      egcs_cn_group_name: row.assigned_group_name,
+      egcs_cn_group_name_en: row.assigned_group_name_en,
+      egcs_cn_group_name_fr: row.assigned_group_name_fr,
       egcs_cn_user_name: row.assigned_user_name ?? '',
       egcs_cn_completedat: completedAt,
       can_update: canUpdate,

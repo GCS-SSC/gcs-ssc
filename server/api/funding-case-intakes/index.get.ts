@@ -1,39 +1,59 @@
 import { requireAuthContext } from '~~/server/utils/authorize'
 import { PaginationSchema } from '~~/shared/types/schemas'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
+import { escapeLikePattern } from '~~/server/utils/sql-like'
+import { sql } from 'kysely'
 
 export default defineEventHandler(async event => {
   const auth = await requireAuthContext(event)
   const { page, limit, search } = await getValidatedQueryI18n(event, PaginationSchema)
-  const rows = await event.context.$db.selectFrom('Funding_Case_Intake_Profile')
+  const readGrants = auth.userAbilities.getGrants()
+    .filter(grant => grant.subject === 'funding_case' && grant.action === 'read')
+  if (readGrants.length === 0) {
+    return { items: [], total: 0, stats: { total: 0 }, page, limit }
+  }
+  const hasGlobalRead = readGrants.some(grant => grant.scope.type === 'global')
+  const agencyIds = readGrants.flatMap(grant => grant.scope.type === 'agency' ? [grant.scope.agencyId] : [])
+  const programScopes = readGrants.flatMap(grant => grant.scope.type === 'program' ? [grant.scope] : [])
+  let query = event.context.$db.selectFrom('Funding_Case_Intake_Profile')
     .innerJoin('Funding_Opportunity_Profile', 'Funding_Opportunity_Profile.id', 'Funding_Case_Intake_Profile.egcs_fi_fundingopportunity')
     .innerJoin('Applicant_Recipient_Profile', 'Applicant_Recipient_Profile.id', 'Funding_Case_Intake_Profile.egcs_fi_applicantrecipient')
     .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Funding_Opportunity_Profile.egcs_fo_transferpaymentstream')
     .innerJoin('Transfer_Payment_Profile', 'Transfer_Payment_Profile.id', 'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile')
-    .select([
-      'Funding_Case_Intake_Profile.id', 'egcs_fi_applicationid', 'egcs_fi_fundingopportunity',
-      'egcs_fi_applicantrecipient', 'egcs_fi_status',
-      'Funding_Opportunity_Profile.egcs_fo_name_en as opportunity_name_en',
-      'Funding_Opportunity_Profile.egcs_fo_name_fr as opportunity_name_fr',
-      'Applicant_Recipient_Profile.egcs_ar_legalname_en as proponent_name_en',
-      'Applicant_Recipient_Profile.egcs_ar_legalname_fr as proponent_name_fr',
-      'Transfer_Payment_Stream.id as stream_id',
-      'Transfer_Payment_Profile.id as program_id',
-      'Transfer_Payment_Profile.egcs_tp_agency as agency_id'
-    ])
     .where('Funding_Case_Intake_Profile._deleted', '=', false)
     .where('Funding_Opportunity_Profile._deleted', '=', false)
     .where('Applicant_Recipient_Profile._deleted', '=', false)
     .where('Transfer_Payment_Stream._deleted', '=', false)
     .where('Transfer_Payment_Profile._deleted', '=', false)
-    .orderBy('Funding_Case_Intake_Profile.id', 'desc').execute()
-  const visible = rows.filter(row => auth.userAbilities.authorize('funding_case', 'read', {
-    type: 'entity', agencyId: String(row.agency_id),
-    path: [{ type: 'transfer_payment', id: String(row.program_id) }]
-  })).filter(row => !search || String(row.egcs_fi_applicationid).includes(search))
+  if (!hasGlobalRead) {
+    query = query.where(eb => eb.or([
+      ...(agencyIds.length ? [eb('Transfer_Payment_Profile.egcs_tp_agency', 'in', agencyIds)] : []),
+      ...programScopes.map(scope => eb.and([
+        eb('Transfer_Payment_Profile.egcs_tp_agency', '=', scope.agencyId),
+        eb('Transfer_Payment_Profile.id', '=', scope.transferPaymentId)
+      ]))
+    ]))
+  }
+  if (search) {
+    query = query.where(sql<string>`CAST(${sql.ref('Funding_Case_Intake_Profile.egcs_fi_applicationid')} AS TEXT)`,
+      'like', `%${escapeLikePattern(search)}%`)
+  }
+  const [items, countResult] = await Promise.all([
+    query.select([
+      'Funding_Case_Intake_Profile.id', 'egcs_fi_applicationid', 'egcs_fi_fundingopportunity',
+      'egcs_fi_applicantrecipient', 'egcs_fi_status',
+      'Funding_Opportunity_Profile.egcs_fo_name_en as opportunity_name_en',
+      'Funding_Opportunity_Profile.egcs_fo_name_fr as opportunity_name_fr',
+      'Applicant_Recipient_Profile.egcs_ar_legalname_en as proponent_name_en',
+      'Applicant_Recipient_Profile.egcs_ar_legalname_fr as proponent_name_fr'
+    ])
+      .orderBy('Funding_Case_Intake_Profile.id', 'desc')
+      .limit(limit).offset((page - 1) * limit).execute(),
+    query.select(eb => eb.fn.count('Funding_Case_Intake_Profile.id').as('total')).executeTakeFirst()
+  ])
+  const total = Number(countResult?.total || 0)
   return {
-    items: visible.slice((page - 1) * limit, page * limit)
-      .map(({ agency_id: _agencyId, program_id: _programId, stream_id: _streamId, ...row }) => row),
-    total: visible.length, stats: { total: visible.length }, page, limit
+    items,
+    total, stats: { total }, page, limit
   }
 })

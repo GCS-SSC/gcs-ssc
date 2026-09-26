@@ -42,3 +42,7 @@
 	path = extensions/gcs-agreement-number
 	url = https://github.com/GCS-SSC/gcs-agreement-number.git
 	branch = feature/feat/agreement-number
+[submodule "extensions/gcs-ssc-portal-connector"]
+	path = extensions/gcs-ssc-portal-connector
+	url = https://github.com/GCS-SSC/gcs-ssc-portal-connector.git
+	branch = main

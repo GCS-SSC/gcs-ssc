@@ -47,7 +47,8 @@ export default defineNuxtConfig({
   compatibilityDate: '2024-07-11',
 
   nitro: {
-    experimental: { asyncContext: true },
+    experimental: { asyncContext: true, tasks: true },
+    scheduledTasks: { '* * * * *': ['extensions:minute'] },
     typescript: { tsConfig: { exclude: ['../server/database/migrations/0240_seed.ts'] } }
   },
 

@@ -43,6 +43,7 @@ import {
   projectFundingOpportunityForPortal,
   type ExternalFundingCaseIntakeInput
 } from '~~/server/utils/funding-case-exchange'
+import { createAgreementForecastAggregate } from '~~/server/utils/agreement-forecast-import'
 import { resolveAssignmentCommonUserId } from '~~/server/utils/entity-assignment'
 import { lockTransferPaymentStreams } from '~~/server/utils/transfer-payment-stream-lock'
 import { assertBusinessStatusMutationAllowed } from '~~/server/utils/business-status-runtime'
@@ -422,11 +423,51 @@ const createExtensionWriteAuthorization = (
       })
       return true
     },
+    createAgreementForecast: async (rawDb, input) => {
+      const db = rawDb as Transaction<Database>
+      if (lockedDb !== db || !lockedAuthContext) {
+        throw new Error('Extension Forecast creation requires auth-state locking on the same transaction first.')
+      }
+      await writeAuthorization.authorizeCurrentEntity(db)
+      if (resolvedHandler.params.streamId && resolvedHandler.params.streamId !== input.streamId) {
+        return { status: 'agreement_unavailable' }
+      }
+      const lockedStreams = await lockTransferPaymentStreams(db, [input.streamId])
+      if (!lockedStreams.has(input.streamId)) return { status: 'agreement_unavailable' }
+      const agreement = await db.selectFrom('Funding_Case_Agreement_Profile')
+        .select(['id', 'egcs_fc_status'])
+        .where('id', '=', input.agreementId)
+        .where('_deleted', '=', false)
+        .forUpdate('Funding_Case_Agreement_Profile')
+        .executeTakeFirst()
+      if (!agreement) return { status: 'agreement_unavailable' }
+      const agreementContext = await resolveAgreementScopeContext(input.agreementId, db)
+      if (!agreementContext || agreementContext.streamId !== input.streamId) {
+        return { status: 'agreement_unavailable' }
+      }
+      if ('agency' in rbac && agreementContext.agencyId !== resolvedHandler.params[rbac.agency.param]) {
+        return { status: 'agreement_unavailable' }
+      }
+      if ('entity' in rbac && rbac.entity.target === 'agreement'
+        && input.agreementId !== resolvedHandler.params[rbac.entity.param]) {
+        return { status: 'agreement_unavailable' }
+      }
+      await assertAgreementCloseoutWriteAllowed(event, db, input.agreementId, agreement.egcs_fc_status)
+      await assertBusinessStatusMutationAllowed(event, db, 'fundingcaseagreement', input.agreementId)
+      await authorizeFreshAssignedItem(event, db, lockedAuthContext,
+        'fundingcaseagreement', input.agreementId, 'create')
+      const creatorId = await resolveAssignmentCommonUserId(db, lockedAuthContext.userId)
+      if (!creatorId) {
+        throw new Error('Extension Forecast creation requires an active Common User for the authenticated actor.')
+      }
+      return await createAgreementForecastAggregate(db, input, agreementContext.agencyId, creatorId)
+    },
     createAgreementClaim: async (rawDb, input) => {
       const db = rawDb as Transaction<Database>
       if (lockedDb !== db || !lockedAuthContext) {
         throw new Error('Extension Claim creation requires auth-state locking on the same transaction first.')
       }
+      await writeAuthorization.authorizeCurrentEntity(db)
       if (resolvedHandler.params.streamId && resolvedHandler.params.streamId !== input.streamId) {
         return { status: 'agreement_unavailable' }
       }
@@ -443,6 +484,13 @@ const createExtensionWriteAuthorization = (
 
       const agreementContext = await resolveAgreementScopeContext(input.agreementId, db)
       if (!agreementContext || agreementContext.streamId !== input.streamId) {
+        return { status: 'agreement_unavailable' }
+      }
+      if ('agency' in rbac && agreementContext.agencyId !== resolvedHandler.params[rbac.agency.param]) {
+        return { status: 'agreement_unavailable' }
+      }
+      if ('entity' in rbac && rbac.entity.target === 'agreement'
+        && input.agreementId !== resolvedHandler.params[rbac.entity.param]) {
         return { status: 'agreement_unavailable' }
       }
       await assertAgreementCloseoutWriteAllowed(
@@ -488,6 +536,7 @@ const createExtensionWriteAuthorization = (
       if (lockedDb !== db || !lockedAuthContext) {
         throw new Error('Extension Intake creation requires auth-state locking on the same transaction first.')
       }
+      await writeAuthorization.authorizeCurrentEntity(db)
       if (!routeScope.agencyId && !routeScope.streamId) return { status: 'opportunity_unavailable' }
       return await createExternalFundingCaseIntake(db, lockedAuthContext, input, routeScope)
     },
@@ -496,6 +545,7 @@ const createExtensionWriteAuthorization = (
       if (lockedDb !== db || !lockedAuthContext) {
         throw new Error('Extension Opportunity publication requires auth-state locking on the same transaction first.')
       }
+      await writeAuthorization.authorizeCurrentEntity(db)
       if (!routeScope.agencyId && !routeScope.streamId) return null
       return await projectFundingOpportunityForPortal(db, lockedAuthContext, opportunityId, routeScope)
     }

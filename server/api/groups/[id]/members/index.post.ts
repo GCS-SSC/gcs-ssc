@@ -1,15 +1,20 @@
 import { GroupMemberSchema } from '~~/shared/types/schemas/group'
 import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import { authorizeGroup, authorizeFreshGroup, listAgencyGroupUsers } from '~~/server/utils/groups'
-import { badRequest } from '~~/server/utils/api-errors'
+import { badRequest, notFound } from '~~/server/utils/api-errors'
 
 // eslint-disable-next-line local/require-authorize -- authorizeGroup applies the agency-scoped group grant.
 export default defineEventHandler(async event => {
   const id = getRouterParam(event, 'id') ?? ''
-  const group = await authorizeGroup(event, event.context.$db, id, 'update')
+  await authorizeGroup(event, event.context.$db, id, 'update')
   const body = await readValidatedBodyI18n(event, GroupMemberSchema)
   return await event.context.$db.transaction().execute(async trx => {
     await authorizeFreshGroup(event, trx, id, 'update')
+    // Group retirement takes this lock before tombstoning members. Keep it through
+    // the INSERT so a concurrent retirement cannot leave a live member behind.
+    const group = await trx.selectFrom('Common_Group').select(['id', 'egcs_cn_agency'])
+      .where('id', '=', id).where('_deleted', '=', false).forUpdate().executeTakeFirst()
+    if (!group) return await notFound(event, 'GROUP_NOT_FOUND', 'apiErrors.admin_common.not_found')
     const eligible = await listAgencyGroupUsers(trx, String(group.egcs_cn_agency))
     if (!eligible.some(user => user.id === body.egcs_cn_user)) {
       return await badRequest(event, 'GROUP_MEMBER_INVALID', 'apiErrors.request.invalid')

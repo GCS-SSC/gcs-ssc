@@ -18,7 +18,7 @@ import type { H3Event } from 'h3'
 import type { Kysely } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
-import { isAssignableGroup } from '~~/server/utils/groups'
+import { lockAssignableGroup } from '~~/server/utils/groups'
 
 type AdditionalReviewerPatchBody = {
   egcs_cn_comments: string
@@ -195,7 +195,7 @@ export default defineEventHandler(async event => {
       return assigneeError
     }
     if (body.egcs_cn_group && (!currentRowContext.runtimeEntity.schemaAgencyId
-      || !await isAssignableGroup(trx, body.egcs_cn_group, currentRowContext.runtimeEntity.schemaAgencyId))) {
+      || !await lockAssignableGroup(trx, body.egcs_cn_group, currentRowContext.runtimeEntity.schemaAgencyId))) {
       return await badRequest(event, 'ADDITIONAL_REVIEWER_ASSIGNEE_INVALID', 'apiErrors.request.invalid')
     }
 

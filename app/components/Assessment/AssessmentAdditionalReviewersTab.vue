@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useCrudModalPending } from '~/composables/useCrudModal'
+import { useBilingualValue } from '~/composables/useBilingualValue'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 /* eslint-disable jsdoc/require-param-description, jsdoc/require-jsdoc -- Page-local callbacks are clear from their use. */
@@ -15,7 +16,8 @@ type AdditionalReviewerRow = {
   egcs_cn_comments: string
   egcs_cn_user: string | null
   egcs_cn_group: string | null
-  egcs_cn_group_name: string | null
+  egcs_cn_group_name_en: string | null
+  egcs_cn_group_name_fr: string | null
   egcs_cn_user_name: string
   egcs_cn_completedat: string | null
   can_update: boolean
@@ -39,6 +41,9 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const { getBilingualValue } = useBilingualValue()
+const getAssigneeName = (row: AdditionalReviewerRow): string => row.egcs_cn_user_name
+  || getBilingualValue(row, 'egcs_cn_group_name', row.id)
 const toast = useToast()
 const { showError } = useApiErrorToast()
 const { createValidator } = useZodI18n()
@@ -153,7 +158,9 @@ const reviewerModal = useCrudModal<AdditionalReviewerRow, AdditionalReviewerModa
   updateState: row => ({
     id: row.id,
     egcs_cn_user: row.egcs_cn_user ?? undefined,
-    egcs_cn_group: row.egcs_cn_group ?? undefined,
+    // A claimed group keeps its group in storage as provenance, but the editor
+    // submits the current user as its one selected assignee.
+    egcs_cn_group: row.egcs_cn_user ? undefined : row.egcs_cn_group ?? undefined,
     egcs_cn_comments: row.egcs_cn_comments
   })
 })
@@ -313,7 +320,11 @@ const saveReviewer = async () => {
         return
       }
 
-      await requestJson(`/api/additional-reviewers/${reviewerId}`, 'PATCH', selectedReviewer.value)
+      await requestJson(`/api/additional-reviewers/${reviewerId}`, 'PATCH', {
+        egcs_cn_user: selectedReviewer.value.egcs_cn_user,
+        egcs_cn_group: selectedReviewer.value.egcs_cn_group,
+        egcs_cn_comments: selectedReviewer.value.egcs_cn_comments
+      })
     }
 
     if (requestedReviewId !== reviewId || requestedReviewGeneration !== reviewGeneration || !reviewerModal.closeSession(session)) return
@@ -450,7 +461,7 @@ const deleteRow = async (rowId: string) => {
 
         <template #assignee-cell="{ row }">
           <span class="text-sm text-zinc-900 dark:text-zinc-100">
-            {{ row.original.egcs_cn_user_name || row.original.egcs_cn_group_name }}
+            {{ getAssigneeName(row.original) }}
           </span>
         </template>
 
@@ -485,8 +496,8 @@ const deleteRow = async (rowId: string) => {
               variant="ghost"
               size="sm"
               class="cursor-default"
-              :aria-label="t('common.edit_named', { name: row.original.egcs_cn_user_name || row.original.id })"
-              :title="t('common.edit_named', { name: row.original.egcs_cn_user_name || row.original.id })"
+              :aria-label="t('common.edit_named', { name: getAssigneeName(row.original) })"
+              :title="t('common.edit_named', { name: getAssigneeName(row.original) })"
               @click="openUpdateReviewer(row.original)" />
             <UButton
               v-if="row.original.can_complete && !runtimeLocked"
@@ -495,8 +506,8 @@ const deleteRow = async (rowId: string) => {
               variant="ghost"
               size="sm"
               class="cursor-default"
-              :aria-label="`${t('assessment.additional_reviewers.complete')}: ${row.original.egcs_cn_user_name || row.original.id}`"
-              :title="`${t('assessment.additional_reviewers.complete')}: ${row.original.egcs_cn_user_name || row.original.id}`"
+              :aria-label="`${t('assessment.additional_reviewers.complete')}: ${getAssigneeName(row.original)}`"
+              :title="`${t('assessment.additional_reviewers.complete')}: ${getAssigneeName(row.original)}`"
               :loading="completingRowId === row.original.id"
               @click="completeRow(row.original.id)" />
             <UButton
@@ -506,8 +517,8 @@ const deleteRow = async (rowId: string) => {
               variant="ghost"
               size="sm"
               class="cursor-default"
-              :aria-label="t('common.delete_named', { name: row.original.egcs_cn_user_name || row.original.id })"
-              :title="t('common.delete_named', { name: row.original.egcs_cn_user_name || row.original.id })"
+              :aria-label="t('common.delete_named', { name: getAssigneeName(row.original) })"
+              :title="t('common.delete_named', { name: getAssigneeName(row.original) })"
               :loading="deletingRowId === row.original.id"
               @click="deleteRow(row.original.id)" />
           </div>

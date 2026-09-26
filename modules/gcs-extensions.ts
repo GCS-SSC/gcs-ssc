@@ -67,6 +67,7 @@ const EXTENSION_HOST_CAPABILITIES = new Set([
   'lifecycle-entities',
   'agreement-number-provider',
   'configuration-access',
+  'scheduled-agreement-import',
   'agency-only-configuration',
   'audit-ownership',
   'file-storage-provider'

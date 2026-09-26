@@ -5,7 +5,7 @@ import {
   resolveAssignmentCommonUserId
 } from '~~/server/utils/entity-assignment'
 import { resolveFundingCaseScope } from '~~/server/utils/funding-case'
-import { isActiveGroupMember } from '~~/server/utils/groups'
+import { lockActiveGroupMember } from '~~/server/utils/groups'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 export default defineEventHandler(async event => {
@@ -27,7 +27,7 @@ export default defineEventHandler(async event => {
       return await throwApiError(event, { statusCode: 409, code: 'GROUP_WORK_ALREADY_CLAIMED', key: 'apiErrors.request.invalid_status' })
     }
     const actorId = await resolveAssignmentCommonUserId(trx, auth.userId)
-    if (!actorId || !await isActiveGroupMember(trx, String(intake.egcs_fi_group), actorId)) return await forbidden(event)
+    if (!actorId || !await lockActiveGroupMember(trx, String(intake.egcs_fi_group), actorId)) return await forbidden(event)
     const group = await trx.selectFrom('Common_Group').select('egcs_cn_agency')
       .where('id', '=', String(intake.egcs_fi_group)).where('_deleted', '=', false).executeTakeFirst()
     if (!group || String(group.egcs_cn_agency) !== scope.agencyId) return await forbidden(event)

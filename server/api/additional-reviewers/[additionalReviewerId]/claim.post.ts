@@ -1,9 +1,9 @@
 import { forbidden, notFound, throwApiError } from '~~/server/utils/api-errors'
-import { requireAuthContext, requireFreshAuthContext } from '~~/server/utils/authorize'
+import { requireAuthContext } from '~~/server/utils/authorize'
 import { resolveAdditionalReviewerRowContext, resolveCurrentCommonUser, listAgencyScopedCommonUsers } from '~~/server/utils/additional-reviewer-runtime'
-import { getReviewRuntimeOwnerAgencyId, lockReviewRuntimeTarget } from '~~/server/utils/review-runtime-access'
+import { authorizeReviewRuntimeAction, executeFreshAuthorizedReviewAdditionalReviewerWrite, getReviewRuntimeOwnerAgencyId } from '~~/server/utils/review-runtime-access'
 import { assertReviewNotLocked } from '~~/server/utils/review-runtime-state'
-import { isActiveGroupMember } from '~~/server/utils/groups'
+import { lockActiveGroupMember } from '~~/server/utils/groups'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 export default defineEventHandler(async event => {
@@ -12,20 +12,21 @@ export default defineEventHandler(async event => {
   if (!isPositivePostgresBigintText(id)) return await notFound(event, 'ADDITIONAL_REVIEWER_NOT_FOUND', 'apiErrors.admin_common.not_found')
   const context = await resolveAdditionalReviewerRowContext(event.context.$db, id)
   if (!context) return await notFound(event, 'ADDITIONAL_REVIEWER_NOT_FOUND', 'apiErrors.admin_common.not_found')
-  return await event.context.$db.transaction().execute(async trx => {
-    await requireFreshAuthContext(event, trx)
-    await lockReviewRuntimeTarget(trx, context.runtimeEntity)
+  await authorizeReviewRuntimeAction(event, 'read_assessment', context.runtimeEntity)
+  return await executeFreshAuthorizedReviewAdditionalReviewerWrite(event, context.runtimeEntity, async (trx, lockedContext) => {
     const current = await resolveAdditionalReviewerRowContext(trx, id)
     if (!current) return await notFound(event, 'ADDITIONAL_REVIEWER_NOT_FOUND', 'apiErrors.admin_common.not_found')
-    if (current.runtimeEntity.entityType !== context.runtimeEntity.entityType
-      || current.runtimeEntity.entityId !== context.runtimeEntity.entityId) return await forbidden(event)
+    if (current.reviewId !== lockedContext.reviewId
+      || current.runtimeEntity.entityType !== lockedContext.entityType
+      || current.runtimeEntity.entityId !== lockedContext.entityId
+      || current.runtimeEntity.reviewSetId !== lockedContext.reviewSetId) return await forbidden(event)
     await assertReviewNotLocked(event, current.reviewRuntimeState, current.reviewSetRuntimeState)
     if (!current.row.assignedGroupId || current.row.assignedUserId || current.row.completedAt) {
       return await throwApiError(event, { statusCode: 409, code: 'GROUP_WORK_ALREADY_CLAIMED', key: 'apiErrors.request.invalid_status' })
     }
     const actor = await resolveCurrentCommonUser(event, trx)
-    if (!actor || !await isActiveGroupMember(trx, current.row.assignedGroupId, actor.id)) return await forbidden(event)
-    const agencyId = getReviewRuntimeOwnerAgencyId(current.runtimeEntity)
+    if (!actor || !await lockActiveGroupMember(trx, current.row.assignedGroupId, actor.id)) return await forbidden(event)
+    const agencyId = getReviewRuntimeOwnerAgencyId(lockedContext)
     const group = await trx.selectFrom('Common_Group').select('egcs_cn_agency')
       .where('id', '=', current.row.assignedGroupId).where('_deleted', '=', false).executeTakeFirst()
     if (!agencyId || !group || String(group.egcs_cn_agency) !== agencyId) return await forbidden(event)
