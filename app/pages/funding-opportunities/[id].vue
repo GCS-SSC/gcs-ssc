@@ -8,7 +8,10 @@ definePageMeta({ i18n: { paths: { en: '/funding-opportunities/[id]', fr: '/possi
 
 type Opportunity = OpportunityForm & {
   id: string; agency_id: string; program_id: string
-  stream_name_en: string; stream_name_fr: string
+  egcs_fo_status: 'draft' | 'open' | 'closed'
+  egcs_fo_reviewsetups: string[]
+  egcs_fo_workflowsetups: string[]
+  streams: Array<{ id: string; name_en: string; name_fr: string }>
   review_setups: Array<{ id: string; name_en: string; name_fr: string }>
   workflow_setups: Array<{ id: string; name_en: string; name_fr: string }>
 }
@@ -31,10 +34,7 @@ const tabs = computed(() => [
 ])
 const scope = computed(() => profile.value && ({
   type: 'entity' as const, agencyId: String(profile.value.agency_id),
-  path: [
-    { type: 'transfer_payment' as const, id: String(profile.value.program_id) },
-    { type: 'transfer_payment_stream' as const, id: String(profile.value.egcs_fo_transferpaymentstream) }
-  ]
+  path: [{ type: 'transfer_payment' as const, id: String(profile.value.program_id) }]
 }))
 const canEdit = computed(() => Boolean(scope.value && can('transfer_payment', 'update', scope.value)))
 const canDelete = computed(() => Boolean(scope.value && can('transfer_payment', 'delete', scope.value)))
@@ -42,16 +42,23 @@ const canCreateIntake = computed(() => Boolean(scope.value && profile.value?.egc
   && can('funding_case', 'create', scope.value)))
 const modalOpen = ref(false)
 const pending = ref(false)
-const form = ref<OpportunityForm>({ egcs_fo_status: 'draft', egcs_fo_applicationschema: null, egcs_fo_reviewsetups: [], egcs_fo_workflowsetups: [] })
+const form = ref<OpportunityForm>({ egcs_fo_transferpaymentstreams: [], egcs_fo_applicationschema: null })
 /**
  *
  */
 const edit = () => {
   if (!profile.value) return
   form.value = {
-    ...profile.value,
+    id: profile.value.id,
+    program_id: profile.value.program_id,
+    egcs_fo_transferpaymentstreams: profile.value.egcs_fo_transferpaymentstreams,
     egcs_fo_datestart: toDateInput(profile.value.egcs_fo_datestart),
-    egcs_fo_dateend: toDateInput(profile.value.egcs_fo_dateend)
+    egcs_fo_dateend: toDateInput(profile.value.egcs_fo_dateend),
+    egcs_fo_name_en: profile.value.egcs_fo_name_en,
+    egcs_fo_name_fr: profile.value.egcs_fo_name_fr,
+    egcs_fo_objective_en: profile.value.egcs_fo_objective_en,
+    egcs_fo_objective_fr: profile.value.egcs_fo_objective_fr,
+    egcs_fo_applicationschema: profile.value.egcs_fo_applicationschema
   }
   modalOpen.value = true
 }
@@ -63,16 +70,14 @@ const submit = async () => {
   pending.value = true
   try {
     const body = {
+      egcs_fo_transferpaymentstreams: form.value.egcs_fo_transferpaymentstreams,
       egcs_fo_datestart: form.value.egcs_fo_datestart,
       egcs_fo_dateend: form.value.egcs_fo_dateend,
       egcs_fo_name_en: form.value.egcs_fo_name_en,
       egcs_fo_name_fr: form.value.egcs_fo_name_fr,
       egcs_fo_objective_en: form.value.egcs_fo_objective_en,
       egcs_fo_objective_fr: form.value.egcs_fo_objective_fr,
-      egcs_fo_applicationschema: form.value.egcs_fo_applicationschema,
-      egcs_fo_status: form.value.egcs_fo_status,
-      egcs_fo_reviewsetups: form.value.egcs_fo_reviewsetups,
-      egcs_fo_workflowsetups: form.value.egcs_fo_workflowsetups
+      egcs_fo_applicationschema: form.value.egcs_fo_applicationschema
     }
     const response = await fetch(getClientRequestUrl(`/api/funding-opportunities/${id}`), {
       method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body)
@@ -147,8 +152,11 @@ const breadcrumbs = computed(() => [
               </div>
               <div>
                 <dt class="text-sm text-muted">
-                  {{ t('funding_opportunity.stream') }}
-                </dt><dd>{{ getBilingualValue(profile, 'stream_name', profile.egcs_fo_transferpaymentstream) }}</dd>
+                  {{ t('funding_opportunity.streams') }}
+                </dt>
+                <dd v-for="stream in profile.streams" :key="stream.id">
+                  {{ getBilingualValue(stream, 'name', stream.id) }}
+                </dd>
               </div>
             </dl>
           </CommonSection>
@@ -183,7 +191,7 @@ const breadcrumbs = computed(() => [
           </CommonSection>
         </CommonEntityEditorWorkspace>
       </div>
-      <FundingOpportunityOpportunityModal v-model:open="modalOpen" v-model:state="form" :pending="pending" @submit="submit" />
+      <FundingOpportunityModal v-model:open="modalOpen" v-model:state="form" :pending="pending" @submit="submit" />
     </template>
   </UDashboardPanel>
 </template>

@@ -37,10 +37,7 @@ export default defineEventHandler(async event => {
   const visible = rows.filter(row => (!selectedIds.length || selectedIds.includes(String(row.id)))
     && auth.userAbilities.authorize('funding_case', 'create', {
       type: 'entity', agencyId: String(row.agency_id),
-      path: [
-        { type: 'transfer_payment', id: String(row.program_id) },
-        { type: 'transfer_payment_stream', id: String(row.stream_id) }
-      ]
+      path: [{ type: 'transfer_payment', id: String(row.program_id) }]
     })).filter(row => !search || [row.label_en, row.label_fr].some(value => value.toLocaleLowerCase().includes(search.toLocaleLowerCase())))
   return { items: visible.slice((page - 1) * limit, page * limit)
     .map(({ agency_id: _agencyId, program_id: _programId, stream_id: _streamId, ...row }) => row),

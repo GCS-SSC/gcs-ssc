@@ -10,7 +10,7 @@ definePageMeta({ i18n: { paths: { en: '/funding-case-intakes/[id]', fr: '/dossie
 type Intake = {
   id: string; egcs_fi_applicationid: string; egcs_fi_fundingopportunity: string
   egcs_fi_applicantrecipient: string; egcs_fi_application: Record<string, JsonValue>
-  egcs_fi_status: string; agency_id: string; program_id: string; stream_id: string
+  egcs_fi_status: string; agency_id: string; program_id: string
   opportunity_name_en: string; opportunity_name_fr: string
   proponent_name_en: string | null; proponent_name_fr: string | null
 }
@@ -37,10 +37,7 @@ const tabs = computed(() => [
 ])
 const scope = computed(() => profile.value && ({
   type: 'entity' as const, agencyId: String(profile.value.agency_id),
-  path: [
-    { type: 'transfer_payment' as const, id: String(profile.value.program_id) },
-    { type: 'transfer_payment_stream' as const, id: String(profile.value.stream_id) }
-  ]
+  path: [{ type: 'transfer_payment' as const, id: String(profile.value.program_id) }]
 }))
 const isLocked = computed(() => isStatusLocked(profile.value?.egcs_fi_status))
 const canEdit = computed(() => Boolean(scope.value && isAssigned.value && !isLocked.value && can('funding_case', 'update', scope.value)))
@@ -118,7 +115,7 @@ const breadcrumbs = computed(() => [
         </template>
       </UAlert>
       <div v-else-if="profile" class="flex flex-1 flex-col">
-        <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-inbox" :title="`${t('funding_case_intake.application_id')} ${profile.egcs_fi_applicationid}`" :description="t('funding_case_intake.description')" :badges="[{ statusId: profile.egcs_fi_status }]" :actions="[{ label: t('common.edit'), icon: 'i-lucide-edit-3', visible: canEdit, onClick: edit }, { label: t('common.delete'), icon: 'i-lucide-trash', visible: canDelete, onClick: remove }]" />
+        <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-inbox" :title="`${t('funding_case_intake.application_id')} ${profile.egcs_fi_applicationid}`" :meta-items="[`${t('funding_case_intake.opportunity')}: ${getBilingualValue(profile, 'opportunity_name', profile.egcs_fi_fundingopportunity)}`, `${t('funding_case_intake.proponent')}: ${getBilingualValue(profile, 'proponent_name', profile.egcs_fi_applicantrecipient)}`]" :badges="[{ statusId: profile.egcs_fi_status }]" :actions="[{ label: t('common.edit'), icon: 'i-lucide-edit-3', visible: canEdit, onClick: edit }, { label: t('common.delete'), icon: 'i-lucide-trash', visible: canDelete, onClick: remove }]" />
         <CommonEntityEditorWorkspace content-test-id="funding-case-intake-detail-content">
           <template #sidebar>
             <CommonRouteTabs v-model="selectedTab" :items="tabs" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
@@ -144,7 +141,7 @@ const breadcrumbs = computed(() => [
           <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" entity-type="fundingcaseintake" :entity-id="id" />
         </CommonEntityEditorWorkspace>
       </div>
-      <FundingCaseIntakeIntakeModal v-model:open="modalOpen" v-model:state="form" :pending="pending" @submit="submit" />
+      <FundingCaseIntakeModal v-model:open="modalOpen" v-model:state="form" :pending="pending" @submit="submit" />
     </template>
   </UDashboardPanel>
 </template>

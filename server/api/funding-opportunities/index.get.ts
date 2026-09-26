@@ -24,15 +24,29 @@ export default defineEventHandler(async event => {
     .orderBy('Funding_Opportunity_Profile.id', 'desc').execute()
   const visible = rows.filter(row => auth.userAbilities.authorize('transfer_payment', 'read', {
     type: 'entity', agencyId: String(row.agency_id),
-    path: [
-      { type: 'transfer_payment', id: String(row.program_id) },
-      { type: 'transfer_payment_stream', id: String(row.egcs_fo_transferpaymentstream) }
-    ]
+    path: [{ type: 'transfer_payment', id: String(row.program_id) }]
   })).filter(row => !search || [row.egcs_fo_name_en, row.egcs_fo_name_fr]
     .some(value => value.toLocaleLowerCase().includes(search.toLocaleLowerCase())))
+  const pageRows = visible.slice((page - 1) * limit, page * limit)
+  const links = pageRows.length
+    ? await db.selectFrom('Funding_Opportunity_Stream')
+        .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Funding_Opportunity_Stream.egcs_fo_transferpaymentstream')
+        .select(['Funding_Opportunity_Stream.egcs_fo_fundingopportunity as opportunity_id', 'Transfer_Payment_Stream.id',
+          'Transfer_Payment_Stream.egcs_tp_name_en as name_en', 'Transfer_Payment_Stream.egcs_tp_name_fr as name_fr'])
+        .where('Funding_Opportunity_Stream.egcs_fo_fundingopportunity', 'in', pageRows.map(row => String(row.id)))
+        .where('Funding_Opportunity_Stream._deleted', '=', false).execute()
+    : []
   return {
-    items: visible.slice((page - 1) * limit, page * limit)
-      .map(({ agency_id: _agencyId, program_id: _programId, ...row }) => row),
+    items: pageRows.map(({ agency_id: _agencyId, program_id: _programId, ...row }) => {
+      const streams = links.filter(link => String(link.opportunity_id) === String(row.id))
+        .map(link => ({ id: String(link.id), name_en: link.name_en, name_fr: link.name_fr }))
+        .sort((a, b) => a.id === String(row.egcs_fo_transferpaymentstream)
+          ? -1
+          : b.id === String(row.egcs_fo_transferpaymentstream)
+            ? 1
+            : a.id.localeCompare(b.id, undefined, { numeric: true }))
+      return { ...row, egcs_fo_transferpaymentstreams: streams.map(stream => stream.id), streams }
+    }),
     total: visible.length, stats: { total: visible.length }, page, limit
   }
 })

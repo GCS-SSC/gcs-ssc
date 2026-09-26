@@ -958,12 +958,13 @@ const ROOT_ROLE_SUBJECTS: readonly RoleAbilitySubject[] = [
   'user',
   'group',
   'agreement',
+  'funding_case',
   'applicant_recipient'
 ]
 const ROOT_ROLE_PERMISSIONS: RoleSeed['permissions'] = ROOT_ROLE_SUBJECTS.map(subject => ({
   subject,
   access_level: 'manager',
-  can_manage_assignments: ['agreement', 'applicant_recipient'].includes(subject)
+  can_manage_assignments: ['agreement', 'funding_case', 'applicant_recipient'].includes(subject)
 }))
 
 const ROLE_MASKS = [1826, 2, 240, 15, 512, 3840, 546, 96, 32, 6, 514, 34, 1028, 48, 128, 3, 768, 1536, 8, 2050] as const
@@ -1907,9 +1908,10 @@ async function seedAgreementAbilities(db: Kysely<Database>): Promise<void> {
     .execute()
 
   for (const role of roles) {
-    await db.insertInto('role_permission').values({
-      role_id: String(role.id), subject: 'agreement', access_level: 'manager', can_manage_assignments: true, _deleted: false
-    }).execute()
+    await db.insertInto('role_permission').values([
+      { role_id: String(role.id), subject: 'agreement', access_level: 'manager', can_manage_assignments: true, _deleted: false },
+      { role_id: String(role.id), subject: 'funding_case', access_level: 'manager', can_manage_assignments: true, _deleted: false }
+    ]).execute()
   }
 }
 
@@ -4161,11 +4163,11 @@ const seedRootProgramApprovalRole = async (db: Kysely<Database>): Promise<void> 
 
   await db
     .insertInto('role_permission')
-    .values((['transfer_payment', 'agreement'] as const).map(subject => ({
+    .values((['transfer_payment', 'agreement', 'funding_case'] as const).map(subject => ({
       role_id: roleId,
       subject,
       access_level: 'manager' as const,
-      can_manage_assignments: subject === 'agreement',
+      can_manage_assignments: subject === 'agreement' || subject === 'funding_case',
       _deleted: false
     })))
     .execute()

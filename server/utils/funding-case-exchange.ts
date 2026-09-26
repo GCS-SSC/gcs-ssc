@@ -51,7 +51,7 @@ export const createExternalFundingCaseIntake = async (
   const applicationId = String(input.applicationId)
   const scope = await resolveFundingOpportunityScope(trx, opportunityId)
   if (!scope || (routeScope.agencyId && routeScope.agencyId !== scope.agencyId)
-    || (routeScope.streamId && routeScope.streamId !== scope.streamId)) {
+    || (routeScope.streamId && !scope.streamIds.includes(routeScope.streamId))) {
     return { status: 'opportunity_unavailable' }
   }
   if (!auth.userAbilities.authorize('funding_case', 'create', scope.scope)) denied()
@@ -140,7 +140,7 @@ export const projectFundingOpportunityForPortal = async (
 ) => {
   const scope = await resolveFundingOpportunityScope(db, opportunityId)
   if (!scope || (routeScope.agencyId && routeScope.agencyId !== scope.agencyId)
-    || (routeScope.streamId && routeScope.streamId !== scope.streamId)) return null
+    || (routeScope.streamId && !scope.streamIds.includes(routeScope.streamId))) return null
   if (!auth.userAbilities.authorize('transfer_payment', 'update', scope.scope)) denied()
   const row = await db.selectFrom('Funding_Opportunity_Profile as opportunity')
     .innerJoin('Transfer_Payment_Stream as stream', 'stream.id', 'opportunity.egcs_fo_transferpaymentstream')
@@ -160,12 +160,26 @@ export const projectFundingOpportunityForPortal = async (
     .where('stream._deleted', '=', false).where('program._deleted', '=', false).where('agency._deleted', '=', false)
     .forShare().executeTakeFirst()
   if (!row || row.egcs_fo_status !== 'open') return null
+  const streams = await db.selectFrom('Funding_Opportunity_Stream')
+    .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Funding_Opportunity_Stream.egcs_fo_transferpaymentstream')
+    .select(['Transfer_Payment_Stream.id', 'Transfer_Payment_Stream.egcs_tp_name_en as name_en',
+      'Transfer_Payment_Stream.egcs_tp_name_fr as name_fr'])
+    .where('Funding_Opportunity_Stream.egcs_fo_fundingopportunity', '=', opportunityId)
+    .where('Funding_Opportunity_Stream._deleted', '=', false).execute()
+  streams.sort((a, b) => String(a.id) === scope.streamId
+    ? -1
+    : String(b.id) === scope.streamId
+      ? 1
+      : String(a.id).localeCompare(String(b.id), undefined, { numeric: true }))
+  const publicationStream = streams.find(stream => String(stream.id) === (routeScope.streamId ?? scope.streamId))
+  if (!publicationStream) return null
   return {
     sourceSystem: 'gcs-ssc', foreignSystemId: String(row.opportunity_id),
     opportunityId: String(row.opportunity_id),
     agency: { id: String(row.agency_id), nameEn: row.agency_name_en, nameFr: row.agency_name_fr },
     program: { id: String(row.program_id), nameEn: row.program_name_en, nameFr: row.program_name_fr },
-    stream: { id: String(row.stream_id), nameEn: row.stream_name_en, nameFr: row.stream_name_fr },
+    stream: { id: String(publicationStream.id), nameEn: publicationStream.name_en, nameFr: publicationStream.name_fr },
+    streams: streams.map(stream => ({ id: String(stream.id), nameEn: stream.name_en, nameFr: stream.name_fr })),
     nameEn: row.egcs_fo_name_en, nameFr: row.egcs_fo_name_fr,
     objectiveEn: row.egcs_fo_objective_en, objectiveFr: row.egcs_fo_objective_fr,
     startDate: row.start_date, startTime: '00:00:00.000000',

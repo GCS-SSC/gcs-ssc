@@ -38,6 +38,7 @@ const {
   selectedFetchUrl,
   selectedValuesQueryKey,
   multiple = false,
+  closeOnSelect = false,
   autoSelectSingle = false,
   disabled = false
 } = defineProps<{
@@ -55,6 +56,7 @@ const {
   selectedFetchUrl?: string
   selectedValuesQueryKey?: string
   multiple?: boolean
+  closeOnSelect?: boolean
   autoSelectSingle?: boolean
   disabled?: boolean
 }>()
@@ -70,6 +72,7 @@ const { showError } = useApiErrorToast()
 const selectMenuRef = useSelectMenuTriggerName()
 
 const searchTerm: Ref<string> = ref('')
+const menuOpen: Ref<boolean> = ref(false)
 const debouncedSearchTerm: Readonly<Ref<string>> = refDebounced(searchTerm, 250)
 const selectedItemsByValue: Ref<Record<string, AdminCommonLookupResponseItem>> = ref({})
 const unavailableSelectedValues: Ref<Set<string>> = ref(new Set())
@@ -112,6 +115,7 @@ const normalizedValues: ComputedRef<string[]> = computed(() => normalizeValues(m
 const onModelUpdate = (value: LookupModelValue) => {
   autoSelectionAvailable.value = false
   const normalized = normalizeValues(value)
+  if (closeOnSelect) menuOpen.value = false
   model.value = multiple ? normalized : normalized[0]
 }
 
@@ -546,6 +550,8 @@ const removeSelectedValue = (value: string) => {
       <USelectMenu
         ref="selectMenuRef"
         v-model:search-term="searchTerm"
+        :open="closeOnSelect ? menuOpen : undefined"
+        :ui="closeOnSelect ? { content: 'data-[state=closed]:animate-none' } : undefined"
         :model-value="displayedModel"
         :items="selectItems"
         value-key="value"
@@ -556,7 +562,8 @@ const removeSelectedValue = (value: string) => {
         :disabled="disabled || isCollectionError"
         :search-input="{ placeholder: t('common.search') }"
         v-bind="$attrs"
-        @update:model-value="onModelUpdate" />
+        @update:model-value="onModelUpdate"
+        @update:open="value => menuOpen = value" />
     </div>
 
     <div v-if="isCollectionError || hasUnavailableSelection" role="alert" class="flex flex-wrap items-center gap-2 text-sm text-error">

@@ -26,16 +26,19 @@ const canCreate = computed(() => canAny('funding_case', 'create'))
 const columns: TableColumnInput<Row>[] = [
   { accessorKey: 'egcs_fi_applicationid', headerKey: 'funding_case_intake.application_id' },
   { id: 'opportunity', headerKey: 'funding_case_intake.opportunity' },
-  { id: 'proponent', headerKey: 'funding_case_intake.proponent' }
+  { id: 'proponent', headerKey: 'funding_case_intake.proponent' },
+  { id: 'status', headerKey: 'funding_opportunity.status' },
+  { id: 'actions', headerKey: 'common.actions' }
 ]
 const modalOpen = ref(false)
 const pending = ref(false)
-const form = ref<IntakeForm>({ egcs_fi_application: '{}' })
+const form = ref<IntakeForm>({ egcs_fi_applicationid: '', egcs_fi_application: '{}' })
 /**
  *
  */
 const openCreate = () => {
   form.value = {
+    egcs_fi_applicationid: '',
     egcs_fi_application: '{}',
     egcs_fi_fundingopportunity: typeof route.query.opportunity_id === 'string' ? route.query.opportunity_id : undefined
   }
@@ -95,8 +98,16 @@ const submit = async () => {
         <template #proponent-cell="{ row }">
           {{ getBilingualValue(row.original, 'proponent_name', row.original.egcs_fi_applicantrecipient) }}
         </template>
+        <template #status-cell="{ row }">
+          <CommonStatusBadge :status-id="row.original.egcs_fi_status" />
+        </template>
+        <template #actions-cell="{ row }">
+          <div class="flex justify-end gap-2">
+            <UButton icon="i-lucide-eye" color="neutral" variant="ghost" :aria-label="t('funding_case_intake.view_details')" :to="localePath(appRouteLocations.fundingCaseIntakeDetail(String(row.original.id)))" />
+          </div>
+        </template>
       </CommonResourceLayoutPage>
-      <FundingCaseIntakeIntakeModal v-model:open="modalOpen" v-model:state="form" :pending="pending" @submit="submit" />
+      <FundingCaseIntakeModal v-model:open="modalOpen" v-model:state="form" :pending="pending" @submit="submit" />
     </template>
   </UDashboardPanel>
 </template>

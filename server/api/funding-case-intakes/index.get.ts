@@ -29,10 +29,7 @@ export default defineEventHandler(async event => {
     .orderBy('Funding_Case_Intake_Profile.id', 'desc').execute()
   const visible = rows.filter(row => auth.userAbilities.authorize('funding_case', 'read', {
     type: 'entity', agencyId: String(row.agency_id),
-    path: [
-      { type: 'transfer_payment', id: String(row.program_id) },
-      { type: 'transfer_payment_stream', id: String(row.stream_id) }
-    ]
+    path: [{ type: 'transfer_payment', id: String(row.program_id) }]
   })).filter(row => !search || String(row.egcs_fi_applicationid).includes(search))
   return {
     items: visible.slice((page - 1) * limit, page * limit)

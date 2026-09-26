@@ -106,7 +106,7 @@ export const resolveReviewRuntimeSetupScopes = async (
     return caseScope
       ? [
           { scopeType: 'fundingopportunity', scopeId: caseScope.opportunityId },
-          { scopeType: 'transferpaymentstream', scopeId: caseScope.streamId }
+          ...caseScope.streamIds.map(streamId => ({ scopeType: 'transferpaymentstream' as const, scopeId: streamId }))
         ]
       : []
   }

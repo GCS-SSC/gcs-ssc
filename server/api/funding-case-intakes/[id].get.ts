@@ -20,5 +20,6 @@ export default defineEventHandler(async event => {
     ])
     .where('Funding_Case_Intake_Profile.id', '=', id).where('Funding_Case_Intake_Profile._deleted', '=', false).executeTakeFirst()
   if (!intake) return await notFound(event, 'FUNDING_CASE_INTAKE_NOT_FOUND', 'apiErrors.admin_common.not_found')
-  return { ...intake, agency_id: scope.agencyId, program_id: scope.transferPaymentId, stream_id: scope.streamId }
+  return { ...intake, agency_id: scope.agencyId, program_id: scope.transferPaymentId,
+    stream_id: scope.streamId, stream_ids: scope.streamIds }
 })

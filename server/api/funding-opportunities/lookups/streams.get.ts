@@ -5,11 +5,11 @@ import { PaginationSchema, PositivePostgresBigintIdSchema } from '~~/shared/type
 
 const QuerySchema = PaginationSchema.extend({ ids: z.union([
   PositivePostgresBigintIdSchema, z.array(PositivePostgresBigintIdSchema).max(100)
-]).optional() })
+]).optional(), program_id: PositivePostgresBigintIdSchema.optional(), group_by: z.literal('program').optional() })
 
 export default defineEventHandler(async event => {
   const auth = await requireAuthContext(event)
-  const { page, limit, search, ids } = await getValidatedQueryI18n(event, QuerySchema)
+  const { page, limit, search, ids, program_id: programId, group_by: groupBy } = await getValidatedQueryI18n(event, QuerySchema)
   const selectedIds = ids ? (Array.isArray(ids) ? ids : [ids]).map(String) : []
   const rows = await event.context.$db.selectFrom('Transfer_Payment_Stream')
     .innerJoin('Transfer_Payment_Profile', 'Transfer_Payment_Profile.id', 'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile')
@@ -17,6 +17,8 @@ export default defineEventHandler(async event => {
     .select([
       'Transfer_Payment_Stream.id', 'Transfer_Payment_Stream.egcs_tp_name_en as label_en',
       'Transfer_Payment_Stream.egcs_tp_name_fr as label_fr',
+      'Transfer_Payment_Profile.egcs_tp_name_en as program_name_en',
+      'Transfer_Payment_Profile.egcs_tp_name_fr as program_name_fr',
       'Transfer_Payment_Profile.id as program_id', 'Agency_Profile.id as agency_id'
     ])
     .where('Transfer_Payment_Stream._deleted', '=', false)
@@ -26,15 +28,22 @@ export default defineEventHandler(async event => {
     .where('Agency_Profile._deleted', '=', false)
     .where('Agency_Profile.egcs_ay_active', '=', true)
     .orderBy('Transfer_Payment_Stream.egcs_tp_name_en').execute()
-  const visible = rows.filter(row => (!selectedIds.length || selectedIds.includes(String(row.id)))
-    && auth.userAbilities.authorize('transfer_payment', 'create', {
-      type: 'entity', agencyId: String(row.agency_id),
-      path: [
-        { type: 'transfer_payment', id: String(row.program_id) },
-        { type: 'transfer_payment_stream', id: String(row.id) }
-      ]
-    })).filter(row => !search || [row.label_en, row.label_fr].some(value => value.toLocaleLowerCase().includes(search.toLocaleLowerCase())))
+  const eligible = rows.filter(row => auth.userAbilities.authorize('transfer_payment', 'create', {
+    type: 'entity', agencyId: String(row.agency_id),
+    path: [{ type: 'transfer_payment', id: String(row.program_id) }]
+  }))
+  if (groupBy === 'program') {
+    const programs = [...new Map(eligible.map(row => [String(row.program_id), {
+      id: String(row.program_id), label_en: row.program_name_en, label_fr: row.program_name_fr
+    }])).values()]
+      .filter(row => (!selectedIds.length || selectedIds.includes(row.id))
+        && (!search || [row.label_en, row.label_fr].some(value => value.toLocaleLowerCase().includes(search.toLocaleLowerCase()))))
+    return { items: programs.slice((page - 1) * limit, page * limit), total: programs.length, page, limit }
+  }
+  const visible = eligible.filter(row => (!programId || String(row.program_id) === String(programId))
+    && (!selectedIds.length || selectedIds.includes(String(row.id))))
+    .filter(row => !search || [row.label_en, row.label_fr].some(value => value.toLocaleLowerCase().includes(search.toLocaleLowerCase())))
   return { items: visible.slice((page - 1) * limit, page * limit)
-    .map(({ agency_id: _agencyId, program_id: _programId, ...row }) => row),
+    .map(({ agency_id: _agencyId, program_name_en: _programNameEn, program_name_fr: _programNameFr, ...row }) => row),
   total: visible.length, page, limit }
 })

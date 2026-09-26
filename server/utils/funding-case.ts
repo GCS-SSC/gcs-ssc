@@ -7,6 +7,7 @@ export interface FundingOpportunityScope {
   agencyId: string
   transferPaymentId: string
   streamId: string
+  streamIds: string[]
   opportunityId: string
   scope: Scope
 }
@@ -39,14 +40,16 @@ export const resolveFundingOpportunityScope = async (
   const agencyId = String(row.agency_id)
   const transferPaymentId = String(row.transfer_payment_id)
   const streamId = String(row.stream_id)
+  const streamIds = (await db.selectFrom('Funding_Opportunity_Stream')
+    .select('egcs_fo_transferpaymentstream')
+    .where('egcs_fo_fundingopportunity', '=', opportunityId)
+    .where('_deleted', '=', false).execute()).map(link => String(link.egcs_fo_transferpaymentstream))
+  if (!streamIds.includes(streamId)) return null
   return {
-    agencyId, transferPaymentId, streamId, opportunityId: String(row.opportunity_id),
+    agencyId, transferPaymentId, streamId, streamIds, opportunityId: String(row.opportunity_id),
     scope: {
       type: 'entity', agencyId,
-      path: [
-        { type: 'transfer_payment', id: transferPaymentId },
-        { type: 'transfer_payment_stream', id: streamId }
-      ]
+      path: [{ type: 'transfer_payment', id: transferPaymentId }]
     }
   }
 }

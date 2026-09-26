@@ -7,8 +7,12 @@ import type { OpportunityForm } from '~/components/FundingOpportunity/Opportunit
 
 definePageMeta({ i18n: { paths: { en: '/funding-opportunities', fr: '/possibilites-de-financement' } } })
 
-type Row = OpportunityForm & { id: string }
-const { t } = useI18n()
+type Row = OpportunityForm & {
+  id: string
+  egcs_fo_status: 'draft' | 'open' | 'closed'
+  streams: Array<{ id: string; name_en: string; name_fr: string }>
+}
+const { t, locale } = useI18n()
 const localePath = useLocalePath()
 const { canAny } = useCan()
 const { showError } = useApiErrorToast()
@@ -18,15 +22,30 @@ const isHeroCollapsed = getHeroCollapsed('funding-opportunities')
 const canCreate = computed(() => canAny('transfer_payment', 'create'))
 const columns: TableColumnInput<Row>[] = [
   { accessorKey: 'egcs_fo_name_en', headerKey: 'funding_opportunity.name_en' },
+  { id: 'streams', headerKey: 'funding_opportunity.streams' },
   { accessorKey: 'egcs_fo_datestart', headerKey: 'funding_opportunity.start_date' },
   { accessorKey: 'egcs_fo_dateend', headerKey: 'funding_opportunity.end_date' },
-  { accessorKey: 'egcs_fo_status', headerKey: 'funding_opportunity.status' }
+  { accessorKey: 'egcs_fo_status', headerKey: 'funding_opportunity.status' },
+  { id: 'actions', headerKey: 'common.actions' }
 ]
 const modalOpen = ref(false)
 const pending = ref(false)
-const form = ref<OpportunityForm>({ egcs_fo_status: 'draft', egcs_fo_applicationschema: null, egcs_fo_reviewsetups: [], egcs_fo_workflowsetups: [] })
+/**
+ * Builds a complete, empty create form so every controlled text field has an initial value.
+ *
+ * @returns Empty Opportunity form values.
+ */
+const emptyForm = (): OpportunityForm => ({
+  egcs_fo_transferpaymentstreams: [],
+  egcs_fo_name_en: '',
+  egcs_fo_name_fr: '',
+  egcs_fo_objective_en: '',
+  egcs_fo_objective_fr: '',
+  egcs_fo_applicationschema: null
+})
+const form = ref<OpportunityForm>(emptyForm())
 const openCreate = () => {
-  form.value = { egcs_fo_status: 'draft', egcs_fo_applicationschema: null, egcs_fo_reviewsetups: [], egcs_fo_workflowsetups: [] }
+  form.value = emptyForm()
   modalOpen.value = true
 }
 /**
@@ -78,8 +97,20 @@ const submit = async () => {
             {{ t(`funding_opportunity.${row.original.egcs_fo_status}`) }}
           </UBadge>
         </template>
+        <template #streams-cell="{ row }">
+          <div class="flex flex-wrap gap-1">
+            <UBadge v-for="stream in row.original.streams" :key="stream.id" color="neutral" variant="soft">
+              {{ locale === 'fr' ? stream.name_fr : stream.name_en }}
+            </UBadge>
+          </div>
+        </template>
+        <template #actions-cell="{ row }">
+          <div class="flex justify-end gap-2">
+            <UButton icon="i-lucide-eye" color="neutral" variant="ghost" :aria-label="t('funding_opportunity.view_details')" :to="localePath(appRouteLocations.fundingOpportunityDetail(String(row.original.id)))" />
+          </div>
+        </template>
       </CommonResourceLayoutPage>
-      <FundingOpportunityOpportunityModal v-model:open="modalOpen" v-model:state="form" :pending="pending" @submit="submit" />
+      <FundingOpportunityModal v-model:open="modalOpen" v-model:state="form" :pending="pending" @submit="submit" />
     </template>
   </UDashboardPanel>
 </template>

@@ -168,6 +168,7 @@ export const AUDIT_TABLE_OWNERSHIP: Readonly<Record<string, AuditOwnershipRule>>
   'public.Funding_Case_Agreement_Profile': parent('egcs_fc_transferpaymentstream', 'public.Transfer_Payment_Stream'),
   'public.Funding_Case_Intake_Profile': parent('egcs_fi_fundingopportunity', 'public.Funding_Opportunity_Profile'),
   'public.Funding_Opportunity_Profile': parent('egcs_fo_transferpaymentstream', 'public.Transfer_Payment_Stream'),
+  'public.Funding_Opportunity_Stream': parent('egcs_fo_fundingopportunity', 'public.Funding_Opportunity_Profile'),
   'public.Funding_Opportunity_Review_Set': parent('egcs_fo_fundingopportunity', 'public.Funding_Opportunity_Profile'),
   'public.Funding_Opportunity_Workflow': parent('egcs_fo_fundingopportunity', 'public.Funding_Opportunity_Profile'),
   'public.Funding_Case_Agreement_Responsible_Party_Activity': parent('egcs_fc_activity', 'public.Funding_Case_Agreement_Activity'),

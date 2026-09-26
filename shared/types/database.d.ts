@@ -442,6 +442,7 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Transfer_Payment_Stream_Field_Assignment: TransferPaymentStreamFieldAssignmentTable
   Funding_Case_Agreement_Profile: FundingCaseAgreementProfileTable
   Funding_Opportunity_Profile: FundingOpportunityProfileTable
+  Funding_Opportunity_Stream: FundingOpportunityStreamTable
   Funding_Opportunity_Review_Set: FundingOpportunityReviewSetTable
   Funding_Opportunity_Workflow: FundingOpportunityWorkflowTable
   Funding_Case_Intake_Profile: FundingCaseIntakeProfileTable
@@ -1339,6 +1340,13 @@ export interface FundingOpportunityReviewSetTable {
   id: Generated<string>
   egcs_fo_fundingopportunity: string
   egcs_fo_reviewsetsetup: string
+  _deleted: Generated<boolean>
+}
+
+export interface FundingOpportunityStreamTable {
+  id: Generated<string>
+  egcs_fo_fundingopportunity: string
+  egcs_fo_transferpaymentstream: string
   _deleted: Generated<boolean>
 }
 

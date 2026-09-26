@@ -37,10 +37,10 @@ const validate = createValidator(schema)
         <CommonSection :title="t('funding_case_intake.details')" :grid-cols="1">
           <div class="grid gap-4 md:grid-cols-2">
             <UFormField :label="t('funding_case_intake.opportunity')" name="egcs_fi_fundingopportunity" required>
-              <CommonServerLookupSelect v-model="state.egcs_fi_fundingopportunity" fetch-url="/api/funding-case-intakes/lookups/opportunities" selected-values-query-key="ids" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :disabled="Boolean(state.id)" searchable />
+              <CommonServerLookupSelect v-model="state.egcs_fi_fundingopportunity" fetch-url="/api/funding-case-intakes/lookups/opportunities" selected-values-query-key="ids" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :disabled="Boolean(state.id)" close-on-select searchable />
             </UFormField>
             <UFormField :label="t('funding_case_intake.proponent')" name="egcs_fi_applicantrecipient" required>
-              <CommonServerLookupSelect v-model="state.egcs_fi_applicantrecipient" fetch-url="/api/agreements/lookups/applicant-recipients" selected-values-query-key="ids" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :disabled="Boolean(state.id)" searchable />
+              <CommonServerLookupSelect v-model="state.egcs_fi_applicantrecipient" fetch-url="/api/agreements/lookups/applicant-recipients" selected-values-query-key="ids" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :disabled="Boolean(state.id)" close-on-select searchable />
             </UFormField>
             <UFormField :label="t('funding_case_intake.application_id')" name="egcs_fi_applicationid" required>
               <UInput v-model="state.egcs_fi_applicationid" :disabled="Boolean(state.id)" inputmode="numeric" class="w-full" />

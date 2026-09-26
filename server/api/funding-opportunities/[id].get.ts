@@ -21,7 +21,12 @@ export default defineEventHandler(async event => {
     .select(['Transfer_Payment_Stream.egcs_tp_name_en as stream_name_en', 'Transfer_Payment_Stream.egcs_tp_name_fr as stream_name_fr'])
     .where('Funding_Opportunity_Profile.id', '=', id).where('Funding_Opportunity_Profile._deleted', '=', false).executeTakeFirst()
   if (!opportunity) return await notFound(event, 'FUNDING_OPPORTUNITY_NOT_FOUND', 'apiErrors.admin_common.not_found')
-  const [reviews, workflows] = await Promise.all([
+  const [streams, reviews, workflows] = await Promise.all([
+    db.selectFrom('Funding_Opportunity_Stream')
+      .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Funding_Opportunity_Stream.egcs_fo_transferpaymentstream')
+      .select(['Transfer_Payment_Stream.id', 'Transfer_Payment_Stream.egcs_tp_name_en as name_en', 'Transfer_Payment_Stream.egcs_tp_name_fr as name_fr'])
+      .where('Funding_Opportunity_Stream.egcs_fo_fundingopportunity', '=', id)
+      .where('Funding_Opportunity_Stream._deleted', '=', false).execute(),
     db.selectFrom('Funding_Opportunity_Review_Set')
       .innerJoin('Common_Review_Set_Setup', 'Common_Review_Set_Setup.id', 'Funding_Opportunity_Review_Set.egcs_fo_reviewsetsetup')
       .select(['egcs_fo_reviewsetsetup', 'Common_Review_Set_Setup.egcs_cn_name_en as name_en', 'Common_Review_Set_Setup.egcs_cn_name_fr as name_fr'])
@@ -31,10 +36,17 @@ export default defineEventHandler(async event => {
       .select(['egcs_fo_workflowsetup', 'Common_Workflow_Setup.egcs_cn_name_en as name_en', 'Common_Workflow_Setup.egcs_cn_name_fr as name_fr'])
       .where('egcs_fo_fundingopportunity', '=', id).where('Funding_Opportunity_Workflow._deleted', '=', false).execute()
   ])
+  streams.sort((a, b) => String(a.id) === String(opportunity.egcs_fo_transferpaymentstream)
+    ? -1
+    : String(b.id) === String(opportunity.egcs_fo_transferpaymentstream)
+      ? 1
+      : String(a.id).localeCompare(String(b.id), undefined, { numeric: true }))
   return {
     ...opportunity,
     agency_id: scope.agencyId,
     program_id: scope.transferPaymentId,
+    egcs_fo_transferpaymentstreams: streams.map(row => String(row.id)),
+    streams: streams.map(row => ({ id: String(row.id), name_en: row.name_en, name_fr: row.name_fr })),
     egcs_fo_reviewsetups: reviews.map(row => String(row.egcs_fo_reviewsetsetup)),
     egcs_fo_workflowsetups: workflows.map(row => String(row.egcs_fo_workflowsetup)),
     review_setups: reviews.map(row => ({ id: String(row.egcs_fo_reviewsetsetup), name_en: row.name_en, name_fr: row.name_fr })),

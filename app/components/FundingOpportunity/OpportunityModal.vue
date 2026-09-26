@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { FundingOpportunityCreateSchema } from '~~/shared/types/schemas'
+import { FundingOpportunityFormSchema } from '~~/shared/types/schemas'
 
 export interface OpportunityForm {
   id?: string
-  egcs_fo_transferpaymentstream?: string
+  program_id?: string
+  egcs_fo_transferpaymentstreams: string[]
   egcs_fo_datestart?: string
   egcs_fo_dateend?: string
   egcs_fo_name_en?: string
@@ -11,9 +12,6 @@ export interface OpportunityForm {
   egcs_fo_objective_en?: string
   egcs_fo_objective_fr?: string
   egcs_fo_applicationschema: Record<string, unknown> | null
-  egcs_fo_status: 'draft' | 'open' | 'closed'
-  egcs_fo_reviewsetups: string[]
-  egcs_fo_workflowsetups: string[]
 }
 
 const { pending = false } = defineProps<{ pending?: boolean }>()
@@ -22,20 +20,23 @@ const state = defineModel<OpportunityForm>('state', { required: true })
 const emit = defineEmits<{ submit: [] }>()
 const { t } = useI18n()
 const { createValidator } = useZodI18n()
-const validate = createValidator(FundingOpportunityCreateSchema)
-const setupQuery = computed(() => ({ stream_id: state.value.egcs_fo_transferpaymentstream ?? '' }))
-const statusItems = computed(() => [
-  { label: t('funding_opportunity.draft'), value: 'draft' },
-  { label: t('funding_opportunity.open'), value: 'open' },
-  { label: t('funding_opportunity.closed'), value: 'closed' }
-])
+const validate = createValidator(FundingOpportunityFormSchema)
+const selectedProgramId = ref<string | undefined>(undefined)
 
-watch(() => state.value.egcs_fo_transferpaymentstream, (next, previous) => {
-  if (previous && next !== previous && !state.value.id) {
-    state.value.egcs_fo_reviewsetups = []
-    state.value.egcs_fo_workflowsetups = []
-  }
-})
+/**
+ * Clears selected Streams after a Program change.
+ *
+ * @param programId - The selected Program id, or undefined when cleared.
+ */
+const selectProgram = (programId: string | undefined) => {
+  if (state.value.id || selectedProgramId.value === programId) return
+  selectedProgramId.value = programId
+  state.value.egcs_fo_transferpaymentstreams = []
+}
+
+watch(() => state.value, next => {
+  selectedProgramId.value = next.program_id
+}, { immediate: true })
 </script>
 
 <template>
@@ -44,39 +45,30 @@ watch(() => state.value.egcs_fo_transferpaymentstream, (next, previous) => {
       <UForm v-if="open" :state="state" :validate="validate" class="space-y-5" @submit="emit('submit')">
         <CommonSection :title="t('funding_opportunity.details')" :grid-cols="1">
           <div class="grid gap-4 md:grid-cols-2">
-            <UFormField :label="t('funding_opportunity.stream')" name="egcs_fo_transferpaymentstream">
-              <CommonServerLookupSelect v-model="state.egcs_fo_transferpaymentstream" fetch-url="/api/funding-opportunities/lookups/streams" selected-values-query-key="ids" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :disabled="Boolean(state.id)" searchable />
+            <UFormField :label="t('funding_opportunity.program')" required>
+              <CommonServerLookupSelect :model-value="selectedProgramId" fetch-url="/api/funding-opportunities/lookups/streams" selected-values-query-key="ids" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :query="{ group_by: 'program' }" :disabled="Boolean(state.id)" close-on-select searchable @update:model-value="selectProgram" />
             </UFormField>
-            <UFormField :label="t('funding_opportunity.status')" name="egcs_fo_status">
-              <USelect v-model="state.egcs_fo_status" :items="statusItems" />
+            <UFormField :label="t('funding_opportunity.streams')" name="egcs_fo_transferpaymentstreams" required>
+              <CommonServerLookupSelect v-if="selectedProgramId" :key="selectedProgramId" v-model:values="state.egcs_fo_transferpaymentstreams" multiple fetch-url="/api/funding-opportunities/lookups/streams" selected-values-query-key="ids" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :query="{ program_id: selectedProgramId }" close-on-select searchable />
+              <USelectMenu v-else :items="[]" disabled :placeholder="t('funding_opportunity.select_program_first')" />
             </UFormField>
-            <UFormField :label="t('funding_opportunity.name_en')" name="egcs_fo_name_en">
+            <UFormField :label="t('funding_opportunity.name_en')" name="egcs_fo_name_en" required>
               <UInput v-model="state.egcs_fo_name_en" class="w-full" />
             </UFormField>
-            <UFormField :label="t('funding_opportunity.name_fr')" name="egcs_fo_name_fr">
+            <UFormField :label="t('funding_opportunity.name_fr')" name="egcs_fo_name_fr" required>
               <UInput v-model="state.egcs_fo_name_fr" class="w-full" />
             </UFormField>
-            <UFormField :label="t('funding_opportunity.start_date')" name="egcs_fo_datestart">
+            <UFormField :label="t('funding_opportunity.start_date')" name="egcs_fo_datestart" required>
               <CommonDatePicker v-model="state.egcs_fo_datestart" />
             </UFormField>
-            <UFormField :label="t('funding_opportunity.end_date')" name="egcs_fo_dateend">
+            <UFormField :label="t('funding_opportunity.end_date')" name="egcs_fo_dateend" required>
               <CommonDatePicker v-model="state.egcs_fo_dateend" />
             </UFormField>
-            <UFormField :label="t('funding_opportunity.objective_en')" name="egcs_fo_objective_en">
+            <UFormField :label="t('funding_opportunity.objective_en')" name="egcs_fo_objective_en" required>
               <CommonTextarea v-model="state.egcs_fo_objective_en" :rows="3" />
             </UFormField>
-            <UFormField :label="t('funding_opportunity.objective_fr')" name="egcs_fo_objective_fr">
+            <UFormField :label="t('funding_opportunity.objective_fr')" name="egcs_fo_objective_fr" required>
               <CommonTextarea v-model="state.egcs_fo_objective_fr" :rows="3" />
-            </UFormField>
-          </div>
-        </CommonSection>
-        <CommonSection :title="t('funding_opportunity.eligibility')" :grid-cols="1">
-          <div class="grid gap-4 md:grid-cols-2">
-            <UFormField :label="t('funding_opportunity.review_setups')" name="egcs_fo_reviewsetups" :required="false">
-              <CommonServerLookupSelect v-model:values="state.egcs_fo_reviewsetups" multiple fetch-url="/api/funding-opportunities/lookups/setups" selected-values-query-key="ids" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :query="{ ...setupQuery, kind: 'review' }" :disabled="!state.egcs_fo_transferpaymentstream" searchable />
-            </UFormField>
-            <UFormField :label="t('funding_opportunity.workflow_setups')" name="egcs_fo_workflowsetups" :required="false">
-              <CommonServerLookupSelect v-model:values="state.egcs_fo_workflowsetups" multiple fetch-url="/api/funding-opportunities/lookups/setups" selected-values-query-key="ids" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :query="{ ...setupQuery, kind: 'workflow' }" :disabled="!state.egcs_fo_transferpaymentstream" searchable />
             </UFormField>
           </div>
         </CommonSection>
