@@ -16,6 +16,13 @@ export default defineEventHandler(async event => {
   const target = await getAttachmentRouteTarget(event)
   const { resolved } = await authorizeAttachmentTarget(event, target, 'update')
   const upload = await readAttachmentUpload(event)
+  if (resolved.fundingCaseScope) {
+    const selected = await event.context.$db.selectFrom('Funding_Opportunity_Attachment_Type').select('id')
+      .where('egcs_fo_fundingopportunity', '=', resolved.fundingCaseScope.opportunityId)
+      .where('egcs_fo_attachmenttype', '=', upload.metadata.attachmentTypeId)
+      .where('_deleted', '=', false).executeTakeFirst()
+    if (!selected) return await badRequest(event, 'ATTACHMENT_TYPE_INVALID', 'apiErrors.attachments.type_invalid')
+  }
   const provider = await resolveAgencyStorageProvider(event.context.$db, resolved.agencyId)
   if (!provider) {
     return await throwApiError(event, {
@@ -57,6 +64,12 @@ export default defineEventHandler(async event => {
       const attachmentType = await trx.selectFrom('Common_Attachment_Types').select('id')
         .where('id', '=', upload.metadata.attachmentTypeId).where('egcs_cn_agency', '=', freshTarget.agencyId)
         .where('_deleted', '=', false).forUpdate().executeTakeFirst()
+      const selectedForIntake = freshTarget.fundingCaseScope
+        ? await trx.selectFrom('Funding_Opportunity_Attachment_Type').select('id')
+            .where('egcs_fo_fundingopportunity', '=', freshTarget.fundingCaseScope.opportunityId)
+            .where('egcs_fo_attachmenttype', '=', upload.metadata.attachmentTypeId)
+            .where('_deleted', '=', false).forShare().executeTakeFirst()
+        : true
       const commonUserId = await resolveAssignmentCommonUserId(trx, auth.userId)
       if (freshTarget.agencyId !== provider.agencyId
         || selection?.provider_key !== provider.extension.key
@@ -65,7 +78,7 @@ export default defineEventHandler(async event => {
           statusCode: 409, code: 'STORAGE_PROVIDER_CHANGED', key: 'apiErrors.attachments.provider_changed'
         })
       }
-      if (!attachmentType) return await badRequest(event, 'ATTACHMENT_TYPE_INVALID', 'apiErrors.attachments.type_invalid')
+      if (!attachmentType || !selectedForIntake) return await badRequest(event, 'ATTACHMENT_TYPE_INVALID', 'apiErrors.attachments.type_invalid')
       if (!commonUserId) return await forbidden(event)
       const metadataDeclaration = provider.extension.fileStorageProvider?.metadata
       const attachment = await withAuditCreationOwner('public.Common_Attachment',

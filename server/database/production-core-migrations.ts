@@ -17,6 +17,8 @@ import * as fundingOpportunityIntakeMigration from './migrations/0150_funding_op
 import * as fundingCaseExternalContractMigration from './migrations/0160_funding_case_external_contract'
 import * as fundingCaseGroupAssignmentMigration from './migrations/0170_funding_case_group_assignment'
 import * as fundingOpportunityStreamsMigration from './migrations/0180_funding_opportunity_streams'
+import * as fundingOpportunityAttachmentTypesMigration from './migrations/0190_funding_opportunity_attachment_types'
+import * as fundingOpportunityAgencyStatusMigration from './migrations/0200_funding_opportunity_agency_status'
 
 export const productionCoreMigrations = {
   '0010_common': commonMigration,
@@ -36,7 +38,9 @@ export const productionCoreMigrations = {
   '0150_funding_opportunity_intake': fundingOpportunityIntakeMigration,
   '0160_funding_case_external_contract': fundingCaseExternalContractMigration,
   '0170_funding_case_group_assignment': fundingCaseGroupAssignmentMigration,
-  '0180_funding_opportunity_streams': fundingOpportunityStreamsMigration
+  '0180_funding_opportunity_streams': fundingOpportunityStreamsMigration,
+  '0190_funding_opportunity_attachment_types': fundingOpportunityAttachmentTypesMigration,
+  '0200_funding_opportunity_agency_status': fundingOpportunityAgencyStatusMigration
 } satisfies Record<string, Migration>
 
 export const productionCoreMigrationProvider: MigrationProvider = {

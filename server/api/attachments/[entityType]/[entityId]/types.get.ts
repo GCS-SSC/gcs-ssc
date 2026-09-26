@@ -18,6 +18,13 @@ export default defineEventHandler(async event => {
     let base = trx.selectFrom('Common_Attachment_Types')
       .where('egcs_cn_agency', '=', resolved.agencyId)
       .where('_deleted', '=', false)
+    const intakeOpportunityId = resolved.fundingCaseScope?.opportunityId
+    if (intakeOpportunityId) {
+      base = base.where('id', 'in', eb => eb.selectFrom('Funding_Opportunity_Attachment_Type')
+        .select('egcs_fo_attachmenttype')
+        .where('egcs_fo_fundingopportunity', '=', intakeOpportunityId)
+        .where('_deleted', '=', false))
+    }
     if (query.search) {
       const search = `%${escapeLikePattern(query.search)}%`
       base = base.where(eb => eb.or([

@@ -59,6 +59,12 @@ export const findLiveStatusReference = async (
   trx: Transaction<Database>,
   statusId: string
 ): Promise<string | null> => {
+  const opportunity = await trx.selectFrom('Funding_Opportunity_Profile').select('id')
+    .where('egcs_fo_status', '=', statusId).where('_deleted', '=', false).executeTakeFirst()
+  if (opportunity) return 'Funding_Opportunity_Profile'
+  const intake = await trx.selectFrom('Funding_Case_Intake_Profile').select('id')
+    .where('egcs_fi_status', '=', statusId).where('_deleted', '=', false).executeTakeFirst()
+  if (intake) return 'Funding_Case_Intake_Profile'
   for (const table of BUSINESS_STATUS_TABLES) {
     const record = await trx.selectFrom(table)
       .select('id')

@@ -445,6 +445,7 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Funding_Opportunity_Stream: FundingOpportunityStreamTable
   Funding_Opportunity_Review_Set: FundingOpportunityReviewSetTable
   Funding_Opportunity_Workflow: FundingOpportunityWorkflowTable
+  Funding_Opportunity_Attachment_Type: FundingOpportunityAttachmentTypeTable
   Funding_Case_Intake_Profile: FundingCaseIntakeProfileTable
   Funding_Case_Agreement_Note: FundingCaseAgreementNoteTable
   Funding_Case_Agreement_Closeout: FundingCaseAgreementCloseoutTable
@@ -1332,7 +1333,7 @@ export interface FundingOpportunityProfileTable {
   egcs_fo_objective_en: string
   egcs_fo_objective_fr: string
   egcs_fo_applicationschema: Record<string, JsonValue> | null
-  egcs_fo_status: Generated<'draft' | 'open' | 'closed'>
+  egcs_fo_status: string
   _deleted: Generated<boolean>
 }
 
@@ -1354,6 +1355,14 @@ export interface FundingOpportunityWorkflowTable {
   id: Generated<string>
   egcs_fo_fundingopportunity: string
   egcs_fo_workflowsetup: string
+  _deleted: Generated<boolean>
+}
+
+export interface FundingOpportunityAttachmentTypeTable {
+  id: Generated<string>
+  egcs_fo_fundingopportunity: string
+  egcs_fo_attachmenttype: string
+  egcs_fo_isinternal: Generated<boolean>
   _deleted: Generated<boolean>
 }
 

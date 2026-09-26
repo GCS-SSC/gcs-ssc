@@ -10,6 +10,7 @@ import { canAccessApplicantRecipient } from './applicant-recipient-auth'
 import { BusinessStatusViolation, lockAgencyDraftStatus } from './business-status-runtime'
 import { lockAssignableGroup } from './groups'
 import { resolveFundingOpportunityScope } from './funding-case'
+import { getFundingOpportunityStatus, isFundingOpportunityIntakeEligible } from './funding-opportunity-status'
 
 const object = z.record(z.string(), z.json())
 const sourceText = (max: number) => z.string().trim().min(1).max(max)
@@ -106,7 +107,8 @@ export const createExternalFundingCaseIntake = async (
     }
     return { status: 'already_imported', intakeId: String(existing.id) }
   }
-  if (opportunity.egcs_fo_status !== 'open' || !opportunity.in_window) {
+  const opportunityStatus = await getFundingOpportunityStatus(trx, String(opportunity.egcs_fo_status), lockedScope.agencyId)
+  if (!isFundingOpportunityIntakeEligible(opportunityStatus) || !opportunity.in_window) {
     return { status: 'opportunity_unavailable' }
   }
   const recipient = await trx.selectFrom('Applicant_Recipient_Profile').select('id')
@@ -167,7 +169,9 @@ export const projectFundingOpportunityForPortal = async (
     .where('opportunity.id', '=', opportunityId).where('opportunity._deleted', '=', false)
     .where('stream._deleted', '=', false).where('program._deleted', '=', false).where('agency._deleted', '=', false)
     .forShare().executeTakeFirst()
-  if (!row || row.egcs_fo_status !== 'open') return null
+  if (!row) return null
+  const opportunityStatus = await getFundingOpportunityStatus(db, String(row.egcs_fo_status), scope.agencyId)
+  if (!isFundingOpportunityIntakeEligible(opportunityStatus)) return null
   const streams = await db.selectFrom('Funding_Opportunity_Stream')
     .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Funding_Opportunity_Stream.egcs_fo_transferpaymentstream')
     .select(['Transfer_Payment_Stream.id', 'Transfer_Payment_Stream.egcs_tp_name_en as name_en',
@@ -181,6 +185,16 @@ export const projectFundingOpportunityForPortal = async (
       : String(a.id).localeCompare(String(b.id), undefined, { numeric: true }))
   const publicationStream = streams.find(stream => String(stream.id) === (routeScope.streamId ?? scope.streamId))
   if (!publicationStream) return null
+  const attachmentTypes = await db.selectFrom('Funding_Opportunity_Attachment_Type as selected')
+    .innerJoin('Common_Attachment_Types as type', 'type.id', 'selected.egcs_fo_attachmenttype')
+    .select(['type.id', 'type.egcs_cn_name_en', 'type.egcs_cn_name_fr',
+      'type.egcs_cn_description_en', 'type.egcs_cn_description_fr'])
+    .where('selected.egcs_fo_fundingopportunity', '=', opportunityId)
+    .where('selected.egcs_fo_isinternal', '=', false)
+    .where('selected._deleted', '=', false)
+    .where('type._deleted', '=', false)
+    .where('type.egcs_cn_agency', '=', scope.agencyId)
+    .orderBy('type.egcs_cn_name_en').execute()
   return {
     sourceSystem: 'gcs-ssc', foreignSystemId: String(row.opportunity_id),
     opportunityId: String(row.opportunity_id),
@@ -190,6 +204,10 @@ export const projectFundingOpportunityForPortal = async (
     streams: streams.map(stream => ({ id: String(stream.id), nameEn: stream.name_en, nameFr: stream.name_fr })),
     nameEn: row.egcs_fo_name_en, nameFr: row.egcs_fo_name_fr,
     objectiveEn: row.egcs_fo_objective_en, objectiveFr: row.egcs_fo_objective_fr,
+    attachmentTypes: attachmentTypes.map(type => ({
+      id: String(type.id), nameEn: type.egcs_cn_name_en, nameFr: type.egcs_cn_name_fr,
+      descriptionEn: type.egcs_cn_description_en, descriptionFr: type.egcs_cn_description_fr
+    })),
     startDate: row.start_date, startTime: '00:00:00.000000',
     endDate: row.end_date, endTime: '23:59:59.999999'
   }

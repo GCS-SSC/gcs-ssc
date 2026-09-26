@@ -4,16 +4,18 @@ import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import type { OpportunityForm } from '~/components/FundingOpportunity/OpportunityModal.vue'
 
-definePageMeta({ i18n: { paths: { en: '/funding-opportunities/[id]', fr: '/possibilites-de-financement/[id]' } } })
+definePageMeta({ key: route => route.path, i18n: { paths: { en: '/funding-opportunities/[id]', fr: '/possibilites-de-financement/[id]' } } })
 
 type Opportunity = OpportunityForm & {
   id: string; agency_id: string; program_id: string
-  egcs_fo_status: 'draft' | 'open' | 'closed'
+  program_name_en: string; program_name_fr: string
+  egcs_fo_status: string
   egcs_fo_reviewsetups: string[]
   egcs_fo_workflowsetups: string[]
   streams: Array<{ id: string; name_en: string; name_fr: string }>
   review_setups: Array<{ id: string; name_en: string; name_fr: string }>
   workflow_setups: Array<{ id: string; name_en: string; name_fr: string }>
+  attachment_types: Array<{ id: string; name_en: string; name_fr: string; egcs_fo_isinternal: boolean }>
 }
 const route = useRoute()
 const id = String(route.params.id)
@@ -25,21 +27,34 @@ const { toDateInput } = useDateHelpers()
 const { getHeroCollapsed } = useDashboard()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
+const statusCatalog = useStatusCatalog()
+void statusCatalog.load()
 const { data: profile, error, status, refresh } = await useFetch<Opportunity, Error, string>(`/api/funding-opportunities/${id}`)
 const isHeroCollapsed = getHeroCollapsed('funding-opportunity-detail')
 const selectedTab = ref('general')
 const tabs = computed(() => [
-  { key: 'funding_opportunity.details', value: 'general', icon: 'i-lucide-file-text' },
-  { key: 'funding_opportunity.eligibility', value: 'eligibility', icon: 'i-lucide-list-checks' }
+  { key: 'agency.tabs.general', value: 'general', icon: 'i-lucide-info' },
+  { key: 'workflow.title', value: 'workflows', icon: 'i-lucide-workflow' },
+  { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-clipboard-check' },
+  { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' }
 ])
 const scope = computed(() => profile.value && ({
   type: 'entity' as const, agencyId: String(profile.value.agency_id),
   path: [{ type: 'transfer_payment' as const, id: String(profile.value.program_id) }]
 }))
-const canEdit = computed(() => Boolean(scope.value && can('transfer_payment', 'update', scope.value)))
-const canDelete = computed(() => Boolean(scope.value && can('transfer_payment', 'delete', scope.value)))
-const canCreateIntake = computed(() => Boolean(scope.value && profile.value?.egcs_fo_status === 'open'
-  && can('funding_case', 'create', scope.value)))
+const statusDefinition = computed(() => statusCatalog.getById(profile.value?.egcs_fo_status))
+const isWritable = computed(() => Boolean(statusDefinition.value && !statusDefinition.value.deleted
+  && !statusDefinition.value.readOnly && !statusDefinition.value.terminal))
+const canEdit = computed(() => Boolean(scope.value && isWritable.value && can('transfer_payment', 'update', scope.value)))
+const canDelete = computed(() => Boolean(scope.value && isWritable.value && can('transfer_payment', 'delete', scope.value)))
+const isWithinIntakeWindow = computed(() => {
+  if (!profile.value) return false
+  const today = new Date().toISOString().slice(0, 10)
+  return toDateInput(profile.value.egcs_fo_datestart) <= today
+    && toDateInput(profile.value.egcs_fo_dateend) >= today
+})
+const canCreateIntake = computed(() => Boolean(scope.value && isWritable.value && !statusDefinition.value?.isDraft
+  && isWithinIntakeWindow.value && can('funding_case', 'create', scope.value)))
 const modalOpen = ref(false)
 const pending = ref(false)
 const form = ref<OpportunityForm>({ egcs_fo_transferpaymentstreams: [], egcs_fo_applicationschema: null })
@@ -133,13 +148,36 @@ const breadcrumbs = computed(() => [
         </template>
       </UAlert>
       <div v-else-if="profile" class="flex flex-1 flex-col">
-        <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-megaphone" :title="getBilingualValue(profile, 'egcs_fo_name', id)" :description="getBilingualValue(profile, 'egcs_fo_objective', '')" :badges="[{ label: t(`funding_opportunity.${profile.egcs_fo_status}`) }]" :actions="[{ label: t('funding_case_intake.create'), icon: 'i-lucide-plus', visible: canCreateIntake, to: localePath({ ...appRouteLocations.fundingCaseIntakes(), query: { opportunity_id: id } }) }, { label: t('common.edit'), icon: 'i-lucide-edit-3', visible: canEdit, onClick: edit }, { label: t('common.delete'), icon: 'i-lucide-trash', visible: canDelete, onClick: remove }]" />
+        <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-megaphone" :title="getBilingualValue(profile, 'egcs_fo_name', id)" :description="getBilingualValue(profile, 'egcs_fo_objective', '')" :badges="[{ statusId: String(profile.egcs_fo_status) }]" :actions="[{ label: t('funding_case_intake.create'), icon: 'i-lucide-plus', visible: canCreateIntake, to: localePath({ ...appRouteLocations.fundingCaseIntakes(), query: { opportunity_id: id } }) }, { label: t('common.edit'), icon: 'i-lucide-edit-3', visible: canEdit, onClick: edit }, { label: t('common.delete'), icon: 'i-lucide-trash', visible: canDelete, onClick: remove }]" />
         <CommonEntityEditorWorkspace content-test-id="funding-opportunity-detail-content">
           <template #sidebar>
             <CommonRouteTabs v-model="selectedTab" :items="tabs" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
           </template>
           <CommonSection v-if="selectedTab === 'general'" :title="t('funding_opportunity.details')" :grid-cols="1">
             <dl class="grid gap-4 md:grid-cols-2">
+              <div>
+                <dt class="text-sm text-muted">
+                  {{ t('funding_opportunity.program') }}
+                </dt><dd>{{ getBilingualValue(profile, 'program_name', profile.program_id) }}</dd>
+              </div>
+              <div>
+                <dt class="text-sm text-muted">
+                  {{ t('funding_opportunity.streams') }}
+                </dt>
+                <dd v-for="stream in profile.streams" :key="stream.id">
+                  {{ getBilingualValue(stream, 'name', stream.id) }}
+                </dd>
+              </div>
+              <div>
+                <dt class="text-sm text-muted">
+                  {{ t('funding_opportunity.name_en') }}
+                </dt><dd>{{ profile.egcs_fo_name_en }}</dd>
+              </div>
+              <div>
+                <dt class="text-sm text-muted">
+                  {{ t('funding_opportunity.name_fr') }}
+                </dt><dd>{{ profile.egcs_fo_name_fr }}</dd>
+              </div>
               <div>
                 <dt class="text-sm text-muted">
                   {{ t('funding_opportunity.start_date') }}
@@ -152,43 +190,25 @@ const breadcrumbs = computed(() => [
               </div>
               <div>
                 <dt class="text-sm text-muted">
-                  {{ t('funding_opportunity.streams') }}
+                  {{ t('funding_opportunity.objective_en') }}
                 </dt>
-                <dd v-for="stream in profile.streams" :key="stream.id">
-                  {{ getBilingualValue(stream, 'name', stream.id) }}
-                </dd>
-              </div>
-            </dl>
-          </CommonSection>
-          <CommonSection v-else :title="t('funding_opportunity.eligibility')" :grid-cols="1">
-            <p class="text-sm text-muted">
-              {{ t('funding_opportunity.eligibility_help') }}
-            </p>
-            <dl class="mt-4 grid gap-4 md:grid-cols-2">
-              <div>
-                <dt class="text-sm text-muted">
-                  {{ t('funding_opportunity.review_setups') }}
-                </dt>
-                <dd v-for="setup in profile.review_setups" :key="setup.id">
-                  {{ getBilingualValue(setup, 'name', setup.id) }}
-                </dd>
-                <dd v-if="!profile.review_setups.length">
-                  {{ t('common.none') }}
+                <dd class="whitespace-pre-wrap">
+                  {{ profile.egcs_fo_objective_en }}
                 </dd>
               </div>
               <div>
                 <dt class="text-sm text-muted">
-                  {{ t('funding_opportunity.workflow_setups') }}
+                  {{ t('funding_opportunity.objective_fr') }}
                 </dt>
-                <dd v-for="setup in profile.workflow_setups" :key="setup.id">
-                  {{ getBilingualValue(setup, 'name', setup.id) }}
-                </dd>
-                <dd v-if="!profile.workflow_setups.length">
-                  {{ t('common.none') }}
+                <dd class="whitespace-pre-wrap">
+                  {{ profile.egcs_fo_objective_fr }}
                 </dd>
               </div>
             </dl>
           </CommonSection>
+          <FundingOpportunitySetupRelationshipsTab v-else-if="selectedTab === 'workflows'" :opportunity-id="id" :stream-ids="profile.egcs_fo_transferpaymentstreams" :linked-setups="profile.workflow_setups" kind="workflow" :can-edit="canEdit" @refresh="refresh" />
+          <FundingOpportunitySetupRelationshipsTab v-else-if="selectedTab === 'reviews'" :opportunity-id="id" :stream-ids="profile.egcs_fo_transferpaymentstreams" :linked-setups="profile.review_setups" kind="review" :can-edit="canEdit" @refresh="refresh" />
+          <FundingOpportunityAttachmentTypesTab v-else-if="selectedTab === 'attachments'" :opportunity-id="id" :attachment-types="profile.attachment_types" :can-edit="canEdit" @updated="refresh" />
         </CommonEntityEditorWorkspace>
       </div>
       <FundingOpportunityModal v-model:open="modalOpen" v-model:state="form" :pending="pending" @submit="submit" />

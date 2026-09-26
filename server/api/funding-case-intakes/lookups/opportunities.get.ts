@@ -16,6 +16,7 @@ export default defineEventHandler(async event => {
     .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Funding_Opportunity_Profile.egcs_fo_transferpaymentstream')
     .innerJoin('Transfer_Payment_Profile', 'Transfer_Payment_Profile.id', 'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile')
     .innerJoin('Agency_Profile', 'Agency_Profile.id', 'Transfer_Payment_Profile.egcs_tp_agency')
+    .innerJoin('Common_Status', 'Common_Status.id', 'Funding_Opportunity_Profile.egcs_fo_status')
     .select([
       'Funding_Opportunity_Profile.id', 'egcs_fo_name_en as label_en', 'egcs_fo_name_fr as label_fr',
       'Transfer_Payment_Stream.id as stream_id', 'Transfer_Payment_Profile.id as program_id',
@@ -24,7 +25,11 @@ export default defineEventHandler(async event => {
     .where('Funding_Opportunity_Profile._deleted', '=', false)
     .where(eb => eb.or([
       eb.and([
-        eb('Funding_Opportunity_Profile.egcs_fo_status', '=', 'open'),
+        eb('Common_Status.egcs_cn_isdraft', '=', false),
+        eb('Common_Status.egcs_cn_readonly', '=', false),
+        eb('Common_Status.egcs_cn_terminal', '=', false),
+        eb('Common_Status._deleted', '=', false),
+        eb('Common_Status.egcs_cn_agency', '=', eb.ref('Agency_Profile.id')),
         eb('Funding_Opportunity_Profile.egcs_fo_datestart', '<=', sql<Date>`CURRENT_DATE`),
         eb('Funding_Opportunity_Profile.egcs_fo_dateend', '>=', sql<Date>`CURRENT_DATE`)
       ]),

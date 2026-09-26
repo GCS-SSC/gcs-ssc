@@ -8,6 +8,7 @@ import { resolveFundingOpportunityScope } from '~~/server/utils/funding-case'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import { resolveAgencyStorageProvider } from '~~/server/utils/file-storage-provider'
+import { getFundingOpportunityStatus, isFundingOpportunityIntakeEligible } from '~~/server/utils/funding-opportunity-status'
 
 const QuerySchema = AttachmentTypeLookupQuerySchema.extend({
   egcs_fi_fundingopportunity: RequiredStringId().refine(isPositivePostgresBigintText, {
@@ -32,7 +33,10 @@ export default defineEventHandler(async event => {
       .where('egcs_fo_datestart', '<=', sql<Date>`CURRENT_DATE`)
       .where('egcs_fo_dateend', '>=', sql<Date>`CURRENT_DATE`)
       .executeTakeFirst()
-    if (!opportunity || opportunity.egcs_fo_status !== 'open') {
+    const opportunityStatus = opportunity
+      ? await getFundingOpportunityStatus(trx, String(opportunity.egcs_fo_status), scope.agencyId)
+      : undefined
+    if (!opportunity || !isFundingOpportunityIntakeEligible(opportunityStatus)) {
       return await badRequest(event, 'FUNDING_OPPORTUNITY_CLOSED', 'apiErrors.request.invalid_status')
     }
     const provider = await resolveAgencyStorageProvider(trx, scope.agencyId)
@@ -42,7 +46,10 @@ export default defineEventHandler(async event => {
         ? 'metadata_required' as const
         : null
     let base = trx.selectFrom('Common_Attachment_Types')
-      .where('egcs_cn_agency', '=', scope.agencyId).where('_deleted', '=', false)
+      .innerJoin('Funding_Opportunity_Attachment_Type', 'Funding_Opportunity_Attachment_Type.egcs_fo_attachmenttype', 'Common_Attachment_Types.id')
+      .where('Funding_Opportunity_Attachment_Type.egcs_fo_fundingopportunity', '=', scope.opportunityId)
+      .where('Funding_Opportunity_Attachment_Type._deleted', '=', false)
+      .where('egcs_cn_agency', '=', scope.agencyId).where('Common_Attachment_Types._deleted', '=', false)
     if (query.search) {
       const search = `%${escapeLikePattern(query.search)}%`
       base = base.where(eb => eb.or([
@@ -50,9 +57,9 @@ export default defineEventHandler(async event => {
         eb('egcs_cn_name_fr', 'ilike', search)
       ]))
     }
-    if (requestedIds.length) base = base.where('id', 'in', requestedIds)
+    if (requestedIds.length) base = base.where('Common_Attachment_Types.id', 'in', requestedIds)
     const [items, count] = await Promise.all([
-      base.selectAll().orderBy('egcs_cn_name_en').orderBy('id')
+      base.selectAll('Common_Attachment_Types').orderBy('egcs_cn_name_en').orderBy('Common_Attachment_Types.id')
         .limit(query.limit).offset(offset).execute(),
       base.clearSelect().select(sql<number>`count(*)::int`.as('count')).executeTakeFirstOrThrow()
     ])

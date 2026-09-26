@@ -5,6 +5,7 @@ import { badRequest } from '~~/server/utils/api-errors'
 import type { JsonValue } from '~~/shared/types/database'
 import { isFundingOpportunityNameAvailable, replaceFundingOpportunityStreams, resolveFundingOpportunityStreams } from '~~/server/utils/funding-opportunity-links'
 import { sql } from 'kysely'
+import { lockAgencyDraftStatus } from '~~/server/utils/business-status-runtime'
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -27,6 +28,7 @@ export default defineEventHandler(async event => {
     if (!await isFundingOpportunityNameAvailable(trx, currentStream.profileId, streamIds, requested.egcs_fo_name_en, requested.egcs_fo_name_fr)) {
       return await badRequest(event, 'FUNDING_OPPORTUNITY_NAME_DUPLICATE', 'apiErrors.request.invalid')
     }
+    const draftStatusId = await lockAgencyDraftStatus(trx, currentStream.agencyId)
     const opportunity = await trx.insertInto('Funding_Opportunity_Profile').values({
       egcs_fo_transferpaymentstream: streamId,
       egcs_fo_datestart: sql<Date>`${requested.egcs_fo_datestart.toISOString().slice(0, 10)}::date`,
@@ -36,7 +38,7 @@ export default defineEventHandler(async event => {
       egcs_fo_objective_en: requested.egcs_fo_objective_en,
       egcs_fo_objective_fr: requested.egcs_fo_objective_fr,
       egcs_fo_applicationschema: requested.egcs_fo_applicationschema as Record<string, JsonValue> | null,
-      egcs_fo_status: 'draft'
+      egcs_fo_status: draftStatusId
     }).returningAll().executeTakeFirstOrThrow()
     await replaceFundingOpportunityStreams(trx, String(opportunity.id), streamIds)
     return { ...opportunity, egcs_fo_transferpaymentstreams: streamIds }

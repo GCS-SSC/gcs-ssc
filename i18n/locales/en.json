@@ -23,7 +23,21 @@
     "start_date": "Start date",
     "end_date": "End date",
     "review_setups": "Available review sets",
-    "workflow_setups": "Available workflows"
+    "workflow_setups": "Available workflows",
+    "associated_setups": "Associated",
+    "available_setups": "Available",
+    "associate": "Associate",
+    "disassociate": "Disassociate",
+    "no_associated_setups": "No associated setups",
+    "attachment_types": "Attachment types",
+    "attachment_types_help": "Choose the attachment types available to Intakes for this opportunity. Portal-visible types are included in the published opportunity; internal-only types stay in GCS-SSC.",
+    "attachment_visibility": "Visibility",
+    "attachment_save_failed": "Attachment types could not be saved.",
+    "internal_only": "Internal only",
+    "portal_visible": "Portal visible",
+    "internal_only_named": "{name}: internal only",
+    "add_attachment_type": "Associate attachment type",
+    "internal_only_help": "Available to Intakes in GCS-SSC and excluded from the portal."
   },
   "funding_case_intake": {
     "title": "Intakes",

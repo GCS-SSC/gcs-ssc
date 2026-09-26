@@ -9,7 +9,7 @@ definePageMeta({ i18n: { paths: { en: '/funding-opportunities', fr: '/possibilit
 
 type Row = OpportunityForm & {
   id: string
-  egcs_fo_status: 'draft' | 'open' | 'closed'
+  egcs_fo_status: string
   streams: Array<{ id: string; name_en: string; name_fr: string }>
 }
 const { t, locale } = useI18n()
@@ -93,9 +93,7 @@ const submit = async () => {
           <CommonBilingualName :name-en="row.original.egcs_fo_name_en" :name-fr="row.original.egcs_fo_name_fr" :to="localePath(appRouteLocations.fundingOpportunityDetail(String(row.original.id)))" />
         </template>
         <template #egcs_fo_status-cell="{ row }">
-          <UBadge color="neutral" variant="soft">
-            {{ t(`funding_opportunity.${row.original.egcs_fo_status}`) }}
-          </UBadge>
+          <CommonStatusBadge :status-id="String(row.original.egcs_fo_status)" />
         </template>
         <template #streams-cell="{ row }">
           <div class="flex flex-wrap gap-1">
@@ -106,7 +104,7 @@ const submit = async () => {
         </template>
         <template #actions-cell="{ row }">
           <div class="flex justify-end gap-2">
-            <UButton icon="i-lucide-eye" color="neutral" variant="ghost" :aria-label="t('funding_opportunity.view_details')" :to="localePath(appRouteLocations.fundingOpportunityDetail(String(row.original.id)))" />
+            <UButton icon="i-lucide-arrow-right" color="neutral" variant="ghost" :aria-label="t('funding_opportunity.view_details')" :to="localePath(appRouteLocations.fundingOpportunityDetail(String(row.original.id)))" />
           </div>
         </template>
       </CommonResourceLayoutPage>

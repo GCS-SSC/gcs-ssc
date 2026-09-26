@@ -23,7 +23,21 @@
     "start_date": "Date de début",
     "end_date": "Date de fin",
     "review_setups": "Ensembles d’examen disponibles",
-    "workflow_setups": "Flux de travail disponibles"
+    "workflow_setups": "Flux de travail disponibles",
+    "associated_setups": "Associés",
+    "available_setups": "Disponibles",
+    "associate": "Associer",
+    "disassociate": "Dissocier",
+    "no_associated_setups": "Aucune configuration associée",
+    "attachment_types": "Types de pièces jointes",
+    "attachment_types_help": "Choisissez les types de pièces jointes offerts aux réceptions de cette possibilité. Les types visibles dans le portail figurent dans la possibilité publiée; les types internes restent dans GCS-SSC.",
+    "attachment_visibility": "Visibilité",
+    "attachment_save_failed": "Impossible d’enregistrer les types de pièces jointes.",
+    "internal_only": "Interne seulement",
+    "portal_visible": "Visible dans le portail",
+    "internal_only_named": "{name} : interne seulement",
+    "add_attachment_type": "Associer un type de pièce jointe",
+    "internal_only_help": "Offert aux réceptions dans GCS-SSC et exclu du portail."
   },
   "funding_case_intake": {
     "title": "Réceptions",

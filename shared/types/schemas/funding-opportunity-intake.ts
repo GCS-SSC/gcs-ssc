@@ -9,6 +9,13 @@ const requiredText = (max?: number) => {
 const uniqueIds = z.array(PositivePostgresBigintIdSchema).refine(
   ids => new Set(ids.map(String)).size === ids.length, { error: 'validation.duplicate' }
 )
+const attachmentTypes = z.array(z.object({
+  id: PositivePostgresBigintIdSchema,
+  egcs_fo_isinternal: z.boolean()
+}).strict()).max(100, { error: 'validation.max_length' }).refine(
+  rows => new Set(rows.map(row => String(row.id))).size === rows.length,
+  { error: 'validation.duplicate' }
+)
 const jsonObject = z.record(z.string(), z.json())
 
 export const FundingOpportunityBaseSchema = z.object({
@@ -32,9 +39,10 @@ export const FundingOpportunityCreateSchema = FundingOpportunityBaseSchema.stric
   { message: 'validation.date_range', path: ['egcs_fo_dateend'] }
 )
 export const FundingOpportunityPatchSchema = FundingOpportunityBaseSchema.extend({
-  egcs_fo_status: z.enum(['draft', 'open', 'closed']),
+  egcs_fo_status: PositivePostgresBigintIdSchema,
   egcs_fo_reviewsetups: uniqueIds,
-  egcs_fo_workflowsetups: uniqueIds
+  egcs_fo_workflowsetups: uniqueIds,
+  egcs_fo_attachmenttypes: attachmentTypes
 }).partial().superRefine((value, context) => {
   if (value.egcs_fo_dateend && value.egcs_fo_datestart && value.egcs_fo_dateend < value.egcs_fo_datestart) {
     context.addIssue({ code: 'custom', message: 'validation.date_range', path: ['egcs_fo_dateend'] })

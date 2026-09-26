@@ -7,6 +7,7 @@ import { canAccessApplicantRecipient } from '~~/server/utils/applicant-recipient
 import { lockAgencyDraftStatus } from '~~/server/utils/business-status-runtime'
 import { createPrimaryEntityAssignment, resolveAssignmentCommonUserId } from '~~/server/utils/entity-assignment'
 import { badRequest, forbidden } from '~~/server/utils/api-errors'
+import { getFundingOpportunityStatus, isFundingOpportunityIntakeEligible } from '~~/server/utils/funding-opportunity-status'
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -30,7 +31,10 @@ export default defineEventHandler(async event => {
       .where('egcs_fo_datestart', '<=', sql<Date>`CURRENT_DATE`)
       .where('egcs_fo_dateend', '>=', sql<Date>`CURRENT_DATE`)
       .forUpdate().executeTakeFirst()
-    if (!opportunity || opportunity.egcs_fo_status !== 'open') {
+    const opportunityStatus = opportunity
+      ? await getFundingOpportunityStatus(trx, String(opportunity.egcs_fo_status), currentScope.agencyId)
+      : undefined
+    if (!opportunity || !isFundingOpportunityIntakeEligible(opportunityStatus)) {
       return await badRequest(event, 'FUNDING_OPPORTUNITY_CLOSED', 'apiErrors.request.invalid_status')
     }
     const lockedScope = await resolveFundingOpportunityScope(trx, opportunityId)
