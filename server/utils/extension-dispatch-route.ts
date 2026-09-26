@@ -38,6 +38,11 @@ import {
   resolveAgreementScopeContext
 } from '~~/server/utils/agreement'
 import { createAgreementClaimAggregate } from '~~/server/utils/agreement-claim'
+import {
+  createExternalFundingCaseIntake,
+  projectFundingOpportunityForPortal,
+  type ExternalFundingCaseIntakeInput
+} from '~~/server/utils/funding-case-exchange'
 import { resolveAssignmentCommonUserId } from '~~/server/utils/entity-assignment'
 import { lockTransferPaymentStreams } from '~~/server/utils/transfer-payment-stream-lock'
 import { assertBusinessStatusMutationAllowed } from '~~/server/utils/business-status-runtime'
@@ -272,8 +277,15 @@ const createExtensionWriteAuthorization = (
 
   let lockedDb: Kysely<Database> | undefined
   let lockedAuthContext: AuthContext | undefined
+  const routeScope = {
+    agencyId: 'agency' in rbac ? resolvedHandler.params[rbac.agency.param] : undefined,
+    streamId: 'stream' in rbac ? resolvedHandler.params[rbac.stream.param] : undefined
+  }
 
-  const writeAuthorization: GcsExtensionWriteAuthorization = {
+  const writeAuthorization: GcsExtensionWriteAuthorization & {
+    createFundingCaseIntake: (db: unknown, input: ExternalFundingCaseIntakeInput) => ReturnType<typeof createExternalFundingCaseIntake>
+    projectFundingOpportunity: (db: unknown, opportunityId: string) => ReturnType<typeof projectFundingOpportunityForPortal>
+  } = {
     lockAuthState: async (rawDb: unknown): Promise<void> => {
       const db = rawDb as Kysely<Database>
       lockedAuthContext = await requireFreshAuthContext(event, db)
@@ -470,6 +482,22 @@ const createExtensionWriteAuthorization = (
         lineItemIds: result.lineItemIds,
         draftStatusId: result.draftStatusId
       }
+    },
+    createFundingCaseIntake: async (rawDb, input) => {
+      const db = rawDb as Transaction<Database>
+      if (lockedDb !== db || !lockedAuthContext) {
+        throw new Error('Extension Intake creation requires auth-state locking on the same transaction first.')
+      }
+      if (!routeScope.agencyId && !routeScope.streamId) return { status: 'opportunity_unavailable' }
+      return await createExternalFundingCaseIntake(db, lockedAuthContext, input, routeScope)
+    },
+    projectFundingOpportunity: async (rawDb, opportunityId) => {
+      const db = rawDb as Transaction<Database>
+      if (lockedDb !== db || !lockedAuthContext) {
+        throw new Error('Extension Opportunity publication requires auth-state locking on the same transaction first.')
+      }
+      if (!routeScope.agencyId && !routeScope.streamId) return null
+      return await projectFundingOpportunityForPortal(db, lockedAuthContext, opportunityId, routeScope)
     }
   }
   writeAuthorization.authorizeCurrentScope = writeAuthorization.authorizeCurrentEntity

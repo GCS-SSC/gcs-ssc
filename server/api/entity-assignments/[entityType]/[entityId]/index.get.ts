@@ -45,6 +45,13 @@ export default defineEventHandler(async event => {
         .select(['Common_Review.egcs_cn_group', 'Common_Review.egcs_cn_groupclaimedby', 'Common_Group.egcs_cn_name_en', 'Common_Group.egcs_cn_name_fr'])
         .where('Common_Review.id', '=', target.entityId).where('Common_Review._deleted', '=', false).executeTakeFirst()
     : null
+  const intakeGroup = target.entityType === 'fundingcaseintake'
+    ? await event.context.$db.selectFrom('Funding_Case_Intake_Profile')
+        .leftJoin('Common_Group', 'Common_Group.id', 'Funding_Case_Intake_Profile.egcs_fi_group')
+        .select(['egcs_fi_group', 'egcs_fi_groupclaimedby', 'Common_Group.egcs_cn_name_en', 'Common_Group.egcs_cn_name_fr'])
+        .where('Funding_Case_Intake_Profile.id', '=', target.entityId)
+        .where('Funding_Case_Intake_Profile._deleted', '=', false).executeTakeFirst()
+    : null
   return {
     assignments: assignments.map(row => ({
       ...row,
@@ -67,6 +74,13 @@ export default defineEventHandler(async event => {
           name_en: reviewGroup.egcs_cn_name_en ?? '',
           name_fr: reviewGroup.egcs_cn_name_fr ?? ''
         }
-      : null
+      : intakeGroup
+        ? {
+            id: intakeGroup.egcs_fi_group ? String(intakeGroup.egcs_fi_group) : null,
+            claimed_by: intakeGroup.egcs_fi_groupclaimedby ? String(intakeGroup.egcs_fi_groupclaimedby) : null,
+            name_en: intakeGroup.egcs_cn_name_en ?? '',
+            name_fr: intakeGroup.egcs_cn_name_fr ?? ''
+          }
+        : null
   }
 })

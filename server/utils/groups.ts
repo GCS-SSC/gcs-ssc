@@ -67,6 +67,14 @@ export const isAssignableGroup = async (db: Db, groupId: string, agencyId: strin
   .where('user._deleted', '=', false)
   .executeTakeFirst())
 
+/** Holds an active Agency group through a transaction that creates a group-only business item. */
+export const lockAssignableGroup = async (trx: Transaction<Database>, groupId: string, agencyId: string): Promise<boolean> => {
+  const group = await trx.selectFrom('Common_Group').select('id')
+    .where('id', '=', groupId).where('egcs_cn_agency', '=', agencyId)
+    .where('_deleted', '=', false).forShare().executeTakeFirst()
+  return Boolean(group && await isAssignableGroup(trx, groupId, agencyId))
+}
+
 /** Users with an active role explicitly owned by this agency can join its groups. */
 export const listAgencyGroupUsers = async (db: Db, agencyId: string): Promise<Array<{ id: string; name: string }>> => {
   const users = await db.selectFrom('Common_User')

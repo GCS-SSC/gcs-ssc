@@ -7,7 +7,7 @@ import { PaginationSchema } from '~~/shared/types/schemas'
 
 const Query = PaginationSchema.extend({ view: z.enum(['available', 'mine']) })
 type GroupWorkRow = {
-  kind: 'review' | 'additional_reviewer' | 'approval'
+  kind: 'review' | 'additional_reviewer' | 'approval' | 'intake'
   id: string
   review_id: string | null
   entity_type: string
@@ -65,6 +65,7 @@ export default defineEventHandler(async event => {
     const agreementRead = scopedRead('agreement', 'agreement_program.egcs_tp_agency', 'agreement_program.id')
     const proponentRead = readGrants.some(grant => grant.subject === 'applicant_recipient')
     const streamRead = scopedRead('transfer_payment', 'stream_program.egcs_tp_agency', 'stream_program.id')
+    const intakeRead = scopedRead('funding_case', 'intake_program.egcs_tp_agency', 'intake_program.id')
     const agencyRead = scopedRead('agency', 'review_agency.id', 'review_agency.id')
     const work = await sql<GroupWorkRow>`
       WITH active_membership AS (
@@ -107,16 +108,28 @@ export default defineEventHandler(async event => {
         JOIN "Common_Runtime_Item" item ON item.id = approval.egcs_cn_runtimeitem
         WHERE approval.egcs_cn_assignedgroup IS NOT NULL AND approval.egcs_cn_approvalvalue IS NULL
           AND item.egcs_cn_state = 'awaiting_action'
+        UNION ALL
+        SELECT 'intake', intake.id, NULL, 'fundingcaseintake', intake.id, NULL,
+          intake.egcs_fi_group, intake.egcs_fi_groupclaimedby,
+          intake.egcs_fi_applicationid::text, intake.egcs_fi_applicationid::text
+        FROM "Funding_Case_Intake_Profile" intake
+        JOIN "Common_Status" status ON status.id = intake.egcs_fi_status AND status._deleted = false
+        WHERE intake._deleted = false AND intake.egcs_fi_group IS NOT NULL
+          AND status.egcs_cn_readonly = false AND status.egcs_cn_terminal = false
+          AND NOT EXISTS (SELECT 1 FROM "Common_Completion" completion
+            WHERE completion.egcs_cn_entitytype = 'fundingcaseintake'
+              AND completion.egcs_cn_entityid = intake.id AND completion._deleted = false)
       )
       SELECT work.*, grp.egcs_cn_name_en group_name_en, grp.egcs_cn_name_fr group_name_fr,
-        CASE WHEN work.kind = 'approval' THEN work.name_en ELSE review_schema.egcs_cn_name_en END detail_name_en,
-        CASE WHEN work.kind = 'approval' THEN work.name_fr ELSE review_schema.egcs_cn_name_fr END detail_name_fr,
+        CASE WHEN work.kind IN ('approval', 'intake') THEN work.name_en ELSE review_schema.egcs_cn_name_en END detail_name_en,
+        CASE WHEN work.kind IN ('approval', 'intake') THEN work.name_fr ELSE review_schema.egcs_cn_name_fr END detail_name_fr,
         COALESCE(
           CASE WHEN ${agreementRead} THEN to_jsonb(agreement)->>'egcs_fc_agreementnumber' END,
           CASE WHEN ${proponentRead} AND proponent.id IS NOT NULL THEN COALESCE(
             to_jsonb(proponent)->>'egcs_ar_legalname_en', to_jsonb(proponent)->>'egcs_ar_operatingname_en',
             to_jsonb(proponent)->>'egcs_ar_legalname_fr', to_jsonb(proponent)->>'egcs_ar_operatingname_fr', '#' || proponent.id::text) END,
           CASE WHEN ${streamRead} THEN to_jsonb(stream)->>'egcs_tp_name_en' END,
+          CASE WHEN ${intakeRead} THEN to_jsonb(intake_opportunity)->>'egcs_fo_name_en' END,
           CASE WHEN agreement.id IS NULL AND proponent.id IS NULL AND stream.id IS NULL
             AND ${agencyRead} THEN to_jsonb(review_agency)->>'egcs_ay_name_en' END) parent_en,
         COALESCE(
@@ -125,6 +138,7 @@ export default defineEventHandler(async event => {
             to_jsonb(proponent)->>'egcs_ar_legalname_fr', to_jsonb(proponent)->>'egcs_ar_operatingname_fr',
             to_jsonb(proponent)->>'egcs_ar_legalname_en', to_jsonb(proponent)->>'egcs_ar_operatingname_en', '#' || proponent.id::text) END,
           CASE WHEN ${streamRead} THEN to_jsonb(stream)->>'egcs_tp_name_fr' END,
+          CASE WHEN ${intakeRead} THEN to_jsonb(intake_opportunity)->>'egcs_fo_name_fr' END,
           CASE WHEN agreement.id IS NULL AND proponent.id IS NULL AND stream.id IS NULL
             AND ${agencyRead} THEN to_jsonb(review_agency)->>'egcs_ay_name_fr' END) parent_fr,
         CASE
@@ -204,8 +218,17 @@ export default defineEventHandler(async event => {
         AND stream._deleted = false
       LEFT JOIN "Transfer_Payment_Profile" stream_program ON stream_program.id = stream.egcs_tp_transferpaymentprofile
         AND stream_program._deleted = false
-      WHERE (${query.view} = 'mine' AND work.claimed_by = ${actor.id}::bigint)
-        OR (${query.view} = 'available' AND work.claimed_by IS NULL AND member.egcs_cn_group IS NOT NULL)
+      LEFT JOIN "Funding_Case_Intake_Profile" intake_work ON intake_work.id = work.entity_id
+        AND work.kind = 'intake' AND intake_work._deleted = false
+      LEFT JOIN "Funding_Opportunity_Profile" intake_opportunity ON intake_opportunity.id = intake_work.egcs_fi_fundingopportunity
+        AND intake_opportunity._deleted = false
+      LEFT JOIN "Transfer_Payment_Stream" intake_stream ON intake_stream.id = intake_opportunity.egcs_fo_transferpaymentstream
+        AND intake_stream._deleted = false
+      LEFT JOIN "Transfer_Payment_Profile" intake_program ON intake_program.id = intake_stream.egcs_tp_transferpaymentprofile
+        AND intake_program._deleted = false
+      WHERE ((${query.view} = 'mine' AND work.claimed_by = ${actor.id}::bigint)
+        OR (${query.view} = 'available' AND work.claimed_by IS NULL AND member.egcs_cn_group IS NOT NULL))
+        AND (work.kind <> 'intake' OR ${intakeRead})
       ORDER BY work.kind, work.id
       LIMIT ${query.limit} OFFSET ${(query.page - 1) * query.limit}
     `.execute(trx)

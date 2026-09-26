@@ -25,8 +25,13 @@ export default defineEventHandler(async event => {
           key: 'apiErrors.assignments.duplicate_user'
         })
       }
+      const existing = await trx.selectFrom('Common_Entity_Assignment').select('id')
+        .where('egcs_cn_entityid', '=', target.entityId)
+        .where('egcs_cn_entitytype', '=', target.entityType)
+        .where('_deleted', '=', false).executeTakeFirst()
       return await trx.insertInto('Common_Entity_Assignment').values({
-        egcs_cn_entityid: target.entityId, egcs_cn_entitytype: target.entityType, egcs_cn_user: body.userId, egcs_cn_createdby: actor.commonUserId
+        egcs_cn_entityid: target.entityId, egcs_cn_entitytype: target.entityType, egcs_cn_user: body.userId,
+        egcs_cn_isprimary: !existing, egcs_cn_createdby: actor.commonUserId
       }).returningAll().executeTakeFirstOrThrow()
     }, { assigneeUserId: body.userId })
   } catch (error: unknown) {

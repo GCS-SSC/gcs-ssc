@@ -27,7 +27,7 @@ export type AssignedWorkItem = BusinessRecordStateFields & {
 
 /** Claimable or claimed review and approval work projected for the home dashboard. */
 export type GroupWorkItem = {
-  kind: 'review' | 'additional_reviewer' | 'approval'
+  kind: 'review' | 'additional_reviewer' | 'approval' | 'intake'
   id: string
   entity_type: string
   entity_id: string

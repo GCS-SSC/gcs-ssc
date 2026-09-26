@@ -1,6 +1,7 @@
 import { requireAuthContext } from '~~/server/utils/authorize'
 import { requireFundingOpportunityAccess } from '~~/server/utils/funding-case-access'
 import { notFound } from '~~/server/utils/api-errors'
+import { sql } from 'kysely'
 
 export default defineEventHandler(async event => {
   await requireAuthContext(event)
@@ -10,7 +11,13 @@ export default defineEventHandler(async event => {
   const scope = await requireFundingOpportunityAccess(event, id, 'read', db)
   const opportunity = await db.selectFrom('Funding_Opportunity_Profile')
     .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Funding_Opportunity_Profile.egcs_fo_transferpaymentstream')
-    .selectAll('Funding_Opportunity_Profile')
+    .select([
+      'Funding_Opportunity_Profile.id', 'egcs_fo_transferpaymentstream',
+      sql<string>`to_char(egcs_fo_datestart, 'YYYY-MM-DD')`.as('egcs_fo_datestart'),
+      sql<string>`to_char(egcs_fo_dateend, 'YYYY-MM-DD')`.as('egcs_fo_dateend'),
+      'egcs_fo_name_en', 'egcs_fo_name_fr', 'egcs_fo_objective_en', 'egcs_fo_objective_fr',
+      'egcs_fo_applicationschema', 'egcs_fo_status', 'Funding_Opportunity_Profile._deleted'
+    ])
     .select(['Transfer_Payment_Stream.egcs_tp_name_en as stream_name_en', 'Transfer_Payment_Stream.egcs_tp_name_fr as stream_name_fr'])
     .where('Funding_Opportunity_Profile.id', '=', id).where('Funding_Opportunity_Profile._deleted', '=', false).executeTakeFirst()
   if (!opportunity) return await notFound(event, 'FUNDING_OPPORTUNITY_NOT_FOUND', 'apiErrors.admin_common.not_found')

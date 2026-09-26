@@ -14,6 +14,8 @@ import * as auditMigration from './migrations/0120_audit'
 import * as notesMigration from './migrations/0130_notes'
 import * as administrativeGroupsMigration from './migrations/0140_administrative_groups'
 import * as fundingOpportunityIntakeMigration from './migrations/0150_funding_opportunity_intake'
+import * as fundingCaseExternalContractMigration from './migrations/0160_funding_case_external_contract'
+import * as fundingCaseGroupAssignmentMigration from './migrations/0170_funding_case_group_assignment'
 
 export const productionCoreMigrations = {
   '0010_common': commonMigration,
@@ -30,7 +32,9 @@ export const productionCoreMigrations = {
   '0120_audit': auditMigration,
   '0130_notes': notesMigration,
   '0140_administrative_groups': administrativeGroupsMigration,
-  '0150_funding_opportunity_intake': fundingOpportunityIntakeMigration
+  '0150_funding_opportunity_intake': fundingOpportunityIntakeMigration,
+  '0160_funding_case_external_contract': fundingCaseExternalContractMigration,
+  '0170_funding_case_group_assignment': fundingCaseGroupAssignmentMigration
 } satisfies Record<string, Migration>
 
 export const productionCoreMigrationProvider: MigrationProvider = {

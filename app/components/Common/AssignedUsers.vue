@@ -49,8 +49,11 @@ const loadUsers = async () => {
     if (disposed || requestGeneration !== usersRequestGeneration || requestedBaseUrl !== baseUrl.value) return
     if (!canManage.value) return
     const nextUsers = await fetchUserOptions(`${requestedBaseUrl}/users`)
-    const nextGroups = entityType === 'commonreview'
-      ? await ($fetch as unknown as (url: string) => Promise<{ items: GroupOption[] }>)(`/api/reviews/${entityId}/groups`)
+    const groupUrl = entityType === 'commonreview'
+      ? `/api/reviews/${entityId}/groups`
+      : `/api/funding-case-intakes/${entityId}/groups`
+    const nextGroups = entityType === 'commonreview' || entityType === 'fundingcaseintake'
+      ? await ($fetch as unknown as (url: string) => Promise<{ items: GroupOption[] }>)(groupUrl)
       : null
     if (disposed || requestGeneration !== usersRequestGeneration || requestedBaseUrl !== baseUrl.value) return
     users.value = nextUsers
@@ -91,6 +94,7 @@ const groupOptions = computed(() => {
   }
   return options
 })
+const currentGroupLabel = computed(() => groupOptions.value.find(option => option.value === currentGroupId.value)?.label ?? t('common.none'))
 const assignmentCount = computed(() => roster.value?.assignments.length ?? 0)
 
 const runAction = async (action: () => Promise<unknown>, successMessage: string) => {
@@ -125,10 +129,11 @@ const addUser = async () => {
   )
 }
 const changeGroup = async (groupId: string | null) => {
-  if (entityType !== 'commonreview' || !canManage.value || isSaving.value || isGroupConfirming.value
+  if ((entityType !== 'commonreview' && entityType !== 'fundingcaseintake') || !canManage.value || isSaving.value || isGroupConfirming.value
+    || (entityType === 'fundingcaseintake' && !groupId && assignmentCount.value === 0)
     || groupId === currentGroupId.value || (groupId && !groups.value.some(group => group.id === groupId))) return
   const generation = targetGeneration
-  const reviewId = entityId
+  const targetId = entityId
   const name = groupOptions.value.find(option => option.value === groupId)?.label ?? ''
   isGroupConfirming.value = true
   try {
@@ -141,8 +146,9 @@ const changeGroup = async (groupId: string | null) => {
     })
     if (!confirmed || disposed || generation !== targetGeneration || !canManage.value) return
     await runAction(
-      () => ($fetch as unknown as (url: string, options: { method: 'PATCH', body: { egcs_cn_group: string | null } }) => Promise<unknown>)(
-        `/api/reviews/${reviewId}/group`, { method: 'PATCH', body: { egcs_cn_group: groupId } }
+      () => ($fetch as unknown as (url: string, options: { method: 'PATCH', body: { egcs_cn_group?: string | null, egcs_fi_group?: string | null } }) => Promise<unknown>)(
+        entityType === 'commonreview' ? `/api/reviews/${targetId}/group` : `/api/funding-case-intakes/${targetId}/group`,
+        { method: 'PATCH', body: entityType === 'commonreview' ? { egcs_cn_group: groupId } : { egcs_fi_group: groupId } }
       ),
       t('common.updated_success')
     )
@@ -296,8 +302,8 @@ const remove = async (userId: string, name: string) => {
         :disabled="!selectedUserId || isSaving || isLoadingUsers || usersError"
         @click="addUser" />
     </div>
-    <div v-if="entityType === 'commonreview' && rosterStatus === 'success'" class="flex flex-col gap-3 rounded-sm bg-slate-200/60 p-4 dark:bg-slate-700/35 sm:flex-row sm:items-end">
-      <UFormField v-if="canManage" :label="t('groups.group')" name="egcs_cn_group" class="min-w-0 flex-1">
+    <div v-if="(entityType === 'commonreview' || entityType === 'fundingcaseintake') && rosterStatus === 'success'" class="flex flex-col gap-3 rounded-sm bg-slate-200/60 p-4 dark:bg-slate-700/35 sm:flex-row sm:items-end">
+      <UFormField v-if="canManage" :label="t('groups.group')" :name="entityType === 'commonreview' ? 'egcs_cn_group' : 'egcs_fi_group'" class="min-w-0 flex-1">
         <USelectMenu
           :model-value="currentGroupId ?? undefined"
           :items="groupOptions"
@@ -311,7 +317,7 @@ const remove = async (userId: string, name: string) => {
           @update:model-value="value => changeGroup(value ?? null)" />
       </UFormField>
       <p v-else class="text-sm text-muted">
-        {{ t('groups.group') }}: {{ roster?.group?.name_en || t('common.none') }}
+        {{ t('groups.group') }}: {{ currentGroupLabel }}
       </p>
       <UButton
         v-if="canManage && currentGroupId"
@@ -319,7 +325,7 @@ const remove = async (userId: string, name: string) => {
         variant="soft"
         icon="i-lucide-x"
         :label="t('groups.clear_group')"
-        :disabled="isSaving || isGroupConfirming"
+        :disabled="isSaving || isGroupConfirming || (entityType === 'fundingcaseintake' && assignmentCount === 0)"
         class="w-full bg-amber-100 text-amber-700 ring-1 ring-inset ring-amber-300 hover:bg-amber-200 dark:bg-amber-400/10 dark:text-amber-300 dark:ring-amber-400/30 dark:hover:bg-amber-400/20 sm:w-auto sm:self-end"
         @click="changeGroup(null)" />
     </div>

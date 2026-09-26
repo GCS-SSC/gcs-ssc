@@ -5,6 +5,7 @@ import { requireFundingOpportunityAccess } from '~~/server/utils/funding-case-ac
 import { replaceFundingOpportunityLinks, validateFundingOpportunityLinks } from '~~/server/utils/funding-opportunity-links'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import type { JsonValue } from '~~/shared/types/database'
+import { sql } from 'kysely'
 
 export default defineEventHandler(async event => {
   await requireAuthContext(event)
@@ -33,6 +34,12 @@ export default defineEventHandler(async event => {
     const updated = Object.keys(fields).length
       ? await trx.updateTable('Funding_Opportunity_Profile').set({
           ...fields,
+          ...(fields.egcs_fo_datestart !== undefined
+            ? { egcs_fo_datestart: sql<Date>`${fields.egcs_fo_datestart.toISOString().slice(0, 10)}::date` }
+            : {}),
+          ...(fields.egcs_fo_dateend !== undefined
+            ? { egcs_fo_dateend: sql<Date>`${fields.egcs_fo_dateend.toISOString().slice(0, 10)}::date` }
+            : {}),
           ...(fields.egcs_fo_applicationschema !== undefined
             ? { egcs_fo_applicationschema: fields.egcs_fo_applicationschema as Record<string, JsonValue> | null }
             : {})

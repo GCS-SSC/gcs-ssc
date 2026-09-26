@@ -5,6 +5,7 @@ import { resolveAgreementStreamScopeContext } from '~~/server/utils/agreement'
 import { badRequest } from '~~/server/utils/api-errors'
 import type { JsonValue } from '~~/shared/types/database'
 import { replaceFundingOpportunityLinks, validateFundingOpportunityLinks } from '~~/server/utils/funding-opportunity-links'
+import { sql } from 'kysely'
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -28,8 +29,8 @@ export default defineEventHandler(async event => {
     }
     const opportunity = await trx.insertInto('Funding_Opportunity_Profile').values({
       egcs_fo_transferpaymentstream: streamId,
-      egcs_fo_datestart: requested.egcs_fo_datestart,
-      egcs_fo_dateend: requested.egcs_fo_dateend,
+      egcs_fo_datestart: sql<Date>`${requested.egcs_fo_datestart.toISOString().slice(0, 10)}::date`,
+      egcs_fo_dateend: sql<Date>`${requested.egcs_fo_dateend.toISOString().slice(0, 10)}::date`,
       egcs_fo_name_en: requested.egcs_fo_name_en,
       egcs_fo_name_fr: requested.egcs_fo_name_fr,
       egcs_fo_objective_en: requested.egcs_fo_objective_en,

@@ -4,6 +4,7 @@ import type { Kysely, Transaction } from 'kysely'
 import type { AuthorizationResourceOwner } from '@gcs-ssc/authorization'
 import { badRequest, notFound, throwApiError } from '~~/server/utils/api-errors'
 import { resolveAgreementScopeContext } from '~~/server/utils/agreement'
+import { resolveFundingCaseScope } from '~~/server/utils/funding-case'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
 import { requireFreshAuthContext } from '~~/server/utils/authorize'
 import {
@@ -15,6 +16,7 @@ import {
 import { executeQualifiedRuntimeTransaction, resolveQualifiedRuntimeTransactionPlan } from './qualified-runtime-transaction'
 import { lockReviewRuntimeTarget } from './review-runtime-access'
 import { getActiveStructuralRoleAssignments } from '~~/server/utils/active-user-scopes'
+import { lockTransferPaymentStreams } from '~~/server/utils/transfer-payment-stream-lock'
 import { defineUserAbilities, getUserAssignmentAgencyScopes } from '~~/server/utils/rbac'
 import type { AssignableEntityType, Database, Entity_Type } from '~~/shared/types/database'
 import { ENTITY_AUTHORIZATION_POLICIES } from '~~/shared/utils/entity-assignments'
@@ -57,6 +59,12 @@ const ownerMatches = (
   }
   if (expected.kind === 'transfer_payment_stream' && current.kind === 'transfer_payment_stream') {
     return expected.transferPaymentId === current.transferPaymentId
+      && expected.streamId === current.streamId
+  }
+  if (expected.kind === 'funding_case' && current.kind === 'funding_case') {
+    return expected.intakeId === current.intakeId
+      && expected.opportunityId === current.opportunityId
+      && expected.transferPaymentId === current.transferPaymentId
       && expected.streamId === current.streamId
   }
   return expected.kind === 'agency' && current.kind === 'agency'
@@ -205,6 +213,9 @@ const lockAndValidateAssignee = async (
         { type: 'transfer_payment_stream', id: owner.streamId }
       ]
     })
+  } else if (owner?.kind === 'funding_case') {
+    const scope = await resolveFundingCaseScope(trx, owner.intakeId)
+    eligible = Boolean(scope && abilities.authorize('funding_case', 'update', scope.scope))
   } else if (owner?.kind === 'agency') {
     eligible = abilities.authorize('agency', 'update', { type: 'agency', agencyId: owner.agencyId })
   }
@@ -320,8 +331,22 @@ export const executeEntityAssignmentManagement = async <T>(
     })
   }
 
-  // Agency and transfer-payment subjects deliberately do not support
-  // manage_assignments. Casework without an Agreement or Proponent owner must
-  // therefore remain unavailable through the generic roster mutation API.
+  if (owner.kind === 'funding_case') {
+    return await db.transaction().execute(async trx => {
+      const auth = await requireFreshAuthContext(event, trx, {
+        lockUserIds: assigneeApplicationUserId ? [assigneeApplicationUserId] : []
+      })
+      const lockedStreams = await lockTransferPaymentStreams(trx, [owner.streamId])
+      if (!lockedStreams.has(owner.streamId)) {
+        return await notFound(event, 'ASSIGNMENT_TARGET_NOT_FOUND', 'apiErrors.request.not_found')
+      }
+      if (!await canManageEntityAssignmentsWithContext(auth, trx, coreTarget.entityType, coreTarget.entityId)) {
+        return await throwApiError(event, { statusCode: 403, code: 'FORBIDDEN', key: 'apiErrors.auth.forbidden' })
+      }
+      return await executeLockedAssignmentManagement(event, trx, coreTarget, owner, callback, options)
+    })
+  }
+
+  // Agency and transfer-payment subjects deliberately do not support manage_assignments.
   return await throwApiError(event, { statusCode: 403, code: 'FORBIDDEN', key: 'apiErrors.auth.forbidden' })
 }

@@ -1,6 +1,7 @@
 import { authorize, resolveTransferPaymentVisibility } from '~~/server/utils/authorize'
 import { PaginationSchema } from '~~/shared/types/schemas'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
+import { sql } from 'kysely'
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -9,7 +10,13 @@ export default defineEventHandler(async event => {
   const rows = await db.selectFrom('Funding_Opportunity_Profile')
     .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Funding_Opportunity_Profile.egcs_fo_transferpaymentstream')
     .innerJoin('Transfer_Payment_Profile', 'Transfer_Payment_Profile.id', 'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile')
-    .selectAll('Funding_Opportunity_Profile')
+    .select([
+      'Funding_Opportunity_Profile.id', 'egcs_fo_transferpaymentstream',
+      sql<string>`to_char(egcs_fo_datestart, 'YYYY-MM-DD')`.as('egcs_fo_datestart'),
+      sql<string>`to_char(egcs_fo_dateend, 'YYYY-MM-DD')`.as('egcs_fo_dateend'),
+      'egcs_fo_name_en', 'egcs_fo_name_fr', 'egcs_fo_objective_en', 'egcs_fo_objective_fr',
+      'egcs_fo_applicationschema', 'egcs_fo_status', 'Funding_Opportunity_Profile._deleted'
+    ])
     .select(['Transfer_Payment_Profile.id as program_id', 'Transfer_Payment_Profile.egcs_tp_agency as agency_id'])
     .where('Funding_Opportunity_Profile._deleted', '=', false)
     .where('Transfer_Payment_Stream._deleted', '=', false)

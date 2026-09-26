@@ -1356,6 +1356,11 @@ export interface FundingCaseIntakeProfileTable {
   egcs_fi_fundingopportunity: string
   egcs_fi_applicantrecipient: string
   egcs_fi_status: StatusId
+  egcs_fi_group: Generated<string | null>
+  egcs_fi_groupclaimedby: Generated<string | null>
+  egcs_fi_sourcesystem: Generated<string | null>
+  egcs_fi_sourcesubmissionid: Generated<string | null>
+  egcs_fi_sourceexport: Generated<Record<string, JsonValue> | null>
   _deleted: Generated<boolean>
 }
 
