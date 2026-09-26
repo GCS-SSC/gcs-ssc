@@ -74,6 +74,10 @@ export const appRouteLocations = {
   groups: () => ({ name: 'groups' }),
   roleDetail: (id: string) => ({ name: 'roles-id', params: { id } }),
   transferPayments: () => ({ name: 'transfer-payments' }),
+  fundingOpportunities: () => ({ name: 'funding-opportunities' }),
+  fundingOpportunityDetail: (id: string) => ({ name: 'funding-opportunities-id', params: { id } }),
+  fundingCaseIntakes: () => ({ name: 'funding-case-intakes' }),
+  fundingCaseIntakeDetail: (id: string) => ({ name: 'funding-case-intakes-id', params: { id } }),
   transferPaymentDetail: (id: string) => ({ name: 'transfer-payments-id', params: { id } }),
   transferPaymentStreamDetail: (id: string, streamId: string, query?: Record<string, string>) => ({
     name: 'transfer-payments-id-streams-streamId',

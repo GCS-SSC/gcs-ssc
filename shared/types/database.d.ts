@@ -441,6 +441,10 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Transfer_Payment_Stream_Field_Section: TransferPaymentStreamFieldSectionTable
   Transfer_Payment_Stream_Field_Assignment: TransferPaymentStreamFieldAssignmentTable
   Funding_Case_Agreement_Profile: FundingCaseAgreementProfileTable
+  Funding_Opportunity_Profile: FundingOpportunityProfileTable
+  Funding_Opportunity_Review_Set: FundingOpportunityReviewSetTable
+  Funding_Opportunity_Workflow: FundingOpportunityWorkflowTable
+  Funding_Case_Intake_Profile: FundingCaseIntakeProfileTable
   Funding_Case_Agreement_Note: FundingCaseAgreementNoteTable
   Funding_Case_Agreement_Closeout: FundingCaseAgreementCloseoutTable
   Funding_Case_Agreement_Closeout_Snapshot: FundingCaseAgreementCloseoutSnapshotTable
@@ -694,7 +698,7 @@ export interface RoleTable {
 export interface RolePermissionTable {
   id: Generated<string>
   role_id: string
-  subject: 'audit' | 'system' | 'agency' | 'transfer_payment' | 'role' | 'user' | 'group' | 'agreement' | 'applicant_recipient'
+  subject: 'audit' | 'system' | 'agency' | 'transfer_payment' | 'role' | 'user' | 'group' | 'agreement' | 'applicant_recipient' | 'funding_case'
   access_level: 'viewer' | 'contributor' | 'manager' | null
   can_manage_assignments: Generated<boolean>
   _deleted: Generated<boolean>
@@ -1111,7 +1115,7 @@ export interface CommonEntityTypeTable {
   egcs_cn_standardworkflow: Generated<'explicit' | 'none'>
   egcs_cn_riskrating: Generated<'explicit' | 'none'>
   egcs_cn_supportsdirectreviews: Generated<boolean>
-  egcs_cn_ownerkind: 'agreement' | 'proponent' | 'runtime_source' | null
+  egcs_cn_ownerkind: 'agreement' | 'proponent' | 'runtime_source' | 'funding_case' | null
   egcs_cn_assignmentmode: 'independent' | 'inherited' | null
   _deleted: Generated<boolean>
 }
@@ -1314,6 +1318,44 @@ export interface FundingCaseAgreementProfileTable {
   egcs_fc_status: StatusId
   egcs_fc_authorizedassistancestartdate: Date
   egcs_fc_authorizedassistanceenddate: Date
+  _deleted: Generated<boolean>
+}
+
+export interface FundingOpportunityProfileTable {
+  id: Generated<string>
+  egcs_fo_transferpaymentstream: string
+  egcs_fo_datestart: Date
+  egcs_fo_dateend: Date
+  egcs_fo_name_en: string
+  egcs_fo_name_fr: string
+  egcs_fo_objective_en: string
+  egcs_fo_objective_fr: string
+  egcs_fo_applicationschema: Record<string, JsonValue> | null
+  egcs_fo_status: Generated<'draft' | 'open' | 'closed'>
+  _deleted: Generated<boolean>
+}
+
+export interface FundingOpportunityReviewSetTable {
+  id: Generated<string>
+  egcs_fo_fundingopportunity: string
+  egcs_fo_reviewsetsetup: string
+  _deleted: Generated<boolean>
+}
+
+export interface FundingOpportunityWorkflowTable {
+  id: Generated<string>
+  egcs_fo_fundingopportunity: string
+  egcs_fo_workflowsetup: string
+  _deleted: Generated<boolean>
+}
+
+export interface FundingCaseIntakeProfileTable {
+  id: Generated<string>
+  egcs_fi_applicationid: string
+  egcs_fi_application: Record<string, JsonValue>
+  egcs_fi_fundingopportunity: string
+  egcs_fi_applicantrecipient: string
+  egcs_fi_status: StatusId
   _deleted: Generated<boolean>
 }
 

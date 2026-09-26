@@ -13,6 +13,7 @@ import * as storageCleanupOutboxMigration from './migrations/0110_storage_cleanu
 import * as auditMigration from './migrations/0120_audit'
 import * as notesMigration from './migrations/0130_notes'
 import * as administrativeGroupsMigration from './migrations/0140_administrative_groups'
+import * as fundingOpportunityIntakeMigration from './migrations/0150_funding_opportunity_intake'
 
 export const productionCoreMigrations = {
   '0010_common': commonMigration,
@@ -28,7 +29,8 @@ export const productionCoreMigrations = {
   '0110_storage_cleanup_outbox': storageCleanupOutboxMigration,
   '0120_audit': auditMigration,
   '0130_notes': notesMigration,
-  '0140_administrative_groups': administrativeGroupsMigration
+  '0140_administrative_groups': administrativeGroupsMigration,
+  '0150_funding_opportunity_intake': fundingOpportunityIntakeMigration
 } satisfies Record<string, Migration>
 
 export const productionCoreMigrationProvider: MigrationProvider = {

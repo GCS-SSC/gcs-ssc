@@ -26,6 +26,14 @@ export type AuthorizationResourceOwner =
     transferPaymentId: string
     streamId: string
   }
+  | {
+    kind: 'funding_case'
+    agencyId: string
+    transferPaymentId: string
+    streamId: string
+    opportunityId: string
+    intakeId: string
+  }
 
 /**
  * Returns the agency boundary shared by every supported runtime owner.

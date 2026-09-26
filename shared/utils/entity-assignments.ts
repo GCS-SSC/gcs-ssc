@@ -4,10 +4,10 @@ import type { AuthorizationSubject } from './abilities'
 
 export type AssignableEntityMetadata = {
   subject: AuthorizationSubject | 'resolved_owner'
-  ownerResolver: 'applicant_recipient' | 'agreement' | 'agreement_parent' | 'agreement_claim_parent' | 'runtime_source'
+  ownerResolver: 'applicant_recipient' | 'agreement' | 'agreement_parent' | 'agreement_claim_parent' | 'runtime_source' | 'funding_case'
   ownerColumn: string | null
   assignmentRoot: 'self'
-  creationParent: 'lead_agency' | 'transfer_payment_stream' | 'agreement' | 'fundingcaseagreementclaim' | 'runtime_source'
+  creationParent: 'lead_agency' | 'transfer_payment_stream' | 'agreement' | 'fundingcaseagreementclaim' | 'runtime_source' | 'funding_opportunity'
   allowedScopes: readonly ('global' | 'agency' | 'program')[]
   table: string
   statusColumn: string | null
@@ -49,6 +49,7 @@ const agreementPolicy = { subject: 'agreement', ownerResolver: 'agreement_parent
 export const ENTITY_AUTHORIZATION_POLICIES = {
   applicantrecipient: createMetadata(proponentPolicy, null, ['Proponent', 'Bénéficiaire']),
   fundingcaseagreement: createMetadata({ ...agreementPolicy, ownerResolver: 'agreement', ownerColumn: null, creationParent: 'transfer_payment_stream', table: 'Funding_Case_Agreement_Profile' }, null, ['Agreement', 'Entente']),
+  fundingcaseintake: createMetadata({ subject: 'funding_case', ownerResolver: 'funding_case', ownerColumn: 'egcs_fi_fundingopportunity', creationParent: 'funding_opportunity', allowedScopes: ['global', 'agency', 'program'], table: 'Funding_Case_Intake_Profile', statusColumn: 'egcs_fi_status' }, null, ['Funding case intake', 'Réception du dossier de financement']),
   fundingcaseagreementcloseout: createMetadata({ ...agreementPolicy, table: 'Funding_Case_Agreement_Closeout' }, 'closeouts', ['Closeout', 'Clôture']),
   commonreview: createMetadata({ subject: 'resolved_owner', ownerResolver: 'runtime_source', ownerColumn: null, creationParent: 'runtime_source', allowedScopes: ['global', 'agency', 'program'], table: 'Common_Review', statusColumn: null }, null, ['Review', 'Examen']),
   commonrecommendation: createMetadata({ subject: 'resolved_owner', ownerResolver: 'runtime_source', ownerColumn: null, creationParent: 'runtime_source', allowedScopes: ['global', 'agency', 'program'], table: 'Common_Recommendation', statusColumn: null }, null, ['Recommendation', 'Recommandation']),
@@ -81,6 +82,7 @@ export const buildAssignedWorkRoute = (
   if (entityType === 'commonreview') return variant === 'checklist' ? `/checklists/${entityId}` : `/assessments/${entityId}`
   if (entityType === 'applicantrecipient') return `/proponents/edit/${entityId}`
   if (entityType === 'fundingcaseagreement') return `/agreements/${entityId}`
+  if (entityType === 'fundingcaseintake') return `/funding-case-intakes/${entityId}`
   if (entityType === 'commonrecommendation') return `/recommendations/${entityId}`
   if (entityType === 'fundingclaimreconcile') return `/claim-reconciliations/${entityId}`
   const segment = ENTITY_AUTHORIZATION_POLICIES[entityType].agreementRouteSegment

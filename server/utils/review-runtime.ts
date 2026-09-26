@@ -133,7 +133,11 @@ export const listEligibleRuntimeReviewSetSetupAgencyIds = async (
   setupScopes: ReviewRuntimeSetupScope[]
 ): Promise<Map<string, string>> => {
   const streamIds = setupScopes.filter(scope => scope.scopeType === 'transferpaymentstream').map(scope => scope.scopeId)
+  const opportunityId = entityType === 'fundingcaseintake'
+    ? setupScopes.find(scope => scope.scopeType === 'fundingopportunity')?.scopeId
+    : null
   if (streamIds.length === 0) return new Map()
+  if (entityType === 'fundingcaseintake' && !opportunityId) return new Map()
   const allowed = new Set(allowedAgencyIds)
   if (allowed.size === 0) return new Map()
   const rows = await db.selectFrom('Common_Review_Set_Setup')
@@ -148,8 +152,15 @@ export const listEligibleRuntimeReviewSetSetupAgencyIds = async (
     .where('Common_Publication._deleted', '=', false)
     .execute()
   const eligible = new Map<string, string>()
+  const linkedReviewIds = opportunityId
+    ? new Set((await db.selectFrom('Funding_Opportunity_Review_Set')
+        .select('egcs_fo_reviewsetsetup')
+        .where('egcs_fo_fundingopportunity', '=', opportunityId)
+        .where('_deleted', '=', false).execute()).map(link => String(link.egcs_fo_reviewsetsetup)))
+    : null
   const schemaVersions = new Map<string, ReturnType<typeof readSchemaVersion>>()
   for (const row of rows) {
+    if (linkedReviewIds && !linkedReviewIds.has(String(row.id))) continue
     const definition = readPublishedReviewSetup(row.definition)
     if (definition.directReview === false || definition.entityType !== entityType
       || definition.agencyId !== String(row.egcs_cn_agency) || !allowed.has(definition.agencyId)) continue
@@ -236,6 +247,15 @@ export const lockEligibleRuntimeReviewSetSetupSnapshot = async (
     || publication.entityType !== entityType || publication.agencyId !== ownerAgencyId
     || String(setup.egcs_cn_agency) !== ownerAgencyId) return null
   if (!allowHistoricalVersions) {
+    if (entityType === 'fundingcaseintake') {
+      const opportunityId = setupScopes.find(scope => scope.scopeType === 'fundingopportunity')?.scopeId
+      if (!opportunityId) return null
+      const opportunityLink = await db.selectFrom('Funding_Opportunity_Review_Set').select('id')
+        .where('egcs_fo_fundingopportunity', '=', opportunityId)
+        .where('egcs_fo_reviewsetsetup', '=', reviewSetSetupId)
+        .where('_deleted', '=', false).forUpdate().executeTakeFirst()
+      if (!opportunityLink) return null
+    }
     const streamIds = setupScopes.filter(scope => scope.scopeType === 'transferpaymentstream').map(scope => scope.scopeId)
     if (!streamIds.length) return null
     const link = await db.selectFrom('Transfer_Payment_Stream_Review_Set').select('id')

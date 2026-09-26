@@ -14,12 +14,14 @@ export const ROLE_ABILITY_SCOPE_MATRIX: Record<RoleAbilitySubject, readonly Role
   user: ['global', 'agency'],
   group: ['global', 'agency'],
   agreement: ['global', 'agency', 'program'],
-  applicant_recipient: ['global', 'agency']
+  applicant_recipient: ['global', 'agency'],
+  funding_case: ['global', 'agency', 'program']
 }
 
 export const ASSIGNMENT_MANAGEMENT_SUBJECTS = [
   'agreement',
-  'applicant_recipient'
+  'applicant_recipient',
+  'funding_case'
 ] as const satisfies readonly RoleAbilitySubject[]
 
 export const canSubjectManageAssignments = (subject: string): subject is (typeof ASSIGNMENT_MANAGEMENT_SUBJECTS)[number] =>

@@ -112,6 +112,17 @@ export default defineEventHandler(async event => {
       LEFT JOIN "Agency_Profile" agency ON agency.id = profile.egcs_ar_leadagency
       WHERE profile._deleted = false
       UNION ALL
+      SELECT intake.id, 'fundingcaseintake', intake.egcs_fi_status::text,
+        'Application #' || intake.egcs_fi_applicationid::text,
+        'Demande no ' || intake.egcs_fi_applicationid::text,
+        NULL::bigint, NULL::text, 'funding_case', program.egcs_tp_agency, program.id
+      FROM "Funding_Case_Intake_Profile" intake
+      JOIN "Funding_Opportunity_Profile" opportunity ON opportunity.id = intake.egcs_fi_fundingopportunity AND opportunity._deleted = false
+      JOIN "Transfer_Payment_Stream" stream ON stream.id = opportunity.egcs_fo_transferpaymentstream AND stream._deleted = false
+      JOIN "Transfer_Payment_Profile" program ON program.id = stream.egcs_tp_transferpaymentprofile AND program._deleted = false
+      JOIN "Agency_Profile" agency ON agency.id = program.egcs_tp_agency AND agency._deleted = false
+      WHERE intake._deleted = false
+      UNION ALL
       SELECT agreement.id, 'fundingcaseagreement', agreement.egcs_fc_status::text,
         agreement.egcs_fc_title_en, agreement.egcs_fc_title_fr, agreement.id, NULL::text,
         'agreement', program.egcs_tp_agency, program.id

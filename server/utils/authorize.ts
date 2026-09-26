@@ -135,6 +135,14 @@ export const authorizeFreshAssignedItem = async (
     })) return await forbidden(event)
     return
   }
+  if (owner.kind === 'funding_case') {
+    const { resolveFundingCaseScope } = await import('./funding-case')
+    const caseScope = await resolveFundingCaseScope(trx, owner.intakeId)
+    if (!caseScope || !context.userAbilities.authorize('funding_case', action, caseScope.scope)) {
+      return await forbidden(event)
+    }
+    return
+  }
   if (!context.userAbilities.authorize('agency', action, { type: 'agency', agencyId: owner.agencyId })) {
     return await forbidden(event)
   }

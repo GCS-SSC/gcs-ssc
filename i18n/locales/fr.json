@@ -1,4 +1,39 @@
 {
+  "funding_opportunity": {
+    "title": "Possibilités de financement",
+    "description": "Gérer les périodes de réception et les examens et flux de travail offerts pour chaque possibilité.",
+    "create": "Ajouter une possibilité",
+    "edit": "Modifier la possibilité",
+    "details": "Détails de la possibilité",
+    "eligibility": "Admissibilité des dossiers",
+    "eligibility_help": "Seuls les examens et flux de travail sélectionnés peuvent être lancés pour les dossiers de cette possibilité.",
+    "stream": "Volet du programme",
+    "status": "Statut",
+    "draft": "Ébauche",
+    "open": "Ouverte",
+    "closed": "Fermée",
+    "name_en": "Nom anglais",
+    "name_fr": "Nom français",
+    "objective_en": "Objectif anglais",
+    "objective_fr": "Objectif français",
+    "start_date": "Date de début",
+    "end_date": "Date de fin",
+    "review_setups": "Ensembles d’examen disponibles",
+    "workflow_setups": "Flux de travail disponibles"
+  },
+  "funding_case_intake": {
+    "title": "Réception des dossiers de financement",
+    "description": "Saisir les demandes et coordonner les examens et les flux de travail des dossiers attribués.",
+    "create": "Ajouter un dossier",
+    "edit": "Modifier le dossier",
+    "details": "Détails du dossier",
+    "opportunity": "Possibilité de financement",
+    "proponent": "Demandeur",
+    "application_id": "ID de demande",
+    "application": "Données de la demande",
+    "application_help": "Saisissez la demande sous forme d’objet JSON.",
+    "approval_submission": "Soumission pour approbation"
+  },
   "reviews": {
     "direct_review": "Disponible pour un examen direct",
     "direct_review_help": "Permettre aux utilisateurs d’ajouter cet ensemble depuis l’onglet Examens d’une entité. L’utilisation dans les flux de travail reste permise. Publiez les modifications pour appliquer ce paramètre.",
@@ -78,6 +113,8 @@
     "home": "Accueil",
     "agencies": "Agences",
     "transfer_payments": "Programmes",
+    "funding_opportunities": "Possibilités",
+    "funding_case_intakes": "Réception des dossiers",
     "agreements": "Ententes",
     "roles": "Rôles",
     "users": "Utilisateurs",
@@ -1825,6 +1862,7 @@
     }
   },
   "validation": {
+    "invalid_json": "Saisissez un objet JSON valide.",
     "note_subject_required": "Saisissez un sujet en anglais ou en français",
     "note_body_required": "Saisissez une note en anglais ou en français",
     "proponent_type_in_use": "Ce type est utilisé par un promoteur d’une entente.",

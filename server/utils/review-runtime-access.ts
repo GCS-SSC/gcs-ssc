@@ -28,6 +28,7 @@ import { canManageEntityAssignmentsWithContext } from '~~/server/utils/entity-as
 import { isBusinessStatusEntityType, isBusinessStatusLineageLocked } from '~~/server/utils/business-status-runtime'
 import { getCoreEntityDefinition, isCoreEntityType } from '~~/shared/constants/entity-registry'
 import { resolveEntityTypeLifecycleDefinition } from '~~/server/utils/entity-type-registry'
+import { resolveFundingCaseScope } from './funding-case'
 import {
   resolveExtensionLifecycleRuntimeInTransaction,
   type ResolvedExtensionLifecycleRuntime
@@ -100,6 +101,15 @@ export const resolveReviewRuntimeSetupScopes = async (
   lockRows = false
 ): Promise<ReviewRuntimeSetupScope[]> => {
   if (entityContext.setupScopes) return entityContext.setupScopes
+  if (entityContext.entityType === 'fundingcaseintake') {
+    const caseScope = await resolveFundingCaseScope(db, entityContext.entityId)
+    return caseScope
+      ? [
+          { scopeType: 'fundingopportunity', scopeId: caseScope.opportunityId },
+          { scopeType: 'transferpaymentstream', scopeId: caseScope.streamId }
+        ]
+      : []
+  }
   if (entityContext.entityType === 'applicantrecipient') {
     let linkedStreamsQuery = db
       .selectFrom('Funding_Case_Agreement_Applicant_Recipient')
@@ -537,6 +547,12 @@ const authorizeReviewRuntimeReadAccess = async (
     } else if (agreementReviewRuntimeEntityTypes.has(entityContext.entityType)) {
       await authorizeAgreementRuntimeAction(event, 'read_assessment', entityContext)
       hasInheritedOwnerRead = true
+    } else if (entityContext.entityType === 'fundingcaseintake') {
+      const caseScope = await resolveFundingCaseScope(db, entityContext.entityId)
+      if (caseScope) {
+        await authorize(event, 'funding_case', 'read', caseScope.scope)
+        hasInheritedOwnerRead = true
+      }
     } else if (extensionRuntime) {
       await authorizeExtensionOwnerAction(event, 'read', extensionRuntime)
       hasInheritedOwnerRead = true
@@ -549,6 +565,8 @@ const authorizeReviewRuntimeReadAccess = async (
       throw error
     }
   }
+
+  if (entityContext.entityType === 'fundingcaseintake' && !hasInheritedOwnerRead) return await forbidden(event)
 
   if (canReadExactRuntimeItem({
     hasInheritedOwnerRead,
@@ -717,6 +735,19 @@ export const resolveReviewRuntimeEntityFromEntity = async (
       : null
   }
 
+  if (entityType === 'fundingcaseintake') {
+    const caseScope = await resolveFundingCaseScope(db, entityId)
+    return caseScope
+      ? {
+          entityType, entityId, agreementId: null,
+          proponentAgencyContextId: null,
+          schemaAgencyId: caseScope.agencyId,
+          reviewSetId: null,
+          reviewId: null
+        }
+      : null
+  }
+
   if (entityType !== 'applicantrecipient') {
     return null
   }
@@ -798,13 +829,19 @@ export const resolveReviewRuntimeEntityFromReviewSet = async (
   if (isAgreementRuntimeEntityType(reviewSet.entity_type) && !agreementEntity) {
     return null
   }
+  const intakeEntity = reviewSet.entity_type === 'fundingcaseintake'
+    ? await resolveReviewRuntimeEntityFromEntity(db, reviewSet.entity_type, String(reviewSet.entity_id))
+    : null
+  if (reviewSet.entity_type === 'fundingcaseintake' && !intakeEntity) return null
+  if (intakeEntity && reviewSet.proponent_schema_agency
+    && String(reviewSet.proponent_schema_agency) !== intakeEntity.schemaAgencyId) return null
 
   return {
     entityType: reviewSet.entity_type,
     entityId: String(reviewSet.entity_id),
     agreementId: agreementEntity?.agreementId ?? null,
     proponentAgencyContextId: reviewSet.proponent_schema_agency ? String(reviewSet.proponent_schema_agency) : null,
-    schemaAgencyId: reviewSet.proponent_schema_agency ? String(reviewSet.proponent_schema_agency) : null,
+    schemaAgencyId: intakeEntity?.schemaAgencyId ?? (reviewSet.proponent_schema_agency ? String(reviewSet.proponent_schema_agency) : null),
     reviewSetId,
     reviewId: null
   }
@@ -891,6 +928,12 @@ export const resolveReviewRuntimeEntityFromReview = async (
   if (isAgreementRuntimeEntityType(review.entity_type) && !agreementEntity) {
     return null
   }
+  const intakeEntity = review.entity_type === 'fundingcaseintake'
+    ? await resolveReviewRuntimeEntityFromEntity(db, review.entity_type, String(review.entity_id))
+    : null
+  if (review.entity_type === 'fundingcaseintake' && !intakeEntity) return null
+  if (intakeEntity && review.schema_agency_id
+    && String(review.schema_agency_id) !== intakeEntity.schemaAgencyId) return null
 
   return {
     entityType: review.entity_type,
@@ -899,7 +942,7 @@ export const resolveReviewRuntimeEntityFromReview = async (
     proponentAgencyContextId: review.entity_type === 'applicantrecipient' && review.schema_agency_id
       ? String(review.schema_agency_id)
       : null,
-    schemaAgencyId: review.schema_agency_id ? String(review.schema_agency_id) : null,
+    schemaAgencyId: intakeEntity?.schemaAgencyId ?? (review.schema_agency_id ? String(review.schema_agency_id) : null),
     reviewSetId: String(review.review_set_id),
     reviewId
   }
@@ -992,6 +1035,10 @@ const authorizeReviewRuntimeWorkOwnerRole = async (
     }
   } else if (agreementReviewRuntimeEntityTypes.has(entityContext.entityType)) {
     await authorizeAgreementRuntimeAction(event, action, entityContext)
+  } else if (entityContext.entityType === 'fundingcaseintake') {
+    const caseScope = await resolveFundingCaseScope(event.context.$db, entityContext.entityId)
+    if (!caseScope) return await forbidden(event)
+    await authorize(event, 'funding_case', action === 'delete_assessment_child' ? 'delete' : 'update', caseScope.scope)
   } else if (extensionRuntime) {
     await authorizeExtensionOwnerRole(
       event,
@@ -1048,7 +1095,9 @@ export const authorizeReviewRuntimeAction = async (
   }
 
   if (resolvedAction === 'action_review_approval') {
-    await authorizeReviewRuntimeReadAccess(event, entityContext)
+    if (entityContext.entityType !== 'fundingcaseintake') {
+      await authorizeReviewRuntimeReadAccess(event, entityContext)
+    }
     return await authorizeAssignedApprovalAction(event, entityContext)
   }
 
@@ -1109,6 +1158,11 @@ export const lockReviewRuntimeTarget = async (
       .where('_deleted', '=', false)
       .forUpdate()
       .executeTakeFirst()
+  }
+  if (entityContext.entityType === 'fundingcaseintake') {
+    await trx.selectFrom('Funding_Case_Intake_Profile').select('id')
+      .where('id', '=', entityContext.entityId).where('_deleted', '=', false)
+      .forUpdate().executeTakeFirst()
   }
 
   let runtimeId: string | null = null

@@ -21,9 +21,10 @@ const canViewGroups = computed(() => canAny('group', 'read'))
 const canViewApplicantRecipients = computed(() => canAny('applicant_recipient', 'read'))
 const canViewAgreements = computed(() => canAny('agreement', 'read'))
 const canViewTransferPayments = computed(() => canAny('transfer_payment', 'read'))
+const canViewFundingCases = computed(() => canAny('funding_case', 'read'))
 const canViewRoles = computed(() => canAny('role', 'read'))
 const assignmentManagementSubjects = [
-  'agreement', 'applicant_recipient'
+  'agreement', 'applicant_recipient', 'funding_case'
 ] as const
 const canViewAssignmentManagement = computed(() =>
   assignmentManagementSubjects.some(subject => canManageAssignments(subject))
@@ -110,6 +111,12 @@ const items = computed(
               icon: 'i-lucide-banknote',
               to: localePath(appRouteLocations.transferPayments())
             }]
+          : []),
+        ...(canViewTransferPayments.value
+          ? [{ label: t('nav.funding_opportunities'), icon: 'i-lucide-megaphone', to: localePath(appRouteLocations.fundingOpportunities()) }]
+          : []),
+        ...(canViewFundingCases.value
+          ? [{ label: t('nav.funding_case_intakes'), icon: 'i-lucide-inbox', to: localePath(appRouteLocations.fundingCaseIntakes()) }]
           : []),
         ...(canViewAgreements.value
           ? [

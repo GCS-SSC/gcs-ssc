@@ -5,6 +5,7 @@ import type { Database } from '~~/shared/types/database'
 import type { CoreLifecycleEntityType } from '~~/shared/constants/entity-registry'
 import type { StatusId } from '~~/shared/types/status'
 import { throwApiError } from '~~/server/utils/api-errors'
+import { resolveFundingCaseScope } from './funding-case'
 
 type DbClient = Kysely<Database> | Transaction<Database>
 export type BusinessStatusMutationMode = 'ordinary' | 'workflow' | 'engine'
@@ -17,8 +18,8 @@ export type BusinessStatusCarrier = {
 
 export type LockedBusinessStatus = BusinessStatusCarrier & {
   agencyId: string
-  agreementId: string
-  authorizationRoot: { entityType: 'fundingcaseagreement', entityId: string }
+  agreementId: string | null
+  authorizationRoot: { entityType: 'fundingcaseagreement' | 'fundingcaseintake', entityId: string }
   status: {
     id: StatusId
     readOnly: boolean
@@ -50,6 +51,7 @@ type BusinessStatusRegistryEntry = {
 }
 
 export const BUSINESS_STATUS_REGISTRY = {
+  fundingcaseintake: { table: 'Funding_Case_Intake_Profile', authorizationRoot: 'self', ancestors: [] },
   fundingcaseagreement: { table: 'Funding_Case_Agreement_Profile', authorizationRoot: 'self', ancestors: [] },
   fundingcaseamendment: { table: 'Funding_Case_Agreement_Amendment', authorizationRoot: 'agreement', ancestors: ['fundingcaseagreement'] },
   fundingcaseagreementcloseout: { table: 'Funding_Case_Agreement_Closeout', authorizationRoot: 'agreement', ancestors: ['fundingcaseagreement'] },
@@ -95,6 +97,11 @@ const readCarrierStatus = async (
   entityType: CoreLifecycleEntityType,
   entityId: string
 ): Promise<StatusId | null> => {
+  if (entityType === 'fundingcaseintake') {
+    const intake = await db.selectFrom('Funding_Case_Intake_Profile').select('egcs_fi_status')
+      .where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirst()
+    return intake ? String(intake.egcs_fi_status) : null
+  }
   const statusId = entityType === 'fundingcaseagreement'
     ? (await db.selectFrom('Funding_Case_Agreement_Profile').select('egcs_fc_status').where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirst())?.egcs_fc_status
     : entityType === 'fundingcaseamendment'
@@ -141,13 +148,14 @@ export const resolveBusinessStatusProtection = async (
   }
 }
 
-type Lineage = { agreementId: string, carriers: Array<{ entityType: CoreLifecycleEntityType, entityId: string }> }
+type Lineage = { agreementId: string | null, carriers: Array<{ entityType: CoreLifecycleEntityType, entityId: string }> }
 
 const resolveLineage = async (
   db: DbClient,
   entityType: CoreLifecycleEntityType,
   entityId: string
 ): Promise<Lineage | null> => {
+  if (entityType === 'fundingcaseintake') return { agreementId: null, carriers: [{ entityType, entityId }] }
   if (entityType === 'fundingcaseagreement') return { agreementId: entityId, carriers: [{ entityType, entityId }] }
   if (entityType === 'fundingclaimreconcile') {
     const row = await db.selectFrom('Funding_Case_Agreement_Claim_Reconcile')
@@ -194,6 +202,12 @@ const lockCarrierStatus = async (
   carrier: { entityType: CoreLifecycleEntityType, entityId: string }
 ): Promise<StatusId> => {
   const entityId = carrier.entityId
+  if (carrier.entityType === 'fundingcaseintake') {
+    const intake = await trx.selectFrom('Funding_Case_Intake_Profile').select('egcs_fi_status')
+      .where('id', '=', entityId).where('_deleted', '=', false).forUpdate().executeTakeFirst()
+    if (!intake) throw new BusinessStatusViolation('BUSINESS_STATUS_NOT_FOUND', 'Funding case intake is unavailable')
+    return String(intake.egcs_fi_status)
+  }
   const row = carrier.entityType === 'fundingcaseagreement'
     ? await trx.selectFrom('Funding_Case_Agreement_Profile').select('egcs_fc_status').where('id', '=', entityId).where('_deleted', '=', false).forUpdate().executeTakeFirst()
     : carrier.entityType === 'fundingcaseamendment'
@@ -246,13 +260,16 @@ export const lockBusinessStatus = async (
 ): Promise<LockedBusinessStatus> => {
   const lineage = await resolveLineage(trx, entityType, entityId)
   if (!lineage) throw new BusinessStatusViolation('BUSINESS_STATUS_NOT_FOUND', 'Business status carrier is unavailable')
-  const agreement = await trx.selectFrom('Funding_Case_Agreement_Profile')
-    .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Funding_Case_Agreement_Profile.egcs_fc_transferpaymentstream')
-    .innerJoin('Transfer_Payment_Profile', 'Transfer_Payment_Profile.id', 'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile')
-    .select('Transfer_Payment_Profile.egcs_tp_agency as agencyId')
-    .where('Funding_Case_Agreement_Profile.id', '=', lineage.agreementId).where('Funding_Case_Agreement_Profile._deleted', '=', false).executeTakeFirst()
-  if (!agreement) throw new BusinessStatusViolation('BUSINESS_STATUS_NOT_FOUND', 'Business Agreement is unavailable')
-  const agencyId = String(agreement.agencyId)
+  const caseScope = entityType === 'fundingcaseintake' ? await resolveFundingCaseScope(trx, entityId) : null
+  const agreement = lineage.agreementId
+    ? await trx.selectFrom('Funding_Case_Agreement_Profile')
+        .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Funding_Case_Agreement_Profile.egcs_fc_transferpaymentstream')
+        .innerJoin('Transfer_Payment_Profile', 'Transfer_Payment_Profile.id', 'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile')
+        .select('Transfer_Payment_Profile.egcs_tp_agency as agencyId')
+        .where('Funding_Case_Agreement_Profile.id', '=', lineage.agreementId).where('Funding_Case_Agreement_Profile._deleted', '=', false).executeTakeFirst()
+    : null
+  if (!agreement && !caseScope) throw new BusinessStatusViolation('BUSINESS_STATUS_NOT_FOUND', 'Business owner is unavailable')
+  const agencyId = caseScope?.agencyId ?? String(agreement!.agencyId)
   const lockedCarriers: Array<BusinessStatusCarrier & { status: LockedBusinessStatus['status'], completed: boolean }> = []
   for (const carrier of lineage.carriers) {
     const statusId = await lockCarrierStatus(trx, carrier)
@@ -278,7 +295,9 @@ export const lockBusinessStatus = async (
     ...target,
     agencyId,
     agreementId: lineage.agreementId,
-    authorizationRoot: { entityType: 'fundingcaseagreement', entityId: lineage.agreementId },
+    authorizationRoot: lineage.agreementId
+      ? { entityType: 'fundingcaseagreement', entityId: lineage.agreementId }
+      : { entityType: 'fundingcaseintake', entityId },
     ancestors: lockedCarriers.slice(0, -1)
   }
 }
@@ -303,6 +322,7 @@ export const assertBusinessStatusMutationAllowed = async (
 }
 
 const updateCarrierStatus = async (trx: Transaction<Database>, entityType: CoreLifecycleEntityType, entityId: string, statusId: StatusId, terminal: boolean) => {
+  if (entityType === 'fundingcaseintake') return await trx.updateTable('Funding_Case_Intake_Profile').set({ egcs_fi_status: statusId }).where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirstOrThrow()
   if (entityType === 'fundingcaseagreement') return await trx.updateTable('Funding_Case_Agreement_Profile').set({ egcs_fc_status: statusId }).where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirstOrThrow()
   if (entityType === 'fundingcaseamendment') return await trx.updateTable('Funding_Case_Agreement_Amendment').set({ egcs_fc_status: statusId }).where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirstOrThrow()
   if (entityType === 'fundingcaseagreementcloseout') return await trx.updateTable('Funding_Case_Agreement_Closeout').set({ egcs_fc_status: statusId, ...(terminal ? { egcs_fc_isopen: false } : {}) }).where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirstOrThrow()

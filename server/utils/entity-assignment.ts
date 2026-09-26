@@ -16,6 +16,7 @@ import { resolveCompletionEvidenceId } from '~~/server/utils/completion-runtime-
 import { resolveCanonicalLifecycleIdentity } from './extension-lifecycle-identity'
 import { loadExtensionLifecycleEntity, isExtensionEnabledForAgency, isExtensionEnabledForStream } from './extensions'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+import { resolveFundingCaseScope } from './funding-case'
 
 export const createPrimaryEntityAssignment = async (
   trx: Transaction<Database>,
@@ -212,6 +213,9 @@ const resolveSourceOwner = async (
   }
   const agreementId = await resolveAgreementIdFromEntity(db, source.entityType, source.entityId)
   if (agreementId) return await resolveAgreementOwner(db, agreementId)
+  if (source.target?.entityType === 'fundingcaseintake') {
+    return await resolveEntityAssignmentOwner(db, 'fundingcaseintake', source.target.entityId)
+  }
   if (source.target && (source.target.entityType === 'commonreview' || source.target.entityType === 'commonrecommendation')) {
     const owner = await resolveEntityAssignmentOwner(db, source.target.entityType, source.target.entityId)
     return owner?.kind === 'applicant_recipient' && source.fallbackAgencyId
@@ -232,6 +236,19 @@ export const resolveEntityAssignmentOwner = async (
   if (!isPositivePostgresBigintText(entityId)) return null
   const policy = getEntityAuthorizationPolicy(entityType)
   if (policy.ownerResolver === 'applicant_recipient') return await resolveApplicantRecipientOwner(db, entityId)
+  if (policy.ownerResolver === 'funding_case') {
+    const context = await resolveFundingCaseScope(db, entityId)
+    return context
+      ? {
+          kind: 'funding_case',
+          agencyId: context.agencyId,
+          transferPaymentId: context.transferPaymentId,
+          streamId: context.streamId,
+          opportunityId: context.opportunityId,
+          intakeId: entityId
+        }
+      : null
+  }
   if (policy.ownerResolver === 'agreement') return await resolveAgreementOwner(db, entityId)
   if (policy.ownerResolver === 'runtime_source' && (entityType === 'commonreview' || entityType === 'commonrecommendation')) {
     const source = await resolveRuntimeAssignmentSource(db, entityType, entityId)
@@ -303,6 +320,13 @@ export const canAccessEntityAssignmentOwner = async (
     const agreement = await resolveAgreementScopeContext(owner.agreementId, db)
     return agreement ? await canAccessAgreement(context, action, agreement.scope, db) : false
   }
+  if (owner.kind === 'funding_case') {
+    const caseScope = await resolveFundingCaseScope(db, owner.intakeId)
+    return Boolean(caseScope && caseScope.opportunityId === owner.opportunityId
+      && caseScope.transferPaymentId === owner.transferPaymentId
+      && caseScope.agencyId === owner.agencyId
+      && context.userAbilities.authorize('funding_case', action, caseScope.scope))
+  }
   if (owner.kind === 'transfer_payment_stream') {
     return context.userAbilities.authorize('transfer_payment', action, {
       type: 'entity',
@@ -340,6 +364,10 @@ export const canManageEntityAssignmentsWithContext = async (
   if (owner.kind === 'agreement') {
     const agreement = await resolveAgreementScopeContext(owner.agreementId, db)
     return Boolean(agreement && context.userAbilities.canManageAssignments('agreement', agreement.scope))
+  }
+  if (owner.kind === 'funding_case') {
+    const caseScope = await resolveFundingCaseScope(db, owner.intakeId)
+    return Boolean(caseScope && context.userAbilities.canManageAssignments('funding_case', caseScope.scope))
   }
   return false
 }
@@ -460,7 +488,7 @@ export const resolveAgencyValidEntityAssigneeIdsWithDb = async (
   const owner = await resolveEntityAssignmentOwner(db, entityType, entityId)
   if (!owner) return new Set()
   const abilitiesByUserId = await defineUsersAbilities(applicationUsers.map(user => String(user.application_user_id)), db)
-  let subject: 'agency' | 'agreement' | 'applicant_recipient' | 'transfer_payment'
+  let subject: 'agency' | 'agreement' | 'applicant_recipient' | 'transfer_payment' | 'funding_case'
   let scope: AuthorizationScope
   if (owner.kind === 'applicant_recipient') {
     if (owner.agencyId) {
@@ -501,6 +529,11 @@ export const resolveAgencyValidEntityAssigneeIdsWithDb = async (
         { type: 'transfer_payment_stream', id: owner.streamId }
       ]
     }
+  } else if (owner.kind === 'funding_case') {
+    const caseScope = await resolveFundingCaseScope(db, owner.intakeId)
+    if (!caseScope) return new Set()
+    subject = 'funding_case'
+    scope = caseScope.scope as AuthorizationScope
   } else {
     subject = 'agency'
     scope = { type: 'agency', agencyId: owner.agencyId } as const

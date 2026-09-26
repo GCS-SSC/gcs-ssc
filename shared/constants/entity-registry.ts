@@ -3,7 +3,7 @@ export type EntityApprovalSubmissionCapability = 'explicit' | 'on_completion' | 
 export type EntityStandardWorkflowCapability = 'explicit' | 'none'
 export type EntityRiskRatingCapability = 'explicit' | 'none'
 export type EntityWorkflowPurpose = 'standard' | 'approval_submission' | 'risk_rating'
-export type EntityOwnerKind = 'agreement' | 'proponent' | 'runtime_source'
+export type EntityOwnerKind = 'agreement' | 'proponent' | 'runtime_source' | 'funding_case'
 export type EntityAssignmentMode = 'independent' | 'inherited'
 
 export interface EntityBilingualLabel {
@@ -87,10 +87,10 @@ export const CORE_ENTITY_REGISTRY = {
   },
   fundingcaseintake: {
     label: { en: 'Funding Case Intake', fr: 'Réception du dossier de financement' },
-    completion: 'none', approvalSubmission: 'none', standardWorkflow: 'none', riskRating: 'none',
+    completion: 'none', approvalSubmission: 'explicit', standardWorkflow: 'explicit', riskRating: 'none',
     supportsDirectReviews: true,
-    ownerKind: null,
-    assignmentMode: null
+    ownerKind: 'funding_case',
+    assignmentMode: 'independent'
   },
   fundingcaseagreementclaim: {
     label: { en: 'Agreement Claim', fr: 'Réclamation d’entente' },

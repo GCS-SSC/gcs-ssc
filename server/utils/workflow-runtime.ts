@@ -657,6 +657,16 @@ export const resolveActiveWorkflowSetup = async (
   const scopes = await resolveReviewRuntimeSetupScopes(db as Kysely<Database>, context, lockRows)
   const streamIds = scopes.filter(scope => scope.scopeType === 'transferpaymentstream').map(scope => scope.scopeId)
   if (streamIds.length === 0) return null
+  const opportunityId = context.entityType === 'fundingcaseintake'
+    ? scopes.find(scope => scope.scopeType === 'fundingopportunity')?.scopeId
+    : null
+  if (context.entityType === 'fundingcaseintake' && !opportunityId) return null
+  const opportunityWorkflowIds = opportunityId
+    ? (await db.selectFrom('Funding_Opportunity_Workflow').select('egcs_fo_workflowsetup')
+        .where('egcs_fo_fundingopportunity', '=', opportunityId).where('_deleted', '=', false).execute())
+        .map(row => String(row.egcs_fo_workflowsetup))
+    : null
+  if (opportunityWorkflowIds && opportunityWorkflowIds.length === 0) return null
   let query = db.selectFrom('Common_Workflow_Setup')
     .innerJoin('Transfer_Payment_Stream_Workflow', 'Transfer_Payment_Stream_Workflow.egcs_tp_workflow', 'Common_Workflow_Setup.id')
     .innerJoin('Common_Publication', 'Common_Publication.id', 'Common_Workflow_Setup.id')
@@ -672,6 +682,7 @@ export const resolveActiveWorkflowSetup = async (
     .where('Common_Workflow_Setup._deleted', '=', false)
     .where('Common_Workflow_Setup.egcs_cn_entitytype', '=', context.entityType)
     .where('Common_Workflow_Setup.egcs_cn_purpose', '=', purpose)
+    .$if(opportunityWorkflowIds !== null, qb => qb.where('Common_Workflow_Setup.id', 'in', opportunityWorkflowIds ?? []))
     .where('Common_Publication.egcs_cn_kind', '=', 'workflow_setup')
     .where('Common_Publication.egcs_cn_state', '=', 'published')
     .where('Common_Publication._deleted', '=', false)
@@ -716,6 +727,16 @@ export const resolvePublishedStandardWorkflowSetups = async (
   const scopes = await resolveReviewRuntimeSetupScopes(db as Kysely<Database>, context, lockRows)
   const streamIds = scopes.filter(scope => scope.scopeType === 'transferpaymentstream').map(scope => scope.scopeId)
   if (streamIds.length === 0) return []
+  const opportunityId = context.entityType === 'fundingcaseintake'
+    ? scopes.find(scope => scope.scopeType === 'fundingopportunity')?.scopeId
+    : null
+  if (context.entityType === 'fundingcaseintake' && !opportunityId) return []
+  const opportunityWorkflowIds = opportunityId
+    ? (await db.selectFrom('Funding_Opportunity_Workflow').select('egcs_fo_workflowsetup')
+        .where('egcs_fo_fundingopportunity', '=', opportunityId).where('_deleted', '=', false).execute())
+        .map(row => String(row.egcs_fo_workflowsetup))
+    : null
+  if (opportunityWorkflowIds && opportunityWorkflowIds.length === 0) return []
   let query = db.selectFrom('Common_Workflow_Setup')
     .innerJoin('Transfer_Payment_Stream_Workflow', 'Transfer_Payment_Stream_Workflow.egcs_tp_workflow', 'Common_Workflow_Setup.id')
     .innerJoin('Common_Publication', 'Common_Publication.id', 'Common_Workflow_Setup.id')
@@ -731,6 +752,7 @@ export const resolvePublishedStandardWorkflowSetups = async (
     .where('Common_Workflow_Setup._deleted', '=', false)
     .where('Common_Workflow_Setup.egcs_cn_entitytype', '=', context.entityType)
     .where('Common_Workflow_Setup.egcs_cn_purpose', '=', 'standard')
+    .$if(opportunityWorkflowIds !== null, qb => qb.where('Common_Workflow_Setup.id', 'in', opportunityWorkflowIds ?? []))
     .where('Transfer_Payment_Stream_Workflow.egcs_tp_transferpaymentstream', 'in', streamIds)
     .where('Transfer_Payment_Stream_Workflow._deleted', '=', false)
     .where('Common_Publication.egcs_cn_kind', '=', 'workflow_setup')

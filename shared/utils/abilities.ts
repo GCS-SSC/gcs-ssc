@@ -204,6 +204,26 @@ export const ABILITIES = [
     name_fr: 'Supprimer les ententes',
     desc_en: 'Ability to delete funding case agreements.',
     desc_fr: 'Capacite de supprimer des ententes de dossier de financement.'
+  },
+  {
+    action: 'create', subject: 'funding_case',
+    name_en: 'Create Funding Cases', name_fr: 'Créer des dossiers de financement',
+    desc_en: 'Create funding case intakes.', desc_fr: 'Créer des dossiers de réception de financement.'
+  },
+  {
+    action: 'read', subject: 'funding_case',
+    name_en: 'Read Funding Cases', name_fr: 'Lire les dossiers de financement',
+    desc_en: 'Read funding case intakes.', desc_fr: 'Lire les dossiers de réception de financement.'
+  },
+  {
+    action: 'update', subject: 'funding_case',
+    name_en: 'Update Funding Cases', name_fr: 'Modifier les dossiers de financement',
+    desc_en: 'Work on assigned funding case intakes.', desc_fr: 'Traiter les dossiers de réception attribués.'
+  },
+  {
+    action: 'delete', subject: 'funding_case',
+    name_en: 'Delete Funding Cases', name_fr: 'Supprimer les dossiers de financement',
+    desc_en: 'Delete assigned funding case intakes.', desc_fr: 'Supprimer les dossiers de réception attribués.'
   }
 ] as const
 

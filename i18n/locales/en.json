@@ -1,4 +1,39 @@
 {
+  "funding_opportunity": {
+    "title": "Funding opportunities",
+    "description": "Manage intake windows and the reviews and workflows available to each opportunity.",
+    "create": "Add opportunity",
+    "edit": "Edit opportunity",
+    "details": "Opportunity details",
+    "eligibility": "Intake eligibility",
+    "eligibility_help": "Only selected reviews and workflows can be started for cases in this opportunity.",
+    "stream": "Program stream",
+    "status": "Status",
+    "draft": "Draft",
+    "open": "Open",
+    "closed": "Closed",
+    "name_en": "English name",
+    "name_fr": "French name",
+    "objective_en": "English objective",
+    "objective_fr": "French objective",
+    "start_date": "Start date",
+    "end_date": "End date",
+    "review_setups": "Available review sets",
+    "workflow_setups": "Available workflows"
+  },
+  "funding_case_intake": {
+    "title": "Funding case intakes",
+    "description": "Capture applications and coordinate assigned case reviews and workflows.",
+    "create": "Add intake",
+    "edit": "Edit intake",
+    "details": "Intake details",
+    "opportunity": "Funding opportunity",
+    "proponent": "Proponent",
+    "application_id": "Application ID",
+    "application": "Application data",
+    "application_help": "Enter the application as a JSON object.",
+    "approval_submission": "Approval submission"
+  },
   "reviews": {
     "direct_review": "Available for direct review",
     "direct_review_help": "Allow users to add this review set from an entity’s Reviews tab. Workflow use is always allowed. Publish changes to apply this setting.",
@@ -78,6 +113,8 @@
     "home": "Home",
     "agencies": "Agencies",
     "transfer_payments": "Programs",
+    "funding_opportunities": "Opportunities",
+    "funding_case_intakes": "Case intakes",
     "agreements": "Agreements",
     "roles": "Roles",
     "users": "Users",
@@ -1825,6 +1862,7 @@
     }
   },
   "validation": {
+    "invalid_json": "Enter a valid JSON object.",
     "note_subject_required": "Enter a subject in English or French",
     "note_body_required": "Enter a note in English or French",
     "proponent_type_in_use": "This type is used by an agreement proponent.",

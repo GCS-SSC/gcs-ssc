@@ -126,7 +126,7 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
         AND (egcs_cn_riskrating = 'none' OR egcs_cn_type = 'fundingcaseagreement')
       ),
       CONSTRAINT cn_chk_entitytypeowner CHECK (
-        (egcs_cn_ownerkind IS NULL OR egcs_cn_ownerkind IN ('agreement', 'proponent', 'runtime_source'))
+        (egcs_cn_ownerkind IS NULL OR egcs_cn_ownerkind IN ('agreement', 'proponent', 'runtime_source', 'funding_case'))
         AND (egcs_cn_assignmentmode IS NULL OR egcs_cn_assignmentmode IN ('independent', 'inherited'))
       ),
       CONSTRAINT cn_chk_entitytypenotdeleted CHECK (_deleted = false)

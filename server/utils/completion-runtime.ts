@@ -116,6 +116,9 @@ export const resolveCompletionRuntimeEntityFromEntity = async (
   entityType: Entity_Type,
   entityId: string
 ): Promise<ReviewRuntimeEntityContext | null> => {
+  if (entityType === 'fundingcaseintake') {
+    return await resolveReviewRuntimeEntityFromEntity(db, entityType, entityId)
+  }
   if (entityType === 'commonreview') {
     return await resolveReviewRuntimeEntityFromReview(db, entityId)
   }
