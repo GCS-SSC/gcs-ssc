@@ -61,6 +61,14 @@ export const createExternalFundingCaseIntake = async (
     .where('id', '=', opportunityId).where('_deleted', '=', false)
     .forUpdate().executeTakeFirst()
   if (!opportunity) return { status: 'opportunity_unavailable' }
+  // Opportunity PATCH holds this row lock while changing selected Streams. Recheck
+  // after acquiring it so a route Stream removed by a concurrent PATCH cannot import.
+  const lockedScope = await resolveFundingOpportunityScope(trx, opportunityId)
+  if (!lockedScope || (routeScope.agencyId && routeScope.agencyId !== lockedScope.agencyId)
+    || (routeScope.streamId && !lockedScope.streamIds.includes(routeScope.streamId))) {
+    return { status: 'opportunity_unavailable' }
+  }
+  if (!auth.userAbilities.authorize('funding_case', 'create', lockedScope.scope)) denied()
 
   // Once the portal has the host ID, it is authoritative for retries. Never create
   // a new Intake in response to a stale or incorrectly paired receipt.
@@ -109,10 +117,10 @@ export const createExternalFundingCaseIntake = async (
   const occupied = await trx.selectFrom('Funding_Case_Intake_Profile').select('id')
     .where('egcs_fi_applicationid', '=', applicationId).where('_deleted', '=', false).executeTakeFirst()
   if (occupied) return { status: 'application_id_conflict' }
-  if (!await lockAssignableGroup(trx, groupId, scope.agencyId)) return { status: 'group_unavailable' }
+  if (!await lockAssignableGroup(trx, groupId, lockedScope.agencyId)) return { status: 'group_unavailable' }
   let draftStatusId: string
   try {
-    draftStatusId = await lockAgencyDraftStatus(trx, scope.agencyId)
+    draftStatusId = await lockAgencyDraftStatus(trx, lockedScope.agencyId)
   } catch (error: unknown) {
     if (error instanceof BusinessStatusViolation && error.code === 'BUSINESS_STATUS_NOT_FOUND') {
       return { status: 'draft_status_unavailable' }

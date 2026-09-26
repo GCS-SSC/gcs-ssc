@@ -100,8 +100,20 @@ export const resolveReviewRuntimeSetupScopes = async (
   entityContext: ReviewRuntimeEntityContext,
   lockRows = false
 ): Promise<ReviewRuntimeSetupScope[]> => {
-  if (entityContext.setupScopes) return entityContext.setupScopes
   if (entityContext.entityType === 'fundingcaseintake') {
+    if (lockRows) {
+      const intake = await db.selectFrom('Funding_Case_Intake_Profile')
+        .select('egcs_fi_fundingopportunity')
+        .where('id', '=', entityContext.entityId).where('_deleted', '=', false)
+        .executeTakeFirst()
+      if (!intake) return []
+      // Opportunity PATCH takes FOR UPDATE on this row before changing its Stream and
+      // setup links. Hold a compatible read lock through review/workflow materialization.
+      const opportunity = await db.selectFrom('Funding_Opportunity_Profile').select('id')
+        .where('id', '=', String(intake.egcs_fi_fundingopportunity)).where('_deleted', '=', false)
+        .forShare().executeTakeFirst()
+      if (!opportunity) return []
+    }
     const caseScope = await resolveFundingCaseScope(db, entityContext.entityId)
     return caseScope
       ? [
@@ -110,6 +122,7 @@ export const resolveReviewRuntimeSetupScopes = async (
         ]
       : []
   }
+  if (entityContext.setupScopes) return entityContext.setupScopes
   if (entityContext.entityType === 'applicantrecipient') {
     let linkedStreamsQuery = db
       .selectFrom('Funding_Case_Agreement_Applicant_Recipient')

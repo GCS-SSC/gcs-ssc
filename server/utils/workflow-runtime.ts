@@ -1086,6 +1086,14 @@ const startWorkflowUnchecked = async (
   if (completionId && (purpose !== 'approval_submission' || entityDefinition.approvalSubmission !== 'on_completion')) {
     return null
   }
+  const selectedIntakeSetup = selectedSetup && context.entityType === 'fundingcaseintake' && !retry
+    ? purpose === 'standard'
+      ? (await resolvePublishedStandardWorkflowSetups(trx, context, String(selectedSetup.id), true))[0]
+      : await resolveActiveWorkflowSetup(trx, context, purpose, true)
+    : null
+  if (selectedSetup && context.entityType === 'fundingcaseintake' && !retry
+    && (!selectedIntakeSetup || String(selectedIntakeSetup.id) !== String(selectedSetup.id)
+      || selectedIntakeSetup.publicationVersionId !== selectedSetup.publicationVersionId)) return null
   const setup = selectedSetup ?? (retry
     ? await resolveRetryableWorkflowSetup(trx, context, retryRuntimeId, true, purpose)
     : purpose === 'standard'
