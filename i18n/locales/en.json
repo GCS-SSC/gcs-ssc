@@ -26,7 +26,8 @@
     "workflow_setups": "Available workflows"
   },
   "funding_case_intake": {
-    "title": "Funding case intakes",
+    "title": "Intakes",
+    "singular": "Intake",
     "description": "Capture applications and coordinate assigned case reviews and workflows.",
     "create": "Add intake",
     "edit": "Edit intake",
@@ -36,7 +37,8 @@
     "proponent": "Proponent",
     "application_id": "Application ID",
     "application": "Application data",
-    "application_help": "Enter the application as a JSON object.",
+    "attachment_upload_failed": "The intake was saved, but an attachment could not be uploaded. Retry to finish adding attachments.",
+    "select_opportunity_first": "Select a funding opportunity first",
     "approval_submission": "Approval submission"
   },
   "reviews": {
@@ -119,7 +121,7 @@
     "agencies": "Agencies",
     "transfer_payments": "Programs",
     "funding_opportunities": "Opportunities",
-    "funding_case_intakes": "Case intakes",
+    "funding_case_intakes": "Intakes",
     "agreements": "Agreements",
     "roles": "Roles",
     "users": "Users",
@@ -493,7 +495,7 @@
       "transferpaymentstream": "Transfer Payment Stream",
       "commonreview": "Common Review",
       "commonrecommendation": "Common Recommendation",
-      "fundingcaseintake": "Funding Case Intake",
+      "fundingcaseintake": "Intake",
       "fundingcaseamendment": "Funding Case Amendment",
       "fundingcasemonitor": "Funding Case Monitor",
       "fundingclaimreconcile": "Funding Claim Reconciliation",
@@ -507,7 +509,7 @@
       "agency": "Agency",
       "program": "Program",
       "fundingopportunity": "Funding Opportunity",
-      "fundingcaseintake": "Funding Case Intake",
+      "fundingcaseintake": "Intake",
       "fundingcaseagreement": "Funding Case Agreement",
       "applicantrecipient": "Proponent",
       "transferpaymentstream": "Transfer Payment Stream"
@@ -542,7 +544,7 @@
       "fundingcasepayment": "Funding Case Payment"
     },
     "decision_type": {
-      "fundingcaseintakeassessment": "Funding Case Intake Assessment"
+      "fundingcaseintakeassessment": "Intake Assessment"
     },
     "amended_type": {
       "articles": "Articles",
@@ -729,7 +731,7 @@
       "user": "Users",
       "group": "Groups",
       "agreement": "Agreements",
-      "funding_case": "Funding case intakes",
+      "funding_case": "Intakes",
       "applicant_recipient": "Proponents"
     },
     "unknown_ability": "Unknown ability ({action}:{subject})",

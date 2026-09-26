@@ -7,7 +7,6 @@ import { canAccessApplicantRecipient } from '~~/server/utils/applicant-recipient
 import { lockAgencyDraftStatus } from '~~/server/utils/business-status-runtime'
 import { createPrimaryEntityAssignment, resolveAssignmentCommonUserId } from '~~/server/utils/entity-assignment'
 import { badRequest, forbidden } from '~~/server/utils/api-errors'
-import type { JsonValue } from '~~/shared/types/database'
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -34,6 +33,12 @@ export default defineEventHandler(async event => {
     if (!opportunity || opportunity.egcs_fo_status !== 'open') {
       return await badRequest(event, 'FUNDING_OPPORTUNITY_CLOSED', 'apiErrors.request.invalid_status')
     }
+    const lockedScope = await resolveFundingOpportunityScope(trx, opportunityId)
+    if (!lockedScope || lockedScope.agencyId !== opportunityScope.agencyId
+      || lockedScope.transferPaymentId !== opportunityScope.transferPaymentId) {
+      return await badRequest(event, 'FUNDING_OPPORTUNITY_CHANGED', 'apiErrors.request.invalid')
+    }
+    await authorizeWithFreshAuthContext(event, auth, 'funding_case', 'create', lockedScope.scope)
     const proponentId = String(requested.egcs_fi_applicantrecipient)
     const proponent = await trx.selectFrom('Applicant_Recipient_Profile').select('id')
       .where('id', '=', proponentId).where('_deleted', '=', false)
@@ -43,10 +48,10 @@ export default defineEventHandler(async event => {
     }
     const actorId = await resolveAssignmentCommonUserId(trx, auth.userId)
     if (!actorId) return await forbidden(event)
-    const statusId = await lockAgencyDraftStatus(trx, currentScope.agencyId)
+    const statusId = await lockAgencyDraftStatus(trx, lockedScope.agencyId)
     const intake = await trx.insertInto('Funding_Case_Intake_Profile').values({
       egcs_fi_applicationid: String(requested.egcs_fi_applicationid),
-      egcs_fi_application: requested.egcs_fi_application as Record<string, JsonValue>,
+      egcs_fi_application: {},
       egcs_fi_fundingopportunity: opportunityId,
       egcs_fi_applicantrecipient: proponentId,
       egcs_fi_status: statusId

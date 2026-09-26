@@ -47,7 +47,10 @@ export const FundingCaseIntakeBaseSchema = z.object({
   egcs_fi_fundingopportunity: PositivePostgresBigintIdSchema,
   egcs_fi_applicantrecipient: PositivePostgresBigintIdSchema
 })
-export const FundingCaseIntakeCreateSchema = FundingCaseIntakeBaseSchema
+/** Manual creation records its application evidence internally; portal imports have a separate contract. */
+export const FundingCaseIntakeCreateSchema = FundingCaseIntakeBaseSchema.omit({
+  egcs_fi_application: true
+}).strict()
 export const FundingCaseIntakePatchSchema = FundingCaseIntakeBaseSchema.pick({
   egcs_fi_application: true
 }).partial()

@@ -1,15 +1,11 @@
 <script setup lang="ts">
 import { appRouteLocations } from '~/utils/route-locations'
-import { getClientRequestUrl } from '~/utils/client-request-url'
-import { throwFetchResponseError } from '~/utils/fetch-error'
-import type { IntakeForm } from '~/components/FundingCaseIntake/IntakeModal.vue'
-import type { JsonValue } from '~~/shared/types/database'
 
 definePageMeta({ i18n: { paths: { en: '/funding-case-intakes/[id]', fr: '/dossiers-de-financement/[id]' } } })
 
 type Intake = {
   id: string; egcs_fi_applicationid: string; egcs_fi_fundingopportunity: string
-  egcs_fi_applicantrecipient: string; egcs_fi_application: Record<string, JsonValue>
+  egcs_fi_applicantrecipient: string
   egcs_fi_status: string; agency_id: string; program_id: string
   opportunity_name_en: string; opportunity_name_fr: string
   proponent_name_en: string | null; proponent_name_fr: string | null
@@ -27,9 +23,10 @@ const { isStatusLocked } = useBusinessStatusState()
 const { data: profile, error, status, refresh } = await useFetch<Intake, Error, string>(`/api/funding-case-intakes/${id}`)
 const { isAssigned } = useEntityAssignmentRoster('fundingcaseintake', id)
 const isHeroCollapsed = getHeroCollapsed('funding-case-intake-detail')
-const selectedTab = ref('general')
+const selectedTab = ref(route.query.tab === 'attachments' ? 'attachments' : 'general')
 const tabs = computed(() => [
   { key: 'funding_case_intake.details', value: 'general', icon: 'i-lucide-file-text' },
+  { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
   { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-list-checks' },
   { key: 'workflow.title', value: 'workflows', icon: 'i-lucide-workflow' },
   { key: 'funding_case_intake.approval_submission', value: 'approval', icon: 'i-lucide-send' },
@@ -42,37 +39,6 @@ const scope = computed(() => profile.value && ({
 const isLocked = computed(() => isStatusLocked(profile.value?.egcs_fi_status))
 const canEdit = computed(() => Boolean(scope.value && isAssigned.value && !isLocked.value && can('funding_case', 'update', scope.value)))
 const canDelete = computed(() => Boolean(scope.value && isAssigned.value && !isLocked.value && can('funding_case', 'delete', scope.value)))
-const modalOpen = ref(false)
-const pending = ref(false)
-const form = ref<IntakeForm>({ egcs_fi_application: '{}' })
-/**
- *
- */
-const edit = () => {
-  if (!profile.value) return
-  form.value = { ...profile.value, egcs_fi_application: JSON.stringify(profile.value.egcs_fi_application, null, 2) }
-  modalOpen.value = true
-}
-/**
- *
- */
-const submit = async () => {
-  if (pending.value || !profile.value) return
-  pending.value = true
-  try {
-    const response = await fetch(getClientRequestUrl(`/api/funding-case-intakes/${id}`), {
-      method: 'PATCH', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ egcs_fi_application: JSON.parse(form.value.egcs_fi_application) })
-    })
-    if (!response.ok) await throwFetchResponseError(response)
-    modalOpen.value = false
-    await refresh()
-  } catch (cause: unknown) {
-    showError(cause)
-  } finally {
-    pending.value = false
-  }
-}
 /**
  *
  */
@@ -115,13 +81,18 @@ const breadcrumbs = computed(() => [
         </template>
       </UAlert>
       <div v-else-if="profile" class="flex flex-1 flex-col">
-        <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-inbox" :title="`${t('funding_case_intake.application_id')} ${profile.egcs_fi_applicationid}`" :meta-items="[`${t('funding_case_intake.opportunity')}: ${getBilingualValue(profile, 'opportunity_name', profile.egcs_fi_fundingopportunity)}`, `${t('funding_case_intake.proponent')}: ${getBilingualValue(profile, 'proponent_name', profile.egcs_fi_applicantrecipient)}`]" :badges="[{ statusId: profile.egcs_fi_status }]" :actions="[{ label: t('common.edit'), icon: 'i-lucide-edit-3', visible: canEdit, onClick: edit }, { label: t('common.delete'), icon: 'i-lucide-trash', visible: canDelete, onClick: remove }]" />
+        <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-inbox" :title="`${t('funding_case_intake.singular')} ${profile.egcs_fi_applicationid}`" :meta-items="[`${t('funding_case_intake.opportunity')}: ${getBilingualValue(profile, 'opportunity_name', profile.egcs_fi_fundingopportunity)}`, `${t('funding_case_intake.proponent')}: ${getBilingualValue(profile, 'proponent_name', profile.egcs_fi_applicantrecipient)}`]" :badges="[{ statusId: profile.egcs_fi_status }]" :actions="[{ label: t('common.delete'), icon: 'i-lucide-trash', visible: canDelete, onClick: remove }]" />
         <CommonEntityEditorWorkspace content-test-id="funding-case-intake-detail-content">
           <template #sidebar>
             <CommonRouteTabs v-model="selectedTab" :items="tabs" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
           </template>
           <CommonSection v-if="selectedTab === 'general'" :title="t('funding_case_intake.details')" :grid-cols="1">
             <dl class="grid gap-4 md:grid-cols-2">
+              <div>
+                <dt class="text-sm text-muted">
+                  {{ t('funding_case_intake.application_id') }}
+                </dt><dd>{{ profile.egcs_fi_applicationid }}</dd>
+              </div>
               <div>
                 <dt class="text-sm text-muted">
                   {{ t('funding_case_intake.opportunity') }}
@@ -133,15 +104,14 @@ const breadcrumbs = computed(() => [
                 </dt><dd>{{ getBilingualValue(profile, 'proponent_name', profile.egcs_fi_applicantrecipient) }}</dd>
               </div>
             </dl>
-            <pre class="mt-5 overflow-auto rounded-md bg-muted p-4 text-sm">{{ JSON.stringify(profile.egcs_fi_application, null, 2) }}</pre>
           </CommonSection>
+          <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcaseintake" :entity-id="id" />
           <CommonReviewsTab v-else-if="selectedTab === 'reviews'" entity-type="fundingcaseintake" :entity-id="id" :can-update="canEdit" @changed="refresh" />
           <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcaseintake" :entity-id="id" purpose="standard" :can-edit="canEdit" @changed="refresh" />
           <CommonWorkflowSection v-else-if="selectedTab === 'approval'" entity-type="fundingcaseintake" :entity-id="id" purpose="approval_submission" :can-edit="canEdit" @changed="refresh" />
           <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" entity-type="fundingcaseintake" :entity-id="id" />
         </CommonEntityEditorWorkspace>
       </div>
-      <FundingCaseIntakeModal v-model:open="modalOpen" v-model:state="form" :pending="pending" @submit="submit" />
     </template>
   </UDashboardPanel>
 </template>

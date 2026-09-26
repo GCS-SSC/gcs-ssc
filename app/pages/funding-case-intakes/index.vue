@@ -32,15 +32,16 @@ const columns: TableColumnInput<Row>[] = [
 ]
 const modalOpen = ref(false)
 const pending = ref(false)
-const form = ref<IntakeForm>({ egcs_fi_applicationid: '', egcs_fi_application: '{}' })
+const toast = useToast()
+const form = ref<IntakeForm>({ egcs_fi_applicationid: '', attachments: [] })
 /**
  *
  */
 const openCreate = () => {
   form.value = {
     egcs_fi_applicationid: '',
-    egcs_fi_application: '{}',
-    egcs_fi_fundingopportunity: typeof route.query.opportunity_id === 'string' ? route.query.opportunity_id : undefined
+    egcs_fi_fundingopportunity: typeof route.query.opportunity_id === 'string' ? route.query.opportunity_id : undefined,
+    attachments: []
   }
   modalOpen.value = true
 }
@@ -53,17 +54,53 @@ watch([() => route.query.opportunity_id, canCreate], ([value, allowed]) => {
 const submit = async () => {
   if (pending.value) return
   pending.value = true
+  let createdId: string | undefined
   try {
     const response = await fetch(getClientRequestUrl('/api/funding-case-intakes'), {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ...form.value, egcs_fi_application: JSON.parse(form.value.egcs_fi_application) })
+      body: JSON.stringify({
+        egcs_fi_applicationid: form.value.egcs_fi_applicationid,
+        egcs_fi_fundingopportunity: form.value.egcs_fi_fundingopportunity,
+        egcs_fi_applicantrecipient: form.value.egcs_fi_applicantrecipient
+      })
     })
     if (!response.ok) await throwFetchResponseError(response)
     const created = await response.json() as { id: string }
+    createdId = String(created.id)
+    let uploadError: unknown
+    for (const draft of form.value.attachments) {
+      const body = new FormData()
+      body.set('file', draft.file)
+      body.set('attachmentTypeId', draft.attachmentTypeId ?? '')
+      body.set('nameEn', draft.nameEn)
+      body.set('nameFr', draft.nameFr)
+      body.set('descriptionEn', draft.descriptionEn)
+      body.set('descriptionFr', draft.descriptionFr)
+      body.set('providerMetadata', JSON.stringify(draft.providerMetadata))
+      try {
+        const upload = await fetch(getClientRequestUrl(`/api/attachments/fundingcaseintake/${createdId}`), {
+          method: 'POST', body
+        })
+        if (!upload.ok) await throwFetchResponseError(upload)
+      } catch (error) {
+        uploadError = error
+        break
+      }
+    }
     modalOpen.value = false
     await refresh()
-    await navigateTo(localePath(appRouteLocations.fundingCaseIntakeDetail(String(created.id))))
+    await navigateTo(localePath({
+      ...appRouteLocations.fundingCaseIntakeDetail(createdId),
+      ...(form.value.attachments.length ? { query: { tab: 'attachments' } } : {})
+    }))
+    if (uploadError) {
+      toast.add({ title: t('funding_case_intake.attachment_upload_failed'), color: 'error' })
+    }
   } catch (error: unknown) {
+    if (createdId) {
+      modalOpen.value = false
+      await navigateTo(localePath({ ...appRouteLocations.fundingCaseIntakeDetail(createdId), query: { tab: 'attachments' } }))
+    }
     showError(error)
   } finally {
     pending.value = false

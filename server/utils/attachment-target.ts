@@ -7,16 +7,19 @@ import type { Database } from '~~/shared/types/database'
 import type { AttachmentTarget, AttachmentTargetEntityType } from '~~/shared/types/schemas'
 import { notFound, forbidden } from './api-errors'
 import { resolveEntityAssignmentOwner } from './entity-assignment'
-import { authorizeAssignedTarget, requireAuthContext, requireFreshAuthContext, type AuthContext } from './authorize'
+import { authorizeAssignedTarget, authorizeFreshAssignedItem, requireAuthContext, requireFreshAuthContext, type AuthContext } from './authorize'
 import { resolveAgreementScopeContext, type AgreementScopeContext } from './agreement'
 import { executeFreshAuthorizedAgreementWrite } from './agreement-write-transaction'
 import { canAccessApplicantRecipient, executeFreshAuthorizedApplicantRecipientWrite, lockActiveApplicantRecipientIds } from './applicant-recipient-auth'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+import { resolveFundingCaseScope, type FundingOpportunityScope } from './funding-case'
+import { assertBusinessStatusMutationAllowed } from './business-status-runtime'
 
 export interface ResolvedAttachmentTarget {
   target: AttachmentTarget
   agencyId: string
   agreementContext?: AgreementScopeContext
+  fundingCaseScope?: FundingOpportunityScope
 }
 
 export const resolveAttachmentTarget = async (
@@ -31,6 +34,10 @@ export const resolveAttachmentTarget = async (
     const agency = await db.selectFrom('Agency_Profile').select('id')
       .where('id', '=', selectedAgencyId).where('_deleted', '=', false).executeTakeFirst()
     return agency ? { target, agencyId: selectedAgencyId } : null
+  }
+  if (owner.kind === 'funding_case' && target.entityType === 'fundingcaseintake') {
+    const fundingCaseScope = await resolveFundingCaseScope(db, target.entityId)
+    return fundingCaseScope ? { target, agencyId: fundingCaseScope.agencyId, fundingCaseScope } : null
   }
   if (owner.kind !== 'agreement') return null
   const agreementContext = await resolveAgreementScopeContext(owner.agreementId, db)
@@ -48,11 +55,13 @@ export const authorizeAttachmentTarget = async (
   const resolved = await resolveAttachmentTarget(event.context.$db, target,
     typeof selectedAgencyId === 'string' ? selectedAgencyId : undefined)
   if (!resolved) return await notFound(event, 'ATTACHMENT_TARGET_NOT_FOUND', 'apiErrors.attachments.target_not_found')
-  const permitted = resolved.agreementContext
-    ? auth.userAbilities.authorize('agreement', action, resolved.agreementContext.scope)
-    : await canAccessApplicantRecipient(auth, target.entityId, action, event.context.$db)
-      && auth.userAbilities.authorize('applicant_recipient', action,
-        { type: 'agency', agencyId: resolved.agencyId })
+  const permitted = resolved.fundingCaseScope
+    ? auth.userAbilities.authorize('funding_case', action, resolved.fundingCaseScope.scope)
+    : resolved.agreementContext
+      ? auth.userAbilities.authorize('agreement', action, resolved.agreementContext.scope)
+      : await canAccessApplicantRecipient(auth, target.entityId, action, event.context.$db)
+        && auth.userAbilities.authorize('applicant_recipient', action,
+          { type: 'agency', agencyId: resolved.agencyId })
   if (!permitted) return await forbidden(event)
   if (action !== 'read') await authorizeAssignedTarget(event, target)
   return { auth, resolved }
@@ -69,11 +78,13 @@ export const authorizeFreshAttachmentTarget = async (
   const resolved = await resolveAttachmentTarget(db, target,
     typeof selectedAgencyId === 'string' ? selectedAgencyId : undefined)
   if (!resolved) return await notFound(event, 'ATTACHMENT_TARGET_NOT_FOUND', 'apiErrors.attachments.target_not_found')
-  const permitted = resolved.agreementContext
-    ? auth.userAbilities.authorize('agreement', action, resolved.agreementContext.scope)
-    : await canAccessApplicantRecipient(auth, target.entityId, action, db)
-      && auth.userAbilities.authorize('applicant_recipient', action,
-        { type: 'agency', agencyId: resolved.agencyId })
+  const permitted = resolved.fundingCaseScope
+    ? auth.userAbilities.authorize('funding_case', action, resolved.fundingCaseScope.scope)
+    : resolved.agreementContext
+      ? auth.userAbilities.authorize('agreement', action, resolved.agreementContext.scope)
+      : await canAccessApplicantRecipient(auth, target.entityId, action, db)
+        && auth.userAbilities.authorize('applicant_recipient', action,
+          { type: 'agency', agencyId: resolved.agencyId })
   if (!permitted) return await forbidden(event)
   return { auth, resolved }
 }
@@ -111,6 +122,34 @@ export const executeFreshAuthorizedAttachmentWrite = async <T>(
         return await callback(trx, auth, fresh)
       }
     )
+  }
+
+  if (target.entityType === 'fundingcaseintake') {
+    const initialCaseScope = initial.fundingCaseScope
+    if (!initialCaseScope) return await forbidden(event)
+    return await event.context.$db.transaction().execute(async trx => {
+      const auth = await requireFreshAuthContext(event, trx)
+      const opportunity = await trx.selectFrom('Funding_Opportunity_Profile').select('id')
+        .where('id', '=', initialCaseScope.opportunityId).where('_deleted', '=', false)
+        .forShare().executeTakeFirst()
+      if (!opportunity) return await notFound(event, 'ATTACHMENT_TARGET_NOT_FOUND', 'apiErrors.attachments.target_not_found')
+      const intake = await trx.selectFrom('Funding_Case_Intake_Profile')
+        .select('egcs_fi_fundingopportunity')
+        .where('id', '=', target.entityId).where('_deleted', '=', false)
+        .forUpdate().executeTakeFirst()
+      if (!intake || String(intake.egcs_fi_fundingopportunity) !== initialCaseScope.opportunityId) {
+        return await notFound(event, 'ATTACHMENT_TARGET_NOT_FOUND', 'apiErrors.attachments.target_not_found')
+      }
+      const fresh = await resolveAttachmentTarget(trx, target)
+      if (!fresh?.fundingCaseScope || fresh.agencyId !== initial.agencyId
+        || fresh.fundingCaseScope.transferPaymentId !== initialCaseScope.transferPaymentId) {
+        return await notFound(event, 'ATTACHMENT_TARGET_NOT_FOUND', 'apiErrors.attachments.target_not_found')
+      }
+      if (!auth.userAbilities.authorize('funding_case', action, fresh.fundingCaseScope.scope)) return await forbidden(event)
+      await authorizeFreshAssignedItem(event, trx, auth, 'fundingcaseintake', target.entityId, action)
+      await assertBusinessStatusMutationAllowed(event, trx, 'fundingcaseintake', target.entityId)
+      return await callback(trx, auth, fresh)
+    })
   }
 
   if (!initial.agreementContext) return await forbidden(event)

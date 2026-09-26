@@ -66,8 +66,11 @@ export default defineEventHandler(async event => {
     base.clearSelect().select(sql<number>`count(*)::int`.as('count')).executeTakeFirstOrThrow()
   ])
 
-  const scope = resolved.agreementContext?.scope ?? { type: 'agency' as const, agencyId: resolved.agencyId }
-  const subject = target.entityType === 'applicantrecipient' ? 'applicant_recipient' : 'agreement'
+  const scope = resolved.fundingCaseScope?.scope ?? resolved.agreementContext?.scope
+    ?? { type: 'agency' as const, agencyId: resolved.agencyId }
+  const subject = target.entityType === 'applicantrecipient'
+    ? 'applicant_recipient'
+    : target.entityType === 'fundingcaseintake' ? 'funding_case' : 'agreement'
   const [grant, targetWorkable] = await Promise.all([
     resolveAssignedItemTargetGrant(auth.userId, target, db),
     isEntityAssignmentRosterWorkable(db, target.entityType, target.entityId)

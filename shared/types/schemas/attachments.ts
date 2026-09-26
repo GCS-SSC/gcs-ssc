@@ -8,6 +8,7 @@ const AttachmentTypeIdSchema = RequiredStringId().refine(isPositivePostgresBigin
 
 export const ATTACHMENT_TARGET_ENTITY_TYPES = [
   'applicantrecipient',
+  'fundingcaseintake',
   'fundingcaseagreement',
   'fundingcaseamendment',
   'fundingcaseagreementclaim',

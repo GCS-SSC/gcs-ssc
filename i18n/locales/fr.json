@@ -26,17 +26,19 @@
     "workflow_setups": "Flux de travail disponibles"
   },
   "funding_case_intake": {
-    "title": "Réception des dossiers de financement",
+    "title": "Réceptions",
+    "singular": "Réception",
     "description": "Saisir les demandes et coordonner les examens et les flux de travail des dossiers attribués.",
-    "create": "Ajouter un dossier",
-    "edit": "Modifier le dossier",
-    "details": "Détails du dossier",
-    "view_details": "Afficher les détails du dossier",
+    "create": "Ajouter une réception",
+    "edit": "Modifier la réception",
+    "details": "Détails de la réception",
+    "view_details": "Afficher les détails de la réception",
     "opportunity": "Possibilité de financement",
     "proponent": "Demandeur",
     "application_id": "ID de demande",
     "application": "Données de la demande",
-    "application_help": "Saisissez la demande sous forme d’objet JSON.",
+    "attachment_upload_failed": "La réception a été enregistrée, mais une pièce jointe n’a pas pu être téléversée. Réessayez pour terminer l’ajout des pièces jointes.",
+    "select_opportunity_first": "Sélectionnez d’abord une possibilité de financement",
     "approval_submission": "Soumission pour approbation"
   },
   "reviews": {
@@ -119,7 +121,7 @@
     "agencies": "Agences",
     "transfer_payments": "Programmes",
     "funding_opportunities": "Possibilités",
-    "funding_case_intakes": "Réception des dossiers",
+    "funding_case_intakes": "Réceptions",
     "agreements": "Ententes",
     "roles": "Rôles",
     "users": "Utilisateurs",
@@ -493,7 +495,7 @@
       "transferpaymentstream": "Volet de paiement de transfert",
       "commonreview": "Examen commun",
       "commonrecommendation": "Recommandation commune",
-      "fundingcaseintake": "Réception du dossier de financement",
+      "fundingcaseintake": "Réception",
       "fundingcaseamendment": "Modification du dossier de financement",
       "fundingcasemonitor": "Suivi du dossier de financement",
       "fundingclaimreconcile": "Rapprochement de réclamation de financement",
@@ -507,7 +509,7 @@
       "agency": "Agence",
       "program": "Programme",
       "fundingopportunity": "Possibilite de financement",
-      "fundingcaseintake": "Dossier de financement - reception",
+      "fundingcaseintake": "Réception",
       "fundingcaseagreement": "Entente de financement",
       "applicantrecipient": "Promoteur",
       "transferpaymentstream": "Volet de paiement de transfert"
@@ -542,7 +544,7 @@
       "fundingcasepayment": "Paiement du dossier de financement"
     },
     "decision_type": {
-      "fundingcaseintakeassessment": "Évaluation d'admission du dossier de financement"
+      "fundingcaseintakeassessment": "Évaluation de la réception"
     },
     "amended_type": {
       "articles": "Articles",
@@ -729,7 +731,7 @@
       "user": "Utilisateurs",
       "group": "Groupes",
       "agreement": "Ententes",
-      "funding_case": "Dossiers de financement",
+      "funding_case": "Réceptions",
       "applicant_recipient": "Promoteurs"
     },
     "unknown_ability": "Autorisation inconnue ({action}:{subject})",
