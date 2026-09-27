@@ -16,6 +16,7 @@
     "build:extension-sdk": "bun run --cwd packages/gcs-ssc-extensions build",
     "dev": "bun run scripts/dev.ts",
     "dev:clean": "bun run scripts/dev.ts --clean",
+    "seed:financial-summary-demo": "bun run scripts/seed-financial-summary-demo.ts",
     "data-model:sheet:read": "bun run scripts/read-data-model-spreadsheet.ts",
     "data-model:sheet:authorize": "bun run scripts/authorize-google-sheets.ts",
     "data-model:sheet:cell:update": "bun run scripts/data-model-spreadsheet-row.ts cell",

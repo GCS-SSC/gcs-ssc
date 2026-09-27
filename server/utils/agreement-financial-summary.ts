@@ -1,6 +1,6 @@
 /* eslint-disable jsdoc/require-jsdoc -- Local shaping helpers are covered by the exported builder's contract. */
 import type { Currency_Codes } from '~~/shared/types/database'
-import { addMoney, parseMoney, type Money } from '~~/shared/utils/money'
+import { addMoney, compareMoney, parseMoney, sumMoney, type Money } from '~~/shared/utils/money'
 
 export type SummaryFiscalYear = { id: string, label: string, order: string }
 export type SummaryBudgetLine = {
@@ -156,6 +156,7 @@ export const buildAgreementFinancialSummary = (
         const month = assertMonth(forecast.month)
         if (line.forecast) line.forecast[month] = addMoney(line.forecast[month] ?? ZERO, forecast.amount)
       }
+      let latestReconciledMonth: number | null = null
       for (const claim of yearClaimLines.filter(row => row.currency === currency)) {
         // A claim/reconciliation spanning months is recognized in the end month, including overlaps.
         const line = claim.budgetLineId ? byId.get(claim.budgetLineId) : undefined
@@ -167,7 +168,9 @@ export const buildAgreementFinancialSummary = (
         }
         const month = assertMonth(claim.periodEnd)
         target.claimed[month] = addMoney(target.claimed[month] ?? ZERO, claim.amount)
-        target.reconciled[month] = addMoney(target.reconciled[month] ?? ZERO, reconciledByClaimLine.get(claim.id) ?? ZERO)
+        const reconciled = reconciledByClaimLine.get(claim.id) ?? ZERO
+        target.reconciled[month] = addMoney(target.reconciled[month] ?? ZERO, reconciled)
+        if (compareMoney(reconciled, ZERO) > 0) latestReconciledMonth = Math.max(latestReconciledMonth ?? month, month)
       }
 
       const paid = emptyMonths()
@@ -183,7 +186,26 @@ export const buildAgreementFinancialSummary = (
           currency
         }
       })
-      return { currency, lines, paid, payments: paymentItems }
+      const monthlyForecast = selectedForecast ? emptyMonths() : null
+      if (monthlyForecast) {
+        for (const line of lines) {
+          if (!line.forecast) continue
+          for (let month = 0; month < MONTH_COUNT; month += 1) {
+            monthlyForecast[month] = addMoney(monthlyForecast[month] ?? ZERO, line.forecast[month] ?? ZERO)
+          }
+        }
+      }
+      const progress = {
+        annualBudget: sumMoney(yearBudgetLines.filter(line => line.currency === currency).map(line => line.budget)),
+        reconciledTotal: sumMoney(lines.flatMap(line => line.reconciled)),
+        latestReconciledMonth,
+        forecastToReconciliation: monthlyForecast && latestReconciledMonth !== null
+          ? sumMoney(monthlyForecast.slice(0, latestReconciledMonth + 1))
+          : null,
+        annualForecast: monthlyForecast ? sumMoney(monthlyForecast) : null,
+        monthlyForecast
+      }
+      return { currency, lines, paid, payments: paymentItems, progress }
     })
     return {
       id: year.id,

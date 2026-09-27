@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import { useAgreementOverview } from '~/composables/useAgreementOverview'
-import { formatMoneyText, parseMoney, sumMoney, type Money } from '~~/shared/utils/money'
+import { compareMoney, formatMoneyText, moneyToCents, parseMoney, subtractMoney, sumMoney, type Money } from '~~/shared/utils/money'
 
 type MonthlyAmounts = [Money, Money, Money, Money, Money, Money, Money, Money, Money, Money, Money, Money]
 type Measure = 'forecast' | 'budget' | 'claimed' | 'reconciled'
@@ -29,11 +29,20 @@ type FinancialPayment = {
   amount: Money
   currency: string
 }
+type FinancialProgress = {
+  annualBudget: Money
+  reconciledTotal: Money
+  latestReconciledMonth: number | null
+  forecastToReconciliation: Money | null
+  annualForecast: Money | null
+  monthlyForecast: MonthlyAmounts | null
+}
 type CurrencySummary = {
   currency: string
   lines: FinancialLine[]
   paid: MonthlyAmounts
   payments: FinancialPayment[]
+  progress: FinancialProgress
 }
 type FinancialYear = {
   id: string
@@ -51,27 +60,27 @@ const ZERO_MONEY = parseMoney('0')
 const ROW_TONES: Record<RowType, { row: string, sticky: string, chip: string }> = {
   forecast: {
     row: 'bg-sky-50/60 dark:bg-sky-950/20',
-    sticky: 'border-l-4 border-sky-500 bg-sky-50 dark:bg-sky-950/40',
+    sticky: 'border-l-4 border-sky-500 bg-sky-50 dark:bg-sky-950',
     chip: 'border-sky-500/50 bg-sky-50 text-sky-800 dark:bg-sky-950/50 dark:text-sky-200'
   },
   budget: {
     row: 'bg-amber-50/60 dark:bg-amber-950/20',
-    sticky: 'border-l-4 border-amber-500 bg-amber-50 dark:bg-amber-950/40',
+    sticky: 'border-l-4 border-amber-500 bg-amber-50 dark:bg-amber-950',
     chip: 'border-amber-500/50 bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200'
   },
   claimed: {
     row: 'bg-violet-50/60 dark:bg-violet-950/20',
-    sticky: 'border-l-4 border-violet-500 bg-violet-50 dark:bg-violet-950/40',
+    sticky: 'border-l-4 border-violet-500 bg-violet-50 dark:bg-violet-950',
     chip: 'border-violet-500/50 bg-violet-50 text-violet-800 dark:bg-violet-950/50 dark:text-violet-200'
   },
   reconciled: {
     row: 'bg-teal-50/60 dark:bg-teal-950/20',
-    sticky: 'border-l-4 border-teal-500 bg-teal-50 dark:bg-teal-950/40',
+    sticky: 'border-l-4 border-teal-500 bg-teal-50 dark:bg-teal-950',
     chip: 'border-teal-500/50 bg-teal-50 text-teal-800 dark:bg-teal-950/50 dark:text-teal-200'
   },
   payments: {
     row: 'bg-emerald-50/70 dark:bg-emerald-950/25',
-    sticky: 'border-l-4 border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40',
+    sticky: 'border-l-4 border-emerald-500 bg-emerald-50 dark:bg-emerald-950',
     chip: 'border-emerald-500/50 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200'
   }
 }
@@ -157,6 +166,128 @@ const forecastSourceLabel = (source: FinancialYear['forecastSource']): string =>
   const status = t(`agreement.financial_summary.forecast_source.${source.status}`)
   return source.version ? `${status} · ${t('agreement.financial_summary.forecast_version', { version: source.version })}` : status
 }
+const hasBudgetScale = (progress: FinancialProgress): boolean => moneyToCents(progress.annualBudget) > BigInt(0)
+const hasAmountsWithoutBudget = (progress: FinancialProgress): boolean => !hasBudgetScale(progress) && (
+  compareMoney(progress.reconciledTotal, ZERO_MONEY) > 0
+  || (progress.annualForecast !== null && compareMoney(progress.annualForecast, ZERO_MONEY) > 0)
+)
+const hasPositiveForecastTotal = (progress: FinancialProgress): boolean =>
+  progress.annualForecast !== null && moneyToCents(progress.annualForecast) > BigInt(0)
+/**
+ * Caps a monetary amount at the visual budget scale without changing its displayed value.
+ * @param amount - Exact amount to position.
+ * @param budget - Exact annual budget used as the scale.
+ * @returns A percentage from zero through one hundred.
+ */
+const trackPercent = (amount: Money | null, budget: Money): number => {
+  if (amount === null) return 0
+  const denominator = moneyToCents(budget)
+  if (denominator <= BigInt(0)) return 0
+  const cents = moneyToCents(amount)
+  const clipped = cents < BigInt(0) ? BigInt(0) : cents > denominator ? denominator : cents
+  return Number(clipped * BigInt(10000) / denominator) / 100
+}
+/**
+ * Formats a ratio as a localized percentage with one decimal place.
+ * @param numerator - Exact numerator in cents.
+ * @param denominator - Exact denominator in cents.
+ * @returns Localized percentage, or null when no ratio exists.
+ */
+const percentText = (numerator: bigint, denominator: bigint): string | null => {
+  if (denominator <= BigInt(0)) return null
+  const safeNumerator = numerator < BigInt(0) ? BigInt(0) : numerator
+  const tenths = (safeNumerator * BigInt(1000) + denominator / BigInt(2)) / denominator
+  const decimal = `${tenths / BigInt(10)}${locale.value === 'fr' ? ',' : '.'}${tenths % BigInt(10)}`
+  return t('agreement.financial_summary.percentage', { value: decimal })
+}
+/**
+ * Describes the annual forecast's exact relationship to budget.
+ * @param progress - Currency-specific pacing values.
+ * @param currency - Currency used for formatted amounts.
+ * @returns Localized comparison, or null without an active forecast.
+ */
+const budgetComparison = (progress: FinancialProgress, currency: string): string | null => {
+  if (progress.annualForecast === null) return null
+  const comparison = compareMoney(progress.annualForecast, progress.annualBudget)
+  if (comparison < 0) return t('agreement.financial_summary.pacing.unforecast_budget', { amount: formatMoney(subtractMoney(progress.annualBudget, progress.annualForecast), currency) })
+  if (comparison > 0) return t('agreement.financial_summary.pacing.forecast_above_budget', { amount: formatMoney(subtractMoney(progress.annualForecast, progress.annualBudget), currency) })
+  return t('agreement.financial_summary.pacing.forecast_matches_budget')
+}
+/**
+ * Describes reconciled spending against the active forecast at the cutoff month.
+ * @param progress - Currency-specific pacing values.
+ * @param currency - Currency used for formatted amounts.
+ * @returns Localized comparison, or null without comparable values.
+ */
+const reconciliationComparison = (progress: FinancialProgress, currency: string): string | null => {
+  if (progress.latestReconciledMonth === null || progress.forecastToReconciliation === null) return null
+  const comparison = compareMoney(progress.reconciledTotal, progress.forecastToReconciliation)
+  const month = monthLabel(progress.latestReconciledMonth)
+  if (comparison < 0) return t('agreement.financial_summary.pacing.reconciled_below_forecast', { month, amount: formatMoney(subtractMoney(progress.forecastToReconciliation, progress.reconciledTotal), currency) })
+  if (comparison > 0) return t('agreement.financial_summary.pacing.reconciled_above_forecast', { month, amount: formatMoney(subtractMoney(progress.reconciledTotal, progress.forecastToReconciliation), currency) })
+  return t('agreement.financial_summary.pacing.reconciled_matches_forecast', { month })
+}
+const exceedsBudget = (progress: FinancialProgress): boolean => hasBudgetScale(progress) && (
+  compareMoney(progress.reconciledTotal, progress.annualBudget) > 0
+  || (progress.forecastToReconciliation !== null && compareMoney(progress.forecastToReconciliation, progress.annualBudget) > 0)
+)
+/**
+ * Finds the highest positive monthly forecast amount.
+ * @param progress - Currency-specific pacing values.
+ * @returns Fiscal month index, or null when all months are nonpositive.
+ */
+const peakMonth = (progress: FinancialProgress): number | null => {
+  if (!progress.monthlyForecast) return null
+  let peakIndex: number | null = null
+  let peakCents = BigInt(0)
+  for (const month of MONTHS) {
+    const cents = moneyToCents(progress.monthlyForecast[month] ?? ZERO_MONEY)
+    if (cents > peakCents) {
+      peakCents = cents
+      peakIndex = month
+    }
+  }
+  return peakIndex
+}
+/**
+ * Scales one month against the peak positive forecast month for its mini-bar.
+ * @param progress - Currency-specific pacing values.
+ * @param month - Fiscal month index.
+ * @returns Bar height from zero through one hundred percent.
+ */
+const distributionHeight = (progress: FinancialProgress, month: number): number => {
+  if (!progress.monthlyForecast) return 0
+  const peakIndex = peakMonth(progress)
+  if (peakIndex === null) return 0
+  const peak = moneyToCents(progress.monthlyForecast[peakIndex] ?? ZERO_MONEY)
+  const cents = moneyToCents(progress.monthlyForecast[month] ?? ZERO_MONEY)
+  if (peak <= BigInt(0) || cents <= BigInt(0)) return 0
+  return Number(cents * BigInt(10000) / peak) / 100
+}
+/**
+ * Positions an even monthly share on the same scale as the forecast mini-bars.
+ * @param progress - Currency-specific pacing values.
+ * @returns Reference-line height from zero through one hundred percent.
+ */
+const evenReferenceHeight = (progress: FinancialProgress): number => {
+  if (!progress.monthlyForecast || !hasPositiveForecastTotal(progress)) return 0
+  const peakIndex = peakMonth(progress)
+  if (peakIndex === null) return 0
+  const peak = moneyToCents(progress.monthlyForecast[peakIndex] ?? ZERO_MONEY)
+  if (peak <= BigInt(0)) return 0
+  const scaled = moneyToCents(progress.annualForecast as Money) * BigInt(10000) / (BigInt(12) * peak)
+  return Number(scaled > BigInt(10000) ? BigInt(10000) : scaled) / 100
+}
+/**
+ * Calculates the peak month's share of the annual active forecast.
+ * @param progress - Currency-specific pacing values.
+ * @returns Localized percentage, or null without a positive annual forecast.
+ */
+const peakShare = (progress: FinancialProgress): string | null => {
+  const peakIndex = peakMonth(progress)
+  if (peakIndex === null || !progress.monthlyForecast || progress.annualForecast === null) return null
+  return percentText(moneyToCents(progress.monthlyForecast[peakIndex] ?? ZERO_MONEY), moneyToCents(progress.annualForecast))
+}
 </script>
 
 <template>
@@ -233,6 +364,125 @@ const forecastSourceLabel = (source: FinancialYear['forecastSource']): string =>
           </h3>
           <UBadge v-if="visibleRowTypes.includes('forecast')" color="neutral" variant="soft" :label="forecastSourceLabel(selectedYear.forecastSource)" />
         </div>
+        <section class="rounded-xl border border-default bg-default p-4 sm:p-5" data-testid="financial-summary-pacing">
+          <h4 class="text-sm font-semibold text-highlighted">
+            {{ t('agreement.financial_summary.pacing.title') }}
+          </h4>
+          <div class="mt-4 grid gap-6 lg:grid-cols-2">
+            <div class="min-w-0 space-y-4">
+              <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                <div>
+                  <dt class="text-xs text-muted">
+                    {{ t('agreement.financial_summary.pacing.annual_budget') }}
+                  </dt>
+                  <dd class="mt-1 font-semibold tabular-nums text-highlighted">
+                    {{ formatMoney(group.progress.annualBudget, group.currency) }}
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-muted">
+                    {{ t('agreement.financial_summary.pacing.reconciled_total') }}
+                  </dt>
+                  <dd class="mt-1 font-semibold tabular-nums text-highlighted">
+                    {{ formatMoney(group.progress.reconciledTotal, group.currency) }}
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-muted">
+                    {{ group.progress.latestReconciledMonth === null ? t('agreement.financial_summary.pacing.forecast_to_cutoff') : t('agreement.financial_summary.pacing.forecast_through_month', { month: monthLabel(group.progress.latestReconciledMonth) }) }}
+                  </dt>
+                  <dd class="mt-1 font-semibold tabular-nums text-highlighted">
+                    {{ group.progress.forecastToReconciliation === null ? t('common.not_available') : formatMoney(group.progress.forecastToReconciliation, group.currency) }}
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-muted">
+                    {{ t('agreement.financial_summary.pacing.annual_forecast') }}
+                  </dt>
+                  <dd class="mt-1 font-semibold tabular-nums text-highlighted">
+                    {{ group.progress.annualForecast === null ? t('common.not_available') : formatMoney(group.progress.annualForecast, group.currency) }}
+                  </dd>
+                </div>
+              </dl>
+              <div v-if="hasBudgetScale(group.progress)" class="space-y-2" data-testid="financial-summary-progress-track">
+                <div
+                  role="img"
+                  :aria-label="group.progress.forecastToReconciliation === null
+                    ? t('agreement.financial_summary.pacing.track_reconciled_aria', { reconciled: formatMoney(group.progress.reconciledTotal, group.currency), budget: formatMoney(group.progress.annualBudget, group.currency) })
+                    : t('agreement.financial_summary.pacing.track_with_forecast_aria', { reconciled: formatMoney(group.progress.reconciledTotal, group.currency), forecast: formatMoney(group.progress.forecastToReconciliation, group.currency), budget: formatMoney(group.progress.annualBudget, group.currency) })"
+                  class="relative h-3 rounded-full bg-elevated">
+                  <div class="h-full rounded-full bg-teal-500" :style="{ width: `${trackPercent(group.progress.reconciledTotal, group.progress.annualBudget)}%` }" />
+                  <div
+                    v-if="group.progress.forecastToReconciliation !== null"
+                    class="absolute -top-1 -bottom-1 w-1 -translate-x-1/2 rounded-sm border border-white bg-sky-700 shadow-sm dark:border-zinc-900 dark:bg-sky-300"
+                    :style="{ left: `${trackPercent(group.progress.forecastToReconciliation, group.progress.annualBudget)}%` }" />
+                </div>
+                <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+                  <span class="inline-flex items-center gap-1.5"><span class="size-2 rounded-sm bg-teal-500" aria-hidden="true" />{{ t('agreement.financial_summary.pacing.reconciled_fill') }}</span>
+                  <span v-if="group.progress.forecastToReconciliation !== null" class="inline-flex items-center gap-1.5"><span class="h-3 w-0.5 bg-sky-700 dark:bg-sky-300" aria-hidden="true" />{{ t('agreement.financial_summary.pacing.forecast_marker') }}</span>
+                </div>
+                <p v-if="exceedsBudget(group.progress)" class="text-xs text-muted">
+                  {{ t('agreement.financial_summary.pacing.over_budget') }}
+                </p>
+              </div>
+              <p v-else class="text-xs text-muted">
+                {{ t('agreement.financial_summary.pacing.zero_budget') }}
+              </p>
+              <p v-if="hasAmountsWithoutBudget(group.progress)" class="text-xs text-muted">
+                {{ t('agreement.financial_summary.pacing.amounts_without_budget') }}
+              </p>
+              <p v-if="group.progress.latestReconciledMonth === null" class="text-xs text-muted">
+                {{ t('agreement.financial_summary.pacing.no_reconciliation') }}
+              </p>
+              <p v-else-if="group.progress.annualForecast === null" class="text-xs text-muted">
+                {{ t('agreement.financial_summary.pacing.no_active_forecast') }}
+              </p>
+              <p v-else-if="reconciliationComparison(group.progress, group.currency)" class="text-xs text-muted">
+                {{ reconciliationComparison(group.progress, group.currency) }}
+              </p>
+              <p v-if="budgetComparison(group.progress, group.currency)" class="text-xs text-muted">
+                {{ budgetComparison(group.progress, group.currency) }}
+              </p>
+            </div>
+            <div class="min-w-0 border-t border-default pt-4 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6" data-testid="financial-summary-distribution">
+              <h5 class="text-sm font-medium text-highlighted">
+                {{ t('agreement.financial_summary.pacing.distribution_title') }}
+              </h5>
+              <template v-if="group.progress.monthlyForecast && peakMonth(group.progress) !== null">
+                <div class="mt-4">
+                  <div class="relative h-14">
+                    <div v-if="hasPositiveForecastTotal(group.progress)" class="pointer-events-none absolute inset-x-0 z-10 border-t border-dashed border-amber-500" :style="{ bottom: `${evenReferenceHeight(group.progress)}%` }" aria-hidden="true" />
+                    <div class="grid h-full grid-cols-12 gap-0.5" aria-hidden="true">
+                      <div v-for="month in MONTHS" :key="month" class="flex min-w-0 items-end rounded-sm bg-elevated/70">
+                        <div class="w-full rounded-t-sm bg-sky-500 dark:bg-sky-400" :style="{ height: `${distributionHeight(group.progress, month)}%` }" />
+                      </div>
+                    </div>
+                  </div>
+                  <div class="mt-1 grid grid-cols-12 gap-0.5" aria-hidden="true">
+                    <span v-for="month in MONTHS" :key="month" class="min-w-0 text-center text-[9px] text-muted sm:text-[10px]">{{ monthLabel(month) }}</span>
+                  </div>
+                </div>
+                <ul class="sr-only">
+                  <li v-for="month in MONTHS" :key="month">
+                    {{ monthLabel(month) }}: {{ formatMoney(group.progress.monthlyForecast?.[month] ?? ZERO_MONEY, group.currency) }}
+                  </li>
+                </ul>
+                <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+                  <span v-if="hasPositiveForecastTotal(group.progress)" class="inline-flex items-center gap-1.5"><span class="w-4 border-t border-dashed border-amber-500" aria-hidden="true" />{{ t('agreement.financial_summary.pacing.even_month_reference') }}</span>
+                  <span v-if="peakMonth(group.progress) !== null && peakShare(group.progress)">
+                    {{ t('agreement.financial_summary.pacing.peak_month', { month: monthLabel(peakMonth(group.progress) as number), share: peakShare(group.progress) }) }}
+                  </span>
+                </div>
+                <p v-if="!hasPositiveForecastTotal(group.progress)" class="mt-2 text-xs text-muted">
+                  {{ t('agreement.financial_summary.pacing.no_positive_forecast_total') }}
+                </p>
+              </template>
+              <p v-else class="mt-3 text-xs text-muted">
+                {{ group.progress.monthlyForecast ? t('agreement.financial_summary.pacing.no_forecast_amounts') : t('agreement.financial_summary.pacing.no_active_forecast') }}
+              </p>
+            </div>
+          </div>
+        </section>
         <p class="flex items-center gap-1.5 text-xs text-muted">
           <UIcon name="i-lucide-move-horizontal" class="size-4 shrink-0" aria-hidden="true" />
           {{ t('agreement.financial_summary.scroll_hint') }}
