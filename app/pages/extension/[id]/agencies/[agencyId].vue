@@ -23,10 +23,13 @@ const registry: Ref<{ items: ExtensionAgencyRegistryItem[] } | null> = ref(null)
 const listStatus: Ref<LoadStatus> = ref('pending')
 const registryStatus: Ref<LoadStatus> = ref('pending')
 let requestSequence = 0
-const selectedTab = ref('connection')
+const requestedTab = computed(() => typeof route.query.section === 'string' ? route.query.section : '')
+const selectedTab = ref(requestedTab.value || 'connection')
 /** Reloads the accessible workspace and Agency registry for the current route. */
 const retry = async () => {
   const sequence = ++requestSequence
+  list.value = null
+  registry.value = null
   listStatus.value = 'pending'
   registryStatus.value = 'pending'
   const requests = await Promise.allSettled([
@@ -60,7 +63,7 @@ const retry = async () => {
   }
 }
 watch([agencyId, extensionKey], () => {
-  selectedTab.value = 'connection'
+  selectedTab.value = requestedTab.value || 'connection'
   void retry()
 }, { immediate: true })
 const workspace = computed(() => list.value?.items.find(item => item.key === extensionKey.value
@@ -82,6 +85,17 @@ const tabs = computed(() => extension.value?.extension.admin.agencyWorkspace?.ta
   label: locale.value === 'fr' ? tab.label.fr : tab.label.en,
   icon: tab.icon
 })) ?? [])
+watch([requestedTab, tabs], ([requested, available]) => {
+  if (!available.length) return
+  const next = available.find(tab => tab.value === requested)?.value
+    ?? available.find(tab => tab.value === 'connection')?.value
+    ?? available[0]!.value
+  if (selectedTab.value !== next) selectedTab.value = next
+}, { immediate: true })
+watch(selectedTab, (value) => {
+  if (!tabs.value.some(tab => tab.value === value) || requestedTab.value === value) return
+  void navigateTo({ path: route.path, query: { ...route.query, section: value }, hash: route.hash }, { replace: true })
+})
 </script>
 
 <template>
