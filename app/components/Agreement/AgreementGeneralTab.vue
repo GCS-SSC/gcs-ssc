@@ -4,6 +4,7 @@ import { agreementCalendarDate } from '~/utils/agreement-calendar-date'
 import { computed } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
 import type { FundingCaseAgreementProfileRow } from '~~/shared/types/funding-case-agreement-ui'
+import type { GcsAgreementProfileExtensionContext } from '~~/shared/utils/extensions'
 
 const { profile } = defineProps<{
   profile: FundingCaseAgreementProfileRow
@@ -13,14 +14,14 @@ const { t, n } = useI18n()
 const { getBilingualValue } = useBilingualValue()
 const { formatDate } = useDateHelpers()
 const localePath = useLocalePath()
-const agreementProfileExtensionContext = computed(() => ({
+const agreementProfileExtensionContext = computed<GcsAgreementProfileExtensionContext>(() => ({
   kind: 'agreement.profile',
   mode: 'read',
   agreementId: profile?.id ? String(profile.id) : undefined,
   streamId: profile?.egcs_fc_transferpaymentstream ? String(profile.egcs_fc_transferpaymentstream) : undefined,
   ownerType: 'fundingcaseagreement',
   ownerId: profile?.id ? String(profile.id) : undefined,
-  profile
+  profile: { ...profile }
 }))
 
 const profileStreamId = computed(() => profile?.egcs_fc_transferpaymentstream ? String(profile.egcs_fc_transferpaymentstream) : '')

@@ -3,6 +3,7 @@ import { getClientRequestUrl } from '~/utils/client-request-url'
 import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { AdminCommonLookupResponseItem } from '~~/shared/types/admin-common-ui'
+import type { GcsAgreementDescriptionsExtensionContext, GcsAgreementProfileExtensionContext } from '~~/shared/utils/extensions'
 import type {
   FundingCaseAgreementProfileForm,
   FundingCaseAgreementSubtypeLookupItem
@@ -119,7 +120,7 @@ const setAgreementExtensionPayload = (extensionKey: string, payloadKey: string, 
   }
 }
 
-const agreementDescriptionsExtensionContext = computed(() => ({
+const agreementDescriptionsExtensionContext = computed<GcsAgreementDescriptionsExtensionContext>(() => ({
   kind: 'agreement.descriptions',
   agreementId,
   streamId: selectedStreamId.value,
@@ -131,7 +132,7 @@ const agreementDescriptionsExtensionContext = computed(() => ({
   setExtensionPayload: setAgreementExtensionPayload
 }))
 
-const agreementProfileExtensionContext = computed(() => ({
+const agreementProfileExtensionContext = computed<GcsAgreementProfileExtensionContext>(() => ({
   kind: 'agreement.profile',
   mode: permissionAction,
   agreementId,
