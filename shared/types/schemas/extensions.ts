@@ -81,6 +81,7 @@ export interface ExtensionRuntimeSlotItem {
   extensionKey: string
   componentName: string
   config: GcsExtensionJsonConfig
+  agencies?: Array<{ agencyId: string; nameEn: string; nameFr: string; config: GcsExtensionJsonConfig }>
 }
 
 export interface ExtensionRuntimeResponse {
@@ -89,8 +90,20 @@ export interface ExtensionRuntimeResponse {
   items: ExtensionRuntimeSlotItem[]
 }
 
-export interface ExtensionEntityTabContext {
-  target: GcsExtensionEntityTabTarget
+export type ExtensionEntityTabContext = {
+  target: 'proponent'
+  applicantRecipientId: string
+  ownerType: 'applicantrecipient'
+  ownerId: string
+  agencies: Array<{ agencyId: string; nameEn: string; nameFr: string; config: GcsExtensionJsonConfig }>
+  agencyId?: never
+  streamId?: never
+  agreementId?: never
+  claimId?: never
+  monitorId?: never
+  scope?: never
+} | {
+  target: Exclude<GcsExtensionEntityTabTarget, 'proponent'>
   agencyId: string
   streamId?: string
   agreementId?: string

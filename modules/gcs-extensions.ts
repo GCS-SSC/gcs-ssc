@@ -665,6 +665,10 @@ export const resolveEntityTab = async (
     || tab.agencyConfigVisibility.values.some(value => typeof value !== 'string' || !value))) {
     throw new Error(`Extension client tab ${index} has invalid agency configuration visibility`)
   }
+  if (tab.agencyReadRequired !== undefined
+    && (tab.target !== 'proponent' || tab.agencyReadRequired !== true)) {
+    throw new Error(`Extension client tab ${index} has invalid Agency read requirement`)
+  }
   validateExtensionRbacRequirement(tab.rbac, `client.tabs.${index}.rbac`)
   validateExtensionEntityRbacRequirement(tab.target, tab.rbac, `client.tabs.${index}.rbac`)
 

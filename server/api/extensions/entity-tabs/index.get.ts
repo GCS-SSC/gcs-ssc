@@ -2,9 +2,12 @@ import { z } from 'zod'
 import type { H3Event } from 'h3'
 import type { Kysely } from 'kysely'
 import type { ExtensionEntityTabItem, ExtensionEntityTabsResponse } from '~~/shared/types/schemas/extensions'
+import type { GcsExtensionJsonConfig } from '~~/shared/utils/extensions'
 import type { Database } from '~~/shared/types/database'
 import { parseI18n } from '~~/server/utils/api-validate'
-import { authorize } from '~~/server/utils/authorize'
+import { authorize, type AuthContext } from '~~/server/utils/authorize'
+import { listApplicantRecipientContributionAgencies, canAccessApplicantRecipient } from '~~/server/utils/applicant-recipient-auth'
+import { badRequest } from '~~/server/utils/api-errors'
 import {
   canAccessExtensionEntity,
   getExtensionConfigurationForEntity,
@@ -43,6 +46,65 @@ const emptyEntityTabsResponse = (target: EntityTabQuery['target']): ExtensionEnt
   target,
   items: []
 })
+
+/**
+ * Resolves each Proponent tab once, with all eligible enabled agencies attached.
+ * @param db - Database used to read agency enablement.
+ * @param context - Authenticated actor and grants.
+ * @param applicantRecipientId - App-wide Proponent identity.
+ * @returns Visible tabs with their eligible agency contexts.
+ */
+const collectProponentTabs = async (
+  db: Kysely<Database>,
+  context: AuthContext,
+  applicantRecipientId: string
+): Promise<ExtensionEntityTabItem[]> => {
+  const extensions = await getRegisteredExtensions()
+  const items: ExtensionEntityTabItem[] = []
+  for (const extension of extensions) {
+    for (const tab of (extension.client.tabs ?? []).filter(item => item.target === 'proponent')) {
+      if (!await canAccessApplicantRecipient(context, applicantRecipientId, tab.rbac.action, db)) continue
+      const candidates = await listApplicantRecipientContributionAgencies(context, tab.rbac.action, db)
+      const agencies = [] as NonNullable<Extract<ExtensionEntityTabItem['context'], { target: 'proponent' }>['agencies']>
+      for (const agency of candidates) {
+        if (tab.agencyReadRequired && !context.userAbilities.authorize('agency', 'read', {
+          type: 'agency', agencyId: agency.id
+        })) continue
+        const row = await db.selectFrom('extensions.agency_enablement')
+          .select('config')
+          .where('extension_key', '=', extension.key)
+          .where('agency_id', '=', agency.id)
+          .where('enabled', '=', true)
+          .where('_deleted', '=', false)
+          .executeTakeFirst()
+        if (!row) continue
+        const config = row.config && typeof row.config === 'object' && !Array.isArray(row.config)
+          ? row.config as GcsExtensionJsonConfig
+          : {}
+        if (tab.agencyConfigVisibility && !tab.agencyConfigVisibility.values.includes(
+          String(config[tab.agencyConfigVisibility.key] ?? '')
+        )) continue
+        agencies.push({ agencyId: agency.id, nameEn: agency.nameEn, nameFr: agency.nameFr, config })
+      }
+      if (agencies.length === 0 || !('componentName' in tab) || !tab.componentName) continue
+      items.push({
+        extensionKey: extension.key,
+        tabId: tab.id,
+        value: tab.value ?? `extension:${extension.key}:proponent:${tab.id}`,
+        label: tab.label,
+        icon: tab.icon,
+        componentName: String(tab.componentName),
+        config: {},
+        context: {
+          target: 'proponent', applicantRecipientId, ownerType: 'applicantrecipient',
+          ownerId: applicantRecipientId, agencies
+        },
+        rbac: tab.rbac
+      })
+    }
+  }
+  return items
+}
 
 /**
  * Authorizes access to the entity that owns extension tabs.
@@ -128,7 +190,7 @@ const collectExtensionEntityTabItems = async (
         icon: tab.icon,
         componentName,
         config,
-        context: entityContext,
+        context: { ...entityContext, target: entityContext.target as 'agreement' | 'claim' | 'monitor' },
         rbac: tab.rbac
       })
     }
@@ -156,6 +218,15 @@ export default defineEventHandler(async event => {
 
   if (!entityId) {
     return emptyEntityTabsResponse(query.target)
+  }
+
+  if (query.target === 'proponent') {
+    if (query.agencyId !== undefined) return await badRequest(event, 'INVALID_EXTENSION_CONTEXT', 'apiErrors.request.invalid_id')
+    const access = await authorize(event, 'applicant_recipient', 'read', async ({ context }) =>
+      await canAccessApplicantRecipient(context, entityId, 'read', db)
+        ? { bypass: true }
+        : { denied: true })
+    return { target: 'proponent', items: await collectProponentTabs(db, access, entityId) }
   }
 
   const entityContext = await resolveExtensionEntityContext(db, query.target, entityId, query.agencyId)

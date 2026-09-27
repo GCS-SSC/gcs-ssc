@@ -96,6 +96,34 @@ export const resolveApplicantRecipientVisibility = async (
   }
 }
 
+/**
+ * Lists active agencies where the actor may use a Proponent contribution.
+ * @param context - Authenticated actor and grants.
+ * @param action - Required Proponent action.
+ * @param db - Database containing active agencies and roles.
+ * @returns Authorized active agency identities and bilingual names.
+ */
+export const listApplicantRecipientContributionAgencies = async (
+  context: AuthContext,
+  action: AbilityAction,
+  db: Kysely<Database>
+): Promise<Array<{ id: string; nameEn: string; nameFr: string }>> => {
+  const visibility = await resolveApplicantRecipientVisibility(context, action, db)
+  if (!visibility.hasGlobalAccess && visibility.agencyIds.length === 0) return []
+
+  let query = db.selectFrom('Agency_Profile')
+    .where('_deleted', '=', false)
+    .where('egcs_ay_active', '=', true)
+  if (!visibility.hasGlobalAccess) query = query.where('id', 'in', visibility.agencyIds)
+  const rows = await query.select(['id', 'egcs_ay_name_en', 'egcs_ay_name_fr'])
+    .orderBy('id', 'asc').execute()
+  return rows.map(row => ({
+    id: String(row.id),
+    nameEn: row.egcs_ay_name_en,
+    nameFr: row.egcs_ay_name_fr
+  }))
+}
+
 export const canAccessApplicantRecipient = async (
   context: AuthContext,
   applicantRecipientId: string,

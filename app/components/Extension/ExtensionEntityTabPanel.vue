@@ -18,7 +18,8 @@ const extensionComponent = computed(() => item ? getGcsExtensionComponent(item.c
     :extension-key="item.extensionKey"
     :target="item.context.target"
     :context="item.context"
-    :agency-id="item.context.agencyId"
+    :agency-id="item.context.target === 'proponent' ? undefined : item.context.agencyId"
+    :agencies="item.context.target === 'proponent' ? item.context.agencies : undefined"
     :stream-id="item.context.streamId"
     :agreement-id="item.context.agreementId"
     :applicant-recipient-id="item.context.applicantRecipientId"
@@ -26,7 +27,7 @@ const extensionComponent = computed(() => item ? getGcsExtensionComponent(item.c
     :monitor-id="item.context.monitorId"
     :owner-type="item.context.ownerType"
     :owner-id="item.context.ownerId"
-    :scope="item.context.scope"
+    :scope="item.context.target === 'proponent' ? undefined : item.context.scope"
     :rbac="item.rbac"
     :config="item.config" />
 </template>

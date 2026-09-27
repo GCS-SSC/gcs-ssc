@@ -87,6 +87,6 @@ const resolveComponent = (componentName: string) => getGcsExtensionComponent(com
       :key="`${item.extensionKey}:${item.componentName}`"
       :extension-key="item.extensionKey"
       :config="item.config as GcsExtensionJsonConfig"
-      :context="context" />
+      :context="item.agencies ? { ...context, agencies: item.agencies } : context" />
   </div>
 </template>

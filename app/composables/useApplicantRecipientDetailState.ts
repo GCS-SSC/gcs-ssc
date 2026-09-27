@@ -21,6 +21,10 @@ import { throwFetchResponseError } from '~/utils/fetch-error'
 
 type ApplicantRecipientDetailProfile = ApplicantRecipientProfileRow
 
+const toSectionSlug = (label: string): string => label.normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+
 export const APPLICANT_RECIPIENT_DETAIL_TAB_KEYS = {
   general: 'agency.tabs.general',
   agencyFinancialIds: 'applicant_recipient.agency_financial_ids.title',
@@ -43,7 +47,7 @@ export const APPLICANT_RECIPIENT_DETAIL_TAB_KEYS = {
  * @returns Fetched profile state plus tab metadata for the detail view.
  */
 export const useApplicantRecipientDetailState = (id: string) => {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const localePath = useLocalePath()
   const { getHeroCollapsed } = useDashboard()
   const { getBilingualValue } = useBilingualValue()
@@ -71,11 +75,9 @@ export const useApplicantRecipientDetailState = (id: string) => {
   queueMicrotask(() => {
     void refreshProfile()
   })
-  const selectedExtensionAgencyId = ref('')
   const { items: extensionItems, tabs: extensionTabs } = useExtensionEntityTabs({
     target: 'proponent',
-    applicantRecipientId: id,
-    agencyId: selectedExtensionAgencyId
+    applicantRecipientId: id
   })
 
   /**
@@ -205,16 +207,24 @@ export const useApplicantRecipientDetailState = (id: string) => {
       })
     }
 
-    for (const tab of extensionTabs.value) {
-      const item = extensionItems.value.find(extensionItem => extensionItem.value === tab.value)
+    const extensionRouteValues = extensionTabs.value.map(tab => {
+      const item = extensionItems.value.find(extensionItem => extensionItem.value === tab.key)
+      return item ? `extension-${toSectionSlug(locale.value === 'fr' ? item.label.fr : item.label.en) || toSectionSlug(item.tabId)}` : ''
+    })
+    for (const [index, tab] of extensionTabs.value.entries()) {
+      const item = extensionItems.value.find(extensionItem => extensionItem.value === tab.key)
       if (!item) {
         continue
       }
-      nextTabMap.set(tab.value, {
+      const baseValue = extensionRouteValues[index] ?? ''
+      const routeValue = extensionRouteValues.filter(value => value === baseValue).length > 1
+        ? `${baseValue}-${toSectionSlug(item.extensionKey)}-${toSectionSlug(item.tabId)}`
+        : baseValue
+      nextTabMap.set(tab.key, {
         key: tab.key,
         label: tab.label,
         icon: tab.icon,
-        value: tab.value,
+        value: routeValue,
         component: ExtensionEntityTabPanel,
         getProps: () => ({ item })
       })
@@ -247,7 +257,6 @@ export const useApplicantRecipientDetailState = (id: string) => {
     activeTabComponent,
     activeTabProps,
     breadcrumbItems,
-    isHeroCollapsed,
-    selectedExtensionAgencyId
+    isHeroCollapsed
   }
 }

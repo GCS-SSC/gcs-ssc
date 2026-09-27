@@ -2686,8 +2686,6 @@
     }
   },
   "applicant_recipient": {
-    "extension_agency_context": "Contexte d’agence pour les extensions",
-    "extension_agency_context_placeholder": "Sélectionnez une agence pour les fonctions propres à l’agence",
     "list_views": {
       "all": "Tous les promoteurs",
       "mine": "Mes promoteurs",

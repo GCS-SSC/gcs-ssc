@@ -48,6 +48,7 @@ import { resolveAssignmentCommonUserId } from '~~/server/utils/entity-assignment
 import { lockTransferPaymentStreams } from '~~/server/utils/transfer-payment-stream-lock'
 import { assertBusinessStatusMutationAllowed } from '~~/server/utils/business-status-runtime'
 import { assertAgreementCloseoutWriteAllowed } from '~~/server/utils/agreement-write-transaction'
+import { listApplicantRecipientContributionAgencies } from '~~/server/utils/applicant-recipient-auth'
 
 const throwExtensionDispatchError = (
   statusCode: number,
@@ -234,8 +235,20 @@ const prepareExtensionRbacContext = async (
   const requestedAgencyId = rbac.entity.target === 'proponent'
     ? resolvedHandler.params.agencyId ?? getQuery(event).agencyId
     : undefined
-  const entityContext = await resolveExtensionEntityContext(event.context.$db, rbac.entity.target, resolvedEntityId,
+  let entityContext = await resolveExtensionEntityContext(event.context.$db, rbac.entity.target, resolvedEntityId,
     typeof requestedAgencyId === 'string' ? requestedAgencyId : undefined)
+  if (!entityContext && rbac.entity.target === 'proponent' && requestedAgencyId === undefined
+    && rbac.action === 'read') {
+    const agencies = await listApplicantRecipientContributionAgencies(authContext, 'read', event.context.$db)
+    for (const agency of agencies) {
+      const candidate = await resolveExtensionEntityContext(event.context.$db, 'proponent', resolvedEntityId, agency.id)
+      if (!candidate) continue
+      const config = await getExtensionConfigurationForEntity(event.context.$db, extensionKey, candidate)
+      if (!config || !await canAccessExtensionEntity(authContext, rbac, candidate, event.context.$db)) continue
+      entityContext = candidate
+      break
+    }
+  }
   if (entityContext === null) {
     throwExtensionDispatchError(404, 'EXTENSION_RBAC_ENTITY_NOT_FOUND', 'Extension RBAC entity not found.')
   }

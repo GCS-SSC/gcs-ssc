@@ -2686,8 +2686,6 @@
     }
   },
   "applicant_recipient": {
-    "extension_agency_context": "Agency context for extensions",
-    "extension_agency_context_placeholder": "Select an agency for agency specific features",
     "list_views": {
       "all": "All Proponents",
       "mine": "My Proponents",

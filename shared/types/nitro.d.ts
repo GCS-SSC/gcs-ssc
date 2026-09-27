@@ -93,6 +93,7 @@ declare module 'nitropack' {
       agreementAccess: GcsExtensionAgreementAccess
       applicantRecipientId: string
       agencyId: string
+      agencyIds: string[]
       rawBody: Record<string, unknown>
       validatedBody: ApplicantRecipientProfilePatch
       updatedProfile: Record<string, unknown>

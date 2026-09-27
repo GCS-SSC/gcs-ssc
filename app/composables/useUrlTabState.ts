@@ -192,6 +192,7 @@ export const useUrlTabState = ({
 
     for (const item of tabsRef.value) {
       aliases.set(String(item.value), item.key)
+      aliases.set(item.key, item.key)
 
       if (typeof getLocaleMessage !== 'function') {
         continue

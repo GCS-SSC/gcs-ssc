@@ -10,9 +10,9 @@ import type {
   GcsRegisteredExtension
 } from '~~/shared/utils/extensions'
 import { forbidden, notFound } from '~~/server/utils/api-errors'
-import { authorize } from '~~/server/utils/authorize'
+import { authorize, requireAuthContext } from '~~/server/utils/authorize'
 import { canAccessAgreement, resolveAgreementScopeContext } from '~~/server/utils/agreement'
-import { canAccessApplicantRecipient } from '~~/server/utils/applicant-recipient-auth'
+import { canAccessApplicantRecipient, listApplicantRecipientContributionAgencies } from '~~/server/utils/applicant-recipient-auth'
 import {
   getRegisteredExtensions,
   resolveExtensionRuntimeSlot,
@@ -194,52 +194,40 @@ const resolveProponentRuntimeResponse = async (
   db: Kysely<Database>,
   query: ExtensionRuntimeSlotQuery
 ): Promise<ExtensionRuntimeResponse> => {
+  if (query.agencyId !== undefined) return await forbidden(event)
   if (!query.applicantRecipientId) {
-    if (query.permissionAction !== 'create' || !query.agencyId) return await forbidden(event)
-    const agency = await db
-      .selectFrom('Agency_Profile')
-      .select('id')
-      .where('id', '=', query.agencyId)
-      .where('_deleted', '=', false)
-      .executeTakeFirst()
-    if (!agency) return await notFound(event, 'AGENCY_NOT_FOUND', 'apiErrors.agency.not_found')
-    await authorize(event, 'applicant_recipient', 'create', { type: 'agency', agencyId: query.agencyId })
-    return await resolveAgencyRuntimeResponse(event, db, query)
-  }
-
-  const profile = await db
-    .selectFrom('Applicant_Recipient_Profile')
-    .select('id')
-    .where('id', '=', query.applicantRecipientId)
-    .where('_deleted', '=', false)
-    .executeTakeFirst()
-  if (!profile) {
-    return await notFound(event, 'APPLICANT_RECIPIENT_PROFILE_NOT_FOUND', 'apiErrors.applicant_recipient.profile_not_found')
-  }
-
-  const agencyId = query.agencyId
-  if (!agencyId) {
-    return await notFound(event, 'APPLICANT_RECIPIENT_PROFILE_NOT_FOUND', 'apiErrors.applicant_recipient.profile_not_found')
-  }
-
-  const agency = await db.selectFrom('Agency_Profile').select('id')
-    .where('id', '=', agencyId).where('_deleted', '=', false).executeTakeFirst()
-  if (!agency) return await notFound(event, 'AGENCY_NOT_FOUND', 'apiErrors.agency.not_found')
-
-  await authorize(event, 'applicant_recipient', query.permissionAction, async ({ context }) => {
-    const canAccess = await canAccessApplicantRecipient(
-      context,
-      String(profile.id),
-      query.permissionAction,
-      db
-    )
-    const canAccessAgency = context.userAbilities.authorize('applicant_recipient', query.permissionAction, {
-      type: 'agency', agencyId
+    if (query.permissionAction !== 'create') return await forbidden(event)
+    await authorize(event, 'applicant_recipient', 'create', async ({ context }) => {
+      const agencies = await listApplicantRecipientContributionAgencies(context, 'create', db)
+      return agencies.length ? { bypass: true } : { denied: true }
     })
-    return canAccess && canAccessAgency ? { bypass: true } : { denied: true }
-  })
-
-  return await resolveAgencyRuntimeResponse(event, db, { ...query, agencyId })
+  } else {
+    const profile = await db.selectFrom('Applicant_Recipient_Profile').select('id')
+      .where('id', '=', query.applicantRecipientId).where('_deleted', '=', false).executeTakeFirst()
+    if (!profile) return await notFound(event, 'APPLICANT_RECIPIENT_PROFILE_NOT_FOUND', 'apiErrors.applicant_recipient.profile_not_found')
+    await authorize(event, 'applicant_recipient', query.permissionAction, async ({ context }) =>
+      await canAccessApplicantRecipient(context, String(profile.id), query.permissionAction, db)
+        ? { bypass: true }
+        : { denied: true })
+  }
+  const context = await requireAuthContext(event)
+  const candidates = await listApplicantRecipientContributionAgencies(context, query.permissionAction, db)
+  const grouped = new Map<string, ExtensionRuntimeSlotItem>()
+  for (const agency of candidates) {
+    const response = await resolveAgencyRuntimeResponse(event, db, { ...query, agencyId: agency.id })
+    for (const item of response.items) {
+      const existing = grouped.get(item.extensionKey)
+      if (existing) existing.agencies?.push({
+        agencyId: agency.id, nameEn: agency.nameEn, nameFr: agency.nameFr, config: item.config
+      })
+      else grouped.set(item.extensionKey, {
+        ...item,
+        config: {},
+        agencies: [{ agencyId: agency.id, nameEn: agency.nameEn, nameFr: agency.nameFr, config: item.config }]
+      })
+    }
+  }
+  return { slot: query.slot, items: [...grouped.values()] }
 }
 
 /** Dispatches runtime configuration loading for agency or stream routes. */
@@ -249,7 +237,8 @@ export const resolveExtensionRuntimeResponse = async (
 ): Promise<ExtensionRuntimeResponse> => {
   const db = event.context.$db
 
-  if (!query.streamId && !query.agencyId && !query.applicantRecipientId) {
+  if (!query.streamId && !query.agencyId && !query.applicantRecipientId
+    && query.slot !== 'proponent.descriptions.after') {
     return emptyRuntimeResponse(query)
   }
 

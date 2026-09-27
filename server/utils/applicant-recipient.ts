@@ -10,9 +10,10 @@ import { badRequest, notFound } from '~~/server/utils/api-errors'
 import { parseI18n, readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import {
   authorizeFreshAssignedItem,
+  requireAuthContext,
   requireFreshAuthContext
 } from '~~/server/utils/authorize'
-import { executeFreshAuthorizedApplicantRecipientWrite } from '~~/server/utils/applicant-recipient-auth'
+import { executeFreshAuthorizedApplicantRecipientWrite, listApplicantRecipientContributionAgencies } from '~~/server/utils/applicant-recipient-auth'
 import { lockRegisteredExtensionScopes } from '~~/server/utils/extensions'
 import { listVisibleAgreementOptions } from '~~/server/utils/agreement'
 import {
@@ -467,6 +468,7 @@ const emitApplicantRecipientProfileUpdated = async (
   db: Transaction<Database>,
   applicantRecipientId: string,
   agencyId: string,
+  agencyIds: string[],
   rawBody: Record<string, unknown>,
   validatedBody: ApplicantRecipientProfilePatch,
   updatedProfile: Record<string, unknown>
@@ -485,6 +487,7 @@ const emitApplicantRecipientProfileUpdated = async (
       } satisfies GcsExtensionAgreementAccess,
       applicantRecipientId,
       agencyId,
+      agencyIds,
       rawBody,
       validatedBody,
       updatedProfile
@@ -502,7 +505,7 @@ class ApplicantRecipientExtensionScopeChanged extends Error {
 const resolveApplicantRecipientExtensionScopes = async (
   db: Kysely<Database>,
   applicantRecipientId: string,
-  selectedAgencyId?: string
+  selectedAgencyIds: string[] = []
 ): Promise<ApplicantRecipientExtensionScope[]> => {
   const rows = await db
     .selectFrom('Funding_Case_Agreement_Applicant_Recipient')
@@ -532,7 +535,7 @@ const resolveApplicantRecipientExtensionScopes = async (
     ])
     .execute()
   const streamsByAgency = new Map<string, Set<string>>()
-  if (selectedAgencyId) streamsByAgency.set(selectedAgencyId, new Set())
+  for (const agencyId of selectedAgencyIds) streamsByAgency.set(agencyId, new Set())
   for (const row of rows) {
     const agencyId = String(row.agency_id)
     const streamIds = streamsByAgency.get(agencyId) ?? new Set<string>()
@@ -564,10 +567,21 @@ export const patchApplicantRecipientProfile = async (
     return await badRequest(event, 'INVALID_ID', 'apiErrors.request.invalid_id')
   }
 
+  const extensionPayload = rawBody.extensions
+  const hasExtensionPayload = extensionPayload !== null && typeof extensionPayload === 'object'
+    && !Array.isArray(extensionPayload) && Object.keys(extensionPayload).length > 0
+  const resolveContributionAgencyIds = async (context: Awaited<ReturnType<typeof requireAuthContext>>, connection: Kysely<Database>) =>
+    hasExtensionPayload
+      ? (await listApplicantRecipientContributionAgencies(context, 'update', connection)).map(agency => agency.id)
+      : []
+
   try {
     const initial = await getApplicantRecipientProfileForPatch(event, db, id)
     if (!hasKey(initial, 'id')) return initial
-    let plannedScopes = await resolveApplicantRecipientExtensionScopes(db, id, selectedAgencyId)
+    const contributionAgencyIds = await resolveContributionAgencyIds(await requireAuthContext(event), db)
+    let plannedScopes = await resolveApplicantRecipientExtensionScopes(db, id, [
+      ...contributionAgencyIds, ...(selectedAgencyId ? [selectedAgencyId] : [])
+    ])
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
@@ -581,7 +595,10 @@ export const patchApplicantRecipientProfile = async (
           const destinationAgencyId = hasOwn(validated, 'egcs_ar_leadagency') && validated.egcs_ar_leadagency
             ? String(validated.egcs_ar_leadagency)
             : currentAgencyId
-          const currentScopes = await resolveApplicantRecipientExtensionScopes(trx, id, selectedAgencyId)
+          const currentContributionAgencyIds = await resolveContributionAgencyIds(context, trx)
+          const currentScopes = await resolveApplicantRecipientExtensionScopes(trx, id, [
+            ...currentContributionAgencyIds, ...(selectedAgencyId ? [selectedAgencyId] : [])
+          ])
           if (!extensionScopesMatch(plannedScopes, currentScopes)) {
             throw new ApplicantRecipientExtensionScopeChanged(currentScopes)
           }
@@ -628,7 +645,7 @@ export const patchApplicantRecipientProfile = async (
                 .where('_deleted', '=', false).returningAll().executeTakeFirstOrThrow()
 
           await emitApplicantRecipientProfileUpdated(
-            event, trx, id, selectedAgencyId ?? '',
+            event, trx, id, selectedAgencyId ?? '', currentContributionAgencyIds,
             rawBody, validated, profile as Record<string, unknown>
           )
 
