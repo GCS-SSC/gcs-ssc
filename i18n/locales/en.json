@@ -2233,6 +2233,41 @@
       "search": "Search addresses",
       "address_type": "Address type"
     },
+    "financial_summary": {
+      "title": "Financial Summary",
+      "fiscal_year": "Fiscal year",
+      "grid_note": "Claims, reconciliations and payments appear in the month their period ends, including overlapping periods. Budget is annual; dashes mark no monthly amount.",
+      "budget_line": "Budget line",
+      "measure": "Measure",
+      "filter_title": "Show measures",
+      "show_all": "All",
+      "show_only": "Show only {measure}",
+      "measures": {
+        "forecast": "Forecast",
+        "budget": "Annual budget",
+        "claimed": "Claimed",
+        "reconciled": "Reconciled"
+      },
+      "forecast_source": {
+        "active": "Active forecast",
+        "none": "No active forecast"
+      },
+      "forecast_version": "Version {version}",
+      "currency_heading": "{currency} amounts",
+      "grid_caption": "Monthly financial summary for {year} in {currency}",
+      "scroll_hint": "Scroll the table sideways to compare amounts.",
+      "not_allocated_short": "—",
+      "year_total": "Year total",
+      "paid": "Paid",
+      "payments": "Payments",
+      "lump_sum_note": "Each payment appears in its period-end month, across all budget lines",
+      "payment_count": "{count} payments",
+      "payment_count_one": "1 payment",
+      "no_fiscal_years": "No fiscal years have been added to this agreement yet.",
+      "no_financial_data": "No financial data is available for this fiscal year.",
+      "no_lines": "No budget or claim lines for this currency.",
+      "load_failed": "Financial summary could not be loaded"
+    },
     "budget": {
       "title": "Budget",
       "search": "Search budget line items",

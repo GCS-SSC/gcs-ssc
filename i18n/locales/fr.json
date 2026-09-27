@@ -2233,6 +2233,41 @@
       "search": "Rechercher des adresses",
       "address_type": "Type d'adresse"
     },
+    "financial_summary": {
+      "title": "Sommaire financier",
+      "fiscal_year": "Exercice financier",
+      "grid_note": "Les réclamations, les rapprochements et les paiements figurent au mois où leur période se termine, même si les périodes se chevauchent. Le budget est annuel; les tirets indiquent l'absence de montant mensuel.",
+      "budget_line": "Ligne budgétaire",
+      "measure": "Mesure",
+      "filter_title": "Afficher les mesures",
+      "show_all": "Tout",
+      "show_only": "Afficher seulement {measure}",
+      "measures": {
+        "forecast": "Prévision",
+        "budget": "Budget annuel",
+        "claimed": "Réclamé",
+        "reconciled": "Rapproché"
+      },
+      "forecast_source": {
+        "active": "Prévision active",
+        "none": "Aucune prévision active"
+      },
+      "forecast_version": "Version {version}",
+      "currency_heading": "Montants en {currency}",
+      "grid_caption": "Sommaire financier mensuel pour {year} en {currency}",
+      "scroll_hint": "Faire défiler le tableau horizontalement pour comparer les montants.",
+      "not_allocated_short": "—",
+      "year_total": "Total de l'exercice",
+      "paid": "Payé",
+      "payments": "Paiements",
+      "lump_sum_note": "Chaque paiement figure au mois de fin de sa période, pour toutes les lignes budgétaires",
+      "payment_count": "{count} paiements",
+      "payment_count_one": "1 paiement",
+      "no_fiscal_years": "Aucun exercice financier n'a encore été ajouté à cette entente.",
+      "no_financial_data": "Aucune donnée financière n'est disponible pour cet exercice.",
+      "no_lines": "Aucune ligne budgétaire ou de réclamation pour cette devise.",
+      "load_failed": "Impossible de charger le sommaire financier"
+    },
     "budget": {
       "title": "Budget",
       "search": "Rechercher des lignes budgétaires",

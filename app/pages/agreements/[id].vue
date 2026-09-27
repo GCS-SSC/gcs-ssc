@@ -12,6 +12,7 @@ import AgreementAddressesTab from '~/components/Agreement/AgreementAddressesTab.
 import AgreementNotesTab from '~/components/Agreement/AgreementNotesTab.vue'
 import AgreementApplicantRecipientsTab from '~/components/Agreement/AgreementApplicantRecipientsTab.vue'
 import AgreementBudgetTab from '~/components/Agreement/AgreementBudgetTab.vue'
+import AgreementFinancialSummaryTab from '~/components/Agreement/AgreementFinancialSummaryTab.vue'
 import AgreementCommitmentsTab from '~/components/Agreement/AgreementCommitmentsTab.vue'
 import AgreementPaymentsTab from '~/components/Agreement/AgreementPaymentsTab.vue'
 import AgreementForecastsTab from '~/components/Agreement/AgreementForecastsTab.vue'
@@ -162,6 +163,11 @@ const tabs = computed(() => {
       key: 'agreement.budget.title',
       value: 'budget',
       icon: 'i-lucide-banknote'
+    })
+    nextTabs.push({
+      key: 'agreement.financial_summary.title',
+      value: 'financial-summary',
+      icon: 'i-lucide-chart-no-axes-combined'
     })
     nextTabs.push({
       key: 'agreement.amendments.recommendation',
@@ -349,7 +355,7 @@ const cancel = () => {
 
 <template>
   <NuxtPage v-if="isChildDetailRoute" />
-  <div v-else class="flex w-full flex-col">
+  <div v-else class="flex min-w-0 flex-1 flex-col">
     <div v-if="status === 'pending' && !profile" role="status" aria-live="polite" class="flex min-h-32 items-center justify-center gap-2 text-sm text-muted">
       <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin" aria-hidden="true" />
       <span>{{ t('common.loading_records') }}</span>
@@ -359,7 +365,7 @@ const cancel = () => {
         <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" @click="() => { void refreshProfile() }" />
       </template>
     </UAlert>
-    <UDashboardPanel v-if="profile" id="agreement-detail" class="w-full">
+    <UDashboardPanel v-if="profile" id="agreement-detail" class="min-w-0 flex-1">
       <template #header>
         <UDashboardNavbar>
           <template #leading>
@@ -381,7 +387,7 @@ const cancel = () => {
       </template>
 
       <template #body>
-        <div class="flex flex-1 flex-col">
+        <div class="flex min-w-0 flex-1 flex-col">
           <AgreementProfileHero
             :profile="profile"
             :is-collapsed="isHeroCollapsed"
@@ -447,6 +453,10 @@ const cancel = () => {
               :can-create-fiscal-year="canCreateChildRecords"
               :can-update-fiscal-year="canUpdateChildRecords"
               :can-delete-fiscal-year="canDeleteChildRecords" />
+
+            <AgreementFinancialSummaryTab
+              v-else-if="selectedTab === 'financial-summary'"
+              :agreement-id="id" />
 
             <CommonWorkflowSection
               v-else-if="selectedTab === 'recommendation'"
