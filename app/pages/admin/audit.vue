@@ -12,7 +12,7 @@ const query = computed(() => ({
     [key, key === 'from' || key === 'to' ? new Date(value).toISOString() : value]))
 }))
 const { permissionRevision } = useAuth()
-const { items: rows, totalRecords, status, refresh, pagination, search } = useResourceTable<AuditSummary>({ fetchUrl: computed(() => `/api/admin/audit/${tab.value}`), query, contextKey: permissionRevision, initialPageSize: 20 })
+const { items: rows, totalRecords, status, refresh, pagination } = useResourceTable<AuditSummary>({ fetchUrl: computed(() => `/api/admin/audit/${tab.value}`), query, contextKey: permissionRevision, initialPageSize: 20 })
 const { data: retention, error: retentionError, refresh: refreshRetention } = await useFetch<{ auditDays: number; accessDays: number }, Error, string>('/api/admin/audit/config' as string)
 const selected: Ref<{ id: string; kind: string } | null> = ref(null)
 const detail: Ref<AuditDetail | null> = ref(null)
@@ -47,7 +47,7 @@ const loadDetail = async () => {
     if (generation === detailGeneration) detailStatus.value = 'error'
   }
 }
-watch([tab, filters, search, permissionRevision], () => {
+watch([tab, filters, permissionRevision], () => {
   pagination.value.pageIndex = 0
   selected.value = null
   clearDetail()
@@ -128,16 +128,15 @@ const isHeroCollapsed = getHeroCollapsed('admin-audit')
               </UFormField>
             </div>
           </div>
-          <CommonResourceLayoutPage
+          <CommonResourceLayoutCard
             v-model:pagination="pagination"
-            v-model:search="search"
-            class="min-h-80" :data="rows" :columns="columns" :total-records="totalRecords" :request-status="status" :show-button="false" @retry="refresh()">
+            :data="rows" :columns="columns" :total-records="totalRecords" :request-status="status" :show-toolbar="false" @retry="refresh()">
             <template #actions-cell="{ row }">
               <div class="flex justify-end gap-2">
                 <UButton icon="i-lucide-eye" color="neutral" variant="ghost" :aria-label="t('audit.details')" @click="openDetail(row.original)" />
               </div>
             </template>
-          </CommonResourceLayoutPage>
+          </CommonResourceLayoutCard>
         </CommonEntityEditorWorkspace>
       </div>
       <UModal :open="selected !== null" :title="t('audit.details')" :ui="{ content: 'sm:max-w-2xl' }" @update:open="value => { if (!value) { selected = null; clearDetail() } }">

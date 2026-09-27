@@ -86,6 +86,7 @@ const bilingualColumns: BilingualColumnConfig<TransferPaymentProfileRow>[] = [
         icon="i-lucide-wand-2"
         color="neutral"
         variant="outline"
+        class="max-w-full"
         @click="emit('wizard')" />
     </template>
 

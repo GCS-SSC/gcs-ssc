@@ -88,7 +88,7 @@ const columns: TableColumnInput<Agency>[] = [
           <template #actions-cell="{ row }">
             <div class="flex justify-end">
               <UButton
-                icon="i-lucide-eye" color="neutral" variant="ghost"
+                icon="i-lucide-arrow-right" color="neutral" variant="ghost"
                 :to="localePath(appRouteLocations.extensionAgencyWorkspace(extensionKey, row.original.id))"
                 :aria-label="`${t('common.view_details')}: ${locale === 'fr' ? row.original.nameFr : row.original.nameEn}`" />
             </div>

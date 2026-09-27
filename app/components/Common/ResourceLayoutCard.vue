@@ -14,6 +14,7 @@ const {
   statusFilterLabel,
   buttonLabel,
   showButton = true,
+  showToolbar = true,
   showSearch = true,
   showColumnToggle = true,
   searchPlaceholder,
@@ -30,6 +31,7 @@ const {
   statusFilterLabel?: string
   buttonLabel?: string
   showButton?: boolean
+  showToolbar?: boolean
   showSearch?: boolean
   showColumnToggle?: boolean
   searchPlaceholder?: string
@@ -64,6 +66,7 @@ defineExpose({
 <template>
   <div class="w-full min-w-0">
     <CommonTableToolbar
+      v-if="showToolbar"
       v-model:search="search"
       v-model:status-filter="statusFilter"
       :status-enum-name="statusEnumName"
@@ -85,13 +88,14 @@ defineExpose({
       :status="requestStatus"
       :has-stale-rows="hasStaleRows"
       class="border-x border-default px-4 pt-4"
-      :class="embedded ? 'border-x-0' : undefined"
+      :class="embedded ? 'border-x-0' : showToolbar ? undefined : 'rounded-xl border'"
       @retry="$emit('retry')" />
 
     <div
       v-if="isInitialLoading"
       data-testid="resource-table-loading"
-      class="flex min-h-32 items-center justify-center gap-2 border-y border-default px-4 py-8 text-sm text-muted"
+      class="flex min-h-32 items-center justify-center gap-2 border-default px-4 py-8 text-sm text-muted"
+      :class="showToolbar ? 'border-y' : 'rounded-xl border'"
       aria-live="polite">
       <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin" aria-hidden="true" />
       <span>{{ t('common.loading_records') }}</span>
@@ -100,7 +104,7 @@ defineExpose({
     <div
       v-else-if="showTable"
       class="w-full min-w-0 overflow-hidden"
-      :class="embedded ? 'border-y border-default' : 'rounded-b-xl border border-t-0 border-default bg-white shadow-sm dark:bg-zinc-900'">
+      :class="embedded ? 'border-y border-default' : showToolbar ? 'rounded-b-xl border border-t-0 border-default bg-white shadow-sm dark:bg-zinc-900' : 'rounded-xl border border-default bg-white shadow-sm dark:bg-zinc-900'">
       <div
         data-testid="resource-table-scroll"
         class="w-full min-w-0 overflow-x-auto transition-opacity"

@@ -137,7 +137,7 @@ const submit = async () => {
         </template>
         <template #actions-cell="{ row }">
           <div class="flex justify-end gap-2">
-            <UButton icon="i-lucide-eye" color="neutral" variant="ghost" :aria-label="t('funding_case_intake.view_details')" :to="localePath(appRouteLocations.fundingCaseIntakeDetail(String(row.original.id)))" />
+            <UButton icon="i-lucide-arrow-right" color="neutral" variant="ghost" :aria-label="t('funding_case_intake.view_details')" :to="localePath(appRouteLocations.fundingCaseIntakeDetail(String(row.original.id)))" />
           </div>
         </template>
       </CommonResourceLayoutPage>
