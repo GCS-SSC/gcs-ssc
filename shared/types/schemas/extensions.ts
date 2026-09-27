@@ -62,6 +62,13 @@ export interface ExtensionAgencyRegistryItem {
   }
 }
 
+export interface ExtensionAgencyWorkspaceListItem {
+  key: string
+  label: { en: string; fr: string }
+  icon?: string
+  agencies: Array<{ id: string; nameEn: string; nameFr: string }>
+}
+
 export interface ExtensionStreamRegistryItem {
   extension: GcsClientExtensionManifest
   canConfigure: boolean

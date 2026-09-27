@@ -4,12 +4,14 @@ import type { TableColumnInput } from '~/composables/useTableColumns'
 import { useExtensionConfigurationState } from '~/composables/useExtensionConfigurationState'
 import type { ExtensionAgencyRegistryItem } from '~~/shared/types/schemas/extensions'
 import { getGcsExtensionComponent } from '#gcs-extensions/registry'
+import { appRouteLocations } from '~/utils/route-locations'
 
 type ExtensionAgencyTableRow = ExtensionAgencyRegistryItem & Record<string, unknown>
 
 const { agencyId, canUpdate } = defineProps<{ agencyId: string, canCreate: boolean, canUpdate: boolean, canDelete: boolean }>()
 
 const { t, locale } = useI18n()
+const localePath = useLocalePath()
 const toast = useToast()
 const canEdit = computed(() => canUpdate)
 const canConfigure = (item: ExtensionAgencyRegistryItem) => canEdit.value && item.canConfigure
@@ -60,6 +62,14 @@ const selectedConfigComponent = computed(() => {
   const componentName = selectedItem.value?.extension.admin.agency?.componentName
   return componentName ? getGcsExtensionComponent(componentName) : null
 })
+
+const configureExtension = async (item: ExtensionAgencyTableRow) => {
+  if (item.extension.admin.agencyWorkspace) {
+    if (item.enabled) await navigateTo(localePath(appRouteLocations.extensionAgencyWorkspace(item.extension.key, agencyId)))
+    return
+  }
+  openConfigure(item)
+}
 
 const updateEnablement = async (item: ExtensionAgencyRegistryItem, enabled: boolean) => {
   if (!canConfigure(item) || isRowBusy(item) || (item.storageProvider?.selected && !enabled)) {
@@ -255,10 +265,10 @@ const selectStorageProvider = async (item: ExtensionAgencyRegistryItem) => {
               variant="ghost"
               size="sm"
               class="cursor-default"
-              :disabled="isRowBusy(row.original)"
+              :disabled="isRowBusy(row.original) || (Boolean(row.original.extension.admin.agencyWorkspace) && !row.original.enabled)"
               :aria-label="`${t('extensions.configure')}: ${extensionName(row.original)}`"
               :title="t('extensions.configure')"
-              @click="openConfigure(row.original)" />
+              @click="configureExtension(row.original)" />
           </UTooltip>
         </div>
       </template>

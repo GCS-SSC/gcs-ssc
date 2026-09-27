@@ -97,6 +97,19 @@ const collectExtensionEntityTabItems = async (
 
     const tabs = extension.client.tabs.filter(tab => tab.target === target)
     for (const tab of tabs) {
+      if (tab.agencyConfigVisibility) {
+        const agencySetting = await db.selectFrom('extensions.agency_enablement')
+          .select('config')
+          .where('extension_key', '=', extension.key)
+          .where('agency_id', '=', entityContext.agencyId)
+          .where('enabled', '=', true)
+          .where('_deleted', '=', false).executeTakeFirst()
+        const agencyConfig = agencySetting?.config
+        const value = agencyConfig && typeof agencyConfig === 'object' && !Array.isArray(agencyConfig)
+          ? agencyConfig[tab.agencyConfigVisibility.key]
+          : undefined
+        if (typeof value !== 'string' || !tab.agencyConfigVisibility.values.includes(value)) continue
+      }
       const componentName = 'componentName' in tab ? String(tab.componentName) : ''
       if (!componentName) {
         continue

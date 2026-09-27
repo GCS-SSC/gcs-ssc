@@ -46,6 +46,7 @@ const EXTENSION_AUTHORIZATION_SUBJECTS = new Set<string>(AUTHORIZATION_SUBJECTS)
 const EXTENSION_SERVER_HANDLER_METHODS = new Set(['get', 'post', 'put', 'patch', 'delete'])
 const EXTENSION_HOST_CAPABILITIES = new Set([
   'agency-config',
+  'agency-workspace',
   'stream-config-modal',
   'stream-config-page',
   'entity-tabs',
@@ -317,6 +318,7 @@ export const validateExtensionServerHandlerRoutes = (
 const inferRequiredHostCapabilities = (definition: GcsExtensionDefinition): Set<GcsExtensionHostCapability> => {
   const capabilities = new Set<GcsExtensionHostCapability>()
   addImpliedCapability(capabilities, Boolean(definition.admin?.agency), 'agency-config')
+  addImpliedCapability(capabilities, Boolean(definition.admin?.agencyWorkspace), 'agency-workspace')
   addImpliedCapability(capabilities, Boolean(definition.admin?.streamConfig), 'stream-config-modal')
   addImpliedCapability(capabilities, Boolean(definition.admin?.streamConfigPage), 'stream-config-page')
   addImpliedCapability(capabilities, (definition.client?.tabs ?? []).length > 0, 'entity-tabs')
@@ -468,6 +470,19 @@ const validateFileStorageProviderDefinition = (definition: GcsExtensionDefinitio
 
 /** Validates extension identity, bilingual naming, SDK compatibility, and host capabilities. */
 export const validateExtensionDefinition = (definition: GcsExtensionDefinition, extensionDir: string): void => {
+  if (definition.admin?.agencyWorkspace) {
+    const workspace = definition.admin.agencyWorkspace
+    if (!definition.admin.agency || !workspace.label?.en || !workspace.label?.fr || !workspace.tabs.length) {
+      throw new Error(`Extension ${definition.key} agency workspace requires an agency component, bilingual label and tabs`)
+    }
+    const tabIds = new Set<string>()
+    for (const tab of workspace.tabs) {
+      if (!/^[a-z][a-z0-9-]*$/.test(tab.id) || !tab.label?.en || !tab.label?.fr || tabIds.has(tab.id)) {
+        throw new Error(`Extension ${definition.key} has an invalid or duplicate agency workspace tab`)
+      }
+      tabIds.add(tab.id)
+    }
+  }
   if (definition.configurationScope !== undefined && definition.configurationScope !== 'agency') {
     throw new Error(`Extension ${definition.key} configurationScope must be agency`)
   }
@@ -644,6 +659,11 @@ export const resolveEntityTab = async (
   }
   if (!tab.label?.en || !tab.label?.fr) {
     throw new Error(`Extension client tab ${index} must define bilingual label.en and label.fr`)
+  }
+  if (tab.agencyConfigVisibility && (!/^[a-z][a-zA-Z0-9]*$/.test(tab.agencyConfigVisibility.key)
+    || !tab.agencyConfigVisibility.values.length
+    || tab.agencyConfigVisibility.values.some(value => typeof value !== 'string' || !value))) {
+    throw new Error(`Extension client tab ${index} has invalid agency configuration visibility`)
   }
   validateExtensionRbacRequirement(tab.rbac, `client.tabs.${index}.rbac`)
   validateExtensionEntityRbacRequirement(tab.target, tab.rbac, `client.tabs.${index}.rbac`)
@@ -984,6 +1004,7 @@ const resolveExtensionAdmin = async (
   definition: GcsExtensionDefinition
 ) => ({
   agency: await resolveComponent(extensionDir, definition.admin?.agency, 'admin.agency.path'),
+  agencyWorkspace: definition.admin?.agencyWorkspace,
   streamConfig: await resolveComponent(extensionDir, definition.admin?.streamConfig, 'admin.streamConfig.path'),
   streamConfigPage: await resolveComponent(extensionDir, definition.admin?.streamConfigPage, 'admin.streamConfigPage.path')
 })
@@ -1170,6 +1191,7 @@ const buildClientExtensionMetadata = (extension: GcsResolvedExtension): GcsClien
     agency: extension.admin.agency
       ? withoutComponentPath(extension.admin.agency, componentName('ExtensionAgency', extension.key))
       : undefined,
+    agencyWorkspace: extension.admin.agencyWorkspace,
     streamConfig: extension.admin.streamConfig
       ? withoutComponentPath(extension.admin.streamConfig, componentName('ExtensionStreamConfig', extension.key))
       : undefined,

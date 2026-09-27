@@ -9,6 +9,10 @@ export const appRouteLocations = {
   login: () => ({ name: 'login' }),
   adminGwcoa: () => ({ name: 'admin-gwcoa' }),
   agencies: () => ({ name: 'agencies' }),
+  extensionAgencyWorkspaceList: (key: string) => ({ name: 'extension-id-agencies', params: { id: key } }),
+  extensionAgencyWorkspace: (key: string, agencyId: string) => ({
+    name: 'extension-id-agencies-agencyId', params: { id: key, agencyId }
+  }),
   agencyDetail: (id: string) => ({ name: 'agencies-id', params: { id } }),
   agencyReviewSetDetail: (id: string, reviewSetId: string) => ({
     name: 'agencies-id-review-sets-reviewSetId',

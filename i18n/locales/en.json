@@ -2940,6 +2940,7 @@
     }
   },
   "extensions": {
+    "workspace_agencies_description": "Choose an agency where this extension is enabled.",
     "select_storage_provider": "Select storage provider",
     "storage_provider_selected": "The agency storage provider was selected.",
     "storage_provider_selected_status": "Selected storage provider",

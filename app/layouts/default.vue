@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { DropdownMenuItem, NavigationMenuItem } from '@nuxt/ui'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
+import { getClientRequestUrl } from '~/utils/client-request-url'
+import type { ExtensionAgencyWorkspaceListItem } from '~~/shared/types/schemas/extensions'
 
 const { t } = useI18n()
 const toast = useToast()
@@ -11,6 +13,26 @@ const abilityHelpers = useCan()
 const { can, canAny } = abilityHelpers
 const canManageAssignments = abilityHelpers.canManageAssignments ?? (() => false)
 const { user, signOut } = useAuth()
+const { locale } = useI18n()
+const route = useRoute()
+const agencyWorkspaces: Ref<ExtensionAgencyWorkspaceListItem[]> = ref([])
+let workspaceRequestSequence = 0
+/** Refreshes Portal-style main-menu entries after navigation or RBAC changes. */
+const loadAgencyWorkspaces = async () => {
+  const sequence = ++workspaceRequestSequence
+  try {
+    const response = await fetch(getClientRequestUrl('/api/extensions/workspaces'))
+    const result = response.ok
+      ? (await response.json()) as { items: ExtensionAgencyWorkspaceListItem[] }
+      : { items: [] }
+    if (sequence !== workspaceRequestSequence) return
+    agencyWorkspaces.value = result.items
+  } catch {
+    if (sequence !== workspaceRequestSequence) return
+    agencyWorkspaces.value = []
+  }
+}
+watch(() => route.fullPath, loadAgencyWorkspaces, { immediate: true })
 
 const open: Ref<boolean> = ref(false)
 const canViewAudit = computed(() => canAny('audit', 'read', ['global', 'agency']))
@@ -127,6 +149,11 @@ const items = computed(
               }
             ]
           : []),
+        ...agencyWorkspaces.value.map((workspace: ExtensionAgencyWorkspaceListItem) => ({
+          label: locale.value === 'fr' ? workspace.label.fr : workspace.label.en,
+          icon: workspace.icon ?? 'i-lucide-panels-top-left',
+          to: localePath(appRouteLocations.extensionAgencyWorkspaceList(workspace.key))
+        })),
         ...(canViewApplicantRecipients.value
           ? [
               {
