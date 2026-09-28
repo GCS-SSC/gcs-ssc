@@ -5130,6 +5130,213 @@ const seedAgreement51Closeout = async (db: Kysely<Database>): Promise<void> => {
   }).execute()
 }
 
+/** Adds a two-year agreement that makes Financial Summary pacing and overlapping periods visible on a clean demo reset. */
+const seedFinancialSummaryShowcase = async (db: Kysely<Database>): Promise<void> => {
+  const source = await db.selectFrom('Funding_Case_Agreement_Profile').selectAll()
+    .where('id', '=', '51').where('_deleted', '=', false).executeTakeFirstOrThrow()
+  const actor = await db.selectFrom('Common_User').select('id')
+    .where('egcs_cn_email', '=', 'root@example.com').where('_deleted', '=', false).executeTakeFirstOrThrow()
+  const agency = await db.selectFrom('Transfer_Payment_Stream')
+    .innerJoin('Transfer_Payment_Profile', 'Transfer_Payment_Profile.id', 'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile')
+    .select('Transfer_Payment_Profile.egcs_tp_agency as id')
+    .where('Transfer_Payment_Stream.id', '=', source.egcs_fc_transferpaymentstream).executeTakeFirstOrThrow()
+  const statuses = await resolveAgencyStatusIds(db, String(agency.id))
+  const agreement = await db.insertInto('Funding_Case_Agreement_Profile').values({
+    egcs_fc_agreementnumber: 'AGR-FIN-DEMO-1',
+    egcs_fc_transferpaymentstream: source.egcs_fc_transferpaymentstream,
+    egcs_fc_financialsystemnumber: '99000051',
+    egcs_fc_title_en: 'Financial Summary and Pacing Showcase',
+    egcs_fc_title_fr: 'Démonstration du sommaire financier et du rythme',
+    egcs_fc_description_en: 'Illustrative two-year agreement with uneven monthly forecasts, overlapping claims, approved reconciliations, and period-end payments for the Financial Summary view.',
+    egcs_fc_description_fr: 'Entente illustrative de deux ans avec des prévisions mensuelles variables, des réclamations qui se chevauchent, des rapprochements approuvés et des paiements en fin de période pour le sommaire financier.',
+    egcs_fc_agreementtype: source.egcs_fc_agreementtype,
+    egcs_fc_agreementsubtype: source.egcs_fc_agreementsubtype,
+    egcs_fc_furtherdistribution: false,
+    egcs_fc_holdback: 0,
+    egcs_fc_holdbackbasis: source.egcs_fc_holdbackbasis,
+    egcs_fc_status: statuses.draft,
+    egcs_fc_authorizedassistancestartdate: new Date('2025-04-01T00:00:00Z'),
+    egcs_fc_authorizedassistanceenddate: new Date('2027-03-31T23:59:59Z'),
+    _deleted: false
+  }).returning('id').executeTakeFirstOrThrow()
+  const agreementId = String(agreement.id)
+  const actorId = String(actor.id)
+  const assign = async (entityType: Database['Common_Entity_Assignment']['egcs_cn_entitytype'], entityId: string): Promise<void> => {
+    await db.insertInto('Common_Entity_Assignment').values({
+      egcs_cn_entitytype: entityType, egcs_cn_entityid: entityId,
+      egcs_cn_user: actorId, egcs_cn_createdby: actorId, egcs_cn_isprimary: true
+    }).execute()
+  }
+  await assign('fundingcaseagreement', agreementId)
+  await db.updateTable('Funding_Case_Agreement_Profile').set({ egcs_fc_status: statuses.active })
+    .where('id', '=', agreementId).execute()
+
+  const sourceYears = await db.selectFrom('Funding_Case_Agreement_Budget_Fiscal_Year')
+    .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fiscalyear')
+    .select('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fiscalyear as fiscalYearId')
+    .where('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fundingagreement', '=', String(source.id))
+    .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
+    .orderBy('Agency_Fiscal_Year.egcs_ay_fiscalyear', 'asc').limit(2).execute()
+  const sourceCostLines = await db.selectFrom('Funding_Case_Agreement_Budget_Line_Item')
+    .innerJoin('Funding_Case_Agreement_Budget_Fiscal_Year', 'Funding_Case_Agreement_Budget_Fiscal_Year.id', 'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreementbudgetfiscalyear')
+    .select('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_organizationcostcategory as costLineId')
+    .where('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fundingagreement', '=', String(source.id))
+    .where('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fiscalyear', '=', String(sourceYears[0]?.fiscalYearId))
+    .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false)
+    .orderBy('Funding_Case_Agreement_Budget_Line_Item.id', 'asc').limit(2).execute()
+  if (sourceYears.length !== 2 || sourceCostLines.length !== 2) throw new Error('Agreement 51 must provide two fiscal years and two cost lines for the Financial Summary showcase.')
+
+  const forecastAmounts = [
+    [
+      ['6000', '8000', '7000', '9000', '12000', '15000', '14000', '12000', '10000', '9000', '10000', '8000'],
+      ['2000', '2500', '2500', '3000', '3500', '4000', '4500', '4000', '3500', '3500', '4000', '3000']
+    ],
+    [
+      ['8000', '9000', '10000', '12000', '14000', '17000', '18000', '16000', '14000', '12000', '11000', '9000'],
+      ['2500', '3000', '3500', '4000', '4500', '5000', '5500', '5500', '5000', '4500', '4000', '3000']
+    ]
+  ] as const
+  const budgetYears: Array<{ id: string, lineIds: [string, string] }> = []
+  for (const [yearIndex, sourceYear] of sourceYears.entries()) {
+    const year = await db.insertInto('Funding_Case_Agreement_Budget_Fiscal_Year').values({
+      egcs_fc_fundingagreement: agreementId, egcs_fc_fiscalyear: String(sourceYear.fiscalYearId), _deleted: false
+    }).returning('id').executeTakeFirstOrThrow()
+    const yearId = String(year.id)
+    const budgetAmounts = yearIndex === 0 ? ['120000.00', '40000.00'] : ['150000.00', '50000.00']
+    const lines = await db.insertInto('Funding_Case_Agreement_Budget_Line_Item').values(
+      budgetAmounts.map((amount, lineIndex) => ({
+        egcs_fc_fundingagreementbudgetfiscalyear: yearId,
+        egcs_fc_organizationcostcategory: String(sourceCostLines[lineIndex]!.costLineId),
+        egcs_fc_costsubsection: lineIndex === 0 ? 'Participant delivery' : 'Project operations',
+        egcs_fc_description: lineIndex === 0
+          ? `Participant support, community outreach, and service delivery in project year ${yearIndex + 1}.`
+          : `Equipment, coordination, accessibility, and reporting in project year ${yearIndex + 1}.`,
+        egcs_fc_totalamount: seedMoney(amount), egcs_fc_programfunding: seedMoney(amount),
+        egcs_fc_currency: 'cad' as const, egcs_fc_calculationmode: 'manual' as const, _deleted: false
+      }))
+    ).returning('id').execute()
+    const lineIds: [string, string] = [String(lines[0]!.id), String(lines[1]!.id)]
+    budgetYears.push({ id: yearId, lineIds })
+    const forecast = await db.insertInto('Funding_Case_Agreement_Forecast').values({
+      egcs_fc_fundingagreement: agreementId, egcs_fc_fiscalyear: yearId,
+      egcs_fc_status: statuses.draft, egcs_fc_active: false, _deleted: false
+    }).returning('id').executeTakeFirstOrThrow()
+    const forecastId = String(forecast.id)
+    await assign('fundingcaseforecast', forecastId)
+    await db.insertInto('Funding_Case_Agreement_Forecast_Line_Item').values(
+      forecastAmounts[yearIndex]!.flatMap((monthly, lineIndex) => monthly.map((amount, month) => ({
+        egcs_fc_agreementforecast: forecastId,
+        egcs_fc_fundingagreementbudgetlineitem: lineIds[lineIndex]!,
+        egcs_fc_month: month, egcs_fc_amount: seedMoney(`${amount}.00`),
+        egcs_fc_currency: 'cad' as const, egcs_fc_version: '0', _deleted: false
+      })))
+    ).execute()
+    await db.updateTable('Funding_Case_Agreement_Forecast')
+      .set({ egcs_fc_status: statuses.active, egcs_fc_active: true })
+      .where('id', '=', forecastId).execute()
+  }
+
+  const claims = [
+    { year: 0, start: 0, end: 3, received: '2025-08-12', amounts: ['22000.00', '6000.00'], reconciled: ['21000.00', '5500.00'] },
+    { year: 0, start: 1, end: 2, received: '2025-07-18', amounts: ['14000.00', '4000.00'], reconciled: ['13000.00', '3500.00'] },
+    { year: 0, start: 0, end: 2, received: '2025-07-30', amounts: ['6000.00', '2000.00'], reconciled: ['5500.00', '1500.00'] },
+    { year: 0, start: 4, end: 6, received: '2025-11-10', amounts: ['35000.00', '10000.00'], reconciled: ['33000.00', '9000.00'] },
+    { year: 0, start: 7, end: 9, received: '2026-02-12', amounts: ['28000.00', '7000.00'], reconciled: null },
+    { year: 1, start: 0, end: 1, received: '2026-06-15', amounts: ['18000.00', '6000.00'], reconciled: ['17000.00', '5500.00'] }
+  ] as const
+  for (const [claimIndex, claimSeed] of claims.entries()) {
+    const budgetYear = budgetYears[claimSeed.year]!
+    const claim = await db.insertInto('Funding_Case_Agreement_Claim').values({
+      egcs_fc_fundingagreement: agreementId, egcs_fc_fiscalyear: budgetYear.id,
+      egcs_fc_isfinalforyear: false, egcs_fc_periodstart: claimSeed.start, egcs_fc_periodend: claimSeed.end,
+      egcs_fc_receiveddate: new Date(`${claimSeed.received}T00:00:00Z`),
+      egcs_fc_status: statuses.draft, _deleted: false
+    }).returning('id').executeTakeFirstOrThrow()
+    const claimId = String(claim.id)
+    await assign('fundingcaseagreementclaim', claimId)
+    const lines = await db.insertInto('Funding_Case_Agreement_Claim_Line_Item').values(
+      claimSeed.amounts.map((amount, lineIndex) => ({
+        egcs_fc_fundingagreementclaim: claimId,
+        egcs_fc_fundingagreementbudgetlineitem: budgetYear.lineIds[lineIndex]!,
+        egcs_fc_description: lineIndex === 0 ? 'Participant delivery costs submitted for the period.' : 'Project operations costs submitted for the period.',
+        egcs_fc_amount: seedMoney(amount), egcs_fc_currency: 'cad' as const, _deleted: false
+      }))
+    ).returning('id').execute()
+    await db.updateTable('Funding_Case_Agreement_Claim').set({ egcs_fc_status: statuses.inReview })
+      .where('id', '=', claimId).execute()
+    if (!claimSeed.reconciled) continue
+    const reconciliation = await db.insertInto('Funding_Case_Agreement_Claim_Reconcile').values({
+      egcs_fc_fundingagreementclaim: claimId, egcs_fc_user: actorId,
+      egcs_fc_status: statuses.draft, egcs_fc_isfinal: true, _deleted: false
+    }).returning('id').executeTakeFirstOrThrow()
+    const reconciliationId = String(reconciliation.id)
+    await assign('fundingclaimreconcile', reconciliationId)
+    await db.insertInto('Funding_Case_Agreement_Claim_Reconcile_Line_Item').values(
+      claimSeed.reconciled.map((amount, lineIndex) => ({
+        egcs_fc_fundingagreementclaimreconcile: reconciliationId,
+        egcs_fc_lineitem: String(lines[lineIndex]!.id), egcs_fc_reconciled: seedMoney(amount), _deleted: false
+      }))
+    ).execute()
+    await db.updateTable('Funding_Case_Agreement_Claim_Reconcile').set({ egcs_fc_status: statuses.approved })
+      .where('id', '=', reconciliationId).execute()
+    await db.insertInto('Common_Completion').values({
+      egcs_cn_entitytype: 'fundingclaimreconcile', egcs_cn_entityid: reconciliationId,
+      egcs_cn_comments: `Illustrative approved reconciliation ${claimIndex + 1} for Financial Summary pacing.`,
+      egcs_cn_user: actorId, egcs_cn_disposition: 'no_workflow',
+      egcs_cn_completedat: new Date(`${claimSeed.received}T12:00:00Z`), _deleted: false
+    }).execute()
+  }
+
+  const sourceCommitment = await db.selectFrom('Funding_Case_Agreement_Commitment').select('egcs_fc_type')
+    .where('egcs_fc_fundingagreement', '=', String(source.id)).where('_deleted', '=', false)
+    .orderBy('id', 'asc').executeTakeFirstOrThrow()
+  const chart = await db.selectFrom('Transfer_Payment_Stream_Chart_of_Account').select('id')
+    .where('egcs_tp_transferpaymentstream', '=', source.egcs_fc_transferpaymentstream)
+    .where('_deleted', '=', false).orderBy('id', 'asc').executeTakeFirstOrThrow()
+  const commitment = await db.insertInto('Funding_Case_Agreement_Commitment').values({
+    egcs_fc_fundingagreement: agreementId, egcs_fc_type: sourceCommitment.egcs_fc_type,
+    egcs_fc_status: statuses.draft, egcs_fc_financialsystemnumber: '99000052',
+    egcs_fc_active: false, _deleted: false
+  }).returning('id').executeTakeFirstOrThrow()
+  const commitmentId = String(commitment.id)
+  await assign('fundingcaseagreementcommitment', commitmentId)
+  await db.updateTable('Funding_Case_Agreement_Commitment')
+    .set({ egcs_fc_status: statuses.active, egcs_fc_active: true })
+    .where('id', '=', commitmentId).execute()
+  const commitmentLine = await db.insertInto('Funding_Case_Agreement_Commitment_Line').values({
+    egcs_fc_commitment: commitmentId, egcs_fc_commitmentlinenumber: 1,
+    egcs_fc_transferpaymentstreamchartofaccount: String(chart.id),
+    egcs_fc_amount: seedMoney('360000.00'), _deleted: false
+  }).returning('id').executeTakeFirstOrThrow()
+  const payments = [
+    { year: 0, start: 0, end: 2, amount: '22000.00' },
+    { year: 0, start: 1, end: 2, amount: '4000.00' },
+    { year: 0, start: 3, end: 5, amount: '35000.00' },
+    { year: 0, start: 6, end: 8, amount: '25000.00' },
+    { year: 1, start: 0, end: 2, amount: '15000.00' }
+  ] as const
+  for (const paymentSeed of payments) {
+    const payment = await db.insertInto('Funding_Case_Agreement_Payment').values({
+      egcs_fc_fundingagreementcommitment: commitmentId,
+      egcs_fc_fiscalyear: budgetYears[paymentSeed.year]!.id,
+      egcs_fc_paymenttype: 'reimbursement',
+      egcs_fc_periodstart: paymentSeed.start, egcs_fc_periodend: paymentSeed.end,
+      egcs_fc_paymentamount: seedMoney(paymentSeed.amount), egcs_fc_currency: 'cad',
+      egcs_fc_comment: 'Illustrative paid period for the Financial Summary showcase.',
+      egcs_fc_status: statuses.draft, _deleted: false
+    }).returning('id').executeTakeFirstOrThrow()
+    const paymentId = String(payment.id)
+    await assign('fundingcasepayment', paymentId)
+    await db.insertInto('Funding_Case_Agreement_Payment_Line').values({
+      egcs_fc_fundingagreementpayment: paymentId,
+      egcs_fc_fundingagreementcommitmentline: String(commitmentLine.id),
+      egcs_fc_amount: seedMoney(paymentSeed.amount), _deleted: false
+    }).execute()
+    await db.updateTable('Funding_Case_Agreement_Payment').set({ egcs_fc_status: statuses.paid })
+      .where('id', '=', paymentId).execute()
+  }
+}
+
 const seedAgreementMonitorData = async (db: Kysely<Database>): Promise<void> => {
   const agreement = await db
     .selectFrom('Funding_Case_Agreement_Profile')
@@ -6460,6 +6667,7 @@ const seedDatabase = async (db: Kysely<Database>): Promise<void> => {
   await seedSuccessfulAgreementApproval(db, '51')
   await seedSuccessfulAgreementApproval(db, '60')
   await seedSharedAgencyCatalogStream(db)
+  await seedFinancialSummaryShowcase(db)
 }
 
 export const up = async (db: Kysely<Database>): Promise<void> => {
