@@ -89,6 +89,7 @@ COPY --from=build --chown=node:node /app/.output ./.output
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 
 RUN node -e 'const fs = require("node:fs"); const path = require("node:path"); const walk = (dir) => { for (const entry of fs.readdirSync(dir, { withFileTypes: true })) if (entry.isDirectory()) walk(path.join(dir, entry.name)); if (fs.readdirSync(dir).join() === "package.json") fs.rmSync(dir, { recursive: true }); }; walk("/app/.output/server/node_modules");' \
+  && node -e 'const fs = require("node:fs"); const path = require("node:path"); const deps = require("/app/.output/server/package.json").dependencies; for (const [name, version] of Object.entries(deps)) { const target = path.join("/app/node_modules", name); const stored = path.join("/app/node_modules/.bun", name.replace("/", "+") + "@" + version, "node_modules", name); if (!fs.existsSync(target) && fs.existsSync(stored)) { fs.mkdirSync(path.dirname(target), { recursive: true }); fs.symlinkSync(stored, target, "dir"); } }' \
   && if [ "$ENVIRONMENT_TYPE" = "demo" ]; then \
     mkdir -p /app/demo-assets \
     && cp "/app/.output/demo-assets/Contribution Agreement.docx" "/app/demo-assets/Contribution Agreement.docx"; \
