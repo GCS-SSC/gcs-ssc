@@ -415,8 +415,7 @@ export const createDemoStack = (scope: Construct, id: string, props: StackProps)
   }
   const metabaseDistribution = new cloudfront.Distribution(stack, 'MetabaseDistribution', {
     comment: 'GCS-SSC Metabase demo',
-    // Enable only after its administrator has been initialized or migrated.
-    enabled: false,
+    enabled: true,
     priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
     defaultBehavior: {
       origin: origins.VpcOrigin.withVpcOrigin(metabaseVpcOrigin, { readTimeout: Duration.seconds(60) }),
@@ -465,6 +464,14 @@ export const createDemoStack = (scope: Construct, id: string, props: StackProps)
     },
     removalPolicy: RemovalPolicy.RETAIN
   })
+  const metabaseSessionSecret = new secretsmanager.Secret(stack, 'MetabaseSessionSecret', {
+    generateSecretString: { passwordLength: 64, excludePunctuation: true },
+    removalPolicy: RemovalPolicy.RETAIN
+  })
+  const metabaseEncryptionSecret = new secretsmanager.Secret(stack, 'MetabaseEncryptionSecret', {
+    generateSecretString: { passwordLength: 64, excludePunctuation: true },
+    removalPolicy: RemovalPolicy.RETAIN
+  })
   const metabaseTask = new ecs.FargateTaskDefinition(stack, 'MetabaseTask', {
     cpu: 1024, memoryLimitMiB: 2048,
     runtimePlatform: {
@@ -497,7 +504,11 @@ export const createDemoStack = (scope: Construct, id: string, props: StackProps)
       MB_DB_USER: 'metabase',
       MB_SITE_URL: metabaseUrl
     },
-    secrets: { MB_DB_PASS: ecs.Secret.fromSecretsManager(metabaseDatabaseSecret, 'password') },
+    secrets: {
+      MB_DB_PASS: ecs.Secret.fromSecretsManager(metabaseDatabaseSecret, 'password'),
+      MB_SESSION_SECRET_KEY: ecs.Secret.fromSecretsManager(metabaseSessionSecret),
+      MB_ENCRYPTION_SECRET_KEY: ecs.Secret.fromSecretsManager(metabaseEncryptionSecret)
+    },
     portMappings: [{ containerPort: 3000 }]
   })
   metabaseContainer.addMountPoints({ sourceVolume: 'rds-ca', containerPath: '/rds-ca', readOnly: true })
