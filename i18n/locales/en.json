@@ -1260,6 +1260,7 @@
       "monitor_not_found": "Agreement monitor not found.",
       "monitor_planning_not_found": "Agreement monitor planning objective not found.",
       "monitor_item_not_found": "Agreement monitor item not found.",
+      "invalid_monitor_link": "Select an active item from this monitor.",
       "monitor_finding_not_found": "Agreement monitor finding not found.",
       "monitor_followup_not_found": "Agreement monitor follow-up not found.",
       "monitor_followup_update_not_found": "Agreement monitor follow-up update not found.",
@@ -2656,6 +2657,7 @@
       "type": "Monitor type",
       "onsite": "On-site",
       "offsite": "Off-site",
+      "site": "Site",
       "tentative_fiscal_year": "Tentative fiscal year",
       "tentative_quarter": "Tentative quarter",
       "quarter_value": "Q{quarter}",
@@ -2678,14 +2680,16 @@
         "planned_end": "Planned end",
         "actual_start": "Actual start",
         "actual_end": "Actual end",
-        "monitored": "Monitored"
+        "monitored": "Monitored",
+        "planning_link": "Planning item (optional)"
       },
       "findings": {
         "title": "Findings",
         "add": "Add Finding",
         "edit": "Update Finding",
         "name": "Finding",
-        "recommendation_type": "Recommendation type"
+        "recommendation_type": "Recommendation type",
+        "item_link": "Monitoring item (optional)"
       },
       "followups": {
         "title": "Follow-ups",
@@ -2701,7 +2705,8 @@
         "updates_for": "Updates for {name}",
         "no_updates": "No updates yet.",
         "add_update": "Add Follow-up Update",
-        "edit_update": "Update Follow-up Update"
+        "edit_update": "Update Follow-up Update",
+        "finding_link": "Finding (optional)"
       },
       "promising_practices": {
         "title": "Promising practices",

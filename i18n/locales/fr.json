@@ -1260,6 +1260,7 @@
       "monitor_not_found": "Surveillance d'entente introuvable.",
       "monitor_planning_not_found": "Objectif de planification de surveillance introuvable.",
       "monitor_item_not_found": "Élément de surveillance introuvable.",
+      "invalid_monitor_link": "Sélectionnez un élément actif de cette surveillance.",
       "monitor_finding_not_found": "Constatation de surveillance introuvable.",
       "monitor_followup_not_found": "Suivi de surveillance introuvable.",
       "monitor_followup_update_not_found": "Mise à jour de suivi de surveillance introuvable.",
@@ -2656,6 +2657,7 @@
       "type": "Type de surveillance",
       "onsite": "Sur place",
       "offsite": "À distance",
+      "site": "Lieu",
       "tentative_fiscal_year": "Exercice financier provisoire",
       "tentative_quarter": "Trimestre provisoire",
       "quarter_value": "T{quarter}",
@@ -2678,14 +2680,16 @@
         "planned_end": "Fin planifiée",
         "actual_start": "Début réel",
         "actual_end": "Fin réelle",
-        "monitored": "Surveillé"
+        "monitored": "Surveillé",
+        "planning_link": "Élément de planification (facultatif)"
       },
       "findings": {
         "title": "Constatations",
         "add": "Ajouter une constatation",
         "edit": "Mettre à jour la constatation",
         "name": "Constatation",
-        "recommendation_type": "Type de recommandation"
+        "recommendation_type": "Type de recommandation",
+        "item_link": "Élément de surveillance (facultatif)"
       },
       "followups": {
         "title": "Suivis",
@@ -2701,7 +2705,8 @@
         "updates_for": "Mises à jour pour {name}",
         "no_updates": "Aucune mise à jour pour le moment.",
         "add_update": "Ajouter une mise à jour de suivi",
-        "edit_update": "Mettre à jour la mise à jour de suivi"
+        "edit_update": "Mettre à jour la mise à jour de suivi",
+        "finding_link": "Constatation (facultative)"
       },
       "promising_practices": {
         "title": "Pratiques prometteuses",

@@ -10,6 +10,7 @@ const {
   content = false,
   mobileCollapsible = true,
   mobileAutoCloseOnSelect = true,
+  priorityValues = [],
   ui
 } = defineProps<{
   items: TranslatedTabItem[]
@@ -19,6 +20,7 @@ const {
   content?: boolean
   mobileCollapsible?: boolean
   mobileAutoCloseOnSelect?: boolean
+  priorityValues?: string[]
   ui?: Record<string, string>
 }>()
 
@@ -29,6 +31,13 @@ const sortedItems = computed(() => {
   const collator = new Intl.Collator(locale.value, { sensitivity: 'base' })
 
   return [...items].sort((left, right) => {
+    const leftPriority = priorityValues.indexOf(left.value)
+    const rightPriority = priorityValues.indexOf(right.value)
+    if (leftPriority !== rightPriority) {
+      if (leftPriority < 0) return 1
+      if (rightPriority < 0) return -1
+      return leftPriority - rightPriority
+    }
     const leftIsGeneral = left.value === 'general' || left.key.endsWith('.general')
     const rightIsGeneral = right.value === 'general' || right.key.endsWith('.general')
 

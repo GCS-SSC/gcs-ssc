@@ -218,6 +218,37 @@ export const syncAgreementMonitorEditingStatus = async (
   // Ordinary monitor edits preserve the Agency-configured business status.
 }
 
+/**
+ * Checks that an optional work-chain target is active and belongs to this monitor.
+ * @param event - Request context.
+ * @param db - Authorized transaction.
+ * @param monitorId - Owning monitor.
+ * @param kind - Linked resource type.
+ * @param linkedId - Optional linked row.
+ * @returns Nothing when the link is valid or absent.
+ */
+export const assertMonitorLinkedRecord = async (
+  event: H3Event,
+  db: AgreementMonitorDb,
+  monitorId: string,
+  kind: 'planning' | 'item' | 'finding',
+  linkedId: string | null | undefined
+) => {
+  if (linkedId == null) return
+  const table = kind === 'planning'
+    ? 'Funding_Case_Agreement_Monitor_Planning'
+    : kind === 'item'
+      ? 'Funding_Case_Agreement_Monitor_Items'
+      : 'Funding_Case_Agreement_Monitor_Finding'
+  const row = await db.selectFrom(table)
+    .select('id')
+    .where('id', '=', linkedId)
+    .where('egcs_fc_fundingagreementmonitor', '=', monitorId)
+    .where('_deleted', '=', false)
+    .executeTakeFirst()
+  if (!row) return await badRequest(event, 'INVALID_MONITOR_LINK', 'apiErrors.agreement.invalid_monitor_link')
+}
+
 export const assertMonitorTypeBelongsToAgreementStream = async (
   event: H3Event,
   db: AgreementMonitorDb,

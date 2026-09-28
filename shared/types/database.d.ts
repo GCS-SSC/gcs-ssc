@@ -1645,6 +1645,7 @@ export interface FundingCaseAgreementMonitorPlanningTable {
 export interface FundingCaseAgreementMonitorItemsTable {
   id: Generated<string>
   egcs_fc_fundingagreementmonitor: string
+  egcs_fc_monitorplanning: Generated<string | null>
   egcs_fc_item: string
   egcs_fc_plannedstart: Date
   egcs_fc_plannedend: Date
@@ -1658,6 +1659,7 @@ export interface FundingCaseAgreementMonitorItemsTable {
 export interface FundingCaseAgreementMonitorFindingTable {
   id: Generated<string>
   egcs_fc_fundingagreementmonitor: string
+  egcs_fc_monitoritem: Generated<string | null>
   egcs_fc_findingname: string
   egcs_fc_recommendationtype: Monitor_Action_Type
   egcs_fc_responsibleparty: Monitor_Responsible_Party
@@ -1668,6 +1670,7 @@ export interface FundingCaseAgreementMonitorFindingTable {
 export interface FundingCaseAgreementMonitorFollowupTable {
   id: Generated<string>
   egcs_fc_fundingagreementmonitor: string
+  egcs_fc_monitorfinding: Generated<string | null>
   egcs_fc_followupname: string
   egcs_fc_responsibleparty: Monitor_Responsible_Party
   egcs_fc_status: Follow_Up_Status

@@ -740,6 +740,7 @@ export type FundingCaseAgreementMonitorPlanningItem = WithId<FundingCaseAgreemen
 
 export const FundingCaseAgreementMonitorItemsBaseSchema = z.object({
   egcs_fc_fundingagreementmonitor: RequiredBigintSelectionId(),
+  egcs_fc_monitorplanning: NullableBigintSelectionId().optional(),
   egcs_fc_item: RequiredString().max(255, { error: 'validation.max_length' }),
   egcs_fc_plannedstart: RequiredDateSchema,
   egcs_fc_plannedend: RequiredDateSchema,
@@ -820,6 +821,7 @@ export type FundingCaseAgreementMonitorItemsItem = WithId<FundingCaseAgreementMo
 
 export const FundingCaseAgreementMonitorFindingBaseSchema = z.object({
   egcs_fc_fundingagreementmonitor: RequiredBigintSelectionId(),
+  egcs_fc_monitoritem: NullableBigintSelectionId().optional(),
   egcs_fc_findingname: RequiredString().max(255, { error: 'validation.max_length' }),
   egcs_fc_recommendationtype: z.enum(MONITOR_ACTION_TYPE_ENUM, { error: 'validation.required' }),
   egcs_fc_responsibleparty: z.enum(MONITOR_RESPONSIBLE_PARTY_ENUM, { error: 'validation.required' }),
@@ -841,6 +843,7 @@ export type FundingCaseAgreementMonitorFindingItem = WithId<FundingCaseAgreement
 
 export const FundingCaseAgreementMonitorFollowupBaseSchema = z.object({
   egcs_fc_fundingagreementmonitor: RequiredBigintSelectionId(),
+  egcs_fc_monitorfinding: NullableBigintSelectionId().optional(),
   egcs_fc_followupname: RequiredString().max(255, { error: 'validation.max_length' }),
   egcs_fc_responsibleparty: z.enum(MONITOR_RESPONSIBLE_PARTY_ENUM, { error: 'validation.required' }),
   egcs_fc_duedate: RequiredDateSchema

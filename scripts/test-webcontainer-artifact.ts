@@ -71,6 +71,7 @@ const EXPECTED_CORE_MIGRATIONS = [
   '0180_funding_opportunity_streams',
   '0190_funding_opportunity_attachment_types',
   '0200_funding_opportunity_agency_status',
+  '0210_monitor_links',
   '0240_seed'
 ] as const
 

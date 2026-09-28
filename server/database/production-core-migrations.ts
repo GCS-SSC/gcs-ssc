@@ -19,6 +19,7 @@ import * as fundingCaseGroupAssignmentMigration from './migrations/0170_funding_
 import * as fundingOpportunityStreamsMigration from './migrations/0180_funding_opportunity_streams'
 import * as fundingOpportunityAttachmentTypesMigration from './migrations/0190_funding_opportunity_attachment_types'
 import * as fundingOpportunityAgencyStatusMigration from './migrations/0200_funding_opportunity_agency_status'
+import * as monitorLinksMigration from './migrations/0210_monitor_links'
 
 export const productionCoreMigrations = {
   '0010_common': commonMigration,
@@ -40,7 +41,8 @@ export const productionCoreMigrations = {
   '0170_funding_case_group_assignment': fundingCaseGroupAssignmentMigration,
   '0180_funding_opportunity_streams': fundingOpportunityStreamsMigration,
   '0190_funding_opportunity_attachment_types': fundingOpportunityAttachmentTypesMigration,
-  '0200_funding_opportunity_agency_status': fundingOpportunityAgencyStatusMigration
+  '0200_funding_opportunity_agency_status': fundingOpportunityAgencyStatusMigration,
+  '0210_monitor_links': monitorLinksMigration
 } satisfies Record<string, Migration>
 
 export const productionCoreMigrationProvider: MigrationProvider = {

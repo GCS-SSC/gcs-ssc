@@ -88,6 +88,7 @@ const {
 })
 const monitorMetadata: Ref<FundingCaseAgreementMonitorForm | null> = ref(null)
 const isSavingMonitorMetadata: Ref<boolean> = ref(false)
+const isMetadataModalOpen: Ref<boolean> = ref(false)
 const approvalsRefreshKey: Ref<number> = ref(0)
 
 const {
@@ -124,6 +125,7 @@ const itemModal = useCrudModal<FundingCaseAgreementMonitorItemsRow, FundingCaseA
     id: item.id,
     egcs_fc_fundingagreementmonitor: item.egcs_fc_fundingagreementmonitor,
     egcs_fc_item: item.egcs_fc_item,
+    egcs_fc_monitorplanning: item.egcs_fc_monitorplanning,
     egcs_fc_plannedstart: toDateInput(item.egcs_fc_plannedstart),
     egcs_fc_plannedend: toDateInput(item.egcs_fc_plannedend),
     egcs_fc_detail: item.egcs_fc_detail,
@@ -146,6 +148,7 @@ const followupModal = useCrudModal<FundingCaseAgreementMonitorFollowupRow, Fundi
     id: item.id,
     egcs_fc_fundingagreementmonitor: item.egcs_fc_fundingagreementmonitor,
     egcs_fc_followupname: item.egcs_fc_followupname,
+    egcs_fc_monitorfinding: item.egcs_fc_monitorfinding,
     egcs_fc_responsibleparty: item.egcs_fc_responsibleparty,
     egcs_fc_duedate: toDateInput(item.egcs_fc_duedate)
   })
@@ -203,6 +206,11 @@ const findingRows = computed<FundingCaseAgreementMonitorFindingRow[]>(() => moni
 const followupRows = computed<FundingCaseAgreementMonitorFollowupRow[]>(() => monitor.value?.followups ?? [])
 const practiceRows = computed<FundingCaseAgreementMonitorPromisingPracticeRow[]>(() => monitor.value?.promisingPractices ?? [])
 const followupUpdateRows = computed<FundingCaseAgreementMonitorFollowupUpdateRow[]>(() => monitor.value?.followupUpdates ?? [])
+const planningOptions = computed(() => planningRows.value.map(row => ({ id: String(row.id), label_en: row.egcs_fc_objective, label_fr: row.egcs_fc_objective })))
+const itemOptions = computed(() => itemRows.value.map(row => ({ id: String(row.id), label_en: row.egcs_fc_item, label_fr: row.egcs_fc_item })))
+const findingOptions = computed(() => findingRows.value.map(row => ({ id: String(row.id), label_en: row.egcs_fc_findingname, label_fr: row.egcs_fc_findingname })))
+const linkedLabel = (options: Array<{ id: string, label_en: string }>, id: string | null | undefined) =>
+  options.find(option => option.id === String(id))?.label_en ?? t('common.none')
 const breadcrumbItems = computed(() => [
   { label: t('agreement.title'), to: localePath(appRouteLocations.agreements()) },
   { label: getBilingualValue(profile.value, 'egcs_fc_title', agreementId), to: authorizedRouteLocation(profile.value?.can_read_agreement, localePath(appRouteLocations.agreementDetail(agreementId))) },
@@ -283,6 +291,17 @@ watchEffect(() => {
   }
 })
 
+const openMetadataEditor = () => {
+  if (!monitor.value) return
+  monitorMetadata.value = {
+    egcs_fc_type: monitor.value.egcs_fc_type,
+    egcs_fc_onsite: monitor.value.egcs_fc_onsite,
+    egcs_fc_tentativefiscalyear: monitor.value.egcs_fc_tentativefiscalyear,
+    egcs_fc_tentativequarter: monitor.value.egcs_fc_tentativequarter
+  }
+  isMetadataModalOpen.value = true
+}
+
 const saveResource = async <T extends { id?: string | number }>(
   key: string,
   path: AgreementMonitorResourcePath,
@@ -339,6 +358,7 @@ const saveMonitorMetadata = async () => {
     isSavingMonitorMetadata.value = true
     await saveJson(`/api/agreements/${agreementId}/monitors/${monitorId}`, 'PATCH', monitorMetadata.value)
     await refreshMonitor()
+    isMetadataModalOpen.value = false
     toast.add({ title: t('common.success'), description: t('common.updated_success'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
@@ -454,7 +474,8 @@ const handleCompleted = async () => {
             :is-collapsed="isHeroCollapsed"
             icon="i-lucide-clipboard-check"
             :title="getBilingualValue(monitor, 'monitor_type_name', monitorId)"
-            :meta-items="[monitor.agreement_number, monitor.agreement_financial_system_number, getBilingualValue(monitor, 'stream_name', '-')]"
+            :meta-items="[monitor.agreement_number, monitor.agreement_financial_system_number, getBilingualValue(monitor, 'stream_name', '-'), `${t('agreement.monitors.tentative_fiscal_year')}: ${monitor.fiscal_year_display || t('common.not_available')}`, `${t('agreement.monitors.tentative_quarter')}: ${t('agreement.monitors.quarter_value', { quarter: monitor.egcs_fc_tentativequarter })}`, `${t('agreement.monitors.site')}: ${t(monitor.egcs_fc_onsite ? 'agreement.monitors.onsite' : 'agreement.monitors.offsite')}`]"
+            :actions="[{ label: t('common.edit'), icon: 'i-lucide-pencil', onClick: openMetadataEditor, visible: canUpdateMonitor }]"
             :badges="[{
               statusId: monitor.egcs_fc_status,
               isCompleted: monitor.isCompleted
@@ -465,6 +486,7 @@ const handleCompleted = async () => {
               <CommonRouteTabs
                 v-model="selectedMonitorTab"
                 :items="monitorTabs"
+                :priority-values="['planning', 'items', 'findings', 'followups', 'promising-practices']"
                 orientation="vertical"
                 :ui="{
                   root: 'w-full',
@@ -475,64 +497,6 @@ const handleCompleted = async () => {
 
             <div v-if="selectedMonitorTab === 'planning'" class="w-full min-w-0">
               <div class="space-y-6">
-                <UForm
-                  v-if="monitorMetadata"
-                  :state="monitorMetadata"
-                  :validate="validateMonitorMetadata"
-                  :validate-on="[]"
-                  class="space-y-4"
-                  @submit="saveMonitorMetadata">
-                  <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <UFormField :label="t('agreement.monitors.type')" name="egcs_fc_type">
-                      <CommonServerLookupSelect
-                        v-if="canUpdateMonitor"
-                        v-model="monitorMetadata.egcs_fc_type"
-                        :fetch-url="`/api/agreements/${agreementId}/monitors/lookups/monitor-types`"
-                        :query="{ permission_action: 'update', monitorId }"
-                        value-key="id"
-                        label-en-key="label_en"
-                        label-fr-key="label_fr"
-                        searchable />
-                      <p v-else data-testid="monitor-type-readonly" class="text-sm text-default">
-                        {{ getBilingualValue(monitor, 'monitor_type_name', monitorId) }}
-                      </p>
-                    </UFormField>
-                    <UFormField :label="t('agreement.monitors.tentative_fiscal_year')" name="egcs_fc_tentativefiscalyear">
-                      <CommonServerLookupSelect
-                        v-if="canUpdateMonitor"
-                        v-model="monitorMetadata.egcs_fc_tentativefiscalyear"
-                        :fetch-url="`/api/agreements/${agreementId}/monitors/lookups/fiscal-years`"
-                        :query="{ permission_action: 'update', monitorId }"
-                        value-key="id"
-                        label-en-key="label_en"
-                        label-fr-key="label_fr"
-                        searchable />
-                      <p v-else data-testid="monitor-fiscal-year-readonly" class="text-sm text-default">
-                        {{ monitor.fiscal_year_display || t('common.not_available') }}
-                      </p>
-                    </UFormField>
-                    <UFormField :label="t('agreement.monitors.tentative_quarter')" name="egcs_fc_tentativequarter">
-                      <UInputNumber v-if="canUpdateMonitor" v-model="monitorMetadata.egcs_fc_tentativequarter" :min="1" :max="4" class="w-full" />
-                      <p v-else data-testid="monitor-quarter-readonly" class="text-sm text-default">
-                        {{ monitor.egcs_fc_tentativequarter }}
-                      </p>
-                    </UFormField>
-                    <UFormField :label="t('agreement.monitors.onsite')" name="egcs_fc_onsite">
-                      <USwitch v-if="canUpdateMonitor" v-model="monitorMetadata.egcs_fc_onsite" />
-                      <p v-else data-testid="monitor-onsite-readonly" class="text-sm text-default">
-                        {{ t(monitor.egcs_fc_onsite ? 'common.yes' : 'common.no') }}
-                      </p>
-                    </UFormField>
-                  </div>
-                  <div class="flex justify-end">
-                    <CommonSaveButton
-                      v-if="canUpdateMonitor"
-                      :label="t('common.save')"
-                      :loading="isSavingMonitorMetadata"
-                      :disabled="isSavingMonitorMetadata" />
-                  </div>
-                </UForm>
-
                 <CommonResourceLayoutCard
                   v-model:search="planningSearch"
                   v-model:pagination="planningPagination"
@@ -566,11 +530,15 @@ const handleCompleted = async () => {
                   :data="itemRows"
                   :columns="[
                     { id: 'item', accessorKey: 'egcs_fc_item', headerKey: 'agreement.monitors.items.item' },
+                    { id: 'planning', headerKey: 'agreement.monitors.planning.title' },
                     { id: 'planned', headerKey: 'agreement.monitors.items.planned' },
                     { id: 'actual', headerKey: 'agreement.monitors.items.actual' },
                     { id: 'monitored', accessorKey: 'egcs_fc_monitored', headerKey: 'agreement.monitors.items.monitored' },
                     { id: 'actions', headerKey: 'common.actions' }
                   ]" :total-records="itemRows.length" :show-button="false">
+                  <template #planning-cell="{ row }">
+                    {{ linkedLabel(planningOptions, asItemRow(row.original).egcs_fc_monitorplanning) }}
+                  </template>
                   <template #planned-cell="{ row }">
                     {{ formatMonitorDateRange(asItemRow(row.original).egcs_fc_plannedstart, asItemRow(row.original).egcs_fc_plannedend) }}
                   </template>
@@ -601,10 +569,14 @@ const handleCompleted = async () => {
                   :data="findingRows"
                   :columns="[
                     { id: 'name', accessorKey: 'egcs_fc_findingname', headerKey: 'agreement.monitors.findings.name' },
+                    { id: 'monitorItem', headerKey: 'agreement.monitors.items.title' },
                     { id: 'type', accessorKey: 'egcs_fc_recommendationtype', headerKey: 'agreement.monitors.findings.recommendation_type' },
                     { id: 'responsible', accessorKey: 'egcs_fc_responsibleparty', headerKey: 'agreement.monitors.responsible_party' },
                     { id: 'actions', headerKey: 'common.actions' }
                   ]" :total-records="findingRows.length" :show-button="false">
+                  <template #monitorItem-cell="{ row }">
+                    {{ linkedLabel(itemOptions, asFindingRow(row.original).egcs_fc_monitoritem) }}
+                  </template>
                   <template #type-cell="{ row }">
                     {{ t(`enums.monitor_action_type.${asFindingRow(row.original).egcs_fc_recommendationtype}`) }}
                   </template>
@@ -632,12 +604,16 @@ const handleCompleted = async () => {
                   :data="followupRows"
                   :columns="[
                     { id: 'name', accessorKey: 'egcs_fc_followupname', headerKey: 'agreement.monitors.followups.name' },
+                    { id: 'finding', headerKey: 'agreement.monitors.findings.title' },
                     { id: 'responsible', accessorKey: 'egcs_fc_responsibleparty', headerKey: 'agreement.monitors.responsible_party' },
                     { id: 'status', accessorKey: 'egcs_fc_status', headerKey: 'common.status' },
                     { id: 'dueDate', accessorKey: 'egcs_fc_duedate', headerKey: 'agreement.monitors.followups.due_date' },
                     { id: 'updates', headerKey: 'agreement.monitors.followups.updates' },
                     { id: 'actions', headerKey: 'common.actions' }
                   ]" :total-records="followupRows.length" :show-button="false">
+                  <template #finding-cell="{ row }">
+                    {{ linkedLabel(findingOptions, asFollowupRow(row.original).egcs_fc_monitorfinding) }}
+                  </template>
                   <template #responsible-cell="{ row }">
                     {{ t(`enums.monitor_responsible_party.${asFollowupRow(row.original).egcs_fc_responsibleparty}`) }}
                   </template>
@@ -742,6 +718,71 @@ const handleCompleted = async () => {
       </template>
     </UDashboardPanel>
 
+    <UModal v-if="monitor" v-model:open="isMetadataModalOpen" :title="t('agreement.monitors.edit')" :description="t('common.form_dialog_description')">
+      <template #body>
+        <UForm
+          v-if="monitorMetadata"
+          :state="monitorMetadata"
+          :validate="validateMonitorMetadata"
+          :validate-on="[]"
+          class="space-y-4"
+          @submit="saveMonitorMetadata">
+          <div class="space-y-4">
+            <UFormField :label="t('agreement.monitors.type')" name="egcs_fc_type">
+              <CommonServerLookupSelect
+                v-if="canUpdateMonitor"
+                v-model="monitorMetadata.egcs_fc_type"
+                :fetch-url="`/api/agreements/${agreementId}/monitors/lookups/monitor-types`"
+                :query="{ permission_action: 'update', monitorId }"
+                value-key="id"
+                label-en-key="label_en"
+                label-fr-key="label_fr"
+                class="w-full"
+                searchable />
+              <p v-else data-testid="monitor-type-readonly" class="text-sm text-default">
+                {{ getBilingualValue(monitor, 'monitor_type_name', monitorId) }}
+              </p>
+            </UFormField>
+            <UFormField :label="t('agreement.monitors.tentative_fiscal_year')" name="egcs_fc_tentativefiscalyear">
+              <CommonServerLookupSelect
+                v-if="canUpdateMonitor"
+                v-model="monitorMetadata.egcs_fc_tentativefiscalyear"
+                :fetch-url="`/api/agreements/${agreementId}/monitors/lookups/fiscal-years`"
+                :query="{ permission_action: 'update', monitorId }"
+                value-key="id"
+                label-en-key="label_en"
+                label-fr-key="label_fr"
+                class="w-full"
+                searchable />
+              <p v-else data-testid="monitor-fiscal-year-readonly" class="text-sm text-default">
+                {{ monitor.fiscal_year_display || t('common.not_available') }}
+              </p>
+            </UFormField>
+            <UFormField :label="t('agreement.monitors.tentative_quarter')" name="egcs_fc_tentativequarter">
+              <UInputNumber v-if="canUpdateMonitor" v-model="monitorMetadata.egcs_fc_tentativequarter" :min="1" :max="4" class="w-full" />
+              <p v-else data-testid="monitor-quarter-readonly" class="text-sm text-default">
+                {{ monitor.egcs_fc_tentativequarter }}
+              </p>
+            </UFormField>
+            <UFormField :label="t('agreement.monitors.onsite')" name="egcs_fc_onsite">
+              <USwitch v-if="canUpdateMonitor" v-model="monitorMetadata.egcs_fc_onsite" />
+              <p v-else data-testid="monitor-onsite-readonly" class="text-sm text-default">
+                {{ t(monitor.egcs_fc_onsite ? 'common.yes' : 'common.no') }}
+              </p>
+            </UFormField>
+          </div>
+          <div class="flex justify-end gap-2">
+            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isMetadataModalOpen = false" />
+            <CommonSaveButton
+              v-if="canUpdateMonitor"
+              :label="t('common.save')"
+              :loading="isSavingMonitorMetadata"
+              :disabled="isSavingMonitorMetadata" />
+          </div>
+        </UForm>
+      </template>
+    </UModal>
+
     <UModal v-if="selectedPlanning" v-model:open="isPlanningModalOpen" :title="selectedPlanning.id ? t('agreement.monitors.planning.edit') : t('agreement.monitors.planning.add')" :description="t('common.form_dialog_description')">
       <template #body>
         <UForm :state="selectedPlanning" :validate="validatePlanning" :validate-on="[]" class="space-y-4" @submit="savePlanning">
@@ -781,6 +822,9 @@ const handleCompleted = async () => {
           <UFormField :label="t('agreement.monitors.items.monitored')" name="egcs_fc_monitored">
             <USwitch v-model="selectedItem.egcs_fc_monitored" />
           </UFormField>
+          <UFormField :label="t('agreement.monitors.items.planning_link')" name="egcs_fc_monitorplanning">
+            <CommonBilingualSelectMenu v-model="selectedItem.egcs_fc_monitorplanning" :items="planningOptions" label-en-key="label_en" label-fr-key="label_fr" :prepend-options="[{ label: t('common.none'), value: null }]" searchable class="w-full" />
+          </UFormField>
           <div class="flex justify-end gap-2">
             <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isItemModalOpen = false" /><CommonSaveButton :label="t('common.save')" :loading="isResourceSaving('item', itemModal)" />
           </div>
@@ -791,6 +835,9 @@ const handleCompleted = async () => {
     <UModal v-if="selectedFinding" v-model:open="isFindingModalOpen" :title="selectedFinding.id ? t('agreement.monitors.findings.edit') : t('agreement.monitors.findings.add')" :description="t('common.form_dialog_description')">
       <template #body>
         <UForm :state="selectedFinding" :validate="validateFinding" :validate-on="[]" class="space-y-4" @submit="saveFinding">
+          <UFormField :label="t('agreement.monitors.findings.item_link')" name="egcs_fc_monitoritem">
+            <CommonBilingualSelectMenu v-model="selectedFinding.egcs_fc_monitoritem" :items="itemOptions" label-en-key="label_en" label-fr-key="label_fr" :prepend-options="[{ label: t('common.none'), value: null }]" searchable class="w-full" />
+          </UFormField>
           <UFormField :label="t('agreement.monitors.findings.name')" name="egcs_fc_findingname">
             <UInput v-model="selectedFinding.egcs_fc_findingname" />
           </UFormField>
@@ -813,6 +860,9 @@ const handleCompleted = async () => {
     <UModal v-if="selectedFollowup" v-model:open="isFollowupModalOpen" :title="selectedFollowup.id ? t('agreement.monitors.followups.edit') : t('agreement.monitors.followups.add')" :description="t('common.form_dialog_description')">
       <template #body>
         <UForm :state="selectedFollowup" :validate="validateFollowup" :validate-on="[]" class="space-y-4" @submit="saveFollowup">
+          <UFormField :label="t('agreement.monitors.followups.finding_link')" name="egcs_fc_monitorfinding">
+            <CommonBilingualSelectMenu v-model="selectedFollowup.egcs_fc_monitorfinding" :items="findingOptions" label-en-key="label_en" label-fr-key="label_fr" :prepend-options="[{ label: t('common.none'), value: null }]" searchable class="w-full" />
+          </UFormField>
           <UFormField :label="t('agreement.monitors.followups.name')" name="egcs_fc_followupname">
             <UInput v-model="selectedFollowup.egcs_fc_followupname" />
           </UFormField>
