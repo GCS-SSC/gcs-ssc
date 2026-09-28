@@ -11,6 +11,7 @@ import type { StackProps } from 'aws-cdk-lib'
 import type { Construct } from 'constructs'
 import { DEMO_IMAGE_PATTERN, readDemoImage } from '../../../deployment/demo-image.js'
 import { readPortalDemoImage } from '../../../deployment/portal-demo-image.js'
+import { readFileSync } from 'node:fs'
 
 /**
  * Creates the fixed-size demo deployment without AWS lookups at synthesis time.
@@ -457,6 +458,13 @@ export const createDemoStack = (scope: Construct, id: string, props: StackProps)
   metabaseDatabase.connections.allowDefaultPortFrom(metabaseSecurityGroup)
   // Metabase's data-source connection to GCS also stays inside this VPC.
   database.connections.allowDefaultPortFrom(metabaseSecurityGroup)
+  const metabaseAdminSecret = new secretsmanager.Secret(stack, 'MetabaseAdminSecret', {
+    generateSecretString: {
+      secretStringTemplate: JSON.stringify({ email: 'admin@gcs-ssc.example' }),
+      generateStringKey: 'password', passwordLength: 32, excludePunctuation: true
+    },
+    removalPolicy: RemovalPolicy.RETAIN
+  })
   const metabaseTask = new ecs.FargateTaskDefinition(stack, 'MetabaseTask', {
     cpu: 1024, memoryLimitMiB: 2048,
     runtimePlatform: {
@@ -495,6 +503,17 @@ export const createDemoStack = (scope: Construct, id: string, props: StackProps)
   metabaseContainer.addMountPoints({ sourceVolume: 'rds-ca', containerPath: '/rds-ca', readOnly: true })
   metabaseContainer.addContainerDependencies({
     container: metabaseCa, condition: ecs.ContainerDependencyCondition.SUCCESS
+  })
+  const metabaseSetup = metabaseTask.addContainer('Setup', {
+    image: ecs.ContainerImage.fromRegistry('python@sha256:9e9fde4d32eedce0b661d9ab91e826b62dddf28e928c230ec55f1866cac66b01'),
+    command: ['python', '-c', readFileSync(new URL('./metabase-setup.py', import.meta.url), 'utf8')],
+    essential: false,
+    logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'metabase-setup', logGroup: metabaseLogGroup }),
+    environment: { METABASE_ADMIN_EMAIL: 'admin@gcs-ssc.example' },
+    secrets: { METABASE_ADMIN_PASSWORD: ecs.Secret.fromSecretsManager(metabaseAdminSecret, 'password') }
+  })
+  metabaseSetup.addContainerDependencies({
+    container: metabaseContainer, condition: ecs.ContainerDependencyCondition.START
   })
   const metabaseService = new ecs.FargateService(stack, 'MetabaseService', {
     cluster, taskDefinition: metabaseTask,
@@ -554,5 +573,6 @@ export const createDemoStack = (scope: Construct, id: string, props: StackProps)
   new CfnOutput(stack, 'MetabaseServiceName', { value: metabaseService.serviceName })
   new CfnOutput(stack, 'MetabaseLogGroupName', { value: metabaseLogGroup.logGroupName })
   new CfnOutput(stack, 'MetabaseDatabaseSecretArn', { value: metabaseDatabaseSecret.secretArn })
+  new CfnOutput(stack, 'MetabaseAdminSecretArn', { value: metabaseAdminSecret.secretArn })
   return stack
 }

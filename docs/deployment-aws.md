@@ -41,8 +41,8 @@ database is migrated separately.
 - Metabase uses an immutable Docker Hub image digest. An init container
   downloads the regional RDS CA bundle before Metabase starts, and the JDBC
   connection verifies the database hostname. Its CloudFront endpoint starts
-  disabled until an administrator is initialized or existing Metabase data is
-  migrated. Its task can reach the GCS
+  disabled until its setup sidecar creates and verifies an administrator using
+  a generated password in Secrets Manager. Its task can reach the GCS
   database as a data source, but its application database is separate.
 - Secrets Manager secrets for authentication, database credentials, and the
   GCS extension encryption seed; separate two-week CloudWatch application logs.
@@ -152,7 +152,7 @@ deleted. Bootstrap creates supporting resources
 with their own lifecycle. CloudFront VPC origin provisioning can take several
 minutes, and database creation and the first image pull take additional time.
 The stack outputs `Url`, `HealthUrl`, `PortalUrl`, `PortalHealthUrl`, `MetabaseUrl`, `MetabaseHealthUrl`, service names,
-log groups, database secret ARNs, EFS ID, and S3 bucket identifiers. No secret
+log groups, database and Metabase administrator secret ARNs, EFS ID, and S3 bucket identifiers. No secret
 values are outputs.
 If the release manifest still contains `image: null`, deployment also requires
 `--parameters DemoImage=ghcr.io/gcs-ssc/gcs-ssc-demo@sha256:…`. Prefer promoting
