@@ -16,6 +16,8 @@ playwright-report
 worktree
 dist
 **/dist
+!extensions/gcs-ssc-portal-connector/vendor/survey/dist
+!extensions/gcs-ssc-portal-connector/vendor/survey/dist/**
 *.log
 .env
 .env.*
