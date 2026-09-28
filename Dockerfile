@@ -87,7 +87,8 @@ WORKDIR /app
 
 COPY --from=build --chown=node:node /app/.output ./.output
 
-RUN npm install --omit=dev --ignore-scripts --legacy-peer-deps --no-audit --no-fund --prefix /app/.output/server \
+RUN node -e 'const fs = require("node:fs"); const path = "/app/.output/server/package.json"; const manifest = JSON.parse(fs.readFileSync(path, "utf8")); delete manifest.dependencies["@gcs-ssc/survey"]; fs.writeFileSync(path, JSON.stringify(manifest));' \
+  && npm install --omit=dev --ignore-scripts --legacy-peer-deps --no-audit --no-fund --prefix /app/.output/server \
   && if [ "$ENVIRONMENT_TYPE" = "demo" ]; then \
     mkdir -p /app/demo-assets \
     && cp "/app/.output/demo-assets/Contribution Agreement.docx" "/app/demo-assets/Contribution Agreement.docx"; \
@@ -96,6 +97,8 @@ RUN npm install --omit=dev --ignore-scripts --legacy-peer-deps --no-audit --no-f
   && if [ -d /app/demo-assets ]; then chown -R node:node /app/demo-assets; fi \
   && mkdir -p /app/.data/pglite \
   && chown -R node:node /app/.data
+
+COPY --from=build --chown=node:node /app/extensions/gcs-ssc-portal-connector/vendor/survey /app/.output/server/node_modules/@gcs-ssc/survey
 
 ENV NODE_ENV=production
 ENV ENVIRONMENT_TYPE=${ENVIRONMENT_TYPE}
