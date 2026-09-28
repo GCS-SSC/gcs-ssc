@@ -1,26 +1,28 @@
 # AWS demo deployment with CDK
 
-The standalone TypeScript CDK app in `infra/aws/` deploys the **demo** environment
-in **Canada Central (`ca-central-1`)**. Both the Docker build and runtime use
-`ENVIRONMENT_TYPE=demo`, just like Railway. This creates a fresh, seeded demo;
-it does not transfer the Railway database or attachments.
+The standalone TypeScript CDK app in `infra/aws/` deploys the **GCS and Portal
+demo** environments in **Canada Central (`ca-central-1`)**. Their images are built
+with demo data. Updating an existing AWS stack preserves its GCS database and
+attachments; the new Portal database starts with its demo seed. Railway data is
+not transferred.
 
 ## What it deploys
 
-- A CloudFront distribution with an AWS-provided `https://….cloudfront.net`
-  address. No domain registration or custom certificate is needed.
-- A private Application Load Balancer reached through a CloudFront VPC origin.
+- Separate CloudFront distributions for GCS and Portal, each with an AWS-provided
+  `https://….cloudfront.net` address. No domain registration or custom certificate
+  is needed.
+- Separate private Application Load Balancers reached through CloudFront VPC origins.
   Viewer traffic requires HTTPS; the private origin leg uses HTTP. Caching is
   disabled, and viewer headers, cookies, query strings, and all application HTTP
   methods are forwarded. CloudFront is a global service; the application and
   data resources reside in Canada Central.
   A CDK custom resource resolves the AWS-managed CloudFront prefix list during
   deployment; only that list is allowed to reach the load balancer on port 80.
-- One Linux x86 Fargate task with 1 vCPU and 4 GiB RAM, including the existing
-  Chromium and LibreOffice image dependencies. No autoscaling or NAT gateway.
-  The task has a public IP for outbound image pulls and integrations; its security
-  group accepts application traffic only from the private load balancer.
-- An encrypted, private, single-AZ PostgreSQL 17 RDS `db.t4g.micro` instance:
+- One GCS Linux x86 Fargate task with 1 vCPU and 4 GiB RAM, including Chromium
+  and LibreOffice, plus one Portal task with 0.5 vCPU and 1 GiB RAM. Neither
+  service autoscales. Each task has a public IP for outbound image pulls and
+  integrations and accepts application traffic only from its private load balancer.
+- Separate encrypted, private, single-AZ PostgreSQL 17 RDS `db.t4g.micro` instances:
   20 GiB gp3 storage, storage growth capped at 50 GiB, seven-day backups,
   deletion protection, and a final snapshot on removal.
 - Encrypted EFS storage mounted only at `/app/.data/files`, preserving the local
@@ -31,8 +33,12 @@ it does not transfer the Railway database or attachments.
   public access blocked, TLS required, and retention on stack deletion. It is
   not selected as the demo's attachment provider and the task receives no S3
   access yet. `S3BucketName` and `S3BucketArn` are deployment outputs.
+- A private retained Portal S3 bucket for uploaded attachments. Only the Portal
+  task can read, write, and delete objects under its attachment prefix; the
+  browser has no direct bucket access. Noncurrent object versions expire after
+  30 days, and active objects have no age-based expiry.
 - Secrets Manager secrets for authentication, database credentials, and the
-  extension encryption seed; two-week CloudWatch application log retention.
+  GCS extension encryption seed; separate two-week CloudWatch application logs.
 - An account-wide monthly cost budget, defaulting to **USD 200**. Providing
   `budgetEmail` enables email notifications at 80% and 100% actual spend.
   It includes unrelated AWS spending in the same account intentionally.
@@ -42,10 +48,12 @@ VPC origins do not support `cac1-az3`; AZ names vary between AWS accounts.
 
 ## Budget
 
-The target is **less than CAD 5,000/year**, approximately CAD 416/month including
-whatever taxes apply to the account. A light-use deployment is expected to be
-around **CAD 150–220/month** (CAD 1,800–2,640/year), before tax, based on the
-following September 18, 2026 on-demand rates and 730 hours/month:
+The previous single-app estimate was **CAD 150–220/month** before tax. Portal
+adds a second task, database, load balancer, CloudFront distribution, and public
+IPv4 address. Recalculate the combined cost with the [AWS Pricing Calculator](https://calculator.aws/)
+before deployment; the previous estimate and the default USD 200 monthly budget
+do not establish a spending ceiling for the expanded stack. The earlier GCS-only
+September 18, 2026 estimate used 730 hours/month:
 
 | Item | Estimated USD/month |
 | --- | ---: |
@@ -63,8 +71,7 @@ internet traffic, retained resources, and additional deployments can raise costs
 Use a fresh [AWS Pricing Calculator](https://calculator.aws/) estimate before
 deployment; this is a planning allowance, not a spending guarantee.
 
-The USD 200 budget leaves headroom using a planning exchange rate of CAD 1.40
-per USD. Exchange rates and tax vary. Set a different USD threshold with
+Set the USD budget threshold with
 `-c monthlyBudgetUsd=…` and keep that context consistent on later deployments.
 **Budget alerts do not stop resources or enforce a hard cap.** Without
 `budgetEmail`, the budget exists but sends no email notifications.
@@ -84,9 +91,11 @@ used for the fixed calculations are
 2. An authenticated AWS profile with CDK bootstrap/deployment permissions,
    including CloudFormation, IAM, CloudFront VPC origins and service-linked roles,
    ECS, RDS, EFS, S3, Secrets Manager, EC2 networking, ECR, logs, and Budgets.
-3. A public digest-pinned demo image from the
-   [GitHub image workflow](container-images.md), promoted to
-   `deployment/demo-image.json`. CDK consumes this image without rebuilding it.
+3. Public digest-pinned GCS and Portal demo images from the
+   [GitHub image workflows](container-images.md), promoted to
+   `deployment/demo-image.json` and `deployment/portal-demo-image.json`. CDK
+   consumes these images without rebuilding them. The Portal image must contain
+   `.output/aws-start.mjs` and `.output/rds-ca.pem`.
    The private tooling submodule is needed only to run the local tests.
 
 From the repository root:
@@ -101,7 +110,7 @@ bun run synth --quiet
 ```
 
 Synthesis and the focused tests need no AWS credentials or Docker daemon.
-GitHub builds the application image; deployment does not require local Docker.
+GitHub builds both application images; deployment does not require local Docker.
 
 ## Deploy
 
@@ -130,11 +139,14 @@ Explicit `-c budgetEmail=…` and `-c monthlyBudgetUsd=…` options override the
 env-file budget defaults. AWS generates the database password, authentication
 secret, and extension seed; do not put application secrets in this deployment file.
 
-Keep the same stack name for updates. Bootstrap creates supporting resources
+Keep the same stack name for updates. Review `cdk diff` against the live stack;
+existing GCS database, EFS, secrets, and distribution must not be replaced or
+deleted. Bootstrap creates supporting resources
 with their own lifecycle. CloudFront VPC origin provisioning can take several
 minutes, and database creation and the first image pull take additional time.
-The stack outputs `Url`, `HealthUrl`, cluster/service names, log group, database
-secret ARN, EFS ID, and S3 bucket identifiers. No secret values are outputs.
+The stack outputs `Url`, `HealthUrl`, `PortalUrl`, `PortalHealthUrl`, service names,
+log groups, database secret ARNs, EFS ID, and S3 bucket identifiers. No secret
+values are outputs.
 If the release manifest still contains `image: null`, deployment also requires
 `--parameters DemoImage=ghcr.io/gcs-ssc/gcs-ssc-demo@sha256:…`. Prefer promoting
 the manifest so AWS and Railway use the same image.
@@ -143,6 +155,7 @@ After deployment:
 
 ```bash
 curl --fail https://YOUR_DISTRIBUTION.cloudfront.net/api/health
+curl --fail https://YOUR_PORTAL_DISTRIBUTION.cloudfront.net/api/session
 bun run aws logs tail YOUR_LOG_GROUP --since 10m --region ca-central-1
 ```
 

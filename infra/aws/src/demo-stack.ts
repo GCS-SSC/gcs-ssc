@@ -10,6 +10,7 @@ import {
 import type { StackProps } from 'aws-cdk-lib'
 import type { Construct } from 'constructs'
 import { DEMO_IMAGE_PATTERN, readDemoImage } from '../../../deployment/demo-image.js'
+import { readPortalDemoImage } from '../../../deployment/portal-demo-image.js'
 
 /**
  * Creates the fixed-size demo deployment without AWS lookups at synthesis time.
@@ -238,6 +239,145 @@ export const createDemoStack = (scope: Construct, id: string, props: StackProps)
   service.attachToApplicationTargetGroup(targets)
   service.node.addDependency(files.mountTargetsAvailable, database, listener)
 
+  const portalSecurityGroup = new ec2.SecurityGroup(stack, 'PortalAppSecurityGroup', { vpc })
+  const portalAlb = new elbv2.ApplicationLoadBalancer(stack, 'PortalLoadBalancer', {
+    vpc,
+    internetFacing: false,
+    vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+    idleTimeout: Duration.seconds(120)
+  })
+  portalAlb.connections.allowFrom(
+    ec2.Peer.prefixList(cloudfrontPrefixList.getResponseField('PrefixLists.0.PrefixListId')),
+    ec2.Port.tcp(80)
+  )
+  const portalTargets = new elbv2.ApplicationTargetGroup(stack, 'PortalTargets', {
+    vpc,
+    port: 3000,
+    protocol: elbv2.ApplicationProtocol.HTTP,
+    targetType: elbv2.TargetType.IP,
+    deregistrationDelay: Duration.seconds(30),
+    healthCheck: {
+      path: '/api/session', healthyHttpCodes: '200',
+      interval: Duration.seconds(30), timeout: Duration.seconds(5),
+      healthyThresholdCount: 2, unhealthyThresholdCount: 3
+    }
+  })
+  const portalListener = portalAlb.addListener('Http', {
+    port: 80, open: false, defaultTargetGroups: [portalTargets]
+  })
+  const portalVpcOrigin = new cloudfront.VpcOrigin(stack, 'PortalPrivateOrigin', {
+    endpoint: cloudfront.VpcOriginEndpoint.applicationLoadBalancer(portalAlb),
+    protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY
+  })
+  portalVpcOrigin.node.addDependency(portalListener, vpc.internetConnectivityEstablished)
+  for (const resource of vpc.node.findAll()) {
+    if (resource instanceof ec2.CfnVPCGatewayAttachment) portalVpcOrigin.node.addDependency(resource)
+  }
+  const portalDistribution = new cloudfront.Distribution(stack, 'PortalDistribution', {
+    comment: 'GCS-SSC Portal demo',
+    priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
+    defaultBehavior: {
+      origin: origins.VpcOrigin.withVpcOrigin(portalVpcOrigin, { readTimeout: Duration.seconds(60) }),
+      viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+      cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+      originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER,
+      compress: true
+    },
+    errorResponses: [500, 502, 503, 504].map(httpStatus => ({ httpStatus, ttl: Duration.seconds(0) }))
+  })
+  const portalUrl = `https://${portalDistribution.distributionDomainName}`
+  const portalDatabaseSecret = new secretsmanager.Secret(stack, 'PortalDatabaseSecret', {
+    generateSecretString: {
+      secretStringTemplate: JSON.stringify({ username: 'portal' }),
+      generateStringKey: 'password', passwordLength: 64, excludePunctuation: true
+    },
+    removalPolicy: RemovalPolicy.RETAIN
+  })
+  const portalDatabase = new rds.DatabaseInstance(stack, 'PortalDatabase', {
+    vpc,
+    vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+    engine: rds.DatabaseInstanceEngine.postgres({ version: rds.PostgresEngineVersion.VER_17_9 }),
+    instanceType: ec2.InstanceType.of(ec2.InstanceClass.T4G, ec2.InstanceSize.MICRO),
+    credentials: rds.Credentials.fromSecret(portalDatabaseSecret),
+    databaseName: 'portal',
+    allocatedStorage: 20,
+    maxAllocatedStorage: 50,
+    storageType: rds.StorageType.GP3,
+    storageEncrypted: true,
+    multiAz: false,
+    publiclyAccessible: false,
+    backupRetention: Duration.days(7),
+    deletionProtection: true,
+    removalPolicy: RemovalPolicy.SNAPSHOT,
+    parameters: { 'rds.force_ssl': '1' },
+    autoMinorVersionUpgrade: true
+  })
+  portalDatabase.connections.allowDefaultPortFrom(portalSecurityGroup)
+  const portalAuthSecret = new secretsmanager.Secret(stack, 'PortalAuthSecret', {
+    generateSecretString: { passwordLength: 64, excludePunctuation: true },
+    removalPolicy: RemovalPolicy.RETAIN
+  })
+  const portalAttachments = new s3.Bucket(stack, 'PortalAttachments', {
+    blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+    encryption: s3.BucketEncryption.S3_MANAGED,
+    enforceSSL: true,
+    versioned: true,
+    objectOwnership: s3.ObjectOwnership.BUCKET_OWNER_ENFORCED,
+    removalPolicy: RemovalPolicy.RETAIN,
+    lifecycleRules: [{
+      abortIncompleteMultipartUploadAfter: Duration.days(7),
+      noncurrentVersionExpiration: Duration.days(30)
+    }]
+  })
+  const portalTask = new ecs.FargateTaskDefinition(stack, 'PortalTask', {
+    cpu: 512, memoryLimitMiB: 1024,
+    runtimePlatform: {
+      cpuArchitecture: ecs.CpuArchitecture.X86_64,
+      operatingSystemFamily: ecs.OperatingSystemFamily.LINUX
+    }
+  })
+  portalTask.addToTaskRolePolicy(new iam.PolicyStatement({
+    actions: ['s3:GetObject', 's3:PutObject', 's3:DeleteObject'],
+    resources: [portalAttachments.arnForObjects('portal-attachments/*')]
+  }))
+  const portalLogGroup = new logs.LogGroup(stack, 'PortalApplicationLogs', {
+    retention: logs.RetentionDays.TWO_WEEKS,
+    removalPolicy: RemovalPolicy.DESTROY
+  })
+  portalTask.addContainer('Application', {
+    image: ecs.ContainerImage.fromRegistry(readPortalDemoImage()),
+    command: ['node', '.output/aws-start.mjs'],
+    logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'portal', logGroup: portalLogGroup }),
+    stopTimeout: Duration.seconds(120),
+    environment: {
+      AWS_DB_HOST: portalDatabase.dbInstanceEndpointAddress,
+      AWS_DB_USER: 'portal',
+      APP_URL: portalUrl,
+      S3_BUCKET: portalAttachments.bucketName,
+      S3_REGION: 'ca-central-1'
+    },
+    secrets: {
+      AWS_DB_PASSWORD: ecs.Secret.fromSecretsManager(portalDatabaseSecret, 'password'),
+      BETTER_AUTH_SECRET: ecs.Secret.fromSecretsManager(portalAuthSecret)
+    },
+    portMappings: [{ containerPort: 3000 }]
+  })
+  const portalService = new ecs.FargateService(stack, 'PortalService', {
+    cluster, taskDefinition: portalTask,
+    desiredCount: 1,
+    assignPublicIp: true,
+    vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
+    securityGroups: [portalSecurityGroup],
+    minHealthyPercent: 0, maxHealthyPercent: 100,
+    circuitBreaker: { rollback: true },
+    healthCheckGracePeriod: Duration.seconds(300),
+    platformVersion: ecs.FargatePlatformVersion.VERSION1_4
+  })
+  portalService.connections.allowFrom(portalAlb, ec2.Port.tcp(3000))
+  portalService.attachToApplicationTargetGroup(portalTargets)
+  portalService.node.addDependency(portalDatabase, portalListener)
+
   const budgetEmail = stack.node.tryGetContext('budgetEmail') as string | undefined
   const monthlyBudgetUsd = Number(stack.node.tryGetContext('monthlyBudgetUsd') ?? 200)
   if (!Number.isFinite(monthlyBudgetUsd) || monthlyBudgetUsd <= 0) {
@@ -270,5 +410,11 @@ export const createDemoStack = (scope: Construct, id: string, props: StackProps)
   new CfnOutput(stack, 'S3BucketName', { value: futureStorage.bucketName })
   new CfnOutput(stack, 'S3BucketArn', { value: futureStorage.bucketArn })
   new CfnOutput(stack, 'BudgetName', { value: monthlyBudget.ref })
+  new CfnOutput(stack, 'PortalUrl', { value: portalUrl })
+  new CfnOutput(stack, 'PortalHealthUrl', { value: `${portalUrl}/api/session` })
+  new CfnOutput(stack, 'PortalServiceName', { value: portalService.serviceName })
+  new CfnOutput(stack, 'PortalLogGroupName', { value: portalLogGroup.logGroupName })
+  new CfnOutput(stack, 'PortalDatabaseSecretArn', { value: portalDatabaseSecret.secretArn })
+  new CfnOutput(stack, 'PortalAttachmentBucketName', { value: portalAttachments.bucketName })
   return stack
 }
