@@ -88,7 +88,8 @@ WORKDIR /app
 COPY --from=build --chown=node:node /app/.output ./.output
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 
-RUN if [ "$ENVIRONMENT_TYPE" = "demo" ]; then \
+RUN node -e 'const fs = require("node:fs"); const path = require("node:path"); const walk = (dir) => { for (const entry of fs.readdirSync(dir, { withFileTypes: true })) if (entry.isDirectory()) walk(path.join(dir, entry.name)); if (fs.readdirSync(dir).join() === "package.json") fs.rmSync(dir, { recursive: true }); }; walk("/app/.output/server/node_modules");' \
+  && if [ "$ENVIRONMENT_TYPE" = "demo" ]; then \
     mkdir -p /app/demo-assets \
     && cp "/app/.output/demo-assets/Contribution Agreement.docx" "/app/demo-assets/Contribution Agreement.docx"; \
   fi \
