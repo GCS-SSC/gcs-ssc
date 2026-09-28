@@ -6,8 +6,10 @@ This configuration manages the existing **GCS Demo / demo** environment:
   populated, otherwise GitHub `GCS-SSC/gcs-ssc` branch `main` and the canonical Dockerfile.
 - Database: existing `GCS DB` service (PostgreSQL 18), with the application's existing `DATABASE_URL` preserved.
 - Domain: https://gcs-ssc-demo.up.railway.app, retained by Railway on the existing service.
-- Volumes: existing `gcs-ssc-volume` at `/app/.data` and replacement `gcs-db-volume` on `GCS DB`, each 5000 MB.
+- Volumes: existing `gcs-ssc-volume` at `/app/.data` and a fresh `gcs-db-volume-intake-reset` on `GCS DB`, each 5000 MB. The old `gcs-db-volume` remains detached for recovery until deliberately retired.
 - Metabase, `Metabase DB`, and their `postgres-volume-4aPn` are included so an IaC apply preserves them.
+- Portal: `gcs-ssc-portal` uses a pinned public GHCR digest from `deployment/portal-demo-image.json` and its own `Portal DB` PostgreSQL service and `portal-db-volume`. It shares this project, not a database, with GCS and Metabase.
+- Canvas groups: `Metabase`, `GCS`, and `Portal` each contain the corresponding app and PostgreSQL service.
 - Placement: one app replica in `us-east4-eqdc4a`, retaining existing resource limits.
 - Seed mode: `ENVIRONMENT_TYPE=demo` at build and runtime. Startup applies core,
   enabled-extension, and demo migrations before `/api/health` becomes ready.
@@ -15,6 +17,9 @@ This configuration manages the existing **GCS Demo / demo** environment:
 Secrets, database URL, and auth URL/origin variables use `preserve()` to keep their current
 Railway values. There are no secret values in this file. This is an imported
 configuration for the existing environment, not a fresh-project template.
+The Portal uses the sealed environment shared variable `PORTAL_AUTH_SECRET`; create
+that variable before applying. The Portal image must be public so Railway can pull
+it without registry credentials.
 
 ## Apply infrastructure changes
 
