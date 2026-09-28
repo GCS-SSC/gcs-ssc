@@ -87,7 +87,7 @@ WORKDIR /app
 
 COPY --from=build --chown=node:node /app/.output ./.output
 
-RUN node -e 'const fs = require("node:fs"); const path = "/app/.output/server/package.json"; const manifest = JSON.parse(fs.readFileSync(path, "utf8")); delete manifest.dependencies["@gcs-ssc/survey"]; fs.writeFileSync(path, JSON.stringify(manifest));' \
+RUN node -e 'const fs = require("node:fs"); const path = "/app/.output/server/package.json"; const manifest = JSON.parse(fs.readFileSync(path, "utf8")); for (const name of Object.keys(manifest.dependencies)) if (name === "@gcs-ssc/survey" || name.endsWith("-linux-x64-musl")) delete manifest.dependencies[name]; fs.writeFileSync(path, JSON.stringify(manifest));' \
   && npm install --omit=dev --ignore-scripts --legacy-peer-deps --no-audit --no-fund --prefix /app/.output/server \
   && if [ "$ENVIRONMENT_TYPE" = "demo" ]; then \
     mkdir -p /app/demo-assets \
