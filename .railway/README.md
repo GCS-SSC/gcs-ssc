@@ -41,6 +41,12 @@ has been cleared; `railway.json` remains only for legacy deployments elsewhere.
 Do not run `config pull --force` or `config migrate --force` unless you intend
 to replace this file.
 
+After the September 2026 rollout, Railway's IaC readback still proposes the two
+database volume attachments and the Portal `DATABASE_URL` reference on repeat
+plans. The live services have the intended volumes and database URL; repeating
+`config apply` reports no change to those resources. Check the live service and
+volume state before treating these readback entries as drift.
+
 `config apply` reconciles infrastructure and can trigger deployments. Source
 changes are deployed from GitHub `main` in source mode; image mode uses the
 pinned public GHCR digest. Follow the
