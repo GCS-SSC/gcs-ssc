@@ -1,14 +1,15 @@
 # AWS demo deployment with CDK
 
-The standalone TypeScript CDK app in `infra/aws/` deploys the **GCS and Portal
-demo** environments in **Canada Central (`ca-central-1`)**. Their images are built
-with demo data. Updating an existing AWS stack preserves its GCS database and
-attachments; the new Portal database starts with its demo seed. Railway data is
-not transferred.
+The standalone TypeScript CDK app in `infra/aws/` deploys the **GCS, Portal,
+and Metabase demo** environments in **Canada Central (`ca-central-1`)**. GCS and
+Portal images are built with demo data. Updating an existing AWS stack preserves
+its GCS database and attachments; the new Portal database starts with its demo
+seed. The new Metabase database starts empty unless its Railway application
+database is migrated separately.
 
 ## What it deploys
 
-- Separate CloudFront distributions for GCS and Portal, each with an AWS-provided
+- Separate CloudFront distributions for GCS, Portal, and Metabase, each with an AWS-provided
   `https://….cloudfront.net` address. No domain registration or custom certificate
   is needed.
 - Separate private Application Load Balancers reached through CloudFront VPC origins.
@@ -19,10 +20,10 @@ not transferred.
   A CDK custom resource resolves the AWS-managed CloudFront prefix list during
   deployment; only that list is allowed to reach the load balancer on port 80.
 - One GCS Linux x86 Fargate task with 1 vCPU and 4 GiB RAM, including Chromium
-  and LibreOffice, plus one Portal task with 0.5 vCPU and 1 GiB RAM. Neither
-  service autoscales. Each task has a public IP for outbound image pulls and
+  and LibreOffice, one Portal task with 0.5 vCPU and 1 GiB RAM, and one Metabase
+  task with 1 vCPU and 2 GiB RAM. None of the services autoscales. Each task has a public IP for outbound image pulls and
   integrations and accepts application traffic only from its private load balancer.
-- Separate encrypted, private, single-AZ PostgreSQL 17 RDS `db.t4g.micro` instances:
+- Three separate encrypted, private, single-AZ PostgreSQL 17 RDS `db.t4g.micro` instances:
   20 GiB gp3 storage, storage growth capped at 50 GiB, seven-day backups,
   deletion protection, and a final snapshot on removal.
 - Encrypted EFS storage mounted only at `/app/.data/files`, preserving the local
@@ -37,6 +38,12 @@ not transferred.
   task can read, write, and delete objects under its attachment prefix; the
   browser has no direct bucket access. Noncurrent object versions expire after
   30 days, and active objects have no age-based expiry.
+- Metabase uses an immutable Docker Hub image digest. An init container
+  downloads the regional RDS CA bundle before Metabase starts, and the JDBC
+  connection verifies the database hostname. Its CloudFront endpoint starts
+  disabled until an administrator is initialized or existing Metabase data is
+  migrated. Its task can reach the GCS
+  database as a data source, but its application database is separate.
 - Secrets Manager secrets for authentication, database credentials, and the
   GCS extension encryption seed; separate two-week CloudWatch application logs.
 - An account-wide monthly cost budget, defaulting to **USD 200**. Providing
@@ -49,8 +56,8 @@ VPC origins do not support `cac1-az3`; AZ names vary between AWS accounts.
 ## Budget
 
 The previous single-app estimate was **CAD 150–220/month** before tax. Portal
-adds a second task, database, load balancer, CloudFront distribution, and public
-IPv4 address. Recalculate the combined cost with the [AWS Pricing Calculator](https://calculator.aws/)
+and Metabase add two tasks, two databases, two load balancers, two CloudFront
+distributions, and two public IPv4 addresses. Recalculate the combined cost with the [AWS Pricing Calculator](https://calculator.aws/)
 before deployment; the previous estimate and the default USD 200 monthly budget
 do not establish a spending ceiling for the expanded stack. The earlier GCS-only
 September 18, 2026 estimate used 730 hours/month:
@@ -144,7 +151,7 @@ existing GCS database, EFS, secrets, and distribution must not be replaced or
 deleted. Bootstrap creates supporting resources
 with their own lifecycle. CloudFront VPC origin provisioning can take several
 minutes, and database creation and the first image pull take additional time.
-The stack outputs `Url`, `HealthUrl`, `PortalUrl`, `PortalHealthUrl`, service names,
+The stack outputs `Url`, `HealthUrl`, `PortalUrl`, `PortalHealthUrl`, `MetabaseUrl`, `MetabaseHealthUrl`, service names,
 log groups, database secret ARNs, EFS ID, and S3 bucket identifiers. No secret
 values are outputs.
 If the release manifest still contains `image: null`, deployment also requires
@@ -156,6 +163,7 @@ After deployment:
 ```bash
 curl --fail https://YOUR_DISTRIBUTION.cloudfront.net/api/health
 curl --fail https://YOUR_PORTAL_DISTRIBUTION.cloudfront.net/api/session
+curl --fail https://YOUR_METABASE_DISTRIBUTION.cloudfront.net/api/health
 bun run aws logs tail YOUR_LOG_GROUP --since 10m --region ca-central-1
 ```
 

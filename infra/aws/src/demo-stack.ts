@@ -378,6 +378,139 @@ export const createDemoStack = (scope: Construct, id: string, props: StackProps)
   portalService.attachToApplicationTargetGroup(portalTargets)
   portalService.node.addDependency(portalDatabase, portalListener)
 
+  const metabaseSecurityGroup = new ec2.SecurityGroup(stack, 'MetabaseAppSecurityGroup', { vpc })
+  const metabaseAlb = new elbv2.ApplicationLoadBalancer(stack, 'MetabaseLoadBalancer', {
+    vpc,
+    internetFacing: false,
+    vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+    idleTimeout: Duration.seconds(120)
+  })
+  metabaseAlb.connections.allowFrom(
+    ec2.Peer.prefixList(cloudfrontPrefixList.getResponseField('PrefixLists.0.PrefixListId')),
+    ec2.Port.tcp(80)
+  )
+  const metabaseTargets = new elbv2.ApplicationTargetGroup(stack, 'MetabaseTargets', {
+    vpc,
+    port: 3000,
+    protocol: elbv2.ApplicationProtocol.HTTP,
+    targetType: elbv2.TargetType.IP,
+    deregistrationDelay: Duration.seconds(30),
+    healthCheck: {
+      path: '/api/health', healthyHttpCodes: '200',
+      interval: Duration.seconds(30), timeout: Duration.seconds(5),
+      healthyThresholdCount: 2, unhealthyThresholdCount: 3
+    }
+  })
+  const metabaseListener = metabaseAlb.addListener('Http', {
+    port: 80, open: false, defaultTargetGroups: [metabaseTargets]
+  })
+  const metabaseVpcOrigin = new cloudfront.VpcOrigin(stack, 'MetabasePrivateOrigin', {
+    endpoint: cloudfront.VpcOriginEndpoint.applicationLoadBalancer(metabaseAlb),
+    protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY
+  })
+  metabaseVpcOrigin.node.addDependency(metabaseListener, vpc.internetConnectivityEstablished)
+  for (const resource of vpc.node.findAll()) {
+    if (resource instanceof ec2.CfnVPCGatewayAttachment) metabaseVpcOrigin.node.addDependency(resource)
+  }
+  const metabaseDistribution = new cloudfront.Distribution(stack, 'MetabaseDistribution', {
+    comment: 'GCS-SSC Metabase demo',
+    // Enable only after its administrator has been initialized or migrated.
+    enabled: false,
+    priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
+    defaultBehavior: {
+      origin: origins.VpcOrigin.withVpcOrigin(metabaseVpcOrigin, { readTimeout: Duration.seconds(60) }),
+      viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+      cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+      originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER,
+      compress: true
+    },
+    errorResponses: [500, 502, 503, 504].map(httpStatus => ({ httpStatus, ttl: Duration.seconds(0) }))
+  })
+  const metabaseUrl = `https://${metabaseDistribution.distributionDomainName}`
+  const metabaseDatabaseSecret = new secretsmanager.Secret(stack, 'MetabaseDatabaseSecret', {
+    generateSecretString: {
+      secretStringTemplate: JSON.stringify({ username: 'metabase' }),
+      generateStringKey: 'password', passwordLength: 64, excludePunctuation: true
+    },
+    removalPolicy: RemovalPolicy.RETAIN
+  })
+  const metabaseDatabase = new rds.DatabaseInstance(stack, 'MetabaseDatabase', {
+    vpc,
+    vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+    engine: rds.DatabaseInstanceEngine.postgres({ version: rds.PostgresEngineVersion.VER_17_9 }),
+    instanceType: ec2.InstanceType.of(ec2.InstanceClass.T4G, ec2.InstanceSize.MICRO),
+    credentials: rds.Credentials.fromSecret(metabaseDatabaseSecret),
+    databaseName: 'metabase',
+    allocatedStorage: 20,
+    maxAllocatedStorage: 50,
+    storageType: rds.StorageType.GP3,
+    storageEncrypted: true,
+    multiAz: false,
+    publiclyAccessible: false,
+    backupRetention: Duration.days(7),
+    deletionProtection: true,
+    removalPolicy: RemovalPolicy.SNAPSHOT,
+    parameters: { 'rds.force_ssl': '1' },
+    autoMinorVersionUpgrade: true
+  })
+  metabaseDatabase.connections.allowDefaultPortFrom(metabaseSecurityGroup)
+  // Metabase's data-source connection to GCS also stays inside this VPC.
+  database.connections.allowDefaultPortFrom(metabaseSecurityGroup)
+  const metabaseTask = new ecs.FargateTaskDefinition(stack, 'MetabaseTask', {
+    cpu: 1024, memoryLimitMiB: 2048,
+    runtimePlatform: {
+      cpuArchitecture: ecs.CpuArchitecture.X86_64,
+      operatingSystemFamily: ecs.OperatingSystemFamily.LINUX
+    },
+    volumes: [{ name: 'rds-ca' }]
+  })
+  const metabaseCa = metabaseTask.addContainer('RdsCa', {
+    image: ecs.ContainerImage.fromRegistry('alpine@sha256:5291449c3df73caf6ed85e649dec1b9e818b39a5d8c871e97afc13e9cd5e8fa8'),
+    command: [
+      'sh', '-ec',
+      'wget -qO /rds-ca/ca.pem https://truststore.pki.rds.amazonaws.com/ca-central-1/ca-central-1-bundle.pem && grep -q "BEGIN CERTIFICATE" /rds-ca/ca.pem'
+    ],
+    essential: false,
+    logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'metabase-ca' })
+  })
+  metabaseCa.addMountPoints({ sourceVolume: 'rds-ca', containerPath: '/rds-ca', readOnly: false })
+  const metabaseLogGroup = new logs.LogGroup(stack, 'MetabaseApplicationLogs', {
+    retention: logs.RetentionDays.TWO_WEEKS,
+    removalPolicy: RemovalPolicy.DESTROY
+  })
+  const metabaseContainer = metabaseTask.addContainer('Application', {
+    image: ecs.ContainerImage.fromRegistry('metabase/metabase@sha256:ca6d63cbedfd0a66a3c0239ac79a9df5f7ef3f2455027ab97e3bb26cbf281999'),
+    logging: ecs.LogDrivers.awsLogs({ streamPrefix: 'metabase', logGroup: metabaseLogGroup }),
+    stopTimeout: Duration.seconds(120),
+    environment: {
+      MB_DB_TYPE: 'postgres',
+      MB_DB_CONNECTION_URI: `jdbc:postgresql://${metabaseDatabase.dbInstanceEndpointAddress}:5432/metabase?sslmode=verify-full&sslrootcert=/rds-ca/ca.pem`,
+      MB_DB_USER: 'metabase',
+      MB_SITE_URL: metabaseUrl
+    },
+    secrets: { MB_DB_PASS: ecs.Secret.fromSecretsManager(metabaseDatabaseSecret, 'password') },
+    portMappings: [{ containerPort: 3000 }]
+  })
+  metabaseContainer.addMountPoints({ sourceVolume: 'rds-ca', containerPath: '/rds-ca', readOnly: true })
+  metabaseContainer.addContainerDependencies({
+    container: metabaseCa, condition: ecs.ContainerDependencyCondition.SUCCESS
+  })
+  const metabaseService = new ecs.FargateService(stack, 'MetabaseService', {
+    cluster, taskDefinition: metabaseTask,
+    desiredCount: 1,
+    assignPublicIp: true,
+    vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
+    securityGroups: [metabaseSecurityGroup],
+    minHealthyPercent: 0, maxHealthyPercent: 100,
+    circuitBreaker: { rollback: true },
+    healthCheckGracePeriod: Duration.seconds(300),
+    platformVersion: ecs.FargatePlatformVersion.VERSION1_4
+  })
+  metabaseService.connections.allowFrom(metabaseAlb, ec2.Port.tcp(3000))
+  metabaseService.attachToApplicationTargetGroup(metabaseTargets)
+  metabaseService.node.addDependency(metabaseDatabase, metabaseListener)
+
   const budgetEmail = stack.node.tryGetContext('budgetEmail') as string | undefined
   const monthlyBudgetUsd = Number(stack.node.tryGetContext('monthlyBudgetUsd') ?? 200)
   if (!Number.isFinite(monthlyBudgetUsd) || monthlyBudgetUsd <= 0) {
@@ -416,5 +549,10 @@ export const createDemoStack = (scope: Construct, id: string, props: StackProps)
   new CfnOutput(stack, 'PortalLogGroupName', { value: portalLogGroup.logGroupName })
   new CfnOutput(stack, 'PortalDatabaseSecretArn', { value: portalDatabaseSecret.secretArn })
   new CfnOutput(stack, 'PortalAttachmentBucketName', { value: portalAttachments.bucketName })
+  new CfnOutput(stack, 'MetabaseUrl', { value: metabaseUrl })
+  new CfnOutput(stack, 'MetabaseHealthUrl', { value: `${metabaseUrl}/api/health` })
+  new CfnOutput(stack, 'MetabaseServiceName', { value: metabaseService.serviceName })
+  new CfnOutput(stack, 'MetabaseLogGroupName', { value: metabaseLogGroup.logGroupName })
+  new CfnOutput(stack, 'MetabaseDatabaseSecretArn', { value: metabaseDatabaseSecret.secretArn })
   return stack
 }
