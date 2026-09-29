@@ -7,6 +7,7 @@ import {
   prepareAgreementForecastRoute
 } from '~~/server/utils/agreement-forecast'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
+import { assertAgreementLineFundingBalance, replaceAgreementLineFunding } from '~~/server/utils/agreement-funding-breakdown'
 
 export default defineEventHandler(async event => {
   const validated = await readValidatedBodyI18n(event, FundingCaseAgreementForecastLineItemCreateSchema)
@@ -43,11 +44,13 @@ export default defineEventHandler(async event => {
         return budgetLineItem
       }
 
+      const { egcs_fc_fundingsources: fundingSources = [], egcs_fc_amount: amount, egcs_fc_totalamount: totalAmount, ...lineValues } = validated
       const lineItem = await trx
         .insertInto('Funding_Case_Agreement_Forecast_Line_Item')
         .values({
-          ...validated,
-          egcs_fc_amount: databaseMoneyValue(validated.egcs_fc_amount)
+          ...lineValues,
+          egcs_fc_amount: databaseMoneyValue(amount),
+          egcs_fc_totalamount: databaseMoneyValue(totalAmount)
         })
         .returning([
           'id',
@@ -56,12 +59,22 @@ export default defineEventHandler(async event => {
           'egcs_fc_fundingagreementbudgetlineitem',
           'egcs_fc_month',
           databaseMoneyText(sql.ref('egcs_fc_amount')).as('egcs_fc_amount'),
+          databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('egcs_fc_totalamount'),
           'egcs_fc_currency',
           'egcs_fc_version',
           '_deleted'
         ])
         .executeTakeFirstOrThrow()
-      return { ...lineItem, egcs_fc_amount: parseDatabaseMoney(lineItem.egcs_fc_amount) }
+      const fundingError = await replaceAgreementLineFunding(event, trx, agreementId, { kind: 'forecast', lineId: String(lineItem.id) }, fundingSources)
+      if (fundingError) return fundingError
+      const balanceError = await assertAgreementLineFundingBalance(event, trx, { kind: 'forecast', lineId: String(lineItem.id) })
+      if (balanceError) return balanceError
+      return {
+        ...lineItem,
+        egcs_fc_amount: parseDatabaseMoney(lineItem.egcs_fc_amount),
+        egcs_fc_totalamount: parseDatabaseMoney(lineItem.egcs_fc_totalamount),
+        egcs_fc_fundingsources: fundingSources
+      }
     },
     { action: 'create' }
   )

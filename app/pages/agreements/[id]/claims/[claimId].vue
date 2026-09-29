@@ -100,6 +100,13 @@ const {
 } = useFetch<EntityAssignmentContext, FetchError, string>(`/api/entity-assignments/fundingcaseagreementclaim/${claimId}/context`)
 
 const draftClaimAmounts: Ref<Record<string, string>> = ref({})
+const fundingEditorLine: Ref<FundingCaseAgreementClaimLineItemRow | null> = ref(null)
+const fundingEditorOpen: Ref<boolean> = ref(false)
+const fundingEditorSession = ref(0)
+const fundingEditorProgramAmount: Ref<string> = ref('0.00')
+const fundingEditorTotalAmount: Ref<string> = ref('0.00')
+const fundingEditorSources: Ref<Array<{ egcs_fc_fundingsubtype: string, egcs_fc_amount: Money }>> = ref([])
+const isSavingFunding: Ref<boolean> = ref(false)
 const draftReconciledAmounts: Ref<Record<string, string>> = ref({})
 const draftSampledAmounts: Ref<Record<string, string>> = ref({})
 const draftRationales: Ref<Record<string, string>> = ref({})
@@ -166,6 +173,44 @@ const activeBudgetLineItems = computed(() => {
   return budgetLineItems.value.filter((line: FundingCaseAgreementBudgetLineItemRow) => String(line.fiscal_year_id) === String(activeClaim.value?.egcs_fc_fiscalyear))
 })
 const activeClaimLineItems = computed(() => claimLineItems.value.filter((line: FundingCaseAgreementClaimLineItemRow) => String(line.egcs_fc_fundingagreementclaim) === claimId))
+const openFundingEditor = (line: FundingCaseAgreementClaimLineItemRow) => {
+  fundingEditorSession.value += 1
+  fundingEditorLine.value = line
+  fundingEditorProgramAmount.value = line.egcs_fc_amount
+  fundingEditorTotalAmount.value = line.egcs_fc_totalamount
+  fundingEditorSources.value = line.egcs_fc_fundingsources.map(source => ({ ...source }))
+  fundingEditorOpen.value = true
+}
+const saveFundingEditor = async () => {
+  const line = fundingEditorLine.value
+  if (!line || isSavingFunding.value) return
+  try {
+    const amount = parseMoney(fundingEditorProgramAmount.value)
+    const totalAmount = parseMoney(fundingEditorTotalAmount.value)
+    const sources = fundingEditorSources.value.map(source => ({
+      egcs_fc_fundingsubtype: source.egcs_fc_fundingsubtype,
+      egcs_fc_amount: parseMoney(source.egcs_fc_amount)
+    }))
+    if (sources.some(source => !source.egcs_fc_fundingsubtype)
+      || new Set(sources.map(source => source.egcs_fc_fundingsubtype)).size !== sources.length
+      || compareMoney(sumMoney([amount, ...sources.map(source => source.egcs_fc_amount)]), totalAmount) !== 0) {
+      toast.add({ title: t('common.error'), description: t('agreement.completion_blockers.funding_breakdown_required'), color: 'error' })
+      return
+    }
+    isSavingFunding.value = true
+    await sendJson(`/api/agreements/${agreementId}/claim-line-items/${line.id}`, 'PATCH', {
+      egcs_fc_amount: amount,
+      egcs_fc_totalamount: totalAmount,
+      egcs_fc_fundingsources: sources
+    })
+    fundingEditorOpen.value = false
+    await refreshPage()
+  } catch (error: unknown) {
+    showError(error)
+  } finally {
+    isSavingFunding.value = false
+  }
+}
 const activeUnallocatedClaimLineItems = computed(() => activeClaimLineItems.value.filter((line: FundingCaseAgreementClaimLineItemRow) =>
   line.egcs_fc_fundingagreementbudgetlineitem === null || line.egcs_fc_fundingagreementbudgetlineitem === undefined
 ))
@@ -760,7 +805,11 @@ const saveSubmission = async () => {
       const amount = validatedAmounts.get(budgetLineId)!
       const existing = claimLinesByBudgetId.value.get(budgetLineId)?.[0]
       if (existing && existing.egcs_fc_amount !== amount && canUpdateClaim.value) {
-        await sendJson(`/api/agreements/${agreementId}/claim-line-items/${existing.id}`, 'PATCH', { egcs_fc_amount: amount, egcs_fc_description: budgetLine.egcs_fc_description })
+        await sendJson(`/api/agreements/${agreementId}/claim-line-items/${existing.id}`, 'PATCH', {
+          egcs_fc_amount: amount,
+          egcs_fc_totalamount: sumMoney([amount, ...existing.egcs_fc_fundingsources.map(source => source.egcs_fc_amount)]),
+          egcs_fc_description: budgetLine.egcs_fc_description
+        })
         didMutate = true
       }
       if (!existing && compareMoney(readDraftMoney(amount), ZERO_MONEY) !== 0 && canCreateClaimLineItems.value) {
@@ -769,6 +818,7 @@ const saveSubmission = async () => {
           egcs_fc_fundingagreementbudgetlineitem: budgetLineId,
           egcs_fc_description: budgetLine.egcs_fc_description,
           egcs_fc_amount: amount,
+          egcs_fc_totalamount: amount,
           egcs_fc_currency: 'cad'
         })
         didMutate = true
@@ -1104,6 +1154,13 @@ const cancelReconciliation = async () => {
                           <p v-if="row.original.description" class="min-w-0 max-w-full whitespace-normal break-words text-sm text-zinc-500 dark:text-zinc-400">
                             {{ row.original.description }}
                           </p>
+                          <UButton
+                            v-if="row.original.claimLine && canUpdateClaim"
+                            color="neutral"
+                            variant="link"
+                            size="xs"
+                            :label="t('agreement.funding_sources.edit_line')"
+                            @click="openFundingEditor(row.original.claimLine)" />
                           <div v-if="row.original.isUnallocated && row.original.claimLine && canAllocateClaimLines" class="flex flex-wrap items-end gap-2 pt-1">
                             <UFormField :label="t('agreement.claims.allocate_to_budget_line')" :name="`allocation-${row.original.claimLine.id}`" required class="min-w-72">
                               <CommonBilingualSelectMenu
@@ -1519,6 +1576,23 @@ const cancelReconciliation = async () => {
               :disabled="isSavingReconcileLine" />
           </div>
         </form>
+      </template>
+    </UModal>
+    <UModal v-model:open="fundingEditorOpen" :title="t('agreement.funding_sources.edit_line')" :ui="{ content: 'sm:max-w-2xl' }">
+      <template #body>
+        <div class="space-y-4">
+          <UFormField :label="t('agreement.claims.submitted_amount')" name="egcs_fc_amount" required>
+            <UInput v-model="fundingEditorProgramAmount" type="number" min="0" step="0.01" required aria-required="true" class="w-full" />
+          </UFormField>
+          <UFormField :label="t('agreement.funding_sources.total_cost')" name="egcs_fc_totalamount" required>
+            <UInput v-model="fundingEditorTotalAmount" type="number" min="0" step="0.01" required aria-required="true" class="w-full" />
+          </UFormField>
+          <AgreementFundingSourcesEditor v-model="fundingEditorSources" :agreement-id="agreementId" :identity="`${fundingEditorLine?.id ?? ''}:${fundingEditorSession}`" />
+          <div class="flex justify-end gap-2">
+            <UButton color="neutral" variant="ghost" :label="t('common.cancel')" @click="fundingEditorOpen = false" />
+            <CommonSaveButton :label="t('agreement.funding_sources.save')" :loading="isSavingFunding" @click="saveFundingEditor" />
+          </div>
+        </div>
       </template>
     </UModal>
   </div>

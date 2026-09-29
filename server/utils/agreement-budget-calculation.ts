@@ -76,7 +76,9 @@ const loadCalculationRows = async (db: Db, versionId: string) => await db.select
     'line.egcs_fc_percentage as percentage', 'line.egcs_fc_description as description',
     databaseMoneyText(sql.ref('line.egcs_fc_programfunding')).as('programFunding'),
     databaseMoneyText(sql.ref('line.egcs_fc_totalamount')).as('totalAmount'),
-    databaseMoneyText(sql`COALESCE(line.egcs_fc_otherfederalfunding, 0) + COALESCE(line.egcs_fc_othergovfunding, 0) + COALESCE(line.egcs_fc_otherfunding, 0)`).as('otherFunding')])
+    databaseMoneyText(sql`COALESCE((SELECT SUM(funding.egcs_fc_amount)
+      FROM "Funding_Case_Agreement_Budget_Line_Item_Funding" funding
+      WHERE funding.egcs_fc_budgetlineitem = line.id AND NOT funding._deleted), 0)`).as('otherFunding')])
   .where('line.egcs_fc_budgetversion', '=', versionId)
   .where('line._deleted', '=', false).where('year._deleted', '=', false)
   .orderBy('line.id').forUpdate('line').execute()

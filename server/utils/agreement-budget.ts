@@ -23,6 +23,7 @@ import { assertFiscalYearOverlapsDuration } from '~~/server/utils/agreement-fisc
 import { budgetFiscalYearStableId, budgetLineItemStableId } from '~~/server/utils/agreement-budget-lineage'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { moneyToCents, type Money } from '~~/shared/utils/money'
+import { loadBudgetFundingSources, replaceBudgetFundingSources, validateBudgetFundingSources } from './agreement-budget-funding'
 
 type DbClient = Kysely<Database> | Transaction<Database>
 
@@ -441,22 +442,15 @@ export const createAgreementBudgetLineItem = async (
     const programFunding = calculation.egcs_fc_programfunding ?? validated.egcs_fc_programfunding!
 
     await parseI18n(event, FundingCaseAgreementBudgetLineItemFundingTotalsSchema, { ...validated, egcs_fc_programfunding: calculation.egcs_fc_programfunding ?? validated.egcs_fc_programfunding })
+    await validateBudgetFundingSources(event, trx, currentContext.streamId, validated.egcs_fc_fundingsources ?? [])
+    const { egcs_fc_fundingsources, ...lineValues } = validated
     const inserted = await trx
       .insertInto('Funding_Case_Agreement_Budget_Line_Item')
       .values({
-        ...validated,
+        ...lineValues,
         ...calculation,
         egcs_fc_totalamount: databaseMoneyValue(validated.egcs_fc_totalamount),
         egcs_fc_programfunding: databaseMoneyValue(programFunding),
-        egcs_fc_otherfederalfunding: validated.egcs_fc_otherfederalfunding === undefined
-          ? undefined
-          : databaseMoneyValue(validated.egcs_fc_otherfederalfunding),
-        egcs_fc_othergovfunding: validated.egcs_fc_othergovfunding === undefined
-          ? undefined
-          : databaseMoneyValue(validated.egcs_fc_othergovfunding),
-        egcs_fc_otherfunding: validated.egcs_fc_otherfunding === undefined
-          ? undefined
-          : databaseMoneyValue(validated.egcs_fc_otherfunding),
         egcs_fc_fundingagreement: agreementId,
         egcs_fc_fundingagreementbudgetfiscalyear: String(fiscalYear.id)
       })
@@ -466,14 +460,13 @@ export const createAgreementBudgetLineItem = async (
         'egcs_fc_organizationcostcategory', 'egcs_fc_costsubsection', 'egcs_fc_description',
         databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('egcs_fc_totalamount'),
         databaseMoneyText(sql.ref('egcs_fc_programfunding')).as('egcs_fc_programfunding'),
-        databaseMoneyText(sql.ref('egcs_fc_otherfederalfunding')).as('egcs_fc_otherfederalfunding'),
-        databaseMoneyText(sql.ref('egcs_fc_othergovfunding')).as('egcs_fc_othergovfunding'),
-        databaseMoneyText(sql.ref('egcs_fc_otherfunding')).as('egcs_fc_otherfunding'),
         'egcs_fc_currency'
       ])
       .executeTakeFirstOrThrow()
 
+    await replaceBudgetFundingSources(trx, String(inserted.id), egcs_fc_fundingsources ?? [])
     const amounts = await recalculateAgreementBudget(event, trx, inserted.id, currentContext.streamId)
+    const fundingSources = await loadBudgetFundingSources(trx, [String(inserted.id)])
     const fiscalYearLabel = await fetchAgreementBudgetLineFiscalYearLabel(
       trx,
       inserted.egcs_fc_fundingagreementbudgetfiscalyear
@@ -483,9 +476,7 @@ export const createAgreementBudgetLineItem = async (
       ...inserted,
       egcs_fc_totalamount: parseDatabaseMoney(inserted.egcs_fc_totalamount),
       egcs_fc_programfunding: amounts.get(inserted.id) ?? parseDatabaseMoney(inserted.egcs_fc_programfunding),
-      egcs_fc_otherfederalfunding: inserted.egcs_fc_otherfederalfunding === null ? null : parseDatabaseMoney(inserted.egcs_fc_otherfederalfunding),
-      egcs_fc_othergovfunding: inserted.egcs_fc_othergovfunding === null ? null : parseDatabaseMoney(inserted.egcs_fc_othergovfunding),
-      egcs_fc_otherfunding: inserted.egcs_fc_otherfunding === null ? null : parseDatabaseMoney(inserted.egcs_fc_otherfunding),
+      egcs_fc_fundingsources: fundingSources,
       id: inserted.egcs_fc_originalbudgetlineitem ?? inserted.id,
       egcs_fc_fundingagreementbudgetfiscalyear: validated.egcs_fc_fundingagreementbudgetfiscalyear,
       fiscal_year_id: validated.egcs_fc_fundingagreementbudgetfiscalyear,

@@ -12,9 +12,7 @@ import type { Money } from '~~/shared/utils/money'
 type BudgetFundingState = {
   egcs_fc_totalamount: Money | string
   egcs_fc_programfunding: Money | string
-  egcs_fc_otherfederalfunding: Money | string | null | undefined
-  egcs_fc_othergovfunding: Money | string | null | undefined
-  egcs_fc_otherfunding: Money | string | null | undefined
+  egcs_fc_fundingsources: Array<{ egcs_fc_fundingsubtype: string, egcs_fc_amount: Money | string }>
 }
 
 type PeriodState = {
@@ -37,9 +35,7 @@ export const validateMergedBudgetLineItemFundingPatch = async (
 ) => await parseI18n(event, FundingCaseAgreementBudgetLineItemFundingTotalsSchema, {
   egcs_fc_totalamount: patch.egcs_fc_totalamount ?? existing.egcs_fc_totalamount,
   egcs_fc_programfunding: patch.egcs_fc_programfunding ?? existing.egcs_fc_programfunding,
-  egcs_fc_otherfederalfunding: patch.egcs_fc_otherfederalfunding ?? existing.egcs_fc_otherfederalfunding,
-  egcs_fc_othergovfunding: patch.egcs_fc_othergovfunding ?? existing.egcs_fc_othergovfunding,
-  egcs_fc_otherfunding: patch.egcs_fc_otherfunding ?? existing.egcs_fc_otherfunding
+  egcs_fc_fundingsources: patch.egcs_fc_fundingsources ?? existing.egcs_fc_fundingsources
 })
 
 /**

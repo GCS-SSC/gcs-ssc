@@ -26,10 +26,10 @@ const onSubmit = () => {
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="title" :description="t('common.form_dialog_description')">
+  <UModal v-model:open="open" :title="title" :description="t('common.form_dialog_description')" :ui="{ content: 'sm:max-w-4xl' }">
     <template #body>
       <UForm :state="state" :validate="validate" class="space-y-4" @submit="onSubmit">
-        <TransferPaymentFieldsTransferPaymentStreamFields :model="state" :program-id="programId" :persisted-stream="persistedStream" :persisted-program-id="persistedProgramId" />
+        <TransferPaymentFieldsTransferPaymentStreamFields :model="state" :program-id="programId" :persisted-stream="persistedStream" :persisted-program-id="persistedProgramId" is-stacked />
         <div class="flex justify-end gap-2 pt-4">
           <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="open = false" />
           <CommonSaveButton :label="submitLabel" :loading="pending" :disabled="pending" />

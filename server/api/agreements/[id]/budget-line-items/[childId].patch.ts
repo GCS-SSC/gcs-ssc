@@ -19,6 +19,7 @@ import { validateMergedBudgetLineItemFundingPatch } from '~~/server/utils/agreem
 import { throwIfAgreementUniqueConstraintError } from '~~/server/utils/agreement-unique-constraint-errors'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+import { loadBudgetFundingSources, replaceBudgetFundingSources, validateBudgetFundingSources } from '~~/server/utils/agreement-budget-funding'
 
 type AgreementBudgetLineDb = Kysely<Database> | Transaction<Database>
 
@@ -98,9 +99,7 @@ const getExistingBudgetLineItem = async (
       budgetFiscalYearStableId.as('egcs_fc_budgetfiscalyearidentity'),
       databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_totalamount')).as('egcs_fc_totalamount'),
       databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_programfunding')).as('egcs_fc_programfunding'),
-      databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_otherfederalfunding')).as('egcs_fc_otherfederalfunding'),
-      databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_othergovfunding')).as('egcs_fc_othergovfunding'),
-      databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_otherfunding')).as('egcs_fc_otherfunding')
+      'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_currency'
     ])
     .forUpdate('Funding_Case_Agreement_Budget_Line_Item')
     .executeTakeFirst(),
@@ -162,9 +161,7 @@ const updateBudgetLineItem = async (
   const {
     egcs_fc_totalamount,
     egcs_fc_programfunding,
-    egcs_fc_otherfederalfunding,
-    egcs_fc_othergovfunding,
-    egcs_fc_otherfunding,
+    egcs_fc_fundingsources,
     ...nonMoneyPatchValues
   } = patchValues
   return await db
@@ -172,10 +169,7 @@ const updateBudgetLineItem = async (
     .set({
       ...nonMoneyPatchValues,
       ...(egcs_fc_totalamount === undefined ? {} : { egcs_fc_totalamount: databaseMoneyValue(egcs_fc_totalamount) }),
-      ...(egcs_fc_programfunding === undefined ? {} : { egcs_fc_programfunding: databaseMoneyValue(egcs_fc_programfunding) }),
-      ...(egcs_fc_otherfederalfunding === undefined ? {} : { egcs_fc_otherfederalfunding: databaseMoneyValue(egcs_fc_otherfederalfunding) }),
-      ...(egcs_fc_othergovfunding === undefined ? {} : { egcs_fc_othergovfunding: databaseMoneyValue(egcs_fc_othergovfunding) }),
-      ...(egcs_fc_otherfunding === undefined ? {} : { egcs_fc_otherfunding: databaseMoneyValue(egcs_fc_otherfunding) })
+      ...(egcs_fc_programfunding === undefined ? {} : { egcs_fc_programfunding: databaseMoneyValue(egcs_fc_programfunding) })
     })
     .where('id', '=', childRowId)
     .where('_deleted', '=', false)
@@ -207,6 +201,7 @@ const fetchBudgetLineItemResponse = async (
   .where('Funding_Case_Agreement_Budget_Line_Item.id', '=', lineItemId)
   .select([
     budgetLineItemStableId.as('id'),
+    'Funding_Case_Agreement_Budget_Line_Item.id as row_id',
     budgetFiscalYearStableId.as('egcs_fc_fundingagreementbudgetfiscalyear'),
     'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_organizationcostcategory as egcs_fc_organizationcostcategory',
     'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_calculationmode',
@@ -217,9 +212,6 @@ const fetchBudgetLineItemResponse = async (
     'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description as egcs_fc_description',
     databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_totalamount')).as('egcs_fc_totalamount'),
     databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_programfunding')).as('egcs_fc_programfunding'),
-    databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_otherfederalfunding')).as('egcs_fc_otherfederalfunding'),
-    databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_othergovfunding')).as('egcs_fc_othergovfunding'),
-    databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_otherfunding')).as('egcs_fc_otherfunding'),
     'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_currency as egcs_fc_currency',
     budgetFiscalYearStableId.as('fiscal_year_id'),
     'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display',
@@ -227,13 +219,11 @@ const fetchBudgetLineItemResponse = async (
     'Agency_Cost_Category_Line_Item.egcs_ay_name_fr as line_item_name_fr'
   ])
   .executeTakeFirstOrThrow()
-  .then(line => ({
+  .then(async line => ({
     ...line,
     egcs_fc_totalamount: parseDatabaseMoney(line.egcs_fc_totalamount),
     egcs_fc_programfunding: parseDatabaseMoney(line.egcs_fc_programfunding),
-    egcs_fc_otherfederalfunding: line.egcs_fc_otherfederalfunding === null ? null : parseDatabaseMoney(line.egcs_fc_otherfederalfunding),
-    egcs_fc_othergovfunding: line.egcs_fc_othergovfunding === null ? null : parseDatabaseMoney(line.egcs_fc_othergovfunding),
-    egcs_fc_otherfunding: line.egcs_fc_otherfunding === null ? null : parseDatabaseMoney(line.egcs_fc_otherfunding)
+    egcs_fc_fundingsources: await loadBudgetFundingSources(db, [String(line.row_id)])
   }))
 
 const isEntityResponse = (value: unknown): value is { id: string | number } =>
@@ -307,7 +297,11 @@ const resolveBudgetLinePatchInput = async (
 
   const calculation = await prepareBudgetCalculation(event, db, patchValues, String(existing.id))
   if (calculation.egcs_fc_programfunding !== undefined) patchValues.egcs_fc_programfunding = calculation.egcs_fc_programfunding
-  await validateMergedBudgetLineItemFundingPatch(event, existing, patchValues)
+  const existingSources = await loadBudgetFundingSources(db, [String(existing.id)])
+  await validateMergedBudgetLineItemFundingPatch(event, { ...existing, egcs_fc_fundingsources: existingSources }, patchValues)
+  if (patchValues.egcs_fc_fundingsources !== undefined) {
+    await validateBudgetFundingSources(event, db, streamId, patchValues.egcs_fc_fundingsources, String(existing.id))
+  }
 
   const persistedPatchValues: FundingCaseAgreementBudgetLineItemPatch = { ...patchValues }
   if (Object.hasOwn(patchValues, 'egcs_fc_fundingagreementbudgetfiscalyear') && referenceGuard.fiscalYearRowId) {
@@ -335,6 +329,9 @@ const applyBudgetLinePatch = async (
     input.patchValues
   )
 
+  if (isEntityResponse(updated) && input.patchValues.egcs_fc_fundingsources !== undefined) {
+    await replaceBudgetFundingSources(db, String(updated.id), input.patchValues.egcs_fc_fundingsources)
+  }
   if (isEntityResponse(updated)) await recalculateAgreementBudget(event, db, String(updated.id), streamId)
   return isEntityResponse(updated)
     ? await fetchBudgetLineItemResponse(db, String(updated.id))

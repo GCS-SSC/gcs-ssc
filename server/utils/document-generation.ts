@@ -14,6 +14,7 @@ import { buildAgreementDocumentCustomFields } from './agreement-document-custom-
 import { buildAgreementCloseoutReadiness } from './agreement-closeout'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { databaseMoneyText, parseDatabaseMoney } from './database-money'
+import { budgetFundingSourcesByLine, loadBudgetFundingSources } from './agreement-budget-funding'
 import { formatMoneyText, parseMoney, sumMoney, type Money } from '~~/shared/utils/money'
 
 export type GeneratedAgreementDocument = GeneratedDocument
@@ -535,15 +536,13 @@ export const buildAgreementDocumentContext = async (
       .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)
       .where('Funding_Case_Agreement_Budget_Version._deleted', '=', false)
       .select([
+        'Funding_Case_Agreement_Budget_Line_Item.id as rowId',
         'Funding_Case_Agreement_Budget_Fiscal_Year.id as fiscalYearId',
         'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscalYear',
         'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection as subsection',
         'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description as description',
         databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_totalamount')).as('totalAmount'),
         databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_programfunding')).as('programFunding'),
-        databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_otherfederalfunding')).as('otherFederalFunding'),
-        databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_othergovfunding')).as('otherGovFunding'),
-        databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_otherfunding')).as('otherFunding'),
         'Agency_Cost_Category.egcs_ay_name_en as costCategoryEn',
         'Agency_Cost_Category.egcs_ay_name_fr as costCategoryFr',
         'Agency_Cost_Category_Line_Item.egcs_ay_name_en as categoryEn',
@@ -580,15 +579,9 @@ export const buildAgreementDocumentContext = async (
 
   const zeroMoney = parseMoney('0')
   const getAmount = (value: unknown): Money => value == null ? zeroMoney : parseDatabaseMoney(value)
-  const getOtherFundingTotal = (item: {
-    otherFederalFunding?: unknown
-    otherGovFunding?: unknown
-    otherFunding?: unknown
-  }): Money => sumMoney([
-    getAmount(item.otherFederalFunding),
-    getAmount(item.otherGovFunding),
-    getAmount(item.otherFunding)
-  ])
+  const fundingByLine = budgetFundingSourcesByLine(await loadBudgetFundingSources(db, budgetItems.map(item => String(item.rowId))))
+  const getOtherFundingTotal = (item: { rowId: string }): Money =>
+    sumMoney((fundingByLine.get(String(item.rowId)) ?? []).map(source => source.egcs_fc_amount))
   const lineItems = budgetItems.map(item => ({
     ...item,
     fiscalYearId: String(item.fiscalYearId),

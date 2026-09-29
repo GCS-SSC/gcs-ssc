@@ -26,7 +26,7 @@ import {
   AgreementApprovalSubmissionPromotionError,
   buildAgreementApprovalSnapshot,
   hashAgreementApprovalSnapshot,
-  type AgreementApprovalSnapshotV1
+  type AgreementApprovalSnapshot
 } from './agreement-approval-submission'
 import { promoteApprovedAgreementAmendment, resolveAgreementAmendmentRuntimeContext } from './agreement-amendment'
 import { buildAgreementCloseoutReadiness, hashAgreementCloseoutSnapshot } from './agreement-closeout'
@@ -400,7 +400,7 @@ const promoteApprovalSubmission = async (trx: Transaction<Database>, run: Workfl
     .selectAll()
     .where('egcs_fc_workflowrun', '=', String(run.id))
     .executeTakeFirstOrThrow()
-  const packet = submission.egcs_fc_packet as AgreementApprovalSnapshotV1
+  const packet = submission.egcs_fc_packet as AgreementApprovalSnapshot
   if (hashAgreementApprovalSnapshot(packet) !== submission.egcs_fc_canonicalhash) {
     throw new AgreementApprovalSubmissionHashMismatchError('Agreement approval submission packet failed its integrity check')
   }

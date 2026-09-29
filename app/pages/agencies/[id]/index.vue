@@ -16,6 +16,7 @@ import AgencyWorkflowSetups from '~/components/Agency/AgencyWorkflowSetups.vue'
 import AgencyReviewSets from '~/components/Agency/AgencyReviewSets.vue'
 import AgencyRecommendationSets from '~/components/Agency/AgencyRecommendationSets.vue'
 import AgencyCostCategories from '~/components/Agency/AgencyCostCategories.vue'
+import AgencyFundingTypes from '~/components/Agency/AgencyFundingTypes.vue'
 import AgencyCustomFields from '~/components/Agency/AgencyCustomFields.vue'
 import AgencyDetailGeneralTab from '~/components/Agency/AgencyDetailGeneralTab.vue'
 import AgencyFiscalYears from '~/components/Agency/AgencyFiscalYears.vue'
@@ -79,6 +80,7 @@ const tabMap: TabMap = new Map([
   ['recommendationSets', { key: 'transfer_payment.recommendation_setups', icon: 'i-lucide-list-checks', component: AgencyRecommendationSets, getProps: () => ({ agencyId: id, canUpdateChild: canUpdateAgency.value, canDeleteChild: canUpdateAgency.value }) }],
   ['programs', { key: 'agency.tabs.programs', icon: 'i-lucide-banknote', component: AgencyTransferPayments, getProps: () => ({ agencyId: id }) }],
   ['costCategories', { key: 'agency.tabs.cost_categories', icon: 'i-lucide-layers', component: AgencyCostCategories, getProps: agencyResourceCapabilities }],
+  ['fundingTypes', { key: 'agency.funding_types.title', icon: 'i-lucide-hand-coins', component: AgencyFundingTypes, getProps: agencyResourceCapabilities }],
   ['fiscalYears', { key: 'agency.tabs.fiscal_years', icon: 'i-lucide-calendar', component: AgencyFiscalYears, getProps: agencyResourceCapabilities }],
   ['chartOfAccounts', { key: 'agency.tabs.chart_of_accounts', icon: 'i-lucide-table-properties', component: AgencyChartOfAccounts, getProps: agencyResourceCapabilities }],
   ['commitmentTypes', { key: 'agency.tabs.commitment_types', icon: 'i-lucide-tags', component: AgencyCommitmentTypes, getProps: agencyResourceCapabilities }],

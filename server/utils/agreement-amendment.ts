@@ -8,6 +8,7 @@ import { resolveBusinessStatusProtection } from '~~/server/utils/business-status
 import type { StatusId } from '~~/shared/types/status'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
+import { budgetFundingSourcesByLine, loadBudgetFundingSources, replaceBudgetFundingSources } from './agreement-budget-funding'
 
 type AmendmentDb = Kysely<Database> | Transaction<Database>
 
@@ -319,17 +320,15 @@ const cloneBudgetVersionRows = async (
         'egcs_fc_calculationmode', 'egcs_fc_sourcecategory', 'egcs_fc_percentage', 'egcs_fc_allowpercentageoverride',
         databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('egcs_fc_totalamount'),
         databaseMoneyText(sql.ref('egcs_fc_programfunding')).as('egcs_fc_programfunding'),
-        databaseMoneyText(sql.ref('egcs_fc_otherfederalfunding')).as('egcs_fc_otherfederalfunding'),
-        databaseMoneyText(sql.ref('egcs_fc_othergovfunding')).as('egcs_fc_othergovfunding'),
-        databaseMoneyText(sql.ref('egcs_fc_otherfunding')).as('egcs_fc_otherfunding'),
         'egcs_fc_currency'
       ])
       .where('egcs_fc_fundingagreementbudgetfiscalyear', '=', String(year.id))
       .where('_deleted', '=', false)
       .orderBy('id', 'asc')
       .execute()
-    if (lines.length > 0) {
-      await trx.insertInto('Funding_Case_Agreement_Budget_Line_Item').values(lines.map(line => ({
+    const sourcesByLine = budgetFundingSourcesByLine(await loadBudgetFundingSources(trx, lines.map(line => String(line.id))))
+    for (const line of lines) {
+      const clonedLine = await trx.insertInto('Funding_Case_Agreement_Budget_Line_Item').values({
         egcs_fc_fundingagreement: agreementId,
         egcs_fc_fundingagreementbudgetfiscalyear: String(clonedYear.id),
         egcs_fc_originalbudgetlineitem: line.egcs_fc_originalbudgetlineitem ?? line.id,
@@ -342,12 +341,10 @@ const cloneBudgetVersionRows = async (
         egcs_fc_description: line.egcs_fc_description,
         egcs_fc_totalamount: databaseMoneyValue(parseDatabaseMoney(line.egcs_fc_totalamount)),
         egcs_fc_programfunding: databaseMoneyValue(parseDatabaseMoney(line.egcs_fc_programfunding)),
-        egcs_fc_otherfederalfunding: line.egcs_fc_otherfederalfunding === null ? null : databaseMoneyValue(parseDatabaseMoney(line.egcs_fc_otherfederalfunding)),
-        egcs_fc_othergovfunding: line.egcs_fc_othergovfunding === null ? null : databaseMoneyValue(parseDatabaseMoney(line.egcs_fc_othergovfunding)),
-        egcs_fc_otherfunding: line.egcs_fc_otherfunding === null ? null : databaseMoneyValue(parseDatabaseMoney(line.egcs_fc_otherfunding)),
         egcs_fc_currency: line.egcs_fc_currency,
         _deleted: false
-      }))).execute()
+      }).returning('id').executeTakeFirstOrThrow()
+      await replaceBudgetFundingSources(trx, String(clonedLine.id), sourcesByLine.get(String(line.id)) ?? [])
     }
   }
 }

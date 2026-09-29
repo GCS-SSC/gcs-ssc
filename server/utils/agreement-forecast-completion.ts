@@ -21,6 +21,7 @@ import {
 import { authorizeFreshAssignedItem } from '~~/server/utils/authorize'
 import { resolveBusinessStatusProtection } from '~~/server/utils/business-status-runtime'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
+import { getAgreementLineFundingCompletionStatus } from '~~/server/utils/agreement-funding-breakdown'
 
 export const getAgreementForecastCompletionRuntime = async (
   event: H3Event,
@@ -33,13 +34,15 @@ export const getAgreementForecastCompletionRuntime = async (
     const protection = await resolveBusinessStatusProtection(trx, 'fundingcaseforecast', forecastId)
     const lineItem = await trx.selectFrom('Funding_Case_Agreement_Forecast_Line_Item')
       .select('id').where('egcs_fc_agreementforecast', '=', forecastId).where('_deleted', '=', false).executeTakeFirst()
+    const funding = await getAgreementLineFundingCompletionStatus(trx, { kind: 'forecast', id: forecastId })
 
     return {
       item,
       can_complete: item === null
         && Boolean(lineItem)
+        && funding.complete
         && Boolean(protection && !protection.locked),
-      blocker: item ? null : !lineItem ? 'lines_required' as const : !protection || protection.locked ? 'business_status' as const : null
+      blocker: item ? null : !lineItem ? 'lines_required' as const : !funding.complete ? 'funding_breakdown_required' as const : !protection || protection.locked ? 'business_status' as const : null
     }
   })
 }
@@ -74,6 +77,9 @@ export const executeAgreementForecastCompletion = async (
   if (lineItems.length === 0) {
     return await badRequest(event, 'AGREEMENT_FORECAST_LINES_REQUIRED', 'apiErrors.request.invalid_status')
   }
+  if (!(await getAgreementLineFundingCompletionStatus(db, { kind: 'forecast', id: forecastId })).complete) {
+    return await badRequest(event, 'AGREEMENT_FORECAST_FUNDING_BREAKDOWN_REQUIRED', 'apiErrors.agreement.funding_breakdown_required')
+  }
 
   const protection = await resolveBusinessStatusProtection(db, 'fundingcaseforecast', forecastId)
   if (!protection || protection.locked) {
@@ -97,6 +103,9 @@ export const executeAgreementForecastCompletion = async (
       .executeTakeFirst()
     if (!currentLineItem) {
       return await badRequest(event, 'AGREEMENT_FORECAST_LINES_REQUIRED', 'apiErrors.request.invalid_status')
+    }
+    if (!(await getAgreementLineFundingCompletionStatus(trx, { kind: 'forecast', id: forecastId })).complete) {
+      return await badRequest(event, 'AGREEMENT_FORECAST_FUNDING_BREAKDOWN_REQUIRED', 'apiErrors.agreement.funding_breakdown_required')
     }
 
     const { completion: createdCompletion } = await createCompletionTransition(

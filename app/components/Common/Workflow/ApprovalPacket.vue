@@ -113,6 +113,47 @@ const packetBudgetOverview = computed<FundingCaseAgreementBudgetOverviewRow>(() 
       const fiscalYearId = fiscalYearIdByDisplay.get(display(line.fiscalYear)) ?? `packet-fiscal-year-missing-${index}`
       const category = asRecord(line.organizationCostCategory)
       const item = asRecord(line.lineItem)
+      const fundingSources = asRecords(line.fundingSources).map((source, sourceIndex) => {
+        const typeName = asRecord(source.fundingType)
+        const subtypeName = asRecord(source.fundingSubtype)
+        const description = asRecord(source.description)
+        return {
+          id: `packet-funding-${index}-${sourceIndex}`,
+          egcs_fc_fundingsubtype: `packet-subtype-${index}-${sourceIndex}`,
+          egcs_fc_amount: toAmount(source.amount) ?? parseMoney('0'),
+          egcs_fc_description_en: String(description.en ?? ''),
+          egcs_fc_description_fr: String(description.fr ?? ''),
+          funding_type_name_en: String(typeName.en ?? ''),
+          funding_type_name_fr: String(typeName.fr ?? ''),
+          funding_subtype_name_en: String(subtypeName.en ?? ''),
+          funding_subtype_name_fr: String(subtypeName.fr ?? ''),
+          funding_type_instacking: Boolean(source.inStacking),
+          funding_type_incostsharing: Boolean(source.inCostSharing)
+        }
+      })
+      if (line.fundingSources === undefined) {
+        for (const [key, label] of [
+          ['otherFederalFunding', 'other_federal_funding'],
+          ['otherGovernmentFunding', 'other_gov_funding'],
+          ['otherFunding', 'other_funding']
+        ] as const) {
+          const amount = toAmount(line[key])
+          if (!amount) continue
+          fundingSources.push({
+            id: `packet-legacy-${index}-${key}`,
+            egcs_fc_fundingsubtype: `packet-legacy-${key}`,
+            egcs_fc_amount: amount,
+            egcs_fc_description_en: '',
+            egcs_fc_description_fr: '',
+            funding_type_name_en: t(`agreement.budget.${label}`),
+            funding_type_name_fr: t(`agreement.budget.${label}`),
+            funding_subtype_name_en: '',
+            funding_subtype_name_fr: '',
+            funding_type_instacking: false,
+            funding_type_incostsharing: false
+          })
+        }
+      }
       return {
         id: `packet-line-${index}`,
         fiscal_year_id: fiscalYearId,
@@ -133,9 +174,7 @@ const packetBudgetOverview = computed<FundingCaseAgreementBudgetOverviewRow>(() 
         egcs_fc_description: display(line.description),
         egcs_fc_totalamount: toAmount(line.totalAmount) ?? parseMoney('0'),
         egcs_fc_programfunding: toAmount(line.programFunding) ?? parseMoney('0'),
-        egcs_fc_otherfederalfunding: toAmount(line.otherFederalFunding),
-        egcs_fc_othergovfunding: toAmount(line.otherGovernmentFunding),
-        egcs_fc_otherfunding: toAmount(line.otherFunding),
+        egcs_fc_fundingsources: fundingSources,
         egcs_fc_currency: String(line.currency || 'cad') as FundingCaseAgreementBudgetLineItemRow['egcs_fc_currency']
       }
     })

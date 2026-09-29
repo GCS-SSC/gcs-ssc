@@ -8,6 +8,7 @@ import { databaseMoneyText, parseDatabaseMoney } from '~~/server/utils/database-
 import { PositivePostgresBigintIdSchema } from '~~/shared/types/schemas'
 import { z } from 'zod'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
+import { budgetFundingSourcesByLine, loadBudgetFundingSources } from '~~/server/utils/agreement-budget-funding'
 
 export const ForecastOverviewQuerySchema = z.object({
   forecastId: PositivePostgresBigintIdSchema.optional()
@@ -102,15 +103,13 @@ const readRoute = async (event: H3Event, forecastId?: string) => {
       .where('Agency_Cost_Category._deleted', '=', false)
       .select([
         budgetLineItemStableId.as('id'),
+        'Funding_Case_Agreement_Budget_Line_Item.id as budget_row_id',
         budgetFiscalYearStableId.as('egcs_fc_fundingagreementbudgetfiscalyear'),
         'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_organizationcostcategory as egcs_fc_organizationcostcategory',
         'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection as egcs_fc_costsubsection',
         'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description as egcs_fc_description',
         databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_totalamount')).as('egcs_fc_totalamount'),
         databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_programfunding')).as('egcs_fc_programfunding'),
-        databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_otherfederalfunding')).as('egcs_fc_otherfederalfunding'),
-        databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_othergovfunding')).as('egcs_fc_othergovfunding'),
-        databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_otherfunding')).as('egcs_fc_otherfunding'),
         'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_currency as egcs_fc_currency',
         budgetFiscalYearStableId.as('fiscal_year_id'),
         'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display',
@@ -170,6 +169,7 @@ const readRoute = async (event: H3Event, forecastId?: string) => {
         'Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_fundingagreementbudgetlineitem as egcs_fc_fundingagreementbudgetlineitem',
         'Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_month as egcs_fc_month',
         databaseMoneyText(sql.ref('Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_amount')).as('egcs_fc_amount'),
+        databaseMoneyText(sql.ref('Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_totalamount')).as('egcs_fc_totalamount'),
         'Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_currency as egcs_fc_currency',
         'Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_version as egcs_fc_version',
         'Funding_Case_Agreement_Forecast.egcs_fc_fiscalyear as forecast_fiscal_year_id',
@@ -188,28 +188,66 @@ const readRoute = async (event: H3Event, forecastId?: string) => {
       .execute()
   ])
 
+  const budgetFundingSources = budgetFundingSourcesByLine(await loadBudgetFundingSources(db, budgetLineItems.map(line => String(line.budget_row_id))))
   const parsedBudgetLineItems = budgetLineItems.map(lineItem => ({
     ...lineItem,
+    egcs_fc_fundingsources: budgetFundingSources.get(String(lineItem.budget_row_id)) ?? [],
     egcs_fc_totalamount: parseDatabaseMoney(lineItem.egcs_fc_totalamount),
-    egcs_fc_programfunding: parseDatabaseMoney(lineItem.egcs_fc_programfunding),
-    egcs_fc_otherfederalfunding: lineItem.egcs_fc_otherfederalfunding === null
-      ? null
-      : parseDatabaseMoney(lineItem.egcs_fc_otherfederalfunding),
-    egcs_fc_othergovfunding: lineItem.egcs_fc_othergovfunding === null
-      ? null
-      : parseDatabaseMoney(lineItem.egcs_fc_othergovfunding),
-    egcs_fc_otherfunding: lineItem.egcs_fc_otherfunding === null
-      ? null
-      : parseDatabaseMoney(lineItem.egcs_fc_otherfunding)
+    egcs_fc_programfunding: parseDatabaseMoney(lineItem.egcs_fc_programfunding)
   }))
+  const sourceRows = lineItems.length === 0
+    ? []
+    : await db
+        .selectFrom('Funding_Case_Agreement_Forecast_Line_Item_Funding')
+        .innerJoin('Agency_Funding_Subtype', 'Agency_Funding_Subtype.id', 'Funding_Case_Agreement_Forecast_Line_Item_Funding.egcs_fc_fundingsubtype')
+        .innerJoin('Agency_Funding_Type', 'Agency_Funding_Type.id', 'Agency_Funding_Subtype.egcs_ay_fundingtype')
+        .select([
+          'Funding_Case_Agreement_Forecast_Line_Item_Funding.egcs_fc_forecastlineitem as egcs_fc_forecastlineitem',
+          'Funding_Case_Agreement_Forecast_Line_Item_Funding.egcs_fc_fundingsubtype as egcs_fc_fundingsubtype',
+          databaseMoneyText(sql.ref('Funding_Case_Agreement_Forecast_Line_Item_Funding.egcs_fc_amount')).as('egcs_fc_amount'),
+          'Agency_Funding_Subtype.egcs_ay_name_en as funding_subtype_name_en',
+          'Agency_Funding_Subtype.egcs_ay_name_fr as funding_subtype_name_fr',
+          'Agency_Funding_Type.egcs_ay_name_en as funding_type_name_en',
+          'Agency_Funding_Type.egcs_ay_name_fr as funding_type_name_fr'
+        ])
+        .where('egcs_fc_forecastlineitem', 'in', lineItems.map(line => String(line.id)))
+        .where('Funding_Case_Agreement_Forecast_Line_Item_Funding._deleted', '=', false)
+        .execute()
+  const sourcesByLine = new Map<string, Array<{
+    egcs_fc_fundingsubtype: string
+    egcs_fc_amount: ReturnType<typeof parseDatabaseMoney>
+    funding_subtype_name_en: string
+    funding_subtype_name_fr: string
+    funding_type_name_en: string
+    funding_type_name_fr: string
+  }>>()
+  for (const source of sourceRows) {
+    const key = String(source.egcs_fc_forecastlineitem)
+    const values = sourcesByLine.get(key) ?? []
+    values.push({
+      egcs_fc_fundingsubtype: String(source.egcs_fc_fundingsubtype),
+      egcs_fc_amount: parseDatabaseMoney(source.egcs_fc_amount),
+      funding_subtype_name_en: source.funding_subtype_name_en,
+      funding_subtype_name_fr: source.funding_subtype_name_fr,
+      funding_type_name_en: source.funding_type_name_en,
+      funding_type_name_fr: source.funding_type_name_fr
+    })
+    sourcesByLine.set(key, values)
+  }
   const parsedLineItems = lineItems.map(lineItem => ({
     ...lineItem,
     egcs_fc_amount: parseDatabaseMoney(lineItem.egcs_fc_amount),
+    egcs_fc_totalamount: parseDatabaseMoney(lineItem.egcs_fc_totalamount),
+    egcs_fc_fundingsources: sourcesByLine.get(String(lineItem.id)) ?? [],
     budget_line_total_amount: parseDatabaseMoney(lineItem.budget_line_total_amount),
     budget_line_program_funding: parseDatabaseMoney(lineItem.budget_line_program_funding)
   }))
   const forecastsWithState = await withBusinessRecordState(db, 'fundingcaseforecast', forecasts)
-  return { forecasts: forecastsWithState, budgetLineItems: parsedBudgetLineItems, lineItems: parsedLineItems }
+  return {
+    forecasts: forecastsWithState,
+    budgetLineItems: parsedBudgetLineItems,
+    lineItems: parsedLineItems
+  }
 }
 
 export default defineEventHandler(async event => {

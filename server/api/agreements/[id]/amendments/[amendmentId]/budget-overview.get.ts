@@ -5,6 +5,7 @@ import { resolveAgreementAmendmentBudgetVersion } from '~~/server/utils/agreemen
 import { budgetFiscalYearStableId, budgetLineItemStableId } from '~~/server/utils/agreement-budget-lineage'
 import { getAgreementAmendmentBudgetDifferences } from '~~/server/utils/agreement-amendment-budget-difference'
 import { databaseMoneyText, parseDatabaseMoney } from '~~/server/utils/database-money'
+import { budgetFundingSourcesByLine, loadBudgetFundingSources } from '~~/server/utils/agreement-budget-funding'
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -45,7 +46,7 @@ export default defineEventHandler(async event => {
       .where('Agency_Cost_Category_Line_Item._deleted', '=', false)
       .where('Agency_Cost_Category._deleted', '=', false)
       .select([
-        budgetLineItemStableId.as('id'), budgetFiscalYearStableId.as('egcs_fc_fundingagreementbudgetfiscalyear'),
+        budgetLineItemStableId.as('id'), 'Funding_Case_Agreement_Budget_Line_Item.id as row_id', budgetFiscalYearStableId.as('egcs_fc_fundingagreementbudgetfiscalyear'),
         'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_organizationcostcategory as egcs_fc_organizationcostcategory',
         sql<boolean>`"Agency_Cost_Category".egcs_ay_active AND "Agency_Cost_Category_Line_Item".egcs_ay_active AND "Transfer_Payment_Stream_Cost_Category_Line_Item".egcs_tp_active`.as('cost_category_available'),
         'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_calculationmode',
@@ -57,8 +58,7 @@ export default defineEventHandler(async event => {
         'Agency_Cost_Category_Line_Item.egcs_ay_organizationcostcategory as calculation_category_id',
         'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection as egcs_fc_costsubsection',
         'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description as egcs_fc_description', databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_totalamount')).as('egcs_fc_totalamount'),
-        databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_programfunding')).as('egcs_fc_programfunding'), databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_otherfederalfunding')).as('egcs_fc_otherfederalfunding'),
-        databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_othergovfunding')).as('egcs_fc_othergovfunding'), databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_otherfunding')).as('egcs_fc_otherfunding'),
+        databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_programfunding')).as('egcs_fc_programfunding'),
         'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_currency as egcs_fc_currency', budgetFiscalYearStableId.as('fiscal_year_id'),
         'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display', 'Agency_Cost_Category.egcs_ay_name_en as organization_cost_category_name_en',
         'Agency_Cost_Category.egcs_ay_name_fr as organization_cost_category_name_fr', 'Agency_Cost_Category_Line_Item.egcs_ay_name_en as line_item_name_en',
@@ -66,15 +66,14 @@ export default defineEventHandler(async event => {
       ]).orderBy('Agency_Fiscal_Year.egcs_ay_fiscalyear', 'asc').orderBy(sql`LOWER("Agency_Cost_Category"."egcs_ay_name_en")`, 'asc').execute(),
     getAgreementAmendmentBudgetDifferences(db, agreementId, [amendmentId])
   ])
+  const fundingSourcesByLine = budgetFundingSourcesByLine(await loadBudgetFundingSources(db, lineItems.map(line => String(line.row_id))))
   return {
     fiscalYears,
     lineItems: lineItems.map(line => ({
       ...line,
       egcs_fc_totalamount: parseDatabaseMoney(line.egcs_fc_totalamount),
       egcs_fc_programfunding: parseDatabaseMoney(line.egcs_fc_programfunding),
-      egcs_fc_otherfederalfunding: line.egcs_fc_otherfederalfunding === null ? null : parseDatabaseMoney(line.egcs_fc_otherfederalfunding),
-      egcs_fc_othergovfunding: line.egcs_fc_othergovfunding === null ? null : parseDatabaseMoney(line.egcs_fc_othergovfunding),
-      egcs_fc_otherfunding: line.egcs_fc_otherfunding === null ? null : parseDatabaseMoney(line.egcs_fc_otherfunding)
+      egcs_fc_fundingsources: fundingSourcesByLine.get(String(line.row_id)) ?? []
     })),
     budget_differences: budgetDifferences.get(amendmentId) ?? []
   }

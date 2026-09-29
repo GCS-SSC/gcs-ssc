@@ -112,6 +112,15 @@ const changeConsistency = async (value: boolean) => {
     </UFormField>
   </div>
 
+  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }">
+    <UFormField :label="t('transfer_payment.description_en')" :name="field('egcs_tp_description_en')">
+      <CommonTextarea v-model="model.egcs_tp_description_en" />
+    </UFormField>
+    <UFormField :label="t('transfer_payment.description_fr')" :name="field('egcs_tp_description_fr')">
+      <CommonTextarea v-model="model.egcs_tp_description_fr" />
+    </UFormField>
+  </div>
+
   <UFormField :label="t('transfer_payment.require_consistent_proponent_type')" :name="field('egcs_tp_requireconsistentproponenttype')">
     <USwitch
       :model-value="model.egcs_tp_requireconsistentproponenttype ?? false"
@@ -121,15 +130,12 @@ const changeConsistency = async (value: boolean) => {
   <UFormField :label="t('transfer_payment.allows_further_distribution')" :name="field('egcs_tp_allowsfurtherdistribution')">
     <USwitch v-model="model.egcs_tp_allowsfurtherdistribution" />
   </UFormField>
-
-  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }">
-    <UFormField :label="t('transfer_payment.description_en')" :name="field('egcs_tp_description_en')">
-      <CommonTextarea v-model="model.egcs_tp_description_en" />
-    </UFormField>
-    <UFormField :label="t('transfer_payment.description_fr')" :name="field('egcs_tp_description_fr')">
-      <CommonTextarea v-model="model.egcs_tp_description_fr" />
-    </UFormField>
-  </div>
+  <UFormField :label="t('transfer_payment.require_forecast_funding_breakdown')" :name="field('egcs_tp_requireforecastfundingbreakdown')">
+    <USwitch v-model="model.egcs_tp_requireforecastfundingbreakdown" />
+  </UFormField>
+  <UFormField :label="t('transfer_payment.require_claim_funding_breakdown')" :name="field('egcs_tp_requireclaimfundingbreakdown')">
+    <USwitch v-model="model.egcs_tp_requireclaimfundingbreakdown" />
+  </UFormField>
 
   <UFormField :label="t('common.active')" :name="field('egcs_tp_active')">
     <USwitch v-model="model.egcs_tp_active" :label="t('common.active')" />

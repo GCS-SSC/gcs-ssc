@@ -9,7 +9,7 @@ import type { Entity_Type } from '~~/shared/types/database'
 type CompletionResponse = {
   item: { id: string } | null
   can_complete: boolean
-  blocker?: 'active_workflow' | 'approval_workflow_missing' | 'claim_lines_required' | 'claim_lines_unallocated' | 'lines_required' | 'payment_total_mismatch' | 'final_reconcile_approved' | 'business_status' | null
+  blocker?: 'active_workflow' | 'approval_workflow_missing' | 'claim_lines_required' | 'claim_lines_unallocated' | 'lines_required' | 'funding_breakdown_required' | 'payment_total_mismatch' | 'final_reconcile_approved' | 'business_status' | null
 }
 
 const {

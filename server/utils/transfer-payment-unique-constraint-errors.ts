@@ -4,6 +4,8 @@ import { throwIfMappedConstraintError, type ConstraintErrorMapping } from '~~/se
 const UNIQUE_VIOLATION_CODE = '23505'
 
 const CONSTRAINT_ERROR_MAP: Record<string, ConstraintErrorMapping> = {
+  tp_uq_stream_funding_subtype_active: { code: 'DUPLICATE_FUNDING_SUBTYPE', key: 'apiErrors.transfer_payment.duplicate_funding_subtype' },
+  tp_chk_stream_funding_subtype_agency: { code: 'INVALID_FUNDING_SUBTYPE', key: 'apiErrors.transfer_payment.invalid_funding_subtype' },
   tp_idx_streamtransferpaymentprofilenameennamefrstatus: {
     code: 'TRANSFER_PAYMENT_DUPLICATE_PROGRAM_STREAM_NAME',
     key: 'apiErrors.transfer_payment.duplicate_program_stream_name'

@@ -15,6 +15,7 @@ import {
 import { createCompletionTransition } from '~~/server/utils/workflow-runtime'
 import type { CompletionHookPayload } from '~~/shared/types/completion'
 import type { CompletionExecuteInput } from '~~/shared/types/schemas/completion'
+import { getAgreementLineFundingCompletionStatus } from '~~/server/utils/agreement-funding-breakdown'
 
 type ClaimLineAllocation = { egcs_fc_fundingagreementbudgetlineitem?: string | null }
 
@@ -44,19 +45,22 @@ export const getAgreementClaimCompletionRuntime = async (
     .execute()
   const hasClaimLines = claimLines.length > 0
   const claimLinesReady = areClaimLinesReady(claimLines)
+  const funding = await getAgreementLineFundingCompletionStatus(event.context.$db, { kind: 'claim', id: claimId })
 
   return {
     item,
-    can_complete: item === null && claimLinesReady && Boolean(protection && !protection.locked),
+    can_complete: item === null && claimLinesReady && funding.complete && Boolean(protection && !protection.locked),
     blocker: item
       ? null
       : !hasClaimLines
           ? 'claim_lines_required' as const
           : !claimLinesReady
               ? 'claim_lines_unallocated' as const
-              : !protection || protection.locked
-                  ? 'business_status' as const
-                  : null
+              : !funding.complete
+                  ? 'funding_breakdown_required' as const
+                  : !protection || protection.locked
+                      ? 'business_status' as const
+                      : null
   }
 }
 
@@ -113,6 +117,9 @@ export const executeAgreementClaimCompletion = async (
       }
       if (!areClaimLinesReady(claimLines)) {
         return await badRequest(event, 'AGREEMENT_CLAIM_LINES_UNALLOCATED', 'apiErrors.agreement.claim_lines_unallocated')
+      }
+      if (!(await getAgreementLineFundingCompletionStatus(trx, { kind: 'claim', id: claimId })).complete) {
+        return await badRequest(event, 'AGREEMENT_CLAIM_FUNDING_BREAKDOWN_REQUIRED', 'apiErrors.agreement.funding_breakdown_required')
       }
 
       if (await resolveCompletionEvidenceId(trx, 'fundingcaseagreementclaim', claimId)) {

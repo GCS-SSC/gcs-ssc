@@ -133,12 +133,22 @@ export interface BudgetCalculationMetadata {
 }
 
 export interface FundingCaseAgreementBudgetLineItemRow extends Omit<FundingCaseAgreementBudgetLineItemItem,
-  'egcs_fc_percentage' | 'egcs_fc_totalamount' | 'egcs_fc_programfunding' | 'egcs_fc_otherfederalfunding' | 'egcs_fc_othergovfunding' | 'egcs_fc_otherfunding'>, BudgetCalculationMetadata {
+  'egcs_fc_percentage' | 'egcs_fc_totalamount' | 'egcs_fc_programfunding' | 'egcs_fc_fundingsources'>, BudgetCalculationMetadata {
   egcs_fc_totalamount: Money
   egcs_fc_programfunding: Money
-  egcs_fc_otherfederalfunding?: Money | null
-  egcs_fc_othergovfunding?: Money | null
-  egcs_fc_otherfunding?: Money | null
+  egcs_fc_fundingsources: Array<{
+    id?: string
+    egcs_fc_fundingsubtype: string
+    egcs_fc_amount: Money
+    egcs_fc_description_en?: string | null
+    egcs_fc_description_fr?: string | null
+    funding_type_name_en?: string | null
+    funding_type_name_fr?: string | null
+    funding_subtype_name_en?: string | null
+    funding_subtype_name_fr?: string | null
+    funding_type_instacking?: boolean
+    funding_type_incostsharing?: boolean
+  }>
   cost_category_available?: boolean
   fiscal_year_id: string
   fiscal_year_display?: string | null
@@ -163,12 +173,10 @@ export interface FundingCaseAgreementBudgetDifference {
 
 export type FundingCaseAgreementBudgetFiscalYearForm = Partial<FundingCaseAgreementBudgetFiscalYearItem>
 export type FundingCaseAgreementBudgetLineItemForm = BudgetCalculationMetadata & Partial<Omit<FundingCaseAgreementBudgetLineItemItem,
-  'egcs_fc_percentage' | 'egcs_fc_totalamount' | 'egcs_fc_programfunding' | 'egcs_fc_otherfederalfunding' | 'egcs_fc_othergovfunding' | 'egcs_fc_otherfunding'> & {
+  'egcs_fc_percentage' | 'egcs_fc_totalamount' | 'egcs_fc_programfunding' | 'egcs_fc_fundingsources'> & {
     egcs_fc_totalamount: string
     egcs_fc_programfunding: string
-    egcs_fc_otherfederalfunding: string | null
-    egcs_fc_othergovfunding: string | null
-    egcs_fc_otherfunding: string | null
+    egcs_fc_fundingsources: FundingCaseAgreementBudgetLineItemRow['egcs_fc_fundingsources']
   }>
 
 export interface FundingCaseAgreementAmendmentTypeRow {
@@ -369,6 +377,14 @@ export interface FundingCaseAgreementForecastRow extends FundingCaseAgreementFor
 }
 
 export interface FundingCaseAgreementForecastLineItemRow extends FundingCaseAgreementForecastLineItemItem {
+  egcs_fc_fundingsources: Array<{
+    egcs_fc_fundingsubtype: string
+    egcs_fc_amount: Money
+    funding_type_name_en?: string | null
+    funding_type_name_fr?: string | null
+    funding_subtype_name_en?: string | null
+    funding_subtype_name_fr?: string | null
+  }>
   forecast_fiscal_year_id: string
   fiscal_year_display?: string | null
   budget_fiscal_year_id: string
@@ -397,6 +413,14 @@ export interface FundingCaseAgreementClaimRow extends FundingCaseAgreementClaimI
 }
 
 export interface FundingCaseAgreementClaimLineItemRow extends FundingCaseAgreementClaimLineItemItem {
+  egcs_fc_fundingsources: Array<{
+    egcs_fc_fundingsubtype: string
+    egcs_fc_amount: Money
+    funding_type_name_en?: string | null
+    funding_type_name_fr?: string | null
+    funding_subtype_name_en?: string | null
+    funding_subtype_name_fr?: string | null
+  }>
   claim_fiscal_year_id: string
   budget_fiscal_year_id?: string | null
   budget_fiscal_year_display?: string | null

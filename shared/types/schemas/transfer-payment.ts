@@ -84,6 +84,8 @@ export type TransferPaymentProfileItem = WithId<TransferPaymentProfile>
 
 export const TransferPaymentStreamSchema = z.object({
   egcs_tp_requireconsistentproponenttype: z.boolean().default(false),
+  egcs_tp_requireforecastfundingbreakdown: z.boolean().default(false),
+  egcs_tp_requireclaimfundingbreakdown: z.boolean().default(false),
   egcs_tp_parentstream: z.preprocess(value => value === '' ? null : value, PositivePostgresBigintIdSchema.nullable()).optional(),
   egcs_tp_name_en: StreamStorageText(255),
   egcs_tp_name_fr: StreamStorageText(255),
@@ -100,6 +102,8 @@ export const TransferPaymentStreamSchema = z.object({
 // PATCH omission must preserve stored flags rather than apply create defaults.
 export const TransferPaymentStreamPatchSchema = TransferPaymentStreamSchema.partial().extend({
   egcs_tp_requireconsistentproponenttype: z.boolean().optional(),
+  egcs_tp_requireforecastfundingbreakdown: z.boolean().optional(),
+  egcs_tp_requireclaimfundingbreakdown: z.boolean().optional(),
   egcs_tp_allowsfurtherdistribution: z.boolean().optional(),
   egcs_tp_active: z.boolean().optional()
 })

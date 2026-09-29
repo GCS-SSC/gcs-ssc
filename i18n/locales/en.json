@@ -322,6 +322,7 @@
     "logout_failed": "Sign out could not be completed. Please try again.",
     "confirm": "Confirm",
     "cancel": "Cancel",
+    "close": "Close",
     "complete": "Complete",
     "active": "Active",
     "inactive": "Inactive",
@@ -616,6 +617,19 @@
     }
   },
   "agency": {
+    "funding_types": {
+      "title": "Funding types",
+      "type": "Funding type",
+      "subtypes": "Funding subtypes",
+      "manage_subtypes_for": "Manage funding subtypes for {name}",
+      "subtypes_for": "Funding subtypes for {name}",
+      "add_type": "Add funding type",
+      "add_subtype": "Add subtype",
+      "add_subtype_for": "Add a subtype to {name}",
+      "stacking": "Included in stacking limit",
+      "cost_sharing": "Used for cost sharing",
+      "active": "Available for new budgets"
+    },
     "cost_line_active_help": "Inactive line items remain on existing budgets but cannot be used for new budget lines.",
     "cost_category_active_help": "Inactive categories remain on existing budgets but cannot be used for new budget lines.",
     "title": "Agencies",
@@ -1087,6 +1101,10 @@
       "transfer_payment_scope_requires_transfer_payment_ability": "Program scope requires at least one transfer payment ability."
     },
     "agency": {
+      "duplicate_funding_type": "A funding type with this name already exists for the Agency.",
+      "duplicate_funding_subtype": "A funding subtype with this name already exists in the type.",
+      "funding_type_not_found": "Funding type not found.",
+      "funding_subtype_not_found": "Funding subtype not found.",
       "not_found": "Agency not found.",
       "holdback_basis_not_found": "Agency holdback basis not found.",
       "holdback_basis_in_use": "Remove all program stream references to this holdback basis before changing its code or deleting it.",
@@ -1185,6 +1203,10 @@
       "libreoffice_unavailable": "LibreOffice is required to convert DOCX templates to PDF. Install LibreOffice on the server or use an HTML PDF template."
     },
     "agreement": {
+      "invalid_funding_subtype": "Select a funding subtype available to this agreement’s stream.",
+      "duplicate_funding_subtype": "Each funding subtype may appear only once per line.",
+      "funding_subtype_invalid": "Select a funding subtype available to this agreement’s stream, without duplicates.",
+      "funding_breakdown_required": "Add at least one other funding source to each line, and make program funding plus other sources equal total cost.",
       "number_provider_conflict": "More than one agreement number provider is enabled for this stream.",
       "invalid_generated_number": "The generated agreement number must contain 1–15 characters without surrounding spaces.",
       "number_managed": "The agreement number is assigned automatically. Remove the supplied number and try again.",
@@ -1296,6 +1318,9 @@
       "duplicate_claim_reconcile_line_item": "A reconciliation line already exists for this claim line item."
     },
     "transfer_payment": {
+      "invalid_funding_subtype": "Select an active funding subtype owned by this stream’s Agency.",
+      "duplicate_funding_subtype": "This funding subtype is already available to the stream.",
+      "funding_subtype_link_not_found": "Stream funding subtype not found.",
       "profile_not_found": "Program not found.",
       "profile_scope_changed": "The program scope changed while this request was being processed. Refresh and try again.",
       "stream_not_found": "Program stream not found.",
@@ -1426,6 +1451,8 @@
     }
   },
   "transfer_payment": {
+    "require_forecast_funding_breakdown": "Require other funding breakdown on forecasts",
+    "require_claim_funding_breakdown": "Require other funding breakdown on claims",
     "proponent_consistency_confirm_title": "Change proponent type consistency?",
     "proponent_consistency_enable_description": "Align existing proponent classifications through a data migration before enabling this option. Changing this setting on its own can have unexpected impacts: historical differences will remain, while future additions and type changes must match the proponent’s most recent eligible type in this stream (highest agreement ID). Unchanged saved types remain allowed. This takes effect when you save the stream.",
     "proponent_consistency_disable_description": "Disabling this option allows future proponent types to differ between agreements. It does not change existing types. Before enabling it again, align existing classifications through a data migration. Re-enabling the option on its own can have unexpected impacts because it only enforces future additions and type changes, using the most recent eligible type (highest agreement ID). This takes effect when you save the stream.",
@@ -2078,6 +2105,24 @@
     "modified_at": "Modified"
   },
   "agreement": {
+    "completion_blockers": {
+      "funding_breakdown_required": "Add at least one other funding source to each line, and make program funding plus other sources equal total cost before completion."
+    },
+    "funding_sources": {
+      "in_stacking": "Included in stacking limit",
+      "in_cost_sharing": "Used for cost sharing",
+      "title": "Other funding sources",
+      "add": "Add source",
+      "none": "No other funding sources entered",
+      "subtype": "Funding subtype",
+      "amount": "Amount",
+      "remove": "Remove source",
+      "description_en": "Source description (English)",
+      "description_fr": "Source description (French)",
+      "total_cost": "Total cost",
+      "edit_line": "Edit funding for this line",
+      "save": "Save funding"
+    },
     "number_generated": "Assigned on creation",
     "number_mode_error": "Unable to determine numbering. Retry.",
     "list_views": {
@@ -2299,6 +2344,7 @@
       "load_failed": "Financial summary could not be loaded"
     },
     "budget": {
+      "funding_sources": "Other funding sources",
       "title": "Budget",
       "search": "Search budget line items",
       "fiscal_year": "Fiscal year",
@@ -3196,6 +3242,7 @@
       "claim_lines_required": "Add at least one claim line before completing this claim.",
       "claim_lines_unallocated": "Allocate every claim line to a budget line before completing this claim.",
       "lines_required": "Add at least one line item before completing this item.",
+      "funding_breakdown_required": "Add at least one other funding source to each line, and make program funding plus other sources equal total cost before completion.",
       "payment_total_mismatch": "The payment line amounts must equal the payment total before completion.",
       "final_reconcile_approved": "The final reconciliation is already approved, so this reconciliation can no longer be completed.",
       "business_status": "The current business status does not allow this item to be completed."

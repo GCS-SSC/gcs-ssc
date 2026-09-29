@@ -1,6 +1,11 @@
 <script setup lang="ts">
-import { watch } from 'vue'
+import { ref, watch } from 'vue'
+import type { Ref } from 'vue'
 import { useLoadRecoveryFocus } from '~/composables/useLoadRecoveryFocus'
+import { getClientRequestUrl } from '~/utils/client-request-url'
+import { throwFetchResponseError } from '~/utils/fetch-error'
+import type { TransferPaymentStreamItem } from '~~/shared/types/schemas'
+import type { TransferPaymentStreamRow } from '~~/shared/types/transfer-payment-ui'
 
 definePageMeta({
   key: route => route.path,
@@ -14,6 +19,7 @@ definePageMeta({
 
 const route = useRoute()
 const { t } = useI18n()
+const toast = useToast()
 const { showError } = useApiErrorToast()
 const { getBilingualValue } = useBilingualValue()
 const id = route.params.id as string
@@ -36,6 +42,7 @@ const {
   streamStatus,
   refreshProfile,
   refreshStream,
+  canUpdateChild,
   tabs,
   selectedTab,
   activeTabComponent,
@@ -44,6 +51,46 @@ const {
   isHeroCollapsed
 } =
   await useTransferPaymentStreamDetailState(id, streamId, { immediate: !isNestedDetailRoute.value })
+
+const isUpdateModalOpen: Ref<boolean> = ref(false)
+const isSavingStream: Ref<boolean> = ref(false)
+const selectedStream: Ref<Partial<TransferPaymentStreamItem> | null> = ref(null)
+const persistedStream: Ref<TransferPaymentStreamRow | null> = ref(null)
+
+/** Copies the current Stream into the shared edit modal. */
+const openUpdateStream = () => {
+  if (!stream.value || !canUpdateChild.value || isSavingStream.value) return
+  persistedStream.value = { ...stream.value } as TransferPaymentStreamRow
+  selectedStream.value = { ...stream.value }
+  isUpdateModalOpen.value = true
+}
+
+/** Saves the edited Stream and refreshes the detail view. */
+const saveStream = async () => {
+  if (!selectedStream.value || !canUpdateChild.value || isSavingStream.value) return
+  const draft = selectedStream.value
+  isSavingStream.value = true
+  try {
+    const response = await fetch(getClientRequestUrl(`/api/transfer-payments/${id}/streams/${streamId}`), {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...draft, egcs_tp_parentstream: draft.egcs_tp_parentstream || null })
+    })
+    if (!response.ok) await throwFetchResponseError(response)
+    await refreshStream()
+    if (streamStatus.value === 'error' || streamError.value) return
+    if (selectedStream.value === draft) {
+      isUpdateModalOpen.value = false
+      selectedStream.value = null
+      persistedStream.value = null
+    }
+    toast.add({ title: t('common.success'), description: t('common.updated_success'), color: 'success' })
+  } catch (error: unknown) {
+    showError(error)
+  } finally {
+    isSavingStream.value = false
+  }
+}
 
 const isLoadingDetail = computed(() => profileStatus.value === 'pending' || streamStatus.value === 'pending')
 const hasLoadError = computed(() =>
@@ -112,7 +159,13 @@ watch([hasLoadError, profileError, streamError, isNestedDetailRoute], ([failed, 
               `${t('agreement.program')}: ${getBilingualValue(profile, 'egcs_tp_name', '')}`,
               `${t('transfer_payment.abbreviation')}: ${getBilingualValue(stream, 'egcs_tp_abbreviation', '')}`
             ]"
-            :badges="[{ variant: stream.egcs_tp_active ? 'active' : 'inactive' }]" />
+            :badges="[{ variant: stream.egcs_tp_active ? 'active' : 'inactive' }]"
+            :actions="[{
+              label: t('common.edit'),
+              icon: 'i-lucide-edit-3',
+              visible: canUpdateChild,
+              onClick: openUpdateStream
+            }]" />
 
           <div class="flex min-h-0 flex-1 flex-col gap-6 overflow-visible px-6 pt-0 pb-6 lg:flex-row lg:gap-0">
             <aside class="w-full shrink-0 lg:w-72 lg:border-r lg:border-zinc-200 lg:pr-4 dark:lg:border-zinc-800">
@@ -138,5 +191,17 @@ watch([hasLoadError, profileError, streamError, isNestedDetailRoute], ([failed, 
         </div>
       </template>
     </UDashboardPanel>
+
+    <TransferPaymentStreamModal
+      v-if="selectedStream && canUpdateChild"
+      v-model:open="isUpdateModalOpen"
+      v-model:state="selectedStream"
+      :title="t('common.edit')"
+      :submit-label="t('common.update')"
+      :program-id="id"
+      :persisted-stream="persistedStream ?? undefined"
+      :persisted-program-id="id"
+      :pending="isSavingStream"
+      @submit="saveStream" />
   </div>
 </template>

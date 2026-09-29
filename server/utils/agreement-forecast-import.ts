@@ -8,7 +8,7 @@ import { budgetFiscalYearStableId, budgetLineItemStableId } from '~~/server/util
 import { BusinessStatusViolation, lockAgencyDraftStatus } from '~~/server/utils/business-status-runtime'
 import { databaseMoneyValue } from '~~/server/utils/database-money'
 import { createPrimaryEntityAssignment } from '~~/server/utils/entity-assignment'
-import { parseMoney } from '~~/shared/utils/money'
+import { moneyToCents, parseMoney } from '~~/shared/utils/money'
 
 /**
  * Creates one inactive Draft Forecast with all monthly lines in the authorized transaction.
@@ -24,6 +24,9 @@ export const createAgreementForecastAggregate = async (
   agencyId: string,
   creatorId: string
 ): Promise<GcsExtensionAgreementForecastCreateResult> => {
+  if (input.lineItems.some(line => moneyToCents(parseMoney(line.amount)) < BigInt(0))) {
+    throw new RangeError('Forecast line amounts must be nonnegative.')
+  }
   const recipient = await trx.selectFrom('Funding_Case_Agreement_Applicant_Recipient')
     .select('id')
     .where('egcs_fc_fundingagreement', '=', input.agreementId)
@@ -106,6 +109,7 @@ export const createAgreementForecastAggregate = async (
       egcs_fc_fundingagreementbudgetlineitem: line.budgetLineItemId,
       egcs_fc_month: line.month,
       egcs_fc_amount: databaseMoneyValue(parseMoney(line.amount)),
+      egcs_fc_totalamount: databaseMoneyValue(parseMoney(line.amount)),
       egcs_fc_currency: line.currency as Database['Funding_Case_Agreement_Forecast_Line_Item']['egcs_fc_currency'],
       egcs_fc_version: line.version
     }).returning('id').executeTakeFirstOrThrow()

@@ -20,6 +20,7 @@ import TransferPaymentStreamGeneralTab from '~/components/TransferPayment/Transf
 import TransferPaymentStreamHoldbackBasesTab from '~/components/TransferPayment/TransferPaymentStreamHoldbackBasesTab.vue'
 import TransferPaymentStreamRecipientsTab from '~/components/TransferPayment/TransferPaymentStreamRecipientsTab.vue'
 import TransferPaymentStreamRiskRatingsTab from '~/components/TransferPayment/TransferPaymentStreamRiskRatingsTab.vue'
+import TransferPaymentStreamFundingSubtypesTab from '~/components/TransferPayment/TransferPaymentStreamFundingSubtypesTab.vue'
 import StreamExtensionsTab from '~/components/Extension/StreamExtensionsTab.vue'
 import { useRouteTabMap } from '~/composables/useRouteTabMap'
 import { appRouteLocations } from '~/utils/route-locations'
@@ -38,6 +39,7 @@ export const TRANSFER_PAYMENT_STREAM_TAB_KEYS = {
   commitmentTypes: 'transfer_payment.commitment_types.title',
   monitorTypes: 'transfer_payment.monitor_types',
   riskRatings: 'transfer_payment.risk_ratings',
+  fundingSubtypes: 'agency.funding_types.subtypes',
   expertise: 'transfer_payment.areas_of_expertise',
   financialLimits: 'transfer_payment.financial_limits',
   reviewSetups: 'transfer_payment.review_setups',
@@ -127,6 +129,10 @@ export const useTransferPaymentStreamDetailState = (
     [
       'costItems',
       { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.costItems, icon: 'i-lucide-list', component: TransferPaymentStreamCostLineItemsTab, getProps: () => ({ transferPaymentId: id, streamId, agencyId: agencyId.value, canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }
+    ],
+    [
+      'fundingSubtypes',
+      { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.fundingSubtypes, icon: 'i-lucide-hand-coins', component: TransferPaymentStreamFundingSubtypesTab, getProps: () => ({ transferPaymentId: id, streamId, agencyId: agencyId.value, canCreateChild: canCreateChild.value, canDeleteChild: canDeleteChild.value }) }
     ],
     [
       'amendmentTypes',

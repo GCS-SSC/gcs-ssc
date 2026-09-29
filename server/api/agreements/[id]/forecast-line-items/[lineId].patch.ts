@@ -13,6 +13,7 @@ import {
   prepareAgreementForecastRoute
 } from '~~/server/utils/agreement-forecast'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
+import { assertAgreementLineFundingBalance, replaceAgreementLineFunding } from '~~/server/utils/agreement-funding-breakdown'
 
 type ForecastLineItemExisting = {
   id: string
@@ -135,12 +136,15 @@ const patchForecastLineItemForRoute = async (
       return budgetLineItem
     }
 
-    const { egcs_fc_amount: patchAmount, ...nonMoneyPatchValues } = patchValues
+    const { egcs_fc_amount: patchAmount, egcs_fc_totalamount: patchTotalAmount, egcs_fc_fundingsources: fundingSources, ...nonMoneyPatchValues } = patchValues
     const databasePatchValues = {
       ...nonMoneyPatchValues,
       ...(patchAmount === undefined
         ? {}
-        : { egcs_fc_amount: databaseMoneyValue(patchAmount) })
+        : { egcs_fc_amount: databaseMoneyValue(patchAmount) }),
+      ...(patchTotalAmount === undefined
+        ? {}
+        : { egcs_fc_totalamount: databaseMoneyValue(patchTotalAmount) })
     }
 
     const updated = await trx
@@ -156,12 +160,23 @@ const patchForecastLineItemForRoute = async (
         'egcs_fc_fundingagreementbudgetlineitem',
         'egcs_fc_month',
         databaseMoneyText(sql.ref('egcs_fc_amount')).as('egcs_fc_amount'),
+        databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('egcs_fc_totalamount'),
         'egcs_fc_currency',
         'egcs_fc_version',
         '_deleted'
       ])
       .executeTakeFirstOrThrow()
-    return { ...updated, egcs_fc_amount: parseDatabaseMoney(updated.egcs_fc_amount) }
+    if (fundingSources !== undefined) {
+      const fundingError = await replaceAgreementLineFunding(event, trx, agreementId, { kind: 'forecast', lineId }, fundingSources)
+      if (fundingError) return fundingError
+    }
+    const balanceError = await assertAgreementLineFundingBalance(event, trx, { kind: 'forecast', lineId })
+    if (balanceError) return balanceError
+    return {
+      ...updated,
+      egcs_fc_amount: parseDatabaseMoney(updated.egcs_fc_amount),
+      egcs_fc_totalamount: parseDatabaseMoney(updated.egcs_fc_totalamount)
+    }
   })
 }
 

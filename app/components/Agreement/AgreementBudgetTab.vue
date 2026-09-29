@@ -62,9 +62,7 @@ type BudgetLeafRow = {
   description: string
   totalAmount?: Money
   programFunding?: Money
-  otherFederalFunding?: Money | null
-  otherGovFunding?: Money | null
-  otherFunding?: Money | null
+  fundingSources?: FundingCaseAgreementBudgetLineItemRow['egcs_fc_fundingsources']
   currency?: string
   isPlaceholder: boolean
 }
@@ -126,7 +124,8 @@ const fiscalYearModal = useCrudModal<FundingCaseAgreementBudgetFiscalYearRow, Fu
 })
 const lineItemModal = useCrudModal<FundingCaseAgreementBudgetLineItemRow, FundingCaseAgreementBudgetLineItemForm>({
   createState: () => ({
-    egcs_fc_currency: 'cad'
+    egcs_fc_currency: 'cad',
+    egcs_fc_fundingsources: []
   }),
   updateState: lineItem => ({
     ...lineItem,
@@ -137,9 +136,7 @@ const lineItemModal = useCrudModal<FundingCaseAgreementBudgetLineItemRow, Fundin
     egcs_fc_description: lineItem.egcs_fc_description,
     egcs_fc_totalamount: lineItem.egcs_fc_totalamount,
     egcs_fc_programfunding: lineItem.egcs_fc_programfunding,
-    egcs_fc_otherfederalfunding: lineItem.egcs_fc_otherfederalfunding,
-    egcs_fc_othergovfunding: lineItem.egcs_fc_othergovfunding,
-    egcs_fc_otherfunding: lineItem.egcs_fc_otherfunding,
+    egcs_fc_fundingsources: lineItem.egcs_fc_fundingsources.map(source => ({ ...source })),
     egcs_fc_currency: lineItem.egcs_fc_currency
   })
 })
@@ -390,9 +387,7 @@ const tableRows = computed<BudgetLeafRow[]>(() => filteredFiscalYears.value.flat
     description: lineItem.egcs_fc_description,
     totalAmount: lineItem.egcs_fc_totalamount,
     programFunding: lineItem.egcs_fc_programfunding,
-    otherFederalFunding: lineItem.egcs_fc_otherfederalfunding,
-    otherGovFunding: lineItem.egcs_fc_othergovfunding,
-    otherFunding: lineItem.egcs_fc_otherfunding,
+    fundingSources: lineItem.egcs_fc_fundingsources,
     currency: lineItem.egcs_fc_currency,
     isPlaceholder: false
   }))
@@ -618,9 +613,7 @@ const deleteLineItem = async (lineItemId: string) => {
 }
 
 const getOtherFundingTotal = (row: BudgetLeafRow) => sumMoney([
-  row.otherFederalFunding ?? ZERO_MONEY,
-  row.otherGovFunding ?? ZERO_MONEY,
-  row.otherFunding ?? ZERO_MONEY
+  ...(row.fundingSources ?? []).map(source => source.egcs_fc_amount)
 ])
 
 const formatMoney = (value?: Money, currency?: string) => {
@@ -782,9 +775,23 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
         <span v-if="isGroupedRow(row as GroupedBudgetRow)" class="font-medium text-zinc-700 dark:text-zinc-200">
           {{ formatGroupedMoney(row as GroupedBudgetRow, 'otherFunding') }}
         </span>
-        <span v-else-if="!row.original.isPlaceholder" class="font-medium text-zinc-700 dark:text-zinc-200">
-          {{ formatMoney(getOtherFundingTotal(row.original), row.original.currency) }}
-        </span>
+        <div v-else-if="!row.original.isPlaceholder" class="space-y-1">
+          <span class="font-medium text-zinc-700 dark:text-zinc-200">
+            {{ formatMoney(getOtherFundingTotal(row.original), row.original.currency) }}
+          </span>
+          <ul v-if="row.original.fundingSources?.length" class="space-y-1 text-xs text-muted">
+            <li v-for="source in row.original.fundingSources" :key="source.id ?? source.egcs_fc_fundingsubtype">
+              {{ locale === 'fr' ? source.funding_type_name_fr : source.funding_type_name_en }} /
+              {{ locale === 'fr' ? source.funding_subtype_name_fr : source.funding_subtype_name_en }}:
+              {{ formatMoney(source.egcs_fc_amount, row.original.currency) }}
+              <span v-if="locale === 'fr' ? source.egcs_fc_description_fr : source.egcs_fc_description_en" class="block ps-2">
+                {{ locale === 'fr' ? source.egcs_fc_description_fr : source.egcs_fc_description_en }}
+              </span>
+              <span v-if="source.funding_type_instacking"> · {{ t('agreement.funding_sources.in_stacking') }}</span>
+              <span v-if="source.funding_type_incostsharing"> · {{ t('agreement.funding_sources.in_cost_sharing') }}</span>
+            </li>
+          </ul>
+        </div>
         <span v-else>&nbsp;</span>
       </template>
 
@@ -924,14 +931,13 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
       v-if="selectedLineItem"
       v-model:open="isLineItemModalOpen"
       :title="selectedLineItem.id ? t('agreement.budget.edit_line_item') : t('agreement.budget.add_line_item')"
-      fullscreen
-      :ui="{ content: 'rounded-none shadow-none ring-0' }">
+      :ui="{ content: 'sm:max-w-4xl', body: 'max-h-[75vh] overflow-y-auto' }">
       <template #body>
         <UForm
           :state="selectedLineItem"
           :validate="validateLineItem"
           :validate-on="[]"
-          class="flex h-full flex-col"
+          class="space-y-6"
           @submit="saveLineItem">
           <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <UFormField :label="t('agreement.budget.fiscal_year')" name="egcs_fc_fundingagreementbudgetfiscalyear">
@@ -973,7 +979,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
             </UFormField>
 
             <AgreementBudgetCalculationFields v-model="selectedLineItem" :preview="calculationPreview" />
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:col-span-2 xl:grid-cols-5">
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:col-span-2">
               <UFormField :label="t('agreement.budget.total_amount')" name="egcs_fc_totalamount">
                 <UInput
                   v-model="selectedLineItem.egcs_fc_totalamount"
@@ -987,25 +993,14 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
                   inputmode="decimal"
                   @update:model-value="selectedLineItem.egcs_fc_programfunding = String($event)" />
               </UFormField>
-
-              <UFormField :label="t('agreement.budget.other_federal_funding')" name="egcs_fc_otherfederalfunding">
-                <UInput
-                  v-model="selectedLineItem.egcs_fc_otherfederalfunding"
-                  inputmode="decimal" />
-              </UFormField>
-
-              <UFormField :label="t('agreement.budget.other_gov_funding')" name="egcs_fc_othergovfunding">
-                <UInput
-                  v-model="selectedLineItem.egcs_fc_othergovfunding"
-                  inputmode="decimal" />
-              </UFormField>
-
-              <UFormField :label="t('agreement.budget.other_funding')" name="egcs_fc_otherfunding">
-                <UInput
-                  v-model="selectedLineItem.egcs_fc_otherfunding"
-                  inputmode="decimal" />
-              </UFormField>
             </div>
+            <AgreementFundingSourcesEditor
+              :model-value="selectedLineItem.egcs_fc_fundingsources ?? []"
+              :agreement-id="agreementId"
+              :identity="`${agreementId}:${selectedLineItem.id ?? 'new'}:${selectedLineItem.egcs_fc_organizationcostcategory ?? ''}`"
+              allow-description
+              class="lg:col-span-2"
+              @update:model-value="selectedLineItem.egcs_fc_fundingsources = $event" />
 
             <UFormField :label="t('common.description')" name="egcs_fc_description" class="lg:col-span-2">
               <CommonTextarea
@@ -1015,7 +1010,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
             </UFormField>
           </div>
 
-          <div class="mt-auto flex justify-end gap-2 pt-6">
+          <div class="flex justify-end gap-2 pt-4">
             <UButton class="cursor-default" :label="t('common.cancel')" color="neutral" variant="ghost" @click="isLineItemModalOpen = false" />
             <CommonSaveButton
               :label="selectedLineItem.id ? t('common.update') : t('common.add')"

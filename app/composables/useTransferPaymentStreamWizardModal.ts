@@ -107,6 +107,8 @@ export const createTransferPaymentStreamWizardInitialState = (): TransferPayment
     egcs_tp_objective_en: '',
     egcs_tp_objective_fr: '',
     egcs_tp_requireconsistentproponenttype: false,
+    egcs_tp_requireforecastfundingbreakdown: false,
+    egcs_tp_requireclaimfundingbreakdown: false,
     egcs_tp_allowsfurtherdistribution: false,
     egcs_tp_active: false
   },

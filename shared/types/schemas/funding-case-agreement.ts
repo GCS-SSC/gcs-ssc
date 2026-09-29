@@ -16,7 +16,7 @@ import { PositivePostgresBigintIdSchema, type WithId } from './common'
 import { CommonAddressBaseSchema, CommonAddressCreateSchema } from './admin-common'
 import { isRepresentableByNumeric } from '~~/shared/utils/decimal'
 import { isCanonicalNonNegativePostgresBigintText } from '~~/shared/utils/database-id'
-import { MoneySchema, OptionalMoneySchema, PositiveMoneySchema } from './money'
+import { MoneySchema, NonNegativeMoneySchema, OptionalMoneySchema, PositiveMoneySchema } from './money'
 import { addMoney, compareMoney, isCanonicalMoney, parseMoney, type Money } from '~~/shared/utils/money'
 
 const RequiredString = () => z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' })
@@ -344,9 +344,7 @@ const validateBudgetLineItemFundingTotals = (
   data: Partial<{
     egcs_fc_totalamount: Money
     egcs_fc_programfunding: Money
-    egcs_fc_otherfederalfunding?: Money
-    egcs_fc_othergovfunding?: Money
-    egcs_fc_otherfunding?: Money
+    egcs_fc_fundingsources?: Array<{ egcs_fc_amount: Money }>
   }>,
   ctx: z.RefinementCtx
 ) => {
@@ -357,16 +355,14 @@ const validateBudgetLineItemFundingTotals = (
   const moneyValues = [
     data.egcs_fc_totalamount,
     data.egcs_fc_programfunding,
-    data.egcs_fc_otherfederalfunding,
-    data.egcs_fc_othergovfunding,
-    data.egcs_fc_otherfunding
+    ...(data.egcs_fc_fundingsources ?? []).map(source => source.egcs_fc_amount)
   ].filter(value => value !== undefined)
   if (!moneyValues.every(isCanonicalMoney)) return
 
   const zero = parseMoney('0')
-  const totalFunding = addMoney(
-    addMoney(data.egcs_fc_programfunding, data.egcs_fc_otherfederalfunding ?? zero),
-    addMoney(data.egcs_fc_othergovfunding ?? zero, data.egcs_fc_otherfunding ?? zero)
+  const totalFunding = (data.egcs_fc_fundingsources ?? []).reduce(
+    (total, source) => addMoney(total, source.egcs_fc_amount),
+    addMoney(data.egcs_fc_programfunding, zero)
   )
 
   if (compareMoney(data.egcs_fc_totalamount, totalFunding) < 0) {
@@ -385,6 +381,21 @@ export type FundingCaseAgreementBudgetFiscalYear = z.infer<typeof FundingCaseAgr
 export type FundingCaseAgreementBudgetFiscalYearPatch = z.infer<typeof FundingCaseAgreementBudgetFiscalYearPatchSchema>
 export type FundingCaseAgreementBudgetFiscalYearItem = WithId<FundingCaseAgreementBudgetFiscalYear>
 
+export const FundingCaseAgreementFundingSourceBaseSchema = z.object({
+  egcs_fc_fundingsubtype: RequiredBigintSelectionId(),
+  egcs_fc_amount: NonNegativeMoneySchema,
+  egcs_fc_description_en: z.string().trim().max(255, { error: 'validation.max_length' }).nullable().optional(),
+  egcs_fc_description_fr: z.string().trim().max(255, { error: 'validation.max_length' }).nullable().optional()
+})
+export const FundingCaseAgreementFundingSourceSchema = FundingCaseAgreementFundingSourceBaseSchema
+export type FundingCaseAgreementFundingSource = z.infer<typeof FundingCaseAgreementFundingSourceSchema>
+
+export const FundingCaseAgreementLineFundingAmountSchema = z.object({
+  egcs_fc_fundingsubtype: RequiredBigintSelectionId(),
+  egcs_fc_amount: NonNegativeMoneySchema
+})
+export type FundingCaseAgreementLineFundingAmount = z.infer<typeof FundingCaseAgreementLineFundingAmountSchema>
+
 export const FundingCaseAgreementBudgetLineItemBaseSchema = z.object({
   egcs_fc_fundingagreementbudgetfiscalyear: RequiredBigintSelectionId(),
   egcs_fc_organizationcostcategory: RequiredBigintSelectionId(),
@@ -393,18 +404,14 @@ export const FundingCaseAgreementBudgetLineItemBaseSchema = z.object({
   egcs_fc_totalamount: MoneySchema,
   egcs_fc_programfunding: MoneySchema.optional(),
   egcs_fc_percentage: BudgetPercentageSchema.optional(),
-  egcs_fc_otherfederalfunding: OptionalMoneySchema,
-  egcs_fc_othergovfunding: OptionalMoneySchema,
-  egcs_fc_otherfunding: OptionalMoneySchema,
+  egcs_fc_fundingsources: z.array(FundingCaseAgreementFundingSourceSchema).optional(),
   egcs_fc_currency: z.enum(CURRENCY_CODES_ENUM, { error: 'validation.required' })
 })
 
 export const FundingCaseAgreementBudgetLineItemFundingTotalsSchema = FundingCaseAgreementBudgetLineItemBaseSchema.pick({
   egcs_fc_totalamount: true,
   egcs_fc_programfunding: true,
-  egcs_fc_otherfederalfunding: true,
-  egcs_fc_othergovfunding: true,
-  egcs_fc_otherfunding: true
+  egcs_fc_fundingsources: true
 }).superRefine(validateBudgetLineItemFundingTotals)
 
 export const FundingCaseAgreementBudgetLineItemCreateSchema = FundingCaseAgreementBudgetLineItemBaseSchema.superRefine((data, ctx) => {
@@ -502,7 +509,9 @@ export const FundingCaseAgreementForecastLineItemBaseSchema = z.object({
   egcs_fc_agreementforecast: RequiredBigintSelectionId(),
   egcs_fc_fundingagreementbudgetlineitem: RequiredBigintSelectionId(),
   egcs_fc_month: RequiredForecastMonth(),
-  egcs_fc_amount: MoneySchema,
+  egcs_fc_amount: NonNegativeMoneySchema,
+  egcs_fc_totalamount: NonNegativeMoneySchema,
+  egcs_fc_fundingsources: z.array(FundingCaseAgreementLineFundingAmountSchema).optional(),
   egcs_fc_currency: z.enum(CURRENCY_CODES_ENUM, { error: 'validation.required' }),
   egcs_fc_version: RequiredForecastVersion()
 })
@@ -626,7 +635,9 @@ export const FundingCaseAgreementClaimLineItemBaseSchema = z.object({
   egcs_fc_submittedcostsubsection: z.string().trim().nullable().optional(),
   egcs_fc_submittedlineitem: z.string().trim().nullable().optional(),
   egcs_fc_description: RequiredString(),
-  egcs_fc_amount: MoneySchema,
+  egcs_fc_amount: NonNegativeMoneySchema,
+  egcs_fc_totalamount: NonNegativeMoneySchema,
+  egcs_fc_fundingsources: z.array(FundingCaseAgreementLineFundingAmountSchema).optional(),
   egcs_fc_currency: z.enum(CURRENCY_CODES_ENUM, { error: 'validation.required' })
 })
 

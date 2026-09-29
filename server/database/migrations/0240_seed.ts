@@ -4607,9 +4607,6 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
                 egcs_fc_programfunding: seedMoney(yearIndex === 0
                   ? (isDelivery ? '60.00' : '15.00')
                   : (isDelivery ? '70.00' : '20.00')),
-                egcs_fc_otherfederalfunding: seedMoney('0.00'),
-                egcs_fc_othergovfunding: seedMoney('0.00'),
-                egcs_fc_otherfunding: seedMoney('0.00'),
                 egcs_fc_currency: 'cad',
                 _deleted: false
               }
@@ -4733,6 +4730,7 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
             egcs_fc_fundingagreementbudgetlineitem: String(budgetLineItems[seed.lineIndex]?.id),
             egcs_fc_month: seed.month,
             egcs_fc_amount: seedMoney(seed.amount),
+            egcs_fc_totalamount: seedMoney(seed.amount),
             egcs_fc_currency: 'cad',
             egcs_fc_version: '0',
             _deleted: false
@@ -4839,6 +4837,7 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
               ? 'Seeded submitted delivery costs.'
               : 'Seeded submitted administrative costs.',
             egcs_fc_amount: seedMoney(lineIndex === 0 ? '25.00' : '10.00'),
+            egcs_fc_totalamount: seedMoney(lineIndex === 0 ? '25.00' : '10.00'),
             egcs_fc_currency: 'cad',
             _deleted: false
           })))
@@ -4953,6 +4952,7 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
               ? 'Seeded draft delivery costs for workflow testing.'
               : 'Seeded draft administrative costs for workflow testing.',
             egcs_fc_amount: seedMoney(lineIndex === 0 ? '20.00' : '5.00'),
+            egcs_fc_totalamount: seedMoney(lineIndex === 0 ? '20.00' : '5.00'),
             egcs_fc_currency: 'cad',
             _deleted: false
           }))
@@ -5083,9 +5083,6 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
             : `Project coordination, financial administration, and performance reporting costs for project year ${yearIndex + 1}.`,
           egcs_fc_totalamount: seedMoney(yearIndex === 0 ? (lineIndex === 0 ? '240000.00' : '60000.00') : (lineIndex === 0 ? '320000.00' : '80000.00')),
           egcs_fc_programfunding: seedMoney(yearIndex === 0 ? (lineIndex === 0 ? '200000.00' : '50000.00') : (lineIndex === 0 ? '260000.00' : '65000.00')),
-          egcs_fc_otherfederalfunding: seedMoney('0.00'),
-          egcs_fc_othergovfunding: seedMoney(yearIndex === 0 ? (lineIndex === 0 ? '25000.00' : '5000.00') : (lineIndex === 0 ? '40000.00' : '10000.00')),
-          egcs_fc_otherfunding: seedMoney(yearIndex === 0 ? (lineIndex === 0 ? '15000.00' : '5000.00') : (lineIndex === 0 ? '20000.00' : '5000.00')),
           egcs_fc_currency: 'cad', _deleted: false
         })))
       ).execute()
@@ -5228,6 +5225,7 @@ const seedFinancialSummaryShowcase = async (db: Kysely<Database>): Promise<void>
         egcs_fc_agreementforecast: forecastId,
         egcs_fc_fundingagreementbudgetlineitem: lineIds[lineIndex]!,
         egcs_fc_month: month, egcs_fc_amount: seedMoney(`${amount}.00`),
+        egcs_fc_totalamount: seedMoney(`${amount}.00`),
         egcs_fc_currency: 'cad' as const, egcs_fc_version: '0', _deleted: false
       })))
     ).execute()
@@ -5259,7 +5257,7 @@ const seedFinancialSummaryShowcase = async (db: Kysely<Database>): Promise<void>
         egcs_fc_fundingagreementclaim: claimId,
         egcs_fc_fundingagreementbudgetlineitem: budgetYear.lineIds[lineIndex]!,
         egcs_fc_description: lineIndex === 0 ? 'Participant delivery costs submitted for the period.' : 'Project operations costs submitted for the period.',
-        egcs_fc_amount: seedMoney(amount), egcs_fc_currency: 'cad' as const, _deleted: false
+        egcs_fc_amount: seedMoney(amount), egcs_fc_totalamount: seedMoney(amount), egcs_fc_currency: 'cad' as const, _deleted: false
       }))
     ).returning('id').execute()
     await db.updateTable('Funding_Case_Agreement_Claim').set({ egcs_fc_status: statuses.inReview })
@@ -6815,14 +6813,17 @@ export const down = async (db: Kysely<Database>): Promise<void> => {
   await db.deleteFrom('Funding_Case_Agreement_Monitor').execute()
   await db.deleteFrom('Funding_Case_Agreement_Claim_Reconcile_Line_Item').execute()
   await db.deleteFrom('Funding_Case_Agreement_Claim_Reconcile').execute()
+  await db.deleteFrom('Funding_Case_Agreement_Claim_Line_Item_Funding').execute()
   await db.deleteFrom('Funding_Case_Agreement_Claim_Line_Item').execute()
   await db.deleteFrom('Funding_Case_Agreement_Claim').execute()
+  await db.deleteFrom('Funding_Case_Agreement_Forecast_Line_Item_Funding').execute()
   await db.deleteFrom('Funding_Case_Agreement_Forecast_Line_Item').execute()
   await db.deleteFrom('Funding_Case_Agreement_Forecast').execute()
   await db.deleteFrom('Funding_Case_Agreement_Responsible_Party_Activity').execute()
   await db.deleteFrom('Funding_Case_Agreement_Outcome_Activity').execute()
   await db.deleteFrom('Funding_Case_Agreement_Activity').execute()
   await db.deleteFrom('Funding_Case_Agreement_Applicant_Recipient').execute()
+  await db.deleteFrom('Funding_Case_Agreement_Budget_Line_Item_Funding').execute()
   await db.deleteFrom('Funding_Case_Agreement_Budget_Line_Item').execute()
   await db.deleteFrom('Funding_Case_Agreement_Budget_Fiscal_Year').execute()
   await db.deleteFrom('Funding_Case_Agreement_Activity_Version').execute()
@@ -6855,6 +6856,7 @@ export const down = async (db: Kysely<Database>): Promise<void> => {
   await db.deleteFrom('Transfer_Payment_Financial_Limits').execute()
   await db.deleteFrom('Transfer_Payment_Stream_Field_Assignment').execute()
   await db.deleteFrom('Transfer_Payment_Stream_Field_Section').execute()
+  await db.deleteFrom('Transfer_Payment_Stream_Funding_Subtype').execute()
   await db.deleteFrom('Agency_Custom_Field_Option').execute()
   await db.deleteFrom('Agency_Custom_Field').execute()
   await db.deleteFrom('Transfer_Payment_Stream').execute()
@@ -6879,6 +6881,8 @@ export const down = async (db: Kysely<Database>): Promise<void> => {
   await db.deleteFrom('Agency_Monitor_Type').execute()
   await db.deleteFrom('Agency_Cost_Category_Line_Item').execute()
   await db.deleteFrom('Agency_Cost_Category').execute()
+  await db.deleteFrom('Agency_Funding_Subtype').execute()
+  await db.deleteFrom('Agency_Funding_Type').execute()
   await db.deleteFrom('Agency_Holdback_Basis').execute()
   await db.updateTable('Agency_Profile').set({
     egcs_ay_claimreconciliationstartstatus: null,

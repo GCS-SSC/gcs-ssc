@@ -5,6 +5,10 @@ const UNIQUE_VIOLATION_CODE = '23505'
 const FOREIGN_KEY_VIOLATION_CODE = '23503'
 
 const CONSTRAINT_ERROR_MAP: Record<string, ConstraintErrorMapping> = {
+  ay_uq_funding_type_name_en_active: { code: 'AGENCY_DUPLICATE_FUNDING_TYPE', key: 'apiErrors.agency.duplicate_funding_type' },
+  ay_uq_funding_type_name_fr_active: { code: 'AGENCY_DUPLICATE_FUNDING_TYPE', key: 'apiErrors.agency.duplicate_funding_type' },
+  ay_uq_funding_subtype_name_en_active: { code: 'AGENCY_DUPLICATE_FUNDING_SUBTYPE', key: 'apiErrors.agency.duplicate_funding_subtype' },
+  ay_uq_funding_subtype_name_fr_active: { code: 'AGENCY_DUPLICATE_FUNDING_SUBTYPE', key: 'apiErrors.agency.duplicate_funding_subtype' },
   workflow_profile_condition_reference: { code: 'WORKFLOW_CONDITION_REFERENCE_IN_USE', key: 'apiErrors.request.resource_in_use' },
   ay_chk_lineitemcalculation: { code: 'INVALID_BUDGET_CALCULATION', key: 'apiErrors.agreement.invalid_budget_calculation' },
   ay_ref_profilegwcoanumber: {

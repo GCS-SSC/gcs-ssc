@@ -22,6 +22,12 @@ const { getBilingualValue } = useBilingualValue()
       <CommonValueCard
         :label="t('transfer_payment.allows_further_distribution')"
         :value="stream.egcs_tp_allowsfurtherdistribution ? t('common.yes') : t('common.no')" />
+      <CommonValueCard
+        :label="t('transfer_payment.require_forecast_funding_breakdown')"
+        :value="stream.egcs_tp_requireforecastfundingbreakdown ? t('common.yes') : t('common.no')" />
+      <CommonValueCard
+        :label="t('transfer_payment.require_claim_funding_breakdown')"
+        :value="stream.egcs_tp_requireclaimfundingbreakdown ? t('common.yes') : t('common.no')" />
     </CommonSection>
   </div>
 </template>

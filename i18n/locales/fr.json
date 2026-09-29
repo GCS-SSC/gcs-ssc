@@ -322,6 +322,7 @@
     "logout_failed": "La déconnexion n’a pas pu être effectuée. Veuillez réessayer.",
     "confirm": "Confirmer",
     "cancel": "Annuler",
+    "close": "Fermer",
     "complete": "Terminé",
     "active": "Actif",
     "inactive": "Inactif",
@@ -616,6 +617,19 @@
     }
   },
   "agency": {
+    "funding_types": {
+      "title": "Types de financement",
+      "type": "Type de financement",
+      "subtypes": "Sous-types de financement",
+      "manage_subtypes_for": "Gérer les sous-types de financement de {name}",
+      "subtypes_for": "Sous-types de financement de {name}",
+      "add_type": "Ajouter un type de financement",
+      "add_subtype": "Ajouter un sous-type",
+      "add_subtype_for": "Ajouter un sous-type à {name}",
+      "stacking": "Inclus dans la limite de cumul",
+      "cost_sharing": "Utilisé pour le partage des coûts",
+      "active": "Disponible pour les nouveaux budgets"
+    },
     "cost_line_active_help": "Les postes inactifs restent dans les budgets existants, mais ne peuvent pas être utilisés pour de nouvelles lignes budgétaires.",
     "cost_category_active_help": "Les catégories inactives restent dans les budgets existants, mais ne peuvent pas être utilisées pour de nouvelles lignes budgétaires.",
     "title": "Agences",
@@ -1087,6 +1101,10 @@
       "transfer_payment_scope_requires_transfer_payment_ability": "La portée de programme nécessite au moins une autorisation de paiement de transfert."
     },
     "agency": {
+      "duplicate_funding_type": "Un type de financement portant ce nom existe déjà pour l’agence.",
+      "duplicate_funding_subtype": "Un sous-type de financement portant ce nom existe déjà dans ce type.",
+      "funding_type_not_found": "Type de financement introuvable.",
+      "funding_subtype_not_found": "Sous-type de financement introuvable.",
       "not_found": "Agence introuvable.",
       "holdback_basis_not_found": "Base de retenue de l'agence introuvable.",
       "holdback_basis_in_use": "Retirez toutes les références à cette base de retenue dans les volets de programme avant de modifier son code ou de la supprimer.",
@@ -1185,6 +1203,10 @@
       "libreoffice_unavailable": "LibreOffice est requis pour convertir les modèles DOCX en PDF. Installez LibreOffice sur le serveur ou utilisez un modèle PDF HTML."
     },
     "agreement": {
+      "invalid_funding_subtype": "Sélectionnez un sous-type de financement offert pour le volet de cette entente.",
+      "duplicate_funding_subtype": "Chaque sous-type de financement ne peut figurer qu’une fois par ligne.",
+      "funding_subtype_invalid": "Sélectionnez un sous-type de financement offert pour le volet de cette entente, sans doublons.",
+      "funding_breakdown_required": "Ajoutez au moins une autre source de financement à chaque ligne et assurez-vous que le financement du programme et les autres sources égalent le coût total.",
       "number_provider_conflict": "Plusieurs fournisseurs de numéros d’entente sont activés pour ce volet.",
       "invalid_generated_number": "Le numéro d’entente généré doit contenir de 1 à 15 caractères sans espaces au début ou à la fin.",
       "number_managed": "Le numéro d’entente est attribué automatiquement. Retirez le numéro fourni et réessayez.",
@@ -1296,6 +1318,9 @@
       "duplicate_claim_reconcile_line_item": "Une ligne de rapprochement existe déjà pour cette ligne de réclamation."
     },
     "transfer_payment": {
+      "invalid_funding_subtype": "Sélectionnez un sous-type de financement actif appartenant à l’agence de ce volet.",
+      "duplicate_funding_subtype": "Ce sous-type de financement est déjà offert pour le volet.",
+      "funding_subtype_link_not_found": "Sous-type de financement du volet introuvable.",
       "profile_not_found": "Programme introuvable.",
       "profile_scope_changed": "La portée du programme a changé pendant le traitement de cette demande. Actualisez la page et réessayez.",
       "stream_not_found": "Volet de programme introuvable.",
@@ -1426,6 +1451,8 @@
     }
   },
   "transfer_payment": {
+    "require_forecast_funding_breakdown": "Exiger la ventilation des autres financements dans les prévisions",
+    "require_claim_funding_breakdown": "Exiger la ventilation des autres financements dans les demandes de remboursement",
     "proponent_consistency_confirm_title": "Modifier la cohérence du type de promoteur?",
     "proponent_consistency_enable_description": "Harmonisez les classifications existantes des promoteurs au moyen d’une migration des données avant d’activer cette option. Modifier ce paramètre seul peut avoir des effets inattendus : les différences antérieures subsisteront, tandis que les ajouts et changements de type futurs devront correspondre au dernier type admissible du promoteur dans ce volet (identifiant d’entente le plus élevé). Les types enregistrés inchangés resteront permis. La modification prendra effet à l’enregistrement du volet.",
     "proponent_consistency_disable_description": "Désactiver cette option permet aux types de promoteur de différer entre les ententes à l’avenir, sans modifier les types existants. Avant de la réactiver, harmonisez les classifications au moyen d’une migration des données. Réactiver l’option seule peut avoir des effets inattendus, car elle régit uniquement les ajouts et changements de type futurs selon le dernier type admissible (identifiant d’entente le plus élevé). La modification prendra effet à l’enregistrement du volet.",
@@ -2078,6 +2105,24 @@
     "modified_at": "Modifiée"
   },
   "agreement": {
+    "completion_blockers": {
+      "funding_breakdown_required": "Ajoutez au moins une autre source de financement à chaque ligne et assurez-vous que le financement du programme et les autres sources égalent le coût total avant l’achèvement."
+    },
+    "funding_sources": {
+      "in_stacking": "Inclus dans la limite de cumul",
+      "in_cost_sharing": "Utilisé pour le partage des coûts",
+      "title": "Autres sources de financement",
+      "add": "Ajouter une source",
+      "none": "Aucune autre source de financement saisie",
+      "subtype": "Sous-type de financement",
+      "amount": "Montant",
+      "remove": "Supprimer la source",
+      "description_en": "Description de la source (anglais)",
+      "description_fr": "Description de la source (français)",
+      "total_cost": "Coût total",
+      "edit_line": "Modifier le financement de cette ligne",
+      "save": "Enregistrer le financement"
+    },
     "number_generated": "Attribué à la création",
     "number_mode_error": "Impossible de déterminer la numérotation. Réessayez.",
     "list_views": {
@@ -2299,6 +2344,7 @@
       "load_failed": "Impossible de charger le sommaire financier"
     },
     "budget": {
+      "funding_sources": "Autres sources de financement",
       "title": "Budget",
       "search": "Rechercher des lignes budgétaires",
       "fiscal_year": "Exercice financier",
@@ -3196,6 +3242,7 @@
       "claim_lines_required": "Ajoutez au moins une ligne de réclamation avant d’achever cette réclamation.",
       "claim_lines_unallocated": "Attribuez chaque ligne de réclamation à une ligne budgétaire avant d’achever cette réclamation.",
       "lines_required": "Ajoutez au moins une ligne avant d’achever cet élément.",
+      "funding_breakdown_required": "Ajoutez au moins une autre source de financement à chaque ligne et assurez-vous que le financement du programme et les autres sources égalent le coût total avant l’achèvement.",
       "payment_total_mismatch": "Les montants des lignes de paiement doivent égaler le total du paiement avant l’achèvement.",
       "final_reconcile_approved": "Le rapprochement final est déjà approuvé; ce rapprochement ne peut donc plus être achevé.",
       "business_status": "L’état administratif actuel ne permet pas d’achever cet élément."

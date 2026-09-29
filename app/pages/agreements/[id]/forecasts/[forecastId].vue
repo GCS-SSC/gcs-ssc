@@ -14,7 +14,7 @@ import type {
   FundingCaseAgreementForecastLineItemRow,
   FundingCaseAgreementForecastOverviewRow
 } from '~~/shared/types/funding-case-agreement-ui'
-import { formatMoneyText, parseMoney, sumMoney, type Money } from '~~/shared/utils/money'
+import { compareMoney, formatMoneyText, parseMoney, sumMoney, type Money } from '~~/shared/utils/money'
 
 definePageMeta({
   key: route => `${route.path}?version=${String(route.query.version ?? '0')}`,
@@ -100,6 +100,13 @@ const breakdownPagination: Ref<{ pageIndex: number, pageSize: number }> = ref({
 })
 const draftAmounts: Ref<Record<string, string>> = ref({})
 const isSavingBreakdown: Ref<boolean> = ref(false)
+const fundingEditorLine: Ref<FundingCaseAgreementForecastLineItemRow | null> = ref(null)
+const fundingEditorOpen: Ref<boolean> = ref(false)
+const fundingEditorSession = ref(0)
+const fundingEditorProgramAmount: Ref<string> = ref('0.00')
+const fundingEditorTotalAmount: Ref<string> = ref('0.00')
+const fundingEditorSources: Ref<Array<{ egcs_fc_fundingsubtype: string, egcs_fc_amount: Money }>> = ref([])
+const isSavingFunding: Ref<boolean> = ref(false)
 const approvalsRefreshKey: Ref<number> = ref(0)
 const selectedTab: Ref<string> = ref('breakdown')
 const tabs = [
@@ -192,6 +199,46 @@ const lineItemByBudgetMonth = computed(() => {
 
   return byKey
 })
+
+const openFundingEditor = (line: FundingCaseAgreementForecastLineItemRow) => {
+  fundingEditorSession.value += 1
+  fundingEditorLine.value = line
+  fundingEditorProgramAmount.value = line.egcs_fc_amount
+  fundingEditorTotalAmount.value = line.egcs_fc_totalamount
+  fundingEditorSources.value = line.egcs_fc_fundingsources.map(source => ({ ...source }))
+  fundingEditorOpen.value = true
+}
+
+const saveFundingEditor = async () => {
+  const line = fundingEditorLine.value
+  if (!line || isSavingFunding.value || !canUpdateForecast.value) return
+  try {
+    const amount = parseMoney(fundingEditorProgramAmount.value)
+    const totalAmount = parseMoney(fundingEditorTotalAmount.value)
+    const sources = fundingEditorSources.value.map(source => ({
+      egcs_fc_fundingsubtype: source.egcs_fc_fundingsubtype,
+      egcs_fc_amount: parseMoney(source.egcs_fc_amount)
+    }))
+    if (sources.some(source => !source.egcs_fc_fundingsubtype)
+      || new Set(sources.map(source => source.egcs_fc_fundingsubtype)).size !== sources.length
+      || compareMoney(sumMoney([amount, ...sources.map(source => source.egcs_fc_amount)]), totalAmount) !== 0) {
+      toast.add({ title: t('common.error'), description: t('agreement.completion_blockers.funding_breakdown_required'), color: 'error' })
+      return
+    }
+    isSavingFunding.value = true
+    await saveJson(`/api/agreements/${agreementId}/forecast-line-items/${line.id}`, 'PATCH', {
+      egcs_fc_amount: amount,
+      egcs_fc_totalamount: totalAmount,
+      egcs_fc_fundingsources: sources
+    })
+    fundingEditorOpen.value = false
+    await refreshPage()
+  } catch (error: unknown) {
+    showError(error)
+  } finally {
+    isSavingFunding.value = false
+  }
+}
 
 const canEditForecastAmount = (budgetLineId: string, month: number): boolean => {
   const existing = lineItemByBudgetMonth.value.get(getDraftKey(budgetLineId, month))
@@ -505,7 +552,10 @@ const saveForecastBreakdown = async () => {
         const existing = lineItemByBudgetMonth.value.get(getDraftKey(budgetLineId, month))
 
         if (existing && existing.egcs_fc_amount !== amount && canUpdateForecast.value) {
-          await saveJson(`/api/agreements/${agreementId}/forecast-line-items/${existing.id}`, 'PATCH', { egcs_fc_amount: amount })
+          await saveJson(`/api/agreements/${agreementId}/forecast-line-items/${existing.id}`, 'PATCH', {
+            egcs_fc_amount: amount,
+            egcs_fc_totalamount: sumMoney([amount, ...existing.egcs_fc_fundingsources.map(source => source.egcs_fc_amount)])
+          })
         }
 
         if (!existing && amount !== ZERO_MONEY && canCreateForecastLineItems.value) {
@@ -514,6 +564,7 @@ const saveForecastBreakdown = async () => {
             egcs_fc_fundingagreementbudgetlineitem: budgetLineId,
             egcs_fc_month: month,
             egcs_fc_amount: amount,
+            egcs_fc_totalamount: amount,
             egcs_fc_currency: 'cad',
             egcs_fc_version: selectedVersion.value
           })
@@ -709,6 +760,13 @@ const saveForecastBreakdown = async () => {
                       <p v-if="isDraftAmountInvalid(row.original.budgetLineId, period.months[0] ?? 0)" :id="`forecast-amount-error-${row.original.budgetLineId}-${period.columnId}`" class="mt-1 text-xs text-error">
                         {{ t('validation.invalid_number') }}
                       </p>
+                      <UButton
+                        v-if="canUpdateForecast && lineItemByBudgetMonth.get(getDraftKey(row.original.budgetLineId, period.months[0] ?? 0))"
+                        color="neutral"
+                        variant="link"
+                        size="xs"
+                        :label="t('agreement.funding_sources.edit_line')"
+                        @click="openFundingEditor(lineItemByBudgetMonth.get(getDraftKey(row.original.budgetLineId, period.months[0] ?? 0))!)" />
                     </div>
                     <span v-else class="font-medium text-zinc-700 dark:text-zinc-200">
                       {{ formatMoney(row.original.periodTotals[period.columnId] ?? ZERO_MONEY) }}
@@ -768,5 +826,22 @@ const saveForecastBreakdown = async () => {
         </div>
       </template>
     </UDashboardPanel>
+    <UModal v-model:open="fundingEditorOpen" :title="t('agreement.funding_sources.edit_line')" :ui="{ content: 'sm:max-w-2xl' }">
+      <template #body>
+        <div class="space-y-4">
+          <UFormField :label="t('agreement.forecasts.amount')" name="egcs_fc_amount" required>
+            <UInput v-model="fundingEditorProgramAmount" type="number" min="0" step="0.01" required aria-required="true" class="w-full" />
+          </UFormField>
+          <UFormField :label="t('agreement.funding_sources.total_cost')" name="egcs_fc_totalamount" required>
+            <UInput v-model="fundingEditorTotalAmount" type="number" min="0" step="0.01" required aria-required="true" class="w-full" />
+          </UFormField>
+          <AgreementFundingSourcesEditor v-model="fundingEditorSources" :agreement-id="agreementId" :identity="`${fundingEditorLine?.id ?? ''}:${fundingEditorSession}`" />
+          <div class="flex justify-end gap-2">
+            <UButton color="neutral" variant="ghost" :label="t('common.cancel')" @click="fundingEditorOpen = false" />
+            <CommonSaveButton :label="t('agreement.funding_sources.save')" :loading="isSavingFunding" @click="saveFundingEditor" />
+          </div>
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>

@@ -7,8 +7,9 @@ import type { H3Event } from 'h3'
 import type { Amended_Type, Database, JsonValue } from '~~/shared/types/database'
 import { throwApiError } from './api-errors'
 import { databaseMoneyText, parseDatabaseMoney } from './database-money'
+import { budgetFundingSourcesByLine, loadBudgetFundingSources } from './agreement-budget-funding'
 
-export const AGREEMENT_APPROVAL_SNAPSHOT_SCHEMA_VERSION = 1
+export const AGREEMENT_APPROVAL_SNAPSHOT_SCHEMA_VERSION = 2
 export const ACTIVE_WORKFLOW_RUN_STATUSES = [
   'pending',
   'active',
@@ -64,6 +65,8 @@ export type AgreementApprovalSnapshotV1 = {
   amendmentTypes: Array<Record<string, JsonValue>>
   amendmentSubtypes: Array<Record<string, JsonValue>>
 }
+export type AgreementApprovalSnapshotV2 = Omit<AgreementApprovalSnapshotV1, 'schemaVersion'> & { schemaVersion: 2 }
+export type AgreementApprovalSnapshot = AgreementApprovalSnapshotV1 | AgreementApprovalSnapshotV2
 
 export const resolveApprovalPacketDomains = (
   entityType: 'fundingcaseagreement' | 'fundingcaseamendment',
@@ -96,10 +99,10 @@ const normalizeValue = (value: unknown): JsonValue => {
 const normalizeRow = (row: Record<string, unknown>): Record<string, JsonValue> =>
   normalizeValue(row) as Record<string, JsonValue>
 
-export const canonicalSerializeAgreementApprovalSnapshot = (snapshot: AgreementApprovalSnapshotV1): string =>
+export const canonicalSerializeAgreementApprovalSnapshot = (snapshot: AgreementApprovalSnapshot): string =>
   JSON.stringify(normalizeValue(snapshot))
 
-export const hashAgreementApprovalSnapshot = (snapshot: AgreementApprovalSnapshotV1): string =>
+export const hashAgreementApprovalSnapshot = (snapshot: AgreementApprovalSnapshot): string =>
   createHash('sha256').update(canonicalSerializeAgreementApprovalSnapshot(snapshot)).digest('hex')
 
 export const buildAgreementApprovalSnapshot = async (
@@ -107,7 +110,7 @@ export const buildAgreementApprovalSnapshot = async (
   trx: Transaction<Database>,
   entityType: 'fundingcaseagreement' | 'fundingcaseamendment',
   entityId: string
-): Promise<{ agreementId: string, amendmentId: string | null, packet: AgreementApprovalSnapshotV1, hash: string }> => {
+): Promise<{ agreementId: string, amendmentId: string | null, packet: AgreementApprovalSnapshotV2, hash: string }> => {
   const amendment = entityType === 'fundingcaseamendment'
     ? await trx.selectFrom('Funding_Case_Agreement_Amendment').selectAll().where('id', '=', entityId).where('_deleted', '=', false).forUpdate().executeTakeFirstOrThrow()
     : null
@@ -257,6 +260,7 @@ export const buildAgreementApprovalSnapshot = async (
       .innerJoin('Funding_Case_Agreement_Budget_Fiscal_Year', 'Funding_Case_Agreement_Budget_Fiscal_Year.id', 'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreementbudgetfiscalyear')
       .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fiscalyear')
       .select([
+        'Funding_Case_Agreement_Budget_Line_Item.id as row_id',
         'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_calculationmode',
         sql<string | null>`(SELECT source.egcs_ay_name_en FROM "Agency_Cost_Category" source WHERE source.id = "Funding_Case_Agreement_Budget_Line_Item".egcs_fc_sourcecategory)`.as('calculation_source_name_en'),
         sql<string | null>`(SELECT source.egcs_ay_name_fr FROM "Agency_Cost_Category" source WHERE source.id = "Funding_Case_Agreement_Budget_Line_Item".egcs_fc_sourcecategory)`.as('calculation_source_name_fr'),
@@ -268,9 +272,6 @@ export const buildAgreementApprovalSnapshot = async (
         'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_description',
         databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_totalamount')).as('egcs_fc_totalamount'),
         databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_programfunding')).as('egcs_fc_programfunding'),
-        databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_otherfederalfunding')).as('egcs_fc_otherfederalfunding'),
-        databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_othergovfunding')).as('egcs_fc_othergovfunding'),
-        databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_otherfunding')).as('egcs_fc_otherfunding'),
         'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_currency',
         'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display',
         'Agency_Cost_Category.egcs_ay_name_en as organization_cost_category_name_en',
@@ -284,6 +285,7 @@ export const buildAgreementApprovalSnapshot = async (
     activityVersion ? trx.selectFrom('Funding_Case_Agreement_Activity').select(['id', 'egcs_fc_name_en', 'egcs_fc_name_fr', 'egcs_fc_description_en', 'egcs_fc_description_fr', 'egcs_fc_startdate', 'egcs_fc_enddate', 'egcs_fc_expectedresults_en', 'egcs_fc_expectedresults_fr']).where('egcs_fc_activityversion', '=', String(activityVersion.id)).where('_deleted', '=', false).orderBy('egcs_fc_startdate').orderBy('id').execute() : [],
     amendment ? trx.selectFrom('Funding_Case_Agreement_Amendment_Subtype').innerJoin('Transfer_Payment_Amendment_Subtype', 'Transfer_Payment_Amendment_Subtype.id', 'Funding_Case_Agreement_Amendment_Subtype.egcs_fc_amendmentsubtype').select(['Transfer_Payment_Amendment_Subtype.egcs_tp_name_en', 'Transfer_Payment_Amendment_Subtype.egcs_tp_name_fr']).where('Funding_Case_Agreement_Amendment_Subtype.egcs_fc_amendment', '=', entityId).where('Funding_Case_Agreement_Amendment_Subtype._deleted', '=', false).where('Transfer_Payment_Amendment_Subtype._deleted', '=', false).orderBy('Transfer_Payment_Amendment_Subtype.id').execute() : []
   ])
+  const budgetFundingByLine = budgetFundingSourcesByLine(await loadBudgetFundingSources(trx, lineItems.map(row => String(row.row_id))))
   const activityIds = activities.map(activity => String(activity.id))
   const [activityOutcomes, activityResponsibleParties] = activityIds.length === 0
     ? [[], []]
@@ -314,8 +316,8 @@ export const buildAgreementApprovalSnapshot = async (
       return bilingualValue(selections.map(option => option.egcs_ay_name_en).join(', '), selections.map(option => option.egcs_ay_name_fr).join(', '))
     })()
   }))
-  const packet: AgreementApprovalSnapshotV1 = {
-    schemaVersion: 1,
+  const packet: AgreementApprovalSnapshotV2 = {
+    schemaVersion: 2,
     agreement: amendment ? null : normalizeRow({
       customFields,
       agreementNumber: agreement.egcs_fc_agreementnumber,
@@ -372,9 +374,14 @@ export const buildAgreementApprovalSnapshot = async (
         description: row.egcs_fc_description,
         totalAmount: parseDatabaseMoney(row.egcs_fc_totalamount),
         programFunding: parseDatabaseMoney(row.egcs_fc_programfunding),
-        otherFederalFunding: row.egcs_fc_otherfederalfunding == null ? null : parseDatabaseMoney(row.egcs_fc_otherfederalfunding),
-        otherGovernmentFunding: row.egcs_fc_othergovfunding == null ? null : parseDatabaseMoney(row.egcs_fc_othergovfunding),
-        otherFunding: row.egcs_fc_otherfunding == null ? null : parseDatabaseMoney(row.egcs_fc_otherfunding),
+        fundingSources: (budgetFundingByLine.get(String(row.row_id)) ?? []).map(source => ({
+          fundingType: bilingualValue(source.funding_type_name_en, source.funding_type_name_fr),
+          fundingSubtype: bilingualValue(source.funding_subtype_name_en, source.funding_subtype_name_fr),
+          amount: source.egcs_fc_amount,
+          description: bilingualValue(source.egcs_fc_description_en, source.egcs_fc_description_fr),
+          inStacking: source.funding_type_instacking,
+          inCostSharing: source.funding_type_incostsharing
+        })),
         currency: row.egcs_fc_currency
       }))
     } : null,

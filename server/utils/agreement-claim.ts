@@ -45,6 +45,7 @@ import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { createPrimaryEntityAssignment } from '~~/server/utils/entity-assignment'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { parseMoney } from '~~/shared/utils/money'
+import { assertAgreementLineFundingBalance, replaceAgreementLineFunding } from '~~/server/utils/agreement-funding-breakdown'
 
 type AgreementClaimDb = Kysely<Database> | Transaction<Database>
 
@@ -163,6 +164,7 @@ export const createAgreementClaimAggregate = async (
       egcs_fc_submittedlineitem: line.submittedLineItem,
       egcs_fc_description: line.description,
       egcs_fc_amount: databaseMoneyValue(parseMoney(line.amount)),
+      egcs_fc_totalamount: databaseMoneyValue(parseMoney(line.amount)),
       egcs_fc_currency: line.currency as Database['Funding_Case_Agreement_Claim_Line_Item']['egcs_fc_currency']
     })
       .returning('id')
@@ -742,12 +744,15 @@ export const patchAgreementClaimLineItem = async (
   lineId: string
 ) => {
   const patchValues = await readAgreementClaimLineItemPatchBody(event)
-  const { egcs_fc_amount: patchedAmount, ...nonMoneyPatchValues } = patchValues
+  const { egcs_fc_amount: patchedAmount, egcs_fc_totalamount: patchedTotalAmount, egcs_fc_fundingsources: fundingSources, ...nonMoneyPatchValues } = patchValues
   const updateValues = {
     ...nonMoneyPatchValues,
     ...(patchedAmount === undefined
       ? {}
-      : { egcs_fc_amount: databaseMoneyValue(patchedAmount) })
+      : { egcs_fc_amount: databaseMoneyValue(patchedAmount) }),
+    ...(patchedTotalAmount === undefined
+      ? {}
+      : { egcs_fc_totalamount: databaseMoneyValue(patchedTotalAmount) })
   }
 
   try {
@@ -791,13 +796,25 @@ export const patchAgreementClaimLineItem = async (
             'egcs_fc_fundingagreementbudgetlineitem', 'egcs_fc_submittedcostcategory',
             'egcs_fc_submittedcostsubsection', 'egcs_fc_submittedlineitem',
             'egcs_fc_description', 'egcs_fc_currency', '_deleted',
-            databaseMoneyText(sql.ref('egcs_fc_amount')).as('egcs_fc_amount')
+            databaseMoneyText(sql.ref('egcs_fc_amount')).as('egcs_fc_amount'),
+            databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('egcs_fc_totalamount')
           ])
           .executeTakeFirstOrThrow()
 
+        if (fundingSources !== undefined) {
+          const fundingError = await replaceAgreementLineFunding(event, trx, agreementId, { kind: 'claim', lineId }, fundingSources)
+          if (fundingError) return fundingError
+        }
+        const balanceError = await assertAgreementLineFundingBalance(event, trx, { kind: 'claim', lineId })
+        if (balanceError) return balanceError
+
         await syncAgreementClaimLineItemPatchStatuses(trx, String(existing.egcs_fc_fundingagreementclaim), String(references.nextClaimId))
 
-        return { ...updated, egcs_fc_amount: parseDatabaseMoney(updated.egcs_fc_amount) }
+        return {
+          ...updated,
+          egcs_fc_amount: parseDatabaseMoney(updated.egcs_fc_amount),
+          egcs_fc_totalamount: parseDatabaseMoney(updated.egcs_fc_totalamount)
+        }
       }
     )
   } catch (error: unknown) {

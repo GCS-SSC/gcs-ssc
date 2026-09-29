@@ -416,6 +416,8 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Agency_Custom_Field_Option: AgencyCustomFieldOptionTable
   Agency_Cost_Category: AgencyCostCategoryTable
   Agency_Cost_Category_Line_Item: AgencyCostCategoryLineItemTable
+  Agency_Funding_Type: AgencyFundingTypeTable
+  Agency_Funding_Subtype: AgencyFundingSubtypeTable
   Agency_Fiscal_Year: AgencyFiscalYearTable
   Agency_Chart_of_Account: AgencyChartOfAccountTable
   Agency_Commitment_Type: AgencyCommitmentTypeTable
@@ -461,10 +463,13 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Funding_Case_Agreement_Address: FundingCaseAgreementAddressTable
   Funding_Case_Agreement_Budget_Fiscal_Year: FundingCaseAgreementBudgetFiscalYearTable
   Funding_Case_Agreement_Budget_Line_Item: FundingCaseAgreementBudgetLineItemTable
+  Funding_Case_Agreement_Budget_Line_Item_Funding: FundingCaseAgreementBudgetLineItemFundingTable
   Funding_Case_Agreement_Forecast: FundingCaseAgreementForecastTable
   Funding_Case_Agreement_Forecast_Line_Item: FundingCaseAgreementForecastLineItemTable
+  Funding_Case_Agreement_Forecast_Line_Item_Funding: FundingCaseAgreementForecastLineItemFundingTable
   Funding_Case_Agreement_Claim: FundingCaseAgreementClaimTable
   Funding_Case_Agreement_Claim_Line_Item: FundingCaseAgreementClaimLineItemTable
+  Funding_Case_Agreement_Claim_Line_Item_Funding: FundingCaseAgreementClaimLineItemFundingTable
   Funding_Case_Agreement_Claim_Reconcile: FundingCaseAgreementClaimReconcileTable
   Funding_Case_Agreement_Claim_Reconcile_Line_Item: FundingCaseAgreementClaimReconcileLineItemTable
   Funding_Case_Agreement_Commitment: FundingCaseAgreementCommitmentTable
@@ -484,6 +489,7 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Funding_Case_Agreement_Responsible_Party_Activity: FundingCaseAgreementResponsiblePartyActivityTable
   Transfer_Payment_Fiscal_Year_Budget: TransferPaymentFiscalYearBudgetTable
   Transfer_Payment_Stream: TransferPaymentStreamTable
+  Transfer_Payment_Stream_Funding_Subtype: TransferPaymentStreamFundingSubtypeTable
   Transfer_Payment_Stream_Holdback_Basis: TransferPaymentStreamHoldbackBasisTable
   Transfer_Payment_Stream_Document_Template: TransferPaymentStreamDocumentTemplateTable
   Transfer_Payment_Objective: TransferPaymentObjectiveTable
@@ -785,6 +791,26 @@ export interface AgencyCostCategoryTable {
   egcs_ay_organizationagency: string
   egcs_ay_name_en: string
   egcs_ay_name_fr: string
+  _deleted: Generated<boolean>
+}
+
+export interface AgencyFundingTypeTable {
+  id: Generated<string>
+  egcs_ay_organizationagency: string
+  egcs_ay_name_en: string
+  egcs_ay_name_fr: string
+  egcs_ay_instacking: Generated<boolean>
+  egcs_ay_incostsharing: Generated<boolean>
+  egcs_ay_active: Generated<boolean>
+  _deleted: Generated<boolean>
+}
+
+export interface AgencyFundingSubtypeTable {
+  id: Generated<string>
+  egcs_ay_fundingtype: string
+  egcs_ay_name_en: string
+  egcs_ay_name_fr: string
+  egcs_ay_active: Generated<boolean>
   _deleted: Generated<boolean>
 }
 
@@ -1501,10 +1527,17 @@ export interface FundingCaseAgreementBudgetLineItemTable {
   egcs_fc_description: string
   egcs_fc_totalamount: number
   egcs_fc_programfunding: number
-  egcs_fc_otherfederalfunding?: number | null
-  egcs_fc_othergovfunding?: number | null
-  egcs_fc_otherfunding?: number | null
   egcs_fc_currency: Currency_Codes
+  _deleted: Generated<boolean>
+}
+
+export interface FundingCaseAgreementBudgetLineItemFundingTable {
+  id: Generated<string>
+  egcs_fc_budgetlineitem: string
+  egcs_fc_fundingsubtype: string
+  egcs_fc_amount: number
+  egcs_fc_description_en?: string | null
+  egcs_fc_description_fr?: string | null
   _deleted: Generated<boolean>
 }
 
@@ -1524,8 +1557,17 @@ export interface FundingCaseAgreementForecastLineItemTable {
   egcs_fc_fundingagreementbudgetlineitem: string
   egcs_fc_month: number
   egcs_fc_amount: number
+  egcs_fc_totalamount: number
   egcs_fc_currency: Currency_Codes
   egcs_fc_version: string
+  _deleted: Generated<boolean>
+}
+
+export interface FundingCaseAgreementForecastLineItemFundingTable {
+  id: Generated<string>
+  egcs_fc_forecastlineitem: string
+  egcs_fc_fundingsubtype: string
+  egcs_fc_amount: number
   _deleted: Generated<boolean>
 }
 
@@ -1552,7 +1594,16 @@ export interface FundingCaseAgreementClaimLineItemTable {
   egcs_fc_submittedlineitem?: string | null
   egcs_fc_description: string
   egcs_fc_amount: number
+  egcs_fc_totalamount: number
   egcs_fc_currency: Currency_Codes
+  _deleted: Generated<boolean>
+}
+
+export interface FundingCaseAgreementClaimLineItemFundingTable {
+  id: Generated<string>
+  egcs_fc_claimlineitem: string
+  egcs_fc_fundingsubtype: string
+  egcs_fc_amount: number
   _deleted: Generated<boolean>
 }
 
@@ -2120,6 +2171,8 @@ export interface TransferPaymentFiscalYearBudgetTable {
 
 export interface TransferPaymentStreamTable {
   egcs_tp_requireconsistentproponenttype: Generated<boolean>
+  egcs_tp_requireforecastfundingbreakdown: Generated<boolean>
+  egcs_tp_requireclaimfundingbreakdown: Generated<boolean>
   id: Generated<string>
   egcs_tp_transferpaymentprofile: string
   egcs_tp_parentstream: string | null
@@ -2133,6 +2186,13 @@ export interface TransferPaymentStreamTable {
   egcs_tp_objective_fr: string
   egcs_tp_allowsfurtherdistribution: Generated<boolean>
   egcs_tp_active: Generated<boolean>
+  _deleted: Generated<boolean>
+}
+
+export interface TransferPaymentStreamFundingSubtypeTable {
+  id: Generated<string>
+  egcs_tp_transferpaymentstream: string
+  egcs_tp_fundingsubtype: string
   _deleted: Generated<boolean>
 }
 
