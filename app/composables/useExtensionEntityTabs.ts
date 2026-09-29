@@ -15,6 +15,7 @@ interface ExtensionEntityTabsOptions {
   agencyId?: MaybeRefString
   claimId?: MaybeRefString
   monitorId?: MaybeRefString
+  opportunityId?: MaybeRefString
 }
 
 /**
@@ -56,7 +57,8 @@ export const useExtensionEntityTabs = (options: ExtensionEntityTabsOptions) => {
     applicantRecipientId: resolveMaybeRefString(options.applicantRecipientId),
     agencyId: resolveMaybeRefString(options.agencyId),
     claimId: resolveMaybeRefString(options.claimId),
-    monitorId: resolveMaybeRefString(options.monitorId)
+    monitorId: resolveMaybeRefString(options.monitorId),
+    opportunityId: resolveMaybeRefString(options.opportunityId)
   }))
 
   const data: Ref<ExtensionEntityTabsResponse | null> = ref(null)
@@ -73,9 +75,9 @@ export const useExtensionEntityTabs = (options: ExtensionEntityTabsOptions) => {
         ? resolvedQuery.claimId
         : options.target === 'monitor'
           ? resolvedQuery.monitorId
-          : options.target === 'proponent'
-            ? resolvedQuery.applicantRecipientId
-            : undefined
+          : options.target === 'opportunity'
+            ? resolvedQuery.opportunityId
+            : resolvedQuery.applicantRecipientId
     if (!requiredId) {
       data.value = null
       error.value = null

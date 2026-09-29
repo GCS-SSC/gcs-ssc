@@ -101,6 +101,7 @@ export type ExtensionEntityTabContext = {
   agreementId?: never
   claimId?: never
   monitorId?: never
+  opportunityId?: never
   scope?: never
 } | {
   target: Exclude<GcsExtensionEntityTabTarget, 'proponent'>
@@ -110,6 +111,7 @@ export type ExtensionEntityTabContext = {
   applicantRecipientId?: string
   claimId?: string
   monitorId?: string
+  opportunityId?: string
   ownerType: string
   ownerId: string
   scope: Scope

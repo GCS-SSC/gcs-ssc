@@ -43,6 +43,7 @@ import { canAccessApplicantRecipient } from './applicant-recipient-auth'
 import { resolveRequestLocale } from './request-locale'
 import { resolveAgreementClaimRuntimeContext } from './agreement-claim'
 import { resolveAgreementMonitorRuntimeContext } from './agreement-monitor'
+import { resolveFundingOpportunityScope } from './funding-case'
 import { badRequest, throwApiError } from './api-errors'
 import type { AuthContext } from './authorize'
 import type { Database, JsonValue } from '~~/shared/types/database'
@@ -78,6 +79,7 @@ export const resolveExtensionStreamContext = async (
   : null
 
 type ExtensionEntityOwnerType =
+  | 'fundingopportunity'
   | 'fundingcaseagreement'
   | 'applicantrecipient'
   | 'fundingcaseagreementclaim'
@@ -91,6 +93,7 @@ export interface ExtensionEntityContext {
   applicantRecipientId?: string
   claimId?: string
   monitorId?: string
+  opportunityId?: string
   ownerType: ExtensionEntityOwnerType
   ownerId: string
   scope: Scope
@@ -561,6 +564,15 @@ export const resolveExtensionEntityContext = async (
   entityId: string,
   agencyId?: string
 ): Promise<ExtensionEntityContext | null> => {
+  if (target === 'opportunity') {
+    const context = await resolveFundingOpportunityScope(db, entityId)
+    if (!context) return null
+    return {
+      target, agencyId: context.agencyId, streamId: context.streamId,
+      opportunityId: entityId, ownerType: 'fundingopportunity', ownerId: entityId,
+      scope: context.scope
+    }
+  }
   if (target === 'agreement') {
     const context = await resolveAgreementScopeContext(entityId, db)
     if (!context) return null
@@ -662,6 +674,9 @@ export const getExtensionConfigurationForEntity = async (
   if (entityContext.target === 'proponent') {
     return {}
   }
+
+  const extension = (await getRegisteredExtensions()).find(item => item.key === extensionKey)
+  if (extension?.configurationScope === 'agency') return {}
 
   if (!entityContext.streamId) {
     return null

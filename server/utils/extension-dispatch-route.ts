@@ -559,8 +559,13 @@ const createExtensionWriteAuthorization = (
         throw new Error('Extension Opportunity publication requires auth-state locking on the same transaction first.')
       }
       await writeAuthorization.authorizeCurrentEntity(db)
-      if (!routeScope.agencyId && !routeScope.streamId) return null
-      return await projectFundingOpportunityForPortal(db, lockedAuthContext, opportunityId, routeScope)
+      const boundOpportunityId = 'entity' in rbac && rbac.entity.target === 'opportunity'
+        ? resolvedHandler.params[rbac.entity.param]
+        : undefined
+      if (!routeScope.agencyId && !routeScope.streamId && !boundOpportunityId) return null
+      if (boundOpportunityId && boundOpportunityId !== opportunityId) return null
+      return await projectFundingOpportunityForPortal(db, lockedAuthContext, opportunityId, routeScope,
+        { includeInactive: true })
     }
   }
   writeAuthorization.authorizeCurrentScope = writeAuthorization.authorizeCurrentEntity

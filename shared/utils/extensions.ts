@@ -12,8 +12,9 @@ export const EXTENSION_ENTITY_AUTHORIZATION_SUBJECTS = {
   agreement: 'agreement',
   proponent: 'applicant_recipient',
   claim: 'agreement',
-  monitor: 'agreement'
-} as const satisfies Record<GcsExtensionEntityTabTarget, 'agreement' | 'applicant_recipient'>
+  monitor: 'agreement',
+  opportunity: 'transfer_payment'
+} as const satisfies Record<GcsExtensionEntityTabTarget, 'agreement' | 'applicant_recipient' | 'transfer_payment'>
 
 /**
  * Returns the authorization domain that owns an extension entity target.
@@ -23,7 +24,7 @@ export const EXTENSION_ENTITY_AUTHORIZATION_SUBJECTS = {
  */
 export const getExtensionEntityAuthorizationSubject = (
   target: GcsExtensionEntityTabTarget
-): 'agreement' | 'applicant_recipient' => EXTENSION_ENTITY_AUTHORIZATION_SUBJECTS[target]
+): 'agreement' | 'applicant_recipient' | 'transfer_payment' => EXTENSION_ENTITY_AUTHORIZATION_SUBJECTS[target]
 
 /**
  * Resolves declarative configuration access to the host's cumulative role action.

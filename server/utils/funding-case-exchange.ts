@@ -146,7 +146,8 @@ export const createExternalFundingCaseIntake = async (
 /** Reads form-agnostic host metadata for an extension-owned portal publication. */
 export const projectFundingOpportunityForPortal = async (
   db: Kysely<Database>, auth: AuthContext, opportunityId: string,
-  routeScope: { agencyId?: string; streamId?: string }
+  routeScope: { agencyId?: string; streamId?: string },
+  options: { includeInactive?: boolean } = {}
 ) => {
   const scope = await resolveFundingOpportunityScope(db, opportunityId)
   if (!scope || (routeScope.agencyId && routeScope.agencyId !== scope.agencyId)
@@ -171,7 +172,10 @@ export const projectFundingOpportunityForPortal = async (
     .forShare().executeTakeFirst()
   if (!row) return null
   const opportunityStatus = await getFundingOpportunityStatus(db, String(row.egcs_fo_status), scope.agencyId)
-  if (!isFundingOpportunityIntakeEligible(opportunityStatus)) return null
+  const active = isFundingOpportunityIntakeEligible(opportunityStatus)
+  if (!active && !options.includeInactive) return null
+  const editable = Boolean(opportunityStatus && !opportunityStatus._deleted
+    && !opportunityStatus.egcs_cn_readonly && !opportunityStatus.egcs_cn_terminal)
   const streams = await db.selectFrom('Funding_Opportunity_Stream')
     .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Funding_Opportunity_Stream.egcs_fo_transferpaymentstream')
     .select(['Transfer_Payment_Stream.id', 'Transfer_Payment_Stream.egcs_tp_name_en as name_en',
@@ -197,6 +201,7 @@ export const projectFundingOpportunityForPortal = async (
     .orderBy('type.egcs_cn_name_en').execute()
   return {
     sourceSystem: 'gcs-ssc', foreignSystemId: String(row.opportunity_id),
+    active, editable,
     opportunityId: String(row.opportunity_id),
     agency: { id: String(row.agency_id), nameEn: row.agency_name_en, nameFr: row.agency_name_fr },
     program: { id: String(row.program_id), nameEn: row.program_name_en, nameFr: row.program_name_fr },

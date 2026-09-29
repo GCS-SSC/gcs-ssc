@@ -3,6 +3,7 @@ import { appRouteLocations } from '~/utils/route-locations'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import type { OpportunityForm } from '~/components/FundingOpportunity/OpportunityModal.vue'
+import { useExtensionEntityTabs } from '~/composables/useExtensionEntityTabs'
 
 definePageMeta({ key: route => route.path, i18n: { paths: { en: '/funding-opportunities/[id]', fr: '/possibilites-de-financement/[id]' } } })
 
@@ -32,12 +33,15 @@ void statusCatalog.load()
 const { data: profile, error, status, refresh } = await useFetch<Opportunity, Error, string>(`/api/funding-opportunities/${id}`)
 const isHeroCollapsed = getHeroCollapsed('funding-opportunity-detail')
 const selectedTab = ref('general')
+const { tabs: extensionTabs, getExtensionTabItem } = useExtensionEntityTabs({ target: 'opportunity', opportunityId: id })
 const tabs = computed(() => [
   { key: 'agency.tabs.general', value: 'general', icon: 'i-lucide-info' },
   { key: 'workflow.title', value: 'workflows', icon: 'i-lucide-workflow' },
   { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-clipboard-check' },
-  { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' }
+  { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
+  ...extensionTabs.value
 ])
+const selectedExtensionTab = computed(() => getExtensionTabItem(selectedTab.value))
 const scope = computed(() => profile.value && ({
   type: 'entity' as const, agencyId: String(profile.value.agency_id),
   path: [{ type: 'transfer_payment' as const, id: String(profile.value.program_id) }]
@@ -209,6 +213,7 @@ const breadcrumbs = computed(() => [
           <FundingOpportunitySetupRelationshipsTab v-else-if="selectedTab === 'workflows'" :opportunity-id="id" :stream-ids="profile.egcs_fo_transferpaymentstreams" :linked-setups="profile.workflow_setups" kind="workflow" :can-edit="canEdit" @refresh="refresh" />
           <FundingOpportunitySetupRelationshipsTab v-else-if="selectedTab === 'reviews'" :opportunity-id="id" :stream-ids="profile.egcs_fo_transferpaymentstreams" :linked-setups="profile.review_setups" kind="review" :can-edit="canEdit" @refresh="refresh" />
           <FundingOpportunityAttachmentTypesTab v-else-if="selectedTab === 'attachments'" :opportunity-id="id" :attachment-types="profile.egcs_fo_attachmenttypes" :can-edit="canEdit" @updated="refresh" />
+          <ExtensionEntityTabPanel v-else-if="selectedExtensionTab" :item="selectedExtensionTab" />
         </CommonEntityEditorWorkspace>
       </div>
       <FundingOpportunityModal v-model:open="modalOpen" v-model:state="form" :pending="pending" @submit="submit" />
