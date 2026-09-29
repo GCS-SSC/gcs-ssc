@@ -86,7 +86,7 @@ const tabs = computed(() => extension.value?.extension.admin.agencyWorkspace?.ta
   icon: tab.icon
 })) ?? [])
 const openForm = (formId: string) => navigateTo(localePath(appRouteLocations.extensionAgencyWorkspaceForm(
-  extensionKey.value, agencyId.value, formId || 'new'
+  extensionKey.value, agencyId.value, formId
 )))
 watch([requestedTab, tabs], ([requested, available]) => {
   if (!available.length) return

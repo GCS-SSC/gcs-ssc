@@ -12,8 +12,6 @@ definePageMeta({ key: route => route.path, i18n: { paths: {
 const route = useRoute()
 const localePath = useLocalePath()
 const { t, locale } = useI18n()
-const { getHeroCollapsed } = useDashboard()
-const isHeroCollapsed = getHeroCollapsed('extension-agency-form-detail')
 const extensionKey = computed(() => String(route.params.id))
 const agencyId = computed(() => String(route.params.agencyId))
 const formId = computed(() => String(route.params.formId))
@@ -74,10 +72,9 @@ const formsLocation = computed(() => localePath({
   ...appRouteLocations.extensionAgencyWorkspace(extensionKey.value, agencyId.value),
   query: { section: 'forms' }
 }))
-const savedForm = (id: string) => {
-  if (formId.value !== 'new') return
-  void navigateTo(localePath(appRouteLocations.extensionAgencyWorkspaceForm(extensionKey.value, agencyId.value, id)), { replace: true })
-}
+watch(formId, id => {
+  if (id === 'new') void navigateTo(formsLocation.value, { replace: true })
+}, { immediate: true })
 </script>
 
 <template>
@@ -106,16 +103,14 @@ const savedForm = (id: string) => {
           <UButton :label="t('common.retry')" @click="retry" />
         </template>
       </UAlert>
+      <div v-else-if="formId === 'new'" />
       <div v-else-if="workspace && extension && extensionComponent" class="flex flex-1 flex-col">
-        <CommonEntityHero
-          :is-collapsed="isHeroCollapsed" :icon="workspace.icon ?? 'i-lucide-panels-top-left'"
-          :title="agencyName" :description="formsLabel" />
         <component
           :is="extensionComponent" :key="`${extensionKey}:${agencyId}`"
           :agency-id="agencyId" :extension-key="extensionKey" section="forms"
-          :detail-form-id="formId === 'new' ? '' : formId"
+          :detail-form-id="formId"
           :enabled="true" :read-only="!extension.canConfigure" :config="extension.config"
-          @saved-form="savedForm" @form-collection-label="formCollectionLabel = $event" />
+          @close-form="navigateTo(formsLocation)" @form-collection-label="formCollectionLabel = $event" />
       </div>
       <UAlert v-else color="error" :title="t('common.not_available')" />
     </template>

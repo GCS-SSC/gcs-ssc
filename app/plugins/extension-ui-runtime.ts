@@ -13,7 +13,9 @@ import CommonCompletionSection from '~/components/Common/Completions/Section.vue
 import CommonWorkflowSection from '~/components/Common/Workflow/Section.vue'
 import {
   AssessmentSchemaAccordionSection,
+  AssessmentSchemaPageSection,
   CommonEntityEditorWorkspace,
+  CommonEntityHero,
   CommonResourceLayoutCard,
   CommonRouteTabs,
   CommonSaveButton,
@@ -50,8 +52,10 @@ const asExtensionHostComponent = (component: object): Component => component as 
 
 const extensionHostComponents = {
   CommonAssessmentSchemaAccordionSection: AssessmentSchemaAccordionSection,
+  CommonAssessmentSchemaPageSection: AssessmentSchemaPageSection,
   CommonCompletionSection,
   CommonEntityEditorWorkspace,
+  CommonEntityHero,
   CommonResourceLayoutCard,
   CommonRouteTabs,
   CommonSaveButton,

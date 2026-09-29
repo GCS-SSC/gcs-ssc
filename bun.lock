@@ -230,7 +230,7 @@
       "name": "@gcs-ssc/gcs-ssc-portal-connector",
       "version": "0.1.0",
       "dependencies": {
-        "@gcs-ssc/extensions": "^0.3.3",
+        "@gcs-ssc/extensions": "^0.3.4",
         "@gcs-ssc/survey": "file:vendor/survey",
         "nanoid": "^5.1.6",
         "zod": "^4.3.6",
@@ -298,7 +298,7 @@
     },
     "packages/gcs-ssc-extensions": {
       "name": "@gcs-ssc/extensions",
-      "version": "0.3.3",
+      "version": "0.3.4",
       "devDependencies": {
         "@types/node": "^25.3.0",
         "h3": "^1.15.5",
