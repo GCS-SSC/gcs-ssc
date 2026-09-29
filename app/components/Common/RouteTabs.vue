@@ -4,6 +4,7 @@ import type { TranslatedTabItem } from '~~/shared/types/ui'
 
 const {
   items,
+  sort = true,
   variant = 'link',
   size = 'sm',
   orientation = 'vertical',
@@ -14,6 +15,7 @@ const {
   ui
 } = defineProps<{
   items: TranslatedTabItem[]
+  sort?: boolean
   variant?: 'link' | 'pill'
   size?: 'xs' | 'sm' | 'md' | 'lg'
   orientation?: 'horizontal' | 'vertical'
@@ -28,6 +30,7 @@ const modelValue = defineModel<string>({ required: true })
 const { t, locale } = useI18n()
 
 const sortedItems = computed(() => {
+  if (!sort) return items
   const collator = new Intl.Collator(locale.value, { sensitivity: 'base' })
 
   return [...items].sort((left, right) => {

@@ -85,6 +85,9 @@ const tabs = computed(() => extension.value?.extension.admin.agencyWorkspace?.ta
   label: locale.value === 'fr' ? tab.label.fr : tab.label.en,
   icon: tab.icon
 })) ?? [])
+const openForm = (formId: string) => navigateTo(localePath(appRouteLocations.extensionAgencyWorkspaceForm(
+  extensionKey.value, agencyId.value, formId || 'new'
+)))
 watch([requestedTab, tabs], ([requested, available]) => {
   if (!available.length) return
   const next = available.find(tab => tab.value === requested)?.value
@@ -93,13 +96,14 @@ watch([requestedTab, tabs], ([requested, available]) => {
   if (selectedTab.value !== next) selectedTab.value = next
 }, { immediate: true })
 watch(selectedTab, (value) => {
-  if (!tabs.value.some(tab => tab.value === value) || requestedTab.value === value) return
+  if (route.params.formId || !tabs.value.some(tab => tab.value === value) || requestedTab.value === value) return
   void navigateTo({ path: route.path, query: { ...route.query, section: value }, hash: route.hash }, { replace: true })
 })
 </script>
 
 <template>
-  <UDashboardPanel id="extension-agency-workspace">
+  <NuxtPage v-if="route.params.formId" />
+  <UDashboardPanel v-else id="extension-agency-workspace">
     <template #header>
       <UDashboardNavbar>
         <template #leading>
@@ -140,7 +144,8 @@ watch(selectedTab, (value) => {
             <component
               :is="extensionComponent" :key="`${extensionKey}:${agencyId}:${selectedTab}`"
               :agency-id="agencyId" :extension-key="extensionKey" :section="selectedTab"
-              :enabled="true" :read-only="!extension.canConfigure" :config="extension.config" />
+              :enabled="true" :read-only="!extension.canConfigure" :config="extension.config"
+              @open-form="openForm" />
           </CommonEntityEditorWorkspace>
         </template>
         <UAlert v-else color="error" :title="t('common.not_available')" />

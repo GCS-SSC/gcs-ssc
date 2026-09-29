@@ -232,6 +232,7 @@
       "dependencies": {
         "@gcs-ssc/extensions": "^0.3.3",
         "@gcs-ssc/survey": "file:vendor/survey",
+        "nanoid": "^5.1.6",
         "zod": "^4.3.6",
       },
       "devDependencies": {

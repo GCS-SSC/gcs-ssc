@@ -13,6 +13,9 @@ export const appRouteLocations = {
   extensionAgencyWorkspace: (key: string, agencyId: string) => ({
     name: 'extension-id-agencies-agencyId', params: { id: key, agencyId }
   }),
+  extensionAgencyWorkspaceForm: (key: string, agencyId: string, formId: string) => ({
+    name: 'extension-id-agencies-agencyId-forms-formId', params: { id: key, agencyId, formId }
+  }),
   agencyDetail: (id: string) => ({ name: 'agencies-id', params: { id } }),
   agencyReviewSetDetail: (id: string, reviewSetId: string) => ({
     name: 'agencies-id-review-sets-reviewSetId',
