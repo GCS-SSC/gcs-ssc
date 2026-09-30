@@ -80,9 +80,9 @@ export default defineEventHandler(async event => {
       WHERE profile._deleted = false
       UNION ALL
       SELECT intake.id, 'fundingcaseintake', intake.egcs_fi_status::text,
-        intake.egcs_fi_applicationid::text,
-        'Application #' || intake.egcs_fi_applicationid::text,
-        'Demande no ' || intake.egcs_fi_applicationid::text,
+        intake.id::text,
+        'Application #' || intake.id::text,
+        'Demande no ' || intake.id::text,
         'funding_case', program.egcs_tp_agency, program.id,
         agency.egcs_ay_name_en, agency.egcs_ay_name_fr,
         program.egcs_tp_name_en, program.egcs_tp_name_fr

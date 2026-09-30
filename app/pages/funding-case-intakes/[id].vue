@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import CommonSubmittedApplication from '~/components/Common/Submitted/Application.vue'
 import { appRouteLocations } from '~/utils/route-locations'
 
 definePageMeta({ i18n: { paths: { en: '/funding-case-intakes/[id]', fr: '/dossiers-de-financement/[id]' } } })
 
 type Intake = {
-  id: string; egcs_fi_applicationid: string; egcs_fi_fundingopportunity: string
+  egcs_fi_application: unknown; egcs_fi_sourceexport: unknown
+  id: string; egcs_fi_externalsourceid: string | null; egcs_fi_fundingopportunity: string
   egcs_fi_applicantrecipient: string
   egcs_fi_status: string; agency_id: string; program_id: string
   opportunity_name_en: string; opportunity_name_fr: string
@@ -23,9 +25,10 @@ const { isStatusLocked } = useBusinessStatusState()
 const { data: profile, error, status, refresh } = await useFetch<Intake, Error, string>(`/api/funding-case-intakes/${id}`)
 const { isAssigned } = useEntityAssignmentRoster('fundingcaseintake', id)
 const isHeroCollapsed = getHeroCollapsed('funding-case-intake-detail')
-const selectedTab = ref(route.query.tab === 'attachments' ? 'attachments' : 'general')
+const selectedTab = ref(['attachments', 'application'].includes(String(route.query.tab)) ? String(route.query.tab) : 'general')
 const tabs = computed(() => [
   { key: 'funding_case_intake.details', value: 'general', icon: 'i-lucide-file-text' },
+  { key: 'submitted_application.menu', value: 'application', icon: 'i-lucide-file-check' },
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
   { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-list-checks' },
   { key: 'workflow.title', value: 'workflows', icon: 'i-lucide-workflow' },
@@ -52,7 +55,7 @@ const remove = async () => {
 }
 const breadcrumbs = computed(() => [
   { label: t('funding_case_intake.title'), to: localePath(appRouteLocations.fundingCaseIntakes()) },
-  { label: profile.value ? String(profile.value.egcs_fi_applicationid) : id }
+  { label: profile.value ? String(profile.value.id) : id }
 ])
 </script>
 
@@ -81,7 +84,7 @@ const breadcrumbs = computed(() => [
         </template>
       </UAlert>
       <div v-else-if="profile" class="flex flex-1 flex-col">
-        <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-inbox" :title="`${t('funding_case_intake.singular')} ${profile.egcs_fi_applicationid}`" :meta-items="[`${t('funding_case_intake.opportunity')}: ${getBilingualValue(profile, 'opportunity_name', profile.egcs_fi_fundingopportunity)}`, `${t('funding_case_intake.proponent')}: ${getBilingualValue(profile, 'proponent_name', profile.egcs_fi_applicantrecipient)}`]" :badges="[{ statusId: profile.egcs_fi_status }]" :actions="[{ label: t('common.delete'), icon: 'i-lucide-trash', visible: canDelete, onClick: remove }]" />
+        <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-inbox" :title="`${t('funding_case_intake.singular')} ${profile.id}`" :meta-items="[`${t('funding_case_intake.opportunity')}: ${getBilingualValue(profile, 'opportunity_name', profile.egcs_fi_fundingopportunity)}`, `${t('funding_case_intake.proponent')}: ${getBilingualValue(profile, 'proponent_name', profile.egcs_fi_applicantrecipient)}`]" :badges="[{ statusId: profile.egcs_fi_status }]" :actions="[{ label: t('common.delete'), icon: 'i-lucide-trash', visible: canDelete, onClick: remove }]" />
         <CommonEntityEditorWorkspace content-test-id="funding-case-intake-detail-content">
           <template #sidebar>
             <CommonRouteTabs v-model="selectedTab" :items="tabs" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
@@ -91,7 +94,12 @@ const breadcrumbs = computed(() => [
               <div>
                 <dt class="text-sm text-muted">
                   {{ t('funding_case_intake.application_id') }}
-                </dt><dd>{{ profile.egcs_fi_applicationid }}</dd>
+                </dt><dd>{{ profile.id }}</dd>
+              </div>
+              <div v-if="profile.egcs_fi_externalsourceid">
+                <dt class="text-sm text-muted">
+                  {{ t('funding_case_intake.external_source_id') }}
+                </dt><dd>{{ profile.egcs_fi_externalsourceid }}</dd>
               </div>
               <div>
                 <dt class="text-sm text-muted">
@@ -105,6 +113,7 @@ const breadcrumbs = computed(() => [
               </div>
             </dl>
           </CommonSection>
+          <CommonSubmittedApplication v-else-if="selectedTab === 'application'" :snapshot="profile.egcs_fi_sourceexport ?? profile.egcs_fi_application" :external-source-id="profile.egcs_fi_externalsourceid" />
           <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcaseintake" :entity-id="id" />
           <CommonReviewsTab v-else-if="selectedTab === 'reviews'" entity-type="fundingcaseintake" :entity-id="id" :can-update="canEdit" @changed="refresh" />
           <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcaseintake" :entity-id="id" purpose="standard" :can-edit="canEdit" @changed="refresh" />

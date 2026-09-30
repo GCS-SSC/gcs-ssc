@@ -57,7 +57,8 @@ export const FundingCaseIntakeBaseSchema = z.object({
 })
 /** Manual creation records its application evidence internally; portal imports have a separate contract. */
 export const FundingCaseIntakeCreateSchema = FundingCaseIntakeBaseSchema.omit({
-  egcs_fi_application: true
+  egcs_fi_application: true,
+  egcs_fi_applicationid: true
 }).strict()
 export const FundingCaseIntakePatchSchema = FundingCaseIntakeBaseSchema.pick({
   egcs_fi_application: true

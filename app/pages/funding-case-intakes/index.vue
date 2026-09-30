@@ -1,108 +1,10 @@
 <script setup lang="ts">
-import { appRouteLocations } from '~/utils/route-locations'
-import { getClientRequestUrl } from '~/utils/client-request-url'
-import { throwFetchResponseError } from '~/utils/fetch-error'
-import type { TableColumnInput } from '~/composables/useTableColumns'
-import type { IntakeForm } from '~/components/FundingCaseIntake/IntakeModal.vue'
-
 definePageMeta({ i18n: { paths: { en: '/funding-case-intakes', fr: '/dossiers-de-financement' } } })
-
-type Row = {
-  id: string; egcs_fi_applicationid: string; egcs_fi_fundingopportunity: string
-  egcs_fi_applicantrecipient: string; egcs_fi_status: string
-  opportunity_name_en: string; opportunity_name_fr: string
-  proponent_name_en: string | null; proponent_name_fr: string | null
-}
 const { t } = useI18n()
-const localePath = useLocalePath()
-const route = useRoute()
 const { canAny } = useCan()
-const { getBilingualValue } = useBilingualValue()
-const { showError } = useApiErrorToast()
 const { getHeroCollapsed } = useDashboard()
-const { search, pagination, items, totalRecords, refresh, retry, status } = useResourceTable<Row>({ fetchUrl: '/api/funding-case-intakes' })
 const isHeroCollapsed = getHeroCollapsed('funding-case-intakes')
 const canCreate = computed(() => canAny('funding_case', 'create'))
-const columns: TableColumnInput<Row>[] = [
-  { accessorKey: 'egcs_fi_applicationid', headerKey: 'funding_case_intake.application_id' },
-  { id: 'opportunity', headerKey: 'funding_case_intake.opportunity' },
-  { id: 'proponent', headerKey: 'funding_case_intake.proponent' },
-  { id: 'status', headerKey: 'funding_opportunity.status' },
-  { id: 'actions', headerKey: 'common.actions' }
-]
-const modalOpen = ref(false)
-const pending = ref(false)
-const toast = useToast()
-const form = ref<IntakeForm>({ egcs_fi_applicationid: '', attachments: [] })
-/**
- *
- */
-const openCreate = () => {
-  form.value = {
-    egcs_fi_applicationid: '',
-    egcs_fi_fundingopportunity: typeof route.query.opportunity_id === 'string' ? route.query.opportunity_id : undefined,
-    attachments: []
-  }
-  modalOpen.value = true
-}
-watch([() => route.query.opportunity_id, canCreate], ([value, allowed]) => {
-  if (typeof value === 'string' && allowed && !modalOpen.value) openCreate()
-}, { immediate: true })
-/**
- *
- */
-const submit = async () => {
-  if (pending.value) return
-  pending.value = true
-  let createdId: string | undefined
-  try {
-    const response = await fetch(getClientRequestUrl('/api/funding-case-intakes'), {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        egcs_fi_applicationid: form.value.egcs_fi_applicationid,
-        egcs_fi_fundingopportunity: form.value.egcs_fi_fundingopportunity,
-        egcs_fi_applicantrecipient: form.value.egcs_fi_applicantrecipient
-      })
-    })
-    if (!response.ok) await throwFetchResponseError(response)
-    const created = await response.json() as { id: string }
-    createdId = String(created.id)
-    let uploadError: unknown
-    for (const draft of form.value.attachments) {
-      const body = new FormData()
-      body.set('file', draft.file)
-      body.set('attachmentTypeId', draft.attachmentTypeId ?? '')
-      body.set('nameEn', draft.nameEn)
-      body.set('nameFr', draft.nameFr)
-      body.set('descriptionEn', draft.descriptionEn)
-      body.set('descriptionFr', draft.descriptionFr)
-      body.set('providerMetadata', JSON.stringify(draft.providerMetadata))
-      try {
-        const upload = await fetch(getClientRequestUrl(`/api/attachments/fundingcaseintake/${createdId}`), {
-          method: 'POST', body
-        })
-        if (!upload.ok) await throwFetchResponseError(upload)
-      } catch (error) {
-        uploadError = error
-        break
-      }
-    }
-    modalOpen.value = false
-    await refresh()
-    await navigateTo(localePath({ ...appRouteLocations.fundingCaseIntakeDetail(createdId), query: { tab: 'attachments' } }))
-    if (uploadError) {
-      toast.add({ title: t('funding_case_intake.attachment_upload_failed'), color: 'error' })
-    }
-  } catch (error: unknown) {
-    if (createdId) {
-      modalOpen.value = false
-      await navigateTo(localePath({ ...appRouteLocations.fundingCaseIntakeDetail(createdId), query: { tab: 'attachments' } }))
-    }
-    showError(error)
-  } finally {
-    pending.value = false
-  }
-}
 </script>
 
 <template>
@@ -122,26 +24,7 @@ const submit = async () => {
     </template>
     <template #body>
       <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-inbox" :title="t('funding_case_intake.title')" :description="t('funding_case_intake.description')" />
-      <CommonResourceLayoutPage v-model:search="search" v-model:pagination="pagination" :data="items" :columns="columns" :total-records="totalRecords" :request-status="status" :show-button="canCreate" :button-label="t('funding_case_intake.create')" @add="openCreate" @retry="retry">
-        <template #egcs_fi_applicationid-cell="{ row }">
-          <UButton variant="link" :label="String(row.original.egcs_fi_applicationid)" :to="localePath(appRouteLocations.fundingCaseIntakeDetail(String(row.original.id)))" />
-        </template>
-        <template #opportunity-cell="{ row }">
-          {{ getBilingualValue(row.original, 'opportunity_name', row.original.egcs_fi_fundingopportunity) }}
-        </template>
-        <template #proponent-cell="{ row }">
-          {{ getBilingualValue(row.original, 'proponent_name', row.original.egcs_fi_applicantrecipient) }}
-        </template>
-        <template #status-cell="{ row }">
-          <CommonStatusBadge :status-id="row.original.egcs_fi_status" />
-        </template>
-        <template #actions-cell="{ row }">
-          <div class="flex justify-end gap-2">
-            <UButton icon="i-lucide-arrow-right" color="neutral" variant="ghost" :aria-label="t('funding_case_intake.view_details')" :to="localePath(appRouteLocations.fundingCaseIntakeDetail(String(row.original.id)))" />
-          </div>
-        </template>
-      </CommonResourceLayoutPage>
-      <FundingCaseIntakeModal v-model:open="modalOpen" v-model:state="form" :pending="pending" @submit="submit" />
+      <FundingCaseIntakeApplicationsTable :can-create="canCreate" />
     </template>
   </UDashboardPanel>
 </template>

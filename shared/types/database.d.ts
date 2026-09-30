@@ -1394,7 +1394,7 @@ export interface FundingOpportunityAttachmentTypeTable {
 
 export interface FundingCaseIntakeProfileTable {
   id: Generated<string>
-  egcs_fi_applicationid: string
+  egcs_fi_applicationid: string | null
   egcs_fi_application: Record<string, JsonValue>
   egcs_fi_fundingopportunity: string
   egcs_fi_applicantrecipient: string
@@ -1402,7 +1402,7 @@ export interface FundingCaseIntakeProfileTable {
   egcs_fi_group: Generated<string | null>
   egcs_fi_groupclaimedby: Generated<string | null>
   egcs_fi_sourcesystem: Generated<string | null>
-  egcs_fi_sourcesubmissionid: Generated<string | null>
+  egcs_fi_externalsourceid: Generated<string | null>
   egcs_fi_sourceexport: Generated<Record<string, JsonValue> | null>
   _deleted: Generated<boolean>
 }

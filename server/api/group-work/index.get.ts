@@ -113,7 +113,7 @@ export default defineEventHandler(async event => {
         UNION ALL
         SELECT 'intake', intake.id, NULL, 'fundingcaseintake', intake.id, NULL,
           intake.egcs_fi_group, intake.egcs_fi_groupclaimedby,
-          intake.egcs_fi_applicationid::text, intake.egcs_fi_applicationid::text
+          intake.id::text, intake.id::text
         FROM "Funding_Case_Intake_Profile" intake
         JOIN "Common_Status" status ON status.id = intake.egcs_fi_status AND status._deleted = false
         WHERE intake._deleted = false AND intake.egcs_fi_group IS NOT NULL

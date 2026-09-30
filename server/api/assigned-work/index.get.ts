@@ -113,8 +113,8 @@ export default defineEventHandler(async event => {
       WHERE profile._deleted = false
       UNION ALL
       SELECT intake.id, 'fundingcaseintake', intake.egcs_fi_status::text,
-        'Application #' || intake.egcs_fi_applicationid::text,
-        'Demande no ' || intake.egcs_fi_applicationid::text,
+        'Application #' || intake.id::text,
+        'Demande no ' || intake.id::text,
         NULL::bigint, NULL::text, 'funding_case', program.egcs_tp_agency, program.id
       FROM "Funding_Case_Intake_Profile" intake
       JOIN "Funding_Opportunity_Profile" opportunity ON opportunity.id = intake.egcs_fi_fundingopportunity AND opportunity._deleted = false

@@ -1,12 +1,14 @@
 import { requireAuthContext } from '~~/server/utils/authorize'
-import { PaginationSchema } from '~~/shared/types/schemas'
+import { PaginationSchema, PositivePostgresBigintIdSchema } from '~~/shared/types/schemas'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { sql } from 'kysely'
 
+const querySchema = PaginationSchema.extend({ egcs_fi_fundingopportunity: PositivePostgresBigintIdSchema.optional() })
+
 export default defineEventHandler(async event => {
   const auth = await requireAuthContext(event)
-  const { page, limit, search } = await getValidatedQueryI18n(event, PaginationSchema)
+  const { page, limit, search, egcs_fi_fundingopportunity: opportunityId } = await getValidatedQueryI18n(event, querySchema)
   const readGrants = auth.userAbilities.getGrants()
     .filter(grant => grant.subject === 'funding_case' && grant.action === 'read')
   if (readGrants.length === 0) {
@@ -34,13 +36,18 @@ export default defineEventHandler(async event => {
       ]))
     ]))
   }
+  if (opportunityId) query = query.where('Funding_Case_Intake_Profile.egcs_fi_fundingopportunity', '=', String(opportunityId))
   if (search) {
-    query = query.where(sql<string>`CAST(${sql.ref('Funding_Case_Intake_Profile.egcs_fi_applicationid')} AS TEXT)`,
-      'like', `%${escapeLikePattern(search)}%`)
+    const pattern = `%${escapeLikePattern(search)}%`
+    query = query.where(eb => eb.or([
+      eb(sql<string>`CAST(${sql.ref('Funding_Case_Intake_Profile.id')} AS TEXT)`, 'like', pattern),
+      eb(sql<string>`CAST(${sql.ref('Funding_Case_Intake_Profile.egcs_fi_applicationid')} AS TEXT)`, 'like', pattern),
+      eb('Funding_Case_Intake_Profile.egcs_fi_externalsourceid', 'ilike', pattern)
+    ]))
   }
   const [items, countResult] = await Promise.all([
     query.select([
-      'Funding_Case_Intake_Profile.id', 'egcs_fi_applicationid', 'egcs_fi_fundingopportunity',
+      'Funding_Case_Intake_Profile.id', 'egcs_fi_applicationid', 'egcs_fi_externalsourceid', 'egcs_fi_fundingopportunity',
       'egcs_fi_applicantrecipient', 'egcs_fi_status',
       'Funding_Opportunity_Profile.egcs_fo_name_en as opportunity_name_en',
       'Funding_Opportunity_Profile.egcs_fo_name_fr as opportunity_name_fr',

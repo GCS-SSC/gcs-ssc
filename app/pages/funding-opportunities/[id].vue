@@ -36,6 +36,7 @@ const selectedTab = ref('general')
 const { tabs: extensionTabs, getExtensionTabItem } = useExtensionEntityTabs({ target: 'opportunity', opportunityId: id })
 const tabs = computed(() => [
   { key: 'agency.tabs.general', value: 'general', icon: 'i-lucide-info' },
+  { key: 'funding_opportunity.applications', value: 'applications', icon: 'i-lucide-inbox' },
   { key: 'workflow.title', value: 'workflows', icon: 'i-lucide-workflow' },
   { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-clipboard-check' },
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
@@ -152,7 +153,7 @@ const breadcrumbs = computed(() => [
         </template>
       </UAlert>
       <div v-else-if="profile" class="flex flex-1 flex-col">
-        <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-megaphone" :title="getBilingualValue(profile, 'egcs_fo_name', id)" :description="getBilingualValue(profile, 'egcs_fo_objective', '')" :badges="[{ statusId: String(profile.egcs_fo_status) }]" :actions="[{ label: t('funding_case_intake.create'), icon: 'i-lucide-plus', visible: canCreateIntake, to: localePath({ ...appRouteLocations.fundingCaseIntakes(), query: { opportunity_id: id } }) }, { label: t('common.edit'), icon: 'i-lucide-edit-3', visible: canEdit, onClick: edit }, { label: t('common.delete'), icon: 'i-lucide-trash', visible: canDelete, onClick: remove }]" />
+        <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-megaphone" :title="getBilingualValue(profile, 'egcs_fo_name', id)" :description="getBilingualValue(profile, 'egcs_fo_objective', '')" :badges="[{ statusId: String(profile.egcs_fo_status) }]" :actions="[{ label: t('common.edit'), icon: 'i-lucide-edit-3', visible: canEdit, onClick: edit }, { label: t('common.delete'), icon: 'i-lucide-trash', visible: canDelete, onClick: remove }]" />
         <CommonEntityEditorWorkspace content-test-id="funding-opportunity-detail-content">
           <template #sidebar>
             <CommonRouteTabs v-model="selectedTab" :items="tabs" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
@@ -210,6 +211,17 @@ const breadcrumbs = computed(() => [
               </div>
             </dl>
           </CommonSection>
+          <div v-else-if="selectedTab === 'applications'" class="space-y-5">
+            <div>
+              <h3 class="text-xl font-semibold text-highlighted">
+                {{ t('funding_opportunity.applications') }}
+              </h3>
+              <p class="mt-1 text-sm text-muted">
+                {{ t('funding_opportunity.applications_description') }}
+              </p>
+            </div>
+            <FundingCaseIntakeApplicationsTable :opportunity-id="id" :can-create="canCreateIntake" />
+          </div>
           <FundingOpportunitySetupRelationshipsTab v-else-if="selectedTab === 'workflows'" :opportunity-id="id" :stream-ids="profile.egcs_fo_transferpaymentstreams" :linked-setups="profile.workflow_setups" kind="workflow" :can-edit="canEdit" @refresh="refresh" />
           <FundingOpportunitySetupRelationshipsTab v-else-if="selectedTab === 'reviews'" :opportunity-id="id" :stream-ids="profile.egcs_fo_transferpaymentstreams" :linked-setups="profile.review_setups" kind="review" :can-edit="canEdit" @refresh="refresh" />
           <FundingOpportunityAttachmentTypesTab v-else-if="selectedTab === 'attachments'" :opportunity-id="id" :attachment-types="profile.egcs_fo_attachmenttypes" :can-edit="canEdit" @updated="refresh" />

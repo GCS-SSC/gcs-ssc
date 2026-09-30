@@ -1,5 +1,8 @@
 {
   "funding_opportunity": {
+    "applications": "Demandes",
+    "add_application": "Ajouter une demande",
+    "applications_description": "Consultez et enregistrez les demandes pour cette possibilité de financement.",
     "title": "Possibilités de financement",
     "description": "Gérer les périodes de réception et les examens et flux de travail offerts pour chaque possibilité.",
     "create": "Ajouter une possibilité",
@@ -40,6 +43,7 @@
     "internal_only_help": "Offert aux réceptions dans GCS-SSC et exclu du portail."
   },
   "funding_case_intake": {
+    "external_source_id": "Identifiant de la source externe",
     "title": "Réceptions",
     "singular": "Réception",
     "description": "Saisir les demandes et coordonner les examens et les flux de travail des dossiers attribués.",
@@ -3715,5 +3719,41 @@
     "program_only": "Calculé uniquement sur le financement du programme",
     "preview": "Financement du programme calculé : {amount}",
     "percent_symbol": " %"
+  },
+  "submitted_application": {
+    "menu": "Demande",
+    "title": "Demande soumise",
+    "description": "Description",
+    "read_only": "Lecture seule",
+    "submitted_at": "Soumise le",
+    "empty_title": "Aucune demande soumise pour le moment",
+    "empty_description": "La demande apparaîtra ici dès la réception d’une soumission.",
+    "form": "Formulaire",
+    "entry": "Entrée",
+    "additional_answers": "Réponses supplémentaires",
+    "answers": "Réponses soumises",
+    "none": "Aucune valeur fournie",
+    "yes": "Oui",
+    "no": "Non",
+    "fiscal_year": "Exercice financier",
+    "cost_item": "Poste de coût",
+    "subsection": "Sous-section",
+    "currency": "Devise",
+    "total_cost": "Coût total",
+    "program_funding": "Financement du programme",
+    "percentage": "Pourcentage",
+    "other_funding": "Autre financement",
+    "funding_source": "Source de financement",
+    "amount": "Montant",
+    "name": "Nom",
+    "expected_results": "Résultats attendus",
+    "start_date": "Date de début",
+    "end_date": "Date de fin",
+    "outcomes": "Résultats",
+    "responsible_parties": "Parties responsables",
+    "intro": "Consultez les réponses et le contenu du formulaire enregistrés lors de la soumission de cette demande.",
+    "budget_summary": "Sommaire du budget",
+    "sections": "Sections de la demande",
+    "no_answers": "Aucune réponse n’a été fournie pour ce formulaire."
   }
 }

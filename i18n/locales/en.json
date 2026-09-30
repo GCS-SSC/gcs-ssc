@@ -1,5 +1,8 @@
 {
   "funding_opportunity": {
+    "applications": "Applications",
+    "add_application": "Add application",
+    "applications_description": "View and record applications for this funding opportunity.",
     "title": "Funding opportunities",
     "description": "Manage intake windows and the reviews and workflows available to each opportunity.",
     "create": "Add opportunity",
@@ -40,6 +43,7 @@
     "internal_only_help": "Available to Intakes in GCS-SSC and excluded from the portal."
   },
   "funding_case_intake": {
+    "external_source_id": "External source ID",
     "title": "Intakes",
     "singular": "Intake",
     "description": "Capture applications and coordinate assigned case reviews and workflows.",
@@ -3715,5 +3719,41 @@
     "program_only": "Based on program funding only",
     "preview": "Calculated program funding: {amount}",
     "percent_symbol": " %"
+  },
+  "submitted_application": {
+    "menu": "Application",
+    "title": "Submitted application",
+    "description": "Description",
+    "read_only": "Read only",
+    "submitted_at": "Submitted",
+    "empty_title": "No submitted application yet",
+    "empty_description": "The application will appear here once a submission has been received.",
+    "form": "Form",
+    "entry": "Entry",
+    "additional_answers": "Additional answers",
+    "answers": "Submitted answers",
+    "none": "None provided",
+    "yes": "Yes",
+    "no": "No",
+    "fiscal_year": "Fiscal year",
+    "cost_item": "Cost item",
+    "subsection": "Subsection",
+    "currency": "Currency",
+    "total_cost": "Total cost",
+    "program_funding": "Program funding",
+    "percentage": "Percentage",
+    "other_funding": "Other funding",
+    "funding_source": "Funding source",
+    "amount": "Amount",
+    "name": "Name",
+    "expected_results": "Expected results",
+    "start_date": "Start date",
+    "end_date": "End date",
+    "outcomes": "Outcomes",
+    "responsible_parties": "Responsible parties",
+    "intro": "Review the answers and form content saved when this application was submitted.",
+    "budget_summary": "Budget summary",
+    "sections": "Application sections",
+    "no_answers": "No answers were provided for this form."
   }
 }

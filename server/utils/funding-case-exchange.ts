@@ -93,13 +93,13 @@ const createFundingCaseIntakeEvidence = async (
   if (intakeId) {
     const byId = await trx.selectFrom('Funding_Case_Intake_Profile')
       .select(['id', 'egcs_fi_applicationid', 'egcs_fi_fundingopportunity', 'egcs_fi_applicantrecipient',
-        'egcs_fi_sourcesystem', 'egcs_fi_sourcesubmissionid', 'egcs_fi_sourceexport', '_deleted'])
+        'egcs_fi_sourcesystem', 'egcs_fi_externalsourceid', 'egcs_fi_sourceexport', '_deleted'])
       .where('id', '=', intakeId).forUpdate().executeTakeFirst()
     if (!byId || byId._deleted || String(byId.egcs_fi_applicationid) !== applicationId
       || String(byId.egcs_fi_fundingopportunity) !== opportunityId
       || String(byId.egcs_fi_applicantrecipient) !== applicantRecipientId
       || byId.egcs_fi_sourcesystem !== input.sourceSystem
-      || byId.egcs_fi_sourcesubmissionid !== input.sourceSubmissionId
+      || byId.egcs_fi_externalsourceid !== input.sourceSubmissionId
       || !isDeepStrictEqual(byId.egcs_fi_sourceexport, input.sourceExport)) {
       return { status: 'intake_id_conflict' }
     }
@@ -113,7 +113,7 @@ const createFundingCaseIntakeEvidence = async (
     .select(['id', 'egcs_fi_applicationid', 'egcs_fi_fundingopportunity', 'egcs_fi_applicantrecipient',
       'egcs_fi_sourceexport', '_deleted'])
     .where('egcs_fi_sourcesystem', '=', input.sourceSystem)
-    .where('egcs_fi_sourcesubmissionid', '=', input.sourceSubmissionId)
+    .where('egcs_fi_externalsourceid', '=', input.sourceSubmissionId)
     .forUpdate().executeTakeFirst()
   if (existing) {
     if (existing._deleted || String(existing.egcs_fi_applicationid) !== applicationId
@@ -166,7 +166,7 @@ const createFundingCaseIntakeEvidence = async (
     egcs_fi_status: draftStatusId,
     egcs_fi_group: groupId,
     egcs_fi_sourcesystem: input.sourceSystem,
-    egcs_fi_sourcesubmissionid: input.sourceSubmissionId,
+    egcs_fi_externalsourceid: input.sourceSubmissionId,
     egcs_fi_sourceexport: input.sourceExport as Record<string, JsonValue>
   }).returning('id').executeTakeFirstOrThrow()
   return { status: 'created', intakeId: String(intake.id), draftStatusId }
