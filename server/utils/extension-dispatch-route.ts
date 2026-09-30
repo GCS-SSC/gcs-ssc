@@ -40,8 +40,7 @@ import {
 import { createAgreementClaimAggregate } from '~~/server/utils/agreement-claim'
 import {
   createExternalFundingCaseIntake,
-  projectFundingOpportunityForPortal,
-  type ExternalFundingCaseIntakeInput
+  projectFundingOpportunityForPortal
 } from '~~/server/utils/funding-case-exchange'
 import { createAgreementForecastAggregate } from '~~/server/utils/agreement-forecast-import'
 import { resolveAssignmentCommonUserId } from '~~/server/utils/entity-assignment'
@@ -296,10 +295,7 @@ const createExtensionWriteAuthorization = (
     streamId: 'stream' in rbac ? resolvedHandler.params[rbac.stream.param] : undefined
   }
 
-  const writeAuthorization: GcsExtensionWriteAuthorization & {
-    createFundingCaseIntake: (db: unknown, input: ExternalFundingCaseIntakeInput) => ReturnType<typeof createExternalFundingCaseIntake>
-    projectFundingOpportunity: (db: unknown, opportunityId: string) => ReturnType<typeof projectFundingOpportunityForPortal>
-  } = {
+  const writeAuthorization: GcsExtensionWriteAuthorization = {
     lockAuthState: async (rawDb: unknown): Promise<void> => {
       const db = rawDb as Kysely<Database>
       lockedAuthContext = await requireFreshAuthContext(event, db)

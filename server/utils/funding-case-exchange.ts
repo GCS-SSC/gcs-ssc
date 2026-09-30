@@ -15,7 +15,7 @@ import { getFundingOpportunityStatus, isFundingOpportunityIntakeEligible } from 
 const object = z.record(z.string(), z.json())
 const sourceText = (max: number) => z.string().trim().min(1).max(max)
 
-/** Host-owned input for a later SDK import operation. IDs remain exact decimal strings. */
+/** Host-owned input for the public SDK application import operation. IDs remain exact decimal strings. */
 export const ExternalFundingCaseIntakeInputSchema = z.object({
   intakeId: PositivePostgresBigintIdSchema.optional(),
   opportunityId: PositivePostgresBigintIdSchema,
@@ -39,9 +39,26 @@ const denied = (): never => {
     data: { code: 'FUNDING_CASE_EXCHANGE_FORBIDDEN' } })
 }
 
-/** Creates a group-queued Intake inside an already authorized transaction. */
+/** Creates a group-queued Intake with the staff actor's current domain permissions. */
 export const createExternalFundingCaseIntake = async (
   trx: Transaction<Database>, auth: AuthContext, rawInput: ExternalFundingCaseIntakeInput,
+  routeScope: { agencyId?: string; streamId?: string }
+): Promise<ExternalFundingCaseIntakeResult> => await createFundingCaseIntakeEvidence(
+  trx, { kind: 'actor', auth }, rawInput, routeScope
+)
+
+/** Creates a group-only Intake for an enabled, explicitly authorized Agency service. */
+export const createScheduledFundingCaseIntake = async (
+  trx: Transaction<Database>, agencyId: string, rawInput: ExternalFundingCaseIntakeInput
+): Promise<ExternalFundingCaseIntakeResult> => await createFundingCaseIntakeEvidence(
+  trx, { kind: 'agency_service', agencyId }, rawInput, { agencyId }
+)
+
+/** Shares immutable evidence and lifecycle enforcement between staff and Agency service imports. */
+const createFundingCaseIntakeEvidence = async (
+  trx: Transaction<Database>,
+  authority: { kind: 'actor'; auth: AuthContext } | { kind: 'agency_service'; agencyId: string },
+  rawInput: ExternalFundingCaseIntakeInput,
   routeScope: { agencyId?: string; streamId?: string }
 ): Promise<ExternalFundingCaseIntakeResult> => {
   const input = ExternalFundingCaseIntakeInputSchema.parse(rawInput)
@@ -55,7 +72,7 @@ export const createExternalFundingCaseIntake = async (
     || (routeScope.streamId && !scope.streamIds.includes(routeScope.streamId))) {
     return { status: 'opportunity_unavailable' }
   }
-  if (!auth.userAbilities.authorize('funding_case', 'create', scope.scope)) denied()
+  if (authority.kind === 'actor' && !authority.auth.userAbilities.authorize('funding_case', 'create', scope.scope)) denied()
   const opportunity = await trx.selectFrom('Funding_Opportunity_Profile')
     .select('egcs_fo_status')
     .select(sql<boolean>`CURRENT_DATE BETWEEN egcs_fo_datestart AND egcs_fo_dateend`.as('in_window'))
@@ -69,7 +86,7 @@ export const createExternalFundingCaseIntake = async (
     || (routeScope.streamId && !lockedScope.streamIds.includes(routeScope.streamId))) {
     return { status: 'opportunity_unavailable' }
   }
-  if (!auth.userAbilities.authorize('funding_case', 'create', lockedScope.scope)) denied()
+  if (authority.kind === 'actor' && !authority.auth.userAbilities.authorize('funding_case', 'create', lockedScope.scope)) denied()
 
   // Once the portal has the host ID, it is authoritative for retries. Never create
   // a new Intake in response to a stale or incorrectly paired receipt.
@@ -111,9 +128,21 @@ export const createExternalFundingCaseIntake = async (
   if (!isFundingOpportunityIntakeEligible(opportunityStatus) || !opportunity.in_window) {
     return { status: 'opportunity_unavailable' }
   }
-  const recipient = await trx.selectFrom('Applicant_Recipient_Profile').select('id')
+  const recipient = await trx.selectFrom('Applicant_Recipient_Profile').select(['id', 'egcs_ar_leadagency', 'egcs_ar_active'])
     .where('id', '=', applicantRecipientId).where('_deleted', '=', false).forShare().executeTakeFirst()
-  if (!recipient || !await canAccessApplicantRecipient(auth, applicantRecipientId, 'read', trx)) {
+  const recipientVisible = authority.kind === 'actor'
+    ? await canAccessApplicantRecipient(authority.auth, applicantRecipientId, 'read', trx)
+    : Boolean(recipient?.egcs_ar_active && (String(recipient.egcs_ar_leadagency) === authority.agencyId
+      || await trx.selectFrom('Funding_Case_Agreement_Applicant_Recipient as link')
+        .innerJoin('Funding_Case_Agreement_Profile as agreement', 'agreement.id', 'link.egcs_fc_fundingagreement')
+        .innerJoin('Transfer_Payment_Stream as stream', 'stream.id', 'agreement.egcs_fc_transferpaymentstream')
+        .innerJoin('Transfer_Payment_Profile as program', 'program.id', 'stream.egcs_tp_transferpaymentprofile')
+        .select('link.id').where('link.egcs_fc_applicantrecipient', '=', applicantRecipientId)
+        .where('program.egcs_tp_agency', '=', authority.agencyId)
+        .where('link._deleted', '=', false).where('agreement._deleted', '=', false)
+        .where('stream._deleted', '=', false).where('program._deleted', '=', false)
+        .forShare(['link', 'agreement', 'stream', 'program']).executeTakeFirst()))
+  if (!recipient || !recipientVisible) {
     return { status: 'recipient_unavailable' }
   }
   const occupied = await trx.selectFrom('Funding_Case_Intake_Profile').select('id')

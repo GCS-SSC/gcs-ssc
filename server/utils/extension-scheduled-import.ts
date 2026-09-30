@@ -9,6 +9,7 @@ import { lockBusinessStatus } from './business-status-runtime'
 import { hasActiveAgreementCloseoutWorkflow } from './agreement-closeout'
 import { createAgreementClaimAggregate } from './agreement-claim'
 import { createAgreementForecastAggregate } from './agreement-forecast-import'
+import { createScheduledFundingCaseIntake, ExternalFundingCaseIntakeInputSchema } from './funding-case-exchange'
 
 /**
  * Rechecks the current Agreement's primary assignee inside the import transaction.
@@ -33,7 +34,7 @@ const primaryAssignee = async (trx: Transaction<Database>, agreementId: string):
 }
 
 /**
- * Service writes are agency-scoped and may only create drafts on open Agreements.
+ * Service writes create Agency-scoped Drafts on eligible Agreements or Opportunities.
  * @param extensionKey - Enabled extension requesting the import.
  * @param agencyId - Configured Agency.
  * @returns Transaction-scoped host write authorization.
@@ -46,8 +47,9 @@ export const createScheduledExtensionWriteAuthorization = (
     const trx = rawDb as Transaction<Database>
     if (!trx?.isTransaction || lockedDb !== trx) throw new Error('Scheduled portal import lost its authorized transaction.')
     const extension = await requireRegisteredExtension(extensionKey)
-    if (!extension.requiredHostCapabilities.includes('scheduled-agreement-import'))
-      throw new Error('This extension has not declared scheduled Agreement import access.')
+    if (!extension.requiredHostCapabilities.includes('scheduled-agreement-import')
+      && !extension.requiredHostCapabilities.includes('scheduled-intake-import'))
+      throw new Error('This extension has not declared scheduled import access.')
     const agency = await trx.selectFrom('Agency_Profile').select('id')
       .where('id', '=', agencyId).where('_deleted', '=', false).forUpdate().executeTakeFirst()
     if (!agency || !await isExtensionEnabledForAgency(trx, extensionKey, agencyId))
@@ -57,6 +59,9 @@ export const createScheduledExtensionWriteAuthorization = (
   const lockAgreement = async (rawDb: unknown, agreementId: string, streamId: string,
     recipientId?: string) => {
     const trx = await requireCurrent(rawDb)
+    const extension = await requireRegisteredExtension(extensionKey)
+    if (!extension.requiredHostCapabilities.includes('scheduled-agreement-import'))
+      throw new Error('This extension has not declared scheduled Agreement import access.')
     if (!(await lockTransferPaymentStreams(trx, [streamId])).has(streamId))
       throw new Error('The Agreement stream is unavailable.')
     const agreement = await trx.selectFrom('Funding_Case_Agreement_Profile')
@@ -92,6 +97,13 @@ export const createScheduledExtensionWriteAuthorization = (
     },
     authorizeCurrentEntity: async (rawDb) => { await requireCurrent(rawDb) },
     authorizeCurrentScope: async (rawDb) => { await requireCurrent(rawDb) },
+    createFundingCaseIntake: async (rawDb, rawInput) => {
+      const trx = await requireCurrent(rawDb)
+      const extension = await requireRegisteredExtension(extensionKey)
+      if (!extension.requiredHostCapabilities.includes('scheduled-intake-import'))
+        throw new Error('This extension has not declared scheduled Intake import access.')
+      return createScheduledFundingCaseIntake(trx, agencyId, ExternalFundingCaseIntakeInputSchema.parse(rawInput))
+    },
     createAgreementClaim: async (rawDb, input) => {
       if (!input.applicantRecipientId) throw new Error('Scheduled Claim import requires a verified recipient.')
       const { trx, assigneeId } = await lockAgreement(rawDb, input.agreementId, input.streamId,
