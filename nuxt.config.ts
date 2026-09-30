@@ -53,6 +53,9 @@ export default defineNuxtConfig({
   },
 
   vite: {
+    // The extension's locally vendored ESM provider changes with its source checkout.
+    // Serve its exports directly instead of retaining an obsolete dependency bundle.
+    optimizeDeps: { exclude: ['@gcs-ssc/survey', '@gcs-ssc/survey/vue', '@gcs-ssc/survey/client'] },
     define: {
       'import.meta.env.VITE_GCS_DEMO': JSON.stringify(process.env.VITE_GCS_DEMO === 'true' ? 'true' : 'false')
     }
@@ -68,6 +71,8 @@ export default defineNuxtConfig({
      */
     'prepare:types': ({ tsConfig, nodeTsConfig, sharedTsConfig }) => {
       for (const config of [tsConfig, nodeTsConfig, sharedTsConfig]) {
+        config.compilerOptions ??= {}
+        config.compilerOptions.allowImportingTsExtensions = true
         config.exclude ??= []
         config.exclude.push('../server/database/migrations/0240_seed.ts')
       }
