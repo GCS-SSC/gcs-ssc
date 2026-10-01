@@ -221,6 +221,17 @@ export const waitForDevChildExit = async (
 }
 
 /**
+ * Resolves local extension fixture settings while preserving explicit overrides.
+ * @param env Parent process environment.
+ * @returns Extension environment passed to the development server.
+ */
+export const resolveDevExtensionEnvironment = (env: NodeJS.ProcessEnv): Record<string, string> => ({
+  GCS_PORTAL_DEMO_SEED: env.GCS_PORTAL_DEMO_SEED ?? '1',
+  GCS_EXTENSION_SECRETS_KEY: env.GCS_EXTENSION_SECRETS_KEY
+    ?? 'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY='
+})
+
+/**
  * Main entry point for the dev script.
  */
 const main = async (): Promise<void> => {
@@ -243,6 +254,7 @@ const main = async (): Promise<void> => {
     cwd: process.cwd(),
     env: {
       ...process.env,
+      ...resolveDevExtensionEnvironment(process.env),
       NUXT_DISABLE_SOURCEMAPS: resolveDevSourceMapSetting(process.env.NUXT_DISABLE_SOURCEMAPS),
       BETTER_AUTH_URL: authUrl,
       BETTER_AUTH_BASE_URL: authUrl,

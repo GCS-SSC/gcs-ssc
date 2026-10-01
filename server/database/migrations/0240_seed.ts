@@ -6610,6 +6610,15 @@ const seedDatabase = async (db: Kysely<Database>): Promise<void> => {
     _deleted: false
   }))).execute()
 
+  if (process.env.GCS_PORTAL_DEMO_SEED === '1' && process.env.NODE_ENV !== 'production') {
+    const healthCanada = agencies.find(agency => agency.nameEn === 'Health Canada')
+    if (!healthCanada) throw new Error('The local Portal demo requires the seeded Health Canada Agency')
+    await db.insertInto('extensions.agency_enablement').values({
+      extension_key: 'gcs-ssc-portal-connector', agency_id: healthCanada.id, enabled: true,
+      config: { portalProponentVerificationAccess: 'contributor' }, _deleted: false
+    }).execute()
+  }
+
   const roles = buildRoleSeeds(agencies)
   const roleIds = await seedRoles(db, roles)
 
