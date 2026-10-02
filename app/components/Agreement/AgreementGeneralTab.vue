@@ -69,6 +69,7 @@ const displayValue = (value: string | number | boolean | null | undefined) => {
       <CommonValueCard :label="t('agreement.stream')" :value="getBilingualValue(profile, 'stream_name', '-')" />
       <CommonValueCard :label="t('agreement.agreement_subtype')" :value="getBilingualValue(profile, 'agreement_subtype_name', '-')" />
       <CommonValueCard :label="t('agreement.agreement_number')" :value="displayValue(profile.egcs_fc_agreementnumber)" />
+      <CommonValueCard :label="t('common.currency')" :value="profile.egcs_fc_currency.toUpperCase()" />
       <CommonValueCard :label="t('agreement.financial_system_number')" :value="displayValue(profile.egcs_fc_financialsystemnumber)" />
       <CommonValueCard :label="t('agreement.further_distribution')" :value="displayValue(profile.egcs_fc_furtherdistribution)" />
       <CommonValueCard :label="t('agreement.authorized_assistance_start_date')" :value="formatDate(agreementCalendarDate(profile.egcs_fc_authorizedassistancestartdate))" />

@@ -1,3 +1,4 @@
+import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { sql } from 'kysely'
 import { z } from 'zod'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
@@ -34,6 +35,8 @@ export default defineEventHandler(async event => {
     return await notFound(event, 'AGREEMENT_PAYMENT_NOT_FOUND', 'apiErrors.agreement.payment_not_found')
   }
 
+  await assertAgreementCurrency(event, db, agreementId, payment.egcs_fc_currency)
+
   if (!payment.egcs_fc_fundingagreementcommitment || !payment.egcs_fc_fiscalyear) {
     return await badRequest(event, 'AGREEMENT_PAYMENT_INVALID_CONTEXT', 'apiErrors.request.invalid')
   }
@@ -62,6 +65,7 @@ export default defineEventHandler(async event => {
     .where('Funding_Case_Agreement_Commitment_Line._deleted', '=', false)
     .where('Transfer_Payment_Stream_Chart_of_Account._deleted', '=', false)
     .where('Agency_Chart_of_Account._deleted', '=', false)
+    .where('Agency_Chart_of_Account.egcs_ay_currency', '=', payment.egcs_fc_currency)
     .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
     .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)
     .where('Funding_Case_Agreement_Budget_Version._deleted', '=', false)

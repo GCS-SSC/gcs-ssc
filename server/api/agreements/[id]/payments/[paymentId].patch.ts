@@ -47,7 +47,7 @@ export default defineEventHandler(async event => {
 
     await validateMergedFinancialPeriodPatch(event, editablePayment, patchValues)
 
-    const { response, nextCommitmentId } = await resolveAgreementPaymentPatchCommitmentId(event, trx, agreementId, patchValues)
+    const { response, nextCommitmentId } = await resolveAgreementPaymentPatchCommitmentId(event, trx, agreementId, patchValues, editablePayment.egcs_fc_currency)
     if (response) {
       return response
     }

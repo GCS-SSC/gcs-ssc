@@ -428,6 +428,10 @@ watch(selectedSubtype, value => {
           :placeholder="t('agreement.agreement_number_placeholder')" />
       </UFormField>
 
+      <UFormField :label="t('common.currency')" :name="field('egcs_fc_currency')" required>
+        <CommonEnumSelect v-model="model.egcs_fc_currency" name="currency_codes" :disabled="permissionAction === 'update'" />
+      </UFormField>
+
       <UFormField :label="t('agreement.financial_system_number')" :name="field('egcs_fc_financialsystemnumber')">
         <UInput
           v-model="model.egcs_fc_financialsystemnumber"

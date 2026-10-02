@@ -1,6 +1,7 @@
 /* eslint-disable jsdoc/require-param, jsdoc/require-returns -- Host-owned exact financial projection. */
 import { sql, type Kysely } from 'kysely'
-import type { Database } from '~~/shared/types/database'
+import type { Currency_Codes, Database } from '~~/shared/types/database'
+import { CURRENCY_CODES_ENUM } from '~~/shared/constants/enums'
 import { addMoney, parseMoney, sumMoney, type Money } from '~~/shared/utils/money'
 import { databaseMoneyText, parseDatabaseMoney } from './database-money'
 import { hasPositiveCompletionTerminus } from './completion-terminus'
@@ -10,9 +11,11 @@ import { hasAccountingTable, hasCorrectionSchema } from './correction-schema'
 const ZERO = parseMoney('0.00')
 
 /** Effective signed entries preserve exact-line attribution and owning Agency coding identity. */
-export const readEffectiveCorrectionAdjustments = async (db: Kysely<Database>, agreementId: string) => {
+export const readEffectiveCorrectionAdjustments = async (
+  db: Kysely<Database>, agreementId: string, options: { currency?: Currency_Codes } = {}
+) => {
   if (!await hasCorrectionSchema(db)) return []
-  const rows = await db.selectFrom('Funding_Case_Agreement_Correction_Adjustment as adjustment')
+  let query = db.selectFrom('Funding_Case_Agreement_Correction_Adjustment as adjustment')
     .innerJoin('Funding_Case_Agreement_Correction as correction', 'correction.id', 'adjustment.egcs_fc_correction')
     .innerJoin('Transfer_Payment_Stream_Chart_of_Account as coding', 'coding.id', 'adjustment.egcs_fc_chartofaccount')
     .select(['adjustment.egcs_fc_commitmentline as commitmentLineId', 'coding.egcs_tp_agencychartofaccount as agencyChartId',
@@ -22,7 +25,9 @@ export const readEffectiveCorrectionAdjustments = async (db: Kysely<Database>, a
     .where('correction.egcs_fc_fundingagreement', '=', agreementId)
     .where('adjustment.egcs_fc_fundingagreement', '=', agreementId)
     .where('correction.egcs_fc_outcome', '=', 'posted')
-    .where('correction._deleted', '=', false).where('adjustment._deleted', '=', false).execute()
+    .where('correction._deleted', '=', false).where('adjustment._deleted', '=', false)
+  if (options.currency) query = query.where('correction.egcs_fc_currency', '=', options.currency)
+  const rows = await query.execute()
   return rows.map(row => ({ ...row, amount: parseDatabaseMoney(row.amount) }))
 }
 
@@ -37,7 +42,7 @@ export const getAgreementAccountingLines = async (
     .innerJoin('Agency_Chart_of_Account as account', 'account.id', 'coding.egcs_tp_agencychartofaccount')
     .innerJoin('Agency_Fiscal_Year as year', 'year.id', 'account.egcs_ay_fiscalyear')
     .select(['line.id', 'line.egcs_fc_commitment', 'line.egcs_fc_commitmentlinenumber',
-      'coding.id as egcs_fc_chartofaccount', 'account.id as egcs_fc_agencychartofaccount',
+      'coding.id as egcs_fc_chartofaccount', 'account.id as egcs_fc_agencychartofaccount', 'commitment.egcs_fc_currency as currency',
       'account.egcs_ay_accountingdimensions as egcs_fc_accountingdimensions',
       'account.egcs_ay_fiscalyear as egcs_fc_agencyfiscalyear', 'year.egcs_ay_fiscalyeardisplay as egcs_fc_fiscalyeardisplay',
       'year.egcs_ay_fiscalyear as egcs_fc_fiscalyearorder',
@@ -47,7 +52,7 @@ export const getAgreementAccountingLines = async (
     .orderBy('line.id').execute()
   let paymentsQuery = db.selectFrom('Funding_Case_Agreement_Payment_Line as line')
     .innerJoin('Funding_Case_Agreement_Payment as payment', 'payment.id', 'line.egcs_fc_fundingagreementpayment')
-    .select(['payment.id as paymentId', 'line.egcs_fc_fundingagreementcommitmentline as commitmentLineId',
+    .select(['payment.id as paymentId', 'payment.egcs_fc_currency as currency', 'line.egcs_fc_fundingagreementcommitmentline as commitmentLineId',
       databaseMoneyText(sql.ref('line.egcs_fc_amount')).as('amount')])
     .where('payment.egcs_fc_fundingagreement', '=', agreementId)
     .where('payment._deleted', '=', false).where('line._deleted', '=', false)
@@ -59,7 +64,7 @@ export const getAgreementAccountingLines = async (
     .innerJoin('Funding_Case_Agreement_Journal_Voucher as voucher', 'voucher.id', 'line.egcs_fc_journalvoucher')
     .innerJoin('Funding_Case_Agreement_Payment as payment', 'payment.id', 'voucher.egcs_fc_payment')
     .innerJoin('Transfer_Payment_Stream_Chart_of_Account as coding', 'coding.id', 'line.egcs_fc_chartofaccount')
-    .select(['voucher.id as voucherId', 'voucher.egcs_fc_payment as paymentId',
+    .select(['voucher.id as voucherId', 'voucher.egcs_fc_currency as currency', 'voucher.egcs_fc_payment as paymentId',
       'line.egcs_fc_commitmentline as commitmentLineId', 'coding.egcs_tp_agencychartofaccount as agencyChartId',
       databaseMoneyText(sql.ref('line.egcs_fc_amount')).as('amount')])
     .where('voucher.egcs_fc_fundingagreement', '=', agreementId).where('line.egcs_fc_kind', '=', 'adjustment')
@@ -72,13 +77,13 @@ export const getAgreementAccountingLines = async (
   }
   const corrections = await readEffectiveCorrectionAdjustments(db, agreementId)
   return lines.map(line => {
-    const original = sumMoney(payments.filter(row => String(row.commitmentLineId) === String(line.id))
+    const original = sumMoney(payments.filter(row => row.currency === line.currency && String(row.commitmentLineId) === String(line.id))
       .map(row => parseDatabaseMoney(row.amount)))
     // JV incoming coding belongs to its shared pool; it is attributed to this exact line only for this same coding.
-    const jv = sumMoney(voucherRows.filter(row => successful.has(String(row.voucherId))
+    const jv = sumMoney(voucherRows.filter(row => row.currency === line.currency && successful.has(String(row.voucherId))
       && String(row.paymentId) !== options.excludePaymentId && String(row.commitmentLineId) === String(line.id)
       && String(row.agencyChartId) === String(line.egcs_fc_agencychartofaccount)).map(row => parseDatabaseMoney(row.amount)))
-    const prior = sumMoney(corrections.filter(row => String(row.commitmentLineId) === String(line.id)).map(row => row.amount))
+    const prior = sumMoney(corrections.filter(row => row.currency === line.currency && String(row.commitmentLineId) === String(line.id)).map(row => row.amount))
     return { ...line, egcs_fc_commitmentamount: parseDatabaseMoney(line.egcs_fc_commitmentamount),
       egcs_fc_originalpaid: original, egcs_fc_jveffect: jv, egcs_fc_priorcorrections: prior,
       egcs_fc_correctedpaid: sumMoney([original, jv, prior]) }
@@ -100,8 +105,10 @@ export const getAgreementAccountingCodingPools = async (db: Kysely<Database>, ag
     .innerJoin('Funding_Case_Agreement_Journal_Voucher as voucher', 'voucher.id', 'line.egcs_fc_journalvoucher')
     .innerJoin('Funding_Case_Agreement_Payment as payment', 'payment.id', 'voucher.egcs_fc_payment')
     .innerJoin('Transfer_Payment_Stream_Chart_of_Account as coding', 'coding.id', 'line.egcs_fc_chartofaccount')
+    .innerJoin('Agency_Chart_of_Account as account', 'account.id', 'coding.egcs_tp_agencychartofaccount')
     .select(['voucher.id', 'coding.egcs_tp_agencychartofaccount as codingId', databaseMoneyText(sql.ref('line.egcs_fc_amount')).as('amount')])
     .where('voucher.egcs_fc_fundingagreement', '=', agreementId).where('line.egcs_fc_kind', '=', 'adjustment')
+    .whereRef('account.egcs_ay_currency', '=', 'voucher.egcs_fc_currency')
     .where(agreementPaymentIsFinal('payment', { requireResolvedApproval: true }))
     .where('voucher._deleted', '=', false).where('line._deleted', '=', false).execute()
   for (const id of new Set(vouchers.map(row => String(row.id)))) {
@@ -117,8 +124,10 @@ export const getAgreementAccountingCodingPools = async (db: Kysely<Database>, ag
 /** Cash and signed accounting entries by Agency fiscal year and fiscal month, without paid floors. */
 export const getAgreementPaidAccountingProjection = async (
   db: Kysely<Database>, agreementId: string,
-  options: { excludePaymentId?: string; paymentMode?: 'reserved' | 'finalized' } = {}
+  options: { excludePaymentId?: string; paymentMode?: 'reserved' | 'finalized'; currency?: string } = {}
 ) => {
+  const currency = CURRENCY_CODES_ENUM.find(code => code === options.currency)
+  if (options.currency !== undefined && !currency) throw new Error('Accounting currency must be a supported lowercase code')
   let paymentsQuery = db.selectFrom('Funding_Case_Agreement_Payment as payment')
     .innerJoin('Funding_Case_Agreement_Budget_Fiscal_Year as budgetYear', 'budgetYear.id', 'payment.egcs_fc_fiscalyear')
     .innerJoin('Agency_Fiscal_Year as agencyYear', 'agencyYear.id', 'budgetYear.egcs_fc_fiscalyear')
@@ -131,6 +140,7 @@ export const getAgreementPaidAccountingProjection = async (
     .where('payment._deleted', '=', false)
     .where(agreementPaymentApprovalIsEligible('payment'))
   if (options.excludePaymentId) paymentsQuery = paymentsQuery.where('payment.id', '!=', options.excludePaymentId)
+  if (currency) paymentsQuery = paymentsQuery.where('payment.egcs_fc_currency', '=', currency)
   if (options.paymentMode === 'finalized') paymentsQuery = paymentsQuery.where(agreementPaymentIsFinal('payment', { requireResolvedApproval: true }))
   else paymentsQuery = paymentsQuery.where(sql<boolean>`NOT EXISTS (
     SELECT 1 FROM "Common_Completion" completion
@@ -153,7 +163,7 @@ export const getAgreementPaidAccountingProjection = async (
     month: number; currency: Database['Funding_Case_Agreement_Payment']['egcs_fc_currency']; amount: Money }> = payments.map(row => ({
     ...row, id: String(row.id), kind: 'cash_payment', amount: parseDatabaseMoney(row.amount),
     agencyFiscalYearId: String(row.agencyFiscalYearId), fiscalYearOrder: String(row.fiscalYearOrder), fiscalYearId: String(row.fiscalYearId) }))
-  for (const row of await readEffectiveCorrectionAdjustments(db, agreementId)) {
+  for (const row of await readEffectiveCorrectionAdjustments(db, agreementId, { currency })) {
     const year = years.find(candidate => String(candidate.agencyFiscalYearId) === String(row.agencyFiscalYearId))
     if (!year) throw new Error('Posted Correction fiscal year has no owning Agreement lineage')
     const date = new Date(row.accountingDate)
@@ -162,14 +172,16 @@ export const getAgreementPaidAccountingProjection = async (
       month: (date.getUTCMonth() + 9) % 12, currency: row.currency, amount: row.amount })
   }
   if (!await hasAccountingTable(db, 'Funding_Case_Agreement_Journal_Voucher')) return { agreementId, entries }
-  const vouchers = await db.selectFrom('Funding_Case_Agreement_Journal_Voucher as voucher')
+  let vouchersQuery = db.selectFrom('Funding_Case_Agreement_Journal_Voucher as voucher')
     .innerJoin('Funding_Case_Agreement_Journal_Voucher_Line as line', 'line.egcs_fc_journalvoucher', 'voucher.id')
     .innerJoin('Funding_Case_Agreement_Payment as payment', 'payment.id', 'voucher.egcs_fc_payment')
     .select(['voucher.id', 'voucher.egcs_fc_payment', 'voucher.egcs_fc_agencyfiscalyear', 'voucher.egcs_fc_currency',
       'voucher.egcs_fc_requesteddate', databaseMoneyText(sql.ref('line.egcs_fc_amount')).as('amount')])
     .where('voucher.egcs_fc_fundingagreement', '=', agreementId).where('line.egcs_fc_kind', '=', 'adjustment')
     .where(agreementPaymentIsFinal('payment', { requireResolvedApproval: true }))
-    .where('voucher._deleted', '=', false).where('line._deleted', '=', false).execute()
+    .where('voucher._deleted', '=', false).where('line._deleted', '=', false)
+  if (currency) vouchersQuery = vouchersQuery.where('voucher.egcs_fc_currency', '=', currency)
+  const vouchers = await vouchersQuery.execute()
   for (const id of new Set(vouchers.map(row => String(row.id)))) {
     if (!await hasPositiveCompletionTerminus(db, 'fundingcasejournalvoucher', id)) continue
     for (const row of vouchers.filter(candidate => String(candidate.id) === id && String(candidate.egcs_fc_payment) !== options.excludePaymentId)) {
@@ -197,7 +209,7 @@ export const summarizePaidAccountingByCurrency = (entries: Awaited<ReturnType<ty
 /** Cumulative recorded paid totals through a stable selected fiscal year and period. */
 export const getAgreementRecordedPaidToDate = async (
   db: Kysely<Database>, agreementId: string,
-  input: { fiscalYearId: string; periodEnd: number; excludePaymentId?: string }
+  input: { fiscalYearId: string; periodEnd: number; excludePaymentId?: string; currency?: string }
 ) => {
   if (!Number.isInteger(input.periodEnd) || input.periodEnd < 0 || input.periodEnd > 11) throw new Error('Invalid fiscal period')
   const year = await db.selectFrom('Funding_Case_Agreement_Budget_Fiscal_Year as budgetYear')
@@ -213,5 +225,5 @@ export const getAgreementRecordedPaidToDate = async (
   return { agreementId, cashPaidAmount: sumMoney(selected.filter(row => row.kind === 'cash_payment').map(row => row.amount)),
     jvEffectAmount: sumMoney(selected.filter(row => row.kind === 'journal_voucher').map(row => row.amount)),
     correctionAmount: sumMoney(selected.filter(row => row.kind === 'correction').map(row => row.amount)),
-    recordedPaidAmount: sumMoney(selected.map(row => row.amount)), currency: selected[0]?.currency ?? null }
+    recordedPaidAmount: sumMoney(selected.map(row => row.amount)), currency: input.currency ?? selected[0]?.currency ?? null }
 }

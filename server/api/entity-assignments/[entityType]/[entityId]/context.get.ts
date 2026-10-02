@@ -50,6 +50,7 @@ export default defineEventHandler(async event => {
     .select([
       'id',
       'egcs_fc_agreementnumber',
+      'egcs_fc_currency',
       'egcs_fc_title_en',
       'egcs_fc_title_fr'
     ])

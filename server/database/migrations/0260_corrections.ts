@@ -152,6 +152,12 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
     BEGIN
       IF TG_OP = 'DELETE' THEN RAISE EXCEPTION 'Correction evidence must be retained' USING ERRCODE = '23514'; END IF;
       PERFORM id FROM "Funding_Case_Agreement_Profile" WHERE id = NEW.egcs_fc_fundingagreement FOR UPDATE;
+      IF NOT EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Commitment" commitment
+        WHERE commitment.id = NEW.egcs_fc_commitment
+          AND commitment.egcs_fc_fundingagreement = NEW.egcs_fc_fundingagreement
+          AND commitment.egcs_fc_currency = NEW.egcs_fc_currency) THEN
+        RAISE EXCEPTION 'Correction and Commitment currencies must match' USING ERRCODE = '23514';
+      END IF;
       SELECT p.egcs_tp_agency INTO owner_agency FROM "Funding_Case_Agreement_Profile" a
         JOIN "Transfer_Payment_Stream" s ON s.id = a.egcs_fc_transferpaymentstream
         JOIN "Transfer_Payment_Profile" p ON p.id = s.egcs_tp_transferpaymentprofile WHERE a.id = NEW.egcs_fc_fundingagreement;
@@ -214,7 +220,8 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
             AND l.egcs_fc_fundingagreement = NEW.egcs_fc_fundingagreement
             AND original.egcs_tp_agencychartofaccount = retained.egcs_tp_agencychartofaccount
             AND retained_program.egcs_tp_agency = owner_agency AND account.egcs_ay_organizationagency = owner_agency
-            AND account.egcs_ay_fiscalyear = fiscal.id AND fiscal.egcs_ay_organizationagency = owner_agency) THEN
+            AND account.egcs_ay_fiscalyear = fiscal.id AND fiscal.egcs_ay_organizationagency = owner_agency
+            AND account.egcs_ay_currency = root.egcs_fc_currency) THEN
           RAISE EXCEPTION 'Correction line must retain owning Commitment and Agency coding lineage' USING ERRCODE = '23514';
         END IF;
       END IF;
@@ -379,6 +386,9 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
       RETURN NULL;
     END $$ LANGUAGE plpgsql`.execute(db)
   await sql`CREATE CONSTRAINT TRIGGER trg_enforce_correction_completion AFTER INSERT ON "Common_Completion" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_enforce_correction_completion()`.execute(db)
+  await sql`CREATE TRIGGER zz_guard_agreement_financial_currency
+    BEFORE INSERT OR UPDATE ON "Funding_Case_Agreement_Correction"
+    FOR EACH ROW EXECUTE FUNCTION guard_agreement_financial_currency()`.execute(db)
   await installAuditOwnershipFunctions(db)
   await sql`SELECT audit.reconcile_capture()`.execute(db)
 }

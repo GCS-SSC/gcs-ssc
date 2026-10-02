@@ -25,6 +25,7 @@ const { getBilingualValue } = useBilingualValue()
 const streamName = computed(() => getBilingualValue(profile, 'stream_name', '-'))
 const metaItems = computed(() => [
   subtitle,
+  profile.egcs_fc_currency?.toUpperCase(),
   showContext ? `${t('agreement.stream')} ${streamName.value}` : undefined
 ])
 const badges = computed(() => profile.egcs_fc_status

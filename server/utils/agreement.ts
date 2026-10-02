@@ -404,6 +404,9 @@ export const mapAgreementWriteValues = (
   if (Object.hasOwn(input, 'egcs_fc_agreementnumber')) {
     values.egcs_fc_agreementnumber = input.egcs_fc_agreementnumber
   }
+  if (Object.hasOwn(input, 'egcs_fc_currency')) {
+    values.egcs_fc_currency = input.egcs_fc_currency
+  }
   if (Object.hasOwn(input, 'egcs_fc_transferpaymentstream')) {
     values.egcs_fc_transferpaymentstream = String(input.egcs_fc_transferpaymentstream)
   }

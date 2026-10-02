@@ -1,10 +1,11 @@
 /* eslint-disable jsdoc/require-param, jsdoc/require-returns -- Public read contracts are documented at their authorization boundary. */
 import type { Kysely, Transaction } from 'kysely'
 import type { GcsExtensionAgreementFinancials } from '@gcs-ssc/extensions/server'
-import type { Database } from '~~/shared/types/database'
+import type { Currency_Codes, Database } from '~~/shared/types/database'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { getAgreementCommitmentPaymentCapacity, getCommitmentLinePaymentCoverage, validateAgreementPaymentAllocations } from './agreement-commitment-line-balance'
 import { getAgreementPaidAccountingProjection, getAgreementRecordedPaidToDate } from './agreement-accounting-projection'
+import { resolveAgreementCurrency } from './agreement-currency'
 
 /**
  * Binds the financial projection to an authorized Agreement and the caller's active transaction.
@@ -24,10 +25,16 @@ export const createExtensionAgreementFinancials = (
   /**
    * Refreshes route authority and checks any same-Agreement exclusion.
    * @param excludePaymentId - Payment being recalculated.
-   * @returns Nothing after the read scope is verified.
+   * @param requestedCurrency - Optional selection that must match the owning Agreement.
+   * @returns The immutable Agreement denomination after the read scope is verified.
    */
-  const prepareRead = async (excludePaymentId?: string): Promise<void> => {
+  const prepareRead = async (excludePaymentId?: string, requestedCurrency?: string): Promise<Currency_Codes> => {
     await beforeRead?.()
+    const currency = await resolveAgreementCurrency(db, agreementId)
+    if (!currency) throw new Error('The bound Agreement is unavailable.')
+    if (requestedCurrency !== undefined && requestedCurrency !== currency) {
+      throw new Error('The selected currency must match the bound Agreement currency.')
+    }
     if (excludePaymentId) {
       const payment = await db.selectFrom('Funding_Case_Agreement_Payment as excludedPayment')
         .innerJoin('Funding_Case_Agreement_Commitment as excludedCommitment',
@@ -37,18 +44,19 @@ export const createExtensionAgreementFinancials = (
         .where('excludedPayment._deleted', '=', false).where('excludedCommitment._deleted', '=', false).executeTakeFirst()
       if (!payment) throw new Error('The excluded Payment must belong to the bound Agreement.')
     }
+    return currency
   }
   return {
     /** Refreshes the bound authority before exposing cumulative corrected accounting. */
     getRecordedPaidToDate: async input => {
-      await prepareRead(input.excludePaymentId)
+      const currency = await prepareRead(input.excludePaymentId, input.currency)
       if (!isPositivePostgresBigintText(input.fiscalYearId)) throw new Error('Fiscal year requires a positive bigint identifier')
-      return await getAgreementRecordedPaidToDate(db, agreementId, input)
+      return await getAgreementRecordedPaidToDate(db, agreementId, { ...input, currency })
     },
     /** Reports retained accounting effects independently of cash and protective capacity. */
     getPaidAccountingProjection: async (input = {}) => {
-      await prepareRead(input.excludePaymentId)
-      return await getAgreementPaidAccountingProjection(db, agreementId, input)
+      const currency = await prepareRead(input.excludePaymentId)
+      return await getAgreementPaidAccountingProjection(db, agreementId, { ...input, currency })
     },
     /**
    * Reads an exact row using the shared host paid floor.
@@ -56,12 +64,12 @@ export const createExtensionAgreementFinancials = (
    * @returns Canonical post-JV paid amount.
    */
     getCommitmentLinePaymentCoverage: async input => {
-      await prepareRead(input.excludePaymentId)
+      const currency = await prepareRead(input.excludePaymentId, input.currency)
       const line = await db.selectFrom('Funding_Case_Agreement_Commitment_Line').select('id')
         .where('id', '=', input.commitmentLineId).where('egcs_fc_fundingagreement', '=', agreementId)
         .where('_deleted', '=', false).executeTakeFirst()
       if (!line) throw new Error('The Commitment line must belong to the bound Agreement.')
-      const coverage = await getCommitmentLinePaymentCoverage(db, input.commitmentLineId, input)
+      const coverage = await getCommitmentLinePaymentCoverage(db, input.commitmentLineId, { ...input, currency })
       return { paidAmount: coverage.paidAmount }
     },
     /**
@@ -70,8 +78,8 @@ export const createExtensionAgreementFinancials = (
    * @returns Whether the exact rows and shared coding pools cover the proposals.
    */
     validatePaymentAllocations: async input => {
-      await prepareRead(input.excludePaymentId)
-      return await validateAgreementPaymentAllocations(db, agreementId, input.allocations, input)
+      const currency = await prepareRead(input.excludePaymentId, input.currency)
+      return await validateAgreementPaymentAllocations(db, agreementId, input.allocations, { ...input, currency })
     },
     /**
    * Reads capacity in this authorized context.
@@ -79,13 +87,13 @@ export const createExtensionAgreementFinancials = (
    * @returns Bound Agreement identity and canonical capacity text.
    */
     getCommitmentPaymentCapacity: async input => {
-      await prepareRead(input.excludePaymentId)
+      const currency = await prepareRead(input.excludePaymentId, input.currency)
       if (![agreementId, input.fiscalYearId, input.commitmentTypeId, ...(input.excludePaymentId ? [input.excludePaymentId] : [])]
         .every(isPositivePostgresBigintText)) {
         throw new Error('Agreement financial capacity requires positive bigint string identifiers.')
       }
 
-      return { agreementId, capacityAmount: await getAgreementCommitmentPaymentCapacity(db, agreementId, input) }
+      return { agreementId, capacityAmount: await getAgreementCommitmentPaymentCapacity(db, agreementId, { ...input, currency }) }
     }
   }
 }

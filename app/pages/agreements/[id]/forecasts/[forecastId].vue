@@ -252,6 +252,7 @@ const forecastHeroTitle = computed(() => activeForecast.value
 )
 const forecastHeroMetaItems = computed(() => [
   displayValue(profile.value?.egcs_fc_agreementnumber),
+  profile.value?.egcs_fc_currency.toUpperCase() ?? '',
   getBilingualValue(profile.value, 'egcs_fc_title', agreementId)
 ])
 const forecastHeroBadges = computed(() => [
@@ -366,7 +367,9 @@ const displayValue = (value: string | number | null | undefined) => {
 }
 
 const ZERO_MONEY = '0.00' as Money
-const formatMoney = (value: Money) => formatMoneyText(value, locale.value, 'CAD')
+const formatMoney = (value: Money) => profile.value?.egcs_fc_currency
+  ? formatMoneyText(value, locale.value, profile.value.egcs_fc_currency.toUpperCase())
+  : value
 
 const getDraftAmount = (budgetLineId: string, month: number) =>
   draftAmounts.value[getDraftKey(budgetLineId, month)] ?? ZERO_MONEY
@@ -565,7 +568,7 @@ const saveForecastBreakdown = async () => {
             egcs_fc_month: month,
             egcs_fc_amount: amount,
             egcs_fc_totalamount: amount,
-            egcs_fc_currency: 'cad',
+            egcs_fc_currency: budgetLine.egcs_fc_currency,
             egcs_fc_version: selectedVersion.value
           })
         }

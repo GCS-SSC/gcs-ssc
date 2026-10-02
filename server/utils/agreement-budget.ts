@@ -1,3 +1,4 @@
+import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { fetchAgreementBudgetCostCategory } from '~~/server/utils/cost-configuration-integrity'
 import { FundingCaseAgreementBudgetLineItemFundingTotalsSchema,
   FundingCaseAgreementBudgetFiscalYearPatchSchema,
@@ -16,7 +17,7 @@ import {
   assertAgreementExists
 } from '~~/server/utils/agreement-child-resources'
 import { throwIfAgreementUniqueConstraintError } from '~~/server/utils/agreement-unique-constraint-errors'
-import type { Database } from '~~/shared/types/database'
+import type { Currency_Codes, Database } from '~~/shared/types/database'
 import type { AgreementScopeContext } from '~~/server/utils/agreement'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
 import { assertFiscalYearOverlapsDuration } from '~~/server/utils/agreement-fiscal-year-duration'
@@ -43,6 +44,7 @@ export interface AgreementBudgetProgramFundingCapacity {
   fiscalYearId: string
   streamBudgetId: string
   streamBudgetTotal: Money
+  currency: Currency_Codes
   overcommitThresholdHundredths: bigint
   allocatedProgramFunding: Money
 }
@@ -50,6 +52,7 @@ export interface AgreementBudgetProgramFundingCapacity {
 export interface ResolveAgreementBudgetProgramFundingCapacityOptions {
   excludeLineItemId?: string
   lockStreamBudget?: boolean
+  currency?: Currency_Codes
 }
 
 const resolveAgreementBudgetFiscalYear = async (
@@ -58,12 +61,15 @@ const resolveAgreementBudgetFiscalYear = async (
 ) => await db
   .selectFrom('Funding_Case_Agreement_Budget_Fiscal_Year')
   .innerJoin('Funding_Case_Agreement_Budget_Version', 'Funding_Case_Agreement_Budget_Version.id', 'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_budgetversion')
+  .innerJoin('Funding_Case_Agreement_Profile', 'Funding_Case_Agreement_Profile.id', 'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fundingagreement')
+  .where('Funding_Case_Agreement_Profile._deleted', '=', false)
   .where(budgetFiscalYearStableId, '=', agreementBudgetFiscalYearId)
   .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
   .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)
   .where('Funding_Case_Agreement_Budget_Version._deleted', '=', false)
   .select([
     budgetFiscalYearStableId.as('id'),
+    'Funding_Case_Agreement_Profile.egcs_fc_currency as currency',
     'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fiscalyear as fiscal_year_id'
   ])
   .executeTakeFirst()
@@ -72,7 +78,8 @@ const resolveStreamBudgetForFiscalYear = async (
   db: DbClient,
   streamId: string,
   fiscalYearId: string,
-  lockStreamBudget: boolean | undefined
+  lockStreamBudget: boolean | undefined,
+  currency: Currency_Codes | undefined
 ) => {
   let streamBudgetQuery = db
     .selectFrom('Transfer_Payment_Stream_Budget')
@@ -89,21 +96,26 @@ const resolveStreamBudgetForFiscalYear = async (
   if (lockStreamBudget) {
     streamBudgetQuery = streamBudgetQuery.forUpdate()
   }
+  if (currency) streamBudgetQuery = streamBudgetQuery.where('Transfer_Payment_Fiscal_Year_Budget.egcs_tp_currency', '=', currency)
 
-  return await streamBudgetQuery
+  const rows = await streamBudgetQuery
     .select([
       'Transfer_Payment_Stream_Budget.id as id',
+      'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_currency as currency',
       databaseMoneyText(sql.ref('Transfer_Payment_Stream_Budget.egcs_tp_totalbudget')).as('total_budget'),
       sql<string>`CAST(${sql.ref('Transfer_Payment_Stream_Budget.egcs_tp_overcommitthreshold')} AS text)`.as('overcommit_threshold')
     ])
-    .executeTakeFirst()
+    .execute()
+  if (new Set(rows.map(row => row.currency)).size > 1) throw new Error('Stream funding capacity currency is ambiguous')
+  return rows[0]
 }
 
 const resolveAllocatedProgramFunding = async (
   db: DbClient,
   streamId: string,
   fiscalYearId: string,
-  excludeLineItemId: string | undefined
+  excludeLineItemId: string | undefined,
+  currency: Currency_Codes
 ) => {
   let allocationQuery = db
     .selectFrom('Funding_Case_Agreement_Budget_Line_Item')
@@ -125,6 +137,8 @@ const resolveAllocatedProgramFunding = async (
     .where('Funding_Case_Agreement_Profile.egcs_fc_transferpaymentstream', '=', streamId)
     .where('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fiscalyear', '=', fiscalYearId)
     .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false)
+    .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_currency', '=', currency)
+    .where('Funding_Case_Agreement_Profile.egcs_fc_currency', '=', currency)
     .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
     .where('Funding_Case_Agreement_Profile._deleted', '=', false)
     .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)
@@ -161,12 +175,13 @@ export const resolveAgreementBudgetProgramFundingCapacity = async (
     return null
   }
 
-  const streamBudget = await resolveStreamBudgetForFiscalYear(db, streamId, String(fiscalYear.fiscal_year_id), options.lockStreamBudget)
+  if (options.currency !== undefined && options.currency !== fiscalYear.currency) return null
+  const streamBudget = await resolveStreamBudgetForFiscalYear(db, streamId, String(fiscalYear.fiscal_year_id), options.lockStreamBudget, fiscalYear.currency)
   if (!streamBudget) {
     return null
   }
 
-  const allocation = await resolveAllocatedProgramFunding(db, streamId, String(fiscalYear.fiscal_year_id), options.excludeLineItemId)
+  const allocation = await resolveAllocatedProgramFunding(db, streamId, String(fiscalYear.fiscal_year_id), options.excludeLineItemId, streamBudget.currency)
   const streamBudgetTotal = parseDatabaseMoney(streamBudget.total_budget)
   const overcommitThresholdHundredths = parseThresholdHundredths(streamBudget.overcommit_threshold)
   const allocatedProgramFunding = parseDatabaseMoney(allocation?.allocated_program_funding)
@@ -180,6 +195,7 @@ export const resolveAgreementBudgetProgramFundingCapacity = async (
     fiscalYearId: String(fiscalYear.fiscal_year_id),
     streamBudgetId: String(streamBudget.id),
     streamBudgetTotal,
+    currency: streamBudget.currency,
     overcommitThresholdHundredths,
     allocatedProgramFunding
   }
@@ -438,6 +454,7 @@ export const createAgreementBudgetLineItem = async (
       return await routeBadRequest(event, 'INVALID_AGREEMENT_BUDGET_LINE_ITEM', 'apiErrors.agreement.invalid_cost_category_line_item')
     }
 
+    await assertAgreementCurrency(event, trx, agreementId, validated.egcs_fc_currency)
     const calculation = await prepareBudgetCalculation(event, trx, validated, undefined, String(fiscalYear.id))
     const programFunding = calculation.egcs_fc_programfunding ?? validated.egcs_fc_programfunding!
 

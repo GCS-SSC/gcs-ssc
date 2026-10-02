@@ -440,8 +440,9 @@ const cancelAmendment = async () => {
               </template>
             </CommonPreActionReport>
             <AgreementBudgetTab
-              v-if="amendment.has_budget_snapshot"
+              v-if="amendment.has_budget_snapshot && profile"
               :agreement-id="agreementId"
+              :currency="profile.egcs_fc_currency"
               :api-base="amendmentApiBase"
               :fiscal-year-lookup-url="`${amendmentApiBase}/budget-fiscal-years/lookups/fiscal-years`"
               :can-create="canEditAmendment && isBudgetAmendment"

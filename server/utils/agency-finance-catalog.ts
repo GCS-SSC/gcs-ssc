@@ -20,6 +20,7 @@ export const findEligibleAgencyChart = async (
     .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Agency_Chart_of_Account.egcs_ay_fiscalyear')
     .innerJoin('Transfer_Payment_Fiscal_Year_Budget', 'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_fiscalyear', 'Agency_Fiscal_Year.id')
     .innerJoin('Transfer_Payment_Stream_Budget', 'Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentbudget', 'Transfer_Payment_Fiscal_Year_Budget.id')
+    .whereRef('Transfer_Payment_Fiscal_Year_Budget.egcs_tp_currency', '=', 'Agency_Chart_of_Account.egcs_ay_currency')
     .where('Agency_Chart_of_Account.id', '=', chartId)
     .where('Agency_Chart_of_Account.egcs_ay_organizationagency', '=', agencyId)
     .where('Agency_Fiscal_Year.egcs_ay_organizationagency', '=', agencyId)

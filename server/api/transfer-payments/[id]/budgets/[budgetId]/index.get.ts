@@ -49,6 +49,7 @@ export default defineEventHandler(async event => {
       'Transfer_Payment_Fiscal_Year_Budget.id as id',
       'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_transferpaymentprofile as egcs_tp_transferpaymentprofile',
       'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_fiscalyear as egcs_tp_fiscalyear',
+      'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_currency',
       databaseMoneyText(sql.ref('Transfer_Payment_Fiscal_Year_Budget.egcs_tp_totalbudget')).as('egcs_tp_totalbudget'),
       'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_overcommitthreshold as egcs_tp_overcommitthreshold',
       'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display',
@@ -62,6 +63,7 @@ export default defineEventHandler(async event => {
 
   return {
     ...budget,
+    fiscal_year_currency_display: `${budget.fiscal_year_display} (${budget.egcs_tp_currency.toUpperCase()})`,
     id: String(budget.id),
     egcs_tp_transferpaymentprofile: String(budget.egcs_tp_transferpaymentprofile),
     egcs_tp_fiscalyear: String(budget.egcs_tp_fiscalyear),

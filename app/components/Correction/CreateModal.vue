@@ -39,6 +39,9 @@ watch([open, () => agreementId, () => linkedCorrectionId], ([isOpen]) => {
       }
     : null
 }, { immediate: true, flush: 'sync' })
+watch(() => state.value?.egcs_fc_commitment, (commitment, previousCommitment) => {
+  if (state.value && commitment !== previousCommitment) state.value.egcs_fc_payments = []
+}, { flush: 'sync' })
 const save = async () => {
   if (!state.value || pending.value) return
   const currentSession = session
@@ -65,7 +68,7 @@ const save = async () => {
           <CommonServerLookupSelect v-model="state.egcs_fc_commitment" :fetch-url="`/api/agreements/${agreementId}/corrections/lookups/commitments`" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :show-value-in-label="false" close-on-select />
         </UFormField>
         <UFormField name="egcs_fc_payments" :label="t('correction.source_payments')" :description="t('correction.source_payments_description')">
-          <CommonServerLookupSelect v-model:values="state.egcs_fc_payments" :fetch-url="`/api/agreements/${agreementId}/corrections/lookups/payments`" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :show-value-in-label="false" multiple close-on-select />
+          <CommonServerLookupSelect v-model:values="state.egcs_fc_payments" :fetch-url="`/api/agreements/${agreementId}/corrections/lookups/payments`" :query="state.egcs_fc_commitment ? { commitmentId: state.egcs_fc_commitment } : {}" :disabled="!state.egcs_fc_commitment" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :show-value-in-label="false" multiple close-on-select />
         </UFormField>
         <UFormField name="egcs_fc_requesteddate" :label="t('correction.requested_date')">
           <CommonDatePicker v-model="state.egcs_fc_requesteddate" />

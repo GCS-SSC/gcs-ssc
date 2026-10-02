@@ -1146,6 +1146,7 @@
       "duplicate_profile": "An agency with the same financial system id, bilingual name, and status already exists.",
       "duplicate_holdback_basis_code": "A holdback basis with this language-independent code already exists for the agency.",
       "chart_fiscal_year_immutable": "The chart of accounts fiscal year cannot be changed. Create a chart for the other fiscal year.",
+      "chart_currency_immutable": "Chart of Account currency cannot be changed. Create a separate line for the other currency.",
       "duplicate_chart_of_account": "A chart of accounts with these accounting dimensions already exists for this fiscal year.",
       "duplicate_commitment_type_name_en": "A commitment type with this English name already exists for the agency.",
       "duplicate_commitment_type_name_fr": "A commitment type with this French name already exists for the agency.",
@@ -1279,6 +1280,7 @@
       "fiscal_year_outside_duration": "The selected fiscal year does not overlap the agreement's authorized start and end dates.",
       "budget_fiscal_year_not_found": "Agreement budget fiscal year not found.",
       "budget_fiscal_year_in_use": "Remove all budget line items before deleting this fiscal year.",
+      "budget_currency_immutable": "Budget currency cannot be changed. Create a separate budget for the other currency.",
       "budget_fiscal_year_financial_records_in_use": "A fiscal year with claims or payments cannot be deleted.",
       "budget_line_item_not_found": "Agreement budget line item not found.",
       "budget_line_item_claim_in_use": "A budget line item with claim costs cannot be deleted.",
@@ -1331,7 +1333,9 @@
       "duplicate_payment_line": "A payment line already exists for this commitment line.",
       "duplicate_final_claim_reconcile": "Only one reconciliation can be marked final for a claim.",
       "claim_reconcile_in_progress": "Finish or cancel the reconciliation already in progress before marking another reconciliation as final.",
-      "duplicate_claim_reconcile_line_item": "A reconciliation line already exists for this claim line item."
+      "duplicate_claim_reconcile_line_item": "A reconciliation line already exists for this claim line item.",
+      "currency_immutable": "Agreement currency is set at creation and cannot be changed.",
+      "currency_mismatch": "Currency must match the Agreement currency."
     },
     "transfer_payment": {
       "invalid_funding_subtype": "Select an active funding subtype owned by this stream’s Agency.",
@@ -1392,6 +1396,7 @@
       "invalid_budget_fiscal_year": "The selected agreement budget fiscal year is invalid.",
       "budget_fiscal_year_not_found": "Agreement budget fiscal year not found.",
       "budget_fiscal_year_in_use": "This budget’s fiscal year is used by an agreement budget. Remove or change the agreement budget year before changing this fiscal year.",
+      "budget_currency_immutable": "Budget currency cannot be changed. Create a separate budget for the other currency.",
       "budget_line_item_not_found": "Agreement budget line item not found.",
       "duplicate_budget_fiscal_year": "A budget fiscal year already exists for this agreement.",
       "invalid_amendment_type": "The selected amendment type is invalid.",

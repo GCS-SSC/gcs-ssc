@@ -11,11 +11,13 @@ const { agencyId, canCreate, canUpdate, canDelete } = defineProps<{
 const { t, locale } = useI18n()
 const columns: TableColumnInput<AgencyChartOfAccountItem>[] = [
   { id: 'fiscal_year_display', accessorKey: 'fiscal_year_display', headerKey: 'common.year' },
+  { accessorKey: 'egcs_ay_currency', headerKey: 'common.currency' },
   { id: 'dimensions', headerKey: 'transfer_payment.chart_of_accounts.accounting_fields' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
 const initialNewItem = {
   egcs_ay_fiscalyear: '',
+  egcs_ay_currency: 'cad' as const,
   egcs_ay_accountingdimensions: [{ label_en: '', label_fr: '', value: '' }]
 }
 const addDimension = (state: Partial<AgencyChartOfAccountItem>) => {
@@ -39,6 +41,9 @@ const addDimension = (state: Partial<AgencyChartOfAccountItem>) => {
     :initial-new-item="initialNewItem"
     :columns="columns"
     modal-fullscreen>
+    <template #egcs_ay_currency-cell="{ row }">
+      {{ row.original.egcs_ay_currency.toUpperCase() }}
+    </template>
     <template #dimensions-cell="{ row }">
       <div class="flex flex-wrap gap-1">
         <CommonStatusBadge
@@ -63,6 +68,9 @@ const addDimension = (state: Partial<AgencyChartOfAccountItem>) => {
           v-model="state.egcs_ay_fiscalyear"
           :fetch-url="`/api/agency/${agencyId}/fiscal-years`" value-key="id"
           label-en-key="egcs_ay_fiscalyeardisplay" label-fr-key="egcs_ay_fiscalyeardisplay" />
+      </UFormField>
+      <UFormField :label="t('common.currency')" name="egcs_ay_currency" required>
+        <CommonEnumSelect v-model="state.egcs_ay_currency" name="currency_codes" :disabled="Boolean(state.id)" />
       </UFormField>
       <div class="space-y-3">
         <div class="flex items-center justify-between gap-3">

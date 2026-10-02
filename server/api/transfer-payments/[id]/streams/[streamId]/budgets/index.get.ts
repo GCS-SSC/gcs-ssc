@@ -73,6 +73,7 @@ export default defineEventHandler(async event => {
           'Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentbudget as egcs_tp_transferpaymentbudget',
           'Transfer_Payment_Stream_Budget.egcs_tp_overcommitthreshold as egcs_tp_overcommitthreshold',
           'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_fiscalyear as egcs_tp_fiscalyear',
+          'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_currency',
           databaseMoneyText(sql.ref('Transfer_Payment_Fiscal_Year_Budget.egcs_tp_totalbudget')).as('program_total_budget'),
           'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display',
           'Agency_Fiscal_Year.egcs_ay_fiscalyear as fiscal_year'

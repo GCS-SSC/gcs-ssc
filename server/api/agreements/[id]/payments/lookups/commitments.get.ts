@@ -1,12 +1,15 @@
+import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { sql } from 'kysely'
 import { z } from 'zod'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { PaginationSchema } from '~~/shared/types/schemas/common'
 import { prepareAgreementPaymentRoute } from '~~/server/utils/agreement-payment'
+import { CURRENCY_CODES_ENUM } from '~~/shared/constants/enums'
 
 const QuerySchema = PaginationSchema.extend({
   paymentId: z.union([z.string().min(1), z.number()]).transform(String).optional(),
+  currency: z.enum(CURRENCY_CODES_ENUM).optional(),
   permission_action: z.enum(['create', 'update']).default('create')
 }).superRefine((query, ctx) => {
   if (query.permission_action === 'update' && !query.paymentId) {
@@ -15,7 +18,7 @@ const QuerySchema = PaginationSchema.extend({
 })
 
 export default defineEventHandler(async event => {
-  const { page, limit, search, paymentId, permission_action } = await getValidatedQueryI18n(event, QuerySchema)
+  const { page, limit, search, paymentId, permission_action, currency: requestedCurrency } = await getValidatedQueryI18n(event, QuerySchema)
   let assignmentTarget
   if (paymentId) assignmentTarget = { entityType: 'fundingcasepayment' as const, entityId: paymentId }
   const prepared = await prepareAgreementPaymentRoute(event, permission_action, assignmentTarget)
@@ -24,6 +27,7 @@ export default defineEventHandler(async event => {
   }
 
   const { agreementId, db } = prepared
+  const currency = await assertAgreementCurrency(event, db, prepared.agreementId, requestedCurrency)
   const offset = (page - 1) * limit
 
   let baseQuery = db
@@ -31,6 +35,7 @@ export default defineEventHandler(async event => {
     .innerJoin('Transfer_Payment_Stream_Commitment_Type', 'Transfer_Payment_Stream_Commitment_Type.id', 'Funding_Case_Agreement_Commitment.egcs_fc_type')
     .innerJoin('Agency_Commitment_Type', 'Agency_Commitment_Type.id', 'Transfer_Payment_Stream_Commitment_Type.egcs_tp_agencycommitmenttype')
     .where('Funding_Case_Agreement_Commitment.egcs_fc_fundingagreement', '=', agreementId)
+    .where('Funding_Case_Agreement_Commitment.egcs_fc_currency', '=', currency)
     .where('Transfer_Payment_Stream_Commitment_Type._deleted', '=', false)
     .where('Agency_Commitment_Type._deleted', '=', false)
     .where(sql<boolean>`(

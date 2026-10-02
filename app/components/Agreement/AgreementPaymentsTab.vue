@@ -16,27 +16,29 @@ import type {
   FundingCaseAgreementPaymentRow
 } from '~~/shared/types/funding-case-agreement-ui'
 import { FundingCaseAgreementPaymentCreateSchema } from '~~/shared/types/schemas'
-import { CURRENCY_CODES_ENUM } from '~~/shared/constants/enums'
 import { compareMoney, formatMoneyText, parseMoney, type Money } from '~~/shared/utils/money'
 import type { GcsPaymentAmountCalculatorResult } from '@gcs-ssc/extensions/ui'
+import type { Currency_Codes } from '~~/shared/types/database'
 
 type PaymentCalculatorResult = GcsPaymentAmountCalculatorResult
 
 type PaymentLookupQuery = {
   permission_action: 'create' | 'update'
   paymentId?: string
+  currency?: string
 }
 
-const buildPaymentLookupQuery = (paymentId?: string): PaymentLookupQuery => {
-  if (paymentId) return { permission_action: 'update', paymentId }
-  return { permission_action: 'create' }
+const buildPaymentLookupQuery = (paymentId?: string, currency?: string): PaymentLookupQuery => {
+  if (paymentId) return { permission_action: 'update', paymentId, currency }
+  return { permission_action: 'create', currency }
 }
 
 const MONTH_KEYS = ['apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec', 'jan', 'feb', 'mar'] as const
 const ZERO_MONEY = parseMoney('0')
 
-const { agreementId, canCreate, canUpdate, canDelete } = defineProps<{
+const { agreementId, currency: agreementCurrency, canCreate, canUpdate, canDelete } = defineProps<{
   agreementId: string
+  currency: Currency_Codes
   canCreate: boolean
   canUpdate: boolean
   canDelete: boolean
@@ -79,7 +81,7 @@ const pagination: Ref<{ pageIndex: number, pageSize: number }> = ref({
 })
 
 const paymentModal = useCrudModal<FundingCaseAgreementPaymentRow, FundingCaseAgreementPaymentForm>({
-  createState: () => ({ egcs_fc_currency: 'cad' }),
+  createState: () => ({ egcs_fc_currency: agreementCurrency }),
   updateState: payment => ({
     id: payment.id,
     egcs_fc_commitmenttype: payment.commitment_type ?? undefined,
@@ -99,6 +101,10 @@ const validatePayment = createValidator(FundingCaseAgreementPaymentCreateSchema)
 const paymentPending = useCrudModalPending(paymentModal.captureSession)
 const isSavingPayment = paymentPending.isPending
 const paymentCalculatorResult: Ref<PaymentCalculatorResult | null> = ref(null)
+let lastSuggestedPaymentAmount: Money | null = null
+watch(selectedPayment, () => {
+  lastSuggestedPaymentAmount = null
+}, { flush: 'sync' })
 const deletingPaymentIds: Ref<Set<string>> = ref(new Set())
 watch(agreementIdRef, () => {
   paymentModal.close()
@@ -174,6 +180,7 @@ const paymentCalculatorModel = computed(() => ({
   paymentType: selectedPayment.value?.egcs_fc_paymenttype,
   periodStart: selectedPayment.value?.egcs_fc_periodstart,
   periodEnd: selectedPayment.value?.egcs_fc_periodend,
+  currency: agreementCurrency,
   amount: selectedPayment.value?.egcs_fc_paymentamount
 }))
 
@@ -193,22 +200,7 @@ const paymentCalculatorCeilingMoney = computed<Money | null>(() => {
     return null
   }
 })
-const calculatorCurrencyCode = computed(() => {
-  const currency = paymentCalculatorResult.value?.currency?.toLowerCase() ?? ''
-  return CURRENCY_CODES_ENUM.includes(currency as (typeof CURRENCY_CODES_ENUM)[number])
-    ? currency as (typeof CURRENCY_CODES_ENUM)[number]
-    : null
-})
-const isCalculatorCurrencyControlled = computed(() => Boolean(
-  paymentAmountCalculator.value
-  && !selectedPayment.value?.id
-  && calculatorCurrencyCode.value
-))
-const paymentCalculatorCurrency = computed(() => {
-  return calculatorCurrencyCode.value
-    ? calculatorCurrencyCode.value.toUpperCase()
-    : selectedPayment.value?.egcs_fc_currency?.toUpperCase() ?? 'CAD'
-})
+const paymentCalculatorCurrency = computed(() => agreementCurrency.toUpperCase())
 
 const isPaymentAboveCalculatorCeiling = computed(() => {
   const ceiling = paymentCalculatorCeilingMoney.value
@@ -231,7 +223,18 @@ watch(
       return
     }
     try {
-      selectedPayment.value.egcs_fc_paymentamount = parseMoney(suggestedAmount)
+      const suggestion = parseMoney(suggestedAmount)
+      const currentAmount = selectedPayment.value.egcs_fc_paymentamount
+      let useSuggestion = currentAmount === undefined || currentAmount === ''
+      if (!useSuggestion && lastSuggestedPaymentAmount !== null && typeof currentAmount === 'string') {
+        try {
+          useSuggestion = compareMoney(parseMoney(currentAmount), lastSuggestedPaymentAmount) === 0
+        } catch {
+          // Keep invalid manual input visible for form validation.
+        }
+      }
+      if (useSuggestion) selectedPayment.value.egcs_fc_paymentamount = suggestion
+      lastSuggestedPaymentAmount = suggestion
     } catch {
       // The extension result remains visible, but invalid money never enters the host form contract.
     }
@@ -239,14 +242,10 @@ watch(
 )
 
 const handlePaymentCalculatorResult = (result: Record<string, unknown>) => {
-  paymentCalculatorResult.value = result as PaymentCalculatorResult
-  if (
-    selectedPayment.value
-    && !selectedPayment.value.id
-    && calculatorCurrencyCode.value
-  ) {
-    selectedPayment.value.egcs_fc_currency = calculatorCurrencyCode.value
+  if (typeof result.currency === 'string' && result.currency.toLowerCase() !== agreementCurrency) {
+    return
   }
+  paymentCalculatorResult.value = result as PaymentCalculatorResult
 }
 
 const handlePaymentCalculatorExtensionPayload = (extensionKey: string, value: Record<string, unknown>) => {
@@ -392,7 +391,7 @@ const deletePayment = async (paymentId: string) => {
 
       <template #amount-cell="{ row }">
         <span class="font-medium text-zinc-700 dark:text-zinc-200">
-          {{ formatMoney(row.original.egcs_fc_paymentamount, row.original.egcs_fc_currency?.toUpperCase() ?? 'CAD') }}
+          {{ formatMoney(row.original.egcs_fc_paymentamount, row.original.egcs_fc_currency.toUpperCase()) }}
         </span>
       </template>
 
@@ -446,7 +445,7 @@ const deletePayment = async (paymentId: string) => {
               label-fr-key="label_fr"
               :show-value-in-label="false"
               :limit="100"
-              :query="buildPaymentLookupQuery(selectedPayment.id)" />
+              :query="buildPaymentLookupQuery(selectedPayment.id, agreementCurrency)" />
           </UFormField>
 
           <UFormField :label="t('agreement.payments.fiscal_year')" name="egcs_fc_fiscalyear">
@@ -458,19 +457,19 @@ const deletePayment = async (paymentId: string) => {
               label-fr-key="label_fr"
               :show-value-in-label="false"
               :limit="100"
-              :query="buildPaymentLookupQuery(selectedPayment.id)" />
+              :query="buildPaymentLookupQuery(selectedPayment.id, agreementCurrency)" />
           </UFormField>
 
           <UFormField :label="t('agreement.payments.type')" name="egcs_fc_paymenttype">
             <CommonEnumSelect v-model="selectedPayment.egcs_fc_paymenttype" name="payment_type" class="w-full" />
           </UFormField>
 
-          <UFormField :label="t('common.currency')" name="egcs_fc_currency">
+          <UFormField :label="t('common.currency')" name="egcs_fc_currency" required>
             <CommonEnumSelect
               v-model="selectedPayment.egcs_fc_currency"
               name="currency_codes"
-              class="w-full"
-              :disabled="isCalculatorCurrencyControlled" />
+              disabled
+              class="w-full" />
           </UFormField>
 
           <div class="grid gap-4 sm:grid-cols-2">

@@ -1,3 +1,4 @@
+import { resolveAgreementCurrency } from './agreement-currency'
 import type { Insertable, Transaction } from 'kysely'
 import type {
   GcsExtensionAgreementForecastCreateInput,
@@ -26,6 +27,11 @@ export const createAgreementForecastAggregate = async (
 ): Promise<GcsExtensionAgreementForecastCreateResult> => {
   if (input.lineItems.some(line => moneyToCents(parseMoney(line.amount)) < BigInt(0))) {
     throw new RangeError('Forecast line amounts must be nonnegative.')
+  }
+  const currency = await resolveAgreementCurrency(trx, input.agreementId)
+  if (!currency) return { status: 'agreement_unavailable' }
+  if (input.lineItems.some(line => line.currency !== currency)) {
+    throw new Error('Forecast line currencies must match the owning Agreement currency.')
   }
   const recipient = await trx.selectFrom('Funding_Case_Agreement_Applicant_Recipient')
     .select('id')

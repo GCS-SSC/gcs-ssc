@@ -1,3 +1,4 @@
+import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { sql } from 'kysely'
 import { FundingCaseAgreementCommitmentLineCreateSchema } from '~~/shared/types/schemas'
 import {
@@ -31,13 +32,15 @@ export default defineEventHandler(async event => {
       agreementContext,
       [{ type: 'commitment', id: validated.egcs_fc_commitment }],
       async (trx, currentContext) => {
-        await lockAgreementCommitmentEditable(event, trx, agreementId, validated.egcs_fc_commitment)
+        const commitment = await lockAgreementCommitmentEditable(event, trx, agreementId, validated.egcs_fc_commitment)
 
+        await assertAgreementCurrency(event, trx, agreementId, commitment.egcs_fc_currency)
         const chartOfAccount = await assertChartOfAccountBelongsToAgreementStream(
           event,
           trx,
           validated.egcs_fc_transferpaymentstreamchartofaccount,
-          currentContext.streamId
+          currentContext.streamId,
+          commitment.egcs_fc_currency
         )
         if (!chartOfAccount || typeof chartOfAccount !== 'object' || !('id' in chartOfAccount)) {
           return chartOfAccount

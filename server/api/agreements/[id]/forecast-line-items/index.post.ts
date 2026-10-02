@@ -1,3 +1,4 @@
+import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { sql } from 'kysely'
 import { FundingCaseAgreementForecastLineItemCreateSchema } from '~~/shared/types/schemas'
 import {
@@ -44,6 +45,7 @@ export default defineEventHandler(async event => {
         return budgetLineItem
       }
 
+      await assertAgreementCurrency(event, trx, agreementId, validated.egcs_fc_currency)
       const { egcs_fc_fundingsources: fundingSources = [], egcs_fc_amount: amount, egcs_fc_totalamount: totalAmount, ...lineValues } = validated
       const lineItem = await trx
         .insertInto('Funding_Case_Agreement_Forecast_Line_Item')

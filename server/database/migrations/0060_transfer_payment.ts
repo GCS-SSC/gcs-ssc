@@ -79,6 +79,7 @@ export async function up(db: Kysely<Database>): Promise<void> {
       col.notNull().references('Agency_Fiscal_Year.id').onDelete('restrict')
     )
     .addColumn('egcs_tp_totalbudget', TOTAL_BUDGET_TYPE, col => col.notNull())
+    .addColumn('egcs_tp_currency', sql`currency_codes`, col => col.notNull().defaultTo('cad'))
     .addColumn('egcs_tp_overcommitthreshold', THRESHOLD_TYPE, col => col.notNull())
     .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
     .execute()
@@ -120,6 +121,10 @@ export async function up(db: Kysely<Database>): Promise<void> {
             USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_stream_profile_immutable';
         END IF;
       ELSIF TG_TABLE_NAME = 'Transfer_Payment_Fiscal_Year_Budget' THEN
+        IF NEW.egcs_tp_currency IS DISTINCT FROM OLD.egcs_tp_currency THEN
+          RAISE EXCEPTION 'Transfer-payment Budget currency is immutable'
+            USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_budget_currency_immutable';
+        END IF;
         IF NEW.egcs_tp_transferpaymentprofile IS DISTINCT FROM OLD.egcs_tp_transferpaymentprofile THEN
           RAISE EXCEPTION 'Transfer-payment fiscal-year Budget ownership is immutable'
             USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_fiscal_year_budget_profile_immutable';
@@ -201,14 +206,16 @@ export async function up(db: Kysely<Database>): Promise<void> {
     DECLARE
       stream_profile_id bigint;
       budget_profile_id bigint;
+      budget_currency currency_codes;
+      previous_budget_currency currency_codes;
     BEGIN
       SELECT stream.egcs_tp_transferpaymentprofile
       INTO stream_profile_id
       FROM "Transfer_Payment_Stream" stream
       WHERE stream.id = NEW.egcs_tp_transferpaymentstream;
 
-      SELECT budget.egcs_tp_transferpaymentprofile
-      INTO budget_profile_id
+      SELECT budget.egcs_tp_transferpaymentprofile, budget.egcs_tp_currency
+      INTO budget_profile_id, budget_currency
       FROM "Transfer_Payment_Fiscal_Year_Budget" budget
       WHERE budget.id = NEW.egcs_tp_transferpaymentbudget;
 
@@ -217,6 +224,17 @@ export async function up(db: Kysely<Database>): Promise<void> {
         AND stream_profile_id IS DISTINCT FROM budget_profile_id THEN
         RAISE EXCEPTION 'Transfer-payment Stream Budget parents must belong to the same Transfer Payment Profile'
           USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_stream_budget_profile_ownership';
+      END IF;
+
+      IF TG_OP = 'UPDATE' AND NEW.egcs_tp_transferpaymentbudget IS DISTINCT FROM OLD.egcs_tp_transferpaymentbudget THEN
+        SELECT budget.egcs_tp_currency INTO previous_budget_currency
+        FROM "Transfer_Payment_Fiscal_Year_Budget" budget
+        WHERE budget.id = OLD.egcs_tp_transferpaymentbudget;
+        IF budget_currency IS NOT NULL AND previous_budget_currency IS NOT NULL
+          AND budget_currency IS DISTINCT FROM previous_budget_currency THEN
+          RAISE EXCEPTION 'Stream Budget currency is immutable through its Program Budget reference'
+            USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_stream_budget_currency_immutable';
+        END IF;
       END IF;
 
       RETURN NEW;
@@ -434,6 +452,18 @@ export async function up(db: Kysely<Database>): Promise<void> {
     .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
     .execute()
 
+  await sql`CREATE FUNCTION protect_stream_chart_catalog_link() RETURNS trigger AS $$
+    BEGIN
+      IF NEW.egcs_tp_agencychartofaccount IS DISTINCT FROM OLD.egcs_tp_agencychartofaccount THEN
+        RAISE EXCEPTION 'Stream Chart of Account catalog link is immutable'
+          USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_stream_chart_catalog_link_immutable';
+      END IF;
+      RETURN NEW;
+    END $$ LANGUAGE plpgsql`.execute(db)
+  await sql`CREATE TRIGGER trg_protect_stream_chart_catalog_link
+    BEFORE UPDATE OF egcs_tp_agencychartofaccount ON "Transfer_Payment_Stream_Chart_of_Account"
+    FOR EACH ROW EXECUTE FUNCTION protect_stream_chart_catalog_link()`.execute(db)
+
   await db.schema
     .createTable('Transfer_Payment_Stream_Commitment_Type')
     .addColumn('id', 'bigserial', col => col.primaryKey())
@@ -613,7 +643,8 @@ export async function up(db: Kysely<Database>): Promise<void> {
     CREATE UNIQUE INDEX ${sql.raw(INDEX_NAMES.programBudgetFiscalYear)}
     ON "Transfer_Payment_Fiscal_Year_Budget" (
       "egcs_tp_transferpaymentprofile",
-      "egcs_tp_fiscalyear"
+      "egcs_tp_fiscalyear",
+      "egcs_tp_currency"
     )
     WHERE "_deleted" = false
   `.execute(db)
@@ -944,6 +975,10 @@ export async function up(db: Kysely<Database>): Promise<void> {
             USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_stream_profile_immutable';
         END IF;
       ELSIF TG_TABLE_NAME = 'Transfer_Payment_Fiscal_Year_Budget' THEN
+        IF NEW.egcs_tp_currency IS DISTINCT FROM OLD.egcs_tp_currency THEN
+          RAISE EXCEPTION 'Transfer-payment Budget currency is immutable'
+            USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_budget_currency_immutable';
+        END IF;
         IF NEW.egcs_tp_transferpaymentprofile IS DISTINCT FROM OLD.egcs_tp_transferpaymentprofile THEN
           RAISE EXCEPTION 'Transfer-payment fiscal-year Budget ownership is immutable'
             USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_fiscal_year_budget_profile_immutable';
@@ -1006,6 +1041,7 @@ export async function down(db: Kysely<Database>): Promise<void> {
   await db.schema.dropTable('Transfer_Payment_Monitor_Type').execute()
   await db.schema.dropTable('Transfer_Payment_Stream_Commitment_Type').execute()
   await db.schema.dropTable('Transfer_Payment_Stream_Chart_of_Account').execute()
+  await sql`DROP FUNCTION protect_stream_chart_catalog_link()`.execute(db)
   await db.schema.dropTable('Transfer_Payment_Agreement_Subtype').execute()
   await sql`DROP TRIGGER IF EXISTS trg_enforce_amendment_subtype_type_stream_scope ON "Transfer_Payment_Amendment_Subtype_Type"`.execute(db)
   await sql`DROP FUNCTION IF EXISTS trg_fn_enforce_amendment_subtype_type_stream_scope()`.execute(db)

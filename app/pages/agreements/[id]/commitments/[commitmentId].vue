@@ -165,7 +165,9 @@ const displayValue = (value: string | number | null | undefined) => {
   return String(value)
 }
 
-const formatMoney = (value: Money) => formatMoneyText(value, locale.value, 'CAD')
+const formatMoney = (value: Money) => commitment.value?.egcs_fc_currency
+  ? formatMoneyText(value, locale.value, commitment.value.egcs_fc_currency.toUpperCase())
+  : value
 
 const getCodingSecondaryText = (line: FundingCaseAgreementCommitmentLineRow) => {
   const activeLocale = locale.value === 'fr' ? 'fr' : 'en'
@@ -289,7 +291,7 @@ const handleCompleted = async () => {
             :is-collapsed="isHeroCollapsed"
             icon="i-lucide-file-check-2"
             :title="getBilingualValue(commitment, 'commitment_type_name', commitmentId)"
-            :meta-items="[displayValue(profile.egcs_fc_agreementnumber), getBilingualValue(profile, 'egcs_fc_title', agreementId)]"
+            :meta-items="[displayValue(profile.egcs_fc_agreementnumber), getBilingualValue(profile, 'egcs_fc_title', agreementId), commitment.egcs_fc_currency.toUpperCase()]"
             :badges="[{
               statusId: commitment.egcs_fc_status,
               isCompleted: commitment.isCompleted,
@@ -418,7 +420,7 @@ const handleCompleted = async () => {
             <CommonServerLookupSelect
               v-model="selectedLine.egcs_fc_transferpaymentstreamchartofaccount"
               :fetch-url="`/api/agreements/${agreementId}/commitment-lines/lookups/chart-of-accounts`"
-              :query="{ permission_action: 'update', commitmentId }"
+              :query="{ permission_action: 'update', commitmentId, ...(commitment ? { currency: commitment.egcs_fc_currency } : {}) }"
               value-key="id"
               label-en-key="label_en"
               label-fr-key="label_fr"

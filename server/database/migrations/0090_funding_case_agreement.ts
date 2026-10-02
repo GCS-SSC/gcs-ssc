@@ -85,6 +85,7 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
       col.primaryKey().notNull().references('Common_Entity.id').onDelete('restrict')
     )
     .addColumn('egcs_fc_agreementnumber', 'varchar(15)', col => col.notNull())
+    .addColumn('egcs_fc_currency', sql`currency_codes`, col => col.notNull())
     .addColumn('egcs_fc_transferpaymentstream', 'bigint', col =>
       col.notNull().references('Transfer_Payment_Stream.id').onDelete('restrict')
     )
@@ -1154,6 +1155,7 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
     )
     .addColumn('egcs_fc_transferpaymentstream', 'bigint', col => col.notNull())
     .addColumn('egcs_fc_type', 'bigint', col => col.notNull())
+    .addColumn('egcs_fc_currency', sql`currency_codes`, col => col.notNull().defaultTo('cad'))
     .addColumn('egcs_fc_status', 'bigint', col => col.notNull().references('Common_Status.id').onDelete('restrict'))
     .addColumn('egcs_fc_financialsystemnumber', 'bigint')
     .addColumn('egcs_fc_active', 'boolean', col => col.defaultTo(false).notNull())
@@ -1171,6 +1173,10 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
   await sql`
     CREATE OR REPLACE FUNCTION trg_fn_resolve_commitment_stream() RETURNS trigger AS $$
     BEGIN
+      IF TG_OP = 'UPDATE' AND NEW.egcs_fc_currency IS DISTINCT FROM OLD.egcs_fc_currency THEN
+        RAISE EXCEPTION 'Commitment currency is immutable'
+          USING ERRCODE = '23514', CONSTRAINT = 'fc_chk_commitment_currency_immutable';
+      END IF;
       SELECT agreement."egcs_fc_transferpaymentstream"
       INTO NEW."egcs_fc_transferpaymentstream"
       FROM "Funding_Case_Agreement_Profile" agreement
@@ -1181,7 +1187,7 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
   `.execute(db)
   await sql`
     CREATE TRIGGER trg_resolve_commitment_stream
-    BEFORE INSERT OR UPDATE OF egcs_fc_fundingagreement, egcs_fc_transferpaymentstream
+    BEFORE INSERT OR UPDATE OF egcs_fc_fundingagreement, egcs_fc_transferpaymentstream, egcs_fc_currency
     ON "Funding_Case_Agreement_Commitment"
     FOR EACH ROW EXECUTE FUNCTION trg_fn_resolve_commitment_stream();
   `.execute(db)
@@ -1198,7 +1204,8 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
     CREATE UNIQUE INDEX ${sql.raw(INDEX_NAMES.activeCommitmentAgreement)}
     ON "Funding_Case_Agreement_Commitment" (
       "egcs_fc_fundingagreement",
-      "egcs_fc_type"
+      "egcs_fc_type",
+      "egcs_fc_currency"
     )
     WHERE "_deleted" = false AND "egcs_fc_active" = true
   `.execute(db)
@@ -1250,6 +1257,7 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
 
   await sql`
     CREATE OR REPLACE FUNCTION trg_fn_resolve_commitment_line_scope() RETURNS trigger AS $$
+    DECLARE commitment_currency currency_codes; chart_currency currency_codes;
     BEGIN
       SELECT commitment."egcs_fc_fundingagreement", agreement."egcs_fc_transferpaymentstream"
       INTO NEW."egcs_fc_fundingagreement", NEW."egcs_fc_transferpaymentstream"
@@ -1257,13 +1265,23 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
       JOIN "Funding_Case_Agreement_Profile" agreement
         ON agreement."id" = commitment."egcs_fc_fundingagreement"
       WHERE commitment."id" = NEW."egcs_fc_commitment";
+      SELECT egcs_fc_currency INTO commitment_currency FROM "Funding_Case_Agreement_Commitment"
+        WHERE id = NEW.egcs_fc_commitment;
+      SELECT account.egcs_ay_currency INTO chart_currency
+        FROM "Transfer_Payment_Stream_Chart_of_Account" coding
+        JOIN "Agency_Chart_of_Account" account ON account.id = coding.egcs_tp_agencychartofaccount
+        WHERE coding.id = NEW.egcs_fc_transferpaymentstreamchartofaccount;
+      IF commitment_currency IS DISTINCT FROM chart_currency THEN
+        RAISE EXCEPTION 'Commitment and Chart of Account currencies must match'
+          USING ERRCODE = '23514', CONSTRAINT = 'fc_chk_commitment_line_currency';
+      END IF;
       RETURN NEW;
     END;
     $$ LANGUAGE plpgsql;
   `.execute(db)
   await sql`
     CREATE TRIGGER trg_resolve_commitment_line_scope
-    BEFORE INSERT OR UPDATE OF egcs_fc_commitment, egcs_fc_fundingagreement, egcs_fc_transferpaymentstream
+    BEFORE INSERT OR UPDATE OF egcs_fc_commitment, egcs_fc_fundingagreement, egcs_fc_transferpaymentstream, egcs_fc_transferpaymentstreamchartofaccount
     ON "Funding_Case_Agreement_Commitment_Line"
     FOR EACH ROW EXECUTE FUNCTION trg_fn_resolve_commitment_line_scope();
   `.execute(db)
@@ -1284,39 +1302,29 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
       target_commitment_id bigint DEFAULT NULL
     ) RETURNS void AS $$
     DECLARE
-      program_funding_total numeric;
       violating_commitment_id bigint;
     BEGIN
-      SELECT COALESCE(SUM(line_item."egcs_fc_programfunding"), 0)
-      INTO program_funding_total
-      FROM "Funding_Case_Agreement_Budget_Line_Item" line_item
-      INNER JOIN "Funding_Case_Agreement_Budget_Fiscal_Year" budget_year
-        ON budget_year."id" = line_item."egcs_fc_fundingagreementbudgetfiscalyear"
-      INNER JOIN "Funding_Case_Agreement_Budget_Version" budget_version
-        ON budget_version."id" = budget_year."egcs_fc_budgetversion"
-        AND budget_version."egcs_fc_fundingagreement" = budget_year."egcs_fc_fundingagreement"
-      WHERE budget_year."egcs_fc_fundingagreement" = target_agreement_id
-        AND line_item."_deleted" = false
-        AND budget_year."_deleted" = false
-        AND budget_version."egcs_fc_iscurrent" = true
-        AND budget_version."_deleted" = false;
-
-      SELECT commitment_totals."commitment_id"
-      INTO violating_commitment_id
-      FROM (
-        SELECT
-          commitment."id" AS "commitment_id",
-          COALESCE(SUM(commitment_line."egcs_fc_amount"), 0) AS "commitment_total"
-        FROM "Funding_Case_Agreement_Commitment" commitment
-        INNER JOIN "Funding_Case_Agreement_Commitment_Line" commitment_line
-          ON commitment_line."egcs_fc_commitment" = commitment."id"
-        WHERE commitment."egcs_fc_fundingagreement" = target_agreement_id
-          AND (target_commitment_id IS NULL OR commitment."id" = target_commitment_id)
-          AND commitment."_deleted" = false
-          AND commitment_line."_deleted" = false
-        GROUP BY commitment."id"
-      ) commitment_totals
-      WHERE commitment_totals."commitment_total" > program_funding_total
+      SELECT commitment.id INTO violating_commitment_id
+      FROM "Funding_Case_Agreement_Commitment" commitment
+      JOIN "Funding_Case_Agreement_Commitment_Line" commitment_line
+        ON commitment_line.egcs_fc_commitment = commitment.id
+      WHERE commitment.egcs_fc_fundingagreement = target_agreement_id
+        AND (target_commitment_id IS NULL OR commitment.id = target_commitment_id)
+        AND commitment._deleted = false AND commitment_line._deleted = false
+      GROUP BY commitment.id, commitment.egcs_fc_currency
+      HAVING SUM(commitment_line.egcs_fc_amount) > COALESCE((
+        SELECT SUM(line_item.egcs_fc_programfunding)
+        FROM "Funding_Case_Agreement_Budget_Line_Item" line_item
+        JOIN "Funding_Case_Agreement_Budget_Fiscal_Year" budget_year
+          ON budget_year.id = line_item.egcs_fc_fundingagreementbudgetfiscalyear
+        JOIN "Funding_Case_Agreement_Budget_Version" budget_version
+          ON budget_version.id = budget_year.egcs_fc_budgetversion
+          AND budget_version.egcs_fc_fundingagreement = budget_year.egcs_fc_fundingagreement
+        WHERE budget_year.egcs_fc_fundingagreement = target_agreement_id
+          AND line_item.egcs_fc_currency = commitment.egcs_fc_currency
+          AND line_item._deleted = false AND budget_year._deleted = false
+          AND budget_version.egcs_fc_iscurrent = true AND budget_version._deleted = false
+      ), 0)
       LIMIT 1;
 
       IF violating_commitment_id IS NOT NULL THEN
@@ -1462,17 +1470,24 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
 
   await sql`
     CREATE OR REPLACE FUNCTION trg_fn_resolve_payment_agreement() RETURNS trigger AS $$
+    DECLARE commitment_currency currency_codes;
     BEGIN
       SELECT "egcs_fc_fundingagreement" INTO NEW."egcs_fc_fundingagreement"
       FROM "Funding_Case_Agreement_Commitment"
       WHERE "id" = NEW."egcs_fc_fundingagreementcommitment";
+      SELECT egcs_fc_currency INTO commitment_currency FROM "Funding_Case_Agreement_Commitment"
+        WHERE id = NEW.egcs_fc_fundingagreementcommitment;
+      IF NEW.egcs_fc_currency IS DISTINCT FROM commitment_currency THEN
+        RAISE EXCEPTION 'Payment and Commitment currencies must match'
+          USING ERRCODE = '23514', CONSTRAINT = 'fc_chk_payment_commitment_currency';
+      END IF;
       RETURN NEW;
     END;
     $$ LANGUAGE plpgsql;
   `.execute(db)
   await sql`
     CREATE TRIGGER trg_resolve_payment_agreement
-    BEFORE INSERT OR UPDATE OF egcs_fc_fundingagreementcommitment, egcs_fc_fundingagreement
+    BEFORE INSERT OR UPDATE OF egcs_fc_fundingagreementcommitment, egcs_fc_fundingagreement, egcs_fc_currency
     ON "Funding_Case_Agreement_Payment"
     FOR EACH ROW EXECUTE FUNCTION trg_fn_resolve_payment_agreement();
   `.execute(db)
@@ -2244,9 +2259,54 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
   await sql`CREATE TRIGGER guard_referenced_proponent_subtype BEFORE UPDATE ON "Agency_Applicant_Recipient_Subtype"
       FOR EACH ROW EXECUTE FUNCTION guard_referenced_proponent_subtype()`.execute(db)
 
+  // Native denomination is an Agreement invariant. These guards run after owning
+  // scope resolvers, and protect direct SQL as well as every API writer.
+  await sql`CREATE FUNCTION guard_agreement_currency_immutable() RETURNS trigger AS $$
+    BEGIN
+      IF NEW.egcs_fc_currency IS DISTINCT FROM OLD.egcs_fc_currency THEN
+        RAISE EXCEPTION 'Agreement currency is immutable'
+          USING ERRCODE = '23514', CONSTRAINT = 'fc_chk_agreement_currency_immutable';
+      END IF;
+      RETURN NEW;
+    END $$ LANGUAGE plpgsql`.execute(db)
+  await sql`CREATE TRIGGER guard_agreement_currency_immutable
+    BEFORE UPDATE OF egcs_fc_currency ON "Funding_Case_Agreement_Profile"
+    FOR EACH ROW EXECUTE FUNCTION guard_agreement_currency_immutable()`.execute(db)
+  await sql`CREATE FUNCTION guard_agreement_financial_currency() RETURNS trigger AS $$
+    DECLARE agreement_currency currency_codes;
+    BEGIN
+      SELECT egcs_fc_currency INTO agreement_currency FROM "Funding_Case_Agreement_Profile"
+        WHERE id = NEW.egcs_fc_fundingagreement;
+      -- Missing owners are rejected by the owning FK, without hiding its error.
+      IF FOUND AND NEW.egcs_fc_currency IS DISTINCT FROM agreement_currency THEN
+        RAISE EXCEPTION 'Financial currency must match its Agreement'
+          USING ERRCODE = '23514', CONSTRAINT = 'fc_chk_agreement_financial_currency';
+      END IF;
+      RETURN NEW;
+    END $$ LANGUAGE plpgsql`.execute(db)
+  for (const table of [
+    'Funding_Case_Agreement_Budget_Line_Item',
+    'Funding_Case_Agreement_Forecast_Line_Item',
+    'Funding_Case_Agreement_Claim_Line_Item',
+    'Funding_Case_Agreement_Commitment',
+    'Funding_Case_Agreement_Payment'
+  ]) {
+    await sql`CREATE TRIGGER zz_guard_agreement_financial_currency
+      BEFORE INSERT OR UPDATE ON ${sql.table(table)}
+      FOR EACH ROW EXECUTE FUNCTION guard_agreement_financial_currency()`.execute(db)
+  }
+
 }
 
 export const down = async (db: Kysely<Database>): Promise<void> => {
+  for (const table of [
+    'Funding_Case_Agreement_Budget_Line_Item', 'Funding_Case_Agreement_Forecast_Line_Item',
+    'Funding_Case_Agreement_Claim_Line_Item', 'Funding_Case_Agreement_Commitment', 'Funding_Case_Agreement_Payment'
+  ]) await sql`DROP TRIGGER IF EXISTS zz_guard_agreement_financial_currency ON ${sql.table(table)}`.execute(db)
+  await sql`DROP FUNCTION IF EXISTS guard_agreement_financial_currency()`.execute(db)
+  await sql`DROP TRIGGER IF EXISTS guard_agreement_currency_immutable ON "Funding_Case_Agreement_Profile"`.execute(db)
+  await sql`DROP FUNCTION IF EXISTS guard_agreement_currency_immutable()`.execute(db)
+
   for (const [table, trigger] of [
     ['Funding_Case_Agreement_Applicant_Recipient', 'guard_future_proponent_type'],
     ['Funding_Case_Agreement_Profile', 'guard_future_agreement_proponent_types'],

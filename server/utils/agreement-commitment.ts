@@ -1,3 +1,4 @@
+import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 /* eslint-disable jsdoc/require-jsdoc -- Existing exported commitment helpers are intentionally documented by their descriptive names. */
 import { getRouterParam, type H3Event } from 'h3'
 import { sql } from 'kysely'
@@ -13,7 +14,7 @@ import {
 import { throwIfAgreementUniqueConstraintError } from '~~/server/utils/agreement-unique-constraint-errors'
 import { lockAgreementAggregate, lockAgreementAggregates, type AgreementAggregateLock } from '~~/server/utils/agreement-aggregate-lock'
 import { FundingCaseAgreementCommitmentLinePatchSchema } from '~~/shared/types/schemas'
-import type { AssignableEntityType, Database } from '~~/shared/types/database'
+import type { AssignableEntityType, Currency_Codes, Database } from '~~/shared/types/database'
 import type { FundingCaseAgreementCommitmentLinePatch } from '~~/shared/types/schemas/funding-case-agreement'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
 import { authorizeFreshAssignedItem } from '~~/server/utils/authorize'
@@ -135,6 +136,7 @@ export const getAgreementCommitment = async (
     'id',
     'egcs_fc_fundingagreement',
     'egcs_fc_type',
+    'egcs_fc_currency',
     'egcs_fc_status',
     'egcs_fc_financialsystemnumber'
   ])
@@ -247,9 +249,10 @@ export const assertChartOfAccountBelongsToAgreementStream = async (
   event: H3Event,
   db: DbClient,
   chartOfAccountId: string,
-  streamId: string
+  streamId: string,
+  currency?: Currency_Codes
 ) => {
-  const chartOfAccount = await db
+  let chartQuery = db
     .selectFrom('Transfer_Payment_Stream_Chart_of_Account')
     .innerJoin('Agency_Chart_of_Account', 'Agency_Chart_of_Account.id', 'Transfer_Payment_Stream_Chart_of_Account.egcs_tp_agencychartofaccount')
     .where('Transfer_Payment_Stream_Chart_of_Account.id', '=', chartOfAccountId)
@@ -258,7 +261,8 @@ export const assertChartOfAccountBelongsToAgreementStream = async (
     .where('Agency_Chart_of_Account._deleted', '=', false)
     .select('Transfer_Payment_Stream_Chart_of_Account.id as id')
     .forUpdate('Transfer_Payment_Stream_Chart_of_Account')
-    .executeTakeFirst()
+  if (currency) chartQuery = chartQuery.where('Agency_Chart_of_Account.egcs_ay_currency', '=', currency)
+  const chartOfAccount = await chartQuery.executeTakeFirst()
 
   if (!chartOfAccount) {
     return await badRequest(event, 'INVALID_AGREEMENT_CHART_OF_ACCOUNT', 'apiErrors.agreement.invalid_chart_of_account')
@@ -338,19 +342,25 @@ const validateAgreementCommitmentLinePatchReferences = async (
     return currentCommitment
   }
 
+  let targetCurrency = currentCommitment.egcs_fc_currency
   if (Object.hasOwn(patchValues, 'egcs_fc_commitment')) {
     const nextCommitment = await assertNextAgreementCommitmentEditable(event, db, agreementId, String(patchValues.egcs_fc_commitment))
     if (!hasKey(nextCommitment, 'id')) {
       return nextCommitment
     }
+    const selectedCommitment = await getAgreementCommitment(db, agreementId, String(nextCommitment.id))
+    if (!selectedCommitment) return await badRequest(event, 'AGREEMENT_COMMITMENT_NOT_FOUND', 'apiErrors.agreement.commitment_not_found')
+    targetCurrency = selectedCommitment.egcs_fc_currency
   }
 
-  if (Object.hasOwn(patchValues, 'egcs_fc_transferpaymentstreamchartofaccount')) {
+  await assertAgreementCurrency(event, db, agreementId, targetCurrency)
+  if (Object.hasOwn(patchValues, 'egcs_fc_transferpaymentstreamchartofaccount') || Object.hasOwn(patchValues, 'egcs_fc_commitment')) {
     const chartOfAccount = await assertChartOfAccountBelongsToAgreementStream(
       event,
       db,
-      String(patchValues.egcs_fc_transferpaymentstreamchartofaccount),
-      streamId
+      String(patchValues.egcs_fc_transferpaymentstreamchartofaccount ?? existingLine.egcs_fc_transferpaymentstreamchartofaccount),
+      streamId,
+      targetCurrency
     )
     if (!hasKey(chartOfAccount, 'id')) {
       return chartOfAccount
@@ -375,7 +385,7 @@ export const assertAgreementCommitmentTotalWithinProgramFunding = async (
 ) => {
   const commitment = await db
     .selectFrom('Funding_Case_Agreement_Commitment')
-    .select('id')
+    .select(['id', 'egcs_fc_currency'])
     .where('id', '=', commitmentId)
     .where('egcs_fc_fundingagreement', '=', agreementId)
     .where('_deleted', '=', false)
@@ -403,6 +413,7 @@ export const assertAgreementCommitmentTotalWithinProgramFunding = async (
     )
     .where('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fundingagreement', '=', agreementId)
     .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false)
+    .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_currency', '=', commitment.egcs_fc_currency)
     .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
     .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)
     .where('Funding_Case_Agreement_Budget_Version._deleted', '=', false)

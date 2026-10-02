@@ -1,3 +1,5 @@
+import { resolveAgreementCurrency } from './agreement-currency'
+import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Correction domain contracts are documented in private architecture/corrections.md. */
 import type { H3Event } from 'h3'
 import { sql, type Kysely, type Transaction } from 'kysely'
@@ -106,16 +108,17 @@ const assertCreationReadiness = async (event: H3Event, trx: Transaction<Database
   }
 }
 
-const validateCurrencyLineage = async (db: Kysely<Database>, agreementId: string, currency: Database['Funding_Case_Agreement_Payment']['egcs_fc_currency']) => {
-  const mismatched = await db.selectFrom('Funding_Case_Agreement_Payment as payment').select('payment.id')
-    .where('payment.egcs_fc_fundingagreement', '=', agreementId).where('payment.egcs_fc_currency', '!=', currency)
-    .where(agreementPaymentIsFinal('payment', { requireResolvedApproval: true })).executeTakeFirst()
-  if (mismatched) throw new CorrectionAccountingError('COR_CURRENCY_AMBIGUOUS')
-  const currencies = await db.selectFrom('Funding_Case_Agreement_Budget_Line_Item as line')
-    .innerJoin('Funding_Case_Agreement_Budget_Version as version', 'version.id', 'line.egcs_fc_budgetversion')
-    .select('line.egcs_fc_currency').distinct().where('line.egcs_fc_fundingagreement', '=', agreementId)
-    .where('version.egcs_fc_iscurrent', '=', true).where('version._deleted', '=', false).where('line._deleted', '=', false).execute()
-  if (currencies.length > 1 || currencies.some(row => row.egcs_fc_currency !== currency)) throw new CorrectionAccountingError('COR_CURRENCY_AMBIGUOUS')
+const validateCurrencyLineage = async (db: Kysely<Database>, agreementId: string, commitmentId: string, currency: Database['Funding_Case_Agreement_Payment']['egcs_fc_currency']) => {
+  if (await resolveAgreementCurrency(db, agreementId) !== currency) throw new CorrectionAccountingError('COR_CURRENCY_AMBIGUOUS')
+  const commitment = await db.selectFrom('Funding_Case_Agreement_Commitment').select('egcs_fc_currency')
+    .where('id', '=', commitmentId).where('egcs_fc_fundingagreement', '=', agreementId).where('_deleted', '=', false).executeTakeFirst()
+  if (!commitment || commitment.egcs_fc_currency !== currency) throw new CorrectionAccountingError('COR_CURRENCY_AMBIGUOUS')
+  const mismatchedChart = await db.selectFrom('Funding_Case_Agreement_Commitment_Line as line')
+    .innerJoin('Transfer_Payment_Stream_Chart_of_Account as coding', 'coding.id', 'line.egcs_fc_transferpaymentstreamchartofaccount')
+    .innerJoin('Agency_Chart_of_Account as chart', 'chart.id', 'coding.egcs_tp_agencychartofaccount')
+    .select('line.id').where('line.egcs_fc_commitment', '=', commitmentId).where('line._deleted', '=', false)
+    .where('chart.egcs_ay_currency', '!=', currency).executeTakeFirst()
+  if (mismatchedChart) throw new CorrectionAccountingError('COR_CURRENCY_AMBIGUOUS')
 }
 
 export const createCorrection = async (event: H3Event, agreementId: string, input: CorrectionCreate) => {
@@ -136,9 +139,10 @@ export const createCorrection = async (event: H3Event, agreementId: string, inpu
       sources.push({ paymentId, accounting })
     }
     const currency = sources[0]!.accounting.header.egcs_fc_currency
+    await assertAgreementCurrency(event, trx, agreementId, currency)
     if (sources.some(source => source.accounting.header.egcs_fc_currency !== currency)) return await correctionError(event, 'COR_CURRENCY_AMBIGUOUS')
     try {
-      await validateCurrencyLineage(trx, agreementId, currency)
+      await validateCurrencyLineage(trx, agreementId, input.egcs_fc_commitment, currency)
     } catch (error) {
       if (!(error instanceof CorrectionAccountingError)) throw error
       return await correctionError(event, error.code)
@@ -201,7 +205,7 @@ export const validateCorrectionPostingBasis = async (
 ) => {
   const header = await trx.selectFrom('Funding_Case_Agreement_Correction').selectAll().where('id', '=', id).where('_deleted', '=', false).executeTakeFirstOrThrow()
   if (header.egcs_fc_outcome !== 'open') throw new CorrectionAccountingError('COR_TERMINAL')
-  await validateCurrencyLineage(trx, String(header.egcs_fc_fundingagreement), header.egcs_fc_currency)
+  await validateCurrencyLineage(trx, String(header.egcs_fc_fundingagreement), String(header.egcs_fc_commitment), header.egcs_fc_currency)
   if (options.requireAdjustment && !header.egcs_fc_narrative_en.trim() && !header.egcs_fc_narrative_fr.trim()) throw new CorrectionAccountingError('COR_RATIONALE_REQUIRED')
   const saved = await readCorrectionLines(trx, id)
   const current = (await getAgreementAccountingLines(trx, String(header.egcs_fc_fundingagreement), { paymentMode: 'finalized' }))

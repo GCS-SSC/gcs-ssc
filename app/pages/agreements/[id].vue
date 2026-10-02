@@ -451,6 +451,7 @@ const cancel = () => {
             <AgreementBudgetTab
               v-else-if="selectedTab === 'budget'"
               :agreement-id="id"
+              :currency="profile.egcs_fc_currency"
               :can-create="canCreateChildRecords"
               :can-update="canUpdateChildRecords"
               :can-delete="canDeleteChildRecords"
@@ -543,6 +544,7 @@ const cancel = () => {
             <AgreementCommitmentsTab
               v-else-if="selectedTab === 'commitments'"
               :agreement-id="id"
+              :currency="profile.egcs_fc_currency"
               :can-create="canCreateChildRecords"
               :can-update="canUpdateChildRecords"
               :can-delete="canDeleteChildRecords" />
@@ -550,6 +552,7 @@ const cancel = () => {
             <AgreementPaymentsTab
               v-else-if="selectedTab === 'payments'"
               :agreement-id="id"
+              :currency="profile.egcs_fc_currency"
               :can-create="canCreateChildRecords"
               :can-update="canUpdateChildRecords"
               :can-delete="canDeleteChildRecords" />

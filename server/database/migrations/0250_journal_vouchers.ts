@@ -110,6 +110,14 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
         WHERE egcs_fc_fundingagreementpayment = source_id AND egcs_fc_fundingagreementcommitmentline = NEW.egcs_fc_commitmentline) THEN
         RAISE EXCEPTION 'JV commitment line must belong to source Payment' USING ERRCODE = '23514';
       END IF;
+      IF TG_OP <> 'DELETE' AND NOT EXISTS (
+        SELECT 1 FROM "Funding_Case_Agreement_Journal_Voucher" voucher
+        JOIN "Transfer_Payment_Stream_Chart_of_Account" coding ON coding.id = NEW.egcs_fc_chartofaccount
+        JOIN "Agency_Chart_of_Account" account ON account.id = coding.egcs_tp_agencychartofaccount
+        WHERE voucher.id = root_id AND account.egcs_ay_currency = voucher.egcs_fc_currency
+      ) THEN
+        RAISE EXCEPTION 'JV Chart of Account currency must match its Payment' USING ERRCODE = '23514';
+      END IF;
       IF TG_OP = 'UPDATE' AND OLD.egcs_fc_journalvoucher IS DISTINCT FROM NEW.egcs_fc_journalvoucher THEN
         RAISE EXCEPTION 'JV lines cannot move between roots' USING ERRCODE = '23514';
       END IF;
@@ -117,6 +125,9 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
       RETURN NEW;
     END $$ LANGUAGE plpgsql`.execute(db)
   await sql`CREATE TRIGGER trg_protect_jv_line BEFORE INSERT OR UPDATE OR DELETE ON "Funding_Case_Agreement_Journal_Voucher_Line" FOR EACH ROW EXECUTE FUNCTION trg_fn_protect_jv_line()`.execute(db)
+  await sql`CREATE TRIGGER zz_guard_agreement_financial_currency
+    BEFORE INSERT OR UPDATE ON "Funding_Case_Agreement_Journal_Voucher"
+    FOR EACH ROW EXECUTE FUNCTION guard_agreement_financial_currency()`.execute(db)
   await installAuditOwnershipFunctions(db)
   await sql`SELECT audit.reconcile_capture()`.execute(db)
 }

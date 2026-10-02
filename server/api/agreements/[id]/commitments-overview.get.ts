@@ -24,6 +24,7 @@ export default defineEventHandler(async event => {
           'Funding_Case_Agreement_Commitment.id as id',
           'Funding_Case_Agreement_Commitment.egcs_fc_fundingagreement as egcs_fc_fundingagreement',
           'Funding_Case_Agreement_Commitment.egcs_fc_type as egcs_fc_type',
+          'Funding_Case_Agreement_Commitment.egcs_fc_currency as egcs_fc_currency',
           'Funding_Case_Agreement_Commitment.egcs_fc_status as egcs_fc_status',
           'Funding_Case_Agreement_Commitment.egcs_fc_active as egcs_fc_active',
           'Funding_Case_Agreement_Commitment.egcs_fc_financialsystemnumber as egcs_fc_financialsystemnumber',

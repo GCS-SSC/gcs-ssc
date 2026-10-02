@@ -1,3 +1,4 @@
+import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import type { Insertable } from 'kysely'
 import { FundingCaseAgreementCommitmentCreateSchema } from '~~/shared/types/schemas'
 import type { FundingCaseAgreementCommitmentTable } from '~~/shared/types/database'
@@ -20,6 +21,7 @@ export default defineEventHandler(async event => {
 
   try {
     return await executeFreshAuthorizedAgreementWrite(event, db, agreementId, agreementContext, async (trx, currentContext, auth) => {
+      await assertAgreementCurrency(event, trx, agreementId, validated.egcs_fc_currency)
       const commitmentType = await assertCommitmentTypeBelongsToAgreementStream(event, trx, validated.egcs_fc_type, currentContext.streamId)
       if (!commitmentType || !('id' in commitmentType)) return commitmentType
       const extensionResponse = await runExtensionCreateOperationHooks(
@@ -42,6 +44,7 @@ export default defineEventHandler(async event => {
         .values({
           egcs_fc_fundingagreement: agreementId,
           egcs_fc_type: validated.egcs_fc_type,
+          egcs_fc_currency: validated.egcs_fc_currency,
           egcs_fc_status: draftStatusId,
           egcs_fc_financialsystemnumber: null
         } satisfies Insertable<FundingCaseAgreementCommitmentTable>)

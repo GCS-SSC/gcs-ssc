@@ -77,6 +77,7 @@ export default defineEventHandler(async event => {
           .select([
             'Transfer_Payment_Fiscal_Year_Budget.id as id',
             'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_fiscalyear as fiscal_year_id',
+            'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_currency',
             databaseMoneyText(sql.ref('Transfer_Payment_Fiscal_Year_Budget.egcs_tp_totalbudget')).as('total_budget')
           ])
           .orderBy('Transfer_Payment_Fiscal_Year_Budget.id', 'asc')
@@ -88,6 +89,9 @@ export default defineEventHandler(async event => {
         }
 
         const currentBudget = budgets.find(candidate => String(candidate.id) === String(lockedStreamBudget.budget_id))
+        if (currentBudget && currentBudget.egcs_tp_currency !== budget.egcs_tp_currency) {
+          return await badRequest(event, 'TRANSFER_PAYMENT_STREAM_BUDGET_CURRENCY_IMMUTABLE', 'apiErrors.transfer_payment.budget_currency_immutable')
+        }
         if (currentBudget && currentBudget.fiscal_year_id !== budget.fiscal_year_id) {
           const replacement = await trx.selectFrom('Transfer_Payment_Stream_Budget')
             .innerJoin('Transfer_Payment_Fiscal_Year_Budget', 'Transfer_Payment_Fiscal_Year_Budget.id', 'Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentbudget')
@@ -95,6 +99,7 @@ export default defineEventHandler(async event => {
             .where('Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentstream', '=', streamId)
             .where('Transfer_Payment_Stream_Budget._deleted', '=', false)
             .where('Transfer_Payment_Fiscal_Year_Budget.egcs_tp_fiscalyear', '=', currentBudget.fiscal_year_id)
+            .where('Transfer_Payment_Fiscal_Year_Budget.egcs_tp_currency', '=', currentBudget.egcs_tp_currency)
             .select('Transfer_Payment_Stream_Budget.id')
             .forUpdate('Transfer_Payment_Stream_Budget')
             .executeTakeFirst()
@@ -104,6 +109,7 @@ export default defineEventHandler(async event => {
               .where('Transfer_Payment_Stream_Chart_of_Account.egcs_tp_transferpaymentstream', '=', streamId)
               .where('Transfer_Payment_Stream_Chart_of_Account._deleted', '=', false)
               .where('Agency_Chart_of_Account.egcs_ay_fiscalyear', '=', currentBudget.fiscal_year_id)
+              .where('Agency_Chart_of_Account.egcs_ay_currency', '=', currentBudget.egcs_tp_currency)
               .select('Transfer_Payment_Stream_Chart_of_Account.id')
               .forUpdate('Transfer_Payment_Stream_Chart_of_Account')
               .executeTakeFirst()
@@ -117,7 +123,7 @@ export default defineEventHandler(async event => {
           .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentstream')
           .innerJoin('Transfer_Payment_Fiscal_Year_Budget', 'Transfer_Payment_Fiscal_Year_Budget.id', 'Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentbudget')
           .where('Transfer_Payment_Stream.egcs_tp_transferpaymentprofile', '=', profileId)
-          .where('Transfer_Payment_Fiscal_Year_Budget.egcs_tp_fiscalyear', '=', budget.fiscal_year_id)
+          .where('Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentbudget', '=', String(budget.id))
           .where('Transfer_Payment_Stream_Budget._deleted', '=', false)
           .where('Transfer_Payment_Stream._deleted', '=', false)
           .where('Transfer_Payment_Fiscal_Year_Budget._deleted', '=', false)
@@ -145,7 +151,7 @@ export default defineEventHandler(async event => {
             'egcs_tp_overcommitthreshold'
           ])
           .executeTakeFirstOrThrow()
-          .then(row => ({ ...row, egcs_tp_totalbudget: parseDatabaseMoney(row.egcs_tp_totalbudget) }))
+          .then(row => ({ ...row, egcs_tp_currency: budget.egcs_tp_currency, egcs_tp_totalbudget: parseDatabaseMoney(row.egcs_tp_totalbudget) }))
       }
     )
   } catch (error) {

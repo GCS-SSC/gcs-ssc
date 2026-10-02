@@ -2495,6 +2495,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
       ? await db
         .insertInto('Transfer_Payment_Fiscal_Year_Budget')
         .values({
+          egcs_tp_currency: 'cad',
           egcs_tp_transferpaymentprofile: String(profile.id),
           egcs_tp_fiscalyear: String(fiscalYear.id),
           egcs_tp_totalbudget: seedMoney('99.99'),
@@ -2635,6 +2636,7 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
           : await db
             .insertInto('Transfer_Payment_Fiscal_Year_Budget')
             .values({
+              egcs_tp_currency: 'cad',
               egcs_tp_transferpaymentprofile: String(profile.id),
               egcs_tp_fiscalyear: String(agencyFiscalYear.id),
               egcs_tp_totalbudget: seedMoney(budgetIndex === 0 ? '99.99' : '95.00'),
@@ -2703,9 +2705,11 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
           let agencyChart = await db.selectFrom('Agency_Chart_of_Account').select('id')
             .where('egcs_ay_fiscalyear', '=', String(agencyFiscalYear.id))
             .where('egcs_ay_accountingdimensions', '=', sql`${dimensions}::jsonb`)
+            .where('egcs_ay_currency', '=', 'cad')
             .where('_deleted', '=', false)
             .executeTakeFirst()
           agencyChart ??= await db.insertInto('Agency_Chart_of_Account').values({
+            egcs_ay_currency: 'cad',
             egcs_ay_organizationagency: String(agency.id),
             egcs_ay_fiscalyear: String(agencyFiscalYear.id),
             egcs_ay_accountingdimensions: sql`${dimensions}::jsonb`
@@ -4431,6 +4435,7 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
     const agreement = await db
       .insertInto('Funding_Case_Agreement_Profile')
       .values({
+        egcs_fc_currency: 'cad',
         egcs_fc_agreementnumber: `AGR-${String(index + 1).padStart(4, '0')}`,
         egcs_fc_transferpaymentstream: String(stream.streamId),
         egcs_fc_status: agencyStatusIds.draft,
@@ -4642,6 +4647,7 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
 
         if (paymentChartOfAccounts.length === 2 && commitmentTypeId && payeTypeId) {
           const commitment = await db.insertInto('Funding_Case_Agreement_Commitment').values({
+            egcs_fc_currency: 'cad',
             egcs_fc_fundingagreement: String(agreement.id), egcs_fc_type: commitmentTypeId,
             egcs_fc_status: agencyStatusIds.draft,
             egcs_fc_financialsystemnumber: '510001', egcs_fc_active: true, _deleted: false
@@ -4670,6 +4676,7 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
             { egcs_fc_commitment: String(commitment.id), egcs_fc_commitmentlinenumber: 2, egcs_fc_transferpaymentstreamchartofaccount: String(paymentChartOfAccounts[1]!.id), egcs_fc_amount: seedMoney('15.00'), _deleted: false }
           ]).returning('id').execute()
           const draftCommitment = await db.insertInto('Funding_Case_Agreement_Commitment').values({
+            egcs_fc_currency: 'cad',
             egcs_fc_fundingagreement: String(agreement.id), egcs_fc_type: payeTypeId,
             egcs_fc_status: agencyStatusIds.draft,
             egcs_fc_financialsystemnumber: '510002', egcs_fc_active: false, _deleted: false
@@ -5139,6 +5146,7 @@ const seedFinancialSummaryShowcase = async (db: Kysely<Database>): Promise<void>
     .where('Transfer_Payment_Stream.id', '=', source.egcs_fc_transferpaymentstream).executeTakeFirstOrThrow()
   const statuses = await resolveAgencyStatusIds(db, String(agency.id))
   const agreement = await db.insertInto('Funding_Case_Agreement_Profile').values({
+    egcs_fc_currency: 'cad',
     egcs_fc_agreementnumber: 'AGR-FIN-DEMO-1',
     egcs_fc_transferpaymentstream: source.egcs_fc_transferpaymentstream,
     egcs_fc_financialsystemnumber: '99000051',
@@ -5292,6 +5300,7 @@ const seedFinancialSummaryShowcase = async (db: Kysely<Database>): Promise<void>
     .where('egcs_tp_transferpaymentstream', '=', source.egcs_fc_transferpaymentstream)
     .where('_deleted', '=', false).orderBy('id', 'asc').executeTakeFirstOrThrow()
   const commitment = await db.insertInto('Funding_Case_Agreement_Commitment').values({
+    egcs_fc_currency: 'cad',
     egcs_fc_fundingagreement: agreementId, egcs_fc_type: sourceCommitment.egcs_fc_type,
     egcs_fc_status: statuses.draft, egcs_fc_financialsystemnumber: '99000052',
     egcs_fc_active: false, _deleted: false

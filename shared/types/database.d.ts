@@ -850,6 +850,7 @@ export interface AgencyChartOfAccountTable {
   id: Generated<string>
   egcs_ay_organizationagency: string
   egcs_ay_fiscalyear: string
+  egcs_ay_currency: Generated<Currency_Codes>
   egcs_ay_accountingdimensions: JsonValue
   _deleted: Generated<boolean>
 }
@@ -1337,6 +1338,7 @@ export interface CommonEntityAssignmentTable {
 }
 
 export interface FundingCaseAgreementProfileTable {
+  egcs_fc_currency: Currency_Codes
   egcs_fc_customfields: Generated<Record<string, string | number | string[]>>
   id: Generated<string>
   egcs_fc_agreementnumber: string
@@ -1642,6 +1644,7 @@ export interface FundingCaseAgreementCommitmentTable {
   egcs_fc_fundingagreement: string
   egcs_fc_transferpaymentstream: Generated<string>
   egcs_fc_type: string
+  egcs_fc_currency: Generated<Currency_Codes>
   egcs_fc_status: StatusId
   egcs_fc_financialsystemnumber?: string | null
   egcs_fc_active: Generated<boolean>
@@ -2281,6 +2284,7 @@ export interface TransferPaymentFiscalYearBudgetTable {
   id: Generated<string>
   egcs_tp_transferpaymentprofile: string
   egcs_tp_fiscalyear: string
+  egcs_tp_currency: Generated<Currency_Codes>
   egcs_tp_totalbudget: number
   egcs_tp_overcommitthreshold: number
   _deleted: Generated<boolean>

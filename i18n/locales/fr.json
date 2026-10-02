@@ -1146,6 +1146,7 @@
       "duplicate_profile": "Une agence avec le même identifiant financier, nom bilingue et statut existe déjà.",
       "duplicate_holdback_basis_code": "Une base de retenue avec ce code indépendant de la langue existe déjà pour l'agence.",
       "chart_fiscal_year_immutable": "L'exercice financier du plan comptable ne peut pas être modifié. Créez un plan comptable pour l'autre exercice financier.",
+      "chart_currency_immutable": "La devise de la ligne comptable ne peut pas être modifiée. Créez une ligne distincte pour l’autre devise.",
       "duplicate_chart_of_account": "Un plan comptable avec ces champs comptables existe déjà pour cet exercice financier.",
       "duplicate_commitment_type_name_en": "Un type d'engagement portant ce nom anglais existe déjà pour l'agence.",
       "duplicate_commitment_type_name_fr": "Un type d'engagement portant ce nom français existe déjà pour l'agence.",
@@ -1279,6 +1280,7 @@
       "fiscal_year_outside_duration": "L'exercice financier sélectionné ne chevauche pas les dates de début et de fin autorisées de l'entente.",
       "budget_fiscal_year_not_found": "Exercice financier du budget d'entente introuvable.",
       "budget_fiscal_year_in_use": "Supprimez toutes les lignes budgétaires avant de supprimer cet exercice financier.",
+      "budget_currency_immutable": "La devise du budget ne peut pas être modifiée. Créez un budget distinct pour l’autre devise.",
       "budget_fiscal_year_financial_records_in_use": "Un exercice financier comportant des réclamations ou des paiements ne peut pas être supprimé.",
       "budget_line_item_not_found": "Ligne budgétaire d'entente introuvable.",
       "budget_line_item_claim_in_use": "Une ligne budgétaire comportant des coûts réclamés ne peut pas être supprimée.",
@@ -1331,7 +1333,9 @@
       "duplicate_payment_line": "Une ligne de paiement existe déjà pour cette ligne d'engagement.",
       "duplicate_final_claim_reconcile": "Un seul rapprochement peut être marqué final pour une réclamation.",
       "claim_reconcile_in_progress": "Terminez ou annulez le rapprochement en cours avant de marquer un autre rapprochement comme final.",
-      "duplicate_claim_reconcile_line_item": "Une ligne de rapprochement existe déjà pour cette ligne de réclamation."
+      "duplicate_claim_reconcile_line_item": "Une ligne de rapprochement existe déjà pour cette ligne de réclamation.",
+      "currency_immutable": "La devise de l’entente est définie à la création et ne peut pas être modifiée.",
+      "currency_mismatch": "La devise doit correspondre à celle de l’entente."
     },
     "transfer_payment": {
       "invalid_funding_subtype": "Sélectionnez un sous-type de financement actif appartenant à l’agence de ce volet.",
@@ -1392,6 +1396,7 @@
       "invalid_budget_fiscal_year": "L'exercice financier du budget d'entente sélectionné est invalide.",
       "budget_fiscal_year_not_found": "Exercice financier du budget d'entente introuvable.",
       "budget_fiscal_year_in_use": "L’exercice de ce budget est utilisé par un budget d’entente. Supprimez ou modifiez l’exercice du budget d’entente avant de modifier cet exercice.",
+      "budget_currency_immutable": "La devise du budget ne peut pas être modifiée. Créez un budget distinct pour l’autre devise.",
       "budget_line_item_not_found": "Ligne budgétaire d'entente introuvable.",
       "duplicate_budget_fiscal_year": "Un exercice financier du budget existe déjà pour cette entente.",
       "invalid_amendment_type": "Le type d'amendement sélectionné est invalide.",

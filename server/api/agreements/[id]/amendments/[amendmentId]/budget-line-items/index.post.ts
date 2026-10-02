@@ -1,3 +1,4 @@
+import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { fetchAgreementBudgetCostCategory } from '~~/server/utils/cost-configuration-integrity'
 import { FundingCaseAgreementBudgetLineItemFundingTotalsSchema, FundingCaseAgreementBudgetLineItemCreateSchema } from '~~/shared/types/schemas'
 import { parseI18n } from '~~/server/utils/api-validate'
@@ -29,6 +30,7 @@ export default defineEventHandler(async event => {
     if (!year) return await notFound(event, 'AGREEMENT_BUDGET_FISCAL_YEAR_NOT_FOUND', 'apiErrors.agreement.budget_fiscal_year_not_found')
     const category = await fetchAgreementBudgetCostCategory(trx, context.streamId, body.egcs_fc_organizationcostcategory)
     if (!category) return await badRequest(event, 'INVALID_AGREEMENT_BUDGET_LINE_ITEM', 'apiErrors.agreement.invalid_cost_category_line_item')
+    await assertAgreementCurrency(event, trx, agreementId, body.egcs_fc_currency)
     const calculation = await prepareBudgetCalculation(event, trx, body, undefined, String(year.id))
     await parseI18n(event, FundingCaseAgreementBudgetLineItemFundingTotalsSchema, { ...body, egcs_fc_programfunding: calculation.egcs_fc_programfunding ?? body.egcs_fc_programfunding })
     await validateBudgetFundingSources(event, trx, context.streamId, body.egcs_fc_fundingsources ?? [])

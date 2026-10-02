@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { ASSIGNABLE_ENTITY_TYPE_ENUM } from '~~/shared/constants/enums'
+import { ASSIGNABLE_ENTITY_TYPE_ENUM, CURRENCY_CODES_ENUM } from '~~/shared/constants/enums'
 import { AssignableEntityTypeIdentitySchema, PositivePostgresBigintIdSchema } from './common'
 import { isPositivePostgresBigintText } from '../../utils/database-id'
 
@@ -22,6 +22,7 @@ export const EntityAssignmentPromoteSchema = EntityAssignmentCreateSchema
 export const EntityAssignmentContextSchema = z.object({
   id: z.coerce.string(),
   egcs_fc_agreementnumber: z.string(),
+  egcs_fc_currency: z.enum(CURRENCY_CODES_ENUM),
   egcs_fc_title_en: z.string(),
   egcs_fc_title_fr: z.string(),
   can_read_agreement: z.boolean()

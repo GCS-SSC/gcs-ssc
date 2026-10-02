@@ -16,14 +16,16 @@ import type {
 } from '~~/shared/types/funding-case-agreement-ui'
 import { FundingCaseAgreementCommitmentCreateSchema } from '~~/shared/types/schemas'
 import { formatMoneyText, sumMoney, type Money } from '~~/shared/utils/money'
+import type { Currency_Codes } from '~~/shared/types/database'
 
 type CommitmentTableRow = FundingCaseAgreementCommitmentRow & {
   line_count: number
   total_amount: Money
 }
 
-const { agreementId, canCreate, canUpdate, canDelete } = defineProps<{
+const { agreementId, currency: agreementCurrency, canCreate, canUpdate, canDelete } = defineProps<{
   agreementId: string
+  currency: Currency_Codes
   canCreate: boolean
   canUpdate: boolean
   canDelete: boolean
@@ -64,10 +66,11 @@ const pagination: Ref<{ pageIndex: number, pageSize: number }> = ref({
 })
 
 const commitmentModal = useCrudModal<FundingCaseAgreementCommitmentRow, FundingCaseAgreementCommitmentForm>({
-  createState: () => ({}),
+  createState: () => ({ egcs_fc_currency: agreementCurrency }),
   updateState: commitment => ({
     id: commitment.id,
-    egcs_fc_type: commitment.egcs_fc_type
+    egcs_fc_type: commitment.egcs_fc_type,
+    egcs_fc_currency: commitment.egcs_fc_currency
   })
 })
 
@@ -121,12 +124,13 @@ const tableRows = computed<CommitmentTableRow[]>(() => commitments.value
     return [
       typeLabel,
       statusLabel,
+      row.egcs_fc_currency,
       row.line_count,
       row.total_amount
     ].some(value => String(value).toLowerCase().includes(normalizedSearch.value))
   }))
 
-const formatMoney = (value: Money) => formatMoneyText(value, locale.value, 'CAD')
+const formatMoney = (value: Money, currency: string) => formatMoneyText(value, locale.value, currency)
 
 const openCreateCommitment = () => {
   commitmentModal.openCreate()
@@ -241,7 +245,7 @@ const deleteCommitment = async (commitmentId: string) => {
 
       <template #amount-cell="{ row }">
         <span class="font-medium text-zinc-700 dark:text-zinc-200">
-          {{ formatMoney(row.original.total_amount) }}
+          {{ formatMoney(row.original.total_amount, row.original.egcs_fc_currency.toUpperCase()) }}
         </span>
       </template>
 
@@ -293,6 +297,9 @@ const deleteCommitment = async (commitmentId: string) => {
               :query="selectedCommitment.id
                 ? { permission_action: 'update', commitmentId: selectedCommitment.id }
                 : { permission_action: 'create' }" />
+          </UFormField>
+          <UFormField :label="t('common.currency')" name="egcs_fc_currency" required>
+            <CommonEnumSelect v-model="selectedCommitment.egcs_fc_currency" name="currency_codes" class="w-full" disabled />
           </UFormField>
           <div class="flex justify-end gap-2 pt-4">
             <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isCommitmentModalOpen = false" />

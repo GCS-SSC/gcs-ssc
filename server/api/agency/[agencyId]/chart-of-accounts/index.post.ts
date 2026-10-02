@@ -22,6 +22,7 @@ export default defineEventHandler(async event => {
       return await trx.insertInto('Agency_Chart_of_Account').values({
         egcs_ay_organizationagency: agencyId,
         egcs_ay_fiscalyear: String(body.egcs_ay_fiscalyear),
+        egcs_ay_currency: body.egcs_ay_currency,
         egcs_ay_accountingdimensions: sql`${JSON.stringify(body.egcs_ay_accountingdimensions)}::jsonb`,
         _deleted: false
       }).returningAll().executeTakeFirstOrThrow()

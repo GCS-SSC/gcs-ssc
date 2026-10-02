@@ -329,14 +329,24 @@ export const useUrlTabState = ({
 
   watch(
     [() => route.path, () => route.query[queryKey], tabValues, resolvedDefaultTab, enabledRef],
-    ([, queryTab, , , isEnabled]) => {
+    ([routePath, queryTab, , defaultValue, isEnabled], previousValues) => {
       if (!isEnabled) {
         previousPath.value = route.path
         previousRouteName.value = typeof route.name === 'string' ? route.name : ''
         return
       }
 
-      const nextTabKey = resolveTabKey(queryTab)
+      // Async tab discovery must not overwrite a valid UI choice before its URL navigation settles.
+      const preservePendingSelection = pendingNavigation !== null
+        && previousValues !== undefined
+        && routePath === previousValues[0]
+        && resolveQueryParamValue(queryTab) === resolveQueryParamValue(previousValues[1])
+        && defaultValue === previousValues[3]
+        && isEnabled === previousValues[4]
+        && tabValues.value.includes(selectedTab.value)
+      const nextTabKey = preservePendingSelection
+        ? tabValueToKey.value[selectedTab.value] ?? resolveTabKey(queryTab)
+        : resolveTabKey(queryTab)
       const nextTabValue = normalizeTabValue(tabKeyToValue.value[nextTabKey] ?? '')
 
       if (selectedTabKey.value !== nextTabKey) {

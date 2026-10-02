@@ -244,6 +244,7 @@ export const useTransferPaymentWizardModal = ({
     state.value.budgets.push({
       tempId: nanoid(),
       egcs_tp_fiscalyear: '',
+      egcs_tp_currency: 'cad',
       egcs_tp_totalbudget: '0',
       egcs_tp_overcommitthreshold: 0
     })

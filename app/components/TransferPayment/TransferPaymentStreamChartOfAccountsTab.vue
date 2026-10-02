@@ -24,6 +24,7 @@ const {
 
 const columns = [
   { id: 'fiscal_year_display', accessorKey: 'fiscal_year_display', header: t('transfer_payment.chart_of_accounts.fiscal_year') },
+  { id: 'egcs_ay_currency', accessorKey: 'egcs_ay_currency', header: t('common.currency') },
   { id: 'egcs_ay_accountingdimensions', accessorKey: 'egcs_ay_accountingdimensions', header: t('transfer_payment.chart_of_accounts.accounting_fields') },
   { id: 'agency_definition_deleted', accessorKey: 'agency_definition_deleted', header: t('common.status') },
   { id: 'actions', header: '' }
@@ -70,6 +71,9 @@ const onDelete = async (id: string) => {
       :show-button="canUpdateChild"
       @add="openCreate"
       @retry="refresh">
+      <template #egcs_ay_currency-cell="{ row }">
+        {{ row.original.egcs_ay_currency.toUpperCase() }}
+      </template>
       <template #egcs_ay_accountingdimensions-cell="{ row }">
         <div class="flex min-w-64 flex-wrap gap-1.5 py-1">
           <CommonStatusBadge

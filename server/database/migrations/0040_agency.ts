@@ -313,9 +313,21 @@ export async function up(db: Kysely<Database>): Promise<void> {
       col.notNull().references('Agency_Fiscal_Year.id').onDelete('restrict')
     )
     .addColumn('egcs_ay_accountingdimensions', 'jsonb', col => col.notNull())
+    .addColumn('egcs_ay_currency', sql`currency_codes`, col => col.notNull().defaultTo('cad'))
     .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
     .addCheckConstraint('ay_chk_chartofaccountdimensions', sql`jsonb_typeof(egcs_ay_accountingdimensions) = 'array' AND jsonb_array_length(egcs_ay_accountingdimensions) > 0`)
     .execute()
+
+  await sql`CREATE FUNCTION protect_chart_currency() RETURNS trigger AS $$
+    BEGIN
+      IF NEW.egcs_ay_currency IS DISTINCT FROM OLD.egcs_ay_currency THEN
+        RAISE EXCEPTION 'Chart of Account currency is immutable'
+          USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_chart_currency_immutable';
+      END IF;
+      RETURN NEW;
+    END $$ LANGUAGE plpgsql`.execute(db)
+  await sql`CREATE TRIGGER trg_protect_chart_currency BEFORE UPDATE OF egcs_ay_currency
+    ON "Agency_Chart_of_Account" FOR EACH ROW EXECUTE FUNCTION protect_chart_currency()`.execute(db)
 
   await db.schema
     .createTable('Agency_Commitment_Type')
@@ -339,7 +351,7 @@ export async function up(db: Kysely<Database>): Promise<void> {
     .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
     .execute()
 
-  await sql`CREATE UNIQUE INDEX ay_idx_chartfiscalyeardimensions ON "Agency_Chart_of_Account" (egcs_ay_fiscalyear, egcs_ay_accountingdimensions) WHERE _deleted = false`.execute(db)
+  await sql`CREATE UNIQUE INDEX ay_idx_chartfiscalyeardimensions ON "Agency_Chart_of_Account" (egcs_ay_fiscalyear, egcs_ay_currency, egcs_ay_accountingdimensions) WHERE _deleted = false`.execute(db)
   await sql`CREATE UNIQUE INDEX ay_idx_commitmenttypenameen ON "Agency_Commitment_Type" (egcs_ay_organizationagency, egcs_ay_name_en) WHERE _deleted = false`.execute(db)
   await sql`CREATE UNIQUE INDEX ay_idx_commitmenttypenamefr ON "Agency_Commitment_Type" (egcs_ay_organizationagency, egcs_ay_name_fr) WHERE _deleted = false`.execute(db)
   await sql`CREATE UNIQUE INDEX ay_idx_monitortypenameen ON "Agency_Monitor_Type" (egcs_ay_organizationagency, egcs_ay_name_en) WHERE _deleted = false`.execute(db)
@@ -614,6 +626,7 @@ export async function down(db: Kysely<Database>): Promise<void> {
   await db.schema.dropTable('Agency_Monitor_Type').execute()
   await db.schema.dropTable('Agency_Commitment_Type').execute()
   await db.schema.dropTable('Agency_Chart_of_Account').execute()
+  await sql`DROP FUNCTION protect_chart_currency()`.execute(db)
   await db.schema.dropTable('Agency_Fiscal_Year').execute()
   await db.schema.dropTable('Agency_Cost_Category_Line_Item').execute()
   await db.schema.dropTable('Agency_Cost_Category').execute()

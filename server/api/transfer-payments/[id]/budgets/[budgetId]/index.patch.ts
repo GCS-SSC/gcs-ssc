@@ -42,7 +42,7 @@ export default defineEventHandler(async event => {
       async (trx, currentContext) => {
         const lockedBudget = await trx
           .selectFrom('Transfer_Payment_Fiscal_Year_Budget')
-          .select(['id', 'egcs_tp_fiscalyear', databaseMoneyText(sql.ref('egcs_tp_totalbudget')).as('egcs_tp_totalbudget')])
+          .select(['id', 'egcs_tp_fiscalyear', 'egcs_tp_currency', databaseMoneyText(sql.ref('egcs_tp_totalbudget')).as('egcs_tp_totalbudget')])
           .where('id', '=', budgetId)
           .where('egcs_tp_transferpaymentprofile', '=', profileId)
           .where('_deleted', '=', false)
@@ -50,6 +50,10 @@ export default defineEventHandler(async event => {
           .executeTakeFirst()
         if (!lockedBudget) {
           return await notFound(event, 'TRANSFER_PAYMENT_BUDGET_NOT_FOUND', 'apiErrors.transfer_payment.budget_not_found')
+        }
+
+        if (validated.egcs_tp_currency !== undefined && validated.egcs_tp_currency !== lockedBudget.egcs_tp_currency) {
+          return await badRequest(event, 'TRANSFER_PAYMENT_BUDGET_CURRENCY_IMMUTABLE', 'apiErrors.transfer_payment.budget_currency_immutable')
         }
 
         const nextTotalBudget = validated.egcs_tp_totalbudget ?? parseDatabaseMoney(lockedBudget.egcs_tp_totalbudget)
@@ -101,7 +105,7 @@ export default defineEventHandler(async event => {
           .where('egcs_tp_transferpaymentprofile', '=', profileId)
           .where('_deleted', '=', false)
           .returning([
-            'id', 'egcs_tp_transferpaymentprofile', 'egcs_tp_fiscalyear',
+            'id', 'egcs_tp_transferpaymentprofile', 'egcs_tp_fiscalyear', 'egcs_tp_currency',
             databaseMoneyText(sql.ref('egcs_tp_totalbudget')).as('egcs_tp_totalbudget'),
             'egcs_tp_overcommitthreshold'
           ])

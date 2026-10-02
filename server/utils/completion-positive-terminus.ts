@@ -93,7 +93,7 @@ export const applyCompletionPositiveTerminusEffects = async (
   if (entityType !== 'fundingcaseagreementcommitment') return
 
   const commitment = await trx.selectFrom('Funding_Case_Agreement_Commitment')
-    .select(['egcs_fc_fundingagreement', 'egcs_fc_type'])
+    .select(['egcs_fc_fundingagreement', 'egcs_fc_type', 'egcs_fc_currency'])
     .where('id', '=', entityId)
     .where('_deleted', '=', false)
     .forUpdate()
@@ -103,6 +103,7 @@ export const applyCompletionPositiveTerminusEffects = async (
     .select('id')
     .where('egcs_fc_fundingagreement', '=', String(commitment.egcs_fc_fundingagreement))
     .where('egcs_fc_type', '=', commitment.egcs_fc_type)
+    .where('egcs_fc_currency', '=', commitment.egcs_fc_currency)
     .where('egcs_fc_active', '=', true)
     .where('_deleted', '=', false)
     .orderBy('id', 'asc')
@@ -112,6 +113,7 @@ export const applyCompletionPositiveTerminusEffects = async (
     .set({ egcs_fc_active: false })
     .where('egcs_fc_fundingagreement', '=', String(commitment.egcs_fc_fundingagreement))
     .where('egcs_fc_type', '=', commitment.egcs_fc_type)
+    .where('egcs_fc_currency', '=', commitment.egcs_fc_currency)
     .where('id', '!=', entityId)
     .where('egcs_fc_active', '=', true)
     .where('_deleted', '=', false)

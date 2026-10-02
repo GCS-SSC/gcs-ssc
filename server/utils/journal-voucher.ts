@@ -1,3 +1,4 @@
+import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Domain helpers expose explicit accounting and authorization contracts. */
 import type { H3Event } from 'h3'
 import { sql, type Kysely, type Transaction } from 'kysely'
@@ -57,12 +58,13 @@ export const persistJournalVoucherLines = async (trx: Transaction<Database>, id:
 }
 
 /** Agency/Stream/fiscal-year choices are authorized by the JV root, without a Program read grant. */
-export const readJournalVoucherCodingChoices = async (db: Kysely<Database>, context: NonNullable<Awaited<ReturnType<typeof resolveJournalVoucherRuntimeContext>>>, fiscalYearId: string) =>
+export const readJournalVoucherCodingChoices = async (db: Kysely<Database>, context: NonNullable<Awaited<ReturnType<typeof resolveJournalVoucherRuntimeContext>>>, fiscalYearId: string, currency: Database['Funding_Case_Agreement_Journal_Voucher']['egcs_fc_currency']) =>
   await db.selectFrom('Transfer_Payment_Stream_Chart_of_Account as s')
     .innerJoin('Agency_Chart_of_Account as a', 'a.id', 's.egcs_tp_agencychartofaccount')
     .select(['s.id', 'a.egcs_ay_accountingdimensions', 's.egcs_tp_agencychartofaccount'])
     .where('s.egcs_tp_transferpaymentstream', '=', context.streamId)
     .where('a.egcs_ay_organizationagency', '=', context.agencyId).where('a.egcs_ay_fiscalyear', '=', fiscalYearId)
+    .where('a.egcs_ay_currency', '=', currency)
     .where('s._deleted', '=', false).where('a._deleted', '=', false).orderBy('s.id').execute()
 
 /** Matches actual coding identities, independently of operational commitment line numbers. */
@@ -136,6 +138,7 @@ export const createJournalVoucher = async (event: H3Event, input: JournalVoucher
           .where('egcs_fc_fundingagreement', '=', context.agreementId).where('_deleted', '=', false).executeTakeFirstOrThrow()
     const commonUserId = await resolveAssignmentCommonUserId(trx, auth.userId)
     if (!commonUserId) return await forbidden(event)
+    await assertAgreementCurrency(event, trx, context.agreementId, source.egcs_fc_currency)
     const numberRow = await trx.selectFrom('Funding_Case_Agreement_Journal_Voucher')
       .select(eb => eb.fn.max<number>('egcs_fc_number').as('maximum')).where('egcs_fc_fundingagreement', '=', context.agreementId).executeTakeFirstOrThrow()
     const created = await trx.insertInto('Funding_Case_Agreement_Journal_Voucher').values({
@@ -176,6 +179,7 @@ export const editJournalVoucher = async (event: H3Event, id: string, input: Jour
   const context = await authorizeJournalVoucher(event, id, 'update')
   return await executeFreshAuthorizedAgreementWrite(event, event.context.$db, context.agreementId, context, async trx => {
     const header = await trx.selectFrom('Funding_Case_Agreement_Journal_Voucher').selectAll().where('id', '=', id).forUpdate().executeTakeFirstOrThrow()
+    await assertAgreementCurrency(event, trx, context.agreementId, header.egcs_fc_currency)
     const saved = await readJournalVoucherLines(trx, id)
     if (header.egcs_fc_reversalof) {
       const frozen = saved.filter(line => line.egcs_fc_kind === 'corrected')
@@ -187,7 +191,7 @@ export const editJournalVoucher = async (event: H3Event, id: string, input: Jour
       }).where('id', '=', id).returningAll().executeTakeFirstOrThrow()
     }
     const original = saved.filter(line => line.egcs_fc_kind === 'original')
-    const choices = await readJournalVoucherCodingChoices(trx, context, header.egcs_fc_agencyfiscalyear)
+    const choices = await readJournalVoucherCodingChoices(trx, context, header.egcs_fc_agencyfiscalyear, header.egcs_fc_currency)
     const corrected: JournalVoucherAccountingLine[] = []
     for (const line of input.egcs_fc_allocations) {
       const commitment = original.find(row => row.egcs_fc_commitmentline === line.egcs_fc_commitmentline)

@@ -38,6 +38,9 @@ const field = useFormFieldPath(() => namePrefix)
       :aria-label="t('transfer_payment.fiscal_year')"
       @resolved-items="items => emit('fiscal-year-resolved', { agencyId, items })" />
   </UFormField>
+  <UFormField :label="t('common.currency')" :name="field('egcs_tp_currency')">
+    <CommonEnumSelect v-model="model.egcs_tp_currency" name="currency_codes" :disabled="Boolean(model.id)" />
+  </UFormField>
   <UFormField :label="t('transfer_payment.total_budget')" :name="field('egcs_tp_totalbudget')">
     <UInput
       v-model="model.egcs_tp_totalbudget"

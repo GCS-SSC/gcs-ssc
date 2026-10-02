@@ -49,8 +49,8 @@ export default defineEventHandler(async event => {
         const dimensions = item.egcs_ay_accountingdimensions as TransferPaymentStreamChartOfAccountDimension[]
         return {
           ...item,
-          label_en: `${item.fiscal_year_display} - ${formatAccountingDimensions(dimensions, 'en', ' - ')}`,
-          label_fr: `${item.fiscal_year_display} - ${formatAccountingDimensions(dimensions, 'fr', ' - ')}`
+          label_en: `${item.fiscal_year_display} (${item.egcs_ay_currency.toUpperCase()}) - ${formatAccountingDimensions(dimensions, 'en', ' - ')}`,
+          label_fr: `${item.fiscal_year_display} (${item.egcs_ay_currency.toUpperCase()}) - ${formatAccountingDimensions(dimensions, 'fr', ' - ')}`
         }
       }) }
     }

@@ -51,11 +51,12 @@ export default defineEventHandler(async event => {
           .values({
             egcs_tp_transferpaymentprofile: profileId,
             egcs_tp_fiscalyear: validated.egcs_tp_fiscalyear,
+            egcs_tp_currency: validated.egcs_tp_currency,
             egcs_tp_totalbudget: databaseMoneyValue(validated.egcs_tp_totalbudget),
             egcs_tp_overcommitthreshold: validated.egcs_tp_overcommitthreshold
           })
           .returning([
-            'id', 'egcs_tp_transferpaymentprofile', 'egcs_tp_fiscalyear',
+            'id', 'egcs_tp_transferpaymentprofile', 'egcs_tp_fiscalyear', 'egcs_tp_currency',
             databaseMoneyText(sql.ref('egcs_tp_totalbudget')).as('egcs_tp_totalbudget'),
             'egcs_tp_overcommitthreshold'
           ])

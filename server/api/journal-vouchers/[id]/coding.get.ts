@@ -6,8 +6,8 @@ import type { JournalVoucherCodingChoice } from '~~/shared/types/journal-voucher
 export default defineEventHandler(async event => {
   const id = getRouterParam(event, 'id') ?? ''
   const context = await authorizeJournalVoucher(event, id)
-  const header = await event.context.$db.selectFrom('Funding_Case_Agreement_Journal_Voucher').select('egcs_fc_agencyfiscalyear').where('id', '=', id).executeTakeFirstOrThrow()
-  const choices = await readJournalVoucherCodingChoices(event.context.$db, context, header.egcs_fc_agencyfiscalyear)
+  const header = await event.context.$db.selectFrom('Funding_Case_Agreement_Journal_Voucher').select(['egcs_fc_agencyfiscalyear', 'egcs_fc_currency']).where('id', '=', id).executeTakeFirstOrThrow()
+  const choices = await readJournalVoucherCodingChoices(event.context.$db, context, header.egcs_fc_agencyfiscalyear, header.egcs_fc_currency)
   const saved = await readJournalVoucherLines(event.context.$db, id)
   const agreementCoding = await readJournalVoucherAgreementCoding(event.context.$db, context.agreementId)
   const historical = saved.filter(line => line.egcs_fc_kind !== 'adjustment').map(line => ({ id: line.egcs_fc_chartofaccount,

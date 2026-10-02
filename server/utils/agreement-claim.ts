@@ -1,3 +1,4 @@
+import { assertAgreementCurrency, resolveAgreementCurrency } from '~~/server/utils/agreement-currency'
 /* eslint-disable jsdoc/require-jsdoc -- Existing exported claim helpers are intentionally documented by their descriptive names. */
 import { getRouterParam, type H3Event } from 'h3'
 import { sql, type Insertable, type Kysely, type Selectable, type Transaction } from 'kysely'
@@ -72,6 +73,11 @@ export const createAgreementClaimAggregate = async (
   agencyId: string,
   creatorId: string
 ): Promise<AgreementClaimAggregateCreateResult> => {
+  const currency = await resolveAgreementCurrency(trx, input.agreementId)
+  if (!currency) return { status: 'agreement_unavailable' }
+  if (input.lineItems.some(line => line.currency !== currency)) {
+    throw new Error('Claim line currencies must match the owning Agreement currency.')
+  }
   const fiscalYear = await trx
     .selectFrom('Funding_Case_Agreement_Budget_Fiscal_Year')
     .innerJoin(
@@ -618,6 +624,7 @@ export const assertAgreementClaimLineItemForAgreement = async (
       'Funding_Case_Agreement_Claim_Line_Item.id as id',
       'Funding_Case_Agreement_Claim_Line_Item.egcs_fc_fundingagreementclaim as egcs_fc_fundingagreementclaim',
       'Funding_Case_Agreement_Claim_Line_Item.egcs_fc_fundingagreementbudgetlineitem as egcs_fc_fundingagreementbudgetlineitem',
+      'Funding_Case_Agreement_Claim_Line_Item.egcs_fc_currency as egcs_fc_currency',
       'Funding_Case_Agreement_Claim.egcs_fc_fiscalyear as claim_fiscalyear',
       'Funding_Case_Agreement_Claim.egcs_fc_status as claim_status'
     ])
@@ -780,6 +787,7 @@ export const patchAgreementClaimLineItem = async (
           return existing
         }
 
+        await assertAgreementCurrency(event, trx, agreementId, patchValues.egcs_fc_currency ?? existing.egcs_fc_currency)
         const references = await validateAgreementClaimLineItemPatchReferences(event, trx, agreementId, existing, patchValues)
         if (!hasKey(references, 'nextClaimId')) {
           return references

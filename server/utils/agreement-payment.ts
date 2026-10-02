@@ -1,3 +1,4 @@
+import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Temporary coverage while agreement payment helpers receive complete documentation. */
 import { getRouterParam, type H3Event } from 'h3'
 import { sql } from 'kysely'
@@ -14,7 +15,7 @@ import { throwIfAgreementUniqueConstraintError } from '~~/server/utils/agreement
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
 import { runExtensionAgreementPaymentMutationGuards } from '~~/server/utils/extensions'
 import { FundingCaseAgreementPaymentLinePatchSchema } from '~~/shared/types/schemas'
-import type { AssignableEntityType, Database } from '~~/shared/types/database'
+import type { AssignableEntityType, Currency_Codes, Database } from '~~/shared/types/database'
 import type { FundingCaseAgreementPaymentLinePatch, FundingCaseAgreementPaymentPatch } from '~~/shared/types/schemas'
 import type { AgreementScopeContext } from '~~/server/utils/agreement'
 import { budgetFiscalYearStableId } from '~~/server/utils/agreement-budget-lineage'
@@ -237,6 +238,7 @@ export const agreementPaymentPatchChangesLineContext = (
   existingPayment: {
     egcs_fc_fundingagreementcommitment: string | number
     egcs_fc_fiscalyear: string | number
+    egcs_fc_currency?: Currency_Codes
   },
   patchValues: FundingCaseAgreementPaymentPatch,
   nextCommitmentId?: string
@@ -246,7 +248,8 @@ export const agreementPaymentPatchChangesLineContext = (
   const changesFiscalYear = Object.hasOwn(patchValues, 'egcs_fc_fiscalyear')
     && String(patchValues.egcs_fc_fiscalyear) !== String(existingPayment.egcs_fc_fiscalyear)
 
-  return changesCommitment || changesFiscalYear
+  const changesCurrency = patchValues.egcs_fc_currency !== undefined && patchValues.egcs_fc_currency !== existingPayment.egcs_fc_currency
+  return changesCommitment || changesFiscalYear || changesCurrency
 }
 
 /** Resolves the patch's commitment reference, including type-based commitment lookup. */
@@ -254,7 +257,8 @@ export const resolveAgreementPaymentPatchCommitmentId = async (
   event: H3Event,
   db: DbClient,
   agreementId: string,
-  patchValues: FundingCaseAgreementPaymentPatch
+  patchValues: FundingCaseAgreementPaymentPatch,
+  existingCurrency?: Currency_Codes
 ): Promise<{
   response?: unknown
   nextCommitmentId?: string
@@ -267,7 +271,8 @@ export const resolveAgreementPaymentPatchCommitmentId = async (
     event,
     db,
     agreementId,
-    patchValues.egcs_fc_commitmenttype
+    patchValues.egcs_fc_commitmenttype,
+    patchValues.egcs_fc_currency ?? existingCurrency
   )
   if (!('id' in resolvedCommitment)) {
     return { response: resolvedCommitment }
@@ -311,6 +316,7 @@ export const validateAgreementPaymentPatchContext = async (
   existingPayment: {
     egcs_fc_fundingagreementcommitment: string | number
     egcs_fc_fiscalyear: string | number
+    egcs_fc_currency?: Currency_Codes
   },
   patchValues: FundingCaseAgreementPaymentPatch,
   updateValues: AgreementPaymentPatchUpdateValues,
@@ -324,8 +330,16 @@ export const validateAgreementPaymentPatchContext = async (
     }
   }
 
-  if (Object.hasOwn(updateValues, 'egcs_fc_fiscalyear')) {
-    const fiscalYear = await assertAgreementPaymentFiscalYear(event, db, agreementId, String(updateValues.egcs_fc_fiscalyear))
+  const currency = patchValues.egcs_fc_currency ?? existingPayment.egcs_fc_currency
+  if (currency !== undefined) {
+    await assertAgreementCurrency(event, db, agreementId, currency)
+    const commitment = await db.selectFrom('Funding_Case_Agreement_Commitment').select('id')
+      .where('id', '=', nextCommitmentId ?? String(existingPayment.egcs_fc_fundingagreementcommitment))
+      .where('egcs_fc_fundingagreement', '=', agreementId).where('egcs_fc_currency', '=', currency).where('_deleted', '=', false).executeTakeFirst()
+    if (!commitment) return await badRequest(event, 'AGREEMENT_PAYMENT_INVALID_COMMITMENT', 'apiErrors.agreement.invalid_payment_commitment')
+  }
+  if (Object.hasOwn(updateValues, 'egcs_fc_fiscalyear') || Object.hasOwn(updateValues, 'egcs_fc_currency')) {
+    const fiscalYear = await assertAgreementPaymentFiscalYear(event, db, agreementId, String(updateValues.egcs_fc_fiscalyear ?? existingPayment.egcs_fc_fiscalyear), currency)
     if (!fiscalYear || typeof fiscalYear !== 'object' || !('id' in fiscalYear)) {
       return fiscalYear
     }
@@ -376,16 +390,19 @@ export const resolveActiveAgreementPaymentCommitmentByType = async (
   event: H3Event,
   db: DbClient,
   agreementId: string,
-  commitmentType: string
+  commitmentType: string,
+  currency?: Currency_Codes
 ) => {
-  const commitments = await db
+  let commitmentQuery = db
     .selectFrom('Funding_Case_Agreement_Commitment')
-    .select(['id', 'egcs_fc_status', 'egcs_fc_active', 'egcs_fc_type'])
+    .select(['id', 'egcs_fc_status', 'egcs_fc_active', 'egcs_fc_type', 'egcs_fc_currency'])
     .where('egcs_fc_fundingagreement', '=', agreementId)
     .where('egcs_fc_type', '=', commitmentType)
     .where('egcs_fc_active', '=', true)
     .where('_deleted', '=', false)
-    .execute()
+  if (currency) commitmentQuery = commitmentQuery.where('egcs_fc_currency', '=', currency)
+  const commitments = await commitmentQuery.execute()
+  if (new Set(commitments.map(row => row.egcs_fc_currency)).size > 1) return await badRequest(event, 'AGREEMENT_PAYMENT_INVALID_COMMITMENT', 'apiErrors.agreement.invalid_payment_commitment')
 
   let commitment = null
   for (const candidate of commitments) {
@@ -411,9 +428,10 @@ export const assertAgreementPaymentFiscalYear = async (
   event: H3Event,
   db: DbClient,
   agreementId: string,
-  fiscalYearId: string
+  fiscalYearId: string,
+  currency?: Currency_Codes
 ) => {
-  const fiscalYear = await db
+  let fiscalYearQuery = db
     .selectFrom('Funding_Case_Agreement_Budget_Fiscal_Year')
     .innerJoin(
       'Funding_Case_Agreement_Budget_Version',
@@ -426,7 +444,12 @@ export const assertAgreementPaymentFiscalYear = async (
     .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
     .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)
     .where('Funding_Case_Agreement_Budget_Version._deleted', '=', false)
-    .executeTakeFirst()
+  if (currency) fiscalYearQuery = fiscalYearQuery.where(sql<boolean>`EXISTS (
+    SELECT 1 FROM "Funding_Case_Agreement_Budget_Line_Item" native_line
+    WHERE native_line.egcs_fc_fundingagreementbudgetfiscalyear = "Funding_Case_Agreement_Budget_Fiscal_Year".id
+      AND native_line.egcs_fc_currency = ${currency} AND NOT native_line._deleted
+  )`)
+  const fiscalYear = await fiscalYearQuery.executeTakeFirst()
 
   if (!fiscalYear) {
     return await badRequest(event, 'INVALID_AGREEMENT_PAYMENT_FISCAL_YEAR', 'apiErrors.agreement.invalid_payment_fiscal_year')
@@ -477,6 +500,7 @@ export const assertAgreementPaymentCommitmentLine = async (
     .where('Funding_Case_Agreement_Commitment_Line._deleted', '=', false)
     .where('Transfer_Payment_Stream_Chart_of_Account._deleted', '=', false)
     .where('Agency_Chart_of_Account._deleted', '=', false)
+    .where('Agency_Chart_of_Account.egcs_ay_currency', '=', payment.egcs_fc_currency)
     .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
     .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)
     .where('Funding_Case_Agreement_Budget_Version._deleted', '=', false)

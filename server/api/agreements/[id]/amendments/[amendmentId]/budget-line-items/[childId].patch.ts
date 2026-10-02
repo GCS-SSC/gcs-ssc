@@ -1,3 +1,4 @@
+import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { fetchAgreementBudgetCostCategory } from '~~/server/utils/cost-configuration-integrity'
 import { prepareBudgetCalculation, recalculateAgreementBudget } from '~~/server/utils/agreement-budget-calculation'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
@@ -63,6 +64,7 @@ export default defineEventHandler(async event => {
       })
       if (!category) return await badRequest(event, 'INVALID_AGREEMENT_BUDGET_LINE_ITEM', 'apiErrors.agreement.invalid_cost_category_line_item')
     }
+    if (body.egcs_fc_currency !== undefined) await assertAgreementCurrency(event, trx, agreementId, body.egcs_fc_currency)
     const calculation = await prepareBudgetCalculation(event, trx, body, String(existing.id))
     if (calculation.egcs_fc_programfunding !== undefined) body.egcs_fc_programfunding = calculation.egcs_fc_programfunding
     const existingSources = await loadBudgetFundingSources(trx, [String(existing.id)])

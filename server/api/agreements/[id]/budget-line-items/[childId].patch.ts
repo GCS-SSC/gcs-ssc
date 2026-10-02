@@ -1,3 +1,4 @@
+import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { fetchAgreementBudgetCostCategory } from '~~/server/utils/cost-configuration-integrity'
 import { prepareBudgetCalculation, recalculateAgreementBudget } from '~~/server/utils/agreement-budget-calculation'
 /* eslint-disable jsdoc/require-jsdoc -- Budget line-item route behavior is covered by focused route tests. */
@@ -285,6 +286,7 @@ const resolveBudgetLinePatchInput = async (
   }
 
   const patchValues = await readValidatedBodyI18n(event, FundingCaseAgreementBudgetLineItemPatchSchema)
+  if (patchValues.egcs_fc_currency !== undefined) await assertAgreementCurrency(event, db, agreementId, patchValues.egcs_fc_currency)
   const referenceGuard = await assertBudgetLinePatchReferences(event, db, agreementId, streamId, patchValues, String(existing.egcs_fc_organizationcostcategory))
   if ('response' in referenceGuard) {
     return { response: referenceGuard.response }

@@ -37,13 +37,14 @@ const {
 
 const budgetColumns: TableColumnInput<TransferPaymentBudgetRow>[] = [
   { id: 'fiscal_year', headerKey: 'transfer_payment.fiscal_year' },
+  { accessorKey: 'egcs_tp_currency', headerKey: 'common.currency' },
   { accessorKey: 'egcs_tp_totalbudget', headerKey: 'transfer_payment.total_budget' },
   { accessorKey: 'egcs_tp_overcommitthreshold', headerKey: 'transfer_payment.overcommit_threshold' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
 
 const budgetModal = useCrudModal<TransferPaymentBudgetRow, TransferPaymentBudgetForm>({
-  createState: () => ({}),
+  createState: () => ({ egcs_tp_currency: 'cad' }),
   updateState: budget => ({ ...budget })
 })
 
@@ -160,9 +161,12 @@ const deleteBudget = async (budget: TransferPaymentBudgetRow) => {
           {{ row.original.fiscal_year_display || row.original.egcs_tp_fiscalyear }}
         </span>
       </template>
+      <template #egcs_tp_currency-cell="{ row }">
+        {{ row.original.egcs_tp_currency.toUpperCase() }}
+      </template>
       <template #egcs_tp_totalbudget-cell="{ row }">
         <span class="font-semibold text-zinc-700 dark:text-zinc-300">
-          {{ formatMoneyText(row.original.egcs_tp_totalbudget, locale, 'CAD') }}
+          {{ formatMoneyText(row.original.egcs_tp_totalbudget, locale, row.original.egcs_tp_currency.toUpperCase()) }}
         </span>
       </template>
       <template #egcs_tp_overcommitthreshold-cell="{ row }">
@@ -208,6 +212,9 @@ const deleteBudget = async (budget: TransferPaymentBudgetRow) => {
               label-fr-key="egcs_ay_fiscalyeardisplay"
               :show-value-in-label="false"
               :selected-fetch-url="selectedFiscalYearFetchUrl" />
+          </UFormField>
+          <UFormField :label="t('common.currency')" name="egcs_tp_currency">
+            <CommonEnumSelect v-model="selectedBudget.egcs_tp_currency" name="currency_codes" :disabled="Boolean(selectedBudget.id)" />
           </UFormField>
           <UFormField :label="t('transfer_payment.total_budget')" name="egcs_tp_totalbudget">
             <UInput

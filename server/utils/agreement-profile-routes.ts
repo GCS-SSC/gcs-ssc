@@ -247,9 +247,12 @@ const patchValidatedAgreementProfile = async (
   }
 
   const current = await db.selectFrom('Funding_Case_Agreement_Profile')
-    .select(['egcs_fc_transferpaymentstream', 'egcs_fc_riskscore', 'egcs_fc_agreementsubtype', 'egcs_fc_agreementtype'])
+    .select(['egcs_fc_transferpaymentstream', 'egcs_fc_riskscore', 'egcs_fc_agreementsubtype', 'egcs_fc_agreementtype', 'egcs_fc_currency'])
     .where('id', '=', agreementId).executeTakeFirstOrThrow()
   const streamChanged = String(current.egcs_fc_transferpaymentstream) !== nextStreamId
+  if (validated.egcs_fc_currency !== undefined && validated.egcs_fc_currency !== current.egcs_fc_currency) {
+    return await badRequest(event, 'AGREEMENT_CURRENCY_IMMUTABLE', 'apiErrors.agreement.currency_immutable')
+  }
   if (streamChanged) {
     const relationships = await db.selectFrom('Funding_Case_Agreement_Applicant_Recipient')
       .select(['egcs_fc_applicantrecipient', 'egcs_fc_applicantrecipientsubtype'])

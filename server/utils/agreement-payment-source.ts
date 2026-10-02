@@ -1,7 +1,8 @@
+import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 /* eslint-disable jsdoc/require-param, jsdoc/require-returns -- Public read contracts are documented at their authorization boundary. */
 import type { H3Event } from 'h3'
 import { sql, type Kysely, type Transaction } from 'kysely'
-import type { Database } from '~~/shared/types/database'
+import type { Currency_Codes, Database } from '~~/shared/types/database'
 import { TransferPaymentStreamChartOfAccountDimensionSchema } from '~~/shared/types/schemas/transfer-payment'
 import { resolveAgreementScopeContext } from './agreement'
 import { authorize, authorizeWithFreshAuthContext, type AuthContext } from './authorize'
@@ -31,7 +32,7 @@ export const requireAgreementPaymentSourceListRead = async (
 /** Lists finalized sources within the same authorized reader boundary as accounting extraction. */
 export const listAgreementPaymentAccountingSources = async (
   event: H3Event, db: PaymentSourceDb,
-  input: { agreementId: string; page: number; limit: number; search?: string },
+  input: { agreementId: string; page: number; limit: number; search?: string; currency?: Currency_Codes; commitmentId?: string },
   freshAuthContext?: AuthContext
 ) => {
   await requireAgreementPaymentSourceListRead(event, db, input.agreementId, freshAuthContext)
@@ -39,6 +40,12 @@ export const listAgreementPaymentAccountingSources = async (
     .where('payment.egcs_fc_fundingagreement', '=', input.agreementId)
     .where(agreementPaymentIsFinal('payment', { requireResolvedApproval: true }))
   if (input.search) query = query.where(sql<boolean>`payment.id::text ILIKE ${`%${escapeLikePattern(input.search)}%`}`)
+  const currency = await assertAgreementCurrency(event, db, input.agreementId, input.currency)
+  query = query.where('payment.egcs_fc_currency', '=', currency)
+  if (input.commitmentId) query = query.where(sql<boolean>`payment.egcs_fc_currency = (
+    SELECT commitment.egcs_fc_currency FROM "Funding_Case_Agreement_Commitment" commitment
+    WHERE commitment.id = ${input.commitmentId} AND commitment.egcs_fc_fundingagreement = ${input.agreementId} AND NOT commitment._deleted
+  )`)
   const rows = await query.select(['payment.id', 'payment.egcs_fc_currency',
     databaseMoneyText(sql.ref('payment.egcs_fc_paymentamount')).as('egcs_fc_amount')])
     .orderBy('payment.id', 'desc').limit(input.limit).offset((input.page - 1) * input.limit).execute()

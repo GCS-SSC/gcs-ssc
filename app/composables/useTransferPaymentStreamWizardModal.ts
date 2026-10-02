@@ -189,7 +189,7 @@ export const useTransferPaymentStreamWizardModal = ({
     excludedErrorSummarySteps: ['review']
   })
 
-  const budgetLabels: Ref<Record<string, { programId: string, budgetId: string, label: string }>> = ref({})
+  const budgetLabels: Ref<Record<string, { programId: string, budgetId: string, label: string, currency: string }>> = ref({})
   const onBudgetResolved = (budgetTempId: string, payload: { programId: string, items: AdminCommonLookupResponseItem[] }) => {
     if (!open.value || payload.programId !== programId) return
     const budget = state.value?.budgets.find(item => item.tempId === budgetTempId)
@@ -197,8 +197,8 @@ export const useTransferPaymentStreamWizardModal = ({
     const item = payload.items.find(item => String(item.id) === String(budget.egcs_tp_transferpaymentbudget))
     if (!item && payload.items.length > 0) return
     const next = Object.fromEntries(Object.entries(budgetLabels.value).filter(([tempId]) => tempId !== budgetTempId))
-    if (item && typeof item.fiscal_year_display === 'string') {
-      next[budgetTempId] = { programId, budgetId: String(item.id), label: item.fiscal_year_display }
+    if (item && typeof item.fiscal_year_currency_display === 'string' && typeof item.egcs_tp_currency === 'string') {
+      next[budgetTempId] = { programId, budgetId: String(item.id), label: item.fiscal_year_currency_display, currency: item.egcs_tp_currency }
     }
     budgetLabels.value = next
   }
@@ -554,7 +554,9 @@ export const useTransferPaymentStreamWizardModal = ({
         {
           key: `total-${index}`,
           label: t('transfer_payment.total_budget'),
-          value: formatMoneyText(parseMoney(budget.egcs_tp_totalbudget), locale.value, 'CAD')
+          value: budgetLabels.value[budget.tempId]
+            ? formatMoneyText(parseMoney(budget.egcs_tp_totalbudget), locale.value, budgetLabels.value[budget.tempId]!.currency.toUpperCase())
+            : budget.egcs_tp_totalbudget
         },
         {
           key: `overcommit-${index}`,

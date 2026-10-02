@@ -493,7 +493,9 @@ const displayValue = (value: string | number | boolean | null | undefined) => {
   return String(value)
 }
 
-const formatMoney = (value: Money) => formatMoneyText(value, locale.value, 'CAD')
+const formatMoney = (value: Money) => profile.value?.egcs_fc_currency
+  ? formatMoneyText(value, locale.value, profile.value.egcs_fc_currency.toUpperCase())
+  : value
 const joinLabelParts = (parts: Array<string | number | null | undefined>) =>
   parts
     .map(part => part === null || part === undefined ? '' : String(part).trim())
@@ -518,6 +520,7 @@ const activeClaimPeriodLabel = computed(() => activeClaim.value
 const claimHeroTitle = computed(() => activeClaim.value ? t('agreement.claims.claim_label', { id: activeClaim.value.id }) : '')
 const claimHeroMetaItems = computed(() => [
   displayValue(profile.value?.egcs_fc_agreementnumber),
+  profile.value?.egcs_fc_currency.toUpperCase() ?? '',
   getBilingualValue(profile.value, 'egcs_fc_title', agreementId),
   `${t('agreement.claims.fiscal_year')}: ${activeClaimFiscalYearLabel.value}`,
   `${t('agreement.claims.period')}: ${activeClaimPeriodLabel.value}`
@@ -819,7 +822,7 @@ const saveSubmission = async () => {
           egcs_fc_description: budgetLine.egcs_fc_description,
           egcs_fc_amount: amount,
           egcs_fc_totalamount: amount,
-          egcs_fc_currency: 'cad'
+          egcs_fc_currency: budgetLine.egcs_fc_currency
         })
         didMutate = true
       }

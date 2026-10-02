@@ -1,3 +1,4 @@
+import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { FundingCaseAgreementCommitmentPatchSchema } from '~~/shared/types/schemas'
 import {
   assertAgreementCommitmentEditable,
@@ -49,6 +50,8 @@ export default defineEventHandler(async event => {
         )
         return existing
       }
+
+      await assertAgreementCurrency(event, trx, agreementId, patchValues.egcs_fc_currency ?? editableCommitment.egcs_fc_currency)
 
       if (patchValues.egcs_fc_type) {
         const commitmentType = await assertCommitmentTypeBelongsToAgreementStream(

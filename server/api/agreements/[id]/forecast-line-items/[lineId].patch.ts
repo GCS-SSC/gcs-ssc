@@ -1,3 +1,4 @@
+import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 /* eslint-disable jsdoc/require-jsdoc -- Route-local validation helpers are self-descriptive and not public API. */
 import { sql, type Kysely } from 'kysely'
 import type { Database } from '~~/shared/types/database'
@@ -136,6 +137,7 @@ const patchForecastLineItemForRoute = async (
       return budgetLineItem
     }
 
+    if (patchValues.egcs_fc_currency !== undefined) await assertAgreementCurrency(event, trx, agreementId, patchValues.egcs_fc_currency)
     const { egcs_fc_amount: patchAmount, egcs_fc_totalamount: patchTotalAmount, egcs_fc_fundingsources: fundingSources, ...nonMoneyPatchValues } = patchValues
     const databasePatchValues = {
       ...nonMoneyPatchValues,

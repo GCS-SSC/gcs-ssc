@@ -145,7 +145,9 @@ const totalAmount = computed(() =>
   sumMoney((payment.value?.lines ?? []).map((line: FundingCaseAgreementPaymentLineRow) => line.egcs_fc_amount))
 )
 
-const formatMoney = (value: Money) => formatMoneyText(value, locale.value, 'CAD')
+const formatMoney = (value: Money) => payment.value?.egcs_fc_currency
+  ? formatMoneyText(value, locale.value, payment.value.egcs_fc_currency.toUpperCase())
+  : value
 const MONTH_KEYS = ['apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec', 'jan', 'feb', 'mar'] as const
 const paymentPeriodLabel = (start: number, end: number) =>
   `${t(`agreement.payments.months.${MONTH_KEYS[start]}`)} - ${t(`agreement.payments.months.${MONTH_KEYS[end]}`)}`
@@ -285,7 +287,7 @@ const handleCompleted = async () => {
             :is-collapsed="isHeroCollapsed"
             icon="i-lucide-wallet-cards"
             :title="t(`enums.payment_type.${payment.egcs_fc_paymenttype}`)"
-            :meta-items="[payment.agreement_number, getBilingualValue(payment, 'agreement_title', agreementId)]"
+            :meta-items="[payment.agreement_number, getBilingualValue(payment, 'agreement_title', agreementId), payment.egcs_fc_currency.toUpperCase()]"
             :badges="[{
               variant: 'amount',
               label: formatMoney(payment.egcs_fc_paymentamount)

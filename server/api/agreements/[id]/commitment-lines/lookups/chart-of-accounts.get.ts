@@ -1,3 +1,4 @@
+import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { sql } from 'kysely'
 import { z } from 'zod'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
@@ -6,9 +7,11 @@ import { PaginationSchema } from '~~/shared/types/schemas/common'
 import { prepareAgreementCommitmentRoute } from '~~/server/utils/agreement-commitment'
 import { formatAccountingDimensions } from '~~/shared/utils/accounting-dimensions'
 import type { TransferPaymentStreamChartOfAccountDimension } from '~~/shared/types/schemas/transfer-payment'
+import { CURRENCY_CODES_ENUM } from '~~/shared/constants/enums'
 
 const QuerySchema = PaginationSchema.extend({
   commitmentId: z.union([z.string().min(1), z.number()]).transform(String).optional(),
+  currency: z.enum(CURRENCY_CODES_ENUM).optional(),
   permission_action: z.enum(['create', 'update']).default('create')
 }).superRefine((query, ctx) => {
   if (query.permission_action === 'update' && !query.commitmentId) {
@@ -17,7 +20,7 @@ const QuerySchema = PaginationSchema.extend({
 })
 
 export default defineEventHandler(async event => {
-  const { page, limit, search, commitmentId, permission_action } = await getValidatedQueryI18n(event, QuerySchema)
+  const { page, limit, search, commitmentId, permission_action, currency: requestedCurrency } = await getValidatedQueryI18n(event, QuerySchema)
   const assignmentTarget = commitmentId
     ? { entityType: 'fundingcaseagreementcommitment' as const, entityId: commitmentId }
     : undefined
@@ -25,6 +28,7 @@ export default defineEventHandler(async event => {
   if (!prepared || !('agreementId' in prepared)) return prepared
 
   const { agreementContext, db } = prepared
+  const currency = await assertAgreementCurrency(event, db, prepared.agreementId, requestedCurrency)
   const offset = (page - 1) * limit
   let baseQuery = db
     .selectFrom('Transfer_Payment_Stream_Chart_of_Account')
@@ -34,6 +38,11 @@ export default defineEventHandler(async event => {
     .where('Transfer_Payment_Stream_Chart_of_Account._deleted', '=', false)
     .where('Agency_Chart_of_Account._deleted', '=', false)
     .where('Agency_Fiscal_Year._deleted', '=', false)
+  if (currency) baseQuery = baseQuery.where('Agency_Chart_of_Account.egcs_ay_currency', '=', currency)
+  if (commitmentId) baseQuery = baseQuery.where(sql<boolean>`"Agency_Chart_of_Account".egcs_ay_currency = (
+    SELECT commitment.egcs_fc_currency FROM "Funding_Case_Agreement_Commitment" commitment
+    WHERE commitment.id = ${commitmentId} AND commitment.egcs_fc_fundingagreement = ${prepared.agreementId} AND NOT commitment._deleted
+  )`)
 
   if (search) {
     const pattern = `%${escapeLikePattern(search)}%`

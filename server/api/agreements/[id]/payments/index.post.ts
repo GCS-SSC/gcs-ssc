@@ -1,3 +1,4 @@
+import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { sql } from 'kysely'
 import { FundingCaseAgreementPaymentCreateSchema } from '~~/shared/types/schemas'
 import {
@@ -22,11 +23,13 @@ export default defineEventHandler(async event => {
   const validated = await readValidatedBodyI18n(event, FundingCaseAgreementPaymentCreateSchema)
 
   return await executeFreshAuthorizedAgreementWrite(event, db, agreementId, agreementContext, async (trx, currentContext, auth) => {
+    await assertAgreementCurrency(event, trx, agreementId, validated.egcs_fc_currency)
     const commitment = await resolveActiveAgreementPaymentCommitmentByType(
       event,
       trx,
       agreementId,
-      validated.egcs_fc_commitmenttype
+      validated.egcs_fc_commitmenttype,
+      validated.egcs_fc_currency
     )
     if (!commitment || typeof commitment !== 'object' || !('id' in commitment)) {
       return commitment
@@ -36,7 +39,8 @@ export default defineEventHandler(async event => {
       event,
       trx,
       agreementId,
-      validated.egcs_fc_fiscalyear
+      validated.egcs_fc_fiscalyear,
+      validated.egcs_fc_currency
     )
     if (!fiscalYear || typeof fiscalYear !== 'object' || !('id' in fiscalYear)) {
       return fiscalYear

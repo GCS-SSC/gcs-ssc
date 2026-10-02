@@ -309,16 +309,16 @@ const assertAgencyFinanceReferences = async (
   if (chartIds.length) {
     const charts = await db.selectFrom('Agency_Chart_of_Account')
       .where('id', 'in', chartIds).where('egcs_ay_organizationagency', '=', agencyId)
-      .where('_deleted', '=', false).select(['id', 'egcs_ay_fiscalyear'])
+      .where('_deleted', '=', false).select(['id', 'egcs_ay_fiscalyear', 'egcs_ay_currency'])
       .forUpdate().execute()
     const budgetIds = uniqueStrings(payload.budgets, item => item.egcs_tp_transferpaymentbudget)
     const budgets = budgetIds.length
       ? await db.selectFrom('Transfer_Payment_Fiscal_Year_Budget')
           .where('id', 'in', budgetIds).where('_deleted', '=', false)
-          .select('egcs_tp_fiscalyear').forUpdate().execute()
+          .select(['egcs_tp_fiscalyear', 'egcs_tp_currency']).forUpdate().execute()
       : []
-    const eligibleYears = new Set(budgets.map(row => String(row.egcs_tp_fiscalyear)))
-    if (hasMissingId(chartIds, charts) || charts.some(row => !eligibleYears.has(String(row.egcs_ay_fiscalyear)))) {
+    const eligibleYears = new Set(budgets.map(row => `${row.egcs_tp_fiscalyear}:${row.egcs_tp_currency}`))
+    if (hasMissingId(chartIds, charts) || charts.some(row => !eligibleYears.has(`${row.egcs_ay_fiscalyear}:${row.egcs_ay_currency}`))) {
       return await routeBadRequest(event, 'CHART_OF_ACCOUNT_NOT_FOUND', 'apiErrors.transfer_payment.chart_of_account_not_found')
     }
   }

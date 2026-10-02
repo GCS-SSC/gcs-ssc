@@ -145,6 +145,7 @@ export default defineEventHandler(async event => {
             validated.budgets.map(budget => ({
               egcs_tp_transferpaymentprofile: String(profile.id),
               egcs_tp_fiscalyear: budget.egcs_tp_fiscalyear,
+              egcs_tp_currency: budget.egcs_tp_currency,
               egcs_tp_totalbudget: databaseMoneyValue(budget.egcs_tp_totalbudget),
               egcs_tp_overcommitthreshold: budget.egcs_tp_overcommitthreshold
             }))

@@ -104,8 +104,8 @@ export const recalculateAgreementBudget = async (event: H3Event, db: Db, rowId: 
   }
   const version = await db.selectFrom('Funding_Case_Agreement_Budget_Version').select('egcs_fc_iscurrent').where('id', '=', anchor.egcs_fc_budgetversion).executeTakeFirstOrThrow()
   if (version.egcs_fc_iscurrent) {
-    const years = new Map(rows.map(row => [row.yearRowId, row.yearIdentity ?? row.yearRowId]))
-    for (const identity of years.values()) await assertAgreementBudgetProgramFundingCapacity(event, db, streamId, identity, parseMoney('0'), { lockStreamBudget: true })
+    const years = new Map(rows.map(row => [`${row.yearRowId}:${row.currency}`, { identity: row.yearIdentity ?? row.yearRowId, currency: row.currency }]))
+    for (const { identity, currency } of years.values()) await assertAgreementBudgetProgramFundingCapacity(event, db, streamId, identity, parseMoney('0'), { lockStreamBudget: true, currency })
   }
   return amounts
 }

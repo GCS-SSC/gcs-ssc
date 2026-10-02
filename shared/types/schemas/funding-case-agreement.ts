@@ -105,6 +105,7 @@ const RequiredProponentsSchema = () => z.array(FundingCaseAgreementApplicantReci
 export const FundingCaseAgreementProfileBaseSchema = z.object({
   egcs_fc_customfields: AgreementCustomFieldValuesSchema.optional(),
   egcs_fc_agreementnumber: AgreementProfileText(15),
+  egcs_fc_currency: z.enum(CURRENCY_CODES_ENUM, { error: 'validation.required' }),
   egcs_fc_transferpaymentstream: RequiredBigintSelectionId(),
   egcs_fc_financialsystemnumber: RequiredBigintLike(),
   egcs_fc_title_en: AgreementProfileText(255),
@@ -457,6 +458,7 @@ const OptionalText = () => z.preprocess(
 ).meta({ formRequired: false })
 
 export const FundingCaseAgreementCommitmentBaseSchema = z.object({
+  egcs_fc_currency: z.enum(CURRENCY_CODES_ENUM, { error: 'validation.required' }),
   egcs_fc_type: RequiredBigintSelectionId()
 })
 

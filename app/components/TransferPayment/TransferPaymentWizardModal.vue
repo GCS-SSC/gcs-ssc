@@ -374,9 +374,10 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentWizard>) => {
                     class="flex items-center justify-between rounded-lg bg-zinc-50 p-4 dark:bg-zinc-900/50">
                     <span class="font-bold">
                       {{ fiscalYearLabelById.get(budget.egcs_tp_fiscalyear) || t(budget.egcs_tp_fiscalyear ? 'common.unavailable' : 'common.none') }}
+                      ({{ budget.egcs_tp_currency.toUpperCase() }})
                     </span>
                     <span class="text-primary font-mono font-black">
-                      {{ formatMoneyText(parseMoney(budget.egcs_tp_totalbudget), locale, 'CAD') }}
+                      {{ formatMoneyText(parseMoney(budget.egcs_tp_totalbudget), locale, budget.egcs_tp_currency.toUpperCase()) }}
                     </span>
                   </div>
                 </div>

@@ -90,6 +90,7 @@ export default defineEventHandler(async event => {
         'Funding_Case_Agreement_Profile.egcs_fc_furtherdistribution as egcs_fc_furtherdistribution',
         'Funding_Case_Agreement_Profile.egcs_fc_holdback as egcs_fc_holdback',
         'Funding_Case_Agreement_Profile.egcs_fc_holdbackbasis as egcs_fc_holdbackbasis',
+        'Funding_Case_Agreement_Profile.egcs_fc_currency as egcs_fc_currency',
         'Agency_Holdback_Basis.egcs_ay_name_en as holdback_basis_name_en',
         'Agency_Holdback_Basis.egcs_ay_name_fr as holdback_basis_name_fr',
         'Agency_Holdback_Basis.egcs_ay_languageindependentcode as holdback_basis_code',

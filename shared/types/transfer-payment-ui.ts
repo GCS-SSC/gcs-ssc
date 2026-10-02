@@ -39,6 +39,7 @@ export type TransferPaymentBudgetForm = Partial<
 
 export interface TransferPaymentStreamBudgetRow extends Omit<TransferPaymentStreamBudgetItem, 'egcs_tp_totalbudget'>, Record<string, unknown> {
   egcs_tp_totalbudget: Money
+  egcs_tp_currency: TransferPaymentBudgetItem['egcs_tp_currency']
   program_total_budget?: Money
   fiscal_year_display?: string
   fiscal_year?: number

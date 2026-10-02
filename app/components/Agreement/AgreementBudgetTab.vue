@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { withFormRequirements } from '~~/shared/utils/form-requirements'
+import type { Currency_Codes } from '~~/shared/types/database'
 import { useBudgetCalculationPreview } from '~/composables/useBudgetCalculationPreview'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 /* eslint-disable jsdoc/require-jsdoc -- Budget table callbacks are exercised by focused component tests. */
@@ -75,6 +76,7 @@ const COST_SUBSECTION_GROUP_COLUMN_ID = 'costSubsectionGroup'
 
 const {
   agreementId,
+  currency: agreementCurrency,
   canCreate,
   canUpdate,
   canDelete,
@@ -89,6 +91,7 @@ const {
   embedded = false
 } = defineProps<{
   agreementId: string
+  currency?: Currency_Codes
   canCreate: boolean
   canUpdate: boolean
   canDelete: boolean
@@ -124,7 +127,7 @@ const fiscalYearModal = useCrudModal<FundingCaseAgreementBudgetFiscalYearRow, Fu
 })
 const lineItemModal = useCrudModal<FundingCaseAgreementBudgetLineItemRow, FundingCaseAgreementBudgetLineItemForm>({
   createState: () => ({
-    egcs_fc_currency: 'cad',
+    egcs_fc_currency: agreementCurrency,
     egcs_fc_fundingsources: []
   }),
   updateState: lineItem => ({
@@ -971,10 +974,11 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
                 :readonly="isLineItemCostSubsectionLocked" />
             </UFormField>
 
-            <UFormField :label="t('agreement.budget.currency')" name="egcs_fc_currency">
+            <UFormField :label="t('agreement.budget.currency')" name="egcs_fc_currency" required>
               <CommonEnumSelect
                 v-model="selectedLineItem.egcs_fc_currency"
                 name="currency_codes"
+                disabled
                 class="w-full" />
             </UFormField>
 

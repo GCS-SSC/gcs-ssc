@@ -17,6 +17,7 @@ import { DirectReviewEntityTypeIdentitySchema, PaginationSchema, PositivePostgre
 import { MoneySchema } from './money'
 import {
   AMENDED_TYPE_ENUM,
+  CURRENCY_CODES_ENUM,
   LANGUAGE_PREFERENCE_ENUM,
   REVIEW_TYPE_ENUM
 } from '~~/shared/constants/enums'
@@ -151,6 +152,7 @@ export const TransferPaymentBudgetListQuerySchema = PaginationSchema.extend({
 
 export const TransferPaymentBudgetSchema = z.object({
   egcs_tp_fiscalyear: PositivePostgresBigintIdSchema,
+  egcs_tp_currency: z.enum(CURRENCY_CODES_ENUM, { error: 'validation.required' }),
   egcs_tp_totalbudget: MoneySchema,
   egcs_tp_overcommitthreshold: RequiredNumeric(5, 2)
     .min(0, { error: 'validation.invalid_number' })
@@ -333,7 +335,7 @@ const validateWizardBudgets = (
   const budgetFiscalYearIds = new Set<string>()
 
   for (const [index, budget] of budgets.entries()) {
-    const budgetKey = String(budget.egcs_tp_fiscalyear)
+    const budgetKey = `${budget.egcs_tp_fiscalyear}:${budget.egcs_tp_currency}`
     if (budgetFiscalYearIds.has(budgetKey)) {
       addInvalidWizardSelectionIssue(ctx, ['budgets', index, 'egcs_tp_fiscalyear'])
       continue
@@ -612,6 +614,7 @@ const validateChartOfAccountDimensions = (
 
 export const AgencyChartOfAccountBaseSchema = z.object({
   egcs_ay_fiscalyear: PositivePostgresBigintIdSchema,
+  egcs_ay_currency: z.enum(CURRENCY_CODES_ENUM, { error: 'validation.required' }),
   egcs_ay_accountingdimensions: z.array(
     TransferPaymentStreamChartOfAccountDimensionSchema,
     { error: 'validation.required' }
@@ -640,6 +643,7 @@ export type TransferPaymentStreamChartOfAccountItem = WithId<TransferPaymentStre
   egcs_tp_transferpaymentstream: string
   egcs_ay_fiscalyear: string
   egcs_ay_accountingdimensions: TransferPaymentStreamChartOfAccountDimension[]
+  egcs_ay_currency: typeof CURRENCY_CODES_ENUM[number]
   fiscal_year_display?: string
   agency_definition_deleted?: boolean
 }>
