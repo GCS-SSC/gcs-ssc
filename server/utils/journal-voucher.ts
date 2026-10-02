@@ -17,6 +17,7 @@ import { hasPositiveCompletionTerminus } from './completion-terminus'
 import { resolveAssignedItemTargetGrant } from './rbac'
 import { withBusinessRecordState } from './business-record-state'
 import { journalVoucherPaymentIsFinal } from './journal-voucher-source'
+import { readAgreementPaymentAccountingSource, requireAgreementPaymentSourceRead } from './agreement-payment-source'
 
 export const journalVoucherError = async (event: H3Event, code: string) => await throwApiError(event, {
   statusCode: 409, code, key: 'apiErrors.journal_voucher.invalid_entry'
@@ -53,20 +54,6 @@ export const persistJournalVoucherLines = async (trx: Transaction<Database>, id:
     egcs_fc_accountingdimensions: sql`${JSON.stringify(line.egcs_fc_accountingdimensions)}::jsonb`,
     egcs_fc_amount: databaseMoneyValue(line.egcs_fc_amount)
   }))).execute()
-}
-
-/** Retains all source coding and bilingual department-defined dimensions in ordinary JV rows. */
-const readPaymentAllocations = async (trx: Transaction<Database>, paymentId: string): Promise<JournalVoucherAccountingLine[]> => {
-  const rows = await trx.selectFrom('Funding_Case_Agreement_Payment_Line as l')
-    .innerJoin('Funding_Case_Agreement_Commitment_Line as c', 'c.id', 'l.egcs_fc_fundingagreementcommitmentline')
-    .innerJoin('Transfer_Payment_Stream_Chart_of_Account as s', 's.id', 'c.egcs_fc_transferpaymentstreamchartofaccount')
-    .innerJoin('Agency_Chart_of_Account as a', 'a.id', 's.egcs_tp_agencychartofaccount')
-    .select(['c.id as egcs_fc_commitmentline', 'c.egcs_fc_commitmentlinenumber', 's.id as egcs_fc_chartofaccount',
-      'a.egcs_ay_accountingdimensions as egcs_fc_accountingdimensions', databaseMoneyText(sql.ref('l.egcs_fc_amount')).as('egcs_fc_amount')])
-    .where('l.egcs_fc_fundingagreementpayment', '=', paymentId).where('l._deleted', '=', false)
-    .orderBy('c.id').forShare('l').execute()
-  return rows.map(row => ({ ...row, egcs_fc_amount: parseDatabaseMoney(row.egcs_fc_amount),
-    egcs_fc_accountingdimensions: TransferPaymentStreamChartOfAccountDimensionSchema.array().parse(row.egcs_fc_accountingdimensions) }))
 }
 
 /** Agency/Stream/fiscal-year choices are authorized by the JV root, without a Program read grant. */
@@ -131,27 +118,31 @@ export const createJournalVoucher = async (event: H3Event, input: JournalVoucher
   if (!initial) return await notFound(event, 'AGREEMENT_PAYMENT_NOT_FOUND', 'apiErrors.agreement.payment_not_found')
   await authorize(event, 'journal_voucher', 'create', initial.scope)
   if (options.reversalOf) await authorizeJournalVoucher(event, options.reversalOf)
-  else await authorize(event, 'agreement', 'read', initial.scope)
+  else await requireAgreementPaymentSourceRead(event, db, input.egcs_fc_payment)
   return await executeFreshAuthorizedAgreementWrite(event, db, initial.agreementId, initial, async (trx, context, auth) => {
+    const accountingSource = options.reversalOf ? null : await readAgreementPaymentAccountingSource(event, trx, input.egcs_fc_payment, { agreementId: context.agreementId, auth })
     await assertJournalVoucherSequence(event, trx, input.egcs_fc_payment, { replacementOf: input.egcs_fc_replacementof, reversalOf: options.reversalOf })
-    const source = await trx.selectFrom('Funding_Case_Agreement_Payment as p')
-      .innerJoin('Common_Status as status', 'status.id', 'p.egcs_fc_status')
-      .innerJoin('Funding_Case_Agreement_Budget_Fiscal_Year as fy', 'fy.id', 'p.egcs_fc_fiscalyear')
-      .innerJoin('Agency_Fiscal_Year as ay', 'ay.id', 'fy.egcs_fc_fiscalyear')
-      .innerJoin('Funding_Case_Agreement_Profile as agreement', 'agreement.id', 'p.egcs_fc_fundingagreement')
-      .select(['p.egcs_fc_currency', 'p.egcs_fc_fiscalyear', 'fy.egcs_fc_fiscalyear as agencyFiscalYear', 'ay.egcs_ay_fiscalyeardisplay',
-        'agreement.egcs_fc_agreementnumber', journalVoucherPaymentIsFinal('p').as('isFinal')])
-      .where('p.id', '=', input.egcs_fc_payment).where('p._deleted', '=', false).where('status._deleted', '=', false).forShare('p').executeTakeFirstOrThrow()
-    if (!source.isFinal) return await journalVoucherError(event, 'JV_PAYMENT_NOT_FINAL')
+    const finality = await trx.selectFrom('Funding_Case_Agreement_Payment as p')
+      .select(journalVoucherPaymentIsFinal('p').as('isFinal'))
+      .where('p.id', '=', input.egcs_fc_payment).where('p.egcs_fc_fundingagreement', '=', context.agreementId)
+      .where('p._deleted', '=', false).executeTakeFirstOrThrow()
+    if (!finality.isFinal) return await journalVoucherError(event, 'JV_PAYMENT_NOT_FINAL')
+    // A reversal reads retained JV evidence; it does not confer source Payment read access.
+    const source = accountingSource
+      ? accountingSource.header
+      : await trx.selectFrom('Funding_Case_Agreement_Journal_Voucher')
+          .select(['egcs_fc_currency', 'egcs_fc_fiscalyear', 'egcs_fc_agencyfiscalyear', 'egcs_fc_fiscalyeardisplay', 'egcs_fc_agreementnumber'])
+          .where('id', '=', options.reversalOf!).where('egcs_fc_payment', '=', input.egcs_fc_payment)
+          .where('egcs_fc_fundingagreement', '=', context.agreementId).where('_deleted', '=', false).executeTakeFirstOrThrow()
     const commonUserId = await resolveAssignmentCommonUserId(trx, auth.userId)
     if (!commonUserId) return await forbidden(event)
     const numberRow = await trx.selectFrom('Funding_Case_Agreement_Journal_Voucher')
       .select(eb => eb.fn.max<number>('egcs_fc_number').as('maximum')).where('egcs_fc_fundingagreement', '=', context.agreementId).executeTakeFirstOrThrow()
     const created = await trx.insertInto('Funding_Case_Agreement_Journal_Voucher').values({
       egcs_fc_fundingagreement: context.agreementId, egcs_fc_payment: input.egcs_fc_payment,
-      egcs_fc_fiscalyear: source.egcs_fc_fiscalyear, egcs_fc_agencyfiscalyear: source.agencyFiscalYear,
+      egcs_fc_fiscalyear: source.egcs_fc_fiscalyear, egcs_fc_agencyfiscalyear: source.egcs_fc_agencyfiscalyear,
       egcs_fc_currency: source.egcs_fc_currency, egcs_fc_number: Number(numberRow.maximum ?? 0) + 1,
-      egcs_fc_agreementnumber: source.egcs_fc_agreementnumber, egcs_fc_fiscalyeardisplay: source.egcs_ay_fiscalyeardisplay,
+      egcs_fc_agreementnumber: source.egcs_fc_agreementnumber, egcs_fc_fiscalyeardisplay: source.egcs_fc_fiscalyeardisplay,
       egcs_fc_requesteddate: sql<Date>`${input.egcs_fc_requesteddate.toISOString().slice(0, 10)}::date`,
       egcs_fc_narrative_en: input.egcs_fc_narrative_en, egcs_fc_narrative_fr: input.egcs_fc_narrative_fr,
       egcs_fc_status: await lockAgencyDraftStatus(trx, context.agencyId),
@@ -164,7 +155,7 @@ export const createJournalVoucher = async (event: H3Event, input: JournalVoucher
       ? reverseJournalVoucherAllocations(previous.filter(line => line.egcs_fc_kind === 'original'), previous.filter(line => line.egcs_fc_kind === 'corrected'))
       : { original: input.egcs_fc_replacementof
           ? (await readJournalVoucherLines(trx, input.egcs_fc_replacementof)).filter(line => line.egcs_fc_kind === (replacementNegative ? 'original' : 'corrected'))
-          : await readPaymentAllocations(trx, input.egcs_fc_payment), corrected: [] as JournalVoucherAccountingLine[], adjustments: [] as JournalVoucherAccountingLine[] }
+          : accountingSource!.allocations, corrected: [] as JournalVoucherAccountingLine[], adjustments: [] as JournalVoucherAccountingLine[] }
     if (!previous) allocations.corrected = allocations.original.map(line => ({ ...line }))
     if (!allocations.original.length) return await journalVoucherError(event, 'JV_LINES_REQUIRED')
     await persistJournalVoucherLines(trx, String(created.id), input.egcs_fc_payment, 'original', allocations.original)
@@ -177,7 +168,7 @@ export const createJournalVoucher = async (event: H3Event, input: JournalVoucher
       const sourceContext = await resolveJournalVoucherRuntimeContext(trx, options.reversalOf)
       if (!sourceContext || sourceContext.agreementId !== context.agreementId
         || !auth.userAbilities.authorize('journal_voucher', 'read', sourceContext.scope)) return await forbidden(event)
-    } else if (!auth.userAbilities.authorize('agreement', 'read', context.scope)) return await forbidden(event)
+    }
   } })
 }
 
