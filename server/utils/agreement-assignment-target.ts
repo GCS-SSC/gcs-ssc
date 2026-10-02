@@ -62,6 +62,12 @@ export const resolveAssignmentTargetAgreementId = async (
     return reconciliation ? String(reconciliation.egcs_fc_fundingagreement) : null
   }
 
+  if (target.entityType === 'fundingcasejournalvoucher') {
+    const voucher = await db.selectFrom('Funding_Case_Agreement_Journal_Voucher').select('egcs_fc_fundingagreement')
+      .where('id', '=', target.entityId).where('_deleted', '=', false).executeTakeFirst()
+    return voucher ? String(voucher.egcs_fc_fundingagreement) : null
+  }
+
   if (target.entityType === 'fundingcasepayment') {
     const payment = await db.selectFrom('Funding_Case_Agreement_Payment').select('egcs_fc_fundingagreement')
       .where('id', '=', target.entityId).where('_deleted', '=', false).executeTakeFirst()
@@ -163,4 +169,12 @@ export const resolvePaymentLineAssignmentTarget = async (
     .executeTakeFirst()
   if (!line) return null
   return { entityType: 'fundingcasepayment', entityId: String(line.egcs_fc_fundingagreementpayment) }
+}
+
+/** Accounting children authorize only through their exact JV root. */
+export const resolveJournalVoucherLineAssignmentTarget = async (db: Kysely<Database>, lineId: string): Promise<AssignmentTarget | null> => {
+  if (!isPositivePostgresBigintText(lineId)) return null
+  const line = await db.selectFrom('Funding_Case_Agreement_Journal_Voucher_Line').select('egcs_fc_journalvoucher')
+    .where('id', '=', lineId).where('_deleted', '=', false).executeTakeFirst()
+  return line ? { entityType: 'fundingcasejournalvoucher', entityId: String(line.egcs_fc_journalvoucher) } : null
 }

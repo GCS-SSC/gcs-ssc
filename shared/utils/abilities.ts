@@ -12,6 +12,10 @@ import {
 export { AUTHORIZATION_SUBJECTS, isAuthorizationSubject }
 
 export const ABILITIES = [
+  { action: 'create', subject: 'journal_voucher', name_en: 'Create Journal Vouchers', name_fr: 'Créer des pièces de journal', desc_en: 'Prepare accounting corrections and reversals.', desc_fr: 'Préparer des corrections comptables et des contrepassations.' },
+  { action: 'read', subject: 'journal_voucher', name_en: 'Read Journal Vouchers', name_fr: 'Lire les pièces de journal', desc_en: 'Read scoped accounting entries.', desc_fr: 'Lire les écritures comptables autorisées.' },
+  { action: 'update', subject: 'journal_voucher', name_en: 'Update Journal Vouchers', name_fr: 'Modifier les pièces de journal', desc_en: 'Work on assigned accounting entries.', desc_fr: 'Traiter les écritures comptables attribuées.' },
+  { action: 'delete', subject: 'journal_voucher', name_en: 'Delete Journal Vouchers', name_fr: 'Supprimer les pièces de journal', desc_en: 'Delete eligible assigned Drafts.', desc_fr: 'Supprimer les brouillons admissibles attribués.' },
   { action: 'read', subject: 'audit', name_en: 'Read Audit', name_fr: 'Consulter l’audit', desc_en: 'Read change and access logs.', desc_fr: 'Consulter les journaux de modification et d’accès.' },
   {
     action: 'create',

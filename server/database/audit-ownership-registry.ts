@@ -168,6 +168,8 @@ export const AUDIT_TABLE_OWNERSHIP: Readonly<Record<string, AuditOwnershipRule>>
   'public.Funding_Case_Agreement_Monitor_Planning': parent('egcs_fc_fundingagreementmonitor', 'public.Funding_Case_Agreement_Monitor'),
   'public.Funding_Case_Agreement_Monitor_Promising_Practice': parent('egcs_fc_fundingagreementmonitor', 'public.Funding_Case_Agreement_Monitor'),
   'public.Funding_Case_Agreement_Outcome_Activity': parent('egcs_fc_activity', 'public.Funding_Case_Agreement_Activity'),
+  'public.Funding_Case_Agreement_Journal_Voucher': parent('egcs_fc_fundingagreement', 'public.Funding_Case_Agreement_Profile'),
+  'public.Funding_Case_Agreement_Journal_Voucher_Line': parent('egcs_fc_journalvoucher', 'public.Funding_Case_Agreement_Journal_Voucher'),
   'public.Funding_Case_Agreement_Payment': parent('egcs_fc_fundingagreementcommitment', 'public.Funding_Case_Agreement_Commitment'),
   'public.Funding_Case_Agreement_Payment_Line': parent('egcs_fc_fundingagreementpayment', 'public.Funding_Case_Agreement_Payment'),
   'public.Funding_Case_Agreement_Profile': parent('egcs_fc_transferpaymentstream', 'public.Transfer_Payment_Stream'),
@@ -240,6 +242,7 @@ export const AUDIT_ENTITY_TABLES: Readonly<Record<string, string>> = {
   fundingcaseagreementclaim: 'public.Funding_Case_Agreement_Claim',
   fundingclaimreconcile: 'public.Funding_Case_Agreement_Claim_Reconcile',
   fundingcaseagreementcommitment: 'public.Funding_Case_Agreement_Commitment',
+  fundingcasejournalvoucher: 'public.Funding_Case_Agreement_Journal_Voucher',
   fundingcasepayment: 'public.Funding_Case_Agreement_Payment',
   fundingcasemonitor: 'public.Funding_Case_Agreement_Monitor',
   // The public SDK persists this owner type in host-managed extension KV/secret records.

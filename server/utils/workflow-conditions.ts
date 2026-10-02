@@ -27,6 +27,7 @@ export const replaceWorkflowConditions = async (
     .select(['s.egcs_cn_entitytype', 's.egcs_cn_agency']).where('m.id', '=', memberId).executeTakeFirstOrThrow()
   if (String(setup.egcs_cn_agency) !== agencyId) return false
   if (conditions.length && (await resolveEntityTypeLifecycleDefinition(trx, setup.egcs_cn_entitytype))?.ownerKind !== 'agreement') return false
+  if (conditions.some(condition => 'source' in condition && condition.source.startsWith('jv_')) && setup.egcs_cn_entitytype !== 'fundingcasejournalvoucher') return false
   const custom = conditions.filter((condition): condition is CustomFieldCondition => 'fieldId' in condition)
   const profile = conditions.filter(condition => 'source' in condition)
   if (profile.length) {

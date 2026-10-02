@@ -30,6 +30,8 @@ export default {
   create: (context) => {
     const approvedAuthorizationCalls = new Set([
       'authorize',
+      'authorizeJournalVoucher',
+      'createJournalVoucher',
       'requireAuthContext',
       'authorizeActiveAgencySubentity',
       'authorizeActiveAgencyCostCategory',

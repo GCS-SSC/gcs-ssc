@@ -1,6 +1,6 @@
 import { sql } from 'kysely'
 import { AgencyFiscalYearSchema } from '~~/shared/types/schemas'
-import { authorize } from '~~/server/utils/authorize'
+import { authorize, requireFreshAuthContext } from '~~/server/utils/authorize'
 import { assertActiveAgencyProfile, withActiveAgencyMutationTransaction } from '~~/server/utils/agency-auth'
 import { throwIfAgencyUniqueConstraintError } from '~~/server/utils/agency-unique-constraint-errors'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
@@ -26,13 +26,18 @@ export default defineEventHandler(async event => {
   const validated = await readValidatedBodyI18n(event, AgencyFiscalYearSchema)
   try {
     return await withActiveAgencyMutationTransaction(event, agencyId, async trx => {
+      if (validated.egcs_ay_jvopen) {
+        const fresh = await requireFreshAuthContext(event, trx)
+        if (!fresh.userAbilities.authorize('agency', 'delete', { type: 'agency', agencyId })) return await forbidden(event)
+      }
       return await trx.insertInto('Agency_Fiscal_Year')
         .values({
           egcs_ay_organizationagency: agencyId,
           egcs_ay_fiscalyeardisplay: validated.egcs_ay_fiscalyeardisplay,
           egcs_ay_fiscalyear: validated.egcs_ay_fiscalyear,
           egcs_ay_startdate: asPostgresDate(validated.egcs_ay_startdate),
-          egcs_ay_enddate: asPostgresDate(validated.egcs_ay_enddate)
+          egcs_ay_enddate: asPostgresDate(validated.egcs_ay_enddate),
+          egcs_ay_jvopen: validated.egcs_ay_jvopen
         })
         .returningAll()
         .executeTakeFirstOrThrow()

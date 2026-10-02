@@ -813,6 +813,7 @@ export type TransferPaymentConfigEntityType =
   | 'fundingclaimreconcile'
   | 'fundingcaseforecast'
   | 'fundingcasepayment'
+  | 'fundingcasejournalvoucher'
 
 export const TRANSFER_PAYMENT_CONFIG_ENTITY_TYPE_ENUM = [
   'applicantrecipient',
@@ -835,6 +836,7 @@ export type TransferPaymentReviewSetupEntityType =
   | 'fundingclaimreconcile'
   | 'fundingcaseforecast'
   | 'fundingcasepayment'
+  | 'fundingcasejournalvoucher'
   | 'fundingcaserecommendation'
 
 export const TRANSFER_PAYMENT_REVIEW_SETUP_ENTITY_TYPE_ENUM = [
@@ -847,6 +849,7 @@ export const TRANSFER_PAYMENT_REVIEW_SETUP_ENTITY_TYPE_ENUM = [
   'fundingclaimreconcile',
   'fundingcaseforecast',
   'fundingcasepayment',
+  'fundingcasejournalvoucher',
   'fundingcaserecommendation'
 ] as const satisfies readonly TransferPaymentReviewSetupEntityType[]
 

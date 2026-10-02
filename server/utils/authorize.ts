@@ -120,7 +120,7 @@ export const authorizeFreshAssignedItem = async (
   if (owner.kind === 'agreement') {
     const { resolveAgreementScopeContext } = await import('./agreement')
     const agreement = await resolveAgreementScopeContext(owner.agreementId, trx)
-    if (!agreement || !context.userAbilities.authorize('agreement', action, agreement.scope)) {
+    if (!agreement || !context.userAbilities.authorize(owner.subject ?? 'agreement', action, agreement.scope)) {
       return await forbidden(event)
     }
     return

@@ -146,6 +146,7 @@ export default defineEventHandler(async event => {
         CASE
           WHEN work.entity_type = 'fundingcaseagreement' THEN work.entity_id
           WHEN work.entity_type = 'fundingcaseagreementclaim' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Claim" WHERE id = work.entity_id)
+          WHEN work.entity_type = 'fundingcasejournalvoucher' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Journal_Voucher" WHERE id = work.entity_id)
           WHEN work.entity_type = 'fundingcasepayment' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Payment" WHERE id = work.entity_id)
           WHEN work.entity_type = 'fundingcaseforecast' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Forecast" WHERE id = work.entity_id)
           WHEN work.entity_type = 'fundingcasemonitor' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Monitor" WHERE id = work.entity_id)
@@ -175,6 +176,8 @@ export default defineEventHandler(async event => {
       LEFT JOIN "Funding_Case_Agreement_Claim_Reconcile" review_reconcile ON review_reconcile.id = source_review_set.egcs_cn_entityid
         AND source_review_set.egcs_cn_entitytype::text = 'fundingclaimreconcile'
       LEFT JOIN "Funding_Case_Agreement_Claim" reconciled_claim ON reconciled_claim.id = review_reconcile.egcs_fc_fundingagreementclaim
+      LEFT JOIN "Funding_Case_Agreement_Journal_Voucher" review_jv ON review_jv.id = source_review_set.egcs_cn_entityid
+        AND source_review_set.egcs_cn_entitytype::text = 'fundingcasejournalvoucher'
       LEFT JOIN "Funding_Case_Agreement_Payment" review_payment ON review_payment.id = source_review_set.egcs_cn_entityid
         AND source_review_set.egcs_cn_entitytype::text = 'fundingcasepayment'
       LEFT JOIN "Funding_Case_Agreement_Forecast" review_forecast ON review_forecast.id = source_review_set.egcs_cn_entityid
@@ -192,12 +195,13 @@ export default defineEventHandler(async event => {
         CASE WHEN source_review_set.egcs_cn_entitytype::text = 'fundingcaseagreement' THEN source_review_set.egcs_cn_entityid END,
         CASE WHEN review_binding.egcs_cn_ownertype = 'fundingcaseagreement' THEN review_binding.egcs_cn_ownerid END,
         review_claim.egcs_fc_fundingagreement, reconciled_claim.egcs_fc_fundingagreement,
-        review_payment.egcs_fc_fundingagreement, review_forecast.egcs_fc_fundingagreement,
+        review_jv.egcs_fc_fundingagreement, review_payment.egcs_fc_fundingagreement, review_forecast.egcs_fc_fundingagreement,
         review_monitor.egcs_fc_fundingagreement, review_commitment.egcs_fc_fundingagreement,
         review_amendment.egcs_fc_fundingagreement, review_closeout.egcs_fc_fundingagreement,
         CASE WHEN target.entity_type = 'fundingcaseagreementclaim' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Claim" WHERE id = target.entity_id) END,
         CASE WHEN target.entity_type = 'fundingclaimreconcile' THEN (SELECT claim.egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Claim_Reconcile" reconcile
           JOIN "Funding_Case_Agreement_Claim" claim ON claim.id = reconcile.egcs_fc_fundingagreementclaim WHERE reconcile.id = target.entity_id) END,
+        CASE WHEN target.entity_type = 'fundingcasejournalvoucher' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Journal_Voucher" WHERE id = target.entity_id) END,
         CASE WHEN target.entity_type = 'fundingcasepayment' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Payment" WHERE id = target.entity_id) END,
         CASE WHEN target.entity_type = 'fundingcaseforecast' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Forecast" WHERE id = target.entity_id) END,
         CASE WHEN target.entity_type = 'fundingcasemonitor' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Monitor" WHERE id = target.entity_id) END,

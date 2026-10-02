@@ -74,6 +74,7 @@ const EXPECTED_CORE_MIGRATIONS = [
   '0210_monitor_links',
   '0220_funding_sources',
   '0230_intake_registry_identity',
+  '0250_journal_vouchers',
   '0240_seed'
 ] as const
 

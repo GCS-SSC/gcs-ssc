@@ -53,6 +53,7 @@ const EXTENSION_HOST_CAPABILITIES = new Set([
   'textarea-slots',
   'create-actions',
   'payment-amount-calculators',
+  'agreement-payment-capacity',
   'server-handlers',
   'server-handler-rbac',
   'migrations',

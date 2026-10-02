@@ -32,6 +32,7 @@ const isSubmitting: Ref<boolean> = ref(false)
 const approvalSubmissionEntityTypes = new Set([
   'fundingcaseagreement', 'fundingcaseamendment', 'fundingcaseagreementcloseout',
   'fundingcaseagreementclaim', 'fundingclaimreconcile', 'fundingcaseagreementcommitment',
+  'fundingcasejournalvoucher',
   'fundingcasepayment', 'fundingcaseforecast', 'fundingcasemonitor'
 ])
 const purposeOptions = computed(() => [

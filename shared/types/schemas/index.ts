@@ -22,3 +22,5 @@ export * from './assessment/review-schema'
 export * from './assessment/assessment'
 export * from './assessment/calculation'
 export * from './checklist/checklist'
+
+export * from './journal-voucher'

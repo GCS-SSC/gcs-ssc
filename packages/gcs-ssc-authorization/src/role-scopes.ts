@@ -15,13 +15,15 @@ export const ROLE_ABILITY_SCOPE_MATRIX: Record<RoleAbilitySubject, readonly Role
   group: ['global', 'agency'],
   agreement: ['global', 'agency', 'program'],
   applicant_recipient: ['global', 'agency'],
-  funding_case: ['global', 'agency', 'program']
+  funding_case: ['global', 'agency', 'program'],
+  journal_voucher: ['global', 'agency', 'program']
 }
 
 export const ASSIGNMENT_MANAGEMENT_SUBJECTS = [
   'agreement',
   'applicant_recipient',
-  'funding_case'
+  'funding_case',
+  'journal_voucher'
 ] as const satisfies readonly RoleAbilitySubject[]
 
 export const canSubjectManageAssignments = (subject: string): subject is (typeof ASSIGNMENT_MANAGEMENT_SUBJECTS)[number] =>

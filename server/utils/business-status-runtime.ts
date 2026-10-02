@@ -65,6 +65,7 @@ export const BUSINESS_STATUS_REGISTRY = {
     ordinaryLockExemptAncestors: ['fundingcaseagreementclaim']
   },
   fundingcaseagreementcommitment: { table: 'Funding_Case_Agreement_Commitment', authorizationRoot: 'agreement', ancestors: ['fundingcaseagreement'] },
+  fundingcasejournalvoucher: { table: 'Funding_Case_Agreement_Journal_Voucher', authorizationRoot: 'agreement', ancestors: ['fundingcaseagreement'] },
   fundingcasepayment: {
     table: 'Funding_Case_Agreement_Payment',
     authorizationRoot: 'agreement',
@@ -101,6 +102,10 @@ const readCarrierStatus = async (
     const intake = await db.selectFrom('Funding_Case_Intake_Profile').select('egcs_fi_status')
       .where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirst()
     return intake ? String(intake.egcs_fi_status) : null
+  }
+  if (entityType === 'fundingcasejournalvoucher') {
+    const row = await db.selectFrom('Funding_Case_Agreement_Journal_Voucher').select('egcs_fc_status').where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirst()
+    return row ? String(row.egcs_fc_status) : null
   }
   const statusId = entityType === 'fundingcaseagreement'
     ? (await db.selectFrom('Funding_Case_Agreement_Profile').select('egcs_fc_status').where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirst())?.egcs_fc_status
@@ -169,6 +174,12 @@ const resolveLineage = async (
       { entityType, entityId }
     ] }
   }
+  if (entityType === 'fundingcasejournalvoucher') {
+    const row = await db.selectFrom('Funding_Case_Agreement_Journal_Voucher').select('egcs_fc_fundingagreement').where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirst()
+    if (!row) return null
+    const agreementId = String(row.egcs_fc_fundingagreement)
+    return { agreementId, carriers: [{ entityType: 'fundingcaseagreement', entityId: agreementId }, { entityType, entityId }] }
+  }
   if (entityType === 'fundingcasepayment') {
     const row = await db.selectFrom('Funding_Case_Agreement_Payment')
       .innerJoin('Funding_Case_Agreement_Commitment', 'Funding_Case_Agreement_Commitment.id', 'Funding_Case_Agreement_Payment.egcs_fc_fundingagreementcommitment')
@@ -207,6 +218,10 @@ const lockCarrierStatus = async (
       .where('id', '=', entityId).where('_deleted', '=', false).forUpdate().executeTakeFirst()
     if (!intake) throw new BusinessStatusViolation('BUSINESS_STATUS_NOT_FOUND', 'Funding case intake is unavailable')
     return String(intake.egcs_fi_status)
+  }
+  if (carrier.entityType === 'fundingcasejournalvoucher') {
+    const row = await trx.selectFrom('Funding_Case_Agreement_Journal_Voucher').select('egcs_fc_status').where('id', '=', entityId).where('_deleted', '=', false).forUpdate().executeTakeFirstOrThrow()
+    return String(row.egcs_fc_status)
   }
   const row = carrier.entityType === 'fundingcaseagreement'
     ? await trx.selectFrom('Funding_Case_Agreement_Profile').select('egcs_fc_status').where('id', '=', entityId).where('_deleted', '=', false).forUpdate().executeTakeFirst()
@@ -279,6 +294,16 @@ export const lockBusinessStatus = async (
       .where('_deleted', '=', false).forUpdate().executeTakeFirst()
     lockedCarriers.push({ ...carrier, statusId, status, completed: Boolean(completion) })
   }
+  if (entityType === 'fundingcasejournalvoucher' && mode !== 'engine') {
+    const root = await trx.selectFrom('Funding_Case_Agreement_Journal_Voucher').select('egcs_fc_payment').where('id', '=', entityId).executeTakeFirstOrThrow()
+    const latest = await trx.selectFrom('Funding_Case_Agreement_Journal_Voucher').select('id').where('egcs_fc_payment', '=', root.egcs_fc_payment).where('_deleted', '=', false).orderBy('egcs_fc_number', 'desc').executeTakeFirstOrThrow()
+    if (String(latest.id) !== entityId) throw new BusinessStatusViolation('BUSINESS_STATUS_READ_ONLY', 'Superseded accounting entries cannot start new work')
+    if (mode === 'ordinary') {
+      const workflow = await trx.selectFrom('Common_Workflow_Run as run').innerJoin('Common_Runtime as runtime', 'runtime.id', 'run.id').select('run.id').where('runtime.egcs_cn_entitytype', '=', entityType).where('runtime.egcs_cn_entityid', '=', entityId).executeTakeFirst()
+      const decision = await trx.selectFrom('Common_Routing_Slip').select('id').where('egcs_cn_entitytype', '=', entityType).where('egcs_cn_entityid', '=', entityId).executeTakeFirst()
+      if (workflow || decision) throw new BusinessStatusViolation('BUSINESS_STATUS_READ_ONLY', 'Submitted accounting entries cannot be edited')
+    }
+  }
   const target = lockedCarriers.at(-1)!
   const terminal = lockedCarriers.find(carrier => carrier.status.terminal)
   if (terminal) throw new BusinessStatusViolation('BUSINESS_STATUS_TERMINAL', 'A terminal business record cannot be changed')
@@ -322,6 +347,7 @@ export const assertBusinessStatusMutationAllowed = async (
 }
 
 const updateCarrierStatus = async (trx: Transaction<Database>, entityType: CoreLifecycleEntityType, entityId: string, statusId: StatusId, terminal: boolean) => {
+  if (entityType === 'fundingcasejournalvoucher') return await trx.updateTable('Funding_Case_Agreement_Journal_Voucher').set({ egcs_fc_status: statusId }).where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirstOrThrow()
   if (entityType === 'fundingcaseintake') return await trx.updateTable('Funding_Case_Intake_Profile').set({ egcs_fi_status: statusId }).where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirstOrThrow()
   if (entityType === 'fundingcaseagreement') return await trx.updateTable('Funding_Case_Agreement_Profile').set({ egcs_fc_status: statusId }).where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirstOrThrow()
   if (entityType === 'fundingcaseamendment') return await trx.updateTable('Funding_Case_Agreement_Amendment').set({ egcs_fc_status: statusId }).where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirstOrThrow()

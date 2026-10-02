@@ -180,7 +180,9 @@ export const CustomFieldConditionSchema = z.object({
   fieldId: PositivePostgresBigintIdSchema,
   optionIds: z.array(PositivePostgresBigintIdSchema).min(1, { error: 'validation.required' })
 }).strict()
+export const JV_WORKFLOW_BOOLEAN_SOURCES = ['jv_fiscal_eligible', 'jv_payment_final', 'jv_rationale_present'] as const
 export const AgreementProfileConditionSchema = z.union([
+  z.object({ source: z.enum(JV_WORKFLOW_BOOLEAN_SOURCES), value: z.boolean({ error: 'validation.required' }) }).strict(),
   z.object({ source: z.literal('agreement_subtype'), optionIds: z.array(PositivePostgresBigintIdSchema).min(1, { error: 'validation.required' }) }).strict(),
   z.object({ source: z.literal('further_distribution'), value: z.boolean({ error: 'validation.required' }) }).strict(),
   z.object({ source: z.literal('recipient_subtype'), quantifier: z.enum(['any', 'all'], { error: 'validation.required' }), optionIds: z.array(PositivePostgresBigintIdSchema).min(1, { error: 'validation.required' }) }).strict()
@@ -200,6 +202,9 @@ export type CustomFieldCondition = z.infer<typeof CustomFieldConditionSchema>
 export type AgreementProfileCondition = z.infer<typeof AgreementProfileConditionSchema>
 export type WorkflowMemberCondition = z.infer<typeof WorkflowMemberConditionsSchema>[number]
 export type AgreementRoutingValues = {
+  jv_fiscal_eligible?: boolean
+  jv_payment_final?: boolean
+  jv_rationale_present?: boolean
   agreement_subtype: string | null
   further_distribution: boolean
   recipient_subtype: Array<string | null>
@@ -221,7 +226,7 @@ export const workflowConditionsMatch = (conditions: WorkflowMemberCondition[], v
   conditions.every(condition => {
     if ('fieldId' in condition) return customFieldOptionIds(values[condition.fieldId]).some(optionId => condition.optionIds.includes(optionId))
     if (!profile) return false
-    if (condition.source === 'further_distribution') return profile.further_distribution === condition.value
+    if ('value' in condition) return profile[condition.source] === condition.value
     if (condition.source === 'recipient_subtype') {
       const matches = (id: string | null) => id !== null && condition.optionIds.includes(id)
       return profile.recipient_subtype.length > 0 && (condition.quantifier === 'all' ? profile.recipient_subtype.every(matches) : profile.recipient_subtype.some(matches))

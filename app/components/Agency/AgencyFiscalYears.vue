@@ -12,6 +12,7 @@ const columns: TableColumnInput<AgencyFiscalYearItem>[] = [
   { accessorKey: 'egcs_ay_fiscalyear', headerKey: 'common.year' },
   { accessorKey: 'egcs_ay_startdate', headerKey: 'common.start_date' },
   { accessorKey: 'egcs_ay_enddate', headerKey: 'common.end_date' },
+  { accessorKey: 'egcs_ay_jvopen', headerKey: 'journal_voucher.fiscal_eligibility' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
 
@@ -48,7 +49,13 @@ const initialNewItem = createAgencyFiscalYearInitial()
       {{ formatDate(row.original.egcs_ay_enddate) }}
     </template>
 
+    <template #egcs_ay_jvopen-cell="{ row }">
+      {{ t(row.original.egcs_ay_jvopen ? 'common.yes' : 'common.no') }}
+    </template>
     <template #form="{ state }">
+      <UFormField :label="t('journal_voucher.fiscal_eligibility')" name="egcs_ay_jvopen">
+        <USwitch v-model="state.egcs_ay_jvopen" :disabled="!canDelete" />
+      </UFormField>
       <UFormField :label="t('common.display')" name="egcs_ay_fiscalyeardisplay">
         <UInput v-model="state.egcs_ay_fiscalyeardisplay" :placeholder="t('agency.fiscal_year_placeholder')" />
       </UFormField>

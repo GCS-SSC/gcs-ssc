@@ -204,7 +204,7 @@ const lockAndValidateAssignee = async (
         .some(scope => abilities.authorize('applicant_recipient', 'update', { type: 'agency', agencyId: scope.agencyId }))
   } else if (owner?.kind === 'agreement') {
     const agreement = await resolveAgreementScopeContext(owner.agreementId, trx)
-    eligible = Boolean(agreement && abilities.authorize('agreement', 'update', agreement.scope))
+    eligible = Boolean(agreement && abilities.authorize(owner.subject ?? 'agreement', 'update', agreement.scope))
   } else if (owner?.kind === 'transfer_payment_stream') {
     eligible = abilities.authorize('transfer_payment', 'update', {
       type: 'entity', agencyId: owner.agencyId,

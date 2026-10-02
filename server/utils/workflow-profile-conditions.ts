@@ -4,6 +4,9 @@ import type { Database } from '~~/shared/types/database'
 import type { AgreementProfileCondition } from '~~/shared/types/schemas/agreement-custom-fields'
 
 export const profileConditionLabels = {
+  jv_fiscal_eligible: { name_en: 'JV fiscal year is open', name_fr: 'L’exercice de la pièce de journal est ouvert' },
+  jv_payment_final: { name_en: 'JV source Payment is final', name_fr: 'Le paiement source de la pièce de journal est définitif' },
+  jv_rationale_present: { name_en: 'JV rationale is present', name_fr: 'La justification de la pièce de journal est présente' },
   agreement_subtype: { name_en: 'Agreement subtype', name_fr: 'Sous-type d’entente' },
   further_distribution: { name_en: 'Further distribution', name_fr: 'Redistribution' },
   recipient_subtype: { name_en: 'Recipient subtype', name_fr: 'Sous-type de bénéficiaire' }
@@ -21,7 +24,7 @@ export const readWorkflowProfileChoices = async (db: Kysely<Database>, agencyId:
   }
 }
 export const resolveWorkflowProfileCondition = (condition: AgreementProfileCondition, choices: Awaited<ReturnType<typeof readWorkflowProfileChoices>>) => {
-  const options = condition.source === 'further_distribution'
+  const options = 'value' in condition
     ? [{ id: String(condition.value), name_en: condition.value ? 'Yes' : 'No', name_fr: condition.value ? 'Oui' : 'Non' }]
     : condition.optionIds.map(id => {
         const option = choices[condition.source].find(item => item.id === id)

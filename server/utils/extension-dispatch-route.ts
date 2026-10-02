@@ -33,6 +33,7 @@ import { isAuthorizationSubject } from '~~/shared/utils/abilities'
 import type { Kysely, Transaction } from 'kysely'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import {
+  authorizeAgreementResource,
   canAccessAgreement,
   listVisibleAgreementOptions,
   resolveAgreementScopeContext
@@ -47,6 +48,7 @@ import { resolveAssignmentCommonUserId } from '~~/server/utils/entity-assignment
 import { lockTransferPaymentStreams } from '~~/server/utils/transfer-payment-stream-lock'
 import { assertBusinessStatusMutationAllowed } from '~~/server/utils/business-status-runtime'
 import { assertAgreementCloseoutWriteAllowed } from '~~/server/utils/agreement-write-transaction'
+import { createExtensionAgreementFinancials } from './extension-agreement-financials'
 import { listApplicantRecipientContributionAgencies } from '~~/server/utils/applicant-recipient-auth'
 
 const throwExtensionDispatchError = (
@@ -615,6 +617,21 @@ export const dispatchExtensionServerRoute = async (
   const writeAuthorization = createExtensionWriteAuthorization(event, extensionKey, handler)
   if (event.context.gcsExtension) {
     event.context.gcsExtension.agreementAccess = createExtensionAgreementAccess(authContext)
+    const entity = event.context.gcsExtension.entity
+    if (handler.extension.requiredHostCapabilities.includes('agreement-payment-capacity')
+      && entity?.target === 'agreement') {
+      const agreementId = String(entity.agreementId)
+      event.context.gcsExtension.agreementFinancials = createExtensionAgreementFinancials(
+        event.context.$db, agreementId, async () => {
+          const current = await authorizeAgreementResource(event, 'read', agreementId, event.context.$db, { freshAuth: true })
+          if (!current) throwExtensionDispatchError(404, 'AGREEMENT_NOT_FOUND', 'Agreement not found.')
+          const currentEntity = await resolveExtensionEntityContext(event.context.$db, 'agreement', agreementId)
+          if (!currentEntity || !await getExtensionConfigurationForEntity(event.context.$db, extensionKey, currentEntity)) {
+            throwExtensionDispatchError(403, 'EXTENSION_ENTITY_DISABLED', 'Extension is disabled for this entity.')
+          }
+        }
+      )
+    }
     if (writeAuthorization) {
       event.context.gcsExtension.writeAuthorization = writeAuthorization
     }

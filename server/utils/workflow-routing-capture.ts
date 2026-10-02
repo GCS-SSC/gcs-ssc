@@ -7,6 +7,7 @@ import { WorkflowRouteValidationError, type WorkflowRoutingSnapshot, type Workfl
 import { profileConditionLabels, readWorkflowProfileChoices } from './workflow-profile-conditions'
 import { readAssignedAgencyCustomFieldDefinitions } from './agreement-custom-fields'
 import { customFieldOptionIds, type AgreementRoutingValues, type AgreementCustomFieldValues } from '~~/shared/types/schemas/agreement-custom-fields'
+import { journalVoucherPaymentIsFinal } from './journal-voucher-source'
 
 export const captureWorkflowRoutingSnapshot = async (
   trx: Transaction<Database>, context: ReviewRuntimeEntityContext, definition: PublishedWorkflowConfiguration
@@ -44,11 +45,23 @@ export const captureWorkflowRoutingSnapshot = async (
         .orderBy('p.id').orderBy('r.id').forShare(['p']).execute()
       relationships.push(...rows.map(row => ({ relationshipId: String(row.id), proponentId: String(row.proponentId), subtypeId: row.subtypeId === null ? null : String(row.subtypeId), name_en: row.name_en, name_fr: row.name_fr })))
       profile = { agreement_subtype: agreementType?.egcs_tp_agreementtype ?? null, further_distribution: agreement.egcs_fc_furtherdistribution, recipient_subtype: relationships.map(row => row.subtypeId) }
+      if (profileConditions.some(condition => condition.source.startsWith('jv_'))) {
+        if (context.entityType !== 'fundingcasejournalvoucher') throw new WorkflowRouteValidationError('JV conditions require a Journal Voucher target')
+        const voucher = await trx.selectFrom('Funding_Case_Agreement_Journal_Voucher as jv')
+          .innerJoin('Agency_Fiscal_Year as fy', 'fy.id', 'jv.egcs_fc_agencyfiscalyear')
+          .innerJoin('Funding_Case_Agreement_Payment as p', 'p.id', 'jv.egcs_fc_payment')
+          .innerJoin('Common_Status as status', 'status.id', 'p.egcs_fc_status')
+          .select(['fy.egcs_ay_jvopen', 'jv.egcs_fc_narrative_en', 'jv.egcs_fc_narrative_fr', journalVoucherPaymentIsFinal('p').as('isFinal'), 'fy._deleted as fiscalDeleted'])
+          .where('jv.id', '=', context.entityId).forShare(['fy', 'p', 'status']).executeTakeFirstOrThrow()
+        profile.jv_fiscal_eligible = voucher.egcs_ay_jvopen && !voucher.fiscalDeleted
+        profile.jv_payment_final = voucher.isFinal
+        profile.jv_rationale_present = Boolean(voucher.egcs_fc_narrative_en.trim() || voucher.egcs_fc_narrative_fr.trim())
+      }
       const choices = await readWorkflowProfileChoices(trx, String(stream.agencyId))
       for (const source of new Set(profileConditions.map(condition => condition.source))) {
         const labels = profileConditionLabels[source]
-        if (source === 'further_distribution') {
-          capturedFields.push({ fieldId: source, ...labels, optionId: String(profile.further_distribution), option_en: profile.further_distribution ? 'Yes' : 'No', option_fr: profile.further_distribution ? 'Oui' : 'Non' })
+        if (source === 'further_distribution' || source === 'jv_fiscal_eligible' || source === 'jv_payment_final' || source === 'jv_rationale_present') {
+          capturedFields.push({ fieldId: source, ...labels, optionId: String(profile[source]), option_en: profile[source] ? 'Yes' : 'No', option_fr: profile[source] ? 'Oui' : 'Non' })
         } else if (source === 'recipient_subtype') {
           for (const row of relationships) capturedFields.push({ fieldId: source, ...labels, optionId: row.relationshipId, option_en: row.name_en ?? 'Unclassified', option_fr: row.name_fr ?? 'Non classé' })
         } else {

@@ -1256,6 +1256,13 @@ export const startWorkflow = async (...args: Parameters<typeof startWorkflowUnch
   try {
     return await startWorkflowUnchecked(...args)
   } catch (error) {
+    if (error instanceof BusinessStatusViolation) {
+      return await throwApiError(args[0], {
+        statusCode: 409,
+        code: error.code,
+        key: 'apiErrors.request.invalid_status'
+      })
+    }
     if (getDatabaseConstraintName(error) === 'cn_idx_workflow_runtime_active_target') {
       return await throwApiError(args[0], {
         statusCode: 409,

@@ -26,20 +26,26 @@ export default defineEventHandler(async event => {
 
   await authorizeReviewRuntimeAction(event, 'action_review_approval', actionContext.runtimeEntity)
 
-  try {
-    return await denyReviewApproval(event, body.approvalId, body)
-  } finally {
-    // Advancement is idempotent. Running it even when a repeated decision is
-    // rejected repairs a decision that committed before an earlier advancement
-    // attempt failed.
-    await advanceWorkflowAfterApprovalForRequest(
+  /**
+   * Repairs a previously persisted decision whose workflow advancement did not commit.
+   * @returns The repaired workflow projection.
+   */
+  const repairAdvancement = async () => await advanceWorkflowAfterApprovalForRequest(
+    event,
+    body.approvalId,
+    async work => await executeFreshAuthorizedApprovalActorWrite(
       event,
-      body.approvalId,
-      async work => await executeFreshAuthorizedApprovalActorWrite(
-        event,
-        actionContext.runtimeEntity,
-        async trx => await work(trx)
-      )
+      actionContext.runtimeEntity,
+      async trx => await work(trx)
     )
+  )
+  try {
+    const decision = await denyReviewApproval(event, body.approvalId, body)
+    if (!['approved', 'denied'].includes(decision.approvalRuntimeState)) await repairAdvancement()
+    return decision
+  } catch (error: unknown) {
+    // Repeated or partially persisted decisions still use the shared repair path.
+    await repairAdvancement()
+    throw error
   }
 })

@@ -55,6 +55,7 @@ export const ENTITY_AUTHORIZATION_POLICIES = {
   commonrecommendation: createMetadata({ subject: 'resolved_owner', ownerResolver: 'runtime_source', ownerColumn: null, creationParent: 'runtime_source', allowedScopes: ['global', 'agency', 'program'], table: 'Common_Recommendation', statusColumn: null }, null, ['Recommendation', 'Recommandation']),
   fundingcaseagreementclaim: createMetadata({ ...agreementPolicy, table: 'Funding_Case_Agreement_Claim' }, 'claims', ['Claim', 'Réclamation']),
   fundingclaimreconcile: createMetadata({ ...agreementPolicy, ownerResolver: 'agreement_claim_parent', ownerColumn: 'egcs_fc_fundingagreementclaim', creationParent: 'fundingcaseagreementclaim', table: 'Funding_Case_Agreement_Claim_Reconcile' }, null, ['Claim reconciliation', 'Rapprochement de réclamation']),
+  fundingcasejournalvoucher: createMetadata({ ...agreementPolicy, subject: 'journal_voucher', table: 'Funding_Case_Agreement_Journal_Voucher' }, 'journal-vouchers', ['Journal voucher', 'Pièce de journal']),
   fundingcasepayment: createMetadata({ ...agreementPolicy, table: 'Funding_Case_Agreement_Payment' }, 'payments', ['Payment', 'Paiement']),
   fundingcaseforecast: createMetadata({ ...agreementPolicy, table: 'Funding_Case_Agreement_Forecast' }, 'forecasts', ['Forecast', 'Prévision']),
   fundingcasemonitor: createMetadata({ ...agreementPolicy, table: 'Funding_Case_Agreement_Monitor' }, 'monitors', ['Monitor', 'Surveillance']),
@@ -79,6 +80,7 @@ export const buildAssignedWorkRoute = (
   agreementId: string | null,
   variant: string | null = null
 ): string => {
+  if (entityType === 'fundingcasejournalvoucher') return `/journal-vouchers/${entityId}`
   if (entityType === 'commonreview') return variant === 'checklist' ? `/checklists/${entityId}` : `/assessments/${entityId}`
   if (entityType === 'applicantrecipient') return `/proponents/edit/${entityId}`
   if (entityType === 'fundingcaseagreement') return `/agreements/${entityId}`

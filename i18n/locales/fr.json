@@ -270,7 +270,8 @@
       "fundingcaseforecast": "Prévision",
       "fundingcasemonitor": "Surveillance",
       "fundingcaseamendment": "Modification",
-      "fundingcaseagreementcommitment": "Engagement"
+      "fundingcaseagreementcommitment": "Engagement",
+      "fundingcasejournalvoucher": "Pièce de journal"
     }
   },
   "attachments": {
@@ -526,7 +527,8 @@
       "fundingcaseforecast": "Prévision du dossier de financement",
       "fundingcasepayment": "Paiement du dossier de financement",
       "fundingcaserecommendation": "Recommandation du dossier de financement",
-      "fundingcaseagreementcommitment": "Engagement d’entente de dossier de financement"
+      "fundingcaseagreementcommitment": "Engagement d’entente de dossier de financement",
+      "fundingcasejournalvoucher": "Pièce de journal"
     },
     "scope_type": {
       "global": "Global",
@@ -769,7 +771,8 @@
       "group": "Groupes",
       "agreement": "Ententes",
       "funding_case": "Réceptions",
-      "applicant_recipient": "Promoteurs"
+      "applicant_recipient": "Promoteurs",
+      "journal_voucher": "Pièces de journal"
     },
     "unknown_ability": "Autorisation inconnue ({action}:{subject})",
     "scope": {
@@ -1452,6 +1455,10 @@
       "review_approval_certifications_required": "Confirmez chaque certification obligatoire avant d’approuver cette étape.",
       "review_not_found": "Examen introuvable.",
       "review_not_denied": "Seuls les examens refusés ou annulés peuvent être réessayés."
+    },
+    "journal_voucher": {
+      "not_found": "Pièce de journal introuvable.",
+      "invalid_entry": "L’écriture comptable ou la séquence de correction est invalide. Vérifiez les totaux des imputations et les écritures liées."
     }
   },
   "transfer_payment": {
@@ -2225,7 +2232,8 @@
         "workflow_active": "Un processus est toujours actif",
         "review_active": "Une revue est toujours active",
         "recommendation_active": "Une recommandation est toujours active",
-        "approval_active": "Une approbation est toujours active"
+        "approval_active": "Une approbation est toujours active",
+        "journal_voucher_not_terminal": "La pièce de journal n’a pas atteint un état opérationnel final"
       }
     },
     "agency": "Agence",
@@ -3229,7 +3237,10 @@
       "matched": "Correspondance",
       "unmatched": "Aucune correspondance",
       "any": "Au moins un promoteur",
-      "all": "Tous les promoteurs"
+      "all": "Tous les promoteurs",
+      "jv_fiscal_eligible": "Exercice ouvert aux pièces de journal",
+      "jv_payment_final": "Le paiement source est définitif",
+      "jv_rationale_present": "La justification est présente"
     },
     "active_target_blocker": "Un flux de travail est déjà actif pour cet élément. Terminez-le ou annulez-le avant d’en ajouter un autre.",
     "completion_error_details": "Éléments à régler",
@@ -3249,7 +3260,12 @@
       "funding_breakdown_required": "Ajoutez au moins une autre source de financement à chaque ligne et assurez-vous que le financement du programme et les autres sources égalent le coût total avant l’achèvement.",
       "payment_total_mismatch": "Les montants des lignes de paiement doivent égaler le total du paiement avant l’achèvement.",
       "final_reconcile_approved": "Le rapprochement final est déjà approuvé; ce rapprochement ne peut donc plus être achevé.",
-      "business_status": "L’état administratif actuel ne permet pas d’achever cet élément."
+      "business_status": "L’état administratif actuel ne permet pas d’achever cet élément.",
+      "JV_LINES_REQUIRED": "Ajoutez des répartitions corrigées avant de finaliser la pièce.",
+      "JV_COMMITMENT_MISMATCH": "Les répartitions corrigées doivent utiliser les lignes d’engagement sources.",
+      "JV_UNBALANCED": "Chaque ligne d’engagement doit conserver son total original.",
+      "JV_NO_ADJUSTMENT": "Modifiez au moins une répartition avant de finaliser la pièce.",
+      "JV_AMOUNT_RANGE": "Saisissez des montants respectant la précision et la plage prises en charge."
     },
     "packet": {
       "title": "Dossier d’approbation",
@@ -3755,5 +3771,51 @@
     "budget_summary": "Sommaire du budget",
     "sections": "Sections de la demande",
     "no_answers": "Aucune réponse n’a été fournie pour ce formulaire."
+  },
+  "journal_voucher": {
+    "title": "Pièces de journal",
+    "description": "Préparer des corrections comptables équilibrées pour des paiements définitifs.",
+    "create": "Créer une correction",
+    "number": "Pièce de journal",
+    "source_payment": "Paiement source",
+    "requested_date": "Date comptable demandée",
+    "narrative_en": "Explication (anglais)",
+    "narrative_fr": "Explication (français)",
+    "accounting_entry": "Écriture comptable",
+    "fiscal_eligibility": "Exercice ouvert aux pièces de journal",
+    "allocations": "Codage des imputations",
+    "original_line": "Originale",
+    "corrected_line": "Répartition corrigée",
+    "subtotal_line": "Solde de la ligne",
+    "unbalanced": "Non équilibré",
+    "commitment_line": "Ligne d’engagement",
+    "coding": "Codage comptable",
+    "amount": "Montant",
+    "add_split": "Ajouter une répartition",
+    "coding_not_on_agreement": "Ce codage ne figure pas dans l’accord.",
+    "coding_not_on_agreement_description": "Aucune ligne d’engagement de l’accord n’utilise ce codage comptable. Vous pouvez continuer avec cette répartition; vérifiez que le nouveau codage est voulu.",
+    "edit_split": "Modifier la répartition",
+    "apply_split": "Appliquer la répartition",
+    "split_description": "Appliquez les modifications au brouillon, puis enregistrez la pièce comptable lorsqu’elle est équilibrée.",
+    "original_allocation_label": "Imputation originale, ligne d’engagement {number}",
+    "corrected_allocation_label": "Imputation corrigée, ligne d’engagement {number}",
+    "subtotal_allocation_label": "Solde de la ligne d’engagement {number}",
+    "balance_instruction": "Les montants originaux sont négatifs; les répartitions corrigées sont positives. Chaque ligne d’engagement et le total doivent s’équilibrer à 0,00 $.",
+    "prepared_transaction": "Transaction comptable préparée. La comptabilisation externe est consignée à l’extérieur de GCS.",
+    "reverse": "Préparer une contrepassation",
+    "replace": "Préparer une correction de remplacement",
+    "reversal_of": "Contrepassation de la pièce de journal",
+    "replacement_of": "Remplacement de la pièce de journal",
+    "completion": {
+      "title": "Achèvement de la pièce de journal",
+      "description": "Valider et verrouiller l’écriture comptable équilibrée et démarrer son flux de travail configuré.",
+      "status_complete": "Terminé",
+      "status_locked": "L’écriture comptable est verrouillée",
+      "comment_placeholder": "Commentaires d’achèvement",
+      "complete": "Terminer l’écriture",
+      "completed_success": "Écriture comptable terminée"
+    },
+    "balanced": "Équilibré",
+    "invalid_amount": "Saisissez un montant valide"
   }
 }

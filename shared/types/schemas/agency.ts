@@ -180,13 +180,16 @@ const AgencyFiscalYearBaseSchema = z.object({
     .max(9, { error: 'validation.max_length' }),
   egcs_ay_fiscalyear: z.coerce.number().int().min(1900).max(2100),
   egcs_ay_startdate: RequiredDateSchema,
-  egcs_ay_enddate: RequiredDateSchema
+  egcs_ay_enddate: RequiredDateSchema,
+  egcs_ay_jvopen: z.boolean().default(false)
 })
 export const AgencyFiscalYearSchema = AgencyFiscalYearBaseSchema.refine(
   value => value.egcs_ay_startdate <= value.egcs_ay_enddate,
   { message: 'validation.date_range', path: ['egcs_ay_enddate'] }
 )
-export const AgencyFiscalYearPatchSchema = AgencyFiscalYearBaseSchema.partial()
+export const AgencyFiscalYearPatchSchema = AgencyFiscalYearBaseSchema.extend({
+  egcs_ay_jvopen: AgencyFiscalYearBaseSchema.shape.egcs_ay_jvopen.removeDefault()
+}).partial()
 export type AgencyFiscalYear = z.infer<typeof AgencyFiscalYearSchema>
 export type AgencyFiscalYearItem = WithId<AgencyFiscalYear>
 
@@ -198,7 +201,8 @@ export const createAgencyFiscalYearInitial = (): Partial<AgencyFiscalYearItem> =
   return {
     id: '',
     egcs_ay_fiscalyeardisplay: '',
-    egcs_ay_fiscalyear: new Date().getFullYear()
+    egcs_ay_fiscalyear: new Date().getFullYear(),
+    egcs_ay_jvopen: false
   }
 }
 

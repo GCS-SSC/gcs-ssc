@@ -1,7 +1,8 @@
 import { forbidden, notFound } from '~~/server/utils/api-errors'
 import {
   canReadEntityAssignments,
-  resolveAssignmentAgreementId
+  resolveAssignmentAgreementId,
+  resolveEntityAssignmentOwner
 } from '~~/server/utils/entity-assignment'
 import { EntityAssignmentTargetSchema } from '~~/shared/types/schemas'
 import { parseI18n } from '~~/server/utils/api-validate'
@@ -32,6 +33,16 @@ export default defineEventHandler(async event => {
     ? (extensionOwner.kind === 'agreement' ? extensionOwner.agreementId : null)
     : await resolveAssignmentAgreementId(event.context.$db, target.entityType as AssignableEntityType, target.entityId)
   if (!agreementId) return await notFound(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
+  const scopeContext = await resolveAgreementScopeContext(agreementId, event.context.$db)
+  const auth = await requireAuthContext(event)
+  let canReadAgreement = false
+  if (scopeContext) {
+    canReadAgreement = await canAccessAgreement(auth, 'read', scopeContext.scope, event.context.$db)
+  }
+  const coreOwner = !extensionRuntime && ['fundingcasejournalvoucher', 'commonreview', 'commonrecommendation'].includes(target.entityType)
+    ? await resolveEntityAssignmentOwner(event.context.$db, target.entityType as AssignableEntityType, target.entityId)
+    : null
+  if (coreOwner?.kind === 'agreement' && coreOwner.subject === 'journal_voucher' && !canReadAgreement) return await forbidden(event)
   const agreement = await event.context.$db.selectFrom('Funding_Case_Agreement_Profile')
     .select([
       'id',
@@ -43,11 +54,5 @@ export default defineEventHandler(async event => {
     .where('_deleted', '=', false)
     .executeTakeFirst()
   if (!agreement) return await notFound(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
-  const scopeContext = await resolveAgreementScopeContext(agreementId, event.context.$db)
-  const auth = await requireAuthContext(event)
-  let canReadAgreement = false
-  if (scopeContext) {
-    canReadAgreement = await canAccessAgreement(auth, 'read', scopeContext.scope, event.context.$db)
-  }
   return { ...agreement, can_read_agreement: canReadAgreement }
 })

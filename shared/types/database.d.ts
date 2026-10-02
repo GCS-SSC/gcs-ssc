@@ -474,6 +474,8 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Funding_Case_Agreement_Claim_Reconcile_Line_Item: FundingCaseAgreementClaimReconcileLineItemTable
   Funding_Case_Agreement_Commitment: FundingCaseAgreementCommitmentTable
   Funding_Case_Agreement_Commitment_Line: FundingCaseAgreementCommitmentLineTable
+  Funding_Case_Agreement_Journal_Voucher: FundingCaseAgreementJournalVoucherTable
+  Funding_Case_Agreement_Journal_Voucher_Line: FundingCaseAgreementJournalVoucherLineTable
   Funding_Case_Agreement_Payment: FundingCaseAgreementPaymentTable
   Funding_Case_Agreement_Payment_Line: FundingCaseAgreementPaymentLineTable
   Funding_Case_Agreement_Monitor: FundingCaseAgreementMonitorTable
@@ -706,7 +708,7 @@ export interface RoleTable {
 export interface RolePermissionTable {
   id: Generated<string>
   role_id: string
-  subject: 'audit' | 'system' | 'agency' | 'transfer_payment' | 'role' | 'user' | 'group' | 'agreement' | 'applicant_recipient' | 'funding_case'
+  subject: 'audit' | 'system' | 'agency' | 'transfer_payment' | 'role' | 'user' | 'group' | 'agreement' | 'applicant_recipient' | 'funding_case' | 'journal_voucher'
   access_level: 'viewer' | 'contributor' | 'manager' | null
   can_manage_assignments: Generated<boolean>
   _deleted: Generated<boolean>
@@ -828,6 +830,7 @@ export interface AgencyCostCategoryLineItemTable {
 }
 
 export interface AgencyFiscalYearTable {
+  egcs_ay_jvopen: Generated<boolean>
   id: Generated<string>
   egcs_ay_organizationagency: string
   egcs_ay_fiscalyeardisplay: string
@@ -1646,6 +1649,38 @@ export interface FundingCaseAgreementCommitmentLineTable {
   egcs_fc_transferpaymentstream: Generated<string>
   egcs_fc_commitmentlinenumber: number
   egcs_fc_transferpaymentstreamchartofaccount: string
+  egcs_fc_amount: number
+  _deleted: Generated<boolean>
+}
+
+export interface FundingCaseAgreementJournalVoucherTable {
+  id: Generated<string>
+  egcs_fc_fundingagreement: string
+  egcs_fc_payment: string
+  egcs_fc_fiscalyear: string
+  egcs_fc_agencyfiscalyear: string
+  egcs_fc_currency: Currency_Codes
+  egcs_fc_number: number
+  egcs_fc_agreementnumber: string
+  egcs_fc_fiscalyeardisplay: string
+  egcs_fc_requesteddate: Date
+  egcs_fc_narrative_en: string
+  egcs_fc_narrative_fr: string
+  egcs_fc_status: StatusId
+  egcs_fc_reversalof: string | null
+  egcs_fc_replacementof: string | null
+  _deleted: Generated<boolean>
+}
+
+export interface FundingCaseAgreementJournalVoucherLineTable {
+  id: Generated<string>
+  egcs_fc_journalvoucher: string
+  egcs_fc_payment: string
+  egcs_fc_commitmentline: string
+  egcs_fc_commitmentlinenumber: number
+  egcs_fc_kind: 'original' | 'corrected' | 'adjustment'
+  egcs_fc_chartofaccount: string
+  egcs_fc_accountingdimensions: JsonValue
   egcs_fc_amount: number
   _deleted: Generated<boolean>
 }

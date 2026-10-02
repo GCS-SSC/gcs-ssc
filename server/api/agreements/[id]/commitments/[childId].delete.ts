@@ -5,6 +5,7 @@ import {
 } from '~~/server/utils/agreement-commitment'
 import { badRequest } from '~~/server/utils/api-errors'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+import { getCommitmentLinePaymentCoverage } from '~~/server/utils/agreement-commitment-line-balance'
 
 export default defineEventHandler(async event => {
   const childId = getRouterParam(event, 'childId')
@@ -32,6 +33,14 @@ export default defineEventHandler(async event => {
       .forUpdate()
       .execute()
     if (payments.length > 0) return await badRequest(event, 'AGREEMENT_COMMITMENT_IN_USE', 'apiErrors.request.invalid_status')
+
+    const lines = await trx.selectFrom('Funding_Case_Agreement_Commitment_Line').select('id')
+      .where('egcs_fc_commitment', '=', childId).where('_deleted', '=', false).orderBy('id').forUpdate().execute()
+    for (const line of lines) {
+      if ((await getCommitmentLinePaymentCoverage(trx, String(line.id))).hasActivePaymentLine) {
+        return await badRequest(event, 'AGREEMENT_COMMITMENT_IN_USE', 'apiErrors.request.invalid_status')
+      }
+    }
 
     const deleted = await trx
       .updateTable('Funding_Case_Agreement_Commitment')

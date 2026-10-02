@@ -152,10 +152,12 @@ export default defineEventHandler(async event => {
       WHERE reconcile._deleted = false
       UNION ALL
       SELECT child.id, child.entity_type, child.status, '#' || child.id::text, '#' || child.id::text,
-        child.agreement_id, NULL::text, 'agreement', program.egcs_tp_agency, program.id
+        child.agreement_id, NULL::text, CASE WHEN child.entity_type = 'fundingcasejournalvoucher' THEN 'journal_voucher' ELSE 'agreement' END, program.egcs_tp_agency, program.id
       FROM (
         SELECT payment.id, 'fundingcasepayment'::text entity_type, payment.egcs_fc_status::text status,
           payment.egcs_fc_fundingagreement agreement_id, payment._deleted FROM "Funding_Case_Agreement_Payment" payment
+        UNION ALL SELECT jv.id, 'fundingcasejournalvoucher', jv.egcs_fc_status::text,
+          jv.egcs_fc_fundingagreement, jv._deleted FROM "Funding_Case_Agreement_Journal_Voucher" jv
         UNION ALL SELECT forecast.id, 'fundingcaseforecast', forecast.egcs_fc_status::text,
           forecast.egcs_fc_fundingagreement, forecast._deleted FROM "Funding_Case_Agreement_Forecast" forecast
         UNION ALL SELECT monitor.id, 'fundingcasemonitor', monitor.egcs_fc_status::text,

@@ -13,7 +13,8 @@ export const ROLE_PERMISSION_SUBJECTS = [
   'group',
   'agreement',
   'applicant_recipient',
-  'funding_case'
+  'funding_case',
+  'journal_voucher'
 ] as const
 
 /** All subjects understood by authorization. */

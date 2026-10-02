@@ -442,7 +442,7 @@ const retryAttachmentList = async () => {
             <UInput type="file" class="block w-full text-sm" required @change="onFileChange" />
           </UFormField>
           <UFormField :label="t('attachments.type')" name="attachmentTypeId" required>
-            <CommonServerLookupSelect v-model="formState.attachmentTypeId" :fetch-url="withAgency(`${baseUrl}/types`)" value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" :show-value-in-label="false" class="w-full" />
+            <CommonServerLookupSelect v-model="formState.attachmentTypeId" :fetch-url="withAgency(`${baseUrl}/types`)" value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" :show-value-in-label="false" close-on-select class="w-full" />
           </UFormField>
           <div class="grid gap-4 md:grid-cols-2">
             <UFormField :label="t('attachments.name_en')" name="nameEn">

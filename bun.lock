@@ -104,7 +104,7 @@
     "extensions/gcs-automated-payments": {
       "name": "@gcs-ssc/gcs-automated-payments",
       "dependencies": {
-        "@gcs-ssc/extensions": "^0.3.2",
+        "@gcs-ssc/extensions": "^0.3.5",
         "zod": "^4.3.6",
       },
       "devDependencies": {
@@ -204,7 +204,7 @@
       "name": "@gcs-ssc/gcs-outcome-cost-allocation",
       "version": "0.1.0",
       "dependencies": {
-        "@gcs-ssc/extensions": "^0.3.2",
+        "@gcs-ssc/extensions": "^0.3.5",
       },
       "devDependencies": {
         "@electric-sql/pglite": "0.3.16",
@@ -298,7 +298,7 @@
     },
     "packages/gcs-ssc-extensions": {
       "name": "@gcs-ssc/extensions",
-      "version": "0.3.4",
+      "version": "0.3.5",
       "devDependencies": {
         "@types/node": "^25.3.0",
         "h3": "^1.15.5",

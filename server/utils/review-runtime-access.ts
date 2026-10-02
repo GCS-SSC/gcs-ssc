@@ -17,6 +17,7 @@ import { resolveAgreementClaimReconcileRuntimeContext, resolveAgreementClaimRunt
 import { resolveAgreementCommitmentRuntimeContext } from '~~/server/utils/agreement-commitment'
 import { resolveAgreementForecastRuntimeContext } from '~~/server/utils/agreement-forecast'
 import { resolveAgreementMonitorRuntimeContext } from '~~/server/utils/agreement-monitor'
+import { resolveJournalVoucherRuntimeContext } from './journal-voucher-context'
 import { resolveAgreementPaymentRuntimeContext } from '~~/server/utils/agreement-payment'
 import { resolveAgreementCloseoutRuntimeContext } from '~~/server/utils/agreement-closeout'
 import { resolveCurrentCommonUser } from '~~/server/utils/additional-reviewer-runtime'
@@ -219,6 +220,7 @@ const agreementReviewRuntimeEntityTypes = new Set<Entity_Type>([
   'fundingcaseagreementcommitment',
   'fundingcaseforecast',
   'fundingcasemonitor',
+  'fundingcasejournalvoucher',
   'fundingcasepayment',
   'fundingclaimreconcile'
 ])
@@ -399,8 +401,9 @@ const authorizeAgreementRuntimeAction = async (
       ? 'delete'
       : 'update'
 
-  return await authorize(event, 'agreement', agreementAction, async ({ context }) => {
-    if (context.userAbilities.authorize('agreement', agreementAction, agreementContext.scope)) {
+  const subject = entityContext.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement'
+  return await authorize(event, subject, agreementAction, async ({ context }) => {
+    if (context.userAbilities.authorize(subject, agreementAction, agreementContext.scope)) {
       return { bypass: true }
     }
     return { denied: true }
@@ -654,6 +657,7 @@ const agreementRuntimeEntityResolvers = {
     resolve: resolveAgreementMonitorRuntimeContext,
     idKey: 'monitorId'
   },
+  fundingcasejournalvoucher: { resolve: resolveJournalVoucherRuntimeContext, idKey: 'journalVoucherId' },
   fundingcasepayment: {
     resolve: resolveAgreementPaymentRuntimeContext,
     idKey: 'paymentId'
@@ -1153,6 +1157,7 @@ const agreementRuntimeOwnerTables = {
   fundingcaseagreementcommitment: 'Funding_Case_Agreement_Commitment',
   fundingcaseforecast: 'Funding_Case_Agreement_Forecast',
   fundingcasemonitor: 'Funding_Case_Agreement_Monitor',
+  fundingcasejournalvoucher: 'Funding_Case_Agreement_Journal_Voucher',
   fundingcasepayment: 'Funding_Case_Agreement_Payment',
   fundingclaimreconcile: 'Funding_Case_Agreement_Claim_Reconcile'
 } as const

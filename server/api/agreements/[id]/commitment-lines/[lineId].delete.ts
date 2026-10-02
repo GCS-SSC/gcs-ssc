@@ -11,6 +11,7 @@ import {
 import { badRequest } from '~~/server/utils/api-errors'
 import { resolveCommitmentLineAssignmentTarget } from '~~/server/utils/agreement-assignment-target'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+import { getCommitmentLinePaymentCoverage } from '~~/server/utils/agreement-commitment-line-balance'
 
 export default defineEventHandler(async event => {
   const lineId = getRouterParam(event, 'lineId')
@@ -64,7 +65,9 @@ export default defineEventHandler(async event => {
       .where('_deleted', '=', false)
       .forUpdate()
       .execute()
-    if (paymentLines.length > 0) return await badRequest(event, 'AGREEMENT_COMMITMENT_LINE_IN_USE', 'apiErrors.request.invalid_status')
+    if (paymentLines.length > 0 || (await getCommitmentLinePaymentCoverage(trx, lineId)).hasActivePaymentLine) {
+      return await badRequest(event, 'AGREEMENT_COMMITMENT_LINE_IN_USE', 'apiErrors.request.invalid_status')
+    }
     await trx.updateTable('Funding_Case_Agreement_Commitment_Line').set({ _deleted: true }).where('id', '=', lineId).where('egcs_fc_commitment', '=', String(existingLine.egcs_fc_commitment)).where('_deleted', '=', false).execute()
     await syncAgreementCommitmentEditingStatus(trx, String(existingLine.egcs_fc_commitment))
   }, { action: 'delete' })

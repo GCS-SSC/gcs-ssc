@@ -10,6 +10,7 @@ export const APPROVAL_TYPE_ENUM = [
   'fundingcasereview',
   'fundingclaimreview',
   'fundingcaseforecast',
+  'fundingcasejournalvoucher',
   'fundingcasepayment'
 ] as const
 
@@ -40,6 +41,7 @@ export const EXECUTION_ENTITY_TYPE_ENUM = [
   'fundingcasemonitor',
   'fundingclaimreconcile',
   'fundingcaseforecast',
+  'fundingcasejournalvoucher',
   'fundingcasepayment',
   'fundingcaserecommendation',
   'fundingcaseagreementcommitment'
@@ -55,6 +57,7 @@ export const RECOMMENDATION_EXECUTION_ENTITY_TYPE_ENUM = [
   'fundingcasemonitor',
   'fundingclaimreconcile',
   'fundingcaseforecast',
+  'fundingcasejournalvoucher',
   'fundingcasepayment',
   'fundingcaseagreementcommitment'
 ] as const

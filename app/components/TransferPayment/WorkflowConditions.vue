@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { JV_WORKFLOW_BOOLEAN_SOURCES } from '~~/shared/types/schemas/agreement-custom-fields'
 import type { AgencyCustomFieldDefinition, AgreementProfileCondition, WorkflowMemberCondition } from '~~/shared/types/schemas/agreement-custom-fields'
 
 const { entityType, readonly = false, customFields, choices, loadError = false } = defineProps<{
   entityType: string
   readonly?: boolean
   customFields: AgencyCustomFieldDefinition[]
-  choices: Partial<Record<Exclude<AgreementProfileCondition['source'], 'further_distribution'>, { id: string, name_en: string, name_fr: string }[]>>
+  choices: Partial<Record<Exclude<AgreementProfileCondition['source'], 'further_distribution' | typeof JV_WORKFLOW_BOOLEAN_SOURCES[number]>, { id: string, name_en: string, name_fr: string }[]>>
   loadError?: boolean
 }>()
 const emit = defineEmits<{ retry: [] }>()
@@ -23,8 +24,8 @@ const update = (fieldId: string, optionIds: string[]) => {
 }
 type Source = AgreementProfileCondition['source']
 const pendingSource: Ref<Source | null> = ref(null)
-const sources: Source[] = ['agreement_subtype', 'further_distribution', 'recipient_subtype']
-const sourceItems = computed(() => sources.filter(source => !model.value.some(condition => 'source' in condition && condition.source === source))
+const sources = computed<Source[]>(() => ['agreement_subtype', 'further_distribution', 'recipient_subtype', ...(entityType === 'fundingcasejournalvoucher' ? JV_WORKFLOW_BOOLEAN_SOURCES : [])])
+const sourceItems = computed(() => sources.value.filter(source => !model.value.some(condition => 'source' in condition && condition.source === source))
   .map(id => ({ id, name_en: t(`workflow.conditions.${id}`, {}, { locale: 'en' }), name_fr: t(`workflow.conditions.${id}`, {}, { locale: 'fr' }) })))
 const profileRows = computed(() => model.value.flatMap((condition, index) => 'source' in condition ? [{ condition, index }] : []))
 /**
@@ -33,9 +34,9 @@ const profileRows = computed(() => model.value.flatMap((condition, index) => 'so
  */
 const addCondition = (source: Source | null) => {
   if (!source) return
-  const condition: AgreementProfileCondition = source === 'further_distribution'
-    ? { source, value: false }
-    : source === 'recipient_subtype' ? { source, quantifier: 'any', optionIds: [] } : { source, optionIds: [] }
+  const condition: AgreementProfileCondition = source === 'further_distribution' || JV_WORKFLOW_BOOLEAN_SOURCES.includes(source as typeof JV_WORKFLOW_BOOLEAN_SOURCES[number])
+    ? { source: source as 'further_distribution' | typeof JV_WORKFLOW_BOOLEAN_SOURCES[number], value: false }
+    : source === 'recipient_subtype' ? { source, quantifier: 'any', optionIds: [] } : { source: source as 'agreement_subtype', optionIds: [] }
   model.value = [...model.value, condition]
   pendingSource.value = null
 }
@@ -65,10 +66,10 @@ const badges = computed(() => model.value.map(condition => {
       })
     }
   }
-  const value = condition.source === 'further_distribution'
+  const value = 'value' in condition
     ? t(condition.value ? 'common.yes' : 'common.no')
     : condition.optionIds.map(id => {
-        const choice = choices[condition.source as Exclude<Source, 'further_distribution'>]?.find(item => item.id === id)
+        const choice = choices[condition.source as Exclude<Source, 'further_distribution' | typeof JV_WORKFLOW_BOOLEAN_SOURCES[number]>]?.find(item => item.id === id)
         return choice ? (locale.value === 'fr' ? choice.name_fr : choice.name_en) : t('workflow.conditions.unavailable')
       }).join(', ')
   return {
@@ -105,7 +106,7 @@ const badges = computed(() => model.value.map(condition => {
         <UButton icon="i-lucide-plus" :label="t('workflow.conditions.add')" :disabled="!pendingSource" @click="addCondition(pendingSource)" />
       </div>
       <div v-for="{ condition, index } in profileRows" :key="condition.source" class="space-y-3">
-        <UFormField v-if="condition.source === 'further_distribution'" :name="`conditions.${index}.value`" :label="t(`workflow.conditions.${condition.source}`)" required>
+        <UFormField v-if="'value' in condition" :name="`conditions.${index}.value`" :label="t(`workflow.conditions.${condition.source}`)" required>
           <CommonBilingualSelectMenu :model-value="String(condition.value)" :items="booleanItems" class="w-full" @update:model-value="condition.value = $event === 'true'" />
         </UFormField>
         <template v-else>

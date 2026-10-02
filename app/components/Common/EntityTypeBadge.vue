@@ -13,6 +13,7 @@ const ENTITY_TYPE_ICON_MAP: Record<string, string> = {
   fundingcasemonitor: 'i-lucide-binoculars',
   fundingclaimreconcile: 'i-lucide-scale',
   fundingcaseforecast: 'i-lucide-chart-column',
+  fundingcasejournalvoucher: 'i-lucide-book-open-check',
   fundingcasepayment: 'i-lucide-wallet',
   fundingcaserecommendation: 'i-lucide-thumbs-up'
 }

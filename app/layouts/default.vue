@@ -41,12 +41,13 @@ const canViewAgencies = computed(() => canAny('agency', 'read'))
 const canViewUsers = computed(() => canAny('user', 'read'))
 const canViewGroups = computed(() => canAny('group', 'read'))
 const canViewApplicantRecipients = computed(() => canAny('applicant_recipient', 'read'))
+const canViewJournalVouchers = computed(() => canAny('journal_voucher', 'read'))
 const canViewAgreements = computed(() => canAny('agreement', 'read'))
 const canViewTransferPayments = computed(() => canAny('transfer_payment', 'read'))
 const canViewFundingCases = computed(() => canAny('funding_case', 'read'))
 const canViewRoles = computed(() => canAny('role', 'read'))
 const assignmentManagementSubjects = [
-  'agreement', 'applicant_recipient', 'funding_case'
+  'agreement', 'applicant_recipient', 'funding_case', 'journal_voucher'
 ] as const
 const canViewAssignmentManagement = computed(() =>
   assignmentManagementSubjects.some(subject => canManageAssignments(subject))
@@ -139,6 +140,9 @@ const items = computed(
           : []),
         ...(canViewFundingCases.value
           ? [{ label: t('nav.funding_case_intakes'), icon: 'i-lucide-inbox', to: localePath(appRouteLocations.fundingCaseIntakes()) }]
+          : []),
+        ...(canViewJournalVouchers.value
+          ? [{ label: t('journal_voucher.title'), icon: 'i-lucide-book-open-check', to: localePath('/journal-vouchers') }]
           : []),
         ...(canViewAgreements.value
           ? [

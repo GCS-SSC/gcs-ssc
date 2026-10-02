@@ -270,7 +270,8 @@
       "fundingcaseforecast": "Forecast",
       "fundingcasemonitor": "Monitor",
       "fundingcaseamendment": "Amendment",
-      "fundingcaseagreementcommitment": "Commitment"
+      "fundingcaseagreementcommitment": "Commitment",
+      "fundingcasejournalvoucher": "Journal Voucher"
     }
   },
   "attachments": {
@@ -526,7 +527,8 @@
       "fundingcaseforecast": "Funding Case Forecast",
       "fundingcasepayment": "Funding Case Payment",
       "fundingcaserecommendation": "Funding Case Recommendation",
-      "fundingcaseagreementcommitment": "Funding Case Agreement Commitment"
+      "fundingcaseagreementcommitment": "Funding Case Agreement Commitment",
+      "fundingcasejournalvoucher": "Journal Voucher"
     },
     "scope_type": {
       "global": "Global",
@@ -769,7 +771,8 @@
       "group": "Groups",
       "agreement": "Agreements",
       "funding_case": "Intakes",
-      "applicant_recipient": "Proponents"
+      "applicant_recipient": "Proponents",
+      "journal_voucher": "Journal Vouchers"
     },
     "unknown_ability": "Unknown ability ({action}:{subject})",
     "scope": {
@@ -1452,6 +1455,10 @@
       "review_approval_certifications_required": "Confirm every required certification before approving this step.",
       "review_not_found": "Review not found.",
       "review_not_denied": "Only denied or cancelled reviews can be retried."
+    },
+    "journal_voucher": {
+      "not_found": "Journal Voucher not found.",
+      "invalid_entry": "The accounting entry or correction sequence is invalid. Check allocation totals and linked entries."
     }
   },
   "transfer_payment": {
@@ -2225,7 +2232,8 @@
         "workflow_active": "A workflow is still active",
         "review_active": "A review is still active",
         "recommendation_active": "A recommendation is still active",
-        "approval_active": "An approval is still active"
+        "approval_active": "An approval is still active",
+        "journal_voucher_not_terminal": "Journal Voucher has not reached a terminal business status"
       }
     },
     "agency": "Agency",
@@ -3229,7 +3237,10 @@
       "matched": "Matched",
       "unmatched": "Did not match",
       "any": "Any proponent",
-      "all": "All proponents"
+      "all": "All proponents",
+      "jv_fiscal_eligible": "Fiscal year open for Journal Vouchers",
+      "jv_payment_final": "Source Payment is final",
+      "jv_rationale_present": "Rationale is present"
     },
     "active_target_blocker": "A workflow is already active for this item. Finish or cancel it before adding another workflow.",
     "completion_error_details": "Items to resolve",
@@ -3249,7 +3260,12 @@
       "funding_breakdown_required": "Add at least one other funding source to each line, and make program funding plus other sources equal total cost before completion.",
       "payment_total_mismatch": "The payment line amounts must equal the payment total before completion.",
       "final_reconcile_approved": "The final reconciliation is already approved, so this reconciliation can no longer be completed.",
-      "business_status": "The current business status does not allow this item to be completed."
+      "business_status": "The current business status does not allow this item to be completed.",
+      "JV_LINES_REQUIRED": "Add corrected allocations before completing the entry.",
+      "JV_COMMITMENT_MISMATCH": "Corrected allocations must use source commitment lines.",
+      "JV_UNBALANCED": "Each commitment line must preserve its original total.",
+      "JV_NO_ADJUSTMENT": "Change at least one allocation before completing the entry.",
+      "JV_AMOUNT_RANGE": "Enter amounts within the supported precision and range."
     },
     "packet": {
       "title": "Approval packet",
@@ -3755,5 +3771,51 @@
     "budget_summary": "Budget summary",
     "sections": "Application sections",
     "no_answers": "No answers were provided for this form."
+  },
+  "journal_voucher": {
+    "title": "Journal Vouchers",
+    "description": "Prepare balanced accounting corrections to finalized Payments.",
+    "create": "Create correction",
+    "number": "Journal Voucher",
+    "source_payment": "Source Payment",
+    "requested_date": "Requested accounting date",
+    "narrative_en": "Narrative (English)",
+    "narrative_fr": "Narrative (French)",
+    "accounting_entry": "Accounting Entry",
+    "fiscal_eligibility": "Fiscal year open for Journal Vouchers",
+    "allocations": "Allocation coding",
+    "original_line": "Original",
+    "corrected_line": "Corrected split",
+    "subtotal_line": "Line balance",
+    "unbalanced": "Unbalanced",
+    "commitment_line": "Commitment line",
+    "coding": "Accounting coding",
+    "amount": "Amount",
+    "add_split": "Add allocation split",
+    "coding_not_on_agreement": "This coding is not on the Agreement.",
+    "coding_not_on_agreement_description": "No commitment line on this Agreement uses this accounting coding. You can continue with this split; check that the new coding is intended.",
+    "edit_split": "Edit allocation split",
+    "apply_split": "Apply split",
+    "split_description": "Apply changes to the draft, then save the accounting entry when it balances.",
+    "original_allocation_label": "Original allocation, commitment line {number}",
+    "corrected_allocation_label": "Corrected allocation, commitment line {number}",
+    "subtotal_allocation_label": "Balance for commitment line {number}",
+    "balance_instruction": "Original amounts are negative; corrected splits are positive. Each commitment line and the total must balance to $0.00.",
+    "prepared_transaction": "Prepared accounting transaction. External posting is recorded outside GCS.",
+    "reverse": "Prepare reversal",
+    "replace": "Prepare replacement correction",
+    "reversal_of": "Reversal of Journal Voucher",
+    "replacement_of": "Replacement of Journal Voucher",
+    "completion": {
+      "title": "JV Completion",
+      "description": "Validate and lock the balanced accounting entry and start its configured workflow.",
+      "status_complete": "Completed",
+      "status_locked": "Accounting entry is locked",
+      "comment_placeholder": "Completion comments",
+      "complete": "Complete entry",
+      "completed_success": "Accounting entry completed"
+    },
+    "balanced": "Balanced",
+    "invalid_amount": "Enter a valid amount"
   }
 }

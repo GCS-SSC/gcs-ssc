@@ -1,3 +1,4 @@
+import { requireFreshAuthContext } from '~~/server/utils/authorize'
 import { sql } from 'kysely'
 import { parseI18n } from '~~/server/utils/api-validate'
 import { AgencyFiscalYearSchema, AgencyFiscalYearPatchSchema } from '~~/shared/types/schemas'
@@ -26,6 +27,10 @@ export default defineEventHandler(async event => {
         .where('id', '=', id).where('egcs_ay_organizationagency', '=', agencyId)
         .where('_deleted', '=', false).forUpdate().executeTakeFirst()
       if (!current) return await notFound(event, 'FISCAL_YEAR_NOT_FOUND', 'apiErrors.agency.fiscal_year_not_found')
+      if (body.egcs_ay_jvopen !== undefined && body.egcs_ay_jvopen !== current.egcs_ay_jvopen) {
+        const fresh = await requireFreshAuthContext(event, trx)
+        if (!fresh.userAbilities.authorize('agency', 'delete', { type: 'agency', agencyId })) return await forbidden(event)
+      }
       const validated = await parseI18n(event, AgencyFiscalYearSchema, { ...current, ...body })
       return await trx
         .updateTable('Agency_Fiscal_Year')

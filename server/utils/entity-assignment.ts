@@ -4,7 +4,7 @@ import { sql, type Kysely, type Transaction } from 'kysely'
 import type { AuthorizationResourceOwner, AuthorizationScope, ExactEntityTarget } from '@gcs-ssc/authorization'
 import { notFound } from '~~/server/utils/api-errors'
 import { requireAuthContext, type AuthContext } from '~~/server/utils/authorize'
-import { canAccessAgreement, resolveAgreementScopeContext } from '~~/server/utils/agreement'
+import { resolveAgreementScopeContext } from '~~/server/utils/agreement'
 import { canAccessApplicantRecipient } from '~~/server/utils/applicant-recipient-auth'
 import { resolveCurrentCommonUser } from '~~/server/utils/additional-reviewer-runtime'
 import type { AssignableEntityType, Database, Entity_Type } from '~~/shared/types/database'
@@ -48,11 +48,12 @@ export const resolveAssignmentActor = async (event: H3Event): Promise<{ auth: Au
 
 const resolveAgreementOwner = async (
   db: Kysely<Database>,
-  agreementId: string
+  agreementId: string,
+  subject: 'agreement' | 'journal_voucher' = 'agreement'
 ): Promise<AuthorizationResourceOwner | null> => {
   const agreement = await resolveAgreementScopeContext(agreementId, db)
   if (!agreement) return null
-  return { kind: 'agreement', agreementId, agencyId: agreement.agencyId }
+  return { kind: 'agreement', agreementId, agencyId: agreement.agencyId, ...(subject === 'journal_voucher' ? { subject } : {}) }
 }
 
 const resolveAgreementIdFromEntity = async (
@@ -212,7 +213,7 @@ const resolveSourceOwner = async (
     return await resolveStreamOwner(db, source.entityId)
   }
   const agreementId = await resolveAgreementIdFromEntity(db, source.entityType, source.entityId)
-  if (agreementId) return await resolveAgreementOwner(db, agreementId)
+  if (agreementId) return await resolveAgreementOwner(db, agreementId, source.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement')
   if (source.target?.entityType === 'fundingcaseintake') {
     return await resolveEntityAssignmentOwner(db, 'fundingcaseintake', source.target.entityId)
   }
@@ -255,7 +256,7 @@ export const resolveEntityAssignmentOwner = async (
     return source ? await resolveSourceOwner(db, source) : null
   }
   const agreementId = await resolveAgreementIdFromEntity(db, entityType, entityId)
-  return agreementId ? await resolveAgreementOwner(db, agreementId) : null
+  return agreementId ? await resolveAgreementOwner(db, agreementId, policy.subject === 'journal_voucher' ? 'journal_voucher' : 'agreement') : null
 }
 
 /** Resolves the explicitly declared source used for runtime ownership inheritance. */
@@ -318,7 +319,7 @@ export const canAccessEntityAssignmentOwner = async (
   }
   if (owner.kind === 'agreement') {
     const agreement = await resolveAgreementScopeContext(owner.agreementId, db)
-    return agreement ? await canAccessAgreement(context, action, agreement.scope, db) : false
+    return Boolean(agreement && context.userAbilities.authorize(owner.subject ?? 'agreement', action, agreement.scope))
   }
   if (owner.kind === 'funding_case') {
     const caseScope = await resolveFundingCaseScope(db, owner.intakeId)
@@ -363,7 +364,7 @@ export const canManageEntityAssignmentsWithContext = async (
   }
   if (owner.kind === 'agreement') {
     const agreement = await resolveAgreementScopeContext(owner.agreementId, db)
-    return Boolean(agreement && context.userAbilities.canManageAssignments('agreement', agreement.scope))
+    return Boolean(agreement && context.userAbilities.canManageAssignments(owner.subject ?? 'agreement', agreement.scope))
   }
   if (owner.kind === 'funding_case') {
     const caseScope = await resolveFundingCaseScope(db, owner.intakeId)
@@ -388,6 +389,19 @@ export const canReadEntityAssignmentRoster = (evidence: {
 
 export const isEntityAssignmentRosterWorkable = async (db: Kysely<Database>, entityType: AssignableEntityType, entityId: string): Promise<boolean> => {
   const policy = getEntityAuthorizationPolicy(entityType)
+  if (entityType === 'fundingcasejournalvoucher') {
+    const voucher = await db.selectFrom('Funding_Case_Agreement_Journal_Voucher').select('egcs_fc_payment')
+      .where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirst()
+    if (!voucher) return false
+    const [latest, workflow, decision] = await Promise.all([
+      db.selectFrom('Funding_Case_Agreement_Journal_Voucher').select('id')
+        .where('egcs_fc_payment', '=', voucher.egcs_fc_payment).where('_deleted', '=', false).orderBy('egcs_fc_number', 'desc').executeTakeFirst(),
+      db.selectFrom('Common_Workflow_Run as run').innerJoin('Common_Runtime as runtime', 'runtime.id', 'run.id').select('run.id')
+        .where('runtime.egcs_cn_entitytype', '=', entityType).where('runtime.egcs_cn_entityid', '=', entityId).executeTakeFirst(),
+      db.selectFrom('Common_Routing_Slip').select('id').where('egcs_cn_entitytype', '=', entityType).where('egcs_cn_entityid', '=', entityId).executeTakeFirst()
+    ])
+    if (String(latest?.id) !== entityId || workflow || decision) return false
+  }
   if (entityType === 'applicantrecipient') {
     const row = await db.selectFrom('Applicant_Recipient_Profile')
       .select('egcs_ar_active')
@@ -488,7 +502,7 @@ export const resolveAgencyValidEntityAssigneeIdsWithDb = async (
   const owner = await resolveEntityAssignmentOwner(db, entityType, entityId)
   if (!owner) return new Set()
   const abilitiesByUserId = await defineUsersAbilities(applicationUsers.map(user => String(user.application_user_id)), db)
-  let subject: 'agency' | 'agreement' | 'applicant_recipient' | 'transfer_payment' | 'funding_case'
+  let subject: 'agency' | 'agreement' | 'applicant_recipient' | 'transfer_payment' | 'funding_case' | 'journal_voucher'
   let scope: AuthorizationScope
   if (owner.kind === 'applicant_recipient') {
     if (owner.agencyId) {
@@ -518,7 +532,7 @@ export const resolveAgencyValidEntityAssigneeIdsWithDb = async (
   } else if (owner.kind === 'agreement') {
     const agreement = await resolveAgreementScopeContext(owner.agreementId, db)
     if (!agreement) return new Set()
-    subject = 'agreement'
+    subject = owner.subject ?? 'agreement'
     scope = agreement.scope
   } else if (owner.kind === 'transfer_payment_stream') {
     subject = 'transfer_payment'

@@ -1,3 +1,4 @@
+import { getJournalVoucherCompletionRuntime, executeJournalVoucherCompletion } from './journal-voucher-completion'
 /* eslint-disable jsdoc/require-jsdoc */
 import type { H3Event } from 'h3'
 import type { Kysely } from 'kysely'
@@ -49,6 +50,7 @@ export const isDirectCompletionRuntimeEntitySupported = (entityType: Entity_Type
   || entityType === 'fundingcaseagreementclaim'
   || entityType === 'fundingcaseagreementcommitment'
   || entityType === 'fundingcasemonitor'
+  || entityType === 'fundingcasejournalvoucher'
   || entityType === 'fundingcasepayment'
   || entityType === 'fundingclaimreconcile'
   || entityType === 'fundingcaseforecast'
@@ -144,7 +146,7 @@ export const resolveCompletionRuntimeEntityFromEntity = async (
     return await resolveReviewRuntimeEntityFromEntity(db, entityType, entityId)
   }
 
-  if (entityType === 'fundingcasepayment') {
+  if (entityType === 'fundingcasepayment' || entityType === 'fundingcasejournalvoucher') {
     return await resolveReviewRuntimeEntityFromEntity(db, entityType, entityId)
   }
 
@@ -164,6 +166,7 @@ export const getCompletionRuntime = async (
     const runtime = await resolveExtensionLifecycleRuntime(event, entityType, entityId)
     return runtime ? await getExtensionCompletionRuntime(event, runtime) : null
   }
+  if (entityType === 'fundingcasejournalvoucher') return await getJournalVoucherCompletionRuntime(event, entityId)
   if (entityType === 'commonreview') {
     return await getCommonReviewCompletionRuntime(event, entityId)
   }
@@ -204,6 +207,7 @@ export const executeCompletion = async (
   input: CompletionExecuteInput
 ) => {
   if (input.entityType?.includes(':')) return await executeExtensionCompletion(event, input)
+  if (input.entityType === 'fundingcasejournalvoucher') return await executeJournalVoucherCompletion(event, input)
   if (input.entityType === 'commonreview') {
     return await executeCommonReviewCompletion(event, input)
   }

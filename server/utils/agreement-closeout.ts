@@ -45,6 +45,7 @@ const closeoutRoute = (agreementId: string, segment: string, entityId: string): 
 }
 
 const targetRoute = (agreementId: string, entityType: Entity_Type, entityId: string): string => {
+  if (entityType === 'fundingcasejournalvoucher') return `/journal-vouchers/${entityId}`
   const segments: Partial<Record<Entity_Type, string>> = {
     fundingcaseagreementclaim: 'claims',
     fundingclaimreconcile: 'claim-reconciliations',
@@ -195,7 +196,7 @@ export const buildAgreementCloseoutReadiness = async (
     .where('id', '=', agreementId).where('_deleted', '=', false).executeTakeFirst()
   if (!agreement) return null
 
-  const [financial, followupRows, amendments, claims, reconciles, payments, forecasts, monitors, commitments] = await Promise.all([
+  const [financial, followupRows, amendments, claims, reconciles, payments, forecasts, monitors, commitments, journalVouchers] = await Promise.all([
     buildFinancialReport(db, agreementId),
     db.selectFrom('Funding_Case_Agreement_Monitor_Followup')
       .innerJoin('Funding_Case_Agreement_Monitor', 'Funding_Case_Agreement_Monitor.id', 'Funding_Case_Agreement_Monitor_Followup.egcs_fc_fundingagreementmonitor')
@@ -226,6 +227,8 @@ export const buildAgreementCloseoutReadiness = async (
     db.selectFrom('Funding_Case_Agreement_Monitor').select(['id', 'egcs_fc_status'])
       .where('egcs_fc_fundingagreement', '=', agreementId).where('_deleted', '=', false).execute(),
     db.selectFrom('Funding_Case_Agreement_Commitment').select(['id', 'egcs_fc_status'])
+      .where('egcs_fc_fundingagreement', '=', agreementId).where('_deleted', '=', false).execute(),
+    db.selectFrom('Funding_Case_Agreement_Journal_Voucher').select(['id', 'egcs_fc_status'])
       .where('egcs_fc_fundingagreement', '=', agreementId).where('_deleted', '=', false).execute()
   ])
 
@@ -236,6 +239,7 @@ export const buildAgreementCloseoutReadiness = async (
     ...claims.map(row => row.egcs_fc_status),
     ...reconciles.map(row => row.egcs_fc_status),
     ...payments.map(row => row.egcs_fc_status),
+    ...journalVouchers.map(row => row.egcs_fc_status),
     ...forecasts.map(row => row.egcs_fc_status),
     ...monitors.map(row => row.egcs_fc_status),
     ...commitments.map(row => row.egcs_fc_status)
@@ -276,11 +280,14 @@ export const buildAgreementCloseoutReadiness = async (
   for (const row of monitors) if (!isTerminal(row.egcs_fc_status)) addBlocker(blockers, agreementId, 'fundingcasemonitor', String(row.id), row.egcs_fc_status, 'monitor_not_terminal')
   for (const row of commitments) if (!isTerminal(row.egcs_fc_status)) addBlocker(blockers, agreementId, 'fundingcaseagreementcommitment', String(row.id), row.egcs_fc_status, 'commitment_not_terminal')
 
+  for (const row of journalVouchers) if (!isTerminal(row.egcs_fc_status)) addBlocker(blockers, agreementId, 'fundingcasejournalvoucher', String(row.id), row.egcs_fc_status, 'journal_voucher_not_terminal')
+
   const targets = [
     { entityType: 'fundingcaseagreement' as const, entityId: agreementId },
     ...amendments.map(row => ({ entityType: 'fundingcaseamendment' as const, entityId: String(row.id) })),
     ...claims.map(row => ({ entityType: 'fundingcaseagreementclaim' as const, entityId: String(row.id) })),
     ...reconciles.map(row => ({ entityType: 'fundingclaimreconcile' as const, entityId: String(row.id) })),
+    ...journalVouchers.map(row => ({ entityType: 'fundingcasejournalvoucher' as const, entityId: String(row.id) })),
     ...payments.map(row => ({ entityType: 'fundingcasepayment' as const, entityId: String(row.id) })),
     ...forecasts.map(row => ({ entityType: 'fundingcaseforecast' as const, entityId: String(row.id) })),
     ...monitors.map(row => ({ entityType: 'fundingcasemonitor' as const, entityId: String(row.id) })),

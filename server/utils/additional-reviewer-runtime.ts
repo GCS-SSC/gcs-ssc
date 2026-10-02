@@ -1,3 +1,4 @@
+import { resolveJournalVoucherRuntimeContext } from './journal-voucher-context'
 import type { H3Event } from 'h3'
 import type { Kysely } from 'kysely'
 import type { Database } from '~~/shared/types/database'
@@ -25,6 +26,7 @@ const agreementOwnerResolvers = {
   fundingcaseagreementcommitment: resolveAgreementCommitmentRuntimeContext,
   fundingcaseforecast: resolveAgreementForecastRuntimeContext,
   fundingcasemonitor: resolveAgreementMonitorRuntimeContext,
+  fundingcasejournalvoucher: resolveJournalVoucherRuntimeContext,
   fundingcasepayment: resolveAgreementPaymentRuntimeContext,
   fundingclaimreconcile: resolveAgreementClaimReconcileRuntimeContext
 } as const

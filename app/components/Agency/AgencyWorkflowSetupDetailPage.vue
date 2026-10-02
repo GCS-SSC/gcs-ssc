@@ -99,6 +99,7 @@ const validateMember = createValidator(CommonWorkflowSetupMemberCreateSchema)
 const approvalSubmissionEntityTypes = new Set([
   'fundingcaseagreement', 'fundingcaseamendment', 'fundingcaseagreementcloseout',
   'fundingcaseagreementclaim', 'fundingclaimreconcile', 'fundingcaseagreementcommitment',
+  'fundingcasejournalvoucher',
   'fundingcasepayment', 'fundingcaseforecast', 'fundingcasemonitor'
 ])
 const purposeOptions = computed(() => [

@@ -129,6 +129,13 @@ export const CORE_ENTITY_REGISTRY = {
     ownerKind: 'agreement',
     assignmentMode: 'independent'
   },
+  fundingcasejournalvoucher: {
+    label: { en: 'Journal Voucher', fr: 'Pièce de journal' },
+    completion: 'supported', approvalSubmission: 'on_completion', standardWorkflow: 'explicit', riskRating: 'none',
+    supportsDirectReviews: true,
+    ownerKind: 'agreement',
+    assignmentMode: 'independent'
+  },
   fundingcasepayment: {
     label: { en: 'Funding Case Payment', fr: 'Paiement du dossier de financement' },
     completion: 'supported', approvalSubmission: 'on_completion', standardWorkflow: 'explicit', riskRating: 'none',
