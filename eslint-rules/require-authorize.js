@@ -31,6 +31,8 @@ export default {
     const approvedAuthorizationCalls = new Set([
       'authorize',
       'authorizeJournalVoucher',
+      'authorizeCorrection',
+      'authorizeCorrectionAgreement',
       'createJournalVoucher',
       'requireAuthContext',
       'authorizeActiveAgencySubentity',

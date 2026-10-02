@@ -41,6 +41,9 @@ type CurrencySummary = {
   currency: string
   lines: FinancialLine[]
   paid: MonthlyAmounts
+  jvEffects?: MonthlyAmounts
+  correctionAdjustments?: MonthlyAmounts
+  correctedRecordedPaid?: MonthlyAmounts
   payments: FinancialPayment[]
   progress: FinancialProgress
 }
@@ -563,6 +566,22 @@ const peakShare = (progress: FinancialProgress): string | null => {
                 </td>
                 <td class="border-t-2 border-l border-default px-3 py-3 text-right font-bold tabular-nums text-primary">
                   {{ formatMoney(paidYearTotal(group), group.currency) }}
+                </td>
+              </tr>
+              <tr
+                v-for="accounting in [
+                  { key: 'jv_effects', amounts: group.jvEffects },
+                  { key: 'correction_adjustments', amounts: group.correctionAdjustments },
+                  { key: 'corrected_recorded_paid', amounts: group.correctedRecordedPaid }
+                ].filter(row => row.amounts)" :key="accounting.key" :data-testid="`financial-summary-${accounting.key}`">
+                <th scope="row" colspan="2" class="sticky left-0 z-20 border-t border-default bg-default px-3 py-3 text-left font-semibold">
+                  {{ t(`agreement.financial_summary.${accounting.key}`) }}
+                </th>
+                <td v-for="month in MONTHS" :key="month" class="border-t border-l border-default px-3 py-3 text-right tabular-nums">
+                  {{ displayMonthlyAmount(accounting.amounts?.[month] ?? ZERO_MONEY, group.currency) }}
+                </td>
+                <td class="border-t border-l border-default px-3 py-3 text-right font-bold tabular-nums">
+                  {{ formatMoney(sumMoney(accounting.amounts ?? []), group.currency) }}
                 </td>
               </tr>
             </tfoot>

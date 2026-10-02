@@ -7,6 +7,7 @@ import { buildAgreementFinancialSummary, type SummaryBudgetLine, type SummaryCla
 import { withBusinessRecordState } from '~~/server/utils/business-record-state'
 import { databaseMoneyText, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
+import { getAgreementPaidAccountingProjection } from '~~/server/utils/agreement-accounting-projection'
 
 /** Agreement-wide financial view, using a single authorized read snapshot. */
 export default defineEventHandler(async event => {
@@ -160,6 +161,15 @@ export default defineEventHandler(async event => {
     const claims: SummaryClaimLine[] = claimRows.map(row => ({ ...row, id: String(row.id), claimId: String(row.claimId), fiscalYearId: String(row.fiscalYearId), budgetLineId: row.budgetLineId == null ? null : String(row.budgetLineId), amount: parseDatabaseMoney(row.amount) }))
     const reconciliations: SummaryReconciliation[] = reconcileRows.map(row => ({ id: String(row.id), claimLineId: String(row.claimLineId), amount: parseDatabaseMoney(row.amount), positive: positiveIds.has(String(row.reconcileId)) }))
     const payments: SummaryPayment[] = paymentRows.map(row => ({ ...row, id: String(row.id), fiscalYearId: String(row.fiscalYearId), amount: parseDatabaseMoney(row.amount) }))
-    return buildAgreementFinancialSummary(years, budgets, forecasts, forecastLines, claims, reconciliations, payments)
+    const accounting = await getAgreementPaidAccountingProjection(db, agreementId, { paymentMode: 'finalized' })
+    for (const entry of accounting.entries) {
+      if (!years.some(year => year.id === entry.fiscalYearId)) years.push({
+        id: entry.fiscalYearId, label: entry.fiscalYearLabel, order: entry.fiscalYearOrder
+      })
+    }
+    const finalizedIds = new Set(accounting.entries.filter(entry => entry.kind === 'cash_payment').map(entry => entry.id))
+    return buildAgreementFinancialSummary(years, budgets, forecasts, forecastLines, claims, reconciliations,
+      payments.filter(payment => finalizedIds.has(payment.id)), accounting.entries.flatMap(entry =>
+        entry.kind === 'cash_payment' ? [] : [{ ...entry, kind: entry.kind }]))
   })
 })

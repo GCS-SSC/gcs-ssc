@@ -47,7 +47,9 @@ export const appRouteLocations = {
   agreements: () => ({ name: 'agreements' }),
   assignmentManagement: () => ({ name: 'assignment-management' }),
   agreementCreate: () => ({ name: 'agreements-new' }),
-  agreementDetail: (id: string) => ({ name: 'agreements-id', params: { id } }),
+  agreementDetail: (id: string, query?: Record<string, string>) => ({
+    name: 'agreements-id', params: { id }, ...(query ? { query } : {})
+  }),
   agreementAmendmentDetail: (id: string, amendmentId: string) => ({
     name: 'agreements-id-amendments-amendmentId',
     params: { id, amendmentId }
@@ -63,6 +65,12 @@ export const appRouteLocations = {
   agreementPaymentDetail: (id: string, paymentId: string) => ({
     name: 'agreements-id-payments-paymentId',
     params: { id, paymentId }
+  }),
+  agreementCorrectionCollection: (id: string) => ({
+    name: 'agreements-id', params: { id }, query: { section: 'corrections' }
+  }),
+  agreementCorrectionDetail: (id: string, correctionId: string) => ({
+    name: 'agreements-id-corrections-correctionId', params: { id, correctionId }
   }),
   agreementForecastDetail: (id: string, forecastId: string, query?: Record<string, string>) => ({
     name: 'agreements-id-forecasts-forecastId',

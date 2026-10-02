@@ -5,7 +5,13 @@ export const WORKFLOW_RUNTIME_COVERAGE_INCLUDE = [
   'server/utils/workflow-routing.ts',
   'server/utils/workflow-routing-capture.ts',
   'server/utils/workflow-condition-evaluation.ts',
-  'server/utils/workflow-execution-plan.ts'
+  'server/utils/workflow-execution-plan.ts',
+  'server/utils/correction-completion.ts',
+  'server/utils/correction-lock.ts',
+  'server/utils/correction-posting.ts',
+  'server/utils/correction-notifications.ts',
+  'server/utils/correction.ts',
+  'server/utils/agreement-accounting-projection.ts'
 ]
 
 export default defineCriticalCoverageProject({
@@ -13,10 +19,18 @@ export default defineCriticalCoverageProject({
   reportsDirectory: 'coverage/workflow-runtime',
   tests: [
     'tests/unit/workflow-routing.test.ts',
+    'tests/unit/correction-lifecycle.test.ts',
+    'tests/unit/correction-lifecycle-refusal.test.ts',
+    'tests/unit/correction-domain.test.ts',
+    'tests/unit/correction-accounting.test.ts',
+    'tests/unit/correction-financial-projection.test.ts',
+    'tests/unit/correction-notifications.test.ts',
+    'tests/unit/workflow-status-graph.test.ts',
     'tests/unit/workflow-routing-contracts.test.ts',
     'tests/unit/workflow-profile-database.test.ts',
     'tests/unit/agreement-amendment-cancel-route-coverage.test.ts',
     'tests/unit/agreement-approval-submission-locking.test.ts',
+    'tests/unit/agreement-write-transaction.test.ts',
     'tests/unit/agreement-claim-completion.test.ts',
     'tests/unit/agreement-claim-reconcile-completion.test.ts',
     'tests/unit/agreement-claim-reconciliation-cancel.test.ts',

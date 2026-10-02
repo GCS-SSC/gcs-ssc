@@ -49,11 +49,11 @@ export const resolveAssignmentActor = async (event: H3Event): Promise<{ auth: Au
 const resolveAgreementOwner = async (
   db: Kysely<Database>,
   agreementId: string,
-  subject: 'agreement' | 'journal_voucher' = 'agreement'
+  subject: 'agreement' | 'journal_voucher' | 'correction' = 'agreement'
 ): Promise<AuthorizationResourceOwner | null> => {
   const agreement = await resolveAgreementScopeContext(agreementId, db)
   if (!agreement) return null
-  return { kind: 'agreement', agreementId, agencyId: agreement.agencyId, ...(subject === 'journal_voucher' ? { subject } : {}) }
+  return { kind: 'agreement', agreementId, agencyId: agreement.agencyId, ...(subject !== 'agreement' ? { subject } : {}) }
 }
 
 const resolveAgreementIdFromEntity = async (
@@ -213,7 +213,7 @@ const resolveSourceOwner = async (
     return await resolveStreamOwner(db, source.entityId)
   }
   const agreementId = await resolveAgreementIdFromEntity(db, source.entityType, source.entityId)
-  if (agreementId) return await resolveAgreementOwner(db, agreementId, source.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement')
+  if (agreementId) return await resolveAgreementOwner(db, agreementId, source.entityType === 'fundingcasecorrection' ? 'correction' : source.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement')
   if (source.target?.entityType === 'fundingcaseintake') {
     return await resolveEntityAssignmentOwner(db, 'fundingcaseintake', source.target.entityId)
   }
@@ -256,7 +256,7 @@ export const resolveEntityAssignmentOwner = async (
     return source ? await resolveSourceOwner(db, source) : null
   }
   const agreementId = await resolveAgreementIdFromEntity(db, entityType, entityId)
-  return agreementId ? await resolveAgreementOwner(db, agreementId, policy.subject === 'journal_voucher' ? 'journal_voucher' : 'agreement') : null
+  return agreementId ? await resolveAgreementOwner(db, agreementId, policy.subject === 'correction' ? 'correction' : policy.subject === 'journal_voucher' ? 'journal_voucher' : 'agreement') : null
 }
 
 /** Resolves the explicitly declared source used for runtime ownership inheritance. */
@@ -389,6 +389,16 @@ export const canReadEntityAssignmentRoster = (evidence: {
 
 export const isEntityAssignmentRosterWorkable = async (db: Kysely<Database>, entityType: AssignableEntityType, entityId: string): Promise<boolean> => {
   const policy = getEntityAuthorizationPolicy(entityType)
+  if (entityType === 'fundingcasecorrection') {
+    const correction = await db.selectFrom('Funding_Case_Agreement_Correction').select('egcs_fc_outcome')
+      .where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirst()
+    if (!correction || correction.egcs_fc_outcome !== 'open') return false
+    const evidence = await db.selectFrom('Common_Runtime').select('id')
+      .where('egcs_cn_entitytype', '=', entityType).where('egcs_cn_entityid', '=', entityId).executeTakeFirst()
+    const decision = await db.selectFrom('Common_Routing_Slip').select('id')
+      .where('egcs_cn_entitytype', '=', entityType).where('egcs_cn_entityid', '=', entityId).executeTakeFirst()
+    if (evidence || decision) return false
+  }
   if (entityType === 'fundingcasejournalvoucher') {
     const voucher = await db.selectFrom('Funding_Case_Agreement_Journal_Voucher').select('egcs_fc_payment')
       .where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirst()
@@ -502,7 +512,7 @@ export const resolveAgencyValidEntityAssigneeIdsWithDb = async (
   const owner = await resolveEntityAssignmentOwner(db, entityType, entityId)
   if (!owner) return new Set()
   const abilitiesByUserId = await defineUsersAbilities(applicationUsers.map(user => String(user.application_user_id)), db)
-  let subject: 'agency' | 'agreement' | 'applicant_recipient' | 'transfer_payment' | 'funding_case' | 'journal_voucher'
+  let subject: 'agency' | 'agreement' | 'applicant_recipient' | 'transfer_payment' | 'funding_case' | 'journal_voucher' | 'correction'
   let scope: AuthorizationScope
   if (owner.kind === 'applicant_recipient') {
     if (owner.agencyId) {

@@ -16,7 +16,7 @@ const monthKeys = ['apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
  * @returns Main line.
  */
 const itemTitle = (item: WorkItem): string => {
-  const identifier = item.entity_type === 'applicantrecipient' || item.entity_type === 'fundingcaseagreement'
+  const identifier = item.entity_type === 'applicantrecipient' || item.entity_type === 'fundingcaseagreement' || item.entity_type === 'fundingcasecorrection'
     ? getBilingualValue(item, 'identifier', item.entity_id)
     : `#${item.entity_id}`
   if (item.entity_type === 'applicantrecipient' || item.entity_type === 'fundingcaseagreement') return identifier

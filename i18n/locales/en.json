@@ -271,7 +271,8 @@
       "fundingcasemonitor": "Monitor",
       "fundingcaseamendment": "Amendment",
       "fundingcaseagreementcommitment": "Commitment",
-      "fundingcasejournalvoucher": "Journal Voucher"
+      "fundingcasejournalvoucher": "Journal Voucher",
+      "fundingcasecorrection": "Correction"
     }
   },
   "attachments": {
@@ -397,7 +398,6 @@
     "start_date": "Start date",
     "end_date": "End date",
     "status": "Status",
-    "active": "Active",
     "deleted": "Deleted",
     "not_deleted": "Not Deleted",
     "yes": "Yes",
@@ -528,7 +528,8 @@
       "fundingcasepayment": "Funding Case Payment",
       "fundingcaserecommendation": "Funding Case Recommendation",
       "fundingcaseagreementcommitment": "Funding Case Agreement Commitment",
-      "fundingcasejournalvoucher": "Journal Voucher"
+      "fundingcasejournalvoucher": "Journal Voucher",
+      "fundingcasecorrection": "Correction"
     },
     "scope_type": {
       "global": "Global",
@@ -620,6 +621,13 @@
       "view:role": "View Role",
       "manage:user": "Manage User",
       "view:user": "View User"
+    },
+    "correction_outcome": {
+      "open": "Open",
+      "posted": "Processed",
+      "denied": "Denied",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
     }
   },
   "agency": {
@@ -772,7 +780,8 @@
       "agreement": "Agreements",
       "funding_case": "Intakes",
       "applicant_recipient": "Proponents",
-      "journal_voucher": "Journal Vouchers"
+      "journal_voucher": "Journal Vouchers",
+      "correction": "Corrections"
     },
     "unknown_ability": "Unknown ability ({action}:{subject})",
     "scope": {
@@ -1382,7 +1391,7 @@
       "agreement_subtype_not_found": "Agreement subtype not found.",
       "invalid_budget_fiscal_year": "The selected agreement budget fiscal year is invalid.",
       "budget_fiscal_year_not_found": "Agreement budget fiscal year not found.",
-      "budget_fiscal_year_in_use": "Remove all budget line items before deleting this fiscal year.",
+      "budget_fiscal_year_in_use": "This budget’s fiscal year is used by an agreement budget. Remove or change the agreement budget year before changing this fiscal year.",
       "budget_line_item_not_found": "Agreement budget line item not found.",
       "duplicate_budget_fiscal_year": "A budget fiscal year already exists for this agreement.",
       "invalid_amendment_type": "The selected amendment type is invalid.",
@@ -1409,7 +1418,6 @@
       "duplicate_program_stream_name": "A stream with this English and French name already exists for the program.",
       "duplicate_program_outcome_name": "An outcome with this English and French name already exists for the program.",
       "duplicate_program_objective": "An objective with this English and French value already exists for the program.",
-      "budget_fiscal_year_in_use": "This budget’s fiscal year is used by an agreement budget. Remove or change the agreement budget year before changing this fiscal year.",
       "duplicate_program_budget_fiscal_year": "A program budget already exists for this fiscal year.",
       "duplicate_outcome_performance_indicator_name": "A performance indicator with this English and French name already exists for the outcome.",
       "duplicate_assessment_members": "Duplicate assessment members are not allowed.",
@@ -1459,6 +1467,11 @@
     "journal_voucher": {
       "not_found": "Journal Voucher not found.",
       "invalid_entry": "The accounting entry or correction sequence is invalid. Check allocation totals and linked entries."
+    },
+    "correction": {
+      "invalid_entry": "This Correction cannot be changed or submitted with its current financial basis, permissions or lifecycle state.",
+      "not_found": "Correction not found.",
+      "financial_locked": "An open Correction locks this Agreement’s financial accounting."
     }
   },
   "transfer_payment": {
@@ -1721,7 +1734,6 @@
     "options": "Options",
     "remove_option_named": "Remove option {position}: {name}",
     "outcome_name": "Outcome Name",
-    "outcomes": "Outcomes",
     "outcomes_placeholder": "Outcomes will be available once all sections are complete.",
     "custom_outcomes": "Custom Outcomes",
     "custom_outcome": "Custom Outcome",
@@ -2233,7 +2245,8 @@
         "review_active": "A review is still active",
         "recommendation_active": "A recommendation is still active",
         "approval_active": "An approval is still active",
-        "journal_voucher_not_terminal": "Journal Voucher has not reached a terminal business status"
+        "journal_voucher_not_terminal": "Journal Voucher has not reached a terminal business status",
+        "correction_not_terminal": "Correction has not reached a terminal outcome"
       }
     },
     "agency": "Agency",
@@ -2353,7 +2366,11 @@
       "no_fiscal_years": "No fiscal years have been added to this agreement yet.",
       "no_financial_data": "No financial data is available for this fiscal year.",
       "no_lines": "No budget or claim lines for this currency.",
-      "load_failed": "Financial summary could not be loaded"
+      "load_failed": "Financial summary could not be loaded",
+      "correction_adjustments": "Posted Correction adjustments",
+      "jv_effects": "Successful JV effects",
+      "corrected_recorded_paid": "Corrected recorded paid",
+      "cash_payments": "Cash Payments"
     },
     "budget": {
       "funding_sources": "Other funding sources",
@@ -2378,22 +2395,37 @@
       "no_line_items": "No budget line items yet."
     },
     "amendments": {
-      "title": "Amendments", "add": "Add Amendment", "search": "Search amendments",
-      "number": "Amendment number", "number_title": "Amendment {number}", "draft_title": "Draft amendment", "working": "Draft",
-      "name_en": "English name", "name_fr": "French name", "name_help": "Provide an amendment name in at least one official language.",
+      "title": "Amendments",
+      "add": "Add Amendment",
+      "search": "Search amendments",
+      "number": "Amendment number",
+      "number_title": "Amendment {number}",
+      "draft_title": "Draft amendment",
+      "working": "Draft",
+      "name_en": "English name",
+      "name_fr": "French name",
+      "name_help": "Provide an amendment name in at least one official language.",
       "sections": { "details": "Amendment details", "scope": "Amendment scope" },
-      "type": "Amendment type", "types": "Amendment types", "types_description": "The selected types describe the areas changed by this amendment.",
-      "type_help": "Select one or more amendment types configured for this agreement's stream.", "add_type": "Add another type",
+      "type": "Amendment type",
+      "types": "Amendment types",
+      "types_description": "The selected types describe the areas changed by this amendment.",
+      "type_help": "Select one or more amendment types configured for this agreement's stream.",
+      "add_type": "Add another type",
       "subtypes": "Amendment subtypes",
-      "snapshots": "Snapshots", "snapshots_description": "Create an explicit point-in-time copy of each enabled working area.",
-      "snapshot_created": "Snapshot created", "not_created": "Not created",
-      "create_budget_snapshot": "Create from current budget", "create_activity_snapshot": "Create from current activities",
-      "budget_snapshot_created": "Budget snapshot created successfully", "activity_snapshot_created": "Activity snapshot created successfully",
+      "snapshots": "Snapshots",
+      "snapshots_description": "Create an explicit point-in-time copy of each enabled working area.",
+      "snapshot_created": "Snapshot created",
+      "not_created": "Not created",
+      "create_budget_snapshot": "Create from current budget",
+      "create_activity_snapshot": "Create from current activities",
+      "budget_snapshot_created": "Budget snapshot created successfully",
+      "activity_snapshot_created": "Activity snapshot created successfully",
       "budget_snapshot_description": "Create a working copy of the agreement budget to make this amendment's budget and fiscal-year changes.",
       "budget_difference": "Budget change",
       "budget_difference_notice": "Total budget change from the last approved budget: {amount}",
       "activity_snapshot_description": "Create a working copy of the agreement activities to make this amendment's activity changes.",
-      "created_success": "Amendment created successfully", "workflow": "Approvals",
+      "created_success": "Amendment created successfully",
+      "workflow": "Approvals",
       "workflow_description": "A recommendation workflow will submit this amendment for approval once that workflow is available.",
       "recommendation": "Recommendation",
       "recommendation_description": "The recommendation and approval chain will be available here in a future update.",
@@ -2606,9 +2638,9 @@
       "ready_for_review_success": "Claim marked ready for review",
       "completion": {
         "title": "Claim completion",
-        "description": "Complete this claim when all submitted amounts are entered and allocated. Completion may start the configured approval submission workflow.",
-        "status_complete": "This claim is complete and ready for reconciliation.",
-        "status_locked": "Complete and allocate the claim submission before completing it, or wait for the active workflow to finish.",
+        "description": "Finalize this claim once the submitted amounts and supporting details are complete.",
+        "status_complete": "This claim is complete.",
+        "status_locked": "This claim is locked and cannot be completed right now.",
         "comment_placeholder": "Add an optional completion note.",
         "complete": "Complete claim",
         "completed_success": "Claim completed successfully"
@@ -2684,15 +2716,6 @@
         "jan": "Jan",
         "feb": "Feb",
         "mar": "Mar"
-      },
-      "completion": {
-        "title": "Claim completion",
-        "description": "Finalize this claim once the submitted amounts and supporting details are complete.",
-        "status_complete": "This claim is complete.",
-        "status_locked": "This claim is locked and cannot be completed right now.",
-        "comment_placeholder": "Add an optional completion note.",
-        "complete": "Complete claim",
-        "completed_success": "Claim completed successfully"
       },
       "workflow": {
         "title": "Completion & approvals"
@@ -3281,15 +3304,40 @@
       "activities": "Activities",
       "none": "None",
       "fields": {
-        "agreementNumber": "Agreement number", "financialSystemNumber": "Financial system number", "title": "Title", "description": "Description",
-        "agency": "Agency", "program": "Program", "stream": "Stream", "agreementType": "Agreement type", "agreementSubtype": "Agreement subtype",
-        "furtherDistribution": "Further distribution", "holdbackPercent": "Holdback", "holdbackBasis": "Holdback basis", "riskScore": "Risk score", "riskRating": "Risk rating",
-        "authorizedAssistanceStartDate": "Authorized assistance start date", "authorizedAssistanceEndDate": "Authorized assistance end date",
-        "amendmentNumber": "Amendment number", "name": "Name", "proposedAuthorizedAssistanceStartDate": "Proposed start date", "proposedAuthorizedAssistanceEndDate": "Proposed end date",
-        "amendmentTypes": "Amendment types", "amendmentSubtypes": "Amendment subtypes", "operatingName": "Operating name", "subtype": "Proponent subtype",
-        "leadAgency": "Lead agency", "researchOrganization": "Research organization", "registries": "Registry identifiers",
-        "programFunding": "Program funding", "otherFederalFunding": "Other federal funding", "otherGovernmentFunding": "Other government funding", "otherFunding": "Other funding",
-        "expectedResults": "Expected results", "outcomes": "Outcomes", "responsibleParties": "Responsible parties"
+        "agreementNumber": "Agreement number",
+        "financialSystemNumber": "Financial system number",
+        "title": "Title",
+        "description": "Description",
+        "agency": "Agency",
+        "program": "Program",
+        "stream": "Stream",
+        "agreementType": "Agreement type",
+        "agreementSubtype": "Agreement subtype",
+        "furtherDistribution": "Further distribution",
+        "holdbackPercent": "Holdback",
+        "holdbackBasis": "Holdback basis",
+        "riskScore": "Risk score",
+        "riskRating": "Risk rating",
+        "authorizedAssistanceStartDate": "Authorized assistance start date",
+        "authorizedAssistanceEndDate": "Authorized assistance end date",
+        "amendmentNumber": "Amendment number",
+        "name": "Name",
+        "proposedAuthorizedAssistanceStartDate": "Proposed start date",
+        "proposedAuthorizedAssistanceEndDate": "Proposed end date",
+        "amendmentTypes": "Amendment types",
+        "amendmentSubtypes": "Amendment subtypes",
+        "operatingName": "Operating name",
+        "subtype": "Proponent subtype",
+        "leadAgency": "Lead agency",
+        "researchOrganization": "Research organization",
+        "registries": "Registry identifiers",
+        "programFunding": "Program funding",
+        "otherFederalFunding": "Other federal funding",
+        "otherGovernmentFunding": "Other government funding",
+        "otherFunding": "Other funding",
+        "expectedResults": "Expected results",
+        "outcomes": "Outcomes",
+        "responsibleParties": "Responsible parties"
       }
     },
     "source_approval_template": "Final approval template",
@@ -3775,7 +3823,7 @@
   "journal_voucher": {
     "title": "Journal Vouchers",
     "description": "Prepare balanced accounting corrections to finalized Payments.",
-    "create": "Create correction",
+    "create": "Create Journal Voucher",
     "number": "Journal Voucher",
     "source_payment": "Source Payment",
     "requested_date": "Requested accounting date",
@@ -3817,5 +3865,96 @@
     },
     "balanced": "Balanced",
     "invalid_amount": "Enter a valid amount"
+  },
+  "correction": {
+    "title": "Corrections",
+    "approval_workspace": "Correction approval",
+    "approval_workspace_description": "Review the submitted Correction evidence and record your assigned approval decision.",
+    "singular": "Correction",
+    "description": "Adjust recorded paid amounts when the external payment was correct. A Correction creates signed accounting entries without another disbursement.",
+    "create": "Create Correction",
+    "create_linked": "Create linked Correction",
+    "number": "Correction reference",
+    "search": "Search Corrections",
+    "outcome": "Business outcome",
+    "created_at": "Created",
+    "agreement": "Agreement",
+    "commitment": "Active Commitment",
+    "source_payments": "Source Payments",
+    "source_payments_description": "Select one or more finalized Payments from this Agreement. Source access is checked independently.",
+    "requested_date": "Requested accounting date",
+    "narrative_en": "Rationale (English)",
+    "narrative_fr": "Rationale (French)",
+    "rationale": "Discrepancy rationale",
+    "rationale_instruction": "Required for Completion: explain the internal error and why the external payment was correct in at least one language. You may save an incomplete draft.",
+    "financial_lines": "Financial Lines",
+    "financial_basis": "Captured financial basis",
+    "coding_details": "Accounting coding",
+    "line_heading": "Commitment line {number}",
+    "financial_summary": "Financial summary",
+    "commitment_amount": "Commitment amount",
+    "financial_basis_description": "Allocations and accounting labels retained from the selected source Payments when this Correction was created. Financial Lines shows the cumulative recorded amounts across the Agreement, including successful journal vouchers and earlier posted Corrections.",
+    "source_allocations": "Captured allocations",
+    "no_sources": "No source payments were captured.",
+    "lines_instruction": "Enter signed adjustments. Corrected recorded paid must stay between zero and the Commitment amount for each line and within shared coding capacity. Completion requires at least one nonzero adjustment; offsetting lines may total zero.",
+    "original_paid": "Original cash paid",
+    "jv_effect": "Successful JV effects",
+    "prior_corrections": "Earlier posted Corrections",
+    "adjustment": "Signed adjustment",
+    "adjustment_total": "Net adjustment",
+    "recorded_paid": "Recorded paid before adjustment",
+    "corrected_paid": "Corrected recorded paid",
+    "remaining": "Remaining balance",
+    "source_payment_reference": "Payment {reference}",
+    "basis_provenance": "Corrected recorded paid = original cash paid + successful JV effects + earlier posted Corrections + the proposed adjustment. These amounts and accounting labels are retained evidence; shared capacity is validated as one batch.",
+    "save_before_completion": "Save your financial lines and rationale before Completion.",
+    "cancel": "Cancel Correction",
+    "cancel_description": "Cancellation keeps the evidence and reason, posts no adjustments and releases the Agreement financial lock.",
+    "cancellation_reason": "Cancellation reason",
+    "export": {
+      "reference": "Correction reference",
+      "outcome": "Outcome",
+      "fiscal_year": "Fiscal year",
+      "line": "Commitment line",
+      "currency": "Currency",
+      "adjustment": "Signed adjustment",
+      "rationale": "Rationale",
+      "creator": "Creator",
+      "decision_actor": "Decision actor",
+      "decision_date": "Decision date",
+      "posting_runtime": "Posting workflow run"
+    },
+    "outcomes": {
+      "draft": "Draft",
+      "success": "Processed",
+      "failure": "Failed",
+      "cancelled": "Cancelled",
+      "pending": "Awaiting approval",
+      "posted": "Processed",
+      "failed": "Failed",
+      "denied": "Denied",
+      "open": "Open"
+    },
+    "completion": {
+      "title": "Correction Completion",
+      "description": "Validate and freeze the financial basis, rationale and supporting evidence, then start the required approval submission. Adjustments become effective only after successful approval.",
+      "status_complete": "Content completed",
+      "status_locked": "Correction content is locked",
+      "comment_placeholder": "Completion comments",
+      "complete": "Complete and submit for approval",
+      "completed_success": "Correction submitted for approval"
+    },
+    "packet": {
+      "title": "Correction approval evidence",
+      "captured": "Captured"
+    },
+    "creator_approval_policy": "Correction creator approval",
+    "allow_creator_approval": "Allow the creator to approve assigned Correction approvals",
+    "creator_approval_policy_description": "Disabled by default. The policy is pinned when a Correction is submitted; exact approval assignment is always required.",
+    "dismiss_cancellation": "Keep Correction open",
+    "linked_correction": "View the linked earlier Correction",
+    "export_label": "Export Corrections",
+    "all_outcomes": "All Outcomes",
+    "all_fiscal_years": "All Fiscal Years"
   }
 }

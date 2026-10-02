@@ -16,6 +16,7 @@ import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { databaseMoneyText, parseDatabaseMoney } from './database-money'
 import { budgetFundingSourcesByLine, loadBudgetFundingSources } from './agreement-budget-funding'
 import { formatMoneyText, parseMoney, sumMoney, type Money } from '~~/shared/utils/money'
+import { getAgreementPaidAccountingProjection, summarizePaidAccountingByCurrency } from './agreement-accounting-projection'
 
 export type GeneratedAgreementDocument = GeneratedDocument
 
@@ -578,6 +579,7 @@ export const buildAgreementDocumentContext = async (
   ])
 
   const zeroMoney = parseMoney('0')
+  const accountingProjection = await getAgreementPaidAccountingProjection(db, agreementId, { paymentMode: 'finalized' })
   const getAmount = (value: unknown): Money => value == null ? zeroMoney : parseDatabaseMoney(value)
   const fundingByLine = budgetFundingSourcesByLine(await loadBudgetFundingSources(db, budgetItems.map(item => String(item.rowId))))
   const getOtherFundingTotal = (item: { rowId: string }): Money =>
@@ -822,6 +824,10 @@ export const buildAgreementDocumentContext = async (
     outcomes: [...expectedOutcomesById.values()],
     expectedOutcomes: [...expectedOutcomesById.values()],
     commitments,
+    financialAccounting: {
+      totals: summarizePaidAccountingByCurrency(accountingProjection.entries),
+      entries: accountingProjection.entries
+    },
     payments: payments.map(payment => ({
       ...payment,
       amount: parseDatabaseMoney(payment.amount),

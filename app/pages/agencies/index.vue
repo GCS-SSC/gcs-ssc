@@ -43,7 +43,7 @@ const {
   captureSession,
   closeSession
 } = useCrudModal<AgencyProfileItem>({
-  createState: () => ({}),
+  createState: () => ({ egcs_ay_correctioncreatorapproval: false }),
   updateState: agency => ({ ...agency })
 })
 const agencyPending = useCrudModalPending(captureSession)

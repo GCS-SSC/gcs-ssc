@@ -474,6 +474,11 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Funding_Case_Agreement_Claim_Reconcile_Line_Item: FundingCaseAgreementClaimReconcileLineItemTable
   Funding_Case_Agreement_Commitment: FundingCaseAgreementCommitmentTable
   Funding_Case_Agreement_Commitment_Line: FundingCaseAgreementCommitmentLineTable
+  Funding_Case_Agreement_Correction: FundingCaseAgreementCorrectionTable
+  Funding_Case_Agreement_Correction_Line: FundingCaseAgreementCorrectionLineTable
+  Funding_Case_Agreement_Correction_Source: FundingCaseAgreementCorrectionSourceTable
+  Funding_Case_Agreement_Correction_Adjustment: FundingCaseAgreementCorrectionAdjustmentTable
+  Funding_Case_Agreement_Correction_Notification: FundingCaseAgreementCorrectionNotificationTable
   Funding_Case_Agreement_Journal_Voucher: FundingCaseAgreementJournalVoucherTable
   Funding_Case_Agreement_Journal_Voucher_Line: FundingCaseAgreementJournalVoucherLineTable
   Funding_Case_Agreement_Payment: FundingCaseAgreementPaymentTable
@@ -708,7 +713,7 @@ export interface RoleTable {
 export interface RolePermissionTable {
   id: Generated<string>
   role_id: string
-  subject: 'audit' | 'system' | 'agency' | 'transfer_payment' | 'role' | 'user' | 'group' | 'agreement' | 'applicant_recipient' | 'funding_case' | 'journal_voucher'
+  subject: 'audit' | 'system' | 'agency' | 'transfer_payment' | 'role' | 'user' | 'group' | 'agreement' | 'applicant_recipient' | 'funding_case' | 'journal_voucher' | 'correction'
   access_level: 'viewer' | 'contributor' | 'manager' | null
   can_manage_assignments: Generated<boolean>
   _deleted: Generated<boolean>
@@ -759,6 +764,7 @@ export interface AgencyProfileTable {
   egcs_ay_abbreviation_en: string
   egcs_ay_abbreviation_fr: string
   egcs_ay_active: Generated<boolean>
+  egcs_ay_correctioncreatorapproval: Generated<boolean>
   egcs_ay_claimreconciliationstartstatus?: StatusId | null
   egcs_ay_claimreconciliationfinalstatus?: StatusId | null
   _deleted: Generated<boolean>
@@ -1650,6 +1656,82 @@ export interface FundingCaseAgreementCommitmentLineTable {
   egcs_fc_commitmentlinenumber: number
   egcs_fc_transferpaymentstreamchartofaccount: string
   egcs_fc_amount: number
+  _deleted: Generated<boolean>
+}
+
+export interface FundingCaseAgreementCorrectionTable {
+  id: Generated<string>
+  egcs_fc_fundingagreement: string
+  egcs_fc_commitment: string
+  egcs_fc_number: number
+  egcs_fc_agreementnumber: string
+  egcs_fc_currency: Currency_Codes
+  egcs_fc_requesteddate: Date
+  egcs_fc_narrative_en: Generated<string>
+  egcs_fc_narrative_fr: Generated<string>
+  egcs_fc_linkedcorrection: string | null
+  egcs_fc_createdby: string
+  egcs_fc_createdat: Generated<Date>
+  egcs_fc_status: StatusId
+  /** Database-derived status integrity keys; never accepted from authored input. */
+  egcs_fc_statusagency: ColumnType<string, never, never>
+  egcs_fc_statusterminal: ColumnType<boolean | null, never, never>
+  egcs_fc_statusdeleted: ColumnType<boolean | null, never, never>
+  egcs_fc_outcome: Generated<'open' | 'posted' | 'denied' | 'failed' | 'cancelled'>
+  egcs_fc_postedat: Date | null
+  egcs_fc_postingruntime: string | null
+  egcs_fc_terminalby: string | null
+  egcs_fc_terminalat: Date | null
+  egcs_fc_terminalreason: string | null
+  _deleted: Generated<boolean>
+}
+
+export interface FundingCaseAgreementCorrectionLineTable {
+  id: Generated<string>
+  egcs_fc_correction: string
+  egcs_fc_fundingagreement: string
+  egcs_fc_commitmentline: string
+  egcs_fc_commitmentlinenumber: number
+  egcs_fc_chartofaccount: string
+  egcs_fc_agencyfiscalyear: string
+  egcs_fc_fiscalyeardisplay: string
+  egcs_fc_accountingdimensions: JsonValue
+  egcs_fc_commitmentamount: number
+  egcs_fc_originalpaid: number
+  egcs_fc_jveffect: number
+  egcs_fc_priorcorrections: number
+  egcs_fc_adjustment: Generated<number>
+  _deleted: Generated<boolean>
+}
+
+export interface FundingCaseAgreementCorrectionSourceTable {
+  id: Generated<string>
+  egcs_fc_correction: string
+  egcs_fc_fundingagreement: string
+  egcs_fc_payment: string
+  egcs_fc_evidence: JsonValue
+  _deleted: Generated<boolean>
+}
+
+export interface FundingCaseAgreementCorrectionAdjustmentTable {
+  id: Generated<string>
+  egcs_fc_correction: string
+  egcs_fc_fundingagreement: string
+  egcs_fc_correctionline: string
+  egcs_fc_commitmentline: string
+  egcs_fc_chartofaccount: string
+  egcs_fc_agencyfiscalyear: string
+  egcs_fc_amount: number
+  _deleted: Generated<boolean>
+}
+
+export interface FundingCaseAgreementCorrectionNotificationTable {
+  id: Generated<string>
+  egcs_fc_correction: string
+  egcs_fc_user: string
+  egcs_fc_outcome: 'posted' | 'denied' | 'failed' | 'cancelled'
+  egcs_fc_recordedat: Generated<Date>
+  egcs_fc_runtime: string | null
   _deleted: Generated<boolean>
 }
 

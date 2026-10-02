@@ -30,6 +30,7 @@ import {
   lockBusinessStatus,
   type BusinessStatusMutationMode
 } from '~~/server/utils/business-status-runtime'
+import { assertAgreementCorrectionFinancialWriteAllowed, correctionLocksEntityFinancialMutation } from './correction-lock'
 
 class AgreementWriteScopeChanged extends Error {
   constructor(readonly context: AgreementScopeContext) {
@@ -150,6 +151,8 @@ export const executeFreshAuthorizedAgreementWrite = async <T>(
     allowDuringCloseout?: boolean
     businessStatusMode?: BusinessStatusMutationMode
     businessStatusTarget?: ExactEntityTarget<CoreLifecycleEntityType>
+    correctionFinancialMutation?: boolean
+    correctionId?: string
   } = {}
 ): Promise<T> => {
   let lockContext = initialContext
@@ -283,6 +286,16 @@ export const executeFreshAuthorizedAgreementWrite = async <T>(
           ?? assignmentTarget?.entityType === 'fundingcaseamendment'
         if (blocksApprovalSubmission) {
           await assertAgreementApprovalSubmissionUnlocked(event, trx, agreementId)
+        }
+
+        if (options.correctionFinancialMutation
+          || correctionLocksEntityFinancialMutation(assignmentTarget?.entityType)
+          || correctionLocksEntityFinancialMutation(options.businessStatusTarget?.entityType)) {
+          const ownedCorrectionId = assignmentTarget?.entityType === 'fundingcasecorrection'
+            && assignmentTarget.entityId === options.correctionId
+            ? options.correctionId
+            : undefined
+          await assertAgreementCorrectionFinancialWriteAllowed(event, trx, agreementId, { correctionId: ownedCorrectionId })
         }
 
         return await withAuditExecution({ type: 'agency', agencyId: currentContext.agencyId }, () => callback(trx, currentContext, authContext))

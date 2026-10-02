@@ -82,7 +82,7 @@ export default defineEventHandler(async event => {
         ...inserted,
         fiscal_year_display: fiscalYear.fiscal_year_display
       }
-    }, { action: 'create', blocksApprovalSubmission: true })
+    }, { action: 'create', blocksApprovalSubmission: true, correctionFinancialMutation: true })
   } catch (error: unknown) {
     await throwIfAgreementUniqueConstraintError(event, error)
     throw error

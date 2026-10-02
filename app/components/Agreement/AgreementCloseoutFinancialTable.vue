@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { CloseoutFinancialRow, CloseoutFinancialTotal } from '~~/shared/types/agreement-closeout'
-import { formatMoneyText, type Money } from '~~/shared/utils/money'
+import { formatMoneyText, parseMoney, type Money } from '~~/shared/utils/money'
 
 const { rows = [], totals = [] } = defineProps<{
   rows?: CloseoutFinancialRow[]
@@ -10,6 +10,8 @@ const { rows = [], totals = [] } = defineProps<{
 const { t, locale } = useI18n()
 const formatMoney = (value: Money, currency: string): string =>
   formatMoneyText(value, locale.value, currency.toUpperCase())
+// Retained closeout packets created before Corrections contain only paidAmount.
+const noCorrections = parseMoney('0')
 </script>
 
 <template>
@@ -30,7 +32,13 @@ const formatMoney = (value: Money, currency: string): string =>
             {{ t('agreement.closeout.approved_claims') }}
           </th>
           <th class="px-4 py-3 text-right">
-            {{ t('agreement.closeout.paid_payments') }}
+            {{ t('agreement.financial_summary.cash_payments') }}
+          </th>
+          <th class="px-4 py-3 text-right">
+            {{ t('agreement.financial_summary.correction_adjustments') }}
+          </th>
+          <th class="px-4 py-3 text-right">
+            {{ t('agreement.financial_summary.corrected_recorded_paid') }}
           </th>
           <th class="px-4 py-3 text-right">
             {{ t('agreement.closeout.variance') }}
@@ -52,6 +60,12 @@ const formatMoney = (value: Money, currency: string): string =>
             {{ formatMoney(row.approvedClaimAmount, row.currency) }}
           </td>
           <td class="px-4 py-3 text-right">
+            {{ formatMoney(row.cashPaidAmount ?? row.paidAmount, row.currency) }}
+          </td>
+          <td class="px-4 py-3 text-right">
+            {{ formatMoney(row.correctionAmount ?? noCorrections, row.currency) }}
+          </td>
+          <td class="px-4 py-3 text-right">
             {{ formatMoney(row.paidAmount, row.currency) }}
           </td>
           <td class="px-4 py-3 text-right font-medium">
@@ -62,7 +76,7 @@ const formatMoney = (value: Money, currency: string): string =>
           </td>
         </tr>
         <tr v-if="rows.length === 0">
-          <td colspan="6" class="px-4 py-8 text-center text-muted">
+          <td colspan="8" class="px-4 py-8 text-center text-muted">
             {{ t('common.no_data') }}
           </td>
         </tr>
@@ -77,6 +91,12 @@ const formatMoney = (value: Money, currency: string): string =>
           </td>
           <td class="px-4 py-3 text-right">
             {{ formatMoney(total.approvedClaimAmount, total.currency) }}
+          </td>
+          <td class="px-4 py-3 text-right">
+            {{ formatMoney(total.cashPaidAmount ?? total.paidAmount, total.currency) }}
+          </td>
+          <td class="px-4 py-3 text-right">
+            {{ formatMoney(total.correctionAmount ?? noCorrections, total.currency) }}
           </td>
           <td class="px-4 py-3 text-right">
             {{ formatMoney(total.paidAmount, total.currency) }}

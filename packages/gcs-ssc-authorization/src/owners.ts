@@ -8,7 +8,7 @@
 export type AuthorizationResourceOwner =
   | {
     kind: 'agreement'
-    subject?: 'agreement' | 'journal_voucher'
+    subject?: 'agreement' | 'journal_voucher' | 'correction'
     agreementId: string
     agencyId: string
   }

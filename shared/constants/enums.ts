@@ -11,6 +11,7 @@ export const APPROVAL_TYPE_ENUM = [
   'fundingclaimreview',
   'fundingcaseforecast',
   'fundingcasejournalvoucher',
+  'fundingcasecorrection',
   'fundingcasepayment'
 ] as const
 
@@ -42,6 +43,7 @@ export const EXECUTION_ENTITY_TYPE_ENUM = [
   'fundingclaimreconcile',
   'fundingcaseforecast',
   'fundingcasejournalvoucher',
+  'fundingcasecorrection',
   'fundingcasepayment',
   'fundingcaserecommendation',
   'fundingcaseagreementcommitment'
@@ -58,6 +60,7 @@ export const RECOMMENDATION_EXECUTION_ENTITY_TYPE_ENUM = [
   'fundingclaimreconcile',
   'fundingcaseforecast',
   'fundingcasejournalvoucher',
+  'fundingcasecorrection',
   'fundingcasepayment',
   'fundingcaseagreementcommitment'
 ] as const
@@ -108,6 +111,7 @@ export const FUNDING_OPPORTUNITY_ASSESSMENT_CHECKLIST_TYPE_ENUM = [
   'fundingopportunityriskassessment'
 ] as const
 export const DECISION_TYPES_ENUM = ['fundingcaseintakeassessment'] as const
+export const CORRECTION_OUTCOME_ENUM = ['open', 'posted', 'denied', 'failed', 'cancelled'] as const
 export const PAYMENT_TYPE_ENUM = ['reimbursement', 'advance'] as const
 export const ACTION_TYPE_ENUM = ['amendment', 'mandatoryaction', 'suggestedaction', 'none'] as const
 export const RESPONSIBLE_PARTY_ENUM = ['applicantrecipient', 'organization', 'joint'] as const

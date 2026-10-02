@@ -17,6 +17,7 @@ import { resolveAgreementClaimReconcileRuntimeContext, resolveAgreementClaimRunt
 import { resolveAgreementCommitmentRuntimeContext } from '~~/server/utils/agreement-commitment'
 import { resolveAgreementForecastRuntimeContext } from '~~/server/utils/agreement-forecast'
 import { resolveAgreementMonitorRuntimeContext } from '~~/server/utils/agreement-monitor'
+import { resolveCorrectionRuntimeContext } from './correction-context'
 import { resolveJournalVoucherRuntimeContext } from './journal-voucher-context'
 import { resolveAgreementPaymentRuntimeContext } from '~~/server/utils/agreement-payment'
 import { resolveAgreementCloseoutRuntimeContext } from '~~/server/utils/agreement-closeout'
@@ -221,6 +222,7 @@ const agreementReviewRuntimeEntityTypes = new Set<Entity_Type>([
   'fundingcaseforecast',
   'fundingcasemonitor',
   'fundingcasejournalvoucher',
+  'fundingcasecorrection',
   'fundingcasepayment',
   'fundingclaimreconcile'
 ])
@@ -401,7 +403,7 @@ const authorizeAgreementRuntimeAction = async (
       ? 'delete'
       : 'update'
 
-  const subject = entityContext.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement'
+  const subject = entityContext.entityType === 'fundingcasecorrection' ? 'correction' : entityContext.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement'
   return await authorize(event, subject, agreementAction, async ({ context }) => {
     if (context.userAbilities.authorize(subject, agreementAction, agreementContext.scope)) {
       return { bypass: true }
@@ -657,6 +659,7 @@ const agreementRuntimeEntityResolvers = {
     resolve: resolveAgreementMonitorRuntimeContext,
     idKey: 'monitorId'
   },
+  fundingcasecorrection: { resolve: resolveCorrectionRuntimeContext, idKey: 'correctionId' },
   fundingcasejournalvoucher: { resolve: resolveJournalVoucherRuntimeContext, idKey: 'journalVoucherId' },
   fundingcasepayment: {
     resolve: resolveAgreementPaymentRuntimeContext,
@@ -1157,6 +1160,7 @@ const agreementRuntimeOwnerTables = {
   fundingcaseagreementcommitment: 'Funding_Case_Agreement_Commitment',
   fundingcaseforecast: 'Funding_Case_Agreement_Forecast',
   fundingcasemonitor: 'Funding_Case_Agreement_Monitor',
+  fundingcasecorrection: 'Funding_Case_Agreement_Correction',
   fundingcasejournalvoucher: 'Funding_Case_Agreement_Journal_Voucher',
   fundingcasepayment: 'Funding_Case_Agreement_Payment',
   fundingclaimreconcile: 'Funding_Case_Agreement_Claim_Reconcile'

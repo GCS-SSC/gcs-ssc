@@ -39,10 +39,13 @@ export default defineEventHandler(async event => {
   if (scopeContext) {
     canReadAgreement = await canAccessAgreement(auth, 'read', scopeContext.scope, event.context.$db)
   }
-  const coreOwner = !extensionRuntime && ['fundingcasejournalvoucher', 'commonreview', 'commonrecommendation'].includes(target.entityType)
+  const coreOwner = !extensionRuntime && ['fundingcasejournalvoucher', 'fundingcasecorrection', 'commonreview', 'commonrecommendation'].includes(target.entityType)
     ? await resolveEntityAssignmentOwner(event.context.$db, target.entityType as AssignableEntityType, target.entityId)
     : null
   if (coreOwner?.kind === 'agreement' && coreOwner.subject === 'journal_voucher' && !canReadAgreement) return await forbidden(event)
+  if (coreOwner?.kind === 'agreement' && coreOwner.subject === 'correction' && !canReadAgreement) {
+    return { id: agreementId, can_read_agreement: false }
+  }
   const agreement = await event.context.$db.selectFrom('Funding_Case_Agreement_Profile')
     .select([
       'id',

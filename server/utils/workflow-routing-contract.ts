@@ -1,9 +1,12 @@
 import type { AgreementRoutingValues, AgreementCustomFieldValues } from '~~/shared/types/schemas/agreement-custom-fields'
+import type { CorrectionPacket } from './correction-posting'
 
 /** An invalid selected route must be rejected before a runtime is created. */
 export class WorkflowRouteValidationError extends Error {}
 
 export type WorkflowRoutingEvidence = {
+  correctionPacket?: CorrectionPacket
+  correctionPacketHash?: string
   version?: 2 | 3
   riskRatingMapping?: {
     streamId: string

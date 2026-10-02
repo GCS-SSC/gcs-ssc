@@ -81,6 +81,8 @@ import {
 } from './extension-lifecycle-context'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { requireQualifiedRuntimeLockEvidence } from './qualified-runtime-transaction'
+import { assertCorrectionWorkflowStatusTransition, captureCorrectionPacket, postCorrection, recordCorrectionTerminalOutcome } from './correction-posting'
+import { assertAgreementCorrectionFinancialUnlocked, correctionLocksEntityFinancialMutation } from './correction-lock'
 
 type DbClient = Kysely<Database> | Transaction<Database>
 type RuntimeRow = Selectable<Database['Common_Runtime']>
@@ -212,6 +214,14 @@ const applyWorkflowParentStatusTransition = async (
   actor?: string
 ) => {
   if (!status) return null
+  if (run.egcs_cn_entitytype === 'fundingcasecorrection') {
+    await assertCorrectionWorkflowStatusTransition(trx, String(run.egcs_cn_entityid), String(run.id), String(status))
+  }
+  if (correctionLocksEntityFinancialMutation(run.egcs_cn_entitytype)) {
+    const financialContext = await resolveReviewRuntimeEntityFromEntity(trx, run.egcs_cn_entitytype, String(run.egcs_cn_entityid))
+    if (!financialContext?.agreementId) throw new Error('Financial workflow target Agreement is unavailable')
+    await assertAgreementCorrectionFinancialUnlocked(trx, financialContext.agreementId)
+  }
   const transition = isBusinessStatusEntityType(run.egcs_cn_entitytype)
     ? await transitionBusinessStatus(trx, run.egcs_cn_entitytype, String(run.egcs_cn_entityid), status)
     : await (async () => {
@@ -255,6 +265,15 @@ const applyWorkflowParentStatusTransition = async (
 }
 
 const lockProtectedAgreement = async (trx: Transaction<Database>, run: Pick<WorkflowRun, 'egcs_cn_purpose' | 'egcs_cn_entitytype' | 'egcs_cn_entityid'>) => {
+  if (run.egcs_cn_entitytype === 'fundingcasecorrection') {
+    const correction = await trx.selectFrom('Funding_Case_Agreement_Correction')
+      .select('egcs_fc_fundingagreement').where('id', '=', String(run.egcs_cn_entityid))
+      .where('_deleted', '=', false).executeTakeFirstOrThrow()
+    if (!await lockAgreementProfileForUpdate(trx, String(correction.egcs_fc_fundingagreement))) {
+      throw new Error('Correction Agreement is unavailable')
+    }
+    return
+  }
   if (run.egcs_cn_purpose === 'risk_rating' && run.egcs_cn_entitytype === 'fundingcaseagreement') {
     const observed = await trx.selectFrom('Funding_Case_Agreement_Profile')
       .select('egcs_fc_transferpaymentstream')
@@ -410,6 +429,7 @@ const promoteApprovalSubmission = async (trx: Transaction<Database>, run: Workfl
     .executeTakeFirst()
   if (existingRevision) return
   const agreementId = String(submission.egcs_fc_fundingagreement)
+  await assertAgreementCorrectionFinancialUnlocked(trx, agreementId)
   const amendmentId = submission.egcs_fc_amendment === null ? null : String(submission.egcs_fc_amendment)
   const latest = await trx.selectFrom('Funding_Case_Agreement_Revision')
     .select('egcs_fc_revisionnumber')
@@ -471,7 +491,10 @@ export const finishWorkflowRun = async (
   if (positive && requiresAgreementApprovalSubmissionPromotion(run)) {
     await promoteApprovalSubmission(trx, run)
   }
-  if (positive && run.egcs_cn_completion !== null && run.egcs_cn_completion !== undefined) {
+  if (positive && run.egcs_cn_entitytype === 'fundingcasecorrection'
+    && run.egcs_cn_purpose === 'approval_submission') {
+    await postCorrection(trx, String(run.egcs_cn_entityid), String(run.id), actor)
+  } else if (positive && run.egcs_cn_completion !== null && run.egcs_cn_completion !== undefined) {
     if (isCoreEntityType(run.egcs_cn_entitytype)) {
       await applyCompletionPositiveTerminusEffects(trx, run.egcs_cn_entitytype, String(run.egcs_cn_entityid))
     } else {
@@ -498,6 +521,12 @@ export const finishWorkflowRun = async (
     undefined,
     actor
   )
+  if (!positive && run.egcs_cn_entitytype === 'fundingcasecorrection'
+    && run.egcs_cn_purpose === 'approval_submission') {
+    await recordCorrectionTerminalOutcome(trx, String(run.egcs_cn_entityid),
+      state === 'cancelled' ? 'cancelled' : state === 'denied' ? 'denied' : 'failed',
+      { runtimeId: String(run.id), actorId: actor, reason: `workflow_${state}` })
+  }
   await transitionRuntime(trx, {
     runtimeId: runId,
     from: run.egcs_cn_state,
@@ -511,7 +540,8 @@ export const finishWorkflowRun = async (
 export const cancelWorkflowRun = async (
   trx: Transaction<Database>,
   run: Pick<WorkflowRun, 'id'>,
-  actorId?: string
+  actorId?: string,
+  options: { reason?: string } = {}
 ) => {
   const locked = await selectWorkflowRunById(trx, String(run.id), true)
   if (!locked || RUNTIME_TERMINAL_STATES.has(locked.egcs_cn_state)) return locked
@@ -527,7 +557,11 @@ export const cancelWorkflowRun = async (
   if (!actorId) {
     throw new Error('Canonical workflow cancellation requires an actor')
   }
-  await cancelRuntimeTree(trx, { runtimeId: String(locked.id), actorId, reason: 'workflow_cancelled' })
+  if (locked.egcs_cn_entitytype === 'fundingcasecorrection' && locked.egcs_cn_purpose === 'approval_submission') {
+    await recordCorrectionTerminalOutcome(trx, String(locked.egcs_cn_entityid), 'cancelled',
+      { runtimeId: String(locked.id), actorId, reason: options.reason ?? 'workflow_cancelled' })
+  }
+  await cancelRuntimeTree(trx, { runtimeId: String(locked.id), actorId, reason: options.reason ?? 'workflow_cancelled' })
   return await selectWorkflowRunById(trx, String(locked.id))
 }
 
@@ -1181,6 +1215,13 @@ const startWorkflowUnchecked = async (
   let routing: WorkflowRoutingEvidence
   try {
     routing = await captureWorkflowRouting(trx, context, setup.publicationDefinition)
+    if (purpose === 'approval_submission' && context.entityType === 'fundingcasecorrection') {
+      const correctionPacket = await captureCorrectionPacket(trx, context.entityId)
+      const { hash: _hash, ...baseEvidence } = routing
+      const payload = { ...baseEvidence, correctionPacket,
+        correctionPacketHash: hashPublicationDefinition(correctionPacket as unknown as JsonValue) }
+      routing = { ...payload, hash: hashPublicationDefinition(payload as unknown as JsonValue) }
+    }
     if (purpose === 'risk_rating') {
       const effect = setup.publicationDefinition.riskRatingEffect
       if (!effect || context.entityType !== 'fundingcaseagreement') {
@@ -1755,10 +1796,21 @@ const getWorkflowRuntimeInSnapshot = async (
     .where('Common_Routing_Slip._deleted', '=', false)
     .orderBy('Common_Runtime_Item.egcs_cn_order', 'asc')
     .execute()
-  const submission = purpose === 'approval_submission'
-    ? await db.selectFrom('Funding_Case_Agreement_Approval_Submission').selectAll()
-        .where('egcs_fc_workflowrun', '=', String(selected.id)).executeTakeFirst()
-    : null
+  const submission = purpose === 'approval_submission' && entityType === 'fundingcasecorrection'
+    ? (() => {
+        const evidence = selected.egcs_cn_routing as WorkflowRoutingEvidence | null
+        return evidence?.correctionPacket && evidence.correctionPacketHash
+          ? {
+              egcs_fc_submittedat: selected.egcs_cn_startedat,
+              egcs_fc_canonicalhash: evidence.correctionPacketHash,
+              egcs_fc_packet: evidence.correctionPacket as unknown as JsonValue
+            }
+          : null
+      })()
+    : purpose === 'approval_submission'
+      ? await db.selectFrom('Funding_Case_Agreement_Approval_Submission').selectAll()
+          .where('egcs_fc_workflowrun', '=', String(selected.id)).executeTakeFirst()
+      : null
   const transitions = await db.selectFrom('Common_Workflow_Status_Transition').selectAll()
     .where('egcs_cn_workflowrun', '=', String(selected.id)).orderBy('id', 'asc').execute()
   const runtimeTransitions = await db.selectFrom('Common_Runtime_Transition').selectAll()

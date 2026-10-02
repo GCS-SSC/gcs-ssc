@@ -1,3 +1,4 @@
+import { resolveCorrectionRuntimeContext } from './correction-context'
 import { resolveJournalVoucherRuntimeContext } from './journal-voucher-context'
 import type { H3Event } from 'h3'
 import type { Kysely } from 'kysely'
@@ -26,6 +27,7 @@ const agreementOwnerResolvers = {
   fundingcaseagreementcommitment: resolveAgreementCommitmentRuntimeContext,
   fundingcaseforecast: resolveAgreementForecastRuntimeContext,
   fundingcasemonitor: resolveAgreementMonitorRuntimeContext,
+  fundingcasecorrection: resolveCorrectionRuntimeContext,
   fundingcasejournalvoucher: resolveJournalVoucherRuntimeContext,
   fundingcasepayment: resolveAgreementPaymentRuntimeContext,
   fundingclaimreconcile: resolveAgreementClaimReconcileRuntimeContext

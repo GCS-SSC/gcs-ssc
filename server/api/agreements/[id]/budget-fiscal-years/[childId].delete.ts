@@ -121,5 +121,5 @@ export default defineEventHandler(async event => {
       .executeTakeFirst()
 
     return { success: true }
-  }, { action: 'delete', blocksApprovalSubmission: true })
+  }, { action: 'delete', blocksApprovalSubmission: true, correctionFinancialMutation: true })
 })

@@ -109,7 +109,7 @@ export default defineEventHandler(async event => {
 
       await recalculateAgreementBudget(event, trx, String(existing.id), agreementContext.streamId)
       return { success: true }
-    }, { action: 'delete', blocksApprovalSubmission: true })
+    }, { action: 'delete', blocksApprovalSubmission: true, correctionFinancialMutation: true })
   } catch (error: unknown) {
     await throwIfAgreementUniqueConstraintError(event, error)
   }

@@ -162,7 +162,7 @@ export const createJournalVoucher = async (event: H3Event, input: JournalVoucher
     await persistJournalVoucherLines(trx, String(created.id), input.egcs_fc_payment, 'corrected', allocations.corrected)
     await persistJournalVoucherLines(trx, String(created.id), input.egcs_fc_payment, 'adjustment', allocations.adjustments)
     return created
-  }, { action: 'create', authorize: async (trx, context, auth) => {
+  }, { action: 'create', correctionFinancialMutation: true, authorize: async (trx, context, auth) => {
     if (!auth.userAbilities.authorize('journal_voucher', 'create', context.scope)) return await forbidden(event)
     if (options.reversalOf) {
       const sourceContext = await resolveJournalVoucherRuntimeContext(trx, options.reversalOf)

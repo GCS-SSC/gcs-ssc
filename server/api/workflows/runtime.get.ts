@@ -35,11 +35,11 @@ export default defineEventHandler(async event => {
     ? await authorizeExtensionLifecycleRead(event, extensionRuntime)
     : await authorizeReviewRuntimeAction(event, 'read_assessment', context)
   const assignmentOwner = !extensionRuntime && context.agreementId
-    && ['fundingcasejournalvoucher', 'commonreview', 'commonrecommendation'].includes(context.entityType)
+    && ['fundingcasecorrection', 'fundingcasejournalvoucher', 'commonreview', 'commonrecommendation'].includes(context.entityType)
     ? await resolveEntityAssignmentOwner(event.context.$db, context.entityType as AssignableEntityType, context.entityId)
     : null
-  const independentJournalVoucher = assignmentOwner?.kind === 'agreement' && assignmentOwner.subject === 'journal_voucher'
-  if (context.agreementId && !independentJournalVoucher) {
+  const independentAccountingSubject = assignmentOwner?.kind === 'agreement' && (assignmentOwner.subject === 'journal_voucher' || assignmentOwner.subject === 'correction')
+  if (context.agreementId && !independentAccountingSubject) {
     const agreementContext = await resolveAgreementScopeContext(context.agreementId, event.context.$db)
     const hasViewerAccess = agreementContext
       ? await canAccessAgreement(authContext, 'read', agreementContext.scope, event.context.$db)

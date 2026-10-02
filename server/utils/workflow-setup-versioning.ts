@@ -383,6 +383,20 @@ export const validatePublishedWorkflowStatusGraph = (
       throw new Error('Workflow approval-submission success must produce a terminal status for this entity type')
     }
   }
+  if (configuration.purpose === 'approval_submission' && configuration.entityType === 'fundingcasecorrection') {
+    if (!requireDefinition(configuration.cancellationStatus).terminal
+      || !requireDefinition(configuration.executionFailureStatus).terminal
+      || configuration.members.some(member => member.failureStatus && !requireDefinition(member.failureStatus).terminal)) {
+      throw new Error('Correction approval-submission failure and cancellation must produce terminal statuses')
+    }
+  }
+  if (configuration.entityType === 'fundingcasecorrection' && configuration.purpose !== 'approval_submission') {
+    const outputStatuses = [configuration.cancellationStatus, configuration.executionFailureStatus,
+      ...configuration.members.flatMap(member => [member.successStatus, member.failureStatus].filter((id): id is string => Boolean(id)))]
+    if (outputStatuses.some(statusId => requireDefinition(statusId).terminal)) {
+      throw new Error('Only Correction approval submission may produce terminal business outcomes')
+    }
+  }
 }
 
 const readLockedWorkflowStatusDefinitions = async (

@@ -60,7 +60,7 @@ export default defineEventHandler(async event => {
       )
 
       return createdCommitment
-    }, { action: 'create' })
+    }, { action: 'create', correctionFinancialMutation: true })
   } catch (error: unknown) {
     await throwIfAgreementUniqueConstraintError(event, error)
     throw error

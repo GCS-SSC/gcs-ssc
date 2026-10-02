@@ -35,7 +35,7 @@ export default defineEventHandler(async event => {
       ? 'applicant_recipient'
       : grant.subject === 'agreement'
         ? 'agreement'
-        : grant.subject === 'funding_case' || grant.subject === 'journal_voucher' ? grant.subject : null
+        : grant.subject === 'funding_case' || grant.subject === 'journal_voucher' || grant.subject === 'correction' ? grant.subject : null
     if (!subject) return []
     if (subject === 'applicant_recipient') {
       if (grant.scope.type === 'global') return [sql`work.owner_subject = 'applicant_recipient'`]
@@ -133,6 +133,19 @@ export default defineEventHandler(async event => {
       JOIN "Transfer_Payment_Profile" program ON program.id = stream.egcs_tp_transferpaymentprofile AND program._deleted = false
       JOIN "Agency_Profile" agency ON agency.id = program.egcs_tp_agency AND agency._deleted = false
       WHERE jv._deleted = false
+      UNION ALL
+      SELECT correction.id, 'fundingcasecorrection', correction.egcs_fc_status::text,
+        correction.egcs_fc_agreementnumber || '-COR-' || correction.egcs_fc_number::text,
+        correction.egcs_fc_agreementnumber || '-COR-' || correction.egcs_fc_number::text,
+        correction.egcs_fc_agreementnumber || '-COR-' || correction.egcs_fc_number::text,
+        'correction', program.egcs_tp_agency, program.id,
+        agency.egcs_ay_name_en, agency.egcs_ay_name_fr, program.egcs_tp_name_en, program.egcs_tp_name_fr
+      FROM "Funding_Case_Agreement_Correction" correction
+      JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.id = correction.egcs_fc_fundingagreement AND agreement._deleted = false
+      JOIN "Transfer_Payment_Stream" stream ON stream.id = agreement.egcs_fc_transferpaymentstream AND stream._deleted = false
+      JOIN "Transfer_Payment_Profile" program ON program.id = stream.egcs_tp_transferpaymentprofile AND program._deleted = false
+      JOIN "Agency_Profile" agency ON agency.id = program.egcs_tp_agency AND agency._deleted = false
+      WHERE correction._deleted = false
       UNION ALL
       SELECT payment.id, 'fundingcasepayment', payment.egcs_fc_status::text, payment.id::text,
         '#' || payment.id::text, '#' || payment.id::text, 'agreement', program.egcs_tp_agency, program.id,

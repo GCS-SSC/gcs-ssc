@@ -65,6 +65,15 @@ export default defineEventHandler(async event => {
     if (authorizationPredicates.length === 0) {
       return { items: [], page: query.page, limit: query.limit, total: 0 }
     }
+    const agreementReadPredicates = readGrants.filter(grant => grant.subject === 'agreement').map(grant => {
+      if (grant.scope.type === 'global') return sql`TRUE`
+      if (grant.scope.type === 'agency') return sql`work.agency_id = ${grant.scope.agencyId}::bigint`
+      return sql`work.agency_id = ${grant.scope.agencyId}::bigint
+        AND work.program_id = ${grant.scope.transferPaymentId}::bigint`
+    })
+    const correctionParentRead = agreementReadPredicates.length > 0
+      ? sql`(${sql.join(agreementReadPredicates, sql` OR `)})`
+      : sql`FALSE`
     const search = `%${escapeLikePattern(query.search ?? '')}%`
     const normalizedSearch = query.search?.trim().toLocaleLowerCase() ?? ''
     const matchesSearch = (labels: readonly string[]): boolean => labels.some(label =>
@@ -150,6 +159,16 @@ export default defineEventHandler(async event => {
       JOIN "Transfer_Payment_Stream" stream ON stream.id = agreement.egcs_fc_transferpaymentstream AND stream._deleted = false
       JOIN "Transfer_Payment_Profile" program ON program.id = stream.egcs_tp_transferpaymentprofile AND program._deleted = false
       WHERE reconcile._deleted = false
+      UNION ALL
+      SELECT correction.id, 'fundingcasecorrection', correction.egcs_fc_status::text,
+        correction.egcs_fc_agreementnumber || '-COR-' || correction.egcs_fc_number::text,
+        correction.egcs_fc_agreementnumber || '-COR-' || correction.egcs_fc_number::text,
+        correction.egcs_fc_fundingagreement, NULL::text, 'correction', program.egcs_tp_agency, program.id
+      FROM "Funding_Case_Agreement_Correction" correction
+      JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.id = correction.egcs_fc_fundingagreement AND agreement._deleted = false
+      JOIN "Transfer_Payment_Stream" stream ON stream.id = agreement.egcs_fc_transferpaymentstream AND stream._deleted = false
+      JOIN "Transfer_Payment_Profile" program ON program.id = stream.egcs_tp_transferpaymentprofile AND program._deleted = false
+      WHERE correction._deleted = false
       UNION ALL
       SELECT child.id, child.entity_type, child.status, '#' || child.id::text, '#' || child.id::text,
         child.agreement_id, NULL::text, CASE WHEN child.entity_type = 'fundingcasejournalvoucher' THEN 'journal_voucher' ELSE 'agreement' END, program.egcs_tp_agency, program.id
@@ -289,6 +308,7 @@ export default defineEventHandler(async event => {
     LEFT JOIN "Agency_Profile" owner_agency ON owner_agency.id = work.agency_id AND owner_agency._deleted = false
     LEFT JOIN "Funding_Case_Agreement_Profile" display_agreement ON display_agreement.id = work.agreement_id
       AND display_agreement._deleted = false
+      AND (work.owner_subject <> 'correction' OR ${correctionParentRead})
     LEFT JOIN "Common_Review" display_review ON display_review.id = work.id AND work.entity_type = 'commonreview'
     LEFT JOIN "Common_Review_Set" display_review_set ON display_review_set.id = display_review.egcs_cn_reviewset
     LEFT JOIN "Common_Review_Schema" review_schema ON review_schema.id = display_review.egcs_cn_reviewschema

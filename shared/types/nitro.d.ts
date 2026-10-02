@@ -7,6 +7,7 @@ import type {
   GcsExtensionAgreementPaymentMutationGuardHookPayload,
   GcsExtensionConfigurationGuardHookPayload,
   GcsExtensionCreateOperationHookPayload,
+  GcsExtensionCorrectionOutcomeContext,
   GcsExtensionDisableGuardHookPayload,
   GcsExtensionStatusReferenceGuardHookPayload
 } from '@gcs-ssc/extensions/server'
@@ -41,6 +42,7 @@ declare module 'nitropack' {
   interface NitroRuntimeHooks {
     'common:completion:completed': (payload: CompletionHookPayload) => void | Promise<void>
     'gcs:extension:create-operation': (payload: GcsExtensionCreateOperationHookPayload) => void | Promise<void>
+    'gcs:extension:correction-outcome': (payload: GcsExtensionCorrectionOutcomeContext) => void | Promise<void>
     'gcs:extension:disable-guard': (payload: GcsExtensionDisableGuardHookPayload) => void | Promise<void>
     'gcs:extension:configuration-guard': (
       payload: GcsExtensionConfigurationGuardHookPayload

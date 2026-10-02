@@ -271,7 +271,8 @@
       "fundingcasemonitor": "Surveillance",
       "fundingcaseamendment": "Modification",
       "fundingcaseagreementcommitment": "Engagement",
-      "fundingcasejournalvoucher": "Pièce de journal"
+      "fundingcasejournalvoucher": "Pièce de journal",
+      "fundingcasecorrection": "Correction"
     }
   },
   "attachments": {
@@ -397,7 +398,6 @@
     "start_date": "Date de début",
     "end_date": "Date de fin",
     "status": "Statut",
-    "active": "Actif",
     "deleted": "Supprimé",
     "not_deleted": "Non supprimé",
     "yes": "Oui",
@@ -528,7 +528,8 @@
       "fundingcasepayment": "Paiement du dossier de financement",
       "fundingcaserecommendation": "Recommandation du dossier de financement",
       "fundingcaseagreementcommitment": "Engagement d’entente de dossier de financement",
-      "fundingcasejournalvoucher": "Pièce de journal"
+      "fundingcasejournalvoucher": "Pièce de journal",
+      "fundingcasecorrection": "Correction"
     },
     "scope_type": {
       "global": "Global",
@@ -620,6 +621,13 @@
       "view:role": "Voir le rôle",
       "manage:user": "Gérer l'utilisateur",
       "view:user": "Voir l'utilisateur"
+    },
+    "correction_outcome": {
+      "open": "Ouverte",
+      "posted": "Traitée",
+      "denied": "Refusée",
+      "failed": "Échouée",
+      "cancelled": "Annulée"
     }
   },
   "agency": {
@@ -772,7 +780,8 @@
       "agreement": "Ententes",
       "funding_case": "Réceptions",
       "applicant_recipient": "Promoteurs",
-      "journal_voucher": "Pièces de journal"
+      "journal_voucher": "Pièces de journal",
+      "correction": "Corrections"
     },
     "unknown_ability": "Autorisation inconnue ({action}:{subject})",
     "scope": {
@@ -1382,7 +1391,7 @@
       "agreement_subtype_not_found": "Sous-type d'entente introuvable.",
       "invalid_budget_fiscal_year": "L'exercice financier du budget d'entente sélectionné est invalide.",
       "budget_fiscal_year_not_found": "Exercice financier du budget d'entente introuvable.",
-      "budget_fiscal_year_in_use": "Supprimez toutes les lignes budgétaires avant de supprimer cet exercice financier.",
+      "budget_fiscal_year_in_use": "L’exercice de ce budget est utilisé par un budget d’entente. Supprimez ou modifiez l’exercice du budget d’entente avant de modifier cet exercice.",
       "budget_line_item_not_found": "Ligne budgétaire d'entente introuvable.",
       "duplicate_budget_fiscal_year": "Un exercice financier du budget existe déjà pour cette entente.",
       "invalid_amendment_type": "Le type d'amendement sélectionné est invalide.",
@@ -1409,7 +1418,6 @@
       "duplicate_program_stream_name": "Un volet avec ce nom en anglais et en français existe déjà pour le programme.",
       "duplicate_program_outcome_name": "Un résultat avec ce nom en anglais et en français existe déjà pour le programme.",
       "duplicate_program_objective": "Un objectif avec cette valeur en anglais et en français existe déjà pour le programme.",
-      "budget_fiscal_year_in_use": "L’exercice de ce budget est utilisé par un budget d’entente. Supprimez ou modifiez l’exercice du budget d’entente avant de modifier cet exercice.",
       "duplicate_program_budget_fiscal_year": "Un budget de programme existe déjà pour cet exercice financier.",
       "duplicate_outcome_performance_indicator_name": "Un indicateur de rendement avec ce nom en anglais et en français existe déjà pour le résultat.",
       "duplicate_assessment_members": "Les membres d'évaluation en double ne sont pas autorisés.",
@@ -1459,6 +1467,11 @@
     "journal_voucher": {
       "not_found": "Pièce de journal introuvable.",
       "invalid_entry": "L’écriture comptable ou la séquence de correction est invalide. Vérifiez les totaux des imputations et les écritures liées."
+    },
+    "correction": {
+      "invalid_entry": "Cette correction ne peut pas être modifiée ou soumise avec sa base financière, ses autorisations ou son état actuel.",
+      "not_found": "Correction introuvable.",
+      "financial_locked": "Une correction ouverte verrouille la comptabilité financière de cette entente."
     }
   },
   "transfer_payment": {
@@ -1721,7 +1734,6 @@
     "options": "Options",
     "remove_option_named": "Retirer l’option {position} : {name}",
     "outcome_name": "Nom du résultat",
-    "outcomes": "Résultats",
     "outcomes_placeholder": "Les résultats seront disponibles une fois que toutes les sections seront complétées.",
     "custom_outcomes": "Résultats personnalisés",
     "custom_outcome": "Résultat personnalisé",
@@ -2233,7 +2245,8 @@
         "review_active": "Une revue est toujours active",
         "recommendation_active": "Une recommandation est toujours active",
         "approval_active": "Une approbation est toujours active",
-        "journal_voucher_not_terminal": "La pièce de journal n’a pas atteint un état opérationnel final"
+        "journal_voucher_not_terminal": "La pièce de journal n’a pas atteint un état opérationnel final",
+        "correction_not_terminal": "La correction n’a pas atteint un résultat définitif"
       }
     },
     "agency": "Agence",
@@ -2353,7 +2366,11 @@
       "no_fiscal_years": "Aucun exercice financier n'a encore été ajouté à cette entente.",
       "no_financial_data": "Aucune donnée financière n'est disponible pour cet exercice.",
       "no_lines": "Aucune ligne budgétaire ou de réclamation pour cette devise.",
-      "load_failed": "Impossible de charger le sommaire financier"
+      "load_failed": "Impossible de charger le sommaire financier",
+      "correction_adjustments": "Ajustements de corrections comptabilisées",
+      "jv_effects": "Effets des pièces de journal réussies",
+      "corrected_recorded_paid": "Paiement consigné corrigé",
+      "cash_payments": "Paiements en espèces"
     },
     "budget": {
       "funding_sources": "Autres sources de financement",
@@ -2378,22 +2395,37 @@
       "no_line_items": "Aucune ligne budgétaire pour le moment."
     },
     "amendments": {
-      "title": "Modifications", "add": "Ajouter une modification", "search": "Rechercher des modifications",
-      "number": "Numéro de modification", "number_title": "Modification {number}", "draft_title": "Modification provisoire", "working": "Provisoire",
-      "name_en": "Nom anglais", "name_fr": "Nom français", "name_help": "Fournissez un nom de modification dans au moins une langue officielle.",
+      "title": "Modifications",
+      "add": "Ajouter une modification",
+      "search": "Rechercher des modifications",
+      "number": "Numéro de modification",
+      "number_title": "Modification {number}",
+      "draft_title": "Modification provisoire",
+      "working": "Provisoire",
+      "name_en": "Nom anglais",
+      "name_fr": "Nom français",
+      "name_help": "Fournissez un nom de modification dans au moins une langue officielle.",
       "sections": { "details": "Détails de la modification", "scope": "Portée de la modification" },
-      "type": "Type de modification", "types": "Types de modification", "types_description": "Les types sélectionnés décrivent les éléments visés par cette modification.",
-      "type_help": "Sélectionnez un ou plusieurs types configurés pour le volet de cette entente.", "add_type": "Ajouter un autre type",
+      "type": "Type de modification",
+      "types": "Types de modification",
+      "types_description": "Les types sélectionnés décrivent les éléments visés par cette modification.",
+      "type_help": "Sélectionnez un ou plusieurs types configurés pour le volet de cette entente.",
+      "add_type": "Ajouter un autre type",
       "subtypes": "Sous-types de modification",
-      "snapshots": "Instantanés", "snapshots_description": "Créez une copie ponctuelle explicite de chaque élément de travail activé.",
-      "snapshot_created": "Instantané créé", "not_created": "Non créé",
-      "create_budget_snapshot": "Créer à partir du budget actuel", "create_activity_snapshot": "Créer à partir des activités actuelles",
-      "budget_snapshot_created": "L’instantané du budget a été créé", "activity_snapshot_created": "L’instantané des activités a été créé",
+      "snapshots": "Instantanés",
+      "snapshots_description": "Créez une copie ponctuelle explicite de chaque élément de travail activé.",
+      "snapshot_created": "Instantané créé",
+      "not_created": "Non créé",
+      "create_budget_snapshot": "Créer à partir du budget actuel",
+      "create_activity_snapshot": "Créer à partir des activités actuelles",
+      "budget_snapshot_created": "L’instantané du budget a été créé",
+      "activity_snapshot_created": "L’instantané des activités a été créé",
       "budget_snapshot_description": "Créez une copie de travail du budget de l’entente afin d’apporter les changements budgétaires et aux exercices financiers de cette modification.",
       "budget_difference": "Variation du budget",
       "budget_difference_notice": "Variation totale par rapport au dernier budget approuvé : {amount}",
       "activity_snapshot_description": "Créez une copie de travail des activités de l’entente afin d’apporter les changements aux activités de cette modification.",
-      "created_success": "La modification a été créée", "workflow": "Approbations",
+      "created_success": "La modification a été créée",
+      "workflow": "Approbations",
       "workflow_description": "Un processus de recommandation soumettra cette modification pour approbation lorsqu’il sera disponible.",
       "recommendation": "Recommandation",
       "recommendation_description": "La recommandation et la chaîne d’approbation seront offertes ici dans une prochaine mise à jour.",
@@ -2605,13 +2637,13 @@
       "ready_for_review": "Prête à réviser",
       "ready_for_review_success": "Réclamation marquée comme prête à réviser",
       "completion": {
-        "title": "Achèvement de la réclamation",
-        "description": "Achevez cette réclamation lorsque tous les montants soumis sont saisis et attribués. L’achèvement peut démarrer le processus configuré de soumission pour approbation.",
-        "status_complete": "Cette réclamation est achevée et prête au rapprochement.",
-        "status_locked": "Terminez et attribuez les montants de la réclamation avant de l’achever, ou attendez la fin du processus actif.",
-        "comment_placeholder": "Ajoutez une note d’achèvement facultative.",
-        "complete": "Achever la réclamation",
-        "completed_success": "Réclamation achevée"
+        "title": "Finalisation de la réclamation",
+        "description": "Finalisez cette réclamation lorsque les montants soumis et les détails justificatifs sont complets.",
+        "status_complete": "Cette réclamation est terminée.",
+        "status_locked": "Cette réclamation est verrouillée et ne peut pas être finalisée pour le moment.",
+        "comment_placeholder": "Ajoutez une note de finalisation facultative.",
+        "complete": "Finaliser la réclamation",
+        "completed_success": "Réclamation finalisée avec succès"
       },
       "unallocated": "Non attribuée",
       "allocate_to_budget_line": "Attribuer à la ligne budgétaire",
@@ -2684,15 +2716,6 @@
         "jan": "Janv",
         "feb": "Févr",
         "mar": "Mars"
-      },
-      "completion": {
-        "title": "Finalisation de la réclamation",
-        "description": "Finalisez cette réclamation lorsque les montants soumis et les détails justificatifs sont complets.",
-        "status_complete": "Cette réclamation est terminée.",
-        "status_locked": "Cette réclamation est verrouillée et ne peut pas être finalisée pour le moment.",
-        "comment_placeholder": "Ajoutez une note de finalisation facultative.",
-        "complete": "Finaliser la réclamation",
-        "completed_success": "Réclamation finalisée avec succès"
       },
       "workflow": {
         "title": "Finalisation et approbations"
@@ -3281,15 +3304,40 @@
       "activities": "Activités",
       "none": "Aucun",
       "fields": {
-        "agreementNumber": "Numéro de l’entente", "financialSystemNumber": "Numéro du système financier", "title": "Titre", "description": "Description",
-        "agency": "Agence", "program": "Programme", "stream": "Volet", "agreementType": "Type d’entente", "agreementSubtype": "Sous-type d’entente",
-        "furtherDistribution": "Redistribution ultérieure", "holdbackPercent": "Retenue", "holdbackBasis": "Base de retenue", "riskScore": "Cote de risque", "riskRating": "Niveau de risque",
-        "authorizedAssistanceStartDate": "Date de début de l’aide autorisée", "authorizedAssistanceEndDate": "Date de fin de l’aide autorisée",
-        "amendmentNumber": "Numéro de modification", "name": "Nom", "proposedAuthorizedAssistanceStartDate": "Date de début proposée", "proposedAuthorizedAssistanceEndDate": "Date de fin proposée",
-        "amendmentTypes": "Types de modification", "amendmentSubtypes": "Sous-types de modification", "operatingName": "Nom commercial", "subtype": "Sous-type de bénéficiaire",
-        "leadAgency": "Agence responsable", "researchOrganization": "Organisme de recherche", "registries": "Identifiants de registre",
-        "programFunding": "Financement du programme", "otherFederalFunding": "Autre financement fédéral", "otherGovernmentFunding": "Autre financement gouvernemental", "otherFunding": "Autre financement",
-        "expectedResults": "Résultats attendus", "outcomes": "Résultats", "responsibleParties": "Parties responsables"
+        "agreementNumber": "Numéro de l’entente",
+        "financialSystemNumber": "Numéro du système financier",
+        "title": "Titre",
+        "description": "Description",
+        "agency": "Agence",
+        "program": "Programme",
+        "stream": "Volet",
+        "agreementType": "Type d’entente",
+        "agreementSubtype": "Sous-type d’entente",
+        "furtherDistribution": "Redistribution ultérieure",
+        "holdbackPercent": "Retenue",
+        "holdbackBasis": "Base de retenue",
+        "riskScore": "Cote de risque",
+        "riskRating": "Niveau de risque",
+        "authorizedAssistanceStartDate": "Date de début de l’aide autorisée",
+        "authorizedAssistanceEndDate": "Date de fin de l’aide autorisée",
+        "amendmentNumber": "Numéro de modification",
+        "name": "Nom",
+        "proposedAuthorizedAssistanceStartDate": "Date de début proposée",
+        "proposedAuthorizedAssistanceEndDate": "Date de fin proposée",
+        "amendmentTypes": "Types de modification",
+        "amendmentSubtypes": "Sous-types de modification",
+        "operatingName": "Nom commercial",
+        "subtype": "Sous-type de bénéficiaire",
+        "leadAgency": "Agence responsable",
+        "researchOrganization": "Organisme de recherche",
+        "registries": "Identifiants de registre",
+        "programFunding": "Financement du programme",
+        "otherFederalFunding": "Autre financement fédéral",
+        "otherGovernmentFunding": "Autre financement gouvernemental",
+        "otherFunding": "Autre financement",
+        "expectedResults": "Résultats attendus",
+        "outcomes": "Résultats",
+        "responsibleParties": "Parties responsables"
       }
     },
     "source_approval_template": "Modèle d’approbation finale",
@@ -3775,7 +3823,7 @@
   "journal_voucher": {
     "title": "Pièces de journal",
     "description": "Préparer des corrections comptables équilibrées pour des paiements définitifs.",
-    "create": "Créer une correction",
+    "create": "Créer une pièce de journal",
     "number": "Pièce de journal",
     "source_payment": "Paiement source",
     "requested_date": "Date comptable demandée",
@@ -3817,5 +3865,96 @@
     },
     "balanced": "Équilibré",
     "invalid_amount": "Saisissez un montant valide"
+  },
+  "correction": {
+    "title": "Corrections",
+    "approval_workspace": "Approbation de correction",
+    "approval_workspace_description": "Examiner les preuves soumises de la correction et consigner votre décision d’approbation assignée.",
+    "singular": "Correction",
+    "description": "Ajuster les montants payés consignés lorsque le paiement externe était exact. Une correction crée des écritures comptables signées sans autre décaissement.",
+    "create": "Créer une correction",
+    "create_linked": "Créer une correction liée",
+    "number": "Référence de correction",
+    "search": "Rechercher des corrections",
+    "outcome": "Résultat opérationnel",
+    "created_at": "Création",
+    "agreement": "Entente",
+    "commitment": "Engagement actif",
+    "source_payments": "Paiements sources",
+    "source_payments_description": "Sélectionnez un ou plusieurs paiements définitifs de cette entente. L’accès aux sources est vérifié séparément.",
+    "requested_date": "Date comptable demandée",
+    "narrative_en": "Justification (anglais)",
+    "narrative_fr": "Justification (français)",
+    "rationale": "Justification de l’écart",
+    "rationale_instruction": "Obligatoire pour l’achèvement : expliquez l’erreur interne et pourquoi le paiement externe était exact dans au moins une langue. Vous pouvez enregistrer un brouillon incomplet.",
+    "financial_lines": "Lignes financières",
+    "financial_basis": "Base financière conservée",
+    "coding_details": "Codage comptable",
+    "line_heading": "Ligne d’engagement {number}",
+    "financial_summary": "Sommaire financier",
+    "commitment_amount": "Montant de l’engagement",
+    "financial_basis_description": "Imputations et libellés comptables conservés des paiements sources sélectionnés lors de la création de cette correction. L’onglet Lignes financières présente les montants cumulatifs consignés pour l’entente, y compris les pièces de journal réussies et les corrections déjà comptabilisées.",
+    "source_allocations": "Imputations conservées",
+    "no_sources": "Aucun paiement source n’a été conservé.",
+    "lines_instruction": "Saisissez des ajustements signés. Le paiement consigné corrigé doit rester entre zéro et le montant de l’engagement pour chaque ligne et respecter la capacité de codage partagée. Au moins un ajustement non nul est obligatoire pour l’achèvement; des lignes compensatoires peuvent totaliser zéro.",
+    "original_paid": "Paiements en espèces originaux",
+    "jv_effect": "Effets des pièces de journal réussies",
+    "prior_corrections": "Corrections déjà comptabilisées",
+    "adjustment": "Ajustement signé",
+    "adjustment_total": "Ajustement net",
+    "recorded_paid": "Paiement consigné avant ajustement",
+    "corrected_paid": "Paiement consigné corrigé",
+    "remaining": "Solde restant",
+    "source_payment_reference": "Paiement {reference}",
+    "basis_provenance": "Paiement consigné corrigé = paiement en espèces original + effets des pièces de journal réussies + corrections déjà comptabilisées + ajustement proposé. Les montants et libellés comptables sont conservés comme preuves; la capacité partagée est validée pour l’ensemble du lot.",
+    "save_before_completion": "Enregistrez vos lignes financières et votre justification avant l’achèvement.",
+    "cancel": "Annuler la correction",
+    "cancel_description": "L’annulation conserve les preuves et le motif, ne comptabilise aucun ajustement et libère le verrou financier de l’entente.",
+    "cancellation_reason": "Motif d’annulation",
+    "export": {
+      "reference": "Référence de la correction",
+      "outcome": "Résultat",
+      "fiscal_year": "Exercice financier",
+      "line": "Ligne d’engagement",
+      "currency": "Devise",
+      "adjustment": "Ajustement signé",
+      "rationale": "Justification",
+      "creator": "Créateur",
+      "decision_actor": "Auteur de la décision",
+      "decision_date": "Date de décision",
+      "posting_runtime": "Exécution du flux de comptabilisation"
+    },
+    "outcomes": {
+      "draft": "Brouillon",
+      "success": "Traitée",
+      "failure": "Échouée",
+      "cancelled": "Annulée",
+      "pending": "En attente d’approbation",
+      "posted": "Traitée",
+      "failed": "Échouée",
+      "denied": "Refusée",
+      "open": "Ouverte"
+    },
+    "completion": {
+      "title": "Achèvement de la correction",
+      "description": "Valider et figer la base financière, la justification et les pièces justificatives, puis démarrer la soumission d’approbation obligatoire. Les ajustements ne prennent effet qu’après une approbation réussie.",
+      "status_complete": "Contenu achevé",
+      "status_locked": "Le contenu de la correction est verrouillé",
+      "comment_placeholder": "Commentaires d’achèvement",
+      "complete": "Terminer et soumettre pour approbation",
+      "completed_success": "Correction soumise pour approbation"
+    },
+    "packet": {
+      "title": "Preuves d’approbation de la correction",
+      "captured": "Conservation"
+    },
+    "creator_approval_policy": "Approbation par le créateur de la correction",
+    "allow_creator_approval": "Permettre au créateur d’approuver les approbations de correction qui lui sont assignées",
+    "creator_approval_policy_description": "Désactivée par défaut. La règle est figée lors de la soumission d’une correction; une assignation exacte à l’approbation reste obligatoire.",
+    "dismiss_cancellation": "Garder la correction ouverte",
+    "linked_correction": "Consulter la correction antérieure liée",
+    "export_label": "Exporter les corrections",
+    "all_outcomes": "Tous les résultats",
+    "all_fiscal_years": "Tous les exercices financiers"
   }
 }

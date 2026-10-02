@@ -14,6 +14,7 @@ const ENTITY_TYPE_ICON_MAP: Record<string, string> = {
   fundingclaimreconcile: 'i-lucide-scale',
   fundingcaseforecast: 'i-lucide-chart-column',
   fundingcasejournalvoucher: 'i-lucide-book-open-check',
+  fundingcasecorrection: 'i-lucide-file-pen-line',
   fundingcasepayment: 'i-lucide-wallet',
   fundingcaserecommendation: 'i-lucide-thumbs-up'
 }

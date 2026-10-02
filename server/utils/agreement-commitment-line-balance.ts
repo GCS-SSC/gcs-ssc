@@ -6,6 +6,7 @@ import { databaseMoneyText, parseDatabaseMoney } from './database-money'
 import { addMoney, compareMoney, subtractMoney, sumMoney, parseMoney, type Money } from '~~/shared/utils/money'
 import { sql } from 'kysely'
 import { budgetFiscalYearStableId } from './agreement-budget-lineage'
+import { readEffectiveCorrectionAdjustments } from './agreement-accounting-projection'
 
 type DbClient = Kysely<Database> | Transaction<Database>
 const ZERO_MONEY = parseMoney('0.00')
@@ -113,7 +114,10 @@ const readCommitmentCodingCapacity = async (
   for (const voucherId of new Set(adjustmentRows.map(row => String(row.voucherId)))) {
     if (await hasPositiveCompletionTerminus(db, 'fundingcasejournalvoucher', voucherId)) successfulVouchers.add(voucherId)
   }
-  const adjustments = adjustmentRows.filter(row => successfulVouchers.has(String(row.voucherId)) && String(row.paymentId) !== options.excludePaymentId)
+  const postedCorrections = (await readEffectiveCorrectionAdjustments(db, agreementId))
+    .filter(row => String(row.agencyChartId) === agencyChartId)
+    .map(row => ({ commitmentLineId: row.commitmentLineId, amount: row.amount, paymentId: null }))
+  const adjustments = [...adjustmentRows.filter(row => successfulVouchers.has(String(row.voucherId)) && String(row.paymentId) !== options.excludePaymentId), ...postedCorrections]
   if (!adjustments.length) return null
 
   const codingLines = await db.selectFrom('Funding_Case_Agreement_Commitment_Line as line')
@@ -134,12 +138,12 @@ const readCommitmentCodingCapacity = async (
   if (options.excludePaymentId) codingPaymentsQuery = codingPaymentsQuery.where('payment.id', '!=', options.excludePaymentId)
   if (options.excludePaymentLineId) codingPaymentsQuery = codingPaymentsQuery.where('paymentLine.id', '!=', options.excludePaymentLineId)
   const codingPayments = await codingPaymentsQuery.execute()
-  for (const paymentId of new Set([...codingPayments, ...adjustments].map(row => String(row.paymentId)))) {
+  for (const paymentId of new Set([...codingPayments, ...adjustments].flatMap(row => row.paymentId === null ? [] : [String(row.paymentId)]))) {
     if (!approvalByPayment.has(paymentId)) {
       approvalByPayment.set(paymentId, await resolveLatestTargetApprovalEvidence(db, 'fundingcasepayment', paymentId))
     }
   }
-  const counted = (paymentId: string) => approvalByPayment.get(String(paymentId))?.approvalRuntimeState !== 'denied'
+  const counted = (paymentId: string | null) => paymentId === null || approvalByPayment.get(String(paymentId))?.approvalRuntimeState !== 'denied'
   const countedAdjustments = adjustments.filter(row => counted(row.paymentId))
   const codingPaid = sumMoney([...codingPayments.filter(row => counted(row.paymentId)), ...countedAdjustments]
     .map(row => parseDatabaseMoney(row.amount)))

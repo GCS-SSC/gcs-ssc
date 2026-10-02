@@ -47,7 +47,7 @@ const canViewTransferPayments = computed(() => canAny('transfer_payment', 'read'
 const canViewFundingCases = computed(() => canAny('funding_case', 'read'))
 const canViewRoles = computed(() => canAny('role', 'read'))
 const assignmentManagementSubjects = [
-  'agreement', 'applicant_recipient', 'funding_case', 'journal_voucher'
+  'agreement', 'applicant_recipient', 'funding_case', 'journal_voucher', 'correction'
 ] as const
 const canViewAssignmentManagement = computed(() =>
   assignmentManagementSubjects.some(subject => canManageAssignments(subject))

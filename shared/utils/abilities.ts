@@ -12,6 +12,10 @@ import {
 export { AUTHORIZATION_SUBJECTS, isAuthorizationSubject }
 
 export const ABILITIES = [
+  { action: 'create', subject: 'correction', name_en: 'Create Corrections', name_fr: 'Créer des corrections', desc_en: 'Prepare recorded payment adjustments.', desc_fr: 'Préparer des ajustements aux paiements comptabilisés.' },
+  { action: 'read', subject: 'correction', name_en: 'Read Corrections', name_fr: 'Lire les corrections', desc_en: 'Read scoped Corrections and retained evidence.', desc_fr: 'Lire les corrections autorisées et les preuves conservées.' },
+  { action: 'update', subject: 'correction', name_en: 'Update Corrections', name_fr: 'Modifier les corrections', desc_en: 'Work on assigned Corrections.', desc_fr: 'Traiter les corrections attribuées.' },
+  { action: 'delete', subject: 'correction', name_en: 'Delete Corrections', name_fr: 'Supprimer les corrections', desc_en: 'Delete eligible assigned Drafts.', desc_fr: 'Supprimer les brouillons admissibles attribués.' },
   { action: 'create', subject: 'journal_voucher', name_en: 'Create Journal Vouchers', name_fr: 'Créer des pièces de journal', desc_en: 'Prepare accounting corrections and reversals.', desc_fr: 'Préparer des corrections comptables et des contrepassations.' },
   { action: 'read', subject: 'journal_voucher', name_en: 'Read Journal Vouchers', name_fr: 'Lire les pièces de journal', desc_en: 'Read scoped accounting entries.', desc_fr: 'Lire les écritures comptables autorisées.' },
   { action: 'update', subject: 'journal_voucher', name_en: 'Update Journal Vouchers', name_fr: 'Modifier les pièces de journal', desc_en: 'Work on assigned accounting entries.', desc_fr: 'Traiter les écritures comptables attribuées.' },

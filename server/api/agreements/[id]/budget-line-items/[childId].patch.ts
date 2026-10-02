@@ -365,7 +365,7 @@ export default defineEventHandler(async event => {
 
         return await applyBudgetLinePatch(event, trx, currentContext.streamId, input)
       },
-      { action: 'update', blocksApprovalSubmission: true }
+      { action: 'update', blocksApprovalSubmission: true, correctionFinancialMutation: true }
     )
   } catch (error: unknown) {
     await throwIfAgreementUniqueConstraintError(event, error)

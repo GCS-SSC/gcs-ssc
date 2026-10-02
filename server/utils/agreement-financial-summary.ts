@@ -53,6 +53,10 @@ export type SummaryPayment = {
   currency: Currency_Codes
   terminal: boolean
 }
+export type SummaryAccountingEntry = {
+  id: string; fiscalYearId: string; month: number; amount: Money; currency: Currency_Codes;
+  kind: 'journal_voucher' | 'correction'
+}
 
 const ZERO = parseMoney('0')
 const MONTH_COUNT = 12
@@ -94,6 +98,7 @@ const lineFromBudget = (line: SummaryBudgetLine, hasActiveForecast: boolean): Su
  * @param claimLines - Non-deleted claim lines.
  * @param reconciliations - Reconciliation lines with positive lifecycle evidence.
  * @param payments - Payment records with terminal status indicators.
+ * @param accountingEntries - Effective separately attributed JV and Correction entries.
  * @returns Fiscal years with currency-specific monthly line grids and payment totals.
  */
 export const buildAgreementFinancialSummary = (
@@ -103,7 +108,8 @@ export const buildAgreementFinancialSummary = (
   forecastLines: SummaryForecastLine[],
   claimLines: SummaryClaimLine[],
   reconciliations: SummaryReconciliation[],
-  payments: SummaryPayment[]
+  payments: SummaryPayment[],
+  accountingEntries: SummaryAccountingEntry[] = []
 ) => ({
   fiscalYears: [...fiscalYears].sort((a, b) => a.order.localeCompare(b.order)).map(year => {
     const yearBudgetLines = budgetLines.filter(line => line.fiscalYearId === year.id)
@@ -121,7 +127,8 @@ export const buildAgreementFinancialSummary = (
       ...yearBudgetLines.map(line => line.currency),
       ...yearForecastLines.map(line => line.currency),
       ...yearClaimLines.map(line => line.currency),
-      ...yearPayments.map(payment => payment.currency)
+      ...yearPayments.map(payment => payment.currency),
+      ...accountingEntries.filter(entry => entry.fiscalYearId === year.id).map(entry => entry.currency)
     ])
     if (currencies.size === 0) currencies.add('cad')
 
@@ -205,7 +212,17 @@ export const buildAgreementFinancialSummary = (
         annualForecast: monthlyForecast ? sumMoney(monthlyForecast) : null,
         monthlyForecast
       }
-      return { currency, lines, paid, payments: paymentItems, progress }
+      const yearEntries = accountingEntries.filter(entry => entry.fiscalYearId === year.id && entry.currency === currency)
+      const jvEffects = emptyMonths()
+      const correctionAdjustments = emptyMonths()
+      for (const entry of yearEntries) {
+        const month = assertMonth(entry.month)
+        const target = entry.kind === 'journal_voucher' ? jvEffects : correctionAdjustments
+        target[month] = addMoney(target[month] ?? ZERO, entry.amount)
+      }
+      const correctedRecordedPaid = paid.map((amount, month) => sumMoney([amount, jvEffects[month] ?? ZERO, correctionAdjustments[month] ?? ZERO]))
+      return { currency, lines, paid, payments: paymentItems, progress,
+        jvEffects, correctionAdjustments, correctedRecordedPaid, accountingEntries: yearEntries }
     })
     return {
       id: year.id,

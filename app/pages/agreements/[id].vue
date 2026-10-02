@@ -24,6 +24,8 @@ import AgreementCloseoutsTab from '~/components/Agreement/AgreementCloseoutsTab.
 import { useExtensionEntityTabs } from '~/composables/useExtensionEntityTabs'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 import { useAgreementSimilarityConfirmation } from '~/composables/useAgreementSimilarityConfirmation'
+import { isAgreementChildRoute } from '~/utils/agreement-child-route'
+import { useUrlTabState } from '~/composables/useUrlTabState'
 
 definePageMeta({
   key: route => route.path,
@@ -79,15 +81,7 @@ const {
   getConfirmations: getSimilarityConfirmations
 } = useAgreementSimilarityConfirmation()
 const id = route.params.id as string
-const isChildDetailRoute = computed(() =>
-  typeof route.params.commitmentId === 'string'
-  || typeof route.params.paymentId === 'string'
-  || typeof route.params.forecastId === 'string'
-  || typeof route.params.monitorId === 'string'
-  || typeof route.params.claimId === 'string'
-  || typeof route.params.amendmentId === 'string'
-  || typeof route.params.closeoutId === 'string'
-)
+const isChildDetailRoute = computed(() => isAgreementChildRoute(route))
 
 const profile: Ref<AgreementDetailProfile | null> = ref(null)
 const error: Ref<unknown | null> = ref(null)
@@ -123,7 +117,7 @@ const {
 
 const selectedProfile: Ref<AgreementDetailForm | null> = ref(null)
 const isSaving: Ref<boolean> = ref(false)
-const selectedTab = ref('general')
+const { canAny } = useCan()
 const isBusinessLocked = computed(() => isRecordLocked(profile.value))
 const canCreateChildRecords = computed(() => Boolean(profile.value?.can_create_child_records) && !isBusinessLocked.value)
 const canUpdateBusinessRecord = computed(() => Boolean(profile.value?.can_update) && !isBusinessLocked.value)
@@ -195,6 +189,11 @@ const tabs = computed(() => {
       value: 'payments',
       icon: 'i-lucide-wallet-cards'
     })
+    if (canAny('correction', 'read')) nextTabs.push({
+      key: 'correction.title',
+      value: 'corrections',
+      icon: 'i-lucide-file-diff'
+    })
     nextTabs.push({
       key: 'agreement.forecasts.title',
       value: 'forecasts',
@@ -248,6 +247,11 @@ const tabs = computed(() => {
   ]
 })
 
+const { selectedTab } = useUrlTabState({
+  tabs,
+  defaultTab: 'general',
+  enabled: computed(() => !isChildDetailRoute.value && profile.value !== null)
+})
 const selectedExtensionTab = computed(() => getExtensionTabItem(selectedTab.value))
 
 const breadcrumbItems = computed(() => [
@@ -549,6 +553,8 @@ const cancel = () => {
               :can-create="canCreateChildRecords"
               :can-update="canUpdateChildRecords"
               :can-delete="canDeleteChildRecords" />
+
+            <CorrectionCollection v-else-if="selectedTab === 'corrections'" :agreement-id="id" />
 
             <AgreementForecastsTab
               v-else-if="selectedTab === 'forecasts'"

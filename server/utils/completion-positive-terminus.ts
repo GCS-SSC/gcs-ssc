@@ -1,6 +1,7 @@
 import type { Transaction } from 'kysely'
 import type { Database, Entity_Type } from '~~/shared/types/database'
 import { transitionBusinessStatus } from '~~/server/utils/business-status-runtime'
+import { assertAgreementCorrectionFinancialUnlocked } from './correction-lock'
 
 /**
  * Applies domain effects only after Completion reaches a positive terminus.
@@ -13,6 +14,9 @@ export const applyCompletionPositiveTerminusEffects = async (
   entityType: Entity_Type,
   entityId: string
 ): Promise<void> => {
+  if (entityType === 'fundingcasecorrection') {
+    throw new Error('Correction effects require the designated Completion-linked approval submission')
+  }
   if (entityType === 'fundingclaimreconcile') {
     const reconcile = await trx.selectFrom('Funding_Case_Agreement_Claim_Reconcile')
       .innerJoin('Funding_Case_Agreement_Claim', 'Funding_Case_Agreement_Claim.id', 'Funding_Case_Agreement_Claim_Reconcile.egcs_fc_fundingagreementclaim')
@@ -94,6 +98,7 @@ export const applyCompletionPositiveTerminusEffects = async (
     .where('_deleted', '=', false)
     .forUpdate()
     .executeTakeFirstOrThrow()
+  await assertAgreementCorrectionFinancialUnlocked(trx, String(commitment.egcs_fc_fundingagreement))
   await trx.selectFrom('Funding_Case_Agreement_Commitment')
     .select('id')
     .where('egcs_fc_fundingagreement', '=', String(commitment.egcs_fc_fundingagreement))

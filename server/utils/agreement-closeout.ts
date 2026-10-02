@@ -12,6 +12,8 @@ import { hasApprovedTargetEvidence } from '~~/server/utils/business-approval-evi
 import { databaseMoneyText, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { addMoney, compareMoney, parseMoney, subtractMoney, type Money } from '~~/shared/utils/money'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+import { agreementPaymentIsFinal } from './agreement-payment-source'
+import { formatCorrectionReference } from '~~/shared/utils/correction'
 
 type DbClient = Kysely<Database> | Transaction<Database>
 
@@ -53,7 +55,8 @@ const targetRoute = (agreementId: string, entityType: Entity_Type, entityId: str
     fundingcaseforecast: 'forecasts',
     fundingcasemonitor: 'monitors',
     fundingcaseamendment: 'amendments',
-    fundingcaseagreementcommitment: 'commitments'
+    fundingcaseagreementcommitment: 'commitments',
+    fundingcasecorrection: 'corrections'
   }
   const segment = segments[entityType]
   return segment ? closeoutRoute(agreementId, segment, entityId) : `/agreements/${agreementId}`
@@ -90,7 +93,7 @@ export const resolveAgreementCloseoutRuntimeContext = async (
 }
 
 const buildFinancialReport = async (db: DbClient, agreementId: string) => {
-  const [candidateClaimRows, paymentRows] = await Promise.all([
+  const [candidateClaimRows, paymentRows, correctionRows] = await Promise.all([
     db.selectFrom('Funding_Case_Agreement_Claim_Reconcile_Line_Item')
       .innerJoin('Funding_Case_Agreement_Claim_Reconcile', 'Funding_Case_Agreement_Claim_Reconcile.id', 'Funding_Case_Agreement_Claim_Reconcile_Line_Item.egcs_fc_fundingagreementclaimreconcile')
       .innerJoin('Funding_Case_Agreement_Claim', 'Funding_Case_Agreement_Claim.id', 'Funding_Case_Agreement_Claim_Reconcile.egcs_fc_fundingagreementclaim')
@@ -101,6 +104,7 @@ const buildFinancialReport = async (db: DbClient, agreementId: string) => {
         'Funding_Case_Agreement_Claim_Reconcile.id as reconcile_id',
         'Funding_Case_Agreement_Claim.egcs_fc_fiscalyear as fiscal_year_id',
         'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year',
+        'Agency_Fiscal_Year.id as agency_fiscal_year_id',
         'Funding_Case_Agreement_Claim_Line_Item.egcs_fc_currency as currency',
         databaseMoneyText(sql.ref('Funding_Case_Agreement_Claim_Reconcile_Line_Item.egcs_fc_reconciled')).as('amount')
       ])
@@ -119,54 +123,79 @@ const buildFinancialReport = async (db: DbClient, agreementId: string) => {
         'Funding_Case_Agreement_Payment.id as payment_id',
         'Funding_Case_Agreement_Payment.egcs_fc_fiscalyear as fiscal_year_id',
         'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year',
+        'Agency_Fiscal_Year.id as agency_fiscal_year_id',
         'Funding_Case_Agreement_Payment.egcs_fc_currency as currency',
         databaseMoneyText(sql.ref('Funding_Case_Agreement_Payment.egcs_fc_paymentamount')).as('amount'),
         'Common_Status.egcs_cn_terminal as status_terminal'
       ])
       .where('Funding_Case_Agreement_Payment.egcs_fc_fundingagreement', '=', agreementId)
+      .where(agreementPaymentIsFinal('Funding_Case_Agreement_Payment'))
       .where('Common_Status._deleted', '=', false)
       .where('Funding_Case_Agreement_Payment._deleted', '=', false)
-      .execute()
+      .execute(),
+    db.selectFrom('Funding_Case_Agreement_Correction_Adjustment as adjustment')
+      .innerJoin('Funding_Case_Agreement_Correction as correction', 'correction.id', 'adjustment.egcs_fc_correction')
+      .innerJoin('Agency_Fiscal_Year as fiscal', 'fiscal.id', 'adjustment.egcs_fc_agencyfiscalyear')
+      .select(['fiscal.id as agency_fiscal_year_id', 'fiscal.egcs_ay_fiscalyeardisplay as fiscal_year',
+        'correction.egcs_fc_currency as currency', databaseMoneyText(sql.ref('adjustment.egcs_fc_amount')).as('amount')])
+      .where('adjustment.egcs_fc_fundingagreement', '=', agreementId).where('correction.egcs_fc_fundingagreement', '=', agreementId)
+      .where('correction.egcs_fc_outcome', '=', 'posted').where('correction._deleted', '=', false)
+      .where('adjustment._deleted', '=', false).execute()
   ])
   const claimRows = (await Promise.all(candidateClaimRows.map(async row =>
     await hasApprovedTargetEvidence(db, 'fundingclaimreconcile', String(row.reconcile_id)) ? row : null)))
     .filter((row): row is NonNullable<typeof row> => row !== null)
   const operationalPaymentRows = paymentRows.filter(row => row.status_terminal)
 
-  type MutableFinancial = Omit<CloseoutFinancialRow, 'variance' | 'state'>
+  type MutableFinancial = Omit<CloseoutFinancialRow, 'variance' | 'state'> & { cashPaidAmount: Money, correctionAmount: Money }
   const rows = new Map<string, MutableFinancial>()
-  const readRow = (fiscalYearId: string, fiscalYear: string, currency: Currency_Codes): MutableFinancial => {
-    const key = `${fiscalYearId}:${currency}`
-    const current = rows.get(key) ?? { fiscalYearId, fiscalYear, currency, approvedClaimAmount: ZERO_MONEY, paidAmount: ZERO_MONEY }
+  const readRow = (fiscalYearId: string, agencyFiscalYearId: string, fiscalYear: string, currency: Currency_Codes): MutableFinancial => {
+    const key = `${agencyFiscalYearId}:${currency}`
+    const current = rows.get(key) ?? { fiscalYearId, fiscalYear, currency, approvedClaimAmount: ZERO_MONEY,
+      cashPaidAmount: ZERO_MONEY, correctionAmount: ZERO_MONEY, paidAmount: ZERO_MONEY }
     rows.set(key, current)
     return current
   }
   for (const row of claimRows) {
-    const current = readRow(String(row.fiscal_year_id), row.fiscal_year, row.currency)
+    const current = readRow(String(row.fiscal_year_id), String(row.agency_fiscal_year_id), row.fiscal_year, row.currency)
     current.approvedClaimAmount = addMoney(current.approvedClaimAmount, parseDatabaseMoney(row.amount))
   }
   for (const row of operationalPaymentRows) {
-    const current = readRow(String(row.fiscal_year_id), row.fiscal_year, row.currency)
-    current.paidAmount = addMoney(current.paidAmount, parseDatabaseMoney(row.amount))
+    const current = readRow(String(row.fiscal_year_id), String(row.agency_fiscal_year_id), row.fiscal_year, row.currency)
+    const amount = parseDatabaseMoney(row.amount)
+    current.cashPaidAmount = addMoney(current.cashPaidAmount, amount)
+    current.paidAmount = addMoney(current.paidAmount, amount)
+  }
+  for (const row of correctionRows) {
+    const current = readRow(String(row.agency_fiscal_year_id), String(row.agency_fiscal_year_id), row.fiscal_year, row.currency)
+    const amount = parseDatabaseMoney(row.amount)
+    current.correctionAmount = addMoney(current.correctionAmount, amount)
+    current.paidAmount = addMoney(current.paidAmount, amount)
   }
 
   const reportRows = [...rows.values()].map(row => {
-    const { approvedClaimAmount, paidAmount } = row
+    const { approvedClaimAmount, paidAmount, cashPaidAmount, correctionAmount, ...identity } = row
     const variance = subtractMoney(paidAmount, approvedClaimAmount)
-    return { ...row, approvedClaimAmount, paidAmount, variance, state: getCloseoutFinancialState(variance) }
+    return { ...identity, approvedClaimAmount, paidAmount,
+      ...(correctionRows.length ? { cashPaidAmount, correctionAmount } : {}),
+      variance, state: getCloseoutFinancialState(variance) }
   }).sort((left, right) => left.fiscalYear.localeCompare(right.fiscalYear) || left.currency.localeCompare(right.currency))
 
-  const totalsByCurrency = new Map<Currency_Codes, { approvedClaimAmount: Money, paidAmount: Money }>()
+  const totalsByCurrency = new Map<Currency_Codes, { approvedClaimAmount: Money, cashPaidAmount: Money, correctionAmount: Money, paidAmount: Money }>()
   for (const row of reportRows) {
-    const total = totalsByCurrency.get(row.currency) ?? { approvedClaimAmount: ZERO_MONEY, paidAmount: ZERO_MONEY }
+    const total = totalsByCurrency.get(row.currency) ?? { approvedClaimAmount: ZERO_MONEY, cashPaidAmount: ZERO_MONEY, correctionAmount: ZERO_MONEY, paidAmount: ZERO_MONEY }
     total.approvedClaimAmount = addMoney(total.approvedClaimAmount, row.approvedClaimAmount)
     total.paidAmount = addMoney(total.paidAmount, row.paidAmount)
+    total.cashPaidAmount = addMoney(total.cashPaidAmount, row.cashPaidAmount ?? row.paidAmount)
+    total.correctionAmount = addMoney(total.correctionAmount, row.correctionAmount ?? ZERO_MONEY)
     totalsByCurrency.set(row.currency, total)
   }
   const totals = [...totalsByCurrency].map(([currency, value]) => {
-    const { approvedClaimAmount, paidAmount } = value
+    const { approvedClaimAmount, cashPaidAmount, correctionAmount, paidAmount } = value
     const variance = subtractMoney(paidAmount, approvedClaimAmount)
-    return { currency, approvedClaimAmount, paidAmount, variance, state: getCloseoutFinancialState(variance) }
+    return { currency, approvedClaimAmount, paidAmount,
+      ...(correctionRows.length ? { cashPaidAmount, correctionAmount } : {}),
+      variance, state: getCloseoutFinancialState(variance) }
   }).sort((left, right) => left.currency.localeCompare(right.currency))
   return { ready: totals.every(total => compareMoney(total.variance, ZERO_MONEY) === 0), rows: reportRows, totals }
 }
@@ -196,7 +225,7 @@ export const buildAgreementCloseoutReadiness = async (
     .where('id', '=', agreementId).where('_deleted', '=', false).executeTakeFirst()
   if (!agreement) return null
 
-  const [financial, followupRows, amendments, claims, reconciles, payments, forecasts, monitors, commitments, journalVouchers] = await Promise.all([
+  const [financial, followupRows, amendments, claims, reconciles, payments, forecasts, monitors, commitments, journalVouchers, corrections] = await Promise.all([
     buildFinancialReport(db, agreementId),
     db.selectFrom('Funding_Case_Agreement_Monitor_Followup')
       .innerJoin('Funding_Case_Agreement_Monitor', 'Funding_Case_Agreement_Monitor.id', 'Funding_Case_Agreement_Monitor_Followup.egcs_fc_fundingagreementmonitor')
@@ -229,6 +258,8 @@ export const buildAgreementCloseoutReadiness = async (
     db.selectFrom('Funding_Case_Agreement_Commitment').select(['id', 'egcs_fc_status'])
       .where('egcs_fc_fundingagreement', '=', agreementId).where('_deleted', '=', false).execute(),
     db.selectFrom('Funding_Case_Agreement_Journal_Voucher').select(['id', 'egcs_fc_status'])
+      .where('egcs_fc_fundingagreement', '=', agreementId).where('_deleted', '=', false).execute(),
+    db.selectFrom('Funding_Case_Agreement_Correction').select(['id', 'egcs_fc_status', 'egcs_fc_outcome', 'egcs_fc_number', 'egcs_fc_agreementnumber'])
       .where('egcs_fc_fundingagreement', '=', agreementId).where('_deleted', '=', false).execute()
   ])
 
@@ -240,6 +271,7 @@ export const buildAgreementCloseoutReadiness = async (
     ...reconciles.map(row => row.egcs_fc_status),
     ...payments.map(row => row.egcs_fc_status),
     ...journalVouchers.map(row => row.egcs_fc_status),
+    ...corrections.map(row => row.egcs_fc_status),
     ...forecasts.map(row => row.egcs_fc_status),
     ...monitors.map(row => row.egcs_fc_status),
     ...commitments.map(row => row.egcs_fc_status)
@@ -281,6 +313,11 @@ export const buildAgreementCloseoutReadiness = async (
   for (const row of commitments) if (!isTerminal(row.egcs_fc_status)) addBlocker(blockers, agreementId, 'fundingcaseagreementcommitment', String(row.id), row.egcs_fc_status, 'commitment_not_terminal')
 
   for (const row of journalVouchers) if (!isTerminal(row.egcs_fc_status)) addBlocker(blockers, agreementId, 'fundingcasejournalvoucher', String(row.id), row.egcs_fc_status, 'journal_voucher_not_terminal')
+  for (const row of corrections) if (row.egcs_fc_outcome === 'open' || !isTerminal(row.egcs_fc_status)) {
+    const label = formatCorrectionReference(row)
+    addBlocker(blockers, agreementId, 'fundingcasecorrection', String(row.id), row.egcs_fc_status,
+      'correction_not_terminal', { en: label, fr: label })
+  }
 
   const targets = [
     { entityType: 'fundingcaseagreement' as const, entityId: agreementId },
@@ -288,6 +325,7 @@ export const buildAgreementCloseoutReadiness = async (
     ...claims.map(row => ({ entityType: 'fundingcaseagreementclaim' as const, entityId: String(row.id) })),
     ...reconciles.map(row => ({ entityType: 'fundingclaimreconcile' as const, entityId: String(row.id) })),
     ...journalVouchers.map(row => ({ entityType: 'fundingcasejournalvoucher' as const, entityId: String(row.id) })),
+    ...corrections.map(row => ({ entityType: 'fundingcasecorrection' as const, entityId: String(row.id) })),
     ...payments.map(row => ({ entityType: 'fundingcasepayment' as const, entityId: String(row.id) })),
     ...forecasts.map(row => ({ entityType: 'fundingcaseforecast' as const, entityId: String(row.id) })),
     ...monitors.map(row => ({ entityType: 'fundingcasemonitor' as const, entityId: String(row.id) })),

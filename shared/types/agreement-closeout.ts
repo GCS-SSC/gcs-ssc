@@ -10,6 +10,8 @@ export type CloseoutFinancialRow = {
   fiscalYear: string
   currency: Currency_Codes
   approvedClaimAmount: Money
+  cashPaidAmount?: Money
+  correctionAmount?: Money
   paidAmount: Money
   variance: Money
   state: CloseoutFinancialState

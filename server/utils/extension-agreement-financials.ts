@@ -1,8 +1,10 @@
+/* eslint-disable jsdoc/require-param, jsdoc/require-returns -- Public read contracts are documented at their authorization boundary. */
 import type { Kysely, Transaction } from 'kysely'
 import type { GcsExtensionAgreementFinancials } from '@gcs-ssc/extensions/server'
 import type { Database } from '~~/shared/types/database'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { getAgreementCommitmentPaymentCapacity, getCommitmentLinePaymentCoverage, validateAgreementPaymentAllocations } from './agreement-commitment-line-balance'
+import { getAgreementPaidAccountingProjection, getAgreementRecordedPaidToDate } from './agreement-accounting-projection'
 
 /**
  * Binds the financial projection to an authorized Agreement and the caller's active transaction.
@@ -37,7 +39,18 @@ export const createExtensionAgreementFinancials = (
     }
   }
   return {
-  /**
+    /** Refreshes the bound authority before exposing cumulative corrected accounting. */
+    getRecordedPaidToDate: async input => {
+      await prepareRead(input.excludePaymentId)
+      if (!isPositivePostgresBigintText(input.fiscalYearId)) throw new Error('Fiscal year requires a positive bigint identifier')
+      return await getAgreementRecordedPaidToDate(db, agreementId, input)
+    },
+    /** Reports retained accounting effects independently of cash and protective capacity. */
+    getPaidAccountingProjection: async (input = {}) => {
+      await prepareRead(input.excludePaymentId)
+      return await getAgreementPaidAccountingProjection(db, agreementId, input)
+    },
+    /**
    * Reads an exact row using the shared host paid floor.
    * @param input - Exact line and optional current Payment exclusion.
    * @returns Canonical post-JV paid amount.

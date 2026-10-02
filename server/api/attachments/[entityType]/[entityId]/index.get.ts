@@ -72,7 +72,9 @@ export default defineEventHandler(async event => {
     ? 'applicant_recipient'
     : target.entityType === 'fundingcaseintake'
       ? 'funding_case'
-      : target.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement'
+      : target.entityType === 'fundingcasejournalvoucher'
+        ? 'journal_voucher'
+        : target.entityType === 'fundingcasecorrection' ? 'correction' : 'agreement'
   const [grant, targetWorkable] = await Promise.all([
     resolveAssignedItemTargetGrant(auth.userId, target, db),
     isEntityAssignmentRosterWorkable(db, target.entityType, target.entityId)

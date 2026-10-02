@@ -13,6 +13,7 @@ export type EnumKey =
   | 'approval_type'
   | 'decision_type'
   | 'payment_type'
+  | 'correction_outcome'
   | 'review_type'
   | 'entity_type'
   | 'execution_entity_type'

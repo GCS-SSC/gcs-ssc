@@ -484,5 +484,5 @@ export const createAgreementBudgetLineItem = async (
       line_item_name_en: costCategory.line_item_name_en,
       line_item_name_fr: costCategory.line_item_name_fr
     }
-  }, { action: 'create', blocksApprovalSubmission: true })
+  }, { action: 'create', blocksApprovalSubmission: true, correctionFinancialMutation: true })
 }

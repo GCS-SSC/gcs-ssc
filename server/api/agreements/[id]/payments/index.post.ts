@@ -111,5 +111,5 @@ export default defineEventHandler(async event => {
     )
 
     return exactCreatedPayment
-  }, { action: 'create' })
+  }, { action: 'create', correctionFinancialMutation: true })
 })

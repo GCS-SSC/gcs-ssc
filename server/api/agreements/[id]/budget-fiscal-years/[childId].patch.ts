@@ -40,6 +40,6 @@ export default defineEventHandler(async event => {
       childId,
       currentContext.streamId
     ),
-    { action: 'update', blocksApprovalSubmission: true }
+    { action: 'update', blocksApprovalSubmission: true, correctionFinancialMutation: true }
   )
 })

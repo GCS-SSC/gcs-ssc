@@ -633,6 +633,9 @@ export const decideCanonicalApproval = async (
       'Common_Routing_Slip.egcs_cn_entityid as entityId',
       'Common_Runtime.id as runtimeId',
       'Common_Runtime.egcs_cn_kind as runtimeKind',
+      'Common_Runtime.egcs_cn_entitytype as runtimeEntityType',
+      'Common_Runtime.egcs_cn_entityid as runtimeEntityId',
+      'Common_Runtime.egcs_cn_purpose as runtimePurpose',
       'Routing_Item.id as routingRuntimeItemId',
       'Routing_Item.egcs_cn_state as routingState',
       'Routing_Item.egcs_cn_parentruntimeitem as parentRuntimeItemId',
@@ -648,6 +651,17 @@ export const decideCanonicalApproval = async (
   if (!approval) return await notFound(event, 'REVIEW_APPROVAL_NOT_FOUND', 'apiErrors.admin_common.not_found')
   const assignedUserId = String(approval.egcs_cn_assigneduser ?? approval.egcs_cn_defaultuser)
   if (assignedUserId !== actorId) return await forbidden(event)
+  if (approval.runtimeEntityType === 'fundingcasecorrection' && approval.runtimePurpose === 'approval_submission') {
+    const submission = await trx.selectFrom('Common_Workflow_Run').select('egcs_cn_routing')
+      .where('id', '=', String(approval.runtimeId)).executeTakeFirstOrThrow()
+    const packet = (submission.egcs_cn_routing as { correctionPacket?: { policy?: { creatorApprovalAllowed?: boolean } } } | null)?.correctionPacket
+    if (!packet?.policy || typeof packet.policy.creatorApprovalAllowed !== 'boolean') {
+      throw new Error('Correction approval requires its captured creator approval policy')
+    }
+    const correction = await trx.selectFrom('Funding_Case_Agreement_Correction').select('egcs_fc_createdby')
+      .where('id', '=', String(approval.runtimeEntityId)).where('_deleted', '=', false).executeTakeFirstOrThrow()
+    if (!packet.policy.creatorApprovalAllowed && String(correction.egcs_fc_createdby) === actorId) return await forbidden(event)
+  }
   if (approval.egcs_cn_approvalvalue !== null || approval.approvalState !== 'awaiting_action'
     || approval.routingState !== 'awaiting_action') {
     return await badRequest(event, 'REVIEW_APPROVAL_INVALID_STATUS', 'apiErrors.request.invalid_status')

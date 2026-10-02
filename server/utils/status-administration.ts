@@ -6,6 +6,7 @@ import type { CommonStatusTable, Database } from '~~/shared/types/database'
 import { authorize } from '~~/server/utils/authorize'
 import { notFound, throwApiError } from '~~/server/utils/api-errors'
 import { throwIfMappedConstraintError } from '~~/server/utils/database-constraint-errors'
+import { hasCorrectionSchema } from './correction-schema'
 
 const BUSINESS_STATUS_TABLES = [
   'Funding_Case_Agreement_Profile',
@@ -15,6 +16,7 @@ const BUSINESS_STATUS_TABLES = [
   'Funding_Case_Agreement_Claim_Reconcile',
   'Funding_Case_Agreement_Commitment',
   'Funding_Case_Agreement_Payment',
+  'Funding_Case_Agreement_Correction',
   'Funding_Case_Agreement_Forecast',
   'Funding_Case_Agreement_Monitor'
 ] as const
@@ -24,12 +26,29 @@ type StatusAdministrationAction = 'update' | 'delete'
 const STATUS_CONSTRAINT_ERRORS = {
   cn_idx_status_name_en_per_agency: { code: 'STATUS_NAME_EN_CONFLICT', key: 'apiErrors.status.name_conflict' },
   cn_idx_status_name_fr_per_agency: { code: 'STATUS_NAME_FR_CONFLICT', key: 'apiErrors.status.name_conflict' },
-  cn_chk_status_claim_reconciliation_in_use: { code: 'STATUS_REFERENCED', key: 'apiErrors.status.referenced' }
+  cn_chk_status_claim_reconciliation_in_use: { code: 'STATUS_REFERENCED', key: 'apiErrors.status.referenced' },
+  cn_chk_correction_status_in_use: { code: 'STATUS_REFERENCED', key: 'apiErrors.status.referenced' },
+  cn_chk_correction_status_outcome: { code: 'STATUS_PUBLISHED_WORKFLOW_CONFLICT', key: 'apiErrors.status.published_workflow_conflict' }
 } as const
+
+/** A preparation Workflow cannot acquire a terminal output through mutable Agency status metadata. */
+const correctionPreparationOutputReference = (statusId: string) => sql<boolean>`(
+  version.egcs_cn_definition ->> 'entityType' = 'fundingcasecorrection'
+  AND COALESCE(version.egcs_cn_definition ->> 'purpose', 'standard') <> 'approval_submission'
+  AND (
+    version.egcs_cn_definition ->> 'cancellationStatus' = ${statusId}
+    OR version.egcs_cn_definition ->> 'executionFailureStatus' = ${statusId}
+    OR EXISTS (
+      SELECT 1 FROM jsonb_array_elements(COALESCE(version.egcs_cn_definition -> 'members', '[]'::jsonb)) AS correction_member(value)
+      WHERE correction_member.value ->> 'successStatus' = ${statusId}
+        OR correction_member.value ->> 'failureStatus' = ${statusId}
+    )
+  )
+)`
 
 /** Maps concurrent bilingual-name conflicts to the stable localized status API contract. */
 export const throwIfStatusConstraintError = async (event: H3Event, error: unknown): Promise<never> =>
-  await throwIfMappedConstraintError(event, error, ['23505', '23514'], STATUS_CONSTRAINT_ERRORS)
+  await throwIfMappedConstraintError(event, error, ['23503', '23505', '23514'], STATUS_CONSTRAINT_ERRORS)
 
 /** Resolves a status through its Agency authorization boundary. */
 export const authorizeStatusDefinition = async (
@@ -66,6 +85,7 @@ export const findLiveStatusReference = async (
     .where('egcs_fi_status', '=', statusId).where('_deleted', '=', false).executeTakeFirst()
   if (intake) return 'Funding_Case_Intake_Profile'
   for (const table of BUSINESS_STATUS_TABLES) {
+    if (table === 'Funding_Case_Agreement_Correction' && !await hasCorrectionSchema(trx)) continue
     const record = await trx.selectFrom(table)
       .select('id')
       .where('egcs_fc_status', '=', statusId)
@@ -217,6 +237,13 @@ export const assertTerminalStatusCompatibleWithPublishedWorkflows = async (
   trx: Transaction<Database>,
   statusId: string
 ): Promise<void> => {
+  if (await hasCorrectionSchema(trx)) {
+    const correction = await trx.selectFrom('Funding_Case_Agreement_Correction').select('id')
+      .where('egcs_fc_status', '=', statusId).where('egcs_fc_outcome', '=', 'open').where('_deleted', '=', false).executeTakeFirst()
+    if (correction) return await throwApiError(event, {
+      statusCode: 409, code: 'STATUS_PUBLISHED_WORKFLOW_CONFLICT', key: 'apiErrors.status.published_workflow_conflict'
+    })
+  }
   const allowedStart = await trx.selectFrom('Common_Workflow_Setup_Allowed_Start_Status as allowed')
     .innerJoin('Common_Workflow_Setup as workflow', 'workflow.id', 'allowed.egcs_cn_workflowsetup')
     .innerJoin('Common_Publication as publication', 'publication.id', 'workflow.id')
@@ -254,6 +281,8 @@ export const assertTerminalStatusCompatibleWithPublishedWorkflows = async (
     .where('workflow._deleted', '=', false)
     .where('publication.egcs_cn_state', '=', 'published')
     .where(sql<boolean>`(
+      ${correctionPreparationOutputReference(statusId)}
+      OR
       EXISTS (
         SELECT 1
         FROM jsonb_array_elements_text(
@@ -343,7 +372,18 @@ export const assertTerminalStatusCompatibleWithPublishedWorkflows = async (
     )`)
     .executeTakeFirst()
 
-  if (!allowedStart && !intermediateMember && !publishedWorkflowConflict && !activeRunConflict && !retryableRunConflict) return
+  const pinnedCorrectionPreparationConflict = await trx.selectFrom('Common_Runtime as correction_run')
+    .innerJoin('Common_Publication_Version as version', 'version.id', 'correction_run.egcs_cn_sourcepublicationversion')
+    .select('correction_run.id')
+    .where('correction_run.egcs_cn_kind', '=', 'workflow')
+    .where('correction_run.egcs_cn_entitytype', '=', 'fundingcasecorrection')
+    .where('correction_run.egcs_cn_purpose', '!=', 'approval_submission')
+    .where('correction_run._deleted', '=', false)
+    .where(correctionPreparationOutputReference(statusId))
+    .executeTakeFirst()
+
+  if (!allowedStart && !intermediateMember && !publishedWorkflowConflict && !activeRunConflict && !retryableRunConflict
+    && !pinnedCorrectionPreparationConflict) return
   return await throwApiError(event, {
     statusCode: 409,
     code: 'STATUS_PUBLISHED_WORKFLOW_CONFLICT',
