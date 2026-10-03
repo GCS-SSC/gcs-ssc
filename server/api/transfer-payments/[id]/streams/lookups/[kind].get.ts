@@ -35,6 +35,7 @@ export default defineEventHandler(async event => {
         .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Agency_Chart_of_Account.egcs_ay_fiscalyear')
         .where('Agency_Chart_of_Account.egcs_ay_organizationagency', '=', access.agencyId)
         .where('Agency_Chart_of_Account._deleted', '=', false)
+        .where('Agency_Chart_of_Account.egcs_ay_kind', '=', 'commitment')
         .where('Agency_Fiscal_Year._deleted', '=', false)
       const filtered = term ? scoped.where(eb => eb('Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay', 'ilike', term)) : scoped
       const result = await fetchAgencyScopedList({

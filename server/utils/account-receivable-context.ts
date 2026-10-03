@@ -125,3 +125,21 @@ export const accountReceivableSourceUsage = (agreementId: string, sourceKey: str
     ${sourceKey.startsWith('advance:') && options.applicantRecipientId ? sql`AND debt.egcs_fc_applicantrecipient = ${options.applicantRecipientId}` : sql``}
     ${excludedId ? sql`AND debt.id <> ${excludedId}` : sql``}
 )`
+
+export const accountReceivableAdvanceUsage = (agreementId: string, applicantRecipientId: string, agencyFiscalYearId: string, excludedId?: string) => sql<string>`(
+  SELECT (COALESCE(SUM(CASE WHEN debt.egcs_fc_outcome = 'posted' THEN line.egcs_fc_amount ELSE greatest(line.egcs_fc_amount,0) END),0) - COALESCE((
+    SELECT SUM(allocation.egcs_fc_amount)
+    FROM "Funding_Case_Account_Receivable_Allocation" allocation
+    JOIN "Funding_Case_Account_Receivable_Recovery" recovery ON recovery.id = allocation.egcs_fc_recovery
+    JOIN "Funding_Case_Agreement_Account_Receivable" source_debt ON source_debt.id = allocation.egcs_fc_receivable
+    WHERE source_debt.egcs_fc_fundingagreement = ${agreementId} AND source_debt.egcs_fc_applicantrecipient = ${applicantRecipientId}
+      AND source_debt.egcs_fc_agencyfiscalyear = ${agencyFiscalYearId} AND source_debt.egcs_fc_advancepaymentrelated
+      AND recovery.egcs_fc_outcome = 'posted' AND NOT recovery._deleted AND NOT allocation._deleted
+  ),0))::text
+  FROM "Funding_Case_Agreement_Account_Receivable_Line" line
+  JOIN "Funding_Case_Agreement_Account_Receivable" debt ON debt.id = line.egcs_fc_receivable
+  WHERE debt.egcs_fc_fundingagreement = ${agreementId} AND debt.egcs_fc_applicantrecipient = ${applicantRecipientId}
+    AND debt.egcs_fc_agencyfiscalyear = ${agencyFiscalYearId} AND debt.egcs_fc_advancepaymentrelated
+    AND NOT line._deleted AND NOT debt._deleted AND debt.egcs_fc_outcome IN ('open','posted')
+    ${excludedId ? sql`AND debt.id <> ${excludedId}` : sql``}
+)`

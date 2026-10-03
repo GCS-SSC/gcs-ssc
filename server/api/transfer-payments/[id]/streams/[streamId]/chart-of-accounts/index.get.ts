@@ -33,6 +33,7 @@ export default defineEventHandler(async event => {
     )
     .where('Transfer_Payment_Stream_Chart_of_Account.egcs_tp_transferpaymentstream', '=', streamId)
     .where('Agency_Chart_of_Account.egcs_ay_organizationagency', '=', streamContext.agencyId)
+    .where('Agency_Chart_of_Account.egcs_ay_kind', '=', 'commitment')
     .where('Transfer_Payment_Stream_Chart_of_Account._deleted', '=', false)
 
   if (search) {

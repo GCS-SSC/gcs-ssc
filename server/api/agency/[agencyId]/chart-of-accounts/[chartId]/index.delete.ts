@@ -17,7 +17,10 @@ export default defineEventHandler(async event => {
     const linked = await trx.selectFrom('Transfer_Payment_Stream_Chart_of_Account').select('id')
       .where('egcs_tp_agencychartofaccount', '=', chartId).where('_deleted', '=', false).forUpdate().executeTakeFirst()
     if (linked) return await badRequest(event, 'TRANSFER_PAYMENT_CHART_OF_ACCOUNT_IN_USE', 'apiErrors.transfer_payment.chart_of_account_in_use')
+    const receivableLine = await trx.selectFrom('Funding_Case_Agreement_Account_Receivable_Line').select('id')
+      .where('egcs_fc_accountreceivablechartofaccount', '=', chartId).executeTakeFirst()
+    if (receivableLine) return await badRequest(event, 'ACCOUNT_RECEIVABLE_CHART_IN_USE', 'apiErrors.agency.account_receivable_chart_in_use')
     await trx.updateTable('Agency_Chart_of_Account').set({ _deleted: true }).where('id', '=', chartId).execute()
     return { success: true }
-  })
+  }, 'delete')
 })

@@ -12,12 +12,14 @@ const { t, locale } = useI18n()
 const columns: TableColumnInput<AgencyChartOfAccountItem>[] = [
   { id: 'fiscal_year_display', accessorKey: 'fiscal_year_display', headerKey: 'common.year' },
   { accessorKey: 'egcs_ay_currency', headerKey: 'common.currency' },
+  { accessorKey: 'egcs_ay_kind', headerKey: 'transfer_payment.chart_of_accounts.kind' },
   { id: 'dimensions', headerKey: 'transfer_payment.chart_of_accounts.accounting_fields' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
 const initialNewItem = {
   egcs_ay_fiscalyear: '',
   egcs_ay_currency: 'cad' as const,
+  egcs_ay_kind: 'commitment' as const,
   egcs_ay_accountingdimensions: [{ label_en: '', label_fr: '', value: '' }]
 }
 const addDimension = (state: Partial<AgencyChartOfAccountItem>) => {
@@ -43,6 +45,9 @@ const addDimension = (state: Partial<AgencyChartOfAccountItem>) => {
     modal-fullscreen>
     <template #egcs_ay_currency-cell="{ row }">
       {{ row.original.egcs_ay_currency.toUpperCase() }}
+    </template>
+    <template #egcs_ay_kind-cell="{ row }">
+      {{ t(`enums.agency_chart_of_account_kind.${row.original.egcs_ay_kind}`) }}
     </template>
     <template #dimensions-cell="{ row }">
       <div class="flex flex-wrap gap-1">
@@ -71,6 +76,9 @@ const addDimension = (state: Partial<AgencyChartOfAccountItem>) => {
       </UFormField>
       <UFormField :label="t('common.currency')" name="egcs_ay_currency" required>
         <CommonEnumSelect v-model="state.egcs_ay_currency" name="currency_codes" :disabled="Boolean(state.id)" />
+      </UFormField>
+      <UFormField :label="t('transfer_payment.chart_of_accounts.kind')" :description="t(state.id ? 'apiErrors.agency.chart_kind_immutable' : 'transfer_payment.chart_of_accounts.kind_description')" name="egcs_ay_kind" required>
+        <CommonEnumSelect v-model="state.egcs_ay_kind" name="agency_chart_of_account_kind" :disabled="Boolean(state.id)" />
       </UFormField>
       <div class="space-y-3">
         <div class="flex items-center justify-between gap-3">

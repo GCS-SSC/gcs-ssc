@@ -25,6 +25,24 @@ export type AgreementMonitorRuntimeContext = {
   agencyId: string
 }
 
+/**
+ * Enforce the Agency type policy inside the authorized Monitor write transaction.
+ * @param event - Request context.
+ * @param db - Authorized transaction.
+ * @param monitorId - Exact owning Monitor.
+ * @param requiresReceivable - Whether this follow-up requires AR establishment.
+ */
+export const assertMonitorReceivableEligible = async (event: H3Event, db: AgreementMonitorDb, monitorId: string, requiresReceivable: boolean | undefined) => {
+  if (!requiresReceivable) return
+  const policy = await db.selectFrom('Funding_Case_Agreement_Monitor as monitor')
+    .innerJoin('Transfer_Payment_Monitor_Type as monitor_type', 'monitor_type.id', 'monitor.egcs_fc_type')
+    .innerJoin('Agency_Monitor_Type as agency_type', 'agency_type.id', 'monitor_type.egcs_tp_agencymonitortype')
+    .where('monitor.id', '=', monitorId).where('monitor._deleted', '=', false)
+    .where('monitor_type._deleted', '=', false).where('agency_type._deleted', '=', false)
+    .select('agency_type.egcs_ay_receivableeligible').forUpdate('agency_type').executeTakeFirst()
+  if (!policy?.egcs_ay_receivableeligible) await badRequest(event, 'MONITOR_RECEIVABLE_NOT_ALLOWED', 'apiErrors.agreement.monitor_receivable_not_allowed')
+}
+
 export const prepareAgreementMonitorRoute = async (
   event: H3Event,
   action: 'create' | 'read' | 'update' | 'delete',
@@ -264,7 +282,7 @@ export const assertMonitorTypeBelongsToAgreementStream = async (
     .where('Transfer_Payment_Monitor_Type.egcs_tp_transferpaymentstream', '=', streamId)
     .where('Transfer_Payment_Monitor_Type._deleted', '=', false)
     .where('Agency_Monitor_Type._deleted', '=', false)
-    .select('Transfer_Payment_Monitor_Type.id')
+    .select(['Transfer_Payment_Monitor_Type.id', 'Agency_Monitor_Type.egcs_ay_receivableeligible'])
   if (options.lockReference) query = query.forUpdate()
   const monitorType = await query.executeTakeFirst()
 
@@ -311,6 +329,13 @@ export const patchAgreementMonitorForRoute = async (
     if (validated.egcs_fc_type) {
       const monitorType = await assertMonitorTypeBelongsToAgreementStream(event, trx, currentContext.streamId, validated.egcs_fc_type, { lockReference: true })
       if (!monitorType || !('id' in monitorType)) return monitorType
+      if (!monitorType.egcs_ay_receivableeligible) {
+        const requiredFollowup = await trx.selectFrom('Funding_Case_Agreement_Monitor_Followup')
+          .where('egcs_fc_fundingagreementmonitor', '=', monitorId)
+          .where(eb => eb.or([eb.and([eb('egcs_fc_requiresreceivable', '=', true), eb('_deleted', '=', false)]), eb.exists(eb.selectFrom('Funding_Case_Agreement_Account_Receivable as receivable').select('receivable.id').whereRef('receivable.egcs_fc_monitorfollowup', '=', 'Funding_Case_Agreement_Monitor_Followup.id'))]))
+          .select('id').executeTakeFirst()
+        if (requiredFollowup) return await badRequest(event, 'MONITOR_RECEIVABLE_NOT_ALLOWED', 'apiErrors.agreement.monitor_receivable_not_allowed')
+      }
     }
 
     if (validated.egcs_fc_tentativefiscalyear) {

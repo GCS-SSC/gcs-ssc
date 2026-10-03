@@ -3,10 +3,11 @@ import type { Currency_Codes, FundingCaseAgreementAccountReceivableTable, Fundin
 import type { BusinessRecordStateFields } from './business-record-state'
 import type { Money } from '../utils/money'
 import type { JournalVoucherAccountingLine } from '../utils/journal-voucher'
-import type { AccountReceivableRecoveryMethod, AccountReceivableType } from '../utils/account-receivable'
+import type { AccountReceivableRecoveryMethod } from '../utils/account-receivable'
 
 export type AccountReceivableRow = Omit<Selectable<FundingCaseAgreementAccountReceivableTable>,
-  'egcs_fc_requesteddate' | 'egcs_fc_createdat' | 'egcs_fc_postedat' | 'egcs_fc_terminalat'> & {
+  'egcs_fc_requesteddate' | 'egcs_fc_createdat' | 'egcs_fc_postedat' | 'egcs_fc_terminalat' | 'egcs_fc_fiscaloutstanding'> & {
+    egcs_fc_fiscaloutstanding: Money | null
     egcs_fc_requesteddate: string
     egcs_fc_createdat: string
     egcs_fc_postedat: string | null
@@ -21,7 +22,7 @@ export type AccountReceivableRow = Omit<Selectable<FundingCaseAgreementAccountRe
     egcs_fc_debtorname_en: string
     egcs_fc_debtorname_fr: string
     egcs_fc_fiscalyeardisplay: string
-    egcs_fc_effectiverecoverymethod: AccountReceivableRecoveryMethod
+    egcs_fc_effectiverecoverymethod: AccountReceivableRecoveryMethod | null
   }
 
 export type AccountReceivableCoding = {
@@ -34,11 +35,14 @@ export type AccountReceivableCoding = {
   egcs_fc_periodstart: number
   egcs_fc_periodend: number
   egcs_fc_paidbasis: Money
+  egcs_fc_sharedpaidbasis: Money
   egcs_fc_amount: Money
   egcs_fc_accountingdimensions: JournalVoucherAccountingLine['egcs_fc_accountingdimensions']
 }
 
 export type AccountReceivableLine = {
+  egcs_fc_accountreceivablechartofaccount: string | null
+  egcs_fc_accountreceivableaccountingdimensions: JournalVoucherAccountingLine['egcs_fc_accountingdimensions']
   id: string
   egcs_fc_receivable: string
   egcs_fc_fundingagreement: string
@@ -115,7 +119,7 @@ export type AccountReceivableCreditMemoDetail = AccountReceivableCreditMemoRow &
     egcs_fc_amount: Money
     egcs_fc_agreementnumber: string
     egcs_fc_number: number
-    egcs_fc_type: AccountReceivableType
+    egcs_fc_type: string
     egcs_fc_recoverymethod: AccountReceivableRecoveryMethod
   }>
   egcs_fc_agreementreadable: boolean
@@ -129,7 +133,7 @@ export type AccountReceivableCreditMemoDetail = AccountReceivableCreditMemoRow &
 
 export type AccountReceivableSource = {
   egcs_fc_sourcekey: string
-  egcs_fc_type: AccountReceivableType
+  egcs_fc_type: string
   egcs_fc_claim: string | null
   egcs_fc_claimline: string | null
   egcs_fc_reconcileline: string | null

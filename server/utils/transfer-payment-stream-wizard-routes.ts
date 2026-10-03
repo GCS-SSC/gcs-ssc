@@ -309,6 +309,7 @@ const assertAgencyFinanceReferences = async (
   if (chartIds.length) {
     const charts = await db.selectFrom('Agency_Chart_of_Account')
       .where('id', 'in', chartIds).where('egcs_ay_organizationagency', '=', agencyId)
+      .where('egcs_ay_kind', '=', 'commitment')
       .where('_deleted', '=', false).select(['id', 'egcs_ay_fiscalyear', 'egcs_ay_currency'])
       .forUpdate().execute()
     const budgetIds = uniqueStrings(payload.budgets, item => item.egcs_tp_transferpaymentbudget)

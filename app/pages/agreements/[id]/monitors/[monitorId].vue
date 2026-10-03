@@ -870,7 +870,7 @@ const handleCompleted = async () => {
           <UFormField :label="t('agreement.monitors.responsible_party')" name="egcs_fc_responsibleparty">
             <CommonEnumSelect v-model="selectedFollowup.egcs_fc_responsibleparty" name="monitor_responsible_party" />
           </UFormField>
-          <UFormField :label="t('account_receivable.monitor_requirement')" name="egcs_fc_requiresreceivable" :description="t('account_receivable.monitor_requirement_description')">
+          <UFormField v-if="monitor?.egcs_ay_receivableeligible" :label="t('account_receivable.monitor_requirement')" name="egcs_fc_requiresreceivable" :description="t('account_receivable.monitor_requirement_description')">
             <USwitch v-model="selectedFollowup.egcs_fc_requiresreceivable" :label="t('account_receivable.monitor_requirement')" />
           </UFormField>
           <UFormField :label="t('agreement.monitors.followups.due_date')" name="egcs_fc_duedate">

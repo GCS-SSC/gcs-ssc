@@ -29,13 +29,32 @@ const amount = (value: string) => formatAccountReceivableAmount(value, locale.va
           </dt><dd>{{ amount(line.egcs_fc_sourceamount) }}</dd>
         </div>
       </dl>
-      <div v-for="coding in line.egcs_fc_coding" :key="coding.id" class="space-y-2 border-l-2 border-default pl-4">
-        <CorrectionAccountingDimensions :dimensions="coding.egcs_fc_accountingdimensions" />
-        <p class="text-sm text-muted">
-          {{ t('account_receivable.retained_paid') }}: {{ amount(coding.egcs_fc_paidbasis) }}
-        </p>
+      <div class="space-y-3 rounded-lg border border-default p-4">
+        <h4 class="text-sm font-semibold">
+          {{ t('account_receivable.receivable_coding') }}
+        </h4>
+        <slot name="coding" :line="line" :index="index">
+          <CorrectionAccountingDimensions v-if="line.egcs_fc_accountreceivableaccountingdimensions?.length" :dimensions="line.egcs_fc_accountreceivableaccountingdimensions" />
+          <p v-else class="text-sm text-muted">
+            {{ t('account_receivable.coding_not_selected') }}
+          </p>
+        </slot>
+        <slot name="amount" :line="line" :index="index" />
       </div>
-      <slot name="amount" :line="line" :index="index" />
+      <details v-if="line.egcs_fc_coding.length" class="space-y-3">
+        <summary class="cursor-default text-sm font-semibold">
+          {{ t('account_receivable.original_paid_coding') }}
+        </summary>
+        <p class="text-sm text-muted">
+          {{ t('account_receivable.original_paid_coding_description') }}
+        </p>
+        <div v-for="coding in line.egcs_fc_coding" :key="coding.id" class="space-y-2 border-l-2 border-default pl-4">
+          <CorrectionAccountingDimensions :dimensions="coding.egcs_fc_accountingdimensions" />
+          <p class="text-sm text-muted">
+            {{ t('account_receivable.retained_paid') }}: {{ amount(coding.egcs_fc_paidbasis) }}
+          </p>
+        </div>
+      </details>
     </article>
   </div>
 </template>

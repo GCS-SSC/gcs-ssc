@@ -636,13 +636,13 @@
       "failed": "Failed",
       "cancelled": "Cancelled"
     },
-    "account_receivable_type": {
-      "ineligible_expense": "Ineligible expense",
-      "outstanding_advance": "Outstanding advance"
-    },
     "account_receivable_recovery_method": {
       "offset": "Offset",
       "direct_repayment": "Direct repayment"
+    },
+    "agency_chart_of_account_kind": {
+      "commitment": "Commitments",
+      "account_receivable": "Accounts Receivables"
     }
   },
   "agency": {
@@ -759,7 +759,26 @@
       "agreement_types": "Agreement Types",
       "approval_templates": "Approval Templates",
       "workflow_setups": "Workflows",
-      "review_schemas": "Review Schemas"
+      "review_schemas": "Review Schemas",
+      "account_receivable_types": "Receivable Types"
+    },
+    "monitor_types": {
+      "receivable_eligible": "Allow receivable follow-ups",
+      "receivable_eligible_description": "Follow-ups for this monitor type may require a linked receivable to be established."
+    },
+    "receivable_types": {
+      "title": "Receivable Type",
+      "title_en": "Title (English)",
+      "title_fr": "Title (French)",
+      "description_en": "Description (English)",
+      "description_fr": "Description (French)",
+      "source": "Related Source",
+      "source_description": "Choose exactly one source for this receivable type.",
+      "advance_description": "Recover amounts from paid advance Payments.",
+      "claim_description": "Recover amounts from finalized reconciled Claims.",
+      "monitor_required": "Require a monitor follow-up",
+      "monitor_description": "Receivables of this type must link a monitor follow-up when they are created.",
+      "policy_locked": "The source and monitoring requirements are locked because a receivable uses this type. You can still edit its name and description."
     }
   },
   "role": {
@@ -775,7 +794,7 @@
     "description_fr": "Description (FR)",
     "description": "Manage system roles and their granular permissions.",
     "permissions": "Permissions",
-    "manage_assignments": "Manage assignments",
+    "manage_assignments": "Manage assignment",
     "permission_level_help": "Choose the cumulative business-data access ceiling for this subject.",
     "permission_level": "Access level",
     "access_levels": {
@@ -1137,6 +1156,7 @@
       "transfer_payment_scope_requires_transfer_payment_ability": "Program scope requires at least one transfer payment ability."
     },
     "agency": {
+      "monitor_receivable_in_use": "Receivable follow-ups already use this monitor type. Its receivable eligibility cannot be disabled.",
       "duplicate_funding_type": "A funding type with this name already exists for the Agency.",
       "duplicate_funding_subtype": "A funding subtype with this name already exists in the type.",
       "funding_type_not_found": "Funding type not found.",
@@ -1187,7 +1207,14 @@
       "duplicate_approval_behalf_type_name_en": "An approval behalf type with this English name already exists for the agency.",
       "duplicate_approval_behalf_type_name_fr": "An approval behalf type with this French name already exists for the agency.",
       "duplicate_agreement_type_name_en": "An agreement subtype with this English name already exists for this agreement type in the agency.",
-      "duplicate_agreement_type_name_fr": "An agreement subtype with this French name already exists for this agreement type in the agency."
+      "duplicate_agreement_type_name_fr": "An agreement subtype with this French name already exists for this agreement type in the agency.",
+      "account_receivable_type_not_found": "Receivable type not found.",
+      "account_receivable_type_in_use": "This receivable type is used by an accounts receivable and cannot be deleted.",
+      "account_receivable_type_policy_locked": "The source and monitoring requirements cannot be changed because a receivable uses this type.",
+      "chart_kind_immutable": "The account type cannot be changed. Create a separate account for the other type.",
+      "account_receivable_chart_in_use": "This account is used by an accounts receivable and cannot be deleted.",
+      "duplicate_account_receivable_type_name_en": "A receivable type with this English title already exists for the Agency.",
+      "duplicate_account_receivable_type_name_fr": "A receivable type with this French title already exists for the Agency."
     },
     "admin_common": {
       "not_found": "Admin resource record not found.",
@@ -1240,6 +1267,7 @@
       "libreoffice_unavailable": "LibreOffice is required to convert DOCX templates to PDF. Install LibreOffice on the server or use an HTML PDF template."
     },
     "agreement": {
+      "monitor_receivable_not_allowed": "This monitor type does not allow receivable establishment follow-ups.",
       "invalid_funding_subtype": "Select a funding subtype available to this agreement’s stream.",
       "duplicate_funding_subtype": "Each funding subtype may appear only once per line.",
       "funding_subtype_invalid": "Select a funding subtype available to this agreement’s stream, without duplicates.",
@@ -1506,7 +1534,11 @@
       "payment_direct_repayment_hold": "This payee has an outstanding receivable requiring direct repayment. Payments are held until it is repaid or an approved adjustment changes the recovery method.",
       "payment_recovery_pending": "A recovery or receivable adjustment is pending for this payee. Finish or cancel that work before processing this Payment.",
       "payment_payee_unavailable": "Select an active Proponent linked to this Agreement as the Payment payee.",
-      "monitor_receivable_required": "Establish the linked accounts receivable before completing this recovery follow-up."
+      "monitor_receivable_required": "Establish the linked accounts receivable before completing this recovery follow-up.",
+      "recovery_method_required": "Select a recovery method before completing this receivable.",
+      "account_required": "Select an accounts receivable account for every nonzero amount before completing this receivable.",
+      "monitor_required": "Select a monitor follow-up required by this receivable type.",
+      "type_unavailable": "Select an active receivable type configured for this Agreement’s Agency."
     }
   },
   "transfer_payment": {
@@ -1626,7 +1658,9 @@
       "move_up": "Move Field Up",
       "move_down": "Move Field Down",
       "create": "Create Chart of Accounts Entry",
-      "update": "Update Chart of Accounts Entry"
+      "update": "Update Chart of Accounts Entry",
+      "kind": "Account Type",
+      "kind_description": "Choose whether this account is used for Commitments or Accounts Receivables."
     },
     "commitment_types": {
       "title": "Commitment Types",
@@ -2140,7 +2174,8 @@
     "workflow_member_owner_reference": "Select exactly one nested review or recommendation member",
     "workflow_member_owner_duplicate": "Each nested workflow member can have only one owner mapping",
     "checklist_na_policy_requires_option": "Enable N/A before requiring an N/A explanation.",
-    "checklist_answer_not_allowed": "This answer is not offered by the pinned question."
+    "checklist_answer_not_allowed": "This answer is not offered by the pinned question.",
+    "account_receivable_source_required": "Select exactly one source: Claims or Advances."
   },
   "notes": {
     "title": "Notes to file",
@@ -4095,11 +4130,13 @@
     "manual_credit_memo": "Manual Credit Memo",
     "recovery_outcome": "Recovery outcome",
     "recovery_amount": "Recovered amount",
-    "recovery_method": "Approved recovery method",
+    "recovery_method": "Recovery Method",
+    "type_instruction": "Select an Agency-defined type. It determines the source and monitoring requirements for this receivable.",
+    "source_context_locked": "The debtor, fiscal year and sources are set from the originating Claim or advance Payment and cannot be changed.",
     "current_recovery_method": "Current approved recovery method",
     "type": "Receivable type",
-    "source_claims": "Source Claim lines",
-    "source_advances": "Source paid advances",
+    "source_claims": "Claims",
+    "source_advances": "Advances",
     "source_description": "Select retained sources from this Agreement and fiscal year. Advance sources may be selected automatically.",
     "source_line": "Source line {number}",
     "source_kind": "Source",
@@ -4125,7 +4162,7 @@
     "override_fr": "Preference override reason (French)",
     "override_instruction": "If the recovery method differs from the recorded preference, explain the decision in at least one language for Completion (required).",
     "monitor_followup": "Monitor follow-up",
-    "monitor_link_description": "Optionally link the instruction to establish this debt. Source access remains independently authorized.",
+    "monitor_link_description": "This receivable type requires a monitor follow-up. Select the instruction to establish this debt.",
     "monitor_requirement": "Require receivable establishment",
     "monitor_requirement_description": "Completing this follow-up requires an established linked receivable. Collection may continue afterward.",
     "record_credit_memo": "Record Credit Memo",
@@ -4186,6 +4223,15 @@
     "allocation_shortfall": "{amount} remains unallocated. Select additional eligible lines or correct the received amount.",
     "clear_preference": "Clear recorded preference",
     "select_source_basis": "Select the debtor, fiscal year and receivable type to load eligible sources.",
-    "adjustment": "Adjustment"
+    "adjustment": "Adjustment",
+    "recovery_method_instruction": "You can save a Draft without a recovery method. Select one before completing the receivable.",
+    "clear_recovery_method": "Clear recovery method",
+    "receivable_coding": "Accounts receivable coding",
+    "receivable_account": "Accounts receivable account",
+    "receivable_account_description": "Select an accounts receivable account for this fiscal year and currency. An account is required for every nonzero amount.",
+    "coding_not_selected": "Select an accounts receivable account before entering a nonzero amount.",
+    "original_paid_coding": "Original paid-source coding",
+    "original_paid_coding_description": "Retained payment coding supports the source amount. The receivable uses its own account above.",
+    "adjustment_source_unavailable": "This source was not included in the original receivable’s accounting. Create a new receivable to recover an amount from this source."
   }
 }

@@ -259,6 +259,7 @@ export const assertChartOfAccountBelongsToAgreementStream = async (
     .where('Transfer_Payment_Stream_Chart_of_Account.egcs_tp_transferpaymentstream', '=', streamId)
     .where('Transfer_Payment_Stream_Chart_of_Account._deleted', '=', false)
     .where('Agency_Chart_of_Account._deleted', '=', false)
+    .where('Agency_Chart_of_Account.egcs_ay_kind', '=', 'commitment')
     .select('Transfer_Payment_Stream_Chart_of_Account.id as id')
     .forUpdate('Transfer_Payment_Stream_Chart_of_Account')
   if (currency) chartQuery = chartQuery.where('Agency_Chart_of_Account.egcs_ay_currency', '=', currency)

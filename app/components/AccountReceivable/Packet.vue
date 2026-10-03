@@ -39,8 +39,8 @@ const labels = computed(() => [
       ]
     : [
         { label: 'agreement.payments.fiscal_year', value: header.value.egcs_fc_fiscalyeardisplay },
-        { label: 'account_receivable.type', value: t(`enums.account_receivable_type.${text(header.value.egcs_fc_type)}`) },
-        { label: 'account_receivable.recovery_method', value: t(`enums.account_receivable_recovery_method.${text(header.value.egcs_fc_recoverymethod)}`) }
+        { label: 'account_receivable.type', value: locale.value === 'fr' ? header.value.egcs_fc_typename_fr : header.value.egcs_fc_typename_en },
+        { label: 'account_receivable.recovery_method', value: header.value.egcs_fc_recoverymethod ? t(`enums.account_receivable_recovery_method.${text(header.value.egcs_fc_recoverymethod)}`) : t('common.none') }
       ])
 ])
 </script>

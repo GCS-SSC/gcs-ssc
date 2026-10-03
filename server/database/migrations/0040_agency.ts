@@ -306,6 +306,7 @@ export async function up(db: Kysely<Database>): Promise<void> {
   await db.schema
     .createTable('Agency_Chart_of_Account')
     .addColumn('id', 'bigserial', col => col.primaryKey())
+    .addColumn('egcs_ay_kind', 'varchar(32)', col => col.notNull().defaultTo('commitment'))
     .addColumn('egcs_ay_organizationagency', 'bigint', col =>
       col.notNull().references('Agency_Profile.id').onDelete('restrict')
     )
@@ -316,17 +317,22 @@ export async function up(db: Kysely<Database>): Promise<void> {
     .addColumn('egcs_ay_currency', sql`currency_codes`, col => col.notNull().defaultTo('cad'))
     .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
     .addCheckConstraint('ay_chk_chartofaccountdimensions', sql`jsonb_typeof(egcs_ay_accountingdimensions) = 'array' AND jsonb_array_length(egcs_ay_accountingdimensions) > 0`)
+    .addCheckConstraint('ay_chk_chart_kind', sql`egcs_ay_kind IN ('commitment','account_receivable')`)
     .execute()
 
   await sql`CREATE FUNCTION protect_chart_currency() RETURNS trigger AS $$
     BEGIN
+      IF NEW.egcs_ay_kind IS DISTINCT FROM OLD.egcs_ay_kind THEN
+        RAISE EXCEPTION 'Chart of Account kind is immutable'
+          USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_chart_kind_immutable';
+      END IF;
       IF NEW.egcs_ay_currency IS DISTINCT FROM OLD.egcs_ay_currency THEN
         RAISE EXCEPTION 'Chart of Account currency is immutable'
           USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_chart_currency_immutable';
       END IF;
       RETURN NEW;
     END $$ LANGUAGE plpgsql`.execute(db)
-  await sql`CREATE TRIGGER trg_protect_chart_currency BEFORE UPDATE OF egcs_ay_currency
+  await sql`CREATE TRIGGER trg_protect_chart_currency BEFORE UPDATE OF egcs_ay_currency,egcs_ay_kind
     ON "Agency_Chart_of_Account" FOR EACH ROW EXECUTE FUNCTION protect_chart_currency()`.execute(db)
 
   await db.schema
@@ -348,10 +354,28 @@ export async function up(db: Kysely<Database>): Promise<void> {
     )
     .addColumn('egcs_ay_name_en', 'varchar(255)', col => col.notNull())
     .addColumn('egcs_ay_name_fr', 'varchar(255)', col => col.notNull())
+    .addColumn('egcs_ay_receivableeligible', 'boolean', col => col.notNull().defaultTo(false))
     .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
     .execute()
 
-  await sql`CREATE UNIQUE INDEX ay_idx_chartfiscalyeardimensions ON "Agency_Chart_of_Account" (egcs_ay_fiscalyear, egcs_ay_currency, egcs_ay_accountingdimensions) WHERE _deleted = false`.execute(db)
+  await db.schema.createTable('Agency_Account_Receivable_Type')
+    .addColumn('id', 'bigserial', col => col.primaryKey())
+    .addColumn('egcs_ay_organizationagency', 'bigint', col => col.notNull().references('Agency_Profile.id').onDelete('restrict'))
+    .addColumn('egcs_ay_name_en', 'varchar(255)', col => col.notNull())
+    .addColumn('egcs_ay_name_fr', 'varchar(255)', col => col.notNull())
+    .addColumn('egcs_ay_description_en', 'text', col => col.notNull().defaultTo(''))
+    .addColumn('egcs_ay_description_fr', 'text', col => col.notNull().defaultTo(''))
+    .addColumn('egcs_ay_monitorrequired', 'boolean', col => col.notNull().defaultTo(false))
+    .addColumn('egcs_ay_advancepaymentrelated', 'boolean', col => col.notNull())
+    .addColumn('egcs_ay_claimrelated', 'boolean', col => col.notNull())
+    .addColumn('_deleted', 'boolean', col => col.notNull().defaultTo(false))
+    .addCheckConstraint('ay_chk_ar_type_source', sql`egcs_ay_advancepaymentrelated <> egcs_ay_claimrelated`)
+    .addCheckConstraint('ay_chk_ar_type_names', sql`length(btrim(egcs_ay_name_en)) > 0 AND length(btrim(egcs_ay_name_fr)) > 0`)
+    .execute()
+  await sql`CREATE UNIQUE INDEX ay_uq_ar_type_name_en ON "Agency_Account_Receivable_Type" (egcs_ay_organizationagency,lower(btrim(egcs_ay_name_en))) WHERE NOT _deleted`.execute(db)
+  await sql`CREATE UNIQUE INDEX ay_uq_ar_type_name_fr ON "Agency_Account_Receivable_Type" (egcs_ay_organizationagency,lower(btrim(egcs_ay_name_fr))) WHERE NOT _deleted`.execute(db)
+
+  await sql`CREATE UNIQUE INDEX ay_idx_chartfiscalyeardimensions ON "Agency_Chart_of_Account" (egcs_ay_fiscalyear, egcs_ay_currency, egcs_ay_kind, egcs_ay_accountingdimensions) WHERE _deleted = false`.execute(db)
   await sql`CREATE UNIQUE INDEX ay_idx_commitmenttypenameen ON "Agency_Commitment_Type" (egcs_ay_organizationagency, egcs_ay_name_en) WHERE _deleted = false`.execute(db)
   await sql`CREATE UNIQUE INDEX ay_idx_commitmenttypenamefr ON "Agency_Commitment_Type" (egcs_ay_organizationagency, egcs_ay_name_fr) WHERE _deleted = false`.execute(db)
   await sql`CREATE UNIQUE INDEX ay_idx_monitortypenameen ON "Agency_Monitor_Type" (egcs_ay_organizationagency, egcs_ay_name_en) WHERE _deleted = false`.execute(db)
@@ -624,6 +648,7 @@ export async function down(db: Kysely<Database>): Promise<void> {
   await db.schema.dropTable('Agency_Applicant_Recipient_Subtype').execute()
   await db.schema.dropTable('Agency_Address_Type').execute()
   await db.schema.dropTable('Agency_Monitor_Type').execute()
+  await db.schema.dropTable('Agency_Account_Receivable_Type').execute()
   await db.schema.dropTable('Agency_Commitment_Type').execute()
   await db.schema.dropTable('Agency_Chart_of_Account').execute()
   await sql`DROP FUNCTION protect_chart_currency()`.execute(db)

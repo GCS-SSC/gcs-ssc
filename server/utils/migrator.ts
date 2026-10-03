@@ -4,7 +4,8 @@ import { pathToFileURL } from 'node:url'
 import { productionCoreMigrationProvider } from '../database/production-core-migrations'
 import type { Migration, MigrationProvider } from 'kysely'
 
-type DemoMigrationLoader = (url: string) => Promise<Migration>
+type DemoMigrationBundle = Migration & { receivableSeed: Migration }
+type DemoMigrationLoader = (url: string) => Promise<DemoMigrationBundle>
 
 /**
  * Loads a separately packaged demo migration.
@@ -13,7 +14,7 @@ type DemoMigrationLoader = (url: string) => Promise<Migration>
  * @returns Demo migration module.
  */
 const loadPackagedDemoMigration: DemoMigrationLoader = async (url) => {
-  return await import(url) as Migration
+  return await import(url) as DemoMigrationBundle
 }
 
 /**
@@ -52,9 +53,14 @@ export const resolveProductionMigrationProvider = async (
     new URL('./demo-migrations/demo.mjs', moduleUrl).href
   )
   return {
+    /**
+     * Includes both demo seed stages alongside the canonical core migrations.
+     * @returns Core migrations and both separately packaged demo seed stages.
+     */
     getMigrations: async () => ({
       ...await productionCoreMigrationProvider.getMigrations(),
-      [`0240_${demoMigrationSuffix}`]: demoMigration
+      [`0240_${demoMigrationSuffix}`]: demoMigration,
+      [`0280_${demoMigrationSuffix}_accounts_receivable`]: demoMigration.receivableSeed
     })
   }
 }

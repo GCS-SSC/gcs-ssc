@@ -92,6 +92,7 @@ const { getDefinition, isRecordLocked, isDraftStatus, isTerminalStatus } = useBu
 
 const agreementId = route.params.id as string
 const claimId = route.params.claimId as string
+const receivableEntry = useAccountReceivableSourceEntry(agreementId, 'claim', claimId)
 const {
   data: profile,
   error: profileError,
@@ -1070,6 +1071,7 @@ const cancelReconciliation = async () => {
           <CommonEntityHero
             :is-collapsed="isHeroCollapsed"
             icon="i-lucide-receipt-text"
+            :actions="receivableEntry.entry.value ? [{ label: t('account_receivable.create'), icon: 'i-lucide-receipt-text', onClick: () => { receivableEntry.open.value = true } }] : []"
             :title="claimHeroTitle"
             :meta-items="claimHeroMetaItems"
             :badges="claimHeroBadges" />
@@ -1599,5 +1601,6 @@ const cancelReconciliation = async () => {
         </div>
       </template>
     </UModal>
+    <AccountReceivableCreateModal v-if="receivableEntry.entry.value" v-model:open="receivableEntry.open.value" :agreement-id="agreementId" :source-entry="receivableEntry.entry.value" @created="receivableEntry.created" />
   </div>
 </template>

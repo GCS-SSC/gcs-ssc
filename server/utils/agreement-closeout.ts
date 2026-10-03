@@ -181,7 +181,10 @@ const buildFinancialReport = async (db: DbClient, agreementId: string) => {
     current.paidAmount = addMoney(current.paidAmount, amount)
   }
 
-  const recoveryFiscalYearIds = [...new Set([...recoveries, ...claimRecoveries].map(row => String(row.agencyFiscalYearId)))]
+  const recoveryFiscalYearIds = [...new Set([
+    ...recoveries.map(row => String(row.sourceAgencyFiscalYearId)),
+    ...claimRecoveries.map(row => String(row.agencyFiscalYearId))
+  ])]
   const recoveryFiscalYears = recoveryFiscalYearIds.length
     ? await db.selectFrom('Agency_Fiscal_Year').select(['id', 'egcs_ay_fiscalyeardisplay']).where('id', 'in', recoveryFiscalYearIds).execute()
     : []
@@ -193,7 +196,7 @@ const buildFinancialReport = async (db: DbClient, agreementId: string) => {
     return readRow(agencyFiscalYearId, agencyFiscalYearId, fiscalYear.egcs_ay_fiscalyeardisplay, currency)
   }
   for (const row of recoveries) {
-    const current = recoveryRow(String(row.agencyFiscalYearId), row.currency)
+    const current = recoveryRow(String(row.sourceAgencyFiscalYearId), row.currency)
     current.paidAmount = addMoney(current.paidAmount, row.amount)
     current.accountReceivableRecoveryAmount = addMoney(current.accountReceivableRecoveryAmount ?? ZERO_MONEY, row.amount)
   }

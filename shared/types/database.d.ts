@@ -420,6 +420,7 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Agency_Funding_Subtype: AgencyFundingSubtypeTable
   Agency_Fiscal_Year: AgencyFiscalYearTable
   Agency_Chart_of_Account: AgencyChartOfAccountTable
+  Agency_Account_Receivable_Type: AgencyAccountReceivableTypeTable
   Agency_Commitment_Type: AgencyCommitmentTypeTable
   Agency_Monitor_Type: AgencyMonitorTypeTable
   Agency_Document_Template: AgencyDocumentTemplateTable
@@ -854,7 +855,21 @@ export interface AgencyFiscalYearTable {
   _deleted: Generated<boolean>
 }
 
+export interface AgencyAccountReceivableTypeTable {
+  id: Generated<string>
+  egcs_ay_organizationagency: string
+  egcs_ay_name_en: string
+  egcs_ay_name_fr: string
+  egcs_ay_description_en: Generated<string>
+  egcs_ay_description_fr: Generated<string>
+  egcs_ay_monitorrequired: Generated<boolean>
+  egcs_ay_advancepaymentrelated: boolean
+  egcs_ay_claimrelated: boolean
+  _deleted: Generated<boolean>
+}
+
 export interface AgencyChartOfAccountTable {
+  egcs_ay_kind: Generated<'commitment' | 'account_receivable'>
   id: Generated<string>
   egcs_ay_organizationagency: string
   egcs_ay_fiscalyear: string
@@ -876,6 +891,7 @@ export interface AgencyMonitorTypeTable {
   egcs_ay_organizationagency: string
   egcs_ay_name_en: string
   egcs_ay_name_fr: string
+  egcs_ay_receivableeligible: Generated<boolean>
   _deleted: Generated<boolean>
 }
 
@@ -2657,8 +2673,16 @@ export interface FundingCaseAgreementAccountReceivableTable {
   egcs_fc_pool: string
   egcs_fc_applicantrecipient: string
   egcs_fc_agencyfiscalyear: string
-  egcs_fc_type: 'ineligible_expense' | 'outstanding_advance'
-  egcs_fc_recoverymethod: 'offset' | 'direct_repayment'
+  egcs_fc_type: string
+  egcs_fc_typename_en: Generated<string>
+  egcs_fc_typename_fr: Generated<string>
+  egcs_fc_typedescription_en: Generated<string>
+  egcs_fc_typedescription_fr: Generated<string>
+  egcs_fc_monitorrequired: Generated<boolean>
+  egcs_fc_advancepaymentrelated: Generated<boolean>
+  egcs_fc_claimrelated: Generated<boolean>
+  egcs_fc_fiscaloutstanding: Generated<number | null>
+  egcs_fc_recoverymethod: Generated<'offset' | 'direct_repayment' | null>
   egcs_fc_recipientpreference: 'offset' | 'direct_repayment' | null
   egcs_fc_preferenceoverride_en: Generated<string>
   egcs_fc_preferenceoverride_fr: Generated<string>
@@ -2715,6 +2739,8 @@ export interface FundingCaseAccountReceivableCreditMemoTable {
 }
 
 export interface FundingCaseAgreementAccountReceivableLineTable {
+  egcs_fc_accountreceivablechartofaccount: Generated<string | null>
+  egcs_fc_accountreceivableaccountingdimensions: Generated<JsonValue>
   id: Generated<string>
   egcs_fc_receivable: string
   egcs_fc_fundingagreement: string
@@ -2744,6 +2770,7 @@ export interface FundingCaseAgreementAccountReceivableCodingTable {
   egcs_fc_periodstart: number
   egcs_fc_periodend: number
   egcs_fc_paidbasis: number
+  egcs_fc_sharedpaidbasis: number
   egcs_fc_amount: Generated<number>
   egcs_fc_accountingdimensions: JsonValue
   _deleted: Generated<boolean>
@@ -2782,6 +2809,8 @@ export interface FundingCaseAccountReceivableAllocationTable {
 }
 
 export interface FundingCaseAccountReceivablePostingTable {
+  egcs_fc_accountreceivablechartofaccount: string
+  egcs_fc_accountreceivableaccountingdimensions: JsonValue
   id: Generated<string>
   egcs_fc_recovery: string
   egcs_fc_allocation: string

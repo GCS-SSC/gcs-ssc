@@ -203,7 +203,7 @@ const deleteMonitor = async (monitorId: string) => {
               value-key="id"
               label-en-key="label_en"
               label-fr-key="label_fr"
-              :query="{ permission_action: selectedMonitor.id ? 'update' : 'create' }"
+              :query="selectedMonitor.id ? { permission_action: 'update', monitorId: selectedMonitor.id } : { permission_action: 'create' }"
               searchable />
           </UFormField>
           <UFormField :label="t('agreement.monitors.tentative_fiscal_year')" name="egcs_fc_tentativefiscalyear">
@@ -214,7 +214,7 @@ const deleteMonitor = async (monitorId: string) => {
               label-en-key="label_en"
               label-fr-key="label_fr"
               :show-value-in-label="false"
-              :query="{ permission_action: selectedMonitor.id ? 'update' : 'create' }"
+              :query="selectedMonitor.id ? { permission_action: 'update', monitorId: selectedMonitor.id } : { permission_action: 'create' }"
               searchable />
           </UFormField>
           <UFormField :label="t('agreement.monitors.tentative_quarter')" name="egcs_fc_tentativequarter">

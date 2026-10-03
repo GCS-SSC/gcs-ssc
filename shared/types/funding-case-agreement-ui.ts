@@ -365,6 +365,7 @@ export type FundingCaseAgreementMonitorPromisingPracticeRow = FundingCaseAgreeme
 export type FundingCaseAgreementMonitorPromisingPracticeForm = Partial<FundingCaseAgreementMonitorPromisingPracticeItem>
 
 export interface FundingCaseAgreementMonitorDetailRow extends FundingCaseAgreementMonitorRow {
+  egcs_ay_receivableeligible: boolean
   agreement_title_en?: string | null
   agreement_title_fr?: string | null
   agreement_number?: string | null

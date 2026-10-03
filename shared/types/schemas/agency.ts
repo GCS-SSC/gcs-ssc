@@ -127,11 +127,44 @@ export type AgencyHoldbackBasisItem = WithId<AgencyHoldbackBasis>
 
 export const AgencyMonitorTypeSchema = z.object({
   egcs_ay_name_en: AgencyLabelSchema('validation.name_en_required'),
-  egcs_ay_name_fr: AgencyLabelSchema('validation.name_fr_required')
+  egcs_ay_name_fr: AgencyLabelSchema('validation.name_fr_required'),
+  egcs_ay_receivableeligible: z.boolean().default(false)
 })
-export const AgencyMonitorTypePatchSchema = AgencyMonitorTypeSchema.partial()
+export const AgencyMonitorTypePatchSchema = AgencyMonitorTypeSchema.partial().extend({ egcs_ay_receivableeligible: z.boolean().optional() })
 export type AgencyMonitorType = z.infer<typeof AgencyMonitorTypeSchema>
 export type AgencyMonitorTypeItem = WithId<AgencyMonitorType & { egcs_ay_organizationagency: string }>
+
+const AgencyAccountReceivableTypeNameSchema = (requiredKey: string) => AgencyLabelSchema(requiredKey)
+  .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' })
+const AgencyAccountReceivableTypeDescriptionSchema = z.string().max(10000, { error: 'validation.max_length' })
+  .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' }).default('')
+
+export const AgencyAccountReceivableTypeBaseSchema = z.object({
+  egcs_ay_name_en: AgencyAccountReceivableTypeNameSchema('validation.name_en_required'),
+  egcs_ay_name_fr: AgencyAccountReceivableTypeNameSchema('validation.name_fr_required'),
+  egcs_ay_description_en: AgencyAccountReceivableTypeDescriptionSchema,
+  egcs_ay_description_fr: AgencyAccountReceivableTypeDescriptionSchema,
+  egcs_ay_monitorrequired: z.boolean().default(false),
+  egcs_ay_advancepaymentrelated: z.boolean(),
+  egcs_ay_claimrelated: z.boolean()
+})
+
+export const AgencyAccountReceivableTypeSchema = AgencyAccountReceivableTypeBaseSchema.refine(
+  value => value.egcs_ay_advancepaymentrelated !== value.egcs_ay_claimrelated,
+  { message: 'validation.account_receivable_source_required', path: ['egcs_ay_advancepaymentrelated'] }
+)
+export const AgencyAccountReceivableTypePatchSchema = AgencyAccountReceivableTypeBaseSchema.partial().extend({
+  egcs_ay_description_en: AgencyAccountReceivableTypeDescriptionSchema.removeDefault().optional(),
+  egcs_ay_description_fr: AgencyAccountReceivableTypeDescriptionSchema.removeDefault().optional(),
+  egcs_ay_monitorrequired: z.boolean().optional()
+}).superRefine((value, ctx) => {
+  if (value.egcs_ay_advancepaymentrelated !== undefined && value.egcs_ay_claimrelated !== undefined
+    && value.egcs_ay_advancepaymentrelated === value.egcs_ay_claimrelated) {
+    ctx.addIssue({ code: 'custom', message: 'validation.account_receivable_source_required', path: ['egcs_ay_advancepaymentrelated'] })
+  }
+})
+export type AgencyAccountReceivableType = z.infer<typeof AgencyAccountReceivableTypeSchema>
+export type AgencyAccountReceivableTypeItem = WithId<AgencyAccountReceivableType & { egcs_ay_organizationagency: string; is_in_use: boolean }>
 
 // --- Cost Category ---
 export const AgencyCostCategorySchema = z.object({

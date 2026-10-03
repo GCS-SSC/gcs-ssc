@@ -20,7 +20,6 @@ export const formatAccountReceivableReference = (record: { egcs_fc_agreementnumb
 export const formatAccountReceivableCreditMemoReference = (record: { egcs_fc_agreementnumber: string; egcs_fc_number: number }): string =>
   `${record.egcs_fc_agreementnumber}-CM-${record.egcs_fc_number}`
 
-export type AccountReceivableType = 'ineligible_expense' | 'outstanding_advance'
 export type AccountReceivableRecoveryMethod = 'offset' | 'direct_repayment'
 
 /**
@@ -50,7 +49,7 @@ export const calculateAccountReceivableBalance = (principal: Money, recovered: M
 export type AccountReceivablePriority = {
   id: string
   egcs_fc_fiscalyearorder: number
-  egcs_fc_type: AccountReceivableType
+  egcs_fc_advancepaymentrelated: boolean
   egcs_fc_postedat: string
   egcs_fc_periodstart: number
   egcs_fc_lineid: string
@@ -64,7 +63,7 @@ export type AccountReceivablePriority = {
  */
 export const compareAccountReceivablePriority = (left: AccountReceivablePriority, right: AccountReceivablePriority): number =>
   left.egcs_fc_fiscalyearorder - right.egcs_fc_fiscalyearorder
-  || Number(left.egcs_fc_type === 'ineligible_expense') - Number(right.egcs_fc_type === 'ineligible_expense')
+  || Number(!left.egcs_fc_advancepaymentrelated) - Number(!right.egcs_fc_advancepaymentrelated)
   || left.egcs_fc_postedat.localeCompare(right.egcs_fc_postedat)
   || (BigInt(left.id) < BigInt(right.id) ? -1 : BigInt(left.id) > BigInt(right.id) ? 1 : 0)
   || left.egcs_fc_periodstart - right.egcs_fc_periodstart

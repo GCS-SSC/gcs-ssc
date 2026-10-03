@@ -42,6 +42,7 @@ const { isRecordLocked } = useBusinessStatusState()
 
 const agreementId = route.params.id as string
 const paymentId = route.params.paymentId as string
+const receivableEntry = useAccountReceivableSourceEntry(agreementId, 'advance', paymentId)
 const isHeroCollapsed = getHeroCollapsed('agreement-payment-detail')
 const search: Ref<string> = ref('')
 const pagination: Ref<{ pageIndex: number, pageSize: number }> = ref({
@@ -286,6 +287,7 @@ const handleCompleted = async () => {
           <CommonEntityHero
             :is-collapsed="isHeroCollapsed"
             icon="i-lucide-wallet-cards"
+            :actions="receivableEntry.entry.value ? [{ label: t('account_receivable.create'), icon: 'i-lucide-receipt-text', onClick: () => { receivableEntry.open.value = true } }] : []"
             :title="t(`enums.payment_type.${payment.egcs_fc_paymenttype}`)"
             :meta-items="[payment.agreement_number, getBilingualValue(payment, 'agreement_title', agreementId), `${t('agreement.payments.payee')}: ${getBilingualValue(payment, 'egcs_fc_payeename', t('agreement.payments.payee_unattributed'))}`, payment.egcs_fc_currency.toUpperCase()]"
             :badges="[{
@@ -418,5 +420,6 @@ const handleCompleted = async () => {
         </UForm>
       </template>
     </UModal>
+    <AccountReceivableCreateModal v-if="receivableEntry.entry.value" v-model:open="receivableEntry.open.value" :agreement-id="agreementId" :source-entry="receivableEntry.entry.value" @created="receivableEntry.created" />
   </div>
 </template>

@@ -464,6 +464,18 @@ export async function up(db: Kysely<Database>): Promise<void> {
     BEFORE UPDATE OF egcs_tp_agencychartofaccount ON "Transfer_Payment_Stream_Chart_of_Account"
     FOR EACH ROW EXECUTE FUNCTION protect_stream_chart_catalog_link()`.execute(db)
 
+  await sql`CREATE FUNCTION validate_stream_chart_kind() RETURNS trigger AS $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM "Agency_Chart_of_Account" account
+        WHERE account.id = NEW.egcs_tp_agencychartofaccount AND account.egcs_ay_kind = 'commitment') THEN
+        RAISE EXCEPTION 'Stream accounting requires a Commitment Chart of Account'
+          USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_stream_chart_kind';
+      END IF;
+      RETURN NEW;
+    END $$ LANGUAGE plpgsql`.execute(db)
+  await sql`CREATE TRIGGER trg_validate_stream_chart_kind BEFORE INSERT OR UPDATE OF egcs_tp_agencychartofaccount
+    ON "Transfer_Payment_Stream_Chart_of_Account" FOR EACH ROW EXECUTE FUNCTION validate_stream_chart_kind()`.execute(db)
+
   await db.schema
     .createTable('Transfer_Payment_Stream_Commitment_Type')
     .addColumn('id', 'bigserial', col => col.primaryKey())
@@ -1042,6 +1054,7 @@ export async function down(db: Kysely<Database>): Promise<void> {
   await db.schema.dropTable('Transfer_Payment_Stream_Commitment_Type').execute()
   await db.schema.dropTable('Transfer_Payment_Stream_Chart_of_Account').execute()
   await sql`DROP FUNCTION protect_stream_chart_catalog_link()`.execute(db)
+  await sql`DROP FUNCTION validate_stream_chart_kind()`.execute(db)
   await db.schema.dropTable('Transfer_Payment_Agreement_Subtype').execute()
   await sql`DROP TRIGGER IF EXISTS trg_enforce_amendment_subtype_type_stream_scope ON "Transfer_Payment_Amendment_Subtype_Type"`.execute(db)
   await sql`DROP FUNCTION IF EXISTS trg_fn_enforce_amendment_subtype_type_stream_scope()`.execute(db)

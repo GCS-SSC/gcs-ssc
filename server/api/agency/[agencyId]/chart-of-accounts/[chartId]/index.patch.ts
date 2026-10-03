@@ -27,6 +27,9 @@ export default defineEventHandler(async event => {
       if (body.egcs_ay_currency !== undefined && body.egcs_ay_currency !== current.egcs_ay_currency) {
         return await badRequest(event, 'AGENCY_CHART_CURRENCY_IMMUTABLE', 'apiErrors.agency.chart_currency_immutable')
       }
+      if (body.egcs_ay_kind !== undefined && body.egcs_ay_kind !== current.egcs_ay_kind) {
+        return await badRequest(event, 'AGENCY_CHART_KIND_IMMUTABLE', 'apiErrors.agency.chart_kind_immutable')
+      }
       if (!body.egcs_ay_accountingdimensions) return current
       return await trx.updateTable('Agency_Chart_of_Account').set({
         egcs_ay_accountingdimensions: sql`${JSON.stringify(body.egcs_ay_accountingdimensions)}::jsonb`

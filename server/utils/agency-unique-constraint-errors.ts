@@ -5,6 +5,8 @@ const UNIQUE_VIOLATION_CODE = '23505'
 const FOREIGN_KEY_VIOLATION_CODE = '23503'
 
 const CONSTRAINT_ERROR_MAP: Record<string, ConstraintErrorMapping> = {
+  ay_uq_ar_type_name_en: { code: 'AGENCY_DUPLICATE_ACCOUNT_RECEIVABLE_TYPE_NAME_EN', key: 'apiErrors.agency.duplicate_account_receivable_type_name_en' },
+  ay_uq_ar_type_name_fr: { code: 'AGENCY_DUPLICATE_ACCOUNT_RECEIVABLE_TYPE_NAME_FR', key: 'apiErrors.agency.duplicate_account_receivable_type_name_fr' },
   ay_uq_funding_type_name_en_active: { code: 'AGENCY_DUPLICATE_FUNDING_TYPE', key: 'apiErrors.agency.duplicate_funding_type' },
   ay_uq_funding_type_name_fr_active: { code: 'AGENCY_DUPLICATE_FUNDING_TYPE', key: 'apiErrors.agency.duplicate_funding_type' },
   ay_uq_funding_subtype_name_en_active: { code: 'AGENCY_DUPLICATE_FUNDING_SUBTYPE', key: 'apiErrors.agency.duplicate_funding_subtype' },

@@ -8,6 +8,7 @@ import { AccountReceivableEditSchema } from '~~/shared/types/schemas/account-rec
 import { appRouteLocations, authorizedRouteLocation } from '~/utils/route-locations'
 import { accountReceivableReference, formatAccountReceivableAmount } from '~/utils/account-receivable-display'
 import { AppFetchResponseError } from '~/utils/fetch-error'
+import { parseMoneyText, moneyToCents } from '~~/shared/utils/money'
 
 definePageMeta({ key: route => route.path, i18n: { paths: {
   en: '/agreements/[id]/account-receivables/[accountReceivableId]', fr: '/ententes/[id]/comptes-debiteurs/[accountReceivableId]'
@@ -37,13 +38,13 @@ const creditMemoOpen: Ref<boolean> = ref(false)
 const detailContent: Ref<HTMLElement | null> = ref(null)
 type FormState = {
   egcs_fc_requesteddate: string | Date | null
-  egcs_fc_recoverymethod: 'offset' | 'direct_repayment'
+  egcs_fc_recoverymethod: 'offset' | 'direct_repayment' | undefined
   egcs_fc_narrative_en: string
   egcs_fc_narrative_fr: string
   egcs_fc_recipientpreference: string | undefined
   egcs_fc_preferenceoverride_en: string
   egcs_fc_preferenceoverride_fr: string
-  egcs_fc_lines: Array<{ id: string, egcs_fc_amount: string }>
+  egcs_fc_lines: Array<{ id: string, egcs_fc_amount: string, egcs_fc_accountreceivablechartofaccount: string | undefined }>
 }
 const state: Ref<FormState | null> = ref(null)
 const savedState: Ref<string> = ref('')
@@ -51,13 +52,13 @@ const dirty = computed(() => state.value !== null && JSON.stringify(state.value)
 const hydrate = (detail: AccountReceivableDetail) => {
   state.value = {
     egcs_fc_requesteddate: detail.egcs_fc_requesteddate.slice(0, 10),
-    egcs_fc_recoverymethod: detail.egcs_fc_recoverymethod,
+    egcs_fc_recoverymethod: detail.egcs_fc_recoverymethod ?? undefined,
     egcs_fc_narrative_en: detail.egcs_fc_narrative_en,
     egcs_fc_narrative_fr: detail.egcs_fc_narrative_fr,
     egcs_fc_recipientpreference: detail.egcs_fc_recipientpreference ?? undefined,
     egcs_fc_preferenceoverride_en: detail.egcs_fc_preferenceoverride_en,
     egcs_fc_preferenceoverride_fr: detail.egcs_fc_preferenceoverride_fr,
-    egcs_fc_lines: detail.egcs_fc_lines.map(line => ({ id: line.id, egcs_fc_amount: line.egcs_fc_amount }))
+    egcs_fc_lines: detail.egcs_fc_lines.map(line => ({ id: line.id, egcs_fc_amount: line.egcs_fc_amount, egcs_fc_accountreceivablechartofaccount: line.egcs_fc_accountreceivablechartofaccount ?? undefined }))
   }
   savedState.value = JSON.stringify(state.value)
 }
@@ -88,6 +89,21 @@ const tabs = [
   { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users' }
 ]
 const amount = (value: string | null | undefined) => formatAccountReceivableAmount(value, locale.value, receivable.value?.egcs_fc_currency ?? 'cad') ?? t('common.not_available')
+const chartRequired = (index: number) => {
+  try {
+    return moneyToCents(parseMoneyText(state.value?.egcs_fc_lines[index]?.egcs_fc_amount ?? '')) !== BigInt(0)
+  } catch {
+    return false
+  }
+}
+const canEditLineAmount = (index: number) => receivable.value?.egcs_fc_canedit === true
+  && (!receivable.value.egcs_fc_linkedreceivable || Boolean(receivable.value.egcs_fc_lines[index]?.egcs_fc_accountreceivablechartofaccount))
+const showCollectionState = computed(() => receivable.value?.egcs_fc_outcome === 'posted')
+const heroBadges = computed(() => receivable.value
+  ? [{ statusId: receivable.value.egcs_fc_status }, ...(showCollectionState.value
+      ? [{ label: t(`account_receivable.collection_states.${receivable.value.egcs_fc_collectionstate}`), prefixLabel: t('account_receivable.collection_state'), uiVariant: 'outline' as const }]
+      : [])]
+  : [])
 const balances = computed(() => receivable.value
   ? [
       { key: 'principal', value: receivable.value.egcs_fc_principal },
@@ -177,7 +193,7 @@ const creditMemoCreated = async (id: string, ownerAgreement: string) => {
         </UDashboardNavbar>
       </template>
       <template #body>
-        <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-hand-coins" :title="accountReceivableReference(receivable)" :meta-items="[`${t('account_receivable.agreement')}: ${receivable.egcs_fc_agreementnumber}`, locale === 'fr' ? receivable.egcs_fc_debtorname_fr : receivable.egcs_fc_debtorname_en, receivable.egcs_fc_fiscalyeardisplay, receivable.egcs_fc_currency.toUpperCase()]" :badges="[{ statusId: receivable.egcs_fc_status }, { label: t(`account_receivable.collection_states.${receivable.egcs_fc_collectionstate}`), prefixLabel: t('account_receivable.collection_state'), uiVariant: 'outline' }]" :actions="heroActions" />
+        <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-hand-coins" :title="accountReceivableReference(receivable)" :meta-items="[`${t('account_receivable.agreement')}: ${receivable.egcs_fc_agreementnumber}`, locale === 'fr' ? receivable.egcs_fc_debtorname_fr : receivable.egcs_fc_debtorname_en, locale === 'fr' ? receivable.egcs_fc_typename_fr : receivable.egcs_fc_typename_en, receivable.egcs_fc_fiscalyeardisplay, receivable.egcs_fc_currency.toUpperCase()]" :badges="heroBadges" :actions="heroActions" />
         <ULink v-if="receivable.egcs_fc_linkedreceivable" :to="localePath(appRouteLocations.agreementAccountReceivableDetail(agreementId, receivable.egcs_fc_linkedreceivable))" class="mb-4 text-sm">{{ t('account_receivable.linked_receivable') }}</ULink>
         <CommonEntityEditorWorkspace content-test-id="agreement-account-receivable-detail-content">
           <template #sidebar>
@@ -185,6 +201,9 @@ const creditMemoCreated = async (id: string, ownerAgreement: string) => {
           </template>
           <UForm v-if="selectedTab === 'lines'" :state="state" :validate="createValidator(AccountReceivableEditSchema)" class="space-y-8" @submit="save">
             <CommonSection :title="t('account_receivable.financial_lines')" :grid-cols="1">
+              <p class="text-sm text-muted">
+                {{ locale === 'fr' ? receivable.egcs_fc_typedescription_fr : receivable.egcs_fc_typedescription_en }}
+              </p>
               <p v-if="receivable.egcs_fc_postedat" class="text-sm">
                 <span class="text-muted">{{ t('account_receivable.current_recovery_method') }}:</span>
                 {{ t(`enums.account_receivable_recovery_method.${receivable.egcs_fc_effectiverecoverymethod}`) }}
@@ -198,15 +217,24 @@ const creditMemoCreated = async (id: string, ownerAgreement: string) => {
                   </dd>
                 </div>
               </dl>
-              <p class="text-sm text-muted">
+              <p v-if="showCollectionState" class="text-sm text-muted">
                 {{ t(`account_receivable.collection_states.${receivable.egcs_fc_collectionstate}`) }}
               </p>
               <p id="account-receivable-amount-instruction" class="text-sm text-muted">
                 {{ t(receivable.egcs_fc_linkedreceivable ? 'account_receivable.adjustment_instruction' : 'account_receivable.amount_instruction') }}
               </p>
               <AccountReceivableSourceLines :lines="receivable.egcs_fc_lines" :currency="receivable.egcs_fc_currency">
+                <template v-if="receivable.egcs_fc_canedit" #coding="{ line, index }">
+                  <UFormField v-if="!receivable.egcs_fc_linkedreceivable" :name="`egcs_fc_lines.${index}.egcs_fc_accountreceivablechartofaccount`" :label="t('account_receivable.receivable_account')" :description="t('account_receivable.receivable_account_description')" :required="chartRequired(index)">
+                    <CommonServerLookupSelect v-model="state.egcs_fc_lines[index]!.egcs_fc_accountreceivablechartofaccount" :fetch-url="`/api/account-receivables/${accountReceivableId}/lookups/charts`" :query="{ egcs_fc_agencyfiscalyear: receivable.egcs_fc_agencyfiscalyear }" selected-values-query-key="selectedIds" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :show-value-in-label="false" :disabled="saving" close-on-select />
+                  </UFormField>
+                  <CorrectionAccountingDimensions v-else-if="line.egcs_fc_accountreceivablechartofaccount" :dimensions="line.egcs_fc_accountreceivableaccountingdimensions" />
+                  <p v-else class="text-sm text-muted">
+                    {{ t('account_receivable.adjustment_source_unavailable') }}
+                  </p>
+                </template>
                 <template #amount="{ line, index }">
-                  <UFormField v-if="receivable.egcs_fc_canedit" :name="`egcs_fc_lines.${index}.egcs_fc_amount`" :label="t('account_receivable.source_amount', { number: index + 1 })">
+                  <UFormField v-if="canEditLineAmount(index)" :name="`egcs_fc_lines.${index}.egcs_fc_amount`" :label="t('account_receivable.source_amount', { number: index + 1 })">
                     <UInput v-model="state.egcs_fc_lines[index]!.egcs_fc_amount" type="text" inputmode="decimal" aria-describedby="account-receivable-amount-instruction" :disabled="saving" class="w-full" />
                   </UFormField>
                   <p v-else class="text-sm font-semibold">
@@ -223,8 +251,9 @@ const creditMemoCreated = async (id: string, ownerAgreement: string) => {
                 <UFormField name="egcs_fc_requesteddate" :label="t('account_receivable.requested_date')">
                   <CommonDatePicker v-model="state.egcs_fc_requesteddate" :disabled="saving || !receivable.egcs_fc_canedit" />
                 </UFormField>
-                <UFormField name="egcs_fc_recoverymethod" :label="t('account_receivable.recovery_method')">
+                <UFormField name="egcs_fc_recoverymethod" :label="t('account_receivable.recovery_method')" :description="receivable.egcs_fc_canedit ? t('account_receivable.recovery_method_instruction') : undefined">
                   <CommonEnumSelect v-model="state.egcs_fc_recoverymethod" name="account_receivable_recovery_method" :disabled="saving || !receivable.egcs_fc_canedit" class="w-full" />
+                  <UButton v-if="state.egcs_fc_recoverymethod && receivable.egcs_fc_canedit" type="button" icon="i-lucide-x" color="neutral" variant="ghost" :label="t('account_receivable.clear_recovery_method')" :disabled="saving" @click="state.egcs_fc_recoverymethod = undefined" />
                 </UFormField>
                 <UFormField name="egcs_fc_narrative_en" :label="t('account_receivable.narrative_en')">
                   <UTextarea v-model="state.egcs_fc_narrative_en" :readonly="!receivable.egcs_fc_canedit" :disabled="saving" aria-describedby="account-receivable-rationale-instruction" class="w-full" :rows="4" />
@@ -237,7 +266,7 @@ const creditMemoCreated = async (id: string, ownerAgreement: string) => {
                 <CommonEnumSelect v-model="state.egcs_fc_recipientpreference" name="account_receivable_recovery_method" :disabled="saving || !receivable.egcs_fc_canedit" class="w-full" />
                 <UButton v-if="state.egcs_fc_recipientpreference && receivable.egcs_fc_canedit" type="button" icon="i-lucide-x" color="neutral" variant="ghost" :label="t('account_receivable.clear_preference')" :disabled="saving" @click="state.egcs_fc_recipientpreference = undefined" />
               </UFormField>
-              <template v-if="state.egcs_fc_recipientpreference && state.egcs_fc_recipientpreference !== state.egcs_fc_recoverymethod">
+              <template v-if="state.egcs_fc_recoverymethod && state.egcs_fc_recipientpreference && state.egcs_fc_recipientpreference !== state.egcs_fc_recoverymethod">
                 <p id="account-receivable-override-instruction" class="text-sm text-muted">
                   {{ t('account_receivable.override_instruction') }}
                 </p>

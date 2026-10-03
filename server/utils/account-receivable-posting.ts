@@ -20,11 +20,14 @@ const retainedAttachments = async (db: Kysely<Database>, entityType: AccountRece
   .where('link.egcs_cn_entitytype', '=', entityType).where('link.egcs_cn_entityid', '=', id).where('attachment._deleted', '=', false).where('link._deleted', '=', false).orderBy('attachment.id').execute()
 
 export const captureAccountReceivablePacket = async (db: Kysely<Database>, id: string) => {
+  await validateAccountReceivableBasis(db, id, { submission: true })
   const lines = await readAccountReceivableLines(db, id)
   const labels = (lines[0]?.egcs_fc_evidence ?? {}) as Record<string, JsonValue>
-  const header = await db.selectFrom('Funding_Case_Agreement_Account_Receivable').selectAll().where('id', '=', id).where('_deleted', '=', false).executeTakeFirstOrThrow()
+  const header = await db.selectFrom('Funding_Case_Agreement_Account_Receivable').selectAll()
+    .select(sql<string | null>`egcs_fc_fiscaloutstanding::text`.as('egcs_fc_fiscaloutstanding')).where('id', '=', id).where('_deleted', '=', false).executeTakeFirstOrThrow()
   return { schemaVersion: 1 as const,
-    accountReceivable: json({ ...header, egcs_fc_debtorname_en: labels.egcs_fc_debtorname_en ?? '', egcs_fc_debtorname_fr: labels.egcs_fc_debtorname_fr ?? '', egcs_fc_fiscalyeardisplay: labels.egcs_fc_fiscalyeardisplay ?? '' }),
+    accountReceivable: json({ ...header, egcs_fc_fiscaloutstanding: header.egcs_fc_fiscaloutstanding === null ? null : parseDatabaseMoney(header.egcs_fc_fiscaloutstanding),
+      egcs_fc_debtorname_en: labels.egcs_fc_debtorname_en ?? '', egcs_fc_debtorname_fr: labels.egcs_fc_debtorname_fr ?? '', egcs_fc_fiscalyeardisplay: labels.egcs_fc_fiscalyeardisplay ?? '' }),
     lines: json(lines), coding: json(await readAccountReceivableCoding(db, id)),
     attachments: json(await retainedAttachments(db, 'fundingcaseaccountreceivable', id)), policy: { creatorApprovalAllowed: false },
     calculation: { moneyScale: 2, formula: 'established_principal_plus_approved_deltas_minus_successful_principal_recoveries' }

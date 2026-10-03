@@ -81,6 +81,7 @@ export const PRODUCTION_CORE_MIGRATIONS = [
 
 export const PROHIBITED_PRODUCTION_BUNDLE_VALUES = [
   '0240_seed',
+  '0280_seed_accounts_receivable',
   'root@example.com',
   'agency@example.com',
   'password123',

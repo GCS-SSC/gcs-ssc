@@ -23,6 +23,7 @@ export const findEligibleAgencyChart = async (
     .whereRef('Transfer_Payment_Fiscal_Year_Budget.egcs_tp_currency', '=', 'Agency_Chart_of_Account.egcs_ay_currency')
     .where('Agency_Chart_of_Account.id', '=', chartId)
     .where('Agency_Chart_of_Account.egcs_ay_organizationagency', '=', agencyId)
+    .where('Agency_Chart_of_Account.egcs_ay_kind', '=', 'commitment')
     .where('Agency_Fiscal_Year.egcs_ay_organizationagency', '=', agencyId)
     .where('Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentstream', '=', streamId)
     .where('Agency_Chart_of_Account._deleted', '=', false)

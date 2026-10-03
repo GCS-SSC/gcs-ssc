@@ -109,7 +109,7 @@ const save = async () => {
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="t('account_receivable.record_credit_memo')" :description="t('account_receivable.credit_memo_description')" :ui="{ content: 'sm:max-w-4xl' }">
+  <UModal v-model:open="open" :title="t('account_receivable.record_credit_memo')" :description="t('account_receivable.credit_memo_description')" :ui="{ content: 'sm:max-w-4xl', header: 'shrink-0' }">
     <template #body>
       <UForm v-if="state" ref="form" :state="state" :validate="createValidator(AccountReceivableCreditMemoCreateSchema)" class="space-y-4" @submit="save">
         <dl class="grid gap-4 text-sm sm:grid-cols-3">
@@ -145,7 +145,7 @@ const save = async () => {
           <p class="text-sm text-muted">
             {{ t('account_receivable.proposal_instruction') }}
           </p>
-          <UButton type="button" icon="i-lucide-list-ordered" color="neutral" variant="outline" :label="t('account_receivable.propose_allocations')" :disabled="pending || !canPropose" @click="proposeAllocations" />
+          <UButton type="button" icon="i-lucide-list-ordered" color="neutral" variant="outline" :label="t('account_receivable.propose_allocations')" :disabled="pending || !canPropose" class="max-w-full [&_[data-slot=label]]:whitespace-normal [&_[data-slot=label]]:text-left" @click="proposeAllocations" />
         </div>
         <UAlert v-if="allocationShortfall" color="warning" :title="t('account_receivable.allocation_shortfall', { amount: amount(allocationShortfall) })" />
         <UFormField v-for="(allocation, index) in state.egcs_fc_allocations" :key="allocation.egcs_fc_receivableline" :name="`egcs_fc_allocations.${index}.egcs_fc_amount`" :label="allocationLabel(allocation.egcs_fc_receivableline, index)">
@@ -161,8 +161,8 @@ const save = async () => {
         <p class="text-sm text-muted">
           {{ t('account_receivable.credit_memo_evidence_instruction') }}
         </p>
-        <div class="flex justify-end gap-2">
-          <UButton type="button" color="neutral" variant="ghost" :label="t('common.cancel')" :disabled="pending" @click="open = false" /><CommonSaveButton :label="t('account_receivable.record_credit_memo')" :loading="pending" :disabled="pending" />
+        <div class="flex flex-wrap justify-end gap-2">
+          <UButton type="button" color="neutral" variant="ghost" :label="t('common.cancel')" :disabled="pending" @click="open = false" /><CommonSaveButton :label="t('account_receivable.record_credit_memo')" :loading="pending" :disabled="pending" class="max-w-full [&_[data-slot=label]]:whitespace-normal [&_[data-slot=label]]:text-left" />
         </div>
       </UForm>
     </template>

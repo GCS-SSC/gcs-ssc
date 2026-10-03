@@ -37,6 +37,7 @@ export default defineEventHandler(async event => {
     .where('Transfer_Payment_Stream_Chart_of_Account.egcs_tp_transferpaymentstream', '=', agreementContext.streamId)
     .where('Transfer_Payment_Stream_Chart_of_Account._deleted', '=', false)
     .where('Agency_Chart_of_Account._deleted', '=', false)
+    .where('Agency_Chart_of_Account.egcs_ay_kind', '=', 'commitment')
     .where('Agency_Fiscal_Year._deleted', '=', false)
   if (currency) baseQuery = baseQuery.where('Agency_Chart_of_Account.egcs_ay_currency', '=', currency)
   if (commitmentId) baseQuery = baseQuery.where(sql<boolean>`"Agency_Chart_of_Account".egcs_ay_currency = (

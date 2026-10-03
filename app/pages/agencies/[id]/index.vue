@@ -22,6 +22,7 @@ import AgencyDetailGeneralTab from '~/components/Agency/AgencyDetailGeneralTab.v
 import AgencyFiscalYears from '~/components/Agency/AgencyFiscalYears.vue'
 import AgencyChartOfAccounts from '~/components/Agency/AgencyChartOfAccounts.vue'
 import AgencyCommitmentTypes from '~/components/Agency/AgencyCommitmentTypes.vue'
+import AgencyAccountReceivableTypes from '~/components/Agency/AgencyAccountReceivableTypes.vue'
 import AgencyHoldbackBases from '~/components/Agency/AgencyHoldbackBases.vue'
 import AgencyMonitorTypes from '~/components/Agency/AgencyMonitorTypes.vue'
 import AgencyDocumentTemplates from '~/components/Agency/AgencyDocumentTemplates.vue'
@@ -84,6 +85,7 @@ const tabMap: TabMap = new Map([
   ['fiscalYears', { key: 'agency.tabs.fiscal_years', icon: 'i-lucide-calendar', component: AgencyFiscalYears, getProps: agencyResourceCapabilities }],
   ['chartOfAccounts', { key: 'agency.tabs.chart_of_accounts', icon: 'i-lucide-table-properties', component: AgencyChartOfAccounts, getProps: agencyResourceCapabilities }],
   ['commitmentTypes', { key: 'agency.tabs.commitment_types', icon: 'i-lucide-tags', component: AgencyCommitmentTypes, getProps: agencyResourceCapabilities }],
+  ['accountReceivableTypes', { key: 'agency.tabs.account_receivable_types', icon: 'i-lucide-tags', component: AgencyAccountReceivableTypes, getProps: agencyResourceCapabilities }],
   ['documentTemplates', { key: 'agency.tabs.document_templates', icon: 'i-lucide-file-text', component: AgencyDocumentTemplates, getProps: agencyResourceCapabilities }],
   ['holdbackBases', { key: 'agency.tabs.holdback_bases', icon: 'i-lucide-percent', component: AgencyHoldbackBases, getProps: agencyResourceCapabilities }],
   ['monitorTypes', { key: 'agency.tabs.monitor_types', icon: 'i-lucide-clipboard-check', component: AgencyMonitorTypes, getProps: agencyResourceCapabilities }],

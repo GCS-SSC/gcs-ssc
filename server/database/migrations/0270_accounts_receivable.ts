@@ -91,8 +91,12 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
     egcs_fc_pool bigint NOT NULL,
     egcs_fc_applicantrecipient bigint NOT NULL REFERENCES "Applicant_Recipient_Profile"(id) ON DELETE RESTRICT,
     egcs_fc_agencyfiscalyear bigint NOT NULL REFERENCES "Agency_Fiscal_Year"(id) ON DELETE RESTRICT,
-    egcs_fc_type varchar(32) NOT NULL CHECK (egcs_fc_type IN ('ineligible_expense','outstanding_advance')),
-    egcs_fc_recoverymethod varchar(32) NOT NULL CHECK (egcs_fc_recoverymethod IN ('offset','direct_repayment')),
+    egcs_fc_type bigint NOT NULL REFERENCES "Agency_Account_Receivable_Type"(id) ON DELETE RESTRICT,
+    egcs_fc_typename_en varchar(255) NOT NULL, egcs_fc_typename_fr varchar(255) NOT NULL,
+    egcs_fc_typedescription_en text NOT NULL, egcs_fc_typedescription_fr text NOT NULL,
+    egcs_fc_monitorrequired boolean NOT NULL, egcs_fc_advancepaymentrelated boolean NOT NULL, egcs_fc_claimrelated boolean NOT NULL,
+    egcs_fc_fiscaloutstanding numeric(19,2) CHECK (egcs_fc_fiscaloutstanding >= 0),
+    egcs_fc_recoverymethod varchar(32) CHECK (egcs_fc_recoverymethod IN ('offset','direct_repayment')),
     egcs_fc_recipientpreference varchar(32) CHECK (egcs_fc_recipientpreference IN ('offset','direct_repayment')),
     egcs_fc_preferenceoverride_en text NOT NULL DEFAULT '', egcs_fc_preferenceoverride_fr text NOT NULL DEFAULT '',
     egcs_fc_currency currency_codes NOT NULL,
@@ -109,11 +113,15 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
       REFERENCES "Funding_Case_Account_Receivable_Pool"(id,egcs_fc_applicantrecipient,egcs_fc_currency) ON DELETE RESTRICT,
     CONSTRAINT fc_fk_ar_link FOREIGN KEY (egcs_fc_linkedreceivable,egcs_fc_fundingagreement)
       REFERENCES "Funding_Case_Agreement_Account_Receivable"(id,egcs_fc_fundingagreement) ON DELETE RESTRICT,
-    CONSTRAINT fc_chk_ar_self CHECK (id IS DISTINCT FROM egcs_fc_linkedreceivable)
+    CONSTRAINT fc_chk_ar_self CHECK (id IS DISTINCT FROM egcs_fc_linkedreceivable),
+    CONSTRAINT fc_chk_ar_type_source CHECK (egcs_fc_advancepaymentrelated <> egcs_fc_claimrelated),
+    CONSTRAINT fc_chk_ar_fiscal_context CHECK (egcs_fc_advancepaymentrelated OR egcs_fc_fiscaloutstanding IS NULL)
   )`).execute(db)
   await sql`CREATE TABLE "Funding_Case_Agreement_Account_Receivable_Line" (
     id bigserial PRIMARY KEY, egcs_fc_receivable bigint NOT NULL, egcs_fc_fundingagreement bigint NOT NULL,
     egcs_fc_originalline bigint,
+    egcs_fc_accountreceivablechartofaccount bigint REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT,
+    egcs_fc_accountreceivableaccountingdimensions jsonb NOT NULL DEFAULT '[]',
     egcs_fc_sourcekey text NOT NULL,
     egcs_fc_claim bigint REFERENCES "Funding_Case_Agreement_Claim"(id) ON DELETE RESTRICT,
     egcs_fc_claimline bigint REFERENCES "Funding_Case_Agreement_Claim_Line_Item"(id) ON DELETE RESTRICT,
@@ -141,6 +149,7 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
     egcs_fc_periodstart integer NOT NULL CHECK (egcs_fc_periodstart BETWEEN 0 AND 11),
     egcs_fc_periodend integer NOT NULL CHECK (egcs_fc_periodend BETWEEN 0 AND 11 AND egcs_fc_periodend >= egcs_fc_periodstart),
     egcs_fc_paidbasis numeric(19,2) NOT NULL CHECK (egcs_fc_paidbasis > 0),
+    egcs_fc_sharedpaidbasis numeric(19,2) NOT NULL CHECK (egcs_fc_sharedpaidbasis >= 0),
     egcs_fc_amount numeric(19,2) NOT NULL DEFAULT 0,
     egcs_fc_accountingdimensions jsonb NOT NULL,
     _deleted boolean NOT NULL DEFAULT false,
@@ -205,6 +214,8 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
     CONSTRAINT fc_uq_ar_allocation_identity UNIQUE (id,egcs_fc_recovery)
   )`.execute(db)
   await sql`CREATE TABLE "Funding_Case_Account_Receivable_Posting" (
+    egcs_fc_accountreceivablechartofaccount bigint NOT NULL REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT,
+    egcs_fc_accountreceivableaccountingdimensions jsonb NOT NULL,
     id bigserial PRIMARY KEY, egcs_fc_recovery bigint NOT NULL, egcs_fc_allocation bigint NOT NULL,
     egcs_fc_coding bigint NOT NULL REFERENCES "Funding_Case_Agreement_Account_Receivable_Coding"(id) ON DELETE RESTRICT,
     egcs_fc_receivable bigint NOT NULL REFERENCES "Funding_Case_Agreement_Account_Receivable"(id) ON DELETE RESTRICT,
@@ -313,6 +324,31 @@ const installIntegrity = async (db: Kysely<Database>): Promise<void> => {
       END IF;
       NEW.egcs_fc_statusagency := owner_agency;
       IF target_type = 'fundingcaseaccountreceivable' THEN
+        IF TG_OP = 'INSERT' THEN
+          IF NEW.egcs_fc_linkedreceivable IS NULL THEN
+            SELECT * INTO linked FROM "Agency_Account_Receivable_Type" configuration
+              WHERE configuration.id = NEW.egcs_fc_type AND configuration.egcs_ay_organizationagency = owner_agency AND NOT configuration._deleted;
+            IF linked.id IS NULL THEN RAISE EXCEPTION 'AR type must belong to its owning Agency' USING ERRCODE = '23514'; END IF;
+            NEW.egcs_fc_typename_en := linked.egcs_ay_name_en; NEW.egcs_fc_typename_fr := linked.egcs_ay_name_fr;
+            NEW.egcs_fc_typedescription_en := linked.egcs_ay_description_en; NEW.egcs_fc_typedescription_fr := linked.egcs_ay_description_fr;
+            NEW.egcs_fc_monitorrequired := linked.egcs_ay_monitorrequired;
+            NEW.egcs_fc_advancepaymentrelated := linked.egcs_ay_advancepaymentrelated; NEW.egcs_fc_claimrelated := linked.egcs_ay_claimrelated;
+          ELSE
+            SELECT * INTO linked FROM "Funding_Case_Agreement_Account_Receivable" WHERE id = NEW.egcs_fc_linkedreceivable;
+            NEW.egcs_fc_typename_en := linked.egcs_fc_typename_en; NEW.egcs_fc_typename_fr := linked.egcs_fc_typename_fr;
+            NEW.egcs_fc_typedescription_en := linked.egcs_fc_typedescription_en; NEW.egcs_fc_typedescription_fr := linked.egcs_fc_typedescription_fr;
+            NEW.egcs_fc_monitorrequired := linked.egcs_fc_monitorrequired;
+            NEW.egcs_fc_advancepaymentrelated := linked.egcs_fc_advancepaymentrelated; NEW.egcs_fc_claimrelated := linked.egcs_fc_claimrelated;
+          END IF;
+        ELSIF (OLD.egcs_fc_typename_en,OLD.egcs_fc_typename_fr,OLD.egcs_fc_typedescription_en,OLD.egcs_fc_typedescription_fr,
+          OLD.egcs_fc_monitorrequired,OLD.egcs_fc_advancepaymentrelated,OLD.egcs_fc_claimrelated)
+          IS DISTINCT FROM (NEW.egcs_fc_typename_en,NEW.egcs_fc_typename_fr,NEW.egcs_fc_typedescription_en,NEW.egcs_fc_typedescription_fr,
+          NEW.egcs_fc_monitorrequired,NEW.egcs_fc_advancepaymentrelated,NEW.egcs_fc_claimrelated) THEN
+          RAISE EXCEPTION 'AR type definition evidence is immutable' USING ERRCODE = '23514';
+        END IF;
+        IF NEW.egcs_fc_monitorrequired <> (NEW.egcs_fc_monitorfollowup IS NOT NULL) THEN
+          RAISE EXCEPTION 'AR Monitor follow-up must match its retained type requirement' USING ERRCODE = '23514';
+        END IF;
         IF NOT EXISTS (SELECT 1 FROM "Agency_Fiscal_Year" fiscal WHERE fiscal.id = NEW.egcs_fc_agencyfiscalyear AND fiscal.egcs_ay_organizationagency = owner_agency) THEN
           RAISE EXCEPTION 'AR fiscal year must belong to owning Agency' USING ERRCODE = '23514';
         END IF;
@@ -348,7 +384,7 @@ const installIntegrity = async (db: Kysely<Database>): Promise<void> => {
     END $$ LANGUAGE plpgsql`.execute(db)
   for (const [table, type, key] of roots) await sql.raw(`CREATE TRIGGER trg_validate_${key}_root BEFORE INSERT OR UPDATE OR DELETE ON "${table}" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_ar_root('${type}')`).execute(db)
   await sql`CREATE FUNCTION trg_fn_validate_ar_content() RETURNS trigger AS $$
-    DECLARE root record; source record; original record; owner_agency bigint; root_id bigint;
+    DECLARE root record; source record; original record; ar_account record; owner_agency bigint; root_id bigint;
     BEGIN
       root_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.egcs_fc_receivable ELSE NEW.egcs_fc_receivable END;
       SELECT * INTO root FROM "Funding_Case_Agreement_Account_Receivable" WHERE id = root_id FOR UPDATE;
@@ -361,6 +397,34 @@ const installIntegrity = async (db: Kysely<Database>): Promise<void> => {
         RAISE EXCEPTION 'AR evidence cannot move between roots' USING ERRCODE = '23514';
       END IF;
       IF TG_TABLE_NAME = 'Funding_Case_Agreement_Account_Receivable_Line' THEN
+        SELECT egcs_fc_agency INTO owner_agency FROM "Funding_Case_Account_Receivable_Pool" WHERE id = root.egcs_fc_pool;
+        IF root.egcs_fc_linkedreceivable IS NOT NULL THEN
+          SELECT * INTO original FROM "Funding_Case_Agreement_Account_Receivable_Line" WHERE id = NEW.egcs_fc_originalline;
+          IF NEW.egcs_fc_accountreceivablechartofaccount IS DISTINCT FROM original.egcs_fc_accountreceivablechartofaccount THEN
+            RAISE EXCEPTION 'AR adjustment must preserve its original AR financial account' USING ERRCODE = '23514';
+          END IF;
+        END IF;
+        IF NEW.egcs_fc_accountreceivablechartofaccount IS NOT NULL THEN
+          SELECT * INTO ar_account FROM "Agency_Chart_of_Account" WHERE id = NEW.egcs_fc_accountreceivablechartofaccount;
+          IF ar_account.id IS NULL OR ar_account.egcs_ay_organizationagency <> owner_agency
+            OR ar_account.egcs_ay_fiscalyear <> root.egcs_fc_agencyfiscalyear OR ar_account.egcs_ay_currency <> root.egcs_fc_currency
+            OR ar_account.egcs_ay_kind <> 'account_receivable'
+            OR (root.egcs_fc_linkedreceivable IS NULL AND ar_account._deleted) THEN
+            RAISE EXCEPTION 'AR financial line requires its Agency fiscal year currency Accounts Receivable Chart' USING ERRCODE = '23514';
+          END IF;
+          IF TG_OP = 'UPDATE' AND OLD.egcs_fc_accountreceivablechartofaccount IS NOT DISTINCT FROM NEW.egcs_fc_accountreceivablechartofaccount THEN
+            NEW.egcs_fc_accountreceivableaccountingdimensions := OLD.egcs_fc_accountreceivableaccountingdimensions;
+          ELSIF root.egcs_fc_linkedreceivable IS NOT NULL THEN
+            NEW.egcs_fc_accountreceivableaccountingdimensions := original.egcs_fc_accountreceivableaccountingdimensions;
+          ELSE
+            NEW.egcs_fc_accountreceivableaccountingdimensions := ar_account.egcs_ay_accountingdimensions;
+          END IF;
+        ELSE
+          NEW.egcs_fc_accountreceivableaccountingdimensions := '[]'::jsonb;
+          IF NEW.egcs_fc_amount <> 0 THEN
+            RAISE EXCEPTION 'A nonzero AR financial line requires an Accounts Receivable Chart' USING ERRCODE = '23514';
+          END IF;
+        END IF;
         IF root.egcs_fc_linkedreceivable IS NULL AND (NEW.egcs_fc_originalline IS NOT NULL OR NEW.egcs_fc_amount < 0 OR NEW.egcs_fc_amount > NEW.egcs_fc_sourceamount) THEN
           RAISE EXCEPTION 'Initial AR amounts must remain within their source basis' USING ERRCODE = '23514';
         END IF;
@@ -372,7 +436,7 @@ const installIntegrity = async (db: Kysely<Database>): Promise<void> => {
             RAISE EXCEPTION 'AR adjustment must preserve its original source lineage' USING ERRCODE = '23514';
           END IF;
         END IF;
-        IF root.egcs_fc_type = 'ineligible_expense' THEN
+        IF root.egcs_fc_claimrelated THEN
           IF NEW.egcs_fc_claim IS NULL OR NEW.egcs_fc_claimline IS NULL OR NEW.egcs_fc_reconcileline IS NULL THEN
             RAISE EXCEPTION 'Ineligible expense AR requires Claim reconciliation lineage' USING ERRCODE = '23514';
           END IF;
@@ -397,6 +461,7 @@ const installIntegrity = async (db: Kysely<Database>): Promise<void> => {
             JOIN "Funding_Case_Agreement_Budget_Fiscal_Year" fiscal ON fiscal.id = payment.egcs_fc_fiscalyear
             WHERE payment.id = NEW.egcs_fc_payment AND payment.egcs_fc_fundingagreement = root.egcs_fc_fundingagreement
               AND payment.egcs_fc_applicantrecipient = root.egcs_fc_applicantrecipient AND payment.egcs_fc_currency = root.egcs_fc_currency
+              AND payment.egcs_fc_paymenttype = 'advance' AND NEW.egcs_fc_sourcekey = 'advance:' || payment.id::text
               AND fiscal.egcs_fc_fiscalyear = root.egcs_fc_agencyfiscalyear) THEN
             RAISE EXCEPTION 'Advance AR source requires explicit payee and retained fiscal lineage' USING ERRCODE = '23514';
           END IF;
@@ -404,8 +469,15 @@ const installIntegrity = async (db: Kysely<Database>): Promise<void> => {
       ELSE
         SELECT egcs_fc_agency INTO owner_agency FROM "Funding_Case_Account_Receivable_Pool" WHERE id = root.egcs_fc_pool;
         SELECT * INTO source FROM "Funding_Case_Agreement_Account_Receivable_Line" WHERE id = NEW.egcs_fc_receivableline;
-        IF NEW.egcs_fc_agencyfiscalyear IS DISTINCT FROM root.egcs_fc_agencyfiscalyear THEN
-          RAISE EXCEPTION 'AR coding must retain original source fiscal period' USING ERRCODE = '23514';
+        IF root.egcs_fc_linkedreceivable IS NOT NULL THEN
+          SELECT * INTO original FROM "Funding_Case_Agreement_Account_Receivable_Coding" retained
+            WHERE retained.egcs_fc_receivableline = source.egcs_fc_originalline
+              AND (retained.egcs_fc_commitmentline,retained.egcs_fc_chartofaccount,retained.egcs_fc_agencychartofaccount,retained.egcs_fc_agencyfiscalyear,retained.egcs_fc_periodstart,retained.egcs_fc_periodend)
+                = (NEW.egcs_fc_commitmentline,NEW.egcs_fc_chartofaccount,NEW.egcs_fc_agencychartofaccount,NEW.egcs_fc_agencyfiscalyear,NEW.egcs_fc_periodstart,NEW.egcs_fc_periodend);
+          IF original.id IS NULL OR (NEW.egcs_fc_paidbasis,NEW.egcs_fc_accountingdimensions)
+            IS DISTINCT FROM (original.egcs_fc_paidbasis,original.egcs_fc_accountingdimensions) THEN
+            RAISE EXCEPTION 'AR adjustment must preserve original paid source coding and weights' USING ERRCODE = '23514';
+          END IF;
         END IF;
         IF NOT EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Commitment_Line" line
           JOIN "Transfer_Payment_Stream_Chart_of_Account" retained_chart ON retained_chart.id = NEW.egcs_fc_chartofaccount
@@ -415,11 +487,15 @@ const installIntegrity = async (db: Kysely<Database>): Promise<void> => {
           WHERE line.id = NEW.egcs_fc_commitmentline AND line.egcs_fc_fundingagreement = root.egcs_fc_fundingagreement
             AND retained_chart.egcs_tp_agencychartofaccount = account.id
             AND account.egcs_ay_organizationagency = owner_agency AND program.egcs_tp_agency = owner_agency
-            AND account.egcs_ay_fiscalyear = root.egcs_fc_agencyfiscalyear AND account.egcs_ay_currency = root.egcs_fc_currency) THEN
+            AND account.egcs_ay_fiscalyear = NEW.egcs_fc_agencyfiscalyear AND account.egcs_ay_currency = root.egcs_fc_currency
+            AND account.egcs_ay_kind = 'commitment') THEN
           RAISE EXCEPTION 'AR coding must preserve Commitment and Agency Chart currency lineage' USING ERRCODE = '23514';
         END IF;
         IF root.egcs_fc_linkedreceivable IS NULL AND (NEW.egcs_fc_amount < 0 OR NEW.egcs_fc_amount > NEW.egcs_fc_paidbasis) THEN
           RAISE EXCEPTION 'AR coding principal exceeds its retained paid basis' USING ERRCODE = '23514';
+        END IF;
+        IF root.egcs_fc_linkedreceivable IS NULL AND NEW.egcs_fc_sharedpaidbasis < NEW.egcs_fc_paidbasis THEN
+          RAISE EXCEPTION 'Initial AR shared coding capacity cannot be less than its source paid basis' USING ERRCODE = '23514';
         END IF;
       END IF;
       RETURN NEW;
@@ -443,7 +519,7 @@ const installIntegrity = async (db: Kysely<Database>): Promise<void> => {
     END $$ LANGUAGE plpgsql`.execute(db)
   await sql`CREATE TRIGGER trg_protect_ar_roster BEFORE INSERT OR UPDATE OR DELETE ON "Common_Entity_Assignment" FOR EACH ROW EXECUTE FUNCTION trg_fn_protect_ar_roster()`.execute(db)
   await sql`CREATE FUNCTION trg_fn_validate_ar_establishment() RETURNS trigger AS $$
-    DECLARE root record; root_id bigint; source record; coding record; principal numeric; consumed numeric; target_type text;
+    DECLARE root record; root_id bigint; source record; coding record; principal numeric; consumed numeric; fiscal_capacity numeric; target_type text;
     BEGIN
       target_type := TG_ARGV[0];
       root_id := CASE WHEN TG_TABLE_NAME IN ('Funding_Case_Agreement_Account_Receivable_Line','Funding_Case_Agreement_Account_Receivable_Coding') THEN (to_jsonb(NEW)->>'egcs_fc_receivable')::bigint ELSE NEW.id END;
@@ -462,6 +538,10 @@ const installIntegrity = async (db: Kysely<Database>): Promise<void> => {
             RAISE EXCEPTION 'Unresolved recovery blocks AR establishment' USING ERRCODE = '23514';
           END IF;
           IF btrim(root.egcs_fc_narrative_en) = '' AND btrim(root.egcs_fc_narrative_fr) = '' THEN RAISE EXCEPTION 'AR establishment requires a bilingual-group rationale' USING ERRCODE = '23514'; END IF;
+          IF root.egcs_fc_recoverymethod IS NULL THEN RAISE EXCEPTION 'AR submission requires a recovery method' USING ERRCODE = '23514'; END IF;
+          IF root.egcs_fc_monitorrequired <> (root.egcs_fc_monitorfollowup IS NOT NULL) THEN
+            RAISE EXCEPTION 'AR submission requires its configured Monitor follow-up' USING ERRCODE = '23514';
+          END IF;
           IF root.egcs_fc_recipientpreference IS NOT NULL AND root.egcs_fc_recipientpreference <> root.egcs_fc_recoverymethod
             AND btrim(root.egcs_fc_preferenceoverride_en) = '' AND btrim(root.egcs_fc_preferenceoverride_fr) = '' THEN
             RAISE EXCEPTION 'AR preference override requires a rationale' USING ERRCODE = '23514';
@@ -469,6 +549,9 @@ const installIntegrity = async (db: Kysely<Database>): Promise<void> => {
           SELECT COALESCE(sum(egcs_fc_amount),0) INTO principal FROM "Funding_Case_Agreement_Account_Receivable_Line" WHERE egcs_fc_receivable = root_id AND NOT _deleted;
           IF root.egcs_fc_linkedreceivable IS NULL AND principal <= 0 THEN RAISE EXCEPTION 'AR establishment requires positive principal' USING ERRCODE = '23514'; END IF;
           FOR source IN SELECT * FROM "Funding_Case_Agreement_Account_Receivable_Line" WHERE egcs_fc_receivable = root_id AND NOT _deleted LOOP
+            IF source.egcs_fc_amount <> 0 AND source.egcs_fc_accountreceivablechartofaccount IS NULL THEN
+              RAISE EXCEPTION 'AR submission requires financial accounts for every nonzero line' USING ERRCODE = '23514';
+            END IF;
             IF COALESCE((SELECT sum(egcs_fc_amount) FROM "Funding_Case_Agreement_Account_Receivable_Coding" WHERE egcs_fc_receivableline = source.id AND NOT _deleted),0) <> source.egcs_fc_amount THEN
               RAISE EXCEPTION 'AR coding must partition source principal exactly once' USING ERRCODE = '23514';
             END IF;
@@ -478,7 +561,7 @@ const installIntegrity = async (db: Kysely<Database>): Promise<void> => {
                 AND other.egcs_fc_applicantrecipient = root.egcs_fc_applicantrecipient
                 AND NOT line._deleted AND NOT other._deleted
                 AND (other.egcs_fc_outcome = 'posted' OR (other.egcs_fc_outcome = 'open' AND ar_has_lifecycle_evidence(other.id,'fundingcaseaccountreceivable')));
-            IF root.egcs_fc_type = 'outstanding_advance' THEN
+            IF root.egcs_fc_advancepaymentrelated THEN
               consumed := consumed - COALESCE((SELECT sum(allocation.egcs_fc_amount)
                 FROM "Funding_Case_Account_Receivable_Allocation" allocation
                 JOIN "Funding_Case_Account_Receivable_Recovery" recovery ON recovery.id = allocation.egcs_fc_recovery
@@ -487,6 +570,30 @@ const installIntegrity = async (db: Kysely<Database>): Promise<void> => {
                 WHERE original.egcs_fc_fundingagreement = root.egcs_fc_fundingagreement AND original.egcs_fc_sourcekey = source.egcs_fc_sourcekey
                   AND originaldebt.egcs_fc_applicantrecipient = root.egcs_fc_applicantrecipient
                   AND recovery.egcs_fc_outcome = 'posted' AND NOT allocation._deleted AND NOT recovery._deleted),0);
+              fiscal_capacity := root.egcs_fc_fiscaloutstanding;
+              IF fiscal_capacity IS NULL THEN
+                RAISE EXCEPTION 'Advance AR requires retained fiscal outstanding capacity' USING ERRCODE = '23514';
+              END IF;
+              SELECT COALESCE(sum(CASE WHEN other.egcs_fc_outcome = 'posted' THEN line.egcs_fc_amount ELSE greatest(line.egcs_fc_amount,0) END),0)
+                - COALESCE((SELECT sum(allocation.egcs_fc_amount)
+                  FROM "Funding_Case_Account_Receivable_Allocation" allocation
+                  JOIN "Funding_Case_Account_Receivable_Recovery" recovery ON recovery.id = allocation.egcs_fc_recovery
+                  JOIN "Funding_Case_Agreement_Account_Receivable" originaldebt ON originaldebt.id = allocation.egcs_fc_receivable
+                  WHERE originaldebt.egcs_fc_fundingagreement = root.egcs_fc_fundingagreement
+                    AND originaldebt.egcs_fc_applicantrecipient = root.egcs_fc_applicantrecipient
+                    AND originaldebt.egcs_fc_agencyfiscalyear = root.egcs_fc_agencyfiscalyear AND originaldebt.egcs_fc_advancepaymentrelated
+                    AND recovery.egcs_fc_outcome = 'posted' AND NOT allocation._deleted AND NOT recovery._deleted),0)
+                INTO principal
+                FROM "Funding_Case_Agreement_Account_Receivable_Line" line
+                JOIN "Funding_Case_Agreement_Account_Receivable" other ON other.id = line.egcs_fc_receivable
+                WHERE other.egcs_fc_fundingagreement = root.egcs_fc_fundingagreement
+                  AND other.egcs_fc_applicantrecipient = root.egcs_fc_applicantrecipient
+                  AND other.egcs_fc_agencyfiscalyear = root.egcs_fc_agencyfiscalyear AND other.egcs_fc_advancepaymentrelated
+                  AND NOT line._deleted AND NOT other._deleted
+                  AND (other.egcs_fc_outcome = 'posted' OR (other.egcs_fc_outcome = 'open' AND ar_has_lifecycle_evidence(other.id,'fundingcaseaccountreceivable')));
+              IF principal > fiscal_capacity OR principal < 0 THEN
+                RAISE EXCEPTION 'Advance AR fiscal principal is already reserved or established' USING ERRCODE = '23514';
+              END IF;
             END IF;
             IF consumed > source.egcs_fc_sourceamount OR consumed < 0 THEN RAISE EXCEPTION 'AR source principal is already reserved or established' USING ERRCODE = '23514'; END IF;
             IF root.egcs_fc_linkedreceivable IS NOT NULL AND ar_line_principal(source.egcs_fc_originalline) <
@@ -501,7 +608,7 @@ const installIntegrity = async (db: Kysely<Database>): Promise<void> => {
           -- Reserve its outstanding principal once across every established or
           -- submitted AR, including approved signed adjustments and collections.
           FOR coding IN SELECT egcs_fc_commitmentline,egcs_fc_chartofaccount,egcs_fc_agencyfiscalyear,
-              egcs_fc_periodstart,egcs_fc_periodend,min(egcs_fc_paidbasis) paid_basis
+              egcs_fc_periodstart,egcs_fc_periodend,min(egcs_fc_sharedpaidbasis) paid_basis
             FROM "Funding_Case_Agreement_Account_Receivable_Coding"
             WHERE egcs_fc_receivable = root_id AND NOT _deleted
             GROUP BY egcs_fc_commitmentline,egcs_fc_chartofaccount,egcs_fc_agencyfiscalyear,egcs_fc_periodstart,egcs_fc_periodend LOOP
@@ -541,7 +648,7 @@ const installIntegrity = async (db: Kysely<Database>): Promise<void> => {
     await sql`CREATE CONSTRAINT TRIGGER trg_validate_ar_establishment AFTER INSERT OR UPDATE ON ${sql.table(table)} DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_ar_establishment('fundingcaseaccountreceivable')`.execute(db)
   }
   await sql`CREATE FUNCTION trg_fn_validate_ar_recovery() RETURNS trigger AS $$
-    DECLARE recovery record; pool record; root record; allocation record; coding record; operation record; principal numeric; consumed numeric; recovery_id bigint;
+    DECLARE recovery record; pool record; root record; source record; allocation record; coding record; operation record; principal numeric; consumed numeric; recovery_id bigint;
     BEGIN
       IF TG_TABLE_NAME = 'Funding_Case_Account_Receivable_Recovery' THEN
         IF TG_OP = 'DELETE' THEN RAISE EXCEPTION 'Recovery reservations retain evidence' USING ERRCODE = '23514'; END IF;
@@ -617,6 +724,11 @@ const installIntegrity = async (db: Kysely<Database>): Promise<void> => {
         IF TG_OP <> 'INSERT' THEN RAISE EXCEPTION 'Recovery postings are immutable' USING ERRCODE = '23514'; END IF;
         SELECT * INTO allocation FROM "Funding_Case_Account_Receivable_Allocation" WHERE id = NEW.egcs_fc_allocation;
         SELECT * INTO coding FROM "Funding_Case_Agreement_Account_Receivable_Coding" WHERE id = NEW.egcs_fc_coding;
+        SELECT * INTO source FROM "Funding_Case_Agreement_Account_Receivable_Line" WHERE id = allocation.egcs_fc_receivableline;
+        IF (NEW.egcs_fc_accountreceivablechartofaccount,NEW.egcs_fc_accountreceivableaccountingdimensions)
+          IS DISTINCT FROM (source.egcs_fc_accountreceivablechartofaccount,source.egcs_fc_accountreceivableaccountingdimensions) THEN
+          RAISE EXCEPTION 'Recovery posting must preserve its retained AR account and dimensions' USING ERRCODE = '23514';
+        END IF;
         IF coding.egcs_fc_receivableline <> allocation.egcs_fc_receivableline
           OR (NEW.egcs_fc_receivable,NEW.egcs_fc_fundingagreement,NEW.egcs_fc_commitmentline,NEW.egcs_fc_chartofaccount,NEW.egcs_fc_agencychartofaccount,NEW.egcs_fc_agencyfiscalyear,NEW.egcs_fc_periodstart,NEW.egcs_fc_periodend)
           IS DISTINCT FROM (coding.egcs_fc_receivable,coding.egcs_fc_fundingagreement,coding.egcs_fc_commitmentline,coding.egcs_fc_chartofaccount,coding.egcs_fc_agencychartofaccount,coding.egcs_fc_agencyfiscalyear,coding.egcs_fc_periodstart,coding.egcs_fc_periodend) THEN
@@ -723,7 +835,7 @@ const installIntegrity = async (db: Kysely<Database>): Promise<void> => {
     END $$ LANGUAGE plpgsql`.execute(db)
   await sql`CREATE TRIGGER zz_ar_payment_line_control BEFORE INSERT OR UPDATE ON "Funding_Case_Agreement_Payment_Line" FOR EACH ROW EXECUTE FUNCTION trg_fn_ar_payment_line_control()`.execute(db)
   await sql`CREATE FUNCTION trg_fn_ar_completion_control() RETURNS trigger AS $$
-    DECLARE payment record;
+    DECLARE payment record; debt record;
     BEGIN
       IF NEW.egcs_cn_entitytype IN ('fundingcaseaccountreceivable','fundingcaseaccountreceivablecreditmemo')
         OR (NEW.egcs_cn_entitytype = 'fundingcasepayment' AND EXISTS (SELECT 1 FROM "Funding_Case_Account_Receivable_Recovery" recovery
@@ -733,6 +845,24 @@ const installIntegrity = async (db: Kysely<Database>): Promise<void> => {
             AND runtime.egcs_cn_entitytype = NEW.egcs_cn_entitytype AND runtime.egcs_cn_entityid = NEW.egcs_cn_entityid
             AND runtime.egcs_cn_kind = 'workflow' AND runtime.egcs_cn_purpose = 'approval_submission' AND NOT runtime._deleted) THEN
           RAISE EXCEPTION 'AR and automatic offsets require a Completion-linked approval submission' USING ERRCODE = '23514';
+        END IF;
+      END IF;
+      IF NEW.egcs_cn_entitytype = 'fundingcaseaccountreceivable' THEN
+        SELECT * INTO debt FROM "Funding_Case_Agreement_Account_Receivable" WHERE id = NEW.egcs_cn_entityid;
+        IF debt.egcs_fc_recoverymethod IS NULL THEN RAISE EXCEPTION 'AR submission requires a recovery method' USING ERRCODE = '23514'; END IF;
+        IF debt.egcs_fc_advancepaymentrelated AND debt.egcs_fc_fiscaloutstanding IS NULL THEN
+          RAISE EXCEPTION 'Advance AR submission requires retained fiscal outstanding capacity' USING ERRCODE = '23514';
+        END IF;
+        IF debt.egcs_fc_monitorrequired <> (debt.egcs_fc_monitorfollowup IS NOT NULL) THEN
+          RAISE EXCEPTION 'AR submission requires its configured Monitor follow-up' USING ERRCODE = '23514';
+        END IF;
+        IF EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Account_Receivable_Line" line
+          LEFT JOIN "Agency_Chart_of_Account" account ON account.id = line.egcs_fc_accountreceivablechartofaccount
+          WHERE line.egcs_fc_receivable = debt.id AND NOT line._deleted AND line.egcs_fc_amount <> 0
+            AND (account.id IS NULL OR account.egcs_ay_kind <> 'account_receivable'
+              OR account.egcs_ay_fiscalyear <> debt.egcs_fc_agencyfiscalyear OR account.egcs_ay_currency <> debt.egcs_fc_currency
+              OR (debt.egcs_fc_linkedreceivable IS NULL AND account._deleted))) THEN
+          RAISE EXCEPTION 'AR submission requires valid financial accounts for every nonzero line' USING ERRCODE = '23514';
         END IF;
       END IF;
       IF NEW.egcs_cn_entitytype = 'fundingcasepayment' THEN

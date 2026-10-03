@@ -17,6 +17,7 @@ import { DirectReviewEntityTypeIdentitySchema, PaginationSchema, PositivePostgre
 import { MoneySchema } from './money'
 import {
   AMENDED_TYPE_ENUM,
+  AGENCY_CHART_KIND_ENUM,
   CURRENCY_CODES_ENUM,
   LANGUAGE_PREFERENCE_ENUM,
   REVIEW_TYPE_ENUM
@@ -613,6 +614,7 @@ const validateChartOfAccountDimensions = (
 }
 
 export const AgencyChartOfAccountBaseSchema = z.object({
+  egcs_ay_kind: z.enum(AGENCY_CHART_KIND_ENUM, { error: 'validation.required' }).default('commitment'),
   egcs_ay_fiscalyear: PositivePostgresBigintIdSchema,
   egcs_ay_currency: z.enum(CURRENCY_CODES_ENUM, { error: 'validation.required' }),
   egcs_ay_accountingdimensions: z.array(
@@ -624,7 +626,9 @@ export const AgencyChartOfAccountBaseSchema = z.object({
 export const AgencyChartOfAccountSchema = AgencyChartOfAccountBaseSchema.superRefine(
   (data, ctx) => validateChartOfAccountDimensions(data.egcs_ay_accountingdimensions, ctx)
 )
-export const AgencyChartOfAccountPatchSchema = AgencyChartOfAccountBaseSchema.partial().superRefine(
+export const AgencyChartOfAccountPatchSchema = AgencyChartOfAccountBaseSchema.partial().extend({
+  egcs_ay_kind: AgencyChartOfAccountBaseSchema.shape.egcs_ay_kind.removeDefault().optional()
+}).superRefine(
   (data, ctx) => validateChartOfAccountDimensions(data.egcs_ay_accountingdimensions, ctx)
 )
 export type AgencyChartOfAccount = z.infer<typeof AgencyChartOfAccountSchema>

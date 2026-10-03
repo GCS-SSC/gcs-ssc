@@ -636,13 +636,13 @@
       "failed": "Échouée",
       "cancelled": "Annulée"
     },
-    "account_receivable_type": {
-      "ineligible_expense": "Dépense inadmissible",
-      "outstanding_advance": "Avance impayée"
-    },
     "account_receivable_recovery_method": {
       "offset": "Compensation",
       "direct_repayment": "Remboursement direct"
+    },
+    "agency_chart_of_account_kind": {
+      "commitment": "Engagements",
+      "account_receivable": "Comptes débiteurs"
     }
   },
   "agency": {
@@ -759,7 +759,26 @@
       "agreement_types": "Types d'ententes",
       "approval_templates": "Modèles d’approbation",
       "workflow_setups": "Flux de travail",
-      "review_schemas": "Schémas de révision"
+      "review_schemas": "Schémas de révision",
+      "account_receivable_types": "Types de comptes débiteurs"
+    },
+    "monitor_types": {
+      "receivable_eligible": "Autoriser les suivis liés aux comptes débiteurs",
+      "receivable_eligible_description": "Les suivis de ce type de contrôle peuvent exiger l’établissement d’un compte débiteur lié."
+    },
+    "receivable_types": {
+      "title": "Type de compte débiteur",
+      "title_en": "Titre (anglais)",
+      "title_fr": "Titre (français)",
+      "description_en": "Description (anglais)",
+      "description_fr": "Description (français)",
+      "source": "Source associée",
+      "source_description": "Choisissez exactement une source pour ce type de compte débiteur.",
+      "advance_description": "Recouvrer des montants provenant de paiements d’avances versés.",
+      "claim_description": "Recouvrer des montants provenant de réclamations rapprochées et finalisées.",
+      "monitor_required": "Exiger un suivi de contrôle",
+      "monitor_description": "Les comptes débiteurs de ce type doivent être liés à un suivi de contrôle lors de leur création.",
+      "policy_locked": "Les exigences relatives aux sources et au suivi sont verrouillées, car un compte débiteur utilise ce type. Vous pouvez toujours modifier son nom et sa description."
     }
   },
   "role": {
@@ -775,7 +794,7 @@
     "description_fr": "Description (FR)",
     "description": "Gérez les rôles du système et leurs autorisations granulaires.",
     "permissions": "Autorisations",
-    "manage_assignments": "Gérer les affectations",
+    "manage_assignments": "Gérer l’affectation",
     "permission_level_help": "Choisissez le plafond cumulatif d’accès aux données administratives pour ce sujet.",
     "permission_level": "Niveau d’accès",
     "access_levels": {
@@ -1137,6 +1156,7 @@
       "transfer_payment_scope_requires_transfer_payment_ability": "La portée de programme nécessite au moins une autorisation de paiement de transfert."
     },
     "agency": {
+      "monitor_receivable_in_use": "Des suivis liés à des comptes débiteurs utilisent déjà ce type de contrôle. Leur autorisation ne peut pas être désactivée.",
       "duplicate_funding_type": "Un type de financement portant ce nom existe déjà pour l’agence.",
       "duplicate_funding_subtype": "Un sous-type de financement portant ce nom existe déjà dans ce type.",
       "funding_type_not_found": "Type de financement introuvable.",
@@ -1187,7 +1207,14 @@
       "duplicate_approval_behalf_type_name_en": "Un type d'approbation au nom de avec ce nom anglais existe déjà pour l'agence.",
       "duplicate_approval_behalf_type_name_fr": "Un type d'approbation au nom de avec ce nom français existe déjà pour l'agence.",
       "duplicate_agreement_type_name_en": "Un sous-type d'entente avec ce nom anglais existe déjà pour ce type d'entente dans l'agence.",
-      "duplicate_agreement_type_name_fr": "Un sous-type d'entente avec ce nom français existe déjà pour ce type d'entente dans l'agence."
+      "duplicate_agreement_type_name_fr": "Un sous-type d'entente avec ce nom français existe déjà pour ce type d'entente dans l'agence.",
+      "account_receivable_type_not_found": "Type de compte débiteur introuvable.",
+      "account_receivable_type_in_use": "Ce type est utilisé par un compte débiteur et ne peut pas être supprimé.",
+      "account_receivable_type_policy_locked": "Les exigences relatives aux sources et au suivi ne peuvent pas être modifiées, car un compte débiteur utilise ce type.",
+      "chart_kind_immutable": "Le type de compte ne peut pas être modifié. Créez un compte distinct pour l’autre type.",
+      "account_receivable_chart_in_use": "Ce compte est utilisé par un compte débiteur et ne peut pas être supprimé.",
+      "duplicate_account_receivable_type_name_en": "Un type de compte débiteur avec ce titre anglais existe déjà pour l’organisme.",
+      "duplicate_account_receivable_type_name_fr": "Un type de compte débiteur avec ce titre français existe déjà pour l’organisme."
     },
     "admin_common": {
       "not_found": "Enregistrement de ressource administrateur introuvable.",
@@ -1240,6 +1267,7 @@
       "libreoffice_unavailable": "LibreOffice est requis pour convertir les modèles DOCX en PDF. Installez LibreOffice sur le serveur ou utilisez un modèle PDF HTML."
     },
     "agreement": {
+      "monitor_receivable_not_allowed": "Ce type de contrôle ne permet pas de suivis exigeant l’établissement d’un compte débiteur.",
       "invalid_funding_subtype": "Sélectionnez un sous-type de financement offert pour le volet de cette entente.",
       "duplicate_funding_subtype": "Chaque sous-type de financement ne peut figurer qu’une fois par ligne.",
       "funding_subtype_invalid": "Sélectionnez un sous-type de financement offert pour le volet de cette entente, sans doublons.",
@@ -1506,7 +1534,11 @@
       "payment_direct_repayment_hold": "Ce bénéficiaire a un compte débiteur impayé exigeant un remboursement direct. Les paiements sont bloqués jusqu’à son remboursement ou jusqu’à ce qu’un ajustement approuvé modifie le mode de recouvrement.",
       "payment_recovery_pending": "Un recouvrement ou un ajustement de compte débiteur est en attente pour ce bénéficiaire. Terminez ou annulez ce travail avant de traiter ce paiement.",
       "payment_payee_unavailable": "Sélectionnez comme bénéficiaire du paiement un promoteur actif lié à cette entente.",
-      "monitor_receivable_required": "Établissez le compte débiteur lié avant de finaliser ce suivi de recouvrement."
+      "monitor_receivable_required": "Établissez le compte débiteur lié avant de finaliser ce suivi de recouvrement.",
+      "recovery_method_required": "Sélectionnez un mode de recouvrement avant de terminer ce compte débiteur.",
+      "account_required": "Sélectionnez un compte comptable débiteur pour chaque montant non nul avant de terminer ce compte débiteur.",
+      "monitor_required": "Sélectionnez un suivi de contrôle exigé par ce type de compte débiteur.",
+      "type_unavailable": "Sélectionnez un type de compte débiteur actif configuré pour l’organisme de cette entente."
     }
   },
   "transfer_payment": {
@@ -1626,7 +1658,9 @@
       "move_up": "Déplacer le champ vers le haut",
       "move_down": "Déplacer le champ vers le bas",
       "create": "Créer une entrée du plan comptable",
-      "update": "Mettre à jour une entrée du plan comptable"
+      "update": "Mettre à jour une entrée du plan comptable",
+      "kind": "Type de compte",
+      "kind_description": "Indiquez si ce compte est utilisé pour les engagements ou les comptes débiteurs."
     },
     "commitment_types": {
       "title": "Types d'engagement",
@@ -2140,7 +2174,8 @@
     "workflow_member_owner_reference": "Sélectionnez exactement un membre de revue ou de recommandation imbriqué",
     "workflow_member_owner_duplicate": "Chaque membre de flux imbriqué ne peut avoir qu’une seule association de propriétaire",
     "checklist_na_policy_requires_option": "Autorisez S. O. avant d’exiger une explication pour S. O.",
-    "checklist_answer_not_allowed": "Cette réponse n’est pas offerte par la question de la version publiée utilisée."
+    "checklist_answer_not_allowed": "Cette réponse n’est pas offerte par la question de la version publiée utilisée.",
+    "account_receivable_source_required": "Sélectionnez exactement une source : Réclamations ou Avances."
   },
   "notes": {
     "title": "Notes au dossier",
@@ -4095,11 +4130,13 @@
     "manual_credit_memo": "Note de crédit manuelle",
     "recovery_outcome": "Résultat du recouvrement",
     "recovery_amount": "Montant recouvré",
-    "recovery_method": "Mode de recouvrement approuvé",
+    "recovery_method": "Mode de recouvrement",
+    "type_instruction": "Choisissez un type défini par l’Agence. Il détermine les exigences relatives aux sources et au suivi du compte débiteur.",
+    "source_context_locked": "Le débiteur, l’exercice et les sources proviennent de la réclamation ou du paiement anticipé d’origine et ne peuvent pas être modifiés.",
     "current_recovery_method": "Mode de recouvrement actuellement approuvé",
     "type": "Type de compte débiteur",
-    "source_claims": "Lignes de réclamation sources",
-    "source_advances": "Avances payées sources",
+    "source_claims": "Réclamations",
+    "source_advances": "Avances",
     "source_description": "Sélectionnez les sources conservées de cette entente et de cet exercice. Les sources d’avance peuvent être sélectionnées automatiquement.",
     "source_line": "Ligne source {number}",
     "source_kind": "Source",
@@ -4125,7 +4162,7 @@
     "override_fr": "Motif du changement de préférence (français)",
     "override_instruction": "Si le mode de recouvrement diffère de la préférence enregistrée, expliquez la décision dans au moins une langue pour la finalisation (obligatoire).",
     "monitor_followup": "Suivi de surveillance",
-    "monitor_link_description": "Reliez facultativement l’instruction d’établir cette dette. L’accès à la source reste autorisé séparément.",
+    "monitor_link_description": "Ce type de compte débiteur exige un suivi de contrôle. Sélectionnez l’instruction d’établir cette dette.",
     "monitor_requirement": "Exiger l’établissement d’un compte débiteur",
     "monitor_requirement_description": "La finalisation de ce suivi exige un compte débiteur lié établi. Le recouvrement peut se poursuivre ensuite.",
     "record_credit_memo": "Enregistrer une note de crédit",
@@ -4186,6 +4223,15 @@
     "allocation_shortfall": "Il reste {amount} non affecté. Sélectionnez d’autres lignes admissibles ou corrigez le montant reçu.",
     "clear_preference": "Effacer la préférence enregistrée",
     "select_source_basis": "Sélectionnez le débiteur, l’exercice et le type de compte débiteur pour charger les sources admissibles.",
-    "adjustment": "Ajustement"
+    "adjustment": "Ajustement",
+    "recovery_method_instruction": "Vous pouvez enregistrer un brouillon sans mode de recouvrement. Sélectionnez-en un avant de terminer le compte débiteur.",
+    "clear_recovery_method": "Effacer le mode de recouvrement",
+    "receivable_coding": "Codification du compte débiteur",
+    "receivable_account": "Compte comptable débiteur",
+    "receivable_account_description": "Sélectionnez un compte débiteur pour cet exercice et cette devise. Un compte est obligatoire pour chaque montant non nul.",
+    "coding_not_selected": "Sélectionnez un compte comptable débiteur avant de saisir un montant non nul.",
+    "original_paid_coding": "Codification originale du paiement source",
+    "original_paid_coding_description": "La codification conservée du paiement justifie le montant source. Le compte débiteur utilise son propre compte ci-dessus.",
+    "adjustment_source_unavailable": "Cette source n’était pas comprise dans la comptabilisation du compte débiteur original. Créez un nouveau compte débiteur pour recouvrer un montant de cette source."
   }
 }

@@ -70,7 +70,8 @@ const updateAssignmentManagement = (subject: RoleAbilitySubject, enabled: boolea
       <USwitch
         v-if="canSubjectManageAssignments(subject)"
         :model-value="getPermission(subject)?.can_manage_assignments ?? false"
-        :label="`${t('role.manage_assignments')}: ${t(`role.subjects.${subject}`)}`"
+        :label="t('role.manage_assignments')"
+        :aria-label="`${t('role.manage_assignments')}: ${t(`role.subjects.${subject}`)}`"
         :disabled="!canUpdateRole || pending"
         @update:model-value="value => updateAssignmentManagement(subject, value)" />
     </div>

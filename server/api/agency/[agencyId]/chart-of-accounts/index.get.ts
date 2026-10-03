@@ -1,4 +1,6 @@
 import { sql } from 'kysely'
+import { z } from 'zod'
+import { AGENCY_CHART_KIND_ENUM } from '~~/shared/constants/enums'
 import { PaginationSchema } from '~~/shared/types/schemas/common'
 import { authorize } from '~~/server/utils/authorize'
 import { withActiveAgencyReadTransaction } from '~~/server/utils/agency-auth'
@@ -8,17 +10,20 @@ import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 
+const ChartListQuerySchema = PaginationSchema.extend({ kind: z.enum(AGENCY_CHART_KIND_ENUM, { error: 'validation.required' }).optional() })
+
 export default defineEventHandler(async event => {
   const agencyId = getRouterParam(event, 'agencyId')
   if (!agencyId) return await badRequest(event, 'MISSING_AGENCY_ID', 'apiErrors.request.missing_agency_id')
   if (!isPositivePostgresBigintText(agencyId)) return await notFound(event, 'AGENCY_NOT_FOUND', 'apiErrors.agency.not_found')
   await authorize(event, 'agency', 'read', { type: 'agency', agencyId })
-  const { page, limit, search } = await getValidatedQueryI18n(event, PaginationSchema)
+  const { page, limit, search, kind } = await getValidatedQueryI18n(event, ChartListQuerySchema)
   return await withActiveAgencyReadTransaction(event, agencyId, async trx => {
-    const scoped = trx.selectFrom('Agency_Chart_of_Account')
+    let scoped = trx.selectFrom('Agency_Chart_of_Account')
       .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Agency_Chart_of_Account.egcs_ay_fiscalyear')
       .where('Agency_Chart_of_Account.egcs_ay_organizationagency', '=', agencyId)
       .where('Agency_Chart_of_Account._deleted', '=', false)
+    if (kind) scoped = scoped.where('Agency_Chart_of_Account.egcs_ay_kind', '=', kind)
     let filtered = scoped
     if (search) {
       const pattern = `%${escapeLikePattern(search)}%`

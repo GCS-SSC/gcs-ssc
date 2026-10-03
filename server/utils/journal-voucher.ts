@@ -65,6 +65,7 @@ export const readJournalVoucherCodingChoices = async (db: Kysely<Database>, cont
     .where('s.egcs_tp_transferpaymentstream', '=', context.streamId)
     .where('a.egcs_ay_organizationagency', '=', context.agencyId).where('a.egcs_ay_fiscalyear', '=', fiscalYearId)
     .where('a.egcs_ay_currency', '=', currency)
+    .where('a.egcs_ay_kind', '=', 'commitment')
     .where('s._deleted', '=', false).where('a._deleted', '=', false).orderBy('s.id').execute()
 
 /** Matches actual coding identities, independently of operational commitment line numbers. */

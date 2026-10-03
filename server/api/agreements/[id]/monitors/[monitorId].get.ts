@@ -48,6 +48,7 @@ const readRoute = defineEventHandler(async event => {
         'Funding_Case_Agreement_Profile.egcs_fc_financialsystemnumber as agreement_financial_system_number',
         'Transfer_Payment_Stream.egcs_tp_name_en as stream_name_en',
         'Transfer_Payment_Stream.egcs_tp_name_fr as stream_name_fr',
+        'Agency_Monitor_Type.egcs_ay_receivableeligible',
         'Agency_Monitor_Type.egcs_ay_name_en as monitor_type_name_en',
         'Agency_Monitor_Type.egcs_ay_name_fr as monitor_type_name_fr',
         'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display'

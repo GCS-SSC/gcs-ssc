@@ -39,8 +39,10 @@ export const readEffectiveAccountReceivableRecoveries = async (
   let query = db.selectFrom('Funding_Case_Account_Receivable_Posting as posting')
     .innerJoin('Funding_Case_Account_Receivable_Recovery as recovery', 'recovery.id', 'posting.egcs_fc_recovery')
     .innerJoin('Funding_Case_Account_Receivable_Pool as pool', 'pool.id', 'recovery.egcs_fc_pool')
+    .innerJoin('Funding_Case_Agreement_Account_Receivable as sourceDebt', 'sourceDebt.id', 'posting.egcs_fc_receivable')
     .select(['posting.id', 'posting.egcs_fc_commitmentline as commitmentLineId',
       'posting.egcs_fc_agencychartofaccount as agencyChartId', 'posting.egcs_fc_agencyfiscalyear as agencyFiscalYearId',
+      'sourceDebt.egcs_fc_agencyfiscalyear as sourceAgencyFiscalYearId',
       'posting.egcs_fc_receivable as receivableId', 'posting.egcs_fc_periodstart as periodStart',
       'posting.egcs_fc_periodend as periodEnd', 'pool.egcs_fc_currency as currency',
       'recovery.egcs_fc_postedat as collectionDate', databaseMoneyText(sql.ref('posting.egcs_fc_amount')).as('amount')])
@@ -62,7 +64,7 @@ export const readEffectiveAccountReceivableClaimRecoveries = async (db: Kysely<D
       'debt.egcs_fc_agencyfiscalyear as agencyFiscalYearId', 'fiscalYear.egcs_ay_fiscalyear as fiscalYearOrder', 'debt.egcs_fc_currency as currency',
       'line.egcs_fc_periodstart as periodStart', 'line.egcs_fc_periodend as periodEnd',
       databaseMoneyText(sql.ref('allocation.egcs_fc_amount')).as('amount')])
-    .where('allocation.egcs_fc_fundingagreement', '=', agreementId).where('debt.egcs_fc_type', '=', 'ineligible_expense')
+    .where('allocation.egcs_fc_fundingagreement', '=', agreementId).where('debt.egcs_fc_claimrelated', '=', true)
     .where('recovery.egcs_fc_outcome', '=', 'posted').where('allocation._deleted', '=', false)
     .where('recovery._deleted', '=', false).execute()
   return rows.filter(row => !options.currency || row.currency === options.currency).map(row => ({ ...row, amount: subtractMoney(ZERO, parseDatabaseMoney(row.amount)) }))
@@ -216,7 +218,7 @@ export const getAgreementPaidAccountingProjection = async (
       month: (date.getUTCMonth() + 9) % 12, currency: row.currency, amount: row.amount })
   }
   for (const row of await readEffectiveAccountReceivableRecoveries(db, agreementId, { currency })) {
-    const year = years.find(candidate => String(candidate.agencyFiscalYearId) === String(row.agencyFiscalYearId))
+    const year = years.find(candidate => String(candidate.agencyFiscalYearId) === String(row.sourceAgencyFiscalYearId))
     if (!year) throw new Error('Posted recovery fiscal year has no owning Agreement lineage')
     entries.push({ id: String(row.id), kind: 'account_receivable_recovery', ...year,
       agencyFiscalYearId: String(year.agencyFiscalYearId), fiscalYearId: String(year.fiscalYearId),

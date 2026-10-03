@@ -75,7 +75,10 @@ const EXPECTED_CORE_MIGRATIONS = [
   '0220_funding_sources',
   '0230_intake_registry_identity',
   '0250_journal_vouchers',
-  '0240_seed'
+  '0260_corrections',
+  '0270_accounts_receivable',
+  '0240_seed',
+  '0280_seed_accounts_receivable'
 ] as const
 
 const EXPECTED_SEEDED_EXTENSION_KEYS = [

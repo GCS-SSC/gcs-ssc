@@ -1,6 +1,6 @@
 import { FundingCaseAgreementMonitorFollowupPatchSchema } from '~~/shared/types/schemas'
 import { badRequest } from '~~/server/utils/api-errors'
-import { assertMonitorLinkedRecord, executeAgreementMonitorMutation, prepareAgreementMonitorRoute, syncAgreementMonitorFollowupStatus } from '~~/server/utils/agreement-monitor'
+import { assertMonitorReceivableEligible, assertMonitorLinkedRecord, executeAgreementMonitorMutation, prepareAgreementMonitorRoute, syncAgreementMonitorFollowupStatus } from '~~/server/utils/agreement-monitor'
 
 export default defineEventHandler(async event => {
   const childId = getRouterParam(event, 'childId')
@@ -13,6 +13,7 @@ export default defineEventHandler(async event => {
   const { agreementId, agreementContext, db } = prepared
   const validated = await readValidatedBodyI18n(event, FundingCaseAgreementMonitorFollowupPatchSchema)
   return await executeAgreementMonitorMutation(event, db, agreementId, agreementContext, monitorId, async trx => {
+    await assertMonitorReceivableEligible(event, trx, monitorId, validated.egcs_fc_requiresreceivable)
     await assertMonitorLinkedRecord(event, trx, monitorId, 'finding', validated.egcs_fc_monitorfinding)
     const updated = await trx
       .updateTable('Funding_Case_Agreement_Monitor_Followup')

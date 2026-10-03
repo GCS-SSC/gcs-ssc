@@ -65,6 +65,7 @@ export default defineEventHandler(async event => {
     .where('Funding_Case_Agreement_Commitment_Line._deleted', '=', false)
     .where('Transfer_Payment_Stream_Chart_of_Account._deleted', '=', false)
     .where('Agency_Chart_of_Account._deleted', '=', false)
+    .where('Agency_Chart_of_Account.egcs_ay_kind', '=', 'commitment')
     .where('Agency_Chart_of_Account.egcs_ay_currency', '=', payment.egcs_fc_currency)
     .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
     .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)

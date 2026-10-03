@@ -54,6 +54,7 @@ export const AUDIT_TABLE_OWNERSHIP: Readonly<Record<string, AuditOwnershipRule>>
   'public.Agency_Funding_Subtype': parent('egcs_ay_fundingtype', 'public.Agency_Funding_Type'),
   'public.Agency_Holdback_Basis': parent('egcs_ay_organizationagency', 'public.Agency_Profile'),
   'public.Agency_Monitor_Type': parent('egcs_ay_organizationagency', 'public.Agency_Profile'),
+  'public.Agency_Account_Receivable_Type': parent('egcs_ay_organizationagency', 'public.Agency_Profile'),
   'public.Agency_Profile': agency('id'),
   'public.Applicant_Recipient_Address': parent('egcs_ar_applicantrecipient', 'public.Applicant_Recipient_Profile'),
   'public.Applicant_Recipient_Agency_Financial_Id': parent('egcs_ar_agency', 'public.Agency_Profile'),

@@ -14,7 +14,7 @@ export type EnumKey =
   | 'decision_type'
   | 'payment_type'
   | 'correction_outcome'
-  | 'account_receivable_type'
+  | 'agency_chart_of_account_kind'
   | 'account_receivable_recovery_method'
   | 'review_type'
   | 'entity_type'

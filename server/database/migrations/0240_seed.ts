@@ -5420,7 +5420,8 @@ const seedAgreementMonitorData = async (db: Kysely<Database>): Promise<void> => 
     agencyType ??= await db.insertInto('Agency_Monitor_Type').values({
       egcs_ay_organizationagency: String(agreement.agencyId),
       egcs_ay_name_en: type.nameEn,
-      egcs_ay_name_fr: type.nameFr
+      egcs_ay_name_fr: type.nameFr,
+      egcs_ay_receivableeligible: type.nameEn === 'Financial desk review'
     }).returning('id').executeTakeFirstOrThrow()
     const streamType = await db.insertInto('Transfer_Payment_Monitor_Type').values({
       egcs_tp_agencymonitortype: String(agencyType.id),
@@ -6625,6 +6626,29 @@ const seedSuccessfulAgreementApproval = async (db: Kysely<Database>, agreementId
   throw new Error(`Seeded Agreement ${agreementId} approval workflow exceeded its step limit`)
 }
 
+const seedAgencyAccountReceivableConfiguration = async (db: Kysely<Database>): Promise<void> => {
+  const agencies = await db.selectFrom('Agency_Profile').select('id').where('_deleted', '=', false).orderBy('id').execute()
+  for (const agency of agencies) {
+    await db.insertInto('Agency_Account_Receivable_Type').values([
+      { egcs_ay_organizationagency: String(agency.id), egcs_ay_name_en: 'Outstanding advance', egcs_ay_name_fr: 'Avance impayée',
+        egcs_ay_description_en: 'Recover unused advance payments.', egcs_ay_description_fr: 'Recouvrer les avances inutilisées.',
+        egcs_ay_monitorrequired: false, egcs_ay_advancepaymentrelated: true, egcs_ay_claimrelated: false },
+      { egcs_ay_organizationagency: String(agency.id), egcs_ay_name_en: 'Ineligible expense', egcs_ay_name_fr: 'Dépense inadmissible',
+        egcs_ay_description_en: 'Recover finalized Claim amounts identified as ineligible.', egcs_ay_description_fr: 'Recouvrer les montants de réclamations finalisées jugés inadmissibles.',
+        egcs_ay_monitorrequired: false, egcs_ay_advancepaymentrelated: false, egcs_ay_claimrelated: true }
+    ]).execute()
+  }
+  const charts = await db.selectFrom('Agency_Chart_of_Account').selectAll()
+    .where('egcs_ay_kind', '=', 'commitment').where('_deleted', '=', false).orderBy('id').execute()
+  for (const chart of charts) {
+    await db.insertInto('Agency_Chart_of_Account').values({
+      egcs_ay_organizationagency: String(chart.egcs_ay_organizationagency), egcs_ay_fiscalyear: String(chart.egcs_ay_fiscalyear),
+      egcs_ay_currency: chart.egcs_ay_currency, egcs_ay_kind: 'account_receivable',
+      egcs_ay_accountingdimensions: sql`${JSON.stringify(chart.egcs_ay_accountingdimensions)}::jsonb`
+    }).execute()
+  }
+}
+
 const seedDatabase = async (db: Kysely<Database>): Promise<void> => {
   const gwcoaNumbers = await seedGwcoa(db)
   const agencies = await seedAgencies(db, gwcoaNumbers)
@@ -6707,6 +6731,7 @@ const seedDatabase = async (db: Kysely<Database>): Promise<void> => {
   await seedSuccessfulAgreementApproval(db, '60')
   await seedSharedAgencyCatalogStream(db)
   await seedFinancialSummaryShowcase(db)
+  await seedAgencyAccountReceivableConfiguration(db)
 }
 
 export const up = async (db: Kysely<Database>): Promise<void> => {
@@ -6718,6 +6743,15 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
 }
 
 export const down = async (db: Kysely<Database>): Promise<void> => {
+  const receivableTables = await sql<{ present: boolean }>`SELECT to_regclass('"Funding_Case_Agreement_Account_Receivable"') IS NOT NULL AS present`.execute(db)
+  if (receivableTables.rows[0]?.present) {
+    // A full demo reset removes retained AR children before their source Payments,
+    // workflow evidence and owners. Domain mutation protections remain untouched.
+    await sql`TRUNCATE TABLE "Funding_Case_Account_Receivable_Posting", "Funding_Case_Account_Receivable_Allocation",
+      "Funding_Case_Account_Receivable_Recovery", "Funding_Case_Account_Receivable_Credit_Memo",
+      "Funding_Case_Agreement_Account_Receivable_Coding", "Funding_Case_Agreement_Account_Receivable_Line",
+      "Funding_Case_Agreement_Account_Receivable", "Funding_Case_Account_Receivable_Pool" RESTART IDENTITY CASCADE`.execute(db)
+  }
   const lifecycleResetTriggers = [
     ['Common_Routing_Slip', 'trg_lock_terminal_routing_slip'],
     ['Common_Certification', 'trg_lock_terminal_routing_certification'],
@@ -6750,7 +6784,9 @@ export const down = async (db: Kysely<Database>): Promise<void> => {
     await sql.raw(`ALTER TABLE "${table}" DISABLE TRIGGER ${trigger}`).execute(db)
   }
   await sql`ALTER TABLE "Common_Entity_Assignment" DISABLE TRIGGER trg_enforce_entity_assignment_roster`.execute(db)
+  if (receivableTables.rows[0]?.present) await sql`ALTER TABLE "Common_Entity_Assignment" DISABLE TRIGGER trg_protect_ar_roster`.execute(db)
   await db.deleteFrom('Common_Entity_Assignment').execute()
+  if (receivableTables.rows[0]?.present) await sql`ALTER TABLE "Common_Entity_Assignment" ENABLE TRIGGER trg_protect_ar_roster`.execute(db)
   await sql`ALTER TABLE "Common_Entity_Assignment" ENABLE TRIGGER trg_enforce_entity_assignment_roster`.execute(db)
   await db.deleteFrom('Common_Workflow_Publication_Condition').execute()
   await db.deleteFrom('Common_Workflow_Member_Condition').execute()
@@ -6916,6 +6952,7 @@ export const down = async (db: Kysely<Database>): Promise<void> => {
   await db.deleteFrom('Agency_Approval_Behalf_Type').execute()
   await db.deleteFrom('Agency_Applicant_Recipient_Subtype').execute()
   await db.deleteFrom('Agency_Address_Type').execute()
+  await db.deleteFrom('Agency_Account_Receivable_Type').execute()
   await db.deleteFrom('Agency_Chart_of_Account').execute()
   await db.deleteFrom('Agency_Fiscal_Year').execute()
   await db.deleteFrom('Agency_Commitment_Type').execute()

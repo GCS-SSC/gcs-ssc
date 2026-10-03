@@ -31,7 +31,7 @@ export const readAccountReceivablePoolDebts = async (db: Kysely<Database>, input
   return result.sort((left, right) => {
     const yearOrder = BigInt(left.fiscalYearOrder) - BigInt(right.fiscalYearOrder)
     if (yearOrder !== BigInt(0)) return yearOrder < BigInt(0) ? -1 : 1
-    const typeOrder = (left.egcs_fc_type === 'outstanding_advance' ? 0 : 1) - (right.egcs_fc_type === 'outstanding_advance' ? 0 : 1)
+    const typeOrder = Number(!left.egcs_fc_advancepaymentrelated) - Number(!right.egcs_fc_advancepaymentrelated)
     if (typeOrder) return typeOrder
     const dateOrder = new Date(left.egcs_fc_postedat!).getTime() - new Date(right.egcs_fc_postedat!).getTime()
     return dateOrder || (BigInt(left.id) < BigInt(right.id) ? -1 : 1)
@@ -64,7 +64,7 @@ export const assertAccountReceivablePaymentAllowed = async (
 export const readAccountReceivableRecoveryAllocations = async (db: Kysely<Database>, recoveryId: string) => {
   const rows = await db.selectFrom('Funding_Case_Account_Receivable_Allocation as allocation')
     .innerJoin('Funding_Case_Agreement_Account_Receivable as debt', 'debt.id', 'allocation.egcs_fc_receivable')
-    .selectAll('allocation').select(['debt.egcs_fc_number', 'debt.egcs_fc_agreementnumber', 'debt.egcs_fc_type', 'debt.egcs_fc_recoverymethod',
+    .selectAll('allocation').select(['debt.egcs_fc_number', 'debt.egcs_fc_agreementnumber', 'debt.egcs_fc_type', 'debt.egcs_fc_typename_en', 'debt.egcs_fc_typename_fr', 'debt.egcs_fc_advancepaymentrelated', 'debt.egcs_fc_claimrelated', 'debt.egcs_fc_recoverymethod',
       databaseMoneyText(sql.ref('allocation.egcs_fc_amount')).as('egcs_fc_amount')])
     .where('allocation.egcs_fc_recovery', '=', recoveryId).where('allocation._deleted', '=', false).orderBy('allocation.id').execute()
   return rows.map(row => ({ ...row, egcs_fc_amount: parseDatabaseMoney(row.egcs_fc_amount) }))
@@ -226,6 +226,9 @@ export const postAccountReceivableRecovery = async (trx: Transaction<Database>, 
     for (const [chartId, pool] of await getAgreementAccountingCodingPools(trx, agreementId)) paidCapacity.set(`${agreementId}:${chartId}`, pool.paid)
   }
   for (const allocation of allocations) {
+    const sourceLine = await trx.selectFrom('Funding_Case_Agreement_Account_Receivable_Line').select(['egcs_fc_accountreceivablechartofaccount', 'egcs_fc_accountreceivableaccountingdimensions'])
+      .where('id', '=', String(allocation.egcs_fc_receivableline)).executeTakeFirstOrThrow()
+    if (!sourceLine.egcs_fc_accountreceivablechartofaccount) throw new Error('AR_ACCOUNT_REQUIRED')
     const coding = (await readAccountReceivableCoding(trx, String(allocation.egcs_fc_receivable))).filter(row => String(row.egcs_fc_receivableline) === String(allocation.egcs_fc_receivableline))
     const postings = await trx.selectFrom('Funding_Case_Account_Receivable_Posting as posting')
       .innerJoin('Funding_Case_Account_Receivable_Recovery as recovery', 'recovery.id', 'posting.egcs_fc_recovery')
@@ -258,6 +261,8 @@ export const postAccountReceivableRecovery = async (trx: Transaction<Database>, 
       const row = coding.find(item => String(item.id) === split.id)!
       await trx.insertInto('Funding_Case_Account_Receivable_Posting').values({ egcs_fc_recovery: recoveryId, egcs_fc_allocation: String(allocation.id), egcs_fc_coding: split.id,
         egcs_fc_receivable: String(allocation.egcs_fc_receivable), egcs_fc_fundingagreement: String(allocation.egcs_fc_fundingagreement),
+        egcs_fc_accountreceivablechartofaccount: String(sourceLine.egcs_fc_accountreceivablechartofaccount),
+        egcs_fc_accountreceivableaccountingdimensions: sql`${JSON.stringify(sourceLine.egcs_fc_accountreceivableaccountingdimensions)}::jsonb`,
         egcs_fc_commitmentline: String(row.egcs_fc_commitmentline), egcs_fc_chartofaccount: String(row.egcs_fc_chartofaccount),
         egcs_fc_agencychartofaccount: String(row.egcs_fc_agencychartofaccount), egcs_fc_agencyfiscalyear: String(row.egcs_fc_agencyfiscalyear),
         egcs_fc_periodstart: row.egcs_fc_periodstart, egcs_fc_periodend: row.egcs_fc_periodend, egcs_fc_amount: databaseMoneyValue(split.amount) }).execute()

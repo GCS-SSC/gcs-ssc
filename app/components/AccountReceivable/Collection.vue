@@ -52,7 +52,7 @@ const created = async (id: string) => {
         {{ locale === 'fr' ? row.original.egcs_fc_debtorname_fr : row.original.egcs_fc_debtorname_en }}
       </template>
       <template #type-cell="{ row }">
-        {{ t(`enums.account_receivable_type.${row.original.egcs_fc_type}`) }}
+        <CommonBilingualName :name-en="row.original.egcs_fc_typename_en" :name-fr="row.original.egcs_fc_typename_fr" />
       </template>
       <template #amounts-cell="{ row }">
         <dl class="space-y-1 text-xs">
@@ -77,7 +77,7 @@ const created = async (id: string) => {
         </dl>
       </template>
       <template #method-cell="{ row }">
-        {{ t(`enums.account_receivable_recovery_method.${row.original.egcs_fc_effectiverecoverymethod}`) }}
+        {{ row.original.egcs_fc_effectiverecoverymethod ? t(`enums.account_receivable_recovery_method.${row.original.egcs_fc_effectiverecoverymethod}`) : t('common.none') }}
       </template>
       <template #actions-cell="{ row }">
         <div class="flex justify-end gap-2">

@@ -1258,7 +1258,7 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
 
   await sql`
     CREATE OR REPLACE FUNCTION trg_fn_resolve_commitment_line_scope() RETURNS trigger AS $$
-    DECLARE commitment_currency currency_codes; chart_currency currency_codes;
+    DECLARE commitment_currency currency_codes; chart_currency currency_codes; chart_kind varchar(32);
     BEGIN
       SELECT commitment."egcs_fc_fundingagreement", agreement."egcs_fc_transferpaymentstream"
       INTO NEW."egcs_fc_fundingagreement", NEW."egcs_fc_transferpaymentstream"
@@ -1268,13 +1268,17 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
       WHERE commitment."id" = NEW."egcs_fc_commitment";
       SELECT egcs_fc_currency INTO commitment_currency FROM "Funding_Case_Agreement_Commitment"
         WHERE id = NEW.egcs_fc_commitment;
-      SELECT account.egcs_ay_currency INTO chart_currency
+      SELECT account.egcs_ay_currency,account.egcs_ay_kind INTO chart_currency,chart_kind
         FROM "Transfer_Payment_Stream_Chart_of_Account" coding
         JOIN "Agency_Chart_of_Account" account ON account.id = coding.egcs_tp_agencychartofaccount
         WHERE coding.id = NEW.egcs_fc_transferpaymentstreamchartofaccount;
       IF commitment_currency IS DISTINCT FROM chart_currency THEN
         RAISE EXCEPTION 'Commitment and Chart of Account currencies must match'
           USING ERRCODE = '23514', CONSTRAINT = 'fc_chk_commitment_line_currency';
+      END IF;
+      IF chart_kind IS DISTINCT FROM 'commitment' THEN
+        RAISE EXCEPTION 'Commitment lines require a Commitment Chart of Account'
+          USING ERRCODE = '23514', CONSTRAINT = 'fc_chk_commitment_line_chart_kind';
       END IF;
       RETURN NEW;
     END;

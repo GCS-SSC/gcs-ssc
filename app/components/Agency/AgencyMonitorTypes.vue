@@ -11,6 +11,7 @@ const { agencyId, canCreate, canUpdate, canDelete } = defineProps<{
 const { t } = useI18n()
 const columns: TableColumnInput<AgencyMonitorTypeItem>[] = [
   { id: 'name', headerKey: 'common.name' },
+  { accessorKey: 'egcs_ay_receivableeligible', headerKey: 'agency.monitor_types.receivable_eligible' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
 const bilingualColumns: BilingualColumnConfig<AgencyMonitorTypeItem>[] = [
@@ -30,11 +31,14 @@ const bilingualColumns: BilingualColumnConfig<AgencyMonitorTypeItem>[] = [
     :can-update="canUpdate"
     :can-delete="canDelete"
     :schema="AgencyMonitorTypeSchema"
-    :initial-new-item="{}"
+    :initial-new-item="{ egcs_ay_receivableeligible: false }"
     :columns="columns"
     :bilingual-columns="bilingualColumns">
     <template #name-cell="{ row }">
       <CommonBilingualName :name-en="row.original.egcs_ay_name_en" :name-fr="row.original.egcs_ay_name_fr" />
+    </template>
+    <template #egcs_ay_receivableeligible-cell="{ row }">
+      {{ t(row.original.egcs_ay_receivableeligible ? 'common.yes' : 'common.no') }}
     </template>
     <template #form="{ state }">
       <UFormField :label="t('agency.name_en')" name="egcs_ay_name_en" required>
@@ -42,6 +46,9 @@ const bilingualColumns: BilingualColumnConfig<AgencyMonitorTypeItem>[] = [
       </UFormField>
       <UFormField :label="t('agency.name_fr')" name="egcs_ay_name_fr" required>
         <UInput v-model="state.egcs_ay_name_fr" required />
+      </UFormField>
+      <UFormField name="egcs_ay_receivableeligible" :description="t('agency.monitor_types.receivable_eligible_description')">
+        <USwitch v-model="state.egcs_ay_receivableeligible" :label="t('agency.monitor_types.receivable_eligible')" />
       </UFormField>
     </template>
   </CommonResourceCrud>
