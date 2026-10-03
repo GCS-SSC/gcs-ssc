@@ -84,6 +84,7 @@ const paymentModal = useCrudModal<FundingCaseAgreementPaymentRow, FundingCaseAgr
   createState: () => ({ egcs_fc_currency: agreementCurrency }),
   updateState: payment => ({
     id: payment.id,
+    egcs_fc_applicantrecipient: payment.egcs_fc_applicantrecipient ?? undefined,
     egcs_fc_commitmenttype: payment.commitment_type ?? undefined,
     egcs_fc_fiscalyear: payment.egcs_fc_fiscalyear,
     egcs_fc_paymenttype: payment.egcs_fc_paymenttype,
@@ -123,10 +124,11 @@ const {
 
 const columns: TableColumnInput<FundingCaseAgreementPaymentRow>[] = [
   { id: 'type', accessorKey: 'egcs_fc_paymenttype', headerKey: 'agreement.payments.type' },
+  { id: 'payee', headerKey: 'agreement.payments.payee' },
   { id: 'status', accessorKey: 'egcs_fc_status', headerKey: 'common.status' },
+  { id: 'amount', accessorKey: 'egcs_fc_paymentamount', headerKey: 'agreement.payments.amount' },
   { id: 'schedule', headerKey: 'agreement.payments.schedule' },
   { id: 'comment', accessorKey: 'egcs_fc_comment', headerKey: 'common.comment' },
-  { id: 'amount', accessorKey: 'egcs_fc_paymentamount', headerKey: 'agreement.payments.amount' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
 
@@ -372,6 +374,10 @@ const deletePayment = async (paymentId: string) => {
         </div>
       </template>
 
+      <template #payee-cell="{ row }">
+        {{ (locale === 'fr' ? row.original.egcs_fc_payeename_fr : row.original.egcs_fc_payeename_en) || t('agreement.payments.payee_unattributed') }}
+      </template>
+
       <template #status-cell="{ row }">
         <CommonRecordState
           :status-id="row.original.egcs_fc_status"
@@ -390,9 +396,30 @@ const deletePayment = async (paymentId: string) => {
       </template>
 
       <template #amount-cell="{ row }">
-        <span class="font-medium text-zinc-700 dark:text-zinc-200">
-          {{ formatMoney(row.original.egcs_fc_paymentamount, row.original.egcs_fc_currency.toUpperCase()) }}
-        </span>
+        <dl class="space-y-1 text-xs">
+          <div>
+            <dt class="inline text-muted">
+              {{ t('agreement.payments.gross') }}:
+            </dt><dd class="ml-1 inline font-medium tabular-nums">
+              {{ formatMoney(row.original.egcs_fc_paymentamount, row.original.egcs_fc_currency.toUpperCase()) }}
+            </dd>
+          </div>
+          <div>
+            <dt class="inline text-muted">
+              {{ t('agreement.payments.offset') }}:
+            </dt><dd class="ml-1 inline tabular-nums">
+              {{ formatMoney(row.original.egcs_fc_offsetamount ?? ZERO_MONEY, row.original.egcs_fc_currency.toUpperCase()) }}
+            </dd>
+          </div>
+          <div>
+            <dt class="inline text-muted">
+              {{ t('agreement.payments.net') }}:
+            </dt><dd class="ml-1 inline font-semibold tabular-nums">
+              {{ formatMoney(row.original.egcs_fc_netamount ?? row.original.egcs_fc_paymentamount, row.original.egcs_fc_currency.toUpperCase()) }}
+            </dd>
+          </div>
+        </dl>
+        <span v-if="row.original.egcs_fc_recoverycontrol === 'direct_repayment_hold'" class="text-xs text-warning">{{ t('agreement.payments.hold_title') }}</span>
       </template>
 
       <template #comment-cell="{ row }">
@@ -433,9 +460,19 @@ const deletePayment = async (paymentId: string) => {
     <UModal
       v-if="selectedPayment"
       v-model:open="isPaymentModalOpen"
-      :title="selectedPayment.id ? t('agreement.payments.edit') : t('agreement.payments.add')">
+      :title="selectedPayment.id ? t('agreement.payments.edit') : t('agreement.payments.add')"
+      :description="t('common.form_dialog_description')">
       <template #body>
         <UForm :state="selectedPayment" :validate="validatePayment" :validate-on="[]" class="space-y-4" @submit="savePayment">
+          <UFormField :label="t('agreement.payments.payee')" name="egcs_fc_applicantrecipient" :description="t('agreement.payments.payee_description')">
+            <CommonServerLookupSelect
+              v-model="selectedPayment.egcs_fc_applicantrecipient"
+              :fetch-url="`/api/agreements/${agreementId}/payments/lookups/proponents`"
+              value-key="id" label-en-key="label_en" label-fr-key="label_fr"
+              :limit="100" :show-value-in-label="false" close-on-select
+              :query="buildPaymentLookupQuery(selectedPayment.id, agreementCurrency)" />
+          </UFormField>
+
           <UFormField :label="t('agreement.payments.commitment_type')" name="egcs_fc_commitmenttype">
             <CommonServerLookupSelect
               v-model="selectedPayment.egcs_fc_commitmenttype"

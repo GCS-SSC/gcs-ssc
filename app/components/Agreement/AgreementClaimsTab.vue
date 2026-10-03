@@ -8,6 +8,7 @@ import { useAgreementOverview } from '~/composables/useAgreementOverview'
 import { useGroupedTableExpansion, type GroupedTableRow } from '~/composables/useGroupedTableExpansion'
 import { useDeleteRequestToast } from '~/composables/useDeleteRequestToast'
 import { useJsonRequest } from '~/composables/useJsonRequest'
+import { useBilingualValue } from '~/composables/useBilingualValue'
 import { useTableListState } from '~/composables/useTableListState'
 import { appRouteLocations } from '~/utils/route-locations'
 import type {
@@ -45,6 +46,7 @@ const { agreementId, canCreate, canUpdate, canDelete } = defineProps<{
 const agreementIdRef = computed(() => agreementId)
 
 const { t, locale } = useI18n()
+const { getBilingualValue } = useBilingualValue()
 const { getGroupedDisclosureControlsId, getGroupedDisclosureContentId } = useGroupedDisclosureIds()
 const statusCatalog = useStatusCatalog()
 void statusCatalog.load()
@@ -69,6 +71,7 @@ const claimModal = useCrudModal<FundingCaseAgreementClaimRow, FundingCaseAgreeme
   }),
   updateState: claim => ({
     id: claim.id,
+    egcs_fc_applicantrecipient: claim.egcs_fc_applicantrecipient,
     egcs_fc_fiscalyear: claim.egcs_fc_fiscalyear,
     egcs_fc_isfinalforyear: claim.egcs_fc_isfinalforyear,
     egcs_fc_periodstart: claim.egcs_fc_periodstart,
@@ -103,6 +106,7 @@ const positiveReconcileIds = computed(() => new Set(
 const columns: TableColumnInput<ClaimTableRow>[] = [
   { id: FISCAL_YEAR_GROUP_COLUMN_ID, accessorKey: FISCAL_YEAR_GROUP_COLUMN_ID, headerKey: 'agreement.claims.fiscal_year' },
   { id: 'claim', accessorKey: 'id', headerKey: 'agreement.claims.claim' },
+  { id: 'submittingProponent', headerKey: 'agreement.claims.submitting_proponent' },
   { id: 'period', headerKey: 'agreement.claims.period' },
   { id: 'status', accessorKey: 'egcs_fc_status', headerKey: 'common.status' },
   { id: 'submitted', accessorKey: 'submittedAmount', headerKey: 'agreement.claims.submitted_amount' },
@@ -298,6 +302,10 @@ const deleteClaim = async (claimId: string) => {
           :is-completed="row.original.isCompleted" />
       </template>
 
+      <template #submittingProponent-cell="{ row }">
+        <span v-if="!isFiscalYearGroupRow(row as ClaimGroupedRow)">{{ getBilingualValue(row.original, 'submitting_proponent_name', t('common.unavailable')) }}</span>
+      </template>
+
       <template #submitted-cell="{ row }">
         <span class="font-medium text-zinc-700 dark:text-zinc-200">
           {{ formatMoney(isFiscalYearGroupRow(row as ClaimGroupedRow) ? getGroupedRowTotal(row as ClaimGroupedRow, 'submittedAmount') : row.original.submittedAmount) }}
@@ -340,9 +348,17 @@ const deleteClaim = async (claimId: string) => {
       </template>
     </CommonResourceLayoutCard>
 
-    <UModal v-if="selectedClaim" v-model:open="isClaimModalOpen" :title="selectedClaim.id ? t('agreement.claims.edit') : t('agreement.claims.add')">
+    <UModal v-if="selectedClaim" v-model:open="isClaimModalOpen" :description="t('common.form_dialog_description')" :title="selectedClaim.id ? t('agreement.claims.edit') : t('agreement.claims.add')">
       <template #body>
         <UForm :state="selectedClaim" :validate="validateClaim" :validate-on="[]" class="space-y-4" @submit="saveClaim">
+          <UFormField :label="t('agreement.claims.submitting_proponent')" name="egcs_fc_applicantrecipient" :description="t('agreement.claims.submitting_proponent_description')">
+            <CommonServerLookupSelect
+              v-model="selectedClaim.egcs_fc_applicantrecipient"
+              :fetch-url="`/api/agreements/${agreementId}/claims/lookups/proponents`"
+              value-key="id" label-en-key="label_en" label-fr-key="label_fr"
+              :limit="100" :show-value-in-label="false" close-on-select
+              :query="selectedClaim.id ? { permission_action: 'update', claimId: selectedClaim.id } : { permission_action: 'create' }" />
+          </UFormField>
           <UFormField :label="t('agreement.claims.fiscal_year')" name="egcs_fc_fiscalyear">
             <CommonBilingualSelectMenu v-model="selectedClaim.egcs_fc_fiscalyear" :items="fiscalYearOptions" value-key="id" label-en-key="label_en" label-fr-key="label_fr" searchable />
           </UFormField>

@@ -23,6 +23,7 @@ import * as monitorLinksMigration from './migrations/0210_monitor_links'
 import * as intakeRegistryIdentityMigration from './migrations/0230_intake_registry_identity'
 import * as fundingSourcesMigration from './migrations/0220_funding_sources'
 
+import * as accountsReceivableMigration from './migrations/0270_accounts_receivable'
 import * as correctionsMigration from './migrations/0260_corrections'
 import * as journalVoucherMigration from './migrations/0250_journal_vouchers'
 
@@ -51,7 +52,8 @@ export const productionCoreMigrations = {
   '0220_funding_sources': fundingSourcesMigration,
   '0230_intake_registry_identity': intakeRegistryIdentityMigration,
   '0250_journal_vouchers': journalVoucherMigration,
-  '0260_corrections': correctionsMigration
+  '0260_corrections': correctionsMigration,
+  '0270_accounts_receivable': accountsReceivableMigration
 } satisfies Record<string, Migration>
 
 export const productionCoreMigrationProvider: MigrationProvider = {

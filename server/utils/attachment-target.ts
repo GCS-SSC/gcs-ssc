@@ -14,6 +14,7 @@ import { canAccessApplicantRecipient, executeFreshAuthorizedApplicantRecipientWr
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { resolveFundingCaseScope, type FundingOpportunityScope } from './funding-case'
 import { assertBusinessStatusMutationAllowed } from './business-status-runtime'
+import { canAccessCreditMemoTargetScopes } from './credit-memo-scope-authority'
 
 export interface ResolvedAttachmentTarget {
   target: AttachmentTarget
@@ -58,11 +59,11 @@ export const authorizeAttachmentTarget = async (
   const permitted = resolved.fundingCaseScope
     ? auth.userAbilities.authorize('funding_case', action, resolved.fundingCaseScope.scope)
     : resolved.agreementContext
-      ? auth.userAbilities.authorize(target.entityType === 'fundingcasecorrection' ? 'correction' : target.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement', action, resolved.agreementContext.scope)
+      ? auth.userAbilities.authorize((target.entityType === 'fundingcaseaccountreceivable' || target.entityType === 'fundingcaseaccountreceivablecreditmemo') ? 'account_receivable' : target.entityType === 'fundingcasecorrection' ? 'correction' : target.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement', action, resolved.agreementContext.scope)
       : await canAccessApplicantRecipient(auth, target.entityId, action, event.context.$db)
         && auth.userAbilities.authorize('applicant_recipient', action,
           { type: 'agency', agencyId: resolved.agencyId })
-  if (!permitted) return await forbidden(event)
+  if (!permitted || !await canAccessCreditMemoTargetScopes(event.context.$db, auth, target.entityType, target.entityId, action)) return await forbidden(event)
   if (action !== 'read') await authorizeAssignedTarget(event, target)
   return { auth, resolved }
 }
@@ -81,11 +82,11 @@ export const authorizeFreshAttachmentTarget = async (
   const permitted = resolved.fundingCaseScope
     ? auth.userAbilities.authorize('funding_case', action, resolved.fundingCaseScope.scope)
     : resolved.agreementContext
-      ? auth.userAbilities.authorize(target.entityType === 'fundingcasecorrection' ? 'correction' : target.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement', action, resolved.agreementContext.scope)
+      ? auth.userAbilities.authorize((target.entityType === 'fundingcaseaccountreceivable' || target.entityType === 'fundingcaseaccountreceivablecreditmemo') ? 'account_receivable' : target.entityType === 'fundingcasecorrection' ? 'correction' : target.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement', action, resolved.agreementContext.scope)
       : await canAccessApplicantRecipient(auth, target.entityId, action, db)
         && auth.userAbilities.authorize('applicant_recipient', action,
           { type: 'agency', agencyId: resolved.agencyId })
-  if (!permitted) return await forbidden(event)
+  if (!permitted || !await canAccessCreditMemoTargetScopes(db, auth, target.entityType, target.entityId, action)) return await forbidden(event)
   return { auth, resolved }
 }
 

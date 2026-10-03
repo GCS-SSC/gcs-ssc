@@ -72,6 +72,15 @@ export const appRouteLocations = {
   agreementCorrectionDetail: (id: string, correctionId: string) => ({
     name: 'agreements-id-corrections-correctionId', params: { id, correctionId }
   }),
+  agreementAccountReceivableCollection: (id: string) => ({
+    name: 'agreements-id', params: { id }, query: { section: 'account-receivables' }
+  }),
+  agreementAccountReceivableDetail: (id: string, accountReceivableId: string) => ({
+    name: 'agreements-id-account-receivables-accountReceivableId', params: { id, accountReceivableId }
+  }),
+  agreementAccountReceivableCreditMemoDetail: (id: string, creditMemoId: string) => ({
+    name: 'agreements-id-account-receivable-credit-memos-creditMemoId', params: { id, creditMemoId }
+  }),
   agreementForecastDetail: (id: string, forecastId: string, query?: Record<string, string>) => ({
     name: 'agreements-id-forecasts-forecastId',
     params: { id, forecastId },

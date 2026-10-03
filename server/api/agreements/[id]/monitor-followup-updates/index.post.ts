@@ -49,7 +49,7 @@ export default defineEventHandler(async event => {
     if (!lockedFollowup || typeof lockedFollowup !== 'object' || !('id' in lockedFollowup)) return lockedFollowup
 
     const update = await trx.insertInto('Funding_Case_Agreement_Monitor_Followup_Update').values(validated).returningAll().executeTakeFirstOrThrow()
-    await syncAgreementMonitorFollowupStatus(trx, validated.egcs_fc_fundingagreementmonitorfollowup)
+    await syncAgreementMonitorFollowupStatus(trx, validated.egcs_fc_fundingagreementmonitorfollowup, { event })
     return update
   }, {
     action: 'create',

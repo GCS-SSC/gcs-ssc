@@ -1,3 +1,4 @@
+import { releaseAccountReceivablePaymentOffset } from '~~/server/utils/account-receivable-recovery'
 import {
   assertAgreementPaymentEditable,
   prepareAgreementPaymentRoute
@@ -49,6 +50,7 @@ export default defineEventHandler(async event => {
       paymentId
     })
 
+    await releaseAccountReceivablePaymentOffset(trx, paymentId)
     await trx
       .updateTable('Funding_Case_Agreement_Payment_Line')
       .set({ _deleted: true })

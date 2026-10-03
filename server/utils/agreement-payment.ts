@@ -27,6 +27,9 @@ import { resolveLatestTargetApprovalEvidence } from '~~/server/utils/business-ap
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { addMoney, compareMoney, type Money } from '~~/shared/utils/money'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+import { hasAccountingTable } from './correction-schema'
+import { rebuildAccountReceivablePaymentOffset } from './account-receivable-recovery'
+import { withPaymentRecoveryErrors } from './payment-recovery-controls'
 
 type DbClient = Kysely<Database> | Transaction<Database>
 type AgreementPaymentPatchUpdateValues = Omit<FundingCaseAgreementPaymentPatch, 'egcs_fc_commitmenttype' | 'egcs_fc_paymentamount'> & {
@@ -143,6 +146,7 @@ export const getAgreementPayment = async (
   paymentId: string,
   options: { lockPayment?: boolean } = {}
 ) => {
+  const hasReceivables = await hasAccountingTable(db, 'Funding_Case_Agreement_Account_Receivable')
   let query = db
     .selectFrom('Funding_Case_Agreement_Payment')
     .innerJoin(
@@ -155,6 +159,7 @@ export const getAgreementPayment = async (
       'Funding_Case_Agreement_Payment.egcs_fc_fundingagreementcommitment as egcs_fc_fundingagreementcommitment',
       'Funding_Case_Agreement_Payment.egcs_fc_fiscalyear as egcs_fc_fiscalyear',
       'Funding_Case_Agreement_Payment.egcs_fc_paymenttype as egcs_fc_paymenttype',
+      (hasReceivables ? sql<string | null>`${sql.ref('Funding_Case_Agreement_Payment.egcs_fc_applicantrecipient')}` : sql<string | null>`NULL::bigint`).as('egcs_fc_applicantrecipient'),
       'Funding_Case_Agreement_Payment.egcs_fc_periodstart as egcs_fc_periodstart',
       'Funding_Case_Agreement_Payment.egcs_fc_periodend as egcs_fc_periodend',
       databaseMoneyText(sql.ref('Funding_Case_Agreement_Payment.egcs_fc_paymentamount')).as('egcs_fc_paymentamount'),
@@ -200,14 +205,15 @@ export const assertAgreementPaymentEditable = async (
 
 /** Recomputes and persists whether a payment remains editable. */
 export const syncAgreementPaymentEditingStatus = async (
-  _db: Transaction<Database>,
-  _paymentId: string,
-  _context: {
+  db: Transaction<Database>,
+  paymentId: string,
+  context: {
     event: H3Event
     agreementId: string
   }
 ) => {
   // Ordinary payment edits preserve the Agency-configured business status.
+  await withPaymentRecoveryErrors(context.event, () => rebuildAccountReceivablePaymentOffset(db, paymentId))
 }
 
 /** Maps a payment patch to database fields without overwriting omitted values. */
@@ -819,6 +825,7 @@ export const patchAgreementPaymentLine = async (
 
         return { ...row, egcs_fc_amount: parseDatabaseMoney(row.egcs_fc_amount) }
       }, {
+        paymentRecovery: true,
         authorize: async (trx, _currentContext, authContext) => {
           const line = await lockAgreementPaymentLineForMutation(
             event,

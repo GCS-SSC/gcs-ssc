@@ -55,7 +55,7 @@ export type SummaryPayment = {
 }
 export type SummaryAccountingEntry = {
   id: string; fiscalYearId: string; month: number; amount: Money; currency: Currency_Codes;
-  kind: 'journal_voucher' | 'correction'
+  kind: 'journal_voucher' | 'correction' | 'account_receivable_recovery'
 }
 
 const ZERO = parseMoney('0')
@@ -80,12 +80,15 @@ type SummaryLine = SummaryBudgetLine & {
   forecast: Money[] | null
   claimed: Money[]
   reconciled: Money[]
+  originalClaimed: Money[]
+  originalReconciled: Money[]
+  accountReceivableRecoveries: Money[]
 }
 
 const lineFromBudget = (line: SummaryBudgetLine, hasActiveForecast: boolean): SummaryLine => ({
   ...line,
   forecast: hasActiveForecast ? emptyMonths() : null,
-  claimed: emptyMonths(), reconciled: emptyMonths()
+  claimed: emptyMonths(), reconciled: emptyMonths(), originalClaimed: emptyMonths(), originalReconciled: emptyMonths(), accountReceivableRecoveries: emptyMonths()
 })
 
 /**
@@ -99,6 +102,7 @@ const lineFromBudget = (line: SummaryBudgetLine, hasActiveForecast: boolean): Su
  * @param reconciliations - Reconciliation lines with positive lifecycle evidence.
  * @param payments - Payment records with terminal status indicators.
  * @param accountingEntries - Effective separately attributed JV and Correction entries.
+ * @param claimRecoveries - Signed reductions attributed to the original source Claim periods.
  * @returns Fiscal years with currency-specific monthly line grids and payment totals.
  */
 export const buildAgreementFinancialSummary = (
@@ -109,7 +113,8 @@ export const buildAgreementFinancialSummary = (
   claimLines: SummaryClaimLine[],
   reconciliations: SummaryReconciliation[],
   payments: SummaryPayment[],
-  accountingEntries: SummaryAccountingEntry[] = []
+  accountingEntries: SummaryAccountingEntry[] = [],
+  claimRecoveries: Array<{ claimLineId: string | null; currency: Currency_Codes; amount: Money }> = []
 ) => ({
   fiscalYears: [...fiscalYears].sort((a, b) => a.order.localeCompare(b.order)).map(year => {
     const yearBudgetLines = budgetLines.filter(line => line.fiscalYearId === year.id)
@@ -174,9 +179,13 @@ export const buildAgreementFinancialSummary = (
           target.description = claim.description
         }
         const month = assertMonth(claim.periodEnd)
-        target.claimed[month] = addMoney(target.claimed[month] ?? ZERO, claim.amount)
+        const recovery = sumMoney(claimRecoveries.filter(row => row.claimLineId === claim.id && row.currency === currency).map(row => row.amount))
+        target.originalClaimed[month] = addMoney(target.originalClaimed[month] ?? ZERO, claim.amount)
+        target.claimed[month] = addMoney(target.claimed[month] ?? ZERO, addMoney(claim.amount, recovery))
+        target.accountReceivableRecoveries[month] = addMoney(target.accountReceivableRecoveries[month] ?? ZERO, recovery)
         const reconciled = reconciledByClaimLine.get(claim.id) ?? ZERO
-        target.reconciled[month] = addMoney(target.reconciled[month] ?? ZERO, reconciled)
+        target.originalReconciled[month] = addMoney(target.originalReconciled[month] ?? ZERO, reconciled)
+        target.reconciled[month] = addMoney(target.reconciled[month] ?? ZERO, addMoney(reconciled, recovery))
         if (compareMoney(reconciled, ZERO) > 0) latestReconciledMonth = Math.max(latestReconciledMonth ?? month, month)
       }
 
@@ -215,14 +224,15 @@ export const buildAgreementFinancialSummary = (
       const yearEntries = accountingEntries.filter(entry => entry.fiscalYearId === year.id && entry.currency === currency)
       const jvEffects = emptyMonths()
       const correctionAdjustments = emptyMonths()
+      const accountReceivableRecoveries = emptyMonths()
       for (const entry of yearEntries) {
         const month = assertMonth(entry.month)
-        const target = entry.kind === 'journal_voucher' ? jvEffects : correctionAdjustments
+        const target = entry.kind === 'journal_voucher' ? jvEffects : entry.kind === 'account_receivable_recovery' ? accountReceivableRecoveries : correctionAdjustments
         target[month] = addMoney(target[month] ?? ZERO, entry.amount)
       }
-      const correctedRecordedPaid = paid.map((amount, month) => sumMoney([amount, jvEffects[month] ?? ZERO, correctionAdjustments[month] ?? ZERO]))
+      const correctedRecordedPaid = paid.map((amount, month) => sumMoney([amount, jvEffects[month] ?? ZERO, correctionAdjustments[month] ?? ZERO, accountReceivableRecoveries[month] ?? ZERO]))
       return { currency, lines, paid, payments: paymentItems, progress,
-        jvEffects, correctionAdjustments, correctedRecordedPaid, accountingEntries: yearEntries }
+        jvEffects, correctionAdjustments, accountReceivableRecoveries, correctedRecordedPaid, accountingEntries: yearEntries }
     })
     return {
       id: year.id,

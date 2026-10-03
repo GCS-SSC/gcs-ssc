@@ -12,6 +12,10 @@ import {
 export { AUTHORIZATION_SUBJECTS, isAuthorizationSubject }
 
 export const ABILITIES = [
+  { action: 'create', subject: 'account_receivable', name_en: 'Create Accounts Receivable', name_fr: 'Créer des comptes débiteurs', desc_en: 'Prepare Accounts Receivable and manual Credit Memos.', desc_fr: 'Préparer des comptes débiteurs et des notes de crédit manuelles.' },
+  { action: 'read', subject: 'account_receivable', name_en: 'Read Accounts Receivable', name_fr: 'Lire les comptes débiteurs', desc_en: 'Read scoped Accounts Receivable and retained recovery evidence.', desc_fr: 'Lire les comptes débiteurs autorisés et les preuves de recouvrement conservées.' },
+  { action: 'update', subject: 'account_receivable', name_en: 'Update Accounts Receivable', name_fr: 'Modifier les comptes débiteurs', desc_en: 'Work on assigned Accounts Receivable and Credit Memos.', desc_fr: 'Traiter les comptes débiteurs et les notes de crédit attribués.' },
+  { action: 'delete', subject: 'account_receivable', name_en: 'Delete Accounts Receivable', name_fr: 'Supprimer les comptes débiteurs', desc_en: 'Delete eligible assigned Drafts.', desc_fr: 'Supprimer les brouillons admissibles attribués.' },
   { action: 'create', subject: 'correction', name_en: 'Create Corrections', name_fr: 'Créer des corrections', desc_en: 'Prepare recorded payment adjustments.', desc_fr: 'Préparer des ajustements aux paiements comptabilisés.' },
   { action: 'read', subject: 'correction', name_en: 'Read Corrections', name_fr: 'Lire les corrections', desc_en: 'Read scoped Corrections and retained evidence.', desc_fr: 'Lire les corrections autorisées et les preuves conservées.' },
   { action: 'update', subject: 'correction', name_en: 'Update Corrections', name_fr: 'Modifier les corrections', desc_en: 'Work on assigned Corrections.', desc_fr: 'Traiter les corrections attribuées.' },

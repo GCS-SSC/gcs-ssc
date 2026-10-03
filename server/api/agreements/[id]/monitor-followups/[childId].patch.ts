@@ -1,6 +1,6 @@
 import { FundingCaseAgreementMonitorFollowupPatchSchema } from '~~/shared/types/schemas'
 import { badRequest } from '~~/server/utils/api-errors'
-import { assertMonitorLinkedRecord, executeAgreementMonitorMutation, prepareAgreementMonitorRoute } from '~~/server/utils/agreement-monitor'
+import { assertMonitorLinkedRecord, executeAgreementMonitorMutation, prepareAgreementMonitorRoute, syncAgreementMonitorFollowupStatus } from '~~/server/utils/agreement-monitor'
 
 export default defineEventHandler(async event => {
   const childId = getRouterParam(event, 'childId')
@@ -23,6 +23,7 @@ export default defineEventHandler(async event => {
       .returningAll()
       .executeTakeFirst()
     if (!updated) return await badRequest(event, 'AGREEMENT_MONITOR_FOLLOWUP_NOT_FOUND', 'apiErrors.agreement.monitor_followup_not_found')
+    if (validated.egcs_fc_requiresreceivable !== undefined) await syncAgreementMonitorFollowupStatus(trx, childId, { event })
     return updated
   })
 })

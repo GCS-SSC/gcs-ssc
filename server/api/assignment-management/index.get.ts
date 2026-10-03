@@ -5,6 +5,7 @@ import { requireAuthContext } from '~~/server/utils/authorize'
 import { AssignedWorkQuerySchema } from '~~/shared/types/schemas'
 import type { AssignableEntityType } from '~~/shared/types/database'
 import { WORKFLOW_TARGET_ENTITY_TYPE_ENUM } from '~~/shared/constants/enums'
+import { creditMemoQueueAuthority, creditMemoQueueContributorAuthority } from '~~/server/utils/credit-memo-queue-authority'
 
 type CandidateRow = {
   entity_id: string
@@ -35,7 +36,7 @@ export default defineEventHandler(async event => {
       ? 'applicant_recipient'
       : grant.subject === 'agreement'
         ? 'agreement'
-        : grant.subject === 'funding_case' || grant.subject === 'journal_voucher' || grant.subject === 'correction' ? grant.subject : null
+        : grant.subject === 'funding_case' || grant.subject === 'journal_voucher' || grant.subject === 'correction' || grant.subject === 'account_receivable' ? grant.subject : null
     if (!subject) return []
     if (subject === 'applicant_recipient') {
       if (grant.scope.type === 'global') return [sql`work.owner_subject = 'applicant_recipient'`]
@@ -146,6 +147,32 @@ export default defineEventHandler(async event => {
       JOIN "Transfer_Payment_Profile" program ON program.id = stream.egcs_tp_transferpaymentprofile AND program._deleted = false
       JOIN "Agency_Profile" agency ON agency.id = program.egcs_tp_agency AND agency._deleted = false
       WHERE correction._deleted = false
+      UNION ALL
+      SELECT item.id, 'fundingcaseaccountreceivable', item.egcs_fc_status::text,
+        item.egcs_fc_agreementnumber || '-AR-' || item.egcs_fc_number::text,
+        item.egcs_fc_agreementnumber || '-AR-' || item.egcs_fc_number::text,
+        item.egcs_fc_agreementnumber || '-AR-' || item.egcs_fc_number::text,
+        'account_receivable', program.egcs_tp_agency, program.id,
+        agency.egcs_ay_name_en, agency.egcs_ay_name_fr, program.egcs_tp_name_en, program.egcs_tp_name_fr
+      FROM "Funding_Case_Agreement_Account_Receivable" item
+      JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.id = item.egcs_fc_fundingagreement AND NOT agreement._deleted
+      JOIN "Transfer_Payment_Stream" stream ON stream.id = agreement.egcs_fc_transferpaymentstream AND NOT stream._deleted
+      JOIN "Transfer_Payment_Profile" program ON program.id = stream.egcs_tp_transferpaymentprofile AND NOT program._deleted
+      JOIN "Agency_Profile" agency ON agency.id = program.egcs_tp_agency AND NOT agency._deleted
+      WHERE NOT item._deleted
+      UNION ALL
+      SELECT item.id, 'fundingcaseaccountreceivablecreditmemo', item.egcs_fc_status::text,
+        item.egcs_fc_agreementnumber || '-CM-' || item.egcs_fc_number::text,
+        item.egcs_fc_agreementnumber || '-CM-' || item.egcs_fc_number::text,
+        item.egcs_fc_agreementnumber || '-CM-' || item.egcs_fc_number::text,
+        'account_receivable', program.egcs_tp_agency, program.id,
+        agency.egcs_ay_name_en, agency.egcs_ay_name_fr, program.egcs_tp_name_en, program.egcs_tp_name_fr
+      FROM "Funding_Case_Account_Receivable_Credit_Memo" item
+      JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.id = item.egcs_fc_fundingagreement AND NOT agreement._deleted
+      JOIN "Transfer_Payment_Stream" stream ON stream.id = agreement.egcs_fc_transferpaymentstream AND NOT stream._deleted
+      JOIN "Transfer_Payment_Profile" program ON program.id = stream.egcs_tp_transferpaymentprofile AND NOT program._deleted
+      JOIN "Agency_Profile" agency ON agency.id = program.egcs_tp_agency AND NOT agency._deleted
+      WHERE NOT item._deleted
       UNION ALL
       SELECT payment.id, 'fundingcasepayment', payment.egcs_fc_status::text, payment.id::text,
         '#' || payment.id::text, '#' || payment.id::text, 'agreement', program.egcs_tp_agency, program.id,
@@ -271,6 +298,7 @@ export default defineEventHandler(async event => {
           OR work.label_en ILIKE ${search} OR work.label_fr ILIKE ${search}
           OR work.status ILIKE ${search})
         AND (${sql.join(authorizationPredicates, sql` OR `)})
+        AND ${creditMemoQueueAuthority(managementGrants)}
       GROUP BY work.id, work.entity_type, work.stable_reference, work.label_en, work.label_fr, work.status,
         work.owner_subject, work.agency_id, work.program_id, work.agency_name_en, work.agency_name_fr,
         work.program_name_en, work.program_name_fr, primary_user.id, primary_user.egcs_cn_name,
@@ -309,7 +337,7 @@ export default defineEventHandler(async event => {
               ))
             ))
           )
-      )) primary_eligible,
+      ) AND ${creditMemoQueueContributorAuthority(sql.ref('roster.primary_auth_user_id'), 'roster', 'entity_id')}) primary_eligible,
       count(*) OVER ()::int total_count
     FROM roster
     ORDER BY roster.entity_type, roster.entity_id::bigint

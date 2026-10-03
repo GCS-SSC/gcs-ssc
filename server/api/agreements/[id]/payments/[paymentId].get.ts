@@ -1,3 +1,4 @@
+import { readAccountReceivablePaymentOffset } from '~~/server/utils/account-receivable-recovery'
 import { sql } from 'kysely'
 import { prepareAgreementPaymentRoute } from '~~/server/utils/agreement-payment'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
@@ -23,6 +24,7 @@ export default defineEventHandler(async event => {
   const { agreementId, db } = prepared
   const payment = await db
     .selectFrom('Funding_Case_Agreement_Payment')
+    .leftJoin('Applicant_Recipient_Profile as payee', 'payee.id', 'Funding_Case_Agreement_Payment.egcs_fc_applicantrecipient')
     .innerJoin(
       'Funding_Case_Agreement_Commitment',
       'Funding_Case_Agreement_Commitment.id',
@@ -55,9 +57,12 @@ export default defineEventHandler(async event => {
     .where('Transfer_Payment_Stream._deleted', '=', false)
     .select([
       'Funding_Case_Agreement_Payment.id as id',
+      sql<string | null>`COALESCE(${sql.ref('payee.egcs_ar_operatingname_en')}, ${sql.ref('payee.egcs_ar_legalname_en')})`.as('egcs_fc_payeename_en'),
+      sql<string | null>`COALESCE(${sql.ref('payee.egcs_ar_operatingname_fr')}, ${sql.ref('payee.egcs_ar_legalname_fr')})`.as('egcs_fc_payeename_fr'),
       'Funding_Case_Agreement_Payment.egcs_fc_fundingagreementcommitment as egcs_fc_fundingagreementcommitment',
       'Funding_Case_Agreement_Payment.egcs_fc_fiscalyear as egcs_fc_fiscalyear',
       'Funding_Case_Agreement_Payment.egcs_fc_paymenttype as egcs_fc_paymenttype',
+      'Funding_Case_Agreement_Payment.egcs_fc_applicantrecipient as egcs_fc_applicantrecipient',
       'Funding_Case_Agreement_Payment.egcs_fc_periodstart as egcs_fc_periodstart',
       'Funding_Case_Agreement_Payment.egcs_fc_periodend as egcs_fc_periodend',
       databaseMoneyText(sql.ref('Funding_Case_Agreement_Payment.egcs_fc_paymentamount')).as('egcs_fc_paymentamount'),
@@ -115,6 +120,7 @@ export default defineEventHandler(async event => {
 
   return {
     ...paymentWithState,
+    ...await readAccountReceivablePaymentOffset(db, paymentId),
     lines: lines.map(line => ({
       ...line,
       egcs_fc_amount: parseDatabaseMoney(line.egcs_fc_amount),

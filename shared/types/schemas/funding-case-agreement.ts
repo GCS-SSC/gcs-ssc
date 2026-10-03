@@ -526,6 +526,7 @@ export type FundingCaseAgreementForecastLineItemPatch = z.infer<typeof FundingCa
 export type FundingCaseAgreementForecastLineItemItem = WithId<FundingCaseAgreementForecastLineItem>
 
 export const FundingCaseAgreementPaymentBaseSchema = z.object({
+  egcs_fc_applicantrecipient: RequiredBigintSelectionId(),
   egcs_fc_fundingagreementcommitment: RequiredBigintSelectionId(),
   egcs_fc_fiscalyear: RequiredBigintSelectionId(),
   egcs_fc_paymenttype: z.enum(PAYMENT_TYPE_ENUM, { error: 'validation.required' }),
@@ -604,6 +605,7 @@ export type FundingCaseAgreementPaymentLinePatch = z.infer<typeof FundingCaseAgr
 export type FundingCaseAgreementPaymentLineItem = WithId<FundingCaseAgreementPaymentLine>
 
 export const FundingCaseAgreementClaimBaseSchema = z.object({
+  egcs_fc_applicantrecipient: RequiredBigintSelectionId(),
   egcs_fc_fiscalyear: RequiredBigintSelectionId(),
   egcs_fc_isfinalforyear: z.boolean(),
   egcs_fc_periodstart: RequiredForecastMonth(),
@@ -855,6 +857,7 @@ export type FundingCaseAgreementMonitorFindingItem = WithId<FundingCaseAgreement
 }>
 
 export const FundingCaseAgreementMonitorFollowupBaseSchema = z.object({
+  egcs_fc_requiresreceivable: z.boolean().default(false),
   egcs_fc_fundingagreementmonitor: RequiredBigintSelectionId(),
   egcs_fc_monitorfinding: NullableBigintSelectionId().optional(),
   egcs_fc_followupname: RequiredString().max(255, { error: 'validation.max_length' }),

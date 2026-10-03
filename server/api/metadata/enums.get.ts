@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import {
+  ACCOUNT_RECEIVABLE_TYPE_ENUM,
+  ACCOUNT_RECEIVABLE_RECOVERY_METHOD_ENUM,
   APPROVAL_TYPE_ENUM,
   CORRECTION_OUTCOME_ENUM,
   EXECUTION_ENTITY_TYPE_ENUM,
@@ -49,6 +51,8 @@ export default defineEventHandler(async event => {
     'decision_type',
     'payment_type',
     'correction_outcome',
+    'account_receivable_type',
+    'account_receivable_recovery_method',
     'review_type',
     'monitor_action_type',
     'monitor_responsible_party',
@@ -75,6 +79,8 @@ export default defineEventHandler(async event => {
 
   const staticEnumsByKey: Partial<Record<(typeof allowedEnums)[number], readonly string[]>> = {
     correction_outcome: CORRECTION_OUTCOME_ENUM,
+    account_receivable_type: ACCOUNT_RECEIVABLE_TYPE_ENUM,
+    account_receivable_recovery_method: ACCOUNT_RECEIVABLE_RECOVERY_METHOD_ENUM,
     approval_type: APPROVAL_TYPE_ENUM,
     execution_entity_type: EXECUTION_ENTITY_TYPE_ENUM,
     transfer_payment_config_entity_type: TRANSFER_PAYMENT_CONFIG_ENTITY_TYPE_ENUM,

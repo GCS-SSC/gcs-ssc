@@ -474,6 +474,14 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Funding_Case_Agreement_Claim_Reconcile_Line_Item: FundingCaseAgreementClaimReconcileLineItemTable
   Funding_Case_Agreement_Commitment: FundingCaseAgreementCommitmentTable
   Funding_Case_Agreement_Commitment_Line: FundingCaseAgreementCommitmentLineTable
+  Funding_Case_Agreement_Account_Receivable: FundingCaseAgreementAccountReceivableTable
+  Funding_Case_Agreement_Account_Receivable_Line: FundingCaseAgreementAccountReceivableLineTable
+  Funding_Case_Agreement_Account_Receivable_Coding: FundingCaseAgreementAccountReceivableCodingTable
+  Funding_Case_Account_Receivable_Pool: FundingCaseAccountReceivablePoolTable
+  Funding_Case_Account_Receivable_Credit_Memo: FundingCaseAccountReceivableCreditMemoTable
+  Funding_Case_Account_Receivable_Recovery: FundingCaseAccountReceivableRecoveryTable
+  Funding_Case_Account_Receivable_Allocation: FundingCaseAccountReceivableAllocationTable
+  Funding_Case_Account_Receivable_Posting: FundingCaseAccountReceivablePostingTable
   Funding_Case_Agreement_Correction: FundingCaseAgreementCorrectionTable
   Funding_Case_Agreement_Correction_Line: FundingCaseAgreementCorrectionLineTable
   Funding_Case_Agreement_Correction_Source: FundingCaseAgreementCorrectionSourceTable
@@ -713,7 +721,7 @@ export interface RoleTable {
 export interface RolePermissionTable {
   id: Generated<string>
   role_id: string
-  subject: 'audit' | 'system' | 'agency' | 'transfer_payment' | 'role' | 'user' | 'group' | 'agreement' | 'applicant_recipient' | 'funding_case' | 'journal_voucher' | 'correction'
+  subject: 'audit' | 'system' | 'agency' | 'transfer_payment' | 'role' | 'user' | 'group' | 'agreement' | 'applicant_recipient' | 'funding_case' | 'journal_voucher' | 'correction' | 'account_receivable'
   access_level: 'viewer' | 'contributor' | 'manager' | null
   can_manage_assignments: Generated<boolean>
   _deleted: Generated<boolean>
@@ -1585,6 +1593,7 @@ export interface FundingCaseAgreementForecastLineItemFundingTable {
 export interface FundingCaseAgreementClaimTable {
   id: Generated<string>
   egcs_fc_fundingagreement: string
+  egcs_fc_applicantrecipient: Generated<string | null>
   egcs_fc_fiscalyear: string
   egcs_fc_isfinalforyear: boolean
   egcs_fc_periodend: number
@@ -1703,6 +1712,7 @@ export interface FundingCaseAgreementCorrectionLineTable {
   egcs_fc_originalpaid: number
   egcs_fc_jveffect: number
   egcs_fc_priorcorrections: number
+  egcs_fc_arrecoveries: Generated<number>
   egcs_fc_adjustment: Generated<number>
   _deleted: Generated<boolean>
 }
@@ -1771,6 +1781,8 @@ export interface FundingCaseAgreementJournalVoucherLineTable {
 }
 
 export interface FundingCaseAgreementPaymentTable {
+  /** Legacy multi-Proponent payments remain unattributed until explicitly resolved. */
+  egcs_fc_applicantrecipient: Generated<string | null>
   id: Generated<string>
   egcs_fc_fundingagreementcommitment: string
   egcs_fc_fundingagreement: Generated<string>
@@ -1839,6 +1851,7 @@ export interface FundingCaseAgreementMonitorFindingTable {
 }
 
 export interface FundingCaseAgreementMonitorFollowupTable {
+  egcs_fc_requiresreceivable: Generated<boolean>
   id: Generated<string>
   egcs_fc_fundingagreementmonitor: string
   egcs_fc_monitorfinding: Generated<string | null>
@@ -2636,4 +2649,151 @@ export interface AuditAttributionColumns {
   attribution_error: Generated<string | null>
   transaction_id: Generated<string | null>
   inputs: Generated<JsonValue | null>
+}
+
+export interface FundingCaseAgreementAccountReceivableTable {
+  id: Generated<string>
+  egcs_fc_fundingagreement: string
+  egcs_fc_pool: string
+  egcs_fc_applicantrecipient: string
+  egcs_fc_agencyfiscalyear: string
+  egcs_fc_type: 'ineligible_expense' | 'outstanding_advance'
+  egcs_fc_recoverymethod: 'offset' | 'direct_repayment'
+  egcs_fc_recipientpreference: 'offset' | 'direct_repayment' | null
+  egcs_fc_preferenceoverride_en: Generated<string>
+  egcs_fc_preferenceoverride_fr: Generated<string>
+  egcs_fc_currency: Currency_Codes
+  egcs_fc_number: number
+  egcs_fc_agreementnumber: string
+  egcs_fc_requesteddate: Date
+  egcs_fc_narrative_en: Generated<string>
+  egcs_fc_narrative_fr: Generated<string>
+  egcs_fc_linkedreceivable: string | null
+  egcs_fc_monitorfollowup: string | null
+  egcs_fc_createdby: string
+  egcs_fc_createdat: Generated<Date>
+  egcs_fc_status: StatusId
+  egcs_fc_statusagency: ColumnType<string, never, never>
+  egcs_fc_statusterminal: ColumnType<boolean | null, never, never>
+  egcs_fc_statusdeleted: ColumnType<boolean | null, never, never>
+  egcs_fc_outcome: Generated<'open' | 'posted' | 'denied' | 'failed' | 'cancelled'>
+  egcs_fc_postedat: Date | null
+  egcs_fc_postingruntime: string | null
+  egcs_fc_terminalby: string | null
+  egcs_fc_terminalat: Date | null
+  egcs_fc_terminalreason: string | null
+  _deleted: Generated<boolean>
+}
+
+export interface FundingCaseAccountReceivableCreditMemoTable {
+  id: Generated<string>
+  egcs_fc_fundingagreement: string
+  egcs_fc_agency: string
+  egcs_fc_pool: string
+  egcs_fc_applicantrecipient: string
+  egcs_fc_currency: Currency_Codes
+  egcs_fc_number: number
+  egcs_fc_agreementnumber: string
+  egcs_fc_receiveddate: Date
+  egcs_fc_amount: number
+  egcs_fc_receiptreference: string | null
+  egcs_fc_narrative_en: Generated<string>
+  egcs_fc_narrative_fr: Generated<string>
+  egcs_fc_createdby: string
+  egcs_fc_createdat: Generated<Date>
+  egcs_fc_status: StatusId
+  egcs_fc_statusagency: ColumnType<string, never, never>
+  egcs_fc_statusterminal: ColumnType<boolean | null, never, never>
+  egcs_fc_statusdeleted: ColumnType<boolean | null, never, never>
+  egcs_fc_outcome: Generated<'open' | 'posted' | 'denied' | 'failed' | 'cancelled'>
+  egcs_fc_postedat: Date | null
+  egcs_fc_postingruntime: string | null
+  egcs_fc_terminalby: string | null
+  egcs_fc_terminalat: Date | null
+  egcs_fc_terminalreason: string | null
+  _deleted: Generated<boolean>
+}
+
+export interface FundingCaseAgreementAccountReceivableLineTable {
+  id: Generated<string>
+  egcs_fc_receivable: string
+  egcs_fc_fundingagreement: string
+  egcs_fc_originalline: string | null
+  egcs_fc_sourcekey: string
+  egcs_fc_claim: string | null
+  egcs_fc_claimline: string | null
+  egcs_fc_reconcileline: string | null
+  egcs_fc_payment: string | null
+  egcs_fc_periodstart: number
+  egcs_fc_periodend: number
+  egcs_fc_sourceamount: number
+  egcs_fc_amount: Generated<number>
+  egcs_fc_evidence: JsonValue
+  _deleted: Generated<boolean>
+}
+
+export interface FundingCaseAgreementAccountReceivableCodingTable {
+  id: Generated<string>
+  egcs_fc_receivableline: string
+  egcs_fc_receivable: string
+  egcs_fc_fundingagreement: string
+  egcs_fc_commitmentline: string
+  egcs_fc_chartofaccount: string
+  egcs_fc_agencychartofaccount: string
+  egcs_fc_agencyfiscalyear: string
+  egcs_fc_periodstart: number
+  egcs_fc_periodend: number
+  egcs_fc_paidbasis: number
+  egcs_fc_amount: Generated<number>
+  egcs_fc_accountingdimensions: JsonValue
+  _deleted: Generated<boolean>
+}
+
+export interface FundingCaseAccountReceivablePoolTable {
+  id: Generated<string>
+  egcs_fc_agency: string
+  egcs_fc_applicantrecipient: string
+  egcs_fc_currency: Currency_Codes
+  _deleted: Generated<boolean>
+}
+
+export interface FundingCaseAccountReceivableRecoveryTable {
+  id: Generated<string>
+  egcs_fc_pool: string
+  egcs_fc_payment: string | null
+  egcs_fc_creditmemo: string | null
+  egcs_fc_amount: number
+  egcs_fc_outcome: Generated<'open' | 'posted' | 'released'>
+  egcs_fc_createdat: Generated<Date>
+  egcs_fc_postedat: Date | null
+  egcs_fc_postingruntime: string | null
+  egcs_fc_releasedat: Date | null
+  _deleted: Generated<boolean>
+}
+
+export interface FundingCaseAccountReceivableAllocationTable {
+  id: Generated<string>
+  egcs_fc_recovery: string
+  egcs_fc_receivable: string
+  egcs_fc_receivableline: string
+  egcs_fc_fundingagreement: string
+  egcs_fc_amount: number
+  _deleted: Generated<boolean>
+}
+
+export interface FundingCaseAccountReceivablePostingTable {
+  id: Generated<string>
+  egcs_fc_recovery: string
+  egcs_fc_allocation: string
+  egcs_fc_coding: string
+  egcs_fc_receivable: string
+  egcs_fc_fundingagreement: string
+  egcs_fc_commitmentline: string
+  egcs_fc_chartofaccount: string
+  egcs_fc_agencychartofaccount: string
+  egcs_fc_agencyfiscalyear: string
+  egcs_fc_periodstart: number
+  egcs_fc_periodend: number
+  egcs_fc_amount: number
+  _deleted: Generated<boolean>
 }

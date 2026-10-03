@@ -117,6 +117,8 @@ export const authorizeFreshAssignedItem = async (
     }
     return
   }
+  const { canAccessCreditMemoTargetScopes } = await import('./credit-memo-scope-authority')
+  if (!await canAccessCreditMemoTargetScopes(trx, context, entityType, entityId, action)) return await forbidden(event)
   if (owner.kind === 'agreement') {
     const { resolveAgreementScopeContext } = await import('./agreement')
     const agreement = await resolveAgreementScopeContext(owner.agreementId, trx)

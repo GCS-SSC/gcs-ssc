@@ -522,6 +522,7 @@ const claimHeroMetaItems = computed(() => [
   displayValue(profile.value?.egcs_fc_agreementnumber),
   profile.value?.egcs_fc_currency.toUpperCase() ?? '',
   getBilingualValue(profile.value, 'egcs_fc_title', agreementId),
+  `${t('agreement.claims.submitting_proponent')}: ${getBilingualValue(activeClaim.value, 'submitting_proponent_name', t('common.unavailable'))}`,
   `${t('agreement.claims.fiscal_year')}: ${activeClaimFiscalYearLabel.value}`,
   `${t('agreement.claims.period')}: ${activeClaimPeriodLabel.value}`
 ])

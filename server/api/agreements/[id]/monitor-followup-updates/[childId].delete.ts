@@ -24,7 +24,7 @@ export default defineEventHandler(async event => {
   await executeAgreementMonitorMutation(event, db, agreementId, agreementContext, monitorId, async trx => {
     const deleted = await trx.updateTable('Funding_Case_Agreement_Monitor_Followup_Update').set({ _deleted: true }).where('id', '=', childId).where('egcs_fc_fundingagreementmonitorfollowup', '=', followupId).where('_deleted', '=', false).returning('id').executeTakeFirst()
     if (!deleted) return await badRequest(event, 'AGREEMENT_MONITOR_FOLLOWUP_UPDATE_NOT_FOUND', 'apiErrors.agreement.monitor_followup_update_not_found')
-    await syncAgreementMonitorFollowupStatus(trx, followupId)
+    await syncAgreementMonitorFollowupStatus(trx, followupId, { event })
   }, { action: 'delete' })
   return { success: true }
 })

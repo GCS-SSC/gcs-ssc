@@ -948,6 +948,7 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
   await db.schema
     .createTable('Funding_Case_Agreement_Claim')
     .addColumn('id', 'bigint', col => col.primaryKey().notNull().references('Common_Entity.id').onDelete('restrict'))
+    .addColumn('egcs_fc_applicantrecipient', 'bigint', col => col.references('Applicant_Recipient_Profile.id').onDelete('restrict'))
     .addColumn('egcs_fc_fundingagreement', 'bigint', col =>
       col.notNull().references('Funding_Case_Agreement_Profile.id').onDelete('restrict')
     )

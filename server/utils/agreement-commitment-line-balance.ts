@@ -7,7 +7,7 @@ import { databaseMoneyText, parseDatabaseMoney } from './database-money'
 import { addMoney, compareMoney, subtractMoney, sumMoney, parseMoney, type Money } from '~~/shared/utils/money'
 import { sql } from 'kysely'
 import { budgetFiscalYearStableId } from './agreement-budget-lineage'
-import { readEffectiveCorrectionAdjustments } from './agreement-accounting-projection'
+import { readEffectiveAccountReceivableRecoveries, readEffectiveCorrectionAdjustments } from './agreement-accounting-projection'
 
 type DbClient = Kysely<Database> | Transaction<Database>
 const ZERO_MONEY = parseMoney('0.00')
@@ -123,7 +123,10 @@ const readCommitmentCodingCapacity = async (
   const postedCorrections = (await readEffectiveCorrectionAdjustments(db, agreementId, { currency: options.currency }))
     .filter(row => String(row.agencyChartId) === agencyChartId)
     .map(row => ({ commitmentLineId: row.commitmentLineId, amount: row.amount, paymentId: null }))
-  const adjustments = [...adjustmentRows.filter(row => successfulVouchers.has(String(row.voucherId)) && String(row.paymentId) !== options.excludePaymentId), ...postedCorrections]
+  const recoveries = (await readEffectiveAccountReceivableRecoveries(db, agreementId, { currency: options.currency }))
+    .filter(row => String(row.agencyChartId) === agencyChartId)
+    .map(row => ({ commitmentLineId: row.commitmentLineId, amount: row.amount, paymentId: null }))
+  const adjustments = [...adjustmentRows.filter(row => successfulVouchers.has(String(row.voucherId)) && String(row.paymentId) !== options.excludePaymentId), ...postedCorrections, ...recoveries]
   if (!adjustments.length) return null
 
   const codingLines = await db.selectFrom('Funding_Case_Agreement_Commitment_Line as line')

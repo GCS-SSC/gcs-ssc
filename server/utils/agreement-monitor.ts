@@ -1,7 +1,8 @@
+import { hasAccountingTable } from './correction-schema'
 /* eslint-disable jsdoc/require-jsdoc -- Existing exported monitor helpers are intentionally documented by their descriptive names. */
 import { getRouterParam, type H3Event } from 'h3'
 import type { Kysely, Transaction } from 'kysely'
-import { badRequest } from '~~/server/utils/api-errors'
+import { badRequest, throwApiError } from '~~/server/utils/api-errors'
 import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import { lockAgreementAggregate } from '~~/server/utils/agreement-aggregate-lock'
@@ -364,7 +365,8 @@ export const assertAgreementMonitorFollowupExists = async (
 
 export const syncAgreementMonitorFollowupStatus = async (
   db: AgreementMonitorDb,
-  followupId: string
+  followupId: string,
+  options: { event?: H3Event } = {}
 ) => {
   const latestUpdate = await db
     .selectFrom('Funding_Case_Agreement_Monitor_Followup_Update')
@@ -375,6 +377,20 @@ export const syncAgreementMonitorFollowupStatus = async (
     .executeTakeFirst()
 
   const status = latestUpdate?.egcs_fc_status ?? 'open'
+  if (status === 'completed' && await hasAccountingTable(db, 'Funding_Case_Agreement_Account_Receivable')) {
+    const followup = await db.selectFrom('Funding_Case_Agreement_Monitor_Followup').select('egcs_fc_requiresreceivable')
+      .where('id', '=', followupId).where('_deleted', '=', false).executeTakeFirst()
+    if (followup?.egcs_fc_requiresreceivable) {
+      const debt = await db.selectFrom('Funding_Case_Agreement_Account_Receivable').select('id')
+        .where('egcs_fc_monitorfollowup', '=', followupId).where('egcs_fc_outcome', '=', 'posted')
+        .where('egcs_fc_linkedreceivable', 'is', null).where('_deleted', '=', false).executeTakeFirst()
+      if (!debt) {
+        if (options.event) return await throwApiError(options.event, { statusCode: 409,
+          code: 'AR_MONITOR_RECEIVABLE_REQUIRED', key: 'apiErrors.account_receivable.monitor_receivable_required' })
+        throw new Error('AR_MONITOR_RECEIVABLE_REQUIRED')
+      }
+    }
+  }
 
   await db
     .updateTable('Funding_Case_Agreement_Monitor_Followup')

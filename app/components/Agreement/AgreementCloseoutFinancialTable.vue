@@ -29,6 +29,9 @@ const noCorrections = parseMoney('0')
             {{ t('common.currency') }}
           </th>
           <th class="px-4 py-3 text-right">
+            {{ t('agreement.financial_summary.original_reconciled') }}
+          </th>
+          <th class="px-4 py-3 text-right">
             {{ t('agreement.closeout.approved_claims') }}
           </th>
           <th class="px-4 py-3 text-right">
@@ -36,6 +39,9 @@ const noCorrections = parseMoney('0')
           </th>
           <th class="px-4 py-3 text-right">
             {{ t('agreement.financial_summary.correction_adjustments') }}
+          </th>
+          <th class="px-4 py-3 text-right">
+            {{ t('agreement.financial_summary.ar_recoveries') }}
           </th>
           <th class="px-4 py-3 text-right">
             {{ t('agreement.financial_summary.corrected_recorded_paid') }}
@@ -57,6 +63,9 @@ const noCorrections = parseMoney('0')
             {{ row.currency }}
           </td>
           <td class="px-4 py-3 text-right">
+            {{ formatMoney(row.originalApprovedClaimAmount ?? row.approvedClaimAmount, row.currency) }}
+          </td>
+          <td class="px-4 py-3 text-right">
             {{ formatMoney(row.approvedClaimAmount, row.currency) }}
           </td>
           <td class="px-4 py-3 text-right">
@@ -64,6 +73,9 @@ const noCorrections = parseMoney('0')
           </td>
           <td class="px-4 py-3 text-right">
             {{ formatMoney(row.correctionAmount ?? noCorrections, row.currency) }}
+          </td>
+          <td class="px-4 py-3 text-right">
+            {{ formatMoney(row.accountReceivableRecoveryAmount ?? noCorrections, row.currency) }}
           </td>
           <td class="px-4 py-3 text-right">
             {{ formatMoney(row.paidAmount, row.currency) }}
@@ -76,7 +88,7 @@ const noCorrections = parseMoney('0')
           </td>
         </tr>
         <tr v-if="rows.length === 0">
-          <td colspan="8" class="px-4 py-8 text-center text-muted">
+          <td colspan="10" class="px-4 py-8 text-center text-muted">
             {{ t('common.no_data') }}
           </td>
         </tr>
@@ -90,6 +102,9 @@ const noCorrections = parseMoney('0')
             {{ total.currency }}
           </td>
           <td class="px-4 py-3 text-right">
+            {{ formatMoney(total.originalApprovedClaimAmount ?? total.approvedClaimAmount, total.currency) }}
+          </td>
+          <td class="px-4 py-3 text-right">
             {{ formatMoney(total.approvedClaimAmount, total.currency) }}
           </td>
           <td class="px-4 py-3 text-right">
@@ -97,6 +112,9 @@ const noCorrections = parseMoney('0')
           </td>
           <td class="px-4 py-3 text-right">
             {{ formatMoney(total.correctionAmount ?? noCorrections, total.currency) }}
+          </td>
+          <td class="px-4 py-3 text-right">
+            {{ formatMoney(total.accountReceivableRecoveryAmount ?? noCorrections, total.currency) }}
           </td>
           <td class="px-4 py-3 text-right">
             {{ formatMoney(total.paidAmount, total.currency) }}

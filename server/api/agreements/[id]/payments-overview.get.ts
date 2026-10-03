@@ -1,3 +1,4 @@
+import { readAccountReceivablePaymentOffset } from '~~/server/utils/account-receivable-recovery'
 import { sql } from 'kysely'
 import { prepareAgreementPaymentRoute } from '~~/server/utils/agreement-payment'
 import { budgetFiscalYearStableId } from '~~/server/utils/agreement-budget-lineage'
@@ -14,6 +15,7 @@ export default defineEventHandler(async event => {
 
   const payments = await db
     .selectFrom('Funding_Case_Agreement_Payment')
+    .leftJoin('Applicant_Recipient_Profile as payee', 'payee.id', 'Funding_Case_Agreement_Payment.egcs_fc_applicantrecipient')
     .innerJoin(
       'Funding_Case_Agreement_Commitment',
       'Funding_Case_Agreement_Commitment.id',
@@ -31,9 +33,12 @@ export default defineEventHandler(async event => {
       .on('Funding_Case_Agreement_Payment_Line._deleted', '=', false))
     .select([
       'Funding_Case_Agreement_Payment.id as id',
+      sql<string | null>`COALESCE(${sql.ref('payee.egcs_ar_operatingname_en')}, ${sql.ref('payee.egcs_ar_legalname_en')})`.as('egcs_fc_payeename_en'),
+      sql<string | null>`COALESCE(${sql.ref('payee.egcs_ar_operatingname_fr')}, ${sql.ref('payee.egcs_ar_legalname_fr')})`.as('egcs_fc_payeename_fr'),
       'Funding_Case_Agreement_Payment.egcs_fc_fundingagreementcommitment as egcs_fc_fundingagreementcommitment',
       'Funding_Case_Agreement_Payment.egcs_fc_fiscalyear as egcs_fc_fiscalyear',
       'Funding_Case_Agreement_Payment.egcs_fc_paymenttype as egcs_fc_paymenttype',
+      'Funding_Case_Agreement_Payment.egcs_fc_applicantrecipient as egcs_fc_applicantrecipient',
       'Funding_Case_Agreement_Payment.egcs_fc_periodstart as egcs_fc_periodstart',
       'Funding_Case_Agreement_Payment.egcs_fc_periodend as egcs_fc_periodend',
       databaseMoneyText(sql.ref('Funding_Case_Agreement_Payment.egcs_fc_paymentamount')).as('egcs_fc_paymentamount'),
@@ -56,6 +61,7 @@ export default defineEventHandler(async event => {
     .where('Agency_Fiscal_Year._deleted', '=', false)
     .groupBy([
       'Funding_Case_Agreement_Payment.id',
+      'payee.id',
       'Funding_Case_Agreement_Commitment.egcs_fc_type',
       'Agency_Commitment_Type.egcs_ay_name_en',
       'Agency_Commitment_Type.egcs_ay_name_fr',
@@ -70,5 +76,6 @@ export default defineEventHandler(async event => {
     line_total: parseDatabaseMoney(payment.line_total)
   }))
   const paymentsWithState = await withBusinessRecordState(db, 'fundingcasepayment', exactPayments)
-  return { payments: paymentsWithState }
+  const withRecovery = await Promise.all(paymentsWithState.map(async payment => ({ ...payment, ...await readAccountReceivablePaymentOffset(db, String(payment.id)) })))
+  return { payments: withRecovery }
 })

@@ -1,3 +1,5 @@
+import { readEffectiveAccountReceivableClaimRecoveries, readEffectiveAccountReceivableRecoveries } from './agreement-accounting-projection'
+import { hasAccountingTable } from './correction-schema'
 /* eslint-disable jsdoc/require-jsdoc -- Closeout domain helpers are covered by executable tests and architecture documentation. */
 import { createHash } from 'node:crypto'
 import { sql, type Kysely, type Transaction } from 'kysely'
@@ -47,6 +49,7 @@ const closeoutRoute = (agreementId: string, segment: string, entityId: string): 
 }
 
 const targetRoute = (agreementId: string, entityType: Entity_Type, entityId: string): string => {
+  if (entityType === 'fundingcaseaccountreceivablecreditmemo') return closeoutRoute(agreementId, 'account-receivable-credit-memos', entityId)
   if (entityType === 'fundingcasejournalvoucher') return `/journal-vouchers/${entityId}`
   const segments: Partial<Record<Entity_Type, string>> = {
     fundingcaseagreementclaim: 'claims',
@@ -56,7 +59,8 @@ const targetRoute = (agreementId: string, entityType: Entity_Type, entityId: str
     fundingcasemonitor: 'monitors',
     fundingcaseamendment: 'amendments',
     fundingcaseagreementcommitment: 'commitments',
-    fundingcasecorrection: 'corrections'
+    fundingcasecorrection: 'corrections',
+    fundingcaseaccountreceivable: 'account-receivables'
   }
   const segment = segments[entityType]
   return segment ? closeoutRoute(agreementId, segment, entityId) : `/agreements/${agreementId}`
@@ -146,12 +150,15 @@ const buildFinancialReport = async (db: DbClient, agreementId: string) => {
     await hasApprovedTargetEvidence(db, 'fundingclaimreconcile', String(row.reconcile_id)) ? row : null)))
     .filter((row): row is NonNullable<typeof row> => row !== null)
   const operationalPaymentRows = paymentRows.filter(row => row.status_terminal)
+  const recoveries = await readEffectiveAccountReceivableRecoveries(db, agreementId)
+  const claimRecoveries = await readEffectiveAccountReceivableClaimRecoveries(db, agreementId)
 
   type MutableFinancial = Omit<CloseoutFinancialRow, 'variance' | 'state'> & { cashPaidAmount: Money, correctionAmount: Money }
   const rows = new Map<string, MutableFinancial>()
   const readRow = (fiscalYearId: string, agencyFiscalYearId: string, fiscalYear: string, currency: Currency_Codes): MutableFinancial => {
     const key = `${agencyFiscalYearId}:${currency}`
     const current = rows.get(key) ?? { fiscalYearId, fiscalYear, currency, approvedClaimAmount: ZERO_MONEY,
+      originalApprovedClaimAmount: ZERO_MONEY, accountReceivableRecoveryAmount: ZERO_MONEY,
       cashPaidAmount: ZERO_MONEY, correctionAmount: ZERO_MONEY, paidAmount: ZERO_MONEY }
     rows.set(key, current)
     return current
@@ -159,6 +166,7 @@ const buildFinancialReport = async (db: DbClient, agreementId: string) => {
   for (const row of claimRows) {
     const current = readRow(String(row.fiscal_year_id), String(row.agency_fiscal_year_id), row.fiscal_year, row.currency)
     current.approvedClaimAmount = addMoney(current.approvedClaimAmount, parseDatabaseMoney(row.amount))
+    current.originalApprovedClaimAmount = addMoney(current.originalApprovedClaimAmount ?? ZERO_MONEY, parseDatabaseMoney(row.amount))
   }
   for (const row of operationalPaymentRows) {
     const current = readRow(String(row.fiscal_year_id), String(row.agency_fiscal_year_id), row.fiscal_year, row.currency)
@@ -173,28 +181,52 @@ const buildFinancialReport = async (db: DbClient, agreementId: string) => {
     current.paidAmount = addMoney(current.paidAmount, amount)
   }
 
+  const recoveryFiscalYearIds = [...new Set([...recoveries, ...claimRecoveries].map(row => String(row.agencyFiscalYearId)))]
+  const recoveryFiscalYears = recoveryFiscalYearIds.length
+    ? await db.selectFrom('Agency_Fiscal_Year').select(['id', 'egcs_ay_fiscalyeardisplay']).where('id', 'in', recoveryFiscalYearIds).execute()
+    : []
+  const recoveryRow = (agencyFiscalYearId: string, currency: Currency_Codes) => {
+    const existing = rows.get(`${agencyFiscalYearId}:${currency}`)
+    if (existing) return existing
+    const fiscalYear = recoveryFiscalYears.find(year => String(year.id) === agencyFiscalYearId)
+    if (!fiscalYear) throw new Error('Recovery source fiscal year is missing')
+    return readRow(agencyFiscalYearId, agencyFiscalYearId, fiscalYear.egcs_ay_fiscalyeardisplay, currency)
+  }
+  for (const row of recoveries) {
+    const current = recoveryRow(String(row.agencyFiscalYearId), row.currency)
+    current.paidAmount = addMoney(current.paidAmount, row.amount)
+    current.accountReceivableRecoveryAmount = addMoney(current.accountReceivableRecoveryAmount ?? ZERO_MONEY, row.amount)
+  }
+  for (const row of claimRecoveries) {
+    const current = recoveryRow(String(row.agencyFiscalYearId), row.currency)
+    current.approvedClaimAmount = addMoney(current.approvedClaimAmount, row.amount)
+  }
   const reportRows = [...rows.values()].map(row => {
-    const { approvedClaimAmount, paidAmount, cashPaidAmount, correctionAmount, ...identity } = row
+    const { approvedClaimAmount, paidAmount, cashPaidAmount, correctionAmount, originalApprovedClaimAmount, accountReceivableRecoveryAmount, ...identity } = row
     const variance = subtractMoney(paidAmount, approvedClaimAmount)
     return { ...identity, approvedClaimAmount, paidAmount,
-      ...(correctionRows.length ? { cashPaidAmount, correctionAmount } : {}),
+      ...(correctionRows.length || recoveries.length ? { cashPaidAmount, correctionAmount } : {}),
+      ...(recoveries.length || claimRecoveries.length ? { originalApprovedClaimAmount, accountReceivableRecoveryAmount } : {}),
       variance, state: getCloseoutFinancialState(variance) }
   }).sort((left, right) => left.fiscalYear.localeCompare(right.fiscalYear) || left.currency.localeCompare(right.currency))
 
-  const totalsByCurrency = new Map<Currency_Codes, { approvedClaimAmount: Money, cashPaidAmount: Money, correctionAmount: Money, paidAmount: Money }>()
+  const totalsByCurrency = new Map<Currency_Codes, { approvedClaimAmount: Money, originalApprovedClaimAmount: Money, accountReceivableRecoveryAmount: Money, cashPaidAmount: Money, correctionAmount: Money, paidAmount: Money }>()
   for (const row of reportRows) {
-    const total = totalsByCurrency.get(row.currency) ?? { approvedClaimAmount: ZERO_MONEY, cashPaidAmount: ZERO_MONEY, correctionAmount: ZERO_MONEY, paidAmount: ZERO_MONEY }
+    const total = totalsByCurrency.get(row.currency) ?? { approvedClaimAmount: ZERO_MONEY, originalApprovedClaimAmount: ZERO_MONEY, accountReceivableRecoveryAmount: ZERO_MONEY, cashPaidAmount: ZERO_MONEY, correctionAmount: ZERO_MONEY, paidAmount: ZERO_MONEY }
     total.approvedClaimAmount = addMoney(total.approvedClaimAmount, row.approvedClaimAmount)
+    total.originalApprovedClaimAmount = addMoney(total.originalApprovedClaimAmount, row.originalApprovedClaimAmount ?? row.approvedClaimAmount)
+    total.accountReceivableRecoveryAmount = addMoney(total.accountReceivableRecoveryAmount, row.accountReceivableRecoveryAmount ?? ZERO_MONEY)
     total.paidAmount = addMoney(total.paidAmount, row.paidAmount)
     total.cashPaidAmount = addMoney(total.cashPaidAmount, row.cashPaidAmount ?? row.paidAmount)
     total.correctionAmount = addMoney(total.correctionAmount, row.correctionAmount ?? ZERO_MONEY)
     totalsByCurrency.set(row.currency, total)
   }
   const totals = [...totalsByCurrency].map(([currency, value]) => {
-    const { approvedClaimAmount, cashPaidAmount, correctionAmount, paidAmount } = value
+    const { approvedClaimAmount, cashPaidAmount, correctionAmount, originalApprovedClaimAmount, accountReceivableRecoveryAmount, paidAmount } = value
     const variance = subtractMoney(paidAmount, approvedClaimAmount)
     return { currency, approvedClaimAmount, paidAmount,
-      ...(correctionRows.length ? { cashPaidAmount, correctionAmount } : {}),
+      ...(correctionRows.length || recoveries.length ? { cashPaidAmount, correctionAmount } : {}),
+      ...(recoveries.length || claimRecoveries.length ? { originalApprovedClaimAmount, accountReceivableRecoveryAmount } : {}),
       variance, state: getCloseoutFinancialState(variance) }
   }).sort((left, right) => left.currency.localeCompare(right.currency))
   return { ready: totals.every(total => compareMoney(total.variance, ZERO_MONEY) === 0), rows: reportRows, totals }
@@ -263,6 +295,21 @@ export const buildAgreementCloseoutReadiness = async (
       .where('egcs_fc_fundingagreement', '=', agreementId).where('_deleted', '=', false).execute()
   ])
 
+  const receivables = await hasAccountingTable(db, 'Funding_Case_Agreement_Account_Receivable')
+    ? await db.selectFrom('Funding_Case_Agreement_Account_Receivable').select(['id', 'egcs_fc_status', 'egcs_fc_outcome'])
+        .where('egcs_fc_fundingagreement', '=', agreementId).where('_deleted', '=', false).execute()
+    : []
+  const repayments = await hasAccountingTable(db, 'Funding_Case_Agreement_Account_Receivable')
+    ? await db.selectFrom('Funding_Case_Account_Receivable_Credit_Memo as repayment')
+        .select(['repayment.id', 'repayment.egcs_fc_status', 'repayment.egcs_fc_outcome', 'repayment.egcs_fc_fundingagreement'])
+        .where('repayment._deleted', '=', false).where(eb => eb.or([
+          eb('repayment.egcs_fc_fundingagreement', '=', agreementId),
+          eb.exists(eb.selectFrom('Funding_Case_Account_Receivable_Recovery as recovery')
+            .innerJoin('Funding_Case_Account_Receivable_Allocation as allocation', 'allocation.egcs_fc_recovery', 'recovery.id')
+            .select('allocation.id').whereRef('recovery.egcs_fc_creditmemo', '=', 'repayment.id')
+            .where('allocation.egcs_fc_fundingagreement', '=', agreementId).where('allocation._deleted', '=', false))
+        ])).execute()
+    : []
   const blockers: CloseoutBlocker[] = []
   const configuredStatusIds = [...new Set([
     agreement.egcs_fc_status,
@@ -272,6 +319,8 @@ export const buildAgreementCloseoutReadiness = async (
     ...payments.map(row => row.egcs_fc_status),
     ...journalVouchers.map(row => row.egcs_fc_status),
     ...corrections.map(row => row.egcs_fc_status),
+    ...receivables.map(row => row.egcs_fc_status),
+    ...repayments.map(row => row.egcs_fc_status),
     ...forecasts.map(row => row.egcs_fc_status),
     ...monitors.map(row => row.egcs_fc_status),
     ...commitments.map(row => row.egcs_fc_status)
@@ -319,8 +368,25 @@ export const buildAgreementCloseoutReadiness = async (
       'correction_not_terminal', { en: label, fr: label })
   }
 
+  for (const row of receivables) if (row.egcs_fc_outcome === 'open') {
+    addBlocker(blockers, agreementId, 'fundingcaseaccountreceivable', String(row.id), row.egcs_fc_status, 'account_receivable_not_terminal')
+  }
+  for (const row of repayments) if (row.egcs_fc_outcome === 'open') {
+    addBlocker(blockers, String(row.egcs_fc_fundingagreement), 'fundingcaseaccountreceivablecreditmemo', String(row.id), row.egcs_fc_status, 'account_receivable_credit_memo_not_terminal')
+  }
+  if (await hasAccountingTable(db, 'Funding_Case_Agreement_Account_Receivable')) {
+    const pending = await db.selectFrom('Funding_Case_Account_Receivable_Allocation as allocation')
+      .innerJoin('Funding_Case_Account_Receivable_Recovery as recovery', 'recovery.id', 'allocation.egcs_fc_recovery')
+      .innerJoin('Funding_Case_Agreement_Account_Receivable as debt', 'debt.id', 'allocation.egcs_fc_receivable')
+      .select(['debt.id', 'debt.egcs_fc_status']).distinct()
+      .where('allocation.egcs_fc_fundingagreement', '=', agreementId).where('recovery.egcs_fc_outcome', '=', 'open')
+      .where('allocation._deleted', '=', false).where('recovery._deleted', '=', false).execute()
+    for (const row of pending) addBlocker(blockers, agreementId, 'fundingcaseaccountreceivable', String(row.id), row.egcs_fc_status, 'account_receivable_recovery_pending')
+  }
   const targets = [
     { entityType: 'fundingcaseagreement' as const, entityId: agreementId },
+    ...receivables.map(row => ({ entityType: 'fundingcaseaccountreceivable' as const, entityId: String(row.id) })),
+    ...repayments.map(row => ({ entityType: 'fundingcaseaccountreceivablecreditmemo' as const, entityId: String(row.id) })),
     ...amendments.map(row => ({ entityType: 'fundingcaseamendment' as const, entityId: String(row.id) })),
     ...claims.map(row => ({ entityType: 'fundingcaseagreementclaim' as const, entityId: String(row.id) })),
     ...reconciles.map(row => ({ entityType: 'fundingclaimreconcile' as const, entityId: String(row.id) })),

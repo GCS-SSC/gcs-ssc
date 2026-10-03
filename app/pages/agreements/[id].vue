@@ -189,6 +189,9 @@ const tabs = computed(() => {
       value: 'payments',
       icon: 'i-lucide-wallet-cards'
     })
+    if (canAny('account_receivable', 'read')) nextTabs.push({
+      key: 'account_receivable.title', value: 'account-receivables', icon: 'i-lucide-hand-coins'
+    })
     if (canAny('correction', 'read')) nextTabs.push({
       key: 'correction.title',
       value: 'corrections',
@@ -557,6 +560,7 @@ const cancel = () => {
               :can-update="canUpdateChildRecords"
               :can-delete="canDeleteChildRecords" />
 
+            <AccountReceivableCollection v-else-if="selectedTab === 'account-receivables'" :agreement-id="id" />
             <CorrectionCollection v-else-if="selectedTab === 'corrections'" :agreement-id="id" />
 
             <AgreementForecastsTab

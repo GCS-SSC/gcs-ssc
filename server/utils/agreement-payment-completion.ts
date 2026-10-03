@@ -1,3 +1,6 @@
+import { assertPaymentRecoveryAllowed, withPaymentRecoveryErrors } from './payment-recovery-controls'
+import { hasAccountingTable } from './correction-schema'
+import { rebuildAccountReceivablePaymentOffset } from './account-receivable-recovery'
 /* eslint-disable jsdoc/require-jsdoc -- Temporary coverage while payment completion helpers receive complete documentation. */
 import type { H3Event } from 'h3'
 import {
@@ -8,6 +11,7 @@ import { resolveCurrentCommonUser } from '~~/server/utils/additional-reviewer-ru
 import {
   assertAgreementPaymentEditable,
   getPaymentLineTotal,
+  getAgreementPayment,
   paymentLineTotalMatchesPaymentAmount,
   resolveAgreementPaymentRuntimeContext
 } from '~~/server/utils/agreement-payment'
@@ -44,21 +48,38 @@ export const getAgreementPaymentCompletionRuntime = async (
     const lineTotal = await getPaymentLineTotal(trx, paymentId)
     const hasPositiveLineTotal = compareMoney(lineTotal, ZERO_MONEY) > 0
     const linesMatch = hasPositiveLineTotal && await paymentLineTotalMatchesPaymentAmount(trx, paymentId)
+    let recoveryBlocked = false
+    if (await hasAccountingTable(trx, 'Funding_Case_Agreement_Account_Receivable')) {
+      const payment = await getAgreementPayment(trx, context.agreementId, paymentId)
+      if (!payment) return null
+      try {
+        await assertPaymentRecoveryAllowed(event, trx, { agreementId: context.agreementId, paymentId,
+          applicantRecipientId: payment.egcs_fc_applicantrecipient === null ? null : String(payment.egcs_fc_applicantrecipient),
+          currency: payment.egcs_fc_currency })
+      } catch (error) {
+        const failure = error as { statusCode?: number; data?: { code?: string } }
+        if (failure?.statusCode !== 409 || typeof failure.data?.code !== 'string' || !failure.data.code.startsWith('AR_')) throw error
+        recoveryBlocked = true
+      }
+    }
 
     return {
       item,
       can_complete: item === null
         && linesMatch
+        && !recoveryBlocked
         && Boolean(protection && !protection.locked),
       blocker: item
         ? null
-        : !hasPositiveLineTotal
-            ? 'lines_required' as const
-            : !linesMatch
-                ? 'payment_total_mismatch' as const
-                : !protection || protection.locked
-                    ? 'business_status' as const
-                    : null
+        : recoveryBlocked
+          ? 'payment_recovery_control' as const
+          : !hasPositiveLineTotal
+              ? 'lines_required' as const
+              : !linesMatch
+                  ? 'payment_total_mismatch' as const
+                  : !protection || protection.locked
+                      ? 'business_status' as const
+                      : null
     }
   })
 }
@@ -134,6 +155,10 @@ export const executeAgreementPaymentCompletion = async (
       return await badRequest(event, 'AGREEMENT_PAYMENT_LINES_MUST_MATCH_TOTAL', 'apiErrors.agreement.payment_lines_must_match_total')
     }
 
+    const header = await getAgreementPayment(trx, context.agreementId, paymentId)
+    if (!header) return await notFound(event, 'AGREEMENT_PAYMENT_NOT_FOUND', 'apiErrors.agreement.payment_not_found')
+    await assertPaymentRecoveryAllowed(event, trx, { agreementId: context.agreementId, applicantRecipientId: header.egcs_fc_applicantrecipient, currency: header.egcs_fc_currency, paymentId })
+    await withPaymentRecoveryErrors(event, () => rebuildAccountReceivablePaymentOffset(trx, paymentId))
     const { completion: createdCompletion } = await createCompletionTransition(
       event,
       trx,

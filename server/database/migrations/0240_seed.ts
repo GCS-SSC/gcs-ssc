@@ -596,6 +596,16 @@ lodFYjY8ULUtBDC8zFYcrw==
 ].join('\n')
 const GCFORMS_LOCAL_CLAIMS_MAPPINGS = [
   {
+    id: 'submitting-proponent',
+    sourceQuestionId: 'submitting_proponent',
+    destinationEntity: 'claim',
+    destinationPath: 'egcs_fc_applicantrecipient',
+    transform: 'string',
+    required: true,
+    onMissing: 'block',
+    onInvalid: 'block'
+  },
+  {
     id: 'agreement-number',
     sourceQuestionId: 'agreement_number',
     destinationEntity: 'claim',
@@ -4748,6 +4758,7 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
           .insertInto('Funding_Case_Agreement_Claim')
           .values({
             egcs_fc_fundingagreement: String(agreement.id),
+            egcs_fc_applicantrecipient: String(applicantRecipient.id),
             egcs_fc_fiscalyear: String(budgetFiscalYear.id),
             egcs_fc_isfinalforyear: false,
             egcs_fc_periodstart: 0,
@@ -4940,6 +4951,7 @@ async function seedAgreementData(db: Kysely<Database>): Promise<void> {
           .insertInto('Funding_Case_Agreement_Claim')
           .values({
             egcs_fc_fundingagreement: String(agreement.id),
+            egcs_fc_applicantrecipient: String(applicantRecipient.id),
             egcs_fc_fiscalyear: String(budgetFiscalYear.id),
             egcs_fc_isfinalforyear: false,
             egcs_fc_periodstart: 3,
@@ -5165,6 +5177,16 @@ const seedFinancialSummaryShowcase = async (db: Kysely<Database>): Promise<void>
     _deleted: false
   }).returning('id').executeTakeFirstOrThrow()
   const agreementId = String(agreement.id)
+  const sourceProponents = await db.selectFrom('Funding_Case_Agreement_Applicant_Recipient').select([
+    'egcs_fc_applicantrecipient','egcs_fc_applicantrecipientsubtype'
+  ]).where('egcs_fc_fundingagreement','=','51').where('_deleted','=',false).execute()
+  if (sourceProponents.length !== 1) throw new Error('Financial Summary seed requires one explicit source Agreement Proponent')
+  await db.insertInto('Funding_Case_Agreement_Applicant_Recipient').values({
+    egcs_fc_fundingagreement:agreementId,
+    egcs_fc_applicantrecipient:sourceProponents[0]!.egcs_fc_applicantrecipient,
+    egcs_fc_applicantrecipientsubtype:sourceProponents[0]!.egcs_fc_applicantrecipientsubtype,
+    _deleted:false
+  }).execute()
   const actorId = String(actor.id)
   const assign = async (entityType: Database['Common_Entity_Assignment']['egcs_cn_entitytype'], entityId: string): Promise<void> => {
     await db.insertInto('Common_Entity_Assignment').values({
@@ -5254,6 +5276,7 @@ const seedFinancialSummaryShowcase = async (db: Kysely<Database>): Promise<void>
     const budgetYear = budgetYears[claimSeed.year]!
     const claim = await db.insertInto('Funding_Case_Agreement_Claim').values({
       egcs_fc_fundingagreement: agreementId, egcs_fc_fiscalyear: budgetYear.id,
+      egcs_fc_applicantrecipient:sourceProponents[0]!.egcs_fc_applicantrecipient,
       egcs_fc_isfinalforyear: false, egcs_fc_periodstart: claimSeed.start, egcs_fc_periodend: claimSeed.end,
       egcs_fc_receiveddate: new Date(`${claimSeed.received}T00:00:00Z`),
       egcs_fc_status: statuses.draft, _deleted: false

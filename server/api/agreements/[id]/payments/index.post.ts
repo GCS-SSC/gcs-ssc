@@ -1,9 +1,11 @@
+import { assertPaymentRecoveryAllowed } from '~~/server/utils/payment-recovery-controls'
 import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { sql } from 'kysely'
 import { FundingCaseAgreementPaymentCreateSchema } from '~~/shared/types/schemas'
 import {
   assertAgreementPaymentFiscalYear,
   prepareAgreementPaymentRoute,
+  syncAgreementPaymentEditingStatus,
   resolveActiveAgreementPaymentCommitmentByType
 } from '~~/server/utils/agreement-payment'
 import { runExtensionCreateOperationHooks } from '~~/server/utils/extensions'
@@ -24,6 +26,7 @@ export default defineEventHandler(async event => {
 
   return await executeFreshAuthorizedAgreementWrite(event, db, agreementId, agreementContext, async (trx, currentContext, auth) => {
     await assertAgreementCurrency(event, trx, agreementId, validated.egcs_fc_currency)
+    await assertPaymentRecoveryAllowed(event, trx, { agreementId, applicantRecipientId: validated.egcs_fc_applicantrecipient, currency: validated.egcs_fc_currency })
     const commitment = await resolveActiveAgreementPaymentCommitmentByType(
       event,
       trx,
@@ -50,6 +53,7 @@ export default defineEventHandler(async event => {
       egcs_fc_fundingagreementcommitment: String(commitment.id),
       egcs_fc_fiscalyear: validated.egcs_fc_fiscalyear,
       egcs_fc_paymenttype: validated.egcs_fc_paymenttype,
+      egcs_fc_applicantrecipient: validated.egcs_fc_applicantrecipient,
       egcs_fc_periodstart: validated.egcs_fc_periodstart,
       egcs_fc_periodend: validated.egcs_fc_periodend,
       egcs_fc_paymentamount: validated.egcs_fc_paymentamount,
@@ -89,6 +93,7 @@ export default defineEventHandler(async event => {
         'egcs_fc_fundingagreementcommitment',
         'egcs_fc_fiscalyear',
         'egcs_fc_paymenttype',
+        'egcs_fc_applicantrecipient',
         'egcs_fc_periodstart',
         'egcs_fc_periodend',
         databaseMoneyText(sql.ref('egcs_fc_paymentamount')).as('egcs_fc_paymentamount'),
@@ -114,6 +119,7 @@ export default defineEventHandler(async event => {
       exactCreatedPayment as Record<string, unknown>
     )
 
+    await syncAgreementPaymentEditingStatus(trx, String(createdPayment.id), { event, agreementId })
     return exactCreatedPayment
-  }, { action: 'create', correctionFinancialMutation: true })
+  }, { action: 'create', correctionFinancialMutation: true, accountReceivablePayees: [{ applicantRecipientId: validated.egcs_fc_applicantrecipient, currency: validated.egcs_fc_currency }] })
 })

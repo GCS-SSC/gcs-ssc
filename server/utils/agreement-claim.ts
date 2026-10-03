@@ -46,6 +46,7 @@ import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { createPrimaryEntityAssignment } from '~~/server/utils/entity-assignment'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { parseMoney } from '~~/shared/utils/money'
+import { isAgreementClaimProponentAvailable } from './agreement-claim-proponent'
 import { assertAgreementLineFundingBalance, replaceAgreementLineFunding } from '~~/server/utils/agreement-funding-breakdown'
 
 type AgreementClaimDb = Kysely<Database> | Transaction<Database>
@@ -73,6 +74,7 @@ export const createAgreementClaimAggregate = async (
   agencyId: string,
   creatorId: string
 ): Promise<AgreementClaimAggregateCreateResult> => {
+  if (!await isAgreementClaimProponentAvailable(trx, input.agreementId, input.applicantRecipientId)) return { status: 'applicant_recipient_unavailable' }
   const currency = await resolveAgreementCurrency(trx, input.agreementId)
   if (!currency) return { status: 'agreement_unavailable' }
   if (input.lineItems.some(line => line.currency !== currency)) {
@@ -149,6 +151,7 @@ export const createAgreementClaimAggregate = async (
 
   const claim = await trx.insertInto('Funding_Case_Agreement_Claim').values({
     egcs_fc_fundingagreement: input.agreementId,
+    egcs_fc_applicantrecipient: input.applicantRecipientId,
     egcs_fc_fiscalyear: input.fiscalYearId,
     egcs_fc_isfinalforyear: input.isFinalForYear,
     egcs_fc_periodstart: input.periodStart,
@@ -853,6 +856,9 @@ export const patchAgreementClaimForRoute = async (
       return claim
     }
 
+    if (Object.hasOwn(patchValues, 'egcs_fc_applicantrecipient') && !await isAgreementClaimProponentAvailable(trx, agreementId, String(patchValues.egcs_fc_applicantrecipient))) {
+      return await badRequest(event, 'AGREEMENT_CLAIM_PROPONENT_INVALID', 'apiErrors.agreement.invalid_claim_proponent')
+    }
     await validateMergedFinancialPeriodPatch(event, claim, patchValues)
 
     if (Object.hasOwn(patchValues, 'egcs_fc_fiscalyear')) {

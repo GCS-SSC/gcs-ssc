@@ -6,7 +6,7 @@ import type { CommonStatusTable, Database } from '~~/shared/types/database'
 import { authorize } from '~~/server/utils/authorize'
 import { notFound, throwApiError } from '~~/server/utils/api-errors'
 import { throwIfMappedConstraintError } from '~~/server/utils/database-constraint-errors'
-import { hasCorrectionSchema } from './correction-schema'
+import { hasAccountingTable, hasCorrectionSchema } from './correction-schema'
 
 const BUSINESS_STATUS_TABLES = [
   'Funding_Case_Agreement_Profile',
@@ -17,6 +17,8 @@ const BUSINESS_STATUS_TABLES = [
   'Funding_Case_Agreement_Commitment',
   'Funding_Case_Agreement_Payment',
   'Funding_Case_Agreement_Correction',
+  'Funding_Case_Agreement_Account_Receivable',
+  'Funding_Case_Account_Receivable_Credit_Memo',
   'Funding_Case_Agreement_Forecast',
   'Funding_Case_Agreement_Monitor'
 ] as const
@@ -33,7 +35,7 @@ const STATUS_CONSTRAINT_ERRORS = {
 
 /** A preparation Workflow cannot acquire a terminal output through mutable Agency status metadata. */
 const correctionPreparationOutputReference = (statusId: string) => sql<boolean>`(
-  version.egcs_cn_definition ->> 'entityType' = 'fundingcasecorrection'
+  version.egcs_cn_definition ->> 'entityType' IN ('fundingcasecorrection','fundingcaseaccountreceivable','fundingcaseaccountreceivablecreditmemo')
   AND COALESCE(version.egcs_cn_definition ->> 'purpose', 'standard') <> 'approval_submission'
   AND (
     version.egcs_cn_definition ->> 'cancellationStatus' = ${statusId}
@@ -86,6 +88,7 @@ export const findLiveStatusReference = async (
   if (intake) return 'Funding_Case_Intake_Profile'
   for (const table of BUSINESS_STATUS_TABLES) {
     if (table === 'Funding_Case_Agreement_Correction' && !await hasCorrectionSchema(trx)) continue
+    if ((table === 'Funding_Case_Agreement_Account_Receivable' || table === 'Funding_Case_Account_Receivable_Credit_Memo') && !await hasAccountingTable(trx, 'Funding_Case_Agreement_Account_Receivable')) continue
     const record = await trx.selectFrom(table)
       .select('id')
       .where('egcs_fc_status', '=', statusId)
@@ -244,6 +247,13 @@ export const assertTerminalStatusCompatibleWithPublishedWorkflows = async (
       statusCode: 409, code: 'STATUS_PUBLISHED_WORKFLOW_CONFLICT', key: 'apiErrors.status.published_workflow_conflict'
     })
   }
+  if (await hasAccountingTable(trx, 'Funding_Case_Agreement_Account_Receivable')) {
+    for (const table of ['Funding_Case_Agreement_Account_Receivable', 'Funding_Case_Account_Receivable_Credit_Memo'] as const) {
+      const pending = await trx.selectFrom(table).select('id').where('egcs_fc_status', '=', statusId)
+        .where('egcs_fc_outcome', '=', 'open').where('_deleted', '=', false).executeTakeFirst()
+      if (pending) return await throwApiError(event, { statusCode: 409, code: 'STATUS_PUBLISHED_WORKFLOW_CONFLICT', key: 'apiErrors.status.published_workflow_conflict' })
+    }
+  }
   const allowedStart = await trx.selectFrom('Common_Workflow_Setup_Allowed_Start_Status as allowed')
     .innerJoin('Common_Workflow_Setup as workflow', 'workflow.id', 'allowed.egcs_cn_workflowsetup')
     .innerJoin('Common_Publication as publication', 'publication.id', 'workflow.id')
@@ -376,7 +386,7 @@ export const assertTerminalStatusCompatibleWithPublishedWorkflows = async (
     .innerJoin('Common_Publication_Version as version', 'version.id', 'correction_run.egcs_cn_sourcepublicationversion')
     .select('correction_run.id')
     .where('correction_run.egcs_cn_kind', '=', 'workflow')
-    .where('correction_run.egcs_cn_entitytype', '=', 'fundingcasecorrection')
+    .where('correction_run.egcs_cn_entitytype', 'in', ['fundingcasecorrection', 'fundingcaseaccountreceivable', 'fundingcaseaccountreceivablecreditmemo'])
     .where('correction_run.egcs_cn_purpose', '!=', 'approval_submission')
     .where('correction_run._deleted', '=', false)
     .where(correctionPreparationOutputReference(statusId))

@@ -1,3 +1,4 @@
+import { resolveAccountReceivableRuntimeContext, resolveAccountReceivableCreditMemoRuntimeContext } from './account-receivable-context'
 import { resolveCorrectionRuntimeContext } from './correction-context'
 import { resolveJournalVoucherRuntimeContext } from './journal-voucher-context'
 import type { H3Event } from 'h3'
@@ -27,6 +28,8 @@ const agreementOwnerResolvers = {
   fundingcaseagreementcommitment: resolveAgreementCommitmentRuntimeContext,
   fundingcaseforecast: resolveAgreementForecastRuntimeContext,
   fundingcasemonitor: resolveAgreementMonitorRuntimeContext,
+  fundingcaseaccountreceivable: resolveAccountReceivableRuntimeContext,
+  fundingcaseaccountreceivablecreditmemo: resolveAccountReceivableCreditMemoRuntimeContext,
   fundingcasecorrection: resolveCorrectionRuntimeContext,
   fundingcasejournalvoucher: resolveJournalVoucherRuntimeContext,
   fundingcasepayment: resolveAgreementPaymentRuntimeContext,

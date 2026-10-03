@@ -76,6 +76,7 @@ export default defineEventHandler(async event => {
         budgetFiscalYearStableId, '=', sql.ref('Funding_Case_Agreement_Claim.egcs_fc_fiscalyear')
       ))
       .innerJoin('Funding_Case_Agreement_Budget_Version', 'Funding_Case_Agreement_Budget_Version.id', 'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_budgetversion')
+      .leftJoin('Applicant_Recipient_Profile as submitting_proponent', 'submitting_proponent.id', 'Funding_Case_Agreement_Claim.egcs_fc_applicantrecipient')
       .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fiscalyear')
       .where('Funding_Case_Agreement_Claim.egcs_fc_fundingagreement', '=', agreementId)
       .$if(Boolean(claimId), query => query.where('Funding_Case_Agreement_Claim.id', '=', claimId!))
@@ -88,6 +89,9 @@ export default defineEventHandler(async event => {
         'Funding_Case_Agreement_Claim.id as id',
         'Funding_Case_Agreement_Claim.egcs_fc_fundingagreement as egcs_fc_fundingagreement',
         'Funding_Case_Agreement_Claim.egcs_fc_fiscalyear as egcs_fc_fiscalyear',
+        'Funding_Case_Agreement_Claim.egcs_fc_applicantrecipient as egcs_fc_applicantrecipient',
+        sql<string>`COALESCE(${sql.ref('submitting_proponent.egcs_ar_operatingname_en')},${sql.ref('submitting_proponent.egcs_ar_legalname_en')},${''})`.as('submitting_proponent_name_en'),
+        sql<string>`COALESCE(${sql.ref('submitting_proponent.egcs_ar_operatingname_fr')},${sql.ref('submitting_proponent.egcs_ar_legalname_fr')},${''})`.as('submitting_proponent_name_fr'),
         'Funding_Case_Agreement_Claim.egcs_fc_isfinalforyear as egcs_fc_isfinalforyear',
         'Funding_Case_Agreement_Claim.egcs_fc_periodend as egcs_fc_periodend',
         'Funding_Case_Agreement_Claim.egcs_fc_periodstart as egcs_fc_periodstart',

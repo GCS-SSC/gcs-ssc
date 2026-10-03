@@ -13,6 +13,7 @@ import {
 } from '~~/shared/utils/entity-assignments'
 import { ASSIGNABLE_ENTITY_TYPE_ENUM, WORKFLOW_TARGET_ENTITY_TYPE_ENUM } from '~~/shared/constants/enums'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
+import { creditMemoQueueAuthority } from '~~/server/utils/credit-memo-queue-authority'
 
 type AssignedWorkRow = {
   entity_id: string
@@ -170,6 +171,26 @@ export default defineEventHandler(async event => {
       JOIN "Transfer_Payment_Profile" program ON program.id = stream.egcs_tp_transferpaymentprofile AND program._deleted = false
       WHERE correction._deleted = false
       UNION ALL
+      SELECT item.id, 'fundingcaseaccountreceivable', item.egcs_fc_status::text,
+        item.egcs_fc_agreementnumber || '-AR-' || item.egcs_fc_number::text,
+        item.egcs_fc_agreementnumber || '-AR-' || item.egcs_fc_number::text,
+        item.egcs_fc_fundingagreement, NULL::text, 'account_receivable', program.egcs_tp_agency, program.id
+      FROM "Funding_Case_Agreement_Account_Receivable" item
+      JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.id = item.egcs_fc_fundingagreement AND NOT agreement._deleted
+      JOIN "Transfer_Payment_Stream" stream ON stream.id = agreement.egcs_fc_transferpaymentstream AND NOT stream._deleted
+      JOIN "Transfer_Payment_Profile" program ON program.id = stream.egcs_tp_transferpaymentprofile AND NOT program._deleted
+      WHERE NOT item._deleted
+      UNION ALL
+      SELECT item.id, 'fundingcaseaccountreceivablecreditmemo', item.egcs_fc_status::text,
+        item.egcs_fc_agreementnumber || '-CM-' || item.egcs_fc_number::text,
+        item.egcs_fc_agreementnumber || '-CM-' || item.egcs_fc_number::text,
+        item.egcs_fc_fundingagreement, NULL::text, 'account_receivable', program.egcs_tp_agency, program.id
+      FROM "Funding_Case_Account_Receivable_Credit_Memo" item
+      JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.id = item.egcs_fc_fundingagreement AND NOT agreement._deleted
+      JOIN "Transfer_Payment_Stream" stream ON stream.id = agreement.egcs_fc_transferpaymentstream AND NOT stream._deleted
+      JOIN "Transfer_Payment_Profile" program ON program.id = stream.egcs_tp_transferpaymentprofile AND NOT program._deleted
+      WHERE NOT item._deleted
+      UNION ALL
       SELECT child.id, child.entity_type, child.status, '#' || child.id::text, '#' || child.id::text,
         child.agreement_id, NULL::text, CASE WHEN child.entity_type = 'fundingcasejournalvoucher' THEN 'journal_voucher' ELSE 'agreement' END, program.egcs_tp_agency, program.id
       FROM (
@@ -308,7 +329,7 @@ export default defineEventHandler(async event => {
     LEFT JOIN "Agency_Profile" owner_agency ON owner_agency.id = work.agency_id AND owner_agency._deleted = false
     LEFT JOIN "Funding_Case_Agreement_Profile" display_agreement ON display_agreement.id = work.agreement_id
       AND display_agreement._deleted = false
-      AND (work.owner_subject <> 'correction' OR ${correctionParentRead})
+      AND (work.owner_subject NOT IN ('correction','account_receivable') OR ${correctionParentRead})
     LEFT JOIN "Common_Review" display_review ON display_review.id = work.id AND work.entity_type = 'commonreview'
     LEFT JOIN "Common_Review_Set" display_review_set ON display_review_set.id = display_review.egcs_cn_reviewset
     LEFT JOIN "Common_Review_Schema" review_schema ON review_schema.id = display_review.egcs_cn_reviewschema
@@ -364,6 +385,7 @@ export default defineEventHandler(async event => {
     WHERE assignment.egcs_cn_user = ${actor.commonUserId}::bigint AND assignment._deleted = false
       AND (work.owner_subject = 'applicant_recipient' OR owner_agency.id IS NOT NULL)
       AND (${sql.join(authorizationPredicates, sql` OR `)})
+      AND ${creditMemoQueueAuthority(readGrants)}
       AND (
         (work.entity_type = 'applicantrecipient' AND work.status = 'active')
         OR (work.entity_type = 'commonreview' AND work.status IN (${sql.join([...ASSIGNABLE_ENGINE_OPEN_QUEUE_STATUSES.commonreview])}))

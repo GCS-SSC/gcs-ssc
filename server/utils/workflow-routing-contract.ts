@@ -1,10 +1,18 @@
 import type { AgreementRoutingValues, AgreementCustomFieldValues } from '~~/shared/types/schemas/agreement-custom-fields'
+import type { captureAccountReceivablePacket, captureAccountReceivableCreditMemoPacket } from './account-receivable-posting'
+import type { captureAccountReceivablePaymentOffsetPacket } from './account-receivable-recovery'
 import type { CorrectionPacket } from './correction-posting'
 
 /** An invalid selected route must be rejected before a runtime is created. */
 export class WorkflowRouteValidationError extends Error {}
 
 export type WorkflowRoutingEvidence = {
+  accountReceivablePacket?: Awaited<ReturnType<typeof captureAccountReceivablePacket>>
+  accountReceivablePacketHash?: string
+  accountReceivableCreditMemoPacket?: Awaited<ReturnType<typeof captureAccountReceivableCreditMemoPacket>>
+  accountReceivableCreditMemoPacketHash?: string
+  paymentOffsetPacket?: Awaited<ReturnType<typeof captureAccountReceivablePaymentOffsetPacket>>
+  paymentOffsetPacketHash?: string
   correctionPacket?: CorrectionPacket
   correctionPacketHash?: string
   version?: 2 | 3

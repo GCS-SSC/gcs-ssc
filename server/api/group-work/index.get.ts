@@ -147,6 +147,8 @@ export default defineEventHandler(async event => {
           WHEN work.entity_type = 'fundingcaseagreement' THEN work.entity_id
           WHEN work.entity_type = 'fundingcaseagreementclaim' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Claim" WHERE id = work.entity_id)
           WHEN work.entity_type = 'fundingcasejournalvoucher' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Journal_Voucher" WHERE id = work.entity_id)
+          WHEN work.entity_type = 'fundingcaseaccountreceivable' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Account_Receivable" WHERE id = work.entity_id AND NOT _deleted)
+          WHEN work.entity_type = 'fundingcaseaccountreceivablecreditmemo' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Account_Receivable_Credit_Memo" WHERE id = work.entity_id AND NOT _deleted)
           WHEN work.entity_type = 'fundingcasecorrection' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Correction" WHERE id = work.entity_id AND _deleted = false)
           WHEN work.entity_type = 'fundingcasepayment' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Payment" WHERE id = work.entity_id)
           WHEN work.entity_type = 'fundingcaseforecast' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Forecast" WHERE id = work.entity_id)
@@ -181,6 +183,8 @@ export default defineEventHandler(async event => {
         AND source_review_set.egcs_cn_entitytype::text = 'fundingcasejournalvoucher'
       LEFT JOIN "Funding_Case_Agreement_Correction" review_correction ON review_correction.id = source_review_set.egcs_cn_entityid
         AND source_review_set.egcs_cn_entitytype::text = 'fundingcasecorrection' AND review_correction._deleted = false
+      LEFT JOIN "Funding_Case_Agreement_Account_Receivable" review_ar ON review_ar.id = source_review_set.egcs_cn_entityid AND source_review_set.egcs_cn_entitytype::text = 'fundingcaseaccountreceivable' AND NOT review_ar._deleted
+      LEFT JOIN "Funding_Case_Account_Receivable_Credit_Memo" review_cm ON review_cm.id = source_review_set.egcs_cn_entityid AND source_review_set.egcs_cn_entitytype::text = 'fundingcaseaccountreceivablecreditmemo' AND NOT review_cm._deleted
       LEFT JOIN "Funding_Case_Agreement_Payment" review_payment ON review_payment.id = source_review_set.egcs_cn_entityid
         AND source_review_set.egcs_cn_entitytype::text = 'fundingcasepayment'
       LEFT JOIN "Funding_Case_Agreement_Forecast" review_forecast ON review_forecast.id = source_review_set.egcs_cn_entityid
@@ -198,13 +202,15 @@ export default defineEventHandler(async event => {
         CASE WHEN source_review_set.egcs_cn_entitytype::text = 'fundingcaseagreement' THEN source_review_set.egcs_cn_entityid END,
         CASE WHEN review_binding.egcs_cn_ownertype = 'fundingcaseagreement' THEN review_binding.egcs_cn_ownerid END,
         review_claim.egcs_fc_fundingagreement, reconciled_claim.egcs_fc_fundingagreement,
-        review_jv.egcs_fc_fundingagreement, review_correction.egcs_fc_fundingagreement, review_payment.egcs_fc_fundingagreement, review_forecast.egcs_fc_fundingagreement,
+        review_ar.egcs_fc_fundingagreement, review_cm.egcs_fc_fundingagreement, review_jv.egcs_fc_fundingagreement, review_correction.egcs_fc_fundingagreement, review_payment.egcs_fc_fundingagreement, review_forecast.egcs_fc_fundingagreement,
         review_monitor.egcs_fc_fundingagreement, review_commitment.egcs_fc_fundingagreement,
         review_amendment.egcs_fc_fundingagreement, review_closeout.egcs_fc_fundingagreement,
         CASE WHEN target.entity_type = 'fundingcaseagreementclaim' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Claim" WHERE id = target.entity_id) END,
         CASE WHEN target.entity_type = 'fundingclaimreconcile' THEN (SELECT claim.egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Claim_Reconcile" reconcile
           JOIN "Funding_Case_Agreement_Claim" claim ON claim.id = reconcile.egcs_fc_fundingagreementclaim WHERE reconcile.id = target.entity_id) END,
         CASE WHEN target.entity_type = 'fundingcasejournalvoucher' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Journal_Voucher" WHERE id = target.entity_id) END,
+        CASE WHEN target.entity_type = 'fundingcaseaccountreceivable' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Account_Receivable" WHERE id = target.entity_id AND NOT _deleted) END,
+        CASE WHEN target.entity_type = 'fundingcaseaccountreceivablecreditmemo' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Account_Receivable_Credit_Memo" WHERE id = target.entity_id AND NOT _deleted) END,
         CASE WHEN target.entity_type = 'fundingcasecorrection' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Correction" WHERE id = target.entity_id AND _deleted = false) END,
         CASE WHEN target.entity_type = 'fundingcasepayment' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Payment" WHERE id = target.entity_id) END,
         CASE WHEN target.entity_type = 'fundingcaseforecast' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Forecast" WHERE id = target.entity_id) END,

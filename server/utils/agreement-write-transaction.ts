@@ -16,7 +16,9 @@ import {
   lockRegisteredExtensionAgreementLifecycle,
   lockRegisteredExtensionAgreementScopes
 } from '~~/server/utils/extensions'
-import type { AssignableEntityType, Database } from '~~/shared/types/database'
+import { resolveAccountReceivableRuntimeContext, resolveAccountReceivableCreditMemoRuntimeContext, lockAccountReceivablePaymentPoolAgreements } from './account-receivable-context'
+import { lockPaymentRecoveryAgreements } from './payment-recovery-lock'
+import type { AssignableEntityType, Currency_Codes, Database } from '~~/shared/types/database'
 import type { CoreLifecycleEntityType } from '~~/shared/constants/entity-registry'
 import type { StatusId } from '~~/shared/types/status'
 import type { AbilityAction } from '~~/shared/utils/abilities'
@@ -153,6 +155,8 @@ export const executeFreshAuthorizedAgreementWrite = async <T>(
     businessStatusTarget?: ExactEntityTarget<CoreLifecycleEntityType>
     correctionFinancialMutation?: boolean
     correctionId?: string
+    accountReceivablePayees?: Array<{ applicantRecipientId: string; currency: Currency_Codes }>
+    paymentRecovery?: boolean
   } = {}
 ): Promise<T> => {
   let lockContext = initialContext
@@ -184,6 +188,19 @@ export const executeFreshAuthorizedAgreementWrite = async <T>(
             key: 'apiErrors.agreement.not_found'
           })
         }
+        const recoveryTarget = options.businessStatusTarget ?? (typeof options.assignmentTarget === 'object' ? options.assignmentTarget : null)
+        if (recoveryTarget?.entityType === 'fundingcasepayment' || options.paymentRecovery || options.accountReceivablePayees) {
+          await lockPaymentRecoveryAgreements(trx, { agreementId, agencyId: lockContext.agencyId, payees: options.accountReceivablePayees, event })
+        }
+        const receivableCollection = recoveryTarget?.entityType === 'fundingcaseaccountreceivable' || recoveryTarget?.entityType === 'fundingcaseaccountreceivablecreditmemo'
+        if (receivableCollection && recoveryTarget) {
+          const context = recoveryTarget.entityType === 'fundingcaseaccountreceivable'
+            ? await resolveAccountReceivableRuntimeContext(trx, recoveryTarget.entityId)
+            : await resolveAccountReceivableCreditMemoRuntimeContext(trx, recoveryTarget.entityId)
+          if (!context || context.agreementId !== agreementId || context.agencyId !== lockContext.agencyId) return await forbidden(event)
+          await lockAccountReceivablePaymentPoolAgreements(trx, { agreementId, agencyId: context.agencyId,
+            applicantRecipientId: context.applicantRecipientId, currency: context.currency })
+        }
         await lockRegisteredExtensionAgreementLifecycle(event, trx, {
           agreementId,
           agencyId: lockContext.agencyId,
@@ -200,7 +217,7 @@ export const executeFreshAuthorizedAgreementWrite = async <T>(
           })
         }
 
-        if (options.allowDuringCloseout !== true) {
+        if (options.allowDuringCloseout !== true && !receivableCollection) {
           await assertAgreementCloseoutWriteAllowed(event, trx, agreementId, lockedAgreement.status)
         }
 
@@ -226,7 +243,7 @@ export const executeFreshAuthorizedAgreementWrite = async <T>(
         }
 
         try {
-          await lockBusinessStatus(
+          if (!receivableCollection) await lockBusinessStatus(
             trx,
             'fundingcaseagreement',
             agreementId,

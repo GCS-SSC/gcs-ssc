@@ -60,6 +60,7 @@ export default defineEventHandler(async event => {
         return null
       }, {
         action: 'delete',
+        paymentRecovery: true,
         /**
          * Resolves and locks the payment aggregate owning the requested line.
          * @param trx Active protected-write transaction.

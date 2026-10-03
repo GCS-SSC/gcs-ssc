@@ -10,7 +10,7 @@ export const isAgreementChildRoute = (route: {
   name?: string | symbol | null
   params: Record<string, unknown>
 }): boolean => {
-  const independentIds = ['commitmentId', 'paymentId', 'forecastId', 'monitorId', 'claimId', 'amendmentId', 'closeoutId', 'correctionId']
+  const independentIds = ['commitmentId', 'paymentId', 'forecastId', 'monitorId', 'claimId', 'amendmentId', 'closeoutId', 'correctionId', 'accountReceivableId', 'creditMemoId']
   if (independentIds.some(key => typeof route.params[key] === 'string')) return true
-  return typeof route.name === 'string' && /^agreements-id-corrections(?:-index)?(?:___[a-z]+)?$/.test(route.name)
+  return typeof route.name === 'string' && /^agreements-id-(?:corrections|account-receivables)(?:-index)?(?:___[a-z]+)?$/.test(route.name)
 }

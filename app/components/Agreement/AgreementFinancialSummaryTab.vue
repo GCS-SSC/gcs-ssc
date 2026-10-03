@@ -17,6 +17,9 @@ type FinancialLine = {
   description: string | null
   budget: Money
   forecast: MonthlyAmounts | null
+  originalClaimed?: MonthlyAmounts
+  originalReconciled?: MonthlyAmounts
+  accountReceivableRecoveries?: MonthlyAmounts
   claimed: MonthlyAmounts
   reconciled: MonthlyAmounts
   currency: string
@@ -43,6 +46,7 @@ type CurrencySummary = {
   paid: MonthlyAmounts
   jvEffects?: MonthlyAmounts
   correctionAdjustments?: MonthlyAmounts
+  accountReceivableRecoveries?: MonthlyAmounts
   correctedRecordedPaid?: MonthlyAmounts
   payments: FinancialPayment[]
   progress: FinancialProgress
@@ -160,6 +164,9 @@ const displayMonthlyAmount = (value: Money | null, currency: string): string =>
   value === null || value === ZERO_MONEY ? t('agreement.financial_summary.not_allocated_short') : formatMoney(value, currency)
 const displayYearAmount = (value: Money | null, currency: string): string =>
   value === null ? t('agreement.financial_summary.not_allocated_short') : formatMoney(value, currency)
+const recoveryBreakdown = (line: FinancialLine) => line.accountReceivableRecoveries?.some(value => value !== ZERO_MONEY)
+  ? [{ key: 'original_claimed', amounts: line.originalClaimed }, { key: 'original_reconciled', amounts: line.originalReconciled }, { key: 'ar_claim_recoveries', amounts: line.accountReceivableRecoveries }].filter(row => row.amounts)
+  : []
 const paidYearTotal = (group: CurrencySummary): Money => sumMoney(group.paid)
 const paymentsInMonth = (group: CurrencySummary, month: number): FinancialPayment[] =>
   group.payments.filter(payment => payment.month === month)
@@ -537,6 +544,17 @@ const peakShare = (progress: FinancialProgress): string | null => {
                   {{ displayYearAmount(yearAmount(line, measure), group.currency) }}
                 </td>
               </tr>
+              <tr v-for="breakdown in recoveryBreakdown(line)" :key="breakdown.key" :data-testid="`financial-summary-${breakdown.key}`">
+                <th scope="row" colspan="2" class="sticky left-0 z-20 border-t border-default bg-default px-3 py-2 text-left text-xs font-medium text-muted">
+                  {{ t(`agreement.financial_summary.${breakdown.key}`) }}
+                </th>
+                <td v-for="month in MONTHS" :key="month" class="border-t border-l border-default px-3 py-2 text-right tabular-nums text-muted">
+                  {{ displayMonthlyAmount(breakdown.amounts?.[month] ?? ZERO_MONEY, group.currency) }}
+                </td>
+                <td class="border-t border-l border-default px-3 py-2 text-right font-semibold tabular-nums">
+                  {{ formatMoney(sumMoney(breakdown.amounts ?? []), group.currency) }}
+                </td>
+              </tr>
             </tbody>
             <tbody v-if="group.lines.length === 0 && visibleMeasures.length > 0">
               <tr>
@@ -572,6 +590,7 @@ const peakShare = (progress: FinancialProgress): string | null => {
                 v-for="accounting in [
                   { key: 'jv_effects', amounts: group.jvEffects },
                   { key: 'correction_adjustments', amounts: group.correctionAdjustments },
+                  { key: 'ar_recoveries', amounts: group.accountReceivableRecoveries },
                   { key: 'corrected_recorded_paid', amounts: group.correctedRecordedPaid }
                 ].filter(row => row.amounts)" :key="accounting.key" :data-testid="`financial-summary-${accounting.key}`">
                 <th scope="row" colspan="2" class="sticky left-0 z-20 border-t border-default bg-default px-3 py-3 text-left font-semibold">

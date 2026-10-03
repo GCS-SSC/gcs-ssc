@@ -640,7 +640,10 @@ const handleApprovalChanged = async () => {
         </p>
       </div>
     </CommonWorkflowPacket>
-    <CorrectionPacket v-if="data?.submission && entityType === 'fundingcasecorrection'" :submission="data.submission" />
+    <AccountReceivablePacket v-if="data?.submission && entityType === 'fundingcaseaccountreceivable'" :submission="data.submission" />
+    <AccountReceivablePacket v-else-if="data?.submission && entityType === 'fundingcaseaccountreceivablecreditmemo'" :submission="data.submission" credit-memo />
+    <CorrectionPacket v-else-if="data?.submission && entityType === 'fundingcasecorrection'" :submission="data.submission" />
+    <AgreementPaymentPacket v-else-if="data?.submission && entityType === 'fundingcasepayment'" :submission="data.submission" />
     <CommonWorkflowApprovalPacket v-else-if="data?.submission" :submission="data.submission" />
     <CommonTranslatedTabs
       v-if="data?.current || data?.previous?.length"

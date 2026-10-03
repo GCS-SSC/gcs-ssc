@@ -272,7 +272,9 @@
       "fundingcaseamendment": "Amendment",
       "fundingcaseagreementcommitment": "Commitment",
       "fundingcasejournalvoucher": "Journal Voucher",
-      "fundingcasecorrection": "Correction"
+      "fundingcasecorrection": "Correction",
+      "fundingcaseaccountreceivable": "Accounts receivable",
+      "fundingcaseaccountreceivablecreditmemo": "Credit Memo"
     }
   },
   "attachments": {
@@ -506,7 +508,10 @@
       "reimbursement": "Reimbursement",
       "advance": "Advance"
     },
-    "recommendation_outcome": { "recommended": "Recommended", "not_recommended": "Not recommended" },
+    "recommendation_outcome": {
+      "recommended": "Recommended",
+      "not_recommended": "Not recommended"
+    },
     "review_type": {
       "checklist": "Checklist",
       "assessment": "Assessment"
@@ -529,7 +534,9 @@
       "fundingcaserecommendation": "Funding Case Recommendation",
       "fundingcaseagreementcommitment": "Funding Case Agreement Commitment",
       "fundingcasejournalvoucher": "Journal Voucher",
-      "fundingcasecorrection": "Correction"
+      "fundingcasecorrection": "Correction",
+      "fundingcaseaccountreceivable": "Accounts Receivable",
+      "fundingcaseaccountreceivablecreditmemo": "Accounts Receivable Credit Memo"
     },
     "scope_type": {
       "global": "Global",
@@ -628,6 +635,14 @@
       "denied": "Denied",
       "failed": "Failed",
       "cancelled": "Cancelled"
+    },
+    "account_receivable_type": {
+      "ineligible_expense": "Ineligible expense",
+      "outstanding_advance": "Outstanding advance"
+    },
+    "account_receivable_recovery_method": {
+      "offset": "Offset",
+      "direct_repayment": "Direct repayment"
     }
   },
   "agency": {
@@ -781,7 +796,8 @@
       "funding_case": "Intakes",
       "applicant_recipient": "Proponents",
       "journal_voucher": "Journal Vouchers",
-      "correction": "Corrections"
+      "correction": "Corrections",
+      "account_receivable": "Accounts receivable"
     },
     "unknown_ability": "Unknown ability ({action}:{subject})",
     "scope": {
@@ -1019,7 +1035,11 @@
     "return_home": "Return to dashboard"
   },
   "apiErrors": {
-    "custom_fields": {"multiple_to_single": "A multiple-selection field cannot be changed to single selection.", "section_in_use": "Move or delete the fields in this section before deleting it.", "in_use": "This field or option has saved Agreement values or workflow references."},
+    "custom_fields": {
+      "multiple_to_single": "A multiple-selection field cannot be changed to single selection.",
+      "section_in_use": "Move or delete the fields in this section before deleting it.",
+      "in_use": "This field or option has saved Agreement values or workflow references."
+    },
     "health": {
       "starting": "The service is starting and cannot accept requests yet. It may be waking from sleep. Please wait a few seconds and try again.",
       "startup_failed": "The service could not finish starting and is temporarily unavailable. Please try again shortly. If this continues, contact support.",
@@ -1335,7 +1355,8 @@
       "claim_reconcile_in_progress": "Finish or cancel the reconciliation already in progress before marking another reconciliation as final.",
       "duplicate_claim_reconcile_line_item": "A reconciliation line already exists for this claim line item.",
       "currency_immutable": "Agreement currency is set at creation and cannot be changed.",
-      "currency_mismatch": "Currency must match the Agreement currency."
+      "currency_mismatch": "Currency must match the Agreement currency.",
+      "invalid_claim_proponent": "Select a submitting Proponent linked to this Agreement."
     },
     "transfer_payment": {
       "invalid_funding_subtype": "Select an active funding subtype owned by this stream’s Agency.",
@@ -1477,6 +1498,15 @@
       "invalid_entry": "This Correction cannot be changed or submitted with its current financial basis, permissions or lifecycle state.",
       "not_found": "Correction not found.",
       "financial_locked": "An open Correction locks this Agreement’s financial accounting."
+    },
+    "account_receivable": {
+      "not_found": "Receivable or Credit Memo not found.",
+      "invalid_entry": "This receivable operation cannot proceed with its current source amounts, recovery reservations, permissions or lifecycle state.",
+      "below_recovered_reserved": "A negative adjustment cannot reduce principal below amounts already recovered or reserved.",
+      "payment_direct_repayment_hold": "This payee has an outstanding receivable requiring direct repayment. Payments are held until it is repaid or an approved adjustment changes the recovery method.",
+      "payment_recovery_pending": "A recovery or receivable adjustment is pending for this payee. Finish or cancel that work before processing this Payment.",
+      "payment_payee_unavailable": "Select an active Proponent linked to this Agreement as the Payment payee.",
+      "monitor_receivable_required": "Establish the linked accounts receivable before completing this recovery follow-up."
     }
   },
   "transfer_payment": {
@@ -2251,7 +2281,10 @@
         "recommendation_active": "A recommendation is still active",
         "approval_active": "An approval is still active",
         "journal_voucher_not_terminal": "Journal Voucher has not reached a terminal business status",
-        "correction_not_terminal": "Correction has not reached a terminal outcome"
+        "correction_not_terminal": "Correction has not reached a terminal outcome",
+        "account_receivable_not_terminal": "Receivable establishment or adjustment is unresolved.",
+        "account_receivable_recovery_pending": "A recovery reservation remains pending.",
+        "account_receivable_credit_memo_not_terminal": "A Credit Memo is unresolved."
       }
     },
     "agency": "Agency",
@@ -2375,7 +2408,11 @@
       "correction_adjustments": "Posted Correction adjustments",
       "jv_effects": "Successful JV effects",
       "corrected_recorded_paid": "Corrected recorded paid",
-      "cash_payments": "Cash Payments"
+      "cash_payments": "Cash Payments",
+      "ar_recoveries": "AR recovery effects",
+      "ar_claim_recoveries": "AR Claim recovery effects",
+      "original_claimed": "Original claimed",
+      "original_reconciled": "Original approved claims"
     },
     "budget": {
       "funding_sources": "Other funding sources",
@@ -2410,7 +2447,10 @@
       "name_en": "English name",
       "name_fr": "French name",
       "name_help": "Provide an amendment name in at least one official language.",
-      "sections": { "details": "Amendment details", "scope": "Amendment scope" },
+      "sections": {
+        "details": "Amendment details",
+        "scope": "Amendment scope"
+      },
       "type": "Amendment type",
       "types": "Amendment types",
       "types_description": "The selected types describe the areas changed by this amendment.",
@@ -2547,7 +2587,20 @@
       },
       "workflow": {
         "title": "Workflow"
-      }
+      },
+      "payee": "Proponent payee",
+      "payee_description": "Select one Proponent from this Agreement. Use separate Payments for different payees.",
+      "payee_unattributed": "Payee attribution required",
+      "gross": "Gross Payment",
+      "offset": "Credit Memo offset",
+      "net": "Recipient disbursement",
+      "recovery_summary": "Payment recovery controls",
+      "hold_title": "Payment held for direct repayment",
+      "hold_description": "An approved direct-repayment receivable prevents disbursement to this payee. AR staff must resolve the debt before payment can proceed.",
+      "offset_reserved": "A recovery or adjustment is already pending for this payee and currency. Processing must wait for that operation to resolve.",
+      "offset_allocations": "Credit Memo allocations",
+      "offset_policy_description": "The Credit Memo reduces the recipient disbursement. Gross Payment remains unchanged.",
+      "packet_title": "Captured Payment settlement"
     },
     "forecasts": {
       "title": "Forecasts",
@@ -2733,7 +2786,9 @@
         "comment_placeholder": "Add an optional completion note.",
         "complete": "Complete reconciliation",
         "completed_success": "Reconciliation completed successfully"
-      }
+      },
+      "submitting_proponent": "Submitting Proponent",
+      "submitting_proponent_description": "Select the Proponent submitting this Claim from this Agreement. The value can be changed while the Claim remains editable."
     },
     "monitors": {
       "title": "Monitors",
@@ -3275,10 +3330,18 @@
     "title": "Workflows",
     "start": "Start Workflow",
     "entry_point": "Entry point",
-    "entry_points": { "completion": "Completion", "recommendation": "Recommendation", "approval": "Approval" },
+    "entry_points": {
+      "completion": "Completion",
+      "recommendation": "Recommendation",
+      "approval": "Approval"
+    },
     "purpose": "Purpose",
     "purpose_help": "Approval submission captures an immutable packet and creates an Agreement revision after success.",
-    "purposes": { "standard": "Standard", "approval_submission": "Approval submission", "risk_rating": "Risk Rating" },
+    "purposes": {
+      "standard": "Standard",
+      "approval_submission": "Approval submission",
+      "risk_rating": "Risk Rating"
+    },
     "completion_blockers": {
       "active_workflow": "Completion is unavailable while a workflow is active.",
       "approval_workflow_missing": "A published approval workflow is required before this item can be completed.",
@@ -3293,7 +3356,8 @@
       "JV_COMMITMENT_MISMATCH": "Corrected allocations must use source commitment lines.",
       "JV_UNBALANCED": "Each commitment line must preserve its original total.",
       "JV_NO_ADJUSTMENT": "Change at least one allocation before completing the entry.",
-      "JV_AMOUNT_RANGE": "Enter amounts within the supported precision and range."
+      "JV_AMOUNT_RANGE": "Enter amounts within the supported precision and range.",
+      "payment_recovery_control": "Resolve the approved direct repayment requirement or pending Credit Memo before completing this Payment."
     },
     "packet": {
       "title": "Approval packet",
@@ -3395,7 +3459,13 @@
     "replacement_owner": "Replacement owner",
     "resume": "Resume workflow",
     "transition_history": "Parent status history",
-    "transition_events": { "materialized": "Member started", "succeeded": "Member succeeded", "failed": "Member failed", "cancelled": "Workflow cancelled", "execution_failed": "Execution failed" },
+    "transition_events": {
+      "materialized": "Member started",
+      "succeeded": "Member succeeded",
+      "failed": "Member failed",
+      "cancelled": "Workflow cancelled",
+      "execution_failed": "Execution failed"
+    },
     "retry": "Try again",
     "cancel": "Cancel workflow",
     "cancel_confirmation": "Cancel this workflow? Its completed steps and history will be retained.",
@@ -3559,9 +3629,23 @@
       "move_group_down": "Move group down",
       "default_group_name_en": "Result group {number}",
       "default_group_name_fr": "Groupe de résultats {number}",
-      "results": { "pass": "Pass", "pass_with_considerations": "Pass with considerations", "fail": "Fail" },
-      "modes": { "any": "Any item", "all": "All items", "at_least_count": "At least a number", "at_least_rate": "At least a percentage" },
-      "summaries": { "any": "Any of {count} items", "all": "All {count} items", "at_least_count": "At least {threshold} of {count} items", "at_least_rate": "At least {threshold}% of {count} items" }
+      "results": {
+        "pass": "Pass",
+        "pass_with_considerations": "Pass with considerations",
+        "fail": "Fail"
+      },
+      "modes": {
+        "any": "Any item",
+        "all": "All items",
+        "at_least_count": "At least a number",
+        "at_least_rate": "At least a percentage"
+      },
+      "summaries": {
+        "any": "Any of {count} items",
+        "all": "All {count} items",
+        "at_least_count": "At least {threshold} of {count} items",
+        "at_least_rate": "At least {threshold}% of {count} items"
+      }
     },
     "add_section": "Add section",
     "no_sections": "No sections have been configured.",
@@ -3590,7 +3674,13 @@
     "rule_name_fr": "Rule name (French)",
     "result": "Result",
     "condition_type": "Condition type",
-    "condition_types": { "aggregate": "Aggregate threshold", "question": "Individual question", "all": "All conditions", "any": "Any condition", "not": "Condition does not match" },
+    "condition_types": {
+      "aggregate": "Aggregate threshold",
+      "question": "Individual question",
+      "all": "All conditions",
+      "any": "Any condition",
+      "not": "Condition does not match"
+    },
     "nested_condition": "Nested condition",
     "nested_conditions": "Nested conditions",
     "add_condition": "Add condition",
@@ -3604,7 +3694,11 @@
     "section": "Section",
     "operator": "Comparison",
     "threshold": "Threshold",
-    "results": { "pass": "Pass", "pass_with_considerations": "Pass with considerations", "fail": "Fail" },
+    "results": {
+      "pass": "Pass",
+      "pass_with_considerations": "Pass with considerations",
+      "fail": "Fail"
+    },
     "comment_policies": {
       "optional": "Optional",
       "required": "Required",
@@ -3612,8 +3706,19 @@
       "required_on_not_applicable": "Required on N/A",
       "required_on_fail_or_not_applicable": "Required on Fail or N/A"
     },
-    "metrics": { "pass_count": "Pass count", "fail_count": "Fail count", "pass_rate": "Pass rate (%)", "fail_rate": "Fail rate (%)" },
-    "operators": { "eq": "Equals", "gt": "Greater than", "gte": "At least", "lt": "Less than", "lte": "At most" },
+    "metrics": {
+      "pass_count": "Pass count",
+      "fail_count": "Fail count",
+      "pass_rate": "Pass rate (%)",
+      "fail_rate": "Fail rate (%)"
+    },
+    "operators": {
+      "eq": "Equals",
+      "gt": "Greater than",
+      "gte": "At least",
+      "lt": "Less than",
+      "lte": "At most"
+    },
     "saved": "Checklist schema saved.",
     "published": "Checklist schema published.",
     "retired": "Checklist schema retired.",
@@ -3961,5 +4066,126 @@
     "export_label": "Export Corrections",
     "all_outcomes": "All Outcomes",
     "all_fiscal_years": "All Fiscal Years"
+  },
+  "account_receivable": {
+    "title": "Accounts receivable",
+    "description": "Establish money owed under this Agreement and track approved adjustments and recoveries.",
+    "create": "Create receivable",
+    "create_adjustment": "Create adjustment",
+    "search": "Search receivables",
+    "number": "Receivable reference",
+    "agreement": "Agreement",
+    "debtor": "Debtor Proponent",
+    "payee": "Payee",
+    "currency": "Agreement currency",
+    "principal": "Effective principal",
+    "recovered": "Recovered principal",
+    "reserved": "Pending recovery",
+    "outstanding": "Outstanding principal",
+    "available": "Available to recover",
+    "balance": "Receivable balance",
+    "collection_state": "Collection state",
+    "financial_lines": "Amounts and sources",
+    "financial_basis": "Captured financial basis",
+    "recoveries": "Recoveries and adjustments",
+    "adjustments": "Linked adjustments",
+    "created_at": "Created",
+    "recovery_kind": "Recovery method",
+    "automatic_offset": "Automatic Payment Credit Memo",
+    "manual_credit_memo": "Manual Credit Memo",
+    "recovery_outcome": "Recovery outcome",
+    "recovery_amount": "Recovered amount",
+    "recovery_method": "Approved recovery method",
+    "current_recovery_method": "Current approved recovery method",
+    "type": "Receivable type",
+    "source_claims": "Source Claim lines",
+    "source_advances": "Source paid advances",
+    "source_description": "Select retained sources from this Agreement and fiscal year. Advance sources may be selected automatically.",
+    "source_line": "Source line {number}",
+    "source_kind": "Source",
+    "source_claim": "Final reconciled Claim",
+    "source_advance": "Paid advance",
+    "source_basis": "Eligible source amount",
+    "source_amount": "Receivable amount for source {number}",
+    "retained_paid": "Retained paid basis",
+    "established_amount": "Receivable amount",
+    "amount_instruction": "Enter a positive recovery amount for each selected source. Unused lines may remain zero. Approval requires a positive total.",
+    "adjustment_instruction": "Enter signed principal changes against the retained sources. A negative adjustment cannot reduce principal below recovered or reserved amounts. The approved recovery method can also change.",
+    "create_amount_instruction": "After saving the Draft, enter source amounts and attach establishment evidence before Completion.",
+    "basis_provenance": "These retained Claim periods, paid amounts and coding form the recovery basis. Current source records do not replace this evidence.",
+    "linked_receivable": "Original receivable",
+    "rationale": "Reason and recovery policy",
+    "requested_date": "Requested date",
+    "narrative_en": "Reason (English)",
+    "narrative_fr": "Reason (French)",
+    "rationale_instruction": "For Completion, provide a reason in at least one language (required). Drafts may be saved with an incomplete reason.",
+    "recipient_preference": "Recorded recipient preference",
+    "preference_description": "Optional information recorded by an officer; it does not establish the approved recovery policy.",
+    "override_en": "Preference override reason (English)",
+    "override_fr": "Preference override reason (French)",
+    "override_instruction": "If the recovery method differs from the recorded preference, explain the decision in at least one language for Completion (required).",
+    "monitor_followup": "Monitor follow-up",
+    "monitor_link_description": "Optionally link the instruction to establish this debt. Source access remains independently authorized.",
+    "monitor_requirement": "Require receivable establishment",
+    "monitor_requirement_description": "Completing this follow-up requires an established linked receivable. Collection may continue afterward.",
+    "record_credit_memo": "Record Credit Memo",
+    "credit_memo_description": "Record money actually received and allocate it to approved receivables in one currency.",
+    "received_date": "Received date",
+    "received_amount": "Amount received",
+    "receipt_reference": "Receipt reference",
+    "allocation_sources": "Receivable source lines",
+    "allocation_instruction": "Select authorized receivable lines for the same debtor, Agency and currency. Positive allocations must equal the amount received.",
+    "allocation_line": "Allocation for source {number}",
+    "allocation_reference": "{agreement} / AR {number}",
+    "credit_memo_reference": "{agreement} / Credit Memo {number}",
+    "offset_reference": "Receivable {number}",
+    "credit_memo_allocations": "Received money and allocations",
+    "credit_memo_evidence_instruction": "Attach receipt evidence in Attachments. Completion and final approval confirm the received funds and post the recovery.",
+    "save_before_completion": "Save your changes before Completion.",
+    "cancel": "Cancel casework",
+    "cancel_description": "Cancel this editable case while preserving its retained evidence.",
+    "cancellation_reason": "Cancellation reason",
+    "dismiss_cancellation": "Keep casework",
+    "approval_workspace": "Receivable approval",
+    "credit_memo_approval_workspace": "Credit Memo approval",
+    "approval_workspace_description": "Review the immutable submission using your exact approval assignment.",
+    "packet_title": "Captured receivable submission",
+    "credit_memo_packet": "Captured Credit Memo submission",
+    "captured_context": "Captured business context",
+    "creator_approval_policy": "Creator approval allowed",
+    "completion": {
+      "title": "Receivable completion",
+      "description": "Submit retained debt evidence, source amounts and recovery policy through a published approval workflow.",
+      "status_complete": "This receivable submission is complete.",
+      "status_locked": "This receivable cannot be completed in its current state.",
+      "comment_placeholder": "Add an optional completion note.",
+      "complete": "Complete receivable",
+      "completed_success": "Receivable submitted successfully."
+    },
+    "credit_memo_completion": {
+      "title": "Credit Memo completion",
+      "description": "Confirm receipt evidence and the exact allocations through a published approval workflow.",
+      "status_complete": "This Credit Memo submission is complete.",
+      "status_locked": "This Credit Memo cannot be completed in its current state.",
+      "comment_placeholder": "Add an optional completion note.",
+      "complete": "Complete Credit Memo",
+      "completed_success": "Credit Memo submitted successfully."
+    },
+    "collection_states": {
+      "outstanding": "Outstanding debt",
+      "partially_recovered": "Partially recovered",
+      "cleared": "Cleared"
+    },
+    "recovery_outcomes": {
+      "open": "Pending",
+      "posted": "Recovered",
+      "released": "Released without recovery"
+    },
+    "propose_allocations": "Suggest priority allocations",
+    "proposal_instruction": "Suggest amounts for the selected lines using the approved recovery priority. Review the proposal before saving; unused lines are removed.",
+    "allocation_shortfall": "{amount} remains unallocated. Select additional eligible lines or correct the received amount.",
+    "clear_preference": "Clear recorded preference",
+    "select_source_basis": "Select the debtor, fiscal year and receivable type to load eligible sources.",
+    "adjustment": "Adjustment"
   }
 }

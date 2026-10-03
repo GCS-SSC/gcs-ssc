@@ -62,6 +62,18 @@ export const resolveAssignmentTargetAgreementId = async (
     return reconciliation ? String(reconciliation.egcs_fc_fundingagreement) : null
   }
 
+  if (target.entityType === 'fundingcaseaccountreceivable') {
+    const row = await db.selectFrom('Funding_Case_Agreement_Account_Receivable').select('egcs_fc_fundingagreement')
+      .where('id', '=', target.entityId).where('_deleted', '=', false).executeTakeFirst()
+    return row ? String(row.egcs_fc_fundingagreement) : null
+  }
+
+  if (target.entityType === 'fundingcaseaccountreceivablecreditmemo') {
+    const row = await db.selectFrom('Funding_Case_Account_Receivable_Credit_Memo').select('egcs_fc_fundingagreement')
+      .where('id', '=', target.entityId).where('_deleted', '=', false).executeTakeFirst()
+    return row ? String(row.egcs_fc_fundingagreement) : null
+  }
+
   if (target.entityType === 'fundingcasecorrection') {
     const correction = await db.selectFrom('Funding_Case_Agreement_Correction').select('egcs_fc_fundingagreement')
       .where('id', '=', target.entityId).where('_deleted', '=', false).executeTakeFirst()

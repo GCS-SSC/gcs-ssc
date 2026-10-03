@@ -21,6 +21,7 @@ import { getAgreementAccountingCodingPools, getAgreementAccountingLines } from '
 import { hasPositiveCompletionTerminus } from './completion-terminus'
 import { resolveAssignedItemTargetGrant } from './rbac'
 import { withBusinessRecordState } from './business-record-state'
+import { hasAccountingTable } from './correction-schema'
 
 const ZERO = parseMoney('0.00')
 export const correctionError = async (event: H3Event, code: string): Promise<never> => {
@@ -43,6 +44,7 @@ export const authorizeCorrection = async (event: H3Event, id: string, action: 'r
 }
 
 export const readCorrectionLines = async (db: Kysely<Database>, id: string) => {
+  const hasReceivables = await hasAccountingTable(db, 'Funding_Case_Agreement_Account_Receivable')
   const rows = await db.selectFrom('Funding_Case_Agreement_Correction_Line as line')
     .innerJoin('Transfer_Payment_Stream_Chart_of_Account as coding', 'coding.id', 'line.egcs_fc_chartofaccount')
     .select(['line.id', 'line.egcs_fc_commitmentline', 'line.egcs_fc_commitmentlinenumber', 'line.egcs_fc_chartofaccount',
@@ -52,13 +54,15 @@ export const readCorrectionLines = async (db: Kysely<Database>, id: string) => {
       databaseMoneyText(sql.ref('line.egcs_fc_originalpaid')).as('egcs_fc_originalpaid'),
       databaseMoneyText(sql.ref('line.egcs_fc_jveffect')).as('egcs_fc_jveffect'),
       databaseMoneyText(sql.ref('line.egcs_fc_priorcorrections')).as('egcs_fc_priorcorrections'),
+      databaseMoneyText(hasReceivables ? sql.ref('line.egcs_fc_arrecoveries') : sql`0::numeric`).as('egcs_fc_arrecoveries'),
       databaseMoneyText(sql.ref('line.egcs_fc_adjustment')).as('egcs_fc_adjustment')])
     .where('line.egcs_fc_correction', '=', id).where('line._deleted', '=', false).orderBy('line.egcs_fc_commitmentlinenumber').execute()
   return rows.map(row => {
     const money = { egcs_fc_commitmentamount: parseDatabaseMoney(row.egcs_fc_commitmentamount),
       egcs_fc_originalpaid: parseDatabaseMoney(row.egcs_fc_originalpaid), egcs_fc_jveffect: parseDatabaseMoney(row.egcs_fc_jveffect),
-      egcs_fc_priorcorrections: parseDatabaseMoney(row.egcs_fc_priorcorrections), egcs_fc_adjustment: parseDatabaseMoney(row.egcs_fc_adjustment) }
-    const corrected = sumMoney([money.egcs_fc_originalpaid, money.egcs_fc_jveffect, money.egcs_fc_priorcorrections, money.egcs_fc_adjustment])
+      egcs_fc_priorcorrections: parseDatabaseMoney(row.egcs_fc_priorcorrections), egcs_fc_arrecoveries: parseDatabaseMoney(row.egcs_fc_arrecoveries),
+      egcs_fc_adjustment: parseDatabaseMoney(row.egcs_fc_adjustment) }
+    const corrected = sumMoney([money.egcs_fc_originalpaid, money.egcs_fc_jveffect, money.egcs_fc_priorcorrections, money.egcs_fc_arrecoveries, money.egcs_fc_adjustment])
     return { ...row, ...money, egcs_fc_accountingdimensions: TransferPaymentStreamChartOfAccountDimensionSchema.array().parse(row.egcs_fc_accountingdimensions),
       egcs_fc_correctedpaid: corrected, egcs_fc_remaining: subtractMoney(money.egcs_fc_commitmentamount, corrected) }
   })
@@ -154,7 +158,7 @@ export const createCorrection = async (event: H3Event, agreementId: string, inpu
     }
     const lines = (await getAgreementAccountingLines(trx, agreementId, { paymentMode: 'finalized' })).filter(line => String(line.egcs_fc_commitment) === input.egcs_fc_commitment)
     if (!lines.length) return await correctionError(event, 'COR_LINES_REQUIRED')
-    if (lines.some(line => ![line.egcs_fc_commitmentamount, line.egcs_fc_originalpaid, line.egcs_fc_jveffect, line.egcs_fc_priorcorrections].every(isNumeric19Money))) {
+    if (lines.some(line => ![line.egcs_fc_commitmentamount, line.egcs_fc_originalpaid, line.egcs_fc_jveffect, line.egcs_fc_priorcorrections, line.egcs_fc_arrecoveries].every(isNumeric19Money))) {
       return await correctionError(event, 'COR_PRECISION')
     }
     if (!sources.some(source => source.accounting.allocations.some(allocation => lines.some(line => String(line.id) === allocation.egcs_fc_commitmentline)))) {
@@ -179,6 +183,7 @@ export const createCorrection = async (event: H3Event, agreementId: string, inpu
         egcs_fc_fundingagreement: agreementId, egcs_fc_payment: source.paymentId,
         egcs_fc_evidence: sql`${JSON.stringify(source.accounting)}::jsonb` }).execute()
     }
+    const hasReceivables = await hasAccountingTable(trx, 'Funding_Case_Agreement_Account_Receivable')
     for (const line of lines) {
       const sourceLine = sources.flatMap(source => source.accounting.allocations).find(allocation => allocation.egcs_fc_commitmentline === String(line.id))
       await trx.insertInto('Funding_Case_Agreement_Correction_Line').values({
@@ -188,6 +193,7 @@ export const createCorrection = async (event: H3Event, agreementId: string, inpu
         egcs_fc_accountingdimensions: sql`${JSON.stringify(sourceLine?.egcs_fc_accountingdimensions ?? line.egcs_fc_accountingdimensions)}::jsonb`,
         egcs_fc_commitmentamount: databaseMoneyValue(line.egcs_fc_commitmentamount), egcs_fc_originalpaid: databaseMoneyValue(line.egcs_fc_originalpaid),
         egcs_fc_jveffect: databaseMoneyValue(line.egcs_fc_jveffect), egcs_fc_priorcorrections: databaseMoneyValue(line.egcs_fc_priorcorrections),
+        ...(hasReceivables ? { egcs_fc_arrecoveries: databaseMoneyValue(line.egcs_fc_arrecoveries) } : {}),
         egcs_fc_adjustment: databaseMoneyValue(ZERO)
       }).execute()
     }
@@ -215,7 +221,7 @@ export const validateCorrectionPostingBasis = async (
     const live = current.find(candidate => String(candidate.id) === String(line.egcs_fc_commitmentline))
     if (!live || String(live.egcs_fc_chartofaccount) !== String(line.egcs_fc_chartofaccount)
       || String(live.egcs_fc_agencyfiscalyear) !== String(line.egcs_fc_agencyfiscalyear)
-      || ['egcs_fc_commitmentamount', 'egcs_fc_originalpaid', 'egcs_fc_jveffect', 'egcs_fc_priorcorrections'].some(key =>
+      || ['egcs_fc_commitmentamount', 'egcs_fc_originalpaid', 'egcs_fc_jveffect', 'egcs_fc_priorcorrections', 'egcs_fc_arrecoveries'].some(key =>
         live[key as keyof typeof live] !== line[key as keyof typeof line])) throw new CorrectionAccountingError('COR_BASIS_CHANGED')
   }
   const sources = await trx.selectFrom('Funding_Case_Agreement_Correction_Source as source')

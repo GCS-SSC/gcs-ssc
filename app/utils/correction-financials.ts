@@ -6,6 +6,7 @@ export type CorrectionFinancialBasis = {
   egcs_fc_originalpaid: string
   egcs_fc_jveffect: string
   egcs_fc_priorcorrections: string
+  egcs_fc_arrecoveries?: string
   egcs_fc_adjustment: string
 }
 export type CorrectionLineBalance = {
@@ -26,7 +27,7 @@ export type CorrectionLineBalance = {
 export const correctionLineBalance = (line: CorrectionFinancialBasis, adjustment: string): CorrectionLineBalance | null => {
   try {
     const signedAdjustment = parseMoney(adjustment)
-    const recordedPaid = sumMoney([line.egcs_fc_originalpaid, line.egcs_fc_jveffect, line.egcs_fc_priorcorrections].map(parseMoneyText))
+    const recordedPaid = sumMoney([line.egcs_fc_originalpaid, line.egcs_fc_jveffect, line.egcs_fc_priorcorrections, line.egcs_fc_arrecoveries ?? '0.00'].map(parseMoneyText))
     const correctedPaid = addMoney(recordedPaid, signedAdjustment)
     const commitment = parseMoneyText(line.egcs_fc_commitmentamount)
     return {

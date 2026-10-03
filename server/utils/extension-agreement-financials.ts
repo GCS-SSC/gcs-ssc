@@ -4,7 +4,7 @@ import type { GcsExtensionAgreementFinancials } from '@gcs-ssc/extensions/server
 import type { Currency_Codes, Database } from '~~/shared/types/database'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { getAgreementCommitmentPaymentCapacity, getCommitmentLinePaymentCoverage, validateAgreementPaymentAllocations } from './agreement-commitment-line-balance'
-import { getAgreementPaidAccountingProjection, getAgreementRecordedPaidToDate } from './agreement-accounting-projection'
+import { readEffectiveAccountReceivableClaimRecoveries, getAgreementPaidAccountingProjection, getAgreementRecordedPaidToDate } from './agreement-accounting-projection'
 import { resolveAgreementCurrency } from './agreement-currency'
 
 /**
@@ -52,6 +52,13 @@ export const createExtensionAgreementFinancials = (
       const currency = await prepareRead(input.excludePaymentId, input.currency)
       if (!isPositivePostgresBigintText(input.fiscalYearId)) throw new Error('Fiscal year requires a positive bigint identifier')
       return await getAgreementRecordedPaidToDate(db, agreementId, { ...input, currency })
+    },
+    /** Exposes signed Claim consumption without AR case data, after refreshing the bound authority. */
+    getClaimRecoveryProjection: async () => {
+      const currency = await prepareRead()
+      const entries = await readEffectiveAccountReceivableClaimRecoveries(db, agreementId, { currency })
+      return { agreementId, entries: entries.map(row => ({ claimLineId: row.claimLineId === null ? null : String(row.claimLineId),
+        fiscalYearOrder: String(row.fiscalYearOrder), month: row.periodEnd, currency: row.currency, amount: row.amount })) }
     },
     /** Reports retained accounting effects independently of cash and protective capacity. */
     getPaidAccountingProjection: async (input = {}) => {

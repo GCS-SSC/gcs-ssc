@@ -7,6 +7,7 @@ export type CorrectionFinancialLine = {
   egcs_fc_originalpaid: Money
   egcs_fc_jveffect: Money
   egcs_fc_priorcorrections: Money
+  egcs_fc_arrecoveries?: Money
   egcs_fc_adjustment: Money
 }
 
@@ -51,7 +52,7 @@ export const validateCorrectionAdjustments = (
     if (seen.has(line.egcs_fc_commitmentline)) throw new CorrectionAccountingError('COR_DUPLICATE_LINE')
     seen.add(line.egcs_fc_commitmentline)
     if (!isNumeric19Money(line.egcs_fc_adjustment)) throw new CorrectionAccountingError('COR_PRECISION')
-    const original = sumMoney([line.egcs_fc_originalpaid, line.egcs_fc_jveffect, line.egcs_fc_priorcorrections])
+    const original = sumMoney([line.egcs_fc_originalpaid, line.egcs_fc_jveffect, line.egcs_fc_priorcorrections, line.egcs_fc_arrecoveries ?? zero])
     const corrected = addMoney(original, line.egcs_fc_adjustment)
     if (compareMoney(corrected, zero) < 0 || compareMoney(corrected, line.egcs_fc_commitmentamount) > 0) {
       throw new CorrectionAccountingError('COR_LINE_CAPACITY')

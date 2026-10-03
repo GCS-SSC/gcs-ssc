@@ -12,6 +12,7 @@ const { line, currency, correctedPaid, remaining, invalid = false } = defineProp
     egcs_fc_originalpaid: string | null
     egcs_fc_jveffect: string | null
     egcs_fc_priorcorrections: string | null
+    egcs_fc_arrecoveries?: string | null
     egcs_fc_adjustment: string | null
     egcs_fc_commitmentamount: string | null
   }
@@ -26,7 +27,7 @@ const primaryCoding = computed(() => {
   return dimension ? formatAccountingDimension(dimension, locale.value === 'fr' ? 'fr' : 'en') : t('common.not_available')
 })
 const recordedPaid = computed(() => {
-  const components = [line.egcs_fc_originalpaid, line.egcs_fc_jveffect, line.egcs_fc_priorcorrections]
+  const components = [line.egcs_fc_originalpaid, line.egcs_fc_jveffect, line.egcs_fc_priorcorrections, line.egcs_fc_arrecoveries ?? '0.00']
   return components.every(value => value !== null) ? sumMoney(components.map(value => parseMoneyText(value!))) : null
 })
 const amount = (value: string | null) => value === null
@@ -78,6 +79,14 @@ const amount = (value: string | null) => value === null
           </dt>
           <dd class="mt-1 tabular-nums">
             {{ amount(line.egcs_fc_priorcorrections) }}
+          </dd>
+        </div>
+        <div v-if="line.egcs_fc_arrecoveries && line.egcs_fc_arrecoveries !== '0.00'">
+          <dt class="text-muted">
+            {{ t('agreement.financial_summary.ar_recoveries') }}
+          </dt>
+          <dd class="mt-1 tabular-nums">
+            {{ amount(line.egcs_fc_arrecoveries) }}
           </dd>
         </div>
         <div>

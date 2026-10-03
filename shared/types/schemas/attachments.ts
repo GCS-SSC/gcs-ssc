@@ -18,6 +18,8 @@ export const ATTACHMENT_TARGET_ENTITY_TYPES = [
   'fundingcasemonitor',
   'fundingcasejournalvoucher',
   'fundingcasecorrection',
+  'fundingcaseaccountreceivable',
+  'fundingcaseaccountreceivablecreditmemo',
   'fundingcasepayment',
   'fundingcaseagreementcloseout'
 ] as const

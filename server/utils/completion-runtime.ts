@@ -1,3 +1,4 @@
+import { getAccountReceivableCompletion, getAccountReceivableCreditMemoCompletion, executeAccountReceivableCompletion, executeAccountReceivableCreditMemoCompletion } from './account-receivable-completion'
 import { getJournalVoucherCompletionRuntime, executeJournalVoucherCompletion } from './journal-voucher-completion'
 import { getCorrectionCompletionRuntime, executeCorrectionCompletion } from './correction-completion'
 /* eslint-disable jsdoc/require-jsdoc */
@@ -53,6 +54,8 @@ export const isDirectCompletionRuntimeEntitySupported = (entityType: Entity_Type
   || entityType === 'fundingcasemonitor'
   || entityType === 'fundingcasejournalvoucher'
   || entityType === 'fundingcasecorrection'
+  || entityType === 'fundingcaseaccountreceivable'
+  || entityType === 'fundingcaseaccountreceivablecreditmemo'
   || entityType === 'fundingcasepayment'
   || entityType === 'fundingclaimreconcile'
   || entityType === 'fundingcaseforecast'
@@ -148,7 +151,7 @@ export const resolveCompletionRuntimeEntityFromEntity = async (
     return await resolveReviewRuntimeEntityFromEntity(db, entityType, entityId)
   }
 
-  if (entityType === 'fundingcasepayment' || entityType === 'fundingcasejournalvoucher' || entityType === 'fundingcasecorrection') {
+  if (entityType === 'fundingcasepayment' || entityType === 'fundingcasejournalvoucher' || entityType === 'fundingcasecorrection' || entityType === 'fundingcaseaccountreceivable' || entityType === 'fundingcaseaccountreceivablecreditmemo') {
     return await resolveReviewRuntimeEntityFromEntity(db, entityType, entityId)
   }
 
@@ -170,6 +173,8 @@ export const getCompletionRuntime = async (
   }
   if (entityType === 'fundingcasejournalvoucher') return await getJournalVoucherCompletionRuntime(event, entityId)
   if (entityType === 'fundingcasecorrection') return await getCorrectionCompletionRuntime(event, entityId)
+  if (entityType === 'fundingcaseaccountreceivable') return await getAccountReceivableCompletion(event, entityId)
+  if (entityType === 'fundingcaseaccountreceivablecreditmemo') return await getAccountReceivableCreditMemoCompletion(event, entityId)
   if (entityType === 'commonreview') {
     return await getCommonReviewCompletionRuntime(event, entityId)
   }
@@ -212,6 +217,8 @@ export const executeCompletion = async (
   if (input.entityType?.includes(':')) return await executeExtensionCompletion(event, input)
   if (input.entityType === 'fundingcasejournalvoucher') return await executeJournalVoucherCompletion(event, input)
   if (input.entityType === 'fundingcasecorrection') return await executeCorrectionCompletion(event, input)
+  if (input.entityType === 'fundingcaseaccountreceivable') return await executeAccountReceivableCompletion(event, input)
+  if (input.entityType === 'fundingcaseaccountreceivablecreditmemo') return await executeAccountReceivableCreditMemoCompletion(event, input)
   if (input.entityType === 'commonreview') {
     return await executeCommonReviewCompletion(event, input)
   }

@@ -1,3 +1,4 @@
+import { canAccessCreditMemoTargetScopes } from './credit-memo-scope-authority'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Review authorization helpers expose typed internal contracts covered by focused regression tests. */
 import type { H3Event } from 'h3'
 import type { Kysely, Transaction } from 'kysely'
@@ -17,6 +18,7 @@ import { resolveAgreementClaimReconcileRuntimeContext, resolveAgreementClaimRunt
 import { resolveAgreementCommitmentRuntimeContext } from '~~/server/utils/agreement-commitment'
 import { resolveAgreementForecastRuntimeContext } from '~~/server/utils/agreement-forecast'
 import { resolveAgreementMonitorRuntimeContext } from '~~/server/utils/agreement-monitor'
+import { resolveAccountReceivableRuntimeContext, resolveAccountReceivableCreditMemoRuntimeContext } from './account-receivable-context'
 import { resolveCorrectionRuntimeContext } from './correction-context'
 import { resolveJournalVoucherRuntimeContext } from './journal-voucher-context'
 import { resolveAgreementPaymentRuntimeContext } from '~~/server/utils/agreement-payment'
@@ -223,6 +225,8 @@ const agreementReviewRuntimeEntityTypes = new Set<Entity_Type>([
   'fundingcasemonitor',
   'fundingcasejournalvoucher',
   'fundingcasecorrection',
+  'fundingcaseaccountreceivable',
+  'fundingcaseaccountreceivablecreditmemo',
   'fundingcasepayment',
   'fundingclaimreconcile'
 ])
@@ -403,9 +407,10 @@ const authorizeAgreementRuntimeAction = async (
       ? 'delete'
       : 'update'
 
-  const subject = entityContext.entityType === 'fundingcasecorrection' ? 'correction' : entityContext.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement'
+  const subject = (entityContext.entityType === 'fundingcaseaccountreceivable' || entityContext.entityType === 'fundingcaseaccountreceivablecreditmemo') ? 'account_receivable' : entityContext.entityType === 'fundingcasecorrection' ? 'correction' : entityContext.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement'
   return await authorize(event, subject, agreementAction, async ({ context }) => {
-    if (context.userAbilities.authorize(subject, agreementAction, agreementContext.scope)) {
+    if (context.userAbilities.authorize(subject, agreementAction, agreementContext.scope)
+      && (!isAssignableEntityType(entityContext.entityType) || await canAccessCreditMemoTargetScopes(event.context.$db, context, entityContext.entityType, entityContext.entityId, agreementAction))) {
       return { bypass: true }
     }
     return { denied: true }
@@ -659,6 +664,8 @@ const agreementRuntimeEntityResolvers = {
     resolve: resolveAgreementMonitorRuntimeContext,
     idKey: 'monitorId'
   },
+  fundingcaseaccountreceivable: { resolve: resolveAccountReceivableRuntimeContext, idKey: 'receivableId' },
+  fundingcaseaccountreceivablecreditmemo: { resolve: resolveAccountReceivableCreditMemoRuntimeContext, idKey: 'creditMemoId' },
   fundingcasecorrection: { resolve: resolveCorrectionRuntimeContext, idKey: 'correctionId' },
   fundingcasejournalvoucher: { resolve: resolveJournalVoucherRuntimeContext, idKey: 'journalVoucherId' },
   fundingcasepayment: {
@@ -1160,6 +1167,8 @@ const agreementRuntimeOwnerTables = {
   fundingcaseagreementcommitment: 'Funding_Case_Agreement_Commitment',
   fundingcaseforecast: 'Funding_Case_Agreement_Forecast',
   fundingcasemonitor: 'Funding_Case_Agreement_Monitor',
+  fundingcaseaccountreceivable: 'Funding_Case_Agreement_Account_Receivable',
+  fundingcaseaccountreceivablecreditmemo: 'Funding_Case_Account_Receivable_Credit_Memo',
   fundingcasecorrection: 'Funding_Case_Agreement_Correction',
   fundingcasejournalvoucher: 'Funding_Case_Agreement_Journal_Voucher',
   fundingcasepayment: 'Funding_Case_Agreement_Payment',

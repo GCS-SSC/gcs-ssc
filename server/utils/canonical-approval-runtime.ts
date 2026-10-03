@@ -662,6 +662,15 @@ export const decideCanonicalApproval = async (
       .where('id', '=', String(approval.runtimeEntityId)).where('_deleted', '=', false).executeTakeFirstOrThrow()
     if (!packet.policy.creatorApprovalAllowed && String(correction.egcs_fc_createdby) === actorId) return await forbidden(event)
   }
+  if ((approval.runtimeEntityType === 'fundingcaseaccountreceivable' || approval.runtimeEntityType === 'fundingcaseaccountreceivablecreditmemo') && approval.runtimePurpose === 'approval_submission') {
+    const submission = await trx.selectFrom('Common_Workflow_Run').select('egcs_cn_routing').where('id', '=', String(approval.runtimeId)).executeTakeFirstOrThrow()
+    const evidence = submission.egcs_cn_routing as { accountReceivablePacket?: { policy?: { creatorApprovalAllowed?: boolean } }; accountReceivableCreditMemoPacket?: { policy?: { creatorApprovalAllowed?: boolean } } } | null
+    const packet = evidence?.accountReceivablePacket ?? evidence?.accountReceivableCreditMemoPacket
+    if (!packet?.policy || packet.policy.creatorApprovalAllowed !== false) throw new Error('Accounts Receivable approval requires its captured creator policy')
+    const table = approval.runtimeEntityType === 'fundingcaseaccountreceivable' ? 'Funding_Case_Agreement_Account_Receivable' : 'Funding_Case_Account_Receivable_Credit_Memo'
+    const record = await trx.selectFrom(table).select('egcs_fc_createdby').where('id', '=', String(approval.runtimeEntityId)).where('_deleted', '=', false).executeTakeFirstOrThrow()
+    if (String(record.egcs_fc_createdby) === actorId) return await forbidden(event)
+  }
   if (approval.egcs_cn_approvalvalue !== null || approval.approvalState !== 'awaiting_action'
     || approval.routingState !== 'awaiting_action') {
     return await badRequest(event, 'REVIEW_APPROVAL_INVALID_STATUS', 'apiErrors.request.invalid_status')

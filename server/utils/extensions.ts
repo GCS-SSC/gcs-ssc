@@ -1,5 +1,6 @@
 import { createExtensionAgreementFinancials } from './extension-agreement-financials'
 import { assertAgreementCorrectionFinancialWriteAllowed } from './correction-lock'
+import { assertPaymentMutationRecoveryAllowed } from './payment-recovery-controls'
 import { publishExtensionAuditOwnership } from '../database/extension-audit-ownership'
 import { reconcileAuditCapture } from './audit-runtime'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Temporary coverage while extension runtime APIs receive complete documentation. */
@@ -854,6 +855,7 @@ export const runExtensionAgreementPaymentMutationGuards = async (
   context: Omit<GcsExtensionAgreementPaymentMutationGuardHookPayload, 'event' | 'db' | 'agreementFinancials'>
 ): Promise<void> => {
   await assertAgreementCorrectionFinancialWriteAllowed(event, db, context.agreementId)
+  await assertPaymentMutationRecoveryAllowed(event, db, context)
   try {
     await useNitroApp().hooks.callHook(GCS_EXTENSION_AGREEMENT_PAYMENT_MUTATION_GUARD_HOOK, {
       ...context,

@@ -22,6 +22,7 @@ export default defineEventHandler(async event => {
     if (!creatorId) return await notFound(event, 'COMMON_USER_NOT_FOUND', 'apiErrors.admin_common.not_found')
     const result = await createAgreementClaimAggregate(trx, {
       agreementId,
+      applicantRecipientId: validated.egcs_fc_applicantrecipient,
       streamId: current.streamId,
       fiscalYearId: validated.egcs_fc_fiscalyear,
       isFinalForYear: validated.egcs_fc_isfinalforyear,
@@ -31,6 +32,7 @@ export default defineEventHandler(async event => {
       submissionUuid: null,
       lineItems: []
     }, current.agencyId, creatorId)
+    if (result.status === 'applicant_recipient_unavailable') return await badRequest(event, 'AGREEMENT_CLAIM_PROPONENT_INVALID', 'apiErrors.agreement.invalid_claim_proponent')
     if (result.status === 'fiscal_year_unavailable') {
       return await badRequest(event, 'INVALID_AGREEMENT_CLAIM_FISCAL_YEAR', 'apiErrors.agreement.invalid_claim_fiscal_year')
     }

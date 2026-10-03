@@ -272,7 +272,9 @@
       "fundingcaseamendment": "Modification",
       "fundingcaseagreementcommitment": "Engagement",
       "fundingcasejournalvoucher": "Pièce de journal",
-      "fundingcasecorrection": "Correction"
+      "fundingcasecorrection": "Correction",
+      "fundingcaseaccountreceivable": "Comptes débiteurs",
+      "fundingcaseaccountreceivablecreditmemo": "Note de crédit"
     }
   },
   "attachments": {
@@ -506,7 +508,10 @@
       "reimbursement": "Remboursement",
       "advance": "Avance"
     },
-    "recommendation_outcome": { "recommended": "Recommandé", "not_recommended": "Non recommandé" },
+    "recommendation_outcome": {
+      "recommended": "Recommandé",
+      "not_recommended": "Non recommandé"
+    },
     "review_type": {
       "checklist": "Liste de contrôle",
       "assessment": "Évaluation"
@@ -529,7 +534,9 @@
       "fundingcaserecommendation": "Recommandation du dossier de financement",
       "fundingcaseagreementcommitment": "Engagement d’entente de dossier de financement",
       "fundingcasejournalvoucher": "Pièce de journal",
-      "fundingcasecorrection": "Correction"
+      "fundingcasecorrection": "Correction",
+      "fundingcaseaccountreceivable": "Compte débiteur",
+      "fundingcaseaccountreceivablecreditmemo": "Note de crédit de compte débiteur"
     },
     "scope_type": {
       "global": "Global",
@@ -628,6 +635,14 @@
       "denied": "Refusée",
       "failed": "Échouée",
       "cancelled": "Annulée"
+    },
+    "account_receivable_type": {
+      "ineligible_expense": "Dépense inadmissible",
+      "outstanding_advance": "Avance impayée"
+    },
+    "account_receivable_recovery_method": {
+      "offset": "Compensation",
+      "direct_repayment": "Remboursement direct"
     }
   },
   "agency": {
@@ -781,7 +796,8 @@
       "funding_case": "Réceptions",
       "applicant_recipient": "Promoteurs",
       "journal_voucher": "Pièces de journal",
-      "correction": "Corrections"
+      "correction": "Corrections",
+      "account_receivable": "Comptes débiteurs"
     },
     "unknown_ability": "Autorisation inconnue ({action}:{subject})",
     "scope": {
@@ -1019,7 +1035,11 @@
     "return_home": "Retourner au tableau de bord"
   },
   "apiErrors": {
-    "custom_fields": {"multiple_to_single": "Un champ à sélections multiples ne peut pas être converti en champ à sélection unique.", "section_in_use": "Déplacez ou supprimez les champs de cette section avant de la supprimer.", "in_use": "Ce champ ou cette option contient des valeurs d’entente enregistrées ou des références de flux de travail."},
+    "custom_fields": {
+      "multiple_to_single": "Un champ à sélections multiples ne peut pas être converti en champ à sélection unique.",
+      "section_in_use": "Déplacez ou supprimez les champs de cette section avant de la supprimer.",
+      "in_use": "Ce champ ou cette option contient des valeurs d’entente enregistrées ou des références de flux de travail."
+    },
     "health": {
       "starting": "Le service démarre et ne peut pas encore traiter les demandes. Il est peut-être en train de sortir de veille. Veuillez patienter quelques secondes et réessayer.",
       "startup_failed": "Le service n’a pas pu terminer son démarrage et est temporairement indisponible. Veuillez réessayer sous peu. Si le problème persiste, contactez le soutien technique.",
@@ -1335,7 +1355,8 @@
       "claim_reconcile_in_progress": "Terminez ou annulez le rapprochement en cours avant de marquer un autre rapprochement comme final.",
       "duplicate_claim_reconcile_line_item": "Une ligne de rapprochement existe déjà pour cette ligne de réclamation.",
       "currency_immutable": "La devise de l’entente est définie à la création et ne peut pas être modifiée.",
-      "currency_mismatch": "La devise doit correspondre à celle de l’entente."
+      "currency_mismatch": "La devise doit correspondre à celle de l’entente.",
+      "invalid_claim_proponent": "Sélectionnez un promoteur soumissionnaire lié à cette entente."
     },
     "transfer_payment": {
       "invalid_funding_subtype": "Sélectionnez un sous-type de financement actif appartenant à l’agence de ce volet.",
@@ -1477,6 +1498,15 @@
       "invalid_entry": "Cette correction ne peut pas être modifiée ou soumise avec sa base financière, ses autorisations ou son état actuel.",
       "not_found": "Correction introuvable.",
       "financial_locked": "Une correction ouverte verrouille la comptabilité financière de cette entente."
+    },
+    "account_receivable": {
+      "not_found": "Compte débiteur ou note de crédit introuvable.",
+      "invalid_entry": "Cette opération sur le compte débiteur ne peut se poursuivre avec les montants sources, les réservations de recouvrement, les autorisations ou l’état du cycle de vie actuels.",
+      "below_recovered_reserved": "Un ajustement négatif ne peut réduire le principal en dessous des montants déjà recouvrés ou réservés.",
+      "payment_direct_repayment_hold": "Ce bénéficiaire a un compte débiteur impayé exigeant un remboursement direct. Les paiements sont bloqués jusqu’à son remboursement ou jusqu’à ce qu’un ajustement approuvé modifie le mode de recouvrement.",
+      "payment_recovery_pending": "Un recouvrement ou un ajustement de compte débiteur est en attente pour ce bénéficiaire. Terminez ou annulez ce travail avant de traiter ce paiement.",
+      "payment_payee_unavailable": "Sélectionnez comme bénéficiaire du paiement un promoteur actif lié à cette entente.",
+      "monitor_receivable_required": "Établissez le compte débiteur lié avant de finaliser ce suivi de recouvrement."
     }
   },
   "transfer_payment": {
@@ -2251,7 +2281,10 @@
         "recommendation_active": "Une recommandation est toujours active",
         "approval_active": "Une approbation est toujours active",
         "journal_voucher_not_terminal": "La pièce de journal n’a pas atteint un état opérationnel final",
-        "correction_not_terminal": "La correction n’a pas atteint un résultat définitif"
+        "correction_not_terminal": "La correction n’a pas atteint un résultat définitif",
+        "account_receivable_not_terminal": "L’établissement ou l’ajustement du compte débiteur n’est pas résolu.",
+        "account_receivable_recovery_pending": "Une réservation de recouvrement est encore en attente.",
+        "account_receivable_credit_memo_not_terminal": "Une note de crédit n’est pas réglée."
       }
     },
     "agency": "Agence",
@@ -2375,7 +2408,11 @@
       "correction_adjustments": "Ajustements de corrections comptabilisées",
       "jv_effects": "Effets des pièces de journal réussies",
       "corrected_recorded_paid": "Paiement consigné corrigé",
-      "cash_payments": "Paiements en espèces"
+      "cash_payments": "Paiements en espèces",
+      "ar_recoveries": "Effets des recouvrements de comptes débiteurs",
+      "ar_claim_recoveries": "Effets des recouvrements sur les réclamations",
+      "original_claimed": "Montant réclamé d’origine",
+      "original_reconciled": "Réclamations approuvées d’origine"
     },
     "budget": {
       "funding_sources": "Autres sources de financement",
@@ -2410,7 +2447,10 @@
       "name_en": "Nom anglais",
       "name_fr": "Nom français",
       "name_help": "Fournissez un nom de modification dans au moins une langue officielle.",
-      "sections": { "details": "Détails de la modification", "scope": "Portée de la modification" },
+      "sections": {
+        "details": "Détails de la modification",
+        "scope": "Portée de la modification"
+      },
       "type": "Type de modification",
       "types": "Types de modification",
       "types_description": "Les types sélectionnés décrivent les éléments visés par cette modification.",
@@ -2547,7 +2587,20 @@
       },
       "workflow": {
         "title": "Flux de travail"
-      }
+      },
+      "payee": "Promoteur bénéficiaire du paiement",
+      "payee_description": "Sélectionnez un promoteur de cette entente. Créez des paiements distincts pour les différents bénéficiaires.",
+      "payee_unattributed": "Attribution du bénéficiaire requise",
+      "gross": "Paiement brut",
+      "offset": "Compensation par note de crédit",
+      "net": "Versement au bénéficiaire",
+      "recovery_summary": "Contrôles de recouvrement sur paiement",
+      "hold_title": "Paiement suspendu pour remboursement direct",
+      "hold_description": "Un compte débiteur approuvé à remboursement direct empêche le versement à ce bénéficiaire. Le personnel des comptes débiteurs doit régler la dette avant de poursuivre le paiement.",
+      "offset_reserved": "Un recouvrement ou un ajustement est déjà en attente pour ce bénéficiaire et cette devise. Le traitement doit attendre sa résolution.",
+      "offset_allocations": "Affectations de la note de crédit",
+      "offset_policy_description": "La note de crédit réduit le versement au bénéficiaire. Le montant brut du paiement demeure inchangé.",
+      "packet_title": "Règlement du paiement conservé"
     },
     "forecasts": {
       "title": "Prévisions",
@@ -2733,7 +2786,9 @@
         "comment_placeholder": "Ajoutez une note de finalisation facultative.",
         "complete": "Finaliser le rapprochement",
         "completed_success": "Rapprochement finalisé avec succès"
-      }
+      },
+      "submitting_proponent": "Promoteur soumissionnaire",
+      "submitting_proponent_description": "Sélectionnez le promoteur de cette entente qui soumet cette demande. La valeur peut être modifiée tant que la demande est modifiable."
     },
     "monitors": {
       "title": "Surveillances",
@@ -3275,10 +3330,18 @@
     "title": "Flux de travail",
     "start": "Démarrer le processus",
     "entry_point": "Point d’entrée",
-    "entry_points": { "completion": "Achèvement", "recommendation": "Recommandation", "approval": "Approbation" },
+    "entry_points": {
+      "completion": "Achèvement",
+      "recommendation": "Recommandation",
+      "approval": "Approbation"
+    },
     "purpose": "Objectif",
     "purpose_help": "La soumission pour approbation saisit un dossier immuable et crée une révision de l’entente après la réussite.",
-    "purposes": { "standard": "Standard", "approval_submission": "Soumission pour approbation", "risk_rating": "Évaluation du risque" },
+    "purposes": {
+      "standard": "Standard",
+      "approval_submission": "Soumission pour approbation",
+      "risk_rating": "Évaluation du risque"
+    },
     "completion_blockers": {
       "active_workflow": "L’achèvement n’est pas disponible pendant qu’un flux de travail est actif.",
       "approval_workflow_missing": "Un flux d’approbation publié est requis avant que cet élément puisse être achevé.",
@@ -3293,7 +3356,8 @@
       "JV_COMMITMENT_MISMATCH": "Les répartitions corrigées doivent utiliser les lignes d’engagement sources.",
       "JV_UNBALANCED": "Chaque ligne d’engagement doit conserver son total original.",
       "JV_NO_ADJUSTMENT": "Modifiez au moins une répartition avant de finaliser la pièce.",
-      "JV_AMOUNT_RANGE": "Saisissez des montants respectant la précision et la plage prises en charge."
+      "JV_AMOUNT_RANGE": "Saisissez des montants respectant la précision et la plage prises en charge.",
+      "payment_recovery_control": "Réglez l’exigence approuvée de remboursement direct ou la note de crédit en attente avant de terminer ce paiement."
     },
     "packet": {
       "title": "Dossier d’approbation",
@@ -3395,7 +3459,13 @@
     "replacement_owner": "Propriétaire de remplacement",
     "resume": "Reprendre le flux",
     "transition_history": "Historique de l’état parent",
-    "transition_events": { "materialized": "Membre démarré", "succeeded": "Membre réussi", "failed": "Membre échoué", "cancelled": "Flux annulé", "execution_failed": "Échec d’exécution" },
+    "transition_events": {
+      "materialized": "Membre démarré",
+      "succeeded": "Membre réussi",
+      "failed": "Membre échoué",
+      "cancelled": "Flux annulé",
+      "execution_failed": "Échec d’exécution"
+    },
     "retry": "Réessayer",
     "cancel": "Annuler le flux de travail",
     "cancel_confirmation": "Annuler ce flux de travail? Les étapes terminées et l’historique seront conservés.",
@@ -3559,9 +3629,23 @@
       "move_group_down": "Déplacer le groupe vers le bas",
       "default_group_name_en": "Result group {number}",
       "default_group_name_fr": "Groupe de résultats {number}",
-      "results": { "pass": "Réussite", "pass_with_considerations": "Réussite avec considérations", "fail": "Échec" },
-      "modes": { "any": "Au moins un élément", "all": "Tous les éléments", "at_least_count": "Au moins un nombre", "at_least_rate": "Au moins un pourcentage" },
-      "summaries": { "any": "Au moins un des {count} éléments", "all": "Les {count} éléments", "at_least_count": "Au moins {threshold} des {count} éléments", "at_least_rate": "Au moins {threshold} % des {count} éléments" }
+      "results": {
+        "pass": "Réussite",
+        "pass_with_considerations": "Réussite avec considérations",
+        "fail": "Échec"
+      },
+      "modes": {
+        "any": "Au moins un élément",
+        "all": "Tous les éléments",
+        "at_least_count": "Au moins un nombre",
+        "at_least_rate": "Au moins un pourcentage"
+      },
+      "summaries": {
+        "any": "Au moins un des {count} éléments",
+        "all": "Les {count} éléments",
+        "at_least_count": "Au moins {threshold} des {count} éléments",
+        "at_least_rate": "Au moins {threshold} % des {count} éléments"
+      }
     },
     "add_section": "Ajouter une section",
     "no_sections": "Aucune section n’a été configurée.",
@@ -3590,7 +3674,13 @@
     "rule_name_fr": "Nom de la règle (français)",
     "result": "Résultat",
     "condition_type": "Type de condition",
-    "condition_types": { "aggregate": "Seuil global", "question": "Question individuelle", "all": "Toutes les conditions", "any": "N'importe quelle condition", "not": "La condition ne correspond pas" },
+    "condition_types": {
+      "aggregate": "Seuil global",
+      "question": "Question individuelle",
+      "all": "Toutes les conditions",
+      "any": "N'importe quelle condition",
+      "not": "La condition ne correspond pas"
+    },
     "nested_condition": "Condition imbriquée",
     "nested_conditions": "Conditions imbriquées",
     "add_condition": "Ajouter une condition",
@@ -3604,7 +3694,11 @@
     "section": "Section",
     "operator": "Comparaison",
     "threshold": "Seuil",
-    "results": { "pass": "Réussite", "pass_with_considerations": "Réussite avec considérations", "fail": "Échec" },
+    "results": {
+      "pass": "Réussite",
+      "pass_with_considerations": "Réussite avec considérations",
+      "fail": "Échec"
+    },
     "comment_policies": {
       "optional": "Facultatif",
       "required": "Obligatoire",
@@ -3612,8 +3706,19 @@
       "required_on_not_applicable": "Obligatoire si S. O.",
       "required_on_fail_or_not_applicable": "Obligatoire en cas d’échec ou si S. O."
     },
-    "metrics": { "pass_count": "Nombre de réussites", "fail_count": "Nombre d'échecs", "pass_rate": "Taux de réussite (%)", "fail_rate": "Taux d'échec (%)" },
-    "operators": { "eq": "Égal à", "gt": "Supérieur à", "gte": "Au moins", "lt": "Inférieur à", "lte": "Au plus" },
+    "metrics": {
+      "pass_count": "Nombre de réussites",
+      "fail_count": "Nombre d'échecs",
+      "pass_rate": "Taux de réussite (%)",
+      "fail_rate": "Taux d'échec (%)"
+    },
+    "operators": {
+      "eq": "Égal à",
+      "gt": "Supérieur à",
+      "gte": "Au moins",
+      "lt": "Inférieur à",
+      "lte": "Au plus"
+    },
     "saved": "Le schéma de la liste a été enregistré.",
     "published": "Le schéma de la liste a été publié.",
     "retired": "Le schéma de la liste a été retiré.",
@@ -3961,5 +4066,126 @@
     "export_label": "Exporter les corrections",
     "all_outcomes": "Tous les résultats",
     "all_fiscal_years": "Tous les exercices financiers"
+  },
+  "account_receivable": {
+    "title": "Comptes débiteurs",
+    "description": "Établissez les sommes dues au titre de cette entente et suivez les ajustements et les recouvrements approuvés.",
+    "create": "Créer un compte débiteur",
+    "create_adjustment": "Créer un ajustement",
+    "search": "Rechercher les comptes débiteurs",
+    "number": "Référence du compte débiteur",
+    "agreement": "Entente",
+    "debtor": "Promoteur débiteur",
+    "payee": "Bénéficiaire du paiement",
+    "currency": "Devise de l’entente",
+    "principal": "Principal effectif",
+    "recovered": "Principal recouvré",
+    "reserved": "Recouvrement en attente",
+    "outstanding": "Principal impayé",
+    "available": "Montant disponible au recouvrement",
+    "balance": "Solde du compte débiteur",
+    "collection_state": "État du recouvrement",
+    "financial_lines": "Montants et sources",
+    "financial_basis": "Base financière conservée",
+    "recoveries": "Recouvrements et ajustements",
+    "adjustments": "Ajustements liés",
+    "created_at": "Créé le",
+    "recovery_kind": "Mode de recouvrement",
+    "automatic_offset": "Note de crédit automatique sur paiement",
+    "manual_credit_memo": "Note de crédit manuelle",
+    "recovery_outcome": "Résultat du recouvrement",
+    "recovery_amount": "Montant recouvré",
+    "recovery_method": "Mode de recouvrement approuvé",
+    "current_recovery_method": "Mode de recouvrement actuellement approuvé",
+    "type": "Type de compte débiteur",
+    "source_claims": "Lignes de réclamation sources",
+    "source_advances": "Avances payées sources",
+    "source_description": "Sélectionnez les sources conservées de cette entente et de cet exercice. Les sources d’avance peuvent être sélectionnées automatiquement.",
+    "source_line": "Ligne source {number}",
+    "source_kind": "Source",
+    "source_claim": "Réclamation rapprochée définitive",
+    "source_advance": "Avance payée",
+    "source_basis": "Montant source admissible",
+    "source_amount": "Montant à recouvrer de la source {number}",
+    "retained_paid": "Base de paiement conservée",
+    "established_amount": "Montant du compte débiteur",
+    "amount_instruction": "Saisissez un montant de recouvrement positif pour chaque source sélectionnée. Les lignes inutilisées peuvent rester à zéro. L’approbation exige un total positif.",
+    "adjustment_instruction": "Saisissez les variations signées du principal des sources conservées. Un ajustement négatif ne peut ramener le principal sous les montants recouvrés ou réservés. Le mode de recouvrement approuvé peut aussi changer.",
+    "create_amount_instruction": "Après avoir enregistré le brouillon, saisissez les montants par source et joignez les preuves avant la finalisation.",
+    "basis_provenance": "Les périodes de réclamation, les montants payés et l’imputation conservés constituent la base du recouvrement. Les données sources actuelles ne remplacent pas ces preuves.",
+    "linked_receivable": "Compte débiteur d’origine",
+    "rationale": "Motif et politique de recouvrement",
+    "requested_date": "Date de la demande",
+    "narrative_en": "Motif (anglais)",
+    "narrative_fr": "Motif (français)",
+    "rationale_instruction": "Pour la finalisation, fournissez un motif dans au moins une langue (obligatoire). Un brouillon peut être enregistré avec un motif incomplet.",
+    "recipient_preference": "Préférence du bénéficiaire enregistrée",
+    "preference_description": "Renseignement facultatif enregistré par un agent; il ne détermine pas la politique de recouvrement approuvée.",
+    "override_en": "Motif du changement de préférence (anglais)",
+    "override_fr": "Motif du changement de préférence (français)",
+    "override_instruction": "Si le mode de recouvrement diffère de la préférence enregistrée, expliquez la décision dans au moins une langue pour la finalisation (obligatoire).",
+    "monitor_followup": "Suivi de surveillance",
+    "monitor_link_description": "Reliez facultativement l’instruction d’établir cette dette. L’accès à la source reste autorisé séparément.",
+    "monitor_requirement": "Exiger l’établissement d’un compte débiteur",
+    "monitor_requirement_description": "La finalisation de ce suivi exige un compte débiteur lié établi. Le recouvrement peut se poursuivre ensuite.",
+    "record_credit_memo": "Enregistrer une note de crédit",
+    "credit_memo_description": "Enregistrez les fonds réellement reçus et affectez-les aux comptes débiteurs approuvés dans une seule devise.",
+    "received_date": "Date de réception",
+    "received_amount": "Montant reçu",
+    "receipt_reference": "Référence du reçu",
+    "allocation_sources": "Lignes sources du compte débiteur",
+    "allocation_instruction": "Sélectionnez les lignes autorisées pour le même débiteur, organisme et devise. Les affectations positives doivent être égales au montant reçu.",
+    "allocation_line": "Affectation à la source {number}",
+    "allocation_reference": "{agreement} / CD {number}",
+    "credit_memo_reference": "{agreement} / Note de crédit {number}",
+    "offset_reference": "Compte débiteur {number}",
+    "credit_memo_allocations": "Fonds reçus et affectations",
+    "credit_memo_evidence_instruction": "Joignez la preuve de réception dans Pièces jointes. La finalisation et l’approbation définitive confirment les fonds reçus et comptabilisent le recouvrement.",
+    "save_before_completion": "Enregistrez vos modifications avant la finalisation.",
+    "cancel": "Annuler le dossier",
+    "cancel_description": "Annulez ce dossier modifiable tout en conservant ses preuves.",
+    "cancellation_reason": "Motif de l’annulation",
+    "dismiss_cancellation": "Conserver le dossier",
+    "approval_workspace": "Approbation du compte débiteur",
+    "credit_memo_approval_workspace": "Approbation de la note de crédit",
+    "approval_workspace_description": "Examinez la soumission immuable à l’aide de votre affectation d’approbation précise.",
+    "packet_title": "Soumission du compte débiteur conservée",
+    "credit_memo_packet": "Soumission de note de crédit conservée",
+    "captured_context": "Contexte opérationnel conservé",
+    "creator_approval_policy": "Approbation par l’auteur permise",
+    "completion": {
+      "title": "Finalisation du compte débiteur",
+      "description": "Soumettez les preuves de dette conservées, les montants sources et la politique de recouvrement par un processus d’approbation publié.",
+      "status_complete": "Cette soumission de compte débiteur est finalisée.",
+      "status_locked": "Ce compte débiteur ne peut être finalisé dans son état actuel.",
+      "comment_placeholder": "Ajoutez une note de finalisation facultative.",
+      "complete": "Finaliser le compte débiteur",
+      "completed_success": "Le compte débiteur a été soumis."
+    },
+    "credit_memo_completion": {
+      "title": "Finalisation de la note de crédit",
+      "description": "Confirmez la preuve de réception et les affectations exactes par un processus d’approbation publié.",
+      "status_complete": "Cette soumission de note de crédit est finalisée.",
+      "status_locked": "Cette note de crédit ne peut être finalisée dans son état actuel.",
+      "comment_placeholder": "Ajoutez une note de finalisation facultative.",
+      "complete": "Finaliser la note de crédit",
+      "completed_success": "La note de crédit a été soumise."
+    },
+    "collection_states": {
+      "outstanding": "Dette impayée",
+      "partially_recovered": "Recouvrement partiel",
+      "cleared": "Soldé"
+    },
+    "recovery_outcomes": {
+      "open": "En attente",
+      "posted": "Recouvré",
+      "released": "Libéré sans recouvrement"
+    },
+    "propose_allocations": "Proposer des affectations prioritaires",
+    "proposal_instruction": "Proposez les montants des lignes sélectionnées selon la priorité de recouvrement approuvée. Vérifiez la proposition avant de l’enregistrer; les lignes inutilisées sont retirées.",
+    "allocation_shortfall": "Il reste {amount} non affecté. Sélectionnez d’autres lignes admissibles ou corrigez le montant reçu.",
+    "clear_preference": "Effacer la préférence enregistrée",
+    "select_source_basis": "Sélectionnez le débiteur, l’exercice et le type de compte débiteur pour charger les sources admissibles.",
+    "adjustment": "Ajustement"
   }
 }

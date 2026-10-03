@@ -17,6 +17,7 @@ import { resolveCanonicalLifecycleIdentity } from './extension-lifecycle-identit
 import { loadExtensionLifecycleEntity, isExtensionEnabledForAgency, isExtensionEnabledForStream } from './extensions'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { resolveFundingCaseScope } from './funding-case'
+import { canAccessCreditMemoTargetScopes, resolveCreditMemoAuthorityTarget } from './credit-memo-scope-authority'
 
 export const createPrimaryEntityAssignment = async (
   trx: Transaction<Database>,
@@ -49,7 +50,7 @@ export const resolveAssignmentActor = async (event: H3Event): Promise<{ auth: Au
 const resolveAgreementOwner = async (
   db: Kysely<Database>,
   agreementId: string,
-  subject: 'agreement' | 'journal_voucher' | 'correction' = 'agreement'
+  subject: 'agreement' | 'journal_voucher' | 'correction' | 'account_receivable' = 'agreement'
 ): Promise<AuthorizationResourceOwner | null> => {
   const agreement = await resolveAgreementScopeContext(agreementId, db)
   if (!agreement) return null
@@ -213,7 +214,7 @@ const resolveSourceOwner = async (
     return await resolveStreamOwner(db, source.entityId)
   }
   const agreementId = await resolveAgreementIdFromEntity(db, source.entityType, source.entityId)
-  if (agreementId) return await resolveAgreementOwner(db, agreementId, source.entityType === 'fundingcasecorrection' ? 'correction' : source.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement')
+  if (agreementId) return await resolveAgreementOwner(db, agreementId, (source.entityType === 'fundingcaseaccountreceivable' || source.entityType === 'fundingcaseaccountreceivablecreditmemo') ? 'account_receivable' : source.entityType === 'fundingcasecorrection' ? 'correction' : source.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement')
   if (source.target?.entityType === 'fundingcaseintake') {
     return await resolveEntityAssignmentOwner(db, 'fundingcaseintake', source.target.entityId)
   }
@@ -256,7 +257,7 @@ export const resolveEntityAssignmentOwner = async (
     return source ? await resolveSourceOwner(db, source) : null
   }
   const agreementId = await resolveAgreementIdFromEntity(db, entityType, entityId)
-  return agreementId ? await resolveAgreementOwner(db, agreementId, policy.subject === 'correction' ? 'correction' : policy.subject === 'journal_voucher' ? 'journal_voucher' : 'agreement') : null
+  return agreementId ? await resolveAgreementOwner(db, agreementId, policy.subject === 'account_receivable' ? 'account_receivable' : policy.subject === 'correction' ? 'correction' : policy.subject === 'journal_voucher' ? 'journal_voucher' : 'agreement') : null
 }
 
 /** Resolves the explicitly declared source used for runtime ownership inheritance. */
@@ -364,7 +365,8 @@ export const canManageEntityAssignmentsWithContext = async (
   }
   if (owner.kind === 'agreement') {
     const agreement = await resolveAgreementScopeContext(owner.agreementId, db)
-    return Boolean(agreement && context.userAbilities.canManageAssignments(owner.subject ?? 'agreement', agreement.scope))
+    return Boolean(agreement && context.userAbilities.canManageAssignments(owner.subject ?? 'agreement', agreement.scope)
+      && await canAccessCreditMemoTargetScopes(db, context, entityType, entityId, 'manage_assignments'))
   }
   if (owner.kind === 'funding_case') {
     const caseScope = await resolveFundingCaseScope(db, owner.intakeId)
@@ -389,6 +391,14 @@ export const canReadEntityAssignmentRoster = (evidence: {
 
 export const isEntityAssignmentRosterWorkable = async (db: Kysely<Database>, entityType: AssignableEntityType, entityId: string): Promise<boolean> => {
   const policy = getEntityAuthorizationPolicy(entityType)
+  if (entityType === 'fundingcaseaccountreceivable' || entityType === 'fundingcaseaccountreceivablecreditmemo') {
+    const table = entityType === 'fundingcaseaccountreceivable' ? 'Funding_Case_Agreement_Account_Receivable' : 'Funding_Case_Account_Receivable_Credit_Memo'
+    const record = await db.selectFrom(table).select('egcs_fc_outcome').where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirst()
+    if (!record || record.egcs_fc_outcome !== 'open') return false
+    const runtime = await db.selectFrom('Common_Runtime').select('id')
+      .where('egcs_cn_entitytype', '=', entityType).where('egcs_cn_entityid', '=', entityId).executeTakeFirst()
+    if (runtime) return false
+  }
   if (entityType === 'fundingcasecorrection') {
     const correction = await db.selectFrom('Funding_Case_Agreement_Correction').select('egcs_fc_outcome')
       .where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirst()
@@ -480,7 +490,7 @@ export const canReadEntityAssignments = async (event: H3Event, entityType: Assig
     canManageEntityAssignmentsWithContext(actor.auth, db, entityType, entityId)
   ])
   return canReadEntityAssignmentRoster({
-    hasInheritedOwnerRead: inheritedOwnerRead,
+    hasInheritedOwnerRead: inheritedOwnerRead && await canAccessCreditMemoTargetScopes(db, actor.auth, entityType, entityId, 'read'),
     hasAssignmentManagement: canManage,
     hasExactAssignment: false,
     hasApprovalAssignment: false
@@ -512,7 +522,7 @@ export const resolveAgencyValidEntityAssigneeIdsWithDb = async (
   const owner = await resolveEntityAssignmentOwner(db, entityType, entityId)
   if (!owner) return new Set()
   const abilitiesByUserId = await defineUsersAbilities(applicationUsers.map(user => String(user.application_user_id)), db)
-  let subject: 'agency' | 'agreement' | 'applicant_recipient' | 'transfer_payment' | 'funding_case' | 'journal_voucher' | 'correction'
+  let subject: 'agency' | 'agreement' | 'applicant_recipient' | 'transfer_payment' | 'funding_case' | 'journal_voucher' | 'correction' | 'account_receivable'
   let scope: AuthorizationScope
   if (owner.kind === 'applicant_recipient') {
     if (owner.agencyId) {
@@ -562,9 +572,23 @@ export const resolveAgencyValidEntityAssigneeIdsWithDb = async (
     subject = 'agency'
     scope = { type: 'agency', agencyId: owner.agencyId } as const
   }
-  return new Set(applicationUsers.filter(user => abilitiesByUserId
-    .get(String(user.application_user_id))
-    ?.authorize(subject, 'update', scope)).map(user => String(user.common_user_id)))
+  const creditMemoId = await resolveCreditMemoAuthorityTarget(db, entityType, entityId)
+  const additionalScopes: AuthorizationScope[] = []
+  if (creditMemoId) {
+    const { resolveAccountReceivableCreditMemoRuntimeContext } = await import('./account-receivable-context')
+    const creditMemo = await resolveAccountReceivableCreditMemoRuntimeContext(db, creditMemoId)
+    if (!creditMemo) return new Set()
+    for (const agreementId of creditMemo.agreementIds) {
+      const agreement = await resolveAgreementScopeContext(agreementId, db)
+      if (!agreement || agreement.agencyId !== creditMemo.agencyId) return new Set()
+      additionalScopes.push(agreement.scope)
+    }
+  }
+  return new Set(applicationUsers.filter(user => {
+    const abilities = abilitiesByUserId.get(String(user.application_user_id))
+    return abilities?.authorize(subject, 'update', scope)
+      && additionalScopes.every(additionalScope => abilities.authorize('account_receivable', 'update', additionalScope))
+  }).map(user => String(user.common_user_id)))
 }
 
 /** Lists active users before checking Proponent role eligibility across all agencies.

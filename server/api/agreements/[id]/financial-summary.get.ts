@@ -7,7 +7,7 @@ import { buildAgreementFinancialSummary, type SummaryBudgetLine, type SummaryCla
 import { withBusinessRecordState } from '~~/server/utils/business-record-state'
 import { databaseMoneyText, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
-import { getAgreementPaidAccountingProjection } from '~~/server/utils/agreement-accounting-projection'
+import { readEffectiveAccountReceivableClaimRecoveries, getAgreementPaidAccountingProjection } from '~~/server/utils/agreement-accounting-projection'
 
 /** Agreement-wide financial view, using a single authorized read snapshot. */
 export default defineEventHandler(async event => {
@@ -170,6 +170,6 @@ export default defineEventHandler(async event => {
     const finalizedIds = new Set(accounting.entries.filter(entry => entry.kind === 'cash_payment').map(entry => entry.id))
     return buildAgreementFinancialSummary(years, budgets, forecasts, forecastLines, claims, reconciliations,
       payments.filter(payment => finalizedIds.has(payment.id)), accounting.entries.flatMap(entry =>
-        entry.kind === 'cash_payment' ? [] : [{ ...entry, kind: entry.kind }]))
+        entry.kind === 'cash_payment' ? [] : [{ ...entry, kind: entry.kind }]), await readEffectiveAccountReceivableClaimRecoveries(db, agreementId))
   })
 })

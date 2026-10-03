@@ -1,3 +1,6 @@
+import { assertPaymentRecoveryAllowed } from '~~/server/utils/payment-recovery-controls'
+import type { Currency_Codes } from '~~/shared/types/database'
+import { resolveAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { FundingCaseAgreementPaymentPatchSchema } from '~~/shared/types/schemas'
 import {
   assertAgreementPaymentEditable,
@@ -45,6 +48,7 @@ export default defineEventHandler(async event => {
       return editablePayment
     }
 
+    await assertPaymentRecoveryAllowed(event, trx, { agreementId, applicantRecipientId: patchValues.egcs_fc_applicantrecipient ?? editablePayment.egcs_fc_applicantrecipient, currency: patchValues.egcs_fc_currency ?? editablePayment.egcs_fc_currency, paymentId })
     await validateMergedFinancialPeriodPatch(event, editablePayment, patchValues)
 
     const { response, nextCommitmentId } = await resolveAgreementPaymentPatchCommitmentId(event, trx, agreementId, patchValues, editablePayment.egcs_fc_currency)
@@ -92,6 +96,7 @@ export default defineEventHandler(async event => {
         'egcs_fc_fundingagreementcommitment',
         'egcs_fc_fiscalyear',
         'egcs_fc_paymenttype',
+        'egcs_fc_applicantrecipient',
         'egcs_fc_periodstart',
         'egcs_fc_periodend',
         databaseMoneyText(sql.ref('egcs_fc_paymentamount')).as('egcs_fc_paymentamount'),
@@ -105,6 +110,7 @@ export default defineEventHandler(async event => {
     await syncAgreementPaymentEditingStatus(trx, paymentId, { event, agreementId })
     return { ...row, egcs_fc_paymentamount: parseDatabaseMoney(row.egcs_fc_paymentamount) }
   }, {
+    accountReceivablePayees: patchValues.egcs_fc_applicantrecipient ? [{ applicantRecipientId: patchValues.egcs_fc_applicantrecipient, currency: patchValues.egcs_fc_currency ?? await resolveAgreementCurrency(db, agreementId) as Currency_Codes }] : undefined,
     assignmentTarget: { entityType: 'fundingcasepayment', entityId: paymentId },
     businessStatusTarget: { entityType: 'fundingcasepayment', entityId: paymentId }
   })

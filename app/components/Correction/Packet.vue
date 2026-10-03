@@ -34,6 +34,7 @@ const financialLines = computed(() => lines.value.map(line => ({
   egcs_fc_originalpaid: money(line.egcs_fc_originalpaid),
   egcs_fc_jveffect: money(line.egcs_fc_jveffect),
   egcs_fc_priorcorrections: money(line.egcs_fc_priorcorrections),
+  egcs_fc_arrecoveries: money(line.egcs_fc_arrecoveries) ?? '0.00',
   egcs_fc_adjustment: money(line.egcs_fc_adjustment),
   egcs_fc_commitmentamount: money(line.egcs_fc_commitmentamount),
   egcs_fc_correctedpaid: money(line.egcs_fc_correctedpaid),

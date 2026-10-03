@@ -287,7 +287,7 @@ const handleCompleted = async () => {
             :is-collapsed="isHeroCollapsed"
             icon="i-lucide-wallet-cards"
             :title="t(`enums.payment_type.${payment.egcs_fc_paymenttype}`)"
-            :meta-items="[payment.agreement_number, getBilingualValue(payment, 'agreement_title', agreementId), payment.egcs_fc_currency.toUpperCase()]"
+            :meta-items="[payment.agreement_number, getBilingualValue(payment, 'agreement_title', agreementId), `${t('agreement.payments.payee')}: ${getBilingualValue(payment, 'egcs_fc_payeename', t('agreement.payments.payee_unattributed'))}`, payment.egcs_fc_currency.toUpperCase()]"
             :badges="[{
               variant: 'amount',
               label: formatMoney(payment.egcs_fc_paymentamount)
@@ -304,6 +304,7 @@ const handleCompleted = async () => {
               <CommonRouteTabs v-model="selectedTab" :items="tabs" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
             </template>
             <CommonSection v-if="selectedTab === 'lines'" :title="t('agreement.payments.lines_title')" :grid-cols="1">
+              <AgreementPaymentRecoverySummary :payment="payment" />
               <div class="space-y-4">
                 <div class="flex justify-end">
                   <UButton
