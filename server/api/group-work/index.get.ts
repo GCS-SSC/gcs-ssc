@@ -23,6 +23,7 @@ type GroupWorkRow = {
   group_name_en: string
   group_name_fr: string
   agreement_id: string | null
+  proponent_id: string | null
   claimed_by: string | null
   total_count: number
 }
@@ -69,8 +70,22 @@ export default defineEventHandler(async event => {
     const intakeRead = scopedAccess('funding_case', 'read', 'intake_program.egcs_tp_agency', 'intake_program.id')
     const intakeUpdate = scopedAccess('funding_case', 'update', 'intake_program.egcs_tp_agency', 'intake_program.id')
     const agencyRead = scopedAccess('agency', 'read', 'review_agency.id', 'review_agency.id')
-    const work = await sql<GroupWorkRow>`
-      WITH active_membership AS (
+    const creditMemoReadPredicates = grants.filter(grant => grant.subject === 'account_receivable' && grant.action === 'read').flatMap(grant => {
+      if (grant.scope.type === 'global') return [sql`TRUE`]
+      if (grant.scope.type === 'agency') return [sql`credit_memo.egcs_fc_agency = ${grant.scope.agencyId}::bigint`]
+      return []
+    })
+    const creditMemoRead = creditMemoReadPredicates.length
+      ? sql`(${sql.join(creditMemoReadPredicates, sql` OR `)})`
+      : sql`FALSE`
+    /**
+     * Reads one page after exact group participation and live owner validation.
+     * @param limit Maximum rows to return.
+     * @param offset Rows to skip.
+     * @returns The page with its complete filtered count.
+     */
+    const executePage = async (limit: number, offset: number) => await sql<GroupWorkRow>`
+      WITH RECURSIVE active_membership AS (
         SELECT member.egcs_cn_group FROM "Common_Group_Member" member
         JOIN "Common_Group" grp ON grp.id = member.egcs_cn_group AND grp._deleted = false
         WHERE member.egcs_cn_user = ${actor.id}::bigint AND member._deleted = false
@@ -121,34 +136,54 @@ export default defineEventHandler(async event => {
           AND NOT EXISTS (SELECT 1 FROM "Common_Completion" completion
             WHERE completion.egcs_cn_entitytype = 'fundingcaseintake'
               AND completion.egcs_cn_entityid = intake.id AND completion._deleted = false)
+      ), source(kind, work_id, entity_id, entity_type) AS (
+        SELECT work.kind, work.id, work.entity_id, work.entity_type::text FROM work
+        UNION
+        SELECT source.kind, source.work_id, edge.entity_id, edge.entity_type FROM source
+        JOIN (
+          SELECT review.id, 'commonreview'::text source_type, review_set.egcs_cn_entityid entity_id,
+            review_set.egcs_cn_entitytype::text entity_type
+          FROM "Common_Review" review
+          JOIN "Common_Review_Set" review_set ON review_set.id=review.egcs_cn_reviewset AND NOT review_set._deleted
+          WHERE NOT review._deleted
+          UNION ALL
+          SELECT recommendation.id, 'commonrecommendation', recommendation.egcs_cn_entityid,
+            recommendation.egcs_cn_entitytype::text FROM "Common_Recommendation" recommendation
+          WHERE NOT recommendation._deleted
+        ) edge ON edge.id=source.entity_id AND edge.source_type=source.entity_type
+      ), credit_memo_sources AS (
+        SELECT DISTINCT kind, work_id, entity_id FROM source
+        WHERE entity_type='fundingcaseaccountreceivablecreditmemo'
       )
       SELECT work.*, grp.egcs_cn_name_en group_name_en, grp.egcs_cn_name_fr group_name_fr,
         CASE WHEN work.kind IN ('approval', 'intake') THEN work.name_en ELSE review_schema.egcs_cn_name_en END detail_name_en,
         CASE WHEN work.kind IN ('approval', 'intake') THEN work.name_fr ELSE review_schema.egcs_cn_name_fr END detail_name_fr,
         COALESCE(
           CASE WHEN ${agreementRead} THEN to_jsonb(agreement)->>'egcs_fc_agreementnumber' END,
-          CASE WHEN ${proponentRead} AND proponent.id IS NOT NULL THEN COALESCE(
+          CASE WHEN (${proponentRead} AND memo_source.work_id IS NULL OR ${creditMemoRead} AND credit_memo.id IS NOT NULL)
+            AND proponent.id IS NOT NULL THEN COALESCE(
             to_jsonb(proponent)->>'egcs_ar_legalname_en', to_jsonb(proponent)->>'egcs_ar_operatingname_en',
             to_jsonb(proponent)->>'egcs_ar_legalname_fr', to_jsonb(proponent)->>'egcs_ar_operatingname_fr', '#' || proponent.id::text) END,
           CASE WHEN ${streamRead} THEN to_jsonb(stream)->>'egcs_tp_name_en' END,
           CASE WHEN ${intakeRead} THEN to_jsonb(intake_opportunity)->>'egcs_fo_name_en' END,
           CASE WHEN agreement.id IS NULL AND proponent.id IS NULL AND stream.id IS NULL
-            AND ${agencyRead} THEN to_jsonb(review_agency)->>'egcs_ay_name_en' END) parent_en,
+            AND memo_source.work_id IS NULL AND ${agencyRead} THEN to_jsonb(review_agency)->>'egcs_ay_name_en' END) parent_en,
         COALESCE(
           CASE WHEN ${agreementRead} THEN to_jsonb(agreement)->>'egcs_fc_agreementnumber' END,
-          CASE WHEN ${proponentRead} AND proponent.id IS NOT NULL THEN COALESCE(
+          CASE WHEN (${proponentRead} AND memo_source.work_id IS NULL OR ${creditMemoRead} AND credit_memo.id IS NOT NULL)
+            AND proponent.id IS NOT NULL THEN COALESCE(
             to_jsonb(proponent)->>'egcs_ar_legalname_fr', to_jsonb(proponent)->>'egcs_ar_operatingname_fr',
             to_jsonb(proponent)->>'egcs_ar_legalname_en', to_jsonb(proponent)->>'egcs_ar_operatingname_en', '#' || proponent.id::text) END,
           CASE WHEN ${streamRead} THEN to_jsonb(stream)->>'egcs_tp_name_fr' END,
           CASE WHEN ${intakeRead} THEN to_jsonb(intake_opportunity)->>'egcs_fo_name_fr' END,
           CASE WHEN agreement.id IS NULL AND proponent.id IS NULL AND stream.id IS NULL
-            AND ${agencyRead} THEN to_jsonb(review_agency)->>'egcs_ay_name_fr' END) parent_fr,
+            AND memo_source.work_id IS NULL AND ${agencyRead} THEN to_jsonb(review_agency)->>'egcs_ay_name_fr' END) parent_fr,
         CASE
+          WHEN memo_source.work_id IS NOT NULL THEN NULL
           WHEN work.entity_type = 'fundingcaseagreement' THEN work.entity_id
           WHEN work.entity_type = 'fundingcaseagreementclaim' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Claim" WHERE id = work.entity_id)
           WHEN work.entity_type = 'fundingcasejournalvoucher' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Journal_Voucher" WHERE id = work.entity_id)
           WHEN work.entity_type = 'fundingcaseaccountreceivable' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Account_Receivable" WHERE id = work.entity_id AND NOT _deleted)
-          WHEN work.entity_type = 'fundingcaseaccountreceivablecreditmemo' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Account_Receivable_Credit_Memo" WHERE id = work.entity_id AND NOT _deleted)
           WHEN work.entity_type = 'fundingcasecorrection' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Correction" WHERE id = work.entity_id AND _deleted = false)
           WHEN work.entity_type = 'fundingcasepayment' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Payment" WHERE id = work.entity_id)
           WHEN work.entity_type = 'fundingcaseforecast' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Forecast" WHERE id = work.entity_id)
@@ -158,9 +193,14 @@ export default defineEventHandler(async event => {
           WHEN work.entity_type = 'fundingcaseamendment' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Amendment" WHERE id = work.entity_id)
           ELSE NULL
         END agreement_id,
+        credit_memo.egcs_fc_applicantrecipient::text proponent_id,
         count(*) OVER()::integer total_count
       FROM work LEFT JOIN active_membership member ON member.egcs_cn_group = work.group_id
       JOIN "Common_Group" grp ON grp.id = work.group_id
+      LEFT JOIN credit_memo_sources memo_source ON memo_source.kind=work.kind AND memo_source.work_id=work.id
+      LEFT JOIN "Funding_Case_Account_Receivable_Credit_Memo" credit_memo
+        ON credit_memo.id=memo_source.entity_id AND NOT credit_memo._deleted
+      LEFT JOIN "Agency_Profile" memo_agency ON memo_agency.id=credit_memo.egcs_fc_agency AND NOT memo_agency._deleted
       LEFT JOIN "Common_Recommendation" approval_recommendation ON approval_recommendation.id = work.entity_id
         AND work.kind = 'approval' AND work.entity_type = 'commonrecommendation'
       LEFT JOIN LATERAL (SELECT
@@ -184,7 +224,6 @@ export default defineEventHandler(async event => {
       LEFT JOIN "Funding_Case_Agreement_Correction" review_correction ON review_correction.id = source_review_set.egcs_cn_entityid
         AND source_review_set.egcs_cn_entitytype::text = 'fundingcasecorrection' AND review_correction._deleted = false
       LEFT JOIN "Funding_Case_Agreement_Account_Receivable" review_ar ON review_ar.id = source_review_set.egcs_cn_entityid AND source_review_set.egcs_cn_entitytype::text = 'fundingcaseaccountreceivable' AND NOT review_ar._deleted
-      LEFT JOIN "Funding_Case_Account_Receivable_Credit_Memo" review_cm ON review_cm.id = source_review_set.egcs_cn_entityid AND source_review_set.egcs_cn_entitytype::text = 'fundingcaseaccountreceivablecreditmemo' AND NOT review_cm._deleted
       LEFT JOIN "Funding_Case_Agreement_Payment" review_payment ON review_payment.id = source_review_set.egcs_cn_entityid
         AND source_review_set.egcs_cn_entitytype::text = 'fundingcasepayment'
       LEFT JOIN "Funding_Case_Agreement_Forecast" review_forecast ON review_forecast.id = source_review_set.egcs_cn_entityid
@@ -202,7 +241,7 @@ export default defineEventHandler(async event => {
         CASE WHEN source_review_set.egcs_cn_entitytype::text = 'fundingcaseagreement' THEN source_review_set.egcs_cn_entityid END,
         CASE WHEN review_binding.egcs_cn_ownertype = 'fundingcaseagreement' THEN review_binding.egcs_cn_ownerid END,
         review_claim.egcs_fc_fundingagreement, reconciled_claim.egcs_fc_fundingagreement,
-        review_ar.egcs_fc_fundingagreement, review_cm.egcs_fc_fundingagreement, review_jv.egcs_fc_fundingagreement, review_correction.egcs_fc_fundingagreement, review_payment.egcs_fc_fundingagreement, review_forecast.egcs_fc_fundingagreement,
+        review_ar.egcs_fc_fundingagreement, review_jv.egcs_fc_fundingagreement, review_correction.egcs_fc_fundingagreement, review_payment.egcs_fc_fundingagreement, review_forecast.egcs_fc_fundingagreement,
         review_monitor.egcs_fc_fundingagreement, review_commitment.egcs_fc_fundingagreement,
         review_amendment.egcs_fc_fundingagreement, review_closeout.egcs_fc_fundingagreement,
         CASE WHEN target.entity_type = 'fundingcaseagreementclaim' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Claim" WHERE id = target.entity_id) END,
@@ -210,7 +249,6 @@ export default defineEventHandler(async event => {
           JOIN "Funding_Case_Agreement_Claim" claim ON claim.id = reconcile.egcs_fc_fundingagreementclaim WHERE reconcile.id = target.entity_id) END,
         CASE WHEN target.entity_type = 'fundingcasejournalvoucher' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Journal_Voucher" WHERE id = target.entity_id) END,
         CASE WHEN target.entity_type = 'fundingcaseaccountreceivable' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Account_Receivable" WHERE id = target.entity_id AND NOT _deleted) END,
-        CASE WHEN target.entity_type = 'fundingcaseaccountreceivablecreditmemo' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Account_Receivable_Credit_Memo" WHERE id = target.entity_id AND NOT _deleted) END,
         CASE WHEN target.entity_type = 'fundingcasecorrection' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Correction" WHERE id = target.entity_id AND _deleted = false) END,
         CASE WHEN target.entity_type = 'fundingcasepayment' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Payment" WHERE id = target.entity_id) END,
         CASE WHEN target.entity_type = 'fundingcaseforecast' THEN (SELECT egcs_fc_fundingagreement FROM "Funding_Case_Agreement_Forecast" WHERE id = target.entity_id) END,
@@ -224,6 +262,7 @@ export default defineEventHandler(async event => {
       LEFT JOIN "Transfer_Payment_Profile" agreement_program ON agreement_program.id = agreement_stream.egcs_tp_transferpaymentprofile
         AND agreement_program._deleted = false
       LEFT JOIN "Applicant_Recipient_Profile" proponent ON proponent.id = CASE
+        WHEN credit_memo.id IS NOT NULL THEN credit_memo.egcs_fc_applicantrecipient
         WHEN target.entity_type = 'applicantrecipient' THEN target.entity_id
         WHEN source_review_set.egcs_cn_entitytype::text = 'applicantrecipient' THEN source_review_set.egcs_cn_entityid
         WHEN review_binding.egcs_cn_ownertype = 'applicantrecipient' THEN review_binding.egcs_cn_ownerid END
@@ -244,16 +283,20 @@ export default defineEventHandler(async event => {
         AND intake_program._deleted = false
       WHERE ((${query.view} = 'mine' AND work.claimed_by = ${actor.id}::bigint)
         OR (${query.view} = 'available' AND work.claimed_by IS NULL AND member.egcs_cn_group IS NOT NULL))
+        AND (memo_source.work_id IS NULL OR (credit_memo.id IS NOT NULL AND memo_agency.id IS NOT NULL AND proponent.id IS NOT NULL))
         AND (work.kind <> 'intake' OR (${query.view} = 'mine' AND ${intakeRead})
           OR (${query.view} = 'available' AND ${intakeUpdate}))
       ORDER BY work.kind, work.id
-      LIMIT ${query.limit} OFFSET ${(query.page - 1) * query.limit}
+      LIMIT ${limit} OFFSET ${offset}
     `.execute(trx)
+    const offset = (query.page - 1) * query.limit
+    const work = await executePage(query.limit, offset)
+    const countProbe = !work.rows.length && offset > 0 ? await executePage(1, 0) : null
     return {
       items: work.rows.map(row => ({ ...row, id: String(row.id), entity_id: String(row.entity_id), review_id: row.review_id ? String(row.review_id) : null,
         group_id: String(row.group_id), claimed_by: row.claimed_by ? String(row.claimed_by) : null,
         agreement_id: row.agreement_id ? String(row.agreement_id) : null })),
-      total: work.rows[0]?.total_count ?? 0, page: query.page, limit: query.limit,
+      total: work.rows[0]?.total_count ?? countProbe?.rows[0]?.total_count ?? 0, page: query.page, limit: query.limit,
       has_membership: hasMembership
     }
   })

@@ -3,7 +3,7 @@ export type EntityApprovalSubmissionCapability = 'explicit' | 'on_completion' | 
 export type EntityStandardWorkflowCapability = 'explicit' | 'none'
 export type EntityRiskRatingCapability = 'explicit' | 'none'
 export type EntityWorkflowPurpose = 'standard' | 'approval_submission' | 'risk_rating'
-export type EntityOwnerKind = 'agreement' | 'proponent' | 'runtime_source' | 'funding_case'
+export type EntityOwnerKind = 'agreement' | 'proponent' | 'agency' | 'runtime_source' | 'funding_case'
 export type EntityAssignmentMode = 'independent' | 'inherited'
 
 export interface EntityBilingualLabel {
@@ -138,7 +138,7 @@ export const CORE_ENTITY_REGISTRY = {
   fundingcaseaccountreceivablecreditmemo: {
     label: { en: 'Accounts Receivable Credit Memo', fr: 'Note de crédit de compte débiteur' },
     completion: 'supported', approvalSubmission: 'on_completion', standardWorkflow: 'explicit', riskRating: 'none',
-    supportsDirectReviews: true, ownerKind: 'agreement', assignmentMode: 'independent',
+    supportsDirectReviews: true, ownerKind: 'agency', assignmentMode: 'independent',
     approvalSubmissionRequired: true, approvalSubmissionTerminalSuccess: true
   },
   fundingcasecorrection: {

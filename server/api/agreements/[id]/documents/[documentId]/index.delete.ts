@@ -25,13 +25,13 @@ export default defineEventHandler(async event => {
       .where('id', '=', documentId)
       .where('egcs_fc_fundingagreement', '=', agreementId)
       .where('_deleted', '=', false)
-      .select(['egcs_fc_generatedattachment', 'egcs_fc_closeout'])
+      .select(['egcs_fc_generatedattachment', 'egcs_fc_closeout', 'egcs_fc_amendment'])
       .executeTakeFirst()
 
     if (!generatedDocument) {
       return await notFound(event, 'DOCUMENT_NOT_FOUND', 'apiErrors.document_generation.document_not_found')
     }
-    if (generatedDocument.egcs_fc_closeout) {
+    if (generatedDocument.egcs_fc_closeout || generatedDocument.egcs_fc_amendment) {
       return await notFound(event, 'DOCUMENT_NOT_FOUND', 'apiErrors.document_generation.document_not_found')
     }
 

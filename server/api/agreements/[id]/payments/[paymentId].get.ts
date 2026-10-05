@@ -1,4 +1,5 @@
 import { readAccountReceivablePaymentOffset } from '~~/server/utils/account-receivable-recovery'
+import { requireAuthContext } from '~~/server/utils/authorize'
 import { sql } from 'kysely'
 import { prepareAgreementPaymentRoute } from '~~/server/utils/agreement-payment'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
@@ -21,7 +22,9 @@ export default defineEventHandler(async event => {
     return prepared
   }
 
-  const { agreementId, db } = prepared
+  const { agreementId, db, agreementContext } = prepared
+  const auth = await requireAuthContext(event)
+  const liveMemoBalances = auth.userAbilities.authorize('account_receivable', 'read', { type: 'agency', agencyId: agreementContext.agencyId })
   const payment = await db
     .selectFrom('Funding_Case_Agreement_Payment')
     .leftJoin('Applicant_Recipient_Profile as payee', 'payee.id', 'Funding_Case_Agreement_Payment.egcs_fc_applicantrecipient')
@@ -120,7 +123,7 @@ export default defineEventHandler(async event => {
 
   return {
     ...paymentWithState,
-    ...await readAccountReceivablePaymentOffset(db, paymentId),
+    ...await readAccountReceivablePaymentOffset(db, paymentId, { liveMemoBalances }),
     lines: lines.map(line => ({
       ...line,
       egcs_fc_amount: parseDatabaseMoney(line.egcs_fc_amount),

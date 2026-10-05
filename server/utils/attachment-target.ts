@@ -15,12 +15,14 @@ import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { resolveFundingCaseScope, type FundingOpportunityScope } from './funding-case'
 import { assertBusinessStatusMutationAllowed } from './business-status-runtime'
 import { canAccessCreditMemoTargetScopes } from './credit-memo-scope-authority'
+import { executeFreshAccountReceivableWrite, resolveAccountReceivableCreditMemoRuntimeContext } from './account-receivable-context'
 
 export interface ResolvedAttachmentTarget {
   target: AttachmentTarget
   agencyId: string
   agreementContext?: AgreementScopeContext
   fundingCaseScope?: FundingOpportunityScope
+  creditMemoContext?: NonNullable<Awaited<ReturnType<typeof resolveAccountReceivableCreditMemoRuntimeContext>>>
 }
 
 export const resolveAttachmentTarget = async (
@@ -30,6 +32,10 @@ export const resolveAttachmentTarget = async (
 ): Promise<ResolvedAttachmentTarget | null> => {
   const owner = await resolveEntityAssignmentOwner(db, target.entityType, target.entityId)
   if (!owner) return null
+  if (owner.kind === 'agency' && owner.subject === 'account_receivable' && target.entityType === 'fundingcaseaccountreceivablecreditmemo') {
+    const creditMemoContext = await resolveAccountReceivableCreditMemoRuntimeContext(db, target.entityId)
+    return creditMemoContext ? { target, agencyId: owner.agencyId, creditMemoContext } : null
+  }
   if (owner.kind === 'applicant_recipient') {
     if (!selectedAgencyId || !isPositivePostgresBigintText(selectedAgencyId)) return null
     const agency = await db.selectFrom('Agency_Profile').select('id')
@@ -56,13 +62,15 @@ export const authorizeAttachmentTarget = async (
   const resolved = await resolveAttachmentTarget(event.context.$db, target,
     typeof selectedAgencyId === 'string' ? selectedAgencyId : undefined)
   if (!resolved) return await notFound(event, 'ATTACHMENT_TARGET_NOT_FOUND', 'apiErrors.attachments.target_not_found')
-  const permitted = resolved.fundingCaseScope
-    ? auth.userAbilities.authorize('funding_case', action, resolved.fundingCaseScope.scope)
-    : resolved.agreementContext
-      ? auth.userAbilities.authorize((target.entityType === 'fundingcaseaccountreceivable' || target.entityType === 'fundingcaseaccountreceivablecreditmemo') ? 'account_receivable' : target.entityType === 'fundingcasecorrection' ? 'correction' : target.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement', action, resolved.agreementContext.scope)
-      : await canAccessApplicantRecipient(auth, target.entityId, action, event.context.$db)
-        && auth.userAbilities.authorize('applicant_recipient', action,
-          { type: 'agency', agencyId: resolved.agencyId })
+  const permitted = resolved.creditMemoContext
+    ? auth.userAbilities.authorize('account_receivable', action, resolved.creditMemoContext.scope)
+    : resolved.fundingCaseScope
+      ? auth.userAbilities.authorize('funding_case', action, resolved.fundingCaseScope.scope)
+      : resolved.agreementContext
+        ? auth.userAbilities.authorize((target.entityType === 'fundingcaseaccountreceivable' || target.entityType === 'fundingcaseaccountreceivablecreditmemo') ? 'account_receivable' : target.entityType === 'fundingcasecorrection' ? 'correction' : target.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement', action, resolved.agreementContext.scope)
+        : await canAccessApplicantRecipient(auth, target.entityId, action, event.context.$db)
+          && auth.userAbilities.authorize('applicant_recipient', action,
+            { type: 'agency', agencyId: resolved.agencyId })
   if (!permitted || !await canAccessCreditMemoTargetScopes(event.context.$db, auth, target.entityType, target.entityId, action)) return await forbidden(event)
   if (action !== 'read') await authorizeAssignedTarget(event, target)
   return { auth, resolved }
@@ -79,13 +87,15 @@ export const authorizeFreshAttachmentTarget = async (
   const resolved = await resolveAttachmentTarget(db, target,
     typeof selectedAgencyId === 'string' ? selectedAgencyId : undefined)
   if (!resolved) return await notFound(event, 'ATTACHMENT_TARGET_NOT_FOUND', 'apiErrors.attachments.target_not_found')
-  const permitted = resolved.fundingCaseScope
-    ? auth.userAbilities.authorize('funding_case', action, resolved.fundingCaseScope.scope)
-    : resolved.agreementContext
-      ? auth.userAbilities.authorize((target.entityType === 'fundingcaseaccountreceivable' || target.entityType === 'fundingcaseaccountreceivablecreditmemo') ? 'account_receivable' : target.entityType === 'fundingcasecorrection' ? 'correction' : target.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement', action, resolved.agreementContext.scope)
-      : await canAccessApplicantRecipient(auth, target.entityId, action, db)
-        && auth.userAbilities.authorize('applicant_recipient', action,
-          { type: 'agency', agencyId: resolved.agencyId })
+  const permitted = resolved.creditMemoContext
+    ? auth.userAbilities.authorize('account_receivable', action, resolved.creditMemoContext.scope)
+    : resolved.fundingCaseScope
+      ? auth.userAbilities.authorize('funding_case', action, resolved.fundingCaseScope.scope)
+      : resolved.agreementContext
+        ? auth.userAbilities.authorize((target.entityType === 'fundingcaseaccountreceivable' || target.entityType === 'fundingcaseaccountreceivablecreditmemo') ? 'account_receivable' : target.entityType === 'fundingcasecorrection' ? 'correction' : target.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement', action, resolved.agreementContext.scope)
+        : await canAccessApplicantRecipient(auth, target.entityId, action, db)
+          && auth.userAbilities.authorize('applicant_recipient', action,
+            { type: 'agency', agencyId: resolved.agencyId })
   if (!permitted || !await canAccessCreditMemoTargetScopes(db, auth, target.entityType, target.entityId, action)) return await forbidden(event)
   return { auth, resolved }
 }
@@ -104,6 +114,16 @@ export const executeFreshAuthorizedAttachmentWrite = async <T>(
   const agencyId = typeof selectedAgencyId === 'string' ? selectedAgencyId : undefined
   const initial = await resolveAttachmentTarget(event.context.$db, target, agencyId)
   if (!initial) return await notFound(event, 'ATTACHMENT_TARGET_NOT_FOUND', 'apiErrors.attachments.target_not_found')
+  if (target.entityType === 'fundingcaseaccountreceivablecreditmemo' && initial.creditMemoContext) {
+    const creditMemoTarget = { entityType: 'fundingcaseaccountreceivablecreditmemo' as const, entityId: target.entityId }
+    return await executeFreshAccountReceivableWrite(event, initial.creditMemoContext, async (trx, auth) => {
+      const fresh = await resolveAttachmentTarget(trx, target)
+      if (!fresh?.creditMemoContext || fresh.agencyId !== initial.agencyId
+        || fresh.creditMemoContext.poolId !== initial.creditMemoContext?.poolId) return await forbidden(event)
+      await assertBusinessStatusMutationAllowed(event, trx, creditMemoTarget.entityType, creditMemoTarget.entityId)
+      return await callback(trx, auth, fresh)
+    }, { action, target: creditMemoTarget })
+  }
 
   if (target.entityType === 'applicantrecipient') {
     return await executeFreshAuthorizedApplicantRecipientWrite(

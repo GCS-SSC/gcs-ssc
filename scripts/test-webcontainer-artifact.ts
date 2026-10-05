@@ -77,8 +77,11 @@ const EXPECTED_CORE_MIGRATIONS = [
   '0250_journal_vouchers',
   '0260_corrections',
   '0270_accounts_receivable',
+  '0300_accounts_receivable_offset_memos',
+  '0310_proponent_credit_ledger',
   '0240_seed',
-  '0280_seed_accounts_receivable'
+  '0280_seed_accounts_receivable',
+  '0290_seed_accounts_receivable_credit_memos'
 ] as const
 
 const EXPECTED_SEEDED_EXTENSION_KEYS = [

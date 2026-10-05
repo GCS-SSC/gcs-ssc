@@ -170,7 +170,7 @@ const items = computed(
         ...(canViewAssignmentManagement.value
           ? [{
               label: t('nav.assignment_management'),
-              icon: 'i-lucide-users-round',
+              icon: 'i-lucide-user-round-check',
               to: localePath(appRouteLocations.assignmentManagement())
             }]
           : []),
@@ -193,7 +193,7 @@ const items = computed(
         ...(canViewGroups.value
           ? [{ label: t('nav.groups'), icon: 'i-lucide-users', to: localePath(appRouteLocations.groups()) }]
           : []),
-        ...(canViewAudit.value ? [{ label: t('audit.title'), icon: 'i-lucide-history', to: localePath('/admin/audit') }] : []),
+        ...(canViewAudit.value ? [{ label: t('audit.title'), icon: 'i-lucide-clipboard-list', to: localePath('/admin/audit') }] : []),
         ...(canViewAdminGwcoa.value
           ? [
               {

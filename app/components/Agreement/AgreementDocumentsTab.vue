@@ -9,12 +9,13 @@ import { AgreementDocumentGenerateSchema } from '~~/shared/types/schemas'
 import type { AgreementGeneratedDocumentItem, TransferPaymentStreamDocumentTemplateItem } from '~~/shared/types/schemas'
 import type { TransferPaymentDocumentTemplateOutputFormat } from '~~/shared/types/database'
 
-const { agreementId, canCreate = false, canDelete = false } = defineProps<{
+const { agreementId, amendmentId, canCreate = false, canDelete = false } = defineProps<{
   agreementId: string
+  amendmentId?: string
   canCreate?: boolean
   canDelete?: boolean
 }>()
-const agreementIdRef = computed(() => agreementId)
+const apiBase = computed(() => amendmentId ? `/api/agreements/${agreementId}/amendments/${amendmentId}` : `/api/agreements/${agreementId}`)
 
 const { t, locale } = useI18n()
 const validateGenerate = useZodI18n().createValidator(AgreementDocumentGenerateSchema)
@@ -33,7 +34,7 @@ const {
   search,
   pagination
 } = useResourceTable<AgreementGeneratedDocumentItem>({
-  fetchUrl: computed(() => `/api/agreements/${agreementId}/documents`)
+  fetchUrl: computed(() => `${apiBase.value}/documents`)
 })
 
 const templates: Ref<TransferPaymentStreamDocumentTemplateItem[]> = ref([])
@@ -42,22 +43,22 @@ let templateGeneration = 0
 
 const refreshTemplates = async () => {
   const generation = ++templateGeneration
-  const requestedAgreementId = agreementId
+  const requestedApiBase = apiBase.value
   templatesStatus.value = 'pending'
   try {
-    const response = await fetch(getClientRequestUrl(`/api/agreements/${requestedAgreementId}/document-templates`))
+    const response = await fetch(getClientRequestUrl(`${requestedApiBase}/document-templates`))
     if (!response.ok) await throwFetchResponseError(response)
     const data = await response.json() as { items: TransferPaymentStreamDocumentTemplateItem[] }
-    if (generation !== templateGeneration || requestedAgreementId !== agreementId) return
+    if (generation !== templateGeneration || requestedApiBase !== apiBase.value) return
     templates.value = data.items
     templatesStatus.value = 'success'
   } catch (error: unknown) {
-    if (generation !== templateGeneration || requestedAgreementId !== agreementId) return
+    if (generation !== templateGeneration || requestedApiBase !== apiBase.value) return
     templatesStatus.value = 'error'
     showError(error)
   }
 }
-watch(agreementIdRef, () => {
+watch(apiBase, () => {
   isGenerateOpen.value = false
   generateState.value = null
   templates.value = []
@@ -100,7 +101,7 @@ watch(() => generateState.value?.templateId, () => {
 
 const downloadDocument = async (generatedDocument: AgreementGeneratedDocumentItem) => {
   try {
-    const response = await fetch(getClientRequestUrl(`/api/agreements/${agreementId}/documents/${generatedDocument.id}/download`))
+    const response = await fetch(getClientRequestUrl(`${apiBase.value}/documents/${generatedDocument.id}/download`))
     if (!response.ok) await throwFetchResponseError(response)
     const blob = await response.blob()
     const disposition = response.headers.get('content-disposition') || ''
@@ -126,7 +127,7 @@ const generateDocument = async () => {
 
   try {
     isGenerating.value = true
-    const response = await fetch(getClientRequestUrl(`/api/agreements/${agreementId}/documents/generate`), {
+    const response = await fetch(getClientRequestUrl(`${apiBase.value}/documents/generate`), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(generateState.value)
@@ -144,7 +145,7 @@ const generateDocument = async () => {
 
 const deleteDocument = async (generatedDocument: AgreementGeneratedDocumentItem) => {
   try {
-    const ok = await confirmDeleteRequest(`/api/agreements/${agreementId}/documents/${generatedDocument.id}`)
+    const ok = await confirmDeleteRequest(`${apiBase.value}/documents/${generatedDocument.id}`)
     if (!ok) return
     await refresh()
     toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })

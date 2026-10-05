@@ -31,7 +31,9 @@ export const replaceWorkflowConditions = async (
   const custom = conditions.filter((condition): condition is CustomFieldCondition => 'fieldId' in condition)
   const profile = conditions.filter(condition => 'source' in condition)
   if (profile.length) {
-    const choices = await readWorkflowProfileChoices(trx, agencyId)
+    const choices = await readWorkflowProfileChoices(trx, agencyId, {
+      amendmentSubtypeIds: [...new Set(profile.flatMap(condition => condition.source === 'amendment_subtype' ? condition.optionIds : []))]
+    })
     try {
       profile.forEach(condition => resolveWorkflowProfileCondition(condition, choices))
     } catch {

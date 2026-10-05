@@ -76,12 +76,15 @@ export const PRODUCTION_CORE_MIGRATIONS = [
   '0230_intake_registry_identity',
   '0250_journal_vouchers',
   '0260_corrections',
-  '0270_accounts_receivable'
+  '0270_accounts_receivable',
+  '0300_accounts_receivable_offset_memos',
+  '0310_proponent_credit_ledger'
 ] as const
 
 export const PROHIBITED_PRODUCTION_BUNDLE_VALUES = [
   '0240_seed',
   '0280_seed_accounts_receivable',
+  '0290_seed_accounts_receivable_credit_memos',
   'root@example.com',
   'agency@example.com',
   'password123',
@@ -631,7 +634,7 @@ const waitForProductionMigrations = async (
   artifact: RunningArtifact,
   timeoutMs: number = DEFAULT_START_TIMEOUT_MS
 ): Promise<void> => {
-  const expectedLine = 'migration "0270_accounts_receivable" was executed successfully'
+  const expectedLine = 'migration "0310_proponent_credit_ledger" was executed successfully'
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     const output = artifact.output()
@@ -664,7 +667,7 @@ const waitForDatabaseUrlPrecedence = async (
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     const output = artifact.output()
-    if (output.includes('migration "0270_accounts_receivable" was executed successfully')) {
+    if (output.includes('migration "0310_proponent_credit_ledger" was executed successfully')) {
       throw new Error(`PGLite unexpectedly won precedence over runtime DATABASE_URL.\n${output}`)
     }
     if (output.includes('failed to migrate')) {

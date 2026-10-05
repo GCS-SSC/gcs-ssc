@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AssignedWorkItem } from '~~/shared/types/assigned-work'
 import { buildAssignedWorkRoute } from '~~/shared/utils/entity-assignments'
+import { appRouteLocations } from '~/utils/route-locations'
 
 type WorkItem = AssignedWorkItem
 
@@ -8,7 +9,18 @@ const { items, compact = false, emptyMessage } = defineProps<{ items: WorkItem[]
 const { t } = useI18n()
 const localePath = useLocalePath()
 const { getBilingualValue } = useBilingualValue()
-const itemUrl = (item: WorkItem) => localePath(buildAssignedWorkRoute(item.entity_type, item.entity_id, item.agreement_id, item.variant))
+/**
+ * Resolves work navigation through its independently owned localized route.
+ * @param item Assigned work item and its explicit owner context.
+ * @returns Localized detail route.
+ */
+const itemUrl = (item: WorkItem) => {
+  if (item.entity_type === 'fundingcaseaccountreceivablecreditmemo') {
+    if (!item.proponent_id) throw new Error('Missing Proponent route context for Credit Memo')
+    return localePath(appRouteLocations.proponentCreditMemoDetail(item.proponent_id, item.entity_id))
+  }
+  return localePath(buildAssignedWorkRoute(item.entity_type, item.entity_id, item.agreement_id, item.variant))
+}
 const monthKeys = ['apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec', 'jan', 'feb', 'mar'] as const
 /**
  * Builds the main line with its owning business identity.

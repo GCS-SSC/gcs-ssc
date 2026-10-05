@@ -22,6 +22,8 @@ export type AssignedWorkItem = BusinessRecordStateFields & {
   payment_type: string | null
   is_primary: boolean
   agreement_id: string | null
+  proponent_id?: string | null
+  url?: string
   variant: string | null
 }
 
@@ -41,4 +43,5 @@ export type GroupWorkItem = {
   group_name_en: string
   group_name_fr: string
   agreement_id: string | null
+  proponent_id?: string | null
 }

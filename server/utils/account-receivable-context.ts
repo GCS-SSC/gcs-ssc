@@ -31,15 +31,22 @@ export const resolveAccountReceivableCreditMemoRuntimeContext = async (db: Kysel
   const row = await db.selectFrom('Funding_Case_Account_Receivable_Credit_Memo').selectAll()
     .where('id', '=', id).where('_deleted', '=', false).executeTakeFirst()
   if (!row) return null
-  const context = await resolveAgreementScopeContext(String(row.egcs_fc_fundingagreement), db)
-  if (!context || context.agencyId !== String(row.egcs_fc_agency)) return null
-  const allocations = await db.selectFrom('Funding_Case_Account_Receivable_Allocation as allocation')
-    .innerJoin('Funding_Case_Account_Receivable_Recovery as recovery', 'recovery.id', 'allocation.egcs_fc_recovery')
-    .select('allocation.egcs_fc_fundingagreement')
-    .where('recovery.egcs_fc_creditmemo', '=', id).where('allocation._deleted', '=', false).execute()
-  return { ...context, creditMemoId: id, poolId: String(row.egcs_fc_pool),
+  const agencyId = String(row.egcs_fc_agency)
+  const pool = await db.selectFrom('Funding_Case_Account_Receivable_Pool as pool')
+    .innerJoin('Agency_Profile as agency', 'agency.id', 'pool.egcs_fc_agency')
+    .innerJoin('Applicant_Recipient_Profile as proponent', 'proponent.id', 'pool.egcs_fc_applicantrecipient')
+    .select('pool.id').where('pool.id', '=', String(row.egcs_fc_pool))
+    .where('pool.egcs_fc_agency', '=', agencyId).where('pool.egcs_fc_applicantrecipient', '=', String(row.egcs_fc_applicantrecipient))
+    .where('pool.egcs_fc_currency', '=', row.egcs_fc_currency)
+    .where('pool._deleted', '=', false).where('agency._deleted', '=', false).where('proponent._deleted', '=', false).executeTakeFirst()
+  if (!pool) return null
+  // The old Agreement is retained provenance, never the memo's current owner.
+  const historicalContext = row.egcs_fc_fundingagreement ? await resolveAgreementScopeContext(String(row.egcs_fc_fundingagreement), db) : null
+  const context = historicalContext?.agencyId === agencyId ? historicalContext : null
+  return { agreementId: context?.agreementId, streamId: context?.streamId, profileId: context?.profileId,
+    agencyId, scope: { type: 'agency' as const, agencyId }, creditMemoId: id, poolId: String(row.egcs_fc_pool),
     applicantRecipientId: String(row.egcs_fc_applicantrecipient), currency: row.egcs_fc_currency,
-    agreementIds: [...new Set([context.agreementId, ...allocations.map(item => String(item.egcs_fc_fundingagreement))])] }
+    agreementIds: [] as string[] }
 }
 
 /** Called before any Agreement lock; the pool serializes recovery and debt policy changes. */
@@ -77,6 +84,7 @@ export const executeFreshAccountReceivableWrite = async <T>(
   if (initial.some(context => !context || context.agencyId !== identity.agencyId)) return await notFound(event, 'ACCOUNT_RECEIVABLE_NOT_FOUND', 'apiErrors.account_receivable.not_found')
   return await event.context.$db.transaction().execute(async trx => {
     const auth = await requireFreshAuthContext(event, trx)
+    if (!identity.agreementIds.length && !auth.userAbilities.authorize('account_receivable', options.action ?? 'update', { type: 'agency', agencyId: identity.agencyId })) return await forbidden(event)
     const streams = [...new Set(initial.flatMap(context => context ? [context.streamId] : []))]
     await lockRegisteredExtensionAgreementScopes(trx, identity.agencyId, streams)
     const agency = await trx.selectFrom('Agency_Profile').select('id').where('id', '=', identity.agencyId)
@@ -87,7 +95,7 @@ export const executeFreshAccountReceivableWrite = async <T>(
     const poolDebts = await trx.selectFrom('Funding_Case_Agreement_Account_Receivable').select('egcs_fc_fundingagreement')
       .where('egcs_fc_pool', '=', String(pool.id)).where('_deleted', '=', false).execute()
     const lockIds = [...new Set([...identity.agreementIds, ...poolDebts.map(row => String(row.egcs_fc_fundingagreement))])]
-    await trx.selectFrom('Funding_Case_Agreement_Profile').select('id').where('id', 'in', lockIds).orderBy('id').forUpdate().execute()
+    if (lockIds.length) await trx.selectFrom('Funding_Case_Agreement_Profile').select('id').where('id', 'in', lockIds).orderBy('id').forUpdate().execute()
     for (let index = 0; index < identity.agreementIds.length; index += 1) {
       const id = identity.agreementIds[index]!
       const context = await resolveAgreementScopeContext(id, trx)

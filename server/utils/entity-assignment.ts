@@ -18,6 +18,7 @@ import { loadExtensionLifecycleEntity, isExtensionEnabledForAgency, isExtensionE
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { resolveFundingCaseScope } from './funding-case'
 import { canAccessCreditMemoTargetScopes, resolveCreditMemoAuthorityTarget } from './credit-memo-scope-authority'
+import { resolveAccountReceivableCreditMemoRuntimeContext } from './account-receivable-context'
 
 export const createPrimaryEntityAssignment = async (
   trx: Transaction<Database>,
@@ -213,8 +214,11 @@ const resolveSourceOwner = async (
   if (source.entityType === 'transferpaymentstream') {
     return await resolveStreamOwner(db, source.entityId)
   }
+  if (source.entityType === 'fundingcaseaccountreceivablecreditmemo') {
+    return await resolveEntityAssignmentOwner(db, source.entityType, source.entityId)
+  }
   const agreementId = await resolveAgreementIdFromEntity(db, source.entityType, source.entityId)
-  if (agreementId) return await resolveAgreementOwner(db, agreementId, (source.entityType === 'fundingcaseaccountreceivable' || source.entityType === 'fundingcaseaccountreceivablecreditmemo') ? 'account_receivable' : source.entityType === 'fundingcasecorrection' ? 'correction' : source.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement')
+  if (agreementId) return await resolveAgreementOwner(db, agreementId, source.entityType === 'fundingcaseaccountreceivable' ? 'account_receivable' : source.entityType === 'fundingcasecorrection' ? 'correction' : source.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement')
   if (source.target?.entityType === 'fundingcaseintake') {
     return await resolveEntityAssignmentOwner(db, 'fundingcaseintake', source.target.entityId)
   }
@@ -236,6 +240,12 @@ export const resolveEntityAssignmentOwner = async (
   entityId: string
 ): Promise<AuthorizationResourceOwner | null> => {
   if (!isPositivePostgresBigintText(entityId)) return null
+  if (entityType === 'fundingcaseaccountreceivablecreditmemo') {
+    const context = await resolveAccountReceivableCreditMemoRuntimeContext(db, entityId)
+    if (!context) return null
+    if (context.scope.type === 'agency') return { kind: 'agency', subject: 'account_receivable', agencyId: context.agencyId }
+    return context.agreementId ? await resolveAgreementOwner(db, context.agreementId, 'account_receivable') : null
+  }
   const policy = getEntityAuthorizationPolicy(entityType)
   if (policy.ownerResolver === 'applicant_recipient') return await resolveApplicantRecipientOwner(db, entityId)
   if (policy.ownerResolver === 'funding_case') {
@@ -339,7 +349,7 @@ export const canAccessEntityAssignmentOwner = async (
       ]
     })
   }
-  return context.userAbilities.authorize('agency', action, { type: 'agency', agencyId: owner.agencyId })
+  return context.userAbilities.authorize(owner.subject ?? 'agency', action, { type: 'agency', agencyId: owner.agencyId })
 }
 
 export const canManageEntityAssignmentsWithContext = async (
@@ -371,6 +381,9 @@ export const canManageEntityAssignmentsWithContext = async (
   if (owner.kind === 'funding_case') {
     const caseScope = await resolveFundingCaseScope(db, owner.intakeId)
     return Boolean(caseScope && context.userAbilities.canManageAssignments('funding_case', caseScope.scope))
+  }
+  if (owner.kind === 'agency' && owner.subject === 'account_receivable') {
+    return context.userAbilities.canManageAssignments(owner.subject, { type: 'agency', agencyId: owner.agencyId })
   }
   return false
 }
@@ -569,7 +582,7 @@ export const resolveAgencyValidEntityAssigneeIdsWithDb = async (
     subject = 'funding_case'
     scope = caseScope.scope as AuthorizationScope
   } else {
-    subject = 'agency'
+    subject = owner.subject ?? 'agency'
     scope = { type: 'agency', agencyId: owner.agencyId } as const
   }
   const creditMemoId = await resolveCreditMemoAuthorityTarget(db, entityType, entityId)

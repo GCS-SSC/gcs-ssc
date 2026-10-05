@@ -189,7 +189,7 @@ const openUpdateLine = (line: FundingCaseAgreementPaymentLineRow) => {
 }
 
 const refreshPage = async () => {
-  await refreshPayment()
+  await Promise.all([refreshPayment(), receivableEntry.refresh()])
   approvalsRefreshKey.value += 1
 }
 

@@ -7,7 +7,7 @@ const { entityType, readonly = false, customFields, choices, loadError = false }
   entityType: string
   readonly?: boolean
   customFields: AgencyCustomFieldDefinition[]
-  choices: Partial<Record<Exclude<AgreementProfileCondition['source'], 'further_distribution' | typeof JV_WORKFLOW_BOOLEAN_SOURCES[number]>, { id: string, name_en: string, name_fr: string }[]>>
+  choices: Partial<Record<Exclude<AgreementProfileCondition['source'], 'further_distribution' | typeof JV_WORKFLOW_BOOLEAN_SOURCES[number]>, { id: string, name_en: string, name_fr: string, category_en?: string, category_fr?: string }[]>>
   loadError?: boolean
 }>()
 const emit = defineEmits<{ retry: [] }>()
@@ -24,7 +24,7 @@ const update = (fieldId: string, optionIds: string[]) => {
 }
 type Source = AgreementProfileCondition['source']
 const pendingSource: Ref<Source | null> = ref(null)
-const sources = computed<Source[]>(() => ['agreement_subtype', 'further_distribution', 'recipient_subtype', ...(entityType === 'fundingcasejournalvoucher' ? JV_WORKFLOW_BOOLEAN_SOURCES : [])])
+const sources = computed<Source[]>(() => ['agreement_subtype', 'amendment_subtype', 'further_distribution', 'recipient_subtype', ...(entityType === 'fundingcasejournalvoucher' ? JV_WORKFLOW_BOOLEAN_SOURCES : [])])
 const sourceItems = computed(() => sources.value.filter(source => !model.value.some(condition => 'source' in condition && condition.source === source))
   .map(id => ({ id, name_en: t(`workflow.conditions.${id}`, {}, { locale: 'en' }), name_fr: t(`workflow.conditions.${id}`, {}, { locale: 'fr' }) })))
 const profileRows = computed(() => model.value.flatMap((condition, index) => 'source' in condition ? [{ condition, index }] : []))
@@ -36,7 +36,7 @@ const addCondition = (source: Source | null) => {
   if (!source) return
   const condition: AgreementProfileCondition = source === 'further_distribution' || JV_WORKFLOW_BOOLEAN_SOURCES.includes(source as typeof JV_WORKFLOW_BOOLEAN_SOURCES[number])
     ? { source: source as 'further_distribution' | typeof JV_WORKFLOW_BOOLEAN_SOURCES[number], value: false }
-    : source === 'recipient_subtype' ? { source, quantifier: 'any', optionIds: [] } : { source: source as 'agreement_subtype', optionIds: [] }
+    : source === 'recipient_subtype' ? { source, quantifier: 'any', optionIds: [] } : { source: source as 'agreement_subtype' | 'amendment_subtype', optionIds: [] }
   model.value = [...model.value, condition]
   pendingSource.value = null
 }
@@ -111,7 +111,12 @@ const badges = computed(() => model.value.map(condition => {
         </UFormField>
         <template v-else>
           <UFormField :name="`conditions.${index}.optionIds`" :label="t(`workflow.conditions.${condition.source}`)" required>
-            <CommonBilingualMultiSelectMenu v-model="condition.optionIds" :items="choices?.[condition.source] ?? []" class="w-full" />
+            <CommonBilingualMultiSelectMenu
+              v-model="condition.optionIds"
+              :items="choices?.[condition.source] ?? []"
+              :category-en-key="condition.source === 'amendment_subtype' ? 'category_en' : undefined"
+              :category-fr-key="condition.source === 'amendment_subtype' ? 'category_fr' : undefined"
+              class="w-full" />
           </UFormField>
           <UFormField v-if="condition.source === 'recipient_subtype'" :name="`conditions.${index}.quantifier`" :label="t('workflow.conditions.quantifier')" required>
             <CommonBilingualSelectMenu v-model="condition.quantifier" :items="quantifierItems" class="w-full" />

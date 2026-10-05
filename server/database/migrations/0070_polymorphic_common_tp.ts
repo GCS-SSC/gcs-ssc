@@ -143,7 +143,8 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
     egcs_cn_standardworkflow: definition.standardWorkflow,
     egcs_cn_riskrating: definition.riskRating,
     egcs_cn_supportsdirectreviews: definition.supportsDirectReviews,
-    egcs_cn_ownerkind: definition.ownerKind,
+    // Later independent Agency owners are installed by their ordered upgrade.
+    egcs_cn_ownerkind: definition.ownerKind === 'agency' ? 'agreement' : definition.ownerKind,
     egcs_cn_assignmentmode: definition.assignmentMode,
     _deleted: false
   }))).onConflict(conflict => conflict.column('egcs_cn_type').doNothing()).execute()

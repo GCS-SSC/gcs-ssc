@@ -427,7 +427,8 @@ export type TransferPaymentAgreementSubtypeItem = WithId<TransferPaymentAgreemen
 
 export const TRANSFER_PAYMENT_DOCUMENT_TEMPLATE_ENTITY_TYPE_ENUM = [
   'fundingcaseagreement',
-  'fundingcaseagreementcloseout'
+  'fundingcaseagreementcloseout',
+  'fundingcaseamendment'
 ] as const satisfies readonly TransferPaymentDocumentTemplateEntityType[]
 export const TRANSFER_PAYMENT_DOCUMENT_TEMPLATE_KIND_ENUM = ['docx', 'html'] as const satisfies readonly TransferPaymentDocumentTemplateKind[]
 export const TRANSFER_PAYMENT_DOCUMENT_TEMPLATE_OUTPUT_FORMAT_ENUM = ['docx', 'html', 'pdf'] as const satisfies readonly TransferPaymentDocumentTemplateOutputFormat[]
@@ -554,6 +555,7 @@ export type AgreementDocumentGenerate = z.infer<typeof AgreementDocumentGenerate
 export type AgreementGeneratedDocumentItem = WithId<{
   egcs_fc_fundingagreement: string
   egcs_fc_closeout?: string | null
+  egcs_fc_amendment?: string | null
   egcs_fc_documenttemplate: string
   egcs_fc_generatedattachment: string
   egcs_fc_language: 'eng' | 'fra'

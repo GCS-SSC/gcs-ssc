@@ -7,16 +7,19 @@ import type { JsonValue } from '~~/shared/types/database'
 import { formatAccountReceivableCreditMemoSettlementReference } from '~~/shared/utils/account-receivable'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
+import { useBilingualValue } from '~/composables/useBilingualValue'
 
-const { agreementId, creditMemoId } = defineProps<{ agreementId: string, creditMemoId: string }>()
+const { agreementId, proponentId, creditMemoId } = defineProps<{ agreementId?: string, proponentId?: string, creditMemoId: string }>()
 const { t } = useI18n()
+const { getBilingualValue } = useBilingualValue()
 const { getHeroCollapsed } = useDashboard()
 const isHeroCollapsed = getHeroCollapsed('agreement-account-receivable-credit-memo-approval')
 const selectedTab: Ref<string> = ref('approval')
 const status: Ref<'pending' | 'success' | 'error'> = ref('pending')
 type ApprovalContext = {
   reference: string
-  agreementNumber: string
+  parentNameEn: string
+  parentNameFr: string
   runtimeState: RuntimeState
 }
 type ApprovalRuntime = {
@@ -24,7 +27,7 @@ type ApprovalRuntime = {
   submission?: { egcs_fc_packet: JsonValue } | null
 }
 const context: Ref<ApprovalContext | null> = ref(null)
-const identity = computed(() => `${agreementId}:${creditMemoId}`)
+const identity = computed(() => `${proponentId ?? agreementId}:${creditMemoId}`)
 let generation = 0
 let controller: AbortController | null = null
 let disposed = false
@@ -47,13 +50,15 @@ const refresh = async () => {
     const packetRecord = packet && typeof packet === 'object' && !Array.isArray(packet) ? packet : null
     const header = packetRecord?.accountReceivableCreditMemo
     if (!header || typeof header !== 'object' || Array.isArray(header)
-      || header.id !== creditMemoId || header.egcs_fc_fundingagreement !== agreementId
-      || typeof header.egcs_fc_agreementnumber !== 'string' || typeof header.egcs_fc_number !== 'number'
+      || header.id !== creditMemoId
+      || (proponentId !== undefined ? header.egcs_fc_applicantrecipient !== proponentId : header.egcs_fc_fundingagreement !== agreementId)
+      || typeof header.egcs_fc_number !== 'number'
       || !runtime.current) throw new Error('Accounts Receivable approval route containment failed')
     if (disposed || generation !== requestGeneration || identity.value !== requestIdentity) return
     context.value = {
-      reference: typeof packetRecord?.recoveryId === 'string' ? formatAccountReceivableCreditMemoSettlementReference(packetRecord.recoveryId) : t('account_receivable.credit_memo_reference', { agreement: header.egcs_fc_agreementnumber, number: header.egcs_fc_number }),
-      agreementNumber: header.egcs_fc_agreementnumber,
+      reference: typeof header.egcs_fc_creditmemoreference === 'string' ? header.egcs_fc_creditmemoreference : packetRecord?.schemaVersion === 2 || header.egcs_fc_ledgerkind === 'pool' ? `CM-${header.id}` : typeof packetRecord?.recoveryId === 'string' ? formatAccountReceivableCreditMemoSettlementReference(packetRecord.recoveryId) : typeof header.egcs_fc_agreementnumber === 'string' ? t('account_receivable.credit_memo_reference', { agreement: header.egcs_fc_agreementnumber, number: header.egcs_fc_number }) : `CM-${header.egcs_fc_number}`,
+      parentNameEn: proponentId !== undefined ? String(header.egcs_fc_debtorname_en ?? '') : String(header.egcs_fc_agreementnumber ?? ''),
+      parentNameFr: proponentId !== undefined ? String(header.egcs_fc_debtorname_fr ?? '') : String(header.egcs_fc_agreementnumber ?? ''),
       runtimeState: runtime.current.runtimeState
     }
     status.value = 'success'
@@ -70,9 +75,9 @@ onBeforeUnmount(() => {
 })
 const tabs = [{ key: 'account_receivable.credit_memo_approval_workspace', value: 'approval', icon: 'i-lucide-circle-check-big' }]
 const breadcrumbs = computed(() => [
-  { label: t('agreement.title') },
-  { label: context.value?.agreementNumber ?? '' },
-  { label: t('account_receivable.title') },
+  { label: t(proponentId !== undefined ? 'applicant_recipient.title' : 'agreement.title') },
+  { label: getBilingualValue({ name_en: context.value?.parentNameEn, name_fr: context.value?.parentNameFr }, 'name', '') },
+  { label: t('account_receivable.credit_memos_title') },
   { label: context.value?.reference ?? '' }
 ])
 </script>
@@ -100,7 +105,7 @@ const breadcrumbs = computed(() => [
       </UDashboardNavbar>
     </template>
     <template #body>
-      <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-hand-coins" :title="context.reference" :description="t('account_receivable.approval_workspace_description')" :meta-items="[`${t('account_receivable.agreement')}: ${context.agreementNumber}`]" :badges="[{ lifecycleEngine: 'runtime', lifecycleState: context.runtimeState }]" />
+      <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-banknote-arrow-down" :title="context.reference" :description="t('account_receivable.approval_workspace_description')" :meta-items="[getBilingualValue({ name_en: context.parentNameEn, name_fr: context.parentNameFr }, 'name', t('common.not_available'))]" :badges="[{ lifecycleEngine: 'runtime', lifecycleState: context.runtimeState }]" />
       <CommonEntityEditorWorkspace content-test-id="account-receivable-approval-workspace">
         <template #sidebar>
           <CommonRouteTabs v-model="selectedTab" :items="tabs" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />

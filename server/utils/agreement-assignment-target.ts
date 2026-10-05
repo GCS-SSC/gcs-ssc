@@ -69,9 +69,7 @@ export const resolveAssignmentTargetAgreementId = async (
   }
 
   if (target.entityType === 'fundingcaseaccountreceivablecreditmemo') {
-    const row = await db.selectFrom('Funding_Case_Account_Receivable_Credit_Memo').select('egcs_fc_fundingagreement')
-      .where('id', '=', target.entityId).where('_deleted', '=', false).executeTakeFirst()
-    return row ? String(row.egcs_fc_fundingagreement) : null
+    return null
   }
 
   if (target.entityType === 'fundingcasecorrection') {

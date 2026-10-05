@@ -1,9 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { JsonValue } from '~~/shared/types/database'
+import type { AccountReceivablePaymentCreditMemo } from '~~/shared/types/account-receivable'
+import { parseMoney } from '~~/shared/utils/money'
+import { hasPaymentOffset } from '~/utils/payment-offset-display'
+import { useBilingualValue } from '~/composables/useBilingualValue'
 
 const { submission } = defineProps<{ submission: { egcs_fc_submittedat: string, egcs_fc_canonicalhash: string, egcs_fc_packet: JsonValue } }>()
-const { t, locale } = useI18n()
+const { t } = useI18n()
+const { getBilingualValue } = useBilingualValue()
 const { formatDate } = useDateHelpers()
 type PacketRecord = Record<string, JsonValue>
 const asRecord = (value: JsonValue | undefined): PacketRecord => value !== null && typeof value === 'object' && !Array.isArray(value) ? value as PacketRecord : {}
@@ -18,6 +23,22 @@ const payment = computed(() => ({
   egcs_fc_netamount: text(packet.value.egcs_fc_netamount),
   egcs_fc_currency: text(header.value.egcs_fc_currency),
   egcs_fc_recoverycontrol: packet.value.egcs_fc_recoverycontrol as 'allowed' | 'direct_repayment_hold' | 'recovery_pending',
+  egcs_fc_creditmemos: Array.isArray(packet.value.egcs_fc_creditmemos)
+    ? packet.value.egcs_fc_creditmemos.map(value => {
+        const memo = asRecord(value)
+        return {
+          id: text(memo.id),
+          egcs_fc_offsetmemo: text(memo.egcs_fc_offsetmemo),
+          egcs_fc_creditmemoreference: text(memo.egcs_fc_creditmemoreference),
+          egcs_fc_amount: parseMoney(text(memo.egcs_fc_amount)),
+          egcs_fc_effectiveamount: parseMoney(text(memo.egcs_fc_effectiveamount)),
+          egcs_fc_appliedamount: parseMoney(text(memo.egcs_fc_appliedamount)),
+          egcs_fc_remainingamount: parseMoney(text(memo.egcs_fc_remainingamount)),
+          egcs_fc_availableamount: parseMoney(text(memo.egcs_fc_availableamount)),
+          egcs_fc_outcome: memo.egcs_fc_outcome as AccountReceivablePaymentCreditMemo['egcs_fc_outcome']
+        }
+      })
+    : [],
   egcs_fc_offsets: Array.isArray(packet.value.egcs_fc_offsets)
     ? packet.value.egcs_fc_offsets.map(value => {
         const allocation = asRecord(value)
@@ -25,6 +46,13 @@ const payment = computed(() => ({
       })
     : []
 }))
+const totals = computed(() => [
+  { key: 'gross', amount: packet.value.egcs_fc_grossamount },
+  ...(hasPaymentOffset(packet.value.egcs_fc_offsetamount)
+    ? [{ key: 'offset', amount: packet.value.egcs_fc_offsetamount }]
+    : []),
+  { key: 'net', amount: packet.value.egcs_fc_netamount }
+])
 const hasCurrency = computed(() => typeof header.value.egcs_fc_currency === 'string')
 </script>
 
@@ -35,12 +63,12 @@ const hasCurrency = computed(() => typeof header.value.egcs_fc_currency === 'str
         {{ text(header.egcs_fc_agreementnumber) }}
       </p>
       <p class="text-sm text-muted">
-        {{ t('agreement.payments.payee') }}: {{ text(locale === 'fr' ? header.egcs_fc_payeename_fr : header.egcs_fc_payeename_en) }}
+        {{ t('agreement.payments.payee') }}: {{ getBilingualValue(header, 'egcs_fc_payeename', t('common.none')) }}
       </p>
     </template>
     <AgreementPaymentRecoverySummary v-if="hasCurrency" :payment="payment" />
     <dl v-else class="grid gap-4 text-sm sm:grid-cols-3">
-      <div v-for="field in [{ key: 'gross', amount: packet.egcs_fc_grossamount }, { key: 'offset', amount: packet.egcs_fc_offsetamount }, { key: 'net', amount: packet.egcs_fc_netamount }]" :key="field.key">
+      <div v-for="field in totals" :key="field.key">
         <dt class="text-muted">
           {{ t(`agreement.payments.${field.key}`) }}
         </dt><dd class="font-semibold">

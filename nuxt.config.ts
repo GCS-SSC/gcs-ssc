@@ -1,3 +1,5 @@
+import lucideIcons from '@iconify-json/lucide/icons.json'
+
 export default defineNuxtConfig({
   modules: ['./modules/gcs-extensions', '@nuxt/eslint', '@nuxt/ui', './modules/form-requirements', '@vueuse/nuxt', '@nuxtjs/i18n'],
 
@@ -103,7 +105,19 @@ export default defineNuxtConfig({
   },
 
   icon: {
-    provider: 'server',
-    localApiEndpoint: '/_nuxt_icon'
+    provider: 'none',
+    fallbackToApi: false,
+    collections: ['lucide', 'simple-icons'],
+    serverBundle: false,
+    clientBundle: {
+      // Persisted names also include legacy aliases; login uses the GitHub brand.
+      icons: [
+        ...Object.keys(lucideIcons.icons).map(name => `lucide:${name}`),
+        ...Object.keys(lucideIcons.aliases).map(name => `lucide:${name}`),
+        'simple-icons:github'
+      ],
+      scan: true,
+      sizeLimitKb: 1024
+    }
   }
 })

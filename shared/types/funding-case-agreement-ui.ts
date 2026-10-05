@@ -1,6 +1,7 @@
 import type { BudgetCalculationMode } from '../utils/budget-percentage'
 import type { Agreement_Type } from './database'
 import type { BusinessRecordStateFields } from './business-record-state'
+import type { AccountReceivablePaymentCreditMemo } from './account-receivable'
 import type { StatusId } from './status'
 import type { Money } from '../utils/money'
 import type { TransferPaymentStreamChartOfAccountDimension } from './schemas/transfer-payment'
@@ -205,6 +206,7 @@ export interface FundingCaseAgreementAmendmentRow extends BusinessRecordStateFie
   can_create_snapshot: boolean
   can_edit: boolean
   can_edit_scope?: boolean
+  can_delete_documents?: boolean
   can_cancel?: boolean
 }
 
@@ -258,6 +260,7 @@ export interface FundingCaseAgreementPaymentRow extends FundingCaseAgreementPaym
   egcs_fc_netamount?: Money
   egcs_fc_recoverycontrol?: 'allowed' | 'direct_repayment_hold' | 'recovery_pending'
   egcs_fc_offsets?: Array<{ egcs_fc_number: string; egcs_fc_amount: Money; egcs_fc_creditmemoreference: string }>
+  egcs_fc_creditmemos?: AccountReceivablePaymentCreditMemo[]
   commitment_type?: string | null
   commitment_type_name_en?: string | null
   commitment_type_name_fr?: string | null

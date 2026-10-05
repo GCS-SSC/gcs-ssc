@@ -119,17 +119,26 @@ export default defineEventHandler(async event => {
   }
   const enumTypeName = enumTypeNameByKey[requestedEnum] ?? requestedEnum
 
+  // Resolve one public enum type. Both quoted and legacy unquoted types can
+  // exist after supported migrations; their values must not be merged.
   // A structured catalog read is safe before authentication and remains audited.
-  const result = await db.withTables<{
-    'pg_catalog.pg_type': { oid: number; typname: string }
+  const enumQuery = db.withTables<{
+    'pg_catalog.pg_type': { oid: number; typname: string; typnamespace: number }
+    'pg_catalog.pg_namespace': { oid: number; nspname: string }
     'pg_catalog.pg_enum': { enumtypid: number; enumlabel: string; enumsortorder: number }
   }>()
     .selectFrom('pg_catalog.pg_type as t')
+    .innerJoin('pg_catalog.pg_namespace as n', 't.typnamespace', 'n.oid')
     .innerJoin('pg_catalog.pg_enum as e', 't.oid', 'e.enumtypid')
     .select('e.enumlabel')
-    .where('t.typname', 'ilike', enumTypeName.replaceAll('_', '\\_'))
+    .where('n.nspname', '=', 'public')
     .orderBy('e.enumsortorder')
-    .execute()
 
-  return result.map(row => row.enumlabel)
+  const result = await enumQuery.where('t.typname', '=', enumTypeName).execute()
+  if (result.length > 0 || enumTypeName === enumTypeName.toLowerCase()) {
+    return result.map(row => row.enumlabel)
+  }
+
+  const legacyResult = await enumQuery.where('t.typname', '=', enumTypeName.toLowerCase()).execute()
+  return legacyResult.map(row => row.enumlabel)
 })

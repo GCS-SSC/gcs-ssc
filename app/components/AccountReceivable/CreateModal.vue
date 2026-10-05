@@ -117,7 +117,7 @@ const save = async () => {
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="t(adjustment ? 'account_receivable.create_adjustment' : 'account_receivable.create')" :description="t('account_receivable.description')" :ui="{ content: 'sm:max-w-4xl', header: 'shrink-0' }">
+  <UModal v-model:open="open" :title="t(adjustment ? 'account_receivable.adjust_receivable' : 'account_receivable.create')" :description="t(adjustment ? 'account_receivable.adjust_receivable_description' : 'account_receivable.description')" :ui="{ content: 'sm:max-w-4xl', header: 'shrink-0' }">
     <template #body>
       <UForm v-if="state" :state="state" :validate="createValidator(createSchema)" class="space-y-4" @submit="save">
         <div class="grid gap-4 md:grid-cols-2">

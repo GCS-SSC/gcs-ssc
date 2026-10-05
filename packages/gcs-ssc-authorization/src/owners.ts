@@ -19,6 +19,7 @@ export type AuthorizationResourceOwner =
   }
   | {
     kind: 'agency'
+    subject?: 'agency' | 'account_receivable'
     agencyId: string
   }
   | {

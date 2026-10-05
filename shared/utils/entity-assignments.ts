@@ -4,10 +4,10 @@ import type { AuthorizationSubject } from './abilities'
 
 export type AssignableEntityMetadata = {
   subject: AuthorizationSubject | 'resolved_owner'
-  ownerResolver: 'applicant_recipient' | 'agreement' | 'agreement_parent' | 'agreement_claim_parent' | 'runtime_source' | 'funding_case'
+  ownerResolver: 'applicant_recipient' | 'agency' | 'agreement' | 'agreement_parent' | 'agreement_claim_parent' | 'runtime_source' | 'funding_case'
   ownerColumn: string | null
   assignmentRoot: 'self'
-  creationParent: 'lead_agency' | 'transfer_payment_stream' | 'agreement' | 'fundingcaseagreementclaim' | 'runtime_source' | 'funding_opportunity'
+  creationParent: 'lead_agency' | 'agency' | 'transfer_payment_stream' | 'agreement' | 'fundingcaseagreementclaim' | 'runtime_source' | 'funding_opportunity'
   allowedScopes: readonly ('global' | 'agency' | 'program')[]
   table: string
   statusColumn: string | null
@@ -56,7 +56,7 @@ export const ENTITY_AUTHORIZATION_POLICIES = {
   fundingcaseagreementclaim: createMetadata({ ...agreementPolicy, table: 'Funding_Case_Agreement_Claim' }, 'claims', ['Claim', 'Réclamation']),
   fundingclaimreconcile: createMetadata({ ...agreementPolicy, ownerResolver: 'agreement_claim_parent', ownerColumn: 'egcs_fc_fundingagreementclaim', creationParent: 'fundingcaseagreementclaim', table: 'Funding_Case_Agreement_Claim_Reconcile' }, null, ['Claim reconciliation', 'Rapprochement de réclamation']),
   fundingcaseaccountreceivable: createMetadata({ ...agreementPolicy, subject: 'account_receivable', table: 'Funding_Case_Agreement_Account_Receivable' }, 'account-receivables', ['Accounts receivable', 'Compte débiteur']),
-  fundingcaseaccountreceivablecreditmemo: createMetadata({ ...agreementPolicy, subject: 'account_receivable', table: 'Funding_Case_Account_Receivable_Credit_Memo' }, 'account-receivable-credit-memos', ['Credit memo', 'Note de crédit']),
+  fundingcaseaccountreceivablecreditmemo: createMetadata({ subject: 'account_receivable', ownerResolver: 'agency', ownerColumn: 'egcs_fc_agency', creationParent: 'agency', allowedScopes: ['global', 'agency'], table: 'Funding_Case_Account_Receivable_Credit_Memo', statusColumn: 'egcs_fc_status' }, null, ['Credit memo', 'Note de crédit']),
   fundingcasecorrection: createMetadata({ ...agreementPolicy, subject: 'correction', table: 'Funding_Case_Agreement_Correction' }, 'corrections', ['Correction', 'Correction']),
   fundingcasejournalvoucher: createMetadata({ ...agreementPolicy, subject: 'journal_voucher', table: 'Funding_Case_Agreement_Journal_Voucher' }, 'journal-vouchers', ['Journal voucher', 'Pièce de journal']),
   fundingcasepayment: createMetadata({ ...agreementPolicy, table: 'Funding_Case_Agreement_Payment' }, 'payments', ['Payment', 'Paiement']),

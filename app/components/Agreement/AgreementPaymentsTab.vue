@@ -9,6 +9,7 @@ import { useExtensionCreateActions } from '~/composables/useExtensionCreateActio
 import { useExtensionPaymentAmountCalculators } from '~/composables/useExtensionPaymentAmountCalculators'
 import { useJsonRequest } from '~/composables/useJsonRequest'
 import type { TableColumnInput } from '~/composables/useTableColumns'
+import { hasPaymentOffset } from '~/utils/payment-offset-display'
 import { appRouteLocations } from '~/utils/route-locations'
 import type {
   FundingCaseAgreementPaymentForm,
@@ -102,9 +103,11 @@ const validatePayment = createValidator(FundingCaseAgreementPaymentCreateSchema)
 const paymentPending = useCrudModalPending(paymentModal.captureSession)
 const isSavingPayment = paymentPending.isPending
 const paymentCalculatorResult: Ref<PaymentCalculatorResult | null> = ref(null)
+const hasManualPaymentAmount: Ref<boolean> = ref(false)
 let lastSuggestedPaymentAmount: Money | null = null
 watch(selectedPayment, () => {
   lastSuggestedPaymentAmount = null
+  hasManualPaymentAmount.value = false
 }, { flush: 'sync' })
 const deletingPaymentIds: Ref<Set<string>> = ref(new Set())
 watch(agreementIdRef, () => {
@@ -129,7 +132,7 @@ const columns: TableColumnInput<FundingCaseAgreementPaymentRow>[] = [
   { id: 'amount', accessorKey: 'egcs_fc_paymentamount', headerKey: 'agreement.payments.amount' },
   { id: 'schedule', headerKey: 'agreement.payments.schedule' },
   { id: 'comment', accessorKey: 'egcs_fc_comment', headerKey: 'common.comment' },
-  { id: 'actions', headerKey: 'common.actions' }
+  { id: 'actions', headerKey: 'common.actions', meta: { class: { th: 'w-40', td: 'w-40' } } }
 ]
 
 const normalizedSearch = computed(() => search.value.trim().toLowerCase())
@@ -218,7 +221,7 @@ const isPaymentAboveCalculatorCeiling = computed(() => {
 watch(
   () => paymentCalculatorResult.value?.suggestedAmount,
   suggestedAmount => {
-    if (!selectedPayment.value || selectedPayment.value.id) {
+    if (!selectedPayment.value || selectedPayment.value.id || hasManualPaymentAmount.value) {
       return
     }
     if (typeof suggestedAmount !== 'string') {
@@ -323,7 +326,8 @@ const deletePayment = async (paymentId: string) => {
       :total-records="tableRows.length"
       :loading="overviewStatus === 'pending'"
       :request-status="overviewStatus"
-      table-class="w-full max-w-full table-fixed"
+      table-class="w-full max-w-full"
+      :ui="{ base: 'w-full min-w-[56rem] table-fixed', th: 'whitespace-normal', td: 'whitespace-normal' }"
       :button-label="t('agreement.payments.add')"
       :show-button="canCreate && !hasExtensionCreateReplacement && !hasExtensionCreateConflict && !hasPaymentAmountCalculatorConflict"
       :search-placeholder="t('agreement.payments.search')"
@@ -404,7 +408,7 @@ const deletePayment = async (paymentId: string) => {
               {{ formatMoney(row.original.egcs_fc_paymentamount, row.original.egcs_fc_currency.toUpperCase()) }}
             </dd>
           </div>
-          <div>
+          <div v-if="hasPaymentOffset(row.original.egcs_fc_offsetamount)">
             <dt class="inline text-muted">
               {{ t('agreement.payments.offset') }}:
             </dt><dd class="ml-1 inline tabular-nums">
@@ -425,7 +429,7 @@ const deletePayment = async (paymentId: string) => {
       <template #comment-cell="{ row }">
         <p
           v-if="row.original.egcs_fc_comment"
-          class="line-clamp-2 max-w-64 text-sm leading-5 text-zinc-600 dark:text-zinc-300">
+          class="line-clamp-2 max-w-full break-words text-sm leading-5 text-zinc-600 dark:text-zinc-300">
           {{ row.original.egcs_fc_comment }}
         </p>
         <span v-else class="text-sm text-zinc-400 dark:text-zinc-500">
@@ -435,6 +439,12 @@ const deletePayment = async (paymentId: string) => {
 
       <template #actions-cell="{ row }">
         <div class="flex items-center justify-end gap-2">
+          <UButton
+            icon="i-lucide-arrow-right"
+            color="neutral"
+            variant="ghost"
+            :aria-label="t('common.view_details')"
+            :to="localePath(appRouteLocations.agreementPaymentDetail(agreementId, String(row.original.id)))" />
           <UButton
             v-if="canUpdate && !isRecordLocked(row.original)"
             icon="i-lucide-pencil"
@@ -523,7 +533,8 @@ const deletePayment = async (paymentId: string) => {
             <UInput
               v-model="selectedPayment.egcs_fc_paymentamount"
               type="text"
-              inputmode="decimal" />
+              inputmode="decimal"
+              @update:model-value="hasManualPaymentAmount = true" />
             <p v-if="isPaymentAboveCalculatorCeiling" class="mt-1 text-sm text-error">
               {{ t('agreement.payments.amount_exceeds_calculated_ceiling', { amount: formatMoney(paymentCalculatorCeilingMoney ?? ZERO_MONEY, paymentCalculatorCurrency) }) }}
             </p>

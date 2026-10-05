@@ -28,6 +28,10 @@ export const canAccessCreditMemoTargetScopes = async (
   const { resolveAccountReceivableCreditMemoRuntimeContext } = await import('./account-receivable-context')
   const context = await resolveAccountReceivableCreditMemoRuntimeContext(db, id)
   if (!context) return false
+  const ownerAllowed = action === 'manage_assignments'
+    ? auth.userAbilities.canManageAssignments('account_receivable', context.scope)
+    : auth.userAbilities.authorize('account_receivable', action, context.scope)
+  if (!ownerAllowed) return false
   for (const agreementId of context.agreementIds) {
     const owner = await resolveAgreementScopeContext(agreementId, db)
     if (!owner || owner.agencyId !== context.agencyId) return false

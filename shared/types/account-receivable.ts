@@ -14,11 +14,7 @@ export type AccountReceivableRow = Omit<Selectable<FundingCaseAgreementAccountRe
     egcs_fc_terminalat: string | null
   } & BusinessRecordStateFields & {
     egcs_fc_principal: Money
-    egcs_fc_recovered: Money
-    egcs_fc_reserved: Money
-    egcs_fc_outstanding: Money
-    egcs_fc_available: Money
-    egcs_fc_collectionstate: 'outstanding' | 'partially_recovered' | 'cleared'
+    egcs_fc_approvedamount: Money
     egcs_fc_debtorname_en: string
     egcs_fc_debtorname_fr: string
     egcs_fc_fiscalyeardisplay: string
@@ -59,40 +55,51 @@ export type AccountReceivableLine = {
   egcs_fc_evidence: JsonValue
   egcs_fc_coding: AccountReceivableCoding[]
   egcs_fc_principal: Money
-  egcs_fc_recovered: Money
-  egcs_fc_reserved: Money
-  egcs_fc_outstanding: Money
-  egcs_fc_available: Money
 }
 
-export type AccountReceivableRecovery = {
+export type AccountReceivableOffsetMemoApplication = {
   id: string
   egcs_fc_recovery: string
-  egcs_fc_creditmemoreference: string
-  egcs_fc_payment: string | null
-  egcs_fc_creditmemo: string | null
+  egcs_fc_payment: string
   egcs_fc_amount: Money
   egcs_fc_outcome: 'open' | 'posted' | 'released'
   egcs_fc_createdat: string
   egcs_fc_postedat: string | null
 }
 
+export type AccountReceivableOffsetMemo = {
+  id: string
+  egcs_fc_pool: string
+  egcs_fc_creditmemoreference: string
+  egcs_fc_amount: Money
+  egcs_fc_effectiveamount: Money
+  egcs_fc_appliedamount: Money
+  egcs_fc_reservedamount: Money
+  egcs_fc_remainingamount: Money
+  egcs_fc_availableamount: Money
+  egcs_fc_createdat: string
+  egcs_fc_applications: AccountReceivableOffsetMemoApplication[]
+}
+
+export type AccountReceivablePaymentCreditMemo = Pick<AccountReceivableOffsetMemo,
+  'id' | 'egcs_fc_creditmemoreference' | 'egcs_fc_amount' | 'egcs_fc_effectiveamount' | 'egcs_fc_remainingamount' | 'egcs_fc_availableamount'> & {
+    egcs_fc_offsetmemo: string
+    egcs_fc_appliedamount: Money
+    egcs_fc_outcome: 'open' | 'posted' | 'released'
+  }
+
 export type AccountReceivableDetail = AccountReceivableRow & {
   egcs_fc_lines: AccountReceivableLine[]
-  egcs_fc_recoveries: AccountReceivableRecovery[]
   egcs_fc_adjustments: AccountReceivableRow[]
   egcs_fc_principal: Money
-  egcs_fc_recovered: Money
-  egcs_fc_reserved: Money
-  egcs_fc_outstanding: Money
-  egcs_fc_available: Money
-  egcs_fc_collectionstate: 'outstanding' | 'partially_recovered' | 'cleared'
   egcs_fc_agreementreadable: boolean
   egcs_fc_sourcereadable: boolean
   egcs_fc_canwork: boolean
   egcs_fc_canedit: boolean
   egcs_fc_candelete: boolean
   egcs_fc_cancancel: boolean
+  egcs_fc_proponentreadable: boolean
+  egcs_fc_approvedamount: Money
   egcs_fc_canadjust: boolean
   egcs_fc_cancreditmemo: boolean
   egcs_fc_debtorname_en: string
@@ -110,18 +117,11 @@ export type AccountReceivableCreditMemoRow = Omit<Selectable<FundingCaseAccountR
   } & BusinessRecordStateFields
 
 export type AccountReceivableCreditMemoDetail = AccountReceivableCreditMemoRow & {
+  egcs_fc_cancomplete: boolean
   egcs_fc_creditmemoreference: string
-  egcs_fc_allocations: Array<{
-    id: string
-    egcs_fc_receivable: string
-    egcs_fc_receivableline: string
-    egcs_fc_fundingagreement: string
-    egcs_fc_amount: Money
-    egcs_fc_agreementnumber: string
-    egcs_fc_number: number
-    egcs_fc_type: string
-    egcs_fc_recoverymethod: AccountReceivableRecoveryMethod
-  }>
+  egcs_fc_agencyname_en: string
+  egcs_fc_agencyname_fr: string
+  egcs_fc_proponentreadable: boolean
   egcs_fc_agreementreadable: boolean
   egcs_fc_canwork: boolean
   egcs_fc_canedit: boolean

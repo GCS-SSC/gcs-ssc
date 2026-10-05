@@ -145,7 +145,7 @@ export const authorizeFreshAssignedItem = async (
     }
     return
   }
-  if (!context.userAbilities.authorize('agency', action, { type: 'agency', agencyId: owner.agencyId })) {
+  if (!context.userAbilities.authorize(owner.subject ?? 'agency', action, { type: 'agency', agencyId: owner.agencyId })) {
     return await forbidden(event)
   }
 }

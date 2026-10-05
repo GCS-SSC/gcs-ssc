@@ -18,7 +18,7 @@ import { resolveAgreementClaimReconcileRuntimeContext, resolveAgreementClaimRunt
 import { resolveAgreementCommitmentRuntimeContext } from '~~/server/utils/agreement-commitment'
 import { resolveAgreementForecastRuntimeContext } from '~~/server/utils/agreement-forecast'
 import { resolveAgreementMonitorRuntimeContext } from '~~/server/utils/agreement-monitor'
-import { resolveAccountReceivableRuntimeContext, resolveAccountReceivableCreditMemoRuntimeContext } from './account-receivable-context'
+import { resolveAccountReceivableRuntimeContext, resolveAccountReceivableCreditMemoRuntimeContext, lockAccountReceivableRecoveryPool } from './account-receivable-context'
 import { resolveCorrectionRuntimeContext } from './correction-context'
 import { resolveJournalVoucherRuntimeContext } from './journal-voucher-context'
 import { resolveAgreementPaymentRuntimeContext } from '~~/server/utils/agreement-payment'
@@ -392,6 +392,12 @@ const authorizeAgreementRuntimeAction = async (
   action: ReviewRuntimeAction,
   entityContext: ReviewRuntimeEntityContext
 ): Promise<AuthContext> => {
+  if (entityContext.entityType === 'fundingcaseaccountreceivablecreditmemo') {
+    const memo = await resolveAccountReceivableCreditMemoRuntimeContext(event.context.$db, entityContext.entityId)
+    if (!memo) return await forbidden(event)
+    const memoAction = action === 'list_review_sets' || action === 'read_assessment' ? 'read' : action === 'delete_assessment_child' ? 'delete' : 'update'
+    return await authorize(event, 'account_receivable', memoAction, memo.scope)
+  }
   if (!entityContext.agreementId) {
     return await forbidden(event)
   }
@@ -407,7 +413,7 @@ const authorizeAgreementRuntimeAction = async (
       ? 'delete'
       : 'update'
 
-  const subject = (entityContext.entityType === 'fundingcaseaccountreceivable' || entityContext.entityType === 'fundingcaseaccountreceivablecreditmemo') ? 'account_receivable' : entityContext.entityType === 'fundingcasecorrection' ? 'correction' : entityContext.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement'
+  const subject = entityContext.entityType === 'fundingcaseaccountreceivable' ? 'account_receivable' : entityContext.entityType === 'fundingcasecorrection' ? 'correction' : entityContext.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement'
   return await authorize(event, subject, agreementAction, async ({ context }) => {
     if (context.userAbilities.authorize(subject, agreementAction, agreementContext.scope)
       && (!isAssignableEntityType(entityContext.entityType) || await canAccessCreditMemoTargetScopes(event.context.$db, context, entityContext.entityType, entityContext.entityId, agreementAction))) {
@@ -708,6 +714,10 @@ const resolveAgreementReviewRuntimeEntity = async (
 
   const resolver = agreementRuntimeEntityResolvers[entityType]
   const context = await resolver.resolve(db, entityId) as Record<string, unknown> | null
+  if (entityType === 'fundingcaseaccountreceivablecreditmemo' && context?.agencyId) {
+    return { entityType, entityId, agreementId: null, proponentAgencyContextId: null,
+      schemaAgencyId: String(context.agencyId), reviewSetId: null, reviewId: null }
+  }
   if (!context || !context.agreementId) {
     return null
   }
@@ -862,13 +872,18 @@ export const resolveReviewRuntimeEntityFromReviewSet = async (
   if (reviewSet.entity_type === 'fundingcaseintake' && !intakeEntity) return null
   if (intakeEntity && reviewSet.proponent_schema_agency
     && String(reviewSet.proponent_schema_agency) !== intakeEntity.schemaAgencyId) return null
+  const creditMemoAgencyId = reviewSet.entity_type === 'fundingcaseaccountreceivablecreditmemo'
+    ? agreementEntity?.schemaAgencyId
+    : null
+  if (creditMemoAgencyId && reviewSet.proponent_schema_agency
+    && String(reviewSet.proponent_schema_agency) !== creditMemoAgencyId) return null
 
   return {
     entityType: reviewSet.entity_type,
     entityId: String(reviewSet.entity_id),
     agreementId: agreementEntity?.agreementId ?? null,
     proponentAgencyContextId: reviewSet.proponent_schema_agency ? String(reviewSet.proponent_schema_agency) : null,
-    schemaAgencyId: intakeEntity?.schemaAgencyId ?? (reviewSet.proponent_schema_agency ? String(reviewSet.proponent_schema_agency) : null),
+    schemaAgencyId: creditMemoAgencyId ?? intakeEntity?.schemaAgencyId ?? (reviewSet.proponent_schema_agency ? String(reviewSet.proponent_schema_agency) : null),
     reviewSetId,
     reviewId: null
   }
@@ -961,6 +976,11 @@ export const resolveReviewRuntimeEntityFromReview = async (
   if (review.entity_type === 'fundingcaseintake' && !intakeEntity) return null
   if (intakeEntity && review.schema_agency_id
     && String(review.schema_agency_id) !== intakeEntity.schemaAgencyId) return null
+  const creditMemoAgencyId = review.entity_type === 'fundingcaseaccountreceivablecreditmemo'
+    ? agreementEntity?.schemaAgencyId
+    : null
+  if (creditMemoAgencyId && review.schema_agency_id
+    && String(review.schema_agency_id) !== creditMemoAgencyId) return null
 
   return {
     entityType: review.entity_type,
@@ -969,7 +989,7 @@ export const resolveReviewRuntimeEntityFromReview = async (
     proponentAgencyContextId: review.entity_type === 'applicantrecipient' && review.schema_agency_id
       ? String(review.schema_agency_id)
       : null,
-    schemaAgencyId: intakeEntity?.schemaAgencyId ?? (review.schema_agency_id ? String(review.schema_agency_id) : null),
+    schemaAgencyId: creditMemoAgencyId ?? intakeEntity?.schemaAgencyId ?? (review.schema_agency_id ? String(review.schema_agency_id) : null),
     reviewSetId: String(review.review_set_id),
     reviewId
   }
@@ -1180,6 +1200,12 @@ export const lockReviewRuntimeTarget = async (
   trx: Transaction<Database>,
   entityContext: ReviewRuntimeEntityContext
 ): Promise<void> => {
+  if (entityContext.entityType === 'fundingcaseaccountreceivablecreditmemo') {
+    const memo = await resolveAccountReceivableCreditMemoRuntimeContext(trx, entityContext.entityId)
+    if (!memo) throw new Error('Credit Memo owner is unavailable')
+    await trx.selectFrom('Agency_Profile').select('id').where('id', '=', memo.agencyId).where('_deleted', '=', false).forShare().executeTakeFirstOrThrow()
+    await lockAccountReceivableRecoveryPool(trx, memo)
+  }
   if (isAgreementRuntimeEntityType(entityContext.entityType)) {
     const ownerTable = agreementRuntimeOwnerTables[entityContext.entityType]
     await trx

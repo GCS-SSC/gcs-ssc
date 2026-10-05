@@ -19,7 +19,7 @@ export type BusinessStatusCarrier = {
 export type LockedBusinessStatus = BusinessStatusCarrier & {
   agencyId: string
   agreementId: string | null
-  authorizationRoot: { entityType: 'fundingcaseagreement' | 'fundingcaseintake', entityId: string }
+  authorizationRoot: { entityType: 'fundingcaseagreement' | 'fundingcaseintake' | 'fundingcaseaccountreceivablecreditmemo', entityId: string }
   status: {
     id: StatusId
     readOnly: boolean
@@ -66,7 +66,7 @@ export const BUSINESS_STATUS_REGISTRY = {
   },
   fundingcaseagreementcommitment: { table: 'Funding_Case_Agreement_Commitment', authorizationRoot: 'agreement', ancestors: ['fundingcaseagreement'] },
   fundingcaseaccountreceivable: { table: 'Funding_Case_Agreement_Account_Receivable', authorizationRoot: 'agreement', ancestors: [] },
-  fundingcaseaccountreceivablecreditmemo: { table: 'Funding_Case_Account_Receivable_Credit_Memo', authorizationRoot: 'agreement', ancestors: [] },
+  fundingcaseaccountreceivablecreditmemo: { table: 'Funding_Case_Account_Receivable_Credit_Memo', authorizationRoot: 'self', ancestors: [] },
   fundingcasecorrection: { table: 'Funding_Case_Agreement_Correction', authorizationRoot: 'agreement', ancestors: ['fundingcaseagreement'] },
   fundingcasejournalvoucher: { table: 'Funding_Case_Agreement_Journal_Voucher', authorizationRoot: 'agreement', ancestors: ['fundingcaseagreement'] },
   fundingcasepayment: {
@@ -195,9 +195,8 @@ const resolveLineage = async (
     return row ? { agreementId: String(row.egcs_fc_fundingagreement), carriers: [{ entityType, entityId }] } : null
   }
   if (entityType === 'fundingcaseaccountreceivablecreditmemo') {
-    const row = await db.selectFrom('Funding_Case_Account_Receivable_Credit_Memo').select('egcs_fc_fundingagreement').where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirst()
-    // Retrospective debt collection remains workable on a closed Agreement.
-    return row ? { agreementId: String(row.egcs_fc_fundingagreement), carriers: [{ entityType, entityId }] } : null
+    const row = await db.selectFrom('Funding_Case_Account_Receivable_Credit_Memo').select('id').where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirst()
+    return row ? { agreementId: null, carriers: [{ entityType, entityId }] } : null
   }
   if (entityType === 'fundingcasecorrection') {
     const row = await db.selectFrom('Funding_Case_Agreement_Correction').select('egcs_fc_fundingagreement').where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirst()
@@ -322,6 +321,11 @@ export const lockBusinessStatus = async (
   const lineage = await resolveLineage(trx, entityType, entityId)
   if (!lineage) throw new BusinessStatusViolation('BUSINESS_STATUS_NOT_FOUND', 'Business status carrier is unavailable')
   const caseScope = entityType === 'fundingcaseintake' ? await resolveFundingCaseScope(trx, entityId) : null
+  const memo = entityType === 'fundingcaseaccountreceivablecreditmemo'
+    ? await trx.selectFrom('Funding_Case_Account_Receivable_Credit_Memo').innerJoin('Agency_Profile', 'Agency_Profile.id', 'Funding_Case_Account_Receivable_Credit_Memo.egcs_fc_agency')
+        .select('Agency_Profile.id as agencyId').where('Funding_Case_Account_Receivable_Credit_Memo.id', '=', entityId)
+        .where('Funding_Case_Account_Receivable_Credit_Memo._deleted', '=', false).where('Agency_Profile._deleted', '=', false).forShare('Agency_Profile').executeTakeFirst()
+    : null
   const agreement = lineage.agreementId
     ? await trx.selectFrom('Funding_Case_Agreement_Profile')
         .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Funding_Case_Agreement_Profile.egcs_fc_transferpaymentstream')
@@ -329,8 +333,8 @@ export const lockBusinessStatus = async (
         .select('Transfer_Payment_Profile.egcs_tp_agency as agencyId')
         .where('Funding_Case_Agreement_Profile.id', '=', lineage.agreementId).where('Funding_Case_Agreement_Profile._deleted', '=', false).executeTakeFirst()
     : null
-  if (!agreement && !caseScope) throw new BusinessStatusViolation('BUSINESS_STATUS_NOT_FOUND', 'Business owner is unavailable')
-  const agencyId = caseScope?.agencyId ?? String(agreement!.agencyId)
+  if (!agreement && !caseScope && !memo) throw new BusinessStatusViolation('BUSINESS_STATUS_NOT_FOUND', 'Business owner is unavailable')
+  const agencyId = memo ? String(memo.agencyId) : caseScope?.agencyId ?? String(agreement!.agencyId)
   const lockedCarriers: Array<BusinessStatusCarrier & { status: LockedBusinessStatus['status'], completed: boolean }> = []
   for (const carrier of lineage.carriers) {
     const statusId = await lockCarrierStatus(trx, carrier)
@@ -368,7 +372,7 @@ export const lockBusinessStatus = async (
     agreementId: lineage.agreementId,
     authorizationRoot: lineage.agreementId
       ? { entityType: 'fundingcaseagreement', entityId: lineage.agreementId }
-      : { entityType: 'fundingcaseintake', entityId },
+      : { entityType: entityType === 'fundingcaseaccountreceivablecreditmemo' ? entityType : 'fundingcaseintake', entityId },
     ancestors: lockedCarriers.slice(0, -1)
   }
 }

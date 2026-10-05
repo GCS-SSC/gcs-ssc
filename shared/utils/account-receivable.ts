@@ -1,4 +1,4 @@
-import { addMoney, compareMoney, moneyFromCents, moneyToCents, parseMoney, subtractMoney, sumMoney, type Money } from './money'
+import { compareMoney, moneyFromCents, moneyToCents, sumMoney, type Money } from './money'
 
 /**
  * Stable business identifier retained independently of the current Agreement title.
@@ -10,41 +10,7 @@ import { addMoney, compareMoney, moneyFromCents, moneyToCents, parseMoney, subtr
 export const formatAccountReceivableReference = (record: { egcs_fc_agreementnumber: string; egcs_fc_number: number }): string =>
   `${record.egcs_fc_agreementnumber}-AR-${record.egcs_fc_number}`
 
-/**
- * Stable manual Credit Memo authoring reference.
- * @param record - Retained Agreement reference and Credit Memo sequence.
- * @param record.egcs_fc_agreementnumber - Original Agreement business number.
- * @param record.egcs_fc_number - Independent manual Credit Memo sequence.
- * @returns The Credit Memo authoring reference.
- */
-export const formatAccountReceivableCreditMemoReference = (record: { egcs_fc_agreementnumber: string; egcs_fc_number: number }): string =>
-  `${record.egcs_fc_agreementnumber}-CM-${record.egcs_fc_number}`
-
 export type AccountReceivableRecoveryMethod = 'offset' | 'direct_repayment'
-
-/**
- * Exact principal totals, distinct from the terminal establishment outcome.
- * @param principal - Effective approved principal including signed adjustments.
- * @param recovered - Successfully settled principal.
- * @param reserved - Principal held by unresolved Credit Memos.
- * @returns Positive balances and the derived collection state.
- */
-export const calculateAccountReceivableBalance = (principal: Money, recovered: Money, reserved: Money) => {
-  const zero = parseMoney('0.00')
-  if (compareMoney(principal, zero) < 0 || compareMoney(recovered, zero) < 0 || compareMoney(reserved, zero) < 0
-    || compareMoney(addMoney(recovered, reserved), principal) > 0) throw new Error('AR_PRINCIPAL_CAPACITY')
-  const outstanding = subtractMoney(principal, recovered)
-  return {
-    egcs_fc_principal: principal,
-    egcs_fc_recovered: recovered,
-    egcs_fc_reserved: reserved,
-    egcs_fc_outstanding: outstanding,
-    egcs_fc_available: subtractMoney(outstanding, reserved),
-    egcs_fc_collectionstate: compareMoney(outstanding, zero) === 0
-      ? 'cleared' as const
-      : compareMoney(recovered, zero) > 0 ? 'partially_recovered' as const : 'outstanding' as const
-  }
-}
 
 export type AccountReceivablePriority = {
   id: string

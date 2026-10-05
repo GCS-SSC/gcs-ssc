@@ -1,4 +1,5 @@
 import { readAccountReceivablePaymentOffset } from '~~/server/utils/account-receivable-recovery'
+import { requireAuthContext } from '~~/server/utils/authorize'
 import { sql } from 'kysely'
 import { prepareAgreementPaymentRoute } from '~~/server/utils/agreement-payment'
 import { budgetFiscalYearStableId } from '~~/server/utils/agreement-budget-lineage'
@@ -11,7 +12,9 @@ export default defineEventHandler(async event => {
     return prepared
   }
 
-  const { agreementId, db } = prepared
+  const { agreementId, db, agreementContext } = prepared
+  const auth = await requireAuthContext(event)
+  const liveMemoBalances = auth.userAbilities.authorize('account_receivable', 'read', { type: 'agency', agencyId: agreementContext.agencyId })
 
   const payments = await db
     .selectFrom('Funding_Case_Agreement_Payment')
@@ -76,6 +79,6 @@ export default defineEventHandler(async event => {
     line_total: parseDatabaseMoney(payment.line_total)
   }))
   const paymentsWithState = await withBusinessRecordState(db, 'fundingcasepayment', exactPayments)
-  const withRecovery = await Promise.all(paymentsWithState.map(async payment => ({ ...payment, ...await readAccountReceivablePaymentOffset(db, String(payment.id)) })))
+  const withRecovery = await Promise.all(paymentsWithState.map(async payment => ({ ...payment, ...await readAccountReceivablePaymentOffset(db, String(payment.id), { liveMemoBalances }) })))
   return { payments: withRecovery }
 })

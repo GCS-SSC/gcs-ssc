@@ -44,6 +44,12 @@ export const appRouteLocations = {
   proponents: () => ({ name: 'proponents' }),
   proponentCreate: () => ({ name: 'proponents-new' }),
   proponentEdit: (id: string) => ({ name: 'proponents-edit-id', params: { id } }),
+  proponentCreditMemoDetail: (id: string, creditMemoId: string) => ({
+    name: 'proponents-edit-id-credit-memos-creditMemoId', params: { id, creditMemoId }
+  }),
+  proponentCreditMemoCollection: (id: string) => ({
+    name: 'proponents-edit-id', params: { id }, query: { section: 'credit-memos' }
+  }),
   agreements: () => ({ name: 'agreements' }),
   assignmentManagement: () => ({ name: 'assignment-management' }),
   agreementCreate: () => ({ name: 'agreements-new' }),

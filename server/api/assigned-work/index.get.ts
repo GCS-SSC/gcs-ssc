@@ -22,6 +22,7 @@ type AssignedWorkRow = {
   identifier_en: string
   identifier_fr: string
   agreement_id: string | null
+  proponent_id: string | null
   variant: string | null
   parent_en: string | null
   parent_fr: string | null
@@ -182,13 +183,14 @@ export default defineEventHandler(async event => {
       WHERE NOT item._deleted
       UNION ALL
       SELECT item.id, 'fundingcaseaccountreceivablecreditmemo', item.egcs_fc_status::text,
-        item.egcs_fc_agreementnumber || '-CM-' || item.egcs_fc_number::text,
-        item.egcs_fc_agreementnumber || '-CM-' || item.egcs_fc_number::text,
-        item.egcs_fc_fundingagreement, NULL::text, 'account_receivable', program.egcs_tp_agency, program.id
+        'CM-' || coalesce((SELECT recovery.id FROM "Funding_Case_Account_Receivable_Recovery" recovery
+          WHERE recovery.egcs_fc_creditmemo=item.id AND NOT recovery._deleted ORDER BY recovery.id DESC LIMIT 1),item.id)::text,
+        'CM-' || coalesce((SELECT recovery.id FROM "Funding_Case_Account_Receivable_Recovery" recovery
+          WHERE recovery.egcs_fc_creditmemo=item.id AND NOT recovery._deleted ORDER BY recovery.id DESC LIMIT 1),item.id)::text,
+        NULL::bigint, NULL::text, 'account_receivable', item.egcs_fc_agency, NULL::bigint
       FROM "Funding_Case_Account_Receivable_Credit_Memo" item
-      JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.id = item.egcs_fc_fundingagreement AND NOT agreement._deleted
-      JOIN "Transfer_Payment_Stream" stream ON stream.id = agreement.egcs_fc_transferpaymentstream AND NOT stream._deleted
-      JOIN "Transfer_Payment_Profile" program ON program.id = stream.egcs_tp_transferpaymentprofile AND NOT program._deleted
+      JOIN "Agency_Profile" agency ON agency.id = item.egcs_fc_agency AND NOT agency._deleted
+      JOIN "Applicant_Recipient_Profile" debtor ON debtor.id = item.egcs_fc_applicantrecipient AND NOT debtor._deleted
       WHERE NOT item._deleted
       UNION ALL
       SELECT child.id, child.entity_type, child.status, '#' || child.id::text, '#' || child.id::text,
@@ -287,6 +289,7 @@ export default defineEventHandler(async event => {
       CASE WHEN work.entity_type = 'fundingcaseagreement' THEN COALESCE(to_jsonb(display_agreement)->>'egcs_fc_agreementnumber', work.identifier_fr)
         ELSE work.identifier_fr END identifier_fr,
       work.agreement_id::text agreement_id, work.variant,
+      display_credit_memo.egcs_fc_applicantrecipient::text proponent_id,
       COALESCE(to_jsonb(display_agreement)->>'egcs_fc_agreementnumber',
         to_jsonb(display_proponent)->>'egcs_ar_legalname_en', to_jsonb(display_proponent)->>'egcs_ar_operatingname_en',
         to_jsonb(display_proponent)->>'egcs_ar_legalname_fr', to_jsonb(display_proponent)->>'egcs_ar_operatingname_fr',
@@ -348,8 +351,15 @@ export default defineEventHandler(async event => {
         CASE WHEN display_recommendation.egcs_cn_entitytype::text <> 'commonreview' THEN display_recommendation.egcs_cn_entitytype::text END,
         recommendation_review_set.egcs_cn_entitytype::text)
       AND display_binding.owner_type = 'applicantrecipient'
+    LEFT JOIN "Funding_Case_Account_Receivable_Credit_Memo" display_credit_memo ON display_credit_memo.id = CASE
+      WHEN work.entity_type = 'fundingcaseaccountreceivablecreditmemo' THEN work.id
+      WHEN display_review_set.egcs_cn_entitytype::text = 'fundingcaseaccountreceivablecreditmemo' THEN display_review_set.egcs_cn_entityid
+      WHEN display_recommendation.egcs_cn_entitytype::text = 'fundingcaseaccountreceivablecreditmemo' THEN display_recommendation.egcs_cn_entityid
+      WHEN recommendation_review_set.egcs_cn_entitytype::text = 'fundingcaseaccountreceivablecreditmemo' THEN recommendation_review_set.egcs_cn_entityid END
+      AND NOT display_credit_memo._deleted
     LEFT JOIN "Applicant_Recipient_Profile" display_proponent ON display_proponent.id = CASE
       WHEN work.entity_type = 'applicantrecipient' THEN work.id
+      WHEN display_credit_memo.id IS NOT NULL THEN display_credit_memo.egcs_fc_applicantrecipient
       WHEN display_review_set.egcs_cn_entitytype::text = 'applicantrecipient' THEN display_review_set.egcs_cn_entityid
       WHEN display_recommendation.egcs_cn_entitytype::text = 'applicantrecipient' THEN display_recommendation.egcs_cn_entityid
       WHEN recommendation_review_set.egcs_cn_entitytype::text = 'applicantrecipient' THEN recommendation_review_set.egcs_cn_entityid
@@ -426,7 +436,9 @@ export default defineEventHandler(async event => {
     const total = result.rows[0]?.total_count ?? countProbe?.rows[0]?.total_count ?? 0
     const items = result.rows.map(({ total_count: _totalCount, ...row }) => ({
       ...row,
-      url: buildAssignedWorkRoute(row.entity_type, row.entity_id, row.agreement_id, row.variant)
+      url: row.entity_type === 'fundingcaseaccountreceivablecreditmemo' && row.proponent_id
+        ? `/proponents/edit/${row.proponent_id}/credit-memos/${row.entity_id}`
+        : buildAssignedWorkRoute(row.entity_type, row.entity_id, row.agreement_id, row.variant)
     }))
     return { items, page: query.page, limit: query.limit, total }
   })

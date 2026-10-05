@@ -232,7 +232,11 @@ export const buildWorkflowSetupPublication = async (
       ? await readAgencyCustomFieldDefinitions(db, String(setup.egcs_cn_agency))
       : []
     if (conditions.length && (await resolveEntityTypeLifecycleDefinition(db, setup.egcs_cn_entitytype))?.ownerKind !== 'agreement') throw new Error('Workflow conditions require an Agreement owner')
-    const choices = conditions.some(condition => 'source' in condition) ? await readWorkflowProfileChoices(db, String(setup.egcs_cn_agency)) : null
+    const choices = conditions.some(condition => 'source' in condition)
+      ? await readWorkflowProfileChoices(db, String(setup.egcs_cn_agency), {
+          amendmentSubtypeIds: [...new Set(conditions.flatMap(condition => 'source' in condition && condition.source === 'amendment_subtype' ? condition.optionIds : []))]
+        })
+      : null
     const resolvedConditions = conditions.map(condition => {
       if ('source' in condition) return resolveWorkflowProfileCondition(condition, choices!)
       const field = fields.find(candidate => candidate.id === condition.fieldId)

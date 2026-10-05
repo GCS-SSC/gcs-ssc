@@ -213,7 +213,8 @@ const storeGeneratedAgreementDocument = async (
   template: TemplateRow,
   agreementId: string,
   generated: GeneratedAgreementDocument,
-  closeoutId?: string
+  closeoutId?: string,
+  amendmentId?: string
 ) => await writeStoredFile(db, {
   agencyId: String(template.agencyId),
   bytes: generated.bytes,
@@ -221,16 +222,23 @@ const storeGeneratedAgreementDocument = async (
   mimeType: generated.mimeType,
   nameEn: generated.filename,
   nameFr: generated.filename,
-  descriptionEn: closeoutId ? `Generated closeout document for agreement ${agreementId}` : `Generated document for agreement ${agreementId}`,
-  descriptionFr: closeoutId ? `Document de cloture genere pour l entente ${agreementId}` : `Document genere pour l entente ${agreementId}`,
-  folder: closeoutId ? `generated-documents/agreement-${agreementId}/closeout-${closeoutId}` : `generated-documents/agreement-${agreementId}`,
+  descriptionEn: amendmentId ? `Generated document for amendment ${amendmentId} of agreement ${agreementId}` : closeoutId ? `Generated closeout document for agreement ${agreementId}` : `Generated document for agreement ${agreementId}`,
+  descriptionFr: amendmentId ? `Document généré pour la modification ${amendmentId} de l’entente ${agreementId}` : closeoutId ? `Document de cloture genere pour l entente ${agreementId}` : `Document genere pour l entente ${agreementId}`,
+  folder: amendmentId ? `generated-documents/agreement-${agreementId}/amendment-${amendmentId}` : closeoutId ? `generated-documents/agreement-${agreementId}/closeout-${closeoutId}` : `generated-documents/agreement-${agreementId}`,
   purpose: 'generated-document',
-  target: { entityType: closeoutId ? 'fundingcaseagreementcloseout' : 'fundingcaseagreement', entityId: closeoutId ?? agreementId },
+  target: generatedDocumentStorageTarget(agreementId, { closeoutId, amendmentId }),
   attachmentTypeNameEn: 'Generated Document',
   attachmentTypeNameFr: 'Document genere',
   attachmentTypeDescriptionEn: 'Generated agreement documents.',
   attachmentTypeDescriptionFr: 'Documents d entente generes.'
 })
+
+const generatedDocumentStorageTarget = (agreementId: string, scope: { closeoutId?: string, amendmentId?: string }) =>
+  scope.amendmentId
+    ? { entityType: 'fundingcaseamendment' as const, entityId: scope.amendmentId }
+    : scope.closeoutId
+      ? { entityType: 'fundingcaseagreementcloseout' as const, entityId: scope.closeoutId }
+      : { entityType: 'fundingcaseagreement' as const, entityId: agreementId }
 
 const insertGeneratedAgreementDocumentRecord = async (
   db: Kysely<Database>,
@@ -240,11 +248,13 @@ const insertGeneratedAgreementDocumentRecord = async (
   storedAttachmentId: string,
   language: Language_Preference,
   outputFormat: TransferPaymentDocumentTemplateOutputFormat,
-  closeoutId?: string
+  closeoutId?: string,
+  amendmentId?: string
 ) => {
   const record: Insertable<FundingCaseAgreementGeneratedDocumentTable> = {
     egcs_fc_fundingagreement: agreementId,
     egcs_fc_closeout: closeoutId,
+    egcs_fc_amendment: amendmentId,
     egcs_fc_documenttemplate: templateId,
     egcs_fc_generatedattachment: storedAttachmentId,
     egcs_fc_language: language,
@@ -266,9 +276,10 @@ export const persistGeneratedDocumentWithRollback = async (
   generated: GeneratedAgreementDocument,
   language: Language_Preference,
   outputFormat: TransferPaymentDocumentTemplateOutputFormat,
-  closeoutId?: string
+  closeoutId?: string,
+  amendmentId?: string
 ) => {
-  const stored = await storeGeneratedAgreementDocument(db, template, agreementId, generated, closeoutId)
+  const stored = await storeGeneratedAgreementDocument(db, template, agreementId, generated, closeoutId, amendmentId)
 
   try {
     return await insertGeneratedAgreementDocumentRecord(
@@ -279,13 +290,11 @@ export const persistGeneratedDocumentWithRollback = async (
       stored.id,
       language,
       outputFormat,
-      closeoutId
+      closeoutId,
+      amendmentId
     )
   } catch (error: unknown) {
-    await bestEffortStorageCleanup(async () => await deleteStoredAttachmentById(db, stored.id, 'generated-document', {
-      entityType: closeoutId ? 'fundingcaseagreementcloseout' : 'fundingcaseagreement',
-      entityId: closeoutId ?? agreementId
-    }), {
+    await bestEffortStorageCleanup(async () => await deleteStoredAttachmentById(db, stored.id, 'generated-document', generatedDocumentStorageTarget(agreementId, { closeoutId, amendmentId })), {
       providerId: stored.providerId,
       objectId: stored.objectId,
       purpose: 'generated-document'
@@ -357,7 +366,8 @@ export const buildAgreementDocumentContext = async (
   agreementId: string,
   db: Kysely<Database>,
   event?: H3Event,
-  language: Language_Preference = 'eng'
+  language: Language_Preference = 'eng',
+  versions: { budgetVersionId?: string, activityVersionId?: string } = {}
 ): Promise<Record<string, unknown>> => {
   const localized = <T extends { en: unknown, fr: unknown }>(value: T): unknown => language === 'fra' ? value.fr : value.en
   const localizedValue = (value: unknown): string => valueOrFallback(value, language)
@@ -437,7 +447,8 @@ export const buildAgreementDocumentContext = async (
       .innerJoin('Funding_Case_Agreement_Activity_Version', 'Funding_Case_Agreement_Activity_Version.id', 'Funding_Case_Agreement_Activity.egcs_fc_activityversion')
       .where('Funding_Case_Agreement_Activity.egcs_fc_fundingagreement', '=', agreementId)
       .where('Funding_Case_Agreement_Activity._deleted', '=', false)
-      .where('Funding_Case_Agreement_Activity_Version.egcs_fc_iscurrent', '=', true)
+      .$if(Boolean(versions.activityVersionId), query => query.where('Funding_Case_Agreement_Activity_Version.id', '=', versions.activityVersionId!))
+      .$if(!versions.activityVersionId, query => query.where('Funding_Case_Agreement_Activity_Version.egcs_fc_iscurrent', '=', true))
       .where('Funding_Case_Agreement_Activity_Version._deleted', '=', false)
       .select([
         'Funding_Case_Agreement_Activity.id as id',
@@ -466,7 +477,8 @@ export const buildAgreementDocumentContext = async (
       )
       .where('Funding_Case_Agreement_Activity.egcs_fc_fundingagreement', '=', agreementId)
       .where('Funding_Case_Agreement_Activity._deleted', '=', false)
-      .where('Funding_Case_Agreement_Activity_Version.egcs_fc_iscurrent', '=', true)
+      .$if(Boolean(versions.activityVersionId), query => query.where('Funding_Case_Agreement_Activity_Version.id', '=', versions.activityVersionId!))
+      .$if(!versions.activityVersionId, query => query.where('Funding_Case_Agreement_Activity_Version.egcs_fc_iscurrent', '=', true))
       .where('Funding_Case_Agreement_Activity_Version._deleted', '=', false)
       .where('Funding_Case_Agreement_Outcome_Activity._deleted', '=', false)
       .where('Transfer_Payment_Outcome._deleted', '=', false)
@@ -499,7 +511,8 @@ export const buildAgreementDocumentContext = async (
       )
       .where('Funding_Case_Agreement_Activity.egcs_fc_fundingagreement', '=', agreementId)
       .where('Funding_Case_Agreement_Activity._deleted', '=', false)
-      .where('Funding_Case_Agreement_Activity_Version.egcs_fc_iscurrent', '=', true)
+      .$if(Boolean(versions.activityVersionId), query => query.where('Funding_Case_Agreement_Activity_Version.id', '=', versions.activityVersionId!))
+      .$if(!versions.activityVersionId, query => query.where('Funding_Case_Agreement_Activity_Version.egcs_fc_iscurrent', '=', true))
       .where('Funding_Case_Agreement_Activity_Version._deleted', '=', false)
       .where('Funding_Case_Agreement_Responsible_Party_Activity._deleted', '=', false)
       .where('Funding_Case_Agreement_Applicant_Recipient._deleted', '=', false)
@@ -519,7 +532,8 @@ export const buildAgreementDocumentContext = async (
       .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fiscalyear')
       .where('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fundingagreement', '=', agreementId)
       .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
-      .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)
+      .$if(Boolean(versions.budgetVersionId), query => query.where('Funding_Case_Agreement_Budget_Version.id', '=', versions.budgetVersionId!))
+      .$if(!versions.budgetVersionId, query => query.where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true))
       .where('Funding_Case_Agreement_Budget_Version._deleted', '=', false)
       .select(['Funding_Case_Agreement_Budget_Fiscal_Year.id as id', 'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as display'])
       .orderBy('Agency_Fiscal_Year.egcs_ay_fiscalyear', 'asc')
@@ -534,7 +548,8 @@ export const buildAgreementDocumentContext = async (
       .where('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fundingagreement', '=', agreementId)
       .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false)
       .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
-      .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)
+      .$if(Boolean(versions.budgetVersionId), query => query.where('Funding_Case_Agreement_Budget_Version.id', '=', versions.budgetVersionId!))
+      .$if(!versions.budgetVersionId, query => query.where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true))
       .where('Funding_Case_Agreement_Budget_Version._deleted', '=', false)
       .select([
         'Funding_Case_Agreement_Budget_Line_Item.id as rowId',
@@ -864,12 +879,13 @@ export const loadAgreementDocumentRenderInput = async (
   templateId: string,
   language: Language_Preference,
   outputFormat: TransferPaymentDocumentTemplateOutputFormat,
-  db: Kysely<Database>
+  db: Kysely<Database>,
+  options: { entityType?: TransferPaymentDocumentTemplateEntityType, coreContext?: Record<string, unknown> } = {}
 ) => {
   if (!isPositivePostgresBigintText(agreementId) || !isPositivePostgresBigintText(templateId)) {
     return await notFound(event, 'DOCUMENT_TEMPLATE_NOT_FOUND', 'apiErrors.document_generation.template_not_found')
   }
-  const template = await loadAgreementDocumentTemplate(agreementId, templateId, db)
+  const template = await loadAgreementDocumentTemplate(agreementId, templateId, db, options.entityType)
 
   if (!template) {
     return await notFound(event, 'DOCUMENT_TEMPLATE_NOT_FOUND', 'apiErrors.document_generation.template_not_found')
@@ -879,7 +895,7 @@ export const loadAgreementDocumentRenderInput = async (
     return await badRequest(event, 'DOCUMENT_OUTPUT_NOT_ALLOWED', 'apiErrors.document_generation.output_not_allowed')
   }
 
-  const coreContext = await buildAgreementDocumentContext(agreementId, db, undefined, language)
+  const coreContext = options.coreContext ?? await buildAgreementDocumentContext(agreementId, db, undefined, language)
   return {
     agreementId, template, coreContext,
     coreContextHash: createHash('sha256').update(JSON.stringify(coreContext)).digest('hex')
@@ -1042,6 +1058,7 @@ const generatedDocumentListSelection = [
   'Funding_Case_Agreement_Generated_Document.id as id',
   'Funding_Case_Agreement_Generated_Document.egcs_fc_fundingagreement as egcs_fc_fundingagreement',
   'Funding_Case_Agreement_Generated_Document.egcs_fc_closeout as egcs_fc_closeout',
+  'Funding_Case_Agreement_Generated_Document.egcs_fc_amendment as egcs_fc_amendment',
   'Funding_Case_Agreement_Generated_Document.egcs_fc_documenttemplate as egcs_fc_documenttemplate',
   'Funding_Case_Agreement_Generated_Document.egcs_fc_generatedattachment as egcs_fc_generatedattachment',
   'Funding_Case_Agreement_Generated_Document.egcs_fc_language as egcs_fc_language',
@@ -1058,7 +1075,8 @@ const generatedDocumentListSelection = [
 const buildAgreementGeneratedDocumentListQuery = (
   agreementId: string,
   db: Kysely<Database>,
-  closeoutId?: string
+  closeoutId?: string,
+  amendmentId?: string
 ) => {
   const query = db
     .selectFrom('Funding_Case_Agreement_Generated_Document')
@@ -1067,19 +1085,19 @@ const buildAgreementGeneratedDocumentListQuery = (
     .where('Funding_Case_Agreement_Generated_Document._deleted', '=', false)
     .where('Common_Attachment._deleted', '=', false)
 
-  return closeoutId
-    ? query.where('Funding_Case_Agreement_Generated_Document.egcs_fc_closeout', '=', closeoutId)
-    : query.where('Funding_Case_Agreement_Generated_Document.egcs_fc_closeout', 'is', null)
+  return query
+    .where('Funding_Case_Agreement_Generated_Document.egcs_fc_closeout', closeoutId ? '=' : 'is', closeoutId ?? null)
+    .where('Funding_Case_Agreement_Generated_Document.egcs_fc_amendment', amendmentId ? '=' : 'is', amendmentId ?? null)
 }
 
 export const listAgreementGeneratedDocumentPage = async (
   agreementId: string,
   db: Kysely<Database>,
-  options: { page: number, limit: number, search?: string }
+  options: { page: number, limit: number, search?: string, amendmentId?: string }
 ) => {
   const { page, limit, search } = options
   const offset = (page - 1) * limit
-  let query = buildAgreementGeneratedDocumentListQuery(agreementId, db)
+  let query = buildAgreementGeneratedDocumentListQuery(agreementId, db, undefined, options.amendmentId)
 
   if (search) {
     const pattern = `%${escapeLikePattern(search)}%`
@@ -1108,9 +1126,10 @@ export const listAgreementGeneratedDocumentPage = async (
 export const listAgreementGeneratedDocuments = async (
   agreementId: string,
   db: Kysely<Database>,
-  closeoutId?: string
+  closeoutId?: string,
+  amendmentId?: string
 ) => {
-  const query = buildAgreementGeneratedDocumentListQuery(agreementId, db, closeoutId)
+  const query = buildAgreementGeneratedDocumentListQuery(agreementId, db, closeoutId, amendmentId)
 
   return await query
     .select([...generatedDocumentListSelection])
@@ -1124,7 +1143,8 @@ export const readAgreementGeneratedDocument = async (
   agreementId: string,
   documentId: string,
   db: Kysely<Database>,
-  closeoutId?: string
+  closeoutId?: string,
+  amendmentId?: string
 ): Promise<GeneratedAgreementDocument> => {
   const document = await db
     .selectFrom('Funding_Case_Agreement_Generated_Document')
@@ -1135,6 +1155,7 @@ export const readAgreementGeneratedDocument = async (
     .where('Common_Attachment._deleted', '=', false)
     .$if(Boolean(closeoutId), query => query.where('Funding_Case_Agreement_Generated_Document.egcs_fc_closeout', '=', closeoutId!))
     .$if(!closeoutId, query => query.where('Funding_Case_Agreement_Generated_Document.egcs_fc_closeout', 'is', null))
+    .where('Funding_Case_Agreement_Generated_Document.egcs_fc_amendment', amendmentId ? '=' : 'is', amendmentId ?? null)
     .select([
       'Common_Attachment.egcs_cn_provider as egcs_cn_provider',
       'Common_Attachment.egcs_cn_providerobjectid as egcs_cn_providerobjectid',
@@ -1150,10 +1171,7 @@ export const readAgreementGeneratedDocument = async (
   }
 
   return {
-    bytes: await readDocumentStoredFile(event, db, String((await db.selectFrom('Common_Attachment_Types').select('egcs_cn_agency').where('id', '=', document.attachmentTypeId).executeTakeFirstOrThrow()).egcs_cn_agency), document, 'generated-document', {
-      entityType: closeoutId ? 'fundingcaseagreementcloseout' : 'fundingcaseagreement',
-      entityId: closeoutId ?? agreementId
-    }),
+    bytes: await readDocumentStoredFile(event, db, String((await db.selectFrom('Common_Attachment_Types').select('egcs_cn_agency').where('id', '=', document.attachmentTypeId).executeTakeFirstOrThrow()).egcs_cn_agency), document, 'generated-document', generatedDocumentStorageTarget(agreementId, { closeoutId, amendmentId })),
     filename: document.filename,
     mimeType: document.mimeType
   }

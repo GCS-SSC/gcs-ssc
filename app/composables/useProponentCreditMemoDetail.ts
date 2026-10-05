@@ -5,17 +5,17 @@ import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 
 /**
- * Loads retained Accounts Receivable evidence without requesting its parent or live sources.
+ * Loads an independently authorized Proponent Credit Memo without live Agreement context.
  *
- * @param agreementId - Owning Agreement from the nested route.
- * @param creditMemoId - Independent Accounts Receivable identity.
+ * @param proponentId - Expected Proponent; null only for a historical entry redirect.
+ * @param creditMemoId - Independently authorized Credit Memo identity.
  * @returns Retained detail, durable request state and an isolated reload.
  */
-export const useAccountReceivableCreditMemoDetail = (agreementId: MaybeRefOrGetter<string>, creditMemoId: MaybeRefOrGetter<string>) => {
+export const useProponentCreditMemoDetail = (proponentId: MaybeRefOrGetter<string | null>, creditMemoId: MaybeRefOrGetter<string>) => {
   const data: Ref<AccountReceivableCreditMemoDetail | null> = ref(null)
   const status: Ref<'idle' | 'pending' | 'success' | 'error'> = ref('idle')
   const error: Ref<unknown | null> = ref(null)
-  const identity = computed(() => `${toValue(agreementId)}:${toValue(creditMemoId)}`)
+  const identity = computed(() => `${toValue(proponentId)}:${toValue(creditMemoId)}`)
   let generation = 0
   let disposed = false
   let controller: AbortController | null = null
@@ -26,7 +26,7 @@ export const useAccountReceivableCreditMemoDetail = (agreementId: MaybeRefOrGett
   const refresh = async () => {
     const requestGeneration = ++generation
     const requestIdentity = identity.value
-    const expectedAgreement = toValue(agreementId)
+    const expectedProponent = toValue(proponentId)
     controller?.abort()
     controller = new AbortController()
     status.value = 'pending'
@@ -36,7 +36,7 @@ export const useAccountReceivableCreditMemoDetail = (agreementId: MaybeRefOrGett
       if (!response.ok) await throwFetchResponseError(response)
       const detail = await response.json() as AccountReceivableCreditMemoDetail
       if (disposed || requestGeneration !== generation || requestIdentity !== identity.value) return false
-      if (detail.egcs_fc_fundingagreement !== expectedAgreement || detail.id !== toValue(creditMemoId)) throw new Error('Accounts Receivable route containment failed')
+      if ((expectedProponent !== null && detail.egcs_fc_applicantrecipient !== expectedProponent) || detail.id !== toValue(creditMemoId)) throw new Error('Accounts Receivable route containment failed')
       data.value = detail
       status.value = 'success'
       return true

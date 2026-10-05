@@ -478,7 +478,7 @@ watch(activeUnallocatedClaimLineItems, lines => {
 }, { immediate: true })
 
 const refreshPage = async () => {
-  await refreshOverview()
+  await Promise.all([refreshOverview(), receivableEntry.refresh()])
   approvalsRefreshKey.value += 1
 }
 

@@ -24,6 +24,10 @@ import * as intakeRegistryIdentityMigration from './migrations/0230_intake_regis
 import * as fundingSourcesMigration from './migrations/0220_funding_sources'
 
 import * as accountsReceivableMigration from './migrations/0270_accounts_receivable'
+import * as accountsReceivableOffsetMemosMigration from './migrations/0300_accounts_receivable_offset_memos'
+import * as proponentCreditLedgerMigration from './migrations/0310_proponent_credit_ledger'
+import * as amendmentDocumentsMigration from './migrations/0320_amendment_documents'
+import * as workflowAmendmentConditionsMigration from './migrations/0330_workflow_amendment_conditions'
 import * as correctionsMigration from './migrations/0260_corrections'
 import * as journalVoucherMigration from './migrations/0250_journal_vouchers'
 
@@ -53,7 +57,11 @@ export const productionCoreMigrations = {
   '0230_intake_registry_identity': intakeRegistryIdentityMigration,
   '0250_journal_vouchers': journalVoucherMigration,
   '0260_corrections': correctionsMigration,
-  '0270_accounts_receivable': accountsReceivableMigration
+  '0270_accounts_receivable': accountsReceivableMigration,
+  '0300_accounts_receivable_offset_memos': accountsReceivableOffsetMemosMigration,
+  '0310_proponent_credit_ledger': proponentCreditLedgerMigration,
+  '0320_amendment_documents': amendmentDocumentsMigration,
+  '0330_workflow_amendment_conditions': workflowAmendmentConditionsMigration
 } satisfies Record<string, Migration>
 
 export const productionCoreMigrationProvider: MigrationProvider = {

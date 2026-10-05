@@ -2,7 +2,7 @@
 import type { H3Event } from 'h3'
 import type { Kysely, Transaction } from 'kysely'
 import type { AuthorizationResourceOwner } from '@gcs-ssc/authorization'
-import { badRequest, notFound, throwApiError } from '~~/server/utils/api-errors'
+import { badRequest, forbidden, notFound, throwApiError } from '~~/server/utils/api-errors'
 import { resolveAgreementScopeContext } from '~~/server/utils/agreement'
 import { resolveFundingCaseScope } from '~~/server/utils/funding-case'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
@@ -67,7 +67,7 @@ const ownerMatches = (
       && expected.transferPaymentId === current.transferPaymentId
       && expected.streamId === current.streamId
   }
-  return expected.kind === 'agency' && current.kind === 'agency'
+  return expected.kind === 'agency' && current.kind === 'agency' && expected.subject === current.subject
 }
 
 const lockAssignmentTarget = async (
@@ -217,7 +217,7 @@ const lockAndValidateAssignee = async (
     const scope = await resolveFundingCaseScope(trx, owner.intakeId)
     eligible = Boolean(scope && abilities.authorize('funding_case', 'update', scope.scope))
   } else if (owner?.kind === 'agency') {
-    eligible = abilities.authorize('agency', 'update', { type: 'agency', agencyId: owner.agencyId })
+    eligible = abilities.authorize(owner.subject ?? 'agency', 'update', { type: 'agency', agencyId: owner.agencyId })
   }
   if (!eligible || activeAssignments.length === 0) {
     return await badRequest(event, 'ASSIGNMENT_USER_OUTSIDE_AGENCY', 'apiErrors.assignments.invalid_assignee')
@@ -347,6 +347,21 @@ export const executeEntityAssignmentManagement = async <T>(
     })
   }
 
-  // Agency and transfer-payment subjects deliberately do not support manage_assignments.
+  if (owner.kind === 'agency' && owner.subject === 'account_receivable') {
+    return await db.transaction().execute(async trx => {
+      const auth = await requireFreshAuthContext(event, trx, { lockUserIds: assigneeApplicationUserId ? [assigneeApplicationUserId] : [] })
+      await trx.selectFrom('Agency_Profile').select('id').where('id', '=', owner.agencyId).where('_deleted', '=', false).forShare().executeTakeFirstOrThrow()
+      const { resolveCreditMemoAuthorityTarget } = await import('./credit-memo-scope-authority')
+      const { resolveAccountReceivableCreditMemoRuntimeContext, lockAccountReceivableRecoveryPool } = await import('./account-receivable-context')
+      const memoId = await resolveCreditMemoAuthorityTarget(trx, coreTarget.entityType, coreTarget.entityId)
+      const memo = memoId ? await resolveAccountReceivableCreditMemoRuntimeContext(trx, memoId) : null
+      if (!memo || memo.agencyId !== owner.agencyId) return await forbidden(event)
+      await lockAccountReceivableRecoveryPool(trx, memo)
+      if (!await canManageEntityAssignmentsWithContext(auth, trx, coreTarget.entityType, coreTarget.entityId)) return await forbidden(event)
+      return await executeLockedAssignmentManagement(event, trx, coreTarget, owner, callback, options)
+    })
+  }
+
+  // Structural Agency and transfer-payment subjects have no independent rosters.
   return await throwApiError(event, { statusCode: 403, code: 'FORBIDDEN', key: 'apiErrors.auth.forbidden' })
 }

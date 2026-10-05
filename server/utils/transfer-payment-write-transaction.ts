@@ -219,6 +219,9 @@ export const executeFreshAuthorizedTransferPaymentAgencyTransfer = async <T>(
       })
     } catch (error: unknown) {
       const constraint = getDatabaseConstraintName(error)
+      if (constraint === 'workflow_profile_condition_reference') {
+        return await throwApiError(event, { statusCode: 409, code: 'WORKFLOW_CONDITION_REFERENCE_IN_USE', key: 'apiErrors.request.resource_in_use' })
+      }
       if ([
         'tp_chk_profile_agency_field_associations',
         'tp_chk_profile_agency_catalog_links',

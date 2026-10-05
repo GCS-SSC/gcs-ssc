@@ -1,4 +1,5 @@
-import { computed, ref } from 'vue'
+import { computed, getCurrentScope, onScopeDispose, ref, toValue, watch } from 'vue'
+import type { MaybeRefOrGetter, Ref } from 'vue'
 import type { ApplicantRecipientProfileRow } from '~~/shared/types/applicant-recipient-ui'
 import type { TabMap } from '~~/shared/types/ui'
 import ApplicantRecipientGeneralTab from '~/components/ApplicantRecipient/ApplicantRecipientGeneralTab.vue'
@@ -13,6 +14,8 @@ import ApplicantRecipientContactsTab from '~/components/ApplicantRecipient/Appli
 import ApplicantRecipientReviewsTab from '~/components/ApplicantRecipient/ApplicantRecipientReviewsTab.vue'
 import ApplicantRecipientAgreementsTab from '~/components/ApplicantRecipient/ApplicantRecipientAgreementsTab.vue'
 import ApplicantRecipientFundingHistoryTab from '~/components/ApplicantRecipient/ApplicantRecipientFundingHistoryTab.vue'
+import ApplicantRecipientAccountReceivablesTab from '~/components/ApplicantRecipient/ApplicantRecipientAccountReceivablesTab.vue'
+import ApplicantRecipientCreditMemosTab from '~/components/ApplicantRecipient/ApplicantRecipientCreditMemosTab.vue'
 import ExtensionEntityTabPanel from '~/components/Extension/ExtensionEntityTabPanel.vue'
 import { useRouteTabMap } from '~/composables/useRouteTabMap'
 import { appRouteLocations } from '~/utils/route-locations'
@@ -36,6 +39,8 @@ export const APPLICANT_RECIPIENT_DETAIL_TAB_KEYS = {
   reviews: 'applicant_recipient.reviews.title',
   agreements: 'applicant_recipient.agreements.title',
   fundingHistory: 'applicant_recipient.funding_history.title',
+  accountReceivables: 'account_receivable.title',
+  creditMemos: 'account_receivable.credit_memos_title',
   attachments: 'attachments.title',
   assignments: 'assignments.title'
 } as const
@@ -44,28 +49,44 @@ export const APPLICANT_RECIPIENT_DETAIL_TAB_KEYS = {
  * Builds proponent detail-page state, including tabs and breadcrumb metadata.
  *
  * @param id - Applicant recipient profile id.
+ * @param options - Parent workspace request controls.
+ * @param options.enabled - Whether the parent profile and tabs own the current route.
  * @returns Fetched profile state plus tab metadata for the detail view.
  */
-export const useApplicantRecipientDetailState = (id: string) => {
+export const useApplicantRecipientDetailState = (id: string, options: { enabled?: MaybeRefOrGetter<boolean> } = {}) => {
   const { t, locale } = useI18n()
   const localePath = useLocalePath()
   const { getHeroCollapsed } = useDashboard()
   const { getBilingualValue } = useBilingualValue()
 
-  const profile = ref<ApplicantRecipientDetailProfile | null>(null)
-  const error = ref<unknown | null>(null)
-  const status = ref<'pending' | 'success' | 'error'>('pending')
+  const isEnabled = computed(() => options.enabled === undefined ? true : toValue(options.enabled))
+  const profile: Ref<ApplicantRecipientDetailProfile | null> = ref(null)
+  const error: Ref<unknown | null> = ref(null)
+  const status: Ref<'idle' | 'pending' | 'success' | 'error'> = ref(isEnabled.value ? 'pending' : 'idle')
+  let requestGeneration = 0
+  let initialRequestQueued = true
+  let disposed = false
+  if (getCurrentScope()) onScopeDispose(() => {
+    disposed = true
+    requestGeneration += 1
+  })
 
   /** Fetches the profile without registering a route-blocking async dependency. */
   const refreshProfile = async () => {
+    if (disposed || !isEnabled.value) return
+    const generation = ++requestGeneration
     status.value = 'pending'
     error.value = null
     try {
       const response = await fetch(getClientRequestUrl(`/api/applicant-recipients/${id}`))
+      if (disposed || generation !== requestGeneration || !isEnabled.value) return
       if (!response.ok) await throwFetchResponseError(response)
-      profile.value = await response.json() as ApplicantRecipientDetailProfile
+      const fetchedProfile = await response.json() as ApplicantRecipientDetailProfile
+      if (disposed || generation !== requestGeneration || !isEnabled.value) return
+      profile.value = fetchedProfile
       status.value = 'success'
     } catch (fetchError: unknown) {
+      if (disposed || generation !== requestGeneration || !isEnabled.value) return
       profile.value = null
       error.value = fetchError
       status.value = 'error'
@@ -73,11 +94,19 @@ export const useApplicantRecipientDetailState = (id: string) => {
   }
 
   queueMicrotask(() => {
+    initialRequestQueued = false
     void refreshProfile()
   })
+  watch(isEnabled, enabled => {
+    requestGeneration += 1
+    profile.value = null
+    error.value = null
+    status.value = enabled ? 'pending' : 'idle'
+    if (enabled && !initialRequestQueued) void refreshProfile()
+  }, { flush: 'sync' })
   const { items: extensionItems, tabs: extensionTabs } = useExtensionEntityTabs({
     target: 'proponent',
-    applicantRecipientId: id
+    applicantRecipientId: computed(() => isEnabled.value ? id : undefined)
   })
 
   /**
@@ -104,6 +133,11 @@ export const useApplicantRecipientDetailState = (id: string) => {
 
   const getAgreementsTabProps = () => ({
     applicantRecipientId: id
+  })
+
+  const getCreditMemoTabProps = () => ({
+    applicantRecipientId: id,
+    profile: profile.value
   })
 
   /**
@@ -189,6 +223,20 @@ export const useApplicantRecipientDetailState = (id: string) => {
         component: ApplicantRecipientFundingHistoryTab,
         getProps: getFundingHistoryTabProps
       })
+      nextTabMap.set('account-receivables', {
+        key: APPLICANT_RECIPIENT_DETAIL_TAB_KEYS.accountReceivables,
+        value: 'account-receivables',
+        icon: 'i-lucide-hand-coins',
+        component: ApplicantRecipientAccountReceivablesTab,
+        getProps: getAgreementsTabProps
+      })
+      nextTabMap.set('credit-memos', {
+        key: APPLICANT_RECIPIENT_DETAIL_TAB_KEYS.creditMemos,
+        value: 'credit-memos',
+        icon: 'i-lucide-receipt-text',
+        component: ApplicantRecipientCreditMemosTab,
+        getProps: getCreditMemoTabProps
+      })
       nextTabMap.set('attachments', {
         key: APPLICANT_RECIPIENT_DETAIL_TAB_KEYS.attachments,
         value: 'attachments',
@@ -236,7 +284,7 @@ export const useApplicantRecipientDetailState = (id: string) => {
   const { tabs, selectedTab, selectedTabKey, activeTabComponent, activeTabProps } = useRouteTabMap({
     tabMap,
     defaultTabId: 'general',
-    enabled: computed(() => Boolean(profile.value))
+    enabled: computed(() => isEnabled.value && Boolean(profile.value))
   })
 
   const breadcrumbItems = computed(() => [

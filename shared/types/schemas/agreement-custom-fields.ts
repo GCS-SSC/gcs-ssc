@@ -184,6 +184,7 @@ export const JV_WORKFLOW_BOOLEAN_SOURCES = ['jv_fiscal_eligible', 'jv_payment_fi
 export const AgreementProfileConditionSchema = z.union([
   z.object({ source: z.enum(JV_WORKFLOW_BOOLEAN_SOURCES), value: z.boolean({ error: 'validation.required' }) }).strict(),
   z.object({ source: z.literal('agreement_subtype'), optionIds: z.array(PositivePostgresBigintIdSchema).min(1, { error: 'validation.required' }) }).strict(),
+  z.object({ source: z.literal('amendment_subtype'), optionIds: z.array(PositivePostgresBigintIdSchema).min(1, { error: 'validation.required' }) }).strict(),
   z.object({ source: z.literal('further_distribution'), value: z.boolean({ error: 'validation.required' }) }).strict(),
   z.object({ source: z.literal('recipient_subtype'), quantifier: z.enum(['any', 'all'], { error: 'validation.required' }), optionIds: z.array(PositivePostgresBigintIdSchema).min(1, { error: 'validation.required' }) }).strict()
 ])
@@ -202,6 +203,7 @@ export type CustomFieldCondition = z.infer<typeof CustomFieldConditionSchema>
 export type AgreementProfileCondition = z.infer<typeof AgreementProfileConditionSchema>
 export type WorkflowMemberCondition = z.infer<typeof WorkflowMemberConditionsSchema>[number]
 export type AgreementRoutingValues = {
+  amendment_subtype?: string[]
   jv_fiscal_eligible?: boolean
   jv_payment_final?: boolean
   jv_rationale_present?: boolean
@@ -226,6 +228,7 @@ export const workflowConditionsMatch = (conditions: WorkflowMemberCondition[], v
   conditions.every(condition => {
     if ('fieldId' in condition) return customFieldOptionIds(values[condition.fieldId]).some(optionId => condition.optionIds.includes(optionId))
     if (!profile) return false
+    if (condition.source === 'amendment_subtype') return (profile.amendment_subtype ?? []).some(optionId => condition.optionIds.includes(optionId))
     if ('value' in condition) return profile[condition.source] === condition.value
     if (condition.source === 'recipient_subtype') {
       const matches = (id: string | null) => id !== null && condition.optionIds.includes(id)

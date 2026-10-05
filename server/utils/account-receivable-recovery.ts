@@ -10,6 +10,8 @@ import { hashPublicationDefinition } from './system-publication'
 import { hasAccountingTable } from './correction-schema'
 import { getAgreementAccountingCodingPools } from './agreement-accounting-projection'
 import { formatAccountReceivableCreditMemoSettlementReference } from '~~/shared/utils/account-receivable'
+import { linkAccountReceivableOffsetMemoApplications, linkAccountReceivablePoolOffsetApplication, readAccountReceivablePaymentCreditMemos, readRetainedAccountReceivablePaymentCreditMemos, readPinnedAccountReceivablePaymentCreditMemos } from './account-receivable-offset-memo'
+import { hasAccountReceivablePoolLedger, readAccountReceivablePoolBalance, readAccountReceivablePoolOffsetPolicy, captureAccountReceivablePoolBasis } from './account-receivable-pool-ledger'
 
 const ZERO = parseMoney('0.00')
 const json = (value: unknown): JsonValue => JSON.parse(JSON.stringify(value)) as JsonValue
@@ -44,6 +46,22 @@ export const assertAccountReceivablePaymentAllowed = async (
   if (!await hasAccountingTable(db, 'Funding_Case_Agreement_Account_Receivable')) return
   const context = await resolveAgreementScopeContext(input.agreementId, db)
   if (!context) throw new Error('AR_PAYMENT_OWNER_UNAVAILABLE')
+  if (await hasAccountReceivablePoolLedger(db)) {
+    const pools = await db.selectFrom('Funding_Case_Account_Receivable_Pool').selectAll().where('egcs_fc_agency', '=', context.agencyId)
+      .where('egcs_fc_applicantrecipient', '=', input.applicantRecipientId).where('_deleted', '=', false).execute()
+    for (const pool of pools) {
+      const balance = await readAccountReceivablePoolBalance(db, String(pool.id))
+      if (moneyToCents(balance.egcs_fc_receivableamount) > BigInt(0) && await readAccountReceivablePoolOffsetPolicy(db, String(pool.id)) === 'direct_repayment') throw new Error('AR_DIRECT_REPAYMENT_HOLD')
+      if (pool.egcs_fc_currency !== input.currency) continue
+      let pending = db.selectFrom('Funding_Case_Account_Receivable_Recovery').select('id').where('egcs_fc_pool', '=', String(pool.id))
+        .where('egcs_fc_outcome', '=', 'open').where('_deleted', '=', false)
+      if (input.paymentId) pending = pending.where(eb => eb.or([eb('egcs_fc_payment', 'is', null), eb('egcs_fc_payment', '!=', input.paymentId!)]))
+      if (await pending.executeTakeFirst()) throw new Error('AR_RECOVERY_UNRESOLVED')
+      if (await db.selectFrom('Funding_Case_Agreement_Account_Receivable').select('id').where('egcs_fc_pool', '=', String(pool.id))
+        .where('egcs_fc_linkedreceivable', 'is not', null).where('egcs_fc_outcome', '=', 'open').where('_deleted', '=', false).executeTakeFirst()) throw new Error('AR_ADJUSTMENT_UNRESOLVED')
+    }
+    return
+  }
   const debts = await readAccountReceivablePoolDebts(db, { agencyId: context.agencyId, applicantRecipientId: input.applicantRecipientId })
   if (debts.some(debt => debt.egcs_fc_recoverymethod === 'direct_repayment'
     && moneyToCents(sumMoney(debt.lines.map(line => line.egcs_fc_outstanding))) > BigInt(0))) throw new Error('AR_DIRECT_REPAYMENT_HOLD')
@@ -90,6 +108,18 @@ export const rebuildAccountReceivablePaymentOffset = async (trx: Transaction<Dat
   if (completion) throw new Error('AR_OFFSET_PINNED')
   await assertAccountReceivablePaymentAllowed(trx, { agreementId: context.agreementId, applicantRecipientId: String(payment.egcs_fc_applicantrecipient), currency: payment.egcs_fc_currency, paymentId })
   await releaseAccountReceivablePaymentOffset(trx, paymentId)
+  if (await hasAccountReceivablePoolLedger(trx)) {
+    const balance = await readAccountReceivablePoolBalance(trx, String(pool.id))
+    const gross = moneyToCents(parseDatabaseMoney(payment.gross))
+    const available = moneyToCents(balance.egcs_fc_availableamount)
+    const amount = moneyFromCents(gross < available ? gross : available)
+    if (moneyToCents(amount) > BigInt(0)) {
+      const recovery = await trx.insertInto('Funding_Case_Account_Receivable_Recovery').values({ egcs_fc_pool: String(pool.id), egcs_fc_payment: paymentId,
+        egcs_fc_creditmemo: null, egcs_fc_ledgerkind: 'pool', egcs_fc_amount: databaseMoneyValue(amount) }).returning('id').executeTakeFirstOrThrow()
+      await linkAccountReceivablePoolOffsetApplication(trx, String(recovery.id))
+    }
+    return await readAccountReceivablePaymentOffset(trx, paymentId)
+  }
   const debts = await readAccountReceivablePoolDebts(trx, { agencyId: context.agencyId,
     applicantRecipientId: String(payment.egcs_fc_applicantrecipient), currency: payment.egcs_fc_currency })
   let remaining = moneyToCents(parseDatabaseMoney(payment.gross))
@@ -111,17 +141,18 @@ export const rebuildAccountReceivablePaymentOffset = async (trx: Transaction<Dat
       egcs_fc_payment: paymentId, egcs_fc_creditmemo: null, egcs_fc_amount: databaseMoneyValue(total) }).returning('id').executeTakeFirstOrThrow()
     await trx.insertInto('Funding_Case_Account_Receivable_Allocation').values(allocations.map(row => ({ ...row,
       egcs_fc_recovery: String(recovery.id), egcs_fc_amount: databaseMoneyValue(row.egcs_fc_amount) }))).execute()
+    await linkAccountReceivableOffsetMemoApplications(trx, String(recovery.id))
   }
   return await readAccountReceivablePaymentOffset(trx, paymentId)
 }
 
 /** Deliberately omits rationale, source data, sibling Agreement identity and debt navigation. */
-export const readAccountReceivablePaymentOffset = async (db: Kysely<Database>, paymentId: string) => {
+export const readAccountReceivablePaymentOffset = async (db: Kysely<Database>, paymentId: string, options: { liveMemoBalances?: boolean } = {}) => {
   if (!await hasAccountingTable(db, 'Funding_Case_Agreement_Account_Receivable')) {
     const historical = await db.selectFrom('Funding_Case_Agreement_Payment').select(databaseMoneyText(sql.ref('egcs_fc_paymentamount')).as('gross'))
       .where('id', '=', paymentId).executeTakeFirstOrThrow()
     const gross = parseDatabaseMoney(historical.gross)
-    return { egcs_fc_grossamount: gross, egcs_fc_offsetamount: ZERO, egcs_fc_netamount: gross, egcs_fc_recoverycontrol: 'allowed' as const, egcs_fc_creditmemoreference: null, egcs_fc_offsets: [] }
+    return { egcs_fc_grossamount: gross, egcs_fc_offsetamount: ZERO, egcs_fc_netamount: gross, egcs_fc_recoverycontrol: 'allowed' as const, egcs_fc_creditmemoreference: null, egcs_fc_offsets: [], egcs_fc_creditmemos: [] }
   }
   const payment = await db.selectFrom('Funding_Case_Agreement_Payment').select(['egcs_fc_fundingagreement', 'egcs_fc_applicantrecipient', 'egcs_fc_currency'])
     .select(sql<boolean>`EXISTS (SELECT 1 FROM "Common_Status" status WHERE status.id = "Funding_Case_Agreement_Payment".egcs_fc_status AND status.egcs_cn_terminal AND NOT status._deleted)`.as('egcs_fc_isterminal'))
@@ -151,11 +182,26 @@ export const readAccountReceivablePaymentOffset = async (db: Kysely<Database>, p
   }
   return { egcs_fc_grossamount: gross, egcs_fc_offsetamount: offset, egcs_fc_netamount: subtractMoney(gross, offset),
     egcs_fc_recoverycontrol: control, egcs_fc_creditmemoreference: retainedRecovery ? formatAccountReceivableCreditMemoSettlementReference(String(retainedRecovery.id)) : null,
+    egcs_fc_creditmemos: options.liveMemoBalances
+      ? await readAccountReceivablePaymentCreditMemos(db, retainedRecovery ? String(retainedRecovery.id) : undefined)
+      : (await readPinnedAccountReceivablePaymentCreditMemos(db, paymentId)).map(memo => ({ ...memo,
+          egcs_fc_outcome: retainedRecovery?.egcs_fc_outcome ?? memo.egcs_fc_outcome,
+          egcs_fc_appliedamount: retainedRecovery?.egcs_fc_outcome === 'released' ? ZERO : memo.egcs_fc_appliedamount })),
     egcs_fc_offsets: allocations.map(row => ({ egcs_fc_number: row.egcs_fc_number, egcs_fc_amount: row.egcs_fc_amount })) }
 }
 
-export const captureAccountReceivablePaymentOffsetPacket = async (db: Kysely<Database>, paymentId: string) => {
-  const summary = await readAccountReceivablePaymentOffset(db, paymentId)
+export const captureAccountReceivablePaymentOffsetPacket = async (db: Kysely<Database>, paymentId: string, options: { version?: 1 | 2 | 3 } = {}) => {
+  const { egcs_fc_creditmemos: creditMemos, ...legacySummary } = await readAccountReceivablePaymentOffset(db, paymentId, { liveMemoBalances: true })
+  const version = options.version ?? (await hasAccountReceivablePoolLedger(db) ? 3 : await hasAccountingTable(db, 'Funding_Case_Account_Receivable_Offset_Memo') ? 2 : 1)
+  const legacyRecovery = version === 2
+    ? await db.selectFrom('Funding_Case_Account_Receivable_Recovery').select('id').where('egcs_fc_payment', '=', paymentId)
+        .where('egcs_fc_outcome', 'in', ['open', 'posted']).where('_deleted', '=', false).executeTakeFirst()
+    : undefined
+  const summary = version === 1
+    ? legacySummary
+    : { ...legacySummary, egcs_fc_creditmemos: version === 2
+        ? await readRetainedAccountReceivablePaymentCreditMemos(db, legacyRecovery ? String(legacyRecovery.id) : undefined)
+        : creditMemos }
   if (!await hasAccountingTable(db, 'Funding_Case_Agreement_Account_Receivable')) return { schemaVersion: 1 as const, ...summary, allocationBasisHash: null }
   const payment = await db.selectFrom('Funding_Case_Agreement_Payment as payment')
     .innerJoin('Funding_Case_Agreement_Profile as agreement', 'agreement.id', 'payment.egcs_fc_fundingagreement')
@@ -167,11 +213,18 @@ export const captureAccountReceivablePaymentOffsetPacket = async (db: Kysely<Dat
   const recovery = await db.selectFrom('Funding_Case_Account_Receivable_Recovery').select('id')
     .where('egcs_fc_payment', '=', paymentId).where('egcs_fc_outcome', '=', 'open').where('_deleted', '=', false).executeTakeFirst()
   const owner = await resolveAgreementScopeContext(String(payment.egcs_fc_fundingagreement), db)
+  if (version === 3 && owner && payment.egcs_fc_applicantrecipient) {
+    const pool = await db.selectFrom('Funding_Case_Account_Receivable_Pool').select('id').where('egcs_fc_agency', '=', owner.agencyId)
+      .where('egcs_fc_applicantrecipient', '=', String(payment.egcs_fc_applicantrecipient)).where('egcs_fc_currency', '=', payment.egcs_fc_currency).executeTakeFirst()
+    return { schemaVersion: 3 as const, ...summary, payment: { ...payment, egcs_fc_paymentamount: summary.egcs_fc_grossamount },
+      poolBasisHash: pool ? hashPublicationDefinition(json(await captureAccountReceivablePoolBasis(db, String(pool.id)))) : null,
+      allocationBasisHash: null, debtBasisHash: null }
+  }
   const debts = owner && payment.egcs_fc_applicantrecipient
     ? await readAccountReceivablePoolDebts(db, { agencyId: owner.agencyId,
         applicantRecipientId: String(payment.egcs_fc_applicantrecipient), currency: payment.egcs_fc_currency })
     : []
-  return { schemaVersion: 1 as const, ...summary, payment: { ...payment, egcs_fc_paymentamount: summary.egcs_fc_grossamount },
+  return { schemaVersion: version, ...summary, payment: { ...payment, egcs_fc_paymentamount: summary.egcs_fc_grossamount },
     debtBasisHash: hashPublicationDefinition(json(debts.map(debt => ({ id: String(debt.id), method: debt.egcs_fc_recoverymethod,
       lines: debt.lines.map(line => ({ id: String(line.id), principal: line.egcs_fc_principal, recovered: line.egcs_fc_recovered, reserved: line.egcs_fc_reserved })) })))),
     allocationBasisHash: recovery ? hashPublicationDefinition(json(await readAccountReceivableRecoveryAllocations(db, String(recovery.id)))) : null }
@@ -182,11 +235,26 @@ export const validateAccountReceivablePaymentOffset = async (trx: Transaction<Da
   const payment = await trx.selectFrom('Funding_Case_Agreement_Payment').select(['egcs_fc_fundingagreement', 'egcs_fc_applicantrecipient', 'egcs_fc_currency']).where('id', '=', paymentId).executeTakeFirstOrThrow()
   if (!payment.egcs_fc_applicantrecipient) throw new Error('AR_PAYMENT_PAYEE_REQUIRED')
   await assertAccountReceivablePaymentAllowed(trx, { agreementId: String(payment.egcs_fc_fundingagreement), applicantRecipientId: String(payment.egcs_fc_applicantrecipient), currency: payment.egcs_fc_currency, paymentId })
-  const packet = await captureAccountReceivablePaymentOffsetPacket(trx, paymentId)
+  const retainedVersion = options.packet && typeof options.packet === 'object' && !Array.isArray(options.packet)
+    && (options.packet.schemaVersion === 1 || options.packet.schemaVersion === 2)
+    ? options.packet.schemaVersion
+    : undefined
+  const packet = await captureAccountReceivablePaymentOffsetPacket(trx, paymentId, { version: retainedVersion })
   if (options.packet && hashPublicationDefinition(json(packet)) !== hashPublicationDefinition(options.packet)) throw new Error('AR_OFFSET_BASIS_CHANGED')
   if (moneyToCents(packet.egcs_fc_netamount) < BigInt(0)) throw new Error('AR_OFFSET_EXCEEDS_GROSS')
   const recovery = await trx.selectFrom('Funding_Case_Account_Receivable_Recovery').select('id').where('egcs_fc_payment', '=', paymentId)
     .where('egcs_fc_outcome', '=', 'open').where('_deleted', '=', false).executeTakeFirst()
+  if (packet.schemaVersion === 3) {
+    const owner = await resolveAgreementScopeContext(String(payment.egcs_fc_fundingagreement), trx)
+    if (!owner) throw new Error('AR_PAYMENT_OWNER_UNAVAILABLE')
+    const pool = await trx.selectFrom('Funding_Case_Account_Receivable_Pool').select('id').where('egcs_fc_agency', '=', owner.agencyId)
+      .where('egcs_fc_applicantrecipient', '=', String(payment.egcs_fc_applicantrecipient)).where('egcs_fc_currency', '=', payment.egcs_fc_currency).executeTakeFirstOrThrow()
+    const balance = await readAccountReceivablePoolBalance(trx, String(pool.id))
+    const eligible = moneyToCents(balance.egcs_fc_availableamount) + moneyToCents(packet.egcs_fc_offsetamount)
+    const gross = moneyToCents(packet.egcs_fc_grossamount)
+    if (moneyToCents(packet.egcs_fc_offsetamount) !== (eligible < gross ? eligible : gross)) throw new Error('AR_OFFSET_PLAN_STALE')
+    return packet
+  }
   const owner = await resolveAgreementScopeContext(String(payment.egcs_fc_fundingagreement), trx)
   if (!owner) throw new Error('AR_PAYMENT_OWNER_UNAVAILABLE')
   const debts = await readAccountReceivablePoolDebts(trx, { agencyId: owner.agencyId, applicantRecipientId: String(payment.egcs_fc_applicantrecipient), currency: payment.egcs_fc_currency })
@@ -194,7 +262,14 @@ export const validateAccountReceivablePaymentOffset = async (trx: Transaction<Da
     + moneyToCents(packet.egcs_fc_offsetamount)
   const gross = moneyToCents(packet.egcs_fc_grossamount)
   if (moneyToCents(packet.egcs_fc_offsetamount) !== (eligible < gross ? eligible : gross)) throw new Error('AR_OFFSET_PLAN_STALE')
-  if (recovery) await validateAccountReceivableRecovery(trx, String(recovery.id))
+  if (recovery) {
+    if (await hasAccountReceivablePoolLedger(trx)) {
+      const pool = await trx.selectFrom('Funding_Case_Account_Receivable_Pool').select('id').where('egcs_fc_agency', '=', owner.agencyId)
+        .where('egcs_fc_applicantrecipient', '=', String(payment.egcs_fc_applicantrecipient)).where('egcs_fc_currency', '=', payment.egcs_fc_currency).executeTakeFirstOrThrow()
+      if (moneyToCents((await readAccountReceivablePoolBalance(trx, String(pool.id))).egcs_fc_receivableamount) < moneyToCents(packet.egcs_fc_offsetamount)) throw new Error('AR_OFFSET_PLAN_STALE')
+    }
+    await validateAccountReceivableRecovery(trx, String(recovery.id))
+  }
   return packet
 }
 
@@ -295,5 +370,11 @@ export const postAccountReceivablePaymentOffset = async (trx: Transaction<Databa
     .select(['approval.egcs_cn_approvalvalue', 'item.egcs_cn_state']).where('item.egcs_cn_runtime', '=', runtimeId).where('item._deleted', '=', false).execute()
   if (!approvals.length || approvals.some(row => row.egcs_cn_approvalvalue !== true || row.egcs_cn_state !== 'approved')) throw new Error('AR_OFFSET_FINAL_APPROVAL_REQUIRED')
   await validateAccountReceivablePaymentOffset(trx, paymentId, { packet: routing.paymentOffsetPacket })
-  await postAccountReceivableRecovery(trx, String(recovery.id), runtimeId)
+  const basis = await hasAccountReceivablePoolLedger(trx)
+    ? await trx.selectFrom('Funding_Case_Account_Receivable_Recovery').select('egcs_fc_ledgerkind').where('id', '=', String(recovery.id)).executeTakeFirstOrThrow()
+    : { egcs_fc_ledgerkind: 'legacy' }
+  if (basis.egcs_fc_ledgerkind === 'pool') {
+    await trx.updateTable('Funding_Case_Account_Receivable_Recovery').set({ egcs_fc_outcome: 'posted', egcs_fc_postingruntime: runtimeId, egcs_fc_postedat: new Date() })
+      .where('id', '=', String(recovery.id)).where('egcs_fc_outcome', '=', 'open').execute()
+  } else await postAccountReceivableRecovery(trx, String(recovery.id), runtimeId)
 }

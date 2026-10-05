@@ -4,23 +4,28 @@ import type { JsonValue } from '~~/shared/types/database'
 import type { AccountReceivableLine } from '~~/shared/types/account-receivable'
 import { formatAccountReceivableCreditMemoSettlementReference } from '~~/shared/utils/account-receivable'
 import { accountReceivableReference, formatAccountReceivableAmount } from '~/utils/account-receivable-display'
+import { useBilingualValue } from '~/composables/useBilingualValue'
 
 const { submission, creditMemo = false } = defineProps<{ submission: { egcs_fc_submittedat: string, egcs_fc_canonicalhash: string, egcs_fc_packet: JsonValue }, creditMemo?: boolean }>()
 const { t, locale } = useI18n()
+const { getBilingualValue } = useBilingualValue()
 const { formatDate } = useDateHelpers()
 type RecordValue = Record<string, JsonValue>
 const record = (value: JsonValue | undefined): RecordValue => value !== null && typeof value === 'object' && !Array.isArray(value) ? value as RecordValue : {}
 const records = (value: JsonValue | undefined): RecordValue[] => Array.isArray(value) ? value.map(record) : []
 const packet = computed(() => record(submission.egcs_fc_packet))
 const header = computed(() => record(creditMemo ? packet.value.accountReceivableCreditMemo : packet.value.accountReceivable))
+const standaloneCredit = computed(() => creditMemo && (packet.value.schemaVersion === 2 || header.value.egcs_fc_ledgerkind === 'pool'))
 const text = (value: JsonValue | undefined) => typeof value === 'string' || typeof value === 'number' ? String(value) : t('common.none')
 const currency = computed(() => text(header.value.egcs_fc_currency))
 const amount = (value: JsonValue | undefined) => formatAccountReceivableAmount(typeof value === 'string' ? value : undefined, locale.value, currency.value) ?? t('common.not_available')
-const reference = computed(() => typeof header.value.egcs_fc_agreementnumber === 'string' && typeof header.value.egcs_fc_number === 'number'
-  ? creditMemo
+const reference = computed(() => {
+  if (standaloneCredit.value && typeof header.value.id === 'string') return `CM-${header.value.id}`
+  if (typeof header.value.egcs_fc_agreementnumber !== 'string' || typeof header.value.egcs_fc_number !== 'number') return t('common.not_available')
+  return creditMemo
     ? typeof packet.value.recoveryId === 'string' ? formatAccountReceivableCreditMemoSettlementReference(packet.value.recoveryId) : t('account_receivable.credit_memo_reference', { agreement: header.value.egcs_fc_agreementnumber, number: header.value.egcs_fc_number })
     : accountReceivableReference({ egcs_fc_agreementnumber: header.value.egcs_fc_agreementnumber, egcs_fc_number: header.value.egcs_fc_number })
-  : t('common.not_available'))
+})
 const coding = computed(() => records(packet.value.coding))
 const lines = computed(() => records(packet.value.lines).map(line => ({ ...line,
   egcs_fc_coding: coding.value.filter(item => item.egcs_fc_receivableline === line.id)
@@ -29,8 +34,10 @@ const allocations = computed(() => records(packet.value.allocations))
 const attachments = computed(() => records(packet.value.attachments))
 const policy = computed(() => record(packet.value.policy))
 const labels = computed(() => [
-  { label: 'account_receivable.agreement', value: header.value.egcs_fc_agreementnumber },
-  { label: 'account_receivable.debtor', value: locale.value === 'fr' ? header.value.egcs_fc_debtorname_fr : header.value.egcs_fc_debtorname_en },
+  ...(standaloneCredit.value
+    ? [{ label: 'account_receivable.credit_memo_agency', value: getBilingualValue(header.value, 'egcs_fc_agencyname', t('common.none')) }]
+    : [{ label: 'account_receivable.agreement', value: header.value.egcs_fc_agreementnumber }]),
+  { label: standaloneCredit.value ? 'account_receivable.proponent' : 'account_receivable.debtor', value: getBilingualValue(header.value, 'egcs_fc_debtorname', t('common.none')) },
   { label: 'common.currency', value: currency.value.toUpperCase() },
   ...(creditMemo
     ? [
@@ -64,7 +71,7 @@ const labels = computed(() => [
           </dd>
         </div><div v-if="creditMemo">
           <dt class="text-muted">
-            {{ t('account_receivable.received_amount') }}
+            {{ t(standaloneCredit ? 'account_receivable.credit_memo_amount' : 'account_receivable.received_amount') }}
           </dt><dd class="mt-1 font-semibold">
             {{ amount(header.egcs_fc_amount) }}
           </dd>
@@ -82,7 +89,10 @@ const labels = computed(() => [
         {{ t('account_receivable.basis_provenance') }}
       </p>
     </CommonSection>
-    <CommonSection v-else :title="t('account_receivable.credit_memo_allocations')" :grid-cols="1">
+    <CommonSection v-else-if="!standaloneCredit" :title="t('account_receivable.historical_credit_memo_allocations')" :grid-cols="1">
+      <p class="text-sm text-muted">
+        {{ t('account_receivable.historical_credit_memo_allocations_description') }}
+      </p>
       <dl v-for="allocation in allocations" :key="text(allocation.egcs_fc_receivableline)" class="grid gap-3 border-t border-default pt-3 text-sm sm:grid-cols-2">
         <div>
           <dt class="text-muted">

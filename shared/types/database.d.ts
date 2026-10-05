@@ -481,6 +481,8 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Funding_Case_Account_Receivable_Pool: FundingCaseAccountReceivablePoolTable
   Funding_Case_Account_Receivable_Credit_Memo: FundingCaseAccountReceivableCreditMemoTable
   Funding_Case_Account_Receivable_Recovery: FundingCaseAccountReceivableRecoveryTable
+  Funding_Case_Account_Receivable_Offset_Memo: FundingCaseAccountReceivableOffsetMemoTable
+  Funding_Case_Account_Receivable_Offset_Memo_Application: FundingCaseAccountReceivableOffsetMemoApplicationTable
   Funding_Case_Account_Receivable_Allocation: FundingCaseAccountReceivableAllocationTable
   Funding_Case_Account_Receivable_Posting: FundingCaseAccountReceivablePostingTable
   Funding_Case_Agreement_Correction: FundingCaseAgreementCorrectionTable
@@ -1177,7 +1179,7 @@ export interface CommonEntityTypeTable {
   egcs_cn_standardworkflow: Generated<'explicit' | 'none'>
   egcs_cn_riskrating: Generated<'explicit' | 'none'>
   egcs_cn_supportsdirectreviews: Generated<boolean>
-  egcs_cn_ownerkind: 'agreement' | 'proponent' | 'runtime_source' | 'funding_case' | null
+  egcs_cn_ownerkind: 'agreement' | 'proponent' | 'agency' | 'runtime_source' | 'funding_case' | null
   egcs_cn_assignmentmode: 'independent' | 'inherited' | null
   _deleted: Generated<boolean>
 }
@@ -2353,7 +2355,7 @@ export interface TransferPaymentStreamHoldbackBasisTable {
   _deleted: Generated<boolean>
 }
 
-export type TransferPaymentDocumentTemplateEntityType = 'fundingcaseagreement' | 'fundingcaseagreementcloseout'
+export type TransferPaymentDocumentTemplateEntityType = 'fundingcaseagreement' | 'fundingcaseagreementcloseout' | 'fundingcaseamendment'
 export type TransferPaymentDocumentTemplateKind = 'docx' | 'html'
 export type TransferPaymentDocumentTemplateOutputFormat = 'docx' | 'html' | 'pdf'
 
@@ -2385,6 +2387,7 @@ export interface FundingCaseAgreementGeneratedDocumentTable {
   egcs_fc_fundingagreement: string
   egcs_fc_transferpaymentstream: Generated<string>
   egcs_fc_closeout?: string | null
+  egcs_fc_amendment?: string | null
   egcs_fc_documenttemplate: string
   egcs_fc_generatedattachment: string
   egcs_fc_language: Language_Preference
@@ -2711,13 +2714,14 @@ export interface FundingCaseAgreementAccountReceivableTable {
 
 export interface FundingCaseAccountReceivableCreditMemoTable {
   id: Generated<string>
-  egcs_fc_fundingagreement: string
+  egcs_fc_fundingagreement: string | null
+  egcs_fc_ledgerkind: Generated<'legacy' | 'pool'>
   egcs_fc_agency: string
   egcs_fc_pool: string
   egcs_fc_applicantrecipient: string
   egcs_fc_currency: Currency_Codes
   egcs_fc_number: number
-  egcs_fc_agreementnumber: string
+  egcs_fc_agreementnumber: string | null
   egcs_fc_receiveddate: Date
   egcs_fc_amount: number
   egcs_fc_receiptreference: string | null
@@ -2784,11 +2788,30 @@ export interface FundingCaseAccountReceivablePoolTable {
   _deleted: Generated<boolean>
 }
 
+export interface FundingCaseAccountReceivableOffsetMemoTable {
+  id: Generated<string>
+  egcs_fc_legacyreceivable: string | null
+  egcs_fc_pool: string
+  egcs_fc_amount: number
+  egcs_fc_createdat: Generated<Date>
+  _deleted: Generated<boolean>
+}
+
+export interface FundingCaseAccountReceivableOffsetMemoApplicationTable {
+  id: Generated<string>
+  egcs_fc_offsetmemo: string
+  egcs_fc_allocation: string | null
+  egcs_fc_recovery: string | null
+  egcs_fc_amount: number | null
+  _deleted: Generated<boolean>
+}
+
 export interface FundingCaseAccountReceivableRecoveryTable {
   id: Generated<string>
   egcs_fc_pool: string
   egcs_fc_payment: string | null
   egcs_fc_creditmemo: string | null
+  egcs_fc_ledgerkind: Generated<'legacy' | 'pool'>
   egcs_fc_amount: number
   egcs_fc_outcome: Generated<'open' | 'posted' | 'released'>
   egcs_fc_createdat: Generated<Date>

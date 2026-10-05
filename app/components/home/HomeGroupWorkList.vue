@@ -40,6 +40,9 @@ const itemDescription = (item: GroupItem): string => {
  * @returns Localized route or null.
  */
 const itemUrl = (item: GroupItem): string | null => {
+  if (item.entity_type === 'fundingcaseaccountreceivablecreditmemo') {
+    return item.proponent_id ? localePath(appRouteLocations.proponentCreditMemoDetail(item.proponent_id, item.entity_id)) : null
+  }
   if (item.entity_type === 'commonreview') return localePath(item.variant === 'checklist' ? appRouteLocations.checklistDetail(item.entity_id) : appRouteLocations.assessmentDetail(item.entity_id))
   if (item.entity_type === 'fundingcaseintake') return localePath(appRouteLocations.fundingCaseIntakeDetail(item.entity_id))
   if (item.entity_type === 'commonrecommendation') return localePath(appRouteLocations.recommendationDetail(item.entity_id))

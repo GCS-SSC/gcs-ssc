@@ -18,6 +18,14 @@ export default defineCriticalCoverageProject({
   include: WORKFLOW_RUNTIME_COVERAGE_INCLUDE,
   reportsDirectory: 'coverage/workflow-runtime',
   tests: [
+    // Exercise independently owned AR/Credit Memo workflows and their real
+    // posting/upgrade paths, alongside the existing Agreement runtime cases.
+    'tests/unit/account-receivable-credit-memo-workflow-selection.test.ts',
+    'tests/unit/account-receivable-pool-ledger.test.ts',
+    'tests/unit/account-receivable-accounting.test.ts',
+    'tests/unit/account-receivable-host-financial-projection.test.ts',
+    'tests/unit/seed-payment-recording-runtime.test.ts',
+    'tests/unit/workflow-amendment-conditions.test.ts',
     'tests/unit/workflow-routing.test.ts',
     'tests/unit/correction-lifecycle.test.ts',
     'tests/unit/correction-lifecycle-refusal.test.ts',

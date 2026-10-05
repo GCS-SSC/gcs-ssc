@@ -41,12 +41,14 @@ const executeCompletion = async (event: H3Event, input: CompletionExecuteInput, 
         return await accountReceivableError(event, error instanceof Error ? error.message : 'AR_INVALID_BASIS')
       }
     } else {
-      await assertAccountReceivableCreditMemoEditable(event, trx, id)
-      const recovery = await trx.selectFrom('Funding_Case_Account_Receivable_Recovery').select('id').where('egcs_fc_creditmemo', '=', id).where('egcs_fc_outcome', '=', 'open').where('_deleted', '=', false).executeTakeFirstOrThrow()
-      try {
-        await validateAccountReceivableRecovery(trx, String(recovery.id))
-      } catch (error) {
-        return await accountReceivableError(event, error instanceof Error ? error.message : 'AR_REPAYMENT_INVALID')
+      const memo = await assertAccountReceivableCreditMemoEditable(event, trx, id)
+      if (memo.egcs_fc_ledgerkind !== 'pool') {
+        const recovery = await trx.selectFrom('Funding_Case_Account_Receivable_Recovery').select('id').where('egcs_fc_creditmemo', '=', id).where('egcs_fc_outcome', '=', 'open').where('_deleted', '=', false).executeTakeFirstOrThrow()
+        try {
+          await validateAccountReceivableRecovery(trx, String(recovery.id))
+        } catch (error) {
+          return await accountReceivableError(event, error instanceof Error ? error.message : 'AR_REPAYMENT_INVALID')
+        }
       }
     }
     const runtimeContext = await resolveReviewRuntimeEntityFromEntity(trx, entityType, id)
@@ -57,7 +59,7 @@ const executeCompletion = async (event: H3Event, input: CompletionExecuteInput, 
     const { completion } = await createCompletionTransition(event, trx, entityType, id, { comments: input.comments ?? '', initiatedBy: actorId })
     const hookPayload = { completionId: completion.id, entityType, entityId: id, completedByUserId: actorId, completedAt: completion.completedAt,
       comments: input.comments ?? '', context: { agreementId: context.agreementId, streamId: context.streamId,
-        parentEntityType: 'fundingcaseagreement', parentEntityId: context.agreementId } } satisfies CompletionHookPayload
+        parentEntityType: context.agreementId ? 'fundingcaseagreement' : 'applicantrecipient', parentEntityId: context.agreementId ?? context.applicantRecipientId } } satisfies CompletionHookPayload
     return { hookPayload, actorName: actor.egcs_cn_name }
   }, { target: { entityType, entityId: id } })
   await emitCompletionHook(result.hookPayload)

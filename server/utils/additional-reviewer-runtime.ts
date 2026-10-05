@@ -63,7 +63,7 @@ const resolveAgreementOwnerId = async (
 ): Promise<string | null> => {
   if (!isAgreementOwnerEntityType(entityType)) return null
   const context = await agreementOwnerResolvers[entityType](db, entityId)
-  return context ? String(context.agreementId) : null
+  return context?.agreementId ? String(context.agreementId) : null
 }
 
 export type AdditionalReviewerExecutableContext = {
@@ -133,7 +133,11 @@ export const resolveAdditionalReviewerExecutableContextFromReview = async (
   }
 
   const agreementId = await resolveAgreementOwnerId(db, review.entity_type, String(review.entity_id))
-  if (isAgreementOwnerEntityType(review.entity_type) && !agreementId) {
+  const memo = review.entity_type === 'fundingcaseaccountreceivablecreditmemo'
+    ? await resolveAccountReceivableCreditMemoRuntimeContext(db, String(review.entity_id))
+    : null
+  if (review.entity_type === 'fundingcaseaccountreceivablecreditmemo' && (!memo || String(review.schema_agency_id) !== memo.agencyId)) return null
+  if (isAgreementOwnerEntityType(review.entity_type) && !agreementId && !memo) {
     return null
   }
 
@@ -146,11 +150,11 @@ export const resolveAdditionalReviewerExecutableContextFromReview = async (
     runtimeEntity: {
       entityType: review.entity_type,
       entityId: String(review.entity_id),
-      agreementId,
+      agreementId: memo ? null : agreementId,
       proponentAgencyContextId: review.entity_type === 'applicantrecipient' && review.schema_agency_id
         ? String(review.schema_agency_id)
         : null,
-      schemaAgencyId: review.schema_agency_id ? String(review.schema_agency_id) : null,
+      schemaAgencyId: memo?.agencyId ?? (review.schema_agency_id ? String(review.schema_agency_id) : null),
       reviewSetId: String(review.review_set_id),
       reviewId
     }

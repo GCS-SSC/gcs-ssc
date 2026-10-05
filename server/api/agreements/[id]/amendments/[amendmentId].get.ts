@@ -4,6 +4,7 @@ import { assertAgreementAmendmentExists, isAgreementAmendable } from '~~/server/
 import { withBusinessRecordState } from '~~/server/utils/business-record-state'
 import { resolveBusinessStatusProtection } from '~~/server/utils/business-status-runtime'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
+import { requireAuthContext } from '~~/server/utils/authorize'
 
 export default defineEventHandler(async event => {
   const agreementId = getRouterParam(event, 'id')
@@ -35,6 +36,7 @@ export default defineEventHandler(async event => {
       withBusinessRecordState(db, 'fundingcaseamendment', [amendment]),
       resolveBusinessStatusProtection(db, 'fundingcaseamendment', amendmentId)
     ])
+    const actor = await requireAuthContext(event)
     return {
       ...amendmentsWithState[0],
       amendment_types: types,
@@ -46,6 +48,7 @@ export default defineEventHandler(async event => {
       can_create_snapshot: agreementAmendable && statusProtection?.isDraft === true,
       can_edit: agreementAmendable && statusProtection?.isDraft === true,
       can_edit_scope: agreementAmendable && statusProtection?.isDraft === true,
+      can_delete_documents: agreementAmendable && statusProtection?.isDraft === true && actor.userAbilities.authorize('agreement', 'delete', context.scope),
       can_cancel: amendment.egcs_fc_isopen
     }
   })

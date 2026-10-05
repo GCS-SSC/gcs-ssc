@@ -136,21 +136,22 @@ export const listEligibleRuntimeReviewSetSetupAgencyIds = async (
   const opportunityId = entityType === 'fundingcaseintake'
     ? setupScopes.find(scope => scope.scopeType === 'fundingopportunity')?.scopeId
     : null
-  if (streamIds.length === 0) return new Map()
+  const independentMemo = entityType === 'fundingcaseaccountreceivablecreditmemo'
+  if (streamIds.length === 0 && !independentMemo) return new Map()
   if (entityType === 'fundingcaseintake' && !opportunityId) return new Map()
   const allowed = new Set(allowedAgencyIds)
   if (allowed.size === 0) return new Map()
-  const rows = await db.selectFrom('Common_Review_Set_Setup')
-    .innerJoin('Transfer_Payment_Stream_Review_Set', 'Transfer_Payment_Stream_Review_Set.egcs_tp_reviewset', 'Common_Review_Set_Setup.id')
+  let setupQuery = db.selectFrom('Common_Review_Set_Setup')
     .innerJoin('Common_Publication', 'Common_Publication.id', 'Common_Review_Set_Setup.id')
     .innerJoin('Common_Publication_Version', 'Common_Publication_Version.id', 'Common_Publication.egcs_cn_currentversion')
     .select(['Common_Review_Set_Setup.id', 'Common_Review_Set_Setup.egcs_cn_agency', 'Common_Publication_Version.egcs_cn_definition as definition'])
-    .where('Transfer_Payment_Stream_Review_Set.egcs_tp_transferpaymentstream', 'in', streamIds)
-    .where('Transfer_Payment_Stream_Review_Set._deleted', '=', false)
     .where('Common_Review_Set_Setup._deleted', '=', false)
     .where('Common_Publication.egcs_cn_state', '=', 'published')
     .where('Common_Publication._deleted', '=', false)
-    .execute()
+  if (!independentMemo) setupQuery = setupQuery.innerJoin('Transfer_Payment_Stream_Review_Set', 'Transfer_Payment_Stream_Review_Set.egcs_tp_reviewset', 'Common_Review_Set_Setup.id')
+    .where('Transfer_Payment_Stream_Review_Set.egcs_tp_transferpaymentstream', 'in', streamIds)
+    .where('Transfer_Payment_Stream_Review_Set._deleted', '=', false)
+  const rows = await setupQuery.where('Common_Review_Set_Setup.egcs_cn_agency', 'in', allowedAgencyIds).execute()
   const eligible = new Map<string, string>()
   const linkedReviewIds = opportunityId
     ? new Set((await db.selectFrom('Funding_Opportunity_Review_Set')
@@ -257,12 +258,14 @@ export const lockEligibleRuntimeReviewSetSetupSnapshot = async (
       if (!opportunityLink) return null
     }
     const streamIds = setupScopes.filter(scope => scope.scopeType === 'transferpaymentstream').map(scope => scope.scopeId)
-    if (!streamIds.length) return null
-    const link = await db.selectFrom('Transfer_Payment_Stream_Review_Set').select('id')
-      .where('egcs_tp_reviewset', '=', reviewSetSetupId)
-      .where('egcs_tp_transferpaymentstream', 'in', streamIds)
-      .where('_deleted', '=', false).forUpdate().executeTakeFirst()
-    if (!link) return null
+    if (!streamIds.length && entityType !== 'fundingcaseaccountreceivablecreditmemo') return null
+    if (entityType !== 'fundingcaseaccountreceivablecreditmemo') {
+      const link = await db.selectFrom('Transfer_Payment_Stream_Review_Set').select('id')
+        .where('egcs_tp_reviewset', '=', reviewSetSetupId)
+        .where('egcs_tp_transferpaymentstream', 'in', streamIds)
+        .where('_deleted', '=', false).forUpdate().executeTakeFirst()
+      if (!link) return null
+    }
   }
   const members = await Promise.all(publication.members.map(member => readSchemaVersion(
     db,

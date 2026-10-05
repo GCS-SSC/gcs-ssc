@@ -145,6 +145,7 @@ const tabs = computed(() => [
   { key: 'agreement.amendments.recommendation', value: 'recommendation', icon: 'i-lucide-git-pull-request-arrow' },
   { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-clipboard-check' },
   { key: 'workflow.title', value: 'workflows', icon: 'i-lucide-workflow' },
+  ...(profile.value?.can_read_agreement ? [{ key: 'agreement.documents.title', value: 'documents', icon: 'i-lucide-files' }] : []),
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
   { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users' }
 ])
@@ -518,6 +519,12 @@ const cancelAmendment = async () => {
             v-else-if="selectedTab === 'assignments'"
             entity-type="fundingcaseamendment"
             :entity-id="amendmentId" />
+          <AgreementDocumentsTab
+            v-else-if="selectedTab === 'documents' && profile?.can_read_agreement"
+            :agreement-id="agreementId"
+            :amendment-id="amendmentId"
+            :can-create="canEditAmendment"
+            :can-delete="isAssigned && amendment.can_delete_documents === true" />
           <CommonAttachmentsTab
             v-else-if="selectedTab === 'attachments'"
             entity-type="fundingcaseamendment"

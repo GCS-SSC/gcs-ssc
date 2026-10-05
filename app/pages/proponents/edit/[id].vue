@@ -6,6 +6,7 @@ import type { Ref } from 'vue'
 import type { ApplicantRecipientProfileForm } from '~~/shared/types/applicant-recipient-ui'
 
 definePageMeta({
+  key: route => route.path,
   i18n: {
     paths: {
       en: '/proponents/edit/[id]',
@@ -28,6 +29,7 @@ const { showError } = useApiErrorToast()
 const { getBilingualValue } = useBilingualValue()
 const route = useRoute()
 const id = route.params.id as string
+const isChildDetailRoute = computed(() => typeof route.params.creditMemoId === 'string')
 const {
   profile,
   error,
@@ -39,7 +41,7 @@ const {
   activeTabProps,
   breadcrumbItems,
   isHeroCollapsed
-} = useApplicantRecipientDetailState(id)
+} = useApplicantRecipientDetailState(id, { enabled: computed(() => !isChildDetailRoute.value) })
 
 const selectedProfile: Ref<ApplicantRecipientDetailForm | null> = ref(null)
 const isSaving: Ref<boolean> = ref(false)
@@ -64,7 +66,7 @@ watch(profile, value => {
  * Saves applicant recipient changes from the inline edit view and refreshes the detail page.
  */
 const submit = async () => {
-  if (disposed || !selectedProfile.value || !profile.value?.can_update || isSaving.value) {
+  if (disposed || isChildDetailRoute.value || !selectedProfile.value || !profile.value?.can_update || isSaving.value) {
     return
   }
 
@@ -87,9 +89,9 @@ const submit = async () => {
     })
     if (!response.ok) await throwFetchResponseError(response)
 
-    if (disposed) return
+    if (disposed || isChildDetailRoute.value) return
     await refreshProfile()
-    if (disposed) return
+    if (disposed || isChildDetailRoute.value) return
 
     toast.add({
       title: t('common.success'),
@@ -97,7 +99,7 @@ const submit = async () => {
       color: 'success'
     })
   } catch (caughtError: unknown) {
-    if (!disposed) showError(caughtError)
+    if (!disposed && !isChildDetailRoute.value) showError(caughtError)
   } finally {
     isSaving.value = false
   }
@@ -117,7 +119,8 @@ const retryProfile = async () => {
 </script>
 
 <template>
-  <div class="flex min-w-0 flex-1 flex-col">
+  <NuxtPage v-if="isChildDetailRoute" />
+  <div v-else class="flex min-w-0 flex-1 flex-col">
     <CommonLoadingState v-if="isLoadingProfile" :label="t('common.loading')" />
 
     <UAlert

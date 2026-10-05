@@ -1,6 +1,6 @@
 import { assertAccountReceivableWorkflowStatusTransition, captureAccountReceivablePacket, captureAccountReceivableCreditMemoPacket, postAccountReceivable, postAccountReceivableCreditMemo, recordAccountReceivableTerminalOutcome, recordAccountReceivableCreditMemoTerminalOutcome } from './account-receivable-posting'
 import { captureAccountReceivablePaymentOffsetPacket, postAccountReceivablePaymentOffset, releaseAccountReceivablePaymentOffset, validateAccountReceivablePaymentOffset, readAccountReceivablePaymentOffset } from './account-receivable-recovery'
-import { resolveAccountReceivableRuntimeContext, resolveAccountReceivableCreditMemoRuntimeContext, lockAccountReceivablePaymentPoolAgreements } from './account-receivable-context'
+import { resolveAccountReceivableRuntimeContext, resolveAccountReceivableCreditMemoRuntimeContext, lockAccountReceivablePaymentPoolAgreements, lockAccountReceivableRecoveryPool } from './account-receivable-context'
 import { lockPaymentRecoveryAgreements } from './payment-recovery-lock'
 import { compareMoney, parseMoney } from '~~/shared/utils/money'
 import { resolveWorkflowExecutionPlan } from './workflow-execution-plan'
@@ -281,10 +281,14 @@ const lockProtectedAgreement = async (trx: Transaction<Database>, run: Pick<Work
     await lockPaymentRecoveryAgreements(trx, { agreementId: String(payment.egcs_fc_fundingagreement), agencyId: context.schemaAgencyId })
     return
   }
-  if (run.egcs_cn_entitytype === 'fundingcaseaccountreceivable' || run.egcs_cn_entitytype === 'fundingcaseaccountreceivablecreditmemo') {
-    const context = run.egcs_cn_entitytype === 'fundingcaseaccountreceivable'
-      ? await resolveAccountReceivableRuntimeContext(trx, String(run.egcs_cn_entityid))
-      : await resolveAccountReceivableCreditMemoRuntimeContext(trx, String(run.egcs_cn_entityid))
+  if (run.egcs_cn_entitytype === 'fundingcaseaccountreceivablecreditmemo') {
+    const memo = await resolveAccountReceivableCreditMemoRuntimeContext(trx, String(run.egcs_cn_entityid))
+    if (!memo) throw new Error('Credit Memo owner is unavailable')
+    await lockAccountReceivableRecoveryPool(trx, memo)
+    return
+  }
+  if (run.egcs_cn_entitytype === 'fundingcaseaccountreceivable') {
+    const context = await resolveAccountReceivableRuntimeContext(trx, String(run.egcs_cn_entityid))
     if (!context) throw new Error('Accounts Receivable Agreement is unavailable')
     await lockAccountReceivablePaymentPoolAgreements(trx, context)
     return
@@ -734,12 +738,62 @@ export const createCompletionTransition = async (
   return { completion, workflow }
 }
 
+/**
+ * Selects published Agency configuration for independent proponent Credit Memos.
+ * @param db Database client.
+ * @param context Exact independently owned memo context.
+ * @param purpose Requested workflow purpose.
+ * @param options Published setup selection and lock policy.
+ * @param options.setupId Optional explicitly selected publication.
+ * @param options.lockRows Locks the retained publication during materialization.
+ * @returns Published memo workflows for the owning Agency.
+ */
+const resolveCreditMemoWorkflowSetups = async (
+  db: DbClient,
+  context: ReviewRuntimeEntityContext,
+  purpose: Workflow_Purpose,
+  options: { setupId?: string; lockRows: boolean }
+): Promise<WorkflowSetupSelection[]> => {
+  const memo = await resolveAccountReceivableCreditMemoRuntimeContext(db as Kysely<Database>, context.entityId)
+  if (!memo || context.schemaAgencyId !== memo.agencyId) return []
+  let query = db.selectFrom('Common_Workflow_Setup')
+    .innerJoin('Common_Publication', 'Common_Publication.id', 'Common_Workflow_Setup.id')
+    .innerJoin('Common_Publication_Version', 'Common_Publication_Version.id', 'Common_Publication.egcs_cn_currentversion')
+    .selectAll('Common_Workflow_Setup')
+    .select(['Common_Publication.id as publicationId', 'Common_Publication.egcs_cn_state as publicationState',
+      'Common_Publication_Version.id as publicationVersionId', 'Common_Publication_Version.egcs_cn_version as publicationVersion',
+      'Common_Publication_Version.egcs_cn_definition as publicationDefinition'])
+    .where('Common_Workflow_Setup.egcs_cn_agency', '=', memo.agencyId)
+    .where('Common_Workflow_Setup.egcs_cn_entitytype', '=', 'fundingcaseaccountreceivablecreditmemo')
+    .where('Common_Workflow_Setup.egcs_cn_purpose', '=', purpose)
+    .where('Common_Workflow_Setup._deleted', '=', false)
+    .where('Common_Publication.egcs_cn_kind', '=', 'workflow_setup')
+    .where('Common_Publication.egcs_cn_state', '=', 'published').where('Common_Publication._deleted', '=', false)
+    .orderBy('Common_Publication_Version.egcs_cn_version', 'desc').orderBy('Common_Workflow_Setup.id')
+  if (options.setupId) query = query.where('Common_Workflow_Setup.id', '=', options.setupId)
+  if (options.lockRows) query = query.forUpdate(['Common_Workflow_Setup', 'Common_Publication', 'Common_Publication_Version'])
+  const rows = await query.execute()
+  return rows.flatMap(row => {
+    const definition = readPublishedWorkflowConfiguration(row.publicationDefinition)
+    if (definition.entityType !== context.entityType || (definition.purpose ?? 'standard') !== purpose) return []
+    // Agreement conditions remain valid in captured legacy runs, but cannot be
+    // evaluated when starting a new independently owned Proponent memo.
+    if (definition.members.some(member => (member.conditions?.length ?? 0) > 0)) return []
+    return [{ ...applyPublishedWorkflowConfiguration(row, definition), publicationId: String(row.publicationId),
+      publicationState: row.publicationState, publicationVersionId: String(row.publicationVersionId),
+      publicationVersion: Number(row.publicationVersion), hasUnpublishedChanges: false, publicationDefinition: definition }]
+  })
+}
+
 export const resolveActiveWorkflowSetup = async (
   db: DbClient,
   context: ReviewRuntimeEntityContext,
   purpose: Workflow_Purpose = 'standard',
   lockRows = false
 ): Promise<WorkflowSetupSelection | null> => {
+  if (context.entityType === 'fundingcaseaccountreceivablecreditmemo') {
+    return (await resolveCreditMemoWorkflowSetups(db, context, purpose, { lockRows }))[0] ?? null
+  }
   const scopes = await resolveReviewRuntimeSetupScopes(db as Kysely<Database>, context, lockRows)
   const streamIds = scopes.filter(scope => scope.scopeType === 'transferpaymentstream').map(scope => scope.scopeId)
   if (streamIds.length === 0) return null
@@ -810,6 +864,9 @@ export const resolvePublishedStandardWorkflowSetups = async (
   workflowSetupId?: string,
   lockRows = false
 ): Promise<WorkflowSetupSelection[]> => {
+  if (context.entityType === 'fundingcaseaccountreceivablecreditmemo') {
+    return await resolveCreditMemoWorkflowSetups(db, context, 'standard', { setupId: workflowSetupId, lockRows })
+  }
   const scopes = await resolveReviewRuntimeSetupScopes(db as Kysely<Database>, context, lockRows)
   const streamIds = scopes.filter(scope => scope.scopeType === 'transferpaymentstream').map(scope => scope.scopeId)
   if (streamIds.length === 0) return []

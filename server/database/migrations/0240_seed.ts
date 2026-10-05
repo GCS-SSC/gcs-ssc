@@ -2448,6 +2448,54 @@ const seedAgreement51WorkflowCatalog = async (
   }
 }
 
+const seedPaymentRecordingWorkflow = async (
+  db: Kysely<Database>, streamId: string, agencyId: string, defaultUserId: string
+): Promise<void> => {
+  const statuses = await resolveAgencyStatusIds(db, agencyId)
+  const template = await db.insertInto('Common_Approval_Template').values({
+    egcs_cn_agency: agencyId,
+    egcs_cn_name_en: 'Payment recording confirmation',
+    egcs_cn_name_fr: 'Confirmation de l’enregistrement du paiement',
+    egcs_cn_description_en: 'Records that an approved Payment has been processed, including its recipient disbursement and any Credit Memo offset.',
+    egcs_cn_description_fr: 'Consigne le traitement d’un paiement approuvé, y compris le versement au bénéficiaire et toute compensation par note de crédit.',
+    _deleted: false
+  }).returningAll().executeTakeFirstOrThrow()
+  const step = await db.insertInto('Common_Approval_Step').values({
+    egcs_cn_approvaltemplate: String(template.id), egcs_cn_sequence: 1,
+    egcs_cn_name_en: 'Confirm payment processing',
+    egcs_cn_name_fr: 'Confirmer le traitement du paiement',
+    egcs_cn_description_en: 'Confirm that the approved Payment was processed before making it a finalized accounting source.',
+    egcs_cn_description_fr: 'Confirmer que le paiement approuvé a été traité avant d’en faire une source comptable finalisée.',
+    egcs_cn_defaultuser: defaultUserId, egcs_cn_approvertitle: 'Program Officer'
+  }).returning('id').executeTakeFirstOrThrow()
+  await db.insertInto('Common_Certification').values({
+    egcs_cn_approvalstep: String(step.id), egcs_cn_order: 1,
+    egcs_cn_name_en: 'Payment processed', egcs_cn_name_fr: 'Paiement traité',
+    egcs_cn_description_en: 'Confirms actual processing of the approved Payment.',
+    egcs_cn_description_fr: 'Confirme le traitement réel du paiement approuvé.',
+    egcs_cn_certification_en: 'I confirm that this approved Payment has been processed, including its recipient disbursement and any Credit Memo offset.',
+    egcs_cn_certification_fr: 'Je confirme que ce paiement approuvé a été traité, y compris le versement au bénéficiaire et toute compensation par note de crédit.',
+    egcs_cn_optional: false, _deleted: false
+  }).execute()
+  await publishApprovalTemplate(db as Transaction<Database>, template, defaultUserId)
+  const workflow = await db.insertInto('Common_Workflow_Setup').values({
+    egcs_cn_agency: agencyId, egcs_cn_entitytype: 'fundingcasepayment', egcs_cn_purpose: 'standard',
+    egcs_cn_name_en: 'Record approved payment', egcs_cn_name_fr: 'Enregistrer le paiement approuvé',
+    egcs_cn_description_en: 'After Payment completion and approval, confirm processing to transition the Payment from Approved to Paid.',
+    egcs_cn_description_fr: 'Après l’achèvement et l’approbation du paiement, confirmer son traitement pour faire passer son statut d’Approuvé à Payé.',
+    egcs_cn_cancellationstatus: statuses.approved, egcs_cn_executionfailurestatus: statuses.approved,
+    egcs_cn_allowretry: true, _deleted: false
+  }).returning('id').executeTakeFirstOrThrow()
+  await linkSeedWorkflowToStream(db, streamId, String(workflow.id))
+  await insertWorkflowAllowedStartStatuses(db, String(workflow.id), [statuses.approved])
+  await db.insertInto('Common_Workflow_Setup_Member').values({
+    egcs_cn_workflowsetup: String(workflow.id), egcs_cn_sequence: 1,
+    egcs_cn_kind: 'approval_template', egcs_cn_approvaltemplate: String(template.id),
+    egcs_cn_successstatus: statuses.paid, egcs_cn_failurestatus: statuses.approved,
+    _deleted: false
+  }).execute()
+}
+
 async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
   const agencies = await db
     .selectFrom('Agency_Profile')
@@ -4122,9 +4170,15 @@ async function seedTransferPaymentData(db: Kysely<Database>): Promise<void> {
     }))).execute()
   }
 
-  await publishSeedWorkflowDependencies(db)
   const actor = await db.selectFrom('Common_User').select('id')
     .where('egcs_cn_email', '=', 'root@example.com').where('_deleted', '=', false).executeTakeFirstOrThrow()
+  const paymentRecordingOwner = await db.selectFrom('Transfer_Payment_Stream')
+    .innerJoin('Transfer_Payment_Profile', 'Transfer_Payment_Profile.id', 'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile')
+    .select('Transfer_Payment_Profile.egcs_tp_agency as agencyId')
+    .where('Transfer_Payment_Stream.id', '=', '31').where('Transfer_Payment_Stream._deleted', '=', false)
+    .executeTakeFirstOrThrow()
+  await seedPaymentRecordingWorkflow(db, '31', String(paymentRecordingOwner.agencyId), String(actor.id))
+  await publishSeedWorkflowDependencies(db)
   for (const setup of await db.selectFrom('Common_Workflow_Setup')
     .innerJoin('Common_Publication', 'Common_Publication.id', 'Common_Workflow_Setup.id')
     .selectAll('Common_Workflow_Setup').where('Common_Publication.egcs_cn_state', '=', 'draft')
