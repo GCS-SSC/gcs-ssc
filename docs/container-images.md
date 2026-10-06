@@ -18,7 +18,8 @@ The workflow:
    bundle, Chromium, LibreOffice, and both startup entry points.
 3. Loads that image locally and tests it against a disposable PostgreSQL 17
    container: migrations/readiness, English/French pages, required artifacts,
-   and persistent files after replacing the application container.
+   persistent files after replacing the application container, and the NCIA seed
+   with eleven agreements and no payments.
 4. Pushes that exact tested image with a unique commit/run/attempt tag, records
    its registry digest, and uploads a `demo-image` workflow artifact containing
    `demo-image.json`.
@@ -113,14 +114,15 @@ If configuring through the Railway UI, set the same digest under Source and
 remove the GitHub source connection, but keep the IaC manifest in agreement.
 The [Railway runbook](../.railway/README.md) explains the existing resource graph.
 
-Verify each platform's `/api/health`, login, and a seeded document download after
+Verify each platform's `/api/health`, login, NCIA agency and eleven agreements, and empty payment lists after
 deployment. Updating a manifest alone does not apply infrastructure; run each
 platform's deployment command. Switching sources does not reset data.
 
 ## Rollback and reset
 
-Restore a previously published manifest and apply both deployments. Image
-rollback does not reverse database migrations; check schema compatibility first.
+Restore a previously published manifest and apply both deployments. A different
+schema baseline requires a clean database cutover and its matching seed; image
+rollback does not reverse database migrations.
 
 The Railway reset helper currently uploads temporary Dockerfiles and targets the
 former `Postgres` service layout. It refuses an image-pinned checkout before
