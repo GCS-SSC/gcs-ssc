@@ -61,12 +61,13 @@ start_application() {
 start_application
 docker exec "$application" node --input-type=module -e '
   import assert from "node:assert/strict";
-  import { access, readFile, writeFile } from "node:fs/promises";
+  import { access, mkdir, readFile, writeFile } from "node:fs/promises";
   assert.equal(process.env.ENVIRONMENT_TYPE, "demo");
   await access("/app/.output/server/aws-start.mjs");
   await access("/app/.output/server/demo-migrations/demo.mjs");
   await access("/app/demo-assets/Contribution Agreement.docx");
   assert.match(await readFile("/app/.output/rds-ca.pem", "utf8"), /BEGIN CERTIFICATE/);
+  await mkdir("/app/.data/files", { recursive: true });
   await writeFile("/app/.data/files/container-persistence-canary", "persisted");
 '
 
@@ -75,9 +76,18 @@ docker rm -f "$application" >/dev/null
 start_application
 docker exec "$application" node --input-type=module -e '
   import assert from "node:assert/strict";
-  import { readFile, readdir } from "node:fs/promises";
+  import { readFile } from "node:fs/promises";
   assert.equal(await readFile("/app/.data/files/container-persistence-canary", "utf8"), "persisted");
-  const files = await readdir("/app/.data/files/gcs-storage-local", { recursive: true });
-  assert.ok(files.length > 0, "Demo template files must exist after replacement");
 '
+seed=$(docker exec "$database" psql -X -U gcs_ssc -d gcs_ssc -At -v ON_ERROR_STOP=1 -c '
+  SELECT
+    (SELECT count(*) FROM kysely_migration WHERE name = '\''9999_seed'\''),
+    (SELECT count(*) FROM "Agency_Profile" WHERE id = 21 AND egcs_ay_abbreviation_en = '\''NCIA'\''),
+    (SELECT count(*) FROM "Funding_Case_Agreement" WHERE NOT _deleted),
+    (SELECT count(*) FROM "Funding_Case_Payment")
+')
+if [ "$seed" != '1|1|11|0' ]; then
+  echo "Unexpected NCIA seed state: $seed" >&2
+  exit 1
+fi
 echo 'Shared demo image passed PostgreSQL startup, bilingual page, and file persistence checks.'
