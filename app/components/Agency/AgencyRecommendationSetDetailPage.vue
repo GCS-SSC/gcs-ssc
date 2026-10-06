@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 import { withFormRequirements } from '~~/shared/utils/form-requirements'
 import { TransferPaymentStreamRecommendationSetupCreateSchema, TransferPaymentStreamRecommendationSetupPatchSchema } from '~~/shared/types/schemas'
 /* eslint-disable jsdoc/require-jsdoc -- page-local handlers */
@@ -35,6 +36,7 @@ const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const toast = useToast()
 const agencyId = String(route.params.id)
+provideBilingualFieldScope(() => ({ subject: 'agency', agencyId, permissionAction: 'update' }))
 const setupId = String(route.params.recommendationSetId)
 const endpoint = `/api/agency/${agencyId}/recommendation-sets/${setupId}`
 const { data: agency } = await useFetch<AgencyProfileItem, FetchError, string>(`/api/agency/${agencyId}`)

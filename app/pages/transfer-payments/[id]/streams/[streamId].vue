@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 import { ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import { useLoadRecoveryFocus } from '~/composables/useLoadRecoveryFocus'
@@ -24,6 +25,8 @@ const { showError } = useApiErrorToast()
 const { getBilingualValue } = useBilingualValue()
 const id = route.params.id as string
 const streamId = route.params.streamId as string
+provideBilingualFieldScope(() => ({ subject: 'transfer_payment', streamId, permissionAction: 'update' }))
+
 const isNestedAssessmentSchemaRoute = computed(() => typeof route.params.schemaId === 'string')
 const isNestedApprovalTemplateRoute = computed(() => typeof route.params.templateId === 'string')
 const isNestedRecommendationSetupRoute = computed(() => typeof route.params.recommendationSetupId === 'string')

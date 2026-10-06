@@ -7,6 +7,7 @@ import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 const RuntimeSlotQuerySchema = z.object({
   slot: z.enum([
     'textarea.after',
+    'bilingual-field.after',
     'agreement.descriptions.after',
     'agreement.profile.classification.fields',
     'agreement.profile.profile.fields',
@@ -14,6 +15,7 @@ const RuntimeSlotQuerySchema = z.object({
     'agreement.profile.sections.after',
     'proponent.descriptions.after'
   ]),
+  subject: z.enum(['agency', 'transfer_payment', 'agreement', 'applicant_recipient']).optional(),
   streamId: z.string().optional(),
   agencyId: z.string().optional(),
   applicantRecipientId: z.string().optional(),

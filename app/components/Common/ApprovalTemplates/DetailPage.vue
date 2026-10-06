@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 /* eslint-disable jsdoc/require-jsdoc */
@@ -19,6 +20,8 @@ const props = withDefaults(defineProps<{
   heroCollapsedKey: string
   canManagePublication?: boolean
 }>(), { canManagePublication: false })
+
+provideBilingualFieldScope(() => ({ subject: 'agency', agencyId: props.agencyId, permissionAction: 'update' }))
 
 const toast = useToast()
 const { t } = useI18n()

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 import { computed } from 'vue'
 import { AgencyProfileSchema, type AgencyProfileItem } from '~~/shared/types/schemas'
 
@@ -12,6 +13,8 @@ const open = defineModel<boolean>('open', { default: false })
 const state = defineModel<Partial<AgencyProfileItem>>('state', { required: true, default: {} })
 
 const emit = defineEmits(['submit'])
+
+provideBilingualFieldScope(() => state.value.id ? { subject: 'agency', agencyId: String(state.value.id), permissionAction: 'update' } : null)
 
 const { t } = useI18n()
 const { createValidator } = useZodI18n()

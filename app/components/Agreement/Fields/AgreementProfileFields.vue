@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
@@ -27,6 +28,10 @@ const model = defineModel<FundingCaseAgreementProfileForm>('model', {
     egcs_fc_holdback: 10
   })
 })
+
+provideBilingualFieldScope(() => model.value.egcs_fc_transferpaymentstream
+  ? { subject: 'agreement', streamId: String(model.value.egcs_fc_transferpaymentstream), agreementId, permissionAction }
+  : null)
 
 const { t } = useI18n()
 const field = useFormFieldPath(() => namePrefix)

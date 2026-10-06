@@ -21,6 +21,7 @@ import {
 
 export interface ExtensionRuntimeSlotQuery {
   slot: GcsExtensionSlot
+  subject?: 'agency' | 'transfer_payment' | 'agreement' | 'applicant_recipient'
   streamId?: string
   agencyId?: string
   applicantRecipientId?: string
@@ -59,19 +60,19 @@ const buildExtensionRuntimeSlotItems = (
   }))
   .filter(item => item.componentName.length > 0)
 
-const listAgencyEnabledExtensionKeys = async (
+const listAgencyEnabledExtensionConfigurations = async (
   db: Kysely<Database>,
   agencyId: string
 ) => {
   const rows = await db
     .selectFrom('extensions.agency_enablement')
-    .select('extension_key')
+    .select(['extension_key', 'config'])
     .where('agency_id', '=', agencyId)
     .where('enabled', '=', true)
     .where('_deleted', '=', false)
     .execute()
 
-  return new Set(rows.map(row => row.extension_key))
+  return new Map(rows.map(row => [row.extension_key, (row.config ?? {}) as GcsExtensionJsonConfig]))
 }
 
 /** Lists extension runtime configuration enabled for both the agency and stream. */
@@ -108,12 +109,12 @@ const resolveAgencyRuntimeResponse = async (
   query: ExtensionRuntimeSlotQuery
 ): Promise<ExtensionRuntimeResponse> => {
   const agencyId = query.agencyId ?? ''
-  const enabledKeys = await listAgencyEnabledExtensionKeys(db, agencyId)
+  const enabledConfigs = await listAgencyEnabledExtensionConfigurations(db, agencyId)
   const extensions = await getRegisteredExtensions()
   const items: ExtensionRuntimeSlotItem[] = []
 
   for (const extension of extensions) {
-    if (!enabledKeys.has(extension.key)) {
+    if (!enabledConfigs.has(extension.key)) {
       continue
     }
 
@@ -122,7 +123,11 @@ const resolveAgencyRuntimeResponse = async (
       continue
     }
 
-    items.push(...buildExtensionRuntimeSlotItems(extension, query, runtimeResolution?.config ?? {}))
+    let config = runtimeResolution?.config ?? {}
+    if (query.slot === 'bilingual-field.after') {
+      config = { agency: enabledConfigs.get(extension.key) ?? {} }
+    }
+    items.push(...buildExtensionRuntimeSlotItems(extension, query, config))
   }
 
   return {
@@ -230,12 +235,65 @@ const resolveProponentRuntimeResponse = async (
   return { slot: query.slot, items: [...grouped.values()] }
 }
 
+/** Authorizes explicitly scoped bilingual controls without borrowing Agreement authority. */
+const resolveBilingualFieldRuntimeResponse = async (
+  event: H3Event,
+  db: Kysely<Database>,
+  query: ExtensionRuntimeSlotQuery
+): Promise<ExtensionRuntimeResponse> => {
+  if (query.subject === 'applicant_recipient') {
+    if (query.streamId || query.agreementId) return await forbidden(event)
+    return await resolveProponentRuntimeResponse(event, db, query)
+  }
+  if (query.applicantRecipientId || !query.subject) return await forbidden(event)
+  if (query.subject === 'agreement' && (!query.streamId || query.agencyId)) return await forbidden(event)
+  if (query.subject !== 'agreement' && query.agreementId) return await forbidden(event)
+  if (query.streamId) {
+    if (!['agreement', 'transfer_payment'].includes(query.subject) || query.agencyId) return await forbidden(event)
+    const owner = await resolveExtensionStreamContext(db, query.streamId)
+    if (!owner) return await notFound(event, 'TRANSFER_PAYMENT_STREAM_NOT_FOUND', 'apiErrors.transfer_payment.stream_not_found')
+    if (query.subject === 'agreement') await authorizeExtensionAgreementRuntime(event, db, query, owner)
+    else await authorize(event, 'transfer_payment', query.permissionAction, owner.scope)
+    const rows = await listStreamRuntimeConfigurationRows(db, query.streamId, owner.agencyId)
+    const rowByKey = new Map(rows.map(row => [row.extension_key, row]))
+    const extensions = await getRegisteredExtensions()
+    const items = extensions.flatMap(extension => {
+      const row = rowByKey.get(extension.key)
+      return row ? buildExtensionRuntimeSlotItems(extension, query, (row.config ?? {}) as GcsExtensionJsonConfig) : []
+    })
+    return await withBilingualAgencyConfiguration(db, { slot: query.slot, streamId: query.streamId, items }, owner.agencyId)
+  }
+  if (!query.agencyId) return emptyRuntimeResponse(query)
+  await authorize(event, query.subject, query.permissionAction, { type: 'agency', agencyId: query.agencyId })
+  return await resolveAgencyRuntimeResponse(event, db, query)
+}
+
+/** Delivers both configuration layers; the extension owns glossary composition. */
+const withBilingualAgencyConfiguration = async (
+  db: Kysely<Database>,
+  response: ExtensionRuntimeResponse,
+  agencyId: string
+): Promise<ExtensionRuntimeResponse> => {
+  const rows = await db.selectFrom('extensions.agency_enablement').select(['extension_key', 'config'])
+    .where('agency_id', '=', agencyId).where('enabled', '=', true).where('_deleted', '=', false).execute()
+  const configs = new Map(rows.map(row => [row.extension_key, row.config]))
+  return {
+    ...response,
+    items: response.items.filter(item => configs.has(item.extensionKey)).map(item => ({
+      ...item,
+      config: { agency: (configs.get(item.extensionKey) ?? {}) as GcsExtensionJsonConfig, stream: item.config }
+    }))
+  }
+}
+
 /** Dispatches runtime configuration loading for agency or stream routes. */
 export const resolveExtensionRuntimeResponse = async (
   event: H3Event,
   query: ExtensionRuntimeSlotQuery
 ): Promise<ExtensionRuntimeResponse> => {
   const db = event.context.$db
+
+  if (query.slot === 'bilingual-field.after') return await resolveBilingualFieldRuntimeResponse(event, db, query)
 
   if (!query.streamId && !query.agencyId && !query.applicantRecipientId
     && query.slot !== 'proponent.descriptions.after') {

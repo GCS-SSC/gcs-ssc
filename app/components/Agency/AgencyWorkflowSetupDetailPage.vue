@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 /* eslint-disable jsdoc/require-jsdoc -- page-local navigation and save handlers */
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import type { Ref } from 'vue'
@@ -57,6 +58,7 @@ const { createValidator } = useZodI18n()
 const toast = useToast()
 
 const agencyId = route.params.id as string
+provideBilingualFieldScope(() => ({ subject: 'agency', agencyId, permissionAction: 'update' }))
 const workflowSetupId = route.params.workflowSetupId as string
 const endpoint = `/api/agency/${agencyId}/workflows/${workflowSetupId}`
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { computed, ref, watch } from 'vue'
@@ -45,6 +46,8 @@ const hasLoadError = computed(() => status.value === 'error' || Boolean(error.va
 watch(error, (loadError) => {
   if (loadError) showError(loadError)
 }, { immediate: true })
+
+provideBilingualFieldScope(() => profile.value ? { subject: 'transfer_payment', agencyId: String(profile.value.egcs_tp_agency), permissionAction: 'update' } : null)
 
 const isUpdateModalOpen: Ref<boolean> = ref(false)
 const selectedProfile: Ref<TransferPaymentProfileForm | null> = ref(null)

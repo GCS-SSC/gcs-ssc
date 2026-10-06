@@ -111,6 +111,8 @@ export type {
   GcsProponentDescriptionsExtensionContext,
   GcsExtensionSlotDefinition,
   GcsTextareaExtensionContext,
+  GcsBilingualFieldExtensionContext,
+  GcsBilingualTextField,
   GcsTextareaKnownTargetKey,
   GcsTextareaTargetContext,
   GcsTextareaTargetDefinition,

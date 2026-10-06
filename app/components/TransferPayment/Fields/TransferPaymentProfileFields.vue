@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 /* eslint-disable jsdoc/require-jsdoc -- local date handlers are self-documenting and not public APIs */
 import type { AdminCommonLookupResponseItem } from '~~/shared/types/admin-common-ui'
 import type { AgencyOptionItem } from '~~/shared/types/admin'
@@ -45,6 +46,10 @@ const onAgencyResolved = (items: AdminCommonLookupResponseItem[]) => {
     ? { id: String(agency.id), egcs_ay_name_en: agency.egcs_ay_name_en, egcs_ay_name_fr: agency.egcs_ay_name_fr }
     : null)
 }
+
+provideBilingualFieldScope(() => model.value.egcs_tp_agency
+  ? { subject: 'transfer_payment', agencyId: String(model.value.egcs_tp_agency), permissionAction: model.value.id ? 'update' : 'create' }
+  : null)
 
 const { t } = useI18n()
 const field = useFormFieldPath(() => namePrefix)
@@ -155,10 +160,10 @@ const onEndDateInput = (value: string | Date | null | undefined) => {
 
   <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }">
     <UFormField :label="t('transfer_payment.terms_link_en')" :name="field('egcs_tp_tclink_en')">
-      <UInput v-model="model.egcs_tp_tclink_en" placeholder="https://..." />
+      <UInput v-model="model.egcs_tp_tclink_en" type="url" placeholder="https://..." />
     </UFormField>
     <UFormField :label="t('transfer_payment.terms_link_fr')" :name="field('egcs_tp_tclink_fr')">
-      <UInput v-model="model.egcs_tp_tclink_fr" placeholder="https://..." />
+      <UInput v-model="model.egcs_tp_tclink_fr" type="url" placeholder="https://..." />
     </UFormField>
   </div>
 

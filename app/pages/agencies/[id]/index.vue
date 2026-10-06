@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -54,6 +55,8 @@ const { showError } = useApiErrorToast()
 const route = useRoute()
 const id = route.params.id as string
 const { can } = useCan()
+provideBilingualFieldScope(() => ({ subject: 'agency', agencyId: id, permissionAction: 'update' }))
+
 const agencyScope = { type: 'agency' as const, agencyId: id }
 const canUpdateAgency = computed(() => can('agency', 'update', agencyScope))
 const canDeleteAgency = computed(() => can('agency', 'delete', agencyScope))

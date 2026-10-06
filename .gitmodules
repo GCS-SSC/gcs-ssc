@@ -46,3 +46,8 @@
 	path = extensions/gcs-ssc-portal-connector
 	url = https://github.com/GCS-SSC/gcs-ssc-portal-connector.git
 	branch = main
+[submodule "extensions/gcs-machine-translation"]
+	path = extensions/gcs-machine-translation
+	url = https://github.com/GCS-SSC/gcs-machine-translation.git
+	branch = main
+	ignore = untracked

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 import { withFormRequirements } from '~~/shared/utils/form-requirements'
 import { TransferPaymentStreamReviewSetupCreateSchema } from '~~/shared/types/schemas'
 /* eslint-disable jsdoc/require-jsdoc -- page-local navigation and persistence handlers */
@@ -50,6 +51,7 @@ const { createValidator } = useZodI18n()
 const toast = useToast()
 
 const agencyId = String(route.params.id)
+provideBilingualFieldScope(() => ({ subject: 'agency', agencyId, permissionAction: 'update' }))
 const reviewSetupId = String(route.params.reviewSetId)
 const endpoint = `/api/agency/${agencyId}/review-sets/${reviewSetupId}`
 

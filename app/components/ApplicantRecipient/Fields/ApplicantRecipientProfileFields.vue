@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 /* eslint-disable jsdoc/require-jsdoc -- local field helpers are self-documenting and not public APIs */
 import { computed, useId } from 'vue'
 import type { ApplicantRecipientProfileForm, ApplicantRecipientProfileRow } from '~~/shared/types/applicant-recipient-ui'
@@ -13,6 +14,11 @@ const {
   leadAgencyPermissionAction?: 'create' | 'update'
   persistedProfile?: ApplicantRecipientProfileRow
 }>()
+
+provideBilingualFieldScope(() => ({
+  subject: 'applicant_recipient', applicantRecipientId: model.value.id ? String(model.value.id) : undefined,
+  permissionAction: leadAgencyPermissionAction
+}))
 
 const { t } = useI18n()
 const requirementId = useId()

@@ -5,12 +5,14 @@ import { getGcsExtensionComponent } from '#gcs-extensions/registry'
 
 const {
   slotName,
+  subject,
   streamId,
   agencyId,
   permissionAction = 'read',
   context = {}
 } = defineProps<{
   slotName: GcsExtensionSlot
+  subject?: 'agency' | 'transfer_payment' | 'agreement' | 'applicant_recipient'
   streamId?: string
   agencyId?: string
   permissionAction?: 'create' | 'read' | 'update'
@@ -55,6 +57,7 @@ const defaultResponse = (): ExtensionRuntimeResponse => ({
 
 const runtimeQuery = computed(() => ({
   slot: slotName,
+  ...(subject ? { subject } : {}),
   ...(streamId ? { streamId } : {}),
   ...(agencyId ? { agencyId } : {}),
   ...(applicantRecipientId.value ? { applicantRecipientId: applicantRecipientId.value } : {}),
@@ -65,7 +68,7 @@ const { data } = useFetch<ExtensionRuntimeResponse, Error, '/api/extensions/runt
   query: runtimeQuery,
   default: defaultResponse,
   server: false,
-  watch: [() => slotName, () => streamId, () => agencyId, () => permissionAction, applicantRecipientId, agreementId]
+  watch: [() => subject, () => slotName, () => streamId, () => agencyId, () => permissionAction, applicantRecipientId, agreementId]
 })
 
 const items = computed(() => data.value?.items ?? [])

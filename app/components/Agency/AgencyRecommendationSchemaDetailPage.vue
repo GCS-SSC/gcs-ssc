@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 /* eslint-disable jsdoc/require-jsdoc */
 import { computed, nextTick, onMounted, ref, useTemplateRef } from 'vue'
 import type { Ref } from 'vue'
@@ -32,6 +33,7 @@ const { showError } = useApiErrorToast()
 const toast = useToast()
 const { can } = useCan()
 const agencyId = String(route.params.id)
+provideBilingualFieldScope(() => ({ subject: 'agency', agencyId, permissionAction: 'update' }))
 const schemaId = String(route.params.schemaId)
 const endpoint = `/api/agency/${agencyId}/recommendation-schemas/${schemaId}`
 const { data: agency } = await useFetch<AgencyProfileItem, Error, string>(`/api/agency/${agencyId}`)

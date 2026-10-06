@@ -1,3 +1,4 @@
+import { provideBilingualFieldControls } from '~/utils/bilingual-field-context'
 import OriginalForm from '@nuxt/ui/components/Form.vue'
 import { defineComponent, h, provide, shallowRef, inject, computed } from 'vue'
 import type { Component, ComponentPublicInstance } from 'vue'
@@ -30,6 +31,7 @@ export default defineComponent({
       return prefix().split('.').filter(Boolean).reduce<unknown>((value, key) =>
         value && typeof value === 'object' ? (value as Record<string, unknown>)[key] : undefined, parentState.value)
     })
+    provideBilingualFieldControls(() => state.value)
     provide(formRequirementKey, {
       /** Resolves own or inherited nested schema requirements.
        * @param path Field path relative to this form.

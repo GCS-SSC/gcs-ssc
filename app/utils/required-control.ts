@@ -1,4 +1,6 @@
-import { computed, defineComponent, h, inject, provide, shallowRef, onMounted, onUpdated, nextTick, unref, watch } from 'vue'
+import BilingualFieldHost from '~/components/Extension/BilingualFieldHost.vue'
+import { useBilingualFieldControl } from './bilingual-field-context'
+import { Fragment, computed, defineComponent, h, inject, provide, shallowRef, onMounted, onUpdated, nextTick, unref, watch } from 'vue'
 import type { Component, ComponentPublicInstance } from 'vue'
 import { formFieldInjectionKey, formOptionsInjectionKey } from '@nuxt/ui/composables/useFormField'
 import { fieldLabelKey, fieldRequirementKey } from './form-requirement-context'
@@ -16,9 +18,11 @@ export const booleanAttribute = (value: unknown): boolean => value === '' || val
  * receive the same contract without relying on Nuxt UI's visual-only label prop.
  * @param component Original Nuxt UI control.
  * @param kind Composite semantics needing adaptation at the interactive target.
+ * @param options Additional deliberately exposed text-control capabilities.
+ * @param options.bilingualText Register plain bilingual text controls with their owning form.
  * @returns A control preserving the original public type and behavior.
  */
-export const createRequiredControl = <T>(component: T, kind: 'standard' | 'select-menu' | 'segmented' | 'group' | 'range' = 'standard'): T => defineComponent({
+export const createRequiredControl = <T>(component: T, kind: 'standard' | 'select-menu' | 'segmented' | 'group' | 'range' = 'standard', options: { bilingualText?: boolean } = {}): T => defineComponent({
   name: 'RequiredControl',
   inheritAttrs: false,
   props: { required: { type: Boolean, default: undefined }, disabled: { type: Boolean, default: undefined }, readonly: { type: Boolean, default: undefined } },
@@ -40,6 +44,29 @@ export const createRequiredControl = <T>(component: T, kind: 'standard' | 'selec
     const control = shallowRef<ComponentPublicInstance | null>(null)
     const isRequired = computed(() => props.required === undefined ? inherited?.value ?? false : booleanAttribute(props.required))
     const isEnabled = computed(() => !formOptions?.value.disabled && !booleanAttribute(props.disabled) && !booleanAttribute(props.readonly))
+    let bilingualElement: HTMLElement | undefined
+    const bilingual = options.bilingualText
+      ? useBilingualFieldControl(
+          () => typeof attrs.name === 'string' ? attrs.name : formField?.value.name,
+          {
+            getText: () => typeof attrs.modelValue === 'string' ? attrs.modelValue : '',
+            /** Checks model handlers and native disabled/read-only state without tracking the component ref.
+             * @returns Whether the actual text control accepts a draft update.
+             */
+            isEditable: () => {
+              const handlers = attrs['onUpdate:modelValue']
+              const hasHandler = typeof handlers === 'function'
+                || (Array.isArray(handlers) && handlers.length > 0 && handlers.every(handler => typeof handler === 'function'))
+              return isEnabled.value && (attrs.type === undefined || attrs.type === 'text') && hasHandler
+                && (!bilingualElement || (!bilingualElement.matches(':disabled') && !bilingualElement.hasAttribute('readonly')))
+            },
+            setText: value => {
+              const handlers = attrs['onUpdate:modelValue']
+              for (const handler of Array.isArray(handlers) ? handlers : [handlers]) (handler as (value: string) => void)(value)
+            }
+          }
+        )
+      : undefined
     /** Resolves an exposed element or Reka component instance.
      * @param reference The original control's public DOM reference.
      * @returns Its HTMLElement when mounted.
@@ -96,6 +123,7 @@ export const createRequiredControl = <T>(component: T, kind: 'standard' | 'selec
       }
       // Nuxt UI spreads its own ariaAttrs after $attrs, which otherwise drops a
       // bilingual/group instruction when a field error or help is present.
+      bilingualElement = options.bilingualText ? targets[0] : undefined
       const descriptions = descriptionIds()
       for (const target of targets) {
         if (descriptions) target.setAttribute('aria-describedby', descriptions)
@@ -118,7 +146,7 @@ export const createRequiredControl = <T>(component: T, kind: 'standard' | 'selec
     return () => {
       const required = isRequired.value
       const enabled = isEnabled.value
-      return h(component as Component, {
+      const original = h(component as Component, {
         ...attrs,
         ...props,
         'required': kind !== 'range' && required && enabled,
@@ -127,6 +155,11 @@ export const createRequiredControl = <T>(component: T, kind: 'standard' | 'selec
         ...(kind === 'segmented' || kind === 'group' ? { 'aria-labelledby': attrs['aria-labelledby'] ?? (attrs['aria-label'] ? undefined : labelId?.value) } : {}),
         'ref': control
       }, slots)
+      const context = bilingual?.context.value
+      const scope = bilingual?.scope?.value
+      return options.bilingualText
+        ? h(Fragment, [original, context && scope ? h(BilingualFieldHost, { context, scope }) : null])
+        : original
     }
   }
 }) as unknown as T

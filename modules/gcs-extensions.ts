@@ -2,10 +2,9 @@ import { defineGcsAuditOwnership } from '@gcs-ssc/extensions'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Generated registry helpers require a temporary documentation migration window. */
 import { createHash } from 'node:crypto'
 import { access, cp, mkdir, mkdtemp, readdir, readFile, realpath, rm, stat } from 'node:fs/promises'
-import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join, relative, resolve } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { createJiti } from 'jiti'
 import { addComponentsDir, addTemplate, defineNuxtModule, useLogger } from '@nuxt/kit'
 import type { Nuxt } from '@nuxt/schema'
@@ -51,6 +50,7 @@ const EXTENSION_HOST_CAPABILITIES = new Set([
   'stream-config-page',
   'entity-tabs',
   'textarea-slots',
+  'bilingual-field-slots',
   'create-actions',
   'payment-amount-calculators',
   'agreement-payment-capacity',
@@ -324,7 +324,8 @@ const inferRequiredHostCapabilities = (definition: GcsExtensionDefinition): Set<
   addImpliedCapability(capabilities, Boolean(definition.admin?.streamConfig), 'stream-config-modal')
   addImpliedCapability(capabilities, Boolean(definition.admin?.streamConfigPage), 'stream-config-page')
   addImpliedCapability(capabilities, (definition.client?.tabs ?? []).length > 0, 'entity-tabs')
-  addImpliedCapability(capabilities, (definition.client?.slots ?? []).length > 0, 'textarea-slots')
+  addImpliedCapability(capabilities, (definition.client?.slots ?? []).some(slot => slot.slot !== 'bilingual-field.after'), 'textarea-slots')
+  addImpliedCapability(capabilities, (definition.client?.slots ?? []).some(slot => slot.slot === 'bilingual-field.after'), 'bilingual-field-slots')
   addImpliedCapability(capabilities, (definition.client?.createActions ?? []).length > 0, 'create-actions')
   addImpliedCapability(capabilities, (definition.client?.paymentAmountCalculators ?? []).length > 0, 'payment-amount-calculators')
   addImpliedCapability(capabilities, (definition.serverHandlers ?? []).length > 0, 'server-handlers')
@@ -761,8 +762,8 @@ const resolveComponent = async (
 }
 
 const resolvePackageRoot = async (rootDir: string, packageName: string): Promise<string> => {
-  const require = createRequire(join(rootDir, 'package.json'))
-  let currentDir = dirname(require.resolve(packageName))
+  const resolver = createJiti(join(rootDir, 'package.json'))
+  let currentDir = dirname(fileURLToPath(resolver.esmResolve(packageName)))
   while (currentDir !== dirname(currentDir)) {
     const packageJsonPath = join(currentDir, 'package.json')
     try {

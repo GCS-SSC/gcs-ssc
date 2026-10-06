@@ -1,3 +1,4 @@
+import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 import type { FetchError } from 'ofetch'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param-description, jsdoc/require-returns -- schema editor helpers use self-descriptive local signatures */
 import type { ComputedRef, Ref } from 'vue'
@@ -68,6 +69,7 @@ export const useAssessmentSchemaDetailPage = async () => {
   const { can } = useCan()
 
   const agencyId = computed(() => String(route.params.id))
+  provideBilingualFieldScope(() => ({ subject: 'agency', agencyId: agencyId.value, permissionAction: 'update' }))
   const schemaId = computed(() => String(route.params.schemaId))
 
   const selectedSection: Ref<string> = ref('schema-general')
