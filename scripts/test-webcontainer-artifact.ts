@@ -51,47 +51,24 @@ const ESSENTIAL_CHILD_ENVIRONMENT_VARIABLES = [
 ] as const
 
 const EXPECTED_CORE_MIGRATIONS = [
-  '0010_common',
+  '0010_enums',
   '0020_users',
   '0030_rbac',
   '0040_agency',
-  '0050_common_agency',
+  '0050_common',
   '0060_transfer_payment',
-  '0070_polymorphic_common_tp',
-  '0080_applicant_recipient',
+  '0070_applicant_recipient',
+  '0080_funding_opportunity',
   '0090_funding_case_agreement',
-  '0100_extensions',
-  '0110_storage_cleanup_outbox',
-  '0120_audit',
-  '0130_notes',
-  '0140_administrative_groups',
-  '0150_funding_opportunity_intake',
-  '0160_funding_case_external_contract',
-  '0170_funding_case_group_assignment',
-  '0180_funding_opportunity_streams',
-  '0190_funding_opportunity_attachment_types',
-  '0200_funding_opportunity_agency_status',
-  '0210_monitor_links',
-  '0220_funding_sources',
-  '0230_intake_registry_identity',
-  '0250_journal_vouchers',
-  '0260_corrections',
-  '0270_accounts_receivable',
-  '0300_accounts_receivable_offset_memos',
-  '0310_proponent_credit_ledger',
-  '0240_seed',
-  '0280_seed_accounts_receivable',
-  '0290_seed_accounts_receivable_credit_memos'
+  '0100_funding_case_intake',
+  '0110_extensions',
+  '0120_storage',
+  '0130_integrity',
+  '0140_audit',
+  '9999_seed'
 ] as const
 
-const EXPECTED_SEEDED_EXTENSION_KEYS = [
-  'gcs-automated-payments',
-  'gcs-gcforms-integration',
-  'gcs-narrative-quality',
-  'gcs-narrative-tags',
-  'gcs-outcome-cost-allocation',
-  'gcs-storage-local'
-] as const
+const EXPECTED_SEEDED_EXTENSION_KEYS = ['gcs-automated-payments'] as const
 
 const EXPECTED_PACKAGED_STORAGE_PROVIDER_KEYS = [
   'gcs-storage-local',
@@ -429,7 +406,7 @@ const waitForCoreMigrationResult = async (
   child: ChildProcessWithoutNullStreams,
   getOutput: () => string
 ): Promise<void> => {
-  const successMarker = 'migration "0240_seed" was executed successfully'
+  const successMarker = 'migration "9999_seed" was executed successfully'
   const deadline = Date.now() + 30_000
 
   while (Date.now() < deadline) {

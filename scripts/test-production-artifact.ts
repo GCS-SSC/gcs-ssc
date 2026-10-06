@@ -51,37 +51,25 @@ export const BUILD_RUNTIME_CONFIG_CANARIES = [
 ] as const
 
 export const PRODUCTION_CORE_MIGRATIONS = [
-  '0010_common',
+  '0010_enums',
   '0020_users',
   '0030_rbac',
   '0040_agency',
-  '0050_common_agency',
+  '0050_common',
   '0060_transfer_payment',
-  '0070_polymorphic_common_tp',
-  '0080_applicant_recipient',
+  '0070_applicant_recipient',
+  '0080_funding_opportunity',
   '0090_funding_case_agreement',
-  '0100_extensions',
-  '0110_storage_cleanup_outbox',
-  '0120_audit',
-  '0130_notes',
-  '0140_administrative_groups',
-  '0150_funding_opportunity_intake',
-  '0160_funding_case_external_contract',
-  '0170_funding_case_group_assignment',
-  '0180_funding_opportunity_streams',
-  '0190_funding_opportunity_attachment_types',
-  '0200_funding_opportunity_agency_status',
-  '0210_monitor_links',
-  '0220_funding_sources',
-  '0230_intake_registry_identity',
-  '0250_journal_vouchers',
-  '0260_corrections',
-  '0270_accounts_receivable',
-  '0300_accounts_receivable_offset_memos',
-  '0310_proponent_credit_ledger'
+  '0100_funding_case_intake',
+  '0110_extensions',
+  '0120_storage',
+  '0130_integrity',
+  '0140_audit'
 ] as const
 
 export const PROHIBITED_PRODUCTION_BUNDLE_VALUES = [
+  '9999_seed',
+  'Northern Communities Innovation Agency',
   '0240_seed',
   '0280_seed_accounts_receivable',
   '0290_seed_accounts_receivable_credit_memos',
@@ -634,7 +622,7 @@ const waitForProductionMigrations = async (
   artifact: RunningArtifact,
   timeoutMs: number = DEFAULT_START_TIMEOUT_MS
 ): Promise<void> => {
-  const expectedLine = 'migration "0310_proponent_credit_ledger" was executed successfully'
+  const expectedLine = `migration "${PRODUCTION_CORE_MIGRATIONS[PRODUCTION_CORE_MIGRATIONS.length - 1]}" was executed successfully`
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     const output = artifact.output()
@@ -667,7 +655,7 @@ const waitForDatabaseUrlPrecedence = async (
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     const output = artifact.output()
-    if (output.includes('migration "0310_proponent_credit_ledger" was executed successfully')) {
+    if (output.includes(`migration "${PRODUCTION_CORE_MIGRATIONS[PRODUCTION_CORE_MIGRATIONS.length - 1]}" was executed successfully`)) {
       throw new Error(`PGLite unexpectedly won precedence over runtime DATABASE_URL.\n${output}`)
     }
     if (output.includes('failed to migrate')) {

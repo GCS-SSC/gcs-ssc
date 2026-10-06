@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url'
 import { productionCoreMigrationProvider } from '../database/production-core-migrations'
 import type { Migration, MigrationProvider } from 'kysely'
 
-type DemoMigrationBundle = Migration & { receivableSeed: Migration; creditMemoSeed: Migration }
+type DemoMigrationBundle = Migration
 type DemoMigrationLoader = (url: string) => Promise<DemoMigrationBundle>
 
 /**
@@ -54,14 +54,12 @@ export const resolveProductionMigrationProvider = async (
   )
   return {
     /**
-     * Includes all demo seed stages alongside the canonical core migrations.
-     * @returns Core migrations and separately packaged demo seed stages.
+     * Includes the final demo seed after the canonical schema migrations.
+     * @returns Core migrations and the separately packaged final demo seed.
      */
     getMigrations: async () => ({
       ...await productionCoreMigrationProvider.getMigrations(),
-      [`0240_${demoMigrationSuffix}`]: demoMigration,
-      [`0280_${demoMigrationSuffix}_accounts_receivable`]: demoMigration.receivableSeed,
-      [`0290_${demoMigrationSuffix}_accounts_receivable_credit_memos`]: demoMigration.creditMemoSeed
+      [`9999_${demoMigrationSuffix}`]: demoMigration
     })
   }
 }
@@ -97,9 +95,6 @@ export const useMigrator = async () => {
   const provider = await resolveRuntimeMigrationProvider()
   return new Migrator({
     db,
-    // Only demo providers include a terminal seed migration. Later core upgrades
-    // may precede it; the canonical production provider keeps strict ordering.
-    allowUnorderedMigrations: provider !== productionCoreMigrationProvider,
     provider
   })
 }

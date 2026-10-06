@@ -1,70 +1,436 @@
-import type { Kysely, SqlBool } from 'kysely'
-import { sql } from 'kysely'
+import { sql, type Kysely } from 'kysely'
 import type { Database } from '../../../shared/types/database'
 
-const INDEX_NAMES = {
-  profileNameEn: 'ay_idx_profilenameen',
-  profileNameFr: 'ay_idx_profilenamefr',
-  profileStatusUnique: 'ay_idx_profileagencyfinancialsystemidnameennamefrstatus',
-  costCategoryNameEnUnique: 'ay_idx_costcategoryorganizationagencynameen',
-  costCategoryNameFrUnique: 'ay_idx_costcategoryorganizationagencynamefr',
-  lineItemNameEnUnique: 'ay_idx_costcategorylineitemorganizationcostcategorynameen',
-  lineItemNameFrUnique: 'ay_idx_costcategorylineitemorganizationcostcategorynamefr',
-  fiscalYearDisplayUnique: 'ay_idx_fiscalyearorganizationagencyfiscalyeardisplay',
-  fiscalYearYearUnique: 'ay_idx_fiscalyearorganizationagencyfiscalyear',
-  addressTypeNameEnUnique: 'ay_idx_addresstypeorganizationagencytypenameen',
-  addressTypeNameFrUnique: 'ay_idx_addresstypeorganizationagencytypenamefr',
-  applicantSubtypeNameEnUnique: 'ay_idx_uniqueartypeen',
-  applicantSubtypeNameFrUnique: 'ay_idx_uniqueartypefr',
-  approvalBehalfNameEnUnique: 'ay_idx_approvalbehalftypeorganizationagencynameen',
-  approvalBehalfNameFrUnique: 'ay_idx_approvalbehalftypeorganizationagencynamefr',
-  agreementTypeNameEnUnique: 'ay_idx_agreementtypeorganizationagencyagreementtypenameen',
-  agreementTypeNameFrUnique: 'ay_idx_agreementtypeorganizationagencyagreementtypenamefr',
-  holdbackBasisCodeUnique: 'ay_idx_holdbackbasisorganizationagencycode'
-} as const
+// Clean-cutover baseline: agency. Edit this subject directly.
 
-export async function up(db: Kysely<Database>): Promise<void> {
-  await db.schema
-    .createTable('Agency_Profile')
-    .addColumn('id', 'bigserial', col => col.primaryKey())
-    .addColumn('egcs_ay_agencyfinancialsystemid', 'bigint', col => col.notNull())
-    .addColumn('egcs_ay_name_en', 'varchar(255)', col => col.notNull())
-    .addColumn('egcs_ay_name_fr', 'varchar(255)', col => col.notNull())
-    .addColumn('egcs_ay_abbreviation_en', 'varchar(255)', col => col.notNull())
-    .addColumn('egcs_ay_abbreviation_fr', 'varchar(255)', col => col.notNull())
-    .addColumn('egcs_ay_active', 'boolean', col => col.notNull().defaultTo(false))
-    .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
-    .execute()
+/** Installs the current up definitions for this subject on a fresh database. */
+export const up = async (db: Kysely<Database>): Promise<void> => {
+  await sql`DO $baseline$ BEGIN
+CREATE SEQUENCE "Agency_Account_Receivable_Type_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
 
-  await db.schema
-    .createTable('Common_Status')
-    .addColumn('id', 'bigserial', col => col.primaryKey())
-    .addColumn('egcs_cn_agency', 'bigint', col => col.notNull().references('Agency_Profile.id').onDelete('restrict'))
-    .addColumn('egcs_cn_name_en', 'varchar(255)', col => col.notNull())
-    .addColumn('egcs_cn_name_fr', 'varchar(255)', col => col.notNull())
-    .addColumn('egcs_cn_color', 'varchar(7)', col => col.notNull())
-    .addColumn('egcs_cn_icon', 'varchar(100)', col => col.notNull())
-    .addColumn('egcs_cn_readonly', 'boolean', col => col.notNull().defaultTo(false))
-    .addColumn('egcs_cn_terminal', 'boolean', col => col.notNull().defaultTo(false))
-    .addColumn('egcs_cn_isdraft', 'boolean', col => col.notNull().defaultTo(false))
-    .addColumn('_deleted', 'boolean', col => col.notNull().defaultTo(false))
-    .addCheckConstraint('cn_chk_status_color', sql`egcs_cn_color ~ '^#[0-9A-Fa-f]{6}$'`)
-    .addCheckConstraint('cn_chk_status_icon', sql`egcs_cn_icon ~ '^i-lucide-[a-z0-9]+(?:-[a-z0-9]+)*$'`)
-    .addCheckConstraint('cn_chk_status_flags', sql`NOT (egcs_cn_readonly AND egcs_cn_terminal)`)
-    .addCheckConstraint(
-      'cn_chk_status_draft_flags',
-      sql`NOT egcs_cn_isdraft OR (NOT egcs_cn_readonly AND NOT egcs_cn_terminal AND NOT _deleted)`
-    )
-    .addCheckConstraint('cn_chk_status_names', sql`length(btrim(egcs_cn_name_en)) > 0 AND length(btrim(egcs_cn_name_fr)) > 0`)
-    .execute()
+CREATE SEQUENCE "Agency_Address_Type_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
 
-  await db.schema.alterTable('Agency_Profile')
-    .addColumn('egcs_ay_claimreconciliationstartstatus', 'bigint', col => col.references('Common_Status.id').onDelete('restrict'))
-    .addColumn('egcs_ay_claimreconciliationfinalstatus', 'bigint', col => col.references('Common_Status.id').onDelete('restrict'))
-    .execute()
+CREATE SEQUENCE "Agency_Agreement_Type_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
 
-  await sql`
-    CREATE OR REPLACE FUNCTION enforce_agency_claim_reconciliation_statuses() RETURNS trigger AS $$
+CREATE SEQUENCE "Agency_Applicant_Recipient_Subtype_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
+
+CREATE SEQUENCE "Agency_Approval_Behalf_Type_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
+
+CREATE SEQUENCE "Agency_Chart_of_Account_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
+
+CREATE SEQUENCE "Agency_Commitment_Type_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
+
+CREATE SEQUENCE "Agency_Cost_Category_Line_Item_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
+
+CREATE SEQUENCE "Agency_Cost_Category_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
+
+CREATE SEQUENCE "Agency_Custom_Field_Option_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
+
+CREATE SEQUENCE "Agency_Custom_Field_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
+
+CREATE SEQUENCE "Agency_Document_Template_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
+
+CREATE SEQUENCE "Agency_Fiscal_Year_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
+
+CREATE SEQUENCE "Agency_Funding_Subtype_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
+
+CREATE SEQUENCE "Agency_Funding_Type_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
+
+CREATE SEQUENCE "Agency_Holdback_Basis_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
+
+CREATE SEQUENCE "Agency_Monitor_Type_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
+
+CREATE SEQUENCE "Agency_Profile_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
+
+CREATE TABLE "Agency_Account_Receivable_Type" (
+  "id" bigint DEFAULT nextval('"Agency_Account_Receivable_Type_id_seq"'::regclass) NOT NULL,
+  "egcs_ay_organizationagency" bigint NOT NULL,
+  "egcs_ay_name_en" character varying(255) NOT NULL,
+  "egcs_ay_name_fr" character varying(255) NOT NULL,
+  "egcs_ay_description_en" text DEFAULT ''::text NOT NULL,
+  "egcs_ay_description_fr" text DEFAULT ''::text NOT NULL,
+  "egcs_ay_monitorrequired" boolean DEFAULT false NOT NULL,
+  "egcs_ay_advancepaymentrelated" boolean NOT NULL,
+  "egcs_ay_claimrelated" boolean NOT NULL,
+  "_deleted" boolean DEFAULT false NOT NULL,
+  CONSTRAINT "Agency_Account_Receivable_Type_pkey" PRIMARY KEY (id),
+  CONSTRAINT "ay_chk_ar_type_names" CHECK (((length(btrim((egcs_ay_name_en)::text)) > 0) AND (length(btrim((egcs_ay_name_fr)::text)) > 0))),
+  CONSTRAINT "ay_chk_ar_type_source" CHECK ((egcs_ay_advancepaymentrelated <> egcs_ay_claimrelated))
+);
+
+CREATE UNIQUE INDEX ay_uq_ar_type_name_en ON "Agency_Account_Receivable_Type" USING btree (egcs_ay_organizationagency, lower(btrim((egcs_ay_name_en)::text))) WHERE (NOT _deleted);
+
+CREATE UNIQUE INDEX ay_uq_ar_type_name_fr ON "Agency_Account_Receivable_Type" USING btree (egcs_ay_organizationagency, lower(btrim((egcs_ay_name_fr)::text))) WHERE (NOT _deleted);
+
+CREATE TABLE "Agency_Address_Type" (
+  "id" bigint DEFAULT nextval('"Agency_Address_Type_id_seq"'::regclass) NOT NULL,
+  "egcs_ay_organizationagency" bigint NOT NULL,
+  "egcs_ay_typename_en" character varying(255) NOT NULL,
+  "egcs_ay_typename_fr" character varying(255) NOT NULL,
+  "_deleted" boolean DEFAULT false NOT NULL,
+  CONSTRAINT "Agency_Address_Type_pkey" PRIMARY KEY (id)
+);
+
+CREATE UNIQUE INDEX ay_idx_addresstypeorganizationagencytypenameen ON "Agency_Address_Type" USING btree (egcs_ay_organizationagency, egcs_ay_typename_en) WHERE (_deleted = false);
+
+CREATE UNIQUE INDEX ay_idx_addresstypeorganizationagencytypenamefr ON "Agency_Address_Type" USING btree (egcs_ay_organizationagency, egcs_ay_typename_fr) WHERE (_deleted = false);
+
+CREATE UNIQUE INDEX ay_uq_address_type_name_en_normalized ON "Agency_Address_Type" USING btree (egcs_ay_organizationagency, lower(btrim((egcs_ay_typename_en)::text))) WHERE (_deleted = false);
+
+CREATE UNIQUE INDEX ay_uq_address_type_name_fr_normalized ON "Agency_Address_Type" USING btree (egcs_ay_organizationagency, lower(btrim((egcs_ay_typename_fr)::text))) WHERE (_deleted = false);
+
+CREATE TABLE "Agency_Agreement_Type" (
+  "id" bigint DEFAULT nextval('"Agency_Agreement_Type_id_seq"'::regclass) NOT NULL,
+  "egcs_ay_organizationagency" bigint NOT NULL,
+  "egcs_ay_agreementtype" agreement_type NOT NULL,
+  "egcs_ay_name_en" character varying(255) NOT NULL,
+  "egcs_ay_name_fr" character varying(255) NOT NULL,
+  "_deleted" boolean DEFAULT false NOT NULL,
+  CONSTRAINT "Agency_Agreement_Type_pkey" PRIMARY KEY (id)
+);
+
+CREATE UNIQUE INDEX ay_idx_agreementtypeorganizationagencyagreementtypenameen ON "Agency_Agreement_Type" USING btree (egcs_ay_organizationagency, egcs_ay_agreementtype, egcs_ay_name_en) WHERE (_deleted = false);
+
+CREATE UNIQUE INDEX ay_idx_agreementtypeorganizationagencyagreementtypenamefr ON "Agency_Agreement_Type" USING btree (egcs_ay_organizationagency, egcs_ay_agreementtype, egcs_ay_name_fr) WHERE (_deleted = false);
+
+CREATE UNIQUE INDEX ay_uq_agreement_type_name_en_normalized ON "Agency_Agreement_Type" USING btree (egcs_ay_organizationagency, egcs_ay_agreementtype, lower(btrim((egcs_ay_name_en)::text))) WHERE (_deleted = false);
+
+CREATE UNIQUE INDEX ay_uq_agreement_type_name_fr_normalized ON "Agency_Agreement_Type" USING btree (egcs_ay_organizationagency, egcs_ay_agreementtype, lower(btrim((egcs_ay_name_fr)::text))) WHERE (_deleted = false);
+
+CREATE TABLE "Agency_Applicant_Recipient_Subtype" (
+  "id" bigint DEFAULT nextval('"Agency_Applicant_Recipient_Subtype_id_seq"'::regclass) NOT NULL,
+  "egcs_ay_applicantrecipienttype" applicant_recipient_type NOT NULL,
+  "egcs_ay_organizationagency" bigint NOT NULL,
+  "egcs_ay_description_en" text NOT NULL,
+  "egcs_ay_description_fr" text NOT NULL,
+  "egcs_ay_name_en" character varying(255) NOT NULL,
+  "egcs_ay_name_fr" character varying(255) NOT NULL,
+  "_deleted" boolean DEFAULT false NOT NULL,
+  CONSTRAINT "Agency_Applicant_Recipient_Subtype_pkey" PRIMARY KEY (id)
+);
+
+CREATE UNIQUE INDEX ay_idx_uniqueartypeen ON "Agency_Applicant_Recipient_Subtype" USING btree (egcs_ay_organizationagency, egcs_ay_applicantrecipienttype, egcs_ay_name_en) WHERE (_deleted = false);
+
+CREATE UNIQUE INDEX ay_idx_uniqueartypefr ON "Agency_Applicant_Recipient_Subtype" USING btree (egcs_ay_organizationagency, egcs_ay_applicantrecipienttype, egcs_ay_name_fr) WHERE (_deleted = false);
+
+CREATE UNIQUE INDEX ay_uq_recipient_subtype_name_en_normalized ON "Agency_Applicant_Recipient_Subtype" USING btree (egcs_ay_organizationagency, egcs_ay_applicantrecipienttype, lower(btrim((egcs_ay_name_en)::text))) WHERE (_deleted = false);
+
+CREATE UNIQUE INDEX ay_uq_recipient_subtype_name_fr_normalized ON "Agency_Applicant_Recipient_Subtype" USING btree (egcs_ay_organizationagency, egcs_ay_applicantrecipienttype, lower(btrim((egcs_ay_name_fr)::text))) WHERE (_deleted = false);
+
+CREATE TABLE "Agency_Approval_Behalf_Type" (
+  "id" bigint DEFAULT nextval('"Agency_Approval_Behalf_Type_id_seq"'::regclass) NOT NULL,
+  "egcs_ay_organizationagency" bigint NOT NULL,
+  "egcs_ay_name_en" character varying(255) NOT NULL,
+  "egcs_ay_name_fr" character varying(255) NOT NULL,
+  "egcs_ay_require_actual" boolean NOT NULL,
+  "_deleted" boolean DEFAULT false NOT NULL,
+  CONSTRAINT "Agency_Approval_Behalf_Type_pkey" PRIMARY KEY (id)
+);
+
+CREATE UNIQUE INDEX ay_idx_approvalbehalftypeorganizationagencynameen ON "Agency_Approval_Behalf_Type" USING btree (egcs_ay_organizationagency, egcs_ay_name_en) WHERE (_deleted = false);
+
+CREATE UNIQUE INDEX ay_idx_approvalbehalftypeorganizationagencynamefr ON "Agency_Approval_Behalf_Type" USING btree (egcs_ay_organizationagency, egcs_ay_name_fr) WHERE (_deleted = false);
+
+CREATE UNIQUE INDEX ay_uq_approval_behalf_name_en_normalized ON "Agency_Approval_Behalf_Type" USING btree (egcs_ay_organizationagency, lower(btrim((egcs_ay_name_en)::text))) WHERE (_deleted = false);
+
+CREATE UNIQUE INDEX ay_uq_approval_behalf_name_fr_normalized ON "Agency_Approval_Behalf_Type" USING btree (egcs_ay_organizationagency, lower(btrim((egcs_ay_name_fr)::text))) WHERE (_deleted = false);
+
+CREATE TABLE "Agency_Chart_of_Account" (
+  "id" bigint DEFAULT nextval('"Agency_Chart_of_Account_id_seq"'::regclass) NOT NULL,
+  "egcs_ay_kind" character varying(32) DEFAULT 'commitment'::character varying NOT NULL,
+  "egcs_ay_organizationagency" bigint NOT NULL,
+  "egcs_ay_fiscalyear" bigint NOT NULL,
+  "egcs_ay_accountingdimensions" jsonb NOT NULL,
+  "egcs_ay_currency" currency_codes DEFAULT 'cad'::currency_codes NOT NULL,
+  "_deleted" boolean DEFAULT false NOT NULL,
+  CONSTRAINT "Agency_Chart_of_Account_pkey" PRIMARY KEY (id),
+  CONSTRAINT "ay_chk_chart_kind" CHECK (((egcs_ay_kind)::text = ANY ((ARRAY['commitment'::character varying, 'account_receivable'::character varying])::text[]))),
+  CONSTRAINT "ay_chk_chartofaccountdimensions" CHECK (((jsonb_typeof(egcs_ay_accountingdimensions) = 'array'::text) AND (jsonb_array_length(egcs_ay_accountingdimensions) > 0)))
+);
+
+CREATE UNIQUE INDEX ay_idx_chartfiscalyeardimensions ON "Agency_Chart_of_Account" USING btree (egcs_ay_fiscalyear, egcs_ay_currency, egcs_ay_kind, egcs_ay_accountingdimensions) WHERE (_deleted = false);
+
+CREATE TABLE "Agency_Commitment_Type" (
+  "id" bigint DEFAULT nextval('"Agency_Commitment_Type_id_seq"'::regclass) NOT NULL,
+  "egcs_ay_organizationagency" bigint NOT NULL,
+  "egcs_ay_name_en" character varying(255) NOT NULL,
+  "egcs_ay_name_fr" character varying(255) NOT NULL,
+  "_deleted" boolean DEFAULT false NOT NULL,
+  CONSTRAINT "Agency_Commitment_Type_pkey" PRIMARY KEY (id)
+);
+
+CREATE UNIQUE INDEX ay_idx_commitmenttypenameen ON "Agency_Commitment_Type" USING btree (egcs_ay_organizationagency, egcs_ay_name_en) WHERE (_deleted = false);
+
+CREATE UNIQUE INDEX ay_idx_commitmenttypenamefr ON "Agency_Commitment_Type" USING btree (egcs_ay_organizationagency, egcs_ay_name_fr) WHERE (_deleted = false);
+
+CREATE TABLE "Agency_Cost_Category" (
+  "id" bigint DEFAULT nextval('"Agency_Cost_Category_id_seq"'::regclass) NOT NULL,
+  "egcs_ay_organizationagency" bigint NOT NULL,
+  "egcs_ay_name_en" character varying(255) NOT NULL,
+  "egcs_ay_name_fr" character varying(255) NOT NULL,
+  "egcs_ay_active" boolean DEFAULT true NOT NULL,
+  "_deleted" boolean DEFAULT false NOT NULL,
+  CONSTRAINT "Agency_Cost_Category_pkey" PRIMARY KEY (id)
+);
+
+CREATE UNIQUE INDEX ay_idx_costcategoryorganizationagencynameen ON "Agency_Cost_Category" USING btree (egcs_ay_organizationagency, egcs_ay_name_en) WHERE (_deleted = false);
+
+CREATE UNIQUE INDEX ay_idx_costcategoryorganizationagencynamefr ON "Agency_Cost_Category" USING btree (egcs_ay_organizationagency, egcs_ay_name_fr) WHERE (_deleted = false);
+
+CREATE UNIQUE INDEX ay_uq_cost_category_name_en_normalized ON "Agency_Cost_Category" USING btree (egcs_ay_organizationagency, lower(btrim((egcs_ay_name_en)::text))) WHERE (_deleted = false);
+
+CREATE UNIQUE INDEX ay_uq_cost_category_name_fr_normalized ON "Agency_Cost_Category" USING btree (egcs_ay_organizationagency, lower(btrim((egcs_ay_name_fr)::text))) WHERE (_deleted = false);
+
+CREATE TABLE "Agency_Cost_Category_Line_Item" (
+  "id" bigint DEFAULT nextval('"Agency_Cost_Category_Line_Item_id_seq"'::regclass) NOT NULL,
+  "egcs_ay_name_en" character varying(255) NOT NULL,
+  "egcs_ay_name_fr" character varying(255) NOT NULL,
+  "egcs_ay_active" boolean DEFAULT true NOT NULL,
+  "egcs_ay_organizationcostcategory" bigint NOT NULL,
+  "egcs_ay_calculationmode" character varying(16) DEFAULT 'manual'::character varying NOT NULL,
+  "egcs_ay_sourcecategory" bigint,
+  "egcs_ay_percentage" numeric(5,2),
+  "egcs_ay_allowpercentageoverride" boolean DEFAULT false NOT NULL,
+  "_deleted" boolean DEFAULT false NOT NULL,
+  CONSTRAINT "Agency_Cost_Category_Line_Item_pkey" PRIMARY KEY (id),
+  CONSTRAINT "ay_chk_lineitemcalculation" CHECK (((((egcs_ay_calculationmode)::text = 'manual'::text) AND (egcs_ay_sourcecategory IS NULL) AND (egcs_ay_percentage IS NULL) AND (NOT egcs_ay_allowpercentageoverride)) OR (((egcs_ay_calculationmode)::text = ANY ((ARRAY['category'::character varying, 'all_other'::character varying])::text[])) AND (egcs_ay_percentage IS NOT NULL) AND ((egcs_ay_percentage >= (0)::numeric) AND (egcs_ay_percentage <= (100)::numeric)) AND ((((egcs_ay_calculationmode)::text = 'category'::text) AND (egcs_ay_sourcecategory IS NOT NULL)) OR (((egcs_ay_calculationmode)::text = 'all_other'::text) AND (egcs_ay_sourcecategory IS NULL))))))
+);
+
+CREATE UNIQUE INDEX ay_idx_costcategorylineitemorganizationcostcategorynameen ON "Agency_Cost_Category_Line_Item" USING btree (egcs_ay_organizationcostcategory, egcs_ay_name_en) WHERE (_deleted = false);
+
+CREATE UNIQUE INDEX ay_idx_costcategorylineitemorganizationcostcategorynamefr ON "Agency_Cost_Category_Line_Item" USING btree (egcs_ay_organizationcostcategory, egcs_ay_name_fr) WHERE (_deleted = false);
+
+CREATE UNIQUE INDEX ay_uq_line_item_name_en_normalized ON "Agency_Cost_Category_Line_Item" USING btree (egcs_ay_organizationcostcategory, lower(btrim((egcs_ay_name_en)::text))) WHERE (_deleted = false);
+
+CREATE UNIQUE INDEX ay_uq_line_item_name_fr_normalized ON "Agency_Cost_Category_Line_Item" USING btree (egcs_ay_organizationcostcategory, lower(btrim((egcs_ay_name_fr)::text))) WHERE (_deleted = false);
+
+CREATE TABLE "Agency_Custom_Field" (
+  "id" bigint DEFAULT nextval('"Agency_Custom_Field_id_seq"'::regclass) NOT NULL,
+  "egcs_ay_agency" bigint NOT NULL,
+  "egcs_ay_name_en" text NOT NULL,
+  "egcs_ay_name_fr" text NOT NULL,
+  "egcs_ay_kind" text NOT NULL,
+  "egcs_ay_multiple" boolean DEFAULT false NOT NULL,
+  "egcs_ay_presentation" text DEFAULT 'single_line'::text NOT NULL,
+  "egcs_ay_discriminator" boolean DEFAULT false NOT NULL,
+  "_deleted" boolean DEFAULT false NOT NULL,
+  CONSTRAINT "Agency_Custom_Field_pkey" PRIMARY KEY (id),
+  CONSTRAINT "Agency_Custom_Field_egcs_ay_kind_check" CHECK ((egcs_ay_kind = ANY (ARRAY['text'::text, 'number'::text, 'relational'::text]))),
+  CONSTRAINT "Agency_Custom_Field_egcs_ay_presentation_check" CHECK ((egcs_ay_presentation = ANY (ARRAY['single_line'::text, 'multiline'::text]))),
+  CONSTRAINT "ay_chk_custom_field_discriminator_kind" CHECK (((NOT egcs_ay_discriminator) OR (egcs_ay_kind = 'relational'::text))),
+  CONSTRAINT "ay_chk_custom_field_multiple_kind" CHECK (((NOT egcs_ay_multiple) OR (egcs_ay_kind = 'relational'::text))),
+  CONSTRAINT "ay_chk_custom_field_presentation_kind" CHECK (((egcs_ay_kind = 'text'::text) OR (egcs_ay_presentation = 'single_line'::text)))
+);
+
+CREATE TABLE "Agency_Custom_Field_Option" (
+  "id" bigint DEFAULT nextval('"Agency_Custom_Field_Option_id_seq"'::regclass) NOT NULL,
+  "egcs_ay_field" bigint NOT NULL,
+  "egcs_ay_name_en" text NOT NULL,
+  "egcs_ay_name_fr" text NOT NULL,
+  "egcs_ay_category_en" text,
+  "egcs_ay_category_fr" text,
+  "egcs_ay_active" boolean DEFAULT true NOT NULL,
+  "egcs_ay_displayorder" integer DEFAULT 0 NOT NULL,
+  "_deleted" boolean DEFAULT false NOT NULL,
+  CONSTRAINT "Agency_Custom_Field_Option_id_egcs_ay_field_key" UNIQUE (id, egcs_ay_field),
+  CONSTRAINT "Agency_Custom_Field_Option_pkey" PRIMARY KEY (id),
+  CONSTRAINT "Agency_Custom_Field_Option_egcs_ay_displayorder_check" CHECK ((egcs_ay_displayorder >= 0)),
+  CONSTRAINT "ay_chk_custom_field_option_categories" CHECK (((egcs_ay_category_en IS NULL) = (egcs_ay_category_fr IS NULL)))
+);
+
+CREATE TABLE "Agency_Document_Template" (
+  "id" bigint DEFAULT nextval('"Agency_Document_Template_id_seq"'::regclass) NOT NULL,
+  "egcs_ay_organizationagency" bigint NOT NULL,
+  "egcs_ay_entitytype" character varying(128) NOT NULL,
+  "egcs_ay_name_en" character varying(255) NOT NULL,
+  "egcs_ay_name_fr" character varying(255) NOT NULL,
+  "egcs_ay_description_en" text NOT NULL,
+  "egcs_ay_description_fr" text NOT NULL,
+  "egcs_ay_templateattachment_en" bigint NOT NULL,
+  "egcs_ay_templateattachment_fr" bigint NOT NULL,
+  "egcs_ay_templatekind" character varying(16) NOT NULL,
+  "egcs_ay_outputformats" jsonb DEFAULT '["docx"]'::jsonb NOT NULL,
+  "egcs_ay_active" boolean DEFAULT true NOT NULL,
+  "_deleted" boolean DEFAULT false NOT NULL,
+  CONSTRAINT "Agency_Document_Template_pkey" PRIMARY KEY (id),
+  CONSTRAINT "ay_chk_documenttemplate_entitytype" CHECK (((egcs_ay_entitytype)::text = ANY ((ARRAY['fundingcaseagreement'::character varying, 'fundingcaseagreementcloseout'::character varying, 'fundingcaseamendment'::character varying])::text[]))),
+  CONSTRAINT "ay_chk_documenttemplate_kind" CHECK (((egcs_ay_templatekind)::text = ANY ((ARRAY['docx'::character varying, 'html'::character varying])::text[]))),
+  CONSTRAINT "ay_chk_documenttemplate_kindoutput" CHECK (((((egcs_ay_templatekind)::text = 'docx'::text) AND (egcs_ay_outputformats <@ '["docx", "pdf"]'::jsonb)) OR (((egcs_ay_templatekind)::text = 'html'::text) AND (egcs_ay_outputformats <@ '["html", "pdf"]'::jsonb)))),
+  CONSTRAINT "ay_chk_documenttemplate_outputs" CHECK (((jsonb_typeof(egcs_ay_outputformats) = 'array'::text) AND (jsonb_array_length(egcs_ay_outputformats) > 0) AND (egcs_ay_outputformats <@ '["docx", "html", "pdf"]'::jsonb)))
+);
+
+CREATE UNIQUE INDEX ay_idx_documenttemplateagencyentitynameen ON "Agency_Document_Template" USING btree (egcs_ay_organizationagency, egcs_ay_entitytype, egcs_ay_name_en) WHERE (_deleted = false);
+
+CREATE UNIQUE INDEX ay_idx_documenttemplateagencyentitynamefr ON "Agency_Document_Template" USING btree (egcs_ay_organizationagency, egcs_ay_entitytype, egcs_ay_name_fr) WHERE (_deleted = false);
+
+CREATE TABLE "Agency_Fiscal_Year" (
+  "id" bigint DEFAULT nextval('"Agency_Fiscal_Year_id_seq"'::regclass) NOT NULL,
+  "egcs_ay_organizationagency" bigint NOT NULL,
+  "egcs_ay_fiscalyeardisplay" character varying(9) NOT NULL,
+  "egcs_ay_fiscalyear" smallint NOT NULL,
+  "egcs_ay_startdate" date NOT NULL,
+  "egcs_ay_enddate" date NOT NULL,
+  "_deleted" boolean DEFAULT false NOT NULL,
+  "egcs_ay_jvopen" boolean DEFAULT false NOT NULL,
+  CONSTRAINT "Agency_Fiscal_Year_pkey" PRIMARY KEY (id),
+  CONSTRAINT "ay_chk_fiscalyear_dates" CHECK ((egcs_ay_enddate >= egcs_ay_startdate))
+);
+
+CREATE UNIQUE INDEX ay_idx_fiscalyearorganizationagencyfiscalyear ON "Agency_Fiscal_Year" USING btree (egcs_ay_organizationagency, egcs_ay_fiscalyear) WHERE (_deleted = false);
+
+CREATE UNIQUE INDEX ay_idx_fiscalyearorganizationagencyfiscalyeardisplay ON "Agency_Fiscal_Year" USING btree (egcs_ay_organizationagency, egcs_ay_fiscalyeardisplay) WHERE (_deleted = false);
+
+CREATE TABLE "Agency_Funding_Subtype" (
+  "id" bigint DEFAULT nextval('"Agency_Funding_Subtype_id_seq"'::regclass) NOT NULL,
+  "egcs_ay_fundingtype" bigint NOT NULL,
+  "egcs_ay_name_en" character varying(255) NOT NULL,
+  "egcs_ay_name_fr" character varying(255) NOT NULL,
+  "egcs_ay_active" boolean DEFAULT true NOT NULL,
+  "_deleted" boolean DEFAULT false NOT NULL,
+  CONSTRAINT "Agency_Funding_Subtype_pkey" PRIMARY KEY (id),
+  CONSTRAINT "ay_uq_funding_subtype_id_type" UNIQUE (id, egcs_ay_fundingtype)
+);
+
+CREATE UNIQUE INDEX ay_uq_funding_subtype_name_en_active ON "Agency_Funding_Subtype" USING btree (egcs_ay_fundingtype, lower((egcs_ay_name_en)::text)) WHERE (_deleted = false);
+
+CREATE UNIQUE INDEX ay_uq_funding_subtype_name_fr_active ON "Agency_Funding_Subtype" USING btree (egcs_ay_fundingtype, lower((egcs_ay_name_fr)::text)) WHERE (_deleted = false);
+
+CREATE TABLE "Agency_Funding_Type" (
+  "id" bigint DEFAULT nextval('"Agency_Funding_Type_id_seq"'::regclass) NOT NULL,
+  "egcs_ay_organizationagency" bigint NOT NULL,
+  "egcs_ay_name_en" character varying(255) NOT NULL,
+  "egcs_ay_name_fr" character varying(255) NOT NULL,
+  "egcs_ay_instacking" boolean DEFAULT false NOT NULL,
+  "egcs_ay_incostsharing" boolean DEFAULT false NOT NULL,
+  "egcs_ay_active" boolean DEFAULT true NOT NULL,
+  "_deleted" boolean DEFAULT false NOT NULL,
+  CONSTRAINT "Agency_Funding_Type_pkey" PRIMARY KEY (id),
+  CONSTRAINT "ay_uq_funding_type_id_agency" UNIQUE (id, egcs_ay_organizationagency)
+);
+
+CREATE UNIQUE INDEX ay_uq_funding_type_name_en_active ON "Agency_Funding_Type" USING btree (egcs_ay_organizationagency, lower((egcs_ay_name_en)::text)) WHERE (_deleted = false);
+
+CREATE UNIQUE INDEX ay_uq_funding_type_name_fr_active ON "Agency_Funding_Type" USING btree (egcs_ay_organizationagency, lower((egcs_ay_name_fr)::text)) WHERE (_deleted = false);
+
+CREATE TABLE "Agency_Holdback_Basis" (
+  "id" bigint DEFAULT nextval('"Agency_Holdback_Basis_id_seq"'::regclass) NOT NULL,
+  "egcs_ay_organizationagency" bigint NOT NULL,
+  "egcs_ay_languageindependentcode" character varying(255) NOT NULL,
+  "egcs_ay_holdbackbasis" holdback_bases DEFAULT 'fullagreement'::holdback_bases NOT NULL,
+  "egcs_ay_name_en" character varying(255) NOT NULL,
+  "egcs_ay_name_fr" character varying(255) NOT NULL,
+  "_deleted" boolean DEFAULT false NOT NULL,
+  CONSTRAINT "Agency_Holdback_Basis_pkey" PRIMARY KEY (id)
+);
+
+CREATE UNIQUE INDEX ay_idx_holdbackbasisorganizationagencycode ON "Agency_Holdback_Basis" USING btree (egcs_ay_organizationagency, egcs_ay_languageindependentcode) WHERE (_deleted = false);
+
+CREATE UNIQUE INDEX ay_uq_holdback_code_normalized ON "Agency_Holdback_Basis" USING btree (egcs_ay_organizationagency, lower(btrim((egcs_ay_languageindependentcode)::text))) WHERE (_deleted = false);
+
+CREATE TABLE "Agency_Monitor_Type" (
+  "id" bigint DEFAULT nextval('"Agency_Monitor_Type_id_seq"'::regclass) NOT NULL,
+  "egcs_ay_organizationagency" bigint NOT NULL,
+  "egcs_ay_name_en" character varying(255) NOT NULL,
+  "egcs_ay_name_fr" character varying(255) NOT NULL,
+  "egcs_ay_receivableeligible" boolean DEFAULT false NOT NULL,
+  "_deleted" boolean DEFAULT false NOT NULL,
+  CONSTRAINT "Agency_Monitor_Type_pkey" PRIMARY KEY (id)
+);
+
+CREATE UNIQUE INDEX ay_idx_monitortypenameen ON "Agency_Monitor_Type" USING btree (egcs_ay_organizationagency, egcs_ay_name_en) WHERE (_deleted = false);
+
+CREATE UNIQUE INDEX ay_idx_monitortypenamefr ON "Agency_Monitor_Type" USING btree (egcs_ay_organizationagency, egcs_ay_name_fr) WHERE (_deleted = false);
+
+CREATE TABLE "Agency_Profile" (
+  "id" bigint DEFAULT nextval('"Agency_Profile_id_seq"'::regclass) NOT NULL,
+  "egcs_ay_agencyfinancialsystemid" bigint NOT NULL,
+  "egcs_ay_name_en" character varying(255) NOT NULL,
+  "egcs_ay_name_fr" character varying(255) NOT NULL,
+  "egcs_ay_abbreviation_en" character varying(255) NOT NULL,
+  "egcs_ay_abbreviation_fr" character varying(255) NOT NULL,
+  "egcs_ay_active" boolean DEFAULT false NOT NULL,
+  "_deleted" boolean DEFAULT false NOT NULL,
+  "egcs_ay_claimreconciliationstartstatus" bigint,
+  "egcs_ay_claimreconciliationfinalstatus" bigint,
+  "egcs_ay_gwcoa_number" bigint NOT NULL,
+  "egcs_ay_correctioncreatorapproval" boolean DEFAULT false NOT NULL,
+  CONSTRAINT "Agency_Profile_pkey" PRIMARY KEY (id)
+);
+
+CREATE UNIQUE INDEX ay_idx_profileagencyfinancialsystemidnameennamefrstatus ON "Agency_Profile" USING btree (egcs_ay_agencyfinancialsystemid, egcs_ay_name_en, egcs_ay_name_fr, egcs_ay_active) WHERE (_deleted = false);
+
+CREATE INDEX ay_idx_profilenameen ON "Agency_Profile" USING btree (egcs_ay_name_en) WHERE (_deleted = false);
+
+CREATE INDEX ay_idx_profilenamefr ON "Agency_Profile" USING btree (egcs_ay_name_fr) WHERE (_deleted = false);
+
+CREATE UNIQUE INDEX ay_uq_profile_normalized ON "Agency_Profile" USING btree (egcs_ay_agencyfinancialsystemid, lower(btrim((egcs_ay_name_en)::text)), lower(btrim((egcs_ay_name_fr)::text)), egcs_ay_active) WHERE (_deleted = false);
+
+ALTER SEQUENCE "Agency_Account_Receivable_Type_id_seq" OWNED BY "Agency_Account_Receivable_Type"."id";
+
+ALTER SEQUENCE "Agency_Address_Type_id_seq" OWNED BY "Agency_Address_Type"."id";
+
+ALTER SEQUENCE "Agency_Agreement_Type_id_seq" OWNED BY "Agency_Agreement_Type"."id";
+
+ALTER SEQUENCE "Agency_Applicant_Recipient_Subtype_id_seq" OWNED BY "Agency_Applicant_Recipient_Subtype"."id";
+
+ALTER SEQUENCE "Agency_Approval_Behalf_Type_id_seq" OWNED BY "Agency_Approval_Behalf_Type"."id";
+
+ALTER SEQUENCE "Agency_Chart_of_Account_id_seq" OWNED BY "Agency_Chart_of_Account"."id";
+
+ALTER SEQUENCE "Agency_Commitment_Type_id_seq" OWNED BY "Agency_Commitment_Type"."id";
+
+ALTER SEQUENCE "Agency_Cost_Category_Line_Item_id_seq" OWNED BY "Agency_Cost_Category_Line_Item"."id";
+
+ALTER SEQUENCE "Agency_Cost_Category_id_seq" OWNED BY "Agency_Cost_Category"."id";
+
+ALTER SEQUENCE "Agency_Custom_Field_Option_id_seq" OWNED BY "Agency_Custom_Field_Option"."id";
+
+ALTER SEQUENCE "Agency_Custom_Field_id_seq" OWNED BY "Agency_Custom_Field"."id";
+
+ALTER SEQUENCE "Agency_Document_Template_id_seq" OWNED BY "Agency_Document_Template"."id";
+
+ALTER SEQUENCE "Agency_Fiscal_Year_id_seq" OWNED BY "Agency_Fiscal_Year"."id";
+
+ALTER SEQUENCE "Agency_Funding_Subtype_id_seq" OWNED BY "Agency_Funding_Subtype"."id";
+
+ALTER SEQUENCE "Agency_Funding_Type_id_seq" OWNED BY "Agency_Funding_Type"."id";
+
+ALTER SEQUENCE "Agency_Holdback_Basis_id_seq" OWNED BY "Agency_Holdback_Basis"."id";
+
+ALTER SEQUENCE "Agency_Monitor_Type_id_seq" OWNED BY "Agency_Monitor_Type"."id";
+
+ALTER SEQUENCE "Agency_Profile_id_seq" OWNED BY "Agency_Profile"."id";
+END $baseline$`.execute(db)
+}
+
+/** Installs the current installFunctions definitions for this subject on a fresh database. */
+export const installFunctions = async (db: Kysely<Database>): Promise<void> => {
+  await sql`DO $baseline$ BEGIN
+CREATE FUNCTION create_default_agency_statuses()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+    BEGIN
+      INSERT INTO "Common_Status" (
+        egcs_cn_agency,
+        egcs_cn_name_en,
+        egcs_cn_name_fr,
+        egcs_cn_color,
+        egcs_cn_icon,
+        egcs_cn_readonly,
+        egcs_cn_isdraft
+      ) VALUES
+        (NEW.id, 'Draft', 'Brouillon', '#64748b', 'i-lucide-file-pen-line', false, true),
+        (NEW.id, 'Active', 'Actif', '#16a34a', 'i-lucide-circle-check', false, false),
+        (NEW.id, 'Inactive', 'Inactif', '#71717a', 'i-lucide-circle-pause', true, false);
+      RETURN NEW;
+    END;
+    $function$;
+
+CREATE FUNCTION enforce_agency_claim_reconciliation_statuses()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
     BEGIN
       IF NEW.egcs_ay_claimreconciliationstartstatus IS NOT NULL AND NOT EXISTS (
         SELECT 1 FROM "Common_Status"
@@ -88,178 +454,97 @@ export async function up(db: Kysely<Database>): Promise<void> {
       END IF;
       RETURN NEW;
     END;
-    $$ LANGUAGE plpgsql;
-  `.execute(db)
-  await sql`
-    CREATE TRIGGER trg_enforce_agency_claim_reconciliation_statuses
-    BEFORE INSERT OR UPDATE OF egcs_ay_claimreconciliationstartstatus, egcs_ay_claimreconciliationfinalstatus
-    ON "Agency_Profile"
-    FOR EACH ROW EXECUTE FUNCTION enforce_agency_claim_reconciliation_statuses();
-  `.execute(db)
-  await sql`
-    CREATE OR REPLACE FUNCTION protect_agency_claim_reconciliation_status_refs() RETURNS trigger AS $$
+    $function$;
+
+CREATE FUNCTION enforce_agency_custom_field_option()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
     BEGIN
-      IF (
-        NEW._deleted
-        OR NEW.egcs_cn_agency IS DISTINCT FROM OLD.egcs_cn_agency
-        OR NEW.egcs_cn_readonly
-        OR NEW.egcs_cn_terminal
-      )
-        AND EXISTS (
-          SELECT 1 FROM "Agency_Profile"
-          WHERE _deleted = false
-            AND egcs_ay_claimreconciliationstartstatus = NEW.id
-        ) THEN
-        RAISE EXCEPTION 'Status is configured as a writable claim reconciliation start status'
-          USING ERRCODE = '23514', CONSTRAINT = 'cn_chk_status_claim_reconciliation_in_use';
+      IF TG_OP = 'UPDATE' AND NEW.egcs_ay_field IS DISTINCT FROM OLD.egcs_ay_field THEN
+        RAISE EXCEPTION 'Agency custom field option parent is immutable'
+          USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_custom_field_option_parent_immutable';
       END IF;
-      IF (NEW._deleted OR NEW.egcs_cn_agency IS DISTINCT FROM OLD.egcs_cn_agency)
-        AND EXISTS (
-          SELECT 1 FROM "Agency_Profile"
-          WHERE _deleted = false
-            AND egcs_ay_claimreconciliationfinalstatus = NEW.id
-        ) THEN
-        RAISE EXCEPTION 'Status is configured as a claim reconciliation final status'
-          USING ERRCODE = '23514', CONSTRAINT = 'cn_chk_status_claim_reconciliation_in_use';
+      IF NOT NEW._deleted AND (TG_OP = 'INSERT' OR OLD._deleted) AND NOT EXISTS (
+        SELECT 1 FROM "Agency_Custom_Field" field
+        WHERE field.id = NEW.egcs_ay_field AND field.egcs_ay_kind = 'relational' AND field._deleted = false
+        FOR SHARE
+      ) THEN
+        RAISE EXCEPTION 'Option requires an active relational Agency field'
+          USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_custom_field_option_parent_active';
       END IF;
       RETURN NEW;
-    END;
-    $$ LANGUAGE plpgsql;
-  `.execute(db)
-  await sql`
-    CREATE TRIGGER trg_protect_agency_claim_reconciliation_status_refs
-    BEFORE UPDATE OF _deleted, egcs_cn_agency, egcs_cn_readonly, egcs_cn_terminal ON "Common_Status"
-    FOR EACH ROW EXECUTE FUNCTION protect_agency_claim_reconciliation_status_refs();
-  `.execute(db)
+    END $function$;
 
-  await sql`
-    CREATE UNIQUE INDEX cn_idx_status_draft_per_agency
-    ON "Common_Status" (egcs_cn_agency)
-    WHERE egcs_cn_isdraft = true
-  `.execute(db)
-  await sql`
-    CREATE UNIQUE INDEX cn_idx_status_name_en_per_agency
-    ON "Common_Status" (egcs_cn_agency, lower(btrim(egcs_cn_name_en)))
-    WHERE _deleted = false
-  `.execute(db)
-  await sql`
-    CREATE UNIQUE INDEX cn_idx_status_name_fr_per_agency
-    ON "Common_Status" (egcs_cn_agency, lower(btrim(egcs_cn_name_fr)))
-    WHERE _deleted = false
-  `.execute(db)
-  await sql`
-    CREATE OR REPLACE FUNCTION protect_agency_draft_status() RETURNS trigger AS $$
+CREATE FUNCTION guard_referenced_proponent_subtype()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
     BEGIN
-      IF TG_OP = 'UPDATE' AND NEW.egcs_cn_agency IS DISTINCT FROM OLD.egcs_cn_agency THEN
-        RAISE EXCEPTION 'Status Agency is immutable'
-          USING ERRCODE = '23514', CONSTRAINT = 'cn_chk_status_agency_immutable';
+      IF (NEW._deleted OR NEW.egcs_ay_organizationagency IS DISTINCT FROM OLD.egcs_ay_organizationagency) AND EXISTS (
+        SELECT 1 FROM "Funding_Case_Agreement_Applicant_Recipient" r
+        JOIN "Funding_Case_Agreement_Profile" a ON a.id = r.egcs_fc_fundingagreement
+        WHERE r.egcs_fc_applicantrecipientsubtype = OLD.id AND NOT r._deleted AND NOT a._deleted
+      ) THEN
+        RAISE EXCEPTION 'Agreement proponent type in use' USING ERRCODE = '23514', CONSTRAINT = 'agreement_proponent_type_eligible';
       END IF;
-
-      IF TG_OP = 'UPDATE' AND OLD.egcs_cn_terminal AND NOT NEW.egcs_cn_terminal THEN
-        RAISE EXCEPTION 'Terminal status definitions cannot become nonterminal'
-          USING ERRCODE = '23514', CONSTRAINT = 'cn_chk_status_terminal_permanent';
-      END IF;
-
-      IF OLD.egcs_cn_isdraft THEN
-        IF TG_OP = 'DELETE' THEN
-          RAISE EXCEPTION 'The protected Draft status is immutable' USING ERRCODE = '23514';
-        END IF;
-        IF NEW.egcs_cn_agency IS DISTINCT FROM OLD.egcs_cn_agency
-          OR NEW.egcs_cn_name_en IS DISTINCT FROM OLD.egcs_cn_name_en
-          OR NEW.egcs_cn_name_fr IS DISTINCT FROM OLD.egcs_cn_name_fr
-          OR NEW.egcs_cn_color IS DISTINCT FROM OLD.egcs_cn_color
-          OR NEW.egcs_cn_icon IS DISTINCT FROM OLD.egcs_cn_icon
-          OR NEW.egcs_cn_readonly IS DISTINCT FROM OLD.egcs_cn_readonly
-          OR NEW.egcs_cn_terminal IS DISTINCT FROM OLD.egcs_cn_terminal
-          OR NEW.egcs_cn_isdraft IS DISTINCT FROM OLD.egcs_cn_isdraft
-          OR NEW._deleted IS DISTINCT FROM OLD._deleted THEN
-          RAISE EXCEPTION 'The protected Draft status is immutable' USING ERRCODE = '23514';
-        END IF;
-      END IF;
-      RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
-    END;
-    $$ LANGUAGE plpgsql
-  `.execute(db)
-  await sql`
-    CREATE TRIGGER trg_protect_agency_draft_status
-    BEFORE UPDATE OR DELETE ON "Common_Status"
-    FOR EACH ROW EXECUTE FUNCTION protect_agency_draft_status()
-  `.execute(db)
-
-  await sql`
-    CREATE OR REPLACE FUNCTION create_default_agency_statuses() RETURNS trigger AS $$
-    BEGIN
-      INSERT INTO "Common_Status" (
-        egcs_cn_agency,
-        egcs_cn_name_en,
-        egcs_cn_name_fr,
-        egcs_cn_color,
-        egcs_cn_icon,
-        egcs_cn_readonly,
-        egcs_cn_isdraft
-      ) VALUES
-        (NEW.id, 'Draft', 'Brouillon', '#64748b', 'i-lucide-file-pen-line', false, true),
-        (NEW.id, 'Active', 'Actif', '#16a34a', 'i-lucide-circle-check', false, false),
-        (NEW.id, 'Inactive', 'Inactif', '#71717a', 'i-lucide-circle-pause', true, false);
       RETURN NEW;
-    END;
-    $$ LANGUAGE plpgsql
-  `.execute(db)
-  await sql`
-    CREATE TRIGGER trg_create_default_agency_statuses
-    AFTER INSERT ON "Agency_Profile"
-    FOR EACH ROW EXECUTE FUNCTION create_default_agency_statuses()
-  `.execute(db)
+    END $function$;
 
-  await db.schema
-    .createTable('Agency_Cost_Category')
-    .addColumn('id', 'bigserial', col => col.primaryKey())
-    .addColumn('egcs_ay_organizationagency', 'bigint', col =>
-      col.notNull().references('Agency_Profile.id').onDelete('restrict')
-    )
-    .addColumn('egcs_ay_name_en', 'varchar(255)', col => col.notNull())
-    .addColumn('egcs_ay_name_fr', 'varchar(255)', col => col.notNull())
-    .addColumn('egcs_ay_active', 'boolean', col => col.notNull().defaultTo(true))
-    .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
-    .execute()
+CREATE FUNCTION protect_chart_currency()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+    BEGIN
+      IF NEW.egcs_ay_kind IS DISTINCT FROM OLD.egcs_ay_kind THEN
+        RAISE EXCEPTION 'Chart of Account kind is immutable'
+          USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_chart_kind_immutable';
+      END IF;
+      IF NEW.egcs_ay_currency IS DISTINCT FROM OLD.egcs_ay_currency THEN
+        RAISE EXCEPTION 'Chart of Account currency is immutable'
+          USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_chart_currency_immutable';
+      END IF;
+      RETURN NEW;
+    END $function$;
 
-  await db.schema
-    .createTable('Agency_Holdback_Basis')
-    .addColumn('id', 'bigserial', col => col.primaryKey())
-    .addColumn('egcs_ay_organizationagency', 'bigint', col =>
-      col.notNull().references('Agency_Profile.id').onDelete('restrict')
-    )
-    .addColumn('egcs_ay_languageindependentcode', 'varchar(255)', col => col.notNull())
-    .addColumn('egcs_ay_holdbackbasis', sql`Holdback_Bases`, col => col.notNull().defaultTo('fullagreement'))
-    .addColumn('egcs_ay_name_en', 'varchar(255)', col => col.notNull())
-    .addColumn('egcs_ay_name_fr', 'varchar(255)', col => col.notNull())
-    .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
-    .execute()
+CREATE FUNCTION protect_chart_fiscal_year_owner()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+    BEGIN
+      IF NEW.egcs_ay_organizationagency IS DISTINCT FROM OLD.egcs_ay_organizationagency
+        AND EXISTS (SELECT 1 FROM "Agency_Chart_of_Account" chart WHERE chart.egcs_ay_fiscalyear = OLD.id) THEN
+        RAISE EXCEPTION 'Fiscal year Agency cannot change while Charts refer to it'
+          USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_chartfiscalyearownerimmutable';
+      END IF;
+      IF NEW._deleted AND NOT OLD._deleted AND EXISTS (
+        SELECT 1 FROM "Agency_Chart_of_Account" chart
+        JOIN "Transfer_Payment_Stream_Chart_of_Account" linked
+          ON linked.egcs_tp_agencychartofaccount = chart.id
+        WHERE chart.egcs_ay_fiscalyear = OLD.id
+          AND chart._deleted = false AND linked._deleted = false
+      ) THEN
+        RAISE EXCEPTION 'Fiscal year cannot retire while a live Stream Chart is linked'
+          USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_chartfiscalyearlinked';
+      END IF;
+      RETURN NEW;
+    END $function$;
 
-  await db.schema
-    .createTable('Agency_Cost_Category_Line_Item')
-    .addColumn('id', 'bigserial', col => col.primaryKey())
-    .addColumn('egcs_ay_name_en', 'varchar(255)', col => col.notNull())
-    .addColumn('egcs_ay_name_fr', 'varchar(255)', col => col.notNull())
-    .addColumn('egcs_ay_active', 'boolean', col => col.notNull().defaultTo(true))
-    .addColumn('egcs_ay_organizationcostcategory', 'bigint', col =>
-      col.notNull().references('Agency_Cost_Category.id').onDelete('restrict')
-    )
-    .addColumn('egcs_ay_calculationmode', 'varchar(16)', col => col.notNull().defaultTo('manual'))
-    .addColumn('egcs_ay_sourcecategory', 'bigint', col => col.references('Agency_Cost_Category.id').onDelete('restrict'))
-    .addColumn('egcs_ay_percentage', 'numeric(5, 2)')
-    .addColumn('egcs_ay_allowpercentageoverride', 'boolean', col => col.notNull().defaultTo(false))
-    .addCheckConstraint('ay_chk_lineitemcalculation', sql`
-      (egcs_ay_calculationmode = 'manual' AND egcs_ay_sourcecategory IS NULL AND egcs_ay_percentage IS NULL AND NOT egcs_ay_allowpercentageoverride)
-      OR (egcs_ay_calculationmode IN ('category', 'all_other') AND egcs_ay_percentage IS NOT NULL
-        AND egcs_ay_percentage BETWEEN 0 AND 100
-        AND ((egcs_ay_calculationmode = 'category' AND egcs_ay_sourcecategory IS NOT NULL)
-          OR (egcs_ay_calculationmode = 'all_other' AND egcs_ay_sourcecategory IS NULL)))`)
-    .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
-    .execute()
+CREATE FUNCTION trg_fn_agency_calculation_source()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+    BEGIN
+      IF (NEW._deleted OR NEW.egcs_ay_organizationagency <> OLD.egcs_ay_organizationagency) AND EXISTS (
+        SELECT 1 FROM "Agency_Cost_Category_Line_Item" WHERE NOT _deleted AND egcs_ay_sourcecategory = NEW.id
+      ) THEN RAISE EXCEPTION 'Cost category is a calculation source' USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_lineitemcalculation'; END IF;
+      RETURN NEW;
+    END $function$;
 
-  await sql`
-    CREATE FUNCTION trg_fn_agency_line_calculation() RETURNS trigger LANGUAGE plpgsql AS $fn$
+CREATE FUNCTION trg_fn_agency_line_calculation()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
     DECLARE owner_id bigint;
     BEGIN
       SELECT egcs_ay_organizationagency INTO owner_id FROM "Agency_Cost_Category" WHERE id = NEW.egcs_ay_organizationcostcategory;
@@ -275,385 +560,146 @@ export async function up(db: Kysely<Database>): Promise<void> {
         OR EXISTS (SELECT 1 FROM "Agency_Cost_Category_Line_Item" WHERE NOT _deleted AND egcs_ay_organizationcostcategory = NEW.egcs_ay_sourcecategory AND egcs_ay_calculationmode <> 'manual' AND id <> NEW.id)
       ) THEN RAISE EXCEPTION 'Invalid percentage source category' USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_lineitemcalculation'; END IF;
       RETURN NEW;
-    END $fn$
-  `.execute(db)
-  await sql`CREATE TRIGGER agency_line_calculation BEFORE INSERT OR UPDATE ON "Agency_Cost_Category_Line_Item" FOR EACH ROW EXECUTE FUNCTION trg_fn_agency_line_calculation()`.execute(db)
-  await sql`CREATE FUNCTION trg_fn_agency_calculation_source() RETURNS trigger LANGUAGE plpgsql AS $fn$
+    END $function$;
+
+CREATE FUNCTION validate_agency_operational_catalog()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+    DECLARE fiscal_agency bigint; attachment_agency bigint;
     BEGIN
-      IF (NEW._deleted OR NEW.egcs_ay_organizationagency <> OLD.egcs_ay_organizationagency) AND EXISTS (
-        SELECT 1 FROM "Agency_Cost_Category_Line_Item" WHERE NOT _deleted AND egcs_ay_sourcecategory = NEW.id
-      ) THEN RAISE EXCEPTION 'Cost category is a calculation source' USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_lineitemcalculation'; END IF;
-      RETURN NEW;
-    END $fn$
-  `.execute(db)
-  await sql`CREATE TRIGGER agency_calculation_source BEFORE UPDATE ON "Agency_Cost_Category" FOR EACH ROW EXECUTE FUNCTION trg_fn_agency_calculation_source();
-  `.execute(db)
-
-  await db.schema
-    .createTable('Agency_Fiscal_Year')
-    .addColumn('id', 'bigserial', col => col.primaryKey())
-    .addColumn('egcs_ay_organizationagency', 'bigint', col =>
-      col.notNull().references('Agency_Profile.id').onDelete('restrict')
-    )
-    .addColumn('egcs_ay_fiscalyeardisplay', 'varchar(9)', col => col.notNull())
-    .addColumn('egcs_ay_fiscalyear', 'smallint', col => col.notNull())
-    .addColumn('egcs_ay_startdate', 'date', col => col.notNull())
-    .addColumn('egcs_ay_enddate', 'date', col => col.notNull())
-    .addCheckConstraint('ay_chk_fiscalyear_dates', sql`egcs_ay_enddate >= egcs_ay_startdate`)
-    .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
-    .execute()
-
-  await db.schema
-    .createTable('Agency_Chart_of_Account')
-    .addColumn('id', 'bigserial', col => col.primaryKey())
-    .addColumn('egcs_ay_kind', 'varchar(32)', col => col.notNull().defaultTo('commitment'))
-    .addColumn('egcs_ay_organizationagency', 'bigint', col =>
-      col.notNull().references('Agency_Profile.id').onDelete('restrict')
-    )
-    .addColumn('egcs_ay_fiscalyear', 'bigint', col =>
-      col.notNull().references('Agency_Fiscal_Year.id').onDelete('restrict')
-    )
-    .addColumn('egcs_ay_accountingdimensions', 'jsonb', col => col.notNull())
-    .addColumn('egcs_ay_currency', sql`currency_codes`, col => col.notNull().defaultTo('cad'))
-    .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
-    .addCheckConstraint('ay_chk_chartofaccountdimensions', sql`jsonb_typeof(egcs_ay_accountingdimensions) = 'array' AND jsonb_array_length(egcs_ay_accountingdimensions) > 0`)
-    .addCheckConstraint('ay_chk_chart_kind', sql`egcs_ay_kind IN ('commitment','account_receivable')`)
-    .execute()
-
-  await sql`CREATE FUNCTION protect_chart_currency() RETURNS trigger AS $$
-    BEGIN
-      IF NEW.egcs_ay_kind IS DISTINCT FROM OLD.egcs_ay_kind THEN
-        RAISE EXCEPTION 'Chart of Account kind is immutable'
-          USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_chart_kind_immutable';
+      IF TG_OP = 'UPDATE' THEN
+        IF NEW.egcs_ay_organizationagency IS DISTINCT FROM OLD.egcs_ay_organizationagency THEN
+          RAISE EXCEPTION 'Agency catalog ownership is immutable'
+            USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_operationalcatalogownerimmutable';
+        END IF;
+        IF TG_TABLE_NAME = 'Agency_Chart_of_Account' AND
+          (to_jsonb(NEW)->>'egcs_ay_fiscalyear') IS DISTINCT FROM (to_jsonb(OLD)->>'egcs_ay_fiscalyear') THEN
+          RAISE EXCEPTION 'Chart fiscal year is immutable'
+            USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_chartfiscalyearimmutable';
+        END IF;
       END IF;
-      IF NEW.egcs_ay_currency IS DISTINCT FROM OLD.egcs_ay_currency THEN
-        RAISE EXCEPTION 'Chart of Account currency is immutable'
-          USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_chart_currency_immutable';
+      IF TG_TABLE_NAME = 'Agency_Chart_of_Account' AND NOT NEW._deleted THEN
+        SELECT fiscal.egcs_ay_organizationagency INTO fiscal_agency
+        FROM "Agency_Fiscal_Year" fiscal
+        WHERE fiscal.id = (to_jsonb(NEW)->>'egcs_ay_fiscalyear')::bigint AND fiscal._deleted = false
+        FOR SHARE OF fiscal;
+        IF fiscal_agency IS DISTINCT FROM NEW.egcs_ay_organizationagency THEN
+          RAISE EXCEPTION 'Chart fiscal year must belong to its Agency'
+            USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_chartfiscalyearagency';
+        END IF;
+      ELSIF TG_TABLE_NAME = 'Agency_Document_Template' AND NOT NEW._deleted THEN
+        SELECT type.egcs_cn_agency INTO attachment_agency
+        FROM "Common_Attachment" attachment
+        JOIN "Common_Attachment_Types" type ON type.id = attachment.egcs_cn_attachmenttype
+        WHERE attachment.id = (to_jsonb(NEW)->>'egcs_ay_templateattachment_en')::bigint
+          AND attachment._deleted = false AND type._deleted = false;
+        IF attachment_agency IS DISTINCT FROM NEW.egcs_ay_organizationagency THEN
+          RAISE EXCEPTION 'English template attachment must belong to its Agency'
+            USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_documenttemplateattachmentenagency';
+        END IF;
+        attachment_agency := NULL;
+        SELECT type.egcs_cn_agency INTO attachment_agency
+        FROM "Common_Attachment" attachment
+        JOIN "Common_Attachment_Types" type ON type.id = attachment.egcs_cn_attachmenttype
+        WHERE attachment.id = (to_jsonb(NEW)->>'egcs_ay_templateattachment_fr')::bigint
+          AND attachment._deleted = false AND type._deleted = false;
+        IF attachment_agency IS DISTINCT FROM NEW.egcs_ay_organizationagency THEN
+          RAISE EXCEPTION 'French template attachment must belong to its Agency'
+            USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_documenttemplateattachmentfragency';
+        END IF;
       END IF;
       RETURN NEW;
-    END $$ LANGUAGE plpgsql`.execute(db)
-  await sql`CREATE TRIGGER trg_protect_chart_currency BEFORE UPDATE OF egcs_ay_currency,egcs_ay_kind
-    ON "Agency_Chart_of_Account" FOR EACH ROW EXECUTE FUNCTION protect_chart_currency()`.execute(db)
-
-  await db.schema
-    .createTable('Agency_Commitment_Type')
-    .addColumn('id', 'bigserial', col => col.primaryKey())
-    .addColumn('egcs_ay_organizationagency', 'bigint', col =>
-      col.notNull().references('Agency_Profile.id').onDelete('restrict')
-    )
-    .addColumn('egcs_ay_name_en', 'varchar(255)', col => col.notNull())
-    .addColumn('egcs_ay_name_fr', 'varchar(255)', col => col.notNull())
-    .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
-    .execute()
-
-  await db.schema
-    .createTable('Agency_Monitor_Type')
-    .addColumn('id', 'bigserial', col => col.primaryKey())
-    .addColumn('egcs_ay_organizationagency', 'bigint', col =>
-      col.notNull().references('Agency_Profile.id').onDelete('restrict')
-    )
-    .addColumn('egcs_ay_name_en', 'varchar(255)', col => col.notNull())
-    .addColumn('egcs_ay_name_fr', 'varchar(255)', col => col.notNull())
-    .addColumn('egcs_ay_receivableeligible', 'boolean', col => col.notNull().defaultTo(false))
-    .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
-    .execute()
-
-  await db.schema.createTable('Agency_Account_Receivable_Type')
-    .addColumn('id', 'bigserial', col => col.primaryKey())
-    .addColumn('egcs_ay_organizationagency', 'bigint', col => col.notNull().references('Agency_Profile.id').onDelete('restrict'))
-    .addColumn('egcs_ay_name_en', 'varchar(255)', col => col.notNull())
-    .addColumn('egcs_ay_name_fr', 'varchar(255)', col => col.notNull())
-    .addColumn('egcs_ay_description_en', 'text', col => col.notNull().defaultTo(''))
-    .addColumn('egcs_ay_description_fr', 'text', col => col.notNull().defaultTo(''))
-    .addColumn('egcs_ay_monitorrequired', 'boolean', col => col.notNull().defaultTo(false))
-    .addColumn('egcs_ay_advancepaymentrelated', 'boolean', col => col.notNull())
-    .addColumn('egcs_ay_claimrelated', 'boolean', col => col.notNull())
-    .addColumn('_deleted', 'boolean', col => col.notNull().defaultTo(false))
-    .addCheckConstraint('ay_chk_ar_type_source', sql`egcs_ay_advancepaymentrelated <> egcs_ay_claimrelated`)
-    .addCheckConstraint('ay_chk_ar_type_names', sql`length(btrim(egcs_ay_name_en)) > 0 AND length(btrim(egcs_ay_name_fr)) > 0`)
-    .execute()
-  await sql`CREATE UNIQUE INDEX ay_uq_ar_type_name_en ON "Agency_Account_Receivable_Type" (egcs_ay_organizationagency,lower(btrim(egcs_ay_name_en))) WHERE NOT _deleted`.execute(db)
-  await sql`CREATE UNIQUE INDEX ay_uq_ar_type_name_fr ON "Agency_Account_Receivable_Type" (egcs_ay_organizationagency,lower(btrim(egcs_ay_name_fr))) WHERE NOT _deleted`.execute(db)
-
-  await sql`CREATE UNIQUE INDEX ay_idx_chartfiscalyeardimensions ON "Agency_Chart_of_Account" (egcs_ay_fiscalyear, egcs_ay_currency, egcs_ay_kind, egcs_ay_accountingdimensions) WHERE _deleted = false`.execute(db)
-  await sql`CREATE UNIQUE INDEX ay_idx_commitmenttypenameen ON "Agency_Commitment_Type" (egcs_ay_organizationagency, egcs_ay_name_en) WHERE _deleted = false`.execute(db)
-  await sql`CREATE UNIQUE INDEX ay_idx_commitmenttypenamefr ON "Agency_Commitment_Type" (egcs_ay_organizationagency, egcs_ay_name_fr) WHERE _deleted = false`.execute(db)
-  await sql`CREATE UNIQUE INDEX ay_idx_monitortypenameen ON "Agency_Monitor_Type" (egcs_ay_organizationagency, egcs_ay_name_en) WHERE _deleted = false`.execute(db)
-  await sql`CREATE UNIQUE INDEX ay_idx_monitortypenamefr ON "Agency_Monitor_Type" (egcs_ay_organizationagency, egcs_ay_name_fr) WHERE _deleted = false`.execute(db)
-
-  await db.schema
-    .createTable('Agency_Address_Type')
-    .addColumn('id', 'bigserial', col => col.primaryKey())
-    .addColumn('egcs_ay_organizationagency', 'bigint', col =>
-      col.notNull().references('Agency_Profile.id').onDelete('restrict')
-    )
-    .addColumn('egcs_ay_typename_en', 'varchar(255)', col => col.notNull())
-    .addColumn('egcs_ay_typename_fr', 'varchar(255)', col => col.notNull())
-    .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
-    .execute()
-
-  await db.schema
-    .createTable('Agency_Applicant_Recipient_Subtype')
-    .addColumn('id', 'bigserial', col => col.primaryKey())
-    .addColumn('egcs_ay_applicantrecipienttype', sql`Applicant_Recipient_Type`, col => col.notNull())
-    .addColumn('egcs_ay_organizationagency', 'bigint', col =>
-      col.notNull().references('Agency_Profile.id').onDelete('restrict')
-    )
-    .addColumn('egcs_ay_description_en', 'text', col => col.notNull())
-    .addColumn('egcs_ay_description_fr', 'text', col => col.notNull())
-    .addColumn('egcs_ay_name_en', 'varchar(255)', col => col.notNull())
-    .addColumn('egcs_ay_name_fr', 'varchar(255)', col => col.notNull())
-    .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
-    .execute()
-
-  await db.schema
-    .createTable('Agency_Approval_Behalf_Type')
-    .addColumn('id', 'bigserial', col => col.primaryKey())
-    .addColumn('egcs_ay_organizationagency', 'bigint', col =>
-      col.notNull().references('Agency_Profile.id').onDelete('restrict')
-    )
-    .addColumn('egcs_ay_name_en', 'varchar(255)', col => col.notNull())
-    .addColumn('egcs_ay_name_fr', 'varchar(255)', col => col.notNull())
-    .addColumn('egcs_ay_require_actual', 'boolean', col => col.notNull())
-    .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
-    .execute()
-
-  await db.schema
-    .createTable('Agency_Agreement_Type')
-    .addColumn('id', 'bigserial', col => col.primaryKey())
-    .addColumn('egcs_ay_organizationagency', 'bigint', col =>
-      col.notNull().references('Agency_Profile.id').onDelete('restrict')
-    )
-    .addColumn('egcs_ay_agreementtype', sql`Agreement_Type`, col => col.notNull())
-    .addColumn('egcs_ay_name_en', 'varchar(255)', col => col.notNull())
-    .addColumn('egcs_ay_name_fr', 'varchar(255)', col => col.notNull())
-    .addColumn('_deleted', 'boolean', col => col.defaultTo(false).notNull())
-    .execute()
-
-  await db.schema
-    .createIndex(INDEX_NAMES.profileNameEn)
-    .on('Agency_Profile')
-    .column('egcs_ay_name_en')
-    .where(sql<SqlBool>`_deleted = false`)
-    .execute()
-
-  await db.schema
-    .createIndex(INDEX_NAMES.profileNameFr)
-    .on('Agency_Profile')
-    .column('egcs_ay_name_fr')
-    .where(sql<SqlBool>`_deleted = false`)
-    .execute()
-
-  await db.schema
-    .createIndex(INDEX_NAMES.profileStatusUnique)
-    .on('Agency_Profile')
-    .columns(['egcs_ay_agencyfinancialsystemid', 'egcs_ay_name_en', 'egcs_ay_name_fr', 'egcs_ay_active'])
-    .where(sql<SqlBool>`_deleted = false`)
-    .unique()
-    .execute()
-
-  await db.schema
-    .createIndex(INDEX_NAMES.costCategoryNameEnUnique)
-    .on('Agency_Cost_Category')
-    .columns(['egcs_ay_organizationagency', 'egcs_ay_name_en'])
-    .where(sql<SqlBool>`_deleted = false`)
-    .unique()
-    .execute()
-
-  await db.schema
-    .createIndex(INDEX_NAMES.costCategoryNameFrUnique)
-    .on('Agency_Cost_Category')
-    .columns(['egcs_ay_organizationagency', 'egcs_ay_name_fr'])
-    .where(sql<SqlBool>`_deleted = false`)
-    .unique()
-    .execute()
-
-  await db.schema
-    .createIndex(INDEX_NAMES.lineItemNameEnUnique)
-    .on('Agency_Cost_Category_Line_Item')
-    .columns(['egcs_ay_organizationcostcategory', 'egcs_ay_name_en'])
-    .where(sql<SqlBool>`_deleted = false`)
-    .unique()
-    .execute()
-
-  await db.schema
-    .createIndex(INDEX_NAMES.lineItemNameFrUnique)
-    .on('Agency_Cost_Category_Line_Item')
-    .columns(['egcs_ay_organizationcostcategory', 'egcs_ay_name_fr'])
-    .where(sql<SqlBool>`_deleted = false`)
-    .unique()
-    .execute()
-
-  await db.schema
-    .createIndex(INDEX_NAMES.fiscalYearDisplayUnique)
-    .on('Agency_Fiscal_Year')
-    .columns(['egcs_ay_organizationagency', 'egcs_ay_fiscalyeardisplay'])
-    .where(sql<SqlBool>`_deleted = false`)
-    .unique()
-    .execute()
-
-  await db.schema
-    .createIndex(INDEX_NAMES.fiscalYearYearUnique)
-    .on('Agency_Fiscal_Year')
-    .columns(['egcs_ay_organizationagency', 'egcs_ay_fiscalyear'])
-    .where(sql<SqlBool>`_deleted = false`)
-    .unique()
-    .execute()
-
-  await db.schema
-    .createIndex(INDEX_NAMES.addressTypeNameEnUnique)
-    .on('Agency_Address_Type')
-    .columns(['egcs_ay_organizationagency', 'egcs_ay_typename_en'])
-    .where(sql<SqlBool>`_deleted = false`)
-    .unique()
-    .execute()
-
-  await db.schema
-    .createIndex(INDEX_NAMES.addressTypeNameFrUnique)
-    .on('Agency_Address_Type')
-    .columns(['egcs_ay_organizationagency', 'egcs_ay_typename_fr'])
-    .where(sql<SqlBool>`_deleted = false`)
-    .unique()
-    .execute()
-
-  await db.schema
-    .createIndex(INDEX_NAMES.applicantSubtypeNameEnUnique)
-    .on('Agency_Applicant_Recipient_Subtype')
-    .columns(['egcs_ay_organizationagency', 'egcs_ay_applicantrecipienttype', 'egcs_ay_name_en'])
-    .where(sql<SqlBool>`_deleted = false`)
-    .unique()
-    .execute()
-
-  await db.schema
-    .createIndex(INDEX_NAMES.applicantSubtypeNameFrUnique)
-    .on('Agency_Applicant_Recipient_Subtype')
-    .columns(['egcs_ay_organizationagency', 'egcs_ay_applicantrecipienttype', 'egcs_ay_name_fr'])
-    .where(sql<SqlBool>`_deleted = false`)
-    .unique()
-    .execute()
-
-  await db.schema
-    .createIndex(INDEX_NAMES.approvalBehalfNameEnUnique)
-    .on('Agency_Approval_Behalf_Type')
-    .columns(['egcs_ay_organizationagency', 'egcs_ay_name_en'])
-    .where(sql<SqlBool>`_deleted = false`)
-    .unique()
-    .execute()
-
-  await db.schema
-    .createIndex(INDEX_NAMES.approvalBehalfNameFrUnique)
-    .on('Agency_Approval_Behalf_Type')
-    .columns(['egcs_ay_organizationagency', 'egcs_ay_name_fr'])
-    .where(sql<SqlBool>`_deleted = false`)
-    .unique()
-    .execute()
-
-  await db.schema
-    .createIndex(INDEX_NAMES.agreementTypeNameEnUnique)
-    .on('Agency_Agreement_Type')
-    .columns(['egcs_ay_organizationagency', 'egcs_ay_agreementtype', 'egcs_ay_name_en'])
-    .where(sql<SqlBool>`_deleted = false`)
-    .unique()
-    .execute()
-
-  await db.schema
-    .createIndex(INDEX_NAMES.agreementTypeNameFrUnique)
-    .on('Agency_Agreement_Type')
-    .columns(['egcs_ay_organizationagency', 'egcs_ay_agreementtype', 'egcs_ay_name_fr'])
-    .where(sql<SqlBool>`_deleted = false`)
-    .unique()
-    .execute()
-
-  await db.schema
-    .createIndex(INDEX_NAMES.holdbackBasisCodeUnique)
-    .on('Agency_Holdback_Basis')
-    .columns(['egcs_ay_organizationagency', 'egcs_ay_languageindependentcode'])
-    .where(sql<SqlBool>`_deleted = false`)
-    .unique()
-    .execute()
-
-  // Expression indexes align database uniqueness with the trimmed, case-insensitive
-  // identifiers presented by the API and browser forms.
-  await sql`CREATE UNIQUE INDEX ay_uq_profile_normalized ON "Agency_Profile"
-    (egcs_ay_agencyfinancialsystemid, lower(btrim(egcs_ay_name_en)), lower(btrim(egcs_ay_name_fr)), egcs_ay_active)
-    WHERE _deleted = false`.execute(db)
-  await sql`CREATE UNIQUE INDEX ay_uq_cost_category_name_en_normalized ON "Agency_Cost_Category"
-    (egcs_ay_organizationagency, lower(btrim(egcs_ay_name_en))) WHERE _deleted = false`.execute(db)
-  await sql`CREATE UNIQUE INDEX ay_uq_cost_category_name_fr_normalized ON "Agency_Cost_Category"
-    (egcs_ay_organizationagency, lower(btrim(egcs_ay_name_fr))) WHERE _deleted = false`.execute(db)
-  await sql`CREATE UNIQUE INDEX ay_uq_line_item_name_en_normalized ON "Agency_Cost_Category_Line_Item"
-    (egcs_ay_organizationcostcategory, lower(btrim(egcs_ay_name_en))) WHERE _deleted = false`.execute(db)
-  await sql`CREATE UNIQUE INDEX ay_uq_line_item_name_fr_normalized ON "Agency_Cost_Category_Line_Item"
-    (egcs_ay_organizationcostcategory, lower(btrim(egcs_ay_name_fr))) WHERE _deleted = false`.execute(db)
-  await sql`CREATE UNIQUE INDEX ay_uq_address_type_name_en_normalized ON "Agency_Address_Type"
-    (egcs_ay_organizationagency, lower(btrim(egcs_ay_typename_en))) WHERE _deleted = false`.execute(db)
-  await sql`CREATE UNIQUE INDEX ay_uq_address_type_name_fr_normalized ON "Agency_Address_Type"
-    (egcs_ay_organizationagency, lower(btrim(egcs_ay_typename_fr))) WHERE _deleted = false`.execute(db)
-  await sql`CREATE UNIQUE INDEX ay_uq_recipient_subtype_name_en_normalized ON "Agency_Applicant_Recipient_Subtype"
-    (egcs_ay_organizationagency, egcs_ay_applicantrecipienttype, lower(btrim(egcs_ay_name_en))) WHERE _deleted = false`.execute(db)
-  await sql`CREATE UNIQUE INDEX ay_uq_recipient_subtype_name_fr_normalized ON "Agency_Applicant_Recipient_Subtype"
-    (egcs_ay_organizationagency, egcs_ay_applicantrecipienttype, lower(btrim(egcs_ay_name_fr))) WHERE _deleted = false`.execute(db)
-  await sql`CREATE UNIQUE INDEX ay_uq_approval_behalf_name_en_normalized ON "Agency_Approval_Behalf_Type"
-    (egcs_ay_organizationagency, lower(btrim(egcs_ay_name_en))) WHERE _deleted = false`.execute(db)
-  await sql`CREATE UNIQUE INDEX ay_uq_approval_behalf_name_fr_normalized ON "Agency_Approval_Behalf_Type"
-    (egcs_ay_organizationagency, lower(btrim(egcs_ay_name_fr))) WHERE _deleted = false`.execute(db)
-  await sql`CREATE UNIQUE INDEX ay_uq_agreement_type_name_en_normalized ON "Agency_Agreement_Type"
-    (egcs_ay_organizationagency, egcs_ay_agreementtype, lower(btrim(egcs_ay_name_en))) WHERE _deleted = false`.execute(db)
-  await sql`CREATE UNIQUE INDEX ay_uq_agreement_type_name_fr_normalized ON "Agency_Agreement_Type"
-    (egcs_ay_organizationagency, egcs_ay_agreementtype, lower(btrim(egcs_ay_name_fr))) WHERE _deleted = false`.execute(db)
-  await sql`CREATE UNIQUE INDEX ay_uq_holdback_code_normalized ON "Agency_Holdback_Basis"
-    (egcs_ay_organizationagency, lower(btrim(egcs_ay_languageindependentcode))) WHERE _deleted = false`.execute(db)
+    END $function$;
+END $baseline$`.execute(db)
 }
 
-export async function down(db: Kysely<Database>): Promise<void> {
-  await sql`DROP TRIGGER IF EXISTS agency_line_calculation ON "Agency_Cost_Category_Line_Item"`.execute(db)
-  await sql`DROP TRIGGER IF EXISTS agency_calculation_source ON "Agency_Cost_Category"`.execute(db)
-  await sql`DROP FUNCTION IF EXISTS trg_fn_agency_line_calculation()`.execute(db)
-  await sql`DROP FUNCTION IF EXISTS trg_fn_agency_calculation_source()`.execute(db)
-  await sql`DROP TRIGGER IF EXISTS trg_protect_agency_claim_reconciliation_status_refs ON "Common_Status"`.execute(db)
-  await sql`DROP FUNCTION IF EXISTS protect_agency_claim_reconciliation_status_refs()`.execute(db)
-  await sql`DROP TRIGGER IF EXISTS trg_enforce_agency_claim_reconciliation_statuses ON "Agency_Profile"`.execute(db)
-  await sql`DROP FUNCTION IF EXISTS enforce_agency_claim_reconciliation_statuses()`.execute(db)
-  await sql`DROP TRIGGER IF EXISTS trg_create_default_agency_statuses ON "Agency_Profile"`.execute(db)
-  await sql`DROP FUNCTION IF EXISTS create_default_agency_statuses()`.execute(db)
-  await sql`DROP TRIGGER IF EXISTS trg_protect_agency_draft_status ON "Common_Status"`.execute(db)
-  await sql`DROP FUNCTION IF EXISTS protect_agency_draft_status()`.execute(db)
-  await db.schema.alterTable('Agency_Profile')
-    .dropColumn('egcs_ay_claimreconciliationfinalstatus')
-    .dropColumn('egcs_ay_claimreconciliationstartstatus')
-    .execute()
-  await db.schema.dropTable('Common_Status').execute()
-  await db.schema.dropIndex(INDEX_NAMES.holdbackBasisCodeUnique).execute()
-  await db.schema.dropIndex(INDEX_NAMES.agreementTypeNameFrUnique).execute()
-  await db.schema.dropIndex(INDEX_NAMES.agreementTypeNameEnUnique).execute()
-  await db.schema.dropIndex(INDEX_NAMES.approvalBehalfNameFrUnique).execute()
-  await db.schema.dropIndex(INDEX_NAMES.approvalBehalfNameEnUnique).execute()
-  await db.schema.dropIndex(INDEX_NAMES.applicantSubtypeNameFrUnique).execute()
-  await db.schema.dropIndex(INDEX_NAMES.applicantSubtypeNameEnUnique).execute()
-  await db.schema.dropIndex(INDEX_NAMES.addressTypeNameFrUnique).execute()
-  await db.schema.dropIndex(INDEX_NAMES.addressTypeNameEnUnique).execute()
-  await db.schema.dropIndex(INDEX_NAMES.fiscalYearYearUnique).execute()
-  await db.schema.dropIndex(INDEX_NAMES.fiscalYearDisplayUnique).execute()
-  await db.schema.dropIndex(INDEX_NAMES.lineItemNameFrUnique).execute()
-  await db.schema.dropIndex(INDEX_NAMES.lineItemNameEnUnique).execute()
-  await db.schema.dropIndex(INDEX_NAMES.costCategoryNameFrUnique).execute()
-  await db.schema.dropIndex(INDEX_NAMES.costCategoryNameEnUnique).execute()
-  await db.schema.dropIndex(INDEX_NAMES.profileStatusUnique).execute()
-  await db.schema.dropIndex(INDEX_NAMES.profileNameFr).execute()
-  await db.schema.dropIndex(INDEX_NAMES.profileNameEn).execute()
+/** Installs the current installForeignKeys definitions for this subject on a fresh database. */
+export const installForeignKeys = async (db: Kysely<Database>): Promise<void> => {
+  await sql`DO $baseline$ BEGIN
+ALTER TABLE "Agency_Account_Receivable_Type" ADD CONSTRAINT "Agency_Account_Receivable_Type_egcs_ay_organizationagency_fkey" FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
 
-  await db.schema.dropTable('Agency_Agreement_Type').execute()
-  await db.schema.dropTable('Agency_Holdback_Basis').execute()
-  await db.schema.dropTable('Agency_Approval_Behalf_Type').execute()
-  await db.schema.dropTable('Agency_Applicant_Recipient_Subtype').execute()
-  await db.schema.dropTable('Agency_Address_Type').execute()
-  await db.schema.dropTable('Agency_Monitor_Type').execute()
-  await db.schema.dropTable('Agency_Account_Receivable_Type').execute()
-  await db.schema.dropTable('Agency_Commitment_Type').execute()
-  await db.schema.dropTable('Agency_Chart_of_Account').execute()
-  await sql`DROP FUNCTION protect_chart_currency()`.execute(db)
-  await db.schema.dropTable('Agency_Fiscal_Year').execute()
-  await db.schema.dropTable('Agency_Cost_Category_Line_Item').execute()
-  await db.schema.dropTable('Agency_Cost_Category').execute()
-  await db.schema.dropTable('Agency_Profile').execute()
+ALTER TABLE "Agency_Address_Type" ADD CONSTRAINT "Agency_Address_Type_egcs_ay_organizationagency_fkey" FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Agency_Agreement_Type" ADD CONSTRAINT "Agency_Agreement_Type_egcs_ay_organizationagency_fkey" FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Agency_Applicant_Recipient_Subtype" ADD CONSTRAINT "Agency_Applicant_Recipient_Subt_egcs_ay_organizationagency_fkey" FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Agency_Approval_Behalf_Type" ADD CONSTRAINT "Agency_Approval_Behalf_Type_egcs_ay_organizationagency_fkey" FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Agency_Chart_of_Account" ADD CONSTRAINT "Agency_Chart_of_Account_egcs_ay_fiscalyear_fkey" FOREIGN KEY (egcs_ay_fiscalyear) REFERENCES "Agency_Fiscal_Year"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Agency_Chart_of_Account" ADD CONSTRAINT "Agency_Chart_of_Account_egcs_ay_organizationagency_fkey" FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Agency_Commitment_Type" ADD CONSTRAINT "Agency_Commitment_Type_egcs_ay_organizationagency_fkey" FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Agency_Cost_Category" ADD CONSTRAINT "Agency_Cost_Category_egcs_ay_organizationagency_fkey" FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Agency_Cost_Category_Line_Item" ADD CONSTRAINT "Agency_Cost_Category_Line_Ite_egcs_ay_organizationcostcate_fkey" FOREIGN KEY (egcs_ay_organizationcostcategory) REFERENCES "Agency_Cost_Category"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Agency_Cost_Category_Line_Item" ADD CONSTRAINT "Agency_Cost_Category_Line_Item_egcs_ay_sourcecategory_fkey" FOREIGN KEY (egcs_ay_sourcecategory) REFERENCES "Agency_Cost_Category"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Agency_Custom_Field" ADD CONSTRAINT "Agency_Custom_Field_egcs_ay_agency_fkey" FOREIGN KEY (egcs_ay_agency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Agency_Custom_Field_Option" ADD CONSTRAINT "Agency_Custom_Field_Option_egcs_ay_field_fkey" FOREIGN KEY (egcs_ay_field) REFERENCES "Agency_Custom_Field"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Agency_Document_Template" ADD CONSTRAINT "Agency_Document_Template_egcs_ay_organizationagency_fkey" FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Agency_Document_Template" ADD CONSTRAINT "Agency_Document_Template_egcs_ay_templateattachment_en_fkey" FOREIGN KEY (egcs_ay_templateattachment_en) REFERENCES "Common_Attachment"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Agency_Document_Template" ADD CONSTRAINT "Agency_Document_Template_egcs_ay_templateattachment_fr_fkey" FOREIGN KEY (egcs_ay_templateattachment_fr) REFERENCES "Common_Attachment"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Agency_Fiscal_Year" ADD CONSTRAINT "Agency_Fiscal_Year_egcs_ay_organizationagency_fkey" FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Agency_Funding_Subtype" ADD CONSTRAINT "Agency_Funding_Subtype_egcs_ay_fundingtype_fkey" FOREIGN KEY (egcs_ay_fundingtype) REFERENCES "Agency_Funding_Type"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Agency_Funding_Type" ADD CONSTRAINT "Agency_Funding_Type_egcs_ay_organizationagency_fkey" FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Agency_Holdback_Basis" ADD CONSTRAINT "Agency_Holdback_Basis_egcs_ay_organizationagency_fkey" FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Agency_Monitor_Type" ADD CONSTRAINT "Agency_Monitor_Type_egcs_ay_organizationagency_fkey" FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Agency_Profile" ADD CONSTRAINT "Agency_Profile_egcs_ay_claimreconciliationfinalstatus_fkey" FOREIGN KEY (egcs_ay_claimreconciliationfinalstatus) REFERENCES "Common_Status"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Agency_Profile" ADD CONSTRAINT "Agency_Profile_egcs_ay_claimreconciliationstartstatus_fkey" FOREIGN KEY (egcs_ay_claimreconciliationstartstatus) REFERENCES "Common_Status"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Agency_Profile" ADD CONSTRAINT "ay_ref_profilegwcoanumber" FOREIGN KEY (egcs_ay_gwcoa_number) REFERENCES "Common_GWCOA"(egcs_cn_number) ON DELETE RESTRICT;
+END $baseline$`.execute(db)
+}
+
+/** Installs the current installTriggers definitions for this subject on a fresh database. */
+export const installTriggers = async (db: Kysely<Database>): Promise<void> => {
+  await sql`DO $baseline$ BEGIN
+CREATE TRIGGER protect_workflow_profile_conditions AFTER DELETE OR UPDATE OF _deleted, egcs_ay_organizationagency ON "Agency_Agreement_Type" FOR EACH ROW EXECUTE FUNCTION validate_workflow_profile_references();
+
+CREATE TRIGGER guard_referenced_proponent_subtype BEFORE UPDATE ON "Agency_Applicant_Recipient_Subtype" FOR EACH ROW EXECUTE FUNCTION guard_referenced_proponent_subtype();
+
+CREATE TRIGGER protect_workflow_profile_conditions AFTER DELETE OR UPDATE OF _deleted, egcs_ay_organizationagency ON "Agency_Applicant_Recipient_Subtype" FOR EACH ROW EXECUTE FUNCTION validate_workflow_profile_references();
+
+CREATE TRIGGER trg_protect_chart_currency BEFORE UPDATE OF egcs_ay_currency, egcs_ay_kind ON "Agency_Chart_of_Account" FOR EACH ROW EXECUTE FUNCTION protect_chart_currency();
+
+CREATE TRIGGER validate_agency_operational_catalog BEFORE INSERT OR UPDATE ON "Agency_Chart_of_Account" FOR EACH ROW EXECUTE FUNCTION validate_agency_operational_catalog();
+
+CREATE TRIGGER validate_agency_operational_catalog BEFORE INSERT OR UPDATE ON "Agency_Commitment_Type" FOR EACH ROW EXECUTE FUNCTION validate_agency_operational_catalog();
+
+CREATE TRIGGER agency_calculation_source BEFORE UPDATE ON "Agency_Cost_Category" FOR EACH ROW EXECUTE FUNCTION trg_fn_agency_calculation_source();
+
+CREATE TRIGGER agency_line_calculation BEFORE INSERT OR UPDATE ON "Agency_Cost_Category_Line_Item" FOR EACH ROW EXECUTE FUNCTION trg_fn_agency_line_calculation();
+
+CREATE TRIGGER protect_agency_custom_field_identity BEFORE UPDATE ON "Agency_Custom_Field" FOR EACH ROW EXECUTE FUNCTION protect_agency_custom_field_identity();
+
+CREATE TRIGGER enforce_agency_custom_field_option BEFORE INSERT OR UPDATE OF egcs_ay_field, _deleted ON "Agency_Custom_Field_Option" FOR EACH ROW EXECUTE FUNCTION enforce_agency_custom_field_option();
+
+CREATE TRIGGER validate_agency_operational_catalog BEFORE INSERT OR UPDATE ON "Agency_Document_Template" FOR EACH ROW EXECUTE FUNCTION validate_agency_operational_catalog();
+
+CREATE TRIGGER protect_chart_fiscal_year_owner BEFORE UPDATE OF egcs_ay_organizationagency, _deleted ON "Agency_Fiscal_Year" FOR EACH ROW EXECUTE FUNCTION protect_chart_fiscal_year_owner();
+
+CREATE TRIGGER validate_agency_operational_catalog BEFORE INSERT OR UPDATE ON "Agency_Holdback_Basis" FOR EACH ROW EXECUTE FUNCTION validate_agency_operational_catalog();
+
+CREATE TRIGGER validate_agency_operational_catalog BEFORE INSERT OR UPDATE ON "Agency_Monitor_Type" FOR EACH ROW EXECUTE FUNCTION validate_agency_operational_catalog();
+
+CREATE TRIGGER trg_create_default_agency_statuses AFTER INSERT ON "Agency_Profile" FOR EACH ROW EXECUTE FUNCTION create_default_agency_statuses();
+
+CREATE TRIGGER trg_enforce_agency_claim_reconciliation_statuses BEFORE INSERT OR UPDATE OF egcs_ay_claimreconciliationstartstatus, egcs_ay_claimreconciliationfinalstatus ON "Agency_Profile" FOR EACH ROW EXECUTE FUNCTION enforce_agency_claim_reconciliation_statuses();
+END $baseline$`.execute(db)
 }

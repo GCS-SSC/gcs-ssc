@@ -50,8 +50,7 @@ export default defineNuxtConfig({
 
   nitro: {
     experimental: { asyncContext: true, tasks: true },
-    scheduledTasks: { '* * * * *': ['extensions:minute'] },
-    typescript: { tsConfig: { exclude: ['../server/database/migrations/0240_seed.ts'] } }
+    scheduledTasks: { '* * * * *': ['extensions:minute'] }
   },
 
   vite: {
@@ -63,9 +62,8 @@ export default defineNuxtConfig({
     }
   },
   hooks: {
-    // The immutable historical seed targets the schema before final cleanup.
     /**
-     * Keep the frozen seed separate from the current schema type contract.
+     * Allow explicit TypeScript imports used by extension workspaces.
      * @param root0 - Generated Nuxt type configurations.
      * @param root0.tsConfig - Application configuration.
      * @param root0.nodeTsConfig - Node configuration.
@@ -75,8 +73,6 @@ export default defineNuxtConfig({
       for (const config of [tsConfig, nodeTsConfig, sharedTsConfig]) {
         config.compilerOptions ??= {}
         config.compilerOptions.allowImportingTsExtensions = true
-        config.exclude ??= []
-        config.exclude.push('../server/database/migrations/0240_seed.ts')
       }
     }
   },
