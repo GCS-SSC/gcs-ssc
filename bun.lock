@@ -155,7 +155,7 @@
       "name": "@gcs-ssc/gcs-machine-translation",
       "version": "0.1.0",
       "dependencies": {
-        "@gcs-ssc/extensions": "^0.3.8",
+        "@gcs-ssc/extensions": "^0.3.9",
         "@huggingface/transformers": "4.1.0",
         "nanoid": "^5.1.6",
         "nmt-enfr": "github:omarmir/nmt-enfr#6bb66e0fcb45391e363d4da88a7329241c515c89",
@@ -324,7 +324,7 @@
     },
     "packages/gcs-ssc-extensions": {
       "name": "@gcs-ssc/extensions",
-      "version": "0.3.8",
+      "version": "0.3.9",
       "devDependencies": {
         "@types/node": "^25.3.0",
         "h3": "^1.15.5",
