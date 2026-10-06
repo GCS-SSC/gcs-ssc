@@ -49,7 +49,14 @@ export const createRequiredControl = <T>(component: T, kind: 'standard' | 'selec
       ? useBilingualFieldControl(
           () => typeof attrs.name === 'string' ? attrs.name : formField?.value.name,
           {
-            getText: () => typeof attrs.modelValue === 'string' ? attrs.modelValue : '',
+            /** Reads either supported Vue template spelling of the live model value.
+             * @returns The current text, or an empty source for non-string values.
+             */
+            getText: () => {
+              // Undeclared Vue attrs retain the template's camel/kebab spelling.
+              const modelValue = attrs.modelValue ?? attrs['model-value']
+              return typeof modelValue === 'string' ? modelValue : ''
+            },
             /** Checks model handlers and native disabled/read-only state without tracking the component ref.
              * @returns Whether the actual text control accepts a draft update.
              */
