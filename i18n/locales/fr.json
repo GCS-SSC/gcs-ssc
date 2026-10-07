@@ -1330,6 +1330,7 @@
       "amendment_activities_exist": "Cette modification possède déjà un instantané des activités.",
       "amendment_budget_snapshot_not_found": "Cette modification ne possède pas d'instantané du budget.",
       "amendment_activity_snapshot_not_found": "Cette modification ne possède pas d'instantané des activités.",
+      "amendment_scope_removal_confirmation_required": "La portée de la modification a changé. Rechargez cette modification et confirmez le retrait de toutes les sections touchées avant de supprimer le travail enregistré.",
       "open_amendment_exists": "Cette entente possède déjà une modification ouverte. Terminez-la ou fermez-la avant d’en créer une autre.",
       "amendment_capability_required": "Le type de modification sélectionné ne permet pas ce changement.",
       "amendment_duration_dates_required": "Une modification de durée exige des dates de début et de fin autorisées proposées.",
@@ -1399,9 +1400,7 @@
       "currency_immutable": "La devise de l’entente est définie à la création et ne peut pas être modifiée.",
       "currency_mismatch": "La devise doit correspondre à celle de l’entente.",
       "invalid_claim_proponent": "Sélectionnez un promoteur soumissionnaire lié à cette entente.",
-      "amendment_risk_workflow_managed": "Un processus de risque gère la proposition de risque de cette modification. Terminez le processus pour la mettre à jour.",
-      "amendment_budget_type_required": "Un type de modification budgétaire est requis tant que cette modification possède un instantané du budget.",
-      "amendment_activities_type_required": "Un type de modification des activités est requis tant que cette modification possède un instantané des activités."
+      "amendment_risk_workflow_managed": "Un processus de risque gère la proposition de risque de cette modification. Terminez le processus pour la mettre à jour."
     },
     "transfer_payment": {
       "invalid_funding_subtype": "Sélectionnez un sous-type de financement actif appartenant à l’agence de ce volet.",
@@ -2535,6 +2534,9 @@
       "duration_description": "Définissez les dates autorisées proposées. Une modification de durée permet ensuite d’ajouter, de modifier ou de supprimer des exercices financiers du budget.",
       "duration_updated": "Les dates autorisées proposées ont été mises à jour",
       "edit_scope": "Modifier la portée",
+      "remove_areas_title": "Retirer des sections de la modification?",
+      "remove_areas_confirm": "Le retrait de ces types de modification supprimera définitivement tout le travail dans ces sections de cette modification : {areas}. Cette action est irréversible. Confirmer le retrait?",
+      "remove_areas": "Retirer les sections",
       "scope_updated": "La portée de la modification a été mise à jour",
       "cancel": "Annuler la modification",
       "cancel_title": "Annuler la modification",

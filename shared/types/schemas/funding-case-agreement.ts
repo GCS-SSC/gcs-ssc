@@ -271,6 +271,7 @@ export const FundingCaseAgreementAmendmentPatchSchema = FundingCaseAgreementAmen
   .partial()
   .extend({
     amendment_subtype_ids: z.array(RequiredBigintSelectionId()).optional(),
+    confirmed_scope_removals: z.array(z.enum(['budget', 'activities'], { error: 'validation.invalid_selection' })).optional(),
     egcs_fc_changerisk: z.boolean().optional(),
     egcs_fc_status: ForbiddenBusinessStatusMutation()
   })

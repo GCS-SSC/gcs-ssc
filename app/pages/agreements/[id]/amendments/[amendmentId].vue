@@ -8,7 +8,7 @@ import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 import type { Ref } from 'vue'
 import AgreementActivitiesTab from '~/components/Agreement/AgreementActivitiesTab.vue'
 import AgreementBudgetTab from '~/components/Agreement/AgreementBudgetTab.vue'
-import { hasRequiredAmendmentSubtypeSelections } from '~/utils/agreement-amendment-scope'
+import { hasRequiredAmendmentSubtypeSelections, resolveSelectedAmendmentScopeTypes } from '~/utils/agreement-amendment-scope'
 import { appRouteLocations, authorizedRouteLocation } from '~/utils/route-locations'
 import type { EntityAssignmentContext } from '~~/shared/types/schemas/entity-assignment'
 import type {
@@ -35,6 +35,7 @@ const { showError } = useApiErrorToast()
 const { getBilingualValue } = useBilingualValue()
 const { getHeroCollapsed } = useDashboard()
 const { saveJson } = useJsonRequest()
+const confirmScopeRemoval = useDeleteConfirm()
 const { isTerminalStatus } = useBusinessStatusState()
 
 const agreementId = route.params.id as string
@@ -82,11 +83,13 @@ usePageResourceError({
 
 type AmendmentTypeLookupResponse = {
   items: Array<{ id: string, egcs_tp_amended: string, egcs_tp_requiresamendmentsubtype: boolean }>
+  total: number
+  limit: number
 }
 const amendmentTypesLookupEndpoint: string = `/api/agreements/${agreementId}/amendments/lookups/types?amendmentId=${amendmentId}`
 const amendmentTypesLookup = useFetch<AmendmentTypeLookupResponse, FetchError, string>(
   amendmentTypesLookupEndpoint,
-  { default: () => ({ items: [] }) }
+  { default: () => ({ items: [], total: 0, limit: 10 }) }
 )
 const hasLoadError = computed(() => Boolean(error.value) || Boolean(profileError.value) || Boolean(amendmentTypesLookup.error.value))
 const isLoadingDetail = computed(() => status.value === 'pending' || profileStatus.value === 'pending' || amendmentTypesLookup.status.value === 'pending')
@@ -94,6 +97,10 @@ const retryLoad = async () => {
   await Promise.all([refresh(), refreshProfile(), amendmentTypesLookup.refresh()])
 }
 const isScopeLookupReady = computed(() => amendmentTypesLookup.status.value === 'success')
+const fetchAmendmentTypes = $fetch as unknown as (
+  url: string,
+  options: { query: { page: number, limit: number } }
+) => Promise<AmendmentTypeLookupResponse>
 const fetchAmendmentSubtypes = $fetch as unknown as (
   url: string,
   options: { query: { amendment_type_ids: string, amendmentId: string } }
@@ -278,18 +285,42 @@ const saveScope = async () => {
     || isSavingScope.value) return
   try {
     isSavingScope.value = true
-    await saveJson(amendmentApiBase, 'PATCH', {
+    const selectedTypeIds = [...scopeTypeIds.value]
+    const selectedTypes = await resolveSelectedAmendmentScopeTypes(
+      selectedTypeIds,
+      [...amendmentTypesLookup.data.value.items, ...(amendment.value?.amendment_types ?? [])],
+      page => fetchAmendmentTypes(amendmentTypesLookupEndpoint, { query: { page, limit: 100 } })
+    )
+    const selectedDomains = new Set(selectedTypes.map(type => type.egcs_tp_amended))
+    const removedAreas: Array<'budget' | 'activities'> = []
+    if (canSnapshotBudget.value && !selectedDomains.has('budget') && !selectedDomains.has('duration')) {
+      removedAreas.push('budget')
+    }
+    if (canSnapshotActivities.value && !selectedDomains.has('activities')) {
+      removedAreas.push('activities')
+    }
+    const payload = {
       egcs_fc_name_en: amendmentNameEn.value,
       egcs_fc_name_fr: amendmentNameFr.value,
-      amendment_type_ids: scopeTypeIds.value,
-      amendment_subtype_ids: scopeSubtypeIds.value,
+      amendment_type_ids: selectedTypeIds,
+      amendment_subtype_ids: [...scopeSubtypeIds.value],
+      confirmed_scope_removals: removedAreas,
       egcs_fc_proposedauthorizedassistancestartdate: scopeIncludesDuration.value
         ? durationDates.value?.egcs_fc_proposedauthorizedassistancestartdate
         : null,
       egcs_fc_proposedauthorizedassistanceenddate: scopeIncludesDuration.value
         ? durationDates.value?.egcs_fc_proposedauthorizedassistanceenddate
         : null
-    })
+    }
+    if (removedAreas.length > 0) {
+      const confirmed = await confirmScopeRemoval({
+        title: t('agreement.amendments.remove_areas_title'),
+        description: t('agreement.amendments.remove_areas_confirm', { areas: removedAreas.map(area => t(`agreement.${area}.title`)).join(', ') }),
+        confirmLabel: t('agreement.amendments.remove_areas')
+      })
+      if (!confirmed || !canEditAmendmentScope.value) return
+    }
+    await saveJson(amendmentApiBase, 'PATCH', payload)
     await refresh()
     toast.add({ title: t('common.success'), description: t('agreement.amendments.scope_updated'), color: 'success' })
   } catch (caughtError: unknown) {

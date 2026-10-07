@@ -7,6 +7,7 @@ import { assertAgreementBudgetFiscalYearsOverlapDuration } from '~~/server/utils
 import { dateOnlySql } from '~~/server/utils/database-date'
 import { isRiskRatingWorkflowManaged } from '~~/server/utils/agreement-risk-rating'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+import { removeDraftAgreementAmendmentScope } from '~~/server/utils/agreement-amendment-scope-removal'
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -87,12 +88,8 @@ export default defineEventHandler(async event => {
     const activitySnapshot = await trx.selectFrom('Funding_Case_Agreement_Activity_Version').select('id')
       .where('egcs_fc_fundingagreement', '=', agreementId).where('egcs_fc_amendment', '=', amendmentId)
       .where('_deleted', '=', false).executeTakeFirst()
-    if (budgetSnapshot && !types.some(type => ['budget', 'duration'].includes(type.egcs_tp_amended))) {
-      return await badRequest(event, 'AGREEMENT_AMENDMENT_BUDGET_TYPE_REQUIRED', 'apiErrors.agreement.amendment_budget_type_required')
-    }
-    if (activitySnapshot && !types.some(type => type.egcs_tp_amended === 'activities')) {
-      return await badRequest(event, 'AGREEMENT_AMENDMENT_ACTIVITIES_TYPE_REQUIRED', 'apiErrors.agreement.amendment_activities_type_required')
-    }
+    const budgetEnabled = types.some(type => ['budget', 'duration'].includes(type.egcs_tp_amended))
+    const activitiesEnabled = types.some(type => type.egcs_tp_amended === 'activities')
     const durationEnabled = types.some(type => type.egcs_tp_amended === 'duration')
     const proposedStartDate = body.egcs_fc_proposedauthorizedassistancestartdate
       ?? amendment.egcs_fc_proposedauthorizedassistancestartdate
@@ -114,6 +111,15 @@ export default defineEventHandler(async event => {
       if (durationError) return durationError
     }
     if (body.amendment_type_ids) {
+      const confirmedRemovals = new Set(body.confirmed_scope_removals ?? [])
+      if ((budgetSnapshot && !budgetEnabled && !confirmedRemovals.has('budget'))
+        || (activitySnapshot && !activitiesEnabled && !confirmedRemovals.has('activities'))) {
+        return await badRequest(event, 'AMENDMENT_SCOPE_REMOVAL_CONFIRMATION_REQUIRED', 'apiErrors.agreement.amendment_scope_removal_confirmation_required')
+      }
+      await removeDraftAgreementAmendmentScope(trx, agreementId, amendmentId, {
+        removeBudget: !budgetEnabled,
+        removeActivities: !activitiesEnabled
+      })
       await trx.updateTable('Funding_Case_Agreement_Amendment_Type').set({ _deleted: true })
         .where('egcs_fc_amendment', '=', amendmentId).where('_deleted', '=', false).execute()
       if (selectedTypeIds.length > 0) {

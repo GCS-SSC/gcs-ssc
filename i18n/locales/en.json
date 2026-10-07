@@ -1330,6 +1330,7 @@
       "amendment_activities_exist": "This amendment already has an activity snapshot.",
       "amendment_budget_snapshot_not_found": "This amendment does not have a budget snapshot.",
       "amendment_activity_snapshot_not_found": "This amendment does not have an activity snapshot.",
+      "amendment_scope_removal_confirmation_required": "The amendment scope has changed. Reload this amendment and confirm removal of all affected areas before deleting saved work.",
       "open_amendment_exists": "This agreement already has an open amendment. Complete or close it before creating another.",
       "amendment_capability_required": "The selected amendment type does not allow this change.",
       "amendment_duration_dates_required": "A duration amendment requires proposed authorized start and end dates.",
@@ -1399,9 +1400,7 @@
       "currency_immutable": "Agreement currency is set at creation and cannot be changed.",
       "currency_mismatch": "Currency must match the Agreement currency.",
       "invalid_claim_proponent": "Select a submitting Proponent linked to this Agreement.",
-      "amendment_risk_workflow_managed": "A risk workflow manages this Amendment’s risk proposal. Complete the workflow to update it.",
-      "amendment_budget_type_required": "A budget amendment type is required while this amendment has a budget snapshot.",
-      "amendment_activities_type_required": "An activities amendment type is required while this amendment has an activity snapshot."
+      "amendment_risk_workflow_managed": "A risk workflow manages this Amendment’s risk proposal. Complete the workflow to update it."
     },
     "transfer_payment": {
       "invalid_funding_subtype": "Select an active funding subtype owned by this stream’s Agency.",
@@ -2535,6 +2534,9 @@
       "duration_description": "Set the proposed authorized dates. Duration amendments can then add, change, or remove budget fiscal years.",
       "duration_updated": "Proposed authorized dates updated successfully",
       "edit_scope": "Edit scope",
+      "remove_areas_title": "Remove amendment areas?",
+      "remove_areas_confirm": "Removing these amendment types will permanently delete all work in these areas of this amendment: {areas}. This cannot be undone. Confirm removal?",
+      "remove_areas": "Remove areas",
       "scope_updated": "Amendment scope updated successfully",
       "cancel": "Cancel amendment",
       "cancel_title": "Cancel amendment",
