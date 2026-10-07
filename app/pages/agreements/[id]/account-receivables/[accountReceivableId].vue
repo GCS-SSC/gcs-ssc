@@ -240,6 +240,32 @@ const creditMemoCreated = async (id: string, proponentId: string) => {
                   </dd>
                 </div>
               </dl>
+              <dl v-if="receivable.egcs_fc_outcome === 'posted' && !receivable.egcs_fc_linkedreceivable" class="grid gap-4 sm:grid-cols-3 text-sm">
+                <div>
+                  <dt class="text-muted">
+                    {{ t('account_receivable.recovered') }}
+                  </dt>
+                  <dd class="mt-1 font-semibold">
+                    {{ amount(receivable.egcs_fc_recovered) }}
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-muted">
+                    {{ t('account_receivable.reserved') }}
+                  </dt>
+                  <dd class="mt-1 font-semibold">
+                    {{ amount(receivable.egcs_fc_reserved) }}
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-muted">
+                    {{ t('account_receivable.outstanding') }}
+                  </dt>
+                  <dd class="mt-1 font-semibold">
+                    {{ amount(receivable.egcs_fc_outstanding) }}
+                  </dd>
+                </div>
+              </dl>
               <p v-if="receivable.egcs_fc_canadjust" class="text-sm text-muted">
                 {{ t('account_receivable.adjust_receivable_description') }}
               </p>
@@ -320,6 +346,6 @@ const creditMemoCreated = async (id: string, proponentId: string) => {
     </UDashboardPanel>
     <AccountReceivableCancelModal v-model:open="cancelOpen" :record-id="accountReceivableId" @cancelled="refreshPage" />
     <AccountReceivableCreateModal v-if="receivable" v-model:open="adjustmentOpen" :agreement-id="agreementId" :adjustment="receivable" @created="adjustmentCreated" />
-    <AccountReceivableCreditMemoCreateModal v-if="receivable" v-model:open="creditMemoOpen" :context="{ egcs_fc_applicantrecipient: receivable.egcs_fc_applicantrecipient, egcs_fc_debtorname_en: receivable.egcs_fc_debtorname_en, egcs_fc_debtorname_fr: receivable.egcs_fc_debtorname_fr, egcs_fc_agency: receivable.egcs_fc_statusagency, egcs_fc_currency: receivable.egcs_fc_currency }" @created="creditMemoCreated" />
+    <AccountReceivableCreditMemoCreateModal v-if="receivable" v-model:open="creditMemoOpen" :context="{ egcs_fc_receivable: accountReceivableId, egcs_fc_applicantrecipient: receivable.egcs_fc_applicantrecipient, egcs_fc_debtorname_en: receivable.egcs_fc_debtorname_en, egcs_fc_debtorname_fr: receivable.egcs_fc_debtorname_fr, egcs_fc_agency: receivable.egcs_fc_statusagency, egcs_fc_currency: receivable.egcs_fc_currency }" @created="creditMemoCreated" />
   </div>
 </template>

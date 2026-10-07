@@ -49,7 +49,6 @@ const statusLabel = computed(() => t(agency.egcs_ay_active ? 'common.active' : '
             icon="i-lucide-shield-check"
             variant="ghost"
             :color="agency.egcs_ay_active ? 'success' : 'neutral'" />
-          <CommonValueCard :label="t('correction.creator_approval_policy')" :value="t(agency.egcs_ay_correctioncreatorapproval ? 'common.yes' : 'common.no')" :sub-value="t('correction.creator_approval_policy_description')" icon="i-lucide-shield-check" variant="ghost" />
         </CommonSection>
       </div>
     </div>

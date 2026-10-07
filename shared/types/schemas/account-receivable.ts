@@ -89,6 +89,8 @@ export const AccountReceivableCancelSchema = z.object({
 }).strict()
 
 export const AccountReceivableCreditMemoCreateSchema = z.object({
+  egcs_fc_receivable: DatabaseIdSchema,
+  egcs_fc_creditmemochartofaccount: DatabaseIdSchema,
   egcs_fc_agency: DatabaseIdSchema,
   egcs_fc_applicantrecipient: DatabaseIdSchema,
   egcs_fc_currency: z.enum(CURRENCY_CODES_ENUM, { error: 'validation.required' }),

@@ -144,7 +144,7 @@ CREATE TABLE "Agency_Chart_of_Account" (
   "egcs_ay_currency" currency_codes DEFAULT 'cad'::currency_codes NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Agency_Chart_of_Account_pkey" PRIMARY KEY (id),
-  CONSTRAINT "ay_chk_chart_kind" CHECK (((egcs_ay_kind)::text = ANY ((ARRAY['commitment'::character varying, 'account_receivable'::character varying])::text[]))),
+  CONSTRAINT "ay_chk_chart_kind" CHECK (((egcs_ay_kind)::text = ANY ((ARRAY['commitment'::character varying, 'account_receivable'::character varying, 'credit_memo'::character varying])::text[]))),
   CONSTRAINT "ay_chk_chartofaccountdimensions" CHECK (((jsonb_typeof(egcs_ay_accountingdimensions) = 'array'::text) AND (jsonb_array_length(egcs_ay_accountingdimensions) > 0)))
 );
 
@@ -353,7 +353,6 @@ CREATE TABLE "Agency_Profile" (
   "egcs_ay_claimreconciliationstartstatus" bigint,
   "egcs_ay_claimreconciliationfinalstatus" bigint,
   "egcs_ay_gwcoa_number" bigint NOT NULL,
-  "egcs_ay_correctioncreatorapproval" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Agency_Profile_pkey" PRIMARY KEY (id)
 );
 
@@ -578,6 +577,11 @@ AS $function$
           RAISE EXCEPTION 'Chart fiscal year is immutable'
             USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_chartfiscalyearimmutable';
         END IF;
+      END IF;
+      IF TG_TABLE_NAME = 'Agency_Chart_of_Account' AND TG_OP='UPDATE' AND NEW._deleted AND NOT OLD._deleted
+        AND EXISTS (SELECT 1 FROM "Transfer_Payment_Stream_Chart_of_Account" selection
+          WHERE selection.egcs_tp_agencychartofaccount=OLD.id AND NOT selection._deleted) THEN
+        RAISE EXCEPTION 'Agency Chart selection is in use by a Stream' USING ERRCODE='23514';
       END IF;
       IF TG_TABLE_NAME = 'Agency_Chart_of_Account' AND NOT NEW._deleted THEN
         SELECT fiscal.egcs_ay_organizationagency INTO fiscal_agency

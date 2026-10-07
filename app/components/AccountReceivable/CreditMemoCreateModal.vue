@@ -17,6 +17,8 @@ const { sendJson } = useJsonRequest()
 const { showError } = useApiErrorToast()
 type State = {
   egcs_fc_applicantrecipient: string
+  egcs_fc_receivable: string | undefined
+  egcs_fc_creditmemochartofaccount: string | undefined
   egcs_fc_agency: string | undefined
   egcs_fc_currency: Currency_Codes | undefined
   egcs_fc_receiveddate: string | Date | null
@@ -27,7 +29,7 @@ type State = {
 }
 const state: Ref<State | null> = ref(null)
 const pending: Ref<boolean> = ref(false)
-const identity = computed(() => `${context.egcs_fc_applicantrecipient}:${context.egcs_fc_agency ?? ''}:${context.egcs_fc_currency ?? ''}`)
+const identity = computed(() => `${context.egcs_fc_applicantrecipient}:${context.egcs_fc_agency ?? ''}:${context.egcs_fc_currency ?? ''}:${context.egcs_fc_receivable ?? ''}`)
 let session = 0
 onBeforeUnmount(() => {
   session += 1
@@ -38,6 +40,7 @@ watch([open, identity], ([isOpen]) => {
   state.value = isOpen
     ? {
         egcs_fc_applicantrecipient: context.egcs_fc_applicantrecipient,
+        egcs_fc_receivable: context.egcs_fc_receivable, egcs_fc_creditmemochartofaccount: undefined,
         egcs_fc_agency: context.egcs_fc_agency,
         egcs_fc_currency: context.egcs_fc_currency,
         egcs_fc_receiveddate: new Date().toISOString().slice(0, 10),
@@ -45,6 +48,20 @@ watch([open, identity], ([isOpen]) => {
       }
     : null
 }, { immediate: true, flush: 'sync' })
+watch(() => state.value?.egcs_fc_agency, (value, previous) => {
+  if (state.value && previous && value !== previous) {
+    state.value.egcs_fc_receivable = undefined
+    state.value.egcs_fc_creditmemochartofaccount = undefined
+    state.value.egcs_fc_currency = undefined
+  }
+}, { flush: 'sync' })
+watch(() => state.value?.egcs_fc_receivable, (value, previous) => {
+  if (state.value && value !== previous) state.value.egcs_fc_creditmemochartofaccount = undefined
+}, { flush: 'sync' })
+const resolveReceivableCurrency = (items: Array<{ id: string; egcs_fc_currency?: unknown }>) => {
+  const selected = items.find(item => String(item.id) === state.value?.egcs_fc_receivable)
+  if (state.value && selected && typeof selected.egcs_fc_currency === 'string') state.value.egcs_fc_currency = selected.egcs_fc_currency as Currency_Codes
+}
 const save = async () => {
   if (!state.value || pending.value) return
   const currentSession = session
@@ -76,10 +93,27 @@ const save = async () => {
         </dl>
         <div class="grid gap-4 md:grid-cols-2">
           <UFormField name="egcs_fc_agency" :label="t('account_receivable.credit_memo_agency')">
-            <CommonServerLookupSelect v-model="state.egcs_fc_agency" fetch-url="/api/account-receivable-credit-memos/lookups/agencies" :query="{ egcs_fc_applicantrecipient: context.egcs_fc_applicantrecipient }" selected-values-query-key="selectedIds" value-key="id" label-en-key="egcs_ay_name_en" label-fr-key="egcs_ay_name_fr" :show-value-in-label="false" :disabled="pending" close-on-select />
+            <CommonServerLookupSelect v-model="state.egcs_fc_agency" fetch-url="/api/account-receivable-credit-memos/lookups/agencies" :query="{ egcs_fc_applicantrecipient: context.egcs_fc_applicantrecipient }" selected-values-query-key="selectedIds" value-key="id" label-en-key="egcs_ay_name_en" label-fr-key="egcs_ay_name_fr" :show-value-in-label="false" :disabled="pending || Boolean(context.egcs_fc_receivable)" close-on-select />
           </UFormField>
           <UFormField name="egcs_fc_currency" :label="t('common.currency')">
-            <CommonEnumSelect v-model="state.egcs_fc_currency" name="currency_codes" :disabled="pending" class="w-full" />
+            <CommonEnumSelect v-model="state.egcs_fc_currency" name="currency_codes" disabled class="w-full" />
+          </UFormField>
+          <UFormField name="egcs_fc_receivable" :label="t('account_receivable.credit_memo_receivable')">
+            <CommonServerLookupSelect
+              v-if="state.egcs_fc_agency" :key="state.egcs_fc_agency" v-model="state.egcs_fc_receivable"
+              fetch-url="/api/account-receivable-credit-memos/lookups/receivables"
+              :query="{ egcs_fc_agency: state.egcs_fc_agency, egcs_fc_applicantrecipient: context.egcs_fc_applicantrecipient }"
+              selected-values-query-key="selectedIds" value-key="id" label-en-key="label_en" label-fr-key="label_fr"
+              :show-value-in-label="false" :disabled="pending || Boolean(context.egcs_fc_receivable)" close-on-select @resolved-items="resolveReceivableCurrency" />
+            <UInput v-else disabled class="w-full" />
+          </UFormField>
+          <UFormField name="egcs_fc_creditmemochartofaccount" :label="t('account_receivable.credit_memo_coding')">
+            <CommonServerLookupSelect
+              v-if="state.egcs_fc_receivable" :key="state.egcs_fc_receivable" v-model="state.egcs_fc_creditmemochartofaccount"
+              fetch-url="/api/account-receivable-credit-memos/lookups/chart-of-accounts" :query="{ egcs_fc_receivable: state.egcs_fc_receivable }"
+              selected-values-query-key="selectedIds" value-key="id" label-en-key="label_en" label-fr-key="label_fr"
+              :show-value-in-label="false" :disabled="pending" close-on-select />
+            <UInput v-else disabled class="w-full" />
           </UFormField>
           <UFormField name="egcs_fc_receiveddate" :label="t('account_receivable.received_date')">
             <CommonDatePicker v-model="state.egcs_fc_receiveddate" :disabled="pending" />

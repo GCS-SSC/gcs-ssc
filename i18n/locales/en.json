@@ -642,7 +642,8 @@
     },
     "agency_chart_of_account_kind": {
       "commitment": "Commitments",
-      "account_receivable": "Accounts Receivables"
+      "account_receivable": "Accounts Receivables",
+      "credit_memo": "Credit Memos"
     }
   },
   "agency": {
@@ -1660,7 +1661,7 @@
       "create": "Create Chart of Accounts Entry",
       "update": "Update Chart of Accounts Entry",
       "kind": "Account Type",
-      "kind_description": "Choose whether this account is used for Commitments or Accounts Receivables."
+      "kind_description": "Choose Commitment, Accounts Receivable or Credit Memo coding."
     },
     "commitment_types": {
       "title": "Commitment Types",
@@ -4094,9 +4095,6 @@
       "title": "Correction approval evidence",
       "captured": "Captured"
     },
-    "creator_approval_policy": "Correction creator approval",
-    "allow_creator_approval": "Allow the creator to approve assigned Correction approvals",
-    "creator_approval_policy_description": "Disabled by default. The policy is pinned when a Correction is submitted; exact approval assignment is always required.",
     "dismiss_cancellation": "Keep Correction open",
     "linked_correction": "View the linked earlier Correction",
     "export_label": "Export Corrections",
@@ -4195,7 +4193,6 @@
     "packet_title": "Captured receivable submission",
     "credit_memo_packet": "Captured Credit Memo submission",
     "captured_context": "Captured business context",
-    "creator_approval_policy": "Creator approval allowed",
     "completion": {
       "title": "Receivable completion",
       "description": "Submit retained debt evidence, source amounts and recovery policy through a published approval workflow.",
@@ -4253,9 +4250,12 @@
     "credit_memo": "Credit Memo",
     "activity_amount": "Amount",
     "create_credit_memo": "Create credit memo",
-    "credit_memo_remaining": "Debt balance",
-    "credit_memo_available": "Unreserved debt",
-    "credit_memo_amount": "Credit amount",
+    "memo_ar_outstanding": "AR outstanding",
+    "memo_ar_available": "AR available for recovery",
+    "memo_ar_collected": "AR collected",
+    "memo_ar_pending": "AR pending recovery",
+    "memo_ar_balance_description": "AR balances describe the linked receivable, not unused Credit Memo credit. Workflow packets show balances captured at submission.",
+    "credit_memo_amount": "Credit Memo amount",
     "payment_deduction": "This payment deduction",
     "receivable_amount": "Receivable amount",
     "credit_memo_application": "Credit Memo application",
@@ -4270,12 +4270,13 @@
     "approved_amount": "Approved amount",
     "credit_memo_summary": "Credit summary",
     "view_proponent_financial_activity": "View proponent financial activity",
-    "credit_memo_credit_instruction": "Credit Memos are recorded for the proponent. The proponent’s net balance compares approved receivables and credits within the same Agency and currency.",
+    "credit_memo_credit_instruction": "Each Credit Memo reduces one Account Receivable. Record a separate Credit Memo for each AR covered by a payment.",
     "credit_memo_applied": "Applied credit",
     "credit_memo_agency": "Agency",
     "proponent": "Proponent",
     "historical_credit_memo_allocations": "Historical allocations",
     "historical_credit_memo_allocations_description": "These allocations are retained evidence from the earlier data model. Current balances are calculated for the proponent, Agency and currency.",
-    "offset_plan_amount": "Original offset plan amount"
+    "credit_memo_receivable": "Account Receivable",
+    "credit_memo_coding": "Credit Memo coding"
   }
 }

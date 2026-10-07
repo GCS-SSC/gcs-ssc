@@ -1,4 +1,4 @@
-/* eslint-disable jsdoc/require-jsdoc -- Standalone Credit Memo queues inherit their Agency financial authority. */
+/* eslint-disable jsdoc/require-jsdoc -- Credit Memo queues require the same linked-AR owner and Agency financial authority as direct reads. */
 import { sql, type RawBuilder } from 'kysely'
 import type { StaticAuthorizationGrant } from '@gcs-ssc/authorization'
 
@@ -45,6 +45,19 @@ const filterCreditMemoQueueOwners = (allowed: RawBuilder<unknown>, workAlias = '
   SELECT 1 FROM source
   LEFT JOIN "Funding_Case_Account_Receivable_Credit_Memo" memo ON memo.id = source.id AND NOT memo._deleted
   LEFT JOIN "Agency_Profile" agency ON agency.id = memo.egcs_fc_agency AND NOT agency._deleted
+  LEFT JOIN "Funding_Case_Account_Receivable_Pool" financial_pool ON financial_pool.id=memo.egcs_fc_pool AND NOT financial_pool._deleted
+  LEFT JOIN "Applicant_Recipient_Profile" proponent ON proponent.id=memo.egcs_fc_applicantrecipient AND NOT proponent._deleted
+  LEFT JOIN "Funding_Case_Agreement_Account_Receivable" debt ON debt.id=memo.egcs_fc_receivable AND NOT debt._deleted
+  LEFT JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.id=debt.egcs_fc_fundingagreement AND NOT agreement._deleted
+  LEFT JOIN "Transfer_Payment_Stream" stream ON stream.id=agreement.egcs_fc_transferpaymentstream AND NOT stream._deleted
+  LEFT JOIN "Transfer_Payment_Profile" program ON program.id=stream.egcs_tp_transferpaymentprofile AND NOT program._deleted
   WHERE source.entity_type = 'fundingcaseaccountreceivablecreditmemo'
-    AND (memo.id IS NULL OR agency.id IS NULL OR memo.egcs_fc_agency <> ${sql.ref(`${workAlias}.agency_id`)} OR NOT ${allowed})
+    AND (memo.id IS NULL OR agency.id IS NULL OR debt.id IS NULL OR program.id IS NULL OR financial_pool.id IS NULL OR proponent.id IS NULL
+      OR financial_pool.egcs_fc_agency IS DISTINCT FROM memo.egcs_fc_agency
+      OR financial_pool.egcs_fc_applicantrecipient IS DISTINCT FROM memo.egcs_fc_applicantrecipient
+      OR financial_pool.egcs_fc_currency IS DISTINCT FROM memo.egcs_fc_currency
+      OR debt.egcs_fc_pool IS DISTINCT FROM memo.egcs_fc_pool
+      OR debt.egcs_fc_applicantrecipient IS DISTINCT FROM memo.egcs_fc_applicantrecipient
+      OR debt.egcs_fc_currency IS DISTINCT FROM memo.egcs_fc_currency OR program.egcs_tp_agency IS DISTINCT FROM memo.egcs_fc_agency
+      OR memo.egcs_fc_agency <> ${sql.ref(`${workAlias}.agency_id`)} OR NOT ${allowed})
 )`

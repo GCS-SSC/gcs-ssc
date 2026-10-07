@@ -9,12 +9,13 @@ import { appRouteLocations, authorizedRouteLocation } from '~/utils/route-locati
 import { AppFetchResponseError } from '~/utils/fetch-error'
 import { useUrlTabState } from '~/composables/useUrlTabState'
 import { useProponentCreditMemoDetail } from '~/composables/useProponentCreditMemoDetail'
+import { formatAccountReceivableAmount } from '~/utils/account-receivable-display'
 import { useBilingualValue } from '~/composables/useBilingualValue'
 
 definePageMeta({ key: route => route.path, i18n: { paths: { en: '/proponents/edit/[id]/credit-memos/[creditMemoId]', fr: '/promoteurs/modifier/[id]/notes-de-credit/[creditMemoId]' } } })
 const route = useRoute()
 const localePath = useLocalePath()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { getBilingualValue } = useBilingualValue()
 const { getHeroCollapsed } = useDashboard()
 const { createValidator } = useZodI18n()
@@ -38,6 +39,8 @@ const refreshKey: Ref<number> = ref(0)
 const content: Ref<HTMLElement | null> = ref(null)
 type FormState = {
   egcs_fc_applicantrecipient: string
+  egcs_fc_receivable: string
+  egcs_fc_creditmemochartofaccount: string | undefined
   egcs_fc_agency: string
   egcs_fc_currency: AccountReceivableCreditMemoDetail['egcs_fc_currency']
   egcs_fc_receiveddate: string | Date | null
@@ -52,6 +55,8 @@ const dirty = computed(() => state.value !== null && JSON.stringify(state.value)
 const hydrate = (record: AccountReceivableCreditMemoDetail) => {
   state.value = {
     egcs_fc_applicantrecipient: record.egcs_fc_applicantrecipient,
+    egcs_fc_receivable: record.egcs_fc_receivable,
+    egcs_fc_creditmemochartofaccount: record.egcs_fc_creditmemochartofaccount,
     egcs_fc_agency: record.egcs_fc_agency,
     egcs_fc_currency: record.egcs_fc_currency,
     egcs_fc_receiveddate: record.egcs_fc_receiveddate.slice(0, 10),
@@ -76,6 +81,12 @@ watch([proponentId, creditMemoId], () => {
   saving.value = false
   cancelOpen.value = false
 }, { flush: 'sync' })
+const balanceFields = [
+  { key: 'egcs_fc_receivablerecovered', label: 'account_receivable.memo_ar_collected' },
+  { key: 'egcs_fc_receivablereserved', label: 'account_receivable.memo_ar_pending' },
+  { key: 'egcs_fc_receivableoutstanding', label: 'account_receivable.memo_ar_outstanding' },
+  { key: 'egcs_fc_receivableavailable', label: 'account_receivable.memo_ar_available' }
+] as const
 const reference = computed(() => creditMemo.value ? creditMemo.value.egcs_fc_creditmemoreference : '')
 const tabs = [
   { key: 'account_receivable.credit_memo_summary', value: 'summary', icon: 'i-lucide-receipt-text' },
@@ -176,6 +187,33 @@ const actions = computed(() => [
                   <UInput v-model="state.egcs_fc_amount" :readonly="!creditMemo.egcs_fc_canedit" :disabled="saving" type="text" inputmode="decimal" class="w-full" />
                 </UFormField>
               </div>
+              <dl class="text-sm">
+                <dt class="text-muted">
+                  {{ t('account_receivable.credit_memo_receivable') }}
+                </dt>
+                <dd>{{ creditMemo.egcs_fc_receivablereference }}</dd>
+              </dl>
+              <dl class="grid gap-4 text-sm sm:grid-cols-2" data-testid="credit-memo-ar-balances">
+                <div v-for="field in balanceFields" :key="field.key">
+                  <dt class="text-muted">
+                    {{ t(field.label) }}
+                  </dt>
+                  <dd class="mt-1 font-semibold tabular-nums">
+                    {{ formatAccountReceivableAmount(creditMemo[field.key], locale, creditMemo.egcs_fc_currency) ?? t('common.not_available') }}
+                  </dd>
+                </div>
+              </dl>
+              <UFormField name="egcs_fc_creditmemochartofaccount" :label="t('account_receivable.credit_memo_coding')">
+                <CommonServerLookupSelect
+                  v-if="creditMemo.egcs_fc_canedit" v-model="state.egcs_fc_creditmemochartofaccount"
+                  fetch-url="/api/account-receivable-credit-memos/lookups/chart-of-accounts" :query="{ egcs_fc_receivable: state.egcs_fc_receivable }"
+                  selected-values-query-key="selectedIds" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :disabled="saving" close-on-select />
+                <dl v-else class="flex flex-wrap gap-4">
+                  <div v-for="dimension in creditMemo.egcs_fc_creditmemoaccountingdimensions as Array<{ label_en: string; label_fr: string; value: string }>" :key="dimension.label_en">
+                    <dt>{{ getBilingualValue(dimension, 'label', '') }}</dt><dd>{{ dimension.value }}</dd>
+                  </div>
+                </dl>
+              </UFormField>
               <UFormField name="egcs_fc_receiptreference" :label="t('account_receivable.receipt_reference')">
                 <UInput v-model="state.egcs_fc_receiptreference" :readonly="!creditMemo.egcs_fc_canedit" :disabled="saving" class="w-full" />
               </UFormField>

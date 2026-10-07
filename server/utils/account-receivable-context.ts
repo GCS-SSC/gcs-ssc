@@ -40,13 +40,13 @@ export const resolveAccountReceivableCreditMemoRuntimeContext = async (db: Kysel
     .where('pool.egcs_fc_currency', '=', row.egcs_fc_currency)
     .where('pool._deleted', '=', false).where('agency._deleted', '=', false).where('proponent._deleted', '=', false).executeTakeFirst()
   if (!pool) return null
-  // The old Agreement is retained provenance, never the memo's current owner.
-  const historicalContext = row.egcs_fc_fundingagreement ? await resolveAgreementScopeContext(String(row.egcs_fc_fundingagreement), db) : null
-  const context = historicalContext?.agencyId === agencyId ? historicalContext : null
-  return { agreementId: context?.agreementId, streamId: context?.streamId, profileId: context?.profileId,
-    agencyId, scope: { type: 'agency' as const, agencyId }, creditMemoId: id, poolId: String(row.egcs_fc_pool),
+  const context = await resolveAccountReceivableRuntimeContext(db, String(row.egcs_fc_receivable))
+  if (!context || context.agencyId !== agencyId || context.applicantRecipientId !== String(row.egcs_fc_applicantrecipient)
+    || context.currency !== row.egcs_fc_currency || context.poolId !== String(row.egcs_fc_pool)) return null
+  return { agreementId: context.agreementId, streamId: context.streamId, profileId: context.profileId,
+    agencyId, scope: { type: 'agency' as const, agencyId }, creditMemoId: id, receivableId: String(row.egcs_fc_receivable), poolId: String(row.egcs_fc_pool),
     applicantRecipientId: String(row.egcs_fc_applicantrecipient), currency: row.egcs_fc_currency,
-    agreementIds: [] as string[] }
+    agreementIds: [context.agreementId] }
 }
 
 /** Called before any Agreement lock; the pool serializes recovery and debt policy changes. */

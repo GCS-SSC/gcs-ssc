@@ -4,7 +4,7 @@ import type { CompletionExecuteInput } from '~~/shared/types/schemas/completion'
 import type { CompletionHookPayload } from '~~/shared/types/completion'
 import { accountReceivableError } from './account-receivable-source'
 import { authorizeAccountReceivable, assertAccountReceivableEditable, validateAccountReceivableBasis } from './account-receivable'
-import { authorizeAccountReceivableCreditMemo, assertAccountReceivableCreditMemoEditable } from './account-receivable-credit-memo'
+import { authorizeAccountReceivableCreditMemo, assertAccountReceivableCreditMemoEditable, validateCreditMemoCoding } from './account-receivable-credit-memo'
 import { executeFreshAccountReceivableWrite, type AccountReceivableCaseType } from './account-receivable-context'
 import { resolveCompletionRecord, resolveCompletionEvidenceId, emitCompletionHook } from './completion-runtime-core'
 import { resolveBusinessStatusProtection, transitionBusinessStatus } from './business-status-runtime'
@@ -42,6 +42,13 @@ const executeCompletion = async (event: H3Event, input: CompletionExecuteInput, 
       }
     } else {
       const memo = await assertAccountReceivableCreditMemoEditable(event, trx, id)
+      if (memo.egcs_fc_ledgerkind === 'pool') {
+        try {
+          await validateCreditMemoCoding(trx, memo)
+        } catch (error) {
+          return await accountReceivableError(event, error instanceof Error ? error.message : 'AR_ACCOUNT_UNAVAILABLE')
+        }
+      }
       if (memo.egcs_fc_ledgerkind !== 'pool') {
         const recovery = await trx.selectFrom('Funding_Case_Account_Receivable_Recovery').select('id').where('egcs_fc_creditmemo', '=', id).where('egcs_fc_outcome', '=', 'open').where('_deleted', '=', false).executeTakeFirstOrThrow()
         try {

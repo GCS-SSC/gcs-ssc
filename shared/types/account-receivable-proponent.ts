@@ -41,8 +41,8 @@ export type ProponentCreditMemoRow = {
   | {
     egcs_fc_kind: 'automatic'
     egcs_fc_status: null
-    /** Current positive pool debt; this is not an unused memo credit. */
-    egcs_fc_remainingamount: Money
+    /** Outstanding balance of the linked AR; this is not unused memo credit. */
+    egcs_fc_receivableoutstanding: Money
     egcs_fc_originapplication: ProponentCreditMemoApplication | null
     egcs_fc_applications: ProponentCreditMemoApplication[]
   }

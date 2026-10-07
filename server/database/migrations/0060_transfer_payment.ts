@@ -632,10 +632,29 @@ CREATE FUNCTION protect_stream_chart_catalog_link()
  LANGUAGE plpgsql
 AS $function$
     BEGIN
+      IF TG_OP='DELETE' THEN RAISE EXCEPTION 'Stream Chart selections use soft deletion' USING ERRCODE='23514'; END IF;
       IF NEW.egcs_tp_agencychartofaccount IS DISTINCT FROM OLD.egcs_tp_agencychartofaccount THEN
         RAISE EXCEPTION 'Stream Chart of Account catalog link is immutable'
           USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_stream_chart_catalog_link_immutable';
       END IF;
+      IF NEW.egcs_tp_transferpaymentstream IS DISTINCT FROM OLD.egcs_tp_transferpaymentstream THEN
+        RAISE EXCEPTION 'Stream Chart selection cannot move between Streams' USING ERRCODE='23514';
+      END IF;
+      IF NEW._deleted AND NOT OLD._deleted AND (
+        EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Commitment_Line" line WHERE line.egcs_fc_transferpaymentstreamchartofaccount=OLD.id AND NOT line._deleted)
+        OR EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Account_Receivable_Line" line
+          JOIN "Funding_Case_Agreement_Account_Receivable" debt ON debt.id=line.egcs_fc_receivable
+          JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.id=debt.egcs_fc_fundingagreement
+          WHERE line.egcs_fc_accountreceivablechartofaccount=OLD.egcs_tp_agencychartofaccount AND agreement.egcs_fc_transferpaymentstream=OLD.egcs_tp_transferpaymentstream AND NOT line._deleted AND NOT debt._deleted)
+        OR EXISTS (SELECT 1 FROM "Funding_Case_Account_Receivable_Credit_Memo" memo
+          JOIN "Funding_Case_Agreement_Account_Receivable" debt ON debt.id=memo.egcs_fc_receivable
+          JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.id=debt.egcs_fc_fundingagreement
+          WHERE memo.egcs_fc_creditmemochartofaccount=OLD.egcs_tp_agencychartofaccount AND agreement.egcs_fc_transferpaymentstream=OLD.egcs_tp_transferpaymentstream AND NOT memo._deleted)
+        OR EXISTS (SELECT 1 FROM "Funding_Case_Account_Receivable_Offset_Memo" memo
+          JOIN "Funding_Case_Agreement_Account_Receivable" debt ON debt.id=memo.egcs_fc_receivable
+          JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.id=debt.egcs_fc_fundingagreement
+          WHERE memo.egcs_fc_creditmemochartofaccount=OLD.egcs_tp_agencychartofaccount AND agreement.egcs_fc_transferpaymentstream=OLD.egcs_tp_transferpaymentstream AND NOT memo._deleted)
+      ) THEN RAISE EXCEPTION 'Stream Chart selection is in use' USING ERRCODE='23514'; END IF;
       RETURN NEW;
     END $function$;
 
@@ -874,19 +893,6 @@ AS $function$
           RAISE EXCEPTION 'Stream already links a Workflow for this entity type and purpose'
             USING ERRCODE = '23505', CONSTRAINT = 'tp_idx_streamworkflow_specialpurpose';
         END IF;
-      END IF;
-      RETURN NEW;
-    END $function$;
-
-CREATE FUNCTION validate_stream_chart_kind()
- RETURNS trigger
- LANGUAGE plpgsql
-AS $function$
-    BEGIN
-      IF NOT EXISTS (SELECT 1 FROM "Agency_Chart_of_Account" account
-        WHERE account.id = NEW.egcs_tp_agencychartofaccount AND account.egcs_ay_kind = 'commitment') THEN
-        RAISE EXCEPTION 'Stream accounting requires a Commitment Chart of Account'
-          USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_stream_chart_kind';
       END IF;
       RETURN NEW;
     END $function$;
@@ -1134,9 +1140,8 @@ CREATE TRIGGER protect_chart_stream_budget BEFORE UPDATE ON "Transfer_Payment_St
 
 CREATE TRIGGER trg_enforce_stream_budget_profile_ownership BEFORE INSERT OR UPDATE ON "Transfer_Payment_Stream_Budget" FOR EACH ROW EXECUTE FUNCTION trg_fn_enforce_stream_budget_profile_ownership();
 
-CREATE TRIGGER trg_protect_stream_chart_catalog_link BEFORE UPDATE OF egcs_tp_agencychartofaccount ON "Transfer_Payment_Stream_Chart_of_Account" FOR EACH ROW EXECUTE FUNCTION protect_stream_chart_catalog_link();
+CREATE TRIGGER trg_protect_stream_chart_catalog_link BEFORE UPDATE OR DELETE ON "Transfer_Payment_Stream_Chart_of_Account" FOR EACH ROW EXECUTE FUNCTION protect_stream_chart_catalog_link();
 
-CREATE TRIGGER trg_validate_stream_chart_kind BEFORE INSERT OR UPDATE OF egcs_tp_agencychartofaccount ON "Transfer_Payment_Stream_Chart_of_Account" FOR EACH ROW EXECUTE FUNCTION validate_stream_chart_kind();
 
 CREATE TRIGGER validate_stream_operational_catalog_link BEFORE INSERT OR UPDATE ON "Transfer_Payment_Stream_Chart_of_Account" FOR EACH ROW EXECUTE FUNCTION validate_stream_operational_catalog_link();
 

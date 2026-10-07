@@ -1,8 +1,9 @@
-/* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Aggregate ledger never attributes a repayment to an individual receivable. */
+/* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Agency currency totals summarize repayments linked to individual receivables. */
 import { sql, type Kysely } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import { moneyFromCents, moneyToCents, parseMoney, subtractMoney, type Money } from '~~/shared/utils/money'
 import { parseDatabaseMoney } from './database-money'
+import { readAccountReceivableCashBalance } from './account-receivable-cash-balance'
 
 const ZERO = parseMoney('0.00')
 const positive = (amount: Money) => moneyToCents(amount) > BigInt(0) ? amount : ZERO
@@ -11,14 +12,17 @@ export const hasAccountReceivablePoolLedger = async (db: Kysely<Database>): Prom
   (await sql<{ installed: boolean }>`SELECT to_regprocedure('public.ar_pool_net(bigint)') IS NOT NULL AS installed`.execute(db)).rows[0]?.installed === true
 
 /** Caller must authorize the complete Agency-owned pool before reading its totals. */
-export const readAccountReceivablePoolBalance = async (db: Kysely<Database>, poolId: string) => {
+export const readAccountReceivablePoolBalance = async (db: Kysely<Database>, poolId: string, options: { excludedCreditMemoId?: string } = {}) => {
   const totals = (await sql<{ debit: string; credit: string; reserved: string }>`SELECT
     coalesce((SELECT sum(line.egcs_fc_amount) FROM "Funding_Case_Agreement_Account_Receivable" debt
       JOIN "Funding_Case_Agreement_Account_Receivable_Line" line ON line.egcs_fc_receivable=debt.id
       WHERE debt.egcs_fc_pool=${poolId}::bigint AND debt.egcs_fc_outcome='posted' AND NOT debt._deleted AND NOT line._deleted),0)::text AS debit,
     (coalesce((SELECT sum(egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Credit_Memo" WHERE egcs_fc_pool=${poolId}::bigint AND egcs_fc_outcome='posted' AND NOT _deleted),0)
       +coalesce((SELECT sum(egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Recovery" WHERE egcs_fc_pool=${poolId}::bigint AND egcs_fc_payment IS NOT NULL AND egcs_fc_outcome='posted' AND NOT _deleted),0))::text AS credit,
-    coalesce((SELECT sum(egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Recovery" WHERE egcs_fc_pool=${poolId}::bigint AND egcs_fc_payment IS NOT NULL AND egcs_fc_outcome='open' AND NOT _deleted),0)::text AS reserved`.execute(db)).rows[0]!
+    (coalesce((SELECT sum(egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Recovery" WHERE egcs_fc_pool=${poolId}::bigint AND egcs_fc_payment IS NOT NULL AND egcs_fc_outcome='open' AND NOT _deleted),0)
+      + coalesce((SELECT sum(egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Credit_Memo"
+        WHERE egcs_fc_pool=${poolId}::bigint AND egcs_fc_outcome='open' AND NOT _deleted
+          ${options.excludedCreditMemoId ? sql`AND id<>${options.excludedCreditMemoId}::bigint` : sql``}),0))::text AS reserved`.execute(db)).rows[0]!
   const debit = parseDatabaseMoney(totals.debit)
   const credit = parseDatabaseMoney(totals.credit)
   const net = subtractMoney(debit, credit)
@@ -34,7 +38,10 @@ export const readAccountReceivablePoolOffsetPolicy = async (db: Kysely<Database>
       WHERE (latest.id=debt.id OR latest.egcs_fc_linkedreceivable=debt.id) AND latest.egcs_fc_outcome='posted' AND NOT latest._deleted
       ORDER BY latest.egcs_fc_postedat DESC,latest.id DESC LIMIT 1),debt.egcs_fc_recoverymethod)`.as('method'))
     .where('debt.egcs_fc_pool', '=', poolId).where('debt.egcs_fc_linkedreceivable', 'is', null).where('debt.egcs_fc_outcome', '=', 'posted').where('debt._deleted', '=', false).execute()
-  return debts.some(debt => debt.method === 'direct_repayment') ? 'direct_repayment' as const : 'offset' as const
+  for (const debt of debts) {
+    if (debt.method === 'direct_repayment' && moneyToCents((await readAccountReceivableCashBalance(db, String(debt.id))).egcs_fc_outstanding) > BigInt(0)) return 'direct_repayment' as const
+  }
+  return 'offset' as const
 }
 
 /** Narrow engine basis includes aggregate values only, never an AR-to-credit matching. */

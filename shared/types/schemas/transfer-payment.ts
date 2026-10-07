@@ -647,6 +647,7 @@ export type TransferPaymentStreamChartOfAccount = z.infer<typeof TransferPayment
 export type TransferPaymentStreamChartOfAccountPatch = z.infer<typeof TransferPaymentStreamChartOfAccountPatchSchema>
 export type TransferPaymentStreamChartOfAccountItem = WithId<TransferPaymentStreamChartOfAccount & {
   egcs_tp_transferpaymentstream: string
+  egcs_ay_kind: typeof AGENCY_CHART_KIND_ENUM[number]
   egcs_ay_fiscalyear: string
   egcs_ay_accountingdimensions: TransferPaymentStreamChartOfAccountDimension[]
   egcs_ay_currency: typeof CURRENCY_CODES_ENUM[number]

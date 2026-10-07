@@ -68,7 +68,7 @@ const EXPECTED_CORE_MIGRATIONS = [
   '9999_seed'
 ] as const
 
-const EXPECTED_SEEDED_EXTENSION_KEYS = ['gcs-automated-payments'] as const
+const EXPECTED_SEEDED_EXTENSION_KEYS = ['gcs-automated-payments', 'gcs-storage-local'] as const
 
 const EXPECTED_PACKAGED_STORAGE_PROVIDER_KEYS = [
   'gcs-storage-local',

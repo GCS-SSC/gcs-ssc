@@ -38,8 +38,7 @@ export default defineEventHandler(async event => {
           egcs_ay_name_fr: validated.egcs_ay_name_fr,
           egcs_ay_abbreviation_en: validated.egcs_ay_abbreviation_en,
           egcs_ay_abbreviation_fr: validated.egcs_ay_abbreviation_fr,
-          egcs_ay_active: validated.egcs_ay_active,
-          egcs_ay_correctioncreatorapproval: validated.egcs_ay_correctioncreatorapproval
+          egcs_ay_active: validated.egcs_ay_active
         })
         .returningAll()
         .executeTakeFirstOrThrow()

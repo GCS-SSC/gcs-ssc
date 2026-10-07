@@ -23,6 +23,7 @@ const {
 })
 
 const columns = [
+  { id: 'egcs_ay_kind', accessorKey: 'egcs_ay_kind', header: t('transfer_payment.chart_of_accounts.kind') },
   { id: 'fiscal_year_display', accessorKey: 'fiscal_year_display', header: t('transfer_payment.chart_of_accounts.fiscal_year') },
   { id: 'egcs_ay_currency', accessorKey: 'egcs_ay_currency', header: t('common.currency') },
   { id: 'egcs_ay_accountingdimensions', accessorKey: 'egcs_ay_accountingdimensions', header: t('transfer_payment.chart_of_accounts.accounting_fields') },
@@ -71,6 +72,9 @@ const onDelete = async (id: string) => {
       :show-button="canUpdateChild"
       @add="openCreate"
       @retry="refresh">
+      <template #egcs_ay_kind-cell="{ row }">
+        {{ t(`enums.agency_chart_of_account_kind.${row.original.egcs_ay_kind}`) }}
+      </template>
       <template #egcs_ay_currency-cell="{ row }">
         {{ row.original.egcs_ay_currency.toUpperCase() }}
       </template>

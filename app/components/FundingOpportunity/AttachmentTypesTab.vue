@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 
-export interface OpportunityAttachmentType {
+interface OpportunityAttachmentType {
   id: string
   name_en: string
   name_fr: string

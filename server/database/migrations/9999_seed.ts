@@ -1,5 +1,7 @@
 import { hashPassword } from 'better-auth/crypto'
 import { sql, type Kysely, type Migration } from 'kysely'
+import type { Database } from '~~/shared/types/database'
+import { restoreNciaTemplateObjects } from '../ncia-template-objects'
 
 type DemoSnapshot = Record<string, Array<Record<string, unknown>>> & { user: Array<{ id: number }> }
 
@@ -64,6 +66,7 @@ const restoreSnapshot = async <DB>(db: Kysely<DB>): Promise<void> => {
     await sql`ALTER TABLE ${sql.raw(foreignKey.table_name)}
       ALTER CONSTRAINT ${sql.id(foreignKey.constraint_name)} NOT DEFERRABLE INITIALLY IMMEDIATE`.execute(db)
   }
+  await restoreNciaTemplateObjects(db as unknown as Kysely<Database>)
 }
 
 export const up: Migration['up'] = async db => {

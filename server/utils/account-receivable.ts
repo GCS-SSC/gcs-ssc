@@ -1,3 +1,4 @@
+import { readAccountReceivableCashBalance } from './account-receivable-cash-balance'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- AR aggregate domain, retained reads and exact assigned writes. */
 import type { H3Event } from 'h3'
 import { readAccountReceivableType, readAccountReceivableAccount } from './account-receivable-configuration'
@@ -172,12 +173,18 @@ export const validateAccountReceivableBasis = async (trx: Kysely<Database>, id: 
       if (!original || moneyToCents(sumMoney([aggregateCreditLedger ? original.egcs_fc_principal : original.egcs_fc_available, line.egcs_fc_amount])) < BigInt(0)) throw new Error('AR_BELOW_RECOVERED')
     }
   }
+  if (debt.egcs_fc_linkedreceivable) {
+    const balance = await readAccountReceivableCashBalance(trx, String(debt.egcs_fc_linkedreceivable))
+    if (moneyToCents(sumMoney([balance.egcs_fc_available, total])) < BigInt(0)) throw new Error('AR_BELOW_RECOVERED')
+  }
   const coding = await readAccountReceivableCoding(trx, id)
+  const agreement = await trx.selectFrom('Funding_Case_Agreement_Profile').select('egcs_fc_transferpaymentstream')
+    .where('id', '=', String(debt.egcs_fc_fundingagreement)).executeTakeFirstOrThrow()
   const pool = await trx.selectFrom('Funding_Case_Account_Receivable_Pool').select('egcs_fc_agency').where('id', '=', String(debt.egcs_fc_pool)).executeTakeFirstOrThrow()
   for (const line of lines) {
     if (options.submission && moneyToCents(line.egcs_fc_amount) !== BigInt(0) && !line.egcs_fc_accountreceivablechartofaccount) throw new Error('AR_ACCOUNT_REQUIRED')
     if (line.egcs_fc_accountreceivablechartofaccount) await readAccountReceivableAccount(trx, { id: String(line.egcs_fc_accountreceivablechartofaccount),
-      agencyId: String(pool.egcs_fc_agency), agencyFiscalYearId: String(debt.egcs_fc_agencyfiscalyear), currency: debt.egcs_fc_currency })
+      agencyId: String(pool.egcs_fc_agency), streamId: String(agreement.egcs_fc_transferpaymentstream), agencyFiscalYearId: String(debt.egcs_fc_agencyfiscalyear), currency: debt.egcs_fc_currency })
     const matching = coding.filter(row => String(row.egcs_fc_receivableline) === String(line.id))
     if (sumMoney(matching.map(row => row.egcs_fc_amount)) !== line.egcs_fc_amount) throw new Error('AR_CODING_TOTAL')
     const source = current?.find(item => item.id === line.egcs_fc_sourcekey)
@@ -353,7 +360,7 @@ export const editAccountReceivable = async (event: H3Event, id: string, input: A
       try {
         account = line.egcs_fc_accountreceivablechartofaccount
           ? await readAccountReceivableAccount(trx, {
-              id: line.egcs_fc_accountreceivablechartofaccount, agencyId: context.agencyId, agencyFiscalYearId: String(debt.egcs_fc_agencyfiscalyear), currency: debt.egcs_fc_currency })
+              id: line.egcs_fc_accountreceivablechartofaccount, agencyId: context.agencyId, streamId: context.streamId, agencyFiscalYearId: String(debt.egcs_fc_agencyfiscalyear), currency: debt.egcs_fc_currency })
           : null
       } catch (error) { return await accountReceivableError(event, error instanceof Error ? error.message : 'AR_ACCOUNT_UNAVAILABLE') }
       await trx.updateTable('Funding_Case_Agreement_Account_Receivable_Line').set({ egcs_fc_amount: databaseMoneyValue(line.egcs_fc_amount),
@@ -405,8 +412,8 @@ export const getAccountReceivableDetail = async (event: H3Event, id: string) => 
     resolveCompletionEvidenceId(db, 'fundingcaseaccountreceivable', id), resolveAssignedItemTargetGrant(auth.userId, { entityType: 'fundingcaseaccountreceivable', entityId: id }, db)])
   const savedLines = debt.egcs_fc_linkedreceivable ? await readAccountReceivableLines(db, id) : lines
   const principal = sumMoney(lines.map(line => line.egcs_fc_principal))
-  const recovered = sumMoney(lines.map(line => line.egcs_fc_recovered))
-  const reserved = sumMoney(lines.map(line => line.egcs_fc_reserved))
+  const cashBalance = await readAccountReceivableCashBalance(db, debt.egcs_fc_linkedreceivable ? String(debt.egcs_fc_linkedreceivable) : id)
+  const recovered = cashBalance.egcs_fc_recovered
   const outstanding = subtractMoney(principal, recovered)
   const editable = debt.egcs_fc_outcome === 'open' && !status.egcs_cn_terminal && !status.egcs_cn_readonly && !completion
   const assigned = Boolean(assignment)
@@ -428,10 +435,10 @@ export const getAccountReceivableDetail = async (event: H3Event, id: string) => 
     egcs_fc_fiscaloutstanding: debt.egcs_fc_fiscaloutstanding === null ? null : parseDatabaseMoney(debt.egcs_fc_fiscaloutstanding),
     egcs_fc_effectiverecoverymethod: effectiveRecoveryMethod,
     egcs_fc_approvedamount: principal, egcs_fc_proponentreadable: await canAccessApplicantRecipient(auth, String(debt.egcs_fc_applicantrecipient), 'read', db),
-    egcs_fc_adjustments: await withBusinessRecordState(db, 'fundingcaseaccountreceivable', projectedAdjustments), egcs_fc_principal: principal,
-    ...(poolLedger ? {} : { egcs_fc_recovered: recovered, egcs_fc_reserved: reserved, egcs_fc_outstanding: outstanding, egcs_fc_available: subtractMoney(outstanding, reserved) }),
+    egcs_fc_adjustments: await withBusinessRecordState(db, 'fundingcaseaccountreceivable', projectedAdjustments),
+    ...cashBalance,
     egcs_fc_debtorname_en: String(labels.egcs_fc_debtorname_en ?? ''), egcs_fc_debtorname_fr: String(labels.egcs_fc_debtorname_fr ?? ''), egcs_fc_fiscalyeardisplay: String(labels.egcs_fc_fiscalyeardisplay ?? ''),
-    ...(poolLedger ? {} : { egcs_fc_collectionstate: moneyToCents(outstanding) === BigInt(0) ? 'cleared' as const : moneyToCents(recovered) > BigInt(0) ? 'partially_recovered' as const : 'outstanding' as const }),
+    egcs_fc_collectionstate: moneyToCents(outstanding) === BigInt(0) ? 'cleared' as const : moneyToCents(recovered) > BigInt(0) ? 'partially_recovered' as const : 'outstanding' as const,
     egcs_fc_canedit: editable && work, egcs_fc_canwork: work && debt.egcs_fc_outcome === 'open',
     egcs_fc_candelete: editable && status.egcs_cn_isdraft && assigned && auth.userAbilities.authorize('account_receivable', 'delete', context.scope),
     egcs_fc_cancancel: work && debt.egcs_fc_outcome === 'open', egcs_fc_canlink: debt.egcs_fc_outcome === 'posted' && !debt.egcs_fc_linkedreceivable && auth.userAbilities.authorize('account_receivable', 'create', context.scope),

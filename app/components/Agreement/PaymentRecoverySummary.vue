@@ -29,10 +29,12 @@ const totals = computed(() => [
 const pagination: Ref<{ pageIndex: number, pageSize: number }> = ref({ pageIndex: 0, pageSize: 10 })
 const memoColumns: TableColumnInput<AccountReceivablePaymentCreditMemo>[] = [
   { id: 'reference', headerKey: 'account_receivable.credit_memos_number' },
-  { id: 'original', headerKey: 'account_receivable.offset_plan_amount' },
+  { id: 'original', headerKey: 'account_receivable.credit_memo_amount' },
   { id: 'deduction', headerKey: 'account_receivable.payment_deduction' },
-  { id: 'remaining', headerKey: 'account_receivable.credit_memo_remaining' },
-  { id: 'available', headerKey: 'account_receivable.credit_memo_available' }
+  { id: 'collected', headerKey: 'account_receivable.memo_ar_collected' },
+  { id: 'pending', headerKey: 'account_receivable.memo_ar_pending' },
+  { id: 'remaining', headerKey: 'account_receivable.memo_ar_outstanding' },
+  { id: 'available', headerKey: 'account_receivable.memo_ar_available' }
 ]
 </script>
 
@@ -73,11 +75,17 @@ const memoColumns: TableColumnInput<AccountReceivablePaymentCreditMemo>[] = [
       <template #deduction-cell="{ row }">
         <span class="font-semibold tabular-nums">{{ amount(row.original.egcs_fc_appliedamount) }}</span>
       </template>
+      <template #collected-cell="{ row }">
+        <span class="tabular-nums">{{ amount(row.original.egcs_fc_receivablerecovered) }}</span>
+      </template>
+      <template #pending-cell="{ row }">
+        <span class="tabular-nums">{{ amount(row.original.egcs_fc_receivablereserved) }}</span>
+      </template>
       <template #remaining-cell="{ row }">
-        <span class="tabular-nums">{{ amount(row.original.egcs_fc_remainingamount) }}</span>
+        <span class="tabular-nums">{{ amount(row.original.egcs_fc_receivableoutstanding) }}</span>
       </template>
       <template #available-cell="{ row }">
-        <span class="tabular-nums">{{ amount(row.original.egcs_fc_availableamount) }}</span>
+        <span class="tabular-nums">{{ amount(row.original.egcs_fc_receivableavailable) }}</span>
       </template>
     </CommonResourceLayoutCard>
     <ul v-else-if="payment.egcs_fc_offsets?.length" :aria-label="t('agreement.payments.offset_allocations')" class="divide-y divide-default text-sm">
@@ -86,6 +94,9 @@ const memoColumns: TableColumnInput<AccountReceivablePaymentCreditMemo>[] = [
         <span class="font-semibold">{{ amount(allocation.egcs_fc_amount) }}</span>
       </li>
     </ul>
+    <p v-if="payment.egcs_fc_creditmemos?.length" class="text-sm text-muted">
+      {{ t('account_receivable.memo_ar_balance_description') }}
+    </p>
     <p class="text-sm text-muted">
       {{ t('agreement.payments.offset_policy_description') }}
     </p>

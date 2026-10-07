@@ -642,7 +642,8 @@
     },
     "agency_chart_of_account_kind": {
       "commitment": "Engagements",
-      "account_receivable": "Comptes débiteurs"
+      "account_receivable": "Comptes débiteurs",
+      "credit_memo": "Notes de crédit"
     }
   },
   "agency": {
@@ -1660,7 +1661,7 @@
       "create": "Créer une entrée du plan comptable",
       "update": "Mettre à jour une entrée du plan comptable",
       "kind": "Type de compte",
-      "kind_description": "Indiquez si ce compte est utilisé pour les engagements ou les comptes débiteurs."
+      "kind_description": "Choisissez le codage des engagements, des comptes débiteurs ou des notes de crédit."
     },
     "commitment_types": {
       "title": "Types d'engagement",
@@ -4094,9 +4095,6 @@
       "title": "Preuves d’approbation de la correction",
       "captured": "Conservation"
     },
-    "creator_approval_policy": "Approbation par le créateur de la correction",
-    "allow_creator_approval": "Permettre au créateur d’approuver les approbations de correction qui lui sont assignées",
-    "creator_approval_policy_description": "Désactivée par défaut. La règle est figée lors de la soumission d’une correction; une assignation exacte à l’approbation reste obligatoire.",
     "dismiss_cancellation": "Garder la correction ouverte",
     "linked_correction": "Consulter la correction antérieure liée",
     "export_label": "Exporter les corrections",
@@ -4195,7 +4193,6 @@
     "packet_title": "Soumission du compte débiteur conservée",
     "credit_memo_packet": "Soumission de note de crédit conservée",
     "captured_context": "Contexte opérationnel conservé",
-    "creator_approval_policy": "Approbation par l’auteur permise",
     "completion": {
       "title": "Finalisation du compte débiteur",
       "description": "Soumettez les preuves de dette conservées, les montants sources et la politique de recouvrement par un processus d’approbation publié.",
@@ -4253,9 +4250,12 @@
     "credit_memo": "Note de crédit",
     "activity_amount": "Montant",
     "create_credit_memo": "Créer une note de crédit",
-    "credit_memo_remaining": "Solde de la dette",
-    "credit_memo_available": "Dette non réservée",
-    "credit_memo_amount": "Montant du crédit",
+    "memo_ar_outstanding": "Solde de la CD",
+    "memo_ar_available": "CD disponible pour recouvrement",
+    "memo_ar_collected": "Montant recouvré de la CD",
+    "memo_ar_pending": "Recouvrement en attente de la CD",
+    "memo_ar_balance_description": "Les soldes de la CD décrivent la créance liée, et non un crédit inutilisé de la note de crédit. Les dossiers de flux de travail présentent les soldes capturés lors de la soumission.",
+    "credit_memo_amount": "Montant de la note de crédit",
     "payment_deduction": "Déduction de ce paiement",
     "receivable_amount": "Montant de la créance",
     "credit_memo_application": "Imputation d’une note de crédit",
@@ -4270,12 +4270,13 @@
     "approved_amount": "Montant approuvé",
     "credit_memo_summary": "Sommaire du crédit",
     "view_proponent_financial_activity": "Voir l’activité financière du promoteur",
-    "credit_memo_credit_instruction": "Les notes de crédit sont consignées pour le promoteur. Le solde net du promoteur compare les créances et les crédits approuvés dans la même agence et la même devise.",
+    "credit_memo_credit_instruction": "Chaque note de crédit réduit un seul compte débiteur. Consignez une note de crédit distincte pour chaque compte débiteur visé par un paiement.",
     "credit_memo_applied": "Crédit appliqué",
     "credit_memo_agency": "Agence",
     "proponent": "Promoteur",
     "historical_credit_memo_allocations": "Répartitions historiques",
     "historical_credit_memo_allocations_description": "Ces répartitions sont des preuves conservées du modèle de données antérieur. Les soldes actuels sont calculés par promoteur, agence et devise.",
-    "offset_plan_amount": "Montant initial du plan de compensation"
+    "credit_memo_receivable": "Compte débiteur",
+    "credit_memo_coding": "Codage de la note de crédit"
   }
 }

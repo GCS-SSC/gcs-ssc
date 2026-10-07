@@ -64,12 +64,10 @@ export const AgencyProfileSchema = z.object({
   egcs_ay_name_fr: AgencyLabelSchema('validation.name_fr_required'),
   egcs_ay_abbreviation_en: AgencyLabelSchema('validation.abbr_en_required'),
   egcs_ay_abbreviation_fr: AgencyLabelSchema('validation.abbr_fr_required'),
-  egcs_ay_active: z.boolean().default(false),
-  egcs_ay_correctioncreatorapproval: z.boolean().default(false)
+  egcs_ay_active: z.boolean().default(false)
 })
 export const AgencyProfilePatchSchema = AgencyProfileSchema.partial().extend({
-  egcs_ay_active: z.boolean().optional(),
-  egcs_ay_correctioncreatorapproval: z.boolean().optional()
+  egcs_ay_active: z.boolean().optional()
 }).refine(
   value => Object.keys(value).length > 0,
   { message: 'validation.required' }

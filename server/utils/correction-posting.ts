@@ -17,7 +17,6 @@ export type CorrectionPacket = {
   lines: JsonValue
   sources: JsonValue
   attachments: JsonValue
-  policy: { creatorApprovalAllowed: boolean }
   calculation: { formula: string, moneyScale: 2, capacity: string }
 }
 export type CorrectionTerminalOutcome = 'posted' | 'denied' | 'failed' | 'cancelled'
@@ -29,8 +28,6 @@ export const captureCorrectionPacket = async (db: DbClient, correctionId: string
     .where('id', '=', correctionId).where('_deleted', '=', false).executeTakeFirstOrThrow()
   const context = await resolveCorrectionRuntimeContext(db, correctionId)
   if (!context) throw new Error('Correction packet owner is unavailable')
-  const agency = await db.selectFrom('Agency_Profile').select('egcs_ay_correctioncreatorapproval')
-    .where('id', '=', context.agencyId).where('_deleted', '=', false).executeTakeFirstOrThrow()
   const [lines, sources, attachments] = await Promise.all([
     readCorrectionLines(db, correctionId),
     db.selectFrom('Funding_Case_Agreement_Correction_Source').selectAll()
@@ -45,7 +42,6 @@ export const captureCorrectionPacket = async (db: DbClient, correctionId: string
   ])
   return {
     schemaVersion: 1, correction: retainJson(correction), lines: retainJson(lines), sources: retainJson(sources), attachments: retainJson(attachments),
-    policy: { creatorApprovalAllowed: agency.egcs_ay_correctioncreatorapproval },
     calculation: {
       formula: 'original_paid + successful_jv_effect + prior_posted_corrections + adjustment',
       moneyScale: 2, capacity: 'agreement_agency_chart_of_account'

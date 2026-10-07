@@ -1,3 +1,5 @@
+import enMessages from '~~/i18n/locales/en.json'
+import frMessages from '~~/i18n/locales/fr.json'
 import { z } from 'zod'
 import { PaginationSchema } from '~~/shared/types/schemas'
 import { authorizeTransferPaymentProfileResource } from '~~/server/utils/transfer-payment-route-authorization'
@@ -35,7 +37,6 @@ export default defineEventHandler(async event => {
         .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Agency_Chart_of_Account.egcs_ay_fiscalyear')
         .where('Agency_Chart_of_Account.egcs_ay_organizationagency', '=', access.agencyId)
         .where('Agency_Chart_of_Account._deleted', '=', false)
-        .where('Agency_Chart_of_Account.egcs_ay_kind', '=', 'commitment')
         .where('Agency_Fiscal_Year._deleted', '=', false)
       const filtered = term ? scoped.where(eb => eb('Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay', 'ilike', term)) : scoped
       const result = await fetchAgencyScopedList({
@@ -50,8 +51,8 @@ export default defineEventHandler(async event => {
         const dimensions = item.egcs_ay_accountingdimensions as TransferPaymentStreamChartOfAccountDimension[]
         return {
           ...item,
-          label_en: `${item.fiscal_year_display} (${item.egcs_ay_currency.toUpperCase()}) - ${formatAccountingDimensions(dimensions, 'en', ' - ')}`,
-          label_fr: `${item.fiscal_year_display} (${item.egcs_ay_currency.toUpperCase()}) - ${formatAccountingDimensions(dimensions, 'fr', ' - ')}`
+          label_en: `${enMessages.enums.agency_chart_of_account_kind[item.egcs_ay_kind]} - ${item.fiscal_year_display} (${item.egcs_ay_currency.toUpperCase()}) - ${formatAccountingDimensions(dimensions, 'en', ' - ')}`,
+          label_fr: `${frMessages.enums.agency_chart_of_account_kind[item.egcs_ay_kind]} - ${item.fiscal_year_display} (${item.egcs_ay_currency.toUpperCase()}) - ${formatAccountingDimensions(dimensions, 'fr', ' - ')}`
         }
       }) }
     }

@@ -72,9 +72,6 @@ const onSubmit = () => {
         <UFormField :label="t('common.active')" name="egcs_ay_active">
           <USwitch v-model="state.egcs_ay_active" :label="t('common.active')" />
         </UFormField>
-        <UFormField :label="t('correction.creator_approval_policy')" name="egcs_ay_correctioncreatorapproval" :description="t('correction.creator_approval_policy_description')">
-          <USwitch v-model="state.egcs_ay_correctioncreatorapproval" :label="t('correction.allow_creator_approval')" />
-        </UFormField>
         <div class="flex justify-end gap-2 pt-4">
           <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="open = false" />
           <CommonSaveButton :label="submitLabel" :loading="pending" :disabled="pending" />

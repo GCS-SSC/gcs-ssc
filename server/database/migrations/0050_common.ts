@@ -1666,7 +1666,7 @@ CREATE FUNCTION trg_fn_ar_completion_control()
  RETURNS trigger
  LANGUAGE plpgsql
 AS $function$
-    DECLARE payment record; debt record;
+    DECLARE payment record; debt record; memo record;
     BEGIN
       IF NEW.egcs_cn_entitytype IN ('fundingcaseaccountreceivable','fundingcaseaccountreceivablecreditmemo')
         OR (NEW.egcs_cn_entitytype = 'fundingcasepayment' AND EXISTS (SELECT 1 FROM "Funding_Case_Account_Receivable_Recovery" recovery
@@ -1691,10 +1691,17 @@ AS $function$
           LEFT JOIN "Agency_Chart_of_Account" account ON account.id = line.egcs_fc_accountreceivablechartofaccount
           WHERE line.egcs_fc_receivable = debt.id AND NOT line._deleted AND line.egcs_fc_amount <> 0
             AND (account.id IS NULL OR account.egcs_ay_kind <> 'account_receivable'
+              OR NOT EXISTS (SELECT 1 FROM "Transfer_Payment_Stream_Chart_of_Account" selection
+                JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.egcs_fc_transferpaymentstream=selection.egcs_tp_transferpaymentstream
+                WHERE agreement.id=debt.egcs_fc_fundingagreement AND selection.egcs_tp_agencychartofaccount=account.id AND NOT selection._deleted)
               OR account.egcs_ay_fiscalyear <> debt.egcs_fc_agencyfiscalyear OR account.egcs_ay_currency <> debt.egcs_fc_currency
               OR (debt.egcs_fc_linkedreceivable IS NULL AND account._deleted))) THEN
           RAISE EXCEPTION 'AR submission requires valid financial accounts for every nonzero line' USING ERRCODE = '23514';
         END IF;
+      END IF;
+      IF NEW.egcs_cn_entitytype = 'fundingcaseaccountreceivablecreditmemo' THEN
+        SELECT * INTO memo FROM "Funding_Case_Account_Receivable_Credit_Memo" WHERE id=NEW.egcs_cn_entityid;
+        PERFORM ar_validate_pool_credit_memo(to_jsonb(memo),to_jsonb(memo),'UPDATE');
       END IF;
       IF NEW.egcs_cn_entitytype = 'fundingcasepayment' THEN
         SELECT * INTO payment FROM "Funding_Case_Agreement_Payment" WHERE id = NEW.egcs_cn_entityid;

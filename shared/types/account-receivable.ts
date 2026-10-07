@@ -69,26 +69,35 @@ export type AccountReceivableOffsetMemoApplication = {
 
 export type AccountReceivableOffsetMemo = {
   id: string
+  egcs_fc_receivable: string
+  egcs_fc_creditmemochartofaccount: string
+  egcs_fc_creditmemoaccountingdimensions: JsonValue
   egcs_fc_pool: string
   egcs_fc_creditmemoreference: string
   egcs_fc_amount: Money
-  egcs_fc_effectiveamount: Money
   egcs_fc_appliedamount: Money
   egcs_fc_reservedamount: Money
-  egcs_fc_remainingamount: Money
-  egcs_fc_availableamount: Money
+  egcs_fc_receivablereserved: Money
+  egcs_fc_receivablerecovered: Money
+  egcs_fc_receivableoutstanding: Money
+  egcs_fc_receivableavailable: Money
   egcs_fc_createdat: string
   egcs_fc_applications: AccountReceivableOffsetMemoApplication[]
 }
 
 export type AccountReceivablePaymentCreditMemo = Pick<AccountReceivableOffsetMemo,
-  'id' | 'egcs_fc_creditmemoreference' | 'egcs_fc_amount' | 'egcs_fc_effectiveamount' | 'egcs_fc_remainingamount' | 'egcs_fc_availableamount'> & {
+  'id' | 'egcs_fc_creditmemoreference' | 'egcs_fc_amount' | 'egcs_fc_receivableoutstanding' | 'egcs_fc_receivableavailable' | 'egcs_fc_receivablereserved' | 'egcs_fc_receivablerecovered'> & {
     egcs_fc_offsetmemo: string
     egcs_fc_appliedamount: Money
     egcs_fc_outcome: 'open' | 'posted' | 'released'
   }
 
 export type AccountReceivableDetail = AccountReceivableRow & {
+  egcs_fc_recovered: Money
+  egcs_fc_reserved: Money
+  egcs_fc_outstanding: Money
+  egcs_fc_available: Money
+  egcs_fc_collectionstate: 'cleared' | 'partially_recovered' | 'outstanding'
   egcs_fc_lines: AccountReceivableLine[]
   egcs_fc_adjustments: AccountReceivableRow[]
   egcs_fc_principal: Money
@@ -117,6 +126,13 @@ export type AccountReceivableCreditMemoRow = Omit<Selectable<FundingCaseAccountR
   } & BusinessRecordStateFields
 
 export type AccountReceivableCreditMemoDetail = AccountReceivableCreditMemoRow & {
+  egcs_fc_receivablerecovered: Money
+  egcs_fc_receivablereserved: Money
+  egcs_fc_receivableoutstanding: Money
+  egcs_fc_receivableavailable: Money
+  egcs_fc_fundingagreement: string
+  egcs_fc_agreementnumber: string
+  egcs_fc_receivablereference: string
   egcs_fc_cancomplete: boolean
   egcs_fc_creditmemoreference: string
   egcs_fc_agencyname_en: string

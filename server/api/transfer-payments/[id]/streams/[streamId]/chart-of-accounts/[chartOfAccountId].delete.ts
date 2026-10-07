@@ -7,7 +7,7 @@ import {
 } from '~~/server/utils/transfer-payment-stream-setup-routes'
 import { authorizeTransferPaymentStreamResource, createTransferPaymentScopedAuthorizeHandler } from '~~/server/utils/transfer-payment-route-authorization'
 import { executeFreshAuthorizedTransferPaymentStreamWrite } from '~~/server/utils/transfer-payment-write-transaction'
-import { hasActiveChartOfAccountCommitmentLine } from '~~/server/utils/transfer-payment-chart-of-account'
+import { hasActiveStreamChartCasework } from '~~/server/utils/transfer-payment-chart-of-account'
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -60,7 +60,7 @@ export default defineEventHandler(async event => {
         'apiErrors.transfer_payment.chart_of_account_not_found'
       )
 
-      const inUse = await hasActiveChartOfAccountCommitmentLine(trx, routeContext.childId)
+      const inUse = await hasActiveStreamChartCasework(trx, routeContext.childId)
       if (inUse) {
         return await badRequest(
           event,

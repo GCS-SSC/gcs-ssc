@@ -31,10 +31,11 @@ const payment = computed(() => ({
           egcs_fc_offsetmemo: text(memo.egcs_fc_offsetmemo),
           egcs_fc_creditmemoreference: text(memo.egcs_fc_creditmemoreference),
           egcs_fc_amount: parseMoney(text(memo.egcs_fc_amount)),
-          egcs_fc_effectiveamount: parseMoney(text(memo.egcs_fc_effectiveamount)),
           egcs_fc_appliedamount: parseMoney(text(memo.egcs_fc_appliedamount)),
-          egcs_fc_remainingamount: parseMoney(text(memo.egcs_fc_remainingamount)),
-          egcs_fc_availableamount: parseMoney(text(memo.egcs_fc_availableamount)),
+          egcs_fc_receivablereserved: parseMoney(text(memo.egcs_fc_receivablereserved)),
+          egcs_fc_receivablerecovered: parseMoney(text(memo.egcs_fc_receivablerecovered)),
+          egcs_fc_receivableoutstanding: parseMoney(text(memo.egcs_fc_receivableoutstanding)),
+          egcs_fc_receivableavailable: parseMoney(text(memo.egcs_fc_receivableavailable)),
           egcs_fc_outcome: memo.egcs_fc_outcome as AccountReceivablePaymentCreditMemo['egcs_fc_outcome']
         }
       })

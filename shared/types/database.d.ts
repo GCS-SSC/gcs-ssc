@@ -775,7 +775,6 @@ export interface AgencyProfileTable {
   egcs_ay_abbreviation_en: string
   egcs_ay_abbreviation_fr: string
   egcs_ay_active: Generated<boolean>
-  egcs_ay_correctioncreatorapproval: Generated<boolean>
   egcs_ay_claimreconciliationstartstatus?: StatusId | null
   egcs_ay_claimreconciliationfinalstatus?: StatusId | null
   _deleted: Generated<boolean>
@@ -871,7 +870,7 @@ export interface AgencyAccountReceivableTypeTable {
 }
 
 export interface AgencyChartOfAccountTable {
-  egcs_ay_kind: Generated<'commitment' | 'account_receivable'>
+  egcs_ay_kind: Generated<'commitment' | 'account_receivable' | 'credit_memo'>
   id: Generated<string>
   egcs_ay_organizationagency: string
   egcs_ay_fiscalyear: string
@@ -2714,14 +2713,15 @@ export interface FundingCaseAgreementAccountReceivableTable {
 
 export interface FundingCaseAccountReceivableCreditMemoTable {
   id: Generated<string>
-  egcs_fc_fundingagreement: string | null
+  egcs_fc_creditmemochartofaccount: string
+  egcs_fc_creditmemoaccountingdimensions: Generated<JsonValue>
+  egcs_fc_receivable: string
   egcs_fc_ledgerkind: Generated<'legacy' | 'pool'>
   egcs_fc_agency: string
   egcs_fc_pool: string
   egcs_fc_applicantrecipient: string
   egcs_fc_currency: Currency_Codes
   egcs_fc_number: number
-  egcs_fc_agreementnumber: string | null
   egcs_fc_receiveddate: Date
   egcs_fc_amount: number
   egcs_fc_receiptreference: string | null
@@ -2790,7 +2790,9 @@ export interface FundingCaseAccountReceivablePoolTable {
 
 export interface FundingCaseAccountReceivableOffsetMemoTable {
   id: Generated<string>
-  egcs_fc_legacyreceivable: string | null
+  egcs_fc_receivable: string
+  egcs_fc_creditmemochartofaccount: string
+  egcs_fc_creditmemoaccountingdimensions: JsonValue
   egcs_fc_pool: string
   egcs_fc_amount: number
   egcs_fc_createdat: Generated<Date>

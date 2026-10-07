@@ -148,7 +148,7 @@ const readOffsetMemoRows = async (db: Kysely<Database>, id: string,
       egcs_fc_creditmemoreference: memo.egcs_fc_creditmemoreference, egcs_fc_agency: String(agency.id),
       egcs_fc_agencyname_en: agency.egcs_ay_name_en, egcs_fc_agencyname_fr: agency.egcs_ay_name_fr,
       egcs_fc_currency: pool.egcs_fc_currency, egcs_fc_amount: memo.egcs_fc_appliedamount,
-      egcs_fc_remainingamount: memo.egcs_fc_remainingamount, egcs_fc_createdat: memo.egcs_fc_createdat,
+      egcs_fc_receivableoutstanding: memo.egcs_fc_receivableoutstanding, egcs_fc_createdat: memo.egcs_fc_createdat,
       egcs_fc_originapplication: applications.find(application => application.id === originId) ?? null,
       egcs_fc_applications: applications
     }

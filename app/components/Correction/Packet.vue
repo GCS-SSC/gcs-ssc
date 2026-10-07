@@ -22,7 +22,6 @@ const reference = computed(() => typeof header.value.egcs_fc_agreementnumber ===
 const lines = computed(() => asRecords(packet.value.lines))
 const sources = computed(() => asRecords(packet.value.sources))
 const attachments = computed(() => asRecords(packet.value.attachments))
-const policy = computed(() => asRecord(packet.value.policy))
 const text = (value: JsonValue | undefined) => typeof value === 'string' || typeof value === 'number' ? String(value) : t('common.none')
 const money = (value: JsonValue | undefined) => typeof value === 'string' ? value : null
 const dimensions = (value: JsonValue | undefined) => asRecords(value) as unknown as TransferPaymentStreamChartOfAccountDimension[]
@@ -67,9 +66,6 @@ const attachmentName = (attachment: PacketRecord) => text(locale.value === 'fr' 
     <template #summary>
       <p class="font-semibold">
         {{ reference }}
-      </p>
-      <p class="text-sm text-muted">
-        {{ t('correction.creator_approval_policy') }}: {{ t(policy.creatorApprovalAllowed === true ? 'common.yes' : 'common.no') }}
       </p>
     </template>
     <CommonSection :title="t('correction.financial_lines')" :grid-cols="1">

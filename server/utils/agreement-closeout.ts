@@ -304,14 +304,9 @@ export const buildAgreementCloseoutReadiness = async (
     : []
   const repayments = await hasAccountingTable(db, 'Funding_Case_Agreement_Account_Receivable')
     ? await db.selectFrom('Funding_Case_Account_Receivable_Credit_Memo as repayment')
-        .select(['repayment.id', 'repayment.egcs_fc_status', 'repayment.egcs_fc_outcome', 'repayment.egcs_fc_fundingagreement'])
-        .where('repayment._deleted', '=', false).where(eb => eb.or([
-          eb('repayment.egcs_fc_fundingagreement', '=', agreementId),
-          eb.exists(eb.selectFrom('Funding_Case_Account_Receivable_Recovery as recovery')
-            .innerJoin('Funding_Case_Account_Receivable_Allocation as allocation', 'allocation.egcs_fc_recovery', 'recovery.id')
-            .select('allocation.id').whereRef('recovery.egcs_fc_creditmemo', '=', 'repayment.id')
-            .where('allocation.egcs_fc_fundingagreement', '=', agreementId).where('allocation._deleted', '=', false))
-        ])).execute()
+        .innerJoin('Funding_Case_Agreement_Account_Receivable as debt', 'debt.id', 'repayment.egcs_fc_receivable')
+        .select(['repayment.id', 'repayment.egcs_fc_status', 'repayment.egcs_fc_outcome', 'debt.egcs_fc_fundingagreement'])
+        .where('repayment._deleted', '=', false).where('debt.egcs_fc_fundingagreement', '=', agreementId).execute()
     : []
   const blockers: CloseoutBlocker[] = []
   const configuredStatusIds = [...new Set([

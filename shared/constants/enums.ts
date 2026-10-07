@@ -117,7 +117,7 @@ export const FUNDING_OPPORTUNITY_ASSESSMENT_CHECKLIST_TYPE_ENUM = [
   'fundingopportunityriskassessment'
 ] as const
 export const DECISION_TYPES_ENUM = ['fundingcaseintakeassessment'] as const
-export const AGENCY_CHART_KIND_ENUM = ['commitment', 'account_receivable'] as const
+export const AGENCY_CHART_KIND_ENUM = ['commitment', 'account_receivable', 'credit_memo'] as const
 export const ACCOUNT_RECEIVABLE_RECOVERY_METHOD_ENUM = ['offset', 'direct_repayment'] as const
 export const CORRECTION_OUTCOME_ENUM = ['open', 'posted', 'denied', 'failed', 'cancelled'] as const
 export const PAYMENT_TYPE_ENUM = ['reimbursement', 'advance'] as const

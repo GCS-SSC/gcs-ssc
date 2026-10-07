@@ -32,7 +32,12 @@ const lines = computed(() => records(packet.value.lines).map(line => ({ ...line,
 })) as unknown as AccountReceivableLine[])
 const allocations = computed(() => records(packet.value.allocations))
 const attachments = computed(() => records(packet.value.attachments))
-const policy = computed(() => record(packet.value.policy))
+const balanceFields = [
+  { key: 'egcs_fc_receivablerecovered', label: 'account_receivable.memo_ar_collected' },
+  { key: 'egcs_fc_receivablereserved', label: 'account_receivable.memo_ar_pending' },
+  { key: 'egcs_fc_receivableoutstanding', label: 'account_receivable.memo_ar_outstanding' },
+  { key: 'egcs_fc_receivableavailable', label: 'account_receivable.memo_ar_available' }
+] as const
 const labels = computed(() => [
   ...(standaloneCredit.value
     ? [{ label: 'account_receivable.credit_memo_agency', value: getBilingualValue(header.value, 'egcs_fc_agencyname', t('common.none')) }]
@@ -41,6 +46,7 @@ const labels = computed(() => [
   { label: 'common.currency', value: currency.value.toUpperCase() },
   ...(creditMemo
     ? [
+        { label: 'account_receivable.credit_memo_receivable', value: header.value.egcs_fc_receivablereference },
         { label: 'account_receivable.received_date', value: typeof header.value.egcs_fc_receiveddate === 'string' ? formatDate(header.value.egcs_fc_receiveddate) : null },
         { label: 'account_receivable.receipt_reference', value: header.value.egcs_fc_receiptreference }
       ]
@@ -57,8 +63,6 @@ const labels = computed(() => [
     <template #summary>
       <p class="font-semibold">
         {{ reference }}
-      </p><p class="text-sm text-muted">
-        {{ t('account_receivable.creator_approval_policy') }}: {{ t(policy.creatorApprovalAllowed === true ? 'common.yes' : 'common.no') }}
       </p>
     </template>
     <CommonSection :title="t('account_receivable.captured_context')" :grid-cols="1">
@@ -77,6 +81,21 @@ const labels = computed(() => [
           </dd>
         </div>
       </dl>
+    </CommonSection>
+    <CommonSection v-if="creditMemo && typeof header.egcs_fc_receivableoutstanding === 'string'" :title="t('account_receivable.credit_memo_receivable')" :grid-cols="1">
+      <dl class="grid gap-4 text-sm sm:grid-cols-2">
+        <div v-for="field in balanceFields" :key="field.key">
+          <dt class="text-muted">
+            {{ t(field.label) }}
+          </dt>
+          <dd class="mt-1 font-semibold tabular-nums">
+            {{ amount(header[field.key]) }}
+          </dd>
+        </div>
+      </dl>
+      <p class="text-sm text-muted">
+        {{ t('account_receivable.memo_ar_balance_description') }}
+      </p>
     </CommonSection>
     <CommonSection v-if="!creditMemo" :title="t('account_receivable.financial_lines')" :grid-cols="1">
       <AccountReceivableSourceLines :lines="lines" :currency="currency">
@@ -104,6 +123,16 @@ const labels = computed(() => [
           </dt><dd class="font-semibold">
             {{ amount(allocation.egcs_fc_amount) }}
           </dd>
+        </div>
+      </dl>
+    </CommonSection>
+    <CommonSection v-if="creditMemo && header.egcs_fc_creditmemoaccountingdimensions" :title="t('account_receivable.credit_memo_coding')" :grid-cols="1">
+      <dl class="flex flex-wrap gap-4 text-sm">
+        <div v-for="dimension in records(header.egcs_fc_creditmemoaccountingdimensions)" :key="text(dimension.label_en)">
+          <dt class="text-muted">
+            {{ getBilingualValue(dimension, 'label', t('common.none')) }}
+          </dt>
+          <dd>{{ text(dimension.value) }}</dd>
         </div>
       </dl>
     </CommonSection>
