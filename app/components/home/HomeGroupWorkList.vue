@@ -29,6 +29,7 @@ const itemTitle = (item: GroupItem): string => {
  */
 const itemDescription = (item: GroupItem): string => {
   let kind = t(`enums.review_type.${item.variant === 'checklist' ? 'checklist' : 'assessment'}`)
+  if (item.kind === 'recommendation') kind = t('home_dashboard.work_labels.recommendation')
   if (item.kind === 'approval') kind = t('home_dashboard.work_labels.approval')
   if (item.kind === 'intake') return t('funding_case_intake.title')
   const name = getBilingualValue(item, 'detail_name', '').trim()

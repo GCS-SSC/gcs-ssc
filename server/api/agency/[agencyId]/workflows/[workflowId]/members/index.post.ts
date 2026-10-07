@@ -1,3 +1,4 @@
+import { isValidWorkflowRiskSource } from '~~/server/utils/workflow-risk-source'
 import { authorize } from '~~/server/utils/authorize'
 import { areAgencyWorkflowStatusesValid, authorizeAgencyWorkflowSetup } from '~~/server/utils/agency-workflow-authorization'
 import { replaceWorkflowConditions } from '~~/server/utils/workflow-conditions'
@@ -34,6 +35,9 @@ export default defineEventHandler(async event => {
     }
     if (!await isValidWorkflowSetupMemberReference(trx, setup, memberValues)) {
       return await badRequest(event, 'WORKFLOW_MEMBER_REFERENCE_INVALID', 'apiErrors.request.invalid_resource')
+    }
+    if (!await isValidWorkflowRiskSource(trx, setup, memberValues)) {
+      return await badRequest(event, 'WORKFLOW_RISK_SOURCE_INVALID', 'apiErrors.workflow.risk_source_invalid')
     }
     const existing = await trx.selectFrom('Common_Workflow_Setup_Member').selectAll()
       .where('egcs_cn_workflowsetup', '=', workflowSetupId).where('_deleted', '=', false)

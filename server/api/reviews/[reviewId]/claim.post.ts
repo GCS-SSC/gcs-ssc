@@ -4,7 +4,7 @@ import { resolveCurrentCommonUser } from '~~/server/utils/additional-reviewer-ru
 import { resolveAgencyValidEntityAssigneeIdsWithDb } from '~~/server/utils/entity-assignment'
 import { getReviewRuntimeOwnerAgencyId, lockReviewRuntimeTarget, resolveReviewRuntimeEntityFromReview } from '~~/server/utils/review-runtime-access'
 import { assertReviewNotLocked } from '~~/server/utils/review-runtime-state'
-import { isActiveGroupMember } from '~~/server/utils/groups'
+import { lockActiveGroupMember } from '~~/server/utils/groups'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 export default defineEventHandler(async event => {
@@ -34,7 +34,7 @@ export default defineEventHandler(async event => {
       return await throwApiError(event, { statusCode: 409, code: 'GROUP_WORK_ALREADY_CLAIMED', key: 'apiErrors.request.invalid_status' })
     }
     const actor = await resolveCurrentCommonUser(event, trx)
-    if (!actor || !await isActiveGroupMember(trx, String(review.egcs_cn_group), actor.id)) return await forbidden(event)
+    if (!actor || !await lockActiveGroupMember(trx, String(review.egcs_cn_group), actor.id)) return await forbidden(event)
     const agencyId = getReviewRuntimeOwnerAgencyId(fresh)
     const group = await trx.selectFrom('Common_Group').select('egcs_cn_agency')
       .where('id', '=', String(review.egcs_cn_group)).where('_deleted', '=', false).executeTakeFirst()

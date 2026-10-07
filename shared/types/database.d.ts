@@ -2140,6 +2140,8 @@ export interface CommonRecommendationTable {
   egcs_cn_entitytype: Entity_Type
   egcs_cn_entityid: string
   egcs_cn_runtimeitem: string
+  egcs_cn_group?: string | null
+  egcs_cn_groupclaimedby?: string | null
   egcs_cn_recommendation?: number | null
   egcs_cn_response: JsonValue
   egcs_cn_resultoptionkey?: string | null
@@ -2158,6 +2160,7 @@ export interface CommonWorkflowSetupTable {
   egcs_cn_description_en: string
   egcs_cn_description_fr: string
   egcs_cn_purpose: Generated<Workflow_Purpose>
+  egcs_cn_riskratingrequired: Generated<boolean>
   egcs_cn_cancellationstatus: StatusId
   egcs_cn_executionfailurestatus: StatusId
   egcs_cn_allowretry: Generated<boolean>
@@ -2184,6 +2187,8 @@ export interface CommonWorkflowSetupMemberTable {
   egcs_cn_materializationstatus?: StatusId | null
   egcs_cn_successstatus?: StatusId | null
   egcs_cn_failurestatus?: StatusId | null
+  egcs_cn_setsriskrating: Generated<boolean>
+  egcs_cn_riskreviewsetup?: string | null
   egcs_cn_allowownerredirect: Generated<boolean>
   _deleted: Generated<boolean>
 }
@@ -2194,6 +2199,7 @@ export interface CommonWorkflowSetupMemberOwnerTable {
   egcs_cn_reviewsetup?: string | null
   egcs_cn_recommendationsetup?: string | null
   egcs_cn_defaultowner?: string | null
+  egcs_cn_defaultgroup?: string | null
   _deleted: Generated<boolean>
 }
 

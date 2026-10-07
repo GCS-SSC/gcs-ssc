@@ -31,17 +31,27 @@ export const streamWorkflowRoute = async (event: H3Event, action: 'read' | 'crea
       const items = await trx.selectFrom('Transfer_Payment_Stream_Workflow')
         .innerJoin('Common_Workflow_Setup', 'Common_Workflow_Setup.id', 'Transfer_Payment_Stream_Workflow.egcs_tp_workflow')
         .innerJoin('Common_Publication', 'Common_Publication.id', 'Common_Workflow_Setup.id')
+        .leftJoin('Common_Publication_Version', 'Common_Publication_Version.id', 'Common_Publication.egcs_cn_currentversion')
         .select([
           'Transfer_Payment_Stream_Workflow.id', 'Transfer_Payment_Stream_Workflow.egcs_tp_workflow',
           'Common_Workflow_Setup.egcs_cn_name_en', 'Common_Workflow_Setup.egcs_cn_name_fr',
           'Common_Workflow_Setup.egcs_cn_entitytype', 'Common_Workflow_Setup.egcs_cn_purpose',
-          'Common_Publication.egcs_cn_state as publicationState'
+          'Common_Publication.egcs_cn_state as publicationState',
+          'Common_Publication_Version.egcs_cn_definition as definition'
         ])
         .where('Transfer_Payment_Stream_Workflow.egcs_tp_transferpaymentstream', '=', streamId)
         .where('Transfer_Payment_Stream_Workflow._deleted', '=', false)
         .where('Common_Workflow_Setup.egcs_cn_agency', '=', fresh.agencyId)
         .orderBy('Common_Workflow_Setup.egcs_cn_name_en').execute()
-      return { items: items.map(item => ({ ...item, id: String(item.id), egcs_tp_workflow: String(item.egcs_tp_workflow) })) }
+      return { items: items.map(({ definition, ...item }) => {
+        const published = definition ? readPublishedWorkflowConfiguration(definition) : null
+        return { ...item, id: String(item.id), egcs_tp_workflow: String(item.egcs_tp_workflow),
+          ...(published
+            ? { egcs_cn_name_en: published.nameEn, egcs_cn_name_fr: published.nameFr,
+                egcs_cn_entitytype: published.entityType, egcs_cn_purpose: published.purpose ?? 'standard',
+                egcs_cn_riskratingrequired: published.riskRatingRequired === true }
+            : {}) }
+      }) }
     })
   }
 
@@ -65,8 +75,7 @@ export const streamWorkflowRoute = async (event: H3Event, action: 'read' | 'crea
           .executeTakeFirst()
         if (!setup) return await badRequest(event, 'WORKFLOW_SETUP_NOT_PUBLISHED', 'apiErrors.request.invalid_resource')
         const definition = readPublishedWorkflowConfiguration(setup.definition)
-        if (definition.entityType !== setup.egcs_cn_entitytype || definition.purpose !== setup.egcs_cn_purpose
-          || !await validateWorkflowRiskRatingMappingForStream(trx, streamId, definition)) {
+        if (!await validateWorkflowRiskRatingMappingForStream(trx, streamId, definition)) {
           return await badRequest(event, 'WORKFLOW_RISK_RATING_MAPPING_INVALID', 'apiErrors.request.invalid_resource')
         }
         const existing = await trx.selectFrom('Transfer_Payment_Stream_Workflow').select('id')

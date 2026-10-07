@@ -41,8 +41,32 @@ const publicationFailurePatterns = [
   /entity type must be commonrecommendation/i
 ]
 
+/**
+ * Identifies explicit Risk Rating source authoring errors for localized recovery.
+ * @param error Publication failure.
+ * @returns Whether the author must correct the selected source.
+ */
+export const isRiskSourcePublicationFailure = (error: unknown): boolean =>
+  error instanceof Error && [
+    'Only Risk Rating workflows may select a risk assessment source',
+    'Risk Rating workflow requires exactly one selected risk review set',
+    'Unselected workflow members cannot specify a risk assessment source',
+    'Risk Rating source must select an assessment member from the published review set'
+  ].includes(error.message)
+
+/**
+ * Identifies workflow owner configuration errors that authors can correct.
+ * @param error Publication failure.
+ * @returns Whether the selected owner needs correction.
+ */
+export const isWorkflowOwnerPublicationFailure = (error: unknown): boolean =>
+  error instanceof Error && [
+    'Workflow default owner must select either a user or a group',
+    'Workflow default group must be active in its Agency and contain an active member'
+  ].includes(error.message)
+
 export const isExpectedPublicationFailure = (error: unknown): boolean =>
-  error instanceof Error && publicationFailurePatterns.some(pattern => pattern.test(error.message))
+  isRiskSourcePublicationFailure(error) || isWorkflowOwnerPublicationFailure(error) || (error instanceof Error && publicationFailurePatterns.some(pattern => pattern.test(error.message)))
 
 /**
  * Maps canonical publication domain and selection conflicts to localized API responses.

@@ -514,6 +514,7 @@ const CommonWorkflowSetupBaseSchema = z.object({
   egcs_cn_description_en: RequiredString('validation.desc_en_required'),
   egcs_cn_description_fr: RequiredString('validation.desc_fr_required'),
   egcs_cn_purpose: z.enum(['standard', 'approval_submission', 'risk_rating'], { error: 'validation.workflow_purpose_required' }).default('standard'),
+  egcs_cn_riskratingrequired: z.boolean().default(false),
   egcs_cn_allowedstartstatuses: z.array(IdSchema).min(1, { error: 'validation.workflow_allowed_start_status_required' })
     .refine(statuses => new Set(statuses.map(String)).size === statuses.length, { error: 'validation.workflow_allowed_start_status_unique' }),
   egcs_cn_cancellationstatus: RequiredIdSchema('validation.workflow_cancellation_status_required'),
@@ -530,13 +531,18 @@ const validateWorkflowSetup = (
   data: Partial<z.infer<typeof CommonWorkflowSetupBaseSchema>>,
   ctx: z.RefinementCtx
 ) => {
-  if (data.egcs_cn_purpose === 'risk_rating' && data.egcs_cn_entitytype !== 'fundingcaseagreement') {
+  if (data.egcs_cn_purpose === 'risk_rating' && !['fundingcaseagreement', 'fundingcaseamendment'].includes(data.egcs_cn_entitytype ?? '')) {
     ctx.addIssue({ code: 'custom', message: 'validation.workflow_risk_rating_entity_type', path: ['egcs_cn_entitytype'] })
+  }
+  if (data.egcs_cn_riskratingrequired && data.egcs_cn_purpose !== 'risk_rating') {
+    ctx.addIssue({ code: 'custom', message: 'validation.workflow_risk_rating_required_purpose', path: ['egcs_cn_riskratingrequired'] })
   }
 }
 
 export const CommonWorkflowSetupCreateSchema = CommonWorkflowSetupBaseSchema.superRefine(validateWorkflowSetup)
 const CommonWorkflowSetupPatchBaseSchema = CommonWorkflowSetupBaseSchema.partial().extend({
+  egcs_cn_purpose: z.enum(['standard', 'approval_submission', 'risk_rating'], { error: 'validation.workflow_purpose_required' }).optional(),
+  egcs_cn_riskratingrequired: z.boolean().optional(),
   _deleted: z.boolean().optional()
 })
 export const CommonWorkflowSetupPatchSchema = CommonWorkflowSetupPatchBaseSchema
@@ -547,14 +553,20 @@ const CommonWorkflowSetupMemberBaseSchema = z.object({
   egcs_cn_materializationstatus: NullableOptionalIdSchema,
   egcs_cn_successstatus: NullableOptionalIdSchema,
   egcs_cn_failurestatus: NullableOptionalIdSchema,
+  egcs_cn_setsriskrating: z.boolean().default(false),
+  egcs_cn_riskreviewsetup: PositivePostgresBigintIdSchema.nullish().meta({ formRequired: false }),
   egcs_cn_allowownerredirect: z.boolean().default(false)
 })
 
 export const CommonWorkflowSetupMemberOwnerSchema = z.object({
   egcs_cn_reviewsetup: OptionalIdSchema,
   egcs_cn_recommendationsetup: OptionalIdSchema,
-  egcs_cn_defaultowner: OptionalIdSchema
+  egcs_cn_defaultowner: OptionalIdSchema,
+  egcs_cn_defaultgroup: OptionalIdSchema
 }).superRefine((data, ctx) => {
+  if (data.egcs_cn_defaultowner && data.egcs_cn_defaultgroup) {
+    ctx.addIssue({ code: 'custom', message: 'validation.invalid_selection', path: ['egcs_cn_defaultgroup'] })
+  }
   if (Number(Boolean(data.egcs_cn_reviewsetup)) + Number(Boolean(data.egcs_cn_recommendationsetup)) !== 1) {
     ctx.addIssue({ code: 'custom', message: 'validation.workflow_member_owner_reference', path: ['egcs_cn_reviewsetup'] })
   }
@@ -570,13 +582,32 @@ export const CommonWorkflowSetupMemberCreateSchema = z.discriminatedUnion('egcs_
   CommonWorkflowSetupMemberBaseSchema.extend({ egcs_cn_kind: z.literal('review_set'), egcs_cn_reviewset: IdSchema, owners: CommonWorkflowSetupMemberOwnersSchema.optional() }),
   CommonWorkflowSetupMemberBaseSchema.extend({ egcs_cn_kind: z.literal('recommendation_set'), egcs_cn_recommendationset: IdSchema, owners: CommonWorkflowSetupMemberOwnersSchema.optional() }),
   CommonWorkflowSetupMemberBaseSchema.extend({ egcs_cn_kind: z.literal('approval_template'), egcs_cn_approvaltemplate: IdSchema, owners: z.array(z.never()).max(0).optional() })
-])
+]).superRefine((data, ctx) => {
+  if (data.egcs_cn_setsriskrating && !data.egcs_cn_riskreviewsetup) {
+    ctx.addIssue({ code: 'custom', message: 'validation.workflow_risk_review_required', path: ['egcs_cn_riskreviewsetup'] })
+  }
+  if (!data.egcs_cn_setsriskrating && data.egcs_cn_riskreviewsetup) {
+    ctx.addIssue({ code: 'custom', message: 'validation.workflow_risk_review_disabled', path: ['egcs_cn_riskreviewsetup'] })
+  }
+  if (data.egcs_cn_setsriskrating && data.egcs_cn_kind !== 'review_set') {
+    ctx.addIssue({ code: 'custom', message: 'validation.workflow_risk_review_kind', path: ['egcs_cn_setsriskrating'] })
+  }
+})
 export const CommonWorkflowSetupMemberPatchSchema = z.object({
   conditions: WorkflowMemberConditionsSchema.optional(),
   egcs_cn_sequence: z.number().int().positive({ error: 'validation.workflow_member_sequence_positive' }).optional(),
   egcs_cn_materializationstatus: NullableOptionalIdSchema,
   egcs_cn_successstatus: NullableOptionalIdSchema,
   egcs_cn_failurestatus: NullableOptionalIdSchema,
+  egcs_cn_setsriskrating: z.boolean().optional(),
+  egcs_cn_riskreviewsetup: PositivePostgresBigintIdSchema.nullish().meta({ formRequired: false }),
   egcs_cn_allowownerredirect: z.boolean().optional(),
   owners: CommonWorkflowSetupMemberOwnersSchema.optional()
+}).superRefine((data, ctx) => {
+  if (data.egcs_cn_setsriskrating === true && data.egcs_cn_riskreviewsetup === null) {
+    ctx.addIssue({ code: 'custom', message: 'validation.workflow_risk_review_required', path: ['egcs_cn_riskreviewsetup'] })
+  }
+  if (data.egcs_cn_setsriskrating === false && data.egcs_cn_riskreviewsetup) {
+    ctx.addIssue({ code: 'custom', message: 'validation.workflow_risk_review_disabled', path: ['egcs_cn_riskreviewsetup'] })
+  }
 })

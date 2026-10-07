@@ -895,9 +895,13 @@ export const resolveReviewRuntimeEntityFromRecommendation = async (
   recommendationId: string
 ): Promise<ReviewRuntimeEntityContext | null> => {
   const recommendation = await db.selectFrom('Common_Recommendation')
-    .select(['egcs_cn_entitytype', 'egcs_cn_entityid'])
-    .where('id', '=', recommendationId)
-    .where('_deleted', '=', false)
+    .innerJoin('Common_Runtime_Item', 'Common_Runtime_Item.id', 'Common_Recommendation.egcs_cn_runtimeitem')
+    .innerJoin('Common_Recommendation_Schema', 'Common_Recommendation_Schema.id', 'Common_Runtime_Item.egcs_cn_publication')
+    .select(['Common_Recommendation.egcs_cn_entitytype', 'Common_Recommendation.egcs_cn_entityid',
+      'Common_Recommendation_Schema.egcs_cn_agency as schemaAgencyId'])
+    .where('Common_Recommendation.id', '=', recommendationId)
+    .where('Common_Recommendation._deleted', '=', false)
+    .where('Common_Runtime_Item._deleted', '=', false)
     .executeTakeFirst()
   if (!recommendation) return null
   const owner = await resolveReviewRuntimeEntityFromEntity(
@@ -908,6 +912,9 @@ export const resolveReviewRuntimeEntityFromRecommendation = async (
   if (!owner) return null
   return {
     ...owner,
+    ...(owner.entityType === 'applicantrecipient'
+      ? { schemaAgencyId: String(recommendation.schemaAgencyId) }
+      : {}),
     approvalEntityType: 'commonrecommendation',
     approvalEntityId: recommendationId
   }
@@ -1234,6 +1241,19 @@ export const lockReviewRuntimeTarget = async (
       .where('Common_Runtime._deleted', '=', false)
       .forUpdate('Common_Runtime')
       .executeTakeFirst()
+    runtimeId = runtime ? String(runtime.id) : null
+  }
+
+  if (!runtimeId && entityContext.approvalEntityType === 'commonrecommendation' && entityContext.approvalEntityId) {
+    const runtime = await trx.selectFrom('Common_Runtime')
+      .innerJoin('Common_Runtime_Item', 'Common_Runtime_Item.egcs_cn_runtime', 'Common_Runtime.id')
+      .innerJoin('Common_Recommendation', 'Common_Recommendation.egcs_cn_runtimeitem', 'Common_Runtime_Item.id')
+      .select('Common_Runtime.id')
+      .where('Common_Recommendation.id', '=', entityContext.approvalEntityId)
+      .where('Common_Recommendation._deleted', '=', false)
+      .where('Common_Runtime_Item._deleted', '=', false)
+      .where('Common_Runtime._deleted', '=', false)
+      .forUpdate('Common_Runtime').executeTakeFirst()
     runtimeId = runtime ? String(runtime.id) : null
   }
 
@@ -1873,7 +1893,7 @@ export const executeFreshAuthorizedReviewRuntimeDelete = async <T>(
 const executeFreshAuthorizedReviewActorMutation = async <T>(
   event: H3Event,
   entityContext: ReviewRuntimeEntityContext,
-  requireAssignedApproval: boolean,
+  actorMode: 'review_approval' | 'additional_reviewer' | 'group_claim',
   callback: ReviewRuntimeWriteCallback<T>
 ): Promise<T> => {
   const authorizeActor = async (
@@ -1882,9 +1902,11 @@ const executeFreshAuthorizedReviewActorMutation = async <T>(
   ): Promise<void> => {
     const currentCommonUser = await resolveCurrentCommonUser(event, trx)
     if (
-      !current.reviewId
-      || !currentCommonUser
-      || (requireAssignedApproval && !(await hasAssignedApproval(trx, currentCommonUser.id, current.reviewId)))
+      !currentCommonUser
+      || (actorMode !== 'group_claim' && !current.reviewId)
+      || (actorMode === 'group_claim' && !current.reviewId
+        && !(current.approvalEntityType === 'commonrecommendation' && current.approvalEntityId))
+      || (actorMode === 'review_approval' && !(await hasAssignedApproval(trx, currentCommonUser.id, current.reviewId!)))
     ) {
       return await forbidden(event)
     }
@@ -1950,7 +1972,7 @@ export const executeFreshAuthorizedReviewActorWrite = async <T>(
   event: H3Event,
   entityContext: ReviewRuntimeEntityContext,
   callback: ReviewRuntimeWriteCallback<T>
-): Promise<T> => await executeFreshAuthorizedReviewActorMutation(event, entityContext, true, callback)
+): Promise<T> => await executeFreshAuthorizedReviewActorMutation(event, entityContext, 'review_approval', callback)
 
 /**
  * Executes an assigned approval actor write for either a review approval or a direct approval
@@ -2051,7 +2073,7 @@ export const executeFreshAuthorizedReviewAdditionalReviewerWrite = async <T>(
   event: H3Event,
   entityContext: ReviewRuntimeEntityContext,
   callback: ReviewRuntimeWriteCallback<T>
-): Promise<T> => await executeFreshAuthorizedReviewActorMutation(event, entityContext, false, callback)
+): Promise<T> => await executeFreshAuthorizedReviewActorMutation(event, entityContext, 'additional_reviewer', callback)
 
 /**
  * Boolean wrapper around `authorizeReviewRuntimeAction` for read paths that need to expose
@@ -2078,3 +2100,11 @@ export const canAuthorizeReviewRuntimeAction = async (
     throw error
   }
 }
+
+/** Runs a group claim under canonical owner locks and fresh runtime Viewer access.
+ * Claim callbacks additionally enforce Contributor eligibility and locked group membership. */
+export const executeFreshAuthorizedRuntimeGroupClaim = async <T>(
+  event: H3Event,
+  entityContext: ReviewRuntimeEntityContext,
+  callback: ReviewRuntimeWriteCallback<T>
+): Promise<T> => await executeFreshAuthorizedReviewActorMutation(event, entityContext, 'group_claim', callback)

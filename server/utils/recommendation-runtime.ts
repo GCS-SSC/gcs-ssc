@@ -39,6 +39,7 @@ type LockedRecommendationMember = PublishedRecommendationPlan['members'][number]
   schemaDefinition: PublishedRecommendationSchema
   schemaAgencyId: string
   defaultOwnerId?: string
+  defaultGroupId?: string
 }
 
 type LockedRecommendationSetup = {
@@ -56,6 +57,7 @@ type CreateRuntimeRecommendationSetTransactionInput = {
   entityId: string
   creatorCommonUserId: string
   ownerByMemberId?: Map<string, string>
+  groupByMemberId?: Map<string, string>
   ownerAgencyId: string
   setupScopes: RecommendationRuntimeSetupScope[]
   publication?: PublishedRecommendationPlan
@@ -385,9 +387,10 @@ const insertRecommendation = async (
     egcs_cn_entityid: input.entityId,
     egcs_cn_runtimeitem: runtimeItemId,
     egcs_cn_response: { responses: [] },
+    egcs_cn_group: input.member.defaultGroupId ?? null,
     _deleted: false
   }).returning('id').executeTakeFirstOrThrow()
-  await createPrimaryEntityAssignment(
+  if (!input.member.defaultGroupId) await createPrimaryEntityAssignment(
     db,
     'commonrecommendation',
     String(recommendation.id),
@@ -474,6 +477,9 @@ export const createRuntimeRecommendationSetInTransaction = async (
         ...member,
         ...(input.ownerByMemberId?.get(member.memberId)
           ? { defaultOwnerId: input.ownerByMemberId.get(member.memberId) }
+          : {}),
+        ...(input.groupByMemberId?.has(member.memberId)
+          ? { defaultGroupId: input.groupByMemberId.get(member.memberId), defaultOwnerId: undefined }
           : {})
       },
       actorId: input.creatorCommonUserId

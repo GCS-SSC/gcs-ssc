@@ -1,3 +1,4 @@
+import { isValidWorkflowRiskSource } from '~~/server/utils/workflow-risk-source'
 import { authorize } from '~~/server/utils/authorize'
 import { areAgencyWorkflowStatusesValid, authorizeAgencyWorkflowSetup } from '~~/server/utils/agency-workflow-authorization'
 import { replaceWorkflowConditions } from '~~/server/utils/workflow-conditions'
@@ -43,6 +44,9 @@ export default defineEventHandler(async event => {
       values.egcs_cn_failurestatus ?? current.egcs_cn_failurestatus
     ])) {
       return await badRequest(event, 'WORKFLOW_STATUSES_INVALID', 'apiErrors.request.invalid_resource')
+    }
+    if (!await isValidWorkflowRiskSource(trx, setup, { ...current, ...values })) {
+      return await badRequest(event, 'WORKFLOW_RISK_SOURCE_INVALID', 'apiErrors.workflow.risk_source_invalid')
     }
     if (requestedSequence && requestedSequence !== current.egcs_cn_sequence) {
       const ordered = members.filter(member => String(member.id) !== memberId)

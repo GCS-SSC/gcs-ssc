@@ -1,5 +1,7 @@
+import { isActiveGroupMember } from '~~/server/utils/groups'
 import { forbidden, notFound } from '~~/server/utils/api-errors'
 import {
+  resolveAgencyValidEntityAssigneeIdsWithDb,
   canManageEntityAssignments,
   canAccessEntityAssignmentOwner,
   canReadEntityAssignments,
@@ -11,7 +13,7 @@ import { resolveAssignedItemGrant } from '~~/server/utils/rbac'
 import { canAccessAgreement, resolveAgreementScopeContext } from '~~/server/utils/agreement'
 import { resolveCompletionRuntimeEntityFromEntity } from '~~/server/utils/completion-runtime'
 import type { Database } from '~~/shared/types/database'
-import { isReviewRuntimeEntityWorkable, resolveReviewRuntimeEntityFromRecommendation } from '~~/server/utils/review-runtime-access'
+import { getReviewRuntimeOwnerAgencyId, isReviewRuntimeEntityWorkable, resolveReviewRuntimeEntityFromRecommendation } from '~~/server/utils/review-runtime-access'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 // eslint-disable-next-line local/require-authorize -- exact assignment or owning-entity/approval read is enforced below
@@ -120,6 +122,11 @@ export default defineEventHandler(async event => {
   const isWorkable = runtimeContext
     ? await isReviewRuntimeEntityWorkable(event.context.$db, runtimeContext)
     : false
+  const claimGroup = row.egcs_cn_group
+    ? await event.context.$db.selectFrom('Common_Group').select('egcs_cn_agency').where('id', '=', String(row.egcs_cn_group)).where('_deleted', '=', false).executeTakeFirst()
+    : null
+  const groupMatchesOwner = runtimeContext && claimGroup
+    && String(claimGroup.egcs_cn_agency) === getReviewRuntimeOwnerAgencyId(runtimeContext)
   return {
     ...recommendation,
     ...approvalSubmission,
@@ -127,6 +134,10 @@ export default defineEventHandler(async event => {
     approvalRuntimeState: approvalRuntime?.approvalRuntimeState ?? null,
     routingSlipId: approvalRuntime ? String(approvalRuntime.routingSlipId) : null,
     can_read: true,
+    can_claim: row.runtimeState === 'active' && isWorkable && Boolean(groupMatchesOwner) && Boolean(row.egcs_cn_group)
+      && !row.egcs_cn_groupclaimedby && Boolean(actor.commonUserId)
+      && await isActiveGroupMember(event.context.$db, String(row.egcs_cn_group), actor.commonUserId!)
+      && (await resolveAgencyValidEntityAssigneeIdsWithDb(event.context.$db, 'commonrecommendation', recommendationId, [actor.commonUserId!])).has(actor.commonUserId!),
     can_update: row.runtimeState === 'active' && isWorkable
       && grant?.actions.has('update') === true && hasUpdateRole,
     can_manage_assignments: await canManageEntityAssignments(event, 'commonrecommendation', recommendationId),

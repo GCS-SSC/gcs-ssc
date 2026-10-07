@@ -1,3 +1,4 @@
+import { readPublishedRiskAssessmentMembers } from '~~/server/utils/workflow-risk-source'
 import { authorize } from '~~/server/utils/authorize'
 import { mapReviewSetupMembers } from '~~/server/utils/transfer-payment-polymorphic'
 import { readReviewSetupPublicationMetadata } from '~~/server/utils/review-setup-versioning'
@@ -59,6 +60,7 @@ export default defineEventHandler(async event => {
     return {
       ...setup,
       members: mapReviewSetupMembers(members),
+      riskAssessmentMembers: await readPublishedRiskAssessmentMembers(trx, reviewSetupId),
       ...await readReviewSetupPublicationMetadata(trx, setup)
     }
   })

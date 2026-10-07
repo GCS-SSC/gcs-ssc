@@ -629,6 +629,8 @@ CREATE TABLE "Common_Recommendation" (
   "egcs_cn_entitytype" character varying(128) NOT NULL,
   "egcs_cn_entityid" bigint NOT NULL,
   "egcs_cn_recommendation" smallint,
+  "egcs_cn_group" bigint,
+  "egcs_cn_groupclaimedby" bigint,
   "egcs_cn_response" jsonb DEFAULT '{"responses": []}'::jsonb NOT NULL,
   "egcs_cn_resultoptionkey" character varying(255),
   "egcs_cn_outcome" character varying(32),
@@ -637,6 +639,7 @@ CREATE TABLE "Common_Recommendation" (
   "egcs_cn_runtimeitem" bigint NOT NULL,
   CONSTRAINT "Common_Recommendation_egcs_cn_runtimeitem_key" UNIQUE (egcs_cn_runtimeitem),
   CONSTRAINT "Common_Recommendation_pkey" PRIMARY KEY (id),
+  CONSTRAINT "cn_chk_recommendation_group_claim" CHECK (egcs_cn_groupclaimedby IS NULL OR egcs_cn_group IS NOT NULL),
   CONSTRAINT "cn_chk_recommendationoutcome" CHECK (((egcs_cn_outcome IS NULL) OR ((egcs_cn_outcome)::text = ANY ((ARRAY['recommended'::character varying, 'not_recommended'::character varying])::text[]))))
 );
 
@@ -1044,12 +1047,14 @@ CREATE TABLE "Common_Workflow_Setup" (
   "egcs_cn_description_en" text NOT NULL,
   "egcs_cn_description_fr" text NOT NULL,
   "egcs_cn_purpose" character varying(32) DEFAULT 'standard'::character varying NOT NULL,
+  "egcs_cn_riskratingrequired" boolean DEFAULT false NOT NULL,
   "egcs_cn_cancellationstatus" bigint NOT NULL,
   "egcs_cn_executionfailurestatus" bigint NOT NULL,
   "egcs_cn_allowretry" boolean DEFAULT false NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "cn_unq_workflowsetuptargetpurpose" UNIQUE (id, egcs_cn_entitytype, egcs_cn_purpose),
   CONSTRAINT "Common_Workflow_Setup_pkey" PRIMARY KEY (id),
+  CONSTRAINT "cn_chk_workflowriskrequiredpurpose" CHECK (NOT egcs_cn_riskratingrequired OR egcs_cn_purpose = 'risk_rating'),
   CONSTRAINT "cn_chk_workflowsetuppurpose" CHECK (((egcs_cn_purpose)::text = ANY ((ARRAY['standard'::character varying, 'approval_submission'::character varying, 'risk_rating'::character varying])::text[]))),
   CONSTRAINT "Common_Workflow_Setup_egcs_cn_publicationkind_check" CHECK (((egcs_cn_publicationkind)::text = 'workflow_setup'::text))
 );
@@ -1083,13 +1088,18 @@ CREATE TABLE "Common_Workflow_Setup_Member" (
   "egcs_cn_failurestatus" bigint,
   "egcs_cn_allowownerredirect" boolean DEFAULT false NOT NULL,
   "egcs_cn_profileconditions" jsonb DEFAULT '[]'::jsonb NOT NULL,
+  "egcs_cn_setsriskrating" boolean DEFAULT false NOT NULL,
+  "egcs_cn_riskreviewsetup" bigint,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Common_Workflow_Setup_Member_pkey" PRIMARY KEY (id),
   CONSTRAINT "cn_chk_workflowsetupmemberreference" CHECK (((((((egcs_cn_reviewset IS NOT NULL))::integer + ((egcs_cn_recommendationset IS NOT NULL))::integer) + ((egcs_cn_approvaltemplate IS NOT NULL))::integer) = 1) AND (((egcs_cn_kind)::text = 'review_set'::text) = (egcs_cn_reviewset IS NOT NULL)) AND (((egcs_cn_kind)::text = 'recommendation_set'::text) = (egcs_cn_recommendationset IS NOT NULL)) AND (((egcs_cn_kind)::text = 'approval_template'::text) = (egcs_cn_approvaltemplate IS NOT NULL)))),
   CONSTRAINT "Common_Workflow_Setup_Member_egcs_cn_kind_check" CHECK (((egcs_cn_kind)::text = ANY ((ARRAY['review_set'::character varying, 'recommendation_set'::character varying, 'approval_template'::character varying])::text[]))),
   CONSTRAINT "Common_Workflow_Setup_Member_egcs_cn_profileconditions_check" CHECK ((jsonb_typeof(egcs_cn_profileconditions) = 'array'::text)),
+  CONSTRAINT "cn_chk_workflowmemberrisksource" CHECK (egcs_cn_setsriskrating = (egcs_cn_riskreviewsetup IS NOT NULL) AND (NOT egcs_cn_setsriskrating OR egcs_cn_kind = 'review_set')),
   CONSTRAINT "Common_Workflow_Setup_Member_egcs_cn_sequence_check" CHECK ((egcs_cn_sequence > 0))
 );
+
+CREATE UNIQUE INDEX cn_idx_workflowmemberrisksource ON "Common_Workflow_Setup_Member" (egcs_cn_workflowsetup) WHERE (_deleted = false AND egcs_cn_setsriskrating = true);
 
 CREATE UNIQUE INDEX cn_idx_workflowsetupmembersequence ON "Common_Workflow_Setup_Member" USING btree (egcs_cn_workflowsetup, egcs_cn_sequence) WHERE (_deleted = false);
 
@@ -1099,8 +1109,10 @@ CREATE TABLE "Common_Workflow_Setup_Member_Owner" (
   "egcs_cn_reviewsetup" bigint,
   "egcs_cn_recommendationsetup" bigint,
   "egcs_cn_defaultowner" bigint,
+  "egcs_cn_defaultgroup" bigint,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Common_Workflow_Setup_Member_Owner_pkey" PRIMARY KEY (id),
+  CONSTRAINT "cn_chk_workflowmemberownertarget" CHECK (egcs_cn_defaultowner IS NULL OR egcs_cn_defaultgroup IS NULL),
   CONSTRAINT "cn_chk_workflowmemberownerreference" CHECK (((((egcs_cn_reviewsetup IS NOT NULL))::integer + ((egcs_cn_recommendationsetup IS NOT NULL))::integer) = 1))
 );
 
@@ -1391,23 +1403,6 @@ AS $function$
       RETURN NEW;
     END;
     $function$;
-
-CREATE FUNCTION preserve_linked_workflow_target()
- RETURNS trigger
- LANGUAGE plpgsql
-AS $function$
-    BEGIN
-      IF (NEW.egcs_cn_entitytype, NEW.egcs_cn_purpose)
-        IS DISTINCT FROM (OLD.egcs_cn_entitytype, OLD.egcs_cn_purpose)
-        AND EXISTS (
-          SELECT 1 FROM "Transfer_Payment_Stream_Workflow" linked
-          WHERE linked.egcs_tp_workflow = OLD.id AND linked._deleted = false
-        ) THEN
-        RAISE EXCEPTION 'A linked Workflow cannot change entity type or purpose'
-          USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_linkedworkflowtargetimmutable';
-      END IF;
-      RETURN NEW;
-    END $function$;
 
 CREATE FUNCTION prevent_catalog_agency_change()
  RETURNS trigger
@@ -2138,6 +2133,11 @@ AS $function$
         SELECT EXISTS (SELECT 1 FROM "Common_Review" review
           WHERE review.id = target_id AND review._deleted = false
             AND review.egcs_cn_group IS NOT NULL AND review.egcs_cn_groupclaimedby IS NULL)
+        INTO has_pending_group;
+      ELSIF target_type = 'commonrecommendation' THEN
+        SELECT EXISTS (SELECT 1 FROM "Common_Recommendation" recommendation
+          WHERE recommendation.id = target_id AND recommendation._deleted = false
+            AND recommendation.egcs_cn_group IS NOT NULL AND recommendation.egcs_cn_groupclaimedby IS NULL)
         INTO has_pending_group;
       ELSIF target_type = 'fundingcaseintake' THEN
         SELECT EXISTS (SELECT 1 FROM "Funding_Case_Intake_Profile" intake
@@ -3367,6 +3367,7 @@ CREATE FUNCTION trg_fn_validate_workflow_member_owner()
 AS $function$
     DECLARE workflow_member "Common_Workflow_Setup_Member"%ROWTYPE;
     BEGIN
+      IF NEW._deleted THEN RETURN NEW; END IF;
       SELECT * INTO workflow_member FROM "Common_Workflow_Setup_Member"
       WHERE id = NEW.egcs_cn_workflowsetupmember AND _deleted = false;
       IF NOT FOUND THEN RAISE EXCEPTION 'Workflow member is unavailable'; END IF;
@@ -3417,8 +3418,8 @@ AS $function$
              AND version.egcs_cn_version = runtime.egcs_cn_sourceversion
             WHERE workflow.id = runtime.egcs_cn_sourcepublication
               AND workflow.egcs_cn_publicationkind = runtime.egcs_cn_sourcepublicationkind
-              AND workflow.egcs_cn_entitytype = runtime.egcs_cn_entitytype
-              AND workflow.egcs_cn_purpose = runtime.egcs_cn_purpose
+              AND version.egcs_cn_definition ->> 'entityType' = runtime.egcs_cn_entitytype
+              AND COALESCE(version.egcs_cn_definition ->> 'purpose', 'standard') = runtime.egcs_cn_purpose
           )
       ) THEN
         RAISE EXCEPTION 'Workflow runtime source definition does not match its target type and purpose'
@@ -3464,13 +3465,29 @@ AS $function$
     END;
     $function$;
 
+CREATE FUNCTION trg_fn_validate_workflow_risk_purpose()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+    BEGIN
+      IF NEW.egcs_cn_purpose <> 'risk_rating' AND EXISTS (
+        SELECT 1 FROM "Common_Workflow_Setup_Member" member
+        WHERE member.egcs_cn_workflowsetup = NEW.id AND NOT member._deleted AND member.egcs_cn_setsriskrating
+      ) THEN
+        RAISE EXCEPTION 'Workflow with a selected risk source must retain risk rating purpose'
+          USING ERRCODE = '23514', CONSTRAINT = 'cn_ref_workflowmemberriskpurpose';
+      END IF;
+      RETURN NEW;
+    END;
+    $function$;
+
 CREATE FUNCTION trg_fn_validate_workflow_setup_member()
  RETURNS trigger
  LANGUAGE plpgsql
 AS $function$
     DECLARE workflow "Common_Workflow_Setup"%ROWTYPE;
     BEGIN
-      SELECT * INTO workflow FROM "Common_Workflow_Setup" WHERE id = NEW.egcs_cn_workflowsetup AND _deleted = false;
+      SELECT * INTO workflow FROM "Common_Workflow_Setup" WHERE id = NEW.egcs_cn_workflowsetup AND _deleted = false FOR UPDATE;
       IF NOT FOUND THEN RAISE EXCEPTION 'Workflow setup is unavailable'; END IF;
       IF NEW.egcs_cn_reviewset IS NOT NULL AND NOT EXISTS (
         SELECT 1 FROM "Common_Review_Set_Setup" candidate
@@ -3494,6 +3511,25 @@ AS $function$
           AND EXISTS (SELECT 1 FROM "Common_Publication" publication
             WHERE publication.id = candidate.id AND publication.egcs_cn_state = 'published' AND publication._deleted = false)
       ) THEN RAISE EXCEPTION 'Workflow approval template scope mismatch'; END IF;
+      IF NEW.egcs_cn_setsriskrating AND NEW.egcs_cn_riskreviewsetup IS NOT NULL AND NOT NEW._deleted THEN
+        IF workflow.egcs_cn_purpose <> 'risk_rating' THEN
+          RAISE EXCEPTION 'Risk source requires a risk rating workflow'
+            USING ERRCODE = '23514', CONSTRAINT = 'cn_ref_workflowmemberriskpurpose';
+        END IF;
+        IF NOT EXISTS (
+          SELECT 1 FROM "Common_Publication" publication
+          JOIN "Common_Publication_Version" version ON version.id = publication.egcs_cn_currentversion
+          CROSS JOIN LATERAL jsonb_array_elements(version.egcs_cn_definition -> 'members') AS member
+          WHERE publication.id = NEW.egcs_cn_reviewset
+            AND publication.egcs_cn_kind = 'review_set_setup'
+            AND publication.egcs_cn_state = 'published' AND NOT publication._deleted
+            AND member ->> 'memberId' = NEW.egcs_cn_riskreviewsetup::text
+            AND member ->> 'reviewType' = 'assessment'
+        ) THEN
+          RAISE EXCEPTION 'Risk source must be an assessment in the published review set'
+            USING ERRCODE = '23514', CONSTRAINT = 'cn_ref_workflowmemberriskassessment';
+        END IF;
+      END IF;
       RETURN NEW;
     END;
     $function$;
@@ -3903,6 +3939,10 @@ ALTER TABLE "Common_Publication_Version_Reference" ADD CONSTRAINT "cn_ref_public
 
 ALTER TABLE "Common_Publication_Version_Reference" ADD CONSTRAINT "Common_Publication_Version_Reference_egcs_cn_parentversion_fkey" FOREIGN KEY (egcs_cn_parentversion) REFERENCES "Common_Publication_Version"(id) ON DELETE RESTRICT;
 
+ALTER TABLE "Common_Recommendation" ADD CONSTRAINT "Common_Recommendation_egcs_cn_group_fkey" FOREIGN KEY (egcs_cn_group) REFERENCES "Common_Group"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Common_Recommendation" ADD CONSTRAINT "Common_Recommendation_egcs_cn_groupclaimedby_fkey" FOREIGN KEY (egcs_cn_groupclaimedby) REFERENCES "Common_User"(id) ON DELETE RESTRICT;
+
 ALTER TABLE "Common_Recommendation" ADD CONSTRAINT "cn_ref_recommendationentityidentitytype" FOREIGN KEY (egcs_cn_entityid, egcs_cn_entitytype) REFERENCES "Common_Entity"(id, egcs_cn_entitytype);
 
 ALTER TABLE "Common_Recommendation" ADD CONSTRAINT "cn_ref_recommendationid" FOREIGN KEY (id) REFERENCES "Common_Entity"(id) ON DELETE RESTRICT;
@@ -4061,6 +4101,8 @@ ALTER TABLE "Common_Workflow_Setup_Allowed_Start_Status" ADD CONSTRAINT "Common_
 
 ALTER TABLE "Common_Workflow_Setup_Allowed_Start_Status" ADD CONSTRAINT "Common_Workflow_Setup_Allowed_Start_Status_egcs_cn_status_fkey" FOREIGN KEY (egcs_cn_status) REFERENCES "Common_Status"(id) ON DELETE RESTRICT;
 
+ALTER TABLE "Common_Workflow_Setup_Member" ADD CONSTRAINT "cn_ref_workflowmemberriskreview" FOREIGN KEY (egcs_cn_riskreviewsetup) REFERENCES "Common_Review_Setup"(id) ON DELETE RESTRICT;
+
 ALTER TABLE "Common_Workflow_Setup_Member" ADD CONSTRAINT "Common_Workflow_Setup_Member_egcs_cn_approvaltemplate_fkey" FOREIGN KEY (egcs_cn_approvaltemplate) REFERENCES "Common_Approval_Template"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Common_Workflow_Setup_Member" ADD CONSTRAINT "Common_Workflow_Setup_Member_egcs_cn_failurestatus_fkey" FOREIGN KEY (egcs_cn_failurestatus) REFERENCES "Common_Status"(id) ON DELETE RESTRICT;
@@ -4078,6 +4120,8 @@ ALTER TABLE "Common_Workflow_Setup_Member" ADD CONSTRAINT "Common_Workflow_Setup
 ALTER TABLE "Common_Workflow_Setup_Member_Owner" ADD CONSTRAINT "Common_Workflow_Setup_Member_O_egcs_cn_recommendationsetup_fkey" FOREIGN KEY (egcs_cn_recommendationsetup) REFERENCES "Common_Recommendation_Setup"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Common_Workflow_Setup_Member_Owner" ADD CONSTRAINT "Common_Workflow_Setup_Member_O_egcs_cn_workflowsetupmember_fkey" FOREIGN KEY (egcs_cn_workflowsetupmember) REFERENCES "Common_Workflow_Setup_Member"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Common_Workflow_Setup_Member_Owner" ADD CONSTRAINT "Common_Workflow_Setup_Member_Owner_egcs_cn_defaultgroup_fkey" FOREIGN KEY (egcs_cn_defaultgroup) REFERENCES "Common_Group"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Common_Workflow_Setup_Member_Owner" ADD CONSTRAINT "Common_Workflow_Setup_Member_Owner_egcs_cn_defaultowner_fkey" FOREIGN KEY (egcs_cn_defaultowner) REFERENCES "Common_User"(id) ON DELETE RESTRICT;
 
@@ -4208,7 +4252,7 @@ CREATE TRIGGER trg_require_unsealed_publication_reference BEFORE INSERT ON "Comm
 
 CREATE TRIGGER trg_validate_publication_version_reference BEFORE INSERT ON "Common_Publication_Version_Reference" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_publication_version_reference();
 
-CREATE CONSTRAINT TRIGGER trg_enforce_commonrecommendation_assignment_roster AFTER INSERT OR UPDATE OF _deleted ON "Common_Recommendation" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_enforce_assignable_entity_roster('commonrecommendation');
+CREATE CONSTRAINT TRIGGER trg_enforce_commonrecommendation_assignment_roster AFTER INSERT OR UPDATE OF egcs_cn_group, egcs_cn_groupclaimedby, _deleted ON "Common_Recommendation" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_enforce_assignable_entity_roster('commonrecommendation');
 
 CREATE TRIGGER trg_lock_terminal_recommendation BEFORE INSERT OR DELETE OR UPDATE ON "Common_Recommendation" FOR EACH ROW EXECUTE FUNCTION trg_fn_lock_terminal_runtime_evidence();
 
@@ -4334,8 +4378,6 @@ CREATE TRIGGER trg_validate_workflow_completion_target BEFORE INSERT OR UPDATE O
 
 CREATE TRIGGER trg_validate_workflow_runtime_extension BEFORE INSERT OR UPDATE OF id ON "Common_Workflow_Run" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_workflow_runtime_extension();
 
-CREATE TRIGGER preserve_linked_workflow_target BEFORE UPDATE OF egcs_cn_entitytype, egcs_cn_purpose ON "Common_Workflow_Setup" FOR EACH ROW EXECUTE FUNCTION preserve_linked_workflow_target();
-
 CREATE TRIGGER trg_guard_publication_authoring BEFORE DELETE OR UPDATE ON "Common_Workflow_Setup" FOR EACH ROW EXECUTE FUNCTION trg_fn_guard_publication_authoring('publication');
 
 CREATE CONSTRAINT TRIGGER trg_preserve_workflow_runtime_definition AFTER DELETE OR UPDATE ON "Common_Workflow_Setup" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_workflow_runtime_definition();
@@ -4353,6 +4395,8 @@ CREATE CONSTRAINT TRIGGER trg_validate_workflow_allowed_status_agency AFTER INSE
 CREATE TRIGGER trg_guard_workflow_member_authoring BEFORE INSERT OR DELETE OR UPDATE ON "Common_Workflow_Setup_Member" FOR EACH ROW EXECUTE FUNCTION trg_fn_guard_publication_authoring('workflow_child');
 
 CREATE CONSTRAINT TRIGGER trg_validate_workflow_member_status_agency AFTER INSERT OR UPDATE ON "Common_Workflow_Setup_Member" DEFERRABLE INITIALLY IMMEDIATE FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_workflow_status_agency();
+
+CREATE TRIGGER trg_validate_workflow_risk_purpose BEFORE UPDATE OF egcs_cn_purpose ON "Common_Workflow_Setup" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_workflow_risk_purpose();
 
 CREATE TRIGGER trg_validate_workflow_setup_member BEFORE INSERT OR UPDATE ON "Common_Workflow_Setup_Member" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_workflow_setup_member();
 

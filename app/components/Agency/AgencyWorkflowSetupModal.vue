@@ -18,6 +18,7 @@ type WorkflowSetupItem = {
   egcs_cn_cancellationstatus?: string
   egcs_cn_executionfailurestatus?: string
   egcs_cn_allowretry?: boolean
+  egcs_cn_riskratingrequired?: boolean
 }
 
 const emit = defineEmits<{ saved: [] }>()
@@ -41,7 +42,7 @@ const purposeOptions = computed(() => [
   ...(approvalSubmissionEntityTypes.has(state.value?.egcs_cn_entitytype ?? '')
     ? [{ value: 'approval_submission', label: t('workflow.purposes.approval_submission') }]
     : []),
-  ...(state.value?.egcs_cn_entitytype === 'fundingcaseagreement'
+  ...(['fundingcaseagreement', 'fundingcaseamendment'].includes(state.value?.egcs_cn_entitytype ?? '')
     ? [{ value: 'risk_rating', label: t('workflow.purposes.risk_rating') }]
     : [])
 ])
@@ -49,9 +50,13 @@ watch(() => state.value?.egcs_cn_entitytype, entityType => {
   if (state.value?.egcs_cn_purpose === 'approval_submission' && !approvalSubmissionEntityTypes.has(entityType ?? '')) {
     state.value.egcs_cn_purpose = 'standard'
   }
-  if (state.value?.egcs_cn_purpose === 'risk_rating' && entityType !== 'fundingcaseagreement') {
+  if (state.value?.egcs_cn_purpose === 'risk_rating' && !['fundingcaseagreement', 'fundingcaseamendment'].includes(entityType ?? '')) {
     state.value.egcs_cn_purpose = 'standard'
   }
+})
+
+watch(() => state.value?.egcs_cn_purpose, purpose => {
+  if (purpose !== 'risk_rating' && state.value) state.value.egcs_cn_riskratingrequired = false
 })
 
 const save = async () => {
@@ -74,7 +79,8 @@ const save = async () => {
       egcs_cn_allowedstartstatuses: state.value.egcs_cn_allowedstartstatuses,
       egcs_cn_cancellationstatus: state.value.egcs_cn_cancellationstatus,
       egcs_cn_executionfailurestatus: state.value.egcs_cn_executionfailurestatus,
-      egcs_cn_allowretry: state.value.egcs_cn_allowretry
+      egcs_cn_allowretry: state.value.egcs_cn_allowretry,
+      egcs_cn_riskratingrequired: state.value.egcs_cn_riskratingrequired ?? false
     }
     const response = await fetch(getClientRequestUrl(url), {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body)
@@ -116,6 +122,13 @@ const save = async () => {
         </div>
         <UFormField :label="t('workflow.purpose')" name="egcs_cn_purpose" :description="t('workflow.purpose_help')">
           <CommonEnumSelect v-model="state.egcs_cn_purpose" name="workflow_purpose" :items="purposeOptions" class="w-full" />
+        </UFormField>
+        <UFormField
+          v-if="state.egcs_cn_purpose === 'risk_rating'"
+          :label="t('workflow.risk_rating_required')"
+          name="egcs_cn_riskratingrequired"
+          :description="t('workflow.risk_rating_required_help')">
+          <USwitch v-model="state.egcs_cn_riskratingrequired" />
         </UFormField>
         <UFormField :label="t('workflow.allowed_start_statuses')" name="egcs_cn_allowedstartstatuses" :description="t('workflow.allowed_start_statuses_help')">
           <CommonStatusSelect v-model="state.egcs_cn_allowedstartstatuses" :agency-id="agencyId" multiple class="w-full" />

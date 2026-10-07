@@ -4,6 +4,7 @@ import { resolveAccountReceivableRuntimeContext, resolveAccountReceivableCreditM
 import { lockPaymentRecoveryAgreements } from './payment-recovery-lock'
 import { compareMoney, parseMoney } from '~~/shared/utils/money'
 import { resolveWorkflowExecutionPlan } from './workflow-execution-plan'
+import { lockAssignableGroup } from './groups'
 import { captureRiskRatingMapping } from './agreement-risk-rating'
 import { hashPublicationDefinition } from './system-publication'
 import { captureWorkflowRouting } from './workflow-routing'
@@ -379,6 +380,9 @@ const applyRiskRatingEffect = async (
       || band.riskScore !== effect.bands[index]?.riskScore)) {
     return await fail('risk_rating_mapping_invalid')
   }
+  const sourceMember = configuration.members.find(member => member.memberId === effect.workflowMemberId)
+  const sourceReview = sourceMember?.reviewPlan?.members.find(member => member.memberId === effect.reviewSetupMemberId)
+  if (!sourceMember || !sourceReview || sourceReview.reviewType !== 'assessment') return await fail('risk_rating_configuration_invalid')
   const review = await trx.selectFrom('Common_Review')
     .innerJoin('Common_Runtime_Item as Review_Item', 'Review_Item.id', 'Common_Review.egcs_cn_runtimeitem')
     .innerJoin('Common_Review_Set', 'Common_Review_Set.id', 'Common_Review.egcs_cn_reviewset')
@@ -386,8 +390,9 @@ const applyRiskRatingEffect = async (
     .select(['Common_Review.id', 'Common_Review.egcs_cn_reviewresult', 'Review_Item.egcs_cn_state'])
     .where('Review_Item.egcs_cn_runtime', '=', String(run.id))
     .where('Review_Item.egcs_cn_publicationversion', '=', effect.assessmentSchemaVersionId)
-    .where('Set_Item.egcs_cn_publicationversion', '=', configuration.members
-      .find(member => member.memberId === effect.workflowMemberId)?.publicationVersionId ?? '')
+    .where('Review_Item.egcs_cn_order', '=', sourceReview.order)
+    .where('Set_Item.egcs_cn_order', '=', sourceMember.sequence)
+    .where('Set_Item.egcs_cn_publicationversion', '=', sourceMember.publicationVersionId)
     .where('Common_Review._deleted', '=', false)
     .forUpdate(['Common_Review', 'Review_Item'])
     .executeTakeFirst()
@@ -820,8 +825,6 @@ export const resolveActiveWorkflowSetup = async (
       'Common_Publication_Version.egcs_cn_definition as publicationDefinition'
     ])
     .where('Common_Workflow_Setup._deleted', '=', false)
-    .where('Common_Workflow_Setup.egcs_cn_entitytype', '=', context.entityType)
-    .where('Common_Workflow_Setup.egcs_cn_purpose', '=', purpose)
     .$if(opportunityWorkflowIds !== null, qb => qb.where('Common_Workflow_Setup.id', 'in', opportunityWorkflowIds ?? []))
     .where('Common_Publication.egcs_cn_kind', '=', 'workflow_setup')
     .where('Common_Publication.egcs_cn_state', '=', 'published')
@@ -835,10 +838,13 @@ export const resolveActiveWorkflowSetup = async (
     'Common_Publication_Version',
     'Transfer_Payment_Stream_Workflow'
   ])
-  const row = await query.executeTakeFirst()
+  const rows = await query.execute()
+  const row = rows.find(candidate => {
+    const configuration = readPublishedWorkflowConfiguration(candidate.publicationDefinition)
+    return configuration.entityType === context.entityType && (configuration.purpose ?? 'standard') === purpose
+  })
   if (!row) return null
   const definition = readPublishedWorkflowConfiguration(row.publicationDefinition)
-  if (definition.entityType !== context.entityType || (definition.purpose ?? 'standard') !== purpose) return null
   return {
     ...applyPublishedWorkflowConfiguration(row, definition),
     publicationId: String(row.publicationId),
@@ -996,13 +1002,14 @@ const pauseForInvalidOwners = async (
   run: WorkflowRun,
   member: PublishedWorkflowMember,
   nestedMemberIds: string[],
-  actorId?: string
+  actorId: string | undefined,
+  ownerAgencyId: string
 ) => {
-  const ownerByMember = new Map(member.owners.map(owner => [
-    owner.nestedMemberId,
-    owner.defaultOwner ?? String(run.egcs_cn_initiatedby)
+  const groupByMember = new Map(member.owners.filter(owner => owner.defaultGroup).map(owner => [owner.nestedMemberId, owner.defaultGroup!]))
+  const ownerByMember = new Map(nestedMemberIds.filter(id => !groupByMember.has(id)).map(id => [
+    id, member.owners.find(owner => owner.nestedMemberId === id)?.defaultOwner ?? String(run.egcs_cn_initiatedby)
   ]))
-  const ownerIds = nestedMemberIds.map(id => ownerByMember.get(id) ?? String(run.egcs_cn_initiatedby))
+  const ownerIds = [...ownerByMember.values()]
   const eligible = isAssignableEntityType(run.egcs_cn_entitytype)
     ? await resolveAgencyValidEntityAssigneeIdsWithDb(
         trx,
@@ -1021,8 +1028,11 @@ const pauseForInvalidOwners = async (
           return runtime ? await resolveExtensionEligibleAssigneeIds(trx, runtime, ownerIds) : new Set<string>()
         })()
       : new Set<string>()
-  const invalid = nestedMemberIds.filter((id, index) => !eligible.has(ownerIds[index]!))
-  if (invalid.length === 0) return ownerByMember
+  const invalid = nestedMemberIds.filter(id => ownerByMember.has(id) && !eligible.has(ownerByMember.get(id)!))
+  for (const [id, groupId] of [...groupByMember].sort((left, right) => left[1].localeCompare(right[1]))) {
+    if (!await lockAssignableGroup(trx, groupId, ownerAgencyId)) invalid.push(id)
+  }
+  if (invalid.length === 0) return { users: ownerByMember, groups: groupByMember }
   for (const nestedMemberId of invalid) {
     await trx.insertInto('Common_Workflow_Owner_Blocker').values({
       egcs_cn_workflowrun: String(run.id),
@@ -1071,7 +1081,7 @@ const materializeWorkflowMember = async (
         : getReviewRuntimeOwnerAgencyId(context)
       const setupScopes = await resolveReviewRuntimeSetupScopes(trx, context, true)
       const owners = ownerAgencyId
-        ? await pauseForInvalidOwners(trx, run, member, member.reviewPlan.members.map(item => item.memberId), actorId)
+        ? await pauseForInvalidOwners(trx, run, member, member.reviewPlan.members.map(item => item.memberId), actorId, String(ownerAgencyId))
         : null
       if (!owners) result = ownerAgencyId ? { kind: 'paused' } : { kind: 'failed' }
       else {
@@ -1087,7 +1097,8 @@ const materializeWorkflowMember = async (
           publicationVersion: member.publicationVersion,
           runtimeId: String(run.id),
           runtimeItemOrder: member.sequence,
-          ownerByMemberId: owners,
+          ownerByMemberId: owners.users,
+          groupByMemberId: owners.groups,
           creatorCommonUserId: String(run.egcs_cn_initiatedby)
         })
         result = created && created !== 'IN_PROGRESS_EXISTS'
@@ -1103,7 +1114,7 @@ const materializeWorkflowMember = async (
         : getReviewRuntimeOwnerAgencyId(context)
       const setupScopes = await resolveReviewRuntimeSetupScopes(trx, context, true)
       const owners = ownerAgencyId
-        ? await pauseForInvalidOwners(trx, run, member, member.recommendationPlan.members.map(item => item.memberId), actorId)
+        ? await pauseForInvalidOwners(trx, run, member, member.recommendationPlan.members.map(item => item.memberId), actorId, String(ownerAgencyId))
         : null
       if (!owners) result = ownerAgencyId ? { kind: 'paused' } : { kind: 'failed' }
       else {
@@ -1119,7 +1130,8 @@ const materializeWorkflowMember = async (
           publicationVersion: member.publicationVersion,
           runtimeId: String(run.id),
           runtimeItemOrder: member.sequence,
-          ownerByMemberId: owners,
+          ownerByMemberId: owners.users,
+          groupByMemberId: owners.groups,
           creatorCommonUserId: String(run.egcs_cn_initiatedby)
         })
         result = created && created !== 'IN_PROGRESS_EXISTS'
@@ -1615,11 +1627,12 @@ export const resumeWorkflowRun = async (
     replacementIds
   )
   if (replacementIds.some(ownerId => !eligible.has(ownerId))) return null
-  const effectiveOwners = new Map(member.owners.map(owner => [owner.nestedMemberId, owner.defaultOwner]))
+  const effectiveOwners = new Map(member.owners.map(owner => [owner.nestedMemberId, owner]))
   const now = new Date()
   for (const blocker of blockers) {
     const replacement = replacementByBlocker.get(String(blocker.id))!
-    effectiveOwners.set(String(blocker.egcs_cn_reviewsetup ?? blocker.egcs_cn_recommendationsetup), replacement)
+    const nestedMemberId = String(blocker.egcs_cn_reviewsetup ?? blocker.egcs_cn_recommendationsetup)
+    effectiveOwners.set(nestedMemberId, { nestedMemberId, defaultOwner: replacement })
     await trx.updateTable('Common_Workflow_Owner_Blocker').set({
       egcs_cn_replacementowner: replacement,
       egcs_cn_resolvedby: resolvedBy,
@@ -1635,10 +1648,7 @@ export const resumeWorkflowRun = async (
   })
   const effectiveMember: PublishedWorkflowMember = {
     ...member,
-    owners: [...effectiveOwners].map(([nestedMemberId, defaultOwner]) => ({
-      nestedMemberId,
-      ...(defaultOwner ? { defaultOwner } : {})
-    }))
+    owners: [...effectiveOwners.values()]
   }
   const rootItem = await trx.selectFrom('Common_Runtime_Item').selectAll()
     .where('egcs_cn_runtime', '=', runId)

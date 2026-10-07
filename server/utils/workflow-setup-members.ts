@@ -1,6 +1,7 @@
 import type { Selectable, Transaction } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import type { z } from 'zod'
+import { lockAssignableGroup } from './groups'
 import type { CommonWorkflowSetupMemberOwnersSchema } from '~~/shared/types/schemas'
 
 type WorkflowMember = Selectable<Database['Common_Workflow_Setup_Member']>
@@ -59,7 +60,7 @@ export const isValidWorkflowSetupMemberReference = async (
 }
 
 /**
- * Replaces owner defaults only after every nested member and user reference is current and valid.
+ * Replaces owner defaults after validating nested members, user identities and Agency-owned groups.
  * @param trx Transaction used for validation and replacement.
  * @param member Persisted workflow setup member.
  * @param owners Proposed nested-member owner mappings.
@@ -86,6 +87,17 @@ export const replaceWorkflowSetupMemberOwners = async (
           .where('id', 'in', nestedIds).where('egcs_cn_recommendationset', '=', String(member.egcs_cn_recommendationset))
           .where('_deleted', '=', false).forUpdate().execute()
     if (validNested.length !== nestedIds.length) return false
+  }
+
+  if (owners.some(owner => owner.egcs_cn_defaultowner && owner.egcs_cn_defaultgroup)) return false
+  const groupIds = [...new Set(owners.flatMap(owner => owner.egcs_cn_defaultgroup ? [String(owner.egcs_cn_defaultgroup)] : []))].sort()
+  if (groupIds.length > 0) {
+    const workflow = await trx.selectFrom('Common_Workflow_Setup').select('egcs_cn_agency')
+      .where('id', '=', String(member.egcs_cn_workflowsetup)).where('_deleted', '=', false).executeTakeFirst()
+    if (!workflow) return false
+    for (const groupId of groupIds) {
+      if (!await lockAssignableGroup(trx, groupId, String(workflow.egcs_cn_agency))) return false
+    }
   }
 
   const ownerIds = [...new Set(owners.flatMap(owner => owner.egcs_cn_defaultowner ? [String(owner.egcs_cn_defaultowner)] : []))]

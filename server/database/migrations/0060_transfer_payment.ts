@@ -888,10 +888,11 @@ AS $function$
             USING ERRCODE = '23514', CONSTRAINT = 'tp_chk_streamreviewsetpublishedagency';
         END IF;
       ELSE
-        SELECT catalog.egcs_cn_entitytype, catalog.egcs_cn_purpose
+        SELECT version.egcs_cn_definition->>'entityType', COALESCE(version.egcs_cn_definition->>'purpose', 'standard')
         INTO workflow_type, workflow_purpose
         FROM "Common_Workflow_Setup" catalog
           JOIN "Common_Publication" publication ON publication.id = catalog.id
+          JOIN "Common_Publication_Version" version ON version.id = publication.egcs_cn_currentversion
           WHERE catalog.id = NEW.egcs_tp_workflow
             AND catalog.egcs_cn_agency = stream_agency
             AND catalog._deleted = false
@@ -905,11 +906,16 @@ AS $function$
         IF workflow_purpose IN ('approval_submission', 'risk_rating') AND EXISTS (
           SELECT 1 FROM "Transfer_Payment_Stream_Workflow" linked
           JOIN "Common_Workflow_Setup" existing ON existing.id = linked.egcs_tp_workflow
+          JOIN "Common_Publication" existing_publication ON existing_publication.id = existing.id
+          JOIN "Common_Publication_Version" existing_version ON existing_version.id = existing_publication.egcs_cn_currentversion
           WHERE linked.egcs_tp_transferpaymentstream = NEW.egcs_tp_transferpaymentstream
             AND linked.id IS DISTINCT FROM NEW.id
             AND linked._deleted = false
-            AND existing.egcs_cn_entitytype = workflow_type
-            AND existing.egcs_cn_purpose = workflow_purpose
+            AND existing._deleted = false
+            AND existing_publication._deleted = false
+            AND existing_publication.egcs_cn_state = 'published'
+            AND existing_version.egcs_cn_definition->>'entityType' = workflow_type
+            AND COALESCE(existing_version.egcs_cn_definition->>'purpose', 'standard') = workflow_purpose
         ) THEN
           RAISE EXCEPTION 'Stream already links a Workflow for this entity type and purpose'
             USING ERRCODE = '23505', CONSTRAINT = 'tp_idx_streamworkflow_specialpurpose';
@@ -917,6 +923,36 @@ AS $function$
       END IF;
       RETURN NEW;
     END $function$;
+
+CREATE FUNCTION validate_stream_workflow_publication()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+  DECLARE definition jsonb;
+  BEGIN
+    IF NEW.egcs_cn_kind <> 'workflow_setup' OR NEW.egcs_cn_state <> 'published' OR NEW._deleted THEN RETURN NEW; END IF;
+    SELECT egcs_cn_definition INTO definition FROM "Common_Publication_Version" WHERE id = NEW.egcs_cn_currentversion;
+    PERFORM 1 FROM "Transfer_Payment_Stream" stream
+      WHERE stream.id IN (SELECT egcs_tp_transferpaymentstream FROM "Transfer_Payment_Stream_Workflow"
+        WHERE egcs_tp_workflow = NEW.id AND NOT _deleted) ORDER BY stream.id FOR UPDATE OF stream;
+    IF COALESCE(definition->>'purpose', 'standard') NOT IN ('approval_submission', 'risk_rating') THEN RETURN NEW; END IF;
+    IF EXISTS (
+      SELECT 1 FROM "Transfer_Payment_Stream_Workflow" own_link
+      JOIN "Transfer_Payment_Stream_Workflow" other_link ON other_link.egcs_tp_transferpaymentstream = own_link.egcs_tp_transferpaymentstream
+        AND other_link.egcs_tp_workflow <> own_link.egcs_tp_workflow AND NOT other_link._deleted
+      JOIN "Common_Workflow_Setup" other_setup ON other_setup.id = other_link.egcs_tp_workflow AND NOT other_setup._deleted
+      JOIN "Common_Publication" other_publication ON other_publication.id = other_setup.id
+        AND other_publication.egcs_cn_state = 'published' AND NOT other_publication._deleted
+      JOIN "Common_Publication_Version" other_version ON other_version.id = other_publication.egcs_cn_currentversion
+      WHERE own_link.egcs_tp_workflow = NEW.id AND NOT own_link._deleted
+        AND other_version.egcs_cn_definition->>'entityType' = definition->>'entityType'
+        AND COALESCE(other_version.egcs_cn_definition->>'purpose', 'standard') = definition->>'purpose'
+    ) THEN
+      RAISE EXCEPTION 'Stream already links a published Workflow for this entity type and purpose'
+        USING ERRCODE = '23505', CONSTRAINT = 'tp_idx_streamworkflow_specialpurpose';
+    END IF;
+    RETURN NEW;
+  END $function$;
 
 CREATE FUNCTION validate_stream_operational_catalog_link()
  RETURNS trigger
@@ -1179,6 +1215,8 @@ CREATE TRIGGER trg_validate_stream_funding_subtype_agency BEFORE INSERT OR UPDAT
 CREATE TRIGGER validate_stream_operational_catalog_link BEFORE INSERT OR UPDATE ON "Transfer_Payment_Stream_Holdback_Basis" FOR EACH ROW EXECUTE FUNCTION validate_stream_operational_catalog_link();
 
 CREATE TRIGGER validate_stream_review_set_link BEFORE INSERT OR UPDATE OF egcs_tp_transferpaymentstream, egcs_tp_reviewset, _deleted ON "Transfer_Payment_Stream_Review_Set" FOR EACH ROW EXECUTE FUNCTION validate_stream_catalog_link();
+
+CREATE TRIGGER validate_stream_workflow_publication AFTER UPDATE OF egcs_cn_currentversion, egcs_cn_state ON "Common_Publication" FOR EACH ROW EXECUTE FUNCTION validate_stream_workflow_publication();
 
 CREATE TRIGGER validate_stream_workflow_link BEFORE INSERT OR UPDATE OF egcs_tp_transferpaymentstream, egcs_tp_workflow, _deleted ON "Transfer_Payment_Stream_Workflow" FOR EACH ROW EXECUTE FUNCTION validate_stream_catalog_link();
 END $baseline$`.execute(db)

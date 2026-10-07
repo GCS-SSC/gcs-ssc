@@ -35,6 +35,7 @@ type RecommendationDetail = {
   definition: RecommendationDefinition
   name_en: string
   name_fr: string
+  can_claim: boolean
   can_read: boolean
   can_update: boolean
   can_manage_assignments: boolean
@@ -50,7 +51,7 @@ type RecommendationDetail = {
 const fetchRecommendationDetail = $fetch as unknown as (url: string) => Promise<RecommendationDetail>
 const mutateRecommendation = $fetch as unknown as (
   url: string,
-  options: { method: 'PATCH' | 'PUT'; body: unknown; query?: Record<string, unknown> }
+  options: { method: 'PATCH' | 'PUT' | 'POST'; body: unknown; query?: Record<string, unknown> }
 ) => Promise<unknown>
 
 const route = useRoute()
@@ -71,9 +72,12 @@ const {
   `recommendation-${recommendationId}`,
   () => fetchRecommendationDetail(`/api/recommendations/${recommendationId}`)
 )
+
 const responses: Ref<RecommendationResponse[]> = ref([])
 const validationIssues: Ref<Array<{ questionKey: string; message: string; field?: 'comment' }>> = ref([])
 const isSaving: Ref<boolean> = ref(false)
+const isClaiming: Ref<boolean> = ref(false)
+const assignmentRosterVersion: Ref<number> = ref(0)
 
 watch(data, value => {
   responses.value = structuredClone(value?.egcs_cn_response.responses ?? [])
@@ -102,6 +106,20 @@ const assignmentSectionBadge = computed(() => {
   if (data.value?.approvalRuntimeId) return '03'
   return '02'
 })
+
+const claim = async () => {
+  if (!data.value?.can_claim || isClaiming.value) return
+  isClaiming.value = true
+  try {
+    await mutateRecommendation(`/api/recommendations/${recommendationId}/claim`, { method: 'POST', body: {} })
+    await refresh()
+    assignmentRosterVersion.value += 1
+  } catch (caughtError: unknown) {
+    showError(caughtError)
+  } finally {
+    isClaiming.value = false
+  }
+}
 
 const save = async (submit: boolean) => {
   if (!isEditable.value || isSaving.value || !data.value) return
@@ -164,6 +182,11 @@ const save = async (submit: boolean) => {
           :badges="heroBadges" />
 
         <div class="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-6 py-6">
+          <UButton
+            v-if="data.can_claim"
+            icon="i-lucide-user-plus" :label="t('groups.claim')"
+            :loading="isClaiming" :disabled="isClaiming" class="self-start" @click="claim" />
+
           <UAlert
             v-if="!isEditable"
             color="neutral"
@@ -222,7 +245,7 @@ const save = async (submit: boolean) => {
           </CommonSection>
 
           <CommonSection :title="t('assignments.title')" :badge="assignmentSectionBadge" :grid-cols="1">
-            <CommonAssignedUsers entity-type="commonrecommendation" :entity-id="recommendationId" />
+            <CommonAssignedUsers :key="assignmentRosterVersion" entity-type="commonrecommendation" :entity-id="recommendationId" />
           </CommonSection>
         </div>
       </div>

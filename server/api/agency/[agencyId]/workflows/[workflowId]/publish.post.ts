@@ -1,9 +1,10 @@
 import { authorize, requireAuthContext } from '~~/server/utils/authorize'
 import { authorizeAgencyWorkflowSetup } from '~~/server/utils/agency-workflow-authorization'
-import { isExpectedPublicationFailure } from '~~/server/utils/publication-errors'
+import { isExpectedPublicationFailure, isRiskSourcePublicationFailure } from '~~/server/utils/publication-errors'
 import { publishDefinition } from '~~/server/utils/system-publication'
 import { withActiveAgencyMutationTransaction } from '~~/server/utils/agency-auth'
 import { buildWorkflowSetupPublication, resolveWorkflowPublicationActorId } from '~~/server/utils/workflow-setup-versioning'
+import { getDatabaseConstraintName } from '~~/server/utils/database-constraint-errors'
 import { validateWorkflowRiskRatingMappingForStream } from '~~/server/utils/agreement-risk-rating'
 
 export default defineEventHandler(async event => {
@@ -23,6 +24,9 @@ export default defineEventHandler(async event => {
     try {
       plan = await buildWorkflowSetupPublication(trx, setup)
     } catch (error: unknown) {
+      if (isRiskSourcePublicationFailure(error)) {
+        return await badRequest(event, 'WORKFLOW_RISK_SOURCE_INVALID', 'apiErrors.workflow.risk_source_invalid')
+      }
       if (!isExpectedPublicationFailure(error)) throw error
       return await badRequest(event, 'WORKFLOW_SETUP_INVALID_PUBLICATION', 'apiErrors.request.invalid_resource')
     }
@@ -39,14 +43,22 @@ export default defineEventHandler(async event => {
         }
       }
     }
-    const published = await publishDefinition(trx, {
-      publicationId: workflowSetupId,
-      kind: 'workflow_setup',
-      definition: plan.definition,
-      actorId,
-      references: plan.references,
-      workflowStatuses: plan.statuses
-    })
+    let published
+    try {
+      published = await publishDefinition(trx, {
+        publicationId: workflowSetupId,
+        kind: 'workflow_setup',
+        definition: plan.definition,
+        actorId,
+        references: plan.references,
+        workflowStatuses: plan.statuses
+      })
+    } catch (error: unknown) {
+      if (getDatabaseConstraintName(error) === 'tp_idx_streamworkflow_specialpurpose') {
+        return await throwApiError(event, { statusCode: 409, code: 'WORKFLOW_LINK_EXISTS', key: 'apiErrors.request.invalid_resource' })
+      }
+      throw error
+    }
     const { definition: _definition, hash: _hash, ...metadata } = published
     return { ...setup, id: String(setup.id), egcs_cn_agency: String(setup.egcs_cn_agency), ...metadata }
   }

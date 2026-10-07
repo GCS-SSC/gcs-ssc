@@ -19,6 +19,7 @@ type CreateRuntimeReviewSetInput = {
   setupScopes: ReviewRuntimeSetupScope[]
   workflowSetupMemberId?: string
   ownerByMemberId?: Map<string, string>
+  groupByMemberId?: Map<string, string>
   groupAssignmentMode?: 'creator_primary' | 'group_only'
 }
 type CreateRuntimeReviewSetTransactionInput = Omit<CreateRuntimeReviewSetInput, 'db'> & {
@@ -422,7 +423,9 @@ export const createRuntimeReviewSetInTransaction = async (input: CreateRuntimeRe
   )
   if (!snapshot) return null
   for (const member of snapshot.members) {
-    if (member.defaultGroupId && !await isAssignableGroup(input.db, member.defaultGroupId, input.ownerAgencyId)) return null
+    const defaultGroupId = input.groupByMemberId?.get(member.memberId)
+      ?? (input.ownerByMemberId?.has(member.memberId) ? undefined : member.defaultGroupId)
+    if (defaultGroupId && !await isAssignableGroup(input.db, defaultGroupId, input.ownerAgencyId)) return null
   }
   // Workflow materialization validates its runtime and pinned publication below.
   // Direct starts cannot use workflow-only sets, even through a crafted API request.
@@ -483,9 +486,11 @@ export const createRuntimeReviewSetInTransaction = async (input: CreateRuntimeRe
       runtimeId: runtimeMetadata.runtimeId, setItemId, setId: String(set.id),
       member: { ...member, ...(input.ownerByMemberId?.get(member.memberId)
         ? { defaultOwnerId: input.ownerByMemberId.get(member.memberId) }
+        : {}), ...(input.groupByMemberId?.has(member.memberId)
+        ? { defaultGroupId: input.groupByMemberId.get(member.memberId), defaultOwnerId: undefined }
         : {}) },
       actorId: input.creatorCommonUserId,
-      groupAssignmentMode: input.groupAssignmentMode
+      groupAssignmentMode: input.groupByMemberId?.has(member.memberId) ? 'group_only' : input.groupAssignmentMode
     }))
   }
   if (!runtime) await transitionRuntime(input.db, {

@@ -330,6 +330,7 @@
     "logout_failed": "La déconnexion n’a pas pu être effectuée. Veuillez réessayer.",
     "confirm": "Confirmer",
     "cancel": "Annuler",
+    "clear": "Effacer la valeur",
     "close": "Fermer",
     "complete": "Terminé",
     "active": "Actif",
@@ -1089,6 +1090,7 @@
       "definition_invalid": "La définition enregistrée de cette évaluation est invalide et ne peut pas être chargée. Communiquez avec le soutien en indiquant le numéro de l’examen."
     },
     "workflow": {
+      "risk_source_invalid": "Sélectionnez une évaluation dans l’ensemble de revues publié comme source de la cote de risque du flux de travail. Une seule source est permise.",
       "route_invalid": "Renseignez des valeurs de sélection valides et vérifiez que le parcours comprend toutes les étapes obligatoires.",
       "recommendation_invalid": "Répondez à toutes les questions obligatoires de la recommandation avant de la soumettre.",
       "recommendation_revision_conflict": "Cette recommandation a changé depuis son ouverture. Actualisez-la et examinez les réponses les plus récentes avant de l’enregistrer de nouveau.",
@@ -2168,7 +2170,10 @@
     "custom_outcomes_disabled": "Les résultats personnalisés sont désactivés pour cette évaluation",
     "workflow_close_out_scope": "Les processus de clôture doivent être associés à un volet de programme",
     "workflow_close_out_entity_type": "Les processus de clôture doivent viser une clôture d’entente",
-    "workflow_risk_rating_entity_type": "Les flux de travail d’évaluation du risque doivent viser une entente",
+    "workflow_risk_review_required": "Sélectionnez le membre d’évaluation qui définit la cote de risque",
+    "workflow_risk_review_disabled": "Activez la cote de risque avant de sélectionner son membre d’évaluation",
+    "workflow_risk_review_kind": "Seul un membre d’ensemble de revues peut définir la cote de risque",
+    "workflow_risk_rating_entity_type": "Les processus d’évaluation du risque doivent cibler une entente ou une modification",
     "workflow_cancellation_status_required": "Sélectionnez l’état parent utilisé lors de l’annulation d’un flux",
     "workflow_execution_failure_status_required": "Sélectionnez l’état parent utilisé lors d’un échec d’exécution",
     "workflow_member_sequence_positive": "La séquence du membre doit être positive",
@@ -2176,7 +2181,8 @@
     "workflow_member_owner_duplicate": "Chaque membre de flux imbriqué ne peut avoir qu’une seule association de propriétaire",
     "checklist_na_policy_requires_option": "Autorisez S. O. avant d’exiger une explication pour S. O.",
     "checklist_answer_not_allowed": "Cette réponse n’est pas offerte par la question de la version publiée utilisée.",
-    "account_receivable_source_required": "Sélectionnez exactement une source : Réclamations ou Avances."
+    "account_receivable_source_required": "Sélectionnez exactement une source : Réclamations ou Avances.",
+    "workflow_risk_rating_required_purpose": "Seul un processus d’évaluation du risque peut exiger une évaluation du risque réussie"
   },
   "notes": {
     "title": "Notes au dossier",
@@ -3372,8 +3378,14 @@
       "recommendation": "Recommandation",
       "approval": "Approbation"
     },
+    "sets_risk_rating": "Définit la cote de risque",
+    "sets_risk_rating_help": "Activer pour le seul ensemble de révisions dont l’évaluation détermine le risque de l’entente ou le risque proposé de la modification.",
+    "risk_assessment_member": "Membre d’évaluation qui définit la cote de risque",
+    "risk_assessment_member_help": "Sélectionnez une évaluation dans la version publiée de cet ensemble de revues. Les autres évaluations ne définissent pas la cote de risque.",
+    "risk_assessment_members_empty": "Publiez cet ensemble de revues avec un membre d’évaluation avant de sélectionner la source de la cote de risque.",
     "purpose": "Objectif",
     "purpose_help": "La soumission pour approbation saisit un dossier immuable et crée une révision de l’entente après la réussite.",
+    "entity_type_help": "Sélectionnez le type de dossier visé par ce flux de travail. Ses étapes et son objectif doivent être compatibles avec ce type.",
     "purposes": {
       "standard": "Standard",
       "approval_submission": "Soumission pour approbation",
@@ -3446,6 +3458,7 @@
         "responsibleParties": "Parties responsables"
       }
     },
+    "approval_template": "Modèle d’approbation",
     "source_approval_template": "Modèle d’approbation finale",
     "complete_to_start": "Achevez cet élément pour démarrer toute recommandation ou approbation applicable",
     "go_to_completion": "Aller à l’achèvement",
@@ -3486,6 +3499,9 @@
     "delete_member": "Supprimer le membre {sequence} du flux",
     "member_kind": "Type de membre",
     "allow_owner_redirect": "Autoriser l’initiateur ou le responsable déclencheur à remplacer un propriétaire indisponible",
+    "default_owner": "Propriétaire par défaut",
+    "assign_to_group": "Attribuer à un groupe",
+    "default_group_help": "Un membre admissible du groupe peut réclamer cet élément avant de le traiter.",
     "default_owner_help": "Laissez vide pour attribuer cet élément à l’initiateur du flux.",
     "no_members": "Aucun membre de flux n’est configuré.",
     "no_change": "Aucun changement",
@@ -3559,7 +3575,8 @@
     "recommendation_validation_description": "Vérifiez les questions mises en évidence et fournissez les réponses obligatoires avant de soumettre.",
     "not_configured": "Aucun flux de travail n’est configuré pour cet élément.",
     "approval_not_configured": "Aucun flux d’approbation n’est configuré. L’achèvement se poursuivra sans flux d’approbation.",
-    "default_owners": "Propriétaires par défaut"
+    "risk_rating_required": "Exiger une évaluation du risque réussie",
+    "risk_rating_required_help": "Après la publication, ce processus de risque doit réussir avant la complétion d’une modification ou la soumission d’une recommandation d’entente. Les scores existants et les évaluations terminées ne satisfont pas à cette exigence."
   },
   "recommendation_schema": {
     "title": "Schéma de recommandation",

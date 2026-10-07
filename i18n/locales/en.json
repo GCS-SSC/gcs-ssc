@@ -330,6 +330,7 @@
     "logout_failed": "Sign out could not be completed. Please try again.",
     "confirm": "Confirm",
     "cancel": "Cancel",
+    "clear": "Clear value",
     "close": "Close",
     "complete": "Complete",
     "active": "Active",
@@ -1089,6 +1090,7 @@
       "definition_invalid": "This assessment's saved definition is invalid and cannot be loaded. Contact support with the review number."
     },
     "workflow": {
+      "risk_source_invalid": "Select one assessment from the published review set as the workflow’s risk rating source. Only one source is allowed.",
       "route_invalid": "Populate valid workflow discriminator values and ensure the selected route includes all required steps.",
       "recommendation_invalid": "Complete all required recommendation questions before submitting.",
       "recommendation_revision_conflict": "This recommendation changed after you opened it. Refresh and review the latest responses before saving again.",
@@ -2168,7 +2170,10 @@
     "custom_outcomes_disabled": "Custom outcomes are disabled for this review",
     "workflow_close_out_scope": "Closeout workflows must be scoped to a program stream",
     "workflow_close_out_entity_type": "Closeout workflows must target Agreement Closeout",
-    "workflow_risk_rating_entity_type": "Risk Rating workflows must target an Agreement",
+    "workflow_risk_review_required": "Select the assessment member that sets the risk score",
+    "workflow_risk_review_disabled": "Enable risk rating before selecting its assessment member",
+    "workflow_risk_review_kind": "Only a review set member can set the risk rating",
+    "workflow_risk_rating_entity_type": "Risk Rating workflows must target an Agreement or Amendment",
     "workflow_cancellation_status_required": "Select the parent status used when a workflow is cancelled",
     "workflow_execution_failure_status_required": "Select the parent status used when workflow execution fails",
     "workflow_member_sequence_positive": "Workflow member sequence must be positive",
@@ -2176,7 +2181,8 @@
     "workflow_member_owner_duplicate": "Each nested workflow member can have only one owner mapping",
     "checklist_na_policy_requires_option": "Enable N/A before requiring an N/A explanation.",
     "checklist_answer_not_allowed": "This answer is not offered by the pinned question.",
-    "account_receivable_source_required": "Select exactly one source: Claims or Advances."
+    "account_receivable_source_required": "Select exactly one source: Claims or Advances.",
+    "workflow_risk_rating_required_purpose": "Only a Risk Rating workflow may require a successful risk rating"
   },
   "notes": {
     "title": "Notes to file",
@@ -3372,8 +3378,14 @@
       "recommendation": "Recommendation",
       "approval": "Approval"
     },
+    "sets_risk_rating": "Sets the risk rating",
+    "sets_risk_rating_help": "Enable for the one review set whose assessment determines the Agreement risk rating or Amendment proposed risk rating.",
+    "risk_assessment_member": "Assessment member setting the risk score",
+    "risk_assessment_member_help": "Select an assessment from this review set’s published version. Other assessments do not set the risk score.",
+    "risk_assessment_members_empty": "Publish this review set with an assessment member before selecting the risk score source.",
     "purpose": "Purpose",
     "purpose_help": "Approval submission captures an immutable packet and creates an Agreement revision after success.",
+    "entity_type_help": "Select the type of record this workflow applies to. Its steps and purpose must be compatible with that type.",
     "purposes": {
       "standard": "Standard",
       "approval_submission": "Approval submission",
@@ -3446,6 +3458,7 @@
         "responsibleParties": "Responsible parties"
       }
     },
+    "approval_template": "Approval template",
     "source_approval_template": "Final approval template",
     "complete_to_start": "Complete this item to start any applicable recommendations and approvals",
     "go_to_completion": "Go to completion",
@@ -3486,6 +3499,9 @@
     "delete_member": "Delete workflow member {sequence}",
     "member_kind": "Member type",
     "allow_owner_redirect": "Allow initiator or triggering caseworker to replace an unavailable owner",
+    "default_owner": "Default owner",
+    "assign_to_group": "Assign to a group",
+    "default_group_help": "An eligible group member can claim this item before working on it.",
     "default_owner_help": "Leave blank to assign this item to the workflow initiator.",
     "no_members": "No workflow members have been configured.",
     "no_change": "No change",
@@ -3559,7 +3575,8 @@
     "recommendation_validation_description": "Review the highlighted questions and provide the required responses before submitting.",
     "not_configured": "No workflow is configured for this item.",
     "approval_not_configured": "No approval workflow is configured. Completion will proceed without an approval workflow.",
-    "default_owners": "Default owners"
+    "risk_rating_required": "Require successful risk rating",
+    "risk_rating_required_help": "After publication, this risk workflow must succeed before Amendment Completion or Agreement Recommendation submission. Existing scores and completed assessments do not satisfy this requirement."
   },
   "recommendation_schema": {
     "title": "Recommendation schema",

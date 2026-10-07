@@ -5,6 +5,7 @@ import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { FetchError } from 'ofetch'
 import { z } from 'zod'
+import { withFormRequirements } from '~~/shared/utils/form-requirements'
 import { WorkflowMemberConditionsSchema } from '~~/shared/types/schemas/agreement-custom-fields'
 import type { AgencyCustomFieldDefinition, AgreementProfileCondition, WorkflowMemberCondition } from '~~/shared/types/schemas/agreement-custom-fields'
 import type { Scope } from '~~/shared/utils/scopes'
@@ -42,10 +43,12 @@ type WorkflowMember = {
   egcs_cn_successstatus?: string | null
   egcs_cn_failurestatus?: string | null
   egcs_cn_allowownerredirect: boolean
-  owners?: Array<{ egcs_cn_reviewsetup?: string, egcs_cn_recommendationsetup?: string, egcs_cn_defaultowner?: string }>
+  egcs_cn_setsriskrating: boolean
+  egcs_cn_riskreviewsetup: string | null
+  owners?: Array<{ egcs_cn_reviewsetup?: string, egcs_cn_recommendationsetup?: string, egcs_cn_defaultowner?: string, egcs_cn_defaultgroup?: string }>
 }
 type WorkflowMemberForm = Omit<WorkflowMember, 'id'> & { id?: string }
-type NestedMember = { id: string, egcs_cn_name_en?: string, egcs_cn_name_fr?: string }
+type NestedMember = { id: string, egcs_cn_order?: number, egcs_cn_name_en?: string, egcs_cn_name_fr?: string }
 
 const route = useRoute()
 const localePath = useLocalePath()
@@ -88,7 +91,31 @@ const validateConditions = createValidator(z.object({ conditions: WorkflowMember
 watch(isConditionsOpen, open => {
   if (!open) selectedConditions.value = null
 })
+const groupOwnerModes: Ref<Record<string, boolean>> = ref({})
+const setGroupOwnerMode = (nestedId: string, index: number, enabled: boolean) => {
+  groupOwnerModes.value[nestedId] = enabled
+  const owner = selectedMember.value?.owners?.[index]
+  if (owner) {
+    owner.egcs_cn_defaultowner = undefined
+    owner.egcs_cn_defaultgroup = undefined
+  }
+}
 const nestedMembers: Ref<NestedMember[]> = ref([])
+const riskAssessmentMembers: Ref<NestedMember[]> = ref([])
+watch(isMemberOpen, open => {
+  if (!open) {
+    selectedMember.value = null
+    riskAssessmentMembers.value = []
+  }
+})
+watch(() => selectedMember.value?.egcs_cn_setsriskrating, enabled => {
+  if (!enabled && selectedMember.value) selectedMember.value.egcs_cn_riskreviewsetup = null
+})
+const riskAssessmentMemberOptions = computed(() => riskAssessmentMembers.value.map((member, index) => ({
+  ...member,
+  egcs_cn_name_en: `${t('workflow.step')} ${member.egcs_cn_order ?? index + 1}: ${member.egcs_cn_name_en ?? ''}`,
+  egcs_cn_name_fr: `${t('workflow.step')} ${member.egcs_cn_order ?? index + 1}: ${member.egcs_cn_name_fr ?? ''}`
+})))
 const selectedSection: Ref<string> = ref('workflow-identity')
 const isHeroCollapsed = getHeroCollapsed('agency-workflow-setup-detail')
 const agencyScope: Scope = { type: 'agency', agencyId }
@@ -97,7 +124,18 @@ const canUpdate = computed(() => canManagePublication.value && state.value?.publ
 const canDelete = computed(() => Boolean(agency.value) && can('agency', 'update', agencyScope))
 const isLoadRetrying = computed(() => loadStatus.value === 'pending')
 const validate = createValidator(CommonWorkflowSetupCreateSchema)
-const validateMember = createValidator(CommonWorkflowSetupMemberCreateSchema)
+const validateMemberBase = createValidator(CommonWorkflowSetupMemberCreateSchema)
+const validateMember = withFormRequirements(async (member: WorkflowMemberForm) => {
+  const errors = await validateMemberBase(member)
+  member.owners?.forEach((owner, index) => {
+    const nestedId = owner.egcs_cn_reviewsetup ?? owner.egcs_cn_recommendationsetup
+    if (nestedId && groupOwnerModes.value[nestedId] && !owner.egcs_cn_defaultgroup) {
+      errors.push({ name: `owners.${index}.egcs_cn_defaultgroup`, message: t('validation.required') })
+    }
+  })
+  return errors
+}, CommonWorkflowSetupMemberCreateSchema)
+
 const approvalSubmissionEntityTypes = new Set([
   'fundingcaseagreement', 'fundingcaseamendment', 'fundingcaseagreementcloseout',
   'fundingcaseagreementclaim', 'fundingclaimreconcile', 'fundingcaseagreementcommitment',
@@ -110,7 +148,7 @@ const purposeOptions = computed(() => [
   ...(approvalSubmissionEntityTypes.has(state.value?.egcs_cn_entitytype ?? '')
     ? [{ value: 'approval_submission', label: t('workflow.purposes.approval_submission') }]
     : []),
-  ...(state.value?.egcs_cn_entitytype === 'fundingcaseagreement'
+  ...(['fundingcaseagreement', 'fundingcaseamendment'].includes(state.value?.egcs_cn_entitytype ?? '')
     ? [{ value: 'risk_rating', label: t('workflow.purposes.risk_rating') }]
     : [])
 ])
@@ -118,9 +156,12 @@ watch(() => state.value?.egcs_cn_entitytype, entityType => {
   if (state.value?.egcs_cn_purpose === 'approval_submission' && !approvalSubmissionEntityTypes.has(entityType ?? '')) {
     state.value.egcs_cn_purpose = 'standard'
   }
-  if (state.value?.egcs_cn_purpose === 'risk_rating' && entityType !== 'fundingcaseagreement') {
+  if (state.value?.egcs_cn_purpose === 'risk_rating' && !['fundingcaseagreement', 'fundingcaseamendment'].includes(entityType ?? '')) {
     state.value.egcs_cn_purpose = 'standard'
   }
+})
+watch(() => state.value?.egcs_cn_purpose, purpose => {
+  if (purpose !== 'risk_rating' && state.value) state.value.egcs_cn_riskratingrequired = false
 })
 const approvalTemplateFetchUrl = computed(() => agencyId ? `/api/agency/${agencyId}/approval-templates` : null)
 const recommendationSetQuery = computed(() => ({
@@ -153,7 +194,8 @@ const buildSetupPayload = () => state.value
       egcs_cn_allowedstartstatuses: state.value.egcs_cn_allowedstartstatuses,
       egcs_cn_cancellationstatus: state.value.egcs_cn_cancellationstatus,
       egcs_cn_executionfailurestatus: state.value.egcs_cn_executionfailurestatus,
-      egcs_cn_allowretry: state.value.egcs_cn_allowretry
+      egcs_cn_allowretry: state.value.egcs_cn_allowretry,
+      egcs_cn_riskratingrequired: state.value.egcs_cn_riskratingrequired ?? false
     }
   : null
 const mutation = useEditorMutationCoordinator({ getDraft: buildSetupPayload })
@@ -170,6 +212,7 @@ const isMemberSaving = computed(() => mutation.isActionPending('save-member'))
 const isNestedMembersLoading = ref(false)
 const nestedMembersError = ref<unknown>(null)
 let nestedMembersGeneration = 0
+let previousNestedMember: WorkflowMemberForm | null = null
 const canEditFields = computed(() => canUpdate.value && !mutation.isPending.value)
 watch(selectedSection, sectionId => {
   if (import.meta.client) document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -271,24 +314,36 @@ const retire = () => performPublicationAction('retire')
 const memberKinds = computed(() => [
   { value: 'review_set', label: t('workflow.review_set') },
   { value: 'recommendation_set', label: t('workflow.recommendation_set') },
-  { value: 'approval_template', label: t('workflow.source_approval_template') }
+  { value: 'approval_template', label: t('workflow.approval_template') }
 ])
 const openMember = (member?: WorkflowMember) => {
   if (!canUpdate.value || mutation.isPending.value || blockDirtyAction()) return
   selectedMember.value = member
-    ? { ...member, conditions: undefined }
+    ? { ...member, conditions: undefined, owners: member.owners?.map(owner => ({ ...owner })) }
     : {
         egcs_cn_sequence: (state.value?.members.length ?? 0) + 1,
-        egcs_cn_kind: 'review_set', egcs_cn_allowownerredirect: false
+        egcs_cn_kind: 'review_set', egcs_cn_allowownerredirect: false,
+        egcs_cn_setsriskrating: false, egcs_cn_riskreviewsetup: null
       }
   isMemberOpen.value = true
 }
-watch(() => [selectedMember.value?.egcs_cn_kind, selectedMember.value?.egcs_cn_reviewset, selectedMember.value?.egcs_cn_recommendationset], async () => {
+watch(() => [selectedMember.value?.egcs_cn_kind, selectedMember.value?.egcs_cn_reviewset, selectedMember.value?.egcs_cn_recommendationset], async (selection, previousSelection) => {
   const generation = ++nestedMembersGeneration
   const member = selectedMember.value
+  const isSameMember = member === previousNestedMember
+  previousNestedMember = member
   nestedMembers.value = []
+  groupOwnerModes.value = {}
+  riskAssessmentMembers.value = []
   nestedMembersError.value = null
-  if (member) member.owners = []
+  isNestedMembersLoading.value = false
+  if (member && member.egcs_cn_kind !== 'review_set') {
+    member.egcs_cn_setsriskrating = false
+    member.egcs_cn_riskreviewsetup = null
+  } else if (member && isSameMember && previousSelection?.[0] && selection[1] !== previousSelection[1]) {
+    member.egcs_cn_riskreviewsetup = null
+  }
+  if (member && isSameMember && previousSelection?.[0] && selection.some((value, index) => value !== previousSelection[index])) member.owners = []
   if (!member || member.egcs_cn_kind === 'approval_template') {
     return
   }
@@ -306,7 +361,7 @@ watch(() => [selectedMember.value?.egcs_cn_kind, selectedMember.value?.egcs_cn_r
       async () => {
         const request = await fetch(getClientRequestUrl(`/api/agency/${agencyId}/${resource === 'review-setups' ? 'review-sets' : 'recommendation-sets'}/${referenceId}`))
         if (!request.ok) await throwFetchResponseError(request)
-        return await request.json() as { members: NestedMember[] }
+        return await request.json() as { members: NestedMember[], riskAssessmentMembers?: NestedMember[] }
       },
       () => {
         const current = selectedMember.value
@@ -317,15 +372,21 @@ watch(() => [selectedMember.value?.egcs_cn_kind, selectedMember.value?.egcs_cn_r
         return { kind: current.egcs_cn_kind, referenceId: String(currentReferenceId) }
       },
       response => {
+        if (generation !== nestedMembersGeneration) return
         const current = selectedMember.value!
         nestedMembers.value = response.members
+        riskAssessmentMembers.value = response.riskAssessmentMembers ?? []
         current.owners = response.members.map((nested: NestedMember) => {
           const existing = current.owners?.find(owner => String(owner.egcs_cn_reviewsetup ?? owner.egcs_cn_recommendationsetup) === String(nested.id))
           return {
             ...(current.egcs_cn_kind === 'review_set' ? { egcs_cn_reviewsetup: String(nested.id) } : { egcs_cn_recommendationsetup: String(nested.id) }),
-            ...(existing?.egcs_cn_defaultowner ? { egcs_cn_defaultowner: existing.egcs_cn_defaultowner } : {})
+            egcs_cn_defaultowner: existing?.egcs_cn_defaultowner ?? undefined,
+            egcs_cn_defaultgroup: existing?.egcs_cn_defaultgroup ?? undefined
           }
         })
+        groupOwnerModes.value = Object.fromEntries(response.members.map(nested => [nested.id,
+          Boolean(current.owners?.find(owner => String(owner.egcs_cn_reviewsetup ?? owner.egcs_cn_recommendationsetup) === String(nested.id))?.egcs_cn_defaultgroup)
+        ]))
       }
     )
   } catch (error) {
@@ -513,7 +574,7 @@ const deleteMember = async (member: WorkflowMember) => {
 
               <AssessmentSchemaPageSection section-id="workflow-routing" :title="t('workflow.routing')">
                 <div class="grid gap-5 lg:grid-cols-2">
-                  <UFormField :label="t('transfer_payment.entity_type')" name="egcs_cn_entitytype">
+                  <UFormField :label="t('transfer_payment.entity_type')" name="egcs_cn_entitytype" :description="t('workflow.entity_type_help')">
                     <CommonEnumSelect v-model="state.egcs_cn_entitytype" name="transfer_payment_review_setup_entity_type" :disabled="!canEditFields" class="w-full" />
                   </UFormField>
                   <UFormField :label="t('workflow.purpose')" name="egcs_cn_purpose" :description="t('workflow.purpose_help')">
@@ -595,6 +656,13 @@ const deleteMember = async (member: WorkflowMember) => {
 
               <AssessmentSchemaPageSection section-id="workflow-behaviour" :title="t('workflow.behaviour')">
                 <div class="space-y-5">
+                  <UFormField
+                    v-if="state.egcs_cn_purpose === 'risk_rating'"
+                    :label="t('workflow.risk_rating_required')"
+                    name="egcs_cn_riskratingrequired"
+                    :description="t('workflow.risk_rating_required_help')">
+                    <USwitch v-model="state.egcs_cn_riskratingrequired" :disabled="!canEditFields" />
+                  </UFormField>
                   <UFormField :label="t('workflow.allow_retry')" name="egcs_cn_allowretry" :description="t('workflow.allow_retry_help')">
                     <USwitch v-model="state.egcs_cn_allowretry" :disabled="!canEditFields" />
                   </UFormField>
@@ -619,18 +687,31 @@ const deleteMember = async (member: WorkflowMember) => {
           </UFormField>
           <AdminCommonLookupField
             v-if="selectedMember.egcs_cn_kind === 'review_set'" v-model="selectedMember.egcs_cn_reviewset"
-            :label="t('workflow.review_set')" name="egcs_cn_reviewset"
+            :label="t('workflow.review_set')" name="egcs_cn_reviewset" :disabled="Boolean(selectedMember.id)"
             :fetch-url="`/api/agency/${agencyId}/review-sets`"
             value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" :query="reviewSetQuery" />
           <AdminCommonLookupField
             v-else-if="selectedMember.egcs_cn_kind === 'recommendation_set'" v-model="selectedMember.egcs_cn_recommendationset"
-            :label="t('workflow.recommendation_set')" name="egcs_cn_recommendationset"
+            :label="t('workflow.recommendation_set')" name="egcs_cn_recommendationset" :disabled="Boolean(selectedMember.id)"
             :fetch-url="`/api/agency/${agencyId}/recommendation-sets`"
             value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" :query="recommendationSetQuery" />
           <AdminCommonLookupField
             v-else-if="approvalTemplateFetchUrl" v-model="selectedMember.egcs_cn_approvaltemplate"
-            :label="t('workflow.source_approval_template')" name="egcs_cn_approvaltemplate"
+            :label="t('workflow.approval_template')" name="egcs_cn_approvaltemplate" :disabled="Boolean(selectedMember.id)"
             :fetch-url="approvalTemplateFetchUrl" :include-deleted-query="false" value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" />
+          <template v-if="state?.egcs_cn_purpose === 'risk_rating' && selectedMember.egcs_cn_kind === 'review_set'">
+            <UFormField :label="t('workflow.sets_risk_rating')" name="egcs_cn_setsriskrating" :description="t('workflow.sets_risk_rating_help')">
+              <USwitch v-model="selectedMember.egcs_cn_setsriskrating" />
+            </UFormField>
+            <UFormField
+              v-if="selectedMember.egcs_cn_setsriskrating"
+              :label="t('workflow.risk_assessment_member')" name="egcs_cn_riskreviewsetup" required
+              :description="riskAssessmentMembers.length ? t('workflow.risk_assessment_member_help') : t('workflow.risk_assessment_members_empty')">
+              <CommonBilingualSelectMenu
+                v-model="selectedMember.egcs_cn_riskreviewsetup" :items="riskAssessmentMemberOptions"
+                value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" class="w-full" />
+            </UFormField>
+          </template>
           <div class="grid gap-4 md:grid-cols-3">
             <UFormField :label="t('workflow.materialization_status')" name="egcs_cn_materializationstatus">
               <CommonStatusSelect v-model="selectedMember.egcs_cn_materializationstatus" :agency-id="agencyId" allow-empty :empty-label="t('workflow.no_change')" class="w-full" />
@@ -645,20 +726,35 @@ const deleteMember = async (member: WorkflowMember) => {
           <UFormField v-if="selectedMember.egcs_cn_kind !== 'approval_template'" :label="t('workflow.allow_owner_redirect')" name="egcs_cn_allowownerredirect">
             <USwitch v-model="selectedMember.egcs_cn_allowownerredirect" />
           </UFormField>
-          <div v-if="selectedMember.egcs_cn_kind !== 'approval_template' && nestedMembers.length" class="space-y-3">
-            <h3 class="font-medium">
-              {{ t('workflow.default_owners') }}
-            </h3>
-            <UFormField
-              v-for="(nested, index) in nestedMembers" :key="nested.id"
-              :label="getBilingualValue(nested, 'egcs_cn_name') || `${t('workflow.step')} ${index + 1}`"
-              :description="t('workflow.default_owner_help')" :name="`owners.${index}.egcs_cn_defaultowner`">
-              <CommonServerLookupSelect
-                v-model="selectedMember.owners![index]!.egcs_cn_defaultowner"
-                :fetch-url="`/api/users/lookups?workflowSetupId=${workflowSetupId}&status=active`"
-                selected-values-query-key="selectedIds"
-                value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" />
-            </UFormField>
+          <div v-if="selectedMember.egcs_cn_kind !== 'approval_template' && nestedMembers.length" class="space-y-4">
+            <div v-for="(nested, index) in nestedMembers" :key="nested.id" class="space-y-2" data-testid="workflow-default-owner">
+              <UFormField
+                :label="t('workflow.default_owner')" :description="getBilingualValue(nested, 'egcs_cn_name') || `${t('workflow.step')} ${index + 1}`" :required="false"
+                :ui="{ label: 'text-sm font-medium normal-case tracking-normal text-default mb-1.5' }">
+                <USwitch
+                  :model-value="groupOwnerModes[nested.id] === true" :label="t('workflow.assign_to_group')"
+                  @update:model-value="setGroupOwnerMode(nested.id, index, $event)" />
+              </UFormField>
+              <UFormField
+                v-if="groupOwnerModes[nested.id]"
+                :label="t('groups.group')" :description="t('workflow.default_group_help')"
+                :name="`owners.${index}.egcs_cn_defaultgroup`" required>
+                <CommonServerLookupSelect
+                  v-model="selectedMember.owners![index]!.egcs_cn_defaultgroup"
+                  :fetch-url="`/api/groups/lookups?workflowSetupId=${workflowSetupId}`"
+                  selected-values-query-key="selectedIds"
+                  value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" />
+              </UFormField>
+              <UFormField
+                v-else :label="t('groups.user')" :description="t('workflow.default_owner_help')"
+                :name="`owners.${index}.egcs_cn_defaultowner`">
+                <CommonServerLookupSelect
+                  v-model="selectedMember.owners![index]!.egcs_cn_defaultowner"
+                  :fetch-url="`/api/users/lookups?workflowSetupId=${workflowSetupId}&status=active`"
+                  selected-values-query-key="selectedIds"
+                  value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" />
+              </UFormField>
+            </div>
           </div>
           <div class="flex justify-end gap-2">
             <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isMemberOpen = false" />

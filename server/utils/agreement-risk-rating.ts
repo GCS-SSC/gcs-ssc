@@ -147,11 +147,18 @@ export const resolveLatestAgreementRiskRating = async (db: DbClient, agreementId
   const effect = configuration.riskRatingEffect
   const mapping = (run.egcs_cn_routing as WorkflowRoutingEvidence | null)?.riskRatingMapping
   if (!effect || !mapping) return null
+  const sourceMember = configuration.members.find(member => member.memberId === effect.workflowMemberId)
+  const sourceReview = sourceMember?.reviewPlan?.members.find(member => member.memberId === effect.reviewSetupMemberId)
+  if (!sourceMember || !sourceReview || sourceReview.reviewType !== 'assessment') return null
   const review = await db.selectFrom('Common_Review')
     .innerJoin('Common_Runtime_Item', 'Common_Runtime_Item.id', 'Common_Review.egcs_cn_runtimeitem')
+    .innerJoin('Common_Runtime_Item as Set_Item', 'Set_Item.id', 'Common_Runtime_Item.egcs_cn_parentruntimeitem')
     .select('Common_Review.egcs_cn_reviewresult')
     .where('Common_Runtime_Item.egcs_cn_runtime', '=', String(run.id))
     .where('Common_Runtime_Item.egcs_cn_publicationversion', '=', effect.assessmentSchemaVersionId)
+    .where('Common_Runtime_Item.egcs_cn_order', '=', sourceReview.order)
+    .where('Set_Item.egcs_cn_order', '=', sourceMember.sequence)
+    .where('Set_Item.egcs_cn_publicationversion', '=', sourceMember.publicationVersionId)
     .where('Common_Review._deleted', '=', false)
     .executeTakeFirst()
   const assessmentScore = review?.egcs_cn_reviewresult === null || review?.egcs_cn_reviewresult === undefined

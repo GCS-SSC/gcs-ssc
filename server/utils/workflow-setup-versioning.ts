@@ -1,3 +1,5 @@
+import { isAssignableGroup } from './groups'
+import { isWorkflowOwnerPublicationFailure, isRiskSourcePublicationFailure } from './publication-errors'
 import { resolveEntityTypeLifecycleDefinition } from './entity-type-registry'
 import { readWorkflowProfileChoices, resolveWorkflowProfileCondition } from './workflow-profile-conditions'
 import { readWorkflowConditions } from './workflow-conditions'
@@ -32,7 +34,7 @@ import {
 type WorkflowSetupRow = Selectable<Database['Common_Workflow_Setup']>
 type DbClient = Kysely<Database> | Transaction<Database>
 
-export type PublishedWorkflowOwner = { nestedMemberId: string, defaultOwner?: string }
+export type PublishedWorkflowOwner = { nestedMemberId: string, defaultOwner?: string, defaultGroup?: string }
 export type PublishedWorkflowMember = {
   conditions?: Array<WorkflowMemberCondition & { name_en: string, name_fr: string, options: Array<{ id: string, name_en: string, name_fr: string }> }>
   memberId: string
@@ -63,6 +65,7 @@ export type PublishedWorkflowConfiguration = {
   allowRetry: boolean
   members: PublishedWorkflowMember[]
   riskRatingEffect?: PublishedRiskRatingEffect
+  riskRatingRequired?: boolean
 }
 export type PublishedRiskRatingBand = {
   maximumScore: number
@@ -169,6 +172,14 @@ export const buildWorkflowSetupPublication = async (
   for (const row of rows) {
     const ownerRows = await db.selectFrom('Common_Workflow_Setup_Member_Owner').selectAll()
       .where('egcs_cn_workflowsetupmember', '=', String(row.id)).where('_deleted', '=', false).orderBy('id', 'asc').execute()
+    for (const configuredOwner of ownerRows) {
+      if (configuredOwner.egcs_cn_defaultowner && configuredOwner.egcs_cn_defaultgroup) {
+        throw new Error('Workflow default owner must select either a user or a group')
+      }
+      if (configuredOwner.egcs_cn_defaultgroup && !await isAssignableGroup(db, String(configuredOwner.egcs_cn_defaultgroup), String(setup.egcs_cn_agency))) {
+        throw new Error('Workflow default group must be active in its Agency and contain an active member')
+      }
+    }
     const referenceId = String(row.egcs_cn_reviewset ?? row.egcs_cn_recommendationset ?? row.egcs_cn_approvaltemplate)
     const owner = row.egcs_cn_reviewset
       ? await db.selectFrom('Common_Review_Set_Setup').select('egcs_cn_agency').where('id', '=', referenceId).where('_deleted', '=', false).executeTakeFirst()
@@ -254,7 +265,8 @@ export const buildWorkflowSetupPublication = async (
       allowOwnerRedirect: row.egcs_cn_allowownerredirect,
       owners: ownerRows.map(owner => ({
         nestedMemberId: String(owner.egcs_cn_reviewsetup ?? owner.egcs_cn_recommendationsetup),
-        ...(owner.egcs_cn_defaultowner ? { defaultOwner: String(owner.egcs_cn_defaultowner) } : {})
+        ...(owner.egcs_cn_defaultowner ? { defaultOwner: String(owner.egcs_cn_defaultowner) } : {}),
+        ...(owner.egcs_cn_defaultgroup ? { defaultGroup: String(owner.egcs_cn_defaultgroup) } : {})
       })),
       ...nestedDefinition
     })
@@ -264,14 +276,18 @@ export const buildWorkflowSetupPublication = async (
     descriptionEn: setup.egcs_cn_description_en, descriptionFr: setup.egcs_cn_description_fr,
     entityType: setup.egcs_cn_entitytype as Workflow_Target_Entity_Type,
     purpose: setup.egcs_cn_purpose,
+    ...(setup.egcs_cn_riskratingrequired ? { riskRatingRequired: true } : {}),
     allowedStartStatuses: allowedRows.map(row => String(row.egcs_cn_status)),
     cancellationStatus: String(setup.egcs_cn_cancellationstatus),
     executionFailureStatus: String(setup.egcs_cn_executionfailurestatus),
     allowRetry: setup.egcs_cn_allowretry,
     members
   }
+  if (definition.purpose !== 'risk_rating' && rows.some(row => row.egcs_cn_setsriskrating || (row.egcs_cn_riskreviewsetup !== null && row.egcs_cn_riskreviewsetup !== undefined))) {
+    throw new Error('Only Risk Rating workflows may select a risk assessment source')
+  }
   if (definition.purpose === 'risk_rating') {
-    definition.riskRatingEffect = await buildRiskRatingEffect(db, setup, members)
+    definition.riskRatingEffect = await buildRiskRatingEffect(db, setup, members, rows)
   }
   if (definition.purpose === 'approval_submission') {
     const hasApproval = members.some(member => member.kind === 'approval_template'
@@ -299,16 +315,24 @@ export const buildWorkflowSetupPublication = async (
 const buildRiskRatingEffect = async (
   db: DbClient,
   setup: WorkflowSetupRow,
-  members: PublishedWorkflowMember[]
+  members: PublishedWorkflowMember[],
+  rows: Array<Selectable<Database['Common_Workflow_Setup_Member']>>
 ): Promise<PublishedRiskRatingEffect> => {
-  if (setup.egcs_cn_entitytype !== 'fundingcaseagreement') {
-    throw new Error('Risk Rating workflow must target an Agreement')
+  if (!['fundingcaseagreement', 'fundingcaseamendment'].includes(setup.egcs_cn_entitytype)) {
+    throw new Error('Risk Rating workflow must target an Agreement or Amendment')
   }
-  const sources = members.flatMap(workflowMember => (workflowMember.reviewPlan?.members ?? [])
-    .filter(reviewMember => reviewMember.reviewType === 'assessment')
-    .map(reviewMember => ({ workflowMember, reviewMember })))
-  if (sources.length !== 1) throw new Error('Risk Rating workflow requires exactly one assessment review')
-  const source = sources[0]!
+  const selected = rows.filter(row => row.egcs_cn_setsriskrating)
+  if (selected.length !== 1) throw new Error('Risk Rating workflow requires exactly one selected risk review set')
+  if (rows.some(row => !row.egcs_cn_setsriskrating && row.egcs_cn_riskreviewsetup !== null && row.egcs_cn_riskreviewsetup !== undefined)) {
+    throw new Error('Unselected workflow members cannot specify a risk assessment source')
+  }
+  const selectedRow = selected[0]!
+  const workflowMember = members.find(member => member.memberId === String(selectedRow.id))
+  const reviewMember = workflowMember?.reviewPlan?.members.find(member => member.memberId === String(selectedRow.egcs_cn_riskreviewsetup))
+  if (!workflowMember || workflowMember.kind !== 'review_set' || !reviewMember || reviewMember.reviewType !== 'assessment') {
+    throw new Error('Risk Rating source must select an assessment member from the published review set')
+  }
+  const source = { workflowMember, reviewMember }
   const version = await db.selectFrom('Common_Publication_Version')
     .select('egcs_cn_definition')
     .where('id', '=', source.reviewMember.schema.publicationVersionId)
@@ -343,6 +367,7 @@ export const applyPublishedWorkflowConfiguration = (
   egcs_cn_description_en: configuration.descriptionEn, egcs_cn_description_fr: configuration.descriptionFr,
   egcs_cn_entitytype: configuration.entityType,
   egcs_cn_purpose: configuration.purpose ?? 'standard',
+  egcs_cn_riskratingrequired: configuration.riskRatingRequired === true,
   egcs_cn_allowedstartstatuses: configuration.allowedStartStatuses,
   egcs_cn_cancellationstatus: configuration.cancellationStatus,
   egcs_cn_executionfailurestatus: configuration.executionFailureStatus,
@@ -423,7 +448,7 @@ export const readWorkflowSetupPublicationMetadata = async (
     const { definition } = await buildWorkflowSetupPublication(db, setup)
     return await readPublicationMetadata(db, String(setup.id), definition as unknown as JsonValue)
   } catch (error) {
-    if (!(error instanceof InvalidWorkflowMemberSequenceError) && !causedByUnavailablePublishedDefinition(error)) throw error
+    if (!(error instanceof InvalidWorkflowMemberSequenceError) && !causedByUnavailablePublishedDefinition(error) && !isRiskSourcePublicationFailure(error) && !isWorkflowOwnerPublicationFailure(error)) throw error
     const metadata = await readPublicationMetadata(db, String(setup.id))
     return { ...metadata, hasUnpublishedChanges: metadata.publicationState !== 'retired' }
   }

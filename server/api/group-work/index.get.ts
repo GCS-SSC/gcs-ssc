@@ -1,13 +1,15 @@
 import { sql, type RawBuilder } from 'kysely'
 import { z } from 'zod'
 import { requireAuthContext, requireFreshAuthContext } from '~~/server/utils/authorize'
+import { resolveAgreementScopeContext } from '~~/server/utils/agreement'
+import { canAccessEntityAssignmentOwner, resolveEntityAssignmentOwner } from '~~/server/utils/entity-assignment'
 import { resolveCurrentCommonUser } from '~~/server/utils/additional-reviewer-runtime'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { PaginationSchema } from '~~/shared/types/schemas'
 
 const Query = PaginationSchema.extend({ view: z.enum(['available', 'mine']) })
 type GroupWorkRow = {
-  kind: 'review' | 'additional_reviewer' | 'approval' | 'intake'
+  kind: 'review' | 'recommendation' | 'additional_reviewer' | 'approval' | 'intake'
   id: string
   review_id: string | null
   entity_type: string
@@ -45,6 +47,29 @@ export default defineEventHandler(async event => {
     const hasMembership = Boolean(membership)
     if (query.view === 'available' && !hasMembership) {
       return { items: [], page: query.page, limit: query.limit, total: 0, has_membership: false }
+    }
+    // Resolve independent Recommendation ownership before SQL pagination and totals.
+    // Membership exposes queue identity only when the ordinary owner role permits it.
+    const recommendationCandidates = await trx.selectFrom('Common_Recommendation as recommendation')
+      .innerJoin('Common_Group as grp', 'grp.id', 'recommendation.egcs_cn_group')
+      .leftJoin('Common_Group_Member as member', join => join
+        .onRef('member.egcs_cn_group', '=', 'grp.id').on('member.egcs_cn_user', '=', actor.id)
+        .on('member._deleted', '=', false))
+      .select(['recommendation.id', 'grp.egcs_cn_agency as agencyId'])
+      .where('recommendation._deleted', '=', false).where('grp._deleted', '=', false)
+      .where(eb => query.view === 'mine'
+        ? eb('recommendation.egcs_cn_groupclaimedby', '=', actor.id)
+        : eb.and([eb('recommendation.egcs_cn_groupclaimedby', 'is', null), eb('member.id', 'is not', null)]))
+      .execute()
+    const authorizedRecommendationIds: string[] = []
+    for (const candidate of recommendationCandidates) {
+      const owner = await resolveEntityAssignmentOwner(trx, 'commonrecommendation', String(candidate.id))
+      const ownerAgencyId = owner?.kind === 'agreement'
+        ? (await resolveAgreementScopeContext(owner.agreementId, trx))?.agencyId
+        : owner && 'agencyId' in owner ? owner.agencyId : null
+      if (owner && ownerAgencyId === String(candidate.agencyId) && await canAccessEntityAssignmentOwner(auth, owner, query.view === 'available' ? 'update' : 'read', trx)) {
+        authorizedRecommendationIds.push(String(candidate.id))
+      }
     }
     const grants = auth.userAbilities.getGrants()
     /**
@@ -99,6 +124,15 @@ export default defineEventHandler(async event => {
         JOIN "Common_Runtime_Item" item ON item.id = review.egcs_cn_runtimeitem
         WHERE review._deleted = false AND review.egcs_cn_group IS NOT NULL
           AND item.egcs_cn_state IN ('active', 'awaiting_action')
+        UNION ALL
+        SELECT 'recommendation', recommendation.id, NULL, 'commonrecommendation', recommendation.id, NULL,
+          recommendation.egcs_cn_group, recommendation.egcs_cn_groupclaimedby,
+          ('#' || recommendation.id::text), ('#' || recommendation.id::text)
+        FROM "Common_Recommendation" recommendation
+        JOIN "Common_Runtime_Item" item ON item.id = recommendation.egcs_cn_runtimeitem AND item._deleted = false
+        JOIN "Common_Runtime" runtime ON runtime.id = item.egcs_cn_runtime AND runtime._deleted = false
+        WHERE recommendation._deleted = false AND recommendation.egcs_cn_group IS NOT NULL
+          AND item.egcs_cn_state = 'active' AND runtime.egcs_cn_state = 'active'
         UNION ALL
         SELECT 'additional_reviewer', reviewer.id, reviewer.egcs_cn_entityid, 'commonreview', reviewer.egcs_cn_entityid,
           CASE WHEN EXISTS (SELECT 1 FROM "Common_Checklist" checklist WHERE checklist.egcs_cn_review = reviewer.egcs_cn_entityid AND checklist._deleted = false)
@@ -156,8 +190,8 @@ export default defineEventHandler(async event => {
         WHERE entity_type='fundingcaseaccountreceivablecreditmemo'
       )
       SELECT work.*, grp.egcs_cn_name_en group_name_en, grp.egcs_cn_name_fr group_name_fr,
-        CASE WHEN work.kind IN ('approval', 'intake') THEN work.name_en ELSE review_schema.egcs_cn_name_en END detail_name_en,
-        CASE WHEN work.kind IN ('approval', 'intake') THEN work.name_fr ELSE review_schema.egcs_cn_name_fr END detail_name_fr,
+        CASE WHEN work.kind IN ('approval', 'intake') THEN work.name_en WHEN work.kind = 'recommendation' THEN recommendation_schema.egcs_cn_name_en ELSE review_schema.egcs_cn_name_en END detail_name_en,
+        CASE WHEN work.kind IN ('approval', 'intake') THEN work.name_fr WHEN work.kind = 'recommendation' THEN recommendation_schema.egcs_cn_name_fr ELSE review_schema.egcs_cn_name_fr END detail_name_fr,
         COALESCE(
           CASE WHEN ${agreementRead} THEN to_jsonb(agreement)->>'egcs_fc_agreementnumber' END,
           CASE WHEN (${proponentRead} AND memo_source.work_id IS NULL OR ${creditMemoRead} AND credit_memo.id IS NOT NULL)
@@ -202,7 +236,9 @@ export default defineEventHandler(async event => {
         ON credit_memo.id=memo_source.entity_id AND NOT credit_memo._deleted
       LEFT JOIN "Agency_Profile" memo_agency ON memo_agency.id=credit_memo.egcs_fc_agency AND NOT memo_agency._deleted
       LEFT JOIN "Common_Recommendation" approval_recommendation ON approval_recommendation.id = work.entity_id
-        AND work.kind = 'approval' AND work.entity_type = 'commonrecommendation'
+        AND work.kind IN ('approval', 'recommendation') AND work.entity_type = 'commonrecommendation'
+      LEFT JOIN "Common_Recommendation_Setup" recommendation_setup ON recommendation_setup.id = approval_recommendation.egcs_cn_recommendationsetup
+      LEFT JOIN "Common_Recommendation_Schema" recommendation_schema ON recommendation_schema.id = recommendation_setup.egcs_cn_recommendationschema
       LEFT JOIN LATERAL (SELECT
         CASE WHEN approval_recommendation.id IS NOT NULL THEN approval_recommendation.egcs_cn_entitytype::text ELSE work.entity_type END entity_type,
         CASE WHEN approval_recommendation.id IS NOT NULL THEN approval_recommendation.egcs_cn_entityid ELSE work.entity_id END entity_id
@@ -284,6 +320,7 @@ export default defineEventHandler(async event => {
       WHERE ((${query.view} = 'mine' AND work.claimed_by = ${actor.id}::bigint)
         OR (${query.view} = 'available' AND work.claimed_by IS NULL AND member.egcs_cn_group IS NOT NULL))
         AND (memo_source.work_id IS NULL OR (credit_memo.id IS NOT NULL AND memo_agency.id IS NOT NULL AND proponent.id IS NOT NULL))
+        AND (work.kind <> 'recommendation' OR work.id = ANY(${authorizedRecommendationIds}::bigint[]))
         AND (work.kind <> 'intake' OR (${query.view} = 'mine' AND ${intakeRead})
           OR (${query.view} = 'available' AND ${intakeUpdate}))
       ORDER BY work.kind, work.id
