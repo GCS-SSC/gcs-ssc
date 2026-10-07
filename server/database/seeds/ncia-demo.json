@@ -2650,6 +2650,13 @@
       "egcs_cn_state": "published",
       "egcs_cn_currentversion": 398,
       "_deleted": false
+    },
+    {
+      "id": 390,
+      "egcs_cn_kind": "review_schema",
+      "egcs_cn_state": "published",
+      "egcs_cn_currentversion": 399,
+      "_deleted": false
     }
   ],
   "Common_Publication_Transition": [
@@ -4978,6 +4985,172 @@
             "reviewType": "assessment",
             "failureThreshold": null,
             "failOnChecklistFailure": false
+          },
+          {
+            "order": 2,
+            "schema": {
+              "definition": {
+                "kind": "review_schema",
+                "name": {
+                  "en": "Risk Score Setting Assessment",
+                  "fr": "Évaluation définissant la cote de risque"
+                },
+                "agencyId": "21",
+                "entityType": "fundingcaseagreement",
+                "reviewType": "assessment",
+                "outcomeName": {
+                  "en": "Risk Rating",
+                  "fr": "Cote de risque"
+                },
+                "scoringMatrix": [
+                  {
+                    "max": 2,
+                    "label": {
+                      "en": "Low",
+                      "fr": "Faible"
+                    },
+                    "indicator": "#16a34a"
+                  },
+                  {
+                    "max": 4,
+                    "label": {
+                      "en": "Moderate",
+                      "fr": "Modéré"
+                    },
+                    "indicator": "#eab308"
+                  },
+                  {
+                    "max": 5,
+                    "label": {
+                      "en": "High",
+                      "fr": "Élevé"
+                    },
+                    "indicator": "#dc2626"
+                  }
+                ],
+                "reviewSchemaId": "390",
+                "checklistSchema": null,
+                "assessmentSchema": {
+                  "outcomes": [],
+                  "sections": [
+                    {
+                      "icon": "i-lucide-shield-check",
+                      "name": "risk",
+                      "label": {
+                        "en": "Delivery Risk",
+                        "fr": "Risque de réalisation"
+                      },
+                      "number": "1",
+                      "weight": 1,
+                      "subSections": [
+                        {
+                          "name": "capacity",
+                          "label": {
+                            "en": "Delivery Capacity",
+                            "fr": "Capacité de réalisation"
+                          },
+                          "weight": {
+                            "weight": 1,
+                            "adjustable": false
+                          },
+                          "questions": [
+                            {
+                              "help": [],
+                              "name": "capacity",
+                              "type": "question",
+                              "weight": {
+                                "weight": 1,
+                                "adjustable": false
+                              },
+                              "options": [
+                                {
+                                  "label": {
+                                    "en": "Low",
+                                    "fr": "Faible"
+                                  },
+                                  "value": 2,
+                                  "description": {
+                                    "en": "Low",
+                                    "fr": "Faible"
+                                  }
+                                },
+                                {
+                                  "label": {
+                                    "en": "Moderate",
+                                    "fr": "Modéré"
+                                  },
+                                  "value": 4,
+                                  "description": {
+                                    "en": "Moderate",
+                                    "fr": "Modéré"
+                                  }
+                                },
+                                {
+                                  "label": {
+                                    "en": "High",
+                                    "fr": "Élevé"
+                                  },
+                                  "value": 5,
+                                  "description": {
+                                    "en": "High",
+                                    "fr": "Élevé"
+                                  }
+                                }
+                              ],
+                              "question": {
+                                "en": "How much delivery risk does the project present?",
+                                "fr": "Quel niveau de risque de réalisation le projet présente-t-il?"
+                              },
+                              "commentThreshold": {
+                                "max": 6,
+                                "min": 0
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ],
+                  "sectionMatrix": [
+                    {
+                      "max": 2,
+                      "label": {
+                        "en": "Low",
+                        "fr": "Faible"
+                      },
+                      "indicator": "#16a34a"
+                    },
+                    {
+                      "max": 4,
+                      "label": {
+                        "en": "Moderate",
+                        "fr": "Modéré"
+                      },
+                      "indicator": "#eab308"
+                    },
+                    {
+                      "max": 5,
+                      "label": {
+                        "en": "High",
+                        "fr": "Élevé"
+                      },
+                      "indicator": "#dc2626"
+                    }
+                  ]
+                },
+                "disableAlignment": true,
+                "disableReviewers": false,
+                "disableCustomOutcomes": true
+              },
+              "publicationId": "390",
+              "publicationKind": "review_schema",
+              "publicationVersion": 1,
+              "publicationVersionId": "399"
+            },
+            "memberId": "2",
+            "reviewType": "assessment",
+            "failureThreshold": null,
+            "failOnChecklistFailure": false
           }
         ],
         "agencyId": "21",
@@ -4990,7 +5163,7 @@
         "directReview": false,
         "reviewSetupId": "388"
       },
-      "egcs_cn_hash": "b0a20750df98ad26fe5ada56896b4eca1bd9151c2e898fadb37d0e91cb7477c1",
+      "egcs_cn_hash": "400f3ce76bdcbeb6cf819825e3f5be4259ea934d682f049fbc2e07f0729f848d",
       "egcs_cn_actor": 1,
       "egcs_cn_createdat": "2026-10-06T20:22:32.207+00:00"
     },
@@ -5181,6 +5354,172 @@
                   "reviewType": "assessment",
                   "failureThreshold": null,
                   "failOnChecklistFailure": false
+                },
+                {
+                  "order": 2,
+                  "schema": {
+                    "definition": {
+                      "kind": "review_schema",
+                      "name": {
+                        "en": "Risk Score Setting Assessment",
+                        "fr": "Évaluation définissant la cote de risque"
+                      },
+                      "agencyId": "21",
+                      "entityType": "fundingcaseagreement",
+                      "reviewType": "assessment",
+                      "outcomeName": {
+                        "en": "Risk Rating",
+                        "fr": "Cote de risque"
+                      },
+                      "scoringMatrix": [
+                        {
+                          "max": 2,
+                          "label": {
+                            "en": "Low",
+                            "fr": "Faible"
+                          },
+                          "indicator": "#16a34a"
+                        },
+                        {
+                          "max": 4,
+                          "label": {
+                            "en": "Moderate",
+                            "fr": "Modéré"
+                          },
+                          "indicator": "#eab308"
+                        },
+                        {
+                          "max": 5,
+                          "label": {
+                            "en": "High",
+                            "fr": "Élevé"
+                          },
+                          "indicator": "#dc2626"
+                        }
+                      ],
+                      "reviewSchemaId": "390",
+                      "checklistSchema": null,
+                      "assessmentSchema": {
+                        "outcomes": [],
+                        "sections": [
+                          {
+                            "icon": "i-lucide-shield-check",
+                            "name": "risk",
+                            "label": {
+                              "en": "Delivery Risk",
+                              "fr": "Risque de réalisation"
+                            },
+                            "number": "1",
+                            "weight": 1,
+                            "subSections": [
+                              {
+                                "name": "capacity",
+                                "label": {
+                                  "en": "Delivery Capacity",
+                                  "fr": "Capacité de réalisation"
+                                },
+                                "weight": {
+                                  "weight": 1,
+                                  "adjustable": false
+                                },
+                                "questions": [
+                                  {
+                                    "help": [],
+                                    "name": "capacity",
+                                    "type": "question",
+                                    "weight": {
+                                      "weight": 1,
+                                      "adjustable": false
+                                    },
+                                    "options": [
+                                      {
+                                        "label": {
+                                          "en": "Low",
+                                          "fr": "Faible"
+                                        },
+                                        "value": 2,
+                                        "description": {
+                                          "en": "Low",
+                                          "fr": "Faible"
+                                        }
+                                      },
+                                      {
+                                        "label": {
+                                          "en": "Moderate",
+                                          "fr": "Modéré"
+                                        },
+                                        "value": 4,
+                                        "description": {
+                                          "en": "Moderate",
+                                          "fr": "Modéré"
+                                        }
+                                      },
+                                      {
+                                        "label": {
+                                          "en": "High",
+                                          "fr": "Élevé"
+                                        },
+                                        "value": 5,
+                                        "description": {
+                                          "en": "High",
+                                          "fr": "Élevé"
+                                        }
+                                      }
+                                    ],
+                                    "question": {
+                                      "en": "How much delivery risk does the project present?",
+                                      "fr": "Quel niveau de risque de réalisation le projet présente-t-il?"
+                                    },
+                                    "commentThreshold": {
+                                      "max": 6,
+                                      "min": 0
+                                    }
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ],
+                        "sectionMatrix": [
+                          {
+                            "max": 2,
+                            "label": {
+                              "en": "Low",
+                              "fr": "Faible"
+                            },
+                            "indicator": "#16a34a"
+                          },
+                          {
+                            "max": 4,
+                            "label": {
+                              "en": "Moderate",
+                              "fr": "Modéré"
+                            },
+                            "indicator": "#eab308"
+                          },
+                          {
+                            "max": 5,
+                            "label": {
+                              "en": "High",
+                              "fr": "Élevé"
+                            },
+                            "indicator": "#dc2626"
+                          }
+                        ]
+                      },
+                      "disableAlignment": true,
+                      "disableReviewers": false,
+                      "disableCustomOutcomes": true
+                    },
+                    "publicationId": "390",
+                    "publicationKind": "review_schema",
+                    "publicationVersion": 1,
+                    "publicationVersionId": "399"
+                  },
+                  "memberId": "2",
+                  "reviewType": "assessment",
+                  "failureThreshold": null,
+                  "failOnChecklistFailure": false
                 }
               ],
               "agencyId": "21",
@@ -5222,10 +5561,10 @@
             }
           ],
           "workflowMemberId": "59",
-          "reviewSetupMemberId": "1",
+          "reviewSetupMemberId": "2",
           "assessmentSchemaVersion": 1,
-          "assessmentSchemaVersionId": "396",
-          "assessmentSchemaPublicationId": "387"
+          "assessmentSchemaVersionId": "399",
+          "assessmentSchemaPublicationId": "390"
         },
         "cancellationStatus": "382",
         "allowedStartStatuses": [
@@ -5235,7 +5574,169 @@
         ],
         "executionFailureStatus": "382"
       },
-      "egcs_cn_hash": "e18c1aa80727df19b869b836ce1e3dded75c761f706520f7f2d48708716331ef",
+      "egcs_cn_hash": "f81c5aa4ea9771cbf661630374959be78d9e9f987fbece062f5eeb2857eff0af",
+      "egcs_cn_actor": 1,
+      "egcs_cn_createdat": "2026-10-06T20:22:32.207+00:00"
+    },
+    {
+      "id": 399,
+      "egcs_cn_publication": 390,
+      "egcs_cn_kind": "review_schema",
+      "egcs_cn_version": 1,
+      "egcs_cn_definition": {
+        "kind": "review_schema",
+        "name": {
+          "en": "Risk Score Setting Assessment",
+          "fr": "Évaluation définissant la cote de risque"
+        },
+        "agencyId": "21",
+        "entityType": "fundingcaseagreement",
+        "reviewType": "assessment",
+        "outcomeName": {
+          "en": "Risk Rating",
+          "fr": "Cote de risque"
+        },
+        "scoringMatrix": [
+          {
+            "max": 2,
+            "label": {
+              "en": "Low",
+              "fr": "Faible"
+            },
+            "indicator": "#16a34a"
+          },
+          {
+            "max": 4,
+            "label": {
+              "en": "Moderate",
+              "fr": "Modéré"
+            },
+            "indicator": "#eab308"
+          },
+          {
+            "max": 5,
+            "label": {
+              "en": "High",
+              "fr": "Élevé"
+            },
+            "indicator": "#dc2626"
+          }
+        ],
+        "reviewSchemaId": "390",
+        "checklistSchema": null,
+        "assessmentSchema": {
+          "outcomes": [],
+          "sections": [
+            {
+              "icon": "i-lucide-shield-check",
+              "name": "risk",
+              "label": {
+                "en": "Delivery Risk",
+                "fr": "Risque de réalisation"
+              },
+              "number": "1",
+              "weight": 1,
+              "subSections": [
+                {
+                  "name": "capacity",
+                  "label": {
+                    "en": "Delivery Capacity",
+                    "fr": "Capacité de réalisation"
+                  },
+                  "weight": {
+                    "weight": 1,
+                    "adjustable": false
+                  },
+                  "questions": [
+                    {
+                      "help": [],
+                      "name": "capacity",
+                      "type": "question",
+                      "weight": {
+                        "weight": 1,
+                        "adjustable": false
+                      },
+                      "options": [
+                        {
+                          "label": {
+                            "en": "Low",
+                            "fr": "Faible"
+                          },
+                          "value": 2,
+                          "description": {
+                            "en": "Low",
+                            "fr": "Faible"
+                          }
+                        },
+                        {
+                          "label": {
+                            "en": "Moderate",
+                            "fr": "Modéré"
+                          },
+                          "value": 4,
+                          "description": {
+                            "en": "Moderate",
+                            "fr": "Modéré"
+                          }
+                        },
+                        {
+                          "label": {
+                            "en": "High",
+                            "fr": "Élevé"
+                          },
+                          "value": 5,
+                          "description": {
+                            "en": "High",
+                            "fr": "Élevé"
+                          }
+                        }
+                      ],
+                      "question": {
+                        "en": "How much delivery risk does the project present?",
+                        "fr": "Quel niveau de risque de réalisation le projet présente-t-il?"
+                      },
+                      "commentThreshold": {
+                        "max": 6,
+                        "min": 0
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "sectionMatrix": [
+            {
+              "max": 2,
+              "label": {
+                "en": "Low",
+                "fr": "Faible"
+              },
+              "indicator": "#16a34a"
+            },
+            {
+              "max": 4,
+              "label": {
+                "en": "Moderate",
+                "fr": "Modéré"
+              },
+              "indicator": "#eab308"
+            },
+            {
+              "max": 5,
+              "label": {
+                "en": "High",
+                "fr": "Élevé"
+              },
+              "indicator": "#dc2626"
+            }
+          ]
+        },
+        "disableAlignment": true,
+        "disableReviewers": false,
+        "disableCustomOutcomes": true
+      },
+      "egcs_cn_hash": "03f911c0ab67f23c206425d605b39fc9d7d64b92e5144fc935cbbd39fbe34d38",
       "egcs_cn_actor": 1,
       "egcs_cn_createdat": "2026-10-06T20:22:32.207+00:00"
     }
@@ -5519,6 +6020,16 @@
       "egcs_cn_publication": 388,
       "egcs_cn_kind": "review_set_setup",
       "egcs_cn_publicationversion": 397,
+      "egcs_cn_version": 1
+    },
+    {
+      "id": 250,
+      "egcs_cn_parentversion": 397,
+      "egcs_cn_path": "members.schema",
+      "egcs_cn_order": 2,
+      "egcs_cn_publication": 390,
+      "egcs_cn_kind": "review_schema",
+      "egcs_cn_publicationversion": 399,
       "egcs_cn_version": 1
     }
   ],
@@ -14637,7 +15148,9 @@
       "egcs_cn_failurestatus": 397,
       "egcs_cn_allowownerredirect": false,
       "egcs_cn_profileconditions": [],
-      "_deleted": false
+      "_deleted": false,
+      "egcs_cn_setsriskrating": false,
+      "egcs_cn_riskreviewsetup": null
     },
     {
       "id": 43,
@@ -14652,7 +15165,9 @@
       "egcs_cn_failurestatus": 397,
       "egcs_cn_allowownerredirect": false,
       "egcs_cn_profileconditions": [],
-      "_deleted": false
+      "_deleted": false,
+      "egcs_cn_setsriskrating": false,
+      "egcs_cn_riskreviewsetup": null
     },
     {
       "id": 44,
@@ -14667,7 +15182,9 @@
       "egcs_cn_failurestatus": 397,
       "egcs_cn_allowownerredirect": false,
       "egcs_cn_profileconditions": [],
-      "_deleted": false
+      "_deleted": false,
+      "egcs_cn_setsriskrating": false,
+      "egcs_cn_riskreviewsetup": null
     },
     {
       "id": 45,
@@ -14682,7 +15199,9 @@
       "egcs_cn_failurestatus": 397,
       "egcs_cn_allowownerredirect": false,
       "egcs_cn_profileconditions": [],
-      "_deleted": false
+      "_deleted": false,
+      "egcs_cn_setsriskrating": false,
+      "egcs_cn_riskreviewsetup": null
     },
     {
       "id": 46,
@@ -14697,7 +15216,9 @@
       "egcs_cn_failurestatus": 397,
       "egcs_cn_allowownerredirect": false,
       "egcs_cn_profileconditions": [],
-      "_deleted": false
+      "_deleted": false,
+      "egcs_cn_setsriskrating": false,
+      "egcs_cn_riskreviewsetup": null
     },
     {
       "id": 47,
@@ -14712,7 +15233,9 @@
       "egcs_cn_failurestatus": 397,
       "egcs_cn_allowownerredirect": false,
       "egcs_cn_profileconditions": [],
-      "_deleted": false
+      "_deleted": false,
+      "egcs_cn_setsriskrating": false,
+      "egcs_cn_riskreviewsetup": null
     },
     {
       "id": 48,
@@ -14727,7 +15250,9 @@
       "egcs_cn_failurestatus": 397,
       "egcs_cn_allowownerredirect": false,
       "egcs_cn_profileconditions": [],
-      "_deleted": false
+      "_deleted": false,
+      "egcs_cn_setsriskrating": false,
+      "egcs_cn_riskreviewsetup": null
     },
     {
       "id": 49,
@@ -14742,7 +15267,9 @@
       "egcs_cn_failurestatus": 397,
       "egcs_cn_allowownerredirect": false,
       "egcs_cn_profileconditions": [],
-      "_deleted": false
+      "_deleted": false,
+      "egcs_cn_setsriskrating": false,
+      "egcs_cn_riskreviewsetup": null
     },
     {
       "id": 50,
@@ -14757,7 +15284,9 @@
       "egcs_cn_failurestatus": 397,
       "egcs_cn_allowownerredirect": false,
       "egcs_cn_profileconditions": [],
-      "_deleted": false
+      "_deleted": false,
+      "egcs_cn_setsriskrating": false,
+      "egcs_cn_riskreviewsetup": null
     },
     {
       "id": 51,
@@ -14772,7 +15301,9 @@
       "egcs_cn_failurestatus": 397,
       "egcs_cn_allowownerredirect": false,
       "egcs_cn_profileconditions": [],
-      "_deleted": false
+      "_deleted": false,
+      "egcs_cn_setsriskrating": false,
+      "egcs_cn_riskreviewsetup": null
     },
     {
       "id": 52,
@@ -14787,7 +15318,9 @@
       "egcs_cn_failurestatus": 397,
       "egcs_cn_allowownerredirect": false,
       "egcs_cn_profileconditions": [],
-      "_deleted": false
+      "_deleted": false,
+      "egcs_cn_setsriskrating": false,
+      "egcs_cn_riskreviewsetup": null
     },
     {
       "id": 53,
@@ -14802,7 +15335,9 @@
       "egcs_cn_failurestatus": 398,
       "egcs_cn_allowownerredirect": false,
       "egcs_cn_profileconditions": [],
-      "_deleted": false
+      "_deleted": false,
+      "egcs_cn_setsriskrating": false,
+      "egcs_cn_riskreviewsetup": null
     },
     {
       "id": 54,
@@ -14817,7 +15352,9 @@
       "egcs_cn_failurestatus": 398,
       "egcs_cn_allowownerredirect": false,
       "egcs_cn_profileconditions": [],
-      "_deleted": false
+      "_deleted": false,
+      "egcs_cn_setsriskrating": false,
+      "egcs_cn_riskreviewsetup": null
     },
     {
       "id": 55,
@@ -14832,7 +15369,9 @@
       "egcs_cn_failurestatus": 398,
       "egcs_cn_allowownerredirect": false,
       "egcs_cn_profileconditions": [],
-      "_deleted": false
+      "_deleted": false,
+      "egcs_cn_setsriskrating": false,
+      "egcs_cn_riskreviewsetup": null
     },
     {
       "id": 56,
@@ -14847,7 +15386,9 @@
       "egcs_cn_failurestatus": 390,
       "egcs_cn_allowownerredirect": false,
       "egcs_cn_profileconditions": [],
-      "_deleted": false
+      "_deleted": false,
+      "egcs_cn_setsriskrating": false,
+      "egcs_cn_riskreviewsetup": null
     },
     {
       "id": 57,
@@ -14862,7 +15403,9 @@
       "egcs_cn_failurestatus": 397,
       "egcs_cn_allowownerredirect": false,
       "egcs_cn_profileconditions": [],
-      "_deleted": false
+      "_deleted": false,
+      "egcs_cn_setsriskrating": false,
+      "egcs_cn_riskreviewsetup": null
     },
     {
       "id": 58,
@@ -14877,7 +15420,9 @@
       "egcs_cn_failurestatus": 397,
       "egcs_cn_allowownerredirect": false,
       "egcs_cn_profileconditions": [],
-      "_deleted": false
+      "_deleted": false,
+      "egcs_cn_setsriskrating": false,
+      "egcs_cn_riskreviewsetup": null
     },
     {
       "id": 59,
@@ -14892,7 +15437,9 @@
       "egcs_cn_failurestatus": 382,
       "egcs_cn_allowownerredirect": false,
       "egcs_cn_profileconditions": [],
-      "_deleted": false
+      "_deleted": false,
+      "egcs_cn_setsriskrating": true,
+      "egcs_cn_riskreviewsetup": "2"
     }
   ],
   "Common_Workflow_Status_Transition": [
@@ -22083,6 +22630,155 @@
       "egcs_cn_disablealignment": true,
       "egcs_cn_disablereviewers": false,
       "egcs_cn_disablecustomoutcomes": true
+    },
+    {
+      "id": 390,
+      "_deleted": false,
+      "egcs_cn_agency": 21,
+      "egcs_cn_name_en": "Risk Score Setting Assessment",
+      "egcs_cn_name_fr": "Évaluation définissant la cote de risque",
+      "egcs_cn_entitytype": "fundingcaseagreement",
+      "egcs_cn_reviewtype": "assessment",
+      "egcs_cn_scoringmatrix": [
+        {
+          "max": 2,
+          "label": {
+            "en": "Low",
+            "fr": "Faible"
+          },
+          "indicator": "#16a34a"
+        },
+        {
+          "max": 4,
+          "label": {
+            "en": "Moderate",
+            "fr": "Modéré"
+          },
+          "indicator": "#eab308"
+        },
+        {
+          "max": 5,
+          "label": {
+            "en": "High",
+            "fr": "Élevé"
+          },
+          "indicator": "#dc2626"
+        }
+      ],
+      "egcs_cn_outcomename_en": "Risk Rating",
+      "egcs_cn_outcomename_fr": "Cote de risque",
+      "egcs_cn_publicationkind": "review_schema",
+      "egcs_cn_assessmentschema": {
+        "outcomes": [],
+        "sections": [
+          {
+            "icon": "i-lucide-shield-check",
+            "name": "risk",
+            "label": {
+              "en": "Delivery Risk",
+              "fr": "Risque de réalisation"
+            },
+            "number": "1",
+            "weight": 1,
+            "subSections": [
+              {
+                "name": "capacity",
+                "label": {
+                  "en": "Delivery Capacity",
+                  "fr": "Capacité de réalisation"
+                },
+                "weight": {
+                  "weight": 1,
+                  "adjustable": false
+                },
+                "questions": [
+                  {
+                    "help": [],
+                    "name": "capacity",
+                    "type": "question",
+                    "weight": {
+                      "weight": 1,
+                      "adjustable": false
+                    },
+                    "options": [
+                      {
+                        "label": {
+                          "en": "Low",
+                          "fr": "Faible"
+                        },
+                        "value": 2,
+                        "description": {
+                          "en": "Low",
+                          "fr": "Faible"
+                        }
+                      },
+                      {
+                        "label": {
+                          "en": "Moderate",
+                          "fr": "Modéré"
+                        },
+                        "value": 4,
+                        "description": {
+                          "en": "Moderate",
+                          "fr": "Modéré"
+                        }
+                      },
+                      {
+                        "label": {
+                          "en": "High",
+                          "fr": "Élevé"
+                        },
+                        "value": 5,
+                        "description": {
+                          "en": "High",
+                          "fr": "Élevé"
+                        }
+                      }
+                    ],
+                    "question": {
+                      "en": "How much delivery risk does the project present?",
+                      "fr": "Quel niveau de risque de réalisation le projet présente-t-il?"
+                    },
+                    "commentThreshold": {
+                      "max": 6,
+                      "min": 0
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "sectionMatrix": [
+          {
+            "max": 2,
+            "label": {
+              "en": "Low",
+              "fr": "Faible"
+            },
+            "indicator": "#16a34a"
+          },
+          {
+            "max": 4,
+            "label": {
+              "en": "Moderate",
+              "fr": "Modéré"
+            },
+            "indicator": "#eab308"
+          },
+          {
+            "max": 5,
+            "label": {
+              "en": "High",
+              "fr": "Élevé"
+            },
+            "indicator": "#dc2626"
+          }
+        ]
+      },
+      "egcs_cn_disablealignment": true,
+      "egcs_cn_disablereviewers": false,
+      "egcs_cn_disablecustomoutcomes": true
     }
   ],
   "Common_Review_Set_Setup": [
@@ -22111,6 +22807,18 @@
       "egcs_cn_entitytype": "fundingcaseagreement",
       "egcs_cn_defaultgroup": null,
       "egcs_cn_reviewschema": 387,
+      "egcs_cn_approvaltemplate": null,
+      "egcs_cn_failurethreshold": null,
+      "egcs_cn_failonchecklistfailure": false
+    },
+    {
+      "id": 2,
+      "_deleted": false,
+      "egcs_cn_order": 2,
+      "egcs_cn_reviewset": 388,
+      "egcs_cn_entitytype": "fundingcaseagreement",
+      "egcs_cn_defaultgroup": null,
+      "egcs_cn_reviewschema": 390,
       "egcs_cn_approvaltemplate": null,
       "egcs_cn_failurethreshold": null,
       "egcs_cn_failonchecklistfailure": false
