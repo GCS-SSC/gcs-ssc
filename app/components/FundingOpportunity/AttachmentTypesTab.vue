@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
-import type { TableColumn } from '@nuxt/ui'
+import type { TableColumnInput } from '~/composables/useTableColumns'
+import { useTableListState } from '~/composables/useTableListState'
 import type { AdminCommonLookupResponseItem } from '~~/shared/types/admin-common-ui'
 import { z } from 'zod'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -54,11 +55,28 @@ const mutationError: Ref<boolean> = ref(false)
 let contextGeneration = 0
 let disposed = false
 
-const columns = computed<TableColumn<OpportunityAttachmentType>[]>(() => [
-  { id: 'name', header: t('attachments.type') },
-  { id: 'visibility', header: t('funding_opportunity.attachment_visibility') },
-  { id: 'actions', header: t('common.actions') }
-])
+const columns: TableColumnInput<OpportunityAttachmentType>[] = [
+  { id: 'name', headerKey: 'attachments.type' },
+  { id: 'visibility', headerKey: 'funding_opportunity.attachment_visibility' },
+  { id: 'actions', headerKey: 'common.actions' }
+]
+const { search, pagination } = useTableListState(10)
+const filteredRows = computed(() => {
+  const query = search.value.trim().toLocaleLowerCase()
+  return rows.value.filter(row => !query || [row.name_en, row.name_fr]
+    .some(name => name.toLocaleLowerCase().includes(query)))
+})
+const pageRows = computed(() => filteredRows.value.slice(
+  pagination.value.pageIndex * pagination.value.pageSize,
+  (pagination.value.pageIndex + 1) * pagination.value.pageSize
+))
+watch(search, () => {
+  pagination.value.pageIndex = 0
+})
+watch([() => filteredRows.value.length, () => pagination.value.pageSize], () => {
+  const lastPage = Math.max(0, Math.ceil(filteredRows.value.length / pagination.value.pageSize) - 1)
+  pagination.value.pageIndex = Math.min(pagination.value.pageIndex, lastPage)
+})
 const linkedIds = computed(() => rows.value.map(row => row.id))
 const lookupUrl = computed(() => `/api/funding-opportunities/${opportunityId}/lookups/attachment-types`)
 const label = (row: OpportunityAttachmentType): string => getBilingualValue(row, 'name', row.id)
@@ -69,6 +87,8 @@ watch(() => attachmentTypes, value => {
 })
 watch(() => opportunityId, () => {
   contextGeneration += 1
+  search.value = ''
+  pagination.value.pageIndex = 0
   rows.value = [...attachmentTypes]
   draft.value = null
   selectedType.value = null
@@ -166,18 +186,6 @@ const remove = async (id: string): Promise<void> => {
 
 <template>
   <section class="space-y-4">
-    <div class="flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <h2 class="text-lg font-semibold">
-          {{ t('funding_opportunity.attachment_types') }}
-        </h2>
-        <p class="mt-1 text-sm text-muted">
-          {{ t('funding_opportunity.attachment_types_help') }}
-        </p>
-      </div>
-      <UButton v-if="canEdit" icon="i-lucide-link" :label="t('common.add')" :disabled="pending" @click="openAdd" />
-    </div>
-
     <UAlert
       v-if="mutationError"
       role="alert"
@@ -185,7 +193,16 @@ const remove = async (id: string): Promise<void> => {
       icon="i-lucide-circle-alert"
       :title="t('funding_opportunity.attachment_save_failed')" />
 
-    <CommonCompactTable :data="rows" :columns="columns" :loading="loading" :empty-text="t('common.no_data')">
+    <CommonResourceLayoutCard
+      v-model:search="search"
+      v-model:pagination="pagination"
+      :data="pageRows"
+      :columns="columns"
+      :total-records="filteredRows.length"
+      :loading="loading"
+      :show-button="canEdit && !pending"
+      :button-label="t('common.add')"
+      @add="openAdd">
       <template #name-cell="{ row }">
         <CommonBilingualName :name-en="row.original.name_en" :name-fr="row.original.name_fr" />
       </template>
@@ -213,9 +230,9 @@ const remove = async (id: string): Promise<void> => {
             @click="remove(row.original.id)" />
         </div>
       </template>
-    </CommonCompactTable>
+    </CommonResourceLayoutCard>
 
-    <UModal :open="draft !== null" :title="t('funding_opportunity.add_attachment_type')" @update:open="value => { if (!value) closeAdd() }">
+    <UModal :open="draft !== null" :title="t('funding_opportunity.add_attachment_type')" :description="t('funding_opportunity.attachment_types_help')" @update:open="value => { if (!value) closeAdd() }">
       <template #body>
         <UForm v-if="draft" :state="draft" :validate="createValidator(LinkSchema)" class="space-y-4" @submit="add">
           <UFormField :label="t('attachments.type')" name="id" required>

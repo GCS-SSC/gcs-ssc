@@ -97,9 +97,11 @@ const submit = async () => {
         </template>
         <template #streams-cell="{ row }">
           <div class="flex flex-wrap gap-1">
-            <UBadge v-for="stream in row.original.streams" :key="stream.id" color="neutral" variant="soft">
-              {{ locale === 'fr' ? stream.name_fr : stream.name_en }}
-            </UBadge>
+            <CommonStatusBadge
+              v-for="stream in row.original.streams"
+              :key="stream.id"
+              variant="meta"
+              :label="locale === 'fr' ? stream.name_fr : stream.name_en" />
           </div>
         </template>
         <template #actions-cell="{ row }">

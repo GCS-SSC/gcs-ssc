@@ -11,6 +11,8 @@ type Opportunity = OpportunityForm & {
   id: string; agency_id: string; program_id: string
   program_name_en: string; program_name_fr: string
   egcs_fo_status: string
+  egcs_fo_name_en: string; egcs_fo_name_fr: string
+  egcs_fo_objective_en: string; egcs_fo_objective_fr: string
   egcs_fo_reviewsetups: string[]
   egcs_fo_workflowsetups: string[]
   streams: Array<{ id: string; name_en: string; name_fr: string }>
@@ -122,6 +124,12 @@ const remove = async () => {
     showError(cause)
   }
 }
+const streamsLabel = computed(() => profile.value
+  ? profile.value.streams.map(stream => getBilingualValue(stream, 'name', stream.id)).join(', ')
+  : '')
+const heroMetaItems = computed(() => profile.value
+  ? [`#${profile.value.id}`, `${t('funding_opportunity.program')}: ${getBilingualValue(profile.value, 'program_name', profile.value.program_id)}`]
+  : [])
 const breadcrumbs = computed(() => [
   { label: t('funding_opportunity.title'), to: localePath(appRouteLocations.fundingOpportunities()) },
   { label: profile.value ? getBilingualValue(profile.value, 'egcs_fo_name', id) : id }
@@ -153,64 +161,59 @@ const breadcrumbs = computed(() => [
         </template>
       </UAlert>
       <div v-else-if="profile" class="flex flex-1 flex-col">
-        <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-megaphone" :title="getBilingualValue(profile, 'egcs_fo_name', id)" :description="getBilingualValue(profile, 'egcs_fo_objective', '')" :badges="[{ statusId: String(profile.egcs_fo_status) }]" :actions="[{ label: t('common.edit'), icon: 'i-lucide-edit-3', visible: canEdit, onClick: edit }, { label: t('common.delete'), icon: 'i-lucide-trash', visible: canDelete, onClick: remove }]" />
+        <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-megaphone" :title="getBilingualValue(profile, 'egcs_fo_name', id)" :meta-items="heroMetaItems" :badges="[{ statusId: String(profile.egcs_fo_status) }]" :actions="[{ label: t('funding_opportunity.edit'), icon: 'i-lucide-edit-3', visible: canEdit, onClick: edit }, { label: t('common.delete'), icon: 'i-lucide-trash', visible: canDelete, onClick: remove }]" />
         <CommonEntityEditorWorkspace content-test-id="funding-opportunity-detail-content">
           <template #sidebar>
             <CommonRouteTabs v-model="selectedTab" :items="tabs" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
           </template>
-          <CommonSection v-if="selectedTab === 'general'" :title="t('funding_opportunity.details')" :grid-cols="1">
-            <dl class="grid gap-4 md:grid-cols-2">
-              <div>
-                <dt class="text-sm text-muted">
-                  {{ t('funding_opportunity.program') }}
-                </dt><dd>{{ getBilingualValue(profile, 'program_name', profile.program_id) }}</dd>
-              </div>
-              <div>
-                <dt class="text-sm text-muted">
-                  {{ t('funding_opportunity.streams') }}
-                </dt>
-                <dd v-for="stream in profile.streams" :key="stream.id">
-                  {{ getBilingualValue(stream, 'name', stream.id) }}
-                </dd>
-              </div>
-              <div>
-                <dt class="text-sm text-muted">
-                  {{ t('funding_opportunity.name_en') }}
-                </dt><dd>{{ profile.egcs_fo_name_en }}</dd>
-              </div>
-              <div>
-                <dt class="text-sm text-muted">
-                  {{ t('funding_opportunity.name_fr') }}
-                </dt><dd>{{ profile.egcs_fo_name_fr }}</dd>
-              </div>
-              <div>
-                <dt class="text-sm text-muted">
-                  {{ t('funding_opportunity.start_date') }}
-                </dt><dd>{{ toDateInput(profile.egcs_fo_datestart) }}</dd>
-              </div>
-              <div>
-                <dt class="text-sm text-muted">
-                  {{ t('funding_opportunity.end_date') }}
-                </dt><dd>{{ toDateInput(profile.egcs_fo_dateend) }}</dd>
-              </div>
-              <div>
-                <dt class="text-sm text-muted">
-                  {{ t('funding_opportunity.objective_en') }}
-                </dt>
-                <dd class="whitespace-pre-wrap">
-                  {{ profile.egcs_fo_objective_en }}
-                </dd>
-              </div>
-              <div>
-                <dt class="text-sm text-muted">
-                  {{ t('funding_opportunity.objective_fr') }}
-                </dt>
-                <dd class="whitespace-pre-wrap">
-                  {{ profile.egcs_fo_objective_fr }}
-                </dd>
-              </div>
-            </dl>
-          </CommonSection>
+          <div v-if="selectedTab === 'general'" class="mx-auto max-w-4xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+            <CommonSection :title="t('agency.detail.core_info')" badge="01">
+              <CommonValueCard :label="t('funding_opportunity.name_en')" :value="profile.egcs_fo_name_en" />
+              <CommonValueCard :label="t('funding_opportunity.name_fr')" :value="profile.egcs_fo_name_fr" />
+              <UCard class="min-w-0 border-none bg-white shadow-sm ring-1 ring-zinc-100 dark:bg-zinc-900 dark:ring-zinc-800">
+                <dl class="space-y-2">
+                  <dt class="text-xs font-black tracking-widest text-zinc-400 uppercase dark:text-zinc-500">
+                    {{ t('funding_opportunity.objective_en') }}
+                  </dt>
+                  <dd class="text-sm break-words whitespace-pre-wrap text-zinc-900 dark:text-white">
+                    {{ profile.egcs_fo_objective_en }}
+                  </dd>
+                </dl>
+              </UCard>
+              <UCard class="min-w-0 border-none bg-white shadow-sm ring-1 ring-zinc-100 dark:bg-zinc-900 dark:ring-zinc-800">
+                <dl class="space-y-2">
+                  <dt class="text-xs font-black tracking-widest text-zinc-400 uppercase dark:text-zinc-500">
+                    {{ t('funding_opportunity.objective_fr') }}
+                  </dt>
+                  <dd class="text-sm break-words whitespace-pre-wrap text-zinc-900 dark:text-white">
+                    {{ profile.egcs_fo_objective_fr }}
+                  </dd>
+                </dl>
+              </UCard>
+            </CommonSection>
+            <CommonSection :title="t('funding_opportunity.details')" badge="02">
+              <CommonValueCard
+                :label="t('funding_opportunity.program')"
+                :value="getBilingualValue(profile, 'program_name', profile.program_id)"
+                icon="i-lucide-landmark"
+                variant="ghost" />
+              <CommonValueCard
+                :label="t('funding_opportunity.streams')"
+                :value="streamsLabel"
+                icon="i-lucide-layers"
+                variant="ghost" />
+              <CommonValueCard
+                :label="t('funding_opportunity.start_date')"
+                :value="toDateInput(profile.egcs_fo_datestart)"
+                icon="i-lucide-calendar-days"
+                variant="ghost" />
+              <CommonValueCard
+                :label="t('funding_opportunity.end_date')"
+                :value="toDateInput(profile.egcs_fo_dateend)"
+                icon="i-lucide-calendar-check"
+                variant="ghost" />
+            </CommonSection>
+          </div>
           <div v-else-if="selectedTab === 'applications'" class="space-y-5">
             <div>
               <h3 class="text-xl font-semibold text-highlighted">
