@@ -8,6 +8,8 @@ import type { Amended_Type, Database, JsonValue } from '~~/shared/types/database
 import { throwApiError } from './api-errors'
 import { databaseMoneyText, parseDatabaseMoney } from './database-money'
 import { budgetFundingSourcesByLine, loadBudgetFundingSources } from './agreement-budget-funding'
+import type { SubmissionRisk } from '~~/shared/types/risk'
+import { captureSubmissionRisk } from './risk-readiness'
 
 export const ACTIVE_WORKFLOW_RUN_STATUSES = [
   'pending',
@@ -65,7 +67,11 @@ export type AgreementApprovalSnapshotV1 = {
   amendmentSubtypes: Array<Record<string, JsonValue>>
 }
 export type AgreementApprovalSnapshotV2 = Omit<AgreementApprovalSnapshotV1, 'schemaVersion'> & { schemaVersion: 2 }
-export type AgreementApprovalSnapshot = AgreementApprovalSnapshotV1 | AgreementApprovalSnapshotV2
+export type AgreementApprovalSnapshotV3 = Omit<AgreementApprovalSnapshotV2, 'schemaVersion'> & {
+  schemaVersion: 3
+  risk: SubmissionRisk
+}
+export type AgreementApprovalSnapshot = AgreementApprovalSnapshotV1 | AgreementApprovalSnapshotV2 | AgreementApprovalSnapshotV3
 
 export const resolveApprovalPacketDomains = (
   entityType: 'fundingcaseagreement' | 'fundingcaseamendment',
@@ -108,13 +114,30 @@ export const buildAgreementApprovalSnapshot = async (
   event: H3Event,
   trx: Transaction<Database>,
   entityType: 'fundingcaseagreement' | 'fundingcaseamendment',
-  entityId: string
-): Promise<{ agreementId: string, amendmentId: string | null, packet: AgreementApprovalSnapshotV2, hash: string }> => {
+  entityId: string,
+  { retryRuntimeId }: { retryRuntimeId?: string } = {}
+): Promise<{ agreementId: string, amendmentId: string | null, packet: AgreementApprovalSnapshot, hash: string }> => {
   const amendment = entityType === 'fundingcaseamendment'
     ? await trx.selectFrom('Funding_Case_Agreement_Amendment').selectAll().where('id', '=', entityId).where('_deleted', '=', false).forUpdate().executeTakeFirstOrThrow()
     : null
   const agreementId = amendment ? String(amendment.egcs_fc_fundingagreement) : entityId
   const agreement = await trx.selectFrom('Funding_Case_Agreement_Profile').selectAll().where('id', '=', agreementId).where('_deleted', '=', false).forUpdate().executeTakeFirstOrThrow()
+  // Retry retains submitted risk decisions, labels and readiness even after configuration changes.
+  const previousSubmission = retryRuntimeId ? await trx.selectFrom('Funding_Case_Agreement_Approval_Submission')
+    .innerJoin('Common_Runtime', 'Common_Runtime.id', 'Funding_Case_Agreement_Approval_Submission.egcs_fc_workflowrun')
+    .select(['egcs_fc_packet', 'egcs_fc_canonicalhash'])
+    .where('Common_Runtime.id', '=', retryRuntimeId)
+    .where('Common_Runtime.egcs_cn_entitytype', '=', entityType)
+    .where('Common_Runtime.egcs_cn_entityid', '=', entityId)
+    .where('Common_Runtime.egcs_cn_purpose', '=', 'approval_submission')
+    .executeTakeFirstOrThrow() : null
+  const previousPacket = previousSubmission?.egcs_fc_packet as AgreementApprovalSnapshot | undefined
+  if (previousSubmission && previousPacket && hashAgreementApprovalSnapshot(previousPacket) !== previousSubmission.egcs_fc_canonicalhash) {
+    throw new AgreementApprovalSubmissionHashMismatchError('Retry submission packet failed its integrity check')
+  }
+  const risk = previousPacket
+    ? previousPacket.schemaVersion === 3 ? previousPacket.risk : null
+    : await captureSubmissionRisk(event, trx, { entityType, entityId })
   if (!amendment) {
     await mergeAgreementCustomFields(event, trx, String(agreement.egcs_fc_transferpaymentstream), agreement.egcs_fc_customfields, {})
   }
@@ -315,7 +338,7 @@ export const buildAgreementApprovalSnapshot = async (
       return bilingualValue(selections.map(option => option.egcs_ay_name_en).join(', '), selections.map(option => option.egcs_ay_name_fr).join(', '))
     })()
   }))
-  const packet: AgreementApprovalSnapshotV2 = {
+  const businessPacket: AgreementApprovalSnapshotV2 = {
     schemaVersion: 2,
     agreement: amendment ? null : normalizeRow({
       customFields,
@@ -396,5 +419,6 @@ export const buildAgreementApprovalSnapshot = async (
     amendmentTypes: amendmentTypes.map(type => normalizeRow({ amendedDomain: type.egcs_tp_amended, name: bilingualValue(type.egcs_tp_name_en, type.egcs_tp_name_fr) })),
     amendmentSubtypes: amendmentSubtypes.map(subtype => normalizeRow({ name: bilingualValue(subtype.egcs_tp_name_en, subtype.egcs_tp_name_fr) }))
   }
+  const packet: AgreementApprovalSnapshot = risk ? { ...businessPacket, schemaVersion: 3, risk } : businessPacket
   return { agreementId, amendmentId: amendment ? entityId : null, packet, hash: hashAgreementApprovalSnapshot(packet) }
 }

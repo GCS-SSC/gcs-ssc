@@ -6,6 +6,7 @@ import { throwIfAgreementUniqueConstraintError } from '~~/server/utils/agreement
 import { createPrimaryEntityAssignment, resolveAssignmentCommonUserId } from '~~/server/utils/entity-assignment'
 import { assertAgreementAmendable } from '~~/server/utils/agreement-amendment'
 import { lockAgencyDraftStatus } from '~~/server/utils/business-status-runtime'
+import { isRiskRatingWorkflowManaged } from '~~/server/utils/agreement-risk-rating'
 import { dateOnlySql } from '~~/server/utils/database-date'
 
 export default defineEventHandler(async event => {
@@ -56,6 +57,9 @@ export default defineEventHandler(async event => {
       if (validSubtypeIds.size !== validated.amendment_subtype_ids.length || subtypeOutsideSelectedTypes || missingRequiredSubtype) {
         return await badRequest(event, 'INVALID_AGREEMENT_AMENDMENT_SUBTYPE', 'apiErrors.agreement.invalid_amendment_subtype')
       }
+      const agreementRisk = await trx.selectFrom('Funding_Case_Agreement_Profile')
+        .select('egcs_fc_riskscore').where('id', '=', agreementId).where('_deleted', '=', false).executeTakeFirstOrThrow()
+      const riskWorkflowManaged = await isRiskRatingWorkflowManaged(trx, { streamId: current.streamId, entityType: 'fundingcaseamendment' })
       const durationEnabled = types.some(type => type.egcs_tp_amended === 'duration')
       const agreementDates = durationEnabled
         ? await trx.selectFrom('Funding_Case_Agreement_Profile')
@@ -79,6 +83,8 @@ export default defineEventHandler(async event => {
         egcs_fc_name_en: validated.egcs_fc_name_en,
         egcs_fc_name_fr: validated.egcs_fc_name_fr,
         egcs_fc_status: draftStatusId,
+        egcs_fc_changerisk: riskWorkflowManaged,
+        egcs_fc_proposedriskscore: agreementRisk.egcs_fc_riskscore ?? null,
         egcs_fc_proposedauthorizedassistancestartdate: agreementDates?.egcs_fc_authorizedassistancestartdate
           ? dateOnlySql(agreementDates.egcs_fc_authorizedassistancestartdate)
           : undefined,

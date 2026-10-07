@@ -8,6 +8,8 @@ import { assertAgreementAmendmentExists } from './agreement-amendment'
 import { notFound } from './api-errors'
 import { buildAgreementDocumentContext } from './document-generation'
 import { valueOrFallback } from './document-rendering'
+import { readSubmissionRisk } from './risk-readiness'
+import type { AgreementApprovalSnapshot } from './agreement-approval-submission'
 
 export const authorizeAmendmentDocumentResource = async (
   event: H3Event, db: Kysely<Database>, agreementId: string, amendmentId: string,
@@ -57,6 +59,14 @@ export const buildAmendmentDocumentContext = async (
     : agreementContext
   const localized = (en: unknown, fr: unknown) => valueOrFallback(language === 'fra' ? fr : en, language)
   const dateValue = (value: Date | null | undefined) => value ? value.toISOString().slice(0, 10) : null
+  const submission = await db.selectFrom('Funding_Case_Agreement_Approval_Submission')
+    .select('egcs_fc_packet').where('egcs_fc_fundingagreement', '=', agreementId)
+    .where('egcs_fc_amendment', '=', amendmentId)
+    .orderBy('id', 'desc').executeTakeFirst()
+  const packet = submission?.egcs_fc_packet as AgreementApprovalSnapshot | undefined
+  const risk = packet?.schemaVersion === 3
+    ? packet.risk
+    : packet ? null : await readSubmissionRisk(db, { entityType: 'fundingcaseamendment', entityId: amendmentId })
   return {
     ...agreementContext,
     amendment: {
@@ -73,6 +83,11 @@ export const buildAmendmentDocumentContext = async (
       subtypeIds: subtypes.map(subtype => String(subtype.id)),
       proposedStartDate: dateValue(amendment.egcs_fc_proposedauthorizedassistancestartdate),
       proposedEndDate: dateValue(amendment.egcs_fc_proposedauthorizedassistanceenddate),
+      changeRisk: risk?.enabled ?? false,
+      applyRisk: risk?.apply ?? false,
+      proposedRiskScore: risk?.proposedScore ?? null,
+      proposedRiskRating: risk?.rating ? localized(risk.rating.label.en, risk.rating.label.fr) : null,
+      risk,
       hasBudgetSnapshot: Boolean(budgetVersion),
       hasActivitySnapshot: Boolean(activityVersion),
       budget: proposedContext.budget,

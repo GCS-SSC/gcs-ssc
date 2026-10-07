@@ -93,7 +93,7 @@ type RuntimeResponse = {
   canCancel?: boolean
   canStart?: boolean
   startBlocker?: {
-    reason: 'active_workflow' | 'closed_target' | 'terminal_status' | 'no_published_workflow' | 'status_ineligible' | 'unsupported'
+    reason: 'active_workflow' | 'closed_target' | 'terminal_status' | 'no_published_workflow' | 'status_ineligible' | 'unsupported' | 'risk_workflow_required' | 'risk_score_required' | 'risk_rating_frozen'
     runtimeId?: string
     purpose?: Workflow_Purpose
     name_en?: string
@@ -916,7 +916,7 @@ const handleApprovalChanged = async () => {
       icon="i-lucide-triangle-alert"
       :title="t('workflow.standard_unavailable')"
       :description="startBlockerDescription" />
-    <p v-else-if="showWorkflowContent && !data?.current && !data?.applicable?.workflow" class="text-sm text-muted">
+    <p v-else-if="showWorkflowContent && !showPreActionReport && !data?.current && !data?.applicable?.workflow" class="text-sm text-muted">
       {{ t(purpose === 'approval_submission' ? 'workflow.approval_not_configured' : 'workflow.not_configured') }}
     </p>
 

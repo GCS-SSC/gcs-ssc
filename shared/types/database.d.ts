@@ -1465,6 +1465,8 @@ export interface FundingCaseAgreementAmendmentTable {
   egcs_fc_name_fr?: string | null
   egcs_fc_status: StatusId
   egcs_fc_isopen: Generated<boolean>
+  egcs_fc_changerisk: Generated<boolean>
+  egcs_fc_proposedriskscore: number | null
   egcs_fc_proposedauthorizedassistancestartdate?: Date | null
   egcs_fc_proposedauthorizedassistanceenddate?: Date | null
   _deleted: Generated<boolean>

@@ -2,6 +2,7 @@ import type { BudgetCalculationMode } from '../utils/budget-percentage'
 import type { Agreement_Type } from './database'
 import type { BusinessRecordStateFields } from './business-record-state'
 import type { AccountReceivablePaymentCreditMemo } from './account-receivable'
+import type { AgreementRiskSource, SubmissionRisk } from './risk'
 import type { StatusId } from './status'
 import type { Money } from '../utils/money'
 import type { TransferPaymentStreamChartOfAccountDimension } from './schemas/transfer-payment'
@@ -45,6 +46,7 @@ export interface FundingCaseAgreementProfileRow extends FundingCaseAgreementProf
   agreement_subtype_name_fr?: string
   risk_rating_name_en?: string | null
   risk_rating_name_fr?: string | null
+  risk_source?: AgreementRiskSource
   can_update?: boolean
   can_delete?: boolean
   can_create_child_records?: boolean
@@ -194,6 +196,12 @@ export interface FundingCaseAgreementAmendmentRow extends BusinessRecordStateFie
   egcs_fc_name_fr?: string | null
   egcs_fc_status: StatusId
   egcs_fc_isopen: boolean
+  egcs_fc_changerisk: boolean
+  egcs_fc_proposedriskscore: number | null
+  risk_workflow_managed?: boolean
+  has_risk_rating_runs?: boolean
+  latest_risk_rating_run?: SubmissionRisk['calculationSource']
+  risk_rating_available?: boolean
   egcs_fc_proposedauthorizedassistancestartdate?: string | null
   egcs_fc_proposedauthorizedassistanceenddate?: string | null
   amendment_types: FundingCaseAgreementAmendmentTypeRow[]

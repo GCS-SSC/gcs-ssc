@@ -421,11 +421,14 @@ CREATE TABLE "Funding_Case_Agreement_Amendment" (
   "egcs_fc_name_fr" character varying(255),
   "egcs_fc_status" bigint NOT NULL,
   "egcs_fc_isopen" boolean DEFAULT true NOT NULL,
+  "egcs_fc_changerisk" boolean DEFAULT false NOT NULL,
+  "egcs_fc_proposedriskscore" numeric(8,2),
   "egcs_fc_proposedauthorizedassistancestartdate" date,
   "egcs_fc_proposedauthorizedassistanceenddate" date,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "fc_unq_amendmentidfundingagreement" UNIQUE (id, egcs_fc_fundingagreement),
   CONSTRAINT "Funding_Case_Agreement_Amendment_pkey" PRIMARY KEY (id),
+  CONSTRAINT "fc_chk_amendmentproposedriskscore" CHECK (egcs_fc_proposedriskscore >= 0 AND egcs_fc_proposedriskscore <> 'NaN'::numeric),
   CONSTRAINT "fc_chk_amendmentauthorizedassistancedates" CHECK ((((egcs_fc_proposedauthorizedassistancestartdate IS NULL) AND (egcs_fc_proposedauthorizedassistanceenddate IS NULL)) OR ((egcs_fc_proposedauthorizedassistancestartdate IS NOT NULL) AND (egcs_fc_proposedauthorizedassistanceenddate IS NOT NULL) AND (egcs_fc_proposedauthorizedassistanceenddate >= egcs_fc_proposedauthorizedassistancestartdate)))),
   CONSTRAINT "fc_chk_amendmentname" CHECK (((NULLIF(btrim((egcs_fc_name_en)::text), ''::text) IS NOT NULL) OR (NULLIF(btrim((egcs_fc_name_fr)::text), ''::text) IS NOT NULL))),
   CONSTRAINT "fc_chk_amendmentnumberpositive" CHECK ((egcs_fc_amendmentnumber >= 1))
@@ -478,7 +481,7 @@ CREATE TABLE "Funding_Case_Agreement_Approval_Submission" (
   CONSTRAINT "Funding_Case_Agreement_Approval_Submiss_egcs_fc_workflowrun_key" UNIQUE (egcs_fc_workflowrun),
   CONSTRAINT "Funding_Case_Agreement_Approval_Submission_pkey" PRIMARY KEY (id),
   CONSTRAINT "fc_chk_approvalsubmissionhash" CHECK (((egcs_fc_canonicalhash)::text ~ '^[0-9a-f]{64}$'::text)),
-  CONSTRAINT "fc_chk_approvalsubmissionversion" CHECK ((egcs_fc_snapshotschemaversion = 1))
+  CONSTRAINT "fc_chk_approvalsubmissionversion" CHECK ((egcs_fc_snapshotschemaversion IN (1, 2, 3)))
 );
 
 CREATE TABLE "Funding_Case_Agreement_Budget_Fiscal_Year" (

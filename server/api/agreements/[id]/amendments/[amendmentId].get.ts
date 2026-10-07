@@ -4,6 +4,7 @@ import { assertAgreementAmendmentExists, isAgreementAmendable } from '~~/server/
 import { withBusinessRecordState } from '~~/server/utils/business-record-state'
 import { resolveBusinessStatusProtection } from '~~/server/utils/business-status-runtime'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
+import { hasRiskRatingRuns, isRiskRatingWorkflowManaged, resolveLatestRiskRating } from '~~/server/utils/agreement-risk-rating'
 import { requireAuthContext } from '~~/server/utils/authorize'
 
 export default defineEventHandler(async event => {
@@ -36,20 +37,32 @@ export default defineEventHandler(async event => {
       withBusinessRecordState(db, 'fundingcaseamendment', [amendment]),
       resolveBusinessStatusProtection(db, 'fundingcaseamendment', amendmentId)
     ])
+    const riskTarget = { entityType: 'fundingcaseamendment' as const, entityId: amendmentId }
+    const [riskManaged, riskHistory, latestRiskRating] = await Promise.all([
+      isRiskRatingWorkflowManaged(db, { ...riskTarget, streamId: context.streamId }),
+      hasRiskRatingRuns(db, riskTarget), resolveLatestRiskRating(db, riskTarget)
+    ])
+    const completed = Boolean(amendmentsWithState[0]?.isCompleted)
     const actor = await requireAuthContext(event)
+    const hasUpdateRole = actor.userAbilities.authorize('agreement', 'update', context.scope)
     return {
       ...amendmentsWithState[0],
+      egcs_fc_changerisk: completed ? amendment.egcs_fc_changerisk : riskManaged || amendment.egcs_fc_changerisk,
+      risk_workflow_managed: riskManaged,
+      has_risk_rating_runs: riskHistory,
+      latest_risk_rating_run: latestRiskRating,
+      risk_rating_available: riskManaged || riskHistory,
       amendment_types: types,
       amendment_type_ids: types.map(type => String(type.id)),
       amendment_subtypes: subtypes,
       amendment_subtype_ids: subtypes.map(subtype => String(subtype.id)),
       has_budget_snapshot: Boolean(budgetVersion),
       has_activity_snapshot: Boolean(activityVersion),
-      can_create_snapshot: agreementAmendable && statusProtection?.isDraft === true,
-      can_edit: agreementAmendable && statusProtection?.isDraft === true,
-      can_edit_scope: agreementAmendable && statusProtection?.isDraft === true,
-      can_delete_documents: agreementAmendable && statusProtection?.isDraft === true && actor.userAbilities.authorize('agreement', 'delete', context.scope),
-      can_cancel: amendment.egcs_fc_isopen
+      can_create_snapshot: !completed && hasUpdateRole && agreementAmendable && statusProtection?.isDraft === true,
+      can_edit: !completed && hasUpdateRole && agreementAmendable && statusProtection?.isDraft === true,
+      can_edit_scope: !completed && hasUpdateRole && agreementAmendable && statusProtection?.isDraft === true,
+      can_delete_documents: !completed && hasUpdateRole && agreementAmendable && statusProtection?.isDraft === true && actor.userAbilities.authorize('agreement', 'delete', context.scope),
+      can_cancel: hasUpdateRole && amendment.egcs_fc_isopen
     }
   })
 })

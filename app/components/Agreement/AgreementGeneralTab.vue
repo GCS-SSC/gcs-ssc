@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useAgreementRiskSource } from '~/composables/useAgreementRiskSource'
 import { agreementCalendarDate } from '~/utils/agreement-calendar-date'
 /* eslint-disable jsdoc/require-jsdoc -- local display helpers are self-documenting and not public APIs */
 import { computed } from 'vue'
@@ -11,6 +12,7 @@ const { profile } = defineProps<{
 }>()
 
 const { t, n } = useI18n()
+const { label: riskSourceLabel } = useAgreementRiskSource(() => profile.risk_source)
 const { getBilingualValue } = useBilingualValue()
 const { formatDate } = useDateHelpers()
 const localePath = useLocalePath()
@@ -109,6 +111,7 @@ const displayValue = (value: string | number | boolean | null | undefined) => {
       <CommonValueCard :label="t('agreement.holdback')" :value="formatPercent(profile.egcs_fc_holdback)" />
       <CommonValueCard :label="t('agreement.holdback_basis')" :value="getBilingualValue(profile, 'holdback_basis_name', '-')" />
       <CommonValueCard :label="t('agreement.risk_score')" :value="riskRatingLabel" />
+      <CommonValueCard :label="t('agreement.risk_source')" :value="riskSourceLabel" />
       <ExtensionSlotHost
         v-if="profileStreamId"
         slot-name="agreement.profile.risk-management.fields"

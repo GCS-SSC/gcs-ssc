@@ -26,7 +26,8 @@ definePageMeta({
 
 const route = useRoute()
 const nameRequirementId = useId()
-const { t } = useI18n()
+const { t, n } = useI18n()
+const { formatDate } = useDateHelpers()
 const localePath = useLocalePath()
 const toast = useToast()
 const { showError } = useApiErrorToast()
@@ -42,6 +43,9 @@ const isHeroCollapsed = getHeroCollapsed('agreement-amendment-detail')
 const isCreatingBudgetSnapshot: Ref<boolean> = ref(false)
 const isCreatingActivitySnapshot: Ref<boolean> = ref(false)
 const isSavingScope: Ref<boolean> = ref(false)
+const isSavingRisk: Ref<boolean> = ref(false)
+const changeRisk: Ref<boolean> = ref(false)
+const proposedRiskScoreSelection: Ref<string | undefined> = ref(undefined)
 const isCancelling: Ref<boolean> = ref(false)
 const isCancelModalOpen: Ref<boolean> = ref(false)
 const approvalsRefreshKey: Ref<number> = ref(0)
@@ -68,6 +72,7 @@ const {
 } = useFetch<FundingCaseAgreementAmendmentRow, FetchError, string>(
   `/api/agreements/${agreementId}/amendments/${amendmentId}`
 )
+
 type AmendmentTypeLookupResponse = {
   items: Array<{ id: string, egcs_tp_amended: string, egcs_tp_requiresamendmentsubtype: boolean }>
 }
@@ -107,6 +112,22 @@ const isDurationAmendment = computed(() => amendment.value?.amendment_types.some
 const canSnapshotBudget = computed(() => isBudgetAmendment.value || isDurationAmendment.value)
 const canSnapshotActivities = computed(() => amendment.value?.amendment_types.some(type => type.egcs_tp_amended === 'activities') === true)
 const canEditAmendment = computed(() => isAssigned.value && amendment.value?.can_edit === true)
+const canEditRisk = computed(() => canEditAmendment.value && !amendment.value?.isCompleted && !amendment.value?.risk_workflow_managed)
+const formatRiskScore = (score: number | null | undefined): string => score === null || score === undefined
+  ? t('common.not_available')
+  : n(score)
+const getLocalizedWorkflowName = (name: { en: string, fr: string }): string => getBilingualValue({
+  workflow_name_en: name.en, workflow_name_fr: name.fr
+}, 'workflow_name', t('common.not_available'))
+const savedRiskScoreItems = computed(() => {
+  const score = amendment.value?.egcs_fc_proposedriskscore
+  if (score === undefined || score === null) return []
+  const rating = amendment.value?.latest_risk_rating_run?.mappedRating
+  const label = rating?.score === score
+    ? getBilingualValue({ name_en: rating.label.en, name_fr: rating.label.fr }, 'name', formatRiskScore(score))
+    : formatRiskScore(score)
+  return [{ value: String(score), label }]
+})
 const canEditAmendmentScope = computed(() => isAssigned.value && amendment.value?.can_edit_scope === true)
 const canCreateAmendmentSnapshot = computed(() => isAssigned.value && amendment.value?.can_create_snapshot === true)
 const canCancelAmendment = computed(() => isAssigned.value && amendment.value?.can_cancel === true)
@@ -143,6 +164,9 @@ const tabs = computed(() => [
   { key: 'agreement.budget.title', value: 'budget', icon: 'i-lucide-wallet-cards' },
   { key: 'agreement.activities.title', value: 'activities', icon: 'i-lucide-list-checks' },
   { key: 'agreement.amendments.recommendation', value: 'recommendation', icon: 'i-lucide-git-pull-request-arrow' },
+  ...(amendment.value?.risk_rating_available || amendment.value?.risk_workflow_managed || amendment.value?.has_risk_rating_runs
+    ? [{ key: 'agreement.risk_rating_workflow', value: 'risk-rating', icon: 'i-lucide-gauge' }]
+    : []),
   { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-clipboard-check' },
   { key: 'workflow.title', value: 'workflows', icon: 'i-lucide-workflow' },
   ...(profile.value?.can_read_agreement ? [{ key: 'agreement.documents.title', value: 'documents', icon: 'i-lucide-files' }] : []),
@@ -176,8 +200,14 @@ watch(amendment, value => {
     scopeTypeIds.value = []
     scopeSubtypeIds.value = []
     durationDates.value = null
+    changeRisk.value = false
+    proposedRiskScoreSelection.value = undefined
     return
   }
+  changeRisk.value = value.egcs_fc_changerisk
+  proposedRiskScoreSelection.value = value.egcs_fc_proposedriskscore === null || value.egcs_fc_proposedriskscore === undefined
+    ? undefined
+    : String(value.egcs_fc_proposedriskscore)
   scopeTypeIds.value = [...(value.amendment_type_ids ?? [])]
   scopeSubtypeIds.value = [...(value.amendment_subtype_ids ?? [])]
   amendmentNameEn.value = value.egcs_fc_name_en ?? ''
@@ -259,6 +289,25 @@ const saveScope = async () => {
     showError(caughtError)
   } finally {
     isSavingScope.value = false
+  }
+}
+
+const saveRisk = async () => {
+  if (!canEditRisk.value || isSavingRisk.value) return
+  try {
+    isSavingRisk.value = true
+    await saveJson(amendmentApiBase, 'PATCH', {
+      egcs_fc_changerisk: changeRisk.value,
+      egcs_fc_proposedriskscore: proposedRiskScoreSelection.value === undefined || proposedRiskScoreSelection.value === ''
+        ? null
+        : Number(proposedRiskScoreSelection.value)
+    })
+    await refreshPage()
+    toast.add({ title: t('common.success'), description: t('agreement.amendments.risk_updated'), color: 'success' })
+  } catch (caughtError: unknown) {
+    showError(caughtError)
+  } finally {
+    isSavingRisk.value = false
   }
 }
 
@@ -406,6 +455,66 @@ const cancelAmendment = async () => {
                 </div>
               </div>
             </CommonSection>
+            <CommonSection
+              :title="t('agreement.amendments.risk_changes')"
+              :badge="scopeIncludesDuration ? '04' : '03'"
+              :grid-cols="1">
+              <div class="space-y-5">
+                <UFormField
+                  :label="t('agreement.amendments.change_risk')"
+                  name="egcs_fc_changerisk"
+                  :description="amendment.isCompleted ? t('agreement.amendments.risk_frozen_help') : amendment.risk_workflow_managed ? t('agreement.amendments.risk_managed_help') : t('agreement.amendments.change_risk_help')">
+                  <USwitch
+                    v-model="changeRisk"
+                    data-testid="amendment-change-risk"
+                    :disabled="!canEditRisk || isSavingRisk" />
+                </UFormField>
+                <UFormField
+                  :label="t('agreement.amendments.proposed_risk_score')"
+                  name="egcs_fc_proposedriskscore"
+                  :required="changeRisk && !amendment.risk_workflow_managed"
+                  :description="amendment.isCompleted ? t('agreement.amendments.risk_frozen_help') : amendment.risk_workflow_managed ? t('agreement.amendments.risk_managed_help') : t('agreement.amendments.proposed_risk_score_help')">
+                  <CommonServerLookupSelect
+                    v-if="canEditAmendment"
+                    v-model="proposedRiskScoreSelection"
+                    data-testid="amendment-risk-score-lookup"
+                    :fetch-url="`${amendmentApiBase}/lookups/risk-ratings`"
+                    value-key="egcs_tp_riskscore"
+                    label-en-key="label_en"
+                    label-fr-key="label_fr"
+                    :show-value-in-label="false"
+                    :disabled="!canEditRisk || !changeRisk || isSavingRisk"
+                    :required="changeRisk && !amendment.risk_workflow_managed"
+                    :placeholder="t('agreement.risk_score_placeholder')"
+                    searchable />
+                  <USelectMenu
+                    v-else
+                    :model-value="proposedRiskScoreSelection"
+                    :items="savedRiskScoreItems"
+                    value-key="value"
+                    disabled
+                    class="w-full"
+                    :placeholder="t('agreement.risk_score_placeholder')" />
+                  <UButton
+                    v-if="canEditRisk && changeRisk && proposedRiskScoreSelection !== undefined"
+                    type="button"
+                    color="neutral"
+                    variant="link"
+                    size="sm"
+                    icon="i-lucide-x"
+                    :label="t('common.clear')"
+                    :disabled="isSavingRisk"
+                    @click="proposedRiskScoreSelection = undefined" />
+                </UFormField>
+                <CommonSaveButton
+                  v-if="canEditRisk"
+                  type="button"
+                  :label="t('agreement.amendments.save_risk')"
+                  :loading="isSavingRisk"
+                  :disabled="isSavingRisk"
+                  @click="saveRisk" />
+              </div>
+            </CommonSection>
             <div v-if="canEditAmendmentScope || canCancelAmendment" class="flex items-center justify-between gap-3 border-t border-zinc-200 pt-6 dark:border-zinc-800">
               <UButton
                 v-if="canCancelAmendment"
@@ -498,6 +607,67 @@ const cancelAmendment = async () => {
               completed-success-key="agreement.amendments.completion.completed_success"
               @changed="refreshPage" />
           </section>
+
+          <div v-else-if="selectedTab === 'risk-rating'" class="space-y-4">
+            <UAlert
+              :title="t('agreement.risk_rating_workflow')"
+              :description="amendment.isCompleted ? t('agreement.amendments.risk_frozen_help') : amendment.risk_workflow_managed ? t('agreement.amendments.risk_managed_help') : t('agreement.amendments.risk_manual_help')"
+              :icon="amendment.risk_workflow_managed ? 'i-lucide-workflow' : 'i-lucide-pencil'" />
+            <CommonSection :title="t('agreement.risk_rating_workflow')" :grid-cols="1">
+              <dl class="grid gap-3 md:grid-cols-2">
+                <div>
+                  <dt class="text-sm text-muted">
+                    {{ t('agreement.amendments.proposed_risk_score') }}
+                  </dt>
+                  <dd>{{ formatRiskScore(amendment.egcs_fc_proposedriskscore) }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-muted">
+                    {{ t('agreement.amendments.change_risk') }}
+                  </dt>
+                  <dd>{{ amendment.egcs_fc_changerisk ? t('common.yes') : t('common.no') }}</dd>
+                </div>
+                <template v-if="amendment.latest_risk_rating_run">
+                  <div>
+                    <dt class="text-sm text-muted">
+                      {{ t('agreement.risk_rating_workflow_name') }}
+                    </dt>
+                    <dd>{{ getLocalizedWorkflowName(amendment.latest_risk_rating_run.workflowName) }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-sm text-muted">
+                      {{ t('agreement.risk_rating_run_status') }}
+                    </dt>
+                    <dd><CommonLifecycleBadge engine="runtime" :state="amendment.latest_risk_rating_run.status" /></dd>
+                  </div>
+                  <div>
+                    <dt class="text-sm text-muted">
+                      {{ t('agreement.risk_rating_assessment_score') }}
+                    </dt>
+                    <dd>{{ formatRiskScore(amendment.latest_risk_rating_run.assessmentScore) }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-sm text-muted">
+                      {{ t('agreement.risk_rating_mapped_score') }}
+                    </dt>
+                    <dd>{{ formatRiskScore(amendment.latest_risk_rating_run.mappedRating?.score) }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-sm text-muted">
+                      {{ t('agreement.risk_rating_completed') }}
+                    </dt>
+                    <dd>{{ formatDate(amendment.latest_risk_rating_run.completedAt) }}</dd>
+                  </div>
+                </template>
+              </dl>
+            </CommonSection>
+            <CommonWorkflowSection
+              entity-type="fundingcaseamendment"
+              :entity-id="amendmentId"
+              purpose="risk_rating"
+              :can-edit="canEditAmendment && !amendment.isCompleted"
+              @changed="refreshPage" />
+          </div>
 
           <CommonReviewsTab
             v-else-if="selectedTab === 'reviews'"

@@ -1,3 +1,4 @@
+import { getRiskReadiness } from '~~/server/utils/risk-readiness'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { authorizeReviewRuntimeAction, canAuthorizeReviewRuntimeAction } from '~~/server/utils/review-runtime-access'
 import { resolveCompletionRuntimeEntityFromEntity, respondCompletionRuntimeEntityNotFound } from '~~/server/utils/completion-runtime'
@@ -89,8 +90,12 @@ export default defineEventHandler(async event => {
     ? entityDefinition?.standardWorkflow === 'explicit'
     : ((query.purpose === 'approval_submission' && entityDefinition?.approvalSubmission === 'explicit')
       || (query.purpose === 'risk_rating' && entityDefinition?.riskRating === 'explicit'))
+  const riskFrozen = query.purpose === 'risk_rating' && context.entityType === 'fundingcaseamendment' && Boolean(completionId)
+  const riskReadiness = query.purpose === 'approval_submission' && context.entityType === 'fundingcaseagreement'
+    ? await getRiskReadiness(event.context.$db, { entityType: context.entityType, entityId: context.entityId })
+    : null
   const targetOpen = context.isOpen !== false
-  const canStart = Boolean(purposeCanStart) && targetOpen && !targetTerminal && !hasActiveRuntime && Boolean(
+  const canStart = !riskFrozen && riskReadiness?.ready !== false && Boolean(purposeCanStart) && targetOpen && !targetTerminal && !hasActiveRuntime && Boolean(
     targetStatus
     && setups.some(candidate => isWorkflowStartStatusAllowed(candidate.egcs_cn_allowedstartstatuses, targetStatus))
   )
@@ -104,15 +109,19 @@ export default defineEventHandler(async event => {
           name_en: activeSetup?.egcs_cn_name_en,
           name_fr: activeSetup?.egcs_cn_name_fr
         }
-      : !targetOpen
-          ? { reason: 'closed_target' as const }
-          : targetTerminal
-            ? { reason: 'terminal_status' as const, statusId: targetStatus }
-            : setups.length === 0
-              ? { reason: 'no_published_workflow' as const }
-              : targetStatus && !setups.some(candidate => isWorkflowStartStatusAllowed(candidate.egcs_cn_allowedstartstatuses, targetStatus))
-                ? { reason: 'status_ineligible' as const, statusId: targetStatus }
-                : { reason: 'unsupported' as const }
+      : riskFrozen
+        ? { reason: 'risk_rating_frozen' as const }
+        : riskReadiness?.ready === false
+          ? { reason: riskReadiness.blocker ?? 'risk_workflow_required' }
+          : !targetOpen
+              ? { reason: 'closed_target' as const }
+              : targetTerminal
+                ? { reason: 'terminal_status' as const, statusId: targetStatus }
+                : setups.length === 0
+                  ? { reason: 'no_published_workflow' as const }
+                  : targetStatus && !setups.some(candidate => isWorkflowStartStatusAllowed(candidate.egcs_cn_allowedstartstatuses, targetStatus))
+                    ? { reason: 'status_ineligible' as const, statusId: targetStatus }
+                    : { reason: 'unsupported' as const }
   const recommendations = await Promise.all((runtime.recommendations ?? []).map(async recommendation => {
     const grant = await resolveAssignedItemGrant(
       authContext.userId,
@@ -174,8 +183,9 @@ export default defineEventHandler(async event => {
   }
   return {
     ...runtime,
-    canRetry: runtime.canRetry && !hasActiveRuntime && targetOpen,
+    canRetry: runtime.canRetry && !hasActiveRuntime && targetOpen && !riskFrozen,
     recommendations,
+    riskReadiness,
     canStart,
     startBlocker,
     activeWorkflowPurpose: activeTargetRuntime?.egcs_cn_purpose ?? null,

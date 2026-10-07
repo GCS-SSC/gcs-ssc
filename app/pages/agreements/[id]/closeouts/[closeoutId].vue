@@ -27,12 +27,14 @@ const closeoutId = route.params.closeoutId as string
 const selectedTab: Ref<string> = ref('workflow')
 const isHeroCollapsed = getHeroCollapsed('agreement-closeout-detail')
 const { isAssigned } = useEntityAssignmentRoster('fundingcaseagreementcloseout', closeoutId)
-const { showError } = useApiErrorToast()
 const { isRecordLocked, isTerminalStatus } = useBusinessStatusState()
 const profile: Ref<EntityAssignmentContext | null> = ref(null)
 const closeout: Ref<CloseoutDetail | null> = ref(null)
 const isLoading: Ref<boolean> = ref(false)
 const hasLoadError: Ref<boolean> = ref(false)
+const loadError: Ref<unknown | null> = ref(null)
+const profileLoadError: Ref<unknown | null> = ref(null)
+const closeoutLoadError: Ref<unknown | null> = ref(null)
 const fetchJson = async (path: string): Promise<unknown> => {
   const response = await fetch(getClientRequestUrl(path))
   if (!response.ok) await throwFetchResponseError(response)
@@ -45,18 +47,19 @@ const loadDetail = async () => {
   if (isLoading.value) return
   isLoading.value = true
   hasLoadError.value = false
-  try {
-    const [profileData] = await Promise.all([
-      fetchJson(`/api/entity-assignments/fundingcaseagreementcloseout/${closeoutId}/context`) as Promise<EntityAssignmentContext>,
-      refresh()
-    ])
-    profile.value = profileData
-  } catch (error: unknown) {
-    hasLoadError.value = true
-    showError(error)
-  } finally {
-    isLoading.value = false
-  }
+  loadError.value = null
+  profileLoadError.value = null
+  closeoutLoadError.value = null
+  const [profileResult, closeoutResult] = await Promise.allSettled([
+    fetchJson(`/api/entity-assignments/fundingcaseagreementcloseout/${closeoutId}/context`) as Promise<EntityAssignmentContext>,
+    refresh()
+  ])
+  if (profileResult.status === 'fulfilled') profile.value = profileResult.value
+  else profileLoadError.value = profileResult.reason
+  if (closeoutResult.status === 'rejected') closeoutLoadError.value = closeoutResult.reason
+  loadError.value = closeoutLoadError.value ?? profileLoadError.value
+  hasLoadError.value = Boolean(loadError.value)
+  isLoading.value = false
 }
 onMounted(loadDetail)
 const title = computed(() => t('agreement.closeout.number', { number: closeout.value?.egcs_fc_closeoutnumber ?? closeoutId }))
@@ -137,6 +140,7 @@ const tabs = [
 
           <section v-if="selectedTab === 'workflow'" class="space-y-6">
             <CommonCompletionWorkflowPreAction
+              mode="completion"
               entity-type="fundingcaseagreementcloseout"
               :entity-id="closeoutId"
               :can-edit="isAssigned"

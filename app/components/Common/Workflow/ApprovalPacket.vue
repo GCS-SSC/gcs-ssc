@@ -20,6 +20,10 @@ const asRecords = (value: JsonValue | undefined): PacketRecord[] =>
 const packet = computed(() => asRecord(submission.egcs_fc_packet))
 const agreement = computed(() => packet.value.agreement == null ? null : asRecord(packet.value.agreement))
 const amendment = computed(() => packet.value.amendment == null ? null : asRecord(packet.value.amendment))
+const risk = computed(() => packet.value.risk == null ? null : asRecord(packet.value.risk))
+const riskReadiness = computed(() => asRecord(risk.value?.readiness))
+const riskReadinessEvidence = computed(() => asRecord(riskReadiness.value.evidence))
+const riskCalculationSource = computed(() => asRecord(risk.value?.calculationSource))
 const proponents = computed(() => asRecords(packet.value.proponents))
 const budget = computed(() => asRecord(packet.value.budget))
 const hasBudget = computed(() => packet.value.budget !== null && packet.value.budget !== undefined)
@@ -33,6 +37,7 @@ const sectionOrder = computed(() => [
   agreement.value ? 'agreement' : null,
   agreement.value ? 'proponents' : null,
   amendment.value ? 'amendment' : null,
+  risk.value ? 'risk' : null,
   hasBudget.value ? 'budget' : null,
   hasActivities.value ? 'activities' : null
 ].filter((value): value is string => value !== null))
@@ -100,6 +105,24 @@ const amendmentDisplayFields = computed<DisplayField[]>(() => [
     value: amendmentSubtypes.value.map(item => bilingual(item.name)).join(', ') || t('workflow.packet.none')
   }
 ])
+const riskFields = computed<DisplayField[]>(() => risk.value
+  ? [
+      { key: 'enabled', label: t('workflow.packet.risk.enabled'), value: display(risk.value.enabled) },
+      { key: 'apply', label: t('workflow.packet.risk.apply'), value: display(risk.value.apply) },
+      { key: 'proposedScore', label: t('agreement.amendments.proposed_risk_score'), value: display(risk.value.proposedScore) },
+      { key: 'rating', label: t('workflow.packet.risk.rating'), value: bilingual(asRecord(risk.value.rating).label) },
+      { key: 'required', label: t('workflow.packet.risk.required'), value: display(riskReadiness.value.required) },
+      { key: 'ready', label: t('workflow.packet.risk.ready'), value: display(riskReadiness.value.ready) },
+      { key: 'source', label: t('workflow.packet.risk.source'), value: risk.value.calculationSource == null
+        ? riskReadiness.value.workflowManaged ? t('workflow.packet.risk.no_calculation') : t('agreement.risk_rating_manual')
+        : bilingual(riskCalculationSource.value.workflowName) },
+      ...(risk.value.calculationSource == null
+        ? []
+        : [
+            { key: 'assessmentScore', label: t('agreement.risk_rating_assessment_score'), value: display(riskCalculationSource.value.assessmentScore) }
+          ])
+    ]
+  : [])
 const packetBudgetOverview = computed<FundingCaseAgreementBudgetOverviewRow>(() => {
   const fiscalYearIdByDisplay = new Map<string, string>()
   const mappedFiscalYears = fiscalYears.value.map((fiscalYear, index) => {
@@ -282,6 +305,41 @@ const packetActivityRows = computed<FundingCaseAgreementActivityRow[]>(() => act
           </dd>
         </div>
       </dl>
+    </CommonSection>
+
+    <CommonSection v-if="risk" :title="t('workflow.packet.risk.title')" :badge="sectionBadge('risk')" :grid-cols="1">
+      <p v-if="!risk.apply" class="text-sm text-muted">
+        {{ t('workflow.packet.risk.preserved') }}
+      </p>
+      <dl class="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div v-for="field in riskFields" :key="field.key">
+          <dt class="text-xs font-medium tracking-wide text-muted uppercase">
+            {{ field.label }}
+          </dt>
+          <dd class="mt-1 whitespace-pre-wrap text-sm text-default">
+            {{ field.value }}
+          </dd>
+        </div>
+      </dl>
+      <details v-if="riskReadiness.successfulRuntimeId || riskCalculationSource.runtimeId" class="text-xs text-muted">
+        <summary class="cursor-pointer">
+          {{ t('workflow.packet.risk.evidence') }}
+        </summary>
+        <dl class="mt-3 grid gap-3 sm:grid-cols-2">
+          <div v-for="key in ['setupId', 'publicationVersionId', 'successfulRuntimeId']" :key="key">
+            <dt>{{ t(`workflow.packet.risk.${key}`) }}</dt>
+            <dd>{{ display(riskReadiness[key]) }}</dd>
+          </div>
+          <div v-if="riskReadinessEvidence.publicationVersionId">
+            <dt>{{ t('workflow.packet.risk.successfulPublicationVersionId') }}</dt>
+            <dd>{{ display(riskReadinessEvidence.publicationVersionId) }}</dd>
+          </div>
+          <div v-if="riskReadinessEvidence.completedAt">
+            <dt>{{ t('agreement.risk_rating_completed') }}</dt>
+            <dd>{{ date(riskReadinessEvidence.completedAt) }}</dd>
+          </div>
+        </dl>
+      </details>
     </CommonSection>
 
     <CommonSection v-if="hasBudget" :title="t('workflow.packet.budget')" :badge="sectionBadge('budget')" :grid-cols="1">

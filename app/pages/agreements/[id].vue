@@ -7,6 +7,7 @@ import type { Ref } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
 import type { FundingCaseAgreementProfileForm, FundingCaseAgreementProfileRow } from '~~/shared/types/funding-case-agreement-ui'
 import type { RuntimeState } from '~~/shared/constants/system-lifecycle'
+import CommonCompletionWorkflowPreAction from '~/components/Common/Completions/WorkflowPreAction.vue'
 import AgreementActivitiesTab from '~/components/Agreement/AgreementActivitiesTab.vue'
 import AgreementAddressesTab from '~/components/Agreement/AgreementAddressesTab.vue'
 import AgreementNotesTab from '~/components/Agreement/AgreementNotesTab.vue'
@@ -25,6 +26,7 @@ import { useExtensionEntityTabs } from '~/composables/useExtensionEntityTabs'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 import { useAgreementSimilarityConfirmation } from '~/composables/useAgreementSimilarityConfirmation'
 import { isAgreementChildRoute } from '~/utils/agreement-child-route'
+import { useAgreementRiskSource } from '~/composables/useAgreementRiskSource'
 import { useUrlTabState } from '~/composables/useUrlTabState'
 
 definePageMeta({
@@ -84,6 +86,7 @@ const id = route.params.id as string
 const isChildDetailRoute = computed(() => isAgreementChildRoute(route))
 
 const profile: Ref<AgreementDetailProfile | null> = ref(null)
+const { label: riskSourceLabel, workflowLabel: riskSourceWorkflowLabel, completedAt: riskSourceCompletedAt } = useAgreementRiskSource(() => profile.value?.risk_source)
 const error: Ref<unknown | null> = ref(null)
 const status: Ref<'idle' | 'pending' | 'success' | 'error'> = ref('idle')
 /**
@@ -275,10 +278,6 @@ watch(profile, value => {
   }
 }, { immediate: true })
 
-watch([error, status], ([loadError, loadStatus]) => {
-  if (loadError || loadStatus === 'error') showError(loadError)
-}, { immediate: true })
-
 /**
  * Saves agreement changes from the inline edit view and refreshes the detail page.
  */
@@ -466,11 +465,16 @@ const cancel = () => {
               v-else-if="selectedTab === 'financial-summary'"
               :agreement-id="id" />
 
-            <CommonWorkflowSection
+            <CommonCompletionWorkflowPreAction
               v-else-if="selectedTab === 'recommendation'"
+              mode="recommendation_submission"
+              show-when-unconfigured
               entity-type="fundingcaseagreement"
               :entity-id="id"
-              purpose="approval_submission"
+              action-label-key="agreement.recommendation.submit"
+              completed-success-key="agreement.recommendation.submitted_success"
+              title-key="agreement.amendments.recommendation"
+              description-key="agreement.recommendation.description"
               :can-edit="Boolean(profile.can_update)"
               @changed="refreshProfile" />
 
@@ -491,7 +495,28 @@ const cancel = () => {
                       {{ t('common.status') }}
                     </dt><dd>{{ profile.risk_workflow_managed ? t('agreement.risk_rating_managed') : t('agreement.risk_rating_manual') }}</dd>
                   </div>
+                  <div>
+                    <dt class="text-sm text-muted">
+                      {{ t('agreement.risk_source') }}
+                    </dt>
+                    <dd>{{ riskSourceLabel }}</dd>
+                  </div>
+                  <div v-if="riskSourceWorkflowLabel">
+                    <dt class="text-sm text-muted">
+                      {{ t('agreement.risk_rating_workflow_name') }}
+                    </dt>
+                    <dd>{{ riskSourceWorkflowLabel }}</dd>
+                  </div>
+                  <div v-if="riskSourceCompletedAt">
+                    <dt class="text-sm text-muted">
+                      {{ t('agreement.risk_rating_completed') }}
+                    </dt>
+                    <dd>{{ formatDate(riskSourceCompletedAt) }}</dd>
+                  </div>
                   <template v-if="profile.latest_risk_rating_run">
+                    <h3 class="text-sm font-semibold md:col-span-2">
+                      {{ t('agreement.risk_rating_latest_history') }}
+                    </h3>
                     <div>
                       <dt class="text-sm text-muted">
                         {{ t('agreement.risk_rating_workflow_name') }}

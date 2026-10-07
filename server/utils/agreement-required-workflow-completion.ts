@@ -11,6 +11,7 @@ import { resolveBusinessStatusProtection } from './business-status-runtime'
 import { executeFreshReadSnapshot } from './fresh-read-snapshot'
 import { emitCompletionHook, resolveCompletionEvidenceId, resolveCompletionRecord } from './completion-runtime-core'
 import { createCompletionTransition } from './workflow-runtime'
+import { getRiskReadiness } from './risk-readiness'
 import type { CompletionHookPayload } from '~~/shared/types/completion'
 import type { Database, Entity_Type } from '~~/shared/types/database'
 import type { Kysely, Transaction } from 'kysely'
@@ -33,10 +34,14 @@ export const getRequiredWorkflowCompletionRuntime = async (
     if (!context) return null
     const item = await resolveCompletionRecord(trx, entityType, entityId)
     const protection = await resolveBusinessStatusProtection(trx, entityType, entityId)
+    const riskReadiness = item === null && entityType === 'fundingcaseamendment'
+      ? await getRiskReadiness(trx, { entityType, entityId })
+      : null
     return {
       item,
-      can_complete: item === null && Boolean(protection && !protection.locked),
-      blocker: item ? null : !protection || protection.locked ? 'business_status' as const : null
+      can_complete: item === null && Boolean(protection && !protection.locked) && riskReadiness?.ready !== false,
+      blocker: item ? null : !protection || protection.locked ? 'business_status' as const : riskReadiness?.blocker ?? null,
+      risk_readiness: riskReadiness
     }
   })
 }

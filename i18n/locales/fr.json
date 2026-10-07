@@ -1107,7 +1107,10 @@
       "active_workflow": "Un autre flux de travail est déjà actif pour cet élément.",
       "closeout_approval_required": "Un flux d’approbation publié est requis avant que cette clôture puisse être achevée.",
       "setup_unpublished": "Le flux sélectionné n’est plus publié ou admissible. Actualisez la page et choisissez-en un autre.",
-      "start_status_ineligible": "Ce flux ne peut pas démarrer à partir du statut actuel de l’élément."
+      "start_status_ineligible": "Ce flux ne peut pas démarrer à partir du statut actuel de l’élément.",
+      "risk_workflow_required": "Terminez avec succès le flux de cote de risque obligatoire avant de soumettre cet élément.",
+      "risk_score_required": "Sélectionnez une cote de risque proposée avant de finaliser cette modification.",
+      "risk_rating_frozen": "La décision de risque de la modification est figée à la complétion et ne peut pas être modifiée."
     },
     "status": {
       "not_found": "Statut introuvable.",
@@ -1386,6 +1389,7 @@
       "currency_immutable": "La devise de l’entente est définie à la création et ne peut pas être modifiée.",
       "currency_mismatch": "La devise doit correspondre à celle de l’entente.",
       "invalid_claim_proponent": "Sélectionnez un promoteur soumissionnaire lié à cette entente.",
+      "amendment_risk_workflow_managed": "Un processus de risque gère la proposition de risque de cette modification. Terminez le processus pour la mettre à jour.",
       "amendment_budget_type_required": "Un type de modification budgétaire est requis tant que cette modification possède un instantané du budget.",
       "amendment_activities_type_required": "Un type de modification des activités est requis tant que cette modification possède un instantané des activités."
     },
@@ -2534,7 +2538,17 @@
         "comment_placeholder": "Ajoutez une note facultative sur la modification.",
         "complete": "Finaliser et soumettre",
         "completed_success": "La modification est finalisée et soumise à son processus"
-      }
+      },
+      "risk_changes": "Changements du risque",
+      "change_risk": "Modifier le risque",
+      "change_risk_help": "Activer pour appliquer le score proposé après une approbation réussie. Désactiver conserve la proposition et préserve le risque de l’entente.",
+      "proposed_risk_score": "Score de risque proposé",
+      "proposed_risk_score_help": "Sélectionnez un score avant la complétion lorsque Modifier le risque est activé. Les propositions provisoires peuvent être effacées. Une proposition vide n’efface jamais le risque de l’entente.",
+      "risk_managed_help": "Le processus d’évaluation du risque contrôle cette proposition. Une approbation réussie applique un score calculé avec succès; ignorer un processus facultatif préserve le risque de l’entente.",
+      "risk_manual_help": "L’historique des processus de risque reste accessible. La proposition est modifiable manuellement tant que cette modification est ouverte et incomplète.",
+      "save_risk": "Enregistrer la proposition de risque",
+      "risk_updated": "Proposition de risque enregistrée.",
+      "risk_frozen_help": "La décision de risque est figée à la complétion. L’approbation utilise la proposition et la preuve de préparation capturées."
     },
     "commitments": {
       "title": "Engagements",
@@ -2935,7 +2949,16 @@
       "profile": "Profil",
       "risk_management": "Gestion des risques",
       "payments": "Paiements"
-    }
+    },
+    "recommendation": {
+      "submit": "Recommander",
+      "description": "Examinez l’entente et les étapes du processus avant de soumettre son dossier d’approbation immuable.",
+      "submitted_success": "Recommandation d’entente soumise."
+    },
+    "risk_source": "Source du risque",
+    "risk_source_amendment": "Modification approuvée {number}",
+    "risk_source_workflow": "Processus d’évaluation du risque",
+    "risk_rating_latest_history": "Dernier processus de risque d’entente réussi"
   },
   "applicant_recipient": {
     "list_views": {
@@ -3406,7 +3429,9 @@
       "JV_UNBALANCED": "Chaque ligne d’engagement doit conserver son total original.",
       "JV_NO_ADJUSTMENT": "Modifiez au moins une répartition avant de finaliser la pièce.",
       "JV_AMOUNT_RANGE": "Saisissez des montants respectant la précision et la plage prises en charge.",
-      "payment_recovery_control": "Réglez l’exigence approuvée de remboursement direct ou la note de crédit en attente avant de terminer ce paiement."
+      "payment_recovery_control": "Réglez l’exigence approuvée de remboursement direct ou la note de crédit en attente avant de terminer ce paiement.",
+      "risk_workflow_required": "Terminez avec succès le processus obligatoire d’évaluation du risque avant la complétion.",
+      "risk_score_required": "Sélectionnez un score de risque proposé pour cette modification avant la complétion."
     },
     "packet": {
       "title": "Dossier d’approbation",
@@ -3456,6 +3481,22 @@
         "expectedResults": "Résultats attendus",
         "outcomes": "Résultats",
         "responsibleParties": "Parties responsables"
+      },
+      "risk": {
+        "title": "Décision de risque capturée",
+        "enabled": "Modification du risque activée",
+        "apply": "Appliquer le risque après l’approbation",
+        "rating": "Évaluation capturée",
+        "required": "Processus réussi obligatoire",
+        "ready": "Conditions de préparation du risque satisfaites",
+        "source": "Source du calcul",
+        "no_calculation": "Aucun calcul de processus réussi",
+        "preserved": "Cette soumission préserve le score de risque de l’entente.",
+        "evidence": "Preuve de préparation",
+        "setupId": "Configuration du processus applicable",
+        "publicationVersionId": "Version publiée applicable",
+        "successfulRuntimeId": "Exécution du processus réussie",
+        "successfulPublicationVersionId": "Version figée réussie"
       }
     },
     "approval_template": "Modèle d’approbation",
@@ -3564,9 +3605,12 @@
       "active_workflow": "{name} ({purpose}) est actif et doit être terminé ou annulé en premier.",
       "closed_target": "Cet élément fermé est historique et ne peut pas démarrer ni relancer un flux de travail.",
       "terminal_status": "L’état administratif actuel est définitif et ne permet pas un autre flux de travail.",
-      "no_published_workflow": "Aucun flux de travail standard publié ne s’applique à cet élément.",
+      "no_published_workflow": "Aucun processus publié ne s’applique à cet élément.",
       "status_ineligible": "L’état administratif actuel n’est un état de départ permis pour aucun flux de travail standard publié.",
-      "unsupported": "Cet élément ne permet pas de démarrer un flux de travail standard."
+      "unsupported": "Cet élément ne permet pas de démarrer un flux de travail standard.",
+      "risk_workflow_required": "Terminez avec succès le processus obligatoire d’évaluation du risque avant de soumettre la recommandation.",
+      "risk_score_required": "Sélectionnez un score de risque proposé avant de soumettre la recommandation.",
+      "risk_rating_frozen": "La décision de risque de la modification est figée à la complétion."
     },
     "unnamed_workflow": "Flux de travail sans nom",
     "version": "Version {version}",

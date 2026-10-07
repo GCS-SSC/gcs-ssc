@@ -225,6 +225,14 @@ export const FundingCaseAgreementAmendmentBaseSchema = z.object({
   egcs_fc_name_fr: OptionalBilingualName(),
   amendment_type_ids: RequiredUniqueBigintSelectionIdsSchema(),
   amendment_subtype_ids: z.array(RequiredBigintSelectionId()).default([]),
+  egcs_fc_changerisk: z.boolean().default(false),
+  egcs_fc_proposedriskscore: z.preprocess(
+    value => value === '' ? null : value,
+    z.coerce.number().finite({ error: 'validation.invalid_number' })
+      .nonnegative({ error: 'validation.invalid_number' })
+      .refine(value => isRepresentableByNumeric(value, 8, 2), { error: 'validation.numeric_not_representable' })
+      .nullable().optional()
+  ).meta({ formRequired: false }),
   egcs_fc_proposedauthorizedassistancestartdate: z.coerce.date().nullable().optional(),
   egcs_fc_proposedauthorizedassistanceenddate: z.coerce.date().nullable().optional()
 })
@@ -263,6 +271,7 @@ export const FundingCaseAgreementAmendmentPatchSchema = FundingCaseAgreementAmen
   .partial()
   .extend({
     amendment_subtype_ids: z.array(RequiredBigintSelectionId()).optional(),
+    egcs_fc_changerisk: z.boolean().optional(),
     egcs_fc_status: ForbiddenBusinessStatusMutation()
   })
   .superRefine((data, ctx) => {
@@ -279,6 +288,8 @@ export type FundingCaseAgreementAmendmentItem = WithId<{
   egcs_fc_fundingagreement: string
   egcs_fc_amendmentnumber: number
   egcs_fc_status: StatusId
+  egcs_fc_changerisk: boolean
+  egcs_fc_proposedriskscore: number | null
   egcs_fc_name_en?: string | null
   egcs_fc_name_fr?: string | null
   egcs_fc_proposedauthorizedassistancestartdate?: Date | null

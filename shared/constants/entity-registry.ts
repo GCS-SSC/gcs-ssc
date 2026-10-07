@@ -101,7 +101,7 @@ export const CORE_ENTITY_REGISTRY = {
   },
   fundingcaseamendment: {
     label: { en: 'Funding Case Amendment', fr: 'Modification du dossier de financement' },
-    completion: 'supported', approvalSubmission: 'on_completion', standardWorkflow: 'explicit', riskRating: 'none',
+    completion: 'supported', approvalSubmission: 'on_completion', standardWorkflow: 'explicit', riskRating: 'explicit',
     supportsDirectReviews: true,
     ownerKind: 'agreement',
     assignmentMode: 'independent',

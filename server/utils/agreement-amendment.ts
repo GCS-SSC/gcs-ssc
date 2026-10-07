@@ -6,6 +6,7 @@ import { agreementBudgetFiscalYearsOverlapDuration } from '~~/server/utils/agree
 import type { Amended_Type, Database } from '~~/shared/types/database'
 import { resolveBusinessStatusProtection } from '~~/server/utils/business-status-runtime'
 import type { StatusId } from '~~/shared/types/status'
+import type { SubmissionRisk } from '~~/shared/types/risk'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { budgetFundingSourcesByLine, loadBudgetFundingSources, replaceBudgetFundingSources } from './agreement-budget-funding'
@@ -411,6 +412,7 @@ export const promoteApprovedAgreementAmendment = async (
     budgetVersionId: string | null
     activityVersionId: string | null
     duration: boolean
+    risk?: SubmissionRisk | null
   }
 ) => {
   const amendment = await trx
@@ -504,5 +506,11 @@ export const promoteApprovedAgreementAmendment = async (
     await cloneActivityVersionRows(trx, String(activitySnapshot.id), String(working.id), context.agreementId)
   }
 
+  const risk = approvedDomains?.risk
+  if (risk?.apply && risk.proposedScore !== null) {
+    await trx.updateTable('Funding_Case_Agreement_Profile')
+      .set({ egcs_fc_riskscore: risk.proposedScore })
+      .where('id', '=', context.agreementId).where('_deleted', '=', false).executeTakeFirstOrThrow()
+  }
   return true
 }

@@ -1107,7 +1107,10 @@
       "active_workflow": "Another workflow is already active for this item.",
       "closeout_approval_required": "A published approval workflow is required before this Closeout can be completed.",
       "setup_unpublished": "The selected workflow is no longer published or eligible. Refresh and choose again.",
-      "start_status_ineligible": "This workflow cannot start from the item’s current status."
+      "start_status_ineligible": "This workflow cannot start from the item’s current status.",
+      "risk_workflow_required": "Complete the required risk rating workflow successfully before submitting this item.",
+      "risk_score_required": "Select a proposed risk score before completing this Amendment.",
+      "risk_rating_frozen": "The Amendment’s risk decision is frozen at Completion and cannot be changed."
     },
     "status": {
       "not_found": "Status not found.",
@@ -1386,6 +1389,7 @@
       "currency_immutable": "Agreement currency is set at creation and cannot be changed.",
       "currency_mismatch": "Currency must match the Agreement currency.",
       "invalid_claim_proponent": "Select a submitting Proponent linked to this Agreement.",
+      "amendment_risk_workflow_managed": "A risk workflow manages this Amendment’s risk proposal. Complete the workflow to update it.",
       "amendment_budget_type_required": "A budget amendment type is required while this amendment has a budget snapshot.",
       "amendment_activities_type_required": "An activities amendment type is required while this amendment has an activity snapshot."
     },
@@ -2534,7 +2538,17 @@
         "comment_placeholder": "Add an optional amendment note.",
         "complete": "Complete and submit",
         "completed_success": "Amendment completed and submitted to its workflow"
-      }
+      },
+      "risk_changes": "Risk changes",
+      "change_risk": "Change risk",
+      "change_risk_help": "Enable to apply the proposed score after successful approval. Turning this off retains the proposal and preserves the Agreement’s risk.",
+      "proposed_risk_score": "Proposed risk score",
+      "proposed_risk_score_help": "Select a score before Completion when Change risk is enabled. Draft proposals may be cleared. A blank proposal never clears the Agreement’s risk.",
+      "risk_managed_help": "The Risk Rating workflow controls this proposal. Successful approval applies a successfully calculated score; skipping an optional workflow preserves the Agreement’s risk.",
+      "risk_manual_help": "Risk workflow history remains available. The proposal is manually editable while this Amendment is open and incomplete.",
+      "save_risk": "Save risk proposal",
+      "risk_updated": "Risk proposal saved.",
+      "risk_frozen_help": "The risk decision is frozen at Completion. Approval uses the captured proposal and readiness evidence."
     },
     "commitments": {
       "title": "Commitments",
@@ -2935,7 +2949,16 @@
       "profile": "Profile",
       "risk_management": "Risk Management",
       "payments": "Payments"
-    }
+    },
+    "recommendation": {
+      "submit": "Recommend",
+      "description": "Review the Agreement and workflow steps before submitting its immutable approval packet.",
+      "submitted_success": "Agreement Recommendation submitted."
+    },
+    "risk_source": "Risk source",
+    "risk_source_amendment": "Approved Amendment {number}",
+    "risk_source_workflow": "Risk Rating workflow",
+    "risk_rating_latest_history": "Latest successful Agreement risk workflow"
   },
   "applicant_recipient": {
     "list_views": {
@@ -3406,7 +3429,9 @@
       "JV_UNBALANCED": "Each commitment line must preserve its original total.",
       "JV_NO_ADJUSTMENT": "Change at least one allocation before completing the entry.",
       "JV_AMOUNT_RANGE": "Enter amounts within the supported precision and range.",
-      "payment_recovery_control": "Resolve the approved direct repayment requirement or pending Credit Memo before completing this Payment."
+      "payment_recovery_control": "Resolve the approved direct repayment requirement or pending Credit Memo before completing this Payment.",
+      "risk_workflow_required": "Complete the required Risk Rating workflow successfully before Completion.",
+      "risk_score_required": "Select a proposed risk score for this Amendment before Completion."
     },
     "packet": {
       "title": "Approval packet",
@@ -3456,6 +3481,22 @@
         "expectedResults": "Expected results",
         "outcomes": "Outcomes",
         "responsibleParties": "Responsible parties"
+      },
+      "risk": {
+        "title": "Captured risk decision",
+        "enabled": "Change risk enabled",
+        "apply": "Apply risk after approval",
+        "rating": "Captured rating",
+        "required": "Successful workflow required",
+        "ready": "Risk readiness satisfied",
+        "source": "Calculation source",
+        "no_calculation": "No successful workflow calculation",
+        "preserved": "This submission preserves the Agreement’s risk score.",
+        "evidence": "Readiness evidence",
+        "setupId": "Applicable workflow setup",
+        "publicationVersionId": "Applicable published version",
+        "successfulRuntimeId": "Successful workflow run",
+        "successfulPublicationVersionId": "Successful pinned version"
       }
     },
     "approval_template": "Approval template",
@@ -3564,9 +3605,12 @@
       "active_workflow": "{name} ({purpose}) is active and must finish or be cancelled first.",
       "closed_target": "This closed item is historical and cannot start or retry a workflow.",
       "terminal_status": "The current business status is terminal and does not allow another workflow.",
-      "no_published_workflow": "No published standard workflow applies to this item.",
+      "no_published_workflow": "No published workflow applies to this item.",
       "status_ineligible": "The current business status is not an allowed starting status for any published standard workflow.",
-      "unsupported": "This item does not support starting a standard workflow."
+      "unsupported": "This item does not support starting a standard workflow.",
+      "risk_workflow_required": "Complete the required Risk Rating workflow successfully before submitting the Recommendation.",
+      "risk_score_required": "Select a proposed risk score before submitting the Recommendation.",
+      "risk_rating_frozen": "The Amendment’s risk decision is frozen at Completion."
     },
     "unnamed_workflow": "Unnamed workflow",
     "version": "Version {version}",

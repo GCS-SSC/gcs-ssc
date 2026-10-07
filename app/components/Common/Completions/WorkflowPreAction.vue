@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useCompletionWorkflowStart } from '~/composables/useCompletionWorkflowStart'
+import CommonCompletionWorkflowStartNotices from '~/components/Common/Completions/WorkflowStartNotices.vue'
+import type { WorkflowPreActionMode } from '~/composables/useCompletionWorkflowStart'
 import type { Ref } from 'vue'
 import type { Workflow_Target_Entity_Type } from '~~/shared/types/database'
 import CommonCompletionWorkflowStartButton from '~/components/Common/Completions/WorkflowStartButton.vue'
 import CommonWorkflowSection from '~/components/Common/Workflow/Section.vue'
 
 const {
+  mode = 'completion',
   entityType,
   entityId,
   canEdit = true,
@@ -16,6 +20,7 @@ const {
   titleKey,
   descriptionKey
 } = defineProps<{
+  mode?: WorkflowPreActionMode
   entityType: Workflow_Target_Entity_Type
   entityId: string
   canEdit?: boolean
@@ -34,6 +39,15 @@ const handleChanged = () => {
   refreshKey.value += 1
   emit('changed')
 }
+const completionState = useCompletionWorkflowStart({
+  mode: () => mode,
+  entityType: () => entityType,
+  entityId: () => entityId,
+  isLocked: () => isLocked || !canEdit,
+  completedSuccessKey: () => completedSuccessKey,
+  immediate: false,
+  onCompleted: handleChanged
+})
 </script>
 
 <template>
@@ -49,14 +63,17 @@ const handleChanged = () => {
     @changed="handleChanged">
     <template #pre-action-action>
       <CommonCompletionWorkflowStartButton
+        :mode="mode"
         :entity-type="entityType"
         :entity-id="entityId"
         :is-locked="isLocked"
         :action-label-key="actionLabelKey"
         :completed-success-key="completedSuccessKey"
-        @completed="handleChanged" />
+        :state="completionState"
+        :show-notices="false" />
     </template>
-    <template v-if="$slots.notices" #pre-action-notices>
+    <template #pre-action-notices>
+      <CommonCompletionWorkflowStartNotices :state="completionState" />
       <slot name="notices" />
     </template>
     <template v-if="$slots.default" #pre-action>

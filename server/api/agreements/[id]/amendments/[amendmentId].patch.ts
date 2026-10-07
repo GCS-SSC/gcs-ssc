@@ -5,6 +5,7 @@ import { FundingCaseAgreementAmendmentPatchSchema } from '~~/shared/types/schema
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
 import { assertAgreementBudgetFiscalYearsOverlapDuration } from '~~/server/utils/agreement-fiscal-year-duration'
 import { dateOnlySql } from '~~/server/utils/database-date'
+import { isRiskRatingWorkflowManaged } from '~~/server/utils/agreement-risk-rating'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 export default defineEventHandler(async event => {
@@ -15,13 +16,34 @@ export default defineEventHandler(async event => {
   if (!isPositivePostgresBigintText(agreementId) || !isPositivePostgresBigintText(amendmentId)) {
     return await badRequest(event, 'INVALID_ID', 'apiErrors.request.invalid')
   }
-  const context = await authorizeAgreementResource(event, 'update', agreementId, db)
+  const context = await authorizeAgreementResource(event, 'update', agreementId, db, {
+    assignmentTarget: { entityType: 'fundingcaseamendment', entityId: amendmentId }
+  })
   if (!context) return await badRequest(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
 
   const body = await readValidatedBodyI18n(event, FundingCaseAgreementAmendmentPatchSchema)
-  return await executeFreshAuthorizedAgreementWrite(event, db, agreementId, context, async trx => {
+  return await executeFreshAuthorizedAgreementWrite(event, db, agreementId, context, async (trx, currentContext) => {
     const amendment = await assertDraftAgreementAmendment(event, trx, agreementId, amendmentId)
     if (!('id' in amendment)) return amendment
+    const riskWorkflowManaged = await isRiskRatingWorkflowManaged(trx, {
+      streamId: currentContext.streamId, entityType: 'fundingcaseamendment', entityId: amendmentId
+    })
+    if (riskWorkflowManaged && (Object.hasOwn(body, 'egcs_fc_changerisk') || Object.hasOwn(body, 'egcs_fc_proposedriskscore'))) {
+      return await badRequest(event, 'AMENDMENT_RISK_WORKFLOW_MANAGED', 'apiErrors.agreement.amendment_risk_workflow_managed')
+    }
+    // A retained proposal can outlive its rating; validate only a newly selected score.
+    const proposedRiskScore = body.egcs_fc_proposedriskscore
+    const proposedRiskScoreChanged = proposedRiskScore !== undefined
+      && proposedRiskScore !== null
+      && (amendment.egcs_fc_proposedriskscore === null
+        || proposedRiskScore !== Number(amendment.egcs_fc_proposedriskscore))
+    if (proposedRiskScoreChanged) {
+      const rating = await trx.selectFrom('Transfer_Payment_Stream_Risk_Rating').select('id')
+        .where('egcs_tp_transferpaymentstream', '=', currentContext.streamId)
+        .where('egcs_tp_riskscore', '=', proposedRiskScore).where('_deleted', '=', false)
+        .forShare().executeTakeFirst()
+      if (!rating) return await badRequest(event, 'INVALID_AGREEMENT_RISK_SCORE', 'apiErrors.agreement.invalid_risk_score')
+    }
     const selectedTypeIds: string[] = body.amendment_type_ids
       ? body.amendment_type_ids
       : await trx.selectFrom('Funding_Case_Agreement_Amendment_Type')
@@ -35,7 +57,7 @@ export default defineEventHandler(async event => {
           .execute().then(rows => rows.map(row => String(row.egcs_fc_amendmentsubtype)))
     const types = selectedTypeIds.length > 0
       ? await trx.selectFrom('Transfer_Payment_Amendment_Type').select(['id', 'egcs_tp_amended', 'egcs_tp_requiresamendmentsubtype'])
-          .where('id', 'in', selectedTypeIds).where('egcs_tp_transferpaymentstream', '=', context.streamId).where('_deleted', '=', false).execute()
+          .where('id', 'in', selectedTypeIds).where('egcs_tp_transferpaymentstream', '=', currentContext.streamId).where('_deleted', '=', false).execute()
       : []
     if (types.length !== selectedTypeIds.length) return await badRequest(event, 'INVALID_AGREEMENT_AMENDMENT_TYPE', 'apiErrors.agreement.invalid_amendment_type')
     const subtypeLinks = selectedSubtypeIds.length > 0
@@ -43,7 +65,7 @@ export default defineEventHandler(async event => {
           .innerJoin('Transfer_Payment_Amendment_Subtype', 'Transfer_Payment_Amendment_Subtype.id', 'Transfer_Payment_Amendment_Subtype_Type.egcs_tp_amendmentsubtype')
           .select(['Transfer_Payment_Amendment_Subtype.id as subtype_id', 'Transfer_Payment_Amendment_Subtype_Type.egcs_tp_amendmenttype as type_id'])
           .where('Transfer_Payment_Amendment_Subtype.id', 'in', selectedSubtypeIds)
-          .where('Transfer_Payment_Amendment_Subtype.egcs_tp_transferpaymentstream', '=', context.streamId)
+          .where('Transfer_Payment_Amendment_Subtype.egcs_tp_transferpaymentstream', '=', currentContext.streamId)
           .where('Transfer_Payment_Amendment_Subtype._deleted', '=', false)
           .where('Transfer_Payment_Amendment_Subtype_Type._deleted', '=', false)
           .forUpdate('Transfer_Payment_Amendment_Subtype')
@@ -59,10 +81,12 @@ export default defineEventHandler(async event => {
     if (validSubtypeIds.size !== selectedSubtypeIds.length || subtypeOutsideSelectedTypes || missingRequiredSubtype) {
       return await badRequest(event, 'INVALID_AGREEMENT_AMENDMENT_SUBTYPE', 'apiErrors.agreement.invalid_amendment_subtype')
     }
-    const [budgetSnapshot, activitySnapshot] = await Promise.all([
-      trx.selectFrom('Funding_Case_Agreement_Budget_Version').select('id').where('egcs_fc_amendment', '=', amendmentId).where('_deleted', '=', false).executeTakeFirst(),
-      trx.selectFrom('Funding_Case_Agreement_Activity_Version').select('id').where('egcs_fc_amendment', '=', amendmentId).where('_deleted', '=', false).executeTakeFirst()
-    ])
+    const budgetSnapshot = await trx.selectFrom('Funding_Case_Agreement_Budget_Version').select('id')
+      .where('egcs_fc_fundingagreement', '=', agreementId).where('egcs_fc_amendment', '=', amendmentId)
+      .where('_deleted', '=', false).executeTakeFirst()
+    const activitySnapshot = await trx.selectFrom('Funding_Case_Agreement_Activity_Version').select('id')
+      .where('egcs_fc_fundingagreement', '=', agreementId).where('egcs_fc_amendment', '=', amendmentId)
+      .where('_deleted', '=', false).executeTakeFirst()
     if (budgetSnapshot && !types.some(type => ['budget', 'duration'].includes(type.egcs_tp_amended))) {
       return await badRequest(event, 'AGREEMENT_AMENDMENT_BUDGET_TYPE_REQUIRED', 'apiErrors.agreement.amendment_budget_type_required')
     }
@@ -112,6 +136,8 @@ export default defineEventHandler(async event => {
     const updated = await trx.updateTable('Funding_Case_Agreement_Amendment').set({
       egcs_fc_name_en: body.egcs_fc_name_en,
       egcs_fc_name_fr: body.egcs_fc_name_fr,
+      egcs_fc_changerisk: riskWorkflowManaged ? true : body.egcs_fc_changerisk,
+      egcs_fc_proposedriskscore: body.egcs_fc_proposedriskscore,
       egcs_fc_proposedauthorizedassistancestartdate: durationEnabled && proposedStartDate ? dateOnlySql(proposedStartDate) : null,
       egcs_fc_proposedauthorizedassistanceenddate: durationEnabled && proposedEndDate ? dateOnlySql(proposedEndDate) : null
     }).where('id', '=', amendmentId).where('_deleted', '=', false).returningAll().executeTakeFirstOrThrow()

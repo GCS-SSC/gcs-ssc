@@ -1,7 +1,7 @@
 import { authorizeWithFreshAuthContext, requireFreshAuthContext } from '~~/server/utils/authorize'
 import { canAccessAgreement, resolveAgreementScopeContext } from '~~/server/utils/agreement'
 import { withBusinessRecordState } from '~~/server/utils/business-record-state'
-import { hasAgreementRiskRatingRuns, isAgreementRiskRatingWorkflowManaged, resolveLatestAgreementRiskRating } from '~~/server/utils/agreement-risk-rating'
+import { hasAgreementRiskRatingRuns, isAgreementRiskRatingWorkflowManaged, resolveLatestAgreementRiskRating, resolveAgreementRiskSource } from '~~/server/utils/agreement-risk-rating'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 
 // eslint-disable-next-line local/require-authorize -- executeFreshReadSnapshot rebuilds auth before the in-snapshot authorization.
@@ -126,9 +126,10 @@ export default defineEventHandler(async event => {
 
     return {
       ...agreementWithState,
-      risk_workflow_managed: await isAgreementRiskRatingWorkflowManaged(db, String(agreement.egcs_fc_transferpaymentstream)),
+      risk_workflow_managed: await isAgreementRiskRatingWorkflowManaged(db, String(agreement.egcs_fc_transferpaymentstream), id),
       has_risk_rating_runs: await hasAgreementRiskRatingRuns(db, id),
       latest_risk_rating_run: await resolveLatestAgreementRiskRating(db, id),
+      risk_source: await resolveAgreementRiskSource(db, id, agreement.egcs_fc_riskscore === null ? null : Number(agreement.egcs_fc_riskscore)),
       can_update: canUpdate,
       can_delete: canDelete,
       can_create_child_records: canCreateChildRecords,

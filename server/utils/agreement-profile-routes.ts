@@ -268,7 +268,7 @@ const patchValidatedAgreementProfile = async (
       && validated.egcs_fc_riskscore !== null && validated.egcs_fc_riskscore !== undefined
       && Number(validated.egcs_fc_riskscore) === Number(current.egcs_fc_riskscore))
   const riskWorkflowManaged = streamChanged || (includesRiskScore && !echoesCurrentRiskScore)
-    ? await isAgreementRiskRatingWorkflowManaged(db, nextStreamId)
+    ? await isAgreementRiskRatingWorkflowManaged(db, nextStreamId, agreementId)
     : false
   if (!streamChanged && riskWorkflowManaged && includesRiskScore
     && !echoesCurrentRiskScore) {

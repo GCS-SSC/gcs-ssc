@@ -5,7 +5,8 @@ import { lockPaymentRecoveryAgreements } from './payment-recovery-lock'
 import { compareMoney, parseMoney } from '~~/shared/utils/money'
 import { resolveWorkflowExecutionPlan } from './workflow-execution-plan'
 import { lockAssignableGroup } from './groups'
-import { captureRiskRatingMapping } from './agreement-risk-rating'
+import { assertRiskReadiness } from './risk-readiness'
+import { captureRiskRatingMapping, resolveRiskRatingAgreementId } from './agreement-risk-rating'
 import { hashPublicationDefinition } from './system-publication'
 import { captureWorkflowRouting } from './workflow-routing'
 import { WorkflowRouteValidationError, type WorkflowRoutingEvidence } from './workflow-routing-contract'
@@ -78,7 +79,7 @@ import {
   requiresTerminalApprovalSubmissionSuccess
 } from '~~/shared/constants/entity-registry'
 import { resolveEntityTypeLifecycleDefinition } from './entity-type-registry'
-import { createCompletionRecord } from './completion-runtime-core'
+import { createCompletionRecord, resolveCompletionEvidenceId } from './completion-runtime-core'
 import { applyCompletionPositiveTerminusEffects } from './completion-positive-terminus'
 import { loadExtensionLifecycleEntity } from './extensions'
 import {
@@ -303,17 +304,25 @@ const lockProtectedAgreement = async (trx: Transaction<Database>, run: Pick<Work
     }
     return
   }
-  if (run.egcs_cn_purpose === 'risk_rating' && run.egcs_cn_entitytype === 'fundingcaseagreement') {
+  if (run.egcs_cn_purpose === 'risk_rating' && ['fundingcaseagreement', 'fundingcaseamendment'].includes(run.egcs_cn_entitytype)) {
+    const agreementId = await resolveRiskRatingAgreementId(trx, {
+      entityType: run.egcs_cn_entitytype as 'fundingcaseagreement' | 'fundingcaseamendment', entityId: String(run.egcs_cn_entityid)
+    })
+    if (!agreementId) throw new Error('Risk Rating target Agreement is unavailable')
     const observed = await trx.selectFrom('Funding_Case_Agreement_Profile')
       .select('egcs_fc_transferpaymentstream')
-      .where('id', '=', String(run.egcs_cn_entityid)).where('_deleted', '=', false).executeTakeFirst()
+      .where('id', '=', agreementId).where('_deleted', '=', false).executeTakeFirst()
     if (!observed) throw new Error('Risk Rating Agreement is unavailable')
     const streamId = String(observed.egcs_fc_transferpaymentstream)
     const stream = await trx.selectFrom('Transfer_Payment_Stream').select('id')
       .where('id', '=', streamId).where('_deleted', '=', false).forUpdate().executeTakeFirst()
     if (!stream) throw new Error('Risk Rating Agreement Stream is unavailable')
-    if (!await lockAgreementProfileForUpdate(trx, String(run.egcs_cn_entityid))) {
+    if (!await lockAgreementProfileForUpdate(trx, agreementId)) {
       throw new Error('Risk Rating Agreement is unavailable')
+    }
+    if (run.egcs_cn_entitytype === 'fundingcaseamendment') {
+      await trx.selectFrom('Funding_Case_Agreement_Amendment').select('id')
+        .where('id', '=', String(run.egcs_cn_entityid)).where('_deleted', '=', false).forUpdate().executeTakeFirstOrThrow()
     }
     return streamId
   }
@@ -357,11 +366,17 @@ const applyRiskRatingEffect = async (
     })
     return false
   }
-  if (!effect || run.egcs_cn_entitytype !== 'fundingcaseagreement') return await fail('risk_rating_configuration_invalid')
+  if (!effect || !['fundingcaseagreement', 'fundingcaseamendment'].includes(run.egcs_cn_entitytype)) return await fail('risk_rating_configuration_invalid')
+  const agreementId = await resolveRiskRatingAgreementId(trx, {
+    entityType: run.egcs_cn_entitytype as 'fundingcaseagreement' | 'fundingcaseamendment', entityId: String(run.egcs_cn_entityid)
+  })
+  if (!agreementId) return await fail('risk_rating_target_unavailable')
+  if (run.egcs_cn_entitytype === 'fundingcaseamendment'
+    && await resolveCompletionEvidenceId(trx, 'fundingcaseamendment', String(run.egcs_cn_entityid))) return await fail('risk_rating_frozen')
   const agreement = await trx.selectFrom('Funding_Case_Agreement_Profile')
     .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Funding_Case_Agreement_Profile.egcs_fc_transferpaymentstream')
     .select(['Funding_Case_Agreement_Profile.egcs_fc_transferpaymentstream as streamId'])
-    .where('Funding_Case_Agreement_Profile.id', '=', String(run.egcs_cn_entityid))
+    .where('Funding_Case_Agreement_Profile.id', '=', agreementId)
     .where('Funding_Case_Agreement_Profile._deleted', '=', false)
     .where('Transfer_Payment_Stream._deleted', '=', false)
     .executeTakeFirst()
@@ -404,11 +419,15 @@ const applyRiskRatingEffect = async (
   }
   const band = mapping.bands.find(candidate => assessmentScore <= candidate.maximumScore)
   if (!band) return await fail('risk_rating_score_out_of_range')
-  await trx.updateTable('Funding_Case_Agreement_Profile')
-    .set({ egcs_fc_riskscore: band.riskScore })
-    .where('id', '=', String(run.egcs_cn_entityid))
-    .where('_deleted', '=', false)
-    .executeTakeFirstOrThrow()
+  if (run.egcs_cn_entitytype === 'fundingcaseamendment') {
+    await trx.updateTable('Funding_Case_Agreement_Amendment')
+      .set({ egcs_fc_changerisk: true, egcs_fc_proposedriskscore: band.riskScore })
+      .where('id', '=', String(run.egcs_cn_entityid)).where('egcs_fc_fundingagreement', '=', agreementId)
+      .where('_deleted', '=', false).executeTakeFirstOrThrow()
+  } else {
+    await trx.updateTable('Funding_Case_Agreement_Profile').set({ egcs_fc_riskscore: band.riskScore })
+      .where('id', '=', agreementId).where('_deleted', '=', false).executeTakeFirstOrThrow()
+  }
   return true
 }
 
@@ -478,6 +497,7 @@ const promoteApprovalSubmission = async (trx: Transaction<Database>, run: Workfl
       ? {
           budgetVersionId: packet.sourceVersions.budget,
           activityVersionId: packet.sourceVersions.activity,
+          risk: packet.schemaVersion === 3 ? packet.risk : null,
           duration: packet.amendment !== null && Object.hasOwn(packet.amendment, 'proposedAuthorizedAssistanceStartDate')
         }
       : undefined
@@ -716,6 +736,13 @@ export const createCompletionTransition = async (
       code: 'CLOSEOUT_APPROVAL_WORKFLOW_REQUIRED',
       key: 'apiErrors.workflow.closeout_approval_required'
     })
+  }
+  if (context.entityType === 'fundingcaseamendment') {
+    const riskReadiness = await assertRiskReadiness(event, trx, { entityType: context.entityType, entityId: context.entityId })
+    if (riskReadiness.workflowManaged) {
+      await trx.updateTable('Funding_Case_Agreement_Amendment').set({ egcs_fc_changerisk: true })
+        .where('id', '=', context.entityId).where('_deleted', '=', false).executeTakeFirstOrThrow()
+    }
   }
   const completion = await createCompletionRecord(trx, {
     entityType: context.entityType,
@@ -1241,6 +1268,10 @@ const startWorkflowUnchecked = async (
   if (completionId && (purpose !== 'approval_submission' || entityDefinition.approvalSubmission !== 'on_completion')) {
     return null
   }
+  if (purpose === 'risk_rating' && context.entityType === 'fundingcaseamendment'
+    && await resolveCompletionEvidenceId(trx, context.entityType, context.entityId)) {
+    return await throwApiError(event, { statusCode: 409, code: 'RISK_RATING_FROZEN', key: 'apiErrors.workflow.risk_rating_frozen' })
+  }
   const selectedIntakeSetup = selectedSetup && context.entityType === 'fundingcaseintake' && !retry
     ? purpose === 'standard'
       ? (await resolvePublishedStandardWorkflowSetups(trx, context, String(selectedSetup.id), true))[0]
@@ -1299,6 +1330,10 @@ const startWorkflowUnchecked = async (
   }
   if ('status' in targetStatus ? targetStatus.status.terminal : targetStatus.terminal) {
     return await badRequest(event, 'WORKFLOW_TARGET_TERMINAL', 'apiErrors.request.invalid_status')
+  }
+  if (!retry && purpose === 'approval_submission'
+    && (context.entityType === 'fundingcaseagreement' || context.entityType === 'fundingcaseamendment')) {
+    await assertRiskReadiness(event, trx, { entityType: context.entityType, entityId: context.entityId })
   }
   const closeoutReadiness = purpose === 'approval_submission'
     && context.entityType === 'fundingcaseagreementcloseout'
@@ -1362,12 +1397,16 @@ const startWorkflowUnchecked = async (
     }
     if (purpose === 'risk_rating') {
       const effect = setup.publicationDefinition.riskRatingEffect
-      if (!effect || context.entityType !== 'fundingcaseagreement') {
+      if (!effect || !['fundingcaseagreement', 'fundingcaseamendment'].includes(context.entityType)) {
         throw new WorkflowRouteValidationError('Risk Rating publication is invalid')
       }
+      const riskAgreementId = await resolveRiskRatingAgreementId(trx, {
+        entityType: context.entityType as 'fundingcaseagreement' | 'fundingcaseamendment', entityId: context.entityId
+      })
+      if (!riskAgreementId) throw new WorkflowRouteValidationError('Risk Rating target Agreement is unavailable')
       const agreement = await trx.selectFrom('Funding_Case_Agreement_Profile')
         .select('egcs_fc_transferpaymentstream')
-        .where('id', '=', context.entityId)
+        .where('id', '=', riskAgreementId)
         .where('_deleted', '=', false)
         .executeTakeFirst()
       if (!agreement) throw new WorkflowRouteValidationError('Risk Rating Agreement is unavailable')
@@ -1401,13 +1440,14 @@ const startWorkflowUnchecked = async (
       event,
       trx,
       context.entityType as 'fundingcaseagreement' | 'fundingcaseamendment',
-      context.entityId
+      context.entityId,
+      { retryRuntimeId: retry ? retryRuntimeId : undefined }
     )
     await trx.insertInto('Funding_Case_Agreement_Approval_Submission').values({
       egcs_fc_fundingagreement: snapshot.agreementId,
       egcs_fc_amendment: snapshot.amendmentId,
       egcs_fc_workflowrun: String(run.id),
-      egcs_fc_snapshotschemaversion: 1,
+      egcs_fc_snapshotschemaversion: snapshot.packet.schemaVersion,
       egcs_fc_packet: snapshot.packet as JsonValue,
       egcs_fc_canonicalhash: snapshot.hash
     }).execute()
