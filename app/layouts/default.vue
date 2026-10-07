@@ -1,19 +1,18 @@
 <script setup lang="ts">
-import type { DropdownMenuItem, NavigationMenuItem } from '@nuxt/ui'
+import type { DropdownMenuItem } from '@nuxt/ui'
 import { ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import type { ExtensionAgencyWorkspaceListItem } from '~~/shared/types/schemas/extensions'
+import { useNavigationCatalog } from '~/composables/useNavigationCatalog'
 
 const { t } = useI18n()
 const toast = useToast()
 const localePath = useLocalePath()
 const abilityHelpers = useCan()
-const { can, canAny } = abilityHelpers
-const canManageAssignments = abilityHelpers.canManageAssignments ?? (() => false)
+const { can } = abilityHelpers
 const { user, signOut } = useAuth()
-const { locale } = useI18n()
 const route = useRoute()
 const agencyWorkspaces: Ref<ExtensionAgencyWorkspaceListItem[]> = ref([])
 let workspaceRequestSequence = 0
@@ -34,24 +33,8 @@ const loadAgencyWorkspaces = async () => {
 }
 watch(() => route.fullPath, loadAgencyWorkspaces, { immediate: true })
 
-const open: Ref<boolean> = ref(false)
-const canViewAudit = computed(() => canAny('audit', 'read', ['global', 'agency']))
 const canViewAdminGwcoa = computed(() => can('system', 'read', { type: 'global' }))
-const canViewAgencies = computed(() => canAny('agency', 'read'))
-const canViewUsers = computed(() => canAny('user', 'read'))
-const canViewGroups = computed(() => canAny('group', 'read'))
-const canViewApplicantRecipients = computed(() => canAny('applicant_recipient', 'read'))
-const canViewJournalVouchers = computed(() => canAny('journal_voucher', 'read'))
-const canViewAgreements = computed(() => canAny('agreement', 'read'))
-const canViewTransferPayments = computed(() => canAny('transfer_payment', 'read'))
-const canViewFundingCases = computed(() => canAny('funding_case', 'read'))
-const canViewRoles = computed(() => canAny('role', 'read'))
-const assignmentManagementSubjects = [
-  'agreement', 'applicant_recipient', 'funding_case', 'journal_voucher', 'correction'
-] as const
-const canViewAssignmentManagement = computed(() =>
-  assignmentManagementSubjects.some(subject => canManageAssignments(subject))
-)
+const { items, pages } = useNavigationCatalog(agencyWorkspaces)
 const userDisplayName = computed(() => {
   if (!user.value) return ''
   if (!user.value.name) return ''
@@ -104,116 +87,6 @@ const userMenuItems = computed<DropdownMenuItem[][]>(() => [
     }
   ]
 ])
-
-const items = computed(
-  () =>
-    [
-      [
-        {
-          label: t('nav.home'),
-          icon: 'i-lucide-house',
-          to: localePath(appRouteLocations.home()),
-          onSelect: () => {
-            open.value = false
-          }
-        },
-        ...(canViewAgencies.value
-          ? [
-              {
-                label: t('nav.agencies'),
-                icon: 'i-lucide-settings',
-                to: localePath(appRouteLocations.agencies()),
-                defaultOpen: true,
-                type: 'trigger'
-              }
-            ]
-          : []),
-        ...(canViewTransferPayments.value
-          ? [{
-              label: t('nav.transfer_payments'),
-              icon: 'i-lucide-banknote',
-              to: localePath(appRouteLocations.transferPayments())
-            }]
-          : []),
-        ...(canViewTransferPayments.value
-          ? [{ label: t('nav.funding_opportunities'), icon: 'i-lucide-megaphone', to: localePath(appRouteLocations.fundingOpportunities()) }]
-          : []),
-        ...(canViewFundingCases.value
-          ? [{ label: t('nav.funding_case_intakes'), icon: 'i-lucide-inbox', to: localePath(appRouteLocations.fundingCaseIntakes()) }]
-          : []),
-        ...(canViewJournalVouchers.value
-          ? [{ label: t('journal_voucher.title'), icon: 'i-lucide-book-open-check', to: localePath('/journal-vouchers') }]
-          : []),
-        ...(canViewAgreements.value
-          ? [
-              {
-                label: t('nav.agreements'),
-                icon: 'i-lucide-file-signature',
-                to: localePath(appRouteLocations.agreements())
-              }
-            ]
-          : []),
-        ...agencyWorkspaces.value.map((workspace: ExtensionAgencyWorkspaceListItem) => ({
-          label: locale.value === 'fr' ? workspace.label.fr : workspace.label.en,
-          icon: workspace.icon ?? 'i-lucide-panels-top-left',
-          to: localePath(appRouteLocations.extensionAgencyWorkspaceList(workspace.key))
-        })),
-        ...(canViewApplicantRecipients.value
-          ? [
-              {
-                label: t('nav.applicant_recipients'),
-                icon: 'i-lucide-store',
-                to: localePath(appRouteLocations.proponents())
-              }
-            ]
-          : []),
-        ...(canViewAssignmentManagement.value
-          ? [{
-              label: t('nav.assignment_management'),
-              icon: 'i-lucide-user-round-check',
-              to: localePath(appRouteLocations.assignmentManagement())
-            }]
-          : []),
-        ...(canViewRoles.value
-          ? [{
-              label: t('role.title'),
-              icon: 'i-lucide-shield',
-              to: localePath(appRouteLocations.roles())
-            }]
-          : []),
-        ...(canViewUsers.value
-          ? [
-              {
-                label: t('nav.users'),
-                icon: 'i-lucide-user-round',
-                to: localePath(appRouteLocations.users())
-              }
-            ]
-          : []),
-        ...(canViewGroups.value
-          ? [{ label: t('nav.groups'), icon: 'i-lucide-users', to: localePath(appRouteLocations.groups()) }]
-          : []),
-        ...(canViewAudit.value ? [{ label: t('audit.title'), icon: 'i-lucide-clipboard-list', to: localePath('/admin/audit') }] : []),
-        ...(canViewAdminGwcoa.value
-          ? [
-              {
-                label: t('admin_common.resources.gwcoa'),
-                icon: 'i-lucide-database',
-                to: localePath(appRouteLocations.adminGwcoa())
-              }
-            ]
-          : [])
-      ]
-    ] as NavigationMenuItem[][]
-)
-
-const groups = computed(() => [
-  {
-    id: 'links',
-    label: t('common.actions'),
-    items: items.value.flat()
-  }
-])
 </script>
 
 <template>
@@ -243,6 +116,8 @@ const groups = computed(() => [
 
         <UDashboardSearchButton
           :collapsed="collapsed"
+          :label="t('global_search.button')"
+          :aria-label="t('global_search.button')"
           class="hover:ring-primary mb-6 bg-white ring-1 ring-zinc-200 transition-all dark:bg-zinc-900 dark:ring-zinc-800" />
 
         <UNavigationMenu
@@ -290,7 +165,7 @@ const groups = computed(() => [
         </div>
       </template>
     </UDashboardSidebar>
-    <UDashboardSearch :groups="groups" />
+    <CommonGlobalSearchPalette :pages="pages" />
 
     <slot />
   </UDashboardGroup>

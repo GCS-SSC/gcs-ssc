@@ -1315,8 +1315,6 @@
       "amendment_activities_exist": "Cette modification possède déjà un instantané des activités.",
       "amendment_budget_snapshot_not_found": "Cette modification ne possède pas d'instantané du budget.",
       "amendment_activity_snapshot_not_found": "Cette modification ne possède pas d'instantané des activités.",
-      "amendment_budget_type_required": "Un type de modification budgétaire est requis tant que cette modification possède un instantané du budget.",
-      "amendment_activities_type_required": "Un type de modification des activités est requis tant que cette modification possède un instantané des activités.",
       "open_amendment_exists": "Cette entente possède déjà une modification ouverte. Terminez-la ou fermez-la avant d’en créer une autre.",
       "amendment_capability_required": "Le type de modification sélectionné ne permet pas ce changement.",
       "amendment_duration_dates_required": "Une modification de durée exige des dates de début et de fin autorisées proposées.",
@@ -1385,7 +1383,9 @@
       "duplicate_claim_reconcile_line_item": "Une ligne de rapprochement existe déjà pour cette ligne de réclamation.",
       "currency_immutable": "La devise de l’entente est définie à la création et ne peut pas être modifiée.",
       "currency_mismatch": "La devise doit correspondre à celle de l’entente.",
-      "invalid_claim_proponent": "Sélectionnez un promoteur soumissionnaire lié à cette entente."
+      "invalid_claim_proponent": "Sélectionnez un promoteur soumissionnaire lié à cette entente.",
+      "amendment_budget_type_required": "Un type de modification budgétaire est requis tant que cette modification possède un instantané du budget.",
+      "amendment_activities_type_required": "Un type de modification des activités est requis tant que cette modification possède un instantané des activités."
     },
     "transfer_payment": {
       "invalid_funding_subtype": "Sélectionnez un sous-type de financement actif appartenant à l’agence de ce volet.",
@@ -3486,7 +3486,6 @@
     "delete_member": "Supprimer le membre {sequence} du flux",
     "member_kind": "Type de membre",
     "allow_owner_redirect": "Autoriser l’initiateur ou le responsable déclencheur à remplacer un propriétaire indisponible",
-    "default_owners": "Propriétaires par défaut",
     "default_owner_help": "Laissez vide pour attribuer cet élément à l’initiateur du flux.",
     "no_members": "Aucun membre de flux n’est configuré.",
     "no_change": "Aucun changement",
@@ -3559,7 +3558,8 @@
     "recommendation_validation_title": "La recommandation est incomplète",
     "recommendation_validation_description": "Vérifiez les questions mises en évidence et fournissez les réponses obligatoires avant de soumettre.",
     "not_configured": "Aucun flux de travail n’est configuré pour cet élément.",
-    "approval_not_configured": "Aucun flux d’approbation n’est configuré. L’achèvement se poursuivra sans flux d’approbation."
+    "approval_not_configured": "Aucun flux d’approbation n’est configuré. L’achèvement se poursuivra sans flux d’approbation.",
+    "default_owners": "Propriétaires par défaut"
   },
   "recommendation_schema": {
     "title": "Schéma de recommandation",
@@ -4278,5 +4278,32 @@
     "historical_credit_memo_allocations_description": "Ces répartitions sont des preuves conservées du modèle de données antérieur. Les soldes actuels sont calculés par promoteur, agence et devise.",
     "credit_memo_receivable": "Compte débiteur",
     "credit_memo_coding": "Codage de la note de crédit"
+  },
+  "global_search": {
+    "title": "Rechercher dans GCS-SSC",
+    "button": "Rechercher",
+    "description": "Trouvez des dossiers, votre travail attribué et des pages.",
+    "placeholder": "Rechercher un nom, une abréviation ou une référence…",
+    "input_label": "Rechercher des dossiers, mon travail et des pages",
+    "close": "Fermer la recherche",
+    "records": "Dossiers",
+    "my_work": "Mon travail",
+    "pages": "Pages",
+    "loading": "Recherche en cours…",
+    "failed": "Les dossiers et le travail attribué n’ont pas pu être chargés. Les raccourcis vers les pages restent disponibles.",
+    "empty": "Aucun dossier, travail ou page correspondant.",
+    "no_work": "Vous n’avez aucune attribution personnelle ouverte.",
+    "no_remote_matches": "Aucun dossier ou attribution personnelle correspondant.",
+    "truncated": "D’autres résultats sont disponibles dans {groups}. Précisez votre recherche.",
+    "keyboard_hint": "Utilisez ↑ et ↓ pour sélectionner, Entrée pour ouvrir et Échap pour fermer.",
+    "types": {
+      "agreement": "Entente",
+      "proponent": "Promoteur",
+      "opportunity": "Possibilité",
+      "intake": "Demande",
+      "program": "Programme",
+      "stream": "Volet",
+      "agency": "Organisme"
+    }
   }
 }

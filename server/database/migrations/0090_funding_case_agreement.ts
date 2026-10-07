@@ -1254,6 +1254,14 @@ ALTER SEQUENCE "Funding_Case_Agreement_Payment_Line_id_seq" OWNED BY "Funding_Ca
 ALTER SEQUENCE "Funding_Case_Agreement_Responsible_Party_Activity_id_seq" OWNED BY "Funding_Case_Agreement_Responsible_Party_Activity"."id";
 
 ALTER SEQUENCE "Funding_Case_Agreement_Revision_id_seq" OWNED BY "Funding_Case_Agreement_Revision"."id";
+-- Palette matching uses only this source's own identity fields.
+CREATE INDEX fc_profile_search_title_en_trgm ON "Funding_Case_Agreement_Profile" USING gin (lower(coalesce(egcs_fc_title_en, '')) gin_trgm_ops) WHERE (_deleted = false);
+CREATE INDEX fc_profile_search_title_en_prefix ON "Funding_Case_Agreement_Profile" USING btree (lower(coalesce(egcs_fc_title_en, '')) text_pattern_ops) WHERE (_deleted = false);
+CREATE INDEX fc_profile_search_title_fr_trgm ON "Funding_Case_Agreement_Profile" USING gin (lower(coalesce(egcs_fc_title_fr, '')) gin_trgm_ops) WHERE (_deleted = false);
+CREATE INDEX fc_profile_search_title_fr_prefix ON "Funding_Case_Agreement_Profile" USING btree (lower(coalesce(egcs_fc_title_fr, '')) text_pattern_ops) WHERE (_deleted = false);
+CREATE INDEX fc_profile_search_agreementnumber_trgm ON "Funding_Case_Agreement_Profile" USING gin (lower(coalesce(egcs_fc_agreementnumber, '')) gin_trgm_ops) WHERE (_deleted = false);
+CREATE INDEX fc_profile_search_agreementnumber_exact ON "Funding_Case_Agreement_Profile" USING btree (lower(coalesce(egcs_fc_agreementnumber, '')) text_pattern_ops) WHERE (_deleted = false);
+CREATE INDEX fc_profile_search_financialsystemnumber_exact ON "Funding_Case_Agreement_Profile" USING btree (egcs_fc_financialsystemnumber) WHERE (_deleted = false);
 END $baseline$`.execute(db)
 }
 

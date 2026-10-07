@@ -8,6 +8,8 @@ export const up = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
 CREATE EXTENSION IF NOT EXISTS citext;
 
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
 CREATE TYPE "Checklist_Answer" AS ENUM ('pass', 'fail', 'not_applicable');
 
 CREATE TYPE "Checklist_Result" AS ENUM ('pass', 'pass_with_considerations', 'fail');

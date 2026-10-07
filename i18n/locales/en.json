@@ -1315,8 +1315,6 @@
       "amendment_activities_exist": "This amendment already has an activity snapshot.",
       "amendment_budget_snapshot_not_found": "This amendment does not have a budget snapshot.",
       "amendment_activity_snapshot_not_found": "This amendment does not have an activity snapshot.",
-      "amendment_budget_type_required": "A budget amendment type is required while this amendment has a budget snapshot.",
-      "amendment_activities_type_required": "An activities amendment type is required while this amendment has an activity snapshot.",
       "open_amendment_exists": "This agreement already has an open amendment. Complete or close it before creating another.",
       "amendment_capability_required": "The selected amendment type does not allow this change.",
       "amendment_duration_dates_required": "A duration amendment requires proposed authorized start and end dates.",
@@ -1385,7 +1383,9 @@
       "duplicate_claim_reconcile_line_item": "A reconciliation line already exists for this claim line item.",
       "currency_immutable": "Agreement currency is set at creation and cannot be changed.",
       "currency_mismatch": "Currency must match the Agreement currency.",
-      "invalid_claim_proponent": "Select a submitting Proponent linked to this Agreement."
+      "invalid_claim_proponent": "Select a submitting Proponent linked to this Agreement.",
+      "amendment_budget_type_required": "A budget amendment type is required while this amendment has a budget snapshot.",
+      "amendment_activities_type_required": "An activities amendment type is required while this amendment has an activity snapshot."
     },
     "transfer_payment": {
       "invalid_funding_subtype": "Select an active funding subtype owned by this stream’s Agency.",
@@ -3486,7 +3486,6 @@
     "delete_member": "Delete workflow member {sequence}",
     "member_kind": "Member type",
     "allow_owner_redirect": "Allow initiator or triggering caseworker to replace an unavailable owner",
-    "default_owners": "Default owners",
     "default_owner_help": "Leave blank to assign this item to the workflow initiator.",
     "no_members": "No workflow members have been configured.",
     "no_change": "No change",
@@ -3559,7 +3558,8 @@
     "recommendation_validation_title": "Recommendation is incomplete",
     "recommendation_validation_description": "Review the highlighted questions and provide the required responses before submitting.",
     "not_configured": "No workflow is configured for this item.",
-    "approval_not_configured": "No approval workflow is configured. Completion will proceed without an approval workflow."
+    "approval_not_configured": "No approval workflow is configured. Completion will proceed without an approval workflow.",
+    "default_owners": "Default owners"
   },
   "recommendation_schema": {
     "title": "Recommendation schema",
@@ -4278,5 +4278,32 @@
     "historical_credit_memo_allocations_description": "These allocations are retained evidence from the earlier data model. Current balances are calculated for the proponent, Agency and currency.",
     "credit_memo_receivable": "Account Receivable",
     "credit_memo_coding": "Credit Memo coding"
+  },
+  "global_search": {
+    "title": "Search GCS-SSC",
+    "button": "Search",
+    "description": "Find records, your assigned work, and pages.",
+    "placeholder": "Search names, abbreviations, or references…",
+    "input_label": "Search records, my work, and pages",
+    "close": "Close search",
+    "records": "Records",
+    "my_work": "My work",
+    "pages": "Pages",
+    "loading": "Searching…",
+    "failed": "Records and assigned work could not be loaded. Page shortcuts are still available.",
+    "empty": "No matching records, work, or pages.",
+    "no_work": "You have no open personal assignments.",
+    "no_remote_matches": "No matching records or personal assignments.",
+    "truncated": "More results are available in {groups}. Refine your search.",
+    "keyboard_hint": "Use ↑ and ↓ to select, Enter to open, and Escape to close.",
+    "types": {
+      "agreement": "Agreement",
+      "proponent": "Proponent",
+      "opportunity": "Opportunity",
+      "intake": "Intake",
+      "program": "Program",
+      "stream": "Stream",
+      "agency": "Agency"
+    }
   }
 }

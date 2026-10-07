@@ -19,6 +19,7 @@ import { join, resolve } from 'node:path'
 import assert from 'node:assert/strict'
 import { PGlite } from '@electric-sql/pglite'
 import { citext } from '@electric-sql/pglite/contrib/citext'
+import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm'
 import PizZip from 'pizzip'
 
 const REPOSITORY_ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -396,7 +397,7 @@ export const prepareAdminSqlDumpForRestore = (dump: string): string => {
  */
 export const verifyAdminSqlDumpRestorable = async (dump: string): Promise<void> => {
   const pg = new PGlite('memory://', {
-    extensions: { citext }
+    extensions: { citext, pg_trgm }
   })
 
   try {
@@ -799,13 +800,17 @@ const verifyExtensionPublicAssets = async (baseUrl: string): Promise<void> => {
  */
 const verifyCoreMigrations = async (pgliteDataDir: string): Promise<void> => {
   const pg = new PGlite(pgliteDataDir, {
-    extensions: { citext }
+    extensions: { citext, pg_trgm }
   })
   try {
     const result = await pg.query<MigrationRow>(
       'select name from kysely_migration order by timestamp, name'
     )
     assert.deepEqual(result.rows.map(row => row.name), PRODUCTION_CORE_MIGRATIONS)
+    const trigram = await pg.query<{ extname: string }>(
+      'SELECT extname FROM pg_extension WHERE extname = \'pg_trgm\''
+    )
+    assert.deepEqual(trigram.rows, [{ extname: 'pg_trgm' }], 'Production startup must install palette matching indexes.')
   } finally {
     await pg.close()
   }

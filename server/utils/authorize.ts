@@ -331,6 +331,23 @@ export const requireFreshAuthContext = async (
 }
 
 /**
+ * Rebuilds read permissions and checks the active principal in the caller's snapshot.
+ * Read projections do not reserve grant rows against concurrent management; protected
+ * writes must continue to use requireFreshAuthContext and its ordered locks.
+ */
+export const requireFreshReadAuthContext = async (
+  event: H3Event,
+  db: Kysely<Database>
+): Promise<AuthContext> => {
+  const userId = await withAnonymousAudit(event.context.auditRequestId ?? null, () => requireSessionUserId(event))
+  await requireActiveUser(event, userId, db)
+  return {
+    userId,
+    userAbilities: await defineUserAbilities(userId, db)
+  }
+}
+
+/**
  * Evaluates an authorization resolution with an explicitly supplied context.
  */
 const authorizeWithContext = async <A extends AbilityAction, T = undefined>(

@@ -7,6 +7,7 @@ import { Kysely, PostgresDialect, sql } from 'kysely'
 import { KyselyPGlite } from 'kysely-pglite'
 import { types as pgliteTypes } from '@electric-sql/pglite'
 import { citext } from '@electric-sql/pglite/contrib/citext'
+import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm'
 import pg from 'pg'
 import type { Database } from '~~/shared/types/database'
 import { parseSafeDecimal } from '~~/shared/utils/decimal'
@@ -175,7 +176,7 @@ const createDatabase = (): Omit<DatabaseGeneration, 'id' | 'leases'> => {
   }
 
   const dialect = new KyselyPGlite(pgliteDataDir, {
-    extensions: { citext },
+    extensions: { citext, pg_trgm },
     parsers: {
       [pgliteTypes.INT8]: String,
       [pgliteTypes.NUMERIC]: parseSafeDecimal

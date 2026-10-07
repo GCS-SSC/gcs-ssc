@@ -1,5 +1,6 @@
 import { PGlite, types as pgliteTypes } from '@electric-sql/pglite'
 import { citext } from '@electric-sql/pglite/contrib/citext'
+import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm'
 import { pgDump } from '@electric-sql/pglite-tools/pg_dump'
 import {
   CompiledQuery,
@@ -134,7 +135,7 @@ const createPGliteDialect = (client: PGlite): Dialect => ({
  */
 export const generateAdminSqlDump = async (): Promise<string> => {
   const pg = new PGlite('memory://', {
-    extensions: { citext },
+    extensions: { citext, pg_trgm },
     parsers: {
       [pgliteTypes.NUMERIC]: parseNumericValue
     }

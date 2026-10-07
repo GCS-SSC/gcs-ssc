@@ -10,6 +10,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { PGlite } from '@electric-sql/pglite'
 import { citext } from '@electric-sql/pglite/contrib/citext'
+import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm'
 import { chromium } from 'playwright'
 import {
   buildOutputPayloads,
@@ -634,7 +635,7 @@ export const verifyWebContainerDatabase = async (
   runtimeExtensions: RuntimeExtensionDefinition[]
 ): Promise<void> => {
   const pg = new PGlite(pgliteDataDirectory, {
-    extensions: { citext }
+    extensions: { citext, pg_trgm }
   })
 
   try {
@@ -651,6 +652,10 @@ export const verifyWebContainerDatabase = async (
       [...EXPECTED_CORE_MIGRATIONS],
       'WebContainer migration journal did not contain the exact core migration set.'
     )
+    const trigram = await pg.query<{ extname: string }>(
+      'SELECT extname FROM pg_extension WHERE extname = \'pg_trgm\''
+    )
+    assert.deepEqual(trigram.rows, [{ extname: 'pg_trgm' }], 'WebContainer startup must install palette matching indexes.')
 
     const columns = await pg.query<CanonicalColumnRow>(`
       select table_schema, table_name, column_name, data_type, is_nullable, column_default

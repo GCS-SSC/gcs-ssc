@@ -87,6 +87,11 @@ ALTER SEQUENCE "Funding_Opportunity_Review_Set_id_seq" OWNED BY "Funding_Opportu
 ALTER SEQUENCE "Funding_Opportunity_Stream_id_seq" OWNED BY "Funding_Opportunity_Stream"."id";
 
 ALTER SEQUENCE "Funding_Opportunity_Workflow_id_seq" OWNED BY "Funding_Opportunity_Workflow"."id";
+-- Palette matching uses only this source's own identity fields.
+CREATE INDEX fo_profile_search_name_en_trgm ON "Funding_Opportunity_Profile" USING gin (lower(coalesce(egcs_fo_name_en, '')) gin_trgm_ops) WHERE (_deleted = false);
+CREATE INDEX fo_profile_search_name_en_prefix ON "Funding_Opportunity_Profile" USING btree (lower(coalesce(egcs_fo_name_en, '')) text_pattern_ops) WHERE (_deleted = false);
+CREATE INDEX fo_profile_search_name_fr_trgm ON "Funding_Opportunity_Profile" USING gin (lower(coalesce(egcs_fo_name_fr, '')) gin_trgm_ops) WHERE (_deleted = false);
+CREATE INDEX fo_profile_search_name_fr_prefix ON "Funding_Opportunity_Profile" USING btree (lower(coalesce(egcs_fo_name_fr, '')) text_pattern_ops) WHERE (_deleted = false);
 END $baseline$`.execute(db)
 }
 

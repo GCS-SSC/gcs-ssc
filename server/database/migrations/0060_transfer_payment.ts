@@ -476,6 +476,27 @@ ALTER SEQUENCE "Transfer_Payment_Stream_Review_Set_id_seq" OWNED BY "Transfer_Pa
 ALTER SEQUENCE "Transfer_Payment_Stream_Risk_Rating_id_seq" OWNED BY "Transfer_Payment_Stream_Risk_Rating"."id";
 
 ALTER SEQUENCE "Transfer_Payment_Stream_Workflow_id_seq" OWNED BY "Transfer_Payment_Stream_Workflow"."id";
+-- Unfinished children remain readable through inactive, non-deleted configuration owners.
+CREATE INDEX tp_idx_profile_agency_live ON "Transfer_Payment_Profile" USING btree (egcs_tp_agency) WHERE (_deleted = false);
+CREATE INDEX tp_idx_stream_profile_live ON "Transfer_Payment_Stream" USING btree (egcs_tp_transferpaymentprofile) WHERE (_deleted = false);
+-- Palette matching uses only this source's own identity fields.
+CREATE INDEX tp_profile_search_name_en_trgm ON "Transfer_Payment_Profile" USING gin (lower(coalesce(egcs_tp_name_en, '')) gin_trgm_ops) WHERE (_deleted = false AND egcs_tp_active = true);
+CREATE INDEX tp_profile_search_name_en_prefix ON "Transfer_Payment_Profile" USING btree (lower(coalesce(egcs_tp_name_en, '')) text_pattern_ops) WHERE (_deleted = false AND egcs_tp_active = true);
+CREATE INDEX tp_profile_search_name_fr_trgm ON "Transfer_Payment_Profile" USING gin (lower(coalesce(egcs_tp_name_fr, '')) gin_trgm_ops) WHERE (_deleted = false AND egcs_tp_active = true);
+CREATE INDEX tp_profile_search_name_fr_prefix ON "Transfer_Payment_Profile" USING btree (lower(coalesce(egcs_tp_name_fr, '')) text_pattern_ops) WHERE (_deleted = false AND egcs_tp_active = true);
+CREATE INDEX tp_profile_search_abbreviation_en_trgm ON "Transfer_Payment_Profile" USING gin (lower(coalesce(egcs_tp_abbreviation_en, '')) gin_trgm_ops) WHERE (_deleted = false AND egcs_tp_active = true);
+CREATE INDEX tp_profile_search_abbreviation_fr_trgm ON "Transfer_Payment_Profile" USING gin (lower(coalesce(egcs_tp_abbreviation_fr, '')) gin_trgm_ops) WHERE (_deleted = false AND egcs_tp_active = true);
+CREATE INDEX tp_profile_search_abbreviation_en_exact ON "Transfer_Payment_Profile" USING btree (lower(coalesce(egcs_tp_abbreviation_en, '')) text_pattern_ops) WHERE (_deleted = false AND egcs_tp_active = true);
+CREATE INDEX tp_profile_search_abbreviation_fr_exact ON "Transfer_Payment_Profile" USING btree (lower(coalesce(egcs_tp_abbreviation_fr, '')) text_pattern_ops) WHERE (_deleted = false AND egcs_tp_active = true);
+-- Palette matching uses only this source's own identity fields.
+CREATE INDEX tp_stream_search_name_en_trgm ON "Transfer_Payment_Stream" USING gin (lower(coalesce(egcs_tp_name_en, '')) gin_trgm_ops) WHERE (_deleted = false AND egcs_tp_active = true);
+CREATE INDEX tp_stream_search_name_en_prefix ON "Transfer_Payment_Stream" USING btree (lower(coalesce(egcs_tp_name_en, '')) text_pattern_ops) WHERE (_deleted = false AND egcs_tp_active = true);
+CREATE INDEX tp_stream_search_name_fr_trgm ON "Transfer_Payment_Stream" USING gin (lower(coalesce(egcs_tp_name_fr, '')) gin_trgm_ops) WHERE (_deleted = false AND egcs_tp_active = true);
+CREATE INDEX tp_stream_search_name_fr_prefix ON "Transfer_Payment_Stream" USING btree (lower(coalesce(egcs_tp_name_fr, '')) text_pattern_ops) WHERE (_deleted = false AND egcs_tp_active = true);
+CREATE INDEX tp_stream_search_abbreviation_en_trgm ON "Transfer_Payment_Stream" USING gin (lower(coalesce(egcs_tp_abbreviation_en, '')) gin_trgm_ops) WHERE (_deleted = false AND egcs_tp_active = true);
+CREATE INDEX tp_stream_search_abbreviation_fr_trgm ON "Transfer_Payment_Stream" USING gin (lower(coalesce(egcs_tp_abbreviation_fr, '')) gin_trgm_ops) WHERE (_deleted = false AND egcs_tp_active = true);
+CREATE INDEX tp_stream_search_abbreviation_en_exact ON "Transfer_Payment_Stream" USING btree (lower(coalesce(egcs_tp_abbreviation_en, '')) text_pattern_ops) WHERE (_deleted = false AND egcs_tp_active = true);
+CREATE INDEX tp_stream_search_abbreviation_fr_exact ON "Transfer_Payment_Stream" USING btree (lower(coalesce(egcs_tp_abbreviation_fr, '')) text_pattern_ops) WHERE (_deleted = false AND egcs_tp_active = true);
 END $baseline$`.execute(db)
 }
 

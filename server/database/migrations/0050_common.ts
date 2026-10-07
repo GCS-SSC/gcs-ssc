@@ -472,6 +472,9 @@ CREATE UNIQUE INDEX cn_idx_entityassignment_active_primary ON "Common_Entity_Ass
 
 CREATE UNIQUE INDEX cn_idx_entityassignment_active_user ON "Common_Entity_Assignment" USING btree (egcs_cn_entityid, egcs_cn_entitytype, egcs_cn_user) WHERE (_deleted = false);
 
+-- Personal work starts from the actor's roster, including independently assigned children.
+CREATE INDEX cn_idx_entityassignment_active_actor ON "Common_Entity_Assignment" USING btree (egcs_cn_user, egcs_cn_isprimary DESC, egcs_cn_entitytype, egcs_cn_entityid) WHERE (_deleted = false);
+
 CREATE TABLE "Common_Entity_Attachment" (
   "id" bigint DEFAULT nextval('"Common_Entity_Attachment_id_seq"'::regclass) NOT NULL,
   "egcs_cn_attachment" bigint NOT NULL,

@@ -30,6 +30,9 @@ CREATE UNIQUE INDEX fi_idx_external_source ON "Funding_Case_Intake_Profile" USIN
 CREATE UNIQUE INDEX fi_idx_profile_applicationid ON "Funding_Case_Intake_Profile" USING btree (egcs_fi_applicationid) WHERE (_deleted = false);
 
 CREATE INDEX fi_idx_profile_opportunity ON "Funding_Case_Intake_Profile" USING btree (egcs_fi_fundingopportunity) WHERE (_deleted = false);
+-- Palette matching uses only this source's own identity fields.
+CREATE INDEX fi_profile_search_externalsourceid_trgm ON "Funding_Case_Intake_Profile" USING gin (lower(coalesce(egcs_fi_externalsourceid, '')) gin_trgm_ops) WHERE (_deleted = false);
+CREATE INDEX fi_profile_search_externalsourceid_exact ON "Funding_Case_Intake_Profile" USING btree (lower(coalesce(egcs_fi_externalsourceid, '')) text_pattern_ops) WHERE (_deleted = false);
 END $baseline$`.execute(db)
 }
 

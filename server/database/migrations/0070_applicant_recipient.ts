@@ -173,6 +173,18 @@ ALTER SEQUENCE "Applicant_Recipient_Note_id_seq" OWNED BY "Applicant_Recipient_N
 ALTER SEQUENCE "Applicant_Recipient_Other_Name_id_seq" OWNED BY "Applicant_Recipient_Other_Name"."id";
 
 ALTER SEQUENCE "Applicant_Recipient_Registry_id_seq" OWNED BY "Applicant_Recipient_Registry"."id";
+-- Palette matching uses only this source's own identity fields.
+CREATE INDEX ar_profile_search_legalname_en_trgm ON "Applicant_Recipient_Profile" USING gin (lower(coalesce(egcs_ar_legalname_en, '')) gin_trgm_ops) WHERE (_deleted = false AND egcs_ar_active = true);
+CREATE INDEX ar_profile_search_legalname_en_prefix ON "Applicant_Recipient_Profile" USING btree (lower(coalesce(egcs_ar_legalname_en, '')) text_pattern_ops) WHERE (_deleted = false AND egcs_ar_active = true);
+CREATE INDEX ar_profile_search_legalname_fr_trgm ON "Applicant_Recipient_Profile" USING gin (lower(coalesce(egcs_ar_legalname_fr, '')) gin_trgm_ops) WHERE (_deleted = false AND egcs_ar_active = true);
+CREATE INDEX ar_profile_search_legalname_fr_prefix ON "Applicant_Recipient_Profile" USING btree (lower(coalesce(egcs_ar_legalname_fr, '')) text_pattern_ops) WHERE (_deleted = false AND egcs_ar_active = true);
+CREATE INDEX ar_profile_search_operatingname_en_trgm ON "Applicant_Recipient_Profile" USING gin (lower(coalesce(egcs_ar_operatingname_en, '')) gin_trgm_ops) WHERE (_deleted = false AND egcs_ar_active = true);
+CREATE INDEX ar_profile_search_operatingname_en_prefix ON "Applicant_Recipient_Profile" USING btree (lower(coalesce(egcs_ar_operatingname_en, '')) text_pattern_ops) WHERE (_deleted = false AND egcs_ar_active = true);
+CREATE INDEX ar_profile_search_operatingname_fr_trgm ON "Applicant_Recipient_Profile" USING gin (lower(coalesce(egcs_ar_operatingname_fr, '')) gin_trgm_ops) WHERE (_deleted = false AND egcs_ar_active = true);
+CREATE INDEX ar_profile_search_operatingname_fr_prefix ON "Applicant_Recipient_Profile" USING btree (lower(coalesce(egcs_ar_operatingname_fr, '')) text_pattern_ops) WHERE (_deleted = false AND egcs_ar_active = true);
+-- Palette matching uses only this source's own identity fields.
+CREATE INDEX ar_registry_search_number_trgm ON "Applicant_Recipient_Registry" USING gin (lower(coalesce(egcs_ar_number, '')) gin_trgm_ops) WHERE (_deleted = false);
+CREATE INDEX ar_registry_search_number_exact ON "Applicant_Recipient_Registry" USING btree (lower(coalesce(egcs_ar_number, '')) text_pattern_ops) WHERE (_deleted = false);
 END $baseline$`.execute(db)
 }
 

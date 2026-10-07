@@ -399,6 +399,17 @@ ALTER SEQUENCE "Agency_Holdback_Basis_id_seq" OWNED BY "Agency_Holdback_Basis"."
 ALTER SEQUENCE "Agency_Monitor_Type_id_seq" OWNED BY "Agency_Monitor_Type"."id";
 
 ALTER SEQUENCE "Agency_Profile_id_seq" OWNED BY "Agency_Profile"."id";
+-- Palette matching uses only this source's own identity fields.
+CREATE INDEX ay_profile_search_name_en_trgm ON "Agency_Profile" USING gin (lower(coalesce(egcs_ay_name_en, '')) gin_trgm_ops) WHERE (_deleted = false AND egcs_ay_active = true);
+CREATE INDEX ay_profile_search_name_en_prefix ON "Agency_Profile" USING btree (lower(coalesce(egcs_ay_name_en, '')) text_pattern_ops) WHERE (_deleted = false AND egcs_ay_active = true);
+CREATE INDEX ay_profile_search_name_fr_trgm ON "Agency_Profile" USING gin (lower(coalesce(egcs_ay_name_fr, '')) gin_trgm_ops) WHERE (_deleted = false AND egcs_ay_active = true);
+CREATE INDEX ay_profile_search_name_fr_prefix ON "Agency_Profile" USING btree (lower(coalesce(egcs_ay_name_fr, '')) text_pattern_ops) WHERE (_deleted = false AND egcs_ay_active = true);
+CREATE INDEX ay_profile_search_abbreviation_en_trgm ON "Agency_Profile" USING gin (lower(coalesce(egcs_ay_abbreviation_en, '')) gin_trgm_ops) WHERE (_deleted = false AND egcs_ay_active = true);
+CREATE INDEX ay_profile_search_abbreviation_fr_trgm ON "Agency_Profile" USING gin (lower(coalesce(egcs_ay_abbreviation_fr, '')) gin_trgm_ops) WHERE (_deleted = false AND egcs_ay_active = true);
+CREATE INDEX ay_profile_search_abbreviation_en_exact ON "Agency_Profile" USING btree (lower(coalesce(egcs_ay_abbreviation_en, '')) text_pattern_ops) WHERE (_deleted = false AND egcs_ay_active = true);
+CREATE INDEX ay_profile_search_abbreviation_fr_exact ON "Agency_Profile" USING btree (lower(coalesce(egcs_ay_abbreviation_fr, '')) text_pattern_ops) WHERE (_deleted = false AND egcs_ay_active = true);
+CREATE INDEX ay_profile_search_agencyfinancialsystemid_exact ON "Agency_Profile" USING btree (egcs_ay_agencyfinancialsystemid) WHERE (_deleted = false AND egcs_ay_active = true);
+CREATE INDEX ay_profile_search_gwcoa_number_exact ON "Agency_Profile" USING btree (egcs_ay_gwcoa_number) WHERE (_deleted = false AND egcs_ay_active = true);
 END $baseline$`.execute(db)
 }
 
