@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePageResourceError } from '~/composables/usePageResourceError'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 /* eslint-disable jsdoc/require-param-description, jsdoc/require-returns -- legacy page callbacks remain concise during request isolation */
@@ -95,6 +96,13 @@ const {
 } = useFetch<FundingCaseAgreementPaymentDetailRow, FetchError, string>(
   `/api/agreements/${agreementId}/payments/${paymentId}`
 )
+
+usePageResourceError({
+  identity: () => route.path,
+  errors: [profileError, paymentError],
+  pending: () => profileStatus.value === 'pending' || paymentStatus.value === 'pending',
+  hasContent: () => Boolean(profile.value && payment.value)
+})
 
 const hasLoadError = computed(() =>
   Boolean(profileError.value) || Boolean(paymentError.value) || profileStatus.value === 'error' || paymentStatus.value === 'error'

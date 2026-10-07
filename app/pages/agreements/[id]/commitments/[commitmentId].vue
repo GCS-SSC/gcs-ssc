@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePageResourceError } from '~/composables/usePageResourceError'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 import type { FetchError } from 'ofetch'
@@ -94,6 +95,13 @@ const {
 } = useFetch<FundingCaseAgreementCommitmentDetailRow & { lines: FundingCaseAgreementCommitmentLineRow[] }, FetchError, string>(
   `/api/agreements/${agreementId}/commitments/${commitmentId}`
 )
+
+usePageResourceError({
+  identity: () => route.path,
+  errors: [profileError, commitmentError],
+  pending: () => profileStatus.value === 'pending' || commitmentStatus.value === 'pending',
+  hasContent: () => Boolean(profile.value && commitment.value)
+})
 
 const hasLoadError = computed(() =>
   Boolean(profileError.value)

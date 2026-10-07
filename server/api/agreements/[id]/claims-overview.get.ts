@@ -5,6 +5,7 @@ import { canReadEntityAssignments } from '~~/server/utils/entity-assignment'
 import { withBusinessRecordState } from '~~/server/utils/business-record-state'
 import { hasPositiveCompletionTerminus } from '~~/server/utils/completion-terminus'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
+import { notFound } from '~~/server/utils/api-errors'
 import { PositivePostgresBigintIdSchema } from '~~/shared/types/schemas'
 import { z } from 'zod'
 import { databaseMoneyText, parseDatabaseMoney } from '~~/server/utils/database-money'
@@ -243,6 +244,10 @@ export default defineEventHandler(async event => {
       ])
       .execute()
   ])
+
+  if (claimId && claims.length === 0) {
+    return await notFound(event, 'AGREEMENT_CLAIM_NOT_FOUND', 'apiErrors.agreement.claim_not_found')
+  }
 
   let reconciles = unfilteredReconciles
   let reconcileLineItems = unfilteredReconcileLineItems

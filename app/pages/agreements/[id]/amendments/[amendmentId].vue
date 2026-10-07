@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePageResourceError } from '~/composables/usePageResourceError'
 import { useId, computed, ref, watch } from 'vue'
 import CommonCompletionPanel from '~/components/Common/Completions/Panel.vue'
 /* eslint-disable jsdoc/require-jsdoc -- concise detail-page actions are covered by focused tests. */
@@ -72,6 +73,12 @@ const {
 } = useFetch<FundingCaseAgreementAmendmentRow, FetchError, string>(
   `/api/agreements/${agreementId}/amendments/${amendmentId}`
 )
+usePageResourceError({
+  identity: () => route.path,
+  errors: [profileError, error],
+  pending: () => profileStatus.value === 'pending' || status.value === 'pending',
+  hasContent: () => Boolean(profile.value && amendment.value)
+})
 
 type AmendmentTypeLookupResponse = {
   items: Array<{ id: string, egcs_tp_amended: string, egcs_tp_requiresamendmentsubtype: boolean }>

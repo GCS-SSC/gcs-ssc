@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import { usePageResourceError } from '~/composables/usePageResourceError'
 import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import type { Ref } from 'vue'
 import { useLoadRecoveryFocus } from '~/composables/useLoadRecoveryFocus'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -55,6 +56,13 @@ const {
 } =
   await useTransferPaymentStreamDetailState(id, streamId, { immediate: !isNestedDetailRoute.value })
 
+usePageResourceError({
+  identity: () => route.path,
+  errors: [() => isNestedDetailRoute.value ? null : profileError.value, () => isNestedDetailRoute.value ? null : streamError.value],
+  pending: () => profileStatus.value === 'pending' || streamStatus.value === 'pending',
+  hasContent: () => Boolean(profile.value && stream.value)
+})
+
 const isUpdateModalOpen: Ref<boolean> = ref(false)
 const isSavingStream: Ref<boolean> = ref(false)
 const selectedStream: Ref<Partial<TransferPaymentStreamItem> | null> = ref(null)
@@ -107,10 +115,6 @@ const retryLoad = async () => {
   await Promise.all([refreshProfile(), refreshStream()])
   if (profile.value && stream.value && !hasLoadError.value) await focusRecoveredContent()
 }
-
-watch([hasLoadError, profileError, streamError, isNestedDetailRoute], ([failed, profileFailure, streamFailure, nested]) => {
-  if (!nested && failed) showError(profileFailure ?? streamFailure)
-}, { immediate: true })
 </script>
 
 <template>

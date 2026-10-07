@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePageResourceError } from '~/composables/usePageResourceError'
 import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { FetchError } from 'ofetch'
@@ -27,6 +28,7 @@ const selectedTab: Ref<string> = ref('entry')
 const refreshKey: Ref<number> = ref(0)
 const saving: Ref<boolean> = ref(false)
 const { data: voucher, error, status, refresh } = useFetch<JournalVoucherDetail, FetchError, string>(`/api/journal-vouchers/${id}`)
+usePageResourceError({ identity: () => route.path, errors: [error], pending: () => status.value === 'pending', hasContent: () => Boolean(voucher.value) })
 type FormState = {
   egcs_fc_requesteddate: string | Date | null
   egcs_fc_narrative_en: string

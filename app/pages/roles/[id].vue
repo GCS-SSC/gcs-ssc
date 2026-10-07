@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param -- page-local handlers are clear from their names and types */
 import type { ComputedRef, Ref } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
@@ -34,6 +35,7 @@ const roleUrl: string = `/api/roles/${id}`
 const role: Ref<RoleDetail | null> = ref(null)
 const loadError: Ref<unknown | null> = ref(null)
 const loadStatus: Ref<'pending' | 'success' | 'error'> = ref('pending')
+usePageResourceError({ identity: () => route.path, errors: [loadError], pending: () => loadStatus.value === 'pending', hasContent: () => Boolean(role.value) })
 const refresh = async () => {
   loadStatus.value = 'pending'
   loadError.value = null

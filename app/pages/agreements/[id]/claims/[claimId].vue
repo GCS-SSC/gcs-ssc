@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePageResourceError } from '~/composables/usePageResourceError'
 import { parseOptionalMoneyInput } from '~/utils/optional-money-input'
 import { MoneySchema } from '~~/shared/types/schemas/money'
 import type { FetchError } from 'ofetch'
@@ -154,6 +155,12 @@ const {
   status: overviewStatus,
   refresh: refreshOverview
 } = useFetch<FundingCaseAgreementClaimOverviewRow, FetchError, string>(`/api/agreements/${agreementId}/claims-overview?claimId=${claimId}`)
+usePageResourceError({
+  identity: () => route.path,
+  errors: [profileError, overviewError],
+  pending: () => profileStatus.value === 'pending' || overviewStatus.value === 'pending',
+  hasContent: () => Boolean(profile.value && overview.value)
+})
 const { isAssigned } = useEntityAssignmentRoster(
   'fundingcaseagreementclaim',
   claimId,
@@ -1289,6 +1296,7 @@ const cancelReconciliation = async () => {
             <div v-else-if="selectedClaimTab === 'reconciliation'" class="w-full min-w-0">
               <CommonCompletionWorkflowPreAction
                 v-if="!claimIsReadyForReconcile"
+                mode="completion"
                 entity-type="fundingcaseagreementclaim"
                 :entity-id="claimId"
                 :can-edit="isAssigned"

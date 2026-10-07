@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-jsdoc -- Historical Agreement entries resolve the independently authorized Proponent Credit Memo. */
 import { computed, nextTick, ref, watch } from 'vue'
 import type { Ref } from 'vue'
@@ -13,7 +14,14 @@ const { t } = useI18n()
 const agreementId = computed(() => String(route.params.id))
 const creditMemoId = computed(() => String(route.params.creditMemoId))
 const { data: creditMemo, status, error, refresh } = useProponentCreditMemoDetail(null, creditMemoId)
+
 const approvalOnly = computed(() => !creditMemo.value && status.value === 'error' && error.value instanceof AppFetchResponseError && error.value.response.status === 403)
+usePageResourceError({
+  identity: () => route.path,
+  errors: [() => approvalOnly.value ? null : error.value],
+  pending: () => status.value === 'pending',
+  hasContent: () => Boolean(creditMemo.value)
+})
 const content: Ref<HTMLElement | null> = ref(null)
 watch(creditMemo, async record => {
   if (!record) return

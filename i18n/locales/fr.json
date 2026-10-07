@@ -1051,6 +1051,16 @@
     "footer_auth": "Authentification gérée par Better Auth."
   },
   "error_page": {
+    "session_expired_title": "Veuillez vous reconnecter",
+    "session_expired_description": "Votre session n’est plus valide. Connectez-vous pour revenir à cette page.",
+    "access_denied_title": "Accès refusé",
+    "access_denied_description": "Vous n’avez pas la permission de consulter cette page. Communiquez avec votre administrateur si vous avez besoin d’y accéder.",
+    "unexpected_title": "Une erreur est survenue",
+    "unexpected_description": "Impossible de charger cette page. Réessayez ou retournez au tableau de bord.",
+    "unavailable_title": "Service temporairement indisponible",
+    "unavailable_description": "Le service n’est pas disponible pour le moment. Patientez un instant et réessayez.",
+    "sign_in": "Se connecter",
+    "try_again": "Réessayer",
     "not_found_title": "Page introuvable",
     "not_found_description": "La page demandée n’existe pas ou n’est plus disponible.",
     "return_home": "Retourner au tableau de bord"

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-jsdoc -- page-local callbacks are self-descriptive */
 import { computed, onMounted, ref } from 'vue'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
@@ -35,6 +36,7 @@ const hasLoadError: Ref<boolean> = ref(false)
 const loadError: Ref<unknown | null> = ref(null)
 const profileLoadError: Ref<unknown | null> = ref(null)
 const closeoutLoadError: Ref<unknown | null> = ref(null)
+usePageResourceError({ identity: () => route.path, errors: [profileLoadError, closeoutLoadError], pending: isLoading, hasContent: () => Boolean(profile.value && closeout.value) })
 const fetchJson = async (path: string): Promise<unknown> => {
   const response = await fetch(getClientRequestUrl(path))
   if (!response.ok) await throwFetchResponseError(response)

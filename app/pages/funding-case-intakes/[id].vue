@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePageResourceError } from '~/composables/usePageResourceError'
 import CommonSubmittedApplication from '~/components/Common/Submitted/Application.vue'
 import { appRouteLocations } from '~/utils/route-locations'
 
@@ -23,6 +24,7 @@ const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const { getHeroCollapsed } = useDashboard()
 const { isStatusLocked } = useBusinessStatusState()
 const { data: profile, error, status, refresh } = await useFetch<Intake, Error, string>(`/api/funding-case-intakes/${id}`)
+usePageResourceError({ identity: () => route.path, errors: [error], pending: () => status.value === 'pending', hasContent: () => Boolean(profile.value) })
 const { isAssigned } = useEntityAssignmentRoster('fundingcaseintake', id)
 const isHeroCollapsed = getHeroCollapsed('funding-case-intake-detail')
 const selectedTab = ref(['attachments', 'application'].includes(String(route.query.tab)) ? String(route.query.tab) : 'general')

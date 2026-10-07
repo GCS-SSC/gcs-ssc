@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePageResourceError } from '~/composables/usePageResourceError'
 import AssessmentSchemaDetailPage from '~/components/AssessmentSchema/AssessmentSchemaDetailPage.vue'
 import ChecklistSchemaDetailPage from '~/components/ChecklistSchema/ChecklistSchemaDetailPage.vue'
 
@@ -8,6 +9,8 @@ const request = useRequestFetch() as (path: string) => Promise<{ egcs_cn_reviewt
 const { data, error, status, refresh } = await useAsyncData(async () => {
   return await request(endpoint.value)
 }, { watch: [endpoint] })
+
+usePageResourceError({ identity: () => route.path, errors: [error], pending: () => status.value === 'pending', hasContent: () => Boolean(data.value) })
 
 definePageMeta({
   i18n: {

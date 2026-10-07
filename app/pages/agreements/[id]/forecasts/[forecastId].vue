@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePageResourceError } from '~/composables/usePageResourceError'
 import type { FetchError } from 'ofetch'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 /* eslint-disable jsdoc/require-jsdoc -- page-local callbacks use self-descriptive signatures */
@@ -131,6 +132,13 @@ const {
   status: overviewStatus,
   refresh: refreshOverview
 } = useFetch<FundingCaseAgreementForecastOverviewRow, FetchError, string>(`/api/agreements/${agreementId}/forecasts-overview?forecastId=${forecastId}`)
+
+usePageResourceError({
+  identity: () => route.path,
+  errors: [profileError, overviewError],
+  pending: () => profileStatus.value === 'pending' || overviewStatus.value === 'pending',
+  hasContent: () => Boolean(profile.value && overview.value)
+})
 
 const forecasts = computed<FundingCaseAgreementForecastOverviewRow['forecasts']>(() => overview.value?.forecasts ?? [])
 const budgetLineItems = computed<FundingCaseAgreementForecastOverviewRow['budgetLineItems']>(() => overview.value?.budgetLineItems ?? [])

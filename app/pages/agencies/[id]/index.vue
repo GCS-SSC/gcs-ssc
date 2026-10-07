@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePageResourceError } from '~/composables/usePageResourceError'
 import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
@@ -120,6 +121,7 @@ const tabMap: TabMap = new Map([
 const agency: Ref<AgencyProfileItem | null> = ref(null)
 const isLoadingAgency = ref(false)
 const agencyLoadError = ref<unknown>(null)
+usePageResourceError({ identity: () => route.path, errors: [agencyLoadError], pending: isLoadingAgency, hasContent: () => Boolean(agency.value) })
 let agencyLoadGeneration = 0
 let isAgencyPageDisposed = false
 onBeforeUnmount(() => {

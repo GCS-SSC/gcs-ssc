@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePageResourceError } from '~/composables/usePageResourceError'
 import { agreementCalendarDate } from '~/utils/agreement-calendar-date'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -89,6 +90,12 @@ const profile: Ref<AgreementDetailProfile | null> = ref(null)
 const { label: riskSourceLabel, workflowLabel: riskSourceWorkflowLabel, completedAt: riskSourceCompletedAt } = useAgreementRiskSource(() => profile.value?.risk_source)
 const error: Ref<unknown | null> = ref(null)
 const status: Ref<'idle' | 'pending' | 'success' | 'error'> = ref('idle')
+usePageResourceError({
+  identity: () => route.path,
+  errors: [() => isChildDetailRoute.value ? null : error.value],
+  pending: () => status.value === 'pending',
+  hasContent: () => Boolean(profile.value)
+})
 /**
  * Refreshes the current Agreement profile.
  *

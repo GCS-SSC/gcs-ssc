@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-jsdoc -- page-local loading and navigation */
 import { computed, ref } from 'vue'
 import type { Ref } from 'vue'
@@ -26,6 +27,7 @@ const agency: Ref<Record<string, unknown> | null> = ref(null)
 const template: Ref<Record<string, unknown> | null> = ref(null)
 const loadError: Ref<unknown | null> = ref(null)
 const loadStatus: Ref<'pending' | 'success' | 'error'> = ref('pending')
+usePageResourceError({ identity: () => route.path, errors: [loadError], pending: () => loadStatus.value === 'pending', hasContent: () => Boolean(template.value) })
 
 const fetchRecord = async (url: string) => {
   const response = await fetch(getClientRequestUrl(url))

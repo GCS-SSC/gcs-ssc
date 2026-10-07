@@ -7,6 +7,7 @@ import type { JsonValue } from '~~/shared/types/database'
 import { formatCorrectionReference } from '~~/shared/utils/correction'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
+import { usePageResourceError } from '~/composables/usePageResourceError'
 
 const { agreementId, correctionId } = defineProps<{ agreementId: string, correctionId: string }>()
 const { t } = useI18n()
@@ -14,6 +15,7 @@ const { getHeroCollapsed } = useDashboard()
 const isHeroCollapsed = getHeroCollapsed('agreement-correction-approval')
 const selectedTab: Ref<string> = ref('approval')
 const status: Ref<'pending' | 'success' | 'error'> = ref('pending')
+const loadError: Ref<unknown | null> = ref(null)
 type ApprovalContext = {
   reference: string
   agreementNumber: string
@@ -25,6 +27,12 @@ type ApprovalRuntime = {
 }
 const context: Ref<ApprovalContext | null> = ref(null)
 const identity = computed(() => `${agreementId}:${correctionId}`)
+usePageResourceError({
+  identity,
+  errors: [loadError],
+  pending: () => status.value === 'pending',
+  hasContent: () => Boolean(context.value)
+})
 let generation = 0
 let controller: AbortController | null = null
 let disposed = false
@@ -34,7 +42,7 @@ const refresh = async () => {
   controller?.abort()
   controller = new AbortController()
   status.value = 'pending'
-  context.value = null
+  loadError.value = null
   try {
     const url = getClientRequestUrl('/api/workflows/runtime')
     url.searchParams.set('entityType', 'fundingcasecorrection')
@@ -56,12 +64,16 @@ const refresh = async () => {
       runtimeState: runtime.current.runtimeState
     }
     status.value = 'success'
-  } catch {
+  } catch (failure: unknown) {
     if (disposed || generation !== requestGeneration || identity.value !== requestIdentity) return
+    loadError.value = failure
     status.value = 'error'
   }
 }
-watch(identity, refresh, { immediate: true, flush: 'sync' })
+watch(identity, () => {
+  context.value = null
+  void refresh()
+}, { immediate: true, flush: 'sync' })
 onBeforeUnmount(() => {
   disposed = true
   generation += 1

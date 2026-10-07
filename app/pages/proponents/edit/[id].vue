@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePageResourceError } from '~/composables/usePageResourceError'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
@@ -42,6 +43,13 @@ const {
   breadcrumbItems,
   isHeroCollapsed
 } = useApplicantRecipientDetailState(id, { enabled: computed(() => !isChildDetailRoute.value) })
+
+usePageResourceError({
+  identity: () => route.path,
+  errors: [() => isChildDetailRoute.value ? null : error.value],
+  pending: () => status.value === 'pending',
+  hasContent: () => Boolean(profile.value)
+})
 
 const selectedProfile: Ref<ApplicantRecipientDetailForm | null> = ref(null)
 const isSaving: Ref<boolean> = ref(false)

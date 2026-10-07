@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePageResourceError } from '~/composables/usePageResourceError'
 import { appRouteLocations } from '~/utils/route-locations'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
@@ -33,6 +34,7 @@ const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const statusCatalog = useStatusCatalog()
 void statusCatalog.load()
 const { data: profile, error, status, refresh } = await useFetch<Opportunity, Error, string>(`/api/funding-opportunities/${id}`)
+usePageResourceError({ identity: () => route.path, errors: [error], pending: () => status.value === 'pending', hasContent: () => Boolean(profile.value) })
 const isHeroCollapsed = getHeroCollapsed('funding-opportunity-detail')
 const selectedTab = ref('general')
 const { tabs: extensionTabs, getExtensionTabItem } = useExtensionEntityTabs({ target: 'opportunity', opportunityId: id })

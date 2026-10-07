@@ -25,7 +25,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
     return navigateTo({ path: loginPath, query: { returnTo } })
   }
 
-  if (isAuthenticated && isLoginRoute) {
+  if (isAuthenticated && isLoginRoute && to.query.reauthenticate !== '1') {
     return navigateTo(resolveAuthReturnTarget(
       to.query.returnTo,
       homePath,

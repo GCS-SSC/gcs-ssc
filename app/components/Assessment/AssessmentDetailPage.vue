@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-param, jsdoc/require-returns -- concise local helpers remain clear without repetitive tags */
 import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
@@ -11,6 +12,7 @@ import AssessmentApprovalsSection from '~/components/Common/Approvals/Section.vu
 import CommonCompletionSection from '~/components/Common/Completions/Section.vue'
 import { scrollReviewPageToTop } from '~/utils/scrollReviewPageToTop'
 
+const route = useRoute()
 const { locale, t } = useI18n()
 const { getBilingualValue } = useBilingualValue()
 
@@ -58,6 +60,7 @@ const {
   setReviewAlignmentNarrative,
   setAdditionalReviewerProgress
 } = useAssessmentDetailPage()
+usePageResourceError({ identity: () => route.path, errors: [loadError], pending: () => loadStatus.value === 'pending', hasContent: () => Boolean(assessment.value) })
 
 type ValidatableForm = {
   validate: () => Promise<unknown>

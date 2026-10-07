@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePageResourceError } from '~/composables/usePageResourceError'
 import CommonCompletionSection from '~/components/Common/Completions/Section.vue'
 /* eslint-disable jsdoc/require-jsdoc -- concise page-local interaction handlers are self-documenting */
 import { computed, ref, watch } from 'vue'
@@ -77,12 +78,15 @@ const reconcileId = String(route.params.reconcileId)
 const isHeroCollapsed = getHeroCollapsed('claim-reconciliation-detail')
 const {
   data,
+  error,
   status,
   refresh
 } = await useAsyncData(
   `claim-reconciliation-${reconcileId}`,
   () => fetchReconciliationDetail(`/api/claim-reconciliations/${reconcileId}`)
 )
+usePageResourceError({ identity: () => route.path, errors: [error], pending: () => status.value === 'pending', hasContent: () => Boolean(data.value) })
+
 const drafts: Ref<Record<string, ReconciliationLineDraft>> = ref({})
 const isSaving: Ref<boolean> = ref(false)
 const isSavingFinal: Ref<boolean> = ref(false)

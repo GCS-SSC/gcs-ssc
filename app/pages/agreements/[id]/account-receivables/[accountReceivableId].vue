@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-jsdoc -- Independent AR casework follows the Correction request and workspace shell. */
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
@@ -34,8 +35,15 @@ onBeforeUnmount(() => {
 })
 const isHeroCollapsed = getHeroCollapsed('agreement-account-receivable-detail')
 const { data: receivable, status, error: detailError, refresh } = useAccountReceivableDetail(agreementId, accountReceivableId)
+
 const approvalOnly = computed(() => !receivable.value && status.value === 'error'
   && detailError.value instanceof AppFetchResponseError && detailError.value.response.status === 403)
+usePageResourceError({
+  identity: () => route.path,
+  errors: [() => approvalOnly.value ? null : detailError.value],
+  pending: () => status.value === 'pending',
+  hasContent: () => Boolean(receivable.value)
+})
 const refreshKey: Ref<number> = ref(0)
 const saving: Ref<boolean> = ref(false)
 const cancelOpen: Ref<boolean> = ref(false)

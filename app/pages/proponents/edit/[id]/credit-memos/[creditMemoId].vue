@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-jsdoc -- Independent Proponent credit uses the financial operational-child shell. */
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
@@ -31,7 +32,14 @@ onBeforeUnmount(() => {
   disposed = true
 })
 const { data: creditMemo, status, error: detailError, refresh } = useProponentCreditMemoDetail(proponentId, creditMemoId)
+
 const approvalOnly = computed(() => !creditMemo.value && status.value === 'error' && detailError.value instanceof AppFetchResponseError && detailError.value.response.status === 403)
+usePageResourceError({
+  identity: () => route.path,
+  errors: [() => approvalOnly.value ? null : detailError.value],
+  pending: () => status.value === 'pending',
+  hasContent: () => Boolean(creditMemo.value)
+})
 const isHeroCollapsed = getHeroCollapsed('proponent-credit-memo-detail')
 const saving: Ref<boolean> = ref(false)
 const cancelOpen: Ref<boolean> = ref(false)

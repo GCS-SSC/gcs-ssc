@@ -1051,6 +1051,16 @@
     "footer_auth": "Authentication managed by Better Auth."
   },
   "error_page": {
+    "session_expired_title": "Please sign in again",
+    "session_expired_description": "Your session is no longer valid. Sign in to return to this page.",
+    "access_denied_title": "Access denied",
+    "access_denied_description": "You don't have permission to view this page. Contact your administrator if you need access.",
+    "unexpected_title": "Something went wrong",
+    "unexpected_description": "We couldn't load this page. Try again, or return to your dashboard.",
+    "unavailable_title": "Service temporarily unavailable",
+    "unavailable_description": "The service isn't available right now. Please wait a moment and try again.",
+    "sign_in": "Sign in",
+    "try_again": "Try again",
     "not_found_title": "Page not found",
     "not_found_description": "The page you requested does not exist or is no longer available.",
     "return_home": "Return to dashboard"

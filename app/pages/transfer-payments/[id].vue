@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import { usePageResourceError } from '~/composables/usePageResourceError'
 import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import type { Ref } from 'vue'
 import type { TransferPaymentProfileForm } from '~~/shared/types/transfer-payment-ui'
 
@@ -40,12 +41,15 @@ const {
   isHeroCollapsed
 } = await useTransferPaymentDetailState(id)
 
+usePageResourceError({
+  identity: () => route.path,
+  errors: [() => isStreamRoute.value ? null : error.value],
+  pending: () => status.value === 'pending',
+  hasContent: () => Boolean(profile.value)
+})
+
 const isLoadingProfile = computed(() => status.value === 'pending')
 const hasLoadError = computed(() => status.value === 'error' || Boolean(error.value))
-
-watch(error, (loadError) => {
-  if (loadError) showError(loadError)
-}, { immediate: true })
 
 provideBilingualFieldScope(() => profile.value ? { subject: 'transfer_payment', agencyId: String(profile.value.egcs_tp_agency), permissionAction: 'update' } : null)
 

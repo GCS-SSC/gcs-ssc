@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param-description, jsdoc/require-returns -- page-local callbacks use self-descriptive signatures */
 import type { FetchError } from 'ofetch'
 import { withFormRequirements } from '~~/shared/utils/form-requirements'
@@ -105,6 +106,13 @@ const {
 } = useFetch<FundingCaseAgreementMonitorDetailRow, FetchError, string>(
   `/api/agreements/${agreementId}/monitors/${monitorId}`
 )
+usePageResourceError({
+  identity: () => route.path,
+  errors: [profileError, monitorError],
+  pending: () => profileStatus.value === 'pending' || monitorStatus.value === 'pending',
+  hasContent: () => Boolean(profile.value && monitor.value)
+})
+
 const hasLoadError = computed(() => Boolean(profileError.value) || Boolean(monitorError.value) || profileStatus.value === 'error' || monitorStatus.value === 'error')
 const isLoadingDetail = computed(() => profileStatus.value === 'pending' || monitorStatus.value === 'pending')
 const retryLoad = async () => {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-jsdoc -- Independent Correction page callbacks have focused request and financial tests. */
 import { computed, nextTick, ref, watch } from 'vue'
 import type { Ref } from 'vue'
@@ -28,8 +29,15 @@ const agreementId = computed(() => String(route.params.id))
 const correctionId = computed(() => String(route.params.correctionId))
 const isHeroCollapsed = getHeroCollapsed('agreement-correction-detail')
 const { data: correction, status, error: detailError, refresh } = useCorrectionDetail(agreementId, correctionId)
+
 const approvalOnly = computed(() => !correction.value && status.value === 'error'
   && detailError.value instanceof AppFetchResponseError && detailError.value.response.status === 403)
+usePageResourceError({
+  identity: () => route.path,
+  errors: [() => approvalOnly.value ? null : detailError.value],
+  pending: () => status.value === 'pending',
+  hasContent: () => Boolean(correction.value)
+})
 const selectedTab: Ref<string> = ref('lines')
 const refreshKey: Ref<number> = ref(0)
 const saving: Ref<boolean> = ref(false)

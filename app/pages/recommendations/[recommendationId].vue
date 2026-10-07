@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-jsdoc -- concise page-local interaction handlers are self-documenting */
 import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
@@ -72,6 +73,7 @@ const {
   `recommendation-${recommendationId}`,
   () => fetchRecommendationDetail(`/api/recommendations/${recommendationId}`)
 )
+usePageResourceError({ identity: () => route.path, errors: [error], pending: () => status.value === 'pending', hasContent: () => Boolean(data.value) })
 
 const responses: Ref<RecommendationResponse[]> = ref([])
 const validationIssues: Ref<Array<{ questionKey: string; message: string; field?: 'comment' }>> = ref([])

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-jsdoc, vue/singleline-html-element-content-newline -- local presentation helpers and compact result labels are self-describing */
 import { computed, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
@@ -16,6 +17,7 @@ import {
   isChecklistQuestionResponseComplete
 } from '~~/shared/utils/checklist-evaluation'
 
+const route = useRoute()
 const { t } = useI18n()
 const { getBilingualValue } = useBilingualValue()
 const approvalsRefreshKey: Ref<number> = ref(0)
@@ -28,6 +30,7 @@ const {
   totalAdditionalReviewerCount, pendingAdditionalReviewerCount, isHeroCollapsed, getResponse, updateAnswer,
   updateComment, setAdditionalReviewerProgress, saveChecklist, refresh
 } = useChecklistDetailPage()
+usePageResourceError({ identity: () => route.path, errors: [loadError], pending: () => loadStatus.value === 'pending', hasContent: () => Boolean(checklist.value) })
 
 const REVIEW_VALUE = 'review'
 const result = computed(() => liveEvaluation.value?.result ?? null)
