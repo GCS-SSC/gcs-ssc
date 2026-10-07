@@ -71,29 +71,6 @@ export const authorizeFreshAgreementUpdate = async (
   await authorizeFreshAssignedItem(event, trx, authContext, target.entityType, target.entityId, action)
 }
 
-/** Validates the active common-user identity for an approval actor. */
-export const authorizeFreshAgreementApprovalActor = async (
-  event: H3Event,
-  trx: Transaction<Database>,
-  _agreementContext: AgreementScopeContext,
-  authContext: AuthContext,
-  commonUserId: string
-): Promise<void> => {
-  const actor = await trx
-    .selectFrom('user')
-    .innerJoin('Common_User', 'Common_User.egcs_cn_auth_user_id', 'user.id')
-    .select('Common_User.id')
-    .where('user.id', '=', authContext.userId)
-    .where('Common_User.id', '=', commonUserId)
-    .where('user._deleted', '=', false)
-    .where('Common_User._deleted', '=', false)
-    .executeTakeFirst()
-
-  if (!actor) {
-    await forbidden(event)
-  }
-}
-
 export const lockAgreementProfileForUpdate = async (
   trx: Transaction<Database>,
   agreementId: string

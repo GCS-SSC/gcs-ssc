@@ -12,11 +12,6 @@ type Keyed = {
   _key: string
 }
 
-export type KeyValueScoreRow = Keyed & {
-  key: string
-  value: number
-}
-
 export type AssessmentBandRow = Keyed & {
   max: number
   label: LabelValue
@@ -404,7 +399,6 @@ const stripEditorKeys = (value: unknown): unknown => {
 }
 
 export const createAssessmentBandRow = (): AssessmentBandRow => createBandRow()
-export const createAssessmentHelpRow = (): AssessmentHelpRow => createHelpRow()
 export const createAssessmentOptionRow = (): AssessmentOptionRow => createOptionRow()
 export const createAssessmentQuestionRow = (): AssessmentQuestionRow => ({
   _key: nanoid(),
@@ -467,11 +461,6 @@ export const createAssessmentImpactorRow = (): AssessmentImpactorRow => ({
   scoringMatrix: [],
   label: { en: '', fr: '' }
 })
-export const createKeyValueScoreRow = (): KeyValueScoreRow => ({
-  _key: nanoid(),
-  key: '',
-  value: 0
-})
 
 export const normalizeAssessmentDefinitionEditorState = (value: unknown): AssessmentDefinitionEditorState => {
   const source = typeof value === 'object' && value !== null ? value as Record<string, unknown> : {}
@@ -509,25 +498,3 @@ export const serializeAssessmentDefinitionEditorState = (value: AssessmentDefini
 
   return serialized
 }
-
-export const normalizeScoringRecordRows = (value: unknown): KeyValueScoreRow[] => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return []
-  }
-
-  return Object.entries(value as Record<string, unknown>).map(([key, currentValue]) => ({
-    _key: nanoid(),
-    key,
-    value: Number(currentValue ?? 0)
-  }))
-}
-
-export const serializeScoringRecordRows = (rows: KeyValueScoreRow[]) => rows.reduce<Record<string, number>>((acc, row) => {
-  const normalizedKey = row.key.trim()
-  if (!normalizedKey) {
-    return acc
-  }
-
-  acc[normalizedKey] = Number(row.value)
-  return acc
-}, {})

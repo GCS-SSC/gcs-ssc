@@ -91,6 +91,3 @@ export const finalizeAuditInputs = (candidate: ReturnType<typeof prepareAuditInp
       : candidate.http,
     truncated: candidate.truncated }
 }
-
-export const redactedAuditInputs = (query: CompiledQuery, http?: unknown) =>
-  finalizeAuditInputs(prepareAuditInputCandidate(query, http))

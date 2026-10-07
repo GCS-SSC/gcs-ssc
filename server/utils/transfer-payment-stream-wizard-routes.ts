@@ -1,7 +1,7 @@
 /* eslint-disable jsdoc/require-param, jsdoc/require-returns */
 import type { H3Event } from 'h3'
 import { sql } from 'kysely'
-import type { Kysely, Selectable, Transaction } from 'kysely'
+import type { Selectable, Transaction } from 'kysely'
 import type { Database, TransferPaymentStreamTable } from '~~/shared/types/database'
 import type { TransferPaymentStreamPolymorphicWizard } from '~~/shared/types/schemas'
 import { badRequest as badRequestApiError } from './api-errors'
@@ -615,15 +615,4 @@ export const createTransferPaymentStreamFromWizardInTransaction = async (
   await insertStreamWizardFinancialLimit(trx, streamId, payload)
 
   return createdStream
-}
-
-/** Creates a stream and all nested wizard setup records in one transaction. */
-export const createTransferPaymentStreamFromWizard = async (
-  db: Kysely<Database>,
-  profileId: string,
-  payload: StreamWizardPayload
-): Promise<CreatedStream> => {
-  return await db.transaction().execute(async trx =>
-    await createTransferPaymentStreamFromWizardInTransaction(trx, profileId, payload)
-  )
 }

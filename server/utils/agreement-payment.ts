@@ -359,38 +359,6 @@ export const normalizeAgreementPaymentEditingResponse = <T extends {
   egcs_fc_status: Database['Funding_Case_Agreement_Payment']['egcs_fc_status']
 }>(payment: T): T => payment
 
-/** Ensures the selected commitment belongs to the payment's agreement and stream. */
-export const assertAgreementPaymentCommitment = async (
-  event: H3Event,
-  db: DbClient,
-  agreementId: string,
-  commitmentId: string
-) => {
-  const commitment = await db
-    .selectFrom('Funding_Case_Agreement_Commitment')
-    .select(['id', 'egcs_fc_status', 'egcs_fc_active'])
-    .where('id', '=', commitmentId)
-    .where('egcs_fc_fundingagreement', '=', agreementId)
-    .where('_deleted', '=', false)
-    .executeTakeFirst()
-
-  if (!commitment) {
-    return await badRequest(event, 'AGREEMENT_COMMITMENT_NOT_FOUND', 'apiErrors.agreement.commitment_not_found')
-  }
-
-  const completion = await db.selectFrom('Common_Completion').select('id')
-    .where('egcs_cn_entitytype', '=', 'fundingcaseagreementcommitment')
-    .where('egcs_cn_entityid', '=', commitmentId).where('_deleted', '=', false).executeTakeFirst()
-  const approval = await resolveLatestTargetApprovalEvidence(db, 'fundingcaseagreementcommitment', commitmentId)
-  const isEligibleCommitment = commitment.egcs_fc_active === true
-    && (Boolean(completion) || approval?.approvalRuntimeState === 'approved')
-  if (!isEligibleCommitment) {
-    return await badRequest(event, 'AGREEMENT_PAYMENT_INVALID_COMMITMENT', 'apiErrors.agreement.invalid_payment_commitment')
-  }
-
-  return commitment
-}
-
 /** Finds the active editable commitment of a requested type for the payment's stream. */
 export const resolveActiveAgreementPaymentCommitmentByType = async (
   event: H3Event,

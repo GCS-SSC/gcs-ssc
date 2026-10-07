@@ -54,15 +54,3 @@ export const getAssessmentHelperComparableValueType = (
 
   return 'string'
 }
-
-export const isAssessmentHelperFieldValid = (entityType: Entity_Type, field: string) =>
-  getAssessmentHelperDefinition(entityType, field) !== null
-
-export const formatAssessmentHelperDefinitionLabel = (definition: AssessmentEntityHelperDefinition) => {
-  const baseLabel = `${definition.labelKey} (${definition.dataType})`
-  if (!definition.referenceTable) {
-    return baseLabel
-  }
-
-  return `${baseLabel} -> ${definition.referenceTable}`
-}

@@ -174,10 +174,6 @@ export const buildReviewSetupPublication = async (
   }
 }
 
-export const buildReviewSetupConfiguration = async (db: DbClient, setup: ReviewSetupRow) => (
-  await buildReviewSetupPublication(db, setup)
-).definition
-
 export const readPublishedReviewSetup = (value: JsonValue): PublishedReviewSetupConfiguration =>
   value as PublishedReviewSetupConfiguration
 
@@ -193,7 +189,3 @@ export const readReviewSetupPublicationMetadata = async (
     return { ...metadata, hasUnpublishedChanges: metadata.publicationState !== 'retired' }
   }
 }
-
-export const hasPendingReviewSetupChanges = async (db: DbClient, setup: ReviewSetupRow): Promise<boolean> => (
-  await readReviewSetupPublicationMetadata(db, setup)
-).hasUnpublishedChanges

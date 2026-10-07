@@ -54,8 +54,7 @@ export default defineEventHandler(async event => {
         'Transfer_Payment_Stream.egcs_tp_allowsfurtherdistribution as egcs_tp_allowsfurtherdistribution',
         'Transfer_Payment_Stream.egcs_tp_active as egcs_tp_active',
         'parent.egcs_tp_name_en as parent_name_en',
-        'parent.egcs_tp_name_fr as parent_name_fr',
-        'Transfer_Payment_Profile.egcs_tp_agency as agency_id'
+        'parent.egcs_tp_name_fr as parent_name_fr'
       ])
       .executeTakeFirst()
 
@@ -63,7 +62,6 @@ export default defineEventHandler(async event => {
       return await notFound(event, 'TRANSFER_PAYMENT_STREAM_NOT_FOUND', 'apiErrors.transfer_payment.stream_not_found')
     }
 
-    const { agency_id, ...payload } = stream
-    return payload
+    return stream
   })
 })

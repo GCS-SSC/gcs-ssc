@@ -233,11 +233,6 @@ export const buildRecommendationPlanPublication = async (
   }
 }
 
-export const buildRecommendationPlan = async (
-  db: DbClient,
-  setup: RecommendationSetRow
-): Promise<PublishedRecommendationPlan> => (await buildRecommendationPlanPublication(db, setup)).definition
-
 export const readPublishedRecommendationPlan = (value: JsonValue): PublishedRecommendationPlan =>
   value as PublishedRecommendationPlan
 
@@ -255,11 +250,6 @@ export const readRecommendationSetupPublicationMetadata = async (
     return { ...metadata, hasUnpublishedChanges: true }
   }
 }
-
-export const hasPendingRecommendationSetupChanges = async (
-  db: DbClient,
-  setup: RecommendationSetRow
-): Promise<boolean> => (await readRecommendationSetupPublicationMetadata(db, setup)).hasUnpublishedChanges
 
 export const resolvePublicationActorId = async (
   db: DbClient,

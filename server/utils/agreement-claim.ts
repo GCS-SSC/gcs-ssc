@@ -34,7 +34,6 @@ import type {
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
 import { authorizeFreshAssignedItem } from '~~/server/utils/authorize'
 import { budgetFiscalYearStableId, budgetLineItemStableId } from '~~/server/utils/agreement-budget-lineage'
-import { hasApprovedTargetEvidence } from '~~/server/utils/business-approval-evidence'
 import { validateMergedFinancialPeriodPatch } from '~~/server/utils/agreement-financial-patch-validation'
 import { resolveCurrentCommonUser } from '~~/server/utils/additional-reviewer-runtime'
 import {
@@ -311,39 +310,6 @@ export const assertAgreementClaimExists = async (
   }
 
   return claim
-}
-
-export const hasApprovedFinalAgreementClaimReconcile = async (
-  db: AgreementClaimDb,
-  claimId: string
-) => {
-  const reconciles = await db
-    .selectFrom('Funding_Case_Agreement_Claim_Reconcile')
-    .select('id')
-    .where('egcs_fc_fundingagreementclaim', '=', claimId)
-    .where('egcs_fc_isfinal', '=', true)
-    .where('_deleted', '=', false)
-    .execute()
-
-  const evidence = await Promise.all(reconciles.map(reconcile =>
-    hasApprovedTargetEvidence(db, 'fundingclaimreconcile', String(reconcile.id))))
-  return evidence.some(Boolean)
-}
-
-export const assertNoApprovedFinalAgreementClaimReconcile = async (
-  event: H3Event,
-  db: AgreementClaimDb,
-  claimId: string
-) => {
-  if (await hasApprovedFinalAgreementClaimReconcile(db, claimId)) {
-    return await badRequest(
-      event,
-      'AGREEMENT_CLAIM_FINAL_RECONCILE_APPROVED',
-      'apiErrors.agreement.final_claim_reconcile_approved'
-    )
-  }
-
-  return null
 }
 
 export const hasCompletedFinalAgreementClaimReconcile = async (

@@ -13,14 +13,6 @@ import {
 export type { AgencyScope, EntityScope, GlobalScope, ProgramScope, RoleScope }
 export type Scope = AuthorizationScope
 
-/** @deprecated Scope hierarchy is owned by `@gcs-ssc/authorization`. */
-export const SCOPE_DEFINITIONS = {
-  global: { parent: null, idKeys: [] },
-  agency: { parent: 'global', idKeys: ['agencyId'] },
-  program: { parent: 'agency', idKeys: ['agencyId', 'transferPaymentId'] },
-  entity: { parent: 'program', idKeys: ['agencyId'] }
-} as const
-
 /** Compatibility adapter for the package-owned scope policy. */
 export const isScopeCovered = (
   grantScope: Scope,

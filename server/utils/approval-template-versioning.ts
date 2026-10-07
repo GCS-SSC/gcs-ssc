@@ -1,7 +1,7 @@
 /* eslint-disable jsdoc/require-jsdoc -- typed publication primitives */
 import type { Kysely, Selectable, Transaction } from 'kysely'
 import type { PublicationMetadata, PublishedDefinition } from './system-publication'
-import { publishDefinition, readPublicationMetadata, retirePublication } from './system-publication'
+import { publishDefinition, retirePublication } from './system-publication'
 import type { Database, JsonValue } from '~~/shared/types/database'
 
 type ApprovalTemplateRow = Selectable<Database['Common_Approval_Template']>
@@ -100,15 +100,6 @@ export const buildApprovalTemplateConfiguration = async (
 }
 
 export const readPublishedApprovalTemplate = (value: JsonValue): PublishedApprovalTemplate => value as PublishedApprovalTemplate
-
-export const readApprovalTemplatePublicationMetadata = async (
-  db: ReadDbClient,
-  template: ApprovalTemplateRow
-): Promise<PublicationMetadata> => await readPublicationMetadata(
-  db,
-  String(template.id),
-  await buildApprovalTemplateConfiguration(db, template) as JsonValue
-)
 
 export const publishApprovalTemplate = async (
   db: Transaction<Database>,

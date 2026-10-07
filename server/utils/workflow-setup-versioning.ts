@@ -148,11 +148,6 @@ const resolvePublishedMember = async <T>(
   return { ...published, definition: reader(published.definition) }
 }
 
-export const buildPublishedWorkflowConfiguration = async (
-  db: DbClient,
-  setup: WorkflowSetupRow
-): Promise<PublishedWorkflowConfiguration> => (await buildWorkflowSetupPublication(db, setup)).definition
-
 export const buildWorkflowSetupPublication = async (
   db: DbClient,
   setup: WorkflowSetupRow

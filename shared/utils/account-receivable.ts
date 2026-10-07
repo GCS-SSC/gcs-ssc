@@ -1,15 +1,5 @@
 import { compareMoney, moneyFromCents, moneyToCents, sumMoney, type Money } from './money'
 
-/**
- * Stable business identifier retained independently of the current Agreement title.
- * @param record - Retained Agreement reference and AR sequence.
- * @param record.egcs_fc_agreementnumber - Original Agreement business number.
- * @param record.egcs_fc_number - Independent AR sequence.
- * @returns The AR authoring reference.
- */
-export const formatAccountReceivableReference = (record: { egcs_fc_agreementnumber: string; egcs_fc_number: number }): string =>
-  `${record.egcs_fc_agreementnumber}-AR-${record.egcs_fc_number}`
-
 export type AccountReceivableRecoveryMethod = 'offset' | 'direct_repayment'
 
 export type AccountReceivablePriority = {

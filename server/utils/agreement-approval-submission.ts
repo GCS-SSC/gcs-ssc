@@ -9,7 +9,6 @@ import { throwApiError } from './api-errors'
 import { databaseMoneyText, parseDatabaseMoney } from './database-money'
 import { budgetFundingSourcesByLine, loadBudgetFundingSources } from './agreement-budget-funding'
 
-export const AGREEMENT_APPROVAL_SNAPSHOT_SCHEMA_VERSION = 2
 export const ACTIVE_WORKFLOW_RUN_STATUSES = [
   'pending',
   'active',

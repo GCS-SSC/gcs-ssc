@@ -1,7 +1,7 @@
 /* eslint-disable jsdoc/require-jsdoc -- canonical approval orchestration adapter */
 import { sql, type Kysely, type Transaction } from 'kysely'
 import { RUNTIME_TERMINAL_STATES, type RuntimeState } from '~~/shared/constants/system-lifecycle'
-import type { Database, Entity_Type, JsonValue, Workflow_Purpose } from '~~/shared/types/database'
+import type { Database, Entity_Type, Workflow_Purpose } from '~~/shared/types/database'
 import {
   ReviewApprovalDecisionEvidenceSchema,
   type ReviewApprovalDecisionEvidenceInput,
@@ -598,7 +598,6 @@ const advanceApprovalOwnerAfterTerminal = async (
       const { advanceRecommendationSetRuntimeAfterTerminalItem } = await import('./recommendation-runtime')
       await advanceRecommendationSetRuntimeAfterTerminalItem(trx, String(recommendationSet.id), actorId)
     }
-    return
   }
 }
 
@@ -811,6 +810,3 @@ export const reassignCanonicalApproval = async (
   }).where('id', '=', approvalId).executeTakeFirstOrThrow()
   return { id: approvalId }
 }
-
-export const readCanonicalApprovalDefinition = (value: JsonValue): PublishedApprovalTemplate =>
-  readPublishedApprovalTemplate(value)
