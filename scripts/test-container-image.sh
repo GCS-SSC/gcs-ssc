@@ -84,9 +84,15 @@ seed=$(docker exec "$database" psql -X -U gcs_ssc -d gcs_ssc -At -v ON_ERROR_STO
     (SELECT count(*) FROM kysely_migration WHERE name = '\''9999_seed'\''),
     (SELECT count(*) FROM "Agency_Profile" WHERE id = 21 AND egcs_ay_abbreviation_en = '\''NCIA'\''),
     (SELECT count(*) FROM "Funding_Case_Agreement_Profile" WHERE NOT _deleted),
-    (SELECT count(*) FROM "Funding_Case_Agreement_Payment")
+    (SELECT count(*) FROM "Funding_Case_Agreement_Payment"),
+    (SELECT count(*) FROM "Funding_Case_Agreement_Payment" payment
+      JOIN "Common_Status" status ON status.id = payment.egcs_fc_status
+      WHERE NOT payment._deleted AND status.egcs_cn_terminal
+        AND status.egcs_cn_name_en = '\''Paid'\''
+        AND ((payment.id = 168 AND payment.egcs_fc_fundingagreement = 120 AND payment.egcs_fc_paymentamount = 21000)
+          OR (payment.id = 172 AND payment.egcs_fc_fundingagreement = 150 AND payment.egcs_fc_paymentamount = 10000)))
 ')
-if [ "$seed" != '1|1|11|0' ]; then
+if [ "$seed" != '1|1|11|2|2' ]; then
   echo "Unexpected NCIA seed state: $seed" >&2
   exit 1
 fi

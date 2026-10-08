@@ -19,7 +19,7 @@ The workflow:
 3. Loads that image locally and tests it against a disposable PostgreSQL 17
    container: migrations/readiness, English/French pages, required artifacts,
    persistent files after replacing the application container, and the NCIA seed
-   with eleven agreements and no payments.
+   with eleven agreements and completed Payments 168/172.
 4. Pushes that exact tested image with a unique commit/run/attempt tag, records
    its registry digest, and uploads a `demo-image` workflow artifact containing
    `demo-image.json`.
@@ -114,7 +114,7 @@ If configuring through the Railway UI, set the same digest under Source and
 remove the GitHub source connection, but keep the IaC manifest in agreement.
 The [Railway runbook](../.railway/README.md) explains the existing resource graph.
 
-Verify each platform's `/api/health`, login, NCIA agency and eleven agreements, and empty payment lists after
+Verify each platform's `/api/health`, login, NCIA agency and eleven agreements, and completed Payments 168/172 after
 deployment. Updating a manifest alone does not apply infrastructure; run each
 platform's deployment command. Switching sources does not reset data.
 

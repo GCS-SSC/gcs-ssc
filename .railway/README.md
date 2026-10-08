@@ -59,7 +59,7 @@ redeploys the most recent deployment. Committing an IaC file alone does not run
 
 Publish and verify the current main commit with `publish-demo-image.yml`, then
 promote its immutable digest in `deployment/demo-image.json`. The image smoke
-check verifies `9999_seed`, Agency 21, eleven agreements, no payments, and file
+check verifies `9999_seed`, Agency 21, eleven agreements, completed Payments 168/172, and file
 persistence across container replacement.
 
 Stop the existing `gcs-ssc` deployment before changing the database storage.
@@ -70,7 +70,7 @@ Railway's plan readback can omit the former database attachment. Once the former
 authorized wipe. Omission from the authoring graph alone may retain unused volumes.
 
 Wait for the app deployment to reach `SUCCESS` and verify public health, demo
-login, NCIA's eleven agreements, and empty payment lists. The application file
+login, NCIA's eleven agreements, and completed Payments 168/172. The application file
 volume, Portal, and Metabase remain outside this cutover. Future schema changes
 need another explicitly authorized clean database cutover; ordinary redeploys
 reuse the configured volume and do not reset it.
