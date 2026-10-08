@@ -57,6 +57,7 @@ const tabs = [
   { key: 'agreement.payments.completion.title', value: 'completion', icon: 'i-lucide-circle-check-big' },
   { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-clipboard-check' },
   { key: 'workflow.title', value: 'workflows', icon: 'i-lucide-workflow' },
+  { key: 'supplementary_information.title', value: 'supplementary-information', icon: 'i-lucide-clipboard-list' },
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
   { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users' }
 ]
@@ -396,6 +397,7 @@ const handleCompleted = async () => {
               @changed="refreshPage" />
 
             <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcasepayment" :entity-id="paymentId" purpose="standard" :can-edit="canEditWorkflow" :refresh-key="approvalsRefreshKey" @changed="refreshPage" />
+            <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" entity-type="fundingcasepayment" :entity-id="paymentId" />
             <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcasepayment" :entity-id="paymentId" />
             <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" entity-type="fundingcasepayment" :entity-id="paymentId" />
           </CommonEntityEditorWorkspace>

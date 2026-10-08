@@ -8,7 +8,7 @@ import { resolveAgreementScopeContext } from '~~/server/utils/agreement'
 import { canAccessApplicantRecipient } from '~~/server/utils/applicant-recipient-auth'
 import { resolveCurrentCommonUser } from '~~/server/utils/additional-reviewer-runtime'
 import type { AssignableEntityType, Database, Entity_Type } from '~~/shared/types/database'
-import { ASSIGNABLE_ENGINE_OPEN_QUEUE_STATUSES, isAssignableEntityType } from '~~/shared/utils/entity-assignments'
+import { ASSIGNABLE_ENGINE_OPEN_QUEUE_STATUSES, isAssignableEntityType, isRuntimeAssignableEntityType, type RuntimeAssignableEntityType } from '~~/shared/utils/entity-assignments'
 import { getEntityAuthorizationPolicy } from '~~/server/utils/entity-authorization-policy'
 import { defineUsersAbilities } from '~~/server/utils/rbac'
 import { getActiveStructuralRoleAssignments } from '~~/server/utils/active-user-scopes'
@@ -137,7 +137,7 @@ type RuntimeAssignmentSource = {
 
 const resolveRuntimeAssignmentSource = async (
   db: Kysely<Database>,
-  entityType: 'commonreview' | 'commonrecommendation',
+  entityType: RuntimeAssignableEntityType,
   entityId: string
 ): Promise<RuntimeAssignmentSource | null> => {
   if (entityType === 'commonreview') {
@@ -167,26 +167,29 @@ const resolveRuntimeAssignmentSource = async (
     }
   }
 
-  const recommendation = await db.selectFrom('Common_Recommendation')
-    .innerJoin('Common_Runtime_Item', 'Common_Runtime_Item.id', 'Common_Recommendation.egcs_cn_runtimeitem')
-    .innerJoin('Common_Recommendation_Schema', 'Common_Recommendation_Schema.id', 'Common_Runtime_Item.egcs_cn_publication')
-    .select([
-      'Common_Recommendation.egcs_cn_entitytype as entity_type',
-      'Common_Recommendation.egcs_cn_entityid as entity_id',
-      'Common_Recommendation_Schema.egcs_cn_agency as agency_id'
-    ])
-    .where('Common_Recommendation.id', '=', entityId)
-    .where('Common_Recommendation._deleted', '=', false)
-    .executeTakeFirst()
-  if (!recommendation) return null
-  const sourceEntityId = String(recommendation.entity_id)
+  const source = entityType === 'commondatacollection'
+    ? await db.selectFrom('Common_Data_Collection')
+        .innerJoin('Common_Data_Collection_Setup', 'Common_Data_Collection_Setup.id', 'Common_Data_Collection.egcs_cn_datacollectionsetup')
+        .select(['Common_Data_Collection.egcs_cn_entitytype as entity_type',
+          'Common_Data_Collection.egcs_cn_entityid as entity_id', 'Common_Data_Collection_Setup.egcs_cn_agency as agency_id'])
+        .where('Common_Data_Collection.id', '=', entityId).where('Common_Data_Collection._deleted', '=', false)
+        .executeTakeFirst()
+    : await db.selectFrom('Common_Recommendation')
+        .innerJoin('Common_Runtime_Item', 'Common_Runtime_Item.id', 'Common_Recommendation.egcs_cn_runtimeitem')
+        .innerJoin('Common_Recommendation_Schema', 'Common_Recommendation_Schema.id', 'Common_Runtime_Item.egcs_cn_publication')
+        .select(['Common_Recommendation.egcs_cn_entitytype as entity_type',
+          'Common_Recommendation.egcs_cn_entityid as entity_id', 'Common_Recommendation_Schema.egcs_cn_agency as agency_id'])
+        .where('Common_Recommendation.id', '=', entityId).where('Common_Recommendation._deleted', '=', false)
+        .executeTakeFirst()
+  if (!source) return null
+  const sourceEntityId = String(source.entity_id)
   return {
-    target: isAssignableEntityType(recommendation.entity_type)
-      ? { entityType: recommendation.entity_type, entityId: sourceEntityId }
+    target: isAssignableEntityType(source.entity_type)
+      ? { entityType: source.entity_type, entityId: sourceEntityId }
       : null,
-    entityType: recommendation.entity_type,
+    entityType: source.entity_type,
     entityId: sourceEntityId,
-    fallbackAgencyId: recommendation.agency_id ? String(recommendation.agency_id) : null
+    fallbackAgencyId: source.agency_id ? String(source.agency_id) : null
   }
 }
 
@@ -222,7 +225,7 @@ const resolveSourceOwner = async (
   if (source.target?.entityType === 'fundingcaseintake') {
     return await resolveEntityAssignmentOwner(db, 'fundingcaseintake', source.target.entityId)
   }
-  if (source.target && (source.target.entityType === 'commonreview' || source.target.entityType === 'commonrecommendation')) {
+  if (source.target && isRuntimeAssignableEntityType(source.target.entityType)) {
     const owner = await resolveEntityAssignmentOwner(db, source.target.entityType, source.target.entityId)
     return owner?.kind === 'applicant_recipient' && source.fallbackAgencyId
       ? { ...owner, agencyId: source.fallbackAgencyId }
@@ -262,7 +265,7 @@ export const resolveEntityAssignmentOwner = async (
       : null
   }
   if (policy.ownerResolver === 'agreement') return await resolveAgreementOwner(db, entityId)
-  if (policy.ownerResolver === 'runtime_source' && (entityType === 'commonreview' || entityType === 'commonrecommendation')) {
+  if (policy.ownerResolver === 'runtime_source' && isRuntimeAssignableEntityType(entityType)) {
     const source = await resolveRuntimeAssignmentSource(db, entityType, entityId)
     return source ? await resolveSourceOwner(db, source) : null
   }
@@ -277,7 +280,7 @@ export const resolveEntityAssignmentSourceTarget = async (
   entityId: string
 ): Promise<ExactEntityTarget<AssignableEntityType> | null> => {
   if (!isPositivePostgresBigintText(entityId)) return null
-  if (entityType !== 'commonreview' && entityType !== 'commonrecommendation') return null
+  if (!isRuntimeAssignableEntityType(entityType)) return null
   return (await resolveRuntimeAssignmentSource(db, entityType, entityId))?.target ?? null
 }
 
@@ -287,11 +290,11 @@ export const resolveQualifiedEntityAssignmentSource = async (
   entityType: AssignableEntityType,
   entityId: string
 ) => {
-  const lineage: Array<{ entityType: 'commonreview' | 'commonrecommendation'; entityId: string; reviewSetId?: string }> = []
+  const lineage: Array<{ entityType: RuntimeAssignableEntityType; entityId: string; reviewSetId?: string }> = []
   const visited = new Set<string>()
   let currentType: Entity_Type = entityType
   let currentId = entityId
-  while (currentType === 'commonreview' || currentType === 'commonrecommendation') {
+  while (isRuntimeAssignableEntityType(currentType)) {
     const key = `${currentType}:${currentId}`
     if (visited.has(key)) return null
     visited.add(key)
@@ -454,16 +457,18 @@ export const isEntityAssignmentRosterWorkable = async (db: Kysely<Database>, ent
     if (!row || !ASSIGNABLE_ENGINE_OPEN_QUEUE_STATUSES.commonreview.has(String(row.status))) return false
     return !await resolveCompletionEvidenceId(db, 'commonreview', entityId)
   }
-  if (entityType === 'commonrecommendation') {
-    const row = await db.selectFrom('Common_Recommendation')
-      .innerJoin('Common_Runtime_Item', 'Common_Runtime_Item.id', 'Common_Recommendation.egcs_cn_runtimeitem')
-      .select('Common_Runtime_Item.egcs_cn_state as status')
-      .where('Common_Recommendation.id', '=', entityId)
-      .where('Common_Recommendation._deleted', '=', false)
-      .where('Common_Runtime_Item._deleted', '=', false)
+  if (entityType === 'commonrecommendation' || entityType === 'commondatacollection') {
+    const table = policy.table as 'Common_Recommendation' | 'Common_Data_Collection'
+    const row = await db.selectFrom(table)
+      .innerJoin('Common_Runtime_Item', 'Common_Runtime_Item.id', `${table}.egcs_cn_runtimeitem`)
+      .innerJoin('Common_Runtime', 'Common_Runtime.id', 'Common_Runtime_Item.egcs_cn_runtime')
+      .select(['Common_Runtime_Item.egcs_cn_state as status', 'Common_Runtime.egcs_cn_state as runtimeState'])
+      .where(`${table}.id`, '=', entityId).where(`${table}._deleted`, '=', false)
+      .where('Common_Runtime_Item._deleted', '=', false).where('Common_Runtime._deleted', '=', false)
       .executeTakeFirst()
-    if (!row || !ASSIGNABLE_ENGINE_OPEN_QUEUE_STATUSES.commonrecommendation.has(String(row.status))) return false
-    return !await resolveCompletionEvidenceId(db, 'commonrecommendation', entityId)
+    if (!row || !ASSIGNABLE_ENGINE_OPEN_QUEUE_STATUSES[entityType].has(String(row.status))) return false
+    if (entityType === 'commondatacollection' && row.runtimeState !== 'active' && row.runtimeState !== 'paused') return false
+    return !await resolveCompletionEvidenceId(db, entityType, entityId)
   }
   if (policy.statusColumn === null) {
     const row = await db.selectFrom(policy.table as keyof Database)
@@ -489,7 +494,7 @@ export const canReadEntityAssignments = async (event: H3Event, entityType: Assig
   const actor = await resolveAssignmentActor(event)
   const db = event.context.$db
   let runtimeSource: RuntimeAssignmentSource | null = null
-  if (entityType === 'commonreview' || entityType === 'commonrecommendation') {
+  if (isRuntimeAssignableEntityType(entityType)) {
     runtimeSource = await resolveRuntimeAssignmentSource(db, entityType, entityId)
   }
   let owner: AuthorizationResourceOwner | null

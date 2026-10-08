@@ -2137,6 +2137,11 @@
       "id": 174,
       "egcs_cn_entitytype": "fundingclaimreconcile",
       "_deleted": false
+    },
+    {
+      "id": 175,
+      "_deleted": false,
+      "egcs_cn_entitytype": "commondatacollection"
     }
   ],
   "Common_Entity_Assignment": [
@@ -2659,6 +2664,16 @@
       "egcs_cn_createdby": 1,
       "egcs_cn_createdat": "2026-10-08T01:46:57.425Z",
       "_deleted": false
+    },
+    {
+      "id": 150,
+      "_deleted": false,
+      "egcs_cn_user": 1,
+      "egcs_cn_entityid": 175,
+      "egcs_cn_createdat": "2026-10-08T15:39:37.126+00:00",
+      "egcs_cn_createdby": 1,
+      "egcs_cn_isprimary": true,
+      "egcs_cn_entitytype": "commondatacollection"
     }
   ],
   "Common_GWCOA": [
@@ -2682,7 +2697,7 @@
       "id": 367,
       "egcs_cn_kind": "workflow_setup",
       "egcs_cn_state": "published",
-      "egcs_cn_currentversion": 373,
+      "egcs_cn_currentversion": 402,
       "_deleted": false
     },
     {
@@ -2845,6 +2860,20 @@
       "egcs_cn_state": "published",
       "egcs_cn_currentversion": 399,
       "_deleted": false
+    },
+    {
+      "id": 391,
+      "_deleted": false,
+      "egcs_cn_kind": "data_collection_setup",
+      "egcs_cn_state": "published",
+      "egcs_cn_currentversion": 400
+    },
+    {
+      "id": 392,
+      "_deleted": false,
+      "egcs_cn_kind": "workflow_setup",
+      "egcs_cn_state": "published",
+      "egcs_cn_currentversion": 401
     }
   ],
   "Common_Publication_Transition": [
@@ -3144,6 +3173,33 @@
       "egcs_cn_publicationversion": 398,
       "egcs_cn_actor": 1,
       "egcs_cn_createdat": "2026-10-06T20:22:32.207+00:00"
+    },
+    {
+      "id": 399,
+      "egcs_cn_actor": 1,
+      "egcs_cn_tostate": "published",
+      "egcs_cn_createdat": "2026-10-08T15:39:37.042+00:00",
+      "egcs_cn_fromstate": "draft",
+      "egcs_cn_publication": 391,
+      "egcs_cn_publicationversion": 400
+    },
+    {
+      "id": 400,
+      "egcs_cn_actor": 1,
+      "egcs_cn_tostate": "published",
+      "egcs_cn_createdat": "2026-10-08T15:39:37.042+00:00",
+      "egcs_cn_fromstate": "draft",
+      "egcs_cn_publication": 392,
+      "egcs_cn_publicationversion": 401
+    },
+    {
+      "id": 401,
+      "egcs_cn_publication": 367,
+      "egcs_cn_fromstate": "published",
+      "egcs_cn_tostate": "published",
+      "egcs_cn_publicationversion": 402,
+      "egcs_cn_actor": 1,
+      "egcs_cn_createdat": "2026-10-08T14:00:00.000Z"
     }
   ],
   "Common_Publication_Version": [
@@ -5927,6 +5983,270 @@
       "egcs_cn_hash": "03f911c0ab67f23c206425d605b39fc9d7d64b92e5144fc935cbbd39fbe34d38",
       "egcs_cn_actor": 1,
       "egcs_cn_createdat": "2026-10-06T20:22:32.207+00:00"
+    },
+    {
+      "id": 400,
+      "egcs_cn_hash": "7d9b5bbb2a029bd2e4048519622c17eaa1b4e59fe98822fc6343f119ff735965",
+      "egcs_cn_kind": "data_collection_setup",
+      "egcs_cn_actor": 1,
+      "egcs_cn_version": 1,
+      "egcs_cn_createdat": "2026-10-08T15:39:37.042+00:00",
+      "egcs_cn_definition": {
+        "nameEn": "Community hall project details",
+        "nameFr": "Détails du projet de salle communautaire",
+        "agencyId": "21",
+        "definition": {
+          "sections": [
+            {
+              "key": "project",
+              "label": {
+                "en": "Project information",
+                "fr": "Renseignements sur le projet"
+              },
+              "subSections": [
+                {
+                  "key": "hall",
+                  "label": {
+                    "en": "Community hall",
+                    "fr": "Salle communautaire"
+                  },
+                  "questions": [
+                    {
+                      "key": "project_location",
+                      "type": "text",
+                      "question": {
+                        "en": "Project location",
+                        "fr": "Lieu du projet"
+                      },
+                      "required": true,
+                      "maxLength": 500
+                    },
+                    {
+                      "key": "accessibility_confirmed",
+                      "type": "radio",
+                      "options": [
+                        {
+                          "key": "yes",
+                          "label": {
+                            "en": "Yes",
+                            "fr": "Oui"
+                          },
+                          "description": {
+                            "en": "Accessibility features are included in the project.",
+                            "fr": "Des mesures d’accessibilité sont prévues dans le projet."
+                          }
+                        },
+                        {
+                          "key": "no",
+                          "label": {
+                            "en": "No",
+                            "fr": "Non"
+                          }
+                        }
+                      ],
+                      "question": {
+                        "en": "Accessibility features confirmed?",
+                        "fr": "Mesures d’accessibilité confirmées ?"
+                      },
+                      "required": true,
+                      "commentPolicy": "required"
+                    },
+                    {
+                      "key": "delivery_notes",
+                      "type": "text",
+                      "question": {
+                        "en": "Delivery notes",
+                        "fr": "Notes sur la réalisation"
+                      },
+                      "required": false,
+                      "maxLength": 2000
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "descriptionEn": "Project information collected for the Aurora Accessible Community Hall demo agreement.",
+        "descriptionFr": "Renseignements recueillis pour la convention de démonstration de la salle communautaire accessible Aurora.",
+        "dataCollectionId": "391"
+      },
+      "egcs_cn_publication": 391
+    },
+    {
+      "id": 401,
+      "egcs_cn_hash": "cfd68c198bdab7e88f96b0a629177b331971c6a0ecaf85a94c93e221b3633976",
+      "egcs_cn_kind": "workflow_setup",
+      "egcs_cn_actor": 1,
+      "egcs_cn_version": 1,
+      "egcs_cn_createdat": "2026-10-08T15:39:37.042+00:00",
+      "egcs_cn_definition": {
+        "nameEn": "Community hall supplementary information",
+        "nameFr": "Renseignements supplémentaires sur la salle communautaire",
+        "members": [
+          {
+            "kind": "data_collection",
+            "owners": [],
+            "memberId": "60",
+            "sequence": 1,
+            "referenceId": "391",
+            "allowOwnerRedirect": true,
+            "dataCollectionPlan": {
+              "nameEn": "Community hall project details",
+              "nameFr": "Détails du projet de salle communautaire",
+              "agencyId": "21",
+              "definition": {
+                "sections": [
+                  {
+                    "key": "project",
+                    "label": {
+                      "en": "Project information",
+                      "fr": "Renseignements sur le projet"
+                    },
+                    "subSections": [
+                      {
+                        "key": "hall",
+                        "label": {
+                          "en": "Community hall",
+                          "fr": "Salle communautaire"
+                        },
+                        "questions": [
+                          {
+                            "key": "project_location",
+                            "type": "text",
+                            "question": {
+                              "en": "Project location",
+                              "fr": "Lieu du projet"
+                            },
+                            "required": true,
+                            "maxLength": 500
+                          },
+                          {
+                            "key": "accessibility_confirmed",
+                            "type": "radio",
+                            "options": [
+                              {
+                                "key": "yes",
+                                "label": {
+                                  "en": "Yes",
+                                  "fr": "Oui"
+                                },
+                                "description": {
+                                  "en": "Accessibility features are included in the project.",
+                                  "fr": "Des mesures d’accessibilité sont prévues dans le projet."
+                                }
+                              },
+                              {
+                                "key": "no",
+                                "label": {
+                                  "en": "No",
+                                  "fr": "Non"
+                                }
+                              }
+                            ],
+                            "question": {
+                              "en": "Accessibility features confirmed?",
+                              "fr": "Mesures d’accessibilité confirmées ?"
+                            },
+                            "required": true,
+                            "commentPolicy": "required"
+                          },
+                          {
+                            "key": "delivery_notes",
+                            "type": "text",
+                            "question": {
+                              "en": "Delivery notes",
+                              "fr": "Notes sur la réalisation"
+                            },
+                            "required": false,
+                            "maxLength": 2000
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              "descriptionEn": "Project information collected for the Aurora Accessible Community Hall demo agreement.",
+              "descriptionFr": "Renseignements recueillis pour la convention de démonstration de la salle communautaire accessible Aurora.",
+              "dataCollectionId": "391"
+            },
+            "publicationVersion": 1,
+            "publicationVersionId": "400"
+          }
+        ],
+        "purpose": "standard",
+        "allowRetry": true,
+        "entityType": "fundingcaseagreement",
+        "descriptionEn": "Collect project details for the community hall agreement.",
+        "descriptionFr": "Recueillir les détails du projet de salle communautaire.",
+        "cancellationStatus": "382",
+        "allowedStartStatuses": [
+          "382"
+        ],
+        "executionFailureStatus": "382"
+      },
+      "egcs_cn_publication": 392
+    },
+    {
+      "id": 402,
+      "egcs_cn_publication": 367,
+      "egcs_cn_kind": "workflow_setup",
+      "egcs_cn_version": 3,
+      "egcs_cn_definition": {
+        "nameEn": "Approve and record payment",
+        "nameFr": "Approuver et enregistrer le paiement",
+        "descriptionEn": "One delegated approver confirms supporting evidence and that payment processing is complete, including recipient disbursement and any Credit Memo offset.",
+        "descriptionFr": "Une personne déléguée confirme les pièces justificatives et le traitement complet du paiement, y compris le versement au bénéficiaire et toute compensation par note de crédit.",
+        "entityType": "fundingcasepayment",
+        "purpose": "approval_submission",
+        "allowRetry": true,
+        "allowedStartStatuses": [
+          "381",
+          "397"
+        ],
+        "cancellationStatus": "381",
+        "executionFailureStatus": "381",
+        "members": [
+          {
+            "memberId": "42",
+            "sequence": 1,
+            "kind": "approval_template",
+            "owners": [],
+            "referenceId": "366",
+            "publicationVersionId": "370",
+            "publicationVersion": 2,
+            "approval": {
+              "templateId": "366",
+              "nameEn": "Financial authorization",
+              "nameFr": "Autorisation financière",
+              "descriptionEn": "Confirm the amount, recipient and accounting allocation before authorization.",
+              "descriptionFr": "Confirmer le montant, le bénéficiaire et l’imputation comptable avant l’autorisation.",
+              "allowAdditionalApprovals": false,
+              "allowAddedApprovalNameChanges": false,
+              "allowAddedApprovalCertificationChanges": false,
+              "additionalCertifications": [],
+              "steps": [
+                {
+                  "stepId": "238",
+                  "sequence": 1,
+                  "nameEn": "Financial authorization",
+                  "nameFr": "Autorisation financière",
+                  "defaultUser": "1",
+                  "certifications": []
+                }
+              ]
+            },
+            "materializationStatus": "385",
+            "successStatus": "391",
+            "failureStatus": "397",
+            "allowOwnerRedirect": false
+          }
+        ]
+      },
+      "egcs_cn_hash": "94bdb910d21e60b35c5b2c9c47c5908a0b70f297049a8b69351ad9cf89412ead",
+      "egcs_cn_actor": 1,
+      "egcs_cn_createdat": "2026-10-08T14:00:00.000Z"
     }
   ],
   "Common_Publication_Version_Reference": [
@@ -6219,6 +6539,26 @@
       "egcs_cn_kind": "review_schema",
       "egcs_cn_publicationversion": 399,
       "egcs_cn_version": 1
+    },
+    {
+      "id": 251,
+      "egcs_cn_kind": "data_collection_setup",
+      "egcs_cn_path": "members.data_collection",
+      "egcs_cn_order": 1,
+      "egcs_cn_version": 1,
+      "egcs_cn_publication": 391,
+      "egcs_cn_parentversion": 401,
+      "egcs_cn_publicationversion": 400
+    },
+    {
+      "id": 252,
+      "egcs_cn_parentversion": 402,
+      "egcs_cn_path": "members.approval_template",
+      "egcs_cn_order": 1,
+      "egcs_cn_publication": 366,
+      "egcs_cn_kind": "approval_template",
+      "egcs_cn_publicationversion": 370,
+      "egcs_cn_version": 2
     }
   ],
   "Common_Routing_Slip": [
@@ -8008,6 +8348,26 @@
       "egcs_cn_updatedat": "2026-10-08T01:46:57.493Z",
       "egcs_cn_completedat": "2026-10-08T01:46:57.493Z",
       "_deleted": false
+    },
+    {
+      "id": 61,
+      "_deleted": false,
+      "egcs_cn_kind": "workflow",
+      "egcs_cn_state": "succeeded",
+      "egcs_cn_attempt": 1,
+      "egcs_cn_purpose": "standard",
+      "egcs_cn_entityid": 123,
+      "egcs_cn_createdat": "2026-10-08T15:39:37.126+00:00",
+      "egcs_cn_startedat": "2026-10-08T15:39:37.126+00:00",
+      "egcs_cn_updatedat": "2026-10-08T15:39:37.198+00:00",
+      "egcs_cn_entitytype": "fundingcaseagreement",
+      "egcs_cn_completedat": "2026-10-08T15:39:37.198+00:00",
+      "egcs_cn_initiatedby": 1,
+      "egcs_cn_sourceversion": 1,
+      "egcs_cn_previousruntime": null,
+      "egcs_cn_sourcepublication": 392,
+      "egcs_cn_sourcepublicationkind": "workflow_setup",
+      "egcs_cn_sourcepublicationversion": 401
     }
   ],
   "Common_Runtime_Item": [
@@ -9744,6 +10104,23 @@
       "egcs_cn_updatedat": "2026-10-08T01:46:57.493Z",
       "egcs_cn_completedat": "2026-10-08T01:46:57.493Z",
       "_deleted": false
+    },
+    {
+      "id": 143,
+      "_deleted": false,
+      "egcs_cn_kind": "data_collection",
+      "egcs_cn_order": 1,
+      "egcs_cn_state": "succeeded",
+      "egcs_cn_runtime": 61,
+      "egcs_cn_version": 1,
+      "egcs_cn_createdat": "2026-10-08T15:39:37.126+00:00",
+      "egcs_cn_startedat": "2026-10-08T15:39:37.126+00:00",
+      "egcs_cn_updatedat": "2026-10-08T15:39:37.198+00:00",
+      "egcs_cn_completedat": "2026-10-08T15:39:37.198+00:00",
+      "egcs_cn_publication": 391,
+      "egcs_cn_publicationkind": "data_collection_setup",
+      "egcs_cn_parentruntimeitem": null,
+      "egcs_cn_publicationversion": 400
     }
   ],
   "Common_Runtime_Transition": [
@@ -12806,6 +13183,46 @@
       "egcs_cn_actor": 1,
       "egcs_cn_reason": "workflow_approved",
       "egcs_cn_createdat": "2026-10-08T01:46:57.493Z"
+    },
+    {
+      "id": 399,
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": "workflow_started",
+      "egcs_cn_runtime": 61,
+      "egcs_cn_tostate": "active",
+      "egcs_cn_createdat": "2026-10-08T15:39:37.126+00:00",
+      "egcs_cn_fromstate": "pending",
+      "egcs_cn_runtimeitem": null
+    },
+    {
+      "id": 400,
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": "data_collection_materialized",
+      "egcs_cn_runtime": 61,
+      "egcs_cn_tostate": "active",
+      "egcs_cn_createdat": "2026-10-08T15:39:37.126+00:00",
+      "egcs_cn_fromstate": "pending",
+      "egcs_cn_runtimeitem": 143
+    },
+    {
+      "id": 401,
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": "data_collection_submitted",
+      "egcs_cn_runtime": 61,
+      "egcs_cn_tostate": "succeeded",
+      "egcs_cn_createdat": "2026-10-08T15:39:37.198+00:00",
+      "egcs_cn_fromstate": "active",
+      "egcs_cn_runtimeitem": 143
+    },
+    {
+      "id": 402,
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": "workflow_succeeded",
+      "egcs_cn_runtime": 61,
+      "egcs_cn_tostate": "succeeded",
+      "egcs_cn_createdat": "2026-10-08T15:39:37.198+00:00",
+      "egcs_cn_fromstate": "active",
+      "egcs_cn_runtimeitem": null
     }
   ],
   "Common_Status": [
@@ -14274,6 +14691,76 @@
       "egcs_cn_status": 382,
       "egcs_cn_role": "failure",
       "egcs_cn_order": 1
+    },
+    {
+      "id": 388,
+      "egcs_cn_role": "allowed_start",
+      "egcs_cn_order": 1,
+      "egcs_cn_status": 382,
+      "egcs_cn_publicationversion": 401
+    },
+    {
+      "id": 389,
+      "egcs_cn_role": "cancellation",
+      "egcs_cn_order": 1,
+      "egcs_cn_status": 382,
+      "egcs_cn_publicationversion": 401
+    },
+    {
+      "id": 390,
+      "egcs_cn_role": "execution_failure",
+      "egcs_cn_order": 1,
+      "egcs_cn_status": 382,
+      "egcs_cn_publicationversion": 401
+    },
+    {
+      "id": 391,
+      "egcs_cn_publicationversion": 402,
+      "egcs_cn_status": 381,
+      "egcs_cn_role": "allowed_start",
+      "egcs_cn_order": 1
+    },
+    {
+      "id": 392,
+      "egcs_cn_publicationversion": 402,
+      "egcs_cn_status": 397,
+      "egcs_cn_role": "allowed_start",
+      "egcs_cn_order": 2
+    },
+    {
+      "id": 393,
+      "egcs_cn_publicationversion": 402,
+      "egcs_cn_status": 381,
+      "egcs_cn_role": "cancellation",
+      "egcs_cn_order": 1
+    },
+    {
+      "id": 394,
+      "egcs_cn_publicationversion": 402,
+      "egcs_cn_status": 381,
+      "egcs_cn_role": "execution_failure",
+      "egcs_cn_order": 1
+    },
+    {
+      "id": 395,
+      "egcs_cn_publicationversion": 402,
+      "egcs_cn_status": 385,
+      "egcs_cn_role": "materialization",
+      "egcs_cn_order": 1
+    },
+    {
+      "id": 396,
+      "egcs_cn_publicationversion": 402,
+      "egcs_cn_status": 391,
+      "egcs_cn_role": "success",
+      "egcs_cn_order": 1
+    },
+    {
+      "id": 397,
+      "egcs_cn_publicationversion": 402,
+      "egcs_cn_status": 397,
+      "egcs_cn_role": "failure",
+      "egcs_cn_order": 1
     }
   ],
   "Common_Workflow_Run": [
@@ -15468,6 +15955,25 @@
         ],
         "agreementId": "150"
       }
+    },
+    {
+      "id": 61,
+      "egcs_cn_routing": {
+        "hash": "9564c2d40ba9f2e3ae210078ff53b08d1425931d1d44f5e9dcf1f22766353e5d",
+        "fields": [],
+        "values": {},
+        "version": 2,
+        "decisions": [
+          {
+            "eligible": true,
+            "memberId": "60",
+            "conditions": [],
+            "unmatchedFieldIds": []
+          }
+        ],
+        "agreementId": "123"
+      },
+      "egcs_cn_completion": null
     }
   ],
   "Common_Workflow_Setup": [
@@ -15476,10 +15982,10 @@
       "egcs_cn_publicationkind": "workflow_setup",
       "egcs_cn_agency": 21,
       "egcs_cn_entitytype": "fundingcasepayment",
-      "egcs_cn_name_en": "Authorize payment",
-      "egcs_cn_name_fr": "Autoriser le paiement",
-      "egcs_cn_description_en": "Authorize payment: one delegated approver confirms the supporting evidence.",
-      "egcs_cn_description_fr": "Autoriser le paiement : une personne déléguée confirme les pièces justificatives.",
+      "egcs_cn_name_en": "Approve and record payment",
+      "egcs_cn_name_fr": "Approuver et enregistrer le paiement",
+      "egcs_cn_description_en": "One delegated approver confirms supporting evidence and that payment processing is complete, including recipient disbursement and any Credit Memo offset.",
+      "egcs_cn_description_fr": "Une personne déléguée confirme les pièces justificatives et le traitement complet du paiement, y compris le versement au bénéficiaire et toute compensation par note de crédit.",
       "egcs_cn_purpose": "approval_submission",
       "egcs_cn_cancellationstatus": 381,
       "egcs_cn_executionfailurestatus": 381,
@@ -15710,6 +16216,22 @@
       "egcs_cn_executionfailurestatus": 382,
       "egcs_cn_allowretry": true,
       "_deleted": false
+    },
+    {
+      "id": 392,
+      "_deleted": false,
+      "egcs_cn_agency": 21,
+      "egcs_cn_name_en": "Community hall supplementary information",
+      "egcs_cn_name_fr": "Renseignements supplémentaires sur la salle communautaire",
+      "egcs_cn_purpose": "standard",
+      "egcs_cn_allowretry": true,
+      "egcs_cn_entitytype": "fundingcaseagreement",
+      "egcs_cn_description_en": "Collect project details for the community hall agreement.",
+      "egcs_cn_description_fr": "Recueillir les détails du projet de salle communautaire.",
+      "egcs_cn_publicationkind": "workflow_setup",
+      "egcs_cn_cancellationstatus": 382,
+      "egcs_cn_riskratingrequired": false,
+      "egcs_cn_executionfailurestatus": 382
     }
   ],
   "Common_Workflow_Setup_Allowed_Start_Status": [
@@ -15936,6 +16458,13 @@
       "egcs_cn_status": 397,
       "egcs_cn_order": 3,
       "_deleted": false
+    },
+    {
+      "id": 136,
+      "_deleted": false,
+      "egcs_cn_order": 1,
+      "egcs_cn_status": 382,
+      "egcs_cn_workflowsetup": 392
     }
   ],
   "Common_Workflow_Setup_Member": [
@@ -15948,13 +16477,14 @@
       "egcs_cn_recommendationset": null,
       "egcs_cn_approvaltemplate": 366,
       "egcs_cn_materializationstatus": 385,
-      "egcs_cn_successstatus": 390,
+      "egcs_cn_successstatus": 391,
       "egcs_cn_failurestatus": 397,
       "egcs_cn_allowownerredirect": false,
       "egcs_cn_profileconditions": [],
       "_deleted": false,
       "egcs_cn_setsriskrating": false,
-      "egcs_cn_riskreviewsetup": null
+      "egcs_cn_riskreviewsetup": null,
+      "egcs_cn_datacollection": null
     },
     {
       "id": 43,
@@ -15971,7 +16501,8 @@
       "egcs_cn_profileconditions": [],
       "_deleted": false,
       "egcs_cn_setsriskrating": false,
-      "egcs_cn_riskreviewsetup": null
+      "egcs_cn_riskreviewsetup": null,
+      "egcs_cn_datacollection": null
     },
     {
       "id": 44,
@@ -15988,7 +16519,8 @@
       "egcs_cn_profileconditions": [],
       "_deleted": false,
       "egcs_cn_setsriskrating": false,
-      "egcs_cn_riskreviewsetup": null
+      "egcs_cn_riskreviewsetup": null,
+      "egcs_cn_datacollection": null
     },
     {
       "id": 45,
@@ -16005,7 +16537,8 @@
       "egcs_cn_profileconditions": [],
       "_deleted": false,
       "egcs_cn_setsriskrating": false,
-      "egcs_cn_riskreviewsetup": null
+      "egcs_cn_riskreviewsetup": null,
+      "egcs_cn_datacollection": null
     },
     {
       "id": 46,
@@ -16022,7 +16555,8 @@
       "egcs_cn_profileconditions": [],
       "_deleted": false,
       "egcs_cn_setsriskrating": false,
-      "egcs_cn_riskreviewsetup": null
+      "egcs_cn_riskreviewsetup": null,
+      "egcs_cn_datacollection": null
     },
     {
       "id": 47,
@@ -16039,7 +16573,8 @@
       "egcs_cn_profileconditions": [],
       "_deleted": false,
       "egcs_cn_setsriskrating": false,
-      "egcs_cn_riskreviewsetup": null
+      "egcs_cn_riskreviewsetup": null,
+      "egcs_cn_datacollection": null
     },
     {
       "id": 48,
@@ -16056,7 +16591,8 @@
       "egcs_cn_profileconditions": [],
       "_deleted": false,
       "egcs_cn_setsriskrating": false,
-      "egcs_cn_riskreviewsetup": null
+      "egcs_cn_riskreviewsetup": null,
+      "egcs_cn_datacollection": null
     },
     {
       "id": 49,
@@ -16073,7 +16609,8 @@
       "egcs_cn_profileconditions": [],
       "_deleted": false,
       "egcs_cn_setsriskrating": false,
-      "egcs_cn_riskreviewsetup": null
+      "egcs_cn_riskreviewsetup": null,
+      "egcs_cn_datacollection": null
     },
     {
       "id": 50,
@@ -16090,7 +16627,8 @@
       "egcs_cn_profileconditions": [],
       "_deleted": false,
       "egcs_cn_setsriskrating": false,
-      "egcs_cn_riskreviewsetup": null
+      "egcs_cn_riskreviewsetup": null,
+      "egcs_cn_datacollection": null
     },
     {
       "id": 51,
@@ -16107,7 +16645,8 @@
       "egcs_cn_profileconditions": [],
       "_deleted": false,
       "egcs_cn_setsriskrating": false,
-      "egcs_cn_riskreviewsetup": null
+      "egcs_cn_riskreviewsetup": null,
+      "egcs_cn_datacollection": null
     },
     {
       "id": 52,
@@ -16124,7 +16663,8 @@
       "egcs_cn_profileconditions": [],
       "_deleted": false,
       "egcs_cn_setsriskrating": false,
-      "egcs_cn_riskreviewsetup": null
+      "egcs_cn_riskreviewsetup": null,
+      "egcs_cn_datacollection": null
     },
     {
       "id": 53,
@@ -16141,7 +16681,8 @@
       "egcs_cn_profileconditions": [],
       "_deleted": false,
       "egcs_cn_setsriskrating": false,
-      "egcs_cn_riskreviewsetup": null
+      "egcs_cn_riskreviewsetup": null,
+      "egcs_cn_datacollection": null
     },
     {
       "id": 54,
@@ -16158,7 +16699,8 @@
       "egcs_cn_profileconditions": [],
       "_deleted": false,
       "egcs_cn_setsriskrating": false,
-      "egcs_cn_riskreviewsetup": null
+      "egcs_cn_riskreviewsetup": null,
+      "egcs_cn_datacollection": null
     },
     {
       "id": 55,
@@ -16175,7 +16717,8 @@
       "egcs_cn_profileconditions": [],
       "_deleted": false,
       "egcs_cn_setsriskrating": false,
-      "egcs_cn_riskreviewsetup": null
+      "egcs_cn_riskreviewsetup": null,
+      "egcs_cn_datacollection": null
     },
     {
       "id": 56,
@@ -16192,7 +16735,8 @@
       "egcs_cn_profileconditions": [],
       "_deleted": false,
       "egcs_cn_setsriskrating": false,
-      "egcs_cn_riskreviewsetup": null
+      "egcs_cn_riskreviewsetup": null,
+      "egcs_cn_datacollection": null
     },
     {
       "id": 57,
@@ -16209,7 +16753,8 @@
       "egcs_cn_profileconditions": [],
       "_deleted": false,
       "egcs_cn_setsriskrating": false,
-      "egcs_cn_riskreviewsetup": null
+      "egcs_cn_riskreviewsetup": null,
+      "egcs_cn_datacollection": null
     },
     {
       "id": 58,
@@ -16226,7 +16771,8 @@
       "egcs_cn_profileconditions": [],
       "_deleted": false,
       "egcs_cn_setsriskrating": false,
-      "egcs_cn_riskreviewsetup": null
+      "egcs_cn_riskreviewsetup": null,
+      "egcs_cn_datacollection": null
     },
     {
       "id": 59,
@@ -16243,7 +16789,26 @@
       "egcs_cn_profileconditions": [],
       "_deleted": false,
       "egcs_cn_setsriskrating": true,
-      "egcs_cn_riskreviewsetup": "2"
+      "egcs_cn_riskreviewsetup": "2",
+      "egcs_cn_datacollection": null
+    },
+    {
+      "id": 60,
+      "_deleted": false,
+      "egcs_cn_kind": "data_collection",
+      "egcs_cn_sequence": 1,
+      "egcs_cn_reviewset": null,
+      "egcs_cn_failurestatus": null,
+      "egcs_cn_successstatus": null,
+      "egcs_cn_workflowsetup": 392,
+      "egcs_cn_datacollection": 391,
+      "egcs_cn_setsriskrating": false,
+      "egcs_cn_riskreviewsetup": null,
+      "egcs_cn_approvaltemplate": null,
+      "egcs_cn_profileconditions": [],
+      "egcs_cn_recommendationset": null,
+      "egcs_cn_allowownerredirect": true,
+      "egcs_cn_materializationstatus": null
     }
   ],
   "Common_Workflow_Status_Transition": [
@@ -22439,6 +23004,12 @@
       "egcs_tp_transferpaymentstream": 118,
       "egcs_tp_workflow": 389,
       "_deleted": false
+    },
+    {
+      "id": 44,
+      "_deleted": false,
+      "egcs_tp_workflow": 392,
+      "egcs_tp_transferpaymentstream": 118
     }
   ],
   "role": [
@@ -24122,6 +24693,121 @@
       ],
       "egcs_fc_amount": "10500.00",
       "_deleted": false
+    }
+  ],
+  "Common_Data_Collection_Setup": [
+    {
+      "id": 391,
+      "_deleted": false,
+      "egcs_cn_agency": 21,
+      "egcs_cn_schema": {
+        "sections": [
+          {
+            "key": "project",
+            "label": {
+              "en": "Project information",
+              "fr": "Renseignements sur le projet"
+            },
+            "subSections": [
+              {
+                "key": "hall",
+                "label": {
+                  "en": "Community hall",
+                  "fr": "Salle communautaire"
+                },
+                "questions": [
+                  {
+                    "key": "project_location",
+                    "type": "text",
+                    "question": {
+                      "en": "Project location",
+                      "fr": "Lieu du projet"
+                    },
+                    "required": true,
+                    "maxLength": 500
+                  },
+                  {
+                    "key": "accessibility_confirmed",
+                    "type": "radio",
+                    "options": [
+                      {
+                        "key": "yes",
+                        "label": {
+                          "en": "Yes",
+                          "fr": "Oui"
+                        },
+                        "description": {
+                          "en": "Accessibility features are included in the project.",
+                          "fr": "Des mesures d’accessibilité sont prévues dans le projet."
+                        }
+                      },
+                      {
+                        "key": "no",
+                        "label": {
+                          "en": "No",
+                          "fr": "Non"
+                        }
+                      }
+                    ],
+                    "question": {
+                      "en": "Accessibility features confirmed?",
+                      "fr": "Mesures d’accessibilité confirmées ?"
+                    },
+                    "required": true,
+                    "commentPolicy": "required"
+                  },
+                  {
+                    "key": "delivery_notes",
+                    "type": "text",
+                    "question": {
+                      "en": "Delivery notes",
+                      "fr": "Notes sur la réalisation"
+                    },
+                    "required": false,
+                    "maxLength": 2000
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "egcs_cn_name_en": "Community hall project details",
+      "egcs_cn_name_fr": "Détails du projet de salle communautaire",
+      "egcs_cn_description_en": "Project information collected for the Aurora Accessible Community Hall demo agreement.",
+      "egcs_cn_description_fr": "Renseignements recueillis pour la convention de démonstration de la salle communautaire accessible Aurora.",
+      "egcs_cn_publicationkind": "data_collection_setup",
+      "egcs_cn_approvaltemplate": null
+    }
+  ],
+  "Common_Data_Collection": [
+    {
+      "id": 175,
+      "_deleted": false,
+      "egcs_cn_group": null,
+      "egcs_cn_entityid": 123,
+      "egcs_cn_response": {
+        "responses": [
+          {
+            "value": "Aurora Community Hall, 125 Northern Lights Road",
+            "questionKey": "project_location"
+          },
+          {
+            "value": "yes",
+            "comment": "The project includes a step-free entrance, accessible washrooms and automatic doors.",
+            "questionKey": "accessibility_confirmed"
+          },
+          {
+            "value": "Renovations are scheduled around existing community programs.\nThe hall will remain available for essential services.",
+            "questionKey": "delivery_notes"
+          }
+        ]
+      },
+      "egcs_cn_revision": 2,
+      "egcs_cn_entitytype": "fundingcaseagreement",
+      "egcs_cn_runtimeitem": 143,
+      "egcs_cn_groupclaimedby": null,
+      "egcs_cn_datacollectionsetup": 391
     }
   ]
 }

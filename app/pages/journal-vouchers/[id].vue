@@ -54,6 +54,7 @@ const tabs = [
   { key: 'journal_voucher.completion.title', value: 'completion', icon: 'i-lucide-circle-check-big' },
   { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-clipboard-check' },
   { key: 'workflow.title', value: 'workflows', icon: 'i-lucide-workflow' },
+  { key: 'supplementary_information.title', value: 'supplementary-information', icon: 'i-lucide-clipboard-list' },
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
   { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users' }
 ]
@@ -365,6 +366,7 @@ const applyAllocation = (line: JournalVoucherAllocationDraft) => {
           <CommonCompletionPanel v-else-if="selectedTab === 'completion'" entity-type="fundingcasejournalvoucher" :entity-id="id" :can-complete="voucher.egcs_fc_canwork && !voucher.isCompleted" :can-work-workflow="voucher.egcs_fc_canwork" :hide-title="false" :show-divider="false" title-key="journal_voucher.completion.title" description-key="journal_voucher.completion.description" status-complete-key="journal_voucher.completion.status_complete" status-locked-key="journal_voucher.completion.status_locked" comment-placeholder-key="journal_voucher.completion.comment_placeholder" complete-action-key="journal_voucher.completion.complete" completed-success-key="journal_voucher.completion.completed_success" :refresh-key="refreshKey" @changed="refreshPage" />
           <CommonReviewsTab v-else-if="selectedTab === 'reviews'" entity-type="fundingcasejournalvoucher" :entity-id="id" :can-update="voucher.egcs_fc_canwork" @changed="refreshPage" />
           <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcasejournalvoucher" :entity-id="id" purpose="standard" :can-edit="voucher.egcs_fc_canwork" :refresh-key="refreshKey" @changed="refreshPage" />
+          <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" entity-type="fundingcasejournalvoucher" :entity-id="id" />
           <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcasejournalvoucher" :entity-id="id" />
           <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" entity-type="fundingcasejournalvoucher" :entity-id="id" />
         </CommonEntityEditorWorkspace>

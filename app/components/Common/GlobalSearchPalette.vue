@@ -133,7 +133,7 @@ const truncated = computed(() => {
           <template v-if="item.result?.status">
             <CommonStatusBadge v-if="item.result.status === 'active'" variant="active" />
             <CommonLifecycleBadge
-              v-else-if="item.result.type === 'commonreview' || item.result.type === 'commonrecommendation'"
+              v-else-if="item.result.type === 'commonreview' || item.result.type === 'commonrecommendation' || item.result.type === 'commondatacollection'"
               engine="runtime"
               :state="runtimeState(item.result.status)" />
             <CommonRecordState v-else :status-id="item.result.status" />

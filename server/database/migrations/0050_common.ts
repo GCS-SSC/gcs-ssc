@@ -572,7 +572,7 @@ CREATE TABLE "Common_Publication" (
   CONSTRAINT "Common_Publication_pkey" PRIMARY KEY (id),
   CONSTRAINT "cn_chk_publicationdeleted" CHECK (((_deleted = false) OR ((egcs_cn_state)::text = 'draft'::text))),
   CONSTRAINT "cn_chk_publicationinitial" CHECK (((((egcs_cn_state)::text = 'draft'::text) AND (egcs_cn_currentversion IS NULL)) OR (((egcs_cn_state)::text = ANY ((ARRAY['published'::character varying, 'retired'::character varying])::text[])) AND (egcs_cn_currentversion IS NOT NULL)))),
-  CONSTRAINT "cn_chk_publicationkind" CHECK (((egcs_cn_kind)::text = ANY ((ARRAY['approval_template'::character varying, 'review_schema'::character varying, 'review_set_setup'::character varying, 'recommendation_schema'::character varying, 'recommendation_set_setup'::character varying, 'workflow_setup'::character varying])::text[]))),
+  CONSTRAINT "cn_chk_publicationkind" CHECK (((egcs_cn_kind)::text = ANY ((ARRAY['approval_template'::character varying, 'review_schema'::character varying, 'review_set_setup'::character varying, 'recommendation_schema'::character varying, 'recommendation_set_setup'::character varying, 'data_collection_setup'::character varying, 'workflow_setup'::character varying])::text[]))),
   CONSTRAINT "cn_chk_publicationstate" CHECK (((egcs_cn_state)::text = ANY ((ARRAY['draft'::character varying, 'published'::character varying, 'retired'::character varying])::text[])))
 );
 
@@ -620,6 +620,49 @@ CREATE TABLE "Common_Publication_Version_Reference" (
   CONSTRAINT "cn_uq_publicationversionreference" UNIQUE NULLS NOT DISTINCT (egcs_cn_parentversion, egcs_cn_path, egcs_cn_order),
   CONSTRAINT "Common_Publication_Version_Reference_pkey" PRIMARY KEY (id),
   CONSTRAINT "Common_Publication_Version_Reference_egcs_cn_version_check" CHECK ((egcs_cn_version > 0))
+);
+
+CREATE TABLE "Common_Data_Collection_Setup" (
+  "id" bigint NOT NULL,
+  "egcs_cn_publicationkind" character varying(64) DEFAULT 'data_collection_setup' NOT NULL,
+  "egcs_cn_agency" bigint NOT NULL,
+  "egcs_cn_name_en" character varying(255) NOT NULL,
+  "egcs_cn_name_fr" character varying(255) NOT NULL,
+  "egcs_cn_description_en" text NOT NULL,
+  "egcs_cn_description_fr" text NOT NULL,
+  "egcs_cn_schema" jsonb NOT NULL,
+  "egcs_cn_approvaltemplate" bigint,
+  "_deleted" boolean DEFAULT false NOT NULL,
+  CONSTRAINT "Common_Data_Collection_Setup_pkey" PRIMARY KEY (id),
+  CONSTRAINT "cn_chk_datacollectionpublicationkind" CHECK (egcs_cn_publicationkind = 'data_collection_setup'),
+  CONSTRAINT "cn_chk_datacollectionschema" CHECK (jsonb_typeof(egcs_cn_schema) = 'object'
+    AND NOT jsonb_path_exists(egcs_cn_schema, '$.**.isResult')
+    AND NOT jsonb_path_exists(egcs_cn_schema, '$.**.outcome'))
+);
+
+CREATE INDEX cn_idx_datacollectionsetupagencynameen ON "Common_Data_Collection_Setup" (egcs_cn_agency, egcs_cn_name_en) WHERE (_deleted = false);
+CREATE INDEX cn_idx_datacollectionsetupagencynamefr ON "Common_Data_Collection_Setup" (egcs_cn_agency, egcs_cn_name_fr) WHERE (_deleted = false);
+
+CREATE TABLE "Common_Data_Collection" (
+  "id" bigint NOT NULL,
+  "egcs_cn_datacollectionsetup" bigint NOT NULL,
+  "egcs_cn_entitytype" character varying(128) NOT NULL,
+  "egcs_cn_entityid" bigint NOT NULL,
+  "egcs_cn_runtimeitem" bigint NOT NULL,
+  "egcs_cn_group" bigint,
+  "egcs_cn_groupclaimedby" bigint,
+  "egcs_cn_response" jsonb DEFAULT '{"responses": []}'::jsonb NOT NULL,
+  "egcs_cn_revision" integer DEFAULT 1 NOT NULL,
+  "_deleted" boolean DEFAULT false NOT NULL,
+  CONSTRAINT "Common_Data_Collection_pkey" PRIMARY KEY (id),
+  CONSTRAINT "cn_uq_datacollectionruntimeitem" UNIQUE (egcs_cn_runtimeitem),
+  CONSTRAINT "cn_chk_datacollectiongroupclaim" CHECK (egcs_cn_groupclaimedby IS NULL OR egcs_cn_group IS NOT NULL),
+  CONSTRAINT "cn_chk_datacollectionrevision" CHECK (egcs_cn_revision > 0),
+  CONSTRAINT "cn_chk_datacollectionresponse" CHECK (jsonb_typeof(egcs_cn_response) = 'object'
+    AND egcs_cn_response ? 'responses'
+    AND jsonb_typeof(egcs_cn_response -> 'responses') = 'array'
+    AND NOT jsonb_path_exists(egcs_cn_response, '$.**.isResult')
+    AND NOT jsonb_path_exists(egcs_cn_response, '$.**.outcome'))
 );
 
 CREATE TABLE "Common_Recommendation" (
@@ -907,7 +950,7 @@ CREATE TABLE "Common_Runtime_Item" (
   CONSTRAINT "cn_uq_runtimeitemidentity" UNIQUE (id, egcs_cn_runtime),
   CONSTRAINT "cn_uq_runtimeitemorder" UNIQUE NULLS NOT DISTINCT (egcs_cn_runtime, egcs_cn_parentruntimeitem, egcs_cn_order),
   CONSTRAINT "Common_Runtime_Item_pkey" PRIMARY KEY (id),
-  CONSTRAINT "cn_chk_runtimeitemkind" CHECK (((egcs_cn_kind)::text = ANY ((ARRAY['review_set'::character varying, 'review'::character varying, 'recommendation_set'::character varying, 'recommendation'::character varying, 'routing_slip'::character varying, 'approval_step'::character varying])::text[]))),
+  CONSTRAINT "cn_chk_runtimeitemkind" CHECK (((egcs_cn_kind)::text = ANY ((ARRAY['review_set'::character varying, 'review'::character varying, 'recommendation_set'::character varying, 'recommendation'::character varying, 'data_collection'::character varying, 'routing_slip'::character varying, 'approval_step'::character varying])::text[]))),
   CONSTRAINT "cn_chk_runtimeitemstate" CHECK (((egcs_cn_state)::text = ANY ((ARRAY['pending'::character varying, 'active'::character varying, 'awaiting_action'::character varying, 'paused'::character varying, 'succeeded'::character varying, 'approved'::character varying, 'unsuccessful'::character varying, 'denied'::character varying, 'cancelled'::character varying, 'failed'::character varying])::text[]))),
   CONSTRAINT "cn_chk_runtimeitemtimestamps" CHECK (((((egcs_cn_state)::text = 'pending'::text) AND (egcs_cn_startedat IS NULL) AND (egcs_cn_completedat IS NULL)) OR (((egcs_cn_state)::text = ANY ((ARRAY['active'::character varying, 'awaiting_action'::character varying, 'paused'::character varying])::text[])) AND (egcs_cn_startedat IS NOT NULL) AND (egcs_cn_completedat IS NULL)) OR (((egcs_cn_state)::text = ANY ((ARRAY['succeeded'::character varying, 'approved'::character varying, 'unsuccessful'::character varying, 'denied'::character varying, 'cancelled'::character varying, 'failed'::character varying])::text[])) AND (egcs_cn_completedat IS NOT NULL)))),
   CONSTRAINT "Common_Runtime_Item_egcs_cn_order_check" CHECK ((egcs_cn_order > (0)::numeric)),
@@ -990,6 +1033,7 @@ CREATE TABLE "Common_Workflow_Owner_Blocker" (
   "egcs_cn_workflowsetupmember" bigint NOT NULL,
   "egcs_cn_reviewsetup" bigint,
   "egcs_cn_recommendationsetup" bigint,
+  "egcs_cn_datacollection" bigint,
   "egcs_cn_configuredowner" bigint,
   "egcs_cn_reason" character varying(64) NOT NULL,
   "egcs_cn_triggeredby" bigint,
@@ -999,11 +1043,13 @@ CREATE TABLE "Common_Workflow_Owner_Blocker" (
   "egcs_cn_resolvedat" timestamp with time zone,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Common_Workflow_Owner_Blocker_pkey" PRIMARY KEY (id),
-  CONSTRAINT "cn_chk_workflowownerblockermember" CHECK (((((egcs_cn_reviewsetup IS NOT NULL))::integer + ((egcs_cn_recommendationsetup IS NOT NULL))::integer) = 1)),
+  CONSTRAINT "cn_chk_workflowownerblockermember" CHECK (((((egcs_cn_reviewsetup IS NOT NULL))::integer + ((egcs_cn_recommendationsetup IS NOT NULL))::integer + ((egcs_cn_datacollection IS NOT NULL))::integer) = 1)),
   CONSTRAINT "cn_chk_workflowownerblockerresolution" CHECK ((((egcs_cn_resolvedat IS NULL) AND (egcs_cn_replacementowner IS NULL) AND (egcs_cn_resolvedby IS NULL)) OR ((egcs_cn_resolvedat IS NOT NULL) AND (egcs_cn_replacementowner IS NOT NULL) AND (egcs_cn_resolvedby IS NOT NULL))))
 );
 
 CREATE UNIQUE INDEX cn_idx_workflowownerblocker_active_recommendation ON "Common_Workflow_Owner_Blocker" USING btree (egcs_cn_workflowrun, egcs_cn_workflowsetupmember, egcs_cn_recommendationsetup) WHERE ((_deleted = false) AND (egcs_cn_resolvedat IS NULL) AND (egcs_cn_recommendationsetup IS NOT NULL));
+
+CREATE UNIQUE INDEX cn_idx_workflowownerblocker_active_collection ON "Common_Workflow_Owner_Blocker" (egcs_cn_workflowrun, egcs_cn_workflowsetupmember, egcs_cn_datacollection) WHERE (_deleted = false AND egcs_cn_resolvedat IS NULL AND egcs_cn_datacollection IS NOT NULL);
 
 CREATE UNIQUE INDEX cn_idx_workflowownerblocker_active_review ON "Common_Workflow_Owner_Blocker" USING btree (egcs_cn_workflowrun, egcs_cn_workflowsetupmember, egcs_cn_reviewsetup) WHERE ((_deleted = false) AND (egcs_cn_resolvedat IS NULL) AND (egcs_cn_reviewsetup IS NOT NULL));
 
@@ -1082,6 +1128,7 @@ CREATE TABLE "Common_Workflow_Setup_Member" (
   "egcs_cn_kind" character varying(32) NOT NULL,
   "egcs_cn_reviewset" bigint,
   "egcs_cn_recommendationset" bigint,
+  "egcs_cn_datacollection" bigint,
   "egcs_cn_approvaltemplate" bigint,
   "egcs_cn_materializationstatus" bigint,
   "egcs_cn_successstatus" bigint,
@@ -1092,8 +1139,13 @@ CREATE TABLE "Common_Workflow_Setup_Member" (
   "egcs_cn_riskreviewsetup" bigint,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Common_Workflow_Setup_Member_pkey" PRIMARY KEY (id),
-  CONSTRAINT "cn_chk_workflowsetupmemberreference" CHECK (((((((egcs_cn_reviewset IS NOT NULL))::integer + ((egcs_cn_recommendationset IS NOT NULL))::integer) + ((egcs_cn_approvaltemplate IS NOT NULL))::integer) = 1) AND (((egcs_cn_kind)::text = 'review_set'::text) = (egcs_cn_reviewset IS NOT NULL)) AND (((egcs_cn_kind)::text = 'recommendation_set'::text) = (egcs_cn_recommendationset IS NOT NULL)) AND (((egcs_cn_kind)::text = 'approval_template'::text) = (egcs_cn_approvaltemplate IS NOT NULL)))),
-  CONSTRAINT "Common_Workflow_Setup_Member_egcs_cn_kind_check" CHECK (((egcs_cn_kind)::text = ANY ((ARRAY['review_set'::character varying, 'recommendation_set'::character varying, 'approval_template'::character varying])::text[]))),
+  CONSTRAINT "cn_chk_workflowsetupmemberreference" CHECK (
+    num_nonnulls(egcs_cn_reviewset, egcs_cn_recommendationset, egcs_cn_datacollection, egcs_cn_approvaltemplate) = 1
+    AND (egcs_cn_kind = 'review_set') = (egcs_cn_reviewset IS NOT NULL)
+    AND (egcs_cn_kind = 'recommendation_set') = (egcs_cn_recommendationset IS NOT NULL)
+    AND (egcs_cn_kind = 'data_collection') = (egcs_cn_datacollection IS NOT NULL)
+    AND (egcs_cn_kind = 'approval_template') = (egcs_cn_approvaltemplate IS NOT NULL)),
+  CONSTRAINT "Common_Workflow_Setup_Member_egcs_cn_kind_check" CHECK (egcs_cn_kind IN ('review_set', 'recommendation_set', 'data_collection', 'approval_template')),
   CONSTRAINT "Common_Workflow_Setup_Member_egcs_cn_profileconditions_check" CHECK ((jsonb_typeof(egcs_cn_profileconditions) = 'array'::text)),
   CONSTRAINT "cn_chk_workflowmemberrisksource" CHECK (egcs_cn_setsriskrating = (egcs_cn_riskreviewsetup IS NOT NULL) AND (NOT egcs_cn_setsriskrating OR egcs_cn_kind = 'review_set')),
   CONSTRAINT "Common_Workflow_Setup_Member_egcs_cn_sequence_check" CHECK ((egcs_cn_sequence > 0))
@@ -1108,15 +1160,18 @@ CREATE TABLE "Common_Workflow_Setup_Member_Owner" (
   "egcs_cn_workflowsetupmember" bigint NOT NULL,
   "egcs_cn_reviewsetup" bigint,
   "egcs_cn_recommendationsetup" bigint,
+  "egcs_cn_datacollection" bigint,
   "egcs_cn_defaultowner" bigint,
   "egcs_cn_defaultgroup" bigint,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Common_Workflow_Setup_Member_Owner_pkey" PRIMARY KEY (id),
   CONSTRAINT "cn_chk_workflowmemberownertarget" CHECK (egcs_cn_defaultowner IS NULL OR egcs_cn_defaultgroup IS NULL),
-  CONSTRAINT "cn_chk_workflowmemberownerreference" CHECK (((((egcs_cn_reviewsetup IS NOT NULL))::integer + ((egcs_cn_recommendationsetup IS NOT NULL))::integer) = 1))
+  CONSTRAINT "cn_chk_workflowmemberownerreference" CHECK (((((egcs_cn_reviewsetup IS NOT NULL))::integer + ((egcs_cn_recommendationsetup IS NOT NULL))::integer + ((egcs_cn_datacollection IS NOT NULL))::integer) = 1))
 );
 
 CREATE UNIQUE INDEX cn_idx_workflowmemberownerrecommendation ON "Common_Workflow_Setup_Member_Owner" USING btree (egcs_cn_workflowsetupmember, egcs_cn_recommendationsetup) WHERE ((_deleted = false) AND (egcs_cn_recommendationsetup IS NOT NULL));
+
+CREATE UNIQUE INDEX cn_idx_workflowmemberownercollection ON "Common_Workflow_Setup_Member_Owner" (egcs_cn_workflowsetupmember, egcs_cn_datacollection) WHERE (_deleted = false AND egcs_cn_datacollection IS NOT NULL);
 
 CREATE UNIQUE INDEX cn_idx_workflowmemberownerreview ON "Common_Workflow_Setup_Member_Owner" USING btree (egcs_cn_workflowsetupmember, egcs_cn_reviewsetup) WHERE ((_deleted = false) AND (egcs_cn_reviewsetup IS NOT NULL));
 
@@ -1242,6 +1297,8 @@ INSERT INTO "Common_Entity_Type" ("_deleted", "egcs_cn_type", "egcs_cn_label_en"
 INSERT INTO "Common_Entity_Type" ("_deleted", "egcs_cn_type", "egcs_cn_label_en", "egcs_cn_label_fr", "egcs_cn_localtype", "egcs_cn_ownerkind", "egcs_cn_completion", "egcs_cn_riskrating", "egcs_cn_extensionkey", "egcs_cn_assignmentmode", "egcs_cn_standardworkflow", "egcs_cn_approvalsubmission", "egcs_cn_supportsdirectreviews") VALUES (false, 'commonreview', 'Common Review', 'Examen commun', 'commonreview', 'runtime_source', 'none', 'none', NULL, 'independent', 'none', 'none', false);
 
 INSERT INTO "Common_Entity_Type" ("_deleted", "egcs_cn_type", "egcs_cn_label_en", "egcs_cn_label_fr", "egcs_cn_localtype", "egcs_cn_ownerkind", "egcs_cn_completion", "egcs_cn_riskrating", "egcs_cn_extensionkey", "egcs_cn_assignmentmode", "egcs_cn_standardworkflow", "egcs_cn_approvalsubmission", "egcs_cn_supportsdirectreviews") VALUES (false, 'commonrecommendation', 'Common Recommendation', 'Recommandation commune', 'commonrecommendation', 'runtime_source', 'none', 'none', NULL, 'independent', 'none', 'none', false);
+
+INSERT INTO "Common_Entity_Type" ("_deleted", "egcs_cn_type", "egcs_cn_label_en", "egcs_cn_label_fr", "egcs_cn_localtype", "egcs_cn_ownerkind", "egcs_cn_completion", "egcs_cn_riskrating", "egcs_cn_extensionkey", "egcs_cn_assignmentmode", "egcs_cn_standardworkflow", "egcs_cn_approvalsubmission", "egcs_cn_supportsdirectreviews") VALUES (false, 'commondatacollection', 'Data Collection', 'Collecte de données', 'commondatacollection', 'runtime_source', 'none', 'none', NULL, 'independent', 'none', 'none', false);
 
 INSERT INTO "Common_Entity_Type" ("_deleted", "egcs_cn_type", "egcs_cn_label_en", "egcs_cn_label_fr", "egcs_cn_localtype", "egcs_cn_ownerkind", "egcs_cn_completion", "egcs_cn_riskrating", "egcs_cn_extensionkey", "egcs_cn_assignmentmode", "egcs_cn_standardworkflow", "egcs_cn_approvalsubmission", "egcs_cn_supportsdirectreviews") VALUES (false, 'fundingcaseagreementclaim', 'Agreement Claim', 'Réclamation d’entente', 'fundingcaseagreementclaim', 'agreement', 'supported', 'none', NULL, 'independent', 'explicit', 'on_completion', true);
 
@@ -2139,6 +2196,11 @@ AS $function$
           WHERE recommendation.id = target_id AND recommendation._deleted = false
             AND recommendation.egcs_cn_group IS NOT NULL AND recommendation.egcs_cn_groupclaimedby IS NULL)
         INTO has_pending_group;
+      ELSIF target_type = 'commondatacollection' THEN
+        SELECT EXISTS (SELECT 1 FROM "Common_Data_Collection" collection
+          WHERE collection.id = target_id AND collection._deleted = false
+            AND collection.egcs_cn_group IS NOT NULL AND collection.egcs_cn_groupclaimedby IS NULL)
+        INTO has_pending_group;
       ELSIF target_type = 'fundingcaseintake' THEN
         SELECT EXISTS (SELECT 1 FROM "Funding_Case_Intake_Profile" intake
           WHERE intake.id = target_id AND intake._deleted = false
@@ -2331,10 +2393,11 @@ AS $function$
           JOIN "Common_Review" review ON review.id = checklist.egcs_cn_review
           JOIN "Common_Runtime_Item" item ON item.id = review.egcs_cn_runtimeitem
           WHERE checklist.id = evidence_row.egcs_cn_checklist;
-      ELSIF TG_TABLE_NAME = 'Common_Recommendation' THEN
+      ELSIF TG_TABLE_NAME IN ('Common_Recommendation', 'Common_Data_Collection') THEN
         SELECT item.egcs_cn_state INTO runtime_state FROM "Common_Runtime_Item" item WHERE item.id = evidence_row.egcs_cn_runtimeitem;
       END IF;
-      IF runtime_state IN ('succeeded', 'approved', 'unsuccessful', 'denied', 'cancelled', 'failed') THEN
+      IF runtime_state IN ('succeeded', 'approved', 'unsuccessful', 'denied', 'cancelled', 'failed')
+        OR (TG_TABLE_NAME = 'Common_Data_Collection' AND runtime_state = 'awaiting_action') THEN
         RAISE EXCEPTION 'Terminal runtime evidence is immutable'
           USING ERRCODE = '23514', CONSTRAINT = 'cn_chk_terminalruntimeevidenceimmutable';
       END IF;
@@ -2878,6 +2941,17 @@ AS $function$
           AND item.egcs_cn_parentruntimeitem IS NULL AND item.egcs_cn_publication = NEW.egcs_cn_recommendationsetsetup
           AND (runtime.egcs_cn_entitytype, runtime.egcs_cn_entityid) = (NEW.egcs_cn_entitytype, NEW.egcs_cn_entityid)
           AND runtime.egcs_cn_kind = 'workflow';
+      ELSIF TG_TABLE_NAME = 'Common_Data_Collection' THEN
+        SELECT true INTO valid FROM "Common_Runtime_Item" item JOIN "Common_Runtime" runtime ON runtime.id = item.egcs_cn_runtime
+        WHERE item.id = NEW.egcs_cn_runtimeitem AND item.egcs_cn_kind = 'data_collection'
+          AND item.egcs_cn_parentruntimeitem IS NULL AND item.egcs_cn_publication = NEW.egcs_cn_datacollectionsetup
+          AND (runtime.egcs_cn_entitytype, runtime.egcs_cn_entityid) = (NEW.egcs_cn_entitytype, NEW.egcs_cn_entityid)
+          AND runtime.egcs_cn_kind = 'workflow'
+          AND (NEW.egcs_cn_group IS NULL OR EXISTS (
+            SELECT 1 FROM "Common_Group" group_owner
+            JOIN "Common_Data_Collection_Setup" setup ON setup.id = NEW.egcs_cn_datacollectionsetup
+            WHERE group_owner.id = NEW.egcs_cn_group AND group_owner.egcs_cn_agency = setup.egcs_cn_agency
+              AND NOT group_owner._deleted));
       ELSIF TG_TABLE_NAME = 'Common_Recommendation' THEN
         SELECT true INTO valid FROM "Common_Runtime_Item" item
         JOIN "Common_Recommendation_Set" runtime_set ON runtime_set.id = NEW.egcs_cn_recommendationset
@@ -3048,7 +3122,8 @@ AS $function$
       IF NEW.egcs_cn_parentversion = NEW.egcs_cn_publicationversion OR NOT (
         (parent_kind = 'review_set_setup' AND NEW.egcs_cn_kind IN ('review_schema', 'approval_template'))
         OR (parent_kind = 'recommendation_set_setup' AND NEW.egcs_cn_kind IN ('recommendation_schema', 'approval_template'))
-        OR (parent_kind = 'workflow_setup' AND NEW.egcs_cn_kind IN ('review_set_setup', 'recommendation_set_setup', 'approval_template'))
+        OR (parent_kind = 'data_collection_setup' AND NEW.egcs_cn_kind = 'approval_template')
+        OR (parent_kind = 'workflow_setup' AND NEW.egcs_cn_kind IN ('review_set_setup', 'recommendation_set_setup', 'data_collection_setup', 'approval_template'))
       ) THEN
         RAISE EXCEPTION 'Publication version reference kind graph is invalid'
           USING ERRCODE = '23514', CONSTRAINT = 'cn_chk_publicationversionreferencekind';
@@ -3056,6 +3131,37 @@ AS $function$
       RETURN NEW;
     END;
     $function$;
+
+CREATE FUNCTION trg_fn_lock_data_collection_identity()
+ RETURNS trigger LANGUAGE plpgsql AS $function$
+    BEGIN
+      IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'Workflow-created collection entries are retained' USING ERRCODE = '23514', CONSTRAINT = 'cn_chk_datacollectionretained';
+      END IF;
+      IF (NEW.id, NEW.egcs_cn_datacollectionsetup, NEW.egcs_cn_entitytype, NEW.egcs_cn_entityid, NEW.egcs_cn_runtimeitem, NEW.egcs_cn_group, NEW._deleted)
+        IS DISTINCT FROM (OLD.id, OLD.egcs_cn_datacollectionsetup, OLD.egcs_cn_entitytype, OLD.egcs_cn_entityid, OLD.egcs_cn_runtimeitem, OLD.egcs_cn_group, OLD._deleted) THEN
+        RAISE EXCEPTION 'Data Collection identity and source pins are immutable' USING ERRCODE = '23514', CONSTRAINT = 'cn_chk_datacollectionidentityimmutable';
+      END IF;
+      RETURN NEW;
+    END $function$;
+
+CREATE FUNCTION trg_fn_protect_data_collection_roster()
+ RETURNS trigger LANGUAGE plpgsql AS $function$
+    DECLARE target_id bigint; target_type varchar(128); item_state varchar(32);
+    BEGIN
+      target_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.egcs_cn_entityid ELSE NEW.egcs_cn_entityid END;
+      target_type := CASE WHEN TG_OP = 'DELETE' THEN OLD.egcs_cn_entitytype ELSE NEW.egcs_cn_entitytype END;
+      IF target_type = 'commondatacollection' THEN
+        SELECT item.egcs_cn_state INTO item_state FROM "Common_Data_Collection" collection
+        JOIN "Common_Runtime_Item" item ON item.id = collection.egcs_cn_runtimeitem
+        WHERE collection.id = target_id FOR UPDATE OF collection, item;
+        IF item_state NOT IN ('pending', 'active', 'paused') THEN
+          RAISE EXCEPTION 'Data Collection roster is frozen' USING ERRCODE = '23514', CONSTRAINT = 'cn_chk_datacollectionrosterfrozen';
+        END IF;
+      END IF;
+      IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
+      RETURN NEW;
+    END $function$;
 
 CREATE FUNCTION trg_fn_validate_recommendation_runtime_member()
  RETURNS trigger
@@ -3194,7 +3300,7 @@ AS $function$
       END IF;
       IF NEW.egcs_cn_parentruntimeitem IS NULL THEN
         hierarchy_valid :=
-          (runtime_row.egcs_cn_kind = 'workflow' AND NEW.egcs_cn_kind IN ('review_set', 'recommendation_set', 'routing_slip'))
+          (runtime_row.egcs_cn_kind = 'workflow' AND NEW.egcs_cn_kind IN ('review_set', 'recommendation_set', 'data_collection', 'routing_slip'))
           OR (runtime_row.egcs_cn_kind = 'review_set' AND NEW.egcs_cn_kind = 'review_set');
         reference_valid := NEW.egcs_cn_publicationversion = runtime_row.egcs_cn_sourcepublicationversion
           OR EXISTS (
@@ -3205,6 +3311,7 @@ AS $function$
               AND reference.egcs_cn_path = CASE NEW.egcs_cn_kind
                 WHEN 'review_set' THEN 'members.review_set'
                 WHEN 'recommendation_set' THEN 'members.recommendation_set'
+                WHEN 'data_collection' THEN 'members.data_collection'
                 WHEN 'routing_slip' THEN 'members.approval_template'
               END
               AND reference.egcs_cn_order = NEW.egcs_cn_order
@@ -3222,6 +3329,7 @@ AS $function$
           OR (parent_row.egcs_cn_kind = 'review' AND NEW.egcs_cn_kind = 'routing_slip')
           OR (parent_row.egcs_cn_kind = 'recommendation_set' AND NEW.egcs_cn_kind IN ('recommendation', 'routing_slip'))
           OR (parent_row.egcs_cn_kind = 'recommendation' AND NEW.egcs_cn_kind = 'routing_slip')
+          OR (parent_row.egcs_cn_kind = 'data_collection' AND NEW.egcs_cn_kind = 'routing_slip')
           OR (parent_row.egcs_cn_kind = 'routing_slip' AND NEW.egcs_cn_kind = 'approval_step');
         reference_valid := (
           parent_row.egcs_cn_kind = 'routing_slip'
@@ -3236,6 +3344,8 @@ AS $function$
                 AND reference.egcs_cn_path = 'members.schema' AND reference.egcs_cn_order = NEW.egcs_cn_order)
               OR (parent_row.egcs_cn_kind = 'recommendation_set' AND NEW.egcs_cn_kind = 'recommendation'
                 AND reference.egcs_cn_path = 'members.schema' AND reference.egcs_cn_order = NEW.egcs_cn_order)
+              OR (parent_row.egcs_cn_kind = 'data_collection' AND NEW.egcs_cn_kind = 'routing_slip'
+                AND reference.egcs_cn_path = 'approval' AND reference.egcs_cn_order IS NULL)
               OR (parent_row.egcs_cn_kind IN ('review_set', 'recommendation_set') AND NEW.egcs_cn_kind = 'routing_slip'
                 AND reference.egcs_cn_path = 'finalApproval' AND reference.egcs_cn_order IS NULL)
             )
@@ -3278,6 +3388,7 @@ AS $function$
         OR (NEW.egcs_cn_kind = 'review' AND NEW.egcs_cn_publicationkind = 'review_schema')
         OR (NEW.egcs_cn_kind = 'recommendation_set' AND NEW.egcs_cn_publicationkind = 'recommendation_set_setup')
         OR (NEW.egcs_cn_kind = 'recommendation' AND NEW.egcs_cn_publicationkind = 'recommendation_schema')
+        OR (NEW.egcs_cn_kind = 'data_collection' AND NEW.egcs_cn_publicationkind = 'data_collection_setup')
         OR (NEW.egcs_cn_kind IN ('routing_slip', 'approval_step') AND NEW.egcs_cn_publicationkind = 'approval_template')
       ) THEN
         RAISE EXCEPTION 'Runtime item kind is incompatible with its publication kind'
@@ -3383,6 +3494,10 @@ AS $function$
           WHERE nested.id = NEW.egcs_cn_recommendationsetup AND nested.egcs_cn_recommendationset = workflow_member.egcs_cn_recommendationset AND nested._deleted = false
         )
       ) THEN RAISE EXCEPTION 'Workflow recommendation owner mapping does not belong to the configured set'; END IF;
+      IF NEW.egcs_cn_datacollection IS NOT NULL AND (
+        workflow_member.egcs_cn_kind <> 'data_collection'
+        OR NEW.egcs_cn_datacollection IS DISTINCT FROM workflow_member.egcs_cn_datacollection
+      ) THEN RAISE EXCEPTION 'Workflow collection owner mapping does not belong to the configured collection'; END IF;
       RETURN NEW;
     END;
     $function$;
@@ -3504,6 +3619,13 @@ AS $function$
           AND EXISTS (SELECT 1 FROM "Common_Publication" publication
             WHERE publication.id = candidate.id AND publication.egcs_cn_state = 'published' AND publication._deleted = false)
       ) THEN RAISE EXCEPTION 'Workflow recommendation set scope mismatch'; END IF;
+      IF NEW.egcs_cn_datacollection IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM "Common_Data_Collection_Setup" candidate
+        WHERE candidate.id = NEW.egcs_cn_datacollection AND candidate.egcs_cn_agency = workflow.egcs_cn_agency
+          AND candidate._deleted = false
+          AND EXISTS (SELECT 1 FROM "Common_Publication" publication
+            WHERE publication.id = candidate.id AND publication.egcs_cn_state = 'published' AND publication._deleted = false)
+      ) THEN RAISE EXCEPTION 'Workflow Data Collection scope mismatch'; END IF;
       IF NEW.egcs_cn_approvaltemplate IS NOT NULL AND NOT EXISTS (
         SELECT 1 FROM "Common_Approval_Template" candidate
         WHERE candidate.id = NEW.egcs_cn_approvaltemplate AND candidate.egcs_cn_agency = workflow.egcs_cn_agency
@@ -3657,7 +3779,7 @@ AS $function$
           RAISE EXCEPTION 'Review Schema must belong to the Review Set Agency'
             USING ERRCODE = '23514', CONSTRAINT = 'cn_ref_reviewsetupagency';
         END IF;
-      ELSIF TG_TABLE_NAME = 'Common_Recommendation_Set_Setup' THEN
+      ELSIF TG_TABLE_NAME IN ('Common_Recommendation_Set_Setup', 'Common_Data_Collection_Setup') THEN
         owner_agency := NEW.egcs_cn_agency;
       ELSIF TG_TABLE_NAME = 'Common_Recommendation_Setup' THEN
         SELECT egcs_cn_agency INTO owner_agency
@@ -3938,6 +4060,19 @@ ALTER TABLE "Common_Publication_Version" ADD CONSTRAINT "Common_Publication_Vers
 ALTER TABLE "Common_Publication_Version_Reference" ADD CONSTRAINT "cn_ref_publicationversionreference" FOREIGN KEY (egcs_cn_publicationversion, egcs_cn_publication, egcs_cn_kind, egcs_cn_version) REFERENCES "Common_Publication_Version"(id, egcs_cn_publication, egcs_cn_kind, egcs_cn_version) ON DELETE RESTRICT;
 
 ALTER TABLE "Common_Publication_Version_Reference" ADD CONSTRAINT "Common_Publication_Version_Reference_egcs_cn_parentversion_fkey" FOREIGN KEY (egcs_cn_parentversion) REFERENCES "Common_Publication_Version"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Common_Data_Collection_Setup" ADD CONSTRAINT cn_ref_datacollectionsetuppublication FOREIGN KEY (id, egcs_cn_publicationkind) REFERENCES "Common_Publication"(id, egcs_cn_kind) ON DELETE RESTRICT;
+ALTER TABLE "Common_Data_Collection_Setup" ADD CONSTRAINT cn_ref_datacollectionsetupagency FOREIGN KEY (egcs_cn_agency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Common_Data_Collection_Setup" ADD CONSTRAINT cn_ref_datacollectionsetupapproval FOREIGN KEY (egcs_cn_approvaltemplate) REFERENCES "Common_Approval_Template"(id) ON DELETE RESTRICT;
+ALTER TABLE "Common_Data_Collection" ADD CONSTRAINT cn_ref_datacollectionidentity FOREIGN KEY (id) REFERENCES "Common_Entity"(id) ON DELETE RESTRICT;
+ALTER TABLE "Common_Data_Collection" ADD CONSTRAINT cn_ref_datacollectionsource FOREIGN KEY (egcs_cn_entityid, egcs_cn_entitytype) REFERENCES "Common_Entity"(id, egcs_cn_entitytype) ON DELETE RESTRICT;
+ALTER TABLE "Common_Data_Collection" ADD CONSTRAINT cn_ref_datacollectionsetup FOREIGN KEY (egcs_cn_datacollectionsetup) REFERENCES "Common_Data_Collection_Setup"(id) ON DELETE RESTRICT;
+ALTER TABLE "Common_Data_Collection" ADD CONSTRAINT cn_ref_datacollectionruntimeitem FOREIGN KEY (egcs_cn_runtimeitem) REFERENCES "Common_Runtime_Item"(id) ON DELETE RESTRICT;
+ALTER TABLE "Common_Data_Collection" ADD CONSTRAINT cn_ref_datacollectiongroup FOREIGN KEY (egcs_cn_group) REFERENCES "Common_Group"(id) ON DELETE RESTRICT;
+ALTER TABLE "Common_Data_Collection" ADD CONSTRAINT cn_ref_datacollectionclaimedby FOREIGN KEY (egcs_cn_groupclaimedby) REFERENCES "Common_User"(id) ON DELETE RESTRICT;
+ALTER TABLE "Common_Workflow_Setup_Member" ADD CONSTRAINT cn_ref_workflowmembercollection FOREIGN KEY (egcs_cn_datacollection) REFERENCES "Common_Data_Collection_Setup"(id) ON DELETE RESTRICT;
+ALTER TABLE "Common_Workflow_Setup_Member_Owner" ADD CONSTRAINT cn_ref_workflowownercollection FOREIGN KEY (egcs_cn_datacollection) REFERENCES "Common_Data_Collection_Setup"(id) ON DELETE RESTRICT;
+ALTER TABLE "Common_Workflow_Owner_Blocker" ADD CONSTRAINT cn_ref_workflowblockercollection FOREIGN KEY (egcs_cn_datacollection) REFERENCES "Common_Data_Collection_Setup"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Common_Recommendation" ADD CONSTRAINT "Common_Recommendation_egcs_cn_group_fkey" FOREIGN KEY (egcs_cn_group) REFERENCES "Common_Group"(id) ON DELETE RESTRICT;
 
@@ -4251,6 +4386,17 @@ CREATE TRIGGER trg_lock_publication_version_reference BEFORE DELETE OR UPDATE ON
 CREATE TRIGGER trg_require_unsealed_publication_reference BEFORE INSERT ON "Common_Publication_Version_Reference" FOR EACH ROW EXECUTE FUNCTION trg_fn_require_unsealed_publication_version('reference');
 
 CREATE TRIGGER trg_validate_publication_version_reference BEFORE INSERT ON "Common_Publication_Version_Reference" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_publication_version_reference();
+
+CREATE TRIGGER trg_register_commondatacollection BEFORE INSERT ON "Common_Data_Collection" FOR EACH ROW EXECUTE FUNCTION register_entity('commondatacollection');
+CREATE CONSTRAINT TRIGGER trg_enforce_commondatacollection_assignment_roster AFTER INSERT OR UPDATE OF egcs_cn_group, egcs_cn_groupclaimedby, _deleted ON "Common_Data_Collection" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_enforce_assignable_entity_roster('commondatacollection');
+CREATE TRIGGER trg_lock_terminal_datacollection BEFORE INSERT OR DELETE OR UPDATE ON "Common_Data_Collection" FOR EACH ROW EXECUTE FUNCTION trg_fn_lock_terminal_runtime_evidence();
+CREATE TRIGGER trg_lock_datacollection_identity BEFORE DELETE OR UPDATE ON "Common_Data_Collection" FOR EACH ROW EXECUTE FUNCTION trg_fn_lock_data_collection_identity();
+CREATE TRIGGER trg_validate_datacollection_runtime BEFORE INSERT OR UPDATE ON "Common_Data_Collection" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_domain_runtime_extension();
+CREATE TRIGGER trg_protect_datacollection_roster BEFORE INSERT OR DELETE OR UPDATE ON "Common_Entity_Assignment" FOR EACH ROW EXECUTE FUNCTION trg_fn_protect_data_collection_roster();
+CREATE TRIGGER prevent_catalog_agency_change BEFORE UPDATE OF egcs_cn_agency ON "Common_Data_Collection_Setup" FOR EACH ROW EXECUTE FUNCTION prevent_catalog_agency_change();
+CREATE TRIGGER trg_guard_publication_authoring BEFORE DELETE OR UPDATE ON "Common_Data_Collection_Setup" FOR EACH ROW EXECUTE FUNCTION trg_fn_guard_publication_authoring('publication');
+CREATE TRIGGER trg_register_datacollectionsetup_publication BEFORE INSERT ON "Common_Data_Collection_Setup" FOR EACH ROW EXECUTE FUNCTION trg_fn_register_publication('data_collection_setup');
+CREATE TRIGGER validate_catalog_nested_agency BEFORE INSERT OR UPDATE ON "Common_Data_Collection_Setup" FOR EACH ROW EXECUTE FUNCTION validate_catalog_nested_agency();
 
 CREATE CONSTRAINT TRIGGER trg_enforce_commonrecommendation_assignment_roster AFTER INSERT OR UPDATE OF egcs_cn_group, egcs_cn_groupclaimedby, _deleted ON "Common_Recommendation" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_enforce_assignable_entity_roster('commonrecommendation');
 

@@ -2,13 +2,14 @@
 import type { Kysely } from 'kysely'
 import type { AssignableEntityType, Database } from '~~/shared/types/database'
 import type { AbilityAction } from '~~/shared/utils/abilities'
+import { isRuntimeAssignableEntityType } from '~~/shared/utils/entity-assignments'
 import type { AuthContext } from './authorize'
 import { resolveAgreementScopeContext } from './agreement'
 
 export const resolveCreditMemoAuthorityTarget = async (db: Kysely<Database>, entityType: AssignableEntityType, entityId: string) => {
   const visited = new Set<string>()
   let current = { entityType, entityId }
-  while (current.entityType === 'commonreview' || current.entityType === 'commonrecommendation') {
+  while (isRuntimeAssignableEntityType(current.entityType)) {
     const { resolveEntityAssignmentSourceTarget } = await import('./entity-assignment')
     const key = `${current.entityType}:${current.entityId}`
     if (visited.has(key)) return null

@@ -6,7 +6,7 @@ This configuration manages the existing **GCS Demo / demo** environment:
   populated, otherwise GitHub `GCS-SSC/gcs-ssc` branch `main` and the canonical Dockerfile.
 - Database: existing `GCS DB` service (PostgreSQL 18), with the application's existing `DATABASE_URL` preserved.
 - Domain: https://gcs-ssc-demo.up.railway.app, retained by Railway on the existing service.
-- Volumes: existing `gcs-ssc-volume` at `/app/.data` and `gcs-db-volume-release-reset` on `GCS DB`, each 5000 MB. The current release clean cutover replaces and deletes `gcs-db-volume-ncia-reset`; no unused GCS database volumes remain.
+- Volumes: existing `gcs-ssc-volume` at `/app/.data` and `gcs-db-volume-ar-paid-reset` on `GCS DB`, each 5000 MB. The current release clean cutover replaces and deletes `gcs-db-volume-release-reset`; no unused GCS database volumes remain.
 - Metabase, `Metabase DB`, and their `postgres-volume-4aPn` are included so an IaC apply preserves them.
 - Portal: `gcs-ssc-portal` uses a pinned public GHCR digest from `deployment/portal-demo-image.json` and its own `Portal DB` PostgreSQL service and `portal-db-volume`. It shares this project, not a database, with GCS and Metabase.
 - Canvas groups: `Metabase`, `GCS`, and `Portal` each contain the corresponding app and PostgreSQL service.
@@ -41,9 +41,12 @@ has been cleared; `railway.json` remains only for legacy deployments elsewhere.
 Do not run `config pull --force` or `config migrate --force` unless you intend
 to replace this file.
 
-After the September 2026 rollout, Railway's IaC readback still proposes the two
-database volume attachments and the Portal `DATABASE_URL` reference on repeat
-plans. The live services have the intended volumes and database URL; repeating
+Railway CLI 5.54.1 loses database attachments when converting live UUID mounts
+into its IaC graph. The Portal's existing database attachment therefore remains
+outside attachment reconciliation; its volume stays declared and its app
+`DATABASE_URL` uses `preserve()`. A GCS release plan must contain no Portal or
+Metabase changes. Check live storage independently of the plan.
+
 `config apply` reports no change to those resources. Check the live service and
 volume state before treating these readback entries as drift.
 
@@ -59,19 +62,27 @@ redeploys the most recent deployment. Committing an IaC file alone does not run
 
 Publish and verify the current main commit with `publish-demo-image.yml`, then
 promote its immutable digest in `deployment/demo-image.json`. The image smoke
-check verifies `9999_seed`, Agency 21, eleven agreements, completed Payments 168/172, and file
-persistence across container replacement.
+check verifies `9999_seed`, Agency 21, eleven agreements, successful terminal
+Payments 168/172, and file persistence across container replacement. Seeded claim reconciliations no longer
+need the final flag for receivable creation; seeded payment workflows must end in
+the owning agency's successful terminal payment status.
 
 Stop the existing `gcs-ssc` deployment before changing the database storage.
-Apply the reviewed IaC plan to create `gcs-db-volume-release-reset`, attach it to
+Stop `GCS DB` and explicitly detach `gcs-db-volume-release-reset` before applying;
+the planner's missing former attachment does not prove that it will detach it.
+Verify the former volume's `serviceId` is null. Apply the reviewed IaC plan to create `gcs-db-volume-ar-paid-reset`, attach it to
 `GCS DB`, and deploy the promoted image. Verify the live volume attachment:
 Railway's plan readback can omit the former database attachment. Once the former
-`gcs-db-volume-ncia-reset` is detached, delete that exact volume to finish the
-authorized wipe. Omission from the authoring graph alone may retain unused volumes.
+`gcs-db-volume-release-reset` (volume ID `2d0716ea-29c4-4675-afc6-78bc545b4058`)
+is detached, delete that exact volume to finish the authorized wipe. Do not delete
+the application attachment volume, Portal volume, or Metabase volume. Omission
+from the authoring graph alone may retain unused volumes.
 
 Wait for the app deployment to reach `SUCCESS` and verify public health, demo
-login, NCIA's eleven agreements, and completed Payments 168/172. The application file
-volume, Portal, and Metabase remain outside this cutover. Future schema changes
+login, NCIA's eleven agreements, and successful terminal Payments 168/172. Verify
+claim-based receivable creation from an approved reconciliation without the final
+flag and unspent-advance receivable creation from a paid advance. The application
+file volume, Portal, and Metabase remain outside this cutover. Future schema changes
 need another explicitly authorized clean database cutover; ordinary redeploys
 reuse the configured volume and do not reset it.
 

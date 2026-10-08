@@ -50,6 +50,8 @@ import {
   createRuntimeRecommendationSetInTransaction,
   getPinnedRuntimeRecommendationSetAgencyId
 } from './recommendation-runtime'
+import { createRuntimeDataCollectionInTransaction } from './data-collection-runtime'
+import { readPublishedDataCollectionSetup } from './data-collection-setup-versioning'
 import { readPublishedRecommendationSchema } from './recommendation-setup-versioning'
 import {
   getReviewRuntimeOwnerAgencyId,
@@ -1058,6 +1060,7 @@ const pauseForInvalidOwners = async (
       egcs_cn_workflowsetupmember: member.memberId,
       egcs_cn_reviewsetup: member.kind === 'review_set' ? nestedMemberId : null,
       egcs_cn_recommendationsetup: member.kind === 'recommendation_set' ? nestedMemberId : null,
+      egcs_cn_datacollection: member.kind === 'data_collection' ? nestedMemberId : null,
       egcs_cn_configuredowner: ownerByMember.get(nestedMemberId) ?? null,
       egcs_cn_reason: 'owner_ineligible',
       egcs_cn_triggeredby: actorId ?? null,
@@ -1156,6 +1159,34 @@ const materializeWorkflowMember = async (
         result = created && created !== 'IN_PROGRESS_EXISTS'
           ? { kind: 'materialized', runtimeItemId: String(created.runtimeItemId) }
           : { kind: 'failed' }
+      }
+    }
+  } else if (member.kind === 'data_collection') {
+    const plan = member.dataCollectionPlan
+    const ownerAgencyId = context.entityType === 'applicantrecipient'
+      ? plan?.agencyId ?? null
+      : getReviewRuntimeOwnerAgencyId(context)
+    if (!plan || !ownerAgencyId) result = { kind: 'failed' }
+    else {
+      const owners = await pauseForInvalidOwners(trx, run, member, [member.referenceId], actorId, ownerAgencyId)
+      if (!owners) result = { kind: 'paused' }
+      else {
+        const created = await createRuntimeDataCollectionInTransaction({
+          db: trx,
+          dataCollectionSetupId: member.referenceId,
+          entityType: context.entityType,
+          entityId: context.entityId,
+          creatorCommonUserId: String(run.egcs_cn_initiatedby),
+          defaultOwnerId: owners.users.get(member.referenceId),
+          defaultGroupId: owners.groups.get(member.referenceId),
+          ownerAgencyId,
+          publication: plan,
+          publicationVersionId: member.publicationVersionId,
+          publicationVersion: member.publicationVersion,
+          runtimeId: String(run.id),
+          runtimeItemOrder: member.sequence
+        })
+        result = created ? { kind: 'materialized', runtimeItemId: String(created.runtimeItemId) } : { kind: 'failed' }
       }
     }
   } else if (!member.approval) result = { kind: 'failed' }
@@ -1496,6 +1527,7 @@ const findMemberForItem = (configuration: PublishedWorkflowConfiguration, item: 
   && member.referenceId === String(item.egcs_cn_publication)
   && ((member.kind === 'review_set' && item.egcs_cn_kind === 'review_set')
     || (member.kind === 'recommendation_set' && item.egcs_cn_kind === 'recommendation_set')
+    || (member.kind === 'data_collection' && item.egcs_cn_kind === 'data_collection')
     || (member.kind === 'approval_template' && item.egcs_cn_kind === 'routing_slip')))
 
 const positiveWorkflowState = async (trx: Transaction<Database>, runtimeId: string): Promise<'succeeded' | 'approved'> => {
@@ -1659,7 +1691,7 @@ export const resumeWorkflowRun = async (
   const now = new Date()
   for (const blocker of blockers) {
     const replacement = replacementByBlocker.get(String(blocker.id))!
-    const nestedMemberId = String(blocker.egcs_cn_reviewsetup ?? blocker.egcs_cn_recommendationsetup)
+    const nestedMemberId = String(blocker.egcs_cn_reviewsetup ?? blocker.egcs_cn_recommendationsetup ?? blocker.egcs_cn_datacollection)
     effectiveOwners.set(nestedMemberId, { nestedMemberId, defaultOwner: replacement })
     await trx.updateTable('Common_Workflow_Owner_Blocker').set({
       egcs_cn_replacementowner: replacement,
@@ -1720,6 +1752,29 @@ export const advanceWorkflowAfterReviewSet = async (
     .executeTakeFirst()
   return row?.runtimeKind === 'workflow' && RUNTIME_TERMINAL_STATES.has(row.runtimeState)
     ? await advanceWorkflowItem(trx, String(row.runtimeItemId), actorId)
+    : null
+}
+
+/**
+ * Advances a workflow after its independently assigned collection reaches a terminal state.
+ * @param trx Locked workflow transaction.
+ * @param dataCollectionRuntimeItemId Exact collection runtime item.
+ * @param actorId User responsible for the terminal transition.
+ * @returns The resulting workflow advancement.
+ */
+export const advanceWorkflowAfterDataCollection = async (
+  trx: Transaction<Database>,
+  dataCollectionRuntimeItemId: string,
+  actorId?: string
+) => {
+  const row = await trx.selectFrom('Common_Runtime_Item')
+    .innerJoin('Common_Runtime', 'Common_Runtime.id', 'Common_Runtime_Item.egcs_cn_runtime')
+    .select(['Common_Runtime_Item.egcs_cn_state as state', 'Common_Runtime.egcs_cn_kind as runtimeKind'])
+    .where('Common_Runtime_Item.id', '=', dataCollectionRuntimeItemId)
+    .where('Common_Runtime_Item.egcs_cn_kind', '=', 'data_collection')
+    .where('Common_Runtime_Item._deleted', '=', false).executeTakeFirst()
+  return row?.runtimeKind === 'workflow' && RUNTIME_TERMINAL_STATES.has(row.state)
+    ? await advanceWorkflowItem(trx, dataCollectionRuntimeItemId, actorId)
     : null
 }
 
@@ -1791,6 +1846,14 @@ export const advanceApprovalInTransaction = async (
     const { advanceRecommendationRuntimeAfterTerminalItem } = await import('./recommendation-runtime')
     await advanceRecommendationRuntimeAfterTerminalItem(trx, String(recommendation.id), actorId)
     return await advanceWorkflowAfterRecommendationSet(trx, String(recommendation.egcs_cn_recommendationset), actorId)
+  }
+  if (parent.egcs_cn_kind === 'data_collection') {
+    const collection = await trx.selectFrom('Common_Data_Collection').select('id')
+      .where('egcs_cn_runtimeitem', '=', String(parent.id)).where('_deleted', '=', false).executeTakeFirst()
+    if (!collection) return null
+    const { advanceDataCollectionRuntimeAfterTerminalItem } = await import('./data-collection-runtime')
+    await advanceDataCollectionRuntimeAfterTerminalItem(trx, String(collection.id), actorId)
+    return await advanceWorkflowAfterDataCollection(trx, String(parent.id), actorId)
   }
   if (parent.egcs_cn_kind === 'review') {
     const review = await trx.selectFrom('Common_Review').select(['id', 'egcs_cn_reviewset'])
@@ -1894,6 +1957,19 @@ const getWorkflowRuntimeInSnapshot = async (
     .where('Common_Recommendation._deleted', '=', false)
     .orderBy('Recommendation_Item.egcs_cn_order', 'asc')
     .execute()
+  const dataCollectionRows = await db.selectFrom('Common_Data_Collection')
+    .innerJoin('Common_Runtime_Item as Collection_Item', 'Collection_Item.id', 'Common_Data_Collection.egcs_cn_runtimeitem')
+    .innerJoin('Common_Publication_Version as Collection_Version', 'Collection_Version.id', 'Collection_Item.egcs_cn_publicationversion')
+    .leftJoin('Common_Runtime_Item as Collection_Routing', join => join
+      .onRef('Collection_Routing.egcs_cn_parentruntimeitem', '=', 'Collection_Item.id')
+      .on('Collection_Routing.egcs_cn_kind', '=', 'routing_slip').on('Collection_Routing._deleted', '=', false))
+    .leftJoin('Common_Routing_Slip as Collection_Slip', 'Collection_Slip.egcs_cn_runtimeitem', 'Collection_Routing.id')
+    .selectAll('Common_Data_Collection')
+    .select(['Collection_Item.id as runtimeItemId', 'Collection_Item.egcs_cn_state as runtimeState',
+      'Collection_Item.egcs_cn_order as workflowMemberOrder', 'Collection_Version.egcs_cn_definition as publicationDefinition',
+      'Collection_Slip.id as routingSlipId'])
+    .where('Collection_Item.egcs_cn_runtime', '=', String(selected.id))
+    .where('Common_Data_Collection._deleted', '=', false).orderBy('Collection_Item.egcs_cn_order').execute()
   const reviewSets = await db.selectFrom('Common_Review_Set')
     .innerJoin('Common_Runtime_Item', 'Common_Runtime_Item.id', 'Common_Review_Set.egcs_cn_runtimeitem')
     .selectAll('Common_Review_Set')
@@ -2016,6 +2092,14 @@ const getWorkflowRuntimeInSnapshot = async (
       ...recommendation,
       egcs_cn_definition: readPublishedRecommendationSchema(recommendation.egcs_cn_definition).definition
     })),
+    dataCollections: dataCollectionRows.map(row => {
+      const { publicationDefinition, ...collection } = row
+      const published = readPublishedDataCollectionSetup(publicationDefinition)
+      return { ...collection, workflowMemberId: configuration.members.find(member => member.kind === 'data_collection' && member.sequence === Number(collection.workflowMemberOrder))?.memberId,
+        egcs_cn_definition: published.definition,
+        egcs_cn_name_en: published.nameEn, egcs_cn_name_fr: published.nameFr,
+        hasApproval: Boolean(published.approval) }
+    }),
     recommendationSet: recommendationSets[0] ?? null,
     recommendationSets,
     reviewSet: reviewSets[0] ?? null,
@@ -2058,6 +2142,14 @@ const getWorkflowRuntimeInSnapshot = async (
         name_fr: member.schemaNameFr,
         has_approval: Boolean(member.approval),
         fails_set_on_not_recommended: member.failOnNotRecommended
+      })),
+      dataCollections: configuration.members.filter(member => member.dataCollectionPlan).map(member => ({
+        workflowMemberId: member.memberId,
+        ordinal: member.sequence,
+        setup_id: member.referenceId,
+        name_en: member.dataCollectionPlan!.nameEn,
+        name_fr: member.dataCollectionPlan!.nameFr,
+        has_approval: Boolean(member.dataCollectionPlan!.approval)
       })),
       has_final_approval: configuration.members.some(member => member.kind === 'approval_template')
     }

@@ -12,6 +12,7 @@ export const selectWorkflowRoute = (
 export const assertWorkflowRouteRequirements = (route: PublishedWorkflowConfiguration): void => {
   if (!route.members.length) throw new WorkflowRouteValidationError('Workflow route is empty')
   if (route.purpose === 'approval_submission' && !route.members.some(member => member.kind === 'approval_template'
+    || member.dataCollectionPlan?.approval
     || member.recommendationPlan?.finalApproval || member.recommendationPlan?.members.some(candidate => candidate.approval))) {
     throw new WorkflowRouteValidationError('Workflow route requires approval')
   }

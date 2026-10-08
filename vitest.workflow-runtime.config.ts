@@ -52,6 +52,8 @@ export default defineCriticalCoverageProject({
     'tests/unit/assigned-item-detail-routes.test.ts',
     'tests/unit/completion-runtime-routes.test.ts',
     'tests/unit/recommendation-runtime.test.ts',
+    'tests/unit/data-collection-runtime.test.ts',
+    'tests/unit/data-collection-workflow-runtime.test.ts',
     'tests/unit/review-approval-runtime-routes.test.ts',
     'tests/unit/workflow-completion-transition.test.ts',
     'tests/unit/workflow-owner-recovery-routes.test.ts',

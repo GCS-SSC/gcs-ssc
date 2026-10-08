@@ -61,6 +61,7 @@ const PUBLICATION_KIND = {
   reviewSetSetup: 'review_set_setup',
   recommendationSchema: 'recommendation_schema',
   recommendationSetSetup: 'recommendation_set_setup',
+  dataCollectionSetup: 'data_collection_setup',
   workflowSetup: 'workflow_setup'
 } as const
 
@@ -78,6 +79,7 @@ const RUNTIME_ITEM_KIND = {
   review: 'review',
   recommendationSet: 'recommendation_set',
   recommendation: 'recommendation',
+  dataCollection: 'data_collection',
   routingSlip: 'routing_slip',
   approvalStep: 'approval_step'
 } as const

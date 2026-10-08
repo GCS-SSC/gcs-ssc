@@ -150,6 +150,8 @@
     "users": "Users",
     "groups": "Groups",
     "language_toggle": "Switch language",
+    "switch_to_dark_mode": "Switch to dark mode",
+    "switch_to_light_mode": "Switch to light mode",
     "admin_common": "Common",
     "assignment_management": "Assignment",
     "stats": {
@@ -228,7 +230,8 @@
       "amendment": "Amendment",
       "amendment_number": "Amendment #{number}",
       "closeout": "Closeout",
-      "approval": "Approval"
+      "approval": "Approval",
+      "data_collection": "Data Collection"
     }
   },
   "assignments": {
@@ -274,7 +277,8 @@
       "fundingcasejournalvoucher": "Journal Voucher",
       "fundingcasecorrection": "Correction",
       "fundingcaseaccountreceivable": "Accounts receivable",
-      "fundingcaseaccountreceivablecreditmemo": "Credit Memo"
+      "fundingcaseaccountreceivablecreditmemo": "Credit Memo",
+      "commondatacollection": "Data Collection"
     }
   },
   "attachments": {
@@ -537,7 +541,8 @@
       "fundingcasejournalvoucher": "Journal Voucher",
       "fundingcasecorrection": "Correction",
       "fundingcaseaccountreceivable": "Accounts Receivable",
-      "fundingcaseaccountreceivablecreditmemo": "Accounts Receivable Credit Memo"
+      "fundingcaseaccountreceivablecreditmemo": "Accounts Receivable Credit Memo",
+      "commondatacollection": "Data Collection"
     },
     "scope_type": {
       "global": "Global",
@@ -1313,7 +1318,7 @@
       "invalid_subtype": "The selected agreement subtype is invalid.",
       "invalid_applicant_recipient": "The selected proponent is invalid.",
       "duplicate_applicant_recipient": "This proponent is already linked to the Agreement.",
-      "applicant_recipient_in_use": "This Agreement proponent is used by an activity and cannot be changed or removed.",
+      "applicant_recipient_in_use": "This Agreement proponent is referenced by related agreement items and cannot be changed or removed.",
       "invalid_address_type": "The selected address type is invalid.",
       "invalid_activity_outcome": "One or more selected activity outcomes are invalid.",
       "invalid_activity_responsible_party": "One or more selected activity proponents are invalid.",
@@ -1555,6 +1560,11 @@
       "account_required": "Select an accounts receivable account for every nonzero amount before completing this receivable.",
       "monitor_required": "Select a monitor follow-up required by this receivable type.",
       "type_unavailable": "Select an active receivable type configured for this Agreement’s Agency."
+    },
+    "data_collection": {
+      "definition_invalid": "The pinned Data Collection form is invalid.",
+      "response_invalid": "The Data Collection responses are invalid or incomplete.",
+      "revision_conflict": "Newer Data Collection responses have been saved. Reload the saved responses."
     }
   },
   "transfer_payment": {
@@ -2100,16 +2110,16 @@
     "checklist_unknown_question": "Select a question from this checklist",
     "duplicate_response_key": "Use a unique response key",
     "duplicate_semantic_key": "Use a unique language-independent key",
-    "recommendation_unknown_question": "Select a question from this recommendation schema",
+    "recommendation_unknown_question": "Select a question from this form",
     "scoring_matrix_order": "Order scoring thresholds from lowest to highest",
     "checklist_duplicate_key": "Use a unique language independent code",
     "checklist_invalid_count": "Enter a whole number no greater than the number of items in this group",
     "checklist_invalid_rate": "Enter a percentage greater than 0 and no greater than 100",
     "checklist_max_group_depth": "Result groups can be nested up to three levels",
     "checklist_comment_required": "Add the required comment for this checklist answer",
-    "recommendation_section_required": "Add at least one recommendation section",
-    "recommendation_subsection_required": "Add at least one subsection to each recommendation section",
-    "recommendation_question_required": "Add at least one question to each recommendation subsection",
+    "recommendation_section_required": "Add at least one form section",
+    "recommendation_subsection_required": "Add at least one subsection to each form section",
+    "recommendation_question_required": "Add at least one question to each form subsection",
     "recommendation_options_required": "Add at least two radio options",
     "recommendation_duplicate_key": "Use a unique language-independent code",
     "recommendation_exactly_one_result_question": "Mark exactly one deciding question",
@@ -2376,6 +2386,7 @@
     "description_fr_placeholder": "Enter the agreement description in French",
     "applicant_recipients": {
       "type": "Proponent type",
+      "action_unavailable": "This action requires assignment to this Agreement and an Agreement that is open for changes.",
       "not_selected": "Not selected",
       "title": "Proponents",
       "add": "Add Proponent",
@@ -3360,7 +3371,8 @@
     "outcomes": {
       "recommended": "Recommended",
       "not_recommended": "Not recommended"
-    }
+    },
+    "validation_title": "Recommendation is incomplete"
   },
   "recommendation_setup": {
     "activate": "Activate recommendation setup",
@@ -3524,7 +3536,8 @@
       "review_set": "Review set",
       "recommendation_set": "Recommendation set",
       "recommendation": "Recommendation",
-      "approvals": "Approvals"
+      "approvals": "Approvals",
+      "data_collection": "Data Collection"
     },
     "view_step": "View {step}",
     "view": "View",
@@ -3632,7 +3645,10 @@
     "not_configured": "No workflow is configured for this item.",
     "approval_not_configured": "No approval workflow is configured. Completion will proceed without an approval workflow.",
     "risk_rating_required": "Require successful risk rating",
-    "risk_rating_required_help": "After publication, this risk workflow must succeed before Amendment Completion or Agreement Recommendation submission. Existing scores and completed assessments do not satisfy this requirement."
+    "risk_rating_required_help": "After publication, this risk workflow must succeed before Amendment Completion or Agreement Recommendation submission. Existing scores and completed assessments do not satisfy this requirement.",
+    "data_collection": "Data Collection",
+    "open_data_collection": "Open Data Collection",
+    "followed_by_approval": "Approval follows"
   },
   "recommendation_schema": {
     "title": "Recommendation schema",
@@ -4387,7 +4403,45 @@
       "intake": "Intake",
       "program": "Program",
       "stream": "Stream",
-      "agency": "Agency"
+      "agency": "Agency",
+      "commondatacollection": "Data Collection"
     }
+  },
+  "data_collection": {
+    "title": "Data Collection",
+    "catalog_title": "Data Collections",
+    "create": "Add Data Collection",
+    "general": "General settings",
+    "form_sections": "Form sections",
+    "saved": "Data Collection saved.",
+    "published": "Data Collection published.",
+    "retired": "Data Collection retired.",
+    "publish": "Publish Data Collection",
+    "retire": "Retire Data Collection",
+    "validation_title": "Data Collection is incomplete",
+    "detail_title": "Data Collection #{id}",
+    "identifier": "Data Collection #{id}",
+    "locked_description": "This collection is awaiting approval or has reached its final state. Its responses and assignments are read-only.",
+    "responses": "Responses",
+    "saved_success": "Data Collection responses saved.",
+    "submitted_success": "Data Collection submitted.",
+    "load_failed": "Data Collection could not be loaded"
+  },
+  "supplementary_information": {
+    "title": "Supplementary Information",
+    "description": "Read-only data collection responses from the latest successful run of each workflow.",
+    "completed_at": "Completed {date}",
+    "empty": "No Data Collection responses are available from successful workflow runs for this entity.",
+    "no_answer": "No response provided",
+    "question_guidance": "Question guidance",
+    "load_failed": "Supplementary information could not be loaded",
+    "load_failed_description": "Try again to load the successful workflow responses."
+  },
+  "questionnaire": {
+    "required_question_help": "This question must be answered before submitting the form.",
+    "validation_description": "Review the highlighted questions and provide the required responses before submitting.",
+    "revision_conflict": "Newer responses have been saved",
+    "revision_conflict_description": "Your answers are preserved here. Copy any changes you need before reloading the latest saved responses.",
+    "reload_responses": "Reload saved responses"
   }
 }

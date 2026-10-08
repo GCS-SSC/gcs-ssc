@@ -18,8 +18,8 @@ export default defineRailway((ctx) => {
   metabaseDatabase.networking = { privateNetworkEndpoint: 'postgres-xwyo' }
   // The imported Metabase DB has no managed source in Railway. Keep its image unchanged.
   delete metabaseDatabase.source
-  const freshPostgresVolume = volume('gcs-db-volume-release-reset', { alerts: { usage: { 100: {}, 80: {}, 95: {} } }, allowOnlineResize: true, region: 'us-east4-eqdc4a', sizeMB: 5000 })
-  database.volumeAttachments = { 'gcs-db-volume-release-reset': { volume: freshPostgresVolume.address, mountPath: '/var/lib/postgresql/data' } }
+  const freshPostgresVolume = volume('gcs-db-volume-ar-paid-reset', { alerts: { usage: { 100: {}, 80: {}, 95: {} } }, allowOnlineResize: true, region: 'us-east4-eqdc4a', sizeMB: 5000 })
+  database.volumeAttachments = { 'gcs-db-volume-ar-paid-reset': { volume: freshPostgresVolume.address, mountPath: '/var/lib/postgresql/data' } }
   const gcsSscVolume = volume('gcs-ssc-volume', { alerts: { usage: { 100: {}, 80: {}, 95: {} } }, allowOnlineResize: true, region: 'us-east4-eqdc4a', sizeMB: 5000 })
   const metabaseVolume = volume('postgres-volume-4aPn', { alerts: { usage: { 100: {}, 80: {}, 95: {} } }, allowOnlineResize: true, region: 'us-east4-eqdc4a', sizeMB: 5000 })
   const portalVolume = volume('portal-db-volume', { allowOnlineResize: true, region: 'us-east4-eqdc4a', sizeMB: 5000 })
@@ -45,13 +45,14 @@ export default defineRailway((ctx) => {
   const metabaseGroup = group('Metabase', [metabase, metabaseDatabase])
   const gcsGroup = group('GCS', [gcsSsc, database])
   const portalDatabase = postgres('Portal DB', { region: 'us-east4-eqdc4a' })
-  portalDatabase.volumeAttachments = { 'portal-db-volume': { volume: portalVolume.address, mountPath: '/var/lib/postgresql/data' } }
+  // Existing Portal storage stays attached; importing database mounts is lossy in CLI 5.54.1.
+  // Keep its volume resource, without reapplying the attachment during a GCS-only release.
   const portal = service('gcs-ssc-portal', {
     source: image(portalImage),
     replicas: { 'us-east4-eqdc4a': 1 },
     deploy: { healthcheckPath: '/api/session', healthcheckTimeout: 300, sleepApplication: true },
     env: {
-      DATABASE_URL: portalDatabase.env.DATABASE_URL,
+      DATABASE_URL: preserve(),
       BETTER_AUTH_SECRET: ctx.shared.PORTAL_AUTH_SECRET,
       PORTAL_ENVIRONMENT: 'demo',
       NODE_ENV: 'production',

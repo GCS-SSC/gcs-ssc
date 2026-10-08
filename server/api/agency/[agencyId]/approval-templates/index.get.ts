@@ -9,15 +9,16 @@ export default defineEventHandler(async event => {
   await requireAuthContext(event)
   const agencyId = getRouterParam(event, 'agencyId') ?? ''
   await authorizeApprovalTemplateScope(event, 'read', agencyId)
-  const { page, limit, search } = await getValidatedQueryI18n(event, ApprovalTemplateListQuerySchema)
+  const { page, limit, search, state } = await getValidatedQueryI18n(event, ApprovalTemplateListQuerySchema)
 
   const normalizedSearch = search ? search.toLowerCase() : ''
   const allItems = await withActiveAgencyReadTransaction(event, agencyId, async trx =>
     await listApprovalTemplates(trx, agencyId)
   )
 
+  const eligibleItems = state ? allItems.filter(item => item.publicationState === state) : allItems
   const filteredItems = normalizedSearch
-    ? allItems.filter(item => {
+    ? eligibleItems.filter(item => {
         const haystack = [
           item.egcs_cn_name_en,
           item.egcs_cn_name_fr,
@@ -42,7 +43,7 @@ export default defineEventHandler(async event => {
 
         return haystack.includes(normalizedSearch)
       })
-    : allItems
+    : eligibleItems
 
   const offset = (page - 1) * limit
   const items = filteredItems.slice(offset, offset + limit)

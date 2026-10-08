@@ -127,7 +127,7 @@ const {
 
 const selectedProfile: Ref<AgreementDetailForm | null> = ref(null)
 const isSaving: Ref<boolean> = ref(false)
-const { canAny } = useCan()
+const { can, canAny } = useCan()
 const isBusinessLocked = computed(() => isRecordLocked(profile.value))
 const canCreateChildRecords = computed(() => Boolean(profile.value?.can_create_child_records) && !isBusinessLocked.value)
 const canUpdateBusinessRecord = computed(() => Boolean(profile.value?.can_update) && !isBusinessLocked.value)
@@ -189,6 +189,7 @@ const tabs = computed(() => {
       value: 'workflows',
       icon: 'i-lucide-workflow'
     })
+    nextTabs.push({ key: 'supplementary_information.title', value: 'supplementary-information', icon: 'i-lucide-clipboard-list' })
     nextTabs.push({
       key: 'agreement.commitments.title',
       value: 'commitments',
@@ -455,7 +456,9 @@ const cancel = () => {
               :agreement-id="id"
               :can-create="canCreateChildRecords"
               :can-update="canUpdateChildRecords"
-              :can-delete="canDeleteChildRecords" />
+              :can-delete="canDeleteChildRecords"
+              :show-update="can('agreement', 'update', { type: 'program', agencyId: profile.agency_id, transferPaymentId: profile.program_id })"
+              :show-delete="can('agreement', 'delete', { type: 'program', agencyId: profile.agency_id, transferPaymentId: profile.program_id })" />
 
             <AgreementBudgetTab
               v-else-if="selectedTab === 'budget'"
@@ -575,6 +578,11 @@ const cancel = () => {
               purpose="standard"
               :can-edit="Boolean(profile.can_update)"
               @changed="refreshProfile" />
+
+            <CommonWorkflowSupplementaryInformation
+              v-else-if="selectedTab === 'supplementary-information'"
+              entity-type="fundingcaseagreement"
+              :entity-id="id" />
 
             <AgreementCommitmentsTab
               v-else-if="selectedTab === 'commitments'"

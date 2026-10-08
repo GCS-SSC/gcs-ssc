@@ -83,6 +83,7 @@ const tabs = [
   { key: 'correction.completion.title', value: 'completion', icon: 'i-lucide-circle-check-big' },
   { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-clipboard-check' },
   { key: 'workflow.title', value: 'workflows', icon: 'i-lucide-workflow' },
+  { key: 'supplementary_information.title', value: 'supplementary-information', icon: 'i-lucide-clipboard-list' },
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
   { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users' }
 ]
@@ -262,6 +263,7 @@ const linkedCreated = async (id: string) => {
           </section>
           <CommonReviewsTab v-else-if="selectedTab === 'reviews'" entity-type="fundingcasecorrection" :entity-id="correctionId" :can-update="correction.egcs_fc_canedit" @changed="refreshPage" />
           <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcasecorrection" :entity-id="correctionId" purpose="standard" :can-edit="correction.egcs_fc_canwork" :refresh-key="refreshKey" @changed="refreshPage" />
+          <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" entity-type="fundingcasecorrection" :entity-id="correctionId" />
           <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcasecorrection" :entity-id="correctionId" />
           <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" entity-type="fundingcasecorrection" :entity-id="correctionId" />
         </CommonEntityEditorWorkspace>

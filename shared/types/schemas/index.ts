@@ -24,3 +24,5 @@ export * from './assessment/calculation'
 export * from './checklist/checklist'
 
 export * from './journal-voucher'
+export * from './questionnaire'
+export * from './data-collection'

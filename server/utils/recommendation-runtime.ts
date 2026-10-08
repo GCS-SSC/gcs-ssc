@@ -15,9 +15,10 @@ import {
   validateRecommendationResponses
 } from '~~/shared/types/schemas/recommendation/recommendation'
 import type { RecommendationResponse } from '~~/shared/types/schemas/recommendation/recommendation'
-import { badRequest, forbidden, notFound, throwApiError } from './api-errors'
+import { notFound } from './api-errors'
 import { materializeCanonicalApprovalRuntime } from './canonical-approval-runtime'
 import { createPrimaryEntityAssignment } from './entity-assignment'
+import { saveQuestionnaireRuntimeInTransaction } from './questionnaire-runtime-save'
 import {
   readPublishedRecommendationPlan,
   readPublishedRecommendationSchema,
@@ -694,107 +695,99 @@ export const saveRecommendationById = async (
   existingTrx?: Transaction<Database>,
   expectedRevision?: number
 ) => {
-  const executeSave = async (trx: Transaction<Database>) => {
-    const recommendation = await trx.selectFrom('Common_Recommendation')
-      .innerJoin('Common_Runtime_Item as Recommendation_Item', 'Recommendation_Item.id', 'Common_Recommendation.egcs_cn_runtimeitem')
-      .innerJoin('Common_Runtime_Item as Set_Item', join => join
-        .onRef('Set_Item.egcs_cn_runtime', '=', 'Recommendation_Item.egcs_cn_runtime')
-        .onRef('Set_Item.id', '=', 'Recommendation_Item.egcs_cn_parentruntimeitem'))
-      .innerJoin('Common_Publication_Version as Schema_Version', 'Schema_Version.id', 'Recommendation_Item.egcs_cn_publicationversion')
-      .innerJoin('Common_Publication_Version as Set_Version', 'Set_Version.id', 'Set_Item.egcs_cn_publicationversion')
-      .selectAll('Common_Recommendation')
-      .select([
-        'Recommendation_Item.id as runtimeItemId',
-        'Recommendation_Item.egcs_cn_runtime as runtimeId',
-        'Recommendation_Item.egcs_cn_state as runtimeState',
-        'Schema_Version.egcs_cn_definition as schemaDefinition',
-        'Set_Version.egcs_cn_definition as setDefinition'
-      ])
-      .where('Common_Recommendation.id', '=', recommendationId)
-      .where('Common_Recommendation._deleted', '=', false)
-      .where('Recommendation_Item._deleted', '=', false)
-      .forUpdate(['Common_Recommendation', 'Recommendation_Item', 'Set_Item'])
-      .executeTakeFirst()
-    if (!recommendation) {
-      return await notFound(event, 'WORKFLOW_RECOMMENDATION_NOT_FOUND', 'apiErrors.admin_common.not_found')
-    }
-    const currentRevision = Number(recommendation.egcs_cn_revision ?? 1)
-    if (expectedRevision !== undefined && currentRevision !== expectedRevision) {
-      return await throwApiError(event, {
-        statusCode: 409,
-        code: 'RECOMMENDATION_REVISION_CONFLICT',
-        key: 'apiErrors.workflow.recommendation_revision_conflict'
-      })
-    }
-    if (recommendation.runtimeState !== 'active') return await forbidden(event)
-    const publishedSchema = readPublishedRecommendationSchema(recommendation.schemaDefinition)
-    const definition = RecommendationDefinitionSchema.parse(publishedSchema.definition)
-    if (submit) {
-      const issues = validateRecommendationResponses(definition, responses)
-      if (issues.length > 0) {
-        return await badRequest(event, 'WORKFLOW_RECOMMENDATION_INVALID', 'apiErrors.workflow.recommendation_invalid')
+  const executeSave = async (trx: Transaction<Database>) => await saveQuestionnaireRuntimeInTransaction(event, trx, {
+    responses, submit, expectedRevision,
+    adapter: {
+      missing: { code: 'WORKFLOW_RECOMMENDATION_NOT_FOUND', key: 'apiErrors.admin_common.not_found' },
+      conflict: { code: 'RECOMMENDATION_REVISION_CONFLICT', key: 'apiErrors.workflow.recommendation_revision_conflict' },
+      load: async db => {
+        const recommendation = await db.selectFrom('Common_Recommendation')
+          .innerJoin('Common_Runtime_Item as Recommendation_Item', 'Recommendation_Item.id', 'Common_Recommendation.egcs_cn_runtimeitem')
+          .innerJoin('Common_Runtime_Item as Set_Item', join => join
+            .onRef('Set_Item.egcs_cn_runtime', '=', 'Recommendation_Item.egcs_cn_runtime')
+            .onRef('Set_Item.id', '=', 'Recommendation_Item.egcs_cn_parentruntimeitem'))
+          .innerJoin('Common_Publication_Version as Schema_Version', 'Schema_Version.id', 'Recommendation_Item.egcs_cn_publicationversion')
+          .innerJoin('Common_Publication_Version as Set_Version', 'Set_Version.id', 'Set_Item.egcs_cn_publicationversion')
+          .selectAll('Common_Recommendation')
+          .select([
+            'Recommendation_Item.id as runtimeItemId',
+            'Recommendation_Item.egcs_cn_runtime as runtimeId',
+            'Recommendation_Item.egcs_cn_state as runtimeState',
+            'Schema_Version.egcs_cn_definition as schemaDefinition',
+            'Set_Version.egcs_cn_definition as setDefinition'
+          ])
+          .where('Common_Recommendation.id', '=', recommendationId)
+          .where('Common_Recommendation._deleted', '=', false)
+          .where('Recommendation_Item._deleted', '=', false)
+          .forUpdate(['Common_Recommendation', 'Recommendation_Item', 'Set_Item'])
+          .executeTakeFirst()
+        return recommendation ? { ...recommendation, revision: Number(recommendation.egcs_cn_revision ?? 1), state: recommendation.runtimeState } : null
+      },
+      validate: (recommendation, suppliedResponses, isSubmit) => {
+        const definition = RecommendationDefinitionSchema.parse(readPublishedRecommendationSchema(recommendation.schemaDefinition).definition)
+        if (!isSubmit) return null
+        if (validateRecommendationResponses(definition, suppliedResponses).length > 0) {
+          return { code: 'WORKFLOW_RECOMMENDATION_INVALID', key: 'apiErrors.workflow.recommendation_invalid' }
+        }
+        return deriveRecommendationOutcome(definition, suppliedResponses)
+          ? null
+          : { code: 'WORKFLOW_RECOMMENDATION_RESULT_REQUIRED', key: 'apiErrors.workflow.recommendation_result_required' }
+      },
+      persist: async (db, recommendation, suppliedResponses, nextRevision, isSubmit) => {
+        const definition = RecommendationDefinitionSchema.parse(readPublishedRecommendationSchema(recommendation.schemaDefinition).definition)
+        const derived = isSubmit ? deriveRecommendationOutcome(definition, suppliedResponses) : null
+        return await db.updateTable('Common_Recommendation').set({
+          egcs_cn_response: { responses: suppliedResponses }, egcs_cn_revision: nextRevision,
+          ...(derived ? { egcs_cn_resultoptionkey: derived.optionKey, egcs_cn_outcome: derived.outcome } : {})
+        }).where('id', '=', recommendationId).returningAll().executeTakeFirstOrThrow()
+      },
+      submit: async (db, recommendation, updated) => {
+        const publishedSchema = readPublishedRecommendationSchema(recommendation.schemaDefinition)
+        const setConfiguration = readPublishedRecommendationPlan(recommendation.setDefinition)
+        const member = setConfiguration.members.find(candidate => candidate.memberId
+          === String(recommendation.egcs_cn_recommendationsetup))
+        if (!member) throw new Error('Pinned recommendation member is missing from its set publication')
+        if (member.approvalTemplateId && member.approvalVersionId) {
+          await materializeCanonicalApprovalRuntime(db, {
+            entityType: 'commonrecommendation',
+            entityId: recommendationId,
+            nameEn: publishedSchema.nameEn,
+            nameFr: publishedSchema.nameFr,
+            approvalTemplateId: member.approvalTemplateId,
+            approvalTemplateVersionId: member.approvalVersionId,
+            parentRuntimeItemId: String(recommendation.runtimeItemId),
+            actorId: userId
+          })
+          return await fetchRuntimeRecommendation(db, recommendationId)
+        }
+        await transitionRuntimeItem(db, {
+          runtimeId: String(recommendation.runtimeId),
+          runtimeItemId: String(recommendation.runtimeItemId),
+          from: 'active',
+          to: updated.egcs_cn_outcome === 'not_recommended' && member.failOnNotRecommended
+            ? 'unsuccessful'
+            : 'succeeded',
+          actorId: userId,
+          reason: 'recommendation_submitted'
+        })
+        const aggregation = await advanceRecommendationRuntimeAfterTerminalItem(db, recommendationId, userId)
+        if (aggregation && 'kind' in aggregation && aggregation.kind === 'final_approval_required') {
+          await materializeCanonicalApprovalRuntime(db, {
+            entityType: aggregation.entityType,
+            entityId: aggregation.entityId,
+            nameEn: aggregation.nameEn,
+            nameFr: aggregation.nameFr,
+            approvalTemplateId: aggregation.approval.publicationId,
+            approvalTemplateVersionId: aggregation.approval.publicationVersionId,
+            actorId: userId,
+            parentRuntimeItemId: aggregation.recommendationSetRuntimeItemId,
+            purpose: 'standard'
+          })
+        }
+        return await fetchRuntimeRecommendation(db, recommendationId)
       }
     }
-    const derived = submit ? deriveRecommendationOutcome(definition, responses) : null
-    if (submit && !derived) {
-      return await badRequest(
-        event,
-        'WORKFLOW_RECOMMENDATION_RESULT_REQUIRED',
-        'apiErrors.workflow.recommendation_result_required'
-      )
-    }
-    const updated = await trx.updateTable('Common_Recommendation').set({
-      egcs_cn_response: { responses },
-      egcs_cn_revision: currentRevision + 1,
-      ...(derived
-        ? { egcs_cn_resultoptionkey: derived.optionKey, egcs_cn_outcome: derived.outcome }
-        : {})
-    }).where('id', '=', recommendationId).returningAll().executeTakeFirstOrThrow()
-    if (!submit) return updated
-
-    const setConfiguration = readPublishedRecommendationPlan(recommendation.setDefinition)
-    const member = setConfiguration.members.find(candidate => candidate.memberId
-      === String(recommendation.egcs_cn_recommendationsetup))
-    if (!member) throw new Error('Pinned recommendation member is missing from its set publication')
-    if (member.approvalTemplateId && member.approvalVersionId) {
-      await materializeCanonicalApprovalRuntime(trx, {
-        entityType: 'commonrecommendation',
-        entityId: recommendationId,
-        nameEn: publishedSchema.nameEn,
-        nameFr: publishedSchema.nameFr,
-        approvalTemplateId: member.approvalTemplateId,
-        approvalTemplateVersionId: member.approvalVersionId,
-        parentRuntimeItemId: String(recommendation.runtimeItemId),
-        actorId: userId
-      })
-      return await fetchRuntimeRecommendation(trx, recommendationId)
-    }
-    await transitionRuntimeItem(trx, {
-      runtimeId: String(recommendation.runtimeId),
-      runtimeItemId: String(recommendation.runtimeItemId),
-      from: 'active',
-      to: derived!.outcome === 'not_recommended' && member.failOnNotRecommended
-        ? 'unsuccessful'
-        : 'succeeded',
-      actorId: userId,
-      reason: 'recommendation_submitted'
-    })
-    const aggregation = await advanceRecommendationRuntimeAfterTerminalItem(trx, recommendationId, userId)
-    if (aggregation && 'kind' in aggregation && aggregation.kind === 'final_approval_required') {
-      await materializeCanonicalApprovalRuntime(trx, {
-        entityType: aggregation.entityType,
-        entityId: aggregation.entityId,
-        nameEn: aggregation.nameEn,
-        nameFr: aggregation.nameFr,
-        approvalTemplateId: aggregation.approval.publicationId,
-        approvalTemplateVersionId: aggregation.approval.publicationVersionId,
-        actorId: userId,
-        parentRuntimeItemId: aggregation.recommendationSetRuntimeItemId,
-        purpose: 'standard'
-      })
-    }
-    return await fetchRuntimeRecommendation(trx, recommendationId)
-  }
+  })
   return existingTrx
     ? await executeSave(existingTrx)
     : await event.context.$db.transaction().execute(executeSave)

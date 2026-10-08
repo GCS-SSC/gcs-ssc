@@ -85,7 +85,7 @@ const handleModelValueUpdate = (value: string | number | null | undefined) => {
             <h3 :id="questionHeadingId" class="text-base font-semibold text-zinc-900 dark:text-white">
               {{ questionLabel }}
               <span v-if="questionRequired" class="text-red-600 dark:text-red-400" aria-hidden="true">*</span>
-              <span v-if="questionRequired" class="sr-only">{{ t('validation.required') }}</span>
+              <span v-if="questionRequired" class="text-xs font-normal text-muted">({{ t('common.field_required') }})</span>
             </h3>
             <p v-if="questionDescription" class="text-sm leading-5 text-muted">
               {{ questionDescription }}
@@ -156,7 +156,8 @@ const handleModelValueUpdate = (value: string | number | null | undefined) => {
           v-if="showComment"
           :name="commentFieldName"
           :label="commentLabel"
-          :required="commentRequired">
+          :required="commentRequired"
+          :error="commentErrorMessage">
           <CommonTextarea
             :model-value="commentValue"
             :rows="4"
@@ -164,16 +165,11 @@ const handleModelValueUpdate = (value: string | number | null | undefined) => {
             :disabled="disabled || commentDisabled"
             :required="commentRequired"
             :aria-required="commentRequired"
-            :aria-invalid="commentErrorMessage ? true : undefined"
-            :aria-describedby="commentErrorMessage ? `${questionHeadingId}-comment-error` : undefined"
             :placeholder="commentPlaceholder"
             :stream-id="streamId"
             :extension-slot-name="extensionSlotName"
             :extension-context="extensionContext"
             @update:model-value="value => emit('update:commentValue', value)" />
-          <p v-if="commentErrorMessage" :id="`${questionHeadingId}-comment-error`" class="text-sm font-medium text-error" role="alert">
-            {{ commentErrorMessage }}
-          </p>
         </UFormField>
       </div>
     </div>

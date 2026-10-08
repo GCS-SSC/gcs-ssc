@@ -183,6 +183,7 @@ const tabs = computed(() => [
     : []),
   { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-clipboard-check' },
   { key: 'workflow.title', value: 'workflows', icon: 'i-lucide-workflow' },
+  { key: 'supplementary_information.title', value: 'supplementary-information', icon: 'i-lucide-clipboard-list' },
   ...(profile.value?.can_read_agreement ? [{ key: 'agreement.documents.title', value: 'documents', icon: 'i-lucide-files' }] : []),
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
   { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users' }
@@ -722,6 +723,11 @@ const cancelAmendment = async () => {
             :can-edit="isAssigned"
             :refresh-key="approvalsRefreshKey"
             @changed="refreshPage" />
+
+          <CommonWorkflowSupplementaryInformation
+            v-else-if="selectedTab === 'supplementary-information'"
+            entity-type="fundingcaseamendment"
+            :entity-id="amendmentId" />
 
           <CommonAssignedUsers
             v-else-if="selectedTab === 'assignments'"

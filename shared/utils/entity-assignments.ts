@@ -22,8 +22,19 @@ export const ASSIGNED_WORK_ENGINE_STATUS_SEARCH_LABELS: Readonly<Record<string, 
 
 export const ASSIGNABLE_ENGINE_OPEN_QUEUE_STATUSES = {
   commonreview: new Set(['active', 'paused']),
-  commonrecommendation: new Set(['active', 'paused'])
+  commonrecommendation: new Set(['active', 'paused']),
+  commondatacollection: new Set(['active', 'paused'])
 } as const
+
+export type RuntimeAssignableEntityType = keyof typeof ASSIGNABLE_ENGINE_OPEN_QUEUE_STATUSES
+
+/**
+ * Identifies independently assigned artifacts whose authorization follows their runtime source.
+ * @param entityType Registered entity type to inspect.
+ * @returns Whether the entity resolves access through a runtime source.
+ */
+export const isRuntimeAssignableEntityType = (entityType: string): entityType is RuntimeAssignableEntityType =>
+  Object.hasOwn(ASSIGNABLE_ENGINE_OPEN_QUEUE_STATUSES, entityType)
 
 /**
  * Creates lifecycle metadata for entity types whose action, roster, and queue states coincide.
@@ -53,6 +64,7 @@ export const ENTITY_AUTHORIZATION_POLICIES = {
   fundingcaseagreementcloseout: createMetadata({ ...agreementPolicy, table: 'Funding_Case_Agreement_Closeout' }, 'closeouts', ['Closeout', 'Clôture']),
   commonreview: createMetadata({ subject: 'resolved_owner', ownerResolver: 'runtime_source', ownerColumn: null, creationParent: 'runtime_source', allowedScopes: ['global', 'agency', 'program'], table: 'Common_Review', statusColumn: null }, null, ['Review', 'Examen']),
   commonrecommendation: createMetadata({ subject: 'resolved_owner', ownerResolver: 'runtime_source', ownerColumn: null, creationParent: 'runtime_source', allowedScopes: ['global', 'agency', 'program'], table: 'Common_Recommendation', statusColumn: null }, null, ['Recommendation', 'Recommandation']),
+  commondatacollection: createMetadata({ subject: 'resolved_owner', ownerResolver: 'runtime_source', ownerColumn: null, creationParent: 'runtime_source', allowedScopes: ['global', 'agency', 'program'], table: 'Common_Data_Collection', statusColumn: null }, null, ['Data collection', 'Collecte de données']),
   fundingcaseagreementclaim: createMetadata({ ...agreementPolicy, table: 'Funding_Case_Agreement_Claim' }, 'claims', ['Claim', 'Réclamation']),
   fundingclaimreconcile: createMetadata({ ...agreementPolicy, ownerResolver: 'agreement_claim_parent', ownerColumn: 'egcs_fc_fundingagreementclaim', creationParent: 'fundingcaseagreementclaim', table: 'Funding_Case_Agreement_Claim_Reconcile' }, null, ['Claim reconciliation', 'Rapprochement de réclamation']),
   fundingcaseaccountreceivable: createMetadata({ ...agreementPolicy, subject: 'account_receivable', table: 'Funding_Case_Agreement_Account_Receivable' }, 'account-receivables', ['Accounts receivable', 'Compte débiteur']),
@@ -89,6 +101,7 @@ export const buildAssignedWorkRoute = (
   if (entityType === 'fundingcaseagreement') return `/agreements/${entityId}`
   if (entityType === 'fundingcaseintake') return `/funding-case-intakes/${entityId}`
   if (entityType === 'commonrecommendation') return `/recommendations/${entityId}`
+  if (entityType === 'commondatacollection') return `/data-collections/${entityId}`
   if (entityType === 'fundingclaimreconcile') return `/claim-reconciliations/${entityId}`
   const segment = ENTITY_AUTHORIZATION_POLICIES[entityType].agreementRouteSegment
   if (!segment || !agreementId) throw new Error(`Missing Agreement route context for ${entityType}`)

@@ -17,6 +17,9 @@ export const appRouteLocations = {
     name: 'extension-id-agencies-agencyId-forms-formId', params: { id: key, agencyId, formId }
   }),
   agencyDetail: (id: string) => ({ name: 'agencies-id', params: { id } }),
+  agencyDataCollectionDetail: (id: string, dataCollectionSetupId: string) => ({
+    name: 'agencies-id-data-collections-dataCollectionSetupId', params: { id, dataCollectionSetupId }
+  }),
   agencyReviewSetDetail: (id: string, reviewSetId: string) => ({
     name: 'agencies-id-review-sets-reviewSetId',
     params: { id, reviewSetId }
@@ -129,6 +132,7 @@ export const appRouteLocations = {
     params: { reviewId },
     ...(query ? { query } : {})
   }),
+  dataCollectionDetail: (dataCollectionId: string) => ({ name: 'data-collections-dataCollectionId', params: { dataCollectionId } }),
   recommendationDetail: (recommendationId: string) => ({
     name: 'recommendations-recommendationId',
     params: { recommendationId }

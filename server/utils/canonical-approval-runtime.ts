@@ -557,6 +557,11 @@ const advanceApprovalOwnerAfterTerminal = async (
     }
     return
   }
+  if (context.entityType === 'commondatacollection') {
+    const { advanceDataCollectionRuntimeAfterTerminalItem } = await import('./data-collection-runtime')
+    await advanceDataCollectionRuntimeAfterTerminalItem(trx, context.entityId, actorId)
+    return
+  }
   if (context.entityType === 'commonreview') {
     const aggregation = await advanceReviewRuntimeAfterTerminalItem(trx, context.entityId, actorId)
     if (aggregation && 'kind' in aggregation && aggregation.kind === 'final_approval_required') {

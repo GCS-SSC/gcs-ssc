@@ -1,5 +1,5 @@
 export type WorkflowNestedMemberSelection = {
-  kind: 'review_set' | 'recommendation_set'
+  kind: 'review_set' | 'recommendation_set' | 'data_collection'
   referenceId: string
 }
 

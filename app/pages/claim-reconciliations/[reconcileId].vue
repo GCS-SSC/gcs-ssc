@@ -101,6 +101,7 @@ const tabs = [
   { key: 'agreement.claims.reconcile_completion.title', value: 'completion', icon: 'i-lucide-circle-check-big' },
   { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-clipboard-check' },
   { key: 'workflow.title', value: 'workflows', icon: 'i-lucide-workflow' },
+  { key: 'supplementary_information.title', value: 'supplementary-information', icon: 'i-lucide-clipboard-list' },
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
   { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users' }
 ]
@@ -417,6 +418,7 @@ const cancelReconciliation = async () => {
             @changed="handleRuntimeChanged" />
 
           <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingclaimreconcile" :entity-id="reconcileId" purpose="standard" :can-edit="data.is_assigned" :refresh-key="approvalsRefreshKey" @changed="handleRuntimeChanged" />
+          <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" entity-type="fundingclaimreconcile" :entity-id="reconcileId" />
           <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingclaimreconcile" :entity-id="reconcileId" />
           <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" entity-type="fundingclaimreconcile" :entity-id="reconcileId" />
         </CommonEntityEditorWorkspace>

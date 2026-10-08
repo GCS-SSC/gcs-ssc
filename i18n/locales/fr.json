@@ -150,6 +150,8 @@
     "users": "Utilisateurs",
     "groups": "Groupes",
     "language_toggle": "Changer de langue",
+    "switch_to_dark_mode": "Passer au mode sombre",
+    "switch_to_light_mode": "Passer au mode clair",
     "admin_common": "Commun",
     "assignment_management": "Affectations",
     "stats": {
@@ -228,7 +230,8 @@
       "amendment": "Modification",
       "amendment_number": "Modification no {number}",
       "closeout": "Clôture",
-      "approval": "Approbation"
+      "approval": "Approbation",
+      "data_collection": "Collecte de données"
     }
   },
   "assignments": {
@@ -274,7 +277,8 @@
       "fundingcasejournalvoucher": "Pièce de journal",
       "fundingcasecorrection": "Correction",
       "fundingcaseaccountreceivable": "Comptes débiteurs",
-      "fundingcaseaccountreceivablecreditmemo": "Note de crédit"
+      "fundingcaseaccountreceivablecreditmemo": "Note de crédit",
+      "commondatacollection": "Collecte de données"
     }
   },
   "attachments": {
@@ -537,7 +541,8 @@
       "fundingcasejournalvoucher": "Pièce de journal",
       "fundingcasecorrection": "Correction",
       "fundingcaseaccountreceivable": "Compte débiteur",
-      "fundingcaseaccountreceivablecreditmemo": "Note de crédit de compte débiteur"
+      "fundingcaseaccountreceivablecreditmemo": "Note de crédit de compte débiteur",
+      "commondatacollection": "Collecte de données"
     },
     "scope_type": {
       "global": "Global",
@@ -1313,7 +1318,7 @@
       "invalid_subtype": "Le sous-type d'entente sélectionné est invalide.",
       "invalid_applicant_recipient": "Le promoteur sélectionné est invalide.",
       "duplicate_applicant_recipient": "Ce promoteur est déjà lié à l'entente.",
-      "applicant_recipient_in_use": "Ce promoteur de l'entente est utilisé par une activité et ne peut pas être modifié ou supprimé.",
+      "applicant_recipient_in_use": "Ce promoteur de l'entente est utilisé par des éléments liés à cette entente et ne peut pas être modifié ou supprimé.",
       "invalid_address_type": "Le type d'adresse sélectionné est invalide.",
       "invalid_activity_outcome": "Un ou plusieurs résultats sélectionnés pour l'activité sont invalides.",
       "invalid_activity_responsible_party": "Un ou plusieurs promoteurs sélectionnés pour l'activité sont invalides.",
@@ -1555,6 +1560,11 @@
       "account_required": "Sélectionnez un compte comptable débiteur pour chaque montant non nul avant de terminer ce compte débiteur.",
       "monitor_required": "Sélectionnez un suivi de contrôle exigé par ce type de compte débiteur.",
       "type_unavailable": "Sélectionnez un type de compte débiteur actif configuré pour l’organisme de cette entente."
+    },
+    "data_collection": {
+      "definition_invalid": "Le formulaire épinglé de la collecte de données est invalide.",
+      "response_invalid": "Les réponses de la collecte de données sont invalides ou incomplètes.",
+      "revision_conflict": "Des réponses plus récentes ont été enregistrées. Rechargez les réponses enregistrées."
     }
   },
   "transfer_payment": {
@@ -2100,16 +2110,16 @@
     "checklist_unknown_question": "Sélectionnez une question de cette liste",
     "duplicate_response_key": "Utilisez une clé de réponse unique",
     "duplicate_semantic_key": "Utilisez une clé indépendante de la langue unique",
-    "recommendation_unknown_question": "Sélectionnez une question de ce schéma de recommandation",
+    "recommendation_unknown_question": "Sélectionnez une question de ce formulaire",
     "scoring_matrix_order": "Classez les seuils de pointage du plus bas au plus élevé",
     "checklist_duplicate_key": "Utilisez un code indépendant de la langue unique",
     "checklist_invalid_count": "Saisissez un nombre entier qui ne dépasse pas le nombre d’éléments de ce groupe",
     "checklist_invalid_rate": "Saisissez un pourcentage supérieur à 0 et inférieur ou égal à 100",
     "checklist_max_group_depth": "Les groupes de résultats peuvent être imbriqués jusqu’à trois niveaux",
     "checklist_comment_required": "Ajoutez le commentaire requis pour cette réponse de la liste de contrôle",
-    "recommendation_section_required": "Ajoutez au moins une section de recommandation",
-    "recommendation_subsection_required": "Ajoutez au moins une sous-section à chaque section de recommandation",
-    "recommendation_question_required": "Ajoutez au moins une question à chaque sous-section de recommandation",
+    "recommendation_section_required": "Ajoutez au moins une section de formulaire",
+    "recommendation_subsection_required": "Ajoutez au moins une sous-section à chaque section du formulaire",
+    "recommendation_question_required": "Ajoutez au moins une question à chaque sous-section du formulaire",
     "recommendation_options_required": "Ajoutez au moins deux options de bouton radio",
     "recommendation_duplicate_key": "Utilisez un code indépendant de la langue unique",
     "recommendation_exactly_one_result_question": "Désignez exactement une question décisionnelle",
@@ -2376,6 +2386,7 @@
     "description_fr_placeholder": "Saisir la description de l'entente en français",
     "applicant_recipients": {
       "type": "Type de promoteur",
+      "action_unavailable": "Cette action exige une affectation à cette entente et une entente ouverte aux modifications.",
       "not_selected": "Non sélectionné",
       "title": "Promoteurs",
       "add": "Ajouter un promoteur",
@@ -3360,7 +3371,8 @@
     "outcomes": {
       "recommended": "Recommandé",
       "not_recommended": "Non recommandé"
-    }
+    },
+    "validation_title": "La recommandation est incomplète"
   },
   "recommendation_setup": {
     "activate": "Activer la configuration de recommandation",
@@ -3524,7 +3536,8 @@
       "review_set": "Ensemble de revues",
       "recommendation_set": "Ensemble de recommandations",
       "recommendation": "Recommandation",
-      "approvals": "Approbations"
+      "approvals": "Approbations",
+      "data_collection": "Collecte de données"
     },
     "view_step": "Afficher {step}",
     "view": "Afficher",
@@ -3632,7 +3645,10 @@
     "not_configured": "Aucun flux de travail n’est configuré pour cet élément.",
     "approval_not_configured": "Aucun flux d’approbation n’est configuré. L’achèvement se poursuivra sans flux d’approbation.",
     "risk_rating_required": "Exiger une évaluation du risque réussie",
-    "risk_rating_required_help": "Après la publication, ce processus de risque doit réussir avant la complétion d’une modification ou la soumission d’une recommandation d’entente. Les scores existants et les évaluations terminées ne satisfont pas à cette exigence."
+    "risk_rating_required_help": "Après la publication, ce processus de risque doit réussir avant la complétion d’une modification ou la soumission d’une recommandation d’entente. Les scores existants et les évaluations terminées ne satisfont pas à cette exigence.",
+    "data_collection": "Collecte de données",
+    "open_data_collection": "Ouvrir la collecte de données",
+    "followed_by_approval": "Suivi d’une approbation"
   },
   "recommendation_schema": {
     "title": "Schéma de recommandation",
@@ -4387,7 +4403,45 @@
       "intake": "Demande",
       "program": "Programme",
       "stream": "Volet",
-      "agency": "Organisme"
+      "agency": "Organisme",
+      "commondatacollection": "Collecte de données"
     }
+  },
+  "data_collection": {
+    "title": "Collecte de données",
+    "catalog_title": "Collectes de données",
+    "create": "Ajouter une collecte de données",
+    "general": "Paramètres généraux",
+    "form_sections": "Sections du formulaire",
+    "saved": "La collecte de données a été enregistrée.",
+    "published": "La collecte de données a été publiée.",
+    "retired": "La collecte de données a été retirée.",
+    "publish": "Publier la collecte de données",
+    "retire": "Retirer la collecte de données",
+    "validation_title": "La collecte de données est incomplète",
+    "detail_title": "Collecte de données no {id}",
+    "identifier": "Collecte de données no {id}",
+    "locked_description": "Cette collecte attend une approbation ou a atteint son état final. Les réponses et les affectations sont en lecture seule.",
+    "responses": "Réponses",
+    "saved_success": "Les réponses de la collecte de données ont été enregistrées.",
+    "submitted_success": "La collecte de données a été soumise.",
+    "load_failed": "Impossible de charger la collecte de données"
+  },
+  "supplementary_information": {
+    "title": "Renseignements supplémentaires",
+    "description": "Réponses aux collectes de données, en lecture seule, provenant de la dernière exécution réussie de chaque processus.",
+    "completed_at": "Terminé le {date}",
+    "empty": "Aucune réponse de collecte de données provenant d’exécutions de processus réussies pour cette entité.",
+    "no_answer": "Aucune réponse fournie",
+    "question_guidance": "Conseils pour la question",
+    "load_failed": "Impossible de charger les renseignements supplémentaires",
+    "load_failed_description": "Réessayez pour charger les réponses des processus réussis."
+  },
+  "questionnaire": {
+    "required_question_help": "Il faut répondre à cette question avant de soumettre le formulaire.",
+    "validation_description": "Vérifiez les questions mises en évidence et fournissez les réponses obligatoires avant de soumettre.",
+    "revision_conflict": "Des réponses plus récentes ont été enregistrées",
+    "revision_conflict_description": "Vos réponses sont conservées ici. Copiez les modifications à conserver avant de recharger les dernières réponses enregistrées.",
+    "reload_responses": "Recharger les réponses enregistrées"
   }
 }

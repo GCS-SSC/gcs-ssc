@@ -27,6 +27,7 @@ const publicationOwner: AuditOwnershipRule = {
   kind: 'switch', column: 'egcs_cn_kind', cases: {
     review_schema: parent('id', 'public.Common_Review_Schema'),
     review_set_setup: parent('id', 'public.Common_Review_Set_Setup'),
+    data_collection_setup: parent('id', 'public.Common_Data_Collection_Setup'),
     recommendation_schema: parent('id', 'public.Common_Recommendation_Schema'),
     recommendation_set_setup: parent('id', 'public.Common_Recommendation_Set_Setup'),
     approval_template: parent('id', 'public.Common_Approval_Template'),
@@ -108,6 +109,8 @@ export const AUDIT_TABLE_OWNERSHIP: Readonly<Record<string, AuditOwnershipRule>>
   'public.Common_Publication_Transition': parent('egcs_cn_publication', 'public.Common_Publication'),
   'public.Common_Publication_Version': parent('egcs_cn_publication', 'public.Common_Publication'),
   'public.Common_Publication_Version_Reference': parent('egcs_cn_parentversion', 'public.Common_Publication_Version'),
+  'public.Common_Data_Collection': entity('egcs_cn_entityid', 'egcs_cn_entitytype'),
+  'public.Common_Data_Collection_Setup': parent('egcs_cn_agency', 'public.Agency_Profile'),
   'public.Common_Recommendation': entity('egcs_cn_entityid', 'egcs_cn_entitytype'),
   'public.Common_Recommendation_Schema': parent('egcs_cn_agency', 'public.Agency_Profile'),
   'public.Common_Recommendation_Set': entity('egcs_cn_entityid', 'egcs_cn_entitytype'),
@@ -268,6 +271,7 @@ export const AUDIT_ENTITY_TABLES: Readonly<Record<string, string>> = {
   // The public SDK persists this owner type in host-managed extension KV/secret records.
   fundingcaseagreementmonitor: 'public.Funding_Case_Agreement_Monitor',
   commonreview: 'public.Common_Review',
+  commondatacollection: 'public.Common_Data_Collection',
   commonrecommendation: 'public.Common_Recommendation'
 }
 

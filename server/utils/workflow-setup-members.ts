@@ -9,7 +9,7 @@ type WorkflowMemberOwner = z.infer<typeof CommonWorkflowSetupMemberOwnersSchema>
 type WorkflowSetupIdentity = Pick<Selectable<Database['Common_Workflow_Setup']>, 'id' | 'egcs_cn_agency' | 'egcs_cn_entitytype'>
 type WorkflowMemberReference = Pick<WorkflowMember, 'egcs_cn_kind'> & Partial<Pick<
   WorkflowMember,
-  'egcs_cn_reviewset' | 'egcs_cn_recommendationset' | 'egcs_cn_approvaltemplate'
+  'egcs_cn_reviewset' | 'egcs_cn_recommendationset' | 'egcs_cn_datacollection' | 'egcs_cn_approvaltemplate'
 >>
 
 /**
@@ -45,6 +45,16 @@ export const isValidWorkflowSetupMemberReference = async (
       .where('Common_Recommendation_Set_Setup._deleted', '=', false).where('Common_Publication._deleted', '=', false)
       .forUpdate().executeTakeFirst())
   }
+  if (member.egcs_cn_kind === 'data_collection' && member.egcs_cn_datacollection) {
+    return Boolean(await trx.selectFrom('Common_Data_Collection_Setup')
+      .innerJoin('Common_Publication', 'Common_Publication.id', 'Common_Data_Collection_Setup.id')
+      .select('Common_Data_Collection_Setup.id')
+      .where('Common_Data_Collection_Setup.id', '=', String(member.egcs_cn_datacollection))
+      .where('Common_Data_Collection_Setup.egcs_cn_agency', '=', setup.egcs_cn_agency)
+      .where('Common_Publication.egcs_cn_state', '=', 'published')
+      .where('Common_Data_Collection_Setup._deleted', '=', false).where('Common_Publication._deleted', '=', false)
+      .forUpdate().executeTakeFirst())
+  }
   if (member.egcs_cn_kind === 'approval_template' && member.egcs_cn_approvaltemplate) {
     return Boolean(await trx.selectFrom('Common_Approval_Template')
       .innerJoin('Common_Publication', 'Common_Publication.id', 'Common_Approval_Template.id')
@@ -74,11 +84,16 @@ export const replaceWorkflowSetupMemberOwners = async (
   if (member.egcs_cn_kind === 'approval_template') return owners.length === 0
 
   const nestedIds = owners.map(owner => String(
-    member.egcs_cn_kind === 'review_set' ? owner.egcs_cn_reviewsetup : owner.egcs_cn_recommendationsetup
+    member.egcs_cn_kind === 'review_set'
+      ? owner.egcs_cn_reviewsetup
+      : member.egcs_cn_kind === 'data_collection' ? owner.egcs_cn_datacollection : owner.egcs_cn_recommendationsetup
   ))
   if (nestedIds.some(id => id === 'undefined') || new Set(nestedIds).size !== nestedIds.length) return false
 
-  if (nestedIds.length > 0) {
+  if (member.egcs_cn_kind === 'data_collection'
+    && (owners.length > 1 || owners.some(owner => String(owner.egcs_cn_datacollection) !== String(member.egcs_cn_datacollection)))) return false
+
+  if (nestedIds.length > 0 && member.egcs_cn_kind !== 'data_collection') {
     const validNested = member.egcs_cn_kind === 'review_set'
       ? await trx.selectFrom('Common_Review_Setup').select('id')
           .where('id', 'in', nestedIds).where('egcs_cn_reviewset', '=', String(member.egcs_cn_reviewset))

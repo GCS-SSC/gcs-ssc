@@ -142,6 +142,13 @@ export default defineEventHandler(async event => {
         && hasUpdateRole
     }
   }))
+  const dataCollections = await Promise.all((runtime.dataCollections ?? []).map(async collection => {
+    const grant = await resolveAssignedItemGrant(authContext.userId, 'commondatacollection', String(collection.id), event.context.$db)
+    const owner = grant ? await resolveEntityAssignmentOwner(event.context.$db, 'commondatacollection', String(collection.id)) : null
+    const hasUpdateRole = owner ? await canAccessEntityAssignmentOwner(authContext, owner, 'update', event.context.$db) : false
+    return { ...collection, canUpdate: runtime.current?.runtimeState === 'active' && collection.runtimeState === 'active'
+      && grant?.actions.has('update') === true && hasUpdateRole }
+  }))
   let canResumeOwners = false
   const independentlyAssignable = isAssignableEntityType(context.entityType) || Boolean(extensionRuntime)
   if (runtime.current?.runtimeState === 'paused' && independentlyAssignable) {
@@ -185,6 +192,7 @@ export default defineEventHandler(async event => {
     ...runtime,
     canRetry: runtime.canRetry && !hasActiveRuntime && targetOpen && !riskFrozen,
     recommendations,
+    dataCollections,
     riskReadiness,
     canStart,
     startBlocker,

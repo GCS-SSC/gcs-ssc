@@ -38,7 +38,7 @@ export const requireAccountReceivableSourceRead = async (event: H3Event, db: Kys
   return context
 }
 
-/** Retains final reconciled Claim amounts and actual paid source periods, never submitted expenses. */
+/** Retains approved reconciled Claim amounts and actual paid source periods, never submitted expenses. */
 export const readAccountReceivableSources = async (db: Kysely<Database>, input: AccountReceivableSourceInput): Promise<CapturedAccountReceivableSource[]> => {
   if (input.claimRelated === input.advancePaymentRelated) throw new Error('AR_TYPE_FLAGS_INVALID')
   const cashRows = await db.selectFrom('Funding_Case_Agreement_Payment_Line as line')
@@ -133,7 +133,7 @@ export const readAccountReceivableSources = async (db: Kysely<Database>, input: 
   // Ambiguous historical Payments cannot be silently assigned to any debtor.
   const debtorPaid = rows.filter(row => String(row.egcs_fc_applicantrecipient) === input.applicantRecipientId)
   const paid = debtorPaid.filter(row => String(row.paymentFiscalYearId) === input.agencyFiscalYearId)
-  const claimRows = await db.selectFrom('Funding_Case_Agreement_Claim_Reconcile_Line_Item as line')
+  let claimQuery = db.selectFrom('Funding_Case_Agreement_Claim_Reconcile_Line_Item as line')
     .innerJoin('Funding_Case_Agreement_Claim_Reconcile as reconcile', 'reconcile.id', 'line.egcs_fc_fundingagreementclaimreconcile')
     .innerJoin('Funding_Case_Agreement_Claim as claim', 'claim.id', 'reconcile.egcs_fc_fundingagreementclaim')
     .innerJoin('Funding_Case_Agreement_Claim_Line_Item as original', 'original.id', 'line.egcs_fc_lineitem')
@@ -143,16 +143,20 @@ export const readAccountReceivableSources = async (db: Kysely<Database>, input: 
       'original.egcs_fc_fundingagreementbudgetlineitem', 'original.egcs_fc_description', 'claim.egcs_fc_periodstart', 'claim.egcs_fc_periodend',
       databaseMoneyText(sql.ref('line.egcs_fc_reconciled')).as('amount')])
     .where('claim.egcs_fc_fundingagreement', '=', input.agreementId).where('year.egcs_fc_fiscalyear', '=', input.agencyFiscalYearId)
-    .where('reconcile.egcs_fc_isfinal', '=', true).where('original.egcs_fc_currency', '=', input.currency)
+    .where('original.egcs_fc_currency', '=', input.currency)
     .where('line._deleted', '=', false).where('reconcile._deleted', '=', false).where('claim._deleted', '=', false)
-    .where('original._deleted', '=', false).orderBy('claim.egcs_fc_periodstart').orderBy('line.id').execute()
-  const finalClaims: typeof claimRows = []
-  let ambiguousFinalClaim = false
+    .where('original._deleted', '=', false)
+  // Claim debt may use any approved reconciliation; advance consumption retains
+  // the existing final-reconciliation basis for the debtor's fiscal balance.
+  if (input.advancePaymentRelated) claimQuery = claimQuery.where('reconcile.egcs_fc_isfinal', '=', true)
+  const claimRows = await claimQuery.orderBy('claim.egcs_fc_periodstart').orderBy('line.id').execute()
+  const approvedClaims: typeof claimRows = []
+  let ambiguousApprovedClaim = false
   for (const row of claimRows) {
     if (moneyToCents(parseDatabaseMoney(row.amount)) > BigInt(0)
       && await hasPositiveCompletionTerminus(db, 'fundingclaimreconcile', String(row.reconcileId))) {
-      if (row.submittingProponentId == null) ambiguousFinalClaim = true
-      else if (String(row.submittingProponentId) === input.applicantRecipientId) finalClaims.push(row)
+      if (row.submittingProponentId == null) ambiguousApprovedClaim = true
+      else if (String(row.submittingProponentId) === input.applicantRecipientId) approvedClaims.push(row)
     }
   }
   const codingFor = (paidRows: typeof paid): CapturedAccountReceivableSource['coding'] => {
@@ -178,14 +182,14 @@ export const readAccountReceivableSources = async (db: Kysely<Database>, input: 
       && pool.egcs_fc_chartofaccount === row.egcs_fc_chartofaccount && pool.egcs_fc_agencyfiscalyear === row.egcs_fc_agencyfiscalyear
       && pool.egcs_fc_periodstart === row.egcs_fc_periodstart && pool.egcs_fc_periodend === row.egcs_fc_periodend)?.egcs_fc_paidbasis ?? row.egcs_fc_paidbasis }))
   const coding = withSharedBasis(codingFor(paid))
-  if (input.claimRelated) return finalClaims.map(row => ({ id: `claim:${row.id}`,
+  if (input.claimRelated) return approvedClaims.map(row => ({ id: `claim:${row.id}`,
     label_en: `Claim ${row.claimId} · ${row.egcs_fc_description}`, label_fr: `Réclamation ${row.claimId} · ${row.egcs_fc_description}`,
     egcs_fc_sourceamount: parseDatabaseMoney(row.amount), egcs_fc_claim: String(row.claimId), egcs_fc_claimline: String(row.claimLineId),
     egcs_fc_reconcileline: String(row.id), egcs_fc_payment: null, egcs_fc_periodstart: row.egcs_fc_periodstart,
     egcs_fc_periodend: row.egcs_fc_periodend, egcs_fc_evidence: json(row), coding }))
-  if (ambiguousFinalClaim) return []
+  if (ambiguousApprovedClaim) return []
   const claimRecoveries = await readEffectiveAccountReceivableClaimRecoveries(db, input.agreementId)
-  const effectiveClaims = sumMoney(finalClaims.map(row => sumMoney([parseDatabaseMoney(row.amount), ...claimRecoveries
+  const effectiveClaims = sumMoney(approvedClaims.map(row => sumMoney([parseDatabaseMoney(row.amount), ...claimRecoveries
     .filter(recovery => String(recovery.reconcileLineId) === String(row.id)).map(recovery => recovery.amount)])))
   const unclaimed = subtractMoney(sumMoney(coding.map(item => item.egcs_fc_paidbasis)), effectiveClaims)
   const advances = paid.filter(row => row.egcs_fc_paymenttype === 'advance')
@@ -203,7 +207,7 @@ export const readAccountReceivableSources = async (db: Kysely<Database>, input: 
       egcs_fc_sourceamount: moneyToCents(paidAmount) < moneyToCents(available) ? paidAmount : available,
       egcs_fc_claim: null, egcs_fc_claimline: null, egcs_fc_reconcileline: null, egcs_fc_payment: paymentId,
       egcs_fc_periodstart: source.egcs_fc_periodstart, egcs_fc_periodend: source.egcs_fc_periodend,
-      egcs_fc_evidence: json({ payments: paymentRows, approvedClaims: finalClaims, egcs_fc_fiscaloutstanding: available,
+      egcs_fc_evidence: json({ payments: paymentRows, approvedClaims, egcs_fc_fiscaloutstanding: available,
         formula: 'minimum_actual_advance_paid_and_actual_paid_minus_final_approved_claims' }), coding: paymentCoding }]
   })
 }

@@ -27,6 +27,14 @@ type RuntimeRecommendation = {
   egcs_cn_definition: RecommendationDefinition
   canUpdate: boolean
 }
+type RuntimeDataCollection = {
+  id: string
+  workflowMemberId: string
+  egcs_cn_datacollectionsetup: string
+  runtimeState: RuntimeState
+  canUpdate: boolean
+  routingSlipId?: string | null
+}
 type RuntimeReview = {
   id: string
   runtimeItemId: string
@@ -66,17 +74,19 @@ type RuntimeResponse = {
   reviewSet: { id: string, runtimeState: RuntimeState, runtimeItemId: string } | null
   sourceApprovalStage: { runtimeItemId: string, runtimeState: RuntimeState, order: number, routingSlipId?: string | null } | null
   recommendations: RuntimeRecommendation[]
+  dataCollections: RuntimeDataCollection[]
   reviews: RuntimeReview[]
   workflowItems: Array<{ runtimeItemId: string, runtimeState: RuntimeState }>
   steps?: Array<{
     eligibility?: { eligible: boolean, unmatchedFieldIds: string[] }
     memberId: string
     sequence: number
-    kind: 'review_set' | 'recommendation_set' | 'approval_template'
+    kind: 'review_set' | 'recommendation_set' | 'data_collection' | 'approval_template'
     materializationStatus?: string
     successStatus?: string
     failureStatus?: string
     reviewPlan?: { name: { en: string, fr: string }, finalApproval?: PublishedApprovalReference }
+    dataCollectionPlan?: { nameEn: string, nameFr: string, descriptionEn: string, descriptionFr: string, approval?: PublishedApprovalPreview }
     recommendationPlan?: { nameEn: string, nameFr: string, members: Array<{ memberId: string, schemaNameEn: string, schemaNameFr: string, approval?: PublishedApprovalPreview }>, finalApproval?: PublishedApprovalReference }
     approval?: PublishedApprovalPreview
     runtimeItem: { runtimeItemId: string, runtimeState: RuntimeState } | null
@@ -116,7 +126,7 @@ type WorkflowDisplayStep = {
   status: RuntimeState | 'upcoming' | 'not_reached' | 'skipped'
   outcome: string | null
   hasApproval: boolean
-  kind: 'review' | 'recommendation' | 'final_approval'
+  kind: 'review' | 'recommendation' | 'data_collection' | 'final_approval'
   routingSlipId?: string
 }
 const {
@@ -231,8 +241,9 @@ type PublishedWorkflowPreview = {
     eligibility?: { eligible: boolean, unmatchedFieldIds: string[] }
     memberId: string
     sequence: number
-    kind: 'review_set' | 'recommendation_set' | 'approval_template'
+    kind: 'review_set' | 'recommendation_set' | 'data_collection' | 'approval_template'
     reviewPlan?: { name: { en: string, fr: string }, description: { en: string, fr: string } }
+    dataCollectionPlan?: { nameEn: string, nameFr: string, descriptionEn: string, descriptionFr: string, approval?: PublishedApprovalPreview }
     recommendationPlan?: { nameEn: string, nameFr: string, descriptionEn: string, descriptionFr: string }
     approval?: PublishedApprovalPreview
   }>
@@ -312,7 +323,7 @@ const workflowPreview = computed(() => {
         ordinal: member.sequence
       }
     }
-    const definition = member.recommendationPlan ?? member.approval
+    const definition = member.dataCollectionPlan ?? member.recommendationPlan ?? member.approval
     return {
       id: `preview-${member.memberId}`,
       type: t(`workflow.preview_types.${member.kind === 'approval_template' ? 'approvals' : member.kind}`),
@@ -367,6 +378,14 @@ const workflowSteps = computed<WorkflowDisplayStep[]>(() => {
           status: member.approvalStage?.runtimeState ?? unmaterializedStepStatus(runStatus),
           outcome: null, hasApproval: false, kind: 'final_approval' as const,
           routingSlipId: member.approvalStage?.routingSlipId
+        })
+      } else if (member.kind === 'data_collection') {
+        const collection = data.value?.dataCollections?.find(item => item.workflowMemberId === member.memberId)
+        steps.push({
+          id: `data-collection-${member.memberId}`, ordinal: ++ordinal,
+          name: (locale.value === 'fr' ? member.dataCollectionPlan?.nameFr : member.dataCollectionPlan?.nameEn) ?? t('workflow.data_collection'),
+          status: collection?.runtimeState ?? unmaterializedStepStatus(runStatus),
+          outcome: null, hasApproval: Boolean(member.dataCollectionPlan?.approval), kind: 'data_collection'
         })
       } else if (member.kind === 'recommendation_set') {
         for (const nested of member.recommendationPlan?.members ?? []) {
@@ -437,6 +456,7 @@ const workflowSteps = computed<WorkflowDisplayStep[]>(() => {
 const selectedRecommendation = computed(() => data.value?.recommendations?.find(
   item => String(item.egcs_cn_recommendationsetup) === selectedStepId.value
 ) ?? null)
+const selectedDataCollection = computed(() => data.value?.dataCollections?.find(item => `data-collection-${item.workflowMemberId}` === selectedStepId.value) ?? null)
 const canEditSelectedRecommendation = computed(() => canEdit && selectedRecommendation.value?.canUpdate === true)
 const selectedStep = computed(() => workflowSteps.value.find(step => step.id === selectedStepId.value) ?? null)
 const isStepViewable = (step: WorkflowDisplayStep): boolean =>
@@ -465,6 +485,9 @@ const selectAttempt = async (attempt: { runtimeId: string }) => {
 watch([currentRecommendation, () => data.value?.current?.runtimeState], ([recommendation]) => {
   if (recommendation) {
     selectedStepId.value = String(recommendation.egcs_cn_recommendationsetup)
+  } else if (data.value?.dataCollections?.some(item => item.runtimeState === 'active' || item.runtimeState === 'awaiting_action')) {
+    const collection = data.value.dataCollections.find(item => item.runtimeState === 'active' || item.runtimeState === 'awaiting_action')!
+    selectedStepId.value = `data-collection-${collection.workflowMemberId}`
   } else if (data.value?.sourceApprovalStage?.runtimeState === 'awaiting_action') {
     selectedStepId.value = workflowSteps.value.find(step => step.kind === 'final_approval' && step.status === 'awaiting_action')?.id
       ?? finalApprovalStepId
@@ -810,7 +833,7 @@ const handleApprovalChanged = async () => {
                 {{ step.name }}
               </div>
               <div v-if="step.hasApproval" class="mt-1 text-xs text-muted">
-                {{ t('workflow.followed_by_recommendation_approval') }}
+                {{ t('workflow.followed_by_approval') }}
               </div>
             </td>
             <td class="px-4 py-4">
@@ -870,6 +893,15 @@ const handleApprovalChanged = async () => {
           :routing-slip-id="selectedRecommendation.routingSlipId"
           hide-title
           @changed="handleApprovalChanged" />
+      </div>
+      <div v-else-if="selectedDataCollection" class="flex items-center justify-between gap-4 border-b border-default py-3">
+        <div>
+          <p class="font-semibold text-highlighted">
+            {{ selectedStep?.name }}
+          </p>
+          <CommonLifecycleBadge engine="runtime" :state="selectedDataCollection.runtimeState" class="mt-1" />
+        </div>
+        <UButton :to="localePath(appRouteLocations.dataCollectionDetail(selectedDataCollection.id))" color="neutral" variant="outline" icon="i-lucide-panel-top-open" :label="t('workflow.open_data_collection')" />
       </div>
       <AssessmentApprovalsSection
         v-else-if="selectedStep?.kind === 'final_approval' && 'routingSlipId' in selectedStep && selectedStep.routingSlipId"

@@ -85,6 +85,13 @@ export const CORE_ENTITY_REGISTRY = {
     ownerKind: 'runtime_source',
     assignmentMode: 'independent'
   },
+  commondatacollection: {
+    label: { en: 'Data Collection', fr: 'Collecte de données' },
+    completion: 'none', approvalSubmission: 'none', standardWorkflow: 'none', riskRating: 'none',
+    supportsDirectReviews: false,
+    ownerKind: 'runtime_source',
+    assignmentMode: 'independent'
+  },
   fundingcaseintake: {
     label: { en: 'Intake', fr: 'Réception' },
     completion: 'none', approvalSubmission: 'explicit', standardWorkflow: 'explicit', riskRating: 'none',

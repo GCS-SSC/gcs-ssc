@@ -1,0 +1,122 @@
+<script setup lang="ts">
+import { nanoid } from 'nanoid'
+import { computed } from 'vue'
+import type { QuestionnaireDefinition, QuestionnaireQuestion } from '~~/shared/types/schemas/questionnaire'
+import { getAssessmentLocaleLabel } from '~/utils/assessment-schema'
+
+const definition = defineModel<QuestionnaireDefinition>({ required: true })
+const { questionFactory, persistenceKey = 'questionnaire' } = defineProps<{ questionFactory?: () => QuestionnaireQuestion, persistenceKey?: string }>()
+const { t, locale } = useI18n()
+const activeLocale = computed<'en' | 'fr'>(() => locale.value === 'fr' ? 'fr' : 'en')
+const getNavigationLabel = (label: { en?: string; fr?: string }, fallback: string) => getAssessmentLocaleLabel(label, activeLocale.value, fallback)
+
+/**
+ * Adds a bilingual section with a stable language-independent key.
+ */
+const addSection = () => {
+  definition.value.sections.push({
+    key: `section-${nanoid(6)}`,
+    label: { en: t('recommendation_schema.new_section_en'), fr: t('recommendation_schema.new_section_fr') },
+    subSections: []
+  })
+}
+/**
+ * Adds a bilingual subsection to the selected section.
+ * @param sectionIndex Selected section index.
+ */
+const addSubSection = (sectionIndex: number) => {
+  definition.value.sections[sectionIndex]?.subSections.push({
+    key: `subsection-${nanoid(6)}`,
+    label: { en: t('recommendation_schema.new_subsection_en'), fr: t('recommendation_schema.new_subsection_fr') },
+    questions: []
+  })
+}
+/**
+ * Adds a radio question, matching the default assessment-style response pattern.
+ * @param sectionIndex Selected section index.
+ * @param subSectionIndex Selected subsection index.
+ */
+const addQuestion = (sectionIndex: number, subSectionIndex: number) => {
+  const question: QuestionnaireQuestion = questionFactory
+    ? questionFactory()
+    : {
+        key: `question-${nanoid(6)}`,
+        type: 'radio',
+        commentPolicy: 'none',
+        question: { en: t('recommendation_schema.new_question_en'), fr: t('recommendation_schema.new_question_fr') },
+        required: true,
+        options: [
+          { key: `option-${nanoid(6)}`, label: { en: t('recommendation_schema.new_option_en'), fr: t('recommendation_schema.new_option_fr') } },
+          { key: `option-${nanoid(6)}`, label: { en: t('recommendation_schema.new_option_en'), fr: t('recommendation_schema.new_option_fr') } }
+        ]
+      }
+  definition.value.sections[sectionIndex]?.subSections[subSectionIndex]?.questions.push(question)
+}
+</script>
+
+<template>
+  <div v-if="definition" class="space-y-5">
+    <div class="flex items-center justify-between border-default border-b pb-3">
+      <h3 class="font-semibold text-highlighted">
+        {{ t('recommendation_schema.form_sections') }}
+      </h3>
+      <UButton icon="i-lucide-plus" variant="outline" :label="t('recommendation_schema.add_section')" class="cursor-default" @click="addSection" />
+    </div>
+
+    <AssessmentSchemaAccordionSection
+      v-for="(section, sectionIndex) in definition.sections"
+      :key="section.key"
+      :persistence-key="`${persistenceKey}:${section.key}`"
+      :title="getNavigationLabel(section.label, section.key)">
+      <div class="space-y-5">
+        <div class="grid gap-4 md:grid-cols-2">
+          <UFormField :label="t('transfer_payment.name_en')" required>
+            <UInput v-model="section.label.en" class="w-full" />
+          </UFormField>
+          <UFormField :label="t('transfer_payment.name_fr')" required>
+            <UInput v-model="section.label.fr" class="w-full" />
+          </UFormField>
+        </div>
+        <div class="flex justify-end gap-2">
+          <UButton icon="i-lucide-plus" variant="outline" :label="t('recommendation_schema.add_subsection')" class="cursor-default" @click="addSubSection(sectionIndex)" />
+          <UButton icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('recommendation_schema.remove_section')" class="cursor-default" @click="definition.sections.splice(sectionIndex, 1)" />
+        </div>
+
+        <AssessmentSchemaAccordionSection
+          v-for="(subSection, subSectionIndex) in section.subSections"
+          :key="subSection.key"
+          :persistence-key="`${persistenceKey}:${section.key}:${subSection.key}`"
+          :title="getNavigationLabel(subSection.label, subSection.key)"
+          level="sub">
+          <div class="space-y-5">
+            <div class="grid gap-4 md:grid-cols-2">
+              <UFormField :label="t('transfer_payment.name_en')" required>
+                <UInput v-model="subSection.label.en" class="w-full" />
+              </UFormField>
+              <UFormField :label="t('transfer_payment.name_fr')" required>
+                <UInput v-model="subSection.label.fr" class="w-full" />
+              </UFormField>
+            </div>
+            <div class="flex justify-end gap-2">
+              <UButton icon="i-lucide-plus" variant="outline" :label="t('recommendation_schema.add_question')" class="cursor-default" @click="addQuestion(sectionIndex, subSectionIndex)" />
+              <UButton icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('recommendation_schema.remove_subsection')" class="cursor-default" @click="section.subSections.splice(subSectionIndex, 1)" />
+            </div>
+            <AssessmentSchemaAccordionSection
+              v-for="(question, questionIndex) in subSection.questions"
+              :key="question.key"
+              :persistence-key="`${persistenceKey}:${section.key}:${subSection.key}:${question.key}`"
+              :title="getNavigationLabel(question.question, question.key)"
+              level="sub">
+              <slot name="question-fields" :question="question" :update-question="(value: QuestionnaireQuestion) => { subSection.questions[questionIndex] = value }">
+                <CommonQuestionnaireQuestionFields v-model="subSection.questions[questionIndex]!" />
+              </slot>
+              <div class="mt-4 flex justify-end">
+                <UButton icon="i-lucide-trash" color="error" variant="ghost" :label="t('recommendation_schema.remove_question')" class="cursor-default" @click="subSection.questions.splice(questionIndex, 1)" />
+              </div>
+            </AssessmentSchemaAccordionSection>
+          </div>
+        </AssessmentSchemaAccordionSection>
+      </div>
+    </AssessmentSchemaAccordionSection>
+  </div>
+</template>

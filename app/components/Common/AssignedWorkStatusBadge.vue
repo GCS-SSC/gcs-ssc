@@ -16,7 +16,7 @@ const runtimeState = computed(() => status as RuntimeState)
     v-if="entityType === 'applicantrecipient'"
     :variant="status === 'active' ? 'active' : 'inactive'" />
   <CommonLifecycleBadge
-    v-else-if="entityType === 'commonreview' || entityType === 'commonrecommendation'"
+    v-else-if="entityType === 'commonreview' || entityType === 'commonrecommendation' || entityType === 'commondatacollection'"
     engine="runtime"
     :state="runtimeState" />
   <CommonRecordState

@@ -34,6 +34,7 @@ const tabs = computed(() => [
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
   { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-list-checks' },
   { key: 'workflow.title', value: 'workflows', icon: 'i-lucide-workflow' },
+  { key: 'supplementary_information.title', value: 'supplementary-information', icon: 'i-lucide-clipboard-list' },
   { key: 'funding_case_intake.approval_submission', value: 'approval', icon: 'i-lucide-send' },
   { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users-round' }
 ])
@@ -119,6 +120,7 @@ const breadcrumbs = computed(() => [
           <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcaseintake" :entity-id="id" />
           <CommonReviewsTab v-else-if="selectedTab === 'reviews'" entity-type="fundingcaseintake" :entity-id="id" :can-update="canEdit" @changed="refresh" />
           <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcaseintake" :entity-id="id" purpose="standard" :can-edit="canEdit" @changed="refresh" />
+          <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" entity-type="fundingcaseintake" :entity-id="id" />
           <CommonWorkflowSection v-else-if="selectedTab === 'approval'" entity-type="fundingcaseintake" :entity-id="id" purpose="approval_submission" :can-edit="canEdit" @changed="refresh" />
           <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" entity-type="fundingcaseintake" :entity-id="id" />
         </CommonEntityEditorWorkspace>

@@ -41,6 +41,10 @@ export const buildAssignedWorkAssignmentLineage = (): RawBuilder<unknown> => {
         FROM "Common_Recommendation" recommendation
         WHERE path.entity_type = 'commonrecommendation' AND recommendation.id = path.id AND NOT recommendation._deleted OFFSET 0)
       UNION ALL
+      (SELECT collection.egcs_cn_entityid, collection.egcs_cn_entitytype::text
+        FROM "Common_Data_Collection" collection
+        WHERE path.entity_type = 'commondatacollection' AND collection.id = path.id AND NOT collection._deleted OFFSET 0)
+      UNION ALL
       (SELECT memo.egcs_fc_receivable, 'fundingcaseaccountreceivable'
         FROM "Funding_Case_Account_Receivable_Credit_Memo" memo
         WHERE path.entity_type = 'fundingcaseaccountreceivablecreditmemo' AND memo.id = path.id AND NOT memo._deleted OFFSET 0)
@@ -259,6 +263,21 @@ export const buildAssignedWorkSearchSourceFacts = (): RawBuilder<unknown> => {
       WHERE target.id = runtime_item.egcs_cn_runtime AND NOT target._deleted OFFSET 0) runtime ON TRUE
     JOIN LATERAL (SELECT target.* FROM "Common_Recommendation_Schema" target
       WHERE target.id = runtime_item.egcs_cn_publication AND NOT target._deleted OFFSET 0) schema ON TRUE
+    UNION ALL
+    SELECT collection.id, 'commondatacollection', runtime_item.egcs_cn_state::text,
+      version.egcs_cn_definition->>'nameEn', version.egcs_cn_definition->>'nameFr', '#' || collection.id::text,
+      NULL::bigint, NULL::bigint, NULL::text, NULL::text, NULL::bigint, NULL::bigint, schema.egcs_cn_agency
+    FROM needed_identities needed
+    JOIN LATERAL (SELECT target.* FROM "Common_Data_Collection" target
+      WHERE target.id = needed.id AND needed.entity_type = 'commondatacollection' AND NOT target._deleted OFFSET 0) collection ON TRUE
+    JOIN LATERAL (SELECT target.* FROM "Common_Runtime_Item" target
+      WHERE target.id = collection.egcs_cn_runtimeitem AND NOT target._deleted OFFSET 0) runtime_item ON TRUE
+    JOIN LATERAL (SELECT target.* FROM "Common_Runtime" target
+      WHERE target.id = runtime_item.egcs_cn_runtime AND NOT target._deleted OFFSET 0) runtime ON TRUE
+    JOIN LATERAL (SELECT target.* FROM "Common_Data_Collection_Setup" target
+      WHERE target.id = runtime_item.egcs_cn_publication AND NOT target._deleted OFFSET 0) schema ON TRUE
+    JOIN LATERAL (SELECT target.* FROM "Common_Publication_Version" target
+      WHERE target.id = runtime_item.egcs_cn_publicationversion OFFSET 0) version ON TRUE
     UNION ALL
     SELECT stream.id, 'transferpaymentstream', 'active', stream.egcs_tp_name_en, stream.egcs_tp_name_fr,
       NULL::text, NULL::bigint, NULL::bigint, NULL::text, 'transfer_payment', program.egcs_tp_agency, program.id, NULL::bigint

@@ -17,6 +17,7 @@ import type {
 } from '~~/shared/types/database'
 import type { StatusId } from '~~/shared/types/status'
 import { readPublishedApprovalTemplate, type PublishedApprovalTemplate } from './approval-template-versioning'
+import { readPublishedDataCollectionSetup, type PublishedDataCollectionSetup } from './data-collection-setup-versioning'
 import { readPublishedRecommendationPlan, type PublishedRecommendationPlan } from './recommendation-setup-versioning'
 import { readPublishedReviewSetup, type PublishedReviewSetupConfiguration } from './review-setup-versioning'
 import { readPublishedReviewSchema } from './review-schema-versioning'
@@ -50,6 +51,7 @@ export type PublishedWorkflowMember = {
   owners: PublishedWorkflowOwner[]
   reviewPlan?: PublishedReviewSetupConfiguration
   recommendationPlan?: PublishedRecommendationPlan
+  dataCollectionPlan?: PublishedDataCollectionSetup
   approval?: PublishedApprovalTemplate
 }
 export type PublishedWorkflowConfiguration = {
@@ -180,12 +182,14 @@ export const buildWorkflowSetupPublication = async (
         throw new Error('Workflow default group must be active in its Agency and contain an active member')
       }
     }
-    const referenceId = String(row.egcs_cn_reviewset ?? row.egcs_cn_recommendationset ?? row.egcs_cn_approvaltemplate)
+    const referenceId = String(row.egcs_cn_reviewset ?? row.egcs_cn_recommendationset ?? row.egcs_cn_datacollection ?? row.egcs_cn_approvaltemplate)
     const owner = row.egcs_cn_reviewset
       ? await db.selectFrom('Common_Review_Set_Setup').select('egcs_cn_agency').where('id', '=', referenceId).where('_deleted', '=', false).executeTakeFirst()
       : row.egcs_cn_recommendationset
         ? await db.selectFrom('Common_Recommendation_Set_Setup').select('egcs_cn_agency').where('id', '=', referenceId).where('_deleted', '=', false).executeTakeFirst()
-        : await db.selectFrom('Common_Approval_Template').select('egcs_cn_agency').where('id', '=', referenceId).where('_deleted', '=', false).executeTakeFirst()
+        : row.egcs_cn_datacollection
+          ? await db.selectFrom('Common_Data_Collection_Setup').select('egcs_cn_agency').where('id', '=', referenceId).where('_deleted', '=', false).executeTakeFirst()
+          : await db.selectFrom('Common_Approval_Template').select('egcs_cn_agency').where('id', '=', referenceId).where('_deleted', '=', false).executeTakeFirst()
     if (!owner || String(owner.egcs_cn_agency) !== String(setup.egcs_cn_agency)) {
       throw new Error('Workflow member must belong to the same Agency')
     }
@@ -193,7 +197,7 @@ export const buildWorkflowSetupPublication = async (
     let publicationId: string
     let publicationVersionId: string
     let publicationVersion: number
-    let nestedDefinition: Pick<PublishedWorkflowMember, 'reviewPlan' | 'recommendationPlan' | 'approval'> = {}
+    let nestedDefinition: Pick<PublishedWorkflowMember, 'reviewPlan' | 'recommendationPlan' | 'dataCollectionPlan' | 'approval'> = {}
     if (row.egcs_cn_reviewset) {
       kind = 'review_set_setup'
       const published = await resolvePublishedMember(
@@ -215,6 +219,18 @@ export const buildWorkflowSetupPublication = async (
       publicationVersion = published.publicationVersion
       publicationId = published.publicationId
       nestedDefinition = { recommendationPlan: published.definition }
+    } else if (row.egcs_cn_datacollection) {
+      kind = 'data_collection_setup'
+      const published = await resolvePublishedMember(
+        db, referenceId, kind, 'Workflow data collection must be published first', readPublishedDataCollectionSetup
+      )
+      publicationVersionId = published.publicationVersionId
+      publicationVersion = published.publicationVersion
+      publicationId = published.publicationId
+      nestedDefinition = { dataCollectionPlan: published.definition }
+      if (ownerRows.length > 1 || ownerRows.some(owner => String(owner.egcs_cn_datacollection) !== referenceId)) {
+        throw new Error('Workflow data collection accepts at most one matching owner mapping')
+      }
     } else {
       kind = 'approval_template'
       const published = await resolvePublishedMember(
@@ -264,7 +280,7 @@ export const buildWorkflowSetupPublication = async (
       ...(row.egcs_cn_failurestatus ? { failureStatus: String(row.egcs_cn_failurestatus) } : {}),
       allowOwnerRedirect: row.egcs_cn_allowownerredirect,
       owners: ownerRows.map(owner => ({
-        nestedMemberId: String(owner.egcs_cn_reviewsetup ?? owner.egcs_cn_recommendationsetup),
+        nestedMemberId: String(owner.egcs_cn_reviewsetup ?? owner.egcs_cn_recommendationsetup ?? owner.egcs_cn_datacollection),
         ...(owner.egcs_cn_defaultowner ? { defaultOwner: String(owner.egcs_cn_defaultowner) } : {}),
         ...(owner.egcs_cn_defaultgroup ? { defaultGroup: String(owner.egcs_cn_defaultgroup) } : {})
       })),
@@ -291,6 +307,7 @@ export const buildWorkflowSetupPublication = async (
   }
   if (definition.purpose === 'approval_submission') {
     const hasApproval = members.some(member => member.kind === 'approval_template'
+      || Boolean(member.dataCollectionPlan?.approval)
       || Boolean(member.recommendationPlan?.finalApproval)
       || member.recommendationPlan?.members.some(candidate => Boolean(candidate.approval)))
     if (!hasApproval) throw new Error('Approval submission workflow requires an approval stage')

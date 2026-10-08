@@ -26,7 +26,7 @@ import { resolveAgreementCloseoutRuntimeContext } from '~~/server/utils/agreemen
 import { resolveCurrentCommonUser } from '~~/server/utils/additional-reviewer-runtime'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
 import type { ReviewRuntimeSetupScope } from '~~/server/utils/review-runtime'
-import { isAssignableEntityType } from '~~/shared/utils/entity-assignments'
+import { isAssignableEntityType, isRuntimeAssignableEntityType } from '~~/shared/utils/entity-assignments'
 import { resolveAssignedItemGrant } from '~~/server/utils/rbac'
 import { canManageEntityAssignmentsWithContext } from '~~/server/utils/entity-assignment'
 import { isBusinessStatusEntityType, isBusinessStatusLineageLocked } from '~~/server/utils/business-status-runtime'
@@ -469,7 +469,7 @@ const isIndependentProponentReviewTarget = (
   entityContext: ReviewRuntimeEntityContext,
   target: ExactEntityTarget<Entity_Type>
 ): boolean => entityContext.entityType === 'applicantrecipient'
-  && (target.entityType === 'commonreview' || target.entityType === 'commonrecommendation')
+  && isRuntimeAssignableEntityType(target.entityType)
 
 const resolveExtensionAuthorizationRuntime = async (
   event: H3Event,
@@ -596,6 +596,10 @@ const authorizeReviewRuntimeReadAccess = async (
   }
 
   if (entityContext.entityType === 'fundingcaseintake' && !hasInheritedOwnerRead) return await forbidden(event)
+
+  if (exactItemTarget.entityType === 'commondatacollection' && !hasInheritedOwnerRead && !approvalAssignment) {
+    return await forbidden(event)
+  }
 
   if (canReadExactRuntimeItem({
     hasInheritedOwnerRead,
@@ -886,6 +890,31 @@ export const resolveReviewRuntimeEntityFromReviewSet = async (
     schemaAgencyId: creditMemoAgencyId ?? intakeEntity?.schemaAgencyId ?? (reviewSet.proponent_schema_agency ? String(reviewSet.proponent_schema_agency) : null),
     reviewSetId,
     reviewId: null
+  }
+}
+
+/** Resolves the source owner's scope and exact assignment/approval target for one collection. */
+export const resolveReviewRuntimeEntityFromDataCollection = async (
+  db: Kysely<Database>,
+  dataCollectionId: string
+): Promise<ReviewRuntimeEntityContext | null> => {
+  const collection = await db.selectFrom('Common_Data_Collection')
+    .innerJoin('Common_Runtime_Item', 'Common_Runtime_Item.id', 'Common_Data_Collection.egcs_cn_runtimeitem')
+    .innerJoin('Common_Data_Collection_Setup', 'Common_Data_Collection_Setup.id', 'Common_Runtime_Item.egcs_cn_publication')
+    .select(['Common_Data_Collection.egcs_cn_entitytype', 'Common_Data_Collection.egcs_cn_entityid',
+      'Common_Data_Collection_Setup.egcs_cn_agency as schemaAgencyId'])
+    .where('Common_Data_Collection.id', '=', dataCollectionId)
+    .where('Common_Data_Collection._deleted', '=', false)
+    .where('Common_Runtime_Item._deleted', '=', false)
+    .executeTakeFirst()
+  if (!collection) return null
+  const owner = await resolveReviewRuntimeEntityFromEntity(db, collection.egcs_cn_entitytype, String(collection.egcs_cn_entityid))
+  if (!owner) return null
+  return {
+    ...owner,
+    ...(owner.entityType === 'applicantrecipient' ? { schemaAgencyId: String(collection.schemaAgencyId) } : {}),
+    approvalEntityType: 'commondatacollection',
+    approvalEntityId: dataCollectionId
   }
 }
 
@@ -1257,6 +1286,19 @@ export const lockReviewRuntimeTarget = async (
     runtimeId = runtime ? String(runtime.id) : null
   }
 
+  if (!runtimeId && entityContext.approvalEntityType === 'commondatacollection' && entityContext.approvalEntityId) {
+    const runtime = await trx.selectFrom('Common_Runtime')
+      .innerJoin('Common_Runtime_Item', 'Common_Runtime_Item.egcs_cn_runtime', 'Common_Runtime.id')
+      .innerJoin('Common_Data_Collection', 'Common_Data_Collection.egcs_cn_runtimeitem', 'Common_Runtime_Item.id')
+      .select('Common_Runtime.id')
+      .where('Common_Data_Collection.id', '=', entityContext.approvalEntityId)
+      .where('Common_Data_Collection._deleted', '=', false)
+      .where('Common_Runtime_Item._deleted', '=', false)
+      .where('Common_Runtime._deleted', '=', false)
+      .forUpdate('Common_Runtime').executeTakeFirst()
+    runtimeId = runtime ? String(runtime.id) : null
+  }
+
   if (runtimeId) {
     await trx.selectFrom('Common_Runtime_Item').select('id')
       .where('egcs_cn_runtime', '=', runtimeId)
@@ -1295,6 +1337,16 @@ export const lockReviewRuntimeTarget = async (
       .forUpdate()
       .executeTakeFirst()
   }
+
+  if (entityContext.approvalEntityType === 'commondatacollection' && entityContext.approvalEntityId) {
+    await trx
+      .selectFrom('Common_Data_Collection')
+      .select('id')
+      .where('id', '=', entityContext.approvalEntityId)
+      .where('_deleted', '=', false)
+      .forUpdate()
+      .executeTakeFirst()
+  }
 }
 
 /** Resolves the same runtime target again after its lock has been acquired. */
@@ -1304,6 +1356,9 @@ const resolveLockedReviewRuntimeTarget = async (
 ): Promise<ReviewRuntimeEntityContext | null> => {
   if (entityContext.approvalEntityType === 'commonrecommendation' && entityContext.approvalEntityId) {
     return await resolveReviewRuntimeEntityFromRecommendation(trx, entityContext.approvalEntityId)
+  }
+  if (entityContext.approvalEntityType === 'commondatacollection' && entityContext.approvalEntityId) {
+    return await resolveReviewRuntimeEntityFromDataCollection(trx, entityContext.approvalEntityId)
   }
   if (entityContext.reviewId) {
     return await resolveReviewRuntimeEntityFromReview(trx, entityContext.reviewId)
@@ -1905,7 +1960,7 @@ const executeFreshAuthorizedReviewActorMutation = async <T>(
       !currentCommonUser
       || (actorMode !== 'group_claim' && !current.reviewId)
       || (actorMode === 'group_claim' && !current.reviewId
-        && !(current.approvalEntityType === 'commonrecommendation' && current.approvalEntityId))
+        && !((current.approvalEntityType === 'commonrecommendation' || current.approvalEntityType === 'commondatacollection') && current.approvalEntityId))
       || (actorMode === 'review_approval' && !(await hasAssignedApproval(trx, currentCommonUser.id, current.reviewId!)))
     ) {
       return await forbidden(event)

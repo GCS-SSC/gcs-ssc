@@ -14,7 +14,7 @@ import {
   resolveQualifiedEntityAssignmentSource
 } from '~~/server/utils/entity-assignment'
 import { executeQualifiedRuntimeTransaction, resolveQualifiedRuntimeTransactionPlan } from './qualified-runtime-transaction'
-import { lockReviewRuntimeTarget } from './review-runtime-access'
+import { lockReviewRuntimeTarget, resolveReviewRuntimeEntityFromDataCollection } from './review-runtime-access'
 import { getActiveStructuralRoleAssignments } from '~~/server/utils/active-user-scopes'
 import { lockTransferPaymentStreams } from '~~/server/utils/transfer-payment-stream-lock'
 import { defineUserAbilities, getUserAssignmentAgencyScopes } from '~~/server/utils/rbac'
@@ -76,6 +76,11 @@ const lockAssignmentTarget = async (
   target: CoreEntityAssignmentTarget,
   expectedOwner: AuthorizationResourceOwner
 ): Promise<void> => {
+  if (target.entityType === 'commondatacollection') {
+    const context = await resolveReviewRuntimeEntityFromDataCollection(trx, target.entityId)
+    if (!context) return await notFound(event, 'ASSIGNMENT_TARGET_NOT_FOUND', 'apiErrors.request.not_found')
+    await lockReviewRuntimeTarget(trx, context)
+  }
   const table = ENTITY_AUTHORIZATION_POLICIES[target.entityType].table as keyof Database
   const concreteEntity = await trx.selectFrom(table)
     .select('id')
@@ -280,8 +285,8 @@ export const executeEntityAssignmentManagement = async <T>(
             schemaAgencyId: null,
             reviewSetId: ancestor.reviewSetId ?? null,
             reviewId: ancestor.entityType === 'commonreview' ? ancestor.entityId : null,
-            approvalEntityType: ancestor.entityType === 'commonrecommendation' ? 'commonrecommendation' : null,
-            approvalEntityId: ancestor.entityType === 'commonrecommendation' ? ancestor.entityId : null
+            approvalEntityType: ancestor.entityType !== 'commonreview' ? ancestor.entityType : null,
+            approvalEntityId: ancestor.entityType !== 'commonreview' ? ancestor.entityId : null
           })
         }
         const currentSource = await resolveQualifiedEntityAssignmentSource(trx, coreTarget.entityType, coreTarget.entityId)

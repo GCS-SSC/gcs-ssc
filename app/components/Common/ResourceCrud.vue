@@ -157,7 +157,7 @@ defineExpose({
       </template>
 
       <template #actions-cell="{ row }">
-        <slot name="actions-cell" :row="row">
+        <slot name="actions-cell" :row="row" :open-update="openUpdate" :delete-item="deleteItem">
           <div class="flex items-center gap-2">
             <UButton
               v-if="canUpdate"

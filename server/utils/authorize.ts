@@ -105,7 +105,7 @@ export const authorizeFreshAssignedItem = async (
   const owner = await resolveEntityAssignmentOwner(trx, entityType, entityId)
   if (!owner) return await forbidden(event)
   if (owner.kind === 'applicant_recipient') {
-    if (owner.agencyId && (entityType === 'commonreview' || entityType === 'commonrecommendation')) {
+    if (owner.agencyId && (entityType === 'commonreview' || entityType === 'commonrecommendation' || entityType === 'commondatacollection')) {
       if (!context.userAbilities.authorize('applicant_recipient', action, {
         type: 'agency', agencyId: owner.agencyId
       })) return await forbidden(event)

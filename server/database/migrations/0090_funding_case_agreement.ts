@@ -2322,7 +2322,7 @@ AS $function$
               AND claim.egcs_fc_fundingagreement = root.egcs_fc_fundingagreement AND fiscal.egcs_fc_fiscalyear = root.egcs_fc_agencyfiscalyear
               AND claim.egcs_fc_applicantrecipient = root.egcs_fc_applicantrecipient
               AND NEW.egcs_fc_periodstart = claim.egcs_fc_periodstart AND NEW.egcs_fc_periodend = claim.egcs_fc_periodend
-              AND (root.egcs_fc_linkedreceivable IS NOT NULL OR (reconciliation.egcs_fc_isfinal AND reconciled.egcs_fc_reconciled >= NEW.egcs_fc_sourceamount))) THEN
+              AND (root.egcs_fc_linkedreceivable IS NOT NULL OR reconciled.egcs_fc_reconciled >= NEW.egcs_fc_sourceamount)) THEN
             RAISE EXCEPTION 'AR Claim source must preserve Agreement fiscal and period lineage' USING ERRCODE = '23514';
           END IF;
         ELSE

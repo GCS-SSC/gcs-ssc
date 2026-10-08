@@ -40,6 +40,10 @@ const filterCreditMemoQueueOwners = (allowed: RawBuilder<unknown>, workAlias = '
       SELECT recommendation.id, 'commonrecommendation', recommendation.egcs_cn_entityid,
         recommendation.egcs_cn_entitytype::text
       FROM "Common_Recommendation" recommendation WHERE NOT recommendation._deleted
+      UNION ALL
+      SELECT collection.id, 'commondatacollection', collection.egcs_cn_entityid,
+        collection.egcs_cn_entitytype::text
+      FROM "Common_Data_Collection" collection WHERE NOT collection._deleted
     ) edge ON edge.id = source.id AND edge.source_type = source.entity_type
   )
   SELECT 1 FROM source

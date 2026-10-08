@@ -38,6 +38,7 @@ export const EXECUTION_ENTITY_TYPE_ENUM = [
   'applicantrecipient',
   'commonreview',
   'commonrecommendation',
+  'commondatacollection',
   'fundingcaseintake',
   'fundingcaseagreementclaim',
   'fundingcaseamendment',

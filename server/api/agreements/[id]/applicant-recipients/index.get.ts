@@ -5,6 +5,7 @@ import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import { assertAgreementExists } from '~~/server/utils/agreement-child-resources'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+import { agreementApplicantRecipientCanDelete } from '~~/server/utils/agreement-applicant-recipient'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 
 const QuerySchema = PaginationSchema.extend({
@@ -65,6 +66,7 @@ export default defineEventHandler(async event => {
       baseQuery
         .select([
           'Funding_Case_Agreement_Applicant_Recipient.id as id',
+          agreementApplicantRecipientCanDelete().as('can_delete'),
           'Funding_Case_Agreement_Applicant_Recipient.egcs_fc_applicantrecipientsubtype',
           'subtype.egcs_ay_name_en as subtype_name_en',
           'subtype.egcs_ay_name_fr as subtype_name_fr',

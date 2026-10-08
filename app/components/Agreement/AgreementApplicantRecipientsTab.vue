@@ -3,16 +3,41 @@ import AgreementProponentLookupField from './AgreementProponentLookupField.vue'
 import type { FundingCaseAgreementApplicantRecipientForm } from '~~/shared/types/funding-case-agreement-ui'
 import { FundingCaseAgreementApplicantRecipientCreateSchema } from '~~/shared/types/schemas'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
+import { appRouteLocations } from '~/utils/route-locations'
 
-const { agreementId, canCreate, canUpdate, canDelete } = defineProps<{
+const { agreementId, canCreate, canUpdate, canDelete, showUpdate = undefined, showDelete = undefined } = defineProps<{
   agreementId: string
   canCreate: boolean
   canUpdate: boolean
   canDelete: boolean
+  showUpdate?: boolean
+  showDelete?: boolean
 }>()
 
 const { t } = useI18n()
+const localePath = useLocalePath()
 const { getBilingualValue } = useBilingualValue()
+const toast = useToast()
+
+/**
+ * Explains a blocked action before opening its editor or deletion confirmation.
+ * @param allowed Whether assignment and lifecycle permit the action.
+ * @param proceed The existing CRUD action.
+ * @param referenced Whether agreement evidence prevents deletion.
+ */
+const exerciseAction = (allowed: boolean, proceed: () => unknown, referenced = false) => {
+  if (!allowed || referenced) {
+    toast.add({
+      title: t('common.warning'),
+      description: t(referenced
+        ? 'apiErrors.agreement.applicant_recipient_in_use'
+        : 'agreement.applicant_recipients.action_unavailable'),
+      color: 'warning'
+    })
+    return
+  }
+  proceed()
+}
 
 const columns: TableColumnInput<{ id: string } & Record<string, unknown>>[] = [
   { id: 'applicant_recipient_name', accessorKey: 'applicant_recipient_name_en', headerKey: 'agreement.applicant_recipients.applicant_recipient' },
@@ -75,6 +100,33 @@ const getApplicantRecipientLookupUrl = (state: FundingCaseAgreementApplicantReci
     :search-placeholder="t('agreement.applicant_recipients.search')">
     <template #subtype-cell="{ row }">
       {{ getBilingualValue(row.original, 'subtype_name', t('agreement.applicant_recipients.not_selected')) }}
+    </template>
+    <template #actions-cell="{ row, openUpdate, deleteItem }">
+      <div class="flex items-center justify-end gap-2">
+        <UButton
+          v-if="showUpdate ?? canUpdate"
+          icon="i-lucide-edit-3"
+          color="neutral"
+          variant="ghost"
+          size="sm"
+          :aria-label="t('common.edit')"
+          @click="exerciseAction(canUpdate, () => openUpdate(row.original))" />
+        <UButton
+          v-if="showDelete ?? canDelete"
+          icon="i-lucide-trash"
+          color="error"
+          variant="ghost"
+          size="sm"
+          :aria-label="t('common.delete')"
+          @click="exerciseAction(canDelete, () => deleteItem(row.original.id), row.original.can_delete !== true)" />
+        <UButton
+          icon="i-lucide-arrow-right"
+          color="neutral"
+          variant="ghost"
+          size="sm"
+          :aria-label="`${t('common.open')}: ${getBilingualValue(row.original, 'applicant_recipient_name')}`"
+          :to="localePath(appRouteLocations.proponentEdit(String(row.original.egcs_fc_applicantrecipient)))" />
+      </div>
     </template>
     <template #form="{ state }">
       <UFormField :label="t('agreement.applicant_recipients.applicant_recipient')" name="egcs_fc_applicantrecipient">

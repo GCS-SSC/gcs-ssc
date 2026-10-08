@@ -1,6 +1,6 @@
 /* eslint-disable jsdoc/require-jsdoc */
 import { z } from 'zod'
-import type { PublicationState } from '../../constants/system-lifecycle'
+import { SYSTEM_LIFECYCLE, type PublicationState } from '../../constants/system-lifecycle'
 import {
   createApprovalTemplateCertificationBaseSchema,
   createApprovalTemplateStepBaseSchema,
@@ -216,7 +216,9 @@ export const ApprovalTemplatePersistenceSchema = ApprovalTemplateBaseSchema
     validateAdditionalApprovalPolicy(data, ctx)
   })
 
-export const ApprovalTemplateListQuerySchema = PaginationSchema.strict()
+export const ApprovalTemplateListQuerySchema = PaginationSchema.extend({
+  state: z.enum(SYSTEM_LIFECYCLE.publication.states, { error: 'validation.invalid_selection' }).optional()
+}).strict()
 
 export type ApprovalTemplate = z.infer<typeof ApprovalTemplateSchema>
 export type ApprovalTemplateScopeType = z.infer<typeof ApprovalTemplateScopeTypeSchema>

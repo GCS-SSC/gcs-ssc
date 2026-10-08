@@ -35,8 +35,9 @@ type WorkflowMember = {
   conditions?: WorkflowMemberCondition[]
   id: string
   egcs_cn_sequence: number
-  egcs_cn_kind: 'review_set' | 'recommendation_set' | 'approval_template'
+  egcs_cn_kind: 'review_set' | 'recommendation_set' | 'data_collection' | 'approval_template'
   egcs_cn_reviewset?: string
+  egcs_cn_datacollection?: string
   egcs_cn_recommendationset?: string
   egcs_cn_approvaltemplate?: string
   egcs_cn_materializationstatus?: string | null
@@ -45,7 +46,7 @@ type WorkflowMember = {
   egcs_cn_allowownerredirect: boolean
   egcs_cn_setsriskrating: boolean
   egcs_cn_riskreviewsetup: string | null
-  owners?: Array<{ egcs_cn_reviewsetup?: string, egcs_cn_recommendationsetup?: string, egcs_cn_defaultowner?: string, egcs_cn_defaultgroup?: string }>
+  owners?: Array<{ egcs_cn_reviewsetup?: string, egcs_cn_recommendationsetup?: string, egcs_cn_datacollection?: string, egcs_cn_defaultowner?: string, egcs_cn_defaultgroup?: string }>
 }
 type WorkflowMemberForm = Omit<WorkflowMember, 'id'> & { id?: string }
 type NestedMember = { id: string, egcs_cn_order?: number, egcs_cn_name_en?: string, egcs_cn_name_fr?: string }
@@ -128,7 +129,7 @@ const validateMemberBase = createValidator(CommonWorkflowSetupMemberCreateSchema
 const validateMember = withFormRequirements(async (member: WorkflowMemberForm) => {
   const errors = await validateMemberBase(member)
   member.owners?.forEach((owner, index) => {
-    const nestedId = owner.egcs_cn_reviewsetup ?? owner.egcs_cn_recommendationsetup
+    const nestedId = owner.egcs_cn_reviewsetup ?? owner.egcs_cn_recommendationsetup ?? owner.egcs_cn_datacollection
     if (nestedId && groupOwnerModes.value[nestedId] && !owner.egcs_cn_defaultgroup) {
       errors.push({ name: `owners.${index}.egcs_cn_defaultgroup`, message: t('validation.required') })
     }
@@ -314,6 +315,7 @@ const retire = () => performPublicationAction('retire')
 const memberKinds = computed(() => [
   { value: 'review_set', label: t('workflow.review_set') },
   { value: 'recommendation_set', label: t('workflow.recommendation_set') },
+  { value: 'data_collection', label: t('workflow.data_collection') },
   { value: 'approval_template', label: t('workflow.approval_template') }
 ])
 const openMember = (member?: WorkflowMember) => {
@@ -327,7 +329,7 @@ const openMember = (member?: WorkflowMember) => {
       }
   isMemberOpen.value = true
 }
-watch(() => [selectedMember.value?.egcs_cn_kind, selectedMember.value?.egcs_cn_reviewset, selectedMember.value?.egcs_cn_recommendationset], async (selection, previousSelection) => {
+watch(() => [selectedMember.value?.egcs_cn_kind, selectedMember.value?.egcs_cn_reviewset, selectedMember.value?.egcs_cn_recommendationset, selectedMember.value?.egcs_cn_datacollection], async (selection, previousSelection) => {
   const generation = ++nestedMembersGeneration
   const member = selectedMember.value
   const isSameMember = member === previousNestedMember
@@ -347,7 +349,7 @@ watch(() => [selectedMember.value?.egcs_cn_kind, selectedMember.value?.egcs_cn_r
   if (!member || member.egcs_cn_kind === 'approval_template') {
     return
   }
-  const referenceId = member.egcs_cn_kind === 'review_set' ? member.egcs_cn_reviewset : member.egcs_cn_recommendationset
+  const referenceId = member.egcs_cn_kind === 'review_set' ? member.egcs_cn_reviewset : member.egcs_cn_kind === 'data_collection' ? member.egcs_cn_datacollection : member.egcs_cn_recommendationset
   if (!referenceId) {
     return
   }
@@ -355,20 +357,21 @@ watch(() => [selectedMember.value?.egcs_cn_kind, selectedMember.value?.egcs_cn_r
   try {
     const requestedKind = member.egcs_cn_kind
     const requestedReferenceId = String(referenceId)
-    const resource = requestedKind === 'review_set' ? 'review-setups' : 'recommendation-setups'
+    const resource = requestedKind === 'review_set' ? 'review-sets' : requestedKind === 'data_collection' ? 'data-collections' : 'recommendation-sets'
     await applyCurrentWorkflowMemberSelection(
       { kind: requestedKind, referenceId: requestedReferenceId },
       async () => {
-        const request = await fetch(getClientRequestUrl(`/api/agency/${agencyId}/${resource === 'review-setups' ? 'review-sets' : 'recommendation-sets'}/${referenceId}`))
+        const request = await fetch(getClientRequestUrl(`/api/agency/${agencyId}/${resource}/${referenceId}`))
         if (!request.ok) await throwFetchResponseError(request)
-        return await request.json() as { members: NestedMember[], riskAssessmentMembers?: NestedMember[] }
+        const payload = await request.json() as { members?: NestedMember[], riskAssessmentMembers?: NestedMember[] } & NestedMember
+        return { members: requestedKind === 'data_collection' ? [payload] : payload.members ?? [], riskAssessmentMembers: payload.riskAssessmentMembers }
       },
       () => {
         const current = selectedMember.value
         if (!current || current.egcs_cn_kind === 'approval_template') return null
         const currentReferenceId = current.egcs_cn_kind === 'review_set'
           ? current.egcs_cn_reviewset
-          : current.egcs_cn_recommendationset
+          : current.egcs_cn_kind === 'data_collection' ? current.egcs_cn_datacollection : current.egcs_cn_recommendationset
         return { kind: current.egcs_cn_kind, referenceId: String(currentReferenceId) }
       },
       response => {
@@ -377,15 +380,15 @@ watch(() => [selectedMember.value?.egcs_cn_kind, selectedMember.value?.egcs_cn_r
         nestedMembers.value = response.members
         riskAssessmentMembers.value = response.riskAssessmentMembers ?? []
         current.owners = response.members.map((nested: NestedMember) => {
-          const existing = current.owners?.find(owner => String(owner.egcs_cn_reviewsetup ?? owner.egcs_cn_recommendationsetup) === String(nested.id))
+          const existing = current.owners?.find(owner => String(owner.egcs_cn_reviewsetup ?? owner.egcs_cn_recommendationsetup ?? owner.egcs_cn_datacollection) === String(nested.id))
           return {
-            ...(current.egcs_cn_kind === 'review_set' ? { egcs_cn_reviewsetup: String(nested.id) } : { egcs_cn_recommendationsetup: String(nested.id) }),
+            ...(current.egcs_cn_kind === 'review_set' ? { egcs_cn_reviewsetup: String(nested.id) } : current.egcs_cn_kind === 'data_collection' ? { egcs_cn_datacollection: String(nested.id) } : { egcs_cn_recommendationsetup: String(nested.id) }),
             egcs_cn_defaultowner: existing?.egcs_cn_defaultowner ?? undefined,
             egcs_cn_defaultgroup: existing?.egcs_cn_defaultgroup ?? undefined
           }
         })
         groupOwnerModes.value = Object.fromEntries(response.members.map(nested => [nested.id,
-          Boolean(current.owners?.find(owner => String(owner.egcs_cn_reviewsetup ?? owner.egcs_cn_recommendationsetup) === String(nested.id))?.egcs_cn_defaultgroup)
+          Boolean(current.owners?.find(owner => String(owner.egcs_cn_reviewsetup ?? owner.egcs_cn_recommendationsetup ?? owner.egcs_cn_datacollection) === String(nested.id))?.egcs_cn_defaultgroup)
         ]))
       }
     )
@@ -695,6 +698,11 @@ const deleteMember = async (member: WorkflowMember) => {
             :label="t('workflow.recommendation_set')" name="egcs_cn_recommendationset" :disabled="Boolean(selectedMember.id)"
             :fetch-url="`/api/agency/${agencyId}/recommendation-sets`"
             value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" :query="recommendationSetQuery" />
+          <AdminCommonLookupField
+            v-else-if="selectedMember.egcs_cn_kind === 'data_collection'" v-model="selectedMember.egcs_cn_datacollection"
+            :label="t('workflow.data_collection')" name="egcs_cn_datacollection" :disabled="Boolean(selectedMember.id)"
+            :fetch-url="`/api/agency/${agencyId}/data-collections`" :include-deleted-query="false" :query="{ state: 'published' }"
+            value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" />
           <AdminCommonLookupField
             v-else-if="approvalTemplateFetchUrl" v-model="selectedMember.egcs_cn_approvaltemplate"
             :label="t('workflow.approval_template')" name="egcs_cn_approvaltemplate" :disabled="Boolean(selectedMember.id)"

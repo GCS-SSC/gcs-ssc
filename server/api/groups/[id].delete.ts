@@ -14,6 +14,7 @@ export default defineEventHandler(async event => {
       .where('id', '=', id).where('_deleted', '=', false).forUpdate().executeTakeFirst()
     if (!group) return await notFound(event, 'GROUP_NOT_FOUND', 'apiErrors.admin_common.not_found')
     const references = await Promise.all([
+      trx.selectFrom('Common_Data_Collection').select('id').where('egcs_cn_group', '=', id).where('_deleted', '=', false).executeTakeFirst(),
       trx.selectFrom('Common_Recommendation').select('id').where('egcs_cn_group', '=', id).where('_deleted', '=', false).executeTakeFirst(),
       trx.selectFrom('Common_Workflow_Setup_Member_Owner as owner')
         .innerJoin('Common_Workflow_Setup_Member as member', 'member.id', 'owner.egcs_cn_workflowsetupmember')

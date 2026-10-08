@@ -58,7 +58,13 @@ export default defineEventHandler(async event => {
         .where('Funding_Case_Intake_Profile.id', '=', target.entityId)
         .where('Funding_Case_Intake_Profile._deleted', '=', false).executeTakeFirst()
     : null
-  const runtimeGroup = reviewGroup ?? recommendationGroup
+  const dataCollectionGroup = target.entityType === 'commondatacollection'
+    ? await event.context.$db.selectFrom('Common_Data_Collection')
+        .leftJoin('Common_Group', 'Common_Group.id', 'Common_Data_Collection.egcs_cn_group')
+        .select(['Common_Data_Collection.egcs_cn_group', 'Common_Data_Collection.egcs_cn_groupclaimedby', 'Common_Group.egcs_cn_name_en', 'Common_Group.egcs_cn_name_fr'])
+        .where('Common_Data_Collection.id', '=', target.entityId).where('Common_Data_Collection._deleted', '=', false).executeTakeFirst()
+    : null
+  const runtimeGroup = reviewGroup ?? recommendationGroup ?? dataCollectionGroup
   return {
     assignments: assignments.map(row => ({
       ...row,

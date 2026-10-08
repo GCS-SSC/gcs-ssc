@@ -115,6 +115,7 @@ const tabs = [
   { key: 'agreement.forecasts.completion.title', value: 'completion', icon: 'i-lucide-circle-check-big' },
   { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-clipboard-check' },
   { key: 'workflow.title', value: 'workflows', icon: 'i-lucide-workflow' },
+  { key: 'supplementary_information.title', value: 'supplementary-information', icon: 'i-lucide-clipboard-list' },
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
   { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users' }
 ]
@@ -828,6 +829,7 @@ const saveForecastBreakdown = async () => {
               @changed="refreshPage" />
 
             <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcaseforecast" :entity-id="forecastId" purpose="standard" :can-edit="isAssigned" :refresh-key="approvalsRefreshKey" @changed="refreshPage" />
+            <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" entity-type="fundingcaseforecast" :entity-id="forecastId" />
             <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcaseforecast" :entity-id="forecastId" />
             <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" entity-type="fundingcaseforecast" :entity-id="forecastId" />
           </CommonEntityEditorWorkspace>

@@ -54,6 +54,7 @@ const itemDescription = (item: WorkItem): string => {
   }
   switch (item.entity_type) {
     case 'commonreview': return withName(item.variant === 'checklist' ? 'enums.review_type.checklist' : 'enums.review_type.assessment')
+    case 'commondatacollection': return withName('home_dashboard.work_labels.data_collection')
     case 'commonrecommendation': return withName('home_dashboard.work_labels.recommendation')
     case 'fundingcaseagreementclaim': return [t('home_dashboard.work_labels.claim'), item.fiscal_year, period].filter(Boolean).join(' - ')
     case 'fundingclaimreconcile': return item.claim_id

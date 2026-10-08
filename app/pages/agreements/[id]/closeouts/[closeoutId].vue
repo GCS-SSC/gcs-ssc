@@ -81,6 +81,7 @@ const tabs = [
   { key: 'agreement.closeout.workflow', value: 'workflow', icon: 'i-lucide-git-pull-request-arrow' },
   { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-clipboard-check' },
   { key: 'workflow.title', value: 'workflows', icon: 'i-lucide-workflow' },
+  { key: 'supplementary_information.title', value: 'supplementary-information', icon: 'i-lucide-clipboard-list' },
   { key: 'agreement.documents.title', value: 'documents', icon: 'i-lucide-files' },
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
   { key: 'agreement.closeout.snapshot_history', value: 'snapshots', icon: 'i-lucide-shield-check' },
@@ -169,6 +170,11 @@ const tabs = [
             purpose="standard"
             :can-edit="isAssigned"
             @changed="refresh" />
+
+          <CommonWorkflowSupplementaryInformation
+            v-else-if="selectedTab === 'supplementary-information'"
+            entity-type="fundingcaseagreementcloseout"
+            :entity-id="closeoutId" />
 
           <section v-else-if="selectedTab === 'documents'" class="space-y-6">
             <h2 class="text-lg font-semibold">

@@ -561,18 +561,19 @@ const CommonWorkflowSetupMemberBaseSchema = z.object({
 export const CommonWorkflowSetupMemberOwnerSchema = z.object({
   egcs_cn_reviewsetup: OptionalIdSchema,
   egcs_cn_recommendationsetup: OptionalIdSchema,
+  egcs_cn_datacollection: OptionalIdSchema,
   egcs_cn_defaultowner: OptionalIdSchema,
   egcs_cn_defaultgroup: OptionalIdSchema
 }).superRefine((data, ctx) => {
   if (data.egcs_cn_defaultowner && data.egcs_cn_defaultgroup) {
     ctx.addIssue({ code: 'custom', message: 'validation.invalid_selection', path: ['egcs_cn_defaultgroup'] })
   }
-  if (Number(Boolean(data.egcs_cn_reviewsetup)) + Number(Boolean(data.egcs_cn_recommendationsetup)) !== 1) {
+  if ([data.egcs_cn_reviewsetup, data.egcs_cn_recommendationsetup, data.egcs_cn_datacollection].filter(Boolean).length !== 1) {
     ctx.addIssue({ code: 'custom', message: 'validation.workflow_member_owner_reference', path: ['egcs_cn_reviewsetup'] })
   }
 })
 export const CommonWorkflowSetupMemberOwnersSchema = z.array(CommonWorkflowSetupMemberOwnerSchema).superRefine((owners, ctx) => {
-  const references = owners.map(owner => `${owner.egcs_cn_reviewsetup ? 'review' : 'recommendation'}:${owner.egcs_cn_reviewsetup ?? owner.egcs_cn_recommendationsetup}`)
+  const references = owners.map(owner => `${owner.egcs_cn_reviewsetup ? 'review' : owner.egcs_cn_recommendationsetup ? 'recommendation' : 'data_collection'}:${owner.egcs_cn_reviewsetup ?? owner.egcs_cn_recommendationsetup ?? owner.egcs_cn_datacollection}`)
   if (new Set(references).size !== references.length) {
     ctx.addIssue({ code: 'custom', message: 'validation.workflow_member_owner_duplicate', path: [] })
   }
@@ -581,8 +582,16 @@ export const CommonWorkflowSetupMemberOwnersSchema = z.array(CommonWorkflowSetup
 export const CommonWorkflowSetupMemberCreateSchema = z.discriminatedUnion('egcs_cn_kind', [
   CommonWorkflowSetupMemberBaseSchema.extend({ egcs_cn_kind: z.literal('review_set'), egcs_cn_reviewset: IdSchema, owners: CommonWorkflowSetupMemberOwnersSchema.optional() }),
   CommonWorkflowSetupMemberBaseSchema.extend({ egcs_cn_kind: z.literal('recommendation_set'), egcs_cn_recommendationset: IdSchema, owners: CommonWorkflowSetupMemberOwnersSchema.optional() }),
+  CommonWorkflowSetupMemberBaseSchema.extend({ egcs_cn_kind: z.literal('data_collection'), egcs_cn_datacollection: IdSchema, owners: CommonWorkflowSetupMemberOwnersSchema.max(1).optional() }),
   CommonWorkflowSetupMemberBaseSchema.extend({ egcs_cn_kind: z.literal('approval_template'), egcs_cn_approvaltemplate: IdSchema, owners: z.array(z.never()).max(0).optional() })
 ]).superRefine((data, ctx) => {
+  if (data.egcs_cn_kind === 'data_collection') {
+    data.owners?.forEach((owner, index) => {
+      if (owner.egcs_cn_datacollection !== data.egcs_cn_datacollection) {
+        ctx.addIssue({ code: 'custom', message: 'validation.workflow_member_owner_reference', path: ['owners', index, 'egcs_cn_datacollection'] })
+      }
+    })
+  }
   if (data.egcs_cn_setsriskrating && !data.egcs_cn_riskreviewsetup) {
     ctx.addIssue({ code: 'custom', message: 'validation.workflow_risk_review_required', path: ['egcs_cn_riskreviewsetup'] })
   }

@@ -11,6 +11,7 @@ import {
 import {
   resolveReviewRuntimeEntityFromEntity,
   resolveReviewRuntimeEntityFromReview,
+  resolveReviewRuntimeEntityFromDataCollection,
   type ReviewRuntimeEntityContext
 } from '~~/server/utils/review-runtime-access'
 import type { Database, Entity_Type } from '~~/shared/types/database'
@@ -23,6 +24,7 @@ import { escapeLikePattern } from './sql-like'
 export const isDirectApprovalRuntimeEntitySupported = (entityType: Entity_Type): boolean =>
   entityType === 'commonreview'
   || entityType === 'commonrecommendation'
+  || entityType === 'commondatacollection'
   || entityType === 'fundingcaseagreement'
   || entityType === 'fundingcaseagreementclaim'
   || entityType === 'fundingcaseagreementcloseout'
@@ -63,6 +65,10 @@ export const respondApprovalRuntimeEntityNotFound = async (
 
   if (entityType === 'commonrecommendation') {
     return await notFound(event, 'RECOMMENDATION_APPROVAL_NOT_FOUND', 'apiErrors.admin_common.not_found')
+  }
+
+  if (entityType === 'commondatacollection') {
+    return await notFound(event, 'DATA_COLLECTION_APPROVAL_NOT_FOUND', 'apiErrors.admin_common.not_found')
   }
 
   if (entityType === 'fundingcaseagreementcloseout') {
@@ -111,6 +117,10 @@ export const resolveApprovalRuntimeEntityFromEntity = async (
 ): Promise<ReviewRuntimeEntityContext | null> => {
   if (entityType === 'commonreview') {
     return await resolveReviewRuntimeEntityFromReview(db, entityId)
+  }
+
+  if (entityType === 'commondatacollection') {
+    return await resolveReviewRuntimeEntityFromDataCollection(db, entityId)
   }
 
   if (entityType === 'commonrecommendation') {

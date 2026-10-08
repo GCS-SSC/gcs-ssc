@@ -84,6 +84,7 @@ const tabs = [
   { key: 'account_receivable.credit_memo_completion.title', value: 'completion', icon: 'i-lucide-circle-check-big' },
   { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-clipboard-check' },
   { key: 'workflow.title', value: 'workflows', icon: 'i-lucide-workflow' },
+  { key: 'supplementary_information.title', value: 'supplementary-information', icon: 'i-lucide-clipboard-list' },
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
   { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users' }
 ]
@@ -189,6 +190,7 @@ const save = async () => {
           </section>
           <CommonReviewsTab v-else-if="selectedTab === 'reviews'" entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" :can-update="creditMemo.egcs_fc_canwork" @changed="refreshPage" />
           <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" purpose="standard" :can-edit="creditMemo.egcs_fc_canwork" :refresh-key="refreshKey" @changed="refreshPage" />
+          <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" />
           <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" />
           <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" />
         </CommonEntityEditorWorkspace>

@@ -328,6 +328,7 @@ const claimTabs = computed(() => [
     value: 'workflows',
     icon: 'i-lucide-workflow'
   },
+  { key: 'supplementary_information.title', value: 'supplementary-information', icon: 'i-lucide-clipboard-list' },
   {
     key: 'attachments.title',
     value: 'attachments',
@@ -1292,6 +1293,11 @@ const cancelReconciliation = async () => {
               :can-edit="isAssigned"
               :refresh-key="approvalsRefreshKey"
               @changed="refreshPage" />
+
+            <CommonWorkflowSupplementaryInformation
+              v-else-if="selectedClaimTab === 'supplementary-information'"
+              entity-type="fundingcaseagreementclaim"
+              :entity-id="claimId" />
 
             <div v-else-if="selectedClaimTab === 'reconciliation'" class="w-full min-w-0">
               <CommonCompletionWorkflowPreAction

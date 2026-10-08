@@ -13,6 +13,7 @@ const publicationFailurePatterns = [
   /assessment review schemas must be published/i,
   /workflow approval template must be published/i,
   /workflow recommendation setup must be published/i,
+  /workflow data collection must be published/i,
   /workflow review setup must be published/i,
   /workflow requires at least one contiguously ordered member/i,
   /workflow member statuses do not satisfy/i,
@@ -62,7 +63,8 @@ export const isRiskSourcePublicationFailure = (error: unknown): boolean =>
 export const isWorkflowOwnerPublicationFailure = (error: unknown): boolean =>
   error instanceof Error && [
     'Workflow default owner must select either a user or a group',
-    'Workflow default group must be active in its Agency and contain an active member'
+    'Workflow default group must be active in its Agency and contain an active member',
+    'Workflow data collection accepts at most one matching owner mapping'
   ].includes(error.message)
 
 export const isExpectedPublicationFailure = (error: unknown): boolean =>

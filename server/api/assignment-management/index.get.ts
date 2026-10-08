@@ -278,8 +278,25 @@ export default defineEventHandler(async event => {
       JOIN source_work source ON source.id = recommendation.egcs_cn_entityid
         AND source.entity_type = recommendation.egcs_cn_entitytype::text
       WHERE recommendation._deleted = false
+    ), data_collection_work AS (
+      SELECT collection.id, 'commondatacollection'::text entity_type, runtime_item.egcs_cn_state::text status,
+        collection.id::text stable_reference, '#' || collection.id::text label_en,
+        '#' || collection.id::text label_fr, source.owner_subject,
+        CASE WHEN source.entity_type = 'applicantrecipient' THEN schema.egcs_cn_agency ELSE source.agency_id END agency_id,
+        source.program_id,
+        CASE WHEN source.entity_type = 'applicantrecipient' THEN schema_agency.egcs_ay_name_en ELSE source.agency_name_en END agency_name_en,
+        CASE WHEN source.entity_type = 'applicantrecipient' THEN schema_agency.egcs_ay_name_fr ELSE source.agency_name_fr END agency_name_fr,
+        source.program_name_en, source.program_name_fr
+      FROM "Common_Data_Collection" collection
+      JOIN "Common_Runtime_Item" runtime_item ON runtime_item.id = collection.egcs_cn_runtimeitem
+      LEFT JOIN "Common_Data_Collection_Setup" schema
+        ON schema.id = runtime_item.egcs_cn_publication AND schema._deleted = false
+      LEFT JOIN "Agency_Profile" schema_agency ON schema_agency.id = schema.egcs_cn_agency AND schema_agency._deleted = false
+      JOIN source_work source ON source.id = collection.egcs_cn_entityid
+        AND source.entity_type = collection.egcs_cn_entitytype::text
+      WHERE collection._deleted = false
     ), work AS (
-      SELECT * FROM base_work UNION ALL SELECT * FROM review_work UNION ALL SELECT * FROM recommendation_work
+      SELECT * FROM base_work UNION ALL SELECT * FROM review_work UNION ALL SELECT * FROM recommendation_work UNION ALL SELECT * FROM data_collection_work
     ), roster AS (
       SELECT work.id::text entity_id, work.entity_type, work.stable_reference, work.label_en, work.label_fr,
         work.status, work.owner_subject, work.agency_id, work.program_id, work.agency_name_en, work.agency_name_fr,

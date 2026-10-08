@@ -262,6 +262,7 @@ const monitorTabs = computed(() => [
     value: 'workflows',
     icon: 'i-lucide-workflow'
   },
+  { key: 'supplementary_information.title', value: 'supplementary-information', icon: 'i-lucide-clipboard-list' },
   {
     key: 'attachments.title',
     value: 'attachments',
@@ -708,6 +709,11 @@ const handleCompleted = async () => {
               :can-edit="isAssigned"
               :refresh-key="approvalsRefreshKey"
               @changed="handleCompleted" />
+
+            <CommonWorkflowSupplementaryInformation
+              v-else-if="selectedMonitorTab === 'supplementary-information'"
+              entity-type="fundingcasemonitor"
+              :entity-id="monitorId" />
 
             <CommonAssignedUsers
               v-else-if="selectedMonitorTab === 'assignments'"

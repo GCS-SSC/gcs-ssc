@@ -11,6 +11,7 @@ import {
 import type { Component } from 'vue'
 import CommonCompletionSection from '~/components/Common/Completions/Section.vue'
 import CommonWorkflowSection from '~/components/Common/Workflow/Section.vue'
+import CommonWorkflowSupplementaryInformation from '~/components/Common/Workflow/SupplementaryInformation.vue'
 import {
   AssessmentSchemaAccordionSection,
   AssessmentSchemaPageSection,
@@ -67,6 +68,7 @@ const extensionHostComponents = {
   CommonStatusBadge,
   CommonStatusSelect,
   CommonWorkflowSection,
+  CommonWorkflowSupplementaryInformation,
   UAccordion: asExtensionHostComponent(UAccordion),
   UAlert,
   UBadge,

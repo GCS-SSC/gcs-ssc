@@ -29,6 +29,7 @@ const itemTitle = (item: GroupItem): string => {
  */
 const itemDescription = (item: GroupItem): string => {
   let kind = t(`enums.review_type.${item.variant === 'checklist' ? 'checklist' : 'assessment'}`)
+  if (item.kind === 'data_collection') kind = t('home_dashboard.work_labels.data_collection')
   if (item.kind === 'recommendation') kind = t('home_dashboard.work_labels.recommendation')
   if (item.kind === 'approval') kind = t('home_dashboard.work_labels.approval')
   if (item.kind === 'intake') return t('funding_case_intake.title')
@@ -46,6 +47,7 @@ const itemUrl = (item: GroupItem): string | null => {
   }
   if (item.entity_type === 'commonreview') return localePath(item.variant === 'checklist' ? appRouteLocations.checklistDetail(item.entity_id) : appRouteLocations.assessmentDetail(item.entity_id))
   if (item.entity_type === 'fundingcaseintake') return localePath(appRouteLocations.fundingCaseIntakeDetail(item.entity_id))
+  if (item.entity_type === 'commondatacollection') return localePath(appRouteLocations.dataCollectionDetail(item.entity_id))
   if (item.entity_type === 'commonrecommendation') return localePath(appRouteLocations.recommendationDetail(item.entity_id))
   if (item.entity_type === 'fundingcaseagreement') return localePath(appRouteLocations.agreementDetail(item.entity_id))
   if (item.entity_type === 'applicantrecipient') return localePath(appRouteLocations.proponentEdit(item.entity_id))
@@ -58,7 +60,7 @@ const itemUrl = (item: GroupItem): string | null => {
 <template>
   <ul class="divide-y divide-default">
     <li v-for="item in items" :key="`${item.kind}:${item.id}`" class="flex items-center gap-4 px-3 py-4 sm:px-5">
-      <span class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><UIcon :name="item.kind === 'approval' ? 'i-lucide-stamp' : 'i-lucide-clipboard-check'" class="size-5" /></span>
+      <span class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><UIcon :name="item.kind === 'approval' ? 'i-lucide-stamp' : item.kind === 'data_collection' ? 'i-lucide-clipboard-list' : 'i-lucide-clipboard-check'" class="size-5" /></span>
       <span class="min-w-0 flex-1">
         <NuxtLink v-if="itemUrl(item)" :to="itemUrl(item)!" class="block break-words font-semibold text-highlighted hover:text-primary hover:underline">{{ itemTitle(item) }}</NuxtLink>
         <span v-else class="block break-words font-semibold text-highlighted">{{ itemTitle(item) }}</span>

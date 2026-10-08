@@ -75,6 +75,7 @@ export const buildAssignedWorkOpenPredicate = (options: { mode: 'dashboard' | 'p
   (work.entity_type = 'applicantrecipient' AND work.status = 'active')
   OR (work.entity_type = 'commonreview' AND work.status IN (${sql.join([...ASSIGNABLE_ENGINE_OPEN_QUEUE_STATUSES.commonreview])}))
   OR (work.entity_type = 'commonrecommendation' AND work.status IN (${sql.join([...ASSIGNABLE_ENGINE_OPEN_QUEUE_STATUSES.commonrecommendation])}))
+  OR (work.entity_type = 'commondatacollection' AND work.status IN (${sql.join([...ASSIGNABLE_ENGINE_OPEN_QUEUE_STATUSES.commondatacollection])}))
   OR (
     work.entity_type IN (${sql.join([...WORKFLOW_TARGET_ENTITY_TYPE_ENUM])})
     AND business_status.id IS NOT NULL
@@ -320,8 +321,33 @@ export const queryAssignedWorkDashboard = async (
           AND recommendation.egcs_cn_entitytype::text NOT IN (${sql.join(typedOwnerSources)})
           AND schema.egcs_cn_agency IS NOT NULL)
       )
+  ), data_collection_work AS (
+    SELECT collection.id, 'commondatacollection'::text entity_type, runtime_item.egcs_cn_state::text status,
+      '#' || collection.id::text identifier_en, '#' || collection.id::text identifier_fr,
+      source.agreement_id, NULL::text variant,
+      COALESCE(source.owner_subject, CASE WHEN stream.id IS NOT NULL THEN 'transfer_payment' ELSE 'agency' END) owner_subject,
+      CASE WHEN source.entity_type = 'applicantrecipient' THEN schema.egcs_cn_agency
+        ELSE COALESCE(source.agency_id, program.egcs_tp_agency, schema.egcs_cn_agency) END agency_id,
+      COALESCE(source.program_id, program.id) program_id
+    FROM "Common_Data_Collection" collection
+    JOIN "Common_Runtime_Item" runtime_item ON runtime_item.id = collection.egcs_cn_runtimeitem
+    JOIN "Common_Data_Collection_Setup" schema
+      ON schema.id = runtime_item.egcs_cn_publication AND schema._deleted = false
+    LEFT JOIN source_work source ON source.id = collection.egcs_cn_entityid
+      AND source.entity_type = collection.egcs_cn_entitytype::text
+    LEFT JOIN "Transfer_Payment_Stream" stream ON collection.egcs_cn_entitytype::text = 'transferpaymentstream'
+      AND stream.id = collection.egcs_cn_entityid AND stream._deleted = false
+    LEFT JOIN "Transfer_Payment_Profile" program ON program.id = stream.egcs_tp_transferpaymentprofile AND program._deleted = false
+    WHERE collection._deleted = false
+      AND (
+        source.id IS NOT NULL
+        OR (stream.id IS NOT NULL AND program.id IS NOT NULL)
+        OR (position(':' in collection.egcs_cn_entitytype::text) = 0
+          AND collection.egcs_cn_entitytype::text NOT IN (${sql.join(typedOwnerSources)})
+          AND schema.egcs_cn_agency IS NOT NULL)
+      )
   ), work AS (
-    SELECT * FROM base_work UNION ALL SELECT * FROM review_work UNION ALL SELECT * FROM recommendation_work
+    SELECT * FROM base_work UNION ALL SELECT * FROM review_work UNION ALL SELECT * FROM recommendation_work UNION ALL SELECT * FROM data_collection_work
   )
   SELECT work.id::text entity_id, work.entity_type, work.status,
     CASE WHEN work.entity_type = 'fundingcaseagreement' THEN COALESCE(to_jsonb(display_agreement)->>'egcs_fc_agreementnumber', work.identifier_en)
@@ -347,6 +373,7 @@ export const queryAssignedWorkDashboard = async (
     CASE work.entity_type
       WHEN 'commonreview' THEN review_schema.egcs_cn_name_en
       WHEN 'commonrecommendation' THEN recommendation_schema.egcs_cn_name_en
+      WHEN 'commondatacollection' THEN collection_version.egcs_cn_definition->>'nameEn'
       WHEN 'fundingcasemonitor' THEN monitor_type.egcs_ay_name_en
       WHEN 'fundingcaseagreementcommitment' THEN commitment_type.egcs_ay_name_en
       WHEN 'fundingcaseamendment' THEN to_jsonb(display_amendment)->>'egcs_fc_name_en'
@@ -354,6 +381,7 @@ export const queryAssignedWorkDashboard = async (
     CASE work.entity_type
       WHEN 'commonreview' THEN review_schema.egcs_cn_name_fr
       WHEN 'commonrecommendation' THEN recommendation_schema.egcs_cn_name_fr
+      WHEN 'commondatacollection' THEN collection_version.egcs_cn_definition->>'nameFr'
       WHEN 'fundingcasemonitor' THEN monitor_type.egcs_ay_name_fr
       WHEN 'fundingcaseagreementcommitment' THEN commitment_type.egcs_ay_name_fr
       WHEN 'fundingcaseamendment' THEN to_jsonb(display_amendment)->>'egcs_fc_name_fr'
@@ -380,20 +408,25 @@ export const queryAssignedWorkDashboard = async (
     AND work.entity_type = 'commonrecommendation'
   LEFT JOIN "Common_Runtime_Item" display_recommendation_item ON display_recommendation_item.id = display_recommendation.egcs_cn_runtimeitem
   LEFT JOIN "Common_Recommendation_Schema" recommendation_schema ON recommendation_schema.id = display_recommendation_item.egcs_cn_publication
+  LEFT JOIN "Common_Data_Collection" display_collection ON display_collection.id = work.id
+    AND work.entity_type = 'commondatacollection'
+  LEFT JOIN "Common_Runtime_Item" display_collection_item ON display_collection_item.id = display_collection.egcs_cn_runtimeitem
+  LEFT JOIN "Common_Publication_Version" collection_version ON collection_version.id = display_collection_item.egcs_cn_publicationversion
   LEFT JOIN "Common_Review" recommendation_review ON recommendation_review.id = display_recommendation.egcs_cn_entityid
     AND display_recommendation.egcs_cn_entitytype::text = 'commonreview'
   LEFT JOIN "Common_Review_Set" recommendation_review_set ON recommendation_review_set.id = recommendation_review.egcs_cn_reviewset
   LEFT JOIN qualified_bindings display_binding ON display_binding.entity_id = COALESCE(
-    display_review_set.egcs_cn_entityid,
+    display_collection.egcs_cn_entityid, display_review_set.egcs_cn_entityid,
     CASE WHEN display_recommendation.egcs_cn_entitytype::text <> 'commonreview' THEN display_recommendation.egcs_cn_entityid END,
     recommendation_review_set.egcs_cn_entityid)
-    AND display_binding.entity_type = COALESCE(display_review_set.egcs_cn_entitytype::text,
+    AND display_binding.entity_type = COALESCE(display_collection.egcs_cn_entitytype::text, display_review_set.egcs_cn_entitytype::text,
       CASE WHEN display_recommendation.egcs_cn_entitytype::text <> 'commonreview' THEN display_recommendation.egcs_cn_entitytype::text END,
       recommendation_review_set.egcs_cn_entitytype::text)
     AND display_binding.owner_type = 'applicantrecipient'
   LEFT JOIN "Funding_Case_Account_Receivable_Credit_Memo" display_credit_memo ON display_credit_memo.id = CASE
     WHEN work.entity_type = 'fundingcaseaccountreceivablecreditmemo' THEN work.id
     WHEN display_review_set.egcs_cn_entitytype::text = 'fundingcaseaccountreceivablecreditmemo' THEN display_review_set.egcs_cn_entityid
+    WHEN display_collection.egcs_cn_entitytype::text = 'fundingcaseaccountreceivablecreditmemo' THEN display_collection.egcs_cn_entityid
     WHEN display_recommendation.egcs_cn_entitytype::text = 'fundingcaseaccountreceivablecreditmemo' THEN display_recommendation.egcs_cn_entityid
     WHEN recommendation_review_set.egcs_cn_entitytype::text = 'fundingcaseaccountreceivablecreditmemo' THEN recommendation_review_set.egcs_cn_entityid END
     AND NOT display_credit_memo._deleted
@@ -401,12 +434,14 @@ export const queryAssignedWorkDashboard = async (
     WHEN work.entity_type = 'applicantrecipient' THEN work.id
     WHEN display_credit_memo.id IS NOT NULL THEN display_credit_memo.egcs_fc_applicantrecipient
     WHEN display_review_set.egcs_cn_entitytype::text = 'applicantrecipient' THEN display_review_set.egcs_cn_entityid
+    WHEN display_collection.egcs_cn_entitytype::text = 'applicantrecipient' THEN display_collection.egcs_cn_entityid
     WHEN display_recommendation.egcs_cn_entitytype::text = 'applicantrecipient' THEN display_recommendation.egcs_cn_entityid
     WHEN recommendation_review_set.egcs_cn_entitytype::text = 'applicantrecipient' THEN recommendation_review_set.egcs_cn_entityid
     ELSE display_binding.owner_id END
     AND display_proponent._deleted = false
   LEFT JOIN "Transfer_Payment_Stream" display_stream ON display_stream.id = CASE
     WHEN display_review_set.egcs_cn_entitytype::text = 'transferpaymentstream' THEN display_review_set.egcs_cn_entityid
+    WHEN display_collection.egcs_cn_entitytype::text = 'transferpaymentstream' THEN display_collection.egcs_cn_entityid
     WHEN display_recommendation.egcs_cn_entitytype::text = 'transferpaymentstream' THEN display_recommendation.egcs_cn_entityid
     WHEN recommendation_review_set.egcs_cn_entitytype::text = 'transferpaymentstream' THEN recommendation_review_set.egcs_cn_entityid END
     AND display_stream._deleted = false
@@ -450,6 +485,8 @@ export const queryAssignedWorkDashboard = async (
       OR review_schema.egcs_cn_name_fr ILIKE ${search}
       OR recommendation_schema.egcs_cn_name_en ILIKE ${search}
       OR recommendation_schema.egcs_cn_name_fr ILIKE ${search}
+      OR (collection_version.egcs_cn_definition->>'nameEn') ILIKE ${search}
+      OR (collection_version.egcs_cn_definition->>'nameFr') ILIKE ${search}
       OR monitor_type.egcs_ay_name_en ILIKE ${search}
       OR monitor_type.egcs_ay_name_fr ILIKE ${search}
       OR commitment_type.egcs_ay_name_en ILIKE ${search}

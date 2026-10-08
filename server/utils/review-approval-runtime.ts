@@ -26,6 +26,7 @@ import {
   executeFreshAuthorizedApprovalActorWrite,
   executeFreshAuthorizedReviewRuntimeWrite,
   resolveReviewRuntimeEntityFromEntity,
+  resolveReviewRuntimeEntityFromDataCollection,
   resolveReviewRuntimeEntityFromReview,
   type ReviewRuntimeEntityContext
 } from './review-runtime-access'
@@ -243,6 +244,10 @@ export const resolveApprovalActionContext = async (db: DbClient, approvalId: str
   if (approval.entityType === 'commonreview') {
     const runtimeEntity = await resolveReviewRuntimeEntityFromReview(db as Kysely<Database>, entityId)
     return runtimeEntity ? { approvalId: String(approval.approvalId), reviewId: entityId, runtimeEntity } : null
+  }
+  if (approval.entityType === 'commondatacollection') {
+    const runtimeEntity = await resolveReviewRuntimeEntityFromDataCollection(db as Kysely<Database>, entityId)
+    return runtimeEntity ? { approvalId: String(approval.approvalId), entityId, runtimeEntity } : null
   }
   if (approval.entityType === 'commonrecommendation') {
     const recommendation = await db.selectFrom('Common_Recommendation')

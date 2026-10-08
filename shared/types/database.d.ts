@@ -28,7 +28,7 @@ export type Applicant_Recipient_Type =
   | 'individualorsoleproprietorships'
   | 'academia'
 export type Workflow_Purpose = 'standard' | 'approval_submission' | 'risk_rating'
-export type Workflow_Setup_Member_Kind = 'review_set' | 'recommendation_set' | 'approval_template'
+export type Workflow_Setup_Member_Kind = 'review_set' | 'recommendation_set' | 'data_collection' | 'approval_template'
 export type Workflow_Transition_Event = 'materialized' | 'succeeded' | 'failed' | 'cancelled' | 'execution_failed'
 export type Recommendation_Outcome = 'recommended' | 'not_recommended'
 export type { AssignableEntityType } from '../constants/enums'
@@ -571,6 +571,8 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Common_Checklist: CommonChecklistTable
   Common_Assessment_Response: CommonAssessmentResponseTable
   Common_Checklist_Response: CommonChecklistResponseTable
+  Common_Data_Collection_Setup: CommonDataCollectionSetupTable
+  Common_Data_Collection: CommonDataCollectionTable
   Common_Recommendation_Schema: CommonRecommendationSchemaTable
   Common_Recommendation_Set_Setup: CommonRecommendationSetSetupTable
   Common_Recommendation_Setup: CommonRecommendationSetupTable
@@ -2094,6 +2096,32 @@ export interface CommonChecklistResponseTable {
   _deleted: Generated<boolean>
 }
 
+export interface CommonDataCollectionSetupTable {
+  id: Generated<string>
+  egcs_cn_publicationkind: Generated<'data_collection_setup'>
+  egcs_cn_agency: string
+  egcs_cn_name_en: string
+  egcs_cn_name_fr: string
+  egcs_cn_description_en: string
+  egcs_cn_description_fr: string
+  egcs_cn_schema: JsonValue
+  egcs_cn_approvaltemplate?: string | null
+  _deleted: Generated<boolean>
+}
+
+export interface CommonDataCollectionTable {
+  id: Generated<string>
+  egcs_cn_datacollectionsetup: string
+  egcs_cn_entitytype: Entity_Type
+  egcs_cn_entityid: string
+  egcs_cn_runtimeitem: string
+  egcs_cn_group?: string | null
+  egcs_cn_groupclaimedby?: string | null
+  egcs_cn_response: Generated<JsonValue>
+  egcs_cn_revision: Generated<number>
+  _deleted: Generated<boolean>
+}
+
 export interface CommonRecommendationSchemaTable {
   id: Generated<string>
   egcs_cn_publicationkind: Generated<'recommendation_schema'>
@@ -2186,6 +2214,7 @@ export interface CommonWorkflowSetupMemberTable {
   egcs_cn_kind: Workflow_Setup_Member_Kind
   egcs_cn_reviewset?: string | null
   egcs_cn_recommendationset?: string | null
+  egcs_cn_datacollection?: string | null
   egcs_cn_approvaltemplate?: string | null
   egcs_cn_materializationstatus?: StatusId | null
   egcs_cn_successstatus?: StatusId | null
@@ -2201,6 +2230,7 @@ export interface CommonWorkflowSetupMemberOwnerTable {
   egcs_cn_workflowsetupmember: string
   egcs_cn_reviewsetup?: string | null
   egcs_cn_recommendationsetup?: string | null
+  egcs_cn_datacollection?: string | null
   egcs_cn_defaultowner?: string | null
   egcs_cn_defaultgroup?: string | null
   _deleted: Generated<boolean>
@@ -2229,6 +2259,7 @@ export interface CommonWorkflowOwnerBlockerTable {
   egcs_cn_workflowsetupmember: string
   egcs_cn_reviewsetup?: string | null
   egcs_cn_recommendationsetup?: string | null
+  egcs_cn_datacollection?: string | null
   egcs_cn_configuredowner?: string | null
   egcs_cn_reason: string
   egcs_cn_triggeredby?: string | null

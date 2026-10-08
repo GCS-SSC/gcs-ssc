@@ -124,13 +124,15 @@ const stats = computed(() => [
 const claimGroupItem = async (item: GroupItem) => {
   const url = item.kind === 'intake'
     ? `/api/funding-case-intakes/${item.id}/claim`
-    : item.kind === 'recommendation'
-      ? `/api/recommendations/${item.id}/claim`
-      : item.kind === 'review'
-        ? `/api/reviews/${item.id}/claim`
-        : item.kind === 'additional_reviewer'
-          ? `/api/additional-reviewers/${item.id}/claim`
-          : `/api/approvals/${item.id}/claim`
+    : item.kind === 'data_collection'
+      ? `/api/data-collections/${item.id}/claim`
+      : item.kind === 'recommendation'
+        ? `/api/recommendations/${item.id}/claim`
+        : item.kind === 'review'
+          ? `/api/reviews/${item.id}/claim`
+          : item.kind === 'additional_reviewer'
+            ? `/api/additional-reviewers/${item.id}/claim`
+            : `/api/approvals/${item.id}/claim`
   try {
     busyGroupItemId.value = item.id
     const response = await fetch(getClientRequestUrl(url), { method: 'POST' })

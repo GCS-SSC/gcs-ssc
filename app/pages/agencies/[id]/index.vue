@@ -16,6 +16,7 @@ import AgencyApprovalBehalfTypes from '~/components/Agency/AgencyApprovalBehalfT
 import AgencyApprovalTemplates from '~/components/Agency/AgencyApprovalTemplates.vue'
 import AgencyWorkflowSetups from '~/components/Agency/AgencyWorkflowSetups.vue'
 import AgencyReviewSets from '~/components/Agency/AgencyReviewSets.vue'
+import AgencyDataCollections from '~/components/Agency/AgencyDataCollections.vue'
 import AgencyRecommendationSets from '~/components/Agency/AgencyRecommendationSets.vue'
 import AgencyCostCategories from '~/components/Agency/AgencyCostCategories.vue'
 import AgencyFundingTypes from '~/components/Agency/AgencyFundingTypes.vue'
@@ -83,6 +84,7 @@ const tabMap: TabMap = new Map([
   ['workflowSetups', { key: 'agency.tabs.workflow_setups', icon: 'i-lucide-git-branch', component: AgencyWorkflowSetups, getProps: () => ({ agencyId: id, canUpdateChild: canUpdateAgency.value, canDeleteChild: canUpdateAgency.value }) }],
   ['reviewSets', { key: 'transfer_payment.review_setups', icon: 'i-lucide-clipboard-list', component: AgencyReviewSets, getProps: () => ({ agencyId: id, canUpdateChild: canUpdateAgency.value, canDeleteChild: canUpdateAgency.value }) }],
   ['recommendationSets', { key: 'transfer_payment.recommendation_setups', icon: 'i-lucide-list-checks', component: AgencyRecommendationSets, getProps: () => ({ agencyId: id, canUpdateChild: canUpdateAgency.value, canDeleteChild: canUpdateAgency.value }) }],
+  ['dataCollections', { key: 'data_collection.catalog_title', icon: 'i-lucide-clipboard-list', component: AgencyDataCollections, getProps: () => ({ agencyId: id, canUpdateChild: canUpdateAgency.value }) }],
   ['programs', { key: 'agency.tabs.programs', icon: 'i-lucide-banknote', component: AgencyTransferPayments, getProps: () => ({ agencyId: id }) }],
   ['costCategories', { key: 'agency.tabs.cost_categories', icon: 'i-lucide-layers', component: AgencyCostCategories, getProps: agencyResourceCapabilities }],
   ['fundingTypes', { key: 'agency.funding_types.title', icon: 'i-lucide-hand-coins', component: AgencyFundingTypes, getProps: agencyResourceCapabilities }],
