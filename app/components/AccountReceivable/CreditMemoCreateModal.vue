@@ -18,14 +18,10 @@ const { showError } = useApiErrorToast()
 type State = {
   egcs_fc_applicantrecipient: string
   egcs_fc_receivable: string | undefined
-  egcs_fc_creditmemochartofaccount: string | undefined
   egcs_fc_agency: string | undefined
   egcs_fc_currency: Currency_Codes | undefined
   egcs_fc_receiveddate: string | Date | null
-  egcs_fc_amount: string
-  egcs_fc_receiptreference: string
-  egcs_fc_narrative_en: string
-  egcs_fc_narrative_fr: string
+  egcs_fc_reason: string
 }
 const state: Ref<State | null> = ref(null)
 const pending: Ref<boolean> = ref(false)
@@ -40,23 +36,19 @@ watch([open, identity], ([isOpen]) => {
   state.value = isOpen
     ? {
         egcs_fc_applicantrecipient: context.egcs_fc_applicantrecipient,
-        egcs_fc_receivable: context.egcs_fc_receivable, egcs_fc_creditmemochartofaccount: undefined,
+        egcs_fc_receivable: context.egcs_fc_receivable,
         egcs_fc_agency: context.egcs_fc_agency,
         egcs_fc_currency: context.egcs_fc_currency,
         egcs_fc_receiveddate: new Date().toISOString().slice(0, 10),
-        egcs_fc_amount: '', egcs_fc_receiptreference: '', egcs_fc_narrative_en: '', egcs_fc_narrative_fr: ''
+        egcs_fc_reason: ''
       }
     : null
 }, { immediate: true, flush: 'sync' })
 watch(() => state.value?.egcs_fc_agency, (value, previous) => {
   if (state.value && previous && value !== previous) {
     state.value.egcs_fc_receivable = undefined
-    state.value.egcs_fc_creditmemochartofaccount = undefined
     state.value.egcs_fc_currency = undefined
   }
-}, { flush: 'sync' })
-watch(() => state.value?.egcs_fc_receivable, (value, previous) => {
-  if (state.value && value !== previous) state.value.egcs_fc_creditmemochartofaccount = undefined
 }, { flush: 'sync' })
 const resolveReceivableCurrency = (items: Array<{ id: string; egcs_fc_currency?: unknown }>) => {
   const selected = items.find(item => String(item.id) === state.value?.egcs_fc_receivable)
@@ -107,35 +99,13 @@ const save = async () => {
               :show-value-in-label="false" :disabled="pending || Boolean(context.egcs_fc_receivable)" close-on-select @resolved-items="resolveReceivableCurrency" />
             <UInput v-else disabled class="w-full" />
           </UFormField>
-          <UFormField name="egcs_fc_creditmemochartofaccount" :label="t('account_receivable.credit_memo_coding')">
-            <CommonServerLookupSelect
-              v-if="state.egcs_fc_receivable" :key="state.egcs_fc_receivable" v-model="state.egcs_fc_creditmemochartofaccount"
-              fetch-url="/api/account-receivable-credit-memos/lookups/chart-of-accounts" :query="{ egcs_fc_receivable: state.egcs_fc_receivable }"
-              selected-values-query-key="selectedIds" value-key="id" label-en-key="label_en" label-fr-key="label_fr"
-              :show-value-in-label="false" :disabled="pending" close-on-select />
-            <UInput v-else disabled class="w-full" />
-          </UFormField>
           <UFormField name="egcs_fc_receiveddate" :label="t('account_receivable.received_date')">
             <CommonDatePicker v-model="state.egcs_fc_receiveddate" :disabled="pending" />
           </UFormField>
-          <UFormField name="egcs_fc_amount" :label="t('account_receivable.credit_memo_amount')">
-            <UInput v-model="state.egcs_fc_amount" type="text" inputmode="decimal" :disabled="pending" class="w-full" />
-          </UFormField>
         </div>
-        <UFormField name="egcs_fc_receiptreference" :label="t('account_receivable.receipt_reference')">
-          <UInput v-model="state.egcs_fc_receiptreference" :disabled="pending" class="w-full" />
+        <UFormField name="egcs_fc_reason" :label="t('account_receivable.reason')">
+          <UTextarea v-model="state.egcs_fc_reason" :disabled="pending" class="w-full" />
         </UFormField>
-        <div class="grid gap-4 md:grid-cols-2">
-          <UFormField name="egcs_fc_narrative_en" :label="t('account_receivable.narrative_en')">
-            <UTextarea v-model="state.egcs_fc_narrative_en" :disabled="pending" class="w-full" />
-          </UFormField>
-          <UFormField name="egcs_fc_narrative_fr" :label="t('account_receivable.narrative_fr')">
-            <UTextarea v-model="state.egcs_fc_narrative_fr" :disabled="pending" class="w-full" />
-          </UFormField>
-        </div>
-        <p class="text-sm text-muted">
-          {{ t('account_receivable.credit_memo_evidence_instruction') }}
-        </p>
         <div class="flex flex-wrap justify-end gap-2">
           <UButton type="button" color="neutral" variant="ghost" :label="t('common.cancel')" :disabled="pending" @click="open = false" />
           <CommonSaveButton :label="t('account_receivable.create_credit_memo')" :loading="pending" :disabled="pending" />

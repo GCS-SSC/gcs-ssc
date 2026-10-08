@@ -90,15 +90,11 @@ export const AccountReceivableCancelSchema = z.object({
 
 export const AccountReceivableCreditMemoCreateSchema = z.object({
   egcs_fc_receivable: DatabaseIdSchema,
-  egcs_fc_creditmemochartofaccount: DatabaseIdSchema,
   egcs_fc_agency: DatabaseIdSchema,
   egcs_fc_applicantrecipient: DatabaseIdSchema,
   egcs_fc_currency: z.enum(CURRENCY_CODES_ENUM, { error: 'validation.required' }),
   egcs_fc_receiveddate: RequiredDateSchema,
-  egcs_fc_amount: PositiveMoneySchema,
-  egcs_fc_receiptreference: z.string().trim().max(1000).nullable().optional(),
-  egcs_fc_narrative_en: NarrativeSchema,
-  egcs_fc_narrative_fr: NarrativeSchema
+  egcs_fc_reason: z.string().max(10000).default('')
 }).strict()
 
 export const AccountReceivableCreditMemoEditSchema = AccountReceivableCreditMemoCreateSchema
@@ -106,3 +102,29 @@ export type AccountReceivableCreate = z.infer<typeof AccountReceivableCreateSche
 export type AccountReceivableEdit = z.infer<typeof AccountReceivableEditSchema>
 export type AccountReceivableCreditMemoCreate = z.infer<typeof AccountReceivableCreditMemoCreateSchema>
 export type AccountReceivableCreditMemoEdit = z.infer<typeof AccountReceivableCreditMemoEditSchema>
+
+export const AccountReceivableCreditMemoLineCreateSchema = z.object({
+  egcs_fc_linenumber: z.number({ error: 'validation.required' }).int({ error: 'validation.invalid_number' }).min(1, { error: 'validation.invalid_number' }).max(32767, { error: 'validation.invalid_number' }),
+  egcs_fc_creditmemochartofaccount: DatabaseIdSchema,
+  egcs_fc_amount: PositiveMoneySchema
+}).strict()
+export const AccountReceivableCreditMemoLineEditSchema = AccountReceivableCreditMemoLineCreateSchema
+export type AccountReceivableCreditMemoLineCreate = z.infer<typeof AccountReceivableCreditMemoLineCreateSchema>
+export type AccountReceivableCreditMemoLineEdit = z.infer<typeof AccountReceivableCreditMemoLineEditSchema>
+
+export const AccountReceivableSummaryEditSchema = z.object(AccountReceivableEditSchema.shape).omit({ egcs_fc_lines: true }).strict()
+export const AccountReceivableLinePatchSchema = z.object({
+  egcs_fc_amount: MoneySchema,
+  egcs_fc_accountreceivablechartofaccount: DatabaseIdSchema.nullable().default(null)
+}).strict().superRefine((input, ctx) => {
+  if (isCanonicalMoney(input.egcs_fc_amount) && moneyToCents(input.egcs_fc_amount) !== BigInt(0) && !input.egcs_fc_accountreceivablechartofaccount) {
+    ctx.addIssue({ code: 'custom', path: ['egcs_fc_accountreceivablechartofaccount'], message: 'validation.required' })
+  }
+})
+export const AccountReceivableLineCreateSchema = AccountReceivableLinePatchSchema.safeExtend({
+  egcs_fc_originalline: DatabaseIdSchema.optional(),
+  egcs_fc_sourcekey: z.string({ error: 'validation.required' }).regex(/^(claim|advance):[1-9]\d*$/, { error: 'validation.invalid_selection' }).meta({ formRequired: true })
+})
+export type AccountReceivableLineCreate = z.infer<typeof AccountReceivableLineCreateSchema>
+export type AccountReceivableLinePatch = z.infer<typeof AccountReceivableLinePatchSchema>
+export type AccountReceivableSummaryEdit = z.infer<typeof AccountReceivableSummaryEditSchema>

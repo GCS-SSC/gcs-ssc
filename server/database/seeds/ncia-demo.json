@@ -281,6 +281,20 @@
       "egcs_ar_researchorganization_fr": null,
       "egcs_ar_active": true,
       "_deleted": false
+    },
+    {
+      "id": 171,
+      "egcs_ar_description_en": "Fictional northern nonprofit supporting community cultural facilities, seeded with one agreement and no accounts receivable.",
+      "egcs_ar_description_fr": "Organisme fictif du Nord soutenant les installations culturelles communautaires, avec une seule convention et aucun compte débiteur.",
+      "egcs_ar_operatingname_en": "Boreal Cultural Society",
+      "egcs_ar_operatingname_fr": "Société culturelle Boréale",
+      "egcs_ar_leadagency": 21,
+      "egcs_ar_legalname_en": "Boreal Cultural Society",
+      "egcs_ar_legalname_fr": "Société culturelle Boréale",
+      "egcs_ar_researchorganization_en": null,
+      "egcs_ar_researchorganization_fr": null,
+      "egcs_ar_active": true,
+      "_deleted": false
     }
   ],
   "Common_Approval": [
@@ -1270,6 +1284,90 @@
       "egcs_cn_comment": "Verified the seeded financial example.",
       "egcs_cn_defaultgroup": null,
       "egcs_cn_assignedgroup": null
+    },
+    {
+      "id": 66,
+      "egcs_cn_runtimeitem": 136,
+      "egcs_cn_sequence": "1",
+      "egcs_cn_name_en": "Financial authorization",
+      "egcs_cn_name_fr": "Autorisation financière",
+      "egcs_cn_routingslip": 60,
+      "egcs_cn_defaultuser": 1,
+      "egcs_cn_assigneduser": 1,
+      "egcs_cn_requiregroupdetails": false,
+      "egcs_cn_onbehalf": null,
+      "egcs_cn_approvername": null,
+      "egcs_cn_approvalpositiontitle": "Program Director",
+      "egcs_cn_isadded": false,
+      "egcs_cn_approvalvalue": true,
+      "egcs_cn_approvaldate": "2026-10-08T01:46:57.155Z",
+      "egcs_cn_attachment": null,
+      "egcs_cn_comment": null,
+      "egcs_cn_defaultgroup": null,
+      "egcs_cn_assignedgroup": null
+    },
+    {
+      "id": 67,
+      "egcs_cn_runtimeitem": 138,
+      "egcs_cn_sequence": "1",
+      "egcs_cn_name_en": "Payment processing confirmation",
+      "egcs_cn_name_fr": "Confirmation du traitement du paiement",
+      "egcs_cn_routingslip": 61,
+      "egcs_cn_defaultuser": 1,
+      "egcs_cn_assigneduser": 1,
+      "egcs_cn_requiregroupdetails": false,
+      "egcs_cn_onbehalf": null,
+      "egcs_cn_approvername": null,
+      "egcs_cn_approvalpositiontitle": "Program Director",
+      "egcs_cn_isadded": false,
+      "egcs_cn_approvalvalue": true,
+      "egcs_cn_approvaldate": "2026-10-08T01:46:57.270Z",
+      "egcs_cn_attachment": null,
+      "egcs_cn_comment": null,
+      "egcs_cn_defaultgroup": null,
+      "egcs_cn_assignedgroup": null
+    },
+    {
+      "id": 68,
+      "egcs_cn_runtimeitem": 140,
+      "egcs_cn_sequence": "1",
+      "egcs_cn_name_en": "Program approval",
+      "egcs_cn_name_fr": "Approbation du programme",
+      "egcs_cn_routingslip": 62,
+      "egcs_cn_defaultuser": 1,
+      "egcs_cn_assigneduser": 1,
+      "egcs_cn_requiregroupdetails": false,
+      "egcs_cn_onbehalf": null,
+      "egcs_cn_approvername": null,
+      "egcs_cn_approvalpositiontitle": "Program Director",
+      "egcs_cn_isadded": false,
+      "egcs_cn_approvalvalue": true,
+      "egcs_cn_approvaldate": "2026-10-08T01:46:57.387Z",
+      "egcs_cn_attachment": null,
+      "egcs_cn_comment": null,
+      "egcs_cn_defaultgroup": null,
+      "egcs_cn_assignedgroup": null
+    },
+    {
+      "id": 69,
+      "egcs_cn_runtimeitem": 142,
+      "egcs_cn_sequence": "1",
+      "egcs_cn_name_en": "Financial authorization",
+      "egcs_cn_name_fr": "Autorisation financière",
+      "egcs_cn_routingslip": 63,
+      "egcs_cn_defaultuser": 1,
+      "egcs_cn_assigneduser": 1,
+      "egcs_cn_requiregroupdetails": false,
+      "egcs_cn_onbehalf": null,
+      "egcs_cn_approvername": null,
+      "egcs_cn_approvalpositiontitle": "Program Director",
+      "egcs_cn_isadded": false,
+      "egcs_cn_approvalvalue": true,
+      "egcs_cn_approvaldate": "2026-10-08T01:46:57.493Z",
+      "egcs_cn_attachment": null,
+      "egcs_cn_comment": null,
+      "egcs_cn_defaultgroup": null,
+      "egcs_cn_assignedgroup": null
     }
   ],
   "Common_Approval_Step": [
@@ -1742,6 +1840,36 @@
       "egcs_cn_disposition": "workflow_started",
       "egcs_cn_completedat": "2026-10-07T02:03:45.111+00:00",
       "_deleted": false
+    },
+    {
+      "id": 62,
+      "egcs_cn_entitytype": "fundingcasepayment",
+      "egcs_cn_entityid": 172,
+      "egcs_cn_comments": "Authorize the CAD 10,000 advance for Boreal Cultural Society.",
+      "egcs_cn_user": 1,
+      "egcs_cn_disposition": "workflow_started",
+      "egcs_cn_completedat": "2026-10-08T01:46:57.060Z",
+      "_deleted": false
+    },
+    {
+      "id": 63,
+      "egcs_cn_entitytype": "fundingcaseagreementclaim",
+      "egcs_cn_entityid": 173,
+      "egcs_cn_comments": "Accept the final CAD 9,000 Claim for the same advance period.",
+      "egcs_cn_user": 1,
+      "egcs_cn_disposition": "workflow_started",
+      "egcs_cn_completedat": "2026-10-08T01:46:57.338Z",
+      "_deleted": false
+    },
+    {
+      "id": 64,
+      "egcs_cn_entitytype": "fundingclaimreconcile",
+      "egcs_cn_entityid": 174,
+      "egcs_cn_comments": "Approve the sole final reconciliation for the full CAD 9,000 Claim.",
+      "egcs_cn_user": 1,
+      "egcs_cn_disposition": "workflow_started",
+      "egcs_cn_completedat": "2026-10-08T01:46:57.442Z",
+      "_deleted": false
     }
   ],
   "Common_Entity": [
@@ -1988,6 +2116,26 @@
     {
       "id": 170,
       "egcs_cn_entitytype": "fundingcaseaccountreceivablecreditmemo",
+      "_deleted": false
+    },
+    {
+      "id": 171,
+      "egcs_cn_entitytype": "applicantrecipient",
+      "_deleted": false
+    },
+    {
+      "id": 172,
+      "egcs_cn_entitytype": "fundingcasepayment",
+      "_deleted": false
+    },
+    {
+      "id": 173,
+      "egcs_cn_entitytype": "fundingcaseagreementclaim",
+      "_deleted": false
+    },
+    {
+      "id": 174,
+      "egcs_cn_entitytype": "fundingclaimreconcile",
       "_deleted": false
     }
   ],
@@ -2470,6 +2618,46 @@
       "egcs_cn_isprimary": true,
       "egcs_cn_createdby": 1,
       "egcs_cn_createdat": "2026-10-07T02:03:45.054+00:00",
+      "_deleted": false
+    },
+    {
+      "id": 146,
+      "egcs_cn_entityid": 171,
+      "egcs_cn_entitytype": "applicantrecipient",
+      "egcs_cn_user": 1,
+      "egcs_cn_isprimary": true,
+      "egcs_cn_createdby": 1,
+      "egcs_cn_createdat": "2026-10-07T12:00:00.000Z",
+      "_deleted": false
+    },
+    {
+      "id": 147,
+      "egcs_cn_entityid": 172,
+      "egcs_cn_entitytype": "fundingcasepayment",
+      "egcs_cn_user": 1,
+      "egcs_cn_isprimary": true,
+      "egcs_cn_createdby": 1,
+      "egcs_cn_createdat": "2026-10-08T01:46:57.008Z",
+      "_deleted": false
+    },
+    {
+      "id": 148,
+      "egcs_cn_entityid": 173,
+      "egcs_cn_entitytype": "fundingcaseagreementclaim",
+      "egcs_cn_user": 1,
+      "egcs_cn_isprimary": true,
+      "egcs_cn_createdby": 1,
+      "egcs_cn_createdat": "2026-10-08T01:46:57.317Z",
+      "_deleted": false
+    },
+    {
+      "id": 149,
+      "egcs_cn_entityid": 174,
+      "egcs_cn_entitytype": "fundingclaimreconcile",
+      "egcs_cn_user": 1,
+      "egcs_cn_isprimary": true,
+      "egcs_cn_createdby": 1,
+      "egcs_cn_createdat": "2026-10-08T01:46:57.425Z",
       "_deleted": false
     }
   ],
@@ -6738,6 +6926,66 @@
       "egcs_cn_allowaddedapprovalcertificationchanges": false,
       "egcs_cn_runtimeitem": 133,
       "_deleted": false
+    },
+    {
+      "id": 60,
+      "egcs_cn_entitytype": "fundingcasepayment",
+      "egcs_cn_entityid": 172,
+      "egcs_cn_name_en": "Financial authorization",
+      "egcs_cn_name_fr": "Autorisation financière",
+      "egcs_cn_approvaltemplate": 366,
+      "egcs_cn_allowadditionalapprovals": false,
+      "egcs_cn_defaultaddedapprovalname_en": null,
+      "egcs_cn_defaultaddedapprovalname_fr": null,
+      "egcs_cn_allowaddedapprovalnamechanges": false,
+      "egcs_cn_allowaddedapprovalcertificationchanges": false,
+      "egcs_cn_runtimeitem": 135,
+      "_deleted": false
+    },
+    {
+      "id": 61,
+      "egcs_cn_entitytype": "fundingcasepayment",
+      "egcs_cn_entityid": 172,
+      "egcs_cn_name_en": "Payment processing confirmation",
+      "egcs_cn_name_fr": "Confirmation du traitement du paiement",
+      "egcs_cn_approvaltemplate": 371,
+      "egcs_cn_allowadditionalapprovals": false,
+      "egcs_cn_defaultaddedapprovalname_en": null,
+      "egcs_cn_defaultaddedapprovalname_fr": null,
+      "egcs_cn_allowaddedapprovalnamechanges": false,
+      "egcs_cn_allowaddedapprovalcertificationchanges": false,
+      "egcs_cn_runtimeitem": 137,
+      "_deleted": false
+    },
+    {
+      "id": 62,
+      "egcs_cn_entitytype": "fundingcaseagreementclaim",
+      "egcs_cn_entityid": 173,
+      "egcs_cn_name_en": "Program approval",
+      "egcs_cn_name_fr": "Approbation du programme",
+      "egcs_cn_approvaltemplate": 370,
+      "egcs_cn_allowadditionalapprovals": false,
+      "egcs_cn_defaultaddedapprovalname_en": null,
+      "egcs_cn_defaultaddedapprovalname_fr": null,
+      "egcs_cn_allowaddedapprovalnamechanges": false,
+      "egcs_cn_allowaddedapprovalcertificationchanges": false,
+      "egcs_cn_runtimeitem": 139,
+      "_deleted": false
+    },
+    {
+      "id": 63,
+      "egcs_cn_entitytype": "fundingclaimreconcile",
+      "egcs_cn_entityid": 174,
+      "egcs_cn_name_en": "Financial authorization",
+      "egcs_cn_name_fr": "Autorisation financière",
+      "egcs_cn_approvaltemplate": 366,
+      "egcs_cn_allowadditionalapprovals": false,
+      "egcs_cn_defaultaddedapprovalname_en": null,
+      "egcs_cn_defaultaddedapprovalname_fr": null,
+      "egcs_cn_allowaddedapprovalnamechanges": false,
+      "egcs_cn_allowaddedapprovalcertificationchanges": false,
+      "egcs_cn_runtimeitem": 141,
+      "_deleted": false
     }
   ],
   "Common_Runtime": [
@@ -7679,6 +7927,86 @@
       "egcs_cn_startedat": "2026-10-07T02:03:45.085+00:00",
       "egcs_cn_updatedat": "2026-10-07T02:03:45.162+00:00",
       "egcs_cn_completedat": "2026-10-07T02:03:45.162+00:00",
+      "_deleted": false
+    },
+    {
+      "id": 57,
+      "egcs_cn_kind": "workflow",
+      "egcs_cn_entitytype": "fundingcasepayment",
+      "egcs_cn_entityid": 172,
+      "egcs_cn_purpose": "approval_submission",
+      "egcs_cn_sourcepublication": 367,
+      "egcs_cn_sourcepublicationkind": "workflow_setup",
+      "egcs_cn_sourcepublicationversion": 373,
+      "egcs_cn_sourceversion": 2,
+      "egcs_cn_previousruntime": null,
+      "egcs_cn_attempt": 1,
+      "egcs_cn_initiatedby": 1,
+      "egcs_cn_state": "approved",
+      "egcs_cn_createdat": "2026-10-08T01:46:57.055Z",
+      "egcs_cn_startedat": "2026-10-08T01:46:57.055Z",
+      "egcs_cn_updatedat": "2026-10-08T01:46:57.155Z",
+      "egcs_cn_completedat": "2026-10-08T01:46:57.155Z",
+      "_deleted": false
+    },
+    {
+      "id": 58,
+      "egcs_cn_kind": "workflow",
+      "egcs_cn_entitytype": "fundingcasepayment",
+      "egcs_cn_entityid": 172,
+      "egcs_cn_purpose": "standard",
+      "egcs_cn_sourcepublication": 383,
+      "egcs_cn_sourcepublicationkind": "workflow_setup",
+      "egcs_cn_sourcepublicationversion": 387,
+      "egcs_cn_sourceversion": 1,
+      "egcs_cn_previousruntime": null,
+      "egcs_cn_attempt": 1,
+      "egcs_cn_initiatedby": 1,
+      "egcs_cn_state": "approved",
+      "egcs_cn_createdat": "2026-10-08T01:46:57.228Z",
+      "egcs_cn_startedat": "2026-10-08T01:46:57.228Z",
+      "egcs_cn_updatedat": "2026-10-08T01:46:57.270Z",
+      "egcs_cn_completedat": "2026-10-08T01:46:57.270Z",
+      "_deleted": false
+    },
+    {
+      "id": 59,
+      "egcs_cn_kind": "workflow",
+      "egcs_cn_entitytype": "fundingcaseagreementclaim",
+      "egcs_cn_entityid": 173,
+      "egcs_cn_purpose": "approval_submission",
+      "egcs_cn_sourcepublication": 374,
+      "egcs_cn_sourcepublicationkind": "workflow_setup",
+      "egcs_cn_sourcepublicationversion": 378,
+      "egcs_cn_sourceversion": 1,
+      "egcs_cn_previousruntime": null,
+      "egcs_cn_attempt": 1,
+      "egcs_cn_initiatedby": 1,
+      "egcs_cn_state": "approved",
+      "egcs_cn_createdat": "2026-10-08T01:46:57.334Z",
+      "egcs_cn_startedat": "2026-10-08T01:46:57.334Z",
+      "egcs_cn_updatedat": "2026-10-08T01:46:57.387Z",
+      "egcs_cn_completedat": "2026-10-08T01:46:57.387Z",
+      "_deleted": false
+    },
+    {
+      "id": 60,
+      "egcs_cn_kind": "workflow",
+      "egcs_cn_entitytype": "fundingclaimreconcile",
+      "egcs_cn_entityid": 174,
+      "egcs_cn_purpose": "approval_submission",
+      "egcs_cn_sourcepublication": 375,
+      "egcs_cn_sourcepublicationkind": "workflow_setup",
+      "egcs_cn_sourcepublicationversion": 379,
+      "egcs_cn_sourceversion": 1,
+      "egcs_cn_previousruntime": null,
+      "egcs_cn_attempt": 1,
+      "egcs_cn_initiatedby": 1,
+      "egcs_cn_state": "approved",
+      "egcs_cn_createdat": "2026-10-08T01:46:57.439Z",
+      "egcs_cn_startedat": "2026-10-08T01:46:57.439Z",
+      "egcs_cn_updatedat": "2026-10-08T01:46:57.493Z",
+      "egcs_cn_completedat": "2026-10-08T01:46:57.493Z",
       "_deleted": false
     }
   ],
@@ -9279,6 +9607,142 @@
       "egcs_cn_startedat": "2026-10-07T02:03:45.085+00:00",
       "egcs_cn_updatedat": "2026-10-07T02:03:45.162+00:00",
       "egcs_cn_completedat": "2026-10-07T02:03:45.162+00:00",
+      "_deleted": false
+    },
+    {
+      "id": 135,
+      "egcs_cn_runtime": 57,
+      "egcs_cn_parentruntimeitem": null,
+      "egcs_cn_kind": "routing_slip",
+      "egcs_cn_order": "1",
+      "egcs_cn_publication": 366,
+      "egcs_cn_publicationkind": "approval_template",
+      "egcs_cn_publicationversion": 370,
+      "egcs_cn_version": 2,
+      "egcs_cn_state": "approved",
+      "egcs_cn_createdat": "2026-10-08T01:46:57.055Z",
+      "egcs_cn_startedat": "2026-10-08T01:46:57.055Z",
+      "egcs_cn_updatedat": "2026-10-08T01:46:57.155Z",
+      "egcs_cn_completedat": "2026-10-08T01:46:57.155Z",
+      "_deleted": false
+    },
+    {
+      "id": 136,
+      "egcs_cn_runtime": 57,
+      "egcs_cn_parentruntimeitem": 135,
+      "egcs_cn_kind": "approval_step",
+      "egcs_cn_order": "1",
+      "egcs_cn_publication": 366,
+      "egcs_cn_publicationkind": "approval_template",
+      "egcs_cn_publicationversion": 370,
+      "egcs_cn_version": 2,
+      "egcs_cn_state": "approved",
+      "egcs_cn_createdat": "2026-10-08T01:46:57.055Z",
+      "egcs_cn_startedat": "2026-10-08T01:46:57.055Z",
+      "egcs_cn_updatedat": "2026-10-08T01:46:57.155Z",
+      "egcs_cn_completedat": "2026-10-08T01:46:57.155Z",
+      "_deleted": false
+    },
+    {
+      "id": 137,
+      "egcs_cn_runtime": 58,
+      "egcs_cn_parentruntimeitem": null,
+      "egcs_cn_kind": "routing_slip",
+      "egcs_cn_order": "1",
+      "egcs_cn_publication": 371,
+      "egcs_cn_publicationkind": "approval_template",
+      "egcs_cn_publicationversion": 372,
+      "egcs_cn_version": 1,
+      "egcs_cn_state": "approved",
+      "egcs_cn_createdat": "2026-10-08T01:46:57.228Z",
+      "egcs_cn_startedat": "2026-10-08T01:46:57.228Z",
+      "egcs_cn_updatedat": "2026-10-08T01:46:57.270Z",
+      "egcs_cn_completedat": "2026-10-08T01:46:57.270Z",
+      "_deleted": false
+    },
+    {
+      "id": 138,
+      "egcs_cn_runtime": 58,
+      "egcs_cn_parentruntimeitem": 137,
+      "egcs_cn_kind": "approval_step",
+      "egcs_cn_order": "1",
+      "egcs_cn_publication": 371,
+      "egcs_cn_publicationkind": "approval_template",
+      "egcs_cn_publicationversion": 372,
+      "egcs_cn_version": 1,
+      "egcs_cn_state": "approved",
+      "egcs_cn_createdat": "2026-10-08T01:46:57.228Z",
+      "egcs_cn_startedat": "2026-10-08T01:46:57.228Z",
+      "egcs_cn_updatedat": "2026-10-08T01:46:57.270Z",
+      "egcs_cn_completedat": "2026-10-08T01:46:57.270Z",
+      "_deleted": false
+    },
+    {
+      "id": 139,
+      "egcs_cn_runtime": 59,
+      "egcs_cn_parentruntimeitem": null,
+      "egcs_cn_kind": "routing_slip",
+      "egcs_cn_order": "1",
+      "egcs_cn_publication": 370,
+      "egcs_cn_publicationkind": "approval_template",
+      "egcs_cn_publicationversion": 371,
+      "egcs_cn_version": 1,
+      "egcs_cn_state": "approved",
+      "egcs_cn_createdat": "2026-10-08T01:46:57.334Z",
+      "egcs_cn_startedat": "2026-10-08T01:46:57.334Z",
+      "egcs_cn_updatedat": "2026-10-08T01:46:57.387Z",
+      "egcs_cn_completedat": "2026-10-08T01:46:57.387Z",
+      "_deleted": false
+    },
+    {
+      "id": 140,
+      "egcs_cn_runtime": 59,
+      "egcs_cn_parentruntimeitem": 139,
+      "egcs_cn_kind": "approval_step",
+      "egcs_cn_order": "1",
+      "egcs_cn_publication": 370,
+      "egcs_cn_publicationkind": "approval_template",
+      "egcs_cn_publicationversion": 371,
+      "egcs_cn_version": 1,
+      "egcs_cn_state": "approved",
+      "egcs_cn_createdat": "2026-10-08T01:46:57.334Z",
+      "egcs_cn_startedat": "2026-10-08T01:46:57.334Z",
+      "egcs_cn_updatedat": "2026-10-08T01:46:57.387Z",
+      "egcs_cn_completedat": "2026-10-08T01:46:57.387Z",
+      "_deleted": false
+    },
+    {
+      "id": 141,
+      "egcs_cn_runtime": 60,
+      "egcs_cn_parentruntimeitem": null,
+      "egcs_cn_kind": "routing_slip",
+      "egcs_cn_order": "1",
+      "egcs_cn_publication": 366,
+      "egcs_cn_publicationkind": "approval_template",
+      "egcs_cn_publicationversion": 370,
+      "egcs_cn_version": 2,
+      "egcs_cn_state": "approved",
+      "egcs_cn_createdat": "2026-10-08T01:46:57.439Z",
+      "egcs_cn_startedat": "2026-10-08T01:46:57.439Z",
+      "egcs_cn_updatedat": "2026-10-08T01:46:57.493Z",
+      "egcs_cn_completedat": "2026-10-08T01:46:57.493Z",
+      "_deleted": false
+    },
+    {
+      "id": 142,
+      "egcs_cn_runtime": 60,
+      "egcs_cn_parentruntimeitem": 141,
+      "egcs_cn_kind": "approval_step",
+      "egcs_cn_order": "1",
+      "egcs_cn_publication": 366,
+      "egcs_cn_publicationkind": "approval_template",
+      "egcs_cn_publicationversion": 370,
+      "egcs_cn_version": 2,
+      "egcs_cn_state": "approved",
+      "egcs_cn_createdat": "2026-10-08T01:46:57.439Z",
+      "egcs_cn_startedat": "2026-10-08T01:46:57.439Z",
+      "egcs_cn_updatedat": "2026-10-08T01:46:57.493Z",
+      "egcs_cn_completedat": "2026-10-08T01:46:57.493Z",
       "_deleted": false
     }
   ],
@@ -12102,6 +12566,246 @@
       "egcs_cn_actor": 4,
       "egcs_cn_reason": "workflow_approved",
       "egcs_cn_createdat": "2026-10-07T02:03:45.162+00:00"
+    },
+    {
+      "id": 375,
+      "egcs_cn_runtime": 57,
+      "egcs_cn_runtimeitem": null,
+      "egcs_cn_fromstate": "pending",
+      "egcs_cn_tostate": "active",
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": "workflow_started",
+      "egcs_cn_createdat": "2026-10-08T01:46:57.055Z"
+    },
+    {
+      "id": 376,
+      "egcs_cn_runtime": 57,
+      "egcs_cn_runtimeitem": 135,
+      "egcs_cn_fromstate": "pending",
+      "egcs_cn_tostate": "awaiting_action",
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": null,
+      "egcs_cn_createdat": "2026-10-08T01:46:57.055Z"
+    },
+    {
+      "id": 377,
+      "egcs_cn_runtime": 57,
+      "egcs_cn_runtimeitem": 136,
+      "egcs_cn_fromstate": "pending",
+      "egcs_cn_tostate": "awaiting_action",
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": null,
+      "egcs_cn_createdat": "2026-10-08T01:46:57.055Z"
+    },
+    {
+      "id": 378,
+      "egcs_cn_runtime": 57,
+      "egcs_cn_runtimeitem": 136,
+      "egcs_cn_fromstate": "awaiting_action",
+      "egcs_cn_tostate": "approved",
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": null,
+      "egcs_cn_createdat": "2026-10-08T01:46:57.155Z"
+    },
+    {
+      "id": 379,
+      "egcs_cn_runtime": 57,
+      "egcs_cn_runtimeitem": 135,
+      "egcs_cn_fromstate": "awaiting_action",
+      "egcs_cn_tostate": "approved",
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": null,
+      "egcs_cn_createdat": "2026-10-08T01:46:57.155Z"
+    },
+    {
+      "id": 380,
+      "egcs_cn_runtime": 57,
+      "egcs_cn_runtimeitem": null,
+      "egcs_cn_fromstate": "active",
+      "egcs_cn_tostate": "approved",
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": "workflow_approved",
+      "egcs_cn_createdat": "2026-10-08T01:46:57.155Z"
+    },
+    {
+      "id": 381,
+      "egcs_cn_runtime": 58,
+      "egcs_cn_runtimeitem": null,
+      "egcs_cn_fromstate": "pending",
+      "egcs_cn_tostate": "active",
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": "workflow_started",
+      "egcs_cn_createdat": "2026-10-08T01:46:57.228Z"
+    },
+    {
+      "id": 382,
+      "egcs_cn_runtime": 58,
+      "egcs_cn_runtimeitem": 137,
+      "egcs_cn_fromstate": "pending",
+      "egcs_cn_tostate": "awaiting_action",
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": null,
+      "egcs_cn_createdat": "2026-10-08T01:46:57.228Z"
+    },
+    {
+      "id": 383,
+      "egcs_cn_runtime": 58,
+      "egcs_cn_runtimeitem": 138,
+      "egcs_cn_fromstate": "pending",
+      "egcs_cn_tostate": "awaiting_action",
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": null,
+      "egcs_cn_createdat": "2026-10-08T01:46:57.228Z"
+    },
+    {
+      "id": 384,
+      "egcs_cn_runtime": 58,
+      "egcs_cn_runtimeitem": 138,
+      "egcs_cn_fromstate": "awaiting_action",
+      "egcs_cn_tostate": "approved",
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": null,
+      "egcs_cn_createdat": "2026-10-08T01:46:57.270Z"
+    },
+    {
+      "id": 385,
+      "egcs_cn_runtime": 58,
+      "egcs_cn_runtimeitem": 137,
+      "egcs_cn_fromstate": "awaiting_action",
+      "egcs_cn_tostate": "approved",
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": null,
+      "egcs_cn_createdat": "2026-10-08T01:46:57.270Z"
+    },
+    {
+      "id": 386,
+      "egcs_cn_runtime": 58,
+      "egcs_cn_runtimeitem": null,
+      "egcs_cn_fromstate": "active",
+      "egcs_cn_tostate": "approved",
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": "workflow_approved",
+      "egcs_cn_createdat": "2026-10-08T01:46:57.270Z"
+    },
+    {
+      "id": 387,
+      "egcs_cn_runtime": 59,
+      "egcs_cn_runtimeitem": null,
+      "egcs_cn_fromstate": "pending",
+      "egcs_cn_tostate": "active",
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": "workflow_started",
+      "egcs_cn_createdat": "2026-10-08T01:46:57.334Z"
+    },
+    {
+      "id": 388,
+      "egcs_cn_runtime": 59,
+      "egcs_cn_runtimeitem": 139,
+      "egcs_cn_fromstate": "pending",
+      "egcs_cn_tostate": "awaiting_action",
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": null,
+      "egcs_cn_createdat": "2026-10-08T01:46:57.334Z"
+    },
+    {
+      "id": 389,
+      "egcs_cn_runtime": 59,
+      "egcs_cn_runtimeitem": 140,
+      "egcs_cn_fromstate": "pending",
+      "egcs_cn_tostate": "awaiting_action",
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": null,
+      "egcs_cn_createdat": "2026-10-08T01:46:57.334Z"
+    },
+    {
+      "id": 390,
+      "egcs_cn_runtime": 59,
+      "egcs_cn_runtimeitem": 140,
+      "egcs_cn_fromstate": "awaiting_action",
+      "egcs_cn_tostate": "approved",
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": null,
+      "egcs_cn_createdat": "2026-10-08T01:46:57.387Z"
+    },
+    {
+      "id": 391,
+      "egcs_cn_runtime": 59,
+      "egcs_cn_runtimeitem": 139,
+      "egcs_cn_fromstate": "awaiting_action",
+      "egcs_cn_tostate": "approved",
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": null,
+      "egcs_cn_createdat": "2026-10-08T01:46:57.387Z"
+    },
+    {
+      "id": 392,
+      "egcs_cn_runtime": 59,
+      "egcs_cn_runtimeitem": null,
+      "egcs_cn_fromstate": "active",
+      "egcs_cn_tostate": "approved",
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": "workflow_approved",
+      "egcs_cn_createdat": "2026-10-08T01:46:57.387Z"
+    },
+    {
+      "id": 393,
+      "egcs_cn_runtime": 60,
+      "egcs_cn_runtimeitem": null,
+      "egcs_cn_fromstate": "pending",
+      "egcs_cn_tostate": "active",
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": "workflow_started",
+      "egcs_cn_createdat": "2026-10-08T01:46:57.439Z"
+    },
+    {
+      "id": 394,
+      "egcs_cn_runtime": 60,
+      "egcs_cn_runtimeitem": 141,
+      "egcs_cn_fromstate": "pending",
+      "egcs_cn_tostate": "awaiting_action",
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": null,
+      "egcs_cn_createdat": "2026-10-08T01:46:57.439Z"
+    },
+    {
+      "id": 395,
+      "egcs_cn_runtime": 60,
+      "egcs_cn_runtimeitem": 142,
+      "egcs_cn_fromstate": "pending",
+      "egcs_cn_tostate": "awaiting_action",
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": null,
+      "egcs_cn_createdat": "2026-10-08T01:46:57.439Z"
+    },
+    {
+      "id": 396,
+      "egcs_cn_runtime": 60,
+      "egcs_cn_runtimeitem": 142,
+      "egcs_cn_fromstate": "awaiting_action",
+      "egcs_cn_tostate": "approved",
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": null,
+      "egcs_cn_createdat": "2026-10-08T01:46:57.493Z"
+    },
+    {
+      "id": 397,
+      "egcs_cn_runtime": 60,
+      "egcs_cn_runtimeitem": 141,
+      "egcs_cn_fromstate": "awaiting_action",
+      "egcs_cn_tostate": "approved",
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": null,
+      "egcs_cn_createdat": "2026-10-08T01:46:57.493Z"
+    },
+    {
+      "id": 398,
+      "egcs_cn_runtime": 60,
+      "egcs_cn_runtimeitem": null,
+      "egcs_cn_fromstate": "active",
+      "egcs_cn_tostate": "approved",
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": "workflow_approved",
+      "egcs_cn_createdat": "2026-10-08T01:46:57.493Z"
     }
   ],
   "Common_Status": [
@@ -14664,6 +15368,106 @@
         },
         "accountReceivableCreditMemoPacketHash": "f95f2fcf7e8617e98af629a4d9a1c725fd44870b37cf4d55f6b20b1ee5f323b4"
       }
+    },
+    {
+      "id": 57,
+      "egcs_cn_completion": 62,
+      "egcs_cn_routing": {
+        "hash": "db87685ecf2f28d6c12767b56c7eacdcacc5ea9c60432986522968e183c04219",
+        "fields": [],
+        "values": {},
+        "version": 2,
+        "decisions": [
+          {
+            "eligible": true,
+            "memberId": "42",
+            "conditions": [],
+            "unmatchedFieldIds": []
+          }
+        ],
+        "agreementId": "150",
+        "paymentOffsetPacket": {
+          "payment": {
+            "egcs_fc_currency": "cad",
+            "egcs_fc_paymenttype": "advance",
+            "egcs_fc_payeename_en": "Boreal Cultural Society",
+            "egcs_fc_payeename_fr": "Société culturelle Boréale",
+            "egcs_fc_paymentamount": "10000.00",
+            "egcs_fc_agreementnumber": "NCIA-26-011",
+            "egcs_fc_fundingagreement": 150,
+            "egcs_fc_applicantrecipient": 171
+          },
+          "debtBasisHash": null,
+          "poolBasisHash": "6dcf817075b5ec2109de48983e56e225b144f76b65d4aa00a02cec990343add6",
+          "schemaVersion": 4,
+          "egcs_fc_offsets": [],
+          "egcs_fc_netamount": "10000.00",
+          "allocationBasisHash": null,
+          "egcs_fc_creditmemos": [],
+          "egcs_fc_grossamount": "10000.00",
+          "egcs_fc_offsetamount": "0.00",
+          "egcs_fc_recoverycontrol": "allowed",
+          "egcs_fc_creditmemoreference": null
+        },
+        "paymentOffsetPacketHash": "1d04df1caef54ec06c4868a3501068bf9a925ea23f88f7d1648a0dcb1466ca6d"
+      }
+    },
+    {
+      "id": 58,
+      "egcs_cn_completion": null,
+      "egcs_cn_routing": {
+        "hash": "1a2c0dd4ce4eec6182ab0558a26f82e7b2310dcb66ff4cc7ab02b1855cae9305",
+        "fields": [],
+        "values": {},
+        "version": 2,
+        "decisions": [
+          {
+            "eligible": true,
+            "memberId": "56",
+            "conditions": [],
+            "unmatchedFieldIds": []
+          }
+        ],
+        "agreementId": "150"
+      }
+    },
+    {
+      "id": 59,
+      "egcs_cn_completion": 63,
+      "egcs_cn_routing": {
+        "hash": "a680bab64ef046e71f7c66f2eb3d2ff981d0802dd1f0adb1490d652d31e9262d",
+        "fields": [],
+        "values": {},
+        "version": 2,
+        "decisions": [
+          {
+            "eligible": true,
+            "memberId": "47",
+            "conditions": [],
+            "unmatchedFieldIds": []
+          }
+        ],
+        "agreementId": "150"
+      }
+    },
+    {
+      "id": 60,
+      "egcs_cn_completion": 64,
+      "egcs_cn_routing": {
+        "hash": "12f21e91aa3be4acba5fcfe30d8678ebf655cb09d7599fcfc798a7a62a97bb86",
+        "fields": [],
+        "values": {},
+        "version": 2,
+        "decisions": [
+          {
+            "eligible": true,
+            "memberId": "48",
+            "conditions": [],
+            "unmatchedFieldIds": []
+          }
+        ],
+        "agreementId": "150"
+      }
     }
   ],
   "Common_Workflow_Setup": [
@@ -16082,6 +16886,76 @@
       "egcs_cn_newstatus": 395,
       "egcs_cn_actor": 4,
       "egcs_cn_createdat": "2026-10-07T02:03:45.162+00:00"
+    },
+    {
+      "id": 74,
+      "egcs_cn_workflowrun": 57,
+      "egcs_cn_workflowitem": 135,
+      "egcs_cn_event": "materialized",
+      "egcs_cn_previousstatus": 381,
+      "egcs_cn_newstatus": 385,
+      "egcs_cn_actor": 1,
+      "egcs_cn_createdat": "2026-10-08T01:46:57.055Z"
+    },
+    {
+      "id": 75,
+      "egcs_cn_workflowrun": 57,
+      "egcs_cn_workflowitem": 135,
+      "egcs_cn_event": "succeeded",
+      "egcs_cn_previousstatus": 385,
+      "egcs_cn_newstatus": 390,
+      "egcs_cn_actor": 1,
+      "egcs_cn_createdat": "2026-10-08T01:46:57.155Z"
+    },
+    {
+      "id": 76,
+      "egcs_cn_workflowrun": 58,
+      "egcs_cn_workflowitem": 137,
+      "egcs_cn_event": "succeeded",
+      "egcs_cn_previousstatus": 390,
+      "egcs_cn_newstatus": 391,
+      "egcs_cn_actor": 1,
+      "egcs_cn_createdat": "2026-10-08T01:46:57.270Z"
+    },
+    {
+      "id": 77,
+      "egcs_cn_workflowrun": 59,
+      "egcs_cn_workflowitem": 139,
+      "egcs_cn_event": "materialized",
+      "egcs_cn_previousstatus": 381,
+      "egcs_cn_newstatus": 385,
+      "egcs_cn_actor": 1,
+      "egcs_cn_createdat": "2026-10-08T01:46:57.334Z"
+    },
+    {
+      "id": 78,
+      "egcs_cn_workflowrun": 59,
+      "egcs_cn_workflowitem": 139,
+      "egcs_cn_event": "succeeded",
+      "egcs_cn_previousstatus": 385,
+      "egcs_cn_newstatus": 387,
+      "egcs_cn_actor": 1,
+      "egcs_cn_createdat": "2026-10-08T01:46:57.387Z"
+    },
+    {
+      "id": 79,
+      "egcs_cn_workflowrun": 60,
+      "egcs_cn_workflowitem": 141,
+      "egcs_cn_event": "materialized",
+      "egcs_cn_previousstatus": 381,
+      "egcs_cn_newstatus": 385,
+      "egcs_cn_actor": 1,
+      "egcs_cn_createdat": "2026-10-08T01:46:57.439Z"
+    },
+    {
+      "id": 80,
+      "egcs_cn_workflowrun": 60,
+      "egcs_cn_workflowitem": 141,
+      "egcs_cn_event": "succeeded",
+      "egcs_cn_previousstatus": 385,
+      "egcs_cn_newstatus": 388,
+      "egcs_cn_actor": 1,
+      "egcs_cn_createdat": "2026-10-08T01:46:57.493Z"
     }
   ],
   "Funding_Case_Agreement_Activity_Version": [
@@ -16248,7 +17122,7 @@
     {
       "id": 13,
       "egcs_fc_fundingagreement": 150,
-      "egcs_fc_applicantrecipient": 119,
+      "egcs_fc_applicantrecipient": 171,
       "egcs_fc_applicantrecipientsubtype": 21,
       "_deleted": false
     }
@@ -18080,6 +18954,19 @@
       "egcs_fc_gcformssubmissionuuid": null,
       "egcs_fc_status": 381,
       "_deleted": false
+    },
+    {
+      "id": 173,
+      "egcs_fc_applicantrecipient": 171,
+      "egcs_fc_fundingagreement": 150,
+      "egcs_fc_fiscalyear": 17,
+      "egcs_fc_isfinalforyear": false,
+      "egcs_fc_periodend": 2,
+      "egcs_fc_periodstart": 0,
+      "egcs_fc_receiveddate": "2026-10-07T00:00:00.000Z",
+      "egcs_fc_gcformssubmissionuuid": null,
+      "egcs_fc_status": 387,
+      "_deleted": false
     }
   ],
   "Funding_Case_Agreement_Claim_Line_Item": [
@@ -18096,6 +18983,20 @@
       "egcs_fc_currency": "cad",
       "_deleted": false,
       "egcs_fc_totalamount": "21000.00"
+    },
+    {
+      "id": 18,
+      "egcs_fc_fundingagreementclaim": 173,
+      "egcs_fc_fundingagreement": 150,
+      "egcs_fc_fundingagreementbudgetlineitem": 24,
+      "egcs_fc_submittedcostcategory": null,
+      "egcs_fc_submittedcostsubsection": null,
+      "egcs_fc_submittedlineitem": null,
+      "egcs_fc_description": "Final cultural centre accessibility equipment expenditure; CAD 1,000 of the advance remains unspent.",
+      "egcs_fc_amount": "9000.00",
+      "egcs_fc_currency": "cad",
+      "_deleted": false,
+      "egcs_fc_totalamount": "9000.00"
     }
   ],
   "Funding_Case_Agreement_Claim_Reconcile": [
@@ -18111,6 +19012,15 @@
     {
       "id": 167,
       "egcs_fc_fundingagreementclaim": 164,
+      "egcs_fc_user": 1,
+      "egcs_fc_status": 388,
+      "egcs_fc_isfinal": true,
+      "egcs_fc_isopen": false,
+      "_deleted": false
+    },
+    {
+      "id": 174,
+      "egcs_fc_fundingagreementclaim": 173,
       "egcs_fc_user": 1,
       "egcs_fc_status": 388,
       "egcs_fc_isfinal": true,
@@ -18137,6 +19047,16 @@
       "egcs_fc_reconciled": "21000.00",
       "egcs_fc_sampled": "0.00",
       "egcs_fc_rationale": "Final eligible expenditure established for the seeded recovery example.",
+      "_deleted": false
+    },
+    {
+      "id": 17,
+      "egcs_fc_fundingagreementclaimreconcile": 174,
+      "egcs_fc_fundingagreementclaim": 173,
+      "egcs_fc_lineitem": 18,
+      "egcs_fc_reconciled": "9000.00",
+      "egcs_fc_sampled": "0.00",
+      "egcs_fc_rationale": "One and final reconciliation accepts the full CAD 9,000 Claim; CAD 1,000 of the CAD 10,000 advance remains unspent.",
       "_deleted": false
     }
   ],
@@ -23001,6 +23921,21 @@
       "egcs_fc_fundingagreement": 120,
       "egcs_fc_applicantrecipient": 119,
       "egcs_fc_fundingagreementcommitment": 121
+    },
+    {
+      "id": 172,
+      "egcs_fc_fundingagreementcommitment": 151,
+      "egcs_fc_fundingagreement": 150,
+      "egcs_fc_fiscalyear": 17,
+      "egcs_fc_paymenttype": "advance",
+      "egcs_fc_periodstart": 0,
+      "egcs_fc_periodend": 2,
+      "egcs_fc_paymentamount": "10000.00",
+      "egcs_fc_currency": "cad",
+      "egcs_fc_comment": "Advance for Boreal Cultural Society cultural centre accessibility costs.",
+      "egcs_fc_status": 391,
+      "_deleted": false,
+      "egcs_fc_applicantrecipient": 171
     }
   ],
   "Funding_Case_Agreement_Payment_Line": [
@@ -23011,6 +23946,14 @@
       "egcs_fc_fundingagreementpayment": 168,
       "egcs_fc_fundingagreementcommitment": 121,
       "egcs_fc_fundingagreementcommitmentline": 6
+    },
+    {
+      "id": 2,
+      "egcs_fc_fundingagreementpayment": 172,
+      "egcs_fc_fundingagreementcommitment": 151,
+      "egcs_fc_fundingagreementcommitmentline": 16,
+      "egcs_fc_amount": "10000.00",
+      "_deleted": false
     }
   ],
   "Funding_Case_Account_Receivable_Pool": [
@@ -23020,6 +23963,13 @@
       "egcs_fc_agency": 21,
       "egcs_fc_currency": "cad",
       "egcs_fc_applicantrecipient": 119
+    },
+    {
+      "id": 2,
+      "egcs_fc_agency": 21,
+      "egcs_fc_applicantrecipient": 171,
+      "egcs_fc_currency": "cad",
+      "_deleted": false
     }
   ],
   "Funding_Case_Agreement_Account_Receivable": [
@@ -23149,14 +24099,19 @@
       "egcs_fc_receivable": 169,
       "egcs_fc_terminalat": "2026-10-07T02:03:45.199+00:00",
       "egcs_fc_terminalby": 4,
-      "egcs_fc_narrative_en": "Receipt of half the approved Claim amount.",
-      "egcs_fc_narrative_fr": "Réception de la moitié du montant de la réclamation approuvée.",
+      "egcs_fc_reason": "Receipt of half the approved Claim amount.",
       "egcs_fc_receiveddate": "2026-10-06",
       "egcs_fc_statusagency": 21,
       "egcs_fc_postingruntime": 56,
       "egcs_fc_terminalreason": null,
-      "egcs_fc_receiptreference": "NCIA-DEMO-HALF-CLAIM-164",
-      "egcs_fc_applicantrecipient": 119,
+      "egcs_fc_applicantrecipient": 119
+    }
+  ],
+  "Funding_Case_Account_Receivable_Credit_Memo_Line": [
+    {
+      "id": 1,
+      "egcs_fc_creditmemo": 170,
+      "egcs_fc_linenumber": 1,
       "egcs_fc_creditmemochartofaccount": 14,
       "egcs_fc_creditmemoaccountingdimensions": [
         {
@@ -23164,7 +24119,9 @@
           "label_en": "Credit Memos",
           "label_fr": "Notes de crédit"
         }
-      ]
+      ],
+      "egcs_fc_amount": "10500.00",
+      "_deleted": false
     }
   ]
 }

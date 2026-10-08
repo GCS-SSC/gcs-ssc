@@ -4,7 +4,7 @@ The private repository instructions, architecture documentation, tests, and expl
 
 [unDraw](https://undraw.co/) is the app's illustration provider. Use its SVG illustrations and adapt their colours to the app's theme, following the canonical guide's Vue and UI instructions.
 
-Use multiple AI agents by default unless the user explicitly requests otherwise. Assign each agent a clearly bounded, non-overlapping scope and exclusive ownership of any files it edits. Coordinate dependencies through the primary agent, which integrates the results and verifies the complete change. If agent tooling is unavailable, state that limitation and continue with a single agent.
+At the start of each task, assess whether the work benefits from multiple AI agents and can be split into clearly bounded, non-overlapping scopes. Use multiple agents when it can, unless the user explicitly requests otherwise; continue with a single agent when the work is too small or tightly coupled to benefit from delegation. Reassess as additional tasks are added or the scope evolves, and delegate whenever a useful split becomes available. Assign each agent exclusive ownership of any files it edits. Coordinate dependencies through the primary agent, which integrates the results and verifies the complete change. If agent tooling is unavailable, state that limitation and continue with a single agent.
 
 Before working in this repository:
 

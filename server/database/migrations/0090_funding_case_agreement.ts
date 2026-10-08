@@ -108,8 +108,6 @@ CREATE TABLE "Funding_Case_Account_Receivable_Allocation" (
 
 CREATE TABLE "Funding_Case_Account_Receivable_Credit_Memo" (
   "id" bigint NOT NULL,
-  "egcs_fc_creditmemochartofaccount" bigint NOT NULL REFERENCES "Agency_Chart_of_Account"(id),
-  "egcs_fc_creditmemoaccountingdimensions" jsonb DEFAULT '[]'::jsonb NOT NULL,
   "egcs_fc_receivable" bigint NOT NULL,
   "egcs_fc_agency" bigint NOT NULL,
   "egcs_fc_pool" bigint NOT NULL,
@@ -117,10 +115,8 @@ CREATE TABLE "Funding_Case_Account_Receivable_Credit_Memo" (
   "egcs_fc_currency" currency_codes NOT NULL,
   "egcs_fc_number" integer NOT NULL,
   "egcs_fc_receiveddate" date NOT NULL,
-  "egcs_fc_amount" numeric(19,2) NOT NULL,
-  "egcs_fc_receiptreference" text,
-  "egcs_fc_narrative_en" text DEFAULT ''::text NOT NULL,
-  "egcs_fc_narrative_fr" text DEFAULT ''::text NOT NULL,
+  "egcs_fc_amount" numeric(19,2) DEFAULT 0 NOT NULL,
+  "egcs_fc_reason" text DEFAULT ''::text NOT NULL,
   "egcs_fc_createdby" bigint NOT NULL,
   "egcs_fc_createdat" timestamp with time zone DEFAULT now() NOT NULL,
   "egcs_fc_status" bigint NOT NULL,
@@ -149,11 +145,23 @@ END) STORED,
   CONSTRAINT "fc_chk_ar_creditmemo_terminal" CHECK ((((egcs_fc_outcome)::text = 'open'::text) = (egcs_fc_terminalat IS NULL))),
   CONSTRAINT "Funding_Case_Account_Receivable_Credit_egcs_fc_ledgerkind_check" CHECK (((egcs_fc_ledgerkind)::text = ANY ((ARRAY['legacy'::character varying, 'pool'::character varying])::text[]))),
   CONSTRAINT "Funding_Case_Account_Receivable_Credit_Me_egcs_fc_outcome_check" CHECK (((egcs_fc_outcome)::text = ANY ((ARRAY['open'::character varying, 'posted'::character varying, 'denied'::character varying, 'failed'::character varying, 'cancelled'::character varying])::text[]))),
-  CONSTRAINT "Funding_Case_Account_Receivable_Credit_Mem_egcs_fc_amount_check" CHECK ((egcs_fc_amount > (0)::numeric)),
+  CONSTRAINT "Funding_Case_Account_Receivable_Credit_Mem_egcs_fc_amount_check" CHECK ((egcs_fc_amount >= (0)::numeric)),
   CONSTRAINT "Funding_Case_Account_Receivable_Credit_Mem_egcs_fc_number_check" CHECK ((egcs_fc_number > 0))
 );
 
 CREATE INDEX fc_idx_ar_creditmemo_receivable ON "Funding_Case_Account_Receivable_Credit_Memo" (egcs_fc_receivable) WHERE NOT _deleted;
+
+CREATE TABLE "Funding_Case_Account_Receivable_Credit_Memo_Line" (
+  "id" bigserial PRIMARY KEY,
+  "egcs_fc_creditmemo" bigint NOT NULL REFERENCES "Funding_Case_Account_Receivable_Credit_Memo"(id) ON DELETE RESTRICT,
+  "egcs_fc_linenumber" smallint NOT NULL CHECK (egcs_fc_linenumber > 0),
+  "egcs_fc_creditmemochartofaccount" bigint NOT NULL REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT,
+  "egcs_fc_creditmemoaccountingdimensions" jsonb DEFAULT '[]'::jsonb NOT NULL,
+  "egcs_fc_amount" numeric(19,2) NOT NULL CHECK (egcs_fc_amount > 0),
+  "_deleted" boolean DEFAULT false NOT NULL
+);
+
+CREATE UNIQUE INDEX fc_uq_ar_creditmemo_line_number ON "Funding_Case_Account_Receivable_Credit_Memo_Line" (egcs_fc_creditmemo, egcs_fc_linenumber) WHERE NOT _deleted;
 
 CREATE TABLE "Funding_Case_Account_Receivable_Offset_Memo" (
   "id" bigint DEFAULT nextval('"Funding_Case_Account_Receivable_Offset_Memo_id_seq"'::regclass) NOT NULL,
@@ -360,7 +368,6 @@ CREATE TABLE "Funding_Case_Agreement_Account_Receivable_Line" (
   "egcs_fc_evidence" jsonb NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "fc_uq_ar_line_identity" UNIQUE (id, egcs_fc_receivable, egcs_fc_fundingagreement),
-  CONSTRAINT "fc_uq_ar_line_source" UNIQUE (egcs_fc_receivable, egcs_fc_sourcekey),
   CONSTRAINT "Funding_Case_Agreement_Account_Receivable_Line_pkey" PRIMARY KEY (id),
   CONSTRAINT "Funding_Case_Agreement_Account_Recei_egcs_fc_sourceamount_check" CHECK ((egcs_fc_sourceamount > (0)::numeric)),
   CONSTRAINT "Funding_Case_Agreement_Account_Receiv_egcs_fc_periodstart_check" CHECK (((egcs_fc_periodstart >= 0) AND (egcs_fc_periodstart <= 11))),
@@ -1381,7 +1388,7 @@ CREATE FUNCTION ar_validate_pool_credit_memo(previous jsonb, current_row jsonb, 
  RETURNS void
  LANGUAGE plpgsql
 AS $function$
-    DECLARE pool record; status record; agreement record; account record; debt record;
+    DECLARE pool record; status record; agreement record; debt record;
     BEGIN
       IF operation='DELETE' THEN RAISE EXCEPTION 'Credit memo evidence uses soft deletion' USING ERRCODE='23514'; END IF;
       SELECT * INTO pool FROM "Funding_Case_Account_Receivable_Pool" WHERE id=(current_row->>'egcs_fc_pool')::bigint FOR UPDATE;
@@ -1396,21 +1403,10 @@ AS $function$
         JOIN "Transfer_Payment_Stream" stream ON stream.id=agreement_row.egcs_fc_transferpaymentstream
         JOIN "Transfer_Payment_Profile" program ON program.id=stream.egcs_tp_transferpaymentprofile
         WHERE agreement_row.id=debt.egcs_fc_fundingagreement AND NOT agreement_row._deleted AND NOT stream._deleted AND NOT program._deleted;
-      SELECT * INTO account FROM "Agency_Chart_of_Account" WHERE id=(current_row->>'egcs_fc_creditmemochartofaccount')::bigint;
       IF agreement.id IS NULL OR agreement.agency_id<>pool.egcs_fc_agency OR agreement.egcs_fc_currency<>pool.egcs_fc_currency
         OR NOT EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Applicant_Recipient" recipient WHERE recipient.egcs_fc_fundingagreement=agreement.id
-          AND recipient.egcs_fc_applicantrecipient=pool.egcs_fc_applicantrecipient AND NOT recipient._deleted)
-        OR account.id IS NULL OR account._deleted OR account.egcs_ay_kind<>'credit_memo'
-        OR account.egcs_ay_organizationagency<>pool.egcs_fc_agency OR account.egcs_ay_currency<>pool.egcs_fc_currency
-        OR account.egcs_ay_fiscalyear<>debt.egcs_fc_agencyfiscalyear
-        OR NOT EXISTS (SELECT 1 FROM "Transfer_Payment_Stream_Chart_of_Account" selection WHERE selection.egcs_tp_transferpaymentstream=agreement.egcs_fc_transferpaymentstream
-          AND selection.egcs_tp_agencychartofaccount=account.id AND NOT selection._deleted) THEN
-        RAISE EXCEPTION 'Credit memo requires one Agreement and its selected Stream fiscal year currency credit memo account' USING ERRCODE='23514';
-      END IF;
-      IF current_row->'egcs_fc_creditmemoaccountingdimensions' IS DISTINCT FROM
-        (CASE WHEN operation='UPDATE' AND previous->>'egcs_fc_creditmemochartofaccount'=current_row->>'egcs_fc_creditmemochartofaccount'
-          THEN previous->'egcs_fc_creditmemoaccountingdimensions' ELSE to_jsonb(account.egcs_ay_accountingdimensions) END) THEN
-        RAISE EXCEPTION 'Credit memo coding must retain captured account dimensions' USING ERRCODE='23514';
+          AND recipient.egcs_fc_applicantrecipient=pool.egcs_fc_applicantrecipient AND NOT recipient._deleted) THEN
+        RAISE EXCEPTION 'Credit memo requires its AR Agreement agency currency and Proponent' USING ERRCODE='23514';
       END IF;
       IF pool.id IS NULL OR pool._deleted OR pool.egcs_fc_agency<>(current_row->>'egcs_fc_agency')::bigint
         OR pool.egcs_fc_applicantrecipient<>(current_row->>'egcs_fc_applicantrecipient')::bigint
@@ -1447,8 +1443,8 @@ AS $function$
         IF previous->>'egcs_fc_ledgerkind'<>'pool' OR previous->>'egcs_fc_outcome'<>'open' AND previous IS DISTINCT FROM current_row THEN
           RAISE EXCEPTION 'Completed credit memo evidence is immutable' USING ERRCODE='23514';
         END IF;
-        IF (previous - ARRAY['egcs_fc_creditmemochartofaccount','egcs_fc_creditmemoaccountingdimensions','egcs_fc_amount','egcs_fc_receiveddate','egcs_fc_receiptreference','egcs_fc_narrative_en','egcs_fc_narrative_fr','_deleted','egcs_fc_status','egcs_fc_statusagency','egcs_fc_outcome','egcs_fc_postedat','egcs_fc_postingruntime','egcs_fc_terminalby','egcs_fc_terminalat','egcs_fc_terminalreason','egcs_fc_statusterminal','egcs_fc_statusdeleted'])
-          IS DISTINCT FROM (current_row - ARRAY['egcs_fc_creditmemochartofaccount','egcs_fc_creditmemoaccountingdimensions','egcs_fc_amount','egcs_fc_receiveddate','egcs_fc_receiptreference','egcs_fc_narrative_en','egcs_fc_narrative_fr','_deleted','egcs_fc_status','egcs_fc_statusagency','egcs_fc_outcome','egcs_fc_postedat','egcs_fc_postingruntime','egcs_fc_terminalby','egcs_fc_terminalat','egcs_fc_terminalreason','egcs_fc_statusterminal','egcs_fc_statusdeleted']) THEN
+        IF (previous - ARRAY['egcs_fc_amount','egcs_fc_receiveddate','egcs_fc_reason','_deleted','egcs_fc_status','egcs_fc_statusagency','egcs_fc_outcome','egcs_fc_postedat','egcs_fc_postingruntime','egcs_fc_terminalby','egcs_fc_terminalat','egcs_fc_terminalreason','egcs_fc_statusterminal','egcs_fc_statusdeleted'])
+          IS DISTINCT FROM (current_row - ARRAY['egcs_fc_amount','egcs_fc_receiveddate','egcs_fc_reason','_deleted','egcs_fc_status','egcs_fc_statusagency','egcs_fc_outcome','egcs_fc_postedat','egcs_fc_postingruntime','egcs_fc_terminalby','egcs_fc_terminalat','egcs_fc_terminalreason','egcs_fc_statusterminal','egcs_fc_statusdeleted']) THEN
           RAISE EXCEPTION 'Credit memo owner identity is immutable' USING ERRCODE='23514';
         END IF;
         IF ar_has_lifecycle_evidence((current_row->>'id')::bigint,'fundingcaseaccountreceivablecreditmemo') AND
@@ -1461,6 +1457,72 @@ AS $function$
           RAISE EXCEPTION 'Only unsubmitted credit memo Drafts may be deleted' USING ERRCODE='23514';
         END IF;
       END IF;
+    END $function$;
+
+CREATE FUNCTION trg_fn_validate_ar_creditmemo_line()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+    DECLARE memo record; debt record; status record; account record; stream_id bigint; pool_id bigint;
+    BEGIN
+      IF TG_OP='DELETE' THEN RAISE EXCEPTION 'Credit memo lines use soft deletion' USING ERRCODE='23514'; END IF;
+      IF TG_OP='UPDATE' AND (OLD.id,OLD.egcs_fc_creditmemo) IS DISTINCT FROM (NEW.id,NEW.egcs_fc_creditmemo) THEN
+        RAISE EXCEPTION 'Credit memo line parent identity is immutable' USING ERRCODE='23514';
+      END IF;
+      SELECT egcs_fc_pool INTO pool_id FROM "Funding_Case_Account_Receivable_Credit_Memo" WHERE id=NEW.egcs_fc_creditmemo;
+      PERFORM 1 FROM "Funding_Case_Account_Receivable_Pool" WHERE id=pool_id FOR UPDATE;
+      SELECT * INTO memo FROM "Funding_Case_Account_Receivable_Credit_Memo" WHERE id=NEW.egcs_fc_creditmemo FOR UPDATE;
+      SELECT * INTO status FROM "Common_Status" WHERE id=memo.egcs_fc_status;
+      IF memo.id IS NULL OR memo._deleted OR memo.egcs_fc_ledgerkind<>'pool' OR memo.egcs_fc_outcome<>'open'
+        OR status.id IS NULL OR status._deleted OR status.egcs_cn_readonly OR status.egcs_cn_terminal
+        OR ar_has_lifecycle_evidence(memo.id,'fundingcaseaccountreceivablecreditmemo') THEN
+        RAISE EXCEPTION 'Credit memo lines require a workable unsubmitted parent' USING ERRCODE='23514';
+      END IF;
+      IF TG_OP='INSERT' AND NEW._deleted OR TG_OP='UPDATE' AND OLD._deleted THEN
+        RAISE EXCEPTION 'Deleted credit memo lines are immutable' USING ERRCODE='23514';
+      END IF;
+      SELECT * INTO debt FROM "Funding_Case_Agreement_Account_Receivable" WHERE id=memo.egcs_fc_receivable;
+      SELECT agreement.egcs_fc_transferpaymentstream INTO stream_id FROM "Funding_Case_Agreement_Profile" agreement
+        JOIN "Transfer_Payment_Stream" stream ON stream.id=agreement.egcs_fc_transferpaymentstream AND NOT stream._deleted
+        JOIN "Transfer_Payment_Profile" program ON program.id=stream.egcs_tp_transferpaymentprofile AND NOT program._deleted
+        WHERE agreement.id=debt.egcs_fc_fundingagreement AND NOT agreement._deleted AND program.egcs_tp_agency=memo.egcs_fc_agency
+          AND agreement.egcs_fc_currency=memo.egcs_fc_currency;
+      SELECT * INTO account FROM "Agency_Chart_of_Account" WHERE id=NEW.egcs_fc_creditmemochartofaccount;
+      IF debt.id IS NULL OR debt._deleted OR debt.egcs_fc_outcome<>'posted' OR debt.egcs_fc_linkedreceivable IS NOT NULL
+        OR stream_id IS NULL OR account.id IS NULL OR account._deleted OR account.egcs_ay_kind<>'credit_memo'
+        OR account.egcs_ay_organizationagency<>memo.egcs_fc_agency OR account.egcs_ay_currency<>memo.egcs_fc_currency
+        OR account.egcs_ay_fiscalyear<>debt.egcs_fc_agencyfiscalyear
+        OR NOT EXISTS (SELECT 1 FROM "Transfer_Payment_Stream_Chart_of_Account" selection WHERE selection.egcs_tp_transferpaymentstream=stream_id
+          AND selection.egcs_tp_agencychartofaccount=account.id AND NOT selection._deleted) THEN
+        RAISE EXCEPTION 'Credit memo line requires its selected Stream fiscal year currency credit memo account' USING ERRCODE='23514';
+      END IF;
+      IF TG_OP='UPDATE' AND OLD.egcs_fc_creditmemochartofaccount=NEW.egcs_fc_creditmemochartofaccount THEN
+        IF NEW.egcs_fc_creditmemoaccountingdimensions IS DISTINCT FROM OLD.egcs_fc_creditmemoaccountingdimensions THEN
+          RAISE EXCEPTION 'Credit memo line must retain captured account dimensions' USING ERRCODE='23514';
+        END IF;
+      ELSIF NEW.egcs_fc_creditmemoaccountingdimensions IS DISTINCT FROM to_jsonb(account.egcs_ay_accountingdimensions) THEN
+        RAISE EXCEPTION 'Credit memo line must capture selected account dimensions' USING ERRCODE='23514';
+      END IF;
+      RETURN NEW;
+    END $function$;
+
+CREATE FUNCTION trg_fn_validate_ar_creditmemo_lines_total()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+    DECLARE memo record; memo_id bigint; total numeric; line_count bigint;
+    BEGIN
+      memo_id := CASE WHEN TG_TABLE_NAME='Funding_Case_Account_Receivable_Credit_Memo_Line' THEN (to_jsonb(NEW)->>'egcs_fc_creditmemo')::bigint ELSE NEW.id END;
+      SELECT * INTO memo FROM "Funding_Case_Account_Receivable_Credit_Memo" WHERE id=memo_id;
+      SELECT coalesce(sum(egcs_fc_amount),0), count(*) INTO total,line_count
+        FROM "Funding_Case_Account_Receivable_Credit_Memo_Line" WHERE egcs_fc_creditmemo=memo_id AND NOT _deleted;
+      IF memo.egcs_fc_amount IS DISTINCT FROM total THEN
+        RAISE EXCEPTION 'Credit memo amount must equal its active line total' USING ERRCODE='23514';
+      END IF;
+      IF memo.egcs_fc_outcome='posted' AND line_count=0 THEN
+        RAISE EXCEPTION 'Posted credit memo requires at least one positive line' USING ERRCODE='23514';
+      END IF;
+      RETURN NULL;
     END $function$;
 
 CREATE FUNCTION correction_has_lifecycle_evidence(root_id bigint)
@@ -3530,6 +3592,12 @@ CREATE CONSTRAINT TRIGGER trg_require_ar_offset_memo_application AFTER INSERT OR
 CREATE TRIGGER trg_validate_ar_recovery BEFORE INSERT OR DELETE OR UPDATE ON "Funding_Case_Account_Receivable_Allocation" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_ar_recovery();
 
 CREATE CONSTRAINT TRIGGER trg_validate_ar_recovery_posting AFTER INSERT OR UPDATE ON "Funding_Case_Account_Receivable_Allocation" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_ar_recovery_posting();
+
+CREATE TRIGGER trg_validate_ar_creditmemo_line BEFORE INSERT OR UPDATE OR DELETE ON "Funding_Case_Account_Receivable_Credit_Memo_Line" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_ar_creditmemo_line();
+
+CREATE CONSTRAINT TRIGGER trg_validate_ar_creditmemo_lines_total AFTER INSERT OR UPDATE ON "Funding_Case_Account_Receivable_Credit_Memo_Line" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_ar_creditmemo_lines_total();
+
+CREATE CONSTRAINT TRIGGER trg_validate_ar_creditmemo_lines_total AFTER INSERT OR UPDATE ON "Funding_Case_Account_Receivable_Credit_Memo" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_ar_creditmemo_lines_total();
 
 CREATE CONSTRAINT TRIGGER trg_enforce_ar_creditmemo_roster AFTER INSERT OR UPDATE OF _deleted ON "Funding_Case_Account_Receivable_Credit_Memo" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_enforce_assignable_entity_roster('fundingcaseaccountreceivablecreditmemo');
 

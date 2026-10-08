@@ -480,6 +480,7 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Funding_Case_Agreement_Account_Receivable_Coding: FundingCaseAgreementAccountReceivableCodingTable
   Funding_Case_Account_Receivable_Pool: FundingCaseAccountReceivablePoolTable
   Funding_Case_Account_Receivable_Credit_Memo: FundingCaseAccountReceivableCreditMemoTable
+  Funding_Case_Account_Receivable_Credit_Memo_Line: FundingCaseAccountReceivableCreditMemoLineTable
   Funding_Case_Account_Receivable_Recovery: FundingCaseAccountReceivableRecoveryTable
   Funding_Case_Account_Receivable_Offset_Memo: FundingCaseAccountReceivableOffsetMemoTable
   Funding_Case_Account_Receivable_Offset_Memo_Application: FundingCaseAccountReceivableOffsetMemoApplicationTable
@@ -2721,8 +2722,6 @@ export interface FundingCaseAgreementAccountReceivableTable {
 
 export interface FundingCaseAccountReceivableCreditMemoTable {
   id: Generated<string>
-  egcs_fc_creditmemochartofaccount: string
-  egcs_fc_creditmemoaccountingdimensions: Generated<JsonValue>
   egcs_fc_receivable: string
   egcs_fc_ledgerkind: Generated<'legacy' | 'pool'>
   egcs_fc_agency: string
@@ -2731,10 +2730,8 @@ export interface FundingCaseAccountReceivableCreditMemoTable {
   egcs_fc_currency: Currency_Codes
   egcs_fc_number: number
   egcs_fc_receiveddate: Date
-  egcs_fc_amount: number
-  egcs_fc_receiptreference: string | null
-  egcs_fc_narrative_en: Generated<string>
-  egcs_fc_narrative_fr: Generated<string>
+  egcs_fc_amount: Generated<number>
+  egcs_fc_reason: Generated<string>
   egcs_fc_createdby: string
   egcs_fc_createdat: Generated<Date>
   egcs_fc_status: StatusId
@@ -2747,6 +2744,16 @@ export interface FundingCaseAccountReceivableCreditMemoTable {
   egcs_fc_terminalby: string | null
   egcs_fc_terminalat: Date | null
   egcs_fc_terminalreason: string | null
+  _deleted: Generated<boolean>
+}
+
+export interface FundingCaseAccountReceivableCreditMemoLineTable {
+  id: Generated<string>
+  egcs_fc_creditmemo: string
+  egcs_fc_linenumber: number
+  egcs_fc_creditmemochartofaccount: string
+  egcs_fc_creditmemoaccountingdimensions: Generated<JsonValue>
+  egcs_fc_amount: number
   _deleted: Generated<boolean>
 }
 

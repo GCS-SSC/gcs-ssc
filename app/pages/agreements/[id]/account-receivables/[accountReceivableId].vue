@@ -7,11 +7,11 @@ import CommonCompletionPanel from '~/components/Common/Completions/Panel.vue'
 import { useUrlTabState } from '~/composables/useUrlTabState'
 import { useBilingualValue } from '~/composables/useBilingualValue'
 import type { AccountReceivableDetail } from '~~/shared/types/account-receivable'
-import { AccountReceivableEditSchema } from '~~/shared/types/schemas/account-receivable'
+import { AccountReceivableSummaryEditSchema } from '~~/shared/types/schemas/account-receivable'
 import { appRouteLocations, authorizedRouteLocation } from '~/utils/route-locations'
 import { accountReceivableReference, formatAccountReceivableAmount } from '~/utils/account-receivable-display'
 import { AppFetchResponseError } from '~/utils/fetch-error'
-import { parseMoneyText, moneyToCents, sumMoney } from '~~/shared/utils/money'
+import { sumMoney } from '~~/shared/utils/money'
 
 definePageMeta({ key: route => route.path, i18n: { paths: {
   en: '/agreements/[id]/account-receivables/[accountReceivableId]', fr: '/ententes/[id]/comptes-debiteurs/[accountReceivableId]'
@@ -58,7 +58,6 @@ type FormState = {
   egcs_fc_recipientpreference: string | undefined
   egcs_fc_preferenceoverride_en: string
   egcs_fc_preferenceoverride_fr: string
-  egcs_fc_lines: Array<{ id: string, egcs_fc_amount: string, egcs_fc_accountreceivablechartofaccount: string | undefined }>
 }
 const state: Ref<FormState | null> = ref(null)
 const savedState: Ref<string> = ref('')
@@ -71,8 +70,7 @@ const hydrate = (detail: AccountReceivableDetail) => {
     egcs_fc_narrative_fr: detail.egcs_fc_narrative_fr,
     egcs_fc_recipientpreference: detail.egcs_fc_recipientpreference ?? undefined,
     egcs_fc_preferenceoverride_en: detail.egcs_fc_preferenceoverride_en,
-    egcs_fc_preferenceoverride_fr: detail.egcs_fc_preferenceoverride_fr,
-    egcs_fc_lines: detail.egcs_fc_lines.map(line => ({ id: line.id, egcs_fc_amount: line.egcs_fc_amount, egcs_fc_accountreceivablechartofaccount: line.egcs_fc_accountreceivablechartofaccount ?? undefined }))
+    egcs_fc_preferenceoverride_fr: detail.egcs_fc_preferenceoverride_fr
   }
   savedState.value = JSON.stringify(state.value)
 }
@@ -93,7 +91,8 @@ watch([agreementId, accountReceivableId], () => {
   creditMemoOpen.value = false
 }, { flush: 'sync' })
 const tabs = [
-  { key: 'agreement.commitments.coding', value: 'lines', icon: 'i-lucide-list' },
+  { key: 'account_receivable.summary', value: 'summary', icon: 'i-lucide-receipt-text' },
+  { key: 'account_receivable.lines', value: 'lines', icon: 'i-lucide-list' },
   { key: 'account_receivable.receivable_adjustments', value: 'adjustments', icon: 'i-lucide-file-diff' },
   { key: 'account_receivable.completion.title', value: 'completion', icon: 'i-lucide-circle-check-big' },
   { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-clipboard-check' },
@@ -101,17 +100,8 @@ const tabs = [
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
   { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users' }
 ]
-const { selectedTab } = useUrlTabState({ tabs, defaultKey: 'agreement.commitments.coding' })
+const { selectedTab } = useUrlTabState({ tabs, defaultKey: 'account_receivable.summary' })
 const amount = (value: string | null | undefined) => formatAccountReceivableAmount(value, locale.value, receivable.value?.egcs_fc_currency ?? 'cad') ?? t('common.not_available')
-const chartRequired = (index: number) => {
-  try {
-    return moneyToCents(parseMoneyText(state.value?.egcs_fc_lines[index]?.egcs_fc_amount ?? '')) !== BigInt(0)
-  } catch {
-    return false
-  }
-}
-const canEditLineAmount = (index: number) => receivable.value?.egcs_fc_canedit === true
-  && (!receivable.value.egcs_fc_linkedreceivable || Boolean(receivable.value.egcs_fc_lines[index]?.egcs_fc_accountreceivablechartofaccount))
 const heroBadges = computed(() => receivable.value
   ? [{ statusId: receivable.value.egcs_fc_status }]
   : [])
@@ -139,7 +129,7 @@ const save = async () => {
   const submitted = JSON.stringify(state.value)
   saving.value = true
   try {
-    await sendJson(`/api/account-receivables/${owner}`, 'PATCH', AccountReceivableEditSchema.parse(state.value))
+    await sendJson(`/api/account-receivables/${owner}`, 'PATCH', AccountReceivableSummaryEditSchema.parse(state.value))
     if (disposed || requestIdentity !== identity.value) return
     const refreshed = await refresh()
     if (disposed || requestIdentity !== identity.value) return
@@ -207,7 +197,8 @@ const creditMemoCreated = async (id: string, proponentId: string) => {
           <template #sidebar>
             <CommonRouteTabs v-model="selectedTab" :items="tabs" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
           </template>
-          <UForm v-if="selectedTab === 'lines'" :state="state" :validate="createValidator(AccountReceivableEditSchema)" class="space-y-8" @submit="save">
+          <AccountReceivableDetailLines v-if="selectedTab === 'lines'" :account-receivable-id="accountReceivableId" :lines="receivable.egcs_fc_lines" :currency="receivable.egcs_fc_currency" :fiscal-year-id="receivable.egcs_fc_agencyfiscalyear" :is-adjustment="Boolean(receivable.egcs_fc_linkedreceivable)" :can-edit="receivable.egcs_fc_canedit && !saving && status === 'success'" :can-delete="receivable.egcs_fc_candeletelines && !saving && status === 'success'" @changed="refreshPage" />
+          <UForm v-else-if="selectedTab === 'summary'" :state="state" :validate="createValidator(AccountReceivableSummaryEditSchema)" class="space-y-8" @submit="save">
             <CommonSection :title="t('account_receivable.financial_summary')" :grid-cols="1">
               <dl class="grid gap-4 text-sm sm:grid-cols-2">
                 <div>
@@ -277,26 +268,6 @@ const creditMemoCreated = async (id: string, proponentId: string) => {
               <p v-if="receivable.egcs_fc_canadjust" class="text-sm text-muted">
                 {{ t('account_receivable.adjust_receivable_description') }}
               </p>
-            </CommonSection>
-            <CommonSection :title="t('agreement.commitments.coding')" :grid-cols="1">
-              <p id="account-receivable-amount-instruction" class="text-sm text-muted">
-                {{ t(receivable.egcs_fc_linkedreceivable ? 'account_receivable.adjustment_instruction' : 'account_receivable.amount_instruction') }}
-              </p>
-              <AccountReceivableDetailSources :lines="receivable.egcs_fc_lines" :currency="receivable.egcs_fc_currency" :is-adjustment="Boolean(receivable.egcs_fc_linkedreceivable)">
-                <template v-if="receivable.egcs_fc_canedit && !receivable.egcs_fc_linkedreceivable" #coding="{ index }">
-                  <UFormField :name="`egcs_fc_lines.${index}.egcs_fc_accountreceivablechartofaccount`" :label="t('account_receivable.receivable_account')" :description="t('account_receivable.receivable_account_description')" :required="chartRequired(index)">
-                    <CommonServerLookupSelect v-model="state.egcs_fc_lines[index]!.egcs_fc_accountreceivablechartofaccount" :fetch-url="`/api/account-receivables/${accountReceivableId}/lookups/charts`" :query="{ egcs_fc_agencyfiscalyear: receivable.egcs_fc_agencyfiscalyear }" selected-values-query-key="selectedIds" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :show-value-in-label="false" :disabled="saving" close-on-select />
-                  </UFormField>
-                </template>
-                <template #amount="{ line, index }">
-                  <UFormField v-if="canEditLineAmount(index)" :name="`egcs_fc_lines.${index}.egcs_fc_amount`" :label="t('account_receivable.source_amount', { number: index + 1 })">
-                    <UInput v-model="state.egcs_fc_lines[index]!.egcs_fc_amount" type="text" inputmode="decimal" aria-describedby="account-receivable-amount-instruction" :disabled="saving" class="w-full" />
-                  </UFormField>
-                  <p v-else class="text-sm font-semibold">
-                    {{ amount(line.egcs_fc_amount) }}
-                  </p>
-                </template>
-              </AccountReceivableDetailSources>
             </CommonSection>
             <CommonSection :title="t('account_receivable.rationale')" :grid-cols="1">
               <p id="account-receivable-rationale-instruction" class="text-sm text-muted">

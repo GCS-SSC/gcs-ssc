@@ -166,7 +166,7 @@ export const listProponentCreditMemos = async (event: H3Event, id: string, reque
     const agencyById = new Map(agencies.map(agency => [String(agency.id), agency]))
     const cash = await db.selectFrom('Funding_Case_Account_Receivable_Credit_Memo as memo')
       .select(['memo.id', 'memo.egcs_fc_number', 'memo.egcs_fc_agency', 'memo.egcs_fc_currency', 'memo.egcs_fc_status',
-        'memo.egcs_fc_receiveddate', 'memo.egcs_fc_receiptreference', 'memo.egcs_fc_createdat'])
+        'memo.egcs_fc_receiveddate', 'memo.egcs_fc_createdat'])
       .select(databaseMoneyText(sql.ref('memo.egcs_fc_amount')).as('egcs_fc_amount'))
       .where('memo.egcs_fc_applicantrecipient', '=', id).where('memo.egcs_fc_agency', 'in', [...agencyById.keys()])
       .where('memo._deleted', '=', false).execute()
@@ -180,8 +180,7 @@ export const listProponentCreditMemos = async (event: H3Event, id: string, reque
         egcs_fc_creditmemoreference: `CM-${legacyRecovery?.id ?? memo.id}`,
         egcs_fc_agency: String(agency.id), egcs_fc_agencyname_en: agency.egcs_ay_name_en, egcs_fc_agencyname_fr: agency.egcs_ay_name_fr,
         egcs_fc_currency: memo.egcs_fc_currency, egcs_fc_amount: parseDatabaseMoney(memo.egcs_fc_amount),
-        egcs_fc_createdat: isoDate(memo.egcs_fc_createdat), egcs_fc_receiveddate: isoDate(memo.egcs_fc_receiveddate),
-        egcs_fc_receiptreference: memo.egcs_fc_receiptreference
+        egcs_fc_createdat: isoDate(memo.egcs_fc_createdat), egcs_fc_receiveddate: isoDate(memo.egcs_fc_receiveddate)
       }
     }))
     const offsetRows = await readOffsetMemoRows(db, id, agencies, auth)
@@ -192,8 +191,7 @@ export const listProponentCreditMemos = async (event: H3Event, id: string, reque
       || row.egcs_fc_agencyname_fr.toLocaleLowerCase().includes(search)
       || (row.egcs_fc_kind === 'automatic' && row.egcs_fc_applications.some(application =>
         application.egcs_fc_agreementnumber.toLocaleLowerCase().includes(search)
-        || application.egcs_fc_payment.includes(search)))
-      || (row.egcs_fc_kind === 'cash' && Boolean(row.egcs_fc_receiptreference?.toLocaleLowerCase().includes(search))))
+        || application.egcs_fc_payment.includes(search))))
       .sort((left, right) => right.egcs_fc_createdat.localeCompare(left.egcs_fc_createdat)
         || right.id.localeCompare(left.id, 'en', { numeric: true }))
     return { ...pageResult(visible.slice((input.page - 1) * input.limit, input.page * input.limit), visible.length, input), egcs_fc_cancreate: canCreate }

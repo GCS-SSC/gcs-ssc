@@ -1,5 +1,5 @@
 import { readAccountReceivableCashBalance } from './account-receivable-cash-balance'
-import { validateCreditMemoCoding } from './account-receivable-credit-memo'
+import { validateAccountReceivableCreditMemoLines } from './account-receivable-credit-memo-lines'
 /* eslint-disable jsdoc/require-jsdoc -- Immutable, latest Completion-linked terminal postings. */
 import type { Kysely, Transaction } from 'kysely'
 import { sql } from 'kysely'
@@ -38,13 +38,13 @@ export const captureAccountReceivablePacket = async (db: Kysely<Database>, id: s
 export const captureAccountReceivableCreditMemoPacket = async (db: Kysely<Database>, id: string) => {
   const repayment = await db.selectFrom('Funding_Case_Account_Receivable_Credit_Memo').selectAll()
     .select(databaseMoneyText(sql.ref('egcs_fc_amount')).as('egcs_fc_amount')).where('id', '=', id).where('_deleted', '=', false).executeTakeFirstOrThrow()
-  await validateCreditMemoCoding(db, repayment)
+  const basis = await validateAccountReceivableCreditMemoLines(db, id)
   const debt = await db.selectFrom('Funding_Case_Agreement_Account_Receivable').select(['egcs_fc_agreementnumber', 'egcs_fc_number'])
     .where('id', '=', repayment.egcs_fc_receivable).executeTakeFirstOrThrow()
   const proponent = await db.selectFrom('Applicant_Recipient_Profile').select(['egcs_ar_legalname_en', 'egcs_ar_legalname_fr']).where('id', '=', repayment.egcs_fc_applicantrecipient).executeTakeFirstOrThrow()
   const agency = await db.selectFrom('Agency_Profile').select(['egcs_ay_name_en', 'egcs_ay_name_fr']).where('id', '=', repayment.egcs_fc_agency).executeTakeFirstOrThrow()
   const balance = await readAccountReceivableCashBalance(db, String(repayment.egcs_fc_receivable))
-  return { schemaVersion: 3 as const, accountReceivableCreditMemo: json({ ...repayment, egcs_fc_amount: parseDatabaseMoney(repayment.egcs_fc_amount),
+  return { schemaVersion: 5 as const, lines: json(basis.lines), total: basis.total, accountReceivableCreditMemo: json({ ...repayment, egcs_fc_amount: parseDatabaseMoney(repayment.egcs_fc_amount),
     egcs_fc_debtorname_en: proponent.egcs_ar_legalname_en, egcs_fc_debtorname_fr: proponent.egcs_ar_legalname_fr,
     egcs_fc_agencyname_en: agency.egcs_ay_name_en, egcs_fc_agencyname_fr: agency.egcs_ay_name_fr,
     egcs_fc_receivablereference: `${debt.egcs_fc_agreementnumber} / AR-${debt.egcs_fc_number}`,
@@ -106,7 +106,8 @@ export const postAccountReceivableCreditMemo = async (trx: Transaction<Database>
   if (!routing?.accountReceivableCreditMemoPacket || !routing.accountReceivableCreditMemoPacketHash
     || hashPublicationDefinition(json(routing.accountReceivableCreditMemoPacket)) !== routing.accountReceivableCreditMemoPacketHash) throw new Error('AR_PACKET_INTEGRITY')
   const current = await captureAccountReceivableCreditMemoPacket(trx, id)
-  if (hashPublicationDefinition(current.allocations) !== hashPublicationDefinition(routing.accountReceivableCreditMemoPacket.allocations)) throw new Error('AR_PACKET_BASIS_CHANGED')
+  if (hashPublicationDefinition(current.lines) !== hashPublicationDefinition(routing.accountReceivableCreditMemoPacket.lines)
+    || current.total !== routing.accountReceivableCreditMemoPacket.total) throw new Error('AR_PACKET_BASIS_CHANGED')
   await trx.updateTable('Funding_Case_Account_Receivable_Credit_Memo').set({ egcs_fc_outcome: 'posted', egcs_fc_postedat: new Date(),
     egcs_fc_postingruntime: runtimeId, egcs_fc_terminalby: actorId!, egcs_fc_terminalat: new Date(), egcs_fc_terminalreason: null }).where('id', '=', id).where('egcs_fc_outcome', '=', 'open').execute()
 }

@@ -1,0 +1,11 @@
+import { authorizeAccountReceivableCreditMemo } from '~~/server/utils/account-receivable-credit-memo'
+import { writeAccountReceivableCreditMemoLine } from '~~/server/utils/account-receivable-credit-memo-lines'
+import { AccountReceivableCreditMemoLineEditSchema } from '~~/shared/types/schemas/account-receivable'
+import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
+
+export default defineEventHandler(async event => {
+  const id = getRouterParam(event, 'id') ?? ''
+  await authorizeAccountReceivableCreditMemo(event, id, 'update')
+  const input = await readValidatedBodyI18n(event, AccountReceivableCreditMemoLineEditSchema)
+  return await writeAccountReceivableCreditMemoLine(event, id, input, getRouterParam(event, 'lineId') ?? '')
+})

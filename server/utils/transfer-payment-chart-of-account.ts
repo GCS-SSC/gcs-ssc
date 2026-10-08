@@ -32,12 +32,13 @@ export const hasActiveStreamChartCasework = async (
     .where('agreement.egcs_fc_transferpaymentstream', '=', selection.egcs_tp_transferpaymentstream)
     .where('line._deleted', '=', false).where('debt._deleted', '=', false).executeTakeFirst()
   if (activeReceivable) return true
-  const activeMemo = await db.selectFrom('Funding_Case_Account_Receivable_Credit_Memo as memo')
+  const activeMemo = await db.selectFrom('Funding_Case_Account_Receivable_Credit_Memo_Line as line')
+    .innerJoin('Funding_Case_Account_Receivable_Credit_Memo as memo', 'memo.id', 'line.egcs_fc_creditmemo')
     .innerJoin('Funding_Case_Agreement_Account_Receivable as debt', 'debt.id', 'memo.egcs_fc_receivable')
     .innerJoin('Funding_Case_Agreement_Profile as agreement', 'agreement.id', 'debt.egcs_fc_fundingagreement')
-    .select('memo.id').where('memo.egcs_fc_creditmemochartofaccount', '=', selection.egcs_tp_agencychartofaccount)
+    .select('line.id').where('line.egcs_fc_creditmemochartofaccount', '=', selection.egcs_tp_agencychartofaccount)
     .where('agreement.egcs_fc_transferpaymentstream', '=', selection.egcs_tp_transferpaymentstream)
-    .where('memo._deleted', '=', false).executeTakeFirst()
+    .where('memo._deleted', '=', false).where('line._deleted', '=', false).executeTakeFirst()
   if (activeMemo) return true
   const offsetMemo = await db.selectFrom('Funding_Case_Account_Receivable_Offset_Memo as memo')
     .innerJoin('Funding_Case_Agreement_Account_Receivable as debt', 'debt.id', 'memo.egcs_fc_receivable')

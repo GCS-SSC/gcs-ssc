@@ -30,6 +30,7 @@ const coding = computed(() => records(packet.value.coding))
 const lines = computed(() => records(packet.value.lines).map(line => ({ ...line,
   egcs_fc_coding: coding.value.filter(item => item.egcs_fc_receivableline === line.id)
 })) as unknown as AccountReceivableLine[])
+const creditMemoLines = computed(() => records(packet.value.lines))
 const allocations = computed(() => records(packet.value.allocations))
 const attachments = computed(() => records(packet.value.attachments))
 const balanceFields = [
@@ -48,7 +49,7 @@ const labels = computed(() => [
     ? [
         { label: 'account_receivable.credit_memo_receivable', value: header.value.egcs_fc_receivablereference },
         { label: 'account_receivable.received_date', value: typeof header.value.egcs_fc_receiveddate === 'string' ? formatDate(header.value.egcs_fc_receiveddate) : null },
-        { label: 'account_receivable.receipt_reference', value: header.value.egcs_fc_receiptreference }
+        ...(typeof header.value.egcs_fc_receiptreference === 'string' ? [{ label: 'account_receivable.receipt_reference', value: header.value.egcs_fc_receiptreference }] : [])
       ]
     : [
         { label: 'agreement.payments.fiscal_year', value: header.value.egcs_fc_fiscalyeardisplay },
@@ -126,6 +127,32 @@ const labels = computed(() => [
         </div>
       </dl>
     </CommonSection>
+    <CommonSection v-if="creditMemo && creditMemoLines.length" :title="t('account_receivable.credit_memo_lines')" :grid-cols="1">
+      <div v-for="line in creditMemoLines" :key="text(line.id)" class="border-b border-default py-3 last:border-0">
+        <dl class="grid gap-4 text-sm sm:grid-cols-2">
+          <div>
+            <dt class="text-muted">
+              {{ t('account_receivable.number') }}
+            </dt>
+            <dd>{{ text(line.egcs_fc_linenumber) }}</dd>
+          </div>
+          <div>
+            <dt class="text-muted">
+              {{ t('account_receivable.credit_memo_amount') }}
+            </dt>
+            <dd class="font-semibold tabular-nums">
+              {{ amount(line.egcs_fc_amount) }}
+            </dd>
+          </div>
+          <div v-for="dimension in records(line.egcs_fc_creditmemoaccountingdimensions)" :key="text(dimension.label_en)">
+            <dt class="text-muted">
+              {{ getBilingualValue(dimension, 'label', t('common.none')) }}
+            </dt>
+            <dd>{{ text(dimension.value) }}</dd>
+          </div>
+        </dl>
+      </div>
+    </CommonSection>
     <CommonSection v-if="creditMemo && header.egcs_fc_creditmemoaccountingdimensions" :title="t('account_receivable.credit_memo_coding')" :grid-cols="1">
       <dl class="flex flex-wrap gap-4 text-sm">
         <div v-for="dimension in records(header.egcs_fc_creditmemoaccountingdimensions)" :key="text(dimension.label_en)">
@@ -136,7 +163,12 @@ const labels = computed(() => [
         </div>
       </dl>
     </CommonSection>
-    <CommonSection :title="t('account_receivable.rationale')" :grid-cols="2">
+    <CommonSection v-if="creditMemo && typeof header.egcs_fc_reason === 'string'" :title="t('account_receivable.reason')" :grid-cols="1">
+      <p class="whitespace-pre-wrap text-sm">
+        {{ text(header.egcs_fc_reason) }}
+      </p>
+    </CommonSection>
+    <CommonSection v-else :title="t('account_receivable.rationale')" :grid-cols="2">
       <div>
         <h4 class="mb-2 text-sm font-semibold">
           {{ t('account_receivable.narrative_en') }}

@@ -93,6 +93,7 @@ export type AccountReceivablePaymentCreditMemo = Pick<AccountReceivableOffsetMem
   }
 
 export type AccountReceivableDetail = AccountReceivableRow & {
+  egcs_fc_candeletelines: boolean
   egcs_fc_recovered: Money
   egcs_fc_reserved: Money
   egcs_fc_outstanding: Money
@@ -125,7 +126,18 @@ export type AccountReceivableCreditMemoRow = Omit<Selectable<FundingCaseAccountR
     egcs_fc_amount: Money
   } & BusinessRecordStateFields
 
+export type AccountReceivableCreditMemoLine = {
+  id: string
+  egcs_fc_creditmemo: string
+  egcs_fc_linenumber: number
+  egcs_fc_creditmemochartofaccount: string
+  egcs_fc_creditmemoaccountingdimensions: JsonValue
+  egcs_fc_amount: Money
+}
+
 export type AccountReceivableCreditMemoDetail = AccountReceivableCreditMemoRow & {
+  egcs_fc_lines: AccountReceivableCreditMemoLine[]
+  egcs_fc_candeletelines: boolean
   egcs_fc_receivablerecovered: Money
   egcs_fc_receivablereserved: Money
   egcs_fc_receivableoutstanding: Money
@@ -133,6 +145,7 @@ export type AccountReceivableCreditMemoDetail = AccountReceivableCreditMemoRow &
   egcs_fc_fundingagreement: string
   egcs_fc_agreementnumber: string
   egcs_fc_receivablereference: string
+  egcs_fc_receivablereadable: boolean
   egcs_fc_cancomplete: boolean
   egcs_fc_creditmemoreference: string
   egcs_fc_agencyname_en: string

@@ -174,6 +174,7 @@ export const AUDIT_TABLE_OWNERSHIP: Readonly<Record<string, AuditOwnershipRule>>
   'public.Funding_Case_Agreement_Account_Receivable_Coding': parent('egcs_fc_receivable', 'public.Funding_Case_Agreement_Account_Receivable'),
   'public.Funding_Case_Account_Receivable_Pool': parent('egcs_fc_agency', 'public.Agency_Profile'),
   'public.Funding_Case_Account_Receivable_Credit_Memo': parent('egcs_fc_agency', 'public.Agency_Profile'),
+  'public.Funding_Case_Account_Receivable_Credit_Memo_Line': parent('egcs_fc_creditmemo', 'public.Funding_Case_Account_Receivable_Credit_Memo'),
   'public.Funding_Case_Account_Receivable_Recovery': parent('egcs_fc_pool', 'public.Funding_Case_Account_Receivable_Pool'),
   'public.Funding_Case_Account_Receivable_Offset_Memo': parent('egcs_fc_pool', 'public.Funding_Case_Account_Receivable_Pool'),
   'public.Funding_Case_Account_Receivable_Offset_Memo_Application': parent('egcs_fc_offsetmemo', 'public.Funding_Case_Account_Receivable_Offset_Memo'),
