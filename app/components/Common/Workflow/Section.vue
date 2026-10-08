@@ -12,6 +12,7 @@ import CommonSelectableTable from '~/components/Common/SelectableTable.vue'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { AppFetchResponseError, throwFetchResponseError } from '~/utils/fetch-error'
 import { appRouteLocations } from '~/utils/route-locations'
+import { dataCollectionRuntimeConfiguration as dataCollectionConfiguration } from '~/utils/data-collection-runtime'
 
 type RuntimeRecommendation = {
   id: string
@@ -457,6 +458,7 @@ const selectedRecommendation = computed(() => data.value?.recommendations?.find(
   item => String(item.egcs_cn_recommendationsetup) === selectedStepId.value
 ) ?? null)
 const selectedDataCollection = computed(() => data.value?.dataCollections?.find(item => `data-collection-${item.workflowMemberId}` === selectedStepId.value) ?? null)
+const dataCollectionEditorKey = computed(() => `${runtimeIdentity.value}:${data.value?.current?.runtimeId}:${selectedDataCollection.value?.id}`)
 const canEditSelectedRecommendation = computed(() => canEdit && selectedRecommendation.value?.canUpdate === true)
 const selectedStep = computed(() => workflowSteps.value.find(step => step.id === selectedStepId.value) ?? null)
 const isStepViewable = (step: WorkflowDisplayStep): boolean =>
@@ -482,7 +484,8 @@ const selectAttempt = async (attempt: { runtimeId: string }) => {
   selectedStepId.value = null
   await refresh()
 }
-watch([currentRecommendation, () => data.value?.current?.runtimeState], ([recommendation]) => {
+watch([currentRecommendation, () => data.value?.current?.runtimeState,
+  () => data.value?.dataCollections?.find(item => item.runtimeState === 'active' || item.runtimeState === 'awaiting_action')?.id], ([recommendation]) => {
   if (recommendation) {
     selectedStepId.value = String(recommendation.egcs_cn_recommendationsetup)
   } else if (data.value?.dataCollections?.some(item => item.runtimeState === 'active' || item.runtimeState === 'awaiting_action')) {
@@ -894,14 +897,27 @@ const handleApprovalChanged = async () => {
           hide-title
           @changed="handleApprovalChanged" />
       </div>
-      <div v-else-if="selectedDataCollection" class="flex items-center justify-between gap-4 border-b border-default py-3">
+      <div v-else-if="selectedDataCollection" class="space-y-6" data-testid="workflow-data-collection">
         <div>
           <p class="font-semibold text-highlighted">
             {{ selectedStep?.name }}
           </p>
           <CommonLifecycleBadge engine="runtime" :state="selectedDataCollection.runtimeState" class="mt-1" />
         </div>
-        <UButton :to="localePath(appRouteLocations.dataCollectionDetail(selectedDataCollection.id))" color="neutral" variant="outline" icon="i-lucide-panel-top-open" :label="t('workflow.open_data_collection')" />
+        <Suspense>
+          <CommonQuestionnaireRuntimeDetail
+            :key="dataCollectionEditorKey"
+            :entity-id="selectedDataCollection.id"
+            :configuration="dataCollectionConfiguration"
+            embedded
+            @changed="handleApprovalChanged" />
+          <template #fallback>
+            <div role="status" class="flex items-center gap-3 py-8 text-sm text-muted">
+              <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin" aria-hidden="true" />
+              {{ t('common.loading') }}
+            </div>
+          </template>
+        </Suspense>
       </div>
       <AssessmentApprovalsSection
         v-else-if="selectedStep?.kind === 'final_approval' && 'routingSlipId' in selectedStep && selectedStep.routingSlipId"

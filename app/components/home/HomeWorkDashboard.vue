@@ -5,6 +5,8 @@ import type { Ref } from 'vue'
 import type { AssignedWorkItem, GroupWorkItem } from '~~/shared/types/assigned-work'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
+import { dataCollectionRuntimeConfiguration } from '~/utils/data-collection-runtime'
+import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 type AssignedItem = AssignedWorkItem
 type GroupItem = GroupWorkItem
@@ -13,6 +15,16 @@ const assignedBatchSize = 100
 const sectionPageSize = 5
 const groupPageSize = 10
 const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
+const selectedDataCollectionId = computed(() => {
+  const value = route.query.dataCollectionId
+  return typeof value === 'string' && isPositivePostgresBigintText(value) ? value : null
+})
+const closeDataCollection = async () => {
+  const { dataCollectionId: _collectionId, ...query } = route.query
+  await router.replace({ query })
+}
 const { showError } = useApiErrorToast()
 const { getHeroCollapsed } = useDashboard()
 const isHeroCollapsed = getHeroCollapsed('home')
@@ -174,6 +186,25 @@ const claimGroupItem = async (item: GroupItem) => {
           :description="t(groupStatus === 'success' && !hasAdministrativeGroups ? 'home_dashboard.hero_description_no_groups' : 'home_dashboard.hero_description')" />
         <div class="mx-auto max-w-7xl px-5 py-8 sm:px-8">
           <div class="space-y-10">
+            <section v-if="selectedDataCollectionId" class="space-y-6 border-b border-default pb-8" data-testid="home-data-collection">
+              <div class="flex items-center justify-between gap-4">
+                <h2 class="text-xl font-semibold text-highlighted">
+                  {{ t('data_collection.title') }}
+                </h2>
+                <UButton color="neutral" variant="ghost" icon="i-lucide-x" :label="t('common.close')" @click="closeDataCollection" />
+              </div>
+              <Suspense>
+                <CommonQuestionnaireRuntimeDetail
+                  :key="selectedDataCollectionId"
+                  :entity-id="selectedDataCollectionId"
+                  :configuration="dataCollectionRuntimeConfiguration"
+                  embedded
+                  @changed="async () => { await refresh(); await refreshGroup() }" />
+                <template #fallback>
+                  <CommonLoadingState :label="t('common.loading')" />
+                </template>
+              </Suspense>
+            </section>
             <div class="grid gap-5 sm:grid-cols-2">
               <CommonStatCard
                 v-for="stat in stats"

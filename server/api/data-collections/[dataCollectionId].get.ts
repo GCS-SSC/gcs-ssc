@@ -1,12 +1,15 @@
 import { notFound, throwApiError } from '~~/server/utils/api-errors'
 import { requireAuthContext } from '~~/server/utils/authorize'
 import { DataCollectionDefinitionInvalidError, fetchRuntimeDataCollection } from '~~/server/utils/data-collection-runtime'
+import { canAccessCreditMemoTargetScopes } from '~~/server/utils/credit-memo-scope-authority'
 import { resolveAssignedItemGrant } from '~~/server/utils/rbac'
 import {
   canManageEntityAssignments,
   canReadEntityAssignments,
+  canAccessEntityAssignmentOwner,
   resolveAgencyValidEntityAssigneeIdsWithDb,
-  resolveAssignmentActor
+  resolveAssignmentActor,
+  resolveEntityAssignmentOwner
 } from '~~/server/utils/entity-assignment'
 import {
   authorizeReviewRuntimeAction,
@@ -34,6 +37,10 @@ export default defineEventHandler(async event => {
   }
   if (!collection) return await notFound(event, 'DATA_COLLECTION_NOT_FOUND', 'apiErrors.admin_common.not_found')
   const actor = await resolveAssignmentActor(event)
+  const owner = await resolveEntityAssignmentOwner(event.context.$db, 'commondatacollection', id)
+  const canUpdateRole = owner !== null
+    && await canAccessEntityAssignmentOwner(actor.auth, owner, 'update', event.context.$db)
+    && await canAccessCreditMemoTargetScopes(event.context.$db, actor.auth, 'commondatacollection', id, 'update')
   const grant = await resolveAssignedItemGrant(actor.auth.userId, 'commondatacollection', id, event.context.$db)
   const workable = await isReviewRuntimeEntityWorkable(event.context.$db, context)
   const active = collection.runtimeState === 'active' && collection.rootRuntimeState === 'active' && workable
@@ -55,6 +62,7 @@ export default defineEventHandler(async event => {
     .orderBy('Common_Routing_Slip.id', 'desc').executeTakeFirst()
   return {
     ...collection, can_read: true, can_claim: canClaim,
+    can_update_role: canUpdateRole,
     can_update: active && await canAuthorizeReviewRuntimeAction(event, 'save_assessment', context),
     can_manage_assignments: active && await canManageEntityAssignments(event, 'commondatacollection', id),
     can_read_assignments: await canReadEntityAssignments(event, 'commondatacollection', id),

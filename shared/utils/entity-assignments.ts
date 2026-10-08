@@ -101,7 +101,7 @@ export const buildAssignedWorkRoute = (
   if (entityType === 'fundingcaseagreement') return `/agreements/${entityId}`
   if (entityType === 'fundingcaseintake') return `/funding-case-intakes/${entityId}`
   if (entityType === 'commonrecommendation') return `/recommendations/${entityId}`
-  if (entityType === 'commondatacollection') return `/data-collections/${entityId}`
+  if (entityType === 'commondatacollection') return `/?dataCollectionId=${encodeURIComponent(entityId)}`
   if (entityType === 'fundingclaimreconcile') return `/claim-reconciliations/${entityId}`
   const segment = ENTITY_AUTHORIZATION_POLICIES[entityType].agreementRouteSegment
   if (!segment || !agreementId) throw new Error(`Missing Agreement route context for ${entityType}`)

@@ -132,7 +132,7 @@ export const appRouteLocations = {
     params: { reviewId },
     ...(query ? { query } : {})
   }),
-  dataCollectionDetail: (dataCollectionId: string) => ({ name: 'data-collections-dataCollectionId', params: { dataCollectionId } }),
+  dataCollectionWork: (dataCollectionId: string) => ({ name: 'index', query: { dataCollectionId } }),
   recommendationDetail: (recommendationId: string) => ({
     name: 'recommendations-recommendationId',
     params: { recommendationId }

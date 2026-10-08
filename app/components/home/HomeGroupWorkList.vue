@@ -47,7 +47,7 @@ const itemUrl = (item: GroupItem): string | null => {
   }
   if (item.entity_type === 'commonreview') return localePath(item.variant === 'checklist' ? appRouteLocations.checklistDetail(item.entity_id) : appRouteLocations.assessmentDetail(item.entity_id))
   if (item.entity_type === 'fundingcaseintake') return localePath(appRouteLocations.fundingCaseIntakeDetail(item.entity_id))
-  if (item.entity_type === 'commondatacollection') return localePath(appRouteLocations.dataCollectionDetail(item.entity_id))
+  if (item.entity_type === 'commondatacollection') return localePath(appRouteLocations.dataCollectionWork(item.entity_id))
   if (item.entity_type === 'commonrecommendation') return localePath(appRouteLocations.recommendationDetail(item.entity_id))
   if (item.entity_type === 'fundingcaseagreement') return localePath(appRouteLocations.agreementDetail(item.entity_id))
   if (item.entity_type === 'applicantrecipient') return localePath(appRouteLocations.proponentEdit(item.entity_id))
