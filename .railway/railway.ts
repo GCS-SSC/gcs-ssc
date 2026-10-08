@@ -18,8 +18,8 @@ export default defineRailway((ctx) => {
   metabaseDatabase.networking = { privateNetworkEndpoint: 'postgres-xwyo' }
   // The imported Metabase DB has no managed source in Railway. Keep its image unchanged.
   delete metabaseDatabase.source
-  const freshPostgresVolume = volume('gcs-db-volume-ncia-reset', { alerts: { usage: { 100: {}, 80: {}, 95: {} } }, allowOnlineResize: true, region: 'us-east4-eqdc4a', sizeMB: 5000 })
-  database.volumeAttachments = { 'gcs-db-volume-ncia-reset': { volume: freshPostgresVolume.address, mountPath: '/var/lib/postgresql/data' } }
+  const freshPostgresVolume = volume('gcs-db-volume-release-reset', { alerts: { usage: { 100: {}, 80: {}, 95: {} } }, allowOnlineResize: true, region: 'us-east4-eqdc4a', sizeMB: 5000 })
+  database.volumeAttachments = { 'gcs-db-volume-release-reset': { volume: freshPostgresVolume.address, mountPath: '/var/lib/postgresql/data' } }
   const gcsSscVolume = volume('gcs-ssc-volume', { alerts: { usage: { 100: {}, 80: {}, 95: {} } }, allowOnlineResize: true, region: 'us-east4-eqdc4a', sizeMB: 5000 })
   const metabaseVolume = volume('postgres-volume-4aPn', { alerts: { usage: { 100: {}, 80: {}, 95: {} } }, allowOnlineResize: true, region: 'us-east4-eqdc4a', sizeMB: 5000 })
   const portalVolume = volume('portal-db-volume', { allowOnlineResize: true, region: 'us-east4-eqdc4a', sizeMB: 5000 })
