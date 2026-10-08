@@ -8,8 +8,9 @@ import { TransferPaymentStreamChartOfAccountDimensionSchema } from '~~/shared/ty
 
 const open = defineModel<boolean>('open', { required: true })
 const state = defineModel<JournalVoucherAllocationDraft | null>({ required: true })
-const { voucherId, original, editing } = defineProps<{
+const { voucherId, original, editing, currency } = defineProps<{
   voucherId: string
+  currency: string
   original: JournalVoucherDetail['egcs_fc_lines']
   editing: boolean
 }>()
@@ -54,8 +55,8 @@ const apply = () => {
             <CommonBilingualSelectMenu v-model="state.egcs_fc_commitmentline" :items="commitments" label-key="label" />
           </UFormField>
           <UFormField name="egcs_fc_amount" :label="t('journal_voucher.amount')">
-            <UInput
-              v-model="state.egcs_fc_amount" class="w-full tabular-nums" type="text" inputmode="decimal"
+            <CommonCurrencyInput
+              v-model="state.egcs_fc_amount" :currency="currency" class="w-full tabular-nums"
               aria-describedby="allocation-modal-instruction" />
           </UFormField>
           <UFormField name="egcs_fc_chartofaccount" :label="t('journal_voucher.coding')" class="sm:col-span-2">

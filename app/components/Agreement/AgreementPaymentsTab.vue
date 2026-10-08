@@ -530,10 +530,9 @@ const deletePayment = async (paymentId: string) => {
           </div>
 
           <UFormField :label="t('agreement.payments.amount')" name="egcs_fc_paymentamount">
-            <UInput
+            <CommonCurrencyInput
               v-model="selectedPayment.egcs_fc_paymentamount"
-              type="text"
-              inputmode="decimal"
+              :currency="selectedPayment.egcs_fc_currency"
               @update:model-value="hasManualPaymentAmount = true" />
             <p v-if="isPaymentAboveCalculatorCeiling" class="mt-1 text-sm text-error">
               {{ t('agreement.payments.amount_exceeds_calculated_ceiling', { amount: formatMoney(paymentCalculatorCeilingMoney ?? ZERO_MONEY, paymentCalculatorCurrency) }) }}

@@ -42,8 +42,9 @@ type FiscalYearLookupItem = {
 
 const FISCAL_YEAR_GROUP_COLUMN_ID = 'fiscalYearGroup'
 
-const { agreementId, canCreate, canUpdate, canDelete } = defineProps<{
+const { agreementId, currency, canCreate, canUpdate, canDelete } = defineProps<{
   agreementId: string
+  currency: string
   canCreate: boolean
   canUpdate: boolean
   canDelete: boolean
@@ -105,7 +106,7 @@ const columns: TableColumnInput<ForecastVersionRow>[] = [
 ]
 
 const ZERO_MONEY = '0.00' as Money
-const formatMoney = (value: Money) => formatMoneyText(value, locale.value, 'CAD')
+const formatMoney = (value: Money) => formatMoneyText(value, locale.value, currency)
 
 const forecastFiscalYearOptions = computed<FiscalYearLookupItem[]>(() => {
   const byId = new Map<string, FiscalYearLookupItem>()

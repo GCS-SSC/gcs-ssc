@@ -21,7 +21,6 @@ const { getHeroCollapsed } = useDashboard()
 const { createValidator } = useZodI18n()
 const { sendJson } = useJsonRequest()
 const { showError } = useApiErrorToast()
-const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const toast = useToast()
 const proponentId = computed(() => String(route.params.id))
 const creditMemoId = computed(() => String(route.params.creditMemoId))
@@ -41,7 +40,6 @@ usePageResourceError({
 })
 const isHeroCollapsed = getHeroCollapsed('proponent-credit-memo-detail')
 const saving: Ref<boolean> = ref(false)
-const cancelOpen: Ref<boolean> = ref(false)
 const refreshKey: Ref<number> = ref(0)
 const content: Ref<HTMLElement | null> = ref(null)
 type FormState = {
@@ -78,7 +76,6 @@ watch([proponentId, creditMemoId], () => {
   state.value = null
   saved.value = ''
   saving.value = false
-  cancelOpen.value = false
 }, { flush: 'sync' })
 const reference = computed(() => creditMemo.value ? creditMemo.value.egcs_fc_creditmemoreference : '')
 const tabs = [
@@ -127,17 +124,6 @@ const save = async () => {
     if (!disposed && requestIdentity === identity.value) saving.value = false
   }
 }
-const deleteDraft = async () => {
-  const owner = creditMemoId.value
-  const requestIdentity = identity.value
-  if (await confirmDeleteRequest(`/api/account-receivable-credit-memos/${owner}`) && !disposed && requestIdentity === identity.value) await navigateTo(localePath(creditMemo.value?.egcs_fc_proponentreadable ? appRouteLocations.proponentCreditMemoCollection(proponentId.value) : appRouteLocations.home()))
-}
-const actions = computed(() => [
-  { label: t('account_receivable.cancel'), color: 'neutral' as const, variant: 'outline' as const, visible: creditMemo.value?.egcs_fc_cancancel === true, onClick: () => {
-    cancelOpen.value = true
-  } },
-  { label: t('common.delete'), color: 'error' as const, variant: 'ghost' as const, icon: 'i-lucide-trash', visible: creditMemo.value?.egcs_fc_candelete === true, onClick: deleteDraft }
-])
 </script>
 
 <template>
@@ -164,7 +150,7 @@ const actions = computed(() => [
         </UDashboardNavbar>
       </template>
       <template #body>
-        <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-banknote-arrow-down" :title="reference" :meta-items="[getBilingualValue(creditMemo, 'egcs_fc_debtorname', t('common.not_available')), getBilingualValue(creditMemo, 'egcs_fc_agencyname', t('common.not_available')), creditMemo.egcs_fc_currency.toUpperCase()]" :badges="[{ statusId: creditMemo.egcs_fc_status }]" :actions="actions" />
+        <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-banknote-arrow-down" :title="reference" :meta-items="[getBilingualValue(creditMemo, 'egcs_fc_debtorname', t('common.not_available')), getBilingualValue(creditMemo, 'egcs_fc_agencyname', t('common.not_available')), creditMemo.egcs_fc_currency.toUpperCase()]" :badges="[{ statusId: creditMemo.egcs_fc_status }]" />
         <CommonEntityEditorWorkspace content-test-id="proponent-credit-memo-detail-content">
           <template #sidebar>
             <CommonRouteTabs v-model="selectedTab" :items="tabs" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
@@ -208,6 +194,5 @@ const actions = computed(() => [
         </CommonEntityEditorWorkspace>
       </template>
     </UDashboardPanel>
-    <AccountReceivableCancelModal v-model:open="cancelOpen" :record-id="creditMemoId" credit-memo @cancelled="refreshPage" />
   </div>
 </template>

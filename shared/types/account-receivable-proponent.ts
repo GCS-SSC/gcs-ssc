@@ -37,7 +37,7 @@ export type ProponentCreditMemoRow = {
   egcs_fc_amount: Money
   egcs_fc_createdat: string
 } & (
-  | { egcs_fc_kind: 'cash'; egcs_fc_status: string; egcs_fc_receiveddate: string }
+  | { egcs_fc_kind: 'cash'; egcs_fc_status: string; egcs_fc_receiveddate: string; egcs_fc_candelete: boolean }
   | {
     egcs_fc_kind: 'automatic'
     egcs_fc_status: null

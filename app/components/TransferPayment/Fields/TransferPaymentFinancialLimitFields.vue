@@ -20,9 +20,9 @@ const field = useFormFieldPath(() => namePrefix)
     <UFormField
       :label="t('transfer_payment.financial_limit_max_allowable_per_recipient')"
       :name="field('egcs_tp_maxallowableperrecipient')">
-      <UInput
+      <CommonCurrencyInput
         v-model="model.egcs_tp_maxallowableperrecipient"
-        inputmode="decimal" />
+        :currency="'cad'" />
     </UFormField>
 
     <UFormField

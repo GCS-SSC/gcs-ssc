@@ -598,6 +598,7 @@ const cancel = () => {
             <AgreementForecastsTab
               v-else-if="selectedTab === 'forecasts'"
               :agreement-id="id"
+              :currency="profile.egcs_fc_currency"
               :can-create="canCreateChildRecords"
               :can-update="canUpdateChildRecords"
               :can-delete="canDeleteChildRecords" />
@@ -605,6 +606,7 @@ const cancel = () => {
             <AgreementClaimsTab
               v-else-if="selectedTab === 'claims'"
               :agreement-id="id"
+              :currency="profile.egcs_fc_currency"
               :can-create="canCreateChildRecords"
               :can-update="canUpdateChildRecords"
               :can-delete="canDeleteChildRecords" />

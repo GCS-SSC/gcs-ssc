@@ -277,7 +277,7 @@ const creditMemoCreated = async (id: string, proponentId: string) => {
                 <UFormField name="egcs_fc_requesteddate" :label="t('account_receivable.requested_date')">
                   <CommonDatePicker v-model="state.egcs_fc_requesteddate" :disabled="saving || !receivable.egcs_fc_canedit" />
                 </UFormField>
-                <UFormField name="egcs_fc_recoverymethod" :label="t('account_receivable.recovery_method')" :description="receivable.egcs_fc_canedit ? t('account_receivable.recovery_method_instruction') : undefined">
+                <UFormField name="egcs_fc_recoverymethod" :label="t('account_receivable.recovery_method')">
                   <CommonEnumSelect v-model="state.egcs_fc_recoverymethod" name="account_receivable_recovery_method" :disabled="saving || !receivable.egcs_fc_canedit" class="w-full" />
                   <UButton v-if="state.egcs_fc_recoverymethod && receivable.egcs_fc_canedit" type="button" icon="i-lucide-x" color="neutral" variant="ghost" :label="t('account_receivable.clear_recovery_method')" :disabled="saving" @click="state.egcs_fc_recoverymethod = undefined" />
                 </UFormField>

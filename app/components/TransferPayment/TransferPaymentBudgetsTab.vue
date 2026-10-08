@@ -217,9 +217,9 @@ const deleteBudget = async (budget: TransferPaymentBudgetRow) => {
             <CommonEnumSelect v-model="selectedBudget.egcs_tp_currency" name="currency_codes" :disabled="Boolean(selectedBudget.id)" />
           </UFormField>
           <UFormField :label="t('transfer_payment.total_budget')" name="egcs_tp_totalbudget">
-            <UInput
+            <CommonCurrencyInput
               v-model="selectedBudget.egcs_tp_totalbudget"
-              inputmode="decimal" />
+              :currency="selectedBudget.egcs_tp_currency" />
           </UFormField>
           <UFormField :label="t('transfer_payment.overcommit_threshold')" name="egcs_tp_overcommitthreshold" required>
             <UInputNumber

@@ -42,9 +42,9 @@ const field = useFormFieldPath(() => namePrefix)
     <CommonEnumSelect v-model="model.egcs_tp_currency" name="currency_codes" :disabled="Boolean(model.id)" />
   </UFormField>
   <UFormField :label="t('transfer_payment.total_budget')" :name="field('egcs_tp_totalbudget')">
-    <UInput
+    <CommonCurrencyInput
       v-model="model.egcs_tp_totalbudget"
-      inputmode="decimal" />
+      :currency="model.egcs_tp_currency" />
   </UFormField>
   <UFormField :label="t('transfer_payment.overcommit_threshold')" :name="field('egcs_tp_overcommitthreshold')" required>
     <UInputNumber

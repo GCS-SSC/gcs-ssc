@@ -222,7 +222,7 @@ const linkedCreated = async (id: string) => {
                 :invalid="line.balance !== null && !line.balance.withinCommitment">
                 <template v-if="correction.egcs_fc_canedit" #adjustment>
                   <UFormField :name="`egcs_fc_lines.${line.index}.egcs_fc_adjustment`" :label="`${t('correction.adjustment')} ${line.egcs_fc_commitmentlinenumber}`">
-                    <UInput v-model="state.egcs_fc_lines[line.index]!.egcs_fc_adjustment" type="text" inputmode="decimal" aria-describedby="correction-line-instruction" :disabled="saving" class="w-full" />
+                    <CommonCurrencyInput v-model="state.egcs_fc_lines[line.index]!.egcs_fc_adjustment" :currency="correction.egcs_fc_currency" aria-describedby="correction-line-instruction" :disabled="saving" class="w-full" />
                   </UFormField>
                 </template>
               </CorrectionFinancialLine>

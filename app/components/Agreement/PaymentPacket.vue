@@ -73,7 +73,7 @@ const hasCurrency = computed(() => typeof header.value.egcs_fc_currency === 'str
         <dt class="text-muted">
           {{ t(`agreement.payments.${field.key}`) }}
         </dt><dd class="font-semibold">
-          {{ text(field.amount) }}
+          {{ t('common.not_available') }}
         </dd>
       </div>
     </dl>

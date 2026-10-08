@@ -407,7 +407,6 @@ const setDraftAmount = (budgetLineId: string, month: number, value: string | num
     [getDraftKey(budgetLineId, month)]: String(value ?? '')
   }
 }
-const getInputValue = (event: Event) => (event.target as HTMLInputElement).value
 
 const getPeriodTotal = (budgetLineId: string, months: number[]) =>
   sumMoney(months.map((month: number) => getDraftMoney(budgetLineId, month) ?? ZERO_MONEY))
@@ -754,19 +753,17 @@ const saveForecastBreakdown = async () => {
                       {{ formatMoney(getBreakdownGroupedTotal(row as GroupedForecastBreakdownRow, period.columnId)) }}
                     </span>
                     <div v-else-if="period.type === 'month' && canEditForecastAmount(row.original.budgetLineId, period.months[0] ?? 0)" class="w-40">
-                      <input
-                        :value="getDraftAmount(row.original.budgetLineId, period.months[0] ?? 0)"
+                      <CommonCurrencyInput
+                        :model-value="getDraftAmount(row.original.budgetLineId, period.months[0] ?? 0)"
+                        :currency="profile?.egcs_fc_currency"
                         :disabled="isSavingBreakdown"
-                        type="text"
-                        inputmode="decimal"
                         required
                         aria-required="true"
                         :aria-describedby="isDraftAmountInvalid(row.original.budgetLineId, period.months[0] ?? 0) ? `forecast-amount-error-${row.original.budgetLineId}-${period.columnId}` : undefined"
                         :aria-invalid="isDraftAmountInvalid(row.original.budgetLineId, period.months[0] ?? 0)"
                         :aria-label="`${period.label} ${row.original.lineItemNameEn}`"
-                        class="w-full rounded-md border bg-default px-2.5 py-1.5 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-75"
-                        :class="isDraftAmountInvalid(row.original.budgetLineId, period.months[0] ?? 0) ? 'border-error focus:ring-2 focus:ring-error/40' : 'border-default focus:ring-2 focus:ring-primary/40'"
-                        @input="event => setDraftAmount(row.original.budgetLineId, period.months[0] ?? 0, getInputValue(event))">
+                        class="w-full"
+                        @update:model-value="value => setDraftAmount(row.original.budgetLineId, period.months[0] ?? 0, value ?? '')" />
                       <span class="mt-1 block text-xs text-muted">({{ t('common.field_required') }})</span>
                       <p v-if="isDraftAmountInvalid(row.original.budgetLineId, period.months[0] ?? 0)" :id="`forecast-amount-error-${row.original.budgetLineId}-${period.columnId}`" class="mt-1 text-xs text-error">
                         {{ t('validation.invalid_number') }}
@@ -837,16 +834,16 @@ const saveForecastBreakdown = async () => {
         </div>
       </template>
     </UDashboardPanel>
-    <UModal v-model:open="fundingEditorOpen" :title="t('agreement.funding_sources.edit_line')" :ui="{ content: 'sm:max-w-2xl' }">
+    <UModal v-if="profile" v-model:open="fundingEditorOpen" :title="t('agreement.funding_sources.edit_line')" :ui="{ content: 'sm:max-w-2xl' }">
       <template #body>
         <div class="space-y-4">
           <UFormField :label="t('agreement.forecasts.amount')" name="egcs_fc_amount" required>
-            <UInput v-model="fundingEditorProgramAmount" type="number" min="0" step="0.01" required aria-required="true" class="w-full" />
+            <CommonCurrencyInput v-model="fundingEditorProgramAmount" :currency="profile?.egcs_fc_currency" required aria-required="true" class="w-full" />
           </UFormField>
           <UFormField :label="t('agreement.funding_sources.total_cost')" name="egcs_fc_totalamount" required>
-            <UInput v-model="fundingEditorTotalAmount" type="number" min="0" step="0.01" required aria-required="true" class="w-full" />
+            <CommonCurrencyInput v-model="fundingEditorTotalAmount" :currency="profile?.egcs_fc_currency" required aria-required="true" class="w-full" />
           </UFormField>
-          <AgreementFundingSourcesEditor v-model="fundingEditorSources" :agreement-id="agreementId" :identity="`${fundingEditorLine?.id ?? ''}:${fundingEditorSession}`" />
+          <AgreementFundingSourcesEditor v-model="fundingEditorSources" :agreement-id="agreementId" :currency="profile.egcs_fc_currency" :identity="`${fundingEditorLine?.id ?? ''}:${fundingEditorSession}`" />
           <div class="flex justify-end gap-2">
             <UButton color="neutral" variant="ghost" :label="t('common.cancel')" @click="fundingEditorOpen = false" />
             <CommonSaveButton :label="t('agreement.funding_sources.save')" :loading="isSavingFunding" @click="saveFundingEditor" />

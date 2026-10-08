@@ -512,7 +512,7 @@ const save = async (_event: FormSubmitEvent<FundingHistoryFormState>) => {
                 <UInput v-model="state.egcs_ar_enddate" type="date" />
               </UFormField>
               <UFormField :label="t('applicant_recipient.funding_history.fields.amount')" name="egcs_ar_fundingamount" required>
-                <UInput v-model="state.egcs_ar_fundingamount" inputmode="decimal" />
+                <CommonCurrencyInput v-model="state.egcs_ar_fundingamount" :currency="state.egcs_ar_currency" />
               </UFormField>
               <UFormField :label="t('applicant_recipient.funding_history.fields.currency')" name="egcs_ar_currency" required>
                 <CommonEnumSelect v-model="state.egcs_ar_currency" name="currency_codes" :items="currencyOptions" />

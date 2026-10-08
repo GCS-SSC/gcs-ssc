@@ -985,22 +985,23 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
             <AgreementBudgetCalculationFields v-model="selectedLineItem" :preview="calculationPreview" />
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:col-span-2">
               <UFormField :label="t('agreement.budget.total_amount')" name="egcs_fc_totalamount">
-                <UInput
+                <CommonCurrencyInput
                   v-model="selectedLineItem.egcs_fc_totalamount"
-                  inputmode="decimal" />
+                  :currency="selectedLineItem.egcs_fc_currency" />
               </UFormField>
 
               <UFormField :label="t('agreement.budget.program_funding')" name="egcs_fc_programfunding" :required="!selectedLineItem.egcs_fc_calculationmode || selectedLineItem.egcs_fc_calculationmode === 'manual'">
-                <UInput
+                <CommonCurrencyInput
+                  :currency="selectedLineItem.egcs_fc_currency"
                   :model-value="selectedLineItem.egcs_fc_calculationmode && selectedLineItem.egcs_fc_calculationmode !== 'manual' ? calculationPreview : selectedLineItem.egcs_fc_programfunding"
                   :readonly="Boolean(selectedLineItem.egcs_fc_calculationmode && selectedLineItem.egcs_fc_calculationmode !== 'manual')"
-                  inputmode="decimal"
                   @update:model-value="selectedLineItem.egcs_fc_programfunding = String($event)" />
               </UFormField>
             </div>
             <AgreementFundingSourcesEditor
               :model-value="selectedLineItem.egcs_fc_fundingsources ?? []"
               :agreement-id="agreementId"
+              :currency="selectedLineItem.egcs_fc_currency!"
               :identity="`${agreementId}:${selectedLineItem.id ?? 'new'}:${selectedLineItem.egcs_fc_organizationcostcategory ?? ''}`"
               allow-description
               class="lg:col-span-2"

@@ -14,9 +14,10 @@ type FundingSource = {
   funding_subtype_name_en?: string | null
   funding_subtype_name_fr?: string | null
 }
-const { modelValue, agreementId, identity, allowDescription = false, disabled = false } = defineProps<{
+const { modelValue, agreementId, currency, identity, allowDescription = false, disabled = false } = defineProps<{
   modelValue: FundingSource[]
   agreementId: string
+  currency: string
   identity?: string
   allowDescription?: boolean
   disabled?: boolean
@@ -90,11 +91,9 @@ const retainedOption = (source: FundingSource) => {
         />
       </UFormField>
       <UFormField :label="t('agreement.funding_sources.amount')" :name="`egcs_fc_fundingsources.${index}.egcs_fc_amount`" :required="!disabled">
-        <UInput
+        <CommonCurrencyInput
           :model-value="source.egcs_fc_amount"
-          type="number"
-          min="0"
-          step="0.01"
+          :currency="currency"
           :disabled="disabled"
           :aria-label="t('agreement.funding_sources.amount')"
           :aria-required="!disabled"

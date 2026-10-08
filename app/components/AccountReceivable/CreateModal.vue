@@ -40,12 +40,6 @@ const claimRelated = computed(() => adjustment?.egcs_fc_claimrelated
 const createSchema = computed(() => createAccountReceivableCreateSchemaForType(selectedType.value && !adjustment
   ? { egcs_ay_monitorrequired: monitorRequired.value, egcs_ay_claimrelated: claimRelated.value }
   : null))
-const typeDescription = computed(() => {
-  if (adjustment) return locale.value === 'fr' ? adjustment.egcs_fc_typedescription_fr : adjustment.egcs_fc_typedescription_en
-  const value = selectedType.value?.[locale.value === 'fr' ? 'egcs_ay_description_fr' : 'egcs_ay_description_en']
-    ?? selectedType.value?.[locale.value === 'fr' ? 'description_fr' : 'description_en']
-  return typeof value === 'string' ? value : undefined
-})
 const resolveType = (items: AdminCommonLookupResponseItem[]) => {
   const next = items.find(item => String(item.id) === state.value?.egcs_fc_type) ?? null
   const previous = selectedType.value
@@ -127,14 +121,11 @@ const save = async () => {
           <UFormField name="egcs_fc_agencyfiscalyear" :label="t('agreement.payments.fiscal_year')">
             <CommonServerLookupSelect v-model="state.egcs_fc_agencyfiscalyear" :fetch-url="`/api/agreements/${agreementId}/account-receivables/lookups/fiscal-years`" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :show-value-in-label="false" :disabled="Boolean(adjustment || sourceEntry) || pending" close-on-select />
           </UFormField>
-          <UFormField name="egcs_fc_type" :label="t('account_receivable.type')" :description="t('account_receivable.type_instruction')">
+          <UFormField name="egcs_fc_type" :label="t('account_receivable.type')">
             <UInput v-if="adjustment" :model-value="locale === 'fr' ? adjustment.egcs_fc_typename_fr : adjustment.egcs_fc_typename_en" readonly required class="w-full" />
             <CommonServerLookupSelect v-else v-model="state.egcs_fc_type" :fetch-url="`/api/agreements/${agreementId}/account-receivables/lookups/types`" :query="sourceEntry ? { source_family: sourceEntry.kind } : undefined" selected-values-query-key="selectedIds" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :show-value-in-label="false" :disabled="pending" close-on-select @resolved-items="resolveType" />
-            <p v-if="typeDescription" class="mt-2 text-sm text-muted">
-              {{ typeDescription }}
-            </p>
           </UFormField>
-          <UFormField name="egcs_fc_recoverymethod" :label="t('account_receivable.recovery_method')" :description="t('account_receivable.recovery_method_instruction')">
+          <UFormField name="egcs_fc_recoverymethod" :label="t('account_receivable.recovery_method')">
             <CommonEnumSelect v-model="state.egcs_fc_recoverymethod" name="account_receivable_recovery_method" :disabled="pending" class="w-full" />
             <UButton v-if="state.egcs_fc_recoverymethod" type="button" icon="i-lucide-x" color="neutral" variant="ghost" :label="t('account_receivable.clear_recovery_method')" :disabled="pending" class="max-w-full [&_[data-slot=label]]:whitespace-normal [&_[data-slot=label]]:text-left" @click="state.egcs_fc_recoverymethod = undefined" />
           </UFormField>

@@ -1204,9 +1204,9 @@ const cancelReconciliation = async () => {
                         {{ formatMoney(getSubmissionGroupedTotal(row as GroupedClaimSubmissionRow, 'submittedAmount')) }}
                       </span>
                       <div v-else-if="row.original.budgetLineId && canEditClaimSubmissionAmount(row.original.budgetLineId)" class="space-y-1">
-                        <UInput
+                        <CommonCurrencyInput
                           :model-value="getDraftClaimAmount(row.original.budgetLineId)"
-                          inputmode="decimal"
+                          :currency="profile?.egcs_fc_currency"
                           required
                           :aria-label="t('agreement.claims.submitted_amount_for', { name: row.original.lineItemNameEn })"
                           :aria-invalid="isDraftClaimAmountInvalid(row.original.budgetLineId)"
@@ -1451,6 +1451,7 @@ const cancelReconciliation = async () => {
                       </p>
                     </div>
                     <AgreementClaimReconciliationLinesTable
+                      :currency="profile.egcs_fc_currency"
                       :lines="reconciliationTableLines"
                       :total-submitted="totalSubmitted"
                       :total-reconciled="totalReconciled"
@@ -1549,17 +1550,17 @@ const cancelReconciliation = async () => {
 
           <div class="grid gap-4 sm:grid-cols-2">
             <UFormField :label="t('agreement.claims.reconciled_amount')" required>
-              <UInput
+              <CommonCurrencyInput
                 v-model="selectedReconcileLine.reconciledAmount"
-                inputmode="decimal"
+                :currency="profile?.egcs_fc_currency"
                 :disabled="!selectedReconcileLine.editable"
                 class="w-full"
                 @update:model-value="updateSelectedReconciledAmount" />
             </UFormField>
             <UFormField :label="t('agreement.claims.sampled_amount')">
-              <UInput
+              <CommonCurrencyInput
                 v-model="selectedReconcileLine.sampledAmount"
-                inputmode="decimal"
+                :currency="profile?.egcs_fc_currency"
                 :disabled="!selectedReconcileLine.editable"
                 class="w-full" />
             </UFormField>
@@ -1592,16 +1593,16 @@ const cancelReconciliation = async () => {
         </form>
       </template>
     </UModal>
-    <UModal v-model:open="fundingEditorOpen" :title="t('agreement.funding_sources.edit_line')" :ui="{ content: 'sm:max-w-2xl' }">
+    <UModal v-if="profile" v-model:open="fundingEditorOpen" :title="t('agreement.funding_sources.edit_line')" :ui="{ content: 'sm:max-w-2xl' }">
       <template #body>
         <div class="space-y-4">
           <UFormField :label="t('agreement.claims.submitted_amount')" name="egcs_fc_amount" required>
-            <UInput v-model="fundingEditorProgramAmount" type="number" min="0" step="0.01" required aria-required="true" class="w-full" />
+            <CommonCurrencyInput v-model="fundingEditorProgramAmount" :currency="profile?.egcs_fc_currency" required aria-required="true" class="w-full" />
           </UFormField>
           <UFormField :label="t('agreement.funding_sources.total_cost')" name="egcs_fc_totalamount" required>
-            <UInput v-model="fundingEditorTotalAmount" type="number" min="0" step="0.01" required aria-required="true" class="w-full" />
+            <CommonCurrencyInput v-model="fundingEditorTotalAmount" :currency="profile?.egcs_fc_currency" required aria-required="true" class="w-full" />
           </UFormField>
-          <AgreementFundingSourcesEditor v-model="fundingEditorSources" :agreement-id="agreementId" :identity="`${fundingEditorLine?.id ?? ''}:${fundingEditorSession}`" />
+          <AgreementFundingSourcesEditor v-model="fundingEditorSources" :agreement-id="agreementId" :currency="profile.egcs_fc_currency" :identity="`${fundingEditorLine?.id ?? ''}:${fundingEditorSession}`" />
           <div class="flex justify-end gap-2">
             <UButton color="neutral" variant="ghost" :label="t('common.cancel')" @click="fundingEditorOpen = false" />
             <CommonSaveButton :label="t('agreement.funding_sources.save')" :loading="isSavingFunding" @click="saveFundingEditor" />

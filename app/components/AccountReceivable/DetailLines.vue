@@ -188,17 +188,14 @@ const deleteLine = async (line: AccountReceivableLine) => {
           <UFormField v-else-if="!selectedLineId" name="egcs_fc_sourcekey" :label="t('account_receivable.source')" required>
             <CommonServerLookupSelect v-model="selected.egcs_fc_sourcekey" :fetch-url="`/api/account-receivables/${accountReceivableId}/lookups/sources`" selected-values-query-key="selectedIds" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :show-value-in-label="false" :disabled="isPending" close-on-select />
           </UFormField>
-          <p v-else class="text-sm text-muted">
-            {{ t('account_receivable.source') }}: {{ selected.egcs_fc_sourcekey }}
-          </p>
           <UFormField name="egcs_fc_accountreceivablechartofaccount" :label="t('account_receivable.receivable_account')" :required="codingRequired">
             <CommonServerLookupSelect
               v-model="selected.egcs_fc_accountreceivablechartofaccount" :fetch-url="`/api/account-receivables/${accountReceivableId}/lookups/charts`"
               :query="{ egcs_fc_agencyfiscalyear: fiscalYearId }" selected-values-query-key="selectedIds"
               value-key="id" label-en-key="label_en" label-fr-key="label_fr" :show-value-in-label="false" :disabled="isPending || isAdjustment" close-on-select />
           </UFormField>
-          <UFormField name="egcs_fc_amount" :label="t('account_receivable.established_amount')">
-            <UInput v-model="selected.egcs_fc_amount" type="text" inputmode="decimal" :disabled="isPending" class="w-full" />
+          <UFormField name="egcs_fc_amount" :label="t('common.amount')">
+            <CommonCurrencyInput v-model="selected.egcs_fc_amount" :currency="currency" :disabled="isPending" class="w-full" />
           </UFormField>
           <div class="flex justify-end gap-2">
             <UButton type="button" color="neutral" variant="ghost" :label="t('common.cancel')" :disabled="isPending" @click="modal.close()" />

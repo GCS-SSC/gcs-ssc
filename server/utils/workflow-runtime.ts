@@ -5,7 +5,6 @@ import { lockPaymentRecoveryAgreements } from './payment-recovery-lock'
 import { compareMoney, parseMoney } from '~~/shared/utils/money'
 import { resolveWorkflowExecutionPlan } from './workflow-execution-plan'
 import { lockAssignableGroup } from './groups'
-import { assertRiskReadiness } from './risk-readiness'
 import { captureRiskRatingMapping, resolveRiskRatingAgreementId } from './agreement-risk-rating'
 import { hashPublicationDefinition } from './system-publication'
 import { captureWorkflowRouting } from './workflow-routing'
@@ -737,13 +736,6 @@ export const createCompletionTransition = async (
       key: 'apiErrors.workflow.closeout_approval_required'
     })
   }
-  if (context.entityType === 'fundingcaseamendment') {
-    const riskReadiness = await assertRiskReadiness(event, trx, { entityType: context.entityType, entityId: context.entityId })
-    if (riskReadiness.workflowManaged) {
-      await trx.updateTable('Funding_Case_Agreement_Amendment').set({ egcs_fc_changerisk: true })
-        .where('id', '=', context.entityId).where('_deleted', '=', false).executeTakeFirstOrThrow()
-    }
-  }
   const completion = await createCompletionRecord(trx, {
     entityType: context.entityType,
     entityId: context.entityId,
@@ -1330,10 +1322,6 @@ const startWorkflowUnchecked = async (
   }
   if ('status' in targetStatus ? targetStatus.status.terminal : targetStatus.terminal) {
     return await badRequest(event, 'WORKFLOW_TARGET_TERMINAL', 'apiErrors.request.invalid_status')
-  }
-  if (!retry && purpose === 'approval_submission'
-    && (context.entityType === 'fundingcaseagreement' || context.entityType === 'fundingcaseamendment')) {
-    await assertRiskReadiness(event, trx, { entityType: context.entityType, entityId: context.entityId })
   }
   const closeoutReadiness = purpose === 'approval_submission'
     && context.entityType === 'fundingcaseagreementcloseout'

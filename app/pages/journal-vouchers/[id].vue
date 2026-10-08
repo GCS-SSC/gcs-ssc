@@ -372,6 +372,6 @@ const applyAllocation = (line: JournalVoucherAllocationDraft) => {
     </UDashboardPanel>
     <JournalVoucherAllocationModal
       v-if="voucher && state" v-model:open="allocationModal.isOpen.value" v-model="allocationModal.selected.value"
-      :voucher-id="id" :original="original" :editing="isEditingAllocation" @save="applyAllocation" />
+      :voucher-id="id" :currency="voucher.egcs_fc_currency" :original="original" :editing="isEditingAllocation" @save="applyAllocation" />
   </div>
 </template>

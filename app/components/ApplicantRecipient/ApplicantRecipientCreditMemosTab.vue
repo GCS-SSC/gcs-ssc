@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { ProponentCreditMemoRow } from '~~/shared/types/account-receivable-proponent'
 import type { ApplicantRecipientProfileRow } from '~~/shared/types/applicant-recipient-ui'
@@ -14,7 +14,14 @@ const localePath = useLocalePath()
 const { getBilingualValue } = useBilingualValue()
 const { formatDate } = useDateHelpers()
 const createOpen: Ref<boolean> = ref(false)
-const { search, pagination, items, totalRecords, status, retry, response } = useResourceTable<ProponentCreditMemoRow>({
+const deletingId: Ref<string | null> = ref(null)
+let disposed = false
+onBeforeUnmount(() => {
+  disposed = true
+})
+const { confirmDeleteRequest } = useConfirmDeleteRequest()
+const { showError } = useApiErrorToast()
+const { search, pagination, items, totalRecords, status, retry, refresh, response } = useResourceTable<ProponentCreditMemoRow>({
   fetchUrl: computed(() => `/api/applicant-recipients/${applicantRecipientId}/credit-memos`)
 })
 const canCreate = computed(() => status.value === 'success' && profile !== null
@@ -42,6 +49,26 @@ watch(() => applicantRecipientId, () => {
 const created = async (id: string, proponentId: string) => {
   if (proponentId !== applicantRecipientId) return
   await navigateTo(localePath(appRouteLocations.proponentCreditMemoDetail(proponentId, id)))
+}
+/**
+ * Deletes an eligible cash draft after confirmation, then refreshes the table.
+ * @param memo - Independently authorized collection row.
+ */
+const deleteMemo = async (memo: ProponentCreditMemoRow) => {
+  if (memo.egcs_fc_kind !== 'cash' || !memo.egcs_fc_candelete || deletingId.value || status.value !== 'success') return
+  const ownerId = applicantRecipientId
+  deletingId.value = memo.id
+  try {
+    const deleted = await confirmDeleteRequest(`/api/account-receivable-credit-memos/${memo.id}`, {
+      shouldProceed: () => !disposed && applicantRecipientId === ownerId && status.value === 'success' && items.value.some(item => item.id === memo.id
+        && item.egcs_fc_kind === 'cash' && item.egcs_fc_candelete)
+    })
+    if (deleted && !disposed && applicantRecipientId === ownerId) await refresh()
+  } catch (error: unknown) {
+    if (!disposed && applicantRecipientId === ownerId) showError(error)
+  } finally {
+    deletingId.value = null
+  }
 }
 const columns: TableColumnInput<ProponentCreditMemoRow>[] = [
   { accessorKey: 'egcs_fc_creditmemoreference', headerKey: 'account_receivable.credit_memos_number' },
@@ -71,75 +98,83 @@ const memoDetailPath = (memo: ProponentCreditMemoRow): string | undefined => {
 <template>
   <div class="min-w-0 space-y-6" data-testid="proponent-credit-memos">
     <ApplicantRecipientAccountBalances :applicant-recipient-id="applicantRecipientId" />
-    <p class="text-sm text-muted">
-      {{ t('account_receivable.credit_memos_description') }}
-    </p>
-    <CommonResourceLayoutCard
-      v-model:search="search" v-model:pagination="pagination"
-      :data="items" :columns="columns" :total-records="totalRecords"
-      :loading="status === 'pending'" :request-status="status" :show-button="canCreate"
-      :button-label="t('account_receivable.create_credit_memo')"
-      :search-placeholder="t('account_receivable.credit_memos_search')" @retry="retry" @add="createOpen = true">
-      <template #egcs_fc_creditmemoreference-cell="{ row }">
-        <ULink
-          v-if="memoDetailPath(row.original)" :to="memoDetailPath(row.original)"
-          class="text-sm font-bold text-zinc-900 transition-colors hover:text-primary dark:text-white">
-          {{ row.original.egcs_fc_creditmemoreference }}
-        </ULink>
-        <span v-else class="text-sm font-semibold">{{ row.original.egcs_fc_creditmemoreference }}</span>
-      </template>
-      <template #agency-cell="{ row }">
-        <CommonBilingualName :name-en="row.original.egcs_fc_agencyname_en" :name-fr="row.original.egcs_fc_agencyname_fr" />
-      </template>
-      <template #status-cell="{ row }">
-        <CommonStatusBadge v-if="row.original.egcs_fc_kind === 'cash'" :status-id="row.original.egcs_fc_status" />
-      </template>
-      <template #kind-cell="{ row }">
-        {{ t(row.original.egcs_fc_kind === 'cash' ? 'account_receivable.manual_credit_memo' : 'account_receivable.automatic_offset') }}
-      </template>
-      <template #agreement-cell="{ row }">
-        <div v-if="row.original.egcs_fc_kind === 'automatic'" class="flex flex-col gap-3">
-          <span v-if="!row.original.egcs_fc_originapplication" class="text-sm text-muted">{{ t('common.not_available') }}</span>
-          <div v-for="application in row.original.egcs_fc_applications" :key="application.id" class="flex flex-col gap-1">
-            <ULink :to="localePath(appRouteLocations.agreementDetail(application.egcs_fc_fundingagreement))" class="text-sm font-semibold hover:text-primary">
-              {{ application.egcs_fc_agreementnumber }}
-            </ULink>
-            <span class="text-xs text-muted">{{ t(application.id === row.original.egcs_fc_originapplication?.id ? 'account_receivable.offset_origin' : 'account_receivable.offset_application') }}</span>
+    <CommonSection :title="t('account_receivable.credit_memos_title')" :grid-cols="1">
+      <p class="text-sm text-muted">
+        {{ t('account_receivable.credit_memos_description') }}
+      </p>
+      <CommonResourceLayoutCard
+        v-model:search="search" v-model:pagination="pagination"
+        :data="items" :columns="columns" :total-records="totalRecords"
+        :loading="status === 'pending'" :request-status="status" :show-button="canCreate"
+        :button-label="t('account_receivable.create_credit_memo')"
+        :search-placeholder="t('account_receivable.credit_memos_search')" @retry="retry" @add="createOpen = true">
+        <template #egcs_fc_creditmemoreference-cell="{ row }">
+          <ULink
+            v-if="memoDetailPath(row.original)" :to="memoDetailPath(row.original)"
+            class="text-sm font-bold text-zinc-900 transition-colors hover:text-primary dark:text-white">
+            {{ row.original.egcs_fc_creditmemoreference }}
+          </ULink>
+          <span v-else class="text-sm font-semibold">{{ row.original.egcs_fc_creditmemoreference }}</span>
+        </template>
+        <template #agency-cell="{ row }">
+          <CommonBilingualName :name-en="row.original.egcs_fc_agencyname_en" :name-fr="row.original.egcs_fc_agencyname_fr" />
+        </template>
+        <template #status-cell="{ row }">
+          <CommonStatusBadge v-if="row.original.egcs_fc_kind === 'cash'" :status-id="row.original.egcs_fc_status" />
+        </template>
+        <template #kind-cell="{ row }">
+          {{ t(row.original.egcs_fc_kind === 'cash' ? 'account_receivable.manual_credit_memo' : 'account_receivable.automatic_offset') }}
+        </template>
+        <template #agreement-cell="{ row }">
+          <div v-if="row.original.egcs_fc_kind === 'automatic'" class="flex flex-col gap-3">
+            <span v-if="!row.original.egcs_fc_originapplication" class="text-sm text-muted">{{ t('common.not_available') }}</span>
+            <div v-for="application in row.original.egcs_fc_applications" :key="application.id" class="flex flex-col gap-1">
+              <ULink :to="localePath(appRouteLocations.agreementDetail(application.egcs_fc_fundingagreement))" class="text-sm font-semibold hover:text-primary">
+                {{ application.egcs_fc_agreementnumber }}
+              </ULink>
+              <span class="text-xs text-muted">{{ t(application.id === row.original.egcs_fc_originapplication?.id ? 'account_receivable.offset_origin' : 'account_receivable.offset_application') }}</span>
+            </div>
           </div>
-        </div>
-        <span v-else class="text-sm text-muted">{{ t('common.none') }}</span>
-      </template>
-      <template #payment-cell="{ row }">
-        <div v-if="row.original.egcs_fc_kind === 'automatic'" class="flex flex-col gap-3">
-          <span v-if="!row.original.egcs_fc_originapplication" class="text-sm text-muted">{{ t('common.not_available') }}</span>
-          <div v-for="application in row.original.egcs_fc_applications" :key="application.id" class="flex flex-col gap-1">
-            <ULink :to="localePath(appRouteLocations.agreementPaymentDetail(application.egcs_fc_fundingagreement, application.egcs_fc_payment))" class="text-sm font-semibold hover:text-primary">
-              {{ t('account_receivable.payment_reference', { reference: application.egcs_fc_payment }) }}
-            </ULink>
-            <span class="text-xs text-muted tabular-nums">{{ amount(application.egcs_fc_amount, row.original.egcs_fc_currency) }} · {{ t(`account_receivable.recovery_outcomes.${application.egcs_fc_outcome}`) }}</span>
+          <span v-else class="text-sm text-muted">{{ t('common.none') }}</span>
+        </template>
+        <template #payment-cell="{ row }">
+          <div v-if="row.original.egcs_fc_kind === 'automatic'" class="flex flex-col gap-3">
+            <span v-if="!row.original.egcs_fc_originapplication" class="text-sm text-muted">{{ t('common.not_available') }}</span>
+            <div v-for="application in row.original.egcs_fc_applications" :key="application.id" class="flex flex-col gap-1">
+              <ULink :to="localePath(appRouteLocations.agreementPaymentDetail(application.egcs_fc_fundingagreement, application.egcs_fc_payment))" class="text-sm font-semibold hover:text-primary">
+                {{ t('account_receivable.payment_reference', { reference: application.egcs_fc_payment }) }}
+              </ULink>
+              <span class="text-xs text-muted tabular-nums">{{ amount(application.egcs_fc_amount, row.original.egcs_fc_currency) }} · {{ t(`account_receivable.recovery_outcomes.${application.egcs_fc_outcome}`) }}</span>
+            </div>
           </div>
-        </div>
-        <span v-else class="text-sm text-muted">{{ t('common.none') }}</span>
-      </template>
-      <template #amount-cell="{ row }">
-        <span v-if="row.original.egcs_fc_kind === 'automatic'" class="text-sm font-semibold tabular-nums">
-          {{ t('account_receivable.credit_memo_applied') }}: {{ amount(row.original.egcs_fc_amount, row.original.egcs_fc_currency) }}
-        </span>
-        <span v-else class="text-sm tabular-nums">{{ amount(row.original.egcs_fc_amount, row.original.egcs_fc_currency) }}</span>
-      </template>
-      <template #received-cell="{ row }">
-        {{ formatDate(row.original.egcs_fc_kind === 'cash' ? row.original.egcs_fc_receiveddate : row.original.egcs_fc_createdat) }}
-      </template>
-      <template #actions-cell="{ row }">
-        <div class="flex justify-end gap-2">
-          <UButton
-            v-if="memoDetailPath(row.original)"
-            icon="i-lucide-arrow-right" color="neutral" variant="ghost"
-            :aria-label="`${t('common.view_details')}: ${row.original.egcs_fc_creditmemoreference}`"
-            :to="memoDetailPath(row.original)" />
-        </div>
-      </template>
-    </CommonResourceLayoutCard>
+          <span v-else class="text-sm text-muted">{{ t('common.none') }}</span>
+        </template>
+        <template #amount-cell="{ row }">
+          <span v-if="row.original.egcs_fc_kind === 'automatic'" class="text-sm font-semibold tabular-nums">
+            {{ t('account_receivable.credit_memo_applied') }}: {{ amount(row.original.egcs_fc_amount, row.original.egcs_fc_currency) }}
+          </span>
+          <span v-else class="text-sm tabular-nums">{{ amount(row.original.egcs_fc_amount, row.original.egcs_fc_currency) }}</span>
+        </template>
+        <template #received-cell="{ row }">
+          {{ formatDate(row.original.egcs_fc_kind === 'cash' ? row.original.egcs_fc_receiveddate : row.original.egcs_fc_createdat) }}
+        </template>
+        <template #actions-cell="{ row }">
+          <div class="flex justify-end gap-2">
+            <UButton
+              v-if="memoDetailPath(row.original)"
+              icon="i-lucide-eye" color="neutral" variant="ghost"
+              :aria-label="`${t('common.view_details')}: ${row.original.egcs_fc_creditmemoreference}`"
+              :to="memoDetailPath(row.original)" />
+            <UButton
+              v-if="row.original.egcs_fc_kind === 'cash' && row.original.egcs_fc_candelete"
+              icon="i-lucide-trash" color="error" variant="ghost"
+              :aria-label="`${t('common.delete')}: ${row.original.egcs_fc_creditmemoreference}`"
+              :loading="deletingId === row.original.id" :disabled="deletingId !== null || status !== 'success'"
+              @click="deleteMemo(row.original)" />
+          </div>
+        </template>
+      </CommonResourceLayoutCard>
+    </CommonSection>
     <AccountReceivableCreditMemoCreateModal v-if="profile" v-model:open="createOpen" :context="createContext" @created="created" />
   </div>
 </template>

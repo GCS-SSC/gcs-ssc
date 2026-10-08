@@ -170,7 +170,7 @@ const deleteLine = async (line: AccountReceivableCreditMemoLine) => {
               value-key="id" label-en-key="label_en" label-fr-key="label_fr" :show-value-in-label="false" :disabled="isPending" close-on-select />
           </UFormField>
           <UFormField name="egcs_fc_amount" :label="t('account_receivable.credit_memo_amount')">
-            <UInput v-model="selected.egcs_fc_amount" type="text" inputmode="decimal" :disabled="isPending" class="w-full" />
+            <CommonCurrencyInput v-model="selected.egcs_fc_amount" :currency="currency" :disabled="isPending" class="w-full" />
           </UFormField>
           <div class="flex justify-end gap-2">
             <UButton type="button" color="neutral" variant="ghost" :label="t('common.cancel')" :disabled="isPending" @click="modal.close()" />

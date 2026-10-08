@@ -33,6 +33,7 @@ type ReconciliationDetail = {
     egcs_fc_isopen: boolean
     agreement_id: string
     agreement_number: string | null
+    egcs_fc_currency: string
     agreement_title_en: string | null
     agreement_title_fr: string | null
     claim_status: string
@@ -371,6 +372,7 @@ const cancelReconciliation = async () => {
 
               <AgreementClaimReconciliationLinesTable
                 :lines="reconciliationTableLines"
+                :currency="data.reconciliation.egcs_fc_currency"
                 :total-submitted="totalSubmitted"
                 :total-reconciled="totalReconciled"
                 :total-sampled="totalSampled"

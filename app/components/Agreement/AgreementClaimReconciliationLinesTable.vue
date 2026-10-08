@@ -5,7 +5,8 @@ import type { Ref } from 'vue'
 import type { AgreementClaimReconciliationTableLine } from '~~/shared/types/agreement-claim-reconciliation-ui'
 import { formatMoneyText, parseMoney, subtractMoney, sumMoney, type Money } from '~~/shared/utils/money'
 
-const { lines = [], totalSubmitted = parseMoney('0'), totalReconciled = parseMoney('0'), totalSampled = parseMoney('0'), editMode = 'inline' } = defineProps<{
+const { currency, lines = [], totalSubmitted = parseMoney('0'), totalReconciled = parseMoney('0'), totalSampled = parseMoney('0'), editMode = 'inline' } = defineProps<{
+  currency: string
   lines?: AgreementClaimReconciliationTableLine[]
   totalSubmitted?: Money
   totalReconciled?: Money
@@ -21,7 +22,7 @@ const emit = defineEmits<{
 
 const { locale, t } = useI18n()
 const { getGroupedDisclosureControlsId } = useGroupedDisclosureIds()
-const formatMoney = (value: Money): string => formatMoneyText(value, locale.value, 'CAD')
+const formatMoney = (value: Money): string => formatMoneyText(value, locale.value, currency)
 /**
  *
  * @param value
@@ -218,13 +219,13 @@ const getCategoryLines = (category: ReconciliationCategoryGroup) => category.sub
                   {{ formatMoney(line.submittedAmount) }}
                 </td>
                 <td class="px-4 py-4">
-                  <UInput
+                  <CommonCurrencyInput
                     v-if="line.editable && editMode === 'inline'"
                     :model-value="line.reconciledAmount"
+                    :currency="currency"
                     required
                     :aria-invalid="tryParseMoney(line.reconciledAmount) === null"
                     :aria-describedby="tryParseMoney(line.reconciledAmount) === null ? `reconciled-error-${line.id}` : undefined"
-                    inputmode="decimal"
                     :aria-label="t('agreement.claims.reconciled_amount_for', { name: line.name })"
                     class="w-40"
                     @update:model-value="value => emit('update:reconciled', line.id, value)" />
@@ -234,10 +235,10 @@ const getCategoryLines = (category: ReconciliationCategoryGroup) => category.sub
                   </p>
                 </td>
                 <td class="px-4 py-4">
-                  <UInput
+                  <CommonCurrencyInput
                     v-if="line.editable && editMode === 'inline'"
                     :model-value="line.sampledAmount"
-                    inputmode="decimal"
+                    :currency="currency"
                     :aria-label="t('agreement.claims.sampled_amount_for', { name: line.name })"
                     class="w-40"
                     @update:model-value="value => emit('update:sampled', line.id, value)" />

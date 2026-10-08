@@ -436,10 +436,9 @@ const handleCompleted = async () => {
           </UFormField>
 
           <UFormField :label="t('agreement.commitments.amount')" name="egcs_fc_amount">
-            <UInput
+            <CommonCurrencyInput
               v-model="selectedLine.egcs_fc_amount"
-              type="text"
-              inputmode="decimal" />
+              :currency="commitment?.egcs_fc_currency" />
           </UFormField>
 
           <div class="flex justify-end gap-2 pt-4">

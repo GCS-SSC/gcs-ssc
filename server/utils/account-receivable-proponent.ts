@@ -16,6 +16,8 @@ import { readAccountReceivableLines, readAccountReceivableApprovedRecoveryMethod
 import { readAccountReceivableOffsetMemos } from './account-receivable-offset-memo'
 import { readAccountReceivablePoolBalance } from './account-receivable-pool-ledger'
 import { databaseMoneyText, parseDatabaseMoney } from './database-money'
+import { resolveAssignedItemTargetGrant } from './rbac'
+import { resolveCompletionEvidenceId } from './completion-runtime-core'
 import { escapeLikePattern } from './sql-like'
 import { getValidatedQueryI18n } from './api-validate'
 import { PaginationSchema } from '~~/shared/types/schemas'
@@ -155,6 +157,26 @@ const readOffsetMemoRows = async (db: Kysely<Database>, id: string,
   })
 }
 
+const canDeleteCashMemo = async (db: Kysely<Database>, auth: AuthContext, memo: {
+  id: string; egcs_fc_agency: string; egcs_fc_status: string; egcs_fc_outcome: string
+}): Promise<boolean> => {
+  if (memo.egcs_fc_outcome !== 'open'
+    || !auth.userAbilities.authorize('account_receivable', 'delete', { type: 'agency', agencyId: String(memo.egcs_fc_agency) })) return false
+  const target = { entityType: 'fundingcaseaccountreceivablecreditmemo' as const, entityId: String(memo.id) }
+  if (!await resolveAssignedItemTargetGrant(auth.userId, target, db)) return false
+  const status = await db.selectFrom('Common_Status')
+    .select(['egcs_cn_isdraft', 'egcs_cn_terminal', 'egcs_cn_readonly', '_deleted'])
+    .where('id', '=', memo.egcs_fc_status).executeTakeFirst()
+  if (!status || status._deleted || !status.egcs_cn_isdraft || status.egcs_cn_terminal || status.egcs_cn_readonly
+    || await resolveCompletionEvidenceId(db, target.entityType, target.entityId)) return false
+  const attachment = await db.selectFrom('Common_Entity_Attachment').select('id')
+    .where('egcs_cn_entitytype', '=', target.entityType).where('egcs_cn_entityid', '=', target.entityId)
+    .where('_deleted', '=', false).executeTakeFirst()
+  const workflow = await db.selectFrom('Common_Runtime').select('id')
+    .where('egcs_cn_entitytype', '=', target.entityType).where('egcs_cn_entityid', '=', target.entityId).executeTakeFirst()
+  return !attachment && !workflow
+}
+
 export const listProponentCreditMemos = async (event: H3Event, id: string, requestedInput?: ListInput) => {
   await requireAuthContext(event)
   return await executeFreshReadSnapshot(event, async db => {
@@ -166,7 +188,7 @@ export const listProponentCreditMemos = async (event: H3Event, id: string, reque
     const agencyById = new Map(agencies.map(agency => [String(agency.id), agency]))
     const cash = await db.selectFrom('Funding_Case_Account_Receivable_Credit_Memo as memo')
       .select(['memo.id', 'memo.egcs_fc_number', 'memo.egcs_fc_agency', 'memo.egcs_fc_currency', 'memo.egcs_fc_status',
-        'memo.egcs_fc_receiveddate', 'memo.egcs_fc_createdat'])
+        'memo.egcs_fc_receiveddate', 'memo.egcs_fc_createdat', 'memo.egcs_fc_outcome'])
       .select(databaseMoneyText(sql.ref('memo.egcs_fc_amount')).as('egcs_fc_amount'))
       .where('memo.egcs_fc_applicantrecipient', '=', id).where('memo.egcs_fc_agency', 'in', [...agencyById.keys()])
       .where('memo._deleted', '=', false).execute()
@@ -177,6 +199,7 @@ export const listProponentCreditMemos = async (event: H3Event, id: string, reque
         .where('egcs_fc_creditmemo', '=', String(memo.id)).where('_deleted', '=', false).orderBy('id', 'desc').executeTakeFirst()
       return {
         id: String(memo.id), egcs_fc_kind: 'cash' as const, egcs_fc_status: String(memo.egcs_fc_status),
+        egcs_fc_candelete: await canDeleteCashMemo(db, auth, memo),
         egcs_fc_creditmemoreference: `CM-${legacyRecovery?.id ?? memo.id}`,
         egcs_fc_agency: String(agency.id), egcs_fc_agencyname_en: agency.egcs_ay_name_en, egcs_fc_agencyname_fr: agency.egcs_ay_name_fr,
         egcs_fc_currency: memo.egcs_fc_currency, egcs_fc_amount: parseDatabaseMoney(memo.egcs_fc_amount),

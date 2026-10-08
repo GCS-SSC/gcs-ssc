@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { FundingCaseAgreementBudgetLineItemForm } from '~~/shared/types/funding-case-agreement-ui'
-import type { Money } from '~~/shared/utils/money'
+import { formatMoneyText, type Money } from '~~/shared/utils/money'
 
 const state = defineModel<FundingCaseAgreementBudgetLineItemForm>({ required: true })
 const { preview } = defineProps<{ preview: Money | null }>()
@@ -19,7 +19,7 @@ const { t, locale } = useI18n()
       <UInput v-model.number="state.egcs_fc_percentage" type="number" min="0" max="100" step="0.01" :readonly="!state.egcs_fc_allowpercentageoverride" />
     </UFormField>
     <p aria-live="polite">
-      {{ t('budget_calculation.preview', { amount: preview ?? t('common.not_available') }) }}
+      {{ t('budget_calculation.preview', { amount: preview !== null && state.egcs_fc_currency ? formatMoneyText(preview, locale, state.egcs_fc_currency) : t('common.not_available') }) }}
     </p>
   </div>
 </template>

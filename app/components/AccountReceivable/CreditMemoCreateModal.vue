@@ -25,14 +25,35 @@ type State = {
 }
 const state: Ref<State | null> = ref(null)
 const pending: Ref<boolean> = ref(false)
+const singleAgency: Ref<boolean> = ref(false)
 const identity = computed(() => `${context.egcs_fc_applicantrecipient}:${context.egcs_fc_agency ?? ''}:${context.egcs_fc_currency ?? ''}:${context.egcs_fc_receivable ?? ''}`)
 let session = 0
 onBeforeUnmount(() => {
   session += 1
 })
+type AgencyLookupResponse = { items: Array<{ id: string }>; total: number }
+const fetchAgencyOptions = $fetch as (url: string, options: { query: Record<string, string | number> }) => Promise<AgencyLookupResponse>
+const resolveSingleAgency = async () => {
+  const currentSession = session
+  try {
+    const result = await fetchAgencyOptions('/api/account-receivable-credit-memos/lookups/agencies', {
+      query: { egcs_fc_applicantrecipient: context.egcs_fc_applicantrecipient, page: 1, limit: 2 }
+    })
+    if (currentSession !== session || !state.value) return
+    const agency = result.items[0]
+    if (result.total === 1 && result.items.length === 1 && agency
+      && (!state.value.egcs_fc_agency || state.value.egcs_fc_agency === String(agency.id))) {
+      state.value.egcs_fc_agency = String(agency.id)
+      singleAgency.value = true
+    }
+  } catch {
+    // Keep the shared lookup visible so its existing error and retry controls remain available.
+  }
+}
 watch([open, identity], ([isOpen]) => {
   session += 1
   pending.value = false
+  singleAgency.value = false
   state.value = isOpen
     ? {
         egcs_fc_applicantrecipient: context.egcs_fc_applicantrecipient,
@@ -43,12 +64,16 @@ watch([open, identity], ([isOpen]) => {
         egcs_fc_reason: ''
       }
     : null
+  if (isOpen) void resolveSingleAgency()
 }, { immediate: true, flush: 'sync' })
-watch(() => state.value?.egcs_fc_agency, (value, previous) => {
-  if (state.value && previous && value !== previous) {
-    state.value.egcs_fc_receivable = undefined
-    state.value.egcs_fc_currency = undefined
+watch(() => [state.value, state.value?.egcs_fc_agency] as const, ([currentState, value], [previousState, previous]) => {
+  if (currentState && currentState === previousState && value !== previous) {
+    currentState.egcs_fc_receivable = undefined
+    currentState.egcs_fc_currency = undefined
   }
+}, { flush: 'sync' })
+watch(() => [state.value, state.value?.egcs_fc_receivable] as const, ([currentState, value], [previousState, previous]) => {
+  if (currentState && currentState === previousState && value !== previous) currentState.egcs_fc_currency = undefined
 }, { flush: 'sync' })
 const resolveReceivableCurrency = (items: Array<{ id: string; egcs_fc_currency?: unknown }>) => {
   const selected = items.find(item => String(item.id) === state.value?.egcs_fc_receivable)
@@ -84,11 +109,8 @@ const save = async () => {
           </dd>
         </dl>
         <div class="grid gap-4 md:grid-cols-2">
-          <UFormField name="egcs_fc_agency" :label="t('account_receivable.credit_memo_agency')">
+          <UFormField v-if="!singleAgency" class="md:col-span-2" name="egcs_fc_agency" :label="t('account_receivable.credit_memo_agency')">
             <CommonServerLookupSelect v-model="state.egcs_fc_agency" fetch-url="/api/account-receivable-credit-memos/lookups/agencies" :query="{ egcs_fc_applicantrecipient: context.egcs_fc_applicantrecipient }" selected-values-query-key="selectedIds" value-key="id" label-en-key="egcs_ay_name_en" label-fr-key="egcs_ay_name_fr" :show-value-in-label="false" :disabled="pending || Boolean(context.egcs_fc_receivable)" close-on-select />
-          </UFormField>
-          <UFormField name="egcs_fc_currency" :label="t('common.currency')">
-            <CommonEnumSelect v-model="state.egcs_fc_currency" name="currency_codes" disabled class="w-full" />
           </UFormField>
           <UFormField name="egcs_fc_receivable" :label="t('account_receivable.credit_memo_receivable')">
             <CommonServerLookupSelect

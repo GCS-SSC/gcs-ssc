@@ -138,6 +138,12 @@ export const buildAgreementApprovalSnapshot = async (
   const risk = previousPacket
     ? previousPacket.schemaVersion === 3 ? previousPacket.risk : null
     : await captureSubmissionRisk(event, trx, { entityType, entityId })
+  // Both targets enforce risk readiness when capturing their first approval submission.
+  // Amendment Completion shares this transaction, so rejection also rolls back its evidence.
+  if (amendment && !previousPacket && risk?.readiness.workflowManaged) {
+    await trx.updateTable('Funding_Case_Agreement_Amendment').set({ egcs_fc_changerisk: true })
+      .where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirstOrThrow()
+  }
   if (!amendment) {
     await mergeAgreementCustomFields(event, trx, String(agreement.egcs_fc_transferpaymentstream), agreement.egcs_fc_customfields, {})
   }

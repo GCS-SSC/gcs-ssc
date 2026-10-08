@@ -37,8 +37,9 @@ type FiscalYearLookupItem = {
 const FISCAL_YEAR_GROUP_COLUMN_ID = 'fiscalYearGroup'
 const MONTH_KEYS = ['apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec', 'jan', 'feb', 'mar'] as const
 
-const { agreementId, canCreate, canUpdate, canDelete } = defineProps<{
+const { agreementId, currency, canCreate, canUpdate, canDelete } = defineProps<{
   agreementId: string
+  currency: string
   canCreate: boolean
   canUpdate: boolean
   canDelete: boolean
@@ -127,7 +128,7 @@ const fiscalYearOptions = computed<FiscalYearLookupItem[]>(() => {
   return [...byId.values()]
 })
 
-const formatMoney = (value: Money) => formatMoneyText(value, locale.value, 'CAD')
+const formatMoney = (value: Money) => formatMoneyText(value, locale.value, currency)
 const getMonthLabel = (month: number) => t(`agreement.claims.months.${MONTH_KEYS[month]}`)
 const getPeriodLabel = (claim: ClaimTableRow) => `${getMonthLabel(claim.egcs_fc_periodstart)} - ${getMonthLabel(claim.egcs_fc_periodend)}`
 
