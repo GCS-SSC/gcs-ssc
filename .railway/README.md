@@ -6,7 +6,7 @@ This configuration manages the existing **GCS Demo / demo** environment:
   populated, otherwise GitHub `GCS-SSC/gcs-ssc` branch `main` and the canonical Dockerfile.
 - Database: existing `GCS DB` service (PostgreSQL 18), with the application's existing `DATABASE_URL` preserved.
 - Domain: https://gcs-ssc-demo.up.railway.app, retained by Railway on the existing service.
-- Volumes: existing `gcs-ssc-volume` at `/app/.data` and `gcs-db-volume-ar-paid-reset` on `GCS DB`, each 5000 MB. The current release clean cutover replaces and deletes `gcs-db-volume-release-reset`; no unused GCS database volumes remain.
+- Volumes: existing `gcs-ssc-volume` at `/app/.data` and `gcs-db-volume-ar-paid-reset` on `GCS DB`, each 5000 MB. The release clean cutover replaces `gcs-db-volume-release-reset`. Verify every previous GCS database volume is detached and absent or pending Railway deletion.
 - Metabase, `Metabase DB`, and their `postgres-volume-4aPn` are included so an IaC apply preserves them.
 - Portal: `gcs-ssc-portal` uses a pinned public GHCR digest from `deployment/portal-demo-image.json` and its own `Portal DB` PostgreSQL service and `portal-db-volume`. It shares this project, not a database, with GCS and Metabase.
 - Canvas groups: `Metabase`, `GCS`, and `Portal` each contain the corresponding app and PostgreSQL service.
