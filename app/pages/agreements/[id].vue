@@ -379,27 +379,7 @@ const cancel = () => {
         <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" @click="() => { void refreshProfile() }" />
       </template>
     </UAlert>
-    <UDashboardPanel v-if="profile" id="agreement-detail" class="min-w-0 flex-1">
-      <template #header>
-        <UDashboardNavbar>
-          <template #leading>
-            <UDashboardSidebarCollapse />
-            <UBreadcrumb :items="breadcrumbItems" class="ml-2" />
-          </template>
-          <template #right>
-            <div class="flex items-center gap-2">
-              <UButton
-                color="neutral"
-                variant="ghost"
-                :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
-                :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')"
-                @click="isHeroCollapsed = !isHeroCollapsed" />
-              <CommonNavbarSide />
-            </div>
-          </template>
-        </UDashboardNavbar>
-      </template>
-
+    <CommonDetailPage v-if="profile" id="agreement-detail" v-model:collapsed="isHeroCollapsed" class="min-w-0 flex-1" :breadcrumb-items="breadcrumbItems">
       <template #body>
         <div class="flex min-w-0 flex-1 flex-col">
           <AgreementProfileHero
@@ -409,19 +389,7 @@ const cancel = () => {
             :subtitle="t('agreement.update_title')"
             show-context />
 
-          <CommonEntityEditorWorkspace content-test-id="agreement-detail-content">
-            <template #sidebar>
-              <CommonRouteTabs
-                v-model="selectedTab"
-                :items="tabs"
-                orientation="vertical"
-                :ui="{
-                  root: 'w-full',
-                  list: 'w-full flex-col items-stretch p-0',
-                  trigger: 'w-full justify-start'
-                }" />
-            </template>
-
+          <CommonDetailWorkspace v-model="selectedTab" content-test-id="agreement-detail-content" :items="tabs">
             <AgreementProfileFormPage
               v-if="selectedTab === 'general' && selectedProfile && canUpdateBusinessRecord"
               v-model:model="selectedProfile"
@@ -662,10 +630,10 @@ const cancel = () => {
             <ExtensionEntityTabPanel
               v-else-if="selectedExtensionTab"
               :item="selectedExtensionTab" />
-          </CommonEntityEditorWorkspace>
+          </CommonDetailWorkspace>
         </div>
       </template>
-    </UDashboardPanel>
+    </CommonDetailPage>
     <ApplicantRecipientFundingHistorySimilarityDialog
       v-model:open="isSimilarityWarningOpen"
       :warnings="similarityWarnings"

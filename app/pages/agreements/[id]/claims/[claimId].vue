@@ -1056,24 +1056,7 @@ const cancelReconciliation = async () => {
     <div v-else-if="isLoadingDetail && (!profile || !activeClaim)" role="status" aria-live="polite" class="flex min-h-32 items-center justify-center gap-2 text-sm text-muted">
       <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin" aria-hidden="true" /><span>{{ t('common.loading_records') }}</span>
     </div>
-    <UDashboardPanel v-if="profile && activeClaim" id="agreement-claim-detail" class="w-full">
-      <template #header>
-        <UDashboardNavbar>
-          <template #leading>
-            <UDashboardSidebarCollapse />
-            <UBreadcrumb :items="breadcrumbItems" class="ml-2" />
-          </template>
-          <template #right>
-            <div class="flex items-center gap-2">
-              <UButton
-                color="neutral" variant="ghost" :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
-                :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')" @click="isHeroCollapsed = !isHeroCollapsed" />
-              <CommonNavbarSide />
-            </div>
-          </template>
-        </UDashboardNavbar>
-      </template>
-
+    <CommonDetailPage v-if="profile && activeClaim" id="agreement-claim-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" class="w-full">
       <template #body>
         <div class="flex flex-1 flex-col">
           <CommonEntityHero
@@ -1084,19 +1067,7 @@ const cancelReconciliation = async () => {
             :meta-items="claimHeroMetaItems"
             :badges="claimHeroBadges" />
 
-          <CommonEntityEditorWorkspace content-test-id="agreement-claim-detail-content">
-            <template #sidebar>
-              <CommonRouteTabs
-                v-model="selectedClaimTab"
-                :items="claimTabs"
-                orientation="vertical"
-                :ui="{
-                  root: 'w-full',
-                  list: 'w-full flex-col items-stretch p-0',
-                  trigger: 'w-full justify-start'
-                }" />
-            </template>
-
+          <CommonDetailWorkspace v-model="selectedClaimTab" :items="claimTabs" content-test-id="agreement-claim-detail-content">
             <div v-if="selectedClaimTab === 'submission'" class="w-full min-w-0">
               <div class="space-y-8">
                 <div class="space-y-4">
@@ -1524,10 +1495,10 @@ const cancelReconciliation = async () => {
             <ExtensionEntityTabPanel
               v-else-if="selectedExtensionTab"
               :item="selectedExtensionTab" />
-          </CommonEntityEditorWorkspace>
+          </CommonDetailWorkspace>
         </div>
       </template>
-    </UDashboardPanel>
+    </CommonDetailPage>
 
     <UModal
       v-if="selectedReconcileLine"

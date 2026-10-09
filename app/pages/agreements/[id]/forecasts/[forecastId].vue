@@ -93,7 +93,7 @@ const forecastId = route.params.forecastId as string
 const { isAssigned } = useEntityAssignmentRoster('fundingcaseforecast', forecastId)
 
 const selectedVersion: Ref<string> = ref(String(route.query.version ?? '0'))
-const expandedQuarter: Ref<QuarterKey | null> = ref(null)
+const expandedQuarters: Ref<QuarterKey[]> = ref([])
 const breakdownSearch: Ref<string> = ref('')
 const breakdownPagination: Ref<{ pageIndex: number, pageSize: number }> = ref({
   pageIndex: 0,
@@ -109,7 +109,7 @@ const fundingEditorTotalAmount: Ref<string> = ref('0.00')
 const fundingEditorSources: Ref<Array<{ egcs_fc_fundingsubtype: string, egcs_fc_amount: Money }>> = ref([])
 const isSavingFunding: Ref<boolean> = ref(false)
 const approvalsRefreshKey: Ref<number> = ref(0)
-const selectedTab: Ref<string> = ref('breakdown')
+
 const tabs = [
   { key: 'agreement.forecasts.breakdown_title', value: 'breakdown', icon: 'i-lucide-chart-no-axes-column-increasing' },
   { key: 'agreement.forecasts.completion.title', value: 'completion', icon: 'i-lucide-circle-check-big' },
@@ -119,6 +119,7 @@ const tabs = [
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
   { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users' }
 ]
+const { selectedTab } = useUrlTabState({ tabs, defaultTab: 'breakdown' })
 const isHeroCollapsed = getHeroCollapsed('agreement-forecast-detail')
 
 const {
@@ -290,7 +291,7 @@ const breadcrumbItems = computed(() => [
 
 const visiblePeriods = computed<BreakdownPeriod[]>(() =>
   QUARTERS.flatMap((quarter): BreakdownPeriod[] => {
-    if (expandedQuarter.value === quarter.key) {
+    if (expandedQuarters.value.includes(quarter.key)) {
       return quarter.months.map(month => ({
         id: `month:${month}`,
         columnId: `period-month-${month}`,
@@ -335,8 +336,8 @@ const breakdownPeriodColumnVisibility = computed<Record<string, boolean>>(() => 
   allBreakdownPeriods.value.map(period => [
     period.columnId,
     period.type === 'quarter'
-      ? expandedQuarter.value !== period.quarter
-      : expandedQuarter.value === period.quarter
+      ? !expandedQuarters.value.includes(period.quarter)
+      : expandedQuarters.value.includes(period.quarter)
   ])
 ))
 
@@ -522,7 +523,9 @@ const getBreakdownGroupedTotal = (row: GroupedForecastBreakdownRow, key: string)
   }))
 
 const toggleQuarter = (quarter: QuarterKey) => {
-  expandedQuarter.value = expandedQuarter.value === quarter ? null : quarter
+  expandedQuarters.value = expandedQuarters.value.includes(quarter)
+    ? expandedQuarters.value.filter(key => key !== quarter)
+    : [...expandedQuarters.value, quarter]
 }
 
 const refreshPage = async () => {
@@ -607,27 +610,7 @@ const saveForecastBreakdown = async () => {
     <div v-else-if="isLoadingDetail && (!profile || !activeForecast)" role="status" aria-live="polite" class="flex min-h-32 items-center justify-center gap-2 text-sm text-muted">
       <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin" aria-hidden="true" /><span>{{ t('common.loading_records') }}</span>
     </div>
-    <UDashboardPanel v-if="profile && activeForecast" id="agreement-forecast-detail" class="w-full">
-      <template #header>
-        <UDashboardNavbar>
-          <template #leading>
-            <UDashboardSidebarCollapse />
-            <UBreadcrumb :items="breadcrumbItems" class="ml-2" />
-          </template>
-          <template #right>
-            <div class="flex items-center gap-2">
-              <UButton
-                color="neutral"
-                variant="ghost"
-                :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
-                :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')"
-                @click="isHeroCollapsed = !isHeroCollapsed" />
-              <CommonNavbarSide />
-            </div>
-          </template>
-        </UDashboardNavbar>
-      </template>
-
+    <CommonDetailPage v-if="profile && activeForecast" id="agreement-forecast-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" class="w-full">
       <template #body>
         <div class="flex flex-1 flex-col">
           <CommonEntityHero
@@ -637,10 +620,7 @@ const saveForecastBreakdown = async () => {
             :meta-items="forecastHeroMetaItems"
             :badges="forecastHeroBadges" />
 
-          <CommonEntityEditorWorkspace content-test-id="agreement-forecast-detail-content">
-            <template #sidebar>
-              <CommonRouteTabs v-model="selectedTab" :items="tabs" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
-            </template>
+          <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="agreement-forecast-detail-content">
             <CommonSection v-if="selectedTab === 'breakdown'" :title="t('agreement.forecasts.breakdown_title')" :grid-cols="1">
               <div class="space-y-4">
                 <div class="flex flex-wrap items-end justify-between gap-3">
@@ -734,6 +714,7 @@ const saveForecastBreakdown = async () => {
                       type="button"
                       class="inline-flex cursor-default items-center gap-2 rounded-sm bg-primary px-3 py-1.5 text-sm font-semibold text-white"
                       :aria-label="`${period.label} ${t('common.expand')}`"
+                      :aria-expanded="false"
                       @click.stop="toggleQuarter(period.quarter)">
                       {{ period.label }}
                       <UIcon name="i-lucide-between-horizontal-start" class="size-4" />
@@ -743,6 +724,7 @@ const saveForecastBreakdown = async () => {
                       type="button"
                       class="group inline-flex cursor-default items-center gap-2 rounded-sm border border-transparent px-2 py-1 text-xs font-semibold tracking-wide text-zinc-500 uppercase transition-colors hover:border-primary/30 hover:text-primary dark:text-zinc-400"
                       :aria-label="`${period.label} ${t('common.collapse')}`"
+                      :aria-expanded="true"
                       @click.stop="toggleQuarter(period.quarter)">
                       {{ period.label }}
                       <UIcon name="i-lucide-between-horizontal-end" class="size-4 text-zinc-400 transition-colors group-hover:text-primary" />
@@ -832,10 +814,10 @@ const saveForecastBreakdown = async () => {
             <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" entity-type="fundingcaseforecast" :entity-id="forecastId" />
             <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcaseforecast" :entity-id="forecastId" />
             <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" entity-type="fundingcaseforecast" :entity-id="forecastId" />
-          </CommonEntityEditorWorkspace>
+          </CommonDetailWorkspace>
         </div>
       </template>
-    </UDashboardPanel>
+    </CommonDetailPage>
     <UModal v-if="profile" v-model:open="fundingEditorOpen" :title="t('agreement.funding_sources.edit_line')" :ui="{ content: 'sm:max-w-2xl' }">
       <template #body>
         <div class="space-y-4">

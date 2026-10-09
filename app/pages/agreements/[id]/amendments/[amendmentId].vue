@@ -51,7 +51,7 @@ const proposedRiskScoreSelection: Ref<string | undefined> = ref(undefined)
 const isCancelling: Ref<boolean> = ref(false)
 const isCancelModalOpen: Ref<boolean> = ref(false)
 const approvalsRefreshKey: Ref<number> = ref(0)
-const selectedTab: Ref<string> = ref('general')
+
 const scopeTypeIds: Ref<string[]> = ref([])
 const scopeSubtypeIds: Ref<string[]> = ref([])
 const amendmentNameEn: Ref<string> = ref('')
@@ -188,6 +188,7 @@ const tabs = computed(() => [
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
   { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users' }
 ])
+const { selectedTab } = useUrlTabState({ tabs, defaultTab: 'general' })
 
 const refreshPage = async () => {
   await refresh()
@@ -367,28 +368,7 @@ const cancelAmendment = async () => {
 </script>
 
 <template>
-  <UDashboardPanel id="agreement-amendment-detail" class="w-full">
-    <template #header>
-      <UDashboardNavbar>
-        <template #leading>
-          <UDashboardSidebarCollapse />
-          <UBreadcrumb :items="breadcrumbItems" class="ml-2" />
-        </template>
-        <template #right>
-          <div class="flex items-center gap-2">
-            <UButton
-              class="cursor-default"
-              color="neutral"
-              variant="ghost"
-              :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
-              :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')"
-              @click="isHeroCollapsed = !isHeroCollapsed" />
-            <CommonNavbarSide />
-          </div>
-        </template>
-      </UDashboardNavbar>
-    </template>
-
+  <CommonDetailPage id="agreement-amendment-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" class="w-full">
     <template #body>
       <div v-if="amendment" class="flex flex-1 flex-col">
         <CommonEntityHero
@@ -401,15 +381,7 @@ const cancelAmendment = async () => {
             isCompleted: amendment.isCompleted
           }]" />
 
-        <CommonEntityEditorWorkspace content-test-id="agreement-amendment-detail-content">
-          <template #sidebar>
-            <CommonRouteTabs
-              v-model="selectedTab"
-              :items="tabs"
-              orientation="vertical"
-              :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
-          </template>
-
+        <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="agreement-amendment-detail-content">
           <section v-if="selectedTab === 'general'" class="space-y-8">
             <CommonSection :title="t('agreement.amendments.sections.details')" badge="01" :grid-cols="1">
               <div class="space-y-4">
@@ -743,7 +715,7 @@ const cancelAmendment = async () => {
             v-else-if="selectedTab === 'attachments'"
             entity-type="fundingcaseamendment"
             :entity-id="amendmentId" />
-        </CommonEntityEditorWorkspace>
+        </CommonDetailWorkspace>
       </div>
 
       <div v-else-if="isLoadingDetail" role="status" aria-live="polite" class="flex flex-1 items-center justify-center gap-2 p-8 text-sm text-muted">
@@ -778,5 +750,5 @@ const cancelAmendment = async () => {
         </template>
       </UModal>
     </template>
-  </UDashboardPanel>
+  </CommonDetailPage>
 </template>

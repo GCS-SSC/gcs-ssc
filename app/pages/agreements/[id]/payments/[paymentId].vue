@@ -51,7 +51,7 @@ const pagination: Ref<{ pageIndex: number, pageSize: number }> = ref({
   pageSize: 25
 })
 const approvalsRefreshKey: Ref<number> = ref(0)
-const selectedTab: Ref<string> = ref('lines')
+
 const tabs = [
   { key: 'agreement.payments.lines_title', value: 'lines', icon: 'i-lucide-list' },
   { key: 'agreement.payments.completion.title', value: 'completion', icon: 'i-lucide-circle-check-big' },
@@ -61,6 +61,7 @@ const tabs = [
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
   { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users' }
 ]
+const { selectedTab } = useUrlTabState({ tabs, defaultTab: 'lines' })
 
 const lineModal = useCrudModal<FundingCaseAgreementPaymentLineRow, FundingCaseAgreementPaymentLineForm>({
   createState: () => ({ egcs_fc_fundingagreementpayment: paymentId }),
@@ -273,24 +274,7 @@ const handleCompleted = async () => {
       <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin" aria-hidden="true" />
       <span>{{ t('common.loading_records') }}</span>
     </div>
-    <UDashboardPanel v-if="payment" id="agreement-payment-detail" class="w-full">
-      <template #header>
-        <UDashboardNavbar>
-          <template #leading>
-            <UDashboardSidebarCollapse />
-            <UBreadcrumb :items="breadcrumbItems" class="ml-2" />
-          </template>
-          <template #right>
-            <div class="flex items-center gap-2">
-              <UButton
-                color="neutral" variant="ghost" :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
-                :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')" @click="isHeroCollapsed = !isHeroCollapsed" />
-              <CommonNavbarSide />
-            </div>
-          </template>
-        </UDashboardNavbar>
-      </template>
-
+    <CommonDetailPage v-if="payment" id="agreement-payment-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" class="w-full">
       <template #body>
         <div class="flex flex-1 flex-col">
           <CommonEntityHero
@@ -310,10 +294,7 @@ const handleCompleted = async () => {
               isCompleted: payment.isCompleted
             }]" />
 
-          <CommonEntityEditorWorkspace content-test-id="agreement-payment-detail-content">
-            <template #sidebar>
-              <CommonRouteTabs v-model="selectedTab" :items="tabs" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
-            </template>
+          <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="agreement-payment-detail-content">
             <CommonSection v-if="selectedTab === 'lines'" :title="t('agreement.payments.lines_title')" :grid-cols="1">
               <AgreementPaymentRecoverySummary :payment="payment" />
               <div class="space-y-4">
@@ -400,10 +381,10 @@ const handleCompleted = async () => {
             <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" entity-type="fundingcasepayment" :entity-id="paymentId" />
             <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcasepayment" :entity-id="paymentId" />
             <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" entity-type="fundingcasepayment" :entity-id="paymentId" />
-          </CommonEntityEditorWorkspace>
+          </CommonDetailWorkspace>
         </div>
       </template>
-    </UDashboardPanel>
+    </CommonDetailPage>
 
     <UModal v-if="selectedLine" v-model:open="isLineModalOpen" :title="selectedLine.id ? t('agreement.payments.edit_line') : t('agreement.payments.add_line')" :description="t('common.form_dialog_description')">
       <template #body>

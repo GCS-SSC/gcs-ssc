@@ -12,7 +12,7 @@ const statusLabel = computed(() => t(agency.egcs_ay_active ? 'common.active' : '
 </script>
 
 <template>
-  <div class="mx-auto max-w-3xl space-y-8 py-4">
+  <div class="space-y-8">
     <div class="space-y-8">
       <div class="space-y-8">
         <CommonSection :title="t('agency.detail.core_info')" badge="01">

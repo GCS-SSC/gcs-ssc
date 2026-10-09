@@ -2,8 +2,13 @@ import type { H3Event } from 'h3'
 import { throwIfMappedConstraintError, type ConstraintErrorMapping } from '~~/server/utils/database-constraint-errors'
 
 const UNIQUE_VIOLATION_CODE = '23505'
+const CHECK_VIOLATION_CODE = '23514'
 
 const CONSTRAINT_ERROR_MAP: Record<string, ConstraintErrorMapping> = {
+  financial_id_identity_in_use: {
+    code: 'APPLICANT_RECIPIENT_FINANCIAL_ID_IN_USE',
+    key: 'apiErrors.applicant_recipient.financial_id_in_use'
+  },
   ar_idx_registryregistrynumber: {
     code: 'APPLICANT_RECIPIENT_DUPLICATE_REGISTRY_NUMBER',
     key: 'apiErrors.applicant_recipient.duplicate_registry_number'
@@ -30,5 +35,5 @@ const CONSTRAINT_ERROR_MAP: Record<string, ConstraintErrorMapping> = {
  * @returns Never when a known violation is matched.
  */
 export const throwIfApplicantRecipientUniqueConstraintError = async (event: H3Event, error: unknown): Promise<never> => {
-  return await throwIfMappedConstraintError(event, error, [UNIQUE_VIOLATION_CODE], CONSTRAINT_ERROR_MAP)
+  return await throwIfMappedConstraintError(event, error, [UNIQUE_VIOLATION_CODE, CHECK_VIOLATION_CODE], CONSTRAINT_ERROR_MAP)
 }

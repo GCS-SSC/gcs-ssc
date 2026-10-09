@@ -41,6 +41,7 @@ export default defineEventHandler(async event => {
         'Applicant_Recipient_Profile.id',
         'Funding_Case_Agreement_Applicant_Recipient.egcs_fc_applicantrecipient'
       )
+      .leftJoin('Applicant_Recipient_Agency_Financial_Id as financial', 'financial.id', 'Funding_Case_Agreement_Applicant_Recipient.egcs_fc_agencyfinancialid')
       .leftJoin('Agency_Applicant_Recipient_Subtype as subtype', 'subtype.id', 'Funding_Case_Agreement_Applicant_Recipient.egcs_fc_applicantrecipientsubtype')
       .leftJoin('Agency_Profile', 'Agency_Profile.id', 'Applicant_Recipient_Profile.egcs_ar_leadagency')
       .where('Funding_Case_Agreement_Applicant_Recipient.egcs_fc_fundingagreement', '=', agreementId)
@@ -68,6 +69,8 @@ export default defineEventHandler(async event => {
           'Funding_Case_Agreement_Applicant_Recipient.id as id',
           agreementApplicantRecipientCanDelete().as('can_delete'),
           'Funding_Case_Agreement_Applicant_Recipient.egcs_fc_applicantrecipientsubtype',
+          'Funding_Case_Agreement_Applicant_Recipient.egcs_fc_agencyfinancialid',
+          'financial.egcs_ar_financialsystemid as financial_system_id',
           'subtype.egcs_ay_name_en as subtype_name_en',
           'subtype.egcs_ay_name_fr as subtype_name_fr',
           'Funding_Case_Agreement_Applicant_Recipient.egcs_fc_applicantrecipient as egcs_fc_applicantrecipient',

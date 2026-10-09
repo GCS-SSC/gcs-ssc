@@ -1,3 +1,4 @@
+import { assertAgreementFinancialId } from '~~/server/utils/agreement-financial-ids'
 import { assertAgreementProponentType } from '~~/server/utils/agreement-proponent-type'
 import type { Insertable } from 'kysely'
 import { sql } from 'kysely'
@@ -88,6 +89,8 @@ export default defineEventHandler(async event => {
           if (applicantRecipient.lead_agency_id !== selectedAgencyHint?.egcs_ar_leadagency) throw new SelectedLeadAgencyChanged()
 
           await assertAgreementProponentType(event, trx, _currentContext.streamId, applicantRecipientId, validated.egcs_fc_applicantrecipientsubtype)
+          const financialId = await assertAgreementFinancialId(event, trx, _currentContext.streamId,
+            applicantRecipientId, validated.egcs_fc_agencyfinancialid)
           const values: Insertable<FundingCaseAgreementApplicantRecipientTable> = {
             egcs_fc_fundingagreement: agreementId,
             ...validated
@@ -96,10 +99,11 @@ export default defineEventHandler(async event => {
           const inserted = await trx
             .insertInto('Funding_Case_Agreement_Applicant_Recipient')
             .values(values)
-            .returning(['id', 'egcs_fc_applicantrecipient', 'egcs_fc_applicantrecipientsubtype'])
+            .returning(['id', 'egcs_fc_applicantrecipient', 'egcs_fc_applicantrecipientsubtype', 'egcs_fc_agencyfinancialid'])
             .executeTakeFirstOrThrow()
           return {
             ...inserted,
+            financial_system_id: financialId.egcs_ar_financialsystemid,
             applicant_recipient_name_en: applicantRecipient.applicant_recipient_name_en,
             applicant_recipient_name_fr: applicantRecipient.applicant_recipient_name_fr,
             lead_agency_name_en: applicantRecipient.lead_agency_name_en,

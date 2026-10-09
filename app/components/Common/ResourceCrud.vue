@@ -16,6 +16,8 @@ const {
   updateMethod = 'PATCH',
   schema,
   initialNewItem,
+  beforeSave,
+  beforeDelete,
   columns,
   bilingualColumns,
   buttonLabel,
@@ -45,6 +47,8 @@ const {
   updateMethod?: 'PATCH' | 'PUT'
   schema: z.ZodTypeAny
   initialNewItem?: Partial<T> | null
+  beforeSave?: (state: Partial<T>, original: T | null, shouldProceed: () => boolean) => Promise<boolean>
+  beforeDelete?: (id: string, shouldProceed: () => boolean) => Promise<boolean | undefined>
   columns: TableColumnInput<T>[]
   bilingualColumns?: BilingualColumnConfig<T>[]
   buttonLabel?: string
@@ -110,6 +114,8 @@ const {
   updateMethod,
   schema,
   initialNewItem,
+  beforeSave,
+  beforeDelete,
   buttonLabel,
   modalTitle,
   updateTitle,
@@ -187,7 +193,7 @@ defineExpose({
       :fullscreen="modalFullscreen"
       :ui="modalUi">
       <template #body>
-        <UForm v-if="formState" :state="formState" :validate="validate" class="space-y-4" @submit="saveItem">
+        <UForm v-if="formState" :state="formState" :validate="validate" :disabled="isSaving" class="space-y-4" @submit="saveItem">
           <slot name="form" :state="formState" />
 
           <div class="flex justify-end gap-2 pt-4">

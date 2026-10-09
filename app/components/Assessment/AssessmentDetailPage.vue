@@ -250,27 +250,7 @@ const handleApprovalChanged = async () => {
 </script>
 
 <template>
-  <UDashboardPanel id="assessment-detail">
-    <template #header>
-      <UDashboardNavbar>
-        <template #leading>
-          <UDashboardSidebarCollapse />
-          <UBreadcrumb :items="breadcrumbItems" class="ml-2" />
-        </template>
-        <template #right>
-          <div class="flex items-center gap-2">
-            <UButton
-              color="neutral"
-              variant="ghost"
-              :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
-              :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')"
-              @click="isHeroCollapsed = !isHeroCollapsed" />
-            <CommonNavbarSide />
-          </div>
-        </template>
-      </UDashboardNavbar>
-    </template>
-
+  <CommonDetailPage id="assessment-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems">
     <template #body>
       <CommonLoadingState v-if="loadStatus === 'pending' && !assessment" :label="t('common.loading')" />
       <UAlert v-else-if="loadError" color="error" icon="i-lucide-circle-alert" :title="t('common.load_failed')" :description="t('common.try_again')">
@@ -627,5 +607,5 @@ const handleApprovalChanged = async () => {
         </div>
       </div>
     </template>
-  </UDashboardPanel>
+  </CommonDetailPage>
 </template>

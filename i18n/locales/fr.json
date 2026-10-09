@@ -1288,6 +1288,8 @@
       "libreoffice_unavailable": "LibreOffice est requis pour convertir les modèles DOCX en PDF. Installez LibreOffice sur le serveur ou utilisez un modèle PDF HTML."
     },
     "agreement": {
+      "invalid_financial_id": "Sélectionnez un identifiant financier actif pour ce promoteur auprès de l'agence de l'entente.",
+      "financial_id_required": "Sélectionnez un identifiant financier pour chaque promoteur de cette entente.",
       "monitor_receivable_not_allowed": "Ce type de contrôle ne permet pas de suivis exigeant l’établissement d’un compte débiteur.",
       "invalid_funding_subtype": "Sélectionnez un sous-type de financement offert pour le volet de cette entente.",
       "duplicate_funding_subtype": "Chaque sous-type de financement ne peut figurer qu’une fois par ligne.",
@@ -1516,6 +1518,7 @@
       "invalid_agency_financial_id_agency": "L'agence sélectionnée est invalide.",
       "funding_history_too_large": "L’historique de financement est trop volumineux pour être affiché de façon sécuritaire. Précisez la demande ou communiquez avec le soutien.",
       "agency_financial_id_not_found": "Identifiant financier d'agence introuvable.",
+      "financial_id_in_use": "Cet identifiant financier est utilisé par des ententes. Sélectionnez un nouvel identifiant financier dans ces ententes avant de modifier cet identifiant ou son agence.",
       "registry_not_found": "Enregistrement de registre introuvable.",
       "other_name_not_found": "Autre nom introuvable.",
       "address_not_found": "Adresse introuvable.",
@@ -2035,6 +2038,7 @@
     }
   },
   "validation": {
+    "invalid_agreement_financial_id": "Sélectionnez un identifiant financier actif pour ce promoteur auprès de l'agence de l'entente.",
     "invalid_json": "Saisissez un objet JSON valide.",
     "note_subject_required": "Saisissez un sujet en anglais ou en français",
     "note_body_required": "Saisissez une note en anglais ou en français",
@@ -2386,6 +2390,8 @@
     "description_fr_placeholder": "Saisir la description de l'entente en français",
     "applicant_recipients": {
       "type": "Type de promoteur",
+      "financial_id": "ID du système financier",
+      "financial_id_placeholder": "Sélectionnez un identifiant financier",
       "action_unavailable": "Cette action exige une affectation à cette entente et une entente ouverte aux modifications.",
       "not_selected": "Non sélectionné",
       "title": "Promoteurs",
@@ -3021,6 +3027,12 @@
       "agency": "Agence",
       "agency_placeholder": "Sélectionnez une agence",
       "financial_system_id": "ID du système financier",
+      "disabled": "Désactivé",
+      "active_help": "Les identifiants désactivés restent dans l'historique et peuvent être réactivés.",
+      "disable_warning_title": "Désactiver l'identifiant financier?",
+      "delete_warning_title": "Supprimer l'identifiant financier?",
+      "affected_agreements": "Cet identifiant financier est utilisé par ces ententes :",
+      "retained_agreements_notice": "Les ententes existantes conservent cet identifiant financier jusqu'à ce qu'il soit modifié manuellement dans chaque entente. Désactiver ou supprimer l'identifiant ne le remplace pas automatiquement.",
       "search": "Rechercher des identifiants financiers d'agence"
     },
     "registries": {

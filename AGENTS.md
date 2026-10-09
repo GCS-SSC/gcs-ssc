@@ -1,25 +1,13 @@
 # GCS-SSC Agent Bootstrap
 
-The private repository instructions, architecture documentation, tests, and explicit GCS-SSC skill are stored in the `tooling/gcs-ssc` submodule.
+Before repository work:
 
-[unDraw](https://undraw.co/) is the app's illustration provider. Use its SVG illustrations and adapt their colours to the app's theme, following the canonical guide's Vue and UI instructions.
+1. Run `bun run tooling:setup` if the private `tooling/gcs-ssc` checkout or local bridges are missing.
+2. Read [the canonical agent guide](tooling/gcs-ssc/AGENTS.md) completely and follow it, including its delegation and documentation-review protocol.
+3. Use [the architecture index](tooling/gcs-ssc/architecture/README.md) to select task-relevant contracts. Verify them against current source before implementation and before completion.
 
-Show actions when the user has the applicable role permission at the owning scope. If assignment, lifecycle, references, or another business prerequisite prevents execution, keep the action available and show a localized warning when activated. Enforce authorization and prerequisites again on the server. Follow the canonical guide's Vue and UI action instructions.
+The canonical guide owns engineering rules; keep detailed contracts there and in their linked architecture documents rather than duplicating them in this bootstrap.
 
-Always use currency-aware inputs and currency-formatted text elements for monetary values. Display the owning entity's currency with localized denomination, grouping and two fractional digits, using existing exact decimal string-safe controls/helpers. Editable inputs may show exact decimal text while focused and format valid values on blur; keep draft and submitted values as exact decimal strings without `Number` coercion. Follow `tooling/gcs-ssc/architecture/financial-precision.md`; prefer reusable currency-aware controls/helpers, and do not replace exact money inputs with number-based `UInputNumber` controls.
+Author host tests and architecture docs under `tooling/gcs-ssc/`; extension tests belong to the owning extension. Root `tests/`, `architecture/`, and `.agents/skills/gcs-ssc` are generated local links and must never be committed. The `$gcs-ssc` skill is explicit-only; this bootstrap does not invoke its stateful workflows.
 
-At the start of each task, assess whether the work benefits from multiple AI agents and can be split into clearly bounded, non-overlapping scopes. Use multiple agents when it can, unless the user explicitly requests otherwise; continue with a single agent when the work is too small or tightly coupled to benefit from delegation. Reassess as additional tasks are added or the scope evolves, and delegate whenever a useful split becomes available. Assign each agent exclusive ownership of any files it edits. Coordinate dependencies through the primary agent, which integrates the results and verifies the complete change. If agent tooling is unavailable, state that limitation and continue with a single agent.
-
-Before working in this repository:
-
-1. Run `bun run tooling:setup` if the private tooling checkout or local bridges are missing.
-2. Read `tooling/gcs-ssc/AGENTS.md` completely and follow it for all repository work.
-   For every task, review the relevant architecture and agent instructions against the current source before implementation and again before completion. Update stale, contradictory, redundant, or missing documentation as part of the work and summarize the evidence and changes; follow the canonical guide's documentation review protocol.
-3. For every added or changed form field (including fields introduced by merges/rebases), follow `tooling/gcs-ssc/architecture/required-fields.md`: keep validation, visible bilingual required indicators, and accessible control semantics consistent. Run `bun run forms:check` and resolve every uncovered or stale contract before considering the work complete.
-4. Extensions own all extension-authored translations and tests. Follow `tooling/gcs-ssc/architecture/extension-translations.md`; use package-local catalogs and the catalog-backed SDK translator. Never expose or consume host message lookup through the extension SDK.
-5. Follow `tooling/gcs-ssc/architecture/database-naming.md` for owning `egcs_<namespace>_` business-column prefixes throughout database, API, validation, and UI contracts. Follow `tooling/gcs-ssc/architecture/migration-policy.md` for clean cutovers: edit the owning subject baseline and rebuild/reseed, with no incremental upgrades or data/history preservation.
-6. Author host tests and architecture documentation in `tooling/gcs-ssc/tests/` and `tooling/gcs-ssc/architecture/`; extension tests belong to their owning extension. When commits are explicitly authorized, commit private tooling changes first, then update the host repository's pinned gitlink.
-
-The generated `tests/`, `architecture/`, and `.agents/skills/gcs-ssc` paths are local compatibility links and must never be committed to this repository. The `$gcs-ssc` skill remains explicit-only; this bootstrap does not invoke its stateful workflows automatically.
-
-Follow the canonical guide's [database and audit invariants](tooling/gcs-ssc/AGENTS.md#database-and-migrations): register every new or renamed core table in `server/database/audit-ownership-registry.ts`, and prove each core table's ownership with independent concrete-row tests. Extension ownership declarations and equivalent tests belong to the extension. Missing coverage fails completion.
+Preserve unrelated work. Do not commit unless explicitly authorized. When authorized, commit private tooling changes first, then update the host repository's pinned gitlink.

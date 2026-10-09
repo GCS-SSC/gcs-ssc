@@ -10,7 +10,7 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <div class="mx-auto max-w-5xl space-y-8 py-4">
+  <div class="space-y-8">
     <CommonSection :title="t('user.detail.core_info')" badge="01">
       <CommonValueCard :label="t('user.full_name')" :value="user.name" />
       <CommonValueCard :label="t('user.email')" :value="user.email" />

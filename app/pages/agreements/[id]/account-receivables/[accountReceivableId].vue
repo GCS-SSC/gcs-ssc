@@ -179,25 +179,11 @@ const creditMemoCreated = async (id: string, proponentId: string) => {
     <div v-else-if="!receivable && status === 'pending'" role="status" aria-live="polite" class="flex min-h-32 items-center justify-center gap-2 text-sm text-muted">
       <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin" aria-hidden="true" /><span>{{ t('common.loading_records') }}</span>
     </div>
-    <UDashboardPanel v-if="receivable && state" id="agreement-account-receivable-detail" class="min-w-0 flex-1">
-      <template #header>
-        <UDashboardNavbar>
-          <template #leading>
-            <UDashboardSidebarCollapse /><UBreadcrumb :items="breadcrumbs" class="ml-2" />
-          </template><template #right>
-            <div class="flex items-center gap-2">
-              <UButton color="neutral" variant="ghost" :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'" :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')" @click="isHeroCollapsed = !isHeroCollapsed" /><CommonNavbarSide />
-            </div>
-          </template>
-        </UDashboardNavbar>
-      </template>
+    <CommonDetailPage v-if="receivable && state" id="agreement-account-receivable-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbs" class="min-w-0 flex-1">
       <template #body>
         <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-hand-coins" :title="accountReceivableReference(receivable)" :meta-items="[getBilingualValue(receivable, 'egcs_fc_debtorname', t('common.not_available')), receivable.egcs_fc_fiscalyeardisplay, receivable.egcs_fc_currency.toUpperCase()]" :badges="heroBadges" :actions="heroActions" />
         <ULink v-if="receivable.egcs_fc_linkedreceivable" :to="localePath(appRouteLocations.agreementAccountReceivableDetail(agreementId, receivable.egcs_fc_linkedreceivable))" class="mb-4 text-sm">{{ t('account_receivable.linked_receivable') }}</ULink>
-        <CommonEntityEditorWorkspace content-test-id="agreement-account-receivable-detail-content">
-          <template #sidebar>
-            <CommonRouteTabs v-model="selectedTab" :items="tabs" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
-          </template>
+        <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="agreement-account-receivable-detail-content">
           <AccountReceivableDetailLines v-if="selectedTab === 'lines'" :account-receivable-id="accountReceivableId" :lines="receivable.egcs_fc_lines" :currency="receivable.egcs_fc_currency" :fiscal-year-id="receivable.egcs_fc_agencyfiscalyear" :is-adjustment="Boolean(receivable.egcs_fc_linkedreceivable)" :can-edit="receivable.egcs_fc_canedit && !saving && status === 'success'" :can-delete="receivable.egcs_fc_candeletelines && !saving && status === 'success'" @changed="refreshPage" />
           <UForm v-else-if="selectedTab === 'summary'" :state="state" :validate="createValidator(AccountReceivableSummaryEditSchema)" class="space-y-8" @submit="save">
             <CommonSection :title="t('account_receivable.financial_summary')" :grid-cols="1">
@@ -322,9 +308,9 @@ const creditMemoCreated = async (id: string, proponentId: string) => {
           <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" entity-type="fundingcaseaccountreceivable" :entity-id="accountReceivableId" />
           <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcaseaccountreceivable" :entity-id="accountReceivableId" />
           <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" entity-type="fundingcaseaccountreceivable" :entity-id="accountReceivableId" />
-        </CommonEntityEditorWorkspace>
+        </CommonDetailWorkspace>
       </template>
-    </UDashboardPanel>
+    </CommonDetailPage>
     <AccountReceivableCancelModal v-model:open="cancelOpen" :record-id="accountReceivableId" @cancelled="refreshPage" />
     <AccountReceivableCreateModal v-if="receivable" v-model:open="adjustmentOpen" :agreement-id="agreementId" :adjustment="receivable" @created="adjustmentCreated" />
     <AccountReceivableCreditMemoCreateModal v-if="receivable" v-model:open="creditMemoOpen" :context="{ egcs_fc_receivable: accountReceivableId, egcs_fc_applicantrecipient: receivable.egcs_fc_applicantrecipient, egcs_fc_debtorname_en: receivable.egcs_fc_debtorname_en, egcs_fc_debtorname_fr: receivable.egcs_fc_debtorname_fr, egcs_fc_agency: receivable.egcs_fc_statusagency, egcs_fc_currency: receivable.egcs_fc_currency }" @created="creditMemoCreated" />

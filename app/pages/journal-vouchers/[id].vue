@@ -24,7 +24,7 @@ const { sendJson } = useJsonRequest()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const id = String(route.params.id)
 const isHeroCollapsed = getHeroCollapsed('journal-voucher-detail')
-const selectedTab: Ref<string> = ref('entry')
+
 const refreshKey: Ref<number> = ref(0)
 const saving: Ref<boolean> = ref(false)
 const { data: voucher, error, status, refresh } = useFetch<JournalVoucherDetail, FetchError, string>(`/api/journal-vouchers/${id}`)
@@ -58,6 +58,7 @@ const tabs = [
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
   { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users' }
 ]
+const { selectedTab } = useUrlTabState({ tabs, defaultTab: 'entry' })
 const original = computed(() => voucher.value?.egcs_fc_lines.filter(line => line.egcs_fc_kind === 'original') ?? [])
 const canEditAllocations = computed(() => Boolean(voucher.value?.egcs_fc_canedit && !voucher.value.egcs_fc_reversalof) && !saving.value)
 const allocationModal = useCrudModal<JournalVoucherAllocationDraft, JournalVoucherAllocationDraft>({
@@ -187,25 +188,10 @@ const applyAllocation = (line: JournalVoucherAllocationDraft) => {
     <div v-else-if="!voucher && status === 'pending'" role="status" aria-live="polite" class="p-6">
       {{ t('common.loading_records') }}
     </div>
-    <UDashboardPanel v-if="voucher && !error" id="journal-voucher-detail" class="w-full">
-      <template #header>
-        <UDashboardNavbar>
-          <template #leading>
-            <UDashboardSidebarCollapse /><UBreadcrumb :items="breadcrumbs" class="ml-2" />
-          </template>
-          <template #right>
-            <div class="flex items-center gap-2">
-              <UButton color="neutral" variant="ghost" :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'" :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')" @click="isHeroCollapsed = !isHeroCollapsed" /><CommonNavbarSide />
-            </div>
-          </template>
-        </UDashboardNavbar>
-      </template>
+    <CommonDetailPage v-if="voucher && !error" id="journal-voucher-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbs" class="w-full">
       <template #body>
         <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-book-open-check" :title="`${t('journal_voucher.number')} ${voucher.egcs_fc_number}`" :meta-items="[voucher.egcs_fc_agreementnumber, voucher.egcs_fc_fiscalyeardisplay, voucher.egcs_fc_currency.toUpperCase()]" :badges="[{ statusId: voucher.egcs_fc_status, isCompleted: voucher.isCompleted }]" />
-        <CommonEntityEditorWorkspace content-test-id="journal-voucher-detail-content">
-          <template #sidebar>
-            <CommonRouteTabs v-model="selectedTab" :items="tabs" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
-          </template>
+        <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="journal-voucher-detail-content">
           <UForm
             v-if="selectedTab === 'entry' && state"
             :state="state"
@@ -369,9 +355,9 @@ const applyAllocation = (line: JournalVoucherAllocationDraft) => {
           <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" entity-type="fundingcasejournalvoucher" :entity-id="id" />
           <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcasejournalvoucher" :entity-id="id" />
           <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" entity-type="fundingcasejournalvoucher" :entity-id="id" />
-        </CommonEntityEditorWorkspace>
+        </CommonDetailWorkspace>
       </template>
-    </UDashboardPanel>
+    </CommonDetailPage>
     <JournalVoucherAllocationModal
       v-if="voucher && state" v-model:open="allocationModal.isOpen.value" v-model="allocationModal.selected.value"
       :voucher-id="id" :currency="voucher.egcs_fc_currency" :original="original" :editing="isEditingAllocation" @save="applyAllocation" />

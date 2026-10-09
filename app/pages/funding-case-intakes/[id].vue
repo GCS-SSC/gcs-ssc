@@ -27,7 +27,7 @@ const { data: profile, error, status, refresh } = await useFetch<Intake, Error, 
 usePageResourceError({ identity: () => route.path, errors: [error], pending: () => status.value === 'pending', hasContent: () => Boolean(profile.value) })
 const { isAssigned } = useEntityAssignmentRoster('fundingcaseintake', id)
 const isHeroCollapsed = getHeroCollapsed('funding-case-intake-detail')
-const selectedTab = ref(['attachments', 'application'].includes(String(route.query.tab)) ? String(route.query.tab) : 'general')
+
 const tabs = computed(() => [
   { key: 'funding_case_intake.details', value: 'general', icon: 'i-lucide-file-text' },
   { key: 'submitted_application.menu', value: 'application', icon: 'i-lucide-file-check' },
@@ -38,6 +38,7 @@ const tabs = computed(() => [
   { key: 'funding_case_intake.approval_submission', value: 'approval', icon: 'i-lucide-send' },
   { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users-round' }
 ])
+const { selectedTab } = useUrlTabState({ tabs, defaultTab: String(route.query.section ?? route.query.tab ?? 'general') })
 const scope = computed(() => profile.value && ({
   type: 'entity' as const, agencyId: String(profile.value.agency_id),
   path: [{ type: 'transfer_payment' as const, id: String(profile.value.program_id) }]
@@ -63,20 +64,7 @@ const breadcrumbs = computed(() => [
 </script>
 
 <template>
-  <UDashboardPanel id="funding-case-intake-detail">
-    <template #header>
-      <UDashboardNavbar>
-        <template #leading>
-          <UDashboardSidebarCollapse /><UBreadcrumb :items="breadcrumbs" class="ml-2" />
-        </template>
-        <template #right>
-          <div class="flex items-center gap-2">
-            <UButton color="neutral" variant="ghost" :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'" :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')" @click="isHeroCollapsed = !isHeroCollapsed" />
-            <CommonNavbarSide />
-          </div>
-        </template>
-      </UDashboardNavbar>
-    </template>
+  <CommonDetailPage id="funding-case-intake-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbs">
     <template #body>
       <div v-if="status === 'pending' && !profile" role="status" class="p-6">
         {{ t('common.loading_records') }}
@@ -88,10 +76,7 @@ const breadcrumbs = computed(() => [
       </UAlert>
       <div v-else-if="profile" class="flex flex-1 flex-col">
         <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-inbox" :title="`${t('funding_case_intake.singular')} ${profile.id}`" :meta-items="[`${t('funding_case_intake.opportunity')}: ${getBilingualValue(profile, 'opportunity_name', profile.egcs_fi_fundingopportunity)}`, `${t('funding_case_intake.proponent')}: ${getBilingualValue(profile, 'proponent_name', profile.egcs_fi_applicantrecipient)}`]" :badges="[{ statusId: profile.egcs_fi_status }]" :actions="[{ label: t('common.delete'), icon: 'i-lucide-trash', visible: canDelete, onClick: remove }]" />
-        <CommonEntityEditorWorkspace content-test-id="funding-case-intake-detail-content">
-          <template #sidebar>
-            <CommonRouteTabs v-model="selectedTab" :items="tabs" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
-          </template>
+        <CommonDetailWorkspace v-model="selectedTab" content-test-id="funding-case-intake-detail-content" :items="tabs">
           <CommonSection v-if="selectedTab === 'general'" :title="t('funding_case_intake.details')" :grid-cols="1">
             <dl class="grid gap-4 md:grid-cols-2">
               <div>
@@ -123,8 +108,8 @@ const breadcrumbs = computed(() => [
           <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" entity-type="fundingcaseintake" :entity-id="id" />
           <CommonWorkflowSection v-else-if="selectedTab === 'approval'" entity-type="fundingcaseintake" :entity-id="id" purpose="approval_submission" :can-edit="canEdit" @changed="refresh" />
           <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" entity-type="fundingcaseintake" :entity-id="id" />
-        </CommonEntityEditorWorkspace>
+        </CommonDetailWorkspace>
       </div>
     </template>
-  </UDashboardPanel>
+  </CommonDetailPage>
 </template>

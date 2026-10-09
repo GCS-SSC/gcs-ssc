@@ -1,3 +1,4 @@
+import { assertAgreementFinancialId } from '~~/server/utils/agreement-financial-ids'
 import { assertAgreementProponentType } from '~~/server/utils/agreement-proponent-type'
 import { resolveAgreementNumberProvider, generateAgreementNumber } from '~~/server/utils/agreement-number-provider'
 import { mergeAgreementCustomFields } from '~~/server/utils/agreement-custom-fields'
@@ -141,6 +142,8 @@ export default defineEventHandler(async event => {
           }
 
           for (const [index, relationship] of validated.egcs_fc_applicantrecipients.entries()) {
+            await assertAgreementFinancialId(event, trx, streamId, relationship.egcs_fc_applicantrecipient,
+              relationship.egcs_fc_agencyfinancialid, ['egcs_fc_applicantrecipients', index, 'egcs_fc_agencyfinancialid'])
             await assertAgreementProponentType(event, trx, streamId, relationship.egcs_fc_applicantrecipient,
               relationship.egcs_fc_applicantrecipientsubtype, ['egcs_fc_applicantrecipients', index, 'egcs_fc_applicantrecipientsubtype'])
           }

@@ -1,3 +1,4 @@
+import { assertAgreementFinancialId } from './agreement-financial-ids'
 import { assertAgreementProponentType } from './agreement-proponent-type'
 import { captureParsedAuditRequestBody } from './audit-request'
 import { mergeAgreementCustomFields } from './agreement-custom-fields'
@@ -255,9 +256,12 @@ const patchValidatedAgreementProfile = async (
   }
   if (streamChanged) {
     const relationships = await db.selectFrom('Funding_Case_Agreement_Applicant_Recipient')
-      .select(['egcs_fc_applicantrecipient', 'egcs_fc_applicantrecipientsubtype'])
+      .select(['egcs_fc_applicantrecipient', 'egcs_fc_applicantrecipientsubtype', 'egcs_fc_agencyfinancialid'])
       .where('egcs_fc_fundingagreement', '=', agreementId).where('_deleted', '=', false).execute()
     for (const relationship of relationships) {
+      if (relationship.egcs_fc_agencyfinancialid) await assertAgreementFinancialId(event, db, nextStreamId,
+        relationship.egcs_fc_applicantrecipient, relationship.egcs_fc_agencyfinancialid, ['egcs_fc_transferpaymentstream'],
+        { preserveSavedId: true })
       if (relationship.egcs_fc_applicantrecipientsubtype) await assertAgreementProponentType(event, db, nextStreamId,
         relationship.egcs_fc_applicantrecipient, relationship.egcs_fc_applicantrecipientsubtype, ['egcs_fc_transferpaymentstream'])
     }

@@ -25,7 +25,8 @@ export default defineEventHandler(async event => {
   const values: Insertable<ApplicantRecipientAgencyFinancialIdTable> = {
     egcs_ar_applicantrecipient: applicantRecipientId,
     egcs_ar_agency: validated.egcs_ar_agency ?? null,
-    egcs_ar_financialsystemid: validated.egcs_ar_financialsystemid
+    egcs_ar_financialsystemid: validated.egcs_ar_financialsystemid,
+    egcs_ar_active: validated.egcs_ar_active
   }
 
   try {
@@ -60,7 +61,8 @@ export default defineEventHandler(async event => {
           .returning([
             'Applicant_Recipient_Agency_Financial_Id.id as id',
             'Applicant_Recipient_Agency_Financial_Id.egcs_ar_agency as egcs_ar_agency',
-            'Applicant_Recipient_Agency_Financial_Id.egcs_ar_financialsystemid as egcs_ar_financialsystemid'
+            'Applicant_Recipient_Agency_Financial_Id.egcs_ar_financialsystemid as egcs_ar_financialsystemid',
+            'Applicant_Recipient_Agency_Financial_Id.egcs_ar_active as egcs_ar_active'
           ])
           .executeTakeFirstOrThrow()
       }

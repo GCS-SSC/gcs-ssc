@@ -188,6 +188,7 @@ export type ApplicantRecipientRegistryPatch = z.infer<typeof ApplicantRecipientR
 export type ApplicantRecipientRegistryItem = WithId<ApplicantRecipientRegistry>
 
 export const ApplicantRecipientAgencyFinancialIdBaseSchema = z.object({
+  egcs_ar_active: z.boolean({ error: 'validation.required' }).default(true),
   egcs_ar_agency: z.union([z.string(), z.number()]).optional()
     .transform(value => value === undefined ? undefined : String(value).trim())
     .refine(value => value === undefined || value.length > 0, { error: 'validation.id_required' }).meta({ formRequired: false }),
@@ -202,7 +203,9 @@ export const ApplicantRecipientAgencyFinancialIdBaseSchema = z.object({
 })
 
 export const ApplicantRecipientAgencyFinancialIdCreateSchema = ApplicantRecipientAgencyFinancialIdBaseSchema
-export const ApplicantRecipientAgencyFinancialIdPatchSchema = ApplicantRecipientAgencyFinancialIdBaseSchema.partial().superRefine(() => undefined)
+export const ApplicantRecipientAgencyFinancialIdPatchSchema = ApplicantRecipientAgencyFinancialIdBaseSchema.partial().extend({
+  egcs_ar_active: z.boolean({ error: 'validation.required' }).optional()
+}).superRefine(() => undefined)
 
 export type ApplicantRecipientAgencyFinancialId = z.infer<typeof ApplicantRecipientAgencyFinancialIdCreateSchema>
 export type ApplicantRecipientAgencyFinancialIdPatch = z.infer<typeof ApplicantRecipientAgencyFinancialIdPatchSchema>

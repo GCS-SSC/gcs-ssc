@@ -37,6 +37,7 @@ CREATE TABLE "Applicant_Recipient_Agency_Financial_Id" (
   "egcs_ar_applicantrecipient" bigint NOT NULL,
   "egcs_ar_agency" bigint,
   "egcs_ar_financialsystemid" bigint NOT NULL,
+  "egcs_ar_active" boolean DEFAULT true NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Applicant_Recipient_Agency_Financial_Id_pkey" PRIMARY KEY (id)
 );
@@ -191,6 +192,21 @@ END $baseline$`.execute(db)
 /** Installs the current installFunctions definitions for this subject on a fresh database. */
 export const installFunctions = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
+CREATE FUNCTION guard_financial_id_identity()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+    BEGIN
+      IF (NEW.egcs_ar_agency, NEW.egcs_ar_applicantrecipient, NEW.egcs_ar_financialsystemid)
+        IS DISTINCT FROM (OLD.egcs_ar_agency, OLD.egcs_ar_applicantrecipient, OLD.egcs_ar_financialsystemid)
+        AND EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Applicant_Recipient" relationship
+          WHERE relationship.egcs_fc_agencyfinancialid = OLD.id) THEN
+        RAISE EXCEPTION 'Referenced financial ID identity must be retained until Agreement selections are moved'
+          USING ERRCODE = '23514', CONSTRAINT = 'financial_id_identity_in_use';
+      END IF;
+      RETURN NEW;
+    END $function$;
+
 CREATE FUNCTION trg_fn_enforce_funding_history_recipient_roster()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -309,6 +325,8 @@ END $baseline$`.execute(db)
 /** Installs the current installTriggers definitions for this subject on a fresh database. */
 export const installTriggers = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
+CREATE TRIGGER guard_financial_id_identity BEFORE UPDATE OF egcs_ar_agency, egcs_ar_applicantrecipient, egcs_ar_financialsystemid ON "Applicant_Recipient_Agency_Financial_Id" FOR EACH ROW EXECUTE FUNCTION guard_financial_id_identity();
+
 CREATE CONSTRAINT TRIGGER trg_enforce_funding_history_recipient_roster_from_history AFTER INSERT OR DELETE OR UPDATE ON "Applicant_Recipient_Funding_History" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_enforce_funding_history_recipient_roster();
 
 CREATE CONSTRAINT TRIGGER trg_enforce_funding_history_recipient_roster_from_recipient AFTER INSERT OR DELETE OR UPDATE ON "Applicant_Recipient_Funding_History_Recipient" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_enforce_funding_history_recipient_roster();

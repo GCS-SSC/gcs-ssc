@@ -284,27 +284,7 @@ const save = async (submit: boolean) => {
 </script>
 
 <template>
-  <QuestionnaireRuntimeShell :embedded="embedded" :panel-id="configuration.panelId">
-    <template #header>
-      <UDashboardNavbar>
-        <template #leading>
-          <UDashboardSidebarCollapse />
-          <UBreadcrumb :items="breadcrumbItems" class="ml-2" />
-        </template>
-        <template #right>
-          <div class="flex items-center gap-2">
-            <UButton
-              color="neutral"
-              variant="ghost"
-              :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
-              :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')"
-              @click="isHeroCollapsed = !isHeroCollapsed" />
-            <CommonNavbarSide />
-          </div>
-        </template>
-      </UDashboardNavbar>
-    </template>
-
+  <QuestionnaireRuntimeShell v-model:collapsed="isHeroCollapsed" :embedded="embedded" :panel-id="configuration.panelId" :breadcrumb-items="breadcrumbItems">
     <template #default>
       <div v-if="data" class="flex flex-1 flex-col">
         <CommonEntityHero

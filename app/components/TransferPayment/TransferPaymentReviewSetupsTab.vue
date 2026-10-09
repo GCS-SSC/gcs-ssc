@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useDetailSectionOwnership } from '~/composables/useDetailSectionOwnership'
 import { ref } from 'vue'
 import type { Ref } from 'vue'
 import { z } from 'zod'
@@ -24,6 +25,7 @@ type ReviewSetLink = {
   publicationState: 'draft' | 'published' | 'retired'
 }
 const { t } = useI18n()
+const ownsHeading = useDetailSectionOwnership(() => t('transfer_payment.review_setups'))
 const localePath = useLocalePath()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
@@ -94,7 +96,7 @@ const removeLink = async (link: ReviewSetLink) => {
 <template>
   <section class="space-y-4">
     <div class="flex items-center justify-between gap-3">
-      <h2 class="text-lg font-semibold">
+      <h2 v-if="!ownsHeading" class="text-lg font-semibold">
         {{ t('transfer_payment.review_setups') }}
       </h2>
       <UButton v-if="canUpdateChild && agencyId" icon="i-lucide-link" :label="t('common.add')" @click="openLink" />

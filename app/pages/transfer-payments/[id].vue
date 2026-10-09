@@ -109,27 +109,7 @@ const updateProfile = async () => {
         <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" :loading="isLoadingProfile" @click="() => refreshProfile()" />
       </template>
     </UAlert>
-    <UDashboardPanel v-if="profile" id="transfer-payment-detail" class="w-full">
-      <template #header>
-        <UDashboardNavbar>
-          <template #leading>
-            <UDashboardSidebarCollapse />
-            <UBreadcrumb :items="breadcrumbItems" class="ml-2" />
-          </template>
-          <template #right>
-            <div class="flex items-center gap-2">
-              <UButton
-                color="neutral"
-                variant="ghost"
-                :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
-                :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')"
-                @click="isHeroCollapsed = !isHeroCollapsed" />
-              <CommonNavbarSide />
-            </div>
-          </template>
-        </UDashboardNavbar>
-      </template>
-
+    <CommonDetailPage v-if="profile" id="transfer-payment-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" class="w-full">
       <template #body>
         <div class="flex flex-1 flex-col">
           <CommonEntityHero
@@ -144,32 +124,16 @@ const updateProfile = async () => {
               onClick: openUpdateProfile
             }]" />
 
-          <div class="flex min-h-0 flex-1 flex-col gap-6 overflow-visible px-6 pt-0 pb-6 lg:flex-row lg:gap-0">
-            <aside class="w-full shrink-0 lg:w-72 lg:border-r lg:border-zinc-200 lg:pr-4 dark:lg:border-zinc-800">
-              <div class="pt-6">
-                <CommonRouteTabs
-                  v-model="selectedTab"
-                  :items="tabs"
-                  orientation="vertical"
-                  :ui="{
-                    root: 'w-full',
-                    list: 'w-full flex-col items-stretch p-0',
-                    trigger: 'w-full justify-start'
-                  }" />
-              </div>
-            </aside>
-
-            <div class="min-h-0 min-w-0 flex-1 overflow-visible pt-6 lg:pl-6">
-              <component
-                :is="activeTabComponent"
-                v-if="activeTabComponent"
-                v-bind="activeTabProps"
-                @outcomes-updated="handleOutcomesUpdated" />
-            </div>
-          </div>
+          <CommonDetailWorkspace v-model="selectedTab" :items="tabs">
+            <component
+              :is="activeTabComponent"
+              v-if="activeTabComponent"
+              v-bind="activeTabProps"
+              @outcomes-updated="handleOutcomesUpdated" />
+          </CommonDetailWorkspace>
         </div>
       </template>
-    </UDashboardPanel>
+    </CommonDetailPage>
 
     <TransferPaymentModal
       v-if="selectedProfile"

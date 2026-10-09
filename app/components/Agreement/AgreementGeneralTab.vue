@@ -64,7 +64,7 @@ const displayValue = (value: string | number | boolean | null | undefined) => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-5xl space-y-8 py-4">
+  <div class="space-y-8">
     <CommonSection :title="t('agreement.sections.classification')" badge="01">
       <CommonValueCard :label="t('agreement.agency')" :value="getBilingualValue(profile, 'agency_name', '-')" />
       <CommonValueCard :label="t('agreement.program')" :value="getBilingualValue(profile, 'program_name', '-')" />

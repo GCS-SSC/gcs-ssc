@@ -25,7 +25,7 @@ const { getBilingualValue } = useBilingualValue()
 const { getHeroCollapsed } = useDashboard()
 const agreementId = route.params.id as string
 const closeoutId = route.params.closeoutId as string
-const selectedTab: Ref<string> = ref('workflow')
+
 const isHeroCollapsed = getHeroCollapsed('agreement-closeout-detail')
 const { isAssigned } = useEntityAssignmentRoster('fundingcaseagreementcloseout', closeoutId)
 const { isRecordLocked, isTerminalStatus } = useBusinessStatusState()
@@ -87,30 +87,11 @@ const tabs = [
   { key: 'agreement.closeout.snapshot_history', value: 'snapshots', icon: 'i-lucide-shield-check' },
   { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users' }
 ]
+const { selectedTab } = useUrlTabState({ tabs, defaultTab: 'workflow' })
 </script>
 
 <template>
-  <UDashboardPanel id="agreement-closeout-detail" class="w-full">
-    <template #header>
-      <UDashboardNavbar>
-        <template #leading>
-          <UDashboardSidebarCollapse />
-          <UBreadcrumb :items="breadcrumbs" class="ml-2" />
-        </template>
-        <template #right>
-          <div class="flex items-center gap-2">
-            <UButton
-              class="cursor-default"
-              color="neutral"
-              variant="ghost"
-              :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
-              :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')"
-              @click="isHeroCollapsed = !isHeroCollapsed" />
-            <CommonNavbarSide />
-          </div>
-        </template>
-      </UDashboardNavbar>
-    </template>
+  <CommonDetailPage id="agreement-closeout-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbs" class="w-full">
     <template #body>
       <div v-if="hasLoadError" class="p-6">
         <UAlert color="error" icon="i-lucide-circle-alert" :title="t('agreement.closeout.load_failed')" :description="t('common.resource_table_load_failed_description')">
@@ -132,15 +113,7 @@ const tabs = [
             isCompleted: closeout.isCompleted
           }]" />
 
-        <CommonEntityEditorWorkspace content-test-id="agreement-closeout-detail-content">
-          <template #sidebar>
-            <CommonRouteTabs
-              v-model="selectedTab"
-              :items="tabs"
-              orientation="vertical"
-              :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
-          </template>
-
+        <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="agreement-closeout-detail-content">
           <section v-if="selectedTab === 'workflow'" class="space-y-6">
             <CommonCompletionWorkflowPreAction
               mode="completion"
@@ -177,9 +150,6 @@ const tabs = [
             :entity-id="closeoutId" />
 
           <section v-else-if="selectedTab === 'documents'" class="space-y-6">
-            <h2 class="text-lg font-semibold">
-              {{ t('agreement.documents.title') }}
-            </h2>
             <AgreementCloseoutDocuments
               :agreement-id="agreementId"
               :closeout-id="closeoutId"
@@ -188,9 +158,6 @@ const tabs = [
 
           <section v-else-if="selectedTab === 'snapshots'" class="space-y-6">
             <div>
-              <h2 class="text-lg font-semibold">
-                {{ t('agreement.closeout.snapshot_history') }}
-              </h2>
               <p class="text-sm text-zinc-500 dark:text-zinc-400">
                 {{ t('agreement.closeout.snapshot_history_help') }}
               </p>
@@ -215,12 +182,12 @@ const tabs = [
             v-else-if="selectedTab === 'assignments'"
             entity-type="fundingcaseagreementcloseout"
             :entity-id="closeoutId" />
-        </CommonEntityEditorWorkspace>
+        </CommonDetailWorkspace>
       </div>
 
       <div v-else-if="isLoading" class="flex flex-1 items-center justify-center p-8">
         <UIcon name="i-lucide-loader-circle" class="size-8 animate-spin text-primary" />
       </div>
     </template>
-  </UDashboardPanel>
+  </CommonDetailPage>
 </template>

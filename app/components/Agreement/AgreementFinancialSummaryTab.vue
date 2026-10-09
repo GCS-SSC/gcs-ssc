@@ -5,6 +5,8 @@ import { useAgreementOverview } from '~/composables/useAgreementOverview'
 import { compareMoney, formatMoneyText, moneyToCents, parseMoney, subtractMoney, sumMoney, type Money } from '~~/shared/utils/money'
 
 type MonthlyAmounts = [Money, Money, Money, Money, Money, Money, Money, Money, Money, Money, Money, Money]
+type QuarterKey = 'q1' | 'q2' | 'q3' | 'q4'
+type SummaryPeriod = { id: string, quarter: QuarterKey, months: number[], month: number | null }
 type Measure = 'forecast' | 'budget' | 'claimed' | 'reconciled'
 type RowType = Measure | 'payments'
 type FinancialLine = {
@@ -63,6 +65,12 @@ const MONTH_KEYS = ['apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec
 const MEASURES: Measure[] = ['forecast', 'budget', 'claimed', 'reconciled']
 const ROW_TYPES: RowType[] = [...MEASURES, 'payments']
 const MONTHS = Array.from({ length: 12 }, (_, index) => index)
+const QUARTERS: Array<{ key: QuarterKey, months: number[] }> = [
+  { key: 'q1', months: [0, 1, 2] },
+  { key: 'q2', months: [3, 4, 5] },
+  { key: 'q3', months: [6, 7, 8] },
+  { key: 'q4', months: [9, 10, 11] }
+]
 const ZERO_MONEY = parseMoney('0')
 const ROW_TONES: Record<RowType, { row: string, sticky: string, chip: string }> = {
   forecast: {
@@ -96,6 +104,7 @@ const { agreementId } = defineProps<{ agreementId: string }>()
 const { t, locale } = useI18n()
 const selectedYearId: Ref<string | null> = ref(null)
 const visibleRowTypes: Ref<RowType[]> = ref([...ROW_TYPES])
+const expandedQuarters: Ref<QuarterKey[]> = ref(QUARTERS.map(quarter => quarter.key))
 const allMode: Ref<boolean> = ref(true)
 const { overview, overviewStatus, refreshOverview } = useAgreementOverview<FinancialSummary>(
   computed(() => `/api/agreements/${agreementId}/financial-summary`)
@@ -103,6 +112,7 @@ const { overview, overviewStatus, refreshOverview } = useAgreementOverview<Finan
 
 watch(() => agreementId, () => {
   selectedYearId.value = null
+  expandedQuarters.value = QUARTERS.map(quarter => quarter.key)
   visibleRowTypes.value = [...ROW_TYPES]
   allMode.value = true
 }, { flush: 'sync' })
@@ -119,6 +129,27 @@ const fiscalYearOptions = computed(() => (overview.value?.fiscalYears ?? []).map
   label_fr: year.label
 })))
 const selectedYear = computed(() => overview.value?.fiscalYears.find(year => year.id === selectedYearId.value) ?? null)
+const visiblePeriods = computed<SummaryPeriod[]>(() => QUARTERS.flatMap<SummaryPeriod>(quarter =>
+  expandedQuarters.value.includes(quarter.key)
+    ? quarter.months.map(month => ({ id: `month:${month}`, quarter: quarter.key, months: [month], month }))
+    : [{ id: `quarter:${quarter.key}`, quarter: quarter.key, months: quarter.months, month: null }]
+))
+/**
+ * Toggles one quarter without changing the other visible periods.
+ * @param quarter - Fiscal quarter to expand or collapse.
+ */
+const toggleQuarter = (quarter: QuarterKey) => {
+  expandedQuarters.value = expandedQuarters.value.includes(quarter)
+    ? expandedQuarters.value.filter(key => key !== quarter)
+    : [...expandedQuarters.value, quarter]
+}
+const periodLabel = (period: SummaryPeriod): string => period.month === null
+  ? t(`agreement.forecasts.quarters.${period.quarter}`)
+  : monthLabel(period.month)
+const periodAmount = (amounts: MonthlyAmounts | undefined | null, period: SummaryPeriod): Money | null =>
+  amounts ? sumMoney(period.months.map(month => amounts[month] ?? ZERO_MONEY)) : null
+const linePeriodAmount = (line: FinancialLine, measure: Measure, period: SummaryPeriod): Money | null =>
+  measure === 'budget' ? null : periodAmount(line[measure], period)
 const visibleMeasures = computed(() => MEASURES.filter(measure => visibleRowTypes.value.includes(measure)))
 const showPayments = computed(() => visibleRowTypes.value.includes('payments'))
 /**
@@ -156,8 +187,6 @@ const lineName = (line: FinancialLine): string => locale.value === 'fr'
 const categoryName = (line: FinancialLine): string => locale.value === 'fr'
   ? line.categoryNameFr || line.categoryNameEn
   : line.categoryNameEn || line.categoryNameFr
-const monthAmount = (line: FinancialLine, measure: Measure, month: number): Money | null =>
-  measure === 'budget' ? null : line[measure]?.[month] ?? null
 const yearAmount = (line: FinancialLine, measure: Measure): Money | null =>
   measure === 'budget' ? line.budget : line[measure] ? sumMoney(line[measure]) : null
 const displayMonthlyAmount = (value: Money | null, currency: string): string =>
@@ -168,8 +197,8 @@ const recoveryBreakdown = (line: FinancialLine) => line.accountReceivableRecover
   ? [{ key: 'original_claimed', amounts: line.originalClaimed }, { key: 'original_reconciled', amounts: line.originalReconciled }, { key: 'ar_claim_recoveries', amounts: line.accountReceivableRecoveries }].filter(row => row.amounts)
   : []
 const paidYearTotal = (group: CurrencySummary): Money => sumMoney(group.paid)
-const paymentsInMonth = (group: CurrencySummary, month: number): FinancialPayment[] =>
-  group.payments.filter(payment => payment.month === month)
+const paymentsInPeriod = (group: CurrencySummary, period: SummaryPeriod): FinancialPayment[] =>
+  group.payments.filter(payment => period.months.includes(payment.month))
 const paymentPeriod = (payment: FinancialPayment): string =>
   `${monthLabel(payment.periodStart)}–${monthLabel(payment.periodEnd)}`
 const forecastSourceLabel = (source: FinancialYear['forecastSource']): string => {
@@ -504,22 +533,27 @@ const peakShare = (progress: FinancialProgress): string | null => {
             </caption>
             <thead class="text-muted">
               <tr class="bg-elevated">
-                <th scope="col" rowspan="2" class="sticky left-0 z-30 w-24 min-w-24 border-b border-default bg-elevated px-2 py-3 text-left font-medium sm:w-56 sm:min-w-56 sm:px-3">
+                <th scope="col" class="sticky left-0 z-30 w-24 min-w-24 border-b border-default bg-elevated px-2 py-3 text-left font-medium sm:w-56 sm:min-w-56 sm:px-3">
                   {{ t('agreement.financial_summary.budget_line') }}
                 </th>
-                <th scope="col" rowspan="2" class="sticky left-24 z-30 w-20 min-w-20 border-b border-default bg-elevated px-2 py-3 text-left text-xs font-medium sm:left-56 sm:w-28 sm:min-w-28 sm:px-3 sm:text-sm">
+                <th scope="col" class="sticky left-24 z-30 w-20 min-w-20 border-b border-default bg-elevated px-2 py-3 text-left text-xs font-medium sm:left-56 sm:w-28 sm:min-w-28 sm:px-3 sm:text-sm">
                   {{ t('agreement.financial_summary.measure') }}
                 </th>
-                <th v-for="quarter in 4" :key="quarter" scope="colgroup" colspan="3" class="border-b border-l border-default px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide">
-                  {{ t(`agreement.forecasts.quarters.q${quarter}`) }}
+                <th v-for="period in visiblePeriods" :key="period.id" scope="col" class="min-w-32 border-b border-l border-default px-3 py-2 text-right">
+                  <button
+                    type="button"
+                    :class="period.month === null
+                      ? 'inline-flex items-center gap-2 rounded-sm bg-primary px-3 py-1.5 text-sm font-semibold text-white'
+                      : 'group inline-flex items-center gap-2 rounded-sm border border-transparent px-2 py-1 text-xs font-semibold tracking-wide text-zinc-500 uppercase transition-colors hover:border-primary/30 hover:text-primary dark:text-zinc-400'"
+                    :aria-label="`${periodLabel(period)} ${t(period.month === null ? 'common.expand' : 'common.collapse')}`"
+                    :aria-expanded="period.month !== null"
+                    @click="toggleQuarter(period.quarter)">
+                    {{ periodLabel(period) }}
+                    <UIcon :name="period.month === null ? 'i-lucide-between-horizontal-start' : 'i-lucide-between-horizontal-end'" class="size-4" />
+                  </button>
                 </th>
-                <th scope="col" rowspan="2" class="min-w-36 border-b border-l border-default px-3 py-3 text-right font-medium">
+                <th scope="col" class="min-w-36 border-b border-l border-default px-3 py-3 text-right font-medium">
                   {{ t('agreement.financial_summary.year_total') }}
-                </th>
-              </tr>
-              <tr class="bg-elevated">
-                <th v-for="month in MONTHS" :key="month" scope="col" class="min-w-32 border-b border-l border-default px-3 py-2 text-right text-xs font-medium uppercase tracking-wide">
-                  {{ monthLabel(month) }}
                 </th>
               </tr>
             </thead>
@@ -533,12 +567,12 @@ const peakShare = (progress: FinancialProgress): string | null => {
                 <th scope="row" class="sticky left-24 z-20 w-20 min-w-20 break-words border-t border-default px-2 py-2 text-left text-[11px] font-semibold sm:left-56 sm:w-28 sm:min-w-28 sm:px-3 sm:text-xs" :class="ROW_TONES[measure].sticky">
                   {{ t(`agreement.financial_summary.measures.${measure}`) }}
                 </th>
-                <td v-for="month in MONTHS" :key="month" class="border-t border-l border-default px-3 py-2 text-right tabular-nums" :class="measure === 'budget' ? 'text-muted' : 'text-highlighted'">
-                  <span v-if="monthAmount(line, measure, month) === ZERO_MONEY">
+                <td v-for="period in visiblePeriods" :key="period.id" :data-month="period.month" :data-quarter="period.month === null ? period.quarter : undefined" class="border-t border-l border-default px-3 py-2 text-right tabular-nums" :class="measure === 'budget' ? 'text-muted' : 'text-highlighted'">
+                  <span v-if="linePeriodAmount(line, measure, period) === ZERO_MONEY">
                     <span aria-hidden="true">{{ t('agreement.financial_summary.not_allocated_short') }}</span>
                     <span class="sr-only">{{ formatMoney(ZERO_MONEY, group.currency) }}</span>
                   </span>
-                  <span v-else>{{ displayMonthlyAmount(monthAmount(line, measure, month), group.currency) }}</span>
+                  <span v-else>{{ displayMonthlyAmount(linePeriodAmount(line, measure, period), group.currency) }}</span>
                 </td>
                 <td class="border-t border-l border-default px-3 py-2 text-right font-semibold tabular-nums text-highlighted">
                   {{ displayYearAmount(yearAmount(line, measure), group.currency) }}
@@ -548,8 +582,8 @@ const peakShare = (progress: FinancialProgress): string | null => {
                 <th scope="row" colspan="2" class="sticky left-0 z-20 border-t border-default bg-default px-3 py-2 text-left text-xs font-medium text-muted">
                   {{ t(`agreement.financial_summary.${breakdown.key}`) }}
                 </th>
-                <td v-for="month in MONTHS" :key="month" class="border-t border-l border-default px-3 py-2 text-right tabular-nums text-muted">
-                  {{ displayMonthlyAmount(breakdown.amounts?.[month] ?? ZERO_MONEY, group.currency) }}
+                <td v-for="period in visiblePeriods" :key="period.id" :data-month="period.month" :data-quarter="period.month === null ? period.quarter : undefined" class="border-t border-l border-default px-3 py-2 text-right tabular-nums text-muted">
+                  {{ displayMonthlyAmount(periodAmount(breakdown.amounts, period), group.currency) }}
                 </td>
                 <td class="border-t border-l border-default px-3 py-2 text-right font-semibold tabular-nums">
                   {{ formatMoney(sumMoney(breakdown.amounts ?? []), group.currency) }}
@@ -558,7 +592,7 @@ const peakShare = (progress: FinancialProgress): string | null => {
             </tbody>
             <tbody v-if="group.lines.length === 0 && visibleMeasures.length > 0">
               <tr>
-                <td colspan="15" class="px-4 py-8 text-center text-muted">
+                <td :colspan="visiblePeriods.length + 3" class="px-4 py-8 text-center text-muted">
                   {{ t('agreement.financial_summary.no_lines') }}
                 </td>
               </tr>
@@ -569,14 +603,14 @@ const peakShare = (progress: FinancialProgress): string | null => {
                   <span class="block font-semibold text-highlighted">{{ t('agreement.financial_summary.payments') }}</span>
                   <span class="block text-xs font-normal text-muted">{{ t('agreement.financial_summary.lump_sum_note') }}</span>
                 </th>
-                <td v-for="month in MONTHS" :key="month" class="border-t-2 border-l border-default px-3 py-3 text-right align-top tabular-nums">
-                  <span class="font-semibold text-highlighted">{{ displayMonthlyAmount(group.paid[month] as Money, group.currency) }}</span>
-                  <details v-if="paymentsInMonth(group, month).length > 0" class="mt-1 text-left text-xs text-muted">
+                <td v-for="period in visiblePeriods" :key="period.id" :data-month="period.month" :data-quarter="period.month === null ? period.quarter : undefined" class="border-t-2 border-l border-default px-3 py-3 text-right align-top tabular-nums">
+                  <span class="font-semibold text-highlighted">{{ displayMonthlyAmount(periodAmount(group.paid, period), group.currency) }}</span>
+                  <details v-if="paymentsInPeriod(group, period).length > 0" class="mt-1 text-left text-xs text-muted">
                     <summary class="cursor-pointer whitespace-nowrap">
-                      {{ t(paymentsInMonth(group, month).length === 1 ? 'agreement.financial_summary.payment_count_one' : 'agreement.financial_summary.payment_count', { count: paymentsInMonth(group, month).length }) }}
+                      {{ t(paymentsInPeriod(group, period).length === 1 ? 'agreement.financial_summary.payment_count_one' : 'agreement.financial_summary.payment_count', { count: paymentsInPeriod(group, period).length }) }}
                     </summary>
                     <ul class="mt-1 space-y-1">
-                      <li v-for="payment in paymentsInMonth(group, month)" :key="payment.id" class="whitespace-nowrap">
+                      <li v-for="payment in paymentsInPeriod(group, period)" :key="payment.id" class="whitespace-nowrap">
                         {{ paymentPeriod(payment) }}: {{ formatMoney(payment.amount, group.currency) }}
                       </li>
                     </ul>
@@ -596,8 +630,8 @@ const peakShare = (progress: FinancialProgress): string | null => {
                 <th scope="row" colspan="2" class="sticky left-0 z-20 border-t border-default bg-default px-3 py-3 text-left font-semibold">
                   {{ t(`agreement.financial_summary.${accounting.key}`) }}
                 </th>
-                <td v-for="month in MONTHS" :key="month" class="border-t border-l border-default px-3 py-3 text-right tabular-nums">
-                  {{ displayMonthlyAmount(accounting.amounts?.[month] ?? ZERO_MONEY, group.currency) }}
+                <td v-for="period in visiblePeriods" :key="period.id" :data-month="period.month" :data-quarter="period.month === null ? period.quarter : undefined" class="border-t border-l border-default px-3 py-3 text-right tabular-nums">
+                  {{ displayMonthlyAmount(periodAmount(accounting.amounts, period), group.currency) }}
                 </td>
                 <td class="border-t border-l border-default px-3 py-3 text-right font-bold tabular-nums">
                   {{ formatMoney(sumMoney(accounting.amounts ?? []), group.currency) }}

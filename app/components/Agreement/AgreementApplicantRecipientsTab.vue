@@ -43,6 +43,7 @@ const columns: TableColumnInput<{ id: string } & Record<string, unknown>>[] = [
   { id: 'applicant_recipient_name', accessorKey: 'applicant_recipient_name_en', headerKey: 'agreement.applicant_recipients.applicant_recipient' },
   { id: 'lead_agency_name', accessorKey: 'lead_agency_name_en', headerKey: 'agreement.applicant_recipients.lead_agency' },
   { id: 'subtype', headerKey: 'agreement.applicant_recipients.type' },
+  { accessorKey: 'financial_system_id', headerKey: 'agreement.applicant_recipients.financial_id' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
 
@@ -141,6 +142,13 @@ const getApplicantRecipientLookupUrl = (state: FundingCaseAgreementApplicantReci
         v-model="(state as FundingCaseAgreementApplicantRecipientForm).egcs_fc_applicantrecipientsubtype"
         :proponent-id="(state as FundingCaseAgreementApplicantRecipientForm).egcs_fc_applicantrecipient"
         :agreement-id="agreementId"
+        :permission-action="state.id ? 'update' : 'create'" />
+      <AgreementFinancialIdField
+        :key="`${agreementId}:${state.id ?? 'create'}`"
+        v-model="(state as FundingCaseAgreementApplicantRecipientForm).egcs_fc_agencyfinancialid"
+        :proponent-id="(state as FundingCaseAgreementApplicantRecipientForm).egcs_fc_applicantrecipient"
+        :agreement-id="agreementId"
+        :relationship-id="state.id"
         :permission-action="state.id ? 'update' : 'create'" />
     </template>
   </CommonResourceCrud>

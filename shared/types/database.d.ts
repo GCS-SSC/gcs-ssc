@@ -980,6 +980,7 @@ export interface ApplicantRecipientAgencyFinancialIdTable {
   egcs_ar_applicantrecipient: string
   egcs_ar_agency?: string | null
   egcs_ar_financialsystemid: string
+  egcs_ar_active: Generated<boolean>
   _deleted: Generated<boolean>
 }
 
@@ -1529,6 +1530,7 @@ export interface FundingCaseAgreementApprovalSubmissionTable {
 }
 
 export interface FundingCaseAgreementApplicantRecipientTable {
+  egcs_fc_agencyfinancialid: string | null
   egcs_fc_applicantrecipientsubtype: string | null
   id: Generated<string>
   egcs_fc_fundingagreement: string

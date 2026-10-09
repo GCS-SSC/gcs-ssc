@@ -95,7 +95,7 @@ const isCancelling: Ref<boolean> = ref(false)
 const isRetryingLoad: Ref<boolean> = ref(false)
 const { recoveryFocusTarget, focusRecoveredContent } = useLoadRecoveryFocus()
 const approvalsRefreshKey: Ref<number> = ref(0)
-const selectedTab: Ref<string> = ref('reconciliation')
+
 const tabs = [
   { key: 'agreement.claims.reconcile_selected_title', value: 'reconciliation', icon: 'i-lucide-list-checks' },
   { key: 'agreement.claims.reconcile_completion.title', value: 'completion', icon: 'i-lucide-circle-check-big' },
@@ -105,6 +105,7 @@ const tabs = [
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
   { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users' }
 ]
+const { selectedTab } = useUrlTabState({ tabs, defaultTab: 'reconciliation' })
 
 const retryLoad = async () => {
   if (isRetryingLoad.value) return
@@ -292,27 +293,7 @@ const cancelReconciliation = async () => {
 </script>
 
 <template>
-  <UDashboardPanel id="claim-reconciliation-detail">
-    <template #header>
-      <UDashboardNavbar>
-        <template #leading>
-          <UDashboardSidebarCollapse />
-          <UBreadcrumb :items="breadcrumbItems" class="ml-2" />
-        </template>
-        <template #right>
-          <div class="flex items-center gap-2">
-            <UButton
-              color="neutral"
-              variant="ghost"
-              :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
-              :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')"
-              @click="isHeroCollapsed = !isHeroCollapsed" />
-            <CommonNavbarSide />
-          </div>
-        </template>
-      </UDashboardNavbar>
-    </template>
-
+  <CommonDetailPage id="claim-reconciliation-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems">
     <template #body>
       <div v-if="data" ref="recoveryFocusTarget" tabindex="-1" class="flex flex-1 flex-col outline-none">
         <CommonEntityHero
@@ -332,10 +313,7 @@ const cancelReconciliation = async () => {
             ...(data.is_primary ? [{ variant: 'meta' as const, label: t('assignments.primary') }] : [])
           ]" />
 
-        <CommonEntityEditorWorkspace content-test-id="claim-reconciliation-detail-content">
-          <template #sidebar>
-            <CommonRouteTabs v-model="selectedTab" :items="tabs" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
-          </template>
+        <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="claim-reconciliation-detail-content">
           <UAlert
             v-if="selectedTab === 'reconciliation' && !data.can_update"
             color="neutral"
@@ -421,7 +399,7 @@ const cancelReconciliation = async () => {
           <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" entity-type="fundingclaimreconcile" :entity-id="reconcileId" />
           <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingclaimreconcile" :entity-id="reconcileId" />
           <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" entity-type="fundingclaimreconcile" :entity-id="reconcileId" />
-        </CommonEntityEditorWorkspace>
+        </CommonDetailWorkspace>
       </div>
 
       <div v-else-if="status === 'pending'" class="flex flex-1 items-center justify-center p-8">
@@ -448,5 +426,5 @@ const cancelReconciliation = async () => {
         </UAlert>
       </div>
     </template>
-  </UDashboardPanel>
+  </CommonDetailPage>
 </template>

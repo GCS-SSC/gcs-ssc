@@ -244,20 +244,7 @@ const runMemberMutation: EditorMutationRunner = async request => {
 </script>
 
 <template>
-  <UDashboardPanel id="transfer-payment-recommendation-setup-detail">
-    <template #header>
-      <UDashboardNavbar>
-        <template #leading>
-          <UDashboardSidebarCollapse /><UBreadcrumb :items="breadcrumbItems" class="ml-2" />
-        </template><template #right>
-          <div class="flex items-center gap-2">
-            <UButton
-              color="neutral" variant="ghost" :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
-              :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')" class="cursor-default" @click="isHeroCollapsed = !isHeroCollapsed" /><CommonNavbarSide />
-          </div>
-        </template>
-      </UDashboardNavbar>
-    </template>
+  <CommonDetailPage id="transfer-payment-recommendation-setup-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems">
     <template #body>
       <div
         v-if="loadError"
@@ -372,5 +359,5 @@ const runMemberMutation: EditorMutationRunner = async request => {
         <AgencyRecommendationSetSchemaCreateModal v-if="schemaCreateState && canCreate" v-model:open="isSchemaCreateModalOpen" v-model:state="schemaCreateState" :recommendation-setup-id="setupId" :agency-id="agencyId" :mutation-pending="mutation.isPending.value" :run-mutation="runMemberMutation" @created="onSchemaCreated" />
       </div>
     </template>
-  </UDashboardPanel>
+  </CommonDetailPage>
 </template>

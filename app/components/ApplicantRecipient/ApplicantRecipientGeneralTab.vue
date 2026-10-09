@@ -22,7 +22,7 @@ const displayValue = (value: string | number | null | undefined) => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-5xl space-y-8 py-4">
+  <div class="space-y-8">
     <CommonSection :title="t('applicant_recipient.sections.classification')" badge="01">
       <CommonValueCard :label="t('applicant_recipient.status')" :value="statusLabel" />
       <CommonValueCard :label="t('applicant_recipient.lead_agency')" :value="getBilingualValue(profile, 'lead_agency_name', '-')" />

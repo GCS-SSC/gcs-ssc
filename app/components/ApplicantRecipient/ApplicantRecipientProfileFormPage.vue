@@ -6,14 +6,12 @@ const {
   submitLabel,
   cancelLabel,
   leadAgencyPermissionAction,
-  compact = false,
   pending = false,
   persistedProfile
 } = defineProps<{
   submitLabel: string
   cancelLabel: string
   leadAgencyPermissionAction: 'create' | 'update'
-  compact?: boolean
   pending?: boolean
   persistedProfile?: ApplicantRecipientProfileRow
 }>()
@@ -33,7 +31,7 @@ const onSubmit = () => {
 </script>
 
 <template>
-  <div :class="[compact ? 'mx-auto w-full max-w-7xl py-4' : 'w-full py-6']">
+  <div class="w-full">
     <UForm :state="model" :validate="validate" class="space-y-8" @submit="onSubmit">
       <ApplicantRecipientFieldsApplicantRecipientProfileFields
         v-model:model="model"

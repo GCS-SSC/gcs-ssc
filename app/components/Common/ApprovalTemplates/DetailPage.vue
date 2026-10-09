@@ -199,27 +199,7 @@ watch(selectedSection, value => {
 </script>
 
 <template>
-  <UDashboardPanel id="approval-template-detail">
-    <template #header>
-      <UDashboardNavbar>
-        <template #leading>
-          <UDashboardSidebarCollapse />
-          <UBreadcrumb :items="breadcrumbItems" class="ml-2" />
-        </template>
-        <template #right>
-          <div class="flex items-center gap-2">
-            <UButton
-              color="neutral"
-              variant="ghost"
-              :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
-              :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')"
-              @click="isHeroCollapsed = !isHeroCollapsed" />
-            <CommonNavbarSide />
-          </div>
-        </template>
-      </UDashboardNavbar>
-    </template>
-
+  <CommonDetailPage id="approval-template-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems">
     <template #body>
       <div class="flex flex-1 flex-col">
         <CommonApprovalTemplatesDetailHero
@@ -312,5 +292,5 @@ watch(selectedSection, value => {
         </CommonDesignTimeEditorShell>
       </div>
     </template>
-  </UDashboardPanel>
+  </CommonDetailPage>
 </template>

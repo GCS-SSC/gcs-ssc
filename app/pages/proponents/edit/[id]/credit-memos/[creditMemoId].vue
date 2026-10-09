@@ -138,24 +138,10 @@ const save = async () => {
     <div v-else-if="!creditMemo && status === 'pending'" role="status" aria-live="polite" class="flex min-h-32 items-center justify-center gap-2 text-sm text-muted">
       <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin" aria-hidden="true" /><span>{{ t('common.loading_records') }}</span>
     </div>
-    <UDashboardPanel v-if="creditMemo && state" id="proponent-credit-memo-detail" class="min-w-0 flex-1">
-      <template #header>
-        <UDashboardNavbar>
-          <template #leading>
-            <UDashboardSidebarCollapse /><UBreadcrumb :items="breadcrumbs" class="ml-2" />
-          </template><template #right>
-            <div class="flex items-center gap-2">
-              <UButton color="neutral" variant="ghost" :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'" :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')" @click="isHeroCollapsed = !isHeroCollapsed" /><CommonNavbarSide />
-            </div>
-          </template>
-        </UDashboardNavbar>
-      </template>
+    <CommonDetailPage v-if="creditMemo && state" id="proponent-credit-memo-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbs" class="min-w-0 flex-1">
       <template #body>
         <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-banknote-arrow-down" :title="reference" :meta-items="[getBilingualValue(creditMemo, 'egcs_fc_debtorname', t('common.not_available')), getBilingualValue(creditMemo, 'egcs_fc_agencyname', t('common.not_available')), creditMemo.egcs_fc_currency.toUpperCase()]" :badges="[{ statusId: creditMemo.egcs_fc_status }]" />
-        <CommonEntityEditorWorkspace content-test-id="proponent-credit-memo-detail-content">
-          <template #sidebar>
-            <CommonRouteTabs v-model="selectedTab" :items="tabs" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
-          </template>
+        <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="proponent-credit-memo-detail-content">
           <UForm v-if="selectedTab === 'summary'" :state="state" :validate="createValidator(AccountReceivableCreditMemoEditSchema)" class="space-y-8" @submit="save">
             <CommonSection :title="t('account_receivable.credit_memo_summary')" :grid-cols="1">
               <UFormField name="egcs_fc_receiveddate" :label="t('account_receivable.received_date')">
@@ -193,8 +179,8 @@ const save = async () => {
           <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" />
           <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" />
           <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" />
-        </CommonEntityEditorWorkspace>
+        </CommonDetailWorkspace>
       </template>
-    </UDashboardPanel>
+    </CommonDetailPage>
   </div>
 </template>

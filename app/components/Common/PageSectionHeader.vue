@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useDetailSectionOwnership } from '~/composables/useDetailSectionOwnership'
+
 const { title, icon, badge, buttonLabel, showButton, variant } = defineProps<{
   title: string
   icon?: string
@@ -9,13 +12,19 @@ const { title, icon, badge, buttonLabel, showButton, variant } = defineProps<{
 }>()
 
 defineEmits(['add'])
+const isOwnedHeading = useDetailSectionOwnership(() => title)
+const showHeading = computed(() => Boolean(badge) || !isOwnedHeading.value)
+const hasAction = computed(() => showButton !== false && Boolean(buttonLabel))
 </script>
 
 <template>
   <div
-    class="flex items-center justify-between group data-[variant=default]:border-default data-[variant=default]:rounded-xl data-[variant=default]:border data-[variant=default]:bg-white data-[variant=default]:shadow-sm data-[variant=default]:dark:bg-zinc-900/50 data-[variant=default]:p-4 data-[variant=ghost]:p-0"
-    :data-variant="variant || 'default'">
+    v-if="showHeading || hasAction"
+    class="flex items-center group data-[variant=default]:border-default data-[variant=default]:rounded-xl data-[variant=default]:border data-[variant=default]:bg-white data-[variant=default]:shadow-sm data-[variant=default]:dark:bg-zinc-900/50 data-[variant=default]:p-4 data-[variant=ghost]:p-0"
+    :class="showHeading ? 'justify-between' : 'justify-end'"
+    :data-variant="showHeading ? variant || 'default' : 'ghost'">
     <h3
+      v-if="showHeading"
       class="flex items-center gap-2 font-black tracking-widest uppercase text-sm text-zinc-900 dark:text-white">
       <div
         v-if="badge"
@@ -29,7 +38,7 @@ defineEmits(['add'])
       {{ title }}
     </h3>
     <UButton
-      v-if="showButton !== false && buttonLabel"
+      v-if="hasAction"
       :label="buttonLabel"
       icon="i-lucide-plus"
       class="rounded-lg"

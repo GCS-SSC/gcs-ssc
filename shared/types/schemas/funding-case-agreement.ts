@@ -89,7 +89,8 @@ const RequiredUniqueBigintSelectionIdsSchema = () => z.array(RequiredBigintSelec
 
 export const FundingCaseAgreementApplicantRecipientBaseSchema = z.object({
   egcs_fc_applicantrecipient: RequiredBigintSelectionId(),
-  egcs_fc_applicantrecipientsubtype: RequiredBigintSelectionId()
+  egcs_fc_applicantrecipientsubtype: RequiredBigintSelectionId(),
+  egcs_fc_agencyfinancialid: RequiredBigintSelectionId()
 })
 
 const RequiredProponentsSchema = () => z.array(FundingCaseAgreementApplicantRecipientBaseSchema, { error: 'validation.required' })

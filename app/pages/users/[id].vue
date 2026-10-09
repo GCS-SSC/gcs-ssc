@@ -219,27 +219,7 @@ const { tabs: routeTabs, selectedTab, activeTabComponent, activeTabProps } = use
 </script>
 
 <template>
-  <UDashboardPanel v-if="user" id="user-detail">
-    <template #header>
-      <UDashboardNavbar>
-        <template #leading>
-          <UDashboardSidebarCollapse />
-          <UBreadcrumb :items="breadcrumbItems" class="ml-2" />
-        </template>
-        <template #right>
-          <div class="flex items-center gap-2">
-            <UButton
-              color="neutral"
-              variant="ghost"
-              :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
-              :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')"
-              @click="isHeroCollapsed = !isHeroCollapsed" />
-            <CommonNavbarSide />
-          </div>
-        </template>
-      </UDashboardNavbar>
-    </template>
-
+  <CommonDetailPage v-if="user" id="user-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems">
     <template #body>
       <div class="flex flex-1 flex-col">
         <CommonEntityHero
@@ -252,30 +232,14 @@ const { tabs: routeTabs, selectedTab, activeTabComponent, activeTabProps } = use
           }]"
           :actions="heroActions" />
 
-        <div class="flex min-h-0 flex-1 flex-col gap-6 overflow-visible px-6 pt-0 pb-6 lg:flex-row lg:gap-0">
-          <aside class="w-full shrink-0 lg:w-72 lg:border-r lg:border-zinc-200 lg:pr-4 dark:lg:border-zinc-800">
-            <div class="pt-6">
-              <CommonRouteTabs
-                v-model="selectedTab"
-                :items="routeTabs"
-                orientation="vertical"
-                :ui="{
-                  root: 'w-full',
-                  list: 'w-full flex-col items-stretch p-0',
-                  trigger: 'w-full justify-start'
-                }" />
-            </div>
-          </aside>
-
-          <div class="min-h-0 min-w-0 flex-1 pt-6 lg:pl-6">
-            <component
-              :is="activeTabComponent"
-              v-if="activeTabComponent"
-              v-bind="activeTabProps"
-              @add="openAssignmentModal"
-              @delete="deleteAssignment" />
-          </div>
-        </div>
+        <CommonDetailWorkspace v-model="selectedTab" :items="routeTabs">
+          <component
+            :is="activeTabComponent"
+            v-if="activeTabComponent"
+            v-bind="activeTabProps"
+            @add="openAssignmentModal"
+            @delete="deleteAssignment" />
+        </CommonDetailWorkspace>
       </div>
 
       <UserModal
@@ -298,5 +262,5 @@ const { tabs: routeTabs, selectedTab, activeTabComponent, activeTabProps } = use
         hide-user
         @submit="addAssignment" />
     </template>
-  </UDashboardPanel>
+  </CommonDetailPage>
 </template>

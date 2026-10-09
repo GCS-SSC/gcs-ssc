@@ -78,27 +78,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <UDashboardPanel id="applicant-recipient-create" class="w-full">
-    <template #header>
-      <UDashboardNavbar>
-        <template #leading>
-          <UDashboardSidebarCollapse />
-          <UBreadcrumb :items="breadcrumbItems" class="ml-2" />
-        </template>
-        <template #right>
-          <div class="flex items-center gap-2">
-            <UButton
-              color="neutral"
-              variant="ghost"
-              :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
-              :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')"
-              @click="isHeroCollapsed = !isHeroCollapsed" />
-            <CommonNavbarSide />
-          </div>
-        </template>
-      </UDashboardNavbar>
-    </template>
-
+  <CommonDetailPage id="applicant-recipient-create" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" class="w-full">
     <template #body>
       <UAlert
         v-if="!canCreateProfile"
@@ -125,17 +105,18 @@ onMounted(() => {
           :subtitle="t('applicant_recipient.description')" />
 
         <CommonEntityEditorWorkspace>
-          <ApplicantRecipientProfileFormPage
-            v-model:model="form"
-            compact
-            :submit-label="t('common.add')"
-            :cancel-label="t('common.cancel')"
-            lead-agency-permission-action="create"
-            :pending="isSaving"
-            @submit="submit"
-            @cancel="cancel" />
+          <CommonDetailSection :title="t('agency.tabs.general')" width="readable">
+            <ApplicantRecipientProfileFormPage
+              v-model:model="form"
+              :submit-label="t('common.add')"
+              :cancel-label="t('common.cancel')"
+              lead-agency-permission-action="create"
+              :pending="isSaving"
+              @submit="submit"
+              @cancel="cancel" />
+          </CommonDetailSection>
         </CommonEntityEditorWorkspace>
       </div>
     </template>
-  </UDashboardPanel>
+  </CommonDetailPage>
 </template>

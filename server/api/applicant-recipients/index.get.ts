@@ -54,6 +54,7 @@ export default defineEventHandler(async event => await executeFreshReadSnapshot(
       eb('Applicant_Recipient_Profile.id', 'in', eb.selectFrom('Applicant_Recipient_Agency_Financial_Id')
         .where('Applicant_Recipient_Agency_Financial_Id.egcs_ar_agency', '=', list_view)
         .where('Applicant_Recipient_Agency_Financial_Id._deleted', '=', false)
+        .where('Applicant_Recipient_Agency_Financial_Id.egcs_ar_active', '=', true)
         .select('Applicant_Recipient_Agency_Financial_Id.egcs_ar_applicantrecipient'))
     ]))
   }

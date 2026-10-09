@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useDetailSectionOwnership } from '~/composables/useDetailSectionOwnership'
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { WorkflowSupplementaryInformationResponse } from '~~/shared/types/workflow-supplementary-information'
@@ -10,6 +11,7 @@ const fetchInformation = $fetch as unknown as (
 
 const { entityType, entityId } = defineProps<{ entityType: string, entityId: string }>()
 const { t } = useI18n()
+const ownsHeading = useDetailSectionOwnership(() => t('supplementary_information.title'))
 const { getBilingualValue } = useBilingualValue()
 const { formatDate } = useDateHelpers({ formatterOptions: { dateStyle: 'medium', timeStyle: 'short' } })
 const information: Ref<WorkflowSupplementaryInformationResponse | null> = ref(null)
@@ -66,7 +68,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="content" tabindex="-1" class="space-y-8" :aria-busy="isLoading" data-testid="supplementary-information">
-    <CommonSection :title="t('supplementary_information.title')" icon="i-lucide-clipboard-list" :grid-cols="1">
+    <CommonSection v-if="!ownsHeading" :title="t('supplementary_information.title')" icon="i-lucide-clipboard-list" :grid-cols="1">
       <p class="text-sm text-muted">
         {{ t('supplementary_information.description') }}
       </p>
@@ -90,11 +92,7 @@ onBeforeUnmount(() => {
     </UAlert>
 
     <template v-else-if="information">
-      <UAlert
-        v-if="information.workflows.length === 0"
-        color="warning"
-        icon="i-lucide-triangle-alert"
-        :title="t('supplementary_information.empty')" />
+      <CommonEmptyState v-if="information.workflows.length === 0" icon="i-lucide-clipboard-list" :description="t('supplementary_information.empty')" />
       <section
         v-for="workflow in information.workflows"
         :key="workflow.runtimeId"

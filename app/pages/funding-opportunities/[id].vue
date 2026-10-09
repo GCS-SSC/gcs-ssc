@@ -36,7 +36,7 @@ void statusCatalog.load()
 const { data: profile, error, status, refresh } = await useFetch<Opportunity, Error, string>(`/api/funding-opportunities/${id}`)
 usePageResourceError({ identity: () => route.path, errors: [error], pending: () => status.value === 'pending', hasContent: () => Boolean(profile.value) })
 const isHeroCollapsed = getHeroCollapsed('funding-opportunity-detail')
-const selectedTab = ref('general')
+
 const { tabs: extensionTabs, getExtensionTabItem } = useExtensionEntityTabs({ target: 'opportunity', opportunityId: id })
 const tabs = computed(() => [
   { key: 'agency.tabs.general', value: 'general', icon: 'i-lucide-info' },
@@ -46,6 +46,7 @@ const tabs = computed(() => [
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
   ...extensionTabs.value
 ])
+const { selectedTab } = useUrlTabState({ tabs, defaultTab: 'general' })
 const selectedExtensionTab = computed(() => getExtensionTabItem(selectedTab.value))
 const scope = computed(() => profile.value && ({
   type: 'entity' as const, agencyId: String(profile.value.agency_id),
@@ -139,20 +140,7 @@ const breadcrumbs = computed(() => [
 </script>
 
 <template>
-  <UDashboardPanel id="funding-opportunity-detail">
-    <template #header>
-      <UDashboardNavbar>
-        <template #leading>
-          <UDashboardSidebarCollapse /><UBreadcrumb :items="breadcrumbs" class="ml-2" />
-        </template>
-        <template #right>
-          <div class="flex items-center gap-2">
-            <UButton color="neutral" variant="ghost" :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'" :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')" @click="isHeroCollapsed = !isHeroCollapsed" />
-            <CommonNavbarSide />
-          </div>
-        </template>
-      </UDashboardNavbar>
-    </template>
+  <CommonDetailPage id="funding-opportunity-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbs">
     <template #body>
       <div v-if="status === 'pending' && !profile" role="status" class="p-6">
         {{ t('common.loading_records') }}
@@ -164,11 +152,8 @@ const breadcrumbs = computed(() => [
       </UAlert>
       <div v-else-if="profile" class="flex flex-1 flex-col">
         <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-megaphone" :title="getBilingualValue(profile, 'egcs_fo_name', id)" :meta-items="heroMetaItems" :badges="[{ statusId: String(profile.egcs_fo_status) }]" :actions="[{ label: t('funding_opportunity.edit'), icon: 'i-lucide-edit-3', visible: canEdit, onClick: edit }, { label: t('common.delete'), icon: 'i-lucide-trash', visible: canDelete, onClick: remove }]" />
-        <CommonEntityEditorWorkspace content-test-id="funding-opportunity-detail-content">
-          <template #sidebar>
-            <CommonRouteTabs v-model="selectedTab" :items="tabs" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
-          </template>
-          <div v-if="selectedTab === 'general'" class="mx-auto max-w-4xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+        <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="funding-opportunity-detail-content">
+          <div v-if="selectedTab === 'general'" class="space-y-8">
             <CommonSection :title="t('agency.detail.core_info')" badge="01">
               <CommonValueCard :label="t('funding_opportunity.name_en')" :value="profile.egcs_fo_name_en" />
               <CommonValueCard :label="t('funding_opportunity.name_fr')" :value="profile.egcs_fo_name_fr" />
@@ -217,23 +202,15 @@ const breadcrumbs = computed(() => [
             </CommonSection>
           </div>
           <div v-else-if="selectedTab === 'applications'" class="space-y-5">
-            <div>
-              <h3 class="text-xl font-semibold text-highlighted">
-                {{ t('funding_opportunity.applications') }}
-              </h3>
-              <p class="mt-1 text-sm text-muted">
-                {{ t('funding_opportunity.applications_description') }}
-              </p>
-            </div>
             <FundingCaseIntakeApplicationsTable :opportunity-id="id" :can-create="canCreateIntake" />
           </div>
           <FundingOpportunitySetupRelationshipsTab v-else-if="selectedTab === 'workflows'" :opportunity-id="id" :stream-ids="profile.egcs_fo_transferpaymentstreams" :linked-setups="profile.workflow_setups" kind="workflow" :can-edit="canEdit" @refresh="refresh" />
           <FundingOpportunitySetupRelationshipsTab v-else-if="selectedTab === 'reviews'" :opportunity-id="id" :stream-ids="profile.egcs_fo_transferpaymentstreams" :linked-setups="profile.review_setups" kind="review" :can-edit="canEdit" @refresh="refresh" />
           <FundingOpportunityAttachmentTypesTab v-else-if="selectedTab === 'attachments'" :opportunity-id="id" :attachment-types="profile.egcs_fo_attachmenttypes" :can-edit="canEdit" @updated="refresh" />
           <ExtensionEntityTabPanel v-else-if="selectedExtensionTab" :item="selectedExtensionTab" />
-        </CommonEntityEditorWorkspace>
+        </CommonDetailWorkspace>
       </div>
       <FundingOpportunityModal v-model:open="modalOpen" v-model:state="form" :pending="pending" @submit="submit" />
     </template>
-  </UDashboardPanel>
+  </CommonDetailPage>
 </template>

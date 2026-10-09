@@ -42,7 +42,7 @@ const onSubmit = () => {
 </script>
 
 <template>
-  <div :class="[compact ? 'mx-auto w-full max-w-7xl py-4' : 'w-full py-6']">
+  <div :class="[compact ? 'mx-auto w-full max-w-4xl' : 'w-full']">
     <UForm
       :state="model"
       :validate="validate"

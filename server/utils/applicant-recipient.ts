@@ -251,7 +251,7 @@ const assertAgencyFinancialIdForApplicantRecipient = async (
     .where('id', '=', childId)
     .where('egcs_ar_applicantrecipient', '=', applicantRecipientId)
     .where('_deleted', '=', false)
-    .select(['id', 'egcs_ar_agency', 'egcs_ar_financialsystemid'])
+    .select(['id', 'egcs_ar_agency', 'egcs_ar_financialsystemid', 'egcs_ar_active'])
     .executeTakeFirst(),
   ...APPLICANT_RECIPIENT_CHILD_ERROR_KEYS.agencyFinancialIdNotFound
 )
@@ -318,7 +318,8 @@ const mapAgencyFinancialIdPatchValues = (
   validated: ApplicantRecipientAgencyFinancialIdPatch
 ) => ({
   ...(hasOwn(validated, 'egcs_ar_agency') ? { egcs_ar_agency: validated.egcs_ar_agency ?? null } : {}),
-  ...(hasOwn(validated, 'egcs_ar_financialsystemid') ? { egcs_ar_financialsystemid: validated.egcs_ar_financialsystemid } : {})
+  ...(hasOwn(validated, 'egcs_ar_financialsystemid') ? { egcs_ar_financialsystemid: validated.egcs_ar_financialsystemid } : {}),
+  ...(hasOwn(validated, 'egcs_ar_active') ? { egcs_ar_active: validated.egcs_ar_active } : {})
 })
 
 export const patchApplicantRecipientAgencyFinancialId = async (
@@ -361,7 +362,7 @@ export const patchApplicantRecipientAgencyFinancialId = async (
           .where('id', '=', childId)
           .where('egcs_ar_applicantrecipient', '=', applicantRecipientId)
           .where('_deleted', '=', false)
-          .returning(['id', 'egcs_ar_agency', 'egcs_ar_financialsystemid'])
+          .returning(['id', 'egcs_ar_agency', 'egcs_ar_financialsystemid', 'egcs_ar_active'])
           .executeTakeFirstOrThrow()
       }
     )

@@ -470,9 +470,12 @@ CREATE TABLE "Funding_Case_Agreement_Applicant_Recipient" (
   "egcs_fc_fundingagreement" bigint NOT NULL,
   "egcs_fc_applicantrecipient" bigint NOT NULL,
   "egcs_fc_applicantrecipientsubtype" bigint,
+  "egcs_fc_agencyfinancialid" bigint,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Funding_Case_Agreement_Applicant_Recipient_pkey" PRIMARY KEY (id)
 );
+
+CREATE INDEX fc_idx_applicantrecipient_financial_id ON "Funding_Case_Agreement_Applicant_Recipient" (egcs_fc_agencyfinancialid);
 
 CREATE UNIQUE INDEX fc_idx_applicantrecipientapplicantrecipientfundingagreement ON "Funding_Case_Agreement_Applicant_Recipient" USING btree (egcs_fc_applicantrecipient, egcs_fc_fundingagreement) WHERE (_deleted = false);
 
@@ -1559,6 +1562,42 @@ AS $function$
       IF FOUND AND NEW.egcs_fc_currency IS DISTINCT FROM agreement_currency THEN
         RAISE EXCEPTION 'Financial currency must match its Agreement'
           USING ERRCODE = '23514', CONSTRAINT = 'fc_chk_agreement_financial_currency';
+      END IF;
+      RETURN NEW;
+    END $function$;
+
+CREATE FUNCTION guard_agreement_financial_id()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+    DECLARE owning_agency bigint; financial_id record; retained boolean := false;
+    BEGIN
+      IF TG_OP = 'UPDATE' THEN
+        IF OLD.egcs_fc_agencyfinancialid IS NOT NULL AND NEW.egcs_fc_agencyfinancialid IS NULL THEN
+          RAISE EXCEPTION 'Cannot clear Agreement financial ID' USING ERRCODE = '23514', CONSTRAINT = 'agreement_financial_id_required';
+        END IF;
+        retained := NOT OLD._deleted
+          AND NEW.egcs_fc_agencyfinancialid IS NOT DISTINCT FROM OLD.egcs_fc_agencyfinancialid
+          AND NEW.egcs_fc_applicantrecipient = OLD.egcs_fc_applicantrecipient
+          AND NEW.egcs_fc_fundingagreement = OLD.egcs_fc_fundingagreement;
+      END IF;
+      IF NEW._deleted THEN RETURN NEW; END IF;
+      IF NEW.egcs_fc_agencyfinancialid IS NULL THEN
+        IF TG_OP = 'UPDATE' AND retained THEN RETURN NEW; END IF;
+        RAISE EXCEPTION 'Agreement financial ID required' USING ERRCODE = '23514', CONSTRAINT = 'agreement_financial_id_required';
+      END IF;
+      SELECT program.egcs_tp_agency INTO owning_agency
+        FROM "Funding_Case_Agreement_Profile" agreement
+        JOIN "Transfer_Payment_Stream" stream ON stream.id = agreement.egcs_fc_transferpaymentstream
+        JOIN "Transfer_Payment_Profile" program ON program.id = stream.egcs_tp_transferpaymentprofile
+        WHERE agreement.id = NEW.egcs_fc_fundingagreement;
+      SELECT * INTO financial_id FROM "Applicant_Recipient_Agency_Financial_Id"
+        WHERE id = NEW.egcs_fc_agencyfinancialid FOR SHARE;
+      IF NOT FOUND OR financial_id.egcs_ar_applicantrecipient IS DISTINCT FROM NEW.egcs_fc_applicantrecipient
+        OR financial_id.egcs_ar_agency IS DISTINCT FROM owning_agency OR owning_agency IS NULL
+        OR (NOT retained AND (NOT financial_id.egcs_ar_active OR financial_id._deleted)) THEN
+        RAISE EXCEPTION 'Financial ID must match the Agreement agency and Proponent and be active for new selections'
+          USING ERRCODE = '23514', CONSTRAINT = 'agreement_financial_id_invalid';
       END IF;
       RETURN NEW;
     END $function$;
@@ -3282,6 +3321,8 @@ ALTER TABLE "Funding_Case_Agreement_Amendment_Type" ADD CONSTRAINT "Funding_Case
 
 ALTER TABLE "Funding_Case_Agreement_Amendment_Type" ADD CONSTRAINT "Funding_Case_Agreement_Amendment_Type_egcs_fc_amendment_fkey" FOREIGN KEY (egcs_fc_amendment) REFERENCES "Funding_Case_Agreement_Amendment"(id) ON DELETE RESTRICT;
 
+ALTER TABLE "Funding_Case_Agreement_Applicant_Recipient" ADD CONSTRAINT fc_fk_agreement_proponent_financial_id FOREIGN KEY (egcs_fc_agencyfinancialid) REFERENCES "Applicant_Recipient_Agency_Financial_Id"(id) ON DELETE RESTRICT;
+
 ALTER TABLE "Funding_Case_Agreement_Applicant_Recipient" ADD CONSTRAINT "Funding_Case_Agreement_Applic_egcs_fc_applicantrecipientsu_fkey" FOREIGN KEY (egcs_fc_applicantrecipientsubtype) REFERENCES "Agency_Applicant_Recipient_Subtype"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Applicant_Recipient" ADD CONSTRAINT "Funding_Case_Agreement_Applican_egcs_fc_applicantrecipient_fkey" FOREIGN KEY (egcs_fc_applicantrecipient) REFERENCES "Applicant_Recipient_Profile"(id) ON DELETE RESTRICT;
@@ -3658,6 +3699,8 @@ CREATE CONSTRAINT TRIGGER trg_validate_fundingcaseamendment_status_agency AFTER 
 CREATE TRIGGER trg_enforce_agreement_amendment_subtype_scope BEFORE INSERT OR UPDATE OF egcs_fc_amendment, egcs_fc_amendmentsubtype ON "Funding_Case_Agreement_Amendment_Subtype" FOR EACH ROW EXECUTE FUNCTION trg_fn_enforce_agreement_amendment_subtype_scope();
 
 CREATE TRIGGER trg_enforce_amendment_type_stream_scope BEFORE INSERT OR UPDATE OF egcs_fc_amendment, egcs_fc_amendmenttype ON "Funding_Case_Agreement_Amendment_Type" FOR EACH ROW EXECUTE FUNCTION trg_fn_enforce_amendment_type_stream_scope();
+
+CREATE TRIGGER guard_agreement_financial_id BEFORE INSERT OR UPDATE ON "Funding_Case_Agreement_Applicant_Recipient" FOR EACH ROW EXECUTE FUNCTION guard_agreement_financial_id();
 
 CREATE TRIGGER guard_agreement_proponent_type AFTER INSERT OR UPDATE ON "Funding_Case_Agreement_Applicant_Recipient" FOR EACH ROW EXECUTE FUNCTION guard_agreement_proponent_type();
 

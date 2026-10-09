@@ -171,24 +171,7 @@ const handleApprovalChanged = async () => {
 </script>
 
 <template>
-  <UDashboardPanel id="checklist-detail">
-    <template #header>
-      <UDashboardNavbar>
-        <template #leading>
-          <UDashboardSidebarCollapse />
-          <UBreadcrumb :items="breadcrumbItems" class="ml-2" />
-        </template>
-        <template #right>
-          <div class="flex items-center gap-2">
-            <UButton
-              color="neutral" variant="ghost" class="cursor-default" :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
-              :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')" @click="isHeroCollapsed = !isHeroCollapsed" />
-            <CommonNavbarSide />
-          </div>
-        </template>
-      </UDashboardNavbar>
-    </template>
-
+  <CommonDetailPage id="checklist-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems">
     <template #body>
       <div v-if="loadError" class="p-6" data-testid="checklist-load-error">
         <UAlert
@@ -370,5 +353,5 @@ const handleApprovalChanged = async () => {
         </div>
       </div>
     </template>
-  </UDashboardPanel>
+  </CommonDetailPage>
 </template>

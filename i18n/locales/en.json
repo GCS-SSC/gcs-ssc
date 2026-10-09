@@ -1288,6 +1288,8 @@
       "libreoffice_unavailable": "LibreOffice is required to convert DOCX templates to PDF. Install LibreOffice on the server or use an HTML PDF template."
     },
     "agreement": {
+      "invalid_financial_id": "Select an active financial ID for this Proponent from the Agreement’s agency.",
+      "financial_id_required": "Select a financial ID for every Proponent on this Agreement.",
       "monitor_receivable_not_allowed": "This monitor type does not allow receivable establishment follow-ups.",
       "invalid_funding_subtype": "Select a funding subtype available to this agreement’s stream.",
       "duplicate_funding_subtype": "Each funding subtype may appear only once per line.",
@@ -1516,6 +1518,7 @@
       "invalid_agency_financial_id_agency": "The selected agency is invalid.",
       "funding_history_too_large": "The funding history is too large to display safely. Narrow the request or contact support.",
       "agency_financial_id_not_found": "Agency financial ID not found.",
+      "financial_id_in_use": "This financial ID is used by Agreements. Select a new financial ID on those Agreements before changing this ID or its agency.",
       "registry_not_found": "Registry record not found.",
       "other_name_not_found": "Other name not found.",
       "address_not_found": "Address not found.",
@@ -2035,6 +2038,7 @@
     }
   },
   "validation": {
+    "invalid_agreement_financial_id": "Select an active financial ID for this Proponent from the Agreement’s agency.",
     "invalid_json": "Enter a valid JSON object.",
     "note_subject_required": "Enter a subject in English or French",
     "note_body_required": "Enter a note in English or French",
@@ -2386,6 +2390,8 @@
     "description_fr_placeholder": "Enter the agreement description in French",
     "applicant_recipients": {
       "type": "Proponent type",
+      "financial_id": "Financial System ID",
+      "financial_id_placeholder": "Select a financial ID",
       "action_unavailable": "This action requires assignment to this Agreement and an Agreement that is open for changes.",
       "not_selected": "Not selected",
       "title": "Proponents",
@@ -3021,6 +3027,12 @@
       "agency": "Agency",
       "agency_placeholder": "Select an agency",
       "financial_system_id": "Financial System ID",
+      "disabled": "Disabled",
+      "active_help": "Disabled IDs remain in history and can be reactivated.",
+      "disable_warning_title": "Disable financial ID?",
+      "delete_warning_title": "Delete financial ID?",
+      "affected_agreements": "This financial ID is used by these Agreements:",
+      "retained_agreements_notice": "Existing Agreements keep this financial ID until it is manually changed on each Agreement. Disabling or deleting the ID does not replace it automatically.",
       "search": "Search agency financial IDs"
     },
     "registries": {

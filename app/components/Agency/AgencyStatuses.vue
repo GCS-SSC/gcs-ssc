@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useDetailSectionOwnership } from '~/composables/useDetailSectionOwnership'
 /* eslint-disable jsdoc/require-jsdoc -- Local UI event handlers are described by their names and focused tests. */
 import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
@@ -13,6 +14,7 @@ type StatusLifecycle = 'normal' | 'readOnly' | 'terminal'
 
 const { agencyId, canCreate, canUpdate, canDelete } = defineProps<{ agencyId: string, canCreate: boolean, canUpdate: boolean, canDelete: boolean }>()
 const { locale, t } = useI18n()
+const ownsHeading = useDetailSectionOwnership(() => t('agency.statuses.title'))
 const { showError } = useApiErrorToast()
 const toast = useToast()
 const confirmDelete = useDeleteConfirm()
@@ -170,7 +172,7 @@ const setDeleted = async (definition: StatusDefinition, deleted: boolean) => {
   <section class="space-y-4">
     <div class="flex items-center justify-between">
       <div>
-        <h2 class="text-xl font-semibold">
+        <h2 v-if="!ownsHeading" class="text-xl font-semibold">
           {{ t('agency.statuses.title') }}
         </h2>
         <p class="text-sm text-zinc-500">

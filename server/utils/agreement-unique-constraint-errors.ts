@@ -3,8 +3,21 @@ import { throwIfMappedConstraintError, type ConstraintErrorMapping } from '~~/se
 
 const UNIQUE_VIOLATION_CODE = '23505'
 const CHECK_VIOLATION_CODE = '23514'
+const FOREIGN_KEY_VIOLATION_CODE = '23503'
 
 const CONSTRAINT_ERROR_MAP: Record<string, ConstraintErrorMapping> = {
+  agreement_financial_id_required: {
+    code: 'AGREEMENT_FINANCIAL_ID_REQUIRED',
+    key: 'apiErrors.agreement.financial_id_required'
+  },
+  agreement_financial_id_invalid: {
+    code: 'AGREEMENT_FINANCIAL_ID_INVALID',
+    key: 'apiErrors.agreement.invalid_financial_id'
+  },
+  fc_fk_agreement_proponent_financial_id: {
+    code: 'AGREEMENT_FINANCIAL_ID_INVALID',
+    key: 'apiErrors.agreement.invalid_financial_id'
+  },
   fc_idx_openamendment: {
     code: 'AGREEMENT_OPEN_AMENDMENT_EXISTS',
     key: 'apiErrors.agreement.open_amendment_exists'
@@ -56,5 +69,5 @@ const CONSTRAINT_ERROR_MAP: Record<string, ConstraintErrorMapping> = {
 }
 
 export const throwIfAgreementUniqueConstraintError = async (event: H3Event, error: unknown): Promise<never> => {
-  return await throwIfMappedConstraintError(event, error, [UNIQUE_VIOLATION_CODE, CHECK_VIOLATION_CODE], CONSTRAINT_ERROR_MAP)
+  return await throwIfMappedConstraintError(event, error, [UNIQUE_VIOLATION_CODE, CHECK_VIOLATION_CODE, FOREIGN_KEY_VIOLATION_CODE], CONSTRAINT_ERROR_MAP)
 }

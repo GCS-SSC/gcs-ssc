@@ -50,7 +50,7 @@ const updateAssignmentManagement = (subject: RoleAbilitySubject, enabled: boolea
 </script>
 
 <template>
-  <div class="mx-auto max-w-5xl divide-y divide-default rounded-sm border border-default">
+  <div class="w-full divide-y divide-default rounded-sm border border-default">
     <div v-for="subject in allowedSubjects" :key="subject" class="grid gap-4 p-4 md:grid-cols-[1fr_14rem_12rem] md:items-center">
       <div>
         <p class="font-medium">

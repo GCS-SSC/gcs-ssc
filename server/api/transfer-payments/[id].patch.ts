@@ -2,6 +2,7 @@ import { TransferPaymentProfileBaseSchema } from '~~/shared/types/schemas'
 import type { Transaction } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import { authorizeTransferPaymentProfileResource } from '~~/server/utils/transfer-payment-route-authorization'
+import { throwIfMappedConstraintError } from '~~/server/utils/database-constraint-errors'
 import {
   executeFreshAuthorizedTransferPaymentAgencyTransfer,
   executeFreshAuthorizedTransferPaymentWrite
@@ -84,9 +85,18 @@ export default defineEventHandler(async event => {
   }
 
   if (transferRequested) {
-    return await executeFreshAuthorizedTransferPaymentAgencyTransfer(
-      event, db, id, access.agencyId, String(validated.egcs_tp_agency), update
-    )
+    try {
+      return await executeFreshAuthorizedTransferPaymentAgencyTransfer(
+        event, db, id, access.agencyId, String(validated.egcs_tp_agency), update
+      )
+    } catch (error: unknown) {
+      return await throwIfMappedConstraintError(event, error, ['23514'], {
+        agreement_financial_id_invalid: {
+          code: 'AGREEMENT_FINANCIAL_ID_INVALID',
+          key: 'apiErrors.agreement.invalid_financial_id'
+        }
+      })
+    }
   }
   return await executeFreshAuthorizedTransferPaymentWrite(
     event, db, id, access.agencyId, 'update', update

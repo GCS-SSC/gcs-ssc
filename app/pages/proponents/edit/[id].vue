@@ -144,27 +144,7 @@ const retryProfile = async () => {
       </template>
     </UAlert>
 
-    <UDashboardPanel v-else-if="profile" id="applicant-recipient-detail" class="min-w-0 flex-1">
-      <template #header>
-        <UDashboardNavbar>
-          <template #leading>
-            <UDashboardSidebarCollapse />
-            <UBreadcrumb :items="breadcrumbItems" class="ml-2" />
-          </template>
-          <template #right>
-            <div class="flex items-center gap-2">
-              <UButton
-                color="neutral"
-                variant="ghost"
-                :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
-                :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')"
-                @click="isHeroCollapsed = !isHeroCollapsed" />
-              <CommonNavbarSide />
-            </div>
-          </template>
-        </UDashboardNavbar>
-      </template>
-
+    <CommonDetailPage v-else-if="profile" id="applicant-recipient-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" class="min-w-0 flex-1">
       <template #body>
         <div class="flex flex-1 flex-col">
           <ApplicantRecipientProfileHero
@@ -175,19 +155,7 @@ const retryProfile = async () => {
             show-status
             show-lead-agency />
 
-          <CommonEntityEditorWorkspace content-test-id="proponent-detail-content">
-            <template #sidebar>
-              <CommonRouteTabs
-                v-model="selectedTab"
-                :items="tabs"
-                orientation="vertical"
-                :ui="{
-                  root: 'w-full',
-                  list: 'w-full flex-col items-stretch p-0',
-                  trigger: 'w-full justify-start'
-                }" />
-            </template>
-
+          <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="proponent-detail-content">
             <ApplicantRecipientProfileFormPage
               v-if="isGeneralTab && selectedProfile && profile.can_update"
               v-model:model="selectedProfile"
@@ -208,9 +176,9 @@ const retryProfile = async () => {
               v-else-if="activeTabComponent"
               class="block w-full"
               v-bind="activeTabProps" />
-          </CommonEntityEditorWorkspace>
+          </CommonDetailWorkspace>
         </div>
       </template>
-    </UDashboardPanel>
+    </CommonDetailPage>
   </div>
 </template>

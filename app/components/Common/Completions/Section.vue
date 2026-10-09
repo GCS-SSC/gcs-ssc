@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useDetailSectionOwnership } from '~/composables/useDetailSectionOwnership'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { resolveApiErrorDetails } from '~/composables/useApiErrorToast'
@@ -59,6 +60,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const ownsHeading = useDetailSectionOwnership(() => t(titleKey))
 const toast = useToast()
 const { showError } = useApiErrorToast()
 const { formatDate } = useDateHelpers({
@@ -176,11 +178,11 @@ const submitCompletion = async () => {
   <div
     class="space-y-6"
     :class="!hideTitle && showDivider ? 'border-t border-primary-500 pt-8 dark:border-primary-600' : ''">
-    <div v-if="!hideTitle" class="space-y-3">
+    <div v-if="!hideTitle && !ownsHeading" class="space-y-3">
       <AssessmentSchemaSectionTitle :title="t(titleKey)" variant="indicator" />
     </div>
 
-    <div class="space-y-4" :class="hideTitle ? '' : 'pl-4 md:pl-6'">
+    <div class="space-y-4" :class="hideTitle || ownsHeading ? '' : 'pl-4 md:pl-6'">
       <p class="text-sm text-zinc-600 dark:text-zinc-300">
         {{ t(descriptionKey) }}
       </p>

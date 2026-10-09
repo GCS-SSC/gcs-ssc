@@ -38,7 +38,7 @@ usePageResourceError({
   pending: () => status.value === 'pending',
   hasContent: () => Boolean(correction.value)
 })
-const selectedTab: Ref<string> = ref('lines')
+
 const refreshKey: Ref<number> = ref(0)
 const saving: Ref<boolean> = ref(false)
 const cancelOpen: Ref<boolean> = ref(false)
@@ -87,6 +87,7 @@ const tabs = [
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
   { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users' }
 ]
+const { selectedTab } = useUrlTabState({ tabs, defaultTab: 'lines' })
 type LineRow = CorrectionDetail['egcs_fc_lines'][number] & { index: number, balance: ReturnType<typeof correctionLineBalance> }
 const lineRows = computed<LineRow[]>(() => (correction.value?.egcs_fc_lines ?? []).map((line, index) => ({
   ...line, index, balance: correctionLineBalance(line, state.value?.egcs_fc_lines[index]?.egcs_fc_adjustment ?? line.egcs_fc_adjustment)
@@ -158,26 +159,11 @@ const linkedCreated = async (id: string) => {
     <div v-else-if="!correction && status === 'pending'" role="status" aria-live="polite" class="flex min-h-32 items-center justify-center gap-2 text-sm text-muted">
       <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin" aria-hidden="true" /><span>{{ t('common.loading_records') }}</span>
     </div>
-    <UDashboardPanel v-if="correction && state" id="agreement-correction-detail" class="min-w-0 flex-1">
-      <template #header>
-        <UDashboardNavbar>
-          <template #leading>
-            <UDashboardSidebarCollapse /><UBreadcrumb :items="breadcrumbs" class="ml-2" />
-          </template>
-          <template #right>
-            <div class="flex items-center gap-2">
-              <UButton color="neutral" variant="ghost" :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'" :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')" @click="isHeroCollapsed = !isHeroCollapsed" /><CommonNavbarSide />
-            </div>
-          </template>
-        </UDashboardNavbar>
-      </template>
+    <CommonDetailPage v-if="correction && state" id="agreement-correction-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbs" class="min-w-0 flex-1">
       <template #body>
         <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-file-diff" :title="formatCorrectionReference(correction)" :meta-items="[`${t('correction.agreement')}: ${correction.egcs_fc_agreementnumber}`, formatDate(correction.egcs_fc_requesteddate)]" :badges="[{ statusId: correction.egcs_fc_status }]" :actions="heroActions" />
         <ULink v-if="correction.egcs_fc_linkedcorrection" :to="localePath(appRouteLocations.agreementCorrectionDetail(agreementId, correction.egcs_fc_linkedcorrection))" class="mb-4 text-sm">{{ t('correction.linked_correction') }}</ULink>
-        <CommonEntityEditorWorkspace content-test-id="agreement-correction-detail-content">
-          <template #sidebar>
-            <CommonRouteTabs v-model="selectedTab" :items="tabs" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
-          </template>
+        <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="agreement-correction-detail-content">
           <UForm v-if="selectedTab === 'lines'" :state="state" :validate="createValidator(CorrectionEditSchema)" class="space-y-8" @submit="save">
             <CommonSection :title="t('correction.financial_lines')" :grid-cols="1">
               <p id="correction-line-instruction" class="text-sm text-muted">
@@ -266,9 +252,9 @@ const linkedCreated = async (id: string) => {
           <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" entity-type="fundingcasecorrection" :entity-id="correctionId" />
           <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcasecorrection" :entity-id="correctionId" />
           <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" entity-type="fundingcasecorrection" :entity-id="correctionId" />
-        </CommonEntityEditorWorkspace>
+        </CommonDetailWorkspace>
       </template>
-    </UDashboardPanel>
+    </CommonDetailPage>
     <CorrectionCancelModal v-model:open="cancelOpen" :correction-id="correctionId" @cancelled="refreshPage" />
     <CorrectionCreateModal v-if="correction" v-model:open="linkedOpen" :agreement-id="agreementId" :linked-correction-id="correctionId" :initial-commitment-id="correction.egcs_fc_commitment" @created="linkedCreated" />
   </div>

@@ -1,26 +1,29 @@
 <script setup lang="ts">
+import { inject } from 'vue'
+import { useDetailSectionOwnership } from '~/composables/useDetailSectionOwnership'
+import { DETAIL_SECTION_CONTEXT } from '~/utils/detail-sections'
+
 const { title, description } = defineProps<{
   title: string
   description: string
 }>()
+const ownsHeading = useDetailSectionOwnership(() => title)
+const detailSection = inject(DETAIL_SECTION_CONTEXT, null)
 </script>
 
 <template>
   <div class="min-w-0 space-y-6">
-    <header class="flex flex-wrap items-start justify-between gap-4">
-      <div class="min-w-0">
-        <h2 class="break-words text-xl font-semibold text-highlighted [overflow-wrap:anywhere]">
-          {{ title }}
-        </h2>
-        <p class="mt-1 break-words text-sm text-muted [overflow-wrap:anywhere]">
-          {{ description }}
-        </p>
-      </div>
-
-      <div v-if="$slots.action" class="flex shrink-0 items-center justify-end">
+    <CommonDetailSectionHeader v-if="!ownsHeading" :title="title" :description="description">
+      <template v-if="$slots.action" #actions>
         <slot name="action" />
-      </div>
-    </header>
+      </template>
+    </CommonDetailSectionHeader>
+    <p v-if="ownsHeading && description && description !== detailSection?.description.value" class="text-sm text-muted">
+      {{ description }}
+    </p>
+    <div v-if="ownsHeading && $slots.action" class="flex justify-end">
+      <slot name="action" />
+    </div>
 
     <div v-if="$slots.notices" class="min-w-0 space-y-3">
       <slot name="notices" />

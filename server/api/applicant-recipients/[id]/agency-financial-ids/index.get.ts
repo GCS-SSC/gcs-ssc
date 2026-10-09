@@ -53,6 +53,7 @@ export default defineEventHandler(async event => {
         'Applicant_Recipient_Agency_Financial_Id.id as id',
         'Applicant_Recipient_Agency_Financial_Id.egcs_ar_agency as egcs_ar_agency',
         'Applicant_Recipient_Agency_Financial_Id.egcs_ar_financialsystemid as egcs_ar_financialsystemid',
+        'Applicant_Recipient_Agency_Financial_Id.egcs_ar_active as egcs_ar_active',
         'Agency_Profile.egcs_ay_name_en as agency_name_en',
         'Agency_Profile.egcs_ay_name_fr as agency_name_fr'
       ])
@@ -60,7 +61,11 @@ export default defineEventHandler(async event => {
       .limit(limit)
       .offset(offset)
       .execute(),
-    baseQuery.select(eb => eb.fn.count('Applicant_Recipient_Agency_Financial_Id.id').as('total')).executeTakeFirst()
+    baseQuery.select(eb => [
+      eb.fn.count('Applicant_Recipient_Agency_Financial_Id.id').as('total'),
+      eb.fn.count('Applicant_Recipient_Agency_Financial_Id.id')
+        .filterWhere('Applicant_Recipient_Agency_Financial_Id.egcs_ar_active', '=', true).as('active')
+    ]).executeTakeFirst()
   ])
 
   const total = Number(totalResult?.total || 0)
@@ -70,7 +75,7 @@ export default defineEventHandler(async event => {
     total,
     stats: {
       total,
-      active: total
+      active: Number(totalResult?.active || 0)
     },
     page,
     limit

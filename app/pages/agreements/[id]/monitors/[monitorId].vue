@@ -460,24 +460,7 @@ const handleCompleted = async () => {
     <div v-else-if="isLoadingDetail && (!profile || !monitor)" role="status" aria-live="polite" class="flex min-h-32 items-center justify-center gap-2 text-sm text-muted">
       <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin" aria-hidden="true" /><span>{{ t('common.loading_records') }}</span>
     </div>
-    <UDashboardPanel v-if="monitor" id="agreement-monitor-detail" class="w-full">
-      <template #header>
-        <UDashboardNavbar>
-          <template #leading>
-            <UDashboardSidebarCollapse />
-            <UBreadcrumb :items="breadcrumbItems" class="ml-2" />
-          </template>
-          <template #right>
-            <div class="flex items-center gap-2">
-              <UButton
-                color="neutral" variant="ghost" :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
-                :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')" @click="isHeroCollapsed = !isHeroCollapsed" />
-              <CommonNavbarSide />
-            </div>
-          </template>
-        </UDashboardNavbar>
-      </template>
-
+    <CommonDetailPage v-if="monitor" id="agreement-monitor-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" class="w-full">
       <template #body>
         <div class="flex flex-1 flex-col">
           <CommonEntityHero
@@ -491,20 +474,7 @@ const handleCompleted = async () => {
               isCompleted: monitor.isCompleted
             }]" />
 
-          <CommonEntityEditorWorkspace content-test-id="agreement-monitor-detail-content">
-            <template #sidebar>
-              <CommonRouteTabs
-                v-model="selectedMonitorTab"
-                :items="monitorTabs"
-                :priority-values="['planning', 'items', 'findings', 'followups', 'promising-practices']"
-                orientation="vertical"
-                :ui="{
-                  root: 'w-full',
-                  list: 'w-full flex-col items-stretch p-0',
-                  trigger: 'w-full justify-start'
-                }" />
-            </template>
-
+          <CommonDetailWorkspace v-model="selectedMonitorTab" :items="monitorTabs" content-test-id="agreement-monitor-detail-content" :priority-values="['planning', 'items', 'findings', 'followups', 'promising-practices']">
             <div v-if="selectedMonitorTab === 'planning'" class="w-full min-w-0">
               <div class="space-y-6">
                 <CommonResourceLayoutCard
@@ -728,10 +698,10 @@ const handleCompleted = async () => {
             <ExtensionEntityTabPanel
               v-else-if="selectedExtensionTab"
               :item="selectedExtensionTab" />
-          </CommonEntityEditorWorkspace>
+          </CommonDetailWorkspace>
         </div>
       </template>
-    </UDashboardPanel>
+    </CommonDetailPage>
 
     <UModal v-if="monitor" v-model:open="isMetadataModalOpen" :title="t('agreement.monitors.edit')" :description="t('common.form_dialog_description')">
       <template #body>

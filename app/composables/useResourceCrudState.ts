@@ -16,6 +16,8 @@ interface UseResourceCrudStateOptions<T extends { id: string } & Record<string, 
   updateMethod?: 'PATCH' | 'PUT'
   schema: z.ZodTypeAny
   initialNewItem?: Partial<T> | null
+  beforeSave?: (state: Partial<T>, original: T | null, shouldProceed: () => boolean) => Promise<boolean>
+  beforeDelete?: (id: string, shouldProceed: () => boolean) => Promise<boolean | undefined>
   buttonLabel?: MaybeRefOrGetter<string | undefined>
   modalTitle?: MaybeRefOrGetter<string | undefined>
   updateTitle?: MaybeRefOrGetter<string | undefined>
@@ -38,6 +40,8 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
   updateMethod = 'PATCH',
   schema,
   initialNewItem,
+  beforeSave,
+  beforeDelete,
   buttonLabel,
   modalTitle,
   updateTitle,
@@ -122,6 +126,7 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
   })
 
   const isEditing: Ref<boolean> = ref(false)
+  let originalItem: T | null = null
   const isDeleting: Ref<boolean> = ref(false)
 
   const createInitialFormState = () => (initialNewItem ? { ...initialNewItem } : {})
@@ -144,6 +149,7 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
   let disposed = false
   watch(() => toValue(fetchUrl), () => {
     generation++
+    originalItem = null
     closeModal()
     isDeleting.value = false
   }, { flush: 'sync' })
@@ -174,6 +180,7 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
   const openCreate = () => {
     if (disposed || isStaticResource || !toValue(createAllowed)) return
     isEditing.value = false
+    originalItem = null
     modal.openCreate()
   }
 
@@ -183,6 +190,7 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
     }
 
     isEditing.value = true
+    originalItem = { ...item }
     modal.openUpdate(item)
   }
 
@@ -207,6 +215,8 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
     }
 
     try {
+      if (beforeSave && !await beforeSave(currentState, originalItem, () => isCurrentTarget() && isCurrentSession(session) && canSave.value)) return
+      if (!isCurrentTarget() || !isCurrentSession(session) || !canSave.value) return
       if (editing) {
         const updateId = currentState.id
         const resolvedUpdateUrlBase = toValue(updateUrlBase)
@@ -274,6 +284,7 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
 
       const deleted = await confirmDeleteRequest(`${resolvedDeleteUrlBase}/${id}`, {
         description: t(toValue(deleteConfirmKey)),
+        ...(beforeDelete ? { confirm: () => beforeDelete(id, () => isCurrentTarget() && toValue(deleteUrlBase) === resolvedDeleteUrlBase) } : {}),
         shouldProceed: () => isCurrentTarget() && toValue(deleteUrlBase) === resolvedDeleteUrlBase
       })
       if (!deleted || !isCurrentTarget()) {

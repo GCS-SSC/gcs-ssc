@@ -267,6 +267,24 @@
       "egcs_ay_gwcoa_number": 113
     }
   ],
+  "Applicant_Recipient_Agency_Financial_Id": [
+    {
+      "id": 1,
+      "egcs_ar_applicantrecipient": 119,
+      "egcs_ar_agency": 21,
+      "egcs_ar_financialsystemid": "9901000119",
+      "egcs_ar_active": true,
+      "_deleted": false
+    },
+    {
+      "id": 2,
+      "egcs_ar_applicantrecipient": 171,
+      "egcs_ar_agency": 21,
+      "egcs_ar_financialsystemid": "9901000171",
+      "egcs_ar_active": true,
+      "_deleted": false
+    }
+  ],
   "Applicant_Recipient_Profile": [
     {
       "id": 119,
@@ -17619,77 +17637,88 @@
       "egcs_fc_fundingagreement": 120,
       "egcs_fc_applicantrecipient": 119,
       "egcs_fc_applicantrecipientsubtype": 21,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_agencyfinancialid": 1
     },
     {
       "id": 4,
       "egcs_fc_fundingagreement": 123,
       "egcs_fc_applicantrecipient": 119,
       "egcs_fc_applicantrecipientsubtype": 21,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_agencyfinancialid": 1
     },
     {
       "id": 5,
       "egcs_fc_fundingagreement": 126,
       "egcs_fc_applicantrecipient": 119,
       "egcs_fc_applicantrecipientsubtype": 21,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_agencyfinancialid": 1
     },
     {
       "id": 6,
       "egcs_fc_fundingagreement": 129,
       "egcs_fc_applicantrecipient": 119,
       "egcs_fc_applicantrecipientsubtype": 21,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_agencyfinancialid": 1
     },
     {
       "id": 7,
       "egcs_fc_fundingagreement": 132,
       "egcs_fc_applicantrecipient": 119,
       "egcs_fc_applicantrecipientsubtype": 21,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_agencyfinancialid": 1
     },
     {
       "id": 8,
       "egcs_fc_fundingagreement": 135,
       "egcs_fc_applicantrecipient": 119,
       "egcs_fc_applicantrecipientsubtype": 21,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_agencyfinancialid": 1
     },
     {
       "id": 9,
       "egcs_fc_fundingagreement": 138,
       "egcs_fc_applicantrecipient": 119,
       "egcs_fc_applicantrecipientsubtype": 21,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_agencyfinancialid": 1
     },
     {
       "id": 10,
       "egcs_fc_fundingagreement": 141,
       "egcs_fc_applicantrecipient": 119,
       "egcs_fc_applicantrecipientsubtype": 21,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_agencyfinancialid": 1
     },
     {
       "id": 11,
       "egcs_fc_fundingagreement": 144,
       "egcs_fc_applicantrecipient": 119,
       "egcs_fc_applicantrecipientsubtype": 21,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_agencyfinancialid": 1
     },
     {
       "id": 12,
       "egcs_fc_fundingagreement": 147,
       "egcs_fc_applicantrecipient": 119,
       "egcs_fc_applicantrecipientsubtype": 21,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_agencyfinancialid": 1
     },
     {
       "id": 13,
       "egcs_fc_fundingagreement": 150,
       "egcs_fc_applicantrecipient": 171,
       "egcs_fc_applicantrecipientsubtype": 21,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_agencyfinancialid": 2
     }
   ],
   "Funding_Case_Agreement_Approval_Submission": [

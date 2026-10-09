@@ -10,7 +10,7 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <div class="mx-auto max-w-5xl space-y-8 py-4">
+  <div class="space-y-8">
     <CommonSection :title="t('agency.detail.core_info')" badge="01">
       <CommonValueCard :label="t('transfer_payment.name_en')" :value="profile.egcs_tp_name_en" />
       <CommonValueCard :label="t('transfer_payment.name_fr')" :value="profile.egcs_tp_name_fr" />

@@ -42,7 +42,7 @@ const {
   streamId?: string
 }>()
 
-const model = defineModel<{ egcs_fc_applicantrecipient: string; egcs_fc_applicantrecipientsubtype?: string | null }[]>('model', {
+const model = defineModel<{ egcs_fc_applicantrecipient: string; egcs_fc_applicantrecipientsubtype?: string | null; egcs_fc_agencyfinancialid?: string | null }[]>('model', {
   default: () => []
 })
 
@@ -633,14 +633,23 @@ const removeSelectedId = (id: string) => {
     </div>
   </UFormField>
 
-  <AgreementProponentTypeField
+  <div
     v-for="(relationship, index) in model"
     :key="relationship.egcs_fc_applicantrecipient"
-    v-model="relationship.egcs_fc_applicantrecipientsubtype"
-    :proponent-id="relationship.egcs_fc_applicantrecipient"
-    :stream-id="streamId"
-    :name="`${name}.${index}.egcs_fc_applicantrecipientsubtype`"
-    :label="`${getSelectedLabel(cachedItemsById[relationship.egcs_fc_applicantrecipient] ?? { id: relationship.egcs_fc_applicantrecipient })} — ${t('agreement.applicant_recipients.type')}`" />
+    class="space-y-4">
+    <AgreementProponentTypeField
+      v-model="relationship.egcs_fc_applicantrecipientsubtype"
+      :proponent-id="relationship.egcs_fc_applicantrecipient"
+      :stream-id="streamId"
+      :name="`${name}.${index}.egcs_fc_applicantrecipientsubtype`"
+      :label="`${getSelectedLabel(cachedItemsById[relationship.egcs_fc_applicantrecipient] ?? { id: relationship.egcs_fc_applicantrecipient })} — ${t('agreement.applicant_recipients.type')}`" />
+    <AgreementFinancialIdField
+      v-model="relationship.egcs_fc_agencyfinancialid"
+      :proponent-id="relationship.egcs_fc_applicantrecipient"
+      :stream-id="streamId"
+      :name="`${name}.${index}.egcs_fc_agencyfinancialid`"
+      :label="`${getSelectedLabel(cachedItemsById[relationship.egcs_fc_applicantrecipient] ?? { id: relationship.egcs_fc_applicantrecipient })} — ${t('agreement.applicant_recipients.financial_id')}`" />
+  </div>
 
   <UModal v-model:open="isOpen" :content="pickerDialogContent" :title="t('agreement.applicant_recipients.select')" :description="t('agreement.applicant_recipients.search')">
     <template #body>

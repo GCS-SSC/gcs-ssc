@@ -503,6 +503,25 @@ END $baseline$`.execute(db)
 /** Installs the current installFunctions definitions for this subject on a fresh database. */
 export const installFunctions = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
+CREATE FUNCTION guard_program_financial_id_agency()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+    BEGIN
+      IF NEW.egcs_tp_agency IS DISTINCT FROM OLD.egcs_tp_agency AND EXISTS (
+        SELECT 1 FROM "Funding_Case_Agreement_Applicant_Recipient" relationship
+        JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.id = relationship.egcs_fc_fundingagreement
+        JOIN "Transfer_Payment_Stream" stream ON stream.id = agreement.egcs_fc_transferpaymentstream
+        JOIN "Applicant_Recipient_Agency_Financial_Id" financial_id ON financial_id.id = relationship.egcs_fc_agencyfinancialid
+        WHERE stream.egcs_tp_transferpaymentprofile = OLD.id AND NOT relationship._deleted
+          AND NOT agreement._deleted AND financial_id.egcs_ar_agency IS DISTINCT FROM NEW.egcs_tp_agency
+      ) THEN
+        RAISE EXCEPTION 'Program agency must match retained Agreement financial IDs'
+          USING ERRCODE = '23514', CONSTRAINT = 'agreement_financial_id_invalid';
+      END IF;
+      RETURN NEW;
+    END $function$;
+
 CREATE FUNCTION enforce_stream_field_assignment_agency()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -1162,6 +1181,8 @@ END $baseline$`.execute(db)
 /** Installs the current installTriggers definitions for this subject on a fresh database. */
 export const installTriggers = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
+CREATE TRIGGER guard_program_financial_id_agency BEFORE UPDATE OF egcs_tp_agency ON "Transfer_Payment_Profile" FOR EACH ROW EXECUTE FUNCTION guard_program_financial_id_agency();
+
 CREATE TRIGGER protect_workflow_amendment_conditions AFTER DELETE OR UPDATE OF _deleted, egcs_tp_transferpaymentstream ON "Transfer_Payment_Amendment_Subtype" FOR EACH ROW EXECUTE FUNCTION protect_workflow_amendment_conditions();
 
 CREATE TRIGGER trg_enforce_amendment_subtype_type_stream_scope BEFORE INSERT OR UPDATE OF egcs_tp_amendmentsubtype, egcs_tp_amendmenttype ON "Transfer_Payment_Amendment_Subtype_Type" FOR EACH ROW EXECUTE FUNCTION trg_fn_enforce_amendment_subtype_type_stream_scope();

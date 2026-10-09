@@ -232,27 +232,7 @@ const isHeroCollapsed = getHeroCollapsed('agency-detail')
 </script>
 
 <template>
-  <UDashboardPanel id="agency-detail">
-    <template #header>
-      <UDashboardNavbar>
-        <template #leading>
-          <UDashboardSidebarCollapse />
-          <UBreadcrumb :items="breadcrumbItems" class="ml-2" />
-        </template>
-        <template #right>
-          <div class="flex items-center gap-2">
-            <UButton
-              color="neutral"
-              variant="ghost"
-              :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
-              :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')"
-              @click="isHeroCollapsed = !isHeroCollapsed" />
-            <CommonNavbarSide />
-          </div>
-        </template>
-      </UDashboardNavbar>
-    </template>
-
+  <CommonDetailPage id="agency-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems">
     <template #body>
       <CommonLoadingState v-if="isLoadingAgency && !agency" :label="t('common.loading')" />
       <UAlert
@@ -268,25 +248,9 @@ const isHeroCollapsed = getHeroCollapsed('agency-detail')
       <div v-if="agency" class="flex flex-1 flex-col">
         <AgencyDetailHero :agency="agency" :is-collapsed="isHeroCollapsed" :can-update="canUpdateAgency" @edit="openUpdateModal" />
 
-        <div class="flex min-h-0 flex-1 flex-col gap-6 overflow-visible px-6 pt-0 pb-6 lg:flex-row lg:gap-0">
-          <aside class="w-full shrink-0 lg:w-72 lg:border-r lg:border-zinc-200 lg:pr-4 dark:lg:border-zinc-800">
-            <div class="pt-6">
-              <CommonRouteTabs
-                v-model="selectedTab"
-                :items="routeTabs"
-                orientation="vertical"
-                :ui="{
-                  root: 'w-full',
-                  list: 'w-full flex-col items-stretch p-0',
-                  trigger: 'w-full justify-start'
-                }" />
-            </div>
-          </aside>
-
-          <div class="min-h-0 min-w-0 flex-1 pt-6 lg:pl-6">
-            <component :is="activeTabComponent" v-if="activeTabComponent" v-bind="activeTabProps" />
-          </div>
-        </div>
+        <CommonDetailWorkspace v-model="selectedTab" :items="routeTabs">
+          <component :is="activeTabComponent" v-if="activeTabComponent" v-bind="activeTabProps" />
+        </CommonDetailWorkspace>
       </div>
 
       <!-- Update Modal -->
@@ -299,5 +263,5 @@ const isHeroCollapsed = getHeroCollapsed('agency-detail')
         :pending="isSavingAgency"
         @submit="updateAgency" />
     </template>
-  </UDashboardPanel>
+  </CommonDetailPage>
 </template>
