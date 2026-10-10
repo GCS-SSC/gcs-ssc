@@ -1,8 +1,10 @@
 <script setup lang="ts">
-const { label, value, subValue, icon, variant, color } = defineProps<{
+const { label, value, subValue, valueLang, subValueLang, icon, variant, color } = defineProps<{
   label: string
   value: string | number
   subValue?: string
+  valueLang?: 'en' | 'fr'
+  subValueLang?: 'en' | 'fr'
   icon?: string
   variant?: 'card' | 'ghost'
   color?: string
@@ -23,10 +25,10 @@ const { label, value, subValue, icon, variant, color } = defineProps<{
       <p class="mb-1 text-xs font-black tracking-widest text-zinc-400 uppercase">
         {{ label }}
       </p>
-      <p class="text-lg font-black text-zinc-900 dark:text-white" :class="{ 'font-mono': typeof value === 'number' }">
+      <p :lang="valueLang" class="text-lg font-black text-zinc-900 dark:text-white" :class="{ 'font-mono': typeof value === 'number' }">
         {{ value }}
       </p>
-      <p v-if="subValue" class="text-xs text-zinc-500">
+      <p v-if="subValue" :lang="subValueLang" class="text-xs text-zinc-500">
         {{ subValue }}
       </p>
     </div>
@@ -37,11 +39,11 @@ const { label, value, subValue, icon, variant, color } = defineProps<{
       <p class="mb-2 text-xs leading-none font-black tracking-widest text-zinc-400 uppercase dark:text-zinc-500">
         {{ label }}
       </p>
-      <p class="mb-1 text-sm font-black text-zinc-900 dark:text-white">
+      <p :lang="valueLang" class="mb-1 text-sm font-black text-zinc-900 dark:text-white">
         {{ value }}
       </p>
       <div v-if="subValue" class="flex items-center gap-2">
-        <span class="rounded bg-zinc-100 px-2 py-0.5 text-xs font-bold text-zinc-500 uppercase dark:bg-zinc-800">
+        <span :lang="subValueLang" class="rounded bg-zinc-100 px-2 py-0.5 text-xs font-bold text-zinc-500 uppercase dark:bg-zinc-800">
           {{ subValue }}
         </span>
       </div>

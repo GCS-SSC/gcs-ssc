@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, useId, watch } from 'vue'
 import type { Ref } from 'vue'
 import { getGcsExtensionComponent } from '#gcs-extensions/registry'
 import type { ExtensionAgencyRegistryItem, ExtensionAgencyWorkspaceListItem } from '~~/shared/types/schemas/extensions'
@@ -12,6 +12,7 @@ definePageMeta({ i18n: { paths: {
 } } })
 
 const route = useRoute()
+const workspacePanelId = useId()
 const localePath = useLocalePath()
 const { t, locale } = useI18n()
 const { getHeroCollapsed } = useDashboard()
@@ -130,11 +131,12 @@ const { selectedTab } = useUrlTabState({
           <CommonEntityEditorWorkspace content-test-id="extension-agency-workspace-content">
             <template #sidebar>
               <CommonRouteTabs
-                v-model="selectedTab" :items="tabs" orientation="vertical"
+                v-model="selectedTab" :items="tabs" :external-panel-id="workspacePanelId" orientation="vertical"
                 :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
             </template>
             <component
-              :is="extensionComponent" :key="`${extensionKey}:${agencyId}:${selectedTab}`"
+              :is="extensionComponent" :id="workspacePanelId" :key="`${extensionKey}:${agencyId}:${selectedTab}`"
+              role="tabpanel" :aria-label="tabs.find(tab => tab.value === selectedTab)?.label"
               :agency-id="agencyId" :extension-key="extensionKey" :section="selectedTab"
               :enabled="true" :read-only="!extension.canConfigure" :config="extension.config"
               @open-form="openForm" />

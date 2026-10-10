@@ -284,7 +284,7 @@ const getSortedSubSectionEntries = (section: SectionRow, sectionKey: string): Su
 </script>
 
 <template>
-  <AssessmentSchemaPageSection section-id="schema-sections" :title="t('transfer_payment.assessment_sections')">
+  <AssessmentSchemaPageSection section-id="schema-sections" :title="t('transfer_payment.assessment_sections')" role="tabpanel" :aria-label="t('transfer_payment.assessment_sections')">
     <template #actions>
       <UButton
         icon="i-lucide-plus"

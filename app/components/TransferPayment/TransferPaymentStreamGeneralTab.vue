@@ -12,13 +12,13 @@ const { getBilingualValue } = useBilingualValue()
 <template>
   <div class="space-y-8">
     <CommonSection :title="t('agency.detail.core_info')" badge="01">
-      <CommonValueCard :label="t('transfer_payment.name_en')" :value="stream.egcs_tp_name_en" />
-      <CommonValueCard :label="t('transfer_payment.name_fr')" :value="stream.egcs_tp_name_fr" />
-      <CommonValueCard :label="t('transfer_payment.abbreviation_en')" :value="stream.egcs_tp_abbreviation_en" />
-      <CommonValueCard :label="t('transfer_payment.abbreviation_fr')" :value="stream.egcs_tp_abbreviation_fr" />
+      <CommonValueCard :label="t('transfer_payment.name_en')" :value="stream.egcs_tp_name_en" value-lang="en" />
+      <CommonValueCard :label="t('transfer_payment.name_fr')" :value="stream.egcs_tp_name_fr" value-lang="fr" />
+      <CommonValueCard :label="t('transfer_payment.abbreviation_en')" :value="stream.egcs_tp_abbreviation_en" value-lang="en" />
+      <CommonValueCard :label="t('transfer_payment.abbreviation_fr')" :value="stream.egcs_tp_abbreviation_fr" value-lang="fr" />
       <CommonValueCard :label="t('transfer_payment.parent_stream')" :value="getBilingualValue(stream, 'parent_name', '-')" />
-      <CommonValueCard :label="t('transfer_payment.objective_en')" :value="stream.egcs_tp_objective_en" />
-      <CommonValueCard :label="t('transfer_payment.objective_fr')" :value="stream.egcs_tp_objective_fr" />
+      <CommonValueCard :label="t('transfer_payment.objective_en')" :value="stream.egcs_tp_objective_en" value-lang="en" />
+      <CommonValueCard :label="t('transfer_payment.objective_fr')" :value="stream.egcs_tp_objective_fr" value-lang="fr" />
       <CommonValueCard
         :label="t('transfer_payment.allows_further_distribution')"
         :value="stream.egcs_tp_allowsfurtherdistribution ? t('common.yes') : t('common.no')" />

@@ -117,7 +117,7 @@ export const useAssessmentSchemaDetailPage = async () => {
     { key: 'transfer_payment.assessment_sections', icon: 'i-lucide-layers', value: 'schema-sections' },
     { key: 'transfer_payment.outcomes', icon: 'i-lucide-shield-check', value: 'schema-outcomes' },
     { key: 'transfer_payment.impactors', icon: 'i-lucide-zap', value: 'schema-impactors' }
-  ])
+  ].map(item => ({ ...item, panelId: item.value })))
 
   /**
    *

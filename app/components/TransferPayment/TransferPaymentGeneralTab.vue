@@ -12,12 +12,12 @@ const { t } = useI18n()
 <template>
   <div class="space-y-8">
     <CommonSection :title="t('agency.detail.core_info')" badge="01">
-      <CommonValueCard :label="t('transfer_payment.name_en')" :value="profile.egcs_tp_name_en" />
-      <CommonValueCard :label="t('transfer_payment.name_fr')" :value="profile.egcs_tp_name_fr" />
-      <CommonValueCard :label="t('transfer_payment.abbreviation_en')" :value="profile.egcs_tp_abbreviation_en" />
-      <CommonValueCard :label="t('transfer_payment.abbreviation_fr')" :value="profile.egcs_tp_abbreviation_fr" />
-      <CommonValueCard :label="t('transfer_payment.purpose_en')" :value="profile.egcs_tp_purpose_en" />
-      <CommonValueCard :label="t('transfer_payment.purpose_fr')" :value="profile.egcs_tp_purpose_fr" />
+      <CommonValueCard :label="t('transfer_payment.name_en')" :value="profile.egcs_tp_name_en" value-lang="en" />
+      <CommonValueCard :label="t('transfer_payment.name_fr')" :value="profile.egcs_tp_name_fr" value-lang="fr" />
+      <CommonValueCard :label="t('transfer_payment.abbreviation_en')" :value="profile.egcs_tp_abbreviation_en" value-lang="en" />
+      <CommonValueCard :label="t('transfer_payment.abbreviation_fr')" :value="profile.egcs_tp_abbreviation_fr" value-lang="fr" />
+      <CommonValueCard :label="t('transfer_payment.purpose_en')" :value="profile.egcs_tp_purpose_en" value-lang="en" />
+      <CommonValueCard :label="t('transfer_payment.purpose_fr')" :value="profile.egcs_tp_purpose_fr" value-lang="fr" />
       <CommonValueCard :label="t('transfer_payment.start_date')" :value="formatDate(profile.egcs_tp_datestart)" />
       <CommonValueCard :label="t('transfer_payment.end_date')" :value="formatDate(profile.egcs_tp_dateend)" />
       <UCard class="border-none bg-white shadow-sm ring-1 ring-zinc-100 dark:bg-zinc-900 dark:ring-zinc-800">

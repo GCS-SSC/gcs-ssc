@@ -1181,7 +1181,7 @@ const cancelReconciliation = async () => {
                           :model-value="getDraftClaimAmount(row.original.budgetLineId)"
                           :currency="profile?.egcs_fc_currency"
                           required
-                          :aria-label="t('agreement.claims.submitted_amount_for', { name: row.original.lineItemNameEn })"
+                          :aria-label="t('agreement.claims.submitted_amount_for', { name: locale === 'fr' ? row.original.lineItemNameFr : row.original.lineItemNameEn })"
                           :aria-invalid="isDraftClaimAmountInvalid(row.original.budgetLineId)"
                           :aria-describedby="isDraftClaimAmountInvalid(row.original.budgetLineId) ? `claim-amount-error-${row.original.budgetLineId}` : undefined"
                           class="w-44"

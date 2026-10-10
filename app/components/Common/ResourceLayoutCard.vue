@@ -107,6 +107,9 @@ defineExpose({
       :class="embedded ? 'border-y border-default' : showToolbar ? 'rounded-b-xl border border-t-0 border-default bg-white shadow-sm dark:bg-zinc-900' : 'rounded-xl border border-default bg-white shadow-sm dark:bg-zinc-900'">
       <div
         data-testid="resource-table-scroll"
+        :tabindex="rowsAreDisabled ? -1 : 0"
+        role="group"
+        :aria-label="t('common.records')"
         class="w-full min-w-0 overflow-x-auto transition-opacity"
         :class="hasStaleRows ? 'opacity-60 saturate-50' : undefined"
         :inert="rowsAreDisabled"

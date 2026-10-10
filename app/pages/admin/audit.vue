@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { useId } from 'vue'
 import type { Ref } from 'vue'
 import type { AuditDetail, AuditSummary } from '~~/shared/types/schemas/audit'
 
 definePageMeta({ middleware: 'admin-audit', i18n: { paths: { en: '/admin/audit', fr: '/admin/audit' } } })
 const { t } = useI18n()
 const tab: Ref<string> = ref('events')
+const auditPanelId = `audit-panel-${useId()}`
 const filters = reactive({ actor: '', table: '', recordId: '', operation: '', requestId: '', from: '', to: '' })
 const filterKeys = ['actor', 'table', 'recordId', 'operation', 'requestId', 'from', 'to'] as const
 const query = computed(() => ({
@@ -104,6 +106,7 @@ const isHeroCollapsed = getHeroCollapsed('admin-audit')
           <template #sidebar>
             <CommonRouteTabs
               v-model="tab"
+              :external-panel-id="auditPanelId"
               :items="[
                 { key: 'audit.title', value: 'events', icon: 'i-lucide-history' },
                 { key: 'audit.access', value: 'access', icon: 'i-lucide-eye' }
@@ -128,15 +131,17 @@ const isHeroCollapsed = getHeroCollapsed('admin-audit')
               </UFormField>
             </div>
           </div>
-          <CommonResourceLayoutCard
-            v-model:pagination="pagination"
-            :data="rows" :columns="columns" :total-records="totalRecords" :request-status="status" :show-toolbar="false" @retry="refresh()">
-            <template #actions-cell="{ row }">
-              <div class="flex justify-end gap-2">
-                <UButton icon="i-lucide-eye" color="neutral" variant="ghost" :aria-label="t('audit.details')" @click="openDetail(row.original)" />
-              </div>
-            </template>
-          </CommonResourceLayoutCard>
+          <div :id="auditPanelId" role="tabpanel" :aria-label="t(tab === 'events' ? 'audit.title' : 'audit.access')">
+            <CommonResourceLayoutCard
+              v-model:pagination="pagination"
+              :data="rows" :columns="columns" :total-records="totalRecords" :request-status="status" :show-toolbar="false" @retry="refresh()">
+              <template #actions-cell="{ row }">
+                <div class="flex justify-end gap-2">
+                  <UButton icon="i-lucide-eye" color="neutral" variant="ghost" :aria-label="t('audit.details')" @click="openDetail(row.original)" />
+                </div>
+              </template>
+            </CommonResourceLayoutCard>
+          </div>
         </CommonEntityEditorWorkspace>
       </div>
       <UModal :open="selected !== null" :title="t('audit.details')" :ui="{ content: 'sm:max-w-2xl' }" @update:open="value => { if (!value) { selected = null; clearDetail() } }">

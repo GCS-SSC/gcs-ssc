@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useId } from 'vue'
 import type { TranslatedTabItem } from '~~/shared/types/ui'
 
 const { items, contentTestId, priorityValues = [], sectionDescription } = defineProps<{
@@ -10,6 +10,7 @@ const { items, contentTestId, priorityValues = [], sectionDescription } = define
 }>()
 const selectedTab = defineModel<string>({ required: true })
 const { t } = useI18n()
+const panelId = `detail-workspace-panel-${useId()}`
 const selectedItem = computed(() => items.find(item => item.value === selectedTab.value))
 const title = computed(() => selectedItem.value?.label ?? (selectedItem.value ? t(selectedItem.value.key) : ''))
 </script>
@@ -17,9 +18,9 @@ const title = computed(() => selectedItem.value?.label ?? (selectedItem.value ? 
 <template>
   <CommonEntityEditorWorkspace :content-test-id="contentTestId">
     <template #sidebar>
-      <CommonRouteTabs v-model="selectedTab" :items="items" :priority-values="priorityValues" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
+      <CommonRouteTabs v-model="selectedTab" :items="items" :priority-values="priorityValues" :external-panel-id="panelId" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
     </template>
-    <CommonDetailSection :title="title" :description="sectionDescription">
+    <CommonDetailSection :id="panelId" role="tabpanel" :aria-label="title" :title="title" :description="sectionDescription">
       <template v-if="$slots.actions" #actions>
         <slot name="actions" />
       </template>

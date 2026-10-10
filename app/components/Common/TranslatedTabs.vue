@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, useId } from 'vue'
-import type { Ref } from 'vue'
+import { computed, nextTick, onMounted, onUpdated, ref, useId } from 'vue'
+import type { ComponentPublicInstance, Ref } from 'vue'
 import type { TranslatedTabItem } from '~~/shared/types/ui'
 
 const {
@@ -11,6 +11,7 @@ const {
   content = false,
   mobileCollapsible = true,
   mobileAutoCloseOnSelect = true,
+  externalPanelId,
   ui
 } = defineProps<{
   items: TranslatedTabItem[]
@@ -20,6 +21,7 @@ const {
   content?: boolean
   mobileCollapsible?: boolean
   mobileAutoCloseOnSelect?: boolean
+  externalPanelId?: string
   ui?: Record<string, string>
 }>()
 
@@ -40,6 +42,40 @@ const itemsIdentity = computed(() => translatedItems.value.map(item => item.valu
 const isMobileExpanded = ref(false)
 const mobileToggleContainer: Ref<HTMLElement | null> = ref(null)
 const mobilePanelId = `translated-tabs-mobile-panel-${useId()}`
+const mobileTabs = ref<ComponentPublicInstance | null>(null)
+const desktopTabs = ref<ComponentPublicInstance | null>(null)
+const inlineTabs = ref<ComponentPublicInstance | null>(null)
+const nativePanelIds = new WeakMap<HTMLElement, string | null>()
+
+/** Associates content-free Nuxt tab triggers with the owner's rendered section.
+ * @returns Resolves after Nuxt UI has rendered the triggers.
+ */
+const associateExternalPanel = async () => {
+  await nextTick()
+  for (const tabs of [mobileTabs.value, desktopTabs.value, inlineTabs.value]) {
+    const triggers = (tabs as { triggersRef?: ComponentPublicInstance[] } | null)?.triggersRef ?? []
+    for (const [index, trigger] of triggers.entries()) {
+      const element = trigger?.$el
+      if (!(element instanceof HTMLElement)) continue
+      const panelId = content ? undefined : translatedItems.value[index]?.panelId ?? externalPanelId
+      if (panelId) {
+        if (!nativePanelIds.has(element)) nativePanelIds.set(element, element.getAttribute('aria-controls'))
+        element.setAttribute('aria-controls', panelId)
+      } else if (nativePanelIds.has(element)) {
+        const nativeId = nativePanelIds.get(element)
+        if (nativeId) element.setAttribute('aria-controls', nativeId)
+        else element.removeAttribute('aria-controls')
+        nativePanelIds.delete(element)
+      }
+    }
+  }
+}
+onMounted(() => {
+  void associateExternalPanel()
+})
+onUpdated(() => {
+  void associateExternalPanel()
+})
 
 const selectedItem = computed(() => {
   const matched = translatedItems.value.find(item => item.value === modelValue.value)
@@ -104,6 +140,7 @@ const onMobilePanelClick = async (event: MouseEvent) => {
 
       <div v-if="isMobileExpanded" :id="mobilePanelId" class="mt-3" @click.capture="onMobilePanelClick">
         <UTabs
+          ref="mobileTabs"
           :key="itemsIdentity"
           activation-mode="manual"
           :model-value="modelValue"
@@ -126,6 +163,7 @@ const onMobilePanelClick = async (event: MouseEvent) => {
 
     <div class="hidden lg:block">
       <UTabs
+        ref="desktopTabs"
         :key="itemsIdentity"
         v-model="modelValue"
         activation-mode="manual"
@@ -147,6 +185,7 @@ const onMobilePanelClick = async (event: MouseEvent) => {
 
   <UTabs
     v-else
+    ref="inlineTabs"
     :key="itemsIdentity"
     v-model="modelValue"
     activation-mode="manual"

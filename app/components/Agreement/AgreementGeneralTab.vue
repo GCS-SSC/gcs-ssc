@@ -95,10 +95,10 @@ const displayValue = (value: string | number | boolean | null | undefined) => {
     </CommonSection>
 
     <CommonSection :title="t('agreement.sections.profile')" badge="02">
-      <CommonValueCard :label="t('agreement.title_en')" :value="displayValue(profile.egcs_fc_title_en)" />
-      <CommonValueCard :label="t('agreement.title_fr')" :value="displayValue(profile.egcs_fc_title_fr)" />
-      <CommonValueCard :label="t('agreement.description_en')" :value="displayValue(profile.egcs_fc_description_en)" />
-      <CommonValueCard :label="t('agreement.description_fr')" :value="displayValue(profile.egcs_fc_description_fr)" />
+      <CommonValueCard :label="t('agreement.title_en')" :value="displayValue(profile.egcs_fc_title_en)" :value-lang="profile.egcs_fc_title_en ? 'en' : undefined" />
+      <CommonValueCard :label="t('agreement.title_fr')" :value="displayValue(profile.egcs_fc_title_fr)" :value-lang="profile.egcs_fc_title_fr ? 'fr' : undefined" />
+      <CommonValueCard :label="t('agreement.description_en')" :value="displayValue(profile.egcs_fc_description_en)" :value-lang="profile.egcs_fc_description_en ? 'en' : undefined" />
+      <CommonValueCard :label="t('agreement.description_fr')" :value="displayValue(profile.egcs_fc_description_fr)" :value-lang="profile.egcs_fc_description_fr ? 'fr' : undefined" />
       <ExtensionSlotHost
         v-if="profileStreamId"
         slot-name="agreement.profile.profile.fields"

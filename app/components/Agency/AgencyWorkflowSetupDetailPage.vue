@@ -183,7 +183,7 @@ const sectionTabs = computed<TranslatedTabItem[]>(() => [
   { key: 'workflow.routing', icon: 'i-lucide-git-branch', value: 'workflow-routing' },
   { key: 'workflow.transitions', icon: 'i-lucide-arrow-right-left', value: 'workflow-transitions' },
   { key: 'workflow.behaviour', icon: 'i-lucide-settings-2', value: 'workflow-behaviour' }
-])
+].map(item => ({ ...item, panelId: item.value })))
 const buildSetupPayload = () => state.value
   ? {
       egcs_cn_entitytype: state.value.egcs_cn_entitytype,
@@ -541,7 +541,7 @@ const deleteMember = async (member: WorkflowMember) => {
               </aside>
             </template>
             <CommonDesignTimeEditorSections>
-              <AssessmentSchemaPageSection section-id="workflow-identity" :title="t('workflow.identity')">
+              <AssessmentSchemaPageSection section-id="workflow-identity" :title="t('workflow.identity')" role="tabpanel" :aria-label="t('workflow.identity')">
                 <div class="grid gap-5 md:grid-cols-2">
                   <UFormField :label="t('transfer_payment.name_en')" name="egcs_cn_name_en">
                     <UInput v-model="state.egcs_cn_name_en" :disabled="!canEditFields" class="w-full" />
@@ -558,7 +558,7 @@ const deleteMember = async (member: WorkflowMember) => {
                 </div>
               </AssessmentSchemaPageSection>
 
-              <AssessmentSchemaPageSection section-id="workflow-routing" :title="t('workflow.routing')">
+              <AssessmentSchemaPageSection section-id="workflow-routing" :title="t('workflow.routing')" role="tabpanel" :aria-label="t('workflow.routing')">
                 <div class="grid gap-5 lg:grid-cols-2">
                   <UFormField :label="t('transfer_payment.entity_type')" name="egcs_cn_entitytype" :description="t('workflow.entity_type_help')">
                     <CommonEnumSelect v-model="state.egcs_cn_entitytype" name="transfer_payment_review_setup_entity_type" :disabled="!canEditFields" class="w-full" />
@@ -624,7 +624,7 @@ const deleteMember = async (member: WorkflowMember) => {
                 </div>
               </AssessmentSchemaPageSection>
 
-              <AssessmentSchemaPageSection section-id="workflow-transitions" :title="t('workflow.transitions')">
+              <AssessmentSchemaPageSection section-id="workflow-transitions" :title="t('workflow.transitions')" role="tabpanel" :aria-label="t('workflow.transitions')">
                 <div class="space-y-5">
                   <UFormField :label="t('workflow.allowed_start_statuses')" name="egcs_cn_allowedstartstatuses" :description="t('workflow.allowed_start_statuses_help')">
                     <CommonStatusSelect v-model="state.egcs_cn_allowedstartstatuses" :agency-id="agencyId" multiple :disabled="!canEditFields" class="w-full" />
@@ -640,7 +640,7 @@ const deleteMember = async (member: WorkflowMember) => {
                 </div>
               </AssessmentSchemaPageSection>
 
-              <AssessmentSchemaPageSection section-id="workflow-behaviour" :title="t('workflow.behaviour')">
+              <AssessmentSchemaPageSection section-id="workflow-behaviour" :title="t('workflow.behaviour')" role="tabpanel" :aria-label="t('workflow.behaviour')">
                 <div class="space-y-5">
                   <UFormField
                     v-if="state.egcs_cn_purpose === 'risk_rating'"

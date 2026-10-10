@@ -96,7 +96,7 @@ const breadcrumbItems = computed(() => [
 const sectionTabs = computed<TranslatedTabItem[]>(() => [
   { key: 'common.general', icon: 'i-lucide-file-text', value: 'review-set-general' },
   { key: 'transfer_payment.review_setup_members', icon: 'i-lucide-list-ordered', value: 'review-set-members' }
-])
+].map(item => ({ ...item, panelId: item.value })))
 const getDraft = () => state.value
   ? {
       egcs_cn_name_en: state.value.egcs_cn_name_en,
@@ -335,7 +335,7 @@ const runMemberMutation: EditorMutationRunner = async request => {
           </template>
 
           <CommonDesignTimeEditorSections>
-            <AssessmentSchemaPageSection section-id="review-set-general" :title="t('common.general')">
+            <AssessmentSchemaPageSection section-id="review-set-general" :title="t('common.general')" role="tabpanel" :aria-label="t('common.general')">
               <UForm :state="state" :validate="validateSet" class="space-y-5" @submit="saveSet">
                 <fieldset :disabled="!canUpdateFields" class="space-y-5">
                   <ReviewSetSetupFields
@@ -350,7 +350,7 @@ const runMemberMutation: EditorMutationRunner = async request => {
               </UForm>
             </AssessmentSchemaPageSection>
 
-            <AssessmentSchemaPageSection section-id="review-set-members" :title="t('transfer_payment.review_setup_members')">
+            <AssessmentSchemaPageSection section-id="review-set-members" :title="t('transfer_payment.review_setup_members')" role="tabpanel" :aria-label="t('transfer_payment.review_setup_members')">
               <div class="mb-5 flex flex-wrap justify-end gap-2">
                 <UButton v-if="canCreate" icon="i-lucide-plus" :label="t('transfer_payment.review_schema_create')" :disabled="mutation.isPending.value" class="cursor-default" @click="openCreateSchema" />
                 <UButton v-if="canUpdate" icon="i-lucide-link" :label="t('transfer_payment.review_schema_associate')" color="neutral" variant="outline" :disabled="mutation.isPending.value" class="cursor-default" @click="openAssociate" />

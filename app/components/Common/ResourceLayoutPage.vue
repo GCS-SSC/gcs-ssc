@@ -101,6 +101,9 @@ defineExpose({
       <div class="w-full min-w-0 shrink-0 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-zinc-200 dark:bg-zinc-900 dark:ring-zinc-800">
         <div
           data-testid="resource-table-scroll"
+          :tabindex="rowsAreDisabled ? -1 : 0"
+          role="group"
+          :aria-label="t('common.records')"
           class="w-full min-w-0 overflow-x-auto transition-opacity"
           :class="hasStaleRows ? 'opacity-60 saturate-50' : undefined"
           :inert="rowsAreDisabled"

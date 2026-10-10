@@ -29,14 +29,14 @@ const displayValue = (value: string | number | null | undefined) => {
     </CommonSection>
 
     <CommonSection :title="t('applicant_recipient.sections.identity')" badge="02">
-      <CommonValueCard :label="t('applicant_recipient.legal_name_en')" :value="displayValue(profile.egcs_ar_legalname_en)" />
-      <CommonValueCard :label="t('applicant_recipient.legal_name_fr')" :value="displayValue(profile.egcs_ar_legalname_fr)" />
-      <CommonValueCard :label="t('applicant_recipient.operating_name_en')" :value="displayValue(profile.egcs_ar_operatingname_en)" />
-      <CommonValueCard :label="t('applicant_recipient.operating_name_fr')" :value="displayValue(profile.egcs_ar_operatingname_fr)" />
-      <CommonValueCard :label="t('applicant_recipient.research_organization_en')" :value="displayValue(profile.egcs_ar_researchorganization_en)" />
-      <CommonValueCard :label="t('applicant_recipient.research_organization_fr')" :value="displayValue(profile.egcs_ar_researchorganization_fr)" />
-      <CommonValueCard :label="t('applicant_recipient.description_en')" :value="displayValue(profile.egcs_ar_description_en)" />
-      <CommonValueCard :label="t('applicant_recipient.description_fr')" :value="displayValue(profile.egcs_ar_description_fr)" />
+      <CommonValueCard :label="t('applicant_recipient.legal_name_en')" :value="displayValue(profile.egcs_ar_legalname_en)" :value-lang="profile.egcs_ar_legalname_en ? 'en' : undefined" />
+      <CommonValueCard :label="t('applicant_recipient.legal_name_fr')" :value="displayValue(profile.egcs_ar_legalname_fr)" :value-lang="profile.egcs_ar_legalname_fr ? 'fr' : undefined" />
+      <CommonValueCard :label="t('applicant_recipient.operating_name_en')" :value="displayValue(profile.egcs_ar_operatingname_en)" :value-lang="profile.egcs_ar_operatingname_en ? 'en' : undefined" />
+      <CommonValueCard :label="t('applicant_recipient.operating_name_fr')" :value="displayValue(profile.egcs_ar_operatingname_fr)" :value-lang="profile.egcs_ar_operatingname_fr ? 'fr' : undefined" />
+      <CommonValueCard :label="t('applicant_recipient.research_organization_en')" :value="displayValue(profile.egcs_ar_researchorganization_en)" :value-lang="profile.egcs_ar_researchorganization_en ? 'en' : undefined" />
+      <CommonValueCard :label="t('applicant_recipient.research_organization_fr')" :value="displayValue(profile.egcs_ar_researchorganization_fr)" :value-lang="profile.egcs_ar_researchorganization_fr ? 'fr' : undefined" />
+      <CommonValueCard :label="t('applicant_recipient.description_en')" :value="displayValue(profile.egcs_ar_description_en)" :value-lang="profile.egcs_ar_description_en ? 'en' : undefined" />
+      <CommonValueCard :label="t('applicant_recipient.description_fr')" :value="displayValue(profile.egcs_ar_description_fr)" :value-lang="profile.egcs_ar_description_fr ? 'fr' : undefined" />
     </CommonSection>
   </div>
 </template>

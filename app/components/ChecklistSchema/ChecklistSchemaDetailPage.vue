@@ -114,7 +114,7 @@ const sectionTabs = computed(() => [
   { key: 'checklist_schema.general', value: 'checklist-general', icon: 'i-lucide-info' },
   { key: 'checklist_schema.sections', value: 'checklist-sections', icon: 'i-lucide-layers' },
   { key: 'checklist_schema.rules', value: 'checklist-rules', icon: 'i-lucide-git-branch' }
-])
+].map(item => ({ ...item, panelId: item.value })))
 
 const toEditorDefinition = (value: ChecklistDefinition): EditorDefinition => ({
   sections: value.sections.map(section => ({
@@ -447,7 +447,7 @@ const retire = async () => {
           <UForm ref="checklistForm" :state="state" :schema="ChecklistMetadataSchema">
             <fieldset :disabled="!canEditFields">
               <CommonDesignTimeEditorSections>
-                <AssessmentSchemaPageSection section-id="checklist-general" :title="t('checklist_schema.general')">
+                <AssessmentSchemaPageSection section-id="checklist-general" :title="t('checklist_schema.general')" role="tabpanel" :aria-label="t('checklist_schema.general')">
                   <div class="grid gap-5 md:grid-cols-2">
                     <UFormField :label="t('transfer_payment.name_en')" name="egcs_cn_name_en" required>
                       <UInput v-model="state.egcs_cn_name_en" class="w-full" />
@@ -465,7 +465,7 @@ const retire = async () => {
                   <UCheckbox v-model="state.egcs_cn_disablereviewers" :label="t('checklist_schema.disable_reviewers')" />
                 </AssessmentSchemaPageSection>
 
-                <AssessmentSchemaPageSection section-id="checklist-sections" :title="t('checklist_schema.sections')">
+                <AssessmentSchemaPageSection section-id="checklist-sections" :title="t('checklist_schema.sections')" role="tabpanel" :aria-label="t('checklist_schema.sections')">
                   <template #actions>
                     <UButton icon="i-lucide-plus" :label="t('checklist_schema.add_section')" variant="outline" class="cursor-default" @click="addSection" />
                   </template>
@@ -543,7 +543,7 @@ const retire = async () => {
                   </div>
                 </AssessmentSchemaPageSection>
 
-                <AssessmentSchemaPageSection section-id="checklist-rules" :title="t('checklist_schema.rules')">
+                <AssessmentSchemaPageSection section-id="checklist-rules" :title="t('checklist_schema.rules')" role="tabpanel" :aria-label="t('checklist_schema.rules')">
                   <template #actions>
                     <ChecklistResultRulesHelp
                       v-if="ruleHelpDefinition"

@@ -60,7 +60,7 @@ const breadcrumbItems = computed(() => [
 const sectionTabs = computed(() => [
   { key: 'recommendation_schema.general', value: 'recommendation-general', icon: 'i-lucide-info' },
   { key: 'recommendation_schema.form_sections', value: 'recommendation-definition', icon: 'i-lucide-layers' }
-])
+].map(item => ({ ...item, panelId: item.value })))
 const definitionValidation = computed(() => definition.value ? RecommendationDefinitionSchema.safeParse(definition.value) : null)
 const definitionErrors = computed(() => definitionValidation.value && !definitionValidation.value.success
   ? [...new Set(definitionValidation.value.error.issues.map(issue => t(issue.message)))]
@@ -278,7 +278,7 @@ const retire = async () => {
 
           <fieldset :disabled="!canEditFields">
             <CommonDesignTimeEditorSections>
-              <AssessmentSchemaPageSection section-id="recommendation-general" :title="t('recommendation_schema.general')">
+              <AssessmentSchemaPageSection section-id="recommendation-general" :title="t('recommendation_schema.general')" role="tabpanel" :aria-label="t('recommendation_schema.general')">
                 <div class="grid gap-5 md:grid-cols-2">
                   <UFormField :label="t('transfer_payment.name_en')" required>
                     <UInput v-model="state.egcs_cn_name_en" class="w-full" />
@@ -289,7 +289,7 @@ const retire = async () => {
                 </div>
               </AssessmentSchemaPageSection>
 
-              <AssessmentSchemaPageSection section-id="recommendation-definition" :title="t('recommendation_schema.form_sections')">
+              <AssessmentSchemaPageSection section-id="recommendation-definition" :title="t('recommendation_schema.form_sections')" role="tabpanel" :aria-label="t('recommendation_schema.form_sections')">
                 <UAlert
                   v-if="definitionErrors.length > 0"
                   icon="i-lucide-circle-alert" color="warning" variant="subtle"

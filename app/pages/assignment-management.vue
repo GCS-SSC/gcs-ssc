@@ -104,6 +104,7 @@ const columns: TableColumnInput<Row>[] = [
             <CommonEnumSelect
               v-model="entityType"
               name="entity_type"
+              :aria-label="t('admin_common.fields.egcs_cn_entitytype')"
               :items="entityTypeOptions"
               icon="i-lucide-layers-3"
               class="min-w-52" />

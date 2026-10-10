@@ -19,12 +19,16 @@ const statusLabel = computed(() => t(agency.egcs_ay_active ? 'common.active' : '
           <CommonValueCard
             :label="t('agency.detail.english_profile')"
             :value="agency.egcs_ay_name_en"
-            :sub-value="agency.egcs_ay_abbreviation_en" />
+            value-lang="en"
+            :sub-value="agency.egcs_ay_abbreviation_en"
+            sub-value-lang="en" />
 
           <CommonValueCard
             :label="t('agency.detail.french_profile')"
             :value="agency.egcs_ay_name_fr"
-            :sub-value="agency.egcs_ay_abbreviation_fr" />
+            value-lang="fr"
+            :sub-value="agency.egcs_ay_abbreviation_fr"
+            sub-value-lang="fr" />
         </CommonSection>
 
         <CommonSection :title="t('agency.detail.system_config')" badge="02">

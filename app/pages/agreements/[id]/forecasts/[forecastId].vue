@@ -744,7 +744,7 @@ const saveForecastBreakdown = async () => {
                         aria-required="true"
                         :aria-describedby="isDraftAmountInvalid(row.original.budgetLineId, period.months[0] ?? 0) ? `forecast-amount-error-${row.original.budgetLineId}-${period.columnId}` : undefined"
                         :aria-invalid="isDraftAmountInvalid(row.original.budgetLineId, period.months[0] ?? 0)"
-                        :aria-label="`${period.label} ${row.original.lineItemNameEn}`"
+                        :aria-label="`${period.label} ${locale === 'fr' ? row.original.lineItemNameFr : row.original.lineItemNameEn}`"
                         class="w-full"
                         @update:model-value="value => setDraftAmount(row.original.budgetLineId, period.months[0] ?? 0, value ?? '')" />
                       <span class="mt-1 block text-xs text-muted">({{ t('common.field_required') }})</span>

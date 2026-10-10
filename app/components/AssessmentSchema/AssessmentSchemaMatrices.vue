@@ -18,7 +18,7 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <AssessmentSchemaPageSection section-id="schema-matrices" :title="t('transfer_payment.scoring_matrix_record')">
+  <AssessmentSchemaPageSection section-id="schema-matrices" :title="t('transfer_payment.scoring_matrix_record')" role="tabpanel" :aria-label="t('transfer_payment.scoring_matrix_record')">
     <div class="space-y-2">
       <AssessmentSchemaAccordionSection :title="t('transfer_payment.overall_scoring_matrix')">
         <AssessmentScoringBandArrayEditor

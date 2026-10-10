@@ -67,7 +67,7 @@ const breadcrumbItems = computed(() => [
 const sectionTabs = computed(() => [
   { key: 'data_collection.general', value: 'data-collection-general', icon: 'i-lucide-info' },
   { key: 'data_collection.form_sections', value: 'data-collection-definition', icon: 'i-lucide-layers' }
-])
+].map(item => ({ ...item, panelId: item.value })))
 const definitionValidation = computed(() => definition.value ? DataCollectionDefinitionSchema.safeParse(definition.value) : null)
 const definitionErrors = computed(() => definitionValidation.value && !definitionValidation.value.success
   ? [...new Set(definitionValidation.value.error.issues.map(issue => t(issue.message)))]
@@ -305,7 +305,7 @@ const deleteDraft = async () => {
           <UForm ref="dataCollectionForm" :state="{ egcs_cn_name_en: state.egcs_cn_name_en, egcs_cn_name_fr: state.egcs_cn_name_fr, egcs_cn_description_en: state.egcs_cn_description_en, egcs_cn_description_fr: state.egcs_cn_description_fr, egcs_cn_approvaltemplate: state.egcs_cn_approvaltemplate, egcs_cn_schema: definition }" :validate="validate" @submit="async () => { await save() }">
             <fieldset :disabled="!canEditFields">
               <CommonDesignTimeEditorSections>
-                <AssessmentSchemaPageSection section-id="data-collection-general" :title="t('data_collection.general')">
+                <AssessmentSchemaPageSection section-id="data-collection-general" :title="t('data_collection.general')" role="tabpanel" :aria-label="t('data_collection.general')">
                   <div class="grid gap-5 md:grid-cols-2">
                     <UFormField :label="t('transfer_payment.name_en')" name="egcs_cn_name_en">
                       <UInput v-model="state.egcs_cn_name_en" class="w-full" />
@@ -326,7 +326,7 @@ const deleteDraft = async () => {
                     label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" class="mt-5" @update:model-value="value => { state!.egcs_cn_approvaltemplate = value ?? null }" />
                 </AssessmentSchemaPageSection>
 
-                <AssessmentSchemaPageSection section-id="data-collection-definition" :title="t('data_collection.form_sections')">
+                <AssessmentSchemaPageSection section-id="data-collection-definition" :title="t('data_collection.form_sections')" role="tabpanel" :aria-label="t('data_collection.form_sections')">
                   <UAlert
                     v-if="definitionErrors.length > 0"
                     icon="i-lucide-circle-alert" color="warning" variant="subtle"

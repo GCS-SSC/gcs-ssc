@@ -109,7 +109,7 @@ provideAssessmentSchemaHelperDefinitions(helperDefinitions)
 
           <fieldset :disabled="!canEditFields">
             <CommonDesignTimeEditorSections>
-              <AssessmentSchemaPageSection :section-id="'schema-general'" :title="t('agency.tabs.general')">
+              <AssessmentSchemaPageSection :section-id="'schema-general'" :title="t('agency.tabs.general')" role="tabpanel" :aria-label="t('agency.tabs.general')">
                 <ReviewSchemaGeneralFields v-if="generalState" v-model:state="generalState" />
               </AssessmentSchemaPageSection>
 
@@ -118,7 +118,7 @@ provideAssessmentSchemaHelperDefinitions(helperDefinitions)
                 v-model="assessmentDefinitionState"
                 v-model:overall-scoring-matrix="overallScoringMatrixState" />
               <AssessmentSchemaSectionsEditor v-if="assessmentDefinitionState" v-model="assessmentDefinitionState" />
-              <AssessmentSchemaPageSection :section-id="'schema-outcomes'" :title="t('transfer_payment.outcomes')">
+              <AssessmentSchemaPageSection :section-id="'schema-outcomes'" :title="t('transfer_payment.outcomes')" role="tabpanel" :aria-label="t('transfer_payment.outcomes')">
                 <template #actions>
                   <UButton
                     icon="i-lucide-plus"
@@ -134,7 +134,7 @@ provideAssessmentSchemaHelperDefinitions(helperDefinitions)
                   v-model="assessmentDefinitionState" />
               </AssessmentSchemaPageSection>
 
-              <AssessmentSchemaPageSection :section-id="'schema-impactors'" :title="t('transfer_payment.impactors')">
+              <AssessmentSchemaPageSection :section-id="'schema-impactors'" :title="t('transfer_payment.impactors')" role="tabpanel" :aria-label="t('transfer_payment.impactors')">
                 <template #actions>
                   <UButton
                     icon="i-lucide-plus"

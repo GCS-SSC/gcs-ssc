@@ -71,7 +71,7 @@ const breadcrumbItems = computed(() => [
 const sectionTabs = computed(() => [
   { key: 'workflow.identity', icon: 'i-lucide-file-text', value: 'recommendation-identity' },
   { key: 'transfer_payment.recommendation_set_members', icon: 'i-lucide-list-ordered', value: 'recommendation-members' }
-])
+].map(item => ({ ...item, panelId: item.value })))
 const getDraft = () => state.value
   ? {
       egcs_cn_name_en: state.value.egcs_cn_name_en,
@@ -290,7 +290,7 @@ const runMemberMutation: EditorMutationRunner = async request => {
               </aside>
             </template>
             <CommonDesignTimeEditorSections>
-              <AssessmentSchemaPageSection section-id="recommendation-identity" :title="t('workflow.identity')">
+              <AssessmentSchemaPageSection section-id="recommendation-identity" :title="t('workflow.identity')" role="tabpanel" :aria-label="t('workflow.identity')">
                 <div class="grid gap-5 md:grid-cols-2">
                   <UFormField :label="t('transfer_payment.name_en')" name="egcs_cn_name_en">
                     <UInput v-model="state.egcs_cn_name_en" :disabled="!canUpdateFields" class="w-full" />
@@ -317,7 +317,7 @@ const runMemberMutation: EditorMutationRunner = async request => {
                   />
                 </div>
               </AssessmentSchemaPageSection>
-              <AssessmentSchemaPageSection section-id="recommendation-members" :title="t('transfer_payment.recommendation_set_members')">
+              <AssessmentSchemaPageSection section-id="recommendation-members" :title="t('transfer_payment.recommendation_set_members')" role="tabpanel" :aria-label="t('transfer_payment.recommendation_set_members')">
                 <template #actions>
                   <div v-if="canCreate || canUpdate" class="flex flex-wrap gap-2">
                     <UButton v-if="canCreate" icon="i-lucide-plus" :label="t('transfer_payment.recommendation_create')" :disabled="mutation.isPending.value" class="cursor-default" @click="createSchema" />

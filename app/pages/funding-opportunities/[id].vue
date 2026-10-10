@@ -155,14 +155,14 @@ const breadcrumbs = computed(() => [
         <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="funding-opportunity-detail-content" :section-description="selectedTab === 'applications' ? t('funding_opportunity.applications_description') : undefined">
           <div v-if="selectedTab === 'general'" class="space-y-8">
             <CommonSection :title="t('agency.detail.core_info')" badge="01">
-              <CommonValueCard :label="t('funding_opportunity.name_en')" :value="profile.egcs_fo_name_en" />
-              <CommonValueCard :label="t('funding_opportunity.name_fr')" :value="profile.egcs_fo_name_fr" />
+              <CommonValueCard :label="t('funding_opportunity.name_en')" :value="profile.egcs_fo_name_en" value-lang="en" />
+              <CommonValueCard :label="t('funding_opportunity.name_fr')" :value="profile.egcs_fo_name_fr" value-lang="fr" />
               <UCard class="min-w-0 border-none bg-white shadow-sm ring-1 ring-zinc-100 dark:bg-zinc-900 dark:ring-zinc-800">
                 <dl class="space-y-2">
                   <dt class="text-xs font-black tracking-widest text-zinc-400 uppercase dark:text-zinc-500">
                     {{ t('funding_opportunity.objective_en') }}
                   </dt>
-                  <dd class="text-sm break-words whitespace-pre-wrap text-zinc-900 dark:text-white">
+                  <dd lang="en" class="text-sm break-words whitespace-pre-wrap text-zinc-900 dark:text-white">
                     {{ profile.egcs_fo_objective_en }}
                   </dd>
                 </dl>
@@ -172,7 +172,7 @@ const breadcrumbs = computed(() => [
                   <dt class="text-xs font-black tracking-widest text-zinc-400 uppercase dark:text-zinc-500">
                     {{ t('funding_opportunity.objective_fr') }}
                   </dt>
-                  <dd class="text-sm break-words whitespace-pre-wrap text-zinc-900 dark:text-white">
+                  <dd lang="fr" class="text-sm break-words whitespace-pre-wrap text-zinc-900 dark:text-white">
                     {{ profile.egcs_fo_objective_fr }}
                   </dd>
                 </dl>

@@ -73,6 +73,7 @@ const handleSave = () => {
           v-for="item in items"
           :key="item.key"
           type="button"
+          :aria-current="selectedValue === item.value ? 'location' : undefined"
           class="group block w-full cursor-default px-3 py-3 text-left transition-colors"
           :class="selectedValue === item.value
             ? 'bg-primary-50 dark:bg-primary-950/20'

@@ -42,6 +42,7 @@ export interface TranslatedTabItem {
   label?: string
   icon?: string
   value: string
+  panelId?: string
 }
 
 export interface TranslatedTabsProps {
@@ -51,6 +52,7 @@ export interface TranslatedTabsProps {
   content?: boolean
   mobileCollapsible?: boolean
   mobileAutoCloseOnSelect?: boolean
+  externalPanelId?: string
   ui?: Record<string, string>
 }
 

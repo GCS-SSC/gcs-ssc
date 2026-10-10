@@ -11,10 +11,10 @@ const { t } = useI18n()
 <template>
   <div class="space-y-8">
     <CommonSection :title="t('role.detail.core_info')" badge="01">
-      <CommonValueCard :label="t('role.name_en')" :value="role.name_en" />
-      <CommonValueCard :label="t('role.name_fr')" :value="role.name_fr" />
-      <CommonValueCard :label="t('role.description_en')" :value="role.description_en || '-'" />
-      <CommonValueCard :label="t('role.description_fr')" :value="role.description_fr || '-'" />
+      <CommonValueCard :label="t('role.name_en')" :value="role.name_en" value-lang="en" />
+      <CommonValueCard :label="t('role.name_fr')" :value="role.name_fr" value-lang="fr" />
+      <CommonValueCard :label="t('role.description_en')" :value="role.description_en || '-'" value-lang="en" />
+      <CommonValueCard :label="t('role.description_fr')" :value="role.description_fr || '-'" value-lang="fr" />
     </CommonSection>
   </div>
 </template>

@@ -16,17 +16,18 @@ const { locale } = useI18n()
     <ULink
       v-if="to"
       :to="to"
+      :lang="locale"
       class="leading-tight font-bold text-zinc-900 transition-colors hover:text-primary dark:text-white">
       {{ locale === 'en' ? nameEn : nameFr }}
     </ULink>
-    <p v-else class="leading-tight font-bold text-zinc-900 dark:text-white">
+    <p v-else :lang="locale" class="leading-tight font-bold text-zinc-900 dark:text-white">
       {{ locale === 'en' ? nameEn : nameFr }}
     </p>
-    <p class="flex items-center gap-1.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+    <p :lang="locale === 'en' ? 'fr' : 'en'" class="flex items-center gap-1.5 text-xs font-medium text-zinc-500 dark:text-zinc-400">
       {{ locale === 'en' ? nameFr : nameEn }}
       <template v-if="abbreviationEn || abbreviationFr || extra">
         <span class="size-1 rounded-full bg-zinc-300 dark:bg-zinc-700" />
-        <span class="uppercase">
+        <span :lang="locale" class="uppercase">
           {{ locale === 'en' ? abbreviationEn : abbreviationFr }}
           {{ extra }}
         </span>

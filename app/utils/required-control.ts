@@ -136,6 +136,12 @@ export const createRequiredControl = <T>(component: T, kind: 'standard' | 'selec
         if (descriptions) target.setAttribute('aria-describedby', descriptions)
         else target.removeAttribute('aria-describedby')
       }
+      // Reka's fully-hidden form proxies duplicate the visible control's name/state.
+      const root = elementOf(exposed.$el) ?? targets[0]?.parentElement
+      if (targets.length) for (const proxy of root?.querySelectorAll<HTMLInputElement>('input[data-hidden][tabindex="-1"]') ?? []) {
+        proxy.setAttribute('aria-hidden', 'true')
+        proxy.hidden = true
+      }
     }
     onMounted(() => {
       void updateAccessibility()
@@ -153,9 +159,14 @@ export const createRequiredControl = <T>(component: T, kind: 'standard' | 'selec
     return () => {
       const required = isRequired.value
       const enabled = isEnabled.value
+      const fieldName = typeof attrs.name === 'string' ? attrs.name : formField?.value.name
+      const contentLanguage = options.bilingualText && (attrs.type === undefined || attrs.type === 'text')
+        ? /(?:^|[_.])(en|fr)$/.exec(fieldName ?? '')?.[1]
+        : undefined
       const original = h(component as Component, {
         ...attrs,
         ...props,
+        'lang': attrs.lang ?? contentLanguage,
         'required': kind !== 'range' && required && enabled,
         'aria-required': kind !== 'segmented' && kind !== 'group' && kind !== 'range' && required && enabled ? 'true' : undefined,
         ...(kind === 'select-menu' ? { 'role': 'combobox', 'aria-label': attrs['aria-label'], 'aria-labelledby': attrs['aria-labelledby'] ?? (attrs['aria-label'] ? undefined : labelId?.value) } : {}),

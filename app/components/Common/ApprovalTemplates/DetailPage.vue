@@ -99,7 +99,7 @@ const sectionTabs = computed(() => [
   { key: 'agency.tabs.general', icon: 'i-lucide-info', value: 'approval-template-general' },
   { key: 'approval_templates.additional_approvals.title', icon: 'i-lucide-list-plus', value: 'approval-template-additional-approvals' },
   { key: 'admin_common.resources.approval_steps', icon: 'i-lucide-list-ordered', value: 'approval-template-steps' }
-])
+].map(item => ({ ...item, panelId: item.value })))
 
 const showPreservedDraft = () => toast.add({
   title: t('common.warning'),
@@ -245,7 +245,7 @@ watch(selectedSection, value => {
             @submit.prevent="() => { void saveTemplate() }">
             <fieldset :disabled="!canEditFields">
               <CommonDesignTimeEditorSections>
-                <AssessmentSchemaPageSection section-id="approval-template-general" :title="t('agency.tabs.general')">
+                <AssessmentSchemaPageSection section-id="approval-template-general" :title="t('agency.tabs.general')" role="tabpanel" :aria-label="t('agency.tabs.general')">
                   <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <UFormField :label="t('admin_common.fields.egcs_cn_name_en')" name="egcs_cn_name_en">
                       <UInput v-model="state.egcs_cn_name_en" />
@@ -264,13 +264,17 @@ watch(selectedSection, value => {
 
                 <AssessmentSchemaPageSection
                   section-id="approval-template-additional-approvals"
-                  :title="t('approval_templates.additional_approvals.title')">
+                  :title="t('approval_templates.additional_approvals.title')"
+                  role="tabpanel"
+                  :aria-label="t('approval_templates.additional_approvals.title')">
                   <CommonApprovalTemplatesAdditionalApprovalsFields v-model:state="state" />
                 </AssessmentSchemaPageSection>
 
                 <AssessmentSchemaPageSection
                   section-id="approval-template-steps"
-                  :title="t('admin_common.resources.approval_steps')">
+                  :title="t('admin_common.resources.approval_steps')"
+                  role="tabpanel"
+                  :aria-label="t('admin_common.resources.approval_steps')">
                   <template #actions>
                     <UButton
                       icon="i-lucide-plus"
