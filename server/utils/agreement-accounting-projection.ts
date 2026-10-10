@@ -153,14 +153,14 @@ export const getAgreementAccountingLines = async (
     .innerJoin('Transfer_Payment_Stream_Chart_of_Account as coding', 'coding.id', 'line.egcs_fc_transferpaymentstreamchartofaccount')
     .innerJoin('Agency_Chart_of_Account as account', 'account.id', 'coding.egcs_tp_agencychartofaccount')
     .innerJoin('Agency_Fiscal_Year as year', 'year.id', 'account.egcs_ay_fiscalyear')
-    .select(['line.id', 'line.egcs_fc_commitment', 'line.egcs_fc_commitmentlinenumber',
+    .select(['line.id', 'line.egcs_fc_commitment', 'line.egcs_fc_commitmentlinenumber', 'commitment.egcs_fc_active as active',
       'coding.id as egcs_fc_chartofaccount', 'account.id as egcs_fc_agencychartofaccount', 'commitment.egcs_fc_currency as currency',
       'account.egcs_ay_accountingdimensions as egcs_fc_accountingdimensions',
       'account.egcs_ay_fiscalyear as egcs_fc_agencyfiscalyear', 'year.egcs_ay_fiscalyeardisplay as egcs_fc_fiscalyeardisplay',
       'year.egcs_ay_fiscalyear as egcs_fc_fiscalyearorder',
       databaseMoneyText(sql.ref('line.egcs_fc_amount')).as('egcs_fc_commitmentamount')])
     .where('line.egcs_fc_fundingagreement', '=', agreementId).where('commitment.egcs_fc_fundingagreement', '=', agreementId)
-    .where('commitment.egcs_fc_active', '=', true).where('commitment._deleted', '=', false).where('line._deleted', '=', false)
+    .where('commitment._deleted', '=', false).where('line._deleted', '=', false)
     .orderBy('line.id').execute()
   let paymentsQuery = db.selectFrom('Funding_Case_Agreement_Payment_Line as line')
     .innerJoin('Funding_Case_Agreement_Payment as payment', 'payment.id', 'line.egcs_fc_fundingagreementpayment')
@@ -189,7 +189,7 @@ export const getAgreementAccountingLines = async (
   }
   const corrections = await readEffectiveCorrectionAdjustments(db, agreementId)
   const recoveries = options.omitCreditMemos ? [] : await readEffectiveAccountReceivableRecoveries(db, agreementId)
-  return lines.map(line => {
+  return lines.flatMap(({ active, ...line }) => {
     const original = sumMoney(payments.filter(row => row.currency === line.currency && String(row.commitmentLineId) === String(line.id))
       .map(row => parseDatabaseMoney(row.amount)))
     // JV incoming coding belongs to its shared pool; it is attributed to this exact line only for this same coding.
@@ -199,9 +199,11 @@ export const getAgreementAccountingLines = async (
     const prior = sumMoney(corrections.filter(row => row.currency === line.currency && String(row.commitmentLineId) === String(line.id)).map(row => row.amount))
     const recovered = sumMoney(recoveries.filter(row => row.currency === line.currency && String(row.commitmentLineId) === String(line.id)
       && String(row.agencyChartId) === String(line.egcs_fc_agencychartofaccount)).map(row => row.amount))
-    return { ...line, egcs_fc_commitmentamount: parseDatabaseMoney(line.egcs_fc_commitmentamount),
+    if (!active && [original, jv, prior, recovered].every(amount => amount === ZERO)) return []
+    // Historical paid keeps its exact source row; only active rows contribute committed funds.
+    return [{ ...line, egcs_fc_commitmentamount: active ? parseDatabaseMoney(line.egcs_fc_commitmentamount) : ZERO,
       egcs_fc_originalpaid: original, egcs_fc_jveffect: jv, egcs_fc_priorcorrections: prior, egcs_fc_arrecoveries: recovered,
-      egcs_fc_correctedpaid: sumMoney([original, jv, prior, recovered]) }
+      egcs_fc_correctedpaid: sumMoney([original, jv, prior, recovered]) }]
   })
 }
 

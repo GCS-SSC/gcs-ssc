@@ -56,7 +56,7 @@ export const getCommitmentLinePaymentCoverage = async (
   const line = await db.selectFrom('Funding_Case_Agreement_Commitment_Line as line')
     .innerJoin('Funding_Case_Agreement_Commitment as commitment', 'commitment.id', 'line.egcs_fc_commitment')
     .innerJoin('Transfer_Payment_Stream_Chart_of_Account as coding', 'coding.id', 'line.egcs_fc_transferpaymentstreamchartofaccount')
-    .select(['line.egcs_fc_fundingagreement', 'coding.egcs_tp_agencychartofaccount', 'commitment.egcs_fc_currency as currency',
+    .select(['line.egcs_fc_fundingagreement', 'coding.egcs_tp_agencychartofaccount', 'commitment.egcs_fc_currency as currency', 'commitment.egcs_fc_type as commitmentTypeId',
       databaseMoneyText(sql.ref('line.egcs_fc_amount')).as('amount')])
     .where('line.id', '=', commitmentLineId).where('line._deleted', '=', false).executeTakeFirst()
   if (line && options.currency !== undefined && options.currency !== line.currency) throw new Error('Commitment line currency must match selected Payment currency')
@@ -75,19 +75,19 @@ export const getCommitmentLinePaymentCoverage = async (
   if (!line) return originalCoverage
 
   const coding = await readCommitmentCodingCapacity(db, String(line.egcs_fc_fundingagreement),
-    String(line.egcs_tp_agencychartofaccount), { ...options, currency: line.currency, includeCommitmentLineId: commitmentLineId }, approvalByPayment)
-  if (!coding) return originalCoverage
+    String(line.egcs_tp_agencychartofaccount), { ...options, currency: line.currency, includeCommitmentLineId: commitmentLineId, commitmentTypeId: line.commitmentTypeId }, approvalByPayment)
   const ownPaid = addMoney(paidAmount, sumMoney(coding.adjustments.filter(row => String(row.commitmentLineId) === commitmentLineId)
     .map(row => parseDatabaseMoney(row.amount))))
   const codingPaidFloor = subtractMoney(parseDatabaseMoney(line.amount), coding.available)
-  const adjustedFloor = compareMoney(ownPaid, codingPaidFloor) >= 0 ? ownPaid : codingPaidFloor
+  const typedFloor = coding.typedAvailable === null ? ZERO_MONEY : subtractMoney(parseDatabaseMoney(line.amount), coding.typedAvailable)
+  const adjustedFloor = [ownPaid, codingPaidFloor, typedFloor].reduce((maximum, floor) => compareMoney(floor, maximum) > 0 ? floor : maximum, ZERO_MONEY)
   return {
     hasActivePaymentLine: rows.length > 0 || coding.adjustments.length > 0,
     paidAmount: compareMoney(adjustedFloor, ZERO_MONEY) < 0 ? ZERO_MONEY : adjustedFloor
   }
 }
 
-type CoverageOptions = { excludePaymentLineId?: string; excludePaymentId?: string; includeCommitmentLineId?: string; includeCommitmentLineIds?: string[]; currency: Currency_Codes }
+type CoverageOptions = { excludePaymentLineId?: string; excludePaymentId?: string; includeCommitmentLineId?: string; includeCommitmentLineIds?: string[]; commitmentTypeId?: string; currency: Currency_Codes }
 type ApprovalEvidence = Awaited<ReturnType<typeof resolveLatestTargetApprovalEvidence>>
 
 /**
@@ -97,7 +97,7 @@ type ApprovalEvidence = Awaited<ReturnType<typeof resolveLatestTargetApprovalEvi
  * @param agencyChartId - Matching Agency chart foreign key.
  * @param options - Excluded Payment or Payment line for an edit calculation.
  * @param approvalByPayment - Shared cache of the canonical Payment approval evidence.
- * @returns Shared capacity and signed adjustments, or null without successful corrections.
+ * @returns Shared capacity across historical payments and signed adjustments.
  */
 const readCommitmentCodingCapacity = async (
   db: DbClient,
@@ -128,12 +128,11 @@ const readCommitmentCodingCapacity = async (
     .filter(row => String(row.agencyChartId) === agencyChartId)
     .map(row => ({ commitmentLineId: row.commitmentLineId, amount: row.amount, paymentId: null }))
   const adjustments = [...adjustmentRows.filter(row => successfulVouchers.has(String(row.voucherId)) && String(row.paymentId) !== options.excludePaymentId), ...postedCorrections, ...recoveries]
-  if (!adjustments.length) return null
 
   const codingLines = await db.selectFrom('Funding_Case_Agreement_Commitment_Line as line')
     .innerJoin('Funding_Case_Agreement_Commitment as commitment', 'commitment.id', 'line.egcs_fc_commitment')
     .innerJoin('Transfer_Payment_Stream_Chart_of_Account as coding', 'coding.id', 'line.egcs_fc_transferpaymentstreamchartofaccount')
-    .select(['line.id', databaseMoneyText(sql.ref('line.egcs_fc_amount')).as('amount')])
+    .select(['line.id', 'commitment.egcs_fc_type as commitmentTypeId', databaseMoneyText(sql.ref('line.egcs_fc_amount')).as('amount')])
     .where('commitment.egcs_fc_fundingagreement', '=', agreementId)
     .where('commitment.egcs_fc_currency', '=', options.currency)
     .where('coding.egcs_tp_agencychartofaccount', '=', agencyChartId)
@@ -145,8 +144,14 @@ const readCommitmentCodingCapacity = async (
         : eb('commitment.egcs_fc_active', '=', true)).execute()
   let codingPaymentsQuery = db.selectFrom('Funding_Case_Agreement_Payment_Line as paymentLine')
     .innerJoin('Funding_Case_Agreement_Payment as payment', 'payment.id', 'paymentLine.egcs_fc_fundingagreementpayment')
-    .select(['payment.id as paymentId', databaseMoneyText(sql.ref('paymentLine.egcs_fc_amount')).as('amount')])
-    .where('paymentLine.egcs_fc_fundingagreementcommitmentline', 'in', codingLines.map(row => String(row.id)))
+    .innerJoin('Funding_Case_Agreement_Commitment_Line as paidLine', 'paidLine.id', 'paymentLine.egcs_fc_fundingagreementcommitmentline')
+    .innerJoin('Funding_Case_Agreement_Commitment as paidCommitment', 'paidCommitment.id', 'paidLine.egcs_fc_commitment')
+    .innerJoin('Transfer_Payment_Stream_Chart_of_Account as paidCoding', 'paidCoding.id', 'paidLine.egcs_fc_transferpaymentstreamchartofaccount')
+    .select(['payment.id as paymentId', 'paidCommitment.egcs_fc_type as commitmentTypeId', databaseMoneyText(sql.ref('paymentLine.egcs_fc_amount')).as('amount')])
+    .where('paidCommitment.egcs_fc_fundingagreement', '=', agreementId)
+    .where('paidCommitment.egcs_fc_currency', '=', options.currency)
+    .where('paidCoding.egcs_tp_agencychartofaccount', '=', agencyChartId)
+    .where('paidCommitment._deleted', '=', false).where('paidLine._deleted', '=', false)
     .where('payment.egcs_fc_currency', '=', options.currency)
     .where('paymentLine._deleted', '=', false).where('payment._deleted', '=', false)
   if (options.excludePaymentId) codingPaymentsQuery = codingPaymentsQuery.where('payment.id', '!=', options.excludePaymentId)
@@ -161,10 +166,31 @@ const readCommitmentCodingCapacity = async (
   const countedAdjustments = adjustments.filter(row => counted(row.paymentId))
   const codingPaid = sumMoney([...codingPayments.filter(row => counted(row.paymentId)), ...countedAdjustments]
     .map(row => parseDatabaseMoney(row.amount)))
+  let typedPaid = ZERO_MONEY
+  let typedAvailable: Money | null = null
+  if (options.commitmentTypeId) {
+    const history = await db.selectFrom('Funding_Case_Agreement_Commitment_Line as historicalLine')
+      .innerJoin('Funding_Case_Agreement_Commitment as historicalCommitment', 'historicalCommitment.id', 'historicalLine.egcs_fc_commitment')
+      .select('historicalLine.id')
+      .where('historicalCommitment.egcs_fc_fundingagreement', '=', agreementId)
+      .where('historicalCommitment.egcs_fc_currency', '=', options.currency)
+      .where('historicalCommitment.egcs_fc_type', '=', options.commitmentTypeId)
+      .where('historicalCommitment._deleted', '=', false).where('historicalLine._deleted', '=', false).execute()
+    const historyIds = new Set(history.map(line => String(line.id)))
+    typedPaid = sumMoney([
+      ...codingPayments.filter(row => String(row.commitmentTypeId) === options.commitmentTypeId && counted(row.paymentId)),
+      ...countedAdjustments.filter(row => row.commitmentLineId !== null && historyIds.has(String(row.commitmentLineId)))
+    ].map(row => parseDatabaseMoney(row.amount)))
+    if (compareMoney(typedPaid, ZERO_MONEY) < 0) typedPaid = ZERO_MONEY
+    const committed = sumMoney(codingLines.filter(line => String(line.commitmentTypeId) === options.commitmentTypeId).map(line => parseDatabaseMoney(line.amount)))
+    typedAvailable = subtractMoney(committed, typedPaid)
+  }
   const committed = sumMoney(codingLines.map(row => parseDatabaseMoney(row.amount)))
   const available = subtractMoney(committed, codingPaid)
   return {
     adjustments: countedAdjustments,
+    typedPaid,
+    typedAvailable,
     available: compareMoney(available, committed) > 0 ? committed : available
   }
 }
@@ -177,11 +203,13 @@ const readCommitmentCodingCapacity = async (
  * @param input.agreementId - Owning Agreement identity.
  * @param input.currency - Commitment currency.
  * @param input.lineIds - Exact current and prior Commitment line identities.
+ * @param input.excludePaymentId - Payment omitted while recalculating its coding.
+ * @param input.commitmentTypeId - Preserves paid coding across previous versions of this type.
  * @returns Exact-row coverage and aggregate coding floors.
  */
 export const getCommitmentAllocationPaidCoverage = async (
   db: DbClient,
-  input: { agreementId: string; currency: Currency_Codes; lineIds: string[] }
+  input: { agreementId: string; currency: Currency_Codes; lineIds: string[]; excludePaymentId?: string; commitmentTypeId?: string }
 ) => {
   const lines = new Map<string, { paidAmount: Money; hasActivePaymentLine: boolean }>()
   const codingFloors = new Map<string, Money>()
@@ -194,13 +222,15 @@ export const getCommitmentAllocationPaidCoverage = async (
     .where('allocationLine.id', 'in', input.lineIds).where('allocationLine.egcs_fc_fundingagreement', '=', input.agreementId)
     .where('commitment.egcs_fc_currency', '=', input.currency).where('allocationLine._deleted', '=', false)
     .where('commitment._deleted', '=', false).execute()
-  const payments = await db.selectFrom('Funding_Case_Agreement_Payment_Line as allocationPaymentLine')
+  let paymentsQuery = db.selectFrom('Funding_Case_Agreement_Payment_Line as allocationPaymentLine')
     .innerJoin('Funding_Case_Agreement_Payment as payment', 'payment.id', 'allocationPaymentLine.egcs_fc_fundingagreementpayment')
     .select(['payment.id as paymentId', 'allocationPaymentLine.egcs_fc_fundingagreementcommitmentline as commitmentLineId',
       databaseMoneyText(sql.ref('allocationPaymentLine.egcs_fc_amount')).as('amount')])
     .where('allocationPaymentLine.egcs_fc_fundingagreementcommitmentline', 'in', input.lineIds)
     .where('payment.egcs_fc_currency', '=', input.currency).where('allocationPaymentLine._deleted', '=', false)
-    .where('payment._deleted', '=', false).execute()
+    .where('payment._deleted', '=', false)
+  if (input.excludePaymentId) paymentsQuery = paymentsQuery.where('payment.id', '!=', input.excludePaymentId)
+  const payments = await paymentsQuery.execute()
   const approvals = new Map<string, ApprovalEvidence>()
   for (const paymentId of new Set(payments.map(row => String(row.paymentId)))) {
     approvals.set(paymentId, await resolveLatestTargetApprovalEvidence(db, 'fundingcasepayment', paymentId))
@@ -208,7 +238,7 @@ export const getCommitmentAllocationPaidCoverage = async (
   for (const codingId of new Set(selected.map(row => String(row.codingId)))) {
     const members = selected.filter(row => String(row.codingId) === codingId)
     const coding = await readCommitmentCodingCapacity(db, input.agreementId, String(members[0]!.agencyChartId),
-      { currency: input.currency, includeCommitmentLineIds: input.lineIds }, approvals)
+      { currency: input.currency, includeCommitmentLineIds: input.lineIds, excludePaymentId: input.excludePaymentId, commitmentTypeId: input.commitmentTypeId }, approvals)
     for (const member of members) {
       const attached = payments.filter(row => String(row.commitmentLineId) === String(member.id))
       const paid = sumMoney(attached.filter(row => approvals.get(String(row.paymentId))?.approvalRuntimeState !== 'denied')
@@ -220,7 +250,7 @@ export const getCommitmentAllocationPaidCoverage = async (
     }
     const exactFloor = sumMoney(members.map(row => lines.get(String(row.id))!.paidAmount))
     const sharedFloor = coding ? subtractMoney(sumMoney(members.map(row => parseDatabaseMoney(row.amount))), coding.available) : ZERO_MONEY
-    codingFloors.set(codingId, compareMoney(sharedFloor, exactFloor) > 0 ? sharedFloor : exactFloor)
+    codingFloors.set(codingId, [sharedFloor, exactFloor, coding?.typedPaid ?? ZERO_MONEY].reduce((maximum, floor) => compareMoney(floor, maximum) > 0 ? floor : maximum, ZERO_MONEY))
   }
   return { lines, codingFloors }
 }
@@ -300,7 +330,8 @@ export const getAgreementCommitmentPaymentCapacity = async (
     const selectedCommitted = sumMoney(selected.map(row => parseDatabaseMoney(row.amount)))
     const effectiveAvailable = subtractMoney(selectedCommitted, selectedPaid)
     const ownAvailable = compareMoney(effectiveAvailable, selectedCommitted) > 0 ? selectedCommitted : effectiveAvailable
-    const remaining = coding && compareMoney(coding.available, ownAvailable) < 0 ? coding.available : ownAvailable
+    const remaining = [ownAvailable, coding.available, coding.typedAvailable ?? ownAvailable]
+      .reduce((minimum, amount) => compareMoney(amount, minimum) < 0 ? amount : minimum, ownAvailable)
     available.push(compareMoney(remaining, ZERO_MONEY) < 0 ? ZERO_MONEY : remaining)
   }
   return sumMoney(available)
@@ -329,12 +360,13 @@ export const validateAgreementPaymentAllocations = async (
     totals.set(row.commitmentLineId, addMoney(totals.get(row.commitmentLineId) ?? ZERO_MONEY, amount))
   }
   const codingTotals = new Map<string, { amount: Money; currency: Currency_Codes }>()
+  const typedTotals = new Map<string, { codingId: string; commitmentTypeId: string; amount: Money; currency: Currency_Codes }>()
   for (const [lineId, proposed] of totals) {
     const line = await db.selectFrom('Funding_Case_Agreement_Commitment_Line as proposedLine')
       .innerJoin('Funding_Case_Agreement_Commitment as commitment', 'commitment.id', 'proposedLine.egcs_fc_commitment')
       .innerJoin('Transfer_Payment_Stream_Chart_of_Account as coding', 'coding.id', 'proposedLine.egcs_fc_transferpaymentstreamchartofaccount')
       .innerJoin('Agency_Chart_of_Account as account', 'account.id', 'coding.egcs_tp_agencychartofaccount')
-      .select(['coding.egcs_tp_agencychartofaccount', 'commitment.egcs_fc_currency as currency', databaseMoneyText(sql.ref('proposedLine.egcs_fc_amount')).as('amount')])
+      .select(['coding.egcs_tp_agencychartofaccount', 'commitment.egcs_fc_currency as currency', 'commitment.egcs_fc_type as commitmentTypeId', databaseMoneyText(sql.ref('proposedLine.egcs_fc_amount')).as('amount')])
       .where('proposedLine.id', '=', lineId).where('proposedLine.egcs_fc_fundingagreement', '=', agreementId)
       .whereRef('account.egcs_ay_currency', '=', 'commitment.egcs_fc_currency')
       .where('proposedLine._deleted', '=', false).executeTakeFirst()
@@ -345,10 +377,18 @@ export const validateAgreementPaymentAllocations = async (
     if (compareMoney(proposed, subtractMoney(parseDatabaseMoney(line.amount), coverage.paidAmount)) > 0) return false
     const codingId = String(line.egcs_tp_agencychartofaccount)
     codingTotals.set(codingId, { currency: line.currency, amount: addMoney(codingTotals.get(codingId)?.amount ?? ZERO_MONEY, proposed) })
+    if (line.commitmentTypeId !== undefined) {
+      const key = `${codingId}:${line.commitmentTypeId}`
+      typedTotals.set(key, { codingId, commitmentTypeId: line.commitmentTypeId, currency: line.currency, amount: addMoney(typedTotals.get(key)?.amount ?? ZERO_MONEY, proposed) })
+    }
   }
   for (const [codingId, proposed] of codingTotals) {
     const coding = await readCommitmentCodingCapacity(db, agreementId, codingId, { ...options, currency: proposed.currency }, new Map())
     if (coding && compareMoney(proposed.amount, coding.available) > 0) return false
+  }
+  for (const proposed of typedTotals.values()) {
+    const coding = await readCommitmentCodingCapacity(db, agreementId, proposed.codingId, { ...options, currency: proposed.currency, commitmentTypeId: proposed.commitmentTypeId }, new Map())
+    if (coding.typedAvailable !== null && compareMoney(proposed.amount, coding.typedAvailable) > 0) return false
   }
   return true
 }

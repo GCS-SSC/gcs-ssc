@@ -253,7 +253,7 @@ export const validateAgreementCommitmentPriorPaidCoverage = async (
     .select(['egcs_fc_transferpaymentstreamchartofaccount', databaseMoneyText(sql.ref('egcs_fc_amount')).as('amount')])
     .where('egcs_fc_commitment', '=', input.commitmentId).where('_deleted', '=', false).execute()
   const { codingFloors } = await getCommitmentAllocationPaidCoverage(db, { agreementId: input.agreementId,
-    currency: input.currency, lineIds: priorLines.map(line => String(line.id)) })
+    currency: input.currency, commitmentTypeId: input.commitmentTypeId, lineIds: priorLines.map(line => String(line.id)) })
   for (const [codingId, paid] of codingFloors) {
     const total = sumMoney(proposed.filter(line => String(line.egcs_fc_transferpaymentstreamchartofaccount) === codingId).map(line => parseDatabaseMoney(line.amount)))
     if (compareMoney(total, paid) < 0) return false

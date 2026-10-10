@@ -234,6 +234,7 @@ export const AUDIT_TABLE_OWNERSHIP: Readonly<Record<string, AuditOwnershipRule>>
   'public.role_permission': parent('role_id', 'public.role'),
   'public.role_transfer_payment_scope': parent('role_id', 'public.role'),
   'public.session': actorAgencies,
+  'public.l1_queue': global('Cross-agency scheduler infrastructure; domain queues retain their own audiences'),
   'public.storage_cleanup_outbox': agency('agency_id'),
   'public.user': actorAgencies,
   'public.user_role_assignment': parent('role_id', 'public.role'),

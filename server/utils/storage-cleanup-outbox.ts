@@ -6,8 +6,8 @@ import type { GcsFileStorageProviderManagedMetadataAdapter, GcsFileStorageTarget
 import { createFileStorageSecretReader } from './extensions'
 import { runBoundedExtensionOperation } from './extension-admission'
 
-const MAX_ATTEMPTS = 8
 const BASE_RETRY_MS = 30_000
+const MAX_RETRY_MS = 30 * 60_000
 
 export type StorageCleanupRequest = Pick<Insertable<StorageCleanupOutboxTable>,
   'provider_key' | 'agency_id' | 'purpose' | 'object_id' | 'locator'>
@@ -45,13 +45,17 @@ export const processStorageCleanupBatch = async (
   db: Kysely<Database>,
   workerId: string,
   limit = 20,
-  now = new Date()
+  now?: Date
 ): Promise<{ claimed: number; completed: number; retried: number; deadLettered: number }> => {
-  const jobs = await claimStorageCleanupJobs(db, workerId, limit, 60_000, now)
+  let claimed = 0
   let completed = 0
   let retried = 0
-  let deadLettered = 0
-  for (const job of jobs) {
+  for (let index = 0; index < limit; index++) {
+    const jobNow = now ?? new Date()
+    // Claim only the next operation so waiting behind slow I/O cannot expire its lease.
+    const [job] = await claimStorageCleanupJobs(db, workerId, 1, 610_000, jobNow)
+    if (!job) break
+    claimed++
     try {
       const provider = await resolveAgencyStorageProvider(db, String(job.agency_id), job.provider_key)
       if (!provider) throw new Error('Recorded storage provider is unavailable')
@@ -66,6 +70,7 @@ export const processStorageCleanupBatch = async (
         await runBoundedExtensionOperation('storage:restore-metadata', async signal => {
           if (signal.aborted) throw signal.reason
           await adapter.updateProviderMetadata({
+            signal,
             objectId: job.object_id, locator: job.locator as Record<string, never>,
             agencyId: String(job.agency_id), purpose: job.purpose as 'attachment',
             target: payload.target, agencyConfig: provider.config,
@@ -81,26 +86,24 @@ export const processStorageCleanupBatch = async (
         })
       }
       await db.updateTable('storage_cleanup_outbox').set({
-        status: 'completed', completed_at: now, updated_at: now,
+        status: 'completed', completed_at: jobNow, updated_at: jobNow,
         lease_owner: null, lease_expires_at: null, last_error: null
       }).where('id', '=', String(job.id)).where('status', '=', 'processing')
         .where('lease_owner', '=', workerId).execute()
       completed++
     } catch (error: unknown) {
       const attempts = job.attempt_count + 1
-      const dead = attempts >= MAX_ATTEMPTS
       await db.updateTable('storage_cleanup_outbox').set({
-        status: dead ? 'dead_letter' : 'pending', attempt_count: attempts,
-        next_attempt_at: new Date(now.getTime() + BASE_RETRY_MS * 2 ** Math.min(attempts - 1, 10)),
-        lease_owner: null, lease_expires_at: null, updated_at: now,
+        status: 'pending', attempt_count: attempts,
+        next_attempt_at: new Date(jobNow.getTime() + Math.min(MAX_RETRY_MS, BASE_RETRY_MS * 2 ** Math.min(attempts - 1, 6))),
+        lease_owner: null, lease_expires_at: null, updated_at: jobNow,
         last_error: (error instanceof Error ? error.message : String(error)).slice(0, 1000)
       }).where('id', '=', String(job.id)).where('status', '=', 'processing')
         .where('lease_owner', '=', workerId).execute()
-      if (dead) deadLettered++
-      else retried++
+      retried++
     }
   }
-  return { claimed: jobs.length, completed, retried, deadLettered }
+  return { claimed, completed, retried, deadLettered: 0 }
 }
 
 export const pruneCompletedStorageCleanupJobs = async (

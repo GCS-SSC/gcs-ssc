@@ -122,7 +122,7 @@ export default defineEventHandler(async event => {
 
     await syncAgreementPaymentEditingStatus(trx, String(createdPayment.id), { event, agreementId })
     await allocateAgreementPayment(event, trx, { agreementId, agencyId: currentContext.agencyId, streamId: currentContext.streamId,
-      paymentId: String(createdPayment.id), commitmentId: String(commitment.id), amount: validated.egcs_fc_paymentamount,
+      paymentId: String(createdPayment.id), commitmentId: String(commitment.id), commitmentTypeId: validated.egcs_fc_commitmenttype, amount: validated.egcs_fc_paymentamount,
       currency: validated.egcs_fc_currency, fiscalYearId: validated.egcs_fc_fiscalyear })
     return exactCreatedPayment
   }, { action: 'create', correctionFinancialMutation: true, accountReceivablePayees: [{ applicantRecipientId: validated.egcs_fc_applicantrecipient, currency: validated.egcs_fc_currency }] })

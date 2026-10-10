@@ -1,7 +1,7 @@
 import { sql } from 'kysely'
 import { AttachmentListQuerySchema } from '~~/shared/types/schemas'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
-import { authorizeAttachmentTarget } from '~~/server/utils/attachment-target'
+import { authorizeAttachmentTarget, getAttachmentTargetSubject } from '~~/server/utils/attachment-target'
 import { getAttachmentRouteTarget } from '~~/server/utils/attachment-route'
 import { resolveAssignedItemTargetGrant } from '~~/server/utils/rbac'
 import { isEntityAssignmentRosterWorkable } from '~~/server/utils/entity-assignment'
@@ -9,6 +9,8 @@ import { createFileStorageSecretReader, getRegisteredExtensions } from '~~/serve
 import { readNamespacedProviderMetadata, resolveAgencyStorageProvider } from '~~/server/utils/file-storage-provider'
 import type { GcsFileStorageProviderManagedMetadataAdapter } from '@gcs-ssc/extensions/server'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
+import { runBoundedExtensionOperation } from '~~/server/utils/extension-admission'
+import { canAccessCreditMemoTargetScopes } from '~~/server/utils/credit-memo-scope-authority'
 
 export default defineEventHandler(async event => {
   const target = await getAttachmentRouteTarget(event)
@@ -66,22 +68,18 @@ export default defineEventHandler(async event => {
     base.clearSelect().select(sql<number>`count(*)::int`.as('count')).executeTakeFirstOrThrow()
   ])
 
-  const scope = resolved.fundingCaseScope?.scope ?? resolved.agreementContext?.scope
+  const scope = resolved.creditMemoContext?.scope ?? resolved.fundingCaseScope?.scope ?? resolved.agreementContext?.scope
     ?? { type: 'agency' as const, agencyId: resolved.agencyId }
-  const subject = target.entityType === 'applicantrecipient'
-    ? 'applicant_recipient'
-    : target.entityType === 'fundingcaseintake'
-      ? 'funding_case'
-      : target.entityType === 'fundingcasejournalvoucher'
-        ? 'journal_voucher'
-        : target.entityType === 'fundingcasecorrection' ? 'correction' : 'agreement'
-  const [grant, targetWorkable] = await Promise.all([
+  const subject = getAttachmentTargetSubject(target.entityType)
+  const [grant, targetWorkable, canUpdateScopes, canDeleteScopes] = await Promise.all([
     resolveAssignedItemTargetGrant(auth.userId, target, db),
-    isEntityAssignmentRosterWorkable(db, target.entityType, target.entityId)
+    isEntityAssignmentRosterWorkable(db, target.entityType, target.entityId),
+    canAccessCreditMemoTargetScopes(db, auth, target.entityType, target.entityId, 'update'),
+    canAccessCreditMemoTargetScopes(db, auth, target.entityType, target.entityId, 'delete')
   ])
-  const canUpdate = targetWorkable && auth.userAbilities.authorize(subject, 'update', scope)
+  const canUpdate = targetWorkable && canUpdateScopes && auth.userAbilities.authorize(subject, 'update', scope)
     && grant?.actions.has('update') === true
-  const canDelete = targetWorkable && auth.userAbilities.authorize(subject, 'delete', scope)
+  const canDelete = targetWorkable && canDeleteScopes && auth.userAbilities.authorize(subject, 'delete', scope)
     && grant?.actions.has('delete') === true
   const registered = await getRegisteredExtensions()
   const providers = new Map(registered.filter(item => item.fileStorageProvider).map(item => [item.key, item]))
@@ -112,16 +110,18 @@ export default defineEventHandler(async event => {
         key: 'apiErrors.attachments.provider_unavailable'
       })
       try {
-        providerMetadata = await (provider.adapter as GcsFileStorageProviderManagedMetadataAdapter).readProviderMetadata({
-          objectId: item.provider_object_id,
-          locator: item.provider_locator as Record<string, never>,
-          agencyId: resolved.agencyId,
-          purpose: 'attachment',
-          target,
-          agencyConfig: provider.config,
-          secrets: createFileStorageSecretReader(db, item.provider_id, resolved.agencyId, process.env.GCS_EXTENSION_SECRETS_KEY ?? ''),
-          contractVersion: compatibleDeclaration.contractVersion
-        })
+        providerMetadata = await runBoundedExtensionOperation('storage:read-provider-metadata', async signal =>
+          await (provider.adapter as GcsFileStorageProviderManagedMetadataAdapter).readProviderMetadata({
+            signal,
+            objectId: item.provider_object_id,
+            locator: item.provider_locator as Record<string, never>,
+            agencyId: resolved.agencyId,
+            purpose: 'attachment',
+            target,
+            agencyConfig: provider.config,
+            secrets: createFileStorageSecretReader(db, item.provider_id, resolved.agencyId, process.env.GCS_EXTENSION_SECRETS_KEY ?? ''),
+            contractVersion: compatibleDeclaration.contractVersion
+          }))
       } catch {
         return await throwApiError(event, {
           statusCode: 503,

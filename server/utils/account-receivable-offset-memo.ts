@@ -16,11 +16,13 @@ const ZERO = parseMoney('0.00')
 const isoDate = (value: Date | string): string => new Date(value).toISOString()
 
 /** Agency/global AR authority is required before projecting a complete pool. */
-export const readAccountReceivableOffsetMemos = async (db: Kysely<Database>, poolIds: string[]): Promise<AccountReceivableOffsetMemo[]> => {
-  if (!poolIds.length || !await hasAccountReceivablePoolLedger(db)) return []
-  const memos = await db.selectFrom('Funding_Case_Account_Receivable_Offset_Memo').selectAll()
+export const readAccountReceivableOffsetMemos = async (db: Kysely<Database>, poolIds: string[], memoIds?: string[]): Promise<AccountReceivableOffsetMemo[]> => {
+  if (!poolIds.length || (memoIds && !memoIds.length) || !await hasAccountReceivablePoolLedger(db)) return []
+  let query = db.selectFrom('Funding_Case_Account_Receivable_Offset_Memo').selectAll()
     .select(databaseMoneyText(sql.ref('egcs_fc_amount')).as('amount')).where('egcs_fc_pool', 'in', poolIds)
-    .where('_deleted', '=', false).orderBy('id').execute()
+    .where('_deleted', '=', false)
+  if (memoIds) query = query.where('id', 'in', memoIds)
+  const memos = await query.orderBy('id').execute()
   const result: AccountReceivableOffsetMemo[] = []
   for (const memo of memos) {
     const balance = await readAccountReceivableCashBalance(db, String(memo.egcs_fc_receivable))

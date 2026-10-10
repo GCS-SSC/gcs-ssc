@@ -64,6 +64,7 @@ export const PRODUCTION_CORE_MIGRATIONS = [
   '0100_funding_case_intake',
   '0110_extensions',
   '0120_storage',
+  '0125_l1_queue',
   '0130_integrity',
   '0140_audit'
 ] as const

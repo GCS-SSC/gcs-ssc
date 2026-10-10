@@ -66,7 +66,7 @@ export const allocateAgreementCoding = async (
   db: DbClient,
   input: {
     agreementId: string; agencyId: string; streamId: string; amount: Money; currency: Currency_Codes
-    output: GcsCodingAllocationOutput; agencyFiscalYearId?: string; fiscalYearId?: string; existingLines?: ExistingAllocationLine[]; codingPaidFloors?: GcsCodingAllocatorContext['codingPaidFloors']
+    output: GcsCodingAllocationOutput; agencyFiscalYearId?: string; fiscalYearId?: string; existingLines?: ExistingAllocationLine[]; codingPaidFloors?: GcsCodingAllocatorContext['codingPaidFloors']; codingAvailableAmounts?: GcsCodingAllocatorContext['codingAvailableAmounts']
   }
 ): Promise<AgreementCodingAllocation[] | null> => {
   const providers = []
@@ -124,11 +124,12 @@ export const allocateAgreementCoding = async (
   try {
     const module = await loadGcsExtensionModule(provider.contribution.id) as { default?: GcsCodingAllocator }
     if (typeof module.default !== 'function') throw new Error('INVALID_CODING_ALLOCATION')
-    result = await module.default({ ...input, codingLines: catalog, commitmentCodingLines: commitmentCatalog, existingLines: input.existingLines ?? [], codingPaidFloors: input.codingPaidFloors ?? [],
+    result = await module.default({ ...input, db: db as Transaction<unknown>, codingAvailableAmounts: input.codingAvailableAmounts ?? [], codingLines: catalog, commitmentCodingLines: commitmentCatalog, existingLines: input.existingLines ?? [], codingPaidFloors: input.codingPaidFloors ?? [],
       config: provider.config, agencyConfig: provider.agencyConfig })
   } catch (error) {
     await handleExtensionCreateOperationError(event, error)
   }
+  if (result === null) return null
   try {
     return validateCodingAllocation(input.amount, catalog, result, input.output.kind === 'commitment' ? input.existingLines : [],
       input.output.kind === 'commitment' ? input.codingPaidFloors : [])
@@ -153,7 +154,7 @@ export const allocateAgreementCommitment = async (
     .where('previousCommitment.id', '!=', input.commitmentId).where('previousCommitment._deleted', '=', false)
     .where('previousLine._deleted', '=', false).orderBy('previousLine.id').forUpdate('previousLine').execute()
   const coverage = await getCommitmentAllocationPaidCoverage(trx, { agreementId: input.agreementId, currency: input.currency,
-    lineIds: [...existing, ...previous].map(line => String(line.id)) })
+    lineIds: [...existing, ...previous].map(line => String(line.id)), commitmentTypeId: input.commitmentTypeId })
   const existingLines = existing.map(line => ({ id: String(line.id), codingLineId: String(line.egcs_fc_transferpaymentstreamchartofaccount),
     amount: parseDatabaseMoney(line.amount), ...coverage.lines.get(String(line.id))! }))
   const priorLines = previous.map(line => ({ id: String(line.id), codingLineId: String(line.codingLineId),
@@ -188,12 +189,23 @@ export const allocateAgreementCommitment = async (
 
 export const allocateAgreementPayment = async (
   event: H3Event, trx: Transaction<Database>,
-  input: { agreementId: string; agencyId: string; streamId: string; paymentId: string; commitmentId: string; amount: Money; currency: Currency_Codes; fiscalYearId: string }
+  input: { agreementId: string; agencyId: string; streamId: string; paymentId: string; commitmentId: string; commitmentTypeId: string; amount: Money; currency: Currency_Codes; fiscalYearId: string }
 ): Promise<boolean> => {
-  const allocated = await allocateAgreementCoding(event, trx, { ...input, output: { kind: 'payment' } })
-  if (!allocated) return false
   const lines = await trx.selectFrom('Funding_Case_Agreement_Commitment_Line').select(['id', 'egcs_fc_transferpaymentstreamchartofaccount', databaseMoneyText(sql.ref('egcs_fc_amount')).as('amount')])
     .where('egcs_fc_commitment', '=', input.commitmentId).where('_deleted', '=', false).orderBy('id').forUpdate().execute()
+  const coverage = await getCommitmentAllocationPaidCoverage(trx, { agreementId: input.agreementId, currency: input.currency,
+    lineIds: lines.map(line => String(line.id)), excludePaymentId: input.paymentId, commitmentTypeId: input.commitmentTypeId })
+  const existingLines = lines.map(line => ({ id: String(line.id), codingLineId: String(line.egcs_fc_transferpaymentstreamchartofaccount),
+    amount: parseDatabaseMoney(line.amount), paidAmount: coverage.lines.get(String(line.id))!.paidAmount }))
+  const codingAvailableAmounts = [...new Set(existingLines.map(line => line.codingLineId))].map(codingLineId => {
+    const amount = subtractMoney(sumMoney(existingLines.filter(line => line.codingLineId === codingLineId).map(line => line.amount)),
+      coverage.codingFloors.get(codingLineId) ?? parseMoney('0'))
+    return { codingLineId, amount: compareMoney(amount, parseMoney('0')) < 0 ? parseMoney('0') : amount }
+  })
+  const allocated = await allocateAgreementCoding(event, trx, { ...input,
+    output: { kind: 'payment', commitmentId: input.commitmentId, commitmentTypeId: input.commitmentTypeId, fiscalYearId: input.fiscalYearId },
+    existingLines, codingPaidFloors: [...coverage.codingFloors].map(([codingLineId, paidAmount]) => ({ codingLineId, paidAmount })), codingAvailableAmounts })
+  if (!allocated) return false
   const allocations = []
   for (const row of allocated) {
     const candidates = lines.filter(line => String(line.egcs_fc_transferpaymentstreamchartofaccount) === row.codingLineId)

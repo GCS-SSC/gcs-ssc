@@ -11,7 +11,6 @@ import { notFound } from './api-errors'
 import { canAccessApplicantRecipient } from './applicant-recipient-auth'
 import { assertApplicantRecipientProfileExists } from './applicant-recipient-child-resources'
 import { executeFreshReadSnapshot } from './fresh-read-snapshot'
-import { resolveAgreementScopeContext } from './agreement'
 import { readAccountReceivableLines, readAccountReceivableApprovedRecoveryMethod } from './account-receivable'
 import { readAccountReceivableOffsetMemos } from './account-receivable-offset-memo'
 import { readAccountReceivablePoolBalance } from './account-receivable-pool-ledger'
@@ -49,17 +48,20 @@ const hasActiveProponent = async (db: Kysely<Database>, id: string) => Boolean(a
   .selectFrom('Applicant_Recipient_Profile').select('id').where('id', '=', id)
   .where('egcs_ar_active', '=', true).where('_deleted', '=', false).executeTakeFirst())
 
-const agreementReader = (db: Kysely<Database>, auth: AuthContext, subject: 'account_receivable' | 'agreement' = 'account_receivable') => {
-  const owners = new Map<string, Promise<Awaited<ReturnType<typeof resolveAgreementScopeContext>>>>()
-  return async (agreementId: string) => {
-    let pendingOwner = owners.get(agreementId)
-    if (!pendingOwner) {
-      pendingOwner = resolveAgreementScopeContext(agreementId, db)
-      owners.set(agreementId, pendingOwner)
-    }
-    const owner = await pendingOwner
-    return owner && auth.userAbilities.authorize(subject, 'read', owner.scope) ? owner : null
-  }
+const authorizedAgreementIds = (db: Kysely<Database>, auth: AuthContext, subject: 'account_receivable' | 'agreement') => {
+  const grants = auth.userAbilities.getGrants().filter(grant => grant.subject === subject && grant.action === 'read')
+  return db.selectFrom('Funding_Case_Agreement_Profile as owner')
+    .innerJoin('Transfer_Payment_Stream as stream', 'stream.id', 'owner.egcs_fc_transferpaymentstream')
+    .innerJoin('Transfer_Payment_Profile as program', 'program.id', 'stream.egcs_tp_transferpaymentprofile')
+    .innerJoin('Agency_Profile as agency', 'agency.id', 'program.egcs_tp_agency')
+    .where('owner._deleted', '=', false).where('stream._deleted', '=', false)
+    .where('program._deleted', '=', false).where('agency._deleted', '=', false)
+    .where(eb => eb.or(grants.map(({ scope }) => {
+      if (scope.type === 'global') return sql<boolean>`true`
+      if (scope.type === 'agency') return eb('agency.id', '=', scope.agencyId)
+      return eb.and([eb('agency.id', '=', scope.agencyId), eb('program.id', '=', scope.transferPaymentId)])
+    })))
+    .select('owner.id')
 }
 
 export const listProponentAccountReceivables = async (event: H3Event, id: string, requestedInput?: ListInput) => {
@@ -67,9 +69,10 @@ export const listProponentAccountReceivables = async (event: H3Event, id: string
   return await executeFreshReadSnapshot(event, async db => {
     const auth = await authorizeProponent(event, id)
     const input = requestedInput ?? await getValidatedQueryI18n(event, PaginationSchema)
-    const readOwner = agreementReader(db, auth)
     let query = db.selectFrom('Funding_Case_Agreement_Account_Receivable')
-      .select(['id', 'egcs_fc_fundingagreement'])
+      .select(['id', 'egcs_fc_fundingagreement', 'egcs_fc_agreementnumber', 'egcs_fc_number', 'egcs_fc_linkedreceivable',
+        'egcs_fc_status', 'egcs_fc_currency', 'egcs_fc_typename_en', 'egcs_fc_typename_fr', 'egcs_fc_outcome'])
+      .where('egcs_fc_fundingagreement', 'in', authorizedAgreementIds(db, auth, 'account_receivable'))
       .where('egcs_fc_applicantrecipient', '=', id).where('_deleted', '=', false)
     if (input.search) {
       const search = `%${escapeLikePattern(input.search)}%`
@@ -80,16 +83,12 @@ export const listProponentAccountReceivables = async (event: H3Event, id: string
         sql<boolean>`${sql.ref('id')}::text ILIKE ${search}`
       ]))
     }
-    const candidates = await query.orderBy('egcs_fc_createdat', 'desc').orderBy('id', 'desc').execute()
-    const accessible = await Promise.all(candidates.map(async row =>
-      await readOwner(String(row.egcs_fc_fundingagreement)) ? row : null))
-    const visible = accessible.filter(row => row !== null)
-    const page = visible.slice((input.page - 1) * input.limit, input.page * input.limit)
-    const items: ProponentAccountReceivableRow[] = await Promise.all(page.map(async row => {
-      const header = await db.selectFrom('Funding_Case_Agreement_Account_Receivable')
-        .select(['id', 'egcs_fc_fundingagreement', 'egcs_fc_agreementnumber', 'egcs_fc_number', 'egcs_fc_linkedreceivable',
-          'egcs_fc_status', 'egcs_fc_currency', 'egcs_fc_typename_en', 'egcs_fc_typename_fr', 'egcs_fc_outcome'])
-        .where('id', '=', String(row.id)).where('_deleted', '=', false).executeTakeFirstOrThrow()
+    const [page, count] = await Promise.all([
+      query.orderBy('egcs_fc_createdat', 'desc').orderBy('id', 'desc')
+        .limit(input.limit).offset((input.page - 1) * input.limit).execute(),
+      query.clearSelect().select(eb => eb.fn.countAll().as('total')).executeTakeFirstOrThrow()
+    ])
+    const items: ProponentAccountReceivableRow[] = await Promise.all(page.map(async header => {
       const lines = await readAccountReceivableLines(db, String(header.id))
       const labels = lines[0]?.egcs_fc_evidence
       const fiscalYear = labels && typeof labels === 'object' && !Array.isArray(labels) && 'egcs_fc_fiscalyeardisplay' in labels
@@ -107,17 +106,17 @@ export const listProponentAccountReceivables = async (event: H3Event, id: string
         egcs_fc_effectiverecoverymethod: await readAccountReceivableApprovedRecoveryMethod(db, String(header.id))
       }
     }))
-    return pageResult(items, visible.length, input)
+    return pageResult(items, Number(count.total), input)
   })
 }
 
 const readOffsetMemoRows = async (db: Kysely<Database>, id: string,
-  agencies: Awaited<ReturnType<typeof financialAgencies>>, auth: AuthContext): Promise<ProponentCreditMemoRow[]> => {
-  if (!agencies.length) return []
+  agencies: Awaited<ReturnType<typeof financialAgencies>>, auth: AuthContext, memoIds: string[]): Promise<ProponentCreditMemoRow[]> => {
+  if (!agencies.length || !memoIds.length) return []
   const pools = await db.selectFrom('Funding_Case_Account_Receivable_Pool')
     .select(['id', 'egcs_fc_agency', 'egcs_fc_currency']).where('egcs_fc_applicantrecipient', '=', id)
     .where('egcs_fc_agency', 'in', agencies.map(agency => String(agency.id))).where('_deleted', '=', false).execute()
-  const memos = await readAccountReceivableOffsetMemos(db, pools.map(pool => String(pool.id)))
+  const memos = await readAccountReceivableOffsetMemos(db, pools.map(pool => String(pool.id)), memoIds)
   const poolById = new Map(pools.map(pool => [String(pool.id), pool]))
   const agencyById = new Map(agencies.map(agency => [String(agency.id), agency]))
   const paymentIds = [...new Set(memos.flatMap(memo => memo.egcs_fc_applications.map(application => application.egcs_fc_payment)))]
@@ -127,12 +126,10 @@ const readOffsetMemoRows = async (db: Kysely<Database>, id: string,
         .innerJoin('Funding_Case_Agreement_Profile as agreement', 'agreement.id', 'commitment.egcs_fc_fundingagreement')
         .select(['payment.id', 'agreement.id as egcs_fc_fundingagreement', 'agreement.egcs_fc_agreementnumber'])
         .where('payment.id', 'in', paymentIds).where('payment._deleted', '=', false)
-        .where('commitment._deleted', '=', false).where('agreement._deleted', '=', false).execute()
+        .where('commitment._deleted', '=', false).where('agreement._deleted', '=', false)
+        .where('agreement.id', 'in', authorizedAgreementIds(db, auth, 'agreement')).execute()
     : []
-  const readOwner = agreementReader(db, auth, 'agreement')
-  const authorizedPayments = await Promise.all(payments.map(async payment =>
-    await readOwner(String(payment.egcs_fc_fundingagreement)) ? payment : null))
-  const paymentById = new Map(authorizedPayments.filter(payment => payment !== null).map(payment => [String(payment.id), payment]))
+  const paymentById = new Map(payments.map(payment => [String(payment.id), payment]))
   return memos.flatMap(memo => {
     const pool = poolById.get(String(memo.egcs_fc_pool))
     const agency = pool ? agencyById.get(String(pool.egcs_fc_agency)) : undefined
@@ -186,12 +183,56 @@ export const listProponentCreditMemos = async (event: H3Event, id: string, reque
     const canCreate = createAgencies.length > 0 && await hasActiveProponent(db, id)
     if (!agencies.length) return { ...pageResult<ProponentCreditMemoRow>([], 0, input), egcs_fc_cancreate: canCreate }
     const agencyById = new Map(agencies.map(agency => [String(agency.id), agency]))
-    const cash = await db.selectFrom('Funding_Case_Account_Receivable_Credit_Memo as memo')
-      .select(['memo.id', 'memo.egcs_fc_number', 'memo.egcs_fc_agency', 'memo.egcs_fc_currency', 'memo.egcs_fc_status',
-        'memo.egcs_fc_receiveddate', 'memo.egcs_fc_createdat', 'memo.egcs_fc_outcome'])
-      .select(databaseMoneyText(sql.ref('memo.egcs_fc_amount')).as('egcs_fc_amount'))
+    const search = input.search?.trim()
+    const pattern = search ? `%${escapeLikePattern(search)}%` : undefined
+    let cashQuery = db.selectFrom('Funding_Case_Account_Receivable_Credit_Memo as memo')
+      .innerJoin('Agency_Profile as agency', 'agency.id', 'memo.egcs_fc_agency')
       .where('memo.egcs_fc_applicantrecipient', '=', id).where('memo.egcs_fc_agency', 'in', [...agencyById.keys()])
-      .where('memo._deleted', '=', false).execute()
+      .where('memo._deleted', '=', false)
+    let offsetQuery = db.selectFrom('Funding_Case_Account_Receivable_Offset_Memo as memo')
+      .innerJoin('Funding_Case_Account_Receivable_Pool as pool', 'pool.id', 'memo.egcs_fc_pool')
+      .innerJoin('Agency_Profile as agency', 'agency.id', 'pool.egcs_fc_agency')
+      .where('pool.egcs_fc_applicantrecipient', '=', id).where('pool.egcs_fc_agency', 'in', [...agencyById.keys()])
+      .where('memo._deleted', '=', false).where('pool._deleted', '=', false)
+    if (pattern) {
+      cashQuery = cashQuery.where(eb => eb.or([
+        sql<boolean>`${sql.ref('memo.id')}::text ILIKE ${pattern}`,
+        eb('agency.egcs_ay_name_en', 'ilike', pattern), eb('agency.egcs_ay_name_fr', 'ilike', pattern)
+      ]))
+      offsetQuery = offsetQuery.where(eb => eb.or([
+        sql<boolean>`('OCM-' || ${sql.ref('memo.id')}::text) ILIKE ${pattern}`,
+        eb('agency.egcs_ay_name_en', 'ilike', pattern), eb('agency.egcs_ay_name_fr', 'ilike', pattern),
+        eb.exists(db.selectFrom('Funding_Case_Account_Receivable_Offset_Memo_Application as application')
+          .innerJoin('Funding_Case_Account_Receivable_Recovery as recovery', 'recovery.id', 'application.egcs_fc_recovery')
+          .innerJoin('Funding_Case_Agreement_Payment as payment', 'payment.id', 'recovery.egcs_fc_payment')
+          .innerJoin('Funding_Case_Agreement_Commitment as commitment', 'commitment.id', 'payment.egcs_fc_fundingagreementcommitment')
+          .innerJoin('Funding_Case_Agreement_Profile as agreement', 'agreement.id', 'commitment.egcs_fc_fundingagreement')
+          .where(sql<boolean>`${sql.ref('application.egcs_fc_offsetmemo')} = ${sql.ref('memo.id')}`)
+          .where('payment._deleted', '=', false).where('commitment._deleted', '=', false)
+          .where('agreement.id', 'in', authorizedAgreementIds(db, auth, 'agreement'))
+          .where(paymentEb => paymentEb.or([
+            paymentEb('agreement.egcs_fc_agreementnumber', 'ilike', pattern),
+            sql<boolean>`${sql.ref('payment.id')}::text ILIKE ${pattern}`
+          ])).select('application.id'))
+      ]))
+    }
+    const combined = cashQuery.select(['memo.id', 'memo.egcs_fc_createdat', sql<number>`0`.as('kind_rank')])
+      .unionAll(offsetQuery.select(['memo.id', 'memo.egcs_fc_createdat', sql<number>`1`.as('kind_rank')]))
+    const pageQuery = db.selectFrom(combined.as('memo_page'))
+    const [page, count] = await Promise.all([
+      pageQuery.selectAll().orderBy('egcs_fc_createdat', 'desc').orderBy('id', 'desc').orderBy('kind_rank')
+        .limit(input.limit).offset((input.page - 1) * input.limit).execute(),
+      pageQuery.select(eb => eb.fn.countAll().as('total')).executeTakeFirstOrThrow()
+    ])
+    const cashIds = page.filter(row => row.kind_rank === 0).map(row => String(row.id))
+    const cash = cashIds.length
+      ? await db.selectFrom('Funding_Case_Account_Receivable_Credit_Memo as memo')
+          .select(['memo.id', 'memo.egcs_fc_number', 'memo.egcs_fc_agency', 'memo.egcs_fc_currency', 'memo.egcs_fc_status',
+            'memo.egcs_fc_receiveddate', 'memo.egcs_fc_createdat', 'memo.egcs_fc_outcome'])
+          .select(databaseMoneyText(sql.ref('memo.egcs_fc_amount')).as('egcs_fc_amount'))
+          .where('memo.egcs_fc_applicantrecipient', '=', id).where('memo.egcs_fc_agency', 'in', [...agencyById.keys()])
+          .where('memo._deleted', '=', false).where('memo.id', 'in', cashIds).execute()
+      : []
     const cashRows: ProponentCreditMemoRow[] = await Promise.all(cash.map(async memo => {
       const agency = agencyById.get(String(memo.egcs_fc_agency))
       if (!agency) throw new Error('CREDIT_MEMO_OWNER_CHANGED')
@@ -204,18 +245,15 @@ export const listProponentCreditMemos = async (event: H3Event, id: string, reque
         egcs_fc_createdat: isoDate(memo.egcs_fc_createdat), egcs_fc_receiveddate: isoDate(memo.egcs_fc_receiveddate)
       }
     }))
-    const offsetRows = await readOffsetMemoRows(db, id, agencies, auth)
-    const search = input.search?.trim().toLocaleLowerCase()
-    const visible = [...cashRows, ...offsetRows].filter(row => !search
-      || row.egcs_fc_creditmemoreference.toLocaleLowerCase().includes(search)
-      || row.egcs_fc_agencyname_en.toLocaleLowerCase().includes(search)
-      || row.egcs_fc_agencyname_fr.toLocaleLowerCase().includes(search)
-      || (row.egcs_fc_kind === 'automatic' && row.egcs_fc_applications.some(application =>
-        application.egcs_fc_agreementnumber.toLocaleLowerCase().includes(search)
-        || application.egcs_fc_payment.includes(search))))
-      .sort((left, right) => right.egcs_fc_createdat.localeCompare(left.egcs_fc_createdat)
-        || right.id.localeCompare(left.id, 'en', { numeric: true }))
-    return { ...pageResult(visible.slice((input.page - 1) * input.limit, input.page * input.limit), visible.length, input), egcs_fc_cancreate: canCreate }
+    const offsetRows = await readOffsetMemoRows(db, id, agencies, auth,
+      page.filter(row => row.kind_rank === 1).map(row => String(row.id)))
+    const rowsById = new Map([...cashRows, ...offsetRows].map(row => [`${row.egcs_fc_kind}:${row.id}`, row]))
+    const items = page.map(row => {
+      const item = rowsById.get(`${row.kind_rank === 0 ? 'cash' : 'automatic'}:${row.id}`)
+      if (!item) throw new Error('CREDIT_MEMO_PAGE_CHANGED')
+      return item
+    })
+    return { ...pageResult(items, Number(count.total), input), egcs_fc_cancreate: canCreate }
   })
 }
 

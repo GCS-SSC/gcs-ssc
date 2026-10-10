@@ -11,6 +11,7 @@ import * as funding_case_agreement from './migrations/0090_funding_case_agreemen
 import * as funding_case_intake from './migrations/0100_funding_case_intake'
 import * as extensions from './migrations/0110_extensions'
 import * as storage from './migrations/0120_storage'
+import * as l1_queue from './migrations/0125_l1_queue'
 import * as integrity from './migrations/0130_integrity'
 import * as audit from './migrations/0140_audit'
 
@@ -27,6 +28,7 @@ export const productionCoreMigrations = {
   '0100_funding_case_intake': funding_case_intake,
   '0110_extensions': extensions,
   '0120_storage': storage,
+  '0125_l1_queue': l1_queue,
   '0130_integrity': integrity,
   '0140_audit': audit
 } satisfies Record<string, Migration>

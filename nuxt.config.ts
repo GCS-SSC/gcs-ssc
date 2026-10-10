@@ -49,8 +49,7 @@ export default defineNuxtConfig({
   compatibilityDate: '2024-07-11',
 
   nitro: {
-    experimental: { asyncContext: true, tasks: true },
-    scheduledTasks: { '* * * * *': ['extensions:minute'] }
+    experimental: { asyncContext: true }
   },
 
   vite: {

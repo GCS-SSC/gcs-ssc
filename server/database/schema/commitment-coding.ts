@@ -68,8 +68,57 @@ export const installCommitmentCodingFunctions = async (db: Kysely<Database>): Pr
             AND recovery.egcs_fc_outcome='posted' AND NOT recovery._deleted AND NOT memo._deleted) received
     $function$;
 
-    CREATE FUNCTION fc_commitment_coding_available(target_line bigint) RETURNS numeric LANGUAGE sql STABLE AS $function$
-      WITH target AS (SELECT line.id,line.egcs_fc_fundingagreement,commitment.egcs_fc_currency,
+    CREATE FUNCTION fc_commitment_line_has_coding_evidence(target_line bigint) RETURNS boolean LANGUAGE sql STABLE AS $function$
+      SELECT fc_commitment_line_gross_paid(target_line)<>0 OR
+        coalesce((SELECT sum(payment_line.egcs_fc_amount) FROM "Funding_Case_Agreement_Payment_Line" payment_line
+          JOIN "Funding_Case_Agreement_Payment" payment ON payment.id=payment_line.egcs_fc_fundingagreementpayment
+          JOIN "Funding_Case_Agreement_Commitment_Line" line ON line.id=payment_line.egcs_fc_fundingagreementcommitmentline
+          JOIN "Funding_Case_Agreement_Commitment" commitment ON commitment.id=line.egcs_fc_commitment
+          WHERE line.id=target_line AND payment.egcs_fc_currency=commitment.egcs_fc_currency
+            AND NOT payment_line._deleted AND NOT payment._deleted AND fc_payment_counts_for_coding(payment.id)),0)<>0 OR
+        coalesce((SELECT sum(adjustment.egcs_fc_amount) FROM "Funding_Case_Agreement_Correction_Adjustment" adjustment
+          JOIN "Funding_Case_Agreement_Correction" correction ON correction.id=adjustment.egcs_fc_correction
+          JOIN "Funding_Case_Agreement_Commitment_Line" line ON line.id=adjustment.egcs_fc_commitmentline
+          JOIN "Funding_Case_Agreement_Commitment" commitment ON commitment.id=line.egcs_fc_commitment
+          WHERE line.id=target_line AND correction.egcs_fc_outcome='posted' AND correction.egcs_fc_currency=commitment.egcs_fc_currency
+            AND NOT correction._deleted AND NOT adjustment._deleted),0)<>0
+    $function$;
+
+    CREATE FUNCTION fc_commitment_line_coding_credit(target_line bigint) RETURNS numeric LANGUAGE plpgsql STABLE AS $function$
+    DECLARE line record; gross numeric; credits numeric; prior_paid numeric; is_last boolean;
+    BEGIN
+      SELECT selected_line.id,selected_line.egcs_fc_fundingagreement,selected_line._deleted,commitment.egcs_fc_active,
+        commitment.egcs_fc_currency,coding.egcs_tp_agencychartofaccount INTO line
+        FROM "Funding_Case_Agreement_Commitment_Line" selected_line
+        JOIN "Funding_Case_Agreement_Commitment" commitment ON commitment.id=selected_line.egcs_fc_commitment
+        JOIN "Transfer_Payment_Stream_Chart_of_Account" coding ON coding.id=selected_line.egcs_fc_transferpaymentstreamchartofaccount
+        WHERE selected_line.id=target_line;
+      IF line._deleted OR NOT line.egcs_fc_active AND NOT fc_commitment_line_has_coding_evidence(target_line) THEN RETURN 0; END IF;
+      gross := greatest(coalesce(fc_commitment_line_gross_paid(target_line),0),0);
+      credits := fc_commitment_coding_credits(line.egcs_fc_fundingagreement,line.egcs_fc_currency::text,line.egcs_tp_agencychartofaccount);
+      SELECT coalesce(sum(greatest(coalesce(fc_commitment_line_gross_paid(prior.id),0),0)),0) INTO prior_paid
+        FROM "Funding_Case_Agreement_Commitment_Line" prior
+        JOIN "Funding_Case_Agreement_Commitment" commitment ON commitment.id=prior.egcs_fc_commitment
+        JOIN "Transfer_Payment_Stream_Chart_of_Account" coding ON coding.id=prior.egcs_fc_transferpaymentstreamchartofaccount
+        WHERE prior.id<line.id AND prior.egcs_fc_fundingagreement=line.egcs_fc_fundingagreement
+          AND coding.egcs_tp_agencychartofaccount=line.egcs_tp_agencychartofaccount AND commitment.egcs_fc_currency=line.egcs_fc_currency
+          AND NOT commitment._deleted AND NOT prior._deleted;
+      SELECT NOT EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Commitment_Line" later
+        JOIN "Funding_Case_Agreement_Commitment" commitment ON commitment.id=later.egcs_fc_commitment
+        JOIN "Transfer_Payment_Stream_Chart_of_Account" coding ON coding.id=later.egcs_fc_transferpaymentstreamchartofaccount
+        WHERE later.id>line.id AND later.egcs_fc_fundingagreement=line.egcs_fc_fundingagreement
+          AND coding.egcs_tp_agencychartofaccount=line.egcs_tp_agencychartofaccount AND commitment.egcs_fc_currency=line.egcs_fc_currency
+          AND NOT commitment._deleted AND NOT later._deleted
+          AND (commitment.egcs_fc_active OR fc_commitment_line_has_coding_evidence(later.id))) INTO is_last;
+      RETURN CASE WHEN is_last THEN greatest(credits-prior_paid,0) ELSE least(gross,greatest(credits-prior_paid,0)) END;
+    END $function$;
+
+    CREATE FUNCTION fc_commitment_line_net_paid(target_line bigint) RETURNS numeric LANGUAGE sql STABLE AS $function$
+      SELECT greatest(coalesce(fc_commitment_line_gross_paid(target_line),0)-fc_commitment_line_coding_credit(target_line),0)
+    $function$;
+
+    CREATE FUNCTION fc_commitment_coding_available(target_line bigint,same_type boolean DEFAULT false) RETURNS numeric LANGUAGE sql STABLE AS $function$
+      WITH target AS (SELECT line.id,line.egcs_fc_fundingagreement,commitment.egcs_fc_currency,commitment.egcs_fc_type,
         coding.egcs_tp_agencychartofaccount FROM "Funding_Case_Agreement_Commitment_Line" line
         JOIN "Funding_Case_Agreement_Commitment" commitment ON commitment.id=line.egcs_fc_commitment
         JOIN "Transfer_Payment_Stream_Chart_of_Account" coding ON coding.id=line.egcs_fc_transferpaymentstreamchartofaccount WHERE line.id=target_line),
@@ -78,11 +127,19 @@ export const installCommitmentCodingFunctions = async (db: Kysely<Database>): Pr
         JOIN "Transfer_Payment_Stream_Chart_of_Account" coding ON coding.id=line.egcs_fc_transferpaymentstreamchartofaccount
         JOIN target ON target.egcs_fc_fundingagreement=line.egcs_fc_fundingagreement
           AND target.egcs_fc_currency=commitment.egcs_fc_currency AND target.egcs_tp_agencychartofaccount=coding.egcs_tp_agencychartofaccount
-        WHERE (commitment.egcs_fc_active OR line.id=target_line) AND NOT commitment._deleted AND NOT line._deleted)
+        WHERE (commitment.egcs_fc_active OR line.id=target_line) AND NOT commitment._deleted AND NOT line._deleted
+          AND (NOT same_type OR commitment.egcs_fc_type=target.egcs_fc_type))
       SELECT least((SELECT coalesce(sum(egcs_fc_amount),0) FROM pool),(SELECT coalesce(sum(egcs_fc_amount),0) FROM pool)
         -coalesce((SELECT sum(line.egcs_fc_amount) FROM "Funding_Case_Agreement_Payment_Line" line
           JOIN "Funding_Case_Agreement_Payment" payment ON payment.id=line.egcs_fc_fundingagreementpayment
-          WHERE line.egcs_fc_fundingagreementcommitmentline IN (SELECT id FROM pool)
+          JOIN "Funding_Case_Agreement_Commitment_Line" paid_line ON paid_line.id=line.egcs_fc_fundingagreementcommitmentline
+          JOIN "Funding_Case_Agreement_Commitment" paid_commitment ON paid_commitment.id=paid_line.egcs_fc_commitment
+          JOIN "Transfer_Payment_Stream_Chart_of_Account" paid_coding ON paid_coding.id=paid_line.egcs_fc_transferpaymentstreamchartofaccount
+          WHERE paid_commitment.egcs_fc_fundingagreement=target.egcs_fc_fundingagreement
+            AND paid_commitment.egcs_fc_currency=target.egcs_fc_currency
+            AND (NOT same_type OR paid_commitment.egcs_fc_type=target.egcs_fc_type)
+            AND paid_coding.egcs_tp_agencychartofaccount=target.egcs_tp_agencychartofaccount
+            AND NOT paid_commitment._deleted AND NOT paid_line._deleted
             AND payment.egcs_fc_currency=target.egcs_fc_currency AND NOT line._deleted AND NOT payment._deleted
             AND fc_payment_counts_for_coding(payment.id)),0)
         -coalesce((SELECT sum(adjustment.egcs_fc_amount) FROM "Funding_Case_Agreement_Journal_Voucher_Line" adjustment
@@ -93,37 +150,29 @@ export const installCommitmentCodingFunctions = async (db: Kysely<Database>): Pr
             AND voucher.egcs_fc_currency=target.egcs_fc_currency AND payment.egcs_fc_currency=target.egcs_fc_currency
             AND coding.egcs_tp_agencychartofaccount=target.egcs_tp_agencychartofaccount AND adjustment.egcs_fc_kind='adjustment'
             AND NOT adjustment._deleted AND NOT voucher._deleted AND NOT payment._deleted
-            AND fc_payment_counts_for_coding(payment.id) AND fc_positive_coding_completion('fundingcasejournalvoucher',voucher.id)),0)
+            AND fc_payment_counts_for_coding(payment.id) AND fc_positive_coding_completion('fundingcasejournalvoucher',voucher.id)
+            AND (NOT same_type OR EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Commitment_Line" source_line
+              JOIN "Funding_Case_Agreement_Commitment" source_commitment ON source_commitment.id=source_line.egcs_fc_commitment
+              WHERE source_line.id=adjustment.egcs_fc_commitmentline AND source_commitment.egcs_fc_type=target.egcs_fc_type))),0)
         -coalesce((SELECT sum(adjustment.egcs_fc_amount) FROM "Funding_Case_Agreement_Correction_Adjustment" adjustment
           JOIN "Funding_Case_Agreement_Correction" correction ON correction.id=adjustment.egcs_fc_correction
           JOIN "Transfer_Payment_Stream_Chart_of_Account" coding ON coding.id=adjustment.egcs_fc_chartofaccount
           WHERE correction.egcs_fc_fundingagreement=target.egcs_fc_fundingagreement AND correction.egcs_fc_currency=target.egcs_fc_currency
             AND coding.egcs_tp_agencychartofaccount=target.egcs_tp_agencychartofaccount AND correction.egcs_fc_outcome='posted'
-            AND NOT correction._deleted AND NOT adjustment._deleted),0)
-        +fc_commitment_coding_credits(target.egcs_fc_fundingagreement,target.egcs_fc_currency::text,target.egcs_tp_agencychartofaccount)) FROM target
+            AND NOT correction._deleted AND NOT adjustment._deleted
+            AND (NOT same_type OR EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Commitment_Line" source_line
+              JOIN "Funding_Case_Agreement_Commitment" source_commitment ON source_commitment.id=source_line.egcs_fc_commitment
+              WHERE source_line.id=adjustment.egcs_fc_commitmentline AND source_commitment.egcs_fc_type=target.egcs_fc_type))),0)
+        +CASE WHEN same_type THEN coalesce((SELECT sum(fc_commitment_line_coding_credit(history.id))
+          FROM "Funding_Case_Agreement_Commitment_Line" history
+          JOIN "Funding_Case_Agreement_Commitment" historical_commitment ON historical_commitment.id=history.egcs_fc_commitment
+          JOIN "Transfer_Payment_Stream_Chart_of_Account" historical_coding ON historical_coding.id=history.egcs_fc_transferpaymentstreamchartofaccount
+          WHERE historical_commitment.egcs_fc_fundingagreement=target.egcs_fc_fundingagreement
+            AND historical_commitment.egcs_fc_currency=target.egcs_fc_currency AND historical_commitment.egcs_fc_type=target.egcs_fc_type
+            AND historical_coding.egcs_tp_agencychartofaccount=target.egcs_tp_agencychartofaccount
+            AND NOT historical_commitment._deleted AND NOT history._deleted),0)
+          ELSE fc_commitment_coding_credits(target.egcs_fc_fundingagreement,target.egcs_fc_currency::text,target.egcs_tp_agencychartofaccount) END) FROM target
     $function$;
-
-    CREATE FUNCTION fc_commitment_line_net_paid(target_line bigint) RETURNS numeric LANGUAGE plpgsql STABLE AS $function$
-    DECLARE line record; gross numeric; credits numeric; prior_paid numeric;
-    BEGIN
-      SELECT selected_line.id,selected_line.egcs_fc_fundingagreement,selected_line._deleted,commitment.egcs_fc_active,
-        commitment.egcs_fc_currency,coding.egcs_tp_agencychartofaccount INTO line
-        FROM "Funding_Case_Agreement_Commitment_Line" selected_line
-        JOIN "Funding_Case_Agreement_Commitment" commitment ON commitment.id=selected_line.egcs_fc_commitment
-        JOIN "Transfer_Payment_Stream_Chart_of_Account" coding ON coding.id=selected_line.egcs_fc_transferpaymentstreamchartofaccount
-        WHERE selected_line.id=target_line;
-      gross := coalesce(fc_commitment_line_gross_paid(target_line),0);
-      IF NOT line.egcs_fc_active OR line._deleted THEN RETURN greatest(gross,0); END IF;
-      credits := fc_commitment_coding_credits(line.egcs_fc_fundingagreement,line.egcs_fc_currency::text,line.egcs_tp_agencychartofaccount);
-      SELECT coalesce(sum(greatest(coalesce(fc_commitment_line_gross_paid(prior.id),0),0)),0) INTO prior_paid
-        FROM "Funding_Case_Agreement_Commitment_Line" prior
-        JOIN "Funding_Case_Agreement_Commitment" commitment ON commitment.id=prior.egcs_fc_commitment
-        JOIN "Transfer_Payment_Stream_Chart_of_Account" coding ON coding.id=prior.egcs_fc_transferpaymentstreamchartofaccount
-        WHERE prior.id<line.id AND prior.egcs_fc_fundingagreement=line.egcs_fc_fundingagreement
-          AND coding.egcs_tp_agencychartofaccount=line.egcs_tp_agencychartofaccount AND commitment.egcs_fc_currency=line.egcs_fc_currency
-          AND commitment.egcs_fc_active AND NOT commitment._deleted AND NOT prior._deleted;
-      RETURN greatest(gross-greatest(credits-prior_paid,0),0);
-    END $function$;
 
     CREATE FUNCTION trg_fn_protect_commitment_line_paid_floor() RETURNS trigger LANGUAGE plpgsql AS $function$
     DECLARE paid numeric;
@@ -132,7 +181,8 @@ export const installCommitmentCodingFunctions = async (db: Kysely<Database>): Pr
         IS NOT DISTINCT FROM (OLD.egcs_fc_amount,OLD._deleted,OLD.egcs_fc_transferpaymentstreamchartofaccount) THEN RETURN NEW; END IF;
       PERFORM 1 FROM "Funding_Case_Agreement_Profile" WHERE id=OLD.egcs_fc_fundingagreement FOR UPDATE;
       paid := greatest(coalesce(fc_commitment_line_net_paid(OLD.id),0),
-        OLD.egcs_fc_amount-coalesce(fc_commitment_coding_available(OLD.id),OLD.egcs_fc_amount),0);
+        OLD.egcs_fc_amount-coalesce(fc_commitment_coding_available(OLD.id),OLD.egcs_fc_amount),
+        OLD.egcs_fc_amount-coalesce(fc_commitment_coding_available(OLD.id,true),OLD.egcs_fc_amount),0);
       IF paid>0 AND (TG_OP='DELETE' OR NEW._deleted OR NEW.egcs_fc_amount<paid
         OR NEW.egcs_fc_transferpaymentstreamchartofaccount<>OLD.egcs_fc_transferpaymentstreamchartofaccount) THEN
         RAISE EXCEPTION 'Commitment coding cannot fall below already paid amount'

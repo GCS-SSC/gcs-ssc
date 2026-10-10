@@ -72,6 +72,7 @@ const EXTENSION_HOST_CAPABILITIES = new Set([
   'configuration-access',
   'scheduled-agreement-import',
   'scheduled-intake-import',
+  'l1-queue',
   'agency-only-configuration',
   'audit-ownership',
   'file-storage-provider'
@@ -1038,7 +1039,8 @@ const resolveExtensionNitroPlugin = async (
 export const isDeferredExtensionNitroPlugin = (
   extension: Pick<GcsResolvedExtension, 'nitroPlugin' | 'requiredHostCapabilities'>
 ): boolean => Boolean(extension.nitroPlugin && (extension.requiredHostCapabilities.includes('scheduled-agreement-import')
-  || extension.requiredHostCapabilities.includes('scheduled-intake-import')))
+  || extension.requiredHostCapabilities.includes('scheduled-intake-import')
+  || extension.requiredHostCapabilities.includes('l1-queue')))
 
 export const resolveFileStorageProvider = async (
   extensionDir: string,
