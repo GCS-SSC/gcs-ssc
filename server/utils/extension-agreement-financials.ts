@@ -1,6 +1,7 @@
 /* eslint-disable jsdoc/require-param, jsdoc/require-returns -- Public read contracts are documented at their authorization boundary. */
 import type { Kysely, Transaction } from 'kysely'
 import type { GcsExtensionAgreementFinancials } from '@gcs-ssc/extensions/server'
+import { createGcsExtensionUserError } from '@gcs-ssc/extensions/server'
 import type { Currency_Codes, Database } from '~~/shared/types/database'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { getAgreementCommitmentPaymentCapacity, getCommitmentLinePaymentCoverage, validateAgreementPaymentAllocations } from './agreement-commitment-line-balance'
@@ -34,7 +35,15 @@ export const createExtensionAgreementFinancials = (
     const currency = await resolveAgreementCurrency(db, agreementId)
     if (!currency) throw new Error('The bound Agreement is unavailable.')
     if (requestedCurrency !== undefined && requestedCurrency !== currency) {
-      throw new Error('The selected currency must match the bound Agreement currency.')
+      const message = {
+        en: 'The selected currency must match the bound Agreement currency.',
+        fr: 'La devise sélectionnée doit correspondre à celle de l’entente liée.'
+      }
+      throw createGcsExtensionUserError({
+        code: 'AGREEMENT_CURRENCY_MISMATCH',
+        message,
+        details: [{ path: 'egcs_fc_currency', message }]
+      })
     }
     if (excludePaymentId) {
       const payment = await db.selectFrom('Funding_Case_Agreement_Payment as excludedPayment')

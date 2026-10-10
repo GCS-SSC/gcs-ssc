@@ -43,7 +43,6 @@ const { isRecordLocked } = useBusinessStatusState()
 
 const agreementId = route.params.id as string
 const paymentId = route.params.paymentId as string
-const receivableEntry = useAccountReceivableSourceEntry(agreementId, 'advance', paymentId)
 const isHeroCollapsed = getHeroCollapsed('agreement-payment-detail')
 const search: Ref<string> = ref('')
 const pagination: Ref<{ pageIndex: number, pageSize: number }> = ref({
@@ -97,6 +96,8 @@ const {
   status: profileStatus,
   refresh: refreshProfile
 } = useFetch<EntityAssignmentContext, FetchError, string>(`/api/entity-assignments/fundingcasepayment/${paymentId}/context`)
+const receivableEntry = useAccountReceivableSourceEntry(agreementId, 'advance', paymentId,
+  computed(() => profile.value?.can_create_account_receivable === true))
 const { isAssigned } = useEntityAssignmentRoster('fundingcasepayment', paymentId)
 const {
   data: payment,

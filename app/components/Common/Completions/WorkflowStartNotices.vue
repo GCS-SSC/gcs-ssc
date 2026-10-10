@@ -24,12 +24,14 @@ const { mode, completionResponse, completionErrorDetails, isLoading, loadStatus,
 
     <UAlert
       v-if="!item && completionResponse?.blocker"
+      role="alert"
       color="warning"
       icon="i-lucide-lock-keyhole"
       :title="t(`workflow.${mode === 'recommendation_submission' ? 'start_blockers' : 'completion_blockers'}.${completionResponse.blocker}`, completionResponse.blockerParameters ?? {})" />
 
     <UAlert
       v-else-if="loadStatus === 'error'"
+      role="alert"
       color="error"
       icon="i-lucide-triangle-alert"
       :title="t('common.unavailable')">

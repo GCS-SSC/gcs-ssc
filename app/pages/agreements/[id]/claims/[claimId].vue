@@ -93,13 +93,14 @@ const { getDefinition, isRecordLocked, isDraftStatus, isTerminalStatus } = useBu
 
 const agreementId = route.params.id as string
 const claimId = route.params.claimId as string
-const receivableEntry = useAccountReceivableSourceEntry(agreementId, 'claim', claimId)
 const {
   data: profile,
   error: profileError,
   status: profileStatus,
   refresh: refreshProfile
 } = useFetch<EntityAssignmentContext, FetchError, string>(`/api/entity-assignments/fundingcaseagreementclaim/${claimId}/context`)
+const receivableEntry = useAccountReceivableSourceEntry(agreementId, 'claim', claimId,
+  computed(() => profile.value?.can_create_account_receivable === true))
 
 const draftClaimAmounts: Ref<Record<string, string>> = ref({})
 const fundingEditorLine: Ref<FundingCaseAgreementClaimLineItemRow | null> = ref(null)

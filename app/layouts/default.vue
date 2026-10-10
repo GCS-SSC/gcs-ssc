@@ -101,13 +101,13 @@ const userMenuItems = computed<DropdownMenuItem[][]>(() => [
       class="relative">
       <template #header="{ collapsed }">
         <div v-if="!collapsed" class="flex flex-row items-center gap-3">
-          <img src="/images/gcs-ssc-logo.svg" class="w-10 object-contain">
+          <img src="/images/gcs-ssc-logo.svg" alt="GCS-SSC" class="w-10 object-contain">
           <div class="flex flex-col">
             <span class="text-lg leading-tight font-black tracking-tighter text-zinc-900 dark:text-white">GCS-SSC</span>
           </div>
         </div>
         <div v-else class="mx-auto">
-          <img src="/images/gcs-ssc-logo.svg" class="size-6 object-contain">
+          <img src="/images/gcs-ssc-logo.svg" alt="GCS-SSC" class="size-6 object-contain">
         </div>
       </template>
 
@@ -150,7 +150,7 @@ const userMenuItems = computed<DropdownMenuItem[][]>(() => [
               icon="i-lucide-user-round"
               :label="collapsed ? undefined : userDisplayName"
               :description="collapsed ? undefined : userDisplayEmail"
-              :aria-label="t('common.account_menu')"
+              :aria-label="collapsed ? t('common.account_menu') : `${t('common.account_menu')}: ${userDisplayName}`"
               :trailing-icon="collapsed ? undefined : 'i-lucide-chevrons-up-down'"
               color="neutral"
               variant="ghost"

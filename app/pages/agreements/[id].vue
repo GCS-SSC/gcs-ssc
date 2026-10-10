@@ -127,7 +127,7 @@ const {
 
 const selectedProfile: Ref<AgreementDetailForm | null> = ref(null)
 const isSaving: Ref<boolean> = ref(false)
-const { can, canAny } = useCan()
+const { can, canAny, permissionsReady } = useCan()
 const isBusinessLocked = computed(() => isRecordLocked(profile.value))
 const canCreateChildRecords = computed(() => Boolean(profile.value?.can_create_child_records) && !isBusinessLocked.value)
 const canUpdateBusinessRecord = computed(() => Boolean(profile.value?.can_update) && !isBusinessLocked.value)
@@ -264,7 +264,7 @@ const tabs = computed(() => {
 const { selectedTab } = useUrlTabState({
   tabs,
   defaultTab: 'general',
-  enabled: computed(() => !isChildDetailRoute.value && profile.value !== null)
+  enabled: computed(() => !isChildDetailRoute.value && profile.value !== null && permissionsReady.value)
 })
 const selectedExtensionTab = computed(() => getExtensionTabItem(selectedTab.value))
 

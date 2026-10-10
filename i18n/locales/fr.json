@@ -3739,6 +3739,8 @@
     }
   },
   "checklist_schema": {
+    "remove_section": "Supprimer la section",
+    "remove_subsection": "Supprimer la sous-section",
     "title": "Schémas de listes de vérification",
     "eyebrow": "Définition de la liste",
     "version": "Version {version}",

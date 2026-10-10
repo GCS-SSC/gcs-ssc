@@ -183,7 +183,7 @@ export const hasOtherActiveCommonAddressReferences = async (
 }
 
 /**
- * Checks whether another active Proponent, completion, or approval-step link references a common contact.
+ * Checks whether another active Proponent link references a common contact.
  *
  * Callers must lock the active Common_Contact row before invoking this check so a concurrent
  * foreign-key reference cannot race the ownership decision.
@@ -211,24 +211,7 @@ export const hasOtherActiveCommonContactReferences = async (
   const applicantRecipientContact = await applicantRecipientContactQuery
     .select('id')
     .executeTakeFirst()
-  if (applicantRecipientContact) return true
-
-  const completion = await db
-    .selectFrom('Common_Completion')
-    .where('egcs_cn_user', '=', commonContactId)
-    .where('_deleted', '=', false)
-    .select('id')
-    .executeTakeFirst()
-  if (completion) return true
-
-  const approvalStep = await db
-    .selectFrom('Common_Approval_Step')
-    .where('egcs_cn_defaultuser', '=', commonContactId)
-    .where('_deleted', '=', false)
-    .select('id')
-    .executeTakeFirst()
-
-  return Boolean(approvalStep)
+  return Boolean(applicantRecipientContact)
 }
 
 const readAgencyFinancialIdPatchBody = async (event: H3Event) => {

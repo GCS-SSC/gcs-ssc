@@ -60,7 +60,7 @@ const moveCertification = (index: number, direction: -1 | 1) => {
           {{ t('approval_templates.additional_approvals.allow_help') }}
         </p>
       </div>
-      <USwitch v-model="state.egcs_cn_allowadditionalapprovals" />
+      <USwitch v-model="state.egcs_cn_allowadditionalapprovals" :aria-label="t('approval_templates.additional_approvals.allow')" />
     </div>
 
     <div v-if="state.egcs_cn_allowadditionalapprovals" class="space-y-6">

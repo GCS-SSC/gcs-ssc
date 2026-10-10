@@ -33,7 +33,7 @@
     "postinstall": "nuxt prepare",
     "repos:update": "git pull --recurse-submodules && git submodule sync --recursive && git submodule update --init --recursive --remote",
     "lint": "eslint .",
-    "typecheck": "nuxt typecheck",
+    "typecheck": "NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--max-old-space-size=8192\" nuxt typecheck",
     "quality:changed": "bash .agents/skills/gcs-ssc/scripts/changed-files.sh",
     "quality:fallow": "mkdir -p .agent/reports/whole && fallow --summary > .agent/reports/whole/fallow-summary.txt || true",
     "quality:deps": "bash .agents/skills/gcs-ssc/scripts/dependency-reports.sh json",

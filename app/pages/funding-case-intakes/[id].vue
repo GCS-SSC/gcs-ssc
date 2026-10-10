@@ -38,7 +38,10 @@ const tabs = computed(() => [
   { key: 'funding_case_intake.approval_submission', value: 'approval', icon: 'i-lucide-send' },
   { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users-round' }
 ])
-const { selectedTab } = useUrlTabState({ tabs, defaultTab: String(route.query.section ?? route.query.tab ?? 'general') })
+const { selectedTab } = useUrlTabState({
+  tabs,
+  defaultKey: tabs.value.find(tab => tab.value === String(route.query.tab ?? 'general'))?.key
+})
 const scope = computed(() => profile.value && ({
   type: 'entity' as const, agencyId: String(profile.value.agency_id),
   path: [{ type: 'transfer_payment' as const, id: String(profile.value.program_id) }]

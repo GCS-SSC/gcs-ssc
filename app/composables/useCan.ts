@@ -9,7 +9,7 @@ import type { Scope } from '~~/shared/utils/scopes'
  * @returns Authorization helper.
  */
 export const useCan = () => {
-  const { authorize, hasAbility, canManageAssignments } = useAuth()
+  const { authorize, hasAbility, canManageAssignments, permissionsReady } = useAuth()
 
   /**
    * Evaluates if the current user is authorized to perform an action on a subject.
@@ -36,6 +36,7 @@ export const useCan = () => {
   return {
     can,
     canAny,
+    permissionsReady,
     canManageAssignments
   }
 }

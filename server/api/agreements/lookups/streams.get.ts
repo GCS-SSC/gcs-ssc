@@ -6,12 +6,13 @@ import {
   resolveAgreementVisibility
 } from '~~/server/utils/agreement'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
-import { PaginationSchema } from '~~/shared/types/schemas'
+import { PaginationSchema, PositivePostgresBigintIdSchema } from '~~/shared/types/schemas'
+import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 
 const QuerySchema = PaginationSchema.extend({
-  agreement_id: z.coerce.string().optional(),
-  program_id: z.coerce.string().optional(),
+  agreement_id: PositivePostgresBigintIdSchema.optional(),
+  program_id: PositivePostgresBigintIdSchema.optional(),
   group_by: z.enum(['program']).optional(),
   permission_action: z.enum(['create', 'update']).default('create')
 })
@@ -21,6 +22,7 @@ const readRoute = defineEventHandler(async event => {
   const { page, limit, search, agreement_id, permission_action, program_id, group_by } = await getValidatedQueryI18n(event, QuerySchema)
   const offset = (page - 1) * limit
   const escapedSearch = search ? escapeLikePattern(search) : ''
+  const searchId = search && isPositivePostgresBigintText(search) ? search : null
 
   const agreementContext = permission_action === 'update' && agreement_id
     ? await resolveAgreementScopeContext(agreement_id, db)
@@ -106,7 +108,7 @@ const readRoute = defineEventHandler(async event => {
   if (group_by === 'program') {
     if (escapedSearch) {
       baseQuery = baseQuery.where(eb => eb.or([
-        eb('Transfer_Payment_Profile.id', '=', escapedSearch),
+        ...(searchId ? [eb('Transfer_Payment_Profile.id', '=', searchId)] : []),
         eb('Transfer_Payment_Profile.egcs_tp_name_en', 'ilike', `%${escapedSearch}%`),
         eb('Transfer_Payment_Profile.egcs_tp_name_fr', 'ilike', `%${escapedSearch}%`)
       ]))
@@ -126,7 +128,7 @@ const readRoute = defineEventHandler(async event => {
 
   if (escapedSearch) {
     baseQuery = baseQuery.where(eb => eb.or([
-      eb('Transfer_Payment_Stream.id', '=', escapedSearch),
+      ...(searchId ? [eb('Transfer_Payment_Stream.id', '=', searchId)] : []),
       eb('Agency_Profile.egcs_ay_name_en', 'ilike', `%${escapedSearch}%`),
       eb('Agency_Profile.egcs_ay_name_fr', 'ilike', `%${escapedSearch}%`),
       eb('Transfer_Payment_Profile.egcs_tp_name_en', 'ilike', `%${escapedSearch}%`),

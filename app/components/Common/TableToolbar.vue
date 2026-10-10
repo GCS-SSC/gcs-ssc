@@ -37,11 +37,11 @@ defineEmits(['add'])
 
 <template>
   <div
-    class="border-default flex min-w-0 flex-wrap items-start justify-between gap-4 p-4 sm:items-center xl:flex-nowrap"
+    class="border-default flex min-w-0 flex-wrap items-start justify-between gap-4 p-4 sm:items-center"
     :class="[
       sticky ? 'sticky top-0 z-10 border-b bg-zinc-50/80 backdrop-blur-md dark:bg-zinc-950/80' : 'rounded-t-xl border bg-zinc-50/50 dark:bg-zinc-900/50'
     ]">
-    <div class="toolbar-filters flex w-full min-w-40 flex-wrap items-center gap-3 sm:w-auto sm:flex-1 xl:flex-nowrap">
+    <div class="toolbar-filters flex w-full min-w-40 flex-wrap items-center gap-3 sm:w-auto sm:flex-1">
       <UInput
         v-if="showSearch"
         v-model="search"
@@ -67,7 +67,7 @@ defineEmits(['add'])
       <slot name="filters" />
     </div>
 
-    <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end xl:flex-nowrap">
+    <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
       <slot name="actions" />
       <UDropdownMenu
         v-if="showColumnToggle && table?.tableApi"

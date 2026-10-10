@@ -67,6 +67,7 @@ export const agencyStatusesE2eSpecPaths = [
 ] as const
 
 export const freshResetE2eSpecPaths = [
+  'tests/e2e/ncia-demo-seed.spec.ts',
   'tests/e2e/design-time-mutation-coordination.spec.ts',
   'tests/e2e/setup-relationship-editors.spec.ts',
   'tests/e2e/assessment-calculated-fields.spec.ts',
@@ -792,11 +793,6 @@ export const resolveManagedE2eServerMode = (
   ? 'development'
   : 'production'
 
-export const managedE2eRequiresNuxtArtifactLock = (
-  suite: E2eSuite,
-  requestedMode: string | undefined
-): boolean => resolveManagedE2eServerMode(suite, requestedMode) === 'production'
-
 const resolveE2eScriptConfig = async (): Promise<E2eScriptConfig> => {
   const selection = resolveE2eTestSelection(process.argv.slice(2), process.env.E2E_SPEC?.trim())
   const preferredPort = getNumberProcessEnvValue('E2E_PORT', DEFAULT_PORT)
@@ -976,11 +972,8 @@ const runE2eTests = async (
  */
 const main = async (): Promise<void> => {
   const rawArgs = process.argv.slice(2)
-  const selection = resolveE2eTestSelection(rawArgs, process.env.E2E_SPEC?.trim())
-  if (
-    managedE2eRequiresNuxtArtifactLock(selection.suite, process.env.E2E_SERVER_MODE) &&
-    process.env[NUXT_ARTIFACT_LOCK_ENV] !== '1'
-  ) {
+  resolveE2eTestSelection(rawArgs, process.env.E2E_SPEC?.trim())
+  if (process.env[NUXT_ARTIFACT_LOCK_ENV] !== '1') {
     process.exitCode = await runWithNuxtArtifactLock([
       process.execPath,
       fileURLToPath(import.meta.url),

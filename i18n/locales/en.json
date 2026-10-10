@@ -3739,6 +3739,8 @@
     }
   },
   "checklist_schema": {
+    "remove_section": "Remove section",
+    "remove_subsection": "Remove subsection",
     "title": "Checklist schemas",
     "eyebrow": "Checklist definition",
     "version": "Version {version}",

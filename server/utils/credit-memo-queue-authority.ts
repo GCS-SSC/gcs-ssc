@@ -2,8 +2,8 @@
 import { sql, type RawBuilder } from 'kysely'
 import type { StaticAuthorizationGrant } from '@gcs-ssc/authorization'
 
-export const creditMemoQueueAuthority = (grants: StaticAuthorizationGrant[], workAlias = 'work') => {
-  const predicates = grants.filter(grant => grant.subject === 'account_receivable' && grant.action === 'read').flatMap(grant => {
+export const creditMemoQueueAuthority = (grants: StaticAuthorizationGrant[], workAlias = 'work', action: 'read' | 'manage_assignments' = 'read') => {
+  const predicates = grants.filter(grant => grant.subject === 'account_receivable' && grant.action === action).flatMap(grant => {
     if (grant.scope.type === 'global') return [sql`TRUE`]
     if (grant.scope.type === 'agency') return [sql`memo.egcs_fc_agency = ${grant.scope.agencyId}::bigint`]
     return []

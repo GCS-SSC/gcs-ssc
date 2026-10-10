@@ -183,6 +183,7 @@ export const useAuth = () => {
     authorize,
     hasAbility,
     canManageAssignments,
+    permissionsReady: computed(() => permissionState.value.userId === userId.value && permissionState.value.status === 'resolved'),
     permissionRevision: computed(() => JSON.stringify(permissionState.value)),
     can: authorize,
     canAny: hasAbility,

@@ -91,7 +91,7 @@ const onMobilePanelClick = async (event: MouseEvent) => {
         variant="outline"
         color="neutral"
         class="w-full justify-between"
-        :aria-label="t('common.toggle_navigation')"
+        :aria-label="`${t('common.toggle_navigation')}: ${selectedItem?.label ?? ''}`"
         :aria-expanded="isMobileExpanded"
         :aria-controls="mobilePanelId"
         @click="toggleMobileTabs">

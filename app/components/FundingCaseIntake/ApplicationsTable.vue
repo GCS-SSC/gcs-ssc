@@ -85,14 +85,14 @@ const submit = async () => {
     }
     modalOpen.value = false
     await refresh()
-    await navigateTo(localePath({ ...appRouteLocations.fundingCaseIntakeDetail(createdId), query: { tab: 'attachments' } }))
+    await navigateTo(localePath({ ...appRouteLocations.fundingCaseIntakeDetail(createdId), query: { section: 'attachments' } }))
     if (uploadError) {
       toast.add({ title: t('funding_case_intake.attachment_upload_failed'), color: 'error' })
     }
   } catch (error: unknown) {
     if (createdId) {
       modalOpen.value = false
-      await navigateTo(localePath({ ...appRouteLocations.fundingCaseIntakeDetail(createdId), query: { tab: 'attachments' } }))
+      await navigateTo(localePath({ ...appRouteLocations.fundingCaseIntakeDetail(createdId), query: { section: 'attachments' } }))
     }
     showError(error)
   } finally {

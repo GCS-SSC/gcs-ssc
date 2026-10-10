@@ -478,9 +478,9 @@ const retire = async () => {
                       :persistence-key="`checklist:${section.key}`">
                       <div class="space-y-6">
                         <div class="flex justify-end gap-1">
-                          <UButton icon="i-lucide-arrow-up" color="neutral" variant="ghost" class="cursor-default" :disabled="sectionIndex === 0" @click="moveItem(definition.sections, sectionIndex, -1)" />
-                          <UButton icon="i-lucide-arrow-down" color="neutral" variant="ghost" class="cursor-default" :disabled="sectionIndex === definition.sections.length - 1" @click="moveItem(definition.sections, sectionIndex, 1)" />
-                          <UButton icon="i-lucide-trash" color="error" variant="ghost" class="cursor-default" @click="removeSection(sectionIndex)" />
+                          <UButton icon="i-lucide-arrow-up" color="neutral" variant="ghost" class="cursor-default" :disabled="sectionIndex === 0" :aria-label="`${t('checklist_schema.policy.move_up')}: ${getNavigationLabel(section.label, section.key)}`" @click="moveItem(definition.sections, sectionIndex, -1)" />
+                          <UButton icon="i-lucide-arrow-down" color="neutral" variant="ghost" class="cursor-default" :disabled="sectionIndex === definition.sections.length - 1" :aria-label="`${t('checklist_schema.policy.move_down')}: ${getNavigationLabel(section.label, section.key)}`" @click="moveItem(definition.sections, sectionIndex, 1)" />
+                          <UButton icon="i-lucide-trash" color="error" variant="ghost" class="cursor-default" :aria-label="`${t('checklist_schema.remove_section')}: ${getNavigationLabel(section.label, section.key)}`" @click="removeSection(sectionIndex)" />
                         </div>
                         <div class="grid gap-4 md:grid-cols-2">
                           <UFormField :label="t('checklist_schema.section_name_en')" required>
@@ -511,9 +511,9 @@ const retire = async () => {
                               level="sub">
                               <div class="space-y-6">
                                 <div class="flex justify-end gap-1">
-                                  <UButton icon="i-lucide-arrow-up" color="neutral" variant="ghost" class="cursor-default" :disabled="subSectionIndex === 0" @click="moveItem(section.subSections, subSectionIndex, -1)" />
-                                  <UButton icon="i-lucide-arrow-down" color="neutral" variant="ghost" class="cursor-default" :disabled="subSectionIndex === section.subSections.length - 1" @click="moveItem(section.subSections, subSectionIndex, 1)" />
-                                  <UButton icon="i-lucide-trash" color="error" variant="ghost" class="cursor-default" @click="removeSubSection(section, subSectionIndex)" />
+                                  <UButton icon="i-lucide-arrow-up" color="neutral" variant="ghost" class="cursor-default" :disabled="subSectionIndex === 0" :aria-label="`${t('checklist_schema.policy.move_up')}: ${getNavigationLabel(subSection.label, subSection.key)}`" @click="moveItem(section.subSections, subSectionIndex, -1)" />
+                                  <UButton icon="i-lucide-arrow-down" color="neutral" variant="ghost" class="cursor-default" :disabled="subSectionIndex === section.subSections.length - 1" :aria-label="`${t('checklist_schema.policy.move_down')}: ${getNavigationLabel(subSection.label, subSection.key)}`" @click="moveItem(section.subSections, subSectionIndex, 1)" />
+                                  <UButton icon="i-lucide-trash" color="error" variant="ghost" class="cursor-default" :aria-label="`${t('checklist_schema.remove_subsection')}: ${getNavigationLabel(subSection.label, subSection.key)}`" @click="removeSubSection(section, subSectionIndex)" />
                                 </div>
                                 <div class="grid gap-4 md:grid-cols-2">
                                   <UFormField :label="t('checklist_schema.subsection_name_en')" required>

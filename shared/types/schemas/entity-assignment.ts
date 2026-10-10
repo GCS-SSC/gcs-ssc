@@ -25,7 +25,8 @@ export const EntityAssignmentContextSchema = z.object({
   egcs_fc_currency: z.enum(CURRENCY_CODES_ENUM),
   egcs_fc_title_en: z.string(),
   egcs_fc_title_fr: z.string(),
-  can_read_agreement: z.boolean()
+  can_read_agreement: z.boolean(),
+  can_create_account_receivable: z.boolean().optional()
 })
 export const AssignedWorkQuerySchema = z.object({
   search: z.string().trim().optional(),

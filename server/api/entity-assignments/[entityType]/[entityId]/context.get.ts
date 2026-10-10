@@ -61,5 +61,10 @@ export default defineEventHandler(async event => {
     .where('_deleted', '=', false)
     .executeTakeFirst()
   if (!agreement) return await notFound(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
-  return { ...agreement, can_read_agreement: canReadAgreement }
+  return {
+    ...agreement,
+    can_read_agreement: canReadAgreement,
+    can_create_account_receivable: Boolean(canReadAgreement && scopeContext
+      && auth.userAbilities.authorize('account_receivable', 'create', scopeContext.scope))
+  }
 })

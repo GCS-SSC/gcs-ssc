@@ -165,13 +165,11 @@ export default defineEventHandler(async event => {
         item.id::text,
         item.id::text,
         item.id::text,
-        'account_receivable', program.egcs_tp_agency, program.id,
-        agency.egcs_ay_name_en, agency.egcs_ay_name_fr, program.egcs_tp_name_en, program.egcs_tp_name_fr
+        'account_receivable', item.egcs_fc_agency, NULL::bigint,
+        agency.egcs_ay_name_en, agency.egcs_ay_name_fr, NULL::varchar, NULL::varchar
       FROM "Funding_Case_Account_Receivable_Credit_Memo" item
-      JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.id = item.egcs_fc_fundingagreement AND NOT agreement._deleted
-      JOIN "Transfer_Payment_Stream" stream ON stream.id = agreement.egcs_fc_transferpaymentstream AND NOT stream._deleted
-      JOIN "Transfer_Payment_Profile" program ON program.id = stream.egcs_tp_transferpaymentprofile AND NOT program._deleted
-      JOIN "Agency_Profile" agency ON agency.id = program.egcs_tp_agency AND NOT agency._deleted
+      JOIN "Agency_Profile" agency ON agency.id = item.egcs_fc_agency AND NOT agency._deleted
+      JOIN "Applicant_Recipient_Profile" debtor ON debtor.id = item.egcs_fc_applicantrecipient AND NOT debtor._deleted
       WHERE NOT item._deleted
       UNION ALL
       SELECT payment.id, 'fundingcasepayment', payment.egcs_fc_status::text, payment.id::text,
@@ -315,7 +313,7 @@ export default defineEventHandler(async event => {
           OR work.label_en ILIKE ${search} OR work.label_fr ILIKE ${search}
           OR work.status ILIKE ${search})
         AND (${sql.join(authorizationPredicates, sql` OR `)})
-        AND ${creditMemoQueueAuthority(managementGrants)}
+        AND ${creditMemoQueueAuthority(managementGrants, 'work', 'manage_assignments')}
       GROUP BY work.id, work.entity_type, work.stable_reference, work.label_en, work.label_fr, work.status,
         work.owner_subject, work.agency_id, work.program_id, work.agency_name_en, work.agency_name_fr,
         work.program_name_en, work.program_name_fr, primary_user.id, primary_user.egcs_cn_name,

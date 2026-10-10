@@ -274,9 +274,9 @@ export const useUrlTabState = ({
         return
       }
 
-      // Async tab discovery must not overwrite a valid UI choice before its URL navigation settles.
-      const preservePendingSelection = pendingNavigation !== null
-        && previousValues !== undefined
+      // Discovery and locale hydration must not overwrite a UI choice whose URL write is pending or deferred.
+      const preservePendingSelection = previousValues !== undefined
+        && (pendingNavigation !== null || !routeLocaleMatches.value || locale.value !== previousValues[5])
         && routePath === previousValues[0]
         && resolveQueryParamValue(queryTab) === resolveQueryParamValue(previousValues[1])
         && defaultValue === previousValues[3]
