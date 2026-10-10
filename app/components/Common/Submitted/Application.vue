@@ -2,7 +2,11 @@
 import CommonSubmittedAnswer from './Answer.vue'
 import { readSubmittedApplication } from '~/utils/submitted-application'
 
-const { snapshot, externalSourceId = null } = defineProps<{ snapshot: unknown; externalSourceId?: string | null }>()
+const { snapshot, externalSourceId = null, showHeader = true } = defineProps<{
+  snapshot: unknown
+  externalSourceId?: string | null
+  showHeader?: boolean
+}>()
 const { t, locale } = useI18n()
 const document = computed(() => readSubmittedApplication(snapshot, locale.value, t))
 const submittedAt = computed(() => {
@@ -12,7 +16,7 @@ const submittedAt = computed(() => {
 </script>
 
 <template>
-  <CommonPreActionReport :title="t('submitted_application.title')" :description="t('submitted_application.intro')" data-testid="submitted-application">
+  <CommonPreActionReport :title="t('submitted_application.title')" :description="t('submitted_application.intro')" :show-header="showHeader" data-testid="submitted-application">
     <template #action>
       <UBadge color="neutral" variant="subtle" icon="i-lucide-lock-keyhole" :label="t('submitted_application.read_only')" />
     </template>

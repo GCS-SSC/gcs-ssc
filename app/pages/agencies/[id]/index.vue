@@ -76,9 +76,9 @@ const agencyResourceCapabilities = () => ({
 
 const tabMap: TabMap = new Map([
   ['general', { key: 'agency.tabs.general', icon: 'i-lucide-info', component: AgencyDetailGeneralTab, getProps: () => ({ agency: agency.value }) }],
-  ['statuses', { key: 'agency.tabs.statuses', icon: 'i-lucide-tags', component: AgencyStatuses, getProps: agencyResourceCapabilities }],
+  ['statuses', { key: 'agency.tabs.statuses', icon: 'i-lucide-tags', component: AgencyStatuses, getProps: () => ({ ...agencyResourceCapabilities(), showHeader: false }) }],
   ['customFields', { key: 'custom_fields.title', icon: 'i-lucide-list-filter', component: AgencyCustomFields, getProps: () => ({
-    agencyId: id, canCreate: canUpdateAgency.value, canUpdate: canUpdateAgency.value, canDelete: canUpdateAgency.value
+    agencyId: id, showHeader: false, canCreate: canUpdateAgency.value, canUpdate: canUpdateAgency.value, canDelete: canUpdateAgency.value
   }) }],
   ['approvalTemplates', { key: 'agency.tabs.approval_templates', icon: 'i-lucide-stamp', component: AgencyApprovalTemplates, getProps: agencyResourceCapabilities }],
   ['workflowSetups', { key: 'agency.tabs.workflow_setups', icon: 'i-lucide-git-branch', component: AgencyWorkflowSetups, getProps: () => ({ agencyId: id, canUpdateChild: canUpdateAgency.value, canDeleteChild: canUpdateAgency.value }) }],

@@ -75,14 +75,6 @@ type AssessmentDetailResponse = {
 const OUTCOMES_TAB_KEY = 'transfer_payment.outcomes'
 const REVIEW_TAB_KEY = 'assessment.review'
 
-/** Normalizes translated tab labels into URL-safe tab values. */
-const toSectionValue = (value: string) => value
-  .normalize('NFD')
-  .replace(/[\u0300-\u036f]/g, '')
-  .toLowerCase()
-  .replace(/[^a-z0-9]+/g, '-')
-  .replace(/^-+|-+$/g, '')
-
 const createAnswerKey = (sectionName: string, subSectionName: string, questionName: string) =>
   [sectionName, subSectionName, questionName].map(encodeURIComponent).join('::')
 
@@ -480,17 +472,17 @@ export const useAssessmentDetailPage = () => {
       key: OUTCOMES_TAB_KEY,
       label: getBilingualValue(assessment.value, 'egcs_cn_outcomename', t('transfer_payment.outcomes')),
       icon: 'i-lucide-flag',
-      value: toSectionValue(t('transfer_payment.outcomes'))
+      value: 'outcomes'
     },
     {
       key: REVIEW_TAB_KEY,
       label: t('assessment.review_tab'),
       icon: 'i-lucide-users',
-      value: toSectionValue(t('assessment.review_tab'))
+      value: 'additional-review'
     }
   ])
-  const outcomesTabValue = computed(() => toSectionValue(t('transfer_payment.outcomes')))
-  const reviewTabValue = computed(() => toSectionValue(t('assessment.review_tab')))
+  const outcomesTabValue = computed(() => 'outcomes')
+  const reviewTabValue = computed(() => 'additional-review')
   const canUpdateAssessment = computed(() => assessment.value?.permissions?.can_update === true)
 
   const {
@@ -498,7 +490,7 @@ export const useAssessmentDetailPage = () => {
     selectedTabKey
   } = useUrlTabState({
     tabs,
-    defaultTab: computed(() => sectionTabs.value[0]?.value ?? toSectionValue(t('transfer_payment.outcomes'))),
+    defaultTab: computed(() => sectionTabs.value[0]?.value ?? 'outcomes'),
     enabled: computed(() => Boolean(assessment.value)),
     queryKey: 'section'
   })

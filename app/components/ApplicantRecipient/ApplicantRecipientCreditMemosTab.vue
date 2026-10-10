@@ -98,7 +98,7 @@ const memoDetailPath = (memo: ProponentCreditMemoRow): string | undefined => {
 <template>
   <div class="min-w-0 space-y-6" data-testid="proponent-credit-memos">
     <ApplicantRecipientAccountBalances :applicant-recipient-id="applicantRecipientId" />
-    <CommonSection :title="t('account_receivable.credit_memos_title')" :grid-cols="1">
+    <CommonSection :show-header="false" :title="t('account_receivable.credit_memos_title')" :grid-cols="1">
       <p class="text-sm text-muted">
         {{ t('account_receivable.credit_memos_description') }}
       </p>
@@ -162,7 +162,7 @@ const memoDetailPath = (memo: ProponentCreditMemoRow): string | undefined => {
           <div class="flex justify-end gap-2">
             <UButton
               v-if="memoDetailPath(row.original)"
-              icon="i-lucide-eye" color="neutral" variant="ghost"
+              icon="i-lucide-arrow-right" color="neutral" variant="ghost"
               :aria-label="`${t('common.view_details')}: ${row.original.egcs_fc_creditmemoreference}`"
               :to="memoDetailPath(row.original)" />
             <UButton

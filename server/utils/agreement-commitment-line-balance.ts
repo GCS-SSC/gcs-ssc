@@ -80,13 +80,14 @@ export const getCommitmentLinePaymentCoverage = async (
   const ownPaid = addMoney(paidAmount, sumMoney(coding.adjustments.filter(row => String(row.commitmentLineId) === commitmentLineId)
     .map(row => parseDatabaseMoney(row.amount))))
   const codingPaidFloor = subtractMoney(parseDatabaseMoney(line.amount), coding.available)
+  const adjustedFloor = compareMoney(ownPaid, codingPaidFloor) >= 0 ? ownPaid : codingPaidFloor
   return {
     hasActivePaymentLine: rows.length > 0 || coding.adjustments.length > 0,
-    paidAmount: compareMoney(ownPaid, codingPaidFloor) >= 0 ? ownPaid : codingPaidFloor
+    paidAmount: compareMoney(adjustedFloor, ZERO_MONEY) < 0 ? ZERO_MONEY : adjustedFloor
   }
 }
 
-type CoverageOptions = { excludePaymentLineId?: string; excludePaymentId?: string; includeCommitmentLineId?: string; currency: Currency_Codes }
+type CoverageOptions = { excludePaymentLineId?: string; excludePaymentId?: string; includeCommitmentLineId?: string; includeCommitmentLineIds?: string[]; currency: Currency_Codes }
 type ApprovalEvidence = Awaited<ReturnType<typeof resolveLatestTargetApprovalEvidence>>
 
 /**
@@ -137,9 +138,11 @@ const readCommitmentCodingCapacity = async (
     .where('commitment.egcs_fc_currency', '=', options.currency)
     .where('coding.egcs_tp_agencychartofaccount', '=', agencyChartId)
     .where('commitment._deleted', '=', false).where('line._deleted', '=', false)
-    .where(eb => options.includeCommitmentLineId
-      ? eb.or([eb('commitment.egcs_fc_active', '=', true), eb('line.id', '=', options.includeCommitmentLineId)])
-      : eb('commitment.egcs_fc_active', '=', true)).execute()
+    .where(eb => options.includeCommitmentLineIds?.length
+      ? eb.or([eb('commitment.egcs_fc_active', '=', true), eb('line.id', 'in', options.includeCommitmentLineIds)])
+      : options.includeCommitmentLineId
+        ? eb.or([eb('commitment.egcs_fc_active', '=', true), eb('line.id', '=', options.includeCommitmentLineId)])
+        : eb('commitment.egcs_fc_active', '=', true)).execute()
   let codingPaymentsQuery = db.selectFrom('Funding_Case_Agreement_Payment_Line as paymentLine')
     .innerJoin('Funding_Case_Agreement_Payment as payment', 'payment.id', 'paymentLine.egcs_fc_fundingagreementpayment')
     .select(['payment.id as paymentId', databaseMoneyText(sql.ref('paymentLine.egcs_fc_amount')).as('amount')])
@@ -158,10 +161,68 @@ const readCommitmentCodingCapacity = async (
   const countedAdjustments = adjustments.filter(row => counted(row.paymentId))
   const codingPaid = sumMoney([...codingPayments.filter(row => counted(row.paymentId)), ...countedAdjustments]
     .map(row => parseDatabaseMoney(row.amount)))
+  const committed = sumMoney(codingLines.map(row => parseDatabaseMoney(row.amount)))
+  const available = subtractMoney(committed, codingPaid)
   return {
     adjustments: countedAdjustments,
-    available: subtractMoney(sumMoney(codingLines.map(row => parseDatabaseMoney(row.amount))), codingPaid)
+    available: compareMoney(available, committed) > 0 ? committed : available
   }
+}
+
+/**
+ * Reads exact-row paid floors and the minimum allocation required by each shared coding pool.
+ * Batch reallocations must preserve the shared floor once, including duplicate coding rows.
+ * @param db - Active database transaction.
+ * @param input - Agreement, currency, and rows whose capacity will be replaced together.
+ * @param input.agreementId - Owning Agreement identity.
+ * @param input.currency - Commitment currency.
+ * @param input.lineIds - Exact current and prior Commitment line identities.
+ * @returns Exact-row coverage and aggregate coding floors.
+ */
+export const getCommitmentAllocationPaidCoverage = async (
+  db: DbClient,
+  input: { agreementId: string; currency: Currency_Codes; lineIds: string[] }
+) => {
+  const lines = new Map<string, { paidAmount: Money; hasActivePaymentLine: boolean }>()
+  const codingFloors = new Map<string, Money>()
+  if (!input.lineIds.length) return { lines, codingFloors }
+  const selected = await db.selectFrom('Funding_Case_Agreement_Commitment_Line as allocationLine')
+    .innerJoin('Funding_Case_Agreement_Commitment as commitment', 'commitment.id', 'allocationLine.egcs_fc_commitment')
+    .innerJoin('Transfer_Payment_Stream_Chart_of_Account as coding', 'coding.id', 'allocationLine.egcs_fc_transferpaymentstreamchartofaccount')
+    .select(['allocationLine.id', 'allocationLine.egcs_fc_transferpaymentstreamchartofaccount as codingId',
+      'coding.egcs_tp_agencychartofaccount as agencyChartId', databaseMoneyText(sql.ref('allocationLine.egcs_fc_amount')).as('amount')])
+    .where('allocationLine.id', 'in', input.lineIds).where('allocationLine.egcs_fc_fundingagreement', '=', input.agreementId)
+    .where('commitment.egcs_fc_currency', '=', input.currency).where('allocationLine._deleted', '=', false)
+    .where('commitment._deleted', '=', false).execute()
+  const payments = await db.selectFrom('Funding_Case_Agreement_Payment_Line as allocationPaymentLine')
+    .innerJoin('Funding_Case_Agreement_Payment as payment', 'payment.id', 'allocationPaymentLine.egcs_fc_fundingagreementpayment')
+    .select(['payment.id as paymentId', 'allocationPaymentLine.egcs_fc_fundingagreementcommitmentline as commitmentLineId',
+      databaseMoneyText(sql.ref('allocationPaymentLine.egcs_fc_amount')).as('amount')])
+    .where('allocationPaymentLine.egcs_fc_fundingagreementcommitmentline', 'in', input.lineIds)
+    .where('payment.egcs_fc_currency', '=', input.currency).where('allocationPaymentLine._deleted', '=', false)
+    .where('payment._deleted', '=', false).execute()
+  const approvals = new Map<string, ApprovalEvidence>()
+  for (const paymentId of new Set(payments.map(row => String(row.paymentId)))) {
+    approvals.set(paymentId, await resolveLatestTargetApprovalEvidence(db, 'fundingcasepayment', paymentId))
+  }
+  for (const codingId of new Set(selected.map(row => String(row.codingId)))) {
+    const members = selected.filter(row => String(row.codingId) === codingId)
+    const coding = await readCommitmentCodingCapacity(db, input.agreementId, String(members[0]!.agencyChartId),
+      { currency: input.currency, includeCommitmentLineIds: input.lineIds }, approvals)
+    for (const member of members) {
+      const attached = payments.filter(row => String(row.commitmentLineId) === String(member.id))
+      const paid = sumMoney(attached.filter(row => approvals.get(String(row.paymentId))?.approvalRuntimeState !== 'denied')
+        .map(row => parseDatabaseMoney(row.amount)))
+      const adjustments = coding?.adjustments.filter(row => String(row.commitmentLineId) === String(member.id)) ?? []
+      const exactPaid = addMoney(paid, sumMoney(adjustments.map(row => parseDatabaseMoney(row.amount))))
+      lines.set(String(member.id), { paidAmount: compareMoney(exactPaid, ZERO_MONEY) < 0 ? ZERO_MONEY : exactPaid,
+        hasActivePaymentLine: attached.length > 0 || adjustments.length > 0 })
+    }
+    const exactFloor = sumMoney(members.map(row => lines.get(String(row.id))!.paidAmount))
+    const sharedFloor = coding ? subtractMoney(sumMoney(members.map(row => parseDatabaseMoney(row.amount))), coding.available) : ZERO_MONEY
+    codingFloors.set(codingId, compareMoney(sharedFloor, exactFloor) > 0 ? sharedFloor : exactFloor)
+  }
+  return { lines, codingFloors }
 }
 
 /** Selection for the host-owned payment-capacity projection. Fiscal year is the stable Agreement budget-year ID. */
@@ -236,7 +297,9 @@ export const getAgreementCommitmentPaymentCapacity = async (
     const coding = await readCommitmentCodingCapacity(db, agreementId, agencyChartId, { ...input, currency: selectedCurrency }, approvalByPayment)
     const selectedPaid = addMoney(directPaid, sumMoney(coding?.adjustments.filter(row => lineIds.has(String(row.commitmentLineId)))
       .map(row => parseDatabaseMoney(row.amount)) ?? []))
-    const ownAvailable = subtractMoney(sumMoney(selected.map(row => parseDatabaseMoney(row.amount))), selectedPaid)
+    const selectedCommitted = sumMoney(selected.map(row => parseDatabaseMoney(row.amount)))
+    const effectiveAvailable = subtractMoney(selectedCommitted, selectedPaid)
+    const ownAvailable = compareMoney(effectiveAvailable, selectedCommitted) > 0 ? selectedCommitted : effectiveAvailable
     const remaining = coding && compareMoney(coding.available, ownAvailable) < 0 ? coding.available : ownAvailable
     available.push(compareMoney(remaining, ZERO_MONEY) < 0 ? ZERO_MONEY : remaining)
   }

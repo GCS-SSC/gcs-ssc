@@ -138,6 +138,7 @@ const {
   refreshKey = 0,
   hideWhenUnconfigured = false,
   showPreActionWhenUnconfigured = false,
+  preActionShowHeader = true,
   preActionTitleKey,
   preActionDescriptionKey
 } = defineProps<{
@@ -148,6 +149,7 @@ const {
   refreshKey?: number
   hideWhenUnconfigured?: boolean
   showPreActionWhenUnconfigured?: boolean
+  preActionShowHeader?: boolean
   preActionTitleKey?: string
   preActionDescriptionKey?: string
 }>()
@@ -666,7 +668,7 @@ const handleApprovalChanged = async () => {
         </p>
       </div>
     </CommonWorkflowPacket>
-    <AccountReceivablePacket v-if="data?.submission && entityType === 'fundingcaseaccountreceivable'" :submission="data.submission" />
+    <AccountReceivablePacket v-if="data?.submission && (entityType === 'fundingcaseaccountreceivable' || entityType === 'fundingcaseaccountreceivableadjustment')" :submission="data.submission" />
     <AccountReceivablePacket v-else-if="data?.submission && entityType === 'fundingcaseaccountreceivablecreditmemo'" :submission="data.submission" credit-memo />
     <CorrectionPacket v-else-if="data?.submission && entityType === 'fundingcasecorrection'" :submission="data.submission" />
     <AgreementPaymentPacket v-else-if="data?.submission && entityType === 'fundingcasepayment'" :submission="data.submission" />
@@ -740,6 +742,7 @@ const handleApprovalChanged = async () => {
     </UAlert>
     <CommonPreActionReport
       v-else-if="showWorkflowContent && showPreActionReport"
+      :show-header="Boolean(applicableWorkflow) || preActionShowHeader"
       :title="preActionTitle"
       :description="preActionDescription">
       <template v-if="$slots['pre-action-action'] || (canEdit && data?.canStart)" #action>

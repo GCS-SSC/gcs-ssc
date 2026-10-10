@@ -15,6 +15,7 @@ const ENTITY_TYPE_ICON_MAP: Record<string, string> = {
   fundingcaseforecast: 'i-lucide-chart-column',
   fundingcasejournalvoucher: 'i-lucide-book-open-check',
   fundingcaseaccountreceivable: 'i-lucide-hand-coins',
+  fundingcaseaccountreceivableadjustment: 'i-lucide-sliders-horizontal',
   fundingcaseaccountreceivablecreditmemo: 'i-lucide-banknote-arrow-down',
   fundingcasecorrection: 'i-lucide-file-pen-line',
   fundingcasepayment: 'i-lucide-wallet',

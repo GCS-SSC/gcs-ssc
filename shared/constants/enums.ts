@@ -13,6 +13,7 @@ export const APPROVAL_TYPE_ENUM = [
   'fundingcasejournalvoucher',
   'fundingcasecorrection',
   'fundingcaseaccountreceivable',
+  'fundingcaseaccountreceivableadjustment',
   'fundingcaseaccountreceivablecreditmemo',
   'fundingcasepayment'
 ] as const
@@ -48,6 +49,7 @@ export const EXECUTION_ENTITY_TYPE_ENUM = [
   'fundingcasejournalvoucher',
   'fundingcasecorrection',
   'fundingcaseaccountreceivable',
+  'fundingcaseaccountreceivableadjustment',
   'fundingcaseaccountreceivablecreditmemo',
   'fundingcasepayment',
   'fundingcaserecommendation',
@@ -67,6 +69,7 @@ export const RECOMMENDATION_EXECUTION_ENTITY_TYPE_ENUM = [
   'fundingcasejournalvoucher',
   'fundingcasecorrection',
   'fundingcaseaccountreceivable',
+  'fundingcaseaccountreceivableadjustment',
   'fundingcaseaccountreceivablecreditmemo',
   'fundingcasepayment',
   'fundingcaseagreementcommitment'

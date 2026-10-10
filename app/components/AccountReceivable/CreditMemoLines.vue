@@ -10,10 +10,14 @@ import { useCrudModal, useCrudModalPending } from '~/composables/useCrudModal'
 import { formatAccountingDimensions, getAccountingDimensionSearchValues } from '~~/shared/utils/accounting-dimensions'
 import { sumMoney } from '~~/shared/utils/money'
 import { formatAccountReceivableAmount } from '~/utils/account-receivable-display'
+import { appRouteLocations } from '~/utils/route-locations'
 
-const { creditMemoId, receivableId, lines, currency, canEdit, canDelete } = defineProps<{
+const { creditMemoId, receivableId, receivableIds, agencyId, applicantRecipientId, lines, currency, canEdit, canDelete } = defineProps<{
   creditMemoId: string
   receivableId: string
+  receivableIds: string[]
+  agencyId: string
+  applicantRecipientId: string
   lines: AccountReceivableCreditMemoLine[]
   currency: string
   canEdit: boolean
@@ -21,6 +25,7 @@ const { creditMemoId, receivableId, lines, currency, canEdit, canDelete } = defi
 }>()
 const emit = defineEmits<{ changed: [] }>()
 const { t, locale } = useI18n()
+const localePath = useLocalePath()
 const { createValidator } = useZodI18n()
 const { sendJson } = useJsonRequest()
 const { showError } = useApiErrorToast()
@@ -28,17 +33,20 @@ const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const toast = useToast()
 const { search, pagination } = useTableListState()
 type LineForm = {
+  egcs_fc_receivable: string | undefined
   egcs_fc_linenumber: number | undefined
   egcs_fc_creditmemochartofaccount: string | undefined
   egcs_fc_amount: string
 }
 const modal = useCrudModal<AccountReceivableCreditMemoLine, LineForm>({
   createState: () => ({
+    egcs_fc_receivable: receivableIds.length === 1 ? receivableIds[0] : undefined,
     egcs_fc_linenumber: Math.max(0, ...lines.map(line => line.egcs_fc_linenumber)) + 1,
     egcs_fc_creditmemochartofaccount: undefined,
     egcs_fc_amount: ''
   }),
   updateState: line => ({
+    egcs_fc_receivable: line.egcs_fc_receivable,
     egcs_fc_linenumber: line.egcs_fc_linenumber,
     egcs_fc_creditmemochartofaccount: line.egcs_fc_creditmemochartofaccount,
     egcs_fc_amount: line.egcs_fc_amount
@@ -58,6 +66,9 @@ watch(() => `${creditMemoId}:${receivableId}`, () => {
   search.value = ''
   pagination.value.pageIndex = 0
 }, { flush: 'sync' })
+watch(() => selected.value?.egcs_fc_receivable, (value, previous) => {
+  if (selected.value && !selectedLineId.value && value !== previous) selected.value.egcs_fc_creditmemochartofaccount = undefined
+}, { flush: 'sync' })
 watch(() => canEdit, allowed => {
   if (!allowed) modal.close()
 }, { flush: 'sync' })
@@ -76,6 +87,8 @@ watch(() => filtered.value.length, count => {
 })
 const total = computed(() => sumMoney(lines.map(line => line.egcs_fc_amount)))
 const columns: TableColumnInput<AccountReceivableCreditMemoLine>[] = [
+  { accessorKey: 'egcs_fc_agreementnumber', headerKey: 'account_receivable.agreement' },
+  { accessorKey: 'egcs_fc_financialsystemid', headerKey: 'applicant_recipient.agency_financial_ids.financial_system_id' },
   { accessorKey: 'egcs_fc_linenumber', headerKey: 'account_receivable.credit_memo_line_number' },
   { id: 'coding', headerKey: 'account_receivable.credit_memo_coding' },
   { id: 'amount', headerKey: 'account_receivable.credit_memo_amount' },
@@ -101,6 +114,7 @@ const save = async () => {
   const updating = lineId !== null
   try {
     const payload = AccountReceivableCreditMemoLineCreateSchema.parse({
+      egcs_fc_receivable: line.egcs_fc_receivable,
       egcs_fc_linenumber: line.egcs_fc_linenumber,
       egcs_fc_creditmemochartofaccount: line.egcs_fc_creditmemochartofaccount,
       egcs_fc_amount: line.egcs_fc_amount
@@ -136,6 +150,10 @@ const deleteLine = async (line: AccountReceivableCreditMemoLine) => {
       :total-records="filtered.length" :pagination-options="{ manualPagination: false }"
       :show-button="canEdit" :button-label="t('account_receivable.credit_memo_add_line')"
       :search-placeholder="t('account_receivable.credit_memo_lines_search')" @add="openCreate">
+      <template #egcs_fc_agreementnumber-cell="{ row }">
+        <ULink v-if="row.original.egcs_fc_fundingagreement" :to="localePath(appRouteLocations.agreementDetail(row.original.egcs_fc_fundingagreement))" class="font-bold text-zinc-900 transition-colors hover:text-primary dark:text-white">{{ row.original.egcs_fc_agreementnumber }}</ULink>
+        <span v-else>{{ row.original.egcs_fc_agreementnumber }}</span>
+      </template>
       <template #coding-cell="{ row }">
         <span class="text-sm whitespace-normal">{{ formatAccountingDimensions(dimensions(row.original), locale === 'fr' ? 'fr' : 'en') || t('account_receivable.coding_not_selected') }}</span>
       </template>
@@ -160,14 +178,22 @@ const deleteLine = async (line: AccountReceivableCreditMemoLine) => {
     <UModal v-model:open="isOpen" :title="t(selectedLineId ? 'account_receivable.credit_memo_edit_line' : 'account_receivable.credit_memo_add_line')" :ui="{ content: 'sm:max-w-2xl' }">
       <template #body>
         <UForm v-if="selected" :state="selected" :validate="createValidator(AccountReceivableCreditMemoLineCreateSchema)" class="space-y-4" @submit="save">
+          <UFormField name="egcs_fc_receivable" :label="t('account_receivable.credit_memo_receivable')">
+            <CommonServerLookupSelect
+              v-model="selected.egcs_fc_receivable"
+              fetch-url="/api/account-receivable-credit-memos/lookups/receivables"
+              :query="{ egcs_fc_agency: agencyId, egcs_fc_applicantrecipient: applicantRecipientId, egcs_fc_currency: currency, eligibleIds: receivableIds.join(',') }"
+              selected-values-query-key="selectedIds" value-key="id" label-en-key="label_en" label-fr-key="label_fr"
+              :show-value-in-label="false" :disabled="isPending || Boolean(selectedLineId)" close-on-select />
+          </UFormField>
           <UFormField name="egcs_fc_linenumber" :label="t('account_receivable.credit_memo_line_number')">
             <UInputNumber v-model="selected.egcs_fc_linenumber" :min="1" :max="32767" :step="1" :disabled="isPending" class="w-full" />
           </UFormField>
           <UFormField name="egcs_fc_creditmemochartofaccount" :label="t('account_receivable.credit_memo_coding')">
             <CommonServerLookupSelect
               v-model="selected.egcs_fc_creditmemochartofaccount" fetch-url="/api/account-receivable-credit-memos/lookups/chart-of-accounts"
-              :query="{ egcs_fc_receivable: receivableId }" selected-values-query-key="selectedIds"
-              value-key="id" label-en-key="label_en" label-fr-key="label_fr" :show-value-in-label="false" :disabled="isPending" close-on-select />
+              :query="selected.egcs_fc_receivable ? { egcs_fc_receivable: selected.egcs_fc_receivable } : {}" selected-values-query-key="selectedIds"
+              value-key="id" label-en-key="label_en" label-fr-key="label_fr" :show-value-in-label="false" :disabled="isPending || !selected.egcs_fc_receivable" close-on-select />
           </UFormField>
           <UFormField name="egcs_fc_amount" :label="t('account_receivable.credit_memo_amount')">
             <CommonCurrencyInput v-model="selected.egcs_fc_amount" :currency="currency" :disabled="isPending" class="w-full" />

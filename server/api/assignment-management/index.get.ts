@@ -148,10 +148,10 @@ export default defineEventHandler(async event => {
       JOIN "Agency_Profile" agency ON agency.id = program.egcs_tp_agency AND agency._deleted = false
       WHERE correction._deleted = false
       UNION ALL
-      SELECT item.id, 'fundingcaseaccountreceivable', item.egcs_fc_status::text,
-        item.egcs_fc_agreementnumber || '-AR-' || item.egcs_fc_number::text,
-        item.egcs_fc_agreementnumber || '-AR-' || item.egcs_fc_number::text,
-        item.egcs_fc_agreementnumber || '-AR-' || item.egcs_fc_number::text,
+      SELECT item.id, item.egcs_fc_entitytype, item.egcs_fc_status::text,
+        item.id::text,
+        item.id::text,
+        item.id::text,
         'account_receivable', program.egcs_tp_agency, program.id,
         agency.egcs_ay_name_en, agency.egcs_ay_name_fr, program.egcs_tp_name_en, program.egcs_tp_name_fr
       FROM "Funding_Case_Agreement_Account_Receivable" item
@@ -162,9 +162,9 @@ export default defineEventHandler(async event => {
       WHERE NOT item._deleted
       UNION ALL
       SELECT item.id, 'fundingcaseaccountreceivablecreditmemo', item.egcs_fc_status::text,
-        item.egcs_fc_agreementnumber || '-CM-' || item.egcs_fc_number::text,
-        item.egcs_fc_agreementnumber || '-CM-' || item.egcs_fc_number::text,
-        item.egcs_fc_agreementnumber || '-CM-' || item.egcs_fc_number::text,
+        item.id::text,
+        item.id::text,
+        item.id::text,
         'account_receivable', program.egcs_tp_agency, program.id,
         agency.egcs_ay_name_en, agency.egcs_ay_name_fr, program.egcs_tp_name_en, program.egcs_tp_name_fr
       FROM "Funding_Case_Account_Receivable_Credit_Memo" item

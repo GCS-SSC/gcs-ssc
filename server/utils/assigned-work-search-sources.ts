@@ -128,8 +128,12 @@ export const buildAssignedWorkSearchSourceFacts = (): RawBuilder<unknown> => {
       nameEn = sql`COALESCE(item.egcs_fc_name_en, '#' || item.id::text)`
       nameFr = sql`COALESCE(item.egcs_fc_name_fr, '#' || item.id::text)`
       reference = sql`item.egcs_fc_amendmentnumber::text`
-    } else if (entityType === 'fundingcasecorrection' || entityType === 'fundingcaseaccountreceivable' || entityType === 'fundingcasejournalvoucher') {
-      const marker = entityType === 'fundingcasecorrection' ? '-COR-' : entityType === 'fundingcaseaccountreceivable' ? '-AR-' : '-JV-'
+    } else if (entityType === 'fundingcaseaccountreceivable' || entityType === 'fundingcaseaccountreceivableadjustment') {
+      reference = sql`item.id::text`
+      nameEn = reference
+      nameFr = reference
+    } else if (entityType === 'fundingcasecorrection' || entityType === 'fundingcasejournalvoucher') {
+      const marker = entityType === 'fundingcasecorrection' ? '-COR-' : '-JV-'
       reference = sql`item.egcs_fc_agreementnumber || ${marker} || item.egcs_fc_number::text`
       nameEn = reference
       nameFr = reference
@@ -220,8 +224,8 @@ export const buildAssignedWorkSearchSourceFacts = (): RawBuilder<unknown> => {
       WHERE target.id = stream.egcs_tp_transferpaymentprofile AND NOT target._deleted OFFSET 0) program ON TRUE
     UNION ALL
     SELECT memo.id, 'fundingcaseaccountreceivablecreditmemo', memo.egcs_fc_status::text,
-      'CM-' || memo.egcs_fc_number::text, 'CM-' || memo.egcs_fc_number::text,
-      'CM-' || memo.egcs_fc_number::text, NULL::bigint, memo.egcs_fc_applicantrecipient, NULL::text,
+      memo.id::text, memo.id::text,
+      memo.id::text, NULL::bigint, memo.egcs_fc_applicantrecipient, NULL::text,
       'account_receivable', memo.egcs_fc_agency, NULL::bigint, NULL::bigint
     FROM needed_identities needed
     JOIN LATERAL (SELECT target.* FROM "Funding_Case_Account_Receivable_Credit_Memo" target

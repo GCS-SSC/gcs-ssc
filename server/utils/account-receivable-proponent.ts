@@ -77,7 +77,7 @@ export const listProponentAccountReceivables = async (event: H3Event, id: string
         eb('egcs_fc_agreementnumber', 'ilike', search),
         eb('egcs_fc_narrative_en', 'ilike', search), eb('egcs_fc_narrative_fr', 'ilike', search),
         eb('egcs_fc_typename_en', 'ilike', search), eb('egcs_fc_typename_fr', 'ilike', search),
-        sql<boolean>`(${sql.ref('egcs_fc_agreementnumber')} || ' / AR ' || ${sql.ref('egcs_fc_number')}::text) ILIKE ${search}`
+        sql<boolean>`${sql.ref('id')}::text ILIKE ${search}`
       ]))
     }
     const candidates = await query.orderBy('egcs_fc_createdat', 'desc').orderBy('id', 'desc').execute()
@@ -195,12 +195,10 @@ export const listProponentCreditMemos = async (event: H3Event, id: string, reque
     const cashRows: ProponentCreditMemoRow[] = await Promise.all(cash.map(async memo => {
       const agency = agencyById.get(String(memo.egcs_fc_agency))
       if (!agency) throw new Error('CREDIT_MEMO_OWNER_CHANGED')
-      const legacyRecovery = await db.selectFrom('Funding_Case_Account_Receivable_Recovery').select('id')
-        .where('egcs_fc_creditmemo', '=', String(memo.id)).where('_deleted', '=', false).orderBy('id', 'desc').executeTakeFirst()
       return {
         id: String(memo.id), egcs_fc_kind: 'cash' as const, egcs_fc_status: String(memo.egcs_fc_status),
         egcs_fc_candelete: await canDeleteCashMemo(db, auth, memo),
-        egcs_fc_creditmemoreference: `CM-${legacyRecovery?.id ?? memo.id}`,
+        egcs_fc_creditmemoreference: String(memo.id),
         egcs_fc_agency: String(agency.id), egcs_fc_agencyname_en: agency.egcs_ay_name_en, egcs_fc_agencyname_fr: agency.egcs_ay_name_fr,
         egcs_fc_currency: memo.egcs_fc_currency, egcs_fc_amount: parseDatabaseMoney(memo.egcs_fc_amount),
         egcs_fc_createdat: isoDate(memo.egcs_fc_createdat), egcs_fc_receiveddate: isoDate(memo.egcs_fc_receiveddate)

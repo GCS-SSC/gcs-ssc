@@ -6,6 +6,7 @@ import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import { throwIfAgencyUniqueConstraintError } from '~~/server/utils/agency-unique-constraint-errors'
+import { assertAgencyCreditMemoCommitmentChart } from '~~/server/utils/agency-credit-memo-chart'
 
 export default defineEventHandler(async event => {
   const agencyId = getRouterParam(event, 'agencyId')
@@ -19,11 +20,14 @@ export default defineEventHandler(async event => {
         .where('id', '=', String(body.egcs_ay_fiscalyear)).where('egcs_ay_organizationagency', '=', agencyId)
         .where('_deleted', '=', false).forUpdate().executeTakeFirst()
       if (!year) return await notFound(event, 'FISCAL_YEAR_NOT_FOUND', 'apiErrors.agency.fiscal_year_not_found')
+      await assertAgencyCreditMemoCommitmentChart(event, trx, { agencyId, fiscalYearId: String(body.egcs_ay_fiscalyear),
+        currency: body.egcs_ay_currency, kind: body.egcs_ay_kind, commitmentChartId: body.egcs_ay_commitmentchartofaccount })
       return await trx.insertInto('Agency_Chart_of_Account').values({
         egcs_ay_organizationagency: agencyId,
         egcs_ay_fiscalyear: String(body.egcs_ay_fiscalyear),
         egcs_ay_currency: body.egcs_ay_currency,
         egcs_ay_kind: body.egcs_ay_kind,
+        egcs_ay_commitmentchartofaccount: body.egcs_ay_commitmentchartofaccount ?? null,
         egcs_ay_accountingdimensions: sql`${JSON.stringify(body.egcs_ay_accountingdimensions)}::jsonb`,
         _deleted: false
       }).returningAll().executeTakeFirstOrThrow()

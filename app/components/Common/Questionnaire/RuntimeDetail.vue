@@ -365,7 +365,7 @@ const save = async (submit: boolean) => {
           </CommonSection>
 
           <CommonSection v-if="data.can_read_assignments !== false" :title="t('assignments.title')" :badge="assignmentSectionBadge" :grid-cols="1">
-            <CommonAssignedUsers :key="`${runtimeIdentity}:${assignmentRosterVersion}`" :entity-type="configuration.entityType" :entity-id="entityId" @changed="handleRuntimeChanged" />
+            <CommonAssignedUsers :key="`${runtimeIdentity}:${assignmentRosterVersion}`" :show-header="false" :entity-type="configuration.entityType" :entity-id="entityId" @changed="handleRuntimeChanged" />
           </CommonSection>
         </div>
       </div>

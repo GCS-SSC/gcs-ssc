@@ -152,7 +152,7 @@ const breadcrumbs = computed(() => [
       </UAlert>
       <div v-else-if="profile" class="flex flex-1 flex-col">
         <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-megaphone" :title="getBilingualValue(profile, 'egcs_fo_name', id)" :meta-items="heroMetaItems" :badges="[{ statusId: String(profile.egcs_fo_status) }]" :actions="[{ label: t('funding_opportunity.edit'), icon: 'i-lucide-edit-3', visible: canEdit, onClick: edit }, { label: t('common.delete'), icon: 'i-lucide-trash', visible: canDelete, onClick: remove }]" />
-        <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="funding-opportunity-detail-content">
+        <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="funding-opportunity-detail-content" :section-description="selectedTab === 'applications' ? t('funding_opportunity.applications_description') : undefined">
           <div v-if="selectedTab === 'general'" class="space-y-8">
             <CommonSection :title="t('agency.detail.core_info')" badge="01">
               <CommonValueCard :label="t('funding_opportunity.name_en')" :value="profile.egcs_fo_name_en" />

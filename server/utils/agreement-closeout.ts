@@ -60,10 +60,11 @@ const targetRoute = (agreementId: string, entityType: Entity_Type, entityId: str
     fundingcaseamendment: 'amendments',
     fundingcaseagreementcommitment: 'commitments',
     fundingcasecorrection: 'corrections',
-    fundingcaseaccountreceivable: 'account-receivables'
+    fundingcaseaccountreceivable: 'account-receivables',
+    fundingcaseaccountreceivableadjustment: 'account-receivables'
   }
   const segment = segments[entityType]
-  return segment ? closeoutRoute(agreementId, segment, entityId) : `/agreements/${agreementId}`
+  return segment ? `${closeoutRoute(agreementId, segment, entityId)}${entityType === 'fundingcaseaccountreceivableadjustment' ? '?entityType=fundingcaseaccountreceivableadjustment' : ''}` : `/agreements/${agreementId}`
 }
 
 export const resolveAgreementCloseoutRuntimeContext = async (
@@ -299,7 +300,7 @@ export const buildAgreementCloseoutReadiness = async (
   ])
 
   const receivables = await hasAccountingTable(db, 'Funding_Case_Agreement_Account_Receivable')
-    ? await db.selectFrom('Funding_Case_Agreement_Account_Receivable').select(['id', 'egcs_fc_status', 'egcs_fc_outcome'])
+    ? await db.selectFrom('Funding_Case_Agreement_Account_Receivable').select(['id', 'egcs_fc_entitytype', 'egcs_fc_status', 'egcs_fc_outcome'])
         .where('egcs_fc_fundingagreement', '=', agreementId).where('_deleted', '=', false).execute()
     : []
   const repayments = await hasAccountingTable(db, 'Funding_Case_Agreement_Account_Receivable')
@@ -367,7 +368,7 @@ export const buildAgreementCloseoutReadiness = async (
   }
 
   for (const row of receivables) if (row.egcs_fc_outcome === 'open') {
-    addBlocker(blockers, agreementId, 'fundingcaseaccountreceivable', String(row.id), row.egcs_fc_status, 'account_receivable_not_terminal')
+    addBlocker(blockers, agreementId, row.egcs_fc_entitytype, String(row.id), row.egcs_fc_status, 'account_receivable_not_terminal')
   }
   for (const row of repayments) if (row.egcs_fc_outcome === 'open') {
     addBlocker(blockers, String(row.egcs_fc_fundingagreement), 'fundingcaseaccountreceivablecreditmemo', String(row.id), row.egcs_fc_status, 'account_receivable_credit_memo_not_terminal')
@@ -376,14 +377,14 @@ export const buildAgreementCloseoutReadiness = async (
     const pending = await db.selectFrom('Funding_Case_Account_Receivable_Allocation as allocation')
       .innerJoin('Funding_Case_Account_Receivable_Recovery as recovery', 'recovery.id', 'allocation.egcs_fc_recovery')
       .innerJoin('Funding_Case_Agreement_Account_Receivable as debt', 'debt.id', 'allocation.egcs_fc_receivable')
-      .select(['debt.id', 'debt.egcs_fc_status']).distinct()
+      .select(['debt.id', 'debt.egcs_fc_entitytype', 'debt.egcs_fc_status']).distinct()
       .where('allocation.egcs_fc_fundingagreement', '=', agreementId).where('recovery.egcs_fc_outcome', '=', 'open')
       .where('allocation._deleted', '=', false).where('recovery._deleted', '=', false).execute()
-    for (const row of pending) addBlocker(blockers, agreementId, 'fundingcaseaccountreceivable', String(row.id), row.egcs_fc_status, 'account_receivable_recovery_pending')
+    for (const row of pending) addBlocker(blockers, agreementId, row.egcs_fc_entitytype, String(row.id), row.egcs_fc_status, 'account_receivable_recovery_pending')
   }
   const targets = [
     { entityType: 'fundingcaseagreement' as const, entityId: agreementId },
-    ...receivables.map(row => ({ entityType: 'fundingcaseaccountreceivable' as const, entityId: String(row.id) })),
+    ...receivables.map(row => ({ entityType: row.egcs_fc_entitytype, entityId: String(row.id) })),
     ...repayments.map(row => ({ entityType: 'fundingcaseaccountreceivablecreditmemo' as const, entityId: String(row.id) })),
     ...amendments.map(row => ({ entityType: 'fundingcaseamendment' as const, entityId: String(row.id) })),
     ...claims.map(row => ({ entityType: 'fundingcaseagreementclaim' as const, entityId: String(row.id) })),

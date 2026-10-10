@@ -1,27 +1,23 @@
 <script setup lang="ts">
-import { inject } from 'vue'
-import { useDetailSectionOwnership } from '~/composables/useDetailSectionOwnership'
-import { DETAIL_SECTION_CONTEXT } from '~/utils/detail-sections'
-
-const { title, description } = defineProps<{
+const { title, description, showHeader = true, showDescription = true } = defineProps<{
   title: string
   description: string
+  showHeader?: boolean
+  showDescription?: boolean
 }>()
-const ownsHeading = useDetailSectionOwnership(() => title)
-const detailSection = inject(DETAIL_SECTION_CONTEXT, null)
 </script>
 
 <template>
   <div class="min-w-0 space-y-6">
-    <CommonDetailSectionHeader v-if="!ownsHeading" :title="title" :description="description">
+    <CommonDetailSectionHeader v-if="showHeader" :title="title" :description="showDescription ? description : undefined">
       <template v-if="$slots.action" #actions>
         <slot name="action" />
       </template>
     </CommonDetailSectionHeader>
-    <p v-if="ownsHeading && description && description !== detailSection?.description.value" class="text-sm text-muted">
+    <p v-if="!showHeader && showDescription && description" class="text-sm text-muted">
       {{ description }}
     </p>
-    <div v-if="ownsHeading && $slots.action" class="flex justify-end">
+    <div v-if="!showHeader && $slots.action" class="flex justify-end">
       <slot name="action" />
     </div>
 

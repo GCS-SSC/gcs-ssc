@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { localizeSectionUrl } from '~/utils/section-url-values'
+
 const { t, locale } = useI18n()
 const switchLocalePath = useSwitchLocalePath()
 const isFrench = computed(() => locale.value === 'fr')
@@ -12,7 +14,7 @@ const onThemeToggle = () => {
 
 const onLocaleToggle = (value: boolean | 'indeterminate') => {
   const nextLocale = value === true ? 'fr' : 'en'
-  navigateTo(switchLocalePath(nextLocale))
+  navigateTo(localizeSectionUrl(switchLocalePath(nextLocale), nextLocale))
 }
 </script>
 

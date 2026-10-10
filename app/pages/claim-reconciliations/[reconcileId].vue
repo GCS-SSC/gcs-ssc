@@ -322,7 +322,7 @@ const cancelReconciliation = async () => {
             :title="t('assignments.read_only_title')"
             :description="t(data.is_assigned ? 'agreement.claims.reconcile_locked_description' : 'assignments.read_only_description')" />
 
-          <CommonSection v-if="selectedTab === 'reconciliation'" :title="t('agreement.claims.reconcile_selected_title')" :grid-cols="1">
+          <CommonSection v-if="selectedTab === 'reconciliation'" :show-header="false" :title="t('agreement.claims.reconcile_selected_title')" :grid-cols="1">
             <div class="space-y-5">
               <div class="flex flex-wrap items-center justify-between gap-4 rounded-sm border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-950">
                 <UCheckbox
@@ -361,13 +361,12 @@ const cancelReconciliation = async () => {
             </div>
           </CommonSection>
 
-          <CommonSection v-else-if="selectedTab === 'completion'" :title="t('agreement.claims.reconcile_completion.title')" :grid-cols="1">
+          <CommonSection v-else-if="selectedTab === 'completion'" :show-header="false" :title="t('agreement.claims.reconcile_completion.title')" :grid-cols="1">
             <div class="space-y-8">
               <CommonCompletionSection
                 entity-type="fundingclaimreconcile"
                 :entity-id="reconcileId"
-                :is-locked="!data.can_update"
-                hide-title
+                :is-locked="!data.can_update" :show-header="false"
                 title-key="agreement.claims.reconcile_completion.title"
                 description-key="agreement.claims.reconcile_completion.description"
                 status-complete-key="agreement.claims.reconcile_completion.status_complete"
@@ -396,9 +395,9 @@ const cancelReconciliation = async () => {
             @changed="handleRuntimeChanged" />
 
           <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingclaimreconcile" :entity-id="reconcileId" purpose="standard" :can-edit="data.is_assigned" :refresh-key="approvalsRefreshKey" @changed="handleRuntimeChanged" />
-          <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" entity-type="fundingclaimreconcile" :entity-id="reconcileId" />
+          <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" :show-header="false" entity-type="fundingclaimreconcile" :entity-id="reconcileId" />
           <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingclaimreconcile" :entity-id="reconcileId" />
-          <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" entity-type="fundingclaimreconcile" :entity-id="reconcileId" />
+          <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" :show-header="false" entity-type="fundingclaimreconcile" :entity-id="reconcileId" />
         </CommonDetailWorkspace>
       </div>
 

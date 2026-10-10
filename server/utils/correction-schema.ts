@@ -8,7 +8,7 @@ import type { Database } from '~~/shared/types/database'
  * @returns Whether the table exists in the current transaction's schema.
  */
 export const hasAccountingTable = async (
-  db: Kysely<Database>, table: 'Funding_Case_Agreement_Correction' | 'Funding_Case_Agreement_Journal_Voucher' | 'Funding_Case_Agreement_Account_Receivable' | 'Funding_Case_Account_Receivable_Pool' | 'Funding_Case_Account_Receivable_Posting' | 'Funding_Case_Account_Receivable_Offset_Memo'
+  db: Kysely<Database>, table: 'Funding_Case_Agreement_Correction' | 'Funding_Case_Agreement_Journal_Voucher' | 'Funding_Case_Agreement_Account_Receivable' | 'Funding_Case_Account_Receivable_Pool' | 'Funding_Case_Account_Receivable_Posting' | 'Funding_Case_Account_Receivable_Offset_Memo' | 'Funding_Case_Account_Receivable_Credit_Memo_Line' | 'Funding_Case_Account_Receivable_Claim_Reduction'
 ): Promise<boolean> => {
   const result = await sql<{ installed: boolean }>`SELECT to_regclass(${`public."${table}"`}) IS NOT NULL AS installed`.execute(db)
   return result.rows[0]?.installed === true

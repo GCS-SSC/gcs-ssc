@@ -1,3 +1,4 @@
+import { applyAccountReceivableClaimReductions } from './account-receivable-claim-reductions'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Narrow engine-owned Payment controls, reservations and exact principal allocation. */
 import { sql, type Kysely, type Transaction } from 'kysely'
 import type { Currency_Codes, Database, JsonValue } from '~~/shared/types/database'
@@ -365,4 +366,8 @@ export const postAccountReceivablePaymentOffset = async (trx: Transaction<Databa
     await trx.updateTable('Funding_Case_Account_Receivable_Recovery').set({ egcs_fc_outcome: 'posted', egcs_fc_postingruntime: runtimeId, egcs_fc_postedat: new Date() })
       .where('id', '=', String(recovery.id)).where('egcs_fc_outcome', '=', 'open').execute()
   } else await postAccountReceivableRecovery(trx, String(recovery.id), runtimeId)
+  const cleared = await trx.selectFrom('Funding_Case_Account_Receivable_Offset_Memo as memo')
+    .innerJoin('Funding_Case_Account_Receivable_Offset_Memo_Application as application', 'application.egcs_fc_offsetmemo', 'memo.id')
+    .select('memo.egcs_fc_receivable').where('application.egcs_fc_recovery', '=', String(recovery.id)).execute()
+  for (const receivableId of new Set(cleared.map(row => String(row.egcs_fc_receivable)))) await applyAccountReceivableClaimReductions(trx, receivableId)
 }

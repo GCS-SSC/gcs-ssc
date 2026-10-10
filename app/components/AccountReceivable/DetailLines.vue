@@ -4,7 +4,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { AdminCommonLookupResponseItem } from '~~/shared/types/admin-common-ui'
 import type { AccountReceivableLine } from '~~/shared/types/account-receivable'
-import { AccountReceivableLineCreateSchema, AccountReceivableLinePatchSchema } from '~~/shared/types/schemas/account-receivable'
+import { AccountReceivableLineCreateSchema, AccountReceivableLinePatchSchema, AccountReceivableRecodeSchema } from '~~/shared/types/schemas/account-receivable'
 import { TransferPaymentStreamChartOfAccountDimensionSchema } from '~~/shared/types/schemas/transfer-payment'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { useCrudModal, useCrudModalPending } from '~/composables/useCrudModal'
@@ -12,7 +12,7 @@ import { formatAccountingDimensions, getAccountingDimensionSearchValues } from '
 import { moneyToCents, parseMoneyText, sumMoney } from '~~/shared/utils/money'
 import { formatAccountReceivableAmount } from '~/utils/account-receivable-display'
 
-const { accountReceivableId, lines, currency, fiscalYearId, isAdjustment, canEdit, canDelete } = defineProps<{
+const { accountReceivableId, lines, currency, fiscalYearId, isAdjustment, canEdit, canDelete, canUpdate } = defineProps<{
   accountReceivableId: string
   fiscalYearId: string
   isAdjustment: boolean
@@ -20,6 +20,7 @@ const { accountReceivableId, lines, currency, fiscalYearId, isAdjustment, canEdi
   currency: string
   canEdit: boolean
   canDelete: boolean
+  canUpdate: boolean
 }>()
 const emit = defineEmits<{ changed: [] }>()
 const { t, locale } = useI18n()
@@ -51,8 +52,12 @@ const modal = useCrudModal<AccountReceivableLine, LineForm>({
 })
 const { selected, isOpen } = modal
 const selectedLineId: Ref<string | null> = ref(null)
+const recodeMode: Ref<boolean> = ref(false)
+const lineValidator = computed(() => createValidator(recodeMode.value ? AccountReceivableRecodeSchema.passthrough() : AccountReceivableLineCreateSchema))
 const pending = useCrudModalPending(modal.captureSession)
 const { isPending } = pending
+const removePending: Ref<Set<string>> = ref(new Set())
+const removeKey = (line: AccountReceivableLine) => `${accountReceivableId}:${line.id}`
 let disposed = false
 onBeforeUnmount(() => {
   disposed = true
@@ -80,6 +85,7 @@ watch(() => filtered.value.length, count => {
   pagination.value.pageIndex = Math.min(pagination.value.pageIndex, Math.max(0, Math.ceil(count / pagination.value.pageSize) - 1))
 })
 const codingRequired = computed(() => {
+  if (recodeMode.value) return true
   try {
     return moneyToCents(parseMoneyText(selected.value?.egcs_fc_amount ?? '')) !== BigInt(0)
   } catch {
@@ -97,12 +103,25 @@ const lineNumber = (line: AccountReceivableLine) => lines.findIndex(item => item
 const openCreate = () => {
   if (!canEdit) return
   selectedLineId.value = null
+  recodeMode.value = false
   modal.openCreate()
 }
 const openEdit = (line: AccountReceivableLine) => {
   if (!canEdit) return
   selectedLineId.value = line.id
+  recodeMode.value = false
   modal.openUpdate(line)
+}
+const openRecode = (line: AccountReceivableLine) => {
+  if (!canUpdate || !isAdjustment || !line.egcs_fc_accountreceivablechartofaccount) return
+  if (!canEdit) {
+    toast.add({ title: t('common.warning'), description: t('account_receivable.work_prerequisite'), color: 'warning' })
+    return
+  }
+  selectedLineId.value = line.id
+  recodeMode.value = true
+  modal.openUpdate(line)
+  selected.value!.egcs_fc_accountreceivablechartofaccount = undefined
 }
 const resolveSource = (items: AdminCommonLookupResponseItem[]) => {
   if (!selected.value || selectedLineId.value || !isAdjustment) return
@@ -118,13 +137,16 @@ const save = async () => {
   const line = selected.value
   const lineId = selectedLineId.value
   const updating = lineId !== null
+  const recoding = recodeMode.value
   try {
-    const payload = (updating ? AccountReceivableLinePatchSchema : AccountReceivableLineCreateSchema).parse({
-      ...(updating ? {} : { egcs_fc_sourcekey: line.egcs_fc_sourcekey, ...(isAdjustment ? { egcs_fc_originalline: line.egcs_fc_originalline } : {}) }),
-      egcs_fc_accountreceivablechartofaccount: line.egcs_fc_accountreceivablechartofaccount ?? undefined,
-      egcs_fc_amount: line.egcs_fc_amount
-    })
-    await sendJson(`/api/account-receivables/${owner}/lines${lineId ? `/${lineId}` : ''}`, updating ? 'PATCH' : 'POST', payload)
+    const payload = recoding
+      ? AccountReceivableRecodeSchema.parse({ egcs_fc_accountreceivablechartofaccount: line.egcs_fc_accountreceivablechartofaccount })
+      : (updating ? AccountReceivableLinePatchSchema : AccountReceivableLineCreateSchema).parse({
+          ...(updating ? {} : { egcs_fc_sourcekey: line.egcs_fc_sourcekey, ...(isAdjustment ? { egcs_fc_originalline: line.egcs_fc_originalline } : {}) }),
+          egcs_fc_accountreceivablechartofaccount: line.egcs_fc_accountreceivablechartofaccount ?? undefined,
+          egcs_fc_amount: line.egcs_fc_amount
+        })
+    await sendJson(`/api/account-receivables/${owner}/lines${lineId ? `/${lineId}` : ''}${recoding ? '/recode' : ''}`, recoding || !updating ? 'POST' : 'PATCH', payload)
     if (disposed || owner !== accountReceivableId || !modal.closeSession(session)) return
     emit('changed')
     toast.add({ title: t('common.success'), description: t(updating ? 'common.updated_success' : 'common.added_success'), color: 'success' })
@@ -132,6 +154,25 @@ const save = async () => {
     if (!disposed && owner === accountReceivableId && modal.isCurrentSession(session)) showError(failure)
   } finally {
     pending.end(session)
+  }
+}
+const removeCoding = async (line: AccountReceivableLine) => {
+  if (!canUpdate || !isAdjustment || disposed) return
+  if (!canEdit) {
+    toast.add({ title: t('common.warning'), description: t('account_receivable.work_prerequisite'), color: 'warning' })
+    return
+  }
+  const owner = accountReceivableId
+  const requestKey = removeKey(line)
+  if (removePending.value.has(requestKey)) return
+  removePending.value.add(requestKey)
+  try {
+    await sendJson(`/api/account-receivables/${owner}/lines/${line.id}/remove-coding`, 'POST', {})
+    if (!disposed && owner === accountReceivableId) emit('changed')
+  } catch (failure) {
+    if (!disposed && owner === accountReceivableId) showError(failure)
+  } finally {
+    removePending.value.delete(requestKey)
   }
 }
 const deleteLine = async (line: AccountReceivableLine) => {
@@ -167,6 +208,8 @@ const deleteLine = async (line: AccountReceivableLine) => {
       <template #actions-cell="{ row }">
         <div class="flex justify-end gap-2">
           <UButton v-if="canEdit" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${t('account_receivable.line_number')} ${lineNumber(row.original)}`" @click="openEdit(row.original)" />
+          <UButton v-if="canUpdate && isAdjustment && row.original.egcs_fc_accountreceivablechartofaccount" icon="i-lucide-arrow-right-left" color="neutral" variant="ghost" :aria-label="`${t('account_receivable.move_coding')}: ${t('account_receivable.line_number')} ${lineNumber(row.original)}`" @click="openRecode(row.original)" />
+          <UButton v-if="canUpdate && isAdjustment && row.original.egcs_fc_accountreceivablechartofaccount" icon="i-lucide-minus" color="neutral" variant="ghost" :loading="removePending.has(removeKey(row.original))" :disabled="removePending.has(removeKey(row.original))" :aria-label="`${t('account_receivable.remove_coding_line')}: ${t('account_receivable.line_number')} ${lineNumber(row.original)}`" @click="removeCoding(row.original)" />
           <UButton v-if="canDelete" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="`${t('common.delete')}: ${t('account_receivable.line_number')} ${lineNumber(row.original)}`" @click="deleteLine(row.original)" />
         </div>
       </template>
@@ -179,9 +222,12 @@ const deleteLine = async (line: AccountReceivableLine) => {
         {{ formatAccountReceivableAmount(total, locale, currency) ?? t('common.not_available') }}
       </dd>
     </dl>
-    <UModal v-model:open="isOpen" :title="t(selectedLineId ? 'account_receivable.edit_line' : 'account_receivable.add_line')" :ui="{ content: 'sm:max-w-2xl' }">
+    <UModal v-model:open="isOpen" :title="t(recodeMode ? 'account_receivable.move_coding' : selectedLineId ? 'account_receivable.edit_line' : 'account_receivable.add_line')" :ui="{ content: 'sm:max-w-2xl' }">
       <template #body>
-        <UForm v-if="selected" :state="selected" :validate="createValidator(AccountReceivableLineCreateSchema)" class="space-y-4" @submit="save">
+        <UForm v-if="selected" :state="selected" :validate="lineValidator" class="space-y-4" @submit="save">
+          <p v-if="recodeMode" class="text-sm text-muted">
+            {{ t('account_receivable.move_coding_instruction') }}
+          </p>
           <UFormField v-if="!selectedLineId && isAdjustment" name="egcs_fc_originalline" :label="t('account_receivable.source')" required>
             <CommonServerLookupSelect v-model="selected.egcs_fc_originalline" :fetch-url="`/api/account-receivables/${accountReceivableId}/lookups/sources`" selected-values-query-key="selectedIds" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :show-value-in-label="false" :disabled="isPending" close-on-select @resolved-items="resolveSource" />
           </UFormField>
@@ -192,14 +238,14 @@ const deleteLine = async (line: AccountReceivableLine) => {
             <CommonServerLookupSelect
               v-model="selected.egcs_fc_accountreceivablechartofaccount" :fetch-url="`/api/account-receivables/${accountReceivableId}/lookups/charts`"
               :query="{ egcs_fc_agencyfiscalyear: fiscalYearId }" selected-values-query-key="selectedIds"
-              value-key="id" label-en-key="label_en" label-fr-key="label_fr" :show-value-in-label="false" :disabled="isPending || isAdjustment" close-on-select />
+              value-key="id" label-en-key="label_en" label-fr-key="label_fr" :show-value-in-label="false" :disabled="isPending" close-on-select />
           </UFormField>
-          <UFormField name="egcs_fc_amount" :label="t('common.amount')">
+          <UFormField v-if="!recodeMode" name="egcs_fc_amount" :label="t('common.amount')">
             <CommonCurrencyInput v-model="selected.egcs_fc_amount" :currency="currency" :disabled="isPending" class="w-full" />
           </UFormField>
           <div class="flex justify-end gap-2">
             <UButton type="button" color="neutral" variant="ghost" :label="t('common.cancel')" :disabled="isPending" @click="modal.close()" />
-            <CommonSaveButton :label="t(selectedLineId ? 'common.update' : 'common.add')" :loading="isPending" :disabled="isPending || !canEdit" />
+            <CommonSaveButton :label="t(recodeMode ? 'account_receivable.move_coding' : selectedLineId ? 'common.update' : 'common.add')" :loading="isPending" :disabled="isPending || !canEdit" />
           </div>
         </UForm>
       </template>

@@ -7,6 +7,8 @@ import {
 } from '~~/server/utils/api-errors'
 import {
   lockAgreementCommitmentEditable,
+  getAgreementCommitmentCodingTotals,
+  validateAgreementCommitmentPriorPaidCoverage,
   resolveAgreementCommitmentRuntimeContext
 } from '~~/server/utils/agreement-commitment'
 import {
@@ -61,13 +63,15 @@ export const getAgreementCommitmentCompletionRuntime = async (
     const protection = await resolveBusinessStatusProtection(trx, 'fundingcaseagreementcommitment', commitmentId)
     const line = await trx.selectFrom('Funding_Case_Agreement_Commitment_Line')
       .select('id').where('egcs_fc_commitment', '=', commitmentId).where('_deleted', '=', false).executeTakeFirst()
+    const totals = await getAgreementCommitmentCodingTotals(trx, commitmentId)
 
     return {
       item,
       can_complete: item === null
         && Boolean(line)
+        && totals.balanced
         && Boolean(protection && !protection.locked),
-      blocker: item ? null : !line ? 'lines_required' as const : !protection || protection.locked ? 'business_status' as const : null
+      blocker: item ? null : !line ? 'lines_required' as const : !totals.balanced ? 'allocation_total' as const : !protection || protection.locked ? 'business_status' as const : null
     }
   })
 }
@@ -126,7 +130,7 @@ export const executeAgreementCommitmentCompletion = async (
   let freshAuthUserId: string | null = null
 
   const completionResult = await executeFreshAuthorizedAgreementWrite(event, db, context.agreementId, agreementContext, async (trx, currentContext) => {
-    await lockAgreementCommitmentEditable(event, trx, context.agreementId, commitmentId)
+    const lockedCommitment = await lockAgreementCommitmentEditable(event, trx, context.agreementId, commitmentId)
 
     const lockedCompletion = await resolveCompletionEvidenceId(trx, 'fundingcaseagreementcommitment', commitmentId)
     if (lockedCompletion) {
@@ -141,6 +145,13 @@ export const executeAgreementCommitmentCompletion = async (
       .executeTakeFirst()
     if (Number(lockedLineCount?.total ?? 0) === 0) {
       return await badRequest(event, 'AGREEMENT_COMMITMENT_LINES_REQUIRED', 'apiErrors.request.invalid_status')
+    }
+    if (!(await getAgreementCommitmentCodingTotals(trx, commitmentId)).balanced) {
+      return await badRequest(event, 'AGREEMENT_COMMITMENT_ALLOCATION_TOTAL_MISMATCH', 'apiErrors.agreement.invalid_coding_allocation')
+    }
+    if (!await validateAgreementCommitmentPriorPaidCoverage(trx, { agreementId: context.agreementId, commitmentId,
+      commitmentTypeId: lockedCommitment.egcs_fc_type, currency: lockedCommitment.egcs_fc_currency })) {
+      return await badRequest(event, 'AGREEMENT_COMMITMENT_LINE_BELOW_PAID_AMOUNT', 'apiErrors.agreement.commitment_line_below_paid_amount')
     }
 
     if (!freshAuthUserId) {

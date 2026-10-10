@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { useDetailSectionOwnership } from '~/composables/useDetailSectionOwnership'
 import { computed, ref, watch, type Ref } from 'vue'
 import { getGroupedRowModel, type ExpandedState } from '@tanstack/vue-table'
 import type { z } from 'zod'
@@ -12,9 +11,8 @@ type AgencyOption = z.infer<typeof AgencyCustomFieldOptionCreateSchema> & { id: 
 type AgencyField = z.infer<typeof AgencyCustomFieldCreateSchema> & { id: string, options: AgencyOption[] }
 type FieldRow = { id: string, fieldGroup: string, categoryGroup: string, field: AgencyField, option: AgencyOption | null }
 
-const { agencyId, canCreate, canUpdate, canDelete } = defineProps<{ agencyId: string, canCreate: boolean, canUpdate: boolean, canDelete: boolean }>()
+const { agencyId, canCreate, canUpdate, canDelete, showHeader = true } = defineProps<{ agencyId: string, canCreate: boolean, canUpdate: boolean, canDelete: boolean, showHeader?: boolean }>()
 const { t, locale } = useI18n()
-const ownsHeading = useDetailSectionOwnership(() => t('custom_fields.title'))
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const { createValidator } = useZodI18n()
@@ -171,7 +169,7 @@ const remove = async (path: string) => {
 <template>
   <section class="space-y-4">
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <h2 v-if="!ownsHeading" class="text-xl font-semibold">
+      <h2 v-if="showHeader" class="text-xl font-semibold">
         {{ t('custom_fields.title') }}
       </h2>
       <UButton v-if="canCreate" icon="i-lucide-plus" :label="t('custom_fields.add_field')" @click="fieldModal.openCreate()" />

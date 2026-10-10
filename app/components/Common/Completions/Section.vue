@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { useDetailSectionOwnership } from '~/composables/useDetailSectionOwnership'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { resolveApiErrorDetails } from '~/composables/useApiErrorToast'
@@ -18,7 +17,7 @@ type CompletionItem = {
 type CompletionResponse = {
   item: CompletionItem | null
   can_complete: boolean
-  blocker?: 'active_workflow' | 'approval_workflow_missing' | 'claim_lines_required' | 'claim_lines_unallocated' | 'lines_required' | 'funding_breakdown_required' | 'payment_total_mismatch' | 'payment_recovery_control' | 'final_reconcile_approved' | 'business_status' | 'risk_workflow_required' | 'risk_score_required' | null
+  blocker?: 'active_workflow' | 'approval_workflow_missing' | 'claim_lines_required' | 'claim_lines_unallocated' | 'lines_required' | 'allocation_total' | 'funding_breakdown_required' | 'payment_total_mismatch' | 'payment_recovery_control' | 'final_reconcile_approved' | 'business_status' | 'risk_workflow_required' | 'risk_score_required' | null
 }
 
 const {
@@ -35,7 +34,7 @@ const {
   confirmationMessageKey,
   refreshKey = 0,
   isLocked = false,
-  hideTitle = false,
+  showHeader = true,
   showDivider = true
 } = defineProps<{
   entityType: Entity_Type
@@ -51,7 +50,7 @@ const {
   confirmationMessageKey?: string
   refreshKey?: number
   isLocked?: boolean
-  hideTitle?: boolean
+  showHeader?: boolean
   showDivider?: boolean
 }>()
 
@@ -60,7 +59,6 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const ownsHeading = useDetailSectionOwnership(() => t(titleKey))
 const toast = useToast()
 const { showError } = useApiErrorToast()
 const { formatDate } = useDateHelpers({
@@ -177,12 +175,12 @@ const submitCompletion = async () => {
 <template>
   <div
     class="space-y-6"
-    :class="!hideTitle && showDivider ? 'border-t border-primary-500 pt-8 dark:border-primary-600' : ''">
-    <div v-if="!hideTitle && !ownsHeading" class="space-y-3">
+    :class="showHeader && showDivider ? 'border-t border-primary-500 pt-8 dark:border-primary-600' : ''">
+    <div v-if="showHeader" class="space-y-3">
       <AssessmentSchemaSectionTitle :title="t(titleKey)" variant="indicator" />
     </div>
 
-    <div class="space-y-4" :class="hideTitle || ownsHeading ? '' : 'pl-4 md:pl-6'">
+    <div class="space-y-4" :class="!showHeader ? '' : 'pl-4 md:pl-6'">
       <p class="text-sm text-zinc-600 dark:text-zinc-300">
         {{ t(descriptionKey) }}
       </p>

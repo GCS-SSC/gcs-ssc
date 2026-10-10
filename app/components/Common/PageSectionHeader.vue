@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useDetailSectionOwnership } from '~/composables/useDetailSectionOwnership'
 
-const { title, icon, badge, buttonLabel, showButton, variant } = defineProps<{
+const { title, icon, badge, buttonLabel, showButton, variant, showHeader = true } = defineProps<{
   title: string
+  showHeader?: boolean
   icon?: string
   badge?: string | number
   buttonLabel?: string
@@ -12,8 +12,7 @@ const { title, icon, badge, buttonLabel, showButton, variant } = defineProps<{
 }>()
 
 defineEmits(['add'])
-const isOwnedHeading = useDetailSectionOwnership(() => title)
-const showHeading = computed(() => Boolean(badge) || !isOwnedHeading.value)
+const showHeading = computed(() => Boolean(badge) || showHeader)
 const hasAction = computed(() => showButton !== false && Boolean(buttonLabel))
 </script>
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-const { title, badge, icon, variant, gridCols } = defineProps<{
+const { title, badge, icon, variant, gridCols, showHeader = true } = defineProps<{
   title: string
+  showHeader?: boolean
   badge?: string | number
   icon?: string
   variant?: 'default' | 'ghost'
@@ -10,7 +11,7 @@ const { title, badge, icon, variant, gridCols } = defineProps<{
 
 <template>
   <section class="space-y-6">
-    <CommonPageSectionHeader :title="title" :badge="badge" :icon="icon" :variant="variant || 'ghost'" />
+    <CommonPageSectionHeader :show-header="showHeader" :title="title" :badge="badge" :icon="icon" :variant="variant || 'ghost'" />
 
     <div
       class="grid grid-cols-1 gap-6"

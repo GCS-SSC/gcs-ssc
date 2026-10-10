@@ -7,7 +7,7 @@ import type { AccountReceivableDetail } from '~~/shared/types/account-receivable
 import type { AdminCommonLookupResponseItem } from '~~/shared/types/admin-common-ui'
 import type { AccountReceivableSourceEntry } from '~~/shared/types/account-receivable-source-entry'
 
-type AdjustmentSource = Pick<AccountReceivableDetail, 'id' | 'egcs_fc_applicantrecipient' | 'egcs_fc_agencyfiscalyear' | 'egcs_fc_type' | 'egcs_fc_typename_en' | 'egcs_fc_typename_fr' | 'egcs_fc_typedescription_en' | 'egcs_fc_typedescription_fr' | 'egcs_fc_recoverymethod' | 'egcs_fc_effectiverecoverymethod' | 'egcs_fc_monitorrequired' | 'egcs_fc_advancepaymentrelated' | 'egcs_fc_claimrelated' | 'egcs_fc_monitorfollowup'>
+type AdjustmentSource = Pick<AccountReceivableDetail, 'id' | 'egcs_fc_applicantrecipient' | 'egcs_fc_agencyfiscalyear' | 'egcs_fc_type' | 'egcs_fc_typename_en' | 'egcs_fc_typename_fr' | 'egcs_fc_typedescription_en' | 'egcs_fc_typedescription_fr' | 'egcs_fc_recoverymethod' | 'egcs_fc_effectiverecoverymethod' | 'egcs_fc_monitorrequired' | 'egcs_fc_advancepaymentrelated' | 'egcs_fc_claimrelated' | 'egcs_fc_monitorfollowup' | 'egcs_fc_agencyfinancialid' | 'egcs_fc_effectiveagencyfinancialid' | 'egcs_fc_currency'>
 const { agreementId, adjustment, sourceEntry } = defineProps<{ agreementId: string, adjustment?: AdjustmentSource, sourceEntry?: AccountReceivableSourceEntry }>()
 const open = defineModel<boolean>('open', { required: true })
 const emit = defineEmits<{ created: [id: string] }>()
@@ -16,6 +16,8 @@ const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
 const { sendJson } = useJsonRequest()
 type CreateState = {
+  egcs_fc_amount?: string
+  egcs_fc_agencyfinancialid?: string
   egcs_fc_applicantrecipient: string | undefined
   egcs_fc_agencyfiscalyear: string | undefined
   egcs_fc_type: string | undefined
@@ -56,6 +58,11 @@ const resolveType = (items: AdminCommonLookupResponseItem[]) => {
     state.value.egcs_fc_sources = [...sourceEntry.egcs_fc_sources]
   }
 }
+const currency: Ref<string | null> = ref(null)
+const resolveFiscalYear = (items: AdminCommonLookupResponseItem[]) => {
+  const selected = items.find(item => String(item.id) === state.value?.egcs_fc_agencyfiscalyear)
+  currency.value = adjustment?.egcs_fc_currency ?? (typeof selected?.egcs_fc_currency === 'string' ? selected.egcs_fc_currency : null)
+}
 const pending: Ref<boolean> = ref(false)
 let session = 0
 watch([open, () => agreementId, () => adjustment?.id, () => sourceEntry], ([isOpen]) => {
@@ -64,6 +71,7 @@ watch([open, () => agreementId, () => adjustment?.id, () => sourceEntry], ([isOp
   selectedType.value = null
   state.value = isOpen
     ? {
+        ...(adjustment ? { egcs_fc_agencyfinancialid: adjustment.egcs_fc_effectiveagencyfinancialid ?? undefined } : { egcs_fc_amount: '' }),
         egcs_fc_applicantrecipient: adjustment?.egcs_fc_applicantrecipient ?? sourceEntry?.egcs_fc_applicantrecipient,
         egcs_fc_agencyfiscalyear: adjustment?.egcs_fc_agencyfiscalyear ?? sourceEntry?.egcs_fc_agencyfiscalyear,
         egcs_fc_type: adjustment?.egcs_fc_type ?? (sourceEntry?.types.length === 1 ? String(sourceEntry.types[0]!.id) : undefined),
@@ -114,12 +122,18 @@ const save = async () => {
   <UModal v-model:open="open" :title="t(adjustment ? 'account_receivable.adjust_receivable' : 'account_receivable.create')" :description="t(adjustment ? 'account_receivable.adjust_receivable_description' : 'account_receivable.description')" :ui="{ content: 'sm:max-w-4xl', header: 'shrink-0' }">
     <template #body>
       <UForm v-if="state" :state="state" :validate="createValidator(createSchema)" class="space-y-4" @submit="save">
+        <UFormField v-if="!adjustment" name="egcs_fc_amount" :label="t('account_receivable.requested_amount')" required>
+          <CommonCurrencyInput v-model="state.egcs_fc_amount" :currency="currency" :disabled="pending" />
+        </UFormField>
+        <UFormField v-if="adjustment" name="egcs_fc_agencyfinancialid" :label="t('account_receivable.financial_id')" required>
+          <CommonServerLookupSelect v-model="state.egcs_fc_agencyfinancialid" :fetch-url="`/api/account-receivables/${adjustment.id}/lookups/financial-ids`" selected-values-query-key="selectedIds" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :disabled="pending" close-on-select />
+        </UFormField>
         <div class="grid gap-4 md:grid-cols-2">
           <UFormField name="egcs_fc_applicantrecipient" :label="t('account_receivable.debtor')">
             <CommonServerLookupSelect v-model="state.egcs_fc_applicantrecipient" :fetch-url="`/api/agreements/${agreementId}/account-receivables/lookups/proponents`" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :show-value-in-label="false" :disabled="Boolean(adjustment || sourceEntry) || pending" close-on-select />
           </UFormField>
           <UFormField name="egcs_fc_agencyfiscalyear" :label="t('agreement.payments.fiscal_year')">
-            <CommonServerLookupSelect v-model="state.egcs_fc_agencyfiscalyear" :fetch-url="`/api/agreements/${agreementId}/account-receivables/lookups/fiscal-years`" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :show-value-in-label="false" :disabled="Boolean(adjustment || sourceEntry) || pending" close-on-select />
+            <CommonServerLookupSelect v-model="state.egcs_fc_agencyfiscalyear" :fetch-url="`/api/agreements/${agreementId}/account-receivables/lookups/fiscal-years`" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :show-value-in-label="false" :disabled="Boolean(adjustment || sourceEntry) || pending" close-on-select @resolved-items="resolveFiscalYear" />
           </UFormField>
           <UFormField name="egcs_fc_type" :label="t('account_receivable.type')">
             <UInput v-if="adjustment" :model-value="locale === 'fr' ? adjustment.egcs_fc_typename_fr : adjustment.egcs_fc_typename_en" readonly required class="w-full" />

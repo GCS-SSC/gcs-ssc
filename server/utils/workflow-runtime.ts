@@ -222,7 +222,7 @@ const applyWorkflowParentStatusTransition = async (
   actor?: string
 ) => {
   if (!status) return null
-  if (run.egcs_cn_entitytype === 'fundingcaseaccountreceivable' || run.egcs_cn_entitytype === 'fundingcaseaccountreceivablecreditmemo') {
+  if ((run.egcs_cn_entitytype === 'fundingcaseaccountreceivable' || run.egcs_cn_entitytype === 'fundingcaseaccountreceivableadjustment') || run.egcs_cn_entitytype === 'fundingcaseaccountreceivablecreditmemo') {
     await assertAccountReceivableWorkflowStatusTransition(trx, run.egcs_cn_entitytype, String(run.egcs_cn_entityid), String(run.id), String(status))
   }
   if (run.egcs_cn_entitytype === 'fundingcasecorrection') {
@@ -290,7 +290,7 @@ const lockProtectedAgreement = async (trx: Transaction<Database>, run: Pick<Work
     await lockAccountReceivableRecoveryPool(trx, memo)
     return
   }
-  if (run.egcs_cn_entitytype === 'fundingcaseaccountreceivable') {
+  if ((run.egcs_cn_entitytype === 'fundingcaseaccountreceivable' || run.egcs_cn_entitytype === 'fundingcaseaccountreceivableadjustment')) {
     const context = await resolveAccountReceivableRuntimeContext(trx, String(run.egcs_cn_entityid))
     if (!context) throw new Error('Accounts Receivable Agreement is unavailable')
     await lockAccountReceivablePaymentPoolAgreements(trx, context)
@@ -546,7 +546,7 @@ export const finishWorkflowRun = async (
     await promoteApprovalSubmission(trx, run)
   }
   if (positive && run.egcs_cn_purpose === 'approval_submission') {
-    if (run.egcs_cn_entitytype === 'fundingcaseaccountreceivable') await postAccountReceivable(trx, String(run.egcs_cn_entityid), String(run.id), actor)
+    if ((run.egcs_cn_entitytype === 'fundingcaseaccountreceivable' || run.egcs_cn_entitytype === 'fundingcaseaccountreceivableadjustment')) await postAccountReceivable(trx, String(run.egcs_cn_entityid), String(run.id), actor)
     if (run.egcs_cn_entitytype === 'fundingcaseaccountreceivablecreditmemo') await postAccountReceivableCreditMemo(trx, String(run.egcs_cn_entityid), String(run.id), actor)
     if (run.egcs_cn_entitytype === 'fundingcasepayment') {
       const evidence = run.egcs_cn_routing as WorkflowRoutingEvidence | null
@@ -593,7 +593,7 @@ export const finishWorkflowRun = async (
   if (!positive && run.egcs_cn_purpose === 'approval_submission') {
     const outcome = state === 'cancelled' ? 'cancelled' : state === 'denied' ? 'denied' : 'failed'
     const terminal = { runtimeId: String(run.id), actorId: actor, reason: `workflow_${state}` }
-    if (run.egcs_cn_entitytype === 'fundingcaseaccountreceivable') await recordAccountReceivableTerminalOutcome(trx, String(run.egcs_cn_entityid), outcome, terminal)
+    if ((run.egcs_cn_entitytype === 'fundingcaseaccountreceivable' || run.egcs_cn_entitytype === 'fundingcaseaccountreceivableadjustment')) await recordAccountReceivableTerminalOutcome(trx, String(run.egcs_cn_entityid), outcome, terminal)
     if (run.egcs_cn_entitytype === 'fundingcaseaccountreceivablecreditmemo') await recordAccountReceivableCreditMemoTerminalOutcome(trx, String(run.egcs_cn_entityid), outcome, terminal)
     if (run.egcs_cn_entitytype === 'fundingcasepayment') await releaseAccountReceivablePaymentOffset(trx, String(run.egcs_cn_entityid))
   }
@@ -633,7 +633,7 @@ export const cancelWorkflowRun = async (
   }
   if (locked.egcs_cn_purpose === 'approval_submission') {
     const terminal = { runtimeId: String(locked.id), actorId, reason: options.reason ?? 'workflow_cancelled' }
-    if (locked.egcs_cn_entitytype === 'fundingcaseaccountreceivable') await recordAccountReceivableTerminalOutcome(trx, String(locked.egcs_cn_entityid), 'cancelled', terminal)
+    if ((locked.egcs_cn_entitytype === 'fundingcaseaccountreceivable' || locked.egcs_cn_entitytype === 'fundingcaseaccountreceivableadjustment')) await recordAccountReceivableTerminalOutcome(trx, String(locked.egcs_cn_entityid), 'cancelled', terminal)
     if (locked.egcs_cn_entitytype === 'fundingcaseaccountreceivablecreditmemo') await recordAccountReceivableCreditMemoTerminalOutcome(trx, String(locked.egcs_cn_entityid), 'cancelled', terminal)
     if (locked.egcs_cn_entitytype === 'fundingcasepayment') await releaseAccountReceivablePaymentOffset(trx, String(locked.egcs_cn_entityid))
   }
@@ -1398,14 +1398,14 @@ const startWorkflowUnchecked = async (
       routing = { ...payload, hash: hashPublicationDefinition(payload as unknown as JsonValue) }
     }
     if (purpose === 'approval_submission') {
-      const packet = context.entityType === 'fundingcaseaccountreceivable'
+      const packet = (context.entityType === 'fundingcaseaccountreceivable' || context.entityType === 'fundingcaseaccountreceivableadjustment')
         ? await captureAccountReceivablePacket(trx, context.entityId)
         : context.entityType === 'fundingcaseaccountreceivablecreditmemo'
           ? await captureAccountReceivableCreditMemoPacket(trx, context.entityId)
           : context.entityType === 'fundingcasepayment' ? await captureAccountReceivablePaymentOffsetPacket(trx, context.entityId) : null
       if (packet) {
         const { hash: _hash, ...baseEvidence } = routing
-        const fields = context.entityType === 'fundingcaseaccountreceivable'
+        const fields = (context.entityType === 'fundingcaseaccountreceivable' || context.entityType === 'fundingcaseaccountreceivableadjustment')
           ? { accountReceivablePacket: packet, accountReceivablePacketHash: hashPublicationDefinition(packet as unknown as JsonValue) }
           : context.entityType === 'fundingcaseaccountreceivablecreditmemo'
             ? { accountReceivableCreditMemoPacket: packet, accountReceivableCreditMemoPacketHash: hashPublicationDefinition(packet as unknown as JsonValue) }
@@ -2036,7 +2036,7 @@ const getWorkflowRuntimeInSnapshot = async (
     .where('Common_Routing_Slip._deleted', '=', false)
     .orderBy('Common_Runtime_Item.egcs_cn_order', 'asc')
     .execute()
-  const submission = purpose === 'approval_submission' && ['fundingcasecorrection', 'fundingcaseaccountreceivable', 'fundingcaseaccountreceivablecreditmemo', 'fundingcasepayment'].includes(entityType)
+  const submission = purpose === 'approval_submission' && ['fundingcasecorrection', 'fundingcaseaccountreceivable', 'fundingcaseaccountreceivableadjustment', 'fundingcaseaccountreceivablecreditmemo', 'fundingcasepayment'].includes(entityType)
     ? (() => {
         const evidence = selected.egcs_cn_routing as WorkflowRoutingEvidence | null
         const packet = evidence?.correctionPacket ?? evidence?.accountReceivablePacket ?? evidence?.accountReceivableCreditMemoPacket ?? evidence?.paymentOffsetPacket

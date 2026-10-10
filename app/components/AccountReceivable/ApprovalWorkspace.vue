@@ -9,7 +9,7 @@ import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 
-const { agreementId, accountReceivableId } = defineProps<{ agreementId: string, accountReceivableId: string }>()
+const { agreementId, accountReceivableId, entityType = 'fundingcaseaccountreceivable' } = defineProps<{ agreementId: string, accountReceivableId: string, entityType?: 'fundingcaseaccountreceivable' | 'fundingcaseaccountreceivableadjustment' }>()
 const { t } = useI18n()
 const { getHeroCollapsed } = useDashboard()
 const isHeroCollapsed = getHeroCollapsed('agreement-account-receivable-approval')
@@ -26,7 +26,7 @@ type ApprovalRuntime = {
   submission?: { egcs_fc_packet: JsonValue } | null
 }
 const context: Ref<ApprovalContext | null> = ref(null)
-const identity = computed(() => `${agreementId}:${accountReceivableId}`)
+const identity = computed(() => `${agreementId}:${accountReceivableId}:${entityType}`)
 usePageResourceError({
   identity,
   errors: [loadError],
@@ -45,7 +45,7 @@ const refresh = async () => {
   loadError.value = null
   try {
     const url = getClientRequestUrl('/api/workflows/runtime')
-    url.searchParams.set('entityType', 'fundingcaseaccountreceivable')
+    url.searchParams.set('entityType', entityType)
     url.searchParams.set('entityId', accountReceivableId)
     url.searchParams.set('purpose', 'approval_submission')
     const response = await fetch(url, { signal: controller.signal })
@@ -59,7 +59,7 @@ const refresh = async () => {
       || !runtime.current) throw new Error('Accounts Receivable approval route containment failed')
     if (disposed || generation !== requestGeneration || identity.value !== requestIdentity) return
     context.value = {
-      reference: accountReceivableReference({ egcs_fc_agreementnumber: header.egcs_fc_agreementnumber, egcs_fc_number: header.egcs_fc_number }),
+      reference: accountReceivableReference({ id: header.id }),
       agreementNumber: header.egcs_fc_agreementnumber,
       runtimeState: runtime.current.runtimeState
     }
@@ -116,7 +116,7 @@ const breadcrumbs = computed(() => [
         <template #sidebar>
           <CommonRouteTabs v-model="selectedTab" :items="tabs" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
         </template>
-        <CommonWorkflowSection entity-type="fundingcaseaccountreceivable" :entity-id="accountReceivableId" purpose="approval_submission" :can-edit="false" @changed="refresh" />
+        <CommonWorkflowSection :entity-type="entityType" :entity-id="accountReceivableId" purpose="approval_submission" :can-edit="false" @changed="refresh" />
       </CommonEntityEditorWorkspace>
     </template>
   </UDashboardPanel>

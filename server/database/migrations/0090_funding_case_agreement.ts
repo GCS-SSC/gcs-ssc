@@ -1,4 +1,7 @@
 import { sql, type Kysely } from 'kysely'
+import { ACCOUNT_RECEIVABLE_CLAIM_REDUCTION_SQL } from '../schema/account-receivable-adjustment'
+import { installCreditMemoFunctions } from '../schema/credit-memo'
+import { installCommitmentCodingFunctions } from '../schema/commitment-coding'
 import type { Database } from '../../../shared/types/database'
 
 // Clean-cutover baseline: funding case agreement. Edit this subject directly.
@@ -108,6 +111,8 @@ CREATE TABLE "Funding_Case_Account_Receivable_Allocation" (
 
 CREATE TABLE "Funding_Case_Account_Receivable_Credit_Memo" (
   "id" bigint NOT NULL,
+  "egcs_fc_receivables" jsonb DEFAULT '[]'::jsonb NOT NULL CHECK (jsonb_typeof(egcs_fc_receivables)='array'),
+  "egcs_fc_totalamount" numeric(19,2) DEFAULT 0 NOT NULL CHECK (egcs_fc_totalamount >= 0),
   "egcs_fc_receivable" bigint NOT NULL,
   "egcs_fc_agency" bigint NOT NULL,
   "egcs_fc_pool" bigint NOT NULL,
@@ -155,6 +160,8 @@ CREATE TABLE "Funding_Case_Account_Receivable_Credit_Memo_Line" (
   "id" bigserial PRIMARY KEY,
   "egcs_fc_creditmemo" bigint NOT NULL REFERENCES "Funding_Case_Account_Receivable_Credit_Memo"(id) ON DELETE RESTRICT,
   "egcs_fc_linenumber" smallint NOT NULL CHECK (egcs_fc_linenumber > 0),
+  "egcs_fc_receivable" bigint NOT NULL,
+  "egcs_fc_commitmentchartofaccount" bigint REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT,
   "egcs_fc_creditmemochartofaccount" bigint NOT NULL REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT,
   "egcs_fc_creditmemoaccountingdimensions" jsonb DEFAULT '[]'::jsonb NOT NULL,
   "egcs_fc_amount" numeric(19,2) NOT NULL CHECK (egcs_fc_amount > 0),
@@ -164,6 +171,7 @@ CREATE TABLE "Funding_Case_Account_Receivable_Credit_Memo_Line" (
 CREATE UNIQUE INDEX fc_uq_ar_creditmemo_line_number ON "Funding_Case_Account_Receivable_Credit_Memo_Line" (egcs_fc_creditmemo, egcs_fc_linenumber) WHERE NOT _deleted;
 
 CREATE TABLE "Funding_Case_Account_Receivable_Offset_Memo" (
+  "egcs_fc_commitmentchartofaccount" bigint REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT,
   "id" bigint DEFAULT nextval('"Funding_Case_Account_Receivable_Offset_Memo_id_seq"'::regclass) NOT NULL,
   "egcs_fc_receivable" bigint NOT NULL,
   "egcs_fc_creditmemochartofaccount" bigint NOT NULL REFERENCES "Agency_Chart_of_Account"(id),
@@ -262,6 +270,10 @@ CREATE UNIQUE INDEX fc_uq_ar_payment_recovery ON "Funding_Case_Account_Receivabl
 
 CREATE TABLE "Funding_Case_Agreement_Account_Receivable" (
   "id" bigint NOT NULL,
+  "egcs_fc_entitytype" text DEFAULT 'fundingcaseaccountreceivable' NOT NULL,
+  "egcs_fc_amount" numeric(19,2) DEFAULT 0 NOT NULL,
+  "egcs_fc_agencyfinancialid" bigint,
+  "egcs_fc_financialsystemid" text DEFAULT '' NOT NULL,
   "egcs_fc_fundingagreement" bigint NOT NULL,
   "egcs_fc_pool" bigint NOT NULL,
   "egcs_fc_applicantrecipient" bigint NOT NULL,
@@ -684,6 +696,7 @@ CREATE TABLE "Funding_Case_Agreement_Closeout_Snapshot" (
 
 CREATE TABLE "Funding_Case_Agreement_Commitment" (
   "id" bigint NOT NULL,
+  "egcs_fc_totalamount" numeric(19,2) DEFAULT 0 NOT NULL CHECK (egcs_fc_totalamount >= 0),
   "egcs_fc_fundingagreement" bigint NOT NULL,
   "egcs_fc_transferpaymentstream" bigint NOT NULL,
   "egcs_fc_type" bigint NOT NULL,
@@ -1276,6 +1289,7 @@ CREATE INDEX fc_profile_search_agreementnumber_trgm ON "Funding_Case_Agreement_P
 CREATE INDEX fc_profile_search_agreementnumber_exact ON "Funding_Case_Agreement_Profile" USING btree (lower(coalesce(egcs_fc_agreementnumber, '')) text_pattern_ops) WHERE (_deleted = false);
 CREATE INDEX fc_profile_search_financialsystemnumber_exact ON "Funding_Case_Agreement_Profile" USING btree (egcs_fc_financialsystemnumber) WHERE (_deleted = false);
 END $baseline$`.execute(db)
+  await sql.raw(`DO $baseline$ BEGIN ${ACCOUNT_RECEIVABLE_CLAIM_REDUCTION_SQL} END $baseline$;`).execute(db)
 }
 
 /** Installs the current installFunctions definitions for this subject on a fresh database. */
@@ -1377,8 +1391,9 @@ CREATE FUNCTION ar_receivable_cash_net(receivable_id bigint, excluded_memo bigin
       JOIN "Funding_Case_Agreement_Account_Receivable" debt ON debt.id=line.egcs_fc_receivable
       WHERE (debt.id=receivable_id OR debt.egcs_fc_linkedreceivable=receivable_id) AND debt.egcs_fc_outcome='posted'
         AND NOT debt._deleted AND NOT line._deleted),0)
-      - coalesce((SELECT sum(memo.egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Credit_Memo" memo
-        WHERE memo.egcs_fc_receivable=receivable_id AND memo.egcs_fc_outcome='posted' AND NOT memo._deleted
+      - coalesce((SELECT sum(coding.egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Credit_Memo" memo
+        JOIN "Funding_Case_Account_Receivable_Credit_Memo_Line" coding ON coding.egcs_fc_creditmemo=memo.id AND NOT coding._deleted
+        WHERE coding.egcs_fc_receivable=receivable_id AND memo.egcs_fc_outcome='posted' AND NOT memo._deleted
           AND (excluded_memo IS NULL OR memo.id<>excluded_memo)),0)
       - coalesce((SELECT sum(application.egcs_fc_amount)
         FROM "Funding_Case_Account_Receivable_Offset_Memo" memo
@@ -1387,146 +1402,8 @@ CREATE FUNCTION ar_receivable_cash_net(receivable_id bigint, excluded_memo bigin
         WHERE memo.egcs_fc_receivable=receivable_id AND recovery.egcs_fc_outcome='posted' AND NOT recovery._deleted),0)
   $function$;
 
-CREATE FUNCTION ar_validate_pool_credit_memo(previous jsonb, current_row jsonb, operation text)
- RETURNS void
- LANGUAGE plpgsql
-AS $function$
-    DECLARE pool record; status record; agreement record; debt record;
-    BEGIN
-      IF operation='DELETE' THEN RAISE EXCEPTION 'Credit memo evidence uses soft deletion' USING ERRCODE='23514'; END IF;
-      SELECT * INTO pool FROM "Funding_Case_Account_Receivable_Pool" WHERE id=(current_row->>'egcs_fc_pool')::bigint FOR UPDATE;
-      SELECT * INTO status FROM "Common_Status" WHERE id=(current_row->>'egcs_fc_status')::bigint;
-      SELECT * INTO debt FROM "Funding_Case_Agreement_Account_Receivable" WHERE id=(current_row->>'egcs_fc_receivable')::bigint;
-      IF debt.id IS NULL OR debt._deleted OR debt.egcs_fc_outcome<>'posted' OR debt.egcs_fc_linkedreceivable IS NOT NULL
-        OR debt.egcs_fc_pool<>(current_row->>'egcs_fc_pool')::bigint THEN
-        RAISE EXCEPTION 'Credit memo requires its one established original AR' USING ERRCODE='23514';
-      END IF;
-      SELECT agreement_row.*, program.egcs_tp_agency AS agency_id INTO agreement
-        FROM "Funding_Case_Agreement_Profile" agreement_row
-        JOIN "Transfer_Payment_Stream" stream ON stream.id=agreement_row.egcs_fc_transferpaymentstream
-        JOIN "Transfer_Payment_Profile" program ON program.id=stream.egcs_tp_transferpaymentprofile
-        WHERE agreement_row.id=debt.egcs_fc_fundingagreement AND NOT agreement_row._deleted AND NOT stream._deleted AND NOT program._deleted;
-      IF agreement.id IS NULL OR agreement.agency_id<>pool.egcs_fc_agency OR agreement.egcs_fc_currency<>pool.egcs_fc_currency
-        OR NOT EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Applicant_Recipient" recipient WHERE recipient.egcs_fc_fundingagreement=agreement.id
-          AND recipient.egcs_fc_applicantrecipient=pool.egcs_fc_applicantrecipient AND NOT recipient._deleted) THEN
-        RAISE EXCEPTION 'Credit memo requires its AR Agreement agency currency and Proponent' USING ERRCODE='23514';
-      END IF;
-      IF pool.id IS NULL OR pool._deleted OR pool.egcs_fc_agency<>(current_row->>'egcs_fc_agency')::bigint
-        OR pool.egcs_fc_applicantrecipient<>(current_row->>'egcs_fc_applicantrecipient')::bigint
-        OR pool.egcs_fc_currency::text<>current_row->>'egcs_fc_currency' OR status.egcs_cn_agency<>pool.egcs_fc_agency OR status._deleted
-        OR NOT EXISTS (SELECT 1 FROM "Agency_Profile" agency JOIN "Applicant_Recipient_Profile" proponent ON proponent.id=pool.egcs_fc_applicantrecipient
-          WHERE agency.id=pool.egcs_fc_agency AND NOT agency._deleted AND NOT proponent._deleted)
-        THEN
-        RAISE EXCEPTION 'Credit memo requires its independent Agency Proponent currency pool' USING ERRCODE='23514';
-      END IF;
-      IF current_row->>'egcs_fc_outcome' IN ('open','posted') AND NOT (current_row->>'_deleted')::boolean
-        AND (current_row->>'egcs_fc_amount')::numeric > ar_receivable_cash_net(debt.id,(current_row->>'id')::bigint)
-          - coalesce((SELECT sum(memo.egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Credit_Memo" memo
-            WHERE memo.egcs_fc_receivable=debt.id AND memo.id<>(current_row->>'id')::bigint AND memo.egcs_fc_outcome='open' AND NOT memo._deleted),0) THEN
-        RAISE EXCEPTION 'Credit memo exceeds its AR available balance' USING ERRCODE='23514';
-      END IF;
-      IF current_row->>'egcs_fc_outcome' IN ('open','posted') AND NOT (current_row->>'_deleted')::boolean
-        AND EXISTS (SELECT 1 FROM "Funding_Case_Account_Receivable_Recovery" recovery WHERE recovery.egcs_fc_pool=pool.id
-          AND recovery.egcs_fc_outcome='open' AND NOT recovery._deleted) THEN
-        RAISE EXCEPTION 'Pending recovery blocks Credit Memo changes' USING ERRCODE='23514';
-      END IF;
-      IF current_row->>'egcs_fc_outcome' IN ('open','posted') AND NOT (current_row->>'_deleted')::boolean
-        AND (current_row->>'egcs_fc_amount')::numeric > ar_pool_net(pool.id)
-          - coalesce((SELECT sum(memo.egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Credit_Memo" memo
-            WHERE memo.egcs_fc_pool=pool.id AND memo.id<>(current_row->>'id')::bigint AND memo.egcs_fc_outcome='open' AND NOT memo._deleted),0)
-          + coalesce((SELECT memo.egcs_fc_amount FROM "Funding_Case_Account_Receivable_Credit_Memo" memo
-            WHERE memo.id=(current_row->>'id')::bigint AND memo.egcs_fc_outcome='posted' AND NOT memo._deleted),0) THEN
-        RAISE EXCEPTION 'Credit memo exceeds the remaining recoverable pool balance' USING ERRCODE='23514';
-      END IF;
-      IF operation='INSERT' THEN
-        IF NOT status.egcs_cn_isdraft OR status.egcs_cn_terminal OR current_row->>'egcs_fc_outcome'<>'open' OR (current_row->>'_deleted')::boolean THEN
-          RAISE EXCEPTION 'Credit memo creation requires active Agency Draft status' USING ERRCODE='23514';
-        END IF;
-      ELSE
-        IF previous->>'egcs_fc_ledgerkind'<>'pool' OR previous->>'egcs_fc_outcome'<>'open' AND previous IS DISTINCT FROM current_row THEN
-          RAISE EXCEPTION 'Completed credit memo evidence is immutable' USING ERRCODE='23514';
-        END IF;
-        IF (previous - ARRAY['egcs_fc_amount','egcs_fc_receiveddate','egcs_fc_reason','_deleted','egcs_fc_status','egcs_fc_statusagency','egcs_fc_outcome','egcs_fc_postedat','egcs_fc_postingruntime','egcs_fc_terminalby','egcs_fc_terminalat','egcs_fc_terminalreason','egcs_fc_statusterminal','egcs_fc_statusdeleted'])
-          IS DISTINCT FROM (current_row - ARRAY['egcs_fc_amount','egcs_fc_receiveddate','egcs_fc_reason','_deleted','egcs_fc_status','egcs_fc_statusagency','egcs_fc_outcome','egcs_fc_postedat','egcs_fc_postingruntime','egcs_fc_terminalby','egcs_fc_terminalat','egcs_fc_terminalreason','egcs_fc_statusterminal','egcs_fc_statusdeleted']) THEN
-          RAISE EXCEPTION 'Credit memo owner identity is immutable' USING ERRCODE='23514';
-        END IF;
-        IF ar_has_lifecycle_evidence((current_row->>'id')::bigint,'fundingcaseaccountreceivablecreditmemo') AND
-          (previous - ARRAY['egcs_fc_status','egcs_fc_statusagency','egcs_fc_outcome','egcs_fc_postedat','egcs_fc_postingruntime','egcs_fc_terminalby','egcs_fc_terminalat','egcs_fc_terminalreason','egcs_fc_statusterminal','egcs_fc_statusdeleted'])
-          IS DISTINCT FROM (current_row - ARRAY['egcs_fc_status','egcs_fc_statusagency','egcs_fc_outcome','egcs_fc_postedat','egcs_fc_postingruntime','egcs_fc_terminalby','egcs_fc_terminalat','egcs_fc_terminalreason','egcs_fc_statusterminal','egcs_fc_statusdeleted']) THEN
-          RAISE EXCEPTION 'Submitted credit memo content is immutable' USING ERRCODE='23514';
-        END IF;
-        IF NOT (previous->>'_deleted')::boolean AND (current_row->>'_deleted')::boolean
-          AND (NOT status.egcs_cn_isdraft OR ar_has_lifecycle_evidence((current_row->>'id')::bigint,'fundingcaseaccountreceivablecreditmemo')) THEN
-          RAISE EXCEPTION 'Only unsubmitted credit memo Drafts may be deleted' USING ERRCODE='23514';
-        END IF;
-      END IF;
-    END $function$;
 
-CREATE FUNCTION trg_fn_validate_ar_creditmemo_line()
- RETURNS trigger
- LANGUAGE plpgsql
-AS $function$
-    DECLARE memo record; debt record; status record; account record; stream_id bigint; pool_id bigint;
-    BEGIN
-      IF TG_OP='DELETE' THEN RAISE EXCEPTION 'Credit memo lines use soft deletion' USING ERRCODE='23514'; END IF;
-      IF TG_OP='UPDATE' AND (OLD.id,OLD.egcs_fc_creditmemo) IS DISTINCT FROM (NEW.id,NEW.egcs_fc_creditmemo) THEN
-        RAISE EXCEPTION 'Credit memo line parent identity is immutable' USING ERRCODE='23514';
-      END IF;
-      SELECT egcs_fc_pool INTO pool_id FROM "Funding_Case_Account_Receivable_Credit_Memo" WHERE id=NEW.egcs_fc_creditmemo;
-      PERFORM 1 FROM "Funding_Case_Account_Receivable_Pool" WHERE id=pool_id FOR UPDATE;
-      SELECT * INTO memo FROM "Funding_Case_Account_Receivable_Credit_Memo" WHERE id=NEW.egcs_fc_creditmemo FOR UPDATE;
-      SELECT * INTO status FROM "Common_Status" WHERE id=memo.egcs_fc_status;
-      IF memo.id IS NULL OR memo._deleted OR memo.egcs_fc_ledgerkind<>'pool' OR memo.egcs_fc_outcome<>'open'
-        OR status.id IS NULL OR status._deleted OR status.egcs_cn_readonly OR status.egcs_cn_terminal
-        OR ar_has_lifecycle_evidence(memo.id,'fundingcaseaccountreceivablecreditmemo') THEN
-        RAISE EXCEPTION 'Credit memo lines require a workable unsubmitted parent' USING ERRCODE='23514';
-      END IF;
-      IF TG_OP='INSERT' AND NEW._deleted OR TG_OP='UPDATE' AND OLD._deleted THEN
-        RAISE EXCEPTION 'Deleted credit memo lines are immutable' USING ERRCODE='23514';
-      END IF;
-      SELECT * INTO debt FROM "Funding_Case_Agreement_Account_Receivable" WHERE id=memo.egcs_fc_receivable;
-      SELECT agreement.egcs_fc_transferpaymentstream INTO stream_id FROM "Funding_Case_Agreement_Profile" agreement
-        JOIN "Transfer_Payment_Stream" stream ON stream.id=agreement.egcs_fc_transferpaymentstream AND NOT stream._deleted
-        JOIN "Transfer_Payment_Profile" program ON program.id=stream.egcs_tp_transferpaymentprofile AND NOT program._deleted
-        WHERE agreement.id=debt.egcs_fc_fundingagreement AND NOT agreement._deleted AND program.egcs_tp_agency=memo.egcs_fc_agency
-          AND agreement.egcs_fc_currency=memo.egcs_fc_currency;
-      SELECT * INTO account FROM "Agency_Chart_of_Account" WHERE id=NEW.egcs_fc_creditmemochartofaccount;
-      IF debt.id IS NULL OR debt._deleted OR debt.egcs_fc_outcome<>'posted' OR debt.egcs_fc_linkedreceivable IS NOT NULL
-        OR stream_id IS NULL OR account.id IS NULL OR account._deleted OR account.egcs_ay_kind<>'credit_memo'
-        OR account.egcs_ay_organizationagency<>memo.egcs_fc_agency OR account.egcs_ay_currency<>memo.egcs_fc_currency
-        OR account.egcs_ay_fiscalyear<>debt.egcs_fc_agencyfiscalyear
-        OR NOT EXISTS (SELECT 1 FROM "Transfer_Payment_Stream_Chart_of_Account" selection WHERE selection.egcs_tp_transferpaymentstream=stream_id
-          AND selection.egcs_tp_agencychartofaccount=account.id AND NOT selection._deleted) THEN
-        RAISE EXCEPTION 'Credit memo line requires its selected Stream fiscal year currency credit memo account' USING ERRCODE='23514';
-      END IF;
-      IF TG_OP='UPDATE' AND OLD.egcs_fc_creditmemochartofaccount=NEW.egcs_fc_creditmemochartofaccount THEN
-        IF NEW.egcs_fc_creditmemoaccountingdimensions IS DISTINCT FROM OLD.egcs_fc_creditmemoaccountingdimensions THEN
-          RAISE EXCEPTION 'Credit memo line must retain captured account dimensions' USING ERRCODE='23514';
-        END IF;
-      ELSIF NEW.egcs_fc_creditmemoaccountingdimensions IS DISTINCT FROM to_jsonb(account.egcs_ay_accountingdimensions) THEN
-        RAISE EXCEPTION 'Credit memo line must capture selected account dimensions' USING ERRCODE='23514';
-      END IF;
-      RETURN NEW;
-    END $function$;
 
-CREATE FUNCTION trg_fn_validate_ar_creditmemo_lines_total()
- RETURNS trigger
- LANGUAGE plpgsql
-AS $function$
-    DECLARE memo record; memo_id bigint; total numeric; line_count bigint;
-    BEGIN
-      memo_id := CASE WHEN TG_TABLE_NAME='Funding_Case_Account_Receivable_Credit_Memo_Line' THEN (to_jsonb(NEW)->>'egcs_fc_creditmemo')::bigint ELSE NEW.id END;
-      SELECT * INTO memo FROM "Funding_Case_Account_Receivable_Credit_Memo" WHERE id=memo_id;
-      SELECT coalesce(sum(egcs_fc_amount),0), count(*) INTO total,line_count
-        FROM "Funding_Case_Account_Receivable_Credit_Memo_Line" WHERE egcs_fc_creditmemo=memo_id AND NOT _deleted;
-      IF memo.egcs_fc_amount IS DISTINCT FROM total THEN
-        RAISE EXCEPTION 'Credit memo amount must equal its active line total' USING ERRCODE='23514';
-      END IF;
-      IF memo.egcs_fc_outcome='posted' AND line_count=0 THEN
-        RAISE EXCEPTION 'Posted credit memo requires at least one positive line' USING ERRCODE='23514';
-      END IF;
-      RETURN NULL;
-    END $function$;
 
 CREATE FUNCTION correction_has_lifecycle_evidence(root_id bigint)
  RETURNS boolean
@@ -2296,7 +2173,7 @@ AS $function$
     BEGIN
       root_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.egcs_fc_receivable ELSE NEW.egcs_fc_receivable END;
       SELECT * INTO root FROM "Funding_Case_Agreement_Account_Receivable" WHERE id = root_id FOR UPDATE;
-      IF root.egcs_fc_outcome <> 'open' OR ar_has_lifecycle_evidence(root_id,'fundingcaseaccountreceivable') THEN
+      IF root.egcs_fc_outcome <> 'open' OR ar_has_lifecycle_evidence(root_id,root.egcs_fc_entitytype) THEN
         RAISE EXCEPTION 'Submitted AR source evidence is immutable' USING ERRCODE = '23514';
       END IF;
       IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
@@ -2306,12 +2183,6 @@ AS $function$
       END IF;
       IF TG_TABLE_NAME = 'Funding_Case_Agreement_Account_Receivable_Line' THEN
         SELECT egcs_fc_agency INTO owner_agency FROM "Funding_Case_Account_Receivable_Pool" WHERE id = root.egcs_fc_pool;
-        IF root.egcs_fc_linkedreceivable IS NOT NULL THEN
-          SELECT * INTO original FROM "Funding_Case_Agreement_Account_Receivable_Line" WHERE id = NEW.egcs_fc_originalline;
-          IF NEW.egcs_fc_accountreceivablechartofaccount IS DISTINCT FROM original.egcs_fc_accountreceivablechartofaccount THEN
-            RAISE EXCEPTION 'AR adjustment must preserve its original AR financial account' USING ERRCODE = '23514';
-          END IF;
-        END IF;
         IF NEW.egcs_fc_accountreceivablechartofaccount IS NOT NULL THEN
           SELECT * INTO ar_account FROM "Agency_Chart_of_Account" WHERE id = NEW.egcs_fc_accountreceivablechartofaccount;
           IF ar_account.id IS NULL OR ar_account.egcs_ay_organizationagency <> owner_agency
@@ -2320,13 +2191,11 @@ AS $function$
             OR NOT EXISTS (SELECT 1 FROM "Transfer_Payment_Stream_Chart_of_Account" selection
               JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.egcs_fc_transferpaymentstream=selection.egcs_tp_transferpaymentstream
               WHERE agreement.id=root.egcs_fc_fundingagreement AND selection.egcs_tp_agencychartofaccount=ar_account.id AND NOT selection._deleted)
-            OR (root.egcs_fc_linkedreceivable IS NULL AND ar_account._deleted) THEN
+            OR (ar_account._deleted AND (TG_OP='INSERT' OR OLD.egcs_fc_accountreceivablechartofaccount IS DISTINCT FROM NEW.egcs_fc_accountreceivablechartofaccount)) THEN
             RAISE EXCEPTION 'AR financial line requires its Agency fiscal year currency Accounts Receivable Chart' USING ERRCODE = '23514';
           END IF;
           IF TG_OP = 'UPDATE' AND OLD.egcs_fc_accountreceivablechartofaccount IS NOT DISTINCT FROM NEW.egcs_fc_accountreceivablechartofaccount THEN
             NEW.egcs_fc_accountreceivableaccountingdimensions := OLD.egcs_fc_accountreceivableaccountingdimensions;
-          ELSIF root.egcs_fc_linkedreceivable IS NOT NULL THEN
-            NEW.egcs_fc_accountreceivableaccountingdimensions := original.egcs_fc_accountreceivableaccountingdimensions;
           ELSE
             NEW.egcs_fc_accountreceivableaccountingdimensions := ar_account.egcs_ay_accountingdimensions;
           END IF;
@@ -2416,12 +2285,13 @@ CREATE FUNCTION trg_fn_validate_ar_establishment()
  RETURNS trigger
  LANGUAGE plpgsql
 AS $function$
-    DECLARE root record; root_id bigint; source record; coding record; principal numeric; consumed numeric; fiscal_capacity numeric; target_type text;
+    DECLARE root record; root_id bigint; source record; coding record; principal numeric; proposal_total numeric; consumed numeric; fiscal_capacity numeric; target_type text;
     BEGIN
       target_type := TG_ARGV[0];
       root_id := CASE WHEN TG_TABLE_NAME IN ('Funding_Case_Agreement_Account_Receivable_Line','Funding_Case_Agreement_Account_Receivable_Coding') THEN (to_jsonb(NEW)->>'egcs_fc_receivable')::bigint ELSE NEW.id END;
-      IF target_type = 'fundingcaseaccountreceivable' THEN
+      IF target_type IN ('fundingcaseaccountreceivable','fundingcaseaccountreceivableadjustment') THEN
         SELECT * INTO root FROM "Funding_Case_Agreement_Account_Receivable" WHERE id = root_id;
+        target_type := root.egcs_fc_entitytype;
       ELSE
         SELECT * INTO root FROM "Funding_Case_Account_Receivable_Credit_Memo" WHERE id = root_id;
       END IF;
@@ -2434,10 +2304,11 @@ AS $function$
         IF NOT ar_successful_submission(root_id,target_type,root.egcs_fc_postingruntime) THEN
           RAISE EXCEPTION 'AR posting requires its latest successful Completion-linked approval submission' USING ERRCODE = '23514';
         END IF;
-        IF target_type = 'fundingcaseaccountreceivable' THEN
+        IF target_type IN ('fundingcaseaccountreceivable','fundingcaseaccountreceivableadjustment') THEN
           IF ar_receivable_cash_net(coalesce(root.egcs_fc_linkedreceivable,root.id)) < coalesce((
-            SELECT sum(memo.egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Credit_Memo" memo
-            WHERE memo.egcs_fc_receivable=coalesce(root.egcs_fc_linkedreceivable,root.id) AND memo.egcs_fc_outcome='open' AND NOT memo._deleted),0) THEN
+            SELECT sum(line.egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Credit_Memo" memo
+            JOIN "Funding_Case_Account_Receivable_Credit_Memo_Line" line ON line.egcs_fc_creditmemo=memo.id AND NOT line._deleted
+            WHERE line.egcs_fc_receivable=coalesce(root.egcs_fc_linkedreceivable,root.id) AND memo.egcs_fc_outcome='open' AND NOT memo._deleted),0) THEN
             RAISE EXCEPTION 'AR principal cannot fall below its own Credit Memos' USING ERRCODE='23514';
           END IF;
           IF EXISTS (SELECT 1 FROM "Funding_Case_Account_Receivable_Recovery" pending
@@ -2454,7 +2325,24 @@ AS $function$
             RAISE EXCEPTION 'AR preference override requires a rationale' USING ERRCODE = '23514';
           END IF;
           SELECT COALESCE(sum(egcs_fc_amount),0) INTO principal FROM "Funding_Case_Agreement_Account_Receivable_Line" WHERE egcs_fc_receivable = root_id AND NOT _deleted;
+          proposal_total := principal;
           IF root.egcs_fc_linkedreceivable IS NULL AND principal <= 0 THEN RAISE EXCEPTION 'AR establishment requires positive principal' USING ERRCODE = '23514'; END IF;
+          IF root.egcs_fc_linkedreceivable IS NULL AND principal<>root.egcs_fc_amount THEN RAISE EXCEPTION 'AR coding total must equal requested amount' USING ERRCODE='23514'; END IF;
+          IF root.egcs_fc_linkedreceivable IS NOT NULL THEN
+            IF NOT EXISTS (SELECT 1 FROM "Applicant_Recipient_Agency_Financial_Id" financial WHERE financial.id=root.egcs_fc_agencyfinancialid AND financial.egcs_ar_active AND NOT financial._deleted) THEN
+              RAISE EXCEPTION 'AR adjustment requires a current active Financial ID' USING ERRCODE='23514';
+            END IF;
+            IF principal<0 AND ar_receivable_cash_net(root.egcs_fc_linkedreceivable)-(CASE WHEN root.egcs_fc_outcome='posted' THEN principal ELSE 0 END)<=0 THEN
+              RAISE EXCEPTION 'AR adjustment cannot reduce a fully cleared receivable' USING ERRCODE='23514';
+            END IF;
+            IF EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Account_Receivable_Line" line
+              JOIN "Funding_Case_Agreement_Account_Receivable" owner ON owner.id=line.egcs_fc_receivable
+              WHERE (owner.id=root.egcs_fc_linkedreceivable OR owner.egcs_fc_linkedreceivable=root.egcs_fc_linkedreceivable)
+                AND (owner.egcs_fc_outcome='posted' OR owner.id=root_id) AND NOT owner._deleted AND NOT line._deleted
+              GROUP BY coalesce(line.egcs_fc_originalline,line.id),line.egcs_fc_accountreceivablechartofaccount HAVING sum(line.egcs_fc_amount)<0) THEN
+              RAISE EXCEPTION 'AR adjustment cannot reduce coding principal below zero' USING ERRCODE='23514';
+            END IF;
+          END IF;
           FOR source IN SELECT * FROM "Funding_Case_Agreement_Account_Receivable_Line" WHERE egcs_fc_receivable = root_id AND NOT _deleted LOOP
             IF source.egcs_fc_amount <> 0 AND source.egcs_fc_accountreceivablechartofaccount IS NULL THEN
               RAISE EXCEPTION 'AR submission requires financial accounts for every nonzero line' USING ERRCODE = '23514';
@@ -2462,13 +2350,15 @@ AS $function$
             IF COALESCE((SELECT sum(egcs_fc_amount) FROM "Funding_Case_Agreement_Account_Receivable_Coding" WHERE egcs_fc_receivableline = source.id AND NOT _deleted),0) <> source.egcs_fc_amount THEN
               RAISE EXCEPTION 'AR coding must partition source principal exactly once' USING ERRCODE = '23514';
             END IF;
-            SELECT COALESCE(sum(CASE WHEN other.egcs_fc_outcome = 'posted' THEN line.egcs_fc_amount ELSE greatest(line.egcs_fc_amount,0) END),0) INTO consumed FROM "Funding_Case_Agreement_Account_Receivable_Line" line
+            SELECT COALESCE(sum(CASE WHEN usage.outcome='posted' OR usage.id=root_id THEN usage.amount ELSE greatest(usage.amount,0) END),0) INTO consumed FROM (
+              SELECT other.id,other.egcs_fc_outcome AS outcome,sum(line.egcs_fc_amount) AS amount FROM "Funding_Case_Agreement_Account_Receivable_Line" line
               JOIN "Funding_Case_Agreement_Account_Receivable" other ON other.id = line.egcs_fc_receivable
               WHERE line.egcs_fc_fundingagreement = root.egcs_fc_fundingagreement AND line.egcs_fc_sourcekey = source.egcs_fc_sourcekey
                 AND other.egcs_fc_applicantrecipient = root.egcs_fc_applicantrecipient
                 AND NOT line._deleted AND NOT other._deleted
-                AND (other.egcs_fc_outcome = 'posted' OR (other.egcs_fc_outcome = 'open' AND ar_has_lifecycle_evidence(other.id,'fundingcaseaccountreceivable')));
-            IF root.egcs_fc_advancepaymentrelated THEN
+                AND (other.egcs_fc_outcome = 'posted' OR (other.egcs_fc_outcome = 'open' AND ar_has_lifecycle_evidence(other.id,other.egcs_fc_entitytype)))
+                GROUP BY other.id,other.egcs_fc_outcome) usage;
+            IF root.egcs_fc_advancepaymentrelated AND (root.egcs_fc_linkedreceivable IS NULL OR proposal_total>0) THEN
               consumed := consumed - COALESCE((SELECT sum(allocation.egcs_fc_amount)
                 FROM "Funding_Case_Account_Receivable_Allocation" allocation
                 JOIN "Funding_Case_Account_Receivable_Recovery" recovery ON recovery.id = allocation.egcs_fc_recovery
@@ -2481,7 +2371,7 @@ AS $function$
               IF fiscal_capacity IS NULL THEN
                 RAISE EXCEPTION 'Advance AR requires retained fiscal outstanding capacity' USING ERRCODE = '23514';
               END IF;
-              SELECT COALESCE(sum(CASE WHEN other.egcs_fc_outcome = 'posted' THEN line.egcs_fc_amount ELSE greatest(line.egcs_fc_amount,0) END),0)
+              SELECT COALESCE(sum(CASE WHEN usage.outcome='posted' OR usage.id=root_id THEN usage.amount ELSE greatest(usage.amount,0) END),0)
                 - COALESCE((SELECT sum(allocation.egcs_fc_amount)
                   FROM "Funding_Case_Account_Receivable_Allocation" allocation
                   JOIN "Funding_Case_Account_Receivable_Recovery" recovery ON recovery.id = allocation.egcs_fc_recovery
@@ -2491,13 +2381,15 @@ AS $function$
                     AND originaldebt.egcs_fc_agencyfiscalyear = root.egcs_fc_agencyfiscalyear AND originaldebt.egcs_fc_advancepaymentrelated
                     AND recovery.egcs_fc_outcome = 'posted' AND NOT allocation._deleted AND NOT recovery._deleted),0)
                 INTO principal
+                FROM (SELECT other.id,other.egcs_fc_outcome AS outcome,sum(line.egcs_fc_amount) AS amount
                 FROM "Funding_Case_Agreement_Account_Receivable_Line" line
                 JOIN "Funding_Case_Agreement_Account_Receivable" other ON other.id = line.egcs_fc_receivable
                 WHERE other.egcs_fc_fundingagreement = root.egcs_fc_fundingagreement
                   AND other.egcs_fc_applicantrecipient = root.egcs_fc_applicantrecipient
                   AND other.egcs_fc_agencyfiscalyear = root.egcs_fc_agencyfiscalyear AND other.egcs_fc_advancepaymentrelated
                   AND NOT line._deleted AND NOT other._deleted
-                  AND (other.egcs_fc_outcome = 'posted' OR (other.egcs_fc_outcome = 'open' AND ar_has_lifecycle_evidence(other.id,'fundingcaseaccountreceivable')));
+                  AND (other.egcs_fc_outcome = 'posted' OR (other.egcs_fc_outcome = 'open' AND ar_has_lifecycle_evidence(other.id,other.egcs_fc_entitytype)))
+                GROUP BY other.id,other.egcs_fc_outcome) usage;
               principal := greatest(principal,0); IF principal > fiscal_capacity THEN
                 RAISE EXCEPTION 'Advance AR fiscal principal is already reserved or established' USING ERRCODE = '23514';
               END IF;
@@ -2508,22 +2400,26 @@ AS $function$
             END IF;
           END LOOP;
           -- Different Claim source lines can retain the same paid coding basis.
-          -- Reserve its outstanding principal once across every established or
-          -- submitted AR, including approved signed adjustments and collections.
+          -- Reserve net increases once across every established or submitted AR.
+          -- Reductions and transfers preserve existing principal even when a
+          -- linked Credit Memo has lowered the live paid basis since capture.
           FOR coding IN SELECT egcs_fc_commitmentline,egcs_fc_chartofaccount,egcs_fc_agencyfiscalyear,
               egcs_fc_periodstart,egcs_fc_periodend,min(egcs_fc_sharedpaidbasis) paid_basis
             FROM "Funding_Case_Agreement_Account_Receivable_Coding"
             WHERE egcs_fc_receivable = root_id AND NOT _deleted
-            GROUP BY egcs_fc_commitmentline,egcs_fc_chartofaccount,egcs_fc_agencyfiscalyear,egcs_fc_periodstart,egcs_fc_periodend LOOP
-            SELECT COALESCE(sum(CASE WHEN other.egcs_fc_outcome = 'posted' THEN retained.egcs_fc_amount
-              ELSE greatest(retained.egcs_fc_amount,0) END),0) INTO consumed
+            GROUP BY egcs_fc_commitmentline,egcs_fc_chartofaccount,egcs_fc_agencyfiscalyear,egcs_fc_periodstart,egcs_fc_periodend
+            HAVING sum(egcs_fc_amount)>0 LOOP
+            SELECT COALESCE(sum(CASE WHEN usage.outcome='posted' OR usage.id=root_id THEN usage.amount
+              ELSE greatest(usage.amount,0) END),0) INTO consumed
+              FROM (SELECT other.id,other.egcs_fc_outcome AS outcome,sum(retained.egcs_fc_amount) AS amount
               FROM "Funding_Case_Agreement_Account_Receivable_Coding" retained
               JOIN "Funding_Case_Agreement_Account_Receivable" other ON other.id = retained.egcs_fc_receivable
               WHERE retained.egcs_fc_fundingagreement = root.egcs_fc_fundingagreement AND other.egcs_fc_pool = root.egcs_fc_pool
                 AND (retained.egcs_fc_commitmentline,retained.egcs_fc_chartofaccount,retained.egcs_fc_agencyfiscalyear,retained.egcs_fc_periodstart,retained.egcs_fc_periodend)
                   = (coding.egcs_fc_commitmentline,coding.egcs_fc_chartofaccount,coding.egcs_fc_agencyfiscalyear,coding.egcs_fc_periodstart,coding.egcs_fc_periodend)
                 AND NOT retained._deleted AND NOT other._deleted
-                AND (other.egcs_fc_outcome = 'posted' OR (other.egcs_fc_outcome = 'open' AND ar_has_lifecycle_evidence(other.id,'fundingcaseaccountreceivable')));
+                AND (other.egcs_fc_outcome = 'posted' OR (other.egcs_fc_outcome = 'open' AND ar_has_lifecycle_evidence(other.id,other.egcs_fc_entitytype)))
+                GROUP BY other.id,other.egcs_fc_outcome) usage;
             consumed := consumed - COALESCE((SELECT sum(posting.egcs_fc_amount)
               FROM "Funding_Case_Account_Receivable_Posting" posting
               JOIN "Funding_Case_Account_Receivable_Recovery" recovery ON recovery.id = posting.egcs_fc_recovery
@@ -2560,6 +2456,7 @@ CREATE FUNCTION trg_fn_validate_ar_offset_memo()
           OR account.egcs_ay_currency<>debt.egcs_fc_currency
           OR account.egcs_ay_organizationagency<>(SELECT egcs_fc_agency FROM "Funding_Case_Account_Receivable_Pool" WHERE id=NEW.egcs_fc_pool)
           OR NEW.egcs_fc_creditmemoaccountingdimensions IS DISTINCT FROM account.egcs_ay_accountingdimensions
+          OR NEW.egcs_fc_commitmentchartofaccount IS DISTINCT FROM account.egcs_ay_commitmentchartofaccount
           OR NOT EXISTS (SELECT 1 FROM "Transfer_Payment_Stream_Chart_of_Account" selection
             WHERE selection.egcs_tp_transferpaymentstream=stream_id AND selection.egcs_tp_agencychartofaccount=account.id AND NOT selection._deleted) THEN
           RAISE EXCEPTION 'Offset Credit Memo requires one established AR and its Stream credit coding' USING ERRCODE='23514'; END IF;
@@ -2574,8 +2471,9 @@ CREATE FUNCTION trg_fn_validate_ar_offset_memo()
           JOIN "Funding_Case_Account_Receivable_Offset_Memo" prior_memo ON prior_memo.id=application.egcs_fc_offsetmemo
           JOIN "Funding_Case_Account_Receivable_Recovery" prior ON prior.id=application.egcs_fc_recovery
           WHERE prior_memo.egcs_fc_receivable=memo.egcs_fc_receivable AND prior.egcs_fc_outcome='open' AND NOT prior._deleted;
-        consumed := consumed+coalesce((SELECT sum(egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Credit_Memo"
-          WHERE egcs_fc_receivable=memo.egcs_fc_receivable AND egcs_fc_outcome='open' AND NOT _deleted),0);
+        consumed := consumed+coalesce((SELECT sum(line.egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Credit_Memo" credit
+          JOIN "Funding_Case_Account_Receivable_Credit_Memo_Line" line ON line.egcs_fc_creditmemo=credit.id AND NOT line._deleted
+          WHERE line.egcs_fc_receivable=memo.egcs_fc_receivable AND credit.egcs_fc_outcome='open' AND NOT credit._deleted),0);
         IF NEW.egcs_fc_amount>ar_receivable_cash_net(memo.egcs_fc_receivable)-consumed THEN
           RAISE EXCEPTION 'Offset Credit Memo exceeds its AR available balance' USING ERRCODE='23514'; END IF;
       END IF; RETURN NEW;
@@ -2784,7 +2682,7 @@ AS $function$
         NEW.egcs_fc_statusagency:=NEW.egcs_fc_agency; RETURN NEW;
       END IF;
       IF TG_OP = 'DELETE' THEN RAISE EXCEPTION 'AR evidence uses soft deletion' USING ERRCODE = '23514'; END IF;
-      target_type := TG_ARGV[0];
+      target_type := NEW.egcs_fc_entitytype;
       SELECT program.egcs_tp_agency,agreement.egcs_fc_currency INTO owner_agency,owner_currency
         FROM "Funding_Case_Agreement_Profile" agreement
         JOIN "Transfer_Payment_Stream" stream ON stream.id = agreement.egcs_fc_transferpaymentstream
@@ -2806,8 +2704,8 @@ AS $function$
           RAISE EXCEPTION 'AR debtor must be an Agreement Proponent' USING ERRCODE = '23514';
         END IF;
       ELSE
-        IF (OLD.id,OLD.egcs_fc_fundingagreement,OLD.egcs_fc_pool,OLD.egcs_fc_applicantrecipient,OLD.egcs_fc_currency,OLD.egcs_fc_number,OLD.egcs_fc_agreementnumber,OLD.egcs_fc_createdby,OLD.egcs_fc_createdat)
-          IS DISTINCT FROM (NEW.id,NEW.egcs_fc_fundingagreement,NEW.egcs_fc_pool,NEW.egcs_fc_applicantrecipient,NEW.egcs_fc_currency,NEW.egcs_fc_number,NEW.egcs_fc_agreementnumber,NEW.egcs_fc_createdby,NEW.egcs_fc_createdat) THEN
+        IF (OLD.id,OLD.egcs_fc_entitytype,OLD.egcs_fc_amount,OLD.egcs_fc_fundingagreement,OLD.egcs_fc_pool,OLD.egcs_fc_applicantrecipient,OLD.egcs_fc_currency,OLD.egcs_fc_number,OLD.egcs_fc_agreementnumber,OLD.egcs_fc_createdby,OLD.egcs_fc_createdat)
+          IS DISTINCT FROM (NEW.id,NEW.egcs_fc_entitytype,NEW.egcs_fc_amount,NEW.egcs_fc_fundingagreement,NEW.egcs_fc_pool,NEW.egcs_fc_applicantrecipient,NEW.egcs_fc_currency,NEW.egcs_fc_number,NEW.egcs_fc_agreementnumber,NEW.egcs_fc_createdby,NEW.egcs_fc_createdat) THEN
           RAISE EXCEPTION 'AR identity is immutable' USING ERRCODE = '23514';
         END IF;
         IF OLD.egcs_fc_outcome <> 'open' AND to_jsonb(OLD) IS DISTINCT FROM to_jsonb(NEW) THEN
@@ -2822,8 +2720,35 @@ AS $function$
           RAISE EXCEPTION 'Only unsubmitted AR Drafts may be deleted' USING ERRCODE = '23514';
         END IF;
       END IF;
+      IF NEW.egcs_fc_agencyfinancialid IS NULL THEN
+        IF TG_OP='INSERT' AND NEW.egcs_fc_linkedreceivable IS NULL THEN
+          SELECT relation.egcs_fc_agencyfinancialid INTO NEW.egcs_fc_agencyfinancialid FROM "Funding_Case_Agreement_Applicant_Recipient" relation
+            WHERE relation.egcs_fc_fundingagreement=NEW.egcs_fc_fundingagreement AND relation.egcs_fc_applicantrecipient=NEW.egcs_fc_applicantrecipient AND NOT relation._deleted;
+        ELSIF TG_OP='INSERT' THEN
+          SELECT parent.egcs_fc_agencyfinancialid INTO NEW.egcs_fc_agencyfinancialid FROM "Funding_Case_Agreement_Account_Receivable" parent WHERE parent.id=NEW.egcs_fc_linkedreceivable;
+        END IF;
+        IF NEW.egcs_fc_agencyfinancialid IS NULL THEN RAISE EXCEPTION 'AR requires a retained Agency Financial ID' USING ERRCODE='23514'; END IF;
+      END IF;
+      IF NEW.egcs_fc_agencyfinancialid IS NOT NULL THEN
+        SELECT * INTO linked FROM "Applicant_Recipient_Agency_Financial_Id" WHERE id=NEW.egcs_fc_agencyfinancialid FOR SHARE;
+        IF linked.id IS NULL OR linked.egcs_ar_agency<>owner_agency OR linked.egcs_ar_applicantrecipient<>NEW.egcs_fc_applicantrecipient
+          OR ((TG_OP='INSERT')
+            OR (TG_OP='UPDATE' AND NEW.egcs_fc_agencyfinancialid IS DISTINCT FROM OLD.egcs_fc_agencyfinancialid))
+            AND (NOT linked.egcs_ar_active OR linked._deleted) THEN
+          RAISE EXCEPTION 'AR Financial ID must belong to active Agreement debtor and Agency' USING ERRCODE='23514';
+        END IF;
+        IF TG_OP='UPDATE' AND OLD.egcs_fc_linkedreceivable IS NULL
+          AND NEW.egcs_fc_agencyfinancialid IS DISTINCT FROM OLD.egcs_fc_agencyfinancialid THEN
+          RAISE EXCEPTION 'Established AR Financial ID requires an adjustment' USING ERRCODE='23514';
+        END IF;
+        IF TG_OP='INSERT' OR NEW.egcs_fc_agencyfinancialid IS DISTINCT FROM OLD.egcs_fc_agencyfinancialid THEN
+          NEW.egcs_fc_financialsystemid:=linked.egcs_ar_financialsystemid::text;
+        ELSE
+          NEW.egcs_fc_financialsystemid:=OLD.egcs_fc_financialsystemid;
+        END IF;
+      END IF;
       NEW.egcs_fc_statusagency := owner_agency;
-      IF target_type = 'fundingcaseaccountreceivable' THEN
+      IF target_type IN ('fundingcaseaccountreceivable','fundingcaseaccountreceivableadjustment') THEN
         IF TG_OP = 'INSERT' THEN
           IF NEW.egcs_fc_linkedreceivable IS NULL THEN
             SELECT * INTO linked FROM "Agency_Account_Receivable_Type" configuration
@@ -2861,9 +2786,6 @@ AS $function$
             OR (linked.egcs_fc_pool,linked.egcs_fc_type,linked.egcs_fc_agencyfiscalyear)
               IS DISTINCT FROM (NEW.egcs_fc_pool,NEW.egcs_fc_type,NEW.egcs_fc_agencyfiscalyear) THEN
             RAISE EXCEPTION 'AR adjustment must link its established original debt' USING ERRCODE = '23514';
-          END IF;
-          IF TG_OP = 'INSERT' AND ar_outstanding(linked.id) <= 0 THEN
-            RAISE EXCEPTION 'A cleared AR cannot be reopened by adjustment' USING ERRCODE = '23514';
           END IF;
           IF EXISTS (SELECT 1 FROM "Funding_Case_Account_Receivable_Recovery" recovery WHERE recovery.egcs_fc_pool = NEW.egcs_fc_pool AND recovery.egcs_fc_outcome = 'open' AND NOT recovery._deleted) THEN
             RAISE EXCEPTION 'Unresolved recovery blocks AR adjustments' USING ERRCODE = '23514';
@@ -3169,11 +3091,15 @@ AS $function$
       RETURN NEW;
     END $function$;
 END $baseline$`.execute(db)
+  await installCreditMemoFunctions(db)
+  await installCommitmentCodingFunctions(db)
 }
 
 /** Installs the current installForeignKeys definitions for this subject on a fresh database. */
 export const installForeignKeys = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
+ALTER TABLE "Funding_Case_Account_Receivable_Credit_Memo_Line" ADD CONSTRAINT "fc_fk_credit_line_receivable" FOREIGN KEY (egcs_fc_receivable) REFERENCES "Funding_Case_Agreement_Account_Receivable"(id) ON DELETE RESTRICT;
+
 ALTER TABLE "Funding_Case_Account_Receivable_Allocation" ADD CONSTRAINT "fc_fk_ar_allocation_line" FOREIGN KEY (egcs_fc_receivableline, egcs_fc_receivable, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Account_Receivable_Line"(id, egcs_fc_receivable, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Account_Receivable_Allocation" ADD CONSTRAINT "Funding_Case_Account_Receivable_Allocatio_egcs_fc_recovery_fkey" FOREIGN KEY (egcs_fc_recovery) REFERENCES "Funding_Case_Account_Receivable_Recovery"(id) ON DELETE RESTRICT;
@@ -3238,6 +3164,12 @@ ALTER TABLE "Funding_Case_Account_Receivable_Recovery" ADD CONSTRAINT "Funding_C
 ALTER TABLE "Funding_Case_Account_Receivable_Recovery" ADD CONSTRAINT "Funding_Case_Account_Receivable_Recovery_egcs_fc_payment_fkey" FOREIGN KEY (egcs_fc_payment) REFERENCES "Funding_Case_Agreement_Payment"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Account_Receivable_Recovery" ADD CONSTRAINT "Funding_Case_Account_Receivable_Recovery_egcs_fc_pool_fkey" FOREIGN KEY (egcs_fc_pool) REFERENCES "Funding_Case_Account_Receivable_Pool"(id) ON DELETE RESTRICT;
+
+ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT fc_chk_ar_entity_kind CHECK (
+  (egcs_fc_linkedreceivable IS NULL AND egcs_fc_entitytype='fundingcaseaccountreceivable') OR
+  (egcs_fc_linkedreceivable IS NOT NULL AND egcs_fc_entitytype='fundingcaseaccountreceivableadjustment'));
+ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT fc_fk_ar_typed_entity FOREIGN KEY (id,egcs_fc_entitytype) REFERENCES "Common_Entity"(id,egcs_cn_entitytype);
+ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT fc_fk_ar_financial_id FOREIGN KEY (egcs_fc_agencyfinancialid) REFERENCES "Applicant_Recipient_Agency_Financial_Id"(id);
 
 ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT "cn_chk_ar_status_in_use" FOREIGN KEY (egcs_fc_status, egcs_fc_statusagency, egcs_fc_statusdeleted) REFERENCES "Common_Status"(id, egcs_cn_agency, _deleted) DEFERRABLE INITIALLY DEFERRED;
 
@@ -3668,11 +3600,14 @@ CREATE TRIGGER trg_validate_ar_recovery BEFORE INSERT OR DELETE OR UPDATE ON "Fu
 
 CREATE CONSTRAINT TRIGGER trg_validate_ar_recovery_posting AFTER INSERT OR UPDATE ON "Funding_Case_Account_Receivable_Recovery" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_ar_recovery_posting();
 
-CREATE CONSTRAINT TRIGGER trg_enforce_ar_roster AFTER INSERT OR UPDATE OF _deleted ON "Funding_Case_Agreement_Account_Receivable" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_enforce_assignable_entity_roster('fundingcaseaccountreceivable');
+CREATE CONSTRAINT TRIGGER trg_enforce_ar_roster AFTER INSERT OR UPDATE OF _deleted ON "Funding_Case_Agreement_Account_Receivable" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (NEW.egcs_fc_entitytype='fundingcaseaccountreceivable') EXECUTE FUNCTION trg_fn_enforce_assignable_entity_roster('fundingcaseaccountreceivable');
+CREATE CONSTRAINT TRIGGER trg_enforce_ar_roster_adjustment AFTER INSERT OR UPDATE OF _deleted ON "Funding_Case_Agreement_Account_Receivable" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (NEW.egcs_fc_entitytype='fundingcaseaccountreceivableadjustment') EXECUTE FUNCTION trg_fn_enforce_assignable_entity_roster('fundingcaseaccountreceivableadjustment');
 
-CREATE TRIGGER trg_register_ar BEFORE INSERT ON "Funding_Case_Agreement_Account_Receivable" FOR EACH ROW EXECUTE FUNCTION register_entity('fundingcaseaccountreceivable');
+CREATE TRIGGER trg_register_ar BEFORE INSERT ON "Funding_Case_Agreement_Account_Receivable" FOR EACH ROW WHEN (NEW.egcs_fc_entitytype='fundingcaseaccountreceivable') EXECUTE FUNCTION register_entity('fundingcaseaccountreceivable');
+CREATE TRIGGER trg_register_ar_adjustment BEFORE INSERT ON "Funding_Case_Agreement_Account_Receivable" FOR EACH ROW WHEN (NEW.egcs_fc_entitytype='fundingcaseaccountreceivableadjustment') EXECUTE FUNCTION register_entity('fundingcaseaccountreceivableadjustment');
 
-CREATE TRIGGER trg_soft_delete_ar_assignments AFTER UPDATE OF _deleted ON "Funding_Case_Agreement_Account_Receivable" FOR EACH ROW EXECUTE FUNCTION trg_fn_soft_delete_entity_assignments('fundingcaseaccountreceivable');
+CREATE TRIGGER trg_soft_delete_ar_assignments AFTER UPDATE OF _deleted ON "Funding_Case_Agreement_Account_Receivable" FOR EACH ROW WHEN (NEW.egcs_fc_entitytype='fundingcaseaccountreceivable') EXECUTE FUNCTION trg_fn_soft_delete_entity_assignments('fundingcaseaccountreceivable');
+CREATE TRIGGER trg_soft_delete_ar_assignments_adjustment AFTER UPDATE OF _deleted ON "Funding_Case_Agreement_Account_Receivable" FOR EACH ROW WHEN (NEW.egcs_fc_entitytype='fundingcaseaccountreceivableadjustment') EXECUTE FUNCTION trg_fn_soft_delete_entity_assignments('fundingcaseaccountreceivableadjustment');
 
 CREATE CONSTRAINT TRIGGER trg_validate_ar_establishment AFTER INSERT OR UPDATE ON "Funding_Case_Agreement_Account_Receivable" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_ar_establishment('fundingcaseaccountreceivable');
 
@@ -3793,6 +3728,15 @@ CREATE TRIGGER trg_correction_financial_lock BEFORE INSERT OR DELETE OR UPDATE O
 CREATE CONSTRAINT TRIGGER trg_enforce_commitment_line_program_funding_total AFTER INSERT OR UPDATE ON "Funding_Case_Agreement_Commitment_Line" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_enforce_commitment_line_program_funding_total();
 
 CREATE TRIGGER trg_resolve_commitment_line_scope BEFORE INSERT OR UPDATE OF egcs_fc_commitment, egcs_fc_fundingagreement, egcs_fc_transferpaymentstream, egcs_fc_transferpaymentstreamchartofaccount ON "Funding_Case_Agreement_Commitment_Line" FOR EACH ROW EXECUTE FUNCTION trg_fn_resolve_commitment_line_scope();
+
+CREATE TRIGGER trg_protect_commitment_line_paid_floor BEFORE UPDATE OR DELETE ON "Funding_Case_Agreement_Commitment_Line" FOR EACH ROW EXECUTE FUNCTION trg_fn_protect_commitment_line_paid_floor();
+
+CREATE CONSTRAINT TRIGGER trg_validate_completed_commitment_header AFTER INSERT OR UPDATE ON "Funding_Case_Agreement_Commitment" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_completed_commitment_coding();
+
+CREATE CONSTRAINT TRIGGER trg_validate_completed_commitment_lines AFTER INSERT OR UPDATE ON "Funding_Case_Agreement_Commitment_Line" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_completed_commitment_coding();
+
+CREATE CONSTRAINT TRIGGER trg_validate_commitment_completion_coding AFTER INSERT OR UPDATE ON "Common_Completion" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (NEW.egcs_cn_entitytype='fundingcaseagreementcommitment') EXECUTE FUNCTION trg_fn_validate_completed_commitment_coding();
+
 
 CREATE CONSTRAINT TRIGGER trg_enforce_correction_roster AFTER INSERT OR UPDATE OF _deleted ON "Funding_Case_Agreement_Correction" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_enforce_assignable_entity_roster('fundingcasecorrection');
 

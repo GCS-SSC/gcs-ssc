@@ -105,7 +105,7 @@ onMounted(() => {
           :subtitle="t('applicant_recipient.description')" />
 
         <CommonEntityEditorWorkspace>
-          <CommonDetailSection :title="t('agency.tabs.general')" width="readable">
+          <CommonDetailSection :title="t('agency.tabs.general')">
             <ApplicantRecipientProfileFormPage
               v-model:model="form"
               :submit-label="t('common.add')"

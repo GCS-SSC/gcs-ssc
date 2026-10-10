@@ -35,7 +35,8 @@
       ],
       "_deleted": false,
       "egcs_ay_kind": "commitment",
-      "egcs_ay_currency": "cad"
+      "egcs_ay_currency": "cad",
+      "egcs_ay_commitmentchartofaccount": null
     },
     {
       "id": 9,
@@ -50,7 +51,8 @@
       ],
       "_deleted": false,
       "egcs_ay_kind": "commitment",
-      "egcs_ay_currency": "cad"
+      "egcs_ay_currency": "cad",
+      "egcs_ay_commitmentchartofaccount": null
     },
     {
       "id": 10,
@@ -65,7 +67,8 @@
       ],
       "_deleted": false,
       "egcs_ay_kind": "commitment",
-      "egcs_ay_currency": "cad"
+      "egcs_ay_currency": "cad",
+      "egcs_ay_commitmentchartofaccount": null
     },
     {
       "id": 11,
@@ -80,7 +83,8 @@
       ],
       "_deleted": false,
       "egcs_ay_kind": "account_receivable",
-      "egcs_ay_currency": "cad"
+      "egcs_ay_currency": "cad",
+      "egcs_ay_commitmentchartofaccount": null
     },
     {
       "id": 12,
@@ -95,7 +99,8 @@
       ],
       "_deleted": false,
       "egcs_ay_kind": "account_receivable",
-      "egcs_ay_currency": "cad"
+      "egcs_ay_currency": "cad",
+      "egcs_ay_commitmentchartofaccount": null
     },
     {
       "id": 13,
@@ -110,7 +115,8 @@
       ],
       "_deleted": false,
       "egcs_ay_kind": "account_receivable",
-      "egcs_ay_currency": "cad"
+      "egcs_ay_currency": "cad",
+      "egcs_ay_commitmentchartofaccount": null
     },
     {
       "id": 14,
@@ -125,7 +131,8 @@
       ],
       "_deleted": false,
       "egcs_ay_kind": "credit_memo",
-      "egcs_ay_currency": "cad"
+      "egcs_ay_currency": "cad",
+      "egcs_ay_commitmentchartofaccount": 8
     },
     {
       "id": 15,
@@ -140,7 +147,8 @@
       ],
       "_deleted": false,
       "egcs_ay_kind": "credit_memo",
-      "egcs_ay_currency": "cad"
+      "egcs_ay_currency": "cad",
+      "egcs_ay_commitmentchartofaccount": 9
     },
     {
       "id": 16,
@@ -155,7 +163,8 @@
       ],
       "_deleted": false,
       "egcs_ay_kind": "credit_memo",
-      "egcs_ay_currency": "cad"
+      "egcs_ay_currency": "cad",
+      "egcs_ay_commitmentchartofaccount": 10
     }
   ],
   "Agency_Commitment_Type": [
@@ -2892,6 +2901,13 @@
       "egcs_cn_kind": "workflow_setup",
       "egcs_cn_state": "published",
       "egcs_cn_currentversion": 401
+    },
+    {
+      "id": 393,
+      "egcs_cn_kind": "workflow_setup",
+      "egcs_cn_state": "published",
+      "egcs_cn_currentversion": 403,
+      "_deleted": false
     }
   ],
   "Common_Publication_Transition": [
@@ -3218,6 +3234,15 @@
       "egcs_cn_publicationversion": 402,
       "egcs_cn_actor": 1,
       "egcs_cn_createdat": "2026-10-08T14:00:00.000Z"
+    },
+    {
+      "id": 402,
+      "egcs_cn_publication": 393,
+      "egcs_cn_fromstate": "draft",
+      "egcs_cn_tostate": "published",
+      "egcs_cn_publicationversion": 403,
+      "egcs_cn_actor": 1,
+      "egcs_cn_createdat": "2026-10-05T14:00:00.000Z"
     }
   ],
   "Common_Publication_Version": [
@@ -6265,6 +6290,66 @@
       "egcs_cn_hash": "94bdb910d21e60b35c5b2c9c47c5908a0b70f297049a8b69351ad9cf89412ead",
       "egcs_cn_actor": 1,
       "egcs_cn_createdat": "2026-10-08T14:00:00.000Z"
+    },
+    {
+      "id": 403,
+      "egcs_cn_publication": 393,
+      "egcs_cn_kind": "workflow_setup",
+      "egcs_cn_version": 1,
+      "egcs_cn_definition": {
+        "nameEn": "Adjust receivable",
+        "nameFr": "Ajuster le compte débiteur",
+        "descriptionEn": "Approve signed coding changes and retained debtor Financial System ID.",
+        "descriptionFr": "Approuver les modifications comptables signées et l’identifiant financier conservé du débiteur.",
+        "entityType": "fundingcaseaccountreceivableadjustment",
+        "purpose": "approval_submission",
+        "allowRetry": false,
+        "allowedStartStatuses": [
+          "381",
+          "397"
+        ],
+        "cancellationStatus": "399",
+        "executionFailureStatus": "400",
+        "members": [
+          {
+            "memberId": "61",
+            "sequence": 1,
+            "kind": "approval_template",
+            "owners": [],
+            "referenceId": "384",
+            "publicationVersionId": "388",
+            "publicationVersion": 1,
+            "approval": {
+              "templateId": "384",
+              "nameEn": "Independent financial authorization",
+              "nameFr": "Autorisation financière indépendante",
+              "descriptionEn": "A financial reviewer other than the creator validates the amount and supporting accounting evidence.",
+              "descriptionFr": "Une personne chargée de l’examen financier autre que la personne ayant créé le dossier valide le montant et les pièces comptables.",
+              "allowAdditionalApprovals": false,
+              "allowAddedApprovalNameChanges": false,
+              "allowAddedApprovalCertificationChanges": false,
+              "additionalCertifications": [],
+              "steps": [
+                {
+                  "stepId": "241",
+                  "sequence": 1,
+                  "nameEn": "Independent financial authorization",
+                  "nameFr": "Autorisation financière indépendante",
+                  "defaultUser": "4",
+                  "certifications": []
+                }
+              ]
+            },
+            "materializationStatus": "385",
+            "successStatus": "394",
+            "failureStatus": "398",
+            "allowOwnerRedirect": false
+          }
+        ]
+      },
+      "egcs_cn_hash": "59d46fc4d6f00d41d60339ae9f3fb330e85aa5686ac5f4fcb28b43b1655b02e4",
+      "egcs_cn_actor": 1,
+      "egcs_cn_createdat": "2026-10-05T14:00:00.000Z"
     }
   ],
   "Common_Publication_Version_Reference": [
@@ -6577,6 +6662,16 @@
       "egcs_cn_kind": "approval_template",
       "egcs_cn_publicationversion": 370,
       "egcs_cn_version": 2
+    },
+    {
+      "id": 253,
+      "egcs_cn_parentversion": 403,
+      "egcs_cn_path": "members.approval_template",
+      "egcs_cn_order": 1,
+      "egcs_cn_publication": 384,
+      "egcs_cn_kind": "approval_template",
+      "egcs_cn_publicationversion": 388,
+      "egcs_cn_version": 1
     }
   ],
   "Common_Routing_Slip": [
@@ -14779,6 +14874,55 @@
       "egcs_cn_status": 397,
       "egcs_cn_role": "failure",
       "egcs_cn_order": 1
+    },
+    {
+      "id": 398,
+      "egcs_cn_publicationversion": 403,
+      "egcs_cn_status": 381,
+      "egcs_cn_role": "allowed_start",
+      "egcs_cn_order": 1
+    },
+    {
+      "id": 399,
+      "egcs_cn_publicationversion": 403,
+      "egcs_cn_status": 397,
+      "egcs_cn_role": "allowed_start",
+      "egcs_cn_order": 2
+    },
+    {
+      "id": 400,
+      "egcs_cn_publicationversion": 403,
+      "egcs_cn_status": 399,
+      "egcs_cn_role": "cancellation",
+      "egcs_cn_order": 1
+    },
+    {
+      "id": 401,
+      "egcs_cn_publicationversion": 403,
+      "egcs_cn_status": 400,
+      "egcs_cn_role": "execution_failure",
+      "egcs_cn_order": 1
+    },
+    {
+      "id": 402,
+      "egcs_cn_publicationversion": 403,
+      "egcs_cn_status": 385,
+      "egcs_cn_role": "materialization",
+      "egcs_cn_order": 1
+    },
+    {
+      "id": 403,
+      "egcs_cn_publicationversion": 403,
+      "egcs_cn_status": 394,
+      "egcs_cn_role": "success",
+      "egcs_cn_order": 1
+    },
+    {
+      "id": 404,
+      "egcs_cn_publicationversion": 403,
+      "egcs_cn_status": 398,
+      "egcs_cn_role": "failure",
+      "egcs_cn_order": 1
     }
   ],
   "Common_Workflow_Run": [
@@ -16250,6 +16394,21 @@
       "egcs_cn_cancellationstatus": 382,
       "egcs_cn_riskratingrequired": false,
       "egcs_cn_executionfailurestatus": 382
+    },
+    {
+      "id": 393,
+      "egcs_cn_publicationkind": "workflow_setup",
+      "egcs_cn_agency": 21,
+      "egcs_cn_entitytype": "fundingcaseaccountreceivableadjustment",
+      "egcs_cn_name_en": "Adjust receivable",
+      "egcs_cn_name_fr": "Ajuster le compte débiteur",
+      "egcs_cn_description_en": "Approve signed coding changes and retained debtor Financial System ID.",
+      "egcs_cn_description_fr": "Approuver les modifications comptables signées et l’identifiant financier conservé du débiteur.",
+      "egcs_cn_purpose": "approval_submission",
+      "egcs_cn_cancellationstatus": 399,
+      "egcs_cn_executionfailurestatus": 400,
+      "egcs_cn_allowretry": false,
+      "_deleted": false
     }
   ],
   "Common_Workflow_Setup_Allowed_Start_Status": [
@@ -16483,6 +16642,20 @@
       "egcs_cn_order": 1,
       "egcs_cn_status": 382,
       "egcs_cn_workflowsetup": 392
+    },
+    {
+      "id": 137,
+      "egcs_cn_workflowsetup": 393,
+      "egcs_cn_status": 381,
+      "egcs_cn_order": 1,
+      "_deleted": false
+    },
+    {
+      "id": 138,
+      "egcs_cn_workflowsetup": 393,
+      "egcs_cn_status": 397,
+      "egcs_cn_order": 2,
+      "_deleted": false
     }
   ],
   "Common_Workflow_Setup_Member": [
@@ -16827,6 +17000,24 @@
       "egcs_cn_recommendationset": null,
       "egcs_cn_allowownerredirect": true,
       "egcs_cn_materializationstatus": null
+    },
+    {
+      "id": 61,
+      "egcs_cn_workflowsetup": 393,
+      "egcs_cn_sequence": 1,
+      "egcs_cn_kind": "approval_template",
+      "egcs_cn_reviewset": null,
+      "egcs_cn_recommendationset": null,
+      "egcs_cn_approvaltemplate": 384,
+      "egcs_cn_materializationstatus": 385,
+      "egcs_cn_successstatus": 394,
+      "egcs_cn_failurestatus": 398,
+      "egcs_cn_allowownerredirect": false,
+      "egcs_cn_profileconditions": [],
+      "_deleted": false,
+      "egcs_cn_setsriskrating": false,
+      "egcs_cn_riskreviewsetup": null,
+      "egcs_cn_datacollection": null
     }
   ],
   "Common_Workflow_Status_Transition": [
@@ -19664,7 +19855,8 @@
       "egcs_fc_status": 386,
       "egcs_fc_financialsystemnumber": null,
       "egcs_fc_active": true,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_totalamount": "150000.00"
     },
     {
       "id": 124,
@@ -19675,7 +19867,8 @@
       "egcs_fc_status": 386,
       "egcs_fc_financialsystemnumber": null,
       "egcs_fc_active": true,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_totalamount": "100000.00"
     },
     {
       "id": 127,
@@ -19686,7 +19879,8 @@
       "egcs_fc_status": 386,
       "egcs_fc_financialsystemnumber": null,
       "egcs_fc_active": true,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_totalamount": "105000.00"
     },
     {
       "id": 130,
@@ -19697,7 +19891,8 @@
       "egcs_fc_status": 386,
       "egcs_fc_financialsystemnumber": null,
       "egcs_fc_active": true,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_totalamount": "110000.00"
     },
     {
       "id": 133,
@@ -19708,7 +19903,8 @@
       "egcs_fc_status": 386,
       "egcs_fc_financialsystemnumber": null,
       "egcs_fc_active": true,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_totalamount": "115000.00"
     },
     {
       "id": 136,
@@ -19719,7 +19915,8 @@
       "egcs_fc_status": 386,
       "egcs_fc_financialsystemnumber": null,
       "egcs_fc_active": true,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_totalamount": "120000.00"
     },
     {
       "id": 139,
@@ -19730,7 +19927,8 @@
       "egcs_fc_status": 386,
       "egcs_fc_financialsystemnumber": null,
       "egcs_fc_active": true,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_totalamount": "125000.00"
     },
     {
       "id": 142,
@@ -19741,7 +19939,8 @@
       "egcs_fc_status": 386,
       "egcs_fc_financialsystemnumber": null,
       "egcs_fc_active": true,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_totalamount": "130000.00"
     },
     {
       "id": 145,
@@ -19752,7 +19951,8 @@
       "egcs_fc_status": 386,
       "egcs_fc_financialsystemnumber": null,
       "egcs_fc_active": true,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_totalamount": "135000.00"
     },
     {
       "id": 148,
@@ -19763,7 +19963,8 @@
       "egcs_fc_status": 386,
       "egcs_fc_financialsystemnumber": null,
       "egcs_fc_active": true,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_totalamount": "140000.00"
     },
     {
       "id": 151,
@@ -19774,7 +19975,8 @@
       "egcs_fc_status": 386,
       "egcs_fc_financialsystemnumber": null,
       "egcs_fc_active": true,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_totalamount": "145000.00"
     }
   ],
   "Funding_Case_Agreement_Commitment_Line": [
@@ -23039,6 +23241,12 @@
       "_deleted": false,
       "egcs_tp_workflow": 392,
       "egcs_tp_transferpaymentstream": 118
+    },
+    {
+      "id": 45,
+      "egcs_tp_transferpaymentstream": 118,
+      "egcs_tp_workflow": 393,
+      "_deleted": false
     }
   ],
   "role": [
@@ -24610,7 +24818,11 @@
       "egcs_fc_recipientpreference": null,
       "egcs_fc_advancepaymentrelated": false,
       "egcs_fc_preferenceoverride_en": "",
-      "egcs_fc_preferenceoverride_fr": ""
+      "egcs_fc_preferenceoverride_fr": "",
+      "egcs_fc_entitytype": "fundingcaseaccountreceivable",
+      "egcs_fc_amount": "21000.00",
+      "egcs_fc_agencyfinancialid": 1,
+      "egcs_fc_financialsystemid": "9901000119"
     }
   ],
   "Funding_Case_Agreement_Account_Receivable_Line": [
@@ -24704,7 +24916,11 @@
       "egcs_fc_statusagency": 21,
       "egcs_fc_postingruntime": 56,
       "egcs_fc_terminalreason": null,
-      "egcs_fc_applicantrecipient": 119
+      "egcs_fc_applicantrecipient": 119,
+      "egcs_fc_receivables": [
+        "169"
+      ],
+      "egcs_fc_totalamount": "10500.00"
     }
   ],
   "Funding_Case_Account_Receivable_Credit_Memo_Line": [
@@ -24721,7 +24937,9 @@
         }
       ],
       "egcs_fc_amount": "10500.00",
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_receivable": 169,
+      "egcs_fc_commitmentchartofaccount": 8
     }
   ],
   "Common_Data_Collection_Setup": [

@@ -18,12 +18,13 @@ import { getExtensionEntityAuthorizationSubject } from '~~/shared/utils/extensio
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 const EntityTabQuerySchema = z.object({
-  target: z.enum(['agreement', 'proponent', 'claim', 'monitor', 'opportunity']),
+  target: z.enum(['agreement', 'proponent', 'claim', 'monitor', 'opportunity', 'payment']),
   agreementId: z.string().optional(),
   applicantRecipientId: z.string().optional(),
   agencyId: z.string().optional(),
   claimId: z.string().optional(),
   monitorId: z.string().optional(),
+  paymentId: z.string().optional(),
   opportunityId: z.string().optional()
 })
 
@@ -37,6 +38,7 @@ const entityIdForQuery = (query: z.infer<typeof EntityTabQuerySchema>): string |
   if (query.target === 'agreement') return query.agreementId ?? null
   if (query.target === 'proponent') return query.applicantRecipientId ?? null
   if (query.target === 'claim') return query.claimId ?? null
+  if (query.target === 'payment') return query.paymentId ?? null
   if (query.target === 'opportunity') return query.opportunityId ?? null
   return query.monitorId ?? null
 }
@@ -192,7 +194,7 @@ const collectExtensionEntityTabItems = async (
         icon: tab.icon,
         componentName,
         config,
-        context: { ...entityContext, target: entityContext.target as 'agreement' | 'claim' | 'monitor' | 'opportunity' },
+        context: { ...entityContext, target: entityContext.target as 'agreement' | 'claim' | 'monitor' | 'opportunity' | 'payment' },
         rbac: tab.rbac
       })
     }
@@ -210,6 +212,7 @@ export default defineEventHandler(async event => {
     rawQuery.agencyId,
     rawQuery.claimId,
     rawQuery.monitorId,
+    rawQuery.paymentId,
     rawQuery.opportunityId
   ]
   if (rawEntityIds.some(value => value !== undefined

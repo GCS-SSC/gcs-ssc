@@ -277,6 +277,7 @@
       "fundingcasejournalvoucher": "Pièce de journal",
       "fundingcasecorrection": "Correction",
       "fundingcaseaccountreceivable": "Comptes débiteurs",
+      "fundingcaseaccountreceivableadjustment": "Ajustement de compte débiteur",
       "fundingcaseaccountreceivablecreditmemo": "Note de crédit",
       "commondatacollection": "Collecte de données"
     }
@@ -541,6 +542,7 @@
       "fundingcasejournalvoucher": "Pièce de journal",
       "fundingcasecorrection": "Correction",
       "fundingcaseaccountreceivable": "Compte débiteur",
+      "fundingcaseaccountreceivableadjustment": "Ajustement de compte débiteur",
       "fundingcaseaccountreceivablecreditmemo": "Note de crédit de compte débiteur",
       "commondatacollection": "Collecte de données"
     },
@@ -1232,6 +1234,8 @@
       "account_receivable_type_not_found": "Type de compte débiteur introuvable.",
       "account_receivable_type_in_use": "Ce type est utilisé par un compte débiteur et ne peut pas être supprimé.",
       "account_receivable_type_policy_locked": "Les exigences relatives aux sources et au suivi ne peuvent pas être modifiées, car un compte débiteur utilise ce type.",
+      "invalid_credit_memo_commitment_chart": "Sélectionnez un compte d’engagement actif de la même agence, du même exercice et de la même devise pour ce compte de note de crédit.",
+      "credit_memo_commitment_chart_in_use": "Ce compte d’engagement est lié à un compte de note de crédit et ne peut pas être supprimé.",
       "chart_kind_immutable": "Le type de compte ne peut pas être modifié. Créez un compte distinct pour l’autre type.",
       "account_receivable_chart_in_use": "Ce compte est utilisé par un compte débiteur et ne peut pas être supprimé.",
       "duplicate_account_receivable_type_name_en": "Un type de compte débiteur avec ce titre anglais existe déjà pour l’organisme.",
@@ -1288,6 +1292,7 @@
       "libreoffice_unavailable": "LibreOffice est requis pour convertir les modèles DOCX en PDF. Installez LibreOffice sur le serveur ou utilisez un modèle PDF HTML."
     },
     "agreement": {
+      "invalid_coding_allocation": "Les lignes de codage doivent appartenir à ce volet, correspondre au montant total et couvrir les montants déjà payés.",
       "invalid_financial_id": "Sélectionnez un identifiant financier actif pour ce promoteur auprès de l'agence de l'entente.",
       "financial_id_required": "Sélectionnez un identifiant financier pour chaque promoteur de cette entente.",
       "monitor_receivable_not_allowed": "Ce type de contrôle ne permet pas de suivis exigeant l’établissement d’un compte débiteur.",
@@ -1384,6 +1389,7 @@
       "invalid_payment_commitment_line": "La ligne d'engagement sélectionnée est invalide pour ce paiement.",
       "payment_exceeds_commitment_balance": "Ce paiement dépasse le solde restant de la ligne d'engagement.",
       "commitment_line_below_paid_amount": "Le montant de la ligne d'engagement ne peut pas etre inferieur au montant deja paye.",
+      "commitment_line_below_paid": "Le montant de la ligne d’engagement ne peut pas être inférieur au montant déjà payé.",
       "commitment_line_payment_context_locked": "Une ligne d’engagement associée à des paiements ne peut pas être déplacée vers un autre engagement ou plan comptable.",
       "commitment_exceeds_program_funding": "Le total de l'engagement ne peut pas dépasser le financement de programme total de l'entente.",
       "payment_lines_must_match_total": "Les montants des lignes de paiement doivent égaler le montant du paiement.",
@@ -1555,6 +1561,7 @@
       "not_found": "Compte débiteur ou note de crédit introuvable.",
       "invalid_entry": "Cette opération sur le compte débiteur ne peut se poursuivre avec les montants sources, les réservations de recouvrement, les autorisations ou l’état du cycle de vie actuels.",
       "below_recovered_reserved": "Un ajustement négatif ne peut réduire le principal en dessous des montants déjà recouvrés ou réservés.",
+      "claim_reduction_source_required": "Cette réduction de réclamation nécessite ses sources de rapprochement réussies conservées. Effacez ou réduisez le plan provisoire avant de retirer ses lignes sources.",
       "payment_direct_repayment_hold": "Ce bénéficiaire a un compte débiteur impayé exigeant un remboursement direct. Les paiements sont bloqués jusqu’à son remboursement ou jusqu’à ce qu’un ajustement approuvé modifie le mode de recouvrement.",
       "payment_recovery_pending": "Un recouvrement ou un ajustement de compte débiteur est en attente pour ce bénéficiaire. Terminez ou annulez ce travail avant de traiter ce paiement.",
       "payment_payee_unavailable": "Sélectionnez comme bénéficiaire du paiement un promoteur actif lié à cette entente.",
@@ -1674,6 +1681,8 @@
       "update": "Mettre à jour l'engagement"
     },
     "chart_of_accounts": {
+      "commitment_account": "Compte d’engagement lié",
+      "commitment_account_help": "Facultatif. Les crédits approuvés réduisent les montants payés et rétablissent la capacité d’engagement uniquement lorsqu’ils sont liés au codage d’engagement.",
       "title": "Plan comptable",
       "description": "Définissez les champs et les valeurs comptables pour ce budget de volet.",
       "fiscal_year": "Année budgétaire",
@@ -2233,6 +2242,7 @@
   },
   "agreement": {
     "completion_blockers": {
+      "allocation_total": "Les lignes de codage doivent correspondre au total de l’engagement avant de terminer.",
       "funding_breakdown_required": "Ajoutez au moins une autre source de financement à chaque ligne et assurez-vous que le financement du programme et les autres sources égalent le coût total avant l’achèvement."
     },
     "funding_sources": {
@@ -2580,6 +2590,8 @@
       "risk_frozen_help": "La décision de risque est figée à la complétion. L’approbation utilise la proposition et la preuve de préparation capturées."
     },
     "commitments": {
+      "allocation_required": "Compléter la répartition du codage",
+      "allocation_total_help": "Les lignes de codage totalisent {allocated}. Répartissez le montant total de l’engagement de {total} avant de terminer.",
       "title": "Engagements",
       "search": "Rechercher des engagements",
       "add": "Ajouter un engagement",
@@ -3248,6 +3260,9 @@
     }
   },
   "extensions": {
+    "entity_tabs_loading": "Chargement des vues d’extension…",
+    "entity_tabs_load_failed": "Les vues d’extension n’ont pas pu être chargées",
+    "entity_tabs_load_failed_description": "Réessayez pour charger les vues d’extension disponibles.",
     "workspace_agencies_description": "Choisissez une agence où cette extension est activée.",
     "select_storage_provider": "Sélectionner le fournisseur de stockage",
     "storage_provider_selected": "Le fournisseur de stockage de l'agence a été sélectionné.",
@@ -4203,6 +4218,21 @@
     "all_fiscal_years": "Tous les exercices financiers"
   },
   "account_receivable": {
+    "remove_coding_line": "Retirer la ligne comptable",
+    "move_coding": "Transférer la ligne comptable",
+    "move_coding_instruction": "Transférez le montant actuel intégral vers un autre compte débiteur tout en conservant la dette totale.",
+    "credit_memos": "Notes de crédit",
+    "claim_reductions_applied": "Le compte débiteur est entièrement réglé. Ces réductions sont incluses dans les totaux des réclamations.",
+    "reduction_amount": "Montant de la réduction",
+    "claimed_amount": "Montant réclamé",
+    "claim_reductions_instruction": "Sélectionnez une réclamation et saisissez la réduction pour chaque ligne conservée. Les réductions modifient les totaux uniquement lorsque le compte débiteur est entièrement réglé. Saisissez zéro pour conserver une ligne.",
+    "claim_reductions": "Rapprochement de réclamation",
+    "claim_reductions_packet_instruction": "Ces réductions de réclamation conservées prennent effet uniquement lorsque le compte débiteur est entièrement réglé.",
+    "claim_line": "Ligne de réclamation",
+    "claim": "Réclamation",
+    "financial_id": "Identifiant du système financier de l’organisme",
+    "captured_financial_id": "Identifiant financier saisi à la création",
+    "requested_amount": "Montant du compte débiteur",
     "title": "Comptes débiteurs",
     "description": "Établissez les sommes dues au titre de cette entente et suivez les ajustements et les recouvrements approuvés.",
     "create": "Créer un compte débiteur",
@@ -4253,7 +4283,7 @@
     "established_amount": "Montant du compte débiteur",
     "amount_instruction": "Saisissez un montant de recouvrement positif pour chaque source sélectionnée. Les lignes inutilisées peuvent rester à zéro. L’approbation exige un total positif.",
     "adjustment_instruction": "Saisissez les variations signées du principal des sources conservées. Un ajustement négatif ne peut ramener le principal sous les montants recouvrés ou réservés. Le mode de recouvrement approuvé peut aussi changer.",
-    "create_amount_instruction": "Après avoir enregistré le brouillon, saisissez les montants par source et joignez les preuves avant la finalisation.",
+    "create_amount_instruction": "Saisissez le total du compte débiteur, puis ajoutez des lignes comptables dont les montants correspondent à ce total.",
     "basis_provenance": "Les périodes de réclamation, les montants payés et l’imputation conservés constituent la base du recouvrement. Les données sources actuelles ne remplacent pas ces preuves.",
     "linked_receivable": "Compte débiteur d’origine",
     "rationale": "Motif et politique de recouvrement",
@@ -4284,6 +4314,7 @@
     "offset_reference": "Compte débiteur {number}",
     "credit_memo_allocations": "Détails du crédit",
     "save_before_completion": "Enregistrez vos modifications avant la finalisation.",
+    "work_prerequisite": "Vous devez être affecté à ce compte débiteur, et il doit rester modifiable, pour effectuer des changements.",
     "cancel": "Annuler le dossier",
     "cancel_description": "Annulez ce dossier modifiable tout en conservant ses preuves.",
     "cancellation_reason": "Motif de l’annulation",
@@ -4337,7 +4368,7 @@
     "original_paid_coding_description": "La codification conservée du paiement justifie le montant source. Le compte débiteur utilise son propre compte ci-dessus.",
     "adjustment_source_unavailable": "Cette source n’était pas comprise dans la comptabilisation du compte débiteur original. Créez un nouveau compte débiteur pour recouvrer un montant de cette source.",
     "adjust_receivable": "Ajuster la créance",
-    "adjust_receivable_description": "Un ajustement modifie le montant dû ou le mode de recouvrement approuvé. Il crée une créance distincte qui doit être approuvée; il ne consigne pas un montant reçu.",
+    "adjust_receivable_description": "Créez un ajustement avec ses propres affectations pour modifier l’identifiant financier, les montants comptables ou le mode de recouvrement. Son flux de travail approuve les changements avant leur application au compte débiteur.",
     "financial_summary": "Sommaire de la créance",
     "activity_type": "Type",
     "activity_reference": "Référence",
@@ -4382,7 +4413,7 @@
     "credit_memo_add_line": "Ajouter une ligne de note de crédit",
     "credit_memo_edit_line": "Modifier une ligne de note de crédit",
     "summary": "Sommaire du compte débiteur",
-    "lines": "Lignes",
+    "lines": "Lignes du compte débiteur",
     "line_number": "Numéro de ligne",
     "add_line": "Ajouter une ligne",
     "edit_line": "Modifier la ligne",
@@ -4440,7 +4471,7 @@
     "load_failed": "Impossible de charger la collecte de données"
   },
   "supplementary_information": {
-    "title": "Renseignements supplémentaires",
+    "title": "Supplémentaire",
     "description": "Réponses aux collectes de données, en lecture seule, provenant de la dernière exécution réussie de chaque processus.",
     "completed_at": "Terminé le {date}",
     "empty": "Aucune réponse de collecte de données provenant d’exécutions de processus réussies pour cette entité.",

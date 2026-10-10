@@ -4,7 +4,6 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { RuntimeState } from '~~/shared/constants/system-lifecycle'
 import type { JsonValue } from '~~/shared/types/database'
-import { formatAccountReceivableCreditMemoSettlementReference } from '~~/shared/utils/account-receivable'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { usePageResourceError } from '~/composables/usePageResourceError'
@@ -64,7 +63,7 @@ const refresh = async () => {
       || !runtime.current) throw new Error('Accounts Receivable approval route containment failed')
     if (disposed || generation !== requestGeneration || identity.value !== requestIdentity) return
     context.value = {
-      reference: typeof header.egcs_fc_creditmemoreference === 'string' ? header.egcs_fc_creditmemoreference : packetRecord?.schemaVersion === 2 || header.egcs_fc_ledgerkind === 'pool' ? `CM-${header.id}` : typeof packetRecord?.recoveryId === 'string' ? formatAccountReceivableCreditMemoSettlementReference(packetRecord.recoveryId) : typeof header.egcs_fc_agreementnumber === 'string' ? t('account_receivable.credit_memo_reference', { agreement: header.egcs_fc_agreementnumber, number: header.egcs_fc_number }) : `CM-${header.egcs_fc_number}`,
+      reference: header.id,
       parentNameEn: proponentId !== undefined ? String(header.egcs_fc_debtorname_en ?? '') : String(header.egcs_fc_agreementnumber ?? ''),
       parentNameFr: proponentId !== undefined ? String(header.egcs_fc_debtorname_fr ?? '') : String(header.egcs_fc_agreementnumber ?? ''),
       runtimeState: runtime.current.runtimeState

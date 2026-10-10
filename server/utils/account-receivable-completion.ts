@@ -17,7 +17,7 @@ import { resolveAssignmentCommonUserId } from './entity-assignment'
 import { forbidden } from './api-errors'
 
 const getCompletion = async (event: H3Event, id: string, entityType: AccountReceivableCaseType) => {
-  if (entityType === 'fundingcaseaccountreceivable') await authorizeAccountReceivable(event, id)
+  if (entityType !== 'fundingcaseaccountreceivablecreditmemo') await authorizeAccountReceivable(event, id)
   else await authorizeAccountReceivableCreditMemo(event, id)
   const db = event.context.$db
   const item = await resolveCompletionRecord(db, entityType, id)
@@ -25,16 +25,19 @@ const getCompletion = async (event: H3Event, id: string, entityType: AccountRece
   return { item, can_complete: !item && Boolean(protection && !protection.locked), blocker: item ? null : !protection || protection.locked ? 'business_status' : null }
 }
 
-export const getAccountReceivableCompletion = async (event: H3Event, id: string) => await getCompletion(event, id, 'fundingcaseaccountreceivable')
+export const getAccountReceivableCompletion = async (event: H3Event, id: string) => {
+  const context = await authorizeAccountReceivable(event, id)
+  return await getCompletion(event, id, context.entityType)
+}
 export const getAccountReceivableCreditMemoCompletion = async (event: H3Event, id: string) => await getCompletion(event, id, 'fundingcaseaccountreceivablecreditmemo')
 
 const executeCompletion = async (event: H3Event, input: CompletionExecuteInput, entityType: AccountReceivableCaseType) => {
   const id = input.entityId
-  const context = entityType === 'fundingcaseaccountreceivable' ? await authorizeAccountReceivable(event, id, 'update') : await authorizeAccountReceivableCreditMemo(event, id, 'update')
+  const context = entityType !== 'fundingcaseaccountreceivablecreditmemo' ? await authorizeAccountReceivable(event, id, 'update') : await authorizeAccountReceivableCreditMemo(event, id, 'update')
   const agreementIds = 'agreementIds' in context ? context.agreementIds : [context.agreementId]
   const result = await executeFreshAccountReceivableWrite(event, { ...context, agreementIds }, async (trx, auth) => {
     if (await resolveCompletionEvidenceId(trx, entityType, id)) return await accountReceivableError(event, 'AR_COMPLETION_LOCKED')
-    if (entityType === 'fundingcaseaccountreceivable') {
+    if (entityType !== 'fundingcaseaccountreceivablecreditmemo') {
       await assertAccountReceivableEditable(event, trx, id)
       try {
         await validateAccountReceivableBasis(trx, id, { submission: true })
@@ -75,11 +78,16 @@ const executeCompletion = async (event: H3Event, input: CompletionExecuteInput, 
     egcs_cn_user_name: result.actorName, egcs_cn_completedat: result.hookPayload.completedAt, egcs_cn_disposition: 'workflow_started' as const }, can_complete: false }
 }
 
-export const executeAccountReceivableCompletion = async (event: H3Event, input: CompletionExecuteInput) => await executeCompletion(event, input, 'fundingcaseaccountreceivable')
+export const executeAccountReceivableCompletion = async (event: H3Event, input: CompletionExecuteInput) => {
+  const context = await authorizeAccountReceivable(event, input.entityId, 'update')
+  if (context.entityType !== input.entityType) return await forbidden(event)
+  return await executeCompletion(event, input, context.entityType)
+}
 export const executeAccountReceivableCreditMemoCompletion = async (event: H3Event, input: CompletionExecuteInput) => await executeCompletion(event, input, 'fundingcaseaccountreceivablecreditmemo')
 
-export const cancelAccountReceivableCase = async (event: H3Event, id: string, entityType: AccountReceivableCaseType, reason: string) => {
-  const context = entityType === 'fundingcaseaccountreceivable' ? await authorizeAccountReceivable(event, id, 'update') : await authorizeAccountReceivableCreditMemo(event, id, 'update')
+export const cancelAccountReceivableCase = async (event: H3Event, id: string, requestedType: AccountReceivableCaseType, reason: string) => {
+  const entityType = requestedType === 'fundingcaseaccountreceivablecreditmemo' ? requestedType : (await authorizeAccountReceivable(event, id, 'update')).entityType
+  const context = entityType !== 'fundingcaseaccountreceivablecreditmemo' ? await authorizeAccountReceivable(event, id, 'update') : await authorizeAccountReceivableCreditMemo(event, id, 'update')
   return await executeFreshAccountReceivableWrite(event, { ...context, agreementIds: 'agreementIds' in context ? context.agreementIds : [context.agreementId] }, async (trx, auth) => {
     const actorId = await resolveAssignmentCommonUserId(trx, auth.userId)
     if (!actorId) return await forbidden(event)
@@ -96,7 +104,7 @@ export const cancelAccountReceivableCase = async (event: H3Event, id: string, en
       const setup = runtimeContext ? await resolveActiveWorkflowSetup(trx, runtimeContext, 'approval_submission', true) : null
       if (!setup) return await accountReceivableError(event, 'COMPLETION_WORKFLOW_REQUIRED')
       if (!(await transitionBusinessStatus(trx, entityType, id, setup.publicationDefinition.cancellationStatus)).terminal) return await accountReceivableError(event, 'AR_CANCELLATION_STATUS_REQUIRED')
-      const record = entityType === 'fundingcaseaccountreceivable' ? recordAccountReceivableTerminalOutcome : recordAccountReceivableCreditMemoTerminalOutcome
+      const record = entityType !== 'fundingcaseaccountreceivablecreditmemo' ? recordAccountReceivableTerminalOutcome : recordAccountReceivableCreditMemoTerminalOutcome
       await record(trx, id, 'cancelled', { actorId, reason })
     }
     return { id }

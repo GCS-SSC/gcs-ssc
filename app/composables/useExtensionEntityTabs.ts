@@ -1,12 +1,12 @@
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
-import { computed, isRef, ref, watch } from 'vue'
-import type { ComputedRef, Ref } from 'vue'
+import { computed, toValue, onBeforeUnmount, ref, watch } from 'vue'
+import type { MaybeRefOrGetter, Ref } from 'vue'
 import type { ExtensionEntityTabItem, ExtensionEntityTabsResponse } from '~~/shared/types/schemas/extensions'
 import type { GcsExtensionEntityTabTarget } from '~~/shared/utils/extensions'
 import type { TranslatedTabItem } from '~~/shared/types/ui'
 
-type MaybeRefString = string | Ref<string | undefined> | ComputedRef<string | undefined> | undefined
+type MaybeRefString = MaybeRefOrGetter<string | undefined>
 
 interface ExtensionEntityTabsOptions {
   target: GcsExtensionEntityTabTarget
@@ -15,6 +15,7 @@ interface ExtensionEntityTabsOptions {
   agencyId?: MaybeRefString
   claimId?: MaybeRefString
   monitorId?: MaybeRefString
+  paymentId?: MaybeRefString
   opportunityId?: MaybeRefString
 }
 
@@ -25,11 +26,7 @@ interface ExtensionEntityTabsOptions {
  * @returns Resolved string value.
  */
 const resolveMaybeRefString = (value: MaybeRefString): string | undefined => {
-  if (isRef(value)) {
-    return value.value
-  }
-
-  return value
+  return toValue(value)
 }
 
 /**
@@ -58,26 +55,34 @@ export const useExtensionEntityTabs = (options: ExtensionEntityTabsOptions) => {
     agencyId: resolveMaybeRefString(options.agencyId),
     claimId: resolveMaybeRefString(options.claimId),
     monitorId: resolveMaybeRefString(options.monitorId),
+    paymentId: resolveMaybeRefString(options.paymentId),
     opportunityId: resolveMaybeRefString(options.opportunityId)
   }))
 
   const data: Ref<ExtensionEntityTabsResponse | null> = ref(null)
   const status: Ref<'idle' | 'pending' | 'success' | 'error'> = ref('idle')
   const error: Ref<unknown | null> = ref(null)
+  let requestGeneration = 0
+  onBeforeUnmount(() => {
+    requestGeneration += 1
+  })
   /**
    *
    */
   const refresh = async () => {
+    const generation = ++requestGeneration
     const resolvedQuery = query.value
     const requiredId = options.target === 'agreement'
       ? resolvedQuery.agreementId
-      : options.target === 'claim'
-        ? resolvedQuery.claimId
-        : options.target === 'monitor'
-          ? resolvedQuery.monitorId
-          : options.target === 'opportunity'
-            ? resolvedQuery.opportunityId
-            : resolvedQuery.applicantRecipientId
+      : options.target === 'payment'
+        ? resolvedQuery.paymentId
+        : options.target === 'claim'
+          ? resolvedQuery.claimId
+          : options.target === 'monitor'
+            ? resolvedQuery.monitorId
+            : options.target === 'opportunity'
+              ? resolvedQuery.opportunityId
+              : resolvedQuery.applicantRecipientId
     if (!requiredId) {
       data.value = null
       error.value = null
@@ -85,6 +90,7 @@ export const useExtensionEntityTabs = (options: ExtensionEntityTabsOptions) => {
       return
     }
     try {
+      data.value = null
       status.value = 'pending'
       error.value = null
       const requestUrl = getClientRequestUrl('/api/extensions/entity-tabs')
@@ -95,9 +101,12 @@ export const useExtensionEntityTabs = (options: ExtensionEntityTabsOptions) => {
       }
       const response = await fetch(requestUrl)
       if (!response.ok) await throwFetchResponseError(response)
-      data.value = await response.json() as ExtensionEntityTabsResponse
+      const responseData = await response.json() as ExtensionEntityTabsResponse
+      if (generation !== requestGeneration) return
+      data.value = responseData
       status.value = 'success'
     } catch (fetchError: unknown) {
+      if (generation !== requestGeneration) return
       error.value = fetchError
       data.value = null
       status.value = 'error'

@@ -61,7 +61,7 @@ export const linkAccountReceivablePoolOffsetApplication = async (trx: Transactio
     const account = await readAccountReceivableAccount(trx, { id: String(selected.id), kind: 'credit_memo', agencyId: context.agencyId,
       streamId: context.streamId, agencyFiscalYearId: String(debt.egcs_fc_agencyfiscalyear), currency: debt.egcs_fc_currency })
     const memo = await trx.insertInto('Funding_Case_Account_Receivable_Offset_Memo').values({
-      egcs_fc_pool: String(recovery.egcs_fc_pool), egcs_fc_receivable: plan.receivableId,
+      egcs_fc_commitmentchartofaccount: account.egcs_ay_commitmentchartofaccount, egcs_fc_pool: String(recovery.egcs_fc_pool), egcs_fc_receivable: plan.receivableId,
       egcs_fc_creditmemochartofaccount: String(account.id), egcs_fc_creditmemoaccountingdimensions: sql`${JSON.stringify(account.egcs_ay_accountingdimensions)}::jsonb`,
       egcs_fc_amount: databaseMoneyValue(plan.amount) }).returning('id').executeTakeFirstOrThrow()
     await trx.insertInto('Funding_Case_Account_Receivable_Offset_Memo_Application').values({ egcs_fc_offsetmemo: String(memo.id),

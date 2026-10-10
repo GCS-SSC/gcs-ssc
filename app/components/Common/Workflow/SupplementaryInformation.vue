@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { useDetailSectionOwnership } from '~/composables/useDetailSectionOwnership'
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { WorkflowSupplementaryInformationResponse } from '~~/shared/types/workflow-supplementary-information'
@@ -9,9 +8,8 @@ const fetchInformation = $fetch as unknown as (
   options: { query: { entityType: string, entityId: string }, signal: AbortSignal }
 ) => Promise<WorkflowSupplementaryInformationResponse>
 
-const { entityType, entityId } = defineProps<{ entityType: string, entityId: string }>()
+const { entityType, entityId, showHeader = true, showDescription = true } = defineProps<{ entityType: string, entityId: string, showHeader?: boolean, showDescription?: boolean }>()
 const { t } = useI18n()
-const ownsHeading = useDetailSectionOwnership(() => t('supplementary_information.title'))
 const { getBilingualValue } = useBilingualValue()
 const { formatDate } = useDateHelpers({ formatterOptions: { dateStyle: 'medium', timeStyle: 'short' } })
 const information: Ref<WorkflowSupplementaryInformationResponse | null> = ref(null)
@@ -68,11 +66,14 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="content" tabindex="-1" class="space-y-8" :aria-busy="isLoading" data-testid="supplementary-information">
-    <CommonSection v-if="!ownsHeading" :title="t('supplementary_information.title')" icon="i-lucide-clipboard-list" :grid-cols="1">
-      <p class="text-sm text-muted">
+    <CommonSection v-if="showHeader" :title="t('supplementary_information.title')" icon="i-lucide-clipboard-list" :grid-cols="1">
+      <p v-if="showDescription" class="text-sm text-muted">
         {{ t('supplementary_information.description') }}
       </p>
     </CommonSection>
+    <p v-else-if="showDescription" class="text-sm text-muted">
+      {{ t('supplementary_information.description') }}
+    </p>
 
     <div v-if="isLoading" role="status" class="flex items-center gap-3 py-8 text-sm text-muted">
       <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin" aria-hidden="true" />

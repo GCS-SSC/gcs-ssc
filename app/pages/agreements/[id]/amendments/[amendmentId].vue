@@ -547,6 +547,7 @@ const cancelAmendment = async () => {
           <section v-else-if="selectedTab === 'budget'" class="w-full min-w-0 space-y-6">
             <CommonPreActionReport
               v-if="!amendment.has_budget_snapshot"
+              :show-header="false"
               :title="t('agreement.budget.title')"
               :description="t('agreement.amendments.budget_snapshot_description')">
               <template #action>
@@ -578,6 +579,7 @@ const cancelAmendment = async () => {
           <section v-else-if="selectedTab === 'activities'" class="w-full min-w-0 space-y-6">
             <CommonPreActionReport
               v-if="!amendment.has_activity_snapshot"
+              :show-header="false"
               :title="t('agreement.activities.title')"
               :description="t('agreement.amendments.activity_snapshot_description')">
               <template #action>
@@ -607,7 +609,7 @@ const cancelAmendment = async () => {
               :can-complete="canEditAmendment"
               :can-work-workflow="isAssigned"
               :refresh-key="approvalsRefreshKey"
-              :hide-title="false"
+              :show-header="false"
               :show-divider="false"
               title-key="agreement.amendments.completion.title"
               description-key="agreement.amendments.completion.description"
@@ -624,7 +626,7 @@ const cancelAmendment = async () => {
               :title="t('agreement.risk_rating_workflow')"
               :description="amendment.isCompleted ? t('agreement.amendments.risk_frozen_help') : amendment.risk_workflow_managed ? t('agreement.amendments.risk_managed_help') : t('agreement.amendments.risk_manual_help')"
               :icon="amendment.risk_workflow_managed ? 'i-lucide-workflow' : 'i-lucide-pencil'" />
-            <CommonSection :title="t('agreement.risk_rating_workflow')" :grid-cols="1">
+            <CommonSection :show-header="false" :title="t('agreement.risk_rating_workflow')" :grid-cols="1">
               <dl class="grid gap-3 md:grid-cols-2">
                 <div>
                   <dt class="text-sm text-muted">
@@ -698,11 +700,13 @@ const cancelAmendment = async () => {
 
           <CommonWorkflowSupplementaryInformation
             v-else-if="selectedTab === 'supplementary-information'"
+            :show-header="false"
             entity-type="fundingcaseamendment"
             :entity-id="amendmentId" />
 
           <CommonAssignedUsers
             v-else-if="selectedTab === 'assignments'"
+            :show-header="false"
             entity-type="fundingcaseamendment"
             :entity-id="amendmentId" />
           <AgreementDocumentsTab

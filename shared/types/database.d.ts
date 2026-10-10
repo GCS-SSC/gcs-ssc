@@ -1,3 +1,4 @@
+import type { FundingCaseAccountReceivableClaimReductionTable } from './account-receivable-adjustment-database'
 import type { ColumnType, Generated } from 'kysely'
 import type { CoreEntityType, CoreLifecycleEntityType } from '../constants/entity-registry'
 import type {
@@ -479,6 +480,7 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Funding_Case_Agreement_Account_Receivable_Line: FundingCaseAgreementAccountReceivableLineTable
   Funding_Case_Agreement_Account_Receivable_Coding: FundingCaseAgreementAccountReceivableCodingTable
   Funding_Case_Account_Receivable_Pool: FundingCaseAccountReceivablePoolTable
+  Funding_Case_Account_Receivable_Claim_Reduction: FundingCaseAccountReceivableClaimReductionTable
   Funding_Case_Account_Receivable_Credit_Memo: FundingCaseAccountReceivableCreditMemoTable
   Funding_Case_Account_Receivable_Credit_Memo_Line: FundingCaseAccountReceivableCreditMemoLineTable
   Funding_Case_Account_Receivable_Recovery: FundingCaseAccountReceivableRecoveryTable
@@ -873,6 +875,7 @@ export interface AgencyAccountReceivableTypeTable {
 }
 
 export interface AgencyChartOfAccountTable {
+  egcs_ay_commitmentchartofaccount: Generated<string | null>
   egcs_ay_kind: Generated<'commitment' | 'account_receivable' | 'credit_memo'>
   id: Generated<string>
   egcs_ay_organizationagency: string
@@ -1673,6 +1676,7 @@ export interface FundingCaseAgreementClaimReconcileLineItemTable {
 }
 
 export interface FundingCaseAgreementCommitmentTable {
+  egcs_fc_totalamount: Generated<number>
   id: Generated<string>
   egcs_fc_fundingagreement: string
   egcs_fc_transferpaymentstream: Generated<string>
@@ -2712,6 +2716,10 @@ export interface AuditAttributionColumns {
 }
 
 export interface FundingCaseAgreementAccountReceivableTable {
+  egcs_fc_entitytype: Generated<'fundingcaseaccountreceivable' | 'fundingcaseaccountreceivableadjustment'>
+  egcs_fc_amount: Generated<number>
+  egcs_fc_agencyfinancialid: Generated<string | null>
+  egcs_fc_financialsystemid: Generated<string>
   id: Generated<string>
   egcs_fc_fundingagreement: string
   egcs_fc_pool: string
@@ -2754,6 +2762,8 @@ export interface FundingCaseAgreementAccountReceivableTable {
 }
 
 export interface FundingCaseAccountReceivableCreditMemoTable {
+  egcs_fc_receivables: Generated<JsonValue>
+  egcs_fc_totalamount: Generated<number>
   id: Generated<string>
   egcs_fc_receivable: string
   egcs_fc_ledgerkind: Generated<'legacy' | 'pool'>
@@ -2781,6 +2791,8 @@ export interface FundingCaseAccountReceivableCreditMemoTable {
 }
 
 export interface FundingCaseAccountReceivableCreditMemoLineTable {
+  egcs_fc_receivable: string
+  egcs_fc_commitmentchartofaccount: Generated<string | null>
   id: Generated<string>
   egcs_fc_creditmemo: string
   egcs_fc_linenumber: number
@@ -2837,6 +2849,7 @@ export interface FundingCaseAccountReceivablePoolTable {
 }
 
 export interface FundingCaseAccountReceivableOffsetMemoTable {
+  egcs_fc_commitmentchartofaccount: Generated<string | null>
   id: Generated<string>
   egcs_fc_receivable: string
   egcs_fc_creditmemochartofaccount: string

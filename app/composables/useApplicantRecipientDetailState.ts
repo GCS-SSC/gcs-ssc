@@ -251,7 +251,7 @@ export const useApplicantRecipientDetailState = (id: string, options: { enabled?
         key: APPLICANT_RECIPIENT_DETAIL_TAB_KEYS.assignments,
         icon: 'i-lucide-users',
         component: CommonAssignedUsers,
-        getProps: () => ({ entityType: 'applicantrecipient', entityId: id })
+        getProps: () => ({ showHeader: false, entityType: 'applicantrecipient', entityId: id })
       })
     }
 

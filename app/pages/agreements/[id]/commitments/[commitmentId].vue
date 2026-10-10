@@ -17,7 +17,7 @@ import type {
 } from '~~/shared/types/funding-case-agreement-ui'
 import { FundingCaseAgreementCommitmentLineCreateSchema } from '~~/shared/types/schemas'
 import { formatAccountingDimension, getAccountingDimensionSearchValues } from '~~/shared/utils/accounting-dimensions'
-import { formatMoneyText, sumMoney, type Money } from '~~/shared/utils/money'
+import { compareMoney, formatMoneyText, sumMoney, type Money } from '~~/shared/utils/money'
 
 definePageMeta({
   key: route => route.path,
@@ -166,6 +166,7 @@ const lines = computed<FundingCaseAgreementCommitmentLineRow[]>(() => {
 const totalAmount = computed(() =>
   sumMoney((commitment.value?.lines ?? []).map((line: FundingCaseAgreementCommitmentLineRow) => line.egcs_fc_amount))
 )
+const hasBalancedCoding = computed(() => commitment.value && compareMoney(totalAmount.value, commitment.value.egcs_fc_totalamount) === 0)
 
 const displayValue = (value: string | number | null | undefined) => {
   if (value === undefined || value === null || value === '') {
@@ -289,8 +290,14 @@ const handleCompleted = async () => {
             }]" />
 
           <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="agreement-commitment-detail-content">
-            <CommonSection v-if="selectedTab === 'lines'" :title="t('agreement.commitments.lines_title')" :grid-cols="1">
+            <CommonSection v-if="selectedTab === 'lines'" :show-header="false" :title="t('agreement.commitments.lines_title')" :grid-cols="1">
               <div class="space-y-4">
+                <UAlert
+                  v-if="!hasBalancedCoding"
+                  color="warning"
+                  icon="i-lucide-triangle-alert"
+                  :title="t('agreement.commitments.allocation_required')"
+                  :description="t('agreement.commitments.allocation_total_help', { total: formatMoney(commitment.egcs_fc_totalamount), allocated: formatMoney(totalAmount) })" />
                 <div class="flex justify-end">
                   <UButton
                     v-if="canCreateCommitmentLine"
@@ -364,7 +371,7 @@ const handleCompleted = async () => {
                 :entity-id="commitmentId"
                 :can-complete="canUpdateCommitment"
                 :can-work-workflow="isAssigned"
-                :hide-title="false"
+                :show-header="false"
                 :show-divider="false"
                 title-key="agreement.commitments.completion.title"
                 description-key="agreement.commitments.completion.description"
@@ -385,9 +392,9 @@ const handleCompleted = async () => {
               @changed="refreshPage" />
 
             <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcaseagreementcommitment" :entity-id="commitmentId" purpose="standard" :can-edit="isAssigned" :refresh-key="approvalsRefreshKey" @changed="refreshPage" />
-            <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" entity-type="fundingcaseagreementcommitment" :entity-id="commitmentId" />
+            <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" :show-header="false" entity-type="fundingcaseagreementcommitment" :entity-id="commitmentId" />
             <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcaseagreementcommitment" :entity-id="commitmentId" />
-            <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" entity-type="fundingcaseagreementcommitment" :entity-id="commitmentId" />
+            <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" :show-header="false" entity-type="fundingcaseagreementcommitment" :entity-id="commitmentId" />
           </CommonDetailWorkspace>
         </div>
       </template>

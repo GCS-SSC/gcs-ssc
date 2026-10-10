@@ -146,6 +146,7 @@ const { selectedTab } = useUrlTabState({ tabs, defaultTab: 'workflow' })
 
           <CommonWorkflowSupplementaryInformation
             v-else-if="selectedTab === 'supplementary-information'"
+            :show-header="false"
             entity-type="fundingcaseagreementcloseout"
             :entity-id="closeoutId" />
 
@@ -180,6 +181,7 @@ const { selectedTab } = useUrlTabState({ tabs, defaultTab: 'workflow' })
 
           <CommonAssignedUsers
             v-else-if="selectedTab === 'assignments'"
+            :show-header="false"
             entity-type="fundingcaseagreementcloseout"
             :entity-id="closeoutId" />
         </CommonDetailWorkspace>

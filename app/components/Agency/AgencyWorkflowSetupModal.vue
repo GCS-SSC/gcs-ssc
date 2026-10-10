@@ -34,7 +34,7 @@ const approvalSubmissionEntityTypes = new Set([
   'fundingcaseagreement', 'fundingcaseamendment', 'fundingcaseagreementcloseout',
   'fundingcaseagreementclaim', 'fundingclaimreconcile', 'fundingcaseagreementcommitment',
   'fundingcasejournalvoucher', 'fundingcasecorrection',
-  'fundingcaseaccountreceivable', 'fundingcaseaccountreceivablecreditmemo',
+  'fundingcaseaccountreceivable', 'fundingcaseaccountreceivableadjustment', 'fundingcaseaccountreceivablecreditmemo',
   'fundingcasepayment', 'fundingcaseforecast', 'fundingcasemonitor'
 ])
 const purposeOptions = computed(() => [

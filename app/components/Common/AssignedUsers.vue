@@ -1,15 +1,13 @@
 <script setup lang="ts">
-import { useDetailSectionOwnership } from '~/composables/useDetailSectionOwnership'
 /* eslint-disable jsdoc/require-jsdoc -- concise component-local action handlers are self-documenting */
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { AssignableEntityType } from '~~/shared/types/schemas'
 import { useBilingualValue } from '~/composables/useBilingualValue'
 
-const { entityType, entityId } = defineProps<{ entityType: AssignableEntityType; entityId: string }>()
+const { entityType, entityId, showHeader = true } = defineProps<{ entityType: AssignableEntityType; entityId: string; showHeader?: boolean }>()
 const emit = defineEmits<{ changed: [] }>()
 const { t } = useI18n()
-const ownsHeading = useDetailSectionOwnership(() => t('assignments.title'))
 const toast = useToast()
 const confirm = useConfirmDialog()
 const { showError } = useApiErrorToast()
@@ -192,11 +190,11 @@ const remove = async (userId: string, name: string) => {
 </script>
 
 <template>
-  <section class="space-y-5" :aria-labelledby="ownsHeading ? undefined : `assigned-users-${entityType}-${entityId}`" :aria-label="ownsHeading ? t('assignments.title') : undefined">
+  <section class="space-y-5" :aria-labelledby="showHeader ? `assigned-users-${entityType}-${entityId}` : undefined" :aria-label="showHeader ? undefined : t('assignments.title')">
     <div class="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-200 pb-4 dark:border-zinc-800">
       <div class="space-y-1">
         <div class="flex items-center gap-2">
-          <h2 v-if="!ownsHeading" :id="`assigned-users-${entityType}-${entityId}`" class="text-base font-semibold text-highlighted">
+          <h2 v-if="showHeader" :id="`assigned-users-${entityType}-${entityId}`" class="text-base font-semibold text-highlighted">
             {{ t('assignments.title') }}
           </h2>
           <CommonStatusBadge v-if="rosterStatus === 'success'" variant="count" :label="String(assignmentCount)" />

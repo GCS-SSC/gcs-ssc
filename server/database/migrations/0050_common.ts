@@ -1311,6 +1311,7 @@ INSERT INTO "Common_Entity_Type" ("_deleted", "egcs_cn_type", "egcs_cn_label_en"
 INSERT INTO "Common_Entity_Type" ("_deleted", "egcs_cn_type", "egcs_cn_label_en", "egcs_cn_label_fr", "egcs_cn_localtype", "egcs_cn_ownerkind", "egcs_cn_completion", "egcs_cn_riskrating", "egcs_cn_extensionkey", "egcs_cn_assignmentmode", "egcs_cn_standardworkflow", "egcs_cn_approvalsubmission", "egcs_cn_supportsdirectreviews") VALUES (false, 'fundingcaseforecast', 'Funding Case Forecast', 'Prévision du dossier de financement', 'fundingcaseforecast', 'agreement', 'supported', 'none', NULL, 'independent', 'explicit', 'on_completion', true);
 
 INSERT INTO "Common_Entity_Type" ("_deleted", "egcs_cn_type", "egcs_cn_label_en", "egcs_cn_label_fr", "egcs_cn_localtype", "egcs_cn_ownerkind", "egcs_cn_completion", "egcs_cn_riskrating", "egcs_cn_extensionkey", "egcs_cn_assignmentmode", "egcs_cn_standardworkflow", "egcs_cn_approvalsubmission", "egcs_cn_supportsdirectreviews") VALUES (false, 'fundingcaseaccountreceivable', 'Accounts Receivable', 'Compte débiteur', 'fundingcaseaccountreceivable', 'agreement', 'supported', 'none', NULL, 'independent', 'explicit', 'on_completion', true);
+INSERT INTO "Common_Entity_Type" ("_deleted", "egcs_cn_type", "egcs_cn_label_en", "egcs_cn_label_fr", "egcs_cn_localtype", "egcs_cn_ownerkind", "egcs_cn_completion", "egcs_cn_riskrating", "egcs_cn_extensionkey", "egcs_cn_assignmentmode", "egcs_cn_standardworkflow", "egcs_cn_approvalsubmission", "egcs_cn_supportsdirectreviews") VALUES (false, 'fundingcaseaccountreceivableadjustment', 'Accounts Receivable Adjustment', 'Ajustement de compte débiteur', 'fundingcaseaccountreceivableadjustment', 'agreement', 'supported', 'none', NULL, 'independent', 'explicit', 'on_completion', true);
 
 INSERT INTO "Common_Entity_Type" ("_deleted", "egcs_cn_type", "egcs_cn_label_en", "egcs_cn_label_fr", "egcs_cn_localtype", "egcs_cn_ownerkind", "egcs_cn_completion", "egcs_cn_riskrating", "egcs_cn_extensionkey", "egcs_cn_assignmentmode", "egcs_cn_standardworkflow", "egcs_cn_approvalsubmission", "egcs_cn_supportsdirectreviews") VALUES (false, 'fundingcasecorrection', 'Correction', 'Correction', 'fundingcasecorrection', 'agreement', 'supported', 'none', NULL, 'independent', 'explicit', 'on_completion', true);
 
@@ -1723,7 +1724,7 @@ CREATE FUNCTION trg_fn_ar_completion_control()
 AS $function$
     DECLARE payment record; debt record; memo record;
     BEGIN
-      IF NEW.egcs_cn_entitytype IN ('fundingcaseaccountreceivable','fundingcaseaccountreceivablecreditmemo')
+      IF NEW.egcs_cn_entitytype IN ('fundingcaseaccountreceivable','fundingcaseaccountreceivableadjustment','fundingcaseaccountreceivablecreditmemo')
         OR (NEW.egcs_cn_entitytype = 'fundingcasepayment' AND EXISTS (SELECT 1 FROM "Funding_Case_Account_Receivable_Recovery" recovery
           WHERE recovery.egcs_fc_payment = NEW.egcs_cn_entityid AND recovery.egcs_fc_outcome <> 'released' AND NOT recovery._deleted AND recovery.egcs_fc_amount > 0)) THEN
         IF NEW.egcs_cn_disposition <> 'workflow_started' OR NOT EXISTS (SELECT 1 FROM "Common_Workflow_Run" run
@@ -1733,7 +1734,7 @@ AS $function$
           RAISE EXCEPTION 'AR and automatic offsets require a Completion-linked approval submission' USING ERRCODE = '23514';
         END IF;
       END IF;
-      IF NEW.egcs_cn_entitytype = 'fundingcaseaccountreceivable' THEN
+      IF NEW.egcs_cn_entitytype IN ('fundingcaseaccountreceivable','fundingcaseaccountreceivableadjustment') THEN
         SELECT * INTO debt FROM "Funding_Case_Agreement_Account_Receivable" WHERE id = NEW.egcs_cn_entityid;
         IF debt.egcs_fc_recoverymethod IS NULL THEN RAISE EXCEPTION 'AR submission requires a recovery method' USING ERRCODE = '23514'; END IF;
         IF debt.egcs_fc_advancepaymentrelated AND debt.egcs_fc_fiscaloutstanding IS NULL THEN
@@ -2475,7 +2476,7 @@ AS $function$
     BEGIN
       root_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.egcs_cn_entityid ELSE NEW.egcs_cn_entityid END;
       target_type := CASE WHEN TG_OP = 'DELETE' THEN OLD.egcs_cn_entitytype ELSE NEW.egcs_cn_entitytype END;
-      IF target_type = 'fundingcaseaccountreceivable' THEN
+      IF target_type IN ('fundingcaseaccountreceivable','fundingcaseaccountreceivableadjustment') THEN
         SELECT egcs_fc_outcome INTO root_outcome FROM "Funding_Case_Agreement_Account_Receivable" WHERE id = root_id FOR UPDATE;
       ELSIF target_type = 'fundingcaseaccountreceivablecreditmemo' THEN
         SELECT egcs_fc_outcome INTO root_outcome FROM "Funding_Case_Account_Receivable_Credit_Memo" WHERE id = root_id FOR UPDATE;

@@ -51,6 +51,7 @@ export default defineEventHandler(async event => {
         'Funding_Case_Agreement_Commitment.egcs_fc_fundingagreement as egcs_fc_fundingagreement',
         'Funding_Case_Agreement_Commitment.egcs_fc_type as egcs_fc_type',
         'Funding_Case_Agreement_Commitment.egcs_fc_currency as egcs_fc_currency',
+        databaseMoneyText(sql.ref('Funding_Case_Agreement_Commitment.egcs_fc_totalamount')).as('egcs_fc_totalamount'),
         'Funding_Case_Agreement_Commitment.egcs_fc_status as egcs_fc_status',
         'Funding_Case_Agreement_Commitment.egcs_fc_active as egcs_fc_active',
         'Funding_Case_Agreement_Commitment.egcs_fc_financialsystemnumber as egcs_fc_financialsystemnumber',
@@ -99,6 +100,7 @@ export default defineEventHandler(async event => {
 
   return {
     ...commitmentWithState,
+    egcs_fc_totalamount: parseDatabaseMoney(commitment.egcs_fc_totalamount),
     lines: lines.map(line => ({ ...line, egcs_fc_amount: parseDatabaseMoney(line.egcs_fc_amount) }))
   }
 })

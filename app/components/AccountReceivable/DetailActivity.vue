@@ -8,6 +8,7 @@ import { formatAccountReceivableAmount } from '~/utils/account-receivable-displa
 import { buildAccountReceivableAdjustmentRows, type AccountReceivableAdjustmentRow } from '~/utils/account-receivable-detail-activity'
 
 const { receivable, agreementId } = defineProps<{ receivable: AccountReceivableDetail, agreementId: string }>()
+const emit = defineEmits<{ adjust: [] }>()
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
 const { formatDate } = useDateHelpers()
@@ -33,9 +34,13 @@ const amount = (value: string | null) => formatAccountReceivableAmount(value, lo
     :data="rows"
     :columns="columns"
     :total-records="rows.length"
-    :show-toolbar="false"
+    :show-search="false"
+    :show-column-toggle="false"
+    :show-button="receivable.egcs_fc_canadjust"
+    :button-label="t('account_receivable.adjust_receivable')"
     :pagination-options="{ manualPagination: false }"
-    data-testid="account-receivable-adjustments-table">
+    data-testid="account-receivable-adjustments-table"
+    @add="emit('adjust')">
     <template #reference-cell="{ row }">
       <span class="text-sm font-semibold">{{ row.original.reference }}</span>
     </template>
@@ -55,7 +60,7 @@ const amount = (value: string | null) => formatAccountReceivableAmount(value, lo
       <div class="flex justify-end gap-2">
         <UButton
           icon="i-lucide-arrow-right" color="neutral" variant="ghost"
-          :to="localePath(appRouteLocations.agreementAccountReceivableDetail(agreementId, row.original.adjustment.id))"
+          :to="localePath({ ...appRouteLocations.agreementAccountReceivableDetail(agreementId, row.original.adjustment.id), query: { entityType: 'fundingcaseaccountreceivableadjustment' } })"
           :aria-label="`${t('common.view_details')}: ${row.original.reference}`" />
       </div>
     </template>

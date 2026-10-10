@@ -213,9 +213,9 @@ export const queryAssignedWorkDashboard = async (
     JOIN "Transfer_Payment_Profile" program ON program.id = stream.egcs_tp_transferpaymentprofile AND program._deleted = false
     WHERE correction._deleted = false
     UNION ALL
-    SELECT item.id, 'fundingcaseaccountreceivable', item.egcs_fc_status::text,
-      item.egcs_fc_agreementnumber || '-AR-' || item.egcs_fc_number::text,
-      item.egcs_fc_agreementnumber || '-AR-' || item.egcs_fc_number::text,
+    SELECT item.id, item.egcs_fc_entitytype::text, item.egcs_fc_status::text,
+      item.id::text,
+      item.id::text,
       item.egcs_fc_fundingagreement, NULL::text, 'account_receivable', program.egcs_tp_agency, program.id
     FROM "Funding_Case_Agreement_Account_Receivable" item
     JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.id = item.egcs_fc_fundingagreement AND NOT agreement._deleted
@@ -224,10 +224,8 @@ export const queryAssignedWorkDashboard = async (
     WHERE NOT item._deleted
     UNION ALL
     SELECT item.id, 'fundingcaseaccountreceivablecreditmemo', item.egcs_fc_status::text,
-      'CM-' || coalesce((SELECT recovery.id FROM "Funding_Case_Account_Receivable_Recovery" recovery
-        WHERE recovery.egcs_fc_creditmemo=item.id AND NOT recovery._deleted ORDER BY recovery.id DESC LIMIT 1),item.id)::text,
-      'CM-' || coalesce((SELECT recovery.id FROM "Funding_Case_Account_Receivable_Recovery" recovery
-        WHERE recovery.egcs_fc_creditmemo=item.id AND NOT recovery._deleted ORDER BY recovery.id DESC LIMIT 1),item.id)::text,
+      item.id::text,
+      item.id::text,
       NULL::bigint, NULL::text, 'account_receivable', item.egcs_fc_agency, NULL::bigint
     FROM "Funding_Case_Account_Receivable_Credit_Memo" item
     JOIN "Agency_Profile" agency ON agency.id = item.egcs_fc_agency AND NOT agency._deleted

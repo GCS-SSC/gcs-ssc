@@ -14,35 +14,49 @@ import { readAccountReceivablePoolBalance } from './account-receivable-pool-ledg
 
 export const readAccountReceivableCreditMemoLines = async (db: Kysely<Database>, id: string) => {
   const rows = await db.selectFrom('Funding_Case_Account_Receivable_Credit_Memo_Line as line')
+    .innerJoin('Funding_Case_Agreement_Account_Receivable as debt', 'debt.id', 'line.egcs_fc_receivable')
     .selectAll('line')
+    .select(['debt.egcs_fc_agreementnumber'])
+    .select(sql<string>`coalesce((SELECT adjusted.egcs_fc_financialsystemid FROM "Funding_Case_Agreement_Account_Receivable" adjusted WHERE adjusted.egcs_fc_linkedreceivable=debt.id AND adjusted.egcs_fc_outcome='posted' AND NOT adjusted._deleted ORDER BY adjusted.egcs_fc_postedat DESC, adjusted.id DESC LIMIT 1),debt.egcs_fc_financialsystemid)`.as('egcs_fc_financialsystemid'))
     .select(databaseMoneyText(sql.ref('line.egcs_fc_amount')).as('egcs_fc_amount'))
     .where('line.egcs_fc_creditmemo', '=', id).where('line._deleted', '=', false).orderBy('line.egcs_fc_linenumber').orderBy('line.id').execute()
-  return rows.map(row => ({ ...row, egcs_fc_amount: parseDatabaseMoney(row.egcs_fc_amount) }))
+  return rows.map(row => ({ ...row, egcs_fc_receivable: String(row.egcs_fc_receivable), egcs_fc_amount: parseDatabaseMoney(row.egcs_fc_amount) }))
 }
 
 export const validateAccountReceivableCreditMemoLines = async (db: Kysely<Database>, id: string) => {
   const memo = await db.selectFrom('Funding_Case_Account_Receivable_Credit_Memo').selectAll()
-    .select(databaseMoneyText(sql.ref('egcs_fc_amount')).as('egcs_fc_amount')).where('id', '=', id).where('_deleted', '=', false).executeTakeFirstOrThrow()
+    .select(databaseMoneyText(sql.ref('egcs_fc_amount')).as('egcs_fc_amount'))
+    .select(databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('egcs_fc_totalamount')).where('id', '=', id).where('_deleted', '=', false).executeTakeFirstOrThrow()
   const lines = await readAccountReceivableCreditMemoLines(db, id)
   if (!lines.length) throw new Error('AR_INVALID_BASIS')
   for (const line of lines) {
     if (moneyToCents(line.egcs_fc_amount) <= BigInt(0)) throw new Error('AR_INVALID_BASIS')
-    await validateCreditMemoCoding(db, { ...memo, egcs_fc_creditmemochartofaccount: String(line.egcs_fc_creditmemochartofaccount) })
+    if (!Array.isArray(memo.egcs_fc_receivables) || !memo.egcs_fc_receivables.includes(line.egcs_fc_receivable)) throw new Error('AR_REPAYMENT_OWNER')
+    await validateCreditMemoCoding(db, { ...memo, egcs_fc_receivable: line.egcs_fc_receivable, egcs_fc_creditmemochartofaccount: String(line.egcs_fc_creditmemochartofaccount) })
   }
   const total = moneyFromCents(lines.reduce((sum, line) => sum + moneyToCents(line.egcs_fc_amount), BigInt(0)))
-  if (total !== parseDatabaseMoney(memo.egcs_fc_amount)) throw new Error('AR_INVALID_BASIS')
-  const balance = await readAccountReceivableCashBalance(db, String(memo.egcs_fc_receivable), id)
+  if (total !== parseDatabaseMoney(memo.egcs_fc_amount) || total !== parseDatabaseMoney(memo.egcs_fc_totalamount)) throw new Error('AR_INVALID_BASIS')
+  for (const receivableId of new Set(lines.map(line => line.egcs_fc_receivable))) {
+    const amount = moneyFromCents(lines.filter(line => line.egcs_fc_receivable === receivableId).reduce((sum, line) => sum + moneyToCents(line.egcs_fc_amount), BigInt(0)))
+    const balance = await readAccountReceivableCashBalance(db, receivableId, id)
+    if (moneyToCents(amount) > moneyToCents(balance.egcs_fc_available)) throw new Error('AR_SOURCE_CAPACITY')
+  }
   const pool = await readAccountReceivablePoolBalance(db, String(memo.egcs_fc_pool), { excludedCreditMemoId: id })
-  if (moneyToCents(total) > moneyToCents(balance.egcs_fc_available)
-    || moneyToCents(total) > moneyToCents(pool.egcs_fc_availableamount)) throw new Error('AR_SOURCE_CAPACITY')
+  if (moneyToCents(total) > moneyToCents(pool.egcs_fc_availableamount)) throw new Error('AR_SOURCE_CAPACITY')
   return { lines, total }
 }
 
-const synchronizeTotal = async (event: H3Event, trx: Transaction<Database>, id: string, receivableId: string) => {
+const synchronizeTotal = async (event: H3Event, trx: Transaction<Database>, id: string) => {
   const lines = await readAccountReceivableCreditMemoLines(trx, id)
   const total = moneyFromCents(lines.reduce((sum, line) => sum + moneyToCents(line.egcs_fc_amount), BigInt(0)))
   if (!isNumeric19Money(total)) return await accountReceivableError(event, 'AR_SOURCE_CAPACITY')
-  await validateCreditMemoAmount(event, trx, { egcs_fc_receivable: receivableId, egcs_fc_amount: total }, id)
+  const memo = await trx.selectFrom('Funding_Case_Account_Receivable_Credit_Memo')
+    .select(databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('total')).where('id', '=', id).executeTakeFirstOrThrow()
+  if (moneyToCents(total) > moneyToCents(parseDatabaseMoney(memo.total))) return await accountReceivableError(event, 'AR_INVALID_BASIS')
+  for (const selectedReceivable of new Set(lines.map(line => line.egcs_fc_receivable))) {
+    const amount = moneyFromCents(lines.filter(line => line.egcs_fc_receivable === selectedReceivable).reduce((sum, line) => sum + moneyToCents(line.egcs_fc_amount), BigInt(0)))
+    await validateCreditMemoAmount(event, trx, { egcs_fc_receivable: selectedReceivable, egcs_fc_amount: amount }, id)
+  }
   await trx.updateTable('Funding_Case_Account_Receivable_Credit_Memo').set({ egcs_fc_amount: databaseMoneyValue(total) }).where('id', '=', id).execute()
 }
 
@@ -61,19 +75,22 @@ export const writeAccountReceivableCreditMemoLine = async (event: H3Event, id: s
     const duplicate = await trx.selectFrom('Funding_Case_Account_Receivable_Credit_Memo_Line').select('id')
       .where('egcs_fc_creditmemo', '=', id).where('egcs_fc_linenumber', '=', input.egcs_fc_linenumber).where('_deleted', '=', false).executeTakeFirst()
     if (duplicate && String(duplicate.id) !== lineId) return await accountReceivableError(event, 'AR_INVALID_BASIS')
+    if (!Array.isArray(memo.egcs_fc_receivables) || !memo.egcs_fc_receivables.includes(input.egcs_fc_receivable)) return await accountReceivableError(event, 'AR_REPAYMENT_OWNER')
+    if (existing && String(existing.egcs_fc_receivable) !== input.egcs_fc_receivable) return await accountReceivableError(event, 'AR_REPAYMENT_OWNER')
     let account
     try {
-      account = await validateCreditMemoCoding(trx, { ...memo, egcs_fc_creditmemochartofaccount: input.egcs_fc_creditmemochartofaccount })
+      account = await validateCreditMemoCoding(trx, { ...memo, egcs_fc_receivable: input.egcs_fc_receivable, egcs_fc_creditmemochartofaccount: input.egcs_fc_creditmemochartofaccount })
     } catch (error) {
       return await accountReceivableError(event, error instanceof Error ? error.message : 'AR_ACCOUNT_UNAVAILABLE')
     }
-    const values = { egcs_fc_linenumber: input.egcs_fc_linenumber, egcs_fc_creditmemochartofaccount: input.egcs_fc_creditmemochartofaccount,
-      egcs_fc_creditmemoaccountingdimensions: sql<JsonValue>`${JSON.stringify(existing && String(existing.egcs_fc_creditmemochartofaccount) === input.egcs_fc_creditmemochartofaccount ? existing.egcs_fc_creditmemoaccountingdimensions : account.egcs_ay_accountingdimensions)}::jsonb`,
+    const retainedCoding = existing && String(existing.egcs_fc_creditmemochartofaccount) === input.egcs_fc_creditmemochartofaccount ? existing : null
+    const values = { egcs_fc_receivable: input.egcs_fc_receivable, egcs_fc_commitmentchartofaccount: retainedCoding ? retainedCoding.egcs_fc_commitmentchartofaccount : account.egcs_ay_commitmentchartofaccount, egcs_fc_linenumber: input.egcs_fc_linenumber, egcs_fc_creditmemochartofaccount: input.egcs_fc_creditmemochartofaccount,
+      egcs_fc_creditmemoaccountingdimensions: sql<JsonValue>`${JSON.stringify(retainedCoding ? retainedCoding.egcs_fc_creditmemoaccountingdimensions : account.egcs_ay_accountingdimensions)}::jsonb`,
       egcs_fc_amount: databaseMoneyValue(input.egcs_fc_amount) }
     const saved = existing
       ? await trx.updateTable('Funding_Case_Account_Receivable_Credit_Memo_Line').set(values).where('id', '=', lineId!).returning('id').executeTakeFirstOrThrow()
       : await trx.insertInto('Funding_Case_Account_Receivable_Credit_Memo_Line').values({ ...values, egcs_fc_creditmemo: id }).returning('id').executeTakeFirstOrThrow()
-    await synchronizeTotal(event, trx, id, context.receivableId)
+    await synchronizeTotal(event, trx, id)
     return { id: String(saved.id) }
   }, { target: { entityType: 'fundingcaseaccountreceivablecreditmemo', entityId: id } })
 }
@@ -88,7 +105,7 @@ export const deleteAccountReceivableCreditMemoLine = async (event: H3Event, id: 
     const row = await trx.updateTable('Funding_Case_Account_Receivable_Credit_Memo_Line').set({ _deleted: true })
       .where('id', '=', lineId).where('egcs_fc_creditmemo', '=', id).where('_deleted', '=', false).returning('id').executeTakeFirst()
     if (!row) return await accountReceivableError(event, 'AR_REPAYMENT_INVALID')
-    await synchronizeTotal(event, trx, id, context.receivableId)
+    await synchronizeTotal(event, trx, id)
     return { success: true }
   }, { action: 'delete', target: { entityType: 'fundingcaseaccountreceivablecreditmemo', entityId: id } })
 }

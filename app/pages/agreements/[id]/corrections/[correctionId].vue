@@ -165,7 +165,7 @@ const linkedCreated = async (id: string) => {
         <ULink v-if="correction.egcs_fc_linkedcorrection" :to="localePath(appRouteLocations.agreementCorrectionDetail(agreementId, correction.egcs_fc_linkedcorrection))" class="mb-4 text-sm">{{ t('correction.linked_correction') }}</ULink>
         <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="agreement-correction-detail-content">
           <UForm v-if="selectedTab === 'lines'" :state="state" :validate="createValidator(CorrectionEditSchema)" class="space-y-8" @submit="save">
-            <CommonSection :title="t('correction.financial_lines')" :grid-cols="1">
+            <CommonSection :show-header="false" :title="t('correction.financial_lines')" :grid-cols="1">
               <p id="correction-line-instruction" class="text-sm text-muted">
                 {{ t('correction.lines_instruction') }}
               </p>
@@ -237,7 +237,7 @@ const linkedCreated = async (id: string) => {
               </div>
             </CommonSection>
           </UForm>
-          <CommonSection v-else-if="selectedTab === 'basis'" :title="t('correction.financial_basis')" :grid-cols="1">
+          <CommonSection v-else-if="selectedTab === 'basis'" :show-header="false" :title="t('correction.financial_basis')" :grid-cols="1">
             <p class="text-sm text-muted">
               {{ t('correction.financial_basis_description') }}
             </p>
@@ -245,13 +245,13 @@ const linkedCreated = async (id: string) => {
           </CommonSection>
           <section v-else-if="selectedTab === 'completion'" class="space-y-6">
             <UAlert v-if="dirty" color="warning" :title="t('correction.save_before_completion')" />
-            <CommonCompletionPanel entity-type="fundingcasecorrection" :entity-id="correctionId" :can-complete="correction.egcs_fc_canedit && completionReady && !dirty && !saving && status === 'success'" :can-work-workflow="correction.egcs_fc_canwork" :hide-title="false" :show-divider="false" title-key="correction.completion.title" description-key="correction.completion.description" status-complete-key="correction.completion.status_complete" status-locked-key="correction.completion.status_locked" comment-placeholder-key="correction.completion.comment_placeholder" complete-action-key="correction.completion.complete" completed-success-key="correction.completion.completed_success" :refresh-key="refreshKey" @changed="refreshPage" />
+            <CommonCompletionPanel entity-type="fundingcasecorrection" :entity-id="correctionId" :can-complete="correction.egcs_fc_canedit && completionReady && !dirty && !saving && status === 'success'" :can-work-workflow="correction.egcs_fc_canwork" :show-header="false" :show-divider="false" title-key="correction.completion.title" description-key="correction.completion.description" status-complete-key="correction.completion.status_complete" status-locked-key="correction.completion.status_locked" comment-placeholder-key="correction.completion.comment_placeholder" complete-action-key="correction.completion.complete" completed-success-key="correction.completion.completed_success" :refresh-key="refreshKey" @changed="refreshPage" />
           </section>
           <CommonReviewsTab v-else-if="selectedTab === 'reviews'" entity-type="fundingcasecorrection" :entity-id="correctionId" :can-update="correction.egcs_fc_canedit" @changed="refreshPage" />
           <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcasecorrection" :entity-id="correctionId" purpose="standard" :can-edit="correction.egcs_fc_canwork" :refresh-key="refreshKey" @changed="refreshPage" />
-          <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" entity-type="fundingcasecorrection" :entity-id="correctionId" />
+          <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" :show-header="false" entity-type="fundingcasecorrection" :entity-id="correctionId" />
           <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcasecorrection" :entity-id="correctionId" />
-          <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" entity-type="fundingcasecorrection" :entity-id="correctionId" />
+          <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" :show-header="false" entity-type="fundingcasecorrection" :entity-id="correctionId" />
         </CommonDetailWorkspace>
       </template>
     </CommonDetailPage>

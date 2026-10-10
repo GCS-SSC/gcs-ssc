@@ -6,6 +6,7 @@ import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { getAgreementCommitmentPaymentCapacity, getCommitmentLinePaymentCoverage, validateAgreementPaymentAllocations } from './agreement-commitment-line-balance'
 import { readEffectiveAccountReceivableClaimRecoveries, getAgreementPaidAccountingProjection, getAgreementRecordedPaidToDate } from './agreement-accounting-projection'
 import { resolveAgreementCurrency } from './agreement-currency'
+import { getAgreementPaymentCalculation } from './agreement-payment-calculation'
 
 /**
  * Binds the financial projection to an authorized Agreement and the caller's active transaction.
@@ -46,7 +47,15 @@ export const createExtensionAgreementFinancials = (
     }
     return currency
   }
-  return {
+  const financials: GcsExtensionAgreementFinancials = {
+    /** Calculates Payment entitlement and holdback using host-owned exact financial projections. */
+    getPaymentCalculation: async input => {
+      const currency = await prepareRead(input.excludePaymentId, input.currency)
+      if (![input.fiscalYearId, input.commitmentTypeId].every(isPositivePostgresBigintText)) {
+        throw new Error('Payment calculation requires positive bigint string identifiers.')
+      }
+      return await getAgreementPaymentCalculation(db, agreementId, { ...input, currency }, financials)
+    },
     /** Refreshes the bound authority before exposing cumulative corrected accounting. */
     getRecordedPaidToDate: async input => {
       const currency = await prepareRead(input.excludePaymentId, input.currency)
@@ -103,4 +112,5 @@ export const createExtensionAgreementFinancials = (
       return { agreementId, capacityAmount: await getAgreementCommitmentPaymentCapacity(db, agreementId, { ...input, currency }) }
     }
   }
+  return financials
 }

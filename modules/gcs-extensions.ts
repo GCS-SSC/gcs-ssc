@@ -35,7 +35,7 @@ const EXTENSION_KEY_PATTERN = /^[a-z][a-z0-9-]*$/
 const EXTENSION_LIFECYCLE_NAMESPACE_PATTERN = /^[a-z][a-z0-9-]{0,62}$/
 const EXTENSION_LIFECYCLE_ENTITY_TYPE_PATTERN = /^[a-z][a-z0-9-]{0,62}$/
 const EXTENSION_ENTITY_TAB_ID_PATTERN = /^[a-z][a-z0-9-]*$/
-const EXTENSION_ENTITY_TAB_TARGETS = new Set(['agreement', 'proponent', 'claim', 'monitor', 'opportunity'])
+const EXTENSION_ENTITY_TAB_TARGETS = new Set(['agreement', 'proponent', 'claim', 'monitor', 'opportunity', 'payment'])
 const EXTENSION_CREATE_ACTION_ID_PATTERN = /^[a-z][a-z0-9-]*$/
 const EXTENSION_PAYMENT_AMOUNT_CALCULATOR_ID_PATTERN = /^[a-z][a-z0-9-]*$/
 const EXTENSION_CREATE_OPERATIONS = new Set(['agreement.commitments.create', 'agreement.payments.create'])
@@ -68,6 +68,7 @@ const EXTENSION_HOST_CAPABILITIES = new Set([
   'extension-lifecycle-hooks',
   'lifecycle-entities',
   'agreement-number-provider',
+  'coding-allocator',
   'configuration-access',
   'scheduled-agreement-import',
   'scheduled-intake-import',
@@ -337,6 +338,7 @@ const inferRequiredHostCapabilities = (definition: GcsExtensionDefinition): Set<
   addImpliedCapability(capabilities, Boolean(definition.nitroPlugin), 'extension-lifecycle-hooks')
   addImpliedCapability(capabilities, (definition.entities ?? []).length > 0, 'lifecycle-entities')
   addImpliedCapability(capabilities, Boolean(definition.agreementNumberProvider), 'agreement-number-provider')
+  addImpliedCapability(capabilities, Boolean(definition.codingAllocator), 'coding-allocator')
   addImpliedCapability(capabilities, definition.configurationAccess !== undefined, 'configuration-access')
   addImpliedCapability(capabilities, Boolean(definition.auditOwnership?.length), 'audit-ownership')
   addImpliedCapability(capabilities, definition.configurationScope !== undefined, 'agency-only-configuration')
@@ -1098,6 +1100,9 @@ const resolveExtensionDirectory = async (
     ? { path: await assertContainedPath(canonicalExtensionDir, definition.agreementNumberProvider.path, 'agreementNumberProvider.path') }
     : undefined
   const fileStorageProvider = await resolveFileStorageProvider(canonicalExtensionDir, definition)
+  const codingAllocator = definition.codingAllocator
+    ? { path: await assertContainedPath(canonicalExtensionDir, definition.codingAllocator.path, 'codingAllocator.path') }
+    : undefined
 
   return {
     key: definition.key,
@@ -1120,6 +1125,7 @@ const resolveExtensionDirectory = async (
     runtime,
     nitroPlugin,
     agreementNumberProvider,
+    codingAllocator,
     fileStorageProvider
   }
 }
@@ -1247,7 +1253,7 @@ const serializeClientExtension = (extension: GcsResolvedExtension): string =>
   JSON.stringify(buildClientExtensionMetadata(extension))
 
 const registryContributionId = (
-  contributionType: 'handler' | 'migration' | 'runtime' | 'nitro_plugin' | 'entity_adapter' | 'storage_adapter' | 'storage_metadata_validator' | 'agreement_number',
+  contributionType: 'handler' | 'migration' | 'runtime' | 'nitro_plugin' | 'entity_adapter' | 'storage_adapter' | 'storage_metadata_validator' | 'agreement_number' | 'coding_allocator',
   extension: GcsResolvedExtension,
   identityParts: string[]
 ): string => {
@@ -1363,6 +1369,12 @@ export const buildExtensionServerRegistry = (
     if (agreementNumberProvider && extension.agreementNumberProvider) {
       registerContributionLoader(agreementNumberProvider.id, extension.agreementNumberProvider.path)
     }
+    const codingAllocator = extension.codingAllocator
+      ? { id: registryContributionId('coding_allocator', extension, [extensionRelativePath(extension, extension.codingAllocator.path)]) }
+      : undefined
+    if (codingAllocator && extension.codingAllocator) {
+      registerContributionLoader(codingAllocator.id, extension.codingAllocator.path)
+    }
     const fileStorageProvider = extension.fileStorageProvider
       ? (() => {
           const adapterId = registryContributionId('storage_adapter', extension, [
@@ -1401,6 +1413,7 @@ export const buildExtensionServerRegistry = (
       ...(entities.length > 0 ? { entities } : {}),
       fileStorageProvider,
       agreementNumberProvider,
+      codingAllocator,
       runtime,
       nitroPlugin
     }

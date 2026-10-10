@@ -27,7 +27,7 @@ const amount = (value: string, currency: string) =>
 <template>
   <div class="min-w-0 space-y-4" data-testid="proponent-account-receivables">
     <ApplicantRecipientAccountBalances :applicant-recipient-id="applicantRecipientId" />
-    <CommonSection :title="t('account_receivable.title')" :grid-cols="1">
+    <CommonSection :show-header="false" :title="t('account_receivable.title')" :grid-cols="1">
       <p class="text-sm text-muted">
         {{ t('account_receivable.proponent_description') }}
       </p>

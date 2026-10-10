@@ -472,7 +472,8 @@ const OptionalText = () => z.preprocess(
 
 export const FundingCaseAgreementCommitmentBaseSchema = z.object({
   egcs_fc_currency: z.enum(CURRENCY_CODES_ENUM, { error: 'validation.required' }),
-  egcs_fc_type: RequiredBigintSelectionId()
+  egcs_fc_type: RequiredBigintSelectionId(),
+  egcs_fc_totalamount: NonNegativeMoneySchema
 })
 
 export const FundingCaseAgreementCommitmentCreateSchema = FundingCaseAgreementCommitmentBaseSchema

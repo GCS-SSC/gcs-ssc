@@ -1,3 +1,4 @@
+import { applyAccountReceivableClaimReductions } from './account-receivable-claim-reductions'
 import { readAccountReceivableCashBalance } from './account-receivable-cash-balance'
 import { validateAccountReceivableCreditMemoLines } from './account-receivable-credit-memo-lines'
 /* eslint-disable jsdoc/require-jsdoc -- Immutable, latest Completion-linked terminal postings. */
@@ -25,29 +26,29 @@ export const captureAccountReceivablePacket = async (db: Kysely<Database>, id: s
   const lines = await readAccountReceivableLines(db, id)
   const labels = (lines[0]?.egcs_fc_evidence ?? {}) as Record<string, JsonValue>
   const header = await db.selectFrom('Funding_Case_Agreement_Account_Receivable').selectAll()
-    .select(sql<string | null>`egcs_fc_fiscaloutstanding::text`.as('egcs_fc_fiscaloutstanding')).where('id', '=', id).where('_deleted', '=', false).executeTakeFirstOrThrow()
-  return { schemaVersion: 2 as const,
-    accountReceivable: json({ ...header, egcs_fc_fiscaloutstanding: header.egcs_fc_fiscaloutstanding === null ? null : parseDatabaseMoney(header.egcs_fc_fiscaloutstanding),
+    .select([sql<string | null>`egcs_fc_fiscaloutstanding::text`.as('egcs_fc_fiscaloutstanding'), sql<string>`egcs_fc_financialsystemid::text`.as('egcs_fc_financialsystemid'), databaseMoneyText(sql.ref('egcs_fc_amount')).as('egcs_fc_amount')]).where('id', '=', id).where('_deleted', '=', false).executeTakeFirstOrThrow()
+  const { readAccountReceivableClaimReductions } = await import('./account-receivable-claim-reductions')
+  return { claimReductions: json(await readAccountReceivableClaimReductions(db, id)), schemaVersion: 3 as const,
+    accountReceivable: json({ ...header, egcs_fc_amount: parseDatabaseMoney(header.egcs_fc_amount), egcs_fc_fiscaloutstanding: header.egcs_fc_fiscaloutstanding === null ? null : parseDatabaseMoney(header.egcs_fc_fiscaloutstanding),
       egcs_fc_debtorname_en: labels.egcs_fc_debtorname_en ?? '', egcs_fc_debtorname_fr: labels.egcs_fc_debtorname_fr ?? '', egcs_fc_fiscalyeardisplay: labels.egcs_fc_fiscalyeardisplay ?? '' }),
     lines: json(lines), coding: json(await readAccountReceivableCoding(db, id)),
-    attachments: json(await retainedAttachments(db, 'fundingcaseaccountreceivable', id)),
+    attachments: json(await retainedAttachments(db, header.egcs_fc_entitytype, id)),
     calculation: { moneyScale: 2, formula: 'established_principal_plus_approved_deltas_minus_successful_principal_recoveries' }
   }
 }
 
 export const captureAccountReceivableCreditMemoPacket = async (db: Kysely<Database>, id: string) => {
   const repayment = await db.selectFrom('Funding_Case_Account_Receivable_Credit_Memo').selectAll()
-    .select(databaseMoneyText(sql.ref('egcs_fc_amount')).as('egcs_fc_amount')).where('id', '=', id).where('_deleted', '=', false).executeTakeFirstOrThrow()
+    .select(databaseMoneyText(sql.ref('egcs_fc_amount')).as('egcs_fc_amount'))
+    .select(databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('egcs_fc_totalamount')).where('id', '=', id).where('_deleted', '=', false).executeTakeFirstOrThrow()
   const basis = await validateAccountReceivableCreditMemoLines(db, id)
-  const debt = await db.selectFrom('Funding_Case_Agreement_Account_Receivable').select(['egcs_fc_agreementnumber', 'egcs_fc_number'])
-    .where('id', '=', repayment.egcs_fc_receivable).executeTakeFirstOrThrow()
   const proponent = await db.selectFrom('Applicant_Recipient_Profile').select(['egcs_ar_legalname_en', 'egcs_ar_legalname_fr']).where('id', '=', repayment.egcs_fc_applicantrecipient).executeTakeFirstOrThrow()
   const agency = await db.selectFrom('Agency_Profile').select(['egcs_ay_name_en', 'egcs_ay_name_fr']).where('id', '=', repayment.egcs_fc_agency).executeTakeFirstOrThrow()
   const balance = await readAccountReceivableCashBalance(db, String(repayment.egcs_fc_receivable))
-  return { schemaVersion: 5 as const, lines: json(basis.lines), total: basis.total, accountReceivableCreditMemo: json({ ...repayment, egcs_fc_amount: parseDatabaseMoney(repayment.egcs_fc_amount),
+  return { schemaVersion: 6 as const, lines: json(basis.lines), total: basis.total, accountReceivableCreditMemo: json({ ...repayment, egcs_fc_totalamount: parseDatabaseMoney(repayment.egcs_fc_totalamount), egcs_fc_amount: parseDatabaseMoney(repayment.egcs_fc_amount),
     egcs_fc_debtorname_en: proponent.egcs_ar_legalname_en, egcs_fc_debtorname_fr: proponent.egcs_ar_legalname_fr,
     egcs_fc_agencyname_en: agency.egcs_ay_name_en, egcs_fc_agencyname_fr: agency.egcs_ay_name_fr,
-    egcs_fc_receivablereference: `${debt.egcs_fc_agreementnumber} / AR-${debt.egcs_fc_number}`,
+    egcs_fc_receivablereference: String(repayment.egcs_fc_receivable),
     egcs_fc_receivablerecovered: balance.egcs_fc_recovered, egcs_fc_receivablereserved: balance.egcs_fc_reserved,
     egcs_fc_receivableoutstanding: balance.egcs_fc_outstanding, egcs_fc_receivableavailable: balance.egcs_fc_available }), recoveryId: null, allocations: [] as JsonValue,
   attachments: json(await retainedAttachments(db, 'fundingcaseaccountreceivablecreditmemo', id)) }
@@ -85,7 +86,7 @@ export const postAccountReceivable = async (trx: Transaction<Database>, id: stri
   const debt = await trx.selectFrom('Funding_Case_Agreement_Account_Receivable').selectAll().where('id', '=', id).where('_deleted', '=', false).forUpdate().executeTakeFirstOrThrow()
   if (debt.egcs_fc_outcome === 'posted' && String(debt.egcs_fc_postingruntime) === runtimeId) return
   if (debt.egcs_fc_outcome !== 'open') throw new Error('AR_TERMINAL_IMMUTABLE')
-  const run = await assertSuccessfulSubmission(trx, 'fundingcaseaccountreceivable', id, runtimeId, actorId)
+  const run = await assertSuccessfulSubmission(trx, debt.egcs_fc_entitytype, id, runtimeId, actorId)
   const routing = run.egcs_cn_routing as { accountReceivablePacket?: Awaited<ReturnType<typeof captureAccountReceivablePacket>>; accountReceivablePacketHash?: string } | null
   if (!routing?.accountReceivablePacket || !routing.accountReceivablePacketHash
     || hashPublicationDefinition(json(routing.accountReceivablePacket)) !== routing.accountReceivablePacketHash) throw new Error('AR_PACKET_INTEGRITY')
@@ -95,6 +96,7 @@ export const postAccountReceivable = async (trx: Transaction<Database>, id: stri
     || hashPublicationDefinition(json(basis.coding)) !== hashPublicationDefinition(routing.accountReceivablePacket.coding)) throw new Error('AR_PACKET_BASIS_CHANGED')
   await trx.updateTable('Funding_Case_Agreement_Account_Receivable').set({ egcs_fc_outcome: 'posted', egcs_fc_postedat: new Date(),
     egcs_fc_postingruntime: runtimeId, egcs_fc_terminalby: actorId!, egcs_fc_terminalat: new Date(), egcs_fc_terminalreason: null }).where('id', '=', id).where('egcs_fc_outcome', '=', 'open').execute()
+  if (debt.egcs_fc_linkedreceivable) await applyAccountReceivableClaimReductions(trx, String(debt.egcs_fc_linkedreceivable))
 }
 
 export const postAccountReceivableCreditMemo = async (trx: Transaction<Database>, id: string, runtimeId: string, actorId?: string) => {
@@ -110,6 +112,8 @@ export const postAccountReceivableCreditMemo = async (trx: Transaction<Database>
     || current.total !== routing.accountReceivableCreditMemoPacket.total) throw new Error('AR_PACKET_BASIS_CHANGED')
   await trx.updateTable('Funding_Case_Account_Receivable_Credit_Memo').set({ egcs_fc_outcome: 'posted', egcs_fc_postedat: new Date(),
     egcs_fc_postingruntime: runtimeId, egcs_fc_terminalby: actorId!, egcs_fc_terminalat: new Date(), egcs_fc_terminalreason: null }).where('id', '=', id).where('egcs_fc_outcome', '=', 'open').execute()
+  const lines = await trx.selectFrom('Funding_Case_Account_Receivable_Credit_Memo_Line').select('egcs_fc_receivable').where('egcs_fc_creditmemo', '=', id).where('_deleted', '=', false).execute()
+  for (const receivableId of new Set(lines.map(line => String(line.egcs_fc_receivable)))) await applyAccountReceivableClaimReductions(trx, receivableId)
 }
 
 export const recordAccountReceivableTerminalOutcome = async (trx: Transaction<Database>, id: string, outcome: Exclude<AccountReceivableTerminalOutcome, 'posted'>, options: { runtimeId?: string; actorId?: string; reason?: string }) => {
@@ -119,8 +123,8 @@ export const recordAccountReceivableTerminalOutcome = async (trx: Transaction<Da
     return
   }
   if (!options.actorId && !(outcome === 'failed' && options.runtimeId && options.reason?.trim())) throw new Error('AR_TERMINAL_ACTOR_REQUIRED')
-  if (options.runtimeId) await lockAccountReceivableSubmission(trx, 'fundingcaseaccountreceivable', id, options.runtimeId)
-  if (!(await resolveBusinessStatusProtection(trx, 'fundingcaseaccountreceivable', id))?.terminal) throw new Error('AR_TERMINAL_STATUS_REQUIRED')
+  if (options.runtimeId) await lockAccountReceivableSubmission(trx, row.egcs_fc_entitytype, id, options.runtimeId)
+  if (!(await resolveBusinessStatusProtection(trx, row.egcs_fc_entitytype, id))?.terminal) throw new Error('AR_TERMINAL_STATUS_REQUIRED')
   await trx.updateTable('Funding_Case_Agreement_Account_Receivable').set({ egcs_fc_outcome: outcome, egcs_fc_terminalby: options.actorId ?? null,
     egcs_fc_terminalat: new Date(), egcs_fc_terminalreason: options.reason ?? null }).where('id', '=', id).execute()
 }

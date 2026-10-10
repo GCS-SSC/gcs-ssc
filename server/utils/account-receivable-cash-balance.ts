@@ -1,4 +1,4 @@
-/* eslint-disable jsdoc/require-jsdoc -- Credit Memos reduce exactly one established receivable. */
+/* eslint-disable jsdoc/require-jsdoc -- Credit Memo lines reduce their explicitly tagged receivable. */
 import { sql, type Kysely } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import { subtractMoney } from '~~/shared/utils/money'
@@ -10,15 +10,17 @@ export const readAccountReceivableCashBalance = async (db: Kysely<Database>, rec
       JOIN "Funding_Case_Agreement_Account_Receivable" debt ON debt.id=line.egcs_fc_receivable
       WHERE (debt.id=${receivableId}::bigint OR debt.egcs_fc_linkedreceivable=${receivableId}::bigint)
         AND debt.egcs_fc_outcome='posted' AND NOT debt._deleted AND NOT line._deleted),0)::text AS principal,
-    (coalesce((SELECT sum(memo.egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Credit_Memo" memo
-      WHERE memo.egcs_fc_receivable=${receivableId}::bigint AND memo.egcs_fc_outcome='posted' AND NOT memo._deleted
+    (coalesce((SELECT sum(line.egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Credit_Memo" memo
+      JOIN "Funding_Case_Account_Receivable_Credit_Memo_Line" line ON line.egcs_fc_creditmemo=memo.id AND NOT line._deleted
+      WHERE line.egcs_fc_receivable=${receivableId}::bigint AND memo.egcs_fc_outcome='posted' AND NOT memo._deleted
         ${excludedMemoId ? sql`AND memo.id<>${excludedMemoId}::bigint` : sql``}),0) + coalesce((SELECT sum(application.egcs_fc_amount)
       FROM "Funding_Case_Account_Receivable_Offset_Memo" memo
       JOIN "Funding_Case_Account_Receivable_Offset_Memo_Application" application ON application.egcs_fc_offsetmemo=memo.id
       JOIN "Funding_Case_Account_Receivable_Recovery" recovery ON recovery.id=application.egcs_fc_recovery
       WHERE memo.egcs_fc_receivable=${receivableId}::bigint AND recovery.egcs_fc_outcome='posted' AND NOT recovery._deleted),0))::text AS recovered,
-    (coalesce((SELECT sum(memo.egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Credit_Memo" memo
-      WHERE memo.egcs_fc_receivable=${receivableId}::bigint AND memo.egcs_fc_outcome='open' AND NOT memo._deleted
+    (coalesce((SELECT sum(line.egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Credit_Memo" memo
+      JOIN "Funding_Case_Account_Receivable_Credit_Memo_Line" line ON line.egcs_fc_creditmemo=memo.id AND NOT line._deleted
+      WHERE line.egcs_fc_receivable=${receivableId}::bigint AND memo.egcs_fc_outcome='open' AND NOT memo._deleted
         ${excludedMemoId ? sql`AND memo.id<>${excludedMemoId}::bigint` : sql``}),0) + coalesce((SELECT sum(application.egcs_fc_amount)
       FROM "Funding_Case_Account_Receivable_Offset_Memo" memo
       JOIN "Funding_Case_Account_Receivable_Offset_Memo_Application" application ON application.egcs_fc_offsetmemo=memo.id

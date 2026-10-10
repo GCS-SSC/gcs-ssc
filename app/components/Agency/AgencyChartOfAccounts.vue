@@ -20,6 +20,7 @@ const initialNewItem = {
   egcs_ay_fiscalyear: '',
   egcs_ay_currency: 'cad' as const,
   egcs_ay_kind: 'commitment' as const,
+  egcs_ay_commitmentchartofaccount: null,
   egcs_ay_accountingdimensions: [{ label_en: '', label_fr: '', value: '' }]
 }
 const addDimension = (state: Partial<AgencyChartOfAccountItem>) => {
@@ -71,14 +72,32 @@ const addDimension = (state: Partial<AgencyChartOfAccountItem>) => {
         <CommonServerLookupSelect
           v-else
           v-model="state.egcs_ay_fiscalyear"
-          :fetch-url="`/api/agency/${agencyId}/fiscal-years`" value-key="id"
-          label-en-key="egcs_ay_fiscalyeardisplay" label-fr-key="egcs_ay_fiscalyeardisplay" />
+          :fetch-url="`/api/agency/${agencyId}/fiscal-years`"
+          value-key="id" label-en-key="egcs_ay_fiscalyeardisplay"
+          label-fr-key="egcs_ay_fiscalyeardisplay" @update:model-value="state.egcs_ay_commitmentchartofaccount = null" />
       </UFormField>
       <UFormField :label="t('common.currency')" name="egcs_ay_currency" required>
-        <CommonEnumSelect v-model="state.egcs_ay_currency" name="currency_codes" :disabled="Boolean(state.id)" />
+        <CommonEnumSelect v-model="state.egcs_ay_currency" name="currency_codes" :disabled="Boolean(state.id)" @update:model-value="state.egcs_ay_commitmentchartofaccount = null" />
       </UFormField>
       <UFormField :label="t('transfer_payment.chart_of_accounts.kind')" :description="t(state.id ? 'apiErrors.agency.chart_kind_immutable' : 'transfer_payment.chart_of_accounts.kind_description')" name="egcs_ay_kind" required>
-        <CommonEnumSelect v-model="state.egcs_ay_kind" name="agency_chart_of_account_kind" :disabled="Boolean(state.id)" />
+        <CommonEnumSelect v-model="state.egcs_ay_kind" name="agency_chart_of_account_kind" :disabled="Boolean(state.id)" @update:model-value="state.egcs_ay_commitmentchartofaccount = null" />
+      </UFormField>
+      <UFormField
+        v-if="state.egcs_ay_kind === 'credit_memo'"
+        :label="t('transfer_payment.chart_of_accounts.commitment_account')"
+        :description="t('transfer_payment.chart_of_accounts.commitment_account_help')"
+        name="egcs_ay_commitmentchartofaccount">
+        <CommonServerLookupSelect
+          v-if="state.egcs_ay_fiscalyear && state.egcs_ay_currency"
+          :model-value="state.egcs_ay_commitmentchartofaccount ?? undefined"
+          :fetch-url="`/api/agency/${agencyId}/chart-of-accounts/lookups/commitment-accounts`"
+          :query="{ fiscalYearId: state.egcs_ay_fiscalyear, currency: state.egcs_ay_currency }"
+          value-key="id"
+          label-en-key="label_en"
+          label-fr-key="label_fr"
+          :show-value-in-label="false"
+          @update:model-value="state.egcs_ay_commitmentchartofaccount = $event ?? null" />
+        <USelectMenu v-else :items="[]" disabled />
       </UFormField>
       <div class="space-y-3">
         <div class="flex items-center justify-between gap-3">

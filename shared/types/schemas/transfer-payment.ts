@@ -619,6 +619,8 @@ export const AgencyChartOfAccountBaseSchema = z.object({
   egcs_ay_kind: z.enum(AGENCY_CHART_KIND_ENUM, { error: 'validation.required' }).default('commitment'),
   egcs_ay_fiscalyear: PositivePostgresBigintIdSchema,
   egcs_ay_currency: z.enum(CURRENCY_CODES_ENUM, { error: 'validation.required' }),
+  egcs_ay_commitmentchartofaccount: z.preprocess(value => value === '' ? null : value,
+    PositivePostgresBigintIdSchema.nullable()).optional().meta({ formRequired: false }),
   egcs_ay_accountingdimensions: z.array(
     TransferPaymentStreamChartOfAccountDimensionSchema,
     { error: 'validation.required' }
@@ -851,6 +853,7 @@ export type TransferPaymentReviewSetupEntityType =
   | 'fundingcasejournalvoucher'
   | 'fundingcasecorrection'
   | 'fundingcaseaccountreceivable'
+  | 'fundingcaseaccountreceivableadjustment'
   | 'fundingcaseaccountreceivablecreditmemo'
   | 'fundingcaserecommendation'
 
@@ -867,6 +870,7 @@ export const TRANSFER_PAYMENT_REVIEW_SETUP_ENTITY_TYPE_ENUM = [
   'fundingcasejournalvoucher',
   'fundingcasecorrection',
   'fundingcaseaccountreceivable',
+  'fundingcaseaccountreceivableadjustment',
   'fundingcaseaccountreceivablecreditmemo',
   'fundingcaserecommendation'
 ] as const satisfies readonly TransferPaymentReviewSetupEntityType[]

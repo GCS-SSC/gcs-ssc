@@ -105,7 +105,7 @@ const isSavingPayment = paymentPending.isPending
 const paymentCalculatorResult: Ref<PaymentCalculatorResult | null> = ref(null)
 const hasManualPaymentAmount: Ref<boolean> = ref(false)
 let lastSuggestedPaymentAmount: Money | null = null
-watch(selectedPayment, () => {
+watch(() => paymentModal.captureSession(), () => {
   lastSuggestedPaymentAmount = null
   hasManualPaymentAmount.value = false
 }, { flush: 'sync' })
@@ -251,6 +251,12 @@ const handlePaymentCalculatorResult = (result: Record<string, unknown>) => {
     return
   }
   paymentCalculatorResult.value = result as PaymentCalculatorResult
+}
+
+const handlePaymentAmountInput = (amount: string) => {
+  if (!selectedPayment.value) return
+  hasManualPaymentAmount.value = true
+  selectedPayment.value.egcs_fc_paymentamount = amount
 }
 
 const handlePaymentCalculatorExtensionPayload = (extensionKey: string, value: Record<string, unknown>) => {
@@ -531,9 +537,9 @@ const deletePayment = async (paymentId: string) => {
 
           <UFormField :label="t('agreement.payments.amount')" name="egcs_fc_paymentamount">
             <CommonCurrencyInput
-              v-model="selectedPayment.egcs_fc_paymentamount"
+              :model-value="selectedPayment.egcs_fc_paymentamount"
               :currency="selectedPayment.egcs_fc_currency"
-              @update:model-value="hasManualPaymentAmount = true" />
+              @update:model-value="handlePaymentAmountInput" />
             <p v-if="isPaymentAboveCalculatorCeiling" class="mt-1 text-sm text-error">
               {{ t('agreement.payments.amount_exceeds_calculated_ceiling', { amount: formatMoney(paymentCalculatorCeilingMoney ?? ZERO_MONEY, paymentCalculatorCurrency) }) }}
             </p>

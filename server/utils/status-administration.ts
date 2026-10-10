@@ -35,7 +35,7 @@ const STATUS_CONSTRAINT_ERRORS = {
 
 /** A preparation Workflow cannot acquire a terminal output through mutable Agency status metadata. */
 const correctionPreparationOutputReference = (statusId: string) => sql<boolean>`(
-  version.egcs_cn_definition ->> 'entityType' IN ('fundingcasecorrection','fundingcaseaccountreceivable','fundingcaseaccountreceivablecreditmemo')
+  version.egcs_cn_definition ->> 'entityType' IN ('fundingcasecorrection','fundingcaseaccountreceivable', 'fundingcaseaccountreceivableadjustment','fundingcaseaccountreceivablecreditmemo')
   AND COALESCE(version.egcs_cn_definition ->> 'purpose', 'standard') <> 'approval_submission'
   AND (
     version.egcs_cn_definition ->> 'cancellationStatus' = ${statusId}
@@ -386,7 +386,7 @@ export const assertTerminalStatusCompatibleWithPublishedWorkflows = async (
     .innerJoin('Common_Publication_Version as version', 'version.id', 'correction_run.egcs_cn_sourcepublicationversion')
     .select('correction_run.id')
     .where('correction_run.egcs_cn_kind', '=', 'workflow')
-    .where('correction_run.egcs_cn_entitytype', 'in', ['fundingcasecorrection', 'fundingcaseaccountreceivable', 'fundingcaseaccountreceivablecreditmemo'])
+    .where('correction_run.egcs_cn_entitytype', 'in', ['fundingcasecorrection', 'fundingcaseaccountreceivable', 'fundingcaseaccountreceivableadjustment', 'fundingcaseaccountreceivablecreditmemo'])
     .where('correction_run.egcs_cn_purpose', '!=', 'approval_submission')
     .where('correction_run._deleted', '=', false)
     .where(correctionPreparationOutputReference(statusId))

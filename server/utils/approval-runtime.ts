@@ -34,6 +34,7 @@ export const isDirectApprovalRuntimeEntitySupported = (entityType: Entity_Type):
   || entityType === 'fundingcasejournalvoucher'
   || entityType === 'fundingcasecorrection'
   || entityType === 'fundingcaseaccountreceivable'
+  || entityType === 'fundingcaseaccountreceivableadjustment'
   || entityType === 'fundingcaseaccountreceivablecreditmemo'
   || entityType === 'fundingcasepayment'
   || entityType === 'fundingclaimreconcile'
@@ -156,7 +157,7 @@ export const resolveApprovalRuntimeEntityFromEntity = async (
     return await resolveReviewRuntimeEntityFromEntity(db, entityType, entityId)
   }
 
-  if (entityType === 'fundingcasepayment' || entityType === 'fundingcasejournalvoucher' || entityType === 'fundingcasecorrection' || entityType === 'fundingcaseaccountreceivable' || entityType === 'fundingcaseaccountreceivablecreditmemo') {
+  if (entityType === 'fundingcasepayment' || entityType === 'fundingcasejournalvoucher' || entityType === 'fundingcasecorrection' || entityType === 'fundingcaseaccountreceivable' || entityType === 'fundingcaseaccountreceivableadjustment' || entityType === 'fundingcaseaccountreceivablecreditmemo') {
     return await resolveReviewRuntimeEntityFromEntity(db, entityType, entityId)
   }
 

@@ -2,6 +2,7 @@ import type { Transaction } from 'kysely'
 import type { Database, Entity_Type } from '~~/shared/types/database'
 import { transitionBusinessStatus } from '~~/server/utils/business-status-runtime'
 import { assertAgreementCorrectionFinancialUnlocked } from './correction-lock'
+import { getAgreementCommitmentCodingTotals, validateAgreementCommitmentPriorPaidCoverage } from './agreement-commitment'
 
 /**
  * Applies domain effects only after Completion reaches a positive terminus.
@@ -99,6 +100,11 @@ export const applyCompletionPositiveTerminusEffects = async (
     .forUpdate()
     .executeTakeFirstOrThrow()
   await assertAgreementCorrectionFinancialUnlocked(trx, String(commitment.egcs_fc_fundingagreement))
+  if (!(await getAgreementCommitmentCodingTotals(trx, entityId)).balanced) throw new Error('AGREEMENT_COMMITMENT_ALLOCATION_TOTAL_MISMATCH')
+  if (!await validateAgreementCommitmentPriorPaidCoverage(trx, { agreementId: String(commitment.egcs_fc_fundingagreement),
+    commitmentId: entityId, commitmentTypeId: String(commitment.egcs_fc_type), currency: commitment.egcs_fc_currency })) {
+    throw new Error('AGREEMENT_COMMITMENT_LINE_BELOW_PAID_AMOUNT')
+  }
   await trx.selectFrom('Funding_Case_Agreement_Commitment')
     .select('id')
     .where('egcs_fc_fundingagreement', '=', String(commitment.egcs_fc_fundingagreement))

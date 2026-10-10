@@ -5,6 +5,7 @@ import { getGcsExtensionComponent } from '#gcs-extensions/registry'
 import type { ExtensionAgencyRegistryItem, ExtensionAgencyWorkspaceListItem } from '~~/shared/types/schemas/extensions'
 import { appRouteLocations } from '~/utils/route-locations'
 import { getClientRequestUrl } from '~/utils/client-request-url'
+import { useUrlTabState } from '~/composables/useUrlTabState'
 
 definePageMeta({ i18n: { paths: {
   en: '/extension/[id]/agencies/[agencyId]', fr: '/extension/[id]/agences/[agencyId]'
@@ -23,8 +24,6 @@ const registry: Ref<{ items: ExtensionAgencyRegistryItem[] } | null> = ref(null)
 const listStatus: Ref<LoadStatus> = ref('pending')
 const registryStatus: Ref<LoadStatus> = ref('pending')
 let requestSequence = 0
-const requestedTab = computed(() => typeof route.query.section === 'string' ? route.query.section : '')
-const selectedTab = ref(requestedTab.value || 'connection')
 /** Reloads the accessible workspace and Agency registry for the current route. */
 const retry = async () => {
   const sequence = ++requestSequence
@@ -63,7 +62,6 @@ const retry = async () => {
   }
 }
 watch([agencyId, extensionKey], () => {
-  selectedTab.value = requestedTab.value || 'connection'
   void retry()
 }, { immediate: true })
 const workspace = computed(() => list.value?.items.find(item => item.key === extensionKey.value
@@ -88,16 +86,10 @@ const tabs = computed(() => extension.value?.extension.admin.agencyWorkspace?.ta
 const openForm = (formId: string) => navigateTo(localePath(appRouteLocations.extensionAgencyWorkspaceForm(
   extensionKey.value, agencyId.value, formId
 )))
-watch([requestedTab, tabs], ([requested, available]) => {
-  if (!available.length) return
-  const next = available.find(tab => tab.value === requested)?.value
-    ?? available.find(tab => tab.value === 'connection')?.value
-    ?? available[0]!.value
-  if (selectedTab.value !== next) selectedTab.value = next
-}, { immediate: true })
-watch(selectedTab, (value) => {
-  if (route.params.formId || !tabs.value.some(tab => tab.value === value) || requestedTab.value === value) return
-  void navigateTo({ path: route.path, query: { ...route.query, section: value }, hash: route.hash }, { replace: true })
+const { selectedTab } = useUrlTabState({
+  tabs,
+  defaultTab: 'connection',
+  enabled: computed(() => listStatus.value === 'success' && registryStatus.value === 'success' && !route.params.formId)
 })
 </script>
 

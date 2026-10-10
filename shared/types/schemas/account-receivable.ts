@@ -11,6 +11,8 @@ const NarrativeSchema = z.string().max(10000).default('')
 const MethodSchema = z.enum(ACCOUNT_RECEIVABLE_RECOVERY_METHOD_ENUM, { error: 'validation.required' })
 
 export const AccountReceivableCreateBaseSchema = z.object({
+  egcs_fc_amount: PositiveMoneySchema.optional(),
+  egcs_fc_agencyfinancialid: DatabaseIdSchema.optional(),
   egcs_fc_applicantrecipient: DatabaseIdSchema,
   egcs_fc_agencyfiscalyear: DatabaseIdSchema,
   egcs_fc_type: DatabaseIdSchema,
@@ -29,6 +31,7 @@ export const AccountReceivableCreateBaseSchema = z.object({
 }).strict()
 
 export const AccountReceivableCreateSchema = AccountReceivableCreateBaseSchema.superRefine((input, ctx) => {
+  if (!input.egcs_fc_linkedreceivable && !input.egcs_fc_amount) ctx.addIssue({ code: 'custom', path: ['egcs_fc_amount'], message: 'validation.required' })
   if ((input.egcs_fc_sourcepayment && input.egcs_fc_sourceclaim)
     || (input.egcs_fc_linkedreceivable && (input.egcs_fc_sourcepayment || input.egcs_fc_sourceclaim))) {
     ctx.addIssue({ code: 'custom', path: ['egcs_fc_sourcepayment'], message: 'validation.invalid_selection' })
@@ -70,6 +73,7 @@ export const AccountReceivableLineEditSchema = z.object({
 })
 
 export const AccountReceivableEditSchema = z.object({
+  egcs_fc_agencyfinancialid: DatabaseIdSchema.optional(),
   egcs_fc_requesteddate: RequiredDateSchema,
   egcs_fc_recoverymethod: MethodSchema.nullable().default(null),
   egcs_fc_narrative_en: NarrativeSchema,
@@ -90,6 +94,8 @@ export const AccountReceivableCancelSchema = z.object({
 
 export const AccountReceivableCreditMemoCreateSchema = z.object({
   egcs_fc_receivable: DatabaseIdSchema,
+  egcs_fc_receivables: z.array(DatabaseIdSchema).min(1, { error: 'validation.required' }).max(100).optional(),
+  egcs_fc_totalamount: PositiveMoneySchema,
   egcs_fc_agency: DatabaseIdSchema,
   egcs_fc_applicantrecipient: DatabaseIdSchema,
   egcs_fc_currency: z.enum(CURRENCY_CODES_ENUM, { error: 'validation.required' }),
@@ -104,6 +110,7 @@ export type AccountReceivableCreditMemoCreate = z.infer<typeof AccountReceivable
 export type AccountReceivableCreditMemoEdit = z.infer<typeof AccountReceivableCreditMemoEditSchema>
 
 export const AccountReceivableCreditMemoLineCreateSchema = z.object({
+  egcs_fc_receivable: DatabaseIdSchema,
   egcs_fc_linenumber: z.number({ error: 'validation.required' }).int({ error: 'validation.invalid_number' }).min(1, { error: 'validation.invalid_number' }).max(32767, { error: 'validation.invalid_number' }),
   egcs_fc_creditmemochartofaccount: DatabaseIdSchema,
   egcs_fc_amount: PositiveMoneySchema
@@ -121,6 +128,10 @@ export const AccountReceivableLinePatchSchema = z.object({
     ctx.addIssue({ code: 'custom', path: ['egcs_fc_accountreceivablechartofaccount'], message: 'validation.required' })
   }
 })
+
+export const AccountReceivableRecodeSchema = z.object({
+  egcs_fc_accountreceivablechartofaccount: DatabaseIdSchema
+}).strict()
 export const AccountReceivableLineCreateSchema = AccountReceivableLinePatchSchema.safeExtend({
   egcs_fc_originalline: DatabaseIdSchema.optional(),
   egcs_fc_sourcekey: z.string({ error: 'validation.required' }).regex(/^(claim|advance):[1-9]\d*$/, { error: 'validation.invalid_selection' }).meta({ formRequired: true })
@@ -128,3 +139,12 @@ export const AccountReceivableLineCreateSchema = AccountReceivableLinePatchSchem
 export type AccountReceivableLineCreate = z.infer<typeof AccountReceivableLineCreateSchema>
 export type AccountReceivableLinePatch = z.infer<typeof AccountReceivableLinePatchSchema>
 export type AccountReceivableSummaryEdit = z.infer<typeof AccountReceivableSummaryEditSchema>
+
+export const AccountReceivableClaimReductionSchema = z.object({
+  egcs_fc_lines: z.array(z.object({ egcs_fc_claimline: DatabaseIdSchema, egcs_fc_amount: PositiveMoneySchema }).strict()).max(500)
+}).strict().superRefine((input, ctx) => {
+  if (new Set(input.egcs_fc_lines.map(line => line.egcs_fc_claimline)).size !== input.egcs_fc_lines.length) {
+    ctx.addIssue({ code: 'custom', path: ['egcs_fc_lines'], message: 'validation.invalid_selection' })
+  }
+})
+export type AccountReceivableClaimReductionInput = z.infer<typeof AccountReceivableClaimReductionSchema>

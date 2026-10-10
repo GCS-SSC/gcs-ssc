@@ -67,7 +67,7 @@ export const authorizeAttachmentTarget = async (
     : resolved.fundingCaseScope
       ? auth.userAbilities.authorize('funding_case', action, resolved.fundingCaseScope.scope)
       : resolved.agreementContext
-        ? auth.userAbilities.authorize((target.entityType === 'fundingcaseaccountreceivable' || target.entityType === 'fundingcaseaccountreceivablecreditmemo') ? 'account_receivable' : target.entityType === 'fundingcasecorrection' ? 'correction' : target.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement', action, resolved.agreementContext.scope)
+        ? auth.userAbilities.authorize((target.entityType === 'fundingcaseaccountreceivable' || target.entityType === 'fundingcaseaccountreceivableadjustment' || target.entityType === 'fundingcaseaccountreceivablecreditmemo') ? 'account_receivable' : target.entityType === 'fundingcasecorrection' ? 'correction' : target.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement', action, resolved.agreementContext.scope)
         : await canAccessApplicantRecipient(auth, target.entityId, action, event.context.$db)
           && auth.userAbilities.authorize('applicant_recipient', action,
             { type: 'agency', agencyId: resolved.agencyId })
@@ -92,7 +92,7 @@ export const authorizeFreshAttachmentTarget = async (
     : resolved.fundingCaseScope
       ? auth.userAbilities.authorize('funding_case', action, resolved.fundingCaseScope.scope)
       : resolved.agreementContext
-        ? auth.userAbilities.authorize((target.entityType === 'fundingcaseaccountreceivable' || target.entityType === 'fundingcaseaccountreceivablecreditmemo') ? 'account_receivable' : target.entityType === 'fundingcasecorrection' ? 'correction' : target.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement', action, resolved.agreementContext.scope)
+        ? auth.userAbilities.authorize((target.entityType === 'fundingcaseaccountreceivable' || target.entityType === 'fundingcaseaccountreceivableadjustment' || target.entityType === 'fundingcaseaccountreceivablecreditmemo') ? 'account_receivable' : target.entityType === 'fundingcasecorrection' ? 'correction' : target.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement', action, resolved.agreementContext.scope)
         : await canAccessApplicantRecipient(auth, target.entityId, action, db)
           && auth.userAbilities.authorize('applicant_recipient', action,
             { type: 'agency', agencyId: resolved.agencyId })

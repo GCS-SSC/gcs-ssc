@@ -225,7 +225,7 @@ const agreementReviewRuntimeEntityTypes = new Set<Entity_Type>([
   'fundingcasemonitor',
   'fundingcasejournalvoucher',
   'fundingcasecorrection',
-  'fundingcaseaccountreceivable',
+  'fundingcaseaccountreceivable', 'fundingcaseaccountreceivableadjustment',
   'fundingcaseaccountreceivablecreditmemo',
   'fundingcasepayment',
   'fundingclaimreconcile'
@@ -413,7 +413,7 @@ const authorizeAgreementRuntimeAction = async (
       ? 'delete'
       : 'update'
 
-  const subject = entityContext.entityType === 'fundingcaseaccountreceivable' ? 'account_receivable' : entityContext.entityType === 'fundingcasecorrection' ? 'correction' : entityContext.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement'
+  const subject = (entityContext.entityType === 'fundingcaseaccountreceivable' || entityContext.entityType === 'fundingcaseaccountreceivableadjustment') ? 'account_receivable' : entityContext.entityType === 'fundingcasecorrection' ? 'correction' : entityContext.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement'
   return await authorize(event, subject, agreementAction, async ({ context }) => {
     if (context.userAbilities.authorize(subject, agreementAction, agreementContext.scope)
       && (!isAssignableEntityType(entityContext.entityType) || await canAccessCreditMemoTargetScopes(event.context.$db, context, entityContext.entityType, entityContext.entityId, agreementAction))) {
@@ -674,8 +674,9 @@ const agreementRuntimeEntityResolvers = {
     resolve: resolveAgreementMonitorRuntimeContext,
     idKey: 'monitorId'
   },
-  fundingcaseaccountreceivable: { resolve: resolveAccountReceivableRuntimeContext, idKey: 'receivableId' },
-  fundingcaseaccountreceivablecreditmemo: { resolve: resolveAccountReceivableCreditMemoRuntimeContext, idKey: 'creditMemoId' },
+  fundingcaseaccountreceivable: { resolve: (db: Kysely<Database>, id: string) => resolveAccountReceivableRuntimeContext(db, id, 'fundingcaseaccountreceivable'), idKey: 'receivableId' },
+  fundingcaseaccountreceivableadjustment: { resolve: (db: Kysely<Database>, id: string) => resolveAccountReceivableRuntimeContext(db, id, 'fundingcaseaccountreceivableadjustment'), idKey: 'receivableId' },
+  fundingcaseaccountreceivablecreditmemo: { resolve: (db: Kysely<Database>, id: string) => resolveAccountReceivableCreditMemoRuntimeContext(db, id), idKey: 'creditMemoId' },
   fundingcasecorrection: { resolve: resolveCorrectionRuntimeContext, idKey: 'correctionId' },
   fundingcasejournalvoucher: { resolve: resolveJournalVoucherRuntimeContext, idKey: 'journalVoucherId' },
   fundingcasepayment: {
@@ -1224,6 +1225,7 @@ const agreementRuntimeOwnerTables = {
   fundingcaseforecast: 'Funding_Case_Agreement_Forecast',
   fundingcasemonitor: 'Funding_Case_Agreement_Monitor',
   fundingcaseaccountreceivable: 'Funding_Case_Agreement_Account_Receivable',
+  fundingcaseaccountreceivableadjustment: 'Funding_Case_Agreement_Account_Receivable',
   fundingcaseaccountreceivablecreditmemo: 'Funding_Case_Account_Receivable_Credit_Memo',
   fundingcasecorrection: 'Funding_Case_Agreement_Correction',
   fundingcasejournalvoucher: 'Funding_Case_Agreement_Journal_Voucher',

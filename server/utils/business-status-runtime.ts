@@ -66,6 +66,7 @@ export const BUSINESS_STATUS_REGISTRY = {
   },
   fundingcaseagreementcommitment: { table: 'Funding_Case_Agreement_Commitment', authorizationRoot: 'agreement', ancestors: ['fundingcaseagreement'] },
   fundingcaseaccountreceivable: { table: 'Funding_Case_Agreement_Account_Receivable', authorizationRoot: 'agreement', ancestors: [] },
+  fundingcaseaccountreceivableadjustment: { table: 'Funding_Case_Agreement_Account_Receivable', authorizationRoot: 'agreement', ancestors: [] },
   fundingcaseaccountreceivablecreditmemo: { table: 'Funding_Case_Account_Receivable_Credit_Memo', authorizationRoot: 'self', ancestors: [] },
   fundingcasecorrection: { table: 'Funding_Case_Agreement_Correction', authorizationRoot: 'agreement', ancestors: ['fundingcaseagreement'] },
   fundingcasejournalvoucher: { table: 'Funding_Case_Agreement_Journal_Voucher', authorizationRoot: 'agreement', ancestors: ['fundingcaseagreement'] },
@@ -106,8 +107,8 @@ const readCarrierStatus = async (
       .where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirst()
     return intake ? String(intake.egcs_fi_status) : null
   }
-  if (entityType === 'fundingcaseaccountreceivable') {
-    const row = await db.selectFrom('Funding_Case_Agreement_Account_Receivable').select('egcs_fc_status').where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirst()
+  if ((entityType === 'fundingcaseaccountreceivable' || entityType === 'fundingcaseaccountreceivableadjustment')) {
+    const row = await db.selectFrom('Funding_Case_Agreement_Account_Receivable').select('egcs_fc_status').where('id', '=', entityId).where('egcs_fc_entitytype', '=', entityType).where('_deleted', '=', false).executeTakeFirst()
     return row ? String(row.egcs_fc_status) : null
   }
   if (entityType === 'fundingcaseaccountreceivablecreditmemo') {
@@ -189,8 +190,8 @@ const resolveLineage = async (
       { entityType, entityId }
     ] }
   }
-  if (entityType === 'fundingcaseaccountreceivable') {
-    const row = await db.selectFrom('Funding_Case_Agreement_Account_Receivable').select('egcs_fc_fundingagreement').where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirst()
+  if ((entityType === 'fundingcaseaccountreceivable' || entityType === 'fundingcaseaccountreceivableadjustment')) {
+    const row = await db.selectFrom('Funding_Case_Agreement_Account_Receivable').select('egcs_fc_fundingagreement').where('id', '=', entityId).where('egcs_fc_entitytype', '=', entityType).where('_deleted', '=', false).executeTakeFirst()
     // Retrospective debt collection remains workable on a closed Agreement.
     return row ? { agreementId: String(row.egcs_fc_fundingagreement), carriers: [{ entityType, entityId }] } : null
   }
@@ -249,8 +250,8 @@ const lockCarrierStatus = async (
     if (!intake) throw new BusinessStatusViolation('BUSINESS_STATUS_NOT_FOUND', 'Funding case intake is unavailable')
     return String(intake.egcs_fi_status)
   }
-  if (carrier.entityType === 'fundingcaseaccountreceivable') {
-    const row = await trx.selectFrom('Funding_Case_Agreement_Account_Receivable').select(['egcs_fc_status', 'egcs_fc_outcome']).where('id', '=', entityId).where('_deleted', '=', false).forUpdate().executeTakeFirstOrThrow()
+  if ((carrier.entityType === 'fundingcaseaccountreceivable' || carrier.entityType === 'fundingcaseaccountreceivableadjustment')) {
+    const row = await trx.selectFrom('Funding_Case_Agreement_Account_Receivable').select(['egcs_fc_status', 'egcs_fc_outcome']).where('id', '=', entityId).where('egcs_fc_entitytype', '=', carrier.entityType).where('_deleted', '=', false).forUpdate().executeTakeFirstOrThrow()
     if (row.egcs_fc_outcome !== 'open') throw new BusinessStatusViolation('BUSINESS_STATUS_TERMINAL', 'A terminal Accounts Receivable record cannot be changed')
     return String(row.egcs_fc_status)
   }
@@ -397,7 +398,7 @@ export const assertBusinessStatusMutationAllowed = async (
 }
 
 const updateCarrierStatus = async (trx: Transaction<Database>, entityType: CoreLifecycleEntityType, entityId: string, statusId: StatusId, terminal: boolean) => {
-  if (entityType === 'fundingcaseaccountreceivable') return await trx.updateTable('Funding_Case_Agreement_Account_Receivable').set({ egcs_fc_status: statusId }).where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirstOrThrow()
+  if ((entityType === 'fundingcaseaccountreceivable' || entityType === 'fundingcaseaccountreceivableadjustment')) return await trx.updateTable('Funding_Case_Agreement_Account_Receivable').set({ egcs_fc_status: statusId }).where('id', '=', entityId).where('egcs_fc_entitytype', '=', entityType).where('_deleted', '=', false).executeTakeFirstOrThrow()
   if (entityType === 'fundingcaseaccountreceivablecreditmemo') return await trx.updateTable('Funding_Case_Account_Receivable_Credit_Memo').set({ egcs_fc_status: statusId }).where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirstOrThrow()
   if (entityType === 'fundingcasecorrection') return await trx.updateTable('Funding_Case_Agreement_Correction').set({ egcs_fc_status: statusId }).where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirstOrThrow()
   if (entityType === 'fundingcasejournalvoucher') return await trx.updateTable('Funding_Case_Agreement_Journal_Voucher').set({ egcs_fc_status: statusId }).where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirstOrThrow()

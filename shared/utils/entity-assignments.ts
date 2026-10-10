@@ -68,6 +68,7 @@ export const ENTITY_AUTHORIZATION_POLICIES = {
   fundingcaseagreementclaim: createMetadata({ ...agreementPolicy, table: 'Funding_Case_Agreement_Claim' }, 'claims', ['Claim', 'Réclamation']),
   fundingclaimreconcile: createMetadata({ ...agreementPolicy, ownerResolver: 'agreement_claim_parent', ownerColumn: 'egcs_fc_fundingagreementclaim', creationParent: 'fundingcaseagreementclaim', table: 'Funding_Case_Agreement_Claim_Reconcile' }, null, ['Claim reconciliation', 'Rapprochement de réclamation']),
   fundingcaseaccountreceivable: createMetadata({ ...agreementPolicy, subject: 'account_receivable', table: 'Funding_Case_Agreement_Account_Receivable' }, 'account-receivables', ['Accounts receivable', 'Compte débiteur']),
+  fundingcaseaccountreceivableadjustment: createMetadata({ ...agreementPolicy, subject: 'account_receivable', table: 'Funding_Case_Agreement_Account_Receivable' }, 'account-receivables', ['Accounts receivable adjustment', 'Ajustement de compte débiteur']),
   fundingcaseaccountreceivablecreditmemo: createMetadata({ subject: 'account_receivable', ownerResolver: 'agency', ownerColumn: 'egcs_fc_agency', creationParent: 'agency', allowedScopes: ['global', 'agency'], table: 'Funding_Case_Account_Receivable_Credit_Memo', statusColumn: 'egcs_fc_status' }, null, ['Credit memo', 'Note de crédit']),
   fundingcasecorrection: createMetadata({ ...agreementPolicy, subject: 'correction', table: 'Funding_Case_Agreement_Correction' }, 'corrections', ['Correction', 'Correction']),
   fundingcasejournalvoucher: createMetadata({ ...agreementPolicy, subject: 'journal_voucher', table: 'Funding_Case_Agreement_Journal_Voucher' }, 'journal-vouchers', ['Journal voucher', 'Pièce de journal']),
@@ -105,5 +106,5 @@ export const buildAssignedWorkRoute = (
   if (entityType === 'fundingclaimreconcile') return `/claim-reconciliations/${entityId}`
   const segment = ENTITY_AUTHORIZATION_POLICIES[entityType].agreementRouteSegment
   if (!segment || !agreementId) throw new Error(`Missing Agreement route context for ${entityType}`)
-  return `/agreements/${agreementId}/${segment}/${entityId}`
+  return `/agreements/${agreementId}/${segment}/${entityId}${entityType === 'fundingcaseaccountreceivableadjustment' ? '?entityType=fundingcaseaccountreceivableadjustment' : ''}`
 }

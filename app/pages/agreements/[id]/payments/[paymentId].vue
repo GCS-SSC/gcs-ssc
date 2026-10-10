@@ -52,16 +52,24 @@ const pagination: Ref<{ pageIndex: number, pageSize: number }> = ref({
 })
 const approvalsRefreshKey: Ref<number> = ref(0)
 
-const tabs = [
+const {
+  tabs: extensionTabs, status: extensionTabsStatus, error: extensionTabsError,
+  refresh: refreshExtensionTabs, getExtensionTabItem
+} = useExtensionEntityTabs({ target: 'payment', paymentId })
+const tabs = computed(() => [
   { key: 'agreement.payments.lines_title', value: 'lines', icon: 'i-lucide-list' },
   { key: 'agreement.payments.completion.title', value: 'completion', icon: 'i-lucide-circle-check-big' },
   { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-clipboard-check' },
   { key: 'workflow.title', value: 'workflows', icon: 'i-lucide-workflow' },
   { key: 'supplementary_information.title', value: 'supplementary-information', icon: 'i-lucide-clipboard-list' },
   { key: 'attachments.title', value: 'attachments', icon: 'i-lucide-paperclip' },
-  { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users' }
-]
-const { selectedTab } = useUrlTabState({ tabs, defaultTab: 'lines' })
+  { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users' },
+  ...extensionTabs.value
+])
+const { selectedTab } = useUrlTabState({
+  tabs, defaultTab: 'lines', enabled: computed(() => extensionTabsStatus.value === 'success')
+})
+const selectedExtensionTab = computed(() => getExtensionTabItem(selectedTab.value))
 
 const lineModal = useCrudModal<FundingCaseAgreementPaymentLineRow, FundingCaseAgreementPaymentLineForm>({
   createState: () => ({ egcs_fc_fundingagreementpayment: paymentId }),
@@ -295,7 +303,18 @@ const handleCompleted = async () => {
             }]" />
 
           <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="agreement-payment-detail-content">
-            <CommonSection v-if="selectedTab === 'lines'" :title="t('agreement.payments.lines_title')" :grid-cols="1">
+            <template #notices>
+              <p v-if="extensionTabsStatus === 'pending'" role="status" aria-live="polite" class="flex items-center gap-2 text-sm text-muted">
+                <UIcon name="i-lucide-loader-circle" class="size-4 animate-spin" aria-hidden="true" />
+                {{ t('extensions.entity_tabs_loading') }}
+              </p>
+              <UAlert v-else-if="extensionTabsError" color="error" icon="i-lucide-circle-alert" :title="t('extensions.entity_tabs_load_failed')" :description="t('extensions.entity_tabs_load_failed_description')">
+                <template #actions>
+                  <UButton color="error" variant="soft" :label="t('common.retry')" icon="i-lucide-refresh-cw" @click="refreshExtensionTabs" />
+                </template>
+              </UAlert>
+            </template>
+            <CommonSection v-if="selectedTab === 'lines'" :show-header="false" :title="t('agreement.payments.lines_title')" :grid-cols="1">
               <AgreementPaymentRecoverySummary :payment="payment" />
               <div class="space-y-4">
                 <div class="flex justify-end">
@@ -357,7 +376,7 @@ const handleCompleted = async () => {
                 :entity-id="paymentId"
                 :can-complete="canUpdatePayment"
                 :can-work-workflow="canEditWorkflow"
-                :hide-title="false"
+                :show-header="false"
                 :show-divider="false"
                 title-key="agreement.payments.completion.title"
                 description-key="agreement.payments.completion.description"
@@ -378,9 +397,10 @@ const handleCompleted = async () => {
               @changed="refreshPage" />
 
             <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcasepayment" :entity-id="paymentId" purpose="standard" :can-edit="canEditWorkflow" :refresh-key="approvalsRefreshKey" @changed="refreshPage" />
-            <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" entity-type="fundingcasepayment" :entity-id="paymentId" />
+            <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" :show-header="false" entity-type="fundingcasepayment" :entity-id="paymentId" />
             <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcasepayment" :entity-id="paymentId" />
-            <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" entity-type="fundingcasepayment" :entity-id="paymentId" />
+            <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" :show-header="false" entity-type="fundingcasepayment" :entity-id="paymentId" />
+            <ExtensionEntityTabPanel v-else-if="selectedExtensionTab" :item="selectedExtensionTab" />
           </CommonDetailWorkspace>
         </div>
       </template>

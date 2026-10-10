@@ -77,7 +77,7 @@ const breadcrumbs = computed(() => [
       <div v-else-if="profile" class="flex flex-1 flex-col">
         <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-inbox" :title="`${t('funding_case_intake.singular')} ${profile.id}`" :meta-items="[`${t('funding_case_intake.opportunity')}: ${getBilingualValue(profile, 'opportunity_name', profile.egcs_fi_fundingopportunity)}`, `${t('funding_case_intake.proponent')}: ${getBilingualValue(profile, 'proponent_name', profile.egcs_fi_applicantrecipient)}`]" :badges="[{ statusId: profile.egcs_fi_status }]" :actions="[{ label: t('common.delete'), icon: 'i-lucide-trash', visible: canDelete, onClick: remove }]" />
         <CommonDetailWorkspace v-model="selectedTab" content-test-id="funding-case-intake-detail-content" :items="tabs">
-          <CommonSection v-if="selectedTab === 'general'" :title="t('funding_case_intake.details')" :grid-cols="1">
+          <CommonSection v-if="selectedTab === 'general'" :show-header="false" :title="t('funding_case_intake.details')" :grid-cols="1">
             <dl class="grid gap-4 md:grid-cols-2">
               <div>
                 <dt class="text-sm text-muted">
@@ -105,9 +105,9 @@ const breadcrumbs = computed(() => [
           <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcaseintake" :entity-id="id" />
           <CommonReviewsTab v-else-if="selectedTab === 'reviews'" entity-type="fundingcaseintake" :entity-id="id" :can-update="canEdit" @changed="refresh" />
           <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcaseintake" :entity-id="id" purpose="standard" :can-edit="canEdit" @changed="refresh" />
-          <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" entity-type="fundingcaseintake" :entity-id="id" />
+          <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" :show-header="false" entity-type="fundingcaseintake" :entity-id="id" />
           <CommonWorkflowSection v-else-if="selectedTab === 'approval'" entity-type="fundingcaseintake" :entity-id="id" purpose="approval_submission" :can-edit="canEdit" @changed="refresh" />
-          <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" entity-type="fundingcaseintake" :entity-id="id" />
+          <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" :show-header="false" entity-type="fundingcaseintake" :entity-id="id" />
         </CommonDetailWorkspace>
       </div>
     </template>

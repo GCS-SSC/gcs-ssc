@@ -25,6 +25,7 @@ const extensionComponent = computed(() => item ? getGcsExtensionComponent(item.c
     :applicant-recipient-id="item.context.applicantRecipientId"
     :claim-id="item.context.claimId"
     :monitor-id="item.context.monitorId"
+    :payment-id="item.context.paymentId"
     :owner-type="item.context.ownerType"
     :owner-id="item.context.ownerId"
     :scope="item.context.target === 'proponent' ? undefined : item.context.scope"

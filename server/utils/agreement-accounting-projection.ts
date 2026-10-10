@@ -2,13 +2,31 @@
 import { sql, type Kysely } from 'kysely'
 import type { Currency_Codes, Database } from '~~/shared/types/database'
 import { CURRENCY_CODES_ENUM } from '~~/shared/constants/enums'
-import { addMoney, parseMoney, subtractMoney, sumMoney, type Money } from '~~/shared/utils/money'
+import { addMoney, compareMoney, parseMoney, subtractMoney, sumMoney, type Money } from '~~/shared/utils/money'
 import { databaseMoneyText, parseDatabaseMoney } from './database-money'
 import { hasPositiveCompletionTerminus } from './completion-terminus'
 import { agreementPaymentIsFinal, agreementPaymentApprovalIsEligible } from './agreement-payment-source'
 import { hasAccountingTable, hasCorrectionSchema } from './correction-schema'
 
 const ZERO = parseMoney('0.00')
+
+type CreditMemoCodingRow = {
+  id: string
+  agencyChartId: string
+  agencyFiscalYearId: string
+  sourceAgencyFiscalYearId: string
+  receivableId: string
+  currency: Currency_Codes
+  accountingDate: Date | string
+  amount: string
+}
+type CreditMemoPaidAdjustment = Omit<CreditMemoCodingRow, 'amount'> & {
+  commitmentLineId: string
+  periodStart: number
+  periodEnd: number
+  collectionDate: Date | string
+  amount: Money
+}
 
 /** Effective signed entries preserve exact-line attribution and owning Agency coding identity. */
 export const readEffectiveCorrectionAdjustments = async (
@@ -31,49 +49,104 @@ export const readEffectiveCorrectionAdjustments = async (
   return rows.map(row => ({ ...row, amount: parseDatabaseMoney(row.amount) }))
 }
 
-/** Immutable successful recoveries reduce their original coding and paid period, once per posting. */
+/** Approved linked Credit Memo coding reduces paid once; receivable principal never changes paid. */
 export const readEffectiveAccountReceivableRecoveries = async (
   db: Kysely<Database>, agreementId: string, options: { currency?: Currency_Codes } = {}
-) => {
-  if (!await hasAccountingTable(db, 'Funding_Case_Account_Receivable_Posting')) return []
-  let query = db.selectFrom('Funding_Case_Account_Receivable_Posting as posting')
-    .innerJoin('Funding_Case_Account_Receivable_Recovery as recovery', 'recovery.id', 'posting.egcs_fc_recovery')
-    .innerJoin('Funding_Case_Account_Receivable_Pool as pool', 'pool.id', 'recovery.egcs_fc_pool')
-    .innerJoin('Funding_Case_Agreement_Account_Receivable as sourceDebt', 'sourceDebt.id', 'posting.egcs_fc_receivable')
-    .select(['posting.id', 'posting.egcs_fc_commitmentline as commitmentLineId',
-      'posting.egcs_fc_agencychartofaccount as agencyChartId', 'posting.egcs_fc_agencyfiscalyear as agencyFiscalYearId',
-      'sourceDebt.egcs_fc_agencyfiscalyear as sourceAgencyFiscalYearId',
-      'posting.egcs_fc_receivable as receivableId', 'posting.egcs_fc_periodstart as periodStart',
-      'posting.egcs_fc_periodend as periodEnd', 'pool.egcs_fc_currency as currency',
-      'recovery.egcs_fc_postedat as collectionDate', databaseMoneyText(sql.ref('posting.egcs_fc_amount')).as('amount')])
-    .where('posting.egcs_fc_fundingagreement', '=', agreementId).where('recovery.egcs_fc_outcome', '=', 'posted')
-    .where('posting._deleted', '=', false).where('recovery._deleted', '=', false)
-  if (options.currency) query = query.where('pool.egcs_fc_currency', '=', options.currency)
-  return (await query.execute()).map(row => ({ ...row, amount: subtractMoney(ZERO, parseDatabaseMoney(row.amount)) }))
+): Promise<CreditMemoPaidAdjustment[]> => {
+  if (!await hasAccountingTable(db, 'Funding_Case_Account_Receivable_Credit_Memo_Line')) return []
+  const manual = await sql<CreditMemoCodingRow>`
+    SELECT line.id::text AS id, line.egcs_fc_commitmentchartofaccount::text AS "agencyChartId",
+      account.egcs_ay_fiscalyear::text AS "agencyFiscalYearId", account.egcs_ay_fiscalyear::text AS "sourceAgencyFiscalYearId",
+      debt.id::text AS "receivableId", memo.egcs_fc_currency AS currency, memo.egcs_fc_receiveddate AS "accountingDate",
+      line.egcs_fc_amount::text AS amount
+    FROM "Funding_Case_Account_Receivable_Credit_Memo_Line" line
+    JOIN "Funding_Case_Account_Receivable_Credit_Memo" memo ON memo.id=line.egcs_fc_creditmemo
+    JOIN "Funding_Case_Agreement_Account_Receivable" debt ON debt.id=line.egcs_fc_receivable
+    JOIN "Agency_Chart_of_Account" account ON account.id=line.egcs_fc_commitmentchartofaccount
+    WHERE debt.egcs_fc_fundingagreement=${agreementId} AND memo.egcs_fc_outcome='posted'
+      AND NOT memo._deleted AND NOT line._deleted
+      AND (${options.currency ?? null}::text IS NULL OR memo.egcs_fc_currency=${options.currency ?? null})
+    ORDER BY memo.egcs_fc_receiveddate, memo.id, line.id
+  `.execute(db)
+  const offsets = await hasAccountingTable(db, 'Funding_Case_Account_Receivable_Offset_Memo')
+    ? await sql<CreditMemoCodingRow>`
+      SELECT ('offset:' || memo.id::text) AS id, memo.egcs_fc_commitmentchartofaccount::text AS "agencyChartId",
+        account.egcs_ay_fiscalyear::text AS "agencyFiscalYearId", account.egcs_ay_fiscalyear::text AS "sourceAgencyFiscalYearId",
+        debt.id::text AS "receivableId", pool.egcs_fc_currency AS currency, memo.egcs_fc_createdat AS "accountingDate",
+        memo.egcs_fc_amount::text AS amount
+      FROM "Funding_Case_Account_Receivable_Offset_Memo" memo
+      JOIN "Funding_Case_Agreement_Account_Receivable" debt ON debt.id=memo.egcs_fc_receivable
+      JOIN "Funding_Case_Account_Receivable_Pool" pool ON pool.id=memo.egcs_fc_pool
+      JOIN "Agency_Chart_of_Account" account ON account.id=memo.egcs_fc_commitmentchartofaccount
+      JOIN "Funding_Case_Account_Receivable_Offset_Memo_Application" application ON application.egcs_fc_offsetmemo=memo.id
+      JOIN "Funding_Case_Account_Receivable_Recovery" recovery ON recovery.id=application.egcs_fc_recovery
+      WHERE debt.egcs_fc_fundingagreement=${agreementId} AND recovery.egcs_fc_outcome='posted'
+        AND NOT recovery._deleted AND NOT memo._deleted
+        AND (${options.currency ?? null}::text IS NULL OR pool.egcs_fc_currency=${options.currency ?? null})
+      ORDER BY memo.id
+    `.execute(db)
+    : { rows: [] as CreditMemoCodingRow[] }
+  if (!manual.rows.length && !offsets.rows.length) return []
+  const lines = await getAgreementAccountingLines(db, agreementId, { omitCreditMemos: true })
+  const paidByLine = new Map(lines.map(line => [String(line.id), line.egcs_fc_correctedpaid]))
+  const result: CreditMemoPaidAdjustment[] = []
+  for (const memo of [...manual.rows, ...offsets.rows]) {
+    const candidates = lines.filter(line => String(line.egcs_fc_agencychartofaccount) === memo.agencyChartId && line.currency === memo.currency)
+    let remaining = parseDatabaseMoney(memo.amount)
+    const period = (new Date(memo.accountingDate).getUTCMonth() + 9) % 12
+    if (!candidates.length) {
+      result.push({ ...memo, commitmentLineId: '', periodStart: period, periodEnd: period,
+        collectionDate: memo.accountingDate, amount: subtractMoney(ZERO, remaining) })
+      continue
+    }
+    for (const [index, line] of candidates.entries()) {
+      const available = paidByLine.get(String(line.id)) ?? ZERO
+      const nonnegativePaid = compareMoney(available, ZERO) < 0 ? ZERO : available
+      // Preserve the entire signed amount even for historically over-credited coding.
+      const attributed = index === candidates.length - 1 || compareMoney(remaining, nonnegativePaid) <= 0 ? remaining : nonnegativePaid
+      if (compareMoney(attributed, ZERO) === 0) continue
+      const amount = subtractMoney(ZERO, attributed)
+      result.push({ ...memo, commitmentLineId: String(line.id), periodStart: period, periodEnd: period,
+        collectionDate: memo.accountingDate, amount })
+      paidByLine.set(String(line.id), addMoney(available, amount))
+      remaining = subtractMoney(remaining, attributed)
+      if (remaining === ZERO) break
+    }
+  }
+  return result
 }
 
-/** Claim consumption uses the source allocation, never the one-to-many coding posting join. */
+/** Claim reductions activate only after their owning receivable has fully cleared. */
 export const readEffectiveAccountReceivableClaimRecoveries = async (db: Kysely<Database>, agreementId: string, options: { currency?: Currency_Codes } = {}) => {
-  if (!await hasAccountingTable(db, 'Funding_Case_Account_Receivable_Posting')) return []
-  const rows = await db.selectFrom('Funding_Case_Account_Receivable_Allocation as allocation')
-    .innerJoin('Funding_Case_Account_Receivable_Recovery as recovery', 'recovery.id', 'allocation.egcs_fc_recovery')
-    .innerJoin('Funding_Case_Agreement_Account_Receivable_Line as line', 'line.id', 'allocation.egcs_fc_receivableline')
-    .innerJoin('Funding_Case_Agreement_Account_Receivable as debt', 'debt.id', 'line.egcs_fc_receivable')
-    .innerJoin('Agency_Fiscal_Year as fiscalYear', 'fiscalYear.id', 'debt.egcs_fc_agencyfiscalyear')
-    .select(['allocation.id', 'line.egcs_fc_claimline as claimLineId', 'line.egcs_fc_reconcileline as reconcileLineId',
-      'debt.egcs_fc_agencyfiscalyear as agencyFiscalYearId', 'fiscalYear.egcs_ay_fiscalyear as fiscalYearOrder', 'debt.egcs_fc_currency as currency',
-      'line.egcs_fc_periodstart as periodStart', 'line.egcs_fc_periodend as periodEnd',
-      databaseMoneyText(sql.ref('allocation.egcs_fc_amount')).as('amount')])
-    .where('allocation.egcs_fc_fundingagreement', '=', agreementId).where('debt.egcs_fc_claimrelated', '=', true)
-    .where('recovery.egcs_fc_outcome', '=', 'posted').where('allocation._deleted', '=', false)
-    .where('recovery._deleted', '=', false).execute()
-  return rows.filter(row => !options.currency || row.currency === options.currency).map(row => ({ ...row, amount: subtractMoney(ZERO, parseDatabaseMoney(row.amount)) }))
+  if (!await hasAccountingTable(db, 'Funding_Case_Account_Receivable_Claim_Reduction')) return []
+  const rows = await db.selectFrom('Funding_Case_Account_Receivable_Claim_Reduction as reduction')
+    .innerJoin('Funding_Case_Agreement_Account_Receivable as debt', 'debt.id', 'reduction.egcs_fc_receivable')
+    .innerJoin('Funding_Case_Agreement_Claim as claim', 'claim.id', 'reduction.egcs_fc_claim')
+    .innerJoin('Funding_Case_Agreement_Claim_Line_Item as line', 'line.id', 'reduction.egcs_fc_claimline')
+    .innerJoin('Funding_Case_Agreement_Budget_Fiscal_Year as sourceYear', 'sourceYear.id', 'claim.egcs_fc_fiscalyear')
+    .innerJoin('Funding_Case_Agreement_Budget_Fiscal_Year as year', join => join.on(
+      sql<string>`COALESCE(year.egcs_fc_originalbudgetfiscalyear,year.id)::text`, '=', sql<string>`COALESCE("sourceYear".egcs_fc_originalbudgetfiscalyear,"sourceYear".id)::text`
+    ))
+    .innerJoin('Funding_Case_Agreement_Budget_Version as version', 'version.id', 'year.egcs_fc_budgetversion')
+    .innerJoin('Agency_Fiscal_Year as fiscal', 'fiscal.id', 'year.egcs_fc_fiscalyear')
+    .select(['reduction.id', 'line.id as claimLineId', sql<null>`NULL`.as('reconcileLineId'),
+      'fiscal.id as agencyFiscalYearId', 'fiscal.egcs_ay_fiscalyear as fiscalYearOrder', 'line.egcs_fc_currency as currency',
+      'claim.egcs_fc_periodstart as periodStart', 'claim.egcs_fc_periodend as periodEnd',
+      databaseMoneyText(sql.ref('reduction.egcs_fc_amount')).as('amount')])
+    .where('debt.egcs_fc_fundingagreement', '=', agreementId).where('claim.egcs_fc_fundingagreement', '=', agreementId)
+    .where('year.egcs_fc_fundingagreement', '=', agreementId).where('version.egcs_fc_iscurrent', '=', true)
+    .where('sourceYear.egcs_fc_fundingagreement', '=', agreementId)
+    .where('reduction.egcs_fc_appliedat', 'is not', null).where('reduction._deleted', '=', false)
+    .where('line._deleted', '=', false).where('claim._deleted', '=', false).where('year._deleted', '=', false)
+    .where('version._deleted', '=', false).execute()
+  return rows.filter(row => !options.currency || row.currency === options.currency)
+    .map(row => ({ ...row, amount: subtractMoney(ZERO, parseDatabaseMoney(row.amount)) }))
 }
 
 /** Actual recorded paid components, never the protective paid floor used by capacity checks. */
 export const getAgreementAccountingLines = async (
   db: Kysely<Database>, agreementId: string,
-  options: { excludePaymentId?: string; paymentMode?: 'reserved' | 'finalized' } = {}
+  options: { excludePaymentId?: string; paymentMode?: 'reserved' | 'finalized'; omitCreditMemos?: boolean } = {}
 ) => {
   const lines = await db.selectFrom('Funding_Case_Agreement_Commitment_Line as line')
     .innerJoin('Funding_Case_Agreement_Commitment as commitment', 'commitment.id', 'line.egcs_fc_commitment')
@@ -115,7 +188,7 @@ export const getAgreementAccountingLines = async (
     if (await hasPositiveCompletionTerminus(db, 'fundingcasejournalvoucher', id)) successful.add(id)
   }
   const corrections = await readEffectiveCorrectionAdjustments(db, agreementId)
-  const recoveries = await readEffectiveAccountReceivableRecoveries(db, agreementId)
+  const recoveries = options.omitCreditMemos ? [] : await readEffectiveAccountReceivableRecoveries(db, agreementId)
   return lines.map(line => {
     const original = sumMoney(payments.filter(row => row.currency === line.currency && String(row.commitmentLineId) === String(line.id))
       .map(row => parseDatabaseMoney(row.amount)))

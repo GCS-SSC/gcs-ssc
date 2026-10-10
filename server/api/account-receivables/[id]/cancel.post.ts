@@ -5,7 +5,7 @@ import { cancelAccountReceivableCase } from '~~/server/utils/account-receivable-
 
 export default defineEventHandler(async event => {
   const id = getRouterParam(event, 'id') ?? ''
-  await authorizeAccountReceivable(event, id, 'update')
+  const context = await authorizeAccountReceivable(event, id, 'update')
   const input = await readValidatedBodyI18n(event, AccountReceivableCancelSchema)
-  return await cancelAccountReceivableCase(event, id, 'fundingcaseaccountreceivable', input.egcs_fc_reason)
+  return await cancelAccountReceivableCase(event, id, context.entityType, input.egcs_fc_reason)
 })

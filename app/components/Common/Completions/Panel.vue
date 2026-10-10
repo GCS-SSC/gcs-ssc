@@ -18,7 +18,7 @@ const {
   completedSuccessKey,
   confirmationMessageKey,
   refreshKey = 0,
-  hideTitle = true,
+  showHeader = false,
   showDivider = false
 } = defineProps<{
   entityType: Entity_Type & Workflow_Target_Entity_Type
@@ -34,7 +34,7 @@ const {
   completedSuccessKey: string
   confirmationMessageKey?: string
   refreshKey?: number
-  hideTitle?: boolean
+  showHeader?: boolean
   showDivider?: boolean
 }>()
 
@@ -57,7 +57,7 @@ const refreshLifecycle = () => {
       :entity-type="entityType"
       :entity-id="entityId"
       :is-locked="!canComplete"
-      :hide-title="hideTitle"
+      :show-header="showHeader"
       :show-divider="showDivider"
       :title-key="titleKey"
       :description-key="descriptionKey"

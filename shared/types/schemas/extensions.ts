@@ -101,6 +101,7 @@ export type ExtensionEntityTabContext = {
   agreementId?: never
   claimId?: never
   monitorId?: never
+  paymentId?: never
   opportunityId?: never
   scope?: never
 } | {
@@ -111,6 +112,7 @@ export type ExtensionEntityTabContext = {
   applicantRecipientId?: string
   claimId?: string
   monitorId?: string
+  paymentId?: string
   opportunityId?: string
   ownerType: string
   ownerId: string

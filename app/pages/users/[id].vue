@@ -200,6 +200,7 @@ const tabMap: TabMap = new Map([
       icon: 'i-lucide-shield-user',
       component: UserAssignmentsTab,
       getProps: () => ({
+        showHeader: false,
         assignments: user.value?.assignments ?? [],
         getLocalizedName,
         canAdd: (

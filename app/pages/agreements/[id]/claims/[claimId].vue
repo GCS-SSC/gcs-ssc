@@ -1267,6 +1267,7 @@ const cancelReconciliation = async () => {
 
             <CommonWorkflowSupplementaryInformation
               v-else-if="selectedClaimTab === 'supplementary-information'"
+              :show-header="false"
               entity-type="fundingcaseagreementclaim"
               :entity-id="claimId" />
 
@@ -1453,8 +1454,7 @@ const cancelReconciliation = async () => {
                       :key="`reconcile-completion:${activeReconcile.id}`"
                       entity-type="fundingclaimreconcile"
                       :entity-id="String(activeReconcile.id)"
-                      :is-locked="!canUpdateReconcile"
-                      hide-title
+                      :is-locked="!canUpdateReconcile" :show-header="false"
                       title-key="agreement.claims.reconcile_completion.title"
                       description-key="agreement.claims.reconcile_completion.description"
                       status-complete-key="agreement.claims.reconcile_completion.status_complete"
@@ -1484,6 +1484,7 @@ const cancelReconciliation = async () => {
 
             <CommonAssignedUsers
               v-else-if="selectedClaimTab === 'assignments'"
+              :show-header="false"
               entity-type="fundingcaseagreementclaim"
               :entity-id="claimId" />
 

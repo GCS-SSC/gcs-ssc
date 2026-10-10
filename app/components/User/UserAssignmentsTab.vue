@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import { useDetailSectionOwnership } from '~/composables/useDetailSectionOwnership'
 import type { UserAssignment } from '~~/shared/types/admin'
 
 const {
   assignments,
   getLocalizedName,
   canAdd = false,
+  showHeader = true,
   deletingAssignmentId = null
 } = defineProps<{
   assignments: UserAssignment[]
   getLocalizedName: (item: UserAssignment, field: string) => string
+  showHeader?: boolean
   canAdd?: boolean
   deletingAssignmentId?: string | null
 }>()
@@ -20,13 +21,12 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const ownsHeading = useDetailSectionOwnership(() => t('role.assignment.title'))
 </script>
 
 <template>
   <div class="space-y-6">
-    <div class="mb-4 flex items-center" :class="ownsHeading ? 'justify-end' : 'justify-between'">
-      <h3 v-if="!ownsHeading" class="text-lg font-bold text-zinc-900 dark:text-white">
+    <div class="mb-4 flex items-center" :class="showHeader ? 'justify-between' : 'justify-end'">
+      <h3 v-if="showHeader" class="text-lg font-bold text-zinc-900 dark:text-white">
         {{ t('role.assignment.title') }}
       </h3>
       <UButton

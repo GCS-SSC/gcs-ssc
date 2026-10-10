@@ -20,9 +20,9 @@ import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-
 import { authorizeFreshAssignedItem } from '~~/server/utils/authorize'
 import type { ExactEntityTarget } from '@gcs-ssc/authorization'
 import { assertBusinessStatusMutationAllowed, resolveBusinessStatusProtection } from '~~/server/utils/business-status-runtime'
-import { getCommitmentLinePaymentCoverage } from '~~/server/utils/agreement-commitment-line-balance'
+import { getCommitmentAllocationPaidCoverage, getCommitmentLinePaymentCoverage } from '~~/server/utils/agreement-commitment-line-balance'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
-import { addMoney, compareMoney, type Money } from '~~/shared/utils/money'
+import { addMoney, compareMoney, sumMoney, type Money } from '~~/shared/utils/money'
 
 type DbClient = Kysely<Database> | Transaction<Database>
 
@@ -137,6 +137,7 @@ export const getAgreementCommitment = async (
     'egcs_fc_fundingagreement',
     'egcs_fc_type',
     'egcs_fc_currency',
+    databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('egcs_fc_totalamount'),
     'egcs_fc_status',
     'egcs_fc_financialsystemnumber'
   ])
@@ -222,6 +223,42 @@ export const syncAgreementCommitmentEditingStatus = async (
   _commitmentId: string
 ) => {
   // Ordinary commitment edits preserve the Agency-configured business status.
+}
+
+export const getAgreementCommitmentCodingTotals = async (db: DbClient, commitmentId: string) => {
+  const commitment = await db.selectFrom('Funding_Case_Agreement_Commitment')
+    .select(databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('amount'))
+    .where('id', '=', commitmentId).where('_deleted', '=', false).executeTakeFirstOrThrow()
+  const lines = await db.selectFrom('Funding_Case_Agreement_Commitment_Line')
+    .select(databaseMoneyText(sql`COALESCE(SUM(${sql.ref('egcs_fc_amount')}), 0)`).as('amount'))
+    .where('egcs_fc_commitment', '=', commitmentId).where('_deleted', '=', false).executeTakeFirst()
+  const declared = parseDatabaseMoney(commitment.amount)
+  const allocated = parseDatabaseMoney(lines?.amount ?? '0')
+  return { declared, allocated, balanced: compareMoney(declared, allocated) === 0 }
+}
+
+export const validateAgreementCommitmentPriorPaidCoverage = async (
+  db: DbClient,
+  input: { agreementId: string; commitmentId: string; commitmentTypeId: string; currency: Currency_Codes }
+): Promise<boolean> => {
+  const priorLines = await db.selectFrom('Funding_Case_Agreement_Commitment_Line as priorLine')
+    .innerJoin('Funding_Case_Agreement_Commitment as priorCommitment', 'priorCommitment.id', 'priorLine.egcs_fc_commitment')
+    .select(['priorLine.id', 'priorLine.egcs_fc_transferpaymentstreamchartofaccount as codingId'])
+    .where('priorCommitment.egcs_fc_fundingagreement', '=', input.agreementId).where('priorCommitment.egcs_fc_type', '=', input.commitmentTypeId)
+    .where('priorCommitment.egcs_fc_currency', '=', input.currency).where('priorCommitment.egcs_fc_active', '=', true)
+    .where('priorCommitment.id', '!=', input.commitmentId).where('priorCommitment._deleted', '=', false).where('priorLine._deleted', '=', false)
+    .orderBy('priorLine.id').forUpdate('priorLine').execute()
+  if (!priorLines.length) return true
+  const proposed = await db.selectFrom('Funding_Case_Agreement_Commitment_Line')
+    .select(['egcs_fc_transferpaymentstreamchartofaccount', databaseMoneyText(sql.ref('egcs_fc_amount')).as('amount')])
+    .where('egcs_fc_commitment', '=', input.commitmentId).where('_deleted', '=', false).execute()
+  const { codingFloors } = await getCommitmentAllocationPaidCoverage(db, { agreementId: input.agreementId,
+    currency: input.currency, lineIds: priorLines.map(line => String(line.id)) })
+  for (const [codingId, paid] of codingFloors) {
+    const total = sumMoney(proposed.filter(line => String(line.egcs_fc_transferpaymentstreamchartofaccount) === codingId).map(line => parseDatabaseMoney(line.amount)))
+    if (compareMoney(total, paid) < 0) return false
+  }
+  return true
 }
 
 export const assertCommitmentTypeBelongsToAgreementStream = async (
@@ -382,11 +419,11 @@ export const assertAgreementCommitmentTotalWithinProgramFunding = async (
   agreementId: string,
   commitmentId: string,
   amount: Money,
-  options: { excludeLineId?: string } = {}
+  options: { excludeLineId?: string; replaceTotal?: boolean } = {}
 ) => {
   const commitment = await db
     .selectFrom('Funding_Case_Agreement_Commitment')
-    .select(['id', 'egcs_fc_currency'])
+    .select(['id', 'egcs_fc_currency', databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('egcs_fc_totalamount')])
     .where('id', '=', commitmentId)
     .where('egcs_fc_fundingagreement', '=', agreementId)
     .where('_deleted', '=', false)
@@ -436,7 +473,12 @@ export const assertAgreementCommitmentTotalWithinProgramFunding = async (
   const programFundingTotal = parseDatabaseMoney(budget?.total ?? '0')
   const existingCommitmentTotal = parseDatabaseMoney(commitmentLines?.total ?? '0')
 
-  if (compareMoney(addMoney(existingCommitmentTotal, amount), programFundingTotal) > 0) {
+  const nextTotal = options.replaceTotal ? amount : addMoney(existingCommitmentTotal, amount)
+  if (!options.replaceTotal && commitment.egcs_fc_totalamount !== undefined
+    && compareMoney(nextTotal, parseDatabaseMoney(commitment.egcs_fc_totalamount)) > 0) {
+    return await badRequest(event, 'AGREEMENT_COMMITMENT_EXCEEDS_TOTAL', 'apiErrors.agreement.invalid_coding_allocation')
+  }
+  if (compareMoney(nextTotal, programFundingTotal) > 0) {
     return await badRequest(
       event,
       'AGREEMENT_COMMITMENT_EXCEEDS_PROGRAM_FUNDING',

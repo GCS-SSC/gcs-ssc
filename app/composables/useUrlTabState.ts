@@ -1,6 +1,7 @@
 import { computed, isRef, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { TranslatedTabItem } from '~~/shared/types/ui'
+import { getSectionTabValue, localizeSectionValue, sectionValueAliases } from '~/utils/section-url-values'
 
 type TranslatedTabInput = Omit<TranslatedTabItem, 'value'> & { value?: string }
 
@@ -72,41 +73,10 @@ const getMessageForKey = (messages: Record<string, unknown>, key: string): strin
 }
 
 /**
- * Removes the locale prefix from a localized route path.
- *
- * @param path - Localized route path.
- * @returns Path without the leading locale segment.
- */
-const stripLocalePrefix = (path: string): string => {
-  const segments = path.split('/').filter(Boolean)
-  if (segments.length === 0) {
-    return '/'
-  }
-
-  if (/^[a-z]{2}$/i.test(segments[0] ?? '')) {
-    return `/${segments.slice(1).join('/')}`
-  }
-
-  return `/${segments.join('/')}`
-}
-
-/**
- * Extracts the locale segment from a localized route path.
- *
- * @param path - Localized route path.
- * @returns Leading locale segment or an empty string.
- */
-const getPathLocaleSegment = (path: string): string => {
-  const [localeSegment] = path.split('/').filter(Boolean)
-  return localeSegment && /^[a-z]{2}$/i.test(localeSegment) ? localeSegment : ''
-}
-
-/**
  * Resolves the selected tab key from route query aliases and configured defaults.
  *
- * @param input - Route query, alias map, defaults, and locale-switch state.
+ * @param input - Route query, alias map and defaults.
  * @param input.queryValue - Candidate route query value.
- * @param input.isLocaleSwitch - Whether the current navigation is a locale switch.
  * @param input.explicitDefaultKey - Configured default tab key.
  * @param input.tabKeyToValue - Map of tab keys to URL values.
  * @param input.tabAliasToKey - Map of URL aliases to tab keys.
@@ -115,25 +85,17 @@ const getPathLocaleSegment = (path: string): string => {
  */
 export const resolveUrlTabKey = ({
   queryValue,
-  isLocaleSwitch,
   explicitDefaultKey,
   tabKeyToValue,
   tabAliasToKey,
   fallbackKey
 }: {
   queryValue: unknown
-  isLocaleSwitch: boolean
   explicitDefaultKey: string
   tabKeyToValue: Record<string, string>
   tabAliasToKey: Record<string, string>
   fallbackKey: string
 }): string => {
-  if (isLocaleSwitch) {
-    return explicitDefaultKey && tabKeyToValue[explicitDefaultKey]
-      ? explicitDefaultKey
-      : fallbackKey
-  }
-
   const keyFromQuery = tabAliasToKey[resolveQueryParamValue(queryValue)]
   if (keyFromQuery) {
     return keyFromQuery
@@ -164,13 +126,11 @@ export const useUrlTabState = ({
   queryKey = 'section',
   historyMode = 'replace'
 }: UrlTabStateOptions) => {
-  const { t, locale, getLocaleMessage } = useI18n()
+  const { locale, getLocaleMessage } = useI18n()
   const route = useRoute()
   const router = useRouter()
   const selectedTab: Ref<string> = ref('')
   const selectedTabKey: Ref<string> = ref('')
-  const previousPath: Ref<string> = ref(route.path)
-  const previousRouteName: Ref<string> = ref(typeof route.name === 'string' ? route.name : '')
   const inputTabsRef: Ref<TranslatedTabInput[]> = isRef(tabs) ? tabs : computed(() => tabs)
   const defaultTabRef: Ref<string> = isRef(defaultTab) ? defaultTab : computed(() => defaultTab ?? '')
   const defaultKeyRef: Ref<string> = isRef(defaultKey) ? defaultKey : computed(() => defaultKey ?? '')
@@ -178,10 +138,7 @@ export const useUrlTabState = ({
   const tabsRef = computed<TranslatedTabItem[]>(() =>
     inputTabsRef.value.map(item => ({
       ...item,
-      value:
-        item.value && item.value.length > 0
-          ? item.value
-          : toTabValue(t(item.key))
+      value: getSectionTabValue(item)
     }))
   )
   const tabKeyToValue = computed<Record<string, string>>(() =>
@@ -191,7 +148,7 @@ export const useUrlTabState = ({
     const aliases = new Map<string, string>()
 
     for (const item of tabsRef.value) {
-      aliases.set(String(item.value), item.key)
+      for (const alias of sectionValueAliases(item.value)) aliases.set(alias, item.key)
       aliases.set(item.key, item.key)
 
       if (typeof getLocaleMessage !== 'function') {
@@ -229,29 +186,12 @@ export const useUrlTabState = ({
   })
   const routeLocaleMatches = computed(() => {
     const [localeSegment] = route.path.split('/').filter(Boolean)
-    if (!localeSegment) {
+    if (localeSegment !== 'en' && localeSegment !== 'fr') {
       return true
     }
 
     return localeSegment === locale.value
   })
-
-  /**
-   * Determines whether the current navigation is a locale switch on the same page.
-   *
-   * @returns True when the user is switching locales on the same page.
-   */
-  const isLocaleSwitchNavigation = (): boolean =>
-    route.path !== previousPath.value
-    && getPathLocaleSegment(route.path) !== getPathLocaleSegment(previousPath.value)
-    && (
-      (
-        typeof route.name === 'string'
-        && previousRouteName.value.length > 0
-        && route.name === previousRouteName.value
-      )
-      || stripLocalePrefix(route.path) === stripLocalePrefix(previousPath.value)
-    )
 
   /**
    * Coerces an arbitrary tab value to one of the allowed tab values.
@@ -276,7 +216,6 @@ export const useUrlTabState = ({
   const resolveTabKey = (queryValue: unknown): string => {
     return resolveUrlTabKey({
       queryValue,
-      isLocaleSwitch: isLocaleSwitchNavigation(),
       explicitDefaultKey: String(defaultKeyRef.value || ''),
       tabKeyToValue: tabKeyToValue.value,
       tabAliasToKey: tabAliasToKey.value,
@@ -300,14 +239,15 @@ export const useUrlTabState = ({
       return
     }
 
+    const nextUrlValue = localizeSectionValue(nextTab, locale.value)
     const currentTab = resolveQueryParamValue(route.query[queryKey])
-    if (currentTab === nextTab && !pendingNavigation) {
+    if (currentTab === nextUrlValue && !pendingNavigation) {
       return
     }
 
     const nextQuery = {
       ...route.query,
-      [queryKey]: nextTab
+      [queryKey]: nextUrlValue
     }
 
     const target = { path: route.path, query: nextQuery, hash: route.hash }
@@ -328,11 +268,9 @@ export const useUrlTabState = ({
   }
 
   watch(
-    [() => route.path, () => route.query[queryKey], tabValues, resolvedDefaultTab, enabledRef],
+    [() => route.path, () => route.query[queryKey], tabValues, resolvedDefaultTab, enabledRef, locale],
     ([routePath, queryTab, , defaultValue, isEnabled], previousValues) => {
       if (!isEnabled) {
-        previousPath.value = route.path
-        previousRouteName.value = typeof route.name === 'string' ? route.name : ''
         return
       }
 
@@ -364,9 +302,6 @@ export const useUrlTabState = ({
           }
         })
       }
-
-      previousPath.value = route.path
-      previousRouteName.value = typeof route.name === 'string' ? route.name : ''
     },
     { immediate: true }
   )

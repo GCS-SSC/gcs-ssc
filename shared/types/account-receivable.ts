@@ -6,7 +6,8 @@ import type { JournalVoucherAccountingLine } from '../utils/journal-voucher'
 import type { AccountReceivableRecoveryMethod } from '../utils/account-receivable'
 
 export type AccountReceivableRow = Omit<Selectable<FundingCaseAgreementAccountReceivableTable>,
-  'egcs_fc_requesteddate' | 'egcs_fc_createdat' | 'egcs_fc_postedat' | 'egcs_fc_terminalat' | 'egcs_fc_fiscaloutstanding'> & {
+  'egcs_fc_amount' | 'egcs_fc_requesteddate' | 'egcs_fc_createdat' | 'egcs_fc_postedat' | 'egcs_fc_terminalat' | 'egcs_fc_fiscaloutstanding'> & {
+    egcs_fc_amount: Money
     egcs_fc_fiscaloutstanding: Money | null
     egcs_fc_requesteddate: string
     egcs_fc_createdat: string
@@ -92,7 +93,29 @@ export type AccountReceivablePaymentCreditMemo = Pick<AccountReceivableOffsetMem
     egcs_fc_outcome: 'open' | 'posted' | 'released'
   }
 
+export type AccountReceivableClaimReduction = {
+  id: string
+  egcs_fc_claim: string
+  egcs_fc_claimline: string
+  egcs_fc_amount: Money
+  egcs_fc_description: string
+  egcs_fc_appliedat: string | null
+}
+export type AccountReceivableCreditMemoLink = {
+  id: string
+  egcs_fc_kind: 'cash' | 'automatic'
+  egcs_fc_origin: { agreementId: string; paymentId: string } | null
+  egcs_fc_amount: Money
+  egcs_fc_outcome: string
+  egcs_fc_reference: string
+}
 export type AccountReceivableDetail = AccountReceivableRow & {
+  egcs_fc_effectiveagencyfinancialid: string | null
+  egcs_fc_effectivefinancialsystemid: string
+  egcs_fc_parentreadable: boolean
+  egcs_fc_claimreductions: AccountReceivableClaimReduction[]
+  egcs_fc_creditmemos: AccountReceivableCreditMemoLink[]
+
   egcs_fc_candeletelines: boolean
   egcs_fc_recovered: Money
   egcs_fc_reserved: Money
@@ -105,6 +128,7 @@ export type AccountReceivableDetail = AccountReceivableRow & {
   egcs_fc_agreementreadable: boolean
   egcs_fc_sourcereadable: boolean
   egcs_fc_canwork: boolean
+  egcs_fc_caneditrole: boolean
   egcs_fc_canedit: boolean
   egcs_fc_candelete: boolean
   egcs_fc_cancancel: boolean
@@ -118,15 +142,22 @@ export type AccountReceivableDetail = AccountReceivableRow & {
 }
 
 export type AccountReceivableCreditMemoRow = Omit<Selectable<FundingCaseAccountReceivableCreditMemoTable>,
-  'egcs_fc_receiveddate' | 'egcs_fc_createdat' | 'egcs_fc_postedat' | 'egcs_fc_terminalat' | 'egcs_fc_amount'> & {
+  'egcs_fc_receiveddate' | 'egcs_fc_createdat' | 'egcs_fc_postedat' | 'egcs_fc_terminalat' | 'egcs_fc_amount' | 'egcs_fc_totalamount' | 'egcs_fc_receivables'> & {
     egcs_fc_receiveddate: string
     egcs_fc_createdat: string
     egcs_fc_postedat: string | null
     egcs_fc_terminalat: string | null
     egcs_fc_amount: Money
+    egcs_fc_totalamount: Money
+    egcs_fc_receivables: string[]
   } & BusinessRecordStateFields
 
 export type AccountReceivableCreditMemoLine = {
+  egcs_fc_fundingagreement?: string | null
+  egcs_fc_receivable: string
+  egcs_fc_agreementnumber: string
+  egcs_fc_financialsystemid: string
+  egcs_fc_commitmentchartofaccount: string | null
   id: string
   egcs_fc_creditmemo: string
   egcs_fc_linenumber: number
@@ -136,6 +167,7 @@ export type AccountReceivableCreditMemoLine = {
 }
 
 export type AccountReceivableCreditMemoDetail = AccountReceivableCreditMemoRow & {
+  egcs_fc_receivablelinks: Array<{ id: string; egcs_fc_fundingagreement: string; egcs_fc_agreementnumber: string; egcs_fc_agreementreadable: boolean; egcs_fc_reference: string; egcs_fc_readable: boolean }>
   egcs_fc_lines: AccountReceivableCreditMemoLine[]
   egcs_fc_candeletelines: boolean
   egcs_fc_receivablerecovered: Money
@@ -150,6 +182,7 @@ export type AccountReceivableCreditMemoDetail = AccountReceivableCreditMemoRow &
   egcs_fc_creditmemoreference: string
   egcs_fc_agencyname_en: string
   egcs_fc_agencyname_fr: string
+  egcs_fc_agencyreadable: boolean
   egcs_fc_proponentreadable: boolean
   egcs_fc_agreementreadable: boolean
   egcs_fc_canwork: boolean

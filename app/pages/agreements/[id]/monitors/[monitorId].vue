@@ -651,7 +651,7 @@ const handleCompleted = async () => {
                 :entity-id="monitorId"
                 :can-complete="canUpdateMonitor"
                 :can-work-workflow="isAssigned"
-                :hide-title="false"
+                :show-header="false"
                 :show-divider="false"
                 title-key="agreement.monitors.completion.title"
                 description-key="agreement.monitors.completion.description"
@@ -682,11 +682,13 @@ const handleCompleted = async () => {
 
             <CommonWorkflowSupplementaryInformation
               v-else-if="selectedMonitorTab === 'supplementary-information'"
+              :show-header="false"
               entity-type="fundingcasemonitor"
               :entity-id="monitorId" />
 
             <CommonAssignedUsers
               v-else-if="selectedMonitorTab === 'assignments'"
+              :show-header="false"
               entity-type="fundingcasemonitor"
               :entity-id="monitorId" />
 

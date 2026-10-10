@@ -17,6 +17,7 @@ const {
   actionLabelKey = 'workflow.start',
   completedSuccessKey,
   showWhenUnconfigured = false,
+  showHeader = true,
   titleKey,
   descriptionKey
 } = defineProps<{
@@ -28,6 +29,7 @@ const {
   actionLabelKey?: string
   completedSuccessKey: string
   showWhenUnconfigured?: boolean
+  showHeader?: boolean
   titleKey?: string
   descriptionKey?: string
 }>()
@@ -57,6 +59,7 @@ const completionState = useCompletionWorkflowStart({
     purpose="approval_submission"
     :can-edit="canEdit"
     :show-pre-action-when-unconfigured="showWhenUnconfigured"
+    :pre-action-show-header="showHeader"
     :pre-action-title-key="titleKey"
     :pre-action-description-key="descriptionKey"
     :refresh-key="refreshKey"

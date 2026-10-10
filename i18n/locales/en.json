@@ -277,6 +277,7 @@
       "fundingcasejournalvoucher": "Journal Voucher",
       "fundingcasecorrection": "Correction",
       "fundingcaseaccountreceivable": "Accounts receivable",
+      "fundingcaseaccountreceivableadjustment": "Accounts receivable adjustment",
       "fundingcaseaccountreceivablecreditmemo": "Credit Memo",
       "commondatacollection": "Data Collection"
     }
@@ -541,6 +542,7 @@
       "fundingcasejournalvoucher": "Journal Voucher",
       "fundingcasecorrection": "Correction",
       "fundingcaseaccountreceivable": "Accounts Receivable",
+      "fundingcaseaccountreceivableadjustment": "Accounts Receivable Adjustment",
       "fundingcaseaccountreceivablecreditmemo": "Accounts Receivable Credit Memo",
       "commondatacollection": "Data Collection"
     },
@@ -1232,6 +1234,8 @@
       "account_receivable_type_not_found": "Receivable type not found.",
       "account_receivable_type_in_use": "This receivable type is used by an accounts receivable and cannot be deleted.",
       "account_receivable_type_policy_locked": "The source and monitoring requirements cannot be changed because a receivable uses this type.",
+      "invalid_credit_memo_commitment_chart": "Select an active commitment account with the same agency, fiscal year and currency for this credit memo account.",
+      "credit_memo_commitment_chart_in_use": "This commitment account is linked by a credit memo account and cannot be deleted.",
       "chart_kind_immutable": "The account type cannot be changed. Create a separate account for the other type.",
       "account_receivable_chart_in_use": "This account is used by an accounts receivable and cannot be deleted.",
       "duplicate_account_receivable_type_name_en": "A receivable type with this English title already exists for the Agency.",
@@ -1288,6 +1292,7 @@
       "libreoffice_unavailable": "LibreOffice is required to convert DOCX templates to PDF. Install LibreOffice on the server or use an HTML PDF template."
     },
     "agreement": {
+      "invalid_coding_allocation": "Coding lines must belong to this stream, match the total amount, and cover amounts already paid.",
       "invalid_financial_id": "Select an active financial ID for this Proponent from the Agreement’s agency.",
       "financial_id_required": "Select a financial ID for every Proponent on this Agreement.",
       "monitor_receivable_not_allowed": "This monitor type does not allow receivable establishment follow-ups.",
@@ -1384,6 +1389,7 @@
       "invalid_payment_commitment_line": "The selected commitment line is invalid for this payment.",
       "payment_exceeds_commitment_balance": "This payment exceeds the remaining commitment line balance.",
       "commitment_line_below_paid_amount": "The commitment line amount cannot be less than the amount already paid.",
+      "commitment_line_below_paid": "The commitment line amount cannot be less than the amount already paid.",
       "commitment_line_payment_context_locked": "A commitment line with payments cannot be moved to another commitment or chart of accounts.",
       "commitment_exceeds_program_funding": "The commitment total cannot exceed the agreement program funding total.",
       "payment_lines_must_match_total": "Payment line amounts must add up to the payment amount.",
@@ -1555,6 +1561,7 @@
       "not_found": "Receivable or Credit Memo not found.",
       "invalid_entry": "This receivable operation cannot proceed with its current source amounts, recovery reservations, permissions or lifecycle state.",
       "below_recovered_reserved": "A negative adjustment cannot reduce principal below amounts already recovered or reserved.",
+      "claim_reduction_source_required": "This Claim reduction requires its retained successful Reconciliation sources. Clear or reduce the draft plan before removing its source coding.",
       "payment_direct_repayment_hold": "This payee has an outstanding receivable requiring direct repayment. Payments are held until it is repaid or an approved adjustment changes the recovery method.",
       "payment_recovery_pending": "A recovery or receivable adjustment is pending for this payee. Finish or cancel that work before processing this Payment.",
       "payment_payee_unavailable": "Select an active Proponent linked to this Agreement as the Payment payee.",
@@ -1674,6 +1681,8 @@
       "update": "Update Commitment"
     },
     "chart_of_accounts": {
+      "commitment_account": "Linked commitment account",
+      "commitment_account_help": "Optional. Approved credits reduce paid amounts and restore commitment capacity only when linked to commitment coding.",
       "title": "Chart of Accounts",
       "description": "Define the accounting fields and values for this stream budget.",
       "fiscal_year": "Fiscal Year",
@@ -2233,6 +2242,7 @@
   },
   "agreement": {
     "completion_blockers": {
+      "allocation_total": "Coding lines must add up to the commitment total before completing.",
       "funding_breakdown_required": "Add at least one other funding source to each line, and make program funding plus other sources equal total cost before completion."
     },
     "funding_sources": {
@@ -2580,6 +2590,8 @@
       "risk_frozen_help": "The risk decision is frozen at Completion. Approval uses the captured proposal and readiness evidence."
     },
     "commitments": {
+      "allocation_required": "Complete the coding allocation",
+      "allocation_total_help": "The coding lines total {allocated}. Allocate the full commitment amount of {total} before completing.",
       "title": "Commitments",
       "search": "Search commitments",
       "add": "Add Commitment",
@@ -3248,6 +3260,9 @@
     }
   },
   "extensions": {
+    "entity_tabs_loading": "Loading extension views…",
+    "entity_tabs_load_failed": "Extension views could not be loaded",
+    "entity_tabs_load_failed_description": "Try again to load the available extension views.",
     "workspace_agencies_description": "Choose an agency where this extension is enabled.",
     "select_storage_provider": "Select storage provider",
     "storage_provider_selected": "The agency storage provider was selected.",
@@ -4203,6 +4218,21 @@
     "all_fiscal_years": "All Fiscal Years"
   },
   "account_receivable": {
+    "remove_coding_line": "Remove coding line",
+    "move_coding": "Move coding",
+    "move_coding_instruction": "Move the full current amount to another Receivable account while preserving the total debt.",
+    "credit_memos": "Credit Memos",
+    "claim_reductions_applied": "The receivable is fully cleared. These reductions are included in Claim totals.",
+    "reduction_amount": "Reduction amount",
+    "claimed_amount": "Claimed amount",
+    "claim_reductions_instruction": "Select a Claim and enter the reduction for each retained line. These reductions affect Claim totals only when the receivable is fully cleared. Enter zero for lines to retain.",
+    "claim_reductions": "Claim reconciliation",
+    "claim_reductions_packet_instruction": "These captured Claim reductions take effect only when this receivable is fully cleared.",
+    "claim_line": "Claim line",
+    "claim": "Claim",
+    "financial_id": "Agency Financial System ID",
+    "captured_financial_id": "Financial ID captured at creation",
+    "requested_amount": "Receivable amount",
     "title": "Accounts receivable",
     "description": "Establish money owed under this Agreement and track approved adjustments and recoveries.",
     "create": "Create receivable",
@@ -4253,7 +4283,7 @@
     "established_amount": "Receivable amount",
     "amount_instruction": "Enter a positive recovery amount for each selected source. Unused lines may remain zero. Approval requires a positive total.",
     "adjustment_instruction": "Enter signed principal changes against the retained sources. A negative adjustment cannot reduce principal below recovered or reserved amounts. The approved recovery method can also change.",
-    "create_amount_instruction": "After saving the Draft, enter source amounts and attach establishment evidence before Completion.",
+    "create_amount_instruction": "Enter the receivable total, then add coding lines whose amounts equal this total.",
     "basis_provenance": "These retained Claim periods, paid amounts and coding form the recovery basis. Current source records do not replace this evidence.",
     "linked_receivable": "Original receivable",
     "rationale": "Reason and recovery policy",
@@ -4284,6 +4314,7 @@
     "offset_reference": "Receivable {number}",
     "credit_memo_allocations": "Credit details",
     "save_before_completion": "Save your changes before Completion.",
+    "work_prerequisite": "You must be assigned to this receivable, and it must remain editable, to make changes.",
     "cancel": "Cancel casework",
     "cancel_description": "Cancel this editable case while preserving its retained evidence.",
     "cancellation_reason": "Cancellation reason",
@@ -4337,7 +4368,7 @@
     "original_paid_coding_description": "Retained payment coding supports the source amount. The receivable uses its own account above.",
     "adjustment_source_unavailable": "This source was not included in the original receivable’s accounting. Create a new receivable to recover an amount from this source.",
     "adjust_receivable": "Adjust receivable",
-    "adjust_receivable_description": "An adjustment changes the amount owed or the approved recovery method. It is a separate receivable that requires approval; it does not record money received.",
+    "adjust_receivable_description": "Create an independently assigned adjustment to change the financial ID, coding amounts or recovery method. Its workflow approves the changes before they affect the receivable.",
     "financial_summary": "Receivable summary",
     "activity_type": "Type",
     "activity_reference": "Reference",
@@ -4382,7 +4413,7 @@
     "credit_memo_add_line": "Add Credit Memo line",
     "credit_memo_edit_line": "Update Credit Memo line",
     "summary": "Receivable summary",
-    "lines": "Lines",
+    "lines": "Receivable Lines",
     "line_number": "Line number",
     "add_line": "Add line",
     "edit_line": "Edit line",
@@ -4440,7 +4471,7 @@
     "load_failed": "Data Collection could not be loaded"
   },
   "supplementary_information": {
-    "title": "Supplementary Information",
+    "title": "Supplementary",
     "description": "Read-only data collection responses from the latest successful run of each workflow.",
     "completed_at": "Completed {date}",
     "empty": "No Data Collection responses are available from successful workflow runs for this entity.",

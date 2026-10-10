@@ -15,11 +15,9 @@ export const formatAccountReceivableAmount = (value: string | null | undefined, 
   }
 }
 
-/** Creates the business reference from retained Agreement numbering.
- * @param record - Captured numbering fields.
- * @param record.egcs_fc_agreementnumber - Agreement business reference.
- * @param record.egcs_fc_number - Independent case sequence.
- * @returns A stable business reference.
+/** Presents the regular record identity for receivables and adjustments.
+ * @param record - Receivable or adjustment identity.
+ * @param record.id - Canonical entity ID.
+ * @returns The numeric record ID.
  */
-export const accountReceivableReference = (record: { egcs_fc_agreementnumber: string, egcs_fc_number: number }): string =>
-  `${record.egcs_fc_agreementnumber} / AR ${record.egcs_fc_number}`
+export const accountReceivableReference = (record: { id: string }): string => record.id

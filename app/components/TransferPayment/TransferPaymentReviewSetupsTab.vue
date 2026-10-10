@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { useDetailSectionOwnership } from '~/composables/useDetailSectionOwnership'
 import { ref } from 'vue'
 import type { Ref } from 'vue'
 import { z } from 'zod'
@@ -7,12 +6,13 @@ import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { appRouteLocations } from '~/utils/route-locations'
 
-const { transferPaymentId, streamId, agencyId, canUpdateChild } = defineProps<{
+const { transferPaymentId, streamId, agencyId, canUpdateChild, showHeader = true } = defineProps<{
   transferPaymentId: string
   streamId: string
   agencyId?: string
   canUpdateChild: boolean
   canDeleteChild: boolean
+  showHeader?: boolean
 }>()
 
 type ReviewSetLink = {
@@ -25,7 +25,6 @@ type ReviewSetLink = {
   publicationState: 'draft' | 'published' | 'retired'
 }
 const { t } = useI18n()
-const ownsHeading = useDetailSectionOwnership(() => t('transfer_payment.review_setups'))
 const localePath = useLocalePath()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
@@ -96,7 +95,7 @@ const removeLink = async (link: ReviewSetLink) => {
 <template>
   <section class="space-y-4">
     <div class="flex items-center justify-between gap-3">
-      <h2 v-if="!ownsHeading" class="text-lg font-semibold">
+      <h2 v-if="showHeader" class="text-lg font-semibold">
         {{ t('transfer_payment.review_setups') }}
       </h2>
       <UButton v-if="canUpdateChild && agencyId" icon="i-lucide-link" :label="t('common.add')" @click="openLink" />

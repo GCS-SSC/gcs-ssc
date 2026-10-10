@@ -199,7 +199,7 @@ const applyAllocation = (line: JournalVoucherAllocationDraft) => {
             :validate-on="[]"
             class="space-y-8"
             @submit="save">
-            <CommonSection :title="t('journal_voucher.accounting_entry')" :grid-cols="1">
+            <CommonSection :show-header="false" :title="t('journal_voucher.accounting_entry')" :grid-cols="1">
               <div class="space-y-4">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                   <p class="text-sm text-muted">
@@ -349,12 +349,12 @@ const applyAllocation = (line: JournalVoucherAllocationDraft) => {
               <CommonSaveButton v-if="voucher.egcs_fc_canedit" :label="t('common.save')" :loading="saving" :disabled="saving" />
             </div>
           </UForm>
-          <CommonCompletionPanel v-else-if="selectedTab === 'completion'" entity-type="fundingcasejournalvoucher" :entity-id="id" :can-complete="voucher.egcs_fc_canwork && !voucher.isCompleted" :can-work-workflow="voucher.egcs_fc_canwork" :hide-title="false" :show-divider="false" title-key="journal_voucher.completion.title" description-key="journal_voucher.completion.description" status-complete-key="journal_voucher.completion.status_complete" status-locked-key="journal_voucher.completion.status_locked" comment-placeholder-key="journal_voucher.completion.comment_placeholder" complete-action-key="journal_voucher.completion.complete" completed-success-key="journal_voucher.completion.completed_success" :refresh-key="refreshKey" @changed="refreshPage" />
+          <CommonCompletionPanel v-else-if="selectedTab === 'completion'" entity-type="fundingcasejournalvoucher" :entity-id="id" :can-complete="voucher.egcs_fc_canwork && !voucher.isCompleted" :can-work-workflow="voucher.egcs_fc_canwork" :show-header="false" :show-divider="false" title-key="journal_voucher.completion.title" description-key="journal_voucher.completion.description" status-complete-key="journal_voucher.completion.status_complete" status-locked-key="journal_voucher.completion.status_locked" comment-placeholder-key="journal_voucher.completion.comment_placeholder" complete-action-key="journal_voucher.completion.complete" completed-success-key="journal_voucher.completion.completed_success" :refresh-key="refreshKey" @changed="refreshPage" />
           <CommonReviewsTab v-else-if="selectedTab === 'reviews'" entity-type="fundingcasejournalvoucher" :entity-id="id" :can-update="voucher.egcs_fc_canwork" @changed="refreshPage" />
           <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcasejournalvoucher" :entity-id="id" purpose="standard" :can-edit="voucher.egcs_fc_canwork" :refresh-key="refreshKey" @changed="refreshPage" />
-          <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" entity-type="fundingcasejournalvoucher" :entity-id="id" />
+          <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" :show-header="false" entity-type="fundingcasejournalvoucher" :entity-id="id" />
           <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcasejournalvoucher" :entity-id="id" />
-          <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" entity-type="fundingcasejournalvoucher" :entity-id="id" />
+          <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" :show-header="false" entity-type="fundingcasejournalvoucher" :entity-id="id" />
         </CommonDetailWorkspace>
       </template>
     </CommonDetailPage>

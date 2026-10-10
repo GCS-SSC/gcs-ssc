@@ -25,7 +25,8 @@ const zero = parseMoney('0.00')
 const json = (value: unknown): JsonValue => JSON.parse(JSON.stringify(value)) as JsonValue
 export const accountReceivableError = async (event: H3Event, code: string): Promise<never> => {
   const keys: Record<string, string> = { AR_BELOW_RECOVERED: 'below_recovered_reserved', AR_RECOVERY_METHOD_REQUIRED: 'recovery_method_required',
-    AR_ACCOUNT_REQUIRED: 'account_required', AR_ACCOUNT_UNAVAILABLE: 'account_required', AR_MONITOR_REQUIRED: 'monitor_required', AR_TYPE_UNAVAILABLE: 'type_unavailable' }
+    AR_ACCOUNT_REQUIRED: 'account_required', AR_ACCOUNT_UNAVAILABLE: 'account_required', AR_MONITOR_REQUIRED: 'monitor_required', AR_TYPE_UNAVAILABLE: 'type_unavailable',
+    AR_CLAIM_REDUCTION_SOURCE_REQUIRED: 'claim_reduction_source_required' }
   await throwApiError(event, { statusCode: 409, code, key: `apiErrors.account_receivable.${keys[code] ?? 'invalid_entry'}` })
   throw new Error(code)
 }
@@ -109,26 +110,16 @@ export const readAccountReceivableSources = async (db: Kysely<Database>, input: 
   const effectiveRecoveries = recoveries.filter(row => row.currency === input.currency)
   const recoveredDebtors = effectiveRecoveries.length
     ? new Map((await db.selectFrom('Funding_Case_Agreement_Account_Receivable')
-        .select(['id', 'egcs_fc_applicantrecipient', 'egcs_fc_agencyfiscalyear']).where('id', 'in', [...new Set(effectiveRecoveries.map(row => String(row.receivableId)))])
-        .execute()).map(row => [String(row.id), { debtor: String(row.egcs_fc_applicantrecipient), year: String(row.egcs_fc_agencyfiscalyear) }]))
-    : new Map<string, { debtor: string; year: string }>()
-  const recoverySources = effectiveRecoveries.length
-    ? new Map((await db.selectFrom('Funding_Case_Account_Receivable_Posting as posting')
-        .innerJoin('Funding_Case_Agreement_Account_Receivable_Coding as coding', 'coding.id', 'posting.egcs_fc_coding')
-        .innerJoin('Funding_Case_Agreement_Account_Receivable_Line as source', 'source.id', 'coding.egcs_fc_receivableline')
-        .select(['posting.id', 'source.egcs_fc_payment']).where('posting.id', 'in', effectiveRecoveries.map(row => String(row.id))).execute())
-        .map(row => [String(row.id), row.egcs_fc_payment]))
-    : new Map<string, string | null>()
+        .select(['id', 'egcs_fc_applicantrecipient']).where('id', 'in', [...new Set(effectiveRecoveries.map(row => String(row.receivableId)))])
+        .execute()).map(row => [String(row.id), String(row.egcs_fc_applicantrecipient)]))
+    : new Map<string, string>()
   for (const effect of effectiveRecoveries) {
-    const owner = recoveredDebtors.get(String(effect.receivableId))
-    if (owner && owner.debtor !== input.applicantRecipientId) continue
-    const debtor = owner?.debtor
+    const debtor = recoveredDebtors.get(String(effect.receivableId))
+    if (debtor && debtor !== input.applicantRecipientId) continue
+    // A Credit Memo retains catalog coding, not an exact source Payment or period.
     if (!debtor || !applyPaidEffect(effect.amount, row => String(row.egcs_fc_applicantrecipient) === debtor
-      && String(row.paymentFiscalYearId) === owner?.year
-      && String(row.commitmentId) === String(effect.commitmentLineId) && String(row.chartId) === String(effect.agencyChartId)
-      && String(row.codingFiscalYearId) === String(effect.agencyFiscalYearId)
-      && (!recoverySources.get(String(effect.id)) || String(row.paymentId) === String(recoverySources.get(String(effect.id))))
-      && row.egcs_fc_periodstart === effect.periodStart && row.egcs_fc_periodend === effect.periodEnd)) return []
+      && String(row.chartId) === String(effect.agencyChartId)
+      && String(row.codingFiscalYearId) === String(effect.agencyFiscalYearId))) return []
   }
   // Ambiguous historical Payments cannot be silently assigned to any debtor.
   const debtorPaid = rows.filter(row => String(row.egcs_fc_applicantrecipient) === input.applicantRecipientId)
@@ -189,8 +180,10 @@ export const readAccountReceivableSources = async (db: Kysely<Database>, input: 
     egcs_fc_periodend: row.egcs_fc_periodend, egcs_fc_evidence: json(row), coding }))
   if (ambiguousApprovedClaim) return []
   const claimRecoveries = await readEffectiveAccountReceivableClaimRecoveries(db, input.agreementId)
-  const effectiveClaims = sumMoney(approvedClaims.map(row => sumMoney([parseDatabaseMoney(row.amount), ...claimRecoveries
-    .filter(recovery => String(recovery.reconcileLineId) === String(row.id)).map(recovery => recovery.amount)])))
+  const approvedClaimLineIds = new Set(approvedClaims.map(row => String(row.claimLineId)))
+  const effectiveClaims = sumMoney([...approvedClaims.map(row => parseDatabaseMoney(row.amount)), ...claimRecoveries
+    .filter(recovery => recovery.currency === input.currency && approvedClaimLineIds.has(String(recovery.claimLineId)))
+    .map(recovery => recovery.amount)])
   const unclaimed = subtractMoney(sumMoney(coding.map(item => item.egcs_fc_paidbasis)), effectiveClaims)
   const advances = paid.filter(row => row.egcs_fc_paymenttype === 'advance')
   const advanceTotal = sumMoney(codingFor(advances).map(item => item.egcs_fc_paidbasis))

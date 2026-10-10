@@ -173,7 +173,7 @@ export const useTransferPaymentStreamDetailState = (
     ],
     [
       'reviewSetups',
-      { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.reviewSetups, icon: 'i-lucide-clipboard-list', component: TransferPaymentReviewSetupsTab, getProps: () => ({ transferPaymentId: id, streamId, agencyId: agencyId.value ?? undefined, canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }
+      { key: TRANSFER_PAYMENT_STREAM_TAB_KEYS.reviewSetups, icon: 'i-lucide-clipboard-list', component: TransferPaymentReviewSetupsTab, getProps: () => ({ showHeader: false, transferPaymentId: id, streamId, agencyId: agencyId.value ?? undefined, canUpdateChild: canUpdateChild.value, canDeleteChild: canDeleteChild.value }) }
     ],
     [
       'document-templates',

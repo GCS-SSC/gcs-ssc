@@ -142,6 +142,12 @@ export const CORE_ENTITY_REGISTRY = {
     supportsDirectReviews: true, ownerKind: 'agreement', assignmentMode: 'independent',
     approvalSubmissionRequired: true, approvalSubmissionTerminalSuccess: true
   },
+  fundingcaseaccountreceivableadjustment: {
+    label: { en: 'Accounts Receivable Adjustment', fr: 'Ajustement de compte débiteur' },
+    completion: 'supported', approvalSubmission: 'on_completion', standardWorkflow: 'explicit', riskRating: 'none',
+    supportsDirectReviews: true, ownerKind: 'agreement', assignmentMode: 'independent',
+    approvalSubmissionRequired: true, approvalSubmissionTerminalSuccess: true
+  },
   fundingcaseaccountreceivablecreditmemo: {
     label: { en: 'Accounts Receivable Credit Memo', fr: 'Note de crédit de compte débiteur' },
     completion: 'supported', approvalSubmission: 'on_completion', standardWorkflow: 'explicit', riskRating: 'none',

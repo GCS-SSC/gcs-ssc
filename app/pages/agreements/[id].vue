@@ -446,6 +446,7 @@ const cancel = () => {
             <CommonCompletionWorkflowPreAction
               v-else-if="selectedTab === 'recommendation'"
               mode="recommendation_submission"
+              :show-header="false"
               show-when-unconfigured
               entity-type="fundingcaseagreement"
               :entity-id="id"
@@ -461,7 +462,7 @@ const cancel = () => {
                 :title="t('agreement.risk_rating_workflow')"
                 :description="profile.risk_workflow_managed ? t('agreement.risk_rating_managed_help') : t('agreement.risk_rating_manual_help')"
                 :icon="profile.risk_workflow_managed ? 'i-lucide-workflow' : 'i-lucide-pencil'" />
-              <CommonSection :title="t('agreement.risk_rating_workflow')" :grid-cols="1">
+              <CommonSection :show-header="false" :title="t('agreement.risk_rating_workflow')" :grid-cols="1">
                 <dl class="grid gap-3 md:grid-cols-2">
                   <div>
                     <dt class="text-sm text-muted">
@@ -549,6 +550,7 @@ const cancel = () => {
 
             <CommonWorkflowSupplementaryInformation
               v-else-if="selectedTab === 'supplementary-information'"
+              :show-header="false"
               entity-type="fundingcaseagreement"
               :entity-id="id" />
 
@@ -619,11 +621,13 @@ const cancel = () => {
 
             <AgreementCloseoutsTab
               v-else-if="selectedTab === 'closeout'"
+              :show-header="false"
               :agreement-id="id"
               :can-create="canCreateChildRecords" />
 
             <CommonAssignedUsers
               v-else-if="selectedTab === 'assignments'"
+              :show-header="false"
               entity-type="fundingcaseagreement"
               :entity-id="id" />
 

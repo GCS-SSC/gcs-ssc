@@ -10,7 +10,11 @@ import { appRouteLocations } from '~/utils/route-locations'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 
-const { agreementId, canCreate } = defineProps<{ agreementId: string, canCreate: boolean }>()
+const { agreementId, canCreate, showHeader = true } = defineProps<{
+  agreementId: string
+  canCreate: boolean
+  showHeader?: boolean
+}>()
 const { t, locale } = useI18n()
 const { formatDate } = useDateHelpers()
 const localePath = useLocalePath()
@@ -93,6 +97,7 @@ const createCloseout = async () => {
 
 <template>
   <CommonPreActionReport
+    :show-header="showHeader"
     :title="t('agreement.closeout.title')"
     :description="t('agreement.closeout.description')">
     <template #action>

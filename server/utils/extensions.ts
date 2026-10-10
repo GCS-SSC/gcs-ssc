@@ -45,6 +45,7 @@ import { canAccessAgreement, resolveAgreementScopeContext } from './agreement'
 import { canAccessApplicantRecipient } from './applicant-recipient-auth'
 import { resolveRequestLocale } from './request-locale'
 import { resolveAgreementClaimRuntimeContext } from './agreement-claim'
+import { resolveAgreementPaymentRuntimeContext } from './agreement-payment'
 import { resolveAgreementMonitorRuntimeContext } from './agreement-monitor'
 import { resolveFundingOpportunityScope } from './funding-case'
 import { badRequest, throwApiError } from './api-errors'
@@ -87,6 +88,7 @@ type ExtensionEntityOwnerType =
   | 'applicantrecipient'
   | 'fundingcaseagreementclaim'
   | 'fundingcaseagreementmonitor'
+  | 'fundingcasepayment'
 
 export interface ExtensionEntityContext {
   target: GcsExtensionEntityTabTarget
@@ -96,6 +98,7 @@ export interface ExtensionEntityContext {
   applicantRecipientId?: string
   claimId?: string
   monitorId?: string
+  paymentId?: string
   opportunityId?: string
   ownerType: ExtensionEntityOwnerType
   ownerId: string
@@ -587,6 +590,19 @@ export const resolveExtensionEntityContext = async (
       ownerType: 'fundingcaseagreement',
       ownerId: context.agreementId,
       scope: context.scope
+    }
+  }
+
+  if (target === 'payment') {
+    const payment = await resolveAgreementPaymentRuntimeContext(db, entityId)
+    if (!payment) return null
+    const agreement = await resolveAgreementScopeContext(payment.agreementId, db)
+    if (!agreement) return null
+    return {
+      target, agencyId: payment.agencyId, streamId: payment.streamId,
+      agreementId: payment.agreementId, paymentId: payment.paymentId,
+      ownerType: 'fundingcasepayment', ownerId: payment.paymentId,
+      scope: extendEntityScope(agreement.scope, 'fundingcasepayment', payment.paymentId)
     }
   }
 

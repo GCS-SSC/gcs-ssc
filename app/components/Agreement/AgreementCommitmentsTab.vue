@@ -15,7 +15,7 @@ import type {
   FundingCaseAgreementCommitmentRow
 } from '~~/shared/types/funding-case-agreement-ui'
 import { FundingCaseAgreementCommitmentCreateSchema } from '~~/shared/types/schemas'
-import { formatMoneyText, sumMoney, type Money } from '~~/shared/utils/money'
+import { formatMoneyText, type Money } from '~~/shared/utils/money'
 import type { Currency_Codes } from '~~/shared/types/database'
 
 type CommitmentTableRow = FundingCaseAgreementCommitmentRow & {
@@ -70,6 +70,7 @@ const commitmentModal = useCrudModal<FundingCaseAgreementCommitmentRow, FundingC
   updateState: commitment => ({
     id: commitment.id,
     egcs_fc_type: commitment.egcs_fc_type,
+    egcs_fc_totalamount: commitment.egcs_fc_totalamount,
     egcs_fc_currency: commitment.egcs_fc_currency
   })
 })
@@ -110,7 +111,7 @@ const tableRows = computed<CommitmentTableRow[]>(() => commitments.value
     return {
       ...commitment,
       line_count: commitmentLines.length,
-      total_amount: sumMoney(commitmentLines.map(line => line.egcs_fc_amount))
+      total_amount: commitment.egcs_fc_totalamount
     }
   })
   .filter((row: CommitmentTableRow) => {
@@ -300,6 +301,9 @@ const deleteCommitment = async (commitmentId: string) => {
           </UFormField>
           <UFormField :label="t('common.currency')" name="egcs_fc_currency" required>
             <CommonEnumSelect v-model="selectedCommitment.egcs_fc_currency" name="currency_codes" class="w-full" disabled />
+          </UFormField>
+          <UFormField :label="t('agreement.commitments.total_amount')" name="egcs_fc_totalamount">
+            <CommonCurrencyInput v-model="selectedCommitment.egcs_fc_totalamount" :currency="selectedCommitment.egcs_fc_currency ?? agreementCurrency" />
           </UFormField>
           <div class="flex justify-end gap-2 pt-4">
             <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isCommitmentModalOpen = false" />

@@ -13,7 +13,8 @@ export const EXTENSION_ENTITY_AUTHORIZATION_SUBJECTS = {
   proponent: 'applicant_recipient',
   claim: 'agreement',
   monitor: 'agreement',
-  opportunity: 'transfer_payment'
+  opportunity: 'transfer_payment',
+  payment: 'agreement'
 } as const satisfies Record<GcsExtensionEntityTabTarget, 'agreement' | 'applicant_recipient' | 'transfer_payment'>
 
 /**
@@ -57,6 +58,7 @@ export interface GcsRegisteredExtensionRuntime {
 export interface GcsRegisteredExtension extends GcsClientExtensionManifest {
   auditOwnership?: GcsAuditTableOwnership[]
   agreementNumberProvider?: { id: string }
+  codingAllocator?: { id: string }
   packageName: string
   requiredHostCapabilities: GcsExtensionHostCapability[]
   serverHandlers: GcsRegisteredExtensionServerHandler[]

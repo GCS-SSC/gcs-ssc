@@ -169,9 +169,9 @@ export const executeFreshAuthorizedAgreementWrite = async <T>(
         if (recoveryTarget?.entityType === 'fundingcasepayment' || options.paymentRecovery || options.accountReceivablePayees) {
           await lockPaymentRecoveryAgreements(trx, { agreementId, agencyId: lockContext.agencyId, payees: options.accountReceivablePayees, event })
         }
-        const receivableCollection = recoveryTarget?.entityType === 'fundingcaseaccountreceivable' || recoveryTarget?.entityType === 'fundingcaseaccountreceivablecreditmemo'
+        const receivableCollection = (recoveryTarget?.entityType === 'fundingcaseaccountreceivable' || recoveryTarget?.entityType === 'fundingcaseaccountreceivableadjustment') || recoveryTarget?.entityType === 'fundingcaseaccountreceivablecreditmemo'
         if (receivableCollection && recoveryTarget) {
-          const context = recoveryTarget.entityType === 'fundingcaseaccountreceivable'
+          const context = (recoveryTarget.entityType === 'fundingcaseaccountreceivable' || recoveryTarget.entityType === 'fundingcaseaccountreceivableadjustment')
             ? await resolveAccountReceivableRuntimeContext(trx, recoveryTarget.entityId)
             : await resolveAccountReceivableCreditMemoRuntimeContext(trx, recoveryTarget.entityId)
           if (!context || context.agreementId !== agreementId || context.agencyId !== lockContext.agencyId) return await forbidden(event)

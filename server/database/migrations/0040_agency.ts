@@ -136,6 +136,7 @@ CREATE UNIQUE INDEX ay_uq_approval_behalf_name_en_normalized ON "Agency_Approval
 CREATE UNIQUE INDEX ay_uq_approval_behalf_name_fr_normalized ON "Agency_Approval_Behalf_Type" USING btree (egcs_ay_organizationagency, lower(btrim((egcs_ay_name_fr)::text))) WHERE (_deleted = false);
 
 CREATE TABLE "Agency_Chart_of_Account" (
+  "egcs_ay_commitmentchartofaccount" bigint,
   "id" bigint DEFAULT nextval('"Agency_Chart_of_Account_id_seq"'::regclass) NOT NULL,
   "egcs_ay_kind" character varying(32) DEFAULT 'commitment'::character varying NOT NULL,
   "egcs_ay_organizationagency" bigint NOT NULL,
@@ -501,6 +502,35 @@ AS $function$
       RETURN NEW;
     END $function$;
 
+CREATE FUNCTION validate_credit_memo_commitment_chart_link()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+    BEGIN
+      PERFORM id FROM "Agency_Profile" WHERE id = NEW.egcs_ay_organizationagency FOR UPDATE;
+      IF TG_OP = 'UPDATE' AND NEW._deleted AND NOT OLD._deleted AND EXISTS (
+        SELECT 1 FROM "Agency_Chart_of_Account" linked
+        WHERE linked.egcs_ay_commitmentchartofaccount = OLD.id AND NOT linked._deleted
+      ) THEN
+        RAISE EXCEPTION 'Commitment account is linked by a Credit Memo account'
+          USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_creditmemo_commitmentchart_in_use';
+      END IF;
+      IF NEW._deleted OR NEW.egcs_ay_commitmentchartofaccount IS NULL THEN RETURN NEW; END IF;
+      IF NEW.egcs_ay_kind <> 'credit_memo' OR NOT EXISTS (
+        SELECT 1 FROM "Agency_Chart_of_Account" commitment
+        WHERE commitment.id = NEW.egcs_ay_commitmentchartofaccount
+          AND commitment.egcs_ay_kind = 'commitment' AND NOT commitment._deleted
+          AND commitment.egcs_ay_organizationagency = NEW.egcs_ay_organizationagency
+          AND commitment.egcs_ay_fiscalyear = NEW.egcs_ay_fiscalyear
+          AND commitment.egcs_ay_currency = NEW.egcs_ay_currency
+        FOR SHARE OF commitment
+      ) THEN
+        RAISE EXCEPTION 'Credit Memo commitment account must be active and match Agency, fiscal year and currency'
+          USING ERRCODE = '23514', CONSTRAINT = 'ay_chk_creditmemo_commitmentchart';
+      END IF;
+      RETURN NEW;
+    END $function$;
+
 CREATE FUNCTION protect_chart_currency()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -642,6 +672,8 @@ ALTER TABLE "Agency_Applicant_Recipient_Subtype" ADD CONSTRAINT "Agency_Applican
 
 ALTER TABLE "Agency_Approval_Behalf_Type" ADD CONSTRAINT "Agency_Approval_Behalf_Type_egcs_ay_organizationagency_fkey" FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
 
+ALTER TABLE "Agency_Chart_of_Account" ADD CONSTRAINT "ay_fk_creditmemo_commitmentchart" FOREIGN KEY (egcs_ay_commitmentchartofaccount) REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT;
+
 ALTER TABLE "Agency_Chart_of_Account" ADD CONSTRAINT "Agency_Chart_of_Account_egcs_ay_fiscalyear_fkey" FOREIGN KEY (egcs_ay_fiscalyear) REFERENCES "Agency_Fiscal_Year"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Agency_Chart_of_Account" ADD CONSTRAINT "Agency_Chart_of_Account_egcs_ay_organizationagency_fkey" FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
@@ -692,6 +724,7 @@ CREATE TRIGGER guard_referenced_proponent_subtype BEFORE UPDATE ON "Agency_Appli
 CREATE TRIGGER protect_workflow_profile_conditions AFTER DELETE OR UPDATE OF _deleted, egcs_ay_organizationagency ON "Agency_Applicant_Recipient_Subtype" FOR EACH ROW EXECUTE FUNCTION validate_workflow_profile_references();
 
 CREATE TRIGGER trg_protect_chart_currency BEFORE UPDATE OF egcs_ay_currency, egcs_ay_kind ON "Agency_Chart_of_Account" FOR EACH ROW EXECUTE FUNCTION protect_chart_currency();
+CREATE TRIGGER validate_credit_memo_commitment_chart_link BEFORE INSERT OR UPDATE ON "Agency_Chart_of_Account" FOR EACH ROW EXECUTE FUNCTION validate_credit_memo_commitment_chart_link();
 
 CREATE TRIGGER validate_agency_operational_catalog BEFORE INSERT OR UPDATE ON "Agency_Chart_of_Account" FOR EACH ROW EXECUTE FUNCTION validate_agency_operational_catalog();
 

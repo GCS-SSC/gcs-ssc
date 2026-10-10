@@ -2,6 +2,7 @@
 import type { H3Event } from 'h3'
 import { sql } from 'kysely'
 import { z } from 'zod'
+import { CURRENCY_CODES_ENUM } from '~~/shared/constants/enums'
 import { PaginationSchema, PositivePostgresBigintIdSchema } from '~~/shared/types/schemas/common'
 import { TransferPaymentStreamChartOfAccountDimensionSchema } from '~~/shared/types/schemas/transfer-payment'
 import { formatAccountingDimensions } from '~~/shared/utils/accounting-dimensions'
@@ -17,7 +18,9 @@ const Query = PaginationSchema.extend({
 
 export const listCreditMemoReceivables = async (event: H3Event) => {
   const input = await getValidatedQueryI18n(event, Query.extend({ egcs_fc_agency: PositivePostgresBigintIdSchema,
-    egcs_fc_applicantrecipient: PositivePostgresBigintIdSchema }))
+    egcs_fc_applicantrecipient: PositivePostgresBigintIdSchema, egcs_fc_currency: z.enum(CURRENCY_CODES_ENUM).optional(),
+    eligibleIds: z.preprocess(value => typeof value === 'string' ? value.split(',') : value,
+      z.array(PositivePostgresBigintIdSchema).min(1).max(100)).optional() }))
   const auth = await authorize(event, 'account_receivable', 'create', { type: 'agency', agencyId: input.egcs_fc_agency })
   let query = event.context.$db.selectFrom('Funding_Case_Agreement_Account_Receivable as debt')
     .innerJoin('Funding_Case_Account_Receivable_Pool as pool', 'pool.id', 'debt.egcs_fc_pool')
@@ -29,10 +32,12 @@ export const listCreditMemoReceivables = async (event: H3Event) => {
     .where('debt.egcs_fc_outcome', '=', 'posted').where('debt.egcs_fc_linkedreceivable', 'is', null)
     .where('debt._deleted', '=', false).where('agreement._deleted', '=', false).where('stream._deleted', '=', false)
     .where('program._deleted', '=', false).where('pool._deleted', '=', false)
+  if (input.egcs_fc_currency) query = query.where('debt.egcs_fc_currency', '=', input.egcs_fc_currency)
+  if (input.eligibleIds) query = query.where('debt.id', 'in', input.eligibleIds)
   if (input.selectedIds) query = query.where('debt.id', 'in', input.selectedIds)
   if (input.search) query = query.where(eb => eb.or([
     eb('debt.egcs_fc_agreementnumber', 'ilike', `%${escapeLikePattern(input.search!)}%`),
-    sql<boolean>`debt.egcs_fc_number::text ILIKE ${`%${escapeLikePattern(input.search!)}%`}`
+    sql<boolean>`debt.id::text ILIKE ${`%${escapeLikePattern(input.search!)}%`}`
   ]))
   const rows = await query.select(['debt.id', 'debt.egcs_fc_number', 'debt.egcs_fc_agreementnumber', 'debt.egcs_fc_currency',
     'stream.egcs_tp_transferpaymentprofile']).orderBy('debt.id').execute()
@@ -40,8 +45,8 @@ export const listCreditMemoReceivables = async (event: H3Event) => {
     type: 'program', agencyId: input.egcs_fc_agency, transferPaymentId: String(row.egcs_tp_transferpaymentprofile)
   }))
   return { items: visible.slice((input.page - 1) * input.limit, input.page * input.limit).map(row => ({
-    ...row, label_en: `${row.egcs_fc_agreementnumber} / AR-${row.egcs_fc_number} (${row.egcs_fc_currency.toUpperCase()})`,
-    label_fr: `${row.egcs_fc_agreementnumber} / CD-${row.egcs_fc_number} (${row.egcs_fc_currency.toUpperCase()})`
+    ...row, label_en: String(row.id),
+    label_fr: String(row.id)
   })), total: visible.length, page: input.page, limit: input.limit }
 }
 

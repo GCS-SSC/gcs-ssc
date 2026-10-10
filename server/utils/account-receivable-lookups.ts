@@ -60,7 +60,8 @@ export const listAccountReceivableYearLookup = async (event: H3Event, agreementI
   if (input.search) query = query.where('egcs_ay_fiscalyeardisplay', 'ilike', `%${input.search}%`)
   const rows = await query.select(['id', 'egcs_ay_fiscalyeardisplay as label_en', 'egcs_ay_fiscalyeardisplay as label_fr']).orderBy('egcs_ay_fiscalyear', 'desc').limit(input.limit).offset((input.page - 1) * input.limit).execute()
   const count = await query.select(sql<string>`count(*)::text`.as('total')).executeTakeFirstOrThrow()
-  return { items: rows, total: Number(count.total), page: input.page, limit: input.limit }
+  const agreement = await event.context.$db.selectFrom('Funding_Case_Agreement_Profile').select('egcs_fc_currency').where('id', '=', agreementId).executeTakeFirstOrThrow()
+  return { items: rows.map(row => ({ ...row, egcs_fc_currency: agreement.egcs_fc_currency })), total: Number(count.total), page: input.page, limit: input.limit }
 }
 
 export const listAccountReceivableMonitorLookup = async (event: H3Event, agreementId: string) => {

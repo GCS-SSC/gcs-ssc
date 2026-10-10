@@ -11,12 +11,14 @@ import { AppFetchResponseError } from '~/utils/fetch-error'
 import { useUrlTabState } from '~/composables/useUrlTabState'
 import { useProponentCreditMemoDetail } from '~/composables/useProponentCreditMemoDetail'
 import { useBilingualValue } from '~/composables/useBilingualValue'
+import { formatMoneyText } from '~~/shared/utils/money'
 
 definePageMeta({ key: route => route.path, i18n: { paths: { en: '/proponents/edit/[id]/credit-memos/[creditMemoId]', fr: '/promoteurs/modifier/[id]/notes-de-credit/[creditMemoId]' } } })
 const route = useRoute()
 const localePath = useLocalePath()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { getBilingualValue } = useBilingualValue()
+const { formatDate } = useDateHelpers()
 const { getHeroCollapsed } = useDashboard()
 const { createValidator } = useZodI18n()
 const { sendJson } = useJsonRequest()
@@ -40,11 +42,15 @@ usePageResourceError({
 })
 const isHeroCollapsed = getHeroCollapsed('proponent-credit-memo-detail')
 const saving: Ref<boolean> = ref(false)
+const isEditOpen: Ref<boolean> = ref(false)
+let editSession = 0
 const refreshKey: Ref<number> = ref(0)
 const content: Ref<HTMLElement | null> = ref(null)
 type FormState = {
   egcs_fc_applicantrecipient: string
   egcs_fc_receivable: string
+  egcs_fc_receivables: string[]
+  egcs_fc_totalamount: string
   egcs_fc_agency: string
   egcs_fc_currency: AccountReceivableCreditMemoDetail['egcs_fc_currency']
   egcs_fc_receiveddate: string | Date | null
@@ -57,6 +63,8 @@ const hydrate = (record: AccountReceivableCreditMemoDetail) => {
   state.value = {
     egcs_fc_applicantrecipient: record.egcs_fc_applicantrecipient,
     egcs_fc_receivable: record.egcs_fc_receivable,
+    egcs_fc_receivables: record.egcs_fc_receivables,
+    egcs_fc_totalamount: record.egcs_fc_totalamount,
     egcs_fc_agency: record.egcs_fc_agency,
     egcs_fc_currency: record.egcs_fc_currency,
     egcs_fc_receiveddate: record.egcs_fc_receiveddate.slice(0, 10),
@@ -64,6 +72,15 @@ const hydrate = (record: AccountReceivableCreditMemoDetail) => {
   }
   saved.value = JSON.stringify(state.value)
 }
+const openEdit = () => {
+  if (!creditMemo.value?.egcs_fc_canedit || saving.value || status.value !== 'success') return
+  hydrate(creditMemo.value)
+  isEditOpen.value = true
+}
+watch(isEditOpen, open => {
+  editSession += 1
+  if (!open && creditMemo.value && !saving.value) hydrate(creditMemo.value)
+}, { flush: 'sync' })
 watch(creditMemo, record => {
   if (!record) {
     state.value = null
@@ -73,11 +90,12 @@ watch(creditMemo, record => {
   if (!dirty.value || !record.egcs_fc_canedit) hydrate(record)
 }, { immediate: true })
 watch([proponentId, creditMemoId], () => {
+  isEditOpen.value = false
   state.value = null
   saved.value = ''
   saving.value = false
 }, { flush: 'sync' })
-const reference = computed(() => creditMemo.value ? creditMemo.value.egcs_fc_creditmemoreference : '')
+const reference = computed(() => creditMemo.value ? creditMemo.value.id : '')
 const tabs = [
   { key: 'account_receivable.credit_memo_summary', value: 'summary', icon: 'i-lucide-receipt-text' },
   { key: 'account_receivable.credit_memo_lines', value: 'lines', icon: 'i-lucide-list' },
@@ -106,21 +124,25 @@ const retry = async () => {
   }
 }
 const save = async () => {
-  if (disposed || !state.value || !creditMemo.value?.egcs_fc_canedit || saving.value || status.value !== 'success') return
+  if (disposed || !isEditOpen.value || !state.value || !creditMemo.value?.egcs_fc_canedit || saving.value || status.value !== 'success') return
   const owner = creditMemoId.value
   const requestIdentity = identity.value
   const submitted = JSON.stringify(state.value)
+  const session = editSession
   saving.value = true
   try {
     await sendJson(`/api/account-receivable-credit-memos/${owner}`, 'PATCH', AccountReceivableCreditMemoEditSchema.parse(state.value))
-    if (disposed || requestIdentity !== identity.value) return
+    if (disposed || requestIdentity !== identity.value || session !== editSession) return
     const refreshed = await refresh()
-    if (disposed || requestIdentity !== identity.value) return
-    if (refreshed && creditMemo.value && submitted === JSON.stringify(state.value)) hydrate(creditMemo.value)
+    if (disposed || requestIdentity !== identity.value || session !== editSession) return
+    if (refreshed && creditMemo.value && submitted === JSON.stringify(state.value)) {
+      hydrate(creditMemo.value)
+      isEditOpen.value = false
+    }
     refreshKey.value += 1
     toast.add({ title: t('common.success'), description: t('common.updated_success'), color: 'success' })
   } catch (failure) {
-    if (!disposed && requestIdentity === identity.value) showError(failure)
+    if (!disposed && requestIdentity === identity.value && session === editSession) showError(failure)
   } finally {
     if (!disposed && requestIdentity === identity.value) saving.value = false
   }
@@ -140,47 +162,88 @@ const save = async () => {
     </div>
     <CommonDetailPage v-if="creditMemo && state" id="proponent-credit-memo-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbs" class="min-w-0 flex-1">
       <template #body>
-        <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-banknote-arrow-down" :title="reference" :meta-items="[getBilingualValue(creditMemo, 'egcs_fc_debtorname', t('common.not_available')), getBilingualValue(creditMemo, 'egcs_fc_agencyname', t('common.not_available')), creditMemo.egcs_fc_currency.toUpperCase()]" :badges="[{ statusId: creditMemo.egcs_fc_status }]" />
+        <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-banknote-arrow-down" :title="reference" :meta-items="[getBilingualValue(creditMemo, 'egcs_fc_debtorname', t('common.not_available')), getBilingualValue(creditMemo, 'egcs_fc_agencyname', t('common.not_available')), creditMemo.egcs_fc_currency.toUpperCase()]" :badges="[{ statusId: creditMemo.egcs_fc_status }]" :actions="creditMemo.egcs_fc_canedit ? [{ label: t('common.edit'), icon: 'i-lucide-edit-3', onClick: openEdit }] : []" />
         <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="proponent-credit-memo-detail-content">
-          <UForm v-if="selectedTab === 'summary'" :state="state" :validate="createValidator(AccountReceivableCreditMemoEditSchema)" class="space-y-8" @submit="save">
-            <CommonSection :title="t('account_receivable.credit_memo_summary')" :grid-cols="1">
-              <UFormField name="egcs_fc_receiveddate" :label="t('account_receivable.received_date')">
-                <CommonDatePicker v-model="state.egcs_fc_receiveddate" :disabled="saving || !creditMemo.egcs_fc_canedit" />
-              </UFormField>
-              <dl class="text-sm">
-                <dt class="text-muted">
-                  {{ t('account_receivable.credit_memo_receivable') }}
-                </dt>
-                <dd>
-                  <ULink v-if="creditMemo.egcs_fc_receivablereadable" :to="localePath(appRouteLocations.agreementAccountReceivableDetail(creditMemo.egcs_fc_fundingagreement, creditMemo.egcs_fc_receivable))" class="text-primary hover:underline">
-                    {{ creditMemo.egcs_fc_receivablereference }}
-                  </ULink>
-                  <span v-else>{{ creditMemo.egcs_fc_receivablereference }}</span>
-                </dd>
-              </dl>
-              <UFormField name="egcs_fc_reason" :label="t('account_receivable.reason')">
-                <UTextarea v-model="state.egcs_fc_reason" :readonly="!creditMemo.egcs_fc_canedit" :disabled="saving" class="w-full" />
-              </UFormField>
-              <div v-if="creditMemo.egcs_fc_canedit" class="flex justify-end">
-                <CommonSaveButton :label="t('common.save')" :loading="saving" :disabled="saving || status !== 'success'" />
-              </div>
+          <div v-if="selectedTab === 'summary'" class="space-y-8" data-testid="credit-memo-summary">
+            <CommonSection :title="t('account_receivable.credit_memo')" badge="01">
+              <CommonValueCard :label="t('account_receivable.received_date')" :value="formatDate(creditMemo.egcs_fc_receiveddate)" />
+              <CommonValueCard :label="t('account_receivable.credit_memo_amount')" :value="formatMoneyText(creditMemo.egcs_fc_totalamount, locale, creditMemo.egcs_fc_currency.toUpperCase())" />
+              <CommonValueCard :label="t('account_receivable.reason')" :value="creditMemo.egcs_fc_reason || t('common.not_available')" class="min-w-0 md:col-span-2 [&_p]:break-words [&_p]:whitespace-pre-wrap" />
             </CommonSection>
-          </UForm>
+            <CommonSection :title="t('account_receivable.credit_memo_receivable')" badge="02">
+              <UCard v-for="receivable in creditMemo.egcs_fc_receivablelinks" :key="receivable.id">
+                <dl class="space-y-4">
+                  <div class="space-y-2">
+                    <dt class="text-xs font-bold tracking-widest text-muted uppercase">
+                      {{ t('account_receivable.credit_memo_agency') }}
+                    </dt>
+                    <dd class="break-words text-sm font-bold">
+                      <ULink v-if="creditMemo.egcs_fc_agencyreadable" :to="localePath(appRouteLocations.agencyDetail(creditMemo.egcs_fc_agency))" class="text-primary hover:underline">{{ getBilingualValue(creditMemo, 'egcs_fc_agencyname', t('common.not_available')) }}</ULink>
+                      <span v-else>{{ getBilingualValue(creditMemo, 'egcs_fc_agencyname', t('common.not_available')) }}</span>
+                    </dd>
+                  </div>
+                  <div class="space-y-2">
+                    <dt class="text-xs font-bold tracking-widest text-muted uppercase">
+                      {{ t('agreement.agreement_number') }}
+                    </dt>
+                    <dd class="break-words text-sm font-bold">
+                      <ULink v-if="receivable.egcs_fc_agreementreadable" :to="localePath(appRouteLocations.agreementDetail(receivable.egcs_fc_fundingagreement))" class="text-primary hover:underline">{{ receivable.egcs_fc_agreementnumber }}</ULink>
+                      <span v-else>{{ receivable.egcs_fc_agreementnumber }}</span>
+                    </dd>
+                  </div>
+                  <div class="space-y-2">
+                    <dt class="text-xs font-bold tracking-widest text-muted uppercase">
+                      {{ t('account_receivable.credit_memo_receivable') }}
+                    </dt>
+                    <dd class="break-words text-sm font-bold">
+                      <ULink v-if="receivable.egcs_fc_readable" :to="localePath(appRouteLocations.agreementAccountReceivableDetail(receivable.egcs_fc_fundingagreement, receivable.id))" class="text-primary hover:underline">{{ receivable.egcs_fc_reference }}</ULink>
+                      <span v-else>{{ receivable.egcs_fc_reference }}</span>
+                    </dd>
+                  </div>
+                </dl>
+              </UCard>
+            </CommonSection>
+          </div>
           <AccountReceivableCreditMemoLines
-            v-else-if="selectedTab === 'lines'" :credit-memo-id="creditMemoId" :receivable-id="creditMemo.egcs_fc_receivable"
+            v-else-if="selectedTab === 'lines'" :credit-memo-id="creditMemoId" :receivable-id="creditMemo.egcs_fc_receivable" :receivable-ids="creditMemo.egcs_fc_receivables" :agency-id="creditMemo.egcs_fc_agency" :applicant-recipient-id="creditMemo.egcs_fc_applicantrecipient"
             :lines="creditMemo.egcs_fc_lines" :currency="creditMemo.egcs_fc_currency"
             :can-edit="creditMemo.egcs_fc_canedit && status === 'success' && !saving" :can-delete="creditMemo.egcs_fc_candeletelines && status === 'success' && !saving"
             @changed="refreshPage" />
           <section v-else-if="selectedTab === 'completion'" class="space-y-6">
-            <UAlert v-if="dirty" color="warning" :title="t('account_receivable.save_before_completion')" /><CommonCompletionPanel entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" :can-complete="creditMemo.egcs_fc_cancomplete && !dirty && !saving && status === 'success'" :can-work-workflow="creditMemo.egcs_fc_canwork" :hide-title="false" :show-divider="false" title-key="account_receivable.credit_memo_completion.title" description-key="account_receivable.credit_memo_completion.description" status-complete-key="account_receivable.credit_memo_completion.status_complete" status-locked-key="account_receivable.credit_memo_completion.status_locked" comment-placeholder-key="account_receivable.credit_memo_completion.comment_placeholder" complete-action-key="account_receivable.credit_memo_completion.complete" completed-success-key="account_receivable.credit_memo_completion.completed_success" :refresh-key="refreshKey" @changed="refreshPage" />
+            <UAlert v-if="dirty" color="warning" :title="t('account_receivable.save_before_completion')" /><CommonCompletionPanel entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" :can-complete="creditMemo.egcs_fc_cancomplete && !dirty && !saving && status === 'success'" :can-work-workflow="creditMemo.egcs_fc_canwork" :show-header="false" :show-divider="false" title-key="account_receivable.credit_memo_completion.title" description-key="account_receivable.credit_memo_completion.description" status-complete-key="account_receivable.credit_memo_completion.status_complete" status-locked-key="account_receivable.credit_memo_completion.status_locked" comment-placeholder-key="account_receivable.credit_memo_completion.comment_placeholder" complete-action-key="account_receivable.credit_memo_completion.complete" completed-success-key="account_receivable.credit_memo_completion.completed_success" :refresh-key="refreshKey" @changed="refreshPage" />
           </section>
           <CommonReviewsTab v-else-if="selectedTab === 'reviews'" entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" :can-update="creditMemo.egcs_fc_canwork" @changed="refreshPage" />
           <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" purpose="standard" :can-edit="creditMemo.egcs_fc_canwork" :refresh-key="refreshKey" @changed="refreshPage" />
-          <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" />
+          <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" :show-header="false" entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" />
           <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" />
-          <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" />
+          <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" :show-header="false" entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" />
         </CommonDetailWorkspace>
       </template>
     </CommonDetailPage>
+    <UModal
+      v-if="isEditOpen && creditMemo && state"
+      v-model:open="isEditOpen"
+      :title="t('common.edit')"
+      :description="t('common.form_dialog_description')"
+      :dismissible="!saving"
+      :close="{ disabled: saving }">
+      <template #body>
+        <UForm :state="state" :validate="createValidator(AccountReceivableCreditMemoEditSchema)" class="space-y-4" @submit="save">
+          <UFormField name="egcs_fc_receiveddate" :label="t('account_receivable.received_date')">
+            <CommonDatePicker v-model="state.egcs_fc_receiveddate" :disabled="saving || !creditMemo.egcs_fc_canedit" />
+          </UFormField>
+          <UFormField name="egcs_fc_totalamount" :label="t('account_receivable.credit_memo_amount')">
+            <CommonCurrencyInput v-model="state.egcs_fc_totalamount" :currency="creditMemo.egcs_fc_currency" :disabled="saving || !creditMemo.egcs_fc_canedit" />
+          </UFormField>
+          <UFormField name="egcs_fc_reason" :label="t('account_receivable.reason')">
+            <UTextarea v-model="state.egcs_fc_reason" :readonly="!creditMemo.egcs_fc_canedit" :disabled="saving" class="w-full" />
+          </UFormField>
+          <div class="flex justify-end gap-2">
+            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" :disabled="saving" @click="isEditOpen = false" />
+            <CommonSaveButton :label="t('common.save')" :loading="saving" :disabled="saving || !creditMemo.egcs_fc_canedit || status !== 'success'" />
+          </div>
+        </UForm>
+      </template>
+    </UModal>
   </div>
 </template>

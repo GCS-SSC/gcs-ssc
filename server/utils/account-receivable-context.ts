@@ -12,16 +12,17 @@ import { assertAgreementCorrectionFinancialWriteAllowed } from './correction-loc
 import { withAuditExecution } from './audit-context'
 
 export type AccountReceivablePoolIdentity = { agencyId: string; applicantRecipientId: string; currency: Currency_Codes }
-export type AccountReceivableCaseType = 'fundingcaseaccountreceivable' | 'fundingcaseaccountreceivablecreditmemo'
+export type AccountReceivableRecordEntityType = 'fundingcaseaccountreceivable' | 'fundingcaseaccountreceivableadjustment'
+export type AccountReceivableCaseType = AccountReceivableRecordEntityType | 'fundingcaseaccountreceivablecreditmemo'
 
-export const resolveAccountReceivableRuntimeContext = async (db: Kysely<Database>, id: string) => {
+export const resolveAccountReceivableRuntimeContext = async (db: Kysely<Database>, id: string, expectedType?: AccountReceivableRecordEntityType) => {
   if (!isPositivePostgresBigintText(id)) return null
   const row = await db.selectFrom('Funding_Case_Agreement_Account_Receivable').selectAll()
     .where('id', '=', id).where('_deleted', '=', false).executeTakeFirst()
-  if (!row) return null
+  if (!row || (expectedType && row.egcs_fc_entitytype !== expectedType)) return null
   const context = await resolveAgreementScopeContext(String(row.egcs_fc_fundingagreement), db)
   return context
-    ? { ...context, receivableId: id, poolId: String(row.egcs_fc_pool),
+    ? { ...context, entityType: row.egcs_fc_entitytype, receivableId: id, poolId: String(row.egcs_fc_pool),
         applicantRecipientId: String(row.egcs_fc_applicantrecipient), currency: row.egcs_fc_currency }
     : null
 }
@@ -46,7 +47,9 @@ export const resolveAccountReceivableCreditMemoRuntimeContext = async (db: Kysel
   return { agreementId: context.agreementId, streamId: context.streamId, profileId: context.profileId,
     agencyId, scope: { type: 'agency' as const, agencyId }, creditMemoId: id, receivableId: String(row.egcs_fc_receivable), poolId: String(row.egcs_fc_pool),
     applicantRecipientId: String(row.egcs_fc_applicantrecipient), currency: row.egcs_fc_currency,
-    agreementIds: [context.agreementId] }
+    agreementIds: await db.selectFrom('Funding_Case_Agreement_Account_Receivable').select('egcs_fc_fundingagreement')
+      .where('id', 'in', Array.isArray(row.egcs_fc_receivables) && row.egcs_fc_receivables.length ? row.egcs_fc_receivables.map(String) : [String(row.egcs_fc_receivable)])
+      .where('_deleted', '=', false).execute().then(rows => [...new Set(rows.map(debt => String(debt.egcs_fc_fundingagreement)))]) }
 }
 
 /** Called before any Agreement lock; the pool serializes recovery and debt policy changes. */
@@ -101,7 +104,7 @@ export const executeFreshAccountReceivableWrite = async <T>(
       const context = await resolveAgreementScopeContext(id, trx)
       const before = initial[index]!
       if (!context || context.agencyId !== identity.agencyId || context.streamId !== before!.streamId || context.profileId !== before!.profileId) return await forbidden(event)
-      if (!auth.userAbilities.authorize('account_receivable', options.action ?? 'update', context.scope)) return await forbidden(event)
+      if (!auth.userAbilities.authorize('account_receivable', options.action ?? 'update', options.target?.entityType === 'fundingcaseaccountreceivablecreditmemo' ? { type: 'agency', agencyId: identity.agencyId } : context.scope)) return await forbidden(event)
       if (options.sourceRead && !auth.userAbilities.authorize('agreement', 'read', context.scope)) return await forbidden(event)
       await lockRegisteredExtensionAgreementLifecycle(event, trx, { agreementId: id, agencyId: context.agencyId,
         currentStreamId: context.streamId, targetStreamIds: [context.streamId] })
@@ -116,7 +119,7 @@ export const executeFreshAccountReceivableWrite = async <T>(
 
 /** Claim keys remain unique; fiscal advance consumption belongs to its explicit debtor. */
 export const accountReceivableSourceUsage = (agreementId: string, sourceKey: string, excludedId?: string, options: { applicantRecipientId?: string } = {}) => sql<string>`(
-  SELECT (COALESCE(SUM(CASE WHEN debt.egcs_fc_outcome = 'posted' THEN line.egcs_fc_amount ELSE greatest(line.egcs_fc_amount,0) END),0) - CASE WHEN ${sourceKey.startsWith('advance:')} THEN COALESCE((
+  SELECT (COALESCE(SUM(CASE WHEN usage.outcome = 'posted' THEN usage.amount ELSE greatest(usage.amount,0) END),0) - CASE WHEN ${sourceKey.startsWith('advance:')} THEN COALESCE((
     SELECT SUM(allocation.egcs_fc_amount)
     FROM "Funding_Case_Account_Receivable_Allocation" allocation
     JOIN "Funding_Case_Account_Receivable_Recovery" recovery ON recovery.id = allocation.egcs_fc_recovery
@@ -126,16 +129,18 @@ export const accountReceivableSourceUsage = (agreementId: string, sourceKey: str
       AND recovery.egcs_fc_outcome = 'posted' AND NOT recovery._deleted AND NOT allocation._deleted
       ${sourceKey.startsWith('advance:') && options.applicantRecipientId ? sql`AND source_debt.egcs_fc_applicantrecipient = ${options.applicantRecipientId}` : sql``}
   ),0) ELSE 0 END)::text
+  FROM (SELECT debt.id, debt.egcs_fc_outcome AS outcome, SUM(line.egcs_fc_amount) AS amount
   FROM "Funding_Case_Agreement_Account_Receivable_Line" line
   JOIN "Funding_Case_Agreement_Account_Receivable" debt ON debt.id = line.egcs_fc_receivable
   WHERE line.egcs_fc_fundingagreement = ${agreementId} AND line.egcs_fc_sourcekey = ${sourceKey}
     AND NOT line._deleted AND NOT debt._deleted AND debt.egcs_fc_outcome IN ('open','posted')
     ${sourceKey.startsWith('advance:') && options.applicantRecipientId ? sql`AND debt.egcs_fc_applicantrecipient = ${options.applicantRecipientId}` : sql``}
     ${excludedId ? sql`AND debt.id <> ${excludedId}` : sql``}
+  GROUP BY debt.id, debt.egcs_fc_outcome) usage
 )`
 
 export const accountReceivableAdvanceUsage = (agreementId: string, applicantRecipientId: string, agencyFiscalYearId: string, excludedId?: string) => sql<string>`(
-  SELECT (COALESCE(SUM(CASE WHEN debt.egcs_fc_outcome = 'posted' THEN line.egcs_fc_amount ELSE greatest(line.egcs_fc_amount,0) END),0) - COALESCE((
+  SELECT (COALESCE(SUM(CASE WHEN usage.outcome = 'posted' THEN usage.amount ELSE greatest(usage.amount,0) END),0) - COALESCE((
     SELECT SUM(allocation.egcs_fc_amount)
     FROM "Funding_Case_Account_Receivable_Allocation" allocation
     JOIN "Funding_Case_Account_Receivable_Recovery" recovery ON recovery.id = allocation.egcs_fc_recovery
@@ -144,10 +149,12 @@ export const accountReceivableAdvanceUsage = (agreementId: string, applicantReci
       AND source_debt.egcs_fc_agencyfiscalyear = ${agencyFiscalYearId} AND source_debt.egcs_fc_advancepaymentrelated
       AND recovery.egcs_fc_outcome = 'posted' AND NOT recovery._deleted AND NOT allocation._deleted
   ),0))::text
+  FROM (SELECT debt.id, debt.egcs_fc_outcome AS outcome, SUM(line.egcs_fc_amount) AS amount
   FROM "Funding_Case_Agreement_Account_Receivable_Line" line
   JOIN "Funding_Case_Agreement_Account_Receivable" debt ON debt.id = line.egcs_fc_receivable
   WHERE debt.egcs_fc_fundingagreement = ${agreementId} AND debt.egcs_fc_applicantrecipient = ${applicantRecipientId}
     AND debt.egcs_fc_agencyfiscalyear = ${agencyFiscalYearId} AND debt.egcs_fc_advancepaymentrelated
     AND NOT line._deleted AND NOT debt._deleted AND debt.egcs_fc_outcome IN ('open','posted')
     ${excludedId ? sql`AND debt.id <> ${excludedId}` : sql``}
+  GROUP BY debt.id, debt.egcs_fc_outcome) usage
 )`

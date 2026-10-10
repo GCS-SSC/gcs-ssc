@@ -77,6 +77,11 @@ const resolveAgreementIdFromEntity = async (
     return row ? String(row.egcs_fc_fundingagreement) : null
   }
   if (policy.ownerResolver !== 'agreement_parent' || !policy.ownerColumn) return null
+  if (entityType === 'fundingcaseaccountreceivable' || entityType === 'fundingcaseaccountreceivableadjustment') {
+    const row = await db.selectFrom('Funding_Case_Agreement_Account_Receivable').select('egcs_fc_fundingagreement')
+      .where('id', '=', entityId).where('egcs_fc_entitytype', '=', entityType).where('_deleted', '=', false).executeTakeFirst()
+    return row ? String(row.egcs_fc_fundingagreement) : null
+  }
   const result = await sql<{ agreement_id: string }>`
     SELECT ${sql.ref(policy.ownerColumn)}::text AS agreement_id
     FROM ${sql.table(policy.table)}
@@ -221,7 +226,7 @@ const resolveSourceOwner = async (
     return await resolveEntityAssignmentOwner(db, source.entityType, source.entityId)
   }
   const agreementId = await resolveAgreementIdFromEntity(db, source.entityType, source.entityId)
-  if (agreementId) return await resolveAgreementOwner(db, agreementId, source.entityType === 'fundingcaseaccountreceivable' ? 'account_receivable' : source.entityType === 'fundingcasecorrection' ? 'correction' : source.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement')
+  if (agreementId) return await resolveAgreementOwner(db, agreementId, (source.entityType === 'fundingcaseaccountreceivable' || source.entityType === 'fundingcaseaccountreceivableadjustment') ? 'account_receivable' : source.entityType === 'fundingcasecorrection' ? 'correction' : source.entityType === 'fundingcasejournalvoucher' ? 'journal_voucher' : 'agreement')
   if (source.target?.entityType === 'fundingcaseintake') {
     return await resolveEntityAssignmentOwner(db, 'fundingcaseintake', source.target.entityId)
   }
@@ -407,9 +412,11 @@ export const canReadEntityAssignmentRoster = (evidence: {
 
 export const isEntityAssignmentRosterWorkable = async (db: Kysely<Database>, entityType: AssignableEntityType, entityId: string): Promise<boolean> => {
   const policy = getEntityAuthorizationPolicy(entityType)
-  if (entityType === 'fundingcaseaccountreceivable' || entityType === 'fundingcaseaccountreceivablecreditmemo') {
-    const table = entityType === 'fundingcaseaccountreceivable' ? 'Funding_Case_Agreement_Account_Receivable' : 'Funding_Case_Account_Receivable_Credit_Memo'
-    const record = await db.selectFrom(table).select('egcs_fc_outcome').where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirst()
+  if ((entityType === 'fundingcaseaccountreceivable' || entityType === 'fundingcaseaccountreceivableadjustment') || entityType === 'fundingcaseaccountreceivablecreditmemo') {
+    const table = (entityType === 'fundingcaseaccountreceivable' || entityType === 'fundingcaseaccountreceivableadjustment') ? 'Funding_Case_Agreement_Account_Receivable' : 'Funding_Case_Account_Receivable_Credit_Memo'
+    const record = entityType === 'fundingcaseaccountreceivablecreditmemo'
+      ? await db.selectFrom(table).select('egcs_fc_outcome').where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirst()
+      : await db.selectFrom('Funding_Case_Agreement_Account_Receivable').select('egcs_fc_outcome').where('id', '=', entityId).where('egcs_fc_entitytype', '=', entityType).where('_deleted', '=', false).executeTakeFirst()
     if (!record || record.egcs_fc_outcome !== 'open') return false
     const runtime = await db.selectFrom('Common_Runtime').select('id')
       .where('egcs_cn_entitytype', '=', entityType).where('egcs_cn_entityid', '=', entityId).executeTakeFirst()

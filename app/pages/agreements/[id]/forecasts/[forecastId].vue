@@ -621,7 +621,7 @@ const saveForecastBreakdown = async () => {
             :badges="forecastHeroBadges" />
 
           <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="agreement-forecast-detail-content">
-            <CommonSection v-if="selectedTab === 'breakdown'" :title="t('agreement.forecasts.breakdown_title')" :grid-cols="1">
+            <CommonSection v-if="selectedTab === 'breakdown'" :show-header="false" :title="t('agreement.forecasts.breakdown_title')" :grid-cols="1">
               <div class="space-y-4">
                 <div class="flex flex-wrap items-end justify-between gap-3">
                   <div class="flex items-center gap-2">
@@ -790,7 +790,7 @@ const saveForecastBreakdown = async () => {
                 :entity-id="forecastId"
                 :can-complete="canUpdateForecast"
                 :can-work-workflow="isAssigned"
-                :hide-title="false"
+                :show-header="false"
                 :show-divider="false"
                 title-key="agreement.forecasts.completion.title"
                 description-key="agreement.forecasts.completion.description"
@@ -811,9 +811,9 @@ const saveForecastBreakdown = async () => {
               @changed="refreshPage" />
 
             <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcaseforecast" :entity-id="forecastId" purpose="standard" :can-edit="isAssigned" :refresh-key="approvalsRefreshKey" @changed="refreshPage" />
-            <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" entity-type="fundingcaseforecast" :entity-id="forecastId" />
+            <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" :show-header="false" entity-type="fundingcaseforecast" :entity-id="forecastId" />
             <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcaseforecast" :entity-id="forecastId" />
-            <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" entity-type="fundingcaseforecast" :entity-id="forecastId" />
+            <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" :show-header="false" entity-type="fundingcaseforecast" :entity-id="forecastId" />
           </CommonDetailWorkspace>
         </div>
       </template>

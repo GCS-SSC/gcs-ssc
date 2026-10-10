@@ -62,6 +62,14 @@ const CONSTRAINT_ERROR_MAP: Record<string, ConstraintErrorMapping> = {
     code: 'AGREEMENT_DUPLICATE_FINAL_CLAIM_RECONCILE',
     key: 'apiErrors.agreement.duplicate_final_claim_reconcile'
   },
+  fc_chk_commitmentlinepaidfloor: {
+    code: 'AGREEMENT_COMMITMENT_LINE_BELOW_PAID',
+    key: 'apiErrors.agreement.commitment_line_below_paid'
+  },
+  fc_chk_commitmentallocationtotal: {
+    code: 'AGREEMENT_COMMITMENT_ALLOCATION_TOTAL',
+    key: 'apiErrors.agreement.invalid_coding_allocation'
+  },
   fc_chk_commitmenttotalprogramfunding: {
     code: 'AGREEMENT_COMMITMENT_EXCEEDS_PROGRAM_FUNDING',
     key: 'apiErrors.agreement.commitment_exceeds_program_funding'
