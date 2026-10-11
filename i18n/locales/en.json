@@ -1405,7 +1405,7 @@
       "final_claim_reconcile_approved": "The final reconciliation for this claim has been approved. No further reconciliation changes are allowed.",
       "final_claim_reconcile_completed": "The final reconciliation for this claim is complete. No further reconciliation changes are allowed.",
       "duplicate_commitment_type": "A commitment with this type already exists for this agreement.",
-      "duplicate_commitment_line": "A commitment line with this number and stream commitment already exists for this commitment.",
+      "duplicate_commitment_line": "This coding account is already used by another line in this commitment.",
       "duplicate_payment_line": "A payment line already exists for this commitment line.",
       "duplicate_final_claim_reconcile": "Only one reconciliation can be marked final for a claim.",
       "claim_reconcile_in_progress": "Finish or cancel the reconciliation already in progress before marking another reconciliation as final.",
@@ -2590,6 +2590,10 @@
       "risk_frozen_help": "The risk decision is frozen at Completion. Approval uses the captured proposal and readiness evidence."
     },
     "commitments": {
+      "committed": "Committed",
+      "paid": "Paid",
+      "credited": "Credited",
+      "balance": "Balance",
       "allocation_required": "Complete the coding allocation",
       "allocation_total_help": "The coding lines total {allocated}. Allocate the full commitment amount of {total} before completing.",
       "title": "Commitments",
@@ -2634,6 +2638,24 @@
       }
     },
     "payments": {
+      "financial_inputs": {
+        "title": "Financial inputs",
+        "line_balances": "Commitment line balances",
+        "select_period": "Select a commitment type, fiscal year and payment period to view financial inputs.",
+        "select_year": "Select a commitment type and fiscal year to view line balances.",
+        "commitment_remaining": "Commitment remaining",
+        "payments_to_date": "Payments to date",
+        "credit_memos": "Credit memos",
+        "reconciled_credit_memos": "Credit memos for reconciled periods",
+        "claims_to_last_claim_month": "Claims to last claim month",
+        "forecast_to_last_claim_month": "Forecast to last claim month",
+        "forecast_to_period_end": "Forecast to period end",
+        "available_before_holdback": "Available before holdback",
+        "agreement_total": "Agreement total",
+        "final_fiscal_year_total": "Final fiscal year total",
+        "holdback_percent": "Holdback percentage",
+        "holdback_basis": "Holdback basis"
+      },
       "title": "Payments",
       "search": "Search payments",
       "search_lines": "Search payment lines",

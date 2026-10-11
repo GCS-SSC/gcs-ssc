@@ -713,7 +713,7 @@ export const getExtensionConfigurationForEntity = async (
 export const getEnabledExtensionsForAgreementCreateOperation = async (
   db: Kysely<Database>,
   agreementContext: ExtensionCreateOperationAgreementContext
-): Promise<Array<{ extension: GcsRegisteredExtension; config: GcsExtensionJsonConfig }>> => {
+): Promise<Array<{ extension: GcsRegisteredExtension; config: GcsExtensionJsonConfig; agencyConfig: GcsExtensionJsonConfig }>> => {
   const extensions = await getRegisteredExtensions()
   const enabled = []
 
@@ -729,7 +729,8 @@ export const getEnabledExtensionsForAgreementCreateOperation = async (
     })
 
     if (config) {
-      enabled.push({ extension, config })
+      const agencyConfiguration = await getExtensionAgencyConfiguration(db, extension.key, agreementContext.agencyId)
+      if (agencyConfiguration.enabled) enabled.push({ extension, config, agencyConfig: agencyConfiguration.config })
     }
   }
 
@@ -868,13 +869,20 @@ export const runExtensionAgreementStreamChangeGuards = async (
 export const runExtensionAgreementPaymentMutationGuards = async (
   event: H3Event,
   db: Transaction<Database>,
-  context: Omit<GcsExtensionAgreementPaymentMutationGuardHookPayload, 'event' | 'db' | 'agreementFinancials'>
+  context: Omit<GcsExtensionAgreementPaymentMutationGuardHookPayload, 'event' | 'db' | 'agreementFinancials' | 'agencyConfigurations'>
 ): Promise<void> => {
   await assertAgreementCorrectionFinancialWriteAllowed(event, db, context.agreementId)
   await assertPaymentMutationRecoveryAllowed(event, db, context)
+  const agreement = await resolveAgreementScopeContext(context.agreementId, db)
+  if (!agreement) throw new Error('The Agreement is unavailable for extension Payment guards.')
+  const extensions = await getRegisteredExtensions()
+  const agencyConfigurations = Object.fromEntries(await Promise.all(extensions.map(async extension => [
+    extension.key, await getExtensionAgencyConfiguration(db, extension.key, agreement.agencyId)
+  ])))
   try {
     await useNitroApp().hooks.callHook(GCS_EXTENSION_AGREEMENT_PAYMENT_MUTATION_GUARD_HOOK, {
       ...context,
+      agencyConfigurations,
       agreementFinancials: createExtensionAgreementFinancials(db, context.agreementId),
       event,
       db: db as unknown as Transaction<unknown>
@@ -1058,7 +1066,7 @@ export const runExtensionCreateOperationHooks = async (
     return null
   }
 
-  const contexts = Object.fromEntries(enabledExtensions.map(({ extension, config }) => [
+  const contexts = Object.fromEntries(enabledExtensions.map(({ extension, config, agencyConfig }) => [
     extension.key,
     {
       operation,
@@ -1071,6 +1079,7 @@ export const runExtensionCreateOperationHooks = async (
       streamId: agreementContext.streamId,
       scope: agreementContext.scope,
       config,
+      agencyConfig,
       validatedBody,
       ...(extension.requiredHostCapabilities.includes('agreement-payment-capacity')
         ? { agreementFinancials: createExtensionAgreementFinancials(trx, agreementContext.agreementId) }
@@ -1302,16 +1311,16 @@ export const getExtensionStreamConfiguration = async (
   }
 }
 
-/** Checks whether an extension is enabled anywhere within an agency. */
-export const isExtensionEnabledForAgency = async (
+/** Loads enabled configuration for the owning live Agency, preserving an empty configuration when absent. */
+export const getExtensionAgencyConfiguration = async (
   db: Kysely<Database>,
   extensionKey: string,
   agencyId: string
-): Promise<boolean> => {
+): Promise<{ enabled: boolean; config: GcsExtensionJsonConfig }> => {
   const row = await db
     .selectFrom('extensions.agency_enablement as enablement')
     .innerJoin('Agency_Profile as agency', 'agency.id', 'enablement.agency_id')
-    .select('enablement.id')
+    .select('enablement.config')
     .where('enablement.extension_key', '=', extensionKey)
     .where('enablement.agency_id', '=', agencyId)
     .where('enablement.enabled', '=', true)
@@ -1319,8 +1328,13 @@ export const isExtensionEnabledForAgency = async (
     .where('agency._deleted', '=', false)
     .executeTakeFirst()
 
-  return Boolean(row)
+  return { enabled: Boolean(row), config: (row?.config ?? {}) as GcsExtensionJsonConfig }
 }
+
+/** Checks whether an extension is enabled anywhere within an agency. */
+export const isExtensionEnabledForAgency = async (
+  db: Kysely<Database>, extensionKey: string, agencyId: string
+): Promise<boolean> => (await getExtensionAgencyConfiguration(db, extensionKey, agencyId)).enabled
 
 /** Checks whether an extension is enabled on a specific stream. */
 export const isExtensionEnabledForStream = async (

@@ -1,6 +1,6 @@
 /* eslint-disable jsdoc/require-jsdoc -- Temporary coverage while this route receives complete API documentation. */
 import type { Scope } from '~~/shared/utils/scopes'
-import type { Kysely, Transaction } from 'kysely'
+import type { Transaction } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import { ExtensionToggleSchema } from '~~/shared/types/schemas/extensions'
 import {
@@ -17,7 +17,7 @@ import {
   runExtensionMigrations
 } from '~~/server/utils/extensions'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
-import { getExtensionConfigurationAction } from '~~/shared/utils/extensions'
+import { getExtensionConfigurationAction, type GcsExtensionJsonConfig } from '~~/shared/utils/extensions'
 import { activateEnabledExtensionNitroPlugins } from '~~/server/utils/extension-nitro-plugins'
 
 export default defineEventHandler(async event => {
@@ -62,7 +62,7 @@ export default defineEventHandler(async event => {
   }
 
   const persistEnablement = async (
-    writeDb: Kysely<Database> | Transaction<Database>
+    writeDb: Transaction<Database>
   ) => {
     const existing = await writeDb
       .selectFrom('extensions.agency_enablement')
@@ -71,6 +71,14 @@ export default defineEventHandler(async event => {
       .where('extension_key', '=', body.extensionKey)
       .where('_deleted', '=', false)
       .executeTakeFirst()
+
+    await runExtensionConfigurationGuards(event, writeDb, {
+      targetExtensionKey: body.extensionKey,
+      scope: 'agency',
+      agencyId,
+      enabled: body.enabled,
+      config: (normalizedConfig ?? existing?.config ?? {}) as GcsExtensionJsonConfig
+    })
 
     const values = normalizedConfig === undefined
       ? { enabled: body.enabled }
@@ -169,14 +177,6 @@ export default defineEventHandler(async event => {
         agencyId
       })
     }
-
-    await runExtensionConfigurationGuards(event, trx, {
-      targetExtensionKey: body.extensionKey,
-      scope: 'agency',
-      agencyId,
-      enabled: body.enabled,
-      config: normalizedConfig
-    })
 
     return await persistEnablement(trx)
   })

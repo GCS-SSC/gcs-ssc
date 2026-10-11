@@ -1405,7 +1405,7 @@
       "final_claim_reconcile_approved": "Le rapprochement final de cette demande de remboursement a été approuvé. Aucun autre changement de rapprochement n'est permis.",
       "final_claim_reconcile_completed": "Le rapprochement final de cette demande de remboursement est terminé. Aucun autre changement de rapprochement n’est permis.",
       "duplicate_commitment_type": "Un engagement de ce type existe déjà pour cette entente.",
-      "duplicate_commitment_line": "Une ligne avec ce numéro et cet engagement du volet existe déjà pour cet engagement.",
+      "duplicate_commitment_line": "Ce compte comptable est déjà utilisé par une autre ligne de cet engagement.",
       "duplicate_payment_line": "Une ligne de paiement existe déjà pour cette ligne d'engagement.",
       "duplicate_final_claim_reconcile": "Un seul rapprochement peut être marqué final pour une demande de remboursement.",
       "claim_reconcile_in_progress": "Terminez ou annulez le rapprochement en cours avant de marquer un autre rapprochement comme final.",
@@ -2590,6 +2590,10 @@
       "risk_frozen_help": "La décision de risque est figée à l’achèvement. L’approbation utilise la proposition et la preuve de préparation capturées."
     },
     "commitments": {
+      "committed": "Engagé",
+      "paid": "Payé",
+      "credited": "Crédité",
+      "balance": "Solde",
       "allocation_required": "Compléter la répartition du codage",
       "allocation_total_help": "Les lignes de codage totalisent {allocated}. Répartissez le montant total de l’engagement de {total} avant de terminer.",
       "title": "Engagements",
@@ -2634,6 +2638,24 @@
       }
     },
     "payments": {
+      "financial_inputs": {
+        "title": "Données financières",
+        "line_balances": "Soldes des lignes d’engagement",
+        "select_period": "Sélectionnez un type d’engagement, un exercice et une période de paiement pour voir les données financières.",
+        "select_year": "Sélectionnez un type d’engagement et un exercice pour voir les soldes des lignes.",
+        "commitment_remaining": "Engagement restant",
+        "payments_to_date": "Paiements à ce jour",
+        "credit_memos": "Notes de crédit",
+        "reconciled_credit_memos": "Notes de crédit pour les périodes rapprochées",
+        "claims_to_last_claim_month": "Demandes jusqu’au dernier mois de demande",
+        "forecast_to_last_claim_month": "Prévisions jusqu’au dernier mois de demande",
+        "forecast_to_period_end": "Prévisions jusqu’à la fin de la période",
+        "available_before_holdback": "Disponible avant la retenue",
+        "agreement_total": "Total de l’entente",
+        "final_fiscal_year_total": "Total du dernier exercice",
+        "holdback_percent": "Pourcentage de retenue",
+        "holdback_basis": "Base de retenue"
+      },
       "title": "Paiements",
       "search": "Rechercher des paiements",
       "search_lines": "Rechercher des lignes de paiement",

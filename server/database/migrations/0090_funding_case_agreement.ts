@@ -726,7 +726,7 @@ CREATE TABLE "Funding_Case_Agreement_Commitment_Line" (
   CONSTRAINT "Funding_Case_Agreement_Commitment_Line_pkey" PRIMARY KEY (id)
 );
 
-CREATE UNIQUE INDEX fc_idx_uniquecommitmentline ON "Funding_Case_Agreement_Commitment_Line" USING btree (egcs_fc_commitment, egcs_fc_commitmentlinenumber, egcs_fc_transferpaymentstreamchartofaccount) WHERE (_deleted = false);
+CREATE UNIQUE INDEX fc_idx_uniquecommitmentline ON "Funding_Case_Agreement_Commitment_Line" USING btree (egcs_fc_commitment, egcs_fc_transferpaymentstreamchartofaccount) WHERE (_deleted = false);
 
 CREATE TABLE "Funding_Case_Agreement_Correction" (
   "id" bigint NOT NULL,

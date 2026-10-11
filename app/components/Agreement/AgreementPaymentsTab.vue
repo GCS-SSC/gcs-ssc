@@ -477,6 +477,7 @@ const deletePayment = async (paymentId: string) => {
       v-if="selectedPayment"
       v-model:open="isPaymentModalOpen"
       :title="selectedPayment.id ? t('agreement.payments.edit') : t('agreement.payments.add')"
+      :ui="{ content: 'sm:max-w-2xl' }"
       :description="t('common.form_dialog_description')">
       <template #body>
         <UForm :state="selectedPayment" :validate="validatePayment" :validate-on="[]" class="space-y-4" @submit="savePayment">
@@ -551,6 +552,14 @@ const deletePayment = async (paymentId: string) => {
             :model="paymentCalculatorModel"
             @result="handlePaymentCalculatorResult"
             @extension-payload="handlePaymentCalculatorExtensionPayload" />
+
+          <AgreementPaymentFinancialInputs
+            v-if="!selectedPayment.id"
+            :agreement-id="agreementId"
+            :commitment-type="selectedPayment.egcs_fc_commitmenttype"
+            :fiscal-year="selectedPayment.egcs_fc_fiscalyear"
+            :period-start="selectedPayment.egcs_fc_periodstart"
+            :period-end="selectedPayment.egcs_fc_periodend" />
 
           <UFormField :label="t('common.comment')" name="egcs_fc_comment">
             <UTextarea v-model="selectedPayment.egcs_fc_comment" class="w-full" />

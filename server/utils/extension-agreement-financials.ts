@@ -57,7 +57,7 @@ export const createExtensionAgreementFinancials = (
     return currency
   }
   const financials: GcsExtensionAgreementFinancials = {
-    /** Calculates Payment entitlement and holdback using host-owned exact financial projections. */
+    /** Supplies financial projections and holdback settings for extension-owned Payment calculations. */
     getPaymentCalculation: async input => {
       const currency = await prepareRead(input.excludePaymentId, input.currency)
       if (![input.fiscalYearId, input.commitmentTypeId].every(isPositivePostgresBigintText)) {

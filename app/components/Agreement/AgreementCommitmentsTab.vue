@@ -231,11 +231,16 @@ const deleteCommitment = async (commitmentId: string) => {
       </template>
 
       <template #name-cell="{ row }">
-        <ULink
-          :to="localePath(appRouteLocations.agreementCommitmentDetail(agreementId, String(row.original.id)))"
-          class="font-bold text-zinc-900 transition-colors hover:text-primary dark:text-white">
-          {{ getCommitmentTypeLabel(row.original) }}
-        </ULink>
+        <div class="flex items-center gap-2">
+          <ULink
+            :to="localePath(appRouteLocations.agreementCommitmentDetail(agreementId, String(row.original.id)))"
+            class="font-bold text-zinc-900 transition-colors hover:text-primary dark:text-white">
+            {{ getCommitmentTypeLabel(row.original) }}
+          </ULink>
+          <UBadge v-if="row.original.egcs_fc_active" color="success" variant="subtle">
+            {{ t('common.active') }}
+          </UBadge>
+        </div>
       </template>
 
       <template #status-cell="{ row }">

@@ -13,7 +13,7 @@ import type { EntityAssignmentContext } from '~~/shared/types/schemas/entity-ass
 import type {
   FundingCaseAgreementCommitmentDetailRow,
   FundingCaseAgreementCommitmentLineForm,
-  FundingCaseAgreementCommitmentLineRow
+  FundingCaseAgreementCommitmentLineBalanceRow
 } from '~~/shared/types/funding-case-agreement-ui'
 import { FundingCaseAgreementCommitmentLineCreateSchema } from '~~/shared/types/schemas'
 import { formatAccountingDimension, getAccountingDimensionSearchValues } from '~~/shared/utils/accounting-dimensions'
@@ -63,7 +63,7 @@ const tabs = [
 const { selectedTab } = useUrlTabState({ tabs, defaultTab: 'lines' })
 const isHeroCollapsed = getHeroCollapsed('agreement-commitment-detail')
 
-const lineModal = useCrudModal<FundingCaseAgreementCommitmentLineRow, FundingCaseAgreementCommitmentLineForm>({
+const lineModal = useCrudModal<FundingCaseAgreementCommitmentLineBalanceRow, FundingCaseAgreementCommitmentLineForm>({
   createState: () => ({
     egcs_fc_commitment: commitmentId
   }),
@@ -94,7 +94,7 @@ const {
   error: commitmentError,
   status: commitmentStatus,
   refresh: refreshCommitment
-} = useFetch<FundingCaseAgreementCommitmentDetailRow & { lines: FundingCaseAgreementCommitmentLineRow[] }, FetchError, string>(
+} = useFetch<FundingCaseAgreementCommitmentDetailRow & { lines: FundingCaseAgreementCommitmentLineBalanceRow[] }, FetchError, string>(
   `/api/agreements/${agreementId}/commitments/${commitmentId}`
 )
 
@@ -140,31 +140,39 @@ const breadcrumbItems = computed(() => [
   }
 ])
 
-const columns: TableColumnInput<FundingCaseAgreementCommitmentLineRow>[] = [
+const columns = computed<TableColumnInput<FundingCaseAgreementCommitmentLineBalanceRow>[]>(() => [
   { id: 'lineNumber', accessorKey: 'egcs_fc_commitmentlinenumber', headerKey: 'agreement.commitments.line_number_short' },
   { id: 'fiscalYear', accessorKey: 'fiscal_year_display', headerKey: 'agreement.commitments.fiscal_year' },
   { id: 'coding', headerKey: 'agreement.commitments.coding' },
-  { id: 'amount', accessorKey: 'egcs_fc_amount', headerKey: 'agreement.commitments.amount' },
+  { id: 'amount', accessorKey: 'egcs_fc_amount', headerKey: commitment.value?.egcs_fc_active ? 'agreement.commitments.committed' : 'agreement.commitments.amount' },
+  ...(commitment.value?.egcs_fc_active
+    ? [
+        { id: 'paid', accessorKey: 'egcs_fc_paidamount', headerKey: 'agreement.commitments.paid' },
+        { id: 'credited', accessorKey: 'egcs_fc_creditmemoamount', headerKey: 'agreement.commitments.credited' },
+        { id: 'balance', accessorKey: 'egcs_fc_balance', headerKey: 'agreement.commitments.balance' }
+      ]
+    : []),
   { id: 'actions', headerKey: 'common.actions' }
-]
+])
 
 const normalizedSearch = computed(() => search.value.trim().toLowerCase())
-const lines = computed<FundingCaseAgreementCommitmentLineRow[]>(() => {
+const lines = computed<FundingCaseAgreementCommitmentLineBalanceRow[]>(() => {
   const allLines = commitment.value?.lines ?? []
   if (!normalizedSearch.value) {
     return allLines
   }
 
-  return allLines.filter((line: FundingCaseAgreementCommitmentLineRow) => [
+  return allLines.filter((line: FundingCaseAgreementCommitmentLineBalanceRow) => [
     line.egcs_fc_commitmentlinenumber,
     line.fiscal_year_display,
     ...getAccountingDimensionSearchValues(line.accounting_dimensions),
-    line.egcs_fc_amount
+    line.egcs_fc_amount,
+    ...(commitment.value?.egcs_fc_active ? [line.egcs_fc_paidamount, line.egcs_fc_creditmemoamount, line.egcs_fc_balance] : [])
   ].some(value => String(value ?? '').toLowerCase().includes(normalizedSearch.value)))
 })
 
 const totalAmount = computed(() =>
-  sumMoney((commitment.value?.lines ?? []).map((line: FundingCaseAgreementCommitmentLineRow) => line.egcs_fc_amount))
+  sumMoney((commitment.value?.lines ?? []).map((line: FundingCaseAgreementCommitmentLineBalanceRow) => line.egcs_fc_amount))
 )
 const hasBalancedCoding = computed(() => commitment.value && compareMoney(totalAmount.value, commitment.value.egcs_fc_totalamount) === 0)
 
@@ -180,14 +188,14 @@ const formatMoney = (value: Money) => commitment.value?.egcs_fc_currency
   ? formatMoneyText(value, locale.value, commitment.value.egcs_fc_currency.toUpperCase())
   : value
 
-const getCodingSecondaryText = (line: FundingCaseAgreementCommitmentLineRow) => {
+const getCodingSecondaryText = (line: FundingCaseAgreementCommitmentLineBalanceRow) => {
   const activeLocale = locale.value === 'fr' ? 'fr' : 'en'
   return line.accounting_dimensions.slice(1)
     .map(dimension => formatAccountingDimension(dimension, activeLocale))
     .join(' | ')
 }
 
-const getCodingPrimaryText = (line: FundingCaseAgreementCommitmentLineRow) => {
+const getCodingPrimaryText = (line: FundingCaseAgreementCommitmentLineBalanceRow) => {
   const dimension = line.accounting_dimensions[0]
   if (!dimension) return '-'
   return formatAccountingDimension(dimension, locale.value === 'fr' ? 'fr' : 'en')
@@ -200,7 +208,7 @@ const openCreateLine = () => {
   }
 }
 
-const openUpdateLine = (line: FundingCaseAgreementCommitmentLineRow) => {
+const openUpdateLine = (line: FundingCaseAgreementCommitmentLineBalanceRow) => {
   lineModal.openUpdate(line)
 }
 
@@ -333,6 +341,18 @@ const handleCompleted = async () => {
                     <span class="font-medium text-zinc-700 dark:text-zinc-200">
                       {{ formatMoney(row.original.egcs_fc_amount) }}
                     </span>
+                  </template>
+
+                  <template #paid-cell="{ row }">
+                    {{ formatMoney(row.original.egcs_fc_paidamount) }}
+                  </template>
+
+                  <template #credited-cell="{ row }">
+                    {{ formatMoney(row.original.egcs_fc_creditmemoamount) }}
+                  </template>
+
+                  <template #balance-cell="{ row }">
+                    {{ formatMoney(row.original.egcs_fc_balance) }}
                   </template>
 
                   <template #actions-cell="{ row }">

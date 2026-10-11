@@ -1,5 +1,5 @@
 import type { BudgetCalculationMode } from '../utils/budget-percentage'
-import type { Agreement_Type } from './database'
+import type { Agreement_Type, Currency_Codes } from './database'
 import type { BusinessRecordStateFields } from './business-record-state'
 import type { AccountReceivablePaymentCreditMemo } from './account-receivable'
 import type { AgreementRiskSource, SubmissionRisk } from './risk'
@@ -243,6 +243,18 @@ export interface FundingCaseAgreementCommitmentDetailRow extends FundingCaseAgre
 export interface FundingCaseAgreementCommitmentLineRow extends FundingCaseAgreementCommitmentLineItem {
   fiscal_year_display?: string | null
   accounting_dimensions: TransferPaymentStreamChartOfAccountDimension[]
+}
+
+export interface FundingCaseAgreementCommitmentLineBalanceRow extends FundingCaseAgreementCommitmentLineRow {
+  egcs_fc_paidamount: Money
+  egcs_fc_creditmemoamount: Money
+  egcs_fc_balance: Money
+}
+
+export interface FundingCaseAgreementCommitmentLineBalances {
+  commitmentId: string | null
+  currency: Currency_Codes
+  lines: FundingCaseAgreementCommitmentLineBalanceRow[]
 }
 
 export interface FundingCaseAgreementCommitmentOverviewRow {

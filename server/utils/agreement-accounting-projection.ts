@@ -335,7 +335,7 @@ export const summarizePaidAccountingByCurrency = (entries: Awaited<ReturnType<ty
       correctedRecordedPaid: sumMoney(selected.map(entry => entry.amount)) }
   })
 
-/** Cumulative recorded paid totals through a stable selected fiscal year and period. */
+/** Cumulative period accounting plus posted credits through the selected fiscal year. */
 export const getAgreementRecordedPaidToDate = async (
   db: Kysely<Database>, agreementId: string,
   input: { fiscalYearId: string; periodEnd: number; excludePaymentId?: string; currency?: string }
@@ -349,11 +349,15 @@ export const getAgreementRecordedPaidToDate = async (
   const projection = await getAgreementPaidAccountingProjection(db, agreementId, input)
   const selected = projection.entries.filter(row => BigInt(row.fiscalYearOrder) < BigInt(year.yearOrder)
     || (String(row.fiscalYearOrder) === String(year.yearOrder) && row.month <= input.periodEnd))
-  const currencies = new Set(selected.map(row => row.currency))
+  // Posted credits restore payment entitlement even when received after the requested payment period.
+  const credits = projection.entries.filter(row => row.kind === 'account_receivable_recovery'
+    && BigInt(row.fiscalYearOrder) <= BigInt(year.yearOrder))
+  const currencies = new Set([...selected, ...credits].map(row => row.currency))
   if (currencies.size > 1) throw new Error('Recorded paid currency is ambiguous')
   return { agreementId, cashPaidAmount: sumMoney(selected.filter(row => row.kind === 'cash_payment').map(row => row.amount)),
     jvEffectAmount: sumMoney(selected.filter(row => row.kind === 'journal_voucher').map(row => row.amount)),
     accountReceivableRecoveryAmount: sumMoney(selected.filter(row => row.kind === 'account_receivable_recovery').map(row => row.amount)),
+    creditMemoAmount: subtractMoney(ZERO, sumMoney(credits.map(row => row.amount))),
     correctionAmount: sumMoney(selected.filter(row => row.kind === 'correction').map(row => row.amount)),
-    recordedPaidAmount: sumMoney(selected.map(row => row.amount)), currency: input.currency ?? selected[0]?.currency ?? null }
+    recordedPaidAmount: sumMoney(selected.map(row => row.amount)), currency: input.currency ?? selected[0]?.currency ?? credits[0]?.currency ?? null }
 }

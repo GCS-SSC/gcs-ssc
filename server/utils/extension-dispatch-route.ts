@@ -11,6 +11,7 @@ import {
 import {
   canAccessExtensionEntity,
   getExtensionConfigurationForEntity,
+  getExtensionAgencyConfiguration,
   getExtensionStreamConfiguration,
   isExtensionEnabledForAgency,
   lockExtensionLifecycleScope,
@@ -182,6 +183,7 @@ const prepareExtensionRbacContext = async (
     event.context.gcsExtension = {
       extensionKey,
       config: streamConfiguration.config,
+      agencyConfig: (await getExtensionAgencyConfiguration(event.context.$db, extensionKey, resolvedStreamContext.agencyId)).config,
       stream: {
         streamId: resolvedStreamId,
         agencyId: resolvedStreamContext.agencyId,
@@ -215,6 +217,7 @@ const prepareExtensionRbacContext = async (
     event.context.gcsExtension = {
       extensionKey,
       config: {},
+      agencyConfig: (await getExtensionAgencyConfiguration(event.context.$db, extensionKey, resolvedAgencyId)).config,
       agency: {
         agencyId: resolvedAgencyId,
         scope,
@@ -268,6 +271,7 @@ const prepareExtensionRbacContext = async (
   event.context.gcsExtension = {
     extensionKey,
     config,
+    agencyConfig: (await getExtensionAgencyConfiguration(event.context.$db, extensionKey, resolvedEntityContext.agencyId)).config,
     entity: {
       ...resolvedEntityContext,
       rbac: {
