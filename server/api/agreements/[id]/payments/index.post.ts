@@ -1,3 +1,4 @@
+import { captureAgreementPaymentEvidence } from '~~/server/utils/agreement-payment-evidence'
 import { assertPaymentRecoveryAllowed } from '~~/server/utils/payment-recovery-controls'
 import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { sql } from 'kysely'
@@ -86,15 +87,18 @@ export default defineEventHandler(async event => {
     if (!creatorId) return await notFound(event, 'COMMON_USER_NOT_FOUND', 'apiErrors.admin_common.not_found')
     const draftStatusId = await lockAgencyDraftStatus(trx, currentContext.agencyId)
 
+    const evidence = await captureAgreementPaymentEvidence(trx, agreementId, String(commitment.id), validated, fiscalYear.fiscal_year_display)
     const createdPayment = await trx
       .insertInto('Funding_Case_Agreement_Payment')
       .values({
         ...paymentValues,
+        egcs_fc_evidence: sql`${JSON.stringify(evidence)}::jsonb`,
         egcs_fc_paymentamount: databaseMoneyValue(paymentValues.egcs_fc_paymentamount),
         egcs_fc_status: draftStatusId
       })
       .returning([
         'id',
+        'egcs_fc_evidence',
         'egcs_fc_fundingagreementcommitment',
         'egcs_fc_fiscalyear',
         'egcs_fc_paymenttype',

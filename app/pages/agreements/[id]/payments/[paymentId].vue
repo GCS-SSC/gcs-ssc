@@ -57,6 +57,7 @@ const {
 } = useExtensionEntityTabs({ target: 'payment', paymentId })
 const tabs = computed(() => [
   { key: 'agreement.payments.lines_title', value: 'lines', icon: 'i-lucide-list' },
+  { key: 'agreement.payments.evidence.title', value: 'payment-evidence', icon: 'i-lucide-file-check' },
   { key: 'agreement.payments.completion.title', value: 'completion', icon: 'i-lucide-circle-check-big' },
   { key: 'reviews.title', value: 'reviews', icon: 'i-lucide-clipboard-check' },
   { key: 'workflow.title', value: 'workflows', icon: 'i-lucide-workflow' },
@@ -370,6 +371,12 @@ const handleCompleted = async () => {
                 </div>
               </div>
             </CommonSection>
+
+            <AgreementPaymentEvidence
+              v-else-if="selectedTab === 'payment-evidence'"
+              :agreement-id="agreementId"
+              :payment-id="paymentId"
+              :evidence="payment.egcs_fc_evidence" />
 
             <section v-else-if="selectedTab === 'completion'" id="payment-completion" class="space-y-6">
               <AgreementPaymentRecoverySummary :payment="payment" />

@@ -16,13 +16,14 @@ import { databaseMoneyText, parseDatabaseMoney } from './database-money'
  * @param options - Optional Payment preview selection.
  * @param options.fiscalYearId - Stable Agreement budget fiscal year.
  * @param options.currency - Native selected currency.
+ * @param options.excludePaymentId - Current editable Payment excluded from its own balance.
  * @returns Exact money coding rows and posted linked credits.
  */
 export const getAgreementCommitmentLineBalances = async (
   db: Kysely<Database>,
   agreementId: string,
   commitmentId: string,
-  options: { fiscalYearId?: string; currency?: Currency_Codes } = {}
+  options: { fiscalYearId?: string; currency?: Currency_Codes; excludePaymentId?: string } = {}
 ): Promise<FundingCaseAgreementCommitmentLineBalanceRow[]> => {
   let query = db.selectFrom('Funding_Case_Agreement_Commitment_Line as line')
     .innerJoin('Funding_Case_Agreement_Commitment as commitment', 'commitment.id', 'line.egcs_fc_commitment')
@@ -55,7 +56,7 @@ export const getAgreementCommitmentLineBalances = async (
   const zero = parseMoney('0.00')
   return await Promise.all(lines.map(async ({ currency, ...line }) => {
     const amount = parseDatabaseMoney(line.egcs_fc_amount)
-    const { paidAmount } = await getCommitmentLinePaymentCoverage(db, String(line.id), { currency })
+    const { paidAmount } = await getCommitmentLinePaymentCoverage(db, String(line.id), { currency, ...(options.excludePaymentId ? { excludePaymentId: options.excludePaymentId } : {}) })
     const balance = subtractMoney(amount, paidAmount)
     const credits = sumMoney(recoveries.filter(row => row.currency === currency && String(row.commitmentLineId) === String(line.id)).map(row => row.amount))
     return { ...line, id: String(line.id), egcs_fc_commitment: String(line.egcs_fc_commitment),

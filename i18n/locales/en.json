@@ -2641,6 +2641,13 @@
       }
     },
     "payments": {
+      "evidence": {
+        "title": "Payment evidence",
+        "captured": "Payment calculation captured on {date}.",
+        "amount": "Payment amount",
+        "unavailable": "No financial inputs or commitment balances have been saved for this payment.",
+        "extension_error": "Unable to load calculation evidence."
+      },
       "financial_inputs": {
         "calculation_details": "Calculation details",
         "title": "Financial inputs",

@@ -28,6 +28,10 @@ const applicantRecipientId = computed(() => {
   return undefined
 })
 
+const paymentId = computed(() => context && 'paymentId' in context && typeof context.paymentId === 'string'
+  ? context.paymentId
+  : undefined)
+
 const agreementId = computed(() => {
   if (context && 'agreementId' in context) {
     const value = context.agreementId
@@ -62,16 +66,18 @@ const runtimeQuery = computed(() => ({
   ...(agencyId ? { agencyId } : {}),
   ...(applicantRecipientId.value ? { applicantRecipientId: applicantRecipientId.value } : {}),
   ...(agreementId.value ? { agreementId: agreementId.value } : {}),
+  ...(paymentId.value ? { paymentId: paymentId.value } : {}),
   permissionAction
 }))
-const { data } = useFetch<ExtensionRuntimeResponse, Error, '/api/extensions/runtime'>('/api/extensions/runtime', {
+const { data, status, error, refresh } = useFetch<ExtensionRuntimeResponse, Error, '/api/extensions/runtime'>('/api/extensions/runtime', {
+  key: computed(() => `extension-slot:${JSON.stringify(runtimeQuery.value)}`),
   query: runtimeQuery,
   default: defaultResponse,
   server: false,
-  watch: [() => subject, () => slotName, () => streamId, () => agencyId, () => permissionAction, applicantRecipientId, agreementId]
+  watch: [() => subject, () => slotName, () => streamId, () => agencyId, () => permissionAction, applicantRecipientId, agreementId, paymentId]
 })
 
-const items = computed(() => data.value?.items ?? [])
+const items = computed(() => slotName === 'payment.evidence' && status.value !== 'success' ? [] : data.value?.items ?? [])
 
 /**
  * Resolves the registered client component for a runtime extension slot item.
@@ -83,7 +89,9 @@ const resolveComponent = (componentName: string) => getGcsExtensionComponent(com
 </script>
 
 <template>
-  <div v-if="items.length > 0" class="space-y-4">
+  <slot v-if="slotName === 'payment.evidence' && status === 'pending'" name="loading" />
+  <slot v-else-if="slotName === 'payment.evidence' && error" name="error" :retry="refresh" />
+  <div v-else-if="items.length > 0" class="space-y-4">
     <component
       :is="resolveComponent(item.componentName)"
       v-for="item in items"

@@ -10,6 +10,7 @@ import type {
   RuntimeState
 } from '../constants/system-lifecycle'
 import type { StatusId } from './status'
+import type { PaymentEvidence } from './payment-evidence'
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
 
@@ -1811,6 +1812,7 @@ export interface FundingCaseAgreementJournalVoucherLineTable {
 }
 
 export interface FundingCaseAgreementPaymentTable {
+  egcs_fc_evidence: Generated<PaymentEvidence | null>
   /** Legacy multi-Proponent payments remain unattributed until explicitly resolved. */
   egcs_fc_applicantrecipient: Generated<string | null>
   id: Generated<string>

@@ -1116,10 +1116,17 @@ CREATE TABLE "Funding_Case_Agreement_Payment" (
   "egcs_fc_periodend" smallint NOT NULL,
   "egcs_fc_paymentamount" numeric(19,2) NOT NULL,
   "egcs_fc_currency" currency_codes DEFAULT 'cad'::currency_codes NOT NULL,
+  "egcs_fc_evidence" jsonb,
   "egcs_fc_comment" text,
   "egcs_fc_status" bigint NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   "egcs_fc_applicantrecipient" bigint,
+  CONSTRAINT "fc_chk_paymentevidence" CHECK (egcs_fc_evidence IS NULL OR
+    (jsonb_typeof(egcs_fc_evidence) = 'object' AND egcs_fc_evidence->>'version' = '1'
+     AND jsonb_typeof(egcs_fc_evidence->'capturedAt') = 'string'
+     AND jsonb_typeof(egcs_fc_evidence->'selection') = 'object'
+     AND jsonb_typeof(egcs_fc_evidence->'financialInputs') = 'object'
+     AND jsonb_typeof(egcs_fc_evidence->'commitmentBalances') = 'object') IS TRUE),
   CONSTRAINT "fc_unq_paymentidcommitment" UNIQUE (id, egcs_fc_fundingagreementcommitment),
   CONSTRAINT "fc_uq_payment_agreement" UNIQUE (id, egcs_fc_fundingagreement),
   CONSTRAINT "Funding_Case_Agreement_Payment_pkey" PRIMARY KEY (id),
@@ -1306,6 +1313,19 @@ END $baseline$`.execute(db)
 /** Installs the current installFunctions definitions for this subject on a fresh database. */
 export const installFunctions = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
+CREATE FUNCTION trg_fn_guard_payment_evidence() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF OLD.egcs_fc_evidence IS DISTINCT FROM NEW.egcs_fc_evidence AND (
+    OLD._deleted OR NOT EXISTS (SELECT 1 FROM "Common_Status" status WHERE status.id = OLD.egcs_fc_status
+      AND NOT status._deleted AND NOT status.egcs_cn_readonly AND NOT status.egcs_cn_terminal)
+    OR EXISTS (SELECT 1 FROM "Common_Completion" completion WHERE completion.egcs_cn_entitytype = 'fundingcasepayment'
+      AND completion.egcs_cn_entityid = OLD.id AND NOT completion._deleted)
+  ) THEN
+    RAISE EXCEPTION 'Locked Payment evidence is immutable' USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$$;
 CREATE FUNCTION ar_has_lifecycle_evidence(root_id bigint, target_type text)
  RETURNS boolean
  LANGUAGE sql
@@ -3844,6 +3864,8 @@ CREATE TRIGGER trg_soft_delete_fundingcasemonitor_assignments AFTER UPDATE OF _d
 CREATE CONSTRAINT TRIGGER trg_validate_fundingcasemonitor_status_agency AFTER INSERT OR UPDATE ON "Funding_Case_Agreement_Monitor" DEFERRABLE INITIALLY IMMEDIATE FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_funding_status_agency();
 
 CREATE TRIGGER trg_ar_monitor_followup BEFORE INSERT OR UPDATE ON "Funding_Case_Agreement_Monitor_Followup" FOR EACH ROW EXECUTE FUNCTION trg_fn_ar_monitor_followup();
+
+CREATE TRIGGER trg_guard_payment_evidence BEFORE UPDATE OF egcs_fc_evidence ON "Funding_Case_Agreement_Payment" FOR EACH ROW EXECUTE FUNCTION trg_fn_guard_payment_evidence();
 
 CREATE TRIGGER trg_correction_financial_lock BEFORE INSERT OR DELETE OR UPDATE ON "Funding_Case_Agreement_Payment" FOR EACH ROW EXECUTE FUNCTION trg_fn_correction_financial_lock();
 

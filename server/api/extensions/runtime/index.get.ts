@@ -6,6 +6,7 @@ import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 const RuntimeSlotQuerySchema = z.object({
   slot: z.enum([
+    'payment.evidence',
     'textarea.after',
     'bilingual-field.after',
     'agreement.descriptions.after',
@@ -20,6 +21,7 @@ const RuntimeSlotQuerySchema = z.object({
   agencyId: z.string().optional(),
   applicantRecipientId: z.string().optional(),
   agreementId: z.string().optional(),
+  paymentId: z.string().optional(),
   permissionAction: z.enum(['create', 'read', 'update']).default('read')
 })
 
@@ -30,7 +32,8 @@ export default defineEventHandler(async event => {
     rawQuery.streamId,
     rawQuery.agencyId,
     rawQuery.applicantRecipientId,
-    rawQuery.agreementId
+    rawQuery.agreementId,
+    rawQuery.paymentId
   ]
   if (rawEntityIds.some(value => value !== undefined
     && (typeof value !== 'string' || !isPositivePostgresBigintText(value)))) {

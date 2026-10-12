@@ -1,3 +1,4 @@
+import type { PaymentEvidence } from './payment-evidence'
 import type { BudgetCalculationMode } from '../utils/budget-percentage'
 import type { Agreement_Type, Currency_Codes } from './database'
 import type { BusinessRecordStateFields } from './business-record-state'
@@ -301,6 +302,7 @@ export interface FundingCaseAgreementPaymentLineRow extends FundingCaseAgreement
 }
 
 export interface FundingCaseAgreementPaymentDetailRow extends FundingCaseAgreementPaymentRow {
+  egcs_fc_evidence: PaymentEvidence | null
   agreement_id: string
   agreement_title_en?: string | null
   agreement_title_fr?: string | null

@@ -60,6 +60,7 @@ export default defineEventHandler(async event => {
     .where('Transfer_Payment_Stream._deleted', '=', false)
     .select([
       'Funding_Case_Agreement_Payment.id as id',
+      'Funding_Case_Agreement_Payment.egcs_fc_evidence as egcs_fc_evidence',
       sql<string | null>`COALESCE(${sql.ref('payee.egcs_ar_operatingname_en')}, ${sql.ref('payee.egcs_ar_legalname_en')})`.as('egcs_fc_payeename_en'),
       sql<string | null>`COALESCE(${sql.ref('payee.egcs_ar_operatingname_fr')}, ${sql.ref('payee.egcs_ar_legalname_fr')})`.as('egcs_fc_payeename_fr'),
       'Funding_Case_Agreement_Payment.egcs_fc_fundingagreementcommitment as egcs_fc_fundingagreementcommitment',

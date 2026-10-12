@@ -2641,6 +2641,13 @@
       }
     },
     "payments": {
+      "evidence": {
+        "title": "Pièces justificatives du paiement",
+        "captured": "Calcul du paiement conservé le {date}.",
+        "amount": "Montant du paiement",
+        "unavailable": "Aucune donnée financière ni aucun solde d’engagement n’a été enregistré pour ce paiement.",
+        "extension_error": "Impossible de charger les pièces justificatives du calcul."
+      },
       "financial_inputs": {
         "calculation_details": "Détails du calcul",
         "title": "Données financières",

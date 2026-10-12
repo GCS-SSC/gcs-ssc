@@ -1,9 +1,11 @@
+import { captureAgreementPaymentEvidence } from '~~/server/utils/agreement-payment-evidence'
 import { assertPaymentRecoveryAllowed } from '~~/server/utils/payment-recovery-controls'
 import type { Currency_Codes } from '~~/shared/types/database'
 import { resolveAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { FundingCaseAgreementPaymentCreateSchema, FundingCaseAgreementPaymentPatchSchema } from '~~/shared/types/schemas'
 import {
   assertAgreementPaymentEditable,
+  assertAgreementPaymentFiscalYear,
   buildAgreementPaymentPatchUpdateValues,
   normalizeAgreementPaymentEditingResponse,
   prepareAgreementPaymentRoute,
@@ -101,14 +103,30 @@ export default defineEventHandler(async event => {
       }
     })
 
-    const row = Object.keys(updateValues).length
+    const recalculateEvidence = explicitOffsetPlan || [
+      'egcs_fc_commitmenttype', 'egcs_fc_fiscalyear', 'egcs_fc_paymenttype', 'egcs_fc_applicantrecipient',
+      'egcs_fc_periodstart', 'egcs_fc_periodend', 'egcs_fc_paymentamount', 'egcs_fc_currency'
+    ].some(key => key in patchValues)
+    let evidence = null
+    if (recalculateEvidence) {
+      const commitmentId = nextCommitmentId ?? String(editablePayment.egcs_fc_fundingagreementcommitment)
+      const commitment = await trx.selectFrom('Funding_Case_Agreement_Commitment').select('egcs_fc_type')
+        .where('id', '=', commitmentId).executeTakeFirstOrThrow()
+      const input = FundingCaseAgreementPaymentCreateSchema.parse({ ...editablePayment, ...patchValues,
+        egcs_fc_commitmenttype: String(commitment.egcs_fc_type) })
+      const fiscalYear = await assertAgreementPaymentFiscalYear(event, trx, agreementId, input.egcs_fc_fiscalyear, input.egcs_fc_currency)
+      if (!fiscalYear || typeof fiscalYear !== 'object' || !('id' in fiscalYear)) return fiscalYear
+      evidence = await captureAgreementPaymentEvidence(trx, agreementId, commitmentId, input, fiscalYear.fiscal_year_display, { excludePaymentId: paymentId })
+    }
+    const row = Object.keys(updateValues).length || evidence
       ? await trx
           .updateTable('Funding_Case_Agreement_Payment')
-          .set(updateValues)
+          .set({ ...updateValues, ...(evidence ? { egcs_fc_evidence: sql`${JSON.stringify(evidence)}::jsonb` } : {}) })
           .where('id', '=', paymentId)
           .where('_deleted', '=', false)
           .returning([
             'id',
+            'egcs_fc_evidence',
             'egcs_fc_fundingagreementcommitment',
             'egcs_fc_fiscalyear',
             'egcs_fc_paymenttype',

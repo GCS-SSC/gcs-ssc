@@ -5,6 +5,7 @@ const SECTION_URL_VALUES: Record<string, SectionUrlDefinition> = {
   'general': { fr: 'general' },
   'summary': { fr: 'sommaire' },
   'lines': { fr: 'lignes' },
+  'payment-evidence': { fr: 'pieces-justificatives-du-paiement' },
   'completion': { fr: 'finalisation' },
   'reviews': { fr: 'examens' },
   'review': { fr: 'examen' },
@@ -103,6 +104,7 @@ const SECTION_URL_VALUES: Record<string, SectionUrlDefinition> = {
 }
 
 const SECTION_TAB_KEYS: Record<string, string> = {
+  'agreement.payments.evidence.title': 'payment-evidence',
   'agency.tabs.general': 'general',
   'agency.tabs.statuses': 'statuses',
   'custom_fields.title': 'custom-fields',

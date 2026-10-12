@@ -49,6 +49,7 @@ const EXTENSION_HOST_CAPABILITIES = new Set([
   'stream-config-modal',
   'stream-config-page',
   'entity-tabs',
+  'payment-evidence',
   'textarea-slots',
   'bilingual-field-slots',
   'create-actions',
@@ -326,8 +327,9 @@ const inferRequiredHostCapabilities = (definition: GcsExtensionDefinition): Set<
   addImpliedCapability(capabilities, Boolean(definition.admin?.streamConfig), 'stream-config-modal')
   addImpliedCapability(capabilities, Boolean(definition.admin?.streamConfigPage), 'stream-config-page')
   addImpliedCapability(capabilities, (definition.client?.tabs ?? []).length > 0, 'entity-tabs')
-  addImpliedCapability(capabilities, (definition.client?.slots ?? []).some(slot => slot.slot !== 'bilingual-field.after'), 'textarea-slots')
+  addImpliedCapability(capabilities, (definition.client?.slots ?? []).some(slot => !['bilingual-field.after', 'payment.evidence'].includes(slot.slot)), 'textarea-slots')
   addImpliedCapability(capabilities, (definition.client?.slots ?? []).some(slot => slot.slot === 'bilingual-field.after'), 'bilingual-field-slots')
+  addImpliedCapability(capabilities, (definition.client?.slots ?? []).some(slot => slot.slot === 'payment.evidence'), 'payment-evidence')
   addImpliedCapability(capabilities, (definition.client?.createActions ?? []).length > 0, 'create-actions')
   addImpliedCapability(capabilities, (definition.client?.paymentAmountCalculators ?? []).length > 0, 'payment-amount-calculators')
   addImpliedCapability(capabilities, (definition.serverHandlers ?? []).length > 0, 'server-handlers')

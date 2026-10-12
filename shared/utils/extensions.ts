@@ -108,6 +108,7 @@ export type {
   GcsExtensionServerHandlerDefinition,
   GcsExtensionSlot,
   GcsExtensionSlotContext,
+  GcsPaymentEvidenceExtensionContext,
   GcsAgreementProfileExtensionContext,
   GcsAgreementDescriptionsExtensionContext,
   GcsProponentDescriptionsExtensionContext,

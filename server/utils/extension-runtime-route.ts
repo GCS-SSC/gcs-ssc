@@ -14,6 +14,9 @@ import { authorize, requireAuthContext } from '~~/server/utils/authorize'
 import { canAccessAgreement, resolveAgreementScopeContext } from '~~/server/utils/agreement'
 import { canAccessApplicantRecipient, listApplicantRecipientContributionAgencies } from '~~/server/utils/applicant-recipient-auth'
 import {
+  canAccessExtensionEntity,
+  getExtensionConfigurationForEntity,
+  resolveExtensionEntityContext,
   getRegisteredExtensions,
   resolveExtensionRuntimeSlot,
   resolveExtensionStreamContext
@@ -26,6 +29,7 @@ export interface ExtensionRuntimeSlotQuery {
   agencyId?: string
   applicantRecipientId?: string
   agreementId?: string
+  paymentId?: string
   permissionAction: Extract<AbilityAction, 'create' | 'read' | 'update'>
 }
 
@@ -286,12 +290,43 @@ const withBilingualAgencyConfiguration = async (
   }
 }
 
+/** Resolves retained Payment contributions using the exact Payment's Viewer boundary. */
+const resolvePaymentEvidenceRuntimeResponse = async (
+  event: H3Event,
+  db: Kysely<Database>,
+  query: ExtensionRuntimeSlotQuery
+): Promise<ExtensionRuntimeResponse> => {
+  if (!query.paymentId || query.permissionAction !== 'read'
+    || (query.subject && query.subject !== 'agreement') || query.applicantRecipientId) {
+    return await forbidden(event)
+  }
+  const owner = await resolveExtensionEntityContext(db, 'payment', query.paymentId)
+  if (!owner) return await notFound(event, 'PAYMENT_NOT_FOUND', 'apiErrors.agreement.payment_not_found')
+  if ((query.agreementId && query.agreementId !== owner.agreementId)
+    || (query.streamId && query.streamId !== owner.streamId)
+    || (query.agencyId && query.agencyId !== owner.agencyId)) return await forbidden(event)
+  await authorize(event, 'agreement', 'read', async ({ context }) =>
+    await canAccessExtensionEntity(context, { subject: 'agreement', action: 'read' }, owner, db)
+      ? { bypass: true }
+      : { denied: true })
+  const items: ExtensionRuntimeSlotItem[] = []
+  for (const extension of await getRegisteredExtensions()) {
+    if (!extension.client.slots.some(slot => slot.slot === query.slot)) continue
+    const config = await getExtensionConfigurationForEntity(db, extension.key, owner)
+    if (config !== null) items.push(...buildExtensionRuntimeSlotItems(extension, query, config))
+  }
+  return { slot: query.slot, streamId: owner.streamId, items }
+}
+
 /** Dispatches runtime configuration loading for agency or stream routes. */
 export const resolveExtensionRuntimeResponse = async (
   event: H3Event,
   query: ExtensionRuntimeSlotQuery
 ): Promise<ExtensionRuntimeResponse> => {
   const db = event.context.$db
+
+  if (query.slot === 'payment.evidence') return await resolvePaymentEvidenceRuntimeResponse(event, db, query)
+  if (query.paymentId !== undefined) return await forbidden(event)
 
   if (query.slot === 'bilingual-field.after') return await resolveBilingualFieldRuntimeResponse(event, db, query)
 

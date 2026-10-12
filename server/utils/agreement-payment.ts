@@ -415,7 +415,8 @@ export const assertAgreementPaymentFiscalYear = async (
       'Funding_Case_Agreement_Budget_Version.id',
       'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_budgetversion'
     )
-    .select(budgetFiscalYearStableId.as('id'))
+    .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fiscalyear')
+    .select([budgetFiscalYearStableId.as('id'), 'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display'])
     .where(budgetFiscalYearStableId, '=', fiscalYearId)
     .where('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fundingagreement', '=', agreementId)
     .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
