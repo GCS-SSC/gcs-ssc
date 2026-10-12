@@ -171,11 +171,8 @@ CREATE TABLE "Funding_Case_Account_Receivable_Credit_Memo_Line" (
 CREATE UNIQUE INDEX fc_uq_ar_creditmemo_line_number ON "Funding_Case_Account_Receivable_Credit_Memo_Line" (egcs_fc_creditmemo, egcs_fc_linenumber) WHERE NOT _deleted;
 
 CREATE TABLE "Funding_Case_Account_Receivable_Offset_Memo" (
-  "egcs_fc_commitmentchartofaccount" bigint REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT,
   "id" bigint DEFAULT nextval('"Funding_Case_Account_Receivable_Offset_Memo_id_seq"'::regclass) NOT NULL,
   "egcs_fc_receivable" bigint NOT NULL,
-  "egcs_fc_creditmemochartofaccount" bigint NOT NULL REFERENCES "Agency_Chart_of_Account"(id),
-  "egcs_fc_creditmemoaccountingdimensions" jsonb NOT NULL,
   "egcs_fc_pool" bigint NOT NULL,
   "egcs_fc_amount" numeric(19,2) NOT NULL,
   "egcs_fc_createdat" timestamp with time zone DEFAULT now() NOT NULL,
@@ -186,6 +183,20 @@ CREATE TABLE "Funding_Case_Account_Receivable_Offset_Memo" (
 );
 
 CREATE INDEX fc_idx_ar_offset_memo_receivable ON "Funding_Case_Account_Receivable_Offset_Memo" USING btree (egcs_fc_receivable);
+
+CREATE TABLE "Funding_Case_Account_Receivable_Offset_Memo_Line" (
+  "id" bigserial PRIMARY KEY,
+  "egcs_fc_offsetmemo" bigint NOT NULL REFERENCES "Funding_Case_Account_Receivable_Offset_Memo"(id) ON DELETE RESTRICT,
+  "egcs_fc_linenumber" smallint NOT NULL CHECK (egcs_fc_linenumber > 0),
+  "egcs_fc_transferpaymentstreamchartofaccount" bigint NOT NULL,
+  "egcs_fc_creditmemochartofaccount" bigint NOT NULL REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT,
+  "egcs_fc_creditmemoaccountingdimensions" jsonb NOT NULL,
+  "egcs_fc_commitmentchartofaccount" bigint REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT,
+  "egcs_fc_amount" numeric(19,2) NOT NULL CHECK (egcs_fc_amount > 0),
+  "_deleted" boolean DEFAULT false NOT NULL CHECK (_deleted = false),
+  CONSTRAINT fc_uq_ar_offset_line_number UNIQUE (egcs_fc_offsetmemo, egcs_fc_linenumber),
+  CONSTRAINT fc_uq_ar_offset_line_account UNIQUE (egcs_fc_offsetmemo, egcs_fc_transferpaymentstreamchartofaccount)
+);
 
 CREATE TABLE "Funding_Case_Account_Receivable_Offset_Memo_Application" (
   "id" bigint DEFAULT nextval('"Funding_Case_Account_Receivable_Offset_Memo_Application_id_seq"'::regclass) NOT NULL,
@@ -2448,18 +2459,26 @@ CREATE FUNCTION trg_fn_validate_ar_offset_memo()
       IF TG_OP<>'INSERT' THEN RAISE EXCEPTION 'Offset credit evidence is immutable' USING ERRCODE='23514'; END IF;
       IF TG_TABLE_NAME='Funding_Case_Account_Receivable_Offset_Memo' THEN
         SELECT * INTO debt FROM "Funding_Case_Agreement_Account_Receivable" WHERE id=NEW.egcs_fc_receivable FOR UPDATE;
+        IF debt.id IS NULL OR debt.egcs_fc_pool<>NEW.egcs_fc_pool OR debt.egcs_fc_outcome<>'posted'
+          OR debt.egcs_fc_linkedreceivable IS NOT NULL OR debt._deleted THEN
+          RAISE EXCEPTION 'Offset Credit Memo requires one established AR' USING ERRCODE='23514'; END IF;
+      ELSIF TG_TABLE_NAME='Funding_Case_Account_Receivable_Offset_Memo_Line' THEN
+        SELECT * INTO memo FROM "Funding_Case_Account_Receivable_Offset_Memo" WHERE id=NEW.egcs_fc_offsetmemo FOR UPDATE;
+        SELECT * INTO debt FROM "Funding_Case_Agreement_Account_Receivable" WHERE id=memo.egcs_fc_receivable;
         SELECT egcs_fc_transferpaymentstream INTO stream_id FROM "Funding_Case_Agreement_Profile" WHERE id=debt.egcs_fc_fundingagreement;
         SELECT * INTO account FROM "Agency_Chart_of_Account" WHERE id=NEW.egcs_fc_creditmemochartofaccount;
-        IF debt.id IS NULL OR debt.egcs_fc_pool<>NEW.egcs_fc_pool OR debt.egcs_fc_outcome<>'posted'
-          OR debt.egcs_fc_linkedreceivable IS NOT NULL OR debt._deleted OR account.id IS NULL OR account._deleted
-          OR account.egcs_ay_kind<>'credit_memo' OR account.egcs_ay_fiscalyear<>debt.egcs_fc_agencyfiscalyear
-          OR account.egcs_ay_currency<>debt.egcs_fc_currency
-          OR account.egcs_ay_organizationagency<>(SELECT egcs_fc_agency FROM "Funding_Case_Account_Receivable_Pool" WHERE id=NEW.egcs_fc_pool)
+        IF account.id IS NULL OR account._deleted OR account.egcs_ay_kind<>'credit_memo'
+          OR account.egcs_ay_fiscalyear<>debt.egcs_fc_agencyfiscalyear OR account.egcs_ay_currency<>debt.egcs_fc_currency
+          OR account.egcs_ay_organizationagency<>(SELECT egcs_fc_agency FROM "Funding_Case_Account_Receivable_Pool" WHERE id=memo.egcs_fc_pool)
           OR NEW.egcs_fc_creditmemoaccountingdimensions IS DISTINCT FROM account.egcs_ay_accountingdimensions
           OR NEW.egcs_fc_commitmentchartofaccount IS DISTINCT FROM account.egcs_ay_commitmentchartofaccount
           OR NOT EXISTS (SELECT 1 FROM "Transfer_Payment_Stream_Chart_of_Account" selection
-            WHERE selection.egcs_tp_transferpaymentstream=stream_id AND selection.egcs_tp_agencychartofaccount=account.id AND NOT selection._deleted) THEN
-          RAISE EXCEPTION 'Offset Credit Memo requires one established AR and its Stream credit coding' USING ERRCODE='23514'; END IF;
+            WHERE selection.id=NEW.egcs_fc_transferpaymentstreamchartofaccount
+              AND selection.egcs_tp_transferpaymentstream=stream_id AND selection.egcs_tp_agencychartofaccount=account.id AND NOT selection._deleted)
+          OR EXISTS (SELECT 1 FROM "Funding_Case_Account_Receivable_Offset_Memo_Application" application
+            JOIN "Funding_Case_Account_Receivable_Recovery" application_recovery ON application_recovery.id=application.egcs_fc_recovery
+            WHERE application.egcs_fc_offsetmemo=memo.id AND application_recovery.egcs_fc_outcome<>'open') THEN
+          RAISE EXCEPTION 'Offset Credit Memo requires its retained Stream credit coding' USING ERRCODE='23514'; END IF;
       ELSE
         SELECT * INTO memo FROM "Funding_Case_Account_Receivable_Offset_Memo" WHERE id=NEW.egcs_fc_offsetmemo FOR UPDATE;
         SELECT * INTO recovery FROM "Funding_Case_Account_Receivable_Recovery" WHERE id=NEW.egcs_fc_recovery;
@@ -2477,6 +2496,18 @@ CREATE FUNCTION trg_fn_validate_ar_offset_memo()
         IF NEW.egcs_fc_amount>ar_receivable_cash_net(memo.egcs_fc_receivable)-consumed THEN
           RAISE EXCEPTION 'Offset Credit Memo exceeds its AR available balance' USING ERRCODE='23514'; END IF;
       END IF; RETURN NEW;
+    END $function$;
+
+CREATE FUNCTION trg_fn_validate_ar_offset_memo_lines_total()
+ RETURNS trigger LANGUAGE plpgsql AS $function$
+    DECLARE memo_id bigint; expected numeric; actual numeric;
+    BEGIN
+      memo_id := CASE WHEN TG_TABLE_NAME='Funding_Case_Account_Receivable_Offset_Memo' THEN NEW.id ELSE (to_jsonb(NEW)->>'egcs_fc_offsetmemo')::bigint END;
+      SELECT egcs_fc_amount INTO expected FROM "Funding_Case_Account_Receivable_Offset_Memo" WHERE id=memo_id;
+      SELECT coalesce(sum(egcs_fc_amount),0) INTO actual FROM "Funding_Case_Account_Receivable_Offset_Memo_Line" WHERE egcs_fc_offsetmemo=memo_id;
+      IF expected IS DISTINCT FROM actual THEN
+        RAISE EXCEPTION 'Offset Credit Memo coding must equal its declared total' USING ERRCODE='23514'; END IF;
+      RETURN NULL;
     END $function$;
 
 CREATE FUNCTION trg_fn_validate_ar_recovery()
@@ -2499,7 +2530,7 @@ AS $function$
           AND memo.egcs_fc_outcome='open' AND NOT memo._deleted) THEN
           RAISE EXCEPTION 'Pending Credit Memo blocks Payment offset processing' USING ERRCODE='23514';
         END IF;
-        IF NEW.egcs_fc_creditmemo IS NOT NULL OR NOT EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Payment" payment
+        IF NEW.egcs_fc_creditmemo IS NOT NULL OR NEW.egcs_fc_outcome<>'released' AND NOT EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Payment" payment
           JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.id=payment.egcs_fc_fundingagreement
           JOIN "Transfer_Payment_Stream" stream ON stream.id=agreement.egcs_fc_transferpaymentstream
           JOIN "Transfer_Payment_Profile" program ON program.id=stream.egcs_tp_transferpaymentprofile
@@ -3125,6 +3156,8 @@ ALTER TABLE "Funding_Case_Account_Receivable_Credit_Memo" ADD CONSTRAINT "Fundin
 
 ALTER TABLE "Funding_Case_Account_Receivable_Credit_Memo" ADD CONSTRAINT "Funding_Case_Account_Receivable_Credit_Memo_id_fkey" FOREIGN KEY (id) REFERENCES "Common_Entity"(id) ON DELETE RESTRICT;
 
+ALTER TABLE "Funding_Case_Account_Receivable_Offset_Memo_Line" ADD CONSTRAINT fc_fk_ar_offset_line_selection FOREIGN KEY (egcs_fc_transferpaymentstreamchartofaccount) REFERENCES "Transfer_Payment_Stream_Chart_of_Account"(id) ON DELETE RESTRICT;
+
 ALTER TABLE "Funding_Case_Account_Receivable_Offset_Memo" ADD CONSTRAINT "Funding_Case_Account_Receivable_Offset__egcs_fc_receivable_fkey" FOREIGN KEY (egcs_fc_receivable) REFERENCES "Funding_Case_Agreement_Account_Receivable"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Account_Receivable_Offset_Memo" ADD CONSTRAINT "Funding_Case_Account_Receivable_Offset_Memo_egcs_fc_pool_fkey" FOREIGN KEY (egcs_fc_pool) REFERENCES "Funding_Case_Account_Receivable_Pool"(id) ON DELETE RESTRICT;
@@ -3585,6 +3618,12 @@ CREATE CONSTRAINT TRIGGER trg_validate_ar_establishment AFTER INSERT OR UPDATE O
 CREATE CONSTRAINT TRIGGER trg_require_ar_offset_memo_application AFTER INSERT ON "Funding_Case_Account_Receivable_Offset_Memo" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_require_ar_offset_memo_application();
 
 CREATE TRIGGER trg_validate_ar_offset_memo BEFORE INSERT OR DELETE OR UPDATE ON "Funding_Case_Account_Receivable_Offset_Memo" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_ar_offset_memo();
+
+CREATE TRIGGER trg_validate_ar_offset_memo BEFORE INSERT OR DELETE OR UPDATE ON "Funding_Case_Account_Receivable_Offset_Memo_Line" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_ar_offset_memo();
+
+CREATE CONSTRAINT TRIGGER trg_validate_ar_offset_memo_lines_total AFTER INSERT ON "Funding_Case_Account_Receivable_Offset_Memo_Line" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_ar_offset_memo_lines_total();
+
+CREATE CONSTRAINT TRIGGER trg_validate_ar_offset_memo_lines_total AFTER INSERT ON "Funding_Case_Account_Receivable_Offset_Memo" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_ar_offset_memo_lines_total();
 
 CREATE TRIGGER trg_validate_ar_offset_memo BEFORE INSERT OR DELETE OR UPDATE ON "Funding_Case_Account_Receivable_Offset_Memo_Application" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_ar_offset_memo();
 

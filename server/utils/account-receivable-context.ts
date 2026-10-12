@@ -63,6 +63,14 @@ export const lockAccountReceivableRecoveryPool = async (trx: Transaction<Databas
     .where('egcs_fc_currency', '=', identity.currency).forUpdate().executeTakeFirstOrThrow()
 }
 
+/** Preview locks the same debtor identity without creating a pool. */
+export const lockExistingAccountReceivableRecoveryPool = async (trx: Transaction<Database>, identity: AccountReceivablePoolIdentity) => {
+  await sql`SELECT pg_advisory_xact_lock(hashtextextended(${`gcs-ar:${identity.agencyId}:${identity.applicantRecipientId}`},0))`.execute(trx)
+  return await trx.selectFrom('Funding_Case_Account_Receivable_Pool').selectAll()
+    .where('egcs_fc_agency', '=', identity.agencyId).where('egcs_fc_applicantrecipient', '=', identity.applicantRecipientId)
+    .where('egcs_fc_currency', '=', identity.currency).forUpdate().executeTakeFirst()
+}
+
 /** Engine lock plan covers every originating debtor Agreement, in canonical numeric ID order. */
 export const lockAccountReceivablePaymentPoolAgreements = async (
   trx: Transaction<Database>, identity: AccountReceivablePoolIdentity & { agreementId: string }

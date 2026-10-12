@@ -372,6 +372,7 @@ const handleCompleted = async () => {
             </CommonSection>
 
             <section v-else-if="selectedTab === 'completion'" id="payment-completion" class="space-y-6">
+              <AgreementPaymentRecoverySummary :payment="payment" />
               <CommonCompletionPanel
                 entity-type="fundingcasepayment"
                 :entity-id="paymentId"

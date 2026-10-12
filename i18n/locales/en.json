@@ -1569,7 +1569,9 @@
       "recovery_method_required": "Select a recovery method before completing this receivable.",
       "account_required": "Select an accounts receivable account for every nonzero amount before completing this receivable.",
       "monitor_required": "Select a monitor follow-up required by this receivable type.",
-      "type_unavailable": "Select an active receivable type configured for this Agreement’s Agency."
+      "type_unavailable": "Select an active receivable type configured for this Agreement’s Agency.",
+      "payment_offset_coding_required": "Select coding for every offset credit memo before creating this payment.",
+      "payment_offset_plan_changed": "The payment offset plan has changed. Recheck the offset credit memos and confirm their coding before saving."
     },
     "data_collection": {
       "definition_invalid": "The pinned Data Collection form is invalid.",
@@ -2218,7 +2220,8 @@
     "checklist_na_policy_requires_option": "Enable N/A before requiring an N/A explanation.",
     "checklist_answer_not_allowed": "This answer is not offered by the pinned question.",
     "account_receivable_source_required": "Select exactly one source: Claims or Advances.",
-    "workflow_risk_rating_required_purpose": "Only a Risk Rating workflow may require a successful risk rating"
+    "workflow_risk_rating_required_purpose": "Only a Risk Rating workflow may require a successful risk rating",
+    "too_many_coding_lines": "A credit memo cannot contain more than 32,767 coding lines."
   },
   "notes": {
     "title": "Notes to file",
@@ -2639,8 +2642,9 @@
     },
     "payments": {
       "financial_inputs": {
+        "calculation_details": "Calculation details",
         "title": "Financial inputs",
-        "line_balances": "Commitment line balances",
+        "line_balances": "Commitment lines",
         "select_period": "Select a commitment type, fiscal year and payment period to view financial inputs.",
         "select_year": "Select a commitment type and fiscal year to view line balances.",
         "commitment_remaining": "Commitment remaining",
@@ -2719,7 +2723,37 @@
       "offset_reserved": "A recovery or adjustment is already pending for this payee and currency. Processing must wait for that operation to resolve.",
       "offset_allocations": "Credit Memo allocations",
       "offset_policy_description": "An automatic offset reduces the recipient disbursement. Excess proponent credit is held separately for refund.",
-      "packet_title": "Captured Payment settlement"
+      "packet_title": "Captured Payment settlement",
+      "wizard": {
+        "steps": {
+          "payment": {
+            "title": "Payment details",
+            "guidance": "Enter the payment details and review the financial inputs. Continue to check any required offset credit memos."
+          },
+          "credit-memos": {
+            "title": "Offset credit memos",
+            "guidance": "Review each offset credit memo. Select its coding and amounts when coding has not been supplied by the allocator. Each memo’s lines must match its total."
+          },
+          "review": {
+            "title": "Confirmation",
+            "guidance": "Review the payment and every offset credit memo before saving. They are created together and approved through the payment workflow."
+          }
+        },
+        "errors_summary": "Correct {count} validation errors.",
+        "errors_steps": "Steps with errors",
+        "errors_current_step": "Errors on this step",
+        "no_offsets": "No offset credit memo is required for this payment.",
+        "memo_number": "Credit memo {number}",
+        "allocated_coding": "Coding supplied by the allocator.",
+        "manual_coding": "Select the credit memo coding and allocate the amount.",
+        "duplicate_coding": "Select each coding account only once in this credit memo.",
+        "coding_total": "The coding lines must total {amount}.",
+        "remove_coding_line": "Remove coding line {number}",
+        "recheck": "Recheck offset credit memos",
+        "no_coding_accounts": "No eligible credit memo coding account is configured for this receivable’s Stream, fiscal year and currency."
+      },
+      "offset_coding_title": "Offset Credit Memo coding",
+      "offset_approval_description": "These offset Credit Memos are approved with this payment, including when the recipient disbursement is zero. Declining or cancelling the payment releases the recovery without posting the Credit Memos."
     },
     "forecasts": {
       "title": "Forecasts",

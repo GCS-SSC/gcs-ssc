@@ -9,7 +9,12 @@ import { hasAccountingTable } from './correction-schema'
 const paymentRecoveryErrorKeys: Readonly<Record<string, string>> = {
   AR_DIRECT_REPAYMENT_HOLD: 'apiErrors.account_receivable.payment_direct_repayment_hold',
   AR_RECOVERY_UNRESOLVED: 'apiErrors.account_receivable.payment_recovery_pending',
-  AR_ADJUSTMENT_UNRESOLVED: 'apiErrors.account_receivable.payment_recovery_pending'
+  AR_ADJUSTMENT_UNRESOLVED: 'apiErrors.account_receivable.payment_recovery_pending',
+  AR_OFFSET_CODING_REQUIRED: 'apiErrors.account_receivable.payment_offset_coding_required',
+  AR_OFFSET_PLAN_CHANGED: 'apiErrors.account_receivable.payment_offset_plan_changed',
+  AR_OFFSET_PLAN_STALE: 'apiErrors.account_receivable.payment_offset_plan_changed',
+  AR_OFFSET_BASIS_CHANGED: 'apiErrors.account_receivable.payment_offset_plan_changed',
+  AR_OFFSET_CODING_INVALID: 'apiErrors.agreement.invalid_coding_allocation'
 }
 
 export const withPaymentRecoveryErrors = async <T>(event: H3Event, operation: () => Promise<T>): Promise<T> => {

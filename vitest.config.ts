@@ -6,9 +6,10 @@ import UiActionVitestReporter from './.agents/skills/gcs-ssc/scripts/whole-revie
 export default defineConfig({
   plugins: [vue()],
   ssr: {
-    noExternal: ['@nuxt/ui']
+    noExternal: ['@nuxt/ui', 'reka-ui', '@vueuse/core', '@vueuse/shared']
   },
   resolve: {
+    dedupe: ['vue'],
     alias: [
       { find: '~', replacement: fileURLToPath(new URL('./app', import.meta.url)) },
       { find: '~~', replacement: fileURLToPath(new URL('.', import.meta.url)) },

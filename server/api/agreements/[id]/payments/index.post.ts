@@ -15,6 +15,7 @@ import { notFound } from '~~/server/utils/api-errors'
 import { lockAgencyDraftStatus } from '~~/server/utils/business-status-runtime'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { allocateAgreementPayment } from '~~/server/utils/agreement-coding-allocator'
+import { prepareAgreementPaymentOffsetPlan, validateAgreementPaymentOffsetPlan } from '~~/server/utils/agreement-payment-offset-plan'
 
 export default defineEventHandler(async event => {
   const prepared = await prepareAgreementPaymentRoute(event, 'create')
@@ -49,6 +50,9 @@ export default defineEventHandler(async event => {
     if (!fiscalYear || typeof fiscalYear !== 'object' || !('id' in fiscalYear)) {
       return fiscalYear
     }
+
+    const offsetPlan = await prepareAgreementPaymentOffsetPlan(event, trx, currentContext, validated)
+    const offsetPlans = await validateAgreementPaymentOffsetPlan(event, offsetPlan, validated)
 
     const paymentValues = {
       egcs_fc_fundingagreementcommitment: String(commitment.id),
@@ -120,7 +124,7 @@ export default defineEventHandler(async event => {
       exactCreatedPayment as Record<string, unknown>
     )
 
-    await syncAgreementPaymentEditingStatus(trx, String(createdPayment.id), { event, agreementId })
+    await syncAgreementPaymentEditingStatus(trx, String(createdPayment.id), { event, agreementId, offsetPlans })
     await allocateAgreementPayment(event, trx, { agreementId, agencyId: currentContext.agencyId, streamId: currentContext.streamId,
       paymentId: String(createdPayment.id), commitmentId: String(commitment.id), commitmentTypeId: validated.egcs_fc_commitmenttype, amount: validated.egcs_fc_paymentamount,
       currency: validated.egcs_fc_currency, fiscalYearId: validated.egcs_fc_fiscalyear })

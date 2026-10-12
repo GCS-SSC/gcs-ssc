@@ -133,6 +133,7 @@ export const executeFreshAuthorizedAgreementWrite = async <T>(
     correctionFinancialMutation?: boolean
     correctionId?: string
     accountReceivablePayees?: Array<{ applicantRecipientId: string; currency: Currency_Codes }>
+    accountReceivableReadOnly?: boolean
     paymentRecovery?: boolean
   } = {}
 ): Promise<T> => {
@@ -167,7 +168,7 @@ export const executeFreshAuthorizedAgreementWrite = async <T>(
         }
         const recoveryTarget = options.businessStatusTarget ?? (typeof options.assignmentTarget === 'object' ? options.assignmentTarget : null)
         if (recoveryTarget?.entityType === 'fundingcasepayment' || options.paymentRecovery || options.accountReceivablePayees) {
-          await lockPaymentRecoveryAgreements(trx, { agreementId, agencyId: lockContext.agencyId, payees: options.accountReceivablePayees, event })
+          await lockPaymentRecoveryAgreements(trx, { agreementId, agencyId: lockContext.agencyId, payees: options.accountReceivablePayees, event, readOnly: options.accountReceivableReadOnly })
         }
         const receivableCollection = (recoveryTarget?.entityType === 'fundingcaseaccountreceivable' || recoveryTarget?.entityType === 'fundingcaseaccountreceivableadjustment') || recoveryTarget?.entityType === 'fundingcaseaccountreceivablecreditmemo'
         if (receivableCollection && recoveryTarget) {

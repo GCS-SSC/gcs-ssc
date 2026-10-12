@@ -1569,7 +1569,9 @@
       "recovery_method_required": "Sélectionnez un mode de recouvrement avant de terminer ce compte débiteur.",
       "account_required": "Sélectionnez un compte comptable débiteur pour chaque montant non nul avant de terminer ce compte débiteur.",
       "monitor_required": "Sélectionnez un suivi de contrôle exigé par ce type de compte débiteur.",
-      "type_unavailable": "Sélectionnez un type de compte débiteur actif configuré pour l’organisme de cette entente."
+      "type_unavailable": "Sélectionnez un type de compte débiteur actif configuré pour l’organisme de cette entente.",
+      "payment_offset_coding_required": "Sélectionnez le codage de chaque note de crédit par compensation avant de créer ce paiement.",
+      "payment_offset_plan_changed": "Le plan de compensation du paiement a changé. Revérifiez les notes de crédit par compensation et confirmez leur codage avant l’enregistrement."
     },
     "data_collection": {
       "definition_invalid": "Le formulaire épinglé de la collecte de données est invalide.",
@@ -2218,7 +2220,8 @@
     "checklist_na_policy_requires_option": "Autorisez S. O. avant d’exiger une explication pour S. O.",
     "checklist_answer_not_allowed": "Cette réponse n’est pas offerte par la question de la version publiée utilisée.",
     "account_receivable_source_required": "Sélectionnez exactement une source : Demandes de remboursement ou Avances.",
-    "workflow_risk_rating_required_purpose": "Seul un processus d’évaluation du risque peut exiger une évaluation du risque réussie"
+    "workflow_risk_rating_required_purpose": "Seul un processus d’évaluation du risque peut exiger une évaluation du risque réussie",
+    "too_many_coding_lines": "Une note de crédit ne peut pas contenir plus de 32 767 lignes de codage."
   },
   "notes": {
     "title": "Notes au dossier",
@@ -2639,8 +2642,9 @@
     },
     "payments": {
       "financial_inputs": {
+        "calculation_details": "Détails du calcul",
         "title": "Données financières",
-        "line_balances": "Soldes des lignes d’engagement",
+        "line_balances": "Lignes d’engagement",
         "select_period": "Sélectionnez un type d’engagement, un exercice et une période de paiement pour voir les données financières.",
         "select_year": "Sélectionnez un type d’engagement et un exercice pour voir les soldes des lignes.",
         "commitment_remaining": "Engagement restant",
@@ -2719,7 +2723,37 @@
       "offset_reserved": "Un recouvrement ou un ajustement est déjà en attente pour ce bénéficiaire et cette devise. Le traitement doit attendre sa résolution.",
       "offset_allocations": "Affectations de la note de crédit",
       "offset_policy_description": "Une compensation automatique réduit le versement au bénéficiaire. Le crédit excédentaire du promoteur est conservé séparément pour remboursement.",
-      "packet_title": "Règlement du paiement conservé"
+      "packet_title": "Règlement du paiement conservé",
+      "wizard": {
+        "steps": {
+          "payment": {
+            "title": "Détails du paiement",
+            "guidance": "Saisissez les détails du paiement et vérifiez les données financières. Continuez pour vérifier les notes de crédit par compensation requises."
+          },
+          "credit-memos": {
+            "title": "Notes de crédit par compensation",
+            "guidance": "Vérifiez chaque note de crédit par compensation. Sélectionnez son codage et ses montants lorsque le répartiteur ne les a pas fournis. Les lignes de chaque note doivent correspondre à son total."
+          },
+          "review": {
+            "title": "Confirmation",
+            "guidance": "Vérifiez le paiement et toutes les notes de crédit par compensation avant l’enregistrement. Ils sont créés ensemble et approuvés par le processus du paiement."
+          }
+        },
+        "errors_summary": "Corrigez {count} erreurs de validation.",
+        "errors_steps": "Étapes comportant des erreurs",
+        "errors_current_step": "Erreurs de cette étape",
+        "no_offsets": "Aucune note de crédit par compensation n’est requise pour ce paiement.",
+        "memo_number": "Note de crédit {number}",
+        "allocated_coding": "Codage fourni par le répartiteur.",
+        "manual_coding": "Sélectionnez le codage de la note de crédit et répartissez le montant.",
+        "duplicate_coding": "Sélectionnez chaque compte de codage une seule fois dans cette note de crédit.",
+        "coding_total": "Le total des lignes de codage doit être de {amount}.",
+        "remove_coding_line": "Supprimer la ligne de codage {number}",
+        "recheck": "Revérifier les notes de crédit par compensation",
+        "no_coding_accounts": "Aucun compte de codage admissible pour les notes de crédit n’est configuré pour le volet, l’exercice et la devise de ce compte débiteur."
+      },
+      "offset_coding_title": "Codage des notes de crédit par compensation",
+      "offset_approval_description": "Ces notes de crédit par compensation sont approuvées avec ce paiement, même si le versement au bénéficiaire est nul. Le refus ou l’annulation du paiement libère le recouvrement sans comptabiliser les notes de crédit."
     },
     "forecasts": {
       "title": "Prévisions",

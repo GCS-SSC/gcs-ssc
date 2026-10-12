@@ -92,7 +92,7 @@ seed=$(docker exec "$database" psql -X -U gcs_ssc -d gcs_ssc -At -v ON_ERROR_STO
         AND ((payment.id = 168 AND payment.egcs_fc_fundingagreement = 120 AND payment.egcs_fc_paymentamount = 21000)
           OR (payment.id = 172 AND payment.egcs_fc_fundingagreement = 150 AND payment.egcs_fc_paymentamount = 10000)))
 ')
-if [ "$seed" != '1|1|11|2|2' ]; then
+if [ "$seed" != '1|1|13|8|2' ]; then
   echo "Unexpected NCIA seed state: $seed" >&2
   exit 1
 fi

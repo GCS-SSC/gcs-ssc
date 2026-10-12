@@ -692,9 +692,10 @@ AS $function$
           JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.id=debt.egcs_fc_fundingagreement
           WHERE line.egcs_fc_creditmemochartofaccount=OLD.egcs_tp_agencychartofaccount AND agreement.egcs_fc_transferpaymentstream=OLD.egcs_tp_transferpaymentstream AND NOT memo._deleted AND NOT line._deleted)
         OR EXISTS (SELECT 1 FROM "Funding_Case_Account_Receivable_Offset_Memo" memo
+          JOIN "Funding_Case_Account_Receivable_Offset_Memo_Line" credit_line ON credit_line.egcs_fc_offsetmemo=memo.id
           JOIN "Funding_Case_Agreement_Account_Receivable" debt ON debt.id=memo.egcs_fc_receivable
           JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.id=debt.egcs_fc_fundingagreement
-          WHERE memo.egcs_fc_creditmemochartofaccount=OLD.egcs_tp_agencychartofaccount AND agreement.egcs_fc_transferpaymentstream=OLD.egcs_tp_transferpaymentstream AND NOT memo._deleted)
+          WHERE credit_line.egcs_fc_transferpaymentstreamchartofaccount=OLD.id AND agreement.egcs_fc_transferpaymentstream=OLD.egcs_tp_transferpaymentstream AND NOT memo._deleted)
       ) THEN RAISE EXCEPTION 'Stream Chart selection is in use' USING ERRCODE='23514'; END IF;
       RETURN NEW;
     END $function$;

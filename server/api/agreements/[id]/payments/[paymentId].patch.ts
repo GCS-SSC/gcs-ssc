@@ -1,7 +1,7 @@
 import { assertPaymentRecoveryAllowed } from '~~/server/utils/payment-recovery-controls'
 import type { Currency_Codes } from '~~/shared/types/database'
 import { resolveAgreementCurrency } from '~~/server/utils/agreement-currency'
-import { FundingCaseAgreementPaymentPatchSchema } from '~~/shared/types/schemas'
+import { FundingCaseAgreementPaymentCreateSchema, FundingCaseAgreementPaymentPatchSchema } from '~~/shared/types/schemas'
 import {
   assertAgreementPaymentEditable,
   buildAgreementPaymentPatchUpdateValues,
@@ -18,6 +18,7 @@ import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { validateMergedFinancialPeriodPatch } from '~~/server/utils/agreement-financial-patch-validation'
 import { sql } from 'kysely'
 import { databaseMoneyText, parseDatabaseMoney } from '~~/server/utils/database-money'
+import { prepareAgreementPaymentOffsetPlan, validateAgreementPaymentOffsetPlan } from '~~/server/utils/agreement-payment-offset-plan'
 
 export default defineEventHandler(async event => {
   const paymentId = getRouterParam(event, 'paymentId')
@@ -36,7 +37,7 @@ export default defineEventHandler(async event => {
   const { agreementId, agreementContext, db } = prepared
   const patchValues = await readValidatedBodyI18n(event, FundingCaseAgreementPaymentPatchSchema)
 
-  const updated = await executeFreshAuthorizedAgreementWrite(event, db, agreementId, agreementContext, async trx => {
+  const updated = await executeFreshAuthorizedAgreementWrite(event, db, agreementId, agreementContext, async (trx, currentContext) => {
     const editablePayment = await assertAgreementPaymentEditable(
       event,
       trx,
@@ -72,7 +73,21 @@ export default defineEventHandler(async event => {
       return contextGuard
     }
 
-    if (Object.keys(updateValues).length === 0) {
+    const explicitOffsetPlan = patchValues.egcs_fc_offsetplanhash !== undefined || patchValues.egcs_fc_offsetcreditmemos !== undefined
+    const nextCommitment = explicitOffsetPlan
+      ? await trx.selectFrom('Funding_Case_Agreement_Commitment').select('egcs_fc_type')
+          .where('id', '=', nextCommitmentId ?? String(editablePayment.egcs_fc_fundingagreementcommitment)).executeTakeFirstOrThrow()
+      : null
+    const nextHeader = explicitOffsetPlan
+      ? FundingCaseAgreementPaymentCreateSchema.parse({ ...editablePayment, ...patchValues,
+          egcs_fc_commitmenttype: String(nextCommitment!.egcs_fc_type) })
+      : null
+    const offsetPlans = nextHeader
+      ? await validateAgreementPaymentOffsetPlan(event,
+          await prepareAgreementPaymentOffsetPlan(event, trx, currentContext, nextHeader, { paymentId }), nextHeader)
+      : undefined
+
+    if (Object.keys(updateValues).length === 0 && !explicitOffsetPlan) {
       return editablePayment
     }
 
@@ -86,28 +101,30 @@ export default defineEventHandler(async event => {
       }
     })
 
-    const row = await trx
-      .updateTable('Funding_Case_Agreement_Payment')
-      .set(updateValues)
-      .where('id', '=', paymentId)
-      .where('_deleted', '=', false)
-      .returning([
-        'id',
-        'egcs_fc_fundingagreementcommitment',
-        'egcs_fc_fiscalyear',
-        'egcs_fc_paymenttype',
-        'egcs_fc_applicantrecipient',
-        'egcs_fc_periodstart',
-        'egcs_fc_periodend',
-        databaseMoneyText(sql.ref('egcs_fc_paymentamount')).as('egcs_fc_paymentamount'),
-        'egcs_fc_currency',
-        'egcs_fc_comment',
-        'egcs_fc_status',
-        '_deleted'
-      ])
-      .executeTakeFirstOrThrow()
+    const row = Object.keys(updateValues).length
+      ? await trx
+          .updateTable('Funding_Case_Agreement_Payment')
+          .set(updateValues)
+          .where('id', '=', paymentId)
+          .where('_deleted', '=', false)
+          .returning([
+            'id',
+            'egcs_fc_fundingagreementcommitment',
+            'egcs_fc_fiscalyear',
+            'egcs_fc_paymenttype',
+            'egcs_fc_applicantrecipient',
+            'egcs_fc_periodstart',
+            'egcs_fc_periodend',
+            databaseMoneyText(sql.ref('egcs_fc_paymentamount')).as('egcs_fc_paymentamount'),
+            'egcs_fc_currency',
+            'egcs_fc_comment',
+            'egcs_fc_status',
+            '_deleted'
+          ])
+          .executeTakeFirstOrThrow()
+      : editablePayment
 
-    await syncAgreementPaymentEditingStatus(trx, paymentId, { event, agreementId })
+    await syncAgreementPaymentEditingStatus(trx, paymentId, { event, agreementId, offsetPlans })
     return { ...row, egcs_fc_paymentamount: parseDatabaseMoney(row.egcs_fc_paymentamount) }
   }, {
     accountReceivablePayees: patchValues.egcs_fc_applicantrecipient ? [{ applicantRecipientId: patchValues.egcs_fc_applicantrecipient, currency: patchValues.egcs_fc_currency ?? await resolveAgreementCurrency(db, agreementId) as Currency_Codes }] : undefined,

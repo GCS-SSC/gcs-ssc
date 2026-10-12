@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { Ref } from 'vue'
-import type { AccountReceivablePaymentCreditMemo } from '~~/shared/types/account-receivable'
+import type { AccountReceivableOffsetMemoLine, AccountReceivablePaymentCreditMemo } from '~~/shared/types/account-receivable'
+import { TransferPaymentStreamChartOfAccountDimensionSchema } from '~~/shared/types/schemas/transfer-payment'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { hasPaymentOffset } from '~/utils/payment-offset-display'
 import { formatAccountReceivableAmount } from '~/utils/account-receivable-display'
+import { useBilingualValue } from '~/composables/useBilingualValue'
 
 const { payment } = defineProps<{ payment: {
   egcs_fc_paymentamount: string
@@ -18,7 +20,13 @@ const { payment } = defineProps<{ payment: {
   egcs_fc_creditmemos?: AccountReceivablePaymentCreditMemo[]
 } }>()
 const { t, locale } = useI18n()
+const { getBilingualValue } = useBilingualValue()
 const amount = (value: string | undefined) => formatAccountReceivableAmount(value, locale.value, payment.egcs_fc_currency) ?? t('common.not_available')
+const dimensions = (line: AccountReceivableOffsetMemoLine) => TransferPaymentStreamChartOfAccountDimensionSchema.array().parse(line.egcs_fc_creditmemoaccountingdimensions)
+const codedMemos = computed(() => payment.egcs_fc_creditmemos?.filter(memo => memo.egcs_fc_codinglines?.length) ?? [])
+const showMemoBalances = computed(() => Boolean(payment.egcs_fc_creditmemos?.length) && payment.egcs_fc_creditmemos!.every(memo =>
+  [memo.egcs_fc_receivablerecovered, memo.egcs_fc_receivablereserved, memo.egcs_fc_receivableoutstanding, memo.egcs_fc_receivableavailable]
+    .every(value => typeof value === 'string')))
 const totals = computed(() => [
   { label: 'agreement.payments.gross', value: payment.egcs_fc_grossamount ?? payment.egcs_fc_paymentamount },
   ...(hasPaymentOffset(payment.egcs_fc_offsetamount)
@@ -27,15 +35,19 @@ const totals = computed(() => [
   { label: 'agreement.payments.net', value: payment.egcs_fc_netamount ?? payment.egcs_fc_paymentamount }
 ])
 const pagination: Ref<{ pageIndex: number, pageSize: number }> = ref({ pageIndex: 0, pageSize: 10 })
-const memoColumns: TableColumnInput<AccountReceivablePaymentCreditMemo>[] = [
+const memoColumns = computed<TableColumnInput<AccountReceivablePaymentCreditMemo>[]>(() => [
   { id: 'reference', headerKey: 'account_receivable.credit_memos_number' },
   { id: 'original', headerKey: 'account_receivable.credit_memo_amount' },
   { id: 'deduction', headerKey: 'account_receivable.payment_deduction' },
-  { id: 'collected', headerKey: 'account_receivable.memo_ar_collected' },
-  { id: 'pending', headerKey: 'account_receivable.memo_ar_pending' },
-  { id: 'remaining', headerKey: 'account_receivable.memo_ar_outstanding' },
-  { id: 'available', headerKey: 'account_receivable.memo_ar_available' }
-]
+  ...(showMemoBalances.value
+    ? [
+        { id: 'collected', headerKey: 'account_receivable.memo_ar_collected' },
+        { id: 'pending', headerKey: 'account_receivable.memo_ar_pending' },
+        { id: 'remaining', headerKey: 'account_receivable.memo_ar_outstanding' },
+        { id: 'available', headerKey: 'account_receivable.memo_ar_available' }
+      ]
+    : [])
+])
 </script>
 
 <template>
@@ -94,8 +106,40 @@ const memoColumns: TableColumnInput<AccountReceivablePaymentCreditMemo>[] = [
         <span class="font-semibold">{{ amount(allocation.egcs_fc_amount) }}</span>
       </li>
     </ul>
-    <p v-if="payment.egcs_fc_creditmemos?.length" class="text-sm text-muted">
+    <p v-if="showMemoBalances" class="text-sm text-muted">
       {{ t('account_receivable.memo_ar_balance_description') }}
+    </p>
+    <CommonSection v-if="codedMemos.length" :title="t('agreement.payments.offset_coding_title')" :grid-cols="1" data-testid="payment-offset-coding">
+      <section v-for="memo in codedMemos" :key="memo.id" :aria-label="memo.egcs_fc_creditmemoreference" class="space-y-3">
+        <h4 class="text-sm font-semibold">
+          {{ memo.egcs_fc_creditmemoreference }}
+        </h4>
+        <dl v-for="line in memo.egcs_fc_codinglines" :key="line.id" class="grid gap-4 border-t border-default pt-3 text-sm sm:grid-cols-2" data-testid="payment-offset-coding-line">
+          <div>
+            <dt class="text-muted">
+              {{ t('account_receivable.credit_memo_line_number') }}
+            </dt>
+            <dd>{{ line.egcs_fc_linenumber }}</dd>
+          </div>
+          <div>
+            <dt class="text-muted">
+              {{ t('account_receivable.credit_memo_amount') }}
+            </dt>
+            <dd class="font-semibold tabular-nums">
+              {{ amount(line.egcs_fc_amount) }}
+            </dd>
+          </div>
+          <div v-for="(dimension, index) in dimensions(line)" :key="index">
+            <dt class="text-muted">
+              {{ getBilingualValue(dimension, 'label', t('common.none')) }}
+            </dt>
+            <dd>{{ dimension.value }}</dd>
+          </div>
+        </dl>
+      </section>
+    </CommonSection>
+    <p v-if="payment.egcs_fc_creditmemos?.length" class="text-sm text-muted" data-testid="payment-offset-approval-description">
+      {{ t('agreement.payments.offset_approval_description') }}
     </p>
     <p class="text-sm text-muted">
       {{ t('agreement.payments.offset_policy_description') }}

@@ -70,20 +70,21 @@ export const readEffectiveAccountReceivableRecoveries = async (
   `.execute(db)
   const offsets = await hasAccountingTable(db, 'Funding_Case_Account_Receivable_Offset_Memo')
     ? await sql<CreditMemoCodingRow>`
-      SELECT ('offset:' || memo.id::text) AS id, memo.egcs_fc_commitmentchartofaccount::text AS "agencyChartId",
+      SELECT ('offset:' || credit_line.id::text) AS id, credit_line.egcs_fc_commitmentchartofaccount::text AS "agencyChartId",
         account.egcs_ay_fiscalyear::text AS "agencyFiscalYearId", account.egcs_ay_fiscalyear::text AS "sourceAgencyFiscalYearId",
         debt.id::text AS "receivableId", pool.egcs_fc_currency AS currency, memo.egcs_fc_createdat AS "accountingDate",
-        memo.egcs_fc_amount::text AS amount
+        credit_line.egcs_fc_amount::text AS amount
       FROM "Funding_Case_Account_Receivable_Offset_Memo" memo
+      JOIN "Funding_Case_Account_Receivable_Offset_Memo_Line" credit_line ON credit_line.egcs_fc_offsetmemo=memo.id
       JOIN "Funding_Case_Agreement_Account_Receivable" debt ON debt.id=memo.egcs_fc_receivable
       JOIN "Funding_Case_Account_Receivable_Pool" pool ON pool.id=memo.egcs_fc_pool
-      JOIN "Agency_Chart_of_Account" account ON account.id=memo.egcs_fc_commitmentchartofaccount
+      JOIN "Agency_Chart_of_Account" account ON account.id=credit_line.egcs_fc_commitmentchartofaccount
       JOIN "Funding_Case_Account_Receivable_Offset_Memo_Application" application ON application.egcs_fc_offsetmemo=memo.id
       JOIN "Funding_Case_Account_Receivable_Recovery" recovery ON recovery.id=application.egcs_fc_recovery
       WHERE debt.egcs_fc_fundingagreement=${agreementId} AND recovery.egcs_fc_outcome='posted'
         AND NOT recovery._deleted AND NOT memo._deleted
         AND (${options.currency ?? null}::text IS NULL OR pool.egcs_fc_currency=${options.currency ?? null})
-      ORDER BY memo.id
+      ORDER BY memo.id, credit_line.egcs_fc_linenumber
     `.execute(db)
     : { rows: [] as CreditMemoCodingRow[] }
   if (!manual.rows.length && !offsets.rows.length) return []

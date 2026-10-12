@@ -2,8 +2,11 @@
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 /* eslint-disable jsdoc/require-jsdoc -- Payment table callbacks are exercised by focused component tests. */
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
+import type { FormError } from '#ui/types'
+import { useWizardFlow } from '~/composables/useWizardFlow'
+import AgreementPaymentFields from '~/components/Agreement/AgreementPaymentFields.vue'
 import { useDeleteRequestToast } from '~/composables/useDeleteRequestToast'
 import { useExtensionCreateActions } from '~/composables/useExtensionCreateActions'
 import { useExtensionPaymentAmountCalculators } from '~/composables/useExtensionPaymentAmountCalculators'
@@ -20,19 +23,21 @@ import { FundingCaseAgreementPaymentCreateSchema } from '~~/shared/types/schemas
 import { compareMoney, formatMoneyText, parseMoney, type Money } from '~~/shared/utils/money'
 import type { GcsPaymentAmountCalculatorResult } from '@gcs-ssc/extensions/ui'
 import type { Currency_Codes } from '~~/shared/types/database'
+import type { PaymentOffsetPreview } from '~~/shared/types/account-receivable'
+import type { AdminCommonLookupResponseItem } from '~~/shared/types/admin-common-ui'
+import { withFormRequirements } from '~~/shared/utils/form-requirements'
+import { sumMoney } from '~~/shared/utils/money'
+
+type PaymentWizardForm = FundingCaseAgreementPaymentForm & {
+  egcs_fc_offsetplanhash?: string
+  egcs_fc_offsetcreditmemos?: Array<{
+    egcs_fc_key: string
+    egcs_fc_lines: Array<{ egcs_fc_codingaccount?: string; egcs_fc_amount: string }>
+  }>
+}
+type PaymentWizardStep = 'payment' | 'credit-memos' | 'review'
 
 type PaymentCalculatorResult = GcsPaymentAmountCalculatorResult
-
-type PaymentLookupQuery = {
-  permission_action: 'create' | 'update'
-  paymentId?: string
-  currency?: string
-}
-
-const buildPaymentLookupQuery = (paymentId?: string, currency?: string): PaymentLookupQuery => {
-  if (paymentId) return { permission_action: 'update', paymentId, currency }
-  return { permission_action: 'create', currency }
-}
 
 const MONTH_KEYS = ['apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec', 'jan', 'feb', 'mar'] as const
 const ZERO_MONEY = parseMoney('0')
@@ -57,7 +62,7 @@ const localePath = useLocalePath()
 const toast = useToast()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
-const { saveJson } = useJsonRequest()
+const { saveJson, sendJson } = useJsonRequest()
 const { isRecordLocked } = useBusinessStatusState()
 const {
   appendActions: extensionAppendCreateActions,
@@ -81,7 +86,7 @@ const pagination: Ref<{ pageIndex: number, pageSize: number }> = ref({
   pageSize: 25
 })
 
-const paymentModal = useCrudModal<FundingCaseAgreementPaymentRow, FundingCaseAgreementPaymentForm>({
+const paymentModal = useCrudModal<FundingCaseAgreementPaymentRow, PaymentWizardForm>({
   createState: () => ({ egcs_fc_currency: agreementCurrency }),
   updateState: payment => ({
     id: payment.id,
@@ -99,9 +104,128 @@ const paymentModal = useCrudModal<FundingCaseAgreementPaymentRow, FundingCaseAgr
 
 const selectedPayment = paymentModal.selected
 const isPaymentModalOpen = paymentModal.isOpen
-const validatePayment = createValidator(FundingCaseAgreementPaymentCreateSchema)
+const validatePaymentSchema = createValidator(FundingCaseAgreementPaymentCreateSchema)
 const paymentPending = useCrudModalPending(paymentModal.captureSession)
 const isSavingPayment = paymentPending.isPending
+const wizardErrors: Ref<FormError[]> = ref([])
+const offsetPreview: Ref<PaymentOffsetPreview | null> = ref(null)
+const resolvedPaymentLabels: Ref<Record<string, AdminCommonLookupResponseItem[]>> = ref({})
+const wizardSteps = computed(() => (['payment', 'credit-memos', 'review'] as const).map(value => ({
+  value,
+  title: t(`agreement.payments.wizard.steps.${value}.title`),
+  icon: value === 'payment' ? 'i-lucide-banknote' : value === 'credit-memos' ? 'i-lucide-receipt' : 'i-lucide-clipboard-check'
+})))
+const { currentStep, steps, isFirstStep, isLastStep, stepIndex, prevStep, goToStep, reset: resetWizard, errorsByStep, currentStepErrors } = useWizardFlow<PaymentWizardStep>({
+  steps: wizardSteps,
+  initialStep: 'payment',
+  errors: wizardErrors,
+  resolveStepForField: name => name?.startsWith('egcs_fc_offsetcreditmemos') ? 'credit-memos' : 'payment'
+})
+let disposed = false
+onBeforeUnmount(() => {
+  disposed = true
+})
+const paymentHeader = () => {
+  if (!selectedPayment.value) return null
+  const { egcs_fc_offsetplanhash: _hash, egcs_fc_offsetcreditmemos: _memos, ...header } = selectedPayment.value
+  return header
+}
+const paymentHeaderSignature = computed(() => JSON.stringify(paymentHeader()))
+watch(paymentHeaderSignature, () => {
+  offsetPreview.value = null
+  if (selectedPayment.value) {
+    delete selectedPayment.value.egcs_fc_offsetplanhash
+    delete selectedPayment.value.egcs_fc_offsetcreditmemos
+  }
+  wizardErrors.value = []
+  resetWizard()
+}, { flush: 'sync' })
+watch(() => paymentModal.captureSession(), () => {
+  offsetPreview.value = null
+  resolvedPaymentLabels.value = {}
+  wizardErrors.value = []
+  resetWizard()
+}, { flush: 'sync' })
+const paymentLabel = (field: string) => {
+  const item = resolvedPaymentLabels.value[field]?.[0]
+  return String(item?.[locale.value === 'fr' ? 'label_fr' : 'label_en'] ?? t('common.not_available'))
+}
+const memoCodingOptions = (memoIndex: number) => (offsetPreview.value?.egcs_fc_creditmemos[memoIndex]?.egcs_fc_codingaccounts ?? [])
+  .map(account => ({ value: account.id, label: locale.value === 'fr' ? account.egcs_fc_name_fr : account.egcs_fc_name_en }))
+const selectedMemoCodingLabel = (memoIndex: number, codingId?: string) => memoCodingOptions(memoIndex).find(item => item.value === codingId)?.label ?? t('common.not_available')
+const validatePayment = withFormRequirements(async (state: PaymentWizardForm) => {
+  const errors = await validatePaymentSchema(state)
+  for (const [memoIndex, memo] of (state.egcs_fc_offsetcreditmemos ?? []).entries()) {
+    const expected = offsetPreview.value?.egcs_fc_creditmemos[memoIndex]?.egcs_fc_amount
+    const names = memo.egcs_fc_lines.map(line => line.egcs_fc_codingaccount).filter(Boolean)
+    if (new Set(names).size !== names.length) errors.push({
+      name: `egcs_fc_offsetcreditmemos.${memoIndex}.egcs_fc_lines`, message: t('agreement.payments.wizard.duplicate_coding')
+    })
+    try {
+      if (expected && compareMoney(sumMoney(memo.egcs_fc_lines.map(line => parseMoney(line.egcs_fc_amount))), expected) !== 0) errors.push({
+        name: `egcs_fc_offsetcreditmemos.${memoIndex}.egcs_fc_lines`, message: t('agreement.payments.wizard.coding_total', { amount: formatMoney(expected, agreementCurrency.toUpperCase()) })
+      })
+    } catch {
+      // The schema keeps invalid money on its individual field.
+    }
+  }
+  wizardErrors.value = errors
+  return errors
+}, FundingCaseAgreementPaymentCreateSchema)
+const preparePaymentOffset = async () => {
+  if (!selectedPayment.value || isSavingPayment.value || isPaymentAboveCalculatorCeiling.value || paymentCalculatorResult.value?.loading) return false
+  const header = paymentHeader()
+  wizardErrors.value = await validatePaymentSchema(header)
+  if (wizardErrors.value.length) return false
+  const session = paymentModal.captureSession()
+  const signature = paymentHeaderSignature.value
+  const owner = agreementId
+  if (!paymentPending.begin(session)) return false
+  try {
+    const previewUrl = header?.id ? `/api/agreements/${owner}/payments/${header.id}/preview` : `/api/agreements/${owner}/payments/preview`
+    const preview = await sendJson<PaymentOffsetPreview>(previewUrl, 'POST', header)
+    if (disposed || !isPaymentModalOpen.value || paymentModal.captureSession() !== session || owner !== agreementId || signature !== paymentHeaderSignature.value || !selectedPayment.value) return false
+    offsetPreview.value = preview
+    selectedPayment.value.egcs_fc_offsetplanhash = preview.egcs_fc_offsetplanhash
+    selectedPayment.value.egcs_fc_offsetcreditmemos = preview.egcs_fc_creditmemos.map(memo => ({
+      egcs_fc_key: memo.egcs_fc_key,
+      egcs_fc_lines: memo.egcs_fc_lines.length ? memo.egcs_fc_lines.map(line => ({ ...line })) : [{ egcs_fc_amount: memo.egcs_fc_amount }]
+    }))
+    goToStep('credit-memos')
+    return true
+  } catch (error) {
+    if (!disposed && isPaymentModalOpen.value && paymentModal.captureSession() === session && owner === agreementId && signature === paymentHeaderSignature.value) showError(error)
+    return false
+  } finally {
+    paymentPending.end(session)
+  }
+}
+const nextPaymentStep = async () => {
+  if (isSavingPayment.value) return
+  if (currentStep.value === 'payment') {
+    await preparePaymentOffset()
+  } else if (currentStep.value === 'credit-memos' && selectedPayment.value && offsetPreview.value) {
+    if (!(await validatePayment(selectedPayment.value)).length) goToStep('review')
+  }
+}
+const changePaymentStep = async (step: string) => {
+  if (isSavingPayment.value) return
+  const targetIndex = steps.value.findIndex(item => item.value === step)
+  if (targetIndex < 0) return
+  if (targetIndex <= stepIndex.value) {
+    goToStep(step as PaymentWizardStep)
+    return
+  }
+  while (stepIndex.value < targetIndex) {
+    const previousIndex = stepIndex.value
+    await nextPaymentStep()
+    if (stepIndex.value === previousIndex) break
+  }
+}
+const addMemoCodingLine = (memoIndex: number) => {
+  if (isSavingPayment.value) return
+  selectedPayment.value?.egcs_fc_offsetcreditmemos?.[memoIndex]?.egcs_fc_lines.push({ egcs_fc_amount: '' })
+}
 const paymentCalculatorResult: Ref<PaymentCalculatorResult | null> = ref(null)
 const hasManualPaymentAmount: Ref<boolean> = ref(false)
 let lastSuggestedPaymentAmount: Money | null = null
@@ -152,10 +276,6 @@ const tableRows = computed<FundingCaseAgreementPaymentRow[]>(() => (overview.val
 }))
 
 const formatMoney = (value: Money, currency = 'CAD') => formatMoneyText(value, locale.value, currency)
-const monthOptions = computed(() => MONTH_KEYS.map((key, index) => ({
-  label: t(`agreement.payments.months.${key}`),
-  value: index
-})))
 const getMonthLabel = (month: number) => t(`agreement.payments.months.${MONTH_KEYS[month]}`)
 const getPeriodLabel = (periodStart: number, periodEnd: number) => `${getMonthLabel(periodStart)} - ${getMonthLabel(periodEnd)}`
 
@@ -278,6 +398,10 @@ const savePayment = async () => {
   }
   const paymentState = selectedPayment.value
   const isUpdate = Boolean(paymentState.id)
+  if (currentStep.value !== 'review' || !offsetPreview.value || paymentCalculatorResult.value?.loading) {
+    await nextPaymentStep()
+    return
+  }
   const session = paymentModal.captureSession()
   if (!paymentPending.begin(session)) return
 
@@ -299,7 +423,7 @@ const savePayment = async () => {
       color: 'success'
     })
   } catch (error: unknown) {
-    showError(error)
+    if (!disposed && isPaymentModalOpen.value && paymentModal.captureSession() === session) showError(error)
   } finally {
     paymentPending.end(session)
   }
@@ -477,100 +601,150 @@ const deletePayment = async (paymentId: string) => {
       v-if="selectedPayment"
       v-model:open="isPaymentModalOpen"
       :title="selectedPayment.id ? t('agreement.payments.edit') : t('agreement.payments.add')"
-      :ui="{ content: 'sm:max-w-2xl' }"
+      fullscreen
+      :ui="{ content: 'rounded-none shadow-none ring-0' }"
       :description="t('common.form_dialog_description')">
       <template #body>
-        <UForm :state="selectedPayment" :validate="validatePayment" :validate-on="[]" class="space-y-4" @submit="savePayment">
-          <UFormField :label="t('agreement.payments.payee')" name="egcs_fc_applicantrecipient" :description="t('agreement.payments.payee_description')">
-            <CommonServerLookupSelect
-              v-model="selectedPayment.egcs_fc_applicantrecipient"
-              :fetch-url="`/api/agreements/${agreementId}/payments/lookups/proponents`"
-              value-key="id" label-en-key="label_en" label-fr-key="label_fr"
-              :limit="100" :show-value-in-label="false" close-on-select
-              :query="buildPaymentLookupQuery(selectedPayment.id, agreementCurrency)" />
-          </UFormField>
-
-          <UFormField :label="t('agreement.payments.commitment_type')" name="egcs_fc_commitmenttype">
-            <CommonServerLookupSelect
-              v-model="selectedPayment.egcs_fc_commitmenttype"
-              :fetch-url="`/api/agreements/${agreementId}/payments/lookups/commitments`"
-              value-key="id"
-              label-en-key="label_en"
-              label-fr-key="label_fr"
-              :show-value-in-label="false"
-              :limit="100"
-              :query="buildPaymentLookupQuery(selectedPayment.id, agreementCurrency)" />
-          </UFormField>
-
-          <UFormField :label="t('agreement.payments.fiscal_year')" name="egcs_fc_fiscalyear">
-            <CommonServerLookupSelect
-              v-model="selectedPayment.egcs_fc_fiscalyear"
-              :fetch-url="`/api/agreements/${agreementId}/payments/lookups/fiscal-years`"
-              value-key="id"
-              label-en-key="label_en"
-              label-fr-key="label_fr"
-              :show-value-in-label="false"
-              :limit="100"
-              :query="buildPaymentLookupQuery(selectedPayment.id, agreementCurrency)" />
-          </UFormField>
-
-          <UFormField :label="t('agreement.payments.type')" name="egcs_fc_paymenttype">
-            <CommonEnumSelect v-model="selectedPayment.egcs_fc_paymenttype" name="payment_type" class="w-full" />
-          </UFormField>
-
-          <UFormField :label="t('common.currency')" name="egcs_fc_currency" required>
-            <CommonEnumSelect
-              v-model="selectedPayment.egcs_fc_currency"
-              name="currency_codes"
-              disabled
-              class="w-full" />
-          </UFormField>
-
-          <div class="grid gap-4 sm:grid-cols-2">
-            <UFormField :label="t('agreement.payments.period_start')" name="egcs_fc_periodstart">
-              <USelect v-model="selectedPayment.egcs_fc_periodstart" :items="monthOptions" />
-            </UFormField>
-
-            <UFormField :label="t('agreement.payments.period_end')" name="egcs_fc_periodend">
-              <USelect v-model="selectedPayment.egcs_fc_periodend" :items="monthOptions" />
-            </UFormField>
-          </div>
-
-          <UFormField :label="t('agreement.payments.amount')" name="egcs_fc_paymentamount">
-            <CommonCurrencyInput
-              :model-value="selectedPayment.egcs_fc_paymentamount"
-              :currency="selectedPayment.egcs_fc_currency"
-              @update:model-value="handlePaymentAmountInput" />
-            <p v-if="isPaymentAboveCalculatorCeiling" class="mt-1 text-sm text-error">
-              {{ t('agreement.payments.amount_exceeds_calculated_ceiling', { amount: formatMoney(paymentCalculatorCeilingMoney ?? ZERO_MONEY, paymentCalculatorCurrency) }) }}
-            </p>
-          </UFormField>
-
-          <ExtensionPaymentAmountCalculatorHost
-            v-if="paymentAmountCalculator && !selectedPayment.id"
-            :item="paymentAmountCalculator"
-            :model="paymentCalculatorModel"
-            @result="handlePaymentCalculatorResult"
-            @extension-payload="handlePaymentCalculatorExtensionPayload" />
-
-          <AgreementPaymentFinancialInputs
-            v-if="!selectedPayment.id"
-            :agreement-id="agreementId"
-            :commitment-type="selectedPayment.egcs_fc_commitmenttype"
-            :fiscal-year="selectedPayment.egcs_fc_fiscalyear"
-            :period-start="selectedPayment.egcs_fc_periodstart"
-            :period-end="selectedPayment.egcs_fc_periodend" />
-
-          <UFormField :label="t('common.comment')" name="egcs_fc_comment">
-            <UTextarea v-model="selectedPayment.egcs_fc_comment" class="w-full" />
-          </UFormField>
-          <div class="flex justify-end gap-2 pt-4">
-            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isPaymentModalOpen = false" />
-            <CommonSaveButton
-              :label="selectedPayment.id ? t('common.update') : t('common.add')"
-              :loading="isSavingPayment"
-              :disabled="isSavingPayment || isPaymentAboveCalculatorCeiling || paymentCalculatorResult?.loading === true" />
-          </div>
+        <UForm :state="selectedPayment" :validate="validatePayment" :validate-on="[]" class="flex h-full flex-col" @submit="savePayment">
+          <CommonWizardShell
+            data-testid="payment-create-wizard"
+            :current-step="currentStep" :steps="steps" :is-first-step="isFirstStep" :is-last-step="isLastStep"
+            :guidance="t(`agreement.payments.wizard.steps.${currentStep}.guidance`)"
+            :errors="wizardErrors" :errors-by-step="errorsByStep" :current-step-errors="currentStepErrors"
+            :cancel-label="t('common.cancel')" :previous-label="t('common.previous')" :next-label="t('common.next')"
+            :submit-label="selectedPayment.id ? t('common.update') : t('common.add')" :guidance-title="t('common.guidance')"
+            :error-summary-label="t('agreement.payments.wizard.errors_summary', { count: wizardErrors.length })"
+            :error-steps-label="t('agreement.payments.wizard.errors_steps')"
+            :error-current-step-label="t('agreement.payments.wizard.errors_current_step')"
+            :pending="isSavingPayment || isPaymentAboveCalculatorCeiling || paymentCalculatorResult?.loading === true"
+            @update:current-step="changePaymentStep" @jump-to-step="changePaymentStep"
+            @next="nextPaymentStep" @previous="prevStep" @cancel="paymentModal.close()">
+            <AgreementPaymentFields
+              v-show="currentStep === 'payment'"
+              v-model:state="selectedPayment"
+              :agreement-id="agreementId" :currency="agreementCurrency"
+              :payment-amount-calculator="paymentAmountCalculator" :payment-calculator-model="paymentCalculatorModel"
+              :ceiling-error="isPaymentAboveCalculatorCeiling ? t('agreement.payments.amount_exceeds_calculated_ceiling', { amount: formatMoney(paymentCalculatorCeilingMoney ?? ZERO_MONEY, paymentCalculatorCurrency) }) : null"
+              :pending="isSavingPayment"
+              @amount="handlePaymentAmountInput" @calculator-result="handlePaymentCalculatorResult" @calculator-payload="handlePaymentCalculatorExtensionPayload"
+              @resolved-items="(field, items) => resolvedPaymentLabels[field] = items" />
+            <div v-if="currentStep !== 'payment' && offsetPreview" class="space-y-6">
+              <section v-if="currentStep === 'review'" class="space-y-4" :aria-label="t('agreement.payments.wizard.steps.payment.title')">
+                <h3 class="text-lg font-semibold">
+                  {{ t('agreement.payments.wizard.steps.payment.title') }}
+                </h3>
+                <dl class="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <dt class="text-sm text-muted">
+                      {{ t('agreement.payments.payee') }}
+                    </dt><dd>{{ paymentLabel('egcs_fc_applicantrecipient') }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-sm text-muted">
+                      {{ t('agreement.payments.commitment_type') }}
+                    </dt><dd>{{ paymentLabel('egcs_fc_commitmenttype') }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-sm text-muted">
+                      {{ t('agreement.payments.fiscal_year') }}
+                    </dt><dd>{{ paymentLabel('egcs_fc_fiscalyear') }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-sm text-muted">
+                      {{ t('agreement.payments.type') }}
+                    </dt><dd>{{ t(`enums.payment_type.${selectedPayment.egcs_fc_paymenttype}`) }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-sm text-muted">
+                      {{ t('agreement.payments.period') }}
+                    </dt><dd>{{ getPeriodLabel(selectedPayment.egcs_fc_periodstart ?? 0, selectedPayment.egcs_fc_periodend ?? 0) }}</dd>
+                  </div>
+                  <div v-if="selectedPayment.egcs_fc_comment">
+                    <dt class="text-sm text-muted">
+                      {{ t('common.comment') }}
+                    </dt><dd class="whitespace-pre-wrap">
+                      {{ selectedPayment.egcs_fc_comment }}
+                    </dd>
+                  </div>
+                </dl>
+              </section>
+              <dl class="grid gap-4 sm:grid-cols-3" data-testid="payment-offset-preview-totals">
+                <div>
+                  <dt class="text-sm text-muted">
+                    {{ t('agreement.payments.gross') }}
+                  </dt><dd class="font-semibold tabular-nums">
+                    {{ formatMoney(offsetPreview.egcs_fc_grossamount, agreementCurrency.toUpperCase()) }}
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-muted">
+                    {{ t('agreement.payments.offset') }}
+                  </dt><dd class="font-semibold tabular-nums">
+                    {{ formatMoney(offsetPreview.egcs_fc_offsetamount, agreementCurrency.toUpperCase()) }}
+                  </dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-muted">
+                    {{ t('agreement.payments.net') }}
+                  </dt><dd class="font-semibold tabular-nums">
+                    {{ formatMoney(offsetPreview.egcs_fc_netamount, agreementCurrency.toUpperCase()) }}
+                  </dd>
+                </div>
+              </dl>
+              <p v-if="!offsetPreview.egcs_fc_creditmemos.length" role="status" class="text-muted">
+                {{ t('agreement.payments.wizard.no_offsets') }}
+              </p>
+              <fieldset
+                v-for="(memo, memoIndex) in selectedPayment.egcs_fc_offsetcreditmemos"
+                :key="memo.egcs_fc_key" class="space-y-4 rounded-lg border border-default p-4"
+                :data-testid="`payment-offset-memo-${memoIndex}`">
+                <legend class="px-2 font-semibold">
+                  {{ t('agreement.payments.wizard.memo_number', { number: memoIndex + 1 }) }}
+                </legend>
+                <p class="font-semibold tabular-nums">
+                  {{ formatMoney(offsetPreview.egcs_fc_creditmemos[memoIndex]?.egcs_fc_amount ?? ZERO_MONEY, agreementCurrency.toUpperCase()) }}
+                </p>
+                <p class="text-sm text-muted">
+                  {{ t(offsetPreview.egcs_fc_creditmemos[memoIndex]?.egcs_fc_allocationmode === 'allocator' ? 'agreement.payments.wizard.allocated_coding' : 'agreement.payments.wizard.manual_coding') }}
+                </p>
+                <UAlert v-if="!memoCodingOptions(memoIndex).length" color="warning" :description="t('agreement.payments.wizard.no_coding_accounts')" />
+                <div
+                  v-for="(line, lineIndex) in memo.egcs_fc_lines" :key="lineIndex"
+                  :data-testid="`payment-offset-line-${memoIndex}-${lineIndex}`"
+                  class="grid items-start gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)_auto]">
+                  <template v-if="currentStep === 'credit-memos' && offsetPreview.egcs_fc_creditmemos[memoIndex]?.egcs_fc_allocationmode === 'manual'">
+                    <UFormField :label="t('account_receivable.credit_memo_coding')" :name="`egcs_fc_offsetcreditmemos.${memoIndex}.egcs_fc_lines.${lineIndex}.egcs_fc_codingaccount`">
+                      <USelectMenu
+                        v-model="line.egcs_fc_codingaccount" :items="memoCodingOptions(memoIndex)" value-key="value"
+                        :disabled="isSavingPayment" :placeholder="t('common.select')" class="w-full" />
+                    </UFormField>
+                    <UFormField :label="t('account_receivable.credit_memo_amount')" :name="`egcs_fc_offsetcreditmemos.${memoIndex}.egcs_fc_lines.${lineIndex}.egcs_fc_amount`">
+                      <CommonCurrencyInput v-model="line.egcs_fc_amount" :currency="agreementCurrency" :disabled="isSavingPayment" class="w-full" />
+                    </UFormField>
+                    <UButton
+                      icon="i-lucide-trash" color="error" variant="ghost" type="button" class="mt-6"
+                      :aria-label="t('agreement.payments.wizard.remove_coding_line', { number: lineIndex + 1 })"
+                      :disabled="isSavingPayment || memo.egcs_fc_lines.length === 1" @click="memo.egcs_fc_lines.splice(lineIndex, 1)" />
+                  </template>
+                  <template v-else>
+                    <span class="break-words text-sm">{{ selectedMemoCodingLabel(memoIndex, line.egcs_fc_codingaccount) }}</span>
+                    <span class="font-semibold tabular-nums">{{ formatMoney(parseMoney(line.egcs_fc_amount), agreementCurrency.toUpperCase()) }}</span>
+                  </template>
+                </div>
+                <UButton
+                  v-if="currentStep === 'credit-memos' && offsetPreview.egcs_fc_creditmemos[memoIndex]?.egcs_fc_allocationmode === 'manual'"
+                  type="button" icon="i-lucide-plus" color="neutral" variant="outline"
+                  :label="t('account_receivable.credit_memo_add_line')" :disabled="isSavingPayment" @click="addMemoCodingLine(memoIndex)" />
+                <p v-if="wizardErrors.some(error => error.name === `egcs_fc_offsetcreditmemos.${memoIndex}.egcs_fc_lines`)" role="alert" class="text-sm text-error">
+                  {{ wizardErrors.find(error => error.name === `egcs_fc_offsetcreditmemos.${memoIndex}.egcs_fc_lines`)?.message }}
+                </p>
+              </fieldset>
+              <p v-if="offsetPreview.egcs_fc_creditmemos.length" class="text-sm text-muted">
+                {{ t('agreement.payments.offset_approval_description') }}
+              </p>
+              <UButton type="button" icon="i-lucide-refresh-cw" color="neutral" variant="outline" :label="t('agreement.payments.wizard.recheck')" :disabled="isSavingPayment" @click="() => void preparePaymentOffset()" />
+            </div>
+          </CommonWizardShell>
         </UForm>
       </template>
     </UModal>

@@ -41,9 +41,10 @@ export const hasActiveStreamChartCasework = async (
     .where('memo._deleted', '=', false).where('line._deleted', '=', false).executeTakeFirst()
   if (activeMemo) return true
   const offsetMemo = await db.selectFrom('Funding_Case_Account_Receivable_Offset_Memo as memo')
+    .innerJoin('Funding_Case_Account_Receivable_Offset_Memo_Line as credit_line', 'credit_line.egcs_fc_offsetmemo', 'memo.id')
     .innerJoin('Funding_Case_Agreement_Account_Receivable as debt', 'debt.id', 'memo.egcs_fc_receivable')
     .innerJoin('Funding_Case_Agreement_Profile as agreement', 'agreement.id', 'debt.egcs_fc_fundingagreement')
-    .select('memo.id').where('memo.egcs_fc_creditmemochartofaccount', '=', selection.egcs_tp_agencychartofaccount)
+    .select('memo.id').where('credit_line.egcs_fc_transferpaymentstreamchartofaccount', '=', chartOfAccountId)
     .where('agreement.egcs_fc_transferpaymentstream', '=', selection.egcs_tp_transferpaymentstream)
     .where('memo._deleted', '=', false).executeTakeFirst()
   return Boolean(offsetMemo)

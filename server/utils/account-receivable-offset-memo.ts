@@ -9,8 +9,7 @@ import { hasAccountReceivablePoolLedger } from './account-receivable-pool-ledger
 import { hasAccountingTable } from './correction-schema'
 import { readAccountReceivableLineBalances } from './account-receivable'
 import { readAccountReceivableCashBalance } from './account-receivable-cash-balance'
-import { resolveAgreementScopeContext } from './agreement'
-import { readAccountReceivableAccount } from './account-receivable-configuration'
+import type { AgreementCodingAllocation } from './agreement-coding-allocator'
 
 const ZERO = parseMoney('0.00')
 const isoDate = (value: Date | string): string => new Date(value).toISOString()
@@ -34,8 +33,9 @@ export const readAccountReceivableOffsetMemos = async (db: Kysely<Database>, poo
       egcs_fc_amount: parseDatabaseMoney(row.amount), egcs_fc_outcome: row.egcs_fc_outcome, egcs_fc_createdat: isoDate(row.egcs_fc_createdat),
       egcs_fc_postedat: row.egcs_fc_postedat === null ? null : isoDate(row.egcs_fc_postedat) }))
     const posted = sumMoney(applications.filter(row => row.egcs_fc_outcome === 'posted').map(row => row.egcs_fc_amount))
+    const codingLines = await readAccountReceivableOffsetMemoLines(db, String(memo.id))
     result.push({ id: String(memo.id), egcs_fc_pool: String(memo.egcs_fc_pool), egcs_fc_receivable: String(memo.egcs_fc_receivable),
-      egcs_fc_creditmemochartofaccount: String(memo.egcs_fc_creditmemochartofaccount), egcs_fc_creditmemoaccountingdimensions: memo.egcs_fc_creditmemoaccountingdimensions, egcs_fc_creditmemoreference: `OCM-${memo.id}`,
+      egcs_fc_codinglines: codingLines, egcs_fc_creditmemoreference: `OCM-${memo.id}`,
       egcs_fc_amount: parseDatabaseMoney(memo.amount),
       egcs_fc_appliedamount: posted, egcs_fc_reservedamount: sumMoney(applications.filter(row => row.egcs_fc_outcome === 'open').map(row => row.egcs_fc_amount)), egcs_fc_receivablereserved: balance.egcs_fc_reserved, egcs_fc_receivablerecovered: balance.egcs_fc_recovered, egcs_fc_receivableoutstanding: balance.egcs_fc_outstanding,
       egcs_fc_receivableavailable: balance.egcs_fc_available, egcs_fc_createdat: isoDate(memo.egcs_fc_createdat), egcs_fc_applications: applications })
@@ -43,29 +43,35 @@ export const readAccountReceivableOffsetMemos = async (db: Kysely<Database>, poo
   return result
 }
 
+export const readAccountReceivableOffsetMemoLines = async (db: Kysely<Database>, memoId: string) => {
+  const lines = await db.selectFrom('Funding_Case_Account_Receivable_Offset_Memo_Line').selectAll()
+    .select(databaseMoneyText(sql.ref('egcs_fc_amount')).as('amount'))
+    .where('egcs_fc_offsetmemo', '=', memoId).orderBy('egcs_fc_linenumber').execute()
+  return lines.map(line => ({ id: String(line.id), egcs_fc_linenumber: line.egcs_fc_linenumber,
+    egcs_fc_transferpaymentstreamchartofaccount: String(line.egcs_fc_transferpaymentstreamchartofaccount),
+    egcs_fc_creditmemochartofaccount: String(line.egcs_fc_creditmemochartofaccount),
+    egcs_fc_creditmemoaccountingdimensions: line.egcs_fc_creditmemoaccountingdimensions,
+    egcs_fc_commitmentchartofaccount: line.egcs_fc_commitmentchartofaccount === null ? null : String(line.egcs_fc_commitmentchartofaccount),
+    egcs_fc_amount: parseDatabaseMoney(line.amount) }))
+}
+
 export const linkAccountReceivablePoolOffsetApplication = async (trx: Transaction<Database>, recoveryId: string,
-  plans: Array<{ receivableId: string; amount: import('~~/shared/utils/money').Money }>) => {
+  plans: Array<{ receivableId: string; amount: import('~~/shared/utils/money').Money; coding: AgreementCodingAllocation[] }>) => {
   const recovery = await trx.selectFrom('Funding_Case_Account_Receivable_Recovery').selectAll()
     .where('id', '=', recoveryId).executeTakeFirstOrThrow()
   for (const plan of plans) {
-    const debt = await trx.selectFrom('Funding_Case_Agreement_Account_Receivable').selectAll()
-      .where('id', '=', plan.receivableId).executeTakeFirstOrThrow()
-    if (String(debt.egcs_fc_pool) !== String(recovery.egcs_fc_pool)) throw new Error('AR_PAYMENT_OWNER_UNAVAILABLE')
-    const context = await resolveAgreementScopeContext(String(debt.egcs_fc_fundingagreement), trx)
-    if (!context) throw new Error('AR_PAYMENT_OWNER_UNAVAILABLE')
-    const selected = await trx.selectFrom('Agency_Chart_of_Account as account')
-      .innerJoin('Transfer_Payment_Stream_Chart_of_Account as selection', 'selection.egcs_tp_agencychartofaccount', 'account.id')
-      .select('account.id').where('selection.egcs_tp_transferpaymentstream', '=', context.streamId)
-      .where('account.egcs_ay_kind', '=', 'credit_memo').where('account.egcs_ay_fiscalyear', '=', String(debt.egcs_fc_agencyfiscalyear))
-      .where('account.egcs_ay_currency', '=', debt.egcs_fc_currency).where('account.egcs_ay_organizationagency', '=', context.agencyId)
-      .where('selection._deleted', '=', false).where('account._deleted', '=', false).orderBy('account.id').executeTakeFirst()
-    if (!selected) throw new Error('AR_ACCOUNT_UNAVAILABLE')
-    const account = await readAccountReceivableAccount(trx, { id: String(selected.id), kind: 'credit_memo', agencyId: context.agencyId,
-      streamId: context.streamId, agencyFiscalYearId: String(debt.egcs_fc_agencyfiscalyear), currency: debt.egcs_fc_currency })
+    if (!plan.coding.length || sumMoney(plan.coding.map(line => line.amount)) !== plan.amount) throw new Error('AR_OFFSET_CODING_REQUIRED')
     const memo = await trx.insertInto('Funding_Case_Account_Receivable_Offset_Memo').values({
-      egcs_fc_commitmentchartofaccount: account.egcs_ay_commitmentchartofaccount, egcs_fc_pool: String(recovery.egcs_fc_pool), egcs_fc_receivable: plan.receivableId,
-      egcs_fc_creditmemochartofaccount: String(account.id), egcs_fc_creditmemoaccountingdimensions: sql`${JSON.stringify(account.egcs_ay_accountingdimensions)}::jsonb`,
+      egcs_fc_pool: String(recovery.egcs_fc_pool), egcs_fc_receivable: plan.receivableId,
       egcs_fc_amount: databaseMoneyValue(plan.amount) }).returning('id').executeTakeFirstOrThrow()
+    for (const [index, line] of plan.coding.entries()) {
+      await trx.insertInto('Funding_Case_Account_Receivable_Offset_Memo_Line').values({ egcs_fc_offsetmemo: String(memo.id),
+        egcs_fc_linenumber: index + 1, egcs_fc_transferpaymentstreamchartofaccount: line.codingLineId,
+        egcs_fc_commitmentchartofaccount: line.commitmentChartOfAccountId ?? null,
+        egcs_fc_creditmemochartofaccount: line.agencyChartOfAccountId,
+        egcs_fc_creditmemoaccountingdimensions: sql`${JSON.stringify(line.accountingDimensions)}::jsonb`,
+        egcs_fc_amount: databaseMoneyValue(line.amount) }).execute()
+    }
     await trx.insertInto('Funding_Case_Account_Receivable_Offset_Memo_Application').values({ egcs_fc_offsetmemo: String(memo.id),
       egcs_fc_allocation: null, egcs_fc_recovery: recoveryId, egcs_fc_amount: databaseMoneyValue(plan.amount) }).execute()
   }
@@ -81,7 +87,7 @@ export const readAccountReceivablePaymentCreditMemos = async (db: Kysely<Databas
     const outcome = applications[0]?.egcs_fc_outcome
     if (!outcome) return []
     return [{ id: memo.id, egcs_fc_offsetmemo: memo.id, egcs_fc_creditmemoreference: memo.egcs_fc_creditmemoreference,
-      egcs_fc_amount: memo.egcs_fc_amount,
+      egcs_fc_amount: memo.egcs_fc_amount, egcs_fc_codinglines: memo.egcs_fc_codinglines,
       egcs_fc_appliedamount: outcome === 'released' ? ZERO : sumMoney(applications.map(row => row.egcs_fc_amount)),
       egcs_fc_receivablereserved: memo.egcs_fc_receivablereserved, egcs_fc_receivablerecovered: memo.egcs_fc_receivablerecovered, egcs_fc_receivableoutstanding: memo.egcs_fc_receivableoutstanding, egcs_fc_receivableavailable: memo.egcs_fc_receivableavailable, egcs_fc_outcome: outcome }]
   })

@@ -186,11 +186,12 @@ export const getCreditMemoSources = async (
         AND owner.egcs_fc_fundingagreement=${agreementId}
         AND fiscal.egcs_ay_fiscalyear<=${selectedYearOrder} AND NOT memo._deleted AND NOT line._deleted
       UNION ALL
-      SELECT memo.egcs_fc_receivable, memo.egcs_fc_amount
+      SELECT memo.egcs_fc_receivable, credit_line.egcs_fc_amount
       FROM "Funding_Case_Account_Receivable_Offset_Memo" memo
+      JOIN "Funding_Case_Account_Receivable_Offset_Memo_Line" credit_line ON credit_line.egcs_fc_offsetmemo=memo.id
       JOIN "Funding_Case_Agreement_Account_Receivable" owner ON owner.id=memo.egcs_fc_receivable
       JOIN "Funding_Case_Account_Receivable_Pool" pool ON pool.id=memo.egcs_fc_pool
-      JOIN "Agency_Chart_of_Account" account ON account.id=memo.egcs_fc_commitmentchartofaccount
+      JOIN "Agency_Chart_of_Account" account ON account.id=credit_line.egcs_fc_commitmentchartofaccount
       JOIN "Agency_Fiscal_Year" fiscal ON fiscal.id=account.egcs_ay_fiscalyear
       JOIN "Funding_Case_Account_Receivable_Offset_Memo_Application" application ON application.egcs_fc_offsetmemo=memo.id
       JOIN "Funding_Case_Account_Receivable_Recovery" recovery ON recovery.id=application.egcs_fc_recovery

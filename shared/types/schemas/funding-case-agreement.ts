@@ -580,8 +580,21 @@ export const FundingCaseAgreementPeriodRangeSchema = z.object({
   egcs_fc_periodend: RequiredForecastMonth()
 }).superRefine(validatePeriodRange)
 
+export const PaymentOffsetCodingLineSchema = z.object({
+  egcs_fc_codingaccount: RequiredBigintSelectionId(),
+  egcs_fc_amount: PositiveMoneySchema
+}).strict()
+
+export const PaymentOffsetMemoInputSchema = z.object({
+  egcs_fc_key: z.string({ error: 'validation.required' }).regex(/^[a-f0-9]{64}$/, { error: 'validation.required' }),
+  egcs_fc_lines: z.array(PaymentOffsetCodingLineSchema, { error: 'validation.required' })
+    .min(1, { error: 'validation.required' }).max(32767, { error: 'validation.too_many_coding_lines' })
+}).strict()
+
 export const FundingCaseAgreementPaymentCreateSchema = FundingCaseAgreementPaymentSharedInputSchema.extend({
   egcs_fc_commitmenttype: RequiredBigintSelectionId(),
+  egcs_fc_offsetplanhash: z.string({ error: 'validation.required' }).regex(/^[a-f0-9]{64}$/, { error: 'validation.required' }).optional(),
+  egcs_fc_offsetcreditmemos: z.array(PaymentOffsetMemoInputSchema, { error: 'validation.required' }).optional(),
   extensions: z.record(z.string(), z.json()).optional()
 }).refine(
   data => data.egcs_fc_periodstart <= data.egcs_fc_periodend,
@@ -593,12 +606,16 @@ export const FundingCaseAgreementPaymentCreateSchema = FundingCaseAgreementPayme
 
 export const FundingCaseAgreementPaymentPatchSchema = FundingCaseAgreementPaymentSharedInputSchema.extend({
   egcs_fc_commitmenttype: RequiredBigintSelectionId().optional(),
+  egcs_fc_offsetplanhash: z.string({ error: 'validation.required' }).regex(/^[a-f0-9]{64}$/, { error: 'validation.required' }).optional(),
+  egcs_fc_offsetcreditmemos: z.array(PaymentOffsetMemoInputSchema, { error: 'validation.required' }).optional(),
   egcs_fc_status: ForbiddenBusinessStatusMutation()
 }).partial().superRefine(validatePeriodRange)
 
 export type FundingCaseAgreementPayment = z.infer<typeof FundingCaseAgreementPaymentBaseSchema>
 export type FundingCaseAgreementPaymentCreate = z.infer<typeof FundingCaseAgreementPaymentCreateSchema>
 export type FundingCaseAgreementPaymentPatch = z.infer<typeof FundingCaseAgreementPaymentPatchSchema>
+export type PaymentOffsetCodingLineInput = z.infer<typeof PaymentOffsetCodingLineSchema>
+export type PaymentOffsetMemoInput = z.infer<typeof PaymentOffsetMemoInputSchema>
 export type FundingCaseAgreementPaymentItem = WithId<FundingCaseAgreementPayment & {
   egcs_fc_status: StatusId
   egcs_fc_commitmenttype?: string

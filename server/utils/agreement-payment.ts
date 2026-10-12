@@ -210,10 +210,11 @@ export const syncAgreementPaymentEditingStatus = async (
   context: {
     event: H3Event
     agreementId: string
+    offsetPlans?: import('./agreement-payment-offset-plan').PaymentOffsetCodingPlan[]
   }
 ) => {
   // Ordinary payment edits preserve the Agency-configured business status.
-  await withPaymentRecoveryErrors(context.event, () => rebuildAccountReceivablePaymentOffset(db, paymentId))
+  await withPaymentRecoveryErrors(context.event, () => rebuildAccountReceivablePaymentOffset(db, paymentId, { plans: context.offsetPlans }))
 }
 
 /** Maps a payment patch to database fields without overwriting omitted values. */
@@ -223,6 +224,8 @@ export const buildAgreementPaymentPatchUpdateValues = (
 ): AgreementPaymentPatchUpdateValues => {
   const {
     egcs_fc_commitmenttype: _commitmentType,
+    egcs_fc_offsetplanhash: _offsetPlanHash,
+    egcs_fc_offsetcreditmemos: _offsetCreditMemos,
     egcs_fc_paymentamount: paymentAmount,
     ...paymentPatchValues
   } = patchValues

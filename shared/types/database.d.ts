@@ -485,6 +485,7 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Funding_Case_Account_Receivable_Credit_Memo_Line: FundingCaseAccountReceivableCreditMemoLineTable
   Funding_Case_Account_Receivable_Recovery: FundingCaseAccountReceivableRecoveryTable
   Funding_Case_Account_Receivable_Offset_Memo: FundingCaseAccountReceivableOffsetMemoTable
+  Funding_Case_Account_Receivable_Offset_Memo_Line: FundingCaseAccountReceivableOffsetMemoLineTable
   Funding_Case_Account_Receivable_Offset_Memo_Application: FundingCaseAccountReceivableOffsetMemoApplicationTable
   Funding_Case_Account_Receivable_Allocation: FundingCaseAccountReceivableAllocationTable
   Funding_Case_Account_Receivable_Posting: FundingCaseAccountReceivablePostingTable
@@ -2861,14 +2862,23 @@ export interface FundingCaseAccountReceivablePoolTable {
 }
 
 export interface FundingCaseAccountReceivableOffsetMemoTable {
-  egcs_fc_commitmentchartofaccount: Generated<string | null>
   id: Generated<string>
   egcs_fc_receivable: string
-  egcs_fc_creditmemochartofaccount: string
-  egcs_fc_creditmemoaccountingdimensions: JsonValue
   egcs_fc_pool: string
   egcs_fc_amount: number
   egcs_fc_createdat: Generated<Date>
+  _deleted: Generated<boolean>
+}
+
+export interface FundingCaseAccountReceivableOffsetMemoLineTable {
+  id: Generated<string>
+  egcs_fc_offsetmemo: string
+  egcs_fc_linenumber: number
+  egcs_fc_transferpaymentstreamchartofaccount: string
+  egcs_fc_creditmemochartofaccount: string
+  egcs_fc_creditmemoaccountingdimensions: JsonValue
+  egcs_fc_commitmentchartofaccount: string | null
+  egcs_fc_amount: number
   _deleted: Generated<boolean>
 }
 

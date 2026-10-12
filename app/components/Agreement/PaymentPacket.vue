@@ -32,11 +32,32 @@ const payment = computed(() => ({
           egcs_fc_creditmemoreference: text(memo.egcs_fc_creditmemoreference),
           egcs_fc_amount: parseMoney(text(memo.egcs_fc_amount)),
           egcs_fc_appliedamount: parseMoney(text(memo.egcs_fc_appliedamount)),
-          egcs_fc_receivablereserved: parseMoney(text(memo.egcs_fc_receivablereserved)),
-          egcs_fc_receivablerecovered: parseMoney(text(memo.egcs_fc_receivablerecovered)),
-          egcs_fc_receivableoutstanding: parseMoney(text(memo.egcs_fc_receivableoutstanding)),
-          egcs_fc_receivableavailable: parseMoney(text(memo.egcs_fc_receivableavailable)),
-          egcs_fc_outcome: memo.egcs_fc_outcome as AccountReceivablePaymentCreditMemo['egcs_fc_outcome']
+          ...([memo.egcs_fc_receivablereserved, memo.egcs_fc_receivablerecovered, memo.egcs_fc_receivableoutstanding, memo.egcs_fc_receivableavailable]
+            .every(value => typeof value === 'string')
+            ? {
+                egcs_fc_receivablereserved: parseMoney(text(memo.egcs_fc_receivablereserved)),
+                egcs_fc_receivablerecovered: parseMoney(text(memo.egcs_fc_receivablerecovered)),
+                egcs_fc_receivableoutstanding: parseMoney(text(memo.egcs_fc_receivableoutstanding)),
+                egcs_fc_receivableavailable: parseMoney(text(memo.egcs_fc_receivableavailable))
+              }
+            : {}),
+          egcs_fc_outcome: memo.egcs_fc_outcome as AccountReceivablePaymentCreditMemo['egcs_fc_outcome'],
+          ...(Array.isArray(memo.egcs_fc_codinglines)
+            ? {
+                egcs_fc_codinglines: memo.egcs_fc_codinglines.map(value => {
+                  const line = asRecord(value)
+                  return {
+                    id: text(line.id),
+                    egcs_fc_linenumber: line.egcs_fc_linenumber as number,
+                    egcs_fc_transferpaymentstreamchartofaccount: text(line.egcs_fc_transferpaymentstreamchartofaccount),
+                    egcs_fc_creditmemochartofaccount: text(line.egcs_fc_creditmemochartofaccount),
+                    egcs_fc_creditmemoaccountingdimensions: line.egcs_fc_creditmemoaccountingdimensions ?? [],
+                    egcs_fc_commitmentchartofaccount: typeof line.egcs_fc_commitmentchartofaccount === 'string' ? line.egcs_fc_commitmentchartofaccount : null,
+                    egcs_fc_amount: parseMoney(text(line.egcs_fc_amount))
+                  }
+                })
+              }
+            : {})
         }
       })
     : [],

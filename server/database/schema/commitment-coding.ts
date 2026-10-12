@@ -58,13 +58,14 @@ export const installCommitmentCodingFunctions = async (db: Kysely<Database>): Pr
             AND credit_line.egcs_fc_commitmentchartofaccount=agency_chart_id
             AND memo.egcs_fc_outcome='posted' AND NOT memo._deleted AND NOT credit_line._deleted
         UNION ALL
-        SELECT memo.egcs_fc_amount amount FROM "Funding_Case_Account_Receivable_Offset_Memo" memo
+        SELECT credit_line.egcs_fc_amount amount FROM "Funding_Case_Account_Receivable_Offset_Memo" memo
+          JOIN "Funding_Case_Account_Receivable_Offset_Memo_Line" credit_line ON credit_line.egcs_fc_offsetmemo=memo.id
           JOIN "Funding_Case_Agreement_Account_Receivable" debt ON debt.id=memo.egcs_fc_receivable
           JOIN "Funding_Case_Account_Receivable_Pool" pool ON pool.id=memo.egcs_fc_pool
           JOIN "Funding_Case_Account_Receivable_Offset_Memo_Application" application ON application.egcs_fc_offsetmemo=memo.id
           JOIN "Funding_Case_Account_Receivable_Recovery" recovery ON recovery.id=application.egcs_fc_recovery
           WHERE debt.egcs_fc_fundingagreement=agreement_id AND pool.egcs_fc_currency::text=currency
-            AND memo.egcs_fc_commitmentchartofaccount=agency_chart_id
+            AND credit_line.egcs_fc_commitmentchartofaccount=agency_chart_id
             AND recovery.egcs_fc_outcome='posted' AND NOT recovery._deleted AND NOT memo._deleted) received
     $function$;
 

@@ -6,7 +6,7 @@ This configuration manages the existing **GCS Demo / demo** environment:
   populated, otherwise GitHub `GCS-SSC/gcs-ssc` branch `main` and the canonical Dockerfile.
 - Database: existing `GCS DB` service (PostgreSQL 18), with the application's existing `DATABASE_URL` preserved.
 - Domain: https://gcs-ssc-demo.up.railway.app, retained by Railway on the existing service.
-- Volumes: existing `gcs-ssc-volume` at `/app/.data` and `gcs-db-volume-ar-paid-reset` on `GCS DB`, each 5000 MB. The release clean cutover replaces `gcs-db-volume-release-reset`. Verify every previous GCS database volume is detached and absent or pending Railway deletion.
+- Volumes: existing `gcs-ssc-volume` at `/app/.data` and `gcs-db-volume-clean-reset` on `GCS DB`, each 5000 MB. The clean cutover replaces `gcs-db-volume-ar-paid-reset`. Verify every previous GCS database volume is detached and absent or pending Railway deletion.
 - Metabase, `Metabase DB`, and their `postgres-volume-4aPn` are included so an IaC apply preserves them.
 - Portal: `gcs-ssc-portal` uses a pinned public GHCR digest from `deployment/portal-demo-image.json` and its own `Portal DB` PostgreSQL service and `portal-db-volume`. It shares this project, not a database, with GCS and Metabase.
 - Canvas groups: `Metabase`, `GCS`, and `Portal` each contain the corresponding app and PostgreSQL service.
@@ -62,24 +62,26 @@ redeploys the most recent deployment. Committing an IaC file alone does not run
 
 Publish and verify the current main commit with `publish-demo-image.yml`, then
 promote its immutable digest in `deployment/demo-image.json`. The image smoke
-check verifies `9999_seed`, Agency 21, eleven agreements, successful terminal
+check verifies `9999_seed`, Agency 21, thirteen agreements, successful terminal
 Payments 168/172, and file persistence across container replacement. Seeded claim reconciliations no longer
 need the final flag for receivable creation; seeded payment workflows must end in
 the owning agency's successful terminal payment status.
 
 Stop the existing `gcs-ssc` deployment before changing the database storage.
-Stop `GCS DB` and explicitly detach `gcs-db-volume-release-reset` before applying;
+Stop `GCS DB` and explicitly detach `gcs-db-volume-ar-paid-reset` before applying;
 the planner's missing former attachment does not prove that it will detach it.
-Verify the former volume's `serviceId` is null. Apply the reviewed IaC plan to create `gcs-db-volume-ar-paid-reset`, attach it to
+Verify the former volume's `serviceId` is null. Apply the reviewed IaC plan to create `gcs-db-volume-clean-reset`, attach it to
 `GCS DB`, and deploy the promoted image. Verify the live volume attachment:
 Railway's plan readback can omit the former database attachment. Once the former
-`gcs-db-volume-release-reset` (volume ID `2d0716ea-29c4-4675-afc6-78bc545b4058`)
+`gcs-db-volume-ar-paid-reset` (volume ID `f14f19e4-17da-42af-93b5-2b9bbbd69e13`)
 is detached, delete that exact volume to finish the authorized wipe. Do not delete
-the application attachment volume, Portal volume, or Metabase volume. Omission
+the application attachment volume, Portal volume, or Metabase volume. The former
+volume is detached and pending Railway deletion on 2026-10-14. Its replacement
+`gcs-db-volume-clean-reset` has volume ID `34d2ebf1-288f-4d9e-b5e0-f2e712777a54`. Omission
 from the authoring graph alone may retain unused volumes.
 
 Wait for the app deployment to reach `SUCCESS` and verify public health, demo
-login, NCIA's eleven agreements, and successful terminal Payments 168/172. Verify
+login, NCIA's thirteen agreements, and successful terminal Payments 168/172. Verify
 claim-based receivable creation from an approved reconciliation without the final
 flag and unspent-advance receivable creation from a paid advance. The application
 file volume, Portal, and Metabase remain outside this cutover. Future schema changes

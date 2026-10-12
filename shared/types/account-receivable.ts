@@ -68,11 +68,41 @@ export type AccountReceivableOffsetMemoApplication = {
   egcs_fc_postedat: string | null
 }
 
+export type AccountReceivableOffsetMemoLine = {
+  id: string
+  egcs_fc_linenumber: number
+  egcs_fc_transferpaymentstreamchartofaccount: string
+  egcs_fc_creditmemochartofaccount: string
+  egcs_fc_creditmemoaccountingdimensions: JsonValue
+  egcs_fc_commitmentchartofaccount: string | null
+  egcs_fc_amount: Money
+}
+
+export type PaymentOffsetPreview = {
+  egcs_fc_grossamount: Money
+  egcs_fc_offsetamount: Money
+  egcs_fc_netamount: Money
+  egcs_fc_offsetplanhash: string
+  egcs_fc_creditmemos: Array<{
+    egcs_fc_key: string
+    egcs_fc_amount: Money
+    egcs_fc_currency: import('./database').Currency_Codes
+    egcs_fc_allocationmode: 'manual' | 'allocator'
+    egcs_fc_codingaccounts: Array<{
+      id: string
+      egcs_fc_name_en: string
+      egcs_fc_name_fr: string
+      egcs_fc_accountingdimensions: JsonValue
+      egcs_fc_commitmentchartofaccount: string | null
+    }>
+    egcs_fc_lines: import('./schemas').PaymentOffsetCodingLineInput[]
+  }>
+}
+
 export type AccountReceivableOffsetMemo = {
   id: string
   egcs_fc_receivable: string
-  egcs_fc_creditmemochartofaccount: string
-  egcs_fc_creditmemoaccountingdimensions: JsonValue
+  egcs_fc_codinglines: AccountReceivableOffsetMemoLine[]
   egcs_fc_pool: string
   egcs_fc_creditmemoreference: string
   egcs_fc_amount: Money
@@ -87,11 +117,13 @@ export type AccountReceivableOffsetMemo = {
 }
 
 export type AccountReceivablePaymentCreditMemo = Pick<AccountReceivableOffsetMemo,
-  'id' | 'egcs_fc_creditmemoreference' | 'egcs_fc_amount' | 'egcs_fc_receivableoutstanding' | 'egcs_fc_receivableavailable' | 'egcs_fc_receivablereserved' | 'egcs_fc_receivablerecovered'> & {
-    egcs_fc_offsetmemo: string
-    egcs_fc_appliedamount: Money
-    egcs_fc_outcome: 'open' | 'posted' | 'released'
-  }
+  'id' | 'egcs_fc_creditmemoreference' | 'egcs_fc_amount'> & Partial<Pick<AccountReceivableOffsetMemo,
+    'egcs_fc_receivableoutstanding' | 'egcs_fc_receivableavailable' | 'egcs_fc_receivablereserved' | 'egcs_fc_receivablerecovered'>> & {
+      egcs_fc_offsetmemo: string
+      egcs_fc_appliedamount: Money
+      egcs_fc_outcome: 'open' | 'posted' | 'released'
+      egcs_fc_codinglines?: AccountReceivableOffsetMemoLine[]
+    }
 
 export type AccountReceivableClaimReduction = {
   id: string
