@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { AccountReceivableDetail } from '~~/shared/types/account-receivable'
 import type { TableColumnInput } from '~/composables/useTableColumns'
@@ -8,14 +8,23 @@ import { formatAccountReceivableAmount } from '~/utils/account-receivable-displa
 import { buildAccountReceivableAdjustmentRows, type AccountReceivableAdjustmentRow } from '~/utils/account-receivable-detail-activity'
 
 const { receivable, agreementId } = defineProps<{ receivable: AccountReceivableDetail, agreementId: string }>()
-const emit = defineEmits<{ adjust: [] }>()
+const emit = defineEmits<{ adjust: [], changed: [] }>()
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
+const { confirmDeleteRequest } = useConfirmDeleteRequest()
+const { showError } = useApiErrorToast()
+const toast = useToast()
+const deletingId: Ref<string | null> = ref(null)
+let disposed = false
+onBeforeUnmount(() => {
+  disposed = true
+})
 const { formatDate } = useDateHelpers()
 const rows = computed(() => buildAccountReceivableAdjustmentRows(receivable))
 const pagination: Ref<{ pageIndex: number, pageSize: number }> = ref({ pageIndex: 0, pageSize: 10 })
 watch(() => `${agreementId}:${receivable.id}`, () => {
   pagination.value.pageIndex = 0
+  deletingId.value = null
 })
 const columns: TableColumnInput<AccountReceivableAdjustmentRow>[] = [
   { id: 'reference', accessorKey: 'reference', headerKey: 'account_receivable.activity_reference' },
@@ -26,6 +35,30 @@ const columns: TableColumnInput<AccountReceivableAdjustmentRow>[] = [
   { id: 'actions', headerKey: 'common.actions' }
 ]
 const amount = (value: string | null) => formatAccountReceivableAmount(value, locale.value, receivable.egcs_fc_currency) ?? t('common.not_available')
+/**
+ * Deletes only the selected independently assigned draft Adjustment.
+ * @param row - Selected independently assigned draft record.
+ */
+const deleteAdjustment = async (row: AccountReceivableAdjustmentRow) => {
+  if (!row.adjustment.egcs_fc_candeleterole || deletingId.value) return
+  if (!row.adjustment.egcs_fc_candelete) {
+    toast.add({ title: t('common.warning'), description: t('account_receivable.work_prerequisite'), color: 'warning' })
+    return
+  }
+  const owner = `${agreementId}:${receivable.id}`
+  deletingId.value = row.adjustment.id
+  try {
+    const deleted = await confirmDeleteRequest(`/api/account-receivables/${row.adjustment.id}`, {
+      shouldProceed: () => !disposed && `${agreementId}:${receivable.id}` === owner
+        && rows.value.some(item => item.adjustment.id === row.adjustment.id && item.adjustment.egcs_fc_candeleterole && item.adjustment.egcs_fc_candelete)
+    })
+    if (deleted && !disposed && `${agreementId}:${receivable.id}` === owner) emit('changed')
+  } catch (error) {
+    if (!disposed && `${agreementId}:${receivable.id}` === owner) showError(error)
+  } finally {
+    if (!disposed && `${agreementId}:${receivable.id}` === owner) deletingId.value = null
+  }
+}
 </script>
 
 <template>
@@ -58,6 +91,12 @@ const amount = (value: string | null) => formatAccountReceivableAmount(value, lo
     </template>
     <template #actions-cell="{ row }">
       <div class="flex justify-end gap-2">
+        <UButton
+          v-if="row.original.adjustment.egcs_fc_candeleterole"
+          icon="i-lucide-trash" color="error" variant="ghost"
+          :aria-label="`${t('common.delete')}: ${row.original.reference}`"
+          :loading="deletingId === row.original.adjustment.id" :disabled="deletingId !== null"
+          @click="deleteAdjustment(row.original)" />
         <UButton
           icon="i-lucide-arrow-right" color="neutral" variant="ghost"
           :to="localePath({ ...appRouteLocations.agreementAccountReceivableDetail(agreementId, row.original.adjustment.id), query: { entityType: 'fundingcaseaccountreceivableadjustment' } })"

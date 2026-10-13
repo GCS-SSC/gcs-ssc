@@ -1,4 +1,4 @@
-import type { AccountReceivableDetail, AccountReceivableRow } from '~~/shared/types/account-receivable'
+import type { AccountReceivableDetail } from '~~/shared/types/account-receivable'
 import type { Money } from '~~/shared/utils/money'
 import { accountReceivableReference } from '~/utils/account-receivable-display'
 
@@ -7,7 +7,7 @@ export type AccountReceivableAdjustmentRow = {
   reference: string
   createdAt: string
   amount: Money | null
-  adjustment: AccountReceivableRow
+  adjustment: AccountReceivableDetail['egcs_fc_adjustments'][number]
 }
 
 /**

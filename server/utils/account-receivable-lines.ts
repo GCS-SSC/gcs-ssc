@@ -125,6 +125,9 @@ export const writeAccountReceivableLine = async (event: H3Event, id: string, inp
             agencyId: context.agencyId, streamId: context.streamId, agencyFiscalYearId: String(debt.egcs_fc_agencyfiscalyear), currency: debt.egcs_fc_currency })
         : null
       const partitions = (await readAccountReceivableCoding(trx, id)).filter(row => String(row.egcs_fc_receivableline) === String(saved.id))
+      if (moneyToCents(input.egcs_fc_amount) !== BigInt(0) && !partitions.some(row => moneyToCents(row.egcs_fc_paidbasis) > BigInt(0))) {
+        throw new Error('AR_NO_PAID_CODING')
+      }
       const allocated = allocateRetainedAccountReceivableCoding(input.egcs_fc_amount, partitions.map(row => ({ id: String(row.id), basis: row.egcs_fc_paidbasis, capacity: row.egcs_fc_paidbasis })))
       await trx.updateTable('Funding_Case_Agreement_Account_Receivable_Line').set({ egcs_fc_amount: databaseMoneyValue(input.egcs_fc_amount), egcs_fc_accountreceivablechartofaccount: account ? String(account.id) : null,
         egcs_fc_accountreceivableaccountingdimensions: sql<JsonValue>`${JSON.stringify(account && String(account.id) === saved.egcs_fc_accountreceivablechartofaccount ? saved.egcs_fc_accountreceivableaccountingdimensions : account?.egcs_ay_accountingdimensions ?? [])}::jsonb` }).where('id', '=', String(saved.id)).execute()

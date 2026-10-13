@@ -128,6 +128,26 @@ export type AccountReceivablePaymentCreditMemo = Pick<AccountReceivableOffsetMem
       egcs_fc_codinglines?: AccountReceivableOffsetMemoLine[]
     }
 
+export type AccountReceivableClaimReductionChoice = {
+  id: string
+  egcs_fc_claim: string
+  egcs_fc_description: string
+  egcs_fc_amount: Money
+  egcs_fc_sourceamount: Money
+  egcs_fc_reconciledamount: Money
+  egcs_fc_reserved: Money
+  egcs_fc_available: Money
+  egcs_fc_fundingagreementbudgetlineitem: string | null
+  egcs_fc_submittedcostcategory: string | null
+  egcs_fc_submittedcostsubsection: string | null
+  egcs_fc_submittedlineitem: string | null
+  organization_cost_category_name_en: string | null
+  organization_cost_category_name_fr: string | null
+  egcs_fc_costsubsection: string | null
+  line_item_name_en: string | null
+  line_item_name_fr: string | null
+}
+
 export type AccountReceivableClaimReduction = {
   id: string
   egcs_fc_claim: string
@@ -159,15 +179,16 @@ export type AccountReceivableDetail = AccountReceivableRow & {
   egcs_fc_available: Money
   egcs_fc_collectionstate: 'cleared' | 'partially_recovered' | 'outstanding'
   egcs_fc_lines: AccountReceivableLine[]
-  egcs_fc_adjustments: AccountReceivableRow[]
+  egcs_fc_adjustments: Array<AccountReceivableRow & { egcs_fc_candeleterole: boolean; egcs_fc_candelete: boolean }>
   egcs_fc_principal: Money
   egcs_fc_agreementreadable: boolean
   egcs_fc_sourcereadable: boolean
   egcs_fc_canwork: boolean
   egcs_fc_caneditrole: boolean
+  egcs_fc_claimreductionlocked: boolean
   egcs_fc_canedit: boolean
+  egcs_fc_candeleterole: boolean
   egcs_fc_candelete: boolean
-  egcs_fc_cancancel: boolean
   egcs_fc_proponentreadable: boolean
   egcs_fc_approvedamount: Money
   egcs_fc_canadjust: boolean
@@ -225,7 +246,6 @@ export type AccountReceivableCreditMemoDetail = AccountReceivableCreditMemoRow &
   egcs_fc_canwork: boolean
   egcs_fc_canedit: boolean
   egcs_fc_candelete: boolean
-  egcs_fc_cancancel: boolean
   egcs_fc_debtorname_en: string
   egcs_fc_debtorname_fr: string
 }

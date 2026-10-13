@@ -20,6 +20,7 @@ import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from './dat
 import { canAccessApplicantRecipient } from './applicant-recipient-auth'
 import { withBusinessRecordState } from './business-record-state'
 import { resolveAssignedItemTargetGrant } from './rbac'
+import { assignedEntityIdsQuery } from '@gcs-ssc/authorization/server'
 import { accountReceivableSourceUsage, accountReceivableAdvanceUsage, executeFreshAccountReceivableWrite, resolveAccountReceivableRuntimeContext } from './account-receivable-context'
 import { accountReceivableError, readAccountReceivableSources, requireAccountReceivableSourceRead, type CapturedAccountReceivableSource } from './account-receivable-source'
 
@@ -480,6 +481,7 @@ export const getAccountReceivableDetail = async (event: H3Event, id: string) => 
   const editable = debt.egcs_fc_outcome === 'open' && !status.egcs_cn_terminal && !status.egcs_cn_readonly && !completion
   const assigned = Boolean(assignment)
   const work = assigned && auth.userAbilities.authorize('account_receivable', 'update', context.scope)
+  const canDeleteRole = auth.userAbilities.authorize('account_receivable', 'delete', context.scope)
   const [record] = await withBusinessRecordState(db, context.entityType, [debt])
   const poolLedger = await hasAccountReceivablePoolLedger(db)
   let labels = (savedLines[0]?.egcs_fc_evidence ?? {}) as Record<string, JsonValue>
@@ -525,15 +527,27 @@ export const getAccountReceivableDetail = async (event: H3Event, id: string) => 
       egcs_fc_origin: origin && readable ? { agreementId: String(origin.egcs_fc_fundingagreement), paymentId: String(origin.id) } : null }
   }))
   const effectiveRecoveryMethod = await readAccountReceivableApprovedRecoveryMethod(db, id)
-  const adjustments = await db.selectFrom('Funding_Case_Agreement_Account_Receivable').selectAll()
-    .select([sql<string | null>`egcs_fc_fiscaloutstanding::text`.as('egcs_fc_fiscaloutstanding'), databaseMoneyText(sql.ref('egcs_fc_amount')).as('egcs_fc_amount')]).where('egcs_fc_linkedreceivable', '=', id).where('_deleted', '=', false).orderBy('egcs_fc_number').execute()
+  const adjustments = await db.selectFrom('Funding_Case_Agreement_Account_Receivable')
+    .innerJoin('Common_Status as adjustmentstatus', 'adjustmentstatus.id', 'Funding_Case_Agreement_Account_Receivable.egcs_fc_status')
+    .selectAll('Funding_Case_Agreement_Account_Receivable')
+    .select([sql<string | null>`egcs_fc_fiscaloutstanding::text`.as('egcs_fc_fiscaloutstanding'), databaseMoneyText(sql.ref('egcs_fc_amount')).as('egcs_fc_amount')])
+    .select(eb => eb.and([
+      eb.val(canDeleteRole), eb('egcs_fc_outcome', '=', 'open'), eb('adjustmentstatus.egcs_cn_isdraft', '=', true),
+      eb('adjustmentstatus.egcs_cn_terminal', '=', false), eb('adjustmentstatus.egcs_cn_readonly', '=', false),
+      eb.exists(assignedEntityIdsQuery(db, auth.userId, 'fundingcaseaccountreceivableadjustment')
+        .where('Common_Entity_Assignment.egcs_cn_entityid', '=', sql<string>`${sql.ref('Funding_Case_Agreement_Account_Receivable.id')}`)),
+      eb.not(eb.exists(eb.selectFrom('Common_Completion').select('id')
+        .where('egcs_cn_entitytype', '=', 'fundingcaseaccountreceivableadjustment')
+        .whereRef('egcs_cn_entityid', '=', 'Funding_Case_Agreement_Account_Receivable.id').where('_deleted', '=', false)))
+    ]).as('egcs_fc_candelete'))
+    .where('egcs_fc_linkedreceivable', '=', id).where('Funding_Case_Agreement_Account_Receivable._deleted', '=', false).orderBy('egcs_fc_number').execute()
   const latestPostedAdjustment = !debt.egcs_fc_linkedreceivable && adjustments.some(adjustment => adjustment.egcs_fc_outcome === 'posted')
     ? await db.selectFrom('Funding_Case_Agreement_Account_Receivable').select(['egcs_fc_agencyfinancialid', 'egcs_fc_financialsystemid'])
         .where('egcs_fc_linkedreceivable', '=', id).where('egcs_fc_outcome', '=', 'posted').where('_deleted', '=', false)
         .orderBy('egcs_fc_postedat', 'desc').orderBy('id', 'desc').executeTakeFirst()
     : null
   const effectiveIdentity = latestPostedAdjustment ?? debt
-  const projectedAdjustments = await Promise.all(adjustments.map(async adjustment => ({ ...adjustment, egcs_fc_amount: parseDatabaseMoney(adjustment.egcs_fc_amount),
+  const projectedAdjustments = await Promise.all(adjustments.map(async adjustment => ({ ...adjustment, egcs_fc_candeleterole: canDeleteRole, egcs_fc_amount: parseDatabaseMoney(adjustment.egcs_fc_amount),
     egcs_fc_fiscaloutstanding: adjustment.egcs_fc_fiscaloutstanding === null ? null : parseDatabaseMoney(adjustment.egcs_fc_fiscaloutstanding),
     egcs_fc_effectiverecoverymethod: effectiveRecoveryMethod,
     egcs_fc_approvedamount: adjustment.egcs_fc_outcome === 'posted' ? sumMoney((await readAccountReceivableLines(db, String(adjustment.id))).map(line => line.egcs_fc_amount)) : ZERO,
@@ -552,9 +566,11 @@ export const getAccountReceivableDetail = async (event: H3Event, id: string) => 
     egcs_fc_automaticcoding: Boolean(debt.egcs_fc_allocationevidence),
     egcs_fc_candeletelines: !debt.egcs_fc_allocationevidence && editable && assigned && auth.userAbilities.authorize('account_receivable', 'delete', context.scope),
     egcs_fc_caneditrole: auth.userAbilities.authorize('account_receivable', 'update', context.scope),
+    egcs_fc_claimreductionlocked: !editable,
     egcs_fc_canedit: editable && work, egcs_fc_canwork: work && debt.egcs_fc_outcome === 'open',
-    egcs_fc_candelete: editable && status.egcs_cn_isdraft && assigned && auth.userAbilities.authorize('account_receivable', 'delete', context.scope),
-    egcs_fc_cancancel: work && debt.egcs_fc_outcome === 'open', egcs_fc_canlink: debt.egcs_fc_outcome === 'posted' && !debt.egcs_fc_linkedreceivable && auth.userAbilities.authorize('account_receivable', 'create', context.scope),
+    egcs_fc_candeleterole: canDeleteRole,
+    egcs_fc_candelete: editable && status.egcs_cn_isdraft && assigned && canDeleteRole,
+    egcs_fc_canlink: debt.egcs_fc_outcome === 'posted' && !debt.egcs_fc_linkedreceivable && auth.userAbilities.authorize('account_receivable', 'create', context.scope),
     egcs_fc_canadjust: debt.egcs_fc_outcome === 'posted' && !debt.egcs_fc_linkedreceivable && auth.userAbilities.authorize('account_receivable', 'create', context.scope),
     egcs_fc_cancreditmemo: debt.egcs_fc_outcome === 'posted' && !debt.egcs_fc_linkedreceivable && auth.userAbilities.authorize('account_receivable', 'create', { type: 'agency', agencyId: context.agencyId }),
     egcs_fc_agreementreadable: auth.userAbilities.authorize('agreement', 'read', context.scope),

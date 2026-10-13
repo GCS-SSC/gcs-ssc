@@ -2330,6 +2330,28 @@ AS $function$
       ELSE
         SELECT * INTO root FROM "Funding_Case_Account_Receivable_Credit_Memo" WHERE id = root_id;
       END IF;
+      IF root.egcs_fc_outcome IN ('denied','failed','cancelled') AND NOT EXISTS (
+        SELECT 1 FROM "Common_Runtime" runtime
+        JOIN "Common_Workflow_Run" run ON run.id=runtime.id
+        JOIN "Common_Completion" completion ON completion.id=run.egcs_cn_completion
+        WHERE runtime.id=root.egcs_fc_postingruntime AND runtime.egcs_cn_kind='workflow'
+          AND runtime.egcs_cn_entitytype=target_type AND runtime.egcs_cn_entityid=root_id
+          AND runtime.egcs_cn_purpose='approval_submission' AND NOT runtime._deleted
+          AND completion.egcs_cn_entitytype=target_type AND completion.egcs_cn_entityid=root_id
+          AND completion.egcs_cn_disposition='workflow_started' AND NOT completion._deleted
+          AND CASE root.egcs_fc_outcome
+            WHEN 'denied' THEN runtime.egcs_cn_state='denied'
+            WHEN 'cancelled' THEN runtime.egcs_cn_state='cancelled'
+            ELSE runtime.egcs_cn_state IN ('failed','unsuccessful') END
+          AND NOT EXISTS (SELECT 1 FROM "Common_Completion" newer
+            WHERE newer.egcs_cn_entitytype=target_type AND newer.egcs_cn_entityid=root_id
+              AND NOT newer._deleted AND newer.id>completion.id)
+          AND NOT EXISTS (SELECT 1 FROM "Common_Runtime" newer_runtime
+            JOIN "Common_Workflow_Run" newer_run ON newer_run.id=newer_runtime.id
+            WHERE newer_run.egcs_cn_completion=completion.id AND NOT newer_runtime._deleted
+              AND (newer_runtime.egcs_cn_attempt,newer_runtime.id)>(runtime.egcs_cn_attempt,runtime.id))) THEN
+        RAISE EXCEPTION 'AR terminal outcomes require their latest Completion-linked Workflow outcome' USING ERRCODE='23514';
+      END IF;
       IF target_type='fundingcaseaccountreceivablecreditmemo' AND to_jsonb(root)->>'egcs_fc_ledgerkind'='pool' THEN
         IF root.egcs_fc_outcome='posted' AND NOT ar_successful_submission(root_id,target_type,root.egcs_fc_postingruntime) THEN
           RAISE EXCEPTION 'Credit memo requires latest successful Completion approval' USING ERRCODE='23514';

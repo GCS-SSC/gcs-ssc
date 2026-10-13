@@ -1381,48 +1381,6 @@
       "egcs_cn_assignedgroup": null
     },
     {
-      "id": 64,
-      "egcs_cn_runtimeitem": 132,
-      "egcs_cn_sequence": "1",
-      "egcs_cn_name_en": "Independent financial authorization",
-      "egcs_cn_name_fr": "Autorisation financière indépendante",
-      "egcs_cn_routingslip": 58,
-      "egcs_cn_defaultuser": 4,
-      "egcs_cn_assigneduser": 4,
-      "egcs_cn_requiregroupdetails": false,
-      "egcs_cn_onbehalf": null,
-      "egcs_cn_approvername": null,
-      "egcs_cn_approvalpositiontitle": "Finance Manager",
-      "egcs_cn_isadded": false,
-      "egcs_cn_approvalvalue": true,
-      "egcs_cn_approvaldate": "2026-10-07T02:03:44.985+00:00",
-      "egcs_cn_attachment": null,
-      "egcs_cn_comment": "Verified the seeded financial example.",
-      "egcs_cn_defaultgroup": null,
-      "egcs_cn_assignedgroup": null
-    },
-    {
-      "id": 65,
-      "egcs_cn_runtimeitem": 134,
-      "egcs_cn_sequence": "1",
-      "egcs_cn_name_en": "Independent financial authorization",
-      "egcs_cn_name_fr": "Autorisation financière indépendante",
-      "egcs_cn_routingslip": 59,
-      "egcs_cn_defaultuser": 4,
-      "egcs_cn_assigneduser": 4,
-      "egcs_cn_requiregroupdetails": false,
-      "egcs_cn_onbehalf": null,
-      "egcs_cn_approvername": null,
-      "egcs_cn_approvalpositiontitle": "Finance Manager",
-      "egcs_cn_isadded": false,
-      "egcs_cn_approvalvalue": true,
-      "egcs_cn_approvaldate": "2026-10-07T02:03:45.162+00:00",
-      "egcs_cn_attachment": null,
-      "egcs_cn_comment": "Verified the seeded financial example.",
-      "egcs_cn_defaultgroup": null,
-      "egcs_cn_assignedgroup": null
-    },
-    {
       "id": 66,
       "egcs_cn_runtimeitem": 136,
       "egcs_cn_sequence": "1",
@@ -1967,6 +1925,48 @@
       "egcs_cn_assignedgroup": null,
       "egcs_cn_requiregroupdetails": false,
       "egcs_cn_approvalpositiontitle": "Finance Manager"
+    },
+    {
+      "id": 20004,
+      "egcs_cn_comment": "Independent approval of the demo Claim reduction and full recovery.",
+      "egcs_cn_isadded": false,
+      "egcs_cn_name_en": "Independent financial authorization",
+      "egcs_cn_name_fr": "Autorisation financière indépendante",
+      "egcs_cn_onbehalf": null,
+      "egcs_cn_sequence": "1",
+      "egcs_cn_attachment": null,
+      "egcs_cn_defaultuser": 4,
+      "egcs_cn_routingslip": 20004,
+      "egcs_cn_runtimeitem": 20010,
+      "egcs_cn_approvaldate": "2026-10-13T17:47:11.335+00:00",
+      "egcs_cn_approvername": null,
+      "egcs_cn_assigneduser": 4,
+      "egcs_cn_defaultgroup": null,
+      "egcs_cn_approvalvalue": true,
+      "egcs_cn_assignedgroup": null,
+      "egcs_cn_requiregroupdetails": false,
+      "egcs_cn_approvalpositiontitle": "Finance Manager"
+    },
+    {
+      "id": 20005,
+      "egcs_cn_comment": "Independent approval of the demo Claim reduction and full recovery.",
+      "egcs_cn_isadded": false,
+      "egcs_cn_name_en": "Independent financial authorization",
+      "egcs_cn_name_fr": "Autorisation financière indépendante",
+      "egcs_cn_onbehalf": null,
+      "egcs_cn_sequence": "1",
+      "egcs_cn_attachment": null,
+      "egcs_cn_defaultuser": 4,
+      "egcs_cn_routingslip": 20005,
+      "egcs_cn_runtimeitem": 20012,
+      "egcs_cn_approvaldate": "2026-10-13T17:47:11.548+00:00",
+      "egcs_cn_approvername": null,
+      "egcs_cn_assigneduser": 4,
+      "egcs_cn_defaultgroup": null,
+      "egcs_cn_approvalvalue": true,
+      "egcs_cn_assignedgroup": null,
+      "egcs_cn_requiregroupdetails": false,
+      "egcs_cn_approvalpositiontitle": "Finance Manager"
     }
   ],
   "Common_Approval_Step": [
@@ -2421,26 +2421,6 @@
       "_deleted": false
     },
     {
-      "id": 60,
-      "egcs_cn_entitytype": "fundingcaseaccountreceivable",
-      "egcs_cn_entityid": 169,
-      "egcs_cn_comments": "",
-      "egcs_cn_user": 1,
-      "egcs_cn_disposition": "workflow_started",
-      "egcs_cn_completedat": "2026-10-07T02:03:44.913+00:00",
-      "_deleted": false
-    },
-    {
-      "id": 61,
-      "egcs_cn_entitytype": "fundingcaseaccountreceivablecreditmemo",
-      "egcs_cn_entityid": 170,
-      "egcs_cn_comments": "",
-      "egcs_cn_user": 1,
-      "egcs_cn_disposition": "workflow_started",
-      "egcs_cn_completedat": "2026-10-07T02:03:45.111+00:00",
-      "_deleted": false
-    },
-    {
       "id": 62,
       "egcs_cn_entitytype": "fundingcasepayment",
       "egcs_cn_entityid": 172,
@@ -2678,6 +2658,26 @@
       "egcs_cn_entityid": 206,
       "egcs_cn_entitytype": "fundingcaseaccountreceivablecreditmemo",
       "egcs_cn_completedat": "2026-10-12T00:13:35.527+00:00",
+      "egcs_cn_disposition": "workflow_started"
+    },
+    {
+      "id": 20003,
+      "_deleted": false,
+      "egcs_cn_user": 1,
+      "egcs_cn_comments": "",
+      "egcs_cn_entityid": 169,
+      "egcs_cn_entitytype": "fundingcaseaccountreceivable",
+      "egcs_cn_completedat": "2026-10-13T17:47:11.228+00:00",
+      "egcs_cn_disposition": "workflow_started"
+    },
+    {
+      "id": 20004,
+      "_deleted": false,
+      "egcs_cn_user": 1,
+      "egcs_cn_comments": "",
+      "egcs_cn_entityid": 170,
+      "egcs_cn_entitytype": "fundingcaseaccountreceivablecreditmemo",
+      "egcs_cn_completedat": "2026-10-13T17:47:11.478+00:00",
       "egcs_cn_disposition": "workflow_started"
     }
   ],
@@ -8638,36 +8638,6 @@
       "_deleted": false
     },
     {
-      "id": 58,
-      "egcs_cn_entitytype": "fundingcaseaccountreceivable",
-      "egcs_cn_entityid": 169,
-      "egcs_cn_name_en": "Independent financial authorization",
-      "egcs_cn_name_fr": "Autorisation financière indépendante",
-      "egcs_cn_approvaltemplate": 384,
-      "egcs_cn_allowadditionalapprovals": false,
-      "egcs_cn_defaultaddedapprovalname_en": null,
-      "egcs_cn_defaultaddedapprovalname_fr": null,
-      "egcs_cn_allowaddedapprovalnamechanges": false,
-      "egcs_cn_allowaddedapprovalcertificationchanges": false,
-      "egcs_cn_runtimeitem": 131,
-      "_deleted": false
-    },
-    {
-      "id": 59,
-      "egcs_cn_entitytype": "fundingcaseaccountreceivablecreditmemo",
-      "egcs_cn_entityid": 170,
-      "egcs_cn_name_en": "Independent financial authorization",
-      "egcs_cn_name_fr": "Autorisation financière indépendante",
-      "egcs_cn_approvaltemplate": 384,
-      "egcs_cn_allowadditionalapprovals": false,
-      "egcs_cn_defaultaddedapprovalname_en": null,
-      "egcs_cn_defaultaddedapprovalname_fr": null,
-      "egcs_cn_allowaddedapprovalnamechanges": false,
-      "egcs_cn_allowaddedapprovalcertificationchanges": false,
-      "egcs_cn_runtimeitem": 133,
-      "_deleted": false
-    },
-    {
       "id": 60,
       "egcs_cn_entitytype": "fundingcasepayment",
       "egcs_cn_entityid": 172,
@@ -9050,6 +9020,36 @@
       "egcs_cn_entityid": 206,
       "egcs_cn_entitytype": "fundingcaseaccountreceivablecreditmemo",
       "egcs_cn_runtimeitem": 188,
+      "egcs_cn_approvaltemplate": 384,
+      "egcs_cn_allowadditionalapprovals": false,
+      "egcs_cn_defaultaddedapprovalname_en": null,
+      "egcs_cn_defaultaddedapprovalname_fr": null,
+      "egcs_cn_allowaddedapprovalnamechanges": false,
+      "egcs_cn_allowaddedapprovalcertificationchanges": false
+    },
+    {
+      "id": 20004,
+      "_deleted": false,
+      "egcs_cn_name_en": "Independent financial authorization",
+      "egcs_cn_name_fr": "Autorisation financière indépendante",
+      "egcs_cn_entityid": 169,
+      "egcs_cn_entitytype": "fundingcaseaccountreceivable",
+      "egcs_cn_runtimeitem": 20009,
+      "egcs_cn_approvaltemplate": 384,
+      "egcs_cn_allowadditionalapprovals": false,
+      "egcs_cn_defaultaddedapprovalname_en": null,
+      "egcs_cn_defaultaddedapprovalname_fr": null,
+      "egcs_cn_allowaddedapprovalnamechanges": false,
+      "egcs_cn_allowaddedapprovalcertificationchanges": false
+    },
+    {
+      "id": 20005,
+      "_deleted": false,
+      "egcs_cn_name_en": "Independent financial authorization",
+      "egcs_cn_name_fr": "Autorisation financière indépendante",
+      "egcs_cn_entityid": 170,
+      "egcs_cn_entitytype": "fundingcaseaccountreceivablecreditmemo",
+      "egcs_cn_runtimeitem": 20011,
       "egcs_cn_approvaltemplate": 384,
       "egcs_cn_allowadditionalapprovals": false,
       "egcs_cn_defaultaddedapprovalname_en": null,
@@ -9960,46 +9960,6 @@
       "_deleted": false
     },
     {
-      "id": 55,
-      "egcs_cn_kind": "workflow",
-      "egcs_cn_entitytype": "fundingcaseaccountreceivable",
-      "egcs_cn_entityid": 169,
-      "egcs_cn_purpose": "approval_submission",
-      "egcs_cn_sourcepublication": 381,
-      "egcs_cn_sourcepublicationkind": "workflow_setup",
-      "egcs_cn_sourcepublicationversion": 390,
-      "egcs_cn_sourceversion": 2,
-      "egcs_cn_previousruntime": null,
-      "egcs_cn_attempt": 1,
-      "egcs_cn_initiatedby": 1,
-      "egcs_cn_state": "approved",
-      "egcs_cn_createdat": "2026-10-07T02:03:44.883+00:00",
-      "egcs_cn_startedat": "2026-10-07T02:03:44.883+00:00",
-      "egcs_cn_updatedat": "2026-10-07T02:03:44.985+00:00",
-      "egcs_cn_completedat": "2026-10-07T02:03:44.985+00:00",
-      "_deleted": false
-    },
-    {
-      "id": 56,
-      "egcs_cn_kind": "workflow",
-      "egcs_cn_entitytype": "fundingcaseaccountreceivablecreditmemo",
-      "egcs_cn_entityid": 170,
-      "egcs_cn_purpose": "approval_submission",
-      "egcs_cn_sourcepublication": 382,
-      "egcs_cn_sourcepublicationkind": "workflow_setup",
-      "egcs_cn_sourcepublicationversion": 391,
-      "egcs_cn_sourceversion": 2,
-      "egcs_cn_previousruntime": null,
-      "egcs_cn_attempt": 1,
-      "egcs_cn_initiatedby": 1,
-      "egcs_cn_state": "approved",
-      "egcs_cn_createdat": "2026-10-07T02:03:45.085+00:00",
-      "egcs_cn_startedat": "2026-10-07T02:03:45.085+00:00",
-      "egcs_cn_updatedat": "2026-10-07T02:03:45.162+00:00",
-      "egcs_cn_completedat": "2026-10-07T02:03:45.162+00:00",
-      "_deleted": false
-    },
-    {
       "id": 57,
       "egcs_cn_kind": "workflow",
       "egcs_cn_entitytype": "fundingcasepayment",
@@ -10532,6 +10492,46 @@
       "egcs_cn_updatedat": "2026-10-12T00:13:35.588+00:00",
       "egcs_cn_entitytype": "fundingcaseaccountreceivablecreditmemo",
       "egcs_cn_completedat": "2026-10-12T00:13:35.588+00:00",
+      "egcs_cn_initiatedby": 1,
+      "egcs_cn_sourceversion": 2,
+      "egcs_cn_previousruntime": null,
+      "egcs_cn_sourcepublication": 382,
+      "egcs_cn_sourcepublicationkind": "workflow_setup",
+      "egcs_cn_sourcepublicationversion": 391
+    },
+    {
+      "id": 20004,
+      "_deleted": false,
+      "egcs_cn_kind": "workflow",
+      "egcs_cn_state": "approved",
+      "egcs_cn_attempt": 1,
+      "egcs_cn_purpose": "approval_submission",
+      "egcs_cn_entityid": 169,
+      "egcs_cn_createdat": "2026-10-13T17:47:11.183+00:00",
+      "egcs_cn_startedat": "2026-10-13T17:47:11.183+00:00",
+      "egcs_cn_updatedat": "2026-10-13T17:47:11.335+00:00",
+      "egcs_cn_entitytype": "fundingcaseaccountreceivable",
+      "egcs_cn_completedat": "2026-10-13T17:47:11.335+00:00",
+      "egcs_cn_initiatedby": 1,
+      "egcs_cn_sourceversion": 2,
+      "egcs_cn_previousruntime": null,
+      "egcs_cn_sourcepublication": 381,
+      "egcs_cn_sourcepublicationkind": "workflow_setup",
+      "egcs_cn_sourcepublicationversion": 390
+    },
+    {
+      "id": 20005,
+      "_deleted": false,
+      "egcs_cn_kind": "workflow",
+      "egcs_cn_state": "approved",
+      "egcs_cn_attempt": 1,
+      "egcs_cn_purpose": "approval_submission",
+      "egcs_cn_entityid": 170,
+      "egcs_cn_createdat": "2026-10-13T17:47:11.436+00:00",
+      "egcs_cn_startedat": "2026-10-13T17:47:11.436+00:00",
+      "egcs_cn_updatedat": "2026-10-13T17:47:11.548+00:00",
+      "egcs_cn_entitytype": "fundingcaseaccountreceivablecreditmemo",
+      "egcs_cn_completedat": "2026-10-13T17:47:11.548+00:00",
       "egcs_cn_initiatedby": 1,
       "egcs_cn_sourceversion": 2,
       "egcs_cn_previousruntime": null,
@@ -12072,74 +12072,6 @@
       "_deleted": false
     },
     {
-      "id": 131,
-      "egcs_cn_runtime": 55,
-      "egcs_cn_parentruntimeitem": null,
-      "egcs_cn_kind": "routing_slip",
-      "egcs_cn_order": "1",
-      "egcs_cn_publication": 384,
-      "egcs_cn_publicationkind": "approval_template",
-      "egcs_cn_publicationversion": 388,
-      "egcs_cn_version": 1,
-      "egcs_cn_state": "approved",
-      "egcs_cn_createdat": "2026-10-07T02:03:44.883+00:00",
-      "egcs_cn_startedat": "2026-10-07T02:03:44.883+00:00",
-      "egcs_cn_updatedat": "2026-10-07T02:03:44.985+00:00",
-      "egcs_cn_completedat": "2026-10-07T02:03:44.985+00:00",
-      "_deleted": false
-    },
-    {
-      "id": 132,
-      "egcs_cn_runtime": 55,
-      "egcs_cn_parentruntimeitem": 131,
-      "egcs_cn_kind": "approval_step",
-      "egcs_cn_order": "1",
-      "egcs_cn_publication": 384,
-      "egcs_cn_publicationkind": "approval_template",
-      "egcs_cn_publicationversion": 388,
-      "egcs_cn_version": 1,
-      "egcs_cn_state": "approved",
-      "egcs_cn_createdat": "2026-10-07T02:03:44.883+00:00",
-      "egcs_cn_startedat": "2026-10-07T02:03:44.883+00:00",
-      "egcs_cn_updatedat": "2026-10-07T02:03:44.985+00:00",
-      "egcs_cn_completedat": "2026-10-07T02:03:44.985+00:00",
-      "_deleted": false
-    },
-    {
-      "id": 133,
-      "egcs_cn_runtime": 56,
-      "egcs_cn_parentruntimeitem": null,
-      "egcs_cn_kind": "routing_slip",
-      "egcs_cn_order": "1",
-      "egcs_cn_publication": 384,
-      "egcs_cn_publicationkind": "approval_template",
-      "egcs_cn_publicationversion": 388,
-      "egcs_cn_version": 1,
-      "egcs_cn_state": "approved",
-      "egcs_cn_createdat": "2026-10-07T02:03:45.085+00:00",
-      "egcs_cn_startedat": "2026-10-07T02:03:45.085+00:00",
-      "egcs_cn_updatedat": "2026-10-07T02:03:45.162+00:00",
-      "egcs_cn_completedat": "2026-10-07T02:03:45.162+00:00",
-      "_deleted": false
-    },
-    {
-      "id": 134,
-      "egcs_cn_runtime": 56,
-      "egcs_cn_parentruntimeitem": 133,
-      "egcs_cn_kind": "approval_step",
-      "egcs_cn_order": "1",
-      "egcs_cn_publication": 384,
-      "egcs_cn_publicationkind": "approval_template",
-      "egcs_cn_publicationversion": 388,
-      "egcs_cn_version": 1,
-      "egcs_cn_state": "approved",
-      "egcs_cn_createdat": "2026-10-07T02:03:45.085+00:00",
-      "egcs_cn_startedat": "2026-10-07T02:03:45.085+00:00",
-      "egcs_cn_updatedat": "2026-10-07T02:03:45.162+00:00",
-      "egcs_cn_completedat": "2026-10-07T02:03:45.162+00:00",
-      "_deleted": false
-    },
-    {
       "id": 135,
       "egcs_cn_runtime": 57,
       "egcs_cn_parentruntimeitem": null,
@@ -13072,6 +13004,74 @@
       "egcs_cn_publication": 384,
       "egcs_cn_publicationkind": "approval_template",
       "egcs_cn_parentruntimeitem": 188,
+      "egcs_cn_publicationversion": 388
+    },
+    {
+      "id": 20009,
+      "_deleted": false,
+      "egcs_cn_kind": "routing_slip",
+      "egcs_cn_order": "1",
+      "egcs_cn_state": "approved",
+      "egcs_cn_runtime": 20004,
+      "egcs_cn_version": 1,
+      "egcs_cn_createdat": "2026-10-13T17:47:11.183+00:00",
+      "egcs_cn_startedat": "2026-10-13T17:47:11.183+00:00",
+      "egcs_cn_updatedat": "2026-10-13T17:47:11.335+00:00",
+      "egcs_cn_completedat": "2026-10-13T17:47:11.335+00:00",
+      "egcs_cn_publication": 384,
+      "egcs_cn_publicationkind": "approval_template",
+      "egcs_cn_parentruntimeitem": null,
+      "egcs_cn_publicationversion": 388
+    },
+    {
+      "id": 20010,
+      "_deleted": false,
+      "egcs_cn_kind": "approval_step",
+      "egcs_cn_order": "1",
+      "egcs_cn_state": "approved",
+      "egcs_cn_runtime": 20004,
+      "egcs_cn_version": 1,
+      "egcs_cn_createdat": "2026-10-13T17:47:11.183+00:00",
+      "egcs_cn_startedat": "2026-10-13T17:47:11.183+00:00",
+      "egcs_cn_updatedat": "2026-10-13T17:47:11.335+00:00",
+      "egcs_cn_completedat": "2026-10-13T17:47:11.335+00:00",
+      "egcs_cn_publication": 384,
+      "egcs_cn_publicationkind": "approval_template",
+      "egcs_cn_parentruntimeitem": 20009,
+      "egcs_cn_publicationversion": 388
+    },
+    {
+      "id": 20011,
+      "_deleted": false,
+      "egcs_cn_kind": "routing_slip",
+      "egcs_cn_order": "1",
+      "egcs_cn_state": "approved",
+      "egcs_cn_runtime": 20005,
+      "egcs_cn_version": 1,
+      "egcs_cn_createdat": "2026-10-13T17:47:11.436+00:00",
+      "egcs_cn_startedat": "2026-10-13T17:47:11.436+00:00",
+      "egcs_cn_updatedat": "2026-10-13T17:47:11.548+00:00",
+      "egcs_cn_completedat": "2026-10-13T17:47:11.548+00:00",
+      "egcs_cn_publication": 384,
+      "egcs_cn_publicationkind": "approval_template",
+      "egcs_cn_parentruntimeitem": null,
+      "egcs_cn_publicationversion": 388
+    },
+    {
+      "id": 20012,
+      "_deleted": false,
+      "egcs_cn_kind": "approval_step",
+      "egcs_cn_order": "1",
+      "egcs_cn_state": "approved",
+      "egcs_cn_runtime": 20005,
+      "egcs_cn_version": 1,
+      "egcs_cn_createdat": "2026-10-13T17:47:11.436+00:00",
+      "egcs_cn_startedat": "2026-10-13T17:47:11.436+00:00",
+      "egcs_cn_updatedat": "2026-10-13T17:47:11.548+00:00",
+      "egcs_cn_completedat": "2026-10-13T17:47:11.548+00:00",
+      "egcs_cn_publication": 384,
+      "egcs_cn_publicationkind": "approval_template",
+      "egcs_cn_parentruntimeitem": 20011,
       "egcs_cn_publicationversion": 388
     }
   ],
@@ -15777,126 +15777,6 @@
       "egcs_cn_createdat": "2026-10-07T02:03:44.72+00:00"
     },
     {
-      "id": 363,
-      "egcs_cn_runtime": 55,
-      "egcs_cn_runtimeitem": null,
-      "egcs_cn_fromstate": "pending",
-      "egcs_cn_tostate": "active",
-      "egcs_cn_actor": 1,
-      "egcs_cn_reason": "workflow_started",
-      "egcs_cn_createdat": "2026-10-07T02:03:44.883+00:00"
-    },
-    {
-      "id": 364,
-      "egcs_cn_runtime": 55,
-      "egcs_cn_runtimeitem": 131,
-      "egcs_cn_fromstate": "pending",
-      "egcs_cn_tostate": "awaiting_action",
-      "egcs_cn_actor": 1,
-      "egcs_cn_reason": null,
-      "egcs_cn_createdat": "2026-10-07T02:03:44.883+00:00"
-    },
-    {
-      "id": 365,
-      "egcs_cn_runtime": 55,
-      "egcs_cn_runtimeitem": 132,
-      "egcs_cn_fromstate": "pending",
-      "egcs_cn_tostate": "awaiting_action",
-      "egcs_cn_actor": 1,
-      "egcs_cn_reason": null,
-      "egcs_cn_createdat": "2026-10-07T02:03:44.883+00:00"
-    },
-    {
-      "id": 366,
-      "egcs_cn_runtime": 55,
-      "egcs_cn_runtimeitem": 132,
-      "egcs_cn_fromstate": "awaiting_action",
-      "egcs_cn_tostate": "approved",
-      "egcs_cn_actor": 4,
-      "egcs_cn_reason": null,
-      "egcs_cn_createdat": "2026-10-07T02:03:44.985+00:00"
-    },
-    {
-      "id": 367,
-      "egcs_cn_runtime": 55,
-      "egcs_cn_runtimeitem": 131,
-      "egcs_cn_fromstate": "awaiting_action",
-      "egcs_cn_tostate": "approved",
-      "egcs_cn_actor": 4,
-      "egcs_cn_reason": null,
-      "egcs_cn_createdat": "2026-10-07T02:03:44.985+00:00"
-    },
-    {
-      "id": 368,
-      "egcs_cn_runtime": 55,
-      "egcs_cn_runtimeitem": null,
-      "egcs_cn_fromstate": "active",
-      "egcs_cn_tostate": "approved",
-      "egcs_cn_actor": 4,
-      "egcs_cn_reason": "workflow_approved",
-      "egcs_cn_createdat": "2026-10-07T02:03:44.985+00:00"
-    },
-    {
-      "id": 369,
-      "egcs_cn_runtime": 56,
-      "egcs_cn_runtimeitem": null,
-      "egcs_cn_fromstate": "pending",
-      "egcs_cn_tostate": "active",
-      "egcs_cn_actor": 1,
-      "egcs_cn_reason": "workflow_started",
-      "egcs_cn_createdat": "2026-10-07T02:03:45.085+00:00"
-    },
-    {
-      "id": 370,
-      "egcs_cn_runtime": 56,
-      "egcs_cn_runtimeitem": 133,
-      "egcs_cn_fromstate": "pending",
-      "egcs_cn_tostate": "awaiting_action",
-      "egcs_cn_actor": 1,
-      "egcs_cn_reason": null,
-      "egcs_cn_createdat": "2026-10-07T02:03:45.085+00:00"
-    },
-    {
-      "id": 371,
-      "egcs_cn_runtime": 56,
-      "egcs_cn_runtimeitem": 134,
-      "egcs_cn_fromstate": "pending",
-      "egcs_cn_tostate": "awaiting_action",
-      "egcs_cn_actor": 1,
-      "egcs_cn_reason": null,
-      "egcs_cn_createdat": "2026-10-07T02:03:45.085+00:00"
-    },
-    {
-      "id": 372,
-      "egcs_cn_runtime": 56,
-      "egcs_cn_runtimeitem": 134,
-      "egcs_cn_fromstate": "awaiting_action",
-      "egcs_cn_tostate": "approved",
-      "egcs_cn_actor": 4,
-      "egcs_cn_reason": null,
-      "egcs_cn_createdat": "2026-10-07T02:03:45.162+00:00"
-    },
-    {
-      "id": 373,
-      "egcs_cn_runtime": 56,
-      "egcs_cn_runtimeitem": 133,
-      "egcs_cn_fromstate": "awaiting_action",
-      "egcs_cn_tostate": "approved",
-      "egcs_cn_actor": 4,
-      "egcs_cn_reason": null,
-      "egcs_cn_createdat": "2026-10-07T02:03:45.162+00:00"
-    },
-    {
-      "id": 374,
-      "egcs_cn_runtime": 56,
-      "egcs_cn_runtimeitem": null,
-      "egcs_cn_fromstate": "active",
-      "egcs_cn_tostate": "approved",
-      "egcs_cn_actor": 4,
-      "egcs_cn_reason": "workflow_approved",
-      "egcs_cn_createdat": "2026-10-07T02:03:45.162+00:00"
-    },
-    {
       "id": 375,
       "egcs_cn_runtime": 57,
       "egcs_cn_runtimeitem": null,
@@ -17533,6 +17413,126 @@
       "egcs_cn_runtime": 83,
       "egcs_cn_tostate": "approved",
       "egcs_cn_createdat": "2026-10-12T00:13:35.588+00:00",
+      "egcs_cn_fromstate": "active",
+      "egcs_cn_runtimeitem": null
+    },
+    {
+      "id": 20023,
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": "workflow_started",
+      "egcs_cn_runtime": 20004,
+      "egcs_cn_tostate": "active",
+      "egcs_cn_createdat": "2026-10-13T17:47:11.183+00:00",
+      "egcs_cn_fromstate": "pending",
+      "egcs_cn_runtimeitem": null
+    },
+    {
+      "id": 20024,
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": null,
+      "egcs_cn_runtime": 20004,
+      "egcs_cn_tostate": "awaiting_action",
+      "egcs_cn_createdat": "2026-10-13T17:47:11.183+00:00",
+      "egcs_cn_fromstate": "pending",
+      "egcs_cn_runtimeitem": 20009
+    },
+    {
+      "id": 20025,
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": null,
+      "egcs_cn_runtime": 20004,
+      "egcs_cn_tostate": "awaiting_action",
+      "egcs_cn_createdat": "2026-10-13T17:47:11.183+00:00",
+      "egcs_cn_fromstate": "pending",
+      "egcs_cn_runtimeitem": 20010
+    },
+    {
+      "id": 20026,
+      "egcs_cn_actor": 4,
+      "egcs_cn_reason": null,
+      "egcs_cn_runtime": 20004,
+      "egcs_cn_tostate": "approved",
+      "egcs_cn_createdat": "2026-10-13T17:47:11.335+00:00",
+      "egcs_cn_fromstate": "awaiting_action",
+      "egcs_cn_runtimeitem": 20010
+    },
+    {
+      "id": 20027,
+      "egcs_cn_actor": 4,
+      "egcs_cn_reason": null,
+      "egcs_cn_runtime": 20004,
+      "egcs_cn_tostate": "approved",
+      "egcs_cn_createdat": "2026-10-13T17:47:11.335+00:00",
+      "egcs_cn_fromstate": "awaiting_action",
+      "egcs_cn_runtimeitem": 20009
+    },
+    {
+      "id": 20028,
+      "egcs_cn_actor": 4,
+      "egcs_cn_reason": "workflow_approved",
+      "egcs_cn_runtime": 20004,
+      "egcs_cn_tostate": "approved",
+      "egcs_cn_createdat": "2026-10-13T17:47:11.335+00:00",
+      "egcs_cn_fromstate": "active",
+      "egcs_cn_runtimeitem": null
+    },
+    {
+      "id": 20029,
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": "workflow_started",
+      "egcs_cn_runtime": 20005,
+      "egcs_cn_tostate": "active",
+      "egcs_cn_createdat": "2026-10-13T17:47:11.436+00:00",
+      "egcs_cn_fromstate": "pending",
+      "egcs_cn_runtimeitem": null
+    },
+    {
+      "id": 20030,
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": null,
+      "egcs_cn_runtime": 20005,
+      "egcs_cn_tostate": "awaiting_action",
+      "egcs_cn_createdat": "2026-10-13T17:47:11.436+00:00",
+      "egcs_cn_fromstate": "pending",
+      "egcs_cn_runtimeitem": 20011
+    },
+    {
+      "id": 20031,
+      "egcs_cn_actor": 1,
+      "egcs_cn_reason": null,
+      "egcs_cn_runtime": 20005,
+      "egcs_cn_tostate": "awaiting_action",
+      "egcs_cn_createdat": "2026-10-13T17:47:11.436+00:00",
+      "egcs_cn_fromstate": "pending",
+      "egcs_cn_runtimeitem": 20012
+    },
+    {
+      "id": 20032,
+      "egcs_cn_actor": 4,
+      "egcs_cn_reason": null,
+      "egcs_cn_runtime": 20005,
+      "egcs_cn_tostate": "approved",
+      "egcs_cn_createdat": "2026-10-13T17:47:11.548+00:00",
+      "egcs_cn_fromstate": "awaiting_action",
+      "egcs_cn_runtimeitem": 20012
+    },
+    {
+      "id": 20033,
+      "egcs_cn_actor": 4,
+      "egcs_cn_reason": null,
+      "egcs_cn_runtime": 20005,
+      "egcs_cn_tostate": "approved",
+      "egcs_cn_createdat": "2026-10-13T17:47:11.548+00:00",
+      "egcs_cn_fromstate": "awaiting_action",
+      "egcs_cn_runtimeitem": 20011
+    },
+    {
+      "id": 20034,
+      "egcs_cn_actor": 4,
+      "egcs_cn_reason": "workflow_approved",
+      "egcs_cn_runtime": 20005,
+      "egcs_cn_tostate": "approved",
+      "egcs_cn_createdat": "2026-10-13T17:47:11.548+00:00",
       "egcs_cn_fromstate": "active",
       "egcs_cn_runtimeitem": null
     }
@@ -20005,219 +20005,6 @@
       }
     },
     {
-      "id": 55,
-      "egcs_cn_completion": 60,
-      "egcs_cn_routing": {
-        "hash": "7f8f5da3a7c78702670be0a75973394e3da72c55fa6538896c4d36600790ab8b",
-        "fields": [],
-        "values": {},
-        "version": 2,
-        "decisions": [
-          {
-            "eligible": true,
-            "memberId": "54",
-            "conditions": [],
-            "unmatchedFieldIds": []
-          }
-        ],
-        "agreementId": "120",
-        "accountReceivablePacket": {
-          "lines": [
-            {
-              "id": "1",
-              "_deleted": false,
-              "egcs_fc_claim": "164",
-              "egcs_fc_amount": "21000.00",
-              "egcs_fc_payment": null,
-              "egcs_fc_evidence": {
-                "source": {
-                  "id": "16",
-                  "amount": "21000.00",
-                  "claimId": "164",
-                  "claimLineId": "17",
-                  "reconcileId": "167",
-                  "egcs_fc_periodend": 2,
-                  "egcs_fc_description": "Energy-efficient kitchen equipment, accessible furniture, delivery and installation. Fictional demo budget.",
-                  "egcs_fc_periodstart": 0,
-                  "submittingProponentId": "119",
-                  "egcs_fc_fundingagreementbudgetlineitem": "14"
-                },
-                "egcs_fc_debtorname_en": "Aurora Community Development Society",
-                "egcs_fc_debtorname_fr": "Société de développement communautaire Aurora",
-                "egcs_fc_fiscalyeardisplay": "2026-2027"
-              },
-              "egcs_fc_claimline": "17",
-              "egcs_fc_periodend": 2,
-              "egcs_fc_sourcekey": "claim:16",
-              "egcs_fc_receivable": "169",
-              "egcs_fc_periodstart": 0,
-              "egcs_fc_originalline": null,
-              "egcs_fc_sourceamount": "21000.00",
-              "egcs_fc_reconcileline": "16",
-              "egcs_fc_fundingagreement": "120",
-              "egcs_fc_accountreceivablechartofaccount": "11",
-              "egcs_fc_accountreceivableaccountingdimensions": [
-                {
-                  "value": "NCIA-2026-AR-001",
-                  "label_en": "Accounts Receivable",
-                  "label_fr": "Comptes débiteurs"
-                }
-              ]
-            }
-          ],
-          "coding": [
-            {
-              "id": "1",
-              "_deleted": false,
-              "egcs_fc_amount": "21000.00",
-              "egcs_fc_paidbasis": "21000.00",
-              "egcs_fc_periodend": 2,
-              "egcs_fc_receivable": "169",
-              "egcs_fc_periodstart": 0,
-              "egcs_fc_chartofaccount": "10",
-              "egcs_fc_commitmentline": "6",
-              "egcs_fc_receivableline": "1",
-              "egcs_fc_sharedpaidbasis": "21000.00",
-              "egcs_fc_agencyfiscalyear": "41",
-              "egcs_fc_fundingagreement": "120",
-              "egcs_fc_accountingdimensions": [
-                {
-                  "value": "NCIA-2026-CIF-001",
-                  "label_en": "Community Infrastructure Fund",
-                  "label_fr": "Fonds d’infrastructure communautaire"
-                }
-              ],
-              "egcs_fc_agencychartofaccount": "8"
-            }
-          ],
-          "policy": {
-            "creatorApprovalAllowed": false
-          },
-          "attachments": [],
-          "calculation": {
-            "formula": "established_principal_plus_approved_deltas_minus_successful_principal_recoveries",
-            "moneyScale": 2
-          },
-          "schemaVersion": 1,
-          "accountReceivable": {
-            "id": "169",
-            "_deleted": false,
-            "egcs_fc_pool": "1",
-            "egcs_fc_type": "2",
-            "egcs_fc_number": 1,
-            "egcs_fc_status": "381",
-            "egcs_fc_outcome": "open",
-            "egcs_fc_currency": "cad",
-            "egcs_fc_postedat": null,
-            "egcs_fc_createdat": "2026-10-07T02:03:44.772Z",
-            "egcs_fc_createdby": "1",
-            "egcs_fc_terminalat": null,
-            "egcs_fc_terminalby": null,
-            "egcs_fc_typename_en": "Ineligible claim expenses",
-            "egcs_fc_typename_fr": "Dépenses inadmissibles de la réclamation",
-            "egcs_fc_claimrelated": true,
-            "egcs_fc_narrative_en": "Recover the approved Claim expenditure in this completed demo example.",
-            "egcs_fc_narrative_fr": "Recouvrer les dépenses de réclamation approuvées dans cet exemple de démonstration.",
-            "egcs_fc_statusagency": "21",
-            "egcs_fc_debtorname_en": "Aurora Community Development Society",
-            "egcs_fc_debtorname_fr": "Société de développement communautaire Aurora",
-            "egcs_fc_requesteddate": "2026-10-06T00:00:00.000Z",
-            "egcs_fc_statusdeleted": false,
-            "egcs_fc_postingruntime": null,
-            "egcs_fc_recoverymethod": "offset",
-            "egcs_fc_statusterminal": false,
-            "egcs_fc_terminalreason": null,
-            "egcs_fc_agreementnumber": "NCIA-26-001",
-            "egcs_fc_monitorfollowup": null,
-            "egcs_fc_monitorrequired": false,
-            "egcs_fc_agencyfiscalyear": "41",
-            "egcs_fc_fundingagreement": "120",
-            "egcs_fc_linkedreceivable": null,
-            "egcs_fc_fiscaloutstanding": null,
-            "egcs_fc_fiscalyeardisplay": "2026-2027",
-            "egcs_fc_applicantrecipient": "119",
-            "egcs_fc_typedescription_en": "Recover previously reimbursed claim expenses.",
-            "egcs_fc_typedescription_fr": "Recouvrer les dépenses de réclamation remboursées antérieurement.",
-            "egcs_fc_recipientpreference": null,
-            "egcs_fc_advancepaymentrelated": false,
-            "egcs_fc_preferenceoverride_en": "",
-            "egcs_fc_preferenceoverride_fr": ""
-          }
-        },
-        "accountReceivablePacketHash": "a1002f8a8dfcec3c87668d37345647eff63604292f5630bc98da36a8da67f9ae"
-      }
-    },
-    {
-      "id": 56,
-      "egcs_cn_completion": 61,
-      "egcs_cn_routing": {
-        "hash": "f32bf686608d80d6f662491966d3d472554af9766f06e9a3f394faf624d2ce68",
-        "fields": [],
-        "values": {},
-        "version": 2,
-        "decisions": [
-          {
-            "eligible": true,
-            "memberId": "55",
-            "conditions": [],
-            "unmatchedFieldIds": []
-          }
-        ],
-        "agreementId": null,
-        "accountReceivableCreditMemoPacket": {
-          "policy": {
-            "creatorApprovalAllowed": false
-          },
-          "recoveryId": null,
-          "allocations": [],
-          "attachments": [],
-          "schemaVersion": 2,
-          "accountReceivableCreditMemo": {
-            "id": "170",
-            "_deleted": false,
-            "egcs_fc_pool": "1",
-            "egcs_fc_agency": "21",
-            "egcs_fc_amount": "10500.00",
-            "egcs_fc_number": 1,
-            "egcs_fc_status": "381",
-            "egcs_fc_outcome": "open",
-            "egcs_fc_currency": "cad",
-            "egcs_fc_postedat": null,
-            "egcs_fc_createdat": "2026-10-07T02:03:45.054Z",
-            "egcs_fc_createdby": "1",
-            "egcs_fc_ledgerkind": "pool",
-            "egcs_fc_receivable": "169",
-            "egcs_fc_terminalat": null,
-            "egcs_fc_terminalby": null,
-            "egcs_fc_narrative_en": "Receipt of half the approved Claim amount.",
-            "egcs_fc_narrative_fr": "Réception de la moitié du montant de la réclamation approuvée.",
-            "egcs_fc_receiveddate": "2026-10-06T00:00:00.000Z",
-            "egcs_fc_statusagency": "21",
-            "egcs_fc_agencyname_en": "Northern Communities Innovation Agency",
-            "egcs_fc_agencyname_fr": "Agence d’innovation des collectivités nordiques",
-            "egcs_fc_debtorname_en": "Aurora Community Development Society",
-            "egcs_fc_debtorname_fr": "Société de développement communautaire Aurora",
-            "egcs_fc_statusdeleted": false,
-            "egcs_fc_postingruntime": null,
-            "egcs_fc_statusterminal": false,
-            "egcs_fc_terminalreason": null,
-            "egcs_fc_receiptreference": "NCIA-DEMO-HALF-CLAIM-164",
-            "egcs_fc_applicantrecipient": "119",
-            "egcs_fc_receivablereference": "NCIA-26-001 / AR-1",
-            "egcs_fc_creditmemochartofaccount": "14",
-            "egcs_fc_creditmemoaccountingdimensions": [
-              {
-                "value": "NCIA-2026-CM-001",
-                "label_en": "Credit Memos",
-                "label_fr": "Notes de crédit"
-              }
-            ]
-          }
-        },
-        "accountReceivableCreditMemoPacketHash": "f95f2fcf7e8617e98af629a4d9a1c725fd44870b37cf4d55f6b20b1ee5f323b4"
-      }
-    },
-    {
       "id": 57,
       "egcs_cn_completion": 62,
       "egcs_cn_routing": {
@@ -21955,6 +21742,251 @@
         "accountReceivableCreditMemoPacketHash": "975e3e1ce3fd1a93dc119d53a44ee46ed464d8f1bbeade54f83930df02d6f08b"
       },
       "egcs_cn_completion": 85
+    },
+    {
+      "id": 20004,
+      "egcs_cn_routing": {
+        "hash": "33cc6e74e6f5f8d1871701722bd0a56c2ccd0577950b87b0c33132107388b5f7",
+        "fields": [],
+        "values": {},
+        "version": 2,
+        "decisions": [
+          {
+            "eligible": true,
+            "memberId": "54",
+            "conditions": [],
+            "unmatchedFieldIds": []
+          }
+        ],
+        "agreementId": "120",
+        "accountReceivablePacket": {
+          "lines": [
+            {
+              "id": "1",
+              "_deleted": false,
+              "egcs_fc_claim": "164",
+              "egcs_fc_amount": "21000.00",
+              "egcs_fc_payment": null,
+              "egcs_fc_evidence": {
+                "source": {
+                  "id": "16",
+                  "amount": "21000.00",
+                  "claimId": "164",
+                  "claimLineId": "17",
+                  "reconcileId": "167",
+                  "egcs_fc_periodend": 2,
+                  "egcs_fc_description": "Energy-efficient kitchen equipment, accessible furniture, delivery and installation. Fictional demo budget.",
+                  "egcs_fc_periodstart": 0,
+                  "submittingProponentId": "119",
+                  "egcs_fc_fundingagreementbudgetlineitem": "14"
+                },
+                "egcs_fc_debtorname_en": "Aurora Community Development Society",
+                "egcs_fc_debtorname_fr": "Société de développement communautaire Aurora",
+                "egcs_fc_fiscalyeardisplay": "2026-2027"
+              },
+              "egcs_fc_claimline": "17",
+              "egcs_fc_periodend": 2,
+              "egcs_fc_sourcekey": "claim:16",
+              "egcs_fc_receivable": "169",
+              "egcs_fc_periodstart": 0,
+              "egcs_fc_originalline": null,
+              "egcs_fc_sourceamount": "21000.00",
+              "egcs_fc_reconcileline": "16",
+              "egcs_fc_fundingagreement": "120",
+              "egcs_fc_accountreceivablechartofaccount": "11",
+              "egcs_fc_accountreceivableaccountingdimensions": [
+                {
+                  "value": "NCIA-2026-AR-001",
+                  "label_en": "Accounts Receivable",
+                  "label_fr": "Comptes débiteurs"
+                }
+              ]
+            }
+          ],
+          "coding": [
+            {
+              "id": "1",
+              "_deleted": false,
+              "egcs_fc_amount": "21000.00",
+              "egcs_fc_paidbasis": "21000.00",
+              "egcs_fc_periodend": 2,
+              "egcs_fc_receivable": "169",
+              "egcs_fc_periodstart": 0,
+              "egcs_fc_chartofaccount": "10",
+              "egcs_fc_commitmentline": "6",
+              "egcs_fc_receivableline": "1",
+              "egcs_fc_sharedpaidbasis": "21000.00",
+              "egcs_fc_agencyfiscalyear": "41",
+              "egcs_fc_fundingagreement": "120",
+              "egcs_fc_accountingdimensions": [
+                {
+                  "value": "NCIA-2026-CIF-001",
+                  "label_en": "Community Infrastructure Fund",
+                  "label_fr": "Fonds d’infrastructure communautaire"
+                }
+              ],
+              "egcs_fc_agencychartofaccount": "8"
+            }
+          ],
+          "attachments": [],
+          "calculation": {
+            "formula": "established_principal_plus_approved_deltas_minus_successful_principal_recoveries",
+            "moneyScale": 2
+          },
+          "schemaVersion": 3,
+          "claimReductions": [
+            {
+              "id": "1",
+              "_deleted": false,
+              "egcs_fc_claim": "164",
+              "egcs_fc_amount": "21000.00",
+              "egcs_fc_appliedat": null,
+              "egcs_fc_claimline": "17",
+              "egcs_fc_receivable": "169",
+              "egcs_fc_description": "Energy-efficient kitchen equipment, accessible furniture, delivery and installation. Fictional demo budget."
+            }
+          ],
+          "accountReceivable": {
+            "id": "169",
+            "_deleted": false,
+            "egcs_fc_pool": "1",
+            "egcs_fc_type": "2",
+            "egcs_fc_amount": "21000.00",
+            "egcs_fc_number": 1,
+            "egcs_fc_status": "381",
+            "egcs_fc_outcome": "open",
+            "egcs_fc_currency": "cad",
+            "egcs_fc_postedat": null,
+            "egcs_fc_createdat": "2026-10-07T02:03:44.772Z",
+            "egcs_fc_createdby": "1",
+            "egcs_fc_entitytype": "fundingcaseaccountreceivable",
+            "egcs_fc_terminalat": null,
+            "egcs_fc_terminalby": null,
+            "egcs_fc_typename_en": "Ineligible claim expenses",
+            "egcs_fc_typename_fr": "Dépenses inadmissibles de la réclamation",
+            "egcs_fc_claimrelated": true,
+            "egcs_fc_narrative_en": "Recover the approved Claim expenditure in this completed demo example.",
+            "egcs_fc_narrative_fr": "Recouvrer les dépenses de réclamation approuvées dans cet exemple de démonstration.",
+            "egcs_fc_statusagency": "21",
+            "egcs_fc_debtorname_en": "Aurora Community Development Society",
+            "egcs_fc_debtorname_fr": "Société de développement communautaire Aurora",
+            "egcs_fc_requesteddate": "2026-10-06T00:00:00.000Z",
+            "egcs_fc_statusdeleted": false,
+            "egcs_fc_postingruntime": null,
+            "egcs_fc_recoverymethod": "offset",
+            "egcs_fc_statusterminal": false,
+            "egcs_fc_terminalreason": null,
+            "egcs_fc_agreementnumber": "NCIA-26-001",
+            "egcs_fc_monitorfollowup": null,
+            "egcs_fc_monitorrequired": false,
+            "egcs_fc_agencyfiscalyear": "41",
+            "egcs_fc_fundingagreement": "120",
+            "egcs_fc_linkedreceivable": null,
+            "egcs_fc_agencyfinancialid": "1",
+            "egcs_fc_financialsystemid": "9901000119",
+            "egcs_fc_fiscaloutstanding": null,
+            "egcs_fc_fiscalyeardisplay": "2026-2027",
+            "egcs_fc_allocationevidence": null,
+            "egcs_fc_applicantrecipient": "119",
+            "egcs_fc_typedescription_en": "Recover previously reimbursed claim expenses.",
+            "egcs_fc_typedescription_fr": "Recouvrer les dépenses de réclamation remboursées antérieurement.",
+            "egcs_fc_recipientpreference": null,
+            "egcs_fc_advancepaymentrelated": false,
+            "egcs_fc_preferenceoverride_en": "",
+            "egcs_fc_preferenceoverride_fr": ""
+          }
+        },
+        "accountReceivablePacketHash": "7070061e6209f06141d260ce6613a71ec1c2c74d7a27e2c840081da7942e929b"
+      },
+      "egcs_cn_completion": 20003
+    },
+    {
+      "id": 20005,
+      "egcs_cn_routing": {
+        "hash": "1e28959366c146b071d492e2cd967b7bf922e342f91536ea356c42f00895935c",
+        "fields": [],
+        "values": {},
+        "version": 2,
+        "decisions": [
+          {
+            "eligible": true,
+            "memberId": "55",
+            "conditions": [],
+            "unmatchedFieldIds": []
+          }
+        ],
+        "agreementId": null,
+        "accountReceivableCreditMemoPacket": {
+          "lines": [
+            {
+              "id": "1",
+              "_deleted": false,
+              "egcs_fc_amount": "21000.00",
+              "egcs_fc_creditmemo": "170",
+              "egcs_fc_linenumber": 1,
+              "egcs_fc_receivable": "169",
+              "egcs_fc_agreementnumber": "NCIA-26-001",
+              "egcs_fc_financialsystemid": "9901000119",
+              "egcs_fc_commitmentchartofaccount": "8",
+              "egcs_fc_creditmemochartofaccount": "14",
+              "egcs_fc_creditmemoaccountingdimensions": [
+                {
+                  "value": "NCIA-2026-CM-001",
+                  "label_en": "Credit Memos",
+                  "label_fr": "Notes de crédit"
+                }
+              ]
+            }
+          ],
+          "total": "21000.00",
+          "recoveryId": null,
+          "allocations": [],
+          "attachments": [],
+          "schemaVersion": 6,
+          "accountReceivableCreditMemo": {
+            "id": "170",
+            "_deleted": false,
+            "egcs_fc_pool": "1",
+            "egcs_fc_agency": "21",
+            "egcs_fc_amount": "21000.00",
+            "egcs_fc_number": 1,
+            "egcs_fc_reason": "Full repayment of the approved Claim reduction.",
+            "egcs_fc_status": "381",
+            "egcs_fc_outcome": "open",
+            "egcs_fc_currency": "cad",
+            "egcs_fc_postedat": null,
+            "egcs_fc_createdat": "2026-10-07T02:03:45.054Z",
+            "egcs_fc_createdby": "1",
+            "egcs_fc_ledgerkind": "pool",
+            "egcs_fc_receivable": "169",
+            "egcs_fc_terminalat": null,
+            "egcs_fc_terminalby": null,
+            "egcs_fc_receivables": [
+              "169"
+            ],
+            "egcs_fc_totalamount": "21000.00",
+            "egcs_fc_receiveddate": "2026-10-06",
+            "egcs_fc_statusagency": "21",
+            "egcs_fc_agencyname_en": "Northern Communities Innovation Agency",
+            "egcs_fc_agencyname_fr": "Agence d’innovation des collectivités nordiques",
+            "egcs_fc_debtorname_en": "Aurora Community Development Society",
+            "egcs_fc_debtorname_fr": "Société de développement communautaire Aurora",
+            "egcs_fc_statusdeleted": false,
+            "egcs_fc_postingruntime": null,
+            "egcs_fc_statusterminal": false,
+            "egcs_fc_terminalreason": null,
+            "egcs_fc_allocationevidence": null,
+            "egcs_fc_applicantrecipient": "119",
+            "egcs_fc_receivablereserved": "21000.00",
+            "egcs_fc_receivableavailable": "0.00",
+            "egcs_fc_receivablerecovered": "0.00",
+            "egcs_fc_receivablereference": "169",
+            "egcs_fc_receivableoutstanding": "21000.00"
+          }
+        },
+        "accountReceivableCreditMemoPacketHash": "e2ed6632388d9f7e8b7c4936719b5ede7f642a8a6b4c1b69de57917d3f142b3d"
+      },
+      "egcs_cn_completion": 20004
     }
   ],
   "Common_Workflow_Setup": [
@@ -23458,46 +23490,6 @@
       "egcs_cn_createdat": "2026-10-07T02:03:44.72+00:00"
     },
     {
-      "id": 70,
-      "egcs_cn_workflowrun": 55,
-      "egcs_cn_workflowitem": 131,
-      "egcs_cn_event": "materialized",
-      "egcs_cn_previousstatus": 381,
-      "egcs_cn_newstatus": 385,
-      "egcs_cn_actor": 1,
-      "egcs_cn_createdat": "2026-10-07T02:03:44.883+00:00"
-    },
-    {
-      "id": 71,
-      "egcs_cn_workflowrun": 55,
-      "egcs_cn_workflowitem": 131,
-      "egcs_cn_event": "succeeded",
-      "egcs_cn_previousstatus": 385,
-      "egcs_cn_newstatus": 394,
-      "egcs_cn_actor": 4,
-      "egcs_cn_createdat": "2026-10-07T02:03:44.985+00:00"
-    },
-    {
-      "id": 72,
-      "egcs_cn_workflowrun": 56,
-      "egcs_cn_workflowitem": 133,
-      "egcs_cn_event": "materialized",
-      "egcs_cn_previousstatus": 381,
-      "egcs_cn_newstatus": 385,
-      "egcs_cn_actor": 1,
-      "egcs_cn_createdat": "2026-10-07T02:03:45.085+00:00"
-    },
-    {
-      "id": 73,
-      "egcs_cn_workflowrun": 56,
-      "egcs_cn_workflowitem": 133,
-      "egcs_cn_event": "succeeded",
-      "egcs_cn_previousstatus": 385,
-      "egcs_cn_newstatus": 395,
-      "egcs_cn_actor": 4,
-      "egcs_cn_createdat": "2026-10-07T02:03:45.162+00:00"
-    },
-    {
       "id": 74,
       "egcs_cn_workflowrun": 57,
       "egcs_cn_workflowitem": 135,
@@ -24025,6 +24017,46 @@
       "egcs_cn_newstatus": 395,
       "egcs_cn_workflowrun": 83,
       "egcs_cn_workflowitem": 188,
+      "egcs_cn_previousstatus": 385
+    },
+    {
+      "id": 20009,
+      "egcs_cn_actor": 1,
+      "egcs_cn_event": "materialized",
+      "egcs_cn_createdat": "2026-10-13T17:47:11.183+00:00",
+      "egcs_cn_newstatus": 385,
+      "egcs_cn_workflowrun": 20004,
+      "egcs_cn_workflowitem": 20009,
+      "egcs_cn_previousstatus": 381
+    },
+    {
+      "id": 20010,
+      "egcs_cn_actor": 4,
+      "egcs_cn_event": "succeeded",
+      "egcs_cn_createdat": "2026-10-13T17:47:11.335+00:00",
+      "egcs_cn_newstatus": 394,
+      "egcs_cn_workflowrun": 20004,
+      "egcs_cn_workflowitem": 20009,
+      "egcs_cn_previousstatus": 385
+    },
+    {
+      "id": 20011,
+      "egcs_cn_actor": 1,
+      "egcs_cn_event": "materialized",
+      "egcs_cn_createdat": "2026-10-13T17:47:11.436+00:00",
+      "egcs_cn_newstatus": 385,
+      "egcs_cn_workflowrun": 20005,
+      "egcs_cn_workflowitem": 20011,
+      "egcs_cn_previousstatus": 381
+    },
+    {
+      "id": 20012,
+      "egcs_cn_actor": 4,
+      "egcs_cn_event": "succeeded",
+      "egcs_cn_createdat": "2026-10-13T17:47:11.548+00:00",
+      "egcs_cn_newstatus": 395,
+      "egcs_cn_workflowrun": 20005,
+      "egcs_cn_workflowitem": 20011,
       "egcs_cn_previousstatus": 385
     }
   ],
@@ -31885,14 +31917,16 @@
       "_deleted": false,
       "egcs_fc_pool": 1,
       "egcs_fc_type": 2,
+      "egcs_fc_amount": "21000.00",
       "egcs_fc_number": 1,
       "egcs_fc_status": 394,
       "egcs_fc_outcome": "posted",
       "egcs_fc_currency": "cad",
-      "egcs_fc_postedat": "2026-10-07T02:03:45.035+00:00",
+      "egcs_fc_postedat": "2026-10-13T17:47:11.409+00:00",
       "egcs_fc_createdat": "2026-10-07T02:03:44.772+00:00",
       "egcs_fc_createdby": 1,
-      "egcs_fc_terminalat": "2026-10-07T02:03:45.035+00:00",
+      "egcs_fc_entitytype": "fundingcaseaccountreceivable",
+      "egcs_fc_terminalat": "2026-10-13T17:47:11.409+00:00",
       "egcs_fc_terminalby": 4,
       "egcs_fc_typename_en": "Ineligible claim expenses",
       "egcs_fc_typename_fr": "Dépenses inadmissibles de la réclamation",
@@ -31901,7 +31935,7 @@
       "egcs_fc_narrative_fr": "Recouvrer les dépenses de réclamation approuvées dans cet exemple de démonstration.",
       "egcs_fc_statusagency": 21,
       "egcs_fc_requesteddate": "2026-10-06",
-      "egcs_fc_postingruntime": 55,
+      "egcs_fc_postingruntime": 20004,
       "egcs_fc_recoverymethod": "offset",
       "egcs_fc_terminalreason": null,
       "egcs_fc_agreementnumber": "NCIA-26-001",
@@ -31910,18 +31944,17 @@
       "egcs_fc_agencyfiscalyear": 41,
       "egcs_fc_fundingagreement": 120,
       "egcs_fc_linkedreceivable": null,
+      "egcs_fc_agencyfinancialid": 1,
+      "egcs_fc_financialsystemid": "9901000119",
       "egcs_fc_fiscaloutstanding": null,
+      "egcs_fc_allocationevidence": null,
       "egcs_fc_applicantrecipient": 119,
       "egcs_fc_typedescription_en": "Recover previously reimbursed claim expenses.",
       "egcs_fc_typedescription_fr": "Recouvrer les dépenses de réclamation remboursées antérieurement.",
       "egcs_fc_recipientpreference": null,
       "egcs_fc_advancepaymentrelated": false,
       "egcs_fc_preferenceoverride_en": "",
-      "egcs_fc_preferenceoverride_fr": "",
-      "egcs_fc_entitytype": "fundingcaseaccountreceivable",
-      "egcs_fc_amount": "21000.00",
-      "egcs_fc_agencyfinancialid": 1,
-      "egcs_fc_financialsystemid": "9901000119"
+      "egcs_fc_preferenceoverride_fr": ""
     },
     {
       "id": 183,
@@ -32639,28 +32672,29 @@
       "_deleted": false,
       "egcs_fc_pool": 1,
       "egcs_fc_agency": 21,
-      "egcs_fc_amount": "10500.00",
+      "egcs_fc_amount": "21000.00",
       "egcs_fc_number": 1,
+      "egcs_fc_reason": "Full repayment of the approved Claim reduction.",
       "egcs_fc_status": 395,
       "egcs_fc_outcome": "posted",
       "egcs_fc_currency": "cad",
-      "egcs_fc_postedat": "2026-10-07T02:03:45.199+00:00",
+      "egcs_fc_postedat": "2026-10-13T17:47:11.604+00:00",
       "egcs_fc_createdat": "2026-10-07T02:03:45.054+00:00",
       "egcs_fc_createdby": 1,
       "egcs_fc_ledgerkind": "pool",
       "egcs_fc_receivable": 169,
-      "egcs_fc_terminalat": "2026-10-07T02:03:45.199+00:00",
+      "egcs_fc_terminalat": "2026-10-13T17:47:11.604+00:00",
       "egcs_fc_terminalby": 4,
-      "egcs_fc_reason": "Receipt of half the approved Claim amount.",
-      "egcs_fc_receiveddate": "2026-10-06",
-      "egcs_fc_statusagency": 21,
-      "egcs_fc_postingruntime": 56,
-      "egcs_fc_terminalreason": null,
-      "egcs_fc_applicantrecipient": 119,
       "egcs_fc_receivables": [
         "169"
       ],
-      "egcs_fc_totalamount": "10500.00"
+      "egcs_fc_totalamount": "21000.00",
+      "egcs_fc_receiveddate": "2026-10-06",
+      "egcs_fc_statusagency": 21,
+      "egcs_fc_postingruntime": 20005,
+      "egcs_fc_terminalreason": null,
+      "egcs_fc_allocationevidence": null,
+      "egcs_fc_applicantrecipient": 119
     },
     {
       "id": 184,
@@ -32806,8 +32840,12 @@
   "Funding_Case_Account_Receivable_Credit_Memo_Line": [
     {
       "id": 1,
+      "_deleted": false,
+      "egcs_fc_amount": "21000.00",
       "egcs_fc_creditmemo": 170,
       "egcs_fc_linenumber": 1,
+      "egcs_fc_receivable": 169,
+      "egcs_fc_commitmentchartofaccount": 8,
       "egcs_fc_creditmemochartofaccount": 14,
       "egcs_fc_creditmemoaccountingdimensions": [
         {
@@ -32815,11 +32853,7 @@
           "label_en": "Credit Memos",
           "label_fr": "Notes de crédit"
         }
-      ],
-      "egcs_fc_amount": "10500.00",
-      "_deleted": false,
-      "egcs_fc_receivable": 169,
-      "egcs_fc_commitmentchartofaccount": 8
+      ]
     },
     {
       "id": 2,
@@ -33110,6 +33144,17 @@
       "egcs_fc_ledgerkind": "pool",
       "egcs_fc_releasedat": null,
       "egcs_fc_postingruntime": null
+    }
+  ],
+  "Funding_Case_Account_Receivable_Claim_Reduction": [
+    {
+      "id": 1,
+      "_deleted": false,
+      "egcs_fc_claim": 164,
+      "egcs_fc_amount": "21000.00",
+      "egcs_fc_appliedat": "2026-10-13T17:47:11.612+00:00",
+      "egcs_fc_claimline": 17,
+      "egcs_fc_receivable": 169
     }
   ]
 }

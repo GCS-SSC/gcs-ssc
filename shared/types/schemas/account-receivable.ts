@@ -88,10 +88,6 @@ export const AccountReceivableEditSchema = z.object({
   }
 })
 
-export const AccountReceivableCancelSchema = z.object({
-  egcs_fc_reason: z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' }).max(10000)
-}).strict()
-
 export const AccountReceivableCreditMemoCreateSchema = z.object({
   egcs_fc_receivable: DatabaseIdSchema,
   egcs_fc_receivables: z.array(DatabaseIdSchema).min(1, { error: 'validation.required' }).max(100).optional(),

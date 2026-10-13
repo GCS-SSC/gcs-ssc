@@ -117,30 +117,30 @@ export const postAccountReceivableCreditMemo = async (trx: Transaction<Database>
   for (const receivableId of new Set(lines.map(line => String(line.egcs_fc_receivable)))) await applyAccountReceivableClaimReductions(trx, receivableId)
 }
 
-export const recordAccountReceivableTerminalOutcome = async (trx: Transaction<Database>, id: string, outcome: Exclude<AccountReceivableTerminalOutcome, 'posted'>, options: { runtimeId?: string; actorId?: string; reason?: string }) => {
+export const recordAccountReceivableTerminalOutcome = async (trx: Transaction<Database>, id: string, outcome: Exclude<AccountReceivableTerminalOutcome, 'posted'>, options: { runtimeId: string; actorId?: string; reason?: string }) => {
   const row = await trx.selectFrom('Funding_Case_Agreement_Account_Receivable').selectAll().where('id', '=', id).where('_deleted', '=', false).forUpdate().executeTakeFirstOrThrow()
   if (row.egcs_fc_outcome !== 'open') {
     if (row.egcs_fc_outcome !== outcome) throw new Error('AR_TERMINAL_IMMUTABLE')
     return
   }
   if (!options.actorId && !(outcome === 'failed' && options.runtimeId && options.reason?.trim())) throw new Error('AR_TERMINAL_ACTOR_REQUIRED')
-  if (options.runtimeId) await lockAccountReceivableSubmission(trx, row.egcs_fc_entitytype, id, options.runtimeId)
+  await lockAccountReceivableSubmission(trx, row.egcs_fc_entitytype, id, options.runtimeId)
   if (!(await resolveBusinessStatusProtection(trx, row.egcs_fc_entitytype, id))?.terminal) throw new Error('AR_TERMINAL_STATUS_REQUIRED')
-  await trx.updateTable('Funding_Case_Agreement_Account_Receivable').set({ egcs_fc_outcome: outcome, egcs_fc_terminalby: options.actorId ?? null,
+  await trx.updateTable('Funding_Case_Agreement_Account_Receivable').set({ egcs_fc_outcome: outcome, egcs_fc_postingruntime: options.runtimeId, egcs_fc_terminalby: options.actorId ?? null,
     egcs_fc_terminalat: new Date(), egcs_fc_terminalreason: options.reason ?? null }).where('id', '=', id).execute()
 }
 
-export const recordAccountReceivableCreditMemoTerminalOutcome = async (trx: Transaction<Database>, id: string, outcome: Exclude<AccountReceivableTerminalOutcome, 'posted'>, options: { runtimeId?: string; actorId?: string; reason?: string }) => {
+export const recordAccountReceivableCreditMemoTerminalOutcome = async (trx: Transaction<Database>, id: string, outcome: Exclude<AccountReceivableTerminalOutcome, 'posted'>, options: { runtimeId: string; actorId?: string; reason?: string }) => {
   const row = await trx.selectFrom('Funding_Case_Account_Receivable_Credit_Memo').selectAll().where('id', '=', id).where('_deleted', '=', false).forUpdate().executeTakeFirstOrThrow()
   if (row.egcs_fc_outcome !== 'open') {
     if (row.egcs_fc_outcome !== outcome) throw new Error('AR_TERMINAL_IMMUTABLE')
     return
   }
   if (!options.actorId && !(outcome === 'failed' && options.runtimeId && options.reason?.trim())) throw new Error('AR_TERMINAL_ACTOR_REQUIRED')
-  if (options.runtimeId) await lockAccountReceivableSubmission(trx, 'fundingcaseaccountreceivablecreditmemo', id, options.runtimeId)
+  await lockAccountReceivableSubmission(trx, 'fundingcaseaccountreceivablecreditmemo', id, options.runtimeId)
   if (!(await resolveBusinessStatusProtection(trx, 'fundingcaseaccountreceivablecreditmemo', id))?.terminal) throw new Error('AR_TERMINAL_STATUS_REQUIRED')
   await trx.updateTable('Funding_Case_Account_Receivable_Recovery').set({ egcs_fc_outcome: 'released', egcs_fc_releasedat: new Date() }).where('egcs_fc_creditmemo', '=', id).where('egcs_fc_outcome', '=', 'open').execute()
-  await trx.updateTable('Funding_Case_Account_Receivable_Credit_Memo').set({ egcs_fc_outcome: outcome, egcs_fc_terminalby: options.actorId ?? null,
+  await trx.updateTable('Funding_Case_Account_Receivable_Credit_Memo').set({ egcs_fc_outcome: outcome, egcs_fc_postingruntime: options.runtimeId, egcs_fc_terminalby: options.actorId ?? null,
     egcs_fc_terminalat: new Date(), egcs_fc_terminalreason: options.reason ?? null }).where('id', '=', id).execute()
 }
 

@@ -68,6 +68,7 @@ export const agencyStatusesE2eSpecPaths = [
 
 export const freshResetE2eSpecPaths = [
   'tests/e2e/ncia-demo-seed.spec.ts',
+  'tests/e2e/account-receivable-claim-reductions.spec.ts',
   'tests/e2e/advance-direct-repayment-hold.spec.ts',
   'tests/e2e/payment-offset-coding-wizard.spec.ts',
   'tests/e2e/commitment-coding-uniqueness.spec.ts',

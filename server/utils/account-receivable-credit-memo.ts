@@ -263,7 +263,7 @@ export const getAccountReceivableCreditMemoDetail = async (event: H3Event, id: s
     egcs_fc_creditmemoreference: String(repayment.id),
     egcs_fc_debtorname_en: proponent.egcs_ar_legalname_en, egcs_fc_debtorname_fr: proponent.egcs_ar_legalname_fr,
     egcs_fc_cancomplete: editable && work, egcs_fc_canedit: repayment.egcs_fc_ledgerkind === 'pool' && editable && work, egcs_fc_canwork: work && repayment.egcs_fc_outcome === 'open',
-    egcs_fc_cancancel: work && repayment.egcs_fc_outcome === 'open', egcs_fc_candelete: editable && Boolean(assignment)
+    egcs_fc_candelete: editable && Boolean(assignment)
       && status.egcs_cn_isdraft && context.contexts.every(owner => auth.userAbilities.authorize('account_receivable', 'delete', owner.scope)),
     egcs_fc_agencyname_en: agency.egcs_ay_name_en, egcs_fc_agencyname_fr: agency.egcs_ay_name_fr,
     egcs_fc_agencyreadable: auth.userAbilities.authorize('agency', 'read', { type: 'agency', agencyId: String(repayment.egcs_fc_agency) }),

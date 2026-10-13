@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { AccountReceivableDetail } from '~~/shared/types/account-receivable'
 import type { TableColumnInput } from '~/composables/useTableColumns'
@@ -10,8 +10,16 @@ import { sumMoney } from '~~/shared/utils/money'
 const { agreementId } = defineProps<{ agreementId: string }>()
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
+const { confirmDeleteRequest } = useConfirmDeleteRequest()
+const { showError } = useApiErrorToast()
+const toast = useToast()
+const deletingId: Ref<string | null> = ref(null)
+let disposed = false
+onBeforeUnmount(() => {
+  disposed = true
+})
 const createOpen: Ref<boolean> = ref(false)
-const { search, pagination, items, totalRecords, status, retry, response } = useResourceTable<AccountReceivableDetail>({
+const { search, pagination, items, totalRecords, status, retry, refresh, response } = useResourceTable<AccountReceivableDetail>({
   fetchUrl: computed(() => `/api/agreements/${agreementId}/account-receivables`)
 })
 const canCreate = computed(() => (response.value as { egcs_fc_cancreate?: boolean } | undefined)?.egcs_fc_cancreate === true)
@@ -32,7 +40,32 @@ const columns: TableColumnInput<CollectionRow>[] = [
 const amount = (value: string | null | undefined, currency: string | undefined) => currency ? formatAccountReceivableAmount(value, locale.value, currency) ?? t('common.not_available') : t('common.not_available')
 watch(() => agreementId, () => {
   createOpen.value = false
+  deletingId.value = null
 }, { flush: 'sync' })
+/**
+ * Deletes an eligible draft from its owning collection after confirmation.
+ * @param row - Selected independently assigned draft record.
+ */
+const deleteDraft = async (row: CollectionRow) => {
+  if (!row.egcs_fc_candeleterole || deletingId.value || status.value !== 'success') return
+  if (!row.egcs_fc_candelete) {
+    toast.add({ title: t('common.warning'), description: t('account_receivable.work_prerequisite'), color: 'warning' })
+    return
+  }
+  const owner = agreementId
+  deletingId.value = row.id
+  try {
+    const deleted = await confirmDeleteRequest(`/api/account-receivables/${row.id}`, {
+      shouldProceed: () => !disposed && agreementId === owner && status.value === 'success'
+        && items.value.some(item => item.id === row.id && item.egcs_fc_candeleterole && item.egcs_fc_candelete)
+    })
+    if (deleted && !disposed && agreementId === owner) await refresh()
+  } catch (error) {
+    if (!disposed && agreementId === owner) showError(error)
+  } finally {
+    if (!disposed && agreementId === owner) deletingId.value = null
+  }
+}
 const created = async (id: string) => {
   await navigateTo(localePath(appRouteLocations.agreementAccountReceivableDetail(agreementId, id)))
 }
@@ -80,6 +113,12 @@ const created = async (id: string) => {
       </template>
       <template #actions-cell="{ row }">
         <div class="flex justify-end gap-2">
+          <UButton
+            v-if="row.original.egcs_fc_candeleterole"
+            icon="i-lucide-trash" color="error" variant="ghost"
+            :aria-label="`${t('common.delete')}: ${accountReceivableReference(row.original)}`"
+            :loading="deletingId === row.original.id" :disabled="deletingId !== null || status !== 'success'"
+            @click="deleteDraft(row.original)" />
           <UButton
             icon="i-lucide-arrow-right" color="neutral" variant="ghost"
             :aria-label="`${t('common.view_details')}: ${accountReceivableReference(row.original)}`"

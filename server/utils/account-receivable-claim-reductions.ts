@@ -1,6 +1,8 @@
 /* eslint-disable jsdoc/require-jsdoc -- AR-owned reconciliation plans retain original Claim evidence. */
 import type { H3Event } from 'h3'
 import { sql, type Kysely, type Transaction } from 'kysely'
+import type { AccountReceivableClaimReductionChoice } from '~~/shared/types/account-receivable'
+import { budgetLineItemStableId } from './agreement-budget-lineage'
 import type { Database } from '~~/shared/types/database'
 import type { AccountReceivableClaimReductionInput } from '~~/shared/types/schemas/account-receivable'
 import { moneyFromCents, moneyToCents, sumMoney } from '~~/shared/utils/money'
@@ -29,7 +31,7 @@ export const validateAccountReceivableClaimReductionBasis = async (db: Kysely<Da
     .innerJoin('Funding_Case_Agreement_Claim as claim', 'claim.id', 'reduction.egcs_fc_claim')
     .select(['reduction.egcs_fc_claim', 'line.egcs_fc_fundingagreementclaim', 'claim.egcs_fc_fundingagreement', 'claim.egcs_fc_applicantrecipient',
       'line._deleted as lineDeleted', 'claim._deleted as claimDeleted',
-      databaseMoneyText(sql.ref('reduction.egcs_fc_amount')).as('amount'), databaseMoneyText(sql.ref('line.egcs_fc_amount')).as('claimed'),
+      databaseMoneyText(sql.ref('reduction.egcs_fc_amount')).as('amount'),
       retainedClaimReductionBasis(id, 'line.id').as('basis'), reservedClaimReductions(id, 'line.id').as('reserved')])
     .where('reduction.egcs_fc_receivable', '=', id).where('reduction._deleted', '=', false).execute()
   if (!plans.length) return
@@ -42,7 +44,7 @@ export const validateAccountReceivableClaimReductionBasis = async (db: Kysely<Da
       || plan.egcs_fc_fundingagreement !== debt.egcs_fc_fundingagreement || plan.egcs_fc_applicantrecipient !== debt.egcs_fc_applicantrecipient) throw new Error('AR_SOURCE_UNAVAILABLE')
     const amount = moneyToCents(parseDatabaseMoney(plan.amount))
     if (plan.basis === null || amount > moneyToCents(parseDatabaseMoney(plan.basis))) throw new Error('AR_CLAIM_REDUCTION_SOURCE_REQUIRED')
-    if (amount + moneyToCents(parseDatabaseMoney(plan.reserved)) > moneyToCents(parseDatabaseMoney(plan.claimed))) throw new Error('AR_SOURCE_CAPACITY')
+    if (amount + moneyToCents(parseDatabaseMoney(plan.reserved)) > moneyToCents(parseDatabaseMoney(plan.basis))) throw new Error('AR_SOURCE_CAPACITY')
   }
 }
 
@@ -54,14 +56,28 @@ export const readAccountReceivableClaimReductions = async (db: Kysely<Database>,
   return rows.map(row => ({ ...row, egcs_fc_amount: parseDatabaseMoney(row.egcs_fc_amount), egcs_fc_appliedat: row.egcs_fc_appliedat?.toISOString() ?? null }))
 }
 
-export const readAccountReceivableClaimReductionChoices = async (event: H3Event, id: string) => {
+export const readAccountReceivableClaimReductionChoices = async (event: H3Event, id: string): Promise<{ items: AccountReceivableClaimReductionChoice[] }> => {
   const context = await authorizeAccountReceivable(event, id, 'read')
   const debt = await event.context.$db.selectFrom('Funding_Case_Agreement_Account_Receivable').select(['egcs_fc_claimrelated', 'egcs_fc_linkedreceivable']).where('id', '=', id).executeTakeFirstOrThrow()
   if (!debt.egcs_fc_claimrelated || debt.egcs_fc_linkedreceivable) return { items: [] }
+  const budgetMetadata = event.context.$db.selectFrom('Funding_Case_Agreement_Budget_Line_Item')
+    .innerJoin('Funding_Case_Agreement_Budget_Fiscal_Year as year', 'year.id', 'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreementbudgetfiscalyear')
+    .innerJoin('Funding_Case_Agreement_Budget_Version as version', 'version.id', 'year.egcs_fc_budgetversion')
+    .leftJoin('Transfer_Payment_Stream_Cost_Category_Line_Item as streamcost', 'streamcost.id', 'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_organizationcostcategory')
+    .leftJoin('Agency_Cost_Category_Line_Item as costline', 'costline.id', 'streamcost.egcs_tp_organizationcostcategory')
+    .leftJoin('Agency_Cost_Category as category', 'category.id', 'costline.egcs_ay_organizationcostcategory')
+    .select([budgetLineItemStableId.as('id'), 'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection',
+      'category.egcs_ay_name_en as organization_cost_category_name_en', 'category.egcs_ay_name_fr as organization_cost_category_name_fr',
+      'costline.egcs_ay_name_en as line_item_name_en', 'costline.egcs_ay_name_fr as line_item_name_fr'])
+    .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false).where('year._deleted', '=', false)
+    .where('version._deleted', '=', false).where('version.egcs_fc_iscurrent', '=', true)
   const rows = await event.context.$db.selectFrom('Funding_Case_Agreement_Claim_Line_Item as line')
     .innerJoin('Funding_Case_Agreement_Claim as claim', 'claim.id', 'line.egcs_fc_fundingagreementclaim')
+    .leftJoin(budgetMetadata.as('budget'), 'budget.id', 'line.egcs_fc_fundingagreementbudgetlineitem')
     .where(eb => eb.exists(eb.selectFrom('Funding_Case_Agreement_Account_Receivable_Line as retained').select('retained.id').where('retained.egcs_fc_receivable', '=', id).whereRef('retained.egcs_fc_claimline', '=', 'line.id').where('retained._deleted', '=', false)))
-    .select(['line.id', 'claim.id as egcs_fc_claim', 'line.egcs_fc_description', databaseMoneyText(sql.ref('line.egcs_fc_amount')).as('egcs_fc_amount'), retainedClaimReductionBasis(id, 'line.id').as('egcs_fc_sourceamount'),
+    .select(['line.id', 'claim.id as egcs_fc_claim', 'line.egcs_fc_description',
+      'line.egcs_fc_fundingagreementbudgetlineitem', 'line.egcs_fc_submittedcostcategory', 'line.egcs_fc_submittedcostsubsection', 'line.egcs_fc_submittedlineitem',
+      'budget.organization_cost_category_name_en', 'budget.organization_cost_category_name_fr', 'budget.egcs_fc_costsubsection', 'budget.line_item_name_en', 'budget.line_item_name_fr', databaseMoneyText(sql.ref('line.egcs_fc_amount')).as('egcs_fc_amount'), retainedClaimReductionBasis(id, 'line.id').as('egcs_fc_sourceamount'),
       reservedClaimReductions(id, 'line.id').as('egcs_fc_reserved')])
     .where('claim.egcs_fc_fundingagreement', '=', context.agreementId).where('claim.egcs_fc_applicantrecipient', '=', context.applicantRecipientId)
     .where('claim._deleted', '=', false).where('line._deleted', '=', false).orderBy('claim.id').orderBy('line.id').execute()
@@ -69,9 +85,10 @@ export const readAccountReceivableClaimReductionChoices = async (event: H3Event,
     const amount = parseDatabaseMoney(row.egcs_fc_amount)
     const reserved = parseDatabaseMoney(row.egcs_fc_reserved)
     const basis = row.egcs_fc_sourceamount === null ? BigInt(0) : moneyToCents(parseDatabaseMoney(row.egcs_fc_sourceamount))
-    const remaining = moneyToCents(amount) - moneyToCents(reserved)
-    const available = remaining < BigInt(0) ? BigInt(0) : remaining < basis ? remaining : basis
-    return { ...row, egcs_fc_sourceamount: row.egcs_fc_sourceamount === null ? '0.00' : parseDatabaseMoney(row.egcs_fc_sourceamount), egcs_fc_amount: amount, egcs_fc_reserved: reserved, egcs_fc_available: moneyFromCents(available) }
+    const remaining = basis - moneyToCents(reserved)
+    const available = remaining < BigInt(0) ? BigInt(0) : remaining
+    return { ...row, egcs_fc_fundingagreementbudgetlineitem: row.egcs_fc_fundingagreementbudgetlineitem ?? null,
+      egcs_fc_submittedcostcategory: row.egcs_fc_submittedcostcategory ?? null, egcs_fc_submittedcostsubsection: row.egcs_fc_submittedcostsubsection ?? null, egcs_fc_submittedlineitem: row.egcs_fc_submittedlineitem ?? null, egcs_fc_sourceamount: moneyFromCents(basis), egcs_fc_reconciledamount: moneyFromCents(basis), egcs_fc_amount: amount, egcs_fc_reserved: reserved, egcs_fc_available: moneyFromCents(available) }
   }) }
 }
 
@@ -90,13 +107,13 @@ export const saveAccountReceivableClaimReductions = async (event: H3Event, id: s
     for (const line of input.egcs_fc_lines) {
       const source = await trx.selectFrom('Funding_Case_Agreement_Claim_Line_Item as line')
         .innerJoin('Funding_Case_Agreement_Claim as claim', 'claim.id', 'line.egcs_fc_fundingagreementclaim')
-        .select(['claim.id', databaseMoneyText(sql.ref('line.egcs_fc_amount')).as('claimed'), retainedClaimReductionBasis(id, 'line.id').as('basis'),
+        .select(['claim.id', retainedClaimReductionBasis(id, 'line.id').as('basis'),
           reservedClaimReductions(id, 'line.id').as('reserved')]).where('line.id', '=', line.egcs_fc_claimline).where('claim.egcs_fc_fundingagreement', '=', context.agreementId)
         .where('claim.egcs_fc_applicantrecipient', '=', context.applicantRecipientId).where('line._deleted', '=', false).where('claim._deleted', '=', false)
         .forUpdate('line').executeTakeFirst()
       if (!source) return await accountReceivableError(event, 'AR_SOURCE_UNAVAILABLE')
       if (source.basis === null || moneyToCents(line.egcs_fc_amount) > moneyToCents(parseDatabaseMoney(source.basis))) return await accountReceivableError(event, 'AR_CLAIM_REDUCTION_SOURCE_REQUIRED')
-      if (moneyToCents(line.egcs_fc_amount) + moneyToCents(parseDatabaseMoney(source.reserved)) > moneyToCents(parseDatabaseMoney(source.claimed))) return await accountReceivableError(event, 'AR_SOURCE_CAPACITY')
+      if (moneyToCents(line.egcs_fc_amount) + moneyToCents(parseDatabaseMoney(source.reserved)) > moneyToCents(parseDatabaseMoney(source.basis))) return await accountReceivableError(event, 'AR_SOURCE_CAPACITY')
       const saved = existing.find(row => String(row.egcs_fc_claimline) === line.egcs_fc_claimline)
       const values = { egcs_fc_amount: databaseMoneyValue(line.egcs_fc_amount) }
       if (saved) await trx.updateTable('Funding_Case_Account_Receivable_Claim_Reduction').set(values).where('id', '=', String(saved.id)).execute()

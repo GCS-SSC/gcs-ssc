@@ -54,15 +54,15 @@ BEGIN
     SELECT egcs_fc_sourcekey,max(egcs_fc_sourceamount) AS amount FROM "Funding_Case_Agreement_Account_Receivable_Line"
       WHERE egcs_fc_receivable=debt.id AND egcs_fc_claimline=NEW.egcs_fc_claimline AND NOT _deleted
       GROUP BY egcs_fc_sourcekey) source_basis;
-  IF reconciled_basis IS NULL OR NEW.egcs_fc_amount>least(claim_line.egcs_fc_amount,reconciled_basis) THEN
+  IF reconciled_basis IS NULL OR NEW.egcs_fc_amount>reconciled_basis THEN
     RAISE EXCEPTION 'Claim reductions require retained successful Reconciliation capacity' USING ERRCODE='23514';
   END IF;
   SELECT coalesce(sum(reduction.egcs_fc_amount),0) INTO retained_total FROM "Funding_Case_Account_Receivable_Claim_Reduction" reduction
     JOIN "Funding_Case_Agreement_Account_Receivable" owner ON owner.id=reduction.egcs_fc_receivable
     WHERE reduction.egcs_fc_claimline=NEW.egcs_fc_claimline AND reduction.id<>NEW.id AND NOT reduction._deleted
       AND (reduction.egcs_fc_appliedat IS NOT NULL OR (NOT owner._deleted AND owner.egcs_fc_outcome IN ('open','posted')));
-  IF NOT NEW._deleted AND retained_total+NEW.egcs_fc_amount>claim_line.egcs_fc_amount THEN
-    RAISE EXCEPTION 'Claim reductions exceed claimed amount' USING ERRCODE='23514';
+  IF NOT NEW._deleted AND retained_total+NEW.egcs_fc_amount>reconciled_basis THEN
+    RAISE EXCEPTION 'Claim reductions exceed retained reconciled amount' USING ERRCODE='23514';
   END IF;
   RETURN NEW;
 END $function$;

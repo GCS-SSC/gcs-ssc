@@ -8,10 +8,9 @@ import { authorizeAccountReceivable, assertAccountReceivableEditable, validateAc
 import { authorizeAccountReceivableCreditMemo, assertAccountReceivableCreditMemoEditable } from './account-receivable-credit-memo'
 import { executeFreshAccountReceivableWrite, type AccountReceivableCaseType } from './account-receivable-context'
 import { resolveCompletionRecord, resolveCompletionEvidenceId, emitCompletionHook } from './completion-runtime-core'
-import { resolveBusinessStatusProtection, transitionBusinessStatus } from './business-status-runtime'
+import { resolveBusinessStatusProtection } from './business-status-runtime'
 import { resolveReviewRuntimeEntityFromEntity } from './review-runtime-access'
-import { cancelWorkflowRun, createCompletionTransition, resolveActiveWorkflowSetup } from './workflow-runtime'
-import { recordAccountReceivableTerminalOutcome, recordAccountReceivableCreditMemoTerminalOutcome } from './account-receivable-posting'
+import { createCompletionTransition, resolveActiveWorkflowSetup } from './workflow-runtime'
 import { validateAccountReceivableRecovery } from './account-receivable-recovery'
 import { resolveAssignmentCommonUserId } from './entity-assignment'
 import { forbidden } from './api-errors'
@@ -84,29 +83,3 @@ export const executeAccountReceivableCompletion = async (event: H3Event, input: 
   return await executeCompletion(event, input, context.entityType)
 }
 export const executeAccountReceivableCreditMemoCompletion = async (event: H3Event, input: CompletionExecuteInput) => await executeCompletion(event, input, 'fundingcaseaccountreceivablecreditmemo')
-
-export const cancelAccountReceivableCase = async (event: H3Event, id: string, requestedType: AccountReceivableCaseType, reason: string) => {
-  const entityType = requestedType === 'fundingcaseaccountreceivablecreditmemo' ? requestedType : (await authorizeAccountReceivable(event, id, 'update')).entityType
-  const context = entityType !== 'fundingcaseaccountreceivablecreditmemo' ? await authorizeAccountReceivable(event, id, 'update') : await authorizeAccountReceivableCreditMemo(event, id, 'update')
-  return await executeFreshAccountReceivableWrite(event, { ...context, agreementIds: 'agreementIds' in context ? context.agreementIds : [context.agreementId] }, async (trx, auth) => {
-    const actorId = await resolveAssignmentCommonUserId(trx, auth.userId)
-    if (!actorId) return await forbidden(event)
-    const active = await trx.selectFrom('Common_Runtime as runtime').innerJoin('Common_Workflow_Run as run', 'run.id', 'runtime.id')
-      .selectAll('runtime').select('run.egcs_cn_completion').where('runtime.egcs_cn_kind', '=', 'workflow')
-      .where('runtime.egcs_cn_entitytype', '=', entityType).where('runtime.egcs_cn_entityid', '=', id)
-      .where('runtime.egcs_cn_state', 'in', ['pending', 'active', 'awaiting_action', 'paused']).where('runtime._deleted', '=', false).forUpdate(['runtime', 'run']).executeTakeFirst()
-    if (active) {
-      if (active.egcs_cn_purpose !== 'approval_submission' || !active.egcs_cn_completion) return await accountReceivableError(event, 'AR_WORKFLOW_ACTIVE')
-      await cancelWorkflowRun(trx, active, actorId, { reason })
-    } else {
-      if (await resolveCompletionEvidenceId(trx, entityType, id)) return await accountReceivableError(event, 'AR_TERMINAL_IMMUTABLE')
-      const runtimeContext = await resolveReviewRuntimeEntityFromEntity(trx, entityType, id)
-      const setup = runtimeContext ? await resolveActiveWorkflowSetup(trx, runtimeContext, 'approval_submission', true) : null
-      if (!setup) return await accountReceivableError(event, 'COMPLETION_WORKFLOW_REQUIRED')
-      if (!(await transitionBusinessStatus(trx, entityType, id, setup.publicationDefinition.cancellationStatus)).terminal) return await accountReceivableError(event, 'AR_CANCELLATION_STATUS_REQUIRED')
-      const record = entityType !== 'fundingcaseaccountreceivablecreditmemo' ? recordAccountReceivableTerminalOutcome : recordAccountReceivableCreditMemoTerminalOutcome
-      await record(trx, id, 'cancelled', { actorId, reason })
-    }
-    return { id }
-  }, { target: { entityType, entityId: id } })
-}

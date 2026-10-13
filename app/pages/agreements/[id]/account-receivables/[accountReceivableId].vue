@@ -26,7 +26,6 @@ const { getHeroCollapsed } = useDashboard()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
 const { sendJson } = useJsonRequest()
-const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const agreementId = computed(() => String(route.params.id))
 const accountReceivableId = computed(() => String(route.params.accountReceivableId))
 const identity = computed(() => `${agreementId.value}:${accountReceivableId.value}`)
@@ -50,7 +49,6 @@ const refreshKey: Ref<number> = ref(0)
 const saving: Ref<boolean> = ref(false)
 const isEditOpen: Ref<boolean> = ref(false)
 let editSession = 0
-const cancelOpen: Ref<boolean> = ref(false)
 const adjustmentOpen: Ref<boolean> = ref(false)
 const creditMemoOpen: Ref<boolean> = ref(false)
 const detailContent: Ref<HTMLElement | null> = ref(null)
@@ -106,7 +104,6 @@ watch([agreementId, accountReceivableId], () => {
   state.value = null
   savedState.value = ''
   saving.value = false
-  cancelOpen.value = false
   adjustmentOpen.value = false
   creditMemoOpen.value = false
 }, { flush: 'sync' })
@@ -170,20 +167,8 @@ const save = async () => {
     if (!disposed && requestIdentity === identity.value) saving.value = false
   }
 }
-const deleteDraft = async () => {
-  const owner = accountReceivableId.value
-  const requestIdentity = identity.value
-  if (await confirmDeleteRequest(`/api/account-receivables/${owner}`) && !disposed && requestIdentity === identity.value) await navigateTo(localePath(appRouteLocations.agreementAccountReceivableCollection(agreementId.value)))
-}
 const heroActions = computed(() => [
-  { label: t('common.edit'), icon: 'i-lucide-edit-3', visible: receivable.value?.egcs_fc_caneditrole === true, onClick: openEdit },
-  { label: t('account_receivable.create_credit_memo'), color: 'primary' as const, icon: 'i-lucide-plus', visible: receivable.value?.egcs_fc_cancreditmemo === true, onClick: () => {
-    creditMemoOpen.value = true
-  } },
-  { label: t('account_receivable.cancel'), color: 'neutral' as const, variant: 'outline' as const, visible: receivable.value?.egcs_fc_cancancel === true, onClick: () => {
-    cancelOpen.value = true
-  } },
-  { label: t('common.delete'), color: 'error' as const, variant: 'ghost' as const, icon: 'i-lucide-trash', visible: receivable.value?.egcs_fc_candelete === true, onClick: deleteDraft }
+  { label: t('common.edit'), icon: 'i-lucide-edit-3', visible: receivable.value?.egcs_fc_caneditrole === true, onClick: openEdit }
 ])
 const adjustmentCreated = async (id: string) => {
   await navigateTo(localePath({ ...appRouteLocations.agreementAccountReceivableDetail(agreementId.value, id), query: { entityType: 'fundingcaseaccountreceivableadjustment' } }))
@@ -240,11 +225,14 @@ const creditMemoCreated = async (id: string, proponentId: string) => {
             <p v-if="receivable.egcs_fc_canadjust" class="text-sm text-muted">
               {{ t('account_receivable.adjust_receivable_description') }}
             </p>
-            <AccountReceivableDetailActivity :receivable="receivable" :agreement-id="agreementId" @adjust="adjustmentOpen = true" />
-            <div v-if="receivable.egcs_fc_creditmemos?.length" class="space-y-3">
-              <h3 class="font-semibold">
-                {{ t('account_receivable.credit_memos') }}
-              </h3>
+            <AccountReceivableDetailActivity :receivable="receivable" :agreement-id="agreementId" @adjust="adjustmentOpen = true" @changed="refreshPage" />
+            <div v-if="receivable.egcs_fc_cancreditmemo || receivable.egcs_fc_creditmemos?.length" class="space-y-3">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <h3 class="font-semibold">
+                  {{ t('account_receivable.credit_memos') }}
+                </h3>
+                <UButton v-if="receivable.egcs_fc_cancreditmemo" :label="t('account_receivable.create_credit_memo')" icon="i-lucide-plus" @click="creditMemoOpen = true" />
+              </div>
               <div v-for="memo in receivable.egcs_fc_creditmemos" :key="`${memo.egcs_fc_kind}:${memo.id}`" class="flex items-center justify-between gap-4 text-sm">
                 <ULink v-if="memo.egcs_fc_kind === 'cash'" :to="localePath(appRouteLocations.proponentCreditMemoDetail(receivable.egcs_fc_applicantrecipient, memo.id))">{{ memo.egcs_fc_reference }}</ULink>
                 <ULink v-else-if="memo.egcs_fc_origin" :to="localePath(appRouteLocations.agreementPaymentDetail(memo.egcs_fc_origin.agreementId, memo.egcs_fc_origin.paymentId))">{{ memo.egcs_fc_reference }}</ULink>
@@ -257,7 +245,7 @@ const creditMemoCreated = async (id: string, proponentId: string) => {
           <section v-else-if="selectedTab === 'completion'" class="space-y-6">
             <UAlert v-if="dirty" color="warning" :title="t('account_receivable.save_before_completion')" /><CommonCompletionPanel :entity-type="entityType" :entity-id="accountReceivableId" :can-complete="receivable.egcs_fc_canedit && !dirty && !saving && status === 'success'" :can-work-workflow="receivable.egcs_fc_canwork" :show-header="false" :show-divider="false" title-key="account_receivable.completion.title" description-key="account_receivable.completion.description" status-complete-key="account_receivable.completion.status_complete" status-locked-key="account_receivable.completion.status_locked" comment-placeholder-key="account_receivable.completion.comment_placeholder" complete-action-key="account_receivable.completion.complete" completed-success-key="account_receivable.completion.completed_success" :refresh-key="refreshKey" @changed="refreshPage" />
           </section>
-          <AccountReceivableClaimReductions v-else-if="selectedTab === 'claim-reductions' && receivable.egcs_fc_claimrelated && !receivable.egcs_fc_linkedreceivable" :account-receivable-id="accountReceivableId" :currency="receivable.egcs_fc_currency" :reductions="receivable.egcs_fc_claimreductions ?? []" :can-edit="receivable.egcs_fc_canedit" :can-update="receivable.egcs_fc_caneditrole" @changed="refreshPage" />
+          <AccountReceivableClaimReductions v-else-if="selectedTab === 'claim-reductions' && receivable.egcs_fc_claimrelated && !receivable.egcs_fc_linkedreceivable" :account-receivable-id="accountReceivableId" :currency="receivable.egcs_fc_currency" :reductions="receivable.egcs_fc_claimreductions ?? []" :can-edit="receivable.egcs_fc_canedit" :can-update="receivable.egcs_fc_caneditrole" :read-only="receivable.egcs_fc_claimreductionlocked" @changed="refreshPage" />
           <CommonReviewsTab v-else-if="selectedTab === 'reviews'" :entity-type="entityType" :entity-id="accountReceivableId" :can-update="receivable.egcs_fc_canedit" @changed="refreshPage" />
           <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" :entity-type="entityType" :entity-id="accountReceivableId" purpose="standard" :can-edit="receivable.egcs_fc_canwork" :refresh-key="refreshKey" @changed="refreshPage" />
           <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" :show-header="false" :entity-type="entityType" :entity-id="accountReceivableId" />
@@ -319,7 +307,6 @@ const creditMemoCreated = async (id: string, proponentId: string) => {
         </UForm>
       </template>
     </UModal>
-    <AccountReceivableCancelModal v-model:open="cancelOpen" :record-id="accountReceivableId" @cancelled="refreshPage" />
     <AccountReceivableCreateModal v-if="receivable" v-model:open="adjustmentOpen" :agreement-id="agreementId" :adjustment="receivable" @created="adjustmentCreated" />
     <AccountReceivableCreditMemoCreateModal v-if="receivable" v-model:open="creditMemoOpen" :context="{ egcs_fc_receivable: accountReceivableId, egcs_fc_applicantrecipient: receivable.egcs_fc_applicantrecipient, egcs_fc_debtorname_en: receivable.egcs_fc_debtorname_en, egcs_fc_debtorname_fr: receivable.egcs_fc_debtorname_fr, egcs_fc_agency: receivable.egcs_fc_statusagency, egcs_fc_currency: receivable.egcs_fc_currency }" @created="creditMemoCreated" />
   </div>
