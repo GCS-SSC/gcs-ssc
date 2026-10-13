@@ -165,6 +165,198 @@
       "egcs_ay_kind": "credit_memo",
       "egcs_ay_currency": "cad",
       "egcs_ay_commitmentchartofaccount": "10010"
+    },
+    {
+      "id": "10017",
+      "egcs_ay_organizationagency": "10021",
+      "egcs_ay_fiscalyear": "10041",
+      "egcs_ay_accountingdimensions": [
+        {
+          "value": "MCIA-2026-CIF-002",
+          "label_en": "Energy-efficient Community Infrastructure",
+          "label_fr": "Infrastructures communautaires écoénergétiques"
+        }
+      ],
+      "_deleted": false,
+      "egcs_ay_kind": "commitment",
+      "egcs_ay_currency": "cad",
+      "egcs_ay_commitmentchartofaccount": null
+    },
+    {
+      "id": "10019",
+      "egcs_ay_organizationagency": "10021",
+      "egcs_ay_fiscalyear": "10041",
+      "egcs_ay_accountingdimensions": [
+        {
+          "value": "MCIA-2026-CM-002",
+          "label_en": "Energy-efficient Community Infrastructure Credit Memos",
+          "label_fr": "Notes de crédit — Infrastructures communautaires écoénergétiques"
+        }
+      ],
+      "_deleted": false,
+      "egcs_ay_kind": "credit_memo",
+      "egcs_ay_currency": "cad",
+      "egcs_ay_commitmentchartofaccount": "10017"
+    },
+    {
+      "id": "10018",
+      "egcs_ay_organizationagency": "10021",
+      "egcs_ay_fiscalyear": "10041",
+      "egcs_ay_accountingdimensions": [
+        {
+          "value": "MCIA-2026-CIF-003",
+          "label_en": "Resilient Community Services",
+          "label_fr": "Services communautaires résilients"
+        }
+      ],
+      "_deleted": false,
+      "egcs_ay_kind": "commitment",
+      "egcs_ay_currency": "cad",
+      "egcs_ay_commitmentchartofaccount": null
+    },
+    {
+      "id": "10020",
+      "egcs_ay_organizationagency": "10021",
+      "egcs_ay_fiscalyear": "10041",
+      "egcs_ay_accountingdimensions": [
+        {
+          "value": "MCIA-2026-CM-003",
+          "label_en": "Resilient Community Services Credit Memos",
+          "label_fr": "Notes de crédit — Services communautaires résilients"
+        }
+      ],
+      "_deleted": false,
+      "egcs_ay_kind": "credit_memo",
+      "egcs_ay_currency": "cad",
+      "egcs_ay_commitmentchartofaccount": "10018"
+    },
+    {
+      "id": "10021",
+      "egcs_ay_organizationagency": "10021",
+      "egcs_ay_fiscalyear": "10042",
+      "egcs_ay_accountingdimensions": [
+        {
+          "value": "MCIA-2027-CIF-002",
+          "label_en": "Energy-efficient Community Infrastructure",
+          "label_fr": "Infrastructures communautaires écoénergétiques"
+        }
+      ],
+      "_deleted": false,
+      "egcs_ay_kind": "commitment",
+      "egcs_ay_currency": "cad",
+      "egcs_ay_commitmentchartofaccount": null
+    },
+    {
+      "id": "10023",
+      "egcs_ay_organizationagency": "10021",
+      "egcs_ay_fiscalyear": "10042",
+      "egcs_ay_accountingdimensions": [
+        {
+          "value": "MCIA-2027-CM-002",
+          "label_en": "Energy-efficient Community Infrastructure Credit Memos",
+          "label_fr": "Notes de crédit — Infrastructures communautaires écoénergétiques"
+        }
+      ],
+      "_deleted": false,
+      "egcs_ay_kind": "credit_memo",
+      "egcs_ay_currency": "cad",
+      "egcs_ay_commitmentchartofaccount": "10021"
+    },
+    {
+      "id": "10022",
+      "egcs_ay_organizationagency": "10021",
+      "egcs_ay_fiscalyear": "10042",
+      "egcs_ay_accountingdimensions": [
+        {
+          "value": "MCIA-2027-CIF-003",
+          "label_en": "Resilient Community Services",
+          "label_fr": "Services communautaires résilients"
+        }
+      ],
+      "_deleted": false,
+      "egcs_ay_kind": "commitment",
+      "egcs_ay_currency": "cad",
+      "egcs_ay_commitmentchartofaccount": null
+    },
+    {
+      "id": "10024",
+      "egcs_ay_organizationagency": "10021",
+      "egcs_ay_fiscalyear": "10042",
+      "egcs_ay_accountingdimensions": [
+        {
+          "value": "MCIA-2027-CM-003",
+          "label_en": "Resilient Community Services Credit Memos",
+          "label_fr": "Notes de crédit — Services communautaires résilients"
+        }
+      ],
+      "_deleted": false,
+      "egcs_ay_kind": "credit_memo",
+      "egcs_ay_currency": "cad",
+      "egcs_ay_commitmentchartofaccount": "10022"
+    },
+    {
+      "id": "10025",
+      "egcs_ay_organizationagency": "10021",
+      "egcs_ay_fiscalyear": "10043",
+      "egcs_ay_accountingdimensions": [
+        {
+          "value": "MCIA-2028-CIF-002",
+          "label_en": "Energy-efficient Community Infrastructure",
+          "label_fr": "Infrastructures communautaires écoénergétiques"
+        }
+      ],
+      "_deleted": false,
+      "egcs_ay_kind": "commitment",
+      "egcs_ay_currency": "cad",
+      "egcs_ay_commitmentchartofaccount": null
+    },
+    {
+      "id": "10027",
+      "egcs_ay_organizationagency": "10021",
+      "egcs_ay_fiscalyear": "10043",
+      "egcs_ay_accountingdimensions": [
+        {
+          "value": "MCIA-2028-CM-002",
+          "label_en": "Energy-efficient Community Infrastructure Credit Memos",
+          "label_fr": "Notes de crédit — Infrastructures communautaires écoénergétiques"
+        }
+      ],
+      "_deleted": false,
+      "egcs_ay_kind": "credit_memo",
+      "egcs_ay_currency": "cad",
+      "egcs_ay_commitmentchartofaccount": "10025"
+    },
+    {
+      "id": "10026",
+      "egcs_ay_organizationagency": "10021",
+      "egcs_ay_fiscalyear": "10043",
+      "egcs_ay_accountingdimensions": [
+        {
+          "value": "MCIA-2028-CIF-003",
+          "label_en": "Resilient Community Services",
+          "label_fr": "Services communautaires résilients"
+        }
+      ],
+      "_deleted": false,
+      "egcs_ay_kind": "commitment",
+      "egcs_ay_currency": "cad",
+      "egcs_ay_commitmentchartofaccount": null
+    },
+    {
+      "id": "10028",
+      "egcs_ay_organizationagency": "10021",
+      "egcs_ay_fiscalyear": "10043",
+      "egcs_ay_accountingdimensions": [
+        {
+          "value": "MCIA-2028-CM-003",
+          "label_en": "Resilient Community Services Credit Memos",
+          "label_fr": "Notes de crédit — Services communautaires résilients"
+        }
+      ],
+      "_deleted": false,
+      "egcs_ay_kind": "credit_memo",
+      "egcs_ay_currency": "cad",
+      "egcs_ay_commitmentchartofaccount": "10026"
     }
   ],
   "Agency_Commitment_Type": [
@@ -7557,6 +7749,78 @@
       "egcs_tp_agencychartofaccount": "10016",
       "egcs_tp_transferpaymentstream": "10118",
       "_deleted": false
+    },
+    {
+      "id": "10019",
+      "egcs_tp_agencychartofaccount": "10017",
+      "egcs_tp_transferpaymentstream": "10118",
+      "_deleted": false
+    },
+    {
+      "id": "10021",
+      "egcs_tp_agencychartofaccount": "10019",
+      "egcs_tp_transferpaymentstream": "10118",
+      "_deleted": false
+    },
+    {
+      "id": "10020",
+      "egcs_tp_agencychartofaccount": "10018",
+      "egcs_tp_transferpaymentstream": "10118",
+      "_deleted": false
+    },
+    {
+      "id": "10022",
+      "egcs_tp_agencychartofaccount": "10020",
+      "egcs_tp_transferpaymentstream": "10118",
+      "_deleted": false
+    },
+    {
+      "id": "10023",
+      "egcs_tp_agencychartofaccount": "10021",
+      "egcs_tp_transferpaymentstream": "10118",
+      "_deleted": false
+    },
+    {
+      "id": "10025",
+      "egcs_tp_agencychartofaccount": "10023",
+      "egcs_tp_transferpaymentstream": "10118",
+      "_deleted": false
+    },
+    {
+      "id": "10024",
+      "egcs_tp_agencychartofaccount": "10022",
+      "egcs_tp_transferpaymentstream": "10118",
+      "_deleted": false
+    },
+    {
+      "id": "10026",
+      "egcs_tp_agencychartofaccount": "10024",
+      "egcs_tp_transferpaymentstream": "10118",
+      "_deleted": false
+    },
+    {
+      "id": "10027",
+      "egcs_tp_agencychartofaccount": "10025",
+      "egcs_tp_transferpaymentstream": "10118",
+      "_deleted": false
+    },
+    {
+      "id": "10029",
+      "egcs_tp_agencychartofaccount": "10027",
+      "egcs_tp_transferpaymentstream": "10118",
+      "_deleted": false
+    },
+    {
+      "id": "10028",
+      "egcs_tp_agencychartofaccount": "10026",
+      "egcs_tp_transferpaymentstream": "10118",
+      "_deleted": false
+    },
+    {
+      "id": "10030",
+      "egcs_tp_agencychartofaccount": "10028",
+      "egcs_tp_transferpaymentstream": "10118",
+      "_deleted": false
     }
   ],
   "Transfer_Payment_Stream_Commitment_Type": [
@@ -7955,13 +8219,13 @@
             "outcomeId": "10002",
             "commitmentType": "10086",
             "streamBudgetId": "10008",
-            "streamCommitmentId": "10010"
+            "streamCommitmentId": "10019"
           },
           {
             "outcomeId": "10003",
             "commitmentType": "10086",
             "streamBudgetId": "10008",
-            "streamCommitmentId": "10010"
+            "streamCommitmentId": "10020"
           },
           {
             "outcomeId": "10001",
@@ -7973,13 +8237,13 @@
             "outcomeId": "10002",
             "commitmentType": "10086",
             "streamBudgetId": "10009",
-            "streamCommitmentId": "10011"
+            "streamCommitmentId": "10023"
           },
           {
             "outcomeId": "10003",
             "commitmentType": "10086",
             "streamBudgetId": "10009",
-            "streamCommitmentId": "10011"
+            "streamCommitmentId": "10024"
           },
           {
             "outcomeId": "10001",
@@ -7991,13 +8255,13 @@
             "outcomeId": "10002",
             "commitmentType": "10086",
             "streamBudgetId": "10010",
-            "streamCommitmentId": "10012"
+            "streamCommitmentId": "10027"
           },
           {
             "outcomeId": "10003",
             "commitmentType": "10086",
             "streamBudgetId": "10010",
-            "streamCommitmentId": "10012"
+            "streamCommitmentId": "10028"
           }
         ],
         "enabledCommitmentTypes": [

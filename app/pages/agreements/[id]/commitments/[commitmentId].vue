@@ -144,14 +144,10 @@ const columns = computed<TableColumnInput<FundingCaseAgreementCommitmentLineBala
   { id: 'lineNumber', accessorKey: 'egcs_fc_commitmentlinenumber', headerKey: 'agreement.commitments.line_number_short' },
   { id: 'fiscalYear', accessorKey: 'fiscal_year_display', headerKey: 'agreement.commitments.fiscal_year' },
   { id: 'coding', headerKey: 'agreement.commitments.coding' },
-  { id: 'amount', accessorKey: 'egcs_fc_amount', headerKey: commitment.value?.egcs_fc_active ? 'agreement.commitments.committed' : 'agreement.commitments.amount' },
-  ...(commitment.value?.egcs_fc_active
-    ? [
-        { id: 'paid', accessorKey: 'egcs_fc_paidamount', headerKey: 'agreement.commitments.paid' },
-        { id: 'credited', accessorKey: 'egcs_fc_creditmemoamount', headerKey: 'agreement.commitments.credited' },
-        { id: 'balance', accessorKey: 'egcs_fc_balance', headerKey: 'agreement.commitments.balance' }
-      ]
-    : []),
+  { id: 'amount', accessorKey: 'egcs_fc_amount', headerKey: 'agreement.commitments.committed' },
+  { id: 'paid', accessorKey: 'egcs_fc_paidamount', headerKey: 'agreement.commitments.paid' },
+  { id: 'credited', accessorKey: 'egcs_fc_creditmemoamount', headerKey: 'agreement.commitments.credited' },
+  { id: 'balance', accessorKey: 'egcs_fc_balance', headerKey: 'agreement.commitments.balance' },
   { id: 'actions', headerKey: 'common.actions' }
 ])
 
@@ -167,7 +163,9 @@ const lines = computed<FundingCaseAgreementCommitmentLineBalanceRow[]>(() => {
     line.fiscal_year_display,
     ...getAccountingDimensionSearchValues(line.accounting_dimensions),
     line.egcs_fc_amount,
-    ...(commitment.value?.egcs_fc_active ? [line.egcs_fc_paidamount, line.egcs_fc_creditmemoamount, line.egcs_fc_balance] : [])
+    line.egcs_fc_paidamount,
+    line.egcs_fc_creditmemoamount,
+    line.egcs_fc_balance
   ].some(value => String(value ?? '').toLowerCase().includes(normalizedSearch.value)))
 })
 
@@ -306,17 +304,6 @@ const handleCompleted = async () => {
                   icon="i-lucide-triangle-alert"
                   :title="t('agreement.commitments.allocation_required')"
                   :description="t('agreement.commitments.allocation_total_help', { total: formatMoney(commitment.egcs_fc_totalamount), allocated: formatMoney(totalAmount) })" />
-                <div class="flex justify-end">
-                  <UButton
-                    v-if="canCreateCommitmentLine"
-                    color="primary"
-                    icon="i-lucide-plus"
-                    class="cursor-default"
-                    @click="openCreateLine">
-                    {{ t('agreement.commitments.add_line') }}
-                  </UButton>
-                </div>
-
                 <CommonResourceLayoutCard
                   v-model:search="search"
                   v-model:pagination="pagination"
@@ -324,8 +311,9 @@ const handleCompleted = async () => {
                   :columns="columns"
                   :total-records="lines.length"
                   :button-label="t('agreement.commitments.add_line')"
-                  :show-button="false"
-                  :search-placeholder="t('agreement.commitments.search_lines')">
+                  :show-button="canCreateCommitmentLine"
+                  :search-placeholder="t('agreement.commitments.search_lines')"
+                  @add="openCreateLine">
                   <template #coding-cell="{ row }">
                     <div class="flex min-w-0 max-w-full flex-col gap-1">
                       <span class="text-sm font-semibold text-zinc-900 dark:text-white">

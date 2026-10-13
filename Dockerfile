@@ -45,7 +45,7 @@ RUN set -eux; \
   fetch_workspace https://github.com/GCS-SSC/gcs-machine-translation.git extensions/gcs-machine-translation c1819d3353041455cad0081bfb011b480f828f05; \
   fetch_workspace https://github.com/GCS-SSC/gcs-narrative-quality.git extensions/gcs-narrative-quality 1fcd7329ab0e5ae3bdf77da8f72b8d5729de643e; \
   fetch_workspace https://github.com/GCS-SSC/gcs-narrative-tags.git extensions/gcs-narrative-tags 7c8ac77b824821ee4c96e3f04ce92b8ad5bdd33b; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-outcome-cost-allocation.git extensions/gcs-outcome-cost-allocation bb12df605e14bba6d14b174dd349c16b3dd25fd7 \
+  fetch_workspace https://github.com/GCS-SSC/gcs-outcome-cost-allocation.git extensions/gcs-outcome-cost-allocation 69d5af19451dfe6f9fab7a1a7aa5470abec0bebe \
   fetch_workspace https://github.com/GCS-SSC/gcs-ssc-portal-connector.git extensions/gcs-ssc-portal-connector 1eb39bd659b2273980c90a80d93273607d833b59; \
   fetch_workspace https://github.com/GCS-SSC/gcs-storage-local.git extensions/gcs-storage-local 933e55267a04ab757e472831b373a21f9a693f1d; \
   fetch_workspace https://github.com/GCS-SSC/gcs-storage-s3.git extensions/gcs-storage-s3 7f021314c9d430f2ed831c5cfe5cd3ac98cc714d
