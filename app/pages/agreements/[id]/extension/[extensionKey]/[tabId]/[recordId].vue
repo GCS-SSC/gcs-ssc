@@ -28,7 +28,7 @@ const item = computed(() => items.value.find(tab =>
 </script>
 
 <template>
-  <div class="flex w-full min-w-0 flex-1 flex-col">
+  <div class="flex min-h-0 w-full min-w-0 flex-1 flex-col">
     <ExtensionEntityTabPanel v-if="status === 'success' && item" :item="item" :record-id="recordId" />
     <CommonDetailPage v-else id="agreement-extension-record-loading" v-model:collapsed="collapsed" :breadcrumb-items="breadcrumbs">
       <template #body>

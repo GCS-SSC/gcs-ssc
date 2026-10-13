@@ -30,7 +30,7 @@ const navigation = computed(() => {
   <component
     :is="extensionComponent"
     v-if="extensionComponent && item"
-    class="block w-full"
+    :class="recordId ? 'flex min-h-0 w-full flex-1 flex-col' : 'block w-full'"
     :extension-key="item.extensionKey"
     :target="item.context.target"
     :context="item.context"
