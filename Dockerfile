@@ -21,6 +21,7 @@ COPY patches/ ./patches/
 # Stage it before installation so Bun can resolve the root workspace dependency
 # and Nuxt's install-time preparation can load its source exports.
 COPY packages/gcs-ssc-authorization ./packages/gcs-ssc-authorization
+COPY packages/gcs-ssc-diagrams ./packages/gcs-ssc-diagrams
 
 # Prefer complete source checkouts, including private extension repositories.
 # Remote contexts without submodule contents fall back to the pinned commits.
@@ -37,15 +38,15 @@ RUN set -eux; \
     git -C "$destination" checkout --detach FETCH_HEAD; \
     rm -rf "$destination/.git"; \
   }; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-ssc-extensions.git packages/gcs-ssc-extensions ffe2997a58b3aa99ab06a5c398b00d92e7b71753; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-ssc-extensions.git packages/gcs-ssc-extensions 38d2dbaf5d0ca94a7e8be94de22a323dd059add0; \
   fetch_workspace https://github.com/GCS-SSC/gcs-agreement-number.git extensions/gcs-agreement-number 854531d05c1a43881073ce8e42297eab0e398c5d; \
   fetch_workspace https://github.com/GCS-SSC/gcs-automated-payments.git extensions/gcs-automated-payments 836c8bcb62abe8c3207298dba487272db6bc09bc; \
   fetch_workspace https://github.com/GCS-SSC/gcs-gcforms-integration.git extensions/gcs-gcforms-integration bf6402a9777da62eef32af18a50f19b424ee38d5; \
   fetch_workspace https://github.com/GCS-SSC/gcs-machine-translation.git extensions/gcs-machine-translation c1819d3353041455cad0081bfb011b480f828f05; \
   fetch_workspace https://github.com/GCS-SSC/gcs-narrative-quality.git extensions/gcs-narrative-quality 1fcd7329ab0e5ae3bdf77da8f72b8d5729de643e; \
   fetch_workspace https://github.com/GCS-SSC/gcs-narrative-tags.git extensions/gcs-narrative-tags 7c8ac77b824821ee4c96e3f04ce92b8ad5bdd33b; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-outcome-cost-allocation.git extensions/gcs-outcome-cost-allocation f11741770f36c9da353cee04c22112ef84c1ad7c; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-ssc-portal-connector.git extensions/gcs-ssc-portal-connector 130803e722c4dc696ec90b5a17edc8dfe872fc18; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-outcome-cost-allocation.git extensions/gcs-outcome-cost-allocation 0a91f2d893dd87ef5962a39638a8abac6edbd31d; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-ssc-portal-connector.git extensions/gcs-ssc-portal-connector 1eb39bd659b2273980c90a80d93273607d833b59; \
   fetch_workspace https://github.com/GCS-SSC/gcs-storage-local.git extensions/gcs-storage-local 933e55267a04ab757e472831b373a21f9a693f1d; \
   fetch_workspace https://github.com/GCS-SSC/gcs-storage-s3.git extensions/gcs-storage-s3 7f021314c9d430f2ed831c5cfe5cd3ac98cc714d
 
