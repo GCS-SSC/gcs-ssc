@@ -1,0 +1,17 @@
+{
+  "name": "@gcs-ssc/diagrams",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./vue": {
+      "types": "./src/vue.d.ts",
+      "default": "./src/FlowDiagram.vue"
+    }
+  },
+  "peerDependencies": {
+    "@gcs-ssc/extensions": "^0.3.14",
+    "vue": "^3.5.28"
+  }
+}

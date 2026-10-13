@@ -29,9 +29,7 @@ export type CoreEntityDefinition = {
  *
  * A null transition mode is deliberate: structural configuration entities and
  * materialized Review/Recommendation evidence participate in polymorphic
- * identity without becoming business-transition roots. Funding Case Intake
- * remains non-lifecycle until its separate RBAC boundary and adapter contract
- * are implemented and confirmed.
+ * identity without becoming business-transition roots.
  */
 export const CORE_ENTITY_REGISTRY = {
   fundingopportunity: {
@@ -93,14 +91,14 @@ export const CORE_ENTITY_REGISTRY = {
     assignmentMode: 'independent'
   },
   fundingcaseintake: {
-    label: { en: 'Intake', fr: 'Réception' },
+    label: { en: 'Intake', fr: 'Dossier de demande' },
     completion: 'none', approvalSubmission: 'explicit', standardWorkflow: 'explicit', riskRating: 'none',
     supportsDirectReviews: true,
     ownerKind: 'funding_case',
     assignmentMode: 'independent'
   },
   fundingcaseagreementclaim: {
-    label: { en: 'Agreement Claim', fr: 'Réclamation d’entente' },
+    label: { en: 'Agreement Claim', fr: 'Demande de remboursement d’entente' },
     completion: 'supported', approvalSubmission: 'on_completion', standardWorkflow: 'explicit', riskRating: 'none',
     supportsDirectReviews: true,
     ownerKind: 'agreement',
@@ -123,7 +121,7 @@ export const CORE_ENTITY_REGISTRY = {
     assignmentMode: 'independent'
   },
   fundingclaimreconcile: {
-    label: { en: 'Funding Claim Reconciliation', fr: 'Rapprochement de réclamation de financement' },
+    label: { en: 'Funding Claim Reconciliation', fr: 'Rapprochement de demande de remboursement' },
     completion: 'supported', approvalSubmission: 'on_completion', standardWorkflow: 'explicit', riskRating: 'none',
     supportsDirectReviews: true,
     ownerKind: 'agreement',

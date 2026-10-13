@@ -3482,6 +3482,46 @@
     "retired": "Review setup retired."
   },
   "workflow": {
+    "flow": {
+      "title": "Flow",
+      "description": "Conditions select the route at start. Selected members run in order; retry captures current values using the original published version.",
+      "order": "Execution order",
+      "member_count": "{count} members",
+      "member_count_one": "{count} member",
+      "condition_count": "{count} conditions",
+      "condition_count_one": "{count} condition",
+      "start": "Start and select route",
+      "allowed": "Allowed start statuses: {statuses}",
+      "nonempty": "At least one member must be selected.",
+      "approval_required": "The selected route must include an approval.",
+      "source_required": "The selected route must include the risk assessment source.",
+      "begin": "Begin selected route",
+      "cancel": "Cancel at any active step",
+      "cancel_status": "Cancellation sets status to {status}.",
+      "all_conditions": "All conditions match?",
+      "member_conditions": "Step {sequence} selection",
+      "edit_member": "Edit workflow step {sequence}: {name}",
+      "or": " OR ",
+      "and": " AND ",
+      "match": "All match — include member",
+      "skip": "Otherwise — skip member",
+      "skip_effect": "Continue without creating work or changing status for this member.",
+      "on_start": "On creation: {status}",
+      "on_success": "On success: {status}",
+      "risk_source": "Selected assessment supplies the risk score after workflow success.",
+      "success": "Success — continue",
+      "failure": "Unsuccessful, denied or failed — stop",
+      "failure_status": "Sets status to {status}.",
+      "complete": "Workflow successful",
+      "positive_outcome": "Approved when approval-backed; otherwise succeeded.",
+      "agreement_risk_effect": "Apply the selected assessment score to the Agreement using captured risk bands.",
+      "amendment_risk_effect": "Update the Amendment’s proposed risk score using captured risk bands; Agreement risk changes after Amendment approval.",
+      "stopped": "Workflow stopped",
+      "stops_remaining": "Remaining members do not run.",
+      "execution_status": "Technical execution failure sets status to {status}.",
+      "retry_allowed": "Retry creates a new attempt with the original publication.",
+      "retry_disabled": "Retry is disabled."
+    },
     "conditions": {
       "field": "Condition field",
       "edit_member": "Conditions for workflow member {sequence}",
@@ -4551,5 +4591,16 @@
     "revision_conflict": "Newer responses have been saved",
     "revision_conflict_description": "Your answers are preserved here. Copy any changes you need before reloading the latest saved responses.",
     "reload_responses": "Reload saved responses"
+  },
+  "diagrams": {
+    "legend": "Connection legend",
+    "overview": "Flow diagram overview",
+    "direct": "Direct progression",
+    "conditional": "Conditional route",
+    "default": "Otherwise",
+    "failure": "Failure",
+    "export_svg": "Export SVG",
+    "export_png": "Export PNG (4×)",
+    "export_error": "The diagram could not be exported. Please try again."
   }
 }

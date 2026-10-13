@@ -98,6 +98,7 @@
     "@electric-sql/pglite-tools": "0.2.21",
     "@fastify/busboy": "^3.2.2",
     "@gcs-ssc/authorization": "workspace:*",
+    "@gcs-ssc/diagrams": "workspace:*",
     "@gcs-ssc/extensions": "workspace:*",
     "@iconify-json/lucide": "^1.2.89",
     "@iconify-json/simple-icons": "^1.2.70",

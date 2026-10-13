@@ -9,6 +9,7 @@ import {
   type GcsGroupedTableExpansionResult
 } from '@gcs-ssc/extensions/ui'
 import type { Component } from 'vue'
+import CommonFlowDiagram from '~/components/Common/FlowDiagram.vue'
 import CommonCompletionSection from '~/components/Common/Completions/Section.vue'
 import CommonWorkflowSection from '~/components/Common/Workflow/Section.vue'
 import CommonWorkflowSupplementaryInformation from '~/components/Common/Workflow/SupplementaryInformation.vue'
@@ -55,6 +56,7 @@ import {
 const asExtensionHostComponent = (component: object): Component => component as Component
 
 const extensionHostComponents = {
+  CommonFlowDiagram,
   CommonAssessmentSchemaAccordionSection: AssessmentSchemaAccordionSection,
   CommonAssessmentSchemaPageSection: AssessmentSchemaPageSection,
   CommonCompletionSection,

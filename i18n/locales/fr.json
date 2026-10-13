@@ -3482,6 +3482,46 @@
     "retired": "La configuration d’examen a été retirée."
   },
   "workflow": {
+    "flow": {
+      "title": "Flux",
+      "description": "Les conditions sélectionnent le parcours au démarrage. Les membres retenus s’exécutent dans l’ordre; une nouvelle tentative capture les valeurs actuelles avec la version publiée d’origine.",
+      "order": "Ordre d’exécution",
+      "member_count": "{count} membres",
+      "member_count_one": "{count} membre",
+      "condition_count": "{count} conditions",
+      "condition_count_one": "{count} condition",
+      "start": "Démarrer et choisir le parcours",
+      "allowed": "États de démarrage permis : {statuses}",
+      "nonempty": "Au moins un membre doit être retenu.",
+      "approval_required": "Le parcours retenu doit comprendre une approbation.",
+      "source_required": "Le parcours retenu doit comprendre la source de l’évaluation du risque.",
+      "begin": "Commencer le parcours retenu",
+      "cancel": "Annuler à toute étape active",
+      "cancel_status": "L’annulation définit l’état à {status}.",
+      "all_conditions": "Toutes les conditions correspondent?",
+      "member_conditions": "Sélection de l’étape {sequence}",
+      "edit_member": "Modifier l’étape {sequence} du flux : {name}",
+      "or": " OU ",
+      "and": " ET ",
+      "match": "Toutes correspondent — inclure le membre",
+      "skip": "Sinon — ignorer le membre",
+      "skip_effect": "Continuer sans créer de travail ni modifier l’état pour ce membre.",
+      "on_start": "À la création : {status}",
+      "on_success": "En cas de succès : {status}",
+      "risk_source": "L’évaluation sélectionnée fournit le score de risque après le succès du processus.",
+      "success": "Succès — continuer",
+      "failure": "Sans succès, refus ou échec — arrêter",
+      "failure_status": "Définit l’état à {status}.",
+      "complete": "Processus réussi",
+      "positive_outcome": "Approuvé lorsqu’il comporte une approbation; réussi autrement.",
+      "agreement_risk_effect": "Appliquer le score de l’évaluation sélectionnée à l’entente selon les tranches de risque capturées.",
+      "amendment_risk_effect": "Mettre à jour le score de risque proposé de la modification selon les tranches capturées; le risque de l’entente change après l’approbation de la modification.",
+      "stopped": "Processus arrêté",
+      "stops_remaining": "Les membres restants ne s’exécutent pas.",
+      "execution_status": "Un échec technique d’exécution définit l’état à {status}.",
+      "retry_allowed": "Une nouvelle tentative conserve la publication d’origine.",
+      "retry_disabled": "Les nouvelles tentatives sont désactivées."
+    },
     "conditions": {
       "field": "Champ de condition",
       "edit_member": "Conditions du membre {sequence} du processus",
@@ -4551,5 +4591,16 @@
     "revision_conflict": "Des réponses plus récentes ont été enregistrées",
     "revision_conflict_description": "Vos réponses sont conservées ici. Copiez les modifications à conserver avant de recharger les dernières réponses enregistrées.",
     "reload_responses": "Recharger les réponses enregistrées"
+  },
+  "diagrams": {
+    "legend": "Légende des connexions",
+    "overview": "Vue d’ensemble du parcours",
+    "direct": "Progression directe",
+    "conditional": "Parcours conditionnel",
+    "default": "Sinon",
+    "failure": "Échec",
+    "export_svg": "Exporter en SVG",
+    "export_png": "Exporter en PNG (4×)",
+    "export_error": "Le diagramme n’a pas pu être exporté. Veuillez réessayer."
   }
 }

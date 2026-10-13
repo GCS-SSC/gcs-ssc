@@ -32,6 +32,8 @@ type WorkflowSetupDetail = WorkflowSetupItem & {
   members: WorkflowMember[]
 }
 type WorkflowMember = {
+  referenceNameEn?: string | null
+  referenceNameFr?: string | null
   conditions?: WorkflowMemberCondition[]
   id: string
   egcs_cn_sequence: number
@@ -73,7 +75,9 @@ const { data: conditionFields, error: conditionFieldsError, refresh: refreshCond
 const { data: conditionChoices, error: conditionChoicesError, refresh: refreshConditionChoices } = await useFetch<
   Record<Exclude<AgreementProfileCondition['source'], 'further_distribution'>, { id: string, name_en: string, name_fr: string }[]>, FetchError, string
 >(`${conditionCatalogBase}/workflow-condition-choices`)
-const retryConditionCatalogs = () => Promise.all([refreshConditionFields(), refreshConditionChoices()])
+const retryConditionCatalogs = async () => {
+  await Promise.all([refreshConditionFields(), refreshConditionChoices()])
+}
 const detailContent = useTemplateRef<HTMLElement>('detailContent')
 const cloneSetup = (value: WorkflowSetupDetail): WorkflowSetupDetail => ({
   ...value,
@@ -181,6 +185,7 @@ const breadcrumbItems = computed(() => [
 const sectionTabs = computed<TranslatedTabItem[]>(() => [
   { key: 'workflow.identity', icon: 'i-lucide-file-text', value: 'workflow-identity' },
   { key: 'workflow.routing', icon: 'i-lucide-git-branch', value: 'workflow-routing' },
+  { key: 'workflow.flow.title', icon: 'i-lucide-workflow', value: 'workflow-flow' },
   { key: 'workflow.transitions', icon: 'i-lucide-arrow-right-left', value: 'workflow-transitions' },
   { key: 'workflow.behaviour', icon: 'i-lucide-settings-2', value: 'workflow-behaviour' }
 ].map(item => ({ ...item, panelId: item.value })))
@@ -428,6 +433,10 @@ const openConditions = (member: WorkflowMember) => {
   }
   isConditionsOpen.value = true
 }
+const selectFlowMember = (memberId: string) => {
+  const member = state.value?.members.find(item => item.id === memberId)
+  if (member) openMember(member)
+}
 const saveConditions = async () => {
   const draft = selectedConditions.value
   if (!draft || !canUpdate.value || mutation.isPending.value || blockDirtyAction()) return
@@ -622,6 +631,13 @@ const deleteMember = async (member: WorkflowMember) => {
                     {{ t('workflow.no_members') }}
                   </p>
                 </div>
+              </AssessmentSchemaPageSection>
+
+              <AssessmentSchemaPageSection section-id="workflow-flow" :title="t('workflow.flow.title')" role="tabpanel" :aria-label="t('workflow.flow.title')">
+                <AgencyWorkflowFlowDiagram
+                  :setup="state" :custom-fields="conditionFields?.items ?? []" :choices="conditionChoices ?? {}"
+                  :editable="canUpdate" @select-member="selectFlowMember" />
+                <UButton v-if="conditionFieldsError || conditionChoicesError" :label="t('common.retry')" color="neutral" variant="ghost" @click="retryConditionCatalogs" />
               </AssessmentSchemaPageSection>
 
               <AssessmentSchemaPageSection section-id="workflow-transitions" :title="t('workflow.transitions')" role="tabpanel" :aria-label="t('workflow.transitions')">

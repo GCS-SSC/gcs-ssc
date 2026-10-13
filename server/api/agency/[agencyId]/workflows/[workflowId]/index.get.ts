@@ -3,6 +3,7 @@ import { authorizeAgencyWorkflowSetup } from '~~/server/utils/agency-workflow-au
 import { readWorkflowConditions } from '~~/server/utils/workflow-conditions'
 import { readWorkflowSetupPublicationMetadata } from '~~/server/utils/workflow-setup-versioning'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+import { sql } from 'kysely'
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -28,9 +29,27 @@ export default defineEventHandler(async event => {
   const allowedStartStatuses = await db.selectFrom('Common_Workflow_Setup_Allowed_Start_Status')
     .select('egcs_cn_status').where('egcs_cn_workflowsetup', '=', workflowSetupId)
     .where('_deleted', '=', false).orderBy('egcs_cn_order', 'asc').execute()
-  const members = await db.selectFrom('Common_Workflow_Setup_Member').selectAll()
-    .where('egcs_cn_workflowsetup', '=', workflowSetupId).where('_deleted', '=', false)
-    .orderBy('egcs_cn_sequence', 'asc').execute()
+  const members = await db.selectFrom('Common_Workflow_Setup_Member')
+    .leftJoin('Common_Review_Set_Setup as reviewSet', join => join
+      .onRef('reviewSet.id', '=', 'Common_Workflow_Setup_Member.egcs_cn_reviewset')
+      .on('reviewSet.egcs_cn_agency', '=', agencyId).on('reviewSet._deleted', '=', false))
+    .leftJoin('Common_Recommendation_Set_Setup as recommendationSet', join => join
+      .onRef('recommendationSet.id', '=', 'Common_Workflow_Setup_Member.egcs_cn_recommendationset')
+      .on('recommendationSet.egcs_cn_agency', '=', agencyId).on('recommendationSet._deleted', '=', false))
+    .leftJoin('Common_Data_Collection_Setup as dataCollection', join => join
+      .onRef('dataCollection.id', '=', 'Common_Workflow_Setup_Member.egcs_cn_datacollection')
+      .on('dataCollection.egcs_cn_agency', '=', agencyId).on('dataCollection._deleted', '=', false))
+    .leftJoin('Common_Approval_Template as approvalTemplate', join => join
+      .onRef('approvalTemplate.id', '=', 'Common_Workflow_Setup_Member.egcs_cn_approvaltemplate')
+      .on('approvalTemplate.egcs_cn_agency', '=', agencyId).on('approvalTemplate._deleted', '=', false))
+    .selectAll('Common_Workflow_Setup_Member')
+    .select([
+      sql<string | null>`coalesce(${sql.ref('reviewSet.egcs_cn_name_en')}, ${sql.ref('recommendationSet.egcs_cn_name_en')}, ${sql.ref('dataCollection.egcs_cn_name_en')}, ${sql.ref('approvalTemplate.egcs_cn_name_en')})`.as('referenceNameEn'),
+      sql<string | null>`coalesce(${sql.ref('reviewSet.egcs_cn_name_fr')}, ${sql.ref('recommendationSet.egcs_cn_name_fr')}, ${sql.ref('dataCollection.egcs_cn_name_fr')}, ${sql.ref('approvalTemplate.egcs_cn_name_fr')})`.as('referenceNameFr')
+    ])
+    .where('Common_Workflow_Setup_Member.egcs_cn_workflowsetup', '=', workflowSetupId)
+    .where('Common_Workflow_Setup_Member._deleted', '=', false)
+    .orderBy('Common_Workflow_Setup_Member.egcs_cn_sequence', 'asc').execute()
   const owners = members.length === 0
     ? []
     : await db.selectFrom('Common_Workflow_Setup_Member_Owner').selectAll()
