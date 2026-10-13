@@ -40,7 +40,8 @@ export const captureAccountReceivablePacket = async (db: Kysely<Database>, id: s
 export const captureAccountReceivableCreditMemoPacket = async (db: Kysely<Database>, id: string) => {
   const repayment = await db.selectFrom('Funding_Case_Account_Receivable_Credit_Memo').selectAll()
     .select(databaseMoneyText(sql.ref('egcs_fc_amount')).as('egcs_fc_amount'))
-    .select(databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('egcs_fc_totalamount')).where('id', '=', id).where('_deleted', '=', false).executeTakeFirstOrThrow()
+    .select(databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('egcs_fc_totalamount'))
+    .select(sql<string>`egcs_fc_receiveddate::text`.as('egcs_fc_receiveddate')).where('id', '=', id).where('_deleted', '=', false).executeTakeFirstOrThrow()
   const basis = await validateAccountReceivableCreditMemoLines(db, id)
   const proponent = await db.selectFrom('Applicant_Recipient_Profile').select(['egcs_ar_legalname_en', 'egcs_ar_legalname_fr']).where('id', '=', repayment.egcs_fc_applicantrecipient).executeTakeFirstOrThrow()
   const agency = await db.selectFrom('Agency_Profile').select(['egcs_ay_name_en', 'egcs_ay_name_fr']).where('id', '=', repayment.egcs_fc_agency).executeTakeFirstOrThrow()

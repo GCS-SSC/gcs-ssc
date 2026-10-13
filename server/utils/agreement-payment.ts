@@ -224,6 +224,8 @@ export const buildAgreementPaymentPatchUpdateValues = (
 ): AgreementPaymentPatchUpdateValues => {
   const {
     egcs_fc_commitmenttype: _commitmentType,
+    egcs_fc_offsetdate: _offsetDate,
+    egcs_fc_offsetdatetoken: _offsetDateToken,
     egcs_fc_offsetplanhash: _offsetPlanHash,
     egcs_fc_offsetcreditmemos: _offsetCreditMemos,
     egcs_fc_paymentamount: paymentAmount,

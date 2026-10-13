@@ -2,12 +2,28 @@
 import { computed } from 'vue'
 import type { ExtensionEntityTabItem } from '~~/shared/types/schemas/extensions'
 import { getGcsExtensionComponent } from '#gcs-extensions/registry'
+import { appRouteLocations } from '~/utils/route-locations'
 
-const { item } = defineProps<{
+const { item, recordId } = defineProps<{
   item?: ExtensionEntityTabItem
+  recordId?: string
 }>()
 
-const extensionComponent = computed(() => item ? getGcsExtensionComponent(item.componentName) : null)
+const localePath = useLocalePath()
+const extensionComponent = computed(() => {
+  const name = recordId ? item?.detailComponentName : item?.componentName
+  return name ? getGcsExtensionComponent(name) : null
+})
+const navigation = computed(() => {
+  if (item?.context.target !== 'agreement' || !item.detailComponentName || !item.context.agreementId) return undefined
+  const agreementId = item.context.agreementId
+  return {
+    collectionHref: localePath(appRouteLocations.agreementDetail(agreementId, { section: item.value })),
+    recordHref: (id: string) => localePath(appRouteLocations.agreementExtensionRecordDetail(
+      agreementId, item.extensionKey, item.tabId, id
+    ))
+  }
+})
 </script>
 
 <template>
@@ -30,5 +46,11 @@ const extensionComponent = computed(() => item ? getGcsExtensionComponent(item.c
     :owner-id="item.context.ownerId"
     :scope="item.context.target === 'proponent' ? undefined : item.context.scope"
     :rbac="item.rbac"
-    :config="item.config" />
+    :config="item.config"
+    :record-id="recordId"
+    :navigation="navigation"
+    :can-update="item.permissions?.canUpdate ?? false"
+    :can-delete="item.permissions?.canDelete ?? false"
+    :can-work="item.permissions?.canWork ?? false"
+    :agreement-context="item.agreementContext" />
 </template>

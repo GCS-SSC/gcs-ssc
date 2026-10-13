@@ -5,6 +5,7 @@ import { resolveApiErrorDetails } from '~/composables/useApiErrorToast'
 import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { Entity_Type } from '~~/shared/types/database'
+import type { GcsExtensionCompletionLabels } from '@gcs-ssc/extensions/ui'
 
 type CompletionItem = {
   id: string
@@ -24,6 +25,7 @@ const {
   entityType,
   entityId,
   completePayload,
+  labels,
   titleKey,
   descriptionKey,
   statusCompleteKey,
@@ -40,13 +42,14 @@ const {
   entityType: Entity_Type
   entityId: string
   completePayload?: unknown
-  titleKey: string
-  descriptionKey: string
-  statusCompleteKey: string
-  statusLockedKey: string
-  commentPlaceholderKey: string
-  completeActionKey: string
-  completedSuccessKey: string
+  labels?: GcsExtensionCompletionLabels
+  titleKey?: string
+  descriptionKey?: string
+  statusCompleteKey?: string
+  statusLockedKey?: string
+  commentPlaceholderKey?: string
+  completeActionKey?: string
+  completedSuccessKey?: string
   confirmationMessageKey?: string
   refreshKey?: number
   isLocked?: boolean
@@ -59,6 +62,16 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const resolvedLabels = computed(() => ({
+  title: labels?.title ?? t(titleKey ?? 'assessment.completion.title'),
+  description: labels?.description ?? t(descriptionKey ?? 'assessment.completion.description'),
+  statusComplete: labels?.statusComplete ?? t(statusCompleteKey ?? 'assessment.completion.status_complete'),
+  statusLocked: labels?.statusLocked ?? t(statusLockedKey ?? 'assessment.completion.status_locked'),
+  commentPlaceholder: labels?.commentPlaceholder ?? t(commentPlaceholderKey ?? 'assessment.completion.comment_placeholder'),
+  completeAction: labels?.completeAction ?? t(completeActionKey ?? 'assessment.completion.complete'),
+  completedSuccess: labels?.completedSuccess ?? t(completedSuccessKey ?? 'assessment.completion.completed_success'),
+  confirmationMessage: labels?.confirmationMessage ?? (confirmationMessageKey ? t(confirmationMessageKey) : undefined)
+}))
 const toast = useToast()
 const { showError } = useApiErrorToast()
 const { formatDate } = useDateHelpers({
@@ -128,7 +141,7 @@ const submitCompletion = async () => {
     return
   }
 
-  if (confirmationMessageKey && !window.confirm(t(confirmationMessageKey))) {
+  if (resolvedLabels.value.confirmationMessage && !window.confirm(resolvedLabels.value.confirmationMessage)) {
     return
   }
 
@@ -159,7 +172,7 @@ const submitCompletion = async () => {
     emit('completed')
     toast.add({
       title: t('common.success'),
-      description: t(completedSuccessKey),
+      description: resolvedLabels.value.completedSuccess,
       color: 'success'
     })
   } catch (error) {
@@ -177,12 +190,12 @@ const submitCompletion = async () => {
     class="space-y-6"
     :class="showHeader && showDivider ? 'border-t border-primary-500 pt-8 dark:border-primary-600' : ''">
     <div v-if="showHeader" class="space-y-3">
-      <AssessmentSchemaSectionTitle :title="t(titleKey)" variant="indicator" />
+      <AssessmentSchemaSectionTitle :title="resolvedLabels.title" variant="indicator" />
     </div>
 
     <div class="space-y-4" :class="!showHeader ? '' : 'pl-4 md:pl-6'">
       <p class="text-sm text-zinc-600 dark:text-zinc-300">
-        {{ t(descriptionKey) }}
+        {{ resolvedLabels.description }}
       </p>
 
       <div
@@ -223,7 +236,7 @@ const submitCompletion = async () => {
         v-else-if="item"
         class="space-y-4">
         <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-          {{ t(statusCompleteKey) }}
+          {{ resolvedLabels.statusComplete }}
         </p>
 
         <div class="grid gap-4 md:grid-cols-2">
@@ -268,14 +281,14 @@ const submitCompletion = async () => {
           v-else-if="isLocked"
           color="warning"
           icon="i-lucide-lock-keyhole"
-          :title="t(statusLockedKey)" />
+          :title="resolvedLabels.statusLocked" />
 
         <template v-else>
           <UFormField :label="t('assessment.completion.comment')">
             <CommonTextarea
               v-model="state.comments"
               :rows="4"
-              :placeholder="t(commentPlaceholderKey)"
+              :placeholder="resolvedLabels.commentPlaceholder"
               :disabled="status === 'pending' || isSubmitting" />
           </UFormField>
 
@@ -287,7 +300,7 @@ const submitCompletion = async () => {
               :loading="isSubmitting"
               :disabled="!canComplete"
               @click="submitCompletion">
-              {{ t(completeActionKey) }}
+              {{ resolvedLabels.completeAction }}
             </UButton>
           </div>
         </template>

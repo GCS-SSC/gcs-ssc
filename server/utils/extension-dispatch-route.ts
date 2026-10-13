@@ -626,11 +626,11 @@ export const dispatchExtensionServerRoute = async (
       && entity?.target === 'agreement') {
       const agreementId = String(entity.agreementId)
       event.context.gcsExtension.agreementFinancials = createExtensionAgreementFinancials(
-        event.context.$db, agreementId, async () => {
-          const current = await authorizeAgreementResource(event, 'read', agreementId, event.context.$db, { freshAuth: true })
+        event.context.$db, agreementId, async readDb => {
+          const current = await authorizeAgreementResource(event, 'read', agreementId, readDb, { freshAuth: true })
           if (!current) throwExtensionDispatchError(404, 'AGREEMENT_NOT_FOUND', 'Agreement not found.')
-          const currentEntity = await resolveExtensionEntityContext(event.context.$db, 'agreement', agreementId)
-          if (!currentEntity || !await getExtensionConfigurationForEntity(event.context.$db, extensionKey, currentEntity)) {
+          const currentEntity = await resolveExtensionEntityContext(readDb, 'agreement', agreementId)
+          if (!currentEntity || !await getExtensionConfigurationForEntity(readDb, extensionKey, currentEntity)) {
             throwExtensionDispatchError(403, 'EXTENSION_ENTITY_DISABLED', 'Extension is disabled for this entity.')
           }
         }

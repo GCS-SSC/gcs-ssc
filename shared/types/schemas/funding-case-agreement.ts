@@ -593,6 +593,8 @@ export const PaymentOffsetMemoInputSchema = z.object({
 
 export const FundingCaseAgreementPaymentCreateSchema = FundingCaseAgreementPaymentSharedInputSchema.extend({
   egcs_fc_commitmenttype: RequiredBigintSelectionId(),
+  egcs_fc_offsetdatetoken: z.string().regex(/^[a-f0-9]{64}$/, { error: 'validation.required' }).optional(),
+  egcs_fc_offsetdate: z.iso.date({ error: 'validation.required' }).optional(),
   egcs_fc_offsetplanhash: z.string({ error: 'validation.required' }).regex(/^[a-f0-9]{64}$/, { error: 'validation.required' }).optional(),
   egcs_fc_offsetcreditmemos: z.array(PaymentOffsetMemoInputSchema, { error: 'validation.required' }).optional(),
   extensions: z.record(z.string(), z.json()).optional()
@@ -606,6 +608,8 @@ export const FundingCaseAgreementPaymentCreateSchema = FundingCaseAgreementPayme
 
 export const FundingCaseAgreementPaymentPatchSchema = FundingCaseAgreementPaymentSharedInputSchema.extend({
   egcs_fc_commitmenttype: RequiredBigintSelectionId().optional(),
+  egcs_fc_offsetdatetoken: z.string().regex(/^[a-f0-9]{64}$/, { error: 'validation.required' }).optional(),
+  egcs_fc_offsetdate: z.iso.date({ error: 'validation.required' }).optional(),
   egcs_fc_offsetplanhash: z.string({ error: 'validation.required' }).regex(/^[a-f0-9]{64}$/, { error: 'validation.required' }).optional(),
   egcs_fc_offsetcreditmemos: z.array(PaymentOffsetMemoInputSchema, { error: 'validation.required' }).optional(),
   egcs_fc_status: ForbiddenBusinessStatusMutation()

@@ -49,6 +49,7 @@ const EXTENSION_HOST_CAPABILITIES = new Set([
   'stream-config-modal',
   'stream-config-page',
   'entity-tabs',
+  'entity-detail-pages',
   'payment-evidence',
   'textarea-slots',
   'bilingual-field-slots',
@@ -327,6 +328,7 @@ const inferRequiredHostCapabilities = (definition: GcsExtensionDefinition): Set<
   addImpliedCapability(capabilities, Boolean(definition.admin?.streamConfig), 'stream-config-modal')
   addImpliedCapability(capabilities, Boolean(definition.admin?.streamConfigPage), 'stream-config-page')
   addImpliedCapability(capabilities, (definition.client?.tabs ?? []).length > 0, 'entity-tabs')
+  addImpliedCapability(capabilities, (definition.client?.tabs ?? []).some(tab => Boolean(tab.detailPage)), 'entity-detail-pages')
   addImpliedCapability(capabilities, (definition.client?.slots ?? []).some(slot => !['bilingual-field.after', 'payment.evidence'].includes(slot.slot)), 'textarea-slots')
   addImpliedCapability(capabilities, (definition.client?.slots ?? []).some(slot => slot.slot === 'bilingual-field.after'), 'bilingual-field-slots')
   addImpliedCapability(capabilities, (definition.client?.slots ?? []).some(slot => slot.slot === 'payment.evidence'), 'payment-evidence')
@@ -478,6 +480,9 @@ const validateFileStorageProviderDefinition = (definition: GcsExtensionDefinitio
 
 /** Validates extension identity, bilingual naming, SDK compatibility, and host capabilities. */
 export const validateExtensionDefinition = (definition: GcsExtensionDefinition, extensionDir: string): void => {
+  if (definition.codingAllocator && 'accountCatalog' in definition.codingAllocator) {
+    throw new Error(`Extension ${definition.key} codingAllocator catalog overrides are unsupported; coding accounts must be available on the Stream`)
+  }
   if (definition.admin?.agencyWorkspace) {
     const workspace = definition.admin.agencyWorkspace
     if (!definition.admin.agency || !workspace.label?.en || !workspace.label?.fr || !workspace.tabs.length) {
@@ -658,7 +663,7 @@ export const resolveEntityTab = async (
   rootDir: string,
   tab: GcsExtensionEntityTabDefinition,
   index: number
-) => {
+): Promise<GcsExtensionEntityTabDefinition> => {
   if (!EXTENSION_ENTITY_TAB_TARGETS.has(tab.target)) {
     throw new Error(`Extension client tab ${index} has invalid target "${tab.target}"`)
   }
@@ -679,11 +684,21 @@ export const resolveEntityTab = async (
   }
   validateExtensionRbacRequirement(tab.rbac, `client.tabs.${index}.rbac`)
   validateExtensionEntityRbacRequirement(tab.target, tab.rbac, `client.tabs.${index}.rbac`)
-
-  return {
-    ...tab,
-    path: await assertContainedPath(rootDir, tab.path, `client.tabs.${index}.path`)
+  if (tab.detailPage && tab.target !== 'agreement') {
+    throw new Error(`Extension client tab ${index} detail pages require an Agreement target`)
   }
+
+  const path = await assertContainedPath(rootDir, tab.path, `client.tabs.${index}.path`)
+  if (tab.target === 'agreement' && tab.detailPage) {
+    return {
+      ...tab,
+      path,
+      detailPage: {
+        path: await assertContainedPath(rootDir, tab.detailPage.path, `client.tabs.${index}.detailPage.path`)
+      }
+    }
+  }
+  return { ...tab, path }
 }
 
 /** Resolves and validates an agreement-create action contributed by an extension. */
@@ -1105,7 +1120,7 @@ const resolveExtensionDirectory = async (
     : undefined
   const fileStorageProvider = await resolveFileStorageProvider(canonicalExtensionDir, definition)
   const codingAllocator = definition.codingAllocator
-    ? { path: await assertContainedPath(canonicalExtensionDir, definition.codingAllocator.path, 'codingAllocator.path') }
+    ? { ...definition.codingAllocator, path: await assertContainedPath(canonicalExtensionDir, definition.codingAllocator.path, 'codingAllocator.path') }
     : undefined
 
   return {
@@ -1221,9 +1236,14 @@ const buildClientExtensionMetadata = (extension: GcsResolvedExtension): GcsClien
     slots: extension.client.slots.map((slot, index) =>
       withoutComponentPath(slot, componentName('ExtensionSlot', extension.key, index))
     ),
-    tabs: extension.client.tabs.map((tab, index) =>
-      withoutComponentPath(tab, componentName('ExtensionEntityTab', extension.key, index))
-    ),
+    tabs: extension.client.tabs.map(({ detailPage, ...tab }, index) => ({
+      ...withoutComponentPath(tab, componentName('ExtensionEntityTab', extension.key, index)),
+      ...(detailPage
+        ? {
+            detailPage: withoutComponentPath(detailPage, componentName('ExtensionEntityDetail', extension.key, index))
+          }
+        : {})
+    })),
     createActions: extension.client.createActions.map((action, index) =>
       withoutComponentPath(action, componentName('ExtensionCreateAction', extension.key, index))
     ),
@@ -1506,6 +1526,9 @@ const buildExtensionComponentRegistry = (extensions: GcsResolvedExtension[]) => 
     }
     for (const [index, tab] of extension.client.tabs.entries()) {
       addComponentRegistryEntry(imports, componentEntries, 'ExtensionEntityTab', extension.key, tab.path, index)
+      if (tab.detailPage) {
+        addComponentRegistryEntry(imports, componentEntries, 'ExtensionEntityDetail', extension.key, tab.detailPage.path, index)
+      }
     }
     for (const [index, action] of extension.client.createActions.entries()) {
       addComponentRegistryEntry(imports, componentEntries, 'ExtensionCreateAction', extension.key, action.path, index)

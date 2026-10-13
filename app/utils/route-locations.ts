@@ -59,6 +59,10 @@ export const appRouteLocations = {
   agreementDetail: (id: string, query?: Record<string, string>) => ({
     name: 'agreements-id', params: { id }, ...(query ? { query } : {})
   }),
+  agreementExtensionRecordDetail: (id: string, extensionKey: string, tabId: string, recordId: string) => ({
+    name: 'agreements-id-extension-extensionKey-tabId-recordId',
+    params: { id, extensionKey, tabId, recordId }
+  }),
   agreementAmendmentDetail: (id: string, amendmentId: string) => ({
     name: 'agreements-id-amendments-amendmentId',
     params: { id, amendmentId }

@@ -389,6 +389,7 @@ export const editAccountReceivable = async (event: H3Event, id: string, input: A
   const context = await authorizeAccountReceivable(event, id, 'update')
   return await executeFreshAccountReceivableWrite(event, { ...context, agreementIds: [context.agreementId] }, async trx => {
     const debt = await assertAccountReceivableEditable(event, trx, id)
+    if (debt.egcs_fc_allocationevidence && 'egcs_fc_lines' in input) return await accountReceivableError(event, 'AR_IMMUTABLE')
     const lines = await readAccountReceivableLines(trx, id)
     const submittedLines = 'egcs_fc_lines' in input ? input.egcs_fc_lines : lines.map(line => ({ id: String(line.id), egcs_fc_amount: line.egcs_fc_amount, egcs_fc_accountreceivablechartofaccount: line.egcs_fc_accountreceivablechartofaccount ? String(line.egcs_fc_accountreceivablechartofaccount) : null }))
     if (lines.length !== submittedLines.length || submittedLines.some(line => !lines.some(saved => String(saved.id) === line.id))) return await accountReceivableError(event, 'AR_LINE_SET_STALE')
@@ -406,7 +407,7 @@ export const editAccountReceivable = async (event: H3Event, id: string, input: A
     await trx.updateTable('Funding_Case_Agreement_Account_Receivable').set({ ...header, egcs_fc_recipientpreference: header.egcs_fc_recipientpreference ?? null,
       ...(refreshedSources ? { egcs_fc_fiscaloutstanding: fiscalSnapshot === null ? null : databaseMoneyValue(fiscalSnapshot) } : {}) }).where('id', '=', id).execute()
     const coding = await readAccountReceivableCoding(trx, id)
-    for (const line of egcs_fc_lines) {
+    for (const line of debt.egcs_fc_allocationevidence ? [] : egcs_fc_lines) {
       const saved = lines.find(row => String(row.id) === line.id)!
       if (moneyToCents(line.egcs_fc_amount) !== BigInt(0) && !line.egcs_fc_accountreceivablechartofaccount) return await accountReceivableError(event, 'AR_ACCOUNT_REQUIRED')
 
@@ -548,7 +549,8 @@ export const getAccountReceivableDetail = async (event: H3Event, id: string) => 
     ...cashBalance,
     egcs_fc_debtorname_en: String(labels.egcs_fc_debtorname_en ?? ''), egcs_fc_debtorname_fr: String(labels.egcs_fc_debtorname_fr ?? ''), egcs_fc_fiscalyeardisplay: String(labels.egcs_fc_fiscalyeardisplay ?? ''),
     egcs_fc_collectionstate: moneyToCents(outstanding) === BigInt(0) ? 'cleared' as const : moneyToCents(recovered) > BigInt(0) ? 'partially_recovered' as const : 'outstanding' as const,
-    egcs_fc_candeletelines: editable && assigned && auth.userAbilities.authorize('account_receivable', 'delete', context.scope),
+    egcs_fc_automaticcoding: Boolean(debt.egcs_fc_allocationevidence),
+    egcs_fc_candeletelines: !debt.egcs_fc_allocationevidence && editable && assigned && auth.userAbilities.authorize('account_receivable', 'delete', context.scope),
     egcs_fc_caneditrole: auth.userAbilities.authorize('account_receivable', 'update', context.scope),
     egcs_fc_canedit: editable && work, egcs_fc_canwork: work && debt.egcs_fc_outcome === 'open',
     egcs_fc_candelete: editable && status.egcs_cn_isdraft && assigned && auth.userAbilities.authorize('account_receivable', 'delete', context.scope),

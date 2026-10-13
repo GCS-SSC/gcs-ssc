@@ -19,6 +19,7 @@ import type { PublicationState } from '~~/shared/constants/system-lifecycle'
 import { applyCurrentWorkflowMemberSelection } from '~/utils/workflow-member-selection'
 import type { EditorMutationToken } from '~/composables/useEditorMutationCoordinator'
 import { useEditorMutationCoordinator } from '~/composables/useEditorMutationCoordinator'
+import { useAgencyWorkflowEntityTypes } from '~/composables/useAgencyWorkflowEntityTypes'
 
 type WorkflowSetupItem = z.infer<typeof CommonWorkflowSetupCreateSchema> & { id: string }
 type WorkflowSetupDetail = WorkflowSetupItem & {
@@ -141,28 +142,24 @@ const validateMember = withFormRequirements(async (member: WorkflowMemberForm) =
   return errors
 }, CommonWorkflowSetupMemberCreateSchema)
 
-const approvalSubmissionEntityTypes = new Set([
-  'fundingcaseagreement', 'fundingcaseamendment', 'fundingcaseagreementcloseout',
-  'fundingcaseagreementclaim', 'fundingclaimreconcile', 'fundingcaseagreementcommitment',
-  'fundingcasejournalvoucher', 'fundingcasecorrection',
-  'fundingcaseaccountreceivable', 'fundingcaseaccountreceivableadjustment', 'fundingcaseaccountreceivablecreditmemo',
-  'fundingcasepayment', 'fundingcaseforecast', 'fundingcasemonitor'
-])
-const purposeOptions = computed(() => [
-  { value: 'standard', label: t('workflow.purposes.standard') },
-  ...(approvalSubmissionEntityTypes.has(state.value?.egcs_cn_entitytype ?? '')
-    ? [{ value: 'approval_submission', label: t('workflow.purposes.approval_submission') }]
-    : []),
-  ...(['fundingcaseagreement', 'fundingcaseamendment'].includes(state.value?.egcs_cn_entitytype ?? '')
-    ? [{ value: 'risk_rating', label: t('workflow.purposes.risk_rating') }]
-    : [])
-])
-watch(() => state.value?.egcs_cn_entitytype, entityType => {
-  if (state.value?.egcs_cn_purpose === 'approval_submission' && !approvalSubmissionEntityTypes.has(entityType ?? '')) {
-    state.value.egcs_cn_purpose = 'standard'
-  }
-  if (state.value?.egcs_cn_purpose === 'risk_rating' && !['fundingcaseagreement', 'fundingcaseamendment'].includes(entityType ?? '')) {
-    state.value.egcs_cn_purpose = 'standard'
+const { entityTypes, purposeOptions, error: entityTypesError, status: entityTypesStatus, refresh: refreshEntityTypes } = useAgencyWorkflowEntityTypes(
+  () => agencyId,
+  () => state.value?.egcs_cn_entitytype
+)
+const entityTypeOptions = computed(() => {
+  const savedSetup = setup.value
+  if (!savedSetup || entityTypes.value.some(item => item.entityType === savedSetup.egcs_cn_entitytype)) return entityTypes.value
+  return [...entityTypes.value, {
+    entityType: savedSetup.egcs_cn_entitytype,
+    labelEn: savedSetup.entityTypeLabelEn,
+    labelFr: savedSetup.entityTypeLabelFr,
+    workflowPurposes: [],
+    disabled: true
+  }]
+})
+watch(purposeOptions, options => {
+  if (state.value && options.length && !options.some(option => option.value === state.value?.egcs_cn_purpose)) {
+    state.value.egcs_cn_purpose = options[0]!.value
   }
 })
 watch(() => state.value?.egcs_cn_purpose, purpose => {
@@ -570,7 +567,13 @@ const deleteMember = async (member: WorkflowMember) => {
               <AssessmentSchemaPageSection section-id="workflow-routing" :title="t('workflow.routing')" role="tabpanel" :aria-label="t('workflow.routing')">
                 <div class="grid gap-5 lg:grid-cols-2">
                   <UFormField :label="t('transfer_payment.entity_type')" name="egcs_cn_entitytype" :description="t('workflow.entity_type_help')">
-                    <CommonEnumSelect v-model="state.egcs_cn_entitytype" name="transfer_payment_review_setup_entity_type" :disabled="!canEditFields" class="w-full" />
+                    <CommonBilingualSelectMenu
+                      v-model="state.egcs_cn_entitytype" :items="entityTypeOptions" value-key="entityType"
+                      label-en-key="labelEn" label-fr-key="labelFr" :loading="entityTypesStatus === 'pending'" :disabled="!canEditFields" class="w-full" />
+                    <div v-if="entityTypesError" role="alert" class="mt-2 flex items-center gap-2 text-sm text-error">
+                      <span>{{ t('common.lookup_load_failed') }}</span>
+                      <UButton :label="t('common.retry')" color="neutral" variant="ghost" @click="refreshEntityTypes()" />
+                    </div>
                   </UFormField>
                   <UFormField :label="t('workflow.purpose')" name="egcs_cn_purpose" :description="t('workflow.purpose_help')">
                     <CommonEnumSelect v-model="state.egcs_cn_purpose" name="workflow_purpose" :items="purposeOptions" :disabled="!canEditFields" class="w-full" />

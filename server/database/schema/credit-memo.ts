@@ -31,6 +31,35 @@ export const installCreditMemoFunctions = async (db: Kysely<Database>): Promise<
           RAISE EXCEPTION 'Tagged receivables must be established originals in the same pool' USING ERRCODE='23514';
         END IF;
       END LOOP;
+      IF current_row->>'egcs_fc_outcome'='posted' OR ar_has_lifecycle_evidence(memo_id,'fundingcaseaccountreceivablecreditmemo') THEN
+      FOR coding IN SELECT line.*, account.id account_id, account.egcs_ay_kind, account.egcs_ay_fiscalyear,
+          account.egcs_ay_currency, account.egcs_ay_organizationagency, account._deleted account_deleted,
+          selected_debt.egcs_fc_agencyfiscalyear receivable_year, agreement.egcs_fc_transferpaymentstream stream_id
+        FROM "Funding_Case_Account_Receivable_Credit_Memo_Line" line
+        LEFT JOIN "Agency_Chart_of_Account" account ON account.id=line.egcs_fc_creditmemochartofaccount
+        JOIN "Funding_Case_Agreement_Account_Receivable" selected_debt ON selected_debt.id=line.egcs_fc_receivable
+        JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.id=selected_debt.egcs_fc_fundingagreement
+        WHERE line.egcs_fc_creditmemo=memo_id AND NOT line._deleted LOOP
+        IF coding.account_id IS NULL OR coding.account_deleted OR coding.egcs_ay_kind<>'credit_memo'
+          OR coding.egcs_ay_organizationagency<>pool.egcs_fc_agency OR coding.egcs_ay_currency<>pool.egcs_fc_currency
+          OR (jsonb_typeof(current_row->'egcs_fc_allocationevidence') IS DISTINCT FROM 'object' AND coding.egcs_ay_fiscalyear<>coding.receivable_year)
+          OR NOT EXISTS (
+            SELECT 1 FROM "Transfer_Payment_Stream_Chart_of_Account" selection WHERE selection.egcs_tp_transferpaymentstream=coding.stream_id
+              AND selection.egcs_tp_agencychartofaccount=coding.account_id AND NOT selection._deleted)
+          OR (jsonb_typeof(current_row->'egcs_fc_allocationevidence')='object' AND NOT EXISTS (
+            SELECT 1 FROM jsonb_array_elements(current_row->'egcs_fc_allocationevidence'->'accounts') captured
+              WHERE captured->>'agencyChartOfAccountId'=coding.account_id::text
+                AND captured->>'agencyFiscalYearId'=coding.egcs_ay_fiscalyear::text
+                AND captured->'accountingDimensions'=coding.egcs_fc_creditmemoaccountingdimensions
+                AND (captured->>'commitmentChartOfAccountId')::bigint IS NOT DISTINCT FROM coding.egcs_fc_commitmentchartofaccount))
+          OR (coding.egcs_fc_commitmentchartofaccount IS NOT NULL AND NOT EXISTS (
+            SELECT 1 FROM "Agency_Chart_of_Account" linked WHERE linked.id=coding.egcs_fc_commitmentchartofaccount
+              AND linked.egcs_ay_kind='commitment' AND linked.egcs_ay_organizationagency=coding.egcs_ay_organizationagency
+              AND linked.egcs_ay_currency=coding.egcs_ay_currency AND linked.egcs_ay_fiscalyear=coding.egcs_ay_fiscalyear AND NOT linked._deleted)) THEN
+          RAISE EXCEPTION 'Credit memo submission requires valid retained financial accounts' USING ERRCODE='23514';
+        END IF;
+      END LOOP;
+      END IF;
       IF current_row->>'egcs_fc_outcome' IN ('open','posted') AND NOT (current_row->>'_deleted')::boolean THEN
         FOR coding IN SELECT egcs_fc_receivable, sum(egcs_fc_amount) amount FROM "Funding_Case_Account_Receivable_Credit_Memo_Line"
           WHERE egcs_fc_creditmemo=memo_id AND NOT _deleted GROUP BY egcs_fc_receivable LOOP
@@ -63,8 +92,8 @@ export const installCreditMemoFunctions = async (db: Kysely<Database>): Promise<
         IF previous->>'egcs_fc_ledgerkind'<>'pool' OR previous->>'egcs_fc_outcome'<>'open' AND previous IS DISTINCT FROM current_row THEN
           RAISE EXCEPTION 'Completed credit memo evidence is immutable' USING ERRCODE='23514';
         END IF;
-        IF (previous - ARRAY['egcs_fc_amount','egcs_fc_totalamount','egcs_fc_receiveddate','egcs_fc_reason','_deleted','egcs_fc_status','egcs_fc_statusagency','egcs_fc_outcome','egcs_fc_postedat','egcs_fc_postingruntime','egcs_fc_terminalby','egcs_fc_terminalat','egcs_fc_terminalreason','egcs_fc_statusterminal','egcs_fc_statusdeleted'])
-          IS DISTINCT FROM (current_row - ARRAY['egcs_fc_amount','egcs_fc_totalamount','egcs_fc_receiveddate','egcs_fc_reason','_deleted','egcs_fc_status','egcs_fc_statusagency','egcs_fc_outcome','egcs_fc_postedat','egcs_fc_postingruntime','egcs_fc_terminalby','egcs_fc_terminalat','egcs_fc_terminalreason','egcs_fc_statusterminal','egcs_fc_statusdeleted']) THEN
+        IF (previous - ARRAY['egcs_fc_allocationevidence','egcs_fc_amount','egcs_fc_totalamount','egcs_fc_receiveddate','egcs_fc_reason','_deleted','egcs_fc_status','egcs_fc_statusagency','egcs_fc_outcome','egcs_fc_postedat','egcs_fc_postingruntime','egcs_fc_terminalby','egcs_fc_terminalat','egcs_fc_terminalreason','egcs_fc_statusterminal','egcs_fc_statusdeleted'])
+          IS DISTINCT FROM (current_row - ARRAY['egcs_fc_allocationevidence','egcs_fc_amount','egcs_fc_totalamount','egcs_fc_receiveddate','egcs_fc_reason','_deleted','egcs_fc_status','egcs_fc_statusagency','egcs_fc_outcome','egcs_fc_postedat','egcs_fc_postingruntime','egcs_fc_terminalby','egcs_fc_terminalat','egcs_fc_terminalreason','egcs_fc_statusterminal','egcs_fc_statusdeleted']) THEN
           RAISE EXCEPTION 'Credit memo owner and tags are immutable' USING ERRCODE='23514';
         END IF;
         IF ar_has_lifecycle_evidence(memo_id,'fundingcaseaccountreceivablecreditmemo') AND
@@ -102,13 +131,24 @@ export const installCreditMemoFunctions = async (db: Kysely<Database>): Promise<
       SELECT * INTO account FROM "Agency_Chart_of_Account" WHERE id=NEW.egcs_fc_creditmemochartofaccount;
       IF debt.id IS NULL OR debt._deleted OR debt.egcs_fc_outcome<>'posted' OR debt.egcs_fc_linkedreceivable IS NOT NULL OR debt.egcs_fc_pool<>memo.egcs_fc_pool
         OR stream_id IS NULL OR account.id IS NULL OR account._deleted OR account.egcs_ay_kind<>'credit_memo'
-        OR account.egcs_ay_organizationagency<>memo.egcs_fc_agency OR account.egcs_ay_currency<>memo.egcs_fc_currency OR account.egcs_ay_fiscalyear<>debt.egcs_fc_agencyfiscalyear
+        OR account.egcs_ay_organizationagency<>memo.egcs_fc_agency OR account.egcs_ay_currency<>memo.egcs_fc_currency
+          OR (NEW.egcs_fc_commitmentchartofaccount IS NOT NULL AND NOT EXISTS (SELECT 1 FROM "Agency_Chart_of_Account" linked
+            WHERE linked.id=NEW.egcs_fc_commitmentchartofaccount AND linked.egcs_ay_kind='commitment'
+              AND linked.egcs_ay_organizationagency=account.egcs_ay_organizationagency AND linked.egcs_ay_currency=account.egcs_ay_currency
+              AND linked.egcs_ay_fiscalyear=account.egcs_ay_fiscalyear AND NOT linked._deleted)) OR (jsonb_typeof(memo.egcs_fc_allocationevidence) IS DISTINCT FROM 'object' AND account.egcs_ay_fiscalyear<>debt.egcs_fc_agencyfiscalyear)
         OR NOT EXISTS (SELECT 1 FROM "Transfer_Payment_Stream_Chart_of_Account" selection WHERE selection.egcs_tp_transferpaymentstream=stream_id AND selection.egcs_tp_agencychartofaccount=account.id AND NOT selection._deleted) THEN
         RAISE EXCEPTION 'Credit coding must match its receivable Stream fiscal year currency' USING ERRCODE='23514';
       END IF;
       IF TG_OP='UPDATE' AND OLD.egcs_fc_creditmemochartofaccount=NEW.egcs_fc_creditmemochartofaccount THEN
         IF (NEW.egcs_fc_creditmemoaccountingdimensions,NEW.egcs_fc_commitmentchartofaccount) IS DISTINCT FROM (OLD.egcs_fc_creditmemoaccountingdimensions,OLD.egcs_fc_commitmentchartofaccount) THEN
           RAISE EXCEPTION 'Credit lines retain captured coding and commitment linkage' USING ERRCODE='23514';
+        END IF;
+      ELSIF jsonb_typeof(memo.egcs_fc_allocationevidence)='object' THEN
+        IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(memo.egcs_fc_allocationevidence->'accounts') captured
+          WHERE captured->>'agencyChartOfAccountId'=account.id::text
+            AND captured->'accountingDimensions'=NEW.egcs_fc_creditmemoaccountingdimensions
+            AND (captured->>'commitmentChartOfAccountId')::bigint IS NOT DISTINCT FROM NEW.egcs_fc_commitmentchartofaccount) THEN
+          RAISE EXCEPTION 'Credit lines require captured allocator coding' USING ERRCODE='23514';
         END IF;
       ELSIF NEW.egcs_fc_creditmemoaccountingdimensions IS DISTINCT FROM account.egcs_ay_accountingdimensions OR NEW.egcs_fc_commitmentchartofaccount IS DISTINCT FROM account.egcs_ay_commitmentchartofaccount THEN
         RAISE EXCEPTION 'Credit lines must capture their catalog coding and commitment linkage' USING ERRCODE='23514';

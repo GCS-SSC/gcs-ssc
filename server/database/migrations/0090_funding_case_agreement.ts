@@ -110,6 +110,7 @@ CREATE TABLE "Funding_Case_Account_Receivable_Allocation" (
 );
 
 CREATE TABLE "Funding_Case_Account_Receivable_Credit_Memo" (
+  "egcs_fc_allocationevidence" jsonb,
   "id" bigint NOT NULL,
   "egcs_fc_receivables" jsonb DEFAULT '[]'::jsonb NOT NULL CHECK (jsonb_typeof(egcs_fc_receivables)='array'),
   "egcs_fc_totalamount" numeric(19,2) DEFAULT 0 NOT NULL CHECK (egcs_fc_totalamount >= 0),
@@ -171,6 +172,8 @@ CREATE TABLE "Funding_Case_Account_Receivable_Credit_Memo_Line" (
 CREATE UNIQUE INDEX fc_uq_ar_creditmemo_line_number ON "Funding_Case_Account_Receivable_Credit_Memo_Line" (egcs_fc_creditmemo, egcs_fc_linenumber) WHERE NOT _deleted;
 
 CREATE TABLE "Funding_Case_Account_Receivable_Offset_Memo" (
+  "egcs_fc_effectivedate" date DEFAULT CURRENT_DATE NOT NULL,
+  "egcs_fc_allocationevidence" jsonb,
   "id" bigint DEFAULT nextval('"Funding_Case_Account_Receivable_Offset_Memo_id_seq"'::regclass) NOT NULL,
   "egcs_fc_receivable" bigint NOT NULL,
   "egcs_fc_pool" bigint NOT NULL,
@@ -195,7 +198,7 @@ CREATE TABLE "Funding_Case_Account_Receivable_Offset_Memo_Line" (
   "egcs_fc_amount" numeric(19,2) NOT NULL CHECK (egcs_fc_amount > 0),
   "_deleted" boolean DEFAULT false NOT NULL CHECK (_deleted = false),
   CONSTRAINT fc_uq_ar_offset_line_number UNIQUE (egcs_fc_offsetmemo, egcs_fc_linenumber),
-  CONSTRAINT fc_uq_ar_offset_line_account UNIQUE (egcs_fc_offsetmemo, egcs_fc_transferpaymentstreamchartofaccount)
+  CONSTRAINT fc_uq_ar_offset_line_account UNIQUE (egcs_fc_offsetmemo, egcs_fc_creditmemochartofaccount)
 );
 
 CREATE TABLE "Funding_Case_Account_Receivable_Offset_Memo_Application" (
@@ -280,6 +283,7 @@ CREATE UNIQUE INDEX fc_uq_ar_open_pool ON "Funding_Case_Account_Receivable_Recov
 CREATE UNIQUE INDEX fc_uq_ar_payment_recovery ON "Funding_Case_Account_Receivable_Recovery" USING btree (egcs_fc_payment) WHERE ((egcs_fc_payment IS NOT NULL) AND ((egcs_fc_outcome)::text <> 'released'::text) AND (NOT _deleted));
 
 CREATE TABLE "Funding_Case_Agreement_Account_Receivable" (
+  "egcs_fc_allocationevidence" jsonb,
   "id" bigint NOT NULL,
   "egcs_fc_entitytype" text DEFAULT 'fundingcaseaccountreceivable' NOT NULL,
   "egcs_fc_amount" numeric(19,2) DEFAULT 0 NOT NULL,
@@ -2488,10 +2492,17 @@ CREATE FUNCTION trg_fn_validate_ar_offset_memo()
         SELECT egcs_fc_transferpaymentstream INTO stream_id FROM "Funding_Case_Agreement_Profile" WHERE id=debt.egcs_fc_fundingagreement;
         SELECT * INTO account FROM "Agency_Chart_of_Account" WHERE id=NEW.egcs_fc_creditmemochartofaccount;
         IF account.id IS NULL OR account._deleted OR account.egcs_ay_kind<>'credit_memo'
-          OR account.egcs_ay_fiscalyear<>debt.egcs_fc_agencyfiscalyear OR account.egcs_ay_currency<>debt.egcs_fc_currency
+          OR (jsonb_typeof(memo.egcs_fc_allocationevidence) IS DISTINCT FROM 'object' AND account.egcs_ay_fiscalyear<>debt.egcs_fc_agencyfiscalyear) OR account.egcs_ay_currency<>debt.egcs_fc_currency
           OR account.egcs_ay_organizationagency<>(SELECT egcs_fc_agency FROM "Funding_Case_Account_Receivable_Pool" WHERE id=memo.egcs_fc_pool)
-          OR NEW.egcs_fc_creditmemoaccountingdimensions IS DISTINCT FROM account.egcs_ay_accountingdimensions
-          OR NEW.egcs_fc_commitmentchartofaccount IS DISTINCT FROM account.egcs_ay_commitmentchartofaccount
+          OR (NEW.egcs_fc_commitmentchartofaccount IS NOT NULL AND NOT EXISTS (SELECT 1 FROM "Agency_Chart_of_Account" linked
+            WHERE linked.id=NEW.egcs_fc_commitmentchartofaccount AND linked.egcs_ay_kind='commitment'
+              AND linked.egcs_ay_organizationagency=account.egcs_ay_organizationagency AND linked.egcs_ay_currency=account.egcs_ay_currency
+              AND linked.egcs_ay_fiscalyear=account.egcs_ay_fiscalyear AND NOT linked._deleted))
+          OR (jsonb_typeof(memo.egcs_fc_allocationevidence) IS DISTINCT FROM 'object' AND (NEW.egcs_fc_creditmemoaccountingdimensions IS DISTINCT FROM account.egcs_ay_accountingdimensions
+          OR NEW.egcs_fc_commitmentchartofaccount IS DISTINCT FROM account.egcs_ay_commitmentchartofaccount))
+          OR (jsonb_typeof(memo.egcs_fc_allocationevidence)='object' AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(memo.egcs_fc_allocationevidence->'accounts') captured
+            WHERE captured->>'agencyChartOfAccountId'=account.id::text AND captured->'accountingDimensions'=NEW.egcs_fc_creditmemoaccountingdimensions
+              AND (captured->>'commitmentChartOfAccountId')::bigint IS NOT DISTINCT FROM NEW.egcs_fc_commitmentchartofaccount))
           OR NOT EXISTS (SELECT 1 FROM "Transfer_Payment_Stream_Chart_of_Account" selection
             WHERE selection.id=NEW.egcs_fc_transferpaymentstreamchartofaccount
               AND selection.egcs_tp_transferpaymentstream=stream_id AND selection.egcs_tp_agencychartofaccount=account.id AND NOT selection._deleted)

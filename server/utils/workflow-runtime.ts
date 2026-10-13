@@ -1,3 +1,7 @@
+import { extensionLifecycleAdapterContext,
+  resolveExtensionEligibleAssigneeIds,
+  resolveExtensionLifecycleRuntimeInTransaction
+} from './extension-lifecycle-context'
 import { assertAccountReceivableWorkflowStatusTransition, captureAccountReceivablePacket, captureAccountReceivableCreditMemoPacket, postAccountReceivable, postAccountReceivableCreditMemo, recordAccountReceivableTerminalOutcome, recordAccountReceivableCreditMemoTerminalOutcome } from './account-receivable-posting'
 import { captureAccountReceivablePaymentOffsetPacket, postAccountReceivablePaymentOffset, releaseAccountReceivablePaymentOffset, validateAccountReceivablePaymentOffset, readAccountReceivablePaymentOffset } from './account-receivable-recovery'
 import { resolveAccountReceivableRuntimeContext, resolveAccountReceivableCreditMemoRuntimeContext, lockAccountReceivablePaymentPoolAgreements, lockAccountReceivableRecoveryPool } from './account-receivable-context'
@@ -83,10 +87,6 @@ import { resolveEntityTypeLifecycleDefinition } from './entity-type-registry'
 import { createCompletionRecord, resolveCompletionEvidenceId } from './completion-runtime-core'
 import { applyCompletionPositiveTerminusEffects } from './completion-positive-terminus'
 import { loadExtensionLifecycleEntity } from './extensions'
-import {
-  resolveExtensionEligibleAssigneeIds,
-  resolveExtensionLifecycleRuntimeInTransaction
-} from './extension-lifecycle-context'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { requireQualifiedRuntimeLockEvidence } from './qualified-runtime-transaction'
 import { assertCorrectionWorkflowStatusTransition, captureCorrectionPacket, postCorrection, recordCorrectionTerminalOutcome } from './correction-posting'
@@ -242,11 +242,7 @@ const applyWorkflowParentStatusTransition = async (
           String(run.egcs_cn_entityid)
         )
         const loaded = evidence.runtime.loaded
-        const adapterContext = {
-          event: null,
-          transaction: trx as never,
-          actorUserId: actor ?? ''
-        }
+        const adapterContext = extensionLifecycleAdapterContext(null, trx, actor ?? '', evidence.runtime.lockedEntity.owner)
         const lockedEntity = evidence.runtime.lockedEntity
         await loaded.adapter.mutateStatus(adapterContext, {
           lockedEntity,
@@ -568,7 +564,7 @@ export const finishWorkflowRun = async (
       )
       const loaded = evidence.runtime.loaded
       if (loaded?.adapter.onPositiveTerminus) {
-        const adapterContext = { event: null, transaction: trx as never, actorUserId: actor ?? '' }
+        const adapterContext = extensionLifecycleAdapterContext(null, trx, actor ?? '', evidence.runtime.lockedEntity.owner)
         await loaded.adapter.onPositiveTerminus(adapterContext, {
           lockedEntity: evidence.runtime.lockedEntity,
           completionId: String(run.egcs_cn_completion), runtimeId: String(run.id)

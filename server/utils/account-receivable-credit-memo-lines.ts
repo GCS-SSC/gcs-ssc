@@ -66,6 +66,7 @@ export const writeAccountReceivableCreditMemoLine = async (event: H3Event, id: s
   return await executeFreshAccountReceivableWrite(event, context, async (trx, auth) => {
     await assertAccountReceivableCreditMemoScopeAuthority(event, trx, auth, id, 'update')
     const memo = await assertAccountReceivableCreditMemoEditable(event, trx, id)
+    if (memo.egcs_fc_allocationevidence) return await accountReceivableError(event, 'AR_REPAYMENT_IMMUTABLE')
     if (memo.egcs_fc_ledgerkind !== 'pool') return await accountReceivableError(event, 'AR_REPAYMENT_IMMUTABLE')
     const existing = lineId
       ? await trx.selectFrom('Funding_Case_Account_Receivable_Credit_Memo_Line').selectAll()
@@ -101,6 +102,7 @@ export const deleteAccountReceivableCreditMemoLine = async (event: H3Event, id: 
   return await executeFreshAccountReceivableWrite(event, context, async (trx, auth) => {
     await assertAccountReceivableCreditMemoScopeAuthority(event, trx, auth, id, 'delete')
     const memo = await assertAccountReceivableCreditMemoEditable(event, trx, id)
+    if (memo.egcs_fc_allocationevidence) return await accountReceivableError(event, 'AR_REPAYMENT_IMMUTABLE')
     if (memo.egcs_fc_ledgerkind !== 'pool') return await accountReceivableError(event, 'AR_REPAYMENT_IMMUTABLE')
     const row = await trx.updateTable('Funding_Case_Account_Receivable_Credit_Memo_Line').set({ _deleted: true })
       .where('id', '=', lineId).where('egcs_fc_creditmemo', '=', id).where('_deleted', '=', false).returning('id').executeTakeFirst()

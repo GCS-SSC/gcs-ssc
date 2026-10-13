@@ -14,7 +14,14 @@ interface ForeignKey {
 // Restoring it through authoring triggers would duplicate Entity/Publication identities.
 const restoreSnapshot = async <DB>(db: Kysely<DB>): Promise<void> => {
   // Keep the captured JSON opaque to TypeScript while bundling it into demo.mjs.
-  const { default: snapshot } = await import('../seeds/ncia-demo.json' as string) as { default: DemoSnapshot }
+  const [{ default: captured }, { default: maple }] = await Promise.all([
+    import('../seeds/ncia-demo.json' as string) as Promise<{ default: DemoSnapshot }>,
+    import('../seeds/maple-demo.json' as string) as Promise<{ default: Record<string, Array<Record<string, unknown>>> }>
+  ])
+  const snapshot: DemoSnapshot = { ...captured }
+  for (const [table, rows] of Object.entries(maple)) {
+    snapshot[table] = [...(snapshot[table] ?? []), ...rows]
+  }
   const tables = Object.entries(snapshot)
   const foreignKeys = await sql<ForeignKey>`
     SELECT conrelid::regclass::text AS table_name, conname AS constraint_name
@@ -51,8 +58,9 @@ const restoreSnapshot = async <DB>(db: Kysely<DB>): Promise<void> => {
 
   // Force every foreign-key check before restoring the schema's original timing.
   await sql`SET CONSTRAINTS ALL IMMEDIATE`.execute(db)
-  for (const [table] of tables) {
+  for (const [table, rows] of tables) {
     await sql`ALTER TABLE ${sql.id(...table.split('.'))} ENABLE TRIGGER USER`.execute(db)
+    if (!Object.hasOwn(rows[0]!, 'id')) continue
     const sequence = await sql<{ name: string | null }>`
       SELECT pg_get_serial_sequence(${table.includes('.') ? table : `"${table}"`}, 'id') AS name
     `.execute(db)

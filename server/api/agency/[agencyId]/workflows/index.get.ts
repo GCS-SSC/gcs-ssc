@@ -1,13 +1,16 @@
 import { authorize } from '~~/server/utils/authorize'
 import { authorizeAgencyWorkflowCatalog } from '~~/server/utils/agency-workflow-authorization'
+import { EntityTypeIdentitySchema } from '~~/shared/types/schemas/common'
 import { PaginationSchema } from '~~/shared/types/schemas'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { readPublicationMetadataBatch } from '~~/server/utils/system-publication'
 import { z } from 'zod'
+import { sql } from 'kysely'
 
 const AgencyWorkflowListQuerySchema = PaginationSchema.extend({
-  publicationState: z.enum(['draft', 'published', 'retired']).optional()
+  publicationState: z.enum(['draft', 'published', 'retired']).optional(),
+  entityType: EntityTypeIdentitySchema.optional()
 })
 
 export default defineEventHandler(async event => {
@@ -16,13 +19,20 @@ export default defineEventHandler(async event => {
   if (!agencyId) return await badRequest(event, 'MISSING_IDS', 'apiErrors.request.missing_ids')
   await authorizeAgencyWorkflowCatalog(event, 'read', agencyId)
   await authorize(event, 'agency', 'read', { type: 'agency', agencyId })
-  const { page, limit, search, publicationState } = await getValidatedQueryI18n(event, AgencyWorkflowListQuerySchema)
+  const { page, limit, search, publicationState, entityType } = await getValidatedQueryI18n(event, AgencyWorkflowListQuerySchema)
   const offset = (page - 1) * limit
   let baseQuery = db.selectFrom('Common_Workflow_Setup')
     .innerJoin('Common_Publication', 'Common_Publication.id', 'Common_Workflow_Setup.id')
     .innerJoin('Common_Entity_Type', 'Common_Entity_Type.egcs_cn_type', 'Common_Workflow_Setup.egcs_cn_entitytype')
     .where('Common_Workflow_Setup.egcs_cn_agency', '=', agencyId).where('Common_Workflow_Setup._deleted', '=', false)
     .where('Common_Publication._deleted', '=', false)
+  if (entityType) {
+    baseQuery = publicationState === 'published'
+      ? baseQuery.where(eb => eb.exists(eb.selectFrom('Common_Publication_Version as publishedVersion').select('publishedVersion.id')
+          .whereRef('publishedVersion.id', '=', 'Common_Publication.egcs_cn_currentversion')
+          .where(sql<string>`${sql.ref('publishedVersion.egcs_cn_definition')} ->> 'entityType'`, '=', entityType)))
+      : baseQuery.where('Common_Workflow_Setup.egcs_cn_entitytype', '=', entityType)
+  }
   if (publicationState) baseQuery = baseQuery.where('Common_Publication.egcs_cn_state', '=', publicationState)
   if (search) {
     const value = escapeLikePattern(search)

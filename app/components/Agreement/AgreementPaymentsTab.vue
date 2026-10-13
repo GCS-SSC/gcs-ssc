@@ -29,6 +29,8 @@ import { withFormRequirements } from '~~/shared/utils/form-requirements'
 import { sumMoney } from '~~/shared/utils/money'
 
 type PaymentWizardForm = FundingCaseAgreementPaymentForm & {
+  egcs_fc_offsetdate?: string
+  egcs_fc_offsetdatetoken?: string
   egcs_fc_offsetplanhash?: string
   egcs_fc_offsetcreditmemos?: Array<{
     egcs_fc_key: string
@@ -127,13 +129,15 @@ onBeforeUnmount(() => {
 })
 const paymentHeader = () => {
   if (!selectedPayment.value) return null
-  const { egcs_fc_offsetplanhash: _hash, egcs_fc_offsetcreditmemos: _memos, ...header } = selectedPayment.value
+  const { egcs_fc_offsetdatetoken: _token, egcs_fc_offsetdate: _date, egcs_fc_offsetplanhash: _hash, egcs_fc_offsetcreditmemos: _memos, ...header } = selectedPayment.value
   return header
 }
 const paymentHeaderSignature = computed(() => JSON.stringify(paymentHeader()))
 watch(paymentHeaderSignature, () => {
   offsetPreview.value = null
   if (selectedPayment.value) {
+    delete selectedPayment.value.egcs_fc_offsetdatetoken
+    delete selectedPayment.value.egcs_fc_offsetdate
     delete selectedPayment.value.egcs_fc_offsetplanhash
     delete selectedPayment.value.egcs_fc_offsetcreditmemos
   }
@@ -186,6 +190,8 @@ const preparePaymentOffset = async () => {
     const preview = await sendJson<PaymentOffsetPreview>(previewUrl, 'POST', header)
     if (disposed || !isPaymentModalOpen.value || paymentModal.captureSession() !== session || owner !== agreementId || signature !== paymentHeaderSignature.value || !selectedPayment.value) return false
     offsetPreview.value = preview
+    selectedPayment.value.egcs_fc_offsetdatetoken = preview.egcs_fc_offsetdatetoken
+    selectedPayment.value.egcs_fc_offsetdate = preview.egcs_fc_offsetdate
     selectedPayment.value.egcs_fc_offsetplanhash = preview.egcs_fc_offsetplanhash
     selectedPayment.value.egcs_fc_offsetcreditmemos = preview.egcs_fc_creditmemos.map(memo => ({
       egcs_fc_key: memo.egcs_fc_key,

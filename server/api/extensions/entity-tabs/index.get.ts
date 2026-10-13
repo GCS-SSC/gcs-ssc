@@ -186,6 +186,14 @@ const collectExtensionEntityTabItems = async (
         continue
       }
 
+      const detailComponentName = tab.target === 'agreement' ? tab.detailPage?.componentName : undefined
+      const permissions = detailComponentName
+        ? {
+            canUpdate: authResult.userAbilities.authorize('agreement', 'update', entityContext.scope),
+            canDelete: authResult.userAbilities.authorize('agreement', 'delete', entityContext.scope),
+            canWork: await canAccessExtensionEntity(authResult, { subject: 'agreement', action: 'update' }, entityContext, db)
+          }
+        : undefined
       items.push({
         extensionKey: extension.key,
         tabId: tab.id,
@@ -193,6 +201,7 @@ const collectExtensionEntityTabItems = async (
         label: tab.label,
         icon: tab.icon,
         componentName,
+        ...(detailComponentName ? { detailComponentName, permissions } : {}),
         config,
         context: { ...entityContext, target: entityContext.target as 'agreement' | 'claim' | 'monitor' | 'opportunity' | 'payment' },
         rbac: tab.rbac
@@ -242,6 +251,21 @@ export default defineEventHandler(async event => {
 
   const authResult = await authorizeExtensionEntityTabs(event, db, entityContext)
   const items = await collectExtensionEntityTabItems(db, authResult, query.target, entityContext)
+  if (query.target === 'agreement' && items.some(item => item.detailComponentName)) {
+    const agreement = await db.selectFrom('Funding_Case_Agreement_Profile')
+      .select(['egcs_fc_title_en', 'egcs_fc_title_fr', 'egcs_fc_agreementnumber'])
+      .where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirst()
+    if (agreement) {
+      for (const item of items) {
+        if (!item.detailComponentName) continue
+        item.agreementContext = {
+          titleEn: agreement.egcs_fc_title_en,
+          titleFr: agreement.egcs_fc_title_fr,
+          agreementNumber: agreement.egcs_fc_agreementnumber
+        }
+      }
+    }
+  }
 
   const response: ExtensionEntityTabsResponse = {
     target: query.target,

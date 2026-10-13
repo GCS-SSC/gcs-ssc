@@ -1,6 +1,6 @@
 /* eslint-disable jsdoc/require-jsdoc -- Extension accounting choices retain the host's source and paid-capacity evidence. */
 import { sql, type Transaction } from 'kysely'
-import type { Database } from '~~/shared/types/database'
+import type { Database, JsonValue } from '~~/shared/types/database'
 import type { AgreementCodingAllocation } from './agreement-coding-allocator'
 import { moneyFromCents, moneyToCents, subtractMoney } from '~~/shared/utils/money'
 import { accountReceivableSourceUsage } from './account-receivable-context'
@@ -8,6 +8,10 @@ import { databaseMoneyValue, parseDatabaseMoney } from './database-money'
 import { readAccountReceivableLines, readAccountReceivableCoding, allocateRetainedAccountReceivableCoding, validateAccountReceivableBasis } from './account-receivable'
 
 export const applyAllocatedAccountReceivableCoding = async (trx: Transaction<Database>, id: string, allocations: AgreementCodingAllocation[]) => {
+  const first = allocations[0]
+  if (first && 'allocationPolicy' in first) await trx.updateTable('Funding_Case_Agreement_Account_Receivable').set({
+    egcs_fc_allocationevidence: sql<JsonValue>`${JSON.stringify({ scope: 'stream', policy: first.allocationPolicy ?? null, accounts: allocations.map(({ amount: _amount, allocationPolicy: _policy, ...account }) => account) })}::jsonb`
+  }).where('id', '=', id).execute()
   const debt = await trx.selectFrom('Funding_Case_Agreement_Account_Receivable').select('egcs_fc_applicantrecipient').where('id', '=', id).executeTakeFirstOrThrow()
   const sources = await readAccountReceivableLines(trx, id)
   const coding = await readAccountReceivableCoding(trx, id)

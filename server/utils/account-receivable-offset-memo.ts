@@ -48,7 +48,7 @@ export const readAccountReceivableOffsetMemoLines = async (db: Kysely<Database>,
     .select(databaseMoneyText(sql.ref('egcs_fc_amount')).as('amount'))
     .where('egcs_fc_offsetmemo', '=', memoId).orderBy('egcs_fc_linenumber').execute()
   return lines.map(line => ({ id: String(line.id), egcs_fc_linenumber: line.egcs_fc_linenumber,
-    egcs_fc_transferpaymentstreamchartofaccount: String(line.egcs_fc_transferpaymentstreamchartofaccount),
+    egcs_fc_transferpaymentstreamchartofaccount: line.egcs_fc_transferpaymentstreamchartofaccount === null ? null : String(line.egcs_fc_transferpaymentstreamchartofaccount),
     egcs_fc_creditmemochartofaccount: String(line.egcs_fc_creditmemochartofaccount),
     egcs_fc_creditmemoaccountingdimensions: line.egcs_fc_creditmemoaccountingdimensions,
     egcs_fc_commitmentchartofaccount: line.egcs_fc_commitmentchartofaccount === null ? null : String(line.egcs_fc_commitmentchartofaccount),
@@ -56,15 +56,17 @@ export const readAccountReceivableOffsetMemoLines = async (db: Kysely<Database>,
 }
 
 export const linkAccountReceivablePoolOffsetApplication = async (trx: Transaction<Database>, recoveryId: string,
-  plans: Array<{ receivableId: string; amount: import('~~/shared/utils/money').Money; coding: AgreementCodingAllocation[] }>) => {
+  plans: Array<{ receivableId: string; effectiveDate?: string; amount: import('~~/shared/utils/money').Money; coding: AgreementCodingAllocation[] }>) => {
   const recovery = await trx.selectFrom('Funding_Case_Account_Receivable_Recovery').selectAll()
     .where('id', '=', recoveryId).executeTakeFirstOrThrow()
   for (const plan of plans) {
     if (!plan.coding.length || sumMoney(plan.coding.map(line => line.amount)) !== plan.amount) throw new Error('AR_OFFSET_CODING_REQUIRED')
     const memo = await trx.insertInto('Funding_Case_Account_Receivable_Offset_Memo').values({
       egcs_fc_pool: String(recovery.egcs_fc_pool), egcs_fc_receivable: plan.receivableId,
+      egcs_fc_allocationevidence: plan.coding[0] && 'allocationPolicy' in plan.coding[0] ? sql`${JSON.stringify({ scope: 'stream', policy: plan.coding[0].allocationPolicy ?? null, accounts: plan.coding.map(({ amount: _amount, allocationPolicy: _policy, ...account }) => account) })}::jsonb` : null,
+      egcs_fc_effectivedate: sql<Date>`${plan.effectiveDate ?? new Date().toISOString().slice(0, 10)}::date`,
       egcs_fc_amount: databaseMoneyValue(plan.amount) }).returning('id').executeTakeFirstOrThrow()
-    for (const [index, line] of plan.coding.entries()) {
+    for (const [index, line] of plan.coding.filter(line => line.amount !== ZERO).entries()) {
       await trx.insertInto('Funding_Case_Account_Receivable_Offset_Memo_Line').values({ egcs_fc_offsetmemo: String(memo.id),
         egcs_fc_linenumber: index + 1, egcs_fc_transferpaymentstreamchartofaccount: line.codingLineId,
         egcs_fc_commitmentchartofaccount: line.commitmentChartOfAccountId ?? null,

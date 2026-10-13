@@ -228,7 +228,8 @@ export const listProponentCreditMemos = async (event: H3Event, id: string, reque
     const cash = cashIds.length
       ? await db.selectFrom('Funding_Case_Account_Receivable_Credit_Memo as memo')
           .select(['memo.id', 'memo.egcs_fc_number', 'memo.egcs_fc_agency', 'memo.egcs_fc_currency', 'memo.egcs_fc_status',
-            'memo.egcs_fc_receiveddate', 'memo.egcs_fc_createdat', 'memo.egcs_fc_outcome'])
+            'memo.egcs_fc_createdat', 'memo.egcs_fc_outcome'])
+          .select(sql<string>`memo.egcs_fc_receiveddate::text`.as('egcs_fc_receiveddate'))
           .select(databaseMoneyText(sql.ref('memo.egcs_fc_amount')).as('egcs_fc_amount'))
           .where('memo.egcs_fc_applicantrecipient', '=', id).where('memo.egcs_fc_agency', 'in', [...agencyById.keys()])
           .where('memo._deleted', '=', false).where('memo.id', 'in', cashIds).execute()
@@ -242,7 +243,7 @@ export const listProponentCreditMemos = async (event: H3Event, id: string, reque
         egcs_fc_creditmemoreference: String(memo.id),
         egcs_fc_agency: String(agency.id), egcs_fc_agencyname_en: agency.egcs_ay_name_en, egcs_fc_agencyname_fr: agency.egcs_ay_name_fr,
         egcs_fc_currency: memo.egcs_fc_currency, egcs_fc_amount: parseDatabaseMoney(memo.egcs_fc_amount),
-        egcs_fc_createdat: isoDate(memo.egcs_fc_createdat), egcs_fc_receiveddate: isoDate(memo.egcs_fc_receiveddate)
+        egcs_fc_createdat: isoDate(memo.egcs_fc_createdat), egcs_fc_receiveddate: memo.egcs_fc_receiveddate
       }
     }))
     const offsetRows = await readOffsetMemoRows(db, id, agencies, auth,

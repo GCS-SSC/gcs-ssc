@@ -11,14 +11,19 @@ import {
 import type { Component } from 'vue'
 import CommonFlowDiagram from '~/components/Common/FlowDiagram.vue'
 import CommonCompletionSection from '~/components/Common/Completions/Section.vue'
+import CommonCompletionPanel from '~/components/Common/Completions/Panel.vue'
+import { useUrlTabState } from '~/composables/useUrlTabState'
 import CommonWorkflowSection from '~/components/Common/Workflow/Section.vue'
 import CommonWorkflowSupplementaryInformation from '~/components/Common/Workflow/SupplementaryInformation.vue'
 import {
   AssessmentSchemaAccordionSection,
   AssessmentSchemaPageSection,
   CommonEntityEditorWorkspace,
+  CommonDetailPage,
+  CommonDetailWorkspace,
   CommonEntityHero,
   CommonCompactTable,
+  CommonSelectableTable,
   CommonCurrencyInput,
   CommonPaymentCalculationBreakdown,
   CommonResourceLayoutCard,
@@ -27,6 +32,7 @@ import {
   CommonSection,
   CommonStatusBadge,
   CommonStatusSelect,
+  CommonStreamWorkflowLinks,
   UAccordion,
   UAlert,
   UBadge,
@@ -60,9 +66,13 @@ const extensionHostComponents = {
   CommonAssessmentSchemaAccordionSection: AssessmentSchemaAccordionSection,
   CommonAssessmentSchemaPageSection: AssessmentSchemaPageSection,
   CommonCompletionSection,
+  CommonCompletionPanel,
   CommonEntityEditorWorkspace,
+  CommonDetailPage,
+  CommonDetailWorkspace,
   CommonEntityHero,
   CommonCompactTable,
+  CommonSelectableTable: asExtensionHostComponent(CommonSelectableTable),
   CommonCurrencyInput,
   CommonPaymentCalculationBreakdown,
   CommonResourceLayoutCard,
@@ -71,6 +81,7 @@ const extensionHostComponents = {
   CommonSection,
   CommonStatusBadge,
   CommonStatusSelect,
+  CommonStreamWorkflowLinks,
   CommonWorkflowSection,
   CommonWorkflowSupplementaryInformation,
   UAccordion: asExtensionHostComponent(UAccordion),
@@ -95,6 +106,7 @@ const extensionHostComponents = {
 const useExtensionFetch: GcsExtensionUiRuntime['composables']['useFetch'] = useFetch
 
 const extensionHostComposables = {
+  useUrlTabState,
   useConfirmDialog: (): GcsExtensionConfirmDialog => {
     const confirm = useConfirmDialog()
     return options => confirm(options)

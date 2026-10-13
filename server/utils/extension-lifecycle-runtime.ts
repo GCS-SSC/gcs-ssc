@@ -168,7 +168,7 @@ export const executeExtensionCompletion = async (
         userId: actor.id,
         disposition: setup ? 'workflow_started' : 'no_workflow'
       })
-      await current.loaded.adapter.validateCompletion(adapterContext(event, trx, actor.id), {
+      await current.loaded.adapter.validateCompletion(adapterContext(event, trx, actor.id, current.lockedEntity.owner), {
         completionId: completion.id,
         lockedEntity: current.lockedEntity
       })
@@ -181,7 +181,7 @@ export const executeExtensionCompletion = async (
         : null
       if (setup && !workflow) throw new Error('Extension Workflow materialization failed')
       if (!workflow && current.loaded.adapter.onPositiveTerminus) {
-        await current.loaded.adapter.onPositiveTerminus(adapterContext(event, trx, actor.id), {
+        await current.loaded.adapter.onPositiveTerminus(adapterContext(event, trx, actor.id, current.lockedEntity.owner), {
           completionId: completion.id,
           lockedEntity: current.lockedEntity
         })

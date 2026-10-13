@@ -31,7 +31,9 @@ import { useAgreementRiskSource } from '~/composables/useAgreementRiskSource'
 import { useUrlTabState } from '~/composables/useUrlTabState'
 
 definePageMeta({
-  key: route => route.path,
+  key: route => ['extensionKey', 'tabId', 'recordId'].every(key => typeof route.params[key] === 'string')
+    ? JSON.stringify([route.params.id, route.params.extensionKey, route.params.tabId, route.params.recordId])
+    : route.path,
   i18n: {
     paths: {
       en: '/agreements/[id]',
@@ -119,6 +121,9 @@ const refreshProfile = async () => {
 if (!isChildDetailRoute.value) void refreshProfile()
 const {
   tabs: extensionTabs,
+  status: extensionTabsStatus,
+  error: extensionTabsError,
+  refresh: refreshExtensionTabs,
   getExtensionTabItem
 } = useExtensionEntityTabs({
   target: 'agreement',
@@ -264,7 +269,7 @@ const tabs = computed(() => {
 const { selectedTab } = useUrlTabState({
   tabs,
   defaultTab: 'general',
-  enabled: computed(() => !isChildDetailRoute.value && profile.value !== null && permissionsReady.value)
+  enabled: computed(() => !isChildDetailRoute.value && profile.value !== null && permissionsReady.value && extensionTabsStatus.value === 'success')
 })
 const selectedExtensionTab = computed(() => getExtensionTabItem(selectedTab.value))
 
@@ -390,6 +395,17 @@ const cancel = () => {
             show-context />
 
           <CommonDetailWorkspace v-model="selectedTab" content-test-id="agreement-detail-content" :items="tabs">
+            <template #notices>
+              <p v-if="extensionTabsStatus === 'pending'" role="status" aria-live="polite" class="flex items-center gap-2 text-sm text-muted">
+                <UIcon name="i-lucide-loader-circle" class="size-4 animate-spin" aria-hidden="true" />
+                {{ t('extensions.entity_tabs_loading') }}
+              </p>
+              <UAlert v-else-if="extensionTabsError" color="error" icon="i-lucide-circle-alert" :title="t('extensions.entity_tabs_load_failed')" :description="t('extensions.entity_tabs_load_failed_description')">
+                <template #actions>
+                  <UButton color="error" variant="soft" :label="t('common.retry')" icon="i-lucide-refresh-cw" @click="refreshExtensionTabs" />
+                </template>
+              </UAlert>
+            </template>
             <AgreementProfileFormPage
               v-if="selectedTab === 'general' && selectedProfile && canUpdateBusinessRecord"
               v-model:model="selectedProfile"

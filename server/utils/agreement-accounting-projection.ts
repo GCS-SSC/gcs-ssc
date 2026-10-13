@@ -219,8 +219,10 @@ export const getAgreementAccountingCodingPools = async (db: Kysely<Database>, ag
       paid: addMoney(pool.paid, sumMoney([line.egcs_fc_originalpaid, line.egcs_fc_priorcorrections])) })
   }
   for (const row of await readEffectiveAccountReceivableRecoveries(db, agreementId)) {
-    const pool = pools.get(String(row.agencyChartId))
-    if (pool) pool.paid = addMoney(pool.paid, row.amount)
+    const key = String(row.agencyChartId)
+    const pool = pools.get(key) ?? { committed: ZERO, paid: ZERO }
+    pool.paid = addMoney(pool.paid, row.amount)
+    pools.set(key, pool)
   }
   // Include incoming JV coding exactly once, even when its source row has different coding.
   const vouchers = await db.selectFrom('Funding_Case_Agreement_Journal_Voucher_Line as line')
@@ -236,8 +238,10 @@ export const getAgreementAccountingCodingPools = async (db: Kysely<Database>, ag
   for (const id of new Set(vouchers.map(row => String(row.id)))) {
     if (!await hasPositiveCompletionTerminus(db, 'fundingcasejournalvoucher', id)) continue
     for (const row of vouchers.filter(item => String(item.id) === id)) {
-      const pool = pools.get(String(row.codingId))
-      if (pool) pool.paid = addMoney(pool.paid, parseDatabaseMoney(row.amount))
+      const key = String(row.codingId)
+      const pool = pools.get(key) ?? { committed: ZERO, paid: ZERO }
+      pool.paid = addMoney(pool.paid, parseDatabaseMoney(row.amount))
+      pools.set(key, pool)
     }
   }
   return pools

@@ -1,4 +1,5 @@
 /* eslint-disable jsdoc/require-jsdoc -- Payment creation retains an explicit, exact, user-reviewed offset coding plan. */
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import type { H3Event } from 'h3'
 import type { Transaction } from 'kysely'
 import { sql } from 'kysely'
@@ -18,18 +19,24 @@ import { hashPublicationDefinition } from './system-publication'
 import type { GcsCodingAllocationCatalogLine } from '@gcs-ssc/extensions/server'
 import { databaseMoneyText, parseDatabaseMoney } from './database-money'
 
-export type PaymentOffsetCodingPlan = { receivableId: string; amount: Money; coding: AgreementCodingAllocation[] }
+export type PaymentOffsetCodingPlan = { receivableId: string; amount: Money; effectiveDate?: string; coding: AgreementCodingAllocation[] }
 type PreparedPaymentOffsetPlan = {
   preview: PaymentOffsetPreview
   plans: Array<{ receivableId: string; amount: Money; catalog: GcsCodingAllocationCatalogLine[]; allocated: AgreementCodingAllocation[] | null }>
 }
 const asJson = (value: unknown): JsonValue => JSON.parse(JSON.stringify(value)) as JsonValue
 const ZERO = parseMoney('0.00')
+const processDateSecret = randomBytes(32).toString('hex')
+// Local auth may omit a secret; restart invalidates only unsaved local previews.
+const dateToken = (event: H3Event, agreementId: string, date: string) => {
+  const secret = process.env.BETTER_AUTH_SECRET || (typeof useRuntimeConfig === 'function' ? useRuntimeConfig().authSecret : '') || processDateSecret
+  return createHmac('sha256', secret).update(JSON.stringify({ agreementId, date, userId: event.context?.$authContext?.userId ?? null })).digest('hex')
+}
 
 export const prepareAgreementPaymentOffsetPlan = async (
   event: H3Event, trx: Transaction<Database>,
   context: { agreementId: string; agencyId: string; streamId: string }, header: FundingCaseAgreementPaymentCreate,
-  options: { paymentId?: string } = {}
+  options: { paymentId?: string; preview?: boolean } = {}
 ): Promise<PreparedPaymentOffsetPlan> => {
   await assertPaymentRecoveryAllowed(event, trx, { agreementId: context.agreementId,
     applicantRecipientId: header.egcs_fc_applicantrecipient, currency: header.egcs_fc_currency, paymentId: options.paymentId })
@@ -38,6 +45,24 @@ export const prepareAgreementPaymentOffsetPlan = async (
   const pool = await trx.selectFrom('Funding_Case_Account_Receivable_Pool').select('id')
     .where('egcs_fc_agency', '=', context.agencyId).where('egcs_fc_applicantrecipient', '=', header.egcs_fc_applicantrecipient)
     .where('egcs_fc_currency', '=', header.egcs_fc_currency).where('_deleted', '=', false).executeTakeFirst()
+  const priorMemo = options.paymentId
+    ? await trx.selectFrom('Funding_Case_Account_Receivable_Offset_Memo as memo')
+        .innerJoin('Funding_Case_Account_Receivable_Offset_Memo_Application as application', 'application.egcs_fc_offsetmemo', 'memo.id')
+        .innerJoin('Funding_Case_Account_Receivable_Recovery as recovery', 'recovery.id', 'application.egcs_fc_recovery')
+        .select(sql<string>`memo.egcs_fc_effectivedate::text`.as('egcs_fc_effectivedate')).where('recovery.egcs_fc_payment', '=', options.paymentId)
+        .where('recovery.egcs_fc_outcome', '=', 'open').where('recovery._deleted', '=', false).executeTakeFirst()
+    : undefined
+  const effectiveDate = priorMemo
+    ? priorMemo.egcs_fc_effectivedate
+    : !options.preview && header.egcs_fc_offsetplanhash && header.egcs_fc_offsetdate ? header.egcs_fc_offsetdate : new Date().toISOString().slice(0, 10)
+  const token = dateToken(event, context.agreementId, effectiveDate)
+  if (!options.preview && !priorMemo && header.egcs_fc_offsetdate && header.egcs_fc_offsetplanhash) {
+    const submitted = Buffer.from(header.egcs_fc_offsetdatetoken ?? '', 'hex')
+    const expected = Buffer.from(token, 'hex')
+    if (submitted.length !== expected.length || !timingSafeEqual(submitted, expected)) return await withPaymentRecoveryErrors(event, async () => {
+      throw new Error('AR_OFFSET_PLAN_CHANGED')
+    })
+  }
   const plans: PreparedPaymentOffsetPlan['plans'] = []
   const creditMemos: PaymentOffsetPreview['egcs_fc_creditmemos'] = []
   const allocatorScopes: unknown[] = []
@@ -70,12 +95,27 @@ export const prepareAgreementPaymentOffsetPlan = async (
     const catalog: GcsCodingAllocationCatalogLine[] = rows.map(row => ({ ...row, codingLineId: String(row.codingLineId),
       agencyChartOfAccountId: String(row.agencyChartOfAccountId), agencyFiscalYearId: String(row.agencyFiscalYearId),
       commitmentChartOfAccountId: row.commitmentChartOfAccountId === null ? null : String(row.commitmentChartOfAccountId) }))
+    const retainedMemo = options.paymentId
+      ? await trx.selectFrom('Funding_Case_Account_Receivable_Offset_Memo as memo')
+          .innerJoin('Funding_Case_Account_Receivable_Offset_Memo_Application as application', 'application.egcs_fc_offsetmemo', 'memo.id')
+          .innerJoin('Funding_Case_Account_Receivable_Recovery as recovery', 'recovery.id', 'application.egcs_fc_recovery')
+          .select('memo.egcs_fc_allocationevidence').where('memo.egcs_fc_receivable', '=', String(debt.id))
+          .where('recovery.egcs_fc_payment', '=', options.paymentId).where('recovery.egcs_fc_outcome', '=', 'open')
+          .where('recovery._deleted', '=', false).executeTakeFirst()
+      : undefined
+    const retained = retainedMemo?.egcs_fc_allocationevidence
+    const evidence = retained && typeof retained === 'object' && !Array.isArray(retained) ? retained : null
     const allocated = await allocateAgreementCoding(event, trx, { agreementId: owner.agreementId, agencyId: owner.agencyId,
       streamId: owner.streamId, amount, currency: header.egcs_fc_currency, agencyFiscalYearId: String(debt.egcs_fc_agencyfiscalyear),
-      output: { kind: 'credit-memo' } })
+      output: { kind: 'credit-memo', effectiveDate },
+      ...(evidence?.policy ? { retainedPolicy: evidence.policy } : {}),
+      ...(Array.isArray(evidence?.accounts) ? { retainedCatalogScope: evidence.scope === 'agency' ? 'agency' as const : 'stream' as const, retainedCatalog: evidence.accounts as unknown as GcsCodingAllocationCatalogLine[] } : {}) })
+    if (evidence?.policy && allocated === null) return await withPaymentRecoveryErrors(event, async () => {
+      throw new Error('AR_OFFSET_CODING_INVALID')
+    })
     // Bind enabled provider configuration even when it explicitly returns null for this output.
     for (const extension of getGcsExtensions()) {
-      if (!extension.codingAllocator) continue
+      if (!extension.codingAllocator || evidence?.policy) continue
       const agency = await trx.selectFrom('extensions.agency_enablement').select(['enabled', 'config'])
         .where('extension_key', '=', extension.key).where('agency_id', '=', owner.agencyId).where('_deleted', '=', false).forShare().executeTakeFirst()
       const stream = extension.configurationScope === 'agency'
@@ -86,7 +126,8 @@ export const prepareAgreementPaymentOffsetPlan = async (
       allocatorScopes.push({ extension: extension.key, contribution: extension.codingAllocator.id, streamId: owner.streamId, agency, stream })
     }
     const key = hashPublicationDefinition(asJson({ pool: String(debt.egcs_fc_pool), receivable: String(debt.id) }))
-    const codingAccounts = catalog.map(account => {
+    const selectedCatalog = allocated ?? catalog
+    const codingAccounts = selectedCatalog.map(account => {
       const parsed = TransferPaymentStreamChartOfAccountDimensionSchema.array().safeParse(account.accountingDimensions)
       const dimensions = parsed.success ? parsed.data : []
       return { id: account.codingLineId, egcs_fc_name_en: dimensions.map(dimension => `${dimension.label_en}: ${dimension.value}`).join(' · ') || account.agencyChartOfAccountId,
@@ -94,20 +135,20 @@ export const prepareAgreementPaymentOffsetPlan = async (
         egcs_fc_accountingdimensions: account.accountingDimensions as JsonValue,
         egcs_fc_commitmentchartofaccount: account.commitmentChartOfAccountId ?? null }
     })
-    plans.push({ receivableId: String(debt.id), amount, catalog, allocated })
+    plans.push({ receivableId: String(debt.id), amount, catalog: selectedCatalog, allocated })
     creditMemos.push({ egcs_fc_key: key, egcs_fc_amount: amount, egcs_fc_currency: header.egcs_fc_currency,
       egcs_fc_allocationmode: allocated === null ? 'manual' : 'allocator', egcs_fc_codingaccounts: codingAccounts,
       egcs_fc_lines: allocated?.filter(line => compareMoney(line.amount, ZERO) > 0).map(line => ({ egcs_fc_codingaccount: line.codingLineId, egcs_fc_amount: line.amount })) ?? [] })
     remaining -= cents
     if (remaining <= BigInt(0)) break
   }
-  const { egcs_fc_offsetplanhash: _priorHash, egcs_fc_offsetcreditmemos: _priorMemos, ...paymentHeader } = header
+  const { egcs_fc_offsetdatetoken: _priorToken, egcs_fc_offsetdate: _priorDate, egcs_fc_offsetplanhash: _priorHash, egcs_fc_offsetcreditmemos: _priorMemos, ...paymentHeader } = header
   const offset = sumMoney(plans.map(plan => plan.amount))
-  const hash = hashPublicationDefinition(asJson({ context, paymentHeader, paymentId: options.paymentId ?? null,
+  const hash = hashPublicationDefinition(asJson({ context, effectiveDate, paymentHeader, paymentId: options.paymentId ?? null,
     poolBasis: pool && debts.length ? await captureAccountReceivablePoolBasis(trx, String(pool.id)) : null,
     debtBasis: debts.map(debt => ({ id: String(debt.id), method: debt.egcs_fc_recoverymethod, lines: debt.lines })),
     plans, creditMemos, allocatorScopes }))
-  return { preview: { egcs_fc_grossamount: header.egcs_fc_paymentamount, egcs_fc_offsetamount: offset,
+  return { preview: { egcs_fc_offsetdate: effectiveDate, egcs_fc_offsetdatetoken: token, egcs_fc_grossamount: header.egcs_fc_paymentamount, egcs_fc_offsetamount: offset,
     egcs_fc_netamount: subtractMoney(header.egcs_fc_paymentamount, offset), egcs_fc_offsetplanhash: hash, egcs_fc_creditmemos: creditMemos }, plans }
 }
 
@@ -128,7 +169,7 @@ export const validateAgreementPaymentOffsetPlan = async (
     const result = memo.egcs_fc_lines.map(line => ({ codingLineId: line.egcs_fc_codingaccount, amount: line.egcs_fc_amount }))
     if (plan.allocated && hashPublicationDefinition(asJson(result)) !== hashPublicationDefinition(asJson(preview.egcs_fc_lines.map(line => ({ codingLineId: line.egcs_fc_codingaccount, amount: line.egcs_fc_amount }))))) throw new Error('AR_OFFSET_PLAN_CHANGED')
     try {
-      return { receivableId: plan.receivableId, amount: plan.amount, coding: validateCodingAllocation(plan.amount, plan.catalog, result) }
+      return { receivableId: plan.receivableId, amount: plan.amount, effectiveDate: prepared.preview.egcs_fc_offsetdate, coding: plan.allocated ?? validateCodingAllocation(plan.amount, plan.catalog, result) }
     } catch {
       throw new Error('AR_OFFSET_CODING_INVALID')
     }

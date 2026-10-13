@@ -38,6 +38,7 @@ export const writeAccountReceivableLine = async (event: H3Event, id: string, inp
   const initial = await event.context.$db.selectFrom('Funding_Case_Agreement_Account_Receivable').select('egcs_fc_linkedreceivable').where('id', '=', id).executeTakeFirstOrThrow()
   return await executeFreshAccountReceivableWrite(event, { ...context, agreementIds: [context.agreementId] }, async trx => {
     const debt = await assertAccountReceivableEditable(event, trx, id)
+    if (debt.egcs_fc_allocationevidence) return await accountReceivableError(event, 'AR_IMMUTABLE')
     let saved = lineId ? (await readAccountReceivableLines(trx, id)).find(line => String(line.id) === lineId) : undefined
     if (lineId && !saved) return await accountReceivableError(event, 'AR_LINE_SET_STALE')
     if (options.removeCoding || options.recodeTo) {
@@ -138,7 +139,8 @@ export const deleteAccountReceivableLine = async (event: H3Event, id: string, li
   const context = await authorizeAccountReceivable(event, id, 'delete')
   if (!isPositivePostgresBigintText(lineId)) return await accountReceivableError(event, 'AR_LINE_SET_STALE')
   return await executeFreshAccountReceivableWrite(event, { ...context, agreementIds: [context.agreementId] }, async trx => {
-    await assertAccountReceivableEditable(event, trx, id)
+    const debt = await assertAccountReceivableEditable(event, trx, id)
+    if (debt.egcs_fc_allocationevidence) return await accountReceivableError(event, 'AR_IMMUTABLE')
     const row = await trx.updateTable('Funding_Case_Agreement_Account_Receivable_Line').set({ _deleted: true }).where('id', '=', lineId).where('egcs_fc_receivable', '=', id).where('_deleted', '=', false).returning('id').executeTakeFirst()
     if (!row) return await accountReceivableError(event, 'AR_LINE_SET_STALE')
     await trx.updateTable('Funding_Case_Agreement_Account_Receivable_Coding').set({ _deleted: true }).where('egcs_fc_receivableline', '=', lineId).where('egcs_fc_receivable', '=', id).execute()

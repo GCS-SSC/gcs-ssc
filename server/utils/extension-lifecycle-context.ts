@@ -1,4 +1,5 @@
 /* eslint-disable jsdoc/require-jsdoc -- low-level adapter context is covered by lifecycle host-contract tests */
+import { createExtensionAgreementFinancials } from './extension-agreement-financials'
 import { createError, type H3Event } from 'h3'
 import type { Kysely, Transaction } from 'kysely'
 import type {
@@ -37,8 +38,10 @@ export const extensionLifecycleTarget = (entityType: Entity_Type, entityId: stri
 export const extensionLifecycleAdapterContext = (
   event: H3Event | null,
   trx: Transaction<Database>,
-  actorUserId: string
-): GcsLifecycleEntityAdapterContext => ({ event, transaction: trx as never, actorUserId })
+  actorUserId: string,
+  owner?: GcsLifecycleEntityOwnerResolution
+): GcsLifecycleEntityAdapterContext => ({ event, transaction: trx as never, actorUserId,
+  ...(owner?.owner === 'agreement' ? { agreementFinancials: createExtensionAgreementFinancials(trx, owner.ownerId) } : {}) })
 
 const throwLifecycleIdentityChanged = async (event: H3Event | null): Promise<never> => {
   if (event) {

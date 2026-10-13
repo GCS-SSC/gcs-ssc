@@ -10,6 +10,7 @@ import type {
   GcsExtensionSlot
 } from '~~/shared/utils/extensions'
 import type { Scope } from '~~/shared/utils/scopes'
+import type { GcsExtensionEntityRecordPermissions } from '@gcs-ssc/extensions/ui'
 
 export const ExtensionKeySchema = z
   .string({ error: 'validation.required' })
@@ -132,6 +133,9 @@ export interface ExtensionEntityTabItem {
   config: GcsExtensionJsonConfig
   context: ExtensionEntityTabContext
   rbac: GcsExtensionRbacRequirement
+  detailComponentName?: string
+  agreementContext?: { titleEn: string; titleFr: string; agreementNumber: string }
+  permissions?: GcsExtensionEntityRecordPermissions
 }
 
 export interface ExtensionEntityTabsResponse {

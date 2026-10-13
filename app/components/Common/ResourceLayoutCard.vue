@@ -13,6 +13,7 @@ const {
   statusEnumName,
   statusFilterLabel,
   buttonLabel,
+  buttonDisabled = false,
   showButton = true,
   showToolbar = true,
   showSearch = true,
@@ -30,6 +31,7 @@ const {
   statusEnumName?: EnumKey
   statusFilterLabel?: string
   buttonLabel?: string
+  buttonDisabled?: boolean
   showButton?: boolean
   showToolbar?: boolean
   showSearch?: boolean
@@ -72,6 +74,7 @@ defineExpose({
       :status-enum-name="statusEnumName"
       :status-filter-label="statusFilterLabel"
       :button-label="buttonLabel"
+      :button-disabled="buttonDisabled"
       :show-button="showButton"
       :show-search="showSearch"
       :show-column-toggle="showColumnToggle"

@@ -29851,6 +29851,35 @@
       "_deleted": false
     }
   ],
+  "Transfer_Payment_Outcome": [
+    {
+      "id": 1,
+      "egcs_tp_transferpaymentprofile": 22,
+      "egcs_tp_name_en": "Accessible community facilities",
+      "egcs_tp_name_fr": "Installations communautaires accessibles",
+      "egcs_tp_description_en": "Improve access to community facilities through barrier-free entrances, accessible spaces and inclusive equipment.",
+      "egcs_tp_description_fr": "Améliorer l’accès aux installations communautaires grâce à des entrées sans obstacle, à des espaces accessibles et à des équipements inclusifs.",
+      "_deleted": false
+    },
+    {
+      "id": 2,
+      "egcs_tp_transferpaymentprofile": 22,
+      "egcs_tp_name_en": "Energy-efficient community infrastructure",
+      "egcs_tp_name_fr": "Infrastructures communautaires écoénergétiques",
+      "egcs_tp_description_en": "Reduce energy use in community facilities through efficient equipment, insulation and building upgrades.",
+      "egcs_tp_description_fr": "Réduire la consommation d’énergie des installations communautaires grâce à des équipements efficaces, à l’isolation et à la modernisation des bâtiments.",
+      "_deleted": false
+    },
+    {
+      "id": 3,
+      "egcs_tp_transferpaymentprofile": 22,
+      "egcs_tp_name_en": "Resilient community services",
+      "egcs_tp_name_fr": "Services communautaires résilients",
+      "egcs_tp_description_en": "Maintain reliable community services through durable facilities suited to northern conditions.",
+      "egcs_tp_description_fr": "Maintenir des services communautaires fiables grâce à des installations durables adaptées aux conditions nordiques.",
+      "_deleted": false
+    }
+  ],
   "Transfer_Payment_Fiscal_Year_Budget": [
     {
       "id": 24,

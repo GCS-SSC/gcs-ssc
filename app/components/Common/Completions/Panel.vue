@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { Entity_Type, Workflow_Target_Entity_Type } from '~~/shared/types/database'
+import type { GcsExtensionCompletionLabels } from '@gcs-ssc/extensions/ui'
 import CommonCompletionSection from './Section.vue'
 
 const {
@@ -9,6 +10,7 @@ const {
   entityId,
   canComplete,
   canWorkWorkflow,
+  labels,
   titleKey,
   descriptionKey,
   statusCompleteKey,
@@ -25,13 +27,14 @@ const {
   entityId: string
   canComplete: boolean
   canWorkWorkflow: boolean
-  titleKey: string
-  descriptionKey: string
-  statusCompleteKey: string
-  statusLockedKey: string
-  commentPlaceholderKey: string
-  completeActionKey: string
-  completedSuccessKey: string
+  labels?: GcsExtensionCompletionLabels
+  titleKey?: string
+  descriptionKey?: string
+  statusCompleteKey?: string
+  statusLockedKey?: string
+  commentPlaceholderKey?: string
+  completeActionKey?: string
+  completedSuccessKey?: string
   confirmationMessageKey?: string
   refreshKey?: number
   showHeader?: boolean
@@ -59,6 +62,7 @@ const refreshLifecycle = () => {
       :is-locked="!canComplete"
       :show-header="showHeader"
       :show-divider="showDivider"
+      :labels="labels"
       :title-key="titleKey"
       :description-key="descriptionKey"
       :status-complete-key="statusCompleteKey"

@@ -21,7 +21,11 @@ const selectItem = (item: T) => {
 </script>
 
 <template>
-  <div class="overflow-x-auto rounded-sm border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+  <div
+    role="group"
+    :aria-label="caption"
+    tabindex="0"
+    class="overflow-x-auto rounded-sm border border-zinc-200 bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:border-zinc-800 dark:bg-zinc-950">
     <table class="min-w-full divide-y divide-zinc-200 text-sm dark:divide-zinc-800">
       <caption class="sr-only">
         {{ caption }}

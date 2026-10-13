@@ -7,6 +7,7 @@ import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { getAgreementCommitmentPaymentCapacity, getCommitmentLinePaymentCoverage, validateAgreementPaymentAllocations } from './agreement-commitment-line-balance'
 import { readEffectiveAccountReceivableClaimRecoveries, getAgreementPaidAccountingProjection, getAgreementRecordedPaidToDate } from './agreement-accounting-projection'
 import { resolveAgreementCurrency } from './agreement-currency'
+import { getAgreementCostAllocationContext } from './agreement-cost-allocation-context'
 import { getAgreementPaymentCalculation } from './agreement-payment-calculation'
 
 /**
@@ -22,17 +23,18 @@ import { getAgreementPaymentCalculation } from './agreement-payment-calculation'
 export const createExtensionAgreementFinancials = (
   db: Kysely<Database> | Transaction<Database>,
   agreementId: string,
-  beforeRead?: () => Promise<void>
+  beforeRead?: (readDb: Kysely<Database> | Transaction<Database>) => Promise<void>
 ): GcsExtensionAgreementFinancials => {
   /**
    * Refreshes route authority and checks any same-Agreement exclusion.
    * @param excludePaymentId - Payment being recalculated.
    * @param requestedCurrency - Optional selection that must match the owning Agreement.
+   * @param readDb - Active host read transaction, defaulting to the bound database.
    * @returns The immutable Agreement denomination after the read scope is verified.
    */
-  const prepareRead = async (excludePaymentId?: string, requestedCurrency?: string): Promise<Currency_Codes> => {
-    await beforeRead?.()
-    const currency = await resolveAgreementCurrency(db, agreementId)
+  const prepareRead = async (excludePaymentId?: string, requestedCurrency?: string, readDb = db): Promise<Currency_Codes> => {
+    await beforeRead?.(readDb)
+    const currency = await resolveAgreementCurrency(readDb, agreementId)
     if (!currency) throw new Error('The bound Agreement is unavailable.')
     if (requestedCurrency !== undefined && requestedCurrency !== currency) {
       const message = {
@@ -46,7 +48,7 @@ export const createExtensionAgreementFinancials = (
       })
     }
     if (excludePaymentId) {
-      const payment = await db.selectFrom('Funding_Case_Agreement_Payment as excludedPayment')
+      const payment = await readDb.selectFrom('Funding_Case_Agreement_Payment as excludedPayment')
         .innerJoin('Funding_Case_Agreement_Commitment as excludedCommitment',
           'excludedCommitment.id', 'excludedPayment.egcs_fc_fundingagreementcommitment')
         .select('excludedPayment.id').where('excludedPayment.id', '=', excludePaymentId)
@@ -57,6 +59,13 @@ export const createExtensionAgreementFinancials = (
     return currency
   }
   const financials: GcsExtensionAgreementFinancials = {
+    /** Refreshes authority and reads allocation context in the active host financial transaction. */
+    getCostAllocationContext: async (input = {}) => {
+      if (input.transaction && !input.transaction.isTransaction) throw new Error('Cost allocation requires a host transaction.')
+      const readDb = input.transaction as Transaction<Database> | undefined ?? db
+      const currency = await prepareRead(undefined, undefined, readDb)
+      return await getAgreementCostAllocationContext(readDb, agreementId, currency)
+    },
     /** Supplies financial projections and holdback settings for extension-owned Payment calculations. */
     getPaymentCalculation: async input => {
       const currency = await prepareRead(input.excludePaymentId, input.currency)

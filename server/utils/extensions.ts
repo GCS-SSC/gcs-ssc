@@ -1,3 +1,4 @@
+import { readAgencyCodingCatalog } from './agreement-coding-allocator'
 import { createExtensionAgreementFinancials } from './extension-agreement-financials'
 import { assertAgreementCorrectionFinancialWriteAllowed } from './correction-lock'
 import { assertPaymentMutationRecoveryAllowed } from './payment-recovery-controls'
@@ -50,7 +51,7 @@ import { resolveAgreementMonitorRuntimeContext } from './agreement-monitor'
 import { resolveFundingOpportunityScope } from './funding-case'
 import { badRequest, throwApiError } from './api-errors'
 import type { AuthContext } from './authorize'
-import type { Database, JsonValue } from '~~/shared/types/database'
+import type { Currency_Codes, Database, JsonValue } from '~~/shared/types/database'
 import type {
   GcsClientExtensionManifest,
   GcsExtensionCreateOperation,
@@ -936,7 +937,11 @@ export const runExtensionConfigurationGuards = async (
     await useNitroApp().hooks.callHook(GCS_EXTENSION_CONFIGURATION_GUARD_HOOK, {
       ...context,
       event,
-      db: db as unknown as Transaction<unknown>
+      db: db as unknown as Transaction<unknown>,
+      codingAccounts: { list: async input => await readAgencyCodingCatalog(db, {
+        agencyId: context.agencyId, kind: input.kind, currency: input.currency as Currency_Codes,
+        agencyFiscalYearId: input.agencyFiscalYearId
+      }) }
     })
   } catch (error: unknown) {
     await handleExtensionCreateOperationError(event, error)

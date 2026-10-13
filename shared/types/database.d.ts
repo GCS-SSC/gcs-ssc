@@ -2731,6 +2731,7 @@ export interface AuditAttributionColumns {
 }
 
 export interface FundingCaseAgreementAccountReceivableTable {
+  egcs_fc_allocationevidence: Generated<JsonValue | null>
   egcs_fc_entitytype: Generated<'fundingcaseaccountreceivable' | 'fundingcaseaccountreceivableadjustment'>
   egcs_fc_amount: Generated<number>
   egcs_fc_agencyfinancialid: Generated<string | null>
@@ -2777,6 +2778,7 @@ export interface FundingCaseAgreementAccountReceivableTable {
 }
 
 export interface FundingCaseAccountReceivableCreditMemoTable {
+  egcs_fc_allocationevidence: Generated<JsonValue | null>
   egcs_fc_receivables: Generated<JsonValue>
   egcs_fc_totalamount: Generated<number>
   id: Generated<string>
@@ -2864,6 +2866,8 @@ export interface FundingCaseAccountReceivablePoolTable {
 }
 
 export interface FundingCaseAccountReceivableOffsetMemoTable {
+  egcs_fc_effectivedate: Generated<Date>
+  egcs_fc_allocationevidence: Generated<JsonValue | null>
   id: Generated<string>
   egcs_fc_receivable: string
   egcs_fc_pool: string

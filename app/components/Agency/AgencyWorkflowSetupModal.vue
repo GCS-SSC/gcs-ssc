@@ -1,10 +1,11 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc */
-import { computed, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { CommonWorkflowSetupCreateSchema } from '~~/shared/types/schemas'
+import { useAgencyWorkflowEntityTypes } from '~/composables/useAgencyWorkflowEntityTypes'
 
 type WorkflowSetupItem = {
   id?: string
@@ -30,28 +31,13 @@ const { showError } = useApiErrorToast()
 const { createValidator } = useZodI18n()
 const validate = createValidator(CommonWorkflowSetupCreateSchema)
 const isSubmitting: Ref<boolean> = ref(false)
-const approvalSubmissionEntityTypes = new Set([
-  'fundingcaseagreement', 'fundingcaseamendment', 'fundingcaseagreementcloseout',
-  'fundingcaseagreementclaim', 'fundingclaimreconcile', 'fundingcaseagreementcommitment',
-  'fundingcasejournalvoucher', 'fundingcasecorrection',
-  'fundingcaseaccountreceivable', 'fundingcaseaccountreceivableadjustment', 'fundingcaseaccountreceivablecreditmemo',
-  'fundingcasepayment', 'fundingcaseforecast', 'fundingcasemonitor'
-])
-const purposeOptions = computed(() => [
-  { value: 'standard', label: t('workflow.purposes.standard') },
-  ...(approvalSubmissionEntityTypes.has(state.value?.egcs_cn_entitytype ?? '')
-    ? [{ value: 'approval_submission', label: t('workflow.purposes.approval_submission') }]
-    : []),
-  ...(['fundingcaseagreement', 'fundingcaseamendment'].includes(state.value?.egcs_cn_entitytype ?? '')
-    ? [{ value: 'risk_rating', label: t('workflow.purposes.risk_rating') }]
-    : [])
-])
-watch(() => state.value?.egcs_cn_entitytype, entityType => {
-  if (state.value?.egcs_cn_purpose === 'approval_submission' && !approvalSubmissionEntityTypes.has(entityType ?? '')) {
-    state.value.egcs_cn_purpose = 'standard'
-  }
-  if (state.value?.egcs_cn_purpose === 'risk_rating' && !['fundingcaseagreement', 'fundingcaseamendment'].includes(entityType ?? '')) {
-    state.value.egcs_cn_purpose = 'standard'
+const { entityTypes, purposeOptions, error: entityTypesError, status: entityTypesStatus, refresh: refreshEntityTypes } = useAgencyWorkflowEntityTypes(
+  () => agencyId,
+  () => state.value?.egcs_cn_entitytype
+)
+watch(purposeOptions, options => {
+  if (state.value && options.length && !options.some(option => option.value === state.value?.egcs_cn_purpose)) {
+    state.value.egcs_cn_purpose = options[0]!.value
   }
 })
 
@@ -104,7 +90,13 @@ const save = async () => {
     <template #body>
       <UForm v-if="state" :state="state" :validate="validate" :validate-on="[]" class="space-y-5" @submit="save">
         <UFormField :label="t('transfer_payment.entity_type')" name="egcs_cn_entitytype">
-          <CommonEnumSelect v-model="state.egcs_cn_entitytype" name="transfer_payment_review_setup_entity_type" class="w-full" />
+          <CommonBilingualSelectMenu
+            v-model="state.egcs_cn_entitytype" :items="entityTypes" value-key="entityType"
+            label-en-key="labelEn" label-fr-key="labelFr" :loading="entityTypesStatus === 'pending'" class="w-full" />
+          <div v-if="entityTypesError" role="alert" class="mt-2 flex items-center gap-2 text-sm text-error">
+            <span>{{ t('common.lookup_load_failed') }}</span>
+            <UButton :label="t('common.retry')" color="neutral" variant="ghost" @click="refreshEntityTypes()" />
+          </div>
         </UFormField>
         <div class="grid gap-4 md:grid-cols-2">
           <UFormField :label="t('transfer_payment.name_en')" name="egcs_cn_name_en">

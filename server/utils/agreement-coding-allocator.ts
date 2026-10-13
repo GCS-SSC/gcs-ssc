@@ -1,20 +1,22 @@
-/* eslint-disable jsdoc/require-jsdoc -- Host allocation dispatch keeps its policy in narrow named helpers. */
+/* eslint-disable jsdoc/require-param, jsdoc/require-returns, jsdoc/require-jsdoc -- Host allocation dispatch keeps its policy in narrow named helpers. */
 import type { H3Event } from 'h3'
 import { sql, type Kysely, type Transaction } from 'kysely'
 import type { GcsCodingAllocator, GcsCodingAllocatorContext, GcsCodingAllocationCatalogLine, GcsCodingAllocationOutput } from '@gcs-ssc/extensions/server'
 import { getGcsExtensions, loadGcsExtensionModule } from '#gcs-extensions/server-registry'
 import type { Currency_Codes, Database } from '~~/shared/types/database'
-import type { GcsExtensionJsonConfig } from '@gcs-ssc/extensions'
+import type { JsonValue, GcsExtensionJsonConfig } from '@gcs-ssc/extensions'
 import { compareMoney, parseMoney, subtractMoney, sumMoney, type Money } from '~~/shared/utils/money'
 import { throwApiError } from './api-errors'
 import { getExtensionStreamConfiguration, handleExtensionCreateOperationError, isExtensionEnabledForAgency } from './extensions'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from './database-money'
 import { getCommitmentAllocationPaidCoverage, getCommitmentLinePaymentCoverage, validateAgreementPaymentAllocations } from './agreement-commitment-line-balance'
+import { hasAgreementPendingAllocationEffects } from './agreement-cost-allocation-context'
 import { budgetFiscalYearStableId } from './agreement-budget-lineage'
+import { hasPositiveCompletionTerminus } from './completion-terminus'
 
 type DbClient = Kysely<Database> | Transaction<Database>
 type ExistingAllocationLine = GcsCodingAllocatorContext['existingLines'][number]
-export type AgreementCodingAllocation = GcsCodingAllocationCatalogLine & { amount: Money }
+export type AgreementCodingAllocation = GcsCodingAllocationCatalogLine & { amount: Money; allocationPolicy?: JsonValue }
 
 const allocationError = async (event: H3Event, code: string): Promise<never> => await throwApiError(event, {
   statusCode: 409, code, key: 'apiErrors.agreement.invalid_coding_allocation'
@@ -61,12 +63,47 @@ export const validateCodingAllocation = (
   return allocations
 }
 
+/** Reads Agency accounts solely for Agency-level configuration validation. */
+export const readAgencyCodingCatalog = async (db: DbClient, input: {
+  agencyId: string; currency: Currency_Codes; kind: 'commitment' | 'account_receivable' | 'credit_memo'; agencyFiscalYearId?: string
+}): Promise<GcsCodingAllocationCatalogLine[]> => {
+  let query = db.selectFrom('Agency_Chart_of_Account as account')
+    .select(['account.id as codingLineId', 'account.id as agencyChartOfAccountId', 'account.egcs_ay_fiscalyear as agencyFiscalYearId',
+      'account.egcs_ay_accountingdimensions as accountingDimensions', 'account.egcs_ay_commitmentchartofaccount as commitmentChartOfAccountId'])
+    .where('account.egcs_ay_organizationagency', '=', input.agencyId).where('account.egcs_ay_currency', '=', input.currency)
+    .where('account.egcs_ay_kind', '=', input.kind).where('account._deleted', '=', false).orderBy('account.id').forShare('account')
+  if (input.agencyFiscalYearId) query = query.where('account.egcs_ay_fiscalyear', '=', input.agencyFiscalYearId)
+  return (await query.execute()).map(line => ({ ...line, codingLineId: String(line.codingLineId),
+    agencyChartOfAccountId: String(line.agencyChartOfAccountId), agencyFiscalYearId: String(line.agencyFiscalYearId),
+    commitmentChartOfAccountId: line.commitmentChartOfAccountId ? String(line.commitmentChartOfAccountId) : null }))
+}
+
+/** Reads the authoritative Stream-selected account catalog for every financial output. */
+export const readAgreementCodingCatalog = async (db: DbClient, input: {
+  agencyId: string; streamId: string; currency: Currency_Codes
+  kind: 'commitment' | 'account_receivable' | 'credit_memo'; agencyFiscalYearId?: string
+}): Promise<GcsCodingAllocationCatalogLine[]> => {
+  let catalogQuery = db.selectFrom('Transfer_Payment_Stream_Chart_of_Account as selection')
+    .innerJoin('Agency_Chart_of_Account as account', 'account.id', 'selection.egcs_tp_agencychartofaccount')
+    .select(['selection.id as codingLineId', 'account.id as agencyChartOfAccountId', 'account.egcs_ay_fiscalyear as agencyFiscalYearId',
+      'account.egcs_ay_accountingdimensions as accountingDimensions', 'account.egcs_ay_commitmentchartofaccount as commitmentChartOfAccountId'])
+    .where('selection.egcs_tp_transferpaymentstream', '=', input.streamId)
+    .where('account.egcs_ay_organizationagency', '=', input.agencyId).where('account.egcs_ay_currency', '=', input.currency)
+    .where('account.egcs_ay_kind', '=', input.kind).where('selection._deleted', '=', false).where('account._deleted', '=', false)
+    .orderBy('selection.id').forShare('selection').forShare('account')
+  if (input.agencyFiscalYearId) catalogQuery = catalogQuery.where('account.egcs_ay_fiscalyear', '=', input.agencyFiscalYearId)
+  const catalog = (await catalogQuery.execute()).map(line => ({ ...line, codingLineId: String(line.codingLineId),
+    agencyChartOfAccountId: String(line.agencyChartOfAccountId), agencyFiscalYearId: String(line.agencyFiscalYearId),
+    commitmentChartOfAccountId: line.commitmentChartOfAccountId ? String(line.commitmentChartOfAccountId) : null }))
+  return catalog
+}
+
 export const allocateAgreementCoding = async (
   event: H3Event,
   db: DbClient,
   input: {
     agreementId: string; agencyId: string; streamId: string; amount: Money; currency: Currency_Codes
-    output: GcsCodingAllocationOutput; agencyFiscalYearId?: string; fiscalYearId?: string; existingLines?: ExistingAllocationLine[]; codingPaidFloors?: GcsCodingAllocatorContext['codingPaidFloors']; codingAvailableAmounts?: GcsCodingAllocatorContext['codingAvailableAmounts']
+    output: GcsCodingAllocationOutput; retainedPolicy?: JsonValue; retainedCatalog?: GcsCodingAllocationCatalogLine[]; retainedCatalogScope?: 'agency' | 'stream'; agencyFiscalYearId?: string; fiscalYearId?: string; existingLines?: ExistingAllocationLine[]; codingPaidFloors?: GcsCodingAllocatorContext['codingPaidFloors']; codingAvailableAmounts?: GcsCodingAllocatorContext['codingAvailableAmounts']
   }
 ): Promise<AgreementCodingAllocation[] | null> => {
   const providers = []
@@ -97,18 +134,17 @@ export const allocateAgreementCoding = async (
     agencyFiscalYearId = String(year.agencyFiscalYearId)
   }
   const kind = input.output.kind === 'receivable' ? 'account_receivable' : input.output.kind === 'credit-memo' ? 'credit_memo' : 'commitment'
-  let catalogQuery = db.selectFrom('Transfer_Payment_Stream_Chart_of_Account as selection')
-    .innerJoin('Agency_Chart_of_Account as account', 'account.id', 'selection.egcs_tp_agencychartofaccount')
-    .select(['selection.id as codingLineId', 'account.id as agencyChartOfAccountId', 'account.egcs_ay_fiscalyear as agencyFiscalYearId',
-      'account.egcs_ay_accountingdimensions as accountingDimensions', 'account.egcs_ay_commitmentchartofaccount as commitmentChartOfAccountId'])
-    .where('selection.egcs_tp_transferpaymentstream', '=', input.streamId)
-    .where('account.egcs_ay_organizationagency', '=', input.agencyId).where('account.egcs_ay_currency', '=', input.currency)
-    .where('account.egcs_ay_kind', '=', kind).where('selection._deleted', '=', false).where('account._deleted', '=', false)
-    .orderBy('selection.id').forShare('selection').forShare('account')
-  if (agencyFiscalYearId) catalogQuery = catalogQuery.where('account.egcs_ay_fiscalyear', '=', agencyFiscalYearId)
-  const catalog = (await catalogQuery.execute()).map(line => ({ ...line, codingLineId: String(line.codingLineId),
-    agencyChartOfAccountId: String(line.agencyChartOfAccountId), agencyFiscalYearId: String(line.agencyFiscalYearId),
-    commitmentChartOfAccountId: line.commitmentChartOfAccountId ? String(line.commitmentChartOfAccountId) : null }))
+  const liveCatalog = await readAgreementCodingCatalog(db, { ...input, kind,
+    agencyFiscalYearId: kind === 'credit_memo' ? undefined : agencyFiscalYearId })
+  const catalog = input.retainedCatalog
+    ? input.retainedCatalog.map(retained => {
+        const live = liveCatalog.find(candidate => candidate.agencyChartOfAccountId === retained.agencyChartOfAccountId
+          && candidate.agencyFiscalYearId === retained.agencyFiscalYearId
+          && (input.retainedCatalogScope === 'agency' || candidate.codingLineId === retained.codingLineId))
+        return live ? { ...retained, codingLineId: live.codingLineId } : null
+      }).filter(line => line !== null)
+    : liveCatalog
+  if (input.retainedCatalog && catalog.length !== input.retainedCatalog.length) return await allocationError(event, 'INVALID_CODING_ALLOCATION')
   const commitmentCatalog = kind === 'commitment' && !agencyFiscalYearId
     ? catalog
     : (await db.selectFrom('Transfer_Payment_Stream_Chart_of_Account as selection')
@@ -121,18 +157,45 @@ export const allocateAgreementCoding = async (
         .forShare('selection').forShare('account').execute()).map(line => ({ ...line, codingLineId: String(line.codingLineId),
         agencyChartOfAccountId: String(line.agencyChartOfAccountId), agencyFiscalYearId: String(line.agencyFiscalYearId) }))
   let result: unknown
+  let output: GcsCodingAllocationOutput = input.output.kind === 'receivable'
+    ? { ...input.output, fiscalYearId: input.output.fiscalYearId ?? input.agencyFiscalYearId }
+    : input.output
+  if (output.kind === 'credit-memo') {
+    const commitments = await db.selectFrom('Funding_Case_Agreement_Commitment as commitment')
+      .innerJoin('Common_Completion as completion', 'completion.egcs_cn_entityid', 'commitment.id')
+      .select(['commitment.id as commitmentId', 'commitment.egcs_fc_type as commitmentTypeId'])
+      .where('commitment.egcs_fc_fundingagreement', '=', input.agreementId)
+      .where('commitment.egcs_fc_currency', '=', input.currency).where('commitment.egcs_fc_active', '=', true)
+      .where('commitment._deleted', '=', false).where('completion._deleted', '=', false)
+      .where('completion.egcs_cn_entitytype', '=', 'fundingcaseagreementcommitment')
+      .orderBy('completion.egcs_cn_completedat', 'desc').orderBy('completion.id', 'desc')
+      .forShare('commitment').forShare('completion').execute()
+    const activeCommitments: Array<{ commitmentId: string; commitmentTypeId: string }> = []
+    for (const commitment of commitments) {
+      if (await hasPositiveCompletionTerminus(db, 'fundingcaseagreementcommitment', String(commitment.commitmentId))) {
+        activeCommitments.push({ commitmentId: String(commitment.commitmentId), commitmentTypeId: String(commitment.commitmentTypeId) })
+      }
+    }
+    output = { ...output, activeCommitments }
+  }
   try {
     const module = await loadGcsExtensionModule(provider.contribution.id) as { default?: GcsCodingAllocator }
     if (typeof module.default !== 'function') throw new Error('INVALID_CODING_ALLOCATION')
-    result = await module.default({ ...input, db: db as Transaction<unknown>, codingAvailableAmounts: input.codingAvailableAmounts ?? [], codingLines: catalog, commitmentCodingLines: commitmentCatalog, existingLines: input.existingLines ?? [], codingPaidFloors: input.codingPaidFloors ?? [],
+    result = await module.default({ ...input, output, db: db as Transaction<unknown>, codingAvailableAmounts: input.codingAvailableAmounts ?? [], codingLines: catalog, commitmentCodingLines: commitmentCatalog, existingLines: input.existingLines ?? [], codingPaidFloors: input.codingPaidFloors ?? [],
       config: provider.config, agencyConfig: provider.agencyConfig })
   } catch (error) {
     await handleExtensionCreateOperationError(event, error)
   }
   if (result === null) return null
+  if (input.output.kind === 'commitment'
+    && await hasAgreementPendingAllocationEffects(db, input.agreementId)) {
+    return await allocationError(event, 'COST_ALLOCATION_PENDING_EFFECTS')
+  }
   try {
-    return validateCodingAllocation(input.amount, catalog, result, input.output.kind === 'commitment' ? input.existingLines : [],
-      input.output.kind === 'commitment' ? input.codingPaidFloors : [])
+    const envelope = !Array.isArray(result) && result && typeof result === 'object' && 'lines' in result ? result : null
+    return validateCodingAllocation(input.amount, catalog, envelope ? envelope.lines : result, input.output.kind === 'commitment' ? input.existingLines : [],
+      input.output.kind === 'commitment' ? input.codingPaidFloors : []).map(line => ({ ...line,
+      ...(envelope && 'policy' in envelope ? { allocationPolicy: envelope.policy as JsonValue } : {}) }))
   } catch (error) {
     return await allocationError(event, error instanceof Error && error.message === 'CODING_ALLOCATION_BELOW_PAID' ? error.message : 'INVALID_CODING_ALLOCATION')
   }
@@ -159,7 +222,7 @@ export const allocateAgreementCommitment = async (
     amount: parseDatabaseMoney(line.amount), ...coverage.lines.get(String(line.id))! }))
   const priorLines = previous.map(line => ({ id: String(line.id), codingLineId: String(line.codingLineId),
     amount: parseDatabaseMoney(line.amount), ...coverage.lines.get(String(line.id))! }))
-  const allocations = await allocateAgreementCoding(event, trx, { ...input, output: { kind: 'commitment', commitmentTypeId: input.commitmentTypeId },
+  const allocations = await allocateAgreementCoding(event, trx, { ...input, output: { kind: 'commitment', commitmentId: input.commitmentId, commitmentTypeId: input.commitmentTypeId },
     existingLines: [...existingLines, ...priorLines], codingPaidFloors: [...coverage.codingFloors].map(([codingLineId, paidAmount]) => ({ codingLineId, paidAmount })) })
   if (!allocations) return false
   let nextNumber = Math.max(0, ...existing.map(line => line.egcs_fc_commitmentlinenumber))

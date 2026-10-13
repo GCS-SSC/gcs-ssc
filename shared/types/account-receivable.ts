@@ -71,7 +71,8 @@ export type AccountReceivableOffsetMemoApplication = {
 export type AccountReceivableOffsetMemoLine = {
   id: string
   egcs_fc_linenumber: number
-  egcs_fc_transferpaymentstreamchartofaccount: string
+  /** Historical read-only offset evidence may lack a selection; every new persisted line requires one. */
+  egcs_fc_transferpaymentstreamchartofaccount: string | null
   egcs_fc_creditmemochartofaccount: string
   egcs_fc_creditmemoaccountingdimensions: JsonValue
   egcs_fc_commitmentchartofaccount: string | null
@@ -79,6 +80,8 @@ export type AccountReceivableOffsetMemoLine = {
 }
 
 export type PaymentOffsetPreview = {
+  egcs_fc_offsetdate: string
+  egcs_fc_offsetdatetoken: string
   egcs_fc_grossamount: Money
   egcs_fc_offsetamount: Money
   egcs_fc_netamount: Money
@@ -148,6 +151,7 @@ export type AccountReceivableDetail = AccountReceivableRow & {
   egcs_fc_claimreductions: AccountReceivableClaimReduction[]
   egcs_fc_creditmemos: AccountReceivableCreditMemoLink[]
 
+  egcs_fc_automaticcoding: boolean
   egcs_fc_candeletelines: boolean
   egcs_fc_recovered: Money
   egcs_fc_reserved: Money
@@ -201,6 +205,7 @@ export type AccountReceivableCreditMemoLine = {
 export type AccountReceivableCreditMemoDetail = AccountReceivableCreditMemoRow & {
   egcs_fc_receivablelinks: Array<{ id: string; egcs_fc_fundingagreement: string; egcs_fc_agreementnumber: string; egcs_fc_agreementreadable: boolean; egcs_fc_reference: string; egcs_fc_readable: boolean }>
   egcs_fc_lines: AccountReceivableCreditMemoLine[]
+  egcs_fc_automaticcoding: boolean
   egcs_fc_candeletelines: boolean
   egcs_fc_receivablerecovered: Money
   egcs_fc_receivablereserved: Money

@@ -14,7 +14,7 @@ export default defineEventHandler(async event => {
     await assertAgreementCurrency(event, trx, agreementId, validated.egcs_fc_currency)
     await resolveActiveAgreementPaymentCommitmentByType(event, trx, agreementId, validated.egcs_fc_commitmenttype, validated.egcs_fc_currency)
     await assertAgreementPaymentFiscalYear(event, trx, agreementId, validated.egcs_fc_fiscalyear, validated.egcs_fc_currency)
-    return await withPaymentRecoveryErrors(event, async () => (await prepareAgreementPaymentOffsetPlan(event, trx, currentContext, validated)).preview)
+    return await withPaymentRecoveryErrors(event, async () => (await prepareAgreementPaymentOffsetPlan(event, trx, currentContext, validated, { preview: true })).preview)
   }, { action: 'create', correctionFinancialMutation: true, accountReceivableReadOnly: true,
     accountReceivablePayees: [{ applicantRecipientId: validated.egcs_fc_applicantrecipient, currency: validated.egcs_fc_currency }] })
 })
