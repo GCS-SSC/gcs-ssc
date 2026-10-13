@@ -232,17 +232,26 @@ export const resolveDevExtensionEnvironment = (env: NodeJS.ProcessEnv): Record<s
 })
 
 /**
+ * Clears local development state before starting Nuxt.
+ * @param repositoryRoot Repository containing the development artifacts.
+ */
+export const cleanDevArtifacts = async (repositoryRoot: string): Promise<void> => {
+  await rm(path.resolve(repositoryRoot, '.data/pglite'), { recursive: true, force: true })
+  // Nitro can start the previous worker before rebuilding, seeding an empty database with stale data.
+  await rm(path.resolve(repositoryRoot, '.nuxt/dev'), { recursive: true, force: true })
+}
+
+/**
  * Main entry point for the dev script.
  */
 const main = async (): Promise<void> => {
   const args = process.argv.slice(2)
   const shouldClean = args.includes('--clean')
   const forwardedArgs = args.filter(arg => arg !== '--clean')
-  const defaultPglitePath = path.resolve(process.cwd(), '.data/pglite')
 
   if (shouldClean) {
-    await rm(defaultPglitePath, { recursive: true, force: true })
-    console.info(`[dev] cleaned ${defaultPglitePath}`)
+    await cleanDevArtifacts(process.cwd())
+    console.info('[dev] cleaned local development artifacts')
   }
 
   const port = resolveDevPort(forwardedArgs)
