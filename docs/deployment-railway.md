@@ -32,8 +32,8 @@ Generate a public Railway domain, then configure these service variables:
 - `production`: excludes demo data and credentials
 
 For `demo`, the Docker build packages the demo migration and the runtime
-applies the final `9999_seed`, including the NCIA agency, agreements, approval workflows,
-and documented demo users, with no seeded payments. Changing
+applies the final `9999_seed`, including the NCIA agency, thirteen agreements,
+approval workflows, documented demo users, and successful terminal Payments 168/172. Changing
 `ENVIRONMENT_TYPE` requires a rebuild and redeploy because the seed is
 intentionally absent from production images.
 
