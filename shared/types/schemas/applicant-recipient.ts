@@ -189,9 +189,7 @@ export type ApplicantRecipientRegistryItem = WithId<ApplicantRecipientRegistry>
 
 export const ApplicantRecipientAgencyFinancialIdBaseSchema = z.object({
   egcs_ar_active: z.boolean({ error: 'validation.required' }).default(true),
-  egcs_ar_agency: z.union([z.string(), z.number()]).optional()
-    .transform(value => value === undefined ? undefined : String(value).trim())
-    .refine(value => value === undefined || value.length > 0, { error: 'validation.id_required' }).meta({ formRequired: false }),
+  egcs_ar_agency: ProfileReferenceId('validation.id_required').optional().meta({ formRequired: false }),
   egcs_ar_financialsystemid: z.union([
     z.string(),
     z.bigint().transform(value => String(value)),

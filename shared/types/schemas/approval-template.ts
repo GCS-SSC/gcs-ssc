@@ -6,9 +6,10 @@ import {
   createApprovalTemplateStepBaseSchema,
   validateApprovalTemplateCertifications,
   validateApprovalTemplatePatchCertifications,
-  validateApprovalTemplateStepSequences
+  validateApprovalTemplateStepSequences,
+  validateUniqueByKey
 } from './approval-template-common'
-import { PaginationSchema } from './common'
+import { PaginationSchema, PositivePostgresBigintIdSchema } from './common'
 
 type WithId<T> = T & { id: string }
 
@@ -49,9 +50,25 @@ export const AdditionalApprovalCertificationPatchSchema = AdditionalApprovalCert
 export type AdditionalApprovalCertification = z.infer<typeof AdditionalApprovalCertificationSchema>
 export type AdditionalApprovalCertificationItem = WithId<AdditionalApprovalCertification>
 
+// Supplied IDs identify existing rows even when a row is marked for deletion.
+const validateApprovalTemplateRowIds = (
+  items: Array<{ id?: string }> | undefined,
+  field: 'steps' | 'certifications' | 'additionalApprovalCertifications',
+  ctx: z.RefinementCtx
+) => {
+  const identified = (items ?? []).map((item, index) => ({ item, index }))
+    .filter(({ item }) => item.id !== undefined)
+  validateUniqueByKey(
+    identified,
+    ({ item }) => String(item.id),
+    index => [field, identified[index]?.index ?? index, 'id'],
+    ctx
+  )
+}
+
 export const ApprovalTemplateStepBaseSchema = createApprovalTemplateStepBaseSchema(
   ApprovalTemplateCertificationSchema,
-  RequiredId,
+  () => PositivePostgresBigintIdSchema,
   RequiredString
 )
 
@@ -74,6 +91,7 @@ export const ApprovalTemplateStepPatchSchema = ApprovalTemplateStepBaseSchema
   })
   .superRefine((data, ctx) => {
     validateApprovalTemplatePatchCertifications(data.certifications, ctx)
+    validateApprovalTemplateRowIds(data.certifications, 'certifications', ctx)
   })
 
 export type ApprovalTemplateStep = z.infer<typeof ApprovalTemplateStepSchema>
@@ -153,6 +171,8 @@ export const ApprovalTemplatePatchSchema = ApprovalTemplateBaseSchema
   })
   .superRefine((data, ctx) => {
     validateApprovalTemplateStepSequences(data, ctx)
+    validateApprovalTemplateRowIds(data.steps, 'steps', ctx)
+    validateApprovalTemplateRowIds(data.additionalApprovalCertifications, 'additionalApprovalCertifications', ctx)
   })
 
 const ApprovalTemplateDeletedCertificationSchema = z.object({
@@ -170,13 +190,14 @@ const ApprovalTemplatePersistenceCertificationSchema = z.union([
 
 const ApprovalTemplatePersistenceStepActiveSchema = createApprovalTemplateStepBaseSchema(
   ApprovalTemplatePersistenceCertificationSchema,
-  RequiredId,
+  () => PositivePostgresBigintIdSchema,
   RequiredString
 ).extend({
   id: RequiredId().optional(),
   _deleted: z.literal(false).optional()
 }).superRefine((data, ctx) => {
   validateApprovalTemplatePatchCertifications(data.certifications, ctx)
+  validateApprovalTemplateRowIds(data.certifications, 'certifications', ctx)
   if (Number(Boolean(data.egcs_cn_defaultuser)) + Number(Boolean(data.egcs_cn_defaultgroup)) !== 1) {
     ctx.addIssue({ code: 'custom', message: 'validation.invalid_selection', path: ['egcs_cn_defaultuser'] })
   }
@@ -213,6 +234,8 @@ export const ApprovalTemplatePersistenceSchema = ApprovalTemplateBaseSchema
   })
   .superRefine((data, ctx) => {
     validateApprovalTemplateStepSequences(data, ctx)
+    validateApprovalTemplateRowIds(data.steps, 'steps', ctx)
+    validateApprovalTemplateRowIds(data.additionalApprovalCertifications, 'additionalApprovalCertifications', ctx)
     validateAdditionalApprovalPolicy(data, ctx)
   })
 

@@ -138,10 +138,10 @@ export type TransferPaymentFinancialLimits = z.infer<typeof TransferPaymentFinan
 export type TransferPaymentFinancialLimitsItem = WithId<TransferPaymentFinancialLimits>
 
 export const TransferPaymentOutcomeSchema = z.object({
-  egcs_tp_name_en: RequiredString(),
-  egcs_tp_name_fr: RequiredString(),
-  egcs_tp_description_en: RequiredString(),
-  egcs_tp_description_fr: RequiredString()
+  egcs_tp_name_en: StreamStorageText(255),
+  egcs_tp_name_fr: StreamStorageText(255),
+  egcs_tp_description_en: StreamStorageText(),
+  egcs_tp_description_fr: StreamStorageText()
 })
 
 export type TransferPaymentOutcome = z.infer<typeof TransferPaymentOutcomeSchema>
@@ -198,10 +198,10 @@ export type TransferPaymentCostCategoryLineItem = z.infer<typeof TransferPayment
 export type TransferPaymentCostCategoryLineItemItem = WithId<TransferPaymentCostCategoryLineItem>
 
 export const TransferPaymentPerformanceIndicatorSchema = z.object({
-  egcs_tp_name_en: RequiredString(),
-  egcs_tp_name_fr: RequiredString(),
-  egcs_tp_description_en: RequiredString(),
-  egcs_tp_description_fr: RequiredString()
+  egcs_tp_name_en: StreamStorageText(255),
+  egcs_tp_name_fr: StreamStorageText(255),
+  egcs_tp_description_en: StreamStorageText(),
+  egcs_tp_description_fr: StreamStorageText()
 })
 
 export type TransferPaymentPerformanceIndicator = z.infer<typeof TransferPaymentPerformanceIndicatorSchema>

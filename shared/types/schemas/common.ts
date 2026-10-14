@@ -138,7 +138,7 @@ export const OptionalNullableTrimmedString = (emptyValue: '' | null = null) => z
 export const PaginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
-  search: z.string().optional(),
+  search: z.string().refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' }).optional(),
   status: z.string().optional()
 })
 

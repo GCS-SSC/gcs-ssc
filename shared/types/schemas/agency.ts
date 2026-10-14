@@ -45,7 +45,7 @@ export type AgencyClaimReconciliationStatusConfiguration = z.infer<typeof Agency
 /**
  * Builds an Agency label with PostgreSQL varchar character-count semantics.
  * @param requiredKey Localized validation key for an empty label.
- * @returns Trimmed label schema limited to 255 Unicode code points.
+ * @returns Trimmed label limited to 255 Unicode code points and rejecting NUL.
  */
 const AgencyLabelSchema = (requiredKey: string) => z.string({ error: requiredKey })
   .trim()
@@ -55,6 +55,7 @@ const AgencyLabelSchema = (requiredKey: string) => z.string({ error: requiredKey
       context.addIssue({ code: 'too_big', origin: 'string', maximum: 255, inclusive: true, message: 'validation.max_length' })
     }
   })
+  .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' })
 
 // --- Agency Profile ---
 export const AgencyProfileSchema = z.object({
@@ -75,7 +76,7 @@ export const AgencyProfilePatchSchema = AgencyProfileSchema.partial().extend({
 export type AgencyProfile = z.infer<typeof AgencyProfileSchema>
 export type AgencyProfileItem = WithId<AgencyProfile>
 
-const StatusNameSchema = z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' }).max(255, { error: 'validation.max_length' })
+const StatusNameSchema = AgencyLabelSchema('validation.required')
 const LucideIconSchema = z.string({ error: 'validation.required' })
   .regex(/^i-lucide-[a-z0-9]+(?:-[a-z0-9]+)*$/, { error: 'validation.invalid_lucide_icon' })
   .refine(value => Object.hasOwn(lucideIcons.icons, value.slice('i-lucide-'.length)), { error: 'validation.invalid_lucide_icon' }).meta({ formRequired: true })
@@ -109,13 +110,11 @@ export const AgencyHoldbackBasisSchema = z.object({
   egcs_ay_name_en: z.string({ error: 'validation.name_en_required' }).trim().min(1, { error: 'validation.name_en_required' }),
   egcs_ay_name_fr: z.string({ error: 'validation.name_fr_required' }).trim().min(1, { error: 'validation.name_fr_required' })
 })
-const AgencyHoldbackBasisFieldSchema = (requiredKey: string) => AgencyLabelSchema(requiredKey)
-  .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' })
 
 export const AgencyHoldbackBasisWriteSchema = AgencyHoldbackBasisSchema.extend({
-  egcs_ay_languageindependentcode: AgencyHoldbackBasisFieldSchema('validation.required'),
-  egcs_ay_name_en: AgencyHoldbackBasisFieldSchema('validation.name_en_required'),
-  egcs_ay_name_fr: AgencyHoldbackBasisFieldSchema('validation.name_fr_required')
+  egcs_ay_languageindependentcode: AgencyLabelSchema('validation.required'),
+  egcs_ay_name_en: AgencyLabelSchema('validation.name_en_required'),
+  egcs_ay_name_fr: AgencyLabelSchema('validation.name_fr_required')
 })
 export const AgencyHoldbackBasisPatchSchema = AgencyHoldbackBasisWriteSchema.partial().extend({
   egcs_ay_holdbackbasis: z.enum(HOLDBACK_BASES_ENUM).optional()
@@ -132,14 +131,12 @@ export const AgencyMonitorTypePatchSchema = AgencyMonitorTypeSchema.partial().ex
 export type AgencyMonitorType = z.infer<typeof AgencyMonitorTypeSchema>
 export type AgencyMonitorTypeItem = WithId<AgencyMonitorType & { egcs_ay_organizationagency: string }>
 
-const AgencyAccountReceivableTypeNameSchema = (requiredKey: string) => AgencyLabelSchema(requiredKey)
-  .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' })
 const AgencyAccountReceivableTypeDescriptionSchema = z.string().max(10000, { error: 'validation.max_length' })
   .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' }).default('')
 
 export const AgencyAccountReceivableTypeBaseSchema = z.object({
-  egcs_ay_name_en: AgencyAccountReceivableTypeNameSchema('validation.name_en_required'),
-  egcs_ay_name_fr: AgencyAccountReceivableTypeNameSchema('validation.name_fr_required'),
+  egcs_ay_name_en: AgencyLabelSchema('validation.name_en_required'),
+  egcs_ay_name_fr: AgencyLabelSchema('validation.name_fr_required'),
   egcs_ay_description_en: AgencyAccountReceivableTypeDescriptionSchema,
   egcs_ay_description_fr: AgencyAccountReceivableTypeDescriptionSchema,
   egcs_ay_monitorrequired: z.boolean().default(false),
@@ -167,8 +164,8 @@ export type AgencyAccountReceivableTypeItem = WithId<AgencyAccountReceivableType
 // --- Cost Category ---
 export const AgencyCostCategorySchema = z.object({
   egcs_ay_active: z.boolean({ error: 'validation.required' }).default(true),
-  egcs_ay_name_en: z.string({ error: 'validation.name_en_required' }).trim().min(1, { error: 'validation.name_en_required' }),
-  egcs_ay_name_fr: z.string({ error: 'validation.name_fr_required' }).trim().min(1, { error: 'validation.name_fr_required' })
+  egcs_ay_name_en: AgencyLabelSchema('validation.name_en_required'),
+  egcs_ay_name_fr: AgencyLabelSchema('validation.name_fr_required')
 })
 export const AgencyCostCategoryPatchSchema = AgencyCostCategorySchema.omit({ egcs_ay_active: true }).partial().extend({
   egcs_ay_active: z.boolean({ error: 'validation.required' }).optional()
@@ -187,8 +184,8 @@ export const AgencyCostCategoryInitial: AgencyCostCategoryItem = {
 export const AgencyCostCategoryLineItemBaseSchema = z.object({
   egcs_ay_active: z.boolean({ error: 'validation.required' }).default(true),
   ...AgencyCalculationFields,
-  egcs_ay_name_en: z.string({ error: 'validation.name_en_required' }).trim().min(1, { error: 'validation.name_en_required' }),
-  egcs_ay_name_fr: z.string({ error: 'validation.name_fr_required' }).trim().min(1, { error: 'validation.name_fr_required' })
+  egcs_ay_name_en: AgencyLabelSchema('validation.name_en_required'),
+  egcs_ay_name_fr: AgencyLabelSchema('validation.name_fr_required')
 })
 export const AgencyCostCategoryLineItemSchema = AgencyCostCategoryLineItemBaseSchema.superRefine(validateAgencyCalculationFields)
 export const AgencyCostCategoryLineItemPatchSchema = AgencyCostCategoryLineItemBaseSchema.omit({ egcs_ay_active: true }).partial().extend({
@@ -240,14 +237,9 @@ export const createAgencyFiscalYearInitial = (): Partial<AgencyFiscalYearItem> =
 }
 
 // --- Address Type ---
-// PostgreSQL text cannot persist NUL; other Unicode characters retain the shared
-// label's character-count and whitespace semantics.
-const AgencyAddressTypeNameSchema = (requiredKey: string) => AgencyLabelSchema(requiredKey)
-  .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' })
-
 export const AgencyAddressTypeSchema = z.object({
-  egcs_ay_typename_en: AgencyAddressTypeNameSchema('validation.type_en_required'),
-  egcs_ay_typename_fr: AgencyAddressTypeNameSchema('validation.type_fr_required')
+  egcs_ay_typename_en: AgencyLabelSchema('validation.type_en_required'),
+  egcs_ay_typename_fr: AgencyLabelSchema('validation.type_fr_required')
 })
 export type AgencyAddressType = z.infer<typeof AgencyAddressTypeSchema>
 export type AgencyAddressTypeItem = WithId<AgencyAddressType>
@@ -259,13 +251,10 @@ export const AgencyAddressTypeInitial: AgencyAddressTypeItem = {
 }
 
 // --- Applicant/Recipient Subtype ---
-const AgencyRecipientSubtypeNameSchema = (requiredKey: string) => AgencyLabelSchema(requiredKey)
-  .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' })
-
 export const AgencyApplicantRecipientSubtypeSchema = z.object({
   egcs_ay_applicantrecipienttype: z.enum(APPLICANT_RECIPIENT_TYPE_ENUM),
-  egcs_ay_name_en: AgencyRecipientSubtypeNameSchema('validation.name_en_required'),
-  egcs_ay_name_fr: AgencyRecipientSubtypeNameSchema('validation.name_fr_required'),
+  egcs_ay_name_en: AgencyLabelSchema('validation.name_en_required'),
+  egcs_ay_name_fr: AgencyLabelSchema('validation.name_fr_required'),
   egcs_ay_description_en: z
     .string({ error: 'validation.desc_en_required' })
     .trim()
@@ -291,8 +280,8 @@ export const AgencyApplicantRecipientSubtypeInitial: AgencyApplicantRecipientSub
 
 // --- Approval Behalf Type ---
 export const AgencyApprovalBehalfTypeSchema = z.object({
-  egcs_ay_name_en: z.string({ error: 'validation.name_en_required' }).trim().min(1, { error: 'validation.name_en_required' }),
-  egcs_ay_name_fr: z.string({ error: 'validation.name_fr_required' }).trim().min(1, { error: 'validation.name_fr_required' }),
+  egcs_ay_name_en: AgencyLabelSchema('validation.name_en_required'),
+  egcs_ay_name_fr: AgencyLabelSchema('validation.name_fr_required'),
   egcs_ay_require_actual: z.boolean().default(false)
 })
 export type AgencyApprovalBehalfType = z.infer<typeof AgencyApprovalBehalfTypeSchema>
@@ -306,13 +295,10 @@ export const AgencyApprovalBehalfTypeInitial: AgencyApprovalBehalfTypeItem = {
 }
 
 // --- Agreement Type ---
-const AgencyAgreementTypeNameSchema = (requiredKey: string) => AgencyLabelSchema(requiredKey)
-  .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' })
-
 export const AgencyAgreementTypeSchema = z.object({
   egcs_ay_agreementtype: z.enum(AGREEMENT_TYPE_ENUM),
-  egcs_ay_name_en: AgencyAgreementTypeNameSchema('validation.name_en_required'),
-  egcs_ay_name_fr: AgencyAgreementTypeNameSchema('validation.name_fr_required')
+  egcs_ay_name_en: AgencyLabelSchema('validation.name_en_required'),
+  egcs_ay_name_fr: AgencyLabelSchema('validation.name_fr_required')
 })
 export type AgencyAgreementType = z.infer<typeof AgencyAgreementTypeSchema>
 export type AgencyAgreementTypeItem = WithId<AgencyAgreementType>

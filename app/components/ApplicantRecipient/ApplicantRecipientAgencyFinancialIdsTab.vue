@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ApplicantRecipientAgencyFinancialIdForm } from '~~/shared/types/applicant-recipient-ui'
 import { ApplicantRecipientAgencyFinancialIdCreateSchema } from '~~/shared/types/schemas'
-import type { TableColumnInput } from '~/composables/useTableColumns'
+import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 import { onBeforeUnmount, ref, watch, watchEffect } from 'vue'
 import type { Ref } from 'vue'
 
@@ -119,10 +119,14 @@ const beforeSave = async (state: Record<string, unknown>, original: Record<strin
 const beforeDelete = (id: string, shouldProceed: () => boolean) => confirmUses(id, 'delete', shouldProceed)
 
 const columns: TableColumnInput<{ id: string } & Record<string, unknown>>[] = [
-  { accessorKey: 'agency_name_en', headerKey: 'applicant_recipient.agency_financial_ids.agency' },
+  { id: 'agency_name_en', accessorKey: 'agency_name_en', headerKey: 'applicant_recipient.agency_financial_ids.agency' },
   { accessorKey: 'egcs_ar_financialsystemid', headerKey: 'applicant_recipient.agency_financial_ids.financial_system_id' },
   { accessorKey: 'egcs_ar_active', headerKey: 'common.status' },
   { id: 'actions', headerKey: 'common.actions' }
+]
+
+const bilingualColumns: BilingualColumnConfig<{ id: string } & Record<string, unknown>>[] = [
+  { id: 'agency_name_en', accessorKey: { en: 'agency_name_en', fr: 'agency_name_fr' } }
 ]
 
 /**
@@ -152,6 +156,7 @@ const getAgencyLookupUrl = (state: ApplicantRecipientAgencyFinancialIdForm) => {
     :before-save="beforeSave"
     :before-delete="beforeDelete"
     :columns="columns"
+    :bilingual-columns="bilingualColumns"
     :button-label="t('common.add')"
     :show-button="canCreate"
     :modal-title="t('applicant_recipient.agency_financial_ids.add')"
