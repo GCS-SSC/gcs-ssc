@@ -18,7 +18,9 @@ export default defineEventHandler(async event => {
   if (!isPositivePostgresBigintText(agreementId) || !isPositivePostgresBigintText(amendmentId)) {
     return await badRequest(event, 'INVALID_ID', 'apiErrors.request.invalid')
   }
-  const context = await authorizeAgreementResource(event, 'update', agreementId, db)
+  const context = await authorizeAgreementResource(event, 'update', agreementId, db, {
+    assignmentTarget: { entityType: 'fundingcaseamendment', entityId: amendmentId }
+  })
   if (!context) return await badRequest(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
 
   return await executeFreshAuthorizedAgreementWrite(event, db, agreementId, context, async trx => {

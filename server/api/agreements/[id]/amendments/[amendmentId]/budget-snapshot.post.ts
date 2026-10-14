@@ -8,7 +8,9 @@ export default defineEventHandler(async event => {
   const agreementId = getRouterParam(event, 'id')
   const amendmentId = getRouterParam(event, 'amendmentId')
   if (!agreementId || !amendmentId) return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')
-  const context = await authorizeAgreementResource(event, 'create', agreementId, db)
+  const context = await authorizeAgreementResource(event, 'create', agreementId, db, {
+    assignmentTarget: { entityType: 'fundingcaseamendment', entityId: amendmentId }
+  })
   if (!context) return await badRequest(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
 
   return await executeFreshAuthorizedAgreementWrite(event, db, agreementId, context, async trx => {

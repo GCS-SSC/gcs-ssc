@@ -11,7 +11,9 @@ export default defineEventHandler(async event => {
   const agreementId = getRouterParam(event, 'id'), amendmentId = getRouterParam(event, 'amendmentId'), childId = getRouterParam(event, 'childId')
   if (!agreementId || !amendmentId || !childId) return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')
   if (!isPositivePostgresBigintText(childId)) return await notFound(event, 'AGREEMENT_BUDGET_FISCAL_YEAR_NOT_FOUND', 'apiErrors.agreement.budget_fiscal_year_not_found')
-  const context = await authorizeAgreementResource(event, 'delete', agreementId, db)
+  const context = await authorizeAgreementResource(event, 'delete', agreementId, db, {
+    assignmentTarget: { entityType: 'fundingcaseamendment', entityId: amendmentId }
+  })
   if (!context) return await badRequest(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
 
   return await executeFreshAuthorizedAgreementWrite(event, db, agreementId, context, async trx => {
