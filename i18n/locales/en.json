@@ -1500,6 +1500,7 @@
       "duplicate_stream_risk_rating": "This risk rating already exists for the stream.",
       "duplicate_stream_area_of_expertise": "This area of expertise already exists for the stream.",
       "duplicate_stream_chart_of_account": "This chart of accounts entry already exists for the stream budget.",
+      "duplicate_program_name": "An active program with the same bilingual name already exists for this Agency.",
       "duplicate_program_stream_name": "A stream with this English and French name already exists for the program.",
       "duplicate_program_outcome_name": "An outcome with this English and French name already exists for the program.",
       "duplicate_program_objective": "An objective with this English and French value already exists for the program.",

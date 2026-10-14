@@ -1500,6 +1500,7 @@
       "duplicate_stream_risk_rating": "Cette cote de risque existe déjà pour le volet.",
       "duplicate_stream_area_of_expertise": "Ce domaine d'expertise existe déjà pour le volet.",
       "duplicate_stream_chart_of_account": "Cette entrée du plan comptable existe déjà pour le budget du volet.",
+      "duplicate_program_name": "Un programme actif portant le même nom bilingue existe déjà pour cet organisme.",
       "duplicate_program_stream_name": "Un volet avec ce nom en anglais et en français existe déjà pour le programme.",
       "duplicate_program_outcome_name": "Un résultat avec ce nom en anglais et en français existe déjà pour le programme.",
       "duplicate_program_objective": "Un objectif avec cette valeur en anglais et en français existe déjà pour le programme.",

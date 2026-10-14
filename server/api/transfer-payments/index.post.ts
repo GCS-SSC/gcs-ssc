@@ -1,3 +1,4 @@
+import { throwIfTransferPaymentUniqueConstraintError } from '~~/server/utils/transfer-payment-unique-constraint-errors'
 import { TransferPaymentProfileSchema } from '~~/shared/types/schemas'
 import {
   authorize,
@@ -20,44 +21,48 @@ export default defineEventHandler(async event => {
     agencyId: String(validated.egcs_tp_agency)
   })
 
-  return await db.transaction().execute(async trx => {
-    const authContext = await requireFreshAuthContext(event, trx)
-    const agency = await trx
-      .selectFrom('Agency_Profile')
-      .where('id', '=', validated.egcs_tp_agency)
-      .where('_deleted', '=', false)
-      .select('id')
-      .forUpdate('Agency_Profile')
-      .executeTakeFirst()
+  try {
+    return await db.transaction().execute(async trx => {
+      const authContext = await requireFreshAuthContext(event, trx)
+      const agency = await trx
+        .selectFrom('Agency_Profile')
+        .where('id', '=', validated.egcs_tp_agency)
+        .where('_deleted', '=', false)
+        .select('id')
+        .forUpdate('Agency_Profile')
+        .executeTakeFirst()
 
-    if (!agency) {
-      return await badRequest(event, 'INVALID_AGENCY', 'apiErrors.request.invalid_agency')
-    }
+      if (!agency) {
+        return await badRequest(event, 'INVALID_AGENCY', 'apiErrors.request.invalid_agency')
+      }
 
-    await authorizeWithFreshAuthContext(event, authContext, 'transfer_payment', 'create', {
-      type: 'agency',
-      agencyId: String(agency.id)
-    })
-
-    return await trx
-      .insertInto('Transfer_Payment_Profile')
-      .values({
-        egcs_tp_agency: validated.egcs_tp_agency,
-        egcs_tp_datestart: validated.egcs_tp_datestart,
-        egcs_tp_dateend: validated.egcs_tp_dateend,
-        egcs_tp_name_en: validated.egcs_tp_name_en,
-        egcs_tp_name_fr: validated.egcs_tp_name_fr,
-        egcs_tp_abbreviation_en: validated.egcs_tp_abbreviation_en,
-        egcs_tp_abbreviation_fr: validated.egcs_tp_abbreviation_fr,
-        egcs_tp_description_en: validated.egcs_tp_description_en,
-        egcs_tp_description_fr: validated.egcs_tp_description_fr,
-        egcs_tp_purpose_en: validated.egcs_tp_purpose_en,
-        egcs_tp_purpose_fr: validated.egcs_tp_purpose_fr,
-        egcs_tp_tclink_en: validated.egcs_tp_tclink_en,
-        egcs_tp_tclink_fr: validated.egcs_tp_tclink_fr,
-        egcs_tp_active: validated.egcs_tp_active
+      await authorizeWithFreshAuthContext(event, authContext, 'transfer_payment', 'create', {
+        type: 'agency',
+        agencyId: String(agency.id)
       })
-      .returningAll()
-      .executeTakeFirstOrThrow()
-  })
+
+      return await trx
+        .insertInto('Transfer_Payment_Profile')
+        .values({
+          egcs_tp_agency: validated.egcs_tp_agency,
+          egcs_tp_datestart: validated.egcs_tp_datestart,
+          egcs_tp_dateend: validated.egcs_tp_dateend,
+          egcs_tp_name_en: validated.egcs_tp_name_en,
+          egcs_tp_name_fr: validated.egcs_tp_name_fr,
+          egcs_tp_abbreviation_en: validated.egcs_tp_abbreviation_en,
+          egcs_tp_abbreviation_fr: validated.egcs_tp_abbreviation_fr,
+          egcs_tp_description_en: validated.egcs_tp_description_en,
+          egcs_tp_description_fr: validated.egcs_tp_description_fr,
+          egcs_tp_purpose_en: validated.egcs_tp_purpose_en,
+          egcs_tp_purpose_fr: validated.egcs_tp_purpose_fr,
+          egcs_tp_tclink_en: validated.egcs_tp_tclink_en,
+          egcs_tp_tclink_fr: validated.egcs_tp_tclink_fr,
+          egcs_tp_active: validated.egcs_tp_active
+        })
+        .returningAll()
+        .executeTakeFirstOrThrow()
+    })
+  } catch (error: unknown) {
+    return await throwIfTransferPaymentUniqueConstraintError(event, error)
+  }
 })
