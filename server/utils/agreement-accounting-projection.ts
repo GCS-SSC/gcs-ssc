@@ -118,28 +118,35 @@ export const readEffectiveAccountReceivableRecoveries = async (
 }
 
 /** Claim reductions activate only after their owning receivable has fully cleared. */
-export const readEffectiveAccountReceivableClaimRecoveries = async (db: Kysely<Database>, agreementId: string, options: { currency?: Currency_Codes } = {}) => {
+export const readEffectiveAccountReceivableClaimRecoveries = async (
+  db: Kysely<Database>, agreementId: string,
+  options: { currency?: Currency_Codes; fiscalYearBasis?: 'current-budget' | 'claim-source' } = {}
+) => {
   if (!await hasAccountingTable(db, 'Funding_Case_Account_Receivable_Claim_Reduction')) return []
   const rows = await db.selectFrom('Funding_Case_Account_Receivable_Claim_Reduction as reduction')
     .innerJoin('Funding_Case_Agreement_Account_Receivable as debt', 'debt.id', 'reduction.egcs_fc_receivable')
     .innerJoin('Funding_Case_Agreement_Claim as claim', 'claim.id', 'reduction.egcs_fc_claim')
     .innerJoin('Funding_Case_Agreement_Claim_Line_Item as line', 'line.id', 'reduction.egcs_fc_claimline')
     .innerJoin('Funding_Case_Agreement_Budget_Fiscal_Year as sourceYear', 'sourceYear.id', 'claim.egcs_fc_fiscalyear')
-    .innerJoin('Funding_Case_Agreement_Budget_Fiscal_Year as year', join => join.on(
-      sql<string>`COALESCE(year.egcs_fc_originalbudgetfiscalyear,year.id)::text`, '=', sql<string>`COALESCE("sourceYear".egcs_fc_originalbudgetfiscalyear,"sourceYear".id)::text`
-    ))
+    .innerJoin('Funding_Case_Agreement_Budget_Fiscal_Year as year', join => options.fiscalYearBasis === 'claim-source'
+      ? join.onRef('year.id', '=', 'sourceYear.id')
+      : join.on(sql<string>`COALESCE(year.egcs_fc_originalbudgetfiscalyear,year.id)::text`,
+          '=', sql<string>`COALESCE("sourceYear".egcs_fc_originalbudgetfiscalyear,"sourceYear".id)::text`))
     .innerJoin('Funding_Case_Agreement_Budget_Version as version', 'version.id', 'year.egcs_fc_budgetversion')
     .innerJoin('Agency_Fiscal_Year as fiscal', 'fiscal.id', 'year.egcs_fc_fiscalyear')
-    .select(['reduction.id', 'line.id as claimLineId', sql<null>`NULL`.as('reconcileLineId'),
+    .select(['reduction.id', sql<string>`claim.id::text`.as('claimId'), 'line.id as claimLineId', sql<null>`NULL`.as('reconcileLineId'),
+      sql<string>`COALESCE("sourceYear".egcs_fc_originalbudgetfiscalyear,"sourceYear".id)::text`.as('fiscalYearId'),
       'fiscal.id as agencyFiscalYearId', 'fiscal.egcs_ay_fiscalyear as fiscalYearOrder', 'line.egcs_fc_currency as currency',
       'claim.egcs_fc_periodstart as periodStart', 'claim.egcs_fc_periodend as periodEnd',
       databaseMoneyText(sql.ref('reduction.egcs_fc_amount')).as('amount')])
     .where('debt.egcs_fc_fundingagreement', '=', agreementId).where('claim.egcs_fc_fundingagreement', '=', agreementId)
-    .where('year.egcs_fc_fundingagreement', '=', agreementId).where('version.egcs_fc_iscurrent', '=', true)
+    .where('year.egcs_fc_fundingagreement', '=', agreementId)
     .where('sourceYear.egcs_fc_fundingagreement', '=', agreementId)
     .where('reduction.egcs_fc_appliedat', 'is not', null).where('reduction._deleted', '=', false)
-    .where('line._deleted', '=', false).where('claim._deleted', '=', false).where('year._deleted', '=', false)
-    .where('version._deleted', '=', false).execute()
+    .where('line._deleted', '=', false).where('claim._deleted', '=', false)
+    .$if(options.fiscalYearBasis !== 'claim-source', query => query
+      .where('version.egcs_fc_iscurrent', '=', true).where('year._deleted', '=', false).where('version._deleted', '=', false))
+    .execute()
   return rows.filter(row => !options.currency || row.currency === options.currency)
     .map(row => ({ ...row, amount: subtractMoney(ZERO, parseDatabaseMoney(row.amount)) }))
 }

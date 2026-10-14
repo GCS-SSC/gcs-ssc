@@ -1,9 +1,10 @@
 import { sql, type Kysely, type Transaction } from 'kysely'
-import type { Database, Workflow_Target_Entity_Type } from '~~/shared/types/database'
+import type { Currency_Codes, Database, Workflow_Target_Entity_Type } from '~~/shared/types/database'
 import type { BusinessRecordStateFields } from '~~/shared/types/business-record-state'
 import { compareMoney, sumMoney, parseMoneyText, type Money } from '~~/shared/utils/money'
 import { parseDatabaseMoney } from './database-money'
 import { getBusinessRecordStateProjections } from './business-record-state'
+import { readEffectiveAccountReceivableClaimRecoveries } from './agreement-accounting-projection'
 
 type Db = Kysely<Database> | Transaction<Database>
 
@@ -43,6 +44,7 @@ interface FundingAmountRow {
 }
 
 const negativeStates = ['unsuccessful', 'denied', 'cancelled', 'failed']
+const ZERO = parseMoneyText('0.00')
 /**
  * Ignores target approval evidence superseded by a newer workflow attempt.
  * @param state - Latest Completion, workflow and target approval evidence.
@@ -107,7 +109,7 @@ export const getAgreementFinancialBudgetViolation = async (
           JOIN "Funding_Case_Agreement_Claim" claim ON claim.id = reconcile.egcs_fc_fundingagreementclaim
           WHERE reconcile.id = ${target.id}::bigint AND claim.egcs_fc_fundingagreement = ${agreementId}::bigint
             AND NOT reconcile._deleted AND NOT claim._deleted`
-  const context = (await sql<{ fiscalYearId: string, currency: string }>`
+  const context = (await sql<{ fiscalYearId: string, currency: Currency_Codes }>`
     SELECT COALESCE(year.egcs_fc_originalbudgetfiscalyear,year.id)::text AS "fiscalYearId",
       profile.egcs_fc_currency AS currency
     FROM (${header}) proposal
@@ -220,11 +222,40 @@ export const getAgreementFinancialBudgetViolation = async (
       return target.kind === 'claim' || state?.lifecycleTerminus === 'positive'
     })
   }
-  const amountsByType = new Map<string | null, Money[]>()
+  const recoveriesByClaim = new Map<string, Money[]>()
+  if (target.kind !== 'forecast' && amounts.length > 0) {
+    const recoveries = await readEffectiveAccountReceivableClaimRecoveries(db, agreementId, {
+      currency: context.currency, fiscalYearBasis: 'claim-source'
+    })
+    for (const recovery of recoveries) {
+      if (recovery.fiscalYearId !== context.fiscalYearId || compareMoney(recovery.amount, ZERO) >= 0) continue
+      const values = recoveriesByClaim.get(recovery.claimId) ?? []
+      values.push(recovery.amount)
+      recoveriesByClaim.set(recovery.claimId, values)
+    }
+  }
+  const amountsByClaim = new Map<string, Map<string | null, Money[]>>()
   for (const row of amounts) {
-    const values = amountsByType.get(row.fundingTypeId) ?? []
+    const claimId = row.claimId ?? row.documentId
+    const pools = amountsByClaim.get(claimId) ?? new Map<string | null, Money[]>()
+    const values = pools.get(row.fundingTypeId) ?? []
     values.push(parseDatabaseMoney(row.amount))
-    amountsByType.set(row.fundingTypeId, values)
+    pools.set(row.fundingTypeId, values)
+    amountsByClaim.set(claimId, pools)
+  }
+  const amountsByType = new Map<string | null, Money[]>()
+  for (const [claimId, pools] of amountsByClaim) {
+    for (const [fundingTypeId, values] of pools) {
+      let amount = sumMoney(values)
+      const recoveries = recoveriesByClaim.get(claimId)
+      if (recoveries && (fundingTypeId === null || fundingTypeId === 'total')) {
+        amount = sumMoney([amount, ...recoveries])
+        if (compareMoney(amount, ZERO) < 0) amount = ZERO
+      }
+      const annualValues = amountsByType.get(fundingTypeId) ?? []
+      annualValues.push(amount)
+      amountsByType.set(fundingTypeId, annualValues)
+    }
   }
   const orderedAmounts = [...amountsByType].sort(([left], [right]) => {
     if (left === right) return 0
@@ -234,7 +265,7 @@ export const getAgreementFinancialBudgetViolation = async (
   })
   for (const [fundingTypeId, values] of orderedAmounts) {
     const amount = sumMoney(values)
-    const budget = budgetByType.get(fundingTypeId) ?? parseMoneyText('0.00')
+    const budget = budgetByType.get(fundingTypeId) ?? ZERO
     if (compareMoney(amount, budget) > 0) return {
       kind: target.kind, fiscalYearId: context.fiscalYearId,
       ...(forecastVersion === undefined ? {} : { forecastVersion }),
