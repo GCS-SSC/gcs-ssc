@@ -17,8 +17,6 @@ export interface AgreementFinancialBudgetViolationDetails {
   kind: AgreementFinancialBudgetTarget['kind']
   fiscalYearId: string
   forecastVersion?: string
-  fundingKind: 'total' | 'program' | 'other'
-  fundingTypeId: string | null
   currency: string
   amount: Money
   budget: Money
@@ -27,7 +25,7 @@ export interface AgreementFinancialBudgetViolationDetails {
 /** Domain failure mapped to a localized response by the owning write handler. */
 export class AgreementFinancialBudgetViolation extends Error {
   /**
-   * Retains exact funding-pool details for the owning response adapter.
+   * Retains exact program-funding details for the owning response adapter.
    * @param details - Exceeded annual pool.
    */
   constructor(public readonly details: AgreementFinancialBudgetViolationDetails) {
@@ -39,7 +37,6 @@ export class AgreementFinancialBudgetViolation extends Error {
 interface FundingAmountRow {
   documentId: string
   claimId?: string
-  fundingTypeId: string | null
   amount: string
 }
 
@@ -92,7 +89,7 @@ const getBudgetRecordStates = async (db: Db, entityType: Workflow_Target_Entity_
  * @param db - Current request snapshot or locked write transaction.
  * @param agreementId - Owning Agreement.
  * @param target - Proposal; forecast omission selects its highest live authored version.
- * @returns First exceeded program or other-funding-type pool, otherwise null.
+ * @returns Exceeded annual program funding, otherwise null.
  */
 export const getAgreementFinancialBudgetViolation = async (
   db: Db,
@@ -120,30 +117,19 @@ export const getAgreementFinancialBudgetViolation = async (
   `.execute(db)).rows[0]
   if (!context) throw new Error('Agreement financial budget proposal is unavailable.')
 
-  const budgets = (await sql<{ fundingTypeId: string | null, amount: string }>`
-    WITH current_lines AS (
-      SELECT line.* FROM "Funding_Case_Agreement_Budget_Line_Item" line
-      JOIN "Funding_Case_Agreement_Budget_Fiscal_Year" year ON year.id = line.egcs_fc_fundingagreementbudgetfiscalyear
-      JOIN "Funding_Case_Agreement_Budget_Version" version ON version.id = year.egcs_fc_budgetversion
-      WHERE year.egcs_fc_fundingagreement = ${agreementId}::bigint
-        AND line.egcs_fc_fundingagreement = ${agreementId}::bigint
-        AND version.egcs_fc_fundingagreement = ${agreementId}::bigint
-        AND COALESCE(year.egcs_fc_originalbudgetfiscalyear,year.id) = ${context.fiscalYearId}::bigint
-        AND version.egcs_fc_iscurrent AND NOT version._deleted AND NOT year._deleted AND NOT line._deleted
-        AND line.egcs_fc_currency = ${context.currency}
-    ), amounts AS (
-      SELECT NULL::text AS type_id, egcs_fc_programfunding AS amount FROM current_lines
-      UNION ALL
-      SELECT 'total', egcs_fc_totalamount FROM current_lines
-      UNION ALL
-      SELECT subtype.egcs_ay_fundingtype::text, funding.egcs_fc_amount
-      FROM current_lines line JOIN "Funding_Case_Agreement_Budget_Line_Item_Funding" funding
-        ON funding.egcs_fc_budgetlineitem = line.id AND NOT funding._deleted
-      JOIN "Agency_Funding_Subtype" subtype ON subtype.id = funding.egcs_fc_fundingsubtype
-    )
-    SELECT type_id::text AS "fundingTypeId", SUM(amount)::text AS amount FROM amounts GROUP BY type_id
-  `.execute(db)).rows
-  const budgetByType = new Map(budgets.map(row => [row.fundingTypeId, parseDatabaseMoney(row.amount)]))
+  const budgetRow = (await sql<{ amount: string }>`
+    SELECT COALESCE(SUM(line.egcs_fc_programfunding), 0)::text AS amount
+    FROM "Funding_Case_Agreement_Budget_Line_Item" line
+    JOIN "Funding_Case_Agreement_Budget_Fiscal_Year" year ON year.id = line.egcs_fc_fundingagreementbudgetfiscalyear
+    JOIN "Funding_Case_Agreement_Budget_Version" version ON version.id = year.egcs_fc_budgetversion
+    WHERE year.egcs_fc_fundingagreement = ${agreementId}::bigint
+      AND line.egcs_fc_fundingagreement = ${agreementId}::bigint
+      AND version.egcs_fc_fundingagreement = ${agreementId}::bigint
+      AND COALESCE(year.egcs_fc_originalbudgetfiscalyear,year.id) = ${context.fiscalYearId}::bigint
+      AND version.egcs_fc_iscurrent AND NOT version._deleted AND NOT year._deleted AND NOT line._deleted
+      AND line.egcs_fc_currency = ${context.currency}
+  `.execute(db)).rows[0]
+  const budget = budgetRow ? parseDatabaseMoney(budgetRow.amount) : ZERO
 
   let forecastVersion: string | undefined
   let amounts: FundingAmountRow[]
@@ -153,22 +139,10 @@ export const getAgreementFinancialBudgetViolation = async (
       WHERE egcs_fc_agreementforecast = ${target.id}::bigint AND NOT _deleted
     `.execute(db)).rows[0]?.version ?? undefined
     amounts = (await sql<FundingAmountRow>`
-      WITH lines AS (
-        SELECT * FROM "Funding_Case_Agreement_Forecast_Line_Item"
-        WHERE egcs_fc_agreementforecast = ${target.id}::bigint AND NOT _deleted
-          AND egcs_fc_currency = ${context.currency} AND egcs_fc_version = ${forecastVersion ?? '0'}::bigint
-      ), amounts AS (
-        SELECT NULL::text AS type_id, egcs_fc_amount AS amount FROM lines
-        UNION ALL
-        SELECT 'total', egcs_fc_totalamount FROM lines
-        UNION ALL
-        SELECT subtype.egcs_ay_fundingtype::text, funding.egcs_fc_amount
-        FROM lines line JOIN "Funding_Case_Agreement_Forecast_Line_Item_Funding" funding
-          ON funding.egcs_fc_forecastlineitem = line.id AND NOT funding._deleted
-        JOIN "Agency_Funding_Subtype" subtype ON subtype.id = funding.egcs_fc_fundingsubtype
-      )
-      SELECT ${target.id}::text AS "documentId", type_id::text AS "fundingTypeId", SUM(amount)::text AS amount
-      FROM amounts GROUP BY type_id
+      SELECT ${target.id}::text AS "documentId", COALESCE(SUM(egcs_fc_amount), 0)::text AS amount
+      FROM "Funding_Case_Agreement_Forecast_Line_Item"
+      WHERE egcs_fc_agreementforecast = ${target.id}::bigint AND NOT _deleted
+        AND egcs_fc_currency = ${context.currency} AND egcs_fc_version = ${forecastVersion ?? '0'}::bigint
     `.execute(db)).rows
   } else {
     const claims = sql`
@@ -179,26 +153,15 @@ export const getAgreementFinancialBudgetViolation = async (
         AND COALESCE(year.egcs_fc_originalbudgetfiscalyear,year.id) = ${context.fiscalYearId}::bigint`
     if (target.kind === 'claim') {
       amounts = (await sql<FundingAmountRow>`
-        WITH lines AS (
-          SELECT line.* FROM "Funding_Case_Agreement_Claim_Line_Item" line JOIN (${claims}) claim
-            ON claim.id = line.egcs_fc_fundingagreementclaim
-          WHERE NOT line._deleted AND line.egcs_fc_currency = ${context.currency}
-        ), amounts AS (
-          SELECT egcs_fc_fundingagreementclaim AS document_id, NULL::text AS type_id, egcs_fc_amount AS amount FROM lines
-          UNION ALL
-          SELECT egcs_fc_fundingagreementclaim, 'total', egcs_fc_totalamount FROM lines
-          UNION ALL
-          SELECT line.egcs_fc_fundingagreementclaim, subtype.egcs_ay_fundingtype::text, funding.egcs_fc_amount
-          FROM lines line JOIN "Funding_Case_Agreement_Claim_Line_Item_Funding" funding
-            ON funding.egcs_fc_claimlineitem = line.id AND NOT funding._deleted
-          JOIN "Agency_Funding_Subtype" subtype ON subtype.id = funding.egcs_fc_fundingsubtype
-        )
-        SELECT document_id::text AS "documentId", type_id::text AS "fundingTypeId", SUM(amount)::text AS amount
-        FROM amounts GROUP BY document_id, type_id
+        SELECT claim.id::text AS "documentId", SUM(line.egcs_fc_amount)::text AS amount
+        FROM "Funding_Case_Agreement_Claim_Line_Item" line JOIN (${claims}) claim
+          ON claim.id = line.egcs_fc_fundingagreementclaim
+        WHERE NOT line._deleted AND line.egcs_fc_currency = ${context.currency}
+        GROUP BY claim.id
       `.execute(db)).rows
     } else {
       amounts = (await sql<FundingAmountRow>`
-        SELECT reconcile.id::text AS "documentId", claim.id::text AS "claimId", NULL::text AS "fundingTypeId", SUM(line.egcs_fc_reconciled)::text AS amount
+        SELECT reconcile.id::text AS "documentId", claim.id::text AS "claimId", SUM(line.egcs_fc_reconciled)::text AS amount
         FROM "Funding_Case_Agreement_Claim_Reconcile" reconcile JOIN (${claims}) claim
           ON claim.id = reconcile.egcs_fc_fundingagreementclaim
         JOIN "Funding_Case_Agreement_Claim_Reconcile_Line_Item" line
@@ -234,51 +197,35 @@ export const getAgreementFinancialBudgetViolation = async (
       recoveriesByClaim.set(recovery.claimId, values)
     }
   }
-  const amountsByClaim = new Map<string, Map<string | null, Money[]>>()
+  const amountsByClaim = new Map<string, Money[]>()
   for (const row of amounts) {
     const claimId = row.claimId ?? row.documentId
-    const pools = amountsByClaim.get(claimId) ?? new Map<string | null, Money[]>()
-    const values = pools.get(row.fundingTypeId) ?? []
+    const values = amountsByClaim.get(claimId) ?? []
     values.push(parseDatabaseMoney(row.amount))
-    pools.set(row.fundingTypeId, values)
-    amountsByClaim.set(claimId, pools)
+    amountsByClaim.set(claimId, values)
   }
-  const amountsByType = new Map<string | null, Money[]>()
-  for (const [claimId, pools] of amountsByClaim) {
-    for (const [fundingTypeId, values] of pools) {
-      let amount = sumMoney(values)
-      const recoveries = recoveriesByClaim.get(claimId)
-      if (recoveries && (fundingTypeId === null || fundingTypeId === 'total')) {
-        amount = sumMoney([amount, ...recoveries])
-        if (compareMoney(amount, ZERO) < 0) amount = ZERO
-      }
-      const annualValues = amountsByType.get(fundingTypeId) ?? []
-      annualValues.push(amount)
-      amountsByType.set(fundingTypeId, annualValues)
+  const annualAmounts: Money[] = []
+  for (const [claimId, values] of amountsByClaim) {
+    let amount = sumMoney(values)
+    const recoveries = recoveriesByClaim.get(claimId)
+    if (recoveries) {
+      amount = sumMoney([amount, ...recoveries])
+      if (compareMoney(amount, ZERO) < 0) amount = ZERO
     }
+    annualAmounts.push(amount)
   }
-  const orderedAmounts = [...amountsByType].sort(([left], [right]) => {
-    if (left === right) return 0
-    if (left === null || right === 'total') return -1
-    if (right === null || left === 'total') return 1
-    return BigInt(left) < BigInt(right) ? -1 : 1
-  })
-  for (const [fundingTypeId, values] of orderedAmounts) {
-    const amount = sumMoney(values)
-    const budget = budgetByType.get(fundingTypeId) ?? ZERO
-    if (compareMoney(amount, budget) > 0) return {
-      kind: target.kind, fiscalYearId: context.fiscalYearId,
-      ...(forecastVersion === undefined ? {} : { forecastVersion }),
-      fundingKind: fundingTypeId === 'total' ? 'total' : fundingTypeId === null ? 'program' : 'other',
-      fundingTypeId: fundingTypeId === 'total' ? null : fundingTypeId,
-      currency: context.currency, amount, budget
-    }
+  const amount = sumMoney(annualAmounts)
+  if (compareMoney(amount, budget) > 0) return {
+    kind: target.kind, fiscalYearId: context.fiscalYearId,
+    ...(forecastVersion === undefined ? {} : { forecastVersion }),
+    currency: context.currency, amount, budget
   }
+
   return null
 }
 
 /**
- * Rejects a saved proposal that exceeds any current annual funding pool.
+ * Rejects a saved proposal that exceeds current annual program funding.
  * @param db - Locked Agreement write transaction.
  * @param agreementId - Owning Agreement.
  * @param target - Proposal being saved or completed.
@@ -291,7 +238,7 @@ export const assertAgreementFinancialBudgetControls = async (
 }
 
 /**
- * Prevents current-budget edits from reducing annual pools below counted financial usage.
+ * Prevents current-budget edits from reducing annual program funding below counted financial usage.
  * @param db - Transaction already holding the Agreement write lock.
  * @param agreementId - Agreement whose current budget has just changed.
  */
