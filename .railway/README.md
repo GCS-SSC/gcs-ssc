@@ -6,7 +6,7 @@ This configuration manages the existing **GCS Demo / demo** environment:
   populated, otherwise GitHub `GCS-SSC/gcs-ssc` branch `main` and the canonical Dockerfile.
 - Database: existing `GCS DB` service (PostgreSQL 18), with the application's existing `DATABASE_URL` preserved.
 - Domain: https://gcs-ssc-demo.up.railway.app, retained by Railway on the existing service.
-- Volumes: existing `gcs-ssc-volume` at `/app/.data` and `gcs-db-volume-budget-controls-reset-20261014-v2` on `GCS DB`, each 5000 MB. Verify every previous GCS database volume is detached and absent or pending Railway deletion.
+- Volumes: existing `gcs-ssc-volume` at `/app/.data` and `gcs-db-volume-forecast-versions-reset-20261014` on `GCS DB`, each 5000 MB. Verify every previous GCS database volume is detached and absent or pending Railway deletion.
 - Metabase, `Metabase DB`, and their `postgres-volume-4aPn` are included so an IaC apply preserves them.
 - Portal: `gcs-ssc-portal` uses a pinned public GHCR digest from `deployment/portal-demo-image.json` and its own `Portal DB` PostgreSQL service and `portal-db-volume`. It shares this project, not a database, with GCS and Metabase.
 - Canvas groups: `Metabase`, `GCS`, and `Portal` each contain the corresponding app and PostgreSQL service.
@@ -85,21 +85,39 @@ the next IaC apply. Verify the live attachment independently: Railway's plan
 readback can omit the former database attachment. Preserve the application
 attachment volume, Portal volume, and Metabase volume.
 
-The current Claim amount editing, collapsed Financial Summary, and access-log reporting release uses source
-commit `df9a336d846be591543b99a7f419e1cf01074a9b` and the public image digest
-`sha256:db29f15c54b4350c5a476aaa30a97e6cba57d566f7be34655d87e54f14e651f8`
-from [verified build 38594938247](https://github.com/GCS-SSC/gcs-ssc/actions/runs/38594938247).
-This correction retains the existing database and attachment storage.
+The Forecast version release uses source commit
+`4779e845e2b616b9bc86d173e633893b37457e56` and the public image digest
+`sha256:ddb378d6fffa60cab9a9523b3bce178a3f94eece664c32248ca51f602fa81032`
+from [verified build 38647016380](https://github.com/GCS-SSC/gcs-ssc/actions/runs/38647016380).
+The schema cutover replaces and reseeds the disposable GCS database; the
+application's attachment storage is retained.
 
-Its database volume `gcs-db-volume-budget-controls-reset-20261014-v2`
-(`a544fc30-e733-4d41-9f86-cafef5d22f2c`) is attached to `GCS DB` at
-`/var/lib/postgresql/data` with 5000 MB and storage state `READY`. The former
+Railway deployment `037270f1-bd33-4d98-885b-dcd4a28bb01c` reached `SUCCESS`
+with that exact digest on 2026-10-14. Public health and demo login passed;
+NCIA's thirteen agreements and terminal, successfully completed Payments
+168/172 were verified. The live Forecast overview returned nineteen Forecast
+headers with versions `0`/`1`, twelve active annual Forecasts, and no monthly-line
+version fields.
+
+Its replacement database volume `gcs-db-volume-forecast-versions-reset-20261014`
+(`3e62e951-d0b0-4672-8c8a-355a63f620ec`) is attached to `GCS DB` at
+`/var/lib/postgresql/data` with 5000 MB and storage state `READY`. The previous
+`gcs-db-volume-budget-controls-reset-20261014-v2`
+(`a544fc30-e733-4d41-9f86-cafef5d22f2c`) is detached and pending Railway deletion
+at `2026-10-16T23:11:01.060Z`. The older
 `gcs-db-volume-payment-evidence-reset` (`8729b72f-801e-4ea0-9b8d-98022cd2f95c`)
 and intermediate `gcs-db-volume-budget-controls-reset-20261014`
-(`ad90fe1f-a25c-49e6-bd41-b11cd2008b26`) are detached and pending Railway
+(`ad90fe1f-a25c-49e6-bd41-b11cd2008b26`) remain detached and pending Railway
 deletion on 2026-10-16. The earlier clean-reset and ar-paid-reset volumes are
-absent from the live project inventory. The application attachment storage,
-Portal database, and Metabase database are retained.
+absent from the live project inventory.
+
+The Portal release uses source commit
+`54117871c2f6a0468e7a877ee6eb2a05284701cd` and pinned public image digest
+`sha256:32fc8c413fcf0abdd0b843c81b3d861510d5160bd24247499fbf666e3e71e205`
+from [verified build 38647190270](https://github.com/GCS-SSC/gcs-ssc-portal/actions/runs/38647190270).
+Its existing `portal-db-volume` and database are preserved. The application
+attachment volume, Portal database, and Metabase database remain outside the
+GCS clean cutover.
 
 Wait for the app deployment to reach `SUCCESS` and verify public health, demo
 login, NCIA's thirteen agreements, and successful terminal Payments 168/172. Verify
