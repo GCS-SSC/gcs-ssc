@@ -454,6 +454,7 @@ const updateCertification = async (
   }
 
   const values = {
+    _deleted: false,
     ...(certification.egcs_cn_order === undefined ? {} : { egcs_cn_order: certification.egcs_cn_order }),
     ...(certification.egcs_cn_description_en === undefined ? {} : { egcs_cn_description_en: certification.egcs_cn_description_en }),
     ...(certification.egcs_cn_description_fr === undefined ? {} : { egcs_cn_description_fr: certification.egcs_cn_description_fr }),
@@ -464,16 +465,11 @@ const updateCertification = async (
     ...(certification.egcs_cn_certification_fr === undefined ? {} : { egcs_cn_certification_fr: certification.egcs_cn_certification_fr })
   }
 
-  if (Object.keys(values).length === 0) {
-    return
-  }
-
   await db
     .updateTable('Common_Certification')
     .set(values)
     .where('id', '=', String(certification.id))
     .where('egcs_cn_approvalstep', '=', stepId)
-    .where('_deleted', '=', false)
     .execute()
 }
 
@@ -534,20 +530,19 @@ const syncCertifications = async (
     .execute()
 
   const existingIds = new Set(existing.map(item => String(item.id)))
-  const retainedIds = new Set<string>()
-
   for (const certification of certifications) {
-    const retainedId = await syncCertification(db, stepId, certification, existingIds)
-    if (retainedId) {
-      retainedIds.add(retainedId)
+    if (certification.id && !existingIds.has(String(certification.id))) {
+      throw new Error('Approval template certification is outside its parent step.')
     }
   }
 
-  const removedIds = existing
-    .map(item => String(item.id))
-    .filter(id => !retainedIds.has(id))
+  // Release the active name/order indexes inside the caller's transaction. Only
+  // IDs proven active in this step above can be restored; omitted rows stay deleted.
+  await softDeleteCertifications(db, stepId, [...existingIds])
 
-  await softDeleteCertifications(db, stepId, removedIds)
+  for (const certification of certifications) {
+    await syncCertification(db, stepId, certification, existingIds)
+  }
 }
 
 const softDeleteSteps = async (
