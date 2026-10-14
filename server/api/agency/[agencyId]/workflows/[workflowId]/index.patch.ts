@@ -88,9 +88,11 @@ export default defineEventHandler(async event => {
         }))
       ).execute()
     }
-    const updated = await trx.updateTable('Common_Workflow_Setup').set(values).where('id', '=', workflowSetupId)
-      .where('egcs_cn_agency', '=', agencyId)
-      .where('_deleted', '=', false).returningAll().executeTakeFirstOrThrow()
+    const updated = Object.keys(values).length > 0
+      ? await trx.updateTable('Common_Workflow_Setup').set(values).where('id', '=', workflowSetupId)
+          .where('egcs_cn_agency', '=', agencyId)
+          .where('_deleted', '=', false).returningAll().executeTakeFirstOrThrow()
+      : current
     return { ...updated, egcs_cn_allowedstartstatuses: nextAllowedStatuses }
   }
   )

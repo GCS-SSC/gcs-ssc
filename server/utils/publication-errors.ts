@@ -3,6 +3,10 @@ import { throwApiError } from './api-errors'
 import { PublicationLifecycleConflictError } from './system-publication'
 
 const publicationFailurePatterns = [
+  /^Approval submission workflow requires an approval stage$/,
+  /^Workflow conditions require an Agreement owner$/,
+  /^Correction approval-submission failure and cancellation must produce terminal statuses$/,
+  /^Only Correction approval submission may produce terminal business outcomes$/,
   /Workflow discriminator/i,
   /Workflow approval-submission success/i,
   /members are not contiguous/i,
