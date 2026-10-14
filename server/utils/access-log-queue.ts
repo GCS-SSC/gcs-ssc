@@ -47,6 +47,7 @@ export const createAccessLogQueue = (
 ) => {
   const pending = new Set<BufferedAccess>()
   let bytes = 0
+  let sent = 0
   let failures = 0
   let nextAttempt = 0
   let flushing: Promise<void> | undefined
@@ -62,6 +63,7 @@ export const createAccessLogQueue = (
     if (Date.now() >= Math.min(deadline, shutdownDeadline)) return false
     try {
       await persist(batch.map(item => item.event))
+      sent += batch.length
       for (const item of batch) remove(item)
       return true
     } catch (error) {
@@ -87,6 +89,7 @@ export const createAccessLogQueue = (
     }
   }
   const drain = async (deadline: number) => {
+    sent = 0
     // Snapshot eligibility: records from active responses/transactions never enter a batch.
     const ready = [...pending].filter(item => item.ready())
     for (let offset = 0; offset < ready.length; offset += BATCH_SIZE) {
@@ -94,7 +97,7 @@ export const createAccessLogQueue = (
       failures = 0
       nextAttempt = 0
     }
-    if (ready.length || pending.size) report({ event: 'audit.access_queue', ...stats() })
+    if (sent || pending.size) report({ event: 'audit.access_queue', sent, ...stats() })
   }
   const flush = async (force = false, deadline = Infinity): Promise<void> => {
     if (flushing) return await flushing

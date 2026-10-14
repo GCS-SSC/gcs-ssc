@@ -104,7 +104,7 @@ const { agreementId } = defineProps<{ agreementId: string }>()
 const { t, locale } = useI18n()
 const selectedYearId: Ref<string | null> = ref(null)
 const visibleRowTypes: Ref<RowType[]> = ref([...ROW_TYPES])
-const expandedQuarters: Ref<QuarterKey[]> = ref(QUARTERS.map(quarter => quarter.key))
+const expandedQuarters: Ref<QuarterKey[]> = ref([])
 const allMode: Ref<boolean> = ref(true)
 const { overview, overviewStatus, refreshOverview } = useAgreementOverview<FinancialSummary>(
   computed(() => `/api/agreements/${agreementId}/financial-summary`)
@@ -112,7 +112,7 @@ const { overview, overviewStatus, refreshOverview } = useAgreementOverview<Finan
 
 watch(() => agreementId, () => {
   selectedYearId.value = null
-  expandedQuarters.value = QUARTERS.map(quarter => quarter.key)
+  expandedQuarters.value = []
   visibleRowTypes.value = [...ROW_TYPES]
   allMode.value = true
 }, { flush: 'sync' })

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import { parseOptionalMoneyInput } from '~/utils/optional-money-input'
-import { MoneySchema } from '~~/shared/types/schemas/money'
+import { FundingCaseAgreementClaimLineItemBaseSchema } from '~~/shared/types/schemas/funding-case-agreement'
 import type { FetchError } from 'ofetch'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 /* eslint-disable jsdoc/require-jsdoc -- page-local callbacks use self-descriptive signatures */
@@ -102,7 +102,14 @@ const {
 const receivableEntry = useAccountReceivableSourceEntry(agreementId, 'claim', claimId,
   computed(() => profile.value?.can_create_account_receivable === true))
 
-const draftClaimAmounts: Ref<Record<string, string>> = ref({})
+const { createValidator } = useZodI18n()
+const submissionAmountSchema = FundingCaseAgreementClaimLineItemBaseSchema.pick({ egcs_fc_amount: true })
+const validateSubmissionAmount = createValidator(submissionAmountSchema)
+const submissionModal = useCrudModal<ClaimSubmissionTableRow, ClaimSubmissionTableRow & { egcs_fc_amount: string }>({
+  updateState: row => ({ ...row, egcs_fc_amount: row.submittedAmount })
+})
+const selectedSubmissionLine = submissionModal.selected
+const isSubmissionModalOpen = submissionModal.isOpen
 const fundingEditorLine: Ref<FundingCaseAgreementClaimLineItemRow | null> = ref(null)
 const fundingEditorOpen: Ref<boolean> = ref(false)
 const fundingEditorSession = ref(0)
@@ -379,10 +386,6 @@ const canEditReconcileLineItem = (claimLineId: string): boolean => {
   return existing ? canUpdateReconcile.value : canCreateReconcileLineItems.value
 }
 
-const canEditClaimSubmission = computed(() => activeBudgetLineItems.value.some((line: FundingCaseAgreementBudgetLineItemRow) =>
-  canEditClaimSubmissionAmount(String(line.id))
-))
-
 const ZERO_MONEY = parseMoney('0')
 const readDraftMoney = (value: string | null | undefined): Money => {
   try {
@@ -418,15 +421,6 @@ const reconciliationTableLines = computed<AgreementClaimReconciliationTableLine[
   }
 }))
 const balanceAll = computed(() => subtractMoney(totalSubmitted.value, totalReconciledAll.value))
-
-watch(activeClaimLineItems, () => {
-  const nextAmounts: Record<string, string> = {}
-  for (const budgetLine of activeBudgetLineItems.value) {
-    const existing = claimLinesByBudgetId.value.get(String(budgetLine.id))?.[0]
-    nextAmounts[String(budgetLine.id)] = existing?.egcs_fc_amount ?? '0.00'
-  }
-  draftClaimAmounts.value = nextAmounts
-}, { immediate: true })
 
 watch(activeClaimReconciles, reconcilesForClaim => {
   const selectedStillExists = selectedReconcileId.value
@@ -544,11 +538,6 @@ const claimHeroBadges = computed(() => activeClaim.value
   : []
 )
 
-const getDraftClaimAmount = (budgetLineId: string) => draftClaimAmounts.value[budgetLineId] ?? '0.00'
-const isDraftClaimAmountInvalid = (budgetLineId: string) => !MoneySchema.safeParse(getDraftClaimAmount(budgetLineId)).success
-const setDraftClaimAmount = (budgetLineId: string, value: string | null | undefined) => {
-  draftClaimAmounts.value = { ...draftClaimAmounts.value, [budgetLineId]: value ?? '' }
-}
 const getDraftReconciledAmount = (claimLineId: string) => draftReconciledAmounts.value[claimLineId] ?? '0.00'
 const getDraftSampledAmount = (claimLineId: string) => draftSampledAmounts.value[claimLineId] ?? '0.00'
 const getDraftRationale = (claimLineId: string) => draftRationales.value[claimLineId] ?? ''
@@ -622,7 +611,8 @@ const submissionColumns: TableColumnInput<ClaimSubmissionTableRow>[] = [
   { id: 'name', accessorKey: 'lineItemNameEn', headerKey: 'agreement.budget.line_item' },
   { id: 'submittedAmount', accessorKey: 'submittedAmount', headerKey: 'agreement.claims.submitted_amount' },
   { id: 'reconciledAmount', accessorKey: 'reconciledAmount', headerKey: 'agreement.claims.reconciled_amount' },
-  { id: 'balance', accessorKey: 'balance', headerKey: 'agreement.claims.balance' }
+  { id: 'balance', accessorKey: 'balance', headerKey: 'agreement.claims.balance' },
+  { id: 'actions', headerKey: 'common.actions' }
 ]
 
 const normalizedSubmissionSearch = computed(() => submissionSearch.value.trim().toLowerCase())
@@ -635,7 +625,7 @@ const claimSubmissionRows = computed<ClaimSubmissionTableRow[]>(() => {
     const costCategoryLabel = getCostCategoryLabel(budgetLine)
     const costSubsectionLabel = getCostSubsectionLabel(budgetLine.egcs_fc_costsubsection)
 
-    if (claimLines.length > 1 && !canUpdateClaim.value) {
+    if (claimLines.length > 1) {
       return claimLines.map((claimLine: FundingCaseAgreementClaimLineItemRow) => {
         const submittedAmount = claimLine.egcs_fc_amount
         const claimLineReconciledAmount = getTotalSuccessfulReconciledForClaimLineId(claimLine.id)
@@ -661,9 +651,7 @@ const claimSubmissionRows = computed<ClaimSubmissionTableRow[]>(() => {
     }
 
     const claimLine = claimLines[0]
-    const submittedAmount = canEditClaimSubmissionAmount(budgetLineId)
-      ? getDraftClaimAmount(budgetLineId)
-      : claimLine?.egcs_fc_amount ?? ZERO_MONEY
+    const submittedAmount = claimLine?.egcs_fc_amount ?? ZERO_MONEY
     const budgetLineReconciledAmount = getTotalSuccessfulReconciledForClaimLineId(claimLine?.id)
 
     return [{
@@ -803,47 +791,42 @@ const canEditActiveReconcileFinal = computed(() =>
 )
 
 const saveSubmission = async () => {
-  if (!activeClaim.value || isSavingSubmission.value || !canEditClaimSubmission.value) {
+  const line = selectedSubmissionLine.value
+  const session = submissionModal.captureSession()
+  const budgetLine = activeBudgetLineItems.value.find(item => String(item.id) === line?.budgetLineId)
+  if (!activeClaim.value || !line || !budgetLine || isSavingSubmission.value || !canEditClaimSubmissionAmount(String(budgetLine.id))) {
     return
   }
 
   try {
     isSavingSubmission.value = true
-    const validatedAmounts = new Map(activeBudgetLineItems.value.map(budgetLine => {
-      const budgetLineId = String(budgetLine.id)
-      return [budgetLineId, parseMoney(getDraftClaimAmount(budgetLineId))] as const
-    }))
+    const { egcs_fc_amount: amount } = submissionAmountSchema.parse(line)
+    const existing = activeClaimLineItems.value.find(item => String(item.id) === line.claimLineId)
     let didMutate = false
-    for (const budgetLine of activeBudgetLineItems.value) {
-      const budgetLineId = String(budgetLine.id)
-      const amount = validatedAmounts.get(budgetLineId)!
-      const existing = claimLinesByBudgetId.value.get(budgetLineId)?.[0]
-      if (existing && existing.egcs_fc_amount !== amount && canUpdateClaim.value) {
-        await sendJson(`/api/agreements/${agreementId}/claim-line-items/${existing.id}`, 'PATCH', {
-          egcs_fc_amount: amount,
-          egcs_fc_totalamount: sumMoney([amount, ...existing.egcs_fc_fundingsources.map(source => source.egcs_fc_amount)]),
-          egcs_fc_description: budgetLine.egcs_fc_description
-        })
-        didMutate = true
-      }
-      if (!existing && compareMoney(readDraftMoney(amount), ZERO_MONEY) !== 0 && canCreateClaimLineItems.value) {
-        await sendJson(`/api/agreements/${agreementId}/claim-line-items`, 'POST', {
-          egcs_fc_fundingagreementclaim: claimId,
-          egcs_fc_fundingagreementbudgetlineitem: budgetLineId,
-          egcs_fc_description: budgetLine.egcs_fc_description,
-          egcs_fc_amount: amount,
-          egcs_fc_totalamount: amount,
-          egcs_fc_currency: budgetLine.egcs_fc_currency
-        })
-        didMutate = true
-      }
+    if (existing && existing.egcs_fc_amount !== amount) {
+      await sendJson(`/api/agreements/${agreementId}/claim-line-items/${existing.id}`, 'PATCH', {
+        egcs_fc_amount: amount,
+        egcs_fc_totalamount: sumMoney([amount, ...existing.egcs_fc_fundingsources.map(source => source.egcs_fc_amount)]),
+        egcs_fc_description: existing.egcs_fc_description
+      })
+      didMutate = true
     }
-    if (!didMutate) {
-      return
+    if (!existing && compareMoney(amount, ZERO_MONEY) !== 0) {
+      await sendJson(`/api/agreements/${agreementId}/claim-line-items`, 'POST', {
+        egcs_fc_fundingagreementclaim: claimId,
+        egcs_fc_fundingagreementbudgetlineitem: String(budgetLine.id),
+        egcs_fc_description: budgetLine.egcs_fc_description,
+        egcs_fc_amount: amount,
+        egcs_fc_totalamount: amount,
+        egcs_fc_currency: budgetLine.egcs_fc_currency
+      })
+      didMutate = true
     }
-
-    await refreshPage()
-    toast.add({ title: t('common.success'), description: t('agreement.claims.saved_submission'), color: 'success' })
+    if (didMutate) {
+      await refreshPage()
+      toast.add({ title: t('common.success'), description: t('agreement.claims.saved_submission'), color: 'success' })
+    }
+    submissionModal.closeSession(session)
   } catch (error: unknown) {
     showError(error)
   } finally {
@@ -1072,9 +1055,6 @@ const cancelReconciliation = async () => {
             <div v-if="selectedClaimTab === 'submission'" class="w-full min-w-0">
               <div class="space-y-8">
                 <div class="space-y-4">
-                  <div class="flex justify-end">
-                    <CommonSaveButton v-if="canEditClaimSubmission" type="button" :label="t('agreement.claims.save_submission')" :loading="isSavingSubmission" :disabled="isSavingSubmission" @click="saveSubmission" />
-                  </div>
                   <CommonResourceLayoutCard
                     v-model:search="submissionSearch"
                     v-model:pagination="submissionPagination"
@@ -1173,27 +1153,23 @@ const cancelReconciliation = async () => {
                     </template>
 
                     <template #submittedAmount-cell="{ row }">
-                      <span v-if="isGroupedSubmissionRow(row as GroupedClaimSubmissionRow)" class="font-medium text-zinc-700 dark:text-zinc-200">
-                        {{ formatMoney(getSubmissionGroupedTotal(row as GroupedClaimSubmissionRow, 'submittedAmount')) }}
+                      <span class="font-medium text-zinc-700 dark:text-zinc-200">
+                        {{ formatMoney(isGroupedSubmissionRow(row as GroupedClaimSubmissionRow) ? getSubmissionGroupedTotal(row as GroupedClaimSubmissionRow, 'submittedAmount') : row.original.submittedAmount) }}
                       </span>
-                      <div v-else-if="row.original.budgetLineId && canEditClaimSubmissionAmount(row.original.budgetLineId)" class="space-y-1">
-                        <CommonCurrencyInput
-                          :model-value="getDraftClaimAmount(row.original.budgetLineId)"
-                          :currency="profile?.egcs_fc_currency"
-                          required
-                          :aria-label="t('agreement.claims.submitted_amount_for', { name: locale === 'fr' ? row.original.lineItemNameFr : row.original.lineItemNameEn })"
-                          :aria-invalid="isDraftClaimAmountInvalid(row.original.budgetLineId)"
-                          :aria-describedby="isDraftClaimAmountInvalid(row.original.budgetLineId) ? `claim-amount-error-${row.original.budgetLineId}` : undefined"
-                          class="w-44"
-                          @update:model-value="value => setDraftClaimAmount(row.original.budgetLineId!, value)" />
-                        <span class="block text-xs text-muted">({{ t('common.field_required') }})</span>
-                        <p v-if="isDraftClaimAmountInvalid(row.original.budgetLineId)" :id="`claim-amount-error-${row.original.budgetLineId}`" class="text-xs text-error">
-                          {{ t('validation.invalid_number') }}
-                        </p>
+                    </template>
+
+                    <template #actions-cell="{ row }">
+                      <div class="flex justify-end gap-2">
+                        <UButton
+                          v-if="!isGroupedSubmissionRow(row as GroupedClaimSubmissionRow) && row.original.budgetLineId && canEditClaimSubmissionAmount(row.original.budgetLineId)"
+                          icon="i-lucide-pencil"
+                          color="neutral"
+                          variant="ghost"
+                          size="sm"
+                          :aria-label="t('agreement.claims.edit_submitted_amount_for', { name: locale === 'fr' ? row.original.lineItemNameFr : row.original.lineItemNameEn })"
+                          :disabled="isSavingSubmission"
+                          @click="submissionModal.openUpdate(row.original)" />
                       </div>
-                      <span v-else class="font-medium text-zinc-700 dark:text-zinc-200">
-                        {{ formatMoney(row.original.submittedAmount) }}
-                      </span>
                     </template>
 
                     <template #reconciledAmount-cell="{ row }">
@@ -1501,6 +1477,32 @@ const cancelReconciliation = async () => {
         </div>
       </template>
     </CommonDetailPage>
+
+    <UModal
+      v-if="selectedSubmissionLine"
+      v-model:open="isSubmissionModalOpen"
+      :title="t('agreement.claims.edit_submitted_amount')"
+      :description="locale === 'fr' ? selectedSubmissionLine.lineItemNameFr : selectedSubmissionLine.lineItemNameEn"
+      :dismissible="!isSavingSubmission">
+      <template #body>
+        <UForm data-testid="claim-submission-form" :state="selectedSubmissionLine" :validate="validateSubmissionAmount" class="space-y-4" @submit="saveSubmission">
+          <UFormField :label="t('agreement.claims.submitted_amount')" name="egcs_fc_amount" required>
+            <CommonCurrencyInput
+              v-model="selectedSubmissionLine.egcs_fc_amount"
+              :currency="profile?.egcs_fc_currency"
+              required
+              aria-required="true"
+              :aria-label="t('agreement.claims.submitted_amount_for', { name: locale === 'fr' ? selectedSubmissionLine.lineItemNameFr : selectedSubmissionLine.lineItemNameEn })"
+              :disabled="isSavingSubmission"
+              class="w-full" />
+          </UFormField>
+          <div class="flex justify-end gap-2">
+            <UButton type="button" color="neutral" variant="ghost" :label="t('common.cancel')" :disabled="isSavingSubmission" @click="submissionModal.close" />
+            <CommonSaveButton type="submit" :label="t('common.save')" :loading="isSavingSubmission" :disabled="isSavingSubmission" />
+          </div>
+        </UForm>
+      </template>
+    </UModal>
 
     <UModal
       v-if="selectedReconcileLine"
