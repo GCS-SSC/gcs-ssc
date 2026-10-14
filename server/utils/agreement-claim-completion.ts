@@ -16,6 +16,7 @@ import { createCompletionTransition } from '~~/server/utils/workflow-runtime'
 import type { CompletionHookPayload } from '~~/shared/types/completion'
 import type { CompletionExecuteInput } from '~~/shared/types/schemas/completion'
 import { getAgreementLineFundingCompletionStatus } from '~~/server/utils/agreement-funding-breakdown'
+import { assertAgreementFinancialBudgetControls, getAgreementFinancialBudgetViolation } from './agreement-financial-budget-controls'
 
 type ClaimLineAllocation = { egcs_fc_fundingagreementbudgetlineitem?: string | null }
 
@@ -46,10 +47,11 @@ export const getAgreementClaimCompletionRuntime = async (
   const hasClaimLines = claimLines.length > 0
   const claimLinesReady = areClaimLinesReady(claimLines)
   const funding = await getAgreementLineFundingCompletionStatus(event.context.$db, { kind: 'claim', id: claimId })
+  const budgetViolation = item ? null : await getAgreementFinancialBudgetViolation(event.context.$db, context.agreementId, { kind: 'claim', id: claimId })
 
   return {
     item,
-    can_complete: item === null && claimLinesReady && funding.complete && Boolean(protection && !protection.locked),
+    can_complete: item === null && claimLinesReady && funding.complete && !budgetViolation && Boolean(protection && !protection.locked),
     blocker: item
       ? null
       : !hasClaimLines
@@ -58,9 +60,11 @@ export const getAgreementClaimCompletionRuntime = async (
               ? 'claim_lines_unallocated' as const
               : !funding.complete
                   ? 'funding_breakdown_required' as const
-                  : !protection || protection.locked
-                      ? 'business_status' as const
-                      : null
+                  : budgetViolation
+                    ? 'annual_budget_exceeded' as const
+                    : !protection || protection.locked
+                        ? 'business_status' as const
+                        : null
   }
 }
 
@@ -126,6 +130,7 @@ export const executeAgreementClaimCompletion = async (
         return await badRequest(event, 'AGREEMENT_CLAIM_ALREADY_COMPLETED', 'apiErrors.request.invalid_status')
       }
 
+      await assertAgreementFinancialBudgetControls(trx, context.agreementId, { kind: 'claim', id: claimId })
       const { completion: createdCompletion } = await createCompletionTransition(
         event,
         trx,

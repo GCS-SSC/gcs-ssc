@@ -22,6 +22,7 @@ import { authorizeFreshAssignedItem } from '~~/server/utils/authorize'
 import { resolveBusinessStatusProtection } from '~~/server/utils/business-status-runtime'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 import { getAgreementLineFundingCompletionStatus } from '~~/server/utils/agreement-funding-breakdown'
+import { assertAgreementFinancialBudgetControls, getAgreementFinancialBudgetViolation } from './agreement-financial-budget-controls'
 
 export const getAgreementForecastCompletionRuntime = async (
   event: H3Event,
@@ -35,14 +36,16 @@ export const getAgreementForecastCompletionRuntime = async (
     const lineItem = await trx.selectFrom('Funding_Case_Agreement_Forecast_Line_Item')
       .select('id').where('egcs_fc_agreementforecast', '=', forecastId).where('_deleted', '=', false).executeTakeFirst()
     const funding = await getAgreementLineFundingCompletionStatus(trx, { kind: 'forecast', id: forecastId })
+    const budgetViolation = item ? null : await getAgreementFinancialBudgetViolation(trx, context.agreementId, { kind: 'forecast', id: forecastId })
 
     return {
       item,
       can_complete: item === null
         && Boolean(lineItem)
         && funding.complete
+        && !budgetViolation
         && Boolean(protection && !protection.locked),
-      blocker: item ? null : !lineItem ? 'lines_required' as const : !funding.complete ? 'funding_breakdown_required' as const : !protection || protection.locked ? 'business_status' as const : null
+      blocker: item ? null : !lineItem ? 'lines_required' as const : !funding.complete ? 'funding_breakdown_required' as const : budgetViolation ? 'annual_budget_exceeded' as const : !protection || protection.locked ? 'business_status' as const : null
     }
   })
 }
@@ -108,6 +111,7 @@ export const executeAgreementForecastCompletion = async (
       return await badRequest(event, 'AGREEMENT_FORECAST_FUNDING_BREAKDOWN_REQUIRED', 'apiErrors.agreement.funding_breakdown_required')
     }
 
+    await assertAgreementFinancialBudgetControls(trx, context.agreementId, { kind: 'forecast', id: forecastId })
     const { completion: createdCompletion } = await createCompletionTransition(
       event,
       trx,

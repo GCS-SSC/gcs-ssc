@@ -47,6 +47,7 @@ import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/se
 import { parseMoney } from '~~/shared/utils/money'
 import { isAgreementClaimProponentAvailable } from './agreement-claim-proponent'
 import { assertAgreementLineFundingBalance, replaceAgreementLineFunding } from '~~/server/utils/agreement-funding-breakdown'
+import { assertAgreementFinancialBudgetControls } from '~~/server/utils/agreement-financial-budget-controls'
 
 type AgreementClaimDb = Kysely<Database> | Transaction<Database>
 
@@ -180,6 +181,9 @@ export const createAgreementClaimAggregate = async (
     lineItemIds.push(String(lineItem.id))
   }
 
+  if (input.lineItems.length > 0) {
+    await assertAgreementFinancialBudgetControls(trx, input.agreementId, { kind: 'claim', id: String(claim.id) })
+  }
   await createPrimaryEntityAssignment(
     trx,
     'fundingcaseagreementclaim',
@@ -784,6 +788,7 @@ export const patchAgreementClaimLineItem = async (
         }
         const balanceError = await assertAgreementLineFundingBalance(event, trx, { kind: 'claim', lineId })
         if (balanceError) return balanceError
+        await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: 'claim', id: String(references.nextClaimId) })
 
         await syncAgreementClaimLineItemPatchStatuses(trx, String(existing.egcs_fc_fundingagreementclaim), String(references.nextClaimId))
 
@@ -868,6 +873,7 @@ export const patchAgreementClaimForRoute = async (
       .returningAll()
       .executeTakeFirstOrThrow()
 
+    await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: 'claim', id: claimId })
     return updated
   })
 }
@@ -1304,6 +1310,9 @@ export const patchAgreementClaimReconcileLineItem = async (
           ])
           .executeTakeFirstOrThrow()
 
+        for (const reconcileId of new Set([String(existing.egcs_fc_fundingagreementclaimreconcile), String(target.nextReconcileId)])) {
+          await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: 'reconciliation', id: reconcileId })
+        }
         await syncAgreementClaimReconcileLineItemPatchStatuses(
           trx,
           String(existing.egcs_fc_fundingagreementclaimreconcile),
@@ -1398,6 +1407,7 @@ export const patchAgreementClaimReconcile = async (
           .returningAll()
           .executeTakeFirstOrThrow()
 
+        await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: 'reconciliation', id: reconcileId })
         await syncAgreementClaimReconcileEditingStatus(trx, reconcileId)
 
         return updated
@@ -1529,6 +1539,7 @@ export const saveAgreementClaimReconcileLineItemsBulk = async (
             .where('_deleted', '=', false)
             .executeTakeFirstOrThrow()
         }
+        await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: 'reconciliation', id: reconcileId })
         await syncAgreementClaimReconcileEditingStatus(trx, reconcileId)
 
         const rows = await trx.selectFrom('Funding_Case_Agreement_Claim_Reconcile_Line_Item')

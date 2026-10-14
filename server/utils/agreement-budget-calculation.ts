@@ -7,6 +7,7 @@ import { isNumeric19Money, moneyToCents, parseMoney, type Money } from '~~/share
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from './database-money'
 import { badRequest, throwApiError } from './api-errors'
 import { assertAgreementBudgetProgramFundingCapacity } from './agreement-budget'
+import { assertAgreementCurrentBudgetUsage } from './agreement-financial-budget-controls'
 
 type Db = Kysely<Database> | Transaction<Database>
 type Input = { egcs_fc_organizationcostcategory?: string, egcs_fc_percentage?: number | null, egcs_fc_programfunding?: Money, egcs_fc_fundingagreementbudgetfiscalyear?: string, egcs_fc_currency?: string }
@@ -102,10 +103,11 @@ export const recalculateAgreementBudget = async (event: H3Event, db: Db, rowId: 
     if (row.mode !== 'manual') await db.updateTable('Funding_Case_Agreement_Budget_Line_Item')
       .set({ egcs_fc_programfunding: databaseMoneyValue(amounts.get(row.id)!) }).where('id', '=', row.id).execute()
   }
-  const version = await db.selectFrom('Funding_Case_Agreement_Budget_Version').select('egcs_fc_iscurrent').where('id', '=', anchor.egcs_fc_budgetversion).executeTakeFirstOrThrow()
+  const version = await db.selectFrom('Funding_Case_Agreement_Budget_Version').select(['egcs_fc_iscurrent', 'egcs_fc_fundingagreement']).where('id', '=', anchor.egcs_fc_budgetversion).executeTakeFirstOrThrow()
   if (version.egcs_fc_iscurrent) {
     const years = new Map(rows.map(row => [`${row.yearRowId}:${row.currency}`, { identity: row.yearIdentity ?? row.yearRowId, currency: row.currency }]))
     for (const { identity, currency } of years.values()) await assertAgreementBudgetProgramFundingCapacity(event, db, streamId, identity, parseMoney('0'), { lockStreamBudget: true, currency })
+    await assertAgreementCurrentBudgetUsage(db, String(version.egcs_fc_fundingagreement))
   }
   return amounts
 }

@@ -9,6 +9,7 @@ import {
 import { badRequest } from '~~/server/utils/api-errors'
 import { throwIfAgreementUniqueConstraintError } from '~~/server/utils/agreement-unique-constraint-errors'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
+import { assertAgreementFinancialBudgetControls } from '~~/server/utils/agreement-financial-budget-controls'
 
 export default defineEventHandler(async event => {
   const validated = await readValidatedBodyI18n(event, FundingCaseAgreementClaimReconcileLineItemCreateSchema)
@@ -66,6 +67,7 @@ export default defineEventHandler(async event => {
           ])
           .executeTakeFirstOrThrow()
 
+        await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: 'reconciliation', id: validated.egcs_fc_fundingagreementclaimreconcile })
         await syncAgreementClaimReconcileEditingStatus(trx, validated.egcs_fc_fundingagreementclaimreconcile)
 
         return {

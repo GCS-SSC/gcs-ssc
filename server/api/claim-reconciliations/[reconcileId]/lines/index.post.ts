@@ -11,6 +11,7 @@ import { throwIfAgreementUniqueConstraintError } from '~~/server/utils/agreement
 import { FundingCaseAgreementClaimReconcileLineItemCreateSchema } from '~~/shared/types/schemas'
 import { isDecimalDatabaseId } from '~~/server/utils/database-id'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
+import { assertAgreementFinancialBudgetControls } from '~~/server/utils/agreement-financial-budget-controls'
 
 // eslint-disable-next-line local/require-authorize -- exact assignment is locked and revalidated by the shared claim mutation helper
 export default defineEventHandler(async event => {
@@ -66,6 +67,7 @@ export default defineEventHandler(async event => {
             databaseMoneyText(sql.ref('egcs_fc_sampled')).as('egcs_fc_sampled')
           ])
           .executeTakeFirstOrThrow()
+        await assertAgreementFinancialBudgetControls(trx, runtime.agreementId, { kind: 'reconciliation', id: reconcileId })
         await syncAgreementClaimReconcileEditingStatus(trx, reconcileId)
         return {
           ...created,

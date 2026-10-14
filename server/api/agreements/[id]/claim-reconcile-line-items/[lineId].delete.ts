@@ -6,6 +6,7 @@ import {
 } from '~~/server/utils/agreement-claim'
 import { badRequest } from '~~/server/utils/api-errors'
 import { resolveClaimReconcileLineAssignmentTarget } from '~~/server/utils/agreement-assignment-target'
+import { assertAgreementFinancialBudgetControls } from '~~/server/utils/agreement-financial-budget-controls'
 
 export default defineEventHandler(async event => {
   const lineId = getRouterParam(event, 'lineId')
@@ -47,6 +48,7 @@ export default defineEventHandler(async event => {
     const reconcile = await assertAgreementClaimReconcileEditable(event, trx, agreementId, String(existing.egcs_fc_fundingagreementclaimreconcile))
     if (!reconcile || typeof reconcile !== 'object' || !('id' in reconcile)) return reconcile
     await trx.updateTable('Funding_Case_Agreement_Claim_Reconcile_Line_Item').set({ _deleted: true }).where('id', '=', lineId).where('egcs_fc_fundingagreementclaimreconcile', '=', existing.egcs_fc_fundingagreementclaimreconcile).where('_deleted', '=', false).execute()
+    await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: 'reconciliation', id: String(existing.egcs_fc_fundingagreementclaimreconcile) })
     await syncAgreementClaimReconcileEditingStatus(trx, String(existing.egcs_fc_fundingagreementclaimreconcile))
   }, { action: 'delete' })
 

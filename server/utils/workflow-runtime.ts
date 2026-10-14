@@ -86,6 +86,8 @@ import {
 import { resolveEntityTypeLifecycleDefinition } from './entity-type-registry'
 import { createCompletionRecord, resolveCompletionEvidenceId } from './completion-runtime-core'
 import { applyCompletionPositiveTerminusEffects } from './completion-positive-terminus'
+import { assertAgreementFinancialBudgetControls } from './agreement-financial-budget-controls'
+import { throwIfAgreementFinancialBudgetError } from './agreement-financial-budget-errors'
 import { loadExtensionLifecycleEntity } from './extensions'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { requireQualifiedRuntimeLockEvidence } from './qualified-runtime-transaction'
@@ -272,6 +274,13 @@ const applyWorkflowParentStatusTransition = async (
 }
 
 const lockProtectedAgreement = async (trx: Transaction<Database>, run: Pick<WorkflowRun, 'egcs_cn_purpose' | 'egcs_cn_entitytype' | 'egcs_cn_entityid'>) => {
+  if (['fundingcaseagreementclaim', 'fundingcaseforecast', 'fundingclaimreconcile'].includes(run.egcs_cn_entitytype)) {
+    const context = await resolveReviewRuntimeEntityFromEntity(trx, run.egcs_cn_entitytype, String(run.egcs_cn_entityid))
+    if (!context?.agreementId || !await lockAgreementProfileForUpdate(trx, context.agreementId)) {
+      throw new Error('Financial workflow Agreement is unavailable')
+    }
+    return
+  }
   if (run.egcs_cn_entitytype === 'fundingcasepayment') {
     const payment = await trx.selectFrom('Funding_Case_Agreement_Payment').select('egcs_fc_fundingagreement')
       .where('id', '=', String(run.egcs_cn_entityid)).where('_deleted', '=', false).executeTakeFirstOrThrow()
@@ -1350,6 +1359,10 @@ const startWorkflowUnchecked = async (
   if ('status' in targetStatus ? targetStatus.status.terminal : targetStatus.terminal) {
     return await badRequest(event, 'WORKFLOW_TARGET_TERMINAL', 'apiErrors.request.invalid_status')
   }
+  if (context.agreementId && ['fundingcaseagreementclaim', 'fundingcaseforecast', 'fundingclaimreconcile'].includes(context.entityType)) {
+    const kind = context.entityType === 'fundingcaseagreementclaim' ? 'claim' : context.entityType === 'fundingcaseforecast' ? 'forecast' : 'reconciliation'
+    await assertAgreementFinancialBudgetControls(trx, context.agreementId, { kind, id: context.entityId })
+  }
   const closeoutReadiness = purpose === 'approval_submission'
     && context.entityType === 'fundingcaseagreementcloseout'
     ? await (async () => {
@@ -1490,6 +1503,7 @@ export const startWorkflow = async (...args: Parameters<typeof startWorkflowUnch
   try {
     return await startWorkflowUnchecked(...args)
   } catch (error) {
+    await throwIfAgreementFinancialBudgetError(args[0], error)
     if (error instanceof BusinessStatusViolation) {
       return await throwApiError(args[0], {
         statusCode: 409,
@@ -1881,6 +1895,7 @@ export const advanceWorkflowAfterApprovalForRequest = async (
   try {
     return await execute(async trx => await advanceApprovalInTransaction(trx, approvalId))
   } catch (error: unknown) {
+    await throwIfAgreementFinancialBudgetError(event, error)
     if (error instanceof AgreementApprovalSubmissionHashMismatchError) {
       return await badRequest(event, 'AGREEMENT_APPROVAL_SUBMISSION_CHANGED', 'apiErrors.workflow.approval_submission_changed')
     }

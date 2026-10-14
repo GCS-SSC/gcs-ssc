@@ -9,6 +9,7 @@ import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-
 import { budgetFiscalYearStableId, budgetLineItemStableId } from '~~/server/utils/agreement-budget-lineage'
 import { sql } from 'kysely'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+import { assertAgreementCurrentBudgetUsage } from '~~/server/utils/agreement-financial-budget-controls'
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -120,6 +121,7 @@ export default defineEventHandler(async event => {
       .where('_deleted', '=', false)
       .executeTakeFirst()
 
+    await assertAgreementCurrentBudgetUsage(trx, agreementId)
     return { success: true }
   }, { action: 'delete', blocksApprovalSubmission: true, correctionFinancialMutation: true })
 })

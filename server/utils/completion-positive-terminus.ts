@@ -3,6 +3,7 @@ import type { Database, Entity_Type } from '~~/shared/types/database'
 import { transitionBusinessStatus } from '~~/server/utils/business-status-runtime'
 import { assertAgreementCorrectionFinancialUnlocked } from './correction-lock'
 import { getAgreementCommitmentCodingTotals, validateAgreementCommitmentPriorPaidCoverage } from './agreement-commitment'
+import { assertAgreementFinancialBudgetControls } from './agreement-financial-budget-controls'
 
 /**
  * Applies domain effects only after Completion reaches a positive terminus.
@@ -18,6 +19,12 @@ export const applyCompletionPositiveTerminusEffects = async (
   if (entityType === 'fundingcasecorrection') {
     throw new Error('Correction effects require the designated Completion-linked approval submission')
   }
+  if (entityType === 'fundingcaseagreementclaim') {
+    const claim = await trx.selectFrom('Funding_Case_Agreement_Claim').select('egcs_fc_fundingagreement')
+      .where('id', '=', entityId).where('_deleted', '=', false).executeTakeFirstOrThrow()
+    await assertAgreementFinancialBudgetControls(trx, String(claim.egcs_fc_fundingagreement), { kind: 'claim', id: entityId })
+    return
+  }
   if (entityType === 'fundingclaimreconcile') {
     const reconcile = await trx.selectFrom('Funding_Case_Agreement_Claim_Reconcile')
       .innerJoin('Funding_Case_Agreement_Claim', 'Funding_Case_Agreement_Claim.id', 'Funding_Case_Agreement_Claim_Reconcile.egcs_fc_fundingagreementclaim')
@@ -27,6 +34,7 @@ export const applyCompletionPositiveTerminusEffects = async (
       .select([
         'Funding_Case_Agreement_Claim_Reconcile.egcs_fc_isfinal as is_final',
         'Funding_Case_Agreement_Claim.id as claim_id',
+        'Funding_Case_Agreement_Claim.egcs_fc_fundingagreement as agreement_id',
         'Transfer_Payment_Profile.egcs_tp_agency as agency_id'
       ])
       .where('Funding_Case_Agreement_Claim_Reconcile.id', '=', entityId)
@@ -37,6 +45,7 @@ export const applyCompletionPositiveTerminusEffects = async (
       .where('Transfer_Payment_Profile._deleted', '=', false)
       .forUpdate('Funding_Case_Agreement_Claim_Reconcile')
       .executeTakeFirstOrThrow()
+    await assertAgreementFinancialBudgetControls(trx, String(reconcile.agreement_id), { kind: 'reconciliation', id: entityId })
     await trx.updateTable('Funding_Case_Agreement_Claim_Reconcile')
       .set({ egcs_fc_isopen: false })
       .where('id', '=', entityId)
@@ -66,6 +75,7 @@ export const applyCompletionPositiveTerminusEffects = async (
       .where('_deleted', '=', false)
       .forUpdate()
       .executeTakeFirstOrThrow()
+    await assertAgreementFinancialBudgetControls(trx, String(forecast.egcs_fc_fundingagreement), { kind: 'forecast', id: entityId })
     await trx.selectFrom('Funding_Case_Agreement_Forecast')
       .select('id')
       .where('egcs_fc_fundingagreement', '=', String(forecast.egcs_fc_fundingagreement))

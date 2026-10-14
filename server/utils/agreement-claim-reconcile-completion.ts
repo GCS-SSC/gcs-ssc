@@ -27,6 +27,7 @@ import {
 } from '~~/server/utils/agreement-write-transaction'
 import { authorizeFreshAssignedItem } from '~~/server/utils/authorize'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
+import { assertAgreementFinancialBudgetControls, getAgreementFinancialBudgetViolation } from '~~/server/utils/agreement-financial-budget-controls'
 
 export const getAgreementClaimReconcileCompletionRuntime = async (
   event: H3Event,
@@ -50,6 +51,9 @@ export const getAgreementClaimReconcileCompletionRuntime = async (
       : null
     const line = await trx.selectFrom('Funding_Case_Agreement_Claim_Reconcile_Line_Item')
       .select('id').where('egcs_fc_fundingagreementclaimreconcile', '=', reconcileId).where('_deleted', '=', false).executeTakeFirst()
+    const budgetViolation = item || !line
+      ? null
+      : await getAgreementFinancialBudgetViolation(trx, context.agreementId, { kind: 'reconciliation', id: reconcileId })
 
     return {
       item,
@@ -57,6 +61,7 @@ export const getAgreementClaimReconcileCompletionRuntime = async (
         && Boolean(reconcile)
         && reconcile?.egcs_fc_isopen !== false
         && Boolean(line)
+        && !budgetViolation
         && !hasCompletedFinalReconcile
         && Boolean(status && !status.egcs_cn_readonly && !status.egcs_cn_terminal),
       blocker: item
@@ -65,9 +70,11 @@ export const getAgreementClaimReconcileCompletionRuntime = async (
           ? 'final_reconcile_approved' as const
           : !line
               ? 'lines_required' as const
-              : !status || status.egcs_cn_readonly || status.egcs_cn_terminal
-                  ? 'business_status' as const
-                  : null
+              : budgetViolation
+                ? 'annual_budget_exceeded' as const
+                : !status || status.egcs_cn_readonly || status.egcs_cn_terminal
+                    ? 'business_status' as const
+                    : null
     }
   })
 }
@@ -157,6 +164,9 @@ export const executeAgreementClaimReconcileCompletion = async (
     if (Number(currentLineCount?.total ?? 0) === 0) {
       return await badRequest(event, 'AGREEMENT_CLAIM_RECONCILE_LINES_REQUIRED', 'apiErrors.request.invalid_status')
     }
+    await assertAgreementFinancialBudgetControls(trx, context.agreementId, {
+      kind: 'reconciliation', id: reconcileId
+    })
 
     const { completion: createdCompletion } = await createCompletionTransition(
       event,

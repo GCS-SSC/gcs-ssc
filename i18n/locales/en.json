@@ -1300,6 +1300,7 @@
       "duplicate_funding_subtype": "Each funding subtype may appear only once per line.",
       "funding_subtype_invalid": "Select a funding subtype available to this agreement’s stream, without duplicates.",
       "funding_breakdown_required": "Add at least one other funding source to each line, and make program funding plus other sources equal total cost.",
+      "annual_budget_exceeded": "The annual {document} amount for {funding} ({amount}) exceeds the current Agreement budget ({budget}).",
       "number_provider_conflict": "More than one agreement number provider is enabled for this stream.",
       "invalid_generated_number": "The generated agreement number must contain 1–15 characters without surrounding spaces.",
       "number_managed": "The agreement number is assigned automatically. Remove the supplied number and try again.",
@@ -2291,6 +2292,14 @@
     "modified_at": "Modified"
   },
   "agreement": {
+    "budget_controls": {
+      "total": "Total cost",
+      "program": "Program funding",
+      "other": "Other funding",
+      "forecast": "forecasts",
+      "claim": "submitted claims",
+      "reconciliation": "reconciliations"
+    },
     "completion_blockers": {
       "allocation_total": "Coding lines must add up to the commitment total before completing.",
       "funding_breakdown_required": "Add at least one other funding source to each line, and make program funding plus other sources equal total cost before completion."
@@ -3616,6 +3625,7 @@
       "risk_rating": "Risk Rating"
     },
     "completion_blockers": {
+      "annual_budget_exceeded": "The annual amounts exceed the current Agreement budget. Reduce the amounts or increase the matching funding in the budget.",
       "active_workflow": "Completion is unavailable while a workflow is active.",
       "approval_workflow_missing": "A published approval workflow is required before this item can be completed.",
       "claim_lines_required": "Add at least one claim line before completing this claim.",

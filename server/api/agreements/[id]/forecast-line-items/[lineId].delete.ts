@@ -2,6 +2,7 @@ import { badRequest } from '~~/server/utils/api-errors'
 import { assertAgreementForecastEditable, executeAgreementForecastMutation, prepareAgreementForecastRoute } from '~~/server/utils/agreement-forecast'
 import { resolveForecastLineAssignmentTarget } from '~~/server/utils/agreement-assignment-target'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+import { assertAgreementFinancialBudgetControls } from '~~/server/utils/agreement-financial-budget-controls'
 
 export default defineEventHandler(async event => {
   const lineId = getRouterParam(event, 'lineId')
@@ -45,6 +46,7 @@ export default defineEventHandler(async event => {
     const editable = await assertAgreementForecastEditable(event, trx, agreementId, String(existing.egcs_fc_agreementforecast))
     if (!editable || typeof editable !== 'object' || !('id' in editable)) return editable
     await trx.updateTable('Funding_Case_Agreement_Forecast_Line_Item').set({ _deleted: true }).where('id', '=', lineId).where('egcs_fc_agreementforecast', '=', existing.egcs_fc_agreementforecast).where('_deleted', '=', false).execute()
+    await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: 'forecast', id: String(existing.egcs_fc_agreementforecast) })
   }, { action: 'delete' })
 
   return result ?? { success: true }

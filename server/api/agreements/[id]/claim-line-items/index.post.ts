@@ -11,6 +11,7 @@ import {
 import { throwIfAgreementUniqueConstraintError } from '~~/server/utils/agreement-unique-constraint-errors'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { assertAgreementLineFundingBalance, replaceAgreementLineFunding } from '~~/server/utils/agreement-funding-breakdown'
+import { assertAgreementFinancialBudgetControls } from '~~/server/utils/agreement-financial-budget-controls'
 
 export default defineEventHandler(async event => {
   const validated = await readValidatedBodyI18n(event, FundingCaseAgreementClaimLineItemCreateSchema)
@@ -68,6 +69,7 @@ export default defineEventHandler(async event => {
         if (fundingError) return fundingError
         const balanceError = await assertAgreementLineFundingBalance(event, trx, { kind: 'claim', lineId: String(created.id) })
         if (balanceError) return balanceError
+        await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: 'claim', id: validated.egcs_fc_fundingagreementclaim })
 
         await syncAgreementClaimEditingStatus(trx, validated.egcs_fc_fundingagreementclaim)
 

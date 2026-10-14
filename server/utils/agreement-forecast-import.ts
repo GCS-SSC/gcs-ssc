@@ -10,6 +10,7 @@ import { BusinessStatusViolation, lockAgencyDraftStatus } from '~~/server/utils/
 import { databaseMoneyValue } from '~~/server/utils/database-money'
 import { createPrimaryEntityAssignment } from '~~/server/utils/entity-assignment'
 import { moneyToCents, parseMoney } from '~~/shared/utils/money'
+import { assertAgreementFinancialBudgetControls } from './agreement-financial-budget-controls'
 
 /**
  * Creates one inactive Draft Forecast with all monthly lines in the authorized transaction.
@@ -120,6 +121,9 @@ export const createAgreementForecastAggregate = async (
       egcs_fc_version: line.version
     }).returning('id').executeTakeFirstOrThrow()
     lineItemIds.push(String(inserted.id))
+  }
+  for (const version of new Set(input.lineItems.map(line => line.version))) {
+    await assertAgreementFinancialBudgetControls(trx, input.agreementId, { kind: 'forecast', id: String(forecast.id), version })
   }
   await createPrimaryEntityAssignment(trx, 'fundingcaseforecast', String(forecast.id), creatorId)
   return { status: 'created', forecastId: String(forecast.id), lineItemIds, draftStatusId }

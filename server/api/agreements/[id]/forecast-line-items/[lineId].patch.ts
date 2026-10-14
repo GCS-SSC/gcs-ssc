@@ -15,6 +15,7 @@ import {
 } from '~~/server/utils/agreement-forecast'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { assertAgreementLineFundingBalance, replaceAgreementLineFunding } from '~~/server/utils/agreement-funding-breakdown'
+import { assertAgreementFinancialBudgetControls } from '~~/server/utils/agreement-financial-budget-controls'
 
 type ForecastLineItemExisting = {
   id: string
@@ -174,6 +175,10 @@ const patchForecastLineItemForRoute = async (
     }
     const balanceError = await assertAgreementLineFundingBalance(event, trx, { kind: 'forecast', lineId })
     if (balanceError) return balanceError
+    await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: 'forecast', id: String(updated.egcs_fc_agreementforecast), version: String(updated.egcs_fc_version) })
+    for (const forecastId of new Set([existing.egcs_fc_agreementforecast, String(updated.egcs_fc_agreementforecast)])) {
+      await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: 'forecast', id: forecastId })
+    }
     return {
       ...updated,
       egcs_fc_amount: parseDatabaseMoney(updated.egcs_fc_amount),

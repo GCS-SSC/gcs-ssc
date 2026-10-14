@@ -1300,6 +1300,7 @@
       "duplicate_funding_subtype": "Chaque sous-type de financement ne peut figurer qu’une fois par ligne.",
       "funding_subtype_invalid": "Sélectionnez un sous-type de financement offert pour le volet de cette entente, sans doublons.",
       "funding_breakdown_required": "Ajoutez au moins une autre source de financement à chaque ligne et assurez-vous que le financement du programme et les autres sources égalent le coût total.",
+      "annual_budget_exceeded": "Le montant annuel des {document} pour {funding} ({amount}) dépasse le budget courant de l’entente ({budget}).",
       "number_provider_conflict": "Plusieurs fournisseurs de numéros d’entente sont activés pour ce volet.",
       "invalid_generated_number": "Le numéro d’entente généré doit contenir de 1 à 15 caractères sans espaces au début ou à la fin.",
       "number_managed": "Le numéro d’entente est attribué automatiquement. Retirez le numéro fourni et réessayez.",
@@ -2291,6 +2292,14 @@
     "modified_at": "Modifiée"
   },
   "agreement": {
+    "budget_controls": {
+      "total": "Coût total",
+      "program": "Financement du programme",
+      "other": "Autres financements",
+      "forecast": "prévisions",
+      "claim": "réclamations soumises",
+      "reconciliation": "rapprochements"
+    },
     "completion_blockers": {
       "allocation_total": "Les lignes de codage doivent correspondre au total de l’engagement avant de terminer.",
       "funding_breakdown_required": "Ajoutez au moins une autre source de financement à chaque ligne et assurez-vous que le financement du programme et les autres sources égalent le coût total avant l’achèvement."
@@ -3616,6 +3625,7 @@
       "risk_rating": "Évaluation du risque"
     },
     "completion_blockers": {
+      "annual_budget_exceeded": "Les montants annuels dépassent le budget courant de l’entente. Réduisez les montants ou augmentez le financement correspondant dans le budget.",
       "active_workflow": "L’achèvement n’est pas disponible pendant qu’un processus est actif.",
       "approval_workflow_missing": "Un processus d’approbation publié est requis avant que cet élément puisse être achevé.",
       "claim_lines_required": "Ajoutez au moins une ligne de demande de remboursement avant d’achever cette demande de remboursement.",

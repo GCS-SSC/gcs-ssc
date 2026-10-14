@@ -1,6 +1,7 @@
 /* eslint-disable jsdoc/require-jsdoc -- Amendment domain helpers are named for their route and lifecycle use. */
 import type { H3Event } from 'h3'
 import { sql, type Kysely, type Transaction } from 'kysely'
+import { assertAgreementCurrentBudgetUsage } from './agreement-financial-budget-controls'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import { agreementBudgetFiscalYearsOverlapDuration } from '~~/server/utils/agreement-fiscal-year-duration'
 import type { Amended_Type, Database } from '~~/shared/types/database'
@@ -483,6 +484,7 @@ export const promoteApprovedAgreementAmendment = async (
       _deleted: false
     }).returning('id').executeTakeFirstOrThrow()
     await cloneBudgetVersionRows(trx, String(budgetSnapshot.id), String(working.id), context.agreementId)
+    await assertAgreementCurrentBudgetUsage(trx, context.agreementId)
   }
 
   let activitySnapshotQuery = trx.selectFrom('Funding_Case_Agreement_Activity_Version').select('id')

@@ -33,6 +33,7 @@ import {
   type BusinessStatusMutationMode
 } from '~~/server/utils/business-status-runtime'
 import { assertAgreementCorrectionFinancialWriteAllowed, correctionLocksEntityFinancialMutation } from './correction-lock'
+import { throwIfAgreementFinancialBudgetError } from './agreement-financial-budget-errors'
 
 class AgreementWriteScopeChanged extends Error {
   constructor(readonly context: AgreementScopeContext) {
@@ -296,6 +297,7 @@ export const executeFreshAuthorizedAgreementWrite = async <T>(
         return await withAuditExecution({ type: 'agency', agencyId: currentContext.agencyId }, () => callback(trx, currentContext, authContext))
       })
     } catch (error: unknown) {
+      await throwIfAgreementFinancialBudgetError(event, error)
       if (!(error instanceof AgreementWriteScopeChanged)) {
         throw error
       }

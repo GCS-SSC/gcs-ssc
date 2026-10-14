@@ -45,6 +45,7 @@ import {
   projectFundingOpportunityForPortal
 } from '~~/server/utils/funding-case-exchange'
 import { createAgreementForecastAggregate } from '~~/server/utils/agreement-forecast-import'
+import { throwIfAgreementFinancialBudgetError } from '~~/server/utils/agreement-financial-budget-errors'
 import { resolveAssignmentCommonUserId } from '~~/server/utils/entity-assignment'
 import { lockTransferPaymentStreams } from '~~/server/utils/transfer-payment-stream-lock'
 import { assertBusinessStatusMutationAllowed } from '~~/server/utils/business-status-runtime'
@@ -588,6 +589,7 @@ const handleExtensionDispatchError = async (
   event: H3Event,
   error: unknown
 ) => {
+  await throwIfAgreementFinancialBudgetError(event, error)
   if (isGcsExtensionUserError(error)) {
     return await throwApiError(event, {
       statusCode: error.statusCode,

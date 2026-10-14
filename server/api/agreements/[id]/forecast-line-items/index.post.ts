@@ -9,6 +9,7 @@ import {
 } from '~~/server/utils/agreement-forecast'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { assertAgreementLineFundingBalance, replaceAgreementLineFunding } from '~~/server/utils/agreement-funding-breakdown'
+import { assertAgreementFinancialBudgetControls } from '~~/server/utils/agreement-financial-budget-controls'
 
 export default defineEventHandler(async event => {
   const validated = await readValidatedBodyI18n(event, FundingCaseAgreementForecastLineItemCreateSchema)
@@ -71,6 +72,7 @@ export default defineEventHandler(async event => {
       if (fundingError) return fundingError
       const balanceError = await assertAgreementLineFundingBalance(event, trx, { kind: 'forecast', lineId: String(lineItem.id) })
       if (balanceError) return balanceError
+      await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: 'forecast', id: validated.egcs_fc_agreementforecast, version: validated.egcs_fc_version })
       return {
         ...lineItem,
         egcs_fc_amount: parseDatabaseMoney(lineItem.egcs_fc_amount),
