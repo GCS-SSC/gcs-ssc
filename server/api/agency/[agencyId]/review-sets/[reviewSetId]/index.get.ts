@@ -1,5 +1,5 @@
 import { readPublishedRiskAssessmentMembers } from '~~/server/utils/workflow-risk-source'
-import { authorize } from '~~/server/utils/authorize'
+import { authorize, authorizeWithFreshAuthContext, requireFreshReadAuthContext } from '~~/server/utils/authorize'
 import { mapReviewSetupMembers } from '~~/server/utils/transfer-payment-polymorphic'
 import { readReviewSetupPublicationMetadata } from '~~/server/utils/review-setup-versioning'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
@@ -11,7 +11,15 @@ export default defineEventHandler(async event => {
   await authorize(event, 'agency', 'read', { type: 'agency', agencyId })
   if (!isPositivePostgresBigintText(reviewSetupId)) return await notFound(event, 'REVIEW_SETUP_NOT_FOUND', 'apiErrors.transfer_payment.review_setup_not_found')
 
+  if (!isPositivePostgresBigintText(agencyId)) return await notFound(event, 'AGENCY_NOT_FOUND', 'apiErrors.agency.not_found')
+
   return await db.transaction().setIsolationLevel('repeatable read').execute(async trx => {
+    const auth = await requireFreshReadAuthContext(event, trx)
+    const agency = await trx.selectFrom('Agency_Profile').select('id')
+      .where('id', '=', agencyId).where('_deleted', '=', false).executeTakeFirst()
+    if (!agency) return await notFound(event, 'AGENCY_NOT_FOUND', 'apiErrors.agency.not_found')
+    await authorizeWithFreshAuthContext(event, auth, 'agency', 'read', { type: 'agency', agencyId })
+
     const setup = await trx.selectFrom('Common_Review_Set_Setup')
       .innerJoin('Common_Entity_Type', 'Common_Entity_Type.egcs_cn_type', 'Common_Review_Set_Setup.egcs_cn_entitytype')
       .selectAll('Common_Review_Set_Setup')

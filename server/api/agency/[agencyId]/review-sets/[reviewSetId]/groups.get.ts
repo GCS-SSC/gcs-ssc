@@ -1,10 +1,12 @@
 import { authorize } from '~~/server/utils/authorize'
 import { withActiveAgencyReadTransaction } from '~~/server/utils/agency-auth'
+import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 export default defineEventHandler(async event => {
   const agencyId = getRouterParam(event, 'agencyId') ?? ''
   const setupId = getRouterParam(event, 'reviewSetId') ?? ''
   await authorize(event, 'agency', 'read', { type: 'agency', agencyId })
+  if (!isPositivePostgresBigintText(setupId)) return await notFound(event, 'REVIEW_SETUP_NOT_FOUND', 'apiErrors.admin_common.not_found')
   return await withActiveAgencyReadTransaction(event, agencyId, async trx => {
     const setup = await trx.selectFrom('Common_Review_Set_Setup').select('id')
       .where('id', '=', setupId).where('egcs_cn_agency', '=', agencyId).where('_deleted', '=', false).executeTakeFirst()
