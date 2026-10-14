@@ -83,7 +83,10 @@ seed=$(docker exec "$database" psql -X -U gcs_ssc -d gcs_ssc -At -v ON_ERROR_STO
   SELECT
     (SELECT count(*) FROM kysely_migration WHERE name = '\''9999_seed'\''),
     (SELECT count(*) FROM "Agency_Profile" WHERE id = 21 AND egcs_ay_abbreviation_en = '\''NCIA'\''),
-    (SELECT count(*) FROM "Funding_Case_Agreement_Profile" WHERE NOT _deleted),
+    (SELECT count(*) FROM "Funding_Case_Agreement_Profile" agreement
+      JOIN "Transfer_Payment_Stream" stream ON stream.id = agreement.egcs_fc_transferpaymentstream
+      JOIN "Transfer_Payment_Profile" program ON program.id = stream.egcs_tp_transferpaymentprofile
+      WHERE NOT agreement._deleted AND program.egcs_tp_agency = 21),
     (SELECT count(*) FROM "Funding_Case_Agreement_Payment"),
     (SELECT count(*) FROM "Funding_Case_Agreement_Payment" payment
       JOIN "Common_Status" status ON status.id = payment.egcs_fc_status
