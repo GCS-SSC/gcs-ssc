@@ -2,6 +2,7 @@ import { authorize } from '~~/server/utils/authorize'
 import { authorizeAgreementStreamLookupRoute, prepareAgreementStreamLookupRoute } from '~~/server/utils/agreement-stream-lookup-routes'
 import { buildListRouteResponse } from '~~/server/utils/list-route-response'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
+import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 const readRoute = defineEventHandler(async event => {
   const db = event.context.$db
@@ -32,7 +33,9 @@ const readRoute = defineEventHandler(async event => {
 
   if (lookup.escapedSearch) {
     baseQuery = baseQuery.where(eb => eb.or([
-      eb('Transfer_Payment_Agreement_Subtype.id', '=', lookup.escapedSearch),
+      ...(isPositivePostgresBigintText(lookup.escapedSearch)
+        ? [eb('Transfer_Payment_Agreement_Subtype.id', '=', lookup.escapedSearch)]
+        : []),
       eb('Agency_Agreement_Type.egcs_ay_name_en', 'ilike', `%${lookup.escapedSearch}%`),
       eb('Agency_Agreement_Type.egcs_ay_name_fr', 'ilike', `%${lookup.escapedSearch}%`)
     ]))
