@@ -23,6 +23,10 @@ const CONSTRAINT_ERROR_MAP: Record<string, ConstraintErrorMapping> = {
     code: 'AGENCY_DUPLICATE_PROFILE',
     key: 'apiErrors.agency.duplicate_profile'
   },
+  ay_uq_profile_normalized: {
+    code: 'AGENCY_DUPLICATE_PROFILE',
+    key: 'apiErrors.agency.duplicate_profile'
+  },
   ay_idx_costcategoryorganizationagencynameen: {
     code: 'AGENCY_DUPLICATE_COST_CATEGORY_NAME_EN',
     key: 'apiErrors.agency.duplicate_cost_category_name_en'
@@ -31,11 +35,27 @@ const CONSTRAINT_ERROR_MAP: Record<string, ConstraintErrorMapping> = {
     code: 'AGENCY_DUPLICATE_COST_CATEGORY_NAME_FR',
     key: 'apiErrors.agency.duplicate_cost_category_name_fr'
   },
+  ay_uq_cost_category_name_en_normalized: {
+    code: 'AGENCY_DUPLICATE_COST_CATEGORY_NAME_EN',
+    key: 'apiErrors.agency.duplicate_cost_category_name_en'
+  },
+  ay_uq_cost_category_name_fr_normalized: {
+    code: 'AGENCY_DUPLICATE_COST_CATEGORY_NAME_FR',
+    key: 'apiErrors.agency.duplicate_cost_category_name_fr'
+  },
   ay_idx_costcategorylineitemorganizationcostcategorynameen: {
     code: 'AGENCY_DUPLICATE_COST_CATEGORY_LINE_ITEM_NAME_EN',
     key: 'apiErrors.agency.duplicate_cost_category_line_item_name_en'
   },
   ay_idx_costcategorylineitemorganizationcostcategorynamefr: {
+    code: 'AGENCY_DUPLICATE_COST_CATEGORY_LINE_ITEM_NAME_FR',
+    key: 'apiErrors.agency.duplicate_cost_category_line_item_name_fr'
+  },
+  ay_uq_line_item_name_en_normalized: {
+    code: 'AGENCY_DUPLICATE_COST_CATEGORY_LINE_ITEM_NAME_EN',
+    key: 'apiErrors.agency.duplicate_cost_category_line_item_name_en'
+  },
+  ay_uq_line_item_name_fr_normalized: {
     code: 'AGENCY_DUPLICATE_COST_CATEGORY_LINE_ITEM_NAME_FR',
     key: 'apiErrors.agency.duplicate_cost_category_line_item_name_fr'
   },
@@ -84,6 +104,14 @@ const CONSTRAINT_ERROR_MAP: Record<string, ConstraintErrorMapping> = {
     key: 'apiErrors.agency.duplicate_approval_behalf_type_name_en'
   },
   ay_idx_approvalbehalftypeorganizationagencynamefr: {
+    code: 'AGENCY_DUPLICATE_APPROVAL_BEHALF_TYPE_NAME_FR',
+    key: 'apiErrors.agency.duplicate_approval_behalf_type_name_fr'
+  },
+  ay_uq_approval_behalf_name_en_normalized: {
+    code: 'AGENCY_DUPLICATE_APPROVAL_BEHALF_TYPE_NAME_EN',
+    key: 'apiErrors.agency.duplicate_approval_behalf_type_name_en'
+  },
+  ay_uq_approval_behalf_name_fr_normalized: {
     code: 'AGENCY_DUPLICATE_APPROVAL_BEHALF_TYPE_NAME_FR',
     key: 'apiErrors.agency.duplicate_approval_behalf_type_name_fr'
   },
