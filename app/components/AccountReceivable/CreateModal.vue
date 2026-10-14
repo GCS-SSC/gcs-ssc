@@ -48,14 +48,18 @@ const resolveType = (items: AdminCommonLookupResponseItem[]) => {
   if (state.value && next && !adjustment) {
     if (next.egcs_ay_monitorrequired !== true) state.value.egcs_fc_monitorfollowup = undefined
     if (previous && (previous.egcs_ay_claimrelated !== next.egcs_ay_claimrelated
-      || previous.egcs_ay_advancepaymentrelated !== next.egcs_ay_advancepaymentrelated)) state.value.egcs_fc_sources = []
+      || previous.egcs_ay_advancepaymentrelated !== next.egcs_ay_advancepaymentrelated)) {
+      state.value.egcs_fc_sources = []
+      state.value.egcs_fc_sourceclaim = undefined
+    }
   }
   selectedType.value = next
   if (state.value && next && sourceEntry
     && (sourceEntry.kind === 'claim' ? next.egcs_ay_claimrelated === true : next.egcs_ay_advancepaymentrelated === true)
     && state.value.egcs_fc_applicantrecipient === sourceEntry.egcs_fc_applicantrecipient
     && state.value.egcs_fc_agencyfiscalyear === sourceEntry.egcs_fc_agencyfiscalyear) {
-    state.value.egcs_fc_sources = [...sourceEntry.egcs_fc_sources]
+    if (sourceEntry.kind === 'claim') state.value.egcs_fc_sourceclaim = sourceEntry.id
+    else state.value.egcs_fc_sources = [...sourceEntry.egcs_fc_sources]
   }
 }
 const currency: Ref<string | null> = ref(null)
@@ -96,7 +100,10 @@ const sourceQuery = computed<Record<string, string>>(() => {
 })
 const sourceReady = computed(() => Boolean(selectedType.value && state.value?.egcs_fc_type && state.value.egcs_fc_agencyfiscalyear && state.value.egcs_fc_applicantrecipient))
 watch(sourceQuery, () => {
-  if (state.value) state.value.egcs_fc_sources = []
+  if (state.value) {
+    state.value.egcs_fc_sources = []
+    state.value.egcs_fc_sourceclaim = sourceEntry?.kind === 'claim' ? sourceEntry.id : undefined
+  }
 }, { flush: 'sync' })
 const save = async () => {
   if (!state.value || pending.value || (!adjustment && !selectedType.value)) return
@@ -144,7 +151,13 @@ const save = async () => {
             <UButton v-if="state.egcs_fc_recoverymethod" type="button" icon="i-lucide-x" color="neutral" variant="ghost" :label="t('account_receivable.clear_recovery_method')" :disabled="pending" class="max-w-full [&_[data-slot=label]]:whitespace-normal [&_[data-slot=label]]:text-left" @click="state.egcs_fc_recoverymethod = undefined" />
           </UFormField>
         </div>
-        <UFormField v-if="!adjustment" name="egcs_fc_sources" :required="claimRelated" :label="t(claimRelated ? 'account_receivable.source_claims' : 'account_receivable.source_advances')" :description="t(sourceEntry ? 'account_receivable.source_context_locked' : 'account_receivable.source_description')">
+        <UFormField v-if="!adjustment && claimRelated" name="egcs_fc_sourceclaim" required :label="t('account_receivable.source_claim')" :description="t(sourceEntry ? 'account_receivable.source_context_locked' : 'account_receivable.source_claim_description')">
+          <CommonServerLookupSelect v-if="sourceReady" v-model="state.egcs_fc_sourceclaim" :fetch-url="`/api/agreements/${agreementId}/account-receivables/lookups/sources`" :query="sourceQuery" :disabled="Boolean(sourceEntry) || pending" selected-values-query-key="selectedIds" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :show-value-in-label="false" close-on-select />
+          <p v-else class="text-sm text-muted">
+            {{ t('account_receivable.select_source_basis') }}
+          </p>
+        </UFormField>
+        <UFormField v-else-if="!adjustment" name="egcs_fc_sources" :label="t('account_receivable.source_advances')" :description="t(sourceEntry ? 'account_receivable.source_context_locked' : 'account_receivable.source_description')">
           <CommonServerLookupSelect v-if="sourceReady" v-model:values="state.egcs_fc_sources" :fetch-url="`/api/agreements/${agreementId}/account-receivables/lookups/sources`" :query="sourceQuery" :disabled="Boolean(sourceEntry) || pending" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :show-value-in-label="false" multiple close-on-select />
           <p v-else class="text-sm text-muted">
             {{ t('account_receivable.select_source_basis') }}

@@ -19,7 +19,7 @@ const SelectedLookupQuery = PaginationSchema.extend({
     .transform(value => [...new Set(Array.isArray(value) ? value : [value])]).optional()
 })
 
-const SourceQuery = PaginationSchema.extend({ egcs_fc_applicantrecipient: PositivePostgresBigintIdSchema,
+const SourceQuery = SelectedLookupQuery.extend({ egcs_fc_applicantrecipient: PositivePostgresBigintIdSchema,
   egcs_fc_agencyfiscalyear: PositivePostgresBigintIdSchema, egcs_fc_type: PositivePostgresBigintIdSchema })
 
 export const listAccountReceivableSourceLookup = async (event: H3Event, agreementId: string) => {
@@ -35,8 +35,12 @@ export const listAccountReceivableSourceLookup = async (event: H3Event, agreemen
   }
   const sources = await readAccountReceivableSources(event.context.$db, { agreementId, applicantRecipientId: input.egcs_fc_applicantrecipient,
     agencyFiscalYearId: input.egcs_fc_agencyfiscalyear, claimRelated: type.egcs_ay_claimrelated, advancePaymentRelated: type.egcs_ay_advancepaymentrelated, currency: agreement.egcs_fc_currency })
-  const rows = input.search ? sources.filter(row => row.label_en.toLowerCase().includes(input.search!.toLowerCase()) || row.label_fr.toLowerCase().includes(input.search!.toLowerCase())) : sources
-  return { items: rows.slice((input.page - 1) * input.limit, input.page * input.limit).map(({ coding: _coding, ...row }) => row), total: rows.length, page: input.page, limit: input.limit }
+  const choices = type.egcs_ay_claimrelated
+    ? [...new Set(sources.map(source => source.egcs_fc_claim!))].filter(id => !input.selectedIds || input.selectedIds.includes(id))
+        .map(id => ({ id, label_en: `Claim ${id}`, label_fr: `Réclamation ${id}` }))
+    : sources.map(({ coding: _coding, ...row }) => row)
+  const rows = input.search ? choices.filter(row => row.label_en.toLowerCase().includes(input.search!.toLowerCase()) || row.label_fr.toLowerCase().includes(input.search!.toLowerCase())) : choices
+  return { items: rows.slice((input.page - 1) * input.limit, input.page * input.limit), total: rows.length, page: input.page, limit: input.limit }
 }
 
 export const listAccountReceivableProponentLookup = async (event: H3Event, agreementId: string) => {

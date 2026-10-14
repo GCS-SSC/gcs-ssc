@@ -27,7 +27,7 @@ export const AccountReceivableCreateBaseSchema = z.object({
   egcs_fc_sourcepayment: DatabaseIdSchema.optional(),
   egcs_fc_sourceclaim: DatabaseIdSchema.optional(),
   egcs_fc_monitorfollowup: DatabaseIdSchema.nullable().optional(),
-  egcs_fc_sources: z.array(z.string().regex(/^(claim|advance):[1-9]\d*$/, { error: 'validation.invalid_selection' })).max(500).optional()
+  egcs_fc_sources: z.array(z.string().regex(/^advance:[1-9]\d*$/, { error: 'validation.invalid_selection' })).max(500).optional()
 }).strict()
 
 export const AccountReceivableCreateSchema = AccountReceivableCreateBaseSchema.superRefine((input, ctx) => {
@@ -37,6 +37,7 @@ export const AccountReceivableCreateSchema = AccountReceivableCreateBaseSchema.s
     ctx.addIssue({ code: 'custom', path: ['egcs_fc_sourcepayment'], message: 'validation.invalid_selection' })
   }
   const ids = input.egcs_fc_sources
+  if (input.egcs_fc_sourceclaim && ids?.length) ctx.addIssue({ code: 'custom', path: ['egcs_fc_sources'], message: 'validation.invalid_selection' })
   if (ids && ids.length !== new Set(ids).size) ctx.addIssue({ code: 'custom', path: ['egcs_fc_sources'], message: 'validation.invalid_selection' })
 })
 
@@ -56,8 +57,8 @@ export const createAccountReceivableCreateSchemaForType = (type: {
   if (!type.egcs_ay_monitorrequired && input.egcs_fc_monitorfollowup) {
     ctx.addIssue({ code: 'custom', path: ['egcs_fc_monitorfollowup'], message: 'validation.invalid_selection' })
   }
-  if (type.egcs_ay_claimrelated && !input.egcs_fc_linkedreceivable && !input.egcs_fc_sources?.length) {
-    ctx.addIssue({ code: 'custom', path: ['egcs_fc_sources'], message: 'validation.required' })
+  if (type.egcs_ay_claimrelated && !input.egcs_fc_linkedreceivable && !input.egcs_fc_sourceclaim) {
+    ctx.addIssue({ code: 'custom', path: ['egcs_fc_sourceclaim'], message: 'validation.required' })
   }
 })
 

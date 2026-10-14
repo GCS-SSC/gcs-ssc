@@ -20,6 +20,7 @@ export const readAccountReceivableSourceOrigin = async (db: Kysely<Database>, ag
 export const assertAccountReceivableSourceOrigin = async (db: Kysely<Database>, agreementId: string, input: AccountReceivableCreate,
   definition: { egcs_fc_claimrelated: boolean; egcs_fc_advancepaymentrelated: boolean }, sources: CapturedAccountReceivableSource[]) => {
   const sourceId = input.egcs_fc_sourcepayment ?? input.egcs_fc_sourceclaim
+  if (!input.egcs_fc_linkedreceivable && definition.egcs_fc_claimrelated && !input.egcs_fc_sourceclaim) throw new Error('AR_SOURCE_UNAVAILABLE')
   if (!sourceId) return
   const kind = input.egcs_fc_sourceclaim ? 'claim' : 'advance'
   const origin = await readAccountReceivableSourceOrigin(db, agreementId, kind, sourceId)
@@ -27,6 +28,9 @@ export const assertAccountReceivableSourceOrigin = async (db: Kysely<Database>, 
   if (!origin || String(origin.egcs_fc_applicantrecipient) !== input.egcs_fc_applicantrecipient
     || String(origin.agencyFiscalYearId) !== input.egcs_fc_agencyfiscalyear
     || definition.egcs_fc_claimrelated !== (kind === 'claim') || definition.egcs_fc_advancepaymentrelated !== (kind === 'advance')
-    || !originSources.length || originSources.length !== input.egcs_fc_sources?.length
-    || input.egcs_fc_sources.some(id => !originSources.some(row => row.id === id))) throw new Error('AR_SOURCE_UNAVAILABLE')
+    || !originSources.length
+    || (kind === 'claim'
+      ? Boolean(input.egcs_fc_sources?.length)
+      : originSources.length !== input.egcs_fc_sources?.length
+        || input.egcs_fc_sources.some(id => !originSources.some(row => row.id === id)))) throw new Error('AR_SOURCE_UNAVAILABLE')
 }

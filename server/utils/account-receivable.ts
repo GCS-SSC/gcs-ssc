@@ -314,7 +314,11 @@ export const createAccountReceivable = async (event: H3Event, agreementId: strin
     const yearLabels = await trx.selectFrom('Agency_Fiscal_Year').select('egcs_ay_fiscalyeardisplay').where('id', '=', input.egcs_fc_agencyfiscalyear).executeTakeFirstOrThrow()
     const sources = await readAccountReceivableSources(trx, { agreementId, applicantRecipientId: input.egcs_fc_applicantrecipient,
       agencyFiscalYearId: input.egcs_fc_agencyfiscalyear, claimRelated: definition.egcs_fc_claimrelated, advancePaymentRelated: definition.egcs_fc_advancepaymentrelated, currency: agreement.egcs_fc_currency })
-    const selected = original ? [] : sources.filter(source => input.egcs_fc_sources?.includes(source.id))
+    const selected = original
+      ? []
+      : sources.filter(source => definition.egcs_fc_claimrelated
+          ? source.egcs_fc_claim === input.egcs_fc_sourceclaim
+          : input.egcs_fc_sources?.includes(source.id))
     try {
       await assertAccountReceivableSourceOrigin(trx, agreementId, input, definition, sources)
     } catch (error) { return await accountReceivableError(event, error instanceof Error ? error.message : 'AR_SOURCE_UNAVAILABLE') }
