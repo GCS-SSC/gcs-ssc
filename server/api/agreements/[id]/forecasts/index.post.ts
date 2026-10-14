@@ -1,3 +1,4 @@
+import { nextAgreementForecastVersion, copyActiveAgreementForecastLines } from '~~/server/utils/agreement-forecast-versions'
 import type { Insertable } from 'kysely'
 import { FundingCaseAgreementForecastCreateSchema } from '~~/shared/types/schemas'
 import type { FundingCaseAgreementForecastTable } from '~~/shared/types/database'
@@ -8,6 +9,7 @@ import {
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
 import { createPrimaryEntityAssignment, resolveAssignmentCommonUserId } from '~~/server/utils/entity-assignment'
 import { notFound } from '~~/server/utils/api-errors'
+import { assertAgreementFinancialBudgetControls } from '~~/server/utils/agreement-financial-budget-controls'
 import { lockAgencyDraftStatus } from '~~/server/utils/business-status-runtime'
 
 export default defineEventHandler(async event => {
@@ -33,11 +35,16 @@ export default defineEventHandler(async event => {
       .insertInto('Funding_Case_Agreement_Forecast')
       .values({
         egcs_fc_fundingagreement: agreementId,
-        egcs_fc_fiscalyear: validated.egcs_fc_fiscalyear,
+        egcs_fc_fiscalyear: String(fiscalYear.id),
+        egcs_fc_version: await nextAgreementForecastVersion(trx, agreementId, String(fiscalYear.id)),
         egcs_fc_status: draftStatusId
       } satisfies Insertable<FundingCaseAgreementForecastTable>)
       .returningAll()
       .executeTakeFirstOrThrow()
+    if (validated.egcs_fc_copyfromactive) {
+      await copyActiveAgreementForecastLines(trx, agreementId, String(fiscalYear.id), String(forecast.id))
+      await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: 'forecast', id: String(forecast.id) })
+    }
     await createPrimaryEntityAssignment(trx, 'fundingcaseforecast', String(forecast.id), creatorId)
     return forecast
   }, { action: 'create' })

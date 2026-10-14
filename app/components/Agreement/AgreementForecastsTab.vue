@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { useCrudModalPending } from '~/composables/useCrudModal'
-import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 /* eslint-disable jsdoc/require-jsdoc */
-import { computed, watch } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { useGroupedTableExpansion, type GroupedTableRow } from '~/composables/useGroupedTableExpansion'
@@ -26,6 +25,7 @@ type ForecastVersionRow = Omit<BusinessRecordStateFields, 'approvalRuntimeId' | 
   fiscalYearDisplay: string
   forecastId: string
   forecastFiscalYearId: string
+  isActive: boolean
   version: string
   status: FundingCaseAgreementForecastRow['egcs_fc_status']
   lineCount: number
@@ -42,7 +42,7 @@ type FiscalYearLookupItem = {
 
 const FISCAL_YEAR_GROUP_COLUMN_ID = 'fiscalYearGroup'
 
-const { agreementId, currency, canCreate, canUpdate, canDelete } = defineProps<{
+const { agreementId, currency, canCreate, canDelete } = defineProps<{
   agreementId: string
   currency: string
   canCreate: boolean
@@ -63,8 +63,12 @@ const localePath = useLocalePath()
 const toast = useToast()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
-const { saveJson } = useJsonRequest()
-const { isRecordLocked } = useBusinessStatusState()
+const { sendJson } = useJsonRequest()
+const isCreatingVersion: Ref<boolean> = ref(false)
+let isScopeActive = true
+onScopeDispose(() => {
+  isScopeActive = false
+})
 
 const { search, pagination } = useTableListState()
 const forecastModal = useCrudModal<FundingCaseAgreementForecastRow, FundingCaseAgreementForecastForm>({
@@ -130,53 +134,23 @@ const versionRows = computed<ForecastVersionRow[]>(() => {
     const lines = forecastLineItems.value.filter((lineItem: FundingCaseAgreementForecastLineItemRow) =>
       String(lineItem.egcs_fc_agreementforecast) === String(forecast.id)
     )
-    const versions = new Map<string, FundingCaseAgreementForecastLineItemRow[]>()
-
-    for (const line of lines) {
-      const version = String(line.egcs_fc_version)
-      const existing = versions.get(version) ?? []
-      existing.push(line)
-      versions.set(version, existing)
-    }
-
-    if (versions.size === 0) {
-      rows.push({
-        id: `forecast:${forecast.id}:version:0`,
-        fiscalYearGroup: forecast.fiscal_year_display ?? t('common.unavailable'),
-        fiscalYearDisplay: forecast.fiscal_year_display ?? t('common.unavailable'),
-        forecastId: String(forecast.id),
-        forecastFiscalYearId: String(forecast.egcs_fc_fiscalyear),
-        version: '0',
-        status: forecast.egcs_fc_status,
-        isCompleted: forecast.isCompleted,
-        completionDisposition: forecast.completionDisposition,
-        workflowRuntimeId: forecast.workflowRuntimeId,
-        workflowRuntimeState: forecast.workflowRuntimeState,
-        lifecycleTerminus: forecast.lifecycleTerminus,
-        lineCount: 0,
-        totalAmount: ZERO_MONEY
-      })
-      continue
-    }
-
-    for (const [version, versionLines] of versions.entries()) {
-      rows.push({
-        id: `forecast:${forecast.id}:version:${version}`,
-        fiscalYearGroup: forecast.fiscal_year_display ?? t('common.unavailable'),
-        fiscalYearDisplay: forecast.fiscal_year_display ?? t('common.unavailable'),
-        forecastId: String(forecast.id),
-        forecastFiscalYearId: String(forecast.egcs_fc_fiscalyear),
-        version,
-        status: forecast.egcs_fc_status,
-        isCompleted: forecast.isCompleted,
-        completionDisposition: forecast.completionDisposition,
-        workflowRuntimeId: forecast.workflowRuntimeId,
-        workflowRuntimeState: forecast.workflowRuntimeState,
-        lifecycleTerminus: forecast.lifecycleTerminus,
-        lineCount: versionLines.length,
-        totalAmount: sumMoney(versionLines.map((line: FundingCaseAgreementForecastLineItemRow) => line.egcs_fc_amount))
-      })
-    }
+    rows.push({
+      id: String(forecast.id),
+      fiscalYearGroup: forecast.fiscal_year_display ?? t('common.unavailable'),
+      fiscalYearDisplay: forecast.fiscal_year_display ?? t('common.unavailable'),
+      forecastId: String(forecast.id),
+      forecastFiscalYearId: String(forecast.egcs_fc_fiscalyear),
+      version: forecast.egcs_fc_version,
+      isActive: forecast.egcs_fc_active,
+      status: forecast.egcs_fc_status,
+      isCompleted: forecast.isCompleted,
+      completionDisposition: forecast.completionDisposition,
+      workflowRuntimeId: forecast.workflowRuntimeId,
+      workflowRuntimeState: forecast.workflowRuntimeState,
+      lifecycleTerminus: forecast.lifecycleTerminus,
+      lineCount: lines.length,
+      totalAmount: sumMoney(lines.map(line => line.egcs_fc_amount))
+    })
   }
 
   return rows
@@ -200,7 +174,7 @@ const versionRows = computed<ForecastVersionRow[]>(() => {
         return fiscalYearCompare
       }
 
-      return Number(a.version) - Number(b.version)
+      return BigInt(a.version) < BigInt(b.version) ? -1 : BigInt(a.version) > BigInt(b.version) ? 1 : 0
     })
 })
 
@@ -221,47 +195,39 @@ const {
   }]
 })
 const isFiscalYearGroupRow = (row: ForecastGroupedRow) => isGroupRow(row, FISCAL_YEAR_GROUP_COLUMN_ID)
-const getLatestGroupedRow = (row: ForecastGroupedRow) =>
-  (row.leafRows ?? row.subRows ?? []).reduce<ForecastVersionRow | null>((latest, item) => {
-    if (!latest || Number(item.original.version) > Number(latest.version)) return item.original
-    return latest
-  }, null)
-const getGroupedRowTotal = (row: ForecastGroupedRow) => getLatestGroupedRow(row)?.totalAmount ?? ZERO_MONEY
-const getGroupedForecastId = (row: ForecastGroupedRow) =>
-  row.leafRows?.[0]?.original.forecastId ?? row.subRows?.[0]?.original.forecastId ?? row.original.forecastId
-const getGroupedForecastStatus = (row: ForecastGroupedRow) => {
-  const latestVersionRow = getLatestGroupedRow(row)
-
-  return latestVersionRow?.status ?? row.original.status
+const getRepresentativeGroupedRow = (row: ForecastGroupedRow) => {
+  const records = (row.leafRows ?? row.subRows ?? []).map(item => item.original)
+  return records.find(item => item.isActive)
+    ?? records.reduce<ForecastVersionRow | null>((latest, item) =>
+      !latest || BigInt(item.version) > BigInt(latest.version) ? item : latest, null)
 }
-
-const getForecastById = (forecastId: string) =>
-  forecasts.value.find((forecast: FundingCaseAgreementForecastRow) => String(forecast.id) === forecastId) ?? null
-const isGroupedForecastLocked = (row: ForecastGroupedRow) =>
-  isRecordLocked(getForecastById(getGroupedForecastId(row)))
-
+const getGroupedRowTotal = (row: ForecastGroupedRow) => getRepresentativeGroupedRow(row)?.totalAmount ?? ZERO_MONEY
+const getGroupedForecastStatus = (row: ForecastGroupedRow) =>
+  getRepresentativeGroupedRow(row)?.status ?? row.original.status
 const getForecastRoute = (row: ForecastVersionRow) =>
-  localePath(appRouteLocations.agreementForecastDetail(agreementId, row.forecastId, { version: row.version }))
+  localePath(appRouteLocations.agreementForecastDetail(agreementId, row.forecastId))
 
-const getAddVersionRoute = (row: ForecastGroupedRow) => {
-  const forecastId = getGroupedForecastId(row)
-  const existingVersions = (row.leafRows ?? row.subRows ?? [])
-    .map(item => Number(item.original.version))
-    .filter(version => Number.isFinite(version))
-  const nextVersion = existingVersions.reduce((max, version) => Math.max(max, version), -1) + 1
-
-  return localePath(appRouteLocations.agreementForecastDetail(agreementId, forecastId, { version: String(nextVersion) }))
+const createForecastVersion = async (row: ForecastGroupedRow) => {
+  const forecast = getRepresentativeGroupedRow(row)
+  if (!forecast || isCreatingVersion.value) return
+  const requestAgreementId = agreementId
+  try {
+    isCreatingVersion.value = true
+    const created = await sendJson<{ id: string }>(`/api/agreements/${requestAgreementId}/forecasts`, 'POST', {
+      egcs_fc_fiscalyear: forecast.forecastFiscalYearId,
+      egcs_fc_copyfromactive: true
+    })
+    if (!isScopeActive || agreementId !== requestAgreementId) return
+    await navigateTo(localePath(appRouteLocations.agreementForecastDetail(requestAgreementId, String(created.id))))
+  } catch (error: unknown) {
+    if (isScopeActive && agreementId === requestAgreementId) showError(error)
+  } finally {
+    isCreatingVersion.value = false
+  }
 }
 
 const openCreateForecast = () => {
   forecastModal.openCreate()
-}
-
-const openUpdateForecast = (forecastId: string) => {
-  const forecast = getForecastById(forecastId)
-  if (forecast) {
-    forecastModal.openUpdate(forecast)
-  }
 }
 
 const saveForecast = async () => {
@@ -269,25 +235,18 @@ const saveForecast = async () => {
     return
   }
   const forecastState = selectedForecast.value
-  const isUpdate = Boolean(forecastState.id)
   const session = forecastModal.captureSession()
   if (!forecastPending.begin(session)) return
 
   try {
-    await saveJson(
-      isUpdate
-        ? `/api/agreements/${agreementId}/forecasts/${forecastState.id}`
-        : `/api/agreements/${agreementId}/forecasts`,
-      isUpdate ? 'PATCH' : 'POST',
-      forecastState
-    )
+    await sendJson(`/api/agreements/${agreementId}/forecasts`, 'POST', forecastState)
 
     if (!forecastModal.closeSession(session)) return
     await refreshOverview()
     if (overviewStatus.value === 'error') return
     toast.add({
       title: t('common.success'),
-      description: isUpdate ? t('common.updated_success') : t('common.added_success'),
+      description: t('common.added_success'),
       color: 'success'
     })
   } catch (error: unknown) {
@@ -354,6 +313,7 @@ const deleteForecast = async (forecastId: string) => {
             <span class="text-sm font-semibold text-zinc-900 transition-colors group-hover:text-primary dark:text-white">
               {{ t('agreement.forecasts.version_label', { version: row.original.version }) }}
             </span>
+            <UBadge v-if="row.original.isActive" color="success" variant="subtle">{{ t('agreement.forecasts.active') }}</UBadge>
           </NuxtLink>
         </div>
       </template>
@@ -386,29 +346,23 @@ const deleteForecast = async (forecastId: string) => {
       <template #actions-cell="{ row }">
         <div class="flex items-center justify-end gap-2">
           <UButton
-            v-if="isFiscalYearGroupRow(row as ForecastGroupedRow) && canCreate && !isGroupedForecastLocked(row as ForecastGroupedRow)"
-            :to="getAddVersionRoute(row as ForecastGroupedRow)"
+            v-if="isFiscalYearGroupRow(row as ForecastGroupedRow) && canCreate"
+            :loading="isCreatingVersion"
+            :disabled="isCreatingVersion"
             icon="i-lucide-plus"
             color="neutral"
             variant="ghost"
             class="cursor-default"
-            :aria-label="t('agreement.forecasts.add_version')" />
+            :aria-label="t('agreement.forecasts.add_version')"
+            @click="createForecastVersion(row as ForecastGroupedRow)" />
           <UButton
-            v-if="isFiscalYearGroupRow(row as ForecastGroupedRow) && canUpdate && !isGroupedForecastLocked(row as ForecastGroupedRow)"
-            icon="i-lucide-pencil"
-            color="neutral"
-            variant="ghost"
-            class="cursor-default"
-            :aria-label="`${t('common.edit')}: ${row.original.fiscalYearDisplay}`"
-            @click="openUpdateForecast(getGroupedForecastId(row as ForecastGroupedRow))" />
-          <UButton
-            v-if="isFiscalYearGroupRow(row as ForecastGroupedRow) && canDelete && !isGroupedForecastLocked(row as ForecastGroupedRow)"
+            v-if="!isFiscalYearGroupRow(row as ForecastGroupedRow) && canDelete"
             icon="i-lucide-trash"
             color="error"
             variant="ghost"
             class="cursor-default"
-            :aria-label="`${t('common.delete')}: ${row.original.fiscalYearDisplay}`"
-            @click="deleteForecast(getGroupedForecastId(row as ForecastGroupedRow))" />
+            :aria-label="`${t('common.delete')}: ${row.original.fiscalYearDisplay}, ${t('agreement.forecasts.version_label', { version: row.original.version })}`"
+            @click="deleteForecast(row.original.forecastId)" />
           <UButton
             v-if="!isFiscalYearGroupRow(row as ForecastGroupedRow)"
             :to="getForecastRoute(row.original)"
@@ -424,22 +378,24 @@ const deleteForecast = async (forecastId: string) => {
     <UModal
       v-if="selectedForecast"
       v-model:open="isForecastModalOpen"
-      :title="selectedForecast.id ? t('agreement.forecasts.edit') : t('agreement.forecasts.add')">
+      :title="t('agreement.forecasts.add')">
       <template #body>
         <UForm :state="selectedForecast" :validate="validateForecast" :validate-on="[]" class="space-y-4" @submit="saveForecast">
-          <UFormField :label="t('agreement.forecasts.fiscal_year')" name="egcs_fc_fiscalyear">
+          <UFormField :label="t('agreement.forecasts.fiscal_year')" name="egcs_fc_fiscalyear" required>
             <CommonBilingualSelectMenu
               v-model="selectedForecast.egcs_fc_fiscalyear"
               :items="forecastFiscalYearOptions"
               value-key="id"
               label-en-key="label_en"
               label-fr-key="label_fr"
+              required
+              aria-required="true"
               searchable />
           </UFormField>
           <div class="flex justify-end gap-2 pt-4">
             <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isForecastModalOpen = false" />
             <CommonSaveButton
-              :label="selectedForecast.id ? t('common.update') : t('common.add')"
+              :label="t('common.add')"
               :loading="isSavingForecast"
               :disabled="isSavingForecast" />
           </div>

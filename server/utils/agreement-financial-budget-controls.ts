@@ -9,7 +9,7 @@ import { readEffectiveAccountReceivableClaimRecoveries } from './agreement-accou
 type Db = Kysely<Database> | Transaction<Database>
 
 export type AgreementFinancialBudgetTarget =
-  | { kind: 'forecast', id: string, version?: string }
+  | { kind: 'forecast', id: string }
   | { kind: 'claim', id: string }
   | { kind: 'reconciliation', id: string }
 
@@ -88,7 +88,7 @@ const getBudgetRecordStates = async (db: Db, entityType: Workflow_Target_Entity_
  * Agreement writes must already hold the established Agreement lock before calling this helper.
  * @param db - Current request snapshot or locked write transaction.
  * @param agreementId - Owning Agreement.
- * @param target - Proposal; forecast omission selects its highest live authored version.
+ * @param target - Proposal; forecasts include their full live monthly breakdown.
  * @returns Exceeded annual program funding, otherwise null.
  */
 export const getAgreementFinancialBudgetViolation = async (
@@ -134,15 +134,13 @@ export const getAgreementFinancialBudgetViolation = async (
   let forecastVersion: string | undefined
   let amounts: FundingAmountRow[]
   if (target.kind === 'forecast') {
-    forecastVersion = target.version ?? (await sql<{ version: string | null }>`
-      SELECT MAX(egcs_fc_version)::text AS version FROM "Funding_Case_Agreement_Forecast_Line_Item"
-      WHERE egcs_fc_agreementforecast = ${target.id}::bigint AND NOT _deleted
-    `.execute(db)).rows[0]?.version ?? undefined
+    forecastVersion = (await db.selectFrom('Funding_Case_Agreement_Forecast')
+      .select('egcs_fc_version').where('id', '=', target.id).executeTakeFirst())?.egcs_fc_version
     amounts = (await sql<FundingAmountRow>`
       SELECT ${target.id}::text AS "documentId", COALESCE(SUM(egcs_fc_amount), 0)::text AS amount
       FROM "Funding_Case_Agreement_Forecast_Line_Item"
       WHERE egcs_fc_agreementforecast = ${target.id}::bigint AND NOT _deleted
-        AND egcs_fc_currency = ${context.currency} AND egcs_fc_version = ${forecastVersion ?? '0'}::bigint
+        AND egcs_fc_currency = ${context.currency}
     `.execute(db)).rows
   } else {
     const claims = sql`

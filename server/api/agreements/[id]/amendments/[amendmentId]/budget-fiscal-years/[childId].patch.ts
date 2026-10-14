@@ -1,3 +1,4 @@
+import { hasAgreementFiscalYearForecastHistory } from '~~/server/utils/agreement-forecast-versions'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import { assertDraftAgreementAmendmentCapability, resolveDraftAgreementAmendmentBudgetVersion } from '~~/server/utils/agreement-amendment'
@@ -33,6 +34,9 @@ export default defineEventHandler(async event => {
         const retainedFiscalYear = await resolveRetainedAgreementBudgetFiscalYear(trx, context.streamId, String(existing.egcs_fc_fiscalyear))
         if (!retainedFiscalYear) return await badRequest(event, 'INVALID_AGREEMENT_BUDGET_FISCAL_YEAR', 'apiErrors.agreement.invalid_budget_fiscal_year')
         return { ...existing, id: existing.egcs_fc_originalbudgetfiscalyear ?? existing.id }
+      }
+      if (await hasAgreementFiscalYearForecastHistory(trx, agreementId, String(existing.egcs_fc_originalbudgetfiscalyear ?? existing.id))) {
+        return await badRequest(event, 'AGREEMENT_BUDGET_FISCAL_YEAR_IN_USE', 'apiErrors.request.invalid_status')
       }
       const fiscalYear = await trx.selectFrom('Transfer_Payment_Stream_Budget')
         .innerJoin('Transfer_Payment_Fiscal_Year_Budget', 'Transfer_Payment_Fiscal_Year_Budget.id', 'Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentbudget')

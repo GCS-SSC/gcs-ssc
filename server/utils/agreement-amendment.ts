@@ -1,6 +1,7 @@
 /* eslint-disable jsdoc/require-jsdoc -- Amendment domain helpers are named for their route and lifecycle use. */
 import type { H3Event } from 'h3'
 import { sql, type Kysely, type Transaction } from 'kysely'
+import { agreementForecastYearsRetained } from './agreement-forecast-versions'
 import { assertAgreementCurrentBudgetUsage } from './agreement-financial-budget-controls'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import { agreementBudgetFiscalYearsOverlapDuration } from '~~/server/utils/agreement-fiscal-year-duration'
@@ -431,6 +432,15 @@ export const promoteApprovedAgreementAmendment = async (
     .executeTakeFirst()
   if (!amendment?.egcs_fc_isopen) return false
 
+  let budgetSnapshotQuery = trx.selectFrom('Funding_Case_Agreement_Budget_Version').select('id')
+    .where('egcs_fc_amendment', '=', context.amendmentId)
+    .where('egcs_fc_fundingagreement', '=', context.agreementId)
+    .where('_deleted', '=', false)
+  if (approvedDomains) budgetSnapshotQuery = budgetSnapshotQuery.where('id', '=', approvedDomains.budgetVersionId ?? '-1')
+  const budgetSnapshot = await budgetSnapshotQuery.executeTakeFirst()
+  if (approvedDomains?.budgetVersionId && !budgetSnapshot) return false
+  if (budgetSnapshot && !await agreementForecastYearsRetained(trx, context.agreementId, String(budgetSnapshot.id))) return false
+
   if (
     approvedDomains?.duration !== false
     && amendment.egcs_fc_proposedauthorizedassistancestartdate
@@ -447,12 +457,6 @@ export const promoteApprovedAgreementAmendment = async (
       !== currentDuration.egcs_fc_authorizedassistanceenddate.getTime()
 
     if (durationChanged) {
-      let durationBudgetQuery = trx.selectFrom('Funding_Case_Agreement_Budget_Version').select('id')
-        .where('egcs_fc_amendment', '=', context.amendmentId)
-        .where('egcs_fc_fundingagreement', '=', context.agreementId)
-        .where('_deleted', '=', false)
-      if (approvedDomains) durationBudgetQuery = durationBudgetQuery.where('id', '=', approvedDomains.budgetVersionId ?? '-1')
-      const budgetSnapshot = await durationBudgetQuery.executeTakeFirst()
       if (!await agreementBudgetFiscalYearsOverlapDuration(trx, context.agreementId, {
         startDate: amendment.egcs_fc_proposedauthorizedassistancestartdate,
         endDate: amendment.egcs_fc_proposedauthorizedassistanceenddate
@@ -465,13 +469,6 @@ export const promoteApprovedAgreementAmendment = async (
     }
   }
 
-  let budgetSnapshotQuery = trx.selectFrom('Funding_Case_Agreement_Budget_Version').select('id')
-    .where('egcs_fc_amendment', '=', context.amendmentId)
-    .where('egcs_fc_fundingagreement', '=', context.agreementId)
-    .where('_deleted', '=', false)
-  if (approvedDomains) budgetSnapshotQuery = budgetSnapshotQuery.where('id', '=', approvedDomains.budgetVersionId ?? '-1')
-  const budgetSnapshot = await budgetSnapshotQuery.executeTakeFirst()
-  if (approvedDomains?.budgetVersionId && !budgetSnapshot) return false
   if (budgetSnapshot) {
     await trx.updateTable('Funding_Case_Agreement_Budget_Version').set({ egcs_fc_iscurrent: false })
       .where('egcs_fc_fundingagreement', '=', context.agreementId).where('egcs_fc_iscurrent', '=', true)

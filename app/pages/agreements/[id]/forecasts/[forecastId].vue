@@ -18,7 +18,7 @@ import type {
 import { compareMoney, formatMoneyText, parseMoney, sumMoney, type Money } from '~~/shared/utils/money'
 
 definePageMeta({
-  key: route => `${route.path}?version=${String(route.query.version ?? '0')}`,
+  key: route => route.path,
   i18n: {
     paths: {
       en: '/agreements/[id]/forecasts/[forecastId]',
@@ -92,7 +92,6 @@ const agreementId = route.params.id as string
 const forecastId = route.params.forecastId as string
 const { isAssigned } = useEntityAssignmentRoster('fundingcaseforecast', forecastId)
 
-const selectedVersion: Ref<string> = ref(String(route.query.version ?? '0'))
 const expandedQuarters: Ref<QuarterKey[]> = ref([])
 const breakdownSearch: Ref<string> = ref('')
 const breakdownPagination: Ref<{ pageIndex: number, pageSize: number }> = ref({
@@ -160,23 +159,6 @@ const activeBudgetLineItems = computed(() => {
 const activeForecastLineItems = computed(() => forecastLineItems.value.filter((line: FundingCaseAgreementForecastLineItemRow) =>
   String(line.egcs_fc_agreementforecast) === forecastId
 ))
-const activeVersionLineItems = computed(() => activeForecastLineItems.value.filter((line: FundingCaseAgreementForecastLineItemRow) =>
-  String(line.egcs_fc_version) === selectedVersion.value
-))
-const versions = computed(() => {
-  const values = new Set(activeForecastLineItems.value.map((line: FundingCaseAgreementForecastLineItemRow) => String(line.egcs_fc_version)))
-
-  const requestedVersion = String(route.query.version ?? '')
-  if (/^\d+$/.test(requestedVersion)) {
-    values.add(requestedVersion)
-  }
-
-  if (values.size === 0) {
-    values.add('0')
-  }
-
-  return [...values].sort((a, b) => Number(a) - Number(b))
-})
 const activeForecastIsLocked = computed(() => isRecordLocked(activeForecast.value))
 const canCreateForecastLineItems = computed(() =>
   isAssigned.value && !activeForecastIsLocked.value
@@ -203,7 +185,7 @@ const getDraftKey = (budgetLineId: string, month: number) => `${budgetLineId}:${
 const lineItemByBudgetMonth = computed(() => {
   const byKey = new Map<string, FundingCaseAgreementForecastLineItemRow>()
 
-  for (const line of activeVersionLineItems.value) {
+  for (const line of activeForecastLineItems.value) {
     byKey.set(getDraftKey(String(line.egcs_fc_fundingagreementbudgetlineitem), line.egcs_fc_month), line)
   }
 
@@ -255,7 +237,6 @@ const canEditForecastAmount = (budgetLineId: string, month: number): boolean => 
   return existing ? canUpdateForecast.value : canCreateForecastLineItems.value
 }
 
-const selectedVersionStatus = computed(() => activeForecast.value?.egcs_fc_status)
 const forecastHeroTitle = computed(() => activeForecast.value
   ? t('agreement.forecasts.detail_title', { fiscalYear: activeForecast.value.fiscal_year_display ?? t('common.unavailable') })
   : ''
@@ -266,9 +247,10 @@ const forecastHeroMetaItems = computed(() => [
   getBilingualValue(profile.value, 'egcs_fc_title', agreementId)
 ])
 const forecastHeroBadges = computed(() => [
-  { variant: 'code', label: String(selectedVersion.value), prefixLabel: t('agreement.forecasts.version') },
+  ...(activeForecast.value?.egcs_fc_active ? [{ variant: 'code', label: t('agreement.forecasts.active') }] : []),
+  { variant: 'code', label: String(activeForecast.value?.egcs_fc_version ?? ''), prefixLabel: t('agreement.forecasts.version') },
   {
-    statusId: selectedVersionStatus.value,
+    statusId: activeForecast.value?.egcs_fc_status,
     isCompleted: activeForecast.value?.isCompleted ?? false,
     prefixLabel: t('common.status')
   }
@@ -283,7 +265,7 @@ const breadcrumbItems = computed(() => [
     label: activeForecast.value
       ? t('agreement.forecasts.detail_breadcrumb', {
           fiscalYear: activeForecast.value.fiscal_year_display ?? t('common.unavailable'),
-          version: selectedVersion.value
+          version: activeForecast.value?.egcs_fc_version
         })
       : forecastId
   }
@@ -341,18 +323,10 @@ const breakdownPeriodColumnVisibility = computed<Record<string, boolean>>(() => 
   ])
 ))
 
-watch(versions, value => {
-  if (value.includes(selectedVersion.value)) {
-    return
-  }
-
-  selectedVersion.value = value[0] ?? '0'
-}, { immediate: true })
-
-watch(activeVersionLineItems, () => {
+watch(activeForecastLineItems, () => {
   const nextDraftAmounts: Record<string, string> = {}
 
-  for (const line of activeVersionLineItems.value) {
+  for (const line of activeForecastLineItems.value) {
     nextDraftAmounts[getDraftKey(String(line.egcs_fc_fundingagreementbudgetlineitem), line.egcs_fc_month)] = line.egcs_fc_amount
   }
 
@@ -579,8 +553,7 @@ const saveForecastBreakdown = async () => {
             egcs_fc_month: month,
             egcs_fc_amount: amount,
             egcs_fc_totalamount: amount,
-            egcs_fc_currency: budgetLine.egcs_fc_currency,
-            egcs_fc_version: selectedVersion.value
+            egcs_fc_currency: budgetLine.egcs_fc_currency
           })
         }
       }
@@ -624,15 +597,6 @@ const saveForecastBreakdown = async () => {
             <CommonSection v-if="selectedTab === 'breakdown'" :show-header="false" :title="t('agreement.forecasts.breakdown_title')" :grid-cols="1">
               <div class="space-y-4">
                 <div class="flex flex-wrap items-end justify-between gap-3">
-                  <div class="flex items-center gap-2">
-                    <UFormField :label="t('agreement.forecasts.version')" name="selectedVersion" class="min-w-40">
-                      <USelect
-                        v-model="selectedVersion"
-                        :items="versions.map(version => ({ label: version, value: version }))"
-                        class="w-full" />
-                    </UFormField>
-                  </div>
-
                   <CommonSaveButton
                     v-if="canEditForecastBreakdown"
                     type="button"

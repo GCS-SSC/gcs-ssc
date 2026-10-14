@@ -53,6 +53,7 @@ const readRoute = async (event: H3Event, forecastId?: string) => {
         'Funding_Case_Agreement_Forecast.egcs_fc_fiscalyear as egcs_fc_fiscalyear',
         'Funding_Case_Agreement_Forecast.egcs_fc_status as egcs_fc_status',
         'Funding_Case_Agreement_Forecast.egcs_fc_active as egcs_fc_active',
+        'Funding_Case_Agreement_Forecast.egcs_fc_version as egcs_fc_version',
         'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display'
       ])
       .orderBy('Agency_Fiscal_Year.egcs_ay_fiscalyear', 'asc')
@@ -171,7 +172,6 @@ const readRoute = async (event: H3Event, forecastId?: string) => {
         databaseMoneyText(sql.ref('Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_amount')).as('egcs_fc_amount'),
         databaseMoneyText(sql.ref('Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_totalamount')).as('egcs_fc_totalamount'),
         'Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_currency as egcs_fc_currency',
-        'Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_version as egcs_fc_version',
         'Funding_Case_Agreement_Forecast.egcs_fc_fiscalyear as forecast_fiscal_year_id',
         budgetFiscalYearStableId.as('budget_fiscal_year_id'),
         'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as budget_fiscal_year_display',
@@ -183,7 +183,6 @@ const readRoute = async (event: H3Event, forecastId?: string) => {
         databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_totalamount')).as('budget_line_total_amount'),
         databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_programfunding')).as('budget_line_program_funding')
       ])
-      .orderBy('Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_version', 'asc')
       .orderBy('Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_month', 'asc')
       .execute()
   ])

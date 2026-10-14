@@ -1,3 +1,4 @@
+import { nextAgreementForecastVersion } from './agreement-forecast-versions'
 import { resolveAgreementCurrency } from './agreement-currency'
 import type { Insertable, Transaction } from 'kysely'
 import type {
@@ -62,9 +63,7 @@ export const createAgreementForecastAggregate = async (
   const keys = input.lineItems.map(line => `${line.budgetLineItemId}:${line.month}`)
   if (new Set(keys).size !== keys.length || input.lineItems.some(line =>
     !Number.isInteger(line.month) || line.month < 0 || line.month > 11
-    || !/^(0|[1-9]\d{0,18})$/.test(line.version)
-    || BigInt(line.version) > BigInt('9223372036854775807')
-  )) throw new Error('Forecast monthly lines contain an invalid or repeated budget line, month, or version.')
+  )) throw new Error('Forecast monthly lines contain an invalid or repeated budget line or month.')
 
   const budgetIds = [...new Set(input.lineItems.map(line => line.budgetLineItemId))]
   const budget = await trx.selectFrom('Funding_Case_Agreement_Budget_Line_Item')
@@ -106,9 +105,10 @@ export const createAgreementForecastAggregate = async (
     egcs_fc_fundingagreement: input.agreementId,
     egcs_fc_fiscalyear: input.fiscalYearId,
     egcs_fc_status: draftStatusId,
+    egcs_fc_version: await nextAgreementForecastVersion(trx, input.agreementId, input.fiscalYearId),
     egcs_fc_active: false
   } satisfies Insertable<Database['Funding_Case_Agreement_Forecast']>)
-    .returning('id').executeTakeFirstOrThrow()
+    .returning(['id', 'egcs_fc_version']).executeTakeFirstOrThrow()
   const lineItemIds: string[] = []
   for (const line of input.lineItems) {
     const inserted = await trx.insertInto('Funding_Case_Agreement_Forecast_Line_Item').values({
@@ -117,14 +117,11 @@ export const createAgreementForecastAggregate = async (
       egcs_fc_month: line.month,
       egcs_fc_amount: databaseMoneyValue(parseMoney(line.amount)),
       egcs_fc_totalamount: databaseMoneyValue(parseMoney(line.amount)),
-      egcs_fc_currency: line.currency as Database['Funding_Case_Agreement_Forecast_Line_Item']['egcs_fc_currency'],
-      egcs_fc_version: line.version
+      egcs_fc_currency: line.currency as Database['Funding_Case_Agreement_Forecast_Line_Item']['egcs_fc_currency']
     }).returning('id').executeTakeFirstOrThrow()
     lineItemIds.push(String(inserted.id))
   }
-  for (const version of new Set(input.lineItems.map(line => line.version))) {
-    await assertAgreementFinancialBudgetControls(trx, input.agreementId, { kind: 'forecast', id: String(forecast.id), version })
-  }
+  await assertAgreementFinancialBudgetControls(trx, input.agreementId, { kind: 'forecast', id: String(forecast.id) })
   await createPrimaryEntityAssignment(trx, 'fundingcaseforecast', String(forecast.id), creatorId)
-  return { status: 'created', forecastId: String(forecast.id), lineItemIds, draftStatusId }
+  return { status: 'created', forecastId: String(forecast.id), version: forecast.egcs_fc_version, lineItemIds, draftStatusId }
 }

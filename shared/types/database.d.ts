@@ -1594,6 +1594,7 @@ export interface FundingCaseAgreementForecastTable {
   id: Generated<string>
   egcs_fc_fundingagreement: string
   egcs_fc_fiscalyear: string
+  egcs_fc_version: string
   egcs_fc_status: StatusId
   egcs_fc_active: Generated<boolean>
   _deleted: Generated<boolean>
@@ -1608,7 +1609,6 @@ export interface FundingCaseAgreementForecastLineItemTable {
   egcs_fc_amount: number
   egcs_fc_totalamount: number
   egcs_fc_currency: Currency_Codes
-  egcs_fc_version: string
   _deleted: Generated<boolean>
 }
 

@@ -1,3 +1,4 @@
+import { hasAgreementFiscalYearForecastHistory } from '~~/server/utils/agreement-forecast-versions'
 import { authorize } from '~~/server/utils/authorize'
 import { badRequest } from '~~/server/utils/api-errors'
 import { canAccessAgreement, resolveAgreementScopeContext } from '~~/server/utils/agreement'
@@ -111,6 +112,10 @@ export default defineEventHandler(async event => {
 
     if (activeLineItem) {
       return await badRequest(event, 'AGREEMENT_BUDGET_FISCAL_YEAR_IN_USE', 'apiErrors.agreement.budget_fiscal_year_in_use')
+    }
+
+    if (await hasAgreementFiscalYearForecastHistory(trx, agreementId, String(existing.stable_id))) {
+      return await badRequest(event, 'AGREEMENT_BUDGET_FISCAL_YEAR_IN_USE', 'apiErrors.request.invalid_status')
     }
 
     await trx

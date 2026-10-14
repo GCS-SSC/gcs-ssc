@@ -15,14 +15,13 @@ export type SummaryBudgetLine = {
   budget: Money
   currency: Currency_Codes
 }
-export type SummaryForecast = { id: string, fiscalYearId: string, active: boolean }
+export type SummaryForecast = { id: string, fiscalYearId: string, active: boolean, version: string }
 export type SummaryForecastLine = {
   id: string
   forecastId: string
   fiscalYearId: string
   budgetLineId: string
   month: number
-  version: string
   description: string | null
   amount: Money
   currency: Currency_Codes
@@ -97,7 +96,7 @@ const lineFromBudget = (line: SummaryBudgetLine, hasActiveForecast: boolean): Su
  * @param fiscalYears - Current agreement budget fiscal years.
  * @param budgetLines - Current annual budget lines, using stable lineage IDs and total amount.
  * @param forecasts - Authored forecast records; only the active record may be displayed.
- * @param forecastLines - Monthly lines across authored versions.
+ * @param forecastLines - Monthly lines belonging to separate Forecast records.
  * @param claimLines - Non-deleted claim lines.
  * @param reconciliations - Reconciliation lines with positive lifecycle evidence.
  * @param payments - Payment records with terminal status indicators.
@@ -120,10 +119,7 @@ export const buildAgreementFinancialSummary = (
     const yearBudgetLines = budgetLines.filter(line => line.fiscalYearId === year.id)
     const selectedForecast = forecasts.filter(forecast => forecast.fiscalYearId === year.id && forecast.active)
       .sort((a, b) => compareNumericText(b.id, a.id))[0]
-    const authoredLines = forecastLines.filter(line => line.fiscalYearId === year.id && line.forecastId === selectedForecast?.id)
-    const version = authoredLines.reduce<string | null>((latest, line) =>
-      latest === null || compareNumericText(line.version, latest) > 0 ? line.version : latest, null)
-    const yearForecastLines = authoredLines.filter(line => line.version === version)
+    const yearForecastLines = forecastLines.filter(line => line.fiscalYearId === year.id && line.forecastId === selectedForecast?.id)
     const yearClaimLines = claimLines.filter(line => line.fiscalYearId === year.id)
       .sort((a, b) => compareNumericText(a.id, b.id))
     const yearPayments = payments.filter(payment => payment.fiscalYearId === year.id && payment.terminal)
@@ -240,7 +236,7 @@ export const buildAgreementFinancialSummary = (
       forecastSource: {
         status: selectedForecast ? 'active' as const : 'none' as const,
         forecastId: selectedForecast?.id ?? null,
-        version
+        version: selectedForecast?.version ?? null
       },
       currencies: groups
     }

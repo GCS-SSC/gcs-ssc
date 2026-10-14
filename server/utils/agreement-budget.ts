@@ -1,3 +1,4 @@
+import { hasAgreementFiscalYearForecastHistory } from '~~/server/utils/agreement-forecast-versions'
 import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { fetchAgreementBudgetCostCategory } from '~~/server/utils/cost-configuration-integrity'
 import { FundingCaseAgreementBudgetLineItemFundingTotalsSchema,
@@ -348,6 +349,10 @@ export const patchAgreementBudgetFiscalYear = async (
       .forUpdate()
       .executeTakeFirst()
     if (activeLine) {
+      return await routeBadRequest(event, 'AGREEMENT_BUDGET_FISCAL_YEAR_IN_USE', 'apiErrors.request.invalid_status')
+    }
+    const linkedForecast = await hasAgreementFiscalYearForecastHistory(db, agreementId, String(existing.id))
+    if (linkedForecast) {
       return await routeBadRequest(event, 'AGREEMENT_BUDGET_FISCAL_YEAR_IN_USE', 'apiErrors.request.invalid_status')
     }
   }

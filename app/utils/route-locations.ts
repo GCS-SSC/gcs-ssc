@@ -94,10 +94,9 @@ export const appRouteLocations = {
   agreementAccountReceivableCreditMemoDetail: (id: string, creditMemoId: string) => ({
     name: 'agreements-id-account-receivable-credit-memos-creditMemoId', params: { id, creditMemoId }
   }),
-  agreementForecastDetail: (id: string, forecastId: string, query?: Record<string, string>) => ({
+  agreementForecastDetail: (id: string, forecastId: string) => ({
     name: 'agreements-id-forecasts-forecastId',
-    params: { id, forecastId },
-    ...(query ? { query } : {})
+    params: { id, forecastId }
   }),
   agreementClaimDetail: (id: string, claimId: string) => ({
     name: 'agreements-id-claims-claimId',

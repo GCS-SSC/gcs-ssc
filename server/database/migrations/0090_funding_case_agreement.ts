@@ -862,9 +862,12 @@ CREATE TABLE "Funding_Case_Agreement_Forecast" (
   "id" bigint NOT NULL,
   "egcs_fc_fundingagreement" bigint NOT NULL,
   "egcs_fc_fiscalyear" bigint NOT NULL,
+  "egcs_fc_version" bigint NOT NULL,
   "egcs_fc_status" bigint NOT NULL,
   "egcs_fc_active" boolean DEFAULT false NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
+  CONSTRAINT "fc_chk_forecastversion" CHECK (egcs_fc_version >= 0),
+  CONSTRAINT "fc_unq_forecastversion" UNIQUE (egcs_fc_fundingagreement, egcs_fc_fiscalyear, egcs_fc_version),
   CONSTRAINT "fc_unq_forecastidfundingagreement" UNIQUE (id, egcs_fc_fundingagreement),
   CONSTRAINT "Funding_Case_Agreement_Forecast_pkey" PRIMARY KEY (id)
 );
@@ -881,12 +884,10 @@ CREATE TABLE "Funding_Case_Agreement_Forecast_Line_Item" (
   "egcs_fc_month" smallint NOT NULL,
   "egcs_fc_amount" numeric(19,2) NOT NULL,
   "egcs_fc_currency" currency_codes NOT NULL,
-  "egcs_fc_version" bigint NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   "egcs_fc_totalamount" numeric(19,2) NOT NULL,
   CONSTRAINT "Funding_Case_Agreement_Forecast_Line_Item_pkey" PRIMARY KEY (id),
-  CONSTRAINT "fc_chk_forecastlineitemmonth" CHECK (((egcs_fc_month >= 0) AND (egcs_fc_month <= 11))),
-  CONSTRAINT "fc_chk_forecastlineitemversion" CHECK ((egcs_fc_version >= 0))
+  CONSTRAINT "fc_chk_forecastlineitemmonth" CHECK (((egcs_fc_month >= 0) AND (egcs_fc_month <= 11)))
 );
 
 CREATE INDEX fc_idx_forecastlineitem ON "Funding_Case_Agreement_Forecast_Line_Item" USING btree (egcs_fc_agreementforecast, egcs_fc_fundingagreementbudgetlineitem) WHERE (_deleted = false);
@@ -1998,6 +1999,20 @@ AS $function$
 
       RETURN NEW;
     END
+    $function$;
+
+CREATE FUNCTION trg_fn_guard_forecast_identity()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+    BEGIN
+      IF NEW.egcs_fc_fundingagreement IS DISTINCT FROM OLD.egcs_fc_fundingagreement
+        OR NEW.egcs_fc_fiscalyear IS DISTINCT FROM OLD.egcs_fc_fiscalyear
+        OR NEW.egcs_fc_version IS DISTINCT FROM OLD.egcs_fc_version THEN
+        RAISE EXCEPTION 'Forecast agreement, fiscal year and version are immutable';
+      END IF;
+      RETURN NEW;
+    END;
     $function$;
 
 CREATE FUNCTION trg_fn_resolve_forecast_line_agreement()
@@ -3861,6 +3876,8 @@ CREATE TRIGGER trg_register_fundingcaseforecast BEFORE INSERT ON "Funding_Case_A
 CREATE TRIGGER trg_soft_delete_fundingcaseforecast_assignments AFTER UPDATE OF _deleted ON "Funding_Case_Agreement_Forecast" FOR EACH ROW EXECUTE FUNCTION trg_fn_soft_delete_entity_assignments('fundingcaseforecast');
 
 CREATE CONSTRAINT TRIGGER trg_validate_fundingcaseforecast_status_agency AFTER INSERT OR UPDATE ON "Funding_Case_Agreement_Forecast" DEFERRABLE INITIALLY IMMEDIATE FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_funding_status_agency();
+
+CREATE TRIGGER trg_guard_forecast_identity BEFORE UPDATE OF egcs_fc_fundingagreement, egcs_fc_fiscalyear, egcs_fc_version ON "Funding_Case_Agreement_Forecast" FOR EACH ROW EXECUTE FUNCTION trg_fn_guard_forecast_identity();
 
 CREATE TRIGGER trg_resolve_forecast_line_agreement BEFORE INSERT OR UPDATE OF egcs_fc_agreementforecast, egcs_fc_fundingagreement ON "Funding_Case_Agreement_Forecast_Line_Item" FOR EACH ROW EXECUTE FUNCTION trg_fn_resolve_forecast_line_agreement();
 

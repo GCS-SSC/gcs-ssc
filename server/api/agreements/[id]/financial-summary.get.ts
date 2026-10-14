@@ -69,7 +69,8 @@ export default defineEventHandler(async event => {
         .select([
           'Funding_Case_Agreement_Forecast.id as id',
           sql<string>`COALESCE(${sql.ref('Source_Budget_Year.egcs_fc_originalbudgetfiscalyear')}, ${sql.ref('Source_Budget_Year.id')}, ${sql.ref('Funding_Case_Agreement_Forecast.egcs_fc_fiscalyear')})`.as('fiscalYearId'),
-          'Funding_Case_Agreement_Forecast.egcs_fc_active as active'
+          'Funding_Case_Agreement_Forecast.egcs_fc_active as active',
+          'Funding_Case_Agreement_Forecast.egcs_fc_version as version'
         ])
         .where('Funding_Case_Agreement_Forecast.egcs_fc_fundingagreement', '=', agreementId)
         .where('Funding_Case_Agreement_Forecast.egcs_fc_active', '=', true)
@@ -88,7 +89,6 @@ export default defineEventHandler(async event => {
           sql<string>`COALESCE(${sql.ref('Source_Budget_Year.egcs_fc_originalbudgetfiscalyear')}, ${sql.ref('Source_Budget_Year.id')}, ${sql.ref('Funding_Case_Agreement_Forecast.egcs_fc_fiscalyear')})`.as('fiscalYearId'),
           sql<string>`COALESCE(${sql.ref('Source_Budget_Line.egcs_fc_originalbudgetlineitem')}, ${sql.ref('Source_Budget_Line.id')}, ${sql.ref('Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_fundingagreementbudgetlineitem')})`.as('budgetLineId'),
           'Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_month as month',
-          'Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_version as version',
           'Source_Budget_Line.egcs_fc_description as description',
           databaseMoneyText(sql.ref('Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_amount')).as('amount'),
           'Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_currency as currency'
@@ -156,8 +156,8 @@ export default defineEventHandler(async event => {
 
     const years: SummaryFiscalYear[] = yearRows.map(row => ({ id: String(row.id), label: row.label, order: String(row.order) }))
     const budgets: SummaryBudgetLine[] = budgetRows.map(row => ({ ...row, id: String(row.id), fiscalYearId: String(row.fiscalYearId), budget: parseDatabaseMoney(row.budget) }))
-    const forecasts: SummaryForecast[] = forecastRows.map(row => ({ id: String(row.id), fiscalYearId: String(row.fiscalYearId), active: row.active }))
-    const forecastLines: SummaryForecastLine[] = forecastLineRows.map(row => ({ ...row, id: String(row.id), forecastId: String(row.forecastId), fiscalYearId: String(row.fiscalYearId), budgetLineId: String(row.budgetLineId), version: String(row.version), amount: parseDatabaseMoney(row.amount) }))
+    const forecasts: SummaryForecast[] = forecastRows.map(row => ({ id: String(row.id), fiscalYearId: String(row.fiscalYearId), active: row.active, version: String(row.version) }))
+    const forecastLines: SummaryForecastLine[] = forecastLineRows.map(row => ({ ...row, id: String(row.id), forecastId: String(row.forecastId), fiscalYearId: String(row.fiscalYearId), budgetLineId: String(row.budgetLineId), amount: parseDatabaseMoney(row.amount) }))
     const claims: SummaryClaimLine[] = claimRows.map(row => ({ ...row, id: String(row.id), claimId: String(row.claimId), fiscalYearId: String(row.fiscalYearId), budgetLineId: row.budgetLineId == null ? null : String(row.budgetLineId), amount: parseDatabaseMoney(row.amount) }))
     const reconciliations: SummaryReconciliation[] = reconcileRows.map(row => ({ id: String(row.id), claimLineId: String(row.claimLineId), amount: parseDatabaseMoney(row.amount), positive: positiveIds.has(String(row.reconcileId)) }))
     const payments: SummaryPayment[] = paymentRows.map(row => ({ ...row, id: String(row.id), fiscalYearId: String(row.fiscalYearId), amount: parseDatabaseMoney(row.amount) }))

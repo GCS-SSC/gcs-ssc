@@ -1,3 +1,4 @@
+import { hasAgreementFiscalYearForecastHistory } from '~~/server/utils/agreement-forecast-versions'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import { assertDraftAgreementAmendmentCapability, resolveDraftAgreementAmendmentBudgetVersion } from '~~/server/utils/agreement-amendment'
@@ -33,6 +34,9 @@ export default defineEventHandler(async event => {
         .where('Funding_Case_Agreement_Claim._deleted', '=', false).executeTakeFirst()
     ])
     if (claim || payment || claimLine) return await badRequest(event, 'AGREEMENT_BUDGET_FISCAL_YEAR_FINANCIAL_RECORDS_IN_USE', 'apiErrors.agreement.budget_fiscal_year_financial_records_in_use')
+    if (await hasAgreementFiscalYearForecastHistory(trx, agreementId, String(row.egcs_fc_originalbudgetfiscalyear ?? row.id))) {
+      return await badRequest(event, 'AGREEMENT_BUDGET_FISCAL_YEAR_IN_USE', 'apiErrors.request.invalid_status')
+    }
     await trx.updateTable('Funding_Case_Agreement_Budget_Line_Item').set({ _deleted: true })
       .where('egcs_fc_fundingagreementbudgetfiscalyear', '=', String(row.id)).where('_deleted', '=', false).execute()
     await trx.updateTable('Funding_Case_Agreement_Budget_Fiscal_Year').set({ _deleted: true }).where('id', '=', String(row.id)).where('egcs_fc_budgetversion', '=', versionId).execute()

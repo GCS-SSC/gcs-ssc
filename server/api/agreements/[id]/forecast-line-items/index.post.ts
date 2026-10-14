@@ -64,7 +64,6 @@ export default defineEventHandler(async event => {
           databaseMoneyText(sql.ref('egcs_fc_amount')).as('egcs_fc_amount'),
           databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('egcs_fc_totalamount'),
           'egcs_fc_currency',
-          'egcs_fc_version',
           '_deleted'
         ])
         .executeTakeFirstOrThrow()
@@ -72,7 +71,7 @@ export default defineEventHandler(async event => {
       if (fundingError) return fundingError
       const balanceError = await assertAgreementLineFundingBalance(event, trx, { kind: 'forecast', lineId: String(lineItem.id) })
       if (balanceError) return balanceError
-      await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: 'forecast', id: validated.egcs_fc_agreementforecast, version: validated.egcs_fc_version })
+      await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: 'forecast', id: validated.egcs_fc_agreementforecast })
       return {
         ...lineItem,
         egcs_fc_amount: parseDatabaseMoney(lineItem.egcs_fc_amount),

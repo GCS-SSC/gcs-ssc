@@ -165,7 +165,6 @@ const patchForecastLineItemForRoute = async (
         databaseMoneyText(sql.ref('egcs_fc_amount')).as('egcs_fc_amount'),
         databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('egcs_fc_totalamount'),
         'egcs_fc_currency',
-        'egcs_fc_version',
         '_deleted'
       ])
       .executeTakeFirstOrThrow()
@@ -175,7 +174,6 @@ const patchForecastLineItemForRoute = async (
     }
     const balanceError = await assertAgreementLineFundingBalance(event, trx, { kind: 'forecast', lineId })
     if (balanceError) return balanceError
-    await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: 'forecast', id: String(updated.egcs_fc_agreementforecast), version: String(updated.egcs_fc_version) })
     for (const forecastId of new Set([existing.egcs_fc_agreementforecast, String(updated.egcs_fc_agreementforecast)])) {
       await assertAgreementFinancialBudgetControls(trx, agreementId, { kind: 'forecast', id: forecastId })
     }

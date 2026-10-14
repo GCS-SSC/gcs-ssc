@@ -448,12 +448,6 @@ const RequiredIntegerInRange = (min: number, max: number) => RequiredNumberInput
   .refine(value => value >= min && value <= max, { error: 'validation.invalid_number' })
 const RequiredSmallint = () => RequiredIntegerInRange(1, 32767)
 const RequiredForecastMonth = () => RequiredIntegerInRange(0, 11)
-const RequiredForecastVersion = () => z.union([z.string(), z.number()], { error: 'validation.required' })
-  .transform(value => typeof value === 'number' ? value : value.trim())
-  .refine(value => value !== '', { error: 'validation.required' })
-  .refine(value => Number.isInteger(typeof value === 'number' ? value : Number(value)), { error: 'validation.invalid_number' })
-  .refine(value => (typeof value === 'number' ? value : Number(value)) >= 0, { error: 'validation.invalid_number' })
-  .transform(value => String(value)).meta({ formRequired: true })
 
 const OptionalText = () => z.preprocess(
   value => {
@@ -508,14 +502,13 @@ export const FundingCaseAgreementForecastBaseSchema = z.object({
   egcs_fc_fiscalyear: RequiredBigintSelectionId()
 })
 
-export const FundingCaseAgreementForecastCreateSchema = FundingCaseAgreementForecastBaseSchema
-export const FundingCaseAgreementForecastPatchSchema = FundingCaseAgreementForecastBaseSchema.partial()
-  .extend({ egcs_fc_status: ForbiddenBusinessStatusMutation() })
-  .superRefine(() => undefined)
+export const FundingCaseAgreementForecastCreateSchema = FundingCaseAgreementForecastBaseSchema.extend({
+  egcs_fc_copyfromactive: z.boolean().optional()
+}).strict()
 
 export type FundingCaseAgreementForecast = z.infer<typeof FundingCaseAgreementForecastCreateSchema>
-export type FundingCaseAgreementForecastPatch = z.infer<typeof FundingCaseAgreementForecastPatchSchema>
 export type FundingCaseAgreementForecastItem = WithId<FundingCaseAgreementForecast & {
+  egcs_fc_version: string
   egcs_fc_fundingagreement: string
   egcs_fc_status: StatusId
   egcs_fc_active: boolean
@@ -528,12 +521,11 @@ export const FundingCaseAgreementForecastLineItemBaseSchema = z.object({
   egcs_fc_amount: NonNegativeMoneySchema,
   egcs_fc_totalamount: NonNegativeMoneySchema,
   egcs_fc_fundingsources: z.array(FundingCaseAgreementLineFundingAmountSchema).optional(),
-  egcs_fc_currency: z.enum(CURRENCY_CODES_ENUM, { error: 'validation.required' }),
-  egcs_fc_version: RequiredForecastVersion()
+  egcs_fc_currency: z.enum(CURRENCY_CODES_ENUM, { error: 'validation.required' })
 })
 
-export const FundingCaseAgreementForecastLineItemCreateSchema = FundingCaseAgreementForecastLineItemBaseSchema
-export const FundingCaseAgreementForecastLineItemPatchSchema = FundingCaseAgreementForecastLineItemBaseSchema.partial().superRefine(() => undefined)
+export const FundingCaseAgreementForecastLineItemCreateSchema = FundingCaseAgreementForecastLineItemBaseSchema.strict()
+export const FundingCaseAgreementForecastLineItemPatchSchema = FundingCaseAgreementForecastLineItemBaseSchema.partial().strict().superRefine(() => undefined)
 
 export type FundingCaseAgreementForecastLineItem = z.infer<typeof FundingCaseAgreementForecastLineItemCreateSchema>
 export type FundingCaseAgreementForecastLineItemPatch = z.infer<typeof FundingCaseAgreementForecastLineItemPatchSchema>

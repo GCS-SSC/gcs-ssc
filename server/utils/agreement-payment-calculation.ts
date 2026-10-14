@@ -250,10 +250,6 @@ const getForecastRows = async (db: Db, agreementId: string, currency: Currency_C
     .where('Funding_Case_Agreement_Forecast.egcs_fc_active', '=', true)
     .where('Funding_Case_Agreement_Forecast._deleted', '=', false)
     .where('Funding_Case_Agreement_Forecast_Line_Item._deleted', '=', false)
-    .where('Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_version', '=', sql<string>`(
-      SELECT MAX(latest.egcs_fc_version) FROM "Funding_Case_Agreement_Forecast_Line_Item" latest
-      WHERE latest.egcs_fc_agreementforecast="Funding_Case_Agreement_Forecast".id AND NOT latest._deleted
-    )`)
     .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
     .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)
     .where('Funding_Case_Agreement_Budget_Version._deleted', '=', false)
