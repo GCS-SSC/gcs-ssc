@@ -10,7 +10,10 @@ export const AgencyFundingTypeBaseSchema = z.object({
   egcs_ay_incostsharing: z.boolean().default(false),
   egcs_ay_active: z.boolean().default(true)
 })
-export const AgencyFundingTypePatchSchema = AgencyFundingTypeBaseSchema.omit({ egcs_ay_active: true }).partial()
+export const AgencyFundingTypePatchSchema = AgencyFundingTypeBaseSchema.omit({ egcs_ay_active: true }).extend({
+  egcs_ay_instacking: AgencyFundingTypeBaseSchema.shape.egcs_ay_instacking.removeDefault(),
+  egcs_ay_incostsharing: AgencyFundingTypeBaseSchema.shape.egcs_ay_incostsharing.removeDefault()
+}).partial()
 
 export const AgencyFundingSubtypeBaseSchema = z.object({
   egcs_ay_name_en: Name,

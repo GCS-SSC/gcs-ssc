@@ -987,7 +987,9 @@ export const TransferPaymentStreamRecommendationSetupSchemaCreateSchema = z.obje
   egcs_cn_approvaltemplate: RequiredId().optional(),
   egcs_cn_failonnotrecommended: z.boolean().default(false)
 })
-export const TransferPaymentStreamReviewSetupMemberPatchSchema = TransferPaymentStreamReviewSetupMemberSchema.partial().strict()
+export const TransferPaymentStreamReviewSetupMemberPatchSchema = TransferPaymentStreamReviewSetupMemberSchema.extend({
+  egcs_cn_failonchecklistfailure: TransferPaymentStreamReviewSetupMemberSchema.shape.egcs_cn_failonchecklistfailure.removeDefault()
+}).partial().strict()
 
 /**
  * Adds a consistent invalid-selection issue to the provided schema path.
