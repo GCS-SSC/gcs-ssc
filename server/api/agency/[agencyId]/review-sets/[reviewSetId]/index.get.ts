@@ -37,6 +37,7 @@ export default defineEventHandler(async event => {
         'Common_Review_Setup.egcs_cn_approvaltemplate as egcs_cn_approvaltemplate',
         'Common_Review_Setup.egcs_cn_failonchecklistfailure as egcs_cn_failonchecklistfailure',
         'Common_Review_Setup.egcs_cn_failurethreshold as egcs_cn_failurethreshold',
+        'Common_Review_Setup.egcs_cn_defaultgroup as egcs_cn_defaultgroup',
         'Common_Review_Schema.egcs_cn_name_en as egcs_cn_name_en',
         'Common_Review_Schema.egcs_cn_name_fr as egcs_cn_name_fr',
         'Common_Review_Schema.egcs_cn_outcomename_en as egcs_cn_outcomename_en',

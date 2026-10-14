@@ -44,6 +44,14 @@ const isSubmitting = ref(false)
 const isUpdate = computed(() => Boolean(state.value?.id))
 const validateCreate = createValidator(TransferPaymentStreamReviewSetupMemberCreateSchema)
 const validatePatch = createValidator(TransferPaymentStreamReviewSetupMemberPatchSchema)
+const getEditablePayload = (payload: ReviewSetupMemberState) => ({
+  egcs_cn_reviewschema: payload.egcs_cn_reviewschema,
+  egcs_cn_order: payload.egcs_cn_order,
+  egcs_cn_approvaltemplate: payload.egcs_cn_approvaltemplate,
+  egcs_cn_defaultgroup: payload.egcs_cn_defaultgroup,
+  egcs_cn_failonchecklistfailure: payload.egcs_cn_failonchecklistfailure,
+  egcs_cn_failurethreshold: payload.egcs_cn_failurethreshold
+})
 /**
  * Applies the correct validator for create versus update flows.
  *
@@ -55,7 +63,7 @@ const validate = withFormRequirements(async (
     | z.infer<typeof TransferPaymentStreamReviewSetupMemberCreateSchema>
     | z.infer<typeof TransferPaymentStreamReviewSetupMemberPatchSchema>
 ) => {
-  const { id: _id, ...editablePayload } = payload as typeof payload & { id?: string }
+  const editablePayload = getEditablePayload(payload)
   if (isUpdate.value) {
     return await validatePatch(editablePayload as z.infer<typeof TransferPaymentStreamReviewSetupMemberPatchSchema>)
   }
@@ -90,7 +98,7 @@ const onSubmit = async (
   try {
     isSubmitting.value = true
     const itemId = state.value?.id ? String(state.value.id) : null
-    const { id: _id, ...body } = event.data as typeof event.data & { id?: string }
+    const body = getEditablePayload(event.data)
 
     const request = async () => {
       const response = await fetch(getClientRequestUrl(itemId
