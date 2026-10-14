@@ -737,6 +737,7 @@ CREATE TABLE "Funding_Case_Agreement_Commitment_Line" (
   "egcs_fc_transferpaymentstreamchartofaccount" bigint NOT NULL,
   "egcs_fc_amount" numeric(19,2) NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
+  CONSTRAINT "fc_chk_commitmentlineamountnonnegative" CHECK (egcs_fc_amount >= (0)::numeric),
   CONSTRAINT "fc_unq_commitmentlineidcommitment" UNIQUE (id, egcs_fc_commitment),
   CONSTRAINT "Funding_Case_Agreement_Commitment_Line_pkey" PRIMARY KEY (id)
 );

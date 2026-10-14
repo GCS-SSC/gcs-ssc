@@ -488,7 +488,7 @@ export const FundingCaseAgreementCommitmentLineBaseSchema = z.object({
   egcs_fc_commitment: RequiredBigintSelectionId(),
   egcs_fc_commitmentlinenumber: RequiredSmallint(),
   egcs_fc_transferpaymentstreamchartofaccount: RequiredBigintSelectionId(),
-  egcs_fc_amount: MoneySchema
+  egcs_fc_amount: NonNegativeMoneySchema
 })
 
 export const FundingCaseAgreementCommitmentLineCreateSchema = FundingCaseAgreementCommitmentLineBaseSchema
