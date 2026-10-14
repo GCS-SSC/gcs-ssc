@@ -1,5 +1,5 @@
 import { isAssignableGroup } from './groups'
-import { isWorkflowOwnerPublicationFailure, isRiskSourcePublicationFailure } from './publication-errors'
+import { isExpectedPublicationFailure } from './publication-errors'
 import { resolveEntityTypeLifecycleDefinition } from './entity-type-registry'
 import { readWorkflowProfileChoices, resolveWorkflowProfileCondition } from './workflow-profile-conditions'
 import { readWorkflowConditions } from './workflow-conditions'
@@ -465,7 +465,7 @@ export const readWorkflowSetupPublicationMetadata = async (
     const { definition } = await buildWorkflowSetupPublication(db, setup)
     return await readPublicationMetadata(db, String(setup.id), definition as unknown as JsonValue)
   } catch (error) {
-    if (!(error instanceof InvalidWorkflowMemberSequenceError) && !causedByUnavailablePublishedDefinition(error) && !isRiskSourcePublicationFailure(error) && !isWorkflowOwnerPublicationFailure(error)) throw error
+    if (!causedByUnavailablePublishedDefinition(error) && !isExpectedPublicationFailure(error)) throw error
     const metadata = await readPublicationMetadata(db, String(setup.id))
     return { ...metadata, hasUnpublishedChanges: metadata.publicationState !== 'retired' }
   }

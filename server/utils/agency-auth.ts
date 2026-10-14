@@ -8,6 +8,7 @@ import {
   resolveAnyAgency
 } from './authorize'
 import { notFound } from './api-errors'
+import { throwIfPublicationConflict } from './publication-errors'
 import type { Scope } from '~~/shared/utils/scopes'
 import { sql } from 'kysely'
 import type { Kysely, Transaction } from 'kysely'
@@ -337,30 +338,34 @@ export const withActiveAgencyMutationTransaction = async <T>(
   if (!isDatabaseId(agencyId)) {
     return await notFound(event, 'AGENCY_NOT_FOUND', 'apiErrors.agency.not_found') as T
   }
-  return await event.context.$db.transaction().execute(async trx => {
-    const authContext = await requireFreshAuthContext(event, trx)
-    const agency = await trx
-      .selectFrom('Agency_Profile')
-      .select('id')
-      .where('id', '=', agencyId)
-      .where('_deleted', '=', false)
-      .forUpdate()
-      .executeTakeFirst()
+  try {
+    return await event.context.$db.transaction().execute(async trx => {
+      const authContext = await requireFreshAuthContext(event, trx)
+      const agency = await trx
+        .selectFrom('Agency_Profile')
+        .select('id')
+        .where('id', '=', agencyId)
+        .where('_deleted', '=', false)
+        .forUpdate()
+        .executeTakeFirst()
 
-    if (!agency) {
-      return await notFound(event, 'AGENCY_NOT_FOUND', 'apiErrors.agency.not_found')
-    }
+      if (!agency) {
+        return await notFound(event, 'AGENCY_NOT_FOUND', 'apiErrors.agency.not_found')
+      }
 
-    await authorizeWithFreshAuthContext(
-      event,
-      authContext,
-      'agency',
-      action,
-      { type: 'agency', agencyId }
-    )
+      await authorizeWithFreshAuthContext(
+        event,
+        authContext,
+        'agency',
+        action,
+        { type: 'agency', agencyId }
+      )
 
-    return await withAuditExecution({ type: 'agency', agencyId }, () => mutate(trx))
-  })
+      return await withAuditExecution({ type: 'agency', agencyId }, () => mutate(trx))
+    })
+  } catch (error: unknown) {
+    return await throwIfPublicationConflict(event, error)
+  }
 }
 
 /**
