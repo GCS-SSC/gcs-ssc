@@ -6,7 +6,7 @@ This configuration manages the existing **GCS Demo / demo** environment:
   populated, otherwise GitHub `GCS-SSC/gcs-ssc` branch `main` and the canonical Dockerfile.
 - Database: existing `GCS DB` service (PostgreSQL 18), with the application's existing `DATABASE_URL` preserved.
 - Domain: https://gcs-ssc-demo.up.railway.app, retained by Railway on the existing service.
-- Volumes: existing `gcs-ssc-volume` at `/app/.data` and `gcs-db-volume-payment-evidence-reset` on `GCS DB`, each 5000 MB. Verify every previous GCS database volume is detached and absent or pending Railway deletion.
+- Volumes: existing `gcs-ssc-volume` at `/app/.data` and `gcs-db-volume-budget-controls-reset-20261014-v2` on `GCS DB`, each 5000 MB. Verify every previous GCS database volume is detached and absent or pending Railway deletion.
 - Metabase, `Metabase DB`, and their `postgres-volume-4aPn` are included so an IaC apply preserves them.
 - Portal: `gcs-ssc-portal` uses a pinned public GHCR digest from `deployment/portal-demo-image.json` and its own `Portal DB` PostgreSQL service and `portal-db-volume`. It shares this project, not a database, with GCS and Metabase.
 - Canvas groups: `Metabase`, `GCS`, and `Portal` each contain the corresponding app and PostgreSQL service.
@@ -69,27 +69,35 @@ the owning agency's successful terminal payment status.
 
 Stop the existing `gcs-ssc` deployment before changing database storage. Stop
 `GCS DB`, explicitly detach its current database volume, and verify the former
-volume's `serviceId` is null. Create a uniquely named replacement, attach it to
-`GCS DB` at `/var/lib/postgresql/data`, and deploy the verified immutable image.
-Update this configuration to match the live replacement before the next IaC apply.
-Verify the live attachment independently: Railway's plan readback can omit the
-former database attachment. Delete the exact detached former volume to finish the
-authorized wipe, then verify its deletion or pending-deletion state. Omission from
-the authoring graph alone may retain unused volumes. Preserve the application
+volume's `serviceId` is null. Mount changes can redeploy the database; remove any
+intermediate deployment while the application remains stopped. Create a uniquely
+named unattached replacement, delete the exact detached former volume, and verify
+its deletion or pending-deletion state. Omission from the authoring graph alone
+may retain unused volumes.
+
+Attach the replacement to `GCS DB` at `/var/lib/postgresql/data`, verify `READY`
+storage and a successful database deployment. Set the `demo` service instance's
+image source and verify its resolved `source.image` before deploying from source;
+a global source connection can leave the previous environment image override in
+place. Confirm the new deployment's image matches the verified immutable digest.
+Update this configuration to match the live replacement before
+the next IaC apply. Verify the live attachment independently: Railway's plan
+readback can omit the former database attachment. Preserve the application
 attachment volume, Portal volume, and Metabase volume.
 
-The payment-evidence release uses source commit
-`f5d33edf0a7865b37cc8312d489ac89cda412661` and the public image digest
-`sha256:5ffa1774cb1412eb9a9d7dcd426281d990e9a8b32a3aabd66859cd26f5781a38`
-from [verified build 38194137113](https://github.com/GCS-SSC/gcs-ssc/actions/runs/38194137113).
+The annual-budget-controls release uses source commit
+`cc88b39f853ea3760267b0700ca784ad441b40ef` and the public image digest
+`sha256:2b5738c66b179aafb75e64f2f67f15eefb84b04a08516fa32146b7e28b4620df`
+from [verified build 38502629302](https://github.com/GCS-SSC/gcs-ssc/actions/runs/38502629302).
 
-Its database volume `gcs-db-volume-payment-evidence-reset`
-(`8729b72f-801e-4ea0-9b8d-98022cd2f95c`) is attached to `GCS DB` at
+Its database volume `gcs-db-volume-budget-controls-reset-20261014-v2`
+(`a544fc30-e733-4d41-9f86-cafef5d22f2c`) is attached to `GCS DB` at
 `/var/lib/postgresql/data` with 5000 MB and storage state `READY`. The former
-`gcs-db-volume-clean-reset` (`34d2ebf1-288f-4d9e-b5e0-f2e712777a54`) is detached
-and pending Railway deletion on 2026-10-14. The earlier
-`gcs-db-volume-ar-paid-reset` (`f14f19e4-17da-42af-93b5-2b9bbbd69e13`) also remains
-detached and pending deletion on that date. The application attachment storage,
+`gcs-db-volume-payment-evidence-reset` (`8729b72f-801e-4ea0-9b8d-98022cd2f95c`)
+and intermediate `gcs-db-volume-budget-controls-reset-20261014`
+(`ad90fe1f-a25c-49e6-bd41-b11cd2008b26`) are detached and pending Railway
+deletion on 2026-10-16. The earlier clean-reset and ar-paid-reset volumes are
+absent from the live project inventory. The application attachment storage,
 Portal database, and Metabase database are retained.
 
 Wait for the app deployment to reach `SUCCESS` and verify public health, demo
