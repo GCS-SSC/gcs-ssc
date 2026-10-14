@@ -85,10 +85,10 @@ the next IaC apply. Verify the live attachment independently: Railway's plan
 readback can omit the former database attachment. Preserve the application
 attachment volume, Portal volume, and Metabase volume.
 
-The current program-budget and applied Claim AR capacity release uses source
-commit `b8ec4b3b5735a6318e8a95a9213fb8453b1107de` and the public image digest
-`sha256:11770e28cf3bf51ec65065c45f0aaa7a8ec3b5f315333707fa8ea3fdc41c3bb5`
-from [verified build 38589921030](https://github.com/GCS-SSC/gcs-ssc/actions/runs/38589921030).
+The current Claim amount editing, collapsed Financial Summary, and access-log reporting release uses source
+commit `df9a336d846be591543b99a7f419e1cf01074a9b` and the public image digest
+`sha256:db29f15c54b4350c5a476aaa30a97e6cba57d566f7be34655d87e54f14e651f8`
+from [verified build 38594938247](https://github.com/GCS-SSC/gcs-ssc/actions/runs/38594938247).
 This correction retains the existing database and attachment storage.
 
 Its database volume `gcs-db-volume-budget-controls-reset-20261014-v2`
