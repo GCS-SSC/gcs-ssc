@@ -1,3 +1,4 @@
 {
-  "image": "ghcr.io/gcs-ssc/gcs-ssc-portal-demo-gcdesign@sha256:642302ce7504cec28041c3e66febd247006ff8444762a33914b767af453a9cc3"
+  "image": "ghcr.io/gcs-ssc/gcs-ssc-portal-demo-gcdesign@sha256:32fc8c413fcf0abdd0b843c81b3d861510d5160bd24247499fbf666e3e71e205",
+  "commit": "54117871c2f6a0468e7a877ee6eb2a05284701cd"
 }
