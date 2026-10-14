@@ -172,6 +172,53 @@ agreement, generate a document, and download a seeded template. Repeat the file
 download after a task replacement to verify persistence. The demo contains its
 usual seeded accounts and is intended for demonstration data.
 
+## One-command demo refresh
+
+From the repository root, using the AWS profile in ignored `infra/aws/.env`:
+
+```bash
+# Inspect the account, target and latest release without changing anything.
+bun run aws:demo:refresh --preview
+
+# Deploy the latest verified main image while preserving the database.
+bun run aws:demo:refresh
+
+# Wipe GCS demo database schemas and migration journals, then deploy and reseed.
+bun run aws:demo:refresh --reset-db
+```
+
+Run the manual GCS image publishing workflow on `main` first to update `:latest`.
+The helper resolves that public tag to its verified digest automatically; no SHA,
+Docker daemon, new IAM roles, or CDK deployment is required. It targets only
+`GcsSscDemo` / Canada Central and validates the existing GCS demo task contract.
+Portal and Metabase services and their databases are untouched. GCS attachment
+files on EFS are preserved; reset discards database references to uploaded files.
+The final demo seed restores its standard template records and files.
+
+A preflight task verifies the new image can connect to RDS using injected secrets
+and verified TLS. Reset then stops GCS, waits for every old service task to reach
+`STOPPED`, and transactionally drops the `public`, `extensions`, and `audit`
+schemas. It restarts only after the reset task exits successfully. This causes
+GCS downtime and permanently removes its demo data, users, audit history, and
+extension configuration. Without `--reset-db`, the database is preserved; baseline
+schema changes still require an explicit reset.
+
+The helper verifies ECS deployment completion, the actual running image digest,
+and public readiness, then updates the local `deployment/demo-image.json` pin.
+Commit/promote that pin separately if other operators should use the same release.
+Direct ECS updates do not rewrite CloudFormation's deployed template; keep the
+manifest aligned before subsequent CDK deployments to avoid restoring an older image.
+Do not run concurrent GCS deployments or refresh commands.
+
+If reset or deployment fails, inspect the printed task ARN and GCS CloudWatch
+logs. The helper does not automatically restart the old application after a reset;
+rollback is disabled during deployment to prevent an incompatible old baseline
+from starting. Recover by deploying the printed new task definition with desired
+count 1 after resolving the error. Once readiness is verified, restore the service's
+usual deployment circuit breaker (`enable: true`, `rollback: true`). The command
+requires a stable service with desired count 1 before another refresh attempt.
+If SSO has expired, run `aws sso login --profile YOUR_PROFILE` and retry.
+
 ## Updates, recovery, and storage
 
 Promote a published image in `deployment/demo-image.json`, then run `cdk diff`

@@ -98,3 +98,13 @@ jobs:
             echo '::error::The image must be public. For a new GHCR package, set Package settings > Change visibility > Public, then verify the digest from the demo-image artifact can be pulled anonymously.'
             exit 1
           fi
+
+      - name: Publish latest verified main image
+        if: github.ref == 'refs/heads/main'
+        env:
+          IMAGE: ${{ steps.image.outputs.tag }}
+        run: |
+          latest="${IMAGE%:*}:latest"
+          docker tag "$IMAGE" "$latest"
+          docker push "$latest"
+          printf 'Latest verified main image: `%s`\n' "$latest" >> "$GITHUB_STEP_SUMMARY"

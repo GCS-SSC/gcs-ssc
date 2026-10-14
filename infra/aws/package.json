@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "refresh": "bun run src/demo-refresh.ts",
     "cdk": "cdk",
     "synth": "cdk synth",
     "test": "tsx --test ../../tooling/gcs-ssc/tests/aws/*.test.ts",

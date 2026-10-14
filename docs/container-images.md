@@ -24,10 +24,15 @@ The workflow:
    its registry digest, and uploads a `demo-image` workflow artifact containing
    `demo-image.json`.
 5. Verifies an anonymous pull with an empty Docker credential directory.
+6. For runs on `main` only, also tags and pushes that verified image as
+   `ghcr.io/gcs-ssc/gcs-ssc-demo:latest`. Branch builds keep their unique tags
+   and release artifacts without updating `latest`.
 
 The existing GitHub Pages/WebContainer workflow is independent. Publishing an
-image does not automatically deploy AWS or Railway. There is no moving `latest`
-deployment tag, and image builds never receive database or application secrets.
+image does not automatically deploy AWS or Railway. The moving `latest` tag
+identifies the last verified image published from `main`; it updates only when
+the manual workflow runs. Existing deployment manifests still require immutable
+digests. Image builds never receive database or application secrets.
 
 ### One-time public package setting
 
@@ -80,6 +85,12 @@ Retain GHCR versions used by running deployments and rollback candidates; a
 digest pin does not protect an image from registry deletion.
 
 ### AWS
+
+For routine GCS refreshes, `bun run aws:demo:refresh` automatically resolves the
+verified `:latest` tag and deploys its digest. Add `--reset-db` for an explicit
+GCS demo database wipe and reseed, or `--preview` to inspect the target. The
+[AWS runbook](deployment-aws.md#one-command-demo-refresh) documents failure
+recovery, retained attachments, and the local release pin update.
 
 From `infra/aws`, run the usual `bun run cdk diff GcsSscDemo` and
 `bun run cdk deploy GcsSscDemo`, preserving any budget context values. CDK
