@@ -257,7 +257,7 @@
       "name": "@gcs-ssc/gcs-ssc-portal-connector",
       "version": "0.1.0",
       "dependencies": {
-        "@gcs-ssc/extensions": "^0.3.4",
+        "@gcs-ssc/extensions": "^0.3.18",
         "@gcs-ssc/survey": "file:vendor/survey",
         "nanoid": "^5.1.6",
         "zod": "^4.3.6",
