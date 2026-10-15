@@ -5,7 +5,8 @@ import { getRouterParams } from 'h3'
 import { AuditAccessParamsSchema, AuditDetailSchema, AuditEventParamsSchema, AuditListQuerySchema, AuditListResponseSchema, type AuditSummary } from '~~/shared/types/schemas/audit'
 import { getValidatedQueryI18n, parseI18n } from './api-validate'
 import { escapeLikePattern } from './sql-like'
-import { requireAuthContext, type AuthContext } from './authorize'
+import { authorize, requireAuthContext, type AuthContext } from './authorize'
+import { executeFreshReadSnapshot } from './fresh-read-snapshot'
 import type { UserAbilities } from '@gcs-ssc/authorization'
 import { notFound } from './api-errors'
 
@@ -50,36 +51,39 @@ export const projectAuditDetail = (row: Record<string, unknown>, kind: keyof typ
 }
 
 export const listAuditEvents = async (event: H3Event, kind: 'events' | 'access') => {
-  const { userAbilities } = await requireAuthContext(event)
-  const filters = await getValidatedQueryI18n(event, AuditListQuerySchema)
-  const source = kind === 'access'
-    ? sql`SELECT id::text, 'access'::text AS kind, created_at, actor_user_id, request_id, table_name, scope_type, agency_id, agency_ids,
-      NULL::text AS record_id, outcome AS operation, returned_identities FROM audit.access_event`
-    : sql`SELECT id::text, 'change'::text AS kind, created_at, actor_user_id, request_id, table_name, scope_type, agency_id, agency_ids,
-        record_id, operation FROM audit.change_event
-      UNION ALL SELECT id::text, 'security'::text, created_at, actor_user_id::text, request_id,
-        target_type, scope_type, agency_id, agency_ids, target_id, event_type FROM audit.security_audit_event`
-  const conditions = [sql`(${auditVisibilityPredicate(userAbilities)})`]
-  if (filters.from) conditions.push(sql`created_at >= ${filters.from}::timestamptz`)
-  if (filters.to) conditions.push(sql`created_at <= ${filters.to}::timestamptz`)
-  for (const [key, column] of [['actor', 'actor_user_id'], ['table', 'table_name'], ['recordId', 'record_id'], ['operation', 'operation'], ['requestId', 'request_id']] as const) {
-    if (kind === 'access' && key === 'recordId') continue
-    if (filters[key]) conditions.push(sql`${sql.ref(column)} = ${filters[key]}`)
-  }
-  if (kind === 'access' && filters.recordId) {
-    conditions.push(sql`EXISTS (SELECT 1 FROM jsonb_array_elements(returned_identities) AS identity,
-      jsonb_each_text(identity->'keys') AS key WHERE key.value = ${filters.recordId})`)
-  }
-  if (filters.search) {
-    const pattern = `%${escapeLikePattern(filters.search)}%`
-    conditions.push(sql`(table_name ILIKE ${pattern} OR request_id ILIKE ${pattern} OR operation ILIKE ${pattern} OR actor_user_id ILIKE ${pattern})`)
-  }
-  const where = sql.join(conditions, sql` AND `)
-  const db = event.context.$db
-  const items = await sql<AuditSummary>`SELECT id, kind, created_at, actor_user_id, request_id, table_name, record_id, operation, scope_type, agency_id, agency_ids FROM (${source}) events WHERE ${where}
-    ORDER BY created_at DESC, kind, id DESC LIMIT ${filters.limit} OFFSET ${(filters.page - 1) * filters.limit}`.execute(db)
-  const count = await sql<{ total: string }>`SELECT count(*)::text AS total FROM (${source}) events WHERE ${where}`.execute(db)
-  return AuditListResponseSchema.parse({ items: items.rows.map(row => ({ ...row, created_at: new Date(row.created_at).toISOString() })), total: Number(count.rows[0]?.total ?? 0), page: filters.page, limit: filters.limit })
+  return await executeFreshReadSnapshot(event, async () => {
+    await authorize(event, 'audit', 'read', resolveAuditReadAccess)
+    const { userAbilities } = await requireAuthContext(event)
+    const filters = await getValidatedQueryI18n(event, AuditListQuerySchema)
+    const source = kind === 'access'
+      ? sql`SELECT id::text, 'access'::text AS kind, created_at, actor_user_id, request_id, table_name, scope_type, agency_id, agency_ids,
+        NULL::text AS record_id, outcome AS operation, returned_identities FROM audit.access_event`
+      : sql`SELECT id::text, 'change'::text AS kind, created_at, actor_user_id, request_id, table_name, scope_type, agency_id, agency_ids,
+          record_id, operation FROM audit.change_event
+        UNION ALL SELECT id::text, 'security'::text, created_at, actor_user_id::text, request_id,
+          target_type, scope_type, agency_id, agency_ids, target_id, event_type FROM audit.security_audit_event`
+    const conditions = [sql`(${auditVisibilityPredicate(userAbilities)})`]
+    if (filters.from) conditions.push(sql`created_at >= ${filters.from}::timestamptz`)
+    if (filters.to) conditions.push(sql`created_at <= ${filters.to}::timestamptz`)
+    for (const [key, column] of [['actor', 'actor_user_id'], ['table', 'table_name'], ['recordId', 'record_id'], ['operation', 'operation'], ['requestId', 'request_id']] as const) {
+      if (kind === 'access' && key === 'recordId') continue
+      if (filters[key]) conditions.push(sql`${sql.ref(column)} = ${filters[key]}`)
+    }
+    if (kind === 'access' && filters.recordId) {
+      conditions.push(sql`EXISTS (SELECT 1 FROM jsonb_array_elements(returned_identities) AS identity,
+        jsonb_each_text(identity->'keys') AS key WHERE key.value = ${filters.recordId})`)
+    }
+    if (filters.search) {
+      const pattern = `%${escapeLikePattern(filters.search)}%`
+      conditions.push(sql`(table_name ILIKE ${pattern} OR request_id ILIKE ${pattern} OR operation ILIKE ${pattern} OR actor_user_id ILIKE ${pattern})`)
+    }
+    const where = sql.join(conditions, sql` AND `)
+    const db = event.context.$db
+    const items = await sql<AuditSummary>`SELECT id, kind, created_at, actor_user_id, request_id, table_name, record_id, operation, scope_type, agency_id, agency_ids FROM (${source}) events WHERE ${where}
+      ORDER BY created_at DESC, kind, id DESC LIMIT ${filters.limit} OFFSET ${(filters.page - 1) * filters.limit}`.execute(db)
+    const count = await sql<{ total: string }>`SELECT count(*)::text AS total FROM (${source}) events WHERE ${where}`.execute(db)
+    return AuditListResponseSchema.parse({ items: items.rows.map(row => ({ ...row, created_at: new Date(row.created_at).toISOString() })), total: Number(count.rows[0]?.total ?? 0), page: filters.page, limit: filters.limit })
+  }, { authorization: 'snapshot' })
 }
 
 export const auditEventDetail = async (event: H3Event, access: boolean) => {

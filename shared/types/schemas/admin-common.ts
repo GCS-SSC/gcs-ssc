@@ -51,7 +51,6 @@ const NullableOptionalIdSchema = z.preprocess(value => {
   return value
 }, z.union([z.null(), z.coerce.string().min(1)]).optional()).meta({ formRequired: false })
 const RequiredString = (key: string) => z.string({ error: key }).min(1, { error: key })
-const OptionalNumericString = z.coerce.number().optional()
 const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
   z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(JsonValueSchema), z.record(z.string(), JsonValueSchema)])
 )
@@ -147,16 +146,62 @@ export const CommonGwcoaCreateSchema = z.object({
 })
 export const CommonGwcoaPatchSchema = CommonGwcoaCreateSchema.partial().extend({ _deleted: z.boolean().optional() })
 
+/** Validates Contact text against storage without changing existing whitespace semantics.
+ * @param schema Base string validation for the field.
+ * @param bounded Whether the column has a 255-character storage limit.
+ * @returns String schema enforcing the field's storage constraints.
+ */
+const ContactTextSchema = (schema: z.ZodString, bounded = true) => schema.superRefine((value, context) => {
+  if (bounded && Array.from(value).length > 255) {
+    context.addIssue({ code: 'too_big', origin: 'string', maximum: 255, inclusive: true, message: 'validation.max_length' })
+  }
+  if (value.includes('\u0000')) context.addIssue({ code: 'custom', message: 'validation.invalid_text_character' })
+})
+
+/** Normalizes integral decimal phone values exactly before applying bigint storage bounds.
+ * @param value Submitted phone or extension value.
+ * @returns Exact normalized text, nullable omission, or the original invalid value.
+ */
+const normalizeContactPhone = (value: unknown): unknown => {
+  if (value === null || value === undefined) return value
+  if (typeof value === 'number') return Number.isSafeInteger(value) ? String(value) : value
+  if (typeof value === 'bigint') return String(value)
+  if (typeof value !== 'string') return value
+  const text = value.trim()
+  if (!text) return null
+  const match = /^([+-]?)(\d+(?:\.\d*)?|\.\d+)(?:e([+-]?\d+))?$/i.exec(text)
+  if (!match) return value
+  const [whole = '', fraction = ''] = match[2]!.split('.')
+  let digits = `${whole}${fraction}`.replace(/^0+/, '')
+  if (!digits) return '0'
+  const scale = Number(match[3] ?? '0') - fraction.length
+  if (!Number.isSafeInteger(scale)) return value
+  if (scale < 0) {
+    if (-scale > digits.length || !/^0*$/.test(digits.slice(digits.length + scale))) return value
+    digits = digits.slice(0, digits.length + scale)
+  } else {
+    if (digits.length + scale > 19) return value
+    digits += '0'.repeat(scale)
+  }
+  return `${match[1] === '-' ? '-' : ''}${digits}`
+}
+
+/** Preserves signed bigint phone values, safe numeric compatibility and explicit clearing. */
+const ContactPhoneSchema = z.preprocess(normalizeContactPhone,
+  z.string({ error: 'validation.invalid_number' })
+    .refine(isCanonicalPostgresBigintText, { error: 'validation.invalid_number' })
+    .nullable().optional()).meta({ formRequired: false })
+
 export const CommonContactCreateSchema = z.object({
-  egcs_cn_title: z.string().optional(),
-  egcs_cn_name: RequiredString('validation.name_required'),
-  egcs_cn_businessphone: OptionalNumericString,
-  egcs_cn_businessphoneextension: OptionalNumericString,
+  egcs_cn_title: ContactTextSchema(z.string()).nullable().optional(),
+  egcs_cn_name: ContactTextSchema(RequiredString('validation.name_required')),
+  egcs_cn_businessphone: ContactPhoneSchema,
+  egcs_cn_businessphoneextension: ContactPhoneSchema,
   egcs_cn_generallanguagepreference: z.enum(LANGUAGE_PREFERENCE_ENUM, { error: 'validation.language_required' }),
-  egcs_cn_jobtitle_en: RequiredString('validation.job_title_en_required'),
-  egcs_cn_jobtitle_fr: RequiredString('validation.job_title_fr_required'),
+  egcs_cn_jobtitle_en: ContactTextSchema(RequiredString('validation.job_title_en_required')),
+  egcs_cn_jobtitle_fr: ContactTextSchema(RequiredString('validation.job_title_fr_required')),
   egcs_cn_primaryaccount: z.boolean({ error: 'validation.primary_account_required' }),
-  egcs_cn_email: RequiredString('validation.email_required')
+  egcs_cn_email: ContactTextSchema(RequiredString('validation.email_required'), false)
 })
 export const CommonContactPatchSchema = CommonContactCreateSchema.partial().extend({ _deleted: z.boolean().optional() })
 

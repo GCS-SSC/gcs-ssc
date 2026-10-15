@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import { PositivePostgresBigintIdSchema } from './common'
 
-const filter = z.string({ error: 'validation.invalid_selection' }).max(200, { error: 'validation.invalid_selection' }).optional()
+const filter = z.string({ error: 'validation.invalid_selection' }).max(200, { error: 'validation.invalid_selection' })
+  .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' }).optional()
 export const AuditListQuerySchema = z.object({
   page: z.coerce.number({ error: 'validation.invalid_number' }).int({ error: 'validation.invalid_number' }).min(1, { error: 'validation.invalid_number' }).default(1),
   limit: z.coerce.number({ error: 'validation.invalid_number' }).int({ error: 'validation.invalid_number' }).min(1, { error: 'validation.invalid_number' }).max(100, { error: 'validation.invalid_number' }).default(20),

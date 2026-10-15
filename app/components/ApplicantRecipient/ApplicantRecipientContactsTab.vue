@@ -44,10 +44,10 @@ const columns: TableColumnInput<{ id: string } & Record<string, unknown>>[] = [
         <UInput :model-value="String((state as ApplicantRecipientContactForm).egcs_cn_name ?? '')" @update:model-value="value => (state as ApplicantRecipientContactForm).egcs_cn_name = value" />
       </UFormField>
       <UFormField :label="t('admin_common.fields.egcs_cn_businessphone')" name="egcs_cn_businessphone">
-        <UInput :model-value="String((state as ApplicantRecipientContactForm).egcs_cn_businessphone ?? '')" type="number" @update:model-value="value => (state as ApplicantRecipientContactForm).egcs_cn_businessphone = value === '' ? undefined : Number(value)" />
+        <UInput :model-value="String((state as ApplicantRecipientContactForm).egcs_cn_businessphone ?? '')" inputmode="numeric" @update:model-value="value => (state as ApplicantRecipientContactForm).egcs_cn_businessphone = value === '' ? null : String(value)" />
       </UFormField>
       <UFormField :label="t('admin_common.fields.egcs_cn_businessphoneextension')" name="egcs_cn_businessphoneextension">
-        <UInput :model-value="String((state as ApplicantRecipientContactForm).egcs_cn_businessphoneextension ?? '')" type="number" @update:model-value="value => (state as ApplicantRecipientContactForm).egcs_cn_businessphoneextension = value === '' ? undefined : Number(value)" />
+        <UInput :model-value="String((state as ApplicantRecipientContactForm).egcs_cn_businessphoneextension ?? '')" inputmode="numeric" @update:model-value="value => (state as ApplicantRecipientContactForm).egcs_cn_businessphoneextension = value === '' ? null : String(value)" />
       </UFormField>
       <UFormField :label="t('admin_common.fields.egcs_cn_generallanguagepreference')" name="egcs_cn_generallanguagepreference">
         <CommonEnumSelect v-model="(state as ApplicantRecipientContactForm).egcs_cn_generallanguagepreference" name="language_preference" />

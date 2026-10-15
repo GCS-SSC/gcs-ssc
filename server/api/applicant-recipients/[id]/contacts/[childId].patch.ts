@@ -1,3 +1,4 @@
+import { throwIfApplicantRecipientUniqueConstraintError } from '~~/server/utils/applicant-recipient-unique-constraint-errors'
 import { authorize, requireAuthContext } from '~~/server/utils/authorize'
 import { ApplicantRecipientContactPatchSchema } from '~~/shared/types/schemas'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
@@ -31,15 +32,55 @@ export default defineEventHandler(async event => {
   const validated = await readValidatedBodyI18n(event, ApplicantRecipientContactPatchSchema)
   const values = Object.fromEntries(Object.entries(validated).filter(([, value]) => value !== undefined))
 
-  return await executeFreshAuthorizedApplicantRecipientWrite(
-    event,
-    db,
-    applicantRecipientId,
-    'update',
-    async trx => {
-      const existing = await assertApplicantRecipientChildExists(
-        event,
-        trx
+  try {
+    return await executeFreshAuthorizedApplicantRecipientWrite(
+      event,
+      db,
+      applicantRecipientId,
+      'update',
+      async trx => {
+        const existing = await assertApplicantRecipientChildExists(
+          event,
+          trx
+            .selectFrom('Applicant_Recipient_Contact')
+            .innerJoin('Common_Contact', 'Common_Contact.id', 'Applicant_Recipient_Contact.egcs_ar_contact')
+            .where('Applicant_Recipient_Contact.id', '=', childId)
+            .where('Applicant_Recipient_Contact.egcs_ar_applicantrecipient', '=', applicantRecipientId)
+            .where('Applicant_Recipient_Contact._deleted', '=', false)
+            .where('Common_Contact._deleted', '=', false)
+            .select(APPLICANT_RECIPIENT_CONTACT_SELECT_COLUMNS)
+            .forUpdate('Common_Contact')
+            .executeTakeFirst(),
+          ...APPLICANT_RECIPIENT_CHILD_ERROR_KEYS.contactNotFound
+        )
+        if (!existing || typeof existing !== 'object' || !('id' in existing)) {
+          return existing
+        }
+        if (!Object.keys(values).length) {
+          return existing
+        }
+
+        const contactIsShared = await hasOtherActiveCommonContactReferences(
+          trx,
+          existing.egcs_ar_contact,
+          childId
+        )
+        if (contactIsShared) {
+          return await badRequest(
+            event,
+            'APPLICANT_RECIPIENT_CONTACT_SHARED',
+            'apiErrors.applicant_recipient.contact_shared'
+          )
+        }
+
+        await trx
+          .updateTable('Common_Contact')
+          .set(values)
+          .where('id', '=', existing.egcs_ar_contact)
+          .where('_deleted', '=', false)
+          .execute()
+
+        return await trx
           .selectFrom('Applicant_Recipient_Contact')
           .innerJoin('Common_Contact', 'Common_Contact.id', 'Applicant_Recipient_Contact.egcs_ar_contact')
           .where('Applicant_Recipient_Contact.id', '=', childId)
@@ -47,46 +88,10 @@ export default defineEventHandler(async event => {
           .where('Applicant_Recipient_Contact._deleted', '=', false)
           .where('Common_Contact._deleted', '=', false)
           .select(APPLICANT_RECIPIENT_CONTACT_SELECT_COLUMNS)
-          .forUpdate('Common_Contact')
-          .executeTakeFirst(),
-        ...APPLICANT_RECIPIENT_CHILD_ERROR_KEYS.contactNotFound
-      )
-      if (!existing || typeof existing !== 'object' || !('id' in existing)) {
-        return existing
+          .executeTakeFirstOrThrow()
       }
-      if (!Object.keys(values).length) {
-        return existing
-      }
-
-      const contactIsShared = await hasOtherActiveCommonContactReferences(
-        trx,
-        existing.egcs_ar_contact,
-        childId
-      )
-      if (contactIsShared) {
-        return await badRequest(
-          event,
-          'APPLICANT_RECIPIENT_CONTACT_SHARED',
-          'apiErrors.applicant_recipient.contact_shared'
-        )
-      }
-
-      await trx
-        .updateTable('Common_Contact')
-        .set(values)
-        .where('id', '=', existing.egcs_ar_contact)
-        .where('_deleted', '=', false)
-        .execute()
-
-      return await trx
-        .selectFrom('Applicant_Recipient_Contact')
-        .innerJoin('Common_Contact', 'Common_Contact.id', 'Applicant_Recipient_Contact.egcs_ar_contact')
-        .where('Applicant_Recipient_Contact.id', '=', childId)
-        .where('Applicant_Recipient_Contact.egcs_ar_applicantrecipient', '=', applicantRecipientId)
-        .where('Applicant_Recipient_Contact._deleted', '=', false)
-        .where('Common_Contact._deleted', '=', false)
-        .select(APPLICANT_RECIPIENT_CONTACT_SELECT_COLUMNS)
-        .executeTakeFirstOrThrow()
-    }
-  )
+    )
+  } catch (error: unknown) {
+    return await throwIfApplicantRecipientUniqueConstraintError(event, error)
+  }
 })

@@ -137,9 +137,10 @@ export type ApplicantRecipientProfileItem = WithId<ApplicantRecipientProfile>
 export type ApplicantRecipientProfilePatch = z.infer<typeof ApplicantRecipientProfilePatchSchema>
 
 export const ApplicantRecipientRegistryBaseSchema = z.object({
-  egcs_ar_number: z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' }),
+  egcs_ar_number: z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' })
+    .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' }),
   egcs_ar_registry: z.enum(REGISTRY_TYPE_ENUM, { error: 'validation.required' }),
-  egcs_ar_othercomment: OptionalText()
+  egcs_ar_othercomment: OptionalText().refine(value => value === undefined || !value.includes('\u0000'), { error: 'validation.invalid_text_character' })
 })
 
 /**

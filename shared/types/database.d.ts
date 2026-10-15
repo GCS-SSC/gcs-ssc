@@ -1136,10 +1136,10 @@ export interface CommonRuntimeTransitionTable {
 
 export interface CommonContactTable {
   id: Generated<string>
-  egcs_cn_title?: string
+  egcs_cn_title: ColumnType<string | null, string | null | undefined, string | null>
   egcs_cn_name: string
-  egcs_cn_businessphone?: number
-  egcs_cn_businessphoneextension?: number
+  egcs_cn_businessphone: ColumnType<string | null, string | number | null | undefined, string | number | null>
+  egcs_cn_businessphoneextension: ColumnType<string | null, string | number | null | undefined, string | number | null>
   egcs_cn_generallanguagepreference: Language_Preference
   egcs_cn_jobtitle_en: string
   egcs_cn_jobtitle_fr: string
