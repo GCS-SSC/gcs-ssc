@@ -211,6 +211,14 @@ export type ApplicantRecipientAgencyFinancialIdItem = WithId<ApplicantRecipientA
 
 export const ApplicantRecipientOtherNameBaseSchema = z.object({
   egcs_ar_othername: z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' })
+    .superRefine((value, context) => {
+      if (value.includes('\u0000')) {
+        context.addIssue({ code: 'custom', message: 'validation.invalid_text_character' })
+      }
+      if (Array.from(value).length > 255) {
+        context.addIssue({ code: 'too_big', origin: 'string', maximum: 255, inclusive: true, message: 'validation.max_length' })
+      }
+    })
 })
 
 export const ApplicantRecipientOtherNameCreateSchema = ApplicantRecipientOtherNameBaseSchema
