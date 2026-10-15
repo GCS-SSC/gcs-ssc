@@ -31,6 +31,8 @@ export default defineEventHandler(async event => {
 
   const patchSchema = TransferPaymentAmendmentTypeSchema.omit({
     egcs_tp_transferpaymentstream: true
+  }).extend({
+    egcs_tp_requiresamendmentsubtype: TransferPaymentAmendmentTypeSchema.shape.egcs_tp_requiresamendmentsubtype.removeDefault()
   }).partial()
   const payload = await readValidatedBodyI18n(event, patchSchema)
   if (Object.keys(payload).length === 0) {

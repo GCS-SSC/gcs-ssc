@@ -3,6 +3,7 @@ import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { authorize } from '~~/server/utils/authorize'
 import { resolveFundingOpportunityStreams } from '~~/server/utils/funding-opportunity-links'
 import { badRequest } from '~~/server/utils/api-errors'
+import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { PaginationSchema, PositivePostgresBigintIdSchema } from '~~/shared/types/schemas'
 
 const QuerySchema = PaginationSchema.extend({
@@ -20,6 +21,9 @@ export default defineEventHandler(async event => {
   const db = event.context.$db
   const { stream_ids: rawStreamIds, kind, page, limit, search, ids } = await getValidatedQueryI18n(event, QuerySchema)
   const streamIds = rawStreamIds.split(',')
+  if (streamIds.some(id => !isPositivePostgresBigintText(id))) {
+    return await badRequest(event, 'FUNDING_OPPORTUNITY_STREAM_INVALID', 'apiErrors.request.invalid')
+  }
   const selectedIds = ids ? (Array.isArray(ids) ? ids : [ids]).map(String) : []
   const stream = await resolveFundingOpportunityStreams(db, streamIds)
   if (!stream) {

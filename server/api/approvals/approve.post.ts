@@ -9,13 +9,16 @@ import {
   resolveApprovalActionContext
 } from '~~/server/utils/review-approval-runtime'
 import { ReviewApprovalApproveSchema } from '~~/shared/types/schemas/review-approval'
+import { PositivePostgresBigintIdSchema } from '~~/shared/types/schemas/common'
 import { advanceWorkflowAfterApprovalForRequest } from '~~/server/utils/workflow-runtime'
 import { throwIfAgreementUniqueConstraintError } from '~~/server/utils/agreement-unique-constraint-errors'
 import { requireAuthContext } from '~~/server/utils/authorize'
 
 export default defineEventHandler(async event => {
   await requireAuthContext(event)
-  const body = await readValidatedBodyI18n(event, ReviewApprovalApproveSchema)
+  const body = await readValidatedBodyI18n(event, ReviewApprovalApproveSchema.safeExtend({
+    approvalId: PositivePostgresBigintIdSchema
+  }))
   if (!body.approvalId) {
     return await badRequest(event, 'MISSING_REVIEW_APPROVAL_ID', 'apiErrors.request.missing_id')
   }

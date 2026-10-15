@@ -6,11 +6,14 @@ import {
   resolveApprovalActionContext
 } from '~~/server/utils/review-approval-runtime'
 import { ReviewApprovalReassignSchema } from '~~/shared/types/schemas/review-approval'
+import { PositivePostgresBigintIdSchema } from '~~/shared/types/schemas/common'
 import { requireAuthContext } from '~~/server/utils/authorize'
 
 export default defineEventHandler(async event => {
   await requireAuthContext(event)
-  const body = await readValidatedBodyI18n(event, ReviewApprovalReassignSchema)
+  const body = await readValidatedBodyI18n(event, ReviewApprovalReassignSchema.safeExtend({
+    approvalId: PositivePostgresBigintIdSchema
+  }))
   if (!body.approvalId) {
     return await badRequest(event, 'MISSING_REVIEW_APPROVAL_ID', 'apiErrors.request.missing_id')
   }
