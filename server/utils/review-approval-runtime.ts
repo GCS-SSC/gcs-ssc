@@ -1,3 +1,4 @@
+import { assertAgreementPaymentCommitmentCurrent } from './agreement-payment-commitment-controls'
 /* eslint-disable jsdoc/require-jsdoc -- Review approval helpers expose typed contracts covered by focused tests. */
 import type { H3Event } from 'h3'
 import type { Kysely, Transaction } from 'kysely'
@@ -317,6 +318,7 @@ const recordCanonicalDecision = async (
     if (!agencyId) return await badRequest(event, 'APPROVAL_AGENCY_NOT_FOUND', 'apiErrors.request.invalid')
     if (approvalValue && actionContext.runtimeEntity.approvalEntityType === 'fundingcasepayment') {
       await assertAgreementPaymentForecastCurrent(trx, actionContext.runtimeEntity.entityId)
+      await assertAgreementPaymentCommitmentCurrent(trx, actionContext.runtimeEntity.entityId)
     }
     return await decideCanonicalApproval(event, trx, approvalId, body, approvalValue, { agencyId })
   })

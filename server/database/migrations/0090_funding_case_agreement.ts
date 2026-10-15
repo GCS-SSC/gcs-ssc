@@ -1718,38 +1718,6 @@ AS $function$
     END
     $function$;
 
-CREATE FUNCTION trg_fn_enforce_budget_line_commitment_program_funding_total()
- RETURNS trigger
- LANGUAGE plpgsql
-AS $function$
-    DECLARE
-      target_agreement_id bigint;
-      old_agreement_id bigint;
-    BEGIN
-      SELECT "egcs_fc_fundingagreement"
-      INTO target_agreement_id
-      FROM "Funding_Case_Agreement_Budget_Fiscal_Year"
-      WHERE "id" = NEW."egcs_fc_fundingagreementbudgetfiscalyear";
-
-      IF TG_OP = 'UPDATE' THEN
-        SELECT "egcs_fc_fundingagreement"
-        INTO old_agreement_id
-        FROM "Funding_Case_Agreement_Budget_Fiscal_Year"
-        WHERE "id" = OLD."egcs_fc_fundingagreementbudgetfiscalyear";
-      END IF;
-
-      IF target_agreement_id IS NOT NULL THEN
-        PERFORM fc_enforce_commitment_program_funding_total(target_agreement_id, NULL);
-      END IF;
-
-      IF old_agreement_id IS NOT NULL AND old_agreement_id IS DISTINCT FROM target_agreement_id THEN
-        PERFORM fc_enforce_commitment_program_funding_total(old_agreement_id, NULL);
-      END IF;
-
-      RETURN NEW;
-    END;
-    $function$;
-
 CREATE FUNCTION trg_fn_enforce_budget_line_item_root()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -1765,16 +1733,6 @@ AS $function$
       END IF;
       RETURN NEW;
     END
-    $function$;
-
-CREATE FUNCTION trg_fn_enforce_budget_version_commitment_program_funding_total()
- RETURNS trigger
- LANGUAGE plpgsql
-AS $function$
-    BEGIN
-      PERFORM fc_enforce_commitment_program_funding_total(NEW."egcs_fc_fundingagreement", NULL);
-      RETURN NEW;
-    END;
     $function$;
 
 CREATE FUNCTION trg_fn_enforce_commitment_line_program_funding_total()
@@ -3761,8 +3719,6 @@ CREATE TRIGGER trg_resolve_current_budget_version BEFORE INSERT ON "Funding_Case
 
 CREATE TRIGGER trg_correction_financial_lock BEFORE INSERT OR DELETE OR UPDATE ON "Funding_Case_Agreement_Budget_Line_Item" FOR EACH ROW EXECUTE FUNCTION trg_fn_correction_financial_lock();
 
-CREATE CONSTRAINT TRIGGER trg_enforce_budget_line_commitment_program_funding_total AFTER INSERT OR UPDATE ON "Funding_Case_Agreement_Budget_Line_Item" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_enforce_budget_line_commitment_program_funding_total();
-
 CREATE TRIGGER trg_enforce_budget_line_item_root BEFORE INSERT OR UPDATE OF egcs_fc_originalbudgetlineitem ON "Funding_Case_Agreement_Budget_Line_Item" FOR EACH ROW EXECUTE FUNCTION trg_fn_enforce_budget_line_item_root();
 
 CREATE TRIGGER trg_resolve_budget_line_item_identity BEFORE INSERT OR UPDATE OF egcs_fc_fundingagreement, egcs_fc_fundingagreementbudgetfiscalyear, egcs_fc_originalbudgetlineitem, _deleted ON "Funding_Case_Agreement_Budget_Line_Item" FOR EACH ROW EXECUTE FUNCTION trg_fn_resolve_budget_line_item_identity();
@@ -3774,8 +3730,6 @@ CREATE TRIGGER trg_correction_financial_lock BEFORE INSERT OR DELETE OR UPDATE O
 CREATE TRIGGER trg_validate_agreement_line_funding_agency BEFORE INSERT OR UPDATE ON "Funding_Case_Agreement_Budget_Line_Item_Funding" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_agreement_line_funding_agency();
 
 CREATE TRIGGER trg_correction_financial_lock BEFORE INSERT OR DELETE OR UPDATE ON "Funding_Case_Agreement_Budget_Version" FOR EACH ROW EXECUTE FUNCTION trg_fn_correction_financial_lock();
-
-CREATE CONSTRAINT TRIGGER trg_enforce_budget_version_commitment_program_funding_total AFTER UPDATE ON "Funding_Case_Agreement_Budget_Version" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (COALESCE(new.egcs_fc_iscurrent, false) OR COALESCE(old.egcs_fc_iscurrent, false)) EXECUTE FUNCTION trg_fn_enforce_budget_version_commitment_program_funding_total();
 
 CREATE CONSTRAINT TRIGGER trg_enforce_fundingcaseagreementclaim_assignment_roster AFTER INSERT OR UPDATE OF _deleted ON "Funding_Case_Agreement_Claim" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_enforce_assignable_entity_roster('fundingcaseagreementclaim');
 

@@ -66,7 +66,8 @@ export const PRODUCTION_CORE_MIGRATIONS = [
   '0120_storage',
   '0125_l1_queue',
   '0130_integrity',
-  '0140_audit'
+  '0140_audit',
+  '9999_z_commitment_budget_payment_hold'
 ] as const
 
 export const PROHIBITED_PRODUCTION_BUNDLE_VALUES = [

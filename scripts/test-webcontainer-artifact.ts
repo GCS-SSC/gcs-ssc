@@ -67,7 +67,8 @@ const EXPECTED_CORE_MIGRATIONS = [
   '0125_l1_queue',
   '0130_integrity',
   '0140_audit',
-  '9999_seed'
+  '9999_seed',
+  '9999_z_commitment_budget_payment_hold'
 ] as const
 
 const EXPECTED_SEEDED_EXTENSION_KEYS = ['gcs-automated-payments', 'gcs-storage-local'] as const
@@ -408,7 +409,7 @@ const waitForCoreMigrationResult = async (
   child: ChildProcessWithoutNullStreams,
   getOutput: () => string
 ): Promise<void> => {
-  const successMarker = 'migration "9999_seed" was executed successfully'
+  const successMarker = `migration "${EXPECTED_CORE_MIGRATIONS[EXPECTED_CORE_MIGRATIONS.length - 1]}" was executed successfully`
   const deadline = Date.now() + 30_000
 
   while (Date.now() < deadline) {

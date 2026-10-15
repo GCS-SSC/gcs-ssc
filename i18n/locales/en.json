@@ -1304,6 +1304,7 @@
       "funding_subtype_invalid": "Select a funding subtype available to this agreement’s stream, without duplicates.",
       "funding_breakdown_required": "Add at least one other funding source to each line, and make program funding plus other sources equal total cost.",
       "annual_budget_exceeded": "The annual {document} program amount ({amount}) exceeds the current Agreement program funding budget ({budget}).",
+      "commitment_revision_required": "Payments require the combined total of all active commitments across all years to be at or below the current agreement program funding total. Use the current active commitment. For a draft tied to a previous commitment, create a new payment.",
       "forecast_revision_required": "Payments for this fiscal year are on hold. Activate a revised forecast within the current annual program funding budget before approving or processing payments. The active forecast cannot be deleted while this hold applies.",
       "number_provider_conflict": "More than one agreement number provider is enabled for this stream.",
       "invalid_generated_number": "The generated agreement number must contain 1–15 characters without surrounding spaces.",
@@ -3646,6 +3647,7 @@
       "JV_NO_ADJUSTMENT": "Change at least one allocation before completing the entry.",
       "JV_AMOUNT_RANGE": "Enter amounts within the supported precision and range.",
       "payment_recovery_control": "Resolve the approved direct repayment requirement or pending Credit Memo before completing this Payment.",
+      "commitment_revision_required": "Payments require the combined total of all active commitments across all years to be at or below the current agreement program funding total. Use the current active commitment. For a draft tied to a previous commitment, create a new payment.",
       "forecast_revision_required": "Activate a revised forecast within the current annual program funding budget before completing this Payment.",
       "risk_workflow_required": "Complete the required Risk Rating workflow successfully before Completion.",
       "risk_score_required": "Select a proposed risk score for this Amendment before Completion."

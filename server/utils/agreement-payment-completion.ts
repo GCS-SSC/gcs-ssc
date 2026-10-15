@@ -1,3 +1,4 @@
+import { assertAgreementPaymentCommitmentCurrent, getAgreementPaymentCommitmentViolation } from './agreement-payment-commitment-controls'
 import { assertPaymentRecoveryAllowed, withPaymentRecoveryErrors } from './payment-recovery-controls'
 import { hasAccountingTable } from './correction-schema'
 import { rebuildAccountReceivablePaymentOffset } from './account-receivable-recovery'
@@ -50,6 +51,7 @@ export const getAgreementPaymentCompletionRuntime = async (
     const hasPositiveLineTotal = compareMoney(lineTotal, ZERO_MONEY) > 0
     const linesMatch = hasPositiveLineTotal && await paymentLineTotalMatchesPaymentAmount(trx, paymentId)
     const forecastViolation = item ? null : await getAgreementPaymentForecastViolation(trx, paymentId)
+    const commitmentViolation = item ? false : await getAgreementPaymentCommitmentViolation(trx, paymentId)
     let recoveryBlocked = false
     if (await hasAccountingTable(trx, 'Funding_Case_Agreement_Account_Receivable')) {
       const payment = await getAgreementPayment(trx, context.agreementId, paymentId)
@@ -70,21 +72,24 @@ export const getAgreementPaymentCompletionRuntime = async (
       can_complete: item === null
         && linesMatch
         && !forecastViolation
+        && !commitmentViolation
         && !recoveryBlocked
         && Boolean(protection && !protection.locked),
       blocker: item
         ? null
-        : forecastViolation
-          ? 'forecast_revision_required' as const
-          : recoveryBlocked
-            ? 'payment_recovery_control' as const
-            : !hasPositiveLineTotal
-                ? 'lines_required' as const
-                : !linesMatch
-                    ? 'payment_total_mismatch' as const
-                    : !protection || protection.locked
-                        ? 'business_status' as const
-                        : null
+        : commitmentViolation
+          ? 'commitment_revision_required' as const
+          : forecastViolation
+            ? 'forecast_revision_required' as const
+            : recoveryBlocked
+              ? 'payment_recovery_control' as const
+              : !hasPositiveLineTotal
+                  ? 'lines_required' as const
+                  : !linesMatch
+                      ? 'payment_total_mismatch' as const
+                      : !protection || protection.locked
+                          ? 'business_status' as const
+                          : null
     }
   })
 }
@@ -161,6 +166,7 @@ export const executeAgreementPaymentCompletion = async (
     }
 
     await assertAgreementPaymentForecastCurrent(trx, paymentId)
+    await assertAgreementPaymentCommitmentCurrent(trx, paymentId)
     const header = await getAgreementPayment(trx, context.agreementId, paymentId)
     if (!header) return await notFound(event, 'AGREEMENT_PAYMENT_NOT_FOUND', 'apiErrors.agreement.payment_not_found')
     await assertPaymentRecoveryAllowed(event, trx, { agreementId: context.agreementId, applicantRecipientId: header.egcs_fc_applicantrecipient, currency: header.egcs_fc_currency, paymentId })

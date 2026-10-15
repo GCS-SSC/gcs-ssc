@@ -1,3 +1,4 @@
+import { assertAgreementPaymentCommitmentCurrent } from './agreement-payment-commitment-controls'
 import { extensionLifecycleAdapterContext,
   resolveExtensionEligibleAssigneeIds,
   resolveExtensionLifecycleRuntimeInTransaction
@@ -543,6 +544,7 @@ export const finishWorkflowRun = async (
   const positive = state === 'succeeded' || state === 'approved'
   if (positive && run.egcs_cn_entitytype === 'fundingcasepayment') {
     await assertAgreementPaymentForecastCurrent(trx, String(run.egcs_cn_entityid))
+    await assertAgreementPaymentCommitmentCurrent(trx, String(run.egcs_cn_entityid))
   }
   if (positive && run.egcs_cn_purpose === 'approval_submission'
     && run.egcs_cn_entitytype === 'fundingcaseagreementcloseout'
@@ -1367,6 +1369,7 @@ const startWorkflowUnchecked = async (
   }
   if (context.entityType === 'fundingcasepayment') {
     await assertAgreementPaymentForecastCurrent(trx, context.entityId)
+    await assertAgreementPaymentCommitmentCurrent(trx, context.entityId)
   }
   if (context.agreementId && ['fundingcaseagreementclaim', 'fundingcaseforecast', 'fundingclaimreconcile'].includes(context.entityType)) {
     const kind = context.entityType === 'fundingcaseagreementclaim' ? 'claim' : context.entityType === 'fundingcaseforecast' ? 'forecast' : 'reconciliation'

@@ -1304,6 +1304,7 @@
       "funding_subtype_invalid": "Sélectionnez un sous-type de financement offert pour le volet de cette entente, sans doublons.",
       "funding_breakdown_required": "Ajoutez au moins une autre source de financement à chaque ligne et assurez-vous que le financement du programme et les autres sources égalent le coût total.",
       "annual_budget_exceeded": "Le montant annuel des {document} pour le programme ({amount}) dépasse le budget courant de financement du programme de l’entente ({budget}).",
+      "commitment_revision_required": "Les paiements exigent que le total combiné de tous les engagements actifs pour tous les exercices soit inférieur ou égal au financement total courant du programme de l’entente. Utilisez l’engagement actif courant. Pour un paiement provisoire lié à un engagement précédent, créez un nouveau paiement.",
       "forecast_revision_required": "Les paiements pour cet exercice sont suspendus. Activez des prévisions révisées respectant le budget annuel courant de financement du programme avant d’approuver ou de traiter les paiements. Les prévisions actives ne peuvent pas être supprimées pendant cette suspension.",
       "number_provider_conflict": "Plusieurs fournisseurs de numéros d’entente sont activés pour ce volet.",
       "invalid_generated_number": "Le numéro d’entente généré doit contenir de 1 à 15 caractères sans espaces au début ou à la fin.",
@@ -3646,6 +3647,7 @@
       "JV_NO_ADJUSTMENT": "Modifiez au moins une répartition avant de terminer la pièce.",
       "JV_AMOUNT_RANGE": "Saisissez des montants respectant la précision et la plage prises en charge.",
       "payment_recovery_control": "Réglez l’exigence approuvée de remboursement direct ou la note de crédit en attente avant de terminer ce paiement.",
+      "commitment_revision_required": "Les paiements exigent que le total combiné de tous les engagements actifs pour tous les exercices soit inférieur ou égal au financement total courant du programme de l’entente. Utilisez l’engagement actif courant. Pour un paiement provisoire lié à un engagement précédent, créez un nouveau paiement.",
       "forecast_revision_required": "Activez des prévisions révisées respectant le budget annuel courant de financement du programme avant de terminer ce paiement.",
       "risk_workflow_required": "Terminez avec succès le processus obligatoire d’évaluation du risque avant l’achèvement.",
       "risk_score_required": "Sélectionnez un score de risque proposé pour cette modification avant l’achèvement."
