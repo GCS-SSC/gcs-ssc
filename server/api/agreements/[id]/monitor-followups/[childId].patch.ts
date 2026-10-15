@@ -1,17 +1,26 @@
-import { FundingCaseAgreementMonitorFollowupPatchSchema } from '~~/shared/types/schemas'
+import { z } from 'zod'
+import { FundingCaseAgreementMonitorFollowupBaseSchema } from '~~/shared/types/schemas'
 import { badRequest } from '~~/server/utils/api-errors'
+import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { assertMonitorReceivableEligible, assertMonitorLinkedRecord, executeAgreementMonitorMutation, prepareAgreementMonitorRoute, syncAgreementMonitorFollowupStatus } from '~~/server/utils/agreement-monitor'
 
 export default defineEventHandler(async event => {
   const childId = getRouterParam(event, 'childId')
   if (!childId) return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')
+  if (!isPositivePostgresBigintText(childId)) return await badRequest(event, 'AGREEMENT_MONITOR_FOLLOWUP_NOT_FOUND', 'apiErrors.agreement.monitor_followup_not_found')
   const existing = await event.context.$db.selectFrom('Funding_Case_Agreement_Monitor_Followup').where('id', '=', childId).where('_deleted', '=', false).selectAll().executeTakeFirst()
   if (!existing) return await badRequest(event, 'AGREEMENT_MONITOR_FOLLOWUP_NOT_FOUND', 'apiErrors.agreement.monitor_followup_not_found')
   const monitorId = String(existing.egcs_fc_fundingagreementmonitor)
   const prepared = await prepareAgreementMonitorRoute(event, 'update', { entityType: 'fundingcasemonitor', entityId: monitorId })
   if (!prepared || !('agreementId' in prepared)) return prepared
   const { agreementId, agreementContext, db } = prepared
-  const validated = await readValidatedBodyI18n(event, FundingCaseAgreementMonitorFollowupPatchSchema)
+  const patchSchema = FundingCaseAgreementMonitorFollowupBaseSchema
+    .omit({ egcs_fc_fundingagreementmonitor: true, egcs_fc_requiresreceivable: true })
+    .partial()
+    .extend({ egcs_fc_requiresreceivable: z.boolean().optional() })
+  const validated = await readValidatedBodyI18n(event, patchSchema)
+  if (Object.keys(validated).length === 0)
+    return await badRequest(event, 'NO_UPDATABLE_FIELDS', 'apiErrors.request.no_updatable_fields')
   return await executeAgreementMonitorMutation(event, db, agreementId, agreementContext, monitorId, async trx => {
     await assertMonitorReceivableEligible(event, trx, monitorId, validated.egcs_fc_requiresreceivable)
     await assertMonitorLinkedRecord(event, trx, monitorId, 'finding', validated.egcs_fc_monitorfinding)
