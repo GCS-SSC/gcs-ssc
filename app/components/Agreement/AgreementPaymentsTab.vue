@@ -113,6 +113,7 @@ const selectedPayment = paymentModal.selected
 const isPaymentModalOpen = paymentModal.isOpen
 const validatePaymentSchema = createValidator(FundingCaseAgreementPaymentCreateSchema)
 const paymentPending = useCrudModalPending(paymentModal.captureSession)
+let modalIntent = 0
 const isSavingPayment = paymentPending.isPending
 const wizardErrors: Ref<FormError[]> = ref([])
 const offsetPreview: Ref<PaymentOffsetPreview | null> = ref(null)
@@ -303,12 +304,12 @@ const warnRecordPrerequisite = () => toast.add({
   description: t('agreement.child_records.work_prerequisite'),
   color: 'warning'
 })
-const loadWorkableRecord = async (recordId: string, action: 'update' | 'delete'): Promise<FundingCaseAgreementPaymentRow | null> => {
+const loadWorkableRecord = async (recordId: string, action: 'update' | 'delete', isCurrent: () => boolean = () => true): Promise<FundingCaseAgreementPaymentRow | null> => {
   const owner = agreementId
   const generation = recordActionGeneration
   const current = tableRows.value.find(row => String(row.id) === recordId)
   if (current && !statusCatalog.getById(current.egcs_fc_status)) await statusCatalog.load()
-  if (disposed || owner !== agreementId || generation !== recordActionGeneration) return null
+  if (disposed || owner !== agreementId || generation !== recordActionGeneration || !isCurrent()) return null
   if (!current || isRecordLocked(current)) {
     warnRecordPrerequisite()
     return null
@@ -319,19 +320,19 @@ const loadWorkableRecord = async (recordId: string, action: 'update' | 'delete')
       $fetch<{ payments: FundingCaseAgreementPaymentRow[] }, string>(`/api/agreements/${owner}/payments-overview`),
       $fetch<{ is_assigned: boolean }, string>(`/api/entity-assignments/fundingcasepayment/${recordId}`)
     ])
-    if (disposed || owner !== agreementId || generation !== recordActionGeneration) return null
+    if (disposed || owner !== agreementId || generation !== recordActionGeneration || !isCurrent()) return null
     const record = overview.payments.find(row => String(row.id) === recordId)
     if (!statusCatalog.getById(parent.egcs_fc_status) || (record && !statusCatalog.getById(record.egcs_fc_status))) await statusCatalog.load()
-    if (disposed || owner !== agreementId || generation !== recordActionGeneration) return null
+    if (disposed || owner !== agreementId || generation !== recordActionGeneration || !isCurrent()) return null
     const permitted = action === 'update' ? parent.can_update_child_records_role : parent.can_delete_child_records_role
     if (permitted !== true || roster.is_assigned !== true || isRecordLocked(parent) || !record || isRecordLocked(record)) {
       warnRecordPrerequisite()
       return null
     }
     const commitment = await $fetch<FundingCaseAgreementCommitmentRow, string>(`/api/agreements/${owner}/commitments/${record.egcs_fc_fundingagreementcommitment}`)
-    if (disposed || owner !== agreementId || generation !== recordActionGeneration) return null
+    if (disposed || owner !== agreementId || generation !== recordActionGeneration || !isCurrent()) return null
     if (!getDefinition(commitment.egcs_fc_status)) await statusCatalog.load()
-    if (disposed || owner !== agreementId || generation !== recordActionGeneration) return null
+    if (disposed || owner !== agreementId || generation !== recordActionGeneration || !isCurrent()) return null
     // Commitment completion/read-only activates downstream Payment work; terminal status still blocks.
     if (!getDefinition(commitment.egcs_fc_status) || isTerminalStatus(commitment.egcs_fc_status)) {
       warnRecordPrerequisite()
@@ -339,17 +340,20 @@ const loadWorkableRecord = async (recordId: string, action: 'update' | 'delete')
     }
     return record
   } catch {
-    if (!disposed && owner === agreementId && generation === recordActionGeneration) warnRecordPrerequisite()
+    if (!disposed && owner === agreementId && generation === recordActionGeneration && isCurrent()) warnRecordPrerequisite()
     return null
   }
 }
 const runRecordAction = async (recordId: string, action: 'update' | 'delete', work: (record: FundingCaseAgreementPaymentRow) => void | Promise<void>) => {
   if (pendingRecordActions.value.has(recordId)) return
+  const intent = action === 'update' ? ++modalIntent : modalIntent
+  const session = paymentModal.captureSession()
+  const isCurrent = () => action === 'delete' || (intent === modalIntent && paymentModal.captureSession() === session)
   const token = Symbol(recordId)
   pendingRecordActions.value = new Map(pendingRecordActions.value).set(recordId, token)
   try {
-    const record = await loadWorkableRecord(recordId, action)
-    if (record) await work(record)
+    const record = await loadWorkableRecord(recordId, action, isCurrent)
+    if (record && isCurrent()) await work(record)
   } finally {
     if (pendingRecordActions.value.get(recordId) === token) {
       const remaining = new Map(pendingRecordActions.value)
@@ -375,10 +379,13 @@ const checkCreationPrerequisites = async (isCurrent: () => boolean = () => true)
 }
 const openCreatePayment = async () => {
   if (isOpeningCreate.value) return
+  const intent = ++modalIntent
+  const session = paymentModal.captureSession()
+  const isCurrent = () => intent === modalIntent && paymentModal.captureSession() === session
   isOpeningCreate.value = true
   const generation = recordActionGeneration
   try {
-    if (!await checkCreationPrerequisites()) return
+    if (!await checkCreationPrerequisites(isCurrent) || !isCurrent()) return
     paymentCalculatorResult.value = null
     paymentModal.openCreate()
   } finally {
@@ -508,8 +515,10 @@ const savePayment = async () => {
   if (!paymentPending.begin(session)) return
 
   try {
-    if (isUpdate && !await loadWorkableRecord(String(paymentState.id), 'update')) return
-    if (!isUpdate && !await checkCreationPrerequisites()) return
+    if (isUpdate && !await loadWorkableRecord(String(paymentState.id), 'update',
+      () => isPaymentModalOpen.value && paymentModal.captureSession() === session)) return
+    if (!isUpdate && !await checkCreationPrerequisites(
+      () => isPaymentModalOpen.value && paymentModal.captureSession() === session)) return
     if (disposed || paymentModal.captureSession() !== session) return
     await saveJson(
       isUpdate

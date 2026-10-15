@@ -90,6 +90,7 @@ const claimModal = useCrudModal<FundingCaseAgreementClaimRow, FundingCaseAgreeme
   })
 })
 const claimPending = useCrudModalPending(claimModal.captureSession)
+let modalIntent = 0
 watch(agreementIdRef, () => {
   recordActionGeneration += 1
   pendingRecordActions.value = new Map()
@@ -242,11 +243,14 @@ const loadWorkableRecord = async (recordId: string, action: 'update' | 'delete',
 }
 const runRecordAction = async (recordId: string, action: 'update' | 'delete', work: (record: FundingCaseAgreementClaimRow) => void | Promise<void>) => {
   if (pendingRecordActions.value.has(recordId)) return
+  const intent = action === 'update' ? ++modalIntent : modalIntent
+  const session = claimModal.captureSession()
+  const isCurrent = () => action === 'delete' || (intent === modalIntent && claimModal.captureSession() === session)
   const token = Symbol(recordId)
   pendingRecordActions.value = new Map(pendingRecordActions.value).set(recordId, token)
   try {
-    const record = await loadWorkableRecord(recordId, action)
-    if (record) await work(record)
+    const record = await loadWorkableRecord(recordId, action, isCurrent)
+    if (record && isCurrent()) await work(record)
   } finally {
     if (pendingRecordActions.value.get(recordId) === token) {
       const remaining = new Map(pendingRecordActions.value)
@@ -256,26 +260,29 @@ const runRecordAction = async (recordId: string, action: 'update' | 'delete', wo
   }
 }
 
-const checkCreationPrerequisites = async (): Promise<boolean> => {
+const checkCreationPrerequisites = async (isCurrent: () => boolean = () => true): Promise<boolean> => {
   const owner = agreementId
   const generation = recordActionGeneration
   try {
     const parent = await $fetch<FundingCaseAgreementProfileRow, string>(`/api/agreements/${owner}`)
     if (!statusCatalog.getById(parent.egcs_fc_status)) await statusCatalog.load()
-    if (disposed || owner !== agreementId || generation !== recordActionGeneration) return false
+    if (disposed || owner !== agreementId || generation !== recordActionGeneration || !isCurrent()) return false
     if (parent.can_create_child_records_role === true && parent.can_create_child_records === true && !isRecordLocked(parent)) return true
   } catch {
-    if (disposed || owner !== agreementId || generation !== recordActionGeneration) return false
+    if (disposed || owner !== agreementId || generation !== recordActionGeneration || !isCurrent()) return false
   }
   toast.add({ title: t('common.warning'), description: t('agreement.child_records.create_prerequisite'), color: 'warning' })
   return false
 }
 const openCreateClaim = async () => {
   if (isOpeningCreate.value) return
+  const intent = ++modalIntent
+  const session = claimModal.captureSession()
+  const isCurrent = () => intent === modalIntent && claimModal.captureSession() === session
   isOpeningCreate.value = true
   const generation = recordActionGeneration
   try {
-    if (!await checkCreationPrerequisites()) return
+    if (!await checkCreationPrerequisites(isCurrent) || !isCurrent()) return
     claimModal.openCreate()
   } finally {
     if (generation === recordActionGeneration) isOpeningCreate.value = false
@@ -297,7 +304,8 @@ const saveClaim = async () => {
   try {
     if (isUpdate && !await loadWorkableRecord(String(claimState.id), 'update',
       () => isClaimModalOpen.value && claimModal.captureSession() === session)) return
-    if (!isUpdate && !await checkCreationPrerequisites()) return
+    if (!isUpdate && !await checkCreationPrerequisites(
+      () => isClaimModalOpen.value && claimModal.captureSession() === session)) return
     if (disposed || claimModal.captureSession() !== session) return
     await saveJson(
       isUpdate
