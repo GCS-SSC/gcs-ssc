@@ -22,6 +22,23 @@ This demo uses **[WebContainers](https://webcontainers.io/)** to run the full No
     - **Clear Site Data:** Go to your browser's DevTools -> Application -> Storage -> "Clear site data".
     - **Incognito:** Alternatively, open the link in a new Incognito/Private window for a disposable session.
 
+## AWS demo refresh
+
+Publish a new image using GitHub Actions **Build and publish shared demo image →
+Run workflow → main**, then run from the repository root:
+
+```bash
+bun run aws:demo:refresh --reset-db
+```
+
+This deploys the verified GHCR `:latest` image and wipes/reseeds the GCS demo
+database. Attachment files, Portal, and Metabase are preserved. Omit `--reset-db`
+to preserve the database; add `--preview` to inspect without making changes.
+Use the AWS profile configured in ignored `infra/aws/.env`. If its SSO session
+has expired, the command starts AWS sign-in and resumes after you authenticate.
+See the [AWS deployment runbook](docs/deployment-aws.md#one-command-demo-refresh)
+for setup and recovery.
+
 ## 📚 Documentation
 
 **CRITICAL:** This project follows strict operating guidelines.

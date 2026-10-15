@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
 import { createHash } from 'node:crypto'
 import { writeFileSync } from 'node:fs'
@@ -21,10 +21,27 @@ type Aws = <T>(args: string[]) => Promise<T>
  * @param args - AWS CLI arguments without shell interpolation.
  * @returns Parsed AWS response.
  */
-const aws: Aws = async <T>(args: string[]): Promise<T> => {
-  const result = await execute('aws', [...args, '--region', 'ca-central-1', '--output', 'json', '--no-cli-pager'], {
+export const aws: Aws = async <T>(args: string[]): Promise<T> => {
+  const request = () => execute('aws', [...args, '--region', 'ca-central-1', '--output', 'json', '--no-cli-pager'], {
     timeout: 60000, maxBuffer: 4 * 1024 * 1024, env: { ...process.env, AWS_PAGER: '', AWS_CLI_AUTO_PROMPT: 'off' }
   })
+  let result
+  try {
+    result = await request()
+  } catch (error) {
+    const stderr = error instanceof Error && 'stderr' in error ? String(error.stderr) : ''
+    if (args[0] !== 'sts' || args[1] !== 'get-caller-identity'
+      || !/Error when retrieving token from sso|SSO session.*expired|Token has expired and refresh failed/i.test(stderr)) throw error
+    console.log('AWS SSO session expired. Signing in; complete the browser or device-code prompt to continue.')
+    await new Promise<void>((resolve, reject) => {
+      const child = spawn('aws', ['sso', 'login', ...(process.env.AWS_PROFILE ? ['--profile', process.env.AWS_PROFILE] : [])], {
+        stdio: 'inherit', env: process.env
+      })
+      child.once('error', reject)
+      child.once('exit', code => code === 0 ? resolve() : reject(new Error('AWS SSO sign-in did not complete; no deployment changes made.')))
+    })
+    result = await request()
+  }
   return JSON.parse(result.stdout) as T
 }
 

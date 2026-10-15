@@ -217,7 +217,11 @@ from starting. Recover by deploying the printed new task definition with desired
 count 1 after resolving the error. Once readiness is verified, restore the service's
 usual deployment circuit breaker (`enable: true`, `rollback: true`). The command
 requires a stable service with desired count 1 before another refresh attempt.
-If SSO has expired, run `aws sso login --profile YOUR_PROFILE` and retry.
+If the initial AWS identity check detects expired SSO credentials, the helper
+runs `aws sso login` for the configured profile, inherits its browser/device-code
+prompt, and retries the identity check once. Complete authentication when prompted;
+no deployment changes occur before it succeeds. Other credential or permission
+errors are reported without starting sign-in.
 
 ## Updates, recovery, and storage
 
