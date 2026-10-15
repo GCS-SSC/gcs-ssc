@@ -46,6 +46,9 @@ type AgreementDetailForm = FundingCaseAgreementProfileForm & {
   egcs_fc_status?: FundingCaseAgreementProfileRow['egcs_fc_status']
   can_update?: boolean
   can_delete?: boolean
+  can_create_child_records_role?: boolean
+  can_update_child_records_role?: boolean
+  can_delete_child_records_role?: boolean
   can_create_child_records?: boolean
   can_update_child_records?: boolean
   can_delete_child_records?: boolean
@@ -62,6 +65,9 @@ type AgreementDetailProfile = FundingCaseAgreementProfileRow & {
     assessmentScore: number | null
     mappedRating: { id: string, score: number, label: { en: string, fr: string } } | null
   } | null
+  can_create_child_records_role?: boolean
+  can_update_child_records_role?: boolean
+  can_delete_child_records_role?: boolean
   can_create_child_records?: boolean
   can_update_child_records?: boolean
   can_delete_child_records?: boolean
@@ -136,6 +142,9 @@ const { can, canAny, permissionsReady } = useCan()
 const isBusinessLocked = computed(() => isRecordLocked(profile.value))
 const canCreateChildRecords = computed(() => Boolean(profile.value?.can_create_child_records) && !isBusinessLocked.value)
 const canUpdateBusinessRecord = computed(() => Boolean(profile.value?.can_update) && !isBusinessLocked.value)
+const canCreateFinancialChildRole = computed(() => profile.value?.can_create_child_records_role === true)
+const canUpdateFinancialChildRole = computed(() => profile.value?.can_update_child_records_role === true)
+const canDeleteFinancialChildRole = computed(() => profile.value?.can_delete_child_records_role === true)
 const canUpdateChildRecords = computed(() => Boolean(profile.value?.can_update_child_records) && !isBusinessLocked.value)
 const canDeleteChildRecords = computed(() => Boolean(profile.value?.can_delete_child_records) && !isBusinessLocked.value)
 const isHeroCollapsed = getHeroCollapsed('agreement-detail')
@@ -305,6 +314,9 @@ const submit = async () => {
       egcs_fc_status: _status,
       can_delete: _canDelete,
       can_update: _canUpdate,
+      can_create_child_records_role: _canCreateChildRecordsRole,
+      can_update_child_records_role: _canUpdateChildRecordsRole,
+      can_delete_child_records_role: _canDeleteChildRecordsRole,
       can_create_child_records: _canCreateChildRecords,
       can_update_child_records: _canUpdateChildRecords,
       can_delete_child_records: _canDeleteChildRecords,
@@ -575,16 +587,18 @@ const cancel = () => {
               :agreement-id="id"
               :currency="profile.egcs_fc_currency"
               :can-create="canCreateChildRecords"
-              :can-update="canUpdateChildRecords"
-              :can-delete="canDeleteChildRecords" />
+              :can-create-role="canCreateFinancialChildRole"
+              :can-update="canUpdateFinancialChildRole"
+              :can-delete="canDeleteFinancialChildRole" />
 
             <AgreementPaymentsTab
               v-else-if="selectedTab === 'payments'"
               :agreement-id="id"
               :currency="profile.egcs_fc_currency"
               :can-create="canCreateChildRecords"
-              :can-update="canUpdateChildRecords"
-              :can-delete="canDeleteChildRecords" />
+              :can-create-role="canCreateFinancialChildRole"
+              :can-update="canUpdateFinancialChildRole"
+              :can-delete="canDeleteFinancialChildRole" />
 
             <AccountReceivableCollection v-else-if="selectedTab === 'account-receivables'" :agreement-id="id" />
             <CorrectionCollection v-else-if="selectedTab === 'corrections'" :agreement-id="id" />
@@ -602,8 +616,9 @@ const cancel = () => {
               :agreement-id="id"
               :currency="profile.egcs_fc_currency"
               :can-create="canCreateChildRecords"
-              :can-update="canUpdateChildRecords"
-              :can-delete="canDeleteChildRecords" />
+              :can-create-role="canCreateFinancialChildRole"
+              :can-update="canUpdateFinancialChildRole"
+              :can-delete="canDeleteFinancialChildRole" />
 
             <AgreementMonitorsTab
               v-else-if="selectedTab === 'monitors'"

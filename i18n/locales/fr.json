@@ -1421,7 +1421,8 @@
       "currency_immutable": "La devise de l’entente est définie à la création et ne peut pas être modifiée.",
       "currency_mismatch": "La devise doit correspondre à celle de l’entente.",
       "invalid_claim_proponent": "Sélectionnez le promoteur qui présente la demande et qui est lié à cette entente.",
-      "amendment_risk_workflow_managed": "Un processus de risque gère la proposition de risque de cette modification. Terminez le processus pour la mettre à jour."
+      "amendment_risk_workflow_managed": "Un processus de risque gère la proposition de risque de cette modification. Terminez le processus pour la mettre à jour.",
+      "forecast_cell_occupied": "Une ligne de prévision existe déjà pour cette ligne budgétaire et ce mois."
     },
     "transfer_payment": {
       "invalid_funding_subtype": "Sélectionnez un sous-type de financement actif appartenant à l’organisme de ce volet.",
@@ -3130,7 +3131,11 @@
     "risk_source": "Source du risque",
     "risk_source_amendment": "Modification approuvée {number}",
     "risk_source_workflow": "Processus d’évaluation du risque",
-    "risk_rating_latest_history": "Dernier processus de risque d’entente réussi"
+    "risk_rating_latest_history": "Dernier processus de risque d’entente réussi",
+    "child_records": {
+      "work_prerequisite": "Vous devez être affecté à ce dossier, et celui-ci ainsi que son entente doivent demeurer modifiables, pour apporter des changements.",
+      "create_prerequisite": "Vous devez être affecté à cette entente, et celle-ci doit demeurer modifiable, pour créer un dossier."
+    }
   },
   "applicant_recipient": {
     "list_views": {

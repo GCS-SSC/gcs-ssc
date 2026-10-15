@@ -101,6 +101,7 @@ const state: Ref<{ comments: string }> = ref({
 })
 const isSubmitting: Ref<boolean> = ref(false)
 let completionRequestGeneration = 0
+let completionSubmissionGeneration = 0
 /**
  *
  */
@@ -130,6 +131,7 @@ const refreshCompletion = async () => {
 watch(completionQuery, async (_nextQuery, previousQuery) => {
   completionErrorDetails.value = []
   if (previousQuery && `${previousQuery.entityType}:${previousQuery.entityId}` !== completionIdentity.value) {
+    completionSubmissionGeneration += 1
     state.value.comments = ''
     isSubmitting.value = false
   }
@@ -164,6 +166,7 @@ const submitCompletion = async () => {
 
   const submittedIdentity = completionIdentity.value
   const submittedGeneration = completionRequestGeneration
+  const submissionGeneration = ++completionSubmissionGeneration
   try {
     isSubmitting.value = true
     completionErrorDetails.value = []
@@ -184,7 +187,7 @@ const submitCompletion = async () => {
     }
     if (submittedIdentity !== completionIdentity.value || submittedGeneration !== completionRequestGeneration) return
     await refreshCompletion()
-    if (submittedIdentity !== completionIdentity.value) return
+    if (submittedIdentity !== completionIdentity.value || submissionGeneration !== completionSubmissionGeneration) return
     state.value.comments = ''
     emit('completed')
     toast.add({
@@ -193,11 +196,11 @@ const submitCompletion = async () => {
       color: 'success'
     })
   } catch (error) {
-    if (submittedIdentity !== completionIdentity.value) return
+    if (submittedIdentity !== completionIdentity.value || submissionGeneration !== completionSubmissionGeneration) return
     completionErrorDetails.value = resolveApiErrorDetails(error)
     showError(error)
   } finally {
-    isSubmitting.value = false
+    if (submissionGeneration === completionSubmissionGeneration) isSubmitting.value = false
   }
 }
 </script>

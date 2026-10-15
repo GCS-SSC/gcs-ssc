@@ -82,6 +82,7 @@ const indicatorBilingualColumns = computed<BilingualColumnConfig<TransferPayment
     :total-records="totalRecords"
     :loading="loading"
     :button-label="t('common.add')"
+    :show-button="canUpdateChild"
     @add="emit('add')">
     <template #filters>
       <CommonBilingualSelectMenu
@@ -121,19 +122,19 @@ const indicatorBilingualColumns = computed<BilingualColumnConfig<TransferPayment
     <template #actions-cell="{ row }">
       <div class="flex items-center gap-2">
         <UButton
+          v-if="canUpdateChild"
           icon="i-lucide-pencil"
           color="neutral"
           variant="ghost"
           size="sm"
-          :disabled="!canUpdateChild"
           :aria-label="t('common.edit_named', { name: getIndicatorActionTarget(row.original) })"
           @click="emit('edit', row.original)" />
         <UButton
+          v-if="canDeleteChild"
           icon="i-lucide-trash"
           color="error"
           variant="ghost"
           size="sm"
-          :disabled="!canDeleteChild"
           :aria-label="t('common.delete_named', { name: getIndicatorActionTarget(row.original) })"
           @click="emit('delete', row.original)" />
       </div>

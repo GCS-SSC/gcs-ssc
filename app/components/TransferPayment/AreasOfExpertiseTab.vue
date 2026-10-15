@@ -51,8 +51,8 @@ const columns: TableColumnInput<TransferPaymentStreamAreaOfExpertiseItem>[] = [
 const {
   isOpen: isModalOpen,
   selected: selectedItem,
-  openCreate,
-  openUpdate,
+  openCreate: createArea,
+  openUpdate: updateArea,
   captureSession,
   closeSession
 } = useCrudModal<TransferPaymentStreamAreaOfExpertiseItem, Partial<TransferPaymentStreamAreaOfExpertiseItem>>({
@@ -61,6 +61,15 @@ const {
   }),
   updateState: row => ({ ...row })
 })
+
+/** Opens a new Area only while the caller can update the Stream. */
+const openCreate = () => {
+  if (canUpdateChild) createArea()
+}
+/** @param row - Area selected for editing. */
+const openUpdate = (row: TransferPaymentStreamAreaOfExpertiseItem) => {
+  if (canUpdateChild) updateArea(row)
+}
 
 const validate = createValidator(TransferPaymentStreamAreaOfExpertiseSchema)
 const pending = useCrudModalPending(captureSession)
@@ -90,7 +99,7 @@ const sendJson = async (url: string, method: 'PATCH' | 'POST', body: unknown) =>
  * Closes the modal, refreshes the table data, and provides success feedback on completion.
  */
 const save = async () => {
-  if (!selectedItem.value) return
+  if (!selectedItem.value || !canUpdateChild) return
   const itemState = selectedItem.value
   const itemId = itemState.id
   const isUpdate = Boolean(itemId)
@@ -132,6 +141,7 @@ const save = async () => {
  * @param {TransferPaymentStreamAreaOfExpertiseItem} row - The expertise record to be deleted.
  */
 const deleteItem = async (row: TransferPaymentStreamAreaOfExpertiseItem) => {
+  if (!canDeleteChild) return
   try {
     const ok = await confirmDeleteRequest(
       `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/areas-of-expertise/${row.id}`
@@ -154,23 +164,24 @@ const deleteItem = async (row: TransferPaymentStreamAreaOfExpertiseItem) => {
     :total-records="totalRecords"
     :loading="status === 'pending'"
     :button-label="t('common.add')"
+    :show-button="canUpdateChild"
     @add="openCreate">
     <template #actions-cell="{ row }">
       <div class="flex items-center gap-2">
         <UButton
+          v-if="canUpdateChild"
           icon="i-lucide-pencil"
           color="neutral"
           variant="ghost"
           size="sm"
-          :disabled="!canUpdateChild"
           :aria-label="t('common.edit_named', { name: getAreaActionTarget(row.original) })"
           @click="openUpdate(row.original)" />
         <UButton
+          v-if="canDeleteChild"
           icon="i-lucide-trash"
           color="error"
           variant="ghost"
           size="sm"
-          :disabled="!canDeleteChild"
           :aria-label="t('common.delete_named', { name: getAreaActionTarget(row.original) })"
           @click="deleteItem(row.original)" />
       </div>

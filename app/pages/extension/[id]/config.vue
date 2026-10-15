@@ -2,7 +2,7 @@
 /* eslint-disable jsdoc/require-jsdoc */
 import type { Ref } from 'vue'
 import { getGcsExtensionComponent } from '#gcs-extensions/registry'
-import { throwFetchResponseError } from '~/utils/fetch-error'
+import { AppFetchResponseError, throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { appRouteLocations } from '~/utils/route-locations'
 import type { ExtensionStreamRegistryItem } from '~~/shared/types/schemas/extensions'
@@ -130,7 +130,17 @@ const refresh = async () => {
     resetDraft(item.value.config)
   } catch (error: unknown) {
     loadError.value = error
-    showError(error)
+    const responseData = error instanceof AppFetchResponseError && error.data && typeof error.data === 'object'
+      ? error.data as Record<string, unknown>
+      : null
+    const apiError = responseData?.data && typeof responseData.data === 'object'
+      ? responseData.data as Record<string, unknown>
+      : responseData
+    const message = typeof apiError?.code === 'string' && apiError.code.trim()
+      && typeof apiError.message === 'string' && apiError.message.trim()
+      ? apiError.message
+      : t('common.unknown_error')
+    showError({ data: { message } })
   } finally {
     isLoading.value = false
   }

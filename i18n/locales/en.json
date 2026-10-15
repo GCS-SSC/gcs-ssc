@@ -1421,7 +1421,8 @@
       "currency_immutable": "Agreement currency is set at creation and cannot be changed.",
       "currency_mismatch": "Currency must match the Agreement currency.",
       "invalid_claim_proponent": "Select a submitting Proponent linked to this Agreement.",
-      "amendment_risk_workflow_managed": "A risk workflow manages this Amendment’s risk proposal. Complete the workflow to update it."
+      "amendment_risk_workflow_managed": "A risk workflow manages this Amendment’s risk proposal. Complete the workflow to update it.",
+      "forecast_cell_occupied": "A forecast line already exists for this budget line and month."
     },
     "transfer_payment": {
       "invalid_funding_subtype": "Select an active funding subtype owned by this stream’s Agency.",
@@ -3130,7 +3131,11 @@
     "risk_source": "Risk source",
     "risk_source_amendment": "Approved Amendment {number}",
     "risk_source_workflow": "Risk Rating workflow",
-    "risk_rating_latest_history": "Latest successful Agreement risk workflow"
+    "risk_rating_latest_history": "Latest successful Agreement risk workflow",
+    "child_records": {
+      "work_prerequisite": "You must be assigned to this record, and both it and its Agreement must remain editable, to make changes.",
+      "create_prerequisite": "You must be assigned to this Agreement, and it must remain editable, to create a record."
+    }
   },
   "applicant_recipient": {
     "list_views": {

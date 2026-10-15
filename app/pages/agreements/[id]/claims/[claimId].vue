@@ -60,6 +60,7 @@ type ReconciliationEditorDetail = {
   reconciliation: { id: string, egcs_fc_isopen: boolean }
   lines: ReconciliationEditorLine[]
   can_update: boolean
+  can_update_role: boolean
   can_cancel: boolean
   is_assigned: boolean
 }
@@ -137,6 +138,7 @@ const isCancellingClaim: Ref<boolean> = ref(false)
 const isCancellingReconcile: Ref<boolean> = ref(false)
 const approvalsRefreshKey: Ref<number> = ref(0)
 const selectedReconcileDetail: Ref<ReconciliationEditorDetail | null> = ref(null)
+const selectedReconcileRole: Ref<{ id: string, allowed: boolean } | null> = ref(null)
 const isSavingReconcile: Ref<boolean> = ref(false)
 const draftReconcileIsFinal: Ref<boolean> = ref(false)
 const reconcileLineModal = useCrudModal<AgreementClaimReconciliationTableLine, AgreementClaimReconciliationTableLine>({
@@ -312,7 +314,28 @@ const canStartReconcile = canCreateClaimLineItems
 const canUpdateReconcile = computed(() => selectedReconcileDetail.value?.can_update === true)
 const canWorkReconcileWorkflow = computed(() => selectedReconcileDetail.value?.is_assigned === true)
 const canCancelReconcile = computed(() => selectedReconcileDetail.value?.can_cancel === true)
-const canCreateReconcileLineItems = canUpdateReconcile
+const canUpdateReconcileRole = computed(() => selectedReconcileDetail.value?.can_update_role
+  ?? (selectedReconcileRole.value?.id === String(activeReconcile.value?.id) && selectedReconcileRole.value?.allowed === true))
+const reconcileWorkflowPrerequisiteWarning = computed(() => {
+  if (!selectedReconcileDetail.value) return undefined
+  if (!selectedReconcileDetail.value.is_assigned) return t('assignments.read_only_description')
+  if (!activeReconcile.value || isTerminalStatus(activeReconcile.value.egcs_fc_status)
+    || selectedReconcileDetail.value.reconciliation.egcs_fc_isopen === false
+    || activeClaimReconciles.value.some(reconcile => reconcile.egcs_fc_isfinal && reconcile.isCompleted)) return t('agreement.claims.action_unavailable')
+  return undefined
+})
+const reconcileEditPrerequisiteWarning = computed(() => reconcileWorkflowPrerequisiteWarning.value
+  ?? (!canUpdateReconcile.value || isRecordLocked(activeReconcile.value) ? t('agreement.claims.action_unavailable') : undefined))
+const guardReconcileAction = (warning: string | undefined): boolean => {
+  if (!selectedReconcileDetail.value || isLoadingDetail.value
+    || (!getDefinition(activeReconcile.value?.egcs_fc_status) && statusCatalog.state.value.status === 'pending')) return false
+  if (!canUpdateReconcileRole.value || warning) {
+    toast.add({ title: t('common.warning'), description: warning ?? t('agreement.claims.action_unavailable'), color: 'warning' })
+    return false
+  }
+  return true
+}
+const canCreateReconcileLineItems = canUpdateReconcileRole
 const showReconcileCompletion = computed(() => Boolean(activeReconcile.value))
 const hasLoadError = computed(() =>
   Boolean(profileError.value)
@@ -400,7 +423,7 @@ const canEditClaimSubmissionAmount = (budgetLineId: string): boolean => {
 
 const canEditReconcileLineItem = (claimLineId: string): boolean => {
   const existing = reconcileLineByClaimLineId.value.get(claimLineId)
-  return existing ? canUpdateReconcile.value : canCreateReconcileLineItems.value
+  return existing ? canUpdateReconcileRole.value : canCreateReconcileLineItems.value
 }
 
 const ZERO_MONEY = parseMoney('0')
@@ -458,6 +481,7 @@ const loadSelectedReconcileDetail = async (reconcile: FundingCaseAgreementClaimR
     const detail = await fetchReconciliationEditorDetail(`/api/claim-reconciliations/${reconcile.id}`)
     if (generation !== reconcileDetailGeneration || String(detail.reconciliation.id) !== String(activeReconcile.value?.id)) return
     selectedReconcileDetail.value = detail
+    selectedReconcileRole.value = { id: String(detail.reconciliation.id), allowed: detail.can_update_role }
     draftReconciledAmounts.value = Object.fromEntries(detail.lines.map(line => [line.claim_line_id, line.egcs_fc_reconciled ?? '0.00']))
     draftSampledAmounts.value = Object.fromEntries(detail.lines.map(line => [line.claim_line_id, line.egcs_fc_sampled ?? '0.00']))
     draftRationales.value = Object.fromEntries(detail.lines.map(line => [line.claim_line_id, line.egcs_fc_rationale ?? '']))
@@ -802,9 +826,8 @@ const otherFinalReconcile = computed(() =>
 )
 const canEditActiveReconcileFinal = computed(() =>
   Boolean(activeReconcile.value)
-  && canUpdateReconcile.value
-  && !isSavingReconcileFinal.value
-  && (activeReconcileIsFinal.value || !otherFinalReconcile.value)
+  && canUpdateReconcileRole.value
+  && !isReconcileMutationPending.value
 )
 
 const openSubmissionEditor = (line: ClaimSubmissionTableRow) => {
@@ -949,13 +972,17 @@ const setActiveReconcileFinal = (value: boolean | 'indeterminate') => {
     return
   }
 
+  if (!guardReconcileAction(reconcileEditPrerequisiteWarning.value
+    ?? (value && otherFinalReconcile.value ? t('agreement.claims.final_reconcile_exists', { id: otherFinalReconcile.value.id }) : undefined))) return
   draftReconcileIsFinal.value = value
 }
 
 const saveReconcile = async (showSuccess = true): Promise<boolean> => {
   const reconcile = activeReconcile.value
   const detail = selectedReconcileDetail.value
-  if (!reconcile || !detail || !canUpdateReconcile.value || isSavingReconcile.value) return false
+  if (!reconcile || !detail || isReconcileMutationPending.value
+    || !guardReconcileAction(reconcileEditPrerequisiteWarning.value
+      ?? (draftReconcileIsFinal.value && otherFinalReconcile.value ? t('agreement.claims.final_reconcile_exists', { id: otherFinalReconcile.value.id }) : undefined))) return false
 
   const desiredIsFinal = draftReconcileIsFinal.value
   let lineRequests: Array<{
@@ -997,13 +1024,21 @@ const saveReconcile = async (showSuccess = true): Promise<boolean> => {
   }
 }
 
+const openReconcileLineEditor = (line: AgreementClaimReconciliationTableLine) => {
+  if (line.editable && (isReconcileMutationPending.value || !guardReconcileAction(reconcileEditPrerequisiteWarning.value))) return
+  reconcileLineModal.openUpdate(line)
+}
+
 const saveReconcileLine = async () => {
   const line = selectedReconcileLine.value
   const reconcile = activeReconcile.value
   const detailLine = selectedReconcileDetail.value?.lines.find(item => item.claim_line_id === line?.id)
   const detail = selectedReconcileDetail.value
   const session = reconcileLineModal.captureSession()
-  if (!line || !reconcile || !detail || !detailLine || !line.editable || !reconcileLinePending.begin(session)) return
+  if (!line || !reconcile || !detail || !detailLine || isSavingReconcile.value || isCancellingReconcile.value || !reconcileLineModal.isCurrentSession(session)
+    || !guardReconcileAction(reconcileEditPrerequisiteWarning.value
+      ?? (draftReconcileIsFinal.value && otherFinalReconcile.value ? t('agreement.claims.final_reconcile_exists', { id: otherFinalReconcile.value.id }) : undefined))
+    || !reconcileLinePending.begin(session)) return
   const desiredIsFinal = draftReconcileIsFinal.value
 
   try {
@@ -1028,10 +1063,10 @@ const saveReconcileLine = async () => {
     })
     await refreshPage()
     await loadSelectedReconcileDetail()
-    reconcileLineModal.closeSession(session)
+    if (!reconcileLineModal.closeSession(session)) return
     toast.add({ title: t('common.success'), description: t('agreement.claims.saved_reconcile_line'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (reconcileLineModal.isCurrentSession(session)) showError(error)
   } finally {
     reconcileLinePending.end(session)
   }
@@ -1042,7 +1077,9 @@ const refreshReconcileWorkspace = async () => {
 }
 const cancelReconciliation = async () => {
   const reconcile = activeReconcile.value
-  if (!reconcile || !canCancelReconcile.value || isCancellingReconcile.value) return
+  if (!reconcile || isReconcileMutationPending.value || isCancellingReconcile.value
+    || !guardReconcileAction(reconcileWorkflowPrerequisiteWarning.value
+      ?? (!canCancelReconcile.value ? t('agreement.claims.action_unavailable') : undefined))) return
   if (!window.confirm(t('agreement.claims.cancel_reconcile_confirmation'))) return
   try {
     isCancellingReconcile.value = true
@@ -1415,7 +1452,7 @@ const cancelReconciliation = async () => {
                       </div>
                       <div class="flex flex-wrap items-center gap-2">
                         <UButton
-                          v-if="canCancelReconcile"
+                          v-if="canUpdateReconcileRole"
                           color="error"
                           variant="outline"
                           icon="i-lucide-ban"
@@ -1424,7 +1461,7 @@ const cancelReconciliation = async () => {
                           :disabled="isCancellingReconcile"
                           @click="cancelReconciliation" />
                         <CommonSaveButton
-                          v-if="canUpdateReconcile"
+                          v-if="canUpdateReconcileRole"
                           type="button"
                           :label="t('agreement.claims.save_reconcile')"
                           :loading="isSavingReconcile"
@@ -1450,7 +1487,7 @@ const cancelReconciliation = async () => {
                       :total-reconciled="totalReconciled"
                       :total-sampled="totalSampled"
                       edit-mode="action"
-                      @edit="reconcileLineModal.openUpdate" />
+                      @edit="openReconcileLineEditor" />
                   </div>
                 </CommonSection>
 
@@ -1470,6 +1507,8 @@ const cancelReconciliation = async () => {
                       entity-type="fundingclaimreconcile"
                       :entity-id="String(activeReconcile.id)"
                       :is-locked="!canUpdateReconcile" :show-header="false"
+                      :action-role-allowed="canUpdateReconcileRole"
+                      :action-prerequisite-warning="reconcileEditPrerequisiteWarning"
                       title-key="agreement.claims.reconcile_completion.title"
                       description-key="agreement.claims.reconcile_completion.description"
                       status-complete-key="agreement.claims.reconcile_completion.status_complete"
@@ -1487,6 +1526,8 @@ const cancelReconciliation = async () => {
                       :entity-id="String(activeReconcile.id)"
                       purpose="approval_submission"
                       :can-edit="canWorkReconcileWorkflow"
+                      :action-role-allowed="canUpdateReconcileRole"
+                      :action-prerequisite-warning="reconcileWorkflowPrerequisiteWarning"
                       :refresh-key="approvalsRefreshKey"
                       @changed="refreshPage" />
                   </div>

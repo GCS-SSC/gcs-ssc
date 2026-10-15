@@ -9,6 +9,7 @@ import { badRequest } from '~~/server/utils/api-errors'
 import { resolveForecastLineAssignmentTarget } from '~~/server/utils/agreement-assignment-target'
 import {
   assertAgreementForecastBudgetLineItem,
+  assertAgreementForecastCellAvailable,
   assertAgreementForecastEditable,
   executeAgreementForecastMutation,
   prepareAgreementForecastRoute
@@ -21,6 +22,7 @@ type ForecastLineItemExisting = {
   id: string
   egcs_fc_agreementforecast: string
   egcs_fc_fundingagreementbudgetlineitem: string
+  egcs_fc_month: number
   forecast_fiscalyear: string
 }
 
@@ -42,6 +44,7 @@ const loadForecastLineItemForPatch = async (
     .where('Funding_Case_Agreement_Forecast._deleted', '=', false)
     .select([
       'Funding_Case_Agreement_Forecast_Line_Item.id as id',
+      'Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_month as egcs_fc_month',
       'Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_agreementforecast as egcs_fc_agreementforecast',
       'Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_fundingagreementbudgetlineitem as egcs_fc_fundingagreementbudgetlineitem',
       'Funding_Case_Agreement_Forecast.egcs_fc_fiscalyear as forecast_fiscalyear'
@@ -144,6 +147,10 @@ const patchForecastLineItemForRoute = async (
     }
 
     if (patchValues.egcs_fc_currency !== undefined) await assertAgreementCurrency(event, trx, agreementId, patchValues.egcs_fc_currency)
+    await assertAgreementForecastCellAvailable(
+      event, trx, String(patchValues.egcs_fc_agreementforecast ?? existing.egcs_fc_agreementforecast),
+      String(budgetLineItem.id), patchValues.egcs_fc_month ?? existing.egcs_fc_month, lineId
+    )
     const { egcs_fc_amount: patchAmount, egcs_fc_totalamount: patchTotalAmount, egcs_fc_fundingsources: fundingSources, ...nonMoneyPatchValues } = patchValues
     const databasePatchValues = {
       ...nonMoneyPatchValues,

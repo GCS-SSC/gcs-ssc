@@ -61,8 +61,14 @@ const indicatorModal = useCrudModal<TransferPaymentPerformanceIndicatorRow, Indi
 
 const isIndicatorModalOpen: Ref<boolean> = indicatorModal.isOpen
 const selectedIndicator: Ref<IndicatorForm | null> = indicatorModal.selected
-const openCreateIndicator = indicatorModal.openCreate
-const openUpdateIndicator = indicatorModal.openUpdate
+/** Opens a new indicator only while the caller can update the Program. */
+const openCreateIndicator = () => {
+  if (canUpdateChild) indicatorModal.openCreate()
+}
+/** @param row - Indicator selected for editing. */
+const openUpdateIndicator = (row: TransferPaymentPerformanceIndicatorRow) => {
+  if (canUpdateChild) indicatorModal.openUpdate(row)
+}
 const indicatorPending = useCrudModalPending(indicatorModal.captureSession)
 const isSavingIndicator = indicatorPending.isPending
 
@@ -72,13 +78,16 @@ const isSavingIndicator = indicatorPending.isPending
  * Correctly handles the association with an outcome, closes the modal, refreshes data, and provides success feedback.
  */
 const saveIndicator = async () => {
-  if (!selectedIndicator.value || !selectedOutcomeId.value) return
-  const session = indicatorModal.captureSession()
-  if (!indicatorPending.begin(session)) return
+  if (!selectedIndicator.value || !canUpdateChild) return
   const outcomeId = selectedOutcomeId.value === 'all'
     ? selectedIndicator.value.egcs_tp_transferpaymentoutcome
     : selectedOutcomeId.value
-  if (!outcomeId) return
+  if (!outcomeId) {
+    toast.add({ title: t('common.warning'), description: t('validation.outcome_required'), color: 'warning' })
+    return
+  }
+  const session = indicatorModal.captureSession()
+  if (!indicatorPending.begin(session)) return
   try {
     const response = await fetch(getClientRequestUrl(selectedIndicator.value.id
       ? `/api/transfer-payments/${programId}/outcomes/${outcomeId}/performance-indicators/${selectedIndicator.value.id}`
@@ -109,7 +118,7 @@ const saveIndicator = async () => {
  * @param {TransferPaymentPerformanceIndicatorRow} row - The performance indicator record to be deleted.
  */
 const deleteIndicator = async (row: TransferPaymentPerformanceIndicatorRow) => {
-  if (!selectedOutcomeId.value) return
+  if (!canDeleteChild || !selectedOutcomeId.value) return
   const outcomeId = selectedOutcomeId.value === 'all'
     ? row.egcs_tp_transferpaymentoutcome
     : selectedOutcomeId.value

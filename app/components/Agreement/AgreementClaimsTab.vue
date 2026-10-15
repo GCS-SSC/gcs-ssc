@@ -2,11 +2,10 @@
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 /* eslint-disable jsdoc/require-jsdoc */
-import { computed, watch } from 'vue'
+import { onBeforeUnmount, computed, ref, watch } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { useAgreementOverview } from '~/composables/useAgreementOverview'
 import { useGroupedTableExpansion, type GroupedTableRow } from '~/composables/useGroupedTableExpansion'
-import { useDeleteRequestToast } from '~/composables/useDeleteRequestToast'
 import { useJsonRequest } from '~/composables/useJsonRequest'
 import { useBilingualValue } from '~/composables/useBilingualValue'
 import { useTableListState } from '~/composables/useTableListState'
@@ -14,7 +13,8 @@ import { appRouteLocations } from '~/utils/route-locations'
 import type {
   FundingCaseAgreementClaimForm,
   FundingCaseAgreementClaimOverviewRow,
-  FundingCaseAgreementClaimRow
+  FundingCaseAgreementClaimRow,
+  FundingCaseAgreementProfileRow
 } from '~~/shared/types/funding-case-agreement-ui'
 import { FundingCaseAgreementClaimCreateSchema } from '~~/shared/types/schemas'
 import { formatMoneyText, sumMoney, type Money } from '~~/shared/utils/money'
@@ -37,14 +37,23 @@ type FiscalYearLookupItem = {
 const FISCAL_YEAR_GROUP_COLUMN_ID = 'fiscalYearGroup'
 const MONTH_KEYS = ['apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec', 'jan', 'feb', 'mar'] as const
 
-const { agreementId, currency, canCreate, canUpdate, canDelete } = defineProps<{
+const { agreementId, currency, canCreate, canCreateRole = undefined, canUpdate, canDelete } = defineProps<{
   agreementId: string
   currency: string
   canCreate: boolean
+  canCreateRole?: boolean
   canUpdate: boolean
   canDelete: boolean
 }>()
 const agreementIdRef = computed(() => agreementId)
+let recordActionGeneration = 0
+const pendingRecordActions = ref<Map<string, symbol>>(new Map())
+const isOpeningCreate = ref(false)
+
+let disposed = false
+onBeforeUnmount(() => {
+  disposed = true
+})
 
 const { t, locale } = useI18n()
 const { getBilingualValue } = useBilingualValue()
@@ -81,7 +90,12 @@ const claimModal = useCrudModal<FundingCaseAgreementClaimRow, FundingCaseAgreeme
   })
 })
 const claimPending = useCrudModalPending(claimModal.captureSession)
-watch(agreementIdRef, () => claimModal.close(), { flush: 'sync' })
+watch(agreementIdRef, () => {
+  recordActionGeneration += 1
+  pendingRecordActions.value = new Map()
+  isOpeningCreate.value = false
+  claimModal.close()
+}, { flush: 'sync' })
 const isSavingClaim = claimPending.isPending
 
 const selectedClaim = claimModal.selected
@@ -188,16 +202,88 @@ const getGroupedClaimStatuses = (row: ClaimGroupedRow) => [
   ...new Set((row.leafRows ?? row.subRows ?? []).map(item => item.original.egcs_fc_status))
 ]
 
-const getClaimById = (claimId: string) => claims.value.find(claim => String(claim.id) === claimId) ?? null
 const getClaimRoute = (row: ClaimTableRow) => localePath(appRouteLocations.agreementClaimDetail(agreementId, String(row.id)))
 
-const openCreateClaim = () => claimModal.openCreate()
-const openUpdateClaim = (claimId: string) => {
-  const claim = getClaimById(claimId)
-  if (claim) {
-    claimModal.openUpdate(claim)
+const warnRecordPrerequisite = () => toast.add({
+  title: t('common.warning'),
+  description: t('agreement.child_records.work_prerequisite'),
+  color: 'warning'
+})
+const loadWorkableRecord = async (recordId: string, action: 'update' | 'delete'): Promise<FundingCaseAgreementClaimRow | null> => {
+  const owner = agreementId
+  const generation = recordActionGeneration
+  const current = tableRows.value.find(row => String(row.id) === recordId)
+  if (current && !statusCatalog.getById(current.egcs_fc_status)) await statusCatalog.load()
+  if (disposed || owner !== agreementId || generation !== recordActionGeneration) return null
+  if (!current || isRecordLocked(current)) {
+    warnRecordPrerequisite()
+    return null
+  }
+  try {
+    const [parent, overview, roster] = await Promise.all([
+      $fetch<FundingCaseAgreementProfileRow, string>(`/api/agreements/${owner}`),
+      $fetch<{ claims: FundingCaseAgreementClaimRow[] }, string>(`/api/agreements/${owner}/claims-overview`),
+      $fetch<{ is_assigned: boolean }, string>(`/api/entity-assignments/fundingcaseagreementclaim/${recordId}`)
+    ])
+    if (disposed || owner !== agreementId || generation !== recordActionGeneration) return null
+    const record = overview.claims.find(row => String(row.id) === recordId)
+    if (!statusCatalog.getById(parent.egcs_fc_status) || (record && !statusCatalog.getById(record.egcs_fc_status))) await statusCatalog.load()
+    if (disposed || owner !== agreementId || generation !== recordActionGeneration) return null
+    const permitted = action === 'update' ? parent.can_update_child_records_role : parent.can_delete_child_records_role
+    if (permitted !== true || roster.is_assigned !== true || isRecordLocked(parent) || !record || isRecordLocked(record)) {
+      warnRecordPrerequisite()
+      return null
+    }
+    return record
+  } catch {
+    if (!disposed && owner === agreementId && generation === recordActionGeneration) warnRecordPrerequisite()
+    return null
   }
 }
+const runRecordAction = async (recordId: string, action: 'update' | 'delete', work: (record: FundingCaseAgreementClaimRow) => void | Promise<void>) => {
+  if (pendingRecordActions.value.has(recordId)) return
+  const token = Symbol(recordId)
+  pendingRecordActions.value = new Map(pendingRecordActions.value).set(recordId, token)
+  try {
+    const record = await loadWorkableRecord(recordId, action)
+    if (record) await work(record)
+  } finally {
+    if (pendingRecordActions.value.get(recordId) === token) {
+      const remaining = new Map(pendingRecordActions.value)
+      remaining.delete(recordId)
+      pendingRecordActions.value = remaining
+    }
+  }
+}
+
+const checkCreationPrerequisites = async (): Promise<boolean> => {
+  const owner = agreementId
+  const generation = recordActionGeneration
+  try {
+    const parent = await $fetch<FundingCaseAgreementProfileRow, string>(`/api/agreements/${owner}`)
+    if (!statusCatalog.getById(parent.egcs_fc_status)) await statusCatalog.load()
+    if (disposed || owner !== agreementId || generation !== recordActionGeneration) return false
+    if (parent.can_create_child_records_role === true && parent.can_create_child_records === true && !isRecordLocked(parent)) return true
+  } catch {
+    if (disposed || owner !== agreementId || generation !== recordActionGeneration) return false
+  }
+  toast.add({ title: t('common.warning'), description: t('agreement.child_records.create_prerequisite'), color: 'warning' })
+  return false
+}
+const openCreateClaim = async () => {
+  if (isOpeningCreate.value) return
+  isOpeningCreate.value = true
+  const generation = recordActionGeneration
+  try {
+    if (!await checkCreationPrerequisites()) return
+    claimModal.openCreate()
+  } finally {
+    if (generation === recordActionGeneration) isOpeningCreate.value = false
+  }
+}
+const openUpdateClaim = (claimId: string) => runRecordAction(claimId, 'update', claim => {
+  claimModal.openUpdate(claim)
+})
 
 const saveClaim = async () => {
   if (!selectedClaim.value) {
@@ -209,6 +295,9 @@ const saveClaim = async () => {
   if (!claimPending.begin(session)) return
 
   try {
+    if (isUpdate && !await loadWorkableRecord(String(claimState.id), 'update')) return
+    if (!isUpdate && !await checkCreationPrerequisites()) return
+    if (disposed || claimModal.captureSession() !== session) return
     await saveJson(
       isUpdate
         ? `/api/agreements/${agreementId}/claims/${claimState.id}`
@@ -225,19 +314,34 @@ const saveClaim = async () => {
       color: 'success'
     })
   } catch (error: unknown) {
-    showError(error)
+    if (!disposed && isClaimModalOpen.value && claimModal.captureSession() === session) showError(error)
   } finally {
     claimPending.end(session)
   }
 }
 
-const { confirmDeleteWithToast } = useDeleteRequestToast()
-
-const deleteClaim = async (claimId: string) => {
-  await confirmDeleteWithToast(`/api/agreements/${agreementId}/claims/${claimId}`, {
-    refresh: async () => { await refreshOverview() }
-  })
-}
+const { confirmDeleteRequest } = useConfirmDeleteRequest()
+const confirmDelete = useDeleteConfirm()
+const deleteClaim = (recordId: string) => runRecordAction(recordId, 'delete', async () => {
+  const owner = agreementId
+  const generation = recordActionGeneration
+  const shouldProceed = () => !disposed && owner === agreementId && generation === recordActionGeneration
+  try {
+    const deleted = await confirmDeleteRequest(`/api/agreements/${owner}/claims/${recordId}`, {
+      shouldProceed,
+      confirm: async () => {
+        if (!await confirmDelete() || !shouldProceed()) return false
+        return Boolean(await loadWorkableRecord(recordId, 'delete')) && shouldProceed()
+      }
+    })
+    if (!deleted || !shouldProceed()) return
+    await refreshOverview()
+    if (!shouldProceed()) return
+    toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+  } catch (error: unknown) {
+    if (shouldProceed()) showError(error)
+  }
+})
 </script>
 
 <template>
@@ -256,7 +360,8 @@ const deleteClaim = async (claimId: string) => {
       :loading="overviewStatus === 'pending'"
       :request-status="overviewStatus"
       :button-label="t('agreement.claims.add')"
-      :show-button="canCreate"
+      :show-button="canCreateRole ?? canCreate"
+      :button-disabled="isOpeningCreate"
       :search-placeholder="t('agreement.claims.search')"
       @add="openCreateClaim"
       @retry="refreshOverview"
@@ -322,16 +427,18 @@ const deleteClaim = async (claimId: string) => {
       <template #actions-cell="{ row }">
         <div class="flex items-center justify-end gap-2">
           <UButton
-            v-if="!isFiscalYearGroupRow(row as ClaimGroupedRow) && canUpdate && !isRecordLocked(row.original)"
+            v-if="!isFiscalYearGroupRow(row as ClaimGroupedRow) && canUpdate && !row.getIsGrouped?.()"
             icon="i-lucide-pencil"
+            :disabled="pendingRecordActions.has(String(row.original.id))"
             color="neutral"
             variant="ghost"
             class="cursor-default"
             :aria-label="`${t('common.edit')}: ${t('agreement.claims.claim_label', { id: row.original.id })}`"
             @click="openUpdateClaim(String(row.original.id))" />
           <UButton
-            v-if="!isFiscalYearGroupRow(row as ClaimGroupedRow) && canDelete && !isRecordLocked(row.original)"
+            v-if="!isFiscalYearGroupRow(row as ClaimGroupedRow) && canDelete && !row.getIsGrouped?.()"
             icon="i-lucide-trash"
+            :disabled="pendingRecordActions.has(String(row.original.id))"
             color="error"
             variant="ghost"
             class="cursor-default"

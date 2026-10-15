@@ -50,6 +50,9 @@ export interface FundingCaseAgreementProfileRow extends FundingCaseAgreementProf
   risk_source?: AgreementRiskSource
   can_update?: boolean
   can_delete?: boolean
+  can_create_child_records_role?: boolean
+  can_update_child_records_role?: boolean
+  can_delete_child_records_role?: boolean
   can_create_child_records?: boolean
   can_update_child_records?: boolean
   can_delete_child_records?: boolean

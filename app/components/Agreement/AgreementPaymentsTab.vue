@@ -7,7 +7,6 @@ import type { Ref } from 'vue'
 import type { FormError } from '#ui/types'
 import { useWizardFlow } from '~/composables/useWizardFlow'
 import AgreementPaymentFields from '~/components/Agreement/AgreementPaymentFields.vue'
-import { useDeleteRequestToast } from '~/composables/useDeleteRequestToast'
 import { useExtensionCreateActions } from '~/composables/useExtensionCreateActions'
 import { useExtensionPaymentAmountCalculators } from '~/composables/useExtensionPaymentAmountCalculators'
 import { useJsonRequest } from '~/composables/useJsonRequest'
@@ -17,7 +16,9 @@ import { appRouteLocations } from '~/utils/route-locations'
 import type {
   FundingCaseAgreementPaymentForm,
   FundingCaseAgreementPaymentOverviewRow,
-  FundingCaseAgreementPaymentRow
+  FundingCaseAgreementPaymentRow,
+  FundingCaseAgreementProfileRow,
+  FundingCaseAgreementCommitmentRow
 } from '~~/shared/types/funding-case-agreement-ui'
 import { FundingCaseAgreementPaymentCreateSchema } from '~~/shared/types/schemas'
 import { compareMoney, formatMoneyText, parseMoney, type Money } from '~~/shared/utils/money'
@@ -44,14 +45,18 @@ type PaymentCalculatorResult = GcsPaymentAmountCalculatorResult
 const MONTH_KEYS = ['apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec', 'jan', 'feb', 'mar'] as const
 const ZERO_MONEY = parseMoney('0')
 
-const { agreementId, currency: agreementCurrency, canCreate, canUpdate, canDelete } = defineProps<{
+const { agreementId, currency: agreementCurrency, canCreate, canCreateRole = undefined, canUpdate, canDelete } = defineProps<{
   agreementId: string
   currency: Currency_Codes
   canCreate: boolean
+  canCreateRole?: boolean
   canUpdate: boolean
   canDelete: boolean
 }>()
 const agreementIdRef = computed(() => agreementId)
+let recordActionGeneration = 0
+const pendingRecordActions = ref<Map<string, symbol>>(new Map())
+const isOpeningCreate = ref(false)
 
 const { t, locale } = useI18n()
 const statusCatalog = useStatusCatalog()
@@ -65,7 +70,7 @@ const toast = useToast()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
 const { saveJson, sendJson } = useJsonRequest()
-const { isRecordLocked } = useBusinessStatusState()
+const { isRecordLocked, getDefinition, isTerminalStatus } = useBusinessStatusState()
 const {
   appendActions: extensionAppendCreateActions,
   replacementAction: extensionReplacementCreateAction,
@@ -179,6 +184,7 @@ const validatePayment = withFormRequirements(async (state: PaymentWizardForm) =>
 const preparePaymentOffset = async () => {
   if (!selectedPayment.value || isSavingPayment.value || isPaymentAboveCalculatorCeiling.value || paymentCalculatorResult.value?.loading) return false
   const header = paymentHeader()
+  if (!header?.id && !await checkCreationPrerequisites()) return false
   wizardErrors.value = await validatePaymentSchema(header)
   if (wizardErrors.value.length) return false
   const session = paymentModal.captureSession()
@@ -239,8 +245,10 @@ watch(() => paymentModal.captureSession(), () => {
   lastSuggestedPaymentAmount = null
   hasManualPaymentAmount.value = false
 }, { flush: 'sync' })
-const deletingPaymentIds: Ref<Set<string>> = ref(new Set())
 watch(agreementIdRef, () => {
+  recordActionGeneration += 1
+  pendingRecordActions.value = new Map()
+  isOpeningCreate.value = false
   paymentModal.close()
   paymentCalculatorResult.value = null
 }, { flush: 'sync' })
@@ -285,9 +293,92 @@ const formatMoney = (value: Money, currency = 'CAD') => formatMoneyText(value, l
 const getMonthLabel = (month: number) => t(`agreement.payments.months.${MONTH_KEYS[month]}`)
 const getPeriodLabel = (periodStart: number, periodEnd: number) => `${getMonthLabel(periodStart)} - ${getMonthLabel(periodEnd)}`
 
-const openCreatePayment = () => {
-  paymentCalculatorResult.value = null
-  paymentModal.openCreate()
+const warnRecordPrerequisite = () => toast.add({
+  title: t('common.warning'),
+  description: t('agreement.child_records.work_prerequisite'),
+  color: 'warning'
+})
+const loadWorkableRecord = async (recordId: string, action: 'update' | 'delete'): Promise<FundingCaseAgreementPaymentRow | null> => {
+  const owner = agreementId
+  const generation = recordActionGeneration
+  const current = tableRows.value.find(row => String(row.id) === recordId)
+  if (current && !statusCatalog.getById(current.egcs_fc_status)) await statusCatalog.load()
+  if (disposed || owner !== agreementId || generation !== recordActionGeneration) return null
+  if (!current || isRecordLocked(current)) {
+    warnRecordPrerequisite()
+    return null
+  }
+  try {
+    const [parent, overview, roster] = await Promise.all([
+      $fetch<FundingCaseAgreementProfileRow, string>(`/api/agreements/${owner}`),
+      $fetch<{ payments: FundingCaseAgreementPaymentRow[] }, string>(`/api/agreements/${owner}/payments-overview`),
+      $fetch<{ is_assigned: boolean }, string>(`/api/entity-assignments/fundingcasepayment/${recordId}`)
+    ])
+    if (disposed || owner !== agreementId || generation !== recordActionGeneration) return null
+    const record = overview.payments.find(row => String(row.id) === recordId)
+    if (!statusCatalog.getById(parent.egcs_fc_status) || (record && !statusCatalog.getById(record.egcs_fc_status))) await statusCatalog.load()
+    if (disposed || owner !== agreementId || generation !== recordActionGeneration) return null
+    const permitted = action === 'update' ? parent.can_update_child_records_role : parent.can_delete_child_records_role
+    if (permitted !== true || roster.is_assigned !== true || isRecordLocked(parent) || !record || isRecordLocked(record)) {
+      warnRecordPrerequisite()
+      return null
+    }
+    const commitment = await $fetch<FundingCaseAgreementCommitmentRow, string>(`/api/agreements/${owner}/commitments/${record.egcs_fc_fundingagreementcommitment}`)
+    if (disposed || owner !== agreementId || generation !== recordActionGeneration) return null
+    if (!getDefinition(commitment.egcs_fc_status)) await statusCatalog.load()
+    if (disposed || owner !== agreementId || generation !== recordActionGeneration) return null
+    // Commitment completion/read-only activates downstream Payment work; terminal status still blocks.
+    if (!getDefinition(commitment.egcs_fc_status) || isTerminalStatus(commitment.egcs_fc_status)) {
+      warnRecordPrerequisite()
+      return null
+    }
+    return record
+  } catch {
+    if (!disposed && owner === agreementId && generation === recordActionGeneration) warnRecordPrerequisite()
+    return null
+  }
+}
+const runRecordAction = async (recordId: string, action: 'update' | 'delete', work: (record: FundingCaseAgreementPaymentRow) => void | Promise<void>) => {
+  if (pendingRecordActions.value.has(recordId)) return
+  const token = Symbol(recordId)
+  pendingRecordActions.value = new Map(pendingRecordActions.value).set(recordId, token)
+  try {
+    const record = await loadWorkableRecord(recordId, action)
+    if (record) await work(record)
+  } finally {
+    if (pendingRecordActions.value.get(recordId) === token) {
+      const remaining = new Map(pendingRecordActions.value)
+      remaining.delete(recordId)
+      pendingRecordActions.value = remaining
+    }
+  }
+}
+
+const checkCreationPrerequisites = async (): Promise<boolean> => {
+  const owner = agreementId
+  const generation = recordActionGeneration
+  try {
+    const parent = await $fetch<FundingCaseAgreementProfileRow, string>(`/api/agreements/${owner}`)
+    if (!statusCatalog.getById(parent.egcs_fc_status)) await statusCatalog.load()
+    if (disposed || owner !== agreementId || generation !== recordActionGeneration) return false
+    if (parent.can_create_child_records_role === true && parent.can_create_child_records === true && !isRecordLocked(parent)) return true
+  } catch {
+    if (disposed || owner !== agreementId || generation !== recordActionGeneration) return false
+  }
+  toast.add({ title: t('common.warning'), description: t('agreement.child_records.create_prerequisite'), color: 'warning' })
+  return false
+}
+const openCreatePayment = async () => {
+  if (isOpeningCreate.value) return
+  isOpeningCreate.value = true
+  const generation = recordActionGeneration
+  try {
+    if (!await checkCreationPrerequisites()) return
+    paymentCalculatorResult.value = null
+    paymentModal.openCreate()
+  } finally {
+    if (generation === recordActionGeneration) isOpeningCreate.value = false
+  }
 }
 
 const handleExtensionCreated = async () => {
@@ -299,10 +390,10 @@ const handleExtensionCreated = async () => {
   })
 }
 
-const openUpdatePayment = (payment: FundingCaseAgreementPaymentRow) => {
+const openUpdatePayment = (record: FundingCaseAgreementPaymentRow) => runRecordAction(String(record.id), 'update', freshRecord => {
   paymentCalculatorResult.value = null
-  paymentModal.openUpdate(payment)
-}
+  paymentModal.openUpdate(freshRecord)
+})
 
 const paymentCalculatorModel = computed(() => ({
   agreementId,
@@ -412,6 +503,9 @@ const savePayment = async () => {
   if (!paymentPending.begin(session)) return
 
   try {
+    if (isUpdate && !await loadWorkableRecord(String(paymentState.id), 'update')) return
+    if (!isUpdate && !await checkCreationPrerequisites()) return
+    if (disposed || paymentModal.captureSession() !== session) return
     await saveJson(
       isUpdate
         ? `/api/agreements/${agreementId}/payments/${paymentState.id}`
@@ -435,21 +529,28 @@ const savePayment = async () => {
   }
 }
 
-const { confirmDeleteWithToast } = useDeleteRequestToast()
-
-const deletePayment = async (paymentId: string) => {
-  if (deletingPaymentIds.value.has(paymentId)) return
-  deletingPaymentIds.value = new Set(deletingPaymentIds.value).add(paymentId)
+const { confirmDeleteRequest } = useConfirmDeleteRequest()
+const confirmDelete = useDeleteConfirm()
+const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', async () => {
+  const owner = agreementId
+  const generation = recordActionGeneration
+  const shouldProceed = () => !disposed && owner === agreementId && generation === recordActionGeneration
   try {
-    await confirmDeleteWithToast(`/api/agreements/${agreementId}/payments/${paymentId}`, {
-      refresh: refreshOverview
+    const deleted = await confirmDeleteRequest(`/api/agreements/${owner}/payments/${recordId}`, {
+      shouldProceed,
+      confirm: async () => {
+        if (!await confirmDelete() || !shouldProceed()) return false
+        return Boolean(await loadWorkableRecord(recordId, 'delete')) && shouldProceed()
+      }
     })
-  } finally {
-    const next = new Set(deletingPaymentIds.value)
-    next.delete(paymentId)
-    deletingPaymentIds.value = next
+    if (!deleted || !shouldProceed()) return
+    await refreshOverview()
+    if (!shouldProceed()) return
+    toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+  } catch (error: unknown) {
+    if (shouldProceed()) showError(error)
   }
-}
+})
 </script>
 
 <template>
@@ -465,7 +566,8 @@ const deletePayment = async (paymentId: string) => {
       table-class="w-full max-w-full"
       :ui="{ base: 'w-full min-w-[56rem] table-fixed', th: 'whitespace-normal', td: 'whitespace-normal' }"
       :button-label="t('agreement.payments.add')"
-      :show-button="canCreate && !hasExtensionCreateReplacement && !hasExtensionCreateConflict && !hasPaymentAmountCalculatorConflict"
+      :show-button="(canCreateRole ?? canCreate) && (!canCreate || (!hasExtensionCreateReplacement && !hasExtensionCreateConflict && !hasPaymentAmountCalculatorConflict))"
+      :button-disabled="isOpeningCreate"
       :search-placeholder="t('agreement.payments.search')"
       @add="openCreatePayment"
       @retry="refreshOverview">
@@ -582,22 +684,23 @@ const deletePayment = async (paymentId: string) => {
             :aria-label="t('common.view_details')"
             :to="localePath(appRouteLocations.agreementPaymentDetail(agreementId, String(row.original.id)))" />
           <UButton
-            v-if="canUpdate && !isRecordLocked(row.original)"
+            v-if="canUpdate && !row.getIsGrouped?.()"
             icon="i-lucide-pencil"
+            :disabled="pendingRecordActions.has(String(row.original.id))"
             color="neutral"
             variant="ghost"
             class="cursor-default"
             :aria-label="t('common.edit')"
             @click="openUpdatePayment(row.original)" />
           <UButton
-            v-if="canDelete && !isRecordLocked(row.original)"
+            v-if="canDelete && !row.getIsGrouped?.()"
             icon="i-lucide-trash"
+            :disabled="pendingRecordActions.has(String(row.original.id))"
             color="error"
             variant="ghost"
             class="cursor-default"
             :aria-label="t('common.delete')"
-            :loading="deletingPaymentIds.has(String(row.original.id))"
-            :disabled="deletingPaymentIds.has(String(row.original.id))"
+            :loading="pendingRecordActions.has(String(row.original.id))"
             @click="deletePayment(String(row.original.id))" />
         </div>
       </template>

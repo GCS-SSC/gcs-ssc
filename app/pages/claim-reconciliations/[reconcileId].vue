@@ -2,7 +2,7 @@
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import CommonCompletionSection from '~/components/Common/Completions/Section.vue'
 /* eslint-disable jsdoc/require-jsdoc -- concise page-local interaction handlers are self-documenting */
-import { computed, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import { appRouteLocations, authorizedRouteLocation } from '~/utils/route-locations'
 import type { BusinessRecordStateFields } from '~~/shared/types/business-record-state'
@@ -40,6 +40,7 @@ type ReconciliationDetail = {
   }
   lines: ReconciliationLine[]
   can_read: boolean
+  can_update_role: boolean
   can_update: boolean
   can_cancel: boolean
   can_read_agreement: boolean
@@ -60,6 +61,7 @@ const mutateReconciliation = $fetch as unknown as (
 ) => Promise<unknown>
 
 definePageMeta({
+  key: route => route.path,
   i18n: {
     paths: {
       en: '/claim-reconciliations/[reconcileId]',
@@ -95,6 +97,29 @@ const isCancelling: Ref<boolean> = ref(false)
 const isRetryingLoad: Ref<boolean> = ref(false)
 const { recoveryFocusTarget, focusRecoveredContent } = useLoadRecoveryFocus()
 const approvalsRefreshKey: Ref<number> = ref(0)
+let isDisposed = false
+onScopeDispose(() => {
+  isDisposed = true
+})
+const isCurrentPage = () => !isDisposed && String(route.params.reconcileId) === reconcileId
+  && data.value?.reconciliation.id === reconcileId
+const canUpdateRole = computed(() => data.value?.can_update_role === true)
+const isMutationPending = computed(() => isSaving.value || isSavingFinal.value || isCancelling.value)
+const workflowPrerequisiteWarning = computed(() => {
+  if (!data.value?.is_assigned) return t('assignments.read_only_description')
+  if (!data.value.can_cancel) return t('agreement.claims.action_unavailable')
+  return undefined
+})
+const editPrerequisiteWarning = computed(() => workflowPrerequisiteWarning.value
+  ?? (!data.value?.can_update ? t('agreement.claims.action_unavailable') : undefined))
+const guardAction = (warning: string | undefined): boolean => {
+  if (!isCurrentPage() || status.value !== 'success') return false
+  if (!canUpdateRole.value || warning) {
+    toast.add({ title: t('common.warning'), description: warning ?? t('agreement.claims.action_unavailable'), color: 'warning' })
+    return false
+  }
+  return true
+}
 
 const tabs = [
   { key: 'agreement.claims.reconcile_selected_title', value: 'reconciliation', icon: 'i-lucide-list-checks' },
@@ -112,21 +137,31 @@ const retryLoad = async () => {
   isRetryingLoad.value = true
   try {
     await refresh()
-    if (data.value) await focusRecoveredContent()
+    if (isCurrentPage()) await focusRecoveredContent()
   } finally {
     isRetryingLoad.value = false
   }
 }
 
-watch(() => data.value?.lines, lines => {
-  drafts.value = Object.fromEntries((lines ?? []).map(line => [
-    line.claim_line_id,
-    {
-      reconciled: line.egcs_fc_reconciled ?? '0.00',
-      sampled: line.egcs_fc_sampled,
-      rationale: line.egcs_fc_rationale ?? ''
-    }
-  ]))
+watch([() => data.value?.lines, () => data.value?.reconciliation.isCompleted], ([lines, isCompleted], [previousLines]) => {
+  const previousById = new Map((previousLines ?? []).map(line => [line.claim_line_id, line]))
+  drafts.value = Object.fromEntries((lines ?? []).map(line => {
+    const previous = previousById.get(line.claim_line_id)
+    const draft = drafts.value[line.claim_line_id]
+    const hasUnsavedChanges = !isCompleted && previous && draft && (
+      draft.reconciled !== (previous.egcs_fc_reconciled ?? '0.00')
+      || draft.sampled !== previous.egcs_fc_sampled
+      || draft.rationale !== (previous.egcs_fc_rationale ?? '')
+    )
+    const nextDraft = hasUnsavedChanges
+      ? draft
+      : {
+          reconciled: line.egcs_fc_reconciled ?? '0.00',
+          sampled: line.egcs_fc_sampled,
+          rationale: line.egcs_fc_rationale ?? ''
+        }
+    return [line.claim_line_id, nextDraft]
+  }))
 }, { immediate: true })
 
 const breadcrumbItems = computed(() => {
@@ -187,7 +222,8 @@ const reconciliationTableLines = computed<AgreementClaimReconciliationTableLine[
     ? drafts.value[line.claim_line_id]?.sampled ?? null
     : line.egcs_fc_sampled,
   rationale: drafts.value[line.claim_line_id]?.rationale ?? line.egcs_fc_rationale ?? '',
-  editable: data.value?.can_update === true && Boolean(drafts.value[line.claim_line_id])
+  editable: data.value?.can_update === true && !data.value.reconciliation.isCompleted
+    && Boolean(drafts.value[line.claim_line_id])
 })))
 const updateDraftReconciled = (id: string, value: string | null | undefined) => {
   const draft = drafts.value[id]
@@ -203,26 +239,28 @@ const updateDraftRationale = (id: string, value: string) => {
 }
 
 const saveFinalState = async (value: boolean | 'indeterminate') => {
-  if (value === 'indeterminate' || data.value?.can_update !== true || isSavingFinal.value) return
+  if (value === 'indeterminate' || isMutationPending.value || !guardAction(editPrerequisiteWarning.value)) return
   isSavingFinal.value = true
   try {
     const draftsSaved = await saveLines(false, value)
-    if (!draftsSaved) return
+    if (!draftsSaved || !isCurrentPage()) return
     await refresh()
+    if (!isCurrentPage()) return
     toast.add({
       title: t('common.success'),
       description: t('agreement.claims.final_reconcile_saved'),
       color: 'success'
     })
   } catch (caughtError: unknown) {
-    showError(caughtError)
+    if (isCurrentPage()) showError(caughtError)
   } finally {
     isSavingFinal.value = false
   }
 }
 
 const saveLines = async (showSuccess = true, desiredIsFinal?: boolean): Promise<boolean> => {
-  if (data.value?.can_update !== true || isSaving.value) return false
+  if (!data.value || isSaving.value || isCancelling.value || (isSavingFinal.value && desiredIsFinal === undefined)
+    || !guardAction(editPrerequisiteWarning.value)) return false
   isSaving.value = true
   try {
     const validatedLines = data.value.lines.map(line => {
@@ -248,7 +286,9 @@ const saveLines = async (showSuccess = true, desiredIsFinal?: boolean): Promise<
         ...(desiredIsFinal === undefined ? {} : { egcs_fc_isfinal: desiredIsFinal })
       }
     })
+    if (!isCurrentPage()) return false
     await refresh()
+    if (!isCurrentPage()) return false
     if (showSuccess) {
       toast.add({
         title: t('common.success'),
@@ -258,7 +298,7 @@ const saveLines = async (showSuccess = true, desiredIsFinal?: boolean): Promise<
     }
     return true
   } catch (caughtError: unknown) {
-    showError(caughtError)
+    if (isCurrentPage()) showError(caughtError)
     return false
   } finally {
     isSaving.value = false
@@ -266,26 +306,30 @@ const saveLines = async (showSuccess = true, desiredIsFinal?: boolean): Promise<
 }
 
 const handleRuntimeChanged = async () => {
+  if (!isCurrentPage()) return
   await refresh()
+  if (!isCurrentPage()) return
   approvalsRefreshKey.value += 1
 }
 
 const cancelReconciliation = async () => {
-  if (data.value?.can_cancel !== true || isCancelling.value) return
+  if (!data.value || isMutationPending.value || !guardAction(workflowPrerequisiteWarning.value)) return
   if (!window.confirm(t('agreement.claims.cancel_reconcile_confirmation'))) return
   try {
     isCancelling.value = true
     await mutateReconciliation(`/api/agreements/${data.value.reconciliation.agreement_id}/claim-reconciles/${reconcileId}/cancel`, {
       method: 'POST'
     })
+    if (!isCurrentPage()) return
     await handleRuntimeChanged()
+    if (!isCurrentPage()) return
     toast.add({
       title: t('common.success'),
       description: t('agreement.claims.cancel_reconcile_success'),
       color: 'success'
     })
   } catch (caughtError: unknown) {
-    showError(caughtError)
+    if (isCurrentPage()) showError(caughtError)
   } finally {
     isCancelling.value = false
   }
@@ -329,23 +373,23 @@ const cancelReconciliation = async () => {
                   :model-value="data.reconciliation.egcs_fc_isfinal"
                   :label="t('agreement.claims.mark_reconcile_final')"
                   :description="t('agreement.claims.mark_reconcile_final_description')"
-                  :disabled="!data.can_update || isSavingFinal"
+                  :disabled="!canUpdateRole || status !== 'success' || isMutationPending"
                   @update:model-value="saveFinalState" />
                 <CommonSaveButton
-                  v-if="data.can_update"
+                  v-if="canUpdateRole"
                   type="button"
                   :label="t('agreement.claims.save_reconcile')"
                   :loading="isSaving"
-                  :disabled="isSaving"
+                  :disabled="status !== 'success' || isMutationPending"
                   @click="saveLines" />
                 <UButton
-                  v-if="data.can_cancel"
+                  v-if="canUpdateRole"
                   color="error"
                   variant="outline"
                   icon="i-lucide-ban"
                   :label="t('agreement.claims.cancel_reconcile')"
                   :loading="isCancelling"
-                  :disabled="isCancelling"
+                  :disabled="status !== 'success' || isMutationPending"
                   @click="cancelReconciliation" />
               </div>
 
@@ -362,11 +406,13 @@ const cancelReconciliation = async () => {
           </CommonSection>
 
           <CommonSection v-else-if="selectedTab === 'completion'" :show-header="false" :title="t('agreement.claims.reconcile_completion.title')" :grid-cols="1">
-            <div class="space-y-8">
+            <fieldset :disabled="status !== 'success' || isMutationPending" class="space-y-8">
               <CommonCompletionSection
                 entity-type="fundingclaimreconcile"
                 :entity-id="reconcileId"
-                :is-locked="!data.can_update" :show-header="false"
+                :is-locked="!data.can_update || status !== 'success'" :show-header="false"
+                :action-role-allowed="canUpdateRole"
+                :action-prerequisite-warning="editPrerequisiteWarning"
                 title-key="agreement.claims.reconcile_completion.title"
                 description-key="agreement.claims.reconcile_completion.description"
                 status-complete-key="agreement.claims.reconcile_completion.status_complete"
@@ -381,10 +427,12 @@ const cancelReconciliation = async () => {
                 :entity-id="reconcileId"
                 purpose="approval_submission"
                 hide-when-unconfigured
-                :can-edit="data.is_assigned"
+                :can-edit="canUpdateRole && data.is_assigned && status === 'success'"
+                :action-role-allowed="canUpdateRole"
+                :action-prerequisite-warning="workflowPrerequisiteWarning"
                 :refresh-key="approvalsRefreshKey"
                 @changed="handleRuntimeChanged" />
-            </div>
+            </fieldset>
           </CommonSection>
 
           <CommonReviewsTab
@@ -394,7 +442,17 @@ const cancelReconciliation = async () => {
             :can-update="data.can_update"
             @changed="handleRuntimeChanged" />
 
-          <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingclaimreconcile" :entity-id="reconcileId" purpose="standard" :can-edit="data.is_assigned" :refresh-key="approvalsRefreshKey" @changed="handleRuntimeChanged" />
+          <fieldset v-else-if="selectedTab === 'workflows'" :disabled="status !== 'success' || isMutationPending">
+            <CommonWorkflowSection
+              entity-type="fundingclaimreconcile"
+              :entity-id="reconcileId"
+              purpose="standard"
+              :can-edit="canUpdateRole && data.is_assigned && status === 'success'"
+              :action-role-allowed="canUpdateRole"
+              :action-prerequisite-warning="workflowPrerequisiteWarning"
+              :refresh-key="approvalsRefreshKey"
+              @changed="handleRuntimeChanged" />
+          </fieldset>
           <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" :show-header="false" entity-type="fundingclaimreconcile" :entity-id="reconcileId" />
           <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingclaimreconcile" :entity-id="reconcileId" />
           <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" :show-header="false" entity-type="fundingclaimreconcile" :entity-id="reconcileId" />

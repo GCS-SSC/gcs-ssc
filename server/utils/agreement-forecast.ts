@@ -1,19 +1,26 @@
 /* eslint-disable jsdoc/require-jsdoc -- Existing exported forecast helpers are intentionally documented by their descriptive names. */
 import { getRouterParam, type H3Event } from 'h3'
 import type { Kysely, Transaction } from 'kysely'
-import { badRequest } from '~~/server/utils/api-errors'
+import { badRequest, throwApiError } from '~~/server/utils/api-errors'
 import { authorizeAgreementResource, type AgreementScopeContext } from '~~/server/utils/agreement'
 import { lockAgreementAggregate, lockAgreementAggregates, type AgreementAggregateLock } from '~~/server/utils/agreement-aggregate-lock'
 import { assertAgreementExists } from '~~/server/utils/agreement-child-resources'
 import type { AssignableEntityType, Database } from '~~/shared/types/database'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
 import { authorizeFreshAssignedItem } from '~~/server/utils/authorize'
-import { budgetFiscalYearStableId, readAgreementBudgetLineReference } from '~~/server/utils/agreement-budget-lineage'
+import { budgetFiscalYearStableId, budgetLineItemStableId, readAgreementBudgetLineReference } from '~~/server/utils/agreement-budget-lineage'
 import type { ExactEntityTarget } from '@gcs-ssc/authorization'
 import { assertBusinessStatusMutationAllowed, resolveBusinessStatusProtection } from '~~/server/utils/business-status-runtime'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+import { getDatabaseConstraintName } from '~~/server/utils/database-constraint-errors'
 
 type AgreementForecastDb = Kysely<Database> | Transaction<Database>
+
+const throwForecastCellOccupied = async (event: H3Event): Promise<never> => await throwApiError(event, {
+  statusCode: 409,
+  code: 'AGREEMENT_FORECAST_CELL_OCCUPIED',
+  key: 'apiErrors.agreement.forecast_cell_occupied'
+})
 
 export const lockAgreementForecastCohort = async (
   trx: Transaction<Database>,
@@ -180,7 +187,14 @@ export const executeAgreementForecastMutation = async <T>(
         }
       }
     }
-  )
+  ).catch(async (error: unknown) => {
+    // Map the backstop only after the transaction has rolled back.
+    if (error && typeof error === 'object' && 'code' in error && error.code === '23505'
+      && getDatabaseConstraintName(error) === 'fc_uq_forecast_line_cell_active') {
+      return await throwForecastCellOccupied(event)
+    }
+    throw error
+  })
 }
 
 export const assertAgreementForecastBudgetLineItem = async (
@@ -203,6 +217,42 @@ export const assertAgreementForecastBudgetLineItem = async (
   }
 
   return lineItem
+}
+
+/**
+ * Checks a monthly cell after fresh authorization and the Agreement write lock.
+ * @param event Current request for localized conflict errors.
+ * @param trx Authorized transaction holding the Agreement write lock.
+ * @param forecastId Forecast containing the destination cell.
+ * @param budgetLineItemId Physical budget line resolved to its stable identity.
+ * @param month Destination month.
+ * @param existingLineId Existing row excluded when editing its own cell.
+ */
+export const assertAgreementForecastCellAvailable = async (
+  event: H3Event,
+  trx: Transaction<Database>,
+  forecastId: string,
+  budgetLineItemId: string,
+  month: number,
+  existingLineId?: string
+): Promise<void> => {
+  const budgetLine = await trx.selectFrom('Funding_Case_Agreement_Budget_Line_Item')
+    .select(budgetLineItemStableId.as('id'))
+    .where('id', '=', budgetLineItemId)
+    .executeTakeFirstOrThrow()
+  let query = trx.selectFrom('Funding_Case_Agreement_Forecast_Line_Item')
+    .innerJoin('Funding_Case_Agreement_Budget_Line_Item',
+      'Funding_Case_Agreement_Budget_Line_Item.id',
+      'Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_fundingagreementbudgetlineitem')
+    .select('Funding_Case_Agreement_Forecast_Line_Item.id')
+    .where('Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_agreementforecast', '=', forecastId)
+    .where('Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_month', '=', month)
+    .where('Funding_Case_Agreement_Forecast_Line_Item._deleted', '=', false)
+    .where(budgetLineItemStableId, '=', String(budgetLine.id))
+  if (existingLineId !== undefined) query = query.where('Funding_Case_Agreement_Forecast_Line_Item.id', '!=', existingLineId)
+  if (await query.executeTakeFirst()) {
+    await throwForecastCellOccupied(event)
+  }
 }
 
 export type AgreementForecastRuntimeContext = {

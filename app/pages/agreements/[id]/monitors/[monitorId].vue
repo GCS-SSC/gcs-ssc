@@ -89,8 +89,13 @@ const {
   monitorId
 })
 const monitorMetadata: Ref<FundingCaseAgreementMonitorForm | null> = ref(null)
-const isSavingMonitorMetadata: Ref<boolean> = ref(false)
 const isMetadataModalOpen: Ref<boolean> = ref(false)
+const metadataSession: Ref<number> = ref(0)
+const pendingMetadataSessions = shallowReactive(new Set<number>())
+const isSavingMonitorMetadata = computed(() => pendingMetadataSessions.has(metadataSession.value))
+watch(isMetadataModalOpen, () => {
+  metadataSession.value += 1
+}, { flush: 'sync' })
 const approvalsRefreshKey: Ref<number> = ref(0)
 
 const {
@@ -307,6 +312,7 @@ watch(
 )
 
 watchEffect(() => {
+  if (isMetadataModalOpen.value) return
   if (!monitor.value) {
     monitorMetadata.value = null
     return
@@ -355,11 +361,12 @@ const saveResource = async <T extends { id?: string | number }>(
       request.method,
       resourceState
     )
-    modal.closeSession(session)
+    if (modal.captureSession() !== session) return
     await refreshMonitor()
+    if (!modal.closeSession(session)) return
     toast.add({ title: t('common.success'), description: isUpdate ? t('common.updated_success') : t('common.added_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (modal.captureSession() === session) showError(error)
   } finally {
     pendingResourceSessions.delete(pendingKey)
   }
@@ -384,16 +391,19 @@ const saveMonitorMetadata = async () => {
     return
   }
 
+  const session = metadataSession.value
+  pendingMetadataSessions.add(session)
   try {
-    isSavingMonitorMetadata.value = true
     await saveJson(`/api/agreements/${agreementId}/monitors/${monitorId}`, 'PATCH', monitorMetadata.value)
+    if (metadataSession.value !== session) return
     await refreshMonitor()
+    if (metadataSession.value !== session) return
     isMetadataModalOpen.value = false
     toast.add({ title: t('common.success'), description: t('common.updated_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (metadataSession.value === session) showError(error)
   } finally {
-    isSavingMonitorMetadata.value = false
+    pendingMetadataSessions.delete(session)
   }
 }
 
@@ -745,7 +755,7 @@ const handleCompleted = async () => {
           <div class="space-y-4">
             <UFormField :label="t('agreement.monitors.type')" name="egcs_fc_type">
               <CommonServerLookupSelect
-                v-if="canUpdateMonitor"
+                v-if="canUpdateMonitorRole && !monitor.isCompleted"
                 v-model="monitorMetadata.egcs_fc_type"
                 :fetch-url="`/api/agreements/${agreementId}/monitors/lookups/monitor-types`"
                 :query="{ permission_action: 'update', monitorId }"
@@ -760,7 +770,7 @@ const handleCompleted = async () => {
             </UFormField>
             <UFormField :label="t('agreement.monitors.tentative_fiscal_year')" name="egcs_fc_tentativefiscalyear">
               <CommonServerLookupSelect
-                v-if="canUpdateMonitor"
+                v-if="canUpdateMonitorRole && !monitor.isCompleted"
                 v-model="monitorMetadata.egcs_fc_tentativefiscalyear"
                 :fetch-url="`/api/agreements/${agreementId}/monitors/lookups/fiscal-years`"
                 :query="{ permission_action: 'update', monitorId }"
@@ -774,13 +784,13 @@ const handleCompleted = async () => {
               </p>
             </UFormField>
             <UFormField :label="t('agreement.monitors.tentative_quarter')" name="egcs_fc_tentativequarter">
-              <UInputNumber v-if="canUpdateMonitor" v-model="monitorMetadata.egcs_fc_tentativequarter" :min="1" :max="4" class="w-full" />
+              <UInputNumber v-if="canUpdateMonitorRole && !monitor.isCompleted" v-model="monitorMetadata.egcs_fc_tentativequarter" :min="1" :max="4" class="w-full" />
               <p v-else data-testid="monitor-quarter-readonly" class="text-sm text-default">
                 {{ monitor.egcs_fc_tentativequarter }}
               </p>
             </UFormField>
             <UFormField :label="t('agreement.monitors.onsite')" name="egcs_fc_onsite">
-              <USwitch v-if="canUpdateMonitor" v-model="monitorMetadata.egcs_fc_onsite" />
+              <USwitch v-if="canUpdateMonitorRole && !monitor.isCompleted" v-model="monitorMetadata.egcs_fc_onsite" />
               <p v-else data-testid="monitor-onsite-readonly" class="text-sm text-default">
                 {{ t(monitor.egcs_fc_onsite ? 'common.yes' : 'common.no') }}
               </p>
@@ -789,7 +799,7 @@ const handleCompleted = async () => {
           <div class="flex justify-end gap-2">
             <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isMetadataModalOpen = false" />
             <CommonSaveButton
-              v-if="canUpdateMonitor"
+              v-if="canUpdateMonitorRole && !monitor.isCompleted"
               :label="t('common.save')"
               :loading="isSavingMonitorMetadata"
               :disabled="isLoadingDetail || isSavingMonitorMetadata" />

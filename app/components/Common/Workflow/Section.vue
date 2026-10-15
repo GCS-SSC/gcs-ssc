@@ -189,6 +189,8 @@ const runtimeIdentity = computed(() => `${entityType}:${entityId}:${purpose}`)
 let runtimeIdentityGeneration = 0
 watch(runtimeIdentity, () => {
   runtimeIdentityGeneration += 1
+  availableWorkflowsRequestGeneration += 1
+  isLoadingAvailable.value = false
   data.value = undefined
   responses.value = []
   validationIssues.value = []
@@ -558,6 +560,7 @@ const start = async () => {
     if (!isCurrentRuntimeIdentity(generation)) return
     isChooserOpen.value = false
     await refresh()
+    if (!isCurrentRuntimeIdentity(generation)) return
     emit('changed')
   } catch (error) {
     if (isCurrentRuntimeIdentity(generation)) showError(error)
@@ -578,6 +581,7 @@ const retry = async () => {
     if (!response.ok) await throwFetchResponseError(response)
     if (!isCurrentRuntimeIdentity(generation)) return
     await refresh()
+    if (!isCurrentRuntimeIdentity(generation)) return
     activeWorkflowTab.value = 'current'
     emit('changed')
   } catch (error) {
@@ -599,6 +603,7 @@ const cancel = async () => {
     if (!response.ok) await throwFetchResponseError(response)
     if (!isCurrentRuntimeIdentity(generation)) return
     await refresh()
+    if (!isCurrentRuntimeIdentity(generation)) return
     emit('changed')
   } catch (error) {
     if (isCurrentRuntimeIdentity(generation)) showError(error)
@@ -623,6 +628,7 @@ const resume = async () => {
     if (!response.ok) await throwFetchResponseError(response)
     if (!isCurrentRuntimeIdentity(generation)) return
     await refresh()
+    if (!isCurrentRuntimeIdentity(generation)) return
     emit('changed')
   } catch (error) {
     if (isCurrentRuntimeIdentity(generation)) showError(error)
@@ -648,10 +654,12 @@ const persist = async (submit: boolean) => {
     if (!response.ok) await throwFetchResponseError(response)
     if (!isCurrentRuntimeIdentity(generation)) return
     await refresh()
+    if (!isCurrentRuntimeIdentity(generation)) return
     emit('changed')
   } catch (error) {
     if (isCurrentRuntimeIdentity(generation)) {
       if (error instanceof AppFetchResponseError && error.response.status === 409) await refresh()
+      if (!isCurrentRuntimeIdentity(generation)) return
       showError(error)
     }
   } finally {
@@ -659,7 +667,9 @@ const persist = async (submit: boolean) => {
   }
 }
 const handleApprovalChanged = async () => {
+  const generation = captureRuntimeIdentity()
   await refresh()
+  if (!isCurrentRuntimeIdentity(generation)) return
   emit('changed')
 }
 </script>

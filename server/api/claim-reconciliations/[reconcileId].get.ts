@@ -9,6 +9,7 @@ import {
 } from '~~/server/utils/entity-assignment'
 import { resolveAssignedItemGrant } from '~~/server/utils/rbac'
 import { withBusinessRecordState } from '~~/server/utils/business-record-state'
+import { isBusinessStatusLineageLocked, resolveBusinessStatusProtection } from '~~/server/utils/business-status-runtime'
 import { sql } from 'kysely'
 import { budgetLineItemStableId } from '~~/server/utils/agreement-budget-lineage'
 import { canAccessAgreement, resolveAgreementScopeContext } from '~~/server/utils/agreement'
@@ -87,14 +88,17 @@ export default defineEventHandler(async event => {
     .orderBy('Funding_Case_Agreement_Claim_Line_Item.id')
     .execute()
   const grant = await resolveAssignedItemGrant(actor.auth.userId, 'fundingclaimreconcile', reconcileId, event.context.$db)
-  const owner = grant
-    ? await resolveEntityAssignmentOwner(event.context.$db, 'fundingclaimreconcile', reconcileId)
-    : null
+  const owner = await resolveEntityAssignmentOwner(event.context.$db, 'fundingclaimreconcile', reconcileId)
   const hasUpdateRole = owner
     ? await canAccessEntityAssignmentOwner(actor.auth, owner, 'update', event.context.$db)
     : false
-  const canUpdate = grant?.actions.has('update') === true
-    && hasUpdateRole
+  const [lineageLocked, agreementProtection] = await Promise.all([
+    isBusinessStatusLineageLocked(event.context.$db, 'fundingclaimreconcile', reconcileId),
+    resolveBusinessStatusProtection(event.context.$db, 'fundingcaseagreement', String(reconciliation.agreement_id))
+  ])
+  const canWork = grant?.actions.has('update') === true && hasUpdateRole && !lineageLocked
+  const canUpdate = canWork
+    && agreementProtection?.locked === false
     && await isEntityAssignmentRosterWorkable(event.context.$db, 'fundingclaimreconcile', reconcileId)
   const agreementScope = await resolveAgreementScopeContext(String(reconciliation.agreement_id), event.context.$db)
   const canReadAgreement = agreementScope
@@ -114,8 +118,9 @@ export default defineEventHandler(async event => {
       egcs_fc_sampled: line.egcs_fc_sampled == null ? line.egcs_fc_sampled : parseDatabaseMoney(line.egcs_fc_sampled)
     })),
     can_read: true,
+    can_update_role: hasUpdateRole,
     can_update: canUpdate,
-    can_cancel: grant?.actions.has('update') === true && hasUpdateRole && reconciliation.egcs_fc_isopen,
+    can_cancel: canWork && reconciliation.egcs_fc_isopen,
     can_read_agreement: canReadAgreement,
     can_read_claim: canReadClaim,
     can_manage_assignments: await canManageEntityAssignments(event, 'fundingclaimreconcile', reconcileId),

@@ -891,7 +891,7 @@ CREATE TABLE "Funding_Case_Agreement_Forecast_Line_Item" (
   CONSTRAINT "fc_chk_forecastlineitemmonth" CHECK (((egcs_fc_month >= 0) AND (egcs_fc_month <= 11)))
 );
 
-CREATE INDEX fc_idx_forecastlineitem ON "Funding_Case_Agreement_Forecast_Line_Item" USING btree (egcs_fc_agreementforecast, egcs_fc_fundingagreementbudgetlineitem) WHERE (_deleted = false);
+CREATE UNIQUE INDEX fc_uq_forecast_line_cell_active ON "Funding_Case_Agreement_Forecast_Line_Item" USING btree (egcs_fc_agreementforecast, egcs_fc_fundingagreementbudgetlineitem, egcs_fc_month) WHERE (_deleted = false);
 
 CREATE TABLE "Funding_Case_Agreement_Forecast_Line_Item_Funding" (
   "id" bigint DEFAULT nextval('"Funding_Case_Agreement_Forecast_Line_Item_Funding_id_seq"'::regclass) NOT NULL,

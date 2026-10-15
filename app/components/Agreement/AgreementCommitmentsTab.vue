@@ -2,17 +2,17 @@
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 /* eslint-disable jsdoc/require-jsdoc */
-import { computed, ref, watch } from 'vue'
+import { onBeforeUnmount, computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import { useExtensionCreateActions } from '~/composables/useExtensionCreateActions'
-import { useDeleteRequestToast } from '~/composables/useDeleteRequestToast'
 import { useJsonRequest } from '~/composables/useJsonRequest'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { appRouteLocations } from '~/utils/route-locations'
 import type {
   FundingCaseAgreementCommitmentForm,
   FundingCaseAgreementCommitmentOverviewRow,
-  FundingCaseAgreementCommitmentRow
+  FundingCaseAgreementCommitmentRow,
+  FundingCaseAgreementProfileRow
 } from '~~/shared/types/funding-case-agreement-ui'
 import { FundingCaseAgreementCommitmentCreateSchema } from '~~/shared/types/schemas'
 import { formatMoneyText, type Money } from '~~/shared/utils/money'
@@ -23,14 +23,23 @@ type CommitmentTableRow = FundingCaseAgreementCommitmentRow & {
   total_amount: Money
 }
 
-const { agreementId, currency: agreementCurrency, canCreate, canUpdate, canDelete } = defineProps<{
+const { agreementId, currency: agreementCurrency, canCreate, canCreateRole = undefined, canUpdate, canDelete } = defineProps<{
   agreementId: string
   currency: Currency_Codes
   canCreate: boolean
+  canCreateRole?: boolean
   canUpdate: boolean
   canDelete: boolean
 }>()
 const agreementIdRef = computed(() => agreementId)
+let recordActionGeneration = 0
+const pendingRecordActions = ref<Map<string, symbol>>(new Map())
+const isOpeningCreate = ref(false)
+
+let disposed = false
+onBeforeUnmount(() => {
+  disposed = true
+})
 
 const { t, locale } = useI18n()
 const statusCatalog = useStatusCatalog()
@@ -80,7 +89,12 @@ const isCommitmentModalOpen = commitmentModal.isOpen
 const validateCommitment = createValidator(FundingCaseAgreementCommitmentCreateSchema)
 const commitmentPending = useCrudModalPending(commitmentModal.captureSession)
 const isSavingCommitment = commitmentPending.isPending
-watch(agreementIdRef, () => commitmentModal.close(), { flush: 'sync' })
+watch(agreementIdRef, () => {
+  recordActionGeneration += 1
+  pendingRecordActions.value = new Map()
+  isOpeningCreate.value = false
+  commitmentModal.close()
+}, { flush: 'sync' })
 const useOverviewFetch = useFetch as unknown as (url: Ref<string>) => {
   data: Ref<FundingCaseAgreementCommitmentOverviewRow | null>
   refresh: () => Promise<void>
@@ -133,8 +147,82 @@ const tableRows = computed<CommitmentTableRow[]>(() => commitments.value
 
 const formatMoney = (value: Money, currency: string) => formatMoneyText(value, locale.value, currency)
 
-const openCreateCommitment = () => {
-  commitmentModal.openCreate()
+const warnRecordPrerequisite = () => toast.add({
+  title: t('common.warning'),
+  description: t('agreement.child_records.work_prerequisite'),
+  color: 'warning'
+})
+const loadWorkableRecord = async (recordId: string, action: 'update' | 'delete'): Promise<FundingCaseAgreementCommitmentRow | null> => {
+  const owner = agreementId
+  const generation = recordActionGeneration
+  const current = tableRows.value.find(row => String(row.id) === recordId)
+  if (current && !statusCatalog.getById(current.egcs_fc_status)) await statusCatalog.load()
+  if (disposed || owner !== agreementId || generation !== recordActionGeneration) return null
+  if (!current || isRecordLocked(current)) {
+    warnRecordPrerequisite()
+    return null
+  }
+  try {
+    const [parent, overview, roster] = await Promise.all([
+      $fetch<FundingCaseAgreementProfileRow, string>(`/api/agreements/${owner}`),
+      $fetch<{ commitments: FundingCaseAgreementCommitmentRow[] }, string>(`/api/agreements/${owner}/commitments-overview`),
+      $fetch<{ is_assigned: boolean }, string>(`/api/entity-assignments/fundingcaseagreementcommitment/${recordId}`)
+    ])
+    if (disposed || owner !== agreementId || generation !== recordActionGeneration) return null
+    const record = overview.commitments.find(row => String(row.id) === recordId)
+    if (!statusCatalog.getById(parent.egcs_fc_status) || (record && !statusCatalog.getById(record.egcs_fc_status))) await statusCatalog.load()
+    if (disposed || owner !== agreementId || generation !== recordActionGeneration) return null
+    const permitted = action === 'update' ? parent.can_update_child_records_role : parent.can_delete_child_records_role
+    if (permitted !== true || roster.is_assigned !== true || isRecordLocked(parent) || !record || isRecordLocked(record)) {
+      warnRecordPrerequisite()
+      return null
+    }
+    return record
+  } catch {
+    if (!disposed && owner === agreementId && generation === recordActionGeneration) warnRecordPrerequisite()
+    return null
+  }
+}
+const runRecordAction = async (recordId: string, action: 'update' | 'delete', work: (record: FundingCaseAgreementCommitmentRow) => void | Promise<void>) => {
+  if (pendingRecordActions.value.has(recordId)) return
+  const token = Symbol(recordId)
+  pendingRecordActions.value = new Map(pendingRecordActions.value).set(recordId, token)
+  try {
+    const record = await loadWorkableRecord(recordId, action)
+    if (record) await work(record)
+  } finally {
+    if (pendingRecordActions.value.get(recordId) === token) {
+      const remaining = new Map(pendingRecordActions.value)
+      remaining.delete(recordId)
+      pendingRecordActions.value = remaining
+    }
+  }
+}
+
+const checkCreationPrerequisites = async (): Promise<boolean> => {
+  const owner = agreementId
+  const generation = recordActionGeneration
+  try {
+    const parent = await $fetch<FundingCaseAgreementProfileRow, string>(`/api/agreements/${owner}`)
+    if (!statusCatalog.getById(parent.egcs_fc_status)) await statusCatalog.load()
+    if (disposed || owner !== agreementId || generation !== recordActionGeneration) return false
+    if (parent.can_create_child_records_role === true && parent.can_create_child_records === true && !isRecordLocked(parent)) return true
+  } catch {
+    if (disposed || owner !== agreementId || generation !== recordActionGeneration) return false
+  }
+  toast.add({ title: t('common.warning'), description: t('agreement.child_records.create_prerequisite'), color: 'warning' })
+  return false
+}
+const openCreateCommitment = async () => {
+  if (isOpeningCreate.value) return
+  isOpeningCreate.value = true
+  const generation = recordActionGeneration
+  try {
+    if (!await checkCreationPrerequisites()) return
+    commitmentModal.openCreate()
+  } finally {
+    if (generation === recordActionGeneration) isOpeningCreate.value = false
+  }
 }
 
 const handleExtensionCreated = async () => {
@@ -146,9 +234,9 @@ const handleExtensionCreated = async () => {
   })
 }
 
-const openUpdateCommitment = (commitment: FundingCaseAgreementCommitmentRow) => {
-  commitmentModal.openUpdate(commitment)
-}
+const openUpdateCommitment = (record: FundingCaseAgreementCommitmentRow) => runRecordAction(String(record.id), 'update', freshRecord => {
+  commitmentModal.openUpdate(freshRecord)
+})
 
 const saveCommitment = async () => {
   if (!selectedCommitment.value) {
@@ -160,6 +248,9 @@ const saveCommitment = async () => {
   if (!commitmentPending.begin(session)) return
 
   try {
+    if (isUpdate && !await loadWorkableRecord(String(commitmentState.id), 'update')) return
+    if (!isUpdate && !await checkCreationPrerequisites()) return
+    if (disposed || commitmentModal.captureSession() !== session) return
     await saveJson(
       isUpdate
         ? `/api/agreements/${agreementId}/commitments/${commitmentState.id}`
@@ -177,19 +268,34 @@ const saveCommitment = async () => {
       color: 'success'
     })
   } catch (error: unknown) {
-    showError(error)
+    if (!disposed && isCommitmentModalOpen.value && commitmentModal.captureSession() === session) showError(error)
   } finally {
     commitmentPending.end(session)
   }
 }
 
-const { confirmDeleteWithToast } = useDeleteRequestToast()
-
-const deleteCommitment = async (commitmentId: string) => {
-  await confirmDeleteWithToast(`/api/agreements/${agreementId}/commitments/${commitmentId}`, {
-    refresh: refreshOverview
-  })
-}
+const { confirmDeleteRequest } = useConfirmDeleteRequest()
+const confirmDelete = useDeleteConfirm()
+const deleteCommitment = (recordId: string) => runRecordAction(recordId, 'delete', async () => {
+  const owner = agreementId
+  const generation = recordActionGeneration
+  const shouldProceed = () => !disposed && owner === agreementId && generation === recordActionGeneration
+  try {
+    const deleted = await confirmDeleteRequest(`/api/agreements/${owner}/commitments/${recordId}`, {
+      shouldProceed,
+      confirm: async () => {
+        if (!await confirmDelete() || !shouldProceed()) return false
+        return Boolean(await loadWorkableRecord(recordId, 'delete')) && shouldProceed()
+      }
+    })
+    if (!deleted || !shouldProceed()) return
+    await refreshOverview()
+    if (!shouldProceed()) return
+    toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+  } catch (error: unknown) {
+    if (shouldProceed()) showError(error)
+  }
+})
 </script>
 
 <template>
@@ -203,7 +309,8 @@ const deleteCommitment = async (commitmentId: string) => {
       :loading="overviewStatus === 'pending'"
       :request-status="overviewStatus"
       :button-label="t('agreement.commitments.add')"
-      :show-button="canCreate && !hasExtensionCreateReplacement && !hasExtensionCreateConflict"
+      :show-button="(canCreateRole ?? canCreate) && (!canCreate || (!hasExtensionCreateReplacement && !hasExtensionCreateConflict))"
+      :button-disabled="isOpeningCreate"
       :search-placeholder="t('agreement.commitments.search')"
       @add="openCreateCommitment"
       @retry="refreshOverview">
@@ -265,16 +372,18 @@ const deleteCommitment = async (commitmentId: string) => {
             class="cursor-default"
             :aria-label="t('common.open')" />
           <UButton
-            v-if="canUpdate && !isRecordLocked(row.original)"
+            v-if="canUpdate && !row.getIsGrouped?.()"
             icon="i-lucide-pencil"
+            :disabled="pendingRecordActions.has(String(row.original.id))"
             color="neutral"
             variant="ghost"
             class="cursor-default"
             :aria-label="t('common.edit')"
             @click="openUpdateCommitment(row.original)" />
           <UButton
-            v-if="canDelete && !isRecordLocked(row.original)"
+            v-if="canDelete && !row.getIsGrouped?.()"
             icon="i-lucide-trash"
+            :disabled="pendingRecordActions.has(String(row.original.id))"
             color="error"
             variant="ghost"
             class="cursor-default"
