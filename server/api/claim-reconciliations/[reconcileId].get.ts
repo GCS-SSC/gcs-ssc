@@ -16,12 +16,13 @@ import { canAccessAgreement, resolveAgreementScopeContext } from '~~/server/util
 import { isDecimalDatabaseId } from '~~/server/utils/database-id'
 import { databaseMoneyText, parseDatabaseMoney } from '~~/server/utils/database-money'
 
-// eslint-disable-next-line local/require-authorize -- exact assignment or owning-entity read is enforced below
+// eslint-disable-next-line local/require-authorize -- owning-entity business read is enforced below
 export default defineEventHandler(async event => {
   const reconcileId = getRouterParam(event, 'reconcileId')
   if (!isDecimalDatabaseId(reconcileId)) return await notFound(event, 'CLAIM_RECONCILIATION_NOT_FOUND', 'apiErrors.admin_common.not_found')
-  if (!await canReadEntityAssignments(event, 'fundingclaimreconcile', reconcileId)) return await forbidden(event)
   const actor = await resolveAssignmentActor(event)
+  const owner = await resolveEntityAssignmentOwner(event.context.$db, 'fundingclaimreconcile', reconcileId)
+  if (!owner || !await canAccessEntityAssignmentOwner(actor.auth, owner, 'read', event.context.$db)) return await forbidden(event)
   const reconciliation = await event.context.$db.selectFrom('Funding_Case_Agreement_Claim_Reconcile')
     .innerJoin('Funding_Case_Agreement_Claim', 'Funding_Case_Agreement_Claim.id', 'Funding_Case_Agreement_Claim_Reconcile.egcs_fc_fundingagreementclaim')
     .innerJoin('Funding_Case_Agreement_Profile', 'Funding_Case_Agreement_Profile.id', 'Funding_Case_Agreement_Claim.egcs_fc_fundingagreement')
@@ -46,11 +47,22 @@ export default defineEventHandler(async event => {
       .onRef('Reconcile_Line.egcs_fc_lineitem', '=', 'Funding_Case_Agreement_Claim_Line_Item.id')
       .on('Reconcile_Line.egcs_fc_fundingagreementclaimreconcile', '=', reconcileId)
       .on('Reconcile_Line._deleted', '=', false))
-    .leftJoin('Funding_Case_Agreement_Budget_Line_Item', join => join
-      .on(budgetLineItemStableId, '=', sql.ref('Funding_Case_Agreement_Claim_Line_Item.egcs_fc_fundingagreementbudgetlineitem')))
-    .leftJoin('Funding_Case_Agreement_Budget_Fiscal_Year', 'Funding_Case_Agreement_Budget_Fiscal_Year.id', 'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreementbudgetfiscalyear')
-    .leftJoin('Funding_Case_Agreement_Budget_Version', 'Funding_Case_Agreement_Budget_Version.id', 'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_budgetversion')
-    .leftJoin('Transfer_Payment_Stream_Cost_Category_Line_Item', 'Transfer_Payment_Stream_Cost_Category_Line_Item.id', 'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_organizationcostcategory')
+    .leftJoin(eb => eb.selectFrom('Funding_Case_Agreement_Budget_Line_Item')
+      .innerJoin('Funding_Case_Agreement_Budget_Fiscal_Year', 'Funding_Case_Agreement_Budget_Fiscal_Year.id', 'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreementbudgetfiscalyear')
+      .innerJoin('Funding_Case_Agreement_Budget_Version', 'Funding_Case_Agreement_Budget_Version.id', 'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_budgetversion')
+      .select([
+        budgetLineItemStableId.as('stable_id'),
+        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_organizationcostcategory',
+        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection'
+      ])
+      .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreement', '=', String(reconciliation.agreement_id))
+      .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false)
+      .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
+      .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)
+      .where('Funding_Case_Agreement_Budget_Version._deleted', '=', false)
+      .as('Current_Budget_Line'), join => join
+      .onRef('Current_Budget_Line.stable_id', '=', 'Funding_Case_Agreement_Claim_Line_Item.egcs_fc_fundingagreementbudgetlineitem'))
+    .leftJoin('Transfer_Payment_Stream_Cost_Category_Line_Item', 'Transfer_Payment_Stream_Cost_Category_Line_Item.id', 'Current_Budget_Line.egcs_fc_organizationcostcategory')
     .leftJoin('Agency_Cost_Category_Line_Item', 'Agency_Cost_Category_Line_Item.id', 'Transfer_Payment_Stream_Cost_Category_Line_Item.egcs_tp_organizationcostcategory')
     .leftJoin('Agency_Cost_Category', 'Agency_Cost_Category.id', 'Agency_Cost_Category_Line_Item.egcs_ay_organizationcostcategory')
     .select([
@@ -62,7 +74,7 @@ export default defineEventHandler(async event => {
       databaseMoneyText(sql.ref('Funding_Case_Agreement_Claim_Line_Item.egcs_fc_amount')).as('submitted_amount'),
       'Agency_Cost_Category.egcs_ay_name_en as organization_cost_category_name_en',
       'Agency_Cost_Category.egcs_ay_name_fr as organization_cost_category_name_fr',
-      'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection as egcs_fc_costsubsection',
+      'Current_Budget_Line.egcs_fc_costsubsection as egcs_fc_costsubsection',
       'Reconcile_Line.id as reconcile_line_id',
       databaseMoneyText(sql.ref('Reconcile_Line.egcs_fc_reconciled')).as('egcs_fc_reconciled'),
       databaseMoneyText(sql.ref('Reconcile_Line.egcs_fc_sampled')).as('egcs_fc_sampled'),
@@ -70,25 +82,9 @@ export default defineEventHandler(async event => {
     ])
     .where('Funding_Case_Agreement_Claim_Line_Item.egcs_fc_fundingagreementclaim', '=', String(reconciliation.egcs_fc_fundingagreementclaim))
     .where('Funding_Case_Agreement_Claim_Line_Item._deleted', '=', false)
-    .where(eb => eb.or([
-      eb('Funding_Case_Agreement_Budget_Line_Item.id', 'is', null),
-      eb('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false)
-    ]))
-    .where(eb => eb.or([
-      eb('Funding_Case_Agreement_Budget_Fiscal_Year.id', 'is', null),
-      eb('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
-    ]))
-    .where(eb => eb.or([
-      eb('Funding_Case_Agreement_Budget_Version.id', 'is', null),
-      eb.and([
-        eb('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true),
-        eb('Funding_Case_Agreement_Budget_Version._deleted', '=', false)
-      ])
-    ]))
     .orderBy('Funding_Case_Agreement_Claim_Line_Item.id')
     .execute()
   const grant = await resolveAssignedItemGrant(actor.auth.userId, 'fundingclaimreconcile', reconcileId, event.context.$db)
-  const owner = await resolveEntityAssignmentOwner(event.context.$db, 'fundingclaimreconcile', reconcileId)
   const hasUpdateRole = owner
     ? await canAccessEntityAssignmentOwner(actor.auth, owner, 'update', event.context.$db)
     : false

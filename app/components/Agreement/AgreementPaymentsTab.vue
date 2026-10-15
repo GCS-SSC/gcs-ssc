@@ -184,12 +184,17 @@ const validatePayment = withFormRequirements(async (state: PaymentWizardForm) =>
 const preparePaymentOffset = async () => {
   if (!selectedPayment.value || isSavingPayment.value || isPaymentAboveCalculatorCeiling.value || paymentCalculatorResult.value?.loading) return false
   const header = paymentHeader()
-  if (!header?.id && !await checkCreationPrerequisites()) return false
-  wizardErrors.value = await validatePaymentSchema(header)
-  if (wizardErrors.value.length) return false
   const session = paymentModal.captureSession()
   const signature = paymentHeaderSignature.value
   const owner = agreementId
+  const isCurrent = () => !disposed && isPaymentModalOpen.value && paymentModal.captureSession() === session
+    && owner === agreementId && signature === paymentHeaderSignature.value
+  if (!header?.id && !await checkCreationPrerequisites(isCurrent)) return false
+  if (!isCurrent()) return false
+  const errors = await validatePaymentSchema(header)
+  if (!isCurrent()) return false
+  wizardErrors.value = errors
+  if (errors.length) return false
   if (!paymentPending.begin(session)) return false
   try {
     const previewUrl = header?.id ? `/api/agreements/${owner}/payments/${header.id}/preview` : `/api/agreements/${owner}/payments/preview`
@@ -354,16 +359,16 @@ const runRecordAction = async (recordId: string, action: 'update' | 'delete', wo
   }
 }
 
-const checkCreationPrerequisites = async (): Promise<boolean> => {
+const checkCreationPrerequisites = async (isCurrent: () => boolean = () => true): Promise<boolean> => {
   const owner = agreementId
   const generation = recordActionGeneration
   try {
     const parent = await $fetch<FundingCaseAgreementProfileRow, string>(`/api/agreements/${owner}`)
     if (!statusCatalog.getById(parent.egcs_fc_status)) await statusCatalog.load()
-    if (disposed || owner !== agreementId || generation !== recordActionGeneration) return false
+    if (disposed || owner !== agreementId || generation !== recordActionGeneration || !isCurrent()) return false
     if (parent.can_create_child_records_role === true && parent.can_create_child_records === true && !isRecordLocked(parent)) return true
   } catch {
-    if (disposed || owner !== agreementId || generation !== recordActionGeneration) return false
+    if (disposed || owner !== agreementId || generation !== recordActionGeneration || !isCurrent()) return false
   }
   toast.add({ title: t('common.warning'), description: t('agreement.child_records.create_prerequisite'), color: 'warning' })
   return false
