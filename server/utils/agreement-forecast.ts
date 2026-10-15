@@ -8,7 +8,7 @@ import { assertAgreementExists } from '~~/server/utils/agreement-child-resources
 import type { AssignableEntityType, Database } from '~~/shared/types/database'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
 import { authorizeFreshAssignedItem } from '~~/server/utils/authorize'
-import { budgetFiscalYearStableId, budgetLineItemStableId } from '~~/server/utils/agreement-budget-lineage'
+import { budgetFiscalYearStableId, readAgreementBudgetLineReference } from '~~/server/utils/agreement-budget-lineage'
 import type { ExactEntityTarget } from '@gcs-ssc/authorization'
 import { assertBusinessStatusMutationAllowed, resolveBusinessStatusProtection } from '~~/server/utils/business-status-runtime'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
@@ -188,32 +188,15 @@ export const assertAgreementForecastBudgetLineItem = async (
   db: AgreementForecastDb,
   agreementId: string,
   forecastFiscalYearId: string,
-  budgetLineItemId: string
+  budgetLineItemId: string,
+  options: { referenceMode?: 'current-choice' | 'retained-existing' } = {}
 ) => {
   if (!isPositivePostgresBigintText(forecastFiscalYearId) || !isPositivePostgresBigintText(budgetLineItemId)) {
     return await badRequest(event, 'INVALID_AGREEMENT_FORECAST_BUDGET_LINE_ITEM', 'apiErrors.agreement.invalid_forecast_budget_line_item')
   }
-  const lineItem = await db
-    .selectFrom('Funding_Case_Agreement_Budget_Line_Item')
-    .innerJoin(
-      'Funding_Case_Agreement_Budget_Fiscal_Year',
-      'Funding_Case_Agreement_Budget_Fiscal_Year.id',
-      'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreementbudgetfiscalyear'
-    )
-    .innerJoin(
-      'Funding_Case_Agreement_Budget_Version',
-      'Funding_Case_Agreement_Budget_Version.id',
-      'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_budgetversion'
-    )
-    .where(budgetLineItemStableId, '=', budgetLineItemId)
-    .where(budgetFiscalYearStableId, '=', forecastFiscalYearId)
-    .where('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fundingagreement', '=', agreementId)
-    .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false)
-    .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
-    .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)
-    .where('Funding_Case_Agreement_Budget_Version._deleted', '=', false)
-    .select(budgetLineItemStableId.as('id'))
-    .executeTakeFirst()
+  const lineItem = await readAgreementBudgetLineReference(
+    db, agreementId, forecastFiscalYearId, budgetLineItemId, options.referenceMode ?? 'current-choice'
+  )
 
   if (!lineItem) {
     return await badRequest(event, 'INVALID_AGREEMENT_FORECAST_BUDGET_LINE_ITEM', 'apiErrors.agreement.invalid_forecast_budget_line_item')

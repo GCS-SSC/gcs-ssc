@@ -1,4 +1,5 @@
-import { FundingCaseAgreementMonitorItemsPatchSchema } from '~~/shared/types/schemas'
+import { FundingCaseAgreementMonitorItemsCreateSchema, FundingCaseAgreementMonitorItemsPatchSchema } from '~~/shared/types/schemas'
+import { parseI18n } from '~~/server/utils/api-validate'
 import { badRequest } from '~~/server/utils/api-errors'
 import { assertMonitorLinkedRecord, executeAgreementMonitorMutation, prepareAgreementMonitorRoute } from '~~/server/utils/agreement-monitor'
 
@@ -13,10 +14,24 @@ export default defineEventHandler(async event => {
   const { agreementId, agreementContext, db } = prepared
   const validated = await readValidatedBodyI18n(event, FundingCaseAgreementMonitorItemsPatchSchema)
   return await executeAgreementMonitorMutation(event, db, agreementId, agreementContext, monitorId, async trx => {
+    const current = await trx.selectFrom('Funding_Case_Agreement_Monitor_Items')
+      .where('id', '=', childId)
+      .where('egcs_fc_fundingagreementmonitor', '=', monitorId)
+      .where('_deleted', '=', false)
+      .selectAll()
+      .forUpdate()
+      .executeTakeFirst()
+    if (!current) return await badRequest(event, 'AGREEMENT_MONITOR_ITEM_NOT_FOUND', 'apiErrors.agreement.monitor_item_not_found')
+    const patch = {
+      ...validated,
+      ...(Object.hasOwn(validated, 'egcs_fc_actualstart') ? { egcs_fc_actualstart: validated.egcs_fc_actualstart ?? null } : {}),
+      ...(Object.hasOwn(validated, 'egcs_fc_actualend') ? { egcs_fc_actualend: validated.egcs_fc_actualend ?? null } : {})
+    }
+    await parseI18n(event, FundingCaseAgreementMonitorItemsCreateSchema, { ...current, ...patch })
     await assertMonitorLinkedRecord(event, trx, monitorId, 'planning', validated.egcs_fc_monitorplanning)
     const updated = await trx
       .updateTable('Funding_Case_Agreement_Monitor_Items')
-      .set(validated)
+      .set(patch)
       .where('id', '=', childId)
       .where('egcs_fc_fundingagreementmonitor', '=', monitorId)
       .where('_deleted', '=', false)

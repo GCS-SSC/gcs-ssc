@@ -1,3 +1,4 @@
+import { throwIfAgencyUniqueConstraintError } from '~~/server/utils/agency-unique-constraint-errors'
 import { authorize } from '~~/server/utils/authorize'
 import { assertActiveAgencyProfile, withActiveAgencyMutationTransaction } from '~~/server/utils/agency-auth'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
@@ -18,6 +19,6 @@ export default defineEventHandler(async event => {
     )
   } catch (error) {
     await cleanupTemplateUploads(event, event.context.$db, agencyId, uploads)
-    throw error
+    return await throwIfAgencyUniqueConstraintError(event, error)
   }
 })

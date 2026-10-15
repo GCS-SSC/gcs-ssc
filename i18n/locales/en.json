@@ -1218,6 +1218,8 @@
       "duplicate_monitor_type_name_fr": "A monitor type with this French name already exists for the agency.",
       "duplicate_recommendation_schema_name_en": "A recommendation schema with this English name already exists for this agency.",
       "duplicate_recommendation_schema_name_fr": "A recommendation schema with this French name already exists for this agency.",
+      "duplicate_document_template_name_en": "A document template with this English name already exists for this entity type.",
+      "duplicate_document_template_name_fr": "A document template with this French name already exists for this entity type.",
       "duplicate_attachment_type_name_en": "An attachment type with this English name already exists for the agency.",
       "duplicate_attachment_type_name_fr": "An attachment type with this French name already exists for the agency.",
       "duplicate_cost_category_name_en": "A cost category with this English name already exists for the agency.",

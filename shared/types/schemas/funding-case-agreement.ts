@@ -855,7 +855,6 @@ export const FundingCaseAgreementMonitorItemsCreateSchema = FundingCaseAgreement
 export const FundingCaseAgreementMonitorItemsPatchSchema = FundingCaseAgreementMonitorItemsBaseSchema
   .omit({ egcs_fc_fundingagreementmonitor: true })
   .partial()
-  .superRefine(validateMonitorItemDates)
 
 export type FundingCaseAgreementMonitorItems = z.infer<typeof FundingCaseAgreementMonitorItemsCreateSchema>
 export type FundingCaseAgreementMonitorItemsPatch = z.infer<typeof FundingCaseAgreementMonitorItemsPatchSchema>

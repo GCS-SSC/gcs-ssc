@@ -33,7 +33,7 @@ import type {
 } from '~~/shared/types/schemas/funding-case-agreement'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
 import { authorizeFreshAssignedItem } from '~~/server/utils/authorize'
-import { budgetFiscalYearStableId, budgetLineItemStableId } from '~~/server/utils/agreement-budget-lineage'
+import { budgetFiscalYearStableId, budgetLineItemStableId, readAgreementBudgetLineReference } from '~~/server/utils/agreement-budget-lineage'
 import { validateMergedFinancialPeriodPatch } from '~~/server/utils/agreement-financial-patch-validation'
 import { resolveCurrentCommonUser } from '~~/server/utils/additional-reviewer-runtime'
 import {
@@ -545,29 +545,12 @@ export const assertAgreementClaimBudgetLineItem = async (
   db: AgreementClaimDb,
   agreementId: string,
   claimFiscalYearId: string,
-  budgetLineItemId: string
+  budgetLineItemId: string,
+  options: { referenceMode?: 'current-choice' | 'retained-existing' } = {}
 ) => {
-  const lineItem = await db
-    .selectFrom('Funding_Case_Agreement_Budget_Line_Item')
-    .innerJoin(
-      'Funding_Case_Agreement_Budget_Fiscal_Year',
-      'Funding_Case_Agreement_Budget_Fiscal_Year.id',
-      'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreementbudgetfiscalyear'
-    )
-    .innerJoin(
-      'Funding_Case_Agreement_Budget_Version',
-      'Funding_Case_Agreement_Budget_Version.id',
-      'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_budgetversion'
-    )
-    .where(budgetLineItemStableId, '=', budgetLineItemId)
-    .where(budgetFiscalYearStableId, '=', claimFiscalYearId)
-    .where('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fundingagreement', '=', agreementId)
-    .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false)
-    .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
-    .where('Funding_Case_Agreement_Budget_Version.egcs_fc_iscurrent', '=', true)
-    .where('Funding_Case_Agreement_Budget_Version._deleted', '=', false)
-    .select(budgetLineItemStableId.as('id'))
-    .executeTakeFirst()
+  const lineItem = await readAgreementBudgetLineReference(
+    db, agreementId, claimFiscalYearId, budgetLineItemId, options.referenceMode ?? 'current-choice'
+  )
 
   if (!lineItem) {
     return await badRequest(event, 'INVALID_AGREEMENT_CLAIM_BUDGET_LINE_ITEM', 'apiErrors.agreement.invalid_claim_budget_line_item')
@@ -696,7 +679,12 @@ const validateAgreementClaimLineItemPatchReferences = async (
     : existing.egcs_fc_fundingagreementbudgetlineitem
 
   if (nextBudgetLineItemId !== null && nextBudgetLineItemId !== undefined) {
-    const budgetLineItem = await assertAgreementClaimBudgetLineItem(event, db, agreementId, String(nextClaim.egcs_fc_fiscalyear), String(nextBudgetLineItemId))
+    const budgetLineItem = await assertAgreementClaimBudgetLineItem(event, db, agreementId, String(nextClaim.egcs_fc_fiscalyear), String(nextBudgetLineItemId), {
+      referenceMode: String(nextBudgetLineItemId) === String(existing.egcs_fc_fundingagreementbudgetlineitem)
+        && nextClaimId === String(existing.egcs_fc_fundingagreementclaim)
+        ? 'retained-existing'
+        : 'current-choice'
+    })
     if (!hasKey(budgetLineItem, 'id')) {
       return budgetLineItem
     }
@@ -724,6 +712,7 @@ export const patchAgreementClaimLineItem = async (
   lineId: string
 ) => {
   const patchValues = await readAgreementClaimLineItemPatchBody(event)
+  if (Object.keys(patchValues).length === 0) return await badRequest(event, 'EMPTY_PATCH', 'apiErrors.request.invalid')
   const { egcs_fc_amount: patchedAmount, egcs_fc_totalamount: patchedTotalAmount, egcs_fc_fundingsources: fundingSources, ...nonMoneyPatchValues } = patchValues
   const updateValues = {
     ...nonMoneyPatchValues,
@@ -766,20 +755,25 @@ export const patchAgreementClaimLineItem = async (
           return references
         }
 
-        const updated = await trx
-          .updateTable('Funding_Case_Agreement_Claim_Line_Item')
-          .set(updateValues)
-          .where('id', '=', lineId)
-          .where('egcs_fc_fundingagreementclaim', '=', String(existing.egcs_fc_fundingagreementclaim))
-          .where('_deleted', '=', false)
-          .returning([
-            'id', 'egcs_fc_fundingagreementclaim', 'egcs_fc_fundingagreement',
-            'egcs_fc_fundingagreementbudgetlineitem', 'egcs_fc_submittedcostcategory',
-            'egcs_fc_submittedcostsubsection', 'egcs_fc_submittedlineitem',
-            'egcs_fc_description', 'egcs_fc_currency', '_deleted',
-            databaseMoneyText(sql.ref('egcs_fc_amount')).as('egcs_fc_amount'),
-            databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('egcs_fc_totalamount')
-          ])
+        const lineQuery = Object.keys(updateValues).length > 0
+          ? trx.updateTable('Funding_Case_Agreement_Claim_Line_Item')
+              .set(updateValues)
+              .where('id', '=', lineId)
+              .where('egcs_fc_fundingagreementclaim', '=', String(existing.egcs_fc_fundingagreementclaim))
+              .where('_deleted', '=', false)
+          : trx.selectFrom('Funding_Case_Agreement_Claim_Line_Item')
+              .where('id', '=', lineId)
+              .where('egcs_fc_fundingagreementclaim', '=', String(existing.egcs_fc_fundingagreementclaim))
+              .where('_deleted', '=', false)
+        const columns = [
+          'id', 'egcs_fc_fundingagreementclaim', 'egcs_fc_fundingagreement',
+          'egcs_fc_fundingagreementbudgetlineitem', 'egcs_fc_submittedcostcategory',
+          'egcs_fc_submittedcostsubsection', 'egcs_fc_submittedlineitem',
+          'egcs_fc_description', 'egcs_fc_currency', '_deleted',
+          databaseMoneyText(sql.ref('egcs_fc_amount')).as('egcs_fc_amount'),
+          databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('egcs_fc_totalamount')
+        ] as const
+        const updated = await ('returning' in lineQuery ? lineQuery.returning(columns) : lineQuery.select(columns))
           .executeTakeFirstOrThrow()
 
         if (fundingSources !== undefined) {
@@ -820,6 +814,7 @@ export const patchAgreementClaimForRoute = async (
   claimId: string
 ) => {
   const patchValues = await readValidatedBodyI18n(event, FundingCaseAgreementClaimPatchSchema)
+  if (Object.keys(patchValues).length === 0) return await badRequest(event, 'EMPTY_PATCH', 'apiErrors.request.invalid')
 
   return await executeAgreementClaimMutation(event, db, agreementId, initialContext, [{ type: 'claim', id: claimId }], async trx => {
     const claim = await assertAgreementClaimEditable(event, trx, agreementId, claimId)
@@ -1220,6 +1215,7 @@ export const patchAgreementClaimReconcileLineItem = async (
   expectedReconcileId?: string
 ) => {
   const patchValues = await readAgreementClaimReconcileLineItemPatchBody(event)
+  if (Object.keys(patchValues).length === 0) return await badRequest(event, 'EMPTY_PATCH', 'apiErrors.request.invalid')
   const {
     egcs_fc_reconciled: patchedReconciled,
     egcs_fc_sampled: patchedSampled,
@@ -1371,6 +1367,7 @@ export const patchAgreementClaimReconcile = async (
   reconcileId: string
 ) => {
   const patchValues = await readAgreementClaimReconcilePatchBody(event)
+  if (Object.keys(patchValues).length === 0) return await badRequest(event, 'EMPTY_PATCH', 'apiErrors.request.invalid')
 
   try {
     return await executeAgreementClaimMutation(

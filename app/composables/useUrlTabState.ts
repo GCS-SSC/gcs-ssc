@@ -223,6 +223,7 @@ export const useUrlTabState = ({
     })
   }
 
+  let deferredSelection: { path: string, query: string, value: string } | null = null
   let pendingNavigation: { signature: string } | null = null
 
   /**
@@ -270,6 +271,13 @@ export const useUrlTabState = ({
   watch(
     [() => route.path, () => route.query[queryKey], tabValues, resolvedDefaultTab, enabledRef, locale],
     ([routePath, queryTab, , defaultValue, isEnabled], previousValues) => {
+      if (deferredSelection && (
+        deferredSelection.path !== routePath
+        || deferredSelection.query !== resolveQueryParamValue(queryTab)
+        || !tabValues.value.includes(deferredSelection.value)
+      )) {
+        deferredSelection = null
+      }
       if (!isEnabled) {
         return
       }
@@ -282,9 +290,12 @@ export const useUrlTabState = ({
         && defaultValue === previousValues[3]
         && isEnabled === previousValues[4]
         && tabValues.value.includes(selectedTab.value)
-      const nextTabKey = preservePendingSelection
-        ? tabValueToKey.value[selectedTab.value] ?? resolveTabKey(queryTab)
-        : resolveTabKey(queryTab)
+      const nextTabKey = deferredSelection
+        ? tabValueToKey.value[deferredSelection.value] ?? resolveTabKey(queryTab)
+        : preservePendingSelection
+          ? tabValueToKey.value[selectedTab.value] ?? resolveTabKey(queryTab)
+          : resolveTabKey(queryTab)
+      deferredSelection = null
       const nextTabValue = normalizeTabValue(tabKeyToValue.value[nextTabKey] ?? '')
 
       if (selectedTabKey.value !== nextTabKey) {
@@ -308,6 +319,9 @@ export const useUrlTabState = ({
 
   watch(selectedTab, value => {
     if (!enabledRef.value) {
+      deferredSelection = tabValues.value.includes(value)
+        ? { path: route.path, query: resolveQueryParamValue(route.query[queryKey]), value }
+        : null
       return
     }
 
@@ -329,7 +343,7 @@ export const useUrlTabState = ({
         }
       })
     }
-  })
+  }, { flush: 'sync' })
 
   return {
     tabs: tabsRef,

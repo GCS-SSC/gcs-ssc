@@ -38,10 +38,9 @@ const IdSchema = z.preprocess(value => {
 
   return value
 }, z.coerce.string({ error: 'validation.id_required' }).min(1, { error: 'validation.id_required' })).meta({ formRequired: true })
-const RequiredIdSchema = (key: string) => z.preprocess(value => {
-  if (value === undefined || value === null) return ''
-  return value
-}, z.coerce.string({ error: key }).min(1, { error: key })).meta({ formRequired: true })
+const RequiredPostgresBigintIdSchema = (key: string) => z.unknown()
+  .refine(value => value !== undefined && value !== null && value !== '', { error: key })
+  .pipe(PositivePostgresBigintIdSchema).meta({ formRequired: true })
 const OptionalIdSchema = z.preprocess(value => {
   if (value === undefined || value === null || value === '') return undefined
   return value
@@ -531,10 +530,10 @@ const CommonWorkflowSetupBaseSchema = z.object({
   }),
   egcs_cn_purpose: z.enum(['standard', 'approval_submission', 'risk_rating'], { error: 'validation.workflow_purpose_required' }).default('standard'),
   egcs_cn_riskratingrequired: z.boolean().default(false),
-  egcs_cn_allowedstartstatuses: z.array(IdSchema).min(1, { error: 'validation.workflow_allowed_start_status_required' })
+  egcs_cn_allowedstartstatuses: z.array(PositivePostgresBigintIdSchema).min(1, { error: 'validation.workflow_allowed_start_status_required' })
     .refine(statuses => new Set(statuses.map(String)).size === statuses.length, { error: 'validation.workflow_allowed_start_status_unique' }),
-  egcs_cn_cancellationstatus: RequiredIdSchema('validation.workflow_cancellation_status_required'),
-  egcs_cn_executionfailurestatus: RequiredIdSchema('validation.workflow_execution_failure_status_required'),
+  egcs_cn_cancellationstatus: RequiredPostgresBigintIdSchema('validation.workflow_cancellation_status_required'),
+  egcs_cn_executionfailurestatus: RequiredPostgresBigintIdSchema('validation.workflow_execution_failure_status_required'),
   egcs_cn_allowretry: z.boolean({ error: 'validation.required' })
 }).strict()
 

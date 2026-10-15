@@ -1218,6 +1218,8 @@
       "duplicate_monitor_type_name_fr": "Un type de suivi portant ce nom français existe déjà pour l'organisme.",
       "duplicate_recommendation_schema_name_en": "Un schéma de recommandation portant ce nom anglais existe déjà pour cet organisme.",
       "duplicate_recommendation_schema_name_fr": "Un schéma de recommandation portant ce nom français existe déjà pour cet organisme.",
+      "duplicate_document_template_name_en": "Un modèle de document portant ce nom anglais existe déjà pour ce type d’entité.",
+      "duplicate_document_template_name_fr": "Un modèle de document portant ce nom français existe déjà pour ce type d’entité.",
       "duplicate_attachment_type_name_en": "Un type de pièce jointe portant ce nom anglais existe déjà pour l'organisme.",
       "duplicate_attachment_type_name_fr": "Un type de pièce jointe portant ce nom français existe déjà pour l'organisme.",
       "duplicate_cost_category_name_en": "Une catégorie de coûts avec ce nom anglais existe déjà pour l'organisme.",

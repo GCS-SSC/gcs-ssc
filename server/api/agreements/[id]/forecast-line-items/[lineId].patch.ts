@@ -83,7 +83,11 @@ const validateForecastPatchBudgetLineItem = async (
     db,
     agreementId,
     forecastFiscalYearId,
-    nextBudgetLineItemId
+    nextBudgetLineItemId,
+    { referenceMode: nextBudgetLineItemId === existing.egcs_fc_fundingagreementbudgetlineitem
+      && String(patchValues.egcs_fc_agreementforecast ?? existing.egcs_fc_agreementforecast) === existing.egcs_fc_agreementforecast
+      ? 'retained-existing'
+      : 'current-choice' }
   )
   if (!budgetLineItem || typeof budgetLineItem !== 'object' || !('id' in budgetLineItem)) {
     return budgetLineItem
@@ -105,6 +109,7 @@ const patchForecastLineItemForRoute = async (
   }
 
   const patchValues = await readValidatedBodyI18n(event, FundingCaseAgreementForecastLineItemPatchSchema)
+  if (Object.keys(patchValues).length === 0) return await badRequest(event, 'EMPTY_PATCH', 'apiErrors.request.invalid')
   return await executeAgreementForecastMutation(event, db, agreementId, initialContext, async trx => {
     const child = await trx.selectFrom('Funding_Case_Agreement_Forecast_Line_Item').select('egcs_fc_agreementforecast').where('id', '=', lineId).where('_deleted', '=', false).executeTakeFirst()
     if (!child) return []
@@ -150,23 +155,28 @@ const patchForecastLineItemForRoute = async (
         : { egcs_fc_totalamount: databaseMoneyValue(patchTotalAmount) })
     }
 
-    const updated = await trx
-      .updateTable('Funding_Case_Agreement_Forecast_Line_Item')
-      .set(databasePatchValues)
-      .where('id', '=', lineId)
-      .where('egcs_fc_agreementforecast', '=', existing.egcs_fc_agreementforecast)
-      .where('_deleted', '=', false)
-      .returning([
-        'id',
-        'egcs_fc_agreementforecast',
-        'egcs_fc_fundingagreement',
-        'egcs_fc_fundingagreementbudgetlineitem',
-        'egcs_fc_month',
-        databaseMoneyText(sql.ref('egcs_fc_amount')).as('egcs_fc_amount'),
-        databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('egcs_fc_totalamount'),
-        'egcs_fc_currency',
-        '_deleted'
-      ])
+    const lineQuery = Object.keys(databasePatchValues).length > 0
+      ? trx.updateTable('Funding_Case_Agreement_Forecast_Line_Item')
+          .set(databasePatchValues)
+          .where('id', '=', lineId)
+          .where('egcs_fc_agreementforecast', '=', existing.egcs_fc_agreementforecast)
+          .where('_deleted', '=', false)
+      : trx.selectFrom('Funding_Case_Agreement_Forecast_Line_Item')
+          .where('id', '=', lineId)
+          .where('egcs_fc_agreementforecast', '=', existing.egcs_fc_agreementforecast)
+          .where('_deleted', '=', false)
+    const columns = [
+      'id',
+      'egcs_fc_agreementforecast',
+      'egcs_fc_fundingagreement',
+      'egcs_fc_fundingagreementbudgetlineitem',
+      'egcs_fc_month',
+      databaseMoneyText(sql.ref('egcs_fc_amount')).as('egcs_fc_amount'),
+      databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('egcs_fc_totalamount'),
+      'egcs_fc_currency',
+      '_deleted'
+    ] as const
+    const updated = await ('returning' in lineQuery ? lineQuery.returning(columns) : lineQuery.select(columns))
       .executeTakeFirstOrThrow()
     if (fundingSources !== undefined) {
       const fundingError = await replaceAgreementLineFunding(event, trx, agreementId, { kind: 'forecast', lineId }, fundingSources)

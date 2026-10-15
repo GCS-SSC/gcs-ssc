@@ -663,8 +663,8 @@ export type TransferPaymentStreamChartOfAccountItem = WithId<TransferPaymentStre
 }>
 
 export const AgencyCommitmentTypeSchema = z.object({
-  egcs_ay_name_en: RequiredString(),
-  egcs_ay_name_fr: RequiredString()
+  egcs_ay_name_en: StreamStorageText(255),
+  egcs_ay_name_fr: StreamStorageText(255)
 })
 export const AgencyCommitmentTypePatchSchema = AgencyCommitmentTypeSchema.partial()
 export type AgencyCommitmentType = z.infer<typeof AgencyCommitmentTypeSchema>
