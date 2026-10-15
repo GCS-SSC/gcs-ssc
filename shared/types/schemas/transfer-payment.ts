@@ -134,6 +134,11 @@ export const TransferPaymentFinancialLimitsSchema = z.object({
   egcs_tp_active: z.boolean().default(false)
 })
 
+export const TransferPaymentFinancialLimitsPatchSchema = TransferPaymentFinancialLimitsSchema
+  .omit({ egcs_tp_transferpaymentstream: true, egcs_tp_active: true })
+  .partial()
+  .extend({ egcs_tp_active: z.boolean().optional() })
+
 export type TransferPaymentFinancialLimits = z.infer<typeof TransferPaymentFinancialLimitsSchema>
 export type TransferPaymentFinancialLimitsItem = WithId<TransferPaymentFinancialLimits>
 

@@ -207,7 +207,8 @@ const AgencyFiscalYearBaseSchema = z.object({
     .string({ error: 'validation.display_required' })
     .trim()
     .min(1, { error: 'validation.display_required' })
-    .max(9, { error: 'validation.max_length' }),
+    .max(9, { error: 'validation.max_length' })
+    .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' }),
   egcs_ay_fiscalyear: z.coerce.number().int().min(1900).max(2100),
   egcs_ay_startdate: RequiredDateSchema,
   egcs_ay_enddate: RequiredDateSchema,

@@ -2,7 +2,7 @@ import { authorize } from '~~/server/utils/authorize'
 import { createTransferPaymentScopedAuthorizeHandler, authorizeTransferPaymentStreamResource } from '~~/server/utils/transfer-payment-route-authorization'
 import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import { notFound, badRequest } from '~~/server/utils/api-errors'
-import { TransferPaymentFinancialLimitsSchema } from '~~/shared/types/schemas/transfer-payment'
+import { TransferPaymentFinancialLimitsPatchSchema } from '~~/shared/types/schemas/transfer-payment'
 import { executeFreshAuthorizedTransferPaymentStreamWrite } from '~~/server/utils/transfer-payment-write-transaction'
 import { sql } from 'kysely'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
@@ -31,8 +31,7 @@ export default defineEventHandler(async event => {
 
   await authorize(event, 'transfer_payment', 'update', createTransferPaymentScopedAuthorizeHandler('update', streamContext.scope, db))
 
-  const patchSchema = TransferPaymentFinancialLimitsSchema.partial().omit({ egcs_tp_transferpaymentstream: true })
-  const validated = await readValidatedBodyI18n(event, patchSchema)
+  const validated = await readValidatedBodyI18n(event, TransferPaymentFinancialLimitsPatchSchema)
   if (Object.keys(validated).length === 0)
     return await badRequest(event, 'NO_UPDATABLE_FIELDS', 'apiErrors.request.no_updatable_fields')
 

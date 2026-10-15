@@ -59,7 +59,7 @@ export default defineEventHandler(async event => {
       .executeTakeFirst()
   ])
 
-  const total = Number(statsResult?.active ?? 0)
+  const total = Number(statsResult?.total ?? 0)
 
   return {
     items: items.map(item => ({
