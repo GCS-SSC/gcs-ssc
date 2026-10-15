@@ -111,7 +111,7 @@ and intermediate `gcs-db-volume-budget-controls-reset-20261014`
 deletion on 2026-10-16. The earlier clean-reset and ar-paid-reset volumes are
 absent from the live project inventory.
 
-The current Commitment budget payment-hold release uses source commit
+The earlier Commitment budget payment-hold release uses source commit
 `274dbb7edeb8dfe755a4b28c42e8e7c8ef3fdc53` and public image digest
 `sha256:38e90328b31759f83c80d222fe83da202e63a2f9676939da7ec58045b1db587c`
 from [verified build 38753855922](https://github.com/GCS-SSC/gcs-ssc/actions/runs/38753855922).
@@ -125,6 +125,21 @@ Agreement 10139, Amendment 10147, inactive Commitment 10140 (CAD 120,000),
 active Commitment 10149 (CAD 50,000), and historical paid Payment 10142 (CAD 30,000).
 Public health, authenticated reads and the Amendment page passed. No database
 reset or seed replay is needed for this hotfix; Portal and Metabase are unchanged.
+
+The current Claim recovery hotfix uses source commit
+`da9ec0568c178358a4852abbdf77d30407566198` and public image digest
+`sha256:2891db198dfafedbd0e2d284670d2ee605adf3d00e793079a86d4280a321201d`
+from [verified build 38772040704](https://github.com/GCS-SSC/gcs-ssc/actions/runs/38772040704).
+The same digest is published as `ghcr.io/gcs-ssc/gcs-ssc-demo:latest`.
+Railway deployment `221b5ef9-1650-4283-bebf-7ab2b42e7e36` reached `SUCCESS`
+on 2026-10-15. This code-only release adds no migrations and performs no reset or
+seed replay. Before/after authenticated financial snapshots match: seventeen
+Agreements and eleven Payments, including Amendment 10167, fully recovered
+Claim AR 10165, posted Credit Memo 10166 and Payments 168/172. Public health and
+the Amendment and AR pages passed. All volume attachments are unchanged.
+The hotfix credits actual posted Claim AR collections when checking budget
+reductions and requires original Claim ARs to allocate their full principal
+in a Claim reduction plan before submission; partial Credit Memos remain valid.
 
 The Portal release uses source commit
 `54117871c2f6a0468e7a877ee6eb2a05284701cd` and pinned public image digest

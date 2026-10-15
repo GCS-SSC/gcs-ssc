@@ -213,7 +213,7 @@ Direct ECS updates do not rewrite CloudFormation's deployed template; keep the
 manifest aligned before subsequent CDK deployments to avoid restoring an older image.
 Do not run concurrent GCS deployments or refresh commands.
 
-The current Commitment budget release was built from source
+The earlier Commitment budget release was built from source
 `274dbb7edeb8dfe755a4b28c42e8e7c8ef3fdc53` by
 [image build 38753855922](https://github.com/GCS-SSC/gcs-ssc/actions/runs/38753855922).
 Both `latest` and the shared manifest resolve to
@@ -225,6 +225,22 @@ browser reads passed at <https://dwqie6eqqoak.cloudfront.net/>. Only the pending
 hotfix migration ran. All fourteen Agreements and eight Payments, including
 Payments 168 and 172, match the before-deployment snapshot; attachment storage,
 Portal and Metabase were preserved.
+
+The current Claim recovery hotfix was built from source
+`da9ec0568c178358a4852abbdf77d30407566198` by
+[image build 38772040704](https://github.com/GCS-SSC/gcs-ssc/actions/runs/38772040704).
+Both `latest` and the shared manifest resolve to
+`ghcr.io/gcs-ssc/gcs-ssc-demo@sha256:2891db198dfafedbd0e2d284670d2ee605adf3d00e793079a86d4280a321201d`.
+`AWS_PROFILE=gcscience bun run aws:demo:refresh` deployed task definition
+`GcsSscDemoTask0D89BCB6:8` on 2026-10-15 with `Reset database: false`.
+ECS reached `COMPLETED`, with one running task and no pending tasks; the running
+image digest matches the verified release. Public health, authenticated API reads
+and Home passed; before/after snapshots match fourteen Agreements and eight Payments,
+including Payments 168/172. This code-only
+release adds no migrations and does not reset or replay the seed. It preserves
+attachment storage, Portal and Metabase. Amendment budget floors now account for
+posted Claim AR collections; original Claim AR submission requires a full-principal
+Claim reduction plan, while partial Credit Memos remain supported.
 
 If reset or deployment fails, inspect the printed task ARN and GCS CloudWatch
 logs. The helper does not automatically restart the old application after a reset;
