@@ -5,6 +5,7 @@ import { compareMoney, sumMoney, parseMoneyText, type Money } from '~~/shared/ut
 import { parseDatabaseMoney } from './database-money'
 import { getBusinessRecordStateProjections } from './business-record-state'
 import { readEffectiveAccountReceivableClaimRecoveries } from './agreement-accounting-projection'
+import { readAgreementBudgetRecoveryCredits } from './agreement-budget-recovery-credit'
 
 type Db = Kysely<Database> | Transaction<Database>
 
@@ -101,12 +102,14 @@ const getBudgetRecordStates = async (db: Db, entityType: Workflow_Target_Entity_
  * @param db - Current request snapshot or locked write transaction.
  * @param agreementId - Owning Agreement.
  * @param target - Proposal; forecasts include their full live monthly breakdown.
+ * @param usageBasis - Budget reductions also credit posted Claim AR collections.
  * @returns Exceeded annual program funding, otherwise null.
  */
 export const getAgreementFinancialBudgetViolation = async (
   db: Db,
   agreementId: string,
-  target: AgreementFinancialBudgetTarget
+  target: AgreementFinancialBudgetTarget,
+  usageBasis: 'submission' | 'budget-reduction' = 'submission'
 ): Promise<AgreementFinancialBudgetViolationDetails | null> => {
   const header = target.kind === 'forecast'
     ? sql`SELECT egcs_fc_fiscalyear AS year_id FROM "Funding_Case_Agreement_Forecast"
@@ -200,7 +203,10 @@ export const getAgreementFinancialBudgetViolation = async (
     const recoveries = await readEffectiveAccountReceivableClaimRecoveries(db, agreementId, {
       currency: context.currency, fiscalYearBasis: 'claim-source'
     })
-    for (const recovery of recoveries) {
+    const postedRecoveries = usageBasis === 'budget-reduction'
+      ? await readAgreementBudgetRecoveryCredits(db, agreementId, context.currency)
+      : []
+    for (const recovery of [...recoveries, ...postedRecoveries]) {
       if (recovery.fiscalYearId !== context.fiscalYearId || compareMoney(recovery.amount, ZERO) >= 0) continue
       const values = recoveriesByClaim.get(recovery.claimId) ?? []
       values.push(recovery.amount)
@@ -239,11 +245,13 @@ export const getAgreementFinancialBudgetViolation = async (
  * @param db - Locked Agreement write transaction.
  * @param agreementId - Owning Agreement.
  * @param target - Proposal being saved or completed.
+ * @param usageBasis - Budget changes include actual collections independently of reduction plans.
  */
 export const assertAgreementFinancialBudgetControls = async (
-  db: Db, agreementId: string, target: AgreementFinancialBudgetTarget
+  db: Db, agreementId: string, target: AgreementFinancialBudgetTarget,
+  usageBasis: 'submission' | 'budget-reduction' = 'submission'
 ): Promise<void> => {
-  const violation = await getAgreementFinancialBudgetViolation(db, agreementId, target)
+  const violation = await getAgreementFinancialBudgetViolation(db, agreementId, target, usageBasis)
   if (violation) throw new AgreementFinancialBudgetViolation(violation)
 }
 
@@ -320,7 +328,7 @@ export const assertAgreementCurrentBudgetUsage = async (db: Db, agreementId: str
   const checkedClaimYears = new Set<string>()
   for (const claim of claims) {
     if (!checkedClaimYears.has(claim.fiscalYearId) && !hasNegativeBudgetOutcome(claimStates.get(String(claim.id)))) {
-      await assertAgreementFinancialBudgetControls(db, agreementId, { kind: 'claim', id: String(claim.id) })
+      await assertAgreementFinancialBudgetControls(db, agreementId, { kind: 'claim', id: String(claim.id) }, 'budget-reduction')
       checkedClaimYears.add(claim.fiscalYearId)
     }
   }
@@ -330,7 +338,7 @@ export const assertAgreementCurrentBudgetUsage = async (db: Db, agreementId: str
     if (!checkedReconcileYears.has(reconciliation.fiscalYearId)
       && state?.lifecycleTerminus === 'positive' && !hasNegativeBudgetOutcome(state)
       && !hasNegativeBudgetOutcome(claimStates.get(String(reconciliation.claimId)))) {
-      await assertAgreementFinancialBudgetControls(db, agreementId, { kind: 'reconciliation', id: String(reconciliation.id) })
+      await assertAgreementFinancialBudgetControls(db, agreementId, { kind: 'reconciliation', id: String(reconciliation.id) }, 'budget-reduction')
       checkedReconcileYears.add(reconciliation.fiscalYearId)
     }
   }

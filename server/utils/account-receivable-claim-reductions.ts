@@ -25,7 +25,9 @@ const reservedClaimReductions = (id: string, claimLine: string) => sql<string>`c
   WHERE reduction.egcs_fc_claimline=${sql.ref(claimLine)} AND reduction.egcs_fc_receivable<>${id}::bigint
     AND NOT reduction._deleted AND (reduction.egcs_fc_appliedat IS NOT NULL OR (NOT owner._deleted AND owner.egcs_fc_outcome IN ('open','posted')))),0)::text`
 
-export const validateAccountReceivableClaimReductionBasis = async (db: Kysely<Database>, id: string) => {
+export const validateAccountReceivableClaimReductionBasis = async (
+  db: Kysely<Database>, id: string, options: { requirePlan?: boolean } = {}
+) => {
   const plans = await db.selectFrom('Funding_Case_Account_Receivable_Claim_Reduction as reduction')
     .innerJoin('Funding_Case_Agreement_Claim_Line_Item as line', 'line.id', 'reduction.egcs_fc_claimline')
     .innerJoin('Funding_Case_Agreement_Claim as claim', 'claim.id', 'reduction.egcs_fc_claim')
@@ -34,11 +36,17 @@ export const validateAccountReceivableClaimReductionBasis = async (db: Kysely<Da
       databaseMoneyText(sql.ref('reduction.egcs_fc_amount')).as('amount'),
       retainedClaimReductionBasis(id, 'line.id').as('basis'), reservedClaimReductions(id, 'line.id').as('reserved')])
     .where('reduction.egcs_fc_receivable', '=', id).where('reduction._deleted', '=', false).execute()
-  if (!plans.length) return
+  if (!plans.length && !options.requirePlan) return
   const debt = await db.selectFrom('Funding_Case_Agreement_Account_Receivable').select(['egcs_fc_fundingagreement', 'egcs_fc_applicantrecipient', 'egcs_fc_claimrelated', 'egcs_fc_linkedreceivable',
     databaseMoneyText(sql.ref('egcs_fc_amount')).as('amount')]).where('id', '=', id).executeTakeFirstOrThrow()
+  if (options.requirePlan && debt.egcs_fc_claimrelated && !debt.egcs_fc_linkedreceivable
+    && !plans.some(plan => moneyToCents(parseDatabaseMoney(plan.amount)) > BigInt(0))) throw new Error('AR_CLAIM_REDUCTION_REQUIRED')
+  if (!plans.length) return
   if (!debt.egcs_fc_claimrelated || debt.egcs_fc_linkedreceivable) throw new Error('AR_SOURCE_UNAVAILABLE')
-  if (moneyToCents(sumMoney(plans.map(plan => parseDatabaseMoney(plan.amount)))) > moneyToCents(parseDatabaseMoney(debt.amount))) throw new Error('AR_SOURCE_CAPACITY')
+  const total = sumMoney(plans.map(plan => parseDatabaseMoney(plan.amount)))
+  const principal = parseDatabaseMoney(debt.amount)
+  if (moneyToCents(total) > moneyToCents(principal)) throw new Error('AR_SOURCE_CAPACITY')
+  if (options.requirePlan && total !== principal) throw new Error('AR_CLAIM_REDUCTION_TOTAL')
   for (const plan of plans) {
     if (plan.lineDeleted || plan.claimDeleted || plan.egcs_fc_claim !== plan.egcs_fc_fundingagreementclaim
       || plan.egcs_fc_fundingagreement !== debt.egcs_fc_fundingagreement || plan.egcs_fc_applicantrecipient !== debt.egcs_fc_applicantrecipient) throw new Error('AR_SOURCE_UNAVAILABLE')

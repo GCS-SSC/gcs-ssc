@@ -151,7 +151,7 @@ export const validateAccountReceivableBasis = async (trx: Kysely<Database>, id: 
   if (!debt.egcs_fc_linkedreceivable && (moneyToCents(total) < BigInt(0) || (options.submission && moneyToCents(total) <= BigInt(0)))) throw new Error('AR_PRINCIPAL_REQUIRED')
   if (options.submission) {
     const { validateAccountReceivableClaimReductionBasis } = await import('./account-receivable-claim-reductions')
-    await validateAccountReceivableClaimReductionBasis(trx, id)
+    await validateAccountReceivableClaimReductionBasis(trx, id, { requirePlan: true })
   }
   const poolRecovery = await trx.selectFrom('Funding_Case_Account_Receivable_Recovery').select('id').where('egcs_fc_pool', '=', String(debt.egcs_fc_pool))
     .where('egcs_fc_outcome', '=', 'open').where('_deleted', '=', false).executeTakeFirst()

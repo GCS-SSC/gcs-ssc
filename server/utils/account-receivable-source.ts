@@ -31,6 +31,8 @@ export const accountReceivableError = async (event: H3Event, code: string): Prom
     AR_ACCOUNT_UNAVAILABLE: 'account_unavailable',
     AR_MONITOR_REQUIRED: 'monitor_required',
     AR_TYPE_UNAVAILABLE: 'type_unavailable',
+    AR_CLAIM_REDUCTION_REQUIRED: 'claim_reduction_required',
+    AR_CLAIM_REDUCTION_TOTAL: 'claim_reduction_total',
     AR_CLAIM_REDUCTION_SOURCE_REQUIRED: 'claim_reduction_source_required',
     AR_NO_PAID_CODING: 'no_paid_coding',
     AR_CODING_CAPACITY: 'coding_capacity',

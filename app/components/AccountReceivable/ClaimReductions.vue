@@ -16,9 +16,10 @@ import type { TableColumnInput } from '~/composables/useTableColumns'
 import { useLoadRecoveryFocus } from '~/composables/useLoadRecoveryFocus'
 import { useCrudModal, useCrudModalPending } from '~/composables/useCrudModal'
 
-const { accountReceivableId, currency, reductions, canEdit, canUpdate, readOnly = false } = defineProps<{
+const { accountReceivableId, currency, declaredAmount, reductions, canEdit, canUpdate, readOnly = false } = defineProps<{
   accountReceivableId: string
   currency: string
+  declaredAmount: string
   reductions: AccountReceivableClaimReduction[]
   canEdit: boolean
   canUpdate: boolean
@@ -47,6 +48,16 @@ const modalPending = useCrudModalPending(lineModal.captureSession)
 const pending = modalPending.isPending
 const selectedChoice = computed(() => choices.value.find(choice => choice.id === selectedLine.value?.egcs_fc_claimline) ?? null)
 const pagination = ref({ pageIndex: 0, pageSize: 50 })
+const planRequirementError = computed(() => {
+  if (readOnly || loadStatus.value !== 'success') return null
+  const amounts = reductions.map(reduction => NonNegativeMoneySchema.safeParse(reduction.egcs_fc_amount))
+  if (!amounts.length) return 'claim_reduction_required'
+  if (amounts.some(amount => !amount.success)) return 'claim_reduction_total'
+  const total = sumMoney(amounts.flatMap(amount => amount.success ? [amount.data] : []))
+  if (moneyToCents(total) <= BigInt(0)) return 'claim_reduction_required'
+  const declared = NonNegativeMoneySchema.safeParse(declaredAmount)
+  return !declared.success || moneyToCents(total) !== moneyToCents(declared.data) ? 'claim_reduction_total' : null
+})
 const bilingual = (en: string | null, fr: string | null) => (locale.value === 'fr' ? fr || en : en || fr)
 const tableRows = computed(() => choices.value.map((choice, index) => ({
   ...choice, index,
@@ -182,6 +193,10 @@ const save = async () => {
     <p class="mb-4 text-sm text-muted">
       {{ t('account_receivable.claim_reductions_instruction') }}
     </p>
+    <p v-if="!readOnly" class="mb-4 text-sm text-muted">
+      {{ t('account_receivable.claim_reduction_requirement') }} ({{ t('common.field_required') }})
+    </p>
+    <UAlert v-if="planRequirementError" class="mb-4" color="warning" :title="t('common.warning')" :description="t(`apiErrors.account_receivable.${planRequirementError}`)" />
     <p v-if="loadStatus === 'pending'" role="status" aria-live="polite" class="text-sm text-muted">
       {{ t('common.loading_records') }}
     </p>
