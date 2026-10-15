@@ -14,6 +14,9 @@ export default defineEventHandler(async event => {
     { code: 'ATTACHMENT_TYPE_NOT_FOUND', key: 'apiErrors.agency.attachment_type_not_found' }
   )
   const body = await readValidatedBodyI18n(event, AgencyAttachmentTypeSchema.partial())
+  if (Object.keys(body).length === 0) {
+    return await badRequest(event, 'NO_UPDATABLE_FIELDS', 'apiErrors.request.no_updatable_fields')
+  }
 
   let result
   try {

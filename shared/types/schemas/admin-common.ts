@@ -130,6 +130,13 @@ const CatalogNameSchema = (requiredKey: string) => RequiredString(requiredKey).s
 const AttachmentTypeNameSchema = (requiredKey: string) => CatalogNameSchema(requiredKey)
   .refine(value => value.trim().length > 0, { error: requiredKey })
 
+/** Builds a required description that PostgreSQL text can store without normalization.
+ * @param requiredKey Localized validation key for an empty description.
+ * @returns Description schema preserving ordinary whitespace and line breaks.
+ */
+const AttachmentTypeDescriptionSchema = (requiredKey: string) => RequiredString(requiredKey)
+  .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' })
+
 export const CommonGwcoaCreateSchema = z.object({
   egcs_cn_number: z.coerce.number({ error: 'validation.required' })
     .int({ error: 'validation.invalid_number' })
@@ -355,8 +362,8 @@ export const CommonAttachmentTypeCreateSchema = z.object({
   egcs_cn_agency: IdSchema,
   egcs_cn_name_en: AttachmentTypeNameSchema('validation.name_en_required'),
   egcs_cn_name_fr: AttachmentTypeNameSchema('validation.name_fr_required'),
-  egcs_cn_description_en: RequiredString('validation.desc_en_required'),
-  egcs_cn_description_fr: RequiredString('validation.desc_fr_required')
+  egcs_cn_description_en: AttachmentTypeDescriptionSchema('validation.desc_en_required'),
+  egcs_cn_description_fr: AttachmentTypeDescriptionSchema('validation.desc_fr_required')
 })
 export const CommonAttachmentTypePatchSchema = CommonAttachmentTypeCreateSchema.partial().extend({
   _deleted: z.boolean().optional()
