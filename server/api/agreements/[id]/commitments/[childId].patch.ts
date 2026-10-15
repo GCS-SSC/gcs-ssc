@@ -56,6 +56,10 @@ export default defineEventHandler(async event => {
         return existing
       }
 
+      if (!Object.values(patchValues).some(value => value !== undefined)) {
+        return await badRequest(event, 'NO_UPDATABLE_FIELDS', 'apiErrors.request.no_updatable_fields')
+      }
+
       await assertAgreementCurrency(event, trx, agreementId, patchValues.egcs_fc_currency ?? editableCommitment.egcs_fc_currency)
 
       if (patchValues.egcs_fc_type) {

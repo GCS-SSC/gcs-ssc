@@ -42,6 +42,14 @@ export default defineEventHandler(async event => {
       }
     }
 
+    // Retire coding while its live parent still contributes to the paid-floor pool.
+    await trx
+      .updateTable('Funding_Case_Agreement_Commitment_Line')
+      .set({ _deleted: true })
+      .where('egcs_fc_commitment', '=', childId)
+      .where('_deleted', '=', false)
+      .execute()
+
     const deleted = await trx
       .updateTable('Funding_Case_Agreement_Commitment')
       .set({ _deleted: true })
@@ -53,13 +61,6 @@ export default defineEventHandler(async event => {
     if (!deleted) {
       return await badRequest(event, 'AGREEMENT_COMMITMENT_NOT_FOUND', 'apiErrors.agreement.commitment_not_found')
     }
-
-    await trx
-      .updateTable('Funding_Case_Agreement_Commitment_Line')
-      .set({ _deleted: true })
-      .where('egcs_fc_commitment', '=', childId)
-      .where('_deleted', '=', false)
-      .execute()
   }, { action: 'delete' })
 
   return { success: true }

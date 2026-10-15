@@ -20,5 +20,5 @@ export default defineEventHandler(async event => {
     if (linked) return await badRequest(event, 'TRANSFER_PAYMENT_COMMITMENT_TYPE_IN_USE', 'apiErrors.transfer_payment.commitment_type_in_use')
     await trx.updateTable('Agency_Commitment_Type').set({ _deleted: true }).where('id', '=', typeId).execute()
     return { success: true }
-  })
+  }, 'delete')
 })
