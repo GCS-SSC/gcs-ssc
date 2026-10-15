@@ -1,6 +1,6 @@
 import { authorize, requireAuthContext } from '~~/server/utils/authorize'
 import { badRequest } from '~~/server/utils/api-errors'
-import { PaginationSchema } from '~~/shared/types/schemas'
+import { PaginationSchema, PositivePostgresBigintIdSchema } from '~~/shared/types/schemas/common'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { assertApplicantRecipientProfileExists } from '~~/server/utils/applicant-recipient-child-resources'
 import { resolveApplicantRecipientAuthorization } from '~~/server/utils/applicant-recipient-auth'
@@ -8,8 +8,10 @@ import { z } from 'zod'
 
 const QuerySchema = PaginationSchema.extend({
   permission_action: z.enum(['create', 'update']).default('create'),
-  selected_id: z.coerce.string().optional()
+  selected_id: z.preprocess(value => value === '' ? undefined : value, PositivePostgresBigintIdSchema.optional())
 })
+const AuthorizationQuerySchema = QuerySchema.omit({ selected_id: true })
+const SelectedAgencyQuerySchema = QuerySchema.pick({ selected_id: true })
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -20,10 +22,11 @@ export default defineEventHandler(async event => {
     return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')
   }
 
-  const { page, limit, search, permission_action, selected_id } = await getValidatedQueryI18n(event, QuerySchema)
+  const { page, limit, search, permission_action } = await getValidatedQueryI18n(event, AuthorizationQuerySchema)
   await authorize(event, 'applicant_recipient', permission_action, async ({ context: authContext }) =>
     await resolveApplicantRecipientAuthorization(authContext, applicantRecipientId, permission_action, db)
   )
+  const { selected_id } = await getValidatedQueryI18n(event, SelectedAgencyQuerySchema)
   const profile = await assertApplicantRecipientProfileExists(event, applicantRecipientId, db)
   if (!profile || typeof profile !== 'object' || !('id' in profile)) {
     return profile
