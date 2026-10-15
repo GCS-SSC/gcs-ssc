@@ -209,12 +209,12 @@ const warnRecordPrerequisite = () => toast.add({
   description: t('agreement.child_records.work_prerequisite'),
   color: 'warning'
 })
-const loadWorkableRecord = async (recordId: string, action: 'update' | 'delete'): Promise<FundingCaseAgreementClaimRow | null> => {
+const loadWorkableRecord = async (recordId: string, action: 'update' | 'delete', isCurrent: () => boolean = () => true): Promise<FundingCaseAgreementClaimRow | null> => {
   const owner = agreementId
   const generation = recordActionGeneration
   const current = tableRows.value.find(row => String(row.id) === recordId)
   if (current && !statusCatalog.getById(current.egcs_fc_status)) await statusCatalog.load()
-  if (disposed || owner !== agreementId || generation !== recordActionGeneration) return null
+  if (disposed || owner !== agreementId || generation !== recordActionGeneration || !isCurrent()) return null
   if (!current || isRecordLocked(current)) {
     warnRecordPrerequisite()
     return null
@@ -225,10 +225,10 @@ const loadWorkableRecord = async (recordId: string, action: 'update' | 'delete')
       $fetch<{ claims: FundingCaseAgreementClaimRow[] }, string>(`/api/agreements/${owner}/claims-overview`),
       $fetch<{ is_assigned: boolean }, string>(`/api/entity-assignments/fundingcaseagreementclaim/${recordId}`)
     ])
-    if (disposed || owner !== agreementId || generation !== recordActionGeneration) return null
+    if (disposed || owner !== agreementId || generation !== recordActionGeneration || !isCurrent()) return null
     const record = overview.claims.find(row => String(row.id) === recordId)
     if (!statusCatalog.getById(parent.egcs_fc_status) || (record && !statusCatalog.getById(record.egcs_fc_status))) await statusCatalog.load()
-    if (disposed || owner !== agreementId || generation !== recordActionGeneration) return null
+    if (disposed || owner !== agreementId || generation !== recordActionGeneration || !isCurrent()) return null
     const permitted = action === 'update' ? parent.can_update_child_records_role : parent.can_delete_child_records_role
     if (permitted !== true || roster.is_assigned !== true || isRecordLocked(parent) || !record || isRecordLocked(record)) {
       warnRecordPrerequisite()
@@ -236,7 +236,7 @@ const loadWorkableRecord = async (recordId: string, action: 'update' | 'delete')
     }
     return record
   } catch {
-    if (!disposed && owner === agreementId && generation === recordActionGeneration) warnRecordPrerequisite()
+    if (!disposed && owner === agreementId && generation === recordActionGeneration && isCurrent()) warnRecordPrerequisite()
     return null
   }
 }
@@ -295,7 +295,8 @@ const saveClaim = async () => {
   if (!claimPending.begin(session)) return
 
   try {
-    if (isUpdate && !await loadWorkableRecord(String(claimState.id), 'update')) return
+    if (isUpdate && !await loadWorkableRecord(String(claimState.id), 'update',
+      () => isClaimModalOpen.value && claimModal.captureSession() === session)) return
     if (!isUpdate && !await checkCreationPrerequisites()) return
     if (disposed || claimModal.captureSession() !== session) return
     await saveJson(

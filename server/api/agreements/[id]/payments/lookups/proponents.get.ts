@@ -1,10 +1,12 @@
 import { sql } from 'kysely'
 import { z } from 'zod'
-import { PaginationSchema } from '~~/shared/types/schemas/common'
+import { PaginationSchema, PositivePostgresBigintIdSchema } from '~~/shared/types/schemas/common'
 import { prepareAgreementPaymentRoute } from '~~/server/utils/agreement-payment'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
 
 const QuerySchema = PaginationSchema.extend({
+  selected_ids: z.preprocess(value => value === undefined ? undefined : Array.isArray(value) ? value : [value],
+    z.array(PositivePostgresBigintIdSchema).max(100).optional()),
   paymentId: z.union([z.string().min(1), z.number()]).transform(String).optional(),
   permission_action: z.enum(['create', 'update']).default('create')
 }).superRefine((query, ctx) => {
@@ -12,7 +14,7 @@ const QuerySchema = PaginationSchema.extend({
 })
 
 export default defineEventHandler(async event => {
-  const { page, limit, search, paymentId, permission_action } = await getValidatedQueryI18n(event, QuerySchema)
+  const { page, limit, search, selected_ids: selectedIds, paymentId, permission_action } = await getValidatedQueryI18n(event, QuerySchema)
   const prepared = await prepareAgreementPaymentRoute(event, permission_action,
     paymentId ? { entityType: 'fundingcasepayment', entityId: paymentId } : undefined)
   if (!prepared || !('agreementId' in prepared)) return prepared
@@ -20,6 +22,7 @@ export default defineEventHandler(async event => {
     .innerJoin('Applicant_Recipient_Profile as payee', 'payee.id', 'link.egcs_fc_applicantrecipient')
     .where('link.egcs_fc_fundingagreement', '=', prepared.agreementId).where('link._deleted', '=', false)
     .where('payee._deleted', '=', false).where('payee.egcs_ar_active', '=', true)
+  if (selectedIds?.length) base = base.where('payee.id', 'in', selectedIds)
   if (search) base = base.where(sql<boolean>`concat_ws(' ',payee.egcs_ar_legalname_en,payee.egcs_ar_legalname_fr,payee.egcs_ar_operatingname_en,payee.egcs_ar_operatingname_fr) ILIKE ${`%${escapeLikePattern(search)}%`}`)
   const [items, count] = await Promise.all([
     base.select(['payee.id', sql<string>`COALESCE(payee.egcs_ar_operatingname_en,payee.egcs_ar_legalname_en,'')`.as('label_en'),

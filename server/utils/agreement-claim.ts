@@ -1344,6 +1344,16 @@ const validateAgreementClaimReconcilePatch = async (
   }
 
   const nextClaimId = String(patchValues.egcs_fc_fundingagreementclaim ?? existing.egcs_fc_fundingagreementclaim)
+  if (nextClaimId !== String(existing.egcs_fc_fundingagreementclaim)) {
+    // Deleted line history retains the same composite Claim identity.
+    const retainedLine = await db.selectFrom('Funding_Case_Agreement_Claim_Reconcile_Line_Item')
+      .select('id')
+      .where('egcs_fc_fundingagreementclaimreconcile', '=', reconcileId)
+      .executeTakeFirst()
+    if (retainedLine) {
+      return await badRequest(event, 'AGREEMENT_CLAIM_RECONCILE_LINES_EXIST', 'apiErrors.agreement.claim_reconcile_lines_exist')
+    }
+  }
   const nextIsFinal = patchValues.egcs_fc_isfinal ?? existing.egcs_fc_isfinal
   if (nextIsFinal) {
     const finalConflict = await assertSingleFinalAgreementClaimReconcile(event, db, nextClaimId, reconcileId)

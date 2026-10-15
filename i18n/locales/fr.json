@@ -1418,6 +1418,7 @@
       "duplicate_final_claim_reconcile": "Un seul rapprochement peut être marqué final pour une demande de remboursement.",
       "claim_reconcile_in_progress": "Terminez ou annulez le rapprochement en cours avant de marquer un autre rapprochement comme final.",
       "duplicate_claim_reconcile_line_item": "Une ligne de rapprochement existe déjà pour cette ligne de demande de remboursement.",
+      "claim_reconcile_lines_exist": "La demande de remboursement liée à ce rapprochement ne peut pas être modifiée, car des lignes de rapprochement ont déjà été enregistrées.",
       "currency_immutable": "La devise de l’entente est définie à la création et ne peut pas être modifiée.",
       "currency_mismatch": "La devise doit correspondre à celle de l’entente.",
       "invalid_claim_proponent": "Sélectionnez le promoteur qui présente la demande et qui est lié à cette entente.",

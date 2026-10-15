@@ -1418,6 +1418,7 @@
       "duplicate_final_claim_reconcile": "Only one reconciliation can be marked final for a claim.",
       "claim_reconcile_in_progress": "Finish or cancel the reconciliation already in progress before marking another reconciliation as final.",
       "duplicate_claim_reconcile_line_item": "A reconciliation line already exists for this claim line item.",
+      "claim_reconcile_lines_exist": "The claim linked to this reconciliation cannot be changed because reconciliation lines have already been recorded.",
       "currency_immutable": "Agreement currency is set at creation and cannot be changed.",
       "currency_mismatch": "Currency must match the Agreement currency.",
       "invalid_claim_proponent": "Select a submitting Proponent linked to this Agreement.",

@@ -42,6 +42,7 @@ const monthOptions = computed(() => ['apr', 'may', 'jun', 'jul', 'aug', 'sep', '
       <CommonServerLookupSelect
         v-model="state.egcs_fc_applicantrecipient"
         :fetch-url="`/api/agreements/${agreementId}/payments/lookups/proponents`"
+        selected-values-query-key="selected_ids"
         value-key="id" label-en-key="label_en" label-fr-key="label_fr"
         :disabled="pending" :limit="100" :show-value-in-label="false" close-on-select
         :query="lookupQuery" @resolved-items="items => emit('resolved-items', 'egcs_fc_applicantrecipient', items)" />
@@ -51,6 +52,7 @@ const monthOptions = computed(() => ['apr', 'may', 'jun', 'jul', 'aug', 'sep', '
       <CommonServerLookupSelect
         v-model="state.egcs_fc_commitmenttype"
         :fetch-url="`/api/agreements/${agreementId}/payments/lookups/commitments`"
+        selected-values-query-key="selected_ids"
         value-key="id"
         label-en-key="label_en"
         label-fr-key="label_fr"
@@ -63,6 +65,7 @@ const monthOptions = computed(() => ['apr', 'may', 'jun', 'jul', 'aug', 'sep', '
       <CommonServerLookupSelect
         v-model="state.egcs_fc_fiscalyear"
         :fetch-url="`/api/agreements/${agreementId}/payments/lookups/fiscal-years`"
+        selected-values-query-key="selected_ids"
         value-key="id"
         label-en-key="label_en"
         label-fr-key="label_fr"

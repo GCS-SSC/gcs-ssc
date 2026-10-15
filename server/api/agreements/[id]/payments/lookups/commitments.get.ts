@@ -3,11 +3,13 @@ import { sql } from 'kysely'
 import { z } from 'zod'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
-import { PaginationSchema } from '~~/shared/types/schemas/common'
+import { PaginationSchema, PositivePostgresBigintIdSchema } from '~~/shared/types/schemas/common'
 import { prepareAgreementPaymentRoute } from '~~/server/utils/agreement-payment'
 import { CURRENCY_CODES_ENUM } from '~~/shared/constants/enums'
 
 const QuerySchema = PaginationSchema.extend({
+  selected_ids: z.preprocess(value => value === undefined ? undefined : Array.isArray(value) ? value : [value],
+    z.array(PositivePostgresBigintIdSchema).max(100).optional()),
   paymentId: z.union([z.string().min(1), z.number()]).transform(String).optional(),
   currency: z.enum(CURRENCY_CODES_ENUM).optional(),
   permission_action: z.enum(['create', 'update']).default('create')
@@ -18,7 +20,7 @@ const QuerySchema = PaginationSchema.extend({
 })
 
 export default defineEventHandler(async event => {
-  const { page, limit, search, paymentId, permission_action, currency: requestedCurrency } = await getValidatedQueryI18n(event, QuerySchema)
+  const { page, limit, search, selected_ids: selectedIds, paymentId, permission_action, currency: requestedCurrency } = await getValidatedQueryI18n(event, QuerySchema)
   let assignmentTarget
   if (paymentId) assignmentTarget = { entityType: 'fundingcasepayment' as const, entityId: paymentId }
   const prepared = await prepareAgreementPaymentRoute(event, permission_action, assignmentTarget)
@@ -61,6 +63,10 @@ export default defineEventHandler(async event => {
       )
     )`)
     .where('Funding_Case_Agreement_Commitment._deleted', '=', false)
+
+  if (selectedIds?.length) {
+    baseQuery = baseQuery.where('Funding_Case_Agreement_Commitment.egcs_fc_type', 'in', selectedIds)
+  }
 
   if (search) {
     baseQuery = baseQuery.where(sql<boolean>`(
