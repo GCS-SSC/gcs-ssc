@@ -8,6 +8,9 @@ import CommonCompletionSection from './Section.vue'
 const {
   entityType,
   entityId,
+  actionRoleAllowed = undefined,
+  completionPrerequisiteWarning,
+  workflowPrerequisiteWarning,
   canComplete,
   canWorkWorkflow,
   labels,
@@ -25,6 +28,9 @@ const {
 } = defineProps<{
   entityType: Entity_Type & Workflow_Target_Entity_Type
   entityId: string
+  actionRoleAllowed?: boolean
+  completionPrerequisiteWarning?: string
+  workflowPrerequisiteWarning?: string
   canComplete: boolean
   canWorkWorkflow: boolean
   labels?: GcsExtensionCompletionLabels
@@ -60,6 +66,8 @@ const refreshLifecycle = () => {
       :entity-type="entityType"
       :entity-id="entityId"
       :is-locked="!canComplete"
+      :action-role-allowed="actionRoleAllowed"
+      :action-prerequisite-warning="completionPrerequisiteWarning"
       :show-header="showHeader"
       :show-divider="showDivider"
       :labels="labels"
@@ -79,6 +87,8 @@ const refreshLifecycle = () => {
       purpose="approval_submission"
       hide-when-unconfigured
       :can-edit="canWorkWorkflow"
+      :action-role-allowed="actionRoleAllowed"
+      :action-prerequisite-warning="workflowPrerequisiteWarning"
       :refresh-key="lifecycleRefreshKey"
       @changed="refreshLifecycle" />
   </div>

@@ -3014,7 +3014,9 @@
         "completed_success": "Rapprochement terminé avec succès"
       },
       "submitting_proponent": "Promoteur présentant la demande",
-      "submitting_proponent_description": "Sélectionnez le promoteur de cette entente qui soumet cette demande. La valeur peut être modifiée tant que la demande est modifiable."
+      "submitting_proponent_description": "Sélectionnez le promoteur de cette entente qui soumet cette demande. La valeur peut être modifiée tant que la demande est modifiable.",
+      "action_unavailable": "Cette action n’est pas disponible dans l’état actuel de la demande de remboursement.",
+      "reconcile_prerequisites": "Terminez la demande de remboursement, répartissez toutes les lignes soumises et assurez-vous qu’aucun rapprochement final n’a été approuvé avant de commencer un rapprochement."
     },
     "monitors": {
       "title": "Surveillances",
@@ -3847,7 +3849,10 @@
     "risk_rating_required_help": "Cette exigence s’applique une fois ce processus publié et sélectionné pour un volet. Le processus d’évaluation du risque doit avoir été terminé avec succès avant l’achèvement d’une modification ou la présentation d’une recommandation d’entente. Les scores existants et les évaluations terminées ne suffisent pas.",
     "data_collection": "Collecte de données",
     "open_data_collection": "Ouvrir la collecte de données",
-    "followed_by_approval": "Suivi d’une approbation"
+    "followed_by_approval": "Suivi d’une approbation",
+    "action_prerequisite_unavailable": "Cette action n’est pas disponible, car une condition préalable n’est pas remplie.",
+    "retry_unavailable": "Ce processus ne peut pas être relancé dans son état actuel.",
+    "cancel_unavailable": "Ce processus ne peut pas être annulé dans son état actuel."
   },
   "recommendation_schema": {
     "title": "Schéma de recommandation",

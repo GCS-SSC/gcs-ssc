@@ -26,6 +26,8 @@ type CompletionWorkflowStartOptions = {
   entityType: MaybeRefOrGetter<Entity_Type>
   entityId: MaybeRefOrGetter<string>
   isLocked?: MaybeRefOrGetter<boolean>
+  actionRoleAllowed?: MaybeRefOrGetter<boolean | undefined>
+  actionPrerequisiteWarning?: MaybeRefOrGetter<string | undefined>
   completePayload?: MaybeRefOrGetter<unknown>
   completedSuccessKey: MaybeRefOrGetter<string>
   confirmationMessageKey?: MaybeRefOrGetter<string | undefined>
@@ -59,6 +61,9 @@ export const useCompletionWorkflowStart = (options: CompletionWorkflowStartOptio
   const canComplete = computed(() => loadStatus.value === 'success'
     && completionResponse.value?.can_complete === true
     && !toValue(options.isLocked))
+
+  const roleVisibleActions = computed(() => toValue(options.actionRoleAllowed) !== undefined)
+  const canShowAction = computed(() => toValue(options.actionRoleAllowed) !== false)
 
   /** Refreshes whether the target can be completed and whether completion already exists. */
   const refreshCompletion = async () => {
@@ -122,7 +127,18 @@ export const useCompletionWorkflowStart = (options: CompletionWorkflowStartOptio
 
   /** Starts the explicit Completion or Agreement Recommendation submission action. */
   const startWorkflow = async () => {
-    if (!isActive.value || !canComplete.value || isSubmitting.value) return
+    if (!isActive.value || isLoading.value || isSubmitting.value || item.value || !canShowAction.value) return
+    if (roleVisibleActions.value) {
+      const blocker = completionResponse.value?.blocker
+      const warning = toValue(options.actionPrerequisiteWarning)
+        || (blocker ? t(`workflow.${mode.value === 'recommendation_submission' ? 'start_blockers' : 'completion_blockers'}.${blocker}`, completionResponse.value?.blockerParameters ?? {}) : undefined)
+        || (!canComplete.value ? t('workflow.action_prerequisite_unavailable') : undefined)
+      if (warning) {
+        toast.add({ title: t('common.unavailable'), description: warning, color: 'warning' })
+        return
+      }
+    }
+    if (!canComplete.value) return
     const confirmationMessageKey = toValue(options.confirmationMessageKey)
     if (confirmationMessageKey && !window.confirm(t(confirmationMessageKey))) return
 
@@ -178,7 +194,7 @@ export const useCompletionWorkflowStart = (options: CompletionWorkflowStartOptio
     isActive.value = false
   }
 
-  return { mode, completionResponse, completionErrorDetails, isLoading, isSubmitting, loadStatus, item, canComplete, refreshCompletion, startWorkflow, activate, deactivate }
+  return { mode, completionResponse, completionErrorDetails, isLoading, isSubmitting, loadStatus, item, canComplete, canShowAction, roleVisibleActions, refreshCompletion, startWorkflow, activate, deactivate }
 }
 
 export type CompletionWorkflowStartState = ReturnType<typeof useCompletionWorkflowStart>

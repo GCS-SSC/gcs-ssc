@@ -3014,7 +3014,9 @@
         "completed_success": "Reconciliation completed successfully"
       },
       "submitting_proponent": "Submitting Proponent",
-      "submitting_proponent_description": "Select the Proponent submitting this Claim from this Agreement. The value can be changed while the Claim remains editable."
+      "submitting_proponent_description": "Select the Proponent submitting this Claim from this Agreement. The value can be changed while the Claim remains editable.",
+      "action_unavailable": "This action is unavailable in the current claim state.",
+      "reconcile_prerequisites": "Complete the claim, allocate all submitted lines, and ensure no final reconciliation has been approved before starting a reconciliation."
     },
     "monitors": {
       "title": "Monitors",
@@ -3847,7 +3849,10 @@
     "risk_rating_required_help": "This requirement applies once this workflow is published and selected for a stream. A successful run is required before completing an Amendment or submitting an Agreement Recommendation. Existing scores and completed assessments alone do not meet this requirement.",
     "data_collection": "Data Collection",
     "open_data_collection": "Open Data Collection",
-    "followed_by_approval": "Approval follows"
+    "followed_by_approval": "Approval follows",
+    "action_prerequisite_unavailable": "This action is unavailable because a required condition has not been met.",
+    "retry_unavailable": "This workflow cannot be retried in its current state.",
+    "cancel_unavailable": "This workflow cannot be cancelled in its current state."
   },
   "recommendation_schema": {
     "title": "Recommendation schema",

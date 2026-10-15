@@ -64,6 +64,13 @@ export default defineEventHandler(async event => {
   return {
     ...agreement,
     can_read_agreement: canReadAgreement,
+    ...(['fundingcaseagreementclaim', 'fundingcaseforecast', 'fundingcasemonitor'].includes(target.entityType)
+      ? {
+          can_create_agreement_role: Boolean(scopeContext && auth.userAbilities.authorize('agreement', 'create', scopeContext.scope)),
+          can_update_agreement_role: Boolean(scopeContext && auth.userAbilities.authorize('agreement', 'update', scopeContext.scope)),
+          can_delete_agreement_role: Boolean(scopeContext && auth.userAbilities.authorize('agreement', 'delete', scopeContext.scope))
+        }
+      : {}),
     can_create_account_receivable: Boolean(canReadAgreement && scopeContext
       && auth.userAbilities.authorize('account_receivable', 'create', scopeContext.scope))
   }

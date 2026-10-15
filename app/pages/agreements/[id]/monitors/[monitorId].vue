@@ -63,11 +63,12 @@ const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const { getBilingualValue } = useBilingualValue()
 const { formatDate, toDateInput } = useDateHelpers()
 const { saveJson } = useJsonRequest()
-const { isRecordLocked } = useBusinessStatusState()
+const { isRecordLocked, getDefinition } = useBusinessStatusState()
+const statusCatalog = useStatusCatalog()
 
 const agreementId = route.params.id as string
 const monitorId = route.params.monitorId as string
-const { isAssigned } = useEntityAssignmentRoster('fundingcasemonitor', monitorId)
+const { isAssigned, status: assignmentStatus } = useEntityAssignmentRoster('fundingcasemonitor', monitorId)
 const isHeroCollapsed = getHeroCollapsed('agreement-monitor-detail')
 const itemSearch: Ref<string> = ref('')
 const planningSearch: Ref<string> = ref('')
@@ -114,7 +115,9 @@ usePageResourceError({
 })
 
 const hasLoadError = computed(() => Boolean(profileError.value) || Boolean(monitorError.value) || profileStatus.value === 'error' || monitorStatus.value === 'error')
-const isLoadingDetail = computed(() => profileStatus.value === 'pending' || monitorStatus.value === 'pending')
+const isLoadingDetail = computed(() => profileStatus.value === 'pending' || monitorStatus.value === 'pending'
+  || assignmentStatus.value === 'pending'
+  || (!getDefinition(monitor.value?.egcs_fc_status) && statusCatalog.state.value.status === 'pending'))
 const retryLoad = async () => {
   await Promise.all([refreshProfile(), refreshMonitor()])
 }
@@ -198,17 +201,33 @@ const validateMonitorMetadata = withFormRequirements(createValidator(FundingCase
 
 const isMonitorLocked = computed(() => isRecordLocked(monitor.value))
 const canUpdateMonitor = computed(() =>
-  isAssigned.value
+  profile.value?.can_update_agreement_role === true
+  && isAssigned.value
   && !isMonitorLocked.value
 )
-const canCreateMonitorResource = computed(() =>
-  isAssigned.value
-  && !isMonitorLocked.value
-)
-const canDeleteMonitorResource = computed(() =>
-  isAssigned.value
-  && !isMonitorLocked.value
-)
+const canUpdateMonitorRole = computed(() => profile.value?.can_update_agreement_role === true)
+const canCreateMonitorResource = computed(() => profile.value?.can_create_agreement_role === true)
+const canDeleteMonitorResource = computed(() => profile.value?.can_delete_agreement_role === true)
+const workflowPrerequisiteWarning = computed(() => !isAssigned.value ? t('assignments.read_only_description') : undefined)
+const completionPrerequisiteWarning = computed(() => workflowPrerequisiteWarning.value
+  ?? (isMonitorLocked.value ? t('agreement.monitors.completion.status_locked') : undefined))
+
+const guardMonitorAction = (action: 'create' | 'update' | 'delete') => {
+  if (isLoadingDetail.value || hasLoadError.value || !monitor.value) return false
+  const allowed = action === 'create'
+    ? canCreateMonitorResource.value
+    : action === 'delete' ? canDeleteMonitorResource.value : canUpdateMonitorRole.value
+  if (!allowed) return false
+  const warning = completionPrerequisiteWarning.value
+  if (warning) {
+    toast.add({ title: t('assignments.read_only_title'), description: warning, color: 'warning' })
+    return false
+  }
+  return true
+}
+const openResourceEditor = (action: 'create' | 'update', open: () => void) => {
+  if (guardMonitorAction(action)) open()
+}
 const planningRows = computed<FundingCaseAgreementMonitorPlanningRow[]>(() => monitor.value?.planning ?? [])
 const itemRows = computed<FundingCaseAgreementMonitorItemsRow[]>(() => monitor.value?.items ?? [])
 const findingRows = computed<FundingCaseAgreementMonitorFindingRow[]>(() => monitor.value?.findings ?? [])
@@ -302,7 +321,7 @@ watchEffect(() => {
 })
 
 const openMetadataEditor = () => {
-  if (!monitor.value) return
+  if (!guardMonitorAction('update') || !monitor.value) return
   monitorMetadata.value = {
     egcs_fc_type: monitor.value.egcs_fc_type,
     egcs_fc_onsite: monitor.value.egcs_fc_onsite,
@@ -324,6 +343,7 @@ const saveResource = async <T extends { id?: string | number }>(
   if (!selected.value) return
   const resourceState = selected.value
   const isUpdate = Boolean(resourceState.id)
+  if (!guardMonitorAction(isUpdate ? 'update' : 'create')) return
   const session = modal.captureSession()
   const pendingKey = `${key}:${session}`
   if (pendingResourceSessions.has(pendingKey)) return
@@ -360,7 +380,7 @@ const savePractice = async () => await saveResource('practice', 'monitor-promisi
  *
  */
 const saveMonitorMetadata = async () => {
-  if (!monitorMetadata.value || isSavingMonitorMetadata.value) {
+  if (!monitorMetadata.value || isSavingMonitorMetadata.value || !guardMonitorAction('update')) {
     return
   }
 
@@ -384,10 +404,10 @@ const saveMonitorMetadata = async () => {
  */
 const deleteResource = async (path: AgreementMonitorResourcePath, id: string) => {
   const pendingKey = `${path}:${id}`
-  if (pendingResourceDeletes.has(pendingKey)) return
+  if (pendingResourceDeletes.has(pendingKey) || !guardMonitorAction('delete')) return
   pendingResourceDeletes.add(pendingKey)
   try {
-    const ok = await confirmDeleteRequest(`/api/agreements/${agreementId}/${path}/${id}`)
+    const ok = await confirmDeleteRequest(`/api/agreements/${agreementId}/${path}/${id}`, { shouldProceed: () => guardMonitorAction('delete') })
     if (!ok) return
     await refreshMonitor()
     toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
@@ -437,6 +457,7 @@ const openViewUpdates = (followup: FundingCaseAgreementMonitorFollowupRow) => {
  * @param followup
  */
 const openCreateUpdate = (followup: FundingCaseAgreementMonitorFollowupRow) => {
+  if (!guardMonitorAction('create')) return
   updateModal.openCreate()
   if (selectedUpdate.value) {
     selectedUpdate.value.egcs_fc_fundingagreementmonitorfollowup = String(followup.id)
@@ -468,7 +489,7 @@ const handleCompleted = async () => {
             icon="i-lucide-clipboard-check"
             :title="getBilingualValue(monitor, 'monitor_type_name', monitorId)"
             :meta-items="[monitor.agreement_number, monitor.agreement_financial_system_number, getBilingualValue(monitor, 'stream_name', '-'), `${t('agreement.monitors.tentative_fiscal_year')}: ${monitor.fiscal_year_display || t('common.not_available')}`, `${t('agreement.monitors.tentative_quarter')}: ${t('agreement.monitors.quarter_value', { quarter: monitor.egcs_fc_tentativequarter })}`, `${t('agreement.monitors.site')}: ${t(monitor.egcs_fc_onsite ? 'agreement.monitors.onsite' : 'agreement.monitors.offsite')}`]"
-            :actions="[{ label: t('common.edit'), icon: 'i-lucide-pencil', onClick: openMetadataEditor, visible: canUpdateMonitor }]"
+            :actions="[{ label: t('common.edit'), icon: 'i-lucide-pencil', onClick: openMetadataEditor, visible: canUpdateMonitorRole, disabled: isLoadingDetail }]"
             :badges="[{
               statusId: monitor.egcs_fc_status,
               isCompleted: monitor.isCompleted
@@ -488,11 +509,12 @@ const handleCompleted = async () => {
                   :total-records="planningRows.length"
                   :button-label="t('agreement.monitors.planning.add')"
                   :show-button="canCreateMonitorResource"
-                  @add="planningModal.openCreate">
+                  :button-disabled="isLoadingDetail"
+                  @add="openResourceEditor('create', () => planningModal.openCreate())">
                   <template #actions-cell="{ row }">
-                    <div v-if="canUpdateMonitor || canDeleteMonitorResource" class="flex justify-end gap-2">
-                      <UButton v-if="canUpdateMonitor" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asPlanningRow(row.original).id}`" @click="planningModal.openUpdate(asPlanningRow(row.original))" />
-                      <UButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isResourceDeleting('monitor-planning', asPlanningRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asPlanningRow(row.original).id}`" @click="deleteResource('monitor-planning', String(asPlanningRow(row.original).id))" />
+                    <div v-if="canUpdateMonitorRole || canDeleteMonitorResource" class="flex justify-end gap-2">
+                      <UButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asPlanningRow(row.original).id}`" @click="openResourceEditor('update', () => planningModal.openUpdate(asPlanningRow(row.original)))" />
+                      <UButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-planning', asPlanningRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asPlanningRow(row.original).id}`" @click="deleteResource('monitor-planning', String(asPlanningRow(row.original).id))" />
                     </div>
                   </template>
                 </CommonResourceLayoutCard>
@@ -502,7 +524,7 @@ const handleCompleted = async () => {
             <div v-else-if="selectedMonitorTab === 'items'" class="w-full min-w-0">
               <div class="space-y-3">
                 <div class="flex justify-end">
-                  <UButton v-if="canCreateMonitorResource" icon="i-lucide-plus" :label="t('agreement.monitors.items.add')" @click="itemModal.openCreate" />
+                  <UButton v-if="canCreateMonitorResource" :disabled="isLoadingDetail" icon="i-lucide-plus" :label="t('agreement.monitors.items.add')" @click="openResourceEditor('create', () => itemModal.openCreate())" />
                 </div>
                 <CommonResourceLayoutCard
                   v-model:search="itemSearch"
@@ -529,9 +551,9 @@ const handleCompleted = async () => {
                     {{ asItemRow(row.original).egcs_fc_monitored ? t('common.yes') : t('common.no') }}
                   </template>
                   <template #actions-cell="{ row }">
-                    <div v-if="canUpdateMonitor || canDeleteMonitorResource" class="flex justify-end gap-2">
-                      <UButton v-if="canUpdateMonitor" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asItemRow(row.original).id}`" @click="itemModal.openUpdate(asItemRow(row.original))" />
-                      <UButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isResourceDeleting('monitor-items', asItemRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asItemRow(row.original).id}`" @click="deleteResource('monitor-items', String(asItemRow(row.original).id))" />
+                    <div v-if="canUpdateMonitorRole || canDeleteMonitorResource" class="flex justify-end gap-2">
+                      <UButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asItemRow(row.original).id}`" @click="openResourceEditor('update', () => itemModal.openUpdate(asItemRow(row.original)))" />
+                      <UButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-items', asItemRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asItemRow(row.original).id}`" @click="deleteResource('monitor-items', String(asItemRow(row.original).id))" />
                     </div>
                   </template>
                 </CommonResourceLayoutCard>
@@ -541,7 +563,7 @@ const handleCompleted = async () => {
             <div v-else-if="selectedMonitorTab === 'findings'" class="w-full min-w-0">
               <div class="space-y-3">
                 <div class="flex justify-end">
-                  <UButton v-if="canCreateMonitorResource" icon="i-lucide-plus" :label="t('agreement.monitors.findings.add')" @click="findingModal.openCreate" />
+                  <UButton v-if="canCreateMonitorResource" :disabled="isLoadingDetail" icon="i-lucide-plus" :label="t('agreement.monitors.findings.add')" @click="openResourceEditor('create', () => findingModal.openCreate())" />
                 </div>
                 <CommonResourceLayoutCard
                   v-model:search="findingSearch"
@@ -564,9 +586,9 @@ const handleCompleted = async () => {
                     {{ t(`enums.monitor_responsible_party.${asFindingRow(row.original).egcs_fc_responsibleparty}`) }}
                   </template>
                   <template #actions-cell="{ row }">
-                    <div v-if="canUpdateMonitor || canDeleteMonitorResource" class="flex justify-end gap-2">
-                      <UButton v-if="canUpdateMonitor" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asFindingRow(row.original).id}`" @click="findingModal.openUpdate(asFindingRow(row.original))" />
-                      <UButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isResourceDeleting('monitor-findings', asFindingRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asFindingRow(row.original).id}`" @click="deleteResource('monitor-findings', String(asFindingRow(row.original).id))" />
+                    <div v-if="canUpdateMonitorRole || canDeleteMonitorResource" class="flex justify-end gap-2">
+                      <UButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asFindingRow(row.original).id}`" @click="openResourceEditor('update', () => findingModal.openUpdate(asFindingRow(row.original)))" />
+                      <UButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-findings', asFindingRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asFindingRow(row.original).id}`" @click="deleteResource('monitor-findings', String(asFindingRow(row.original).id))" />
                     </div>
                   </template>
                 </CommonResourceLayoutCard>
@@ -576,7 +598,7 @@ const handleCompleted = async () => {
             <div v-else-if="selectedMonitorTab === 'followups'" class="w-full min-w-0">
               <div class="space-y-3">
                 <div class="flex justify-end">
-                  <UButton v-if="canCreateMonitorResource" icon="i-lucide-plus" :label="t('agreement.monitors.followups.add')" @click="followupModal.openCreate" />
+                  <UButton v-if="canCreateMonitorResource" :disabled="isLoadingDetail" icon="i-lucide-plus" :label="t('agreement.monitors.followups.add')" @click="openResourceEditor('create', () => followupModal.openCreate())" />
                 </div>
                 <CommonResourceLayoutCard
                   v-model:search="followupSearch"
@@ -612,9 +634,9 @@ const handleCompleted = async () => {
                   <template #actions-cell="{ row }">
                     <div class="flex justify-end gap-2">
                       <UButton icon="i-lucide-eye" color="neutral" variant="ghost" :aria-label="t('agreement.monitors.followups.view_updates')" @click="openViewUpdates(asFollowupRow(row.original))" />
-                      <UButton v-if="canCreateMonitorResource" icon="i-lucide-message-square-plus" color="neutral" variant="ghost" :aria-label="`${t('agreement.monitors.followups.add_update')}: ${asFollowupRow(row.original).id}`" @click="openCreateUpdate(asFollowupRow(row.original))" />
-                      <UButton v-if="canUpdateMonitor" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asFollowupRow(row.original).id}`" @click="followupModal.openUpdate(asFollowupRow(row.original))" />
-                      <UButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isResourceDeleting('monitor-followups', asFollowupRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asFollowupRow(row.original).id}`" @click="deleteResource('monitor-followups', String(asFollowupRow(row.original).id))" />
+                      <UButton v-if="canCreateMonitorResource" :disabled="isLoadingDetail" icon="i-lucide-message-square-plus" color="neutral" variant="ghost" :aria-label="`${t('agreement.monitors.followups.add_update')}: ${asFollowupRow(row.original).id}`" @click="openCreateUpdate(asFollowupRow(row.original))" />
+                      <UButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asFollowupRow(row.original).id}`" @click="openResourceEditor('update', () => followupModal.openUpdate(asFollowupRow(row.original)))" />
+                      <UButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-followups', asFollowupRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asFollowupRow(row.original).id}`" @click="deleteResource('monitor-followups', String(asFollowupRow(row.original).id))" />
                     </div>
                   </template>
                 </CommonResourceLayoutCard>
@@ -634,11 +656,12 @@ const handleCompleted = async () => {
                   :total-records="practiceRows.length"
                   :button-label="t('agreement.monitors.promising_practices.add')"
                   :show-button="canCreateMonitorResource"
-                  @add="practiceModal.openCreate">
+                  :button-disabled="isLoadingDetail"
+                  @add="openResourceEditor('create', () => practiceModal.openCreate())">
                   <template #actions-cell="{ row }">
-                    <div v-if="canUpdateMonitor || canDeleteMonitorResource" class="flex justify-end gap-2">
-                      <UButton v-if="canUpdateMonitor" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asPracticeRow(row.original).id}`" @click="practiceModal.openUpdate(asPracticeRow(row.original))" />
-                      <UButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isResourceDeleting('monitor-promising-practices', asPracticeRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asPracticeRow(row.original).id}`" @click="deleteResource('monitor-promising-practices', String(asPracticeRow(row.original).id))" />
+                    <div v-if="canUpdateMonitorRole || canDeleteMonitorResource" class="flex justify-end gap-2">
+                      <UButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asPracticeRow(row.original).id}`" @click="openResourceEditor('update', () => practiceModal.openUpdate(asPracticeRow(row.original)))" />
+                      <UButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-promising-practices', asPracticeRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asPracticeRow(row.original).id}`" @click="deleteResource('monitor-promising-practices', String(asPracticeRow(row.original).id))" />
                     </div>
                   </template>
                 </CommonResourceLayoutCard>
@@ -650,6 +673,9 @@ const handleCompleted = async () => {
                 entity-type="fundingcasemonitor"
                 :entity-id="monitorId"
                 :can-complete="canUpdateMonitor"
+                :action-role-allowed="canUpdateMonitorRole"
+                :completion-prerequisite-warning="completionPrerequisiteWarning"
+                :workflow-prerequisite-warning="workflowPrerequisiteWarning"
                 :can-work-workflow="isAssigned"
                 :show-header="false"
                 :show-divider="false"
@@ -677,6 +703,8 @@ const handleCompleted = async () => {
               :entity-id="monitorId"
               purpose="standard"
               :can-edit="isAssigned"
+              :action-role-allowed="canUpdateMonitorRole"
+              :action-prerequisite-warning="workflowPrerequisiteWarning"
               :refresh-key="approvalsRefreshKey"
               @changed="handleCompleted" />
 
@@ -764,7 +792,7 @@ const handleCompleted = async () => {
               v-if="canUpdateMonitor"
               :label="t('common.save')"
               :loading="isSavingMonitorMetadata"
-              :disabled="isSavingMonitorMetadata" />
+              :disabled="isLoadingDetail || isSavingMonitorMetadata" />
           </div>
         </UForm>
       </template>
@@ -777,7 +805,7 @@ const handleCompleted = async () => {
             <UTextarea v-model="selectedPlanning.egcs_fc_objective" class="w-full" />
           </UFormField>
           <div class="flex justify-end gap-2">
-            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isPlanningModalOpen = false" /><CommonSaveButton :label="t('common.save')" :loading="isResourceSaving('planning', planningModal)" />
+            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isPlanningModalOpen = false" /><CommonSaveButton :label="t('common.save')" :loading="isResourceSaving('planning', planningModal)" :disabled="isLoadingDetail || isResourceSaving('planning', planningModal)" />
           </div>
         </UForm>
       </template>
@@ -813,7 +841,7 @@ const handleCompleted = async () => {
             <CommonBilingualSelectMenu v-model="selectedItem.egcs_fc_monitorplanning" :items="planningOptions" label-en-key="label_en" label-fr-key="label_fr" :prepend-options="[{ label: t('common.none'), value: null }]" searchable class="w-full" />
           </UFormField>
           <div class="flex justify-end gap-2">
-            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isItemModalOpen = false" /><CommonSaveButton :label="t('common.save')" :loading="isResourceSaving('item', itemModal)" />
+            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isItemModalOpen = false" /><CommonSaveButton :label="t('common.save')" :loading="isResourceSaving('item', itemModal)" :disabled="isLoadingDetail || isResourceSaving('item', itemModal)" />
           </div>
         </UForm>
       </template>
@@ -838,7 +866,7 @@ const handleCompleted = async () => {
             <UTextarea v-model="selectedFinding.egcs_fc_detail" />
           </UFormField>
           <div class="flex justify-end gap-2">
-            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isFindingModalOpen = false" /><CommonSaveButton :label="t('common.save')" :loading="isResourceSaving('finding', findingModal)" />
+            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isFindingModalOpen = false" /><CommonSaveButton :label="t('common.save')" :loading="isResourceSaving('finding', findingModal)" :disabled="isLoadingDetail || isResourceSaving('finding', findingModal)" />
           </div>
         </UForm>
       </template>
@@ -863,7 +891,7 @@ const handleCompleted = async () => {
             <UInput v-model="selectedFollowup.egcs_fc_duedate" type="date" />
           </UFormField>
           <div class="flex justify-end gap-2">
-            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isFollowupModalOpen = false" /><CommonSaveButton :label="t('common.save')" :loading="isResourceSaving('followup', followupModal)" />
+            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isFollowupModalOpen = false" /><CommonSaveButton :label="t('common.save')" :loading="isResourceSaving('followup', followupModal)" :disabled="isLoadingDetail || isResourceSaving('followup', followupModal)" />
           </div>
         </UForm>
       </template>
@@ -882,7 +910,7 @@ const handleCompleted = async () => {
             <CommonDatePicker v-model="selectedUpdate.egcs_fc_updatedate" />
           </UFormField>
           <div class="flex justify-end gap-2">
-            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isUpdateModalOpen = false" /><CommonSaveButton :label="t('common.save')" :loading="isResourceSaving('update', updateModal)" />
+            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isUpdateModalOpen = false" /><CommonSaveButton :label="t('common.save')" :loading="isResourceSaving('update', updateModal)" :disabled="isLoadingDetail || isResourceSaving('update', updateModal)" />
           </div>
         </UForm>
       </template>
@@ -913,9 +941,9 @@ const handleCompleted = async () => {
                 {{ update.egcs_fc_update }}
               </p>
             </div>
-            <div v-if="canUpdateMonitor || canDeleteMonitorResource" class="flex shrink-0 gap-2">
-              <UButton v-if="canUpdateMonitor" icon="i-lucide-pencil" color="neutral" variant="ghost" size="xs" :aria-label="`${t('common.edit')}: ${update.id}`" @click="updateModal.openUpdate(update)" />
-              <UButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" size="xs" :disabled="isResourceDeleting('monitor-followup-updates', update.id)" :aria-label="`${t('common.delete')}: ${update.id}`" @click="deleteResource('monitor-followup-updates', String(update.id))" />
+            <div v-if="canUpdateMonitorRole || canDeleteMonitorResource" class="flex shrink-0 gap-2">
+              <UButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" size="xs" :aria-label="`${t('common.edit')}: ${update.id}`" @click="openResourceEditor('update', () => updateModal.openUpdate(update))" />
+              <UButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" size="xs" :disabled="isLoadingDetail || isResourceDeleting('monitor-followup-updates', update.id)" :aria-label="`${t('common.delete')}: ${update.id}`" @click="deleteResource('monitor-followup-updates', String(update.id))" />
             </div>
           </div>
         </div>
@@ -929,7 +957,7 @@ const handleCompleted = async () => {
             <UTextarea v-model="selectedPractice.egcs_fc_practice" />
           </UFormField>
           <div class="flex justify-end gap-2">
-            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isPracticeModalOpen = false" /><CommonSaveButton :label="t('common.save')" :loading="isResourceSaving('practice', practiceModal)" />
+            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isPracticeModalOpen = false" /><CommonSaveButton :label="t('common.save')" :loading="isResourceSaving('practice', practiceModal)" :disabled="isLoadingDetail || isResourceSaving('practice', practiceModal)" />
           </div>
         </UForm>
       </template>

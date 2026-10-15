@@ -133,6 +133,8 @@ type WorkflowDisplayStep = {
 const {
   entityType,
   entityId,
+  actionRoleAllowed = undefined,
+  actionPrerequisiteWarning,
   purpose = 'standard',
   canEdit = true,
   refreshKey = 0,
@@ -144,6 +146,10 @@ const {
 } = defineProps<{
   entityType: Workflow_Target_Entity_Type
   entityId: string
+  /** Optional role-only visibility; omission preserves legacy readiness-based presentation. */
+  actionRoleAllowed?: boolean
+  /** Localized owning-page prerequisite, separate from role permission. */
+  actionPrerequisiteWarning?: string
   purpose?: Workflow_Purpose
   canEdit?: boolean
   refreshKey?: number
@@ -160,6 +166,8 @@ const route = useRoute()
 const { showError } = useApiErrorToast()
 const isSaving: Ref<boolean> = ref(false)
 const isStarting: Ref<boolean> = ref(false)
+const isRetrying: Ref<boolean> = ref(false)
+const toast = useToast()
 const isCancelling: Ref<boolean> = ref(false)
 const responses: Ref<RecommendationResponse[]> = ref([])
 const validationIssues: Ref<Array<{ questionKey: string, message: string }>> = ref([])
@@ -193,6 +201,7 @@ watch(runtimeIdentity, () => {
   selectedWorkflowSetupId.value = null
   availableWorkflows.value = []
   availableWorkflowsStatus.value = 'idle'
+  isRetrying.value = false
   isStarting.value = false
   isCancelling.value = false
   isResuming.value = false
@@ -298,7 +307,26 @@ const loadAvailableWorkflows = async () => {
     if (requestGeneration === availableWorkflowsRequestGeneration) isLoadingAvailable.value = false
   }
 }
+const roleVisibleActions = computed(() => actionRoleAllowed !== undefined)
+const canShowParentAction = computed(() => actionRoleAllowed ?? canEdit)
+const guardParentAction = (action: 'start' | 'retry' | 'cancel') => {
+  if (!roleVisibleActions.value) return true
+  if (!actionRoleAllowed || status.value === 'pending' || activeWorkflowTab.value === 'previous') return false
+  const ready = canEdit && status.value === 'success' && (action === 'start' ? data.value?.canStart : action === 'retry' ? data.value?.canRetry : data.value?.canCancel)
+  const warning = actionPrerequisiteWarning
+    || (!ready
+      ? action === 'start'
+        ? startBlockerDescription.value || t('workflow.action_prerequisite_unavailable')
+        : t(`workflow.${action}_unavailable`)
+      : undefined)
+  if (warning) {
+    toast.add({ title: t('common.unavailable'), description: warning, color: 'warning' })
+    return false
+  }
+  return true
+}
 const openChooser = async () => {
+  if (isLoadingAvailable.value || !guardParentAction('start')) return
   selectedWorkflowSetupId.value = null
   isChooserOpen.value = true
   await loadAvailableWorkflows()
@@ -508,7 +536,7 @@ watch(selectedRecommendation, item => {
   validationIssues.value = []
 }, { immediate: true })
 const start = async () => {
-  if (isStarting.value) return
+  if (isStarting.value || !guardParentAction('start')) return
   if (purpose === 'standard' && (
     availableWorkflowsStatus.value !== 'success'
     || selectedAvailableWorkflow.value?.eligible !== true
@@ -538,9 +566,10 @@ const start = async () => {
   }
 }
 const retry = async () => {
-  if (!data.value?.current) return
+  if (!data.value?.current || isRetrying.value || !guardParentAction('retry')) return
   const generation = captureRuntimeIdentity()
   try {
+    isRetrying.value = true
     const response = await fetch(getClientRequestUrl('/api/workflows/retry'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -553,10 +582,12 @@ const retry = async () => {
     emit('changed')
   } catch (error) {
     if (isCurrentRuntimeIdentity(generation)) showError(error)
+  } finally {
+    if (isCurrentRuntimeIdentity(generation)) isRetrying.value = false
   }
 }
 const cancel = async () => {
-  if (!data.value?.current || isCancelling.value || !window.confirm(t('workflow.cancel_confirmation'))) return
+  if (!data.value?.current || isCancelling.value || !guardParentAction('cancel') || !window.confirm(t('workflow.cancel_confirmation'))) return
   const generation = captureRuntimeIdentity()
   try {
     isCancelling.value = true
@@ -635,7 +666,7 @@ const handleApprovalChanged = async () => {
 
 <template>
   <section v-if="shouldRenderSection" class="min-w-0 space-y-6" :aria-label="t('workflow.title')">
-    <div v-if="status === 'success' && purpose === 'standard' && !hasActiveWorkflow && activeWorkflowTab !== 'previous' && canEdit && data?.canStart" class="flex justify-end">
+    <div v-if="status === 'success' && purpose === 'standard' && activeWorkflowTab !== 'previous' && canShowParentAction && (roleVisibleActions || (!hasActiveWorkflow && data?.canStart))" class="flex justify-end">
       <UButton
         icon="i-lucide-plus"
         :label="t('workflow.add_workflow')"
@@ -647,6 +678,10 @@ const handleApprovalChanged = async () => {
       color="warning"
       icon="i-lucide-lock-keyhole"
       :title="t('workflow.active_target_blocker')" />
+    <div v-if="roleVisibleActions && canShowParentAction && data?.current && activeWorkflowTab !== 'previous'" class="flex justify-end gap-2">
+      <UButton icon="i-lucide-rotate-ccw" :label="t('workflow.retry')" :loading="isRetrying" :disabled="status === 'pending' || isRetrying" @click="retry" />
+      <UButton color="error" variant="outline" icon="i-lucide-ban" :label="t('workflow.cancel')" :loading="isCancelling" :disabled="status === 'pending' || isCancelling" @click="cancel" />
+    </div>
     <CommonWorkflowPacket v-if="data?.routing && (data.routing.fields.length || data.routing.decisions.some(decision => decision.conditions?.length))" :title="t('custom_fields.routing')" :packet-id="`routing-${data.current?.runtimeId}`" :hash="data.routing.hash" :hash-label="t('workflow.packet.hash')">
       <dl class="space-y-3">
         <div v-for="field in data.routing.fields" :key="`${field.fieldId}:${field.optionId}`">
@@ -745,7 +780,7 @@ const handleApprovalChanged = async () => {
       :show-header="Boolean(applicableWorkflow) || preActionShowHeader"
       :title="preActionTitle"
       :description="preActionDescription">
-      <template v-if="$slots['pre-action-action'] || (canEdit && data?.canStart)" #action>
+      <template v-if="$slots['pre-action-action'] || (canShowParentAction && (roleVisibleActions || data?.canStart))" #action>
         <slot v-if="$slots['pre-action-action']" name="pre-action-action" />
         <UButton
           v-else
@@ -788,9 +823,9 @@ const handleApprovalChanged = async () => {
       <div v-if="hasTerminalResult" class="flex items-center justify-end gap-2">
         <span class="text-sm font-medium text-muted">{{ t('workflow.result') }}</span>
         <CommonLifecycleBadge engine="runtime" :state="data.current.runtimeState" />
-        <UButton v-if="canEdit && data.canRetry" icon="i-lucide-rotate-ccw" :label="t('workflow.retry')" class="cursor-default" @click="retry" />
+        <UButton v-if="!roleVisibleActions && canEdit && data.canRetry" icon="i-lucide-rotate-ccw" :label="t('workflow.retry')" class="cursor-default" @click="retry" />
       </div>
-      <div v-else-if="canEdit && data.canCancel" class="flex justify-end">
+      <div v-else-if="!roleVisibleActions && canEdit && data.canCancel" class="flex justify-end">
         <UButton color="error" variant="outline" icon="i-lucide-ban" :label="t('workflow.cancel')" :loading="isCancelling" :disabled="isCancelling" @click="cancel" />
       </div>
       <div v-if="data.current.runtimeState === 'paused'" class="space-y-4 rounded-lg border border-warning/40 bg-warning/5 p-4">

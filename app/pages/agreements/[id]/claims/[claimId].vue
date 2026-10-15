@@ -90,6 +90,7 @@ const { showError } = useApiErrorToast()
 const { getBilingualValue } = useBilingualValue()
 const { sendJson } = useJsonRequest()
 const { getDefinition, isRecordLocked, isDraftStatus, isTerminalStatus } = useBusinessStatusState()
+const statusCatalog = useStatusCatalog()
 
 const agreementId = route.params.id as string
 const claimId = route.params.claimId as string
@@ -169,7 +170,7 @@ usePageResourceError({
   pending: () => profileStatus.value === 'pending' || overviewStatus.value === 'pending',
   hasContent: () => Boolean(profile.value && overview.value)
 })
-const { isAssigned } = useEntityAssignmentRoster(
+const { isAssigned, status: assignmentStatus } = useEntityAssignmentRoster(
   'fundingcaseagreementclaim',
   claimId,
   { enabled: computed(() => overviewStatus.value === 'success') }
@@ -190,6 +191,7 @@ const activeBudgetLineItems = computed(() => {
 })
 const activeClaimLineItems = computed(() => claimLineItems.value.filter((line: FundingCaseAgreementClaimLineItemRow) => String(line.egcs_fc_fundingagreementclaim) === claimId))
 const openFundingEditor = (line: FundingCaseAgreementClaimLineItemRow) => {
+  if (isLoadingDetail.value || isSavingFunding.value || !guardClaimAction(canUpdateClaim.value, claimEditPrerequisiteWarning.value)) return
   fundingEditorSession.value += 1
   fundingEditorLine.value = line
   fundingEditorProgramAmount.value = line.egcs_fc_amount
@@ -199,7 +201,8 @@ const openFundingEditor = (line: FundingCaseAgreementClaimLineItemRow) => {
 }
 const saveFundingEditor = async () => {
   const line = fundingEditorLine.value
-  if (!line || isSavingFunding.value) return
+  if (!line || isLoadingDetail.value || isSavingFunding.value || !guardClaimAction(canUpdateClaim.value, claimEditPrerequisiteWarning.value)) return
+  const session = fundingEditorSession.value
   try {
     const amount = parseMoney(fundingEditorProgramAmount.value)
     const totalAmount = parseMoney(fundingEditorTotalAmount.value)
@@ -219,7 +222,7 @@ const saveFundingEditor = async () => {
       egcs_fc_totalamount: totalAmount,
       egcs_fc_fundingsources: sources
     })
-    fundingEditorOpen.value = false
+    if (session === fundingEditorSession.value) fundingEditorOpen.value = false
     await refreshPage()
   } catch (error: unknown) {
     showError(error)
@@ -255,20 +258,29 @@ const activeReconcileLineItems = computed(() => {
 })
 const activeClaimStatus = computed(() => getDefinition(activeClaim.value?.egcs_fc_status))
 const activeClaimIsLocked = computed(() => isRecordLocked(activeClaim.value))
-const canCreateClaimLineItems = computed(() =>
-  isAssigned.value && !activeClaimIsLocked.value
-)
-const canUpdateClaim = computed(() =>
-  isAssigned.value && !activeClaimIsLocked.value
-)
-const canAllocateClaimLines = computed(() =>
-  isAssigned.value
-  && !activeClaimIsLocked.value
-)
+const canCreateClaimLineItems = computed(() => profile.value?.can_create_agreement_role === true)
+const canUpdateClaim = computed(() => profile.value?.can_update_agreement_role === true)
+const canAllocateClaimLines = canUpdateClaim
+const claimWorkflowPrerequisiteWarning = computed(() => {
+  if (!isAssigned.value) return t('assignments.read_only_description')
+  if (!activeClaim.value || isTerminalStatus(activeClaim.value.egcs_fc_status)) return t('agreement.claims.action_unavailable')
+  return undefined
+})
+const claimEditPrerequisiteWarning = computed(() => claimWorkflowPrerequisiteWarning.value
+  ?? (activeClaimIsLocked.value ? t('agreement.claims.action_unavailable') : undefined))
+const claimEditReady = computed(() => canUpdateClaim.value && !claimEditPrerequisiteWarning.value)
+const guardClaimAction = (roleAllowed: boolean, warning: string | undefined): boolean => {
+  if (!roleAllowed) return false
+  if (warning) {
+    toast.add({ title: t('common.warning'), description: warning, color: 'warning' })
+    return false
+  }
+  return true
+}
 const claimHasActiveWorkflow = computed(() =>
   ACTIVE_CLAIM_WORKFLOW_STATES.has(activeClaim.value?.workflowRuntimeState ?? '')
   || ACTIVE_CLAIM_WORKFLOW_STATES.has(activeClaim.value?.approvalRuntimeState ?? ''))
-const canWithdrawClaim = computed(() => isAssigned.value
+const withdrawClaimReady = computed(() => isAssigned.value
   && activeClaim.value !== null
   && claimHasActiveWorkflow.value
   && activeClaimStatus.value?.readOnly === true
@@ -280,7 +292,7 @@ const approvedFinalReconcile = computed(() =>
   ) ?? null
 )
 const claimHasApprovedFinalReconcile = computed(() => Boolean(approvedFinalReconcile.value))
-const canCancelClaim = computed(() =>
+const cancelClaimReady = computed(() =>
   isAssigned.value
   && Boolean(activeClaim.value)
   && claimHasActiveWorkflow.value
@@ -288,12 +300,15 @@ const canCancelClaim = computed(() =>
   && !isTerminalStatus(activeClaim.value?.egcs_fc_status)
 )
 const claimIsReadyForReconcile = computed(() => activeClaim.value?.hasPositiveCompletionTerminus === true)
-const canStartReconcile = computed(() =>
+const startReconcileReady = computed(() =>
   isAssigned.value
   && claimIsReadyForReconcile.value
   && activeUnallocatedClaimLineItems.value.length === 0
   && !claimHasApprovedFinalReconcile.value
 )
+const canWithdrawClaim = canUpdateClaim
+const canCancelClaim = canUpdateClaim
+const canStartReconcile = canCreateClaimLineItems
 const canUpdateReconcile = computed(() => selectedReconcileDetail.value?.can_update === true)
 const canWorkReconcileWorkflow = computed(() => selectedReconcileDetail.value?.is_assigned === true)
 const canCancelReconcile = computed(() => selectedReconcileDetail.value?.can_cancel === true)
@@ -305,7 +320,9 @@ const hasLoadError = computed(() =>
   || profileStatus.value === 'error'
   || overviewStatus.value === 'error'
 )
-const isLoadingDetail = computed(() => profileStatus.value === 'pending' || overviewStatus.value === 'pending')
+const isLoadingDetail = computed(() => profileStatus.value === 'pending' || overviewStatus.value === 'pending'
+  || assignmentStatus.value === 'pending'
+  || (!activeClaimStatus.value && statusCatalog.state.value.status === 'pending'))
 const retryLoad = async () => {
   await Promise.all([refreshProfile(), refreshOverview()])
 }
@@ -790,13 +807,21 @@ const canEditActiveReconcileFinal = computed(() =>
   && (activeReconcileIsFinal.value || !otherFinalReconcile.value)
 )
 
+const openSubmissionEditor = (line: ClaimSubmissionTableRow) => {
+  if (isLoadingDetail.value || isSavingSubmission.value || !line.budgetLineId
+    || !guardClaimAction(canEditClaimSubmissionAmount(line.budgetLineId), claimEditPrerequisiteWarning.value)) return
+  submissionModal.openUpdate(line)
+}
+
 const saveSubmission = async () => {
   const line = selectedSubmissionLine.value
   const session = submissionModal.captureSession()
   const budgetLine = activeBudgetLineItems.value.find(item => String(item.id) === line?.budgetLineId)
-  if (!activeClaim.value || !line || !budgetLine || isSavingSubmission.value || !canEditClaimSubmissionAmount(String(budgetLine.id))) {
+  if (!activeClaim.value || !line || !budgetLine || isLoadingDetail.value || isSavingSubmission.value) {
     return
   }
+
+  if (!guardClaimAction(canEditClaimSubmissionAmount(String(budgetLine.id)), claimEditPrerequisiteWarning.value)) return
 
   try {
     isSavingSubmission.value = true
@@ -838,9 +863,12 @@ const allocateClaimLine = async (line: FundingCaseAgreementClaimLineItemRow) => 
   const lineId = String(line.id)
   const budgetLineItemId = draftAllocations.value[lineId]
 
-  if (!budgetLineItemId || allocatingClaimLineId.value !== null || !canAllocateClaimLines.value) {
+  if (isLoadingDetail.value || allocatingClaimLineId.value !== null) {
     return
   }
+
+  if (!guardClaimAction(canAllocateClaimLines.value, claimEditPrerequisiteWarning.value
+    ?? (!budgetLineItemId ? t('agreement.claims.action_unavailable') : undefined))) return
 
   try {
     allocatingClaimLineId.value = lineId
@@ -878,7 +906,8 @@ const transitionClaim = async (
 }
 
 const withdrawClaim = async () => {
-  if (!canWithdrawClaim.value) {
+  if (isLoadingDetail.value || isWithdrawingClaim.value || isCancellingClaim.value || !guardClaimAction(canWithdrawClaim.value,
+    claimWorkflowPrerequisiteWarning.value ?? (!withdrawClaimReady.value ? t('agreement.claims.action_unavailable') : undefined))) {
     return
   }
 
@@ -886,7 +915,8 @@ const withdrawClaim = async () => {
 }
 
 const cancelClaim = async () => {
-  if (!canCancelClaim.value) {
+  if (isLoadingDetail.value || isCancellingClaim.value || isWithdrawingClaim.value || !guardClaimAction(canCancelClaim.value,
+    claimWorkflowPrerequisiteWarning.value ?? (!cancelClaimReady.value ? t('agreement.claims.action_unavailable') : undefined))) {
     return
   }
 
@@ -894,7 +924,8 @@ const cancelClaim = async () => {
 }
 
 const startReconcile = async () => {
-  if (!activeClaim.value || isStartingReconcile.value || !canStartReconcile.value) {
+  if (isLoadingDetail.value || isStartingReconcile.value || !guardClaimAction(canStartReconcile.value,
+    claimWorkflowPrerequisiteWarning.value ?? (!startReconcileReady.value ? t('agreement.claims.reconcile_prerequisites') : undefined))) {
     return
   }
 
@@ -1126,6 +1157,7 @@ const cancelReconciliation = async () => {
                             variant="link"
                             size="xs"
                             :label="t('agreement.funding_sources.edit_line')"
+                            :disabled="isLoadingDetail || isSavingFunding"
                             @click="openFundingEditor(row.original.claimLine)" />
                           <div v-if="row.original.isUnallocated && row.original.claimLine && canAllocateClaimLines" class="flex flex-wrap items-end gap-2 pt-1">
                             <UFormField :label="t('agreement.claims.allocate_to_budget_line')" :name="`allocation-${row.original.claimLine.id}`" required class="min-w-72">
@@ -1136,6 +1168,7 @@ const cancelReconciliation = async () => {
                                 label-en-key="label_en"
                                 label-fr-key="label_fr"
                                 searchable
+                                :disabled="!claimEditReady"
                                 @update:model-value="value => setDraftAllocation(String(row.original.claimLine!.id), value)" />
                             </UFormField>
                             <UButton
@@ -1143,7 +1176,7 @@ const cancelReconciliation = async () => {
                               icon="i-lucide-link"
                               class="cursor-default"
                               :loading="allocatingClaimLineId === String(row.original.claimLine.id)"
-                              :disabled="allocatingClaimLineId !== null || !draftAllocations[String(row.original.claimLine.id)]"
+                              :disabled="isLoadingDetail || allocatingClaimLineId !== null"
                               @click="allocateClaimLine(row.original.claimLine)">
                               {{ t('agreement.claims.allocate') }}
                             </UButton>
@@ -1167,8 +1200,8 @@ const cancelReconciliation = async () => {
                           variant="ghost"
                           size="sm"
                           :aria-label="t('agreement.claims.edit_submitted_amount_for', { name: locale === 'fr' ? row.original.lineItemNameFr : row.original.lineItemNameEn })"
-                          :disabled="isSavingSubmission"
-                          @click="submissionModal.openUpdate(row.original)" />
+                          :disabled="isLoadingDetail || isSavingSubmission"
+                          @click="openSubmissionEditor(row.original)" />
                       </div>
                     </template>
 
@@ -1206,7 +1239,7 @@ const cancelReconciliation = async () => {
                       icon="i-lucide-undo-2"
                       class="cursor-default"
                       :loading="isWithdrawingClaim"
-                      :disabled="isWithdrawingClaim || isCancellingClaim"
+                      :disabled="isLoadingDetail || isWithdrawingClaim || isCancellingClaim"
                       @click="withdrawClaim">
                       {{ t('agreement.claims.withdraw') }}
                     </UButton>
@@ -1217,7 +1250,7 @@ const cancelReconciliation = async () => {
                       icon="i-lucide-ban"
                       class="cursor-default"
                       :loading="isCancellingClaim"
-                      :disabled="isCancellingClaim || isWithdrawingClaim"
+                      :disabled="isLoadingDetail || isCancellingClaim || isWithdrawingClaim"
                       @click="cancelClaim">
                       {{ t('agreement.claims.cancel') }}
                     </UButton>
@@ -1230,7 +1263,7 @@ const cancelReconciliation = async () => {
               v-else-if="selectedClaimTab === 'reviews'"
               entity-type="fundingcaseagreementclaim"
               :entity-id="claimId"
-              :can-update="canUpdateClaim"
+              :can-update="isAssigned && !activeClaimIsLocked"
               @changed="refreshPage" />
 
             <CommonWorkflowSection
@@ -1239,6 +1272,8 @@ const cancelReconciliation = async () => {
               :entity-id="claimId"
               purpose="standard"
               :can-edit="isAssigned"
+              :action-role-allowed="canUpdateClaim"
+              :action-prerequisite-warning="claimWorkflowPrerequisiteWarning"
               :refresh-key="approvalsRefreshKey"
               @changed="refreshPage" />
 
@@ -1249,13 +1284,27 @@ const cancelReconciliation = async () => {
               :entity-id="claimId" />
 
             <div v-else-if="selectedClaimTab === 'reconciliation'" class="w-full min-w-0">
+              <div v-if="canStartReconcile" class="mb-6 flex justify-end">
+                <UButton
+                  color="primary"
+                  icon="i-lucide-plus"
+                  class="cursor-default"
+                  :loading="isStartingReconcile"
+                  :disabled="isLoadingDetail || isStartingReconcile"
+                  :aria-label="t('agreement.claims.new_reconcile_with_context')"
+                  @click="startReconcile">
+                  {{ t('agreement.claims.new_reconcile') }}
+                </UButton>
+              </div>
               <CommonCompletionWorkflowPreAction
                 v-if="!claimIsReadyForReconcile"
                 mode="completion"
                 entity-type="fundingcaseagreementclaim"
                 :entity-id="claimId"
                 :can-edit="isAssigned"
-                :is-locked="!canUpdateClaim"
+                :is-locked="!claimEditReady"
+                :action-role-allowed="canUpdateClaim"
+                :action-prerequisite-warning="claimEditPrerequisiteWarning"
                 show-when-unconfigured
                 title-key="agreement.claims.completion.title"
                 description-key="agreement.claims.completion.description"
@@ -1275,17 +1324,6 @@ const cancelReconciliation = async () => {
                           {{ t(claimHasApprovedFinalReconcile ? 'agreement.claims.final_reconcile_approved_description' : 'agreement.claims.reconcile_collection_description') }}
                         </p>
                       </div>
-                      <UButton
-                        v-if="canStartReconcile"
-                        color="primary"
-                        icon="i-lucide-plus"
-                        class="cursor-default"
-                        :loading="isStartingReconcile"
-                        :disabled="isStartingReconcile"
-                        :aria-label="t('agreement.claims.new_reconcile_with_context')"
-                        @click="startReconcile">
-                        {{ t('agreement.claims.new_reconcile') }}
-                      </UButton>
                     </div>
 
                     <CommonSelectableTable
@@ -1493,12 +1531,12 @@ const cancelReconciliation = async () => {
               required
               aria-required="true"
               :aria-label="t('agreement.claims.submitted_amount_for', { name: locale === 'fr' ? selectedSubmissionLine.lineItemNameFr : selectedSubmissionLine.lineItemNameEn })"
-              :disabled="isSavingSubmission"
+              :disabled="isLoadingDetail || isSavingSubmission"
               class="w-full" />
           </UFormField>
           <div class="flex justify-end gap-2">
-            <UButton type="button" color="neutral" variant="ghost" :label="t('common.cancel')" :disabled="isSavingSubmission" @click="submissionModal.close" />
-            <CommonSaveButton type="submit" :label="t('common.save')" :loading="isSavingSubmission" :disabled="isSavingSubmission" />
+            <UButton type="button" color="neutral" variant="ghost" :label="t('common.cancel')" :disabled="isLoadingDetail || isSavingSubmission" @click="submissionModal.close" />
+            <CommonSaveButton type="submit" :label="t('common.save')" :loading="isSavingSubmission" :disabled="isLoadingDetail || isSavingSubmission" />
           </div>
         </UForm>
       </template>
@@ -1586,7 +1624,7 @@ const cancelReconciliation = async () => {
           <AgreementFundingSourcesEditor v-model="fundingEditorSources" :agreement-id="agreementId" :currency="profile.egcs_fc_currency" :identity="`${fundingEditorLine?.id ?? ''}:${fundingEditorSession}`" />
           <div class="flex justify-end gap-2">
             <UButton color="neutral" variant="ghost" :label="t('common.cancel')" @click="fundingEditorOpen = false" />
-            <CommonSaveButton :label="t('agreement.funding_sources.save')" :loading="isSavingFunding" @click="saveFundingEditor" />
+            <CommonSaveButton :label="t('agreement.funding_sources.save')" :loading="isSavingFunding" :disabled="isLoadingDetail || isSavingFunding" @click="saveFundingEditor" />
           </div>
         </div>
       </template>

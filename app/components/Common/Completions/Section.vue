@@ -24,6 +24,8 @@ type CompletionResponse = {
 const {
   entityType,
   entityId,
+  actionRoleAllowed = undefined,
+  actionPrerequisiteWarning,
   completePayload,
   labels,
   titleKey,
@@ -41,6 +43,10 @@ const {
 } = defineProps<{
   entityType: Entity_Type
   entityId: string
+  /** Optional role-only visibility; omission preserves legacy readiness-based presentation. */
+  actionRoleAllowed?: boolean
+  /** Localized owning-page prerequisite, separate from role permission. */
+  actionPrerequisiteWarning?: string
   completePayload?: unknown
   labels?: GcsExtensionCompletionLabels
   titleKey?: string
@@ -137,7 +143,18 @@ const canComplete = computed(() => status.value === 'success'
 
 /** Persists the completion comment and finalizes the runtime entity. */
 const submitCompletion = async () => {
-  if (!canComplete.value || isSubmitting.value) {
+  if (isSubmitting.value || status.value === 'pending' || item.value || actionRoleAllowed === false) return
+  if (actionRoleAllowed !== undefined) {
+    const blocker = completionResponse.value?.blocker
+    const warning = actionPrerequisiteWarning
+      || (blocker ? t(`workflow.completion_blockers.${blocker}`) : undefined)
+      || (!canComplete.value ? t('workflow.action_prerequisite_unavailable') : undefined)
+    if (warning) {
+      toast.add({ title: t('common.unavailable'), description: warning, color: 'warning' })
+      return
+    }
+  }
+  if (!canComplete.value) {
     return
   }
 
@@ -283,7 +300,7 @@ const submitCompletion = async () => {
           icon="i-lucide-lock-keyhole"
           :title="resolvedLabels.statusLocked" />
 
-        <template v-else>
+        <template v-if="actionRoleAllowed === true || (actionRoleAllowed === undefined && !completionResponse?.blocker && !isLocked)">
           <UFormField :label="t('assessment.completion.comment')">
             <CommonTextarea
               v-model="state.comments"
@@ -298,7 +315,7 @@ const submitCompletion = async () => {
               icon="i-lucide-circle-check-big"
               class="cursor-default"
               :loading="isSubmitting"
-              :disabled="!canComplete"
+              :disabled="isSubmitting || status === 'pending' || (actionRoleAllowed === undefined && !canComplete)"
               @click="submitCompletion">
               {{ resolvedLabels.completeAction }}
             </UButton>

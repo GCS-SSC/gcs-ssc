@@ -9,6 +9,8 @@ const {
   mode = 'completion',
   entityType,
   entityId,
+  actionRoleAllowed = undefined,
+  actionPrerequisiteWarning,
   completePayload,
   completedSuccessKey,
   actionLabelKey = 'workflow.start',
@@ -20,6 +22,10 @@ const {
   mode?: WorkflowPreActionMode
   entityType: Entity_Type
   entityId: string
+  /** Optional role-only visibility; omission preserves legacy readiness-based presentation. */
+  actionRoleAllowed?: boolean
+  /** Localized owning-page prerequisite, separate from role permission. */
+  actionPrerequisiteWarning?: string
   completePayload?: unknown
   completedSuccessKey: string
   actionLabelKey?: string
@@ -39,25 +45,27 @@ const completionState = state ?? useCompletionWorkflowStart({
   completedSuccessKey: () => completedSuccessKey,
   confirmationMessageKey: () => confirmationMessageKey,
   isLocked: () => isLocked,
+  actionRoleAllowed: () => actionRoleAllowed,
+  actionPrerequisiteWarning: () => actionPrerequisiteWarning,
   onCompleted: () => emit('completed')
 })
 if (state) {
   onMounted(state.activate)
   onUnmounted(state.deactivate)
 }
-const { item, isLoading, isSubmitting, canComplete, startWorkflow } = completionState
+const { item, isLoading, isSubmitting, canComplete, canShowAction, roleVisibleActions, startWorkflow } = completionState
 </script>
 
 <template>
   <div class="space-y-3">
     <CommonCompletionWorkflowStartNotices v-if="showNotices" :state="completionState" />
     <UButton
-      v-if="!item"
+      v-if="!item && canShowAction"
       color="primary"
       icon="i-lucide-message-square-quote"
       :label="t(actionLabelKey)"
       :loading="isLoading || isSubmitting"
-      :disabled="!canComplete || isSubmitting"
+      :disabled="isLoading || isSubmitting || (!roleVisibleActions && !canComplete)"
       class="cursor-default"
       @click="startWorkflow" />
   </div>

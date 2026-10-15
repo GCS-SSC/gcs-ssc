@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import type { FetchError } from 'ofetch'
+import { useStatusCatalog } from '~/composables/useStatusCatalog'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 /* eslint-disable jsdoc/require-jsdoc -- page-local callbacks use self-descriptive signatures */
 import { computed, ref, watch } from 'vue'
@@ -86,11 +87,12 @@ const { getHeroCollapsed } = useDashboard()
 const { showError } = useApiErrorToast()
 const { getBilingualValue } = useBilingualValue()
 const { saveJson } = useJsonRequest()
-const { isRecordLocked } = useBusinessStatusState()
+const { isRecordLocked, isTerminalStatus } = useBusinessStatusState()
+const statusCatalog = useStatusCatalog()
 
 const agreementId = route.params.id as string
 const forecastId = route.params.forecastId as string
-const { isAssigned } = useEntityAssignmentRoster('fundingcaseforecast', forecastId)
+const { isAssigned, status: assignmentStatus } = useEntityAssignmentRoster('fundingcaseforecast', forecastId)
 
 const expandedQuarters: Ref<QuarterKey[]> = ref([])
 const breakdownSearch: Ref<string> = ref('')
@@ -100,6 +102,7 @@ const breakdownPagination: Ref<{ pageIndex: number, pageSize: number }> = ref({
 })
 const draftAmounts: Ref<Record<string, string>> = ref({})
 const isSavingBreakdown: Ref<boolean> = ref(false)
+const breakdownReloadRequired = ref(false)
 const fundingEditorLine: Ref<FundingCaseAgreementForecastLineItemRow | null> = ref(null)
 const fundingEditorOpen: Ref<boolean> = ref(false)
 const fundingEditorSession = ref(0)
@@ -160,22 +163,32 @@ const activeForecastLineItems = computed(() => forecastLineItems.value.filter((l
   String(line.egcs_fc_agreementforecast) === forecastId
 ))
 const activeForecastIsLocked = computed(() => isRecordLocked(activeForecast.value))
-const canCreateForecastLineItems = computed(() =>
-  isAssigned.value && !activeForecastIsLocked.value
-)
-const canUpdateForecast = computed(() =>
-  isAssigned.value && !activeForecastIsLocked.value
-)
-const canEditForecastBreakdown = computed(() =>
-  canCreateForecastLineItems.value || canUpdateForecast.value
-)
+const canCreateForecastLineItems = computed(() => profile.value?.can_create_agreement_role === true)
+const canUpdateForecast = computed(() => profile.value?.can_update_agreement_role === true)
+const canEditForecastBreakdown = computed(() => canCreateForecastLineItems.value || canUpdateForecast.value)
+const workflowPrerequisiteWarning = computed(() => {
+  if (!isAssigned.value) return t('assignments.read_only_description')
+  if (!activeForecast.value || isTerminalStatus(activeForecast.value.egcs_fc_status)) return t('apiErrors.request.invalid_status')
+  return undefined
+})
+const completionPrerequisiteWarning = computed(() => workflowPrerequisiteWarning.value
+  ?? (activeForecastIsLocked.value ? t('apiErrors.request.invalid_status') : undefined))
+const warnPrerequisite = (warning: string | undefined): boolean => {
+  if (!warning) return false
+  toast.add({ title: t('common.warning'), description: warning, color: 'warning' })
+  return true
+}
+const canMutateForecast = (roleAllowed: boolean): boolean => !isLoadingDetail.value && roleAllowed
+  && !warnPrerequisite(completionPrerequisiteWarning.value)
 const hasLoadError = computed(() =>
   Boolean(profileError.value)
   || Boolean(overviewError.value)
   || profileStatus.value === 'error'
   || overviewStatus.value === 'error'
 )
-const isLoadingDetail = computed(() => profileStatus.value === 'pending' || overviewStatus.value === 'pending')
+const isLoadingDetail = computed(() => profileStatus.value === 'pending' || overviewStatus.value === 'pending'
+  || assignmentStatus.value === 'pending'
+  || (statusCatalog.state.value.status === 'pending' && !statusCatalog.getById(activeForecast.value?.egcs_fc_status)))
 const retryLoad = async () => {
   await Promise.all([refreshProfile(), refreshOverview()])
 }
@@ -193,6 +206,8 @@ const lineItemByBudgetMonth = computed(() => {
 })
 
 const openFundingEditor = (line: FundingCaseAgreementForecastLineItemRow) => {
+  if (isSavingFunding.value || !canMutateForecast(canUpdateForecast.value)) return
+  if (lineItemByBudgetMonth.value.get(getDraftKey(String(line.egcs_fc_fundingagreementbudgetlineitem), line.egcs_fc_month))?.id !== line.id) return
   fundingEditorSession.value += 1
   fundingEditorLine.value = line
   fundingEditorProgramAmount.value = line.egcs_fc_amount
@@ -203,7 +218,8 @@ const openFundingEditor = (line: FundingCaseAgreementForecastLineItemRow) => {
 
 const saveFundingEditor = async () => {
   const line = fundingEditorLine.value
-  if (!line || isSavingFunding.value || !canUpdateForecast.value) return
+  if (!line || isSavingFunding.value || !canMutateForecast(canUpdateForecast.value)) return
+  if (lineItemByBudgetMonth.value.get(getDraftKey(String(line.egcs_fc_fundingagreementbudgetlineitem), line.egcs_fc_month))?.id !== line.id) return
   try {
     const amount = parseMoney(fundingEditorProgramAmount.value)
     const totalAmount = parseMoney(fundingEditorTotalAmount.value)
@@ -234,7 +250,8 @@ const saveFundingEditor = async () => {
 
 const canEditForecastAmount = (budgetLineId: string, month: number): boolean => {
   const existing = lineItemByBudgetMonth.value.get(getDraftKey(budgetLineId, month))
-  return existing ? canUpdateForecast.value : canCreateForecastLineItems.value
+  return isAssigned.value && !activeForecastIsLocked.value
+    && (existing ? canUpdateForecast.value : canCreateForecastLineItems.value)
 }
 
 const forecastHeroTitle = computed(() => activeForecast.value
@@ -339,7 +356,9 @@ watch(activeForecastLineItems, () => {
     }
   }
 
-  draftAmounts.value = nextDraftAmounts
+  draftAmounts.value = breakdownReloadRequired.value
+    ? { ...nextDraftAmounts, ...draftAmounts.value }
+    : nextDraftAmounts
 }, { immediate: true })
 
 const displayValue = (value: string | number | null | undefined) => {
@@ -507,13 +526,34 @@ const refreshPage = async () => {
   approvalsRefreshKey.value += 1
 }
 
+const reloadForecastBreakdown = async () => {
+  const pendingDrafts = { ...draftAmounts.value }
+  breakdownReloadRequired.value = true
+  try {
+    await refreshPage()
+    if (overviewError.value || overviewStatus.value === 'error') {
+      throw overviewError.value ?? new Error(t('common.resource_table_load_failed'))
+    }
+    breakdownReloadRequired.value = false
+    return true
+  } catch (error: unknown) {
+    showError(error)
+    return false
+  } finally {
+    draftAmounts.value = pendingDrafts
+  }
+}
+
 const saveForecastBreakdown = async () => {
-  if (!activeForecast.value || isSavingBreakdown.value || !canEditForecastBreakdown.value) {
+  if (!activeForecast.value || isSavingBreakdown.value || !canMutateForecast(canEditForecastBreakdown.value)) {
     return
   }
 
+  let savedCells = 0
+  let savedAllCells = false
   try {
     isSavingBreakdown.value = true
+    if (breakdownReloadRequired.value && !await reloadForecastBreakdown()) return
     const canonicalDraftAmounts = new Map<string, Money>()
 
     for (const budgetLine of activeBudgetLineItems.value) {
@@ -532,6 +572,15 @@ const saveForecastBreakdown = async () => {
       }
     }
 
+    for (const [key, amount] of canonicalDraftAmounts) {
+      const existing = lineItemByBudgetMonth.value.get(key)
+      if ((existing && existing.egcs_fc_amount !== amount && !canUpdateForecast.value)
+        || (!existing && amount !== ZERO_MONEY && !canCreateForecastLineItems.value)) {
+        warnPrerequisite(t('apiErrors.request.invalid_status'))
+        return
+      }
+    }
+
     for (const budgetLine of activeBudgetLineItems.value) {
       const budgetLineId = String(budgetLine.id)
 
@@ -539,14 +588,17 @@ const saveForecastBreakdown = async () => {
         const amount = canonicalDraftAmounts.get(getDraftKey(budgetLineId, month)) ?? ZERO_MONEY
         const existing = lineItemByBudgetMonth.value.get(getDraftKey(budgetLineId, month))
 
-        if (existing && existing.egcs_fc_amount !== amount && canUpdateForecast.value) {
+        if (existing && existing.egcs_fc_amount !== amount) {
+          if (!canMutateForecast(canUpdateForecast.value)) return
           await saveJson(`/api/agreements/${agreementId}/forecast-line-items/${existing.id}`, 'PATCH', {
             egcs_fc_amount: amount,
             egcs_fc_totalamount: sumMoney([amount, ...existing.egcs_fc_fundingsources.map(source => source.egcs_fc_amount)])
           })
+          savedCells += 1
         }
 
-        if (!existing && amount !== ZERO_MONEY && canCreateForecastLineItems.value) {
+        if (!existing && amount !== ZERO_MONEY) {
+          if (!canMutateForecast(canCreateForecastLineItems.value)) return
           await saveJson(`/api/agreements/${agreementId}/forecast-line-items`, 'POST', {
             egcs_fc_agreementforecast: forecastId,
             egcs_fc_fundingagreementbudgetlineitem: budgetLineId,
@@ -555,11 +607,13 @@ const saveForecastBreakdown = async () => {
             egcs_fc_totalamount: amount,
             egcs_fc_currency: budgetLine.egcs_fc_currency
           })
+          savedCells += 1
         }
       }
     }
 
-    await refreshPage()
+    if (!await reloadForecastBreakdown()) return
+    savedAllCells = true
     toast.add({
       title: t('common.success'),
       description: t('agreement.forecasts.saved_breakdown'),
@@ -568,6 +622,10 @@ const saveForecastBreakdown = async () => {
   } catch (error: unknown) {
     showError(error)
   } finally {
+    if (savedCells > 0 && !savedAllCells && !breakdownReloadRequired.value) {
+      await reloadForecastBreakdown()
+    }
+
     isSavingBreakdown.value = false
   }
 }
@@ -602,7 +660,7 @@ const saveForecastBreakdown = async () => {
                     type="button"
                     :label="t('agreement.forecasts.save_breakdown')"
                     :loading="isSavingBreakdown"
-                    :disabled="isSavingBreakdown || hasInvalidDraftAmounts"
+                    :disabled="isLoadingDetail || isSavingBreakdown || hasInvalidDraftAmounts"
                     @click="saveForecastBreakdown" />
                 </div>
 
@@ -715,17 +773,18 @@ const saveForecastBreakdown = async () => {
                       <p v-if="isDraftAmountInvalid(row.original.budgetLineId, period.months[0] ?? 0)" :id="`forecast-amount-error-${row.original.budgetLineId}-${period.columnId}`" class="mt-1 text-xs text-error">
                         {{ t('validation.invalid_number') }}
                       </p>
-                      <UButton
-                        v-if="canUpdateForecast && lineItemByBudgetMonth.get(getDraftKey(row.original.budgetLineId, period.months[0] ?? 0))"
-                        color="neutral"
-                        variant="link"
-                        size="xs"
-                        :label="t('agreement.funding_sources.edit_line')"
-                        @click="openFundingEditor(lineItemByBudgetMonth.get(getDraftKey(row.original.budgetLineId, period.months[0] ?? 0))!)" />
                     </div>
                     <span v-else class="font-medium text-zinc-700 dark:text-zinc-200">
                       {{ formatMoney(row.original.periodTotals[period.columnId] ?? ZERO_MONEY) }}
                     </span>
+                    <UButton
+                      v-if="period.type === 'month' && !isGroupedBreakdownRow(row as GroupedForecastBreakdownRow) && canUpdateForecast && lineItemByBudgetMonth.get(getDraftKey(row.original.budgetLineId, period.months[0] ?? 0))"
+                      :disabled="isLoadingDetail || isSavingFunding"
+                      color="neutral"
+                      variant="link"
+                      size="xs"
+                      :label="t('agreement.funding_sources.edit_line')"
+                      @click="openFundingEditor(lineItemByBudgetMonth.get(getDraftKey(row.original.budgetLineId, period.months[0] ?? 0))!)" />
                   </template>
 
                   <template #total-cell="{ row }">
@@ -754,6 +813,9 @@ const saveForecastBreakdown = async () => {
                 :entity-id="forecastId"
                 :can-complete="canUpdateForecast"
                 :can-work-workflow="isAssigned"
+                :action-role-allowed="canUpdateForecast"
+                :completion-prerequisite-warning="completionPrerequisiteWarning"
+                :workflow-prerequisite-warning="workflowPrerequisiteWarning"
                 :show-header="false"
                 :show-divider="false"
                 title-key="agreement.forecasts.completion.title"
@@ -771,10 +833,10 @@ const saveForecastBreakdown = async () => {
               v-else-if="selectedTab === 'reviews'"
               entity-type="fundingcaseforecast"
               :entity-id="forecastId"
-              :can-update="canUpdateForecast"
+              :can-update="canUpdateForecast && isAssigned && !activeForecastIsLocked"
               @changed="refreshPage" />
 
-            <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcaseforecast" :entity-id="forecastId" purpose="standard" :can-edit="isAssigned" :refresh-key="approvalsRefreshKey" @changed="refreshPage" />
+            <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcaseforecast" :entity-id="forecastId" purpose="standard" :can-edit="isAssigned" :action-role-allowed="canUpdateForecast" :action-prerequisite-warning="workflowPrerequisiteWarning" :refresh-key="approvalsRefreshKey" @changed="refreshPage" />
             <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" :show-header="false" entity-type="fundingcaseforecast" :entity-id="forecastId" />
             <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcaseforecast" :entity-id="forecastId" />
             <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" :show-header="false" entity-type="fundingcaseforecast" :entity-id="forecastId" />
@@ -794,7 +856,7 @@ const saveForecastBreakdown = async () => {
           <AgreementFundingSourcesEditor v-model="fundingEditorSources" :agreement-id="agreementId" :currency="profile.egcs_fc_currency" :identity="`${fundingEditorLine?.id ?? ''}:${fundingEditorSession}`" />
           <div class="flex justify-end gap-2">
             <UButton color="neutral" variant="ghost" :label="t('common.cancel')" @click="fundingEditorOpen = false" />
-            <CommonSaveButton :label="t('agreement.funding_sources.save')" :loading="isSavingFunding" @click="saveFundingEditor" />
+            <CommonSaveButton :label="t('agreement.funding_sources.save')" :loading="isSavingFunding" :disabled="isLoadingDetail || isSavingFunding" @click="saveFundingEditor" />
           </div>
         </div>
       </template>

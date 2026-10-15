@@ -12,6 +12,8 @@ const {
   mode = 'completion',
   entityType,
   entityId,
+  actionRoleAllowed = undefined,
+  actionPrerequisiteWarning,
   canEdit = true,
   isLocked = false,
   actionLabelKey = 'workflow.start',
@@ -24,6 +26,10 @@ const {
   mode?: WorkflowPreActionMode
   entityType: Workflow_Target_Entity_Type
   entityId: string
+  /** Optional role-only visibility; omission preserves legacy readiness-based presentation. */
+  actionRoleAllowed?: boolean
+  /** Localized owning-page prerequisite, separate from role permission. */
+  actionPrerequisiteWarning?: string
   canEdit?: boolean
   isLocked?: boolean
   actionLabelKey?: string
@@ -46,6 +52,8 @@ const completionState = useCompletionWorkflowStart({
   entityType: () => entityType,
   entityId: () => entityId,
   isLocked: () => isLocked || !canEdit,
+  actionRoleAllowed: () => actionRoleAllowed,
+  actionPrerequisiteWarning: () => actionPrerequisiteWarning,
   completedSuccessKey: () => completedSuccessKey,
   immediate: false,
   onCompleted: handleChanged
@@ -58,6 +66,8 @@ const completionState = useCompletionWorkflowStart({
     :entity-id="entityId"
     purpose="approval_submission"
     :can-edit="canEdit"
+    :action-role-allowed="actionRoleAllowed"
+    :action-prerequisite-warning="actionPrerequisiteWarning"
     :show-pre-action-when-unconfigured="showWhenUnconfigured"
     :pre-action-show-header="showHeader"
     :pre-action-title-key="titleKey"

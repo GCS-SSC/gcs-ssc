@@ -26,6 +26,9 @@ export const EntityAssignmentContextSchema = z.object({
   egcs_fc_title_en: z.string(),
   egcs_fc_title_fr: z.string(),
   can_read_agreement: z.boolean(),
+  can_create_agreement_role: z.boolean().optional(),
+  can_update_agreement_role: z.boolean().optional(),
+  can_delete_agreement_role: z.boolean().optional(),
   can_create_account_receivable: z.boolean().optional()
 })
 export const AssignedWorkQuerySchema = z.object({
