@@ -33,10 +33,12 @@ export const RolePermissionSchema = z.object({
 export type RolePermissionInput = z.infer<typeof RolePermissionSchema>
 
 const RoleCoreFields = {
-  name_en: z.string({ error: 'validation.name_en_required' }).min(1, { error: 'validation.name_en_required' }),
-  name_fr: z.string({ error: 'validation.name_fr_required' }).min(1, { error: 'validation.name_fr_required' }),
-  description_en: z.string().nullable().optional(),
-  description_fr: z.string().nullable().optional(),
+  name_en: z.string({ error: 'validation.name_en_required' }).min(1, { error: 'validation.name_en_required' })
+    .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' }),
+  name_fr: z.string({ error: 'validation.name_fr_required' }).min(1, { error: 'validation.name_fr_required' })
+    .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' }),
+  description_en: z.string().refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' }).nullable().optional(),
+  description_fr: z.string().refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' }).nullable().optional(),
   permissions: z.array(RolePermissionSchema)
 }
 
