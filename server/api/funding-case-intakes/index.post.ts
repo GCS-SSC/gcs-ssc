@@ -14,8 +14,8 @@ export default defineEventHandler(async event => {
   const requested = await readValidatedBodyI18n(event, FundingCaseIntakeCreateSchema)
   const opportunityId = String(requested.egcs_fi_fundingopportunity)
   const opportunityScope = await resolveFundingOpportunityScope(db, opportunityId)
+  await authorize(event, 'funding_case', 'create', opportunityScope?.scope ?? { type: 'global' })
   if (!opportunityScope) return await badRequest(event, 'FUNDING_OPPORTUNITY_NOT_FOUND', 'apiErrors.admin_common.not_found')
-  await authorize(event, 'funding_case', 'create', opportunityScope.scope)
 
   return await db.transaction().execute(async trx => {
     const auth = await requireFreshAuthContext(event, trx)

@@ -952,11 +952,24 @@ export type TransferPaymentStreamApprovalSetup = TransferPaymentStreamApprovalTe
 export type TransferPaymentStreamApprovalSetupPatch = TransferPaymentStreamApprovalTemplatePatch
 export type TransferPaymentStreamApprovalSetupItem = TransferPaymentStreamApprovalTemplateItem
 
+/**
+ * Validates required authoring order against its signed-smallint storage range.
+ * @param minimum Existing field-specific lower bound; Review authoring permits signed orders.
+ * @returns Required integer schema retaining numeric-string form inputs.
+ */
+const RequiredAuthoringOrder = (minimum = -32768) => z.preprocess(
+  value => value === null || (typeof value === 'string' && value.trim() === '') ? undefined : value,
+  z.coerce.number({ error: 'validation.required' })
+    .int({ error: 'validation.invalid_number' })
+    .min(minimum, { error: 'validation.invalid_number' })
+    .max(32767, { error: 'validation.invalid_number' })
+).meta({ formRequired: true })
+
 export const TransferPaymentStreamReviewSetupMemberSchema = z.object({
   egcs_cn_reviewschema: RequiredId(),
   egcs_cn_defaultgroup: PositivePostgresBigintIdSchema.nullable().optional(),
   egcs_cn_reviewtype: z.enum(REVIEW_TYPE_ENUM).optional(),
-  egcs_cn_order: z.coerce.number({ error: 'validation.required' }).int(),
+  egcs_cn_order: RequiredAuthoringOrder(),
   egcs_cn_approvaltemplate: RequiredId().optional(),
   egcs_cn_failonchecklistfailure: z.boolean().default(false),
   egcs_cn_failurethreshold: z.preprocess(
@@ -984,11 +997,11 @@ export const TransferPaymentStreamReviewSetupMemberCreateSchema = TransferPaymen
 })
 export const TransferPaymentStreamReviewSetupSchemaCreateSchema = z.object({
   egcs_cn_reviewtype: z.enum(REVIEW_TYPE_ENUM, { error: 'validation.required' }),
-  egcs_cn_order: z.coerce.number({ error: 'validation.required' }).int(),
+  egcs_cn_order: RequiredAuthoringOrder(),
   egcs_cn_approvaltemplate: RequiredId().optional()
 })
 export const TransferPaymentStreamRecommendationSetupSchemaCreateSchema = z.object({
-  egcs_cn_order: z.coerce.number({ error: 'validation.required' }).int().min(1),
+  egcs_cn_order: RequiredAuthoringOrder(1),
   egcs_cn_approvaltemplate: RequiredId().optional(),
   egcs_cn_failonnotrecommended: z.boolean().default(false)
 })
@@ -1071,7 +1084,7 @@ const TransferPaymentReviewSetupBaseFields = {
   egcs_cn_name_fr: RequiredString(),
   egcs_cn_description_en: RequiredString(),
   egcs_cn_description_fr: RequiredString(),
-  egcs_cn_order: z.coerce.number({ error: 'validation.required' }).int(),
+  egcs_cn_order: RequiredAuthoringOrder(),
   egcs_cn_directreview: z.boolean({ error: 'validation.required' }).default(false),
   egcs_cn_sequential: z.boolean({ error: 'validation.required' }),
   egcs_cn_approvaltemplate: RequiredId().optional()
@@ -1131,7 +1144,7 @@ export type TransferPaymentAssessmentSetRecord = TransferPaymentAssessmentSetIte
 
 const TransferPaymentAssessmentSetItemBaseSchema = z.object({
   egcs_cn_reviewschema: RequiredId(),
-  egcs_cn_order: z.coerce.number({ error: 'validation.required' }).int(),
+  egcs_cn_order: RequiredAuthoringOrder(),
   egcs_cn_approvaltemplate: RequiredId().optional()
 })
 
@@ -1146,7 +1159,7 @@ export type TransferPaymentAssessmentSetItemRecord = WithId<TransferPaymentAsses
 
 const TransferPaymentStreamRecommendationSetupMemberBaseSchema = z.object({
   egcs_cn_recommendationschema: RequiredId(),
-  egcs_cn_order: z.coerce.number({ error: 'validation.required' }).int(),
+  egcs_cn_order: RequiredAuthoringOrder(),
   egcs_cn_approvaltemplate: RequiredId().optional(),
   egcs_cn_failonnotrecommended: z.boolean()
 })

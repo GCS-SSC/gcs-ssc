@@ -28,9 +28,15 @@ const ZERO = parseMoney('0.00')
 const json = (value: unknown): JsonValue => JSON.parse(JSON.stringify(value)) as JsonValue
 
 export const authorizeAccountReceivableAgreement = async (event: H3Event, agreementId: string, action: 'read' | 'create' = 'read') => {
-  const context = await resolveAgreementScopeContext(agreementId, event.context.$db)
+  const result = await authorize<'read' | 'create', Awaited<ReturnType<typeof resolveAgreementScopeContext>>>(
+    event, 'account_receivable', action, async () => {
+      const context = await resolveAgreementScopeContext(agreementId, event.context.$db)
+      if (!context) return { scope: { type: 'global' as const }, data: null }
+      return { scope: context.scope, data: context }
+    }
+  )
+  const context = result.data
   if (!context) return await notFound(event, 'ACCOUNT_RECEIVABLE_NOT_FOUND', 'apiErrors.account_receivable.not_found')
-  await authorize(event, 'account_receivable', action, context.scope)
   return context
 }
 

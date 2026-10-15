@@ -13,6 +13,9 @@ export default defineEventHandler(async event => {
   const agencyIds = access.agencyIds ?? []
   const base = db.selectFrom('Common_Group')
     .where('Common_Group._deleted', '=', false)
+    .where(eb => eb.exists(eb.selectFrom('Agency_Profile').select('Agency_Profile.id')
+      .whereRef('Agency_Profile.id', '=', 'Common_Group.egcs_cn_agency')
+      .where('Agency_Profile._deleted', '=', false)))
     .$if(!access.hasGlobalAccess, query => query.where('Common_Group.egcs_cn_agency', 'in', agencyIds))
     .$if(Boolean(agency), query => query.where('Common_Group.egcs_cn_agency', '=', agency!))
     .$if(Boolean(search), query => query.where(eb => eb.or([

@@ -521,10 +521,14 @@ export const CommonRecommendationPatchSchema = CommonRecommendationCreateSchema.
 
 const CommonWorkflowSetupBaseSchema = z.object({
   egcs_cn_entitytype: createWorkflowTargetEntityTypeIdentitySchema('validation.workflow_entity_type_required'),
-  egcs_cn_name_en: RequiredString('validation.name_en_required'),
-  egcs_cn_name_fr: RequiredString('validation.name_fr_required'),
-  egcs_cn_description_en: RequiredString('validation.desc_en_required'),
-  egcs_cn_description_fr: RequiredString('validation.desc_fr_required'),
+  egcs_cn_name_en: CatalogNameSchema('validation.name_en_required'),
+  egcs_cn_name_fr: CatalogNameSchema('validation.name_fr_required'),
+  egcs_cn_description_en: RequiredString('validation.desc_en_required').refine(value => !value.includes(String.fromCharCode(0)), {
+    error: 'validation.invalid_text_character'
+  }),
+  egcs_cn_description_fr: RequiredString('validation.desc_fr_required').refine(value => !value.includes(String.fromCharCode(0)), {
+    error: 'validation.invalid_text_character'
+  }),
   egcs_cn_purpose: z.enum(['standard', 'approval_submission', 'risk_rating'], { error: 'validation.workflow_purpose_required' }).default('standard'),
   egcs_cn_riskratingrequired: z.boolean().default(false),
   egcs_cn_allowedstartstatuses: z.array(IdSchema).min(1, { error: 'validation.workflow_allowed_start_status_required' })

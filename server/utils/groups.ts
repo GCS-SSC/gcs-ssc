@@ -2,7 +2,7 @@
 import type { H3Event } from 'h3'
 import type { Kysely, Transaction } from 'kysely'
 import type { Database } from '~~/shared/types/database'
-import { authorize, authorizeFresh } from './authorize'
+import { authorize, authorizeWithFreshAuthContext, requireFreshAuthContext } from './authorize'
 import { notFound } from './api-errors'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
@@ -10,8 +10,10 @@ type Db = Kysely<Database> | Transaction<Database>
 
 export const requireGroup = async (event: H3Event, db: Db, id: string) => {
   if (!isPositivePostgresBigintText(id)) return await notFound(event, 'GROUP_NOT_FOUND', 'apiErrors.admin_common.not_found')
-  const group = await db.selectFrom('Common_Group').selectAll().where('id', '=', id)
-    .where('_deleted', '=', false).executeTakeFirst()
+  const group = await db.selectFrom('Common_Group')
+    .innerJoin('Agency_Profile', 'Agency_Profile.id', 'Common_Group.egcs_cn_agency')
+    .selectAll('Common_Group').where('Common_Group.id', '=', id)
+    .where('Common_Group._deleted', '=', false).where('Agency_Profile._deleted', '=', false).executeTakeFirst()
   if (!group) return await notFound(event, 'GROUP_NOT_FOUND', 'apiErrors.admin_common.not_found')
   return group
 }
@@ -33,8 +35,19 @@ export const authorizeFreshGroup = async (
   id: string,
   action: 'update' | 'delete'
 ) => {
-  const group = await requireGroup(event, trx, id)
-  await authorizeFresh(event, 'group', action, { type: 'agency', agencyId: String(group.egcs_cn_agency) }, trx)
+  // Principal and role locks precede the Agency and Group rows. The parent
+  // share lock keeps Agency retirement from racing a Group mutation.
+  const authContext = await requireFreshAuthContext(event, trx)
+  const observed = await requireGroup(event, trx, id)
+  const agencyId = String(observed.egcs_cn_agency)
+  const agency = await trx.selectFrom('Agency_Profile').select('id')
+    .where('id', '=', agencyId).where('_deleted', '=', false).forShare().executeTakeFirst()
+  if (!agency) return await notFound(event, 'GROUP_NOT_FOUND', 'apiErrors.admin_common.not_found')
+  const group = await trx.selectFrom('Common_Group').selectAll()
+    .where('id', '=', id).where('egcs_cn_agency', '=', agencyId)
+    .where('_deleted', '=', false).forUpdate().executeTakeFirst()
+  if (!group) return await notFound(event, 'GROUP_NOT_FOUND', 'apiErrors.admin_common.not_found')
+  await authorizeWithFreshAuthContext(event, authContext, 'group', action, { type: 'agency', agencyId })
   return group
 }
 

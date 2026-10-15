@@ -39,6 +39,9 @@ export default defineEventHandler(async event => {
   const rows = await event.context.$db.selectFrom('Common_Group')
     .select(['id', 'egcs_cn_name_en', 'egcs_cn_name_fr', 'egcs_cn_email'])
     .where('egcs_cn_agency', '=', agencyId).where('_deleted', '=', false)
+    .where(eb => eb.exists(eb.selectFrom('Agency_Profile').select('Agency_Profile.id')
+      .whereRef('Agency_Profile.id', '=', 'Common_Group.egcs_cn_agency')
+      .where('Agency_Profile._deleted', '=', false)))
     .$if(Boolean(workflowSetupId) && !selectedIds, query => query.where(eb => eb.exists(eb
       .selectFrom('Common_Group_Member')
       .innerJoin('Common_User', 'Common_User.id', 'Common_Group_Member.egcs_cn_user')

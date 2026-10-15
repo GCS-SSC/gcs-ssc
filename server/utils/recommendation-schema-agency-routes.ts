@@ -8,6 +8,7 @@ import { withActiveAgencyReadTransaction, withActiveAgencyMutationTransaction } 
 import { getValidatedQueryI18n, readValidatedBodyI18n } from './api-validate'
 import { badRequest, notFound, throwApiError } from './api-errors'
 import { escapeLikePattern } from './sql-like'
+import { throwIfAgencyUniqueConstraintError } from './agency-unique-constraint-errors'
 import { buildRecommendationSchemaDefinition, resolvePublicationActorId } from './recommendation-setup-versioning'
 import { publishDefinition, readPublicationMetadata, retirePublication } from './system-publication'
 
@@ -71,13 +72,17 @@ export const createAgencyRecommendationSchema = async (event: H3Event) => {
   const { agencyId } = await ids(event)
   await authorize(event, 'agency', 'update', { type: 'agency', agencyId })
   const body = await readValidatedBodyI18n(event, createBodySchema)
-  return await withActiveAgencyMutationTransaction(event, agencyId, async trx => {
-    const created = await trx.insertInto('Common_Recommendation_Schema')
-      .values({ ...body, egcs_cn_agency: agencyId, _deleted: false })
-      .returningAll().executeTakeFirstOrThrow()
-    const metadata = await readPublicationMetadata(trx, String(created.id), buildRecommendationSchemaDefinition(created))
-    return { ...created, id: String(created.id), egcs_cn_agency: String(created.egcs_cn_agency), ...metadata }
-  })
+  try {
+    return await withActiveAgencyMutationTransaction(event, agencyId, async trx => {
+      const created = await trx.insertInto('Common_Recommendation_Schema')
+        .values({ ...body, egcs_cn_agency: agencyId, _deleted: false })
+        .returningAll().executeTakeFirstOrThrow()
+      const metadata = await readPublicationMetadata(trx, String(created.id), buildRecommendationSchemaDefinition(created))
+      return { ...created, id: String(created.id), egcs_cn_agency: String(created.egcs_cn_agency), ...metadata }
+    })
+  } catch (error) {
+    return await throwIfAgencyUniqueConstraintError(event, error)
+  }
 }
 
 export const getAgencyRecommendationSchema = async (event: H3Event) => {
@@ -97,15 +102,19 @@ export const patchAgencyRecommendationSchema = async (event: H3Event) => {
   await authorize(event, 'agency', 'update', { type: 'agency', agencyId })
   const body = await readValidatedBodyI18n(event, patchBodySchema)
   if (Object.keys(body).length === 0) return await badRequest(event, 'EMPTY_UPDATE', 'apiErrors.request.invalid_resource')
-  return await withActiveAgencyMutationTransaction(event, agencyId, async trx => {
-    const current = await lockSchema(event, trx, agencyId, schemaId)
-    if (current.publicationState === 'retired') return await throwApiError(event, { statusCode: 409, code: 'PUBLICATION_RETIRED', key: 'apiErrors.request.invalid_status' })
-    const updated = await trx.updateTable('Common_Recommendation_Schema').set(body)
-      .where('id', '=', schemaId).where('egcs_cn_agency', '=', agencyId).where('_deleted', '=', false)
-      .returningAll().executeTakeFirstOrThrow()
-    return { ...updated, id: String(updated.id), egcs_cn_agency: String(updated.egcs_cn_agency),
-      ...await readPublicationMetadata(trx, schemaId, buildRecommendationSchemaDefinition(updated)) }
-  })
+  try {
+    return await withActiveAgencyMutationTransaction(event, agencyId, async trx => {
+      const current = await lockSchema(event, trx, agencyId, schemaId)
+      if (current.publicationState === 'retired') return await throwApiError(event, { statusCode: 409, code: 'PUBLICATION_RETIRED', key: 'apiErrors.request.invalid_status' })
+      const updated = await trx.updateTable('Common_Recommendation_Schema').set(body)
+        .where('id', '=', schemaId).where('egcs_cn_agency', '=', agencyId).where('_deleted', '=', false)
+        .returningAll().executeTakeFirstOrThrow()
+      return { ...updated, id: String(updated.id), egcs_cn_agency: String(updated.egcs_cn_agency),
+        ...await readPublicationMetadata(trx, schemaId, buildRecommendationSchemaDefinition(updated)) }
+    })
+  } catch (error) {
+    return await throwIfAgencyUniqueConstraintError(event, error)
+  }
 }
 
 export const publishAgencyRecommendationSchema = async (event: H3Event) => {

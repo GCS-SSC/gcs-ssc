@@ -1,3 +1,4 @@
+import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { authorize } from '~~/server/utils/authorize'
 import { createTransferPaymentScopedAuthorizeHandler } from '~~/server/utils/transfer-payment-route-authorization'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
@@ -12,6 +13,9 @@ export default defineEventHandler(async event => {
   const transferPaymentId = getRouterParam(event, 'id')
   const streamId = getRouterParam(event, 'streamId')
   if (!transferPaymentId || !streamId) return await badRequest(event, 'MISSING_IDS', 'apiErrors.request.missing_ids')
+  if (!isPositivePostgresBigintText(transferPaymentId) || !isPositivePostgresBigintText(streamId)) {
+    return await notFound(event, 'TRANSFER_PAYMENT_STREAM_NOT_FOUND', 'apiErrors.transfer_payment.stream_not_found')
+  }
   const streamContext = await resolveTransferPaymentAgreementSubtypeStreamScopeContext(transferPaymentId, streamId, db)
   if (!streamContext) return await notFound(event, 'TRANSFER_PAYMENT_STREAM_NOT_FOUND', 'apiErrors.transfer_payment.stream_not_found')
   await authorize(event, 'transfer_payment', 'create', createTransferPaymentScopedAuthorizeHandler('create', streamContext.scope, db))

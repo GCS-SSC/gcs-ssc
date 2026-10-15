@@ -159,6 +159,14 @@ const CONSTRAINT_ERROR_MAP: Record<string, ConstraintErrorMapping> = {
     code: 'AGENCY_DUPLICATE_MONITOR_TYPE_NAME_FR',
     key: 'apiErrors.agency.duplicate_monitor_type_name_fr'
   },
+  cn_idx_recommendationschemaagencynameen: {
+    code: 'AGENCY_DUPLICATE_RECOMMENDATION_SCHEMA_NAME_EN',
+    key: 'apiErrors.agency.duplicate_recommendation_schema_name_en'
+  },
+  cn_idx_recommendationschemaagencynamefr: {
+    code: 'AGENCY_DUPLICATE_RECOMMENDATION_SCHEMA_NAME_FR',
+    key: 'apiErrors.agency.duplicate_recommendation_schema_name_fr'
+  },
   cn_idx_attachmenttypesagencynameen: {
     code: 'AGENCY_DUPLICATE_ATTACHMENT_TYPE_NAME_EN',
     key: 'apiErrors.agency.duplicate_attachment_type_name_en'

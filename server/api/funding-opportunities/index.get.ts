@@ -19,6 +19,8 @@ export default defineEventHandler(async event => {
   let query = db.selectFrom('Funding_Opportunity_Profile')
     .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Funding_Opportunity_Profile.egcs_fo_transferpaymentstream')
     .innerJoin('Transfer_Payment_Profile', 'Transfer_Payment_Profile.id', 'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile')
+    .innerJoin('Agency_Profile', 'Agency_Profile.id', 'Transfer_Payment_Profile.egcs_tp_agency')
+    .where('Agency_Profile._deleted', '=', false)
     .where('Funding_Opportunity_Profile._deleted', '=', false)
     .where('Transfer_Payment_Stream._deleted', '=', false)
     .where('Transfer_Payment_Profile._deleted', '=', false)

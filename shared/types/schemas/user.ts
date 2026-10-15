@@ -2,9 +2,10 @@ import { z } from 'zod'
 
 export const UserProfileSchema = z.object({
   id: z.string().optional(),
-  name: z.string({ error: 'validation.name_en_required' }).min(1, { error: 'validation.name_en_required' }),
+  name: z.string({ error: 'validation.name_en_required' }).min(1, { error: 'validation.name_en_required' })
+    .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' }),
   email: z.string({ error: 'validation.invalid_email' }).email({ error: 'validation.invalid_email' }).toLowerCase(),
-  image: z.string().nullable().optional()
+  image: z.string().refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' }).nullable().optional()
 })
 
 export type UserProfileItem = z.infer<typeof UserProfileSchema>

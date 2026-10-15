@@ -16,7 +16,9 @@ export default defineEventHandler(async event => {
     .innerJoin('Funding_Case_Agreement_Profile as a', 'a.id', 'jv.egcs_fc_fundingagreement')
     .innerJoin('Transfer_Payment_Stream as s', 's.id', 'a.egcs_fc_transferpaymentstream')
     .innerJoin('Transfer_Payment_Profile as p', 'p.id', 's.egcs_tp_transferpaymentprofile')
+    .innerJoin('Agency_Profile as agency', 'agency.id', 'p.egcs_tp_agency')
     .where('jv._deleted', '=', false).where('a._deleted', '=', false).where('s._deleted', '=', false).where('p._deleted', '=', false)
+    .where('agency._deleted', '=', false)
   if (!grants.some(grant => grant.scope.type === 'global')) {
     query = query.where(eb => eb.or(grants.flatMap(grant => {
       if (grant.scope.type === 'agency') return [eb('p.egcs_tp_agency', '=', grant.scope.agencyId)]

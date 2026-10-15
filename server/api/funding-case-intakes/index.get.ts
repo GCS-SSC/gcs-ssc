@@ -22,11 +22,13 @@ export default defineEventHandler(async event => {
     .innerJoin('Applicant_Recipient_Profile', 'Applicant_Recipient_Profile.id', 'Funding_Case_Intake_Profile.egcs_fi_applicantrecipient')
     .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Funding_Opportunity_Profile.egcs_fo_transferpaymentstream')
     .innerJoin('Transfer_Payment_Profile', 'Transfer_Payment_Profile.id', 'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile')
+    .innerJoin('Agency_Profile', 'Agency_Profile.id', 'Transfer_Payment_Profile.egcs_tp_agency')
     .where('Funding_Case_Intake_Profile._deleted', '=', false)
     .where('Funding_Opportunity_Profile._deleted', '=', false)
     .where('Applicant_Recipient_Profile._deleted', '=', false)
     .where('Transfer_Payment_Stream._deleted', '=', false)
     .where('Transfer_Payment_Profile._deleted', '=', false)
+    .where('Agency_Profile._deleted', '=', false)
   if (!hasGlobalRead) {
     query = query.where(eb => eb.or([
       ...(agencyIds.length ? [eb('Transfer_Payment_Profile.egcs_tp_agency', 'in', agencyIds)] : []),

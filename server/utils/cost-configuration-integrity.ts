@@ -18,6 +18,14 @@ export const assertAgencyCostCategoryNotInUse = async (
     .select('id').where('egcs_ay_organizationcostcategory', '=', costCategoryId)
     .where('_deleted', '=', false).forUpdate().executeTakeFirst()
   if (reference) return await routeBadRequest(event, 'AGENCY_COST_CATEGORY_IN_USE', 'apiErrors.agency.cost_category_in_use')
+  // Availability retirement preserves the relation; only soft-deleted lines
+  // release it. The caller already holds the owning Agency/category locks.
+  const calculationSource = await trx.selectFrom('Agency_Cost_Category_Line_Item')
+    .select('id').where('egcs_ay_sourcecategory', '=', costCategoryId)
+    .where('_deleted', '=', false).forUpdate().executeTakeFirst()
+  if (calculationSource) return await routeBadRequest(
+    event, 'AGENCY_COST_CATEGORY_CALCULATION_SOURCE_IN_USE', 'apiErrors.agency.cost_category_calculation_source_in_use'
+  )
 }
 
 export const assertAgencyCostCategoryLineItemNotInUse = async (
