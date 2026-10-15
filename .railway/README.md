@@ -111,6 +111,15 @@ and intermediate `gcs-db-volume-budget-controls-reset-20261014`
 deletion on 2026-10-16. The earlier clean-reset and ar-paid-reset volumes are
 absent from the live project inventory.
 
+The subsequent Forecast budget payment-hold release uses source commit
+`d89f26d07e97ffb6075a22a5cd261bfb28a6ff16` and public image digest
+`sha256:64e5bad0742c85244bdea80cbde471c018bb8431a9b3ce8163c442a6fdc5ee67`
+from [verified build 38665713283](https://github.com/GCS-SSC/gcs-ssc/actions/runs/38665713283).
+Railway deployment `e62c9276-0681-431b-9b2f-369f67755a00` reached `SUCCESS`
+on 2026-10-15. This release preserves the existing database and every volume;
+public health, demo login, and the Forecast revision-required response passed.
+Portal and Metabase deployments were unchanged.
+
 The Portal release uses source commit
 `54117871c2f6a0468e7a877ee6eb2a05284701cd` and pinned public image digest
 `sha256:32fc8c413fcf0abdd0b843c81b3d861510d5160bd24247499fbf666e3e71e205`
