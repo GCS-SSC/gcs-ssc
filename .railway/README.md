@@ -111,14 +111,20 @@ and intermediate `gcs-db-volume-budget-controls-reset-20261014`
 deletion on 2026-10-16. The earlier clean-reset and ar-paid-reset volumes are
 absent from the live project inventory.
 
-The subsequent Forecast budget payment-hold release uses source commit
-`d89f26d07e97ffb6075a22a5cd261bfb28a6ff16` and public image digest
-`sha256:64e5bad0742c85244bdea80cbde471c018bb8431a9b3ce8163c442a6fdc5ee67`
-from [verified build 38665713283](https://github.com/GCS-SSC/gcs-ssc/actions/runs/38665713283).
-Railway deployment `e62c9276-0681-431b-9b2f-369f67755a00` reached `SUCCESS`
-on 2026-10-15. This release preserves the existing database and every volume;
-public health, demo login, and the Forecast revision-required response passed.
-Portal and Metabase deployments were unchanged.
+The current Commitment budget payment-hold release uses source commit
+`274dbb7edeb8dfe755a4b28c42e8e7c8ef3fdc53` and public image digest
+`sha256:38e90328b31759f83c80d222fe83da202e63a2f9676939da7ec58045b1db587c`
+from [verified build 38753855922](https://github.com/GCS-SSC/gcs-ssc/actions/runs/38753855922).
+The verified main image is also published as `ghcr.io/gcs-ssc/gcs-ssc-demo:latest`
+for the AWS refresh command; Railway uses the immutable digest.
+Railway deployment `8a690ce5-fc5a-4176-8fac-1335d6a3d9bb` reached `SUCCESS`
+on 2026-10-15. Only the pending `9999_z_commitment_budget_payment_hold`
+migration ran; the existing seed journal and all volume attachments were preserved.
+Live verification retained fifteen Agreements and nine Payments, including
+Agreement 10139, Amendment 10147, inactive Commitment 10140 (CAD 120,000),
+active Commitment 10149 (CAD 50,000), and historical paid Payment 10142 (CAD 30,000).
+Public health, authenticated reads and the Amendment page passed. No database
+reset or seed replay is needed for this hotfix; Portal and Metabase are unchanged.
 
 The Portal release uses source commit
 `54117871c2f6a0468e7a877ee6eb2a05284701cd` and pinned public image digest
@@ -132,9 +138,9 @@ Wait for the app deployment to reach `SUCCESS` and verify public health, demo
 login, NCIA's thirteen agreements, and successful terminal Payments 168/172. Verify
 claim-based receivable creation from an approved reconciliation without the final
 flag and unspent-advance receivable creation from a paid advance. The application
-file volume, Portal, and Metabase remain outside this cutover. Future schema changes
-need another explicitly authorized clean database cutover; ordinary redeploys
-reuse the configured volume and do not reset it.
+file volume, Portal, and Metabase remain outside this cutover. Ordinary redeploys reuse the configured volume and do not reset it. Subject
+baseline changes use an explicitly authorized clean cutover by default; the
+Commitment budget hotfix above is the explicitly authorized incremental exception.
 
 ## Reset the disposable demo, including attachments
 

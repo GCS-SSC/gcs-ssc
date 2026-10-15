@@ -174,7 +174,8 @@ usual seeded accounts and is intended for demonstration data.
 
 ## One-command demo refresh
 
-From the repository root, using the AWS profile in ignored `infra/aws/.env`:
+From the repository root, using `AWS_PROFILE` in the environment or ignored
+`infra/aws/.env`:
 
 ```bash
 # Inspect the account, target and latest release without changing anything.
@@ -200,8 +201,10 @@ and verified TLS. Reset then stops GCS, waits for every old service task to reac
 `STOPPED`, and transactionally drops the `public`, `extensions`, and `audit`
 schemas. It restarts only after the reset task exits successfully. This causes
 GCS downtime and permanently removes its demo data, users, audit history, and
-extension configuration. Without `--reset-db`, the database is preserved; baseline
-schema changes still require an explicit reset.
+extension configuration. Without `--reset-db`, the database is preserved. Baseline-only schema changes
+require an explicit reset; the authorized Commitment budget hotfix supplies
+`9999_z_commitment_budget_payment_hold` as an incremental migration for existing
+databases, so this release needs no reset or seed replay.
 
 The helper verifies ECS deployment completion, the actual running image digest,
 and public readiness, then updates the local `deployment/demo-image.json` pin.
@@ -209,6 +212,19 @@ Commit/promote that pin separately if other operators should use the same releas
 Direct ECS updates do not rewrite CloudFormation's deployed template; keep the
 manifest aligned before subsequent CDK deployments to avoid restoring an older image.
 Do not run concurrent GCS deployments or refresh commands.
+
+The current Commitment budget release was built from source
+`274dbb7edeb8dfe755a4b28c42e8e7c8ef3fdc53` by
+[image build 38753855922](https://github.com/GCS-SSC/gcs-ssc/actions/runs/38753855922).
+Both `latest` and the shared manifest resolve to
+`ghcr.io/gcs-ssc/gcs-ssc-demo@sha256:38e90328b31759f83c80d222fe83da202e63a2f9676939da7ec58045b1db587c`.
+`AWS_PROFILE=gcscience bun run aws:demo:refresh` deployed task definition
+`GcsSscDemoTask0D89BCB6:7` on 2026-10-15 with database reset disabled. ECS reached
+`COMPLETED`, one task runs the verified digest, and public health and authenticated
+browser reads passed at <https://dwqie6eqqoak.cloudfront.net/>. Only the pending
+hotfix migration ran. All fourteen Agreements and eight Payments, including
+Payments 168 and 172, match the before-deployment snapshot; attachment storage,
+Portal and Metabase were preserved.
 
 If reset or deployment fails, inspect the printed task ARN and GCS CloudWatch
 logs. The helper does not automatically restart the old application after a reset;
