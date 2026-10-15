@@ -32,6 +32,7 @@ import {
 } from './review-runtime-access'
 import { readPublishedReviewSetup, type PublishedPublicationReference } from './review-setup-versioning'
 import { readPublishedReviewSchema } from './review-schema-versioning'
+import { assertAgreementPaymentForecastCurrent } from './agreement-financial-budget-controls'
 
 type DbClient = Kysely<Database> | Transaction<Database>
 
@@ -314,6 +315,9 @@ const recordCanonicalDecision = async (
   return await executeFreshAuthorizedApprovalActorWrite(event, actionContext.runtimeEntity, async (trx, current) => {
     const agencyId = current?.schemaAgencyId ?? actionContext.runtimeEntity.schemaAgencyId
     if (!agencyId) return await badRequest(event, 'APPROVAL_AGENCY_NOT_FOUND', 'apiErrors.request.invalid')
+    if (approvalValue && actionContext.runtimeEntity.approvalEntityType === 'fundingcasepayment') {
+      await assertAgreementPaymentForecastCurrent(trx, actionContext.runtimeEntity.entityId)
+    }
     return await decideCanonicalApproval(event, trx, approvalId, body, approvalValue, { agencyId })
   })
 }

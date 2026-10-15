@@ -1,3 +1,4 @@
+import { AgreementForecastRevisionRequired, getAgreementFinancialBudgetViolation } from '~~/server/utils/agreement-financial-budget-controls'
 import { badRequest } from '~~/server/utils/api-errors'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import {
@@ -28,6 +29,11 @@ export default defineEventHandler(async event => {
   const result = await executeAgreementForecastMutation(event, db, agreementId, agreementContext, [{ type: 'forecast', id: forecastId }], async trx => {
     const editable = await assertAgreementForecastEditable(event, trx, agreementId, forecastId)
     if (!editable || typeof editable !== 'object' || !('id' in editable)) return editable
+
+    if (editable.egcs_fc_active) {
+      const violation = await getAgreementFinancialBudgetViolation(trx, agreementId, { kind: 'forecast', id: forecastId })
+      if (violation) throw new AgreementForecastRevisionRequired(violation)
+    }
 
     const deleted = await trx
       .updateTable('Funding_Case_Agreement_Forecast')

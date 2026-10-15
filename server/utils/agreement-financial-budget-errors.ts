@@ -1,6 +1,6 @@
 import type { H3Event } from 'h3'
 import { useTranslation } from '@intlify/h3'
-import { AgreementFinancialBudgetViolation } from './agreement-financial-budget-controls'
+import { AgreementFinancialBudgetViolation, AgreementForecastRevisionRequired } from './agreement-financial-budget-controls'
 import { badRequest } from './api-errors'
 import { resolveRequestLocale } from './request-locale'
 import { formatMoneyText } from '~~/shared/utils/money'
@@ -11,6 +11,10 @@ import { formatMoneyText } from '~~/shared/utils/money'
  * @param error - Failure from the locked write.
  */
 export const throwIfAgreementFinancialBudgetError = async (event: H3Event, error: unknown): Promise<void> => {
+  if (error instanceof AgreementForecastRevisionRequired) {
+    await badRequest(event, 'AGREEMENT_FORECAST_REVISION_REQUIRED', 'apiErrors.agreement.forecast_revision_required')
+    return
+  }
   if (!(error instanceof AgreementFinancialBudgetViolation)) return
   const { kind, currency, amount, budget } = error.details
   const locale = resolveRequestLocale(event)

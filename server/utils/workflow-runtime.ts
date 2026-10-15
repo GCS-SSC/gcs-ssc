@@ -86,7 +86,7 @@ import {
 import { resolveEntityTypeLifecycleDefinition } from './entity-type-registry'
 import { createCompletionRecord, resolveCompletionEvidenceId } from './completion-runtime-core'
 import { applyCompletionPositiveTerminusEffects } from './completion-positive-terminus'
-import { assertAgreementFinancialBudgetControls } from './agreement-financial-budget-controls'
+import { assertAgreementFinancialBudgetControls, assertAgreementPaymentForecastCurrent } from './agreement-financial-budget-controls'
 import { throwIfAgreementFinancialBudgetError } from './agreement-financial-budget-errors'
 import { loadExtensionLifecycleEntity } from './extensions'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
@@ -287,6 +287,9 @@ const lockProtectedAgreement = async (trx: Transaction<Database>, run: Pick<Work
     const context = await resolveReviewRuntimeEntityFromEntity(trx, 'fundingcasepayment', String(run.egcs_cn_entityid))
     if (!context?.schemaAgencyId) throw new Error('Payment Agreement is unavailable')
     await lockPaymentRecoveryAgreements(trx, { agreementId: String(payment.egcs_fc_fundingagreement), agencyId: context.schemaAgencyId })
+    if (!await lockAgreementProfileForUpdate(trx, String(payment.egcs_fc_fundingagreement))) {
+      throw new Error('Payment Agreement is unavailable')
+    }
     return
   }
   if (run.egcs_cn_entitytype === 'fundingcaseaccountreceivablecreditmemo') {
@@ -538,6 +541,9 @@ export const finishWorkflowRun = async (
   if (!run || RUNTIME_TERMINAL_STATES.has(run.egcs_cn_state)) return run
   const configuration = await readWorkflowRuntimeConfiguration(trx, run)
   const positive = state === 'succeeded' || state === 'approved'
+  if (positive && run.egcs_cn_entitytype === 'fundingcasepayment') {
+    await assertAgreementPaymentForecastCurrent(trx, String(run.egcs_cn_entityid))
+  }
   if (positive && run.egcs_cn_purpose === 'approval_submission'
     && run.egcs_cn_entitytype === 'fundingcaseagreementcloseout'
     && !await validateCloseoutPacket(trx, run, configuration, actor)) {
@@ -1358,6 +1364,9 @@ const startWorkflowUnchecked = async (
   }
   if ('status' in targetStatus ? targetStatus.status.terminal : targetStatus.terminal) {
     return await badRequest(event, 'WORKFLOW_TARGET_TERMINAL', 'apiErrors.request.invalid_status')
+  }
+  if (context.entityType === 'fundingcasepayment') {
+    await assertAgreementPaymentForecastCurrent(trx, context.entityId)
   }
   if (context.agreementId && ['fundingcaseagreementclaim', 'fundingcaseforecast', 'fundingclaimreconcile'].includes(context.entityType)) {
     const kind = context.entityType === 'fundingcaseagreementclaim' ? 'claim' : context.entityType === 'fundingcaseforecast' ? 'forecast' : 'reconciliation'

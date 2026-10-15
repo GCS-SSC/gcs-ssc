@@ -1,3 +1,4 @@
+import { getAgreementFinancialBudgetViolation } from '~~/server/utils/agreement-financial-budget-controls'
 import { sql } from 'kysely'
 import type { H3Event } from 'h3'
 import { prepareAgreementForecastRoute } from '~~/server/utils/agreement-forecast'
@@ -243,7 +244,11 @@ const readRoute = async (event: H3Event, forecastId?: string) => {
   }))
   const forecastsWithState = await withBusinessRecordState(db, 'fundingcaseforecast', forecasts)
   return {
-    forecasts: forecastsWithState,
+    forecasts: await Promise.all(forecastsWithState.map(async forecast => ({
+      ...forecast,
+      forecast_revision_required: Boolean(forecast.egcs_fc_active
+        && await getAgreementFinancialBudgetViolation(db, agreementId, { kind: 'forecast', id: String(forecast.id) }))
+    }))),
     budgetLineItems: parsedBudgetLineItems,
     lineItems: parsedLineItems
   }

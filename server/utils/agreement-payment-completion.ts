@@ -33,6 +33,7 @@ import type {
 import { resolveBusinessStatusProtection } from '~~/server/utils/business-status-runtime'
 import { compareMoney, parseMoney } from '~~/shared/utils/money'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
+import { assertAgreementPaymentForecastCurrent, getAgreementPaymentForecastViolation } from './agreement-financial-budget-controls'
 
 const ZERO_MONEY = parseMoney('0')
 
@@ -48,6 +49,7 @@ export const getAgreementPaymentCompletionRuntime = async (
     const lineTotal = await getPaymentLineTotal(trx, paymentId)
     const hasPositiveLineTotal = compareMoney(lineTotal, ZERO_MONEY) > 0
     const linesMatch = hasPositiveLineTotal && await paymentLineTotalMatchesPaymentAmount(trx, paymentId)
+    const forecastViolation = item ? null : await getAgreementPaymentForecastViolation(trx, paymentId)
     let recoveryBlocked = false
     if (await hasAccountingTable(trx, 'Funding_Case_Agreement_Account_Receivable')) {
       const payment = await getAgreementPayment(trx, context.agreementId, paymentId)
@@ -67,19 +69,22 @@ export const getAgreementPaymentCompletionRuntime = async (
       item,
       can_complete: item === null
         && linesMatch
+        && !forecastViolation
         && !recoveryBlocked
         && Boolean(protection && !protection.locked),
       blocker: item
         ? null
-        : recoveryBlocked
-          ? 'payment_recovery_control' as const
-          : !hasPositiveLineTotal
-              ? 'lines_required' as const
-              : !linesMatch
-                  ? 'payment_total_mismatch' as const
-                  : !protection || protection.locked
-                      ? 'business_status' as const
-                      : null
+        : forecastViolation
+          ? 'forecast_revision_required' as const
+          : recoveryBlocked
+            ? 'payment_recovery_control' as const
+            : !hasPositiveLineTotal
+                ? 'lines_required' as const
+                : !linesMatch
+                    ? 'payment_total_mismatch' as const
+                    : !protection || protection.locked
+                        ? 'business_status' as const
+                        : null
     }
   })
 }
@@ -155,6 +160,7 @@ export const executeAgreementPaymentCompletion = async (
       return await badRequest(event, 'AGREEMENT_PAYMENT_LINES_MUST_MATCH_TOTAL', 'apiErrors.agreement.payment_lines_must_match_total')
     }
 
+    await assertAgreementPaymentForecastCurrent(trx, paymentId)
     const header = await getAgreementPayment(trx, context.agreementId, paymentId)
     if (!header) return await notFound(event, 'AGREEMENT_PAYMENT_NOT_FOUND', 'apiErrors.agreement.payment_not_found')
     await assertPaymentRecoveryAllowed(event, trx, { agreementId: context.agreementId, applicantRecipientId: header.egcs_fc_applicantrecipient, currency: header.egcs_fc_currency, paymentId })

@@ -34,6 +34,18 @@ export class AgreementFinancialBudgetViolation extends Error {
   }
 }
 
+/** Keeps a forecast mismatch distinct from a Claim or reconciliation capacity failure. */
+export class AgreementForecastRevisionRequired extends AgreementFinancialBudgetViolation {
+  /**
+   * Preserves the affected year and exact current program amounts.
+   * @param details - Active Forecast exceeding its current annual program budget.
+   */
+  constructor(details: AgreementFinancialBudgetViolationDetails) {
+    super(details)
+    this.name = 'AgreementForecastRevisionRequired'
+  }
+}
+
 interface FundingAmountRow {
   documentId: string
   claimId?: string
@@ -236,14 +248,54 @@ export const assertAgreementFinancialBudgetControls = async (
 }
 
 /**
- * Prevents current-budget edits from reducing annual program funding below counted financial usage.
+ * Resolves a Payment's hold from the active Forecast in its stable fiscal year.
+ * @param db - Authorized snapshot or transaction holding the Agreement write lock.
+ * @param paymentId - Payment whose approval or processing is being checked.
+ * @returns Active Forecast discrepancy, or null when this year has no mismatch.
+ */
+export const getAgreementPaymentForecastViolation = async (
+  db: Db, paymentId: string
+): Promise<AgreementFinancialBudgetViolationDetails | null> => {
+  const forecasts = (await sql<{ id: string, agreementId: string }>`
+    SELECT forecast.id::text AS id, payment.egcs_fc_fundingagreement::text AS "agreementId"
+    FROM "Funding_Case_Agreement_Payment" payment
+    JOIN "Funding_Case_Agreement_Profile" profile ON profile.id = payment.egcs_fc_fundingagreement
+      AND profile.egcs_fc_currency = payment.egcs_fc_currency AND NOT profile._deleted
+    JOIN "Funding_Case_Agreement_Budget_Fiscal_Year" payment_year ON payment_year.id = payment.egcs_fc_fiscalyear
+      AND payment_year.egcs_fc_fundingagreement = payment.egcs_fc_fundingagreement
+    JOIN "Funding_Case_Agreement_Forecast" forecast ON forecast.egcs_fc_fundingagreement = payment.egcs_fc_fundingagreement
+      AND forecast.egcs_fc_active AND NOT forecast._deleted
+    JOIN "Funding_Case_Agreement_Budget_Fiscal_Year" forecast_year ON forecast_year.id = forecast.egcs_fc_fiscalyear
+      AND forecast_year.egcs_fc_fundingagreement = payment.egcs_fc_fundingagreement
+      AND COALESCE(forecast_year.egcs_fc_originalbudgetfiscalyear, forecast_year.id)
+        = COALESCE(payment_year.egcs_fc_originalbudgetfiscalyear, payment_year.id)
+    WHERE payment.id = ${paymentId}::bigint AND NOT payment._deleted
+    ORDER BY forecast.id
+  `.execute(db)).rows
+  for (const forecast of forecasts) {
+    const violation = await getAgreementFinancialBudgetViolation(db, forecast.agreementId, { kind: 'forecast', id: forecast.id })
+    if (violation) return violation
+  }
+  return null
+}
+
+/**
+ * Rechecks the Forecast hold before Payment approval or processing effects commit.
+ * @param db - Transaction holding the established Agreement lock.
+ * @param paymentId - Payment being submitted, approved or processed.
+ */
+export const assertAgreementPaymentForecastCurrent = async (db: Db, paymentId: string): Promise<void> => {
+  const violation = await getAgreementPaymentForecastViolation(db, paymentId)
+  if (violation) throw new AgreementForecastRevisionRequired(violation)
+}
+
+/**
+ * Prevents current-budget edits from reducing annual program funding below counted Claims or reconciliations.
  * @param db - Transaction already holding the Agreement write lock.
  * @param agreementId - Agreement whose current budget has just changed.
  */
 export const assertAgreementCurrentBudgetUsage = async (db: Db, agreementId: string): Promise<void> => {
-  const [forecasts, claims, reconciliations] = await Promise.all([
-    db.selectFrom('Funding_Case_Agreement_Forecast').select(['id', 'egcs_fc_active'])
-      .where('egcs_fc_fundingagreement', '=', agreementId).where('_deleted', '=', false).execute(),
+  const [claims, reconciliations] = await Promise.all([
     db.selectFrom('Funding_Case_Agreement_Claim')
       .innerJoin('Funding_Case_Agreement_Budget_Fiscal_Year as sourceYear', join => join
         .onRef('sourceYear.id', '=', 'Funding_Case_Agreement_Claim.egcs_fc_fiscalyear')
@@ -263,14 +315,8 @@ export const assertAgreementCurrentBudgetUsage = async (db: Db, agreementId: str
       .where('Funding_Case_Agreement_Claim._deleted', '=', false)
       .where('Funding_Case_Agreement_Claim_Reconcile._deleted', '=', false).execute()
   ])
-  const forecastStates = await getBudgetRecordStates(db, 'fundingcaseforecast', forecasts.map(row => String(row.id)))
   const claimStates = await getBudgetRecordStates(db, 'fundingcaseagreementclaim', claims.map(row => String(row.id)))
   const reconcileStates = await getBudgetRecordStates(db, 'fundingclaimreconcile', reconciliations.map(row => String(row.id)))
-  for (const forecast of forecasts) {
-    const state = forecastStates.get(String(forecast.id))
-    if (!forecast.egcs_fc_active && (hasNegativeBudgetOutcome(state) || state?.lifecycleTerminus === 'positive')) continue
-    await assertAgreementFinancialBudgetControls(db, agreementId, { kind: 'forecast', id: String(forecast.id) })
-  }
   const checkedClaimYears = new Set<string>()
   for (const claim of claims) {
     if (!checkedClaimYears.has(claim.fiscalYearId) && !hasNegativeBudgetOutcome(claimStates.get(String(claim.id)))) {

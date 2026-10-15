@@ -409,6 +409,7 @@ export interface FundingCaseAgreementMonitorDetailRow extends FundingCaseAgreeme
 
 export interface FundingCaseAgreementForecastRow extends FundingCaseAgreementForecastItem, BusinessRecordStateFields {
   fiscal_year_display?: string | null
+  forecast_revision_required: boolean
 }
 
 export interface FundingCaseAgreementForecastLineItemRow extends FundingCaseAgreementForecastLineItemItem {

@@ -109,7 +109,7 @@ export const assertAgreementForecastExists = async (
     .where('id', '=', forecastId)
     .where('egcs_fc_fundingagreement', '=', agreementId)
     .where('_deleted', '=', false)
-    .select(['id', 'egcs_fc_fiscalyear', 'egcs_fc_status'])
+    .select(['id', 'egcs_fc_fiscalyear', 'egcs_fc_status', 'egcs_fc_active'])
     .executeTakeFirst()
 
   if (!forecast) {

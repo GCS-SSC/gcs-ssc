@@ -97,6 +97,9 @@ const {
 } = useOverviewFetch(computed(() => `/api/agreements/${agreementId}/forecasts-overview`))
 
 const forecasts = computed<FundingCaseAgreementForecastOverviewRow['forecasts']>(() => overview.value?.forecasts ?? [])
+const forecastsRequiringRevision = computed(() => forecasts.value.filter(forecast =>
+  forecast.egcs_fc_active && forecast.forecast_revision_required
+))
 const budgetLineItems = computed<FundingCaseAgreementForecastOverviewRow['budgetLineItems']>(() => overview.value?.budgetLineItems ?? [])
 const forecastLineItems = computed<FundingCaseAgreementForecastOverviewRow['lineItems']>(() => overview.value?.lineItems ?? [])
 
@@ -215,7 +218,9 @@ const createForecastVersion = async (row: ForecastGroupedRow) => {
     isCreatingVersion.value = true
     const created = await sendJson<{ id: string }>(`/api/agreements/${requestAgreementId}/forecasts`, 'POST', {
       egcs_fc_fiscalyear: forecast.forecastFiscalYearId,
-      egcs_fc_copyfromactive: true
+      egcs_fc_copyfromactive: !forecastsRequiringRevision.value.some(item =>
+        String(item.egcs_fc_fiscalyear) === forecast.forecastFiscalYearId
+      )
     })
     if (!isScopeActive || agreementId !== requestAgreementId) return
     await navigateTo(localePath(appRouteLocations.agreementForecastDetail(requestAgreementId, String(created.id))))
@@ -267,6 +272,14 @@ const deleteForecast = async (forecastId: string) => {
 
 <template>
   <div class="w-full">
+    <UAlert
+      v-for="forecast in forecastsRequiringRevision"
+      :key="forecast.id"
+      class="mb-4"
+      color="warning"
+      icon="i-lucide-triangle-alert"
+      :title="`${forecast.fiscal_year_display ?? t('common.unavailable')}, ${t('agreement.forecasts.version_label', { version: forecast.egcs_fc_version })}`"
+      :description="t('agreement.budget_controls.forecast_revision_required')" />
     <CommonResourceLayoutCard
       v-model:search="search"
       v-model:pagination="pagination"
