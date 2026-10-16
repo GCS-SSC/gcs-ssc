@@ -1,11 +1,11 @@
-import { PaginationSchema } from '~~/shared/types/schemas'
+import { PaginationSchema, PositivePostgresBigintIdSchema } from '~~/shared/types/schemas'
 import { authorize, requireAuthContext } from '~~/server/utils/authorize'
 import { canAccessApplicantRecipient, resolveApplicantRecipientVisibility, type ApplicantRecipientVisibility } from '~~/server/utils/applicant-recipient-auth'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { z } from 'zod'
 
 const QuerySchema = PaginationSchema.extend({
-  applicant_recipient_id: z.coerce.string().optional(),
+  applicant_recipient_id: PositivePostgresBigintIdSchema.or(z.literal('')).optional(),
   permission_action: z.enum(['create', 'read', 'update']).default('create'),
   role_scoped: z.enum(['true', 'false']).default('false')
 })
