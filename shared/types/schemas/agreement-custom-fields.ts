@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { PositivePostgresBigintIdSchema } from './common'
 
 const Label = z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' })
+  .refine(value => !value.includes('\u0000'), { error: 'validation.invalid_text_character' })
 const DisplayOrder = z.number().int().nonnegative().max(2147483647, { error: 'validation.custom_field_display_order_max' })
 const CategoryLabel = z.preprocess(
   value => typeof value === 'string' && value.trim() === '' ? null : value,

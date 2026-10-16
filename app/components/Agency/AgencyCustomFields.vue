@@ -247,7 +247,7 @@ const remove = async (path: string) => {
 
     <UModal v-model:open="fieldModal.isOpen.value" :title="t('custom_fields.title')" :ui="{ content: 'sm:max-w-2xl' }">
       <template #body>
-        <UForm v-if="fieldModal.selected.value" :state="fieldModal.selected.value" :validate="createValidator(AgencyCustomFieldCreateSchema)" class="space-y-4" @submit="saveField">
+        <UForm v-if="fieldModal.selected.value" :state="fieldModal.selected.value" :validate="createValidator(AgencyCustomFieldCreateSchema.strip())" class="space-y-4" @submit="saveField">
           <UFormField :label="t('custom_fields.name_en')" name="egcs_ay_name_en" required>
             <UInput v-model="fieldModal.selected.value.egcs_ay_name_en" class="w-full" />
           </UFormField>
@@ -268,7 +268,7 @@ const remove = async (path: string) => {
     </UModal>
     <UModal v-model:open="optionModal.isOpen.value" :title="t('custom_fields.add_option')" :ui="{ content: 'sm:max-w-2xl' }">
       <template #body>
-        <UForm v-if="optionModal.selected.value" :state="optionModal.selected.value" :validate="createValidator(AgencyCustomFieldOptionCreateSchema)" class="space-y-4" @submit="saveOption">
+        <UForm v-if="optionModal.selected.value" :state="optionModal.selected.value" :validate="createValidator(AgencyCustomFieldOptionCreateSchema.strip())" class="space-y-4" @submit="saveOption">
           <UFormField :label="t('custom_fields.name_en')" name="egcs_ay_name_en" required>
             <UInput v-model="optionModal.selected.value.egcs_ay_name_en" class="w-full" />
           </UFormField>
