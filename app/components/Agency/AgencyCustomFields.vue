@@ -162,7 +162,11 @@ const saveOption = async () => {
  * @param path - Agency catalog resource path.
  */
 const remove = async (path: string) => {
-  if (await confirmDeleteRequest(path)) await refresh()
+  try {
+    if (await confirmDeleteRequest(path)) await refresh()
+  } catch (deleteError) {
+    showError(deleteError)
+  }
 }
 </script>
 
