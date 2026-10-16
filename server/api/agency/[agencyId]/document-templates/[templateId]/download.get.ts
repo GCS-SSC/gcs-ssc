@@ -18,8 +18,10 @@ export default defineEventHandler(async event => {
   await authorize(event, 'agency', 'read', { type: 'agency', agencyId })
   const { language } = await getValidatedQueryI18n(event, QuerySchema)
   const template = await event.context.$db.selectFrom('Agency_Document_Template')
-    .where('id', '=', templateId).where('egcs_ay_organizationagency', '=', agencyId)
-    .where('_deleted', '=', false)
+    .innerJoin('Agency_Profile', 'Agency_Profile.id', 'Agency_Document_Template.egcs_ay_organizationagency')
+    .where('Agency_Document_Template.id', '=', templateId).where('egcs_ay_organizationagency', '=', agencyId)
+    .where('Agency_Document_Template._deleted', '=', false)
+    .where('Agency_Profile._deleted', '=', false)
     .select(['egcs_ay_templateattachment_en', 'egcs_ay_templateattachment_fr']).executeTakeFirst()
   if (!template) return await notFound(event, 'DOCUMENT_TEMPLATE_NOT_FOUND', 'apiErrors.document_generation.template_not_found')
   const attachmentId = language === 'fra' ? template.egcs_ay_templateattachment_fr : template.egcs_ay_templateattachment_en
