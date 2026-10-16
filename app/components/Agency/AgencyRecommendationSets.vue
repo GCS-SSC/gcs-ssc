@@ -239,9 +239,11 @@ const onDeleteMember = async (row: RecommendationRow) => {
       :expanded="expandedRows"
       :total-records="totalRecords"
       :loading="status === 'pending'"
+      :request-status="status"
       :button-label="canUpdateChild ? t('common.add') : undefined"
       :show-button="canUpdateChild"
       @add="onAdd"
+      @retry="refresh()"
       @update:expanded="expandedRows = $event">
       <template #name-cell="{ row }">
         <div :id="getGroupedDisclosureContentId(row)" class="contents">
