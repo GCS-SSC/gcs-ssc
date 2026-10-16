@@ -66,7 +66,69 @@ export const agencyStatusesE2eSpecPaths = [
   'tests/e2e/agency-statuses.spec.ts'
 ] as const
 
+export const lifecycleFixturePgliteE2eSpecPaths = [
+  'tests/e2e/agency-address-type-review.spec.ts',
+  'tests/e2e/agreement-activity-relationship-lookup.spec.ts',
+  'tests/e2e/agreement-address-mutations-review.spec.ts',
+  'tests/e2e/agreement-budget-activity-scroll.spec.ts',
+  'tests/e2e/agreement-budget-core.spec.ts',
+  'tests/e2e/agreement-budget-fiscal-year-review.spec.ts',
+  'tests/e2e/agreement-claim-completion-presentation.spec.ts',
+  'tests/e2e/agreement-claim-core.spec.ts',
+  'tests/e2e/agreement-custom-fields-seed.spec.ts',
+  'tests/e2e/agreement-custom-fields.spec.ts',
+  'tests/e2e/agreement-delete-review.spec.ts',
+  'tests/e2e/agreement-detail-review.spec.ts',
+  'tests/e2e/agreement-document-ui.spec.ts',
+  'tests/e2e/agreement-financial-budget-controls.spec.ts',
+  'tests/e2e/agreement-forecast-claim-funding.spec.ts',
+  'tests/e2e/agreement-forecast-core.spec.ts',
+  'tests/e2e/agreement-forecast-grouping.spec.ts',
+  'tests/e2e/agreement-list-review.spec.ts',
+  'tests/e2e/agreement-monitor-lifecycle.spec.ts',
+  'tests/e2e/agreement-monitor-pending-actions.spec.ts',
+  'tests/e2e/agreement-payments-tab-selection.spec.ts',
+  'tests/e2e/agreement-payments.spec.ts',
+  'tests/e2e/agreement-proponent-create-review.spec.ts',
+  'tests/e2e/agreement-proponent-lookup-review.spec.ts',
+  'tests/e2e/agreement-proponent-read-review.spec.ts',
+  'tests/e2e/agreement-proponent-update-review.spec.ts',
+  'tests/e2e/agreement-update-review.spec.ts',
+  'tests/e2e/agreements.spec.ts',
+  'tests/e2e/amendment-document-ui.spec.ts',
+  'tests/e2e/assigned-work-deleted-owner.spec.ts',
+  'tests/e2e/assignment-management.spec.ts',
+  'tests/e2e/attachment-member-ids.spec.ts',
+  'tests/e2e/budget-percentage.spec.ts',
+  'tests/e2e/composed-financial-spine.spec.ts',
+  'tests/e2e/correction-lifecycle.spec.ts',
+  'tests/e2e/cost-category-availability.spec.ts',
+  'tests/e2e/custom-field-namespace-crud.spec.ts',
+  'tests/e2e/document-docx-generation.spec.ts',
+  'tests/e2e/document-generation-failures.spec.ts',
+  'tests/e2e/entity-assignment-context-review.spec.ts',
+  'tests/e2e/entity-reviews-tabs.spec.ts',
+  'tests/e2e/exact-roster-worker-approver-handoff.spec.ts',
+  'tests/e2e/forecast-historical-budget-read.spec.ts',
+  'tests/e2e/forecast-role-recovery.spec.ts',
+  'tests/e2e/funding-source-retained-budget.spec.ts',
+  'tests/e2e/hostile-deep-links.spec.ts',
+  'tests/e2e/journal-vouchers.spec.ts',
+  'tests/e2e/lifecycle-approval-helper-outcomes.spec.ts',
+  'tests/e2e/qualified-assignment-route-review.spec.ts',
+  'tests/e2e/stream-agreement-subtypes-delete-review.spec.ts',
+  'tests/e2e/stream-agreement-subtypes-update-reference-review.spec.ts',
+  'tests/e2e/stream-holdback-bases-delete-review.spec.ts',
+  'tests/e2e/stream-holdback-bases-update-referenced-review.spec.ts',
+  'tests/e2e/transfer-payment-amendment-subtypes.spec.ts',
+  'tests/e2e/workflow-amendment-conditions.spec.ts',
+  'tests/e2e/workflow-group-owners.spec.ts',
+  'tests/e2e/workflow-profile-conditions.spec.ts'
+] as const
+
 export const freshResetE2eSpecPaths = [
+  'tests/e2e/lifecycle-helper-capacity-isolation.spec.ts',
+  ...lifecycleFixturePgliteE2eSpecPaths,
   'tests/e2e/ncia-demo-seed.spec.ts',
   'tests/e2e/account-receivable-claim-reductions.spec.ts',
   'tests/e2e/advance-direct-repayment-hold.spec.ts',
@@ -127,11 +189,15 @@ export type E2eSuite = 'pglite' | 'postgres' | 'review-scratch' | 'amendment-ref
 export type E2eTestSelection = {
   forwardedPlaywrightArgs: string[]
   suite: E2eSuite
+  selectedSpec: string | undefined
 }
 
 type E2eScriptConfig = {
   forwardedPlaywrightArgs: string[]
   suite: E2eSuite
+  selectedSpec: string | undefined
+  ownsPgliteDataDir: boolean
+  ownsLocalFileStorageDir: boolean
   preferredPort: number
   port: number
   baseUrl: string
@@ -578,35 +644,44 @@ export const resolveE2eTestSelection = (rawArgs: string[], specFromEnv?: string)
 
   const selectedSuite = suite ?? 'pglite'
   const selectedSpec = specFromArg ?? specFromEnv
+  let effectiveSelectedSpec = selectedSpec
+  if (selectedSuite === 'postgres' && !selectedSpec) {
+    throw new Error('The PostgreSQL leaf runner requires one exact --spec; use bun run test:e2e:postgres for all PostgreSQL specs with per-spec reset.')
+  }
   if (selectedSuite === 'fresh-reset' && !selectedSpec) {
     throw new Error('The fresh-reset runner requires one exact --spec; use bun run test:e2e:fresh-reset for all fresh-reset specs.')
   }
   if (selectedSpec) {
     assertSpecBelongsToSuite(selectedSuite, selectedSpec)
     forwardedPlaywrightArgs.push(selectedSpec)
-  } else if (selectedSuite === 'postgres') {
-    forwardedPlaywrightArgs.push(...postgresE2eSpecPaths)
   } else if (selectedSuite === 'review-scratch') {
     forwardedPlaywrightArgs.push(reviewScratchE2eFilePattern)
   } else if (selectedSuite === 'amendment-refresh') {
     forwardedPlaywrightArgs.push(...amendmentRefreshE2eSpecPaths)
+    effectiveSelectedSpec = amendmentRefreshE2eSpecPaths[0]
   } else if (selectedSuite === 'agreement-closeout') {
     forwardedPlaywrightArgs.push(...agreementCloseoutE2eSpecPaths)
+    effectiveSelectedSpec = agreementCloseoutE2eSpecPaths[0]
   } else if (selectedSuite === 'workflow-recommendation') {
     forwardedPlaywrightArgs.push(...workflowRecommendationE2eSpecPaths)
+    effectiveSelectedSpec = workflowRecommendationE2eSpecPaths[0]
   } else if (selectedSuite === 'workflow-setup-retired') {
     forwardedPlaywrightArgs.push(...workflowSetupRetiredE2eSpecPaths)
+    effectiveSelectedSpec = workflowSetupRetiredE2eSpecPaths[0]
   } else if (selectedSuite === 'agreement-amendments') {
     forwardedPlaywrightArgs.push(...agreementAmendmentsE2eSpecPaths)
+    effectiveSelectedSpec = agreementAmendmentsE2eSpecPaths[0]
   } else if (selectedSuite === 'attachments') {
     forwardedPlaywrightArgs.push(...attachmentsE2eSpecPaths)
+    effectiveSelectedSpec = attachmentsE2eSpecPaths[0]
   } else if (selectedSuite === 'agency-statuses') {
     forwardedPlaywrightArgs.push(...agencyStatusesE2eSpecPaths)
+    effectiveSelectedSpec = agencyStatusesE2eSpecPaths[0]
   } else {
     forwardedPlaywrightArgs.push(pgliteE2eFilePattern)
   }
 
-  return { forwardedPlaywrightArgs, suite: selectedSuite }
+  return { forwardedPlaywrightArgs, suite: selectedSuite, selectedSpec: effectiveSelectedSpec }
 }
 
 /**
@@ -815,6 +890,9 @@ const resolveE2eScriptConfig = async (): Promise<E2eScriptConfig> => {
   return {
     forwardedPlaywrightArgs: selection.forwardedPlaywrightArgs,
     suite: selection.suite,
+    selectedSpec: selection.selectedSpec,
+    ownsPgliteDataDir: dataPaths.ownsPgliteDataDir,
+    ownsLocalFileStorageDir: dataPaths.ownsLocalFileStorageDir,
     preferredPort,
     port,
     baseUrl,
@@ -828,7 +906,7 @@ const resolveE2eScriptConfig = async (): Promise<E2eScriptConfig> => {
   }
 }
 
-const buildE2eEnv = (
+export const buildE2eEnv = (
   baseUrl: string,
   pgliteDataDir: string,
   localFileStorageDir: string,
@@ -849,6 +927,7 @@ const buildE2eEnv = (
   }
   Object.assign(env, { GCS_E2E_SUITE: suite, GCS_E2E_SERVER_MODE: resolveManagedE2eServerMode(suite, process.env.E2E_SERVER_MODE) })
   if (suite === 'agreement-amendments') Object.assign(env, { E2E_ISOLATED_AMENDMENT_AGREEMENT: '1' })
+  delete env.GCS_E2E_FIXTURE_ISOLATION
   delete env.DATABASE_URL
   delete env.NUXT_DATABASE_URL
   delete env.E2E_POSTGRES_TEST_URL
@@ -866,6 +945,18 @@ const buildE2eEnv = (
   }
 
   return env
+}
+
+export const resolveFixtureIsolationCapability = (options: {
+  spec: string | undefined
+  database: 'pglite' | 'postgres'
+  databaseOwned: boolean
+  storageOwned: boolean
+  serverOwned: boolean
+}): string | undefined => {
+  if (!options.spec || !options.databaseOwned || !options.storageOwned || !options.serverOwned) return undefined
+  assertCanonicalExistingSpecPath(options.spec)
+  return JSON.stringify({ spec: options.spec, database: options.database, databaseOwned: true, storageOwned: true })
 }
 
 const logPortSelection = (config: E2eScriptConfig): void => {
@@ -1014,6 +1105,14 @@ const main = async (): Promise<void> => {
       config.suite,
       postgresIsolation?.connectionString
     )
+    const fixtureIsolation = resolveFixtureIsolationCapability({
+      spec: config.selectedSpec,
+      database: postgresIsolation ? 'postgres' : 'pglite',
+      databaseOwned: postgresIsolation !== undefined || config.ownsPgliteDataDir,
+      storageOwned: config.ownsLocalFileStorageDir,
+      serverOwned: !config.baseUrlFromEnv
+    })
+    if (fixtureIsolation) env.GCS_E2E_FIXTURE_ISOLATION = fixtureIsolation
     await prepareManagedProductionServer(
       config.serverMode,
       env.ENVIRONMENT_TYPE,
