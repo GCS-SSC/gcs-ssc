@@ -797,7 +797,7 @@ const getSubmissionGroupedTotal = (row: GroupedClaimSubmissionRow, key: 'submitt
   sumMoney(getSubmissionLeafRows(row).map(leafRow => leafRow.original[key]))
 
 const isReconcileMutationPending = computed(() =>
-  isSavingReconcile.value || isSavingReconcileFinal.value || isSavingReconcileLine.value
+  isSavingReconcile.value || isSavingReconcileFinal.value || isSavingReconcileLine.value || isCancellingReconcile.value
 )
 
 const selectReconcile = (reconcileId: string | number) => {
