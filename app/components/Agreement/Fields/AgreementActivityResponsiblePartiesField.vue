@@ -3,10 +3,12 @@ import { computed } from 'vue'
 
 const {
   agreementId,
+  amendmentId,
   name = 'responsible_party_ids',
   permissionAction = 'update'
 } = defineProps<{
   agreementId: string
+  amendmentId?: string
   name?: string
   permissionAction?: 'create' | 'update'
 }>()
@@ -15,7 +17,10 @@ const model = defineModel<string[]>('model', {
   default: () => []
 })
 const { t } = useI18n()
-const lookupQuery = computed(() => ({ permission_action: permissionAction }))
+const lookupQuery = computed(() => ({
+  permission_action: permissionAction,
+  ...(amendmentId ? { amendment_id: amendmentId } : {})
+}))
 </script>
 
 <template>

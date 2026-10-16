@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { usePageResourceError } from '~/composables/usePageResourceError'
-import { useId, computed, ref, watch } from 'vue'
+import { useId, computed, onUnmounted, ref, watch } from 'vue'
 import CommonCompletionPanel from '~/components/Common/Completions/Panel.vue'
 /* eslint-disable jsdoc/require-jsdoc -- concise detail-page actions are covered by focused tests. */
 import type { FetchError } from 'ofetch'
@@ -37,6 +37,7 @@ const { getHeroCollapsed } = useDashboard()
 const { saveJson } = useJsonRequest()
 const confirmScopeRemoval = useDeleteConfirm()
 const { isTerminalStatus } = useBusinessStatusState()
+const snapshotStatusCatalog = useStatusCatalog()
 
 const agreementId = route.params.id as string
 const amendmentId = route.params.amendmentId as string
@@ -143,7 +144,7 @@ const savedRiskScoreItems = computed(() => {
   return [{ value: String(score), label }]
 })
 const canEditAmendmentScope = computed(() => isAssigned.value && amendment.value?.can_edit_scope === true)
-const canCreateAmendmentSnapshot = computed(() => isAssigned.value && amendment.value?.can_create_snapshot === true)
+const canCreateAmendmentSnapshot = computed(() => profile.value?.can_create_agreement_role === true)
 const canCancelAmendment = computed(() => isAssigned.value && amendment.value?.can_cancel === true)
 const requiredScopeTypeIds = computed(() => amendmentTypesLookup.data.value.items
   .filter(type => scopeTypeIds.value.includes(String(type.id)) && type.egcs_tp_requiresamendmentsubtype)
@@ -195,19 +196,82 @@ const refreshPage = async () => {
   approvalsRefreshKey.value += 1
 }
 
-const createSnapshot = async (domain: 'budget' | 'activity') => {
-  const pending = domain === 'budget' ? isCreatingBudgetSnapshot : isCreatingActivitySnapshot
-  if (pending.value) return
-
+type SnapshotDomain = 'budget' | 'activity'
+let snapshotActionGeneration = 0
+let snapshotActionsDisposed = false
+const snapshotActionTokens = new Map<SnapshotDomain, symbol>()
+const invalidateSnapshotActions = () => {
+  snapshotActionGeneration += 1
+  snapshotActionTokens.clear()
+  isCreatingBudgetSnapshot.value = false
+  isCreatingActivitySnapshot.value = false
+}
+watch(() => [route.path, route.params.id, route.params.amendmentId], invalidateSnapshotActions, { flush: 'sync' })
+onUnmounted(() => {
+  snapshotActionsDisposed = true
+  invalidateSnapshotActions()
+})
+const ownsSnapshotPage = () => !snapshotActionsDisposed
+  && route.params.id === agreementId
+  && route.params.amendmentId === amendmentId
+const warnSnapshotPrerequisite = (missingAssignment = false) => toast.add({
+  title: t('common.warning'),
+  description: t(missingAssignment ? 'assignments.read_only_description' : 'agreement.child_records.work_prerequisite'),
+  color: 'warning'
+})
+const checkSnapshotPrerequisites = async (domain: SnapshotDomain, shouldProceed: () => boolean) => {
   try {
-    pending.value = true
-    await saveJson(`/api/agreements/${agreementId}/amendments/${amendmentId}/${domain}-snapshot`, 'POST', {})
+    const [record, context, roster] = await Promise.all([
+      $fetch<FundingCaseAgreementAmendmentRow, string>(amendmentApiBase),
+      $fetch<EntityAssignmentContext, string>(`/api/entity-assignments/fundingcaseamendment/${amendmentId}/context`),
+      $fetch<{ is_assigned: boolean }, string>(`/api/entity-assignments/fundingcaseamendment/${amendmentId}`)
+    ])
+    if (!shouldProceed()) return false
+    if (roster.is_assigned !== true) {
+      warnSnapshotPrerequisite(true)
+      return false
+    }
+    if (!snapshotStatusCatalog.getById(record.egcs_fc_status)) await snapshotStatusCatalog.load()
+    if (!shouldProceed()) return false
+    const definition = snapshotStatusCatalog.getById(record.egcs_fc_status)
+    const enabled = record.amendment_types.some(type => domain === 'budget'
+      ? type.egcs_tp_amended === 'budget' || type.egcs_tp_amended === 'duration'
+      : type.egcs_tp_amended === 'activities')
+    const missing = domain === 'budget' ? record.has_budget_snapshot === false : record.has_activity_snapshot === false
+    if (context.can_create_agreement_role === true && record.can_create_snapshot === true
+      && definition?.isDraft === true && !definition.deleted && !definition.readOnly && !definition.terminal
+      && record.isCompleted !== true && enabled && missing) return true
+  } catch {
+    if (!shouldProceed()) return false
+  }
+  if (shouldProceed()) warnSnapshotPrerequisite()
+  return false
+}
+const createSnapshot = async (domain: SnapshotDomain) => {
+  const pending = domain === 'budget' ? isCreatingBudgetSnapshot : isCreatingActivitySnapshot
+  if (!ownsSnapshotPage() || !canCreateAmendmentSnapshot.value || isLoadingDetail.value || hasLoadError.value || snapshotActionTokens.has(domain)) return
+  const token = Symbol(domain)
+  const generation = snapshotActionGeneration
+  const requestedPath = route.path
+  const requestedBase = amendmentApiBase
+  snapshotActionTokens.set(domain, token)
+  pending.value = true
+  const shouldProceed = () => ownsSnapshotPage() && generation === snapshotActionGeneration
+    && requestedPath === route.path && snapshotActionTokens.get(domain) === token && canCreateAmendmentSnapshot.value
+  try {
+    if (!await checkSnapshotPrerequisites(domain, shouldProceed) || !shouldProceed()) return
+    await saveJson(`${requestedBase}/${domain}-snapshot`, 'POST', {})
+    if (!shouldProceed()) return
     await refresh()
+    if (!shouldProceed() || error.value || status.value === 'error') return
     toast.add({ title: t('common.success'), description: t(`agreement.amendments.${domain}_snapshot_created`), color: 'success' })
   } catch (caughtError: unknown) {
-    showError(caughtError)
+    if (shouldProceed()) showError(caughtError)
   } finally {
-    pending.value = false
+    if (snapshotActionTokens.get(domain) === token) {
+      snapshotActionTokens.delete(domain)
+      pending.value = false
+    }
   }
 }
 
@@ -552,7 +616,7 @@ const cancelAmendment = async () => {
               :description="t('agreement.amendments.budget_snapshot_description')">
               <template #action>
                 <UButton
-                  v-if="canSnapshotBudget && canCreateAmendmentSnapshot"
+                  v-if="canCreateAmendmentSnapshot"
                   icon="i-lucide-copy-plus"
                   :label="t('agreement.amendments.create_budget_snapshot')"
                   class="cursor-default"
@@ -585,7 +649,7 @@ const cancelAmendment = async () => {
               :description="t('agreement.amendments.activity_snapshot_description')">
               <template #action>
                 <UButton
-                  v-if="canSnapshotActivities && canCreateAmendmentSnapshot"
+                  v-if="canCreateAmendmentSnapshot"
                   icon="i-lucide-copy-plus"
                   :label="t('agreement.amendments.create_activity_snapshot')"
                   class="cursor-default"

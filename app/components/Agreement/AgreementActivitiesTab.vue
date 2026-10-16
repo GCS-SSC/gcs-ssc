@@ -188,6 +188,7 @@ const bilingualColumns: BilingualColumnConfig<AgreementActivityCrudRow>[] = [
           <AgreementActivityResponsiblePartiesField
             v-model:model="(state as FundingCaseAgreementActivityForm).responsible_party_ids"
             :agreement-id="agreementId"
+            :amendment-id="actionTarget?.kind === 'amendment' ? actionTarget.amendmentId : undefined"
             :permission-action="state.id ? 'update' : 'create'" />
         </div>
 
@@ -195,6 +196,7 @@ const bilingualColumns: BilingualColumnConfig<AgreementActivityCrudRow>[] = [
           <AgreementActivityOutcomesField
             v-model:model="(state as FundingCaseAgreementActivityForm).outcome_ids"
             :agreement-id="agreementId"
+            :amendment-id="actionTarget?.kind === 'amendment' ? actionTarget.amendmentId : undefined"
             :permission-action="state.id ? 'update' : 'create'" />
         </div>
 
