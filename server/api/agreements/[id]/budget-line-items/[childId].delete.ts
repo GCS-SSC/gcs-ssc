@@ -82,11 +82,14 @@ export default defineEventHandler(async event => {
           'Funding_Case_Agreement_Claim.id',
           'Funding_Case_Agreement_Claim_Line_Item.egcs_fc_fundingagreementclaim'
         )
-        .where(
-          'Funding_Case_Agreement_Claim_Line_Item.egcs_fc_fundingagreementbudgetlineitem',
-          '=',
-          existing.stable_id
+        .innerJoin(
+          'Funding_Case_Agreement_Budget_Line_Item',
+          'Funding_Case_Agreement_Budget_Line_Item.id',
+          'Funding_Case_Agreement_Claim_Line_Item.egcs_fc_fundingagreementbudgetlineitem'
         )
+        .where('Funding_Case_Agreement_Claim.egcs_fc_fundingagreement', '=', agreementId)
+        .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreement', '=', agreementId)
+        .where(budgetLineItemStableId, '=', existing.stable_id)
         .where('Funding_Case_Agreement_Claim_Line_Item._deleted', '=', false)
         .where('Funding_Case_Agreement_Claim._deleted', '=', false)
         .select('Funding_Case_Agreement_Claim_Line_Item.id')

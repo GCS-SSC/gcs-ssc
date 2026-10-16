@@ -82,7 +82,7 @@ const claimModal = useCrudModal<FundingCaseAgreementClaimRow, FundingCaseAgreeme
   updateState: claim => ({
     id: claim.id,
     egcs_fc_applicantrecipient: claim.egcs_fc_applicantrecipient,
-    egcs_fc_fiscalyear: claim.egcs_fc_fiscalyear,
+    egcs_fc_fiscalyear: claim.fiscal_year_id ?? claim.egcs_fc_fiscalyear,
     egcs_fc_isfinalforyear: claim.egcs_fc_isfinalforyear,
     egcs_fc_periodstart: claim.egcs_fc_periodstart,
     egcs_fc_periodend: claim.egcs_fc_periodend,
@@ -210,6 +210,11 @@ const warnRecordPrerequisite = () => toast.add({
   description: t('agreement.child_records.work_prerequisite'),
   color: 'warning'
 })
+const warnUnavailableFiscalYear = () => toast.add({
+  title: t('common.warning'),
+  description: t('agreement.claims.historical_fiscal_year_read_only'),
+  color: 'warning'
+})
 const loadWorkableRecord = async (recordId: string, action: 'update' | 'delete', isCurrent: () => boolean = () => true): Promise<FundingCaseAgreementClaimRow | null> => {
   const owner = agreementId
   const generation = recordActionGeneration
@@ -233,6 +238,10 @@ const loadWorkableRecord = async (recordId: string, action: 'update' | 'delete',
     const permitted = action === 'update' ? parent.can_update_child_records_role : parent.can_delete_child_records_role
     if (permitted !== true || roster.is_assigned !== true || isRecordLocked(parent) || !record || isRecordLocked(record)) {
       warnRecordPrerequisite()
+      return null
+    }
+    if (action === 'update' && record.fiscal_year_available === false) {
+      warnUnavailableFiscalYear()
       return null
     }
     return record

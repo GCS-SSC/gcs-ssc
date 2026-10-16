@@ -72,6 +72,7 @@ export const freshResetE2eSpecPaths = [
   'tests/e2e/advance-direct-repayment-hold.spec.ts',
   'tests/e2e/payment-offset-coding-wizard.spec.ts',
   'tests/e2e/payment-accounting-boundaries.spec.ts',
+  'tests/e2e/claim-overview-read-recovery.spec.ts',
   'tests/e2e/commitment-coding-uniqueness.spec.ts',
   'tests/e2e/design-time-mutation-coordination.spec.ts',
   'tests/e2e/setup-relationship-editors.spec.ts',

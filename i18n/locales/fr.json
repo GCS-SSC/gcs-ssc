@@ -2894,6 +2894,8 @@
       }
     },
     "claims": {
+      "historical_budget_line_read_only": "Cette ligne de demande enregistrée fait référence à un poste budgétaire retiré et est en lecture seule.",
+      "historical_fiscal_year_read_only": "Cette demande fait référence à un exercice retiré et ne peut pas être modifiée.",
       "title": "Demandes de remboursement",
       "search": "Rechercher des demandes de remboursement",
       "add": "Ajouter une demande de remboursement",

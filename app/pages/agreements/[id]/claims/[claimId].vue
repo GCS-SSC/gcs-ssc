@@ -43,6 +43,7 @@ type ClaimSubmissionTableRow = {
   claimLineId?: string
   claimLine?: FundingCaseAgreementClaimLineItemRow
   isUnallocated: boolean
+  isHistorical?: boolean
 }
 
 type GroupedClaimSubmissionRow = GroupedTableRow<ClaimSubmissionTableRow>
@@ -189,11 +190,29 @@ const activeBudgetLineItems = computed(() => {
     return []
   }
 
-  return budgetLineItems.value.filter((line: FundingCaseAgreementBudgetLineItemRow) => String(line.fiscal_year_id) === String(activeClaim.value?.egcs_fc_fiscalyear))
+  return budgetLineItems.value.filter((line: FundingCaseAgreementBudgetLineItemRow) => String(line.fiscal_year_id) === String(activeClaim.value?.fiscal_year_id ?? activeClaim.value?.egcs_fc_fiscalyear))
 })
 const activeClaimLineItems = computed(() => claimLineItems.value.filter((line: FundingCaseAgreementClaimLineItemRow) => String(line.egcs_fc_fundingagreementclaim) === claimId))
+const isHistoricalClaimLine = (line: FundingCaseAgreementClaimLineItemRow): boolean =>
+  line.egcs_fc_fundingagreementbudgetlineitem != null
+  && !activeBudgetLineItems.value.some(choice => String(choice.id) === String(line.budget_line_item_id ?? line.egcs_fc_fundingagreementbudgetlineitem))
+const warnHistoricalClaimLine = (line: FundingCaseAgreementClaimLineItemRow): boolean => {
+  if (!isHistoricalClaimLine(line)) return false
+  toast.add({ title: t('common.warning'), description: t('agreement.claims.historical_budget_line_read_only'), color: 'warning' })
+  return true
+}
+watch(() => {
+  const current = activeClaimLineItems.value.find(line => String(line.id) === String(fundingEditorLine.value?.id))
+  return Boolean(current && !isHistoricalClaimLine(current))
+}, available => {
+  if (available || !fundingEditorOpen.value) return
+  fundingEditorOpen.value = false
+  fundingEditorLine.value = null
+  fundingEditorSession.value += 1
+})
 const openFundingEditor = (line: FundingCaseAgreementClaimLineItemRow) => {
   if (isLoadingDetail.value || isSavingFunding.value || !guardClaimAction(canUpdateClaim.value, claimEditPrerequisiteWarning.value)) return
+  if (warnHistoricalClaimLine(line)) return
   fundingEditorSession.value += 1
   fundingEditorLine.value = line
   fundingEditorProgramAmount.value = line.egcs_fc_amount
@@ -204,6 +223,7 @@ const openFundingEditor = (line: FundingCaseAgreementClaimLineItemRow) => {
 const saveFundingEditor = async () => {
   const line = fundingEditorLine.value
   if (!line || isLoadingDetail.value || isSavingFunding.value || !guardClaimAction(canUpdateClaim.value, claimEditPrerequisiteWarning.value)) return
+  if (warnHistoricalClaimLine(line)) return
   const session = fundingEditorSession.value
   try {
     const amount = parseMoney(fundingEditorProgramAmount.value)
@@ -398,7 +418,7 @@ const claimLinesByBudgetId = computed(() => {
       continue
     }
 
-    const budgetLineId = String(line.egcs_fc_fundingagreementbudgetlineitem)
+    const budgetLineId = String(line.budget_line_item_id ?? line.egcs_fc_fundingagreementbudgetlineitem)
     const lines = byId.get(budgetLineId) ?? []
     lines.push(line)
     byId.set(budgetLineId, lines)
@@ -417,6 +437,7 @@ const reconcileLineByClaimLineId = computed(() => {
 })
 
 const canEditClaimSubmissionAmount = (budgetLineId: string): boolean => {
+  if (!activeBudgetLineItems.value.some(line => String(line.id) === budgetLineId)) return false
   const existing = claimLinesByBudgetId.value.get(budgetLineId)?.[0]
   return existing ? canUpdateClaim.value : canCreateClaimLineItems.value
 }
@@ -714,6 +735,30 @@ const claimSubmissionRows = computed<ClaimSubmissionTableRow[]>(() => {
     }]
   })
 
+  const historicalRows = activeClaimLineItems.value.filter(isHistoricalClaimLine).map(line => {
+    const reconciledAmount = getTotalSuccessfulReconciledForClaimLineId(line.id)
+    const categoryLabel = getCostCategoryLabel(line)
+    const subsectionLabel = getCostSubsectionLabel(line.egcs_fc_costsubsection)
+    return {
+      id: `claim:${line.id}`,
+      costCategoryGroup: categoryLabel,
+      costSubsectionGroup: subsectionLabel,
+      costCategoryLabel: categoryLabel,
+      costSubsectionLabel: subsectionLabel,
+      lineItemNameEn: line.line_item_name_en || line.egcs_fc_submittedlineitem?.trim() || line.egcs_fc_description || t('common.unavailable'),
+      lineItemNameFr: line.line_item_name_fr || line.egcs_fc_submittedlineitem?.trim() || line.egcs_fc_description || t('common.unavailable'),
+      description: line.egcs_fc_description,
+      submittedAmount: line.egcs_fc_amount,
+      reconciledAmount,
+      balance: subtractMoney(line.egcs_fc_amount, reconciledAmount),
+      budgetLineId: String(line.budget_line_item_id ?? line.egcs_fc_fundingagreementbudgetlineitem),
+      claimLineId: String(line.id),
+      claimLine: line,
+      isUnallocated: false,
+      isHistorical: true
+    }
+  })
+
   const unallocatedRows = activeUnallocatedClaimLineItems.value.map((line: FundingCaseAgreementClaimLineItemRow) => {
     const submittedCostCategory = line.egcs_fc_submittedcostcategory?.trim()
     const submittedCostSubsection = line.egcs_fc_submittedcostsubsection?.trim()
@@ -747,7 +792,7 @@ const claimSubmissionRows = computed<ClaimSubmissionTableRow[]>(() => {
     }
   })
 
-  return [...budgetRows, ...unallocatedRows]
+  return [...budgetRows, ...historicalRows, ...unallocatedRows]
 })
 
 const filteredClaimSubmissionRows = computed(() => {
@@ -1185,9 +1230,22 @@ const cancelReconciliation = async () => {
                               :name-en="row.original.lineItemNameEn"
                               :name-fr="row.original.lineItemNameFr" />
                           </div>
+                          <p v-if="row.original.isHistorical" class="text-sm text-muted">
+                            {{ t('agreement.claims.historical_budget_line_read_only') }}
+                          </p>
                           <p v-if="row.original.description" class="min-w-0 max-w-full whitespace-normal break-words text-sm text-zinc-500 dark:text-zinc-400">
                             {{ row.original.description }}
                           </p>
+                          <dl v-if="row.original.isHistorical && row.original.claimLine" data-testid="claim-historical-funding" class="space-y-1 text-sm text-muted">
+                            <div class="flex flex-wrap gap-x-2">
+                              <dt>{{ t('agreement.funding_sources.total_cost') }}</dt>
+                              <dd>{{ formatMoney(row.original.claimLine.egcs_fc_totalamount) }}</dd>
+                            </div>
+                            <div v-for="source in row.original.claimLine.egcs_fc_fundingsources" :key="source.egcs_fc_fundingsubtype" class="flex flex-wrap gap-x-2">
+                              <dt>{{ t('agreement.funding_sources.title') }}: {{ getBilingualValue(source, 'funding_subtype_name', t('common.unavailable')) }}</dt>
+                              <dd>{{ formatMoney(source.egcs_fc_amount) }}</dd>
+                            </div>
+                          </dl>
                           <UButton
                             v-if="row.original.claimLine && canUpdateClaim"
                             color="neutral"

@@ -2894,6 +2894,8 @@
       }
     },
     "claims": {
+      "historical_budget_line_read_only": "This saved claim line references a retired budget line and is read-only.",
+      "historical_fiscal_year_read_only": "This claim references a retired fiscal year and cannot be edited.",
       "title": "Claims",
       "search": "Search claims",
       "add": "Add Claim",
