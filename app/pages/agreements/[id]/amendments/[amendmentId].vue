@@ -564,15 +564,16 @@ const cancelAmendment = async () => {
             <AgreementBudgetTab
               v-if="amendment.has_budget_snapshot && profile"
               :agreement-id="agreementId"
+              :action-target="{ kind: 'amendment', agreementId, amendmentId }"
               :currency="profile.egcs_fc_currency"
               :api-base="amendmentApiBase"
               :fiscal-year-lookup-url="`${amendmentApiBase}/budget-fiscal-years/lookups/fiscal-years`"
-              :can-create="canEditAmendment && isBudgetAmendment"
-              :can-update="canEditAmendment && isBudgetAmendment"
-              :can-delete="canEditAmendment && isBudgetAmendment"
-              :can-create-fiscal-year="canEditAmendment && (isBudgetAmendment || isDurationAmendment)"
-              :can-update-fiscal-year="canEditAmendment && (isBudgetAmendment || isDurationAmendment)"
-              :can-delete-fiscal-year="canEditAmendment && (isBudgetAmendment || isDurationAmendment)"
+              :can-create="profile?.can_create_agreement_role === true"
+              :can-update="profile?.can_update_agreement_role === true"
+              :can-delete="profile?.can_delete_agreement_role === true"
+              :can-create-fiscal-year="profile?.can_create_agreement_role === true"
+              :can-update-fiscal-year="profile?.can_update_agreement_role === true"
+              :can-delete-fiscal-year="profile?.can_delete_agreement_role === true"
               :allow-delete-fiscal-year-with-lines="isBudgetAmendment || isDurationAmendment" />
           </section>
 
@@ -596,10 +597,11 @@ const cancelAmendment = async () => {
             <AgreementActivitiesTab
               v-if="amendment.has_activity_snapshot"
               :agreement-id="agreementId"
+              :action-target="{ kind: 'amendment', agreementId, amendmentId }"
               :api-base="amendmentApiBase"
-              :can-create="canEditAmendment"
-              :can-update="canEditAmendment"
-              :can-delete="canEditAmendment" />
+              :can-create="profile?.can_create_agreement_role === true"
+              :can-update="profile?.can_update_agreement_role === true"
+              :can-delete="profile?.can_delete_agreement_role === true" />
           </section>
 
           <section v-else-if="selectedTab === 'recommendation'" class="space-y-6">

@@ -8,7 +8,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 import { useGroupedTableExpansion, type GroupedTableRow } from '~/composables/useGroupedTableExpansion'
-import { useDeleteRequestToast } from '~/composables/useDeleteRequestToast'
+import { useAgreementChildActionPrerequisites, type AgreementChildActionTarget, type AgreementChildAction, type AgreementChildArea } from '~/composables/useAgreementChildActionPrerequisites'
 import type {
   FundingCaseAgreementBudgetFiscalYearForm,
   FundingCaseAgreementBudgetFiscalYearRow,
@@ -85,6 +85,7 @@ const {
   canDeleteFiscalYear,
   allowDeleteFiscalYearWithLines = false,
   apiBase,
+  actionTarget,
   fiscalYearLookupUrl,
   snapshotOverview,
   staticMode = false,
@@ -99,6 +100,7 @@ const {
   canUpdateFiscalYear: boolean
   canDeleteFiscalYear: boolean
   allowDeleteFiscalYearWithLines?: boolean
+  actionTarget?: AgreementChildActionTarget
   apiBase?: string
   fiscalYearLookupUrl?: string
   snapshotOverview?: FundingCaseAgreementBudgetOverviewRow
@@ -111,6 +113,7 @@ const { getGroupedDisclosureControlsId, getGroupedDisclosureContentId } = useGro
 const toast = useToast()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
+const { check } = useAgreementChildActionPrerequisites(() => actionTarget)
 
 const search: Ref<string> = ref('')
 const pagination: Ref<{ pageIndex: number, pageSize: number }> = ref({
@@ -172,13 +175,17 @@ const resourceBase = computed<string>(() => apiBase ?? `/api/agreements/${agreem
 const overviewEndpoint = computed<string>(() => `${resourceBase.value}/budget-overview`)
 const fiscalYearLookupEndpoint = computed<string>(() => fiscalYearLookupUrl ?? `/api/agreements/${agreementId}/budget-fiscal-years/lookups/fiscal-years`)
 let fiscalYearContextGeneration = 0
-watch([() => agreementId, resourceBase, fiscalYearLookupEndpoint, () => staticMode], () => {
+const pendingDeletes = new Map<string, symbol>()
+const targetKey = computed(() => actionTarget ? `${actionTarget.kind}:${actionTarget.agreementId}:${actionTarget.kind === 'amendment' ? actionTarget.amendmentId : ''}` : '')
+watch([() => agreementId, resourceBase, fiscalYearLookupEndpoint, targetKey, () => staticMode], () => {
   fiscalYearContextGeneration += 1
+  pendingDeletes.clear()
   fiscalYearModal.close()
   lineItemModal.close()
 }, { flush: 'sync' })
 onUnmounted(() => {
   fiscalYearContextGeneration += 1
+  pendingDeletes.clear()
 })
 const canSaveFiscalYear = computed(() => !staticMode && Boolean(selectedFiscalYear.value)
   && (selectedFiscalYear.value?.id ? canUpdateFiscalYear : canCreateFiscalYear))
@@ -480,18 +487,54 @@ const formatTableTotalMoney = (key: 'totalAmount' | 'programFunding' | 'otherFun
 const getFiscalYearById = (id: string) => fiscalYears.value.find((fiscalYear: FundingCaseAgreementBudgetFiscalYearRow) => String(fiscalYear.id) === String(id))
 const getLineItemById = (id: string) => lineItems.value.find((lineItem: FundingCaseAgreementBudgetLineItemRow) => lineItem.id === id)
 
-const openCreateFiscalYear = () => {
-  if (staticMode || !canCreateFiscalYear) return
-  fiscalYearModal.openCreate()
+const permitted = (action: AgreementChildAction, area: AgreementChildArea) => !staticMode && (area === 'budget-year'
+  ? action === 'create' ? canCreateFiscalYear : action === 'update' ? canUpdateFiscalYear : canDeleteFiscalYear
+  : action === 'create' ? canCreate : action === 'update' ? canUpdate : canDelete)
+let openingIntent = 0
+const pendingOpens = new Map<string, { generation: number; token: symbol }>()
+const openBudgetAction = (action: 'create' | 'update', area: AgreementChildArea, open: (current: () => boolean) => void | Promise<void>) => {
+  if (!permitted(action, area)) return
+  const key = `${area}:${action}`
+  if (pendingOpens.get(key)?.generation === fiscalYearContextGeneration) return
+  const intent = ++openingIntent
+  const generation = fiscalYearContextGeneration
+  const modal = area === 'budget-year' ? fiscalYearModal : lineItemModal
+  const session = modal.captureSession()
+  const current = () => intent === openingIntent && generation === fiscalYearContextGeneration && modal.captureSession() === session && permitted(action, area)
+  if (!actionTarget) return open(current)
+  const token = Symbol(key)
+  pendingOpens.set(key, { generation, token })
+  return check(action, area, current).then(async ok => {
+    if (ok && current()) await open(current)
+  }).finally(() => {
+    if (pendingOpens.get(key)?.token === token) pendingOpens.delete(key)
+  })
 }
 
-const openUpdateFiscalYear = (fiscalYear: FundingCaseAgreementBudgetFiscalYearRow) => {
-  if (staticMode || !canUpdateFiscalYear) return
-  fiscalYearModal.openUpdate(fiscalYear)
-}
+const openCreateFiscalYear = () => openBudgetAction('create', 'budget-year', () => fiscalYearModal.openCreate())
 
-const openCreateLineItem = (fiscalYearId?: string, organizationCostCategoryId?: string, costSubsection?: string) => {
-  if (organizationCostCategoryId && lineItems.value.some(item => item.egcs_fc_organizationcostcategory === organizationCostCategoryId && item.cost_category_available === false)) return
+const openUpdateFiscalYear = (fiscalYear: FundingCaseAgreementBudgetFiscalYearRow) =>
+  openBudgetAction('update', 'budget-year', () => fiscalYearModal.openUpdate(fiscalYear))
+
+const openCreateLineItem = (fiscalYearId?: string, organizationCostCategoryId?: string, costSubsection?: string) => openBudgetAction('create', 'budget-line', async current => {
+  if (organizationCostCategoryId) {
+    let items = lineItems.value
+    if (actionTarget) {
+      try {
+        const fresh = await $fetch<FundingCaseAgreementBudgetOverviewRow, string>(overviewEndpoint.value)
+        if (!current()) return
+        items = fresh.lineItems
+      } catch (error: unknown) {
+        if (current()) showError(error)
+        return
+      }
+    }
+    // Absence of an existing line is not proof that a category is unavailable.
+    if (items.some(item => item.egcs_fc_organizationcostcategory === organizationCostCategoryId && item.cost_category_available === false)) {
+      toast.add({ title: t('common.warning'), description: t('apiErrors.agreement.invalid_cost_category_line_item'), color: 'warning' })
+      return
+    }
+  }
   lineItemModal.openCreate()
   isLineItemCostCategoryLocked.value = false
   isLineItemCostSubsectionLocked.value = false
@@ -513,13 +556,13 @@ const openCreateLineItem = (fiscalYearId?: string, organizationCostCategoryId?: 
     selectedLineItem.value.egcs_fc_costsubsection = costSubsection
     isLineItemCostSubsectionLocked.value = true
   }
-}
+})
 
-const openUpdateLineItem = (lineItem: FundingCaseAgreementBudgetLineItemRow) => {
+const openUpdateLineItem = (lineItem: FundingCaseAgreementBudgetLineItemRow) => openBudgetAction('update', 'budget-line', () => {
   lineItemModal.openUpdate(lineItem)
   isLineItemCostCategoryLocked.value = false
   isLineItemCostSubsectionLocked.value = false
-}
+})
 
 const saveJson = async (url: string, method: 'PATCH' | 'POST', body: Record<string, unknown>) => {
   const fetchJson = $fetch as JsonFetch
@@ -540,7 +583,9 @@ const saveFiscalYear = async () => {
   const session = fiscalYearModal.captureSession()
   if (!fiscalYearPending.begin(session)) return
 
+  const current = () => requestedContextGeneration === fiscalYearContextGeneration && fiscalYearModal.captureSession() === session && canSaveFiscalYear.value
   try {
+    if (!current() || (actionTarget && !await check(isUpdate ? 'update' : 'create', 'budget-year', current)) || !current()) return
     await saveJson(
       isUpdate
         ? `${requestedBase}/budget-fiscal-years/${fiscalYearState.id}`
@@ -549,7 +594,7 @@ const saveFiscalYear = async () => {
       fiscalYearState
     )
 
-    if (requestedContextGeneration !== fiscalYearContextGeneration || !fiscalYearModal.closeSession(session)) return
+    if (!current() || !fiscalYearModal.closeSession(session)) return
     await refreshOverview()
     if (requestedContextGeneration !== fiscalYearContextGeneration || overviewStatus.value === 'error') return
     toast.add({
@@ -565,19 +610,23 @@ const saveFiscalYear = async () => {
 }
 
 const saveLineItem = async () => {
-  if (!selectedLineItem.value) {
+  if (!selectedLineItem.value || !permitted(selectedLineItem.value.id ? 'update' : 'create', 'budget-line')) {
     return
   }
   const lineItemState = selectedLineItem.value
   const isUpdate = Boolean(lineItemState.id)
   const session = lineItemModal.captureSession()
+  const requestedContextGeneration = fiscalYearContextGeneration
+  const requestedBase = resourceBase.value
+  const current = () => requestedContextGeneration === fiscalYearContextGeneration && lineItemModal.captureSession() === session && permitted(isUpdate ? 'update' : 'create', 'budget-line')
   if (!lineItemPending.begin(session)) return
 
   try {
+    if (!current() || (actionTarget && !await check(isUpdate ? 'update' : 'create', 'budget-line', current)) || !current()) return
     await saveJson(
       isUpdate
-        ? `${resourceBase.value}/budget-line-items/${lineItemState.id}`
-        : `${resourceBase.value}/budget-line-items`,
+        ? `${requestedBase}/budget-line-items/${lineItemState.id}`
+        : `${requestedBase}/budget-line-items`,
       isUpdate ? 'PATCH' : 'POST',
       {
         ...lineItemState,
@@ -586,34 +635,64 @@ const saveLineItem = async () => {
       }
     )
 
-    if (!lineItemModal.closeSession(session)) return
+    if (!current() || !lineItemModal.closeSession(session)) return
     await refreshOverview()
-    if (overviewStatus.value === 'error') return
+    if (requestedContextGeneration !== fiscalYearContextGeneration || overviewStatus.value === 'error') return
     toast.add({
       title: t('common.success'),
       description: isUpdate ? t('common.updated_success') : t('common.added_success'),
       color: 'success'
     })
   } catch (error: unknown) {
-    showError(error)
+    if (current()) showError(error)
   } finally {
     lineItemPending.end(session)
   }
 }
 
-const { confirmDeleteWithToast } = useDeleteRequestToast()
-
-const deleteFiscalYear = async (fiscalYearId: string) => {
-  await confirmDeleteWithToast(`${resourceBase.value}/budget-fiscal-years/${fiscalYearId}`, {
-    refresh: refreshOverview
-  })
+const { confirmDeleteRequest } = useConfirmDeleteRequest()
+const confirmDelete = useDeleteConfirm()
+const checkFiscalYearLines = async (id: string, area: 'budget-year' | 'budget-line', base: string, current: () => boolean) => {
+  if (area !== 'budget-year' || allowDeleteFiscalYearWithLines) return current()
+  const fresh = actionTarget?.kind === 'agreement'
+    ? await $fetch<FundingCaseAgreementBudgetOverviewRow, string>(`${base}/budget-overview`)
+    : overview.value
+  if (!current()) return false
+  if (fresh?.lineItems.some(item => String(item.fiscal_year_id) === id)) {
+    toast.add({ title: t('common.warning'), description: t('apiErrors.agreement.budget_fiscal_year_in_use'), color: 'warning' })
+    return false
+  }
+  return true
 }
-
-const deleteLineItem = async (lineItemId: string) => {
-  await confirmDeleteWithToast(`${resourceBase.value}/budget-line-items/${lineItemId}`, {
-    refresh: refreshOverview
-  })
+const deleteBudgetRecord = async (id: string, area: 'budget-year' | 'budget-line') => {
+  const key = `${area}:${id}`
+  if (!permitted('delete', area) || pendingDeletes.has(key)) return
+  const token = Symbol(key)
+  pendingDeletes.set(key, token)
+  const generation = fiscalYearContextGeneration
+  const base = resourceBase.value
+  const current = () => generation === fiscalYearContextGeneration && base === resourceBase.value && pendingDeletes.get(key) === token && permitted('delete', area)
+  try {
+    if (!await check('delete', area, current) || !current() || !await checkFiscalYearLines(id, area, base, current)) return
+    const deleted = await confirmDeleteRequest(`${base}/${area === 'budget-year' ? 'budget-fiscal-years' : 'budget-line-items'}/${id}`, {
+      shouldProceed: current,
+      confirm: async () => {
+        if (!await confirmDelete() || !current()) return false
+        return await check('delete', area, current) && current() && await checkFiscalYearLines(id, area, base, current)
+      }
+    })
+    if (!deleted || !current()) return
+    await refreshOverview()
+    if (!current() || overviewStatus.value === 'error') return
+    toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+  } catch (error: unknown) {
+    if (current()) showError(error)
+  } finally {
+    if (pendingDeletes.get(key) === token) pendingDeletes.delete(key)
+  }
 }
+const deleteFiscalYear = (id: string) => deleteBudgetRecord(id, 'budget-year')
+const deleteLineItem = (id: string) => deleteBudgetRecord(id, 'budget-line')
 
 const getOtherFundingTotal = (row: BudgetLeafRow) => sumMoney([
   ...(row.fundingSources ?? []).map(source => source.egcs_fc_amount)
@@ -819,7 +898,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
             :aria-label="`${t('common.edit')}: ${row.original.fiscalYearDisplay}`"
             @click="openUpdateFiscalYear(getFiscalYearById(row.original.fiscalYearId)!)" />
           <UButton
-            v-if="canDeleteFiscalYear && (allowDeleteFiscalYearWithLines || getGroupedRowCount(row as GroupedBudgetRow) === 0)"
+            v-if="!staticMode && canDeleteFiscalYear"
             icon="i-lucide-trash"
             color="error"
             variant="ghost"
@@ -838,7 +917,6 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
             size="sm"
             class="cursor-default"
             :aria-label="t('agreement.budget.add_line_item')"
-            :disabled="row.original.costCategoryAvailable === false"
             @click="openCreateLineItem(row.original.fiscalYearId, row.original.costCategoryId)" />
         </div>
 
@@ -851,7 +929,6 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
             size="sm"
             class="cursor-default"
             :aria-label="t('agreement.budget.add_line_item')"
-            :disabled="row.original.costCategoryAvailable === false"
             @click="openCreateLineItem(row.original.fiscalYearId, row.original.costCategoryId, row.original.costSubsectionGroup === '__all__' ? '' : row.original.costSubsectionLabel)" />
         </div>
 
