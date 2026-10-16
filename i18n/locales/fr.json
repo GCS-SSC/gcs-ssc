@@ -2829,6 +2829,7 @@
       "offset_approval_description": "Ces notes de crédit par compensation sont approuvées avec ce paiement, même si le versement au bénéficiaire est nul. Le refus ou l’annulation du paiement libère le recouvrement sans comptabiliser les notes de crédit."
     },
     "forecasts": {
+      "historical_budget_line_read_only": "Cette ligne enregistrée est en lecture seule, car sa ligne budgétaire n’est plus disponible dans le budget courant.",
       "title": "Prévisions",
       "search": "Rechercher des prévisions",
       "search_versions": "Rechercher des versions de prévision",

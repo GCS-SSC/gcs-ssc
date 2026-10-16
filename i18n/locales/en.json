@@ -2829,6 +2829,7 @@
       "offset_approval_description": "These offset Credit Memos are approved with this payment, including when the recipient disbursement is zero. Declining or cancelling the payment releases the recovery without posting the Credit Memos."
     },
     "forecasts": {
+      "historical_budget_line_read_only": "This saved line is read-only because its budget line is no longer available in the current budget.",
       "title": "Forecasts",
       "search": "Search forecasts",
       "search_versions": "Search forecast versions",

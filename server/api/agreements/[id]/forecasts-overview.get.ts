@@ -37,7 +37,7 @@ const readRoute = async (event: H3Event, forecastId?: string) => {
     db
       .selectFrom('Funding_Case_Agreement_Forecast')
       .innerJoin('Funding_Case_Agreement_Budget_Fiscal_Year', join => join.on(
-        budgetFiscalYearStableId, '=', sql.ref('Funding_Case_Agreement_Forecast.egcs_fc_fiscalyear')
+        budgetFiscalYearStableId, '=', sql.ref<string>('Funding_Case_Agreement_Forecast.egcs_fc_fiscalyear')
       ))
       .innerJoin('Funding_Case_Agreement_Budget_Version', 'Funding_Case_Agreement_Budget_Version.id', 'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_budgetversion')
       .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fiscalyear')
@@ -132,39 +132,55 @@ const readRoute = async (event: H3Event, forecastId?: string) => {
         'Funding_Case_Agreement_Forecast.id',
         'Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_agreementforecast'
       )
-      .innerJoin('Funding_Case_Agreement_Budget_Line_Item', join => join.on(
-        budgetLineItemStableId, '=', sql.ref('Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_fundingagreementbudgetlineitem')
-      ))
-      .innerJoin(
-        'Funding_Case_Agreement_Budget_Fiscal_Year',
-        'Funding_Case_Agreement_Budget_Fiscal_Year.id',
-        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreementbudgetfiscalyear'
-      )
-      .innerJoin('Funding_Case_Agreement_Budget_Version as Line_Budget_Version', 'Line_Budget_Version.id', 'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_budgetversion')
-      .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fiscalyear')
-      .innerJoin(
-        'Transfer_Payment_Stream_Cost_Category_Line_Item',
-        'Transfer_Payment_Stream_Cost_Category_Line_Item.id',
-        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_organizationcostcategory'
-      )
-      .innerJoin(
-        'Agency_Cost_Category_Line_Item',
-        'Agency_Cost_Category_Line_Item.id',
-        'Transfer_Payment_Stream_Cost_Category_Line_Item.egcs_tp_organizationcostcategory'
-      )
-      .innerJoin(
-        'Agency_Cost_Category',
-        'Agency_Cost_Category.id',
-        'Agency_Cost_Category_Line_Item.egcs_ay_organizationcostcategory'
-      )
+      // A monthly amount remains evidence even when its budget choice is retired.
+      // Resolve its stored physical source within the same Agreement/stable year.
+      .leftJoinLateral(eb => eb.selectFrom('Funding_Case_Agreement_Budget_Line_Item as Stored_Line')
+        .innerJoin('Funding_Case_Agreement_Budget_Fiscal_Year as Stored_Year',
+          'Stored_Year.id', 'Stored_Line.egcs_fc_fundingagreementbudgetfiscalyear')
+        .innerJoin('Funding_Case_Agreement_Budget_Version as Stored_Version', 'Stored_Version.id', 'Stored_Year.egcs_fc_budgetversion')
+        .whereRef('Stored_Line.id', '=', 'Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_fundingagreementbudgetlineitem')
+        .whereRef('Stored_Line.egcs_fc_fundingagreement', '=', 'Funding_Case_Agreement_Forecast.egcs_fc_fundingagreement')
+        .whereRef('Stored_Year.egcs_fc_fundingagreement', '=', 'Funding_Case_Agreement_Forecast.egcs_fc_fundingagreement')
+        .whereRef('Stored_Version.egcs_fc_fundingagreement', '=', 'Funding_Case_Agreement_Forecast.egcs_fc_fundingagreement')
+        .where(sql<string>`COALESCE("Stored_Year".egcs_fc_originalbudgetfiscalyear, "Stored_Year".id)`,
+          '=', sql.ref<string>('Funding_Case_Agreement_Forecast.egcs_fc_fiscalyear'))
+        .selectAll('Stored_Line')
+        .select([
+          sql<string>`COALESCE("Stored_Line".egcs_fc_originalbudgetlineitem, "Stored_Line".id)`.as('stable_line_id'),
+          sql<string>`COALESCE("Stored_Year".egcs_fc_originalbudgetfiscalyear, "Stored_Year".id)`.as('stable_year_id'),
+          'Stored_Year.egcs_fc_fiscalyear as agency_fiscal_year_id'
+        ]).as('Source_Budget'), join => join.onTrue())
+      // Current version + stable identity indexes guarantee at most one match.
+      .leftJoinLateral(eb => eb.selectFrom('Funding_Case_Agreement_Budget_Line_Item as Current_Line')
+        .innerJoin('Funding_Case_Agreement_Budget_Fiscal_Year as Current_Year',
+          'Current_Year.id', 'Current_Line.egcs_fc_fundingagreementbudgetfiscalyear')
+        .innerJoin('Funding_Case_Agreement_Budget_Version as Current_Version', 'Current_Version.id', 'Current_Year.egcs_fc_budgetversion')
+        .innerJoin('Agency_Fiscal_Year as Current_Fiscal', 'Current_Fiscal.id', 'Current_Year.egcs_fc_fiscalyear')
+        .innerJoin('Transfer_Payment_Stream_Cost_Category_Line_Item as Current_Stream_Line',
+          'Current_Stream_Line.id', 'Current_Line.egcs_fc_organizationcostcategory')
+        .innerJoin('Agency_Cost_Category_Line_Item as Current_Definition',
+          'Current_Definition.id', 'Current_Stream_Line.egcs_tp_organizationcostcategory')
+        .innerJoin('Agency_Cost_Category as Current_Category', 'Current_Category.id', 'Current_Definition.egcs_ay_organizationcostcategory')
+        .whereRef('Current_Line.egcs_fc_fundingagreement', '=', 'Funding_Case_Agreement_Forecast.egcs_fc_fundingagreement')
+        .whereRef('Current_Year.egcs_fc_fundingagreement', '=', 'Funding_Case_Agreement_Forecast.egcs_fc_fundingagreement')
+        .whereRef('Current_Version.egcs_fc_fundingagreement', '=', 'Funding_Case_Agreement_Forecast.egcs_fc_fundingagreement')
+        .where(sql<string>`COALESCE("Current_Line".egcs_fc_originalbudgetlineitem, "Current_Line".id)`, '=', sql.ref<string>('Source_Budget.stable_line_id'))
+        .where(sql<string>`COALESCE("Current_Year".egcs_fc_originalbudgetfiscalyear, "Current_Year".id)`, '=', sql.ref<string>('Source_Budget.stable_year_id'))
+        .where('Current_Line._deleted', '=', false).where('Current_Year._deleted', '=', false)
+        .where('Current_Version.egcs_fc_iscurrent', '=', true).where('Current_Version._deleted', '=', false)
+        .where('Current_Fiscal._deleted', '=', false).where('Current_Stream_Line._deleted', '=', false)
+        .where('Current_Definition._deleted', '=', false).where('Current_Category._deleted', '=', false)
+        .selectAll('Current_Line').as('Current_Budget'), join => join.onTrue())
+      .leftJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Source_Budget.agency_fiscal_year_id')
+      .leftJoin('Transfer_Payment_Stream_Cost_Category_Line_Item', join => join.on(
+        'Transfer_Payment_Stream_Cost_Category_Line_Item.id', '=',
+        sql<string>`CASE WHEN "Current_Budget".id IS NOT NULL THEN "Current_Budget".egcs_fc_organizationcostcategory ELSE "Source_Budget".egcs_fc_organizationcostcategory END`))
+      .leftJoin('Agency_Cost_Category_Line_Item', 'Agency_Cost_Category_Line_Item.id', 'Transfer_Payment_Stream_Cost_Category_Line_Item.egcs_tp_organizationcostcategory')
+      .leftJoin('Agency_Cost_Category', 'Agency_Cost_Category.id', 'Agency_Cost_Category_Line_Item.egcs_ay_organizationcostcategory')
       .where('Funding_Case_Agreement_Forecast.egcs_fc_fundingagreement', '=', agreementId)
       .$if(Boolean(forecastId), query => query.where('Funding_Case_Agreement_Forecast.id', '=', forecastId!))
       .where('Funding_Case_Agreement_Forecast_Line_Item._deleted', '=', false)
       .where('Funding_Case_Agreement_Forecast._deleted', '=', false)
-      .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false)
-      .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
-      .where('Line_Budget_Version.egcs_fc_iscurrent', '=', true)
-      .where('Line_Budget_Version._deleted', '=', false)
       .select([
         'Funding_Case_Agreement_Forecast_Line_Item.id as id',
         'Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_agreementforecast as egcs_fc_agreementforecast',
@@ -174,15 +190,18 @@ const readRoute = async (event: H3Event, forecastId?: string) => {
         databaseMoneyText(sql.ref('Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_totalamount')).as('egcs_fc_totalamount'),
         'Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_currency as egcs_fc_currency',
         'Funding_Case_Agreement_Forecast.egcs_fc_fiscalyear as forecast_fiscal_year_id',
-        budgetFiscalYearStableId.as('budget_fiscal_year_id'),
+        sql<string>`COALESCE("Source_Budget".stable_year_id, "Funding_Case_Agreement_Forecast".egcs_fc_fiscalyear)`.as('budget_fiscal_year_id'),
+        sql<string>`COALESCE("Source_Budget".stable_line_id, "Funding_Case_Agreement_Forecast_Line_Item".egcs_fc_fundingagreementbudgetlineitem)`.as('budget_line_stable_id'),
+        sql<boolean>`"Current_Budget".id IS NOT NULL`.as('budget_line_available'),
+        sql<string | null>`CASE WHEN "Current_Budget".id IS NOT NULL THEN "Current_Budget".egcs_fc_description ELSE "Source_Budget".egcs_fc_description END`.as('budget_line_description'),
         'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as budget_fiscal_year_display',
         'Agency_Cost_Category.egcs_ay_name_en as organization_cost_category_name_en',
         'Agency_Cost_Category.egcs_ay_name_fr as organization_cost_category_name_fr',
-        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_costsubsection as egcs_fc_costsubsection',
+        sql<string | null>`CASE WHEN "Current_Budget".id IS NOT NULL THEN "Current_Budget".egcs_fc_costsubsection ELSE "Source_Budget".egcs_fc_costsubsection END`.as('egcs_fc_costsubsection'),
         'Agency_Cost_Category_Line_Item.egcs_ay_name_en as line_item_name_en',
         'Agency_Cost_Category_Line_Item.egcs_ay_name_fr as line_item_name_fr',
-        databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_totalamount')).as('budget_line_total_amount'),
-        databaseMoneyText(sql.ref('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_programfunding')).as('budget_line_program_funding')
+        databaseMoneyText(sql`CASE WHEN "Current_Budget".id IS NOT NULL THEN "Current_Budget".egcs_fc_totalamount ELSE "Source_Budget".egcs_fc_totalamount END`).as('budget_line_total_amount'),
+        databaseMoneyText(sql`CASE WHEN "Current_Budget".id IS NOT NULL THEN "Current_Budget".egcs_fc_programfunding ELSE "Source_Budget".egcs_fc_programfunding END`).as('budget_line_program_funding')
       ])
       .orderBy('Funding_Case_Agreement_Forecast_Line_Item.egcs_fc_month', 'asc')
       .execute()
@@ -239,8 +258,8 @@ const readRoute = async (event: H3Event, forecastId?: string) => {
     egcs_fc_amount: parseDatabaseMoney(lineItem.egcs_fc_amount),
     egcs_fc_totalamount: parseDatabaseMoney(lineItem.egcs_fc_totalamount),
     egcs_fc_fundingsources: sourcesByLine.get(String(lineItem.id)) ?? [],
-    budget_line_total_amount: parseDatabaseMoney(lineItem.budget_line_total_amount),
-    budget_line_program_funding: parseDatabaseMoney(lineItem.budget_line_program_funding)
+    budget_line_total_amount: lineItem.budget_line_total_amount == null ? null : parseDatabaseMoney(lineItem.budget_line_total_amount),
+    budget_line_program_funding: lineItem.budget_line_program_funding == null ? null : parseDatabaseMoney(lineItem.budget_line_program_funding)
   }))
   const forecastsWithState = await withBusinessRecordState(db, 'fundingcaseforecast', forecasts)
   return {

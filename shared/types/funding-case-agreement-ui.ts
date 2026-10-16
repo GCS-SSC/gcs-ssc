@@ -416,6 +416,9 @@ export interface FundingCaseAgreementForecastRow extends FundingCaseAgreementFor
 }
 
 export interface FundingCaseAgreementForecastLineItemRow extends FundingCaseAgreementForecastLineItemItem {
+  budget_line_stable_id: string
+  budget_line_available: boolean
+  budget_line_description?: string | null
   egcs_fc_fundingsources: Array<{
     egcs_fc_fundingsubtype: string
     egcs_fc_amount: Money
