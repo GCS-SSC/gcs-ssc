@@ -3,8 +3,15 @@ import { assertAgreementForecastEditable, executeAgreementForecastMutation, prep
 import { resolveForecastLineAssignmentTarget } from '~~/server/utils/agreement-assignment-target'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { assertAgreementFinancialBudgetControls } from '~~/server/utils/agreement-financial-budget-controls'
+import { authorize } from '~~/server/utils/authorize'
+import { resolveAgreementScopeContext } from '~~/server/utils/agreement'
 
 export default defineEventHandler(async event => {
+  // Check the owning role before child existence; exact assignment is checked below.
+  await authorize(event, 'agreement', 'delete', async () => ({
+    scope: (await resolveAgreementScopeContext(getRouterParam(event, 'id') ?? '', event.context.$db))?.scope
+      ?? { type: 'global' as const }
+  }))
   const lineId = getRouterParam(event, 'lineId')
   if (!lineId) {
     return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')

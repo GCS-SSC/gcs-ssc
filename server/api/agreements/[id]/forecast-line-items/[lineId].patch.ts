@@ -2,7 +2,8 @@ import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 /* eslint-disable jsdoc/require-jsdoc -- Route-local validation helpers are self-descriptive and not public API. */
 import { sql, type Kysely } from 'kysely'
 import type { Database } from '~~/shared/types/database'
-import type { AgreementScopeContext } from '~~/server/utils/agreement'
+import { resolveAgreementScopeContext, type AgreementScopeContext } from '~~/server/utils/agreement'
+import { authorize } from '~~/server/utils/authorize'
 import { FundingCaseAgreementForecastLineItemPatchSchema } from '~~/shared/types/schemas'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { badRequest } from '~~/server/utils/api-errors'
@@ -203,6 +204,11 @@ const patchForecastLineItemForRoute = async (
 }
 
 export default defineEventHandler(async event => {
+  // Check the owning role before child existence; exact assignment is checked below.
+  await authorize(event, 'agreement', 'update', async () => ({
+    scope: (await resolveAgreementScopeContext(getRouterParam(event, 'id') ?? '', event.context.$db))?.scope
+      ?? { type: 'global' as const }
+  }))
   const lineId = getRouterParam(event, 'lineId')
   if (!lineId) {
     return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')

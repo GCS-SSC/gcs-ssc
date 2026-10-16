@@ -5,11 +5,12 @@ import { computed, onScopeDispose, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { useGroupedTableExpansion, type GroupedTableRow } from '~/composables/useGroupedTableExpansion'
-import { useDeleteRequestToast } from '~/composables/useDeleteRequestToast'
+import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 import { useJsonRequest } from '~/composables/useJsonRequest'
 import { useTableListState } from '~/composables/useTableListState'
 import { appRouteLocations } from '~/utils/route-locations'
 import type {
+  FundingCaseAgreementProfileRow,
   FundingCaseAgreementForecastForm,
   FundingCaseAgreementForecastLineItemRow,
   FundingCaseAgreementForecastOverviewRow,
@@ -42,12 +43,11 @@ type FiscalYearLookupItem = {
 
 const FISCAL_YEAR_GROUP_COLUMN_ID = 'fiscalYearGroup'
 
-const { agreementId, currency, canCreate, canDelete } = defineProps<{
+const { agreementId, currency, canCreateRole, canDeleteRole } = defineProps<{
   agreementId: string
   currency: string
-  canCreate: boolean
-  canUpdate: boolean
-  canDelete: boolean
+  canCreateRole: boolean
+  canDeleteRole: boolean
 }>()
 const agreementIdRef = computed(() => agreementId)
 
@@ -64,7 +64,10 @@ const toast = useToast()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
 const { sendJson } = useJsonRequest()
+const { isRecordLocked } = useBusinessStatusState()
 const isCreatingVersion: Ref<boolean> = ref(false)
+const pendingAction: Ref<symbol | null> = ref(null)
+let actionGeneration = 0
 let isScopeActive = true
 onScopeDispose(() => {
   isScopeActive = false
@@ -80,7 +83,12 @@ const forecastModal = useCrudModal<FundingCaseAgreementForecastRow, FundingCaseA
 })
 const forecastPending = useCrudModalPending(forecastModal.captureSession)
 const isSavingForecast = forecastPending.isPending
-watch(agreementIdRef, () => forecastModal.close(), { flush: 'sync' })
+watch(agreementIdRef, () => {
+  actionGeneration += 1
+  pendingAction.value = null
+  isCreatingVersion.value = false
+  forecastModal.close()
+}, { flush: 'sync' })
 
 const selectedForecast = forecastModal.selected
 const isForecastModalOpen = forecastModal.isOpen
@@ -210,64 +218,110 @@ const getGroupedForecastStatus = (row: ForecastGroupedRow) =>
 const getForecastRoute = (row: ForecastVersionRow) =>
   localePath(appRouteLocations.agreementForecastDetail(agreementId, row.forecastId))
 
-const createForecastVersion = async (row: ForecastGroupedRow) => {
-  const forecast = getRepresentativeGroupedRow(row)
-  if (!forecast || isCreatingVersion.value) return
-  const requestAgreementId = agreementId
+const warnPrerequisite = (key: string) => toast.add({ title: t('common.warning'), description: t(key), color: 'warning' })
+const captureAction = () => {
+  const owner = agreementId
+  const generation = actionGeneration
+  return () => isScopeActive && agreementId === owner && actionGeneration === generation
+}
+const checkPrerequisites = async (isCurrent: () => boolean, recordId?: string): Promise<boolean> => {
+  const owner = agreementId
   try {
-    isCreatingVersion.value = true
-    const created = await sendJson<{ id: string }>(`/api/agreements/${requestAgreementId}/forecasts`, 'POST', {
-      egcs_fc_fiscalyear: forecast.forecastFiscalYearId,
-      egcs_fc_copyfromactive: !forecastsRequiringRevision.value.some(item =>
-        String(item.egcs_fc_fiscalyear) === forecast.forecastFiscalYearId
-      )
-    })
-    if (!isScopeActive || agreementId !== requestAgreementId) return
-    await navigateTo(localePath(appRouteLocations.agreementForecastDetail(requestAgreementId, String(created.id))))
-  } catch (error: unknown) {
-    if (isScopeActive && agreementId === requestAgreementId) showError(error)
-  } finally {
-    isCreatingVersion.value = false
+    const [parent, roster, freshOverview] = await Promise.all([
+      $fetch<FundingCaseAgreementProfileRow, string>(`/api/agreements/${owner}`),
+      $fetch<{ is_assigned: boolean }, string>(`/api/entity-assignments/${recordId ? 'fundingcaseforecast' : 'fundingcaseagreement'}/${recordId ?? owner}`),
+      recordId ? $fetch<FundingCaseAgreementForecastOverviewRow, string>(`/api/agreements/${owner}/forecasts-overview?forecastId=${recordId}`) : Promise.resolve(null)
+    ])
+    if (!isCurrent()) return false
+    const record = freshOverview?.forecasts.find(item => String(item.id) === recordId)
+    if (!statusCatalog.getById(parent.egcs_fc_status) || (record && !statusCatalog.getById(record.egcs_fc_status))) await statusCatalog.load()
+    if (!isCurrent()) return false
+    const roleAllowed = recordId ? parent.can_delete_child_records_role : parent.can_create_child_records_role
+    if (roleAllowed !== true || isRecordLocked(parent) || (recordId && (!record || isRecordLocked(record)))) {
+      warnPrerequisite(recordId ? 'agreement.child_records.work_prerequisite' : 'agreement.child_records.create_prerequisite')
+      return false
+    }
+    if (record?.egcs_fc_active && record.forecast_revision_required) {
+      warnPrerequisite('agreement.budget_controls.forecast_revision_required')
+      return false
+    }
+    if (!roster.is_assigned) {
+      warnPrerequisite('assignments.read_only_description')
+      return false
+    }
+    if (!recordId && parent.can_create_child_records !== true) {
+      warnPrerequisite('agreement.child_records.create_prerequisite')
+      return false
+    }
+    return true
+  } catch {
+    if (isCurrent()) warnPrerequisite(recordId ? 'agreement.child_records.work_prerequisite' : 'agreement.child_records.create_prerequisite')
+    return false
   }
 }
-
-const openCreateForecast = () => {
-  forecastModal.openCreate()
+const runAction = async (work: (isCurrent: () => boolean) => Promise<void>) => {
+  if (pendingAction.value || overviewStatus.value === 'pending') return
+  const token = Symbol('forecast-action')
+  const isCurrent = captureAction()
+  pendingAction.value = token
+  try {
+    await work(isCurrent)
+  } catch (error: unknown) {
+    if (isCurrent()) showError(error)
+  } finally {
+    if (pendingAction.value === token) pendingAction.value = null
+  }
 }
+const createForecastVersion = (row: ForecastGroupedRow) => runAction(async isCurrent => {
+  const forecast = getRepresentativeGroupedRow(row)
+  if (!forecast || !await checkPrerequisites(isCurrent)) return
+  const owner = agreementId
+  isCreatingVersion.value = true
+  try {
+    const created = await sendJson<{ id: string }>(`/api/agreements/${owner}/forecasts`, 'POST', {
+      egcs_fc_fiscalyear: forecast.forecastFiscalYearId,
+      egcs_fc_copyfromactive: !forecastsRequiringRevision.value.some(item => String(item.egcs_fc_fiscalyear) === forecast.forecastFiscalYearId)
+    })
+    if (isCurrent()) await navigateTo(localePath(appRouteLocations.agreementForecastDetail(owner, String(created.id))))
+  } finally { if (isCurrent()) isCreatingVersion.value = false }
+})
+const openCreateForecast = () => runAction(async isCurrent => {
+  const session = forecastModal.captureSession()
+  if (await checkPrerequisites(isCurrent) && isCurrent() && forecastModal.captureSession() === session) forecastModal.openCreate()
+})
 
 const saveForecast = async () => {
-  if (!selectedForecast.value) {
-    return
-  }
+  if (!selectedForecast.value) return
   const forecastState = selectedForecast.value
   const session = forecastModal.captureSession()
+  const isCurrentScope = captureAction()
+  const isCurrent = () => isCurrentScope() && forecastModal.isCurrentSession(session)
   if (!forecastPending.begin(session)) return
-
   try {
+    if (!await checkPrerequisites(isCurrent) || !isCurrent()) return
     await sendJson(`/api/agreements/${agreementId}/forecasts`, 'POST', forecastState)
-
-    if (!forecastModal.closeSession(session)) return
+    if (!isCurrent() || !forecastModal.closeSession(session)) return
     await refreshOverview()
-    if (overviewStatus.value === 'error') return
-    toast.add({
-      title: t('common.success'),
-      description: t('common.added_success'),
-      color: 'success'
-    })
+    if (!isCurrentScope() || overviewStatus.value === 'error') return
+    toast.add({ title: t('common.success'), description: t('common.added_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
-  } finally {
-    forecastPending.end(session)
-  }
+    if (isCurrent()) showError(error)
+  } finally { forecastPending.end(session) }
 }
 
-const { confirmDeleteWithToast } = useDeleteRequestToast()
-
-const deleteForecast = async (forecastId: string) => {
-  await confirmDeleteWithToast(`/api/agreements/${agreementId}/forecasts/${forecastId}`, {
-    refresh: refreshOverview
+const { confirmDeleteRequest } = useConfirmDeleteRequest()
+const confirmDelete = useDeleteConfirm()
+const deleteForecast = (forecastId: string) => runAction(async isCurrent => {
+  if (!await checkPrerequisites(isCurrent, forecastId)) return
+  const owner = agreementId
+  const deleted = await confirmDeleteRequest(`/api/agreements/${owner}/forecasts/${forecastId}`, {
+    shouldProceed: isCurrent,
+    confirm: async () => Boolean(await confirmDelete()) && isCurrent() && await checkPrerequisites(isCurrent, forecastId)
   })
-}
+  if (!deleted || !isCurrent()) return
+  await refreshOverview()
+  if (isCurrent()) toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+})
 </script>
 
 <template>
@@ -294,7 +348,8 @@ const deleteForecast = async (forecastId: string) => {
       :loading="overviewStatus === 'pending'"
       :request-status="overviewStatus"
       :button-label="t('agreement.forecasts.add')"
-      :show-button="canCreate"
+      :show-button="canCreateRole"
+      :button-disabled="Boolean(pendingAction)"
       :search-placeholder="t('agreement.forecasts.search')"
       @add="openCreateForecast"
       @retry="refreshOverview"
@@ -359,9 +414,9 @@ const deleteForecast = async (forecastId: string) => {
       <template #actions-cell="{ row }">
         <div class="flex items-center justify-end gap-2">
           <UButton
-            v-if="isFiscalYearGroupRow(row as ForecastGroupedRow) && canCreate"
+            v-if="isFiscalYearGroupRow(row as ForecastGroupedRow) && canCreateRole"
             :loading="isCreatingVersion"
-            :disabled="isCreatingVersion"
+            :disabled="Boolean(pendingAction)"
             icon="i-lucide-plus"
             color="neutral"
             variant="ghost"
@@ -369,7 +424,7 @@ const deleteForecast = async (forecastId: string) => {
             :aria-label="t('agreement.forecasts.add_version')"
             @click="createForecastVersion(row as ForecastGroupedRow)" />
           <UButton
-            v-if="!isFiscalYearGroupRow(row as ForecastGroupedRow) && canDelete"
+            v-if="!isFiscalYearGroupRow(row as ForecastGroupedRow) && canDeleteRole"
             icon="i-lucide-trash"
             color="error"
             variant="ghost"
