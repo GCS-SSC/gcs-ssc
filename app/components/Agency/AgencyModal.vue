@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
-import { computed } from 'vue'
+import { computed, nextTick } from 'vue'
 import { AgencyProfileSchema, type AgencyProfileItem } from '~~/shared/types/schemas'
 
 const { title, submitLabel, pending = false } = defineProps<{
@@ -36,12 +36,19 @@ const selectedGwcoaFetchUrl = computed(() => {
 const onSubmit = () => {
   emit('submit')
 }
+/** Signal a real structured-field edit after Vue updates the business control. */
+const completeActiveHelp = async () => {
+  await nextTick()
+  window.dispatchEvent(new CustomEvent('guided-help:completed', {
+    detail: { target: 'agency.edit.active', action: 'field-change' }
+  }))
+}
 </script>
 
 <template>
   <UModal v-model:open="open" :title="title" :description="t('common.form_dialog_description')">
     <template #body>
-      <UForm :state="state" :validate="validate" class="space-y-4" @submit="onSubmit">
+      <UForm :state="state" :validate="validate" class="space-y-4" data-help-view="agency.edit" @submit="onSubmit">
         <UFormField :label="t('agency.gwcoa_number')" name="egcs_ay_gwcoa_number">
           <CommonServerLookupSelect
             v-model="state.egcs_ay_gwcoa_number"
@@ -70,7 +77,7 @@ const onSubmit = () => {
           <UInput v-model="state.egcs_ay_abbreviation_fr" />
         </UFormField>
         <UFormField :label="t('common.active')" name="egcs_ay_active">
-          <USwitch v-model="state.egcs_ay_active" :label="t('common.active')" />
+          <USwitch v-model="state.egcs_ay_active" :label="t('common.active')" data-help-target="agency.edit.active" :data-help-value="state.egcs_ay_active" @update:model-value="completeActiveHelp" />
         </UFormField>
         <div class="flex justify-end gap-2 pt-4">
           <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="open = false" />

@@ -22,6 +22,8 @@ const {
   columns,
   bilingualColumns,
   buttonLabel,
+  helpAddTarget,
+  helpSaveTarget,
   showButton = true,
   canCreate: createAllowed = true,
   canUpdate: updateAllowed = true,
@@ -53,6 +55,8 @@ const {
   beforeDelete?: (id: string, shouldProceed: () => boolean) => Promise<boolean | undefined>
   columns: TableColumnInput<T>[]
   bilingualColumns?: BilingualColumnConfig<T>[]
+  helpSaveTarget?: string
+  helpAddTarget?: string
   buttonLabel?: string
   showButton?: boolean
   canCreate?: boolean
@@ -83,6 +87,15 @@ const slots = useSlots()
 const forwardedSlotNames = computed(() => Object.keys(slots).filter(name => name !== 'actions-cell'))
 
 const tableRef: Ref<unknown | null> = ref(null)
+let helpCreatePending = false
+
+/** Notify guidance only after the business operation completes successfully.
+ * @param target Registered control that performed the action.
+ * @param action Completed business action.
+ */
+const completeHelpAction = (target: string | undefined, action: 'modal-open' | 'save-success') => {
+  if (target) window.dispatchEvent(new CustomEvent('guided-help:completed', { detail: { target, action } }))
+}
 
 const {
   validate,
@@ -124,10 +137,28 @@ const {
   updateTitle,
   deleteConfirmKey,
   statusFilter,
-  emitAdded: () => emit('added'),
-  emitUpdated: () => emit('updated'),
+  emitAdded: () => {
+    emit('added')
+    completeHelpAction(helpSaveTarget, 'save-success')
+  },
+  emitUpdated: () => {
+    emit('updated')
+    completeHelpAction(helpSaveTarget, 'save-success')
+  },
   emitDeleted: () => emit('deleted')
 })
+
+/** Track an actual Add action, rather than any modal opened for editing. */
+const openGuidedCreate = () => {
+  openCreate()
+  helpCreatePending = Boolean(isModalOpen.value)
+}
+
+/** Wait until the modal's controls are rendered before advancing guidance. */
+const completeHelpModal = () => {
+  if (helpCreatePending && isModalOpen.value) completeHelpAction(helpAddTarget, 'modal-open')
+  helpCreatePending = false
+}
 
 defineExpose({
   search,
@@ -148,6 +179,7 @@ defineExpose({
       :status-enum-name="statusEnumName"
       :status-filter-label="statusFilterLabel"
       :button-label="buttonLabel"
+      :help-add-target="helpAddTarget"
       :show-button="showButton && createAllowed && !staticMode"
       :search-placeholder="searchPlaceholder"
       :data="items"
@@ -158,7 +190,7 @@ defineExpose({
       :request-status="listStatus"
       :table-class="tableClass"
       :embedded="embedded"
-      @add="openCreate"
+      @add="openGuidedCreate"
       @retry="retry">
       <!-- Pass through all slots to Layout/Table -->
       <template v-for="name in forwardedSlotNames" #[name]="slotData">
@@ -194,14 +226,16 @@ defineExpose({
       :title="resolvedModalTitle"
       :description="t('common.form_dialog_description')"
       :fullscreen="modalFullscreen"
-      :ui="modalUi">
+      :ui="modalUi"
+      @after:enter="completeHelpModal"
+      @after:leave="helpCreatePending = false">
       <template #body>
         <UForm v-if="formState" :state="formState" :validate="validate" :disabled="isSaving" class="space-y-4" @submit="saveItem">
           <slot name="form" :state="formState" />
 
           <div class="flex justify-end gap-2 pt-4">
             <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="closeModal" />
-            <CommonSaveButton :label="submitLabel" :loading="isSaving" :disabled="isSaving || !canSave" />
+            <CommonSaveButton :data-help-target="helpSaveTarget" :label="submitLabel" :loading="isSaving" :disabled="isSaving || !canSave" />
           </div>
         </UForm>
       </template>

@@ -168,5 +168,6 @@ const userMenuItems = computed<DropdownMenuItem[][]>(() => [
     <CommonGlobalSearchPalette :pages="pages" />
 
     <slot />
+    <GuidedHelpContextual />
   </UDashboardGroup>
 </template>

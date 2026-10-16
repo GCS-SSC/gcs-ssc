@@ -5,6 +5,8 @@ export const authorizedRouteLocation = <T>(authorized: boolean | undefined, loca
 }
 
 export const appRouteLocations = {
+  guidedHelp: () => ({ name: 'guided-help' }),
+  guidedHelpDetail: (guideId: string) => ({ name: 'guided-help-guideId', params: { guideId } }),
   home: () => ({ name: 'index' }),
   login: () => ({ name: 'login' }),
   adminGwcoa: () => ({ name: 'admin-gwcoa' }),

@@ -54,6 +54,7 @@ export const useNavigationCatalog = (workspaces: MaybeRefOrGetter<ExtensionAgenc
     add('proponents', 'nav.applicant_recipients', 'i-lucide-store', appRouteLocations.proponents(), canAny('applicant_recipient', 'read'))
     const assignmentSubjects = ['agreement', 'applicant_recipient', 'funding_case', 'journal_voucher', 'correction'] as const
     add('assignment', 'nav.assignment_management', 'i-lucide-user-round-check', appRouteLocations.assignmentManagement(), assignmentSubjects.some(subject => canManageAssignments(subject)))
+    add('guided-help', 'guided_help.title', 'i-lucide-circle-help', appRouteLocations.guidedHelp(), canAny('guided_help', 'read', ['global', 'agency']))
     add('roles', 'role.title', 'i-lucide-shield', appRouteLocations.roles(), canAny('role', 'read'))
     add('users', 'nav.users', 'i-lucide-user-round', appRouteLocations.users(), canAny('user', 'read'))
     add('groups', 'nav.groups', 'i-lucide-users', appRouteLocations.groups(), canAny('group', 'read'))

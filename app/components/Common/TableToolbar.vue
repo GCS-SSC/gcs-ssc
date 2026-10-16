@@ -7,6 +7,7 @@ const {
   statusEnumName,
   statusFilterLabel,
   buttonLabel,
+  helpAddTarget,
   searchPlaceholder,
   table,
   showButton = true,
@@ -17,6 +18,7 @@ const {
 } = defineProps<{
   statusEnumName?: EnumKey
   statusFilterLabel?: string
+  helpAddTarget?: string
   buttonLabel?: string
   searchPlaceholder?: string
   table?: ToolbarTableLike
@@ -97,6 +99,7 @@ defineEmits(['add'])
 
       <UButton
         v-if="showButton"
+        :data-help-target="helpAddTarget"
         :label="buttonLabel || t('common.add')"
         icon="i-lucide-plus"
         :disabled="buttonDisabled"

@@ -12,6 +12,7 @@
         "@gcs-ssc/authorization": "workspace:*",
         "@gcs-ssc/diagrams": "workspace:*",
         "@gcs-ssc/extensions": "workspace:*",
+        "@gcs-ssc/guided-help": "workspace:*",
         "@iconify-json/lucide": "^1.2.89",
         "@iconify-json/simple-icons": "^1.2.70",
         "@internationalized/date": "^3.11.0",
@@ -350,6 +351,19 @@
         "zod": "^4.3.6",
       },
     },
+    "packages/gcs-ssc-guided-help": {
+      "name": "@gcs-ssc/guided-help",
+      "version": "0.1.0",
+      "dependencies": {
+        "@vue/compiler-dom": "3.5.28",
+        "@vue/compiler-sfc": "3.5.28",
+        "driver.js": "^1.4.0",
+        "zod": "4.3.6",
+      },
+      "peerDependencies": {
+        "vue": "^3.5.28",
+      },
+    },
   },
   "patchedDependencies": {
     "nitropack@2.13.1": "patches/nitropack@2.13.1.patch",
@@ -666,6 +680,8 @@
     "@gcs-ssc/gcs-storage-local": ["@gcs-ssc/gcs-storage-local@workspace:extensions/gcs-storage-local"],
 
     "@gcs-ssc/gcs-storage-s3": ["@gcs-ssc/gcs-storage-s3@workspace:extensions/gcs-storage-s3"],
+
+    "@gcs-ssc/guided-help": ["@gcs-ssc/guided-help@workspace:packages/gcs-ssc-guided-help"],
 
     "@graphql-typed-document-node/core": ["@graphql-typed-document-node/core@3.2.0", "", { "peerDependencies": { "graphql": "^0.8.0 || ^0.9.0 || ^0.10.0 || ^0.11.0 || ^0.12.0 || ^0.13.0 || ^14.0.0 || ^15.0.0 || ^16.0.0 || ^17.0.0" } }, "sha512-mB9oAsNCm9aM3/SOv4YtBMqZbYj10R7dkq8byBqxGY/ncFwhf2oQzMV+LCRlWoDSEBJ3COiR1yeDvMtsoOsuFQ=="],
 
@@ -1788,6 +1804,8 @@
     "dotenv": ["dotenv@17.2.3", "", {}, "sha512-JVUnt+DUIzu87TABbhPmNfVdBDt18BLOWjMUFJMSi/Qqg7NTYtabbvSNJGOJ7afbRuv9D/lngizHtP7QyLQ+9w=="],
 
     "dotenv-expand": ["dotenv-expand@11.0.7", "", { "dependencies": { "dotenv": "^16.4.5" } }, "sha512-zIHwmZPRshsCdpMDyVsqGmgyP0yT8GAgXUnkdAoJisxvf33k7yO6OuoKmcTGuXPWSsm8Oh88nZicRLA9Y0rUeA=="],
+
+    "driver.js": ["driver.js@1.10.1", "", {}, "sha512-mpcJ15eIRWnGMykeIWjr0CdQF00/JzImFOEXy/VponYgMbP/y46t24MPBDO3PV/rH6CjdSe3T7WQ9cP3GvEPdQ=="],
 
     "dunder-proto": ["dunder-proto@1.0.1", "", { "dependencies": { "call-bind-apply-helpers": "^1.0.1", "es-errors": "^1.3.0", "gopd": "^1.2.0" } }, "sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A=="],
 

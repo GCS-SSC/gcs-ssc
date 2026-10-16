@@ -19,4 +19,7 @@ export interface FlowDiagramLabels {
   exportSvg: string
   exportPng: string
   exportError: string
+  addNode?: string
+  addBranch?: string
+  addFirstNode?: string
 }

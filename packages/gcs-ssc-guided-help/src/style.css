@@ -1,0 +1,33 @@
+@import 'driver.js/dist/driver.css';
+/* Help is non-modal: teleported lookup/date menus and the guide popover remain usable. */
+body.driver-active * { pointer-events: auto; }
+body.driver-active .driver-overlay, body.driver-active .driver-overlay * { pointer-events: none !important; }
+body.driver-active .driver-active-element { pointer-events: auto !important; }
+/* Driver's own positioning and arrow stay intact; colors follow the host theme. */
+.gcs-guide-popover.driver-popover { background: var(--ui-bg-elevated, white); color: var(--ui-text, #172b4d); font-family: var(--font-sans, inherit); font-size: 1rem; line-height: 1.5; border: 1px solid var(--ui-border, #ddd); border-radius: .75rem; padding: 1.25rem; width: 400px; max-width: calc(100vw - 24px); box-shadow: 0 12px 40px #0004; }
+.gcs-guide-popover .driver-popover-title { font-size: 1.25rem; padding-right: 1.5rem; }
+.gcs-guide-popover .driver-popover-title p { margin: 0; }
+.gcs-guide-popover .driver-popover-description { font-size: 1rem; line-height: 1.6; font-family: inherit; color: inherit; }
+.gcs-guide-popover .driver-popover-description p { margin: .6rem 0; }
+.gcs-guide-popover .driver-popover-footer button, .gcs-guide-retry { font-family: inherit; font-size: 1rem; line-height: 1.5; text-shadow: none; border-radius: .375rem; padding: .5rem .75rem; background: var(--ui-bg, white); color: var(--ui-text, #172b4d); border: 1px solid var(--ui-border, #ddd); cursor: pointer; }
+.gcs-guide-popover .driver-popover-footer .driver-popover-next-btn { background: var(--ui-primary, #008ac0); color: var(--ui-bg, white); border-color: transparent; }
+.gcs-guide-popover .driver-popover-close-btn { color: var(--ui-text-muted, #666); }
+.gcs-guide-popover .driver-popover-progress-text { font-size: 1rem; color: var(--ui-text-muted, #666); }
+.gcs-guide-popover .driver-popover-arrow-side-top { border-top-color: var(--ui-bg-elevated, white); }
+.gcs-guide-popover .driver-popover-arrow-side-bottom { border-bottom-color: var(--ui-bg-elevated, white); }
+.gcs-guide-popover .driver-popover-arrow-side-left { border-left-color: var(--ui-bg-elevated, white); }
+.gcs-guide-popover .driver-popover-arrow-side-right { border-right-color: var(--ui-bg-elevated, white); }
+.gcs-guide-popover button:focus-visible, .gcs-guided-help-editor :is(button,input,select,textarea):focus-visible { outline: 2px solid var(--ui-primary, currentColor); outline-offset: 2px; }
+.gcs-guide-status { color: var(--ui-text-muted, #666); }
+.gcs-guide-modal-host { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none !important; z-index: 1000000001; }
+.gcs-guided-help-editor { display: grid; gap: 1rem; }
+.gcs-guided-help-editor fieldset { display: grid; gap: .5rem; padding: 1rem; border: 1px solid currentColor; }
+.gcs-guided-help-editor label { display: grid; gap: .25rem; }
+.gcs-guide-step-label { position: relative; display: grid; gap: .25rem; margin-top: .75rem; font-size: 1rem; color: var(--ui-text-muted, #666); }
+.gcs-guide-step-label::after { content: ''; position: absolute; right: 1rem; bottom: 1rem; width: .5rem; height: .5rem; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); pointer-events: none; }
+.gcs-guide-step-select { appearance: none; width: 100%; padding: .5rem 2.75rem .5rem .75rem; border: 1px solid var(--ui-border, #ddd); border-radius: .375rem; background: var(--ui-bg, white); color: var(--ui-text, #172b4d); font: inherit; }
+
+/* Narrow modals keep help in normal flow after the business footer, rather than
+   covering fields or actions. The modal's existing scroll body stays available. */
+.gcs-guide-popover.gcs-guide-modal-inline { z-index: 1000000002; position: relative !important; inset: auto !important; width: auto !important; max-width: none !important; max-height: 40dvh; overflow: auto; flex-shrink: 0; margin: .75rem; }
+.gcs-guide-modal-inline .driver-popover-arrow { display: none; }

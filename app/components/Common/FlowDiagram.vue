@@ -7,8 +7,14 @@ defineProps<{
   selectedNodeId?: string
   filename?: string
   direction?: 'auto' | 'vertical'
+  editable?: boolean
+  branchNodeIds?: string[]
 }>()
-const emit = defineEmits<{ 'select-node': [nodeId: string] }>()
+const emit = defineEmits<{
+  'select-node': [nodeId: string]
+  'add-node': [afterNodeId?: string]
+  'add-branch': [nodeId: string]
+}>()
 const { t } = useI18n()
 const labels = computed<FlowDiagramLabels>(() => ({
   legend: t('diagrams.legend'),
@@ -19,12 +25,16 @@ const labels = computed<FlowDiagramLabels>(() => ({
   failure: t('diagrams.failure'),
   exportSvg: t('diagrams.export_svg'),
   exportPng: t('diagrams.export_png'),
-  exportError: t('diagrams.export_error')
+  exportError: t('diagrams.export_error'),
+  addNode: t('diagrams.add_node'),
+  addBranch: t('diagrams.add_branch'),
+  addFirstNode: t('diagrams.add_first_node')
 }))
 </script>
 
 <template>
   <DiagramRenderer
     :definition="definition" :selected-node-id="selectedNodeId" :filename="filename" :direction="direction"
-    :labels="labels" @select-node="emit('select-node', $event)" />
+    :labels="labels" :editable="editable" :branch-node-ids="branchNodeIds"
+    @select-node="emit('select-node', $event)" @add-node="emit('add-node', $event)" @add-branch="emit('add-branch', $event)" />
 </template>

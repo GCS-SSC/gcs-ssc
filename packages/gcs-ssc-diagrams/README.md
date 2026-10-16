@@ -42,6 +42,16 @@ Only nodes with `selectLabel` render as buttons and emit `select-node`; the
 optional `selectedNodeId` identifies the current step. Text is escaped by Vue
 and the SVG serializer.
 
+The host adapter and renderer also support opt-in `editable` controls. The add-first control
+emits `add-node` with no argument for either an empty or populated graph; each non-end node's insertion control emits
+`add-node` with its ID, and its branch control emits `add-branch` with its ID.
+Callers own all graph mutations. `branchNodeIds` restricts branch controls to the
+listed IDs; omitted permits all nodes, while an empty list disables every branch
+control. Renderer consumers provide optional localized `addNode`, `addBranch`
+and `addFirstNode` labels; host consumers receive host translations. These controls
+are absent by default and excluded from exports. Editing is currently host-only;
+the extension SDK's read-only component contract is unchanged.
+
 `direction="auto"` keeps the portal's horizontal flow and stacks it in narrow
 containers. `direction="vertical"` keeps workflows on a vertical spine. Routes
 that skip nodes or would cross another route tile use bounded outside lanes.

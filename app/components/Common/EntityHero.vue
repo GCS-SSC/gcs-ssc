@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useSlots } from 'vue'
 import type { PublicationState, RuntimeState } from '~~/shared/constants/system-lifecycle'
 
 type EntityHeroActionBase = {
@@ -57,6 +57,7 @@ const {
   actions?: EntityHeroAction[]
 }>()
 
+const slots = useSlots()
 const visibleMetaItems = computed(() => metaItems.filter(item => item !== undefined && item !== null && String(item).trim() !== ''))
 const visibleStats = computed(() => stats.filter(stat => stat.visible !== false && stat.value !== undefined && stat.value !== null && stat.label.trim() !== ''))
 const visibleActions = computed(() => actions.filter(action =>
@@ -126,7 +127,7 @@ const visibleActions = computed(() => actions.filter(action =>
         </div>
       </div>
 
-      <div v-if="!isCollapsed && (visibleStats.length > 0 || visibleActions.length > 0)" class="flex flex-wrap items-center gap-4 md:justify-end">
+      <div v-if="!isCollapsed && (visibleStats.length > 0 || visibleActions.length > 0 || slots.actions)" class="flex flex-wrap items-center gap-4 md:justify-end">
         <div v-if="visibleStats.length > 0" class="flex items-center gap-6">
           <template v-for="(stat, statIndex) in visibleStats" :key="`${statIndex}:${stat.label}`">
             <div v-if="statIndex > 0" class="h-10 w-px bg-zinc-200 dark:bg-zinc-800" />
@@ -143,7 +144,8 @@ const visibleActions = computed(() => actions.filter(action =>
           </template>
         </div>
 
-        <div v-if="visibleActions.length > 0" class="flex flex-wrap items-center gap-2">
+        <div v-if="visibleActions.length > 0 || slots.actions" class="flex flex-wrap items-center gap-2">
+          <slot name="actions" />
           <template v-for="(action, actionIndex) in visibleActions" :key="`${actionIndex}:${action.label}`">
             <UButton
               v-if="action.onClick"

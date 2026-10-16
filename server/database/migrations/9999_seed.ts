@@ -2,6 +2,7 @@ import { hashPassword } from 'better-auth/crypto'
 import { sql, type Kysely, type Migration } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import { restoreNciaTemplateObjects } from '../ncia-template-objects'
+import { seedGuidedHelpExample } from '../guided-help-seed'
 
 type DemoSnapshot = Record<string, Array<Record<string, unknown>>> & { user: Array<{ id: number }> }
 
@@ -75,6 +76,10 @@ const restoreSnapshot = async <DB>(db: Kysely<DB>): Promise<void> => {
       ALTER CONSTRAINT ${sql.id(foreignKey.constraint_name)} NOT DEFERRABLE INITIALLY IMMEDIATE`.execute(db)
   }
   await restoreNciaTemplateObjects(db as unknown as Kysely<Database>)
+  // Publication state and transition history are validated together at the end of the seed.
+  await sql`SET CONSTRAINTS ALL DEFERRED`.execute(db)
+  await seedGuidedHelpExample(db as unknown as import('kysely').Transaction<Database>)
+  await sql`SET CONSTRAINTS ALL IMMEDIATE`.execute(db)
 }
 
 export const up: Migration['up'] = async db => {

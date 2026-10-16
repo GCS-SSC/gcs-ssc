@@ -3,6 +3,10 @@ type SectionUrlDefinition = { fr: string; aliases?: readonly string[] }
 // URL vocabulary is deliberately independent of interface labels and their translations.
 const SECTION_URL_VALUES: Record<string, SectionUrlDefinition> = {
   'general': { fr: 'general' },
+  'steps': { fr: 'etapes' },
+  'flow': { fr: 'deroulement' },
+  'history': { fr: 'historique' },
+  'distribution': { fr: 'diffusion' },
   'summary': { fr: 'sommaire' },
   'lines': { fr: 'lignes' },
   'payment-evidence': { fr: 'pieces-justificatives-du-paiement' },
@@ -106,6 +110,10 @@ const SECTION_URL_VALUES: Record<string, SectionUrlDefinition> = {
 const SECTION_TAB_KEYS: Record<string, string> = {
   'agreement.payments.evidence.title': 'payment-evidence',
   'agency.tabs.general': 'general',
+  'guided_help.steps': 'steps',
+  'guided_help.flow': 'flow',
+  'guided_help.version_history': 'history',
+  'guided_help.distribution': 'distribution',
   'agency.tabs.statuses': 'statuses',
   'custom_fields.title': 'custom-fields',
   'agency.tabs.approval_templates': 'approval-templates',

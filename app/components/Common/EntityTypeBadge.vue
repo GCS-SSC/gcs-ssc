@@ -24,6 +24,7 @@ const ENTITY_TYPE_ICON_MAP: Record<string, string> = {
 
 const {
   type,
+  icon: customIcon,
   labelEn,
   labelFr,
   to,
@@ -33,6 +34,7 @@ const {
   variant = 'pill'
 } = defineProps<{
   type: string
+  icon?: string
   labelEn?: string
   labelFr?: string
   to?: RouteLocationRaw
@@ -44,7 +46,7 @@ const {
 
 const { locale, t } = useI18n()
 
-const icon = computed(() => ENTITY_TYPE_ICON_MAP[type] ?? 'i-lucide-shapes')
+const icon = computed(() => customIcon ?? ENTITY_TYPE_ICON_MAP[type] ?? 'i-lucide-shapes')
 const label = computed(() => (locale.value === 'fr' ? labelFr : labelEn) || t(`enums.entity_type.${type}`))
 const isAccent = computed(() => highlighted || selected)
 const isMetaVariant = computed(() => variant === 'meta')

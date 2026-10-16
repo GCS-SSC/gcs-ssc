@@ -572,7 +572,7 @@ CREATE TABLE "Common_Publication" (
   CONSTRAINT "Common_Publication_pkey" PRIMARY KEY (id),
   CONSTRAINT "cn_chk_publicationdeleted" CHECK (((_deleted = false) OR ((egcs_cn_state)::text = 'draft'::text))),
   CONSTRAINT "cn_chk_publicationinitial" CHECK (((((egcs_cn_state)::text = 'draft'::text) AND (egcs_cn_currentversion IS NULL)) OR (((egcs_cn_state)::text = ANY ((ARRAY['published'::character varying, 'retired'::character varying])::text[])) AND (egcs_cn_currentversion IS NOT NULL)))),
-  CONSTRAINT "cn_chk_publicationkind" CHECK (((egcs_cn_kind)::text = ANY ((ARRAY['approval_template'::character varying, 'review_schema'::character varying, 'review_set_setup'::character varying, 'recommendation_schema'::character varying, 'recommendation_set_setup'::character varying, 'data_collection_setup'::character varying, 'workflow_setup'::character varying])::text[]))),
+  CONSTRAINT "cn_chk_publicationkind" CHECK (((egcs_cn_kind)::text = ANY ((ARRAY['guided_help'::character varying, 'guided_help_catalog'::character varying, 'approval_template'::character varying, 'review_schema'::character varying, 'review_set_setup'::character varying, 'recommendation_schema'::character varying, 'recommendation_set_setup'::character varying, 'data_collection_setup'::character varying, 'workflow_setup'::character varying])::text[]))),
   CONSTRAINT "cn_chk_publicationstate" CHECK (((egcs_cn_state)::text = ANY ((ARRAY['draft'::character varying, 'published'::character varying, 'retired'::character varying])::text[])))
 );
 
@@ -1326,6 +1326,17 @@ INSERT INTO "Common_Entity_Type" ("_deleted", "egcs_cn_type", "egcs_cn_label_en"
 INSERT INTO "Common_Entity_Type" ("_deleted", "egcs_cn_type", "egcs_cn_label_en", "egcs_cn_label_fr", "egcs_cn_localtype", "egcs_cn_ownerkind", "egcs_cn_completion", "egcs_cn_riskrating", "egcs_cn_extensionkey", "egcs_cn_assignmentmode", "egcs_cn_standardworkflow", "egcs_cn_approvalsubmission", "egcs_cn_supportsdirectreviews") VALUES (false, 'fundingcaseintake', 'Intake', 'Réception', 'fundingcaseintake', 'funding_case', 'none', 'none', NULL, 'independent', 'explicit', 'explicit', true);
 
 INSERT INTO "Common_Entity_Type" ("_deleted", "egcs_cn_type", "egcs_cn_label_en", "egcs_cn_label_fr", "egcs_cn_localtype", "egcs_cn_ownerkind", "egcs_cn_completion", "egcs_cn_riskrating", "egcs_cn_extensionkey", "egcs_cn_assignmentmode", "egcs_cn_standardworkflow", "egcs_cn_approvalsubmission", "egcs_cn_supportsdirectreviews") VALUES (false, 'fundingcaseaccountreceivablecreditmemo', 'Accounts Receivable Credit Memo', 'Note de crédit de compte débiteur', 'fundingcaseaccountreceivablecreditmemo', 'agency', 'supported', 'none', NULL, 'independent', 'explicit', 'on_completion', true);
+CREATE TABLE "Common_Guided_Help" (
+  id bigint PRIMARY KEY,
+  egcs_cn_publicationkind varchar(64) NOT NULL DEFAULT 'guided_help' CHECK (egcs_cn_publicationkind = 'guided_help'),
+  egcs_cn_ownertype varchar(16) NOT NULL CHECK (egcs_cn_ownertype IN ('system', 'agency')),
+  egcs_cn_agency bigint,
+  egcs_cn_document jsonb NOT NULL CHECK (jsonb_typeof(egcs_cn_document) = 'object'),
+  egcs_cn_shared boolean NOT NULL DEFAULT false,
+  egcs_cn_clonedfromversion bigint,
+  _deleted boolean NOT NULL DEFAULT false,
+  CONSTRAINT cn_chk_guidedhelpowner CHECK ((egcs_cn_ownertype = 'system' AND egcs_cn_agency IS NULL) OR (egcs_cn_ownertype = 'agency' AND egcs_cn_agency IS NOT NULL))
+);
 END $baseline$`.execute(db)
 }
 
@@ -3949,6 +3960,14 @@ AS $function$
           AND COALESCE(condition.value->'optionIds', '[]'::jsonb) ? subtype_id::text
       )
     $function$;
+CREATE FUNCTION trg_fn_guidedhelp_immutable_owner() RETURNS trigger LANGUAGE plpgsql AS $fn$
+BEGIN
+  IF OLD.egcs_cn_ownertype IS DISTINCT FROM NEW.egcs_cn_ownertype OR OLD.egcs_cn_agency IS DISTINCT FROM NEW.egcs_cn_agency THEN
+    RAISE EXCEPTION 'Guided Help ownership is immutable' USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END $fn$;
+
 END $baseline$`.execute(db)
 }
 
@@ -4273,6 +4292,9 @@ ALTER TABLE "Common_Workflow_Status_Transition" ADD CONSTRAINT "Common_Workflow_
 ALTER TABLE "Common_Workflow_Status_Transition" ADD CONSTRAINT "Common_Workflow_Status_Transition_egcs_cn_previousstatus_fkey" FOREIGN KEY (egcs_cn_previousstatus) REFERENCES "Common_Status"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Common_Workflow_Status_Transition" ADD CONSTRAINT "Common_Workflow_Status_Transition_egcs_cn_workflowrun_fkey" FOREIGN KEY (egcs_cn_workflowrun) REFERENCES "Common_Workflow_Run"(id) ON DELETE RESTRICT;
+ALTER TABLE "Common_Guided_Help" ADD FOREIGN KEY (egcs_cn_agency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Common_Guided_Help" ADD FOREIGN KEY (egcs_cn_clonedfromversion) REFERENCES "Common_Publication_Version"(id) ON DELETE RESTRICT;
+ALTER TABLE "Common_Guided_Help" ADD CONSTRAINT cn_ref_guidedhelppublication FOREIGN KEY (id, egcs_cn_publicationkind) REFERENCES "Common_Publication"(id, egcs_cn_kind) ON DELETE RESTRICT;
 END $baseline$`.execute(db)
 }
 
@@ -4555,5 +4577,7 @@ CREATE TRIGGER trg_validate_workflow_member_owner BEFORE INSERT OR UPDATE ON "Co
 CREATE TRIGGER trg_lock_workflow_status_transition BEFORE DELETE OR UPDATE ON "Common_Workflow_Status_Transition" FOR EACH ROW EXECUTE FUNCTION trg_fn_lock_workflow_status_transition();
 
 CREATE CONSTRAINT TRIGGER trg_validate_workflow_transition_status_agency AFTER INSERT ON "Common_Workflow_Status_Transition" DEFERRABLE INITIALLY IMMEDIATE FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_workflow_transition_status_agency();
+CREATE TRIGGER trg_guard_guidedhelp_authoring BEFORE DELETE OR UPDATE ON "Common_Guided_Help" FOR EACH ROW EXECUTE FUNCTION trg_fn_guard_publication_authoring('publication');
+CREATE TRIGGER trg_guidedhelp_immutable_owner BEFORE UPDATE ON "Common_Guided_Help" FOR EACH ROW EXECUTE FUNCTION trg_fn_guidedhelp_immutable_owner();
 END $baseline$`.execute(db)
 }

@@ -25,6 +25,8 @@ const actorAgencies: AuditOwnershipRule = { kind: 'actor-agencies' }
 
 const publicationOwner: AuditOwnershipRule = {
   kind: 'switch', column: 'egcs_cn_kind', cases: {
+    guided_help: parent('id', 'public.Common_Guided_Help'),
+    guided_help_catalog: parent('id', 'public.Agency_Guided_Help'),
     review_schema: parent('id', 'public.Common_Review_Schema'),
     review_set_setup: parent('id', 'public.Common_Review_Set_Setup'),
     data_collection_setup: parent('id', 'public.Common_Data_Collection_Setup'),
@@ -39,6 +41,8 @@ type CoreTable = Exclude<keyof Database, `extensions.${string}`> | keyof HostMan
 type QualifiedCoreTable = { [Table in CoreTable]: Table extends `${string}.${string}` ? Table : `public.${Table}` }[CoreTable]
 
 export const AUDIT_TABLE_OWNERSHIP: Readonly<Record<string, AuditOwnershipRule>> = {
+  'public.Common_Guided_Help': { kind: 'switch', column: 'egcs_cn_ownertype', cases: { system: global('System-owned Guided Help'), agency: agency('egcs_cn_agency') } },
+  'public.Agency_Guided_Help': agency('egcs_ay_agency'),
   'public.Agency_Address_Type': parent('egcs_ay_organizationagency', 'public.Agency_Profile'),
   'public.Agency_Agreement_Type': parent('egcs_ay_organizationagency', 'public.Agency_Profile'),
   'public.Agency_Custom_Field': parent('egcs_ay_agency', 'public.Agency_Profile'),

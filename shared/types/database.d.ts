@@ -537,6 +537,8 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Common_Contact: CommonContactTable
   Common_Address: CommonAddressTable
   Common_Completion: CommonCompletionTable
+  Common_Guided_Help: CommonGuidedHelpTable
+  Agency_Guided_Help: AgencyGuidedHelpTable
   Common_Publication: CommonPublicationTable
   Common_Publication_Version: CommonPublicationVersionTable
   Common_Publication_Version_Reference: CommonPublicationVersionReferenceTable
@@ -732,7 +734,7 @@ export interface RoleTable {
 export interface RolePermissionTable {
   id: Generated<string>
   role_id: string
-  subject: 'audit' | 'system' | 'agency' | 'transfer_payment' | 'role' | 'user' | 'group' | 'agreement' | 'applicant_recipient' | 'funding_case' | 'journal_voucher' | 'correction' | 'account_receivable'
+  subject: 'guided_help' | 'audit' | 'system' | 'agency' | 'transfer_payment' | 'role' | 'user' | 'group' | 'agreement' | 'applicant_recipient' | 'funding_case' | 'journal_voucher' | 'correction' | 'account_receivable'
   access_level: 'viewer' | 'contributor' | 'manager' | null
   can_manage_assignments: Generated<boolean>
   _deleted: Generated<boolean>
@@ -2938,5 +2940,31 @@ export interface FundingCaseAccountReceivablePostingTable {
   egcs_fc_periodstart: number
   egcs_fc_periodend: number
   egcs_fc_amount: number
+  _deleted: Generated<boolean>
+}
+
+/** Guided Help source authoring; published documents live in Common_Publication_Version. */
+export interface CommonGuidedHelpTable {
+  id: string
+  egcs_cn_publicationkind: Generated<'guided_help'>
+  egcs_cn_ownertype: 'system' | 'agency'
+  egcs_cn_agency: string | null
+  egcs_cn_document: JsonValue
+  egcs_cn_shared: Generated<boolean>
+  egcs_cn_clonedfromversion: string | null
+  _deleted: Generated<boolean>
+}
+
+/** Agency-owned working distribution settings, independently versioned on publication. */
+export interface AgencyGuidedHelpTable {
+  id: string
+  egcs_ay_publicationkind: Generated<'guided_help_catalog'>
+  egcs_ay_agency: string
+  egcs_ay_guide: string
+  egcs_ay_sourceversion: string
+  egcs_ay_sourcekind: Generated<'guided_help'>
+  egcs_ay_discoveryscreens: JsonValue
+  egcs_ay_roles: JsonValue
+  egcs_ay_enabled: Generated<boolean>
   _deleted: Generated<boolean>
 }

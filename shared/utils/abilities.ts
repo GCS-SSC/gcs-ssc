@@ -12,6 +12,10 @@ import {
 export { AUTHORIZATION_SUBJECTS, isAuthorizationSubject }
 
 export const ABILITIES = [
+  { action: 'create', subject: 'guided_help', name_en: 'Create Guided Help', name_fr: 'Créer de l’aide guidée', desc_en: 'Author, adopt and clone guided help.', desc_fr: 'Rédiger, adopter et cloner de l’aide guidée.' },
+  { action: 'read', subject: 'guided_help', name_en: 'Read Guided Help Administration', name_fr: 'Consulter l’administration de l’aide guidée', desc_en: 'Inspect guided help drafts and publications.', desc_fr: 'Consulter les brouillons et les publications d’aide guidée.' },
+  { action: 'update', subject: 'guided_help', name_en: 'Publish Guided Help', name_fr: 'Publier de l’aide guidée', desc_en: 'Edit and publish guides and agency catalog settings.', desc_fr: 'Modifier et publier les guides et les paramètres du catalogue de l’agence.' },
+  { action: 'delete', subject: 'guided_help', name_en: 'Retire Guided Help', name_fr: 'Retirer de l’aide guidée', desc_en: 'Retire guides and delete eligible unpublished drafts.', desc_fr: 'Retirer les guides et supprimer les brouillons non publiés admissibles.' },
   { action: 'create', subject: 'account_receivable', name_en: 'Create Accounts Receivable', name_fr: 'Créer des comptes débiteurs', desc_en: 'Prepare Accounts Receivable and manual Credit Memos.', desc_fr: 'Préparer des comptes débiteurs et des notes de crédit manuelles.' },
   { action: 'read', subject: 'account_receivable', name_en: 'Read Accounts Receivable', name_fr: 'Lire les comptes débiteurs', desc_en: 'Read scoped Accounts Receivable and retained recovery evidence.', desc_fr: 'Lire les comptes débiteurs autorisés et les preuves de recouvrement conservées.' },
   { action: 'update', subject: 'account_receivable', name_en: 'Update Accounts Receivable', name_fr: 'Modifier les comptes débiteurs', desc_en: 'Work on assigned Accounts Receivable and Credit Memos.', desc_fr: 'Traiter les comptes débiteurs et les notes de crédit attribués.' },

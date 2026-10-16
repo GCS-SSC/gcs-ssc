@@ -56,6 +56,8 @@ export const SYSTEM_LIFECYCLE = {
 } as const
 
 const PUBLICATION_KIND = {
+  guidedHelp: 'guided_help',
+  guidedHelpCatalog: 'guided_help_catalog',
   approvalTemplate: 'approval_template',
   reviewSchema: 'review_schema',
   reviewSetSetup: 'review_set_setup',

@@ -12,48 +12,50 @@ const statusLabel = computed(() => t(agency.egcs_ay_active ? 'common.active' : '
 </script>
 
 <template>
-  <div class="space-y-8">
+  <div data-help-view="agency.general">
     <div class="space-y-8">
       <div class="space-y-8">
-        <CommonSection :title="t('agency.detail.core_info')" badge="01">
-          <CommonValueCard
-            :label="t('agency.detail.english_profile')"
-            :value="agency.egcs_ay_name_en"
-            value-lang="en"
-            :sub-value="agency.egcs_ay_abbreviation_en"
-            sub-value-lang="en" />
+        <div class="space-y-8">
+          <CommonSection :title="t('agency.detail.core_info')" badge="01">
+            <CommonValueCard
+              :label="t('agency.detail.english_profile')"
+              :value="agency.egcs_ay_name_en"
+              value-lang="en"
+              :sub-value="agency.egcs_ay_abbreviation_en"
+              sub-value-lang="en" />
 
-          <CommonValueCard
-            :label="t('agency.detail.french_profile')"
-            :value="agency.egcs_ay_name_fr"
-            value-lang="fr"
-            :sub-value="agency.egcs_ay_abbreviation_fr"
-            sub-value-lang="fr" />
-        </CommonSection>
+            <CommonValueCard
+              :label="t('agency.detail.french_profile')"
+              :value="agency.egcs_ay_name_fr"
+              value-lang="fr"
+              :sub-value="agency.egcs_ay_abbreviation_fr"
+              sub-value-lang="fr" />
+          </CommonSection>
 
-        <CommonSection :title="t('agency.detail.system_config')" badge="02">
-          <CommonValueCard
-            :label="t('agency.detail.gwcoa_link')"
-            :value="agency.egcs_ay_gwcoa_number"
-            :sub-value="t('agency.detail.chart_of_accounts')"
-            icon="i-lucide-landmark"
-            variant="ghost" />
+          <CommonSection :title="t('agency.detail.system_config')" badge="02">
+            <CommonValueCard
+              :label="t('agency.detail.gwcoa_link')"
+              :value="agency.egcs_ay_gwcoa_number"
+              :sub-value="t('agency.detail.chart_of_accounts')"
+              icon="i-lucide-landmark"
+              variant="ghost" />
 
-          <CommonValueCard
-            :label="t('agency.detail.financial_link')"
-            :value="agency.egcs_ay_agencyfinancialsystemid"
-            :sub-value="t('agency.detail.external_id')"
-            icon="i-lucide-database"
-            variant="ghost" />
+            <CommonValueCard
+              :label="t('agency.detail.financial_link')"
+              :value="agency.egcs_ay_agencyfinancialsystemid"
+              :sub-value="t('agency.detail.external_id')"
+              icon="i-lucide-database"
+              variant="ghost" />
 
-          <CommonValueCard
-            :label="t('agency.detail.op_status')"
-            :value="statusLabel"
-            :sub-value="t('agency.detail.lifecycle')"
-            icon="i-lucide-shield-check"
-            variant="ghost"
-            :color="agency.egcs_ay_active ? 'success' : 'neutral'" />
-        </CommonSection>
+            <CommonValueCard
+              :label="t('agency.detail.op_status')"
+              :value="statusLabel"
+              :sub-value="t('agency.detail.lifecycle')"
+              icon="i-lucide-shield-check"
+              variant="ghost"
+              :color="agency.egcs_ay_active ? 'success' : 'neutral'" />
+          </CommonSection>
+        </div>
       </div>
     </div>
   </div>

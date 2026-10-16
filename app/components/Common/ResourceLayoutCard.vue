@@ -13,6 +13,7 @@ const {
   statusEnumName,
   statusFilterLabel,
   buttonLabel,
+  helpAddTarget,
   buttonDisabled = false,
   showButton = true,
   showToolbar = true,
@@ -30,6 +31,7 @@ const {
   requestStatus?: ResourceTableStatus
   statusEnumName?: EnumKey
   statusFilterLabel?: string
+  helpAddTarget?: string
   buttonLabel?: string
   buttonDisabled?: boolean
   showButton?: boolean
@@ -74,6 +76,7 @@ defineExpose({
       :status-enum-name="statusEnumName"
       :status-filter-label="statusFilterLabel"
       :button-label="buttonLabel"
+      :help-add-target="helpAddTarget"
       :button-disabled="buttonDisabled"
       :show-button="showButton"
       :show-search="showSearch"

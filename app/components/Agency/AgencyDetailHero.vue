@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import GuidedHelpLauncher from '~/components/GuidedHelp/Launcher.vue'
 import type { AgencyProfileItem } from '~~/shared/types/schemas'
 
 const { agency, isCollapsed, canUpdate } = defineProps<{
@@ -40,5 +41,9 @@ const actions = computed(() => canUpdate
     :title="title"
     :meta-items="metaItems"
     :badges="badges"
-    :actions="actions" />
+    :actions="actions">
+    <template #actions>
+      <GuidedHelpLauncher />
+    </template>
+  </CommonEntityHero>
 </template>

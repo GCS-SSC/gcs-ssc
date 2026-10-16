@@ -55,7 +55,7 @@ export default defineConfig({
         'tests/**',
         'extensions/**/tests/**',
         'extensions/**',
-        'server/utils/!(applicant-recipient-auth|authorize|entity-team|entity-team-routes|rbac|team-auth).ts',
+        'server/utils/!(applicant-recipient-auth|authorize|entity-team|entity-team-routes|rbac|team-auth|guided-help).ts',
         'extensions/**/client/**',
         'extensions/**/extension.config.ts',
         'server/database/migrations/**',

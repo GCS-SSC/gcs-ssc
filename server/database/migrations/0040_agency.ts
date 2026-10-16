@@ -411,6 +411,19 @@ CREATE INDEX ay_profile_search_abbreviation_en_exact ON "Agency_Profile" USING b
 CREATE INDEX ay_profile_search_abbreviation_fr_exact ON "Agency_Profile" USING btree (lower(coalesce(egcs_ay_abbreviation_fr, '')) text_pattern_ops) WHERE (_deleted = false AND egcs_ay_active = true);
 CREATE INDEX ay_profile_search_agencyfinancialsystemid_exact ON "Agency_Profile" USING btree (egcs_ay_agencyfinancialsystemid) WHERE (_deleted = false AND egcs_ay_active = true);
 CREATE INDEX ay_profile_search_gwcoa_number_exact ON "Agency_Profile" USING btree (egcs_ay_gwcoa_number) WHERE (_deleted = false AND egcs_ay_active = true);
+CREATE TABLE "Agency_Guided_Help" (
+  id bigint PRIMARY KEY,
+  egcs_ay_publicationkind varchar(64) NOT NULL DEFAULT 'guided_help_catalog' CHECK (egcs_ay_publicationkind = 'guided_help_catalog'),
+  egcs_ay_agency bigint NOT NULL,
+  egcs_ay_guide bigint NOT NULL,
+  egcs_ay_sourceversion bigint NOT NULL,
+  egcs_ay_sourcekind varchar(64) NOT NULL DEFAULT 'guided_help' CHECK (egcs_ay_sourcekind = 'guided_help'),
+  egcs_ay_discoveryscreens jsonb NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(egcs_ay_discoveryscreens) = 'array'),
+  egcs_ay_roles jsonb NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(egcs_ay_roles) = 'array'),
+  egcs_ay_enabled boolean NOT NULL DEFAULT true,
+  _deleted boolean NOT NULL DEFAULT false
+);
+CREATE UNIQUE INDEX ay_uq_guidedhelpactive ON "Agency_Guided_Help" (egcs_ay_agency, egcs_ay_guide) WHERE NOT _deleted;
 END $baseline$`.execute(db)
 }
 
@@ -711,6 +724,10 @@ ALTER TABLE "Agency_Profile" ADD CONSTRAINT "Agency_Profile_egcs_ay_claimreconci
 ALTER TABLE "Agency_Profile" ADD CONSTRAINT "Agency_Profile_egcs_ay_claimreconciliationstartstatus_fkey" FOREIGN KEY (egcs_ay_claimreconciliationstartstatus) REFERENCES "Common_Status"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Agency_Profile" ADD CONSTRAINT "ay_ref_profilegwcoanumber" FOREIGN KEY (egcs_ay_gwcoa_number) REFERENCES "Common_GWCOA"(egcs_cn_number) ON DELETE RESTRICT;
+ALTER TABLE "Agency_Guided_Help" ADD FOREIGN KEY (egcs_ay_agency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Agency_Guided_Help" ADD FOREIGN KEY (egcs_ay_guide) REFERENCES "Common_Guided_Help"(id) ON DELETE RESTRICT;
+ALTER TABLE "Agency_Guided_Help" ADD CONSTRAINT ay_ref_guidedhelppublication FOREIGN KEY (id, egcs_ay_publicationkind) REFERENCES "Common_Publication"(id, egcs_cn_kind) ON DELETE RESTRICT;
+ALTER TABLE "Agency_Guided_Help" ADD CONSTRAINT ay_ref_guidedhelpsource FOREIGN KEY (egcs_ay_sourceversion, egcs_ay_guide, egcs_ay_sourcekind) REFERENCES "Common_Publication_Version"(id, egcs_cn_publication, egcs_cn_kind) ON DELETE RESTRICT;
 END $baseline$`.execute(db)
 }
 
@@ -749,5 +766,6 @@ CREATE TRIGGER validate_agency_operational_catalog BEFORE INSERT OR UPDATE ON "A
 CREATE TRIGGER trg_create_default_agency_statuses AFTER INSERT ON "Agency_Profile" FOR EACH ROW EXECUTE FUNCTION create_default_agency_statuses();
 
 CREATE TRIGGER trg_enforce_agency_claim_reconciliation_statuses BEFORE INSERT OR UPDATE OF egcs_ay_claimreconciliationstartstatus, egcs_ay_claimreconciliationfinalstatus ON "Agency_Profile" FOR EACH ROW EXECUTE FUNCTION enforce_agency_claim_reconciliation_statuses();
+CREATE TRIGGER trg_guard_guidedhelpcatalog_authoring BEFORE DELETE OR UPDATE ON "Agency_Guided_Help" FOR EACH ROW EXECUTE FUNCTION trg_fn_guard_publication_authoring('publication');
 END $baseline$`.execute(db)
 }

@@ -5,7 +5,7 @@ import type { PublicationState } from '~~/shared/constants/system-lifecycle'
 const {
   name, description, icon, entityType, entityTypeLabelEn, entityTypeLabelFr, typeLabelKey, publicationState, publicationVersion = null,
   hasUnpublishedChanges = false, isCollapsed = false, isPublishing = false, isRetiring = false,
-  isMutationPending = false, canManage = false, canImport = false, publishLabelKey, retireLabelKey
+  isMutationPending = false, canManage = false, canRetire = undefined, canImport = false, versionLabelKey = 'transfer_payment.schema_version', publishLabelKey, retireLabelKey
 } = defineProps<{
   name: string
   description?: string
@@ -23,6 +23,8 @@ const {
   isMutationPending?: boolean
   canImport?: boolean
   canManage?: boolean
+  canRetire?: boolean
+  versionLabelKey?: string
   publishLabelKey: string
   retireLabelKey: string
 }>()
@@ -50,15 +52,19 @@ const badges = computed(() => [
   { lifecycleEngine: 'publication' as const, lifecycleState: publicationState },
   { variant: 'meta' as const, labelKey: typeLabelKey },
   ...(hasUnpublishedChanges ? [{ variant: 'warning' as const, labelKey: 'transfer_payment.unpublished_changes' }] : []),
-  ...(publicationVersion === null ? [] : [{ variant: 'code' as const, label: String(publicationVersion), prefixLabel: t('transfer_payment.schema_version') }])
+  ...(publicationVersion === null ? [] : [{ variant: 'code' as const, label: String(publicationVersion), prefixLabel: t(versionLabelKey) }])
 ])
 const actions = computed(() => [
   { label: t('review_schema_import.title'), icon: 'i-lucide-import', color: 'neutral' as const, variant: 'outline' as const, disabled: isMutationPending, visible: canImport && canManage && publicationState !== 'retired', onClick: () => emit('import') },
   { label: t(publishLabelKey), icon: 'i-lucide-upload', loading: isPublishing, disabled: isMutationPending, visible: canManage && (publicationState === 'draft' || (publicationState === 'published' && hasUnpublishedChanges)), onClick: () => emit('publish') },
-  { label: t(retireLabelKey), icon: 'i-lucide-archive', color: 'neutral' as const, variant: 'outline' as const, loading: isRetiring, disabled: isMutationPending, visible: canManage && publicationState === 'published', onClick: requestRetirement }
+  { label: t(retireLabelKey), icon: 'i-lucide-archive', color: 'neutral' as const, variant: 'outline' as const, loading: isRetiring, disabled: isMutationPending, visible: (canRetire ?? canManage) && publicationState === 'published', onClick: requestRetirement }
 ])
 </script>
 
 <template>
-  <CommonEntityHero :is-collapsed="isCollapsed" :icon="icon" :title="name" :description="description" :badges="badges" :actions="actions" />
+  <CommonEntityHero :is-collapsed="isCollapsed" :icon="icon" :title="name" :description="description" :badges="badges" :actions="actions">
+    <template v-if="$slots.actions" #actions>
+      <slot name="actions" />
+    </template>
+  </CommonEntityHero>
 </template>

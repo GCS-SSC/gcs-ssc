@@ -1,0 +1,30 @@
+{
+  "name": "@gcs-ssc/guided-help",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./contracts": "./src/contracts.ts",
+    "./checker": "./src/checker.ts",
+    "./runtime": "./src/runtime.ts",
+    "./authoring": "./src/authoring.ts",
+    "./markdown": "./src/markdown.ts",
+    "./session": "./src/session.ts",
+    "./style.css": "./src/style.css",
+    "./components/*": "./src/components/*"
+  },
+  "scripts": {
+    "test:unit": "vitest run --config vitest.config.ts",
+    "test:coverage": "vitest run --coverage --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@vue/compiler-dom": "3.5.28",
+    "@vue/compiler-sfc": "3.5.28",
+    "driver.js": "^1.4.0",
+    "zod": "4.3.6"
+  },
+  "peerDependencies": {
+    "vue": "^3.5.28"
+  }
+}

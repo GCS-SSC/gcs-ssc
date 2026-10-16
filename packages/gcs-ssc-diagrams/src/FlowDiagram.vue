@@ -12,8 +12,14 @@ const props = withDefaults(defineProps<{
   selectedNodeId?: string
   filename?: string
   direction?: 'auto' | 'vertical'
+  editable?: boolean
+  branchNodeIds?: string[]
 }>(), { direction: 'auto', filename: 'diagram' })
-const emit = defineEmits<{ 'select-node': [nodeId: string] }>()
+const emit = defineEmits<{
+  'select-node': [nodeId: string]
+  'add-node': [afterNodeId?: string]
+  'add-branch': [nodeId: string]
+}>()
 const root = ref<HTMLElement | null>(null)
 const canvas = ref<HTMLElement | null>(null)
 const flowSize = ref({ width: 0, height: 0 })
@@ -87,7 +93,7 @@ onBeforeUnmount(() => {
   observer?.disconnect()
   if (frame) cancelAnimationFrame(frame)
 })
-watch(() => [props.definition, props.direction], async () => {
+watch(() => [props.definition, props.direction, props.editable, props.branchNodeIds], async () => {
   await nextTick()
   scheduleEdges()
 }, { deep: true })
@@ -148,6 +154,9 @@ const exportDiagram = async (format: 'svg' | 'png') => {
           </defs>
           <path v-for="(edge, index) in edges" :key="index" :d="edge.path" class="flow-connection" :class="`flow-connection--${edge.kind}`" :marker-end="`url(#${markerId}-${edge.kind})`" />
         </svg>
+        <button v-if="editable && labels.addFirstNode" type="button" class="flow-export" data-export-ignore @click="emit('add-node')">
+          {{ labels.addFirstNode }}
+        </button>
         <ol class="flow-track" :aria-label="definition.orderLabel || definition.title">
           <li v-for="node in definition.nodes" :key="node.id" class="flow-step" :class="node.kind === 'start' || node.kind === 'end' ? 'flow-terminal' : 'flow-page'">
             <span v-if="node.kind === 'decision' && node.eyebrow" class="flow-decision-label">{{ node.eyebrow }}</span>
@@ -166,6 +175,14 @@ const exportDiagram = async (format: 'svg' | 'png') => {
               <svg v-if="node.selectLabel" class="flow-page-edit flow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10" /></svg>
             </component>
             <span v-for="(line, index) in node.kind === 'decision' ? node.lines : []" :key="index" class="flow-node-line flow-decision-line">{{ line }}</span>
+            <div v-if="editable && node.kind !== 'end'" class="flow-edit-controls" data-export-ignore>
+              <button v-if="labels.addNode" type="button" class="flow-export" :aria-label="`${labels.addNode}: ${node.title}`" @click="emit('add-node', node.id)">
+                {{ labels.addNode }}
+              </button>
+              <button v-if="labels.addBranch" type="button" class="flow-export" :aria-label="`${labels.addBranch}: ${node.title}`" :disabled="branchNodeIds !== undefined && !branchNodeIds.includes(node.id)" @click="emit('add-branch', node.id)">
+                {{ labels.addBranch }}
+              </button>
+            </div>
             <div v-if="node.routes?.length && !directRoute(node)" class="flow-routes">
               <div
                 v-for="(route, index) in node.routes" :key="index" class="flow-route" :class="`flow-route--${route.kind}`"
@@ -252,6 +269,8 @@ const exportDiagram = async (format: 'svg' | 'png') => {
 .flow-export { border: 1px solid var(--ui-border); border-radius: .375rem; padding: .4rem .65rem; font-size: .75rem; color: var(--ui-text); cursor: pointer; }
 .flow-export:hover { background: var(--ui-bg-elevated); }
 .flow-export:focus-visible { outline: 2px solid var(--ui-primary); outline-offset: 2px; }
+.flow-edit-controls { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
+.flow-edit-controls .flow-export:disabled { cursor: not-allowed; }
 .flow-export:disabled { opacity: .5; cursor: wait; }
 .flow-toolbar [role="alert"] { color: var(--ui-error); width: 100%; font-size: .875rem; }
 .flow-icon { width: 1rem; height: 1rem; flex-shrink: 0; }
@@ -269,5 +288,5 @@ const exportDiagram = async (format: 'svg' | 'png') => {
 .flow-route--failure { border-color: color-mix(in srgb, var(--ui-error) 40%, var(--ui-border)); }
 .flow-route--failure::before { background: var(--ui-error); }
 .flow-route--failure .flow-route-label, .flow-route--failure .flow-route-target { color: var(--ui-error); }
-@media print { .flow-toolbar { display: none; } .flow-scroll { overflow: visible; } }
+@media print { .flow-toolbar, .flow-edit-controls { display: none; } .flow-scroll { overflow: visible; } }
 </style>
