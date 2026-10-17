@@ -1,13 +1,16 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- concise amendment UI callbacks are covered by focused tests. */
-import { computed, ref, useId, watch } from 'vue'
+import { computed, onUnmounted, ref, useId, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { FetchError } from 'ofetch'
 import type { TableColumnInput } from '~/composables/useTableColumns'
+import type { AdminCommonLookupResponseItem } from '~~/shared/types/admin-common-ui'
+import { hasRequiredAmendmentSubtypeSelections } from '~/utils/agreement-amendment-scope'
 import { appRouteLocations } from '~/utils/route-locations'
 import type {
   FundingCaseAgreementAmendmentListResponse,
-  FundingCaseAgreementAmendmentRow
+  FundingCaseAgreementAmendmentRow,
+  FundingCaseAgreementProfileRow
 } from '~~/shared/types/funding-case-agreement-ui'
 import { compareMoney, formatMoneyText, moneyFromCents, moneyToCents, parseMoney } from '~~/shared/utils/money'
 
@@ -32,10 +35,32 @@ const selectedSubtypeIds: Ref<string[]> = ref([])
 const amendmentNameEn: Ref<string> = ref('')
 const amendmentNameFr: Ref<string> = ref('')
 let subtypeFilterRequest = 0
+let subtypeRequirementRequest = 0
+const resolvedTypeMetadata: Ref<AmendmentTypeMetadata[]> = ref([])
+const requiredSubtypeIdsByType: Ref<Record<string, string[]>> = ref({})
+const subtypeRequirementFailed: Ref<boolean> = ref(false)
 const isSaving: Ref<boolean> = ref(false)
-type AmendmentTypeLookupResponse = {
-  items: Array<{ id: string, egcs_tp_requiresamendmentsubtype: boolean }>
+const isOpeningCreate: Ref<boolean> = ref(false)
+let createGeneration = 0
+let createDisposed = false
+let createOperation: symbol | null = null
+const invalidateCreateActions = () => {
+  createGeneration += 1
+  createOperation = null
+  subtypeFilterRequest += 1
+  subtypeRequirementRequest += 1
+  resolvedTypeMetadata.value = []
+  requiredSubtypeIdsByType.value = {}
+  subtypeRequirementFailed.value = false
+  isSaving.value = false
+  isOpeningCreate.value = false
 }
+onUnmounted(() => {
+  createDisposed = true
+  invalidateCreateActions()
+})
+type AmendmentTypeMetadata = { id: string, egcs_tp_amended: string, egcs_tp_requiresamendmentsubtype: boolean }
+type AmendmentTypeLookupResponse = { items: AmendmentTypeMetadata[] }
 const amendmentTypesEndpoint = computed(() => `/api/agreements/${agreementId}/amendments/lookups/types`)
 const amendmentTypesLookup = useFetch<AmendmentTypeLookupResponse, FetchError, string>(
   amendmentTypesEndpoint,
@@ -71,10 +96,11 @@ watch(search, () => {
   pagination.value.pageIndex = 0
 })
 watch(() => agreementId, () => {
+  invalidateCreateActions()
   pagination.value.pageIndex = 0
   isCreateOpen.value = false
 }, { flush: 'sync' })
-const canCreateAmendment = computed(() => canCreate && response.value.can_create)
+const hasOpenAmendment = computed(() => response.value.items.some(amendment => amendment.egcs_fc_isopen === true))
 const ZERO_MONEY = parseMoney('0')
 const formatBudgetDifference = (amendment: FundingCaseAgreementAmendmentRow): string => {
   const budgetDifferences = amendment.budget_differences ?? []
@@ -89,9 +115,21 @@ const formatBudgetDifference = (amendment: FundingCaseAgreementAmendmentRow): st
   }).join(' / ')
 }
 const hasAmendmentName = computed(() => amendmentNameEn.value.trim().length > 0 || amendmentNameFr.value.trim().length > 0)
-const subtypeRequired = computed(() => amendmentTypesLookup.data.value.items.some(type =>
-  selectedTypeIds.value.includes(String(type.id)) && type.egcs_tp_requiresamendmentsubtype
-))
+const onResolvedTypes = (items: AdminCommonLookupResponseItem[]) => {
+  if (createDisposed || !isCreateOpen.value) return
+  resolvedTypeMetadata.value = items.flatMap(item => typeof item.id === 'string'
+    && typeof item.egcs_tp_amended === 'string' && typeof item.egcs_tp_requiresamendmentsubtype === 'boolean'
+    ? [{ id: item.id, egcs_tp_amended: item.egcs_tp_amended, egcs_tp_requiresamendmentsubtype: item.egcs_tp_requiresamendmentsubtype }]
+    : [])
+}
+const selectedTypes = computed(() => {
+  const byId = new Map([...amendmentTypesLookup.data.value.items, ...resolvedTypeMetadata.value].map(type => [type.id, type]))
+  return selectedTypeIds.value.flatMap(id => byId.has(id) ? [byId.get(id)!] : [])
+})
+const typeMetadataReady = computed(() => selectedTypes.value.length === selectedTypeIds.value.length)
+const requiredTypeIds = computed(() => selectedTypes.value.filter(type => type.egcs_tp_requiresamendmentsubtype).map(type => type.id))
+const subtypeRequired = computed(() => requiredTypeIds.value.length > 0)
+const hasRequiredSubtypes = computed(() => hasRequiredAmendmentSubtypeSelections(requiredTypeIds.value, selectedSubtypeIds.value, requiredSubtypeIdsByType.value))
 const subtypeQuery = computed(() => ({ amendment_type_ids: selectedTypeIds.value.join(',') }))
 const fetchAmendmentSubtypes = $fetch as unknown as (
   url: string,
@@ -108,41 +146,126 @@ watch(selectedTypeIds, async typeIds => {
       `/api/agreements/${agreementId}/amendments/lookups/subtypes`,
       { query: { amendment_type_ids: typeIds.join(',') } }
     )
-    if (requestId !== subtypeFilterRequest) return
+    if (requestId !== subtypeFilterRequest || !isCreateOpen.value || createDisposed) return
     const validSubtypeIds = new Set(subtypeResponse.items.map(item => String(item.id)))
     selectedSubtypeIds.value = selectedSubtypeIds.value.filter(subtypeId => validSubtypeIds.has(subtypeId))
   } catch (error: unknown) {
-    if (requestId === subtypeFilterRequest) showError(error)
+    if (requestId === subtypeFilterRequest && isCreateOpen.value && !createDisposed) showError(error)
   }
 })
 
-const openCreate = () => {
-  if (!canCreateAmendment.value) return
-  selectedTypeIds.value = []
-  selectedSubtypeIds.value = []
-  amendmentNameEn.value = ''
-  amendmentNameFr.value = ''
-  isCreateOpen.value = true
+const loadRequiredSubtypes = async () => {
+  const requestId = ++subtypeRequirementRequest
+  const owner = agreementId
+  const generation = createGeneration
+  const typeIds = [...requiredTypeIds.value]
+  const isCurrent = () => !createDisposed && isCreateOpen.value && owner === agreementId && generation === createGeneration && requestId === subtypeRequirementRequest
+  requiredSubtypeIdsByType.value = {}
+  subtypeRequirementFailed.value = false
+  if (typeIds.length === 0 || !isCreateOpen.value) return
+  try {
+    const responses = await Promise.all(typeIds.map(async id => ({ id, response: await fetchAmendmentSubtypes(
+      `/api/agreements/${owner}/amendments/lookups/subtypes`, { query: { amendment_type_ids: id } }
+    ) })))
+    if (!isCurrent()) return
+    requiredSubtypeIdsByType.value = Object.fromEntries(responses.map(({ id, response }) => [id, response.items.map(item => String(item.id))]))
+  } catch (error: unknown) {
+    if (isCurrent()) {
+      subtypeRequirementFailed.value = true
+      showError(error)
+    }
+  }
+}
+watch(requiredTypeIds, loadRequiredSubtypes)
+watch(isCreateOpen, open => {
+  if (open) return
+  subtypeFilterRequest += 1
+  subtypeRequirementRequest += 1
+  resolvedTypeMetadata.value = []
+  requiredSubtypeIdsByType.value = {}
+  subtypeRequirementFailed.value = false
+}, { flush: 'sync' })
+
+const warnCreatePrerequisite = (missingAssignment = false) => toast.add({
+  title: t('common.warning'),
+  description: t(missingAssignment ? 'assignments.read_only_description' : 'agreement.child_records.work_prerequisite'),
+  color: 'warning'
+})
+const checkCreatePrerequisites = async (owner: string, shouldProceed: () => boolean): Promise<boolean> => {
+  try {
+    const [record, roster, collection] = await Promise.all([
+      $fetch<FundingCaseAgreementProfileRow, string>(`/api/agreements/${owner}`),
+      $fetch<{ is_assigned: boolean }, string>(`/api/entity-assignments/fundingcaseagreement/${owner}`),
+      $fetch<FundingCaseAgreementAmendmentListResponse, string>(`/api/agreements/${owner}/amendments`)
+    ])
+    if (!shouldProceed()) return false
+    if (roster.is_assigned !== true) {
+      warnCreatePrerequisite(true)
+      return false
+    }
+    if (record.can_create_child_records_role === true && record.can_create_child_records === true && collection.can_create === true) return true
+  } catch {
+    if (!shouldProceed()) return false
+  }
+  if (shouldProceed()) warnCreatePrerequisite()
+  return false
+}
+const openCreate = async () => {
+  if (!canCreate || createDisposed || isOpeningCreate.value) return
+  invalidateCreateActions()
+  const owner = agreementId
+  const generation = createGeneration
+  const token = Symbol('amendment-open')
+  createOperation = token
+  isOpeningCreate.value = true
+  const shouldProceed = () => !createDisposed && agreementId === owner && canCreate
+    && createGeneration === generation && createOperation === token
+  try {
+    if (!await checkCreatePrerequisites(owner, shouldProceed) || !shouldProceed()) return
+    selectedTypeIds.value = []
+    selectedSubtypeIds.value = []
+    amendmentNameEn.value = ''
+    amendmentNameFr.value = ''
+    isCreateOpen.value = true
+  } finally {
+    if (createOperation === token) {
+      createOperation = null
+      isOpeningCreate.value = false
+    }
+  }
 }
 
 const createAmendment = async () => {
-  if (!hasAmendmentName.value || selectedTypeIds.value.length === 0 || (subtypeRequired.value && selectedSubtypeIds.value.length === 0) || isSaving.value) return
+  if (!canCreate || createDisposed || !isCreateOpen.value || !hasAmendmentName.value || selectedTypeIds.value.length === 0 || (!typeMetadataReady.value || !hasRequiredSubtypes.value) || isSaving.value) return
 
+  const payload = {
+    egcs_fc_name_en: amendmentNameEn.value,
+    egcs_fc_name_fr: amendmentNameFr.value,
+    amendment_type_ids: [...selectedTypeIds.value],
+    amendment_subtype_ids: [...selectedSubtypeIds.value]
+  }
+  const owner = agreementId
+  const generation = createGeneration
+  const token = Symbol('amendment-create')
+  createOperation = token
+  const shouldProceed = () => !createDisposed && agreementId === owner && canCreate
+    && createGeneration === generation && createOperation === token
   try {
     isSaving.value = true
-    await saveJson(`/api/agreements/${agreementId}/amendments`, 'POST', {
-      egcs_fc_name_en: amendmentNameEn.value,
-      egcs_fc_name_fr: amendmentNameFr.value,
-      amendment_type_ids: selectedTypeIds.value,
-      amendment_subtype_ids: selectedSubtypeIds.value
-    })
+    if (!await checkCreatePrerequisites(owner, shouldProceed) || !shouldProceed()) return
+    await saveJson(`/api/agreements/${owner}/amendments`, 'POST', payload)
+    if (!shouldProceed()) return
     isCreateOpen.value = false
     await refresh()
+    if (!shouldProceed()) return
     toast.add({ title: t('common.success'), description: t('agreement.amendments.created_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (shouldProceed()) showError(error)
   } finally {
-    isSaving.value = false
+    if (createOperation === token) {
+      createOperation = null
+      isSaving.value = false
+    }
   }
 }
 </script>
@@ -150,7 +273,7 @@ const createAmendment = async () => {
 <template>
   <div class="w-full">
     <UAlert
-      v-if="canCreate && !canCreateAmendment"
+      v-if="canCreate && hasOpenAmendment"
       class="mb-4"
       color="info"
       icon="i-lucide-info"
@@ -164,7 +287,7 @@ const createAmendment = async () => {
       :loading="status === 'pending'"
       :request-status="status"
       :button-label="t('agreement.amendments.add')"
-      :show-button="canCreateAmendment"
+      :show-button="canCreate"
       :search-placeholder="t('agreement.amendments.search')"
       @add="openCreate"
       @retry="refresh">
@@ -250,7 +373,8 @@ const createAmendment = async () => {
               value-key="id"
               label-en-key="egcs_tp_name_en"
               label-fr-key="egcs_tp_name_fr"
-              required />
+              required
+              @resolved-items="onResolvedTypes" />
           </UFormField>
           <UFormField
             v-if="selectedTypeIds.length > 0"
@@ -265,12 +389,13 @@ const createAmendment = async () => {
               :query="subtypeQuery"
               :required="subtypeRequired" />
           </UFormField>
+          <UButton v-if="subtypeRequirementFailed" :label="t('common.retry')" color="neutral" variant="ghost" @click="loadRequiredSubtypes" />
           <div class="flex justify-end gap-2 pt-4">
             <UButton class="cursor-default" color="neutral" variant="ghost" :label="t('common.cancel')" @click="isCreateOpen = false" />
             <CommonSaveButton
               :label="t('common.add')"
               :loading="isSaving"
-              :disabled="isSaving || !hasAmendmentName || selectedTypeIds.length === 0 || (subtypeRequired && selectedSubtypeIds.length === 0)" />
+              :disabled="isSaving || !hasAmendmentName || selectedTypeIds.length === 0 || (!typeMetadataReady || !hasRequiredSubtypes)" />
           </div>
         </form>
       </template>

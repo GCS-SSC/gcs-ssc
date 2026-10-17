@@ -9,6 +9,7 @@ import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 
 const QuerySchema = PaginationSchema.extend({
   permission_action: z.enum(['create', 'update']).default('create'),
+  amendment_id: PositivePostgresBigintIdSchema.optional(),
   ids: z.union([
     PositivePostgresBigintIdSchema,
     z.array(PositivePostgresBigintIdSchema).max(100, { error: 'validation.invalid_selection' })
@@ -36,8 +37,11 @@ export default defineEventHandler(async event => {
     return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')
   }
   return await executeFreshReadSnapshot(event, async db => {
-    const { page, limit, search, permission_action, ids } = await getValidatedQueryI18n(event, QuerySchema)
-    const agreementContext = await authorizeAgreementResource(event, permission_action, agreementId, db, { freshAuth: true })
+    const { page, limit, search, permission_action, amendment_id, ids } = await getValidatedQueryI18n(event, QuerySchema)
+    const agreementContext = await authorizeAgreementResource(event, permission_action, agreementId, db, {
+      freshAuth: true,
+      assignmentTarget: amendment_id ? { entityType: 'fundingcaseamendment', entityId: amendment_id } : undefined
+    })
     if (!agreementContext) {
       return await badRequest(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
     }

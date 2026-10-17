@@ -1226,9 +1226,9 @@ export const patchAgreementClaimReconcileLineItem = async (
     ...(patchedReconciled === undefined
       ? {}
       : { egcs_fc_reconciled: databaseMoneyValue(patchedReconciled) }),
-    ...(patchedSampled === undefined
-      ? {}
-      : { egcs_fc_sampled: patchedSampled === null ? null : databaseMoneyValue(patchedSampled) })
+    ...(Object.hasOwn(patchValues, 'egcs_fc_sampled')
+      ? { egcs_fc_sampled: patchedSampled == null ? null : databaseMoneyValue(patchedSampled) }
+      : {})
   }
 
   if (

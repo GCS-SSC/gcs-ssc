@@ -1,8 +1,15 @@
 import { patchAgreementClaimReconcileLineItem, prepareAgreementClaimRoute } from '~~/server/utils/agreement-claim'
 import { badRequest } from '~~/server/utils/api-errors'
 import { resolveClaimReconcileLineAssignmentTarget } from '~~/server/utils/agreement-assignment-target'
+import { authorize } from '~~/server/utils/authorize'
+import { resolveAgreementScopeContext } from '~~/server/utils/agreement'
 
 export default defineEventHandler(async event => {
+  // Check the owning role before child existence; exact assignment is checked below.
+  await authorize(event, 'agreement', 'update', async () => ({
+    scope: (await resolveAgreementScopeContext(getRouterParam(event, 'id') ?? '', event.context.$db))?.scope
+      ?? { type: 'global' as const }
+  }))
   const lineId = getRouterParam(event, 'lineId')
   if (!lineId) {
     return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')

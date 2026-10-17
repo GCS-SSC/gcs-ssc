@@ -2,6 +2,7 @@ import { badRequest, notFound } from '~~/server/utils/api-errors'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import { resolveDraftAgreementAmendmentActivityVersion } from '~~/server/utils/agreement-amendment'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
+import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -9,6 +10,7 @@ export default defineEventHandler(async event => {
   const amendmentId = getRouterParam(event, 'amendmentId')
   const childId = getRouterParam(event, 'childId')
   if (!agreementId || !amendmentId || !childId) return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')
+  if (!isPositivePostgresBigintText(childId)) return await badRequest(event, 'AGREEMENT_ACTIVITY_NOT_FOUND', 'apiErrors.agreement.activity_not_found')
   const agreementContext = await authorizeAgreementResource(event, 'delete', agreementId, db, {
     assignmentTarget: { entityType: 'fundingcaseamendment', entityId: amendmentId }
   })

@@ -416,6 +416,9 @@ export interface FundingCaseAgreementForecastRow extends FundingCaseAgreementFor
 }
 
 export interface FundingCaseAgreementForecastLineItemRow extends FundingCaseAgreementForecastLineItemItem {
+  budget_line_stable_id: string
+  budget_line_available: boolean
+  budget_line_description?: string | null
   egcs_fc_fundingsources: Array<{
     egcs_fc_fundingsubtype: string
     egcs_fc_amount: Money
@@ -447,6 +450,8 @@ export type FundingCaseAgreementForecastForm = Partial<FundingCaseAgreementForec
 export type FundingCaseAgreementForecastLineItemForm = Partial<FundingCaseAgreementForecastLineItemItem>
 
 export interface FundingCaseAgreementClaimRow extends FundingCaseAgreementClaimItem, BusinessRecordStateFields {
+  fiscal_year_id?: string
+  fiscal_year_available?: boolean
   hasPositiveCompletionTerminus?: boolean
   fiscal_year_display?: string | null
   submitting_proponent_name_en?: string | null
@@ -463,6 +468,7 @@ export interface FundingCaseAgreementClaimLineItemRow extends FundingCaseAgreeme
     funding_subtype_name_fr?: string | null
   }>
   claim_fiscal_year_id: string
+  budget_line_item_id?: string | null
   budget_fiscal_year_id?: string | null
   budget_fiscal_year_display?: string | null
   organization_cost_category_name_en?: string | null

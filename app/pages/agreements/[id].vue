@@ -459,13 +459,14 @@ const cancel = () => {
             <AgreementBudgetTab
               v-else-if="selectedTab === 'budget'"
               :agreement-id="id"
+              :action-target="{ kind: 'agreement', agreementId: id }"
               :currency="profile.egcs_fc_currency"
-              :can-create="canCreateChildRecords"
-              :can-update="canUpdateChildRecords"
-              :can-delete="canDeleteChildRecords"
-              :can-create-fiscal-year="canCreateChildRecords"
-              :can-update-fiscal-year="canUpdateChildRecords"
-              :can-delete-fiscal-year="canDeleteChildRecords" />
+              :can-create="canCreateFinancialChildRole"
+              :can-update="canUpdateFinancialChildRole"
+              :can-delete="canDeleteFinancialChildRole"
+              :can-create-fiscal-year="canCreateFinancialChildRole"
+              :can-update-fiscal-year="canUpdateFinancialChildRole"
+              :can-delete-fiscal-year="canDeleteFinancialChildRole" />
 
             <AgreementFinancialSummaryTab
               v-else-if="selectedTab === 'financial-summary'"
@@ -607,9 +608,8 @@ const cancel = () => {
               v-else-if="selectedTab === 'forecasts'"
               :agreement-id="id"
               :currency="profile.egcs_fc_currency"
-              :can-create="canCreateChildRecords"
-              :can-update="canUpdateChildRecords"
-              :can-delete="canDeleteChildRecords" />
+              :can-create-role="canCreateFinancialChildRole"
+              :can-delete-role="canDeleteFinancialChildRole" />
 
             <AgreementClaimsTab
               v-else-if="selectedTab === 'claims'"
@@ -630,14 +630,15 @@ const cancel = () => {
             <AgreementActivitiesTab
               v-else-if="selectedTab === 'activities'"
               :agreement-id="id"
-              :can-create="canCreateChildRecords"
-              :can-update="canUpdateChildRecords"
-              :can-delete="canDeleteChildRecords" />
+              :action-target="{ kind: 'agreement', agreementId: id }"
+              :can-create="canCreateFinancialChildRole"
+              :can-update="canUpdateFinancialChildRole"
+              :can-delete="canDeleteFinancialChildRole" />
 
             <AgreementAmendmentsTab
               v-else-if="selectedTab === 'amendments'"
               :agreement-id="id"
-              :can-create="canCreateChildRecords" />
+              :can-create="canCreateFinancialChildRole" />
 
             <AgreementDocumentsTab
               v-else-if="selectedTab === 'documents'"

@@ -16,6 +16,7 @@ const {
   updateMethod = 'PATCH',
   schema,
   initialNewItem,
+  beforeOpen,
   beforeSave,
   beforeDelete,
   columns,
@@ -47,6 +48,7 @@ const {
   updateMethod?: 'PATCH' | 'PUT'
   schema: z.ZodTypeAny
   initialNewItem?: Partial<T> | null
+  beforeOpen?: (action: 'create' | 'update', original: T | null, shouldProceed: () => boolean) => Promise<boolean>
   beforeSave?: (state: Partial<T>, original: T | null, shouldProceed: () => boolean) => Promise<boolean>
   beforeDelete?: (id: string, shouldProceed: () => boolean) => Promise<boolean | undefined>
   columns: TableColumnInput<T>[]
@@ -114,6 +116,7 @@ const {
   updateMethod,
   schema,
   initialNewItem,
+  beforeOpen,
   beforeSave,
   beforeDelete,
   buttonLabel,

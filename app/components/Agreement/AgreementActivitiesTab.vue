@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onUnmounted, watch } from 'vue'
+import { useAgreementChildActionPrerequisites, type AgreementChildActionTarget } from '~/composables/useAgreementChildActionPrerequisites'
 import type { FundingCaseAgreementActivityForm, FundingCaseAgreementActivityRow } from '~~/shared/types/funding-case-agreement-ui'
 import { FundingCaseAgreementActivityCreateSchema } from '~~/shared/types/schemas'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
@@ -8,11 +9,12 @@ import AgreementActivityResponsiblePartiesField from './Fields/AgreementActivity
 
 type AgreementActivityCrudRow = FundingCaseAgreementActivityRow & Record<string, unknown>
 
-const { agreementId, canCreate, canUpdate, canDelete, apiBase, snapshotItems, staticMode = false, embedded = false } = defineProps<{
+const { agreementId, canCreate, canUpdate, canDelete, apiBase, snapshotItems, actionTarget, staticMode = false, embedded = false } = defineProps<{
   agreementId: string
   canCreate: boolean
   canUpdate: boolean
   canDelete: boolean
+  actionTarget?: AgreementChildActionTarget
   apiBase?: string
   snapshotItems?: FundingCaseAgreementActivityRow[]
   staticMode?: boolean
@@ -20,6 +22,35 @@ const { agreementId, canCreate, canUpdate, canDelete, apiBase, snapshotItems, st
 }>()
 
 const { t } = useI18n()
+const confirmDelete = useDeleteConfirm()
+const { check } = useAgreementChildActionPrerequisites(() => actionTarget)
+let actionGeneration = 0
+watch(() => actionTarget ? `${actionTarget.kind}:${actionTarget.agreementId}:${actionTarget.kind === 'amendment' ? actionTarget.amendmentId : ''}` : '', () => {
+  actionGeneration += 1
+}, { flush: 'sync' })
+onUnmounted(() => {
+  actionGeneration += 1
+})
+const permitted = (action: 'create' | 'update' | 'delete') => !staticMode && (action === 'create' ? canCreate : action === 'update' ? canUpdate : canDelete)
+const beforeOpen = (action: 'create' | 'update', _original: unknown, current: () => boolean) => {
+  const generation = actionGeneration
+  return permitted(action) ? check(action, 'activity', () => generation === actionGeneration && current() && permitted(action)) : Promise.resolve(false)
+}
+const beforeSave = (_state: unknown, original: unknown, current: () => boolean) =>
+  beforeOpen(original ? 'update' : 'create', original, current)
+/**
+ * Rechecks the same Activity owner before and after destructive confirmation.
+ * @param _id - Resource ID retained by the owning CRUD request.
+ * @param current - Whether the captured CRUD operation still owns its context.
+ * @returns Whether the confirmed deletion may proceed.
+ */
+const beforeDelete = async (_id: string, current: () => boolean) => {
+  const generation = actionGeneration
+  const proceed = () => generation === actionGeneration && current() && permitted('delete')
+  if (!proceed() || !await check('delete', 'activity', proceed)) return false
+  if (!await confirmDelete({ description: t('agency.delete_confirm') }) || !proceed()) return false
+  return await check('delete', 'activity', proceed) && proceed()
+}
 const { formatDate } = useDateHelpers()
 const { getBilingualValue } = useBilingualValue()
 const resourceBase = computed(() => apiBase ?? `/api/agreements/${agreementId}`)
@@ -73,6 +104,9 @@ const bilingualColumns: BilingualColumnConfig<AgreementActivityCrudRow>[] = [
     :post-url="canCreate && !staticMode ? `${resourceBase}/activities` : undefined"
     :update-url-base="canUpdate && !staticMode ? `${resourceBase}/activities` : undefined"
     :delete-url-base="canDelete && !staticMode ? `${resourceBase}/activities` : undefined"
+    :before-open="actionTarget ? beforeOpen : undefined"
+    :before-save="actionTarget ? beforeSave : undefined"
+    :before-delete="actionTarget ? beforeDelete : undefined"
     :schema="FundingCaseAgreementActivityCreateSchema"
     :initial-new-item="{ outcome_ids: [], responsible_party_ids: [] }"
     :columns="columns"
@@ -154,6 +188,7 @@ const bilingualColumns: BilingualColumnConfig<AgreementActivityCrudRow>[] = [
           <AgreementActivityResponsiblePartiesField
             v-model:model="(state as FundingCaseAgreementActivityForm).responsible_party_ids"
             :agreement-id="agreementId"
+            :amendment-id="actionTarget?.kind === 'amendment' ? actionTarget.amendmentId : undefined"
             :permission-action="state.id ? 'update' : 'create'" />
         </div>
 
@@ -161,6 +196,7 @@ const bilingualColumns: BilingualColumnConfig<AgreementActivityCrudRow>[] = [
           <AgreementActivityOutcomesField
             v-model:model="(state as FundingCaseAgreementActivityForm).outcome_ids"
             :agreement-id="agreementId"
+            :amendment-id="actionTarget?.kind === 'amendment' ? actionTarget.amendmentId : undefined"
             :permission-action="state.id ? 'update' : 'create'" />
         </div>
 

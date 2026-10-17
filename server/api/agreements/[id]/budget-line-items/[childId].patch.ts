@@ -165,16 +165,17 @@ const updateBudgetLineItem = async (
     egcs_fc_fundingsources,
     ...nonMoneyPatchValues
   } = patchValues
-  return await db
-    .updateTable('Funding_Case_Agreement_Budget_Line_Item')
-    .set({
-      ...nonMoneyPatchValues,
-      ...(egcs_fc_totalamount === undefined ? {} : { egcs_fc_totalamount: databaseMoneyValue(egcs_fc_totalamount) }),
-      ...(egcs_fc_programfunding === undefined ? {} : { egcs_fc_programfunding: databaseMoneyValue(egcs_fc_programfunding) })
-    })
-    .where('id', '=', childRowId)
-    .where('_deleted', '=', false)
-    .returning('id')
+  const databasePatchValues = {
+    ...nonMoneyPatchValues,
+    ...(egcs_fc_totalamount === undefined ? {} : { egcs_fc_totalamount: databaseMoneyValue(egcs_fc_totalamount) }),
+    ...(egcs_fc_programfunding === undefined ? {} : { egcs_fc_programfunding: databaseMoneyValue(egcs_fc_programfunding) })
+  }
+  const lineQuery = Object.keys(databasePatchValues).length > 0
+    ? db.updateTable('Funding_Case_Agreement_Budget_Line_Item').set(databasePatchValues)
+        .where('id', '=', childRowId).where('_deleted', '=', false)
+    : db.selectFrom('Funding_Case_Agreement_Budget_Line_Item')
+        .where('id', '=', childRowId).where('_deleted', '=', false)
+  return await ('returning' in lineQuery ? lineQuery.returning('id') : lineQuery.select('id'))
     .executeTakeFirstOrThrow()
 }
 
@@ -233,6 +234,7 @@ const isEntityResponse = (value: unknown): value is { id: string | number } =>
 const assertClaimLinkedBudgetLineCanMove = async (
   event: H3Event,
   db: AgreementBudgetLineDb,
+  agreementId: string,
   existing: {
     egcs_fc_budgetlineitemidentity: string
     egcs_fc_fundingagreementbudgetfiscalyear: string | number
@@ -254,11 +256,14 @@ const assertClaimLinkedBudgetLineCanMove = async (
       'Funding_Case_Agreement_Claim.id',
       'Funding_Case_Agreement_Claim_Line_Item.egcs_fc_fundingagreementclaim'
     )
-    .where(
-      'Funding_Case_Agreement_Claim_Line_Item.egcs_fc_fundingagreementbudgetlineitem',
-      '=',
-      String(existing.egcs_fc_budgetlineitemidentity)
+    .innerJoin(
+      'Funding_Case_Agreement_Budget_Line_Item',
+      'Funding_Case_Agreement_Budget_Line_Item.id',
+      'Funding_Case_Agreement_Claim_Line_Item.egcs_fc_fundingagreementbudgetlineitem'
     )
+    .where('Funding_Case_Agreement_Claim.egcs_fc_fundingagreement', '=', agreementId)
+    .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreement', '=', agreementId)
+    .where(budgetLineItemStableId, '=', String(existing.egcs_fc_budgetlineitemidentity))
     .where('Funding_Case_Agreement_Claim_Line_Item._deleted', '=', false)
     .where('Funding_Case_Agreement_Claim._deleted', '=', false)
     .select('Funding_Case_Agreement_Claim_Line_Item.id')
@@ -292,7 +297,7 @@ const resolveBudgetLinePatchInput = async (
     return { response: referenceGuard.response }
   }
 
-  const claimMoveGuard = await assertClaimLinkedBudgetLineCanMove(event, db, existing, patchValues)
+  const claimMoveGuard = await assertClaimLinkedBudgetLineCanMove(event, db, agreementId, existing, patchValues)
   if (claimMoveGuard) {
     return { response: claimMoveGuard }
   }

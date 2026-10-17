@@ -64,7 +64,7 @@ export default defineEventHandler(async event => {
   return {
     ...agreement,
     can_read_agreement: canReadAgreement,
-    ...(['fundingcaseagreementclaim', 'fundingcaseforecast', 'fundingcasemonitor'].includes(target.entityType)
+    ...(['fundingcaseagreementclaim', 'fundingcaseforecast', 'fundingcasemonitor', 'fundingcaseamendment'].includes(target.entityType)
       ? {
           can_create_agreement_role: Boolean(scopeContext && auth.userAbilities.authorize('agreement', 'create', scopeContext.scope)),
           can_update_agreement_role: Boolean(scopeContext && auth.userAbilities.authorize('agreement', 'update', scopeContext.scope)),

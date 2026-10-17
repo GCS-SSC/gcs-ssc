@@ -24,14 +24,29 @@ export default defineEventHandler(async event => {
     const row = await trx.selectFrom('Funding_Case_Agreement_Budget_Fiscal_Year').select(['id', 'egcs_fc_originalbudgetfiscalyear']).where(budgetFiscalYearStableId, '=', childId).where('egcs_fc_budgetversion', '=', versionId).where('_deleted', '=', false).executeTakeFirst()
     if (!row) return await notFound(event, 'AGREEMENT_BUDGET_FISCAL_YEAR_NOT_FOUND', 'apiErrors.agreement.budget_fiscal_year_not_found')
     const [claim, payment, claimLine] = await Promise.all([
-      trx.selectFrom('Funding_Case_Agreement_Claim').select('id').where('egcs_fc_fiscalyear', '=', row.egcs_fc_originalbudgetfiscalyear ?? row.id).where('_deleted', '=', false).executeTakeFirst(),
-      trx.selectFrom('Funding_Case_Agreement_Payment').select('id').where('egcs_fc_fiscalyear', '=', row.egcs_fc_originalbudgetfiscalyear ?? row.id).where('_deleted', '=', false).executeTakeFirst(),
+      trx.selectFrom('Funding_Case_Agreement_Claim')
+        .innerJoin('Funding_Case_Agreement_Budget_Fiscal_Year', 'Funding_Case_Agreement_Budget_Fiscal_Year.id', 'Funding_Case_Agreement_Claim.egcs_fc_fiscalyear')
+        .select('Funding_Case_Agreement_Claim.id')
+        .where('Funding_Case_Agreement_Claim.egcs_fc_fundingagreement', '=', agreementId)
+        .where('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fundingagreement', '=', agreementId)
+        .where(budgetFiscalYearStableId, '=', row.egcs_fc_originalbudgetfiscalyear ?? row.id)
+        .where('Funding_Case_Agreement_Claim._deleted', '=', false).executeTakeFirst(),
+      trx.selectFrom('Funding_Case_Agreement_Payment')
+        .innerJoin('Funding_Case_Agreement_Budget_Fiscal_Year', 'Funding_Case_Agreement_Budget_Fiscal_Year.id', 'Funding_Case_Agreement_Payment.egcs_fc_fiscalyear')
+        .select('Funding_Case_Agreement_Payment.id')
+        .where('Funding_Case_Agreement_Payment.egcs_fc_fundingagreement', '=', agreementId)
+        .where('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fundingagreement', '=', agreementId)
+        .where(budgetFiscalYearStableId, '=', row.egcs_fc_originalbudgetfiscalyear ?? row.id)
+        .where('Funding_Case_Agreement_Payment._deleted', '=', false).executeTakeFirst(),
       trx.selectFrom('Funding_Case_Agreement_Budget_Line_Item')
+        .innerJoin('Funding_Case_Agreement_Budget_Fiscal_Year', 'Funding_Case_Agreement_Budget_Fiscal_Year.id', 'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreementbudgetfiscalyear')
         .innerJoin('Funding_Case_Agreement_Claim_Line_Item', 'Funding_Case_Agreement_Claim_Line_Item.egcs_fc_fundingagreementbudgetlineitem', 'Funding_Case_Agreement_Budget_Line_Item.id')
         .innerJoin('Funding_Case_Agreement_Claim', 'Funding_Case_Agreement_Claim.id', 'Funding_Case_Agreement_Claim_Line_Item.egcs_fc_fundingagreementclaim')
         .select('Funding_Case_Agreement_Claim_Line_Item.id')
-        .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreementbudgetfiscalyear', '=', String(row.id))
-        .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false)
+        .where('Funding_Case_Agreement_Claim.egcs_fc_fundingagreement', '=', agreementId)
+        .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreement', '=', agreementId)
+        .where('Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fundingagreement', '=', agreementId)
+        .where(budgetFiscalYearStableId, '=', row.egcs_fc_originalbudgetfiscalyear ?? row.id)
         .where('Funding_Case_Agreement_Claim_Line_Item._deleted', '=', false)
         .where('Funding_Case_Agreement_Claim._deleted', '=', false).executeTakeFirst()
     ])

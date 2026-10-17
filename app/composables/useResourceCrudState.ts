@@ -16,6 +16,7 @@ interface UseResourceCrudStateOptions<T extends { id: string } & Record<string, 
   updateMethod?: 'PATCH' | 'PUT'
   schema: z.ZodTypeAny
   initialNewItem?: Partial<T> | null
+  beforeOpen?: (action: 'create' | 'update', original: T | null, shouldProceed: () => boolean) => Promise<boolean>
   beforeSave?: (state: Partial<T>, original: T | null, shouldProceed: () => boolean) => Promise<boolean>
   beforeDelete?: (id: string, shouldProceed: () => boolean) => Promise<boolean | undefined>
   buttonLabel?: MaybeRefOrGetter<string | undefined>
@@ -40,6 +41,7 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
   updateMethod = 'PATCH',
   schema,
   initialNewItem,
+  beforeOpen,
   beforeSave,
   beforeDelete,
   buttonLabel,
@@ -177,22 +179,53 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
     return toValue(buttonLabel) || t('common.add')
   })
 
-  const openCreate = () => {
-    if (disposed || isStaticResource || !toValue(createAllowed)) return
-    isEditing.value = false
-    originalItem = null
-    modal.openCreate()
-  }
+  let opening: object | null = null
+  let modalRevision = 0
+  watch(captureSession, () => {
+    modalRevision++
+    opening = null
+  }, { flush: 'sync' })
+  watch(() => toValue(fetchUrl), () => {
+    opening = null
+  }, { flush: 'sync' })
 
-  const openUpdate = (item: T) => {
-    if (disposed || !toValue(updateUrlBase)) {
+  const open = (action: 'create' | 'update', item: T | null) => {
+    const allowed = () => !disposed && !isStaticResource && (action === 'create'
+      ? toValue(createAllowed)
+      : Boolean(toValue(updateUrlBase)))
+    if (!allowed() || opening) return
+    const apply = () => {
+      isEditing.value = action === 'update'
+      originalItem = item ? { ...item } : null
+      if (item) modal.openUpdate(item)
+      else modal.openCreate()
+    }
+    // Existing callers open synchronously; only explicit guards introduce an await.
+    if (!beforeOpen) {
+      apply()
       return
     }
-
-    isEditing.value = true
-    originalItem = { ...item }
-    modal.openUpdate(item)
+    const token = {}
+    opening = token
+    const requestedGeneration = generation
+    const requestedModalRevision = modalRevision
+    const shouldProceed = () => opening === token
+      && generation === requestedGeneration
+      && modalRevision === requestedModalRevision
+      && allowed()
+    return (async () => {
+      try {
+        if (await beforeOpen(action, item, shouldProceed) && shouldProceed()) apply()
+      } catch (error: unknown) {
+        if (shouldProceed()) showError(error)
+      } finally {
+        if (opening === token) opening = null
+      }
+    })()
   }
+
+  const openCreate = () => open('create', null)
+  const openUpdate = (item: T) => open('update', item)
 
   /** Creates or updates the modal item, emits the matching event, and refreshes the list. */
   const saveItem = async () => {

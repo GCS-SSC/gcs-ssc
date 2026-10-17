@@ -47,6 +47,7 @@ type ForecastBreakdownTableRow = {
   lineItemNameFr: string
   description: string
   budgetLineId: string
+  historical: boolean
   periodTotals: Record<string, Money>
   total: Money
 }
@@ -162,6 +163,49 @@ const activeBudgetLineItems = computed(() => {
 const activeForecastLineItems = computed(() => forecastLineItems.value.filter((line: FundingCaseAgreementForecastLineItemRow) =>
   String(line.egcs_fc_agreementforecast) === forecastId
 ))
+const getStableBudgetLineId = (line: FundingCaseAgreementForecastLineItemRow) => line.budget_line_stable_id
+type ForecastDisplayBudgetLine = {
+  id: string
+  egcs_fc_description: string
+  egcs_fc_costsubsection?: string | null
+  organization_cost_category_name_en?: string | null
+  organization_cost_category_name_fr?: string | null
+  line_item_name_en?: string | null
+  line_item_name_fr?: string | null
+  historical: boolean
+}
+const displayedBudgetLineItems = computed(() => {
+  const rows: ForecastDisplayBudgetLine[] = activeBudgetLineItems.value.map(line => ({
+    id: String(line.id), egcs_fc_description: line.egcs_fc_description,
+    egcs_fc_costsubsection: line.egcs_fc_costsubsection,
+    organization_cost_category_name_en: line.organization_cost_category_name_en,
+    organization_cost_category_name_fr: line.organization_cost_category_name_fr,
+    line_item_name_en: line.line_item_name_en, line_item_name_fr: line.line_item_name_fr,
+    historical: false
+  }))
+  const ids = new Set(rows.map(line => line.id))
+  for (const saved of activeForecastLineItems.value) {
+    const id = getStableBudgetLineId(saved)
+    if (ids.has(id)) continue
+    ids.add(id)
+    rows.push({ id, egcs_fc_description: saved.budget_line_description ?? '',
+      egcs_fc_costsubsection: saved.egcs_fc_costsubsection,
+      organization_cost_category_name_en: saved.organization_cost_category_name_en,
+      organization_cost_category_name_fr: saved.organization_cost_category_name_fr,
+      line_item_name_en: saved.line_item_name_en, line_item_name_fr: saved.line_item_name_fr,
+      historical: true })
+  }
+  return rows
+})
+watch(() => {
+  const current = activeForecastLineItems.value.find(line => line.id === fundingEditorLine.value?.id)
+  return Boolean(current?.budget_line_available && activeBudgetLineItems.value.some(line => String(line.id) === getStableBudgetLineId(current)))
+}, available => {
+  if (available || !fundingEditorOpen.value) return
+  fundingEditorOpen.value = false
+  fundingEditorLine.value = null
+  fundingEditorSession.value += 1
+})
 const activeForecastIsLocked = computed(() => isRecordLocked(activeForecast.value))
 const canCreateForecastLineItems = computed(() => profile.value?.can_create_agreement_role === true)
 const canUpdateForecast = computed(() => profile.value?.can_update_agreement_role === true)
@@ -199,7 +243,7 @@ const lineItemByBudgetMonth = computed(() => {
   const byKey = new Map<string, FundingCaseAgreementForecastLineItemRow>()
 
   for (const line of activeForecastLineItems.value) {
-    byKey.set(getDraftKey(String(line.egcs_fc_fundingagreementbudgetlineitem), line.egcs_fc_month), line)
+    byKey.set(getDraftKey(getStableBudgetLineId(line), line.egcs_fc_month), line)
   }
 
   return byKey
@@ -207,7 +251,11 @@ const lineItemByBudgetMonth = computed(() => {
 
 const openFundingEditor = (line: FundingCaseAgreementForecastLineItemRow) => {
   if (isSavingFunding.value || !canMutateForecast(canUpdateForecast.value)) return
-  if (lineItemByBudgetMonth.value.get(getDraftKey(String(line.egcs_fc_fundingagreementbudgetlineitem), line.egcs_fc_month))?.id !== line.id) return
+  if (!line.budget_line_available || !activeBudgetLineItems.value.some(row => String(row.id) === getStableBudgetLineId(line))) {
+    toast.add({ title: t('common.warning'), description: t('agreement.forecasts.historical_budget_line_read_only'), color: 'warning' })
+    return
+  }
+  if (lineItemByBudgetMonth.value.get(getDraftKey(getStableBudgetLineId(line), line.egcs_fc_month))?.id !== line.id) return
   fundingEditorSession.value += 1
   fundingEditorLine.value = line
   fundingEditorProgramAmount.value = line.egcs_fc_amount
@@ -219,7 +267,12 @@ const openFundingEditor = (line: FundingCaseAgreementForecastLineItemRow) => {
 const saveFundingEditor = async () => {
   const line = fundingEditorLine.value
   if (!line || isSavingFunding.value || !canMutateForecast(canUpdateForecast.value)) return
-  if (lineItemByBudgetMonth.value.get(getDraftKey(String(line.egcs_fc_fundingagreementbudgetlineitem), line.egcs_fc_month))?.id !== line.id) return
+  const current = lineItemByBudgetMonth.value.get(getDraftKey(getStableBudgetLineId(line), line.egcs_fc_month))
+  if (current?.id !== line.id) return
+  if (!current.budget_line_available || !activeBudgetLineItems.value.some(row => String(row.id) === getStableBudgetLineId(current))) {
+    toast.add({ title: t('common.warning'), description: t('agreement.forecasts.historical_budget_line_read_only'), color: 'warning' })
+    return
+  }
   try {
     const amount = parseMoney(fundingEditorProgramAmount.value)
     const totalAmount = parseMoney(fundingEditorTotalAmount.value)
@@ -250,7 +303,8 @@ const saveFundingEditor = async () => {
 
 const canEditForecastAmount = (budgetLineId: string, month: number): boolean => {
   const existing = lineItemByBudgetMonth.value.get(getDraftKey(budgetLineId, month))
-  return isAssigned.value && !activeForecastIsLocked.value
+  return activeBudgetLineItems.value.some(line => String(line.id) === budgetLineId)
+    && (!existing || existing.budget_line_available) && isAssigned.value && !activeForecastIsLocked.value
     && (existing ? canUpdateForecast.value : canCreateForecastLineItems.value)
 }
 
@@ -344,7 +398,7 @@ watch(activeForecastLineItems, () => {
   const nextDraftAmounts: Record<string, string> = {}
 
   for (const line of activeForecastLineItems.value) {
-    nextDraftAmounts[getDraftKey(String(line.egcs_fc_fundingagreementbudgetlineitem), line.egcs_fc_month)] = line.egcs_fc_amount
+    nextDraftAmounts[getDraftKey(getStableBudgetLineId(line), line.egcs_fc_month)] = line.egcs_fc_amount
   }
 
   for (const budgetLine of activeBudgetLineItems.value) {
@@ -374,8 +428,12 @@ const formatMoney = (value: Money) => profile.value?.egcs_fc_currency
   ? formatMoneyText(value, locale.value, profile.value.egcs_fc_currency.toUpperCase())
   : value
 
-const getDraftAmount = (budgetLineId: string, month: number) =>
-  draftAmounts.value[getDraftKey(budgetLineId, month)] ?? ZERO_MONEY
+const getDraftAmount = (budgetLineId: string, month: number) => {
+  if (!activeBudgetLineItems.value.some(line => String(line.id) === budgetLineId)) {
+    return lineItemByBudgetMonth.value.get(getDraftKey(budgetLineId, month))?.egcs_fc_amount ?? ZERO_MONEY
+  }
+  return draftAmounts.value[getDraftKey(budgetLineId, month)] ?? ZERO_MONEY
+}
 
 const getDraftMoney = (budgetLineId: string, month: number): Money | null => {
   try {
@@ -387,14 +445,9 @@ const getDraftMoney = (budgetLineId: string, month: number): Money | null => {
 
 const isDraftAmountInvalid = (budgetLineId: string, month: number) =>
   getDraftMoney(budgetLineId, month) === null
-const hasInvalidDraftAmounts = computed(() => Object.values(draftAmounts.value).some(value => {
-  try {
-    parseMoney(value)
-    return false
-  } catch {
-    return true
-  }
-}))
+const hasInvalidDraftAmounts = computed(() => activeBudgetLineItems.value.some(line =>
+  MONTH_KEYS.some((_month, month) => getDraftMoney(String(line.id), month) === null)
+))
 
 const setDraftAmount = (budgetLineId: string, month: number, value: string | number | null | undefined) => {
   draftAmounts.value = {
@@ -407,15 +460,15 @@ const getPeriodTotal = (budgetLineId: string, months: number[]) =>
   sumMoney(months.map((month: number) => getDraftMoney(budgetLineId, month) ?? ZERO_MONEY))
 
 const getColumnTotal = (months: number[]) =>
-  sumMoney(activeBudgetLineItems.value.map((line: FundingCaseAgreementBudgetLineItemRow) => getPeriodTotal(String(line.id), months)))
+  sumMoney(displayedBudgetLineItems.value.map(line => getPeriodTotal(String(line.id), months)))
 
 const getLineTotal = (budgetLineId: string) =>
   sumMoney(MONTH_KEYS.map((_month, index: number) => getDraftMoney(budgetLineId, index) ?? ZERO_MONEY))
 
 const getGrandDraftTotal = () =>
-  sumMoney(activeBudgetLineItems.value.map((line: FundingCaseAgreementBudgetLineItemRow) => getLineTotal(String(line.id))))
+  sumMoney(displayedBudgetLineItems.value.map(line => getLineTotal(String(line.id))))
 
-const getCostCategoryLabel = (line: FundingCaseAgreementBudgetLineItemRow) =>
+const getCostCategoryLabel = (line: { organization_cost_category_name_en?: string | null, organization_cost_category_name_fr?: string | null }) =>
   getBilingualValue(line, 'organization_cost_category_name', t('common.all'))
 
 const getCostSubsectionLabel = (value: string | null | undefined) => {
@@ -436,7 +489,7 @@ const breakdownColumns = computed<TableColumnInput<ForecastBreakdownTableRow>[]>
 ])
 
 const normalizedBreakdownSearch = computed(() => breakdownSearch.value.trim().toLowerCase())
-const breakdownRows = computed<ForecastBreakdownTableRow[]>(() => activeBudgetLineItems.value.map(line => {
+const breakdownRows = computed<ForecastBreakdownTableRow[]>(() => displayedBudgetLineItems.value.map(line => {
   const budgetLineId = String(line.id)
   const costCategoryLabel = getCostCategoryLabel(line)
   const costSubsectionLabel = getCostSubsectionLabel(line.egcs_fc_costsubsection)
@@ -455,6 +508,7 @@ const breakdownRows = computed<ForecastBreakdownTableRow[]>(() => activeBudgetLi
     lineItemNameFr: line.line_item_name_fr ?? line.egcs_fc_description,
     description: line.egcs_fc_description,
     budgetLineId,
+    historical: line.historical,
     periodTotals,
     total: getLineTotal(budgetLineId)
   }
@@ -725,6 +779,9 @@ const saveForecastBreakdown = async () => {
                           :name-fr="row.original.lineItemNameFr" />
                         <p v-if="row.original.description" class="min-w-0 max-w-full whitespace-normal break-words text-sm text-zinc-500 dark:text-zinc-400">
                           {{ row.original.description }}
+                        </p>
+                        <p v-if="row.original.historical" class="text-sm text-muted">
+                          {{ t('agreement.forecasts.historical_budget_line_read_only') }}
                         </p>
                       </div>
                     </div>

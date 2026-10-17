@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { usePageResourceError } from '~/composables/usePageResourceError'
-import { useId, computed, ref, watch } from 'vue'
+import { useId, computed, onUnmounted, ref, watch } from 'vue'
 import CommonCompletionPanel from '~/components/Common/Completions/Panel.vue'
 /* eslint-disable jsdoc/require-jsdoc -- concise detail-page actions are covered by focused tests. */
+import type { AdminCommonLookupResponseItem } from '~~/shared/types/admin-common-ui'
 import type { FetchError } from 'ofetch'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 import type { Ref } from 'vue'
@@ -37,6 +38,7 @@ const { getHeroCollapsed } = useDashboard()
 const { saveJson } = useJsonRequest()
 const confirmScopeRemoval = useDeleteConfirm()
 const { isTerminalStatus } = useBusinessStatusState()
+const snapshotStatusCatalog = useStatusCatalog()
 
 const agreementId = route.params.id as string
 const amendmentId = route.params.amendmentId as string
@@ -59,6 +61,8 @@ const amendmentNameFr: Ref<string> = ref('')
 const requiredSubtypeIdsByType: Ref<Record<string, string[]>> = ref({})
 let scopeSubtypeFilterRequest = 0
 let scopeSubtypeRequirementRequest = 0
+const resolvedScopeTypeMetadata: Ref<AmendmentTypeMetadata[]> = ref([])
+const scopeSubtypeRequirementFailed: Ref<boolean> = ref(false)
 const durationDates: Ref<{
   egcs_fc_proposedauthorizedassistancestartdate?: string
   egcs_fc_proposedauthorizedassistanceenddate?: string
@@ -81,8 +85,9 @@ usePageResourceError({
   hasContent: () => Boolean(profile.value && amendment.value)
 })
 
+type AmendmentTypeMetadata = { id: string, egcs_tp_amended: string, egcs_tp_requiresamendmentsubtype: boolean }
 type AmendmentTypeLookupResponse = {
-  items: Array<{ id: string, egcs_tp_amended: string, egcs_tp_requiresamendmentsubtype: boolean }>
+  items: AmendmentTypeMetadata[]
   total: number
   limit: number
 }
@@ -96,7 +101,18 @@ const isLoadingDetail = computed(() => status.value === 'pending' || profileStat
 const retryLoad = async () => {
   await Promise.all([refresh(), refreshProfile(), amendmentTypesLookup.refresh()])
 }
-const isScopeLookupReady = computed(() => amendmentTypesLookup.status.value === 'success')
+const selectedScopeTypes = computed(() => {
+  const byId = new Map([...amendmentTypesLookup.data.value.items, ...resolvedScopeTypeMetadata.value].map(type => [type.id, type]))
+  return scopeTypeIds.value.flatMap(id => byId.has(id) ? [byId.get(id)!] : [])
+})
+const isScopeLookupReady = computed(() => amendmentTypesLookup.status.value === 'success' && selectedScopeTypes.value.length === scopeTypeIds.value.length)
+const onResolvedScopeTypes = (items: AdminCommonLookupResponseItem[]) => {
+  if (!ownsAmendmentPage()) return
+  resolvedScopeTypeMetadata.value = items.flatMap(item => typeof item.id === 'string'
+    && typeof item.egcs_tp_amended === 'string' && typeof item.egcs_tp_requiresamendmentsubtype === 'boolean'
+    ? [{ id: item.id, egcs_tp_amended: item.egcs_tp_amended, egcs_tp_requiresamendmentsubtype: item.egcs_tp_requiresamendmentsubtype }]
+    : [])
+}
 const fetchAmendmentTypes = $fetch as unknown as (
   url: string,
   options: { query: { page: number, limit: number } }
@@ -143,10 +159,10 @@ const savedRiskScoreItems = computed(() => {
   return [{ value: String(score), label }]
 })
 const canEditAmendmentScope = computed(() => isAssigned.value && amendment.value?.can_edit_scope === true)
-const canCreateAmendmentSnapshot = computed(() => isAssigned.value && amendment.value?.can_create_snapshot === true)
+const canCreateAmendmentSnapshot = computed(() => profile.value?.can_create_agreement_role === true)
 const canCancelAmendment = computed(() => isAssigned.value && amendment.value?.can_cancel === true)
-const requiredScopeTypeIds = computed(() => amendmentTypesLookup.data.value.items
-  .filter(type => scopeTypeIds.value.includes(String(type.id)) && type.egcs_tp_requiresamendmentsubtype)
+const requiredScopeTypeIds = computed(() => selectedScopeTypes.value
+  .filter(type => type.egcs_tp_requiresamendmentsubtype)
   .map(type => String(type.id)))
 const scopeSubtypeRequired = computed(() => requiredScopeTypeIds.value.length > 0)
 const hasRequiredScopeSubtypes = computed(() => hasRequiredAmendmentSubtypeSelections(
@@ -156,9 +172,7 @@ const hasRequiredScopeSubtypes = computed(() => hasRequiredAmendmentSubtypeSelec
 ))
 const isHistoricalAmendment = computed(() => amendment.value?.egcs_fc_isopen === false
   || isTerminalStatus(amendment.value?.egcs_fc_status))
-const scopeIncludesDuration = computed(() => amendmentTypesLookup.data.value.items.some(type =>
-  scopeTypeIds.value.includes(String(type.id)) && type.egcs_tp_amended === 'duration'
-))
+const scopeIncludesDuration = computed(() => selectedScopeTypes.value.some(type => type.egcs_tp_amended === 'duration'))
 const scopeSubtypeQuery = computed(() => ({ amendment_type_ids: scopeTypeIds.value.join(',') }))
 const durationDatesValid = computed(() => {
   const dates = durationDates.value
@@ -195,19 +209,90 @@ const refreshPage = async () => {
   approvalsRefreshKey.value += 1
 }
 
-const createSnapshot = async (domain: 'budget' | 'activity') => {
-  const pending = domain === 'budget' ? isCreatingBudgetSnapshot : isCreatingActivitySnapshot
-  if (pending.value) return
-
+type SnapshotDomain = 'budget' | 'activity'
+let amendmentActionGeneration = 0
+let amendmentActionsDisposed = false
+let scopeSaveToken: symbol | null = null
+const snapshotActionTokens = new Map<SnapshotDomain, symbol>()
+const invalidateAmendmentActions = () => {
+  amendmentActionGeneration += 1
+  snapshotActionTokens.clear()
+  scopeSaveToken = null
+  scopeSubtypeFilterRequest += 1
+  scopeSubtypeRequirementRequest += 1
+  resolvedScopeTypeMetadata.value = []
+  requiredSubtypeIdsByType.value = {}
+  scopeSubtypeRequirementFailed.value = false
+  isSavingScope.value = false
+  isCreatingBudgetSnapshot.value = false
+  isCreatingActivitySnapshot.value = false
+}
+watch([() => route.path, () => route.params.id, () => route.params.amendmentId], invalidateAmendmentActions, { flush: 'sync' })
+onUnmounted(() => {
+  amendmentActionsDisposed = true
+  invalidateAmendmentActions()
+})
+const ownsAmendmentPage = () => !amendmentActionsDisposed
+  && route.params.id === agreementId
+  && route.params.amendmentId === amendmentId
+const warnSnapshotPrerequisite = (missingAssignment = false) => toast.add({
+  title: t('common.warning'),
+  description: t(missingAssignment ? 'assignments.read_only_description' : 'agreement.child_records.work_prerequisite'),
+  color: 'warning'
+})
+const checkSnapshotPrerequisites = async (domain: SnapshotDomain, shouldProceed: () => boolean) => {
   try {
-    pending.value = true
-    await saveJson(`/api/agreements/${agreementId}/amendments/${amendmentId}/${domain}-snapshot`, 'POST', {})
+    const [record, context, roster] = await Promise.all([
+      $fetch<FundingCaseAgreementAmendmentRow, string>(amendmentApiBase),
+      $fetch<EntityAssignmentContext, string>(`/api/entity-assignments/fundingcaseamendment/${amendmentId}/context`),
+      $fetch<{ is_assigned: boolean }, string>(`/api/entity-assignments/fundingcaseamendment/${amendmentId}`)
+    ])
+    if (!shouldProceed()) return false
+    if (roster.is_assigned !== true) {
+      warnSnapshotPrerequisite(true)
+      return false
+    }
+    if (!snapshotStatusCatalog.getById(record.egcs_fc_status)) await snapshotStatusCatalog.load()
+    if (!shouldProceed()) return false
+    const definition = snapshotStatusCatalog.getById(record.egcs_fc_status)
+    const enabled = record.amendment_types.some(type => domain === 'budget'
+      ? type.egcs_tp_amended === 'budget' || type.egcs_tp_amended === 'duration'
+      : type.egcs_tp_amended === 'activities')
+    const missing = domain === 'budget' ? record.has_budget_snapshot === false : record.has_activity_snapshot === false
+    if (context.can_create_agreement_role === true && record.can_create_snapshot === true
+      && definition?.isDraft === true && !definition.deleted && !definition.readOnly && !definition.terminal
+      && record.isCompleted !== true && enabled && missing) return true
+  } catch {
+    if (!shouldProceed()) return false
+  }
+  if (shouldProceed()) warnSnapshotPrerequisite()
+  return false
+}
+const createSnapshot = async (domain: SnapshotDomain) => {
+  const pending = domain === 'budget' ? isCreatingBudgetSnapshot : isCreatingActivitySnapshot
+  if (!ownsAmendmentPage() || !canCreateAmendmentSnapshot.value || isLoadingDetail.value || hasLoadError.value || snapshotActionTokens.has(domain)) return
+  const token = Symbol(domain)
+  const generation = amendmentActionGeneration
+  const requestedPath = route.path
+  const requestedBase = amendmentApiBase
+  snapshotActionTokens.set(domain, token)
+  pending.value = true
+  const shouldProceed = () => ownsAmendmentPage() && generation === amendmentActionGeneration
+    && requestedPath === route.path && snapshotActionTokens.get(domain) === token && canCreateAmendmentSnapshot.value
+  try {
+    if (!await checkSnapshotPrerequisites(domain, shouldProceed) || !shouldProceed()) return
+    await saveJson(`${requestedBase}/${domain}-snapshot`, 'POST', {})
+    if (!shouldProceed()) return
     await refresh()
+    if (!shouldProceed() || error.value || status.value === 'error') return
     toast.add({ title: t('common.success'), description: t(`agreement.amendments.${domain}_snapshot_created`), color: 'success' })
   } catch (caughtError: unknown) {
-    showError(caughtError)
+    if (shouldProceed()) showError(caughtError)
   } finally {
-    pending.value = false
+    if (snapshotActionTokens.get(domain) === token) {
+      snapshotActionTokens.delete(domain)
+      pending.value = false
+    }
   }
 }
 
@@ -236,6 +321,8 @@ watch(amendment, value => {
 
 const onScopeTypesChanged = async (typeIds: string[]) => {
   const requestId = ++scopeSubtypeFilterRequest
+  const generation = amendmentActionGeneration
+  const isCurrent = () => ownsAmendmentPage() && generation === amendmentActionGeneration && requestId === scopeSubtypeFilterRequest
   if (typeIds.length === 0) {
     scopeSubtypeIds.value = []
     return
@@ -246,16 +333,20 @@ const onScopeTypesChanged = async (typeIds: string[]) => {
       `/api/agreements/${agreementId}/amendments/lookups/subtypes`,
       { query: { amendment_type_ids: typeIds.join(','), amendmentId } }
     )
-    if (requestId !== scopeSubtypeFilterRequest) return
+    if (!isCurrent()) return
     const validSubtypeIds = new Set(response.items.map(item => String(item.id)))
     scopeSubtypeIds.value = scopeSubtypeIds.value.filter(subtypeId => validSubtypeIds.has(subtypeId))
   } catch (caughtError: unknown) {
-    if (requestId === scopeSubtypeFilterRequest) showError(caughtError)
+    if (isCurrent()) showError(caughtError)
   }
 }
 
-watch(requiredScopeTypeIds, async typeIds => {
+const loadRequiredScopeSubtypes = async () => {
+  const typeIds = [...requiredScopeTypeIds.value]
   const requestId = ++scopeSubtypeRequirementRequest
+  const generation = amendmentActionGeneration
+  const isCurrent = () => ownsAmendmentPage() && generation === amendmentActionGeneration && requestId === scopeSubtypeRequirementRequest
+  scopeSubtypeRequirementFailed.value = false
   requiredSubtypeIdsByType.value = {}
   if (typeIds.length === 0) return
 
@@ -267,32 +358,54 @@ watch(requiredScopeTypeIds, async typeIds => {
         { query: { amendment_type_ids: typeId, amendmentId } }
       )
     })))
-    if (requestId !== scopeSubtypeRequirementRequest) return
+    if (!isCurrent()) return
     requiredSubtypeIdsByType.value = Object.fromEntries(subtypeResponses.map(({ typeId, response }) => [
       typeId,
       response.items.map(item => String(item.id))
     ]))
   } catch (caughtError: unknown) {
-    if (requestId === scopeSubtypeRequirementRequest) showError(caughtError)
+    if (isCurrent()) {
+      scopeSubtypeRequirementFailed.value = true
+      showError(caughtError)
+    }
   }
-}, { immediate: true })
+}
+watch(requiredScopeTypeIds, loadRequiredScopeSubtypes, { immediate: true })
 
 const saveScope = async () => {
-  if (!canEditAmendmentScope.value
+  if (!ownsAmendmentPage()
+    || !canEditAmendmentScope.value
     || !isScopeLookupReady.value
     || !hasAmendmentName.value
     || scopeTypeIds.value.length === 0
     || !hasRequiredScopeSubtypes.value
     || (scopeIncludesDuration.value && !durationDatesValid.value)
     || isSavingScope.value) return
+  const generation = amendmentActionGeneration
+  const requestedPath = route.path
+  const token = Symbol('scope-save')
+  scopeSaveToken = token
+  const shouldProceed = () => ownsAmendmentPage()
+    && generation === amendmentActionGeneration
+    && route.path === requestedPath
+    && scopeSaveToken === token
+    && canEditAmendmentScope.value
   try {
     isSavingScope.value = true
     const selectedTypeIds = [...scopeTypeIds.value]
+    const submittedDraft = {
+      egcs_fc_name_en: amendmentNameEn.value,
+      egcs_fc_name_fr: amendmentNameFr.value,
+      amendment_subtype_ids: [...scopeSubtypeIds.value],
+      startDate: durationDates.value?.egcs_fc_proposedauthorizedassistancestartdate,
+      endDate: durationDates.value?.egcs_fc_proposedauthorizedassistanceenddate
+    }
     const selectedTypes = await resolveSelectedAmendmentScopeTypes(
       selectedTypeIds,
       [...amendmentTypesLookup.data.value.items, ...(amendment.value?.amendment_types ?? [])],
       page => fetchAmendmentTypes(amendmentTypesLookupEndpoint, { query: { page, limit: 100 } })
     )
+    if (!shouldProceed()) return
     const selectedDomains = new Set(selectedTypes.map(type => type.egcs_tp_amended))
     const removedAreas: Array<'budget' | 'activities'> = []
     if (canSnapshotBudget.value && !selectedDomains.has('budget') && !selectedDomains.has('duration')) {
@@ -302,16 +415,16 @@ const saveScope = async () => {
       removedAreas.push('activities')
     }
     const payload = {
-      egcs_fc_name_en: amendmentNameEn.value,
-      egcs_fc_name_fr: amendmentNameFr.value,
+      egcs_fc_name_en: submittedDraft.egcs_fc_name_en,
+      egcs_fc_name_fr: submittedDraft.egcs_fc_name_fr,
       amendment_type_ids: selectedTypeIds,
-      amendment_subtype_ids: [...scopeSubtypeIds.value],
+      amendment_subtype_ids: submittedDraft.amendment_subtype_ids,
       confirmed_scope_removals: removedAreas,
-      egcs_fc_proposedauthorizedassistancestartdate: scopeIncludesDuration.value
-        ? durationDates.value?.egcs_fc_proposedauthorizedassistancestartdate
+      egcs_fc_proposedauthorizedassistancestartdate: selectedDomains.has('duration')
+        ? submittedDraft.startDate
         : null,
-      egcs_fc_proposedauthorizedassistanceenddate: scopeIncludesDuration.value
-        ? durationDates.value?.egcs_fc_proposedauthorizedassistanceenddate
+      egcs_fc_proposedauthorizedassistanceenddate: selectedDomains.has('duration')
+        ? submittedDraft.endDate
         : null
     }
     if (removedAreas.length > 0) {
@@ -320,15 +433,21 @@ const saveScope = async () => {
         description: t('agreement.amendments.remove_areas_confirm', { areas: removedAreas.map(area => t(`agreement.${area}.title`)).join(', ') }),
         confirmLabel: t('agreement.amendments.remove_areas')
       })
-      if (!confirmed || !canEditAmendmentScope.value) return
+      if (!confirmed || !shouldProceed()) return
     }
+    if (!shouldProceed()) return
     await saveJson(amendmentApiBase, 'PATCH', payload)
+    if (!shouldProceed()) return
     await refresh()
+    if (!shouldProceed()) return
     toast.add({ title: t('common.success'), description: t('agreement.amendments.scope_updated'), color: 'success' })
   } catch (caughtError: unknown) {
-    showError(caughtError)
+    if (shouldProceed()) showError(caughtError)
   } finally {
-    isSavingScope.value = false
+    if (scopeSaveToken === token) {
+      scopeSaveToken = null
+      isSavingScope.value = false
+    }
   }
 }
 
@@ -413,7 +532,8 @@ const cancelAmendment = async () => {
                     label-fr-key="egcs_tp_name_fr"
                     :disabled="!canEditAmendmentScope"
                     required
-                    @update:model-value="onScopeTypesChanged" />
+                    @update:model-value="onScopeTypesChanged"
+                    @resolved-items="onResolvedScopeTypes" />
                 </UFormField>
                 <UFormField v-if="scopeTypeIds.length > 0" :label="t('agreement.amendments.subtypes')" :required="scopeSubtypeRequired">
                   <div v-if="isHistoricalAmendment" data-testid="historical-amendment-subtypes" class="flex flex-wrap gap-2">
@@ -440,6 +560,7 @@ const cancelAmendment = async () => {
                     :disabled="!canEditAmendmentScope"
                     :required="scopeSubtypeRequired" />
                 </UFormField>
+                <UButton v-if="scopeSubtypeRequirementFailed" :label="t('common.retry')" color="neutral" variant="ghost" @click="loadRequiredScopeSubtypes" />
               </div>
             </CommonSection>
 
@@ -552,7 +673,7 @@ const cancelAmendment = async () => {
               :description="t('agreement.amendments.budget_snapshot_description')">
               <template #action>
                 <UButton
-                  v-if="canSnapshotBudget && canCreateAmendmentSnapshot"
+                  v-if="canCreateAmendmentSnapshot"
                   icon="i-lucide-copy-plus"
                   :label="t('agreement.amendments.create_budget_snapshot')"
                   class="cursor-default"
@@ -564,15 +685,16 @@ const cancelAmendment = async () => {
             <AgreementBudgetTab
               v-if="amendment.has_budget_snapshot && profile"
               :agreement-id="agreementId"
+              :action-target="{ kind: 'amendment', agreementId, amendmentId }"
               :currency="profile.egcs_fc_currency"
               :api-base="amendmentApiBase"
               :fiscal-year-lookup-url="`${amendmentApiBase}/budget-fiscal-years/lookups/fiscal-years`"
-              :can-create="canEditAmendment && isBudgetAmendment"
-              :can-update="canEditAmendment && isBudgetAmendment"
-              :can-delete="canEditAmendment && isBudgetAmendment"
-              :can-create-fiscal-year="canEditAmendment && (isBudgetAmendment || isDurationAmendment)"
-              :can-update-fiscal-year="canEditAmendment && (isBudgetAmendment || isDurationAmendment)"
-              :can-delete-fiscal-year="canEditAmendment && (isBudgetAmendment || isDurationAmendment)"
+              :can-create="profile?.can_create_agreement_role === true"
+              :can-update="profile?.can_update_agreement_role === true"
+              :can-delete="profile?.can_delete_agreement_role === true"
+              :can-create-fiscal-year="profile?.can_create_agreement_role === true"
+              :can-update-fiscal-year="profile?.can_update_agreement_role === true"
+              :can-delete-fiscal-year="profile?.can_delete_agreement_role === true"
               :allow-delete-fiscal-year-with-lines="isBudgetAmendment || isDurationAmendment" />
           </section>
 
@@ -584,7 +706,7 @@ const cancelAmendment = async () => {
               :description="t('agreement.amendments.activity_snapshot_description')">
               <template #action>
                 <UButton
-                  v-if="canSnapshotActivities && canCreateAmendmentSnapshot"
+                  v-if="canCreateAmendmentSnapshot"
                   icon="i-lucide-copy-plus"
                   :label="t('agreement.amendments.create_activity_snapshot')"
                   class="cursor-default"
@@ -596,10 +718,11 @@ const cancelAmendment = async () => {
             <AgreementActivitiesTab
               v-if="amendment.has_activity_snapshot"
               :agreement-id="agreementId"
+              :action-target="{ kind: 'amendment', agreementId, amendmentId }"
               :api-base="amendmentApiBase"
-              :can-create="canEditAmendment"
-              :can-update="canEditAmendment"
-              :can-delete="canEditAmendment" />
+              :can-create="profile?.can_create_agreement_role === true"
+              :can-update="profile?.can_update_agreement_role === true"
+              :can-delete="profile?.can_delete_agreement_role === true" />
           </section>
 
           <section v-else-if="selectedTab === 'recommendation'" class="space-y-6">

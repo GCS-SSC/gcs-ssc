@@ -54,8 +54,11 @@ export default defineEventHandler(async event => {
       if (String(body.egcs_fc_fundingagreementbudgetfiscalyear) !== String(existing.stable_fiscal_year_id)) {
         const claimLine = await trx.selectFrom('Funding_Case_Agreement_Claim_Line_Item')
           .innerJoin('Funding_Case_Agreement_Claim', 'Funding_Case_Agreement_Claim.id', 'Funding_Case_Agreement_Claim_Line_Item.egcs_fc_fundingagreementclaim')
+          .innerJoin('Funding_Case_Agreement_Budget_Line_Item', 'Funding_Case_Agreement_Budget_Line_Item.id', 'Funding_Case_Agreement_Claim_Line_Item.egcs_fc_fundingagreementbudgetlineitem')
           .select('Funding_Case_Agreement_Claim_Line_Item.id')
-          .where('Funding_Case_Agreement_Claim_Line_Item.egcs_fc_fundingagreementbudgetlineitem', '=', String(existing.stable_id))
+          .where('Funding_Case_Agreement_Claim.egcs_fc_fundingagreement', '=', agreementId)
+          .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreement', '=', agreementId)
+          .where(budgetLineItemStableId, '=', String(existing.stable_id))
           .where('Funding_Case_Agreement_Claim_Line_Item._deleted', '=', false).where('Funding_Case_Agreement_Claim._deleted', '=', false).executeTakeFirst()
         if (claimLine) return await badRequest(event, 'AGREEMENT_BUDGET_LINE_ITEM_CLAIM_MOVE_NOT_ALLOWED', 'apiErrors.agreement.budget_line_item_claim_move_not_allowed')
       }
@@ -81,17 +84,25 @@ export default defineEventHandler(async event => {
       egcs_fc_fundingsources,
       ...nonMoneyUpdateValues
     } = updateValues
-    const updated = await trx.updateTable('Funding_Case_Agreement_Budget_Line_Item').set({
+    const databasePatchValues = {
       ...nonMoneyUpdateValues,
       ...(egcs_fc_totalamount === undefined ? {} : { egcs_fc_totalamount: databaseMoneyValue(egcs_fc_totalamount) }),
       ...(egcs_fc_programfunding === undefined ? {} : { egcs_fc_programfunding: databaseMoneyValue(egcs_fc_programfunding) })
-    }).where('id', '=', String(existing.id)).where('_deleted', '=', false).returning([
+    }
+    const lineQuery = Object.keys(databasePatchValues).length > 0
+      ? trx.updateTable('Funding_Case_Agreement_Budget_Line_Item').set(databasePatchValues)
+          .where('id', '=', String(existing.id)).where('_deleted', '=', false)
+      : trx.selectFrom('Funding_Case_Agreement_Budget_Line_Item')
+          .where('id', '=', String(existing.id)).where('_deleted', '=', false)
+    const columns = [
       'egcs_fc_calculationmode', 'egcs_fc_sourcecategory', 'egcs_fc_percentage', 'egcs_fc_allowpercentageoverride',
       'id', 'egcs_fc_originalbudgetlineitem',
       databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('egcs_fc_totalamount'),
       databaseMoneyText(sql.ref('egcs_fc_programfunding')).as('egcs_fc_programfunding'),
       'egcs_fc_currency'
-    ]).executeTakeFirstOrThrow()
+    ] as const
+    const updated = await ('returning' in lineQuery ? lineQuery.returning(columns) : lineQuery.select(columns))
+      .executeTakeFirstOrThrow()
     if (egcs_fc_fundingsources !== undefined) await replaceBudgetFundingSources(trx, String(updated.id), egcs_fc_fundingsources)
     const amounts = await recalculateAgreementBudget(event, trx, updated.id, context.streamId)
     const fiscalYearIdentity = body.egcs_fc_fundingagreementbudgetfiscalyear
