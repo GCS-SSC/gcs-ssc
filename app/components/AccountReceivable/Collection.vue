@@ -113,13 +113,13 @@ const created = async (id: string) => {
       </template>
       <template #actions-cell="{ row }">
         <div class="flex justify-end gap-2">
-          <UButton
+          <CommonActionButton
             v-if="row.original.egcs_fc_candeleterole"
             icon="i-lucide-trash" color="error" variant="ghost"
             :aria-label="`${t('common.delete')}: ${accountReceivableReference(row.original)}`"
             :loading="deletingId === row.original.id" :disabled="deletingId !== null || status !== 'success'"
             @click="deleteDraft(row.original)" />
-          <UButton
+          <CommonActionButton
             icon="i-lucide-arrow-right" color="neutral" variant="ghost"
             :aria-label="`${t('common.view_details')}: ${accountReceivableReference(row.original)}`"
             :to="localePath(appRouteLocations.agreementAccountReceivableDetail(agreementId, row.original.id))" />

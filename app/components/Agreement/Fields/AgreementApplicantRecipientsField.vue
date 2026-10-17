@@ -591,13 +591,15 @@ const removeSelectedId = (id: string) => {
           :key="item.id"
           class="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
           <span>{{ getSelectedLabel(item) }}</span>
-          <button
-            type="button"
-            class="cursor-default text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
-            :aria-label="`${t('common.remove')}: ${getSelectedLabel(item)}`"
-            @click="removeSelectedId(String(item.id))">
-            <UIcon name="i-lucide-x" class="size-4" />
-          </button>
+          <UTooltip :text="`${t('common.remove')}: ${getSelectedLabel(item)}`">
+            <button
+              type="button"
+              class="cursor-default text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+              :aria-label="`${t('common.remove')}: ${getSelectedLabel(item)}`"
+              @click="removeSelectedId(String(item.id))">
+              <UIcon name="i-lucide-x" class="size-4" />
+            </button>
+          </UTooltip>
         </div>
       </div>
 

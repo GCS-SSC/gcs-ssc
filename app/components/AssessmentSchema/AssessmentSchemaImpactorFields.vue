@@ -78,7 +78,7 @@ const removeScoringRow = (rowIndex: number) => {
           </UFormField>
 
           <div class="flex items-end">
-            <UButton
+            <CommonActionButton
               icon="i-lucide-trash"
               color="error"
               variant="ghost"

@@ -234,13 +234,13 @@ const remove = async (path: string) => {
       </template>
       <template #actions-cell="{ row }">
         <div v-if="row.groupingColumnId === 'fieldGroup'" class="flex justify-end gap-2">
-          <UButton v-if="canCreate && row.original.field.egcs_ay_kind === 'relational'" icon="i-lucide-plus" color="neutral" variant="ghost" size="sm" :aria-label="`${t('custom_fields.add_option')}: ${label(row.original.field)}`" @click="openOption(row.original.field.id)" />
-          <UButton v-if="canUpdate" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" :aria-label="`${t('common.edit')}: ${label(row.original.field)}`" @click="fieldModal.openUpdate(row.original.field)" />
-          <UButton v-if="canDelete" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="`${t('common.delete')}: ${label(row.original.field)}`" @click="remove(`${url}/${row.original.field.id}`)" />
+          <CommonActionButton v-if="canCreate && row.original.field.egcs_ay_kind === 'relational'" icon="i-lucide-plus" color="neutral" variant="ghost" size="sm" :aria-label="`${t('custom_fields.add_option')}: ${label(row.original.field)}`" @click="openOption(row.original.field.id)" />
+          <CommonActionButton v-if="canUpdate" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" :aria-label="`${t('common.edit')}: ${label(row.original.field)}`" @click="fieldModal.openUpdate(row.original.field)" />
+          <CommonActionButton v-if="canDelete" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="`${t('common.delete')}: ${label(row.original.field)}`" @click="remove(`${url}/${row.original.field.id}`)" />
         </div>
         <div v-else-if="!row.getIsGrouped() && row.original.option" class="flex justify-end gap-2">
-          <UButton v-if="canUpdate" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" :aria-label="`${t('common.edit')}: ${label(row.original.option)}`" @click="openOption(row.original.field.id, row.original.option)" />
-          <UButton v-if="canDelete" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="`${t('common.delete')}: ${label(row.original.option)}`" @click="remove(`${url}/${row.original.field.id}/options/${row.original.option.id}`)" />
+          <CommonActionButton v-if="canUpdate" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" :aria-label="`${t('common.edit')}: ${label(row.original.option)}`" @click="openOption(row.original.field.id, row.original.option)" />
+          <CommonActionButton v-if="canDelete" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="`${t('common.delete')}: ${label(row.original.option)}`" @click="remove(`${url}/${row.original.field.id}/options/${row.original.option.id}`)" />
         </div>
       </template>
     </CommonResourceLayoutCard>

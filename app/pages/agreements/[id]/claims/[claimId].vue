@@ -1288,7 +1288,7 @@ const cancelReconciliation = async () => {
 
                     <template #actions-cell="{ row }">
                       <div class="flex justify-end gap-2">
-                        <UButton
+                        <CommonActionButton
                           v-if="!isGroupedSubmissionRow(row as GroupedClaimSubmissionRow) && row.original.budgetLineId && canEditClaimSubmissionAmount(row.original.budgetLineId)"
                           icon="i-lucide-pencil"
                           color="neutral"

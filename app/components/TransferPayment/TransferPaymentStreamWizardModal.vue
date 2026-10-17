@@ -149,7 +149,7 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentStreamPolymorphicWizard>
                 v-for="(holdbackBasis, index) in state.holdbackBases"
                 :key="holdbackBasis.tempId"
                 class="border-default relative space-y-4 rounded-xl border bg-zinc-50/50 p-4 dark:bg-zinc-900/50">
-                <UButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" :title="t('common.remove')" @click="removeHoldbackBasis(index)" />
+                <CommonActionButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" @click="removeHoldbackBasis(index)" />
                 <TransferPaymentFieldsTransferPaymentStreamHoldbackBasisFields
                   :model="holdbackBasis"
                   :agency-holdback-bases="agencyHoldbackOptions"
@@ -164,7 +164,7 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentStreamPolymorphicWizard>
                 v-for="(budget, index) in state.budgets"
                 :key="budget.tempId"
                 class="border-default relative grid grid-cols-1 gap-4 rounded-xl border bg-zinc-50/50 p-4 md:grid-cols-3 dark:bg-zinc-900/50">
-                <UButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" :title="t('common.remove')" @click="removeBudget(index)" />
+                <CommonActionButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" @click="removeBudget(index)" />
                 <TransferPaymentFieldsTransferPaymentStreamBudgetFields
                   :model="budget"
                   :transfer-payment-id="programId"
@@ -180,7 +180,7 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentStreamPolymorphicWizard>
                 v-for="(recipient, index) in state.eligibleRecipients"
                 :key="recipient.tempId"
                 class="border-default relative space-y-4 rounded-xl border bg-zinc-50/50 p-4 dark:bg-zinc-900/50">
-                <UButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" :title="t('common.remove')" @click="removeEligibleRecipient(index)" />
+                <CommonActionButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" @click="removeEligibleRecipient(index)" />
                 <TransferPaymentFieldsTransferPaymentEligibleRecipientFields
                   :model="recipient"
                   :recipient-options="applicantRecipientOptions"
@@ -194,7 +194,7 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentStreamPolymorphicWizard>
                 v-for="(lineItem, index) in state.costCategoryLineItems"
                 :key="lineItem.tempId"
                 class="border-default relative grid grid-cols-1 gap-4 rounded-xl border bg-zinc-50/50 p-4 md:grid-cols-2 dark:bg-zinc-900/50">
-                <UButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" :title="t('common.remove')" @click="removeCostCategoryLineItem(index)" />
+                <CommonActionButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" @click="removeCostCategoryLineItem(index)" />
                 <TransferPaymentFieldsTransferPaymentCostCategoryLineItemFields
                   :model="lineItem"
                   :line-item-options="lineItemOptions"
@@ -208,7 +208,7 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentStreamPolymorphicWizard>
                 v-for="(amendmentType, index) in state.amendmentTypes"
                 :key="amendmentType.tempId"
                 class="border-default relative space-y-4 rounded-xl border bg-zinc-50/50 p-4 dark:bg-zinc-900/50">
-                <UButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" :title="t('common.remove')" @click="removeAmendmentType(index)" />
+                <CommonActionButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" @click="removeAmendmentType(index)" />
                 <TransferPaymentFieldsTransferPaymentAmendmentTypeFields
                   :model="amendmentType"
                   :name-prefix="`amendmentTypes.${index}`" />
@@ -221,7 +221,7 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentStreamPolymorphicWizard>
                 v-for="(subtype, index) in state.amendmentSubtypes"
                 :key="subtype.tempId"
                 class="border-default relative space-y-4 rounded-xl border bg-zinc-50/50 p-4 dark:bg-zinc-900/50">
-                <UButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" :title="t('common.remove')" @click="removeAmendmentSubtype(index)" />
+                <CommonActionButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" @click="removeAmendmentSubtype(index)" />
                 <TransferPaymentFieldsTransferPaymentAmendmentSubtypeFields
                   :model="subtype"
                   :amendment-types="state.amendmentTypes"
@@ -244,7 +244,7 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentStreamPolymorphicWizard>
                 v-for="(agreementSubtype, index) in state.agreementSubtypes"
                 :key="agreementSubtype.tempId"
                 class="border-default relative space-y-4 rounded-xl border bg-zinc-50/50 p-4 dark:bg-zinc-900/50">
-                <UButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" :title="t('common.remove')" @click="removeAgreementSubtype(index)" />
+                <CommonActionButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" @click="removeAgreementSubtype(index)" />
                 <TransferPaymentFieldsTransferPaymentAgreementSubtypeFields
                   :model="agreementSubtype"
                   :agreement-types="agreementTypeOptions"
@@ -258,7 +258,7 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentStreamPolymorphicWizard>
                 v-for="(chartOfAccount, index) in state.chartOfAccounts"
                 :key="chartOfAccount.tempId"
                 class="border-default relative space-y-4 rounded-xl border bg-zinc-50/50 p-4 dark:bg-zinc-900/50">
-                <UButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" :title="t('common.remove')" @click="removeChartOfAccount(index)" />
+                <CommonActionButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" @click="removeChartOfAccount(index)" />
                 <UFormField :label="t('transfer_payment.chart_of_accounts.title')" :name="`chartOfAccounts.${index}.egcs_tp_agencychartofaccount`" required>
                   <CommonServerLookupSelect
                     v-model="chartOfAccount.egcs_tp_agencychartofaccount"
@@ -276,7 +276,7 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentStreamPolymorphicWizard>
                 v-for="(reviewType, index) in state.monitorTypes"
                 :key="reviewType.tempId"
                 class="border-default relative space-y-4 rounded-xl border bg-zinc-50/50 p-4 dark:bg-zinc-900/50">
-                <UButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" :title="t('common.remove')" @click="removeMonitorType(index)" />
+                <CommonActionButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" @click="removeMonitorType(index)" />
                 <TransferPaymentFieldsTransferPaymentMonitorTypeFields :model="reviewType" :lookup-url="`/api/transfer-payments/${programId}/streams/lookups/monitor-types`" :name-prefix="`monitorTypes.${index}`" />
               </div>
               <UButton type="button" :label="t('common.add')" icon="i-lucide-plus" variant="outline" block @click="addMonitorType" />
@@ -287,7 +287,7 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentStreamPolymorphicWizard>
                 v-for="(commitmentType, index) in state.commitmentTypes"
                 :key="commitmentType.tempId"
                 class="border-default relative space-y-4 rounded-xl border bg-zinc-50/50 p-4 dark:bg-zinc-900/50">
-                <UButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" :title="t('common.remove')" @click="removeCommitmentType(index)" />
+                <CommonActionButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" @click="removeCommitmentType(index)" />
                 <UFormField :label="t('transfer_payment.commitment_types.title')" :name="`commitmentTypes.${index}.egcs_tp_agencycommitmenttype`" required>
                   <CommonServerLookupSelect
                     v-model="commitmentType.egcs_tp_agencycommitmenttype"
@@ -305,7 +305,7 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentStreamPolymorphicWizard>
                 v-for="(area, index) in state.areasOfExpertise"
                 :key="area.tempId"
                 class="border-default relative space-y-4 rounded-xl border bg-zinc-50/50 p-4 dark:bg-zinc-900/50">
-                <UButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" :title="t('common.remove')" @click="removeAreaOfExpertise(index)" />
+                <CommonActionButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" @click="removeAreaOfExpertise(index)" />
                 <TransferPaymentFieldsTransferPaymentAreaOfExpertiseFields :model="area" :name-prefix="`areasOfExpertise.${index}`" is-stacked />
               </div>
               <UButton type="button" :label="t('common.add')" icon="i-lucide-plus" variant="outline" block @click="addAreaOfExpertise" />
@@ -319,7 +319,7 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentStreamPolymorphicWizard>
               <div
                 v-else
                 class="border-default relative space-y-4 rounded-xl border bg-zinc-50/50 p-4 dark:bg-zinc-900/50">
-                <UButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" :title="t('common.remove')" @click="clearFinancialLimit" />
+                <CommonActionButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" @click="clearFinancialLimit" />
                 <TransferPaymentFieldsTransferPaymentFinancialLimitFields
                   :model="state.financialLimit"
                   is-stacked

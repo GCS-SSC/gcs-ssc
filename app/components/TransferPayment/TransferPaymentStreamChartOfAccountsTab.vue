@@ -95,7 +95,7 @@ const onDelete = async (id: string) => {
 
       <template #actions-cell="{ row }">
         <div class="flex justify-end gap-2">
-          <UButton
+          <CommonActionButton
             v-if="canDeleteChild"
             :aria-label="t('common.delete_named', { name: getActionTarget(row.original) })"
             icon="i-lucide-trash"

@@ -164,14 +164,14 @@ const onDelete = async (id: string) => {
 
       <template #actions-cell="{ row }">
         <div class="flex justify-end gap-2">
-          <UButton
+          <CommonActionButton
             v-if="canUpdateChild"
             :aria-label="t('common.edit')"
             icon="i-lucide-pencil"
             color="neutral"
             variant="ghost"
             @click="openUpdate(row.original as TransferPaymentFinancialLimitsRow)" />
-          <UButton
+          <CommonActionButton
             v-if="canDeleteChild"
             :aria-label="t('common.delete')"
             icon="i-lucide-trash"

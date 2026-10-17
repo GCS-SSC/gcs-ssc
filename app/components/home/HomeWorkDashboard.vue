@@ -167,7 +167,7 @@ const claimGroupItem = async (item: GroupItem) => {
           <UDashboardSidebarCollapse />
         </template>
         <template #right>
-          <UButton
+          <CommonActionButton
             color="neutral"
             variant="ghost"
             :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"

@@ -104,7 +104,7 @@ watch([() => transferPaymentId, () => streamId], () => modal.close())
 
     <template #actions-cell="{ row }">
       <div class="flex items-center gap-2">
-        <UButton
+        <CommonActionButton
           v-if="canUpdateChild"
           icon="i-lucide-pencil"
           color="neutral"
@@ -112,7 +112,7 @@ watch([() => transferPaymentId, () => streamId], () => modal.close())
           size="sm"
           :aria-label="t('common.edit_named', { name: getActionTarget(row.original) })"
           @click="openUpdate(row.original)" />
-        <UButton
+        <CommonActionButton
           v-if="canDeleteChild"
           icon="i-lucide-trash"
           color="error"

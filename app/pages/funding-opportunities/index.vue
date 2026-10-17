@@ -80,7 +80,7 @@ const submit = async () => {
         </template>
         <template #right>
           <div class="flex items-center gap-2">
-            <UButton color="neutral" variant="ghost" :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'" :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')" @click="isHeroCollapsed = !isHeroCollapsed" />
+            <CommonActionButton color="neutral" variant="ghost" :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'" :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')" @click="isHeroCollapsed = !isHeroCollapsed" />
             <CommonNavbarSide />
           </div>
         </template>
@@ -106,7 +106,7 @@ const submit = async () => {
         </template>
         <template #actions-cell="{ row }">
           <div class="flex justify-end gap-2">
-            <UButton icon="i-lucide-arrow-right" color="neutral" variant="ghost" :aria-label="t('funding_opportunity.view_details')" :to="localePath(appRouteLocations.fundingOpportunityDetail(String(row.original.id)))" />
+            <CommonActionButton icon="i-lucide-arrow-right" color="neutral" variant="ghost" :aria-label="t('funding_opportunity.view_details')" :to="localePath(appRouteLocations.fundingOpportunityDetail(String(row.original.id)))" />
           </div>
         </template>
       </CommonResourceLayoutPage>

@@ -220,7 +220,7 @@ const remove = async (id: string): Promise<void> => {
             :disabled="pending"
             :aria-label="t('funding_opportunity.internal_only_named', { name: label(row.original) })"
             @update:model-value="value => setInternal(row.original.id, value)" />
-          <UButton
+          <CommonActionButton
             v-if="canEdit"
             icon="i-lucide-unlink"
             color="error"

@@ -335,7 +335,7 @@ const createAmendment = async () => {
 
       <template #actions-cell="{ row }">
         <div class="flex justify-end">
-          <UButton
+          <CommonActionButton
             :to="localePath(appRouteLocations.agreementAmendmentDetail(agreementId, String(row.original.id)))"
             icon="i-lucide-arrow-right"
             color="neutral"

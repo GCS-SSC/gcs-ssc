@@ -130,7 +130,7 @@ const selectedGroup = computed({
                   :name="`step.certifications.${sourceIndex}.egcs_cn_optional`">
                   <USwitch v-model="certification.egcs_cn_optional" />
                 </UFormField>
-                <UButton
+                <CommonActionButton
                   icon="i-lucide-trash"
                   color="error"
                   variant="ghost"

@@ -362,7 +362,7 @@ const expandedOptions = { autoResetExpanded: false }
             <button
               type="button"
               class="cursor-default text-left [&_p:first-child]:transition-colors hover:[&_p:first-child]:text-primary"
-              :aria-label="t('common.open')"
+              :aria-label="`${t('common.open')}: ${row.original.reviewNameEn} / ${row.original.reviewNameFr}`"
               @click="openReview(row.original)">
               <CommonBilingualName
                 :name-en="row.original.reviewNameEn"
@@ -392,7 +392,7 @@ const expandedOptions = { autoResetExpanded: false }
 
       <template #actions-cell="{ row }">
         <div v-if="isReviewSetGroupRow(row) && canUpdate" class="flex justify-end gap-2">
-          <UButton
+          <CommonActionButton
             v-if="!isTerminalRuntimeState(row.original.reviewSetRuntimeState)"
             icon="i-lucide-ban"
             color="error"
@@ -403,12 +403,12 @@ const expandedOptions = { autoResetExpanded: false }
         </div>
 
         <div v-else-if="!isGroupedRow(row)" class="flex justify-end gap-2">
-          <UButton
+          <CommonActionButton
             icon="i-lucide-eye"
             color="neutral"
             variant="ghost"
             class="cursor-default"
-            :aria-label="t('common.open')"
+            :aria-label="`${t('common.open')}: ${row.original.reviewNameEn} / ${row.original.reviewNameFr}`"
             @click="openReview(row.original)" />
           <UButton
             v-if="row.original.canRetry && row.original.reviewSetRuntimeKind === 'review_set' && isTerminalRuntimeState(row.original.reviewSetRuntimeState) && isRetryableReviewState(row.original.reviewRuntimeState)"

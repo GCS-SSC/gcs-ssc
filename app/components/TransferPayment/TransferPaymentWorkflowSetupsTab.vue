@@ -133,7 +133,7 @@ const name = (item: LinkedWorkflow) => (locale.value === 'fr' ? item.egcs_cn_nam
       </template>
       <template #actions-cell="{ row }">
         <div class="flex justify-end gap-2">
-          <UButton
+          <CommonActionButton
             v-if="canUpdateChild" icon="i-lucide-unlink" variant="ghost" color="error" size="sm"
             :aria-label="t('common.delete_named', { name: name(row.original) })" @click="remove(row.original)" />
         </div>

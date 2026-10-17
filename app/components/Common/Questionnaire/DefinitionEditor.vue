@@ -79,7 +79,7 @@ const addQuestion = (sectionIndex: number, subSectionIndex: number) => {
         </div>
         <div class="flex justify-end gap-2">
           <UButton icon="i-lucide-plus" variant="outline" :label="t('recommendation_schema.add_subsection')" class="cursor-default" @click="addSubSection(sectionIndex)" />
-          <UButton icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('recommendation_schema.remove_section')" class="cursor-default" @click="definition.sections.splice(sectionIndex, 1)" />
+          <CommonActionButton icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('recommendation_schema.remove_section')" class="cursor-default" @click="definition.sections.splice(sectionIndex, 1)" />
         </div>
 
         <AssessmentSchemaAccordionSection
@@ -99,7 +99,7 @@ const addQuestion = (sectionIndex: number, subSectionIndex: number) => {
             </div>
             <div class="flex justify-end gap-2">
               <UButton icon="i-lucide-plus" variant="outline" :label="t('recommendation_schema.add_question')" class="cursor-default" @click="addQuestion(sectionIndex, subSectionIndex)" />
-              <UButton icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('recommendation_schema.remove_subsection')" class="cursor-default" @click="section.subSections.splice(subSectionIndex, 1)" />
+              <CommonActionButton icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('recommendation_schema.remove_subsection')" class="cursor-default" @click="section.subSections.splice(subSectionIndex, 1)" />
             </div>
             <AssessmentSchemaAccordionSection
               v-for="(question, questionIndex) in subSection.questions"

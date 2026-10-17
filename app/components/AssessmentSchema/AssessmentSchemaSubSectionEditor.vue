@@ -42,7 +42,7 @@ const subSectionTitle = computed(() => {
   <AssessmentSchemaAccordionSection :title="subSectionTitle" level="sub">
     <div class="space-y-6">
       <div class="flex justify-end">
-        <UButton
+        <CommonActionButton
           icon="i-lucide-trash"
           color="error"
           variant="ghost"

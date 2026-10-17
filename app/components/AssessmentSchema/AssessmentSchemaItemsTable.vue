@@ -190,7 +190,7 @@ const removeItem = (index: number) => {
 
       <template #actions-cell="{ row }">
         <div class="flex items-center gap-1">
-          <UButton
+          <CommonActionButton
             icon="i-lucide-pencil"
             color="neutral"
             variant="ghost"
@@ -198,7 +198,7 @@ const removeItem = (index: number) => {
             class="cursor-default"
             :aria-label="t('common.edit')"
             @click="openEditEditor(row.index)" />
-          <UButton
+          <CommonActionButton
             icon="i-lucide-trash"
             color="error"
             variant="ghost"

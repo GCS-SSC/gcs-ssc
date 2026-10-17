@@ -89,7 +89,7 @@ const getOptionKey = (option: AssessmentOutcomeOptionRow) => option._key
                 <UInput v-model="strategy.name" />
               </UFormField>
               <div class="flex items-end">
-                <UButton
+                <CommonActionButton
                   icon="i-lucide-trash"
                   color="error"
                   variant="ghost"
@@ -129,7 +129,7 @@ const getOptionKey = (option: AssessmentOutcomeOptionRow) => option._key
                       <UInput v-model="option.value" />
                     </UFormField>
                     <div class="flex items-end">
-                      <UButton
+                      <CommonActionButton
                         icon="i-lucide-trash"
                         color="error"
                         variant="ghost"

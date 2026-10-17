@@ -139,7 +139,7 @@ const getOptionName = (option: AssessmentOptionRow) => getAssessmentLocaleLabel(
               </UFormField>
 
               <div class="flex items-end xl:pb-1.5">
-                <UButton
+                <CommonActionButton
                   icon="i-lucide-trash"
                   color="error"
                   variant="ghost"

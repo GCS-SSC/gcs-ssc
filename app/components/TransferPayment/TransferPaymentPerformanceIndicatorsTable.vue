@@ -121,7 +121,7 @@ const indicatorBilingualColumns = computed<BilingualColumnConfig<TransferPayment
 
     <template #actions-cell="{ row }">
       <div class="flex items-center gap-2">
-        <UButton
+        <CommonActionButton
           v-if="canUpdateChild"
           icon="i-lucide-pencil"
           color="neutral"
@@ -129,7 +129,7 @@ const indicatorBilingualColumns = computed<BilingualColumnConfig<TransferPayment
           size="sm"
           :aria-label="t('common.edit_named', { name: getIndicatorActionTarget(row.original) })"
           @click="emit('edit', row.original)" />
-        <UButton
+        <CommonActionButton
           v-if="canDeleteChild"
           icon="i-lucide-trash"
           color="error"

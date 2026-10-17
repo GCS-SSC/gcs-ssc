@@ -421,7 +421,7 @@ watch(
           <p class="text-sm font-semibold">
             {{ t('transfer_payment.score_weights') }}
           </p>
-          <UButton
+          <CommonActionButton
             icon="i-lucide-plus" size="sm" variant="outline" class="cursor-default"
             :aria-label="t('transfer_payment.add_score_weight')" @click="addAdjustableWeightRow" />
         </div>
@@ -436,7 +436,7 @@ watch(
           <UFormField :label="t('common.weight')">
             <UInput v-model.number="row.value" type="number" />
           </UFormField>
-          <UButton
+          <CommonActionButton
             icon="i-lucide-trash" color="error" variant="ghost" class="cursor-default"
             :aria-label="t('transfer_payment.delete_score_weight', { position: rowIndex + 1 })"
             @click="removeAdjustableWeightRow(row.id)" />
@@ -465,7 +465,7 @@ watch(
           <p class="text-sm font-semibold">
             {{ t('transfer_payment.adjustable_scenario') }} {{ scenarioIndex + 1 }}
           </p>
-          <UButton
+          <CommonActionButton
             icon="i-lucide-trash" color="error" variant="ghost" class="cursor-default"
             :aria-label="t('transfer_payment.delete_adjustable_scenario', { scenario: scenarioIndex + 1 })"
             @click="removeAdjustableScenario(scenarioIndex)" />
@@ -505,7 +505,7 @@ watch(
             <p class="text-sm font-semibold">
               {{ t('transfer_payment.score_weights') }}
             </p>
-            <UButton
+            <CommonActionButton
               icon="i-lucide-plus" size="sm" variant="outline" class="cursor-default"
               :aria-label="t('transfer_payment.add_scenario_score_weight', { scenario: scenarioIndex + 1 })"
               @click="addArrayWeightRow(scenario)" />
@@ -521,7 +521,7 @@ watch(
             <UFormField :label="t('common.weight')">
               <UInput v-model.number="row.value" type="number" @update:model-value="updateArrayWeightRows(scenario)" />
             </UFormField>
-            <UButton
+            <CommonActionButton
               icon="i-lucide-trash" color="error" variant="ghost" class="cursor-default"
               :aria-label="t('transfer_payment.delete_scenario_score_weight', { position: rowIndex + 1, scenario: scenarioIndex + 1 })"
               @click="removeArrayWeightRow(scenario, row.id)" />

@@ -195,7 +195,7 @@ const setDeleted = async (definition: StatusDefinition, deleted: boolean) => {
           </p>
         </div>
         <div class="flex items-center gap-1">
-          <UButton
+          <CommonActionButton
             v-if="canEdit && !definition.isDraft && !definition.deleted"
             type="button"
             icon="i-lucide-pencil"
@@ -203,7 +203,7 @@ const setDeleted = async (definition: StatusDefinition, deleted: boolean) => {
             variant="ghost"
             :aria-label="t('common.edit')"
             @click="openEdit(definition)" />
-          <UButton
+          <CommonActionButton
             v-if="canManageFlags && !definition.isDraft"
             type="button"
             :icon="definition.deleted ? 'i-lucide-rotate-ccw' : 'i-lucide-trash-2'"

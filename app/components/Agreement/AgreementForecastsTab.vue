@@ -413,7 +413,7 @@ const deleteForecast = (forecastId: string) => runAction(async isCurrent => {
 
       <template #actions-cell="{ row }">
         <div class="flex items-center justify-end gap-2">
-          <UButton
+          <CommonActionButton
             v-if="isFiscalYearGroupRow(row as ForecastGroupedRow) && canCreateRole"
             :loading="isCreatingVersion"
             :disabled="Boolean(pendingAction)"
@@ -423,7 +423,7 @@ const deleteForecast = (forecastId: string) => runAction(async isCurrent => {
             class="cursor-default"
             :aria-label="t('agreement.forecasts.add_version')"
             @click="createForecastVersion(row as ForecastGroupedRow)" />
-          <UButton
+          <CommonActionButton
             v-if="!isFiscalYearGroupRow(row as ForecastGroupedRow) && canDeleteRole"
             icon="i-lucide-trash"
             color="error"
@@ -431,7 +431,7 @@ const deleteForecast = (forecastId: string) => runAction(async isCurrent => {
             class="cursor-default"
             :aria-label="`${t('common.delete')}: ${row.original.fiscalYearDisplay}, ${t('agreement.forecasts.version_label', { version: row.original.version })}`"
             @click="deleteForecast(row.original.forecastId)" />
-          <UButton
+          <CommonActionButton
             v-if="!isFiscalYearGroupRow(row as ForecastGroupedRow)"
             :to="getForecastRoute(row.original)"
             icon="i-lucide-arrow-right"

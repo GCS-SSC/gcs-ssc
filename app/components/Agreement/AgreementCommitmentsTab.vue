@@ -373,14 +373,14 @@ const deleteCommitment = (recordId: string) => runRecordAction(recordId, 'delete
 
       <template #actions-cell="{ row }">
         <div class="flex items-center justify-end gap-2">
-          <UButton
+          <CommonActionButton
             :to="localePath(appRouteLocations.agreementCommitmentDetail(agreementId, String(row.original.id)))"
             icon="i-lucide-arrow-right"
             color="neutral"
             variant="ghost"
             class="cursor-default"
             :aria-label="t('common.open')" />
-          <UButton
+          <CommonActionButton
             v-if="canUpdate && !row.getIsGrouped?.()"
             icon="i-lucide-pencil"
             :disabled="pendingRecordActions.has(String(row.original.id))"
@@ -389,7 +389,7 @@ const deleteCommitment = (recordId: string) => runRecordAction(recordId, 'delete
             class="cursor-default"
             :aria-label="t('common.edit')"
             @click="openUpdateCommitment(row.original)" />
-          <UButton
+          <CommonActionButton
             v-if="canDelete && !row.getIsGrouped?.()"
             icon="i-lucide-trash"
             :disabled="pendingRecordActions.has(String(row.original.id))"

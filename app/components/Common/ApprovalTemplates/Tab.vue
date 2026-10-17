@@ -150,7 +150,7 @@ const deleteTemplate = async (templateId: string) => {
 
       <template #actions-cell="{ row }">
         <div class="flex items-center gap-2">
-          <UButton
+          <CommonActionButton
             icon="i-lucide-arrow-right"
             color="neutral"
             variant="ghost"
@@ -158,7 +158,7 @@ const deleteTemplate = async (templateId: string) => {
             class="cursor-default"
             :aria-label="`${t('common.open')}: ${getTemplateLabel(row.original)}`"
             @click="openTemplateDetail(row.original.templateId)" />
-          <UButton
+          <CommonActionButton
             v-if="canDeleteChild"
             icon="i-lucide-trash"
             color="error"

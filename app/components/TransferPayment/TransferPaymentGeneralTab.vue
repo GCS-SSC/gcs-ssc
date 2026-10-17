@@ -30,7 +30,7 @@ const { t } = useI18n()
             :href="profile.egcs_tp_tclink_en"
             target="_blank"
             rel="noopener noreferrer"
-            :aria-label="t('transfer_payment.terms_link_en')">
+            :aria-label="`${t('transfer_payment.terms_link_en')}: ${profile.egcs_tp_tclink_en}`">
             {{ profile.egcs_tp_tclink_en }}
           </a>
         </div>
@@ -45,7 +45,7 @@ const { t } = useI18n()
             :href="profile.egcs_tp_tclink_fr"
             target="_blank"
             rel="noopener noreferrer"
-            :aria-label="t('transfer_payment.terms_link_fr')">
+            :aria-label="`${t('transfer_payment.terms_link_fr')}: ${profile.egcs_tp_tclink_fr}`">
             {{ profile.egcs_tp_tclink_fr }}
           </a>
         </div>

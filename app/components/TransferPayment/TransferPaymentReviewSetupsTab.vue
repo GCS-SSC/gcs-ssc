@@ -132,7 +132,7 @@ const removeLink = async (link: ReviewSetLink) => {
       </template>
       <template #actions-cell="{ row }">
         <div class="flex justify-end gap-2">
-          <UButton
+          <CommonActionButton
             v-if="canUpdateChild" icon="i-lucide-trash" color="error" variant="ghost" size="sm"
             :aria-label="t('common.delete_named', { name: locale === 'fr' ? row.original.egcs_cn_name_fr : row.original.egcs_cn_name_en })"
             @click="removeLink(row.original)" />

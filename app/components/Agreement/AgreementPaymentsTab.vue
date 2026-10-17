@@ -691,13 +691,13 @@ const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', 
 
       <template #actions-cell="{ row }">
         <div class="flex items-center justify-end gap-2">
-          <UButton
+          <CommonActionButton
             icon="i-lucide-arrow-right"
             color="neutral"
             variant="ghost"
             :aria-label="t('common.view_details')"
             :to="localePath(appRouteLocations.agreementPaymentDetail(agreementId, String(row.original.id)))" />
-          <UButton
+          <CommonActionButton
             v-if="canUpdate && !row.getIsGrouped?.()"
             icon="i-lucide-pencil"
             :disabled="pendingRecordActions.has(String(row.original.id))"
@@ -706,7 +706,7 @@ const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', 
             class="cursor-default"
             :aria-label="t('common.edit')"
             @click="openUpdatePayment(row.original)" />
-          <UButton
+          <CommonActionButton
             v-if="canDelete && !row.getIsGrouped?.()"
             icon="i-lucide-trash"
             :disabled="pendingRecordActions.has(String(row.original.id))"
@@ -844,7 +844,7 @@ const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', 
                     <UFormField :label="t('account_receivable.credit_memo_amount')" :name="`egcs_fc_offsetcreditmemos.${memoIndex}.egcs_fc_lines.${lineIndex}.egcs_fc_amount`">
                       <CommonCurrencyInput v-model="line.egcs_fc_amount" :currency="agreementCurrency" :disabled="isSavingPayment" class="w-full" />
                     </UFormField>
-                    <UButton
+                    <CommonActionButton
                       icon="i-lucide-trash" color="error" variant="ghost" type="button" class="mt-6"
                       :aria-label="t('agreement.payments.wizard.remove_coding_line', { number: lineIndex + 1 })"
                       :disabled="isSavingPayment || memo.egcs_fc_lines.length === 1" @click="memo.egcs_fc_lines.splice(lineIndex, 1)" />

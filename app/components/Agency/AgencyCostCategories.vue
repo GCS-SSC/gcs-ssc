@@ -463,7 +463,7 @@ const deleteLineItem = async (lineItemId: string) => {
       <template #actions-cell="{ row }">
         <div class="flex items-center justify-end gap-2">
           <template v-if="isCostCategoryGroupRow(row as GroupedCostCategoryRow)">
-            <UButton
+            <CommonActionButton
               v-if="canUpdate"
               icon="i-lucide-edit-3"
               color="neutral"
@@ -471,7 +471,7 @@ const deleteLineItem = async (lineItemId: string) => {
               size="sm"
               :aria-label="t('common.edit')"
               @click="openEditCategory(row.original.costCategoryId)" />
-            <UButton
+            <CommonActionButton
               v-if="canCreate"
               icon="i-lucide-plus"
               color="primary"
@@ -480,7 +480,7 @@ const deleteLineItem = async (lineItemId: string) => {
               class="cursor-default"
               :aria-label="t('agency.add_line_item_named', { name: getBilingualValue({ egcs_ay_name_en: row.original.costCategoryNameEn, egcs_ay_name_fr: row.original.costCategoryNameFr }, 'egcs_ay_name', row.original.costCategoryId) })"
               @click="openCreateLineItem(row.original.costCategoryId)" />
-            <UButton
+            <CommonActionButton
               v-if="canDelete && getGroupedRowCount(row as GroupedCostCategoryRow) === 0"
               icon="i-lucide-trash"
               color="error"
@@ -492,7 +492,7 @@ const deleteLineItem = async (lineItemId: string) => {
           </template>
 
           <template v-else-if="!row.original.isPlaceholder && row.original.lineItemId">
-            <UButton
+            <CommonActionButton
               v-if="canUpdate"
               icon="i-lucide-edit-3"
               color="neutral"
@@ -500,7 +500,7 @@ const deleteLineItem = async (lineItemId: string) => {
               size="sm"
               :aria-label="t('common.edit')"
               @click="openEditLineItem(row.original.lineItemId)" />
-            <UButton
+            <CommonActionButton
               v-if="canDelete"
               icon="i-lucide-trash"
               color="error"

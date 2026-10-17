@@ -162,14 +162,14 @@ const deleteMonitor = async (monitorId: string) => {
 
       <template #actions-cell="{ row }">
         <div class="flex items-center justify-end gap-2">
-          <UButton
+          <CommonActionButton
             :to="localePath(appRouteLocations.agreementMonitorDetail(agreementId, String(row.original.id)))"
             icon="i-lucide-arrow-right"
             color="neutral"
             variant="ghost"
             class="cursor-default"
             :aria-label="t('common.open')" />
-          <UButton
+          <CommonActionButton
             v-if="canUpdate && !isRecordLocked(row.original)"
             icon="i-lucide-pencil"
             color="neutral"
@@ -177,7 +177,7 @@ const deleteMonitor = async (monitorId: string) => {
             class="cursor-default"
             :aria-label="t('common.edit')"
             @click="monitorModal.openUpdate(row.original)" />
-          <UButton
+          <CommonActionButton
             v-if="canDelete && !isRecordLocked(row.original)"
             icon="i-lucide-trash"
             color="error"

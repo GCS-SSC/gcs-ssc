@@ -237,7 +237,7 @@ const deleteTemplate = async (row: AgencyDocumentTemplateItem) => {
         <div class="space-y-1 text-xs leading-5">
           <div class="flex items-center justify-between gap-2">
             <span>{{ t('enums.language_preference.eng') }}: {{ row.original.attachment_en_name_en }}</span>
-            <UButton
+            <CommonActionButton
               icon="i-lucide-download"
               color="neutral"
               variant="ghost"
@@ -250,7 +250,7 @@ const deleteTemplate = async (row: AgencyDocumentTemplateItem) => {
           </div>
           <div class="flex items-center justify-between gap-2">
             <span>{{ t('enums.language_preference.fra') }}: {{ row.original.attachment_fr_name_fr }}</span>
-            <UButton
+            <CommonActionButton
               icon="i-lucide-download"
               color="neutral"
               variant="ghost"
@@ -266,8 +266,8 @@ const deleteTemplate = async (row: AgencyDocumentTemplateItem) => {
 
       <template #actions-cell="{ row }">
         <div class="flex items-center gap-2">
-          <UButton v-if="canUpdate" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" class="cursor-default" :aria-label="t('common.edit_named', { name: getTemplateActionTarget(row.original) })" @click="openUpdate(row.original)" />
-          <UButton v-if="canDelete" icon="i-lucide-trash" color="error" variant="ghost" size="sm" class="cursor-default" :aria-label="t('common.delete_named', { name: getTemplateActionTarget(row.original) })" @click="deleteTemplate(row.original)" />
+          <CommonActionButton v-if="canUpdate" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" class="cursor-default" :aria-label="t('common.edit_named', { name: getTemplateActionTarget(row.original) })" @click="openUpdate(row.original)" />
+          <CommonActionButton v-if="canDelete" icon="i-lucide-trash" color="error" variant="ghost" size="sm" class="cursor-default" :aria-label="t('common.delete_named', { name: getTemplateActionTarget(row.original) })" @click="deleteTemplate(row.original)" />
         </div>
       </template>
     </CommonResourceLayoutCard>

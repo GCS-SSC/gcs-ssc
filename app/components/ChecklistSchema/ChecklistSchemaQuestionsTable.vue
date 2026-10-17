@@ -8,7 +8,7 @@ import type { ChecklistEditorQuestion } from '~/types/checklist-schema-editor'
 import { DEFAULT_CHECKLIST_OPTIONS } from '~~/shared/types/schemas/checklist/checklist'
 
 const questions = defineModel<ChecklistEditorQuestion[]>('questions', { default: () => [] })
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const isEditorOpen: Ref<boolean> = ref(false)
 const editorMode: Ref<'create' | 'edit'> = ref('create')
 const editingKey: Ref<string | null> = ref(null)
@@ -98,8 +98,8 @@ const removeQuestion = (index: number) => questions.value.splice(index, 1)
       </template>
       <template #actions-cell="{ row }">
         <div class="flex items-center gap-1">
-          <UButton icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" class="cursor-default" :aria-label="t('common.edit_named', { name: row.original.nameEn || row.original.nameFr || row.original.code })" @click="openEditEditor(row.index)" />
-          <UButton icon="i-lucide-trash" color="error" variant="ghost" size="sm" class="cursor-default" :aria-label="t('common.delete_named', { name: row.original.nameEn || row.original.nameFr || row.original.code })" @click="removeQuestion(row.index)" />
+          <CommonActionButton icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" class="cursor-default" :aria-label="t('common.edit_named', { name: (locale === 'fr' ? row.original.nameFr : row.original.nameEn) || row.original.nameEn || row.original.nameFr || row.original.code })" @click="openEditEditor(row.index)" />
+          <CommonActionButton icon="i-lucide-trash" color="error" variant="ghost" size="sm" class="cursor-default" :aria-label="t('common.delete_named', { name: (locale === 'fr' ? row.original.nameFr : row.original.nameEn) || row.original.nameEn || row.original.nameFr || row.original.code })" @click="removeQuestion(row.index)" />
         </div>
       </template>
     </CommonCompactTable>

@@ -82,7 +82,7 @@ const certificationStatus = (value: boolean | null) => {
 
 <template>
   <UPopover>
-    <UButton
+    <CommonActionButton
       icon="i-lucide-eye"
       color="neutral"
       variant="ghost"

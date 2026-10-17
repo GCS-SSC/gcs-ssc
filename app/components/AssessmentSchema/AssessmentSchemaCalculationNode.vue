@@ -284,7 +284,7 @@ watchEffect(() => {
           <p class="text-xs font-bold tracking-[0.18em] text-zinc-500 uppercase dark:text-zinc-400">
             {{ t('transfer_payment.calculation_argument') }} {{ argumentIndex + 1 }}
           </p>
-          <UButton
+          <CommonActionButton
             v-if="(operationConfig?.minArgs ?? 0) < expression.args.length"
             icon="i-lucide-trash"
             color="error"

@@ -209,7 +209,7 @@ const columns: TableColumnInput<UserListItem>[] = [
         </template>
         <template #right>
           <div class="flex items-center gap-2">
-            <UButton
+            <CommonActionButton
               color="neutral"
               variant="ghost"
               :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
@@ -268,7 +268,7 @@ const columns: TableColumnInput<UserListItem>[] = [
                 :disabled="isMutationPending"
                 :loading="isActivatingUser && activatingUserId === row.original.id"
                 @click.stop="openActivationModal(row.original)" />
-              <UButton
+              <CommonActionButton
                 v-if="row.original.can_update && row.original.id && !deletedUserIds.has(row.original.id)"
                 icon="i-lucide-edit-3"
                 variant="soft"
@@ -278,7 +278,7 @@ const columns: TableColumnInput<UserListItem>[] = [
                 :disabled="isMutationPending"
                 :loading="isSavingUser && selectedUser?.id === row.original.id"
                 @click.stop="openUpdateModal(row.original)" />
-              <UButton
+              <CommonActionButton
                 v-if="row.original.can_delete && row.original.id && !deletedUserIds.has(row.original.id)"
                 icon="i-lucide-trash"
                 variant="soft"

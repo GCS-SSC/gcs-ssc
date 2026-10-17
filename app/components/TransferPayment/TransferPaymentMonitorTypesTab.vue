@@ -103,7 +103,7 @@ watch([() => transferPaymentId, () => streamId], () => modal.close())
 
     <template #actions-cell="{ row }">
       <div class="flex items-center gap-2">
-        <UButton
+        <CommonActionButton
           v-if="canDeleteChild"
           icon="i-lucide-trash"
           color="error"

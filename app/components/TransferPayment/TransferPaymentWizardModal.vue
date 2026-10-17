@@ -133,7 +133,7 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentWizard>) => {
                 v-for="(outcome, index) in state.outcomes"
                 :key="outcome.tempId"
                 class="border-default relative space-y-4 rounded-xl border bg-zinc-50/50 p-4 dark:bg-zinc-900/50">
-                <UButton
+                <CommonActionButton
                   icon="i-lucide-x"
                   color="error"
                   variant="ghost"
@@ -171,7 +171,7 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentWizard>) => {
                 v-for="(objective, index) in state.objectives"
                 :key="objective.tempId"
                 class="border-default relative space-y-4 rounded-xl border bg-zinc-50/50 p-4 dark:bg-zinc-900/50">
-                <UButton
+                <CommonActionButton
                   icon="i-lucide-x"
                   color="error"
                   variant="ghost"
@@ -209,7 +209,7 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentWizard>) => {
                 v-for="(budget, index) in state.budgets"
                 :key="budget.tempId"
                 class="border-default relative grid grid-cols-1 gap-4 rounded-xl border bg-zinc-50/50 p-4 md:grid-cols-3 dark:bg-zinc-900/50">
-                <UButton
+                <CommonActionButton
                   icon="i-lucide-x"
                   color="error"
                   variant="ghost"
@@ -251,7 +251,7 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentWizard>) => {
                 v-for="(pi, index) in state.performanceIndicators"
                 :key="pi.tempId"
                 class="border-default relative space-y-4 rounded-xl border bg-zinc-50/50 p-4 dark:bg-zinc-900/50">
-                <UButton
+                <CommonActionButton
                   icon="i-lucide-x"
                   color="error"
                   variant="ghost"

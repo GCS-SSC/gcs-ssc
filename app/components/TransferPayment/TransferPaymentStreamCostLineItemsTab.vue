@@ -195,7 +195,7 @@ const { data: costLineItemResponse } = await useAgencyReferenceData<AgencyCostCa
 
     <template #actions-cell="{ row }">
       <div class="flex items-center gap-2">
-        <UButton
+        <CommonActionButton
           icon="i-lucide-pencil"
           color="neutral"
           variant="ghost"
@@ -203,7 +203,7 @@ const { data: costLineItemResponse } = await useAgencyReferenceData<AgencyCostCa
           :aria-label="t('common.edit_named', { name: getCostLineActionTarget(row.original) })"
           :disabled="!canUpdateChild"
           @click="openUpdateCostCategoryLine(row.original)" />
-        <UButton
+        <CommonActionButton
           icon="i-lucide-trash"
           color="error"
           variant="ghost"

@@ -100,8 +100,8 @@ defineExpose({
     <CommonCompactTable :data="rows" :columns="columns">
       <template #actions-cell="{ row }">
         <div class="flex items-center gap-1">
-          <UButton icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" class="cursor-default" :aria-label="t('common.edit_named', { name: row.original.label || row.original.id })" @click="openEditEditor(row.index)" />
-          <UButton icon="i-lucide-trash" color="error" variant="ghost" size="sm" class="cursor-default" :aria-label="t('common.delete_named', { name: row.original.label || row.original.id })" @click="removeOutcome(row.index)" />
+          <CommonActionButton icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" class="cursor-default" :aria-label="t('common.edit_named', { name: row.original.label || row.original.id })" @click="openEditEditor(row.index)" />
+          <CommonActionButton icon="i-lucide-trash" color="error" variant="ghost" size="sm" class="cursor-default" :aria-label="t('common.delete_named', { name: row.original.label || row.original.id })" @click="removeOutcome(row.index)" />
         </div>
       </template>
     </CommonCompactTable>

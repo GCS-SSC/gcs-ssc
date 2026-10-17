@@ -150,7 +150,7 @@ const remove = async (row: AmendmentSubtypeRow) => {
       </template>
       <template #actions-cell="{ row }">
         <div class="flex items-center gap-2">
-          <UButton
+          <CommonActionButton
             v-if="canUpdateChild"
             icon="i-lucide-pencil"
             color="neutral"
@@ -159,7 +159,7 @@ const remove = async (row: AmendmentSubtypeRow) => {
             class="cursor-default"
             :aria-label="t('common.edit')"
             @click="openUpdate(row.original)" />
-          <UButton
+          <CommonActionButton
             v-if="canDeleteChild"
             icon="i-lucide-trash"
             color="error"

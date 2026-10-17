@@ -4,7 +4,7 @@ import { nanoid } from 'nanoid'
 import type { ReviewSchemaHelpEditorItem } from '~/types/review-schema-editor'
 
 const helpItems = defineModel<ReviewSchemaHelpEditorItem[]>({ default: () => [] })
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 /** Adds an empty bilingual help entry to the shared review-schema editor. */
 const addHelp = () => {
@@ -44,12 +44,12 @@ const removeHelp = (helpIndex: number) => helpItems.value.splice(helpIndex, 1)
           </UFormField>
 
           <div class="flex items-end xl:pb-1.5">
-            <UButton
+            <CommonActionButton
               icon="i-lucide-trash"
               color="error"
               variant="ghost"
               class="cursor-default"
-              :aria-label="t('common.delete_named', { name: helpItem.title.en || helpItem.title.fr || String(helpIndex + 1) })"
+              :aria-label="t('common.delete_named', { name: helpItem.title[locale === 'fr' ? 'fr' : 'en'] || helpItem.title.en || helpItem.title.fr || String(helpIndex + 1) })"
               @click="removeHelp(helpIndex)" />
           </div>
         </div>

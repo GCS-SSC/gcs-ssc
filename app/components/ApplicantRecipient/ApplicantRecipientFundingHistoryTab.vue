@@ -230,7 +230,7 @@ const visibleRows = computed(() => items.value)
 
       <template #actions-cell="{ row }">
         <div v-if="isVisible(row.original)" class="flex justify-end">
-          <UButton
+          <CommonActionButton
             v-if="row.original.source === 'system' && row.original.agreementId"
             icon="i-lucide-arrow-right"
             color="neutral"
@@ -238,7 +238,7 @@ const visibleRows = computed(() => items.value)
             :aria-label="t('common.open')"
             @click="openSystemAgreement(row.original)" />
           <UDropdownMenu v-else-if="row.original.source === 'external' && hasExternalActions(row.original)" :items="menuItems(row.original)">
-            <UButton
+            <CommonActionButton
               icon="i-lucide-ellipsis-vertical"
               color="neutral"
               variant="ghost"

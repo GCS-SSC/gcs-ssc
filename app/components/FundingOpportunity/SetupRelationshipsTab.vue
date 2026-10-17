@@ -176,7 +176,7 @@ const saveLinks = async (row: SetupRow, action: 'associate' | 'disassociate') =>
     </template>
     <template #actions-cell="{ row }">
       <div class="flex justify-end gap-2">
-        <UButton
+        <CommonActionButton
           v-if="canEdit"
           icon="i-lucide-unlink"
           color="error"

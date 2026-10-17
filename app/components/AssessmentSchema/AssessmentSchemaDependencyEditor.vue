@@ -200,7 +200,7 @@ const getDependencyValueTypeItems = (rule: DependencyRuleUi, clauseId: string) =
         <p class="text-sm font-semibold">
           {{ t('transfer_payment.dependency_rule') }} {{ ruleIndex + 1 }}
         </p>
-        <UButton
+        <CommonActionButton
           icon="i-lucide-trash"
           color="error"
           variant="ghost"
@@ -224,7 +224,7 @@ const getDependencyValueTypeItems = (rule: DependencyRuleUi, clauseId: string) =
           <p class="text-xs font-bold tracking-wide text-zinc-500 uppercase dark:text-zinc-400">
             {{ t('transfer_payment.condition') }} {{ clauseIndex + 1 }}
           </p>
-          <UButton
+          <CommonActionButton
             icon="i-lucide-trash"
             color="error"
             variant="ghost"

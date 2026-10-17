@@ -152,21 +152,21 @@ watch(search, value => {
       <template #actions-cell="{ row }">
         <div class="flex items-center justify-end gap-2">
           <template v-if="row.getIsGrouped()">
-            <UButton v-if="row.original.canEdit" icon="i-lucide-plus" color="primary" variant="ghost" size="sm" :aria-label="t('guided_help.create_in', { name: ownerName(row.original) })" :title="t('guided_help.create_in', { name: ownerName(row.original) })" :disabled="pending" @click="emit('create', row.original.context)" />
-            <UButton v-if="groupFor(row.original)?.error" icon="i-lucide-refresh-cw" color="neutral" variant="ghost" size="sm" :aria-label="t('common.retry')" :title="t('common.retry')" @click="emit('expand', row.original.context)" />
+            <CommonActionButton v-if="row.original.canEdit" icon="i-lucide-plus" color="primary" variant="ghost" size="sm" :aria-label="t('guided_help.create_in', { name: ownerName(row.original) })" :disabled="pending" @click="emit('create', row.original.context)" />
+            <CommonActionButton v-if="groupFor(row.original)?.error" icon="i-lucide-refresh-cw" color="neutral" variant="ghost" size="sm" :aria-label="t('common.retry')" @click="emit('expand', row.original.context)" />
           </template>
           <template v-else-if="!row.original.placeholder">
-            <UButton v-if="row.original.guide" icon="i-lucide-arrow-right" color="neutral" variant="ghost" size="sm" :aria-label="t('common.open')" :title="t('common.open')" :disabled="pending" @click="emit('open', row.original.context, row.original.guide.id)" />
-            <UButton v-if="row.original.catalog" :icon="row.original.guide ? 'i-lucide-settings-2' : 'i-lucide-arrow-right'" color="neutral" variant="ghost" size="sm" :aria-label="t(row.original.guide ? 'guided_help.distribution' : 'common.open')" :title="t(row.original.guide ? 'guided_help.distribution' : 'common.open')" :disabled="pending" @click="emit('catalog', row.original.context, row.original.catalog.egcs_ay_guide, row.original.catalog.id)" />
-            <UButton v-else-if="!row.original.offer && row.original.context !== 'system' && row.original.canEdit && row.original.guide?.versions.length" icon="i-lucide-plus" color="neutral" variant="ghost" size="sm" :aria-label="t('guided_help.adopt')" :title="t('guided_help.adopt')" :disabled="pending" @click="emit('catalog', row.original.context, row.original.guide.id)" />
+            <CommonActionButton v-if="row.original.guide" icon="i-lucide-arrow-right" color="neutral" variant="ghost" size="sm" :aria-label="t('common.open')" :disabled="pending" @click="emit('open', row.original.context, row.original.guide.id)" />
+            <CommonActionButton v-if="row.original.catalog" :icon="row.original.guide ? 'i-lucide-settings-2' : 'i-lucide-arrow-right'" color="neutral" variant="ghost" size="sm" :aria-label="t(row.original.guide ? 'guided_help.distribution' : 'common.open')" :disabled="pending" @click="emit('catalog', row.original.context, row.original.catalog.egcs_ay_guide, row.original.catalog.id)" />
+            <CommonActionButton v-else-if="!row.original.offer && row.original.context !== 'system' && row.original.canEdit && row.original.guide?.versions.length" icon="i-lucide-plus" color="neutral" variant="ghost" size="sm" :aria-label="t('guided_help.adopt')" :disabled="pending" @click="emit('catalog', row.original.context, row.original.guide.id)" />
             <template v-if="row.original.offer">
               <template v-for="action in (['catalog', 'clone'] as const)" :key="action">
                 <UDropdownMenu v-if="destinations(row.original, action).length > 1" :items="destinationItems(row.original, action)">
-                  <UButton :icon="action === 'catalog' ? 'i-lucide-plus' : 'i-lucide-copy'" color="neutral" variant="ghost" size="sm" :aria-label="t(action === 'catalog' ? 'guided_help.adopt' : 'guided_help.clone')" :title="t(action === 'catalog' ? 'guided_help.adopt' : 'guided_help.clone')" :disabled="pending" />
+                  <CommonActionButton :icon="action === 'catalog' ? 'i-lucide-plus' : 'i-lucide-copy'" color="neutral" variant="ghost" size="sm" :aria-label="t(action === 'catalog' ? 'guided_help.adopt' : 'guided_help.clone')" :disabled="pending" />
                 </UDropdownMenu>
-                <UButton v-else-if="destinations(row.original, action).length === 1" :icon="action === 'catalog' ? 'i-lucide-plus' : 'i-lucide-copy'" color="neutral" variant="ghost" size="sm" :aria-label="t(action === 'catalog' ? 'guided_help.adopt' : 'guided_help.clone')" :title="t(action === 'catalog' ? 'guided_help.adopt' : 'guided_help.clone')" :disabled="pending" @click="selectDestination(row.original, action)" />
+                <CommonActionButton v-else-if="destinations(row.original, action).length === 1" :icon="action === 'catalog' ? 'i-lucide-plus' : 'i-lucide-copy'" color="neutral" variant="ghost" size="sm" :aria-label="t(action === 'catalog' ? 'guided_help.adopt' : 'guided_help.clone')" :disabled="pending" @click="selectDestination(row.original, action)" />
               </template>
-              <UButton icon="i-lucide-play" color="neutral" variant="ghost" size="sm" :aria-label="t('guided_help.preview')" :title="t('guided_help.preview')" @click="emit('preview', groups.find(group => group.id !== 'system')?.id ?? row.original.context, row.original.offer.egcs_cn_document)" />
+              <CommonActionButton icon="i-lucide-play" color="neutral" variant="ghost" size="sm" :aria-label="t('guided_help.preview')" @click="emit('preview', groups.find(group => group.id !== 'system')?.id ?? row.original.context, row.original.offer.egcs_cn_document)" />
             </template>
           </template>
         </div>

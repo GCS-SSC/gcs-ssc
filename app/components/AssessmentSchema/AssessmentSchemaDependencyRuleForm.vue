@@ -134,7 +134,7 @@ watch(
           {{ t('transfer_payment.condition') }} {{ clauseIndex + 1 }}
         </p>
 
-        <UButton
+        <CommonActionButton
           v-if="rule.clauses.length > 1"
           icon="i-lucide-trash"
           color="error"

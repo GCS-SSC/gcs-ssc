@@ -523,8 +523,8 @@ const handleCompleted = async () => {
                   @add="openResourceEditor('create', () => planningModal.openCreate())">
                   <template #actions-cell="{ row }">
                     <div v-if="canUpdateMonitorRole || canDeleteMonitorResource" class="flex justify-end gap-2">
-                      <UButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asPlanningRow(row.original).id}`" @click="openResourceEditor('update', () => planningModal.openUpdate(asPlanningRow(row.original)))" />
-                      <UButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-planning', asPlanningRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asPlanningRow(row.original).id}`" @click="deleteResource('monitor-planning', String(asPlanningRow(row.original).id))" />
+                      <CommonActionButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asPlanningRow(row.original).id}`" @click="openResourceEditor('update', () => planningModal.openUpdate(asPlanningRow(row.original)))" />
+                      <CommonActionButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-planning', asPlanningRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asPlanningRow(row.original).id}`" @click="deleteResource('monitor-planning', String(asPlanningRow(row.original).id))" />
                     </div>
                   </template>
                 </CommonResourceLayoutCard>
@@ -562,8 +562,8 @@ const handleCompleted = async () => {
                   </template>
                   <template #actions-cell="{ row }">
                     <div v-if="canUpdateMonitorRole || canDeleteMonitorResource" class="flex justify-end gap-2">
-                      <UButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asItemRow(row.original).id}`" @click="openResourceEditor('update', () => itemModal.openUpdate(asItemRow(row.original)))" />
-                      <UButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-items', asItemRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asItemRow(row.original).id}`" @click="deleteResource('monitor-items', String(asItemRow(row.original).id))" />
+                      <CommonActionButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asItemRow(row.original).id}`" @click="openResourceEditor('update', () => itemModal.openUpdate(asItemRow(row.original)))" />
+                      <CommonActionButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-items', asItemRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asItemRow(row.original).id}`" @click="deleteResource('monitor-items', String(asItemRow(row.original).id))" />
                     </div>
                   </template>
                 </CommonResourceLayoutCard>
@@ -597,8 +597,8 @@ const handleCompleted = async () => {
                   </template>
                   <template #actions-cell="{ row }">
                     <div v-if="canUpdateMonitorRole || canDeleteMonitorResource" class="flex justify-end gap-2">
-                      <UButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asFindingRow(row.original).id}`" @click="openResourceEditor('update', () => findingModal.openUpdate(asFindingRow(row.original)))" />
-                      <UButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-findings', asFindingRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asFindingRow(row.original).id}`" @click="deleteResource('monitor-findings', String(asFindingRow(row.original).id))" />
+                      <CommonActionButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asFindingRow(row.original).id}`" @click="openResourceEditor('update', () => findingModal.openUpdate(asFindingRow(row.original)))" />
+                      <CommonActionButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-findings', asFindingRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asFindingRow(row.original).id}`" @click="deleteResource('monitor-findings', String(asFindingRow(row.original).id))" />
                     </div>
                   </template>
                 </CommonResourceLayoutCard>
@@ -643,10 +643,10 @@ const handleCompleted = async () => {
                   </template>
                   <template #actions-cell="{ row }">
                     <div class="flex justify-end gap-2">
-                      <UButton icon="i-lucide-eye" color="neutral" variant="ghost" :aria-label="t('agreement.monitors.followups.view_updates')" @click="openViewUpdates(asFollowupRow(row.original))" />
-                      <UButton v-if="canCreateMonitorResource" :disabled="isLoadingDetail" icon="i-lucide-message-square-plus" color="neutral" variant="ghost" :aria-label="`${t('agreement.monitors.followups.add_update')}: ${asFollowupRow(row.original).id}`" @click="openCreateUpdate(asFollowupRow(row.original))" />
-                      <UButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asFollowupRow(row.original).id}`" @click="openResourceEditor('update', () => followupModal.openUpdate(asFollowupRow(row.original)))" />
-                      <UButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-followups', asFollowupRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asFollowupRow(row.original).id}`" @click="deleteResource('monitor-followups', String(asFollowupRow(row.original).id))" />
+                      <CommonActionButton icon="i-lucide-eye" color="neutral" variant="ghost" :aria-label="t('agreement.monitors.followups.view_updates')" @click="openViewUpdates(asFollowupRow(row.original))" />
+                      <CommonActionButton v-if="canCreateMonitorResource" :disabled="isLoadingDetail" icon="i-lucide-message-square-plus" color="neutral" variant="ghost" :aria-label="`${t('agreement.monitors.followups.add_update')}: ${asFollowupRow(row.original).id}`" @click="openCreateUpdate(asFollowupRow(row.original))" />
+                      <CommonActionButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asFollowupRow(row.original).id}`" @click="openResourceEditor('update', () => followupModal.openUpdate(asFollowupRow(row.original)))" />
+                      <CommonActionButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-followups', asFollowupRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asFollowupRow(row.original).id}`" @click="deleteResource('monitor-followups', String(asFollowupRow(row.original).id))" />
                     </div>
                   </template>
                 </CommonResourceLayoutCard>
@@ -670,8 +670,8 @@ const handleCompleted = async () => {
                   @add="openResourceEditor('create', () => practiceModal.openCreate())">
                   <template #actions-cell="{ row }">
                     <div v-if="canUpdateMonitorRole || canDeleteMonitorResource" class="flex justify-end gap-2">
-                      <UButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asPracticeRow(row.original).id}`" @click="openResourceEditor('update', () => practiceModal.openUpdate(asPracticeRow(row.original)))" />
-                      <UButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-promising-practices', asPracticeRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asPracticeRow(row.original).id}`" @click="deleteResource('monitor-promising-practices', String(asPracticeRow(row.original).id))" />
+                      <CommonActionButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asPracticeRow(row.original).id}`" @click="openResourceEditor('update', () => practiceModal.openUpdate(asPracticeRow(row.original)))" />
+                      <CommonActionButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-promising-practices', asPracticeRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asPracticeRow(row.original).id}`" @click="deleteResource('monitor-promising-practices', String(asPracticeRow(row.original).id))" />
                     </div>
                   </template>
                 </CommonResourceLayoutCard>
@@ -952,8 +952,8 @@ const handleCompleted = async () => {
               </p>
             </div>
             <div v-if="canUpdateMonitorRole || canDeleteMonitorResource" class="flex shrink-0 gap-2">
-              <UButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" size="xs" :aria-label="`${t('common.edit')}: ${update.id}`" @click="openResourceEditor('update', () => updateModal.openUpdate(update))" />
-              <UButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" size="xs" :disabled="isLoadingDetail || isResourceDeleting('monitor-followup-updates', update.id)" :aria-label="`${t('common.delete')}: ${update.id}`" @click="deleteResource('monitor-followup-updates', String(update.id))" />
+              <CommonActionButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" size="xs" :aria-label="`${t('common.edit')}: ${update.id}`" @click="openResourceEditor('update', () => updateModal.openUpdate(update))" />
+              <CommonActionButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" size="xs" :disabled="isLoadingDetail || isResourceDeleting('monitor-followup-updates', update.id)" :aria-label="`${t('common.delete')}: ${update.id}`" @click="deleteResource('monitor-followup-updates', String(update.id))" />
             </div>
           </div>
         </div>

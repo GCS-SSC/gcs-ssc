@@ -99,7 +99,7 @@ const canUpdateAgency = (agency: AgencyProfileItem) => can('agency', 'update', {
         </template>
         <template #right>
           <div class="flex items-center gap-2">
-            <UButton
+            <CommonActionButton
               color="neutral"
               variant="ghost"
               :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"

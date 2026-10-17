@@ -20,7 +20,7 @@ const { t } = useI18n()
         <template #right>
           <div class="flex items-center gap-2">
             <slot name="navbar-actions" />
-            <UButton color="neutral" variant="ghost" :icon="collapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'" :aria-label="t(collapsed ? 'common.expand' : 'common.collapse')" @click="collapsed = !collapsed" />
+            <CommonActionButton color="neutral" variant="ghost" :icon="collapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'" :aria-label="t(collapsed ? 'common.expand' : 'common.collapse')" @click="collapsed = !collapsed" />
             <CommonNavbarSide />
           </div>
         </template>

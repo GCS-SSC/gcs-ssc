@@ -62,7 +62,7 @@ const { t } = useI18n()
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <UButton
+            <CommonActionButton
               v-if="assignment.can_delete"
               icon="i-lucide-trash"
               variant="soft"

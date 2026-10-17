@@ -117,7 +117,7 @@ const exportCorrections = async () => {
         </div>
       </template>
       <template #actions>
-        <UButton icon="i-lucide-download" color="neutral" variant="outline" :aria-label="t('correction.export_label')" :loading="exporting" :disabled="status !== 'success'" @click="exportCorrections" />
+        <CommonActionButton icon="i-lucide-download" color="neutral" variant="outline" :aria-label="t('correction.export_label')" :loading="exporting" :disabled="status !== 'success'" @click="exportCorrections" />
       </template>
       <template #egcs_fc_number-cell="{ row }">
         {{ formatCorrectionReference(row.original) }}
@@ -133,7 +133,7 @@ const exportCorrections = async () => {
       </template>
       <template #actions-cell="{ row }">
         <div class="flex justify-end gap-2">
-          <UButton
+          <CommonActionButton
             icon="i-lucide-arrow-right" color="neutral" variant="ghost"
             :aria-label="`${t('common.view_details')}: ${formatCorrectionReference(row.original)}`"
             :to="localePath(appRouteLocations.agreementCorrectionDetail(agreementId, String(row.original.id)))" />

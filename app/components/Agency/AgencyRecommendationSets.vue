@@ -280,15 +280,15 @@ const onDeleteMember = async (row: RecommendationRow) => {
       </template>
       <template #actions-cell="{ row }">
         <div v-if="isSetupGroup(row) && setupForRow(row)" class="flex items-center gap-2">
-          <UButton v-if="canUpdateChild" icon="i-lucide-plus" color="primary" variant="ghost" size="sm" class="cursor-default" :aria-label="t('transfer_payment.recommendation_schema_create')" @click="onCreateSchema(setupForRow(row)!)" />
-          <UButton v-if="canUpdateChild" icon="i-lucide-link" color="neutral" variant="ghost" size="sm" class="cursor-default" :aria-label="t('transfer_payment.recommendation_schema_associate')" @click="onAddMember(setupForRow(row)!)" />
-          <UButton icon="i-lucide-arrow-right" color="neutral" variant="ghost" size="sm" class="cursor-default" :aria-label="t('common.open')" @click="onEdit(setupForRow(row)!)" />
-          <UButton v-if="canDeleteChild" icon="i-lucide-trash" color="error" variant="ghost" size="sm" class="cursor-default" :disabled="isDeleting" :aria-label="t('common.delete')" @click="onDelete(setupForRow(row)!)" />
+          <CommonActionButton v-if="canUpdateChild" icon="i-lucide-plus" color="primary" variant="ghost" size="sm" class="cursor-default" :aria-label="t('transfer_payment.recommendation_schema_create')" @click="onCreateSchema(setupForRow(row)!)" />
+          <CommonActionButton v-if="canUpdateChild" icon="i-lucide-link" color="neutral" variant="ghost" size="sm" class="cursor-default" :aria-label="t('transfer_payment.recommendation_schema_associate')" @click="onAddMember(setupForRow(row)!)" />
+          <CommonActionButton icon="i-lucide-arrow-right" color="neutral" variant="ghost" size="sm" class="cursor-default" :aria-label="t('common.open')" @click="onEdit(setupForRow(row)!)" />
+          <CommonActionButton v-if="canDeleteChild" icon="i-lucide-trash" color="error" variant="ghost" size="sm" class="cursor-default" :disabled="isDeleting" :aria-label="t('common.delete')" @click="onDelete(setupForRow(row)!)" />
         </div>
         <div v-else-if="isMemberGroup(row) && !row.original.isPlaceholder" class="flex items-center gap-2">
-          <UButton icon="i-lucide-arrow-right" color="neutral" variant="ghost" size="sm" class="cursor-default" :aria-label="t('common.open')" @click="openSchemaEditor(row.original)" />
-          <UButton v-if="canUpdateChild" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" class="cursor-default" :aria-label="t('common.edit')" @click="onEditMember(row.original)" />
-          <UButton v-if="canDeleteChild" icon="i-lucide-trash" color="error" variant="ghost" size="sm" class="cursor-default" :loading="deletingMemberId === row.original.id" :aria-label="t('common.delete')" @click="onDeleteMember(row.original)" />
+          <CommonActionButton icon="i-lucide-arrow-right" color="neutral" variant="ghost" size="sm" class="cursor-default" :aria-label="t('common.open')" @click="openSchemaEditor(row.original)" />
+          <CommonActionButton v-if="canUpdateChild" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" class="cursor-default" :aria-label="t('common.edit')" @click="onEditMember(row.original)" />
+          <CommonActionButton v-if="canDeleteChild" icon="i-lucide-trash" color="error" variant="ghost" size="sm" class="cursor-default" :loading="deletingMemberId === row.original.id" :aria-label="t('common.delete')" @click="onDeleteMember(row.original)" />
         </div>
       </template>
     </CommonResourceLayoutCard>

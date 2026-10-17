@@ -476,7 +476,7 @@ const updateExpandedRows = (value: ExpandedState) => {
 
       <template #actions-cell="{ row }">
         <div v-if="isEntityTypeGroupRow(row)" class="flex items-center gap-2">
-          <UButton
+          <CommonActionButton
             v-if="canUpdateChild"
             icon="i-lucide-plus"
             color="primary"
@@ -488,7 +488,7 @@ const updateExpandedRows = (value: ExpandedState) => {
         </div>
 
         <div v-else-if="isReviewSetGroupRow(row) && getReviewSetupForRow(row)" class="flex items-center gap-2">
-          <UButton
+          <CommonActionButton
             v-if="canUpdateChild"
             icon="i-lucide-plus"
             color="primary"
@@ -497,7 +497,7 @@ const updateExpandedRows = (value: ExpandedState) => {
             class="cursor-default"
             :aria-label="t('transfer_payment.review_schema_create')"
             @click="openCreateSchema(getReviewSetupForRow(row)!)" />
-          <UButton
+          <CommonActionButton
             v-if="canUpdateChild"
             icon="i-lucide-link"
             color="neutral"
@@ -506,7 +506,7 @@ const updateExpandedRows = (value: ExpandedState) => {
             class="cursor-default"
             :aria-label="t('transfer_payment.review_schema_associate')"
             @click="openAssociateSchema(getReviewSetupForRow(row)!)" />
-          <UButton
+          <CommonActionButton
             icon="i-lucide-arrow-right"
             color="neutral"
             variant="ghost"
@@ -514,7 +514,7 @@ const updateExpandedRows = (value: ExpandedState) => {
             class="cursor-default"
             :aria-label="t('common.open')"
             @click="openReviewSetupDetail(getReviewSetupForRow(row)!)" />
-          <UButton
+          <CommonActionButton
             v-if="canDeleteChild"
             icon="i-lucide-trash"
             color="error"
@@ -526,7 +526,7 @@ const updateExpandedRows = (value: ExpandedState) => {
         </div>
 
         <div v-else-if="isReviewSetupMemberGroupRow(row) && !row.original.isPlaceholder" class="flex items-center gap-2">
-          <UButton
+          <CommonActionButton
             icon="i-lucide-arrow-right"
             color="neutral"
             variant="ghost"

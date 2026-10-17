@@ -112,7 +112,7 @@ const removeRule = (index: number) => {
 
       <template #actions-cell="{ row }">
         <div class="flex items-center gap-1">
-          <UButton
+          <CommonActionButton
             icon="i-lucide-pencil"
             color="neutral"
             variant="ghost"
@@ -120,7 +120,7 @@ const removeRule = (index: number) => {
             class="cursor-default"
             :aria-label="`${t('common.edit')}: ${row.original.target} (${row.original.mode})`"
             @click="openEdit(row.index)" />
-          <UButton
+          <CommonActionButton
             icon="i-lucide-trash"
             color="error"
             variant="ghost"

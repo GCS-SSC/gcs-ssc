@@ -879,7 +879,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
 
       <template #actions-cell="{ row }">
         <div v-if="isFiscalYearGroupRow(row as GroupedBudgetRow)" class="flex flex-wrap items-center gap-2">
-          <UButton
+          <CommonActionButton
             v-if="canCreate"
             icon="i-lucide-plus"
             color="primary"
@@ -888,7 +888,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
             class="cursor-default"
             :aria-label="t('agreement.budget.add_line_item')"
             @click="openCreateLineItem(row.original.fiscalYearId)" />
-          <UButton
+          <CommonActionButton
             v-if="!staticMode && canUpdateFiscalYear && getFiscalYearById(row.original.fiscalYearId)"
             icon="i-lucide-pencil"
             color="neutral"
@@ -897,7 +897,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
             class="cursor-default"
             :aria-label="`${t('common.edit')}: ${row.original.fiscalYearDisplay}`"
             @click="openUpdateFiscalYear(getFiscalYearById(row.original.fiscalYearId)!)" />
-          <UButton
+          <CommonActionButton
             v-if="!staticMode && canDeleteFiscalYear"
             icon="i-lucide-trash"
             color="error"
@@ -909,7 +909,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
         </div>
 
         <div v-else-if="isCostCategoryGroupRow(row as GroupedBudgetRow)" class="flex items-center gap-2">
-          <UButton
+          <CommonActionButton
             v-if="canCreate"
             icon="i-lucide-plus"
             color="primary"
@@ -921,7 +921,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
         </div>
 
         <div v-else-if="isCostSubsectionGroupRow(row as GroupedBudgetRow)" class="flex items-center gap-2">
-          <UButton
+          <CommonActionButton
             v-if="canCreate"
             icon="i-lucide-plus"
             color="primary"
@@ -933,7 +933,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
         </div>
 
         <div v-else-if="!row.original.isPlaceholder" class="flex items-center gap-2">
-          <UButton
+          <CommonActionButton
             v-if="canUpdate && row.original.lineItemId && getLineItemById(row.original.lineItemId)"
             icon="i-lucide-pencil"
             color="neutral"
@@ -942,7 +942,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
             class="cursor-default"
             :aria-label="`${t('common.edit')}: ${locale === 'fr' ? row.original.lineItemNameFr : row.original.lineItemNameEn}`"
             @click="openUpdateLineItem(getLineItemById(row.original.lineItemId)!)" />
-          <UButton
+          <CommonActionButton
             v-if="canDelete && row.original.lineItemId"
             icon="i-lucide-trash"
             color="error"

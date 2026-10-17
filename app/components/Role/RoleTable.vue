@@ -121,7 +121,7 @@ const buttonLabel: ComputedRef<string | undefined> = computed(() => (canCreate ?
     </template>
     <template #actions-cell="{ row }">
       <div class="flex items-center gap-2">
-        <UButton
+        <CommonActionButton
           v-if="canUpdateRole(row.original) && !deletedRoleIds.has(row.original.id)"
           icon="i-lucide-edit-3"
           variant="soft"
@@ -132,7 +132,7 @@ const buttonLabel: ComputedRef<string | undefined> = computed(() => (canCreate ?
           :disabled="mutationPending"
           :loading="savingRoleId === row.original.id"
           @click.stop="emit('edit', row.original)" />
-        <UButton
+        <CommonActionButton
           v-if="canDeleteRole(row.original) && !deletedRoleIds.has(row.original.id)"
           icon="i-lucide-trash"
           variant="soft"

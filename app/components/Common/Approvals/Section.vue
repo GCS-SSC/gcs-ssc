@@ -1129,7 +1129,7 @@ const submitReassign = async () => {
                 certifications: row.original.certifications
               }"
               :runtime-state="getStepStatus(row.original)" />
-            <UButton
+            <CommonActionButton
               v-if="row.original.can_action"
               icon="i-lucide-file-signature"
               color="primary"
@@ -1138,7 +1138,7 @@ const submitReassign = async () => {
               class="cursor-default"
               :aria-label="t('assessment.approvals.action_step')"
               @click="openActionModal(row.original)" />
-            <UButton
+            <CommonActionButton
               v-if="row.original.can_reassign"
               icon="i-lucide-user-round-pen"
               color="neutral"
@@ -1151,7 +1151,7 @@ const submitReassign = async () => {
               v-if="row.original.can_add_before || row.original.can_add_after"
               :items="getAddStepMenuItems(row.original)"
               :content="{ align: 'end' }">
-              <UButton
+              <CommonActionButton
                 icon="i-lucide-list-plus"
                 color="neutral"
                 variant="ghost"

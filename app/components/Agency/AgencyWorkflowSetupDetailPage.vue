@@ -598,15 +598,15 @@ const deleteMember = async (member: WorkflowMember) => {
                         <CommonStatusBadge v-if="member.egcs_cn_successstatus" :status-id="member.egcs_cn_successstatus" />
                         <CommonStatusBadge v-if="member.egcs_cn_failurestatus" :status-id="member.egcs_cn_failurestatus" />
                         <template v-if="canUpdate">
-                          <UButton
+                          <CommonActionButton
                             icon="i-lucide-arrow-up" color="neutral" variant="ghost"
                             :aria-label="t('workflow.move_member_up', { sequence: member.egcs_cn_sequence })"
                             :disabled="mutation.isPending.value || member.egcs_cn_sequence === 1" @click="moveMember(member, member.egcs_cn_sequence - 1)" />
-                          <UButton
+                          <CommonActionButton
                             icon="i-lucide-arrow-down" color="neutral" variant="ghost"
                             :aria-label="t('workflow.move_member_down', { sequence: member.egcs_cn_sequence })"
                             :disabled="mutation.isPending.value || member.egcs_cn_sequence === state.members.length" @click="moveMember(member, member.egcs_cn_sequence + 1)" />
-                          <UButton
+                          <CommonActionButton
                             icon="i-lucide-pencil" color="neutral" variant="ghost"
                             :aria-label="t('workflow.edit_member_sequence', { sequence: member.egcs_cn_sequence })"
                             :disabled="mutation.isPending.value"
@@ -617,7 +617,7 @@ const deleteMember = async (member: WorkflowMember) => {
                             :aria-label="t('workflow.conditions.edit_member', { sequence: member.egcs_cn_sequence })"
                             :disabled="mutation.isPending.value"
                             @click="openConditions(member)" />
-                          <UButton
+                          <CommonActionButton
                             v-if="canDelete" icon="i-lucide-trash-2" color="error" variant="ghost"
                             :aria-label="t('workflow.delete_member', { sequence: member.egcs_cn_sequence })"
                             :disabled="mutation.isPending.value"

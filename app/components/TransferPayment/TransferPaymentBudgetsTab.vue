@@ -177,7 +177,7 @@ const deleteBudget = async (budget: TransferPaymentBudgetRow) => {
 
       <template #actions-cell="{ row }">
         <div class="flex items-center gap-2">
-          <UButton
+          <CommonActionButton
             icon="i-lucide-pencil"
             color="neutral"
             variant="ghost"
@@ -185,7 +185,7 @@ const deleteBudget = async (budget: TransferPaymentBudgetRow) => {
             :disabled="!canUpdateChild || !agencyId"
             :aria-label="t('common.edit_named', { name: getBudgetName(row.original) })"
             @click="openUpdateBudget(row.original)" />
-          <UButton
+          <CommonActionButton
             icon="i-lucide-trash"
             color="error"
             variant="ghost"

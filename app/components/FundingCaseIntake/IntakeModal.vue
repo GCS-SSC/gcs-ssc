@@ -143,7 +143,7 @@ watch([() => state.value.egcs_fi_fundingopportunity, open], async ([opportunityI
               <p class="min-w-0 truncate text-sm font-medium">
                 {{ draft.file.name }}
               </p>
-              <UButton color="neutral" variant="ghost" icon="i-lucide-x" :aria-label="t('common.delete_named', { name: draft.file.name })" :disabled="pending" @click="removeFile(draft.key)" />
+              <CommonActionButton color="neutral" variant="ghost" icon="i-lucide-x" :aria-label="t('common.delete_named', { name: draft.file.name })" :disabled="pending" @click="removeFile(draft.key)" />
             </div>
             <UFormField :label="t('attachments.type')" :name="`attachments.${index}.attachmentTypeId`" required>
               <CommonServerLookupSelect v-if="state.egcs_fi_fundingopportunity" v-model="draft.attachmentTypeId" fetch-url="/api/funding-case-intakes/lookups/attachment-types" selected-values-query-key="ids" value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" :show-value-in-label="false" :query="{ egcs_fi_fundingopportunity: state.egcs_fi_fundingopportunity }" close-on-select searchable class="w-full" />

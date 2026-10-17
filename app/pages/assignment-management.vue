@@ -71,7 +71,7 @@ const columns: TableColumnInput<Row>[] = [
           <UDashboardSidebarCollapse />
         </template><template #right>
           <div class="flex items-center gap-2">
-            <UButton
+            <CommonActionButton
               color="neutral"
               variant="ghost"
               :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'"
@@ -142,7 +142,7 @@ const columns: TableColumnInput<Row>[] = [
           </template>
           <template #actions-cell="{ row }">
             <div class="flex justify-end gap-2">
-              <UButton
+              <CommonActionButton
                 icon="i-lucide-users"
                 color="neutral"
                 variant="ghost"

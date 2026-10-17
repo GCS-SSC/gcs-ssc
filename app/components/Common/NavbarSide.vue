@@ -20,7 +20,7 @@ const onLocaleToggle = (value: boolean | 'indeterminate') => {
 
 <template>
   <div class="mr-2 flex items-center gap-3">
-    <UButton
+    <CommonActionButton
       :icon="isDark ? 'i-lucide-sun' : 'i-lucide-moon'"
       :aria-label="themeToggleLabel"
       :title="themeToggleLabel"

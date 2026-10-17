@@ -115,8 +115,8 @@ const updateGroup = (index: number, group: EditorResultPolicy['groups'][number])
       <ol v-else class="divide-y divide-zinc-200 border-y border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
         <li v-for="(group, groupIndex) in currentPolicy.groups" :key="group._key" class="py-3">
           <div class="mb-1 flex justify-end gap-1">
-            <UButton icon="i-lucide-arrow-up" color="neutral" variant="ghost" class="cursor-default" :disabled="groupIndex === 0 || currentPolicy.anyFailureFails" :aria-label="t('checklist_schema.policy.move_group_up')" @click="moveGroup(groupIndex, -1)" />
-            <UButton icon="i-lucide-arrow-down" color="neutral" variant="ghost" class="cursor-default" :disabled="groupIndex === currentPolicy.groups.length - 1 || currentPolicy.anyFailureFails" :aria-label="t('checklist_schema.policy.move_group_down')" @click="moveGroup(groupIndex, 1)" />
+            <CommonActionButton icon="i-lucide-arrow-up" color="neutral" variant="ghost" class="cursor-default" :disabled="groupIndex === 0 || currentPolicy.anyFailureFails" :aria-label="t('checklist_schema.policy.move_group_up')" @click="moveGroup(groupIndex, -1)" />
+            <CommonActionButton icon="i-lucide-arrow-down" color="neutral" variant="ghost" class="cursor-default" :disabled="groupIndex === currentPolicy.groups.length - 1 || currentPolicy.anyFailureFails" :aria-label="t('checklist_schema.policy.move_group_down')" @click="moveGroup(groupIndex, 1)" />
           </div>
           <ChecklistSchemaResultPolicyGroup
             :model-value="group"

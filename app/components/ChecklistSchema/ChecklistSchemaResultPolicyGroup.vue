@@ -167,7 +167,7 @@ const questionLabel = (questionKey: string) => {
         <UBadge color="neutral" variant="subtle">
           {{ t(`checklist_schema.policy.results.${currentGroup.result}`) }}
         </UBadge>
-        <UButton
+        <CommonActionButton
           icon="i-lucide-trash"
           color="error"
           variant="ghost"
@@ -243,15 +243,15 @@ const questionLabel = (questionKey: string) => {
               {{ t('checklist_schema.policy.is_failed') }}
             </span>
             <div class="flex shrink-0 gap-1">
-              <UButton icon="i-lucide-arrow-up" color="neutral" variant="ghost" class="cursor-default" :disabled="itemIndex === 0" :aria-label="t('checklist_schema.policy.move_up')" @click="moveItem(itemIndex, -1)" />
-              <UButton icon="i-lucide-arrow-down" color="neutral" variant="ghost" class="cursor-default" :disabled="itemIndex === currentGroup.items.length - 1" :aria-label="t('checklist_schema.policy.move_down')" @click="moveItem(itemIndex, 1)" />
-              <UButton icon="i-lucide-trash" color="error" variant="ghost" class="cursor-default" :aria-label="t('checklist_schema.policy.remove_question')" @click="removeItem(itemIndex)" />
+              <CommonActionButton icon="i-lucide-arrow-up" color="neutral" variant="ghost" class="cursor-default" :disabled="itemIndex === 0" :aria-label="t('checklist_schema.policy.move_up')" @click="moveItem(itemIndex, -1)" />
+              <CommonActionButton icon="i-lucide-arrow-down" color="neutral" variant="ghost" class="cursor-default" :disabled="itemIndex === currentGroup.items.length - 1" :aria-label="t('checklist_schema.policy.move_down')" @click="moveItem(itemIndex, 1)" />
+              <CommonActionButton icon="i-lucide-trash" color="error" variant="ghost" class="cursor-default" :aria-label="t('checklist_schema.policy.remove_question')" @click="removeItem(itemIndex)" />
             </div>
           </div>
           <div v-else>
             <div class="mb-1 flex justify-end gap-1">
-              <UButton icon="i-lucide-arrow-up" color="neutral" variant="ghost" class="cursor-default" :disabled="itemIndex === 0" :aria-label="t('checklist_schema.policy.move_group_up')" @click="moveItem(itemIndex, -1)" />
-              <UButton icon="i-lucide-arrow-down" color="neutral" variant="ghost" class="cursor-default" :disabled="itemIndex === currentGroup.items.length - 1" :aria-label="t('checklist_schema.policy.move_group_down')" @click="moveItem(itemIndex, 1)" />
+              <CommonActionButton icon="i-lucide-arrow-up" color="neutral" variant="ghost" class="cursor-default" :disabled="itemIndex === 0" :aria-label="t('checklist_schema.policy.move_group_up')" @click="moveItem(itemIndex, -1)" />
+              <CommonActionButton icon="i-lucide-arrow-down" color="neutral" variant="ghost" class="cursor-default" :disabled="itemIndex === currentGroup.items.length - 1" :aria-label="t('checklist_schema.policy.move_group_down')" @click="moveItem(itemIndex, 1)" />
             </div>
             <ChecklistSchemaResultPolicyGroup
               :model-value="nestedGroup(item)"

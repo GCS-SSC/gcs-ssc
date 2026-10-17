@@ -32,7 +32,7 @@ const created = async (id: string) => await navigateTo(localePath(`/journal-vouc
         </template>
         <template #right>
           <div class="flex items-center gap-2">
-            <UButton color="neutral" variant="ghost" :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'" :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')" @click="isHeroCollapsed = !isHeroCollapsed" /><CommonNavbarSide />
+            <CommonActionButton color="neutral" variant="ghost" :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'" :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')" @click="isHeroCollapsed = !isHeroCollapsed" /><CommonNavbarSide />
           </div>
         </template>
       </UDashboardNavbar>
@@ -48,7 +48,7 @@ const created = async (id: string) => await navigateTo(localePath(`/journal-vouc
         </template>
         <template #actions-cell="{ row }">
           <div class="flex justify-end">
-            <UButton icon="i-lucide-eye" color="neutral" variant="ghost" :aria-label="t('common.view_details')" :to="localePath(`/journal-vouchers/${row.original.id}`)" />
+            <CommonActionButton icon="i-lucide-eye" color="neutral" variant="ghost" :aria-label="t('common.view_details')" :to="localePath(`/journal-vouchers/${row.original.id}`)" />
           </div>
         </template>
       </CommonResourceLayoutCard>

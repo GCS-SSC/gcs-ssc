@@ -102,14 +102,13 @@ const handleModelValueUpdate = (value: string | number | null | undefined) => {
               content: 'sm:max-w-xl',
               body: 'space-y-4'
             }">
-            <UButton
+            <CommonActionButton
               icon="i-lucide-circle-help"
               color="primary"
               variant="solid"
               size="xs"
               class="cursor-default rounded-full shadow-sm transition-colors hover:bg-primary/90"
               :aria-label="helpButtonLabel"
-              :title="helpButtonLabel"
               :ui="{ leadingIcon: 'size-4' }"
               @click="isHelpOpen = true" />
 

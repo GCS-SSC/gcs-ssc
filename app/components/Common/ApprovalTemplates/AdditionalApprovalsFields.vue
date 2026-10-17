@@ -139,7 +139,7 @@ const moveCertification = (index: number, direction: -1 | 1) => {
               {{ t('assessment.approvals.certification_number', { number: index + 1 }) }}
             </span>
             <div class="flex items-center gap-1">
-              <UButton
+              <CommonActionButton
                 type="button"
                 icon="i-lucide-arrow-up"
                 color="neutral"
@@ -149,7 +149,7 @@ const moveCertification = (index: number, direction: -1 | 1) => {
                 :disabled="index === 0"
                 :aria-label="t('assessment.approvals.move_certification_up')"
                 @click="moveCertification(index, -1)" />
-              <UButton
+              <CommonActionButton
                 type="button"
                 icon="i-lucide-arrow-down"
                 color="neutral"
@@ -159,7 +159,7 @@ const moveCertification = (index: number, direction: -1 | 1) => {
                 :disabled="index === state.additionalApprovalCertifications.length - 1"
                 :aria-label="t('assessment.approvals.move_certification_down')"
                 @click="moveCertification(index, 1)" />
-              <UButton
+              <CommonActionButton
                 type="button"
                 icon="i-lucide-trash"
                 color="error"

@@ -241,7 +241,7 @@ const save = async () => {
           <span class="font-semibold tabular-nums text-primary">{{ formattedAmount(row as GroupedRow, 'balance') }}</span>
         </template>
         <template #actions-cell="{ row }">
-          <UButton
+          <CommonActionButton
             v-if="canUpdate && !readOnly && !isGroupedRow(row as GroupedRow)"
             icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm"
             :aria-label="`${t('common.edit')}: ${row.original.name}`"

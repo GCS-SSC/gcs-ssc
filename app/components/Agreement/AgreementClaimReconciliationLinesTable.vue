@@ -259,7 +259,7 @@ const getCategoryLines = (category: ReconciliationCategoryGroup) => category.sub
                   </span>
                 </td>
                 <td v-if="editMode === 'action'" class="px-4 py-4">
-                  <UButton
+                  <CommonActionButton
                     color="neutral"
                     variant="ghost"
                     size="sm"

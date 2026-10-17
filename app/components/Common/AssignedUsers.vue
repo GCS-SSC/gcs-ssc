@@ -263,7 +263,7 @@ const remove = async (userId: string, name: string) => {
             :label="t('assignments.make_primary')"
             :disabled="isSaving || !canPromote(assignment.user_id)"
             @click="promote(assignment.user_id)" />
-          <UButton
+          <CommonActionButton
             v-if="canRemove(assignment.user_id)"
             size="xs"
             color="error"

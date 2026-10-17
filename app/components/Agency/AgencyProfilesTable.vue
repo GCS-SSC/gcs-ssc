@@ -115,7 +115,7 @@ const bilingualColumns: BilingualColumnConfig<AgencyProfileItem>[] = [
 
     <template #actions-cell="{ row }">
       <div class="flex items-center gap-2">
-        <UButton
+        <CommonActionButton
           v-if="canUpdate(row.original)"
           icon="i-lucide-edit-3"
           color="neutral"

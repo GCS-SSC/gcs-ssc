@@ -121,7 +121,7 @@ const addDimension = (state: Partial<AgencyChartOfAccountItem>) => {
           <UFormField :label="t('transfer_payment.chart_of_accounts.value')" :name="`egcs_ay_accountingdimensions.${index}.value`" required>
             <UInput v-model="dimension.value" required />
           </UFormField>
-          <UButton
+          <CommonActionButton
             type="button" icon="i-lucide-trash" color="error" variant="ghost"
             :aria-label="t('transfer_payment.chart_of_accounts.remove_field')"
             :disabled="(state.egcs_ay_accountingdimensions?.length ?? 0) === 1"

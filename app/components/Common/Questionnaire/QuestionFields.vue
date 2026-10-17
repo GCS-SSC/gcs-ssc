@@ -151,7 +151,7 @@ const updateTextDescription = (language: 'en' | 'fr', value: string) => {
           <UInput v-model="option.label.fr" class="w-full" />
         </UFormField>
         <slot name="option-extension" :question="question" :option="option" />
-        <UButton
+        <CommonActionButton
           icon="i-lucide-trash"
           color="error"
           variant="ghost"

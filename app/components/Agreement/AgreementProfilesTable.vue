@@ -131,7 +131,7 @@ const getAgreementActionTarget = (agreement: FundingCaseAgreementProfileRow) => 
 
     <template #actions-cell="{ row }">
       <div class="flex items-center gap-2">
-        <UButton
+        <CommonActionButton
           icon="i-lucide-edit-3"
           color="neutral"
           variant="ghost"
@@ -139,7 +139,7 @@ const getAgreementActionTarget = (agreement: FundingCaseAgreementProfileRow) => 
           :disabled="!canUpdate(row.original)"
           :aria-label="t('common.edit_named', { name: getAgreementActionTarget(row.original) })"
           @click="emit('edit', row.original)" />
-        <UButton
+        <CommonActionButton
           icon="i-lucide-trash"
           color="error"
           variant="ghost"

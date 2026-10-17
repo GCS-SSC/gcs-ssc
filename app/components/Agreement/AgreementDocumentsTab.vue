@@ -199,14 +199,14 @@ const deleteDocument = async (generatedDocument: AgreementGeneratedDocumentItem)
 
       <template #actions-cell="{ row }">
         <div class="flex items-center justify-end gap-2">
-          <UButton
+          <CommonActionButton
             icon="i-lucide-download"
             color="neutral"
             variant="ghost"
             class="cursor-default"
             :aria-label="`${t('common.download')}: ${locale === 'fr' ? row.original.egcs_fc_name_fr : row.original.egcs_fc_name_en}`"
             @click="downloadDocument(row.original)" />
-          <UButton
+          <CommonActionButton
             v-if="canDelete"
             icon="i-lucide-trash"
             color="error"

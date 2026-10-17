@@ -104,7 +104,7 @@ const getApplicantRecipientLookupUrl = (state: FundingCaseAgreementApplicantReci
     </template>
     <template #actions-cell="{ row, openUpdate, deleteItem }">
       <div class="flex items-center justify-end gap-2">
-        <UButton
+        <CommonActionButton
           v-if="showUpdate ?? canUpdate"
           icon="i-lucide-edit-3"
           color="neutral"
@@ -112,7 +112,7 @@ const getApplicantRecipientLookupUrl = (state: FundingCaseAgreementApplicantReci
           size="sm"
           :aria-label="t('common.edit')"
           @click="exerciseAction(canUpdate, () => openUpdate(row.original))" />
-        <UButton
+        <CommonActionButton
           v-if="showDelete ?? canDelete"
           icon="i-lucide-trash"
           color="error"
@@ -120,7 +120,7 @@ const getApplicantRecipientLookupUrl = (state: FundingCaseAgreementApplicantReci
           size="sm"
           :aria-label="t('common.delete')"
           @click="exerciseAction(canDelete, () => deleteItem(row.original.id), row.original.can_delete !== true)" />
-        <UButton
+        <CommonActionButton
           icon="i-lucide-arrow-right"
           color="neutral"
           variant="ghost"

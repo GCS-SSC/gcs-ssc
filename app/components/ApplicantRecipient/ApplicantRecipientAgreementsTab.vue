@@ -118,7 +118,7 @@ const openAgreement = async (agreement: FundingCaseAgreementProfileRow) => {
     </template>
 
     <template #actions-cell="{ row }">
-      <UButton
+      <CommonActionButton
         icon="i-lucide-arrow-right"
         color="neutral"
         variant="ghost"

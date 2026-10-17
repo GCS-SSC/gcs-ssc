@@ -160,7 +160,7 @@ const deleteOutcome = async (outcome: TransferPaymentOutcomeRow) => {
 
       <template #actions-cell="{ row }">
         <div class="flex items-center gap-2">
-          <UButton
+          <CommonActionButton
             icon="i-lucide-pencil"
             color="neutral"
             variant="ghost"
@@ -168,7 +168,7 @@ const deleteOutcome = async (outcome: TransferPaymentOutcomeRow) => {
             :disabled="!canUpdateChild"
             :aria-label="t('common.edit_named', { name: getOutcomeActionTarget(row.original) })"
             @click="openUpdateOutcome(row.original)" />
-          <UButton
+          <CommonActionButton
             icon="i-lucide-trash"
             color="error"
             variant="ghost"

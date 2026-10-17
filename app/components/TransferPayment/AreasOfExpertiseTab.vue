@@ -168,7 +168,7 @@ const deleteItem = async (row: TransferPaymentStreamAreaOfExpertiseItem) => {
     @add="openCreate">
     <template #actions-cell="{ row }">
       <div class="flex items-center gap-2">
-        <UButton
+        <CommonActionButton
           v-if="canUpdateChild"
           icon="i-lucide-pencil"
           color="neutral"
@@ -176,7 +176,7 @@ const deleteItem = async (row: TransferPaymentStreamAreaOfExpertiseItem) => {
           size="sm"
           :aria-label="t('common.edit_named', { name: getAreaActionTarget(row.original) })"
           @click="openUpdate(row.original)" />
-        <UButton
+        <CommonActionButton
           v-if="canDeleteChild"
           icon="i-lucide-trash"
           color="error"

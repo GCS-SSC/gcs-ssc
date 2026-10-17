@@ -192,7 +192,7 @@ const removeMember = async (group: Group, member: Member) => {
         </template>
         <template #right>
           <div class="flex items-center gap-2">
-            <UButton color="neutral" variant="ghost" :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'" :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')" @click="isHeroCollapsed = !isHeroCollapsed" />
+            <CommonActionButton color="neutral" variant="ghost" :icon="isHeroCollapsed ? 'i-lucide-chevron-down' : 'i-lucide-chevron-up'" :aria-label="t(isHeroCollapsed ? 'common.expand' : 'common.collapse')" @click="isHeroCollapsed = !isHeroCollapsed" />
             <CommonNavbarSide />
           </div>
         </template>
@@ -222,11 +222,11 @@ const removeMember = async (group: Group, member: Member) => {
           <template #actions-cell="{ row }">
             <div class="flex justify-end gap-2">
               <template v-if="!row.original.member && !row.original.placeholder">
-                <UButton v-if="can('group', 'update', { type: 'agency', agencyId: row.original.group.egcs_cn_agency })" icon="i-lucide-user-plus" color="neutral" variant="ghost" :aria-label="t('groups.add_member')" @click="openMemberPicker(row.original.group)" />
-                <UButton v-if="can('group', 'update', { type: 'agency', agencyId: row.original.group.egcs_cn_agency })" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="t('common.edit')" @click="openEdit(row.original.group)" />
-                <UButton v-if="can('group', 'delete', { type: 'agency', agencyId: row.original.group.egcs_cn_agency })" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('common.delete_named', { name: row.original.name })" @click="remove(row.original.group)" />
+                <CommonActionButton v-if="can('group', 'update', { type: 'agency', agencyId: row.original.group.egcs_cn_agency })" icon="i-lucide-user-plus" color="neutral" variant="ghost" :aria-label="`${t('groups.add_member')}: ${row.original.name}`" @click="openMemberPicker(row.original.group)" />
+                <CommonActionButton v-if="can('group', 'update', { type: 'agency', agencyId: row.original.group.egcs_cn_agency })" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="t('common.edit_named', { name: row.original.name })" @click="openEdit(row.original.group)" />
+                <CommonActionButton v-if="can('group', 'delete', { type: 'agency', agencyId: row.original.group.egcs_cn_agency })" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('common.delete_named', { name: row.original.name })" @click="remove(row.original.group)" />
               </template>
-              <UButton v-else-if="row.original.member && can('group', 'update', { type: 'agency', agencyId: row.original.group.egcs_cn_agency })" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('common.delete_named', { name: row.original.name })" :loading="removingMemberIds.includes(row.original.id)" :disabled="removingMemberIds.includes(row.original.id)" @click="removeMember(row.original.group, row.original.member)" />
+              <CommonActionButton v-else-if="row.original.member && can('group', 'update', { type: 'agency', agencyId: row.original.group.egcs_cn_agency })" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('common.delete_named', { name: row.original.name })" :loading="removingMemberIds.includes(row.original.id)" :disabled="removingMemberIds.includes(row.original.id)" @click="removeMember(row.original.group, row.original.member)" />
             </div>
           </template>
         </CommonResourceLayoutPage>

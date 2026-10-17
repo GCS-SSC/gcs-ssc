@@ -105,8 +105,8 @@ const remove = async (item: WorkflowSetupItem) => {
       </template>
       <template #actions-cell="{ row }">
         <div class="flex items-center gap-2">
-          <UButton icon="i-lucide-arrow-right" variant="ghost" color="neutral" size="sm" class="cursor-default" :aria-label="`${t('common.open')}: ${getSetupLabel(row.original)}`" @click="edit(row.original)" />
-          <UButton v-if="canDeleteChild" icon="i-lucide-trash" variant="ghost" color="error" size="sm" class="cursor-default" :aria-label="t('common.delete_named', { name: getSetupLabel(row.original) })" @click="remove(row.original)" />
+          <CommonActionButton icon="i-lucide-arrow-right" variant="ghost" color="neutral" size="sm" class="cursor-default" :aria-label="`${t('common.open')}: ${getSetupLabel(row.original)}`" @click="edit(row.original)" />
+          <CommonActionButton v-if="canDeleteChild" icon="i-lucide-trash" variant="ghost" color="error" size="sm" class="cursor-default" :aria-label="t('common.delete_named', { name: getSetupLabel(row.original) })" @click="remove(row.original)" />
         </div>
       </template>
     </CommonResourceLayoutCard>

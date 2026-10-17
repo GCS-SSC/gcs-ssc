@@ -428,9 +428,9 @@ const retryAttachmentList = async () => {
       </template>
       <template #actions-cell="{ row }">
         <div v-if="status === 'success'" class="flex items-center justify-end gap-1">
-          <UButton icon="i-lucide-download" color="neutral" variant="ghost" :aria-label="`${t('common.download')}: ${getAttachmentLabel(row.original)}`" @click="download(row.original)" />
-          <UButton v-if="row.original.can_update" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="t('common.edit_named', { name: getAttachmentLabel(row.original) })" @click="openEdit(row.original)" />
-          <UButton v-if="row.original.can_delete" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('common.delete_named', { name: getAttachmentLabel(row.original) })" @click="remove(row.original)" />
+          <CommonActionButton icon="i-lucide-download" color="neutral" variant="ghost" :aria-label="`${t('common.download')}: ${getAttachmentLabel(row.original)}`" @click="download(row.original)" />
+          <CommonActionButton v-if="row.original.can_update" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="t('common.edit_named', { name: getAttachmentLabel(row.original) })" @click="openEdit(row.original)" />
+          <CommonActionButton v-if="row.original.can_delete" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('common.delete_named', { name: getAttachmentLabel(row.original) })" @click="remove(row.original)" />
         </div>
       </template>
     </CommonResourceLayoutCard>

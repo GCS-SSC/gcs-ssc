@@ -50,7 +50,7 @@ const bilingualColumns: BilingualColumnConfig<CollectionRow>[] = [
     </template>
     <template #actions-cell="{ row }">
       <div class="flex justify-end gap-2">
-        <UButton :to="localePath(appRouteLocations.agencyDataCollectionDetail(agencyId, row.original.id))" icon="i-lucide-arrow-right" color="neutral" variant="ghost" :aria-label="t('common.view_details')" />
+        <CommonActionButton :to="localePath(appRouteLocations.agencyDataCollectionDetail(agencyId, row.original.id))" icon="i-lucide-arrow-right" color="neutral" variant="ghost" :aria-label="t('common.view_details')" />
       </div>
     </template>
     <template #form="{ state }">

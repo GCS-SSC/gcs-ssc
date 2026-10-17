@@ -131,7 +131,7 @@ const remove = async (row: LinkedSubtype) => {
       </template>
       <template #actions-cell="{ row }">
         <div class="flex justify-end gap-2">
-          <UButton
+          <CommonActionButton
             v-if="canDeleteChild" icon="i-lucide-trash" color="error" variant="ghost"
             :aria-label="t('common.delete_named', { name: getBilingualValue(row.original, 'egcs_ay_name', row.original.id) })"
             :disabled="removing" @click="remove(row.original)" />

@@ -110,7 +110,7 @@ defineExpose({
     <CommonCompactTable :data="rows" :columns="columns">
       <template #actions-cell="{ row }">
         <div class="flex items-center gap-1">
-          <UButton
+          <CommonActionButton
             icon="i-lucide-pencil"
             color="neutral"
             variant="ghost"
@@ -118,7 +118,7 @@ defineExpose({
             class="cursor-default"
             :aria-label="t('common.edit_named', { name: row.original.name || row.original.id })"
             @click="openEditEditor(row.original.sourceIndex)" />
-          <UButton
+          <CommonActionButton
             icon="i-lucide-trash"
             color="error"
             variant="ghost"

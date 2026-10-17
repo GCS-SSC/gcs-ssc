@@ -23,14 +23,13 @@ const isOpen: Ref<boolean> = ref(false)
       content: 'sm:max-w-xl',
       body: 'space-y-7'
     }">
-    <UButton
+    <CommonActionButton
       icon="i-lucide-circle-help"
       color="primary"
       variant="solid"
       size="xs"
       class="cursor-default rounded-full shadow-sm transition-colors hover:bg-primary/90"
       :aria-label="t('checklist.result_policy.open_help')"
-      :title="t('checklist.result_policy.open_help')"
       :ui="{ leadingIcon: 'size-4' }"
       @click="isOpen = true" />
 

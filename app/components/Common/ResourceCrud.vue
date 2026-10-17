@@ -200,21 +200,21 @@ defineExpose({
       <template #actions-cell="{ row }">
         <slot name="actions-cell" :row="row" :open-update="openUpdate" :delete-item="deleteItem">
           <div class="flex items-center gap-2">
-            <UButton
+            <CommonActionButton
               v-if="canUpdate"
               icon="i-lucide-edit-3"
               color="neutral"
               variant="ghost"
               size="sm"
-              :aria-label="t('common.edit')"
+              :aria-label="t('common.edit_named', { name: row.original.id })"
               @click="openUpdate(row.original)" />
-            <UButton
+            <CommonActionButton
               v-if="effectiveDeleteUrlBase"
               icon="i-lucide-trash"
               color="error"
               variant="ghost"
               size="sm"
-              :aria-label="t('common.delete')"
+              :aria-label="t('common.delete_named', { name: row.original.id })"
               @click="deleteItem(row.original.id)" />
           </div>
         </slot>

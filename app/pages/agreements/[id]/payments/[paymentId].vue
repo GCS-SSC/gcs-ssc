@@ -358,8 +358,8 @@ const handleCompleted = async () => {
 
                   <template #actions-cell="{ row }">
                     <div v-if="canUpdatePayment || canDeletePaymentLine" class="flex items-center justify-end gap-2">
-                      <UButton v-if="canUpdatePayment" icon="i-lucide-pencil" color="neutral" variant="ghost" class="cursor-default" :aria-label="`${t('common.edit')}: ${row.original.commitment_line_number ?? row.original.id}`" @click="openUpdateLine(row.original)" />
-                      <UButton v-if="canDeletePaymentLine" icon="i-lucide-trash" color="error" variant="ghost" class="cursor-default" :aria-label="`${t('common.delete')}: ${row.original.commitment_line_number ?? row.original.id}`" @click="deleteLine(String(row.original.id))" />
+                      <CommonActionButton v-if="canUpdatePayment" icon="i-lucide-pencil" color="neutral" variant="ghost" class="cursor-default" :aria-label="`${t('common.edit')}: ${row.original.commitment_line_number ?? row.original.id}`" @click="openUpdateLine(row.original)" />
+                      <CommonActionButton v-if="canDeletePaymentLine" icon="i-lucide-trash" color="error" variant="ghost" class="cursor-default" :aria-label="`${t('common.delete')}: ${row.original.commitment_line_number ?? row.original.id}`" @click="deleteLine(String(row.original.id))" />
                     </div>
                   </template>
                 </CommonResourceLayoutCard>

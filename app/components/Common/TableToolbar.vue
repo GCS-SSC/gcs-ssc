@@ -90,7 +90,7 @@ defineEmits(['add'])
             }))
         "
         :content="{ align: 'end' }">
-        <UButton
+        <CommonActionButton
           icon="i-lucide-columns-3"
           :aria-label="t('common.choose_columns')"
           color="neutral"

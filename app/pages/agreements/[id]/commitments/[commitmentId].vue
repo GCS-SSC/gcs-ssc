@@ -345,7 +345,7 @@ const handleCompleted = async () => {
 
                   <template #actions-cell="{ row }">
                     <div v-if="canUpdateCommitment || canDeleteCommitmentLine" class="flex items-center justify-end gap-2">
-                      <UButton
+                      <CommonActionButton
                         v-if="canUpdateCommitment"
                         icon="i-lucide-pencil"
                         color="neutral"
@@ -353,7 +353,7 @@ const handleCompleted = async () => {
                         class="cursor-default"
                         :aria-label="`${t('common.edit')}: ${row.original.egcs_fc_commitmentlinenumber ?? row.original.id}`"
                         @click="openUpdateLine(row.original)" />
-                      <UButton
+                      <CommonActionButton
                         v-if="canDeleteCommitmentLine"
                         icon="i-lucide-trash"
                         color="error"

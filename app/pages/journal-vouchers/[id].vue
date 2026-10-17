@@ -317,11 +317,11 @@ const applyAllocation = (line: JournalVoucherAllocationDraft) => {
                         :icon="row.original.balanced ? 'i-lucide-check' : 'i-lucide-triangle-alert'"
                         :label="t(row.original.balanced ? 'journal_voucher.balanced' : 'journal_voucher.unbalanced')" />
                       <template v-else-if="row.original.kind === 'corrected' && canEditAllocations">
-                        <UButton
+                        <CommonActionButton
                           type="button" icon="i-lucide-pencil" color="neutral" variant="ghost"
                           :aria-label="`${t('common.edit')}: ${t('journal_voucher.commitment_line')} ${row.original.number}, ${row.original.index + 1}`"
                           @click="allocationModal.openUpdate(row.original.line)" />
-                        <UButton
+                        <CommonActionButton
                           type="button" icon="i-lucide-trash" color="error" variant="ghost"
                           :aria-label="`${t('common.delete')}: ${t('journal_voucher.commitment_line')} ${row.original.number}, ${row.original.index + 1}`"
                           @click="state.egcs_fc_allocations.splice(row.original.index, 1)" />

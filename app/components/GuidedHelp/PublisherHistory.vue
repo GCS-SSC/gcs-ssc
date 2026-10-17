@@ -40,7 +40,7 @@ const inspect = (version: HelpVersion) => {
         {{ publishedAt(row.original.publishedAt) }}
       </template>
       <template #actions-cell="{ row }">
-        <UButton icon="i-lucide-arrow-right" color="neutral" variant="ghost" size="sm" :aria-label="t('common.open')" @click="inspect(row.original)" />
+        <CommonActionButton icon="i-lucide-arrow-right" color="neutral" variant="ghost" size="sm" :aria-label="t('common.open')" @click="inspect(row.original)" />
       </template>
     </CommonCompactTable>
     <UModal v-model:open="open" :title="selected ? `${label(selected.document.title)} · ${t('guided_help.version_number', { number: selected.version })}` : t('guided_help.version_history')" :description="t('guided_help.published_evidence')" :ui="{ content: 'sm:max-w-4xl' }">

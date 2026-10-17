@@ -13,6 +13,7 @@ const { transferPaymentId, streamId, agencyId, canUpdateChild, canDeleteChild } 
   canDeleteChild: boolean
 }>()
 const { t } = useI18n()
+const { getBilingualValue } = useBilingualValue()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const { createValidator } = useZodI18n()
@@ -90,12 +91,12 @@ const remove = async (item: TransferPaymentStreamDocumentTemplateItem) => {
       <CommonStatusBadge :variant="row.original.egcs_ay_active ? 'active' : 'inactive'" />
     </template>
     <template #actions-cell="{ row }">
-      <UButton
+      <CommonActionButton
         v-if="canDeleteChild"
         icon="i-lucide-trash"
         color="error"
         variant="ghost"
-        :aria-label="t('common.delete_named', { name: row.original.egcs_ay_name_en })"
+        :aria-label="t('common.delete_named', { name: getBilingualValue(row.original, 'egcs_ay_name', row.original.id) })"
         @click="remove(row.original)" />
     </template>
   </CommonResourceLayoutCard>

@@ -311,7 +311,7 @@ const getSortedSubSectionEntries = (section: SectionRow, sectionKey: string): Su
           <div class="space-y-6">
             <div class="flex items-center justify-between gap-3">
               <div />
-              <UButton
+              <CommonActionButton
                 icon="i-lucide-trash"
                 color="error"
                 variant="ghost"

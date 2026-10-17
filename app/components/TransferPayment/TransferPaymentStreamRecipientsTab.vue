@@ -217,7 +217,7 @@ const retryRecipientReferences = async () => {
 
     <template #actions-cell="{ row }">
       <div class="flex items-center gap-2">
-        <UButton
+        <CommonActionButton
           icon="i-lucide-pencil"
           color="neutral"
           variant="ghost"
@@ -225,7 +225,7 @@ const retryRecipientReferences = async () => {
           :aria-label="t('common.edit_named', { name: getRecipientActionTarget(row.original) })"
           :disabled="!canUpdateChild"
           @click="openUpdateRecipient(row.original)" />
-        <UButton
+        <CommonActionButton
           icon="i-lucide-trash"
           color="error"
           variant="ghost"

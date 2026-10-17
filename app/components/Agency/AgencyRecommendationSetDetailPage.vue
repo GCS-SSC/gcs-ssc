@@ -345,8 +345,8 @@ const runMemberMutation: EditorMutationRunner = async request => {
                         <CommonLifecycleBadge v-if="member.publicationState" engine="publication" :state="member.publicationState" />
                       </div>
                     </div>
-                    <UButton icon="i-lucide-arrow-up-right" color="neutral" variant="ghost" size="sm" class="cursor-default" :disabled="mutation.isPending.value" :aria-label="t('transfer_payment.recommendation_schema')" @click="openSchemaEditor(member)" />
-                    <UButton v-if="canDelete" icon="i-lucide-trash" color="error" variant="ghost" size="sm" class="cursor-default" :loading="deletingMemberId === String(member.id)" :disabled="mutation.isPending.value" :aria-label="t('common.delete')" @click="deleteMember(member)" />
+                    <CommonActionButton icon="i-lucide-arrow-up-right" color="neutral" variant="ghost" size="sm" class="cursor-default" :disabled="mutation.isPending.value" :aria-label="t('transfer_payment.recommendation_schema')" @click="openSchemaEditor(member)" />
+                    <CommonActionButton v-if="canDelete" icon="i-lucide-trash" color="error" variant="ghost" size="sm" class="cursor-default" :loading="deletingMemberId === String(member.id)" :disabled="mutation.isPending.value" :aria-label="t('common.delete')" @click="deleteMember(member)" />
                   </div><div v-if="state.members.length === 0" class="py-8 text-center text-sm text-zinc-500">
                     {{ t('common.no_data') }}
                   </div>

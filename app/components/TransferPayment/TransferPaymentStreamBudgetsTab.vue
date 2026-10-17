@@ -188,7 +188,7 @@ const deleteStreamBudget = async (row: TransferPaymentStreamBudgetRow) => {
 
     <template #actions-cell="{ row }">
       <div class="flex items-center gap-2">
-        <UButton
+        <CommonActionButton
           icon="i-lucide-pencil"
           color="neutral"
           variant="ghost"
@@ -196,7 +196,7 @@ const deleteStreamBudget = async (row: TransferPaymentStreamBudgetRow) => {
           :aria-label="t('common.edit_named', { name: getStreamBudgetActionTarget(row.original) })"
           :disabled="!canUpdateChild"
           @click="openUpdateStreamBudget(row.original)" />
-        <UButton
+        <CommonActionButton
           icon="i-lucide-trash"
           color="error"
           variant="ghost"

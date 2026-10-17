@@ -78,8 +78,8 @@ const branchLabel = (branch: { target: string, equals: string | boolean }) => {
           <div v-for="(branch, index) in branches" :key="index" class="flex items-center justify-between gap-3 rounded-md border border-default p-3">
             <span>{{ branchLabel(branch) }} {{ t('guided_help.routes_to') }} {{ destinations.find(item => item.value === (branch.next ?? '__end'))?.label }}</span>
             <div v-if="!disabled" class="flex gap-1">
-              <UButton icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="t('common.edit')" @click="edit(index)" />
-              <UButton icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('guided_help.remove_branch')" @click="branches.splice(index, 1)" />
+              <CommonActionButton icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="t('common.edit')" @click="edit(index)" />
+              <CommonActionButton icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('guided_help.remove_branch')" @click="branches.splice(index, 1)" />
             </div>
           </div>
         </section>

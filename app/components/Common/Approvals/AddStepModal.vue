@@ -149,7 +149,7 @@ const getCertificationLabel = (certification: AdditionalApprovalCertificationSta
                 {{ getCertificationLabel(certification, index) }}
               </span>
               <div v-if="canEditCertifications" class="flex items-center gap-1">
-                <UButton
+                <CommonActionButton
                   type="button"
                   icon="i-lucide-arrow-up"
                   color="neutral"
@@ -159,7 +159,7 @@ const getCertificationLabel = (certification: AdditionalApprovalCertificationSta
                   :disabled="index === 0 || isSubmitting"
                   :aria-label="t('assessment.approvals.move_certification_up')"
                   @click="emit('moveCertification', index, -1)" />
-                <UButton
+                <CommonActionButton
                   type="button"
                   icon="i-lucide-arrow-down"
                   color="neutral"
@@ -169,7 +169,7 @@ const getCertificationLabel = (certification: AdditionalApprovalCertificationSta
                   :disabled="index === orderedCertifications.length - 1 || isSubmitting"
                   :aria-label="t('assessment.approvals.move_certification_down')"
                   @click="emit('moveCertification', index, 1)" />
-                <UButton
+                <CommonActionButton
                   type="button"
                   icon="i-lucide-trash"
                   color="error"

@@ -162,8 +162,8 @@ const deleteLine = async (line: AccountReceivableCreditMemoLine) => {
       </template>
       <template #actions-cell="{ row }">
         <div class="flex justify-end gap-2">
-          <UButton v-if="canEdit" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${row.original.egcs_fc_linenumber}`" @click="openEdit(row.original)" />
-          <UButton v-if="canDelete" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="`${t('common.delete')}: ${row.original.egcs_fc_linenumber}`" @click="deleteLine(row.original)" />
+          <CommonActionButton v-if="canEdit" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${row.original.egcs_fc_linenumber}`" @click="openEdit(row.original)" />
+          <CommonActionButton v-if="canDelete" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="`${t('common.delete')}: ${row.original.egcs_fc_linenumber}`" @click="deleteLine(row.original)" />
         </div>
       </template>
     </CommonResourceLayoutCard>

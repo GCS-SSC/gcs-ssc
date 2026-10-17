@@ -444,7 +444,7 @@ const deleteClaim = (recordId: string) => runRecordAction(recordId, 'delete', as
 
       <template #actions-cell="{ row }">
         <div class="flex items-center justify-end gap-2">
-          <UButton
+          <CommonActionButton
             v-if="!isFiscalYearGroupRow(row as ClaimGroupedRow) && canUpdate && !row.getIsGrouped?.()"
             icon="i-lucide-pencil"
             :disabled="pendingRecordActions.has(String(row.original.id))"
@@ -453,7 +453,7 @@ const deleteClaim = (recordId: string) => runRecordAction(recordId, 'delete', as
             class="cursor-default"
             :aria-label="`${t('common.edit')}: ${t('agreement.claims.claim_label', { id: row.original.id })}`"
             @click="openUpdateClaim(String(row.original.id))" />
-          <UButton
+          <CommonActionButton
             v-if="!isFiscalYearGroupRow(row as ClaimGroupedRow) && canDelete && !row.getIsGrouped?.()"
             icon="i-lucide-trash"
             :disabled="pendingRecordActions.has(String(row.original.id))"
@@ -462,7 +462,7 @@ const deleteClaim = (recordId: string) => runRecordAction(recordId, 'delete', as
             class="cursor-default"
             :aria-label="`${t('common.delete')}: ${t('agreement.claims.claim_label', { id: row.original.id })}`"
             @click="deleteClaim(String(row.original.id))" />
-          <UButton
+          <CommonActionButton
             v-if="!isFiscalYearGroupRow(row as ClaimGroupedRow)"
             :to="getClaimRoute(row.original)"
             icon="i-lucide-arrow-right"

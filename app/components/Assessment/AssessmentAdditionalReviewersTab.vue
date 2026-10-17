@@ -489,7 +489,7 @@ const deleteRow = async (rowId: string) => {
 
         <template #actions-cell="{ row }">
           <div class="flex items-center gap-2">
-            <UButton
+            <CommonActionButton
               v-if="row.original.can_update && !runtimeLocked"
               icon="i-lucide-edit-3"
               color="neutral"
@@ -497,9 +497,8 @@ const deleteRow = async (rowId: string) => {
               size="sm"
               class="cursor-default"
               :aria-label="t('common.edit_named', { name: getAssigneeName(row.original) })"
-              :title="t('common.edit_named', { name: getAssigneeName(row.original) })"
               @click="openUpdateReviewer(row.original)" />
-            <UButton
+            <CommonActionButton
               v-if="row.original.can_complete && !runtimeLocked"
               icon="i-lucide-circle-check-big"
               color="primary"
@@ -507,10 +506,9 @@ const deleteRow = async (rowId: string) => {
               size="sm"
               class="cursor-default"
               :aria-label="`${t('assessment.additional_reviewers.complete')}: ${getAssigneeName(row.original)}`"
-              :title="`${t('assessment.additional_reviewers.complete')}: ${getAssigneeName(row.original)}`"
               :loading="completingRowId === row.original.id"
               @click="completeRow(row.original.id)" />
-            <UButton
+            <CommonActionButton
               v-if="row.original.can_delete && !runtimeLocked"
               icon="i-lucide-trash-2"
               color="error"
@@ -518,7 +516,6 @@ const deleteRow = async (rowId: string) => {
               size="sm"
               class="cursor-default"
               :aria-label="t('common.delete_named', { name: getAssigneeName(row.original) })"
-              :title="t('common.delete_named', { name: getAssigneeName(row.original) })"
               :loading="deletingRowId === row.original.id"
               @click="deleteRow(row.original.id)" />
           </div>

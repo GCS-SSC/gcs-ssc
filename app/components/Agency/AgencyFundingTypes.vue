@@ -312,22 +312,22 @@ const deleteSubtype = async (typeId: string, id: string) => {
       <template #actions-cell="{ row }">
         <div class="flex items-center justify-end gap-2">
           <template v-if="isTypeRow(row as GroupedFundingRow)">
-            <UButton
+            <CommonActionButton
               v-if="canCreate" icon="i-lucide-plus" color="primary" variant="ghost" size="sm"
               :aria-label="t('agency.funding_types.add_subtype_for', { name: typeName(row.original) })"
               @click="createSubtype(row.original.typeId)" />
-            <UButton
+            <CommonActionButton
               v-if="canUpdate" icon="i-lucide-edit-3" color="neutral" variant="ghost" size="sm"
               :aria-label="t('common.edit')" @click="editType(row.original.typeId)" />
-            <UButton
+            <CommonActionButton
               v-if="canDelete" icon="i-lucide-trash" color="error" variant="ghost" size="sm"
               :aria-label="t('common.delete_named', { name: typeName(row.original) })" @click="deleteType(row.original.typeId)" />
           </template>
           <template v-else-if="!row.original.isPlaceholder && row.original.subtypeId">
-            <UButton
+            <CommonActionButton
               v-if="canUpdate" icon="i-lucide-edit-3" color="neutral" variant="ghost" size="sm"
               :aria-label="t('common.edit')" @click="editSubtype(row.original.subtypeId)" />
-            <UButton
+            <CommonActionButton
               v-if="canDelete" icon="i-lucide-trash" color="error" variant="ghost" size="sm"
               :aria-label="t('common.delete_named', { name: subtypeName(row.original) })"
               @click="deleteSubtype(row.original.typeId, row.original.subtypeId)" />

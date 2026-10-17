@@ -83,7 +83,7 @@ watch([() => transferPaymentId, () => streamId], () => modal.close())
     </template>
     <template #actions-cell="{ row }">
       <div class="flex justify-end gap-2">
-        <UButton v-if="canDeleteChild" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('common.delete_named', { name: getActionTarget(row.original) })" @click="onDelete(row.original.id)" />
+        <CommonActionButton v-if="canDeleteChild" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('common.delete_named', { name: getActionTarget(row.original) })" @click="onDelete(row.original.id)" />
       </div>
     </template>
   </CommonResourceLayoutCard>

@@ -155,7 +155,7 @@ const download = async (item: AgreementGeneratedDocumentItem) => {
             {{ t(`enums.language_preference.${item.egcs_fc_language}`) }} · {{ item.egcs_fc_outputformat.toUpperCase() }} · {{ new Date(item.egcs_fc_generatedat).toLocaleString(locale) }}
           </p>
         </div>
-        <UButton color="neutral" variant="ghost" icon="i-lucide-download" :aria-label="`${t('common.download')}: ${locale === 'fr' ? item.egcs_fc_name_fr : item.egcs_fc_name_en}`" @click="download(item)" />
+        <CommonActionButton color="neutral" variant="ghost" icon="i-lucide-download" :aria-label="`${t('common.download')}: ${locale === 'fr' ? item.egcs_fc_name_fr : item.egcs_fc_name_en}`" @click="download(item)" />
       </div>
       <p v-if="documents.length === 0" class="px-4 py-6 text-center text-sm text-muted">
         {{ t('common.no_data') }}

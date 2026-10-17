@@ -91,13 +91,13 @@ const deleteAdjustment = async (row: AccountReceivableAdjustmentRow) => {
     </template>
     <template #actions-cell="{ row }">
       <div class="flex justify-end gap-2">
-        <UButton
+        <CommonActionButton
           v-if="row.original.adjustment.egcs_fc_candeleterole"
           icon="i-lucide-trash" color="error" variant="ghost"
           :aria-label="`${t('common.delete')}: ${row.original.reference}`"
           :loading="deletingId === row.original.adjustment.id" :disabled="deletingId !== null"
           @click="deleteAdjustment(row.original)" />
-        <UButton
+        <CommonActionButton
           icon="i-lucide-arrow-right" color="neutral" variant="ghost"
           :to="localePath({ ...appRouteLocations.agreementAccountReceivableDetail(agreementId, row.original.adjustment.id), query: { entityType: 'fundingcaseaccountreceivableadjustment' } })"
           :aria-label="`${t('common.view_details')}: ${row.original.reference}`" />

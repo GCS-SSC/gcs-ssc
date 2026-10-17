@@ -102,7 +102,7 @@ const retainedOption = (source: FundingSource) => {
           @update:model-value="value => updateSource(index, { egcs_fc_amount: String(value ?? '') as Money })"
         />
       </UFormField>
-      <UButton v-if="!disabled" type="button" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('agreement.funding_sources.remove')" @click="removeSource(index)" />
+      <CommonActionButton v-if="!disabled" type="button" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('agreement.funding_sources.remove')" @click="removeSource(index)" />
       <div v-if="allowDescription" class="grid gap-3 md:col-span-3 md:grid-cols-2">
         <UFormField :label="t('agreement.funding_sources.description_en')" :name="`egcs_fc_fundingsources.${index}.egcs_fc_description_en`">
           <CommonTextarea

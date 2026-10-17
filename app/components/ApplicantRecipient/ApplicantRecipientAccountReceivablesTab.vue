@@ -63,7 +63,7 @@ const amount = (value: string, currency: string) =>
         </template>
         <template #actions-cell="{ row }">
           <div class="flex justify-end gap-2">
-            <UButton
+            <CommonActionButton
               icon="i-lucide-arrow-right" color="neutral" variant="ghost"
               :aria-label="`${t('common.view_details')}: ${accountReceivableReference(row.original)}`"
               :to="localePath(appRouteLocations.agreementAccountReceivableDetail(row.original.egcs_fc_fundingagreement, row.original.id))" />

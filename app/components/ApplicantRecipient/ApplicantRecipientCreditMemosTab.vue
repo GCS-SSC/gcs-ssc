@@ -160,12 +160,12 @@ const memoDetailPath = (memo: ProponentCreditMemoRow): string | undefined => {
         </template>
         <template #actions-cell="{ row }">
           <div class="flex justify-end gap-2">
-            <UButton
+            <CommonActionButton
               v-if="memoDetailPath(row.original)"
               icon="i-lucide-arrow-right" color="neutral" variant="ghost"
               :aria-label="`${t('common.view_details')}: ${row.original.egcs_fc_creditmemoreference}`"
               :to="memoDetailPath(row.original)" />
-            <UButton
+            <CommonActionButton
               v-if="row.original.egcs_fc_kind === 'cash' && row.original.egcs_fc_candelete"
               icon="i-lucide-trash" color="error" variant="ghost"
               :aria-label="`${t('common.delete')}: ${row.original.egcs_fc_creditmemoreference}`"

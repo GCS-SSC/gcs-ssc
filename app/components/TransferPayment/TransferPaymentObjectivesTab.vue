@@ -149,7 +149,7 @@ const deleteObjective = async (objective: TransferPaymentObjectiveRow) => {
 
       <template #actions-cell="{ row }">
         <div class="flex items-center gap-2">
-          <UButton
+          <CommonActionButton
             icon="i-lucide-pencil"
             color="neutral"
             variant="ghost"
@@ -157,7 +157,7 @@ const deleteObjective = async (objective: TransferPaymentObjectiveRow) => {
             :disabled="!canUpdateChild"
             :aria-label="t('common.edit_named', { name: getObjectiveActionTarget(row.original) })"
             @click="openUpdateObjective(row.original)" />
-          <UButton
+          <CommonActionButton
             icon="i-lucide-trash"
             color="error"
             variant="ghost"

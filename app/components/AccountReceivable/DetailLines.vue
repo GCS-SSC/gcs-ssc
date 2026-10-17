@@ -207,10 +207,10 @@ const deleteLine = async (line: AccountReceivableLine) => {
       </template>
       <template #actions-cell="{ row }">
         <div class="flex justify-end gap-2">
-          <UButton v-if="canEdit" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${t('account_receivable.line_number')} ${lineNumber(row.original)}`" @click="openEdit(row.original)" />
-          <UButton v-if="canUpdate && isAdjustment && row.original.egcs_fc_accountreceivablechartofaccount" icon="i-lucide-arrow-right-left" color="neutral" variant="ghost" :aria-label="`${t('account_receivable.move_coding')}: ${t('account_receivable.line_number')} ${lineNumber(row.original)}`" @click="openRecode(row.original)" />
-          <UButton v-if="canUpdate && isAdjustment && row.original.egcs_fc_accountreceivablechartofaccount" icon="i-lucide-minus" color="neutral" variant="ghost" :loading="removePending.has(removeKey(row.original))" :disabled="removePending.has(removeKey(row.original))" :aria-label="`${t('account_receivable.remove_coding_line')}: ${t('account_receivable.line_number')} ${lineNumber(row.original)}`" @click="removeCoding(row.original)" />
-          <UButton v-if="canDelete" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="`${t('common.delete')}: ${t('account_receivable.line_number')} ${lineNumber(row.original)}`" @click="deleteLine(row.original)" />
+          <CommonActionButton v-if="canEdit" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${t('account_receivable.line_number')} ${lineNumber(row.original)}`" @click="openEdit(row.original)" />
+          <CommonActionButton v-if="canUpdate && isAdjustment && row.original.egcs_fc_accountreceivablechartofaccount" icon="i-lucide-arrow-right-left" color="neutral" variant="ghost" :aria-label="`${t('account_receivable.move_coding')}: ${t('account_receivable.line_number')} ${lineNumber(row.original)}`" @click="openRecode(row.original)" />
+          <CommonActionButton v-if="canUpdate && isAdjustment && row.original.egcs_fc_accountreceivablechartofaccount" icon="i-lucide-minus" color="neutral" variant="ghost" :loading="removePending.has(removeKey(row.original))" :disabled="removePending.has(removeKey(row.original))" :aria-label="`${t('account_receivable.remove_coding_line')}: ${t('account_receivable.line_number')} ${lineNumber(row.original)}`" @click="removeCoding(row.original)" />
+          <CommonActionButton v-if="canDelete" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="`${t('common.delete')}: ${t('account_receivable.line_number')} ${lineNumber(row.original)}`" @click="deleteLine(row.original)" />
         </div>
       </template>
     </CommonResourceLayoutCard>

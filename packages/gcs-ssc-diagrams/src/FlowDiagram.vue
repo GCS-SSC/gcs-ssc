@@ -2,6 +2,7 @@
 /* eslint-disable jsdoc/require-jsdoc -- component-local rendering and browser lifecycle */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 import type { FlowDiagramDefinition, FlowDiagramProps, FlowDiagramEdgeKind } from '@gcs-ssc/extensions/ui'
+import { ExtensionTooltip } from '@gcs-ssc/extensions/ui'
 import type { FlowDiagramLabels } from './index'
 import { flowConnectionPath, flowLaneSpacing } from './connections'
 import { flowBranchLayout } from './branch-layout'
@@ -331,19 +332,27 @@ const exportDiagram = async (format: 'svg' | 'png') => {
           </div>
           <div class="flow-canvas-view-controls">
             <div v-if="labels.zoomIn && labels.zoomOut && labels.resetZoom" class="flow-zoom-controls">
-              <button type="button" class="flow-zoom-button" :aria-label="labels.zoomOut" :title="labels.zoomOut" :disabled="zoom <= .25" @click="changeZoom(zoom - .25)">
-                <svg class="flow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14" /></svg>
-              </button>
-              <button type="button" class="flow-zoom-button flow-zoom-reset" :aria-label="labels.resetZoom" :title="labels.resetZoom" @click="changeZoom(1)">
-                <span aria-live="polite" aria-atomic="true">{{ Math.round(zoom * 100) }}%</span>
-              </button>
-              <button type="button" class="flow-zoom-button" :aria-label="labels.zoomIn" :title="labels.zoomIn" :disabled="zoom >= 2" @click="changeZoom(zoom + .25)">
-                <svg class="flow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5v14" /></svg>
-              </button>
+              <ExtensionTooltip :text="labels.zoomOut">
+                <button type="button" class="flow-zoom-button" :aria-label="labels.zoomOut" :disabled="zoom <= .25" @click="changeZoom(zoom - .25)">
+                  <svg class="flow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14" /></svg>
+                </button>
+              </ExtensionTooltip>
+              <ExtensionTooltip :text="labels.resetZoom">
+                <button type="button" class="flow-zoom-button flow-zoom-reset" :aria-label="labels.resetZoom" @click="changeZoom(1)">
+                  <span aria-live="polite" aria-atomic="true">{{ Math.round(zoom * 100) }}%</span>
+                </button>
+              </ExtensionTooltip>
+              <ExtensionTooltip :text="labels.zoomIn">
+                <button type="button" class="flow-zoom-button" :aria-label="labels.zoomIn" :disabled="zoom >= 2" @click="changeZoom(zoom + .25)">
+                  <svg class="flow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M12 5v14" /></svg>
+                </button>
+              </ExtensionTooltip>
             </div>
-            <button v-if="labels.enterFullscreen && labels.exitFullscreen" type="button" class="flow-zoom-button flow-fullscreen-button" :aria-label="fullscreen ? labels.exitFullscreen : labels.enterFullscreen" :title="fullscreen ? labels.exitFullscreen : labels.enterFullscreen" :aria-expanded="fullscreen" @click="toggleFullscreen">
-              <svg class="flow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path :d="fullscreen ? 'M4 9h5V4m6 0v5h5M4 15h5v5m6 0v-5h5' : 'M9 4H4v5m11-5h5v5M4 15v5h5m6 0h5v-5'" /></svg>
-            </button>
+            <ExtensionTooltip v-if="labels.enterFullscreen && labels.exitFullscreen" :text="fullscreen ? labels.exitFullscreen : labels.enterFullscreen">
+              <button type="button" class="flow-zoom-button flow-fullscreen-button" :aria-label="fullscreen ? labels.exitFullscreen : labels.enterFullscreen" :aria-expanded="fullscreen" @click="toggleFullscreen">
+                <svg class="flow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path :d="fullscreen ? 'M4 9h5V4m6 0v5h5M4 15h5v5m6 0v-5h5' : 'M9 4H4v5m11-5h5v5M4 15v5h5m6 0h5v-5'" /></svg>
+              </button>
+            </ExtensionTooltip>
           </div>
           <p v-if="exportError" role="alert">
             {{ labels.exportError }}

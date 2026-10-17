@@ -236,13 +236,13 @@ watch(baseUrl, () => {
       </template>
       <template #actions-cell="{ row }">
         <div v-if="row.groupingColumnId === 'sectionGroup'" class="flex items-center gap-2">
-          <UButton v-if="canUpdateChild" icon="i-lucide-plus" color="neutral" variant="ghost" size="sm" :aria-label="t('custom_fields.assign_field')" @click="openAssignment(row.original.section?.id ?? null)" />
-          <UButton v-if="canUpdateChild && row.original.section" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" :aria-label="t('common.edit')" @click="sectionModal.openUpdate(row.original.section)" />
-          <UButton v-if="canDeleteChild && row.original.section" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('common.delete')" @click="remove(`${baseUrl}/custom-fields/sections/${row.original.section.id}`)" />
+          <CommonActionButton v-if="canUpdateChild" icon="i-lucide-plus" color="neutral" variant="ghost" size="sm" :aria-label="t('custom_fields.assign_field')" @click="openAssignment(row.original.section?.id ?? null)" />
+          <CommonActionButton v-if="canUpdateChild && row.original.section" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" :aria-label="t('common.edit')" @click="sectionModal.openUpdate(row.original.section)" />
+          <CommonActionButton v-if="canDeleteChild && row.original.section" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('common.delete')" @click="remove(`${baseUrl}/custom-fields/sections/${row.original.section.id}`)" />
         </div>
         <div v-else-if="row.groupingColumnId === 'fieldGroup' && row.original.field" class="flex items-center gap-2">
-          <UButton v-if="canUpdateChild" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" :aria-label="t('common.edit')" @click="editAssignment(row.original.field)" />
-          <UButton v-if="canDeleteChild" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('common.delete')" @click="remove(`${assignmentUrl}/${row.original.field.assignmentId}`)" />
+          <CommonActionButton v-if="canUpdateChild" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" :aria-label="t('common.edit')" @click="editAssignment(row.original.field)" />
+          <CommonActionButton v-if="canDeleteChild" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('common.delete')" @click="remove(`${assignmentUrl}/${row.original.field.assignmentId}`)" />
         </div>
       </template>
     </CommonResourceLayoutCard>

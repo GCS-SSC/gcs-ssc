@@ -439,7 +439,7 @@ const save = async (_event: FormSubmitEvent<FundingHistoryFormState>) => {
                     :exclude-values="state.recipientIds.filter((_, recipientIndex) => recipientIndex !== index + 1)"
                     :placeholder="t('applicant_recipient.funding_history.placeholders.recipient')" />
                 </UFormField>
-                <UButton
+                <CommonActionButton
                   icon="i-lucide-x"
                   color="error"
                   variant="ghost"
