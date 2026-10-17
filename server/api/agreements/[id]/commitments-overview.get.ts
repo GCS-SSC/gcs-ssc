@@ -5,8 +5,8 @@ import { databaseMoneyText, parseDatabaseMoney } from '~~/server/utils/database-
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 
 export default defineEventHandler(async event => {
-  return await executeFreshReadSnapshot(event, async snapshotDb => {
-    const prepared = await prepareAgreementCommitmentRoute(event, 'read', undefined, { db: snapshotDb, freshAuth: true })
+  return await executeFreshReadSnapshot(event, async (snapshotDb, freshAuthContext) => {
+    const prepared = await prepareAgreementCommitmentRoute(event, 'read', undefined, { db: snapshotDb, freshAuth: true, freshAuthContext })
     if (!prepared || !('agreementId' in prepared)) {
       return prepared
     }

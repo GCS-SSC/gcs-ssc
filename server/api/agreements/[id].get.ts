@@ -11,8 +11,8 @@ export default defineEventHandler(async event => {
   if (!id) {
     return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')
   }
-  return await executeFreshReadSnapshot(event, async db => {
-    const freshAuth = await requireFreshAuthContext(event, db)
+  return await executeFreshReadSnapshot(event, async (db, freshAuthContext) => {
+    const freshAuth = freshAuthContext ?? await requireFreshAuthContext(event, db)
 
     const agreementContext = await resolveAgreementScopeContext(id, db)
     if (!agreementContext) {

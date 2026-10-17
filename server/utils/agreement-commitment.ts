@@ -17,7 +17,7 @@ import { FundingCaseAgreementCommitmentLinePatchSchema } from '~~/shared/types/s
 import type { AssignableEntityType, Currency_Codes, Database } from '~~/shared/types/database'
 import type { FundingCaseAgreementCommitmentLinePatch } from '~~/shared/types/schemas/funding-case-agreement'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
-import { authorizeFreshAssignedItem } from '~~/server/utils/authorize'
+import { authorizeFreshAssignedItem, type AuthContext } from '~~/server/utils/authorize'
 import type { ExactEntityTarget } from '@gcs-ssc/authorization'
 import { assertBusinessStatusMutationAllowed, resolveBusinessStatusProtection } from '~~/server/utils/business-status-runtime'
 import { getCommitmentAllocationPaidCoverage, getCommitmentLinePaymentCoverage } from '~~/server/utils/agreement-commitment-line-balance'
@@ -43,7 +43,7 @@ export const prepareAgreementCommitmentRoute = async (
   event: H3Event,
   action: 'create' | 'read' | 'update' | 'delete',
   assignmentTarget?: ExactEntityTarget<AssignableEntityType>,
-  options: { db?: DbClient, freshAuth?: boolean } = {}
+  options: { db?: DbClient, freshAuth?: boolean, freshAuthContext?: AuthContext } = {}
 ) => {
   const db = options.db ?? event.context.$db as Kysely<Database>
   const agreementId = getRouterParam(event, 'id')
@@ -54,7 +54,8 @@ export const prepareAgreementCommitmentRoute = async (
 
   const agreementContext = await authorizeAgreementResource(event, action, agreementId, db, {
     assignmentTarget,
-    freshAuth: options.freshAuth
+    freshAuth: options.freshAuth,
+    freshAuthContext: options.freshAuthContext
   })
   if (!agreementContext) {
     return await badRequest(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')

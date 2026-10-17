@@ -84,6 +84,7 @@ export const lifecycleFixturePgliteE2eSpecPaths = [
   'tests/e2e/agreement-forecast-claim-funding.spec.ts',
   'tests/e2e/agreement-forecast-core.spec.ts',
   'tests/e2e/agreement-forecast-grouping.spec.ts',
+  'tests/e2e/agreement-forecast-monthly-recovery.spec.ts',
   'tests/e2e/agreement-list-review.spec.ts',
   'tests/e2e/agreement-monitor-lifecycle.spec.ts',
   'tests/e2e/agreement-monitor-pending-actions.spec.ts',

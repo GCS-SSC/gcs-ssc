@@ -14,8 +14,8 @@ export default defineEventHandler(async event => {
   const agreementId = getRouterParam(event, 'id')
   if (!agreementId) return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')
 
-  return await executeFreshReadSnapshot(event, async db => {
-    const context = await authorizeAgreementResource(event, 'read', agreementId, db, { freshAuth: true })
+  return await executeFreshReadSnapshot(event, async (db, freshAuthContext) => {
+    const context = await authorizeAgreementResource(event, 'read', agreementId, db, { freshAuth: true, freshAuthContext })
     if (!context) return await notFound(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
     const agreement = await assertAgreementExists(event, agreementId, db)
     if (!agreement || typeof agreement !== 'object' || !('id' in agreement)) return agreement

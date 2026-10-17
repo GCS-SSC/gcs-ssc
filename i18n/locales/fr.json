@@ -1424,7 +1424,8 @@
       "currency_mismatch": "La devise doit correspondre à celle de l’entente.",
       "invalid_claim_proponent": "Sélectionnez le promoteur qui présente la demande et qui est lié à cette entente.",
       "amendment_risk_workflow_managed": "Un processus de risque gère la proposition de risque de cette modification. Terminez le processus pour la mettre à jour.",
-      "forecast_cell_occupied": "Une ligne de prévision existe déjà pour cette ligne budgétaire et ce mois."
+      "forecast_cell_occupied": "Une ligne de prévision existe déjà pour cette ligne budgétaire et ce mois.",
+      "forecast_breakdown_conflict": "La ventilation des prévisions a changé. Rechargez les montants enregistrés pour vérifier vos modifications. Un nouvel enregistrement remplacera les montants enregistrés dans les cellules modifiées."
     },
     "transfer_payment": {
       "invalid_funding_subtype": "Sélectionnez un sous-type de financement actif appartenant à l’organisme de ce volet.",

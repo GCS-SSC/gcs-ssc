@@ -1424,7 +1424,8 @@
       "currency_mismatch": "Currency must match the Agreement currency.",
       "invalid_claim_proponent": "Select a submitting Proponent linked to this Agreement.",
       "amendment_risk_workflow_managed": "A risk workflow manages this Amendment’s risk proposal. Complete the workflow to update it.",
-      "forecast_cell_occupied": "A forecast line already exists for this budget line and month."
+      "forecast_cell_occupied": "A forecast line already exists for this budget line and month.",
+      "forecast_breakdown_conflict": "The forecast breakdown changed. Reload the saved amounts to review your edits. Saving again will replace the saved amounts in your edited cells."
     },
     "transfer_payment": {
       "invalid_funding_subtype": "Select an active funding subtype owned by this stream’s Agency.",

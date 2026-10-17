@@ -339,7 +339,7 @@ export default defineEventHandler(async event => {
         WHERE application_user.id = roster.primary_auth_user_id AND application_user._deleted = false
           AND (
             assigned_role.agency_id IS NULL
-            OR (roster.owner_subject = 'applicant_recipient' AND assigned_role.agency_id IS NOT NULL)
+            OR (roster.entity_type = 'applicantrecipient' AND assigned_role.agency_id IS NOT NULL)
             OR (assigned_role.agency_id = roster.agency_id AND (
               NOT EXISTS (
                 SELECT 1 FROM role_transfer_payment_scope role_scope

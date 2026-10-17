@@ -85,7 +85,8 @@ export interface AgreementVisibility {
  * @param db - Database used for canonical ownership and exact-assignment resolution.
  * @param options - Explicit optional authorization sources for the resource.
  * @param options.assignmentTarget - Exact assigned item whose grant may authorize this resource.
- * @param options.freshAuth - Rebuild the grant graph from the supplied transaction before authorizing.
+ * @param options.freshAuth - Require fresh grants, rebuilding unless the transaction supplies its fresh context.
+ * @param options.freshAuthContext - Fresh context handed off by the supplied read transaction, avoiding a second rebuild.
  * @returns Authorized canonical context, or null for an authorized missing resource.
  */
 export const authorizeAgreementResource = async (
@@ -96,6 +97,7 @@ export const authorizeAgreementResource = async (
   options: {
     assignmentTarget?: ExactEntityTarget<AssignableEntityType>
     freshAuth?: boolean
+    freshAuthContext?: AuthContext
   } = {}
 ): Promise<AgreementScopeContext | null> => {
   const resolver = async ({ context }: { context: AuthContext }) => {
@@ -124,7 +126,7 @@ export const authorizeAgreementResource = async (
   const result = options.freshAuth
     ? await authorizeWithFreshAuthContext<AgreementAction, AgreementScopeContext | null>(
         event,
-        await requireFreshAuthContext(event, db),
+        options.freshAuthContext ?? await requireFreshAuthContext(event, db),
         'agreement',
         action,
         resolver

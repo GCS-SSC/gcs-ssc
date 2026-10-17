@@ -11,8 +11,8 @@ import { escapeLikePattern } from '~~/server/utils/sql-like'
 export default defineEventHandler(async event => {
   const agreementId = getRouterParam(event, 'id')
   if (!agreementId) return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')
-  return await executeFreshReadSnapshot(event, async db => {
-    const agreementContext = await authorizeAgreementResource(event, 'read', agreementId, db, { freshAuth: true })
+  return await executeFreshReadSnapshot(event, async (db, freshAuthContext) => {
+    const agreementContext = await authorizeAgreementResource(event, 'read', agreementId, db, { freshAuth: true, freshAuthContext })
     if (!agreementContext) return await badRequest(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
 
     const { page, limit, search } = await getValidatedQueryI18n(event, PaginationSchema)

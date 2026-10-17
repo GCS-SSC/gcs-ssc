@@ -22,9 +22,9 @@ export default defineEventHandler(async event => {
   if (!agreementId) {
     return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')
   }
-  return await executeFreshReadSnapshot(event, async db => {
+  return await executeFreshReadSnapshot(event, async (db, freshAuthContext) => {
     const { page, limit, search, permission_action, address_id, selected_ids } = await getValidatedQueryI18n(event, QuerySchema)
-    const agreementContext = await authorizeAgreementResource(event, permission_action, agreementId, db, { freshAuth: true })
+    const agreementContext = await authorizeAgreementResource(event, permission_action, agreementId, db, { freshAuth: true, freshAuthContext })
     if (!agreementContext) {
       return await badRequest(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
     }

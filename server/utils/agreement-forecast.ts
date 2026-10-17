@@ -169,7 +169,7 @@ export const executeAgreementForecastMutation = async <T>(
   initialContext: AgreementScopeContext,
   aggregateLocks: AgreementAggregateLock[] | ((trx: Transaction<Database>) => Promise<AgreementAggregateLock[]>),
   callback: (trx: Transaction<Database>) => Promise<T>,
-  options: { action?: 'create' | 'update' | 'delete' } = {}
+  options: { action?: 'create' | 'update' | 'delete' | Array<'create' | 'update' | 'delete'> } = {}
 ): Promise<T> => {
   return await executeFreshAuthorizedAgreementWrite(
     event,
@@ -183,7 +183,10 @@ export const executeAgreementForecastMutation = async <T>(
         await lockAgreementAggregates(trx, locks, agreementId)
         for (const lock of locks.filter(lock => lock.type === 'forecast')) {
           await assertBusinessStatusMutationAllowed(event, trx, 'fundingcaseforecast', lock.id)
-          await authorizeFreshAssignedItem(event, trx, authContext, 'fundingcaseforecast', lock.id, options.action ?? 'update')
+          const actions = Array.isArray(options.action) ? options.action : [options.action ?? 'update']
+          for (const action of actions) {
+            await authorizeFreshAssignedItem(event, trx, authContext, 'fundingcaseforecast', lock.id, action)
+          }
         }
       }
     }

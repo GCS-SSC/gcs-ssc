@@ -9,6 +9,7 @@ import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-
 import { requireFreshAuthContext } from '~~/server/utils/authorize'
 import {
   isEntityAssignmentRosterWorkable,
+  isProponentEntityAssigneeEligible,
   canManageEntityAssignmentsWithContext,
   resolveEntityAssignmentOwner,
   resolveQualifiedEntityAssignmentSource
@@ -17,7 +18,7 @@ import { executeQualifiedRuntimeTransaction, resolveQualifiedRuntimeTransactionP
 import { lockReviewRuntimeTarget, resolveReviewRuntimeEntityFromDataCollection } from './review-runtime-access'
 import { getActiveStructuralRoleAssignments } from '~~/server/utils/active-user-scopes'
 import { lockTransferPaymentStreams } from '~~/server/utils/transfer-payment-stream-lock'
-import { defineUserAbilities, getUserAssignmentAgencyScopes } from '~~/server/utils/rbac'
+import { defineUserAbilities } from '~~/server/utils/rbac'
 import type { AssignableEntityType, Database, Entity_Type } from '~~/shared/types/database'
 import { ENTITY_AUTHORIZATION_POLICIES } from '~~/shared/utils/entity-assignments'
 import {
@@ -204,9 +205,7 @@ const lockAndValidateAssignee = async (
   const abilities = await defineUserAbilities(String(applicationUser.id), trx)
   let eligible = false
   if (owner?.kind === 'applicant_recipient') {
-    eligible = abilities.authorize('applicant_recipient', 'update', { type: 'global' })
-      || (await getUserAssignmentAgencyScopes(String(applicationUser.id), trx))
-        .some(scope => abilities.authorize('applicant_recipient', 'update', { type: 'agency', agencyId: scope.agencyId }))
+    eligible = isProponentEntityAssigneeEligible(owner, abilities)
   } else if (owner?.kind === 'agreement') {
     const agreement = await resolveAgreementScopeContext(owner.agreementId, trx)
     eligible = Boolean(agreement && abilities.authorize(owner.subject ?? 'agreement', 'update', agreement.scope))

@@ -11,6 +11,7 @@ import { useGroupedTableExpansion, type GroupedTableRow } from '~/composables/us
 import CommonCompletionPanel from '~/components/Common/Completions/Panel.vue'
 import { appRouteLocations, authorizedRouteLocation } from '~/utils/route-locations'
 import type { EntityAssignmentContext } from '~~/shared/types/schemas/entity-assignment'
+import type { FundingCaseAgreementForecastBreakdownPatch } from '~~/shared/types/schemas'
 import type {
   FundingCaseAgreementBudgetLineItemRow,
   FundingCaseAgreementForecastLineItemRow,
@@ -250,7 +251,7 @@ const lineItemByBudgetMonth = computed(() => {
 })
 
 const openFundingEditor = (line: FundingCaseAgreementForecastLineItemRow) => {
-  if (isSavingFunding.value || !canMutateForecast(canUpdateForecast.value)) return
+  if (isSavingFunding.value || isSavingBreakdown.value || !canMutateForecast(canUpdateForecast.value)) return
   if (!line.budget_line_available || !activeBudgetLineItems.value.some(row => String(row.id) === getStableBudgetLineId(line))) {
     toast.add({ title: t('common.warning'), description: t('agreement.forecasts.historical_budget_line_read_only'), color: 'warning' })
     return
@@ -266,7 +267,7 @@ const openFundingEditor = (line: FundingCaseAgreementForecastLineItemRow) => {
 
 const saveFundingEditor = async () => {
   const line = fundingEditorLine.value
-  if (!line || isSavingFunding.value || !canMutateForecast(canUpdateForecast.value)) return
+  if (!line || isSavingFunding.value || isSavingBreakdown.value || !canMutateForecast(canUpdateForecast.value)) return
   const current = lineItemByBudgetMonth.value.get(getDraftKey(getStableBudgetLineId(line), line.egcs_fc_month))
   if (current?.id !== line.id) return
   if (!current.budget_line_available || !activeBudgetLineItems.value.some(row => String(row.id) === getStableBudgetLineId(current))) {
@@ -395,24 +396,7 @@ const breakdownPeriodColumnVisibility = computed<Record<string, boolean>>(() => 
 ))
 
 watch(activeForecastLineItems, () => {
-  const nextDraftAmounts: Record<string, string> = {}
-
-  for (const line of activeForecastLineItems.value) {
-    nextDraftAmounts[getDraftKey(getStableBudgetLineId(line), line.egcs_fc_month)] = line.egcs_fc_amount
-  }
-
-  for (const budgetLine of activeBudgetLineItems.value) {
-    for (let month = 0; month < MONTH_KEYS.length; month += 1) {
-      const key = getDraftKey(String(budgetLine.id), month)
-      if (nextDraftAmounts[key] === undefined) {
-        nextDraftAmounts[key] = '0.00'
-      }
-    }
-  }
-
-  draftAmounts.value = breakdownReloadRequired.value
-    ? { ...nextDraftAmounts, ...draftAmounts.value }
-    : nextDraftAmounts
+  if (!breakdownReloadRequired.value) draftAmounts.value = {}
 }, { immediate: true })
 
 const displayValue = (value: string | number | null | undefined) => {
@@ -432,7 +416,8 @@ const getDraftAmount = (budgetLineId: string, month: number) => {
   if (!activeBudgetLineItems.value.some(line => String(line.id) === budgetLineId)) {
     return lineItemByBudgetMonth.value.get(getDraftKey(budgetLineId, month))?.egcs_fc_amount ?? ZERO_MONEY
   }
-  return draftAmounts.value[getDraftKey(budgetLineId, month)] ?? ZERO_MONEY
+  const key = getDraftKey(budgetLineId, month)
+  return draftAmounts.value[key] ?? lineItemByBudgetMonth.value.get(key)?.egcs_fc_amount ?? ZERO_MONEY
 }
 
 const getDraftMoney = (budgetLineId: string, month: number): Money | null => {
@@ -450,10 +435,11 @@ const hasInvalidDraftAmounts = computed(() => activeBudgetLineItems.value.some(l
 ))
 
 const setDraftAmount = (budgetLineId: string, month: number, value: string | number | null | undefined) => {
-  draftAmounts.value = {
-    ...draftAmounts.value,
-    [getDraftKey(budgetLineId, month)]: String(value ?? '')
-  }
+  const key = getDraftKey(budgetLineId, month)
+  const draft = String(value ?? '')
+  draftAmounts.value = draft === (lineItemByBudgetMonth.value.get(key)?.egcs_fc_amount ?? ZERO_MONEY)
+    ? Object.fromEntries(Object.entries(draftAmounts.value).filter(([draftKey]) => draftKey !== key))
+    : { ...draftAmounts.value, [key]: draft }
 }
 
 const getPeriodTotal = (budgetLineId: string, months: number[]) =>
@@ -581,13 +567,20 @@ const refreshPage = async () => {
 }
 
 const reloadForecastBreakdown = async () => {
-  const pendingDrafts = { ...draftAmounts.value }
+  let pendingDrafts = { ...draftAmounts.value }
   breakdownReloadRequired.value = true
   try {
     await refreshPage()
     if (overviewError.value || overviewStatus.value === 'error') {
       throw overviewError.value ?? new Error(t('common.resource_table_load_failed'))
     }
+    pendingDrafts = Object.fromEntries(Object.entries(pendingDrafts).filter(([key, value]) => {
+      try {
+        return parseMoney(value) !== (lineItemByBudgetMonth.value.get(key)?.egcs_fc_amount ?? ZERO_MONEY)
+      } catch {
+        return true
+      }
+    }))
     breakdownReloadRequired.value = false
     return true
   } catch (error: unknown) {
@@ -599,16 +592,14 @@ const reloadForecastBreakdown = async () => {
 }
 
 const saveForecastBreakdown = async () => {
-  if (!activeForecast.value || isSavingBreakdown.value || !canMutateForecast(canEditForecastBreakdown.value)) {
+  if (!activeForecast.value || isSavingBreakdown.value || isSavingFunding.value || !canMutateForecast(canEditForecastBreakdown.value)) {
     return
   }
 
-  let savedCells = 0
-  let savedAllCells = false
   try {
     isSavingBreakdown.value = true
     if (breakdownReloadRequired.value && !await reloadForecastBreakdown()) return
-    const canonicalDraftAmounts = new Map<string, Money>()
+    const cells: FundingCaseAgreementForecastBreakdownPatch['cells'] = []
 
     for (const budgetLine of activeBudgetLineItems.value) {
       const budgetLineId = String(budgetLine.id)
@@ -622,52 +613,29 @@ const saveForecastBreakdown = async () => {
           })
           return
         }
-        canonicalDraftAmounts.set(getDraftKey(budgetLineId, month), amount)
-      }
-    }
-
-    for (const [key, amount] of canonicalDraftAmounts) {
-      const existing = lineItemByBudgetMonth.value.get(key)
-      if ((existing && existing.egcs_fc_amount !== amount && !canUpdateForecast.value)
-        || (!existing && amount !== ZERO_MONEY && !canCreateForecastLineItems.value)) {
-        warnPrerequisite(t('apiErrors.request.invalid_status'))
-        return
-      }
-    }
-
-    for (const budgetLine of activeBudgetLineItems.value) {
-      const budgetLineId = String(budgetLine.id)
-
-      for (let month = 0; month < MONTH_KEYS.length; month += 1) {
-        const amount = canonicalDraftAmounts.get(getDraftKey(budgetLineId, month)) ?? ZERO_MONEY
         const existing = lineItemByBudgetMonth.value.get(getDraftKey(budgetLineId, month))
-
-        if (existing && existing.egcs_fc_amount !== amount) {
-          if (!canMutateForecast(canUpdateForecast.value)) return
-          await saveJson(`/api/agreements/${agreementId}/forecast-line-items/${existing.id}`, 'PATCH', {
-            egcs_fc_amount: amount,
-            egcs_fc_totalamount: sumMoney([amount, ...existing.egcs_fc_fundingsources.map(source => source.egcs_fc_amount)])
-          })
-          savedCells += 1
+        if (existing ? existing.egcs_fc_amount === amount : amount === ZERO_MONEY) continue
+        if (!(existing ? canUpdateForecast.value : canCreateForecastLineItems.value)) {
+          warnPrerequisite(t('apiErrors.request.invalid_status'))
+          return
         }
-
-        if (!existing && amount !== ZERO_MONEY) {
-          if (!canMutateForecast(canCreateForecastLineItems.value)) return
-          await saveJson(`/api/agreements/${agreementId}/forecast-line-items`, 'POST', {
-            egcs_fc_agreementforecast: forecastId,
-            egcs_fc_fundingagreementbudgetlineitem: budgetLineId,
-            egcs_fc_month: month,
-            egcs_fc_amount: amount,
-            egcs_fc_totalamount: amount,
-            egcs_fc_currency: budgetLine.egcs_fc_currency
-          })
-          savedCells += 1
-        }
+        cells.push({
+          egcs_fc_fundingagreementbudgetlineitem: budgetLineId,
+          egcs_fc_month: month,
+          egcs_fc_amount: amount,
+          expected: existing ? { id: existing.id, egcs_fc_amount: existing.egcs_fc_amount } : null
+        })
       }
     }
 
+    if (cells.length > 0) {
+      // A failed response may follow a committed save; reload before any retry.
+      breakdownReloadRequired.value = true
+      await saveJson(`/api/agreements/${agreementId}/forecasts/${forecastId}/breakdown`, 'PATCH', { cells })
+      const savedKeys = new Set(cells.map(cell => getDraftKey(cell.egcs_fc_fundingagreementbudgetlineitem, cell.egcs_fc_month)))
+      draftAmounts.value = Object.fromEntries(Object.entries(draftAmounts.value).filter(([key]) => !savedKeys.has(key)))
+    }
     if (!await reloadForecastBreakdown()) return
-    savedAllCells = true
     toast.add({
       title: t('common.success'),
       description: t('agreement.forecasts.saved_breakdown'),
@@ -675,11 +643,8 @@ const saveForecastBreakdown = async () => {
     })
   } catch (error: unknown) {
     showError(error)
+    if (breakdownReloadRequired.value) await reloadForecastBreakdown()
   } finally {
-    if (savedCells > 0 && !savedAllCells && !breakdownReloadRequired.value) {
-      await reloadForecastBreakdown()
-    }
-
     isSavingBreakdown.value = false
   }
 }
@@ -714,7 +679,7 @@ const saveForecastBreakdown = async () => {
                     type="button"
                     :label="t('agreement.forecasts.save_breakdown')"
                     :loading="isSavingBreakdown"
-                    :disabled="isLoadingDetail || isSavingBreakdown || hasInvalidDraftAmounts"
+                    :disabled="isLoadingDetail || isSavingBreakdown || isSavingFunding || hasInvalidDraftAmounts"
                     @click="saveForecastBreakdown" />
                 </div>
 
@@ -836,7 +801,7 @@ const saveForecastBreakdown = async () => {
                     </span>
                     <UButton
                       v-if="period.type === 'month' && !isGroupedBreakdownRow(row as GroupedForecastBreakdownRow) && canUpdateForecast && lineItemByBudgetMonth.get(getDraftKey(row.original.budgetLineId, period.months[0] ?? 0))"
-                      :disabled="isLoadingDetail || isSavingFunding"
+                      :disabled="isLoadingDetail || isSavingFunding || isSavingBreakdown"
                       color="neutral"
                       variant="link"
                       size="xs"

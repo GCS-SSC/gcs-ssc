@@ -25,8 +25,8 @@ export default defineEventHandler(async event => {
   const agreementId = getRouterParam(event, 'id')
   if (!agreementId) return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')
 
-  return await executeFreshReadSnapshot(event, async db => {
-    const context = await authorizeAgreementResource(event, 'read', agreementId, db, { freshAuth: true })
+  return await executeFreshReadSnapshot(event, async (db, freshAuthContext) => {
+    const context = await authorizeAgreementResource(event, 'read', agreementId, db, { freshAuth: true, freshAuthContext })
     if (!context) return await notFound(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
     const input = await getValidatedQueryI18n(event, PaymentFinancialInputsQuerySchema)
     const currency = await assertAgreementCurrency(event, db, agreementId, input.egcs_fc_currency)

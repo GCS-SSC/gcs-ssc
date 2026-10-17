@@ -27,7 +27,6 @@ import { resolveCurrentCommonUser } from '~~/server/utils/additional-reviewer-ru
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
 import type { ReviewRuntimeSetupScope } from '~~/server/utils/review-runtime'
 import { isAssignableEntityType, isRuntimeAssignableEntityType } from '~~/shared/utils/entity-assignments'
-import { resolveAssignedItemGrant } from '~~/server/utils/rbac'
 import { canManageEntityAssignmentsWithContext } from '~~/server/utils/entity-assignment'
 import { isBusinessStatusEntityType, isBusinessStatusLineageLocked } from '~~/server/utils/business-status-runtime'
 import { getCoreEntityDefinition, isCoreEntityType } from '~~/shared/constants/entity-registry'
@@ -448,7 +447,7 @@ const authorizeSchemaAgencyRuntimeAction = async (
   return null
 }
 
-/** Resolves the exact artifact whose direct assignment or approval grants runtime read access. */
+/** Resolves the exact artifact whose approval assignment grants runtime read access. */
 const getReviewRuntimeReadTarget = (
   entityContext: ReviewRuntimeEntityContext
 ): ExactEntityTarget<Entity_Type> => {
@@ -540,33 +539,6 @@ const authorizeReviewRuntimeReadAccess = async (
   const db = event.context.$db
   const extensionRuntime = await resolveExtensionAuthorizationRuntime(event, entityContext)
   const exactItemTarget = getReviewRuntimeReadTarget(entityContext)
-  const exactItemAssignment = isAssignableEntityType(exactItemTarget.entityType)
-    ? await resolveAssignedItemGrant(authContext.userId, exactItemTarget.entityType, exactItemTarget.entityId, db)
-    : null
-  const extensionAssignmentTarget = extensionRuntime
-    ? extensionRuntime.loaded.definition.assignmentMode === 'independent'
-      ? { entityType: entityContext.entityType, entityId: entityContext.entityId }
-      : {
-          entityType: extensionRuntime.lockedEntity.owner.owner === 'agreement'
-            ? 'fundingcaseagreement' as const
-            : 'applicantrecipient' as const,
-          entityId: extensionRuntime.lockedEntity.owner.ownerId
-        }
-    : null
-  const sourceAssignmentTarget = extensionAssignmentTarget
-    ?? (isAssignableEntityType(entityContext.entityType)
-      ? { entityType: entityContext.entityType, entityId: entityContext.entityId }
-      : null)
-  const sourceAssignment = sourceAssignmentTarget
-    && (sourceAssignmentTarget.entityType !== exactItemTarget.entityType
-      || sourceAssignmentTarget.entityId !== exactItemTarget.entityId)
-    ? await resolveAssignedItemGrant(
-        authContext.userId,
-        sourceAssignmentTarget.entityType,
-        sourceAssignmentTarget.entityId,
-        db
-      )
-    : null
   const approvalAssignment = await resolveApprovalItemGrant(authContext.userId, exactItemTarget, db)
   let hasInheritedOwnerRead = false
   try {
@@ -603,8 +575,6 @@ const authorizeReviewRuntimeReadAccess = async (
 
   if (canReadExactRuntimeItem({
     hasInheritedOwnerRead,
-    hasExactItemAssignment: exactItemAssignment !== null,
-    hasExactSourceAssignment: sourceAssignment !== null,
     hasApprovalAssignment: approvalAssignment !== null
   })) {
     return authContext

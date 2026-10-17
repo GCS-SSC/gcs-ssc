@@ -1,7 +1,7 @@
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Assignment helpers are documented by their explicit authorization-oriented names and types. */
 import type { H3Event } from 'h3'
 import { sql, type Kysely, type Transaction } from 'kysely'
-import type { AuthorizationResourceOwner, AuthorizationScope, ExactEntityTarget } from '@gcs-ssc/authorization'
+import type { AuthorizationResourceOwner, AuthorizationScope, ExactEntityTarget, UserAbilities } from '@gcs-ssc/authorization'
 import { notFound } from '~~/server/utils/api-errors'
 import { requireAuthContext, type AuthContext } from '~~/server/utils/authorize'
 import { resolveAgreementScopeContext } from '~~/server/utils/agreement'
@@ -11,7 +11,6 @@ import type { AssignableEntityType, Database, Entity_Type } from '~~/shared/type
 import { ASSIGNABLE_ENGINE_OPEN_QUEUE_STATUSES, isAssignableEntityType, isRuntimeAssignableEntityType, type RuntimeAssignableEntityType } from '~~/shared/utils/entity-assignments'
 import { getEntityAuthorizationPolicy } from '~~/server/utils/entity-authorization-policy'
 import { defineUsersAbilities } from '~~/server/utils/rbac'
-import { getActiveStructuralRoleAssignments } from '~~/server/utils/active-user-scopes'
 import { resolveCompletionEvidenceId } from '~~/server/utils/completion-runtime-core'
 import { resolveCanonicalLifecycleIdentity } from './extension-lifecycle-identity'
 import { loadExtensionLifecycleEntity, isExtensionEnabledForAgency, isExtensionEnabledForStream } from './extensions'
@@ -530,6 +529,15 @@ export const isAgencyValidEntityAssigneeWithDb = async (db: Kysely<Database>, en
   return (await resolveAgencyValidEntityAssigneeIdsWithDb(db, entityType, entityId, [commonUserId])).has(commonUserId)
 }
 
+export const isProponentEntityAssigneeEligible = (
+  owner: Extract<AuthorizationResourceOwner, { kind: 'applicant_recipient' }>,
+  abilities: UserAbilities
+): boolean => owner.agencyId
+  ? abilities.authorize('applicant_recipient', 'update', { type: 'agency', agencyId: owner.agencyId })
+  : abilities.getGrants().some(grant => grant.subject === 'applicant_recipient'
+    && grant.action === 'update'
+    && (grant.scope.type === 'global' || grant.scope.type === 'agency'))
+
 /** Resolves eligible common-user IDs in one owner lookup and one batched role-graph load. */
 export const resolveAgencyValidEntityAssigneeIdsWithDb = async (
   db: Kysely<Database>,
@@ -550,30 +558,10 @@ export const resolveAgencyValidEntityAssigneeIdsWithDb = async (
   let subject: 'agency' | 'agreement' | 'applicant_recipient' | 'transfer_payment' | 'funding_case' | 'journal_voucher' | 'correction' | 'account_receivable'
   let scope: AuthorizationScope
   if (owner.kind === 'applicant_recipient') {
-    if (owner.agencyId) {
-      return new Set(applicationUsers.filter(user => abilitiesByUserId
-        .get(String(user.application_user_id))
-        ?.authorize('applicant_recipient', 'update', { type: 'agency', agencyId: owner.agencyId }))
-        .map(user => String(user.common_user_id)))
-    }
-    const activeAssignments = await getActiveStructuralRoleAssignments(db, applicationUsers.map(user => String(user.application_user_id)))
-    const agencyIdsByUser = new Map<string, Set<string>>()
-    for (const assignment of activeAssignments) {
-      if (!assignment.agencyId) continue
-      const userId = String(assignment.userId)
-      const agencies = agencyIdsByUser.get(userId) ?? new Set<string>()
-      agencies.add(String(assignment.agencyId))
-      agencyIdsByUser.set(userId, agencies)
-    }
-    return new Set(applicationUsers.map(user => {
+    return new Set(applicationUsers.filter(user => {
       const abilities = abilitiesByUserId.get(String(user.application_user_id))
-      if (!abilities) return null
-      if (abilities.authorize('applicant_recipient', 'update', { type: 'global' })) return String(user.common_user_id)
-      const agencyIds = agencyIdsByUser.get(String(user.application_user_id)) ?? new Set<string>()
-      return [...agencyIds].some(agencyId => abilities.authorize('applicant_recipient', 'update', { type: 'agency', agencyId }))
-        ? String(user.common_user_id)
-        : null
-    }).filter((id): id is string => id !== null))
+      return abilities && isProponentEntityAssigneeEligible(owner, abilities)
+    }).map(user => String(user.common_user_id)))
   } else if (owner.kind === 'agreement') {
     const agreement = await resolveAgreementScopeContext(owner.agreementId, db)
     if (!agreement) return new Set()

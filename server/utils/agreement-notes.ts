@@ -15,10 +15,10 @@ const parentId = (event: H3Event) => getRouterParam(event, 'id') ?? ''
 const noteId = (event: H3Event) => getRouterParam(event, 'noteId') ?? ''
 const missing = async (event: H3Event) => await notFound(event, 'AGREEMENT_NOTE_NOT_FOUND', 'apiErrors.agreement.not_found')
 
-export const listAgreementNotes = async (event: H3Event) => await executeFreshReadSnapshot(event, async db => {
+export const listAgreementNotes = async (event: H3Event) => await executeFreshReadSnapshot(event, async (db, freshAuthContext) => {
   const agreementId = parentId(event)
   if (!isPositivePostgresBigintText(agreementId)) return await missing(event)
-  await authorizeAgreementResource(event, 'read', agreementId, db, { freshAuth: true })
+  await authorizeAgreementResource(event, 'read', agreementId, db, { freshAuth: true, freshAuthContext })
   await assertAgreementExists(event, agreementId, db)
   const { page, limit, search } = await getValidatedQueryI18n(event, PaginationSchema)
   const base = db.selectFrom('Funding_Case_Agreement_Note')

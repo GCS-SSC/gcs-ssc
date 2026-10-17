@@ -16,9 +16,9 @@ export default defineEventHandler(async event => {
     return await badRequest(event, 'INVALID_ID', 'apiErrors.request.invalid')
   }
   const { page, limit, search } = await getValidatedQueryI18n(event, PaginationSchema)
-  return await executeFreshReadSnapshot(event, async db => {
+  return await executeFreshReadSnapshot(event, async (db, freshAuthContext) => {
     const context = await authorizeAgreementResource(event, 'update', agreementId, db, {
-      assignmentTarget: { entityType: 'fundingcaseamendment', entityId: amendmentId }, freshAuth: true
+      assignmentTarget: { entityType: 'fundingcaseamendment', entityId: amendmentId }, freshAuth: true, freshAuthContext
     })
     if (!context) return await badRequest(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
     const amendment = await assertAgreementAmendmentExists(event, db, agreementId, amendmentId)

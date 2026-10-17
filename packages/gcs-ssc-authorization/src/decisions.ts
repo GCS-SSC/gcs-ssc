@@ -24,8 +24,6 @@ export type AuthorizationDecision<T = undefined> =
 /** Evidence accepted by the canonical exact-runtime read policy. */
 export type ExactRuntimeReadEvidence = {
   hasInheritedOwnerRead: boolean
-  hasExactItemAssignment: boolean
-  hasExactSourceAssignment: boolean
   hasApprovalAssignment: boolean
 }
 

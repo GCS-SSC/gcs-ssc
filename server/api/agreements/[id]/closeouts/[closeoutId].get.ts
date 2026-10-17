@@ -7,8 +7,8 @@ export default defineEventHandler(async event => {
   const agreementId = getRouterParam(event, 'id')
   const closeoutId = getRouterParam(event, 'closeoutId')
   if (!agreementId || !closeoutId) return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')
-  return await executeFreshReadSnapshot(event, async db => {
-    const context = await authorizeAgreementResource(event, 'read', agreementId, db, { freshAuth: true })
+  return await executeFreshReadSnapshot(event, async (db, freshAuthContext) => {
+    const context = await authorizeAgreementResource(event, 'read', agreementId, db, { freshAuth: true, freshAuthContext })
     if (!context) return await notFound(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
     const closeout = await db.selectFrom('Funding_Case_Agreement_Closeout').selectAll()
       .where('id', '=', closeoutId).where('egcs_fc_fundingagreement', '=', agreementId).where('_deleted', '=', false).executeTakeFirst()

@@ -531,6 +531,34 @@ export type FundingCaseAgreementForecastLineItem = z.infer<typeof FundingCaseAgr
 export type FundingCaseAgreementForecastLineItemPatch = z.infer<typeof FundingCaseAgreementForecastLineItemPatchSchema>
 export type FundingCaseAgreementForecastLineItemItem = WithId<FundingCaseAgreementForecastLineItem>
 
+export const FundingCaseAgreementForecastBreakdownCellSchema = z.object({
+  egcs_fc_fundingagreementbudgetlineitem: RequiredBigintSelectionId(),
+  egcs_fc_month: RequiredForecastMonth(),
+  egcs_fc_amount: NonNegativeMoneySchema,
+  expected: z.object({
+    id: RequiredBigintSelectionId(),
+    egcs_fc_amount: NonNegativeMoneySchema
+  }).strict().nullable()
+}).strict()
+
+export const FundingCaseAgreementForecastBreakdownPatchSchema = z.object({
+  cells: z.array(FundingCaseAgreementForecastBreakdownCellSchema)
+    .min(1, { error: 'validation.required' })
+    .max(2400, { error: 'validation.max_items' })
+}).strict().superRefine(({ cells }, ctx) => {
+  const identities = new Set<string>()
+  for (const [index, cell] of cells.entries()) {
+    const identity = `${cell.egcs_fc_fundingagreementbudgetlineitem}:${cell.egcs_fc_month}`
+    if (identities.has(identity)) {
+      ctx.addIssue({ code: 'custom', path: ['cells', index, 'egcs_fc_month'], message: 'validation.duplicate' })
+    }
+    identities.add(identity)
+  }
+})
+
+export type FundingCaseAgreementForecastBreakdownCell = z.infer<typeof FundingCaseAgreementForecastBreakdownCellSchema>
+export type FundingCaseAgreementForecastBreakdownPatch = z.infer<typeof FundingCaseAgreementForecastBreakdownPatchSchema>
+
 export const FundingCaseAgreementPaymentBaseSchema = z.object({
   egcs_fc_applicantrecipient: RequiredBigintSelectionId(),
   egcs_fc_fundingagreementcommitment: RequiredBigintSelectionId(),

@@ -151,23 +151,17 @@ describe('static and exact authorization decisions', () => {
     )).toEqual(expected)
   })
 
-  it('keeps exact assignment evidence below the read ceiling', () => {
+  it('requires owner Viewer access or an approval assignment for runtime reads', () => {
     expect(canReadExactRuntimeItem({
       hasInheritedOwnerRead: true,
-      hasExactItemAssignment: false,
-      hasExactSourceAssignment: false,
       hasApprovalAssignment: false
     })).toBe(true)
     expect(canReadExactRuntimeItem({
       hasInheritedOwnerRead: false,
-      hasExactItemAssignment: true,
-      hasExactSourceAssignment: true,
       hasApprovalAssignment: false
     })).toBe(false)
     expect(canReadExactRuntimeItem({
       hasInheritedOwnerRead: false,
-      hasExactItemAssignment: false,
-      hasExactSourceAssignment: false,
       hasApprovalAssignment: true
     })).toBe(true)
   })
