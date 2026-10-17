@@ -638,7 +638,7 @@ const cancel = () => {
             <AgreementAmendmentsTab
               v-else-if="selectedTab === 'amendments'"
               :agreement-id="id"
-              :can-create="canCreateChildRecords" />
+              :can-create="canCreateFinancialChildRole" />
 
             <AgreementDocumentsTab
               v-else-if="selectedTab === 'documents'"
