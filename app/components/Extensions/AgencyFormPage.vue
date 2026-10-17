@@ -4,10 +4,7 @@ import type { ExtensionAgencyRegistryItem, ExtensionAgencyWorkspaceListItem } fr
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { appRouteLocations } from '~/utils/route-locations'
 
-definePageMeta({ key: route => route.path, i18n: { paths: {
-  en: '/extension/[id]/agencies/[agencyId]/forms/[formId]',
-  fr: '/extension/[id]/agences/[agencyId]/formulaires/[formId]'
-} } })
+const { flowOnly = false } = defineProps<{ flowOnly?: boolean }>()
 
 const route = useRoute()
 const localePath = useLocalePath()
@@ -15,6 +12,7 @@ const { t, locale } = useI18n()
 const extensionKey = computed(() => String(route.params.id))
 const agencyId = computed(() => String(route.params.agencyId))
 const formId = computed(() => String(route.params.formId))
+const editorView = computed(() => route.query.view === 'test' || route.query.view === 'publish' ? route.query.view : 'edit')
 type LoadStatus = 'pending' | 'success' | 'error'
 const list: Ref<{ items: ExtensionAgencyWorkspaceListItem[] } | null> = ref(null)
 const registry: Ref<{ items: ExtensionAgencyRegistryItem[] } | null> = ref(null)
@@ -108,8 +106,9 @@ watch(formId, id => {
         <component
           :is="extensionComponent" :key="`${extensionKey}:${agencyId}`"
           :agency-id="agencyId" :extension-key="extensionKey" section="forms"
-          :detail-form-id="formId"
+          :detail-form-id="formId" :form-flow-only="flowOnly" :form-editor-view="editorView"
           :enabled="true" :read-only="!extension.canConfigure" :config="extension.config"
+          @form-flow="navigateTo(localePath($event === 'flow' ? appRouteLocations.extensionAgencyWorkspaceFormFlow(extensionKey, agencyId, formId) : { ...appRouteLocations.extensionAgencyWorkspaceForm(extensionKey, agencyId, formId), query: $event === 'edit' ? {} : { view: $event } }))"
           @close-form="navigateTo(formsLocation)" @form-collection-label="formCollectionLabel = $event" />
       </div>
       <UAlert v-else color="error" :title="t('common.not_available')" />

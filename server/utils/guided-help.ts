@@ -280,7 +280,7 @@ export const cloneGuidedHelp = async (event: H3Event, agencyId: string, sourceVe
 
 const authorizeScreen = async (event: H3Event, agencyId: string, view: string) => {
   // Each supported view has a trusted host-owned authorization mapping. A ledger entry alone grants nothing.
-  if (!['agency.general', 'agency.address-types'].includes(view)) return fail(event, 'unavailable', 409)
+  if (!['agency.general', 'agency.address-types', 'agency.agreement-types'].includes(view)) return fail(event, 'unavailable', 409)
   await authorize(event, 'agency', 'read', { type: 'agency', agencyId })
   await ensureAgency(event, event.context.$db, agencyId)
 }

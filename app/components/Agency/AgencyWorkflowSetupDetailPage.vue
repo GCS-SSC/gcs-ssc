@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 /* eslint-disable jsdoc/require-jsdoc -- page-local navigation and save handlers */
-import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { FetchError } from 'ofetch'
 import { z } from 'zod'
@@ -20,6 +20,8 @@ import { applyCurrentWorkflowMemberSelection } from '~/utils/workflow-member-sel
 import type { EditorMutationToken } from '~/composables/useEditorMutationCoordinator'
 import { useEditorMutationCoordinator } from '~/composables/useEditorMutationCoordinator'
 import { useAgencyWorkflowEntityTypes } from '~/composables/useAgencyWorkflowEntityTypes'
+
+const { flowOnly = false } = defineProps<{ flowOnly?: boolean }>()
 
 type WorkflowSetupItem = z.infer<typeof CommonWorkflowSetupCreateSchema> & { id: string }
 type WorkflowSetupDetail = WorkflowSetupItem & {
@@ -122,7 +124,11 @@ const riskAssessmentMemberOptions = computed(() => riskAssessmentMembers.value.m
   egcs_cn_name_en: `${t('workflow.step')} ${member.egcs_cn_order ?? index + 1}: ${member.egcs_cn_name_en ?? ''}`,
   egcs_cn_name_fr: `${t('workflow.step')} ${member.egcs_cn_order ?? index + 1}: ${member.egcs_cn_name_fr ?? ''}`
 })))
-const selectedSection: Ref<string> = ref('workflow-identity')
+const selectedSection: Ref<string> = ref(flowOnly ? 'workflow-flow' : (route.hash ?? '').slice(1) || 'workflow-identity')
+onMounted(async () => {
+  await nextTick()
+  if (!flowOnly && route.hash) document.getElementById(selectedSection.value)?.scrollIntoView({ block: 'start' })
+})
 const isHeroCollapsed = getHeroCollapsed('agency-workflow-setup-detail')
 const agencyScope: Scope = { type: 'agency', agencyId }
 const canManagePublication = computed(() => Boolean(agency.value) && can('agency', 'update', agencyScope))
@@ -182,9 +188,9 @@ const breadcrumbItems = computed(() => [
 const sectionTabs = computed<TranslatedTabItem[]>(() => [
   { key: 'workflow.identity', icon: 'i-lucide-file-text', value: 'workflow-identity' },
   { key: 'workflow.routing', icon: 'i-lucide-git-branch', value: 'workflow-routing' },
-  { key: 'workflow.flow.title', icon: 'i-lucide-workflow', value: 'workflow-flow' },
   { key: 'workflow.transitions', icon: 'i-lucide-arrow-right-left', value: 'workflow-transitions' },
-  { key: 'workflow.behaviour', icon: 'i-lucide-settings-2', value: 'workflow-behaviour' }
+  { key: 'workflow.behaviour', icon: 'i-lucide-settings-2', value: 'workflow-behaviour' },
+  { key: 'workflow.flow.title', icon: 'i-lucide-workflow', value: 'workflow-flow' }
 ].map(item => ({ ...item, panelId: item.value })))
 const buildSetupPayload = () => state.value
   ? {
@@ -217,7 +223,20 @@ const nestedMembersError = ref<unknown>(null)
 let nestedMembersGeneration = 0
 let previousNestedMember: WorkflowMemberForm | null = null
 const canEditFields = computed(() => canUpdate.value && !mutation.isPending.value)
-watch(selectedSection, sectionId => {
+watch(selectedSection, async (sectionId, previous) => {
+  if ((sectionId === 'workflow-flow') !== flowOnly) {
+    if (mutation.isPending.value || blockDirtyAction()) {
+      selectedSection.value = previous
+      return
+    }
+    await navigateTo(localePath({
+      ...(sectionId === 'workflow-flow'
+        ? appRouteLocations.agencyWorkflowSetupFlow(agencyId, workflowSetupId)
+        : appRouteLocations.agencyWorkflowSetupDetail(agencyId, workflowSetupId)),
+      hash: sectionId === 'workflow-flow' ? undefined : `#${sectionId}`
+    }))
+    return
+  }
   if (import.meta.client) document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 })
 const retryLoad = async () => {
@@ -430,10 +449,6 @@ const openConditions = (member: WorkflowMember) => {
   }
   isConditionsOpen.value = true
 }
-const selectFlowMember = (memberId: string) => {
-  const member = state.value?.members.find(item => item.id === memberId)
-  if (member) openMember(member)
-}
 const saveConditions = async () => {
   const draft = selectedConditions.value
   if (!draft || !canUpdate.value || mutation.isPending.value || blockDirtyAction()) return
@@ -529,25 +544,13 @@ const deleteMember = async (member: WorkflowMember) => {
           <CommonDesignTimeEditorShell>
             <template #sidebar>
               <AssessmentSchemaDetailSidebar
-                v-if="canUpdate"
-                v-model="selectedSection"
-                :section-tabs="sectionTabs"
-                :is-saving="isSaving"
-                :disabled="mutation.isPending.value"
-                :ui="{ trigger: 'w-full justify-start whitespace-normal break-words text-left' }"
+                v-model="selectedSection" :section-tabs="sectionTabs" :sort="false" :show-save="canUpdate && !flowOnly"
+                :is-saving="isSaving" :disabled="mutation.isPending.value"
+                :ui="{ trigger: 'h-8 min-h-8 justify-start py-1 whitespace-normal break-words text-left' }"
                 @save="save" />
-              <aside v-else class="w-full shrink-0 lg:sticky lg:top-6 lg:self-start lg:w-72 lg:border-r lg:border-zinc-200 lg:pr-4 dark:lg:border-zinc-800">
-                <div class="pt-6">
-                  <CommonRouteTabs
-                    v-model="selectedSection"
-                    :items="sectionTabs"
-                    orientation="vertical"
-                    :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
-                </div>
-              </aside>
             </template>
             <CommonDesignTimeEditorSections>
-              <AssessmentSchemaPageSection section-id="workflow-identity" :title="t('workflow.identity')" role="tabpanel" :aria-label="t('workflow.identity')">
+              <AssessmentSchemaPageSection v-if="!flowOnly" section-id="workflow-identity" :title="t('workflow.identity')" role="tabpanel" :aria-label="t('workflow.identity')">
                 <div class="grid gap-5 md:grid-cols-2">
                   <UFormField :label="t('transfer_payment.name_en')" name="egcs_cn_name_en">
                     <UInput v-model="state.egcs_cn_name_en" :disabled="!canEditFields" class="w-full" />
@@ -564,7 +567,7 @@ const deleteMember = async (member: WorkflowMember) => {
                 </div>
               </AssessmentSchemaPageSection>
 
-              <AssessmentSchemaPageSection section-id="workflow-routing" :title="t('workflow.routing')" role="tabpanel" :aria-label="t('workflow.routing')">
+              <AssessmentSchemaPageSection v-if="!flowOnly" section-id="workflow-routing" :title="t('workflow.routing')" role="tabpanel" :aria-label="t('workflow.routing')">
                 <div class="grid gap-5 lg:grid-cols-2">
                   <UFormField :label="t('transfer_payment.entity_type')" name="egcs_cn_entitytype" :description="t('workflow.entity_type_help')">
                     <CommonBilingualSelectMenu
@@ -636,14 +639,13 @@ const deleteMember = async (member: WorkflowMember) => {
                 </div>
               </AssessmentSchemaPageSection>
 
-              <AssessmentSchemaPageSection section-id="workflow-flow" :title="t('workflow.flow.title')" role="tabpanel" :aria-label="t('workflow.flow.title')">
+              <AssessmentSchemaPageSection v-if="flowOnly" section-id="workflow-flow" :title="t('workflow.flow.title')" role="tabpanel" :aria-label="t('workflow.flow.title')">
                 <AgencyWorkflowFlowDiagram
-                  :setup="state" :custom-fields="conditionFields?.items ?? []" :choices="conditionChoices ?? {}"
-                  :editable="canUpdate" @select-member="selectFlowMember" />
+                  :setup="state" :custom-fields="conditionFields?.items ?? []" :choices="conditionChoices ?? {}" />
                 <UButton v-if="conditionFieldsError || conditionChoicesError" :label="t('common.retry')" color="neutral" variant="ghost" @click="retryConditionCatalogs" />
               </AssessmentSchemaPageSection>
 
-              <AssessmentSchemaPageSection section-id="workflow-transitions" :title="t('workflow.transitions')" role="tabpanel" :aria-label="t('workflow.transitions')">
+              <AssessmentSchemaPageSection v-if="!flowOnly" section-id="workflow-transitions" :title="t('workflow.transitions')" role="tabpanel" :aria-label="t('workflow.transitions')">
                 <div class="space-y-5">
                   <UFormField :label="t('workflow.allowed_start_statuses')" name="egcs_cn_allowedstartstatuses" :description="t('workflow.allowed_start_statuses_help')">
                     <CommonStatusSelect v-model="state.egcs_cn_allowedstartstatuses" :agency-id="agencyId" multiple :disabled="!canEditFields" class="w-full" />
@@ -659,7 +661,7 @@ const deleteMember = async (member: WorkflowMember) => {
                 </div>
               </AssessmentSchemaPageSection>
 
-              <AssessmentSchemaPageSection section-id="workflow-behaviour" :title="t('workflow.behaviour')" role="tabpanel" :aria-label="t('workflow.behaviour')">
+              <AssessmentSchemaPageSection v-if="!flowOnly" section-id="workflow-behaviour" :title="t('workflow.behaviour')" role="tabpanel" :aria-label="t('workflow.behaviour')">
                 <div class="space-y-5">
                   <UFormField
                     v-if="state.egcs_cn_purpose === 'risk_rating'"

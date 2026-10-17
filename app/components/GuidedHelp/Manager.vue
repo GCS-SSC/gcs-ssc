@@ -35,6 +35,7 @@ type PublisherForm = { submit: () => Promise<void>, setErrors: (errors: { name?:
 const guideForm: Ref<PublisherForm | null> = ref(null)
 const catalogForm: Ref<PublisherForm | null> = ref(null)
 const groups: Ref<PublisherGroup[]> = ref([])
+const offers = ref<HelpGuide[]>([])
 const contexts: Ref<HelpOption[]> = ref([])
 const canSystem = ref(false)
 const context = ref('')
@@ -118,7 +119,9 @@ const initialize = async () => {
     contexts.value = options.items
     canSystem.value = options.canSystem
     if (!detail) {
-      groups.value = [...(options.canSystem ? [{ id: 'system', name: { en: '', fr: '' } }] : []), ...options.items].map(item => ({ ...item, guides: [], catalogs: [], shared: [], loaded: false, loading: false, error: false, canEdit: can('guided_help', 'update', item.id === 'system' ? { type: 'global' } : { type: 'agency', agencyId: item.id }) }))
+      groups.value = [...(options.canSystem ? [{ id: 'system', name: { en: '', fr: '' } }] : []), ...options.items].map(item => ({ ...item, guides: [], catalogs: [], loaded: false, loading: false, error: false, canEdit: can('guided_help', 'update', item.id === 'system' ? { type: 'global' } : { type: 'agency', agencyId: item.id }) }))
+      const agency = options.items[0]
+      offers.value = agency ? (await helpRequest<{ items: { id: string, document: GuideDraft, sourceVersionId: string, version: number, sourceAttribution?: HelpAttribution }[] }>(`/api/guided-help/shared?agencyId=${agency.id}`)).items.map(item => ({ id: item.id, sourceAttribution: item.sourceAttribution, egcs_cn_document: item.document, egcs_cn_shared: true, publicationState: 'published', versions: [{ id: item.sourceVersionId, version: item.version, document: item.document as HelpVersion['document'] }] })) : []
     }
     const picking = user.value?.id ? readHelpPicker(user.value.id) : null
     if (picking && !detail) {
@@ -312,15 +315,13 @@ const loadGroup = async (id: string) => {
   group.error = false
   const request = generation
   try {
-    const [owned, catalog, library] = await Promise.all([
+    const [owned, catalog] = await Promise.all([
       helpRequest<{ items: HelpGuide[] }>(`/api/guided-help${id === 'system' ? '' : `?agencyId=${id}`}`),
-      id === 'system' ? Promise.resolve({ items: [] }) : helpRequest<{ items: HelpCatalog[] }>(`/api/agency/${id}/guided-help`),
-      id === 'system' ? Promise.resolve({ items: [] }) : helpRequest<{ items: { id: string, document: GuideDraft, sourceVersionId: string, version: number, sourceAttribution?: HelpAttribution }[] }>(`/api/guided-help/shared?agencyId=${id}`)
+      id === 'system' ? Promise.resolve({ items: [] }) : helpRequest<{ items: HelpCatalog[] }>(`/api/agency/${id}/guided-help`)
     ])
     if (request !== generation) return
     group.guides = owned.items
     group.catalogs = catalog.items
-    group.shared = library.items.map(item => ({ id: item.id, sourceAttribution: item.sourceAttribution, egcs_cn_document: item.document, egcs_cn_shared: true, versions: [{ id: item.sourceVersionId, version: item.version, document: item.document as HelpVersion['document'] }] }))
     group.loaded = true
   } catch (error) {
     group.error = true
@@ -340,8 +341,10 @@ const loadRouteSelection = async () => {
       if (entry) await openCatalog(entry)
       else loadError.value = true
     } else {
+      const existing = catalogs.value.find(item => item.egcs_ay_guide === id)
       const guide = [...guides.value, ...shared.value].find(item => item.id === id)
-      if (guide) adopt(guide)
+      if (existing) await openCatalog(existing)
+      else if (guide) adopt(guide)
       else loadError.value = true
     }
   } else if (id === 'new') createGuide()
@@ -372,11 +375,12 @@ const publicationVersion = computed(() => (isCatalog.value ? selectedCatalog.val
 const heroDescription = computed(() => `${contextTitle.value}${selected.value ? ` · ${t('guided_help.source_guide', { id: selected.value.id })}` : ''} · ${t('guided_help.owner')}: ${ownerName.value}`)
 const saveCurrent = () => isCatalog.value ? catalogForm.value?.submit() : selectedTab.value === 'general' ? guideForm.value?.submit() : saveGuide()
 const publishCurrent = () => isCatalog.value ? catalogAction('publish') : guideAction('publish')
+const previewCurrent = () => {
+  if (isCatalog.value) previewVersion()
+  else if (document.value) preview(document.value)
+}
 const secondaryActions = computed<DropdownMenuItem[][]>(() => [
-  [{ label: t('guided_help.preview'), icon: 'i-lucide-play', disabled: pending.value || (isCatalog.value ? !pinnedVersion.value : !document.value), onSelect: () => {
-    if (isCatalog.value) previewVersion()
-    else if (document.value) preview(document.value)
-  } }],
+  [{ label: t('guided_help.preview'), icon: 'i-lucide-play', disabled: pending.value || (isCatalog.value ? !pinnedVersion.value : !document.value), onSelect: previewCurrent }],
   [
     ...(isCatalog.value && canEdit.value && settings.value ? [{ label: t('guided_help.clone'), icon: 'i-lucide-copy', disabled: pending.value, onSelect: () => clone(settings.value!.egcs_ay_sourceversion) }] : []),
     ...(isCatalog.value && canEdit.value && selectedCatalog.value?.publicationState === 'published' ? [{ label: t('guided_help.unpublish'), icon: 'i-lucide-eye-off', disabled: pending.value, onSelect: () => catalogAction('unpublish') }] : []),
@@ -394,7 +398,8 @@ watch([() => route.params.guideId, () => route.query.catalog, () => route.query.
       <CommonPublicationDetailHero v-if="detail" :name="selectedTitle" :description="heroDescription" icon="i-lucide-book-open" :type-label-key="isCatalog ? 'guided_help.catalog' : 'guided_help.help'" :publication-state="state ?? 'draft'" :publication-version="publicationVersion" version-label-key="guided_help.version" :has-unpublished-changes="hasUnpublishedChanges" :is-collapsed="collapsed" :is-mutation-pending="pending" :is-publishing="pendingAction === 'publish'" :is-retiring="pendingAction === 'retire'" :can-manage="canEdit && Boolean(document || settings)" :can-retire="!isCatalog && canDelete" publish-label-key="common.publish" retire-label-key="common.retire" @publish="publishCurrent" @retire="guideAction('retire')">
         <template #actions>
           <CommonSaveButton v-if="canEdit && state !== 'retired' && (document || settings)" type="button" :label="t('common.save')" color="neutral" variant="outline" :loading="pendingAction === 'save'" :disabled="pending" @click="saveCurrent" />
-          <UDropdownMenu :items="secondaryActions" :content="{ align: 'end' }">
+          <UButton v-if="secondaryActions.flat().length === 1" :label="t('guided_help.preview')" icon="i-lucide-play" color="neutral" variant="outline" :disabled="pending || (isCatalog ? !pinnedVersion : !document)" @click="previewCurrent" />
+          <UDropdownMenu v-else :items="secondaryActions" :content="{ align: 'end' }">
             <UButton :label="t('guided_help.more_actions')" icon="i-lucide-ellipsis" color="neutral" variant="ghost" :disabled="pending" />
           </UDropdownMenu>
         </template>
@@ -410,7 +415,7 @@ watch([() => route.params.guideId, () => route.query.catalog, () => route.query.
             }" />
         </template>
       </UAlert>
-      <GuidedHelpPublisherTable v-else-if="!detail" :groups="groups" :pending="pending" @expand="loadGroup" @create="owner => goGuide('new', owner)" @open="(owner, id) => goGuide(id, owner)" @catalog="(owner, id, catalogId) => goCatalog(id, catalogId, owner)" @clone="cloneInto" @preview="(owner, draft) => preview(draft, owner)" />
+      <GuidedHelpPublisherTable v-else-if="!detail" :groups="groups" :offers="offers" :pending="pending" @expand="loadGroup" @create="owner => goGuide('new', owner)" @open="(owner, id) => goGuide(id, owner)" @catalog="(owner, id, catalogId) => goCatalog(id, catalogId, owner)" @clone="cloneInto" @preview="(owner, draft) => preview(draft, owner)" />
       <CommonDesignTimeEditorShell v-else-if="context && (document || settings)">
         <template #sidebar>
           <aside class="w-full shrink-0 lg:sticky lg:top-6 lg:self-start lg:w-72 lg:border-r lg:border-default lg:pr-4">

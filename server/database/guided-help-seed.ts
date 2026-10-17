@@ -1,5 +1,6 @@
 import type { Transaction } from 'kysely'
 import type { Database, JsonValue } from '~~/shared/types/database'
+import { agreementTypeGuide } from '../../shared/guided-help/agreement-type-guide'
 import { addressTypeGuide } from '../../shared/guided-help/address-type-guide'
 import { createPublication, publishDefinition } from '../utils/system-publication'
 
@@ -24,23 +25,28 @@ export const seedGuidedHelpExample = async (db: Transaction<Database>): Promise<
     .where(eb => eb.or([eb('agency_id', '=', '21'), eb('agency_id', 'is', null)]))
     .orderBy('id').execute()
   const roleIds = roles.map(role => String(role.id))
-  const document = addressTypeGuide as unknown as JsonValue
-  const guideId = await createPublication(db, 'guided_help')
-  await db.insertInto('Common_Guided_Help').values({
-    id: guideId, egcs_cn_ownertype: 'system', egcs_cn_agency: null,
-    egcs_cn_document: document, egcs_cn_shared: true, egcs_cn_clonedfromversion: null
-  }).execute()
-  const guide = await publishDefinition(db, { publicationId: guideId, kind: 'guided_help', definition: document, actorId: String(publicationActor.id) })
-  if (!guide.publicationVersionId) throw new Error('System guided-help example publication did not produce a version')
-  const catalogId = await createPublication(db, 'guided_help_catalog')
-  const screens = ['agency.general', 'agency.address-types']
-  await db.insertInto('Agency_Guided_Help').values({
-    id: catalogId, egcs_ay_agency: '21', egcs_ay_guide: guideId,
-    egcs_ay_sourceversion: guide.publicationVersionId,
-    egcs_ay_discoveryscreens: JSON.stringify(screens), egcs_ay_roles: JSON.stringify(roleIds), egcs_ay_enabled: true
-  }).execute()
-  await publishDefinition(db, {
-    publicationId: catalogId, kind: 'guided_help_catalog', actorId: String(publicationActor.id),
-    definition: { formatVersion: 1, sourceVersionId: guide.publicationVersionId, discoveryScreens: screens, roles: roleIds, enabled: true }
-  })
+  for (const example of [
+    { document: addressTypeGuide, screens: ['agency.general', 'agency.address-types'] },
+    { document: agreementTypeGuide, screens: ['agency.agreement-types'] }
+  ]) {
+    const document = example.document as unknown as JsonValue
+    const guideId = await createPublication(db, 'guided_help')
+    await db.insertInto('Common_Guided_Help').values({
+      id: guideId, egcs_cn_ownertype: 'system', egcs_cn_agency: null,
+      egcs_cn_document: document, egcs_cn_shared: true, egcs_cn_clonedfromversion: null
+    }).execute()
+    const guide = await publishDefinition(db, { publicationId: guideId, kind: 'guided_help', definition: document, actorId: String(publicationActor.id) })
+    if (!guide.publicationVersionId) throw new Error('System guided-help example publication did not produce a version')
+    const catalogId = await createPublication(db, 'guided_help_catalog')
+    const screens = example.screens
+    await db.insertInto('Agency_Guided_Help').values({
+      id: catalogId, egcs_ay_agency: '21', egcs_ay_guide: guideId,
+      egcs_ay_sourceversion: guide.publicationVersionId,
+      egcs_ay_discoveryscreens: JSON.stringify(screens), egcs_ay_roles: JSON.stringify(roleIds), egcs_ay_enabled: true
+    }).execute()
+    await publishDefinition(db, {
+      publicationId: catalogId, kind: 'guided_help_catalog', actorId: String(publicationActor.id),
+      definition: { formatVersion: 1, sourceVersionId: guide.publicationVersionId, discoveryScreens: screens, roles: roleIds, enabled: true }
+    })
+  }
 }

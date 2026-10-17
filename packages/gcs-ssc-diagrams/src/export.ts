@@ -21,6 +21,25 @@ export const diagramSvg = (root: HTMLElement, title: string): DiagramSvg => {
   const origin = root.getBoundingClientRect()
   const canvas = root.querySelector<HTMLElement>('.flow-canvas')
   const scroll = root.querySelector<HTMLElement>('.flow-scroll')
+  const branches = root.classList.contains('flow-map--branches')
+  const viewport = canvas && scroll
+  const canvasBounds = canvas?.getBoundingClientRect()
+  const scrollBounds = scroll?.getBoundingClientRect()
+  const frame = root.querySelector<HTMLElement>('.flow-frame')
+  const frameBounds = frame?.getBoundingClientRect() ?? scrollBounds
+  const surface = root.querySelector<HTMLElement>('.flow-surface')
+  const toolbarHeight = Number(frame?.dataset.flowToolbarHeight) || root.querySelector<HTMLElement>('.flow-canvas-toolbar')?.getBoundingClientRect().height || 0
+  const surfaceBorder = surface?.classList.contains('flow-surface--fullscreen') ? 1 : surface?.clientTop ?? 0
+  const scrollStyle = scroll ? getComputedStyle(scroll) : null
+  const scale = viewport ? Number(canvas.dataset.flowZoom) || 1 : 1
+  const insetX = parseFloat(scrollStyle?.paddingLeft ?? '') || 0
+  const insetY = parseFloat(scrollStyle?.paddingTop ?? '') || 0
+  const viewportHeight = viewport && frameBounds && surface ? frameBounds.height - toolbarHeight - surfaceBorder * 2 : scroll?.clientHeight ?? 0
+  const expandedHeight = viewport ? canvas.scrollHeight + insetY + (parseFloat(scrollStyle?.paddingBottom ?? '') || 0) - viewportHeight : 0
+  const canvasOrigin = viewport
+    ? { x: frameBounds!.left - origin.left + surfaceBorder + insetX,
+        y: frameBounds!.top - origin.top + surfaceBorder + toolbarHeight + insetY }
+    : null
   const padding = 24, titleHeight = 38
   const rootStyle = getComputedStyle(root)
   const bg = rootStyle.getPropertyValue('--ui-bg').trim() || '#ffffff'
@@ -32,8 +51,8 @@ export const diagramSvg = (root: HTMLElement, title: string): DiagramSvg => {
   const titleWidth = probe.getBoundingClientRect().width
   const background = getComputedStyle(probe).color
   probe.remove()
-  const width = Math.ceil(Math.max(origin.width, canvas?.scrollWidth ?? 0, titleWidth) + padding * 2)
-  const height = Math.ceil(Math.max(origin.height, root.scrollHeight) + padding * 2 + titleHeight)
+  const width = Math.ceil(Math.max(origin.width, (canvasOrigin?.x ?? 0) + (canvas?.scrollWidth ?? 0), titleWidth) + padding * 2)
+  const height = Math.ceil(Math.max(origin.height, root.scrollHeight) + expandedHeight + padding * 2 + titleHeight)
   const svg = svgElement('svg', { width, height, viewBox: `0 0 ${width} ${height}`, role: 'img' })
   const accessibleTitle = svgElement('title')
   accessibleTitle.textContent = title
@@ -42,11 +61,21 @@ export const diagramSvg = (root: HTMLElement, title: string): DiagramSvg => {
   const heading = svgElement('text', { 'x': padding, 'y': padding + 19, 'fill': rootStyle.color, 'font-family': rootStyle.fontFamily, 'font-size': 18, 'font-weight': 700 })
   heading.textContent = title
   svg.append(heading)
-  const position = (element: Element, rect = element.getBoundingClientRect()) => ({
-    x: rect.left - origin.left + padding + (canvas?.contains(element) ? scroll?.scrollLeft ?? 0 : 0),
-    y: rect.top - origin.top + padding + titleHeight + (canvas?.contains(element) ? scroll?.scrollTop ?? 0 : 0),
-    width: rect.width, height: rect.height
-  })
+  const position = (element: Element, rect = element.getBoundingClientRect()) => {
+    if (canvasOrigin && canvas?.contains(element)) return {
+      x: canvasOrigin.x + (rect.left - canvasBounds!.left) / scale + padding,
+      y: canvasOrigin.y + (rect.top - canvasBounds!.top) / scale + padding + titleHeight,
+      width: rect.width / scale, height: rect.height / scale
+    }
+    return {
+      x: rect.left - origin.left + padding + (canvas?.contains(element) ? scroll?.scrollLeft ?? 0 : 0),
+      y: rect.top - origin.top + padding + titleHeight + (canvas?.contains(element) ? scroll?.scrollTop ?? 0 : 0)
+        + (viewport && rect.top >= frameBounds!.bottom ? expandedHeight : 0),
+      width: rect.width, height: rect.height
+    }
+  }
+  const branchConnections = branches ? svgElement('g') : null
+  if (branchConnections) svg.append(branchConnections)
   for (const element of root.querySelectorAll<HTMLElement>('.flow-routes')) {
     const rect = position(element), style = getComputedStyle(element)
     svg.append(svgElement('line', { 'x1': rect.x, 'x2': rect.x, 'y1': rect.y, 'y2': rect.y + rect.height,
@@ -68,7 +97,7 @@ export const diagramSvg = (root: HTMLElement, title: string): DiagramSvg => {
     if (element.classList.contains('flow-route')) {
       const dot = getComputedStyle(element, '::before')
       const size = parseFloat(dot.width)
-      if (size) svg.append(svgElement('circle', { cx: rect.x + parseFloat(dot.left) + size / 2,
+      if (size && dot.content !== 'none') svg.append(svgElement('circle', { cx: rect.x + parseFloat(dot.left) + size / 2,
         cy: rect.y + parseFloat(dot.top) + size / 2, r: size / 2, fill: dot.backgroundColor }))
     }
   }
@@ -97,7 +126,8 @@ export const diagramSvg = (root: HTMLElement, title: string): DiagramSvg => {
     clone.setAttribute('width', String(rect.width))
     clone.setAttribute('height', String(rect.height))
     clone.setAttribute('overflow', 'visible')
-    svg.append(clone)
+    if (branchConnections && element.classList.contains('flow-connections')) branchConnections.append(clone)
+    else svg.append(clone)
   }
   // Range measurements retain wrapping and exact positions while keeping text editable/searchable.
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
@@ -128,7 +158,7 @@ export const diagramSvg = (root: HTMLElement, title: string): DiagramSvg => {
         lastTop = rect.top
         const point = position(parent, rect)
         startX = point.x
-        baseline = point.y + rect.height * 0.8
+        baseline = point.y + point.height * 0.8
       }
       run += node.textContent[index]
     }

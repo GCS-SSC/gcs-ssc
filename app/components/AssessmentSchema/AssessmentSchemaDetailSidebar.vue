@@ -8,11 +8,15 @@ const emit = defineEmits<{
 
 const {
   sectionTabs = [],
+  sort = true,
+  showSave = true,
   isSaving = false,
   disabled = false,
   ui = {}
 } = defineProps<{
   sectionTabs?: TranslatedTabItem[]
+  sort?: boolean
+  showSave?: boolean
   isSaving?: boolean
   disabled?: boolean
   ui?: Record<string, string>
@@ -27,6 +31,7 @@ const { t } = useI18n()
       <CommonRouteTabs
         v-model="selectedSection"
         :items="sectionTabs"
+        :sort="sort"
         orientation="vertical"
         :ui="{
           root: 'w-full',
@@ -35,7 +40,7 @@ const { t } = useI18n()
           ...ui
         }" />
 
-      <div class="pt-1">
+      <div v-if="showSave" class="pt-1">
         <CommonSaveButton
           :label="t('common.save')"
           class="cursor-default px-6"

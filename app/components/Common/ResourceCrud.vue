@@ -149,8 +149,8 @@ const {
 })
 
 /** Track an actual Add action, rather than any modal opened for editing. */
-const openGuidedCreate = () => {
-  openCreate()
+const openGuidedCreate = async () => {
+  await openCreate()
   helpCreatePending = Boolean(isModalOpen.value)
 }
 

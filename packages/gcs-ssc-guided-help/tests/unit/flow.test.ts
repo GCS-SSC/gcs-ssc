@@ -221,3 +221,12 @@ it('keeps the next business switch visible within a scrollable modal after autom
   expect(scroll).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' })
   runtime.destroy()
 })
+
+it('reads an explicit host combobox value without using its display label', () => {
+  document.body.innerHTML = '<button role="combobox" data-help-target="choice" data-help-value="repayable">Remboursable</button>'
+  expect(readGuideTargetValue(document, 'choice')).toBe('repayable')
+  document.querySelector('button')!.setAttribute('data-help-value', '')
+  expect(readGuideTargetValue(document, 'choice')).toBeNull()
+  document.querySelector('button')!.setAttribute('aria-hidden', 'true')
+  expect(readGuideTargetValue(document, 'choice')).toBeUndefined()
+})

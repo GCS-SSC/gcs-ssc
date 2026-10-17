@@ -9,9 +9,7 @@ const props = defineProps<{
   setup: WorkflowFlowSetup
   customFields: AgencyCustomFieldDefinition[]
   choices: WorkflowFlowChoices
-  editable: boolean
 }>()
-const emit = defineEmits<{ 'select-member': [id: string] }>()
 const { t, locale } = useI18n()
 const catalog = useStatusCatalog()
 onMounted(() => {
@@ -23,15 +21,14 @@ const definition = computed(() => buildWorkflowFlowDefinition(props.setup, {
     const status = catalog.getById(id)
     return status ? (locale.value === 'fr' ? status.nameFr : status.nameEn) : t('common.unknown')
   },
-  customFields: props.customFields, choices: props.choices, editable: props.editable
+  customFields: props.customFields, choices: props.choices
 }))
 </script>
 
 <template>
   <CommonFlowDiagram
     v-if="setup.members.length"
-    :definition="definition" direction="vertical" :filename="`workflow-${setup.egcs_cn_name_en}`"
-    @select-node="emit('select-member', $event)" />
+    :definition="definition" direction="vertical" :filename="`workflow-${setup.egcs_cn_name_en}`" />
   <p v-else class="text-sm text-muted">
     {{ t('workflow.no_members') }}
   </p>

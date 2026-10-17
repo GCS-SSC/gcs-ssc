@@ -4677,6 +4677,12 @@
     "reload_responses": "Recharger les réponses enregistrées"
   },
   "diagrams": {
+    "enter_fullscreen": "Afficher en plein écran",
+    "exit_fullscreen": "Quitter le plein écran",
+    "zoom_in": "Agrandir",
+    "zoom_out": "Réduire",
+    "reset_zoom": "Rétablir le zoom à 100 %",
+    "branch_overflow": "Faites défiler horizontalement pour voir tous les parcours.",
     "legend": "Légende des connexions",
     "overview": "Vue d’ensemble du parcours",
     "direct": "Progression directe",
@@ -4715,7 +4721,7 @@
     "editor": "Ébauche du guide",
     "distribution": "Paramètres de publication de l’organisme",
     "add_catalog": "Ajouter au catalogue",
-    "adopt": "Adopter",
+    "adopt": "Ajouter à l’organisme",
     "clone": "Créer une copie",
     "new_version": "Nouvelle version disponible",
     "preview": "Aperçu",

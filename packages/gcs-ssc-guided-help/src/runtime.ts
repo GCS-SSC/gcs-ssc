@@ -21,7 +21,7 @@ export interface GuideRuntimeOptions {
   notice?: string
 }
 
-/** Read native structured values or explicit accessible checkbox state.
+/** Read native structured values, host combobox keys or accessible checkbox state.
  * @param root Host DOM root.
  * @param key Stable registered target.
  * @returns Typed value; undefined means unavailable, null means unselected.
@@ -30,7 +30,7 @@ export const readGuideTargetValue = (root: ParentNode, key: string): GuideTarget
   const matches = Array.from(root.querySelectorAll<HTMLElement>('[data-help-target]')).filter(element => element.dataset.helpTarget === key)
   if (matches.length !== 1) return undefined
   const element = matches[0]!
-  const selector = 'select,input[type="checkbox"],[role="checkbox"],[role="switch"]'
+  const selector = 'select,input[type="checkbox"],[role="checkbox"],[role="switch"],[role="combobox"][data-help-value]'
   const controls = element.matches(selector) ? [element] : Array.from(element.querySelectorAll<HTMLElement>(selector))
   if (controls.length !== 1) return undefined
   const control = controls[0]!
@@ -40,6 +40,7 @@ export const readGuideTargetValue = (root: ParentNode, key: string): GuideTarget
     if (ancestor.hidden || ancestor.getAttribute('aria-hidden') === 'true' || getComputedStyle(ancestor).display === 'none' || getComputedStyle(ancestor).visibility === 'hidden') return undefined
     ancestor = ancestor.parentElement
   }
+  if (control.matches('[role="combobox"][data-help-value]')) return control.dataset.helpValue || null
   if (control instanceof HTMLSelectElement && !control.multiple) return control.value || null
   if (control instanceof HTMLInputElement && control.type === 'checkbox') return control.indeterminate ? undefined : control.checked
   if (control?.matches('[role="checkbox"],[role="switch"]')) {
@@ -138,12 +139,13 @@ export const createGuideRuntime = (options: GuideRuntimeOptions) => {
     : { previous: 'Previous', next: 'Next', exit: 'Exit', retry: 'Retry', wrongView: 'Follow the instructions to open this screen.', conditionUnavailable: 'A control needed for this decision is unavailable. Open that screen, then retry.', unavailable: 'This control is unavailable. Follow the instructions, then retry.', of: 'of', steps: 'Steps' }
   /** Reject controls hidden by their own or ancestor presentation.
    * @param element Candidate control.
+   * @param ignoreAriaHidden Open dropdowns may temporarily aria-hide their still-open owning dialog.
    * @returns Whether the control and its ancestors are visible.
    */
-  const isVisible = (element: HTMLElement) => {
+  const isVisible = (element: HTMLElement, ignoreAriaHidden = false) => {
     let ancestor: HTMLElement | null = element
     while (ancestor) {
-      if (ancestor.hidden || ancestor.getAttribute('aria-hidden') === 'true' || getComputedStyle(ancestor).display === 'none' || getComputedStyle(ancestor).visibility === 'hidden') return false
+      if (ancestor.hidden || (!ignoreAriaHidden && ancestor.getAttribute('aria-hidden') === 'true') || getComputedStyle(ancestor).display === 'none' || getComputedStyle(ancestor).visibility === 'hidden') return false
       ancestor = ancestor.parentElement
     }
     return true
@@ -462,7 +464,7 @@ export const createGuideRuntime = (options: GuideRuntimeOptions) => {
     observer ??= new MutationObserver(records => {
       if (destroyed) return
       if (records.some(record => record.attributeName === 'aria-invalid') && completePendingBlur()) return
-      if (modalWorkflow && (!modalWorkflow.dialog.isConnected || modalWorkflow.dialog.dataset.state === 'closed' || !isVisible(modalWorkflow.dialog))) {
+      if (modalWorkflow && (!modalWorkflow.dialog.isConnected || modalWorkflow.dialog.dataset.state === 'closed' || !isVisible(modalWorkflow.dialog, true))) {
         const origin = modalWorkflow.stepId
         const originIndex = options.document.steps.findIndex(step => step.id === origin)
         for (const step of options.document.steps.slice(originIndex)) completedButtons.delete(step.id)

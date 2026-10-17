@@ -19,7 +19,16 @@ export interface FlowDiagramLabels {
   exportSvg: string
   exportPng: string
   exportError: string
+  branchOverflow?: string
+  zoomIn?: string
+  zoomOut?: string
+  resetZoom?: string
+  enterFullscreen?: string
+  exitFullscreen?: string
   addNode?: string
   addBranch?: string
   addFirstNode?: string
 }
+
+export { flowBranchLayout } from './branch-layout'
+export type { FlowBranchLayout } from './branch-layout'

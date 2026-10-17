@@ -32,7 +32,6 @@ type FlowContext = {
   statusName: (id: string | null | undefined) => string
   customFields: AgencyCustomFieldDefinition[]
   choices: WorkflowFlowChoices
-  editable?: boolean
 }
 
 export const buildWorkflowFlowDefinition = (setup: WorkflowFlowSetup, context: FlowContext): FlowDiagramDefinition => {
@@ -94,7 +93,6 @@ export const buildWorkflowFlowDefinition = (setup: WorkflowFlowSetup, context: F
         ...(member.egcs_cn_successstatus ? [t('workflow.flow.on_success', { status: statusName(member.egcs_cn_successstatus) })] : []),
         ...(member.egcs_cn_setsriskrating ? [t('workflow.flow.risk_source')] : [])
       ],
-      selectLabel: context.editable ? t('workflow.flow.edit_member', { sequence: member.egcs_cn_sequence, name }) : undefined,
       routes: [{ targetId: next, kind: 'direct', label: t('workflow.flow.success') }, {
         targetId: 'stopped', kind: 'failure', label: t('workflow.flow.failure'),
         detail: t('workflow.flow.failure_status', { status: statusName(member.egcs_cn_failurestatus || setup.egcs_cn_executionfailurestatus) })

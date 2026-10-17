@@ -3,6 +3,7 @@
 import GuidedHelpPublisherBranches from './PublisherBranches.vue'
 import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
+import { flowBranchLayout } from '@gcs-ssc/diagrams'
 import type { FlowDiagramDefinition } from '@gcs-ssc/diagrams'
 import { GuideDraftSchema } from '@gcs-ssc/guided-help/contracts'
 import type { GuideDraft, GuideStep } from '@gcs-ssc/guided-help/contracts'
@@ -22,10 +23,14 @@ const label = (value: { en: string, fr: string }) => value[locale.value === 'fr'
 const afterStep = ref<string | undefined>()
 const viewName = (key: string) => label(guidedHelpLedger.views.find(view => view.key === key)?.label ?? { en: key, fr: key })
 const branchable = computed(() => document.value.steps.filter(step => guidedHelpLedger.views.find(view => view.key === step.view)?.targets.some(target => target.kind === 'checkbox' || (target.kind === 'select' && target.choices?.length))).map(step => step.id))
-const flow = computed<FlowDiagramDefinition>(() => ({ title: t('guided_help.flow'), nodes: [
-  ...document.value.steps.map((step, index, steps) => ({ id: step.id, kind: 'step' as const, title: label(step.title) || t('guided_help.untitled_step'), eyebrow: t('guided_help.step_number', { number: index + 1 }), lines: [viewName(step.view)], selectLabel: disabled ? t('guided_help.inspect_step', { name: label(step.title) || t('guided_help.untitled_step') }) : t('guided_help.edit_step') + ': ' + (label(step.title) || t('guided_help.untitled_step')), routes: step.flow ? [...step.flow.branches.map(branch => ({ targetId: branch.next ?? '__end', kind: 'conditional' as const, label: branchLabel(branch) })), { targetId: step.flow.next ?? '__end', kind: 'default' as const, label: t('guided_help.otherwise') }] : [{ targetId: steps[index + 1]?.id ?? '__end', kind: 'direct' as const }] })),
-  ...(document.value.steps.length ? [{ id: '__end', kind: 'end' as const, title: t('guided_help.end_guide') }] : [])
-] }))
+const flow = computed<FlowDiagramDefinition>(() => {
+  const definition: FlowDiagramDefinition = { title: t('guided_help.flow'), nodes: [
+    ...document.value.steps.map((step, index, steps) => ({ id: step.id, kind: 'step' as const, title: label(step.title) || t('guided_help.untitled_step'), eyebrow: t('guided_help.step_number', { number: index + 1 }), lines: [viewName(step.view)], selectLabel: disabled ? t('guided_help.inspect_step', { name: label(step.title) || t('guided_help.untitled_step') }) : t('guided_help.edit_step') + ': ' + (label(step.title) || t('guided_help.untitled_step')), routes: step.flow ? [...step.flow.branches.map(branch => ({ targetId: branch.next ?? '__end', kind: 'conditional' as const, label: branchLabel(branch) })), { targetId: step.flow.next ?? '__end', kind: step.flow.branches.length ? 'default' as const : 'direct' as const, label: step.flow.branches.length ? t('guided_help.otherwise') : undefined }] : [{ targetId: steps[index + 1]?.id ?? '__end', kind: 'direct' as const }] })),
+    ...(document.value.steps.length ? [{ id: '__end', kind: 'end' as const, title: t('guided_help.end_guide') }] : [])
+  ] }
+  const positions = flowBranchLayout(definition).nodes
+  return { ...definition, nodes: definition.nodes.map(node => node.kind === 'step' ? { ...node, eyebrow: t('guided_help.step_number', { number: positions[node.id]!.row + 1 }) } : node) }
+})
 const branchStep = ref('')
 const branchOpen = ref(false)
 const branchLabel = (branch: { target: string, equals: string | boolean }) => {
@@ -123,7 +128,7 @@ const remove = () => {
     <p class="text-sm text-muted">
       {{ t(disabled ? 'guided_help.flow_readonly_hint' : 'guided_help.flow_edit_hint') }}
     </p>
-    <CommonFlowDiagram :definition="flow" :selected-node-id="selectedStep" :editable="!disabled" :branch-node-ids="branchable" direction="vertical" filename="guided-help" @select-node="edit" @add-node="create" @add-branch="addBranch" />
+    <CommonFlowDiagram :definition="flow" :selected-node-id="selectedStep" :editable="!disabled" :branch-node-ids="branchable" direction="vertical" layout="branches" filename="guided-help" @select-node="edit" @add-node="create" @add-branch="addBranch" />
     <GuidedHelpPublisherBranches v-model="document" v-model:open="branchOpen" :step-id="branchStep" :disabled="disabled" />
     <UModal v-model:open="open" :title="t(creating ? 'guided_help.create_step' : disabled ? 'guided_help.step_details' : 'guided_help.edit_step')" :description="t('guided_help.publication_required')" fullscreen :ui="{ content: 'rounded-none shadow-none ring-0' }" @after:leave="reset">
       <template #body>

@@ -347,6 +347,20 @@ it('requires reopening a cancelled modal and restores stale session steps to the
   runtime.destroy()
 })
 
+it('keeps an open modal workflow when a portalled dropdown temporarily hides it from accessibility', async () => {
+  document.body.innerHTML = '<button data-help-target="agency.add">Add</button><div role="dialog" data-state="open"><input data-help-target="agency.name"></div>'
+  const runtime = createGuideRuntime({ document: { ...guide, steps: [{ ...guide.steps[1]!, id: 'add', target: 'agency.add' }, ...guide.steps] }, locale: 'en', currentView: 'agency.general' })
+  window.dispatchEvent(new CustomEvent('guided-help:completed', { detail: { target: 'agency.add', action: 'modal-open' } }))
+  const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!
+  dialog.setAttribute('aria-hidden', 'true')
+  await vi.waitFor(() => expect(runtime.state.value.status).toBe('unavailable'))
+  expect(runtime.state.value.step.id).toBe('name')
+  dialog.removeAttribute('aria-hidden')
+  await vi.waitFor(() => expect(runtime.state.value.status).toBe('ready'))
+  expect(runtime.state.value.step.id).toBe('name')
+  runtime.destroy()
+})
+
 it('revokes modal completion when a retained dialog changes to closed', async () => {
   document.body.innerHTML = '<button data-help-target="agency.add">Add</button><div role="dialog" data-state="open"><input data-help-target="agency.name"></div>'
   const runtime = createGuideRuntime({ document: { ...guide, steps: [{ ...guide.steps[1]!, id: 'add', target: 'agency.add' }, ...guide.steps] }, locale: 'en', currentView: 'agency.general' })

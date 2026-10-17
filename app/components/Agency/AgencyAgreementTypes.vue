@@ -16,40 +16,44 @@ const initialNewItem = { ...AgencyAgreementTypeInitial }
 </script>
 
 <template>
-  <CommonResourceCrud
-    :title="t('agency.tabs.agreement_types')"
-    icon="i-lucide-file-text"
-    :fetch-url="`/api/agency/${agencyId}/agreement-types`"
-    :post-url="canCreate ? `/api/agency/${agencyId}/agreement-types` : undefined"
-    :delete-url-base="canDelete ? '/api/agency/agreement-types' : undefined"
-    :update-url-base="canUpdate ? '/api/agency/agreement-types' : undefined"
-    :can-create="canCreate"
-    :can-update="canUpdate"
-    :can-delete="canDelete"
-    :schema="AgencyAgreementTypeSchema"
-    :initial-new-item="initialNewItem"
-    :columns="columns"
-    status-enum-name="agreement_type"
-    :status-filter-label="t('common.all_types')">
-    <template #name-cell="{ row }">
-      <CommonBilingualName :name-en="row.original.egcs_ay_name_en" :name-fr="row.original.egcs_ay_name_fr" />
-    </template>
+  <section data-help-view="agency.agreement-types">
+    <CommonResourceCrud
+      help-add-target="agency.agreement-types.add"
+      help-save-target="agency.agreement-types.save"
+      :title="t('agency.tabs.agreement_types')"
+      icon="i-lucide-file-text"
+      :fetch-url="`/api/agency/${agencyId}/agreement-types`"
+      :post-url="canCreate ? `/api/agency/${agencyId}/agreement-types` : undefined"
+      :delete-url-base="canDelete ? '/api/agency/agreement-types' : undefined"
+      :update-url-base="canUpdate ? '/api/agency/agreement-types' : undefined"
+      :can-create="canCreate"
+      :can-update="canUpdate"
+      :can-delete="canDelete"
+      :schema="AgencyAgreementTypeSchema"
+      :initial-new-item="initialNewItem"
+      :columns="columns"
+      status-enum-name="agreement_type"
+      :status-filter-label="t('common.all_types')">
+      <template #name-cell="{ row }">
+        <CommonBilingualName :name-en="row.original.egcs_ay_name_en" :name-fr="row.original.egcs_ay_name_fr" />
+      </template>
 
-    <template #egcs_ay_agreementtype-cell="{ row }">
-      <CommonStatusBadge variant="meta" :label="t(`enums.agreement_type.${row.original.egcs_ay_agreementtype}`)" />
-    </template>
+      <template #egcs_ay_agreementtype-cell="{ row }">
+        <CommonStatusBadge variant="meta" :label="t(`enums.agreement_type.${row.original.egcs_ay_agreementtype}`)" />
+      </template>
 
-    <template #form="{ state }">
-      <UFormField :label="t('agency.tabs.agreement_types')" name="egcs_ay_agreementtype">
-        <CommonEnumSelect v-model="state.egcs_ay_agreementtype" name="agreement_type" />
-      </UFormField>
+      <template #form="{ state }">
+        <UFormField :label="t('agency.tabs.agreement_types')" name="egcs_ay_agreementtype">
+          <CommonEnumSelect v-model="state.egcs_ay_agreementtype" name="agreement_type" data-help-target="agency.agreement-types.type" :data-help-value="state.egcs_ay_agreementtype" />
+        </UFormField>
 
-      <UFormField :label="t('agency.name_en')" name="egcs_ay_name_en">
-        <UInput v-model="state.egcs_ay_name_en" />
-      </UFormField>
-      <UFormField :label="t('agency.name_fr')" name="egcs_ay_name_fr">
-        <UInput v-model="state.egcs_ay_name_fr" />
-      </UFormField>
-    </template>
-  </CommonResourceCrud>
+        <UFormField :label="t('agency.name_en')" name="egcs_ay_name_en">
+          <UInput v-model="state.egcs_ay_name_en" data-help-target="agency.agreement-types.name-en" />
+        </UFormField>
+        <UFormField :label="t('agency.name_fr')" name="egcs_ay_name_fr">
+          <UInput v-model="state.egcs_ay_name_fr" data-help-target="agency.agreement-types.name-fr" />
+        </UFormField>
+      </template>
+    </CommonResourceCrud>
+  </section>
 </template>

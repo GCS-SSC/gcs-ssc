@@ -9,7 +9,7 @@ import type { PublicationState } from '~~/shared/constants/system-lifecycle'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { guidedHelpLedger } from '~~/shared/guided-help/catalog'
 
-const { groups, pending } = defineProps<{ groups: PublisherGroup[], pending: boolean }>()
+const { groups, offers = [], pending } = defineProps<{ groups: PublisherGroup[], offers?: HelpGuide[], pending: boolean }>()
 const emit = defineEmits<{ expand: [context: string], create: [context: string], open: [context: string, id: string], catalog: [context: string, guideId: string, catalogId?: string], clone: [context: string, versionId: string], preview: [context: string, document: GuideDraft] }>()
 const { t, locale } = useI18n()
 const { getGroupedDisclosureControlsId, getGroupedDisclosureContentId } = useGroupedDisclosureIds()
@@ -18,10 +18,25 @@ const pagination = ref({ pageIndex: 0, pageSize: 10 })
 const expanded = ref<ExpandedState>({})
 const ownerName = (row: GuideRow) => row.context === 'system' ? t('guided_help.system') : label({ en: row.ownerNameEn, fr: row.ownerNameFr })
 const label = (value: { en: string, fr: string }) => value[locale.value === 'fr' ? 'fr' : 'en']
-type GuideRow = { id: string, context: string, ownerNameEn: string, ownerNameFr: string, name: string, document: GuideDraft, state: PublicationState, version: number, guide?: HelpGuide, catalog?: HelpCatalog, offered: boolean, placeholder: boolean, canEdit: boolean }
+type GuideRow = { id: string, context: string, ownerNameEn: string, ownerNameFr: string, name: string, document: GuideDraft, state: PublicationState, version: number, guide?: HelpGuide, catalog?: HelpCatalog, offer?: HelpGuide, offered: boolean, placeholder: boolean, canEdit: boolean }
+const ownerGroups = computed(() => {
+  const owners = groups.map(group => ({ ...group, shared: [] as HelpGuide[] }))
+  for (const offer of offers) {
+    const owner = offer.sourceAttribution
+    const id = owner?.ownerType === 'system' ? 'system' : owner?.agencyId
+    if (!id) continue
+    let group = owners.find(item => item.id === id)
+    if (!group) {
+      group = { id, name: owner!.agencyName, guides: [], catalogs: [], shared: [], loaded: true, loading: false, error: false, canEdit: false }
+      owners.push(group)
+    }
+    group.shared.push(offer)
+  }
+  return owners
+})
 const searchedGroups = computed(() => {
   const query = search.value.trim().toLocaleLowerCase()
-  return groups.filter(group => !query || !group.loaded || [group.id === 'system' ? t('guided_help.system') : group.name.en, group.name.fr, ...[...group.guides, ...group.shared].flatMap(guide => [guide.egcs_cn_document.title.en, guide.egcs_cn_document.title.fr]), ...group.catalogs.flatMap(catalog => [catalog.sourceVersionDocument?.title.en ?? '', catalog.sourceVersionDocument?.title.fr ?? ''])].some(value => value.toLocaleLowerCase().includes(query)))
+  return ownerGroups.value.filter(group => !query || !group.loaded || [group.id === 'system' ? t('guided_help.system') : group.name.en, group.name.fr, ...[...group.guides, ...group.shared].flatMap(guide => [guide.egcs_cn_document.title.en, guide.egcs_cn_document.title.fr]), ...group.catalogs.flatMap(catalog => [catalog.sourceVersionDocument?.title.en ?? '', catalog.sourceVersionDocument?.title.fr ?? ''])].some(value => value.toLocaleLowerCase().includes(query)))
 })
 const visibleGroups = computed(() => searchedGroups.value.slice(pagination.value.pageIndex * pagination.value.pageSize, (pagination.value.pageIndex + 1) * pagination.value.pageSize))
 const rows = computed<GuideRow[]>(() => visibleGroups.value.flatMap(group => {
@@ -31,14 +46,27 @@ const rows = computed<GuideRow[]>(() => visibleGroups.value.flatMap(group => {
     const catalog = group.catalogs.find(item => item.egcs_ay_guide === id)
     const offer = group.shared.find(item => item.id === id)
     const document = guide?.egcs_cn_document ?? catalog?.sourceVersionDocument ?? offer?.egcs_cn_document ?? { formatVersion: 1 as const, title: { en: '', fr: '' }, description: { en: '', fr: '' }, steps: [] }
-    return { id: `${group.id}:${id || 'empty'}`, context: group.id, ownerNameEn: group.name.en, ownerNameFr: group.name.fr, name: label(document.title) || t('guided_help.untitled'), document, state: catalog?.publicationState ?? guide?.publicationState ?? 'draft', version: Math.max(0, ...(guide?.versions ?? offer?.versions ?? []).map(version => version.version)), guide, catalog, offered: Boolean(offer), placeholder: !id, canEdit: group.canEdit }
+    return { id: `${group.id}:${id || 'empty'}`, context: group.id, ownerNameEn: group.name.en, ownerNameFr: group.name.fr, name: label(document.title) || t('guided_help.untitled'), document, state: catalog?.publicationState ?? guide?.publicationState ?? offer?.publicationState ?? 'draft', version: Math.max(0, ...(guide?.versions ?? offer?.versions ?? []).map(version => version.version)), guide, catalog, offer, offered: Boolean(offer), placeholder: !id, canEdit: group.canEdit }
   })
 }))
 // Retain owner groups while searching and reveal their matching guide rows.
 const filtered = computed(() => rows.value.filter(row => row.placeholder || !search.value.trim() || [row.context === 'system' ? t('guided_help.system') : row.ownerNameEn, row.name, row.document.title.en, row.document.title.fr, row.ownerNameEn, row.ownerNameFr].some(value => value.toLocaleLowerCase().includes(search.value.trim().toLocaleLowerCase()))))
 const columns: TableColumnInput<GuideRow>[] = [{ id: 'context', accessorKey: 'context', headerKey: 'guided_help.owner' }, { id: 'name', accessorKey: 'name', headerKey: 'common.name' }, { id: 'state', headerKey: 'common.status' }, { id: 'availability', headerKey: 'guided_help.availability' }, { id: 'actions', headerKey: 'common.actions' }]
-const groupFor = (row: GuideRow) => groups.find(group => group.id === row.context)
+const groupFor = (row: GuideRow) => ownerGroups.value.find(group => group.id === row.context)
 const newest = (guide: HelpGuide) => [...guide.versions].sort((left, right) => right.version - left.version)[0]
+const destinations = (row: GuideRow, action: 'catalog' | 'clone') => groups.filter(group => group.id !== 'system' && group.canEdit && (action === 'clone' || !group.catalogs.some(catalog => catalog.egcs_ay_guide === row.offer?.id)))
+/**
+ * Builds actions for the recipient Agency without changing source ownership.
+ * @param row Source guide row.
+ * @param action Adoption or independent copy.
+ * @returns Localized recipient actions.
+ */
+const destinationItems = (row: GuideRow, action: 'catalog' | 'clone') => destinations(row, action).map(group => ({
+  label: label(group.name), icon: 'i-lucide-building-2', onSelect: () => action === 'catalog'
+    ? emit('catalog', group.id, row.offer!.id)
+    : emit('clone', group.id, newest(row.offer!)!.id)
+}))
+const selectDestination = (row: GuideRow, action: 'catalog' | 'clone') => destinationItems(row, action)[0]?.onSelect()
 const viewName = (key: string) => label(guidedHelpLedger.views.find(view => view.key === key)?.label ?? { en: key, fr: key })
 const toggle = (row: { original: GuideRow, toggleExpanded: () => void, getIsExpanded: () => boolean }) => {
   if (!row.getIsExpanded()) emit('expand', row.original.context)
@@ -47,8 +75,8 @@ const toggle = (row: { original: GuideRow, toggleExpanded: () => void, getIsExpa
 watch(search, value => {
   pagination.value.pageIndex = 0
   if (value.trim()) {
-    for (const group of groups) emit('expand', group.id)
-    expanded.value = Object.fromEntries(groups.map(group => [`context:${group.id}`, true]))
+    for (const group of ownerGroups.value) emit('expand', group.id)
+    expanded.value = Object.fromEntries(ownerGroups.value.map(group => [`context:${group.id}`, true]))
   }
 })
 </script>
@@ -79,8 +107,8 @@ watch(search, value => {
             <UIcon name="i-lucide-corner-down-right" class="mt-1 size-4 shrink-0 text-muted" /><div>
               <CommonBilingualName v-if="row.original.document.title.en || row.original.document.title.fr" :name-en="row.original.document.title.en" :name-fr="row.original.document.title.fr" />
               <span v-else class="font-semibold">{{ t('guided_help.untitled') }}</span>
-              <p v-if="row.original.catalog?.sourceAttribution || row.original.guide?.sourceAttribution" class="mt-1 text-xs text-muted">
-                {{ t('guided_help.owner') }}: {{ (row.original.catalog?.sourceAttribution ?? row.original.guide?.sourceAttribution)?.ownerType === 'system' ? t('guided_help.system') : label((row.original.catalog?.sourceAttribution ?? row.original.guide?.sourceAttribution)!.agencyName) }}
+              <p v-if="row.original.catalog?.sourceAttribution || row.original.guide?.sourceAttribution || row.original.offer?.sourceAttribution" class="mt-1 text-xs text-muted">
+                {{ t('guided_help.owner') }}: {{ (row.original.catalog?.sourceAttribution ?? row.original.guide?.sourceAttribution ?? row.original.offer?.sourceAttribution)?.ownerType === 'system' ? t('guided_help.system') : label((row.original.catalog?.sourceAttribution ?? row.original.guide?.sourceAttribution ?? row.original.offer?.sourceAttribution)!.agencyName) }}
               </p>
             </div>
           </div>
@@ -91,8 +119,8 @@ watch(search, value => {
       </template>
       <template #state-cell="{ row }">
         <div v-if="!row.getIsGrouped() && !row.original.placeholder" class="space-y-2">
-          <div v-if="row.original.guide" class="flex flex-wrap items-center gap-2">
-            <span v-if="row.original.catalog" class="text-xs text-muted">{{ t('guided_help.source') }}</span><CommonLifecycleBadge engine="publication" :state="row.original.guide.publicationState ?? 'draft'" />
+          <div v-if="row.original.guide || row.original.offer" class="flex flex-wrap items-center gap-2">
+            <span v-if="row.original.catalog" class="text-xs text-muted">{{ t('guided_help.source') }}</span><CommonLifecycleBadge engine="publication" :state="(row.original.guide ?? row.original.offer)?.publicationState ?? 'draft'" />
           </div>
           <div v-if="row.original.catalog" class="flex flex-wrap items-center gap-2">
             <span v-if="row.original.guide" class="text-xs text-muted">{{ t('guided_help.catalog') }}</span><CommonLifecycleBadge engine="publication" :state="row.original.catalog.publicationState ?? 'draft'" />
@@ -124,22 +152,27 @@ watch(search, value => {
       <template #actions-cell="{ row }">
         <div class="flex items-center justify-end gap-2">
           <template v-if="row.getIsGrouped()">
-            <UButton v-if="row.original.canEdit" icon="i-lucide-plus" color="primary" variant="ghost" size="sm" :aria-label="t('guided_help.create_in', { name: ownerName(row.original) })" :disabled="pending" @click="emit('create', row.original.context)" />
-            <UButton v-if="groupFor(row.original)?.error" icon="i-lucide-refresh-cw" color="neutral" variant="ghost" size="sm" :aria-label="t('common.retry')" @click="emit('expand', row.original.context)" />
+            <UButton v-if="row.original.canEdit" icon="i-lucide-plus" color="primary" variant="ghost" size="sm" :aria-label="t('guided_help.create_in', { name: ownerName(row.original) })" :title="t('guided_help.create_in', { name: ownerName(row.original) })" :disabled="pending" @click="emit('create', row.original.context)" />
+            <UButton v-if="groupFor(row.original)?.error" icon="i-lucide-refresh-cw" color="neutral" variant="ghost" size="sm" :aria-label="t('common.retry')" :title="t('common.retry')" @click="emit('expand', row.original.context)" />
           </template>
           <template v-else-if="!row.original.placeholder">
-            <UButton v-if="row.original.guide" icon="i-lucide-arrow-right" color="neutral" variant="ghost" size="sm" :aria-label="t('common.open')" :disabled="pending" @click="emit('open', row.original.context, row.original.guide.id)" />
-            <UButton v-if="row.original.catalog" :icon="row.original.guide ? 'i-lucide-settings-2' : 'i-lucide-arrow-right'" color="neutral" variant="ghost" size="sm" :aria-label="t(row.original.guide ? 'guided_help.distribution' : 'common.open')" :disabled="pending" @click="emit('catalog', row.original.context, row.original.catalog.egcs_ay_guide, row.original.catalog.id)" />
-            <UButton v-else-if="row.original.context !== 'system' && row.original.canEdit && (row.original.guide?.versions.length || row.original.offered)" icon="i-lucide-plus" color="neutral" variant="ghost" size="sm" :aria-label="t('guided_help.adopt')" :disabled="pending" @click="emit('catalog', row.original.context, (row.original.guide ?? groupFor(row.original)!.shared.find(guide => `${row.original.context}:${guide.id}` === row.original.id))!.id)" />
-            <template v-if="row.original.context !== 'system' && row.original.offered">
-              <UButton v-if="row.original.canEdit" icon="i-lucide-copy" color="neutral" variant="ghost" size="sm" :aria-label="t('guided_help.clone')" :disabled="pending" @click="emit('clone', row.original.context, newest(groupFor(row.original)!.shared.find(guide => `${row.original.context}:${guide.id}` === row.original.id)!)!.id)" />
-              <UButton icon="i-lucide-play" color="neutral" variant="ghost" size="sm" :aria-label="t('guided_help.preview')" @click="emit('preview', row.original.context, row.original.document)" />
+            <UButton v-if="row.original.guide" icon="i-lucide-arrow-right" color="neutral" variant="ghost" size="sm" :aria-label="t('common.open')" :title="t('common.open')" :disabled="pending" @click="emit('open', row.original.context, row.original.guide.id)" />
+            <UButton v-if="row.original.catalog" :icon="row.original.guide ? 'i-lucide-settings-2' : 'i-lucide-arrow-right'" color="neutral" variant="ghost" size="sm" :aria-label="t(row.original.guide ? 'guided_help.distribution' : 'common.open')" :title="t(row.original.guide ? 'guided_help.distribution' : 'common.open')" :disabled="pending" @click="emit('catalog', row.original.context, row.original.catalog.egcs_ay_guide, row.original.catalog.id)" />
+            <UButton v-else-if="!row.original.offer && row.original.context !== 'system' && row.original.canEdit && row.original.guide?.versions.length" icon="i-lucide-plus" color="neutral" variant="ghost" size="sm" :aria-label="t('guided_help.adopt')" :title="t('guided_help.adopt')" :disabled="pending" @click="emit('catalog', row.original.context, row.original.guide.id)" />
+            <template v-if="row.original.offer">
+              <template v-for="action in (['catalog', 'clone'] as const)" :key="action">
+                <UDropdownMenu v-if="destinations(row.original, action).length > 1" :items="destinationItems(row.original, action)">
+                  <UButton :icon="action === 'catalog' ? 'i-lucide-plus' : 'i-lucide-copy'" color="neutral" variant="ghost" size="sm" :aria-label="t(action === 'catalog' ? 'guided_help.adopt' : 'guided_help.clone')" :title="t(action === 'catalog' ? 'guided_help.adopt' : 'guided_help.clone')" :disabled="pending" />
+                </UDropdownMenu>
+                <UButton v-else-if="destinations(row.original, action).length === 1" :icon="action === 'catalog' ? 'i-lucide-plus' : 'i-lucide-copy'" color="neutral" variant="ghost" size="sm" :aria-label="t(action === 'catalog' ? 'guided_help.adopt' : 'guided_help.clone')" :title="t(action === 'catalog' ? 'guided_help.adopt' : 'guided_help.clone')" :disabled="pending" @click="selectDestination(row.original, action)" />
+              </template>
+              <UButton icon="i-lucide-play" color="neutral" variant="ghost" size="sm" :aria-label="t('guided_help.preview')" :title="t('guided_help.preview')" @click="emit('preview', groups.find(group => group.id !== 'system')?.id ?? row.original.context, row.original.offer.egcs_cn_document)" />
             </template>
           </template>
         </div>
       </template>
       <template #footer-left>
-        {{ groups.length }} {{ t('guided_help.owners') }}
+        {{ ownerGroups.length }} {{ t('guided_help.owners') }}
       </template>
     </CommonResourceLayoutCard>
   </div>

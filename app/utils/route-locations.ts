@@ -18,6 +18,9 @@ export const appRouteLocations = {
   extensionAgencyWorkspaceForm: (key: string, agencyId: string, formId: string) => ({
     name: 'extension-id-agencies-agencyId-forms-formId', params: { id: key, agencyId, formId }
   }),
+  extensionAgencyWorkspaceFormFlow: (key: string, agencyId: string, formId: string) => ({
+    name: 'extension-id-agencies-agencyId-forms-formId-flow', params: { id: key, agencyId, formId }
+  }),
   agencyDetail: (id: string) => ({ name: 'agencies-id', params: { id } }),
   agencyDataCollectionDetail: (id: string, dataCollectionSetupId: string) => ({
     name: 'agencies-id-data-collections-dataCollectionSetupId', params: { id, dataCollectionSetupId }
@@ -44,6 +47,10 @@ export const appRouteLocations = {
   }),
   agencyWorkflowSetupDetail: (id: string, workflowSetupId: string) => ({
     name: 'agencies-id-workflows-workflowSetupId',
+    params: { id, workflowSetupId }
+  }),
+  agencyWorkflowSetupFlow: (id: string, workflowSetupId: string) => ({
+    name: 'agencies-id-workflows-workflowSetupId-flow',
     params: { id, workflowSetupId }
   }),
   proponents: () => ({ name: 'proponents' }),
