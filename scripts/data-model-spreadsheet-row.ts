@@ -1,6 +1,7 @@
 /* eslint-disable jsdoc/require-jsdoc, @typescript-eslint/no-explicit-any */
 import { readFile } from 'node:fs/promises'
 import { buildFillBlankRowsRequest } from './google-sheets-fill-blank'
+import { buildFormatRowsRequests } from './google-sheets-format'
 import {
   DATA_MODEL_SPREADSHEET_ID,
   getGoogleSheetsAccessToken,
@@ -9,7 +10,7 @@ import {
   sheetsRequest
 } from './google-sheets-workbook'
 
-type Action = 'cell' | 'color' | 'delete' | 'fill-blank' | 'insert' | 'move' | 'read' | 'update'
+type Action = 'cell' | 'color' | 'delete' | 'fill-blank' | 'format' | 'insert' | 'move' | 'read' | 'update'
 type Request = Record<string, unknown>
 
 const AUDIT_COLORS = {
@@ -26,6 +27,7 @@ const usage = (): never => {
     '  data-model-spreadsheet-row.ts cell --sheet TITLE --row N --column A --expected-value TEXT --value-file PATH',
     '  data-model-spreadsheet-row.ts update --sheet TITLE --row N --expected-first-cell TEXT (--values-file PATH | --values-json JSON)',
     '  data-model-spreadsheet-row.ts fill-blank --sheet TITLE --row N --count N --expected-first-cell-empty --values-file PATH',
+    '  data-model-spreadsheet-row.ts format --sheet TITLE --row N --count N --expected-first-cell TEXT --format-file PATH',
     '  data-model-spreadsheet-row.ts insert --sheet TITLE --row N --count N --expected-first-cell TEXT',
     '  data-model-spreadsheet-row.ts delete --sheet TITLE --row N --count N --expected-first-cell TEXT',
     '  data-model-spreadsheet-row.ts color --sheet TITLE --row N --count N --color yellow|red|purple|blue (--expected-first-cell TEXT | --expected-first-cell-empty)',
@@ -34,7 +36,7 @@ const usage = (): never => {
 }
 
 const action = process.argv[2] as Action | undefined
-if (!action || !['cell', 'color', 'delete', 'fill-blank', 'insert', 'move', 'read', 'update'].includes(action)) usage()
+if (!action || !['cell', 'color', 'delete', 'fill-blank', 'format', 'insert', 'move', 'read', 'update'].includes(action)) usage()
 
 const args = new Map<string, string>()
 for (let index = 3; index < process.argv.length; index += 1) {
@@ -81,7 +83,9 @@ const rowDocument = (sheet: ReturnType<typeof requireSheet>, rowIndex: number): 
     row: rowIndex + 1,
     enteredValues: cells.map(enteredValue),
     effectiveValues: cells.map(effectiveValue),
-    backgroundColors: cells.map(cell => cell.effectiveFormat?.backgroundColorStyle ?? cell.userEnteredFormat?.backgroundColorStyle ?? null)
+    backgroundColors: cells.map(cell => cell.effectiveFormat?.backgroundColorStyle ?? cell.userEnteredFormat?.backgroundColorStyle ?? null),
+    effectiveFormats: cells.map(cell => cell.effectiveFormat ?? null),
+    userEnteredFormats: cells.map(cell => cell.userEnteredFormat ?? null)
   }
 }
 
@@ -100,7 +104,9 @@ const sheetTitle = required('--sheet')
 const row = positiveInteger('--row')
 const count = positiveInteger('--count', 1)
 const accessToken = await getGoogleSheetsAccessToken()
-let workbook = await readWorkbookSnapshot(accessToken)
+const boundedRead = action === 'read' || action === 'format'
+let workbook = await readWorkbookSnapshot(accessToken, DATA_MODEL_SPREADSHEET_ID,
+  boundedRead ? { sheetTitle, startRowIndex: row - 1, count } : undefined)
 let sheet = requireSheet(workbook, sheetTitle)
 const startRowIndex = row - 1
 if (action === 'insert') {
@@ -158,8 +164,11 @@ if (actualFirstCell !== expectedFirstCell) {
   throw new Error(`${sheetTitle}!A${row} guard failed: expected ${JSON.stringify(expectedFirstCell)}, received ${JSON.stringify(actualFirstCell)}`)
 }
 
-let request: Request
-if (action === 'fill-blank') {
+let request: Request | Request[]
+if (action === 'format') {
+  const input: unknown = JSON.parse(await readFile(required('--format-file'), 'utf8'))
+  request = buildFormatRowsRequests(sheet, startRowIndex, count, input)
+} else if (action === 'fill-blank') {
   const input: unknown = JSON.parse(await readFile(required('--values-file'), 'utf8'))
   request = buildFillBlankRowsRequest(sheet, startRowIndex, count, input)
 } else if (action === 'update') {
@@ -245,12 +254,15 @@ if (action === 'fill-blank') {
 
 await sheetsRequest(accessToken, `${DATA_MODEL_SPREADSHEET_ID}:batchUpdate`, {
   method: 'POST',
-  body: JSON.stringify({ requests: [request] })
+  body: JSON.stringify({ requests: Array.isArray(request) ? request : [request] })
 })
 
-workbook = await readWorkbookSnapshot(accessToken)
-sheet = requireSheet(workbook, sheetTitle)
 const verificationStart = action === 'move'
   ? Math.max(0, Math.min(startRowIndex, positiveInteger('--before-row') - 1) - 1)
   : Math.max(0, startRowIndex - 1)
+workbook = await readWorkbookSnapshot(accessToken, DATA_MODEL_SPREADSHEET_ID,
+  action === 'format'
+    ? { sheetTitle, startRowIndex: verificationStart, count: Math.min(sheet.properties.gridProperties.rowCount - verificationStart, count + 3) }
+    : undefined)
+sheet = requireSheet(workbook, sheetTitle)
 printRows(sheet, verificationStart, Math.min(sheet.properties.gridProperties.rowCount - verificationStart, count + 3))

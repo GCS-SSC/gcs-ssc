@@ -16,12 +16,18 @@ interface SheetProperties {
 }
 
 export interface WorkbookSheet {
-  data?: Array<{ rowData?: Array<{ values?: Array<Record<string, any>> }> }>
+  data?: Array<{ startRow?: number, startColumn?: number, rowData?: Array<{ values?: Array<Record<string, any>> }> }>
   properties: SheetProperties
 }
 
 export interface WorkbookSnapshot {
   sheets: WorkbookSheet[]
+}
+
+interface WorkbookRowRange {
+  sheetTitle: string
+  startRowIndex: number
+  count: number
 }
 
 /**
@@ -89,16 +95,42 @@ export const sheetsRequest = async <T>(accessToken: string, path: string, init?:
  *
  * @param accessToken
  * @param spreadsheetId
+ * @param range Optional bounded rows across the worksheet's existing columns.
  */
 export const readWorkbookSnapshot = async (
   accessToken: string,
-  spreadsheetId = DATA_MODEL_SPREADSHEET_ID
+  spreadsheetId = DATA_MODEL_SPREADSHEET_ID,
+  range?: WorkbookRowRange
 ): Promise<WorkbookSnapshot> => {
-  const fields = 'sheets(properties(sheetId,title,gridProperties),data(startRow,startColumn,rowData(values(effectiveValue,userEnteredValue,effectiveFormat.backgroundColorStyle,userEnteredFormat.backgroundColorStyle,note))))'
-  return await sheetsRequest<WorkbookSnapshot>(
+  if (range && (!Number.isSafeInteger(range.startRowIndex) || range.startRowIndex < 0
+    || !Number.isSafeInteger(range.count) || range.count < 1 || !range.sheetTitle)) {
+    throw new Error('Workbook range requires a worksheet and positive bounded rows')
+  }
+  const fields = 'sheets(properties(sheetId,title,gridProperties),data(startRow,startColumn,rowData(values(effectiveValue,userEnteredValue,effectiveFormat,userEnteredFormat,note))))'
+  const a1Range = range
+    ? `'${range.sheetTitle.replaceAll('\'', '\'\'')}'!${range.startRowIndex + 1}:${range.startRowIndex + range.count}`
+    : undefined
+  const workbook = await sheetsRequest<WorkbookSnapshot>(
     accessToken,
-    `${spreadsheetId}?includeGridData=true&fields=${encodeURIComponent(fields)}`
+    `${spreadsheetId}?includeGridData=true&fields=${encodeURIComponent(fields)}${a1Range ? `&ranges=${encodeURIComponent(a1Range)}` : ''}`
   )
+  // GridData offsets are relative to requested ranges; consumers use absolute worksheet indices.
+  for (const sheet of workbook.sheets) {
+    if (!sheet.data?.length) continue
+    const rows: NonNullable<NonNullable<WorkbookSheet['data']>[number]['rowData']> = []
+    for (const block of sheet.data) {
+      for (const [rowOffset, row] of (block.rowData ?? []).entries()) {
+        const rowIndex = (block.startRow ?? 0) + rowOffset
+        const cells = rows[rowIndex]?.values ?? []
+        for (const [columnOffset, cell] of (row.values ?? []).entries()) {
+          cells[(block.startColumn ?? 0) + columnOffset] = cell
+        }
+        rows[rowIndex] = { values: cells }
+      }
+    }
+    sheet.data = [{ startRow: 0, startColumn: 0, rowData: rows }]
+  }
+  return workbook
 }
 
 export const cellText = (cell: Record<string, any> | undefined): string => {
