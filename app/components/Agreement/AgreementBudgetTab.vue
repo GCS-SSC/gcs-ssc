@@ -1039,7 +1039,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
                 value-key="id"
                 label-en-key="label_en"
                 label-fr-key="label_fr"
-                :query="{ page: 1, limit: 100, permission_action: selectedLineItem.id ? 'update' : 'create' }"
+                :query="{ page: 1, limit: 100, permission_action: selectedLineItem.id ? 'update' : 'create', ...(actionTarget?.kind === 'amendment' ? { amendment_id: actionTarget.amendmentId } : {}) }"
                 :disabled="isLineItemCostCategoryLocked"
                 @resolved-items="hydrateCalculation" />
             </UFormField>
