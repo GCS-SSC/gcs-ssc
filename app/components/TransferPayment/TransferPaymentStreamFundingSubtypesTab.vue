@@ -30,7 +30,7 @@ const { getBilingualValue } = useBilingualValue()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
-const toast = useToast()
+const toast = useLocalizedToast()
 const baseUrl = computed(() => `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/funding-subtypes`)
 const lookupUrl = computed(() => `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/lookups/funding-subtypes`)
 const { data: links, refresh: refreshLinks, status: linkStatus } = await useFetch<{ items: LinkedSubtype[] }, FetchError, string>(baseUrl)
@@ -75,7 +75,7 @@ const save = async () => {
     if (!response.ok) await throwFetchResponseError(response)
     selected.value = null
     await refreshLinks()
-    toast.add({ title: t('common.success'), description: t('common.added_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.added_success'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
   } finally {
@@ -93,7 +93,7 @@ const remove = async (row: LinkedSubtype) => {
   try {
     if (await confirmDeleteRequest(`${baseUrl.value}/${row.id}`)) {
       await refreshLinks()
-      toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+      toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
     }
   } catch (error: unknown) {
     showError(error)

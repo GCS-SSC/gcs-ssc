@@ -1,16 +1,19 @@
 import type { H3Event } from 'h3'
 import { useTranslation } from '@intlify/h3'
 import type { ZodError } from 'zod'
-import { formatZodIssues, localizeBilingualIssueParams } from '../../shared/utils/zod-i18n'
+import { resolveZodIssuePresentation, localizeBilingualIssueParams } from '../../shared/utils/zod-i18n'
+import { ApiErrorTranslationSchema, type ApiErrorTranslation } from '../../shared/types/schemas/api-error'
 import { resolveRequestLocale } from './request-locale'
 
 export interface ApiErrorDetail {
+  translation?: ApiErrorTranslation
   path: string
   message: string
   code?: string
 }
 
 export interface ApiErrorData {
+  translation?: ApiErrorTranslation
   message: string
   code: string
   details?: ApiErrorDetail[]
@@ -56,12 +59,16 @@ const translate = async (event: H3Event, key: string, params?: Record<string, un
  * @returns Never returns (throws error).
  */
 export const throwApiError = async (event: H3Event, options: ThrowApiErrorOptions): Promise<never> => {
-  const message = options.message ?? await translate(event, options.key ?? 'common.unknown_error', options.params)
+  const key = options.key ?? 'common.unknown_error'
+  const message = options.message ?? await translate(event, key, options.params)
+  const presentation = ApiErrorTranslationSchema.safeParse({ key, params: options.params })
+  const translation = options.message === undefined && presentation.success ? presentation.data : undefined
   throw createError({
     statusCode: options.statusCode,
     message,
     data: {
       message,
+      ...(translation ? { translation } : {}),
       code: options.code,
       details: options.details,
       warnings: options.warnings
@@ -157,13 +164,13 @@ export const validationError = async (event: H3Event, error: ZodError): Promise<
 
   const t = await translationLoader(event)
   const locale = resolveRequestLocale(event)
-  const details = formatZodIssues(error.issues, (key, params) => t(
-    key,
-    localizeBilingualIssueParams(params ?? {}, locale)
-  )).map(issue => ({
-    path: issue.path,
-    message: issue.message,
-    code: issue.code
+  const details = error.issues.map(issue => ({
+    path: issue.path.join('.'),
+    code: issue.code,
+    ...resolveZodIssuePresentation(issue.message, issue, (key, params) => t(
+      key,
+      localizeBilingualIssueParams(params ?? {}, locale)
+    ))
   }))
 
   return await throwApiError(event, {

@@ -74,7 +74,7 @@ type AgreementDetailProfile = FundingCaseAgreementProfileRow & {
 }
 
 const { t, n } = useI18n()
-const toast = useToast()
+const toast = useLocalizedToast()
 const route = useRoute()
 const localePath = useLocalePath()
 const { showError } = useApiErrorToast()
@@ -348,8 +348,8 @@ const submit = async () => {
     if (!await refreshProfile()) return
 
     toast.add({
-      title: t('common.success'),
-      description: t('common.updated_success'),
+      title: toast.localized('common.success'),
+      description: toast.localized('common.updated_success'),
       color: 'success'
     })
   } catch (caughtError: unknown) {

@@ -13,8 +13,7 @@ type DeleteRequestToastOptions = {
  * @returns Delete request toast helper.
  */
 export const useDeleteRequestToast = () => {
-  const { t } = useI18n()
-  const toast = useToast()
+  const toast = useLocalizedToast()
   const { showError } = useApiErrorToast()
   const { confirmDeleteRequest } = useConfirmDeleteRequest()
 
@@ -36,8 +35,8 @@ export const useDeleteRequestToast = () => {
 
       await options.refresh()
       toast.add({
-        title: options.successTitle ?? t('common.success'),
-        description: options.successDescription ?? t('common.deleted_success'),
+        title: options.successTitle ?? toast.localized('common.success'),
+        description: options.successDescription ?? toast.localized('common.deleted_success'),
         color: 'success'
       })
 

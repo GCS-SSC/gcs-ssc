@@ -14,7 +14,7 @@ type StatusLifecycle = 'normal' | 'readOnly' | 'terminal'
 const { agencyId, canCreate, canUpdate, canDelete, showHeader = true } = defineProps<{ agencyId: string, canCreate: boolean, canUpdate: boolean, canDelete: boolean, showHeader?: boolean }>()
 const { locale, t } = useI18n()
 const { showError } = useApiErrorToast()
-const toast = useToast()
+const toast = useLocalizedToast()
 const confirmDelete = useDeleteConfirm()
 const catalog = useStatusCatalog()
 const canEdit = computed(() => canUpdate)
@@ -76,7 +76,7 @@ const saveReconciliationStatuses = async () => {
     })
     if (!response.ok) await throwFetchResponseError(response)
     reconciliationStatuses.value = await response.json() as AgencyClaimReconciliationStatusConfiguration
-    toast.add({ title: t('common.success'), description: t('agency.statuses.reconciliation_saved'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('agency.statuses.reconciliation_saved'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
   } finally {
@@ -128,7 +128,7 @@ const save = async () => {
     const response = await fetch(url, { method: updating ? 'PATCH' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
     if (!response.ok) await throwFetchResponseError(response)
     if (modalSession.value === requestSession) isOpen.value = false
-    toast.add({ title: t('common.success'), description: t(updating ? 'common.updated_success' : 'common.created_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized(updating ? 'common.updated_success' : 'common.created_success'), color: 'success' })
     try {
       await catalog.refreshAgency(agencyId)
     } catch (refreshError) {
@@ -152,7 +152,7 @@ const setDeleted = async (definition: StatusDefinition, deleted: boolean) => {
   try {
     const response = await fetch(`/api/agency/statuses/${definition.id}/${deleted ? 'delete' : 'restore'}`, { method: 'POST' })
     if (!response.ok) await throwFetchResponseError(response)
-    toast.add({ title: t('common.success'), description: t(deleted ? 'agency.statuses.deleted_success' : 'agency.statuses.restored_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized(deleted ? 'agency.statuses.deleted_success' : 'agency.statuses.restored_success'), color: 'success' })
     try {
       await catalog.refreshAgency(agencyId)
     } catch (refreshError) {

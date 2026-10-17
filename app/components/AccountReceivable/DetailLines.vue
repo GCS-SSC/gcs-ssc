@@ -28,7 +28,7 @@ const { createValidator } = useZodI18n()
 const { sendJson } = useJsonRequest()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { search, pagination } = useTableListState()
 type LineForm = {
   egcs_fc_sourcekey: string | undefined
@@ -115,7 +115,7 @@ const openEdit = (line: AccountReceivableLine) => {
 const openRecode = (line: AccountReceivableLine) => {
   if (!canUpdate || !isAdjustment || !line.egcs_fc_accountreceivablechartofaccount) return
   if (!canEdit) {
-    toast.add({ title: t('common.warning'), description: t('account_receivable.work_prerequisite'), color: 'warning' })
+    toast.add({ title: toast.localized('common.warning'), description: toast.localized('account_receivable.work_prerequisite'), color: 'warning' })
     return
   }
   selectedLineId.value = line.id
@@ -149,7 +149,7 @@ const save = async () => {
     await sendJson(`/api/account-receivables/${owner}/lines${lineId ? `/${lineId}` : ''}${recoding ? '/recode' : ''}`, recoding || !updating ? 'POST' : 'PATCH', payload)
     if (disposed || owner !== accountReceivableId || !modal.closeSession(session)) return
     emit('changed')
-    toast.add({ title: t('common.success'), description: t(updating ? 'common.updated_success' : 'common.added_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized(updating ? 'common.updated_success' : 'common.added_success'), color: 'success' })
   } catch (failure) {
     if (!disposed && owner === accountReceivableId && modal.isCurrentSession(session)) showError(failure)
   } finally {
@@ -159,7 +159,7 @@ const save = async () => {
 const removeCoding = async (line: AccountReceivableLine) => {
   if (!canUpdate || !isAdjustment || disposed) return
   if (!canEdit) {
-    toast.add({ title: t('common.warning'), description: t('account_receivable.work_prerequisite'), color: 'warning' })
+    toast.add({ title: toast.localized('common.warning'), description: toast.localized('account_receivable.work_prerequisite'), color: 'warning' })
     return
   }
   const owner = accountReceivableId
@@ -182,7 +182,7 @@ const deleteLine = async (line: AccountReceivableLine) => {
     if (!await confirmDeleteRequest(`/api/account-receivables/${owner}/lines/${line.id}`)) return
     if (disposed || owner !== accountReceivableId) return
     emit('changed')
-    toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (failure) {
     if (!disposed && owner === accountReceivableId) showError(failure)
   }

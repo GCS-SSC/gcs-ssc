@@ -1,8 +1,8 @@
-import { computed, onScopeDispose, ref, toValue, watch } from 'vue'
+import type { LocalizedToastText } from '~/composables/useLocalizedToast'
+import { computed, onScopeDispose, ref, toValue, watch, h } from 'vue'
 import type { MaybeRefOrGetter, Ref } from 'vue'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
-import { resolveApiErrorDetails } from '~/composables/useApiErrorToast'
 import type { Entity_Type } from '~~/shared/types/database'
 
 export type WorkflowPreActionMode = 'completion' | 'recommendation_submission'
@@ -10,7 +10,7 @@ export type WorkflowPreActionMode = 'completion' | 'recommendation_submission'
 type CompletionResponse = {
   item: { id: string } | null
   can_complete: boolean
-  blockerParameters?: { name: string, purpose: string }
+  blockerParameters?: { name_en?: string, name_fr?: string, purpose?: string }
   blocker?: 'active_workflow' | 'approval_workflow_missing' | 'claim_lines_required' | 'claim_lines_unallocated' | 'lines_required' | 'annual_budget_exceeded' | 'funding_breakdown_required' | 'payment_total_mismatch' | 'final_reconcile_approved' | 'business_status' | 'risk_workflow_required' | 'risk_score_required' | 'risk_rating_frozen' | 'forecast_revision_required' | 'commitment_revision_required' | 'payment_recovery_control' | 'closed_target' | 'terminal_status' | 'no_published_workflow' | 'status_ineligible' | 'unsupported' | null
 }
 
@@ -27,7 +27,7 @@ type CompletionWorkflowStartOptions = {
   entityId: MaybeRefOrGetter<string>
   isLocked?: MaybeRefOrGetter<boolean>
   actionRoleAllowed?: MaybeRefOrGetter<boolean | undefined>
-  actionPrerequisiteWarning?: MaybeRefOrGetter<string | undefined>
+  actionPrerequisiteWarning?: MaybeRefOrGetter<LocalizedToastText | undefined>
   completePayload?: MaybeRefOrGetter<unknown>
   completedSuccessKey: MaybeRefOrGetter<string>
   confirmationMessageKey?: MaybeRefOrGetter<string | undefined>
@@ -42,10 +42,11 @@ type CompletionWorkflowStartOptions = {
  */
 export const useCompletionWorkflowStart = (options: CompletionWorkflowStartOptions) => {
   const { t, locale } = useI18n()
-  const toast = useToast()
-  const { showError } = useApiErrorToast()
+  const toast = useLocalizedToast()
+  const { showError, resolveDetails } = useApiErrorToast()
   const completionResponse: Ref<CompletionResponse | null> = ref(null)
-  const completionErrorDetails: Ref<string[]> = ref([])
+  const completionError: Ref<unknown> = ref(null)
+  const completionErrorDetails = computed(() => resolveDetails(completionError.value))
   const isLoading: Ref<boolean> = ref(false)
   const isSubmitting: Ref<boolean> = ref(false)
   const loadStatus: Ref<'idle' | 'pending' | 'success' | 'error'> = ref('idle')
@@ -93,8 +94,9 @@ export const useCompletionWorkflowStart = (options: CompletionWorkflowStartOptio
           can_complete: submissionResponse.canStart === true,
           blocker: blocker?.reason ?? null,
           blockerParameters: {
-            name: (locale.value === 'fr' ? blocker?.name_fr : blocker?.name_en) || t('workflow.unnamed_workflow'),
-            purpose: t(`workflow.purposes.${blocker?.purpose ?? 'standard'}`)
+            name_en: blocker?.name_en,
+            name_fr: blocker?.name_fr,
+            purpose: blocker?.purpose
           }
         }
       } else {
@@ -113,7 +115,7 @@ export const useCompletionWorkflowStart = (options: CompletionWorkflowStartOptio
   }
 
   watch([entityIdentity, isActive], async () => {
-    completionErrorDetails.value = []
+    completionError.value = null
     isSubmitting.value = false
     if (isActive.value) {
       await refreshCompletion()
@@ -125,16 +127,31 @@ export const useCompletionWorkflowStart = (options: CompletionWorkflowStartOptio
     }
   }, { immediate: true })
 
+  /** Captures the current blocker and bilingual content for a persistent warning.
+   * @param blocker Current server-provided blocker identity.
+   * @returns A renderer with captured domain context and reactive host messages.
+   */
+  const snapshotBlockerMessage = (blocker: NonNullable<CompletionResponse['blocker']>): LocalizedToastText => {
+    const key = `workflow.${mode.value === 'recommendation_submission' ? 'start_blockers' : 'completion_blockers'}.${blocker}`
+    const params = completionResponse.value?.blockerParameters
+    if (blocker !== 'active_workflow' || !params) return toast.localized(key)
+    const { name_en, name_fr, purpose } = params
+    return () => h('span', t(key, {
+      name: (locale.value === 'fr' ? name_fr : name_en) || t('workflow.unnamed_workflow'),
+      purpose: t(`workflow.purposes.${purpose ?? 'standard'}`)
+    }))
+  }
+
   /** Starts the explicit Completion or Agreement Recommendation submission action. */
   const startWorkflow = async () => {
     if (!isActive.value || isLoading.value || isSubmitting.value || item.value || !canShowAction.value) return
     if (roleVisibleActions.value) {
       const blocker = completionResponse.value?.blocker
       const warning = toValue(options.actionPrerequisiteWarning)
-        || (blocker ? t(`workflow.${mode.value === 'recommendation_submission' ? 'start_blockers' : 'completion_blockers'}.${blocker}`, completionResponse.value?.blockerParameters ?? {}) : undefined)
-        || (!canComplete.value ? t('workflow.action_prerequisite_unavailable') : undefined)
+        || (blocker ? snapshotBlockerMessage(blocker) : undefined)
+        || (!canComplete.value ? toast.localized('workflow.action_prerequisite_unavailable') : undefined)
       if (warning) {
-        toast.add({ title: t('common.unavailable'), description: warning, color: 'warning' })
+        toast.add({ title: toast.localized('common.unavailable'), description: warning, color: 'warning' })
         return
       }
     }
@@ -146,7 +163,7 @@ export const useCompletionWorkflowStart = (options: CompletionWorkflowStartOptio
     const submittedGeneration = completionRequestGeneration
     try {
       isSubmitting.value = true
-      completionErrorDetails.value = []
+      completionError.value = null
       const response = await fetch(getClientRequestUrl(mode.value === 'recommendation_submission'
         ? '/api/workflows/start'
         : '/api/completions/complete'), {
@@ -172,13 +189,13 @@ export const useCompletionWorkflowStart = (options: CompletionWorkflowStartOptio
       if (!isActive.value || submittedIdentity !== entityIdentity.value || refreshGeneration !== completionRequestGeneration) return
       options.onCompleted()
       toast.add({
-        title: t('common.success'),
-        description: t(toValue(options.completedSuccessKey)),
+        title: toast.localized('common.success'),
+        description: toast.localized(toValue(options.completedSuccessKey)),
         color: 'success'
       })
     } catch (error) {
       if (!isActive.value || submittedIdentity !== entityIdentity.value || submittedGeneration !== completionRequestGeneration) return
-      completionErrorDetails.value = resolveApiErrorDetails(error)
+      completionError.value = error
       showError(error)
     } finally {
       if (isActive.value && submittedIdentity === entityIdentity.value

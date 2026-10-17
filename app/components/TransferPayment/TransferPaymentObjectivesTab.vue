@@ -21,7 +21,7 @@ const { t } = useI18n()
 const { getBilingualValue } = useBilingualValue()
 const getObjectiveActionTarget = (objective: TransferPaymentObjectiveRow) =>
   `${getBilingualValue(objective, 'egcs_tp_objective', String(objective.id))} [${objective.id}]`
-const toast = useToast()
+const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 
@@ -89,8 +89,8 @@ const saveObjective = async () => {
 
   emit('objectivesUpdated')
   toast.add({
-    title: t('common.success'),
-    description: t(isUpdate ? 'common.updated_success' : 'common.added_success'),
+    title: toast.localized('common.success'),
+    description: toast.localized(isUpdate ? 'common.updated_success' : 'common.added_success'),
     color: 'success'
   })
   try {
@@ -113,7 +113,7 @@ const deleteObjective = async (objective: TransferPaymentObjectiveRow) => {
     if (!ok) return
     await refreshObjectives()
     emit('objectivesUpdated')
-    toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
   }

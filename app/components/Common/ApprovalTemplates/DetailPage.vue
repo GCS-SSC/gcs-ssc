@@ -23,7 +23,7 @@ const props = withDefaults(defineProps<{
 
 provideBilingualFieldScope(() => ({ subject: 'agency', agencyId: props.agencyId, permissionAction: 'update' }))
 
-const toast = useToast()
+const toast = useLocalizedToast()
 const { t } = useI18n()
 const { getBilingualValue } = useBilingualValue()
 const { showError } = useApiErrorToast()
@@ -102,20 +102,20 @@ const sectionTabs = computed(() => [
 ].map(item => ({ ...item, panelId: item.value })))
 
 const showPreservedDraft = () => toast.add({
-  title: t('common.warning'),
-  description: t('common.newer_changes_preserved'),
+  title: toast.localized('common.warning'),
+  description: toast.localized('common.newer_changes_preserved'),
   color: 'warning'
 })
 const showSynchronizationWarning = () => toast.add({
-  title: t('common.warning'),
-  description: t('common.saved_refresh_failed'),
+  title: toast.localized('common.warning'),
+  description: toast.localized('common.saved_refresh_failed'),
   color: 'warning'
 })
 const blockDirtyAction = () => {
   if (!mutation.isDirty.value) return false
   toast.add({
-    title: t('common.warning'),
-    description: t('common.save_changes_before_action'),
+    title: toast.localized('common.warning'),
+    description: toast.localized('common.save_changes_before_action'),
     color: 'warning'
   })
   return true
@@ -139,12 +139,12 @@ const persistTemplate = async (token: EditorMutationToken, showSuccess: boolean)
   } catch {
     if (mutation.isTokenCurrent(token)) showSynchronizationWarning()
     if (showSuccess) {
-      toast.add({ title: t('common.success'), description: t('common.updated_success'), color: 'success' })
+      toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
     }
     return true
   }
   if (showSuccess) {
-    toast.add({ title: t('common.success'), description: t('common.updated_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
   }
   return true
 }
@@ -180,7 +180,7 @@ const performPublicationAction = async (action: 'publish' | 'retire') => {
       } catch {
         if (mutation.isTokenCurrent(token)) showSynchronizationWarning()
       }
-      toast.add({ title: t('common.success'), description: t(`approval_templates.${action === 'publish' ? 'published' : 'retired'}`), color: 'success' })
+      toast.add({ title: toast.localized('common.success'), description: toast.localized(`approval_templates.${action === 'publish' ? 'published' : 'retired'}`), color: 'success' })
     } catch (error) {
       showError(error)
     }

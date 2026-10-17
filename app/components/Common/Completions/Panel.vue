@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { LocalizedToastText } from '~/composables/useLocalizedToast'
 import { ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { Entity_Type, Workflow_Target_Entity_Type } from '~~/shared/types/database'
@@ -29,8 +30,8 @@ const {
   entityType: Entity_Type & Workflow_Target_Entity_Type
   entityId: string
   actionRoleAllowed?: boolean
-  completionPrerequisiteWarning?: string
-  workflowPrerequisiteWarning?: string
+  completionPrerequisiteWarning?: LocalizedToastText
+  workflowPrerequisiteWarning?: LocalizedToastText
   canComplete: boolean
   canWorkWorkflow: boolean
   labels?: GcsExtensionCompletionLabels

@@ -22,7 +22,7 @@ const { agreementId, canCreate } = defineProps<{
 const nameRequirementId = useId()
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { getBilingualValue } = useBilingualValue()
 const { saveJson } = useJsonRequest()
@@ -187,8 +187,8 @@ watch(isCreateOpen, open => {
 }, { flush: 'sync' })
 
 const warnCreatePrerequisite = (missingAssignment = false) => toast.add({
-  title: t('common.warning'),
-  description: t(missingAssignment ? 'assignments.read_only_description' : 'agreement.child_records.work_prerequisite'),
+  title: toast.localized('common.warning'),
+  description: toast.localized(missingAssignment ? 'assignments.read_only_description' : 'agreement.child_records.work_prerequisite'),
   color: 'warning'
 })
 const checkCreatePrerequisites = async (owner: string, shouldProceed: () => boolean): Promise<boolean> => {
@@ -258,7 +258,7 @@ const createAmendment = async () => {
     isCreateOpen.value = false
     await refresh()
     if (!shouldProceed()) return
-    toast.add({ title: t('common.success'), description: t('agreement.amendments.created_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('agreement.amendments.created_success'), color: 'success' })
   } catch (error: unknown) {
     if (shouldProceed()) showError(error)
   } finally {

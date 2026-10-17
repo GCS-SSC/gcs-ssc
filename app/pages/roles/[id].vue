@@ -23,7 +23,7 @@ definePageMeta({
 
 const { t } = useI18n()
 const { getBilingualValue } = useBilingualValue()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { saveJson } = useJsonRequest()
 const localePath = useLocalePath()
@@ -88,8 +88,8 @@ const updateRole = async () => {
       return
     }
     toast.add({
-      title: t('common.success'),
-      description: t('common.updated_success'),
+      title: toast.localized('common.success'),
+      description: toast.localized('common.updated_success'),
       color: 'success'
     })
   } catch (error: unknown) {

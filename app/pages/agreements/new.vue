@@ -17,7 +17,7 @@ definePageMeta({
 })
 
 const { t } = useI18n()
-const toast = useToast()
+const toast = useLocalizedToast()
 const localePath = useLocalePath()
 const route = useRoute()
 const { showError } = useApiErrorToast()
@@ -131,8 +131,8 @@ const submit = async () => {
     const created = await response.json() as { id: string }
 
     toast.add({
-      title: t('common.success'),
-      description: t('common.added_success'),
+      title: toast.localized('common.success'),
+      description: toast.localized('common.added_success'),
       color: 'success'
     })
 
@@ -182,7 +182,7 @@ onMounted(() => {
       <UDashboardNavbar>
         <template #leading>
           <UDashboardSidebarCollapse />
-          <UBreadcrumb :items="breadcrumbItems" class="ml-2" />
+          <UBreadcrumb :aria-label="t('common.breadcrumb')" :items="breadcrumbItems" class="ml-2" />
         </template>
         <template #right>
           <div class="flex items-center gap-2">

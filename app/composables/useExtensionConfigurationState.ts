@@ -24,7 +24,8 @@ export const useExtensionConfigurationState = <TRow extends ExtensionConfigurati
   const draftConfig: Ref<GcsExtensionJsonConfig> = ref({})
   const initialConfigSnapshot: Ref<string> = ref('{}')
   const fallbackConfigText: Ref<string> = ref('{}')
-  const fallbackConfigError: Ref<string> = ref('')
+  const fallbackConfigErrorKey: Ref<string> = ref('')
+  const fallbackConfigError = computed(() => fallbackConfigErrorKey.value ? t(fallbackConfigErrorKey.value) : '')
   const isSavingConfiguration: Ref<boolean> = ref(false)
   const savingExtensionKeys: Ref<Set<string>> = ref(new Set())
 
@@ -52,7 +53,7 @@ export const useExtensionConfigurationState = <TRow extends ExtensionConfigurati
     draftConfig.value = JSON.parse(JSON.stringify(item.config ?? {})) as GcsExtensionJsonConfig
     initialConfigSnapshot.value = JSON.stringify(draftConfig.value)
     fallbackConfigText.value = JSON.stringify(draftConfig.value, null, 2)
-    fallbackConfigError.value = ''
+    fallbackConfigErrorKey.value = ''
     isModalOpen.value = true
   }
 
@@ -61,7 +62,7 @@ export const useExtensionConfigurationState = <TRow extends ExtensionConfigurati
     isDiscardConfirmOpen.value = false
     selectedItem.value = null
     initialConfigSnapshot.value = '{}'
-    fallbackConfigError.value = ''
+    fallbackConfigErrorKey.value = ''
   }
 
   const closeConfigure = (): void => {
@@ -90,9 +91,9 @@ export const useExtensionConfigurationState = <TRow extends ExtensionConfigurati
 
     try {
       draftConfig.value = JSON.parse(fallbackConfigText.value) as GcsExtensionJsonConfig
-      fallbackConfigError.value = ''
+      fallbackConfigErrorKey.value = ''
     } catch {
-      fallbackConfigError.value = t('apiErrors.request.invalid_json')
+      fallbackConfigErrorKey.value = 'apiErrors.request.invalid_json'
     }
   }
 

@@ -18,7 +18,7 @@ definePageMeta({
 })
 
 const { t } = useI18n()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { getBilingualValue } = useBilingualValue()
 const route = useRoute()
@@ -85,7 +85,7 @@ const updateProfile = async () => {
     if (!response.ok) await throwFetchResponseError(response)
     isUpdateModalOpen.value = false
     await refreshProfile()
-    toast.add({ title: t('common.success'), description: t('common.updated_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
   }

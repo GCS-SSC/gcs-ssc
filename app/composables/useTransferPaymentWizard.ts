@@ -11,8 +11,7 @@ type WizardRefreshHandler = () => Promise<unknown>
  * @returns Wizard open state and submit handler.
  */
 export const useTransferPaymentWizard = (refresh: WizardRefreshHandler) => {
-  const { t } = useI18n()
-  const toast = useToast()
+  const toast = useLocalizedToast()
   const { showError } = useApiErrorToast()
   const isWizardOpen: Ref<boolean> = ref(false)
   const isSavingWizard: Ref<boolean> = ref(false)
@@ -38,8 +37,8 @@ export const useTransferPaymentWizard = (refresh: WizardRefreshHandler) => {
       if (!response.ok) await throwFetchResponseError(response)
       isWizardOpen.value = false
       toast.add({
-        title: t('common.success'),
-        description: t('common.added_success'),
+        title: toast.localized('common.success'),
+        description: toast.localized('common.added_success'),
         color: 'success'
       })
     } catch (error: unknown) {

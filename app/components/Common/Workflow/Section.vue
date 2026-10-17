@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import type { LocalizedToastText } from '~/composables/useLocalizedToast'
 /* eslint-disable jsdoc/require-jsdoc */
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, h } from 'vue'
 import type { Ref } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
 import type { RuntimeState } from '~~/shared/constants/system-lifecycle'
@@ -149,7 +150,7 @@ const {
   /** Optional role-only visibility; omission preserves legacy readiness-based presentation. */
   actionRoleAllowed?: boolean
   /** Localized owning-page prerequisite, separate from role permission. */
-  actionPrerequisiteWarning?: string
+  actionPrerequisiteWarning?: LocalizedToastText
   purpose?: Workflow_Purpose
   canEdit?: boolean
   refreshKey?: number
@@ -167,7 +168,7 @@ const { showError } = useApiErrorToast()
 const isSaving: Ref<boolean> = ref(false)
 const isStarting: Ref<boolean> = ref(false)
 const isRetrying: Ref<boolean> = ref(false)
-const toast = useToast()
+const toast = useLocalizedToast()
 const isCancelling: Ref<boolean> = ref(false)
 const responses: Ref<RecommendationResponse[]> = ref([])
 const validationIssues: Ref<Array<{ questionKey: string, message: string }>> = ref([])
@@ -311,6 +312,16 @@ const loadAvailableWorkflows = async () => {
 }
 const roleVisibleActions = computed(() => actionRoleAllowed !== undefined)
 const canShowParentAction = computed(() => actionRoleAllowed ?? canEdit)
+const snapshotStartBlocker = (): LocalizedToastText => {
+  const blocker = data.value?.startBlocker
+  if (!blocker) return toast.localized('workflow.action_prerequisite_unavailable')
+  if (blocker.reason !== 'active_workflow') return toast.localized(`workflow.start_blockers.${blocker.reason}`)
+  const { name_en, name_fr, purpose: blockedPurpose } = blocker
+  return () => h('span', t('workflow.start_blockers.active_workflow', {
+    name: (locale.value === 'fr' ? name_fr : name_en) || t('workflow.unnamed_workflow'),
+    purpose: t(`workflow.purposes.${blockedPurpose ?? 'standard'}`)
+  }))
+}
 const guardParentAction = (action: 'start' | 'retry' | 'cancel') => {
   if (!roleVisibleActions.value) return true
   if (!actionRoleAllowed || status.value === 'pending' || activeWorkflowTab.value === 'previous') return false
@@ -318,11 +329,11 @@ const guardParentAction = (action: 'start' | 'retry' | 'cancel') => {
   const warning = actionPrerequisiteWarning
     || (!ready
       ? action === 'start'
-        ? startBlockerDescription.value || t('workflow.action_prerequisite_unavailable')
-        : t(`workflow.${action}_unavailable`)
+        ? snapshotStartBlocker()
+        : toast.localized(`workflow.${action}_unavailable`)
       : undefined)
   if (warning) {
-    toast.add({ title: t('common.unavailable'), description: warning, color: 'warning' })
+    toast.add({ title: toast.localized('common.unavailable'), description: warning, color: 'warning' })
     return false
   }
   return true

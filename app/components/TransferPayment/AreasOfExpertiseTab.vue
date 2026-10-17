@@ -24,7 +24,7 @@ const { t } = useI18n()
 const { getBilingualValue } = useBilingualValue()
 const getAreaActionTarget = (area: TransferPaymentStreamAreaOfExpertiseItem) =>
   `${getBilingualValue(area, 'egcs_tp_name', String(area.id))} [${area.id}]`
-const toast = useToast()
+const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const { createValidator } = useZodI18n()
@@ -122,8 +122,8 @@ const save = async () => {
     closeSession(session)
     await refresh()
     toast.add({
-      title: t('common.success'),
-      description: isUpdate ? t('common.updated_success') : t('common.created_success'),
+      title: toast.localized('common.success'),
+      description: isUpdate ? toast.localized('common.updated_success') : toast.localized('common.created_success'),
       color: 'success'
     })
   } catch (error: unknown) {
@@ -148,7 +148,7 @@ const deleteItem = async (row: TransferPaymentStreamAreaOfExpertiseItem) => {
     )
     if (!ok) return
     await refresh()
-    toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
   }

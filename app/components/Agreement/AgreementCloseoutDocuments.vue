@@ -10,7 +10,7 @@ import { throwFetchResponseError } from '~/utils/fetch-error'
 const { agreementId, closeoutId, canPersist } = defineProps<{ agreementId: string, closeoutId: string, canPersist: boolean }>()
 const { t, locale } = useI18n()
 const { showError } = useApiErrorToast()
-const toast = useToast()
+const toast = useLocalizedToast()
 const templates: Ref<TransferPaymentStreamDocumentTemplateItem[]> = ref([])
 const documents: Ref<AgreementGeneratedDocumentItem[]> = ref([])
 const selectedTemplateId: Ref<string | undefined> = ref(undefined)
@@ -101,7 +101,7 @@ const generate = async (persist: boolean) => {
         showError(error)
         return
       }
-      toast.add({ title: t('common.success'), description: t('agreement.documents.generated_success'), color: 'success' })
+      toast.add({ title: toast.localized('common.success'), description: toast.localized('agreement.documents.generated_success'), color: 'success' })
     } else {
       await saveBlob(response, `closeout-${closeoutId}.${outputFormat.value}`)
     }

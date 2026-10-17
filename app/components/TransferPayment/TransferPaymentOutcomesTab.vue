@@ -19,7 +19,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const { getBilingualValue } = useBilingualValue()
@@ -94,8 +94,8 @@ const saveOutcome = async () => {
   }
 
   toast.add({
-    title: t('common.success'),
-    description: t(isUpdate ? 'common.updated_success' : 'common.added_success'),
+    title: toast.localized('common.success'),
+    description: toast.localized(isUpdate ? 'common.updated_success' : 'common.added_success'),
     color: 'success'
   })
   emit('outcomesUpdated')
@@ -117,7 +117,7 @@ const deleteOutcome = async (outcome: TransferPaymentOutcomeRow) => {
   try {
     const ok = await confirmDeleteRequest(`/api/transfer-payments/${programId}/outcomes/${outcome.id}`)
     if (!ok) return
-    toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
     return

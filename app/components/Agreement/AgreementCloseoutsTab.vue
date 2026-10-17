@@ -19,7 +19,7 @@ const { t, locale } = useI18n()
 const { formatDate } = useDateHelpers()
 const localePath = useLocalePath()
 const router = useRouter()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const isCreating: Ref<boolean> = ref(false)
 const isLoading: Ref<boolean> = ref(true)
@@ -85,7 +85,7 @@ const createCloseout = async () => {
     if (!response.ok) await throwFetchResponseError(response)
     const closeout = await response.json() as CloseoutRow
     if (requestedAgreementId !== agreementId || !await refreshAll()) return
-    toast.add({ title: t('common.success'), description: t('agreement.closeout.created_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('agreement.closeout.created_success'), color: 'success' })
     await router.push(localePath(appRouteLocations.agreementCloseoutDetail(requestedAgreementId, String(closeout.id))))
   } catch (error: unknown) {
     showError(error)

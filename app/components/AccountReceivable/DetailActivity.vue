@@ -13,7 +13,7 @@ const { t, locale } = useI18n()
 const localePath = useLocalePath()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const { showError } = useApiErrorToast()
-const toast = useToast()
+const toast = useLocalizedToast()
 const deletingId: Ref<string | null> = ref(null)
 let disposed = false
 onBeforeUnmount(() => {
@@ -42,7 +42,7 @@ const amount = (value: string | null) => formatAccountReceivableAmount(value, lo
 const deleteAdjustment = async (row: AccountReceivableAdjustmentRow) => {
   if (!row.adjustment.egcs_fc_candeleterole || deletingId.value) return
   if (!row.adjustment.egcs_fc_candelete) {
-    toast.add({ title: t('common.warning'), description: t('account_receivable.work_prerequisite'), color: 'warning' })
+    toast.add({ title: toast.localized('common.warning'), description: toast.localized('account_receivable.work_prerequisite'), color: 'warning' })
     return
   }
   const owner = `${agreementId}:${receivable.id}`

@@ -15,7 +15,8 @@ const target = ref('')
 const field = computed(() => fields.value.find(field => field.key === target.value))
 const value = ref('')
 const destination = ref('__end')
-const error = ref('')
+const errorKey = ref('')
+const error = computed(() => errorKey.value ? t(errorKey.value) : '')
 const editing = ref<number | null>(null)
 const branches = ref<NonNullable<GuideDraft['steps'][number]['flow']>['branches']>([])
 const fallback = ref('__end')
@@ -32,7 +33,7 @@ watch(open, opened => {
   target.value = fields.value[0]?.key ?? ''
   value.value = choices.value[0]?.value ?? ''
   destination.value = destinations.value[1]?.value ?? '__end'
-  error.value = ''
+  errorKey.value = ''
 })
 const edit = (index: number) => {
   const branch = branches.value[index]
@@ -48,14 +49,14 @@ const add = () => {
   if (disabled || !field.value || !choices.value.some(choice => choice.value === value.value)) return
   const equals = field.value.kind === 'checkbox' ? value.value === 'true' : value.value
   if (branches.value.some((branch, index) => index !== editing.value && branch.target === target.value && branch.equals === equals)) {
-    error.value = t('guided_help.duplicate_branch')
+    errorKey.value = 'guided_help.duplicate_branch'
     return
   }
   const branch = { target: target.value, equals, next: destination.value === '__end' ? null : destination.value }
   if (editing.value === null) branches.value.push(branch)
   else branches.value[editing.value] = branch
   editing.value = null
-  error.value = ''
+  errorKey.value = ''
 }
 const save = () => {
   if (!disabled && source.value) source.value.flow = { next: fallback.value === '__end' ? null : fallback.value, branches: JSON.parse(JSON.stringify(branches.value)) }

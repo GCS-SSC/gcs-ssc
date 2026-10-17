@@ -1,7 +1,10 @@
 import { provideBilingualFieldControls } from '~/utils/bilingual-field-context'
 import OriginalForm from '@nuxt/ui/components/Form.vue'
-import { defineComponent, h, provide, shallowRef, inject, computed } from 'vue'
+import { defineComponent, h, provide, shallowRef, inject, computed, watch } from 'vue'
 import type { Component, ComponentPublicInstance } from 'vue'
+import type { Form, FormSchema } from '@nuxt/ui'
+import type { z } from 'zod'
+import { LOCALIZED_VALIDATION_ISSUE, useZodI18n } from '~/composables/useZodI18n'
 import { getFormValidatorSchema, resolveFormFieldRequirement } from '~~/shared/utils/form-requirements'
 import { formStateInjectionKey } from '@nuxt/ui/composables/useFormField'
 import { booleanAttribute } from '~/utils/required-control'
@@ -43,7 +46,17 @@ export default defineComponent({
         return nested() && parentRequirement ? parentRequirement.resolve([prefix(), path].filter(Boolean).join('.')) : 'unknown'
       }
     })
-    const form = shallowRef<ComponentPublicInstance | null>(null)
+    const form = shallowRef<(ComponentPublicInstance & Pick<Form<FormSchema>, 'getErrors' | 'setErrors'>) | null>(null)
+    const { locale } = useI18n({ useScope: 'global' })
+    const { translateMessage } = useZodI18n()
+    watch(locale, () => {
+      const errors = form.value?.getErrors() ?? []
+      if (errors.length === 0) return
+      form.value?.setErrors(errors.map((error: typeof errors[number] & { [LOCALIZED_VALIDATION_ISSUE]?: z.ZodIssue }) => {
+        const issue = error[LOCALIZED_VALIDATION_ISSUE]
+        return issue ? { ...error, message: translateMessage(issue.message, issue) } : error
+      }))
+    })
     expose(new Proxy({}, {
       get: (_target, key) => form.value?.[key as keyof ComponentPublicInstance],
       has: (_target, key) => form.value !== null && key in form.value

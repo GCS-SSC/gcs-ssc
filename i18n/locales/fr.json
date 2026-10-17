@@ -160,7 +160,9 @@
       "agreements": "Ententes",
       "stakeholders": "Promoteurs"
     },
-    "applicant_recipients": "Promoteurs"
+    "applicant_recipients": "Promoteurs",
+    "main_navigation": "Navigation principale",
+    "secondary_navigation": "Navigation secondaire"
   },
   "home": {
     "welcome": "Bienvenue sur",
@@ -446,7 +448,25 @@
     "max": "Max",
     "weight": "Poids",
     "icon": "Icône",
-    "toggle_navigation": "Basculer la navigation"
+    "toggle_navigation": "Basculer la navigation",
+    "pagination_first": "Première page",
+    "pagination_previous": "Page précédente",
+    "pagination_next": "Page suivante",
+    "pagination_last": "Dernière page",
+    "breadcrumb": "Fil d’Ariane",
+    "calendar_date": "Date",
+    "date_parts": {
+      "year": "année",
+      "month": "mois",
+      "day": "jour",
+      "hour": "heure",
+      "minute": "minute",
+      "second": "seconde",
+      "dayPeriod": "AM/PM",
+      "timeZoneName": "fuseau horaire",
+      "era": "ère"
+    },
+    "date_empty": "Vide"
   },
   "enums": {
     "publication_state": {
@@ -1257,7 +1277,9 @@
       "agency_disabled": "Activez cette extension pour l'organisme avant de la configurer sur un volet.",
       "stream_config_required": "Activez au moins une cible d'extension avant d'activer cette extension pour le volet.",
       "migration_failed": "Les migrations de base de donnees de l'extension ont echoue.",
-      "create_operation_conflict": "Plus d'une extension est configuree pour remplacer cette action de creation."
+      "create_operation_conflict": "Plus d'une extension est configuree pour remplacer cette action de creation.",
+      "stream_disabled": "Cette extension est désactivée pour ce volet de programme.",
+      "entity_disabled": "Cette extension est désactivée pour cet enregistrement."
     },
     "attachments": {
       "target_not_found": "La cible de la pièce jointe est introuvable.",
@@ -2285,7 +2307,10 @@
     "workflow_risk_rating_required_purpose": "Seul un processus d’évaluation du risque peut exiger une évaluation du risque réussie",
     "too_many_coding_lines": "Une note de crédit ne peut pas contenir plus de 32 767 lignes de codage.",
     "guided_help_document_invalid": "Le document d’aide guidée est invalide.",
-    "guided_help_duplicate_key": "Sélectionnez chaque cible ou rôle une seule fois."
+    "guided_help_duplicate_key": "Sélectionnez chaque cible ou rôle une seule fois.",
+    "invalid_input": "Entrez une valeur valide",
+    "string_too_long": "Entrez au plus {max} caractères",
+    "array_too_long": "Sélectionnez au plus {max} éléments"
   },
   "notes": {
     "title": "Notes au dossier",

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { LocalizedToastText } from '~/composables/useLocalizedToast'
 import { onMounted, onUnmounted } from 'vue'
 import { useCompletionWorkflowStart } from '~/composables/useCompletionWorkflowStart'
 import type { CompletionWorkflowStartState, WorkflowPreActionMode } from '~/composables/useCompletionWorkflowStart'
@@ -25,7 +26,7 @@ const {
   /** Optional role-only visibility; omission preserves legacy readiness-based presentation. */
   actionRoleAllowed?: boolean
   /** Localized owning-page prerequisite, separate from role permission. */
-  actionPrerequisiteWarning?: string
+  actionPrerequisiteWarning?: LocalizedToastText
   completePayload?: unknown
   completedSuccessKey: string
   actionLabelKey?: string

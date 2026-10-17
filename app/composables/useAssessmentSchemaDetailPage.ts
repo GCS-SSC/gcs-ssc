@@ -60,7 +60,7 @@ type AgencyNameResponse = {
 export const useAssessmentSchemaDetailPage = async () => {
   const route = useRoute()
   const localePath = useLocalePath()
-  const toast = useToast()
+  const toast = useLocalizedToast()
   const { showError } = useApiErrorToast()
   const { t } = useI18n()
   const { getBilingualValue } = useBilingualValue()
@@ -98,7 +98,7 @@ export const useAssessmentSchemaDetailPage = async () => {
       label: getBilingualValue(agency.value, 'egcs_ay_name'),
       to: localePath(appRouteLocations.agencyDetail(agencyId.value))
     },
-    { label: String(schema.value?.egcs_cn_name_en ?? '') }
+    { label: getBilingualValue(schema.value, 'egcs_cn_name', '') }
   ])
 
   const isHeroCollapsed = getHeroCollapsed('transfer-payment-assessment-schema-detail')
@@ -225,15 +225,15 @@ export const useAssessmentSchemaDetailPage = async () => {
   })
 
   const showPreservedDraft = () => toast.add({
-    title: t('common.warning'),
-    description: t('common.newer_changes_preserved'),
+    title: toast.localized('common.warning'),
+    description: toast.localized('common.newer_changes_preserved'),
     color: 'warning'
   })
   const blockDirtyAction = () => {
     if (!mutation.isDirty.value) return false
     toast.add({
-      title: t('common.warning'),
-      description: t('common.save_changes_before_action'),
+      title: toast.localized('common.warning'),
+      description: toast.localized('common.save_changes_before_action'),
       color: 'warning'
     })
     return true
@@ -258,7 +258,7 @@ export const useAssessmentSchemaDetailPage = async () => {
       return false
     }
     if (showSuccess) {
-      toast.add({ title: t('common.success'), description: t('common.updated_success'), color: 'success' })
+      toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
     }
     return true
   }
@@ -287,7 +287,7 @@ export const useAssessmentSchemaDetailPage = async () => {
       return false
     }
 
-    toast.add({ title: t('common.error'), description: t(result.error.issues[0]?.message ?? 'common.error'), color: 'error' })
+    toast.add({ title: toast.localized('common.error'), description: result.error.issues[0] ? toast.validation(result.error.issues[0]) : toast.localized('common.error'), color: 'error' })
     return true
   }
 
@@ -356,7 +356,7 @@ export const useAssessmentSchemaDetailPage = async () => {
           if (mutation.isTokenCurrent(token)) showPreservedDraft()
           return
         }
-        toast.add({ title: t('common.success'), description: t(successKey), color: 'success' })
+        toast.add({ title: toast.localized('common.success'), description: toast.localized(successKey), color: 'success' })
       } catch (error) {
         showError(error)
       }

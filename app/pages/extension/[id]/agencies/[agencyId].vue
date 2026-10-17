@@ -102,6 +102,7 @@ const { selectedTab } = useUrlTabState({
         <template #leading>
           <UDashboardSidebarCollapse />
           <UBreadcrumb
+            :aria-label="t('common.breadcrumb')"
             :items="[
               { label: title, to: localePath(appRouteLocations.extensionAgencyWorkspaceList(extensionKey)) },
               { label: agencyName }

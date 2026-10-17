@@ -54,7 +54,7 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
   emitDeleted
 }: UseResourceCrudStateOptions<T>) => {
   const { t } = useI18n()
-  const toast = useToast()
+  const toast = useLocalizedToast()
   const { createValidator } = useZodI18n()
   const validate = createValidator(schema)
   const { showError } = useApiErrorToast()
@@ -287,15 +287,15 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
     if (editing) {
       emitUpdated()
       toast.add({
-        title: t('common.success'),
-        description: t('common.updated_success'),
+        title: toast.localized('common.success'),
+        description: toast.localized('common.updated_success'),
         color: 'success'
       })
     } else {
       emitAdded()
       toast.add({
-        title: t('common.success'),
-        description: t('common.added_success'),
+        title: toast.localized('common.success'),
+        description: toast.localized('common.added_success'),
         color: 'success'
       })
     }
@@ -326,8 +326,8 @@ export const useResourceCrudState = <T extends { id: string } & Record<string, u
 
       emitDeleted()
       toast.add({
-        title: t('common.success'),
-        description: t('common.deleted_success'),
+        title: toast.localized('common.success'),
+        description: toast.localized('common.deleted_success'),
         color: 'success'
       })
     } catch (error: unknown) {

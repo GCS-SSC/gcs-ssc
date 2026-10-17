@@ -21,7 +21,7 @@ definePageMeta({
 
 const route = useRoute()
 const { t } = useI18n()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { getBilingualValue } = useBilingualValue()
 const id = route.params.id as string
@@ -95,7 +95,7 @@ const saveStream = async () => {
       selectedStream.value = null
       persistedStream.value = null
     }
-    toast.add({ title: t('common.success'), description: t('common.updated_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
   } finally {

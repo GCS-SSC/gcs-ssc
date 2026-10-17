@@ -2,7 +2,7 @@ import { classifyExtensionAuditInputs } from './audit-request'
 import { withAuditExecution } from './audit-context'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Temporary coverage while extension dispatch helpers receive complete documentation. */
 import type { H3Event } from 'h3'
-import { createError, getMethod, getQuery } from 'h3'
+import { getMethod, getQuery, isError } from 'h3'
 import {
   isGcsExtensionUserError,
   type GcsExtensionAgreementAccess,
@@ -53,24 +53,26 @@ import { assertAgreementCloseoutWriteAllowed } from '~~/server/utils/agreement-w
 import { createExtensionAgreementFinancials } from './extension-agreement-financials'
 import { listApplicantRecipientContributionAgencies } from '~~/server/utils/applicant-recipient-auth'
 
+class ExtensionDispatchError extends Error {
+  readonly data: { code: string }
+
+  constructor(readonly statusCode: number, readonly code: string, readonly key: string) {
+    super(code)
+    this.data = { code }
+  }
+}
+
 const throwExtensionDispatchError = (
   statusCode: number,
   code: string,
-  message: string
+  key: string
 ): never => {
-  throw createError({
-    statusCode,
-    message,
-    data: {
-      message,
-      code
-    }
-  })
+  throw new ExtensionDispatchError(statusCode, code, key)
 }
 
 const resolveExtensionAuthorizationSubject = (subject: string): AuthorizationSubject => {
   if (isAuthorizationSubject(subject)) return subject
-  return throwExtensionDispatchError(500, 'EXTENSION_RBAC_SUBJECT_INVALID', 'Extension route RBAC subject is invalid.')
+  return throwExtensionDispatchError(500, 'EXTENSION_RBAC_SUBJECT_INVALID', 'common.unknown_error')
 }
 
 const resolveExtensionRouteIdentifiers = (event: H3Event) => {
@@ -78,7 +80,7 @@ const resolveExtensionRouteIdentifiers = (event: H3Event) => {
   const route = getRouterParam(event, 'route')
 
   if (!extensionKey || !route) {
-    throwExtensionDispatchError(400, 'MISSING_IDS', 'Missing extension route identifiers.')
+    throwExtensionDispatchError(400, 'MISSING_IDS', 'apiErrors.request.missing_ids')
   }
 
   const resolvedExtensionKey = extensionKey as string
@@ -103,13 +105,13 @@ const assertExtensionStreamEnabled = async (
 
   const streamContext = await resolveExtensionStreamContext(event.context.$db, streamId)
   if (!streamContext) {
-    throwExtensionDispatchError(404, 'TRANSFER_PAYMENT_STREAM_NOT_FOUND', 'Transfer payment stream not found.')
+    throwExtensionDispatchError(404, 'TRANSFER_PAYMENT_STREAM_NOT_FOUND', 'apiErrors.transfer_payment.stream_not_found')
   }
 
   const resolvedStreamContext = streamContext as NonNullable<typeof streamContext>
   const isAgencyEnabled = await isExtensionEnabledForAgency(event.context.$db, extensionKey, resolvedStreamContext.agencyId)
   if (!isAgencyEnabled) {
-    throwExtensionDispatchError(403, 'EXTENSION_AGENCY_DISABLED', 'Extension is disabled for this agency.')
+    throwExtensionDispatchError(403, 'EXTENSION_AGENCY_DISABLED', 'apiErrors.extensions.agency_disabled')
   }
 }
 
@@ -123,7 +125,7 @@ const assertExtensionAgencyEnabled = async (
   }
 
   if (!isPositivePostgresBigintText(agencyId)) {
-    throwExtensionDispatchError(404, 'AGENCY_NOT_FOUND', 'Agency not found.')
+    throwExtensionDispatchError(404, 'AGENCY_NOT_FOUND', 'apiErrors.agency.not_found')
   }
 
   const agency = await event.context.$db
@@ -133,12 +135,12 @@ const assertExtensionAgencyEnabled = async (
     .where('_deleted', '=', false)
     .executeTakeFirst()
   if (!agency) {
-    throwExtensionDispatchError(404, 'AGENCY_NOT_FOUND', 'Agency not found.')
+    throwExtensionDispatchError(404, 'AGENCY_NOT_FOUND', 'apiErrors.agency.not_found')
   }
 
   const isAgencyEnabled = await isExtensionEnabledForAgency(event.context.$db, extensionKey, agencyId)
   if (!isAgencyEnabled) {
-    throwExtensionDispatchError(403, 'EXTENSION_AGENCY_DISABLED', 'Extension is disabled for this agency.')
+    throwExtensionDispatchError(403, 'EXTENSION_AGENCY_DISABLED', 'apiErrors.extensions.agency_disabled')
   }
 }
 
@@ -158,18 +160,18 @@ const prepareExtensionRbacContext = async (
   if ('stream' in rbac) {
     const streamId = resolvedHandler.params[rbac.stream.param]
     if (!streamId) {
-      throwExtensionDispatchError(400, 'EXTENSION_RBAC_STREAM_PARAM_MISSING', 'Extension RBAC stream parameter is missing.')
+      throwExtensionDispatchError(400, 'EXTENSION_RBAC_STREAM_PARAM_MISSING', 'apiErrors.request.missing_id')
     }
     const resolvedStreamId = String(streamId)
 
     const streamContext = await resolveExtensionStreamContext(event.context.$db, resolvedStreamId)
     if (!streamContext) {
-      throwExtensionDispatchError(404, 'TRANSFER_PAYMENT_STREAM_NOT_FOUND', 'Transfer payment stream not found.')
+      throwExtensionDispatchError(404, 'TRANSFER_PAYMENT_STREAM_NOT_FOUND', 'apiErrors.transfer_payment.stream_not_found')
     }
     const resolvedStreamContext = streamContext as NonNullable<typeof streamContext>
     const streamConfiguration = await getExtensionStreamConfiguration(event.context.$db, extensionKey, resolvedStreamId)
     if (!streamConfiguration.enabled) {
-      throwExtensionDispatchError(403, 'EXTENSION_STREAM_DISABLED', 'Extension is disabled for this stream.')
+      throwExtensionDispatchError(403, 'EXTENSION_STREAM_DISABLED', 'apiErrors.extensions.stream_disabled')
     }
 
     const canAccess = authContext.userAbilities.authorize(
@@ -178,7 +180,7 @@ const prepareExtensionRbacContext = async (
       resolvedStreamContext.scope
     )
     if (!canAccess) {
-      throwExtensionDispatchError(403, 'EXTENSION_RBAC_FORBIDDEN', 'Extension route access is forbidden.')
+      throwExtensionDispatchError(403, 'EXTENSION_RBAC_FORBIDDEN', 'apiErrors.auth.forbidden')
     }
 
     event.context.gcsExtension = {
@@ -201,18 +203,18 @@ const prepareExtensionRbacContext = async (
   if ('agency' in rbac) {
     const agencyId = resolvedHandler.params[rbac.agency.param]
     if (!agencyId) {
-      throwExtensionDispatchError(400, 'EXTENSION_RBAC_AGENCY_PARAM_MISSING', 'Extension RBAC agency parameter is missing.')
+      throwExtensionDispatchError(400, 'EXTENSION_RBAC_AGENCY_PARAM_MISSING', 'apiErrors.request.missing_id')
     }
     const resolvedAgencyId = String(agencyId)
 
     const isAgencyEnabled = await isExtensionEnabledForAgency(event.context.$db, extensionKey, resolvedAgencyId)
     if (!isAgencyEnabled) {
-      throwExtensionDispatchError(403, 'EXTENSION_AGENCY_DISABLED', 'Extension is disabled for this agency.')
+      throwExtensionDispatchError(403, 'EXTENSION_AGENCY_DISABLED', 'apiErrors.extensions.agency_disabled')
     }
 
     const scope = { type: 'agency' as const, agencyId: resolvedAgencyId }
     if (!authContext.userAbilities.authorize(subject, rbac.action, scope)) {
-      throwExtensionDispatchError(403, 'EXTENSION_RBAC_FORBIDDEN', 'Extension route access is forbidden.')
+      throwExtensionDispatchError(403, 'EXTENSION_RBAC_FORBIDDEN', 'apiErrors.auth.forbidden')
     }
 
     event.context.gcsExtension = {
@@ -233,7 +235,7 @@ const prepareExtensionRbacContext = async (
 
   const entityId = resolvedHandler.params[rbac.entity.param]
   if (!entityId) {
-    throwExtensionDispatchError(400, 'EXTENSION_RBAC_ENTITY_PARAM_MISSING', 'Extension RBAC entity parameter is missing.')
+    throwExtensionDispatchError(400, 'EXTENSION_RBAC_ENTITY_PARAM_MISSING', 'apiErrors.request.missing_id')
   }
   const resolvedEntityId = entityId as string
 
@@ -255,18 +257,18 @@ const prepareExtensionRbacContext = async (
     }
   }
   if (entityContext === null) {
-    throwExtensionDispatchError(404, 'EXTENSION_RBAC_ENTITY_NOT_FOUND', 'Extension RBAC entity not found.')
+    throwExtensionDispatchError(404, 'EXTENSION_RBAC_ENTITY_NOT_FOUND', 'apiErrors.request.not_found')
   }
   const resolvedEntityContext = entityContext as NonNullable<typeof entityContext>
 
   const config = await getExtensionConfigurationForEntity(event.context.$db, extensionKey, resolvedEntityContext)
   if (!config) {
-    throwExtensionDispatchError(403, 'EXTENSION_ENTITY_DISABLED', 'Extension is disabled for this entity.')
+    throwExtensionDispatchError(403, 'EXTENSION_ENTITY_DISABLED', 'apiErrors.extensions.entity_disabled')
   }
 
   const canAccess = await canAccessExtensionEntity(authContext, rbac, resolvedEntityContext, event.context.$db)
   if (!canAccess) {
-    throwExtensionDispatchError(403, 'EXTENSION_RBAC_FORBIDDEN', 'Extension route access is forbidden.')
+    throwExtensionDispatchError(403, 'EXTENSION_RBAC_FORBIDDEN', 'apiErrors.auth.forbidden')
   }
 
   event.context.gcsExtension = {
@@ -317,7 +319,7 @@ const createExtensionWriteAuthorization = (
       if ('agency' in rbac) {
         const agencyId = resolvedHandler.params[rbac.agency.param]
         if (!agencyId) {
-          throwExtensionDispatchError(400, 'EXTENSION_RBAC_AGENCY_PARAM_MISSING', 'Extension RBAC agency parameter is missing.')
+          throwExtensionDispatchError(400, 'EXTENSION_RBAC_AGENCY_PARAM_MISSING', 'apiErrors.request.missing_id')
         }
         const resolvedAgencyId = String(agencyId)
         await lockExtensionLifecycleScope(db as Transaction<Database>, extensionKey, resolvedAgencyId)
@@ -329,11 +331,11 @@ const createExtensionWriteAuthorization = (
           .forUpdate()
           .executeTakeFirst()
         if (!agency) {
-          throwExtensionDispatchError(404, 'EXTENSION_RBAC_ENTITY_NOT_FOUND', 'Extension RBAC entity not found.')
+          throwExtensionDispatchError(404, 'EXTENSION_RBAC_ENTITY_NOT_FOUND', 'apiErrors.request.not_found')
         }
         const enabled = await isExtensionEnabledForAgency(db, extensionKey, resolvedAgencyId)
         if (!enabled) {
-          throwExtensionDispatchError(403, 'EXTENSION_AGENCY_DISABLED', 'Extension is disabled for this agency.')
+          throwExtensionDispatchError(403, 'EXTENSION_AGENCY_DISABLED', 'apiErrors.extensions.agency_disabled')
         }
         await authorizeWithFreshAuthContext(
           event,
@@ -348,12 +350,12 @@ const createExtensionWriteAuthorization = (
       if ('stream' in rbac) {
         const streamId = resolvedHandler.params[rbac.stream.param]
         if (!streamId) {
-          throwExtensionDispatchError(400, 'EXTENSION_RBAC_STREAM_PARAM_MISSING', 'Extension RBAC stream parameter is missing.')
+          throwExtensionDispatchError(400, 'EXTENSION_RBAC_STREAM_PARAM_MISSING', 'apiErrors.request.missing_id')
         }
         const resolvedStreamId = String(streamId)
         const streamContext = await resolveExtensionStreamContext(db, resolvedStreamId)
         if (!streamContext) {
-          throwExtensionDispatchError(404, 'TRANSFER_PAYMENT_STREAM_NOT_FOUND', 'Transfer payment stream not found.')
+          throwExtensionDispatchError(404, 'TRANSFER_PAYMENT_STREAM_NOT_FOUND', 'apiErrors.transfer_payment.stream_not_found')
         }
         const currentStreamContext = streamContext as NonNullable<typeof streamContext>
         await lockExtensionLifecycleScope(
@@ -364,11 +366,11 @@ const createExtensionWriteAuthorization = (
         )
         const agencyEnabled = await isExtensionEnabledForAgency(db, extensionKey, currentStreamContext.agencyId)
         if (!agencyEnabled) {
-          throwExtensionDispatchError(403, 'EXTENSION_AGENCY_DISABLED', 'Extension is disabled for this agency.')
+          throwExtensionDispatchError(403, 'EXTENSION_AGENCY_DISABLED', 'apiErrors.extensions.agency_disabled')
         }
         const streamConfiguration = await getExtensionStreamConfiguration(db, extensionKey, resolvedStreamId)
         if (!streamConfiguration.enabled) {
-          throwExtensionDispatchError(403, 'EXTENSION_STREAM_DISABLED', 'Extension is disabled for this stream.')
+          throwExtensionDispatchError(403, 'EXTENSION_STREAM_DISABLED', 'apiErrors.extensions.stream_disabled')
         }
         await authorizeWithFreshAuthContext(event, lockedAuthContext, subject, rbac.action, async ({ context }) => {
           const canAccess = context.userAbilities.authorize(
@@ -384,7 +386,7 @@ const createExtensionWriteAuthorization = (
 
       const entityId = resolvedHandler.params[rbac.entity.param]
       if (!entityId) {
-        throwExtensionDispatchError(400, 'EXTENSION_RBAC_ENTITY_PARAM_MISSING', 'Extension RBAC entity parameter is missing.')
+        throwExtensionDispatchError(400, 'EXTENSION_RBAC_ENTITY_PARAM_MISSING', 'apiErrors.request.missing_id')
       }
       await authorizeWithFreshAuthContext(event, lockedAuthContext, subject, rbac.action, async ({ context }) => {
         const entityContext = await resolveExtensionEntityContext(
@@ -398,7 +400,7 @@ const createExtensionWriteAuthorization = (
             : undefined
         )
         if (!entityContext) {
-          throwExtensionDispatchError(404, 'EXTENSION_RBAC_ENTITY_NOT_FOUND', 'Extension RBAC entity not found.')
+          throwExtensionDispatchError(404, 'EXTENSION_RBAC_ENTITY_NOT_FOUND', 'apiErrors.request.not_found')
         }
         const currentEntityContext = entityContext as NonNullable<typeof entityContext>
         await lockExtensionLifecycleScope(
@@ -409,7 +411,7 @@ const createExtensionWriteAuthorization = (
         )
         const config = await getExtensionConfigurationForEntity(db, extensionKey, currentEntityContext)
         if (!config) {
-          throwExtensionDispatchError(403, 'EXTENSION_ENTITY_DISABLED', 'Extension is disabled for this entity.')
+          throwExtensionDispatchError(403, 'EXTENSION_ENTITY_DISABLED', 'apiErrors.extensions.entity_disabled')
         }
 
         const canAccess = await canAccessExtensionEntity(context, rbac, currentEntityContext, db)
@@ -603,14 +605,14 @@ const handleExtensionDispatchError = async (
 }
 
 /** Resolves, authorizes, and invokes an extension server route with isolated route parameters. */
-export const dispatchExtensionServerRoute = async (
+const runExtensionServerRoute = async (
   event: H3Event,
   authContext: AuthContext
 ) => {
   const { extensionKey, route, routePath } = resolveExtensionRouteIdentifiers(event)
   const resolvedHandler = await resolveExtensionServerHandler(extensionKey, getMethod(event), routePath)
   if (!resolvedHandler) {
-    throwExtensionDispatchError(404, 'EXTENSION_ROUTE_NOT_FOUND', 'Extension route not found.')
+    throwExtensionDispatchError(404, 'EXTENSION_ROUTE_NOT_FOUND', 'apiErrors.request.not_found')
   }
   const handler = resolvedHandler as NonNullable<typeof resolvedHandler>
   classifyExtensionAuditInputs(event, handler.extension)
@@ -630,10 +632,10 @@ export const dispatchExtensionServerRoute = async (
       event.context.gcsExtension.agreementFinancials = createExtensionAgreementFinancials(
         event.context.$db, agreementId, async readDb => {
           const current = await authorizeAgreementResource(event, 'read', agreementId, readDb, { freshAuth: true })
-          if (!current) throwExtensionDispatchError(404, 'AGREEMENT_NOT_FOUND', 'Agreement not found.')
+          if (!current) throwExtensionDispatchError(404, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
           const currentEntity = await resolveExtensionEntityContext(readDb, 'agreement', agreementId)
           if (!currentEntity || !await getExtensionConfigurationForEntity(readDb, extensionKey, currentEntity)) {
-            throwExtensionDispatchError(403, 'EXTENSION_ENTITY_DISABLED', 'Extension is disabled for this entity.')
+            throwExtensionDispatchError(403, 'EXTENSION_ENTITY_DISABLED', 'apiErrors.extensions.entity_disabled')
           }
         }
       )
@@ -662,5 +664,26 @@ export const dispatchExtensionServerRoute = async (
   } finally {
     event.context.params = originalParams
     event.context.$authContext = originalAuthContext
+  }
+}
+
+/** Localizes host dispatch failures without changing extension-owned errors or authorization. */
+export const dispatchExtensionServerRoute = async (event: H3Event, authContext: AuthContext) => {
+  try {
+    return await runExtensionServerRoute(event, authContext)
+  } catch (error: unknown) {
+    if (error instanceof ExtensionDispatchError) {
+      return await throwApiError(event, { statusCode: error.statusCode, code: error.code, key: error.key })
+    }
+    const serviceCode = isError(error) && typeof error.data === 'object' && error.data !== null && 'code' in error.data
+      ? error.data.code
+      : undefined
+    if (serviceCode === 'FUNDING_CASE_EXCHANGE_FORBIDDEN') {
+      return await throwApiError(event, { statusCode: 403, code: 'FUNDING_CASE_EXCHANGE_FORBIDDEN', key: 'apiErrors.auth.forbidden' })
+    }
+    if (serviceCode === 'EXTENSION_NOT_FOUND') {
+      return await throwApiError(event, { statusCode: 404, code: 'EXTENSION_NOT_FOUND', key: 'apiErrors.extensions.not_found' })
+    }
+    throw error
   }
 }

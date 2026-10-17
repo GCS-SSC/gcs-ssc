@@ -1,6 +1,7 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-param-description, jsdoc/require-returns -- legacy approval helpers remain concise during request hardening */
 /* eslint-disable @stylistic/comma-dangle -- generic Vue arrows need parser-disambiguating commas */
+import { useBilingualValue } from '~/composables/useBilingualValue'
 import { getGroupedRowModel } from '@tanstack/vue-table'
 import type { ExpandedState } from '@tanstack/vue-table'
 import type { FetchError } from 'ofetch'
@@ -50,9 +51,10 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const { getBilingualValue } = useBilingualValue()
 const { getGroupedDisclosureControlsId, getGroupedDisclosureContentId } = useGroupedDisclosureIds()
 const { formatDate } = useDateHelpers()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { saveJson } = useJsonRequest()
 const runtimeQuery = computed(() => ({
@@ -254,7 +256,7 @@ const tableRows = computed<ApprovalTableRow[]>(() => routingSlips.value.flatMap(
     stepDisplayOrder: step.display_order,
     stepNameEn: step.egcs_cn_name_en,
     stepNameFr: step.egcs_cn_name_fr,
-    assignedApproverLabel: step.assigned_user_name || step.assigned_group_name_en || step.default_user_name,
+    assignedApproverLabel: step.assigned_user_name || getBilingualValue(step, 'assigned_group_name', '') || step.default_user_name,
     sequence: step.sequence,
     egcs_cn_defaultuser: step.egcs_cn_defaultuser,
     egcs_cn_defaultgroup: step.egcs_cn_defaultgroup,
@@ -792,8 +794,8 @@ const submitAddStep = async () => {
     emit('changed')
     closeAddStepModal(true)
     toast.add({
-      title: t('common.success'),
-      description: t('assessment.approvals.add_step_success'),
+      title: toast.localized('common.success'),
+      description: toast.localized('assessment.approvals.add_step_success'),
       color: 'success'
     })
     try {
@@ -834,7 +836,7 @@ const defaultApproverDisplay = computed(() => {
     return ''
   }
 
-  if (selectedActionStep.value.egcs_cn_defaultgroup) return selectedActionStep.value.default_group_name_en ?? selectedActionStep.value.egcs_cn_defaultgroup
+  if (selectedActionStep.value.egcs_cn_defaultgroup) return getBilingualValue(selectedActionStep.value, 'default_group_name', selectedActionStep.value.egcs_cn_defaultgroup)
   return `${selectedActionStep.value.egcs_cn_defaultuser}: ${selectedActionStep.value.default_user_name}`
 })
 const assignedApproverDisplay = computed(() => {
@@ -936,8 +938,8 @@ const submitAction = async (decision: 'approve' | 'deny') => {
       closeActionModal(true)
     }
     toast.add({
-      title: t('common.success'),
-      description: t('assessment.approvals.action_success'),
+      title: toast.localized('common.success'),
+      description: toast.localized('assessment.approvals.action_success'),
       color: 'success'
     })
     try {
@@ -970,8 +972,8 @@ const submitReassign = async () => {
     emit('changed')
     closeReassignModal()
     toast.add({
-      title: t('common.success'),
-      description: t('common.updated_success'),
+      title: toast.localized('common.success'),
+      description: toast.localized('common.updated_success'),
       color: 'success'
     })
     try {

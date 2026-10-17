@@ -14,7 +14,7 @@ definePageMeta({
 })
 
 const { t } = useI18n()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { canAny } = useCan()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
@@ -60,8 +60,8 @@ const deleteProfile = async (profile: ApplicantRecipientProfileRow) => {
     if (!deleted) return
     await refresh()
     toast.add({
-      title: t('common.success'),
-      description: t('common.deleted_success'),
+      title: toast.localized('common.success'),
+      description: toast.localized('common.deleted_success'),
       color: 'success'
     })
   } catch (error: unknown) {

@@ -20,7 +20,7 @@ definePageMeta({
 })
 
 const { t } = useI18n()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { can, canAny } = useCan()
 const { toDateInput } = useDateHelpers()
 const { showError } = useApiErrorToast()
@@ -118,8 +118,8 @@ const deleteProfile = async (profile: TransferPaymentProfileRow) => {
     if (!deleted) return
     await refresh()
     toast.add({
-      title: t('common.success'),
-      description: t('common.deleted_success'),
+      title: toast.localized('common.success'),
+      description: toast.localized('common.deleted_success'),
       color: 'success'
     })
   } catch (error: unknown) {

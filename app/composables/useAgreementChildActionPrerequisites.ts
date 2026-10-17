@@ -22,16 +22,15 @@ type AmendmentPrerequisites = {
  * @returns A fresh action prerequisite check guarded by the caller's current intent.
  */
 export const useAgreementChildActionPrerequisites = (target: MaybeRefOrGetter<AgreementChildActionTarget | undefined>) => {
-  const { t } = useI18n()
-  const toast = useToast()
+  const toast = useLocalizedToast()
   /**
    * Explains the currently unmet assignment or business prerequisite.
    * @param assigned - Whether the exact assignment is missing.
    * @returns The localized prerequisite notice.
    */
   const warn = (assigned = false) => toast.add({
-    title: t('common.warning'),
-    description: t(assigned ? 'assignments.read_only_description' : 'agreement.child_records.work_prerequisite'),
+    title: toast.localized('common.warning'),
+    description: toast.localized(assigned ? 'assignments.read_only_description' : 'agreement.child_records.work_prerequisite'),
     color: 'warning'
   })
   /**

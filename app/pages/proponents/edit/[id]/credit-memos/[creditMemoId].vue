@@ -23,7 +23,7 @@ const { getHeroCollapsed } = useDashboard()
 const { createValidator } = useZodI18n()
 const { sendJson } = useJsonRequest()
 const { showError } = useApiErrorToast()
-const toast = useToast()
+const toast = useLocalizedToast()
 const proponentId = computed(() => String(route.params.id))
 const creditMemoId = computed(() => String(route.params.creditMemoId))
 const identity = computed(() => `${proponentId.value}:${creditMemoId.value}`)
@@ -140,7 +140,7 @@ const save = async () => {
       isEditOpen.value = false
     }
     refreshKey.value += 1
-    toast.add({ title: t('common.success'), description: t('common.updated_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
   } catch (failure) {
     if (!disposed && requestIdentity === identity.value && session === editSession) showError(failure)
   } finally {

@@ -21,7 +21,7 @@ const agreementIdRef = computed(() => agreementId)
 
 const { t } = useI18n()
 const localePath = useLocalePath()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
@@ -103,7 +103,7 @@ const saveMonitor = async () => {
     )
     if (!monitorModal.closeSession(session)) return
     if (!await refreshOverview()) return
-    toast.add({ title: t('common.success'), description: isUpdate ? t('common.updated_success') : t('common.added_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: isUpdate ? toast.localized('common.updated_success') : toast.localized('common.added_success'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
   } finally {
@@ -118,7 +118,7 @@ const deleteMonitor = async (monitorId: string) => {
     const ok = await confirmDeleteRequest(`/api/agreements/${agreementId}/monitors/${monitorId}`)
     if (!ok) return
     await refreshOverview()
-    toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
   } finally {

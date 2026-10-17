@@ -25,7 +25,7 @@ type ApplicantRecipientDetailForm = ApplicantRecipientProfileForm & {
 }
 
 const { t } = useI18n()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { getBilingualValue } = useBilingualValue()
 const route = useRoute()
@@ -102,8 +102,8 @@ const submit = async () => {
     if (disposed || isChildDetailRoute.value) return
 
     toast.add({
-      title: t('common.success'),
-      description: t('common.updated_success'),
+      title: toast.localized('common.success'),
+      description: toast.localized('common.updated_success'),
       color: 'success'
     })
   } catch (caughtError: unknown) {

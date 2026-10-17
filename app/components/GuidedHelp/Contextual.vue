@@ -20,12 +20,14 @@ const { user } = useAuth()
 const route = useRoute()
 const localePath = useLocalePath()
 const { showError } = useApiErrorToast()
+const toast = useLocalizedToast()
 const currentView = ref('')
 const loading = ref(false)
 const { items, loading: discoveryLoading, active, requestedGuideId } = useGuidedHelpDiscovery()
 const snapshot: Ref<GuideSessionSnapshot | null> = ref(null)
 const previewDocument: Ref<GuideDocument | null> = ref(null)
-const pickerMessage = ref('')
+const pickerMessageKey = ref('')
+const pickerMessage = computed(() => pickerMessageKey.value ? t(pickerMessageKey.value) : '')
 const previewStepId: Ref<string | undefined> = ref(undefined)
 const previewPath: Ref<string[] | undefined> = ref(undefined)
 let session: ReturnType<typeof createGuideSession> | null = null
@@ -108,7 +110,7 @@ const preview = (event: Event) => {
   const draft = (event as CustomEvent<{ document: unknown }>).detail.document
   const result = GuideDocumentSchema.safeParse(draft)
   if (!result.success || checkGuideCompatibility(result.data, guidedHelpLedger).length) {
-    showError(new Error(t('guided_help.preview_incomplete')))
+    toast.add({ title: toast.localized('common.error'), description: toast.localized('guided_help.preview_incomplete'), color: 'error' })
     return
   }
   exit()
@@ -116,12 +118,12 @@ const preview = (event: Event) => {
 }
 const completePicker = () => {
   picking = null
-  pickerMessage.value = ''
+  pickerMessageKey.value = ''
 }
 let picking: { view: string, target: string } | null = null
 const pick = (event: Event) => {
   picking = (event as CustomEvent<{ view: string, target: string }>).detail
-  pickerMessage.value = t('guided_help.pick_instructions')
+  pickerMessageKey.value = 'guided_help.pick_instructions'
 }
 const pickTarget = (event: MouseEvent) => {
   if (!picking || !(event.target instanceof Element)) return
@@ -135,12 +137,12 @@ const pickTarget = (event: MouseEvent) => {
   const declaration = view.targets.find(item => item.key === key)
   if (state && declaration) saveHelpPicker({ ...state, selected: { view: view.key, target: declaration.key, kind: declaration.kind } })
   picking = null
-  pickerMessage.value = t('guided_help.pick_selected')
+  pickerMessageKey.value = 'guided_help.pick_selected'
 }
 watch(() => user.value?.id, (id, previousId) => {
   if (previousId && previousId !== id) {
     clearHelpPicker()
-    pickerMessage.value = ''
+    pickerMessageKey.value = ''
     picking = null
   }
   generation++
@@ -150,7 +152,7 @@ watch(() => user.value?.id, (id, previousId) => {
   if (!id) {
     exit()
     clearHelpPicker()
-    pickerMessage.value = ''
+    pickerMessageKey.value = ''
     picking = null
     return
   }
@@ -176,7 +178,7 @@ onMounted(() => {
     const storedPicker = readHelpPicker(user.value.id)
     if (storedPicker) {
       picking = { view: '', target: '' }
-      pickerMessage.value = t('guided_help.pick_instructions')
+      pickerMessageKey.value = 'guided_help.pick_instructions'
     }
   }
   readView()

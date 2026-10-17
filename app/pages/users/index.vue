@@ -16,7 +16,7 @@ definePageMeta({
 })
 
 const { t } = useI18n()
-const toast = useToast()
+const toast = useLocalizedToast()
 const localePath = useLocalePath()
 const { getHeroCollapsed } = useDashboard()
 const isHeroCollapsed = getHeroCollapsed('users')
@@ -180,7 +180,7 @@ const activateUser = async () => {
   try {
     isActivatingUser.value = true
     await saveJson(`/api/users/${userId}/activate`, 'POST', { password: state.password })
-    toast.add({ title: t('user.activated_success'), color: 'success' })
+    toast.add({ title: toast.localized('user.activated_success'), color: 'success' })
     isActivationModalOpen.value = false
     activationState.value = null
     activatingUserId.value = null

@@ -14,7 +14,7 @@ const { profileId, streamId, canUpdateChild, canDeleteChild } = defineProps<{
 }>()
 
 const { t, n, locale } = useI18n()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 
@@ -103,7 +103,7 @@ const saveFinancialLimit = async () => {
 
     closeSession(session)
     await refresh()
-    toast.add({ title: t('common.success'), description: t('common.updated_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
   } finally {

@@ -57,7 +57,7 @@ const emit = defineEmits<{ changed: [] }>()
 const route = useRoute()
 const { t } = useI18n()
 const localePath = useLocalePath()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { getHeroCollapsed } = useDashboard()
 const { getBilingualValue } = useBilingualValue()
@@ -245,8 +245,8 @@ const save = async (submit: boolean) => {
   if (disposed || !showMutationActions.value || isSaving.value || !data.value) return
   if (!isEditable.value || hasRevisionConflict.value) {
     toast.add({
-      title: t('common.warning'),
-      description: hasRevisionConflict.value ? t('questionnaire.revision_conflict_description') : readOnlyDescription.value,
+      title: toast.localized('common.warning'),
+      description: hasRevisionConflict.value ? toast.localized('questionnaire.revision_conflict_description') : toast.localized(data.value?.runtimeState !== 'active' ? `${configuration.messagePrefix}.locked_description` : 'assignments.read_only_description'),
       color: 'warning'
     })
     return
@@ -271,7 +271,7 @@ const save = async (submit: boolean) => {
         },
         mergeMetadata: () => { data.value = refreshed }
       })
-      toast.add({ title: t('common.success'), description: t(`${configuration.messagePrefix}.${submit ? 'submitted_success' : 'saved_success'}`), color: 'success' })
+      toast.add({ title: toast.localized('common.success'), description: toast.localized(`${configuration.messagePrefix}.${submit ? 'submitted_success' : 'saved_success'}`), color: 'success' })
       emit('changed')
     } catch (caughtError: unknown) {
       if (!mutation.isTokenCurrent(token) || !isCurrentTarget(generation, requestedEndpoint)) return

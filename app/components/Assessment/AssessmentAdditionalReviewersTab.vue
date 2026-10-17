@@ -44,7 +44,7 @@ const { t } = useI18n()
 const { getBilingualValue } = useBilingualValue()
 const getAssigneeName = (row: AdditionalReviewerRow): string => row.egcs_cn_user_name
   || getBilingualValue(row, 'egcs_cn_group_name', row.id)
-const toast = useToast()
+const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { createValidator } = useZodI18n()
 const validate = createValidator(AdditionalReviewerInputSchema)
@@ -331,8 +331,8 @@ const saveReviewer = async () => {
     await refreshRows()
     if (requestedReviewId !== reviewId || requestedReviewGeneration !== reviewGeneration) return
     toast.add({
-      title: t('common.success'),
-      description: isCreate ? t('assessment.additional_reviewers.created_success') : t('common.updated_success'),
+      title: toast.localized('common.success'),
+      description: isCreate ? toast.localized('assessment.additional_reviewers.created_success') : toast.localized('common.updated_success'),
       color: 'success'
     })
   } catch (error) {
@@ -362,8 +362,8 @@ const completeRow = async (rowId: string) => {
     await refreshRows()
     if (!isCurrent()) return
     toast.add({
-      title: t('common.success'),
-      description: t('assessment.additional_reviewers.completed_success'),
+      title: toast.localized('common.success'),
+      description: toast.localized('assessment.additional_reviewers.completed_success'),
       color: 'success'
     })
   } catch (error) {
@@ -393,8 +393,8 @@ const deleteRow = async (rowId: string) => {
     await refreshRows()
     if (!isCurrent()) return
     toast.add({
-      title: t('common.success'),
-      description: t('common.deleted_success'),
+      title: toast.localized('common.success'),
+      description: toast.localized('common.deleted_success'),
       color: 'success'
     })
   } catch (error) {

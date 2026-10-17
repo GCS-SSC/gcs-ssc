@@ -18,7 +18,7 @@ const {
 }>()
 
 const { t } = useI18n()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 
@@ -75,7 +75,7 @@ const saveItem = async () => {
     if (!response.ok) await throwFetchResponseError(response)
     closeSession(session)
     await refresh()
-    toast.add({ title: t('common.success'), description: isUpdate ? t('common.updated_success') : t('common.added_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: isUpdate ? toast.localized('common.updated_success') : toast.localized('common.added_success'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
   } finally {
@@ -97,7 +97,7 @@ const deleteItem = async (row: TransferPaymentAmendmentTypeItem) => {
     )
     if (!ok) return
     await refresh()
-    toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
   }

@@ -19,7 +19,7 @@ export class DocumentConversionError extends Error {}
 
 const fallbackValues: Record<Language_Preference, string> = {
   eng: 'To be confirmed',
-  fra: 'A confirmer'
+  fra: 'À confirmer'
 }
 export const DEFAULT_CHROMIUM_RENDER_BUDGET_MS = 30_000
 export const DEFAULT_CHROMIUM_CLEANUP_TIMEOUT_MS = 2_000

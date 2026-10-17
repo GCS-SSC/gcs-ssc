@@ -53,7 +53,7 @@ const getCommitmentTypeLabel = (row: FundingCaseAgreementCommitmentRow) =>
     ? row.commitment_type_name_fr ?? row.commitment_type_name_en ?? String(row.egcs_fc_type)
     : row.commitment_type_name_en ?? row.commitment_type_name_fr ?? String(row.egcs_fc_type)
 const localePath = useLocalePath()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
 const { saveJson } = useJsonRequest()
@@ -149,8 +149,8 @@ const tableRows = computed<CommitmentTableRow[]>(() => commitments.value
 const formatMoney = (value: Money, currency: string) => formatMoneyText(value, locale.value, currency)
 
 const warnRecordPrerequisite = () => toast.add({
-  title: t('common.warning'),
-  description: t('agreement.child_records.work_prerequisite'),
+  title: toast.localized('common.warning'),
+  description: toast.localized('agreement.child_records.work_prerequisite'),
   color: 'warning'
 })
 const loadWorkableRecord = async (recordId: string, action: 'update' | 'delete', isCurrent: () => boolean = () => true): Promise<FundingCaseAgreementCommitmentRow | null> => {
@@ -214,7 +214,7 @@ const checkCreationPrerequisites = async (isCurrent: () => boolean = () => true)
   } catch {
     if (disposed || owner !== agreementId || generation !== recordActionGeneration || !isCurrent()) return false
   }
-  toast.add({ title: t('common.warning'), description: t('agreement.child_records.create_prerequisite'), color: 'warning' })
+  toast.add({ title: toast.localized('common.warning'), description: toast.localized('agreement.child_records.create_prerequisite'), color: 'warning' })
   return false
 }
 const openCreateCommitment = async () => {
@@ -235,8 +235,8 @@ const openCreateCommitment = async () => {
 const handleExtensionCreated = async () => {
   await refreshOverview()
   toast.add({
-    title: t('common.success'),
-    description: t('common.added_success'),
+    title: toast.localized('common.success'),
+    description: toast.localized('common.added_success'),
     color: 'success'
   })
 }
@@ -272,8 +272,8 @@ const saveCommitment = async () => {
     await refreshOverview()
     if (overviewStatus.value === 'error') return
     toast.add({
-      title: t('common.success'),
-      description: isUpdate ? t('common.updated_success') : t('common.added_success'),
+      title: toast.localized('common.success'),
+      description: isUpdate ? toast.localized('common.updated_success') : toast.localized('common.added_success'),
       color: 'success'
     })
   } catch (error: unknown) {
@@ -300,7 +300,7 @@ const deleteCommitment = (recordId: string) => runRecordAction(recordId, 'delete
     if (!deleted || !shouldProceed()) return
     await refreshOverview()
     if (!shouldProceed()) return
-    toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
     if (shouldProceed()) showError(error)
   }

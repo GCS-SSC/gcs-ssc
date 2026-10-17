@@ -14,7 +14,7 @@ definePageMeta({
 })
 
 const { t } = useI18n()
-const toast = useToast()
+const toast = useLocalizedToast()
 const localePath = useLocalePath()
 const { showError } = useApiErrorToast()
 const { getHeroCollapsed } = useDashboard()
@@ -52,8 +52,8 @@ const submit = async () => {
     if (disposed) return
 
     toast.add({
-      title: t('common.success'),
-      description: t('common.added_success'),
+      title: toast.localized('common.success'),
+      description: toast.localized('common.added_success'),
       color: 'success'
     })
 

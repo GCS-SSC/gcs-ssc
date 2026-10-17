@@ -145,7 +145,7 @@ export const useTransferPaymentStreamWizardModal = ({
   programId
 }: UseTransferPaymentStreamWizardModalOptions) => {
   const { t, locale } = useI18n()
-  const toast = useToast()
+  const toast = useLocalizedToast()
   const { createValidator } = useZodI18n()
   const { getBilingualValue } = useBilingualValue()
 
@@ -614,8 +614,8 @@ export const useTransferPaymentStreamWizardModal = ({
       referenceLoadError.value = error
       console.error('Failed to preload stream wizard reference data', error)
       toast.add({
-        title: t('common.error'),
-        description: t('common.unknown_error'),
+        title: toast.localized('common.error'),
+        description: toast.localized('common.unknown_error'),
         color: 'error'
       })
     } finally {

@@ -160,7 +160,9 @@
       "agreements": "Agreements",
       "stakeholders": "Proponents"
     },
-    "applicant_recipients": "Proponents"
+    "applicant_recipients": "Proponents",
+    "main_navigation": "Main navigation",
+    "secondary_navigation": "Secondary navigation"
   },
   "home": {
     "welcome": "Welcome to",
@@ -446,7 +448,25 @@
     "max": "Max",
     "weight": "Weight",
     "icon": "Icon",
-    "toggle_navigation": "Toggle navigation"
+    "toggle_navigation": "Toggle navigation",
+    "pagination_first": "First page",
+    "pagination_previous": "Previous page",
+    "pagination_next": "Next page",
+    "pagination_last": "Last page",
+    "breadcrumb": "Breadcrumb",
+    "calendar_date": "Date",
+    "date_parts": {
+      "year": "year",
+      "month": "month",
+      "day": "day",
+      "hour": "hour",
+      "minute": "minute",
+      "second": "second",
+      "dayPeriod": "AM/PM",
+      "timeZoneName": "time zone",
+      "era": "era"
+    },
+    "date_empty": "Empty"
   },
   "enums": {
     "publication_state": {
@@ -1257,7 +1277,9 @@
       "agency_disabled": "Enable this extension for the agency before configuring it on a stream.",
       "stream_config_required": "Enable at least one extension target before enabling this extension for the stream.",
       "migration_failed": "Extension database migrations failed.",
-      "create_operation_conflict": "More than one extension is configured to replace this create action."
+      "create_operation_conflict": "More than one extension is configured to replace this create action.",
+      "stream_disabled": "This extension is disabled for this program stream.",
+      "entity_disabled": "This extension is disabled for this record."
     },
     "attachments": {
       "target_not_found": "The attachment target was not found.",
@@ -2285,7 +2307,10 @@
     "workflow_risk_rating_required_purpose": "Only a Risk Rating workflow may require a successful risk rating",
     "too_many_coding_lines": "A credit memo cannot contain more than 32,767 coding lines.",
     "guided_help_document_invalid": "The guided-help document is invalid.",
-    "guided_help_duplicate_key": "Select each guided-help target or role only once."
+    "guided_help_duplicate_key": "Select each guided-help target or role only once.",
+    "invalid_input": "Enter a valid value",
+    "string_too_long": "Enter no more than {max} characters",
+    "array_too_long": "Select no more than {max} items"
   },
   "notes": {
     "title": "Notes to file",

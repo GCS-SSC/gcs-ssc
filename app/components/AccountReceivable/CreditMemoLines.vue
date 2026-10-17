@@ -30,7 +30,7 @@ const { createValidator } = useZodI18n()
 const { sendJson } = useJsonRequest()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { search, pagination } = useTableListState()
 type LineForm = {
   egcs_fc_receivable: string | undefined
@@ -122,7 +122,7 @@ const save = async () => {
     await sendJson(`/api/account-receivable-credit-memos/${owner}/lines${lineId ? `/${lineId}` : ''}`, updating ? 'PATCH' : 'POST', payload)
     if (disposed || owner !== creditMemoId || !modal.closeSession(session)) return
     emit('changed')
-    toast.add({ title: t('common.success'), description: t(updating ? 'common.updated_success' : 'common.added_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized(updating ? 'common.updated_success' : 'common.added_success'), color: 'success' })
   } catch (failure) {
     if (!disposed && owner === creditMemoId && modal.isCurrentSession(session)) showError(failure)
   } finally {
@@ -136,7 +136,7 @@ const deleteLine = async (line: AccountReceivableCreditMemoLine) => {
     if (!await confirmDeleteRequest(`/api/account-receivable-credit-memos/${owner}/lines/${line.id}`)) return
     if (disposed || owner !== creditMemoId) return
     emit('changed')
-    toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (failure) {
     if (!disposed && owner === creditMemoId) showError(failure)
   }

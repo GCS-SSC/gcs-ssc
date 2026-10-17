@@ -101,7 +101,7 @@ const breadcrumbs = computed(() => [
     <template #header>
       <UDashboardNavbar>
         <template #leading>
-          <UDashboardSidebarCollapse /><UBreadcrumb :items="breadcrumbs" class="ml-2" />
+          <UDashboardSidebarCollapse /><UBreadcrumb :aria-label="t('common.breadcrumb')" :items="breadcrumbs" class="ml-2" />
         </template>
         <template #right>
           <div class="flex items-center gap-2">

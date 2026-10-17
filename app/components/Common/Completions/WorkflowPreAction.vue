@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { LocalizedToastText } from '~/composables/useLocalizedToast'
 import { ref } from 'vue'
 import { useCompletionWorkflowStart } from '~/composables/useCompletionWorkflowStart'
 import CommonCompletionWorkflowStartNotices from '~/components/Common/Completions/WorkflowStartNotices.vue'
@@ -29,7 +30,7 @@ const {
   /** Optional role-only visibility; omission preserves legacy readiness-based presentation. */
   actionRoleAllowed?: boolean
   /** Localized owning-page prerequisite, separate from role permission. */
-  actionPrerequisiteWarning?: string
+  actionPrerequisiteWarning?: LocalizedToastText
   canEdit?: boolean
   isLocked?: boolean
   actionLabelKey?: string

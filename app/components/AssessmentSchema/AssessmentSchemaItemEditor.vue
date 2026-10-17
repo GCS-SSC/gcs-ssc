@@ -85,7 +85,7 @@ const saveEditor = () => {
       <div v-if="item" class="flex h-full flex-col">
         <div class="flex-1 overflow-y-auto p-6 lg:p-8">
           <div class="mx-auto w-full max-w-6xl space-y-8 pb-12">
-            <UAlert v-if="validationError" color="error" icon="i-lucide-circle-alert" :description="t('errors.request.validation_failed')" />
+            <UAlert v-if="validationError" color="error" icon="i-lucide-circle-alert" :description="t('apiErrors.request.validation_failed')" />
             <AssessmentSchemaItemFields v-model:item="item" :answer-path-tree="answerPathTree" />
           </div>
         </div>

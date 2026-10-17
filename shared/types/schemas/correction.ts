@@ -5,10 +5,10 @@ import { PositivePostgresBigintIdSchema as DatabaseIdSchema } from './common'
 
 export const CorrectionCreateSchema = z.object({
   egcs_fc_commitment: DatabaseIdSchema,
-  egcs_fc_payments: z.array(DatabaseIdSchema).min(1, { error: 'validation.required' }).max(500).meta({ formRequired: true }),
+  egcs_fc_payments: z.array(DatabaseIdSchema).min(1, { error: 'validation.required' }).max(500, { error: 'validation.array_too_long' }).meta({ formRequired: true }),
   egcs_fc_requesteddate: RequiredDateSchema,
-  egcs_fc_narrative_en: z.string().max(10000).default(''),
-  egcs_fc_narrative_fr: z.string().max(10000).default(''),
+  egcs_fc_narrative_en: z.string().max(10000, { error: 'validation.string_too_long' }).default(''),
+  egcs_fc_narrative_fr: z.string().max(10000, { error: 'validation.string_too_long' }).default(''),
   egcs_fc_linkedcorrection: DatabaseIdSchema.optional()
 }).strict().superRefine((input, ctx) => {
   if (new Set(input.egcs_fc_payments).size !== input.egcs_fc_payments.length) {
@@ -23,13 +23,13 @@ export const CorrectionLineEditSchema = z.object({
 
 export const CorrectionEditSchema = z.object({
   egcs_fc_requesteddate: RequiredDateSchema,
-  egcs_fc_narrative_en: z.string().max(10000).default(''),
-  egcs_fc_narrative_fr: z.string().max(10000).default(''),
-  egcs_fc_lines: z.array(CorrectionLineEditSchema).min(1, { error: 'validation.required' }).max(500)
+  egcs_fc_narrative_en: z.string().max(10000, { error: 'validation.string_too_long' }).default(''),
+  egcs_fc_narrative_fr: z.string().max(10000, { error: 'validation.string_too_long' }).default(''),
+  egcs_fc_lines: z.array(CorrectionLineEditSchema).min(1, { error: 'validation.required' }).max(500, { error: 'validation.array_too_long' })
 }).strict()
 
 export const CorrectionCancelSchema = z.object({
-  egcs_fc_reason: z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' }).max(10000)
+  egcs_fc_reason: z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' }).max(10000, { error: 'validation.string_too_long' })
 }).strict()
 
 export type CorrectionCreate = z.infer<typeof CorrectionCreateSchema>

@@ -156,7 +156,7 @@ defineExpose({
             variant="ghost"
             size="xs"
             @update:model-value="val => (pagination.pageIndex = 0)" />
-          <UPagination
+          <CommonPagination
             :page="pagination.pageIndex + 1"
             :items-per-page="pagination.pageSize"
             :total="totalRecords"

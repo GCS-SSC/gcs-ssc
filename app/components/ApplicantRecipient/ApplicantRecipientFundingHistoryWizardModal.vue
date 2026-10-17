@@ -29,7 +29,7 @@ const emit = defineEmits<{
 
 const { t, locale } = useI18n()
 const { showError } = useApiErrorToast()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { items: allCurrencyOptions } = useEnumSelectOptions({ name: () => 'currency_codes' })
 const currencyOptions = computed(() => allCurrencyOptions.value.filter(option => option.value !== 'all'))
 const ZERO_MONEY = parseMoney('0')
@@ -347,8 +347,8 @@ const save = async (_event: FormSubmitEvent<FundingHistoryFormState>) => {
         body: payload(state.value)
       })
       toast.add({
-        title: t('common.success'),
-        description: t(state.value.historyId ? 'common.updated_success' : 'common.created_success'),
+        title: toast.localized('common.success'),
+        description: toast.localized(state.value.historyId ? 'common.updated_success' : 'common.created_success'),
         color: 'success'
       })
       open.value = false

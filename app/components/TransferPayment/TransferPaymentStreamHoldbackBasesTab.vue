@@ -24,7 +24,7 @@ const { transferPaymentId, streamId, agencyId, canCreateChild, canDeleteChild } 
 }>()
 
 const { t } = useI18n()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const { createValidator } = useZodI18n()
@@ -97,7 +97,7 @@ const save = async () => {
   try {
     await refresh()
     if (!isCurrentContext(generation) || !closedSession || modal.captureSession() !== null || status.value !== 'success') return
-    toast.add({ title: t('common.success'), description: t('common.added_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.added_success'), color: 'success' })
   } catch (error: unknown) {
     if (isCurrentContext(generation)) showError(error)
   }
@@ -119,7 +119,7 @@ const remove = async (row: HoldbackBasisRow) => {
     if (!ok || !isCurrentContext(generation)) return
     await refresh()
     if (!isCurrentContext(generation) || status.value !== 'success') return
-    toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
     if (isCurrentContext(generation)) showError(error)
   } finally {

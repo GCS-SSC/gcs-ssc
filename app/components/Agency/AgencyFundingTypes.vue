@@ -58,7 +58,7 @@ const { getGroupedDisclosureControlsId, getGroupedDisclosureContentId } = useGro
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
 const { confirmDeleteWithToast } = useDeleteRequestToast()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { search, pagination } = useTableListState()
 const types: Ref<FundingType[]> = ref([])
 const subtypes: Ref<FundingSubtype[]> = ref([])
@@ -230,7 +230,7 @@ const saveType = async () => {
     committed = true
     if (generation !== refreshGeneration) return
     if (selectedType.value === state) closeType()
-    toast.add({ title: t('common.success'), description: t(updating ? 'common.updated_success' : 'common.added_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized(updating ? 'common.updated_success' : 'common.added_success'), color: 'success' })
     await refresh()
   } catch (error: unknown) {
     if (!committed) showError(error)
@@ -250,7 +250,7 @@ const saveSubtype = async () => {
     committed = true
     if (generation !== refreshGeneration) return
     if (selectedSubtype.value === state) closeSubtype()
-    toast.add({ title: t('common.success'), description: t(updating ? 'common.updated_success' : 'common.added_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized(updating ? 'common.updated_success' : 'common.added_success'), color: 'success' })
     await refresh()
     expandType(typeId)
   } catch (error: unknown) {

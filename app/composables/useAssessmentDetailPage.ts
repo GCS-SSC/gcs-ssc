@@ -4,7 +4,6 @@ import type { FetchError } from 'ofetch'
 /* eslint-disable jsdoc/require-param, jsdoc/require-returns -- composable callbacks use self-descriptive local signatures */
 import { computed, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
-import type { z } from 'zod'
 import type { AssessmentDefinition, ScoringMatrixItem } from '~~/shared/types/schemas/assessment/assessment'
 import type {
   AssessmentResponse,
@@ -92,10 +91,10 @@ const getCurrentOverallResultOption = (
 export const useAssessmentDetailPage = () => {
   const route = useRoute()
   const localePath = useLocalePath()
-  const toast = useToast()
+  const toast = useLocalizedToast()
   const { showError } = useApiErrorToast()
   const { t, locale } = useI18n()
-  const { translateMessage, createValidator } = useZodI18n()
+  const { createValidator } = useZodI18n()
   const { getHeroCollapsed } = useDashboard()
   const { getBilingualValue } = useBilingualValue()
 
@@ -417,8 +416,8 @@ export const useAssessmentDetailPage = () => {
       if (!validationResult.success) {
         const firstIssue = validationResult.error.issues[0]
         toast.add({
-          title: t('common.error'),
-          description: firstIssue ? translateMessage(firstIssue.message, firstIssue as z.ZodIssue) : t('apiErrors.validation.failed'),
+          title: toast.localized('common.error'),
+          description: firstIssue ? toast.validation(firstIssue) : toast.localized('apiErrors.request.validation_failed'),
           color: 'error'
         })
         return
@@ -441,8 +440,8 @@ export const useAssessmentDetailPage = () => {
       await refresh()
       if (reviewId.value !== targetReviewId) return
       toast.add({
-        title: t('common.success'),
-        description: t('common.updated_success'),
+        title: toast.localized('common.success'),
+        description: toast.localized('common.updated_success'),
         color: 'success'
       })
     } catch (error) {

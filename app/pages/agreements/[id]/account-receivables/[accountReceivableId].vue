@@ -21,7 +21,7 @@ const { getBilingualValue } = useBilingualValue()
 const { formatDate } = useDateHelpers()
 const route = useRoute()
 const localePath = useLocalePath()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { getHeroCollapsed } = useDashboard()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
@@ -80,7 +80,7 @@ const hydrate = (detail: AccountReceivableDetail) => {
 }
 const openEdit = () => {
   if (!receivable.value?.egcs_fc_canedit || status.value !== 'success') {
-    toast.add({ title: t('common.warning'), description: t('account_receivable.work_prerequisite'), color: 'warning' })
+    toast.add({ title: toast.localized('common.warning'), description: toast.localized('account_receivable.work_prerequisite'), color: 'warning' })
     return
   }
   if (saving.value) return
@@ -160,7 +160,7 @@ const save = async () => {
       isEditOpen.value = false
     }
     refreshKey.value += 1
-    toast.add({ title: t('common.success'), description: t('common.updated_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
   } catch (failure) {
     if (!disposed && requestIdentity === identity.value && session === editSession) showError(failure)
   } finally {

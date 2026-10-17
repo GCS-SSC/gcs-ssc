@@ -60,7 +60,7 @@ const getStatusLabel = (statusId: string) => {
   return definition ? (locale.value === 'fr' ? definition.nameFr : definition.nameEn) : ''
 }
 const localePath = useLocalePath()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
 const { sendJson } = useJsonRequest()
@@ -218,7 +218,7 @@ const getGroupedForecastStatus = (row: ForecastGroupedRow) =>
 const getForecastRoute = (row: ForecastVersionRow) =>
   localePath(appRouteLocations.agreementForecastDetail(agreementId, row.forecastId))
 
-const warnPrerequisite = (key: string) => toast.add({ title: t('common.warning'), description: t(key), color: 'warning' })
+const warnPrerequisite = (key: string) => toast.add({ title: toast.localized('common.warning'), description: toast.localized(key), color: 'warning' })
 const captureAction = () => {
   const owner = agreementId
   const generation = actionGeneration
@@ -303,7 +303,7 @@ const saveForecast = async () => {
     if (!isCurrent() || !forecastModal.closeSession(session)) return
     await refreshOverview()
     if (!isCurrentScope() || overviewStatus.value === 'error') return
-    toast.add({ title: t('common.success'), description: t('common.added_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.added_success'), color: 'success' })
   } catch (error: unknown) {
     if (isCurrent()) showError(error)
   } finally { forecastPending.end(session) }
@@ -320,7 +320,7 @@ const deleteForecast = (forecastId: string) => runAction(async isCurrent => {
   })
   if (!deleted || !isCurrent()) return
   await refreshOverview()
-  if (isCurrent()) toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+  if (isCurrent()) toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
 })
 </script>
 

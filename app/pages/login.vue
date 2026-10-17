@@ -16,12 +16,14 @@ definePageMeta({
 const { t } = useI18n()
 const localePath = useLocalePath()
 const route = useRoute()
-const toast = useToast()
+const toast = useLocalizedToast()
 
 const email = ref('')
 const password = ref('')
 const loading = ref(false)
-const loginError = ref('')
+const loginErrorMessage = ref('')
+const hasLoginError = ref(false)
+const loginError = computed(() => hasLoginError.value ? loginErrorMessage.value || t('login.error_description') : '')
 const isDemoBuild = import.meta.env.VITE_GCS_DEMO === 'true'
 
 /**
@@ -29,10 +31,11 @@ const isDemoBuild = import.meta.env.VITE_GCS_DEMO === 'true'
  * @param error - Authentication response or transport failure.
  */
 const showLoginError = (error: unknown) => {
-  loginError.value = resolveLoginError(error, t('login.error_description'))
+  loginErrorMessage.value = resolveLoginError(error, '')
+  hasLoginError.value = true
   toast.add({
-    title: t('login.error_title'),
-    description: loginError.value,
+    title: toast.localized('login.error_title'),
+    description: resolveLoginError(error, '') || toast.localized('login.error_description'),
     color: 'error'
   })
 }
@@ -49,7 +52,8 @@ if (import.meta.dev || isDemoBuild) {
 const onLogin = async () => {
   if (loading.value) return
   loading.value = true
-  loginError.value = ''
+  hasLoginError.value = false
+  loginErrorMessage.value = ''
   try {
     const { error } = await authClient.signIn.email({
       email: email.value,

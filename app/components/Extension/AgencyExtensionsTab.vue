@@ -12,7 +12,7 @@ const { agencyId, canUpdate } = defineProps<{ agencyId: string, canCreate: boole
 
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
-const toast = useToast()
+const toast = useLocalizedToast()
 const canEdit = computed(() => canUpdate)
 const canConfigure = (item: ExtensionAgencyRegistryItem) => canEdit.value && item.canConfigure
 const { showError } = useApiErrorToast()
@@ -83,7 +83,7 @@ const updateEnablement = async (item: ExtensionAgencyRegistryItem, enabled: bool
       enabled
     })
     await refresh()
-    toast.add({ title: t('common.success'), description: t('common.updated_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
   } finally {
@@ -106,7 +106,7 @@ const saveConfiguration = async (item: ExtensionAgencyTableRow) => {
     })
     resetConfigureState()
     await refresh()
-    toast.add({ title: t('common.success'), description: t('common.updated_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
   } finally {
@@ -127,8 +127,8 @@ const runMigrations = async (item: ExtensionAgencyRegistryItem) => {
     })
     await refresh()
     toast.add({
-      title: t('common.success'),
-      description: t(response.results.length > 0
+      title: toast.localized('common.success'),
+      description: toast.localized(response.results.length > 0
         ? 'extensions.migrations_applied'
         : 'extensions.no_pending_migrations'),
       color: 'success'
@@ -148,7 +148,7 @@ const selectStorageProvider = async (item: ExtensionAgencyRegistryItem) => {
       providerKey: item.extension.key
     })
     await refresh()
-    toast.add({ title: t('common.success'), description: t('extensions.storage_provider_selected'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('extensions.storage_provider_selected'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
   } finally {

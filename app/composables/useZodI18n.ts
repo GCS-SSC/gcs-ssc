@@ -3,6 +3,14 @@ import { FORM_VALIDATOR_SCHEMA } from '~~/shared/utils/form-requirements'
 import { en, frCA } from 'zod/locales'
 import { localizeBilingualIssueParams, translateZodIssueMessage } from '~~/shared/utils/zod-i18n'
 
+export const LOCALIZED_VALIDATION_ISSUE = Symbol('localized-validation-issue')
+
+export type LocalizedValidationError = {
+  name: string
+  message: string
+  [LOCALIZED_VALIDATION_ISSUE]?: z.ZodIssue
+}
+
 /**
  * Provides localized Zod validation helpers for Nuxt UI forms.
  *
@@ -12,9 +20,8 @@ export const useZodI18n = () => {
   const { locale, t } = useI18n()
 
   /**
-   * Translates a Zod message if it's a known validation key.
-   * Only translates if the message starts with 'validation.',
-   * which indicates it was explicitly set in the schema as a translation key.
+   * Resolves schema keys and default Zod failures through the host catalog.
+   * Uncatalogued prose and missing validation keys use a localized fallback.
    *
    * @param message - The raw message or translation key.
    * @param issue - The Zod issue being translated.
@@ -39,7 +46,7 @@ export const useZodI18n = () => {
      * @param state Untrusted, possibly incomplete form input.
      * @returns Localized field errors for Nuxt UI.
      */
-    const validate = async (state: unknown) => {
+    const validate = async (state: unknown): Promise<LocalizedValidationError[]> => {
       // We use standard safeParseAsync.
       // If the schema has { error: 'validation.key' },
       // Zod will put 'validation.key' into issue.message automatically.
@@ -50,7 +57,8 @@ export const useZodI18n = () => {
 
       return result.error.issues.map(issue => ({
         name: issue.path.join('.'),
-        message: translateMessage(issue.message, issue)
+        message: translateMessage(issue.message, issue),
+        [LOCALIZED_VALIDATION_ISSUE]: issue
       }))
     }
     return Object.assign(validate, { [FORM_VALIDATOR_SCHEMA]: schema })

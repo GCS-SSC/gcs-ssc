@@ -13,8 +13,7 @@ const { programId, canUpdateChild, canDeleteChild, outcomesRefreshKey = 0 } = de
   outcomesRefreshKey?: number
 }>()
 
-const { t } = useI18n()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 
@@ -83,7 +82,7 @@ const saveIndicator = async () => {
     ? selectedIndicator.value.egcs_tp_transferpaymentoutcome
     : selectedOutcomeId.value
   if (!outcomeId) {
-    toast.add({ title: t('common.warning'), description: t('validation.outcome_required'), color: 'warning' })
+    toast.add({ title: toast.localized('common.warning'), description: toast.localized('validation.outcome_required'), color: 'warning' })
     return
   }
   const session = indicatorModal.captureSession()
@@ -102,7 +101,7 @@ const saveIndicator = async () => {
     if (!response.ok) await throwFetchResponseError(response)
     indicatorModal.closeSession(session)
     await refreshIndicators()
-    toast.add({ title: t('common.success'), description: t('common.updated_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
   } finally {
@@ -127,7 +126,7 @@ const deleteIndicator = async (row: TransferPaymentPerformanceIndicatorRow) => {
     const ok = await confirmDeleteRequest(`/api/transfer-payments/${programId}/outcomes/${outcomeId}/performance-indicators/${row.id}`)
     if (!ok) return
     await refreshIndicators()
-    toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
   }

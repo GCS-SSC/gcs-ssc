@@ -153,7 +153,7 @@ defineExpose({
           </span>
           /
           {{ totalRecords }}
-          {{ t('common.selected') || 'Records' }}
+          {{ t('common.selected') }}
         </slot>
       </div>
 
@@ -168,7 +168,7 @@ defineExpose({
             size="xs"
             @update:model-value="val => (pagination.pageIndex = 0)" />
         </div>
-        <UPagination
+        <CommonPagination
           :page="pagination.pageIndex + 1"
           :items-per-page="pagination.pageSize"
           :total="totalRecords"

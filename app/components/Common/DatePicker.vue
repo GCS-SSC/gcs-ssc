@@ -1,8 +1,14 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import type { Ref } from 'vue'
+import type { DateFieldRootProps } from 'reka-ui'
 import { parseDate } from '@internationalized/date'
 import type { CalendarProps, InputDateProps } from '@nuxt/ui'
+import DateInput from './DateInput.vue'
+import { createRequiredControl } from '~/utils/required-control'
+
+const LocalizedDateInput = createRequiredControl(DateInput, 'segmented')
+const { t } = useI18n()
 
 const {
   disabled = false
@@ -100,14 +106,15 @@ watch(() => modelValue.value, () => {
 
 <template>
   <UPopover>
-    <UInputDate
-      :model-value="inputDateValue as InputDateProps['modelValue']"
+    <LocalizedDateInput
+      :model-value="inputDateValue as DateFieldRootProps['modelValue']"
       :disabled="disabled"
       class="w-full"
       @update:model-value="value => inputDateValue = value as InputCalendarValue" />
 
     <template #content>
       <UCalendar
+        :calendar-label="t('common.calendar_date')"
         :model-value="inputDateValue as CalendarProps['modelValue']"
         class="p-2"
         @update:model-value="value => inputDateValue = value as InputCalendarValue" />

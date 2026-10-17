@@ -38,7 +38,8 @@ const schema = FundingCaseIntakeCreateSchema.extend({
 })
 const validate = createValidator(schema)
 const inlineUploadState = ref<InlineUploadState>('idle')
-const fileError = ref<string | undefined>(undefined)
+const fileErrorKey = ref<string | undefined>(undefined)
+const fileError = computed(() => fileErrorKey.value ? t(fileErrorKey.value) : undefined)
 let nextAttachmentKey = 0
 
 /**
@@ -57,11 +58,11 @@ const addFiles = (event: Event) => {
   const invalidName = files.find(file => file.name.length > MAX_ATTACHMENT_FILENAME_LENGTH
     || [...file.name].some(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127))
   if (oversized || invalidName) {
-    fileError.value = t(oversized ? 'apiErrors.attachments.file_too_large' : 'apiErrors.attachments.filename_invalid')
+    fileErrorKey.value = oversized ? 'apiErrors.attachments.file_too_large' : 'apiErrors.attachments.filename_invalid'
     input.value = ''
     return
   }
-  fileError.value = undefined
+  fileErrorKey.value = undefined
   for (const file of files) {
     const name = file.name.slice(0, 255)
     state.value.attachments.push({
@@ -84,7 +85,7 @@ const removeFile = (key: string) => {
 watch([() => state.value.egcs_fi_fundingopportunity, open], async ([opportunityId, isOpen], previous, onCleanup) => {
   if (previous?.[0] && opportunityId !== previous[0]) {
     state.value.attachments = []
-    fileError.value = undefined
+    fileErrorKey.value = undefined
   }
   if (!isOpen || !opportunityId) {
     inlineUploadState.value = 'idle'
@@ -92,7 +93,7 @@ watch([() => state.value.egcs_fi_fundingopportunity, open], async ([opportunityI
   }
   inlineUploadState.value = 'checking'
   state.value.attachments = []
-  fileError.value = undefined
+  fileErrorKey.value = undefined
   if (import.meta.server) return
   const controller = new AbortController()
   onCleanup(() => controller.abort())

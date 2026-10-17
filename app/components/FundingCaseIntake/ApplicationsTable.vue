@@ -32,7 +32,7 @@ const columns = computed<TableColumnInput<Row>[]>(() => [
 ])
 const modalOpen = ref(false)
 const pending = ref(false)
-const toast = useToast()
+const toast = useLocalizedToast()
 const form: Ref<IntakeForm> = ref({ attachments: [] })
 /**
  *
@@ -87,7 +87,7 @@ const submit = async () => {
     await refresh()
     await navigateTo(localePath({ ...appRouteLocations.fundingCaseIntakeDetail(createdId), query: { section: 'attachments' } }))
     if (uploadError) {
-      toast.add({ title: t('funding_case_intake.attachment_upload_failed'), color: 'error' })
+      toast.add({ title: toast.localized('funding_case_intake.attachment_upload_failed'), color: 'error' })
     }
   } catch (error: unknown) {
     if (createdId) {

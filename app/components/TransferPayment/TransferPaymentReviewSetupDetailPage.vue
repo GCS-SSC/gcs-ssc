@@ -48,7 +48,7 @@ const { getBilingualValue } = useBilingualValue()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const { createValidator } = useZodI18n()
-const toast = useToast()
+const toast = useLocalizedToast()
 
 const agencyId = String(route.params.id)
 provideBilingualFieldScope(() => ({ subject: 'agency', agencyId, permissionAction: 'update' }))
@@ -137,15 +137,15 @@ const retryLoad = async () => {
 }
 
 const showPreservedDraft = () => toast.add({
-  title: t('common.warning'),
-  description: t('common.newer_changes_preserved'),
+  title: toast.localized('common.warning'),
+  description: toast.localized('common.newer_changes_preserved'),
   color: 'warning'
 })
 const blockDirtyAction = () => {
   if (!mutation.isDirty.value) return false
   toast.add({
-    title: t('common.warning'),
-    description: t('common.save_changes_before_action'),
+    title: toast.localized('common.warning'),
+    description: toast.localized('common.save_changes_before_action'),
     color: 'warning'
   })
   return true
@@ -192,7 +192,7 @@ const persistSet = async (token: EditorMutationToken, showSuccess: boolean) => {
     return false
   }
   if (showSuccess) {
-    toast.add({ title: t('common.success'), description: t('transfer_payment.review_setup_saved'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('transfer_payment.review_setup_saved'), color: 'success' })
   }
   return true
 }
@@ -220,7 +220,7 @@ const publicationAction = async (action: 'publish' | 'retire') => {
         if (mutation.isTokenCurrent(token)) showPreservedDraft()
         return
       }
-      toast.add({ title: t('common.success'), description: t(`review_setup.${action === 'publish' ? 'published' : 'retired'}`), color: 'success' })
+      toast.add({ title: toast.localized('common.success'), description: toast.localized(`review_setup.${action === 'publish' ? 'published' : 'retired'}`), color: 'success' })
     } catch (error) {
       showError(error)
     }

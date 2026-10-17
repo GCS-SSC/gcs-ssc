@@ -77,7 +77,7 @@ const { formatDate } = useDateHelpers({
 })
 const { createValidator } = useZodI18n()
 const validateHostMetadata = createValidator(AttachmentMetadataBaseSchema)
-const toast = useToast()
+const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const baseUrl = computed(() => `/api/attachments/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}`)
@@ -304,7 +304,7 @@ const save = async () => {
       if (!responseValue.ok) await throwFetchResponseError(responseValue)
     }
     resetModalState()
-    toast.add({ title: t('common.success'), description: t('common.updated_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
     try {
       await refresh()
     } catch (refreshError) {
@@ -314,8 +314,8 @@ const save = async () => {
     if (editingAttachment && savedHostPatch && failedProviderMetadataDraft && !providerMetadataSaved) {
       await rebasePartiallySavedEdit(editingAttachment, savedHostPatch, failedProviderMetadataDraft)
       toast.add({
-        title: t('attachments.partial_update_title'),
-        description: t('attachments.partial_update_metadata_failed'),
+        title: toast.localized('attachments.partial_update_title'),
+        description: toast.localized('attachments.partial_update_metadata_failed'),
         color: 'warning'
       })
     }
@@ -346,7 +346,7 @@ const remove = async (item: AttachmentItem) => {
   if (status.value !== 'success' || item.can_delete !== true) return
   const deleted = await confirmDeleteRequest(withAgency(`${baseUrl.value}/${item.id}`))
   if (!deleted) return
-  toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+  toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   try {
     await refresh()
   } catch (error) {

@@ -8,7 +8,7 @@ import type { ExtensionAgencyWorkspaceListItem } from '~~/shared/types/schemas/e
 import { useNavigationCatalog } from '~/composables/useNavigationCatalog'
 
 const { t } = useI18n()
-const toast = useToast()
+const toast = useLocalizedToast()
 const localePath = useLocalePath()
 const abilityHelpers = useCan()
 const { can } = abilityHelpers
@@ -54,12 +54,12 @@ const handleLogout = async () => {
     isSigningOut.value = true
     const result = await signOut()
     if (result?.error) {
-      toast.add({ title: t('common.error'), description: t('common.logout_failed'), color: 'error' })
+      toast.add({ title: toast.localized('common.error'), description: toast.localized('common.logout_failed'), color: 'error' })
       return
     }
     await navigateTo(localePath(appRouteLocations.login()))
   } catch {
-    toast.add({ title: t('common.error'), description: t('common.logout_failed'), color: 'error' })
+    toast.add({ title: toast.localized('common.error'), description: toast.localized('common.logout_failed'), color: 'error' })
   } finally {
     isSigningOut.value = false
   }
@@ -120,7 +120,8 @@ const userMenuItems = computed<DropdownMenuItem[][]>(() => [
           :aria-label="t('global_search.button')"
           class="hover:ring-primary mb-6 bg-white ring-1 ring-zinc-200 transition-all dark:bg-zinc-900 dark:ring-zinc-800" />
 
-        <UNavigationMenu
+        <CommonNavigationMenu
+          :label="t('nav.main_navigation')"
           :collapsed="collapsed"
           :items="items[0]"
           orientation="vertical"
@@ -128,7 +129,8 @@ const userMenuItems = computed<DropdownMenuItem[][]>(() => [
             link: `font-black uppercase tracking-widest text-xs py-3 ${collapsed ? 'px-1.5' : 'px-4'} rounded-lg transition-colors data-[active]:text-primary data-[active]:bg-primary/5 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800/50`
           }" />
 
-        <UNavigationMenu
+        <CommonNavigationMenu
+          :label="t('nav.secondary_navigation')"
           :collapsed="collapsed"
           :items="items[1]"
           orientation="vertical"

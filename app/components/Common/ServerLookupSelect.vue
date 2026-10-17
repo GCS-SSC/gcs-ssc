@@ -589,14 +589,16 @@ const removeSelectedValue = (value: string) => {
       <li v-for="item in selectedOptions" :key="item.value">
         <span class="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-2 py-1 text-sm dark:bg-zinc-800">
           {{ item.label }}
-          <button
-            type="button"
-            class="cursor-default rounded-sm p-0.5 text-zinc-500 hover:text-error disabled:opacity-50"
-            :disabled="disabled"
-            :aria-label="t('common.remove_selected_item', { label: item.label })"
-            @click="removeSelectedValue(item.value)">
-            <UIcon name="i-lucide-x" aria-hidden="true" />
-          </button>
+          <UTooltip :text="t('common.remove_selected_item', { label: item.label })">
+            <button
+              type="button"
+              class="cursor-default rounded-sm p-0.5 text-zinc-500 hover:text-error disabled:opacity-50"
+              :disabled="disabled"
+              :aria-label="t('common.remove_selected_item', { label: item.label })"
+              @click="removeSelectedValue(item.value)">
+              <UIcon name="i-lucide-x" aria-hidden="true" />
+            </button>
+          </UTooltip>
         </span>
       </li>
     </ul>

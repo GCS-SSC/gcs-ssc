@@ -32,7 +32,7 @@ const localePath = useLocalePath()
 const { t } = useI18n()
 const { getBilingualValue } = useBilingualValue()
 const { showError } = useApiErrorToast()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { can } = useCan()
 const router = useRouter()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
@@ -132,15 +132,15 @@ const retryLoad = async () => {
 onMounted(retryLoad)
 
 const showPreservedDraft = () => toast.add({
-  title: t('common.warning'),
-  description: t('common.newer_changes_preserved'),
+  title: toast.localized('common.warning'),
+  description: toast.localized('common.newer_changes_preserved'),
   color: 'warning'
 })
 const blockDirtyAction = () => {
   if (!mutation.isDirty.value) return false
   toast.add({
-    title: t('common.warning'),
-    description: t('common.save_changes_before_action'),
+    title: toast.localized('common.warning'),
+    description: toast.localized('common.save_changes_before_action'),
     color: 'warning'
   })
   return true
@@ -175,7 +175,7 @@ const persist = async (token: EditorMutationToken, showSuccess: boolean) => {
     return false
   }
   if (showSuccess) {
-    toast.add({ title: t('common.success'), description: t('data_collection.saved'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('data_collection.saved'), color: 'success' })
   }
   return true
 }
@@ -202,7 +202,7 @@ const publish = async () => {
         if (mutation.isTokenCurrent(token)) showPreservedDraft()
         return
       }
-      toast.add({ title: t('common.success'), description: t('data_collection.published'), color: 'success' })
+      toast.add({ title: toast.localized('common.success'), description: toast.localized('data_collection.published'), color: 'success' })
     } catch (error) {
       showError(error)
     }
@@ -216,7 +216,7 @@ const retire = async () => {
       const response = await fetch(getClientRequestUrl(`${endpoint}/retire`), { method: 'POST' })
       if (!response.ok) await throwFetchResponseError(response)
       if (!await refreshForMutation(token)) return
-      toast.add({ title: t('common.success'), description: t('data_collection.retired'), color: 'success' })
+      toast.add({ title: toast.localized('common.success'), description: toast.localized('data_collection.retired'), color: 'success' })
     } catch (error) {
       showError(error)
     }

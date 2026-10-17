@@ -110,7 +110,7 @@ const {
 
 const { t, locale } = useI18n()
 const { getGroupedDisclosureControlsId, getGroupedDisclosureContentId } = useGroupedDisclosureIds()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
 const { check } = useAgreementChildActionPrerequisites(() => actionTarget)
@@ -531,7 +531,7 @@ const openCreateLineItem = (fiscalYearId?: string, organizationCostCategoryId?: 
     }
     // Absence of an existing line is not proof that a category is unavailable.
     if (items.some(item => item.egcs_fc_organizationcostcategory === organizationCostCategoryId && item.cost_category_available === false)) {
-      toast.add({ title: t('common.warning'), description: t('apiErrors.agreement.invalid_cost_category_line_item'), color: 'warning' })
+      toast.add({ title: toast.localized('common.warning'), description: toast.localized('apiErrors.agreement.invalid_cost_category_line_item'), color: 'warning' })
       return
     }
   }
@@ -598,8 +598,8 @@ const saveFiscalYear = async () => {
     await refreshOverview()
     if (requestedContextGeneration !== fiscalYearContextGeneration || overviewStatus.value === 'error') return
     toast.add({
-      title: t('common.success'),
-      description: isUpdate ? t('common.updated_success') : t('common.added_success'),
+      title: toast.localized('common.success'),
+      description: isUpdate ? toast.localized('common.updated_success') : toast.localized('common.added_success'),
       color: 'success'
     })
   } catch (error: unknown) {
@@ -639,8 +639,8 @@ const saveLineItem = async () => {
     await refreshOverview()
     if (requestedContextGeneration !== fiscalYearContextGeneration || overviewStatus.value === 'error') return
     toast.add({
-      title: t('common.success'),
-      description: isUpdate ? t('common.updated_success') : t('common.added_success'),
+      title: toast.localized('common.success'),
+      description: isUpdate ? toast.localized('common.updated_success') : toast.localized('common.added_success'),
       color: 'success'
     })
   } catch (error: unknown) {
@@ -659,7 +659,7 @@ const checkFiscalYearLines = async (id: string, area: 'budget-year' | 'budget-li
     : overview.value
   if (!current()) return false
   if (fresh?.lineItems.some(item => String(item.fiscal_year_id) === id)) {
-    toast.add({ title: t('common.warning'), description: t('apiErrors.agreement.budget_fiscal_year_in_use'), color: 'warning' })
+    toast.add({ title: toast.localized('common.warning'), description: toast.localized('apiErrors.agreement.budget_fiscal_year_in_use'), color: 'warning' })
     return false
   }
   return true
@@ -684,7 +684,7 @@ const deleteBudgetRecord = async (id: string, area: 'budget-year' | 'budget-line
     if (!deleted || !current()) return
     await refreshOverview()
     if (!current() || overviewStatus.value === 'error') return
-    toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
     if (current()) showError(error)
   } finally {

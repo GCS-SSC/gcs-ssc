@@ -14,7 +14,7 @@ const { agencyId } = defineProps<{
 const { t } = useI18n()
 const { can } = useCan()
 const localePath = useLocalePath()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { formatDate, toDateInput } = useDateHelpers()
 const availabilityItems = computed(() => [

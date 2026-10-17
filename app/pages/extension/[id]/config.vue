@@ -155,7 +155,7 @@ await refresh()
       <UDashboardNavbar>
         <template #leading>
           <UDashboardSidebarCollapse />
-          <UBreadcrumb :items="breadcrumbItems" class="ml-2" />
+          <UBreadcrumb :aria-label="t('common.breadcrumb')" :items="breadcrumbItems" class="ml-2" />
         </template>
       </UDashboardNavbar>
     </template>

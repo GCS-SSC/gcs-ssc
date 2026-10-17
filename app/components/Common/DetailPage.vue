@@ -15,7 +15,7 @@ const { t } = useI18n()
       <UDashboardNavbar>
         <template #leading>
           <UDashboardSidebarCollapse />
-          <UBreadcrumb :items="breadcrumbItems" class="ml-2" />
+          <UBreadcrumb :aria-label="t('common.breadcrumb')" :items="breadcrumbItems" class="ml-2" />
         </template>
         <template #right>
           <div class="flex items-center gap-2">

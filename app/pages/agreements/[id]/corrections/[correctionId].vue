@@ -18,7 +18,7 @@ definePageMeta({ key: route => route.path, i18n: { paths: {
 const { t, locale } = useI18n()
 const route = useRoute()
 const localePath = useLocalePath()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { getHeroCollapsed } = useDashboard()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
@@ -127,7 +127,7 @@ const save = async () => {
     if (correctionId.value !== owner) return
     if (await refresh() && correction.value && JSON.stringify(state.value) === submitted) hydrate(correction.value)
     refreshKey.value += 1
-    toast.add({ title: t('common.success'), description: t('common.updated_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
   } catch (failure) {
     if (correctionId.value === owner) showError(failure)
   } finally {

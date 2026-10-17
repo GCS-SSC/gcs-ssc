@@ -16,7 +16,7 @@ const { streamId, transferPaymentId, agencyId, canUpdateChild = false } = define
 }>()
 
 const { t, locale } = useI18n()
-const toast = useToast()
+const toast = useLocalizedToast()
 const localePath = useLocalePath()
 const { showError } = useApiErrorToast()
 const canConfigure = (item: ExtensionStreamRegistryItem) => canUpdateChild && item.canConfigure
@@ -118,7 +118,7 @@ const saveConfiguration = async (item: ExtensionStreamTableRow, enabled = item.s
       resetConfigureState()
     }
 
-    toast.add({ title: t('common.success'), description: t('common.updated_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
     return

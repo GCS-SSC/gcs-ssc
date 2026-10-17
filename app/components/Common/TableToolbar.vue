@@ -78,7 +78,7 @@ defineEmits(['add'])
             .getAllColumns()
             .filter(column => column.getCanHide())
             .map(column => ({
-              label: typeof column.columnDef.header === 'string' ? column.columnDef.header : upperFirst(column.id),
+              label: column.id === 'select' ? t('common.select') : typeof column.columnDef.header === 'string' ? column.columnDef.header : upperFirst(column.id),
               type: 'checkbox' as const,
               checked: column.getIsVisible(),
               onUpdateChecked(checked: boolean) {

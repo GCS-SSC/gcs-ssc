@@ -30,7 +30,7 @@ const {
 }>()
 
 const { t } = useI18n()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const { createValidator } = useZodI18n()
@@ -126,8 +126,8 @@ const saveRecipient = async () => {
     await refreshRecipients()
     if (!isCurrentContext(generation) || !closedSession || recipientModal.captureSession() !== null || recipientStatusState.value === 'error') return
     toast.add({
-      title: t('common.success'),
-      description: t(isUpdate ? 'common.updated_success' : 'common.added_success'),
+      title: toast.localized('common.success'),
+      description: toast.localized(isUpdate ? 'common.updated_success' : 'common.added_success'),
       color: 'success'
     })
   } catch (error: unknown) {
@@ -148,7 +148,7 @@ const deleteRecipient = async (row: TransferPaymentEligibleRecipientRow) => {
       `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/eligible-recipients/${row.id}`
     )
     if (!ok) return
-    toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
     return

@@ -22,7 +22,7 @@ definePageMeta({
 
 const { t, locale } = useI18n()
 const { formatDate } = useDateHelpers()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { saveJson } = useJsonRequest()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
@@ -84,8 +84,8 @@ const updateUser = async () => {
     isUpdateModalOpen.value = false
     await refresh()
     toast.add({
-      title: t('common.success'),
-      description: t('common.updated_success'),
+      title: toast.localized('common.success'),
+      description: toast.localized('common.updated_success'),
       color: 'success'
     })
   } catch (error: unknown) {
@@ -106,8 +106,8 @@ const addAssignment = async (role: RoleOptionItem) => {
   if (!assignment || !canAssignRole(role) || isMutationPending.value) return
   if (!assignment.role_id) {
     toast.add({
-      title: t('common.error'),
-      description: t('validation.required'),
+      title: toast.localized('common.error'),
+      description: toast.localized('validation.required'),
       color: 'error'
     })
     return
@@ -123,8 +123,8 @@ const addAssignment = async (role: RoleOptionItem) => {
     isAssignmentModalOpen.value = false
     await refresh()
     toast.add({
-      title: t('common.success'),
-      description: t('common.added_success'),
+      title: toast.localized('common.success'),
+      description: toast.localized('common.added_success'),
       color: 'success'
     })
   } catch (error: unknown) {
@@ -150,8 +150,8 @@ const deleteAssignment = async (assignmentId: string) => {
 
     await refresh()
     toast.add({
-      title: t('common.success'),
-      description: t('common.deleted_success'),
+      title: toast.localized('common.success'),
+      description: toast.localized('common.deleted_success'),
       color: 'success'
     })
   } catch (error: unknown) {

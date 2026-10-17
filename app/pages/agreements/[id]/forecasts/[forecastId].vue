@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { LocalizedToastText } from '~/composables/useLocalizedToast'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import type { FetchError } from 'ofetch'
 import { useStatusCatalog } from '~/composables/useStatusCatalog'
@@ -84,7 +85,7 @@ const { t, locale } = useI18n()
 const { getGroupedDisclosureControlsId, getGroupedDisclosureContentId } = useGroupedDisclosureIds()
 const route = useRoute()
 const localePath = useLocalePath()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { getHeroCollapsed } = useDashboard()
 const { showError } = useApiErrorToast()
 const { getBilingualValue } = useBilingualValue()
@@ -212,15 +213,15 @@ const canCreateForecastLineItems = computed(() => profile.value?.can_create_agre
 const canUpdateForecast = computed(() => profile.value?.can_update_agreement_role === true)
 const canEditForecastBreakdown = computed(() => canCreateForecastLineItems.value || canUpdateForecast.value)
 const workflowPrerequisiteWarning = computed(() => {
-  if (!isAssigned.value) return t('assignments.read_only_description')
-  if (!activeForecast.value || isTerminalStatus(activeForecast.value.egcs_fc_status)) return t('apiErrors.request.invalid_status')
+  if (!isAssigned.value) return toast.localized('assignments.read_only_description')
+  if (!activeForecast.value || isTerminalStatus(activeForecast.value.egcs_fc_status)) return toast.localized('apiErrors.request.invalid_status')
   return undefined
 })
 const completionPrerequisiteWarning = computed(() => workflowPrerequisiteWarning.value
-  ?? (activeForecastIsLocked.value ? t('apiErrors.request.invalid_status') : undefined))
-const warnPrerequisite = (warning: string | undefined): boolean => {
+  ?? (activeForecastIsLocked.value ? toast.localized('apiErrors.request.invalid_status') : undefined))
+const warnPrerequisite = (warning: LocalizedToastText | undefined): boolean => {
   if (!warning) return false
-  toast.add({ title: t('common.warning'), description: warning, color: 'warning' })
+  toast.add({ title: toast.localized('common.warning'), description: warning, color: 'warning' })
   return true
 }
 const canMutateForecast = (roleAllowed: boolean): boolean => !isLoadingDetail.value && roleAllowed
@@ -253,7 +254,7 @@ const lineItemByBudgetMonth = computed(() => {
 const openFundingEditor = (line: FundingCaseAgreementForecastLineItemRow) => {
   if (isSavingFunding.value || isSavingBreakdown.value || !canMutateForecast(canUpdateForecast.value)) return
   if (!line.budget_line_available || !activeBudgetLineItems.value.some(row => String(row.id) === getStableBudgetLineId(line))) {
-    toast.add({ title: t('common.warning'), description: t('agreement.forecasts.historical_budget_line_read_only'), color: 'warning' })
+    toast.add({ title: toast.localized('common.warning'), description: toast.localized('agreement.forecasts.historical_budget_line_read_only'), color: 'warning' })
     return
   }
   if (lineItemByBudgetMonth.value.get(getDraftKey(getStableBudgetLineId(line), line.egcs_fc_month))?.id !== line.id) return
@@ -271,7 +272,7 @@ const saveFundingEditor = async () => {
   const current = lineItemByBudgetMonth.value.get(getDraftKey(getStableBudgetLineId(line), line.egcs_fc_month))
   if (current?.id !== line.id) return
   if (!current.budget_line_available || !activeBudgetLineItems.value.some(row => String(row.id) === getStableBudgetLineId(current))) {
-    toast.add({ title: t('common.warning'), description: t('agreement.forecasts.historical_budget_line_read_only'), color: 'warning' })
+    toast.add({ title: toast.localized('common.warning'), description: toast.localized('agreement.forecasts.historical_budget_line_read_only'), color: 'warning' })
     return
   }
   try {
@@ -284,7 +285,7 @@ const saveFundingEditor = async () => {
     if (sources.some(source => !source.egcs_fc_fundingsubtype)
       || new Set(sources.map(source => source.egcs_fc_fundingsubtype)).size !== sources.length
       || compareMoney(sumMoney([amount, ...sources.map(source => source.egcs_fc_amount)]), totalAmount) !== 0) {
-      toast.add({ title: t('common.error'), description: t('agreement.completion_blockers.funding_breakdown_required'), color: 'error' })
+      toast.add({ title: toast.localized('common.error'), description: toast.localized('agreement.completion_blockers.funding_breakdown_required'), color: 'error' })
       return
     }
     isSavingFunding.value = true
@@ -607,8 +608,8 @@ const saveForecastBreakdown = async () => {
         const amount = getDraftMoney(budgetLineId, month)
         if (amount === null) {
           toast.add({
-            title: t('common.error'),
-            description: t('validation.invalid_number'),
+            title: toast.localized('common.error'),
+            description: toast.localized('validation.invalid_number'),
             color: 'error'
           })
           return
@@ -637,8 +638,8 @@ const saveForecastBreakdown = async () => {
     }
     if (!await reloadForecastBreakdown()) return
     toast.add({
-      title: t('common.success'),
-      description: t('agreement.forecasts.saved_breakdown'),
+      title: toast.localized('common.success'),
+      description: toast.localized('agreement.forecasts.saved_breakdown'),
       color: 'success'
     })
   } catch (error: unknown) {

@@ -47,7 +47,7 @@ const reset = () => {
   draft.value = null
   selectedStep.value = ''
   creating.value = false
-  removeError.value = ''
+  removeErrorKey.value = ''
 }
 const edit = (id: string) => {
   if (!document.value.steps.some(step => step.id === id)) return
@@ -104,18 +104,19 @@ const move = (offset: number) => {
   steps.splice(destination, 0, step!)
   const positions = new Map(steps.map((step, index) => [step.id, index]))
   if (steps.some((step, index) => step.flow && [step.flow.next, ...step.flow.branches.map(branch => branch.next)].some(target => target !== null && (positions.get(target) ?? -1) <= index))) {
-    removeError.value = t('guided_help.move_breaks_branch')
+    removeErrorKey.value = 'guided_help.move_breaks_branch'
     return
   }
   draft.value = { ...draft.value, steps }
-  removeError.value = ''
+  removeErrorKey.value = ''
 }
-const removeError = ref('')
+const removeErrorKey = ref('')
+const removeError = computed(() => removeErrorKey.value ? t(removeErrorKey.value) : '')
 const remove = () => {
   if (disabled) return
   const id = selectedStep.value
   if (document.value.steps.some(step => step.id !== id && step.flow && (step.flow.next === id || step.flow.branches.some(branch => branch.next === id)))) {
-    removeError.value = t('guided_help.step_referenced')
+    removeErrorKey.value = 'guided_help.step_referenced'
     return
   }
   document.value = { ...document.value, steps: document.value.steps.filter(step => step.id !== id) }

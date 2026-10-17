@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import type { LocalizedToastText } from '~/composables/useLocalizedToast'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
-import { resolveApiErrorDetails } from '~/composables/useApiErrorToast'
 import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { Entity_Type } from '~~/shared/types/database'
@@ -46,7 +46,7 @@ const {
   /** Optional role-only visibility; omission preserves legacy readiness-based presentation. */
   actionRoleAllowed?: boolean
   /** Localized owning-page prerequisite, separate from role permission. */
-  actionPrerequisiteWarning?: string
+  actionPrerequisiteWarning?: LocalizedToastText
   completePayload?: unknown
   labels?: GcsExtensionCompletionLabels
   titleKey?: string
@@ -78,8 +78,8 @@ const resolvedLabels = computed(() => ({
   completedSuccess: labels?.completedSuccess ?? t(completedSuccessKey ?? 'assessment.completion.completed_success'),
   confirmationMessage: labels?.confirmationMessage ?? (confirmationMessageKey ? t(confirmationMessageKey) : undefined)
 }))
-const toast = useToast()
-const { showError } = useApiErrorToast()
+const toast = useLocalizedToast()
+const { showError, resolveDetails } = useApiErrorToast()
 const { formatDate } = useDateHelpers({
   formatterOptions: {
     dateStyle: 'medium',
@@ -94,7 +94,8 @@ const completionQuery = computed(() => ({
 const completionIdentity = computed(() => `${entityType}:${entityId}`)
 
 const completionResponse: Ref<CompletionResponse | null> = ref(null)
-const completionErrorDetails: Ref<string[]> = ref([])
+const completionError: Ref<unknown> = ref(null)
+const completionErrorDetails = computed(() => resolveDetails(completionError.value))
 const status: Ref<'idle' | 'pending' | 'success' | 'error'> = ref('idle')
 const state: Ref<{ comments: string }> = ref({
   comments: ''
@@ -129,7 +130,7 @@ const refreshCompletion = async () => {
 }
 
 watch(completionQuery, async (_nextQuery, previousQuery) => {
-  completionErrorDetails.value = []
+  completionError.value = null
   if (previousQuery && `${previousQuery.entityType}:${previousQuery.entityId}` !== completionIdentity.value) {
     completionSubmissionGeneration += 1
     state.value.comments = ''
@@ -149,10 +150,10 @@ const submitCompletion = async () => {
   if (actionRoleAllowed !== undefined) {
     const blocker = completionResponse.value?.blocker
     const warning = actionPrerequisiteWarning
-      || (blocker ? t(`workflow.completion_blockers.${blocker}`) : undefined)
-      || (!canComplete.value ? t('workflow.action_prerequisite_unavailable') : undefined)
+      || (blocker ? toast.localized(`workflow.completion_blockers.${blocker}`) : undefined)
+      || (!canComplete.value ? toast.localized('workflow.action_prerequisite_unavailable') : undefined)
     if (warning) {
-      toast.add({ title: t('common.unavailable'), description: warning, color: 'warning' })
+      toast.add({ title: toast.localized('common.unavailable'), description: warning, color: 'warning' })
       return
     }
   }
@@ -169,7 +170,7 @@ const submitCompletion = async () => {
   const submissionGeneration = ++completionSubmissionGeneration
   try {
     isSubmitting.value = true
-    completionErrorDetails.value = []
+    completionError.value = null
     const response = await fetch(getClientRequestUrl('/api/completions/complete'), {
       method: 'POST',
       headers: {
@@ -191,13 +192,13 @@ const submitCompletion = async () => {
     state.value.comments = ''
     emit('completed')
     toast.add({
-      title: t('common.success'),
-      description: resolvedLabels.value.completedSuccess,
+      title: toast.localized('common.success'),
+      description: labels?.completedSuccess ?? toast.localized(completedSuccessKey ?? 'assessment.completion.completed_success'),
       color: 'success'
     })
   } catch (error) {
     if (submittedIdentity !== completionIdentity.value || submissionGeneration !== completionSubmissionGeneration) return
-    completionErrorDetails.value = resolveApiErrorDetails(error)
+    completionError.value = error
     showError(error)
   } finally {
     if (submissionGeneration === completionSubmissionGeneration) isSubmitting.value = false

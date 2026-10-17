@@ -30,7 +30,7 @@ const { t, locale } = useI18n()
 const { createValidator } = useZodI18n()
 const { sendJson } = useJsonRequest()
 const { showError } = useApiErrorToast()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { recoveryFocusTarget, focusRecoveredContent } = useLoadRecoveryFocus()
 type Choice = AccountReceivableClaimReductionChoice
 type DraftLine = { egcs_fc_claimline: string, egcs_fc_amount: string }
@@ -158,7 +158,7 @@ const formattedAmount = (row: GroupedRow, field: 'reconciled' | 'reduction' | 'b
 const openEdit = (choice: Choice) => {
   if (readOnly || !canUpdate || loadStatus.value !== 'success' || pending.value) return
   if (!canEdit) {
-    toast.add({ title: t('common.warning'), description: t('account_receivable.work_prerequisite'), color: 'warning' })
+    toast.add({ title: toast.localized('common.warning'), description: toast.localized('account_receivable.work_prerequisite'), color: 'warning' })
     return
   }
   lineModal.openUpdate(choice)
@@ -166,7 +166,7 @@ const openEdit = (choice: Choice) => {
 const save = async () => {
   if (!state.value || !selectedLine.value || readOnly || !canUpdate || loadStatus.value !== 'success') return
   if (!canEdit) {
-    toast.add({ title: t('common.warning'), description: t('account_receivable.work_prerequisite'), color: 'warning' })
+    toast.add({ title: toast.localized('common.warning'), description: toast.localized('account_receivable.work_prerequisite'), color: 'warning' })
     return
   }
   const session = lineModal.captureSession()

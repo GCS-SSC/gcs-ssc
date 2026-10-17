@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { LocalizedToastText } from '~/composables/useLocalizedToast'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import CommonCompletionSection from '~/components/Common/Completions/Section.vue'
 /* eslint-disable jsdoc/require-jsdoc -- concise page-local interaction handlers are self-documenting */
@@ -74,7 +75,7 @@ const route = useRoute()
 const { t } = useI18n()
 const { getBilingualValue } = useBilingualValue()
 const localePath = useLocalePath()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { getHeroCollapsed } = useDashboard()
 const reconcileId = String(route.params.reconcileId)
@@ -106,16 +107,16 @@ const isCurrentPage = () => !isDisposed && String(route.params.reconcileId) === 
 const canUpdateRole = computed(() => data.value?.can_update_role === true)
 const isMutationPending = computed(() => isSaving.value || isSavingFinal.value || isCancelling.value)
 const workflowPrerequisiteWarning = computed(() => {
-  if (!data.value?.is_assigned) return t('assignments.read_only_description')
-  if (!data.value.can_cancel) return t('agreement.claims.action_unavailable')
+  if (!data.value?.is_assigned) return toast.localized('assignments.read_only_description')
+  if (!data.value.can_cancel) return toast.localized('agreement.claims.action_unavailable')
   return undefined
 })
 const editPrerequisiteWarning = computed(() => workflowPrerequisiteWarning.value
-  ?? (!data.value?.can_update ? t('agreement.claims.action_unavailable') : undefined))
-const guardAction = (warning: string | undefined): boolean => {
+  ?? (!data.value?.can_update ? toast.localized('agreement.claims.action_unavailable') : undefined))
+const guardAction = (warning: LocalizedToastText | undefined): boolean => {
   if (!isCurrentPage() || status.value !== 'success') return false
   if (!canUpdateRole.value || warning) {
-    toast.add({ title: t('common.warning'), description: warning ?? t('agreement.claims.action_unavailable'), color: 'warning' })
+    toast.add({ title: toast.localized('common.warning'), description: warning ?? toast.localized('agreement.claims.action_unavailable'), color: 'warning' })
     return false
   }
   return true
@@ -247,8 +248,8 @@ const saveFinalState = async (value: boolean | 'indeterminate') => {
     await refresh()
     if (!isCurrentPage()) return
     toast.add({
-      title: t('common.success'),
-      description: t('agreement.claims.final_reconcile_saved'),
+      title: toast.localized('common.success'),
+      description: toast.localized('agreement.claims.final_reconcile_saved'),
       color: 'success'
     })
   } catch (caughtError: unknown) {
@@ -291,8 +292,8 @@ const saveLines = async (showSuccess = true, desiredIsFinal?: boolean): Promise<
     if (!isCurrentPage()) return false
     if (showSuccess) {
       toast.add({
-        title: t('common.success'),
-        description: t('agreement.claims.saved_reconcile'),
+        title: toast.localized('common.success'),
+        description: toast.localized('agreement.claims.saved_reconcile'),
         color: 'success'
       })
     }
@@ -324,8 +325,8 @@ const cancelReconciliation = async () => {
     await handleRuntimeChanged()
     if (!isCurrentPage()) return
     toast.add({
-      title: t('common.success'),
-      description: t('agreement.claims.cancel_reconcile_success'),
+      title: toast.localized('common.success'),
+      description: toast.localized('agreement.claims.cancel_reconcile_success'),
       color: 'success'
     })
   } catch (caughtError: unknown) {

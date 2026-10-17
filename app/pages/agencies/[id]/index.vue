@@ -51,7 +51,7 @@ type BreadcrumbItem = {
 
 const { t } = useI18n()
 const { getBilingualValue } = useBilingualValue()
-const toast = useToast()
+const toast = useLocalizedToast()
 const localePath = useLocalePath()
 const { showError } = useApiErrorToast()
 const route = useRoute()
@@ -191,8 +191,8 @@ const updateAgency = async () => {
     if (!response.ok) await throwFetchResponseError(response)
     closeAgencySession(session)
     toast.add({
-      title: t('common.success'),
-      description: t('common.updated_success') || 'Agency updated successfully',
+      title: toast.localized('common.success'),
+      description: toast.localized('common.updated_success'),
       color: 'success'
     })
     try {

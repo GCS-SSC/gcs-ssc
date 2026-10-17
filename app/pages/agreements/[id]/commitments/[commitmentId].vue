@@ -32,7 +32,7 @@ definePageMeta({
 const { t, locale } = useI18n()
 const route = useRoute()
 const localePath = useLocalePath()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { getHeroCollapsed } = useDashboard()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
@@ -236,8 +236,8 @@ const saveLine = async () => {
     lineModal.closeSession(session)
     await refreshPage()
     toast.add({
-      title: t('common.success'),
-      description: isUpdate ? t('common.updated_success') : t('common.added_success'),
+      title: toast.localized('common.success'),
+      description: isUpdate ? toast.localized('common.updated_success') : toast.localized('common.added_success'),
       color: 'success'
     })
   } catch (error: unknown) {
@@ -256,8 +256,8 @@ const deleteLine = async (lineId: string) => {
 
     await refreshPage()
     toast.add({
-      title: t('common.success'),
-      description: t('common.deleted_success'),
+      title: toast.localized('common.success'),
+      description: toast.localized('common.deleted_success'),
       color: 'success'
     })
   } catch (error: unknown) {

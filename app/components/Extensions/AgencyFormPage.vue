@@ -82,6 +82,7 @@ watch(formId, id => {
         <template #leading>
           <UDashboardSidebarCollapse />
           <UBreadcrumb
+            :aria-label="t('common.breadcrumb')"
             :items="[
               { label: agencyName, to: localePath(appRouteLocations.extensionAgencyWorkspaceList(extensionKey)) },
               { label: formCollectionLabel || formsLabel, to: formsLocation }

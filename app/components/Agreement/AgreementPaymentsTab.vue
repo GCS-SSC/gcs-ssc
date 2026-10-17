@@ -66,7 +66,7 @@ const getStatusLabel = (statusId: string) => {
   return definition ? (locale.value === 'fr' ? definition.nameFr : definition.nameEn) : ''
 }
 const localePath = useLocalePath()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
 const { saveJson, sendJson } = useJsonRequest()
@@ -300,8 +300,8 @@ const getMonthLabel = (month: number) => t(`agreement.payments.months.${MONTH_KE
 const getPeriodLabel = (periodStart: number, periodEnd: number) => `${getMonthLabel(periodStart)} - ${getMonthLabel(periodEnd)}`
 
 const warnRecordPrerequisite = () => toast.add({
-  title: t('common.warning'),
-  description: t('agreement.child_records.work_prerequisite'),
+  title: toast.localized('common.warning'),
+  description: toast.localized('agreement.child_records.work_prerequisite'),
   color: 'warning'
 })
 const loadWorkableRecord = async (recordId: string, action: 'update' | 'delete', isCurrent: () => boolean = () => true): Promise<FundingCaseAgreementPaymentRow | null> => {
@@ -374,7 +374,7 @@ const checkCreationPrerequisites = async (isCurrent: () => boolean = () => true)
   } catch {
     if (disposed || owner !== agreementId || generation !== recordActionGeneration || !isCurrent()) return false
   }
-  toast.add({ title: t('common.warning'), description: t('agreement.child_records.create_prerequisite'), color: 'warning' })
+  toast.add({ title: toast.localized('common.warning'), description: toast.localized('agreement.child_records.create_prerequisite'), color: 'warning' })
   return false
 }
 const openCreatePayment = async () => {
@@ -396,8 +396,8 @@ const openCreatePayment = async () => {
 const handleExtensionCreated = async () => {
   await refreshOverview()
   toast.add({
-    title: t('common.success'),
-    description: t('common.added_success'),
+    title: toast.localized('common.success'),
+    description: toast.localized('common.added_success'),
     color: 'success'
   })
 }
@@ -532,8 +532,8 @@ const savePayment = async () => {
     await refreshOverview()
     if (overviewStatus.value === 'error') return
     toast.add({
-      title: t('common.success'),
-      description: isUpdate ? t('common.updated_success') : t('common.added_success'),
+      title: toast.localized('common.success'),
+      description: isUpdate ? toast.localized('common.updated_success') : toast.localized('common.added_success'),
       color: 'success'
     })
   } catch (error: unknown) {
@@ -560,7 +560,7 @@ const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', 
     if (!deleted || !shouldProceed()) return
     await refreshOverview()
     if (!shouldProceed()) return
-    toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
     if (shouldProceed()) showError(error)
   }

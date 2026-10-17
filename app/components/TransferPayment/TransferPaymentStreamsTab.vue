@@ -16,7 +16,7 @@ const { programId, canUpdateChild, canDeleteChild } = defineProps<{
 }>()
 
 const { t } = useI18n()
-const toast = useToast()
+const toast = useLocalizedToast()
 const localePath = useLocalePath()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
@@ -148,8 +148,8 @@ const saveStream = async () => {
     await refreshStreams()
     if (!isCurrentContext(generation) || !closedSession || streamModal.captureSession() !== null || streamStatusState.value === 'error') return
     toast.add({
-      title: t('common.success'),
-      description: t(isUpdate ? 'common.updated_success' : 'common.added_success'),
+      title: toast.localized('common.success'),
+      description: toast.localized(isUpdate ? 'common.updated_success' : 'common.added_success'),
       color: 'success'
     })
   } catch (error: unknown) {
@@ -173,7 +173,7 @@ const deleteStream = async (stream: TransferPaymentStreamRow) => {
     if (!ok || !isCurrentContext(generation)) return
     await refreshStreams()
     if (!isCurrentContext(generation) || streamStatusState.value === 'error') return
-    toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
     if (isCurrentContext(generation)) showError(error)
   }

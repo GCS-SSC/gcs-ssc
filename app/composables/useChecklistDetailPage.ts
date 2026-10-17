@@ -71,7 +71,7 @@ export const useChecklistDetailPage = () => {
   const totalAdditionalReviewerCount: Ref<number> = ref(0)
   const pendingAdditionalReviewerCount: Ref<number> = ref(0)
   const { showError } = useApiErrorToast()
-  const toast = useToast()
+  const toast = useLocalizedToast()
 
   const serializeResponses = (value: EditableChecklistResponse[]) => JSON.stringify(value)
   const isDirty = computed(() => serializeResponses(responses.value) !== persistedResponses.value)
@@ -190,7 +190,7 @@ export const useChecklistDetailPage = () => {
       persistedResponses.value = submittedDraft
       await refresh()
       if (reviewId.value !== targetReviewId) return
-      toast.add({ title: t('common.success'), description: t('checklist.saved'), color: 'success' })
+      toast.add({ title: toast.localized('common.success'), description: toast.localized('checklist.saved'), color: 'success' })
     } catch (error) {
       showError(error)
     } finally {

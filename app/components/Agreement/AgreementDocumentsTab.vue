@@ -19,7 +19,7 @@ const apiBase = computed(() => amendmentId ? `/api/agreements/${agreementId}/ame
 
 const { t, locale } = useI18n()
 const validateGenerate = useZodI18n().createValidator(AgreementDocumentGenerateSchema)
-const toast = useToast()
+const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const isGenerateOpen: Ref<boolean> = ref(false)
@@ -135,7 +135,7 @@ const generateDocument = async () => {
     if (!response.ok) await throwFetchResponseError(response)
     isGenerateOpen.value = false
     await refresh()
-    toast.add({ title: t('common.success'), description: t('agreement.documents.generated_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('agreement.documents.generated_success'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
   } finally {
@@ -148,7 +148,7 @@ const deleteDocument = async (generatedDocument: AgreementGeneratedDocumentItem)
     const ok = await confirmDeleteRequest(`${apiBase.value}/documents/${generatedDocument.id}`)
     if (!ok) return
     await refresh()
-    toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
   }

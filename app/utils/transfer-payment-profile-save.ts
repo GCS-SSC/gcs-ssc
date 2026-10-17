@@ -1,3 +1,4 @@
+import type { useLocalizedToast } from '~/composables/useLocalizedToast'
 import type { TransferPaymentProfileForm } from '~~/shared/types/transfer-payment-ui'
 
 export interface TransferPaymentProfileSaveRequest {
@@ -12,9 +13,7 @@ interface CompleteTransferPaymentProfileSaveOptions {
   close: () => void
   refresh: () => Promise<void> | void
   t: (key: string) => string
-  toast: {
-    add: (notification: { title: string, description: string, color: 'success' }) => void
-  }
+  toast: Pick<ReturnType<typeof useLocalizedToast>, 'add' | 'localized'>
 }
 
 export interface TransferPaymentHeroStatsSource {
@@ -58,8 +57,8 @@ export const completeTransferPaymentProfileSave = async (
 ): Promise<void> => {
   options.close()
   options.toast.add({
-    title: options.t('common.success'),
-    description: options.t(options.isUpdate ? 'common.updated_success' : 'common.added_success'),
+    title: options.toast.localized('common.success'),
+    description: options.toast.localized(options.isUpdate ? 'common.updated_success' : 'common.added_success'),
     color: 'success'
   })
   await options.refresh()

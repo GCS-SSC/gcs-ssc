@@ -17,7 +17,7 @@ const { programId, agencyId, canUpdateChild, canDeleteChild } = defineProps<{
 }>()
 
 const { t, n, locale } = useI18n()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
@@ -106,8 +106,8 @@ const saveBudget = async () => {
 
   if (closedCurrentSession) {
     toast.add({
-      title: t('common.success'),
-      description: t(isUpdate ? 'common.updated_success' : 'common.added_success'),
+      title: toast.localized('common.success'),
+      description: toast.localized(isUpdate ? 'common.updated_success' : 'common.added_success'),
       color: 'success'
     })
   }
@@ -129,7 +129,7 @@ const deleteBudget = async (budget: TransferPaymentBudgetRow) => {
   try {
     const ok = await confirmDeleteRequest(`/api/transfer-payments/${programId}/budgets/${budget.id}`)
     if (!ok) return
-    toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
     return

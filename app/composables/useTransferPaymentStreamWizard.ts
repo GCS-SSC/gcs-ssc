@@ -15,8 +15,7 @@ type WizardRefreshHandler = () => Promise<boolean>
  * @returns Wizard open state and submit handler.
  */
 export const useTransferPaymentStreamWizard = (programId: MaybeRefOrGetter<string>, refresh: WizardRefreshHandler) => {
-  const { t } = useI18n()
-  const toast = useToast()
+  const toast = useLocalizedToast()
   const { showError } = useApiErrorToast()
   const isStreamWizardOpen: Ref<boolean> = ref(false)
   let contextGeneration = 0
@@ -72,8 +71,8 @@ export const useTransferPaymentStreamWizard = (programId: MaybeRefOrGetter<strin
       const refreshed = await refresh()
       if (!refreshed || !isCurrentContext(generation) || !closedSession || session.value !== null) return
       toast.add({
-        title: t('common.success'),
-        description: t('common.added_success'),
+        title: toast.localized('common.success'),
+        description: toast.localized('common.added_success'),
         color: 'success'
       })
     } catch (error: unknown) {

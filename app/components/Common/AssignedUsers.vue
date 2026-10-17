@@ -8,7 +8,7 @@ import { useBilingualValue } from '~/composables/useBilingualValue'
 const { entityType, entityId, showHeader = true } = defineProps<{ entityType: AssignableEntityType; entityId: string; showHeader?: boolean }>()
 const emit = defineEmits<{ changed: [] }>()
 const { t } = useI18n()
-const toast = useToast()
+const toast = useLocalizedToast()
 const confirm = useConfirmDialog()
 const { showError } = useApiErrorToast()
 type UserOption = { id: string; name: string }
@@ -97,7 +97,7 @@ const groupOptions = computed(() => {
 const currentGroupLabel = computed(() => groupOptions.value.find(option => option.value === currentGroupId.value)?.label ?? t('common.none'))
 const assignmentCount = computed(() => roster.value?.assignments.length ?? 0)
 
-const runAction = async (action: () => Promise<unknown>, successMessage: string) => {
+const runAction = async (action: () => Promise<unknown>, successMessage: ReturnType<typeof toast.localized>) => {
   if (disposed || isSaving.value || !canManage.value) return
   const generation = targetGeneration
   const isCurrent = () => !disposed && generation === targetGeneration
@@ -110,7 +110,7 @@ const runAction = async (action: () => Promise<unknown>, successMessage: string)
     if (!isCurrent() || rosterError.value || rosterStatus.value !== 'success') return
     emit('changed')
     toast.add({
-      title: t('common.success'),
+      title: toast.localized('common.success'),
       description: successMessage,
       color: 'success'
     })
@@ -125,7 +125,7 @@ const addUser = async () => {
   const userId = selectedUserId.value
   await runAction(
     () => mutateAssignment(baseUrl.value, { method: 'POST', body: { userId } }),
-    t('assignments.added_success')
+    toast.localized('assignments.added_success')
   )
 }
 const changeGroup = async (groupId: string | null) => {
@@ -150,7 +150,7 @@ const changeGroup = async (groupId: string | null) => {
         entityType === 'commonreview' ? `/api/reviews/${targetId}/group` : `/api/funding-case-intakes/${targetId}/group`,
         { method: 'PATCH', body: entityType === 'commonreview' ? { egcs_cn_group: groupId } : { egcs_fi_group: groupId } }
       ),
-      t('common.updated_success')
+      toast.localized('common.updated_success')
     )
   } finally {
     if (generation === targetGeneration) isGroupConfirming.value = false
@@ -165,7 +165,7 @@ const promote = async (userId: string) => {
   if (!canPromote(userId)) return
   await runAction(
     () => mutateAssignment(`${baseUrl.value}/primary`, { method: 'PATCH', body: { userId } }),
-    t('assignments.primary_updated_success')
+    toast.localized('assignments.primary_updated_success')
   )
 }
 
@@ -184,7 +184,7 @@ const remove = async (userId: string, name: string) => {
 
   await runAction(
     () => mutateAssignment(`${baseUrl.value}/${userId}`, { method: 'DELETE' }),
-    t('assignments.removed_success')
+    toast.localized('assignments.removed_success')
   )
 }
 </script>

@@ -17,7 +17,7 @@ const { agreementId, canCreate, canUpdate, canDelete, showUpdate = undefined, sh
 const { t } = useI18n()
 const localePath = useLocalePath()
 const { getBilingualValue } = useBilingualValue()
-const toast = useToast()
+const toast = useLocalizedToast()
 
 /**
  * Explains a blocked action before opening its editor or deletion confirmation.
@@ -28,8 +28,8 @@ const toast = useToast()
 const exerciseAction = (allowed: boolean, proceed: () => unknown, referenced = false) => {
   if (!allowed || referenced) {
     toast.add({
-      title: t('common.warning'),
-      description: t(referenced
+      title: toast.localized('common.warning'),
+      description: toast.localized(referenced
         ? 'apiErrors.agreement.applicant_recipient_in_use'
         : 'agreement.applicant_recipients.action_unavailable'),
       color: 'warning'

@@ -26,7 +26,7 @@ const removeCertification = (certificationIndex: number) => {
 }
 
 const getCertificationTitle = (certification: ApprovalTemplateEditorCertification) => {
-  const label = certification.egcs_cn_name_en || certification.egcs_cn_name_fr
+  const label = getBilingualValue(certification, 'egcs_cn_name', '')
   return `${certification.egcs_cn_order} - ${label || t('admin_common.resources.certifications')}`
 }
 

@@ -55,7 +55,7 @@ definePageMeta({
 const { t } = useI18n()
 const route = useRoute()
 const localePath = useLocalePath()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { getHeroCollapsed } = useDashboard()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
@@ -213,9 +213,9 @@ const canUpdateMonitor = computed(() =>
 const canUpdateMonitorRole = computed(() => profile.value?.can_update_agreement_role === true)
 const canCreateMonitorResource = computed(() => profile.value?.can_create_agreement_role === true)
 const canDeleteMonitorResource = computed(() => profile.value?.can_delete_agreement_role === true)
-const workflowPrerequisiteWarning = computed(() => !isAssigned.value ? t('assignments.read_only_description') : undefined)
+const workflowPrerequisiteWarning = computed(() => !isAssigned.value ? toast.localized('assignments.read_only_description') : undefined)
 const completionPrerequisiteWarning = computed(() => workflowPrerequisiteWarning.value
-  ?? (isMonitorLocked.value ? t('agreement.monitors.completion.status_locked') : undefined))
+  ?? (isMonitorLocked.value ? toast.localized('agreement.monitors.completion.status_locked') : undefined))
 
 const guardMonitorAction = (action: 'create' | 'update' | 'delete') => {
   if (isLoadingDetail.value || hasLoadError.value || !monitor.value) return false
@@ -225,7 +225,7 @@ const guardMonitorAction = (action: 'create' | 'update' | 'delete') => {
   if (!allowed) return false
   const warning = completionPrerequisiteWarning.value
   if (warning) {
-    toast.add({ title: t('assignments.read_only_title'), description: warning, color: 'warning' })
+    toast.add({ title: toast.localized('assignments.read_only_title'), description: warning, color: 'warning' })
     return false
   }
   return true
@@ -364,7 +364,7 @@ const saveResource = async <T extends { id?: string | number }>(
     if (modal.captureSession() !== session) return
     await refreshMonitor()
     if (!modal.closeSession(session)) return
-    toast.add({ title: t('common.success'), description: isUpdate ? t('common.updated_success') : t('common.added_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: isUpdate ? toast.localized('common.updated_success') : toast.localized('common.added_success'), color: 'success' })
   } catch (error: unknown) {
     if (modal.captureSession() === session) showError(error)
   } finally {
@@ -399,7 +399,7 @@ const saveMonitorMetadata = async () => {
     await refreshMonitor()
     if (metadataSession.value !== session) return
     isMetadataModalOpen.value = false
-    toast.add({ title: t('common.success'), description: t('common.updated_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
   } catch (error: unknown) {
     if (metadataSession.value === session) showError(error)
   } finally {
@@ -420,7 +420,7 @@ const deleteResource = async (path: AgreementMonitorResourcePath, id: string) =>
     const ok = await confirmDeleteRequest(`/api/agreements/${agreementId}/${path}/${id}`, { shouldProceed: () => guardMonitorAction('delete') })
     if (!ok) return
     await refreshMonitor()
-    toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
   } finally {

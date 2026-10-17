@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { LocalizedToastText } from '~/composables/useLocalizedToast'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import { parseOptionalMoneyInput } from '~/utils/optional-money-input'
 import { FundingCaseAgreementClaimLineItemBaseSchema } from '~~/shared/types/schemas/funding-case-agreement'
@@ -86,7 +87,7 @@ const { t, locale } = useI18n()
 const { getGroupedDisclosureControlsId, getGroupedDisclosureContentId } = useGroupedDisclosureIds()
 const route = useRoute()
 const localePath = useLocalePath()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { getHeroCollapsed } = useDashboard()
 const { showError } = useApiErrorToast()
 const { getBilingualValue } = useBilingualValue()
@@ -198,7 +199,7 @@ const isHistoricalClaimLine = (line: FundingCaseAgreementClaimLineItemRow): bool
   && !activeBudgetLineItems.value.some(choice => String(choice.id) === String(line.budget_line_item_id ?? line.egcs_fc_fundingagreementbudgetlineitem))
 const warnHistoricalClaimLine = (line: FundingCaseAgreementClaimLineItemRow): boolean => {
   if (!isHistoricalClaimLine(line)) return false
-  toast.add({ title: t('common.warning'), description: t('agreement.claims.historical_budget_line_read_only'), color: 'warning' })
+  toast.add({ title: toast.localized('common.warning'), description: toast.localized('agreement.claims.historical_budget_line_read_only'), color: 'warning' })
   return true
 }
 watch(() => {
@@ -235,7 +236,7 @@ const saveFundingEditor = async () => {
     if (sources.some(source => !source.egcs_fc_fundingsubtype)
       || new Set(sources.map(source => source.egcs_fc_fundingsubtype)).size !== sources.length
       || compareMoney(sumMoney([amount, ...sources.map(source => source.egcs_fc_amount)]), totalAmount) !== 0) {
-      toast.add({ title: t('common.error'), description: t('agreement.completion_blockers.funding_breakdown_required'), color: 'error' })
+      toast.add({ title: toast.localized('common.error'), description: toast.localized('agreement.completion_blockers.funding_breakdown_required'), color: 'error' })
       return
     }
     isSavingFunding.value = true
@@ -284,17 +285,17 @@ const canCreateClaimLineItems = computed(() => profile.value?.can_create_agreeme
 const canUpdateClaim = computed(() => profile.value?.can_update_agreement_role === true)
 const canAllocateClaimLines = canUpdateClaim
 const claimWorkflowPrerequisiteWarning = computed(() => {
-  if (!isAssigned.value) return t('assignments.read_only_description')
-  if (!activeClaim.value || isTerminalStatus(activeClaim.value.egcs_fc_status)) return t('agreement.claims.action_unavailable')
+  if (!isAssigned.value) return toast.localized('assignments.read_only_description')
+  if (!activeClaim.value || isTerminalStatus(activeClaim.value.egcs_fc_status)) return toast.localized('agreement.claims.action_unavailable')
   return undefined
 })
 const claimEditPrerequisiteWarning = computed(() => claimWorkflowPrerequisiteWarning.value
-  ?? (activeClaimIsLocked.value ? t('agreement.claims.action_unavailable') : undefined))
+  ?? (activeClaimIsLocked.value ? toast.localized('agreement.claims.action_unavailable') : undefined))
 const claimEditReady = computed(() => canUpdateClaim.value && !claimEditPrerequisiteWarning.value)
-const guardClaimAction = (roleAllowed: boolean, warning: string | undefined): boolean => {
+const guardClaimAction = (roleAllowed: boolean, warning: LocalizedToastText | undefined): boolean => {
   if (!roleAllowed) return false
   if (warning) {
-    toast.add({ title: t('common.warning'), description: warning, color: 'warning' })
+    toast.add({ title: toast.localized('common.warning'), description: warning, color: 'warning' })
     return false
   }
   return true
@@ -338,19 +339,19 @@ const canUpdateReconcileRole = computed(() => selectedReconcileDetail.value?.can
   ?? (selectedReconcileRole.value?.id === String(activeReconcile.value?.id) && selectedReconcileRole.value?.allowed === true))
 const reconcileWorkflowPrerequisiteWarning = computed(() => {
   if (!selectedReconcileDetail.value) return undefined
-  if (!selectedReconcileDetail.value.is_assigned) return t('assignments.read_only_description')
+  if (!selectedReconcileDetail.value.is_assigned) return toast.localized('assignments.read_only_description')
   if (!activeReconcile.value || isTerminalStatus(activeReconcile.value.egcs_fc_status)
     || selectedReconcileDetail.value.reconciliation.egcs_fc_isopen === false
-    || activeClaimReconciles.value.some(reconcile => reconcile.egcs_fc_isfinal && reconcile.isCompleted)) return t('agreement.claims.action_unavailable')
+    || activeClaimReconciles.value.some(reconcile => reconcile.egcs_fc_isfinal && reconcile.isCompleted)) return toast.localized('agreement.claims.action_unavailable')
   return undefined
 })
 const reconcileEditPrerequisiteWarning = computed(() => reconcileWorkflowPrerequisiteWarning.value
-  ?? (!canUpdateReconcile.value || isRecordLocked(activeReconcile.value) ? t('agreement.claims.action_unavailable') : undefined))
-const guardReconcileAction = (warning: string | undefined): boolean => {
+  ?? (!canUpdateReconcile.value || isRecordLocked(activeReconcile.value) ? toast.localized('agreement.claims.action_unavailable') : undefined))
+const guardReconcileAction = (warning: LocalizedToastText | undefined): boolean => {
   if (!selectedReconcileDetail.value || isLoadingDetail.value
     || (!getDefinition(activeReconcile.value?.egcs_fc_status) && statusCatalog.state.value.status === 'pending')) return false
   if (!canUpdateReconcileRole.value || warning) {
-    toast.add({ title: t('common.warning'), description: warning ?? t('agreement.claims.action_unavailable'), color: 'warning' })
+    toast.add({ title: toast.localized('common.warning'), description: warning ?? toast.localized('agreement.claims.action_unavailable'), color: 'warning' })
     return false
   }
   return true
@@ -917,7 +918,7 @@ const saveSubmission = async () => {
     }
     if (didMutate) {
       await refreshPage()
-      toast.add({ title: t('common.success'), description: t('agreement.claims.saved_submission'), color: 'success' })
+      toast.add({ title: toast.localized('common.success'), description: toast.localized('agreement.claims.saved_submission'), color: 'success' })
     }
     submissionModal.closeSession(session)
   } catch (error: unknown) {
@@ -936,7 +937,7 @@ const allocateClaimLine = async (line: FundingCaseAgreementClaimLineItemRow) => 
   }
 
   if (!guardClaimAction(canAllocateClaimLines.value, claimEditPrerequisiteWarning.value
-    ?? (!budgetLineItemId ? t('agreement.claims.action_unavailable') : undefined))) return
+    ?? (!budgetLineItemId ? toast.localized('agreement.claims.action_unavailable') : undefined))) return
 
   try {
     allocatingClaimLineId.value = lineId
@@ -944,7 +945,7 @@ const allocateClaimLine = async (line: FundingCaseAgreementClaimLineItemRow) => 
       egcs_fc_fundingagreementbudgetlineitem: budgetLineItemId
     })
     await refreshPage()
-    toast.add({ title: t('common.success'), description: t('agreement.claims.allocation_saved'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('agreement.claims.allocation_saved'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
   } finally {
@@ -965,7 +966,7 @@ const transitionClaim = async (
     loadingRef.value = true
     await sendJson(`/api/agreements/${agreementId}/claims/${claimId}/${action}`, 'POST')
     await refreshPage()
-    toast.add({ title: t('common.success'), description: t(successKey), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized(successKey), color: 'success' })
   } catch (error: unknown) {
     showError(error)
   } finally {
@@ -975,7 +976,7 @@ const transitionClaim = async (
 
 const withdrawClaim = async () => {
   if (isLoadingDetail.value || isWithdrawingClaim.value || isCancellingClaim.value || !guardClaimAction(canWithdrawClaim.value,
-    claimWorkflowPrerequisiteWarning.value ?? (!withdrawClaimReady.value ? t('agreement.claims.action_unavailable') : undefined))) {
+    claimWorkflowPrerequisiteWarning.value ?? (!withdrawClaimReady.value ? toast.localized('agreement.claims.action_unavailable') : undefined))) {
     return
   }
 
@@ -984,7 +985,7 @@ const withdrawClaim = async () => {
 
 const cancelClaim = async () => {
   if (isLoadingDetail.value || isCancellingClaim.value || isWithdrawingClaim.value || !guardClaimAction(canCancelClaim.value,
-    claimWorkflowPrerequisiteWarning.value ?? (!cancelClaimReady.value ? t('agreement.claims.action_unavailable') : undefined))) {
+    claimWorkflowPrerequisiteWarning.value ?? (!cancelClaimReady.value ? toast.localized('agreement.claims.action_unavailable') : undefined))) {
     return
   }
 
@@ -993,7 +994,7 @@ const cancelClaim = async () => {
 
 const startReconcile = async () => {
   if (isLoadingDetail.value || isStartingReconcile.value || !guardClaimAction(canStartReconcile.value,
-    claimWorkflowPrerequisiteWarning.value ?? (!startReconcileReady.value ? t('agreement.claims.reconcile_prerequisites') : undefined))) {
+    claimWorkflowPrerequisiteWarning.value ?? (!startReconcileReady.value ? toast.localized('agreement.claims.reconcile_prerequisites') : undefined))) {
     return
   }
 
@@ -1018,7 +1019,7 @@ const setActiveReconcileFinal = (value: boolean | 'indeterminate') => {
   }
 
   if (!guardReconcileAction(reconcileEditPrerequisiteWarning.value
-    ?? (value && otherFinalReconcile.value ? t('agreement.claims.final_reconcile_exists', { id: otherFinalReconcile.value.id }) : undefined))) return
+    ?? (value && otherFinalReconcile.value ? toast.localized('agreement.claims.final_reconcile_exists', { id: otherFinalReconcile.value.id }) : undefined))) return
   draftReconcileIsFinal.value = value
 }
 
@@ -1027,7 +1028,7 @@ const saveReconcile = async (showSuccess = true): Promise<boolean> => {
   const detail = selectedReconcileDetail.value
   if (!reconcile || !detail || isReconcileMutationPending.value
     || !guardReconcileAction(reconcileEditPrerequisiteWarning.value
-      ?? (draftReconcileIsFinal.value && otherFinalReconcile.value ? t('agreement.claims.final_reconcile_exists', { id: otherFinalReconcile.value.id }) : undefined))) return false
+      ?? (draftReconcileIsFinal.value && otherFinalReconcile.value ? toast.localized('agreement.claims.final_reconcile_exists', { id: otherFinalReconcile.value.id }) : undefined))) return false
 
   const desiredIsFinal = draftReconcileIsFinal.value
   let lineRequests: Array<{
@@ -1059,7 +1060,7 @@ const saveReconcile = async (showSuccess = true): Promise<boolean> => {
     })
     await refreshPage()
     await loadSelectedReconcileDetail()
-    if (showSuccess) toast.add({ title: t('common.success'), description: t('agreement.claims.saved_reconcile'), color: 'success' })
+    if (showSuccess) toast.add({ title: toast.localized('common.success'), description: toast.localized('agreement.claims.saved_reconcile'), color: 'success' })
     return true
   } catch (error: unknown) {
     showError(error)
@@ -1082,7 +1083,7 @@ const saveReconcileLine = async () => {
   const session = reconcileLineModal.captureSession()
   if (!line || !reconcile || !detail || !detailLine || isSavingReconcile.value || isCancellingReconcile.value || !reconcileLineModal.isCurrentSession(session)
     || !guardReconcileAction(reconcileEditPrerequisiteWarning.value
-      ?? (draftReconcileIsFinal.value && otherFinalReconcile.value ? t('agreement.claims.final_reconcile_exists', { id: otherFinalReconcile.value.id }) : undefined))
+      ?? (draftReconcileIsFinal.value && otherFinalReconcile.value ? toast.localized('agreement.claims.final_reconcile_exists', { id: otherFinalReconcile.value.id }) : undefined))
     || !reconcileLinePending.begin(session)) return
   const desiredIsFinal = draftReconcileIsFinal.value
 
@@ -1109,7 +1110,7 @@ const saveReconcileLine = async () => {
     await refreshPage()
     await loadSelectedReconcileDetail()
     if (!reconcileLineModal.closeSession(session)) return
-    toast.add({ title: t('common.success'), description: t('agreement.claims.saved_reconcile_line'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('agreement.claims.saved_reconcile_line'), color: 'success' })
   } catch (error: unknown) {
     if (reconcileLineModal.isCurrentSession(session)) showError(error)
   } finally {
@@ -1124,15 +1125,15 @@ const cancelReconciliation = async () => {
   const reconcile = activeReconcile.value
   if (!reconcile || isReconcileMutationPending.value || isCancellingReconcile.value
     || !guardReconcileAction(reconcileWorkflowPrerequisiteWarning.value
-      ?? (!canCancelReconcile.value ? t('agreement.claims.action_unavailable') : undefined))) return
+      ?? (!canCancelReconcile.value ? toast.localized('agreement.claims.action_unavailable') : undefined))) return
   if (!window.confirm(t('agreement.claims.cancel_reconcile_confirmation'))) return
   try {
     isCancellingReconcile.value = true
     await sendJson(`/api/agreements/${agreementId}/claim-reconciles/${reconcile.id}/cancel`, 'POST')
     await refreshReconcileWorkspace()
     toast.add({
-      title: t('common.success'),
-      description: t('agreement.claims.cancel_reconcile_success'),
+      title: toast.localized('common.success'),
+      description: toast.localized('agreement.claims.cancel_reconcile_success'),
       color: 'success'
     })
   } catch (error: unknown) {

@@ -35,7 +35,7 @@ const { t } = useI18n()
 const { getBilingualValue } = useBilingualValue()
 const getAgreementSubtypeActionTarget = (subtype: AgreementSubtypeRow) =>
   `${getBilingualValue(subtype, 'agreement_name', String(subtype.id))} [${subtype.id}]`
-const toast = useToast()
+const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const { createValidator } = useZodI18n()
@@ -125,8 +125,8 @@ const save = async () => {
     await refresh()
     if (!isCurrentContext(generation) || !closedSession || modal.captureSession() !== null || status.value === 'error') return
     toast.add({
-      title: t('common.success'),
-      description: isUpdate ? t('common.updated_success') : t('common.added_success'),
+      title: toast.localized('common.success'),
+      description: isUpdate ? toast.localized('common.updated_success') : toast.localized('common.added_success'),
       color: 'success'
     })
   } catch (error: unknown) {
@@ -151,7 +151,7 @@ const remove = async (row: AgreementSubtypeRow) => {
     if (!ok || !isCurrentContext(generation)) return
     await refresh()
     if (!isCurrentContext(generation) || status.value !== 'success') return
-    toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
     if (isCurrentContext(generation)) showError(error)
   } finally {

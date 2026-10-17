@@ -53,7 +53,7 @@ const { agencyId, canCreate, canUpdate, canDelete } = defineProps<{
 const { t } = useI18n()
 const { getGroupedDisclosureControlsId, getGroupedDisclosureContentId } = useGroupedDisclosureIds()
 const { getBilingualValue } = useBilingualValue()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
 
@@ -322,7 +322,7 @@ const saveCategory = async () => {
     committed = true
     if (requestedGeneration !== refreshGeneration) return
     if (selectedCategory.value === requestedState) closeCategoryModal()
-    toast.add({ title: t('common.success'), description: t(updating ? 'common.updated_success' : 'common.added_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized(updating ? 'common.updated_success' : 'common.added_success'), color: 'success' })
     await refresh()
   } catch (error: unknown) {
     if (!committed) showError(error)
@@ -351,7 +351,7 @@ const saveLineItem = async () => {
     committed = true
     if (requestedGeneration !== refreshGeneration) return
     if (selectedLineItem.value === requestedState) closeLineItemModal()
-    toast.add({ title: t('common.success'), description: t(updating ? 'common.updated_success' : 'common.added_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized(updating ? 'common.updated_success' : 'common.added_success'), color: 'success' })
     await refresh()
   } catch (error: unknown) {
     if (!committed) showError(error)

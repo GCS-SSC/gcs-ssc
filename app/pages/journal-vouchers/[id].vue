@@ -19,7 +19,7 @@ const localePath = useLocalePath()
 const { getHeroCollapsed } = useDashboard()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { sendJson } = useJsonRequest()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const id = String(route.params.id)
@@ -143,7 +143,7 @@ const save = async () => {
     })) }
     await sendJson(`/api/journal-vouchers/${id}`, 'PATCH', payload)
     await refreshPage()
-    toast.add({ title: t('common.success'), description: t('common.updated_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
   } catch (failure) {
     showError(failure)
   } finally { saving.value = false }

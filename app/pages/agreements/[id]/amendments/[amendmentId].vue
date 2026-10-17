@@ -31,7 +31,7 @@ const nameRequirementId = useId()
 const { t, n } = useI18n()
 const { formatDate } = useDateHelpers()
 const localePath = useLocalePath()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { getBilingualValue } = useBilingualValue()
 const { getHeroCollapsed } = useDashboard()
@@ -236,8 +236,8 @@ const ownsAmendmentPage = () => !amendmentActionsDisposed
   && route.params.id === agreementId
   && route.params.amendmentId === amendmentId
 const warnSnapshotPrerequisite = (missingAssignment = false) => toast.add({
-  title: t('common.warning'),
-  description: t(missingAssignment ? 'assignments.read_only_description' : 'agreement.child_records.work_prerequisite'),
+  title: toast.localized('common.warning'),
+  description: toast.localized(missingAssignment ? 'assignments.read_only_description' : 'agreement.child_records.work_prerequisite'),
   color: 'warning'
 })
 const checkSnapshotPrerequisites = async (domain: SnapshotDomain, shouldProceed: () => boolean) => {
@@ -285,7 +285,7 @@ const createSnapshot = async (domain: SnapshotDomain) => {
     if (!shouldProceed()) return
     await refresh()
     if (!shouldProceed() || error.value || status.value === 'error') return
-    toast.add({ title: t('common.success'), description: t(`agreement.amendments.${domain}_snapshot_created`), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized(`agreement.amendments.${domain}_snapshot_created`), color: 'success' })
   } catch (caughtError: unknown) {
     if (shouldProceed()) showError(caughtError)
   } finally {
@@ -440,7 +440,7 @@ const saveScope = async () => {
     if (!shouldProceed()) return
     await refresh()
     if (!shouldProceed()) return
-    toast.add({ title: t('common.success'), description: t('agreement.amendments.scope_updated'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('agreement.amendments.scope_updated'), color: 'success' })
   } catch (caughtError: unknown) {
     if (shouldProceed()) showError(caughtError)
   } finally {
@@ -462,7 +462,7 @@ const saveRisk = async () => {
         : Number(proposedRiskScoreSelection.value)
     })
     await refreshPage()
-    toast.add({ title: t('common.success'), description: t('agreement.amendments.risk_updated'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('agreement.amendments.risk_updated'), color: 'success' })
   } catch (caughtError: unknown) {
     showError(caughtError)
   } finally {
@@ -477,7 +477,7 @@ const cancelAmendment = async () => {
     await saveJson(`${amendmentApiBase}/cancel`, 'POST', {})
     isCancelModalOpen.value = false
     await refresh()
-    toast.add({ title: t('common.success'), description: t('agreement.amendments.cancelled_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('agreement.amendments.cancelled_success'), color: 'success' })
   } catch (caughtError: unknown) {
     showError(caughtError)
   } finally {

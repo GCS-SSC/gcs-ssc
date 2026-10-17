@@ -28,7 +28,7 @@ const {
 }>()
 
 const { t } = useI18n()
-const toast = useToast()
+const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const { createValidator } = useZodI18n()
@@ -156,7 +156,7 @@ const saveTemplate = async () => {
     templatePending.end(session)
   }
 
-  toast.add({ title: t('common.success'), description: request.isUpdate ? t('common.updated_success') : t('common.added_success'), color: 'success' })
+  toast.add({ title: toast.localized('common.success'), description: request.isUpdate ? toast.localized('common.updated_success') : toast.localized('common.added_success'), color: 'success' })
   try {
     await refresh()
   } catch (error: unknown) {
@@ -168,7 +168,7 @@ const deleteTemplate = async (row: AgencyDocumentTemplateItem) => {
   try {
     const ok = await confirmDeleteRequest(`/api/agency/${agencyId}/document-templates/${row.id}`)
     if (!ok) return
-    toast.add({ title: t('common.success'), description: t('common.deleted_success'), color: 'success' })
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
     showError(error)
     return

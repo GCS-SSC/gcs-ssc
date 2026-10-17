@@ -1,3 +1,6 @@
+import type { z } from 'zod'
+import { LOCALIZED_VALIDATION_ISSUE } from '~/composables/useZodI18n'
+import type { useLocalizedToast } from '~/composables/useLocalizedToast'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import type { ApprovalTemplate } from '~~/shared/types/schemas'
 import type { ApprovalTemplateEditorTemplate } from '~/types/approval-template-editor'
@@ -5,10 +8,8 @@ import type { ApprovalTemplateEditorTemplate } from '~/types/approval-template-e
 export interface ApprovalTemplateDetailSaveOptions {
   state: ApprovalTemplateEditorTemplate | null
   requestUrl: RequestInfo | URL
-  validate: (payload: ApprovalTemplate) => Promise<Array<{ message?: unknown }>>
-  toast: {
-    add: (notification: { title: string, description: string, color: 'error' | 'success' }) => void
-  }
+  validate: (payload: ApprovalTemplate) => Promise<Array<{ message?: unknown, [LOCALIZED_VALIDATION_ISSUE]?: z.ZodIssue }>>
+  toast: Pick<ReturnType<typeof useLocalizedToast>, 'add' | 'localized' | 'validation'>
   t: (key: string) => string
   showError: (error: unknown) => void
   showSuccess?: boolean
@@ -86,7 +87,6 @@ export const saveApprovalTemplateDetail = async (options: ApprovalTemplateDetail
     requestUrl,
     validate,
     toast,
-    t,
     showError,
     showSuccess = true
   } = options
@@ -99,8 +99,12 @@ export const saveApprovalTemplateDetail = async (options: ApprovalTemplateDetail
     const result = await validate(payload)
     if (result.length > 0) {
       toast.add({
-        title: t('common.error'),
-        description: t(String(result[0]?.message ?? 'common.error')),
+        title: toast.localized('common.error'),
+        description: result[0]?.[LOCALIZED_VALIDATION_ISSUE]
+          ? toast.validation(result[0][LOCALIZED_VALIDATION_ISSUE])
+          : typeof result[0]?.message === 'string'
+            ? result[0].message
+            : toast.localized('common.error'),
         color: 'error'
       })
       return false
@@ -118,8 +122,8 @@ export const saveApprovalTemplateDetail = async (options: ApprovalTemplateDetail
     }
     if (showSuccess) {
       toast.add({
-        title: t('common.success'),
-        description: t('common.updated_success'),
+        title: toast.localized('common.success'),
+        description: toast.localized('common.updated_success'),
         color: 'success'
       })
     }
