@@ -284,11 +284,13 @@ const activeClaimIsLocked = computed(() => isRecordLocked(activeClaim.value))
 const canCreateClaimLineItems = computed(() => profile.value?.can_create_agreement_role === true)
 const canUpdateClaim = computed(() => profile.value?.can_update_agreement_role === true)
 const canAllocateClaimLines = canUpdateClaim
-const claimWorkflowPrerequisiteWarning = computed(() => {
+const claimSourcePrerequisiteWarning = computed(() => {
   if (!isAssigned.value) return toast.localized('assignments.read_only_description')
-  if (!activeClaim.value || isTerminalStatus(activeClaim.value.egcs_fc_status)) return toast.localized('agreement.claims.action_unavailable')
+  if (!activeClaim.value) return toast.localized('agreement.claims.action_unavailable')
   return undefined
 })
+const claimWorkflowPrerequisiteWarning = computed(() => claimSourcePrerequisiteWarning.value
+  ?? (isTerminalStatus(activeClaim.value?.egcs_fc_status) ? toast.localized('agreement.claims.action_unavailable') : undefined))
 const claimEditPrerequisiteWarning = computed(() => claimWorkflowPrerequisiteWarning.value
   ?? (activeClaimIsLocked.value ? toast.localized('agreement.claims.action_unavailable') : undefined))
 const claimEditReady = computed(() => canUpdateClaim.value && !claimEditPrerequisiteWarning.value)
@@ -994,7 +996,7 @@ const cancelClaim = async () => {
 
 const startReconcile = async () => {
   if (isLoadingDetail.value || isStartingReconcile.value || !guardClaimAction(canStartReconcile.value,
-    claimWorkflowPrerequisiteWarning.value ?? (!startReconcileReady.value ? toast.localized('agreement.claims.reconcile_prerequisites') : undefined))) {
+    claimSourcePrerequisiteWarning.value ?? (!startReconcileReady.value ? toast.localized('agreement.claims.reconcile_prerequisites') : undefined))) {
     return
   }
 
@@ -1160,7 +1162,7 @@ const cancelReconciliation = async () => {
           <CommonEntityHero
             :is-collapsed="isHeroCollapsed"
             icon="i-lucide-receipt-text"
-            :actions="receivableEntry.entry.value ? [{ label: t('account_receivable.create'), icon: 'i-lucide-receipt-text', onClick: () => { receivableEntry.open.value = true } }] : []"
+            :actions="receivableEntry.canCreate.value ? [{ label: t('account_receivable.create'), icon: 'i-lucide-receipt-text', loading: receivableEntry.starting.value, onClick: receivableEntry.start }] : []"
             :title="claimHeroTitle"
             :meta-items="claimHeroMetaItems"
             :badges="claimHeroBadges" />

@@ -1,3 +1,4 @@
+import { readAgreementMonitorBody } from '~~/server/utils/agreement-monitor-validation'
 import { FundingCaseAgreementMonitorFollowupUpdatePatchSchema } from '~~/shared/types/schemas'
 import { badRequest } from '~~/server/utils/api-errors'
 import {
@@ -19,7 +20,7 @@ export default defineEventHandler(async event => {
   const prepared = await prepareAgreementMonitorRoute(event, 'update', { entityType: 'fundingcasemonitor', entityId: monitorId })
   if (!prepared || !('agreementId' in prepared)) return prepared
   const { agreementId, agreementContext, db } = prepared
-  const validated = await readValidatedBodyI18n(event, FundingCaseAgreementMonitorFollowupUpdatePatchSchema)
+  const validated = await readAgreementMonitorBody(event, FundingCaseAgreementMonitorFollowupUpdatePatchSchema)
   if (Object.keys(validated).length === 0) return await badRequest(event, 'NO_UPDATABLE_FIELDS', 'apiErrors.request.no_updatable_fields')
   const followupId = String(existing.egcs_fc_fundingagreementmonitorfollowup)
   return await executeAgreementMonitorMutation(event, db, agreementId, agreementContext, monitorId, async trx => {

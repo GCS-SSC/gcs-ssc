@@ -93,6 +93,7 @@ const lineFromBudget = (line: SummaryBudgetLine, hasActiveForecast: boolean): Su
 /**
  * Builds one fiscal-year-at-a-time monthly financial grid. Annual budget has no monthly allocation.
  *
+ * @param agreementCurrency - Denomination for a fiscal year without currency-bearing records.
  * @param fiscalYears - Current agreement budget fiscal years.
  * @param budgetLines - Current annual budget lines, using stable lineage IDs and total amount.
  * @param forecasts - Authored forecast records; only the active record may be displayed.
@@ -105,6 +106,7 @@ const lineFromBudget = (line: SummaryBudgetLine, hasActiveForecast: boolean): Su
  * @returns Fiscal years with currency-specific monthly line grids and payment totals.
  */
 export const buildAgreementFinancialSummary = (
+  agreementCurrency: Currency_Codes,
   fiscalYears: SummaryFiscalYear[],
   budgetLines: SummaryBudgetLine[],
   forecasts: SummaryForecast[],
@@ -131,7 +133,7 @@ export const buildAgreementFinancialSummary = (
       ...yearPayments.map(payment => payment.currency),
       ...accountingEntries.filter(entry => entry.fiscalYearId === year.id).map(entry => entry.currency)
     ])
-    if (currencies.size === 0) currencies.add('cad')
+    if (currencies.size === 0) currencies.add(agreementCurrency)
 
     const reconciledByClaimLine = new Map<string, Money>()
     for (const row of reconciliations) {

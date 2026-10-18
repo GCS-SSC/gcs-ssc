@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- Modal sessions have focused regression coverage. */
-import { ref, watch } from 'vue'
+import { onUnmounted, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import { CorrectionCancelSchema } from '~~/shared/types/schemas/correction'
 
@@ -14,6 +14,9 @@ const { sendJson } = useJsonRequest()
 const state: Ref<{ egcs_fc_reason: string } | null> = ref(null)
 const pending: Ref<boolean> = ref(false)
 let session = 0
+onUnmounted(() => {
+  session += 1
+})
 watch([open, () => correctionId], ([value]) => {
   session += 1
   pending.value = false

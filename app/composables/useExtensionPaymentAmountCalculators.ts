@@ -1,6 +1,5 @@
 import { computed, toValue } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
-import type { FetchError } from 'ofetch'
 import type { ExtensionPaymentAmountCalculatorsResponse } from '~~/shared/types/schemas/extensions'
 
 /**
@@ -14,35 +13,25 @@ export const useExtensionPaymentAmountCalculators = (options: {
   agreementId: MaybeRefOrGetter<string>
 }) => {
   const agreementId = computed(() => toValue(options.agreementId))
-  const query = computed(() => ({
-    operation: 'agreement.payments.create',
-    agreementId: agreementId.value
-  }))
-  const { data } = useFetch<ExtensionPaymentAmountCalculatorsResponse, FetchError, string>(
-    '/api/extensions/payment-amount-calculators',
-    {
-      query,
-      /**
-       * Builds the empty response used before the request completes.
-       *
-       * @returns Empty calculator response.
-       */
-      default: (): ExtensionPaymentAmountCalculatorsResponse => ({
-        operation: 'agreement.payments.create',
-        items: [],
-        conflict: false
-      }),
-      server: false,
-      watch: [() => agreementId.value]
-    }
-  )
-
-  const items = computed(() => data.value?.items ?? [])
-  const hasConflict = computed(() => data.value?.conflict === true)
+  const key = computed(() => `payment-amount-calculators:${agreementId.value}`)
+  const { data, status, error, refresh } = useAsyncData(key, async () => {
+    const owner = agreementId.value
+    const response = await $fetch<ExtensionPaymentAmountCalculatorsResponse, string>(
+      '/api/extensions/payment-amount-calculators',
+      { query: { operation: 'agreement.payments.create', agreementId: owner } }
+    )
+    return { agreementId: owner, response }
+  }, { server: false })
+  const isReady = computed(() => status.value === 'success' && data.value?.agreementId === agreementId.value)
+  const items = computed(() => isReady.value ? data.value?.response.items ?? [] : [])
+  const hasConflict = computed(() => isReady.value && data.value?.response.conflict === true)
   const calculator = computed(() => items.value.length === 1 && !hasConflict.value ? items.value[0] ?? null : null)
 
   return {
     calculator,
-    hasConflict
+    hasConflict,
+    isReady,
+    error,
+    refresh
   }
 }

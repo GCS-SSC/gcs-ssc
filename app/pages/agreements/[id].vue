@@ -3,7 +3,8 @@ import { usePageResourceError } from '~/composables/usePageResourceError'
 import { agreementCalendarDate } from '~/utils/agreement-calendar-date'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
+import { useAgreementChildActionPrerequisites } from '~/composables/useAgreementChildActionPrerequisites'
 import type { Ref } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
 import type { FundingCaseAgreementProfileForm, FundingCaseAgreementProfileRow } from '~~/shared/types/funding-case-agreement-ui'
@@ -139,14 +140,35 @@ const {
 const selectedProfile: Ref<AgreementDetailForm | null> = ref(null)
 const isSaving: Ref<boolean> = ref(false)
 const { can, canAny, permissionsReady } = useCan()
+const { user: currentActor, permissionRevision } = useAuth()
 const isBusinessLocked = computed(() => isRecordLocked(profile.value))
 const canCreateChildRecords = computed(() => Boolean(profile.value?.can_create_child_records) && !isBusinessLocked.value)
 const canUpdateBusinessRecord = computed(() => Boolean(profile.value?.can_update) && !isBusinessLocked.value)
 const canCreateFinancialChildRole = computed(() => profile.value?.can_create_child_records_role === true)
 const canUpdateFinancialChildRole = computed(() => profile.value?.can_update_child_records_role === true)
 const canDeleteFinancialChildRole = computed(() => profile.value?.can_delete_child_records_role === true)
-const canUpdateChildRecords = computed(() => Boolean(profile.value?.can_update_child_records) && !isBusinessLocked.value)
-const canDeleteChildRecords = computed(() => Boolean(profile.value?.can_delete_child_records) && !isBusinessLocked.value)
+const { check: checkProfileAction } = useAgreementChildActionPrerequisites(() => ({ kind: 'agreement', agreementId: id }))
+const isCheckingProfileEdit = ref(false)
+let profileActionGeneration = 0
+watch(() => [profile.value?.id, canUpdateFinancialChildRole.value, currentActor.value?.id, permissionRevision.value], () => {
+  profileActionGeneration += 1
+}, { flush: 'sync' })
+onUnmounted(() => {
+  profileActionGeneration += 1
+})
+/** Keeps a role-permitted Edit activation available while the profile is read-only. */
+const requestProfileEdit = async () => {
+  if (isCheckingProfileEdit.value || isSaving.value || !canUpdateFinancialChildRole.value) return
+  const generation = profileActionGeneration
+  const proceed = () => generation === profileActionGeneration && canUpdateFinancialChildRole.value
+  isCheckingProfileEdit.value = true
+  try {
+    if (await checkProfileAction('update', 'profile', proceed) && proceed()) await refreshProfile()
+  } finally {
+    isCheckingProfileEdit.value = false
+  }
+}
+
 const isHeroCollapsed = getHeroCollapsed('agreement-detail')
 const getLocalizedWorkflowName = (name: { en: string, fr: string }): string => getBilingualValue({
   workflow_name_en: name.en,
@@ -308,8 +330,12 @@ const submit = async () => {
     return
   }
 
+  const generation = profileActionGeneration
+  const originalDraft = selectedProfile.value
+  const proceed = () => generation === profileActionGeneration && selectedProfile.value === originalDraft && canUpdateFinancialChildRole.value
   try {
     isSaving.value = true
+    if (!await checkProfileAction('update', 'profile', proceed) || !proceed()) return
     const {
       egcs_fc_status: _status,
       can_delete: _canDelete,
@@ -333,7 +359,7 @@ const submit = async () => {
       agreementNumber,
       excludeAgreementId: id
     })
-    if (!canContinue) return
+    if (!canContinue || !proceed() || !await checkProfileAction('update', 'profile', proceed) || !proceed()) return
 
     const response = await fetch(getClientRequestUrl(`/api/agreements/${id}`), {
       method: 'PATCH',
@@ -429,30 +455,33 @@ const cancel = () => {
               @submit="submit"
               @cancel="cancel" />
 
-            <AgreementGeneralTab
-              v-else-if="selectedTab === 'general'"
-              :profile="profile" />
+            <div v-else-if="selectedTab === 'general'" class="space-y-4">
+              <div v-if="canUpdateFinancialChildRole" class="flex justify-end">
+                <UButton :label="t('common.edit')" :loading="isCheckingProfileEdit" :disabled="isCheckingProfileEdit || isSaving" @click="requestProfileEdit" />
+              </div>
+              <AgreementGeneralTab :profile="profile" />
+            </div>
 
             <AgreementAddressesTab
               v-else-if="selectedTab === 'addresses'"
               :agreement-id="id"
-              :can-create="canCreateChildRecords"
-              :can-update="canUpdateChildRecords"
-              :can-delete="canDeleteChildRecords" />
+              :can-create="canCreateFinancialChildRole"
+              :can-update="canUpdateFinancialChildRole"
+              :can-delete="canDeleteFinancialChildRole" />
 
             <AgreementNotesTab
               v-else-if="selectedTab === 'notes'"
               :agreement-id="id"
-              :can-create="canCreateChildRecords"
-              :can-update="canUpdateChildRecords"
-              :can-delete="canDeleteChildRecords" />
+              :can-create="canCreateFinancialChildRole"
+              :can-update="canUpdateFinancialChildRole"
+              :can-delete="canDeleteFinancialChildRole" />
 
             <AgreementApplicantRecipientsTab
               v-else-if="selectedTab === 'applicant-recipients'"
               :agreement-id="id"
-              :can-create="canCreateChildRecords"
-              :can-update="canUpdateChildRecords"
-              :can-delete="canDeleteChildRecords"
+              :can-create="canCreateFinancialChildRole"
+              :can-update="canUpdateFinancialChildRole"
+              :can-delete="canDeleteFinancialChildRole"
               :show-update="can('agreement', 'update', { type: 'program', agencyId: profile.agency_id, transferPaymentId: profile.program_id })"
               :show-delete="can('agreement', 'delete', { type: 'program', agencyId: profile.agency_id, transferPaymentId: profile.program_id })" />
 
@@ -623,9 +652,9 @@ const cancel = () => {
             <AgreementMonitorsTab
               v-else-if="selectedTab === 'monitors'"
               :agreement-id="id"
-              :can-create="canCreateChildRecords"
-              :can-update="canUpdateChildRecords"
-              :can-delete="canDeleteChildRecords" />
+              :can-create="canCreateFinancialChildRole"
+              :can-update="canUpdateFinancialChildRole"
+              :can-delete="canDeleteFinancialChildRole" />
 
             <AgreementActivitiesTab
               v-else-if="selectedTab === 'activities'"
@@ -643,8 +672,8 @@ const cancel = () => {
             <AgreementDocumentsTab
               v-else-if="selectedTab === 'documents'"
               :agreement-id="id"
-              :can-create="canCreateChildRecords"
-              :can-delete="canDeleteChildRecords" />
+              :can-create="canCreateFinancialChildRole"
+              :can-delete="canDeleteFinancialChildRole" />
 
             <CommonAttachmentsTab
               v-else-if="selectedTab === 'attachments'"
@@ -655,7 +684,7 @@ const cancel = () => {
               v-else-if="selectedTab === 'closeout'"
               :show-header="false"
               :agreement-id="id"
-              :can-create="canCreateChildRecords" />
+              :can-create="canCreateFinancialChildRole" />
 
             <CommonAssignedUsers
               v-else-if="selectedTab === 'assignments'"

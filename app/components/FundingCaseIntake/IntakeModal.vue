@@ -116,7 +116,7 @@ watch([() => state.value.egcs_fi_fundingopportunity, open], async ([opportunityI
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="t(lockOpportunity ? 'funding_opportunity.add_application' : 'funding_case_intake.create')" :description="t('common.form_dialog_description')" :dismissible="!pending" :ui="{ content: 'sm:max-w-4xl' }">
+  <UModal v-model:open="open" :title="t(lockOpportunity ? 'funding_opportunity.add_application' : 'funding_case_intake.create')" :description="t('common.form_dialog_description')" :dismissible="!pending" :close="pending ? false : undefined" :ui="{ content: 'sm:max-w-4xl' }">
     <template #body>
       <UForm v-if="open" :state="state" :validate="validate" class="space-y-5" @submit="emit('submit')">
         <CommonSection :title="t('funding_case_intake.details')" :grid-cols="1">
@@ -125,7 +125,7 @@ watch([() => state.value.egcs_fi_fundingopportunity, open], async ([opportunityI
               <CommonServerLookupSelect v-model="state.egcs_fi_fundingopportunity" :disabled="pending || lockOpportunity" fetch-url="/api/funding-case-intakes/lookups/opportunities" selected-values-query-key="ids" value-key="id" label-en-key="label_en" label-fr-key="label_fr" close-on-select searchable />
             </UFormField>
             <UFormField :label="t('funding_case_intake.proponent')" name="egcs_fi_applicantrecipient" required>
-              <CommonServerLookupSelect v-model="state.egcs_fi_applicantrecipient" fetch-url="/api/agreements/lookups/applicant-recipients" selected-values-query-key="ids" value-key="id" label-en-key="label_en" label-fr-key="label_fr" close-on-select searchable />
+              <CommonServerLookupSelect v-model="state.egcs_fi_applicantrecipient" :disabled="pending" fetch-url="/api/agreements/lookups/applicant-recipients" selected-values-query-key="ids" value-key="id" label-en-key="label_en" label-fr-key="label_fr" close-on-select searchable />
             </UFormField>
           </div>
         </CommonSection>
@@ -147,21 +147,21 @@ watch([() => state.value.egcs_fi_fundingopportunity, open], async ([opportunityI
               <CommonActionButton color="neutral" variant="ghost" icon="i-lucide-x" :aria-label="t('common.delete_named', { name: draft.file.name })" :disabled="pending" @click="removeFile(draft.key)" />
             </div>
             <UFormField :label="t('attachments.type')" :name="`attachments.${index}.attachmentTypeId`" required>
-              <CommonServerLookupSelect v-if="state.egcs_fi_fundingopportunity" v-model="draft.attachmentTypeId" fetch-url="/api/funding-case-intakes/lookups/attachment-types" selected-values-query-key="ids" value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" :show-value-in-label="false" :query="{ egcs_fi_fundingopportunity: state.egcs_fi_fundingopportunity }" close-on-select searchable class="w-full" />
+              <CommonServerLookupSelect v-if="state.egcs_fi_fundingopportunity" v-model="draft.attachmentTypeId" :disabled="pending" fetch-url="/api/funding-case-intakes/lookups/attachment-types" selected-values-query-key="ids" value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" :show-value-in-label="false" :query="{ egcs_fi_fundingopportunity: state.egcs_fi_fundingopportunity }" close-on-select searchable class="w-full" />
               <USelectMenu v-else :items="[]" disabled :placeholder="t('funding_case_intake.select_opportunity_first')" />
             </UFormField>
             <div class="mt-4 grid gap-4 md:grid-cols-2">
               <UFormField :label="t('attachments.name_en')" :name="`attachments.${index}.nameEn`" required>
-                <UInput v-model="draft.nameEn" class="w-full" />
+                <UInput v-model="draft.nameEn" :disabled="pending" class="w-full" />
               </UFormField>
               <UFormField :label="t('attachments.name_fr')" :name="`attachments.${index}.nameFr`" required>
-                <UInput v-model="draft.nameFr" class="w-full" />
+                <UInput v-model="draft.nameFr" :disabled="pending" class="w-full" />
               </UFormField>
               <UFormField :label="t('attachments.description_en')" :name="`attachments.${index}.descriptionEn`" required>
-                <CommonTextarea v-model="draft.descriptionEn" class="w-full" />
+                <CommonTextarea v-model="draft.descriptionEn" :disabled="pending" class="w-full" />
               </UFormField>
               <UFormField :label="t('attachments.description_fr')" :name="`attachments.${index}.descriptionFr`" required>
-                <CommonTextarea v-model="draft.descriptionFr" class="w-full" />
+                <CommonTextarea v-model="draft.descriptionFr" :disabled="pending" class="w-full" />
               </UFormField>
             </div>
           </div>

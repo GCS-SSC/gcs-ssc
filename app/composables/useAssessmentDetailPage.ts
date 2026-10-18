@@ -2,7 +2,7 @@ import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import type { FetchError } from 'ofetch'
 /* eslint-disable jsdoc/require-param, jsdoc/require-returns -- composable callbacks use self-descriptive local signatures */
-import { computed, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 import type { AssessmentDefinition, ScoringMatrixItem } from '~~/shared/types/schemas/assessment/assessment'
 import type {
@@ -130,6 +130,10 @@ export const useAssessmentDetailPage = () => {
   const persistedResponse = ref(serializeResponse(assessmentResponse.value))
   const isDirty = computed(() => serializeResponse(assessmentResponse.value) !== persistedResponse.value)
   const isSaving: Ref<boolean> = ref(false)
+  let saveGeneration = 0
+  onScopeDispose(() => {
+    saveGeneration++
+  }, true)
   const totalAdditionalReviewerCount: Ref<number> = ref(0)
   const pendingAdditionalReviewerCount: Ref<number> = ref(0)
   const customOutcomesDisabled = computed(() => assessment.value?.egcs_cn_disablecustomoutcomes === true)
@@ -161,10 +165,11 @@ export const useAssessmentDetailPage = () => {
     }
   }, { immediate: true })
   watch(reviewId, () => {
+    saveGeneration++
     assessmentResponse.value = { answers: [], outcomes: [], customOutcomes: [], egcs_cn_reviewalignment: false, egcs_cn_reviewalignresult: null, egcs_cn_reviewalignmentnarrative: '' }
     persistedResponse.value = serializeResponse(assessmentResponse.value)
     isSaving.value = false
-  })
+  }, { flush: 'sync' })
 
   const reviewRuntimeContext = computed(() => ({
     reviewAlignmentDisabled: alignmentDisabled.value,
@@ -409,9 +414,13 @@ export const useAssessmentDetailPage = () => {
       return
     }
 
+    const targetReviewId = reviewId.value
+    const generation = ++saveGeneration
+    const submittedResponse = JSON.parse(serializeResponse(assessmentResponse.value))
     try {
       isSaving.value = true
-      const validationResult = await assessmentValidationSchema.value.safeParseAsync(assessmentResponse.value)
+      const validationResult = await assessmentValidationSchema.value.safeParseAsync(submittedResponse)
+      if (generation !== saveGeneration) return
 
       if (!validationResult.success) {
         const firstIssue = validationResult.error.issues[0]
@@ -423,7 +432,6 @@ export const useAssessmentDetailPage = () => {
         return
       }
 
-      const targetReviewId = reviewId.value
       const submittedDraft = serializeResponse(validationResult.data)
       const response = await fetch(getClientRequestUrl(`/api/reviews/${targetReviewId}/assessment`), {
         method: 'PATCH',
@@ -435,19 +443,19 @@ export const useAssessmentDetailPage = () => {
       if (!response.ok) {
         await throwFetchResponseError(response)
       }
-      if (reviewId.value !== targetReviewId) return
+      if (generation !== saveGeneration) return
       persistedResponse.value = submittedDraft
       await refresh()
-      if (reviewId.value !== targetReviewId) return
+      if (generation !== saveGeneration) return
       toast.add({
         title: toast.localized('common.success'),
         description: toast.localized('common.updated_success'),
         color: 'success'
       })
     } catch (error) {
-      showError(error)
+      if (generation === saveGeneration) showError(error)
     } finally {
-      isSaving.value = false
+      if (generation === saveGeneration) isSaving.value = false
     }
   }
 

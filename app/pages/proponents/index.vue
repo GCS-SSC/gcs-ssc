@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { ComputedRef } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
 import type { ApplicantRecipientProfileRow } from '~~/shared/types/applicant-recipient-ui'
@@ -20,6 +20,12 @@ const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const localePath = useLocalePath()
 
+let disposed = false
+onBeforeUnmount(() => {
+  disposed = true
+})
+const deletingId = ref<string | null>(null)
+const editingId = ref<string | null>(null)
 const listView = ref('all')
 const listViewQuery = computed(() => ({ list_view: listView.value }))
 
@@ -41,12 +47,35 @@ const {
   fetchUrl: '/api/applicant-recipients'
 })
 
+watch(listView, () => {
+  pagination.value.pageIndex = 0
+}, { flush: 'sync' })
+
 const openCreateProfile = async () => {
   await navigateTo(localePath(appRouteLocations.proponentCreate()))
 }
 
+/** Rechecks exact profile assignment before entering its edit view.
+ * @param profile Profile selected from the current collection.
+ */
 const openUpdateProfile = async (profile: ApplicantRecipientProfileRow) => {
-  await navigateTo(localePath(appRouteLocations.proponentEdit(String(profile.id))))
+  if (disposed || editingId.value || profile.can_update_role !== true) return
+  const ownerId = String(profile.id)
+  const current = () => !disposed && status.value === 'success' && profiles.value.some(item => String(item.id) === ownerId && item.can_update_role === true)
+  editingId.value = ownerId
+  try {
+    const live = await $fetch<Pick<ApplicantRecipientProfileRow, 'can_update'>, string>(`/api/applicant-recipients/${ownerId}`)
+    if (!current()) return
+    if (!live.can_update) {
+      toast.add({ title: toast.localized('common.warning'), description: toast.localized('workflow.action_prerequisite_unavailable'), color: 'warning' })
+      return
+    }
+    await navigateTo(localePath(appRouteLocations.proponentEdit(ownerId)))
+  } catch (error: unknown) {
+    if (current()) showError(error)
+  } finally {
+    editingId.value = null
+  }
 }
 
 /**
@@ -55,17 +84,30 @@ const openUpdateProfile = async (profile: ApplicantRecipientProfileRow) => {
  * @param profile - Profile to delete.
  */
 const deleteProfile = async (profile: ApplicantRecipientProfileRow) => {
+  if (disposed || deletingId.value || profile.can_delete_role !== true) return
+  const ownerId = String(profile.id)
+  const current = () => !disposed && status.value === 'success' && profiles.value.some(item => String(item.id) === ownerId && item.can_delete_role === true)
+  deletingId.value = ownerId
   try {
-    const deleted = await confirmDeleteRequest(`/api/applicant-recipients/${profile.id}`)
-    if (!deleted) return
+    const live = await $fetch<Pick<ApplicantRecipientProfileRow, 'can_delete'>, string>(`/api/applicant-recipients/${ownerId}`)
+    if (!current()) return
+    if (!live.can_delete) {
+      toast.add({ title: toast.localized('common.warning'), description: toast.localized('workflow.action_prerequisite_unavailable'), color: 'warning' })
+      return
+    }
+    const deleted = await confirmDeleteRequest(`/api/applicant-recipients/${ownerId}`, { shouldProceed: current })
+    if (!deleted || !current()) return
     await refresh()
+    if (disposed) return
     toast.add({
       title: toast.localized('common.success'),
       description: toast.localized('common.deleted_success'),
       color: 'success'
     })
   } catch (error: unknown) {
-    showError(error)
+    if (current()) showError(error)
+  } finally {
+    deletingId.value = null
   }
 }
 
@@ -94,7 +136,7 @@ const canCreateProfile: ComputedRef<boolean> = computed(() => canAny('applicant_
  * @returns True when the API has marked the row as editable.
  */
 const canUpdateProfile = (profile: ApplicantRecipientProfileRow) => {
-  return Boolean(profile.can_update)
+  return profile.can_update_role === true
 }
 
 /**
@@ -104,7 +146,7 @@ const canUpdateProfile = (profile: ApplicantRecipientProfileRow) => {
  * @returns True when delete actions should be enabled for the row.
  */
 const canDeleteProfile = (profile: ApplicantRecipientProfileRow) => {
-  return Boolean(profile.can_delete)
+  return profile.can_delete_role === true
 }
 </script>
 

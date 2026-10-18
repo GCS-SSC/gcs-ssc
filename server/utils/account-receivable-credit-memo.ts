@@ -1,3 +1,4 @@
+import { executeFreshReadSnapshot } from './fresh-read-snapshot'
 import { readAccountReceivableCreditMemoLines } from './account-receivable-credit-memo-lines'
 import { allocateAgreementCoding, type AgreementCodingAllocation } from './agreement-coding-allocator'
 import { moneyFromCents, moneyToCents } from '~~/shared/utils/money'
@@ -65,6 +66,7 @@ const resolveRepaymentInputs = async (event: H3Event, db: Kysely<Database>, inpu
 export const createAccountReceivableCreditMemo = async (event: H3Event, input: AccountReceivableCreditMemoCreate) => {
   const context = await resolveRepaymentInputs(event, event.context.$db, input)
   return await executeFreshAccountReceivableWrite(event, context, async (trx, auth, poolId) => {
+    await authorizeWithFreshAuthContext(event, auth, 'account_receivable', 'create', { type: 'agency', agencyId: context.agencyId })
     await resolveRepaymentInputs(event, trx, input)
     const creatorId = await resolveAssignmentCommonUserId(trx, auth.userId)
     if (!creatorId) return await forbidden(event)
@@ -218,7 +220,7 @@ export const deleteAccountReceivableCreditMemo = async (event: H3Event, id: stri
   }, { action: 'delete', target: { entityType: 'fundingcaseaccountreceivablecreditmemo', entityId: id } })
 }
 
-export const getAccountReceivableCreditMemoDetail = async (event: H3Event, id: string) => {
+export const getAccountReceivableCreditMemoDetail = async (event: H3Event, id: string) => await executeFreshReadSnapshot(event, async () => {
   const context = await authorizeAccountReceivableCreditMemo(event, id)
   const auth = await requireAuthContext(event)
   const db = event.context.$db
@@ -268,7 +270,7 @@ export const getAccountReceivableCreditMemoDetail = async (event: H3Event, id: s
     egcs_fc_agencyname_en: agency.egcs_ay_name_en, egcs_fc_agencyname_fr: agency.egcs_ay_name_fr,
     egcs_fc_agencyreadable: auth.userAbilities.authorize('agency', 'read', { type: 'agency', agencyId: String(repayment.egcs_fc_agency) }),
     egcs_fc_proponentreadable: await canAccessApplicantRecipient(auth, String(repayment.egcs_fc_applicantrecipient), 'read', db), egcs_fc_agreementreadable: context.agreementId ? await canAccessAgreement(auth, 'read', { type: 'program', agencyId: context.agencyId, transferPaymentId: context.profileId }, db) : false }
-}
+}, { authorization: 'snapshot' })
 
 export const validateCreditMemoCoding = async (db: Kysely<Database>, input: {
   egcs_fc_receivable: string; egcs_fc_creditmemochartofaccount: string; egcs_fc_agency: string; egcs_fc_allocationevidence?: import('~~/shared/types/database').JsonValue | null;

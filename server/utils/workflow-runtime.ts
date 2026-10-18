@@ -1699,15 +1699,22 @@ export const resumeWorkflowRun = async (
   const configuration = await readWorkflowRuntimeConfiguration(trx, run)
   const member = configuration.members.find(candidate => candidate.memberId === String(blockers[0]!.egcs_cn_workflowsetupmember))
   if (!member || blockers.some(blocker => String(blocker.egcs_cn_workflowsetupmember) !== member.memberId)) return null
-  if (!isAssignableEntityType(run.egcs_cn_entitytype)) return null
   const replacementIds = [...replacementByBlocker.values()]
   if (replacementIds.some(ownerId => !isPositivePostgresBigintText(ownerId))) return null
-  const eligible = await resolveAgencyValidEntityAssigneeIdsWithDb(
-    trx,
-    run.egcs_cn_entitytype,
-    String(run.egcs_cn_entityid),
-    replacementIds
-  )
+  const eligible = isAssignableEntityType(run.egcs_cn_entitytype)
+    ? await resolveAgencyValidEntityAssigneeIdsWithDb(
+        trx,
+        run.egcs_cn_entitytype,
+        String(run.egcs_cn_entityid),
+        replacementIds
+      )
+    : run.egcs_cn_entitytype.includes(':')
+      ? await resolveExtensionEligibleAssigneeIds(
+          trx,
+          requireQualifiedRuntimeLockEvidence(trx, run.egcs_cn_entitytype, String(run.egcs_cn_entityid)).runtime,
+          replacementIds
+        )
+      : new Set<string>()
   if (replacementIds.some(ownerId => !eligible.has(ownerId))) return null
   const effectiveOwners = new Map(member.owners.map(owner => [owner.nestedMemberId, owner]))
   const now = new Date()

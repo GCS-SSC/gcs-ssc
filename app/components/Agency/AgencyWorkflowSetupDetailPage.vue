@@ -191,7 +191,7 @@ const sectionTabs = computed<TranslatedTabItem[]>(() => [
   { key: 'workflow.transitions', icon: 'i-lucide-arrow-right-left', value: 'workflow-transitions' },
   { key: 'workflow.behaviour', icon: 'i-lucide-settings-2', value: 'workflow-behaviour' },
   { key: 'workflow.flow.title', icon: 'i-lucide-workflow', value: 'workflow-flow' }
-].map(item => ({ ...item, panelId: item.value })))
+].map(item => ({ ...item, panelId: 'workflow-editor-panel' })))
 const buildSetupPayload = () => state.value
   ? {
       egcs_cn_entitytype: state.value.egcs_cn_entitytype,
@@ -549,8 +549,8 @@ const deleteMember = async (member: WorkflowMember) => {
                 :ui="{ trigger: 'h-8 min-h-8 justify-start py-1 whitespace-normal break-words text-left' }"
                 @save="save" />
             </template>
-            <CommonDesignTimeEditorSections>
-              <AssessmentSchemaPageSection v-if="!flowOnly" section-id="workflow-identity" :title="t('workflow.identity')" role="tabpanel" :aria-label="t('workflow.identity')">
+            <CommonDesignTimeEditorSections id="workflow-editor-panel" role="tabpanel" :aria-label="t('workflow.title')">
+              <AssessmentSchemaPageSection v-if="!flowOnly" section-id="workflow-identity" :title="t('workflow.identity')">
                 <div class="grid gap-5 md:grid-cols-2">
                   <UFormField :label="t('transfer_payment.name_en')" name="egcs_cn_name_en">
                     <UInput v-model="state.egcs_cn_name_en" :disabled="!canEditFields" class="w-full" />
@@ -567,7 +567,7 @@ const deleteMember = async (member: WorkflowMember) => {
                 </div>
               </AssessmentSchemaPageSection>
 
-              <AssessmentSchemaPageSection v-if="!flowOnly" section-id="workflow-routing" :title="t('workflow.routing')" role="tabpanel" :aria-label="t('workflow.routing')">
+              <AssessmentSchemaPageSection v-if="!flowOnly" section-id="workflow-routing" :title="t('workflow.routing')">
                 <div class="grid gap-5 lg:grid-cols-2">
                   <UFormField :label="t('transfer_payment.entity_type')" name="egcs_cn_entitytype" :description="t('workflow.entity_type_help')">
                     <CommonBilingualSelectMenu
@@ -639,13 +639,13 @@ const deleteMember = async (member: WorkflowMember) => {
                 </div>
               </AssessmentSchemaPageSection>
 
-              <AssessmentSchemaPageSection v-if="flowOnly" section-id="workflow-flow" :title="t('workflow.flow.title')" role="tabpanel" :aria-label="t('workflow.flow.title')">
+              <AssessmentSchemaPageSection v-if="flowOnly" section-id="workflow-flow" :title="t('workflow.flow.title')">
                 <AgencyWorkflowFlowDiagram
                   :setup="state" :custom-fields="conditionFields?.items ?? []" :choices="conditionChoices ?? {}" />
                 <UButton v-if="conditionFieldsError || conditionChoicesError" :label="t('common.retry')" color="neutral" variant="ghost" @click="retryConditionCatalogs" />
               </AssessmentSchemaPageSection>
 
-              <AssessmentSchemaPageSection v-if="!flowOnly" section-id="workflow-transitions" :title="t('workflow.transitions')" role="tabpanel" :aria-label="t('workflow.transitions')">
+              <AssessmentSchemaPageSection v-if="!flowOnly" section-id="workflow-transitions" :title="t('workflow.transitions')">
                 <div class="space-y-5">
                   <UFormField :label="t('workflow.allowed_start_statuses')" name="egcs_cn_allowedstartstatuses" :description="t('workflow.allowed_start_statuses_help')">
                     <CommonStatusSelect v-model="state.egcs_cn_allowedstartstatuses" :agency-id="agencyId" multiple :disabled="!canEditFields" class="w-full" />
@@ -661,7 +661,7 @@ const deleteMember = async (member: WorkflowMember) => {
                 </div>
               </AssessmentSchemaPageSection>
 
-              <AssessmentSchemaPageSection v-if="!flowOnly" section-id="workflow-behaviour" :title="t('workflow.behaviour')" role="tabpanel" :aria-label="t('workflow.behaviour')">
+              <AssessmentSchemaPageSection v-if="!flowOnly" section-id="workflow-behaviour" :title="t('workflow.behaviour')">
                 <div class="space-y-5">
                   <UFormField
                     v-if="state.egcs_cn_purpose === 'risk_rating'"

@@ -215,11 +215,11 @@ onBeforeUnmount(() => {
       </template>
       <template #actions>
         <UButton
+          v-if="canUpdateChild"
           :label="t('transfer_payment.stream_wizard_new')"
           icon="i-lucide-wand-sparkles"
           color="neutral"
           variant="outline"
-          :disabled="!canUpdateChild"
           @click="isStreamWizardOpen = true" />
       </template>
 
@@ -243,19 +243,19 @@ onBeforeUnmount(() => {
       <template #actions-cell="{ row }">
         <div class="flex items-center gap-2">
           <CommonActionButton
+            v-if="canUpdateChild"
             icon="i-lucide-pencil"
             color="neutral"
             variant="ghost"
             size="sm"
-            :disabled="!canUpdateChild"
             :aria-label="t('common.edit_named', { name: getStreamActionTarget(row.original) })"
             @click="openUpdateStream(row.original)" />
           <CommonActionButton
+            v-if="canDeleteChild"
             icon="i-lucide-trash"
             color="error"
             variant="ghost"
             size="sm"
-            :disabled="!canDeleteChild"
             :aria-label="t('common.delete_named', { name: getStreamActionTarget(row.original) })"
             @click="deleteStream(row.original)" />
         </div>

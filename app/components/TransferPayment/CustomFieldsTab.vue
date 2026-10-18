@@ -10,18 +10,16 @@ import {
 } from '~~/shared/types/schemas/agreement-custom-fields'
 
 type AssignmentForm = {
-  assignmentId?: string
   egcs_tp_agencyfield: string | undefined
   egcs_tp_section: string | null
   egcs_tp_required: boolean
   egcs_tp_active: boolean
   egcs_tp_displayorder: number
 }
-type AgencyField = { id: string, egcs_ay_name_en: string, egcs_ay_name_fr: string }
 type Option = AssignedAgencyCustomFieldDefinition['options'][number]
 type FieldRow = { id: string, sectionGroup: string, section: AgreementCustomFieldSection | null, fieldGroup: string, categoryGroup: string, field: AssignedAgencyCustomFieldDefinition | null, option: Option | null }
 
-const { transferPaymentId, streamId, canUpdateChild, canDeleteChild } = defineProps<{
+const { transferPaymentId, streamId, canUpdateChild } = defineProps<{
   transferPaymentId: string, streamId: string, canUpdateChild: boolean, canDeleteChild: boolean
 }>()
 const { t } = useI18n()
@@ -35,26 +33,11 @@ const { data, refresh, status } = await useAsyncData<{ items: AssignedAgencyCust
   if (!response.ok) await throwFetchResponseError(response)
   return await response.json() as { items: AssignedAgencyCustomFieldDefinition[], sections: AgreementCustomFieldSection[] }
 })
-const profileUrl = computed(() => `/api/transfer-payments/${transferPaymentId}`)
-const { data: profile } = await useAsyncData<{ egcs_tp_agency: string }>(profileUrl, async () => {
-  const response = await fetch(getClientRequestUrl(profileUrl.value))
-  if (!response.ok) await throwFetchResponseError(response)
-  return await response.json() as { egcs_tp_agency: string }
-})
-const catalogUrl = computed(() => profile.value?.egcs_tp_agency ? `/api/agency/${profile.value.egcs_tp_agency}/custom-fields` : '')
-const { data: catalog, refresh: refreshCatalog } = await useAsyncData<{ items: AgencyField[] }>(catalogUrl, async () => {
-  if (!catalogUrl.value) return { items: [] }
-  const response = await fetch(getClientRequestUrl(catalogUrl.value))
-  if (!response.ok) await throwFetchResponseError(response)
-  return await response.json() as { items: AgencyField[] }
-})
-const availableFields = computed(() => (catalog.value?.items ?? []).filter(field =>
-  !data.value?.items.some(assigned => assigned.id === String(field.id)) || String(field.id) === assignmentModal.selected.value?.egcs_tp_agencyfield
-))
 const assignmentModal = useCrudModal<AssignmentForm>({
   createState: () => ({ egcs_tp_agencyfield: undefined, egcs_tp_section: null, egcs_tp_required: false, egcs_tp_active: true, egcs_tp_displayorder: 0 }),
   updateState: field => ({ ...field })
 })
+const editingAssignmentId: Ref<string | undefined> = ref<string>()
 const sectionModal = useCrudModal<Partial<AgreementCustomFieldSection>>({ createState: () => ({ egcs_tp_displayorder: 0 }), updateState: section => ({ ...section }) })
 const saving: Ref<boolean> = ref(false)
 const search: Ref<string> = ref('')
@@ -81,17 +64,18 @@ const columnVisibility = { sectionGroup: false, fieldGroup: false, categoryGroup
  * @param sectionId - Existing section or null for no section.
  */
 const openAssignment = (sectionId: string | null) => {
+  editingAssignmentId.value = undefined
   assignmentModal.openCreate()
   if (assignmentModal.selected.value) assignmentModal.selected.value.egcs_tp_section = sectionId
-  void refreshCatalog()
 }
 /**
  * Opens the Stream settings of an assigned Agency field.
  * @param field - Joined assigned Agency field.
  */
 const editAssignment = (field: AssignedAgencyCustomFieldDefinition) => {
+  editingAssignmentId.value = field.assignmentId
   assignmentModal.openUpdate({
-    assignmentId: field.assignmentId, egcs_tp_agencyfield: field.id,
+    egcs_tp_agencyfield: field.id,
     egcs_tp_section: field.egcs_tp_section, egcs_tp_required: field.egcs_tp_required,
     egcs_tp_active: field.egcs_tp_active, egcs_tp_displayorder: field.egcs_tp_displayorder
   })
@@ -120,7 +104,8 @@ const saveAssignment = async () => {
   const session = assignmentModal.captureSession()
   saving.value = true
   try {
-    const { assignmentId, egcs_tp_agencyfield, ...settings } = selected
+    const assignmentId = editingAssignmentId.value
+    const { egcs_tp_agencyfield, ...settings } = selected
     const body = assignmentId ? settings : { egcs_tp_agencyfield, ...settings }
     const response = await fetch(getClientRequestUrl(`${assignmentUrl.value}${assignmentId ? `/${assignmentId}` : ''}`), { method: assignmentId ? 'PATCH' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
     if (!response.ok) await throwFetchResponseError(response)
@@ -170,6 +155,7 @@ watch(baseUrl, () => {
   expandedRows.value = {}
   sectionModal.close()
   assignmentModal.close()
+  editingAssignmentId.value = undefined
 })
 </script>
 
@@ -238,11 +224,11 @@ watch(baseUrl, () => {
         <div v-if="row.groupingColumnId === 'sectionGroup'" class="flex items-center gap-2">
           <CommonActionButton v-if="canUpdateChild" icon="i-lucide-plus" color="neutral" variant="ghost" size="sm" :aria-label="t('custom_fields.assign_field')" @click="openAssignment(row.original.section?.id ?? null)" />
           <CommonActionButton v-if="canUpdateChild && row.original.section" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" :aria-label="t('common.edit')" @click="sectionModal.openUpdate(row.original.section)" />
-          <CommonActionButton v-if="canDeleteChild && row.original.section" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('common.delete')" @click="remove(`${baseUrl}/custom-fields/sections/${row.original.section.id}`)" />
+          <CommonActionButton v-if="canUpdateChild && row.original.section" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('common.delete')" @click="remove(`${baseUrl}/custom-fields/sections/${row.original.section.id}`)" />
         </div>
         <div v-else-if="row.groupingColumnId === 'fieldGroup' && row.original.field" class="flex items-center gap-2">
           <CommonActionButton v-if="canUpdateChild" icon="i-lucide-pencil" color="neutral" variant="ghost" size="sm" :aria-label="t('common.edit')" @click="editAssignment(row.original.field)" />
-          <CommonActionButton v-if="canDeleteChild" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('common.delete')" @click="remove(`${assignmentUrl}/${row.original.field.assignmentId}`)" />
+          <CommonActionButton v-if="canUpdateChild" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('common.delete')" @click="remove(`${assignmentUrl}/${row.original.field.assignmentId}`)" />
         </div>
       </template>
     </CommonResourceLayoutCard>
@@ -266,7 +252,7 @@ watch(baseUrl, () => {
       <template #body>
         <UForm v-if="assignmentModal.selected.value" :state="assignmentModal.selected.value" :validate="createValidator(StreamFieldAssignmentCreateSchema)" class="space-y-4" @submit="saveAssignment">
           <UFormField :label="t('custom_fields.agency_field')" name="egcs_tp_agencyfield" required>
-            <CommonBilingualSelectMenu v-model="assignmentModal.selected.value.egcs_tp_agencyfield" :items="availableFields" label-en-key="egcs_ay_name_en" label-fr-key="egcs_ay_name_fr" value-key="id" :disabled="Boolean(assignmentModal.selected.value.assignmentId)" />
+            <CommonServerLookupSelect v-model="assignmentModal.selected.value.egcs_tp_agencyfield" :fetch-url="`${baseUrl}/lookups/custom-fields`" :include-deleted-query="false" selected-values-query-key="ids" :exclude-values="(data?.items ?? []).filter(field => field.id !== assignmentModal.selected.value?.egcs_tp_agencyfield).map(field => field.id)" label-en-key="egcs_ay_name_en" label-fr-key="egcs_ay_name_fr" value-key="id" :disabled="Boolean(editingAssignmentId)" />
           </UFormField>
           <UFormField :label="t('custom_fields.section')" name="egcs_tp_section">
             <CommonBilingualSelectMenu v-model="assignmentModal.selected.value.egcs_tp_section" :items="data?.sections ?? []" :prepend-options="[{ label: t('custom_fields.unsectioned'), value: null }]" label-en-key="egcs_tp_name_en" label-fr-key="egcs_tp_name_fr" value-key="id" />

@@ -28,7 +28,7 @@ const closeoutId = route.params.closeoutId as string
 
 const isHeroCollapsed = getHeroCollapsed('agreement-closeout-detail')
 const { isAssigned } = useEntityAssignmentRoster('fundingcaseagreementcloseout', closeoutId)
-const { isRecordLocked, isTerminalStatus } = useBusinessStatusState()
+const { isRecordLocked } = useBusinessStatusState()
 const profile: Ref<EntityAssignmentContext | null> = ref(null)
 const closeout: Ref<CloseoutDetail | null> = ref(null)
 const isLoading: Ref<boolean> = ref(false)
@@ -69,9 +69,7 @@ const heroMetaItems = computed(() => [
   `${t('agreement.agreement_number')}: ${profile.value?.egcs_fc_agreementnumber ?? agreementId}`,
   getBilingualValue(profile.value, 'egcs_fc_title', agreementId)
 ])
-const canPersistDocument = computed(() => isAssigned.value
-  && closeout.value?.egcs_fc_isopen === true
-  && !isTerminalStatus(closeout.value.egcs_fc_status))
+const canPersistDocument = computed(() => profile.value?.can_create_agreement_role === true)
 const breadcrumbs = computed(() => [
   { label: t('agreement.title'), to: localePath(appRouteLocations.agreements()) },
   { label: getBilingualValue(profile.value, 'egcs_fc_title', agreementId), to: authorizedRouteLocation(profile.value?.can_read_agreement, localePath(appRouteLocations.agreementDetail(agreementId))) },

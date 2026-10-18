@@ -1,3 +1,4 @@
+import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import { badRequest, notFound, throwApiError } from '~~/server/utils/api-errors'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
@@ -8,6 +9,7 @@ export default defineEventHandler(async event => {
   const agreementId = getRouterParam(event, 'id')
   const closeoutId = getRouterParam(event, 'closeoutId')
   if (!agreementId || !closeoutId) return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')
+  if (![agreementId, closeoutId].every(isPositivePostgresBigintText)) return await badRequest(event, 'INVALID_IDS', 'apiErrors.request.invalid')
   const db = event.context.$db
   const assignmentTarget = { entityType: 'fundingcaseagreementcloseout' as const, entityId: closeoutId }
   const context = await authorizeAgreementResource(event, 'update', agreementId, db, { assignmentTarget })
@@ -26,6 +28,7 @@ export default defineEventHandler(async event => {
       .where('Common_Runtime.egcs_cn_kind', '=', 'workflow')
       .where('Common_Runtime.egcs_cn_entitytype', '=', 'fundingcaseagreementcloseout')
       .where('Common_Runtime.egcs_cn_entityid', '=', closeoutId)
+      .where('Common_Runtime.egcs_cn_purpose', '=', 'approval_submission')
       .where('Common_Runtime.egcs_cn_state', 'in', ['pending', 'active', 'awaiting_action', 'paused'])
       .where('Common_Runtime._deleted', '=', false)
       .forUpdate(['Common_Runtime', 'Common_Workflow_Run']).executeTakeFirst()

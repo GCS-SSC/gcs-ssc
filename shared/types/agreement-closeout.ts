@@ -59,3 +59,15 @@ export type AgreementCloseoutReadiness = {
   outstandingFollowups: CloseoutFollowup[]
   blockers: CloseoutBlocker[]
 }
+
+export type CloseoutDocumentPersistence =
+  | { can_persist_documents: true }
+  | { can_persist_documents: false, code:
+    | 'AGREEMENT_CLOSEOUT_NOT_FOUND'
+    | 'BUSINESS_STATUS_NOT_FOUND'
+    | 'BUSINESS_STATUS_TERMINAL'
+    | 'AGREEMENT_CLOSEOUT_CLOSED'
+    | 'AGREEMENT_CLOSEOUT_LOCKED'
+    | 'BUSINESS_COMPLETED'
+    | 'BUSINESS_STATUS_READ_ONLY'
+  }

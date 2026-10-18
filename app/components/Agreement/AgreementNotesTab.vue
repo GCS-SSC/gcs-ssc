@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { onUnmounted, watch } from 'vue'
+import { useAgreementChildActionPrerequisites } from '~/composables/useAgreementChildActionPrerequisites'
 import { FundingCaseAgreementNoteCreateSchema } from '~~/shared/types/schemas'
 import type { TableColumnInput, BilingualColumnConfig } from '~/composables/useTableColumns'
 
@@ -9,6 +11,43 @@ const { agreementId, canCreate, canUpdate, canDelete } = defineProps<{
   canDelete: boolean
 }>()
 const { t, locale } = useI18n()
+const { check } = useAgreementChildActionPrerequisites(() => ({ kind: 'agreement', agreementId }))
+const confirmDelete = useDeleteConfirm()
+let actionGeneration = 0
+watch(() => [agreementId, canCreate, canUpdate, canDelete], () => {
+  actionGeneration += 1
+}, { flush: 'sync' })
+onUnmounted(() => {
+  actionGeneration += 1
+})
+const permitted = (action: 'create' | 'update' | 'delete') => action === 'create' ? canCreate : action === 'update' ? canUpdate : canDelete
+/**
+ * Checks current action prerequisites before opening the editor.
+ * @param action Requested editor action.
+ * @param _original Original record supplied by the editor.
+ * @param current Whether the captured editor context remains current.
+ * @returns Whether the editor may open.
+ */
+const beforeOpen = (action: 'create' | 'update', _original: unknown, current: () => boolean) => {
+  const generation = actionGeneration
+  const proceed = () => generation === actionGeneration && current() && permitted(action)
+  return proceed() ? check(action, 'note', proceed) : Promise.resolve(false)
+}
+const beforeSave = (_state: unknown, original: unknown, current: () => boolean) => beforeOpen(original ? 'update' : 'create', original, current)
+/**
+ * Checks current delete prerequisites before and after confirmation.
+ * @param _id Record identifier supplied by the table.
+ * @param current Whether the captured delete context remains current.
+ * @returns Whether deletion may proceed.
+ */
+const beforeDelete = async (_id: string, current: () => boolean) => {
+  const generation = actionGeneration
+  const proceed = () => generation === actionGeneration && current() && permitted('delete')
+  if (!proceed() || !await check('delete', 'note', proceed)) return false
+  if (!await confirmDelete({ description: t('agency.delete_confirm') }) || !proceed()) return false
+  return await check('delete', 'note', proceed) && proceed()
+}
+
 const { formatDate } = useDateHelpers()
 type Note = { id: string, egcs_fc_subject_en?: string, egcs_fc_subject_fr?: string,
   egcs_fc_body_en?: string, egcs_fc_body_fr?: string, egcs_fc_createdat?: string,
@@ -31,10 +70,12 @@ const bilingualColumns: BilingualColumnConfig<Note>[] = [
   <CommonResourceCrud
     class="w-full" :title="t('notes.title')" icon="i-lucide-sticky-note"
     :fetch-url="`/api/agreements/${agreementId}/notes`"
-    :post-url="`/api/agreements/${agreementId}/notes`"
-    :update-url-base="`/api/agreements/${agreementId}/notes`"
-    :delete-url-base="`/api/agreements/${agreementId}/notes`"
+    :post-url="canCreate ? `/api/agreements/${agreementId}/notes` : undefined"
+    :update-url-base="canUpdate ? `/api/agreements/${agreementId}/notes` : undefined"
+    :delete-url-base="canDelete ? `/api/agreements/${agreementId}/notes` : undefined"
     :can-create="canCreate" :can-update="canUpdate" :can-delete="canDelete"
+    :before-open="beforeOpen" :before-save="beforeSave" :before-delete="beforeDelete"
+    :show-button="canCreate"
     :schema="FundingCaseAgreementNoteCreateSchema" :columns="columns" :bilingual-columns="bilingualColumns"
     :button-label="t('common.add')" :modal-title="t('notes.add')" :update-title="t('notes.edit')"
     :search-placeholder="t('notes.search')" :modal-ui="{ content: 'sm:max-w-2xl' }">

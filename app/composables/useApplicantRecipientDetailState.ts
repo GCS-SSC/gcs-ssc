@@ -152,7 +152,8 @@ export const useApplicantRecipientDetailState = (id: string, options: { enabled?
       'egcs_ar_legalname',
       getBilingualValue(profile.value, 'egcs_ar_operatingname', id)
     ),
-    canCreate: Boolean(profile.value?.can_create_child_records)
+    canCreate: Boolean(profile.value?.can_create_child_records),
+    canCreateRole: profile.value?.can_create_child_records_role === true
   })
 
   const tabMap = computed<TabMap>(() => {
@@ -173,7 +174,10 @@ export const useApplicantRecipientDetailState = (id: string, options: { enabled?
         key: APPLICANT_RECIPIENT_DETAIL_TAB_KEYS.agencyFinancialIds,
         icon: 'i-lucide-landmark',
         component: ApplicantRecipientAgencyFinancialIdsTab,
-        getProps: getChildRecordTabProps
+        getProps: () => ({ ...getChildRecordTabProps(),
+          canCreateRole: profile.value?.can_create_child_records_role === true,
+          canUpdateRole: profile.value?.can_update_child_records_role === true,
+          canDeleteRole: profile.value?.can_delete_child_records_role === true })
       })
       nextTabMap.set('registries', {
         key: APPLICANT_RECIPIENT_DETAIL_TAB_KEYS.registries,

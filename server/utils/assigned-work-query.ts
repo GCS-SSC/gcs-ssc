@@ -358,12 +358,14 @@ export const queryAssignedWorkDashboard = async (
       to_jsonb(display_proponent)->>'egcs_ar_legalname_en', to_jsonb(display_proponent)->>'egcs_ar_operatingname_en',
       to_jsonb(display_proponent)->>'egcs_ar_legalname_fr', to_jsonb(display_proponent)->>'egcs_ar_operatingname_fr',
       '#' || display_proponent.id::text,
-      to_jsonb(display_stream)->>'egcs_tp_name_en', to_jsonb(owner_agency)->>'egcs_ay_name_en') parent_en,
+      to_jsonb(display_stream)->>'egcs_tp_name_en',
+      CASE WHEN work.agreement_id IS NULL THEN to_jsonb(owner_agency)->>'egcs_ay_name_en' END) parent_en,
     COALESCE(to_jsonb(display_agreement)->>'egcs_fc_agreementnumber',
       to_jsonb(display_proponent)->>'egcs_ar_legalname_fr', to_jsonb(display_proponent)->>'egcs_ar_operatingname_fr',
       to_jsonb(display_proponent)->>'egcs_ar_legalname_en', to_jsonb(display_proponent)->>'egcs_ar_operatingname_en',
       '#' || display_proponent.id::text,
-      to_jsonb(display_stream)->>'egcs_tp_name_fr', to_jsonb(owner_agency)->>'egcs_ay_name_fr') parent_fr,
+      to_jsonb(display_stream)->>'egcs_tp_name_fr',
+      CASE WHEN work.agreement_id IS NULL THEN to_jsonb(owner_agency)->>'egcs_ay_name_fr' END) parent_fr,
     CASE WHEN work.entity_type = 'fundingcaseagreement' THEN to_jsonb(display_agreement)->>'egcs_fc_title_en'
       WHEN work.entity_type = 'applicantrecipient' THEN to_jsonb(display_proponent)->>'egcs_ar_operatingname_en' END secondary_en,
     CASE WHEN work.entity_type = 'fundingcaseagreement' THEN to_jsonb(display_agreement)->>'egcs_fc_title_fr'

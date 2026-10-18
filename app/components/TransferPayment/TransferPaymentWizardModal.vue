@@ -16,6 +16,18 @@ const emit = defineEmits<{
 }>()
 
 const { t, locale } = useI18n()
+/** Displays exact valid money while retaining invalid drafts for submit validation.
+ * @param amount - Unchanged editable budget draft.
+ * @param currency - Selected budget denomination.
+ * @returns Localized valid amount or the original invalid draft.
+ */
+const formatBudgetAmount = (amount: string, currency: string): string => {
+  try {
+    return formatMoneyText(parseMoney(amount), locale.value, currency.toUpperCase())
+  } catch {
+    return amount
+  }
+}
 const {
   state,
   wizardErrors,
@@ -377,7 +389,7 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentWizard>) => {
                       ({{ budget.egcs_tp_currency.toUpperCase() }})
                     </span>
                     <span class="text-primary font-mono font-black">
-                      {{ formatMoneyText(parseMoney(budget.egcs_tp_totalbudget), locale, budget.egcs_tp_currency.toUpperCase()) }}
+                      {{ formatBudgetAmount(budget.egcs_tp_totalbudget, budget.egcs_tp_currency) }}
                     </span>
                   </div>
                 </div>

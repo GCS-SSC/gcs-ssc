@@ -416,7 +416,7 @@ const createExtensionWriteAuthorization = (
 
         const canAccess = await canAccessExtensionEntity(context, rbac, currentEntityContext, db)
         if (canAccess) return { bypass: true }
-        return { scope: currentEntityContext.scope }
+        return { denied: true }
       })
     },
     lockAndAuthorizeAgreement: async (rawDb, input): Promise<boolean> => {

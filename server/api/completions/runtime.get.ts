@@ -12,7 +12,8 @@ import { resolveActiveWorkflowSetup } from '~~/server/utils/workflow-runtime'
 import type { H3Event } from 'h3'
 import type { Entity_Type } from '~~/shared/types/database'
 import { isCoreEntityType, requiresApprovalSubmissionAtCompletion } from '~~/shared/constants/entity-registry'
-import { requireAuthContext, requireFreshAuthContext } from '~~/server/utils/authorize'
+import { requireAuthContext } from '~~/server/utils/authorize'
+import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 
 type CompletionTarget = {
   entityType: Entity_Type
@@ -55,9 +56,7 @@ const withCompletionBlocker = async (
 export default defineEventHandler(async event => {
   await requireAuthContext(event)
   const { entityType, entityId } = await getValidatedQueryI18n(event, CompletionRuntimeQuerySchema)
-  return await event.context.$db.transaction().setIsolationLevel('repeatable read').execute(async trx => {
-    await requireFreshAuthContext(event, trx)
-    event.context.$db = trx
+  return await executeFreshReadSnapshot(event, async () => {
     const unsupportedEntityResult = await assertDirectCompletionRuntimeEntitySupported(event, entityType)
 
     if (unsupportedEntityResult) {

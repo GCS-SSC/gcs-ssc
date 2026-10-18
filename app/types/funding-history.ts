@@ -43,6 +43,8 @@ export interface VisibleFundingHistoryRow extends FundingHistoryRowBase, Funding
   descriptionEn?: string | null
   descriptionFr?: string | null
   recipients?: FundingHistoryRecipient[]
+  canUpdateRole?: boolean
+  canDeleteRole?: boolean
   canUpdate?: boolean
   canDelete?: boolean
 }

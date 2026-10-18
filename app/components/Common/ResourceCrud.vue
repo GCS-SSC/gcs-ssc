@@ -230,7 +230,7 @@ defineExpose({
       @after:enter="completeHelpModal"
       @after:leave="helpCreatePending = false">
       <template #body>
-        <UForm v-if="formState" :state="formState" :validate="validate" :disabled="isSaving" class="space-y-4" @submit="saveItem">
+        <UForm v-if="formState" :state="formState" :validate="validate" :validate-on="[]" :disabled="isSaving" class="space-y-4" @submit="saveItem">
           <slot name="form" :state="formState" />
 
           <div class="flex justify-end gap-2 pt-4">

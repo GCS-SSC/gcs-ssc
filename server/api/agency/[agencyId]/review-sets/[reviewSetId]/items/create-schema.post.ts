@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { validateReviewSetApprovalTemplateForAgency } from '~~/server/utils/agency-review-set-dependencies'
 import { TransferPaymentStreamReviewSetupSchemaCreateSchema } from '~~/shared/types/schemas'
 import { authorize } from '~~/server/utils/authorize'
@@ -50,12 +51,13 @@ export default defineEventHandler(async event => {
         return await badRequest(event, 'DUPLICATE_REVIEW_SETUP_ORDER', 'apiErrors.transfer_payment.duplicate_review_setup_order')
       }
       const isChecklist = body.egcs_cn_reviewtype === 'checklist'
+      const suffix = randomUUID()
       const schema = await trx.insertInto('Common_Review_Schema').values({
         egcs_cn_reviewtype: body.egcs_cn_reviewtype,
         egcs_cn_agency: agencyId,
         egcs_cn_entitytype: parentSet.egcs_cn_entitytype,
-        egcs_cn_name_en: isChecklist ? 'Untitled checklist' : 'Untitled assessment',
-        egcs_cn_name_fr: isChecklist ? 'Liste de contrôle sans titre' : 'Évaluation sans titre',
+        egcs_cn_name_en: isChecklist ? `Untitled checklist ${suffix}` : `Untitled assessment ${suffix}`,
+        egcs_cn_name_fr: isChecklist ? `Liste de contrôle sans titre ${suffix}` : `Évaluation sans titre ${suffix}`,
         egcs_cn_outcomename_en: isChecklist ? 'Result' : 'Outcome',
         egcs_cn_outcomename_fr: 'Résultat',
         egcs_cn_disablecustomoutcomes: isChecklist,

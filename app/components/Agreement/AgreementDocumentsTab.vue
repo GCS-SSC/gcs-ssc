@@ -2,7 +2,9 @@
 import { throwFetchResponseError } from '~/utils/fetch-error'
 /* eslint-disable jsdoc/require-jsdoc -- component-local callbacks are self-descriptive */
 import { getClientRequestUrl } from '~/utils/client-request-url'
-import { computed, watch } from 'vue'
+import { computed, onBeforeUnmount, watch } from 'vue'
+import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
+import type { FundingCaseAgreementProfileRow, FundingCaseAgreementAmendmentRow } from '~~/shared/types/funding-case-agreement-ui'
 import type { Ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { AgreementDocumentGenerateSchema } from '~~/shared/types/schemas'
@@ -20,10 +22,12 @@ const apiBase = computed(() => amendmentId ? `/api/agreements/${agreementId}/ame
 const { t, locale } = useI18n()
 const validateGenerate = useZodI18n().createValidator(AgreementDocumentGenerateSchema)
 const toast = useLocalizedToast()
+const { isRecordLocked } = useBusinessStatusState()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const isGenerateOpen: Ref<boolean> = ref(false)
 const isGenerating: Ref<boolean> = ref(false)
+const isOpeningGenerate: Ref<boolean> = ref(false)
 const generateState: Ref<{ templateId?: string, language: 'eng' | 'fra', outputFormat?: TransferPaymentDocumentTemplateOutputFormat } | null> = ref(null)
 
 const {
@@ -40,6 +44,19 @@ const {
 const templates: Ref<TransferPaymentStreamDocumentTemplateItem[]> = ref([])
 const templatesStatus: Ref<'pending' | 'success' | 'error'> = ref('pending')
 let templateGeneration = 0
+let operationGeneration = 0
+let ownerGeneration = 0
+onBeforeUnmount(() => {
+  ownerGeneration++
+  templateGeneration++
+  operationGeneration++
+})
+watch(isGenerateOpen, open => {
+  if (!open) {
+    operationGeneration++
+    isGenerating.value = false
+  }
+}, { flush: 'sync' })
 
 const refreshTemplates = async () => {
   const generation = ++templateGeneration
@@ -59,6 +76,10 @@ const refreshTemplates = async () => {
   }
 }
 watch(apiBase, () => {
+  ownerGeneration++
+  operationGeneration++
+  isGenerating.value = false
+  isOpeningGenerate.value = false
   isGenerateOpen.value = false
   generateState.value = null
   templates.value = []
@@ -79,16 +100,59 @@ const outputFormatItems = computed(() => (selectedTemplate.value?.egcs_ay_output
   value: format
 })))
 
-const openGenerate = () => {
-  if (!canCreate) return
-
-  const initialTemplate = templates.value[0]
-  generateState.value = {
-    templateId: initialTemplate?.id,
-    language: locale.value === 'fr' ? 'fra' : 'eng',
-    outputFormat: initialTemplate?.egcs_ay_outputformats[0] || 'docx'
+const warnDocumentPrerequisite = (missingAssignment = false) => toast.add({
+  title: toast.localized('common.warning'),
+  description: toast.localized(missingAssignment ? 'assignments.read_only_description' : 'agreement.child_records.work_prerequisite'),
+  color: 'warning'
+})
+const readJson = async (path: string): Promise<unknown> => {
+  const response = await fetch(getClientRequestUrl(path))
+  if (!response.ok) await throwFetchResponseError(response)
+  return await response.json()
+}
+const checkDocumentPrerequisites = async (action: 'create' | 'delete', current: () => boolean): Promise<boolean> => {
+  const owner = agreementId
+  const child = amendmentId
+  const entityType = child ? 'fundingcaseamendment' : 'fundingcaseagreement'
+  const [parent, roster, amendment] = await Promise.all([
+    readJson(`/api/agreements/${owner}`) as Promise<FundingCaseAgreementProfileRow>,
+    readJson(`/api/entity-assignments/${entityType}/${child ?? owner}`) as Promise<{ is_assigned: boolean }>,
+    child ? readJson(`/api/agreements/${owner}/amendments/${child}`) as Promise<FundingCaseAgreementAmendmentRow> : Promise.resolve(null)
+  ])
+  if (!current()) return false
+  if (roster.is_assigned !== true) {
+    warnDocumentPrerequisite(true)
+    return false
   }
-  isGenerateOpen.value = true
+  const allowed = amendment
+    ? amendment.egcs_fc_isopen && (action === 'create' ? amendment.can_edit : amendment.can_delete_documents)
+    : action === 'create'
+      ? parent.can_create_child_records_role && parent.can_create_child_records
+      : parent.can_delete_child_records_role && parent.can_delete_child_records
+  if (allowed && !isRecordLocked(parent) && (!amendment || !isRecordLocked(amendment))) return true
+  warnDocumentPrerequisite()
+  return false
+}
+const openGenerate = async () => {
+  if (!canCreate || isOpeningGenerate.value) return
+  const generation = ++operationGeneration
+  const requestedBase = apiBase.value
+  const current = () => generation === operationGeneration && requestedBase === apiBase.value
+  try {
+    isOpeningGenerate.value = true
+    if (!await checkDocumentPrerequisites('create', current) || !current()) return
+    const initialTemplate = templates.value[0]
+    generateState.value = {
+      templateId: initialTemplate?.id,
+      language: locale.value === 'fr' ? 'fra' : 'eng',
+      outputFormat: initialTemplate?.egcs_ay_outputformats[0] || 'docx'
+    }
+    isGenerateOpen.value = true
+  } catch (error: unknown) {
+    if (current()) showError(error)
+  } finally {
+    if (current()) isOpeningGenerate.value = false
+  }
 }
 
 watch(() => generateState.value?.templateId, () => {
@@ -100,10 +164,14 @@ watch(() => generateState.value?.templateId, () => {
 })
 
 const downloadDocument = async (generatedDocument: AgreementGeneratedDocumentItem) => {
+  const generation = ownerGeneration
+  const requestedBase = apiBase.value
+  const current = () => generation === ownerGeneration && requestedBase === apiBase.value
   try {
-    const response = await fetch(getClientRequestUrl(`${apiBase.value}/documents/${generatedDocument.id}/download`))
+    const response = await fetch(getClientRequestUrl(`${requestedBase}/documents/${generatedDocument.id}/download`))
     if (!response.ok) await throwFetchResponseError(response)
     const blob = await response.blob()
+    if (!current()) return
     const disposition = response.headers.get('content-disposition') || ''
     const filenameMatch = /filename="?([^";]+)"?/i.exec(disposition)
     const attachmentName = locale.value === 'fr' ? generatedDocument.attachment_name_fr : generatedDocument.attachment_name_en
@@ -116,7 +184,7 @@ const downloadDocument = async (generatedDocument: AgreementGeneratedDocumentIte
     link.click()
     URL.revokeObjectURL(url)
   } catch (error: unknown) {
-    showError(error)
+    if (current()) showError(error)
   }
 }
 
@@ -125,32 +193,45 @@ const generateDocument = async () => {
     return
   }
 
+  let generation = ++operationGeneration
+  const requestedBase = apiBase.value
+  const draft = generateState.value
+  const current = () => generation === operationGeneration && requestedBase === apiBase.value
   try {
     isGenerating.value = true
-    const response = await fetch(getClientRequestUrl(`${apiBase.value}/documents/generate`), {
+    if (!await checkDocumentPrerequisites('create', current) || !current()) return
+    const response = await fetch(getClientRequestUrl(`${requestedBase}/documents/generate`), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(generateState.value)
+      body: JSON.stringify(draft)
     })
     if (!response.ok) await throwFetchResponseError(response)
+    if (!current()) return
     isGenerateOpen.value = false
+    generation = operationGeneration
     await refresh()
+    if (!current()) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('agreement.documents.generated_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (current()) showError(error)
   } finally {
-    isGenerating.value = false
+    if (current()) isGenerating.value = false
   }
 }
 
 const deleteDocument = async (generatedDocument: AgreementGeneratedDocumentItem) => {
+  const generation = operationGeneration
+  const requestedBase = apiBase.value
+  const current = () => generation === operationGeneration && requestedBase === apiBase.value
   try {
-    const ok = await confirmDeleteRequest(`${apiBase.value}/documents/${generatedDocument.id}`)
-    if (!ok) return
+    if (!await checkDocumentPrerequisites('delete', current) || !current()) return
+    const ok = await confirmDeleteRequest(`${requestedBase}/documents/${generatedDocument.id}`)
+    if (!ok || !current()) return
     await refresh()
+    if (!current()) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (current()) showError(error)
   }
 }
 </script>
@@ -175,6 +256,7 @@ const deleteDocument = async (generatedDocument: AgreementGeneratedDocumentItem)
       :total-records="totalRecords"
       :loading="status === 'pending'"
       :button-label="t('agreement.documents.generate')"
+      :button-disabled="isOpeningGenerate || isGenerating"
       :show-button="canCreate && templatesStatus === 'success' && templates.length > 0"
       :request-status="status"
       search-placeholder=""

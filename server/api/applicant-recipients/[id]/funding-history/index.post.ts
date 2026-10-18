@@ -55,8 +55,8 @@ export default defineEventHandler(async event => {
         egcs_ar_title_fr: validated.egcs_ar_title_fr,
         egcs_ar_description_en: validated.egcs_ar_description_en,
         egcs_ar_description_fr: validated.egcs_ar_description_fr,
-        egcs_ar_startdate: validated.egcs_ar_startdate,
-        egcs_ar_enddate: validated.egcs_ar_enddate,
+        egcs_ar_startdate: sql<Date>`${validated.egcs_ar_startdate.toISOString().slice(0, 10)}::date`,
+        egcs_ar_enddate: sql<Date>`${validated.egcs_ar_enddate.toISOString().slice(0, 10)}::date`,
         egcs_ar_fundingamount: databaseMoneyValue(validated.egcs_ar_fundingamount),
         egcs_ar_currency: validated.egcs_ar_currency
       }

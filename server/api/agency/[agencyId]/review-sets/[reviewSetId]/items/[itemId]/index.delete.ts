@@ -27,11 +27,20 @@ export default defineEventHandler(async event => {
         .where('id', '=', itemId).where('egcs_cn_reviewset', '=', reviewSetupId).where('_deleted', '=', false)
         .returning('id').executeTakeFirst()
       if (!deleted) return await notFound(event, 'REVIEW_SETUP_MEMBER_NOT_FOUND', 'apiErrors.review.review_set_setup_not_found')
-      const remainingMembers = await trx.selectFrom('Common_Review_Setup').select('id')
+      const remainingMembers = await trx.selectFrom('Common_Review_Setup').select(['id', 'egcs_cn_order'])
         .where('egcs_cn_reviewset', '=', reviewSetupId).where('_deleted', '=', false)
         .orderBy('egcs_cn_order', 'asc').forUpdate().execute()
+      // Large signed-order sets must end at SMALLINT max rather than overflow positive orders.
+      const firstOrder = Math.min(1, 32768 - remainingMembers.length)
+      // Move down from the start, then up from the end, so occupied orders are freed first.
       for (const [index, member] of remainingMembers.entries()) {
-        await trx.updateTable('Common_Review_Setup').set({ egcs_cn_order: index + 1 })
+        if (member.egcs_cn_order <= index + firstOrder) continue
+        await trx.updateTable('Common_Review_Setup').set({ egcs_cn_order: index + firstOrder })
+          .where('id', '=', String(member.id)).execute()
+      }
+      for (const [index, member] of Array.from(remainingMembers.entries()).reverse()) {
+        if (member.egcs_cn_order >= index + firstOrder) continue
+        await trx.updateTable('Common_Review_Setup').set({ egcs_cn_order: index + firstOrder })
           .where('id', '=', String(member.id)).execute()
       }
       return { success: true }

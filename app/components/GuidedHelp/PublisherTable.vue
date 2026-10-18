@@ -123,14 +123,14 @@ watch(search, value => {
             <span v-if="row.original.catalog" class="text-xs text-muted">{{ t('guided_help.source') }}</span><CommonLifecycleBadge engine="publication" :state="(row.original.guide ?? row.original.offer)?.publicationState ?? 'draft'" />
           </div>
           <div v-if="row.original.catalog" class="flex flex-wrap items-center gap-2">
-            <span v-if="row.original.guide" class="text-xs text-muted">{{ t('guided_help.catalog') }}</span><CommonLifecycleBadge engine="publication" :state="row.original.catalog.publicationState ?? 'draft'" />
+            <span v-if="row.original.guide" class="text-xs text-muted">{{ t('guided_help.catalog') }}</span><CommonLifecycleBadge engine="publication" :state="row.original.catalog.egcs_ay_enabled ? row.original.catalog.publicationState ?? 'draft' : 'draft'" />
           </div>
         </div>
       </template>
       <template #availability-cell="{ row }">
         <div v-if="!row.getIsGrouped() && !row.original.placeholder" class="max-w-sm space-y-1 whitespace-normal text-sm">
           <template v-if="row.original.catalog">
-            <p>{{ t(row.original.catalog.publicationState === 'published' ? 'guided_help.available_in_agency' : 'guided_help.not_published_locally') }}</p>
+            <p>{{ t(row.original.catalog.egcs_ay_enabled && row.original.catalog.publicationState === 'published' ? 'guided_help.available_in_agency' : 'guided_help.not_published_locally') }}</p>
             <p class="text-muted">
               {{ t('guided_help.configured_screens') }}: {{ row.original.catalog.egcs_ay_discoveryscreens.map(viewName).join(', ') }}
             </p>

@@ -5,7 +5,7 @@ import { getClientRequestUrl } from '~/utils/client-request-url'
 import { watch } from 'vue'
 import type { Ref } from 'vue'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
-import type { TransferPaymentCostCategoryLineItemItem, AgencyCostCategoryLineItemItem } from '~~/shared/types/schemas'
+import type { TransferPaymentCostCategoryLineItemItem } from '~~/shared/types/schemas'
 import { TransferPaymentCostCategoryLineItemSchema } from '~~/shared/types/schemas'
 
 interface TransferPaymentCostCategoryLineRow extends TransferPaymentCostCategoryLineItemItem, Record<string, unknown> {
@@ -19,8 +19,7 @@ const {
   transferPaymentId,
   streamId,
   canUpdateChild,
-  canDeleteChild,
-  agencyId
+  canDeleteChild
 } = defineProps<{
   transferPaymentId: string
   streamId: string
@@ -140,12 +139,6 @@ const deleteCostCategoryLine = async (row: TransferPaymentCostCategoryLineRow) =
     showError(error)
   }
 }
-
-const { data: costLineItemResponse } = await useAgencyReferenceData<AgencyCostCategoryLineItemItem>({
-  agencyId,
-  buildUrl: id => `/api/agency/${id}/line-items`,
-  query: { page: 1, limit: 100 }
-})
 </script>
 
 <template>
@@ -196,20 +189,20 @@ const { data: costLineItemResponse } = await useAgencyReferenceData<AgencyCostCa
     <template #actions-cell="{ row }">
       <div class="flex items-center gap-2">
         <CommonActionButton
+          v-if="canUpdateChild"
           icon="i-lucide-pencil"
           color="neutral"
           variant="ghost"
           size="sm"
           :aria-label="t('common.edit_named', { name: getCostLineActionTarget(row.original) })"
-          :disabled="!canUpdateChild"
           @click="openUpdateCostCategoryLine(row.original)" />
         <CommonActionButton
+          v-if="canDeleteChild"
           icon="i-lucide-trash"
           color="error"
           variant="ghost"
           size="sm"
           :aria-label="t('common.delete_named', { name: getCostLineActionTarget(row.original) })"
-          :disabled="!canDeleteChild"
           @click="deleteCostCategoryLine(row.original)" />
       </div>
     </template>
@@ -225,9 +218,22 @@ const { data: costLineItemResponse } = await useAgencyReferenceData<AgencyCostCa
         :validate="validateCostCategoryLine"
         class="space-y-4"
         @submit="saveCostCategoryLine">
-        <TransferPaymentFieldsTransferPaymentCostCategoryLineItemFields
-          :model="selectedCostCategoryLine"
-          :line-item-options="costLineItemResponse?.items || []" />
+        <UFormField :label="t('transfer_payment.cost_category_line_items')" name="egcs_tp_organizationcostcategory">
+          <CommonServerLookupSelect
+            v-model="selectedCostCategoryLine.egcs_tp_organizationcostcategory"
+            :fetch-url="`/api/transfer-payments/${transferPaymentId}/streams/${streamId}/lookups/cost-category-line-items`"
+            :include-deleted-query="false"
+            selected-values-query-key="ids"
+            value-key="id"
+            label-en-key="egcs_ay_name_en"
+            label-fr-key="egcs_ay_name_fr" />
+        </UFormField>
+        <UFormField :label="t('transfer_payment.cost_sharing_ratio')" name="egcs_tp_costsharingratio" required>
+          <UInputNumber v-model="selectedCostCategoryLine.egcs_tp_costsharingratio" :step="0.01" :format-options="{ style: 'percent' }" />
+        </UFormField>
+        <UFormField name="egcs_tp_active" :description="t('transfer_payment.cost_line_active_help')">
+          <USwitch v-model="selectedCostCategoryLine.egcs_tp_active" :label="t('common.active')" />
+        </UFormField>
         <div class="flex justify-end gap-2 pt-4">
           <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isCostCategoryModalOpen = false" />
           <CommonSaveButton

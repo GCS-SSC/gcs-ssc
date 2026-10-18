@@ -1,17 +1,18 @@
 import { z } from 'zod'
+import { PositivePostgresBigintIdSchema } from '~~/shared/types/schemas/common'
 import { PaginationSchema } from '~~/shared/types/schemas'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import {
   listAgencyScopedCommonUsersPage,
-  resolveAdditionalReviewerExecutableContextFromReview
+  authorizeAdditionalReviewerLookup
 } from '~~/server/utils/additional-reviewer-runtime'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
-import { authorizeReviewRuntimeAction } from '~~/server/utils/review-runtime-access'
 import { requireAuthContext } from '~~/server/utils/authorize'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 const UserLookupQuerySchema = PaginationSchema.extend({
-  search: z.string().optional()
+  search: z.string().optional(),
+  additionalReviewerId: PositivePostgresBigintIdSchema.optional()
 })
 
 export default defineEventHandler(async event => {
@@ -25,15 +26,9 @@ export default defineEventHandler(async event => {
   if (!isPositivePostgresBigintText(reviewId)) {
     return await notFound(event, 'ASSESSMENT_NOT_FOUND', 'apiErrors.admin_common.not_found')
   }
-  const { search, page, limit } = await getValidatedQueryI18n(event, UserLookupQuerySchema)
+  const { search, page, limit, additionalReviewerId } = await getValidatedQueryI18n(event, UserLookupQuerySchema)
 
-  const executableContext = await resolveAdditionalReviewerExecutableContextFromReview(db, reviewId)
-  if (!executableContext) {
-    return await notFound(event, 'ASSESSMENT_NOT_FOUND', 'apiErrors.admin_common.not_found')
-  }
-
-  await authorizeReviewRuntimeAction(event, 'save_assessment', executableContext.runtimeEntity)
-
+  const executableContext = await authorizeAdditionalReviewerLookup(event, reviewId, additionalReviewerId)
   if (!executableContext.runtimeEntity.schemaAgencyId) {
     return await badRequest(event, 'MISSING_SCHEMA_AGENCY', 'apiErrors.request.invalid')
   }

@@ -1,3 +1,4 @@
+import { dateOnlySql } from '~~/server/utils/database-date'
 import { throwIfTransferPaymentUniqueConstraintError } from '~~/server/utils/transfer-payment-unique-constraint-errors'
 import { TransferPaymentProfileSchema } from '~~/shared/types/schemas'
 import {
@@ -45,8 +46,8 @@ export default defineEventHandler(async event => {
         .insertInto('Transfer_Payment_Profile')
         .values({
           egcs_tp_agency: validated.egcs_tp_agency,
-          egcs_tp_datestart: validated.egcs_tp_datestart,
-          egcs_tp_dateend: validated.egcs_tp_dateend,
+          egcs_tp_datestart: dateOnlySql(validated.egcs_tp_datestart),
+          egcs_tp_dateend: dateOnlySql(validated.egcs_tp_dateend),
           egcs_tp_name_en: validated.egcs_tp_name_en,
           egcs_tp_name_fr: validated.egcs_tp_name_fr,
           egcs_tp_abbreviation_en: validated.egcs_tp_abbreviation_en,

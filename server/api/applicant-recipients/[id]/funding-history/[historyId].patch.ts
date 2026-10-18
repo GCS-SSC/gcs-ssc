@@ -1,6 +1,8 @@
 import { sql } from 'kysely'
-import { FundingHistoryExternalPatchSchema } from '~~/shared/types/schemas'
+import { z } from 'zod'
+import { FundingHistoryExternalCreateSchema, FundingHistoryExternalPatchSchema } from '~~/shared/types/schemas'
 import { authorize, authorizeWithFreshAuthContext, requireAuthContext, requireFreshAuthContext } from '~~/server/utils/authorize'
+import { parseI18n } from '~~/server/utils/api-validate'
 import { badRequest } from '~~/server/utils/api-errors'
 import {
   lockActiveApplicantRecipientIds,
@@ -26,7 +28,7 @@ export default defineEventHandler(async event => {
   const applicantRecipientId = getRouterParam(event, 'id')
   const historyId = getRouterParam(event, 'historyId')
   if (!isValidFundingHistoryId(applicantRecipientId) || !isValidFundingHistoryId(historyId)) return await badRequest(event, 'INVALID_ID', 'apiErrors.request.invalid_id')
-  const validated = await readValidatedBodyI18n(event, FundingHistoryExternalPatchSchema)
+  const validated = await readValidatedBodyI18n(event, z.object(FundingHistoryExternalPatchSchema.shape))
   await authorize(event, 'applicant_recipient', 'update', async ({ context }) =>
     await resolveApplicantRecipientAuthorization(context, applicantRecipientId, 'update', db)
   )
@@ -51,10 +53,18 @@ export default defineEventHandler(async event => {
           'egcs_ar_agencyname_fr',
           'egcs_ar_programname_en',
           'egcs_ar_programname_fr',
-          'egcs_ar_agreementnumber'
+          'egcs_ar_agreementnumber',
+          'egcs_ar_title_en', 'egcs_ar_title_fr',
+          'egcs_ar_description_en', 'egcs_ar_description_fr',
+          sql<string>`egcs_ar_startdate::text`.as('egcs_ar_startdate'),
+          sql<string>`egcs_ar_enddate::text`.as('egcs_ar_enddate'), 'egcs_ar_currency',
+          databaseMoneyText(sql.ref('egcs_ar_fundingamount')).as('egcs_ar_fundingamount')
         ])
         .forUpdate()
         .executeTakeFirstOrThrow()
+      const merged = await parseI18n(event, FundingHistoryExternalCreateSchema, {
+        ...currentHistory, recipientIds: currentRecipientIds, ...validated
+      })
       const identityChanged = [
         'egcs_ar_agencyname_en',
         'egcs_ar_agencyname_fr',
@@ -120,17 +130,17 @@ export default defineEventHandler(async event => {
       }
 
       const detailValues = {
-        ...(hasOwn(validated, 'egcs_ar_agencyname_en') ? { egcs_ar_agencyname_en: validated.egcs_ar_agencyname_en } : {}),
-        ...(hasOwn(validated, 'egcs_ar_agencyname_fr') ? { egcs_ar_agencyname_fr: validated.egcs_ar_agencyname_fr } : {}),
-        ...(hasOwn(validated, 'egcs_ar_programname_en') ? { egcs_ar_programname_en: validated.egcs_ar_programname_en } : {}),
-        ...(hasOwn(validated, 'egcs_ar_programname_fr') ? { egcs_ar_programname_fr: validated.egcs_ar_programname_fr } : {}),
+        ...(hasOwn(validated, 'egcs_ar_agencyname_en') ? { egcs_ar_agencyname_en: merged.egcs_ar_agencyname_en ?? null } : {}),
+        ...(hasOwn(validated, 'egcs_ar_agencyname_fr') ? { egcs_ar_agencyname_fr: merged.egcs_ar_agencyname_fr ?? null } : {}),
+        ...(hasOwn(validated, 'egcs_ar_programname_en') ? { egcs_ar_programname_en: merged.egcs_ar_programname_en ?? null } : {}),
+        ...(hasOwn(validated, 'egcs_ar_programname_fr') ? { egcs_ar_programname_fr: merged.egcs_ar_programname_fr ?? null } : {}),
         ...(hasOwn(validated, 'egcs_ar_agreementnumber') ? { egcs_ar_agreementnumber: validated.egcs_ar_agreementnumber } : {}),
-        ...(hasOwn(validated, 'egcs_ar_title_en') ? { egcs_ar_title_en: validated.egcs_ar_title_en } : {}),
-        ...(hasOwn(validated, 'egcs_ar_title_fr') ? { egcs_ar_title_fr: validated.egcs_ar_title_fr } : {}),
-        ...(hasOwn(validated, 'egcs_ar_description_en') ? { egcs_ar_description_en: validated.egcs_ar_description_en } : {}),
-        ...(hasOwn(validated, 'egcs_ar_description_fr') ? { egcs_ar_description_fr: validated.egcs_ar_description_fr } : {}),
-        ...(hasOwn(validated, 'egcs_ar_startdate') ? { egcs_ar_startdate: validated.egcs_ar_startdate } : {}),
-        ...(hasOwn(validated, 'egcs_ar_enddate') ? { egcs_ar_enddate: validated.egcs_ar_enddate } : {}),
+        ...(hasOwn(validated, 'egcs_ar_title_en') ? { egcs_ar_title_en: merged.egcs_ar_title_en ?? null } : {}),
+        ...(hasOwn(validated, 'egcs_ar_title_fr') ? { egcs_ar_title_fr: merged.egcs_ar_title_fr ?? null } : {}),
+        ...(hasOwn(validated, 'egcs_ar_description_en') ? { egcs_ar_description_en: merged.egcs_ar_description_en ?? null } : {}),
+        ...(hasOwn(validated, 'egcs_ar_description_fr') ? { egcs_ar_description_fr: merged.egcs_ar_description_fr ?? null } : {}),
+        ...(validated.egcs_ar_startdate !== undefined ? { egcs_ar_startdate: sql<Date>`${validated.egcs_ar_startdate.toISOString().slice(0, 10)}::date` } : {}),
+        ...(validated.egcs_ar_enddate !== undefined ? { egcs_ar_enddate: sql<Date>`${validated.egcs_ar_enddate.toISOString().slice(0, 10)}::date` } : {}),
         ...(hasOwn(validated, 'egcs_ar_fundingamount') && validated.egcs_ar_fundingamount !== undefined
           ? { egcs_ar_fundingamount: databaseMoneyValue(validated.egcs_ar_fundingamount) }
           : {}),

@@ -1,6 +1,6 @@
 import { getRiskReadiness } from '~~/server/utils/risk-readiness'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
-import { authorizeReviewRuntimeAction, canAuthorizeReviewRuntimeAction } from '~~/server/utils/review-runtime-access'
+import { authorizeReviewRuntimeAction, canAuthorizeWorkflowOwnerRecovery } from '~~/server/utils/review-runtime-access'
 import { resolveCompletionRuntimeEntityFromEntity, respondCompletionRuntimeEntityNotFound } from '~~/server/utils/completion-runtime'
 import {
   getWorkflowRuntime,
@@ -20,7 +20,6 @@ import { resolveCompletionEvidenceId } from '~~/server/utils/completion-runtime-
 import { resolveEntityTypeLifecycleDefinition } from '~~/server/utils/entity-type-registry'
 import { authorizeExtensionLifecycleRead, resolveExtensionLifecycleRuntime } from '~~/server/utils/extension-lifecycle-runtime'
 import { canManageExtensionEntityAssignments } from '~~/server/utils/extension-entity-assignment'
-import { canAccessApplicantRecipient } from '~~/server/utils/applicant-recipient-auth'
 import type { AssignableEntityType } from '~~/shared/types/database'
 import { isBusinessStatusEntityType, resolveBusinessStatusProtection } from '~~/server/utils/business-status-runtime'
 
@@ -158,27 +157,8 @@ export default defineEventHandler(async event => {
       || blockers.some(blocker => String(blocker.egcs_cn_triggeredby) === actor.id))
     const canRedirect = blockers.length > 0 && blockers.every(blocker => (runtime.steps ?? [])
       .find(member => member.memberId === String(blocker.egcs_cn_workflowsetupmember))?.allowOwnerRedirect)
-    const extensionCanWork = extensionRuntime
-      ? await (async () => {
-          const owner = extensionRuntime.lockedEntity.owner
-          const hasUpdateRole = owner.owner === 'agreement'
-            ? await (async () => {
-                const agreement = await resolveAgreementScopeContext(owner.ownerId, event.context.$db)
-                return agreement ? await canAccessAgreement(authContext, 'update', agreement.scope, event.context.$db) : false
-              })()
-            : await canAccessApplicantRecipient(authContext, owner.ownerId, 'update', event.context.$db)
-          const assignmentTarget = extensionRuntime.loaded.definition.assignmentMode === 'independent'
-            ? { entityType: context.entityType, entityId: context.entityId }
-            : { entityType: owner.owner === 'agreement' ? 'fundingcaseagreement' as const : 'applicantrecipient' as const, entityId: owner.ownerId }
-          return hasUpdateRole && Boolean(await resolveAssignedItemGrant(
-            authContext.userId, assignmentTarget.entityType, assignmentTarget.entityId, event.context.$db
-          ))
-        })()
-      : false
-    const canWork = ordinaryActor && canRedirect && (extensionRuntime
-      ? extensionCanWork
-      : await canAuthorizeReviewRuntimeAction(event, 'save_assessment', context))
-    canResumeOwners = canWork || (extensionRuntime
+    const hasWorkAuthority = await canAuthorizeWorkflowOwnerRecovery(event, context, extensionRuntime)
+    canResumeOwners = hasWorkAuthority && ((ordinaryActor && canRedirect) || (extensionRuntime
       ? extensionRuntime.loaded.definition.assignmentMode === 'independent'
         ? await canManageExtensionEntityAssignments(event, extensionRuntime)
         : await canManageEntityAssignments(
@@ -186,7 +166,7 @@ export default defineEventHandler(async event => {
             extensionRuntime.lockedEntity.owner.owner === 'agreement' ? 'fundingcaseagreement' : 'applicantrecipient',
             extensionRuntime.lockedEntity.owner.ownerId
           )
-      : await canManageEntityAssignments(event, context.entityType as AssignableEntityType, context.entityId))
+      : await canManageEntityAssignments(event, context.entityType as AssignableEntityType, context.entityId)))
   }
   return {
     ...runtime,

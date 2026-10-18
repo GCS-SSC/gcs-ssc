@@ -1,8 +1,9 @@
+import { readAgreementMonitorBody } from '~~/server/utils/agreement-monitor-validation'
 import { FundingCaseAgreementMonitorPlanningCreateSchema } from '~~/shared/types/schemas'
 import { executeAgreementMonitorMutation, prepareAgreementMonitorRoute } from '~~/server/utils/agreement-monitor'
 
 export default defineEventHandler(async event => {
-  const validated = await readValidatedBodyI18n(event, FundingCaseAgreementMonitorPlanningCreateSchema)
+  const validated = await readAgreementMonitorBody(event, FundingCaseAgreementMonitorPlanningCreateSchema)
   const prepared = await prepareAgreementMonitorRoute(event, 'create', {
     entityType: 'fundingcasemonitor',
     entityId: validated.egcs_fc_fundingagreementmonitor

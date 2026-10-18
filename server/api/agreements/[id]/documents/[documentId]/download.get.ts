@@ -1,10 +1,11 @@
+import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 import { setResponseHeader } from 'h3'
 import { create as contentDisposition } from 'content-disposition'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import { readAgreementGeneratedDocument } from '~~/server/utils/document-generation'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
-export default defineEventHandler(async event => {
+const readRoute = defineEventHandler(async event => {
   const db = event.context.$db
   const agreementId = getRouterParam(event, 'id')
   const documentId = getRouterParam(event, 'documentId')
@@ -29,3 +30,6 @@ export default defineEventHandler(async event => {
   setResponseHeader(event, 'Cache-Control', 'private, no-store')
   return generated.bytes
 })
+
+export default defineEventHandler(async event =>
+  await executeFreshReadSnapshot(event, async () => await readRoute(event)))

@@ -1,3 +1,4 @@
+import { resolveAssignedItemGrant } from './rbac'
 import { canAccessCreditMemoTargetScopes } from './credit-memo-scope-authority'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Review authorization helpers expose typed internal contracts covered by focused regression tests. */
 import type { H3Event } from 'h3'
@@ -8,6 +9,7 @@ import { badRequest, forbidden, notFound, throwApiError } from '~~/server/utils/
 import { canAccessAgreement, resolveAgreementScopeContext } from '~~/server/utils/agreement'
 import {
   canAccessApplicantRecipient,
+  resolveApplicantRecipientVisibility,
   executeFreshAuthorizedApplicantRecipientWrite
 } from '~~/server/utils/applicant-recipient-auth'
 import { authorize, authorizeAssignedItem, authorizeFreshAssignedItem, authorizeWithFreshAuthContext, requireAuthContext, requireFreshAuthContext } from '~~/server/utils/authorize'
@@ -1120,6 +1122,38 @@ export const canAuthorizeReviewRuntimeWorkOwnerRole = async (
   }
 }
 
+/** Projects presentation-only Add/Cancel role permission after the caller establishes source read access. */
+export const canAuthorizeReviewSetSourceRole = async (
+  event: H3Event,
+  action: 'create_review_set' | 'cancel_review_set',
+  entityContext: ReviewRuntimeEntityContext
+): Promise<boolean> => {
+  try {
+    if (entityContext.entityType === 'applicantrecipient') {
+      if (entityContext.proponentAgencyContextId) {
+        await authorizeApplicantRecipientOwnerRole(event, action, entityContext)
+        return true
+      }
+      // Add describes at least one eligible owner; the selected setup still authorizes its pinned Agency.
+      if (action === 'cancel_review_set') return false
+      const auth = await requireAuthContext(event)
+      const visibility = await resolveApplicantRecipientVisibility(auth, 'update', event.context.$db)
+      return visibility.hasGlobalAccess || visibility.agencyIds.length > 0
+    }
+    await authorizeReviewRuntimeWorkOwnerRole(event, action, entityContext)
+    if (entityContext.entityType === 'fundingcaseaccountreceivablecreditmemo') {
+      const auth = await requireAuthContext(event)
+      return await canAccessCreditMemoTargetScopes(
+        event.context.$db, auth, entityContext.entityType, entityContext.entityId, 'update'
+      )
+    }
+    return true
+  } catch (error) {
+    if (getErrorStatusCode(error) === 403) return false
+    throw error
+  }
+}
+
 /**
  * Applies review-specific authorization against the resolved owning entity.
  *
@@ -1754,7 +1788,7 @@ export const executeFreshAuthorizedApprovalAddStepWrite = async <T>(
   })
 }
 
-/** Executes workflow owner recovery using the independent manage-assignments grant. */
+/** Executes management-assisted recovery after ordinary exact-target work authorization. */
 export const executeFreshAuthorizedWorkflowOwnerRecovery = async <T>(
   event: H3Event,
   entityContext: ReviewRuntimeEntityContext,
@@ -1765,6 +1799,9 @@ export const executeFreshAuthorizedWorkflowOwnerRecovery = async <T>(
     authContext: AuthContext,
     current: ReviewRuntimeEntityContext
   ): Promise<void> => {
+    const workTarget = getReviewRuntimeReadTarget(current)
+    if (!isAssignableEntityType(workTarget.entityType)) return await forbidden(event)
+    await authorizeFreshAssignedItem(event, trx, authContext, workTarget.entityType, workTarget.entityId, 'update')
     if (!isAssignableEntityType(current.entityType)
       || !await canManageEntityAssignmentsWithContext(authContext, trx, current.entityType, current.entityId)) {
       return await forbidden(event)
@@ -2126,6 +2163,29 @@ export const canAuthorizeReviewRuntimeAction = async (
 
     throw error
   }
+}
+
+/** Recovery projections retain the same role and declared assignment ceiling as writes. */
+export const canAuthorizeWorkflowOwnerRecovery = async (
+  event: H3Event,
+  context: ReviewRuntimeEntityContext,
+  runtime: ResolvedExtensionLifecycleRuntime | null
+): Promise<boolean> => {
+  if (!runtime) return await canAuthorizeReviewRuntimeAction(event, 'save_assessment', context)
+  if (runtime.lockedEntity.status.terminal) return false
+  const auth = await requireAuthContext(event)
+  const owner = runtime.lockedEntity.owner
+  const hasRole = owner.owner === 'agreement'
+    ? await (async () => {
+        const agreement = await resolveAgreementScopeContext(owner.ownerId, event.context.$db)
+        return Boolean(agreement && auth.userAbilities.authorize('agreement', 'update', agreement.scope))
+      })()
+    : auth.userAbilities.authorize('applicant_recipient', 'update', { type: 'agency', agencyId: owner.agencyId })
+  if (!hasRole) return false
+  const target = runtime.loaded.definition.assignmentMode === 'independent'
+    ? { entityType: context.entityType, entityId: context.entityId }
+    : { entityType: owner.owner === 'agreement' ? 'fundingcaseagreement' as const : 'applicantrecipient' as const, entityId: owner.ownerId }
+  return Boolean(await resolveAssignedItemGrant(auth.userId, target.entityType, target.entityId, event.context.$db))
 }
 
 /** Runs a group claim under canonical owner locks and fresh runtime Viewer access.

@@ -1,3 +1,4 @@
+import { assertAgreementApprovalSubmissionUnlocked } from '~~/server/utils/agreement-approval-submission'
 import { badRequest } from '~~/server/utils/api-errors'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import {
@@ -24,6 +25,7 @@ export default defineEventHandler(async event => {
   if (!context) return await badRequest(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
 
   return await executeFreshAuthorizedAgreementWrite(event, db, agreementId, context, async trx => {
+    await assertAgreementApprovalSubmissionUnlocked(event, trx, agreementId, { excludedAmendmentId: amendmentId })
     const amendment = await assertEditableAgreementAmendment(event, trx, agreementId, amendmentId)
     if (!('id' in amendment)) return amendment
     const currentUser = await resolveCurrentCommonUser(event, trx)
@@ -74,6 +76,7 @@ export default defineEventHandler(async event => {
     action: 'update',
     assignmentTarget: { entityType: 'fundingcaseamendment', entityId: amendmentId },
     businessStatusTarget: { entityType: 'fundingcaseamendment', entityId: amendmentId },
-    businessStatusMode: 'workflow'
+    businessStatusMode: 'workflow',
+    blocksApprovalSubmission: false
   })
 })

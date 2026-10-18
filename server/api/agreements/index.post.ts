@@ -1,3 +1,4 @@
+import { isGcsExtensionUserError } from '@gcs-ssc/extensions/server'
 import { assertAgreementFinancialId } from '~~/server/utils/agreement-financial-ids'
 import { assertAgreementProponentType } from '~~/server/utils/agreement-proponent-type'
 import { resolveAgreementNumberProvider, generateAgreementNumber } from '~~/server/utils/agreement-number-provider'
@@ -28,7 +29,7 @@ import {
   collectFundingHistorySimilarityWarnings,
   requireFundingHistorySimilarityConfirmation
 } from '~~/server/utils/funding-history'
-import { lockRegisteredExtensionAgreementScopes } from '~~/server/utils/extensions'
+import { handleExtensionCreateOperationError, lockRegisteredExtensionAgreementScopes } from '~~/server/utils/extensions'
 import { lockTransferPaymentStreams } from '~~/server/utils/transfer-payment-stream-lock'
 import {
   canAccessApplicantRecipientIds,
@@ -284,6 +285,7 @@ export default defineEventHandler(async event => {
     }
     return await badRequest(event, 'INVALID_AGREEMENT_STREAM', 'apiErrors.agreement.invalid_stream')
   } catch (error: unknown) {
+    if (isGcsExtensionUserError(error)) return await handleExtensionCreateOperationError(event, error)
     await throwIfAgreementUniqueConstraintError(event, error)
     throw error
   }

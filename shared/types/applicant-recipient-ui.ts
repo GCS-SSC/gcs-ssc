@@ -10,6 +10,11 @@ import type {
 export interface ApplicantRecipientProfileRow extends ApplicantRecipientProfileItem {
   lead_agency_name_en?: string
   lead_agency_name_fr?: string
+  can_update_role?: boolean
+  can_delete_role?: boolean
+  can_create_child_records_role?: boolean
+  can_update_child_records_role?: boolean
+  can_delete_child_records_role?: boolean
   can_update?: boolean
   can_delete?: boolean
   can_create_child_records?: boolean

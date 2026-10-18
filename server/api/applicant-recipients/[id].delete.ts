@@ -26,7 +26,6 @@ export default defineEventHandler(async event => {
       .where('Funding_Case_Agreement_Applicant_Recipient.egcs_fc_applicantrecipient', '=', id)
       .where('Funding_Case_Agreement_Applicant_Recipient._deleted', '=', false)
       .where('Funding_Case_Agreement_Profile._deleted', '=', false)
-      .forUpdate('Funding_Case_Agreement_Applicant_Recipient')
       .executeTakeFirst()
     const activeFundingHistoryLink = await trx
       .selectFrom('Applicant_Recipient_Funding_History_Recipient')
@@ -39,7 +38,6 @@ export default defineEventHandler(async event => {
       .where('Applicant_Recipient_Funding_History_Recipient.egcs_ar_applicantrecipient', '=', id)
       .where('Applicant_Recipient_Funding_History_Recipient._deleted', '=', false)
       .where('Applicant_Recipient_Funding_History._deleted', '=', false)
-      .forUpdate('Applicant_Recipient_Funding_History_Recipient')
       .executeTakeFirst()
     if (activeAgreementLink || activeFundingHistoryLink) {
       return await throwApiError(event, {

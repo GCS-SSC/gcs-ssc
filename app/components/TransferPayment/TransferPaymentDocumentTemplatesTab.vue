@@ -5,7 +5,7 @@ import { withFormRequirements } from '~~/shared/utils/form-requirements'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 
-const { transferPaymentId, streamId, agencyId, canUpdateChild, canDeleteChild } = defineProps<{
+const { transferPaymentId, streamId, canUpdateChild, canDeleteChild } = defineProps<{
   transferPaymentId: string
   streamId: string
   agencyId: string
@@ -103,15 +103,16 @@ const remove = async (item: TransferPaymentStreamDocumentTemplateItem) => {
   <UModal v-if="selected" v-model:open="isOpen" :title="t('transfer_payment.document_templates.create')" :description="t('common.form_dialog_description')">
     <template #body>
       <UForm :state="selected" :validate="validate" class="space-y-4" @submit="save">
-        <AdminCommonLookupField
-          v-model="selected.egcs_tp_agencydocumenttemplate"
-          :label="t('transfer_payment.document_templates.title')"
-          name="egcs_tp_agencydocumenttemplate"
-          :fetch-url="`/api/agency/${agencyId}/document-templates`"
-          :include-deleted-query="false"
-          value-key="id"
-          label-en-key="egcs_ay_name_en"
-          label-fr-key="egcs_ay_name_fr" />
+        <UFormField :label="t('transfer_payment.document_templates.title')" name="egcs_tp_agencydocumenttemplate" required>
+          <CommonServerLookupSelect
+            v-model="selected.egcs_tp_agencydocumenttemplate"
+            :fetch-url="`/api/transfer-payments/${transferPaymentId}/streams/${streamId}/lookups/document-templates`"
+            :include-deleted-query="false"
+            selected-values-query-key="ids"
+            value-key="id"
+            label-en-key="egcs_ay_name_en"
+            label-fr-key="egcs_ay_name_fr" />
+        </UFormField>
         <div class="flex justify-end gap-2">
           <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isOpen = false" />
           <CommonSaveButton :label="t('common.add')" :loading="isSaving" :disabled="isSaving" />

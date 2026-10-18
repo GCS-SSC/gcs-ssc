@@ -15,6 +15,7 @@ export default defineEventHandler(async event => {
     return await notFound(event, 'REVIEW_SETUP_MEMBER_NOT_FOUND', 'apiErrors.transfer_payment.review_schema_not_found')
   }
   const body = await readValidatedBodyI18n(event, TransferPaymentStreamReviewSetupMemberPatchSchema)
+  if (Object.keys(body).length === 0) return await badRequest(event, 'EMPTY_UPDATE', 'apiErrors.request.invalid_resource')
   try {
     return await withActiveAgencyMutationTransaction(event, agencyId, async trx =>
       await patchTransferPaymentReviewSetupItem(event, trx, { agencyId, reviewSetupId, itemId, body }))

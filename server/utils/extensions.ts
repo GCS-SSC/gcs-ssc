@@ -1381,7 +1381,7 @@ export const setExtensionKvEntry = async (
   if (existing) {
     return await db
       .updateTable('extensions.kv_entry')
-      .set({ value })
+      .set({ value: sql<JsonValue>`${JSON.stringify(value)}::jsonb` })
       .where('id', '=', existing.id)
       .returningAll()
       .executeTakeFirst()
@@ -1394,7 +1394,7 @@ export const setExtensionKvEntry = async (
       owner_type: ownerType,
       owner_id: ownerId,
       config_key: configKey,
-      value
+      value: sql<JsonValue>`${JSON.stringify(value)}::jsonb`
     })
     .returningAll()
     .executeTakeFirst()

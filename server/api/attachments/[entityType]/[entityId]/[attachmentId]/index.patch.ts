@@ -38,6 +38,13 @@ export default defineEventHandler(async event => {
           .where('_deleted', '=', false).forUpdate().executeTakeFirst()
         if (!type) return await badRequest(event, 'ATTACHMENT_TYPE_INVALID', 'apiErrors.attachments.type_invalid')
       }
+      if (resolved.fundingCaseScope && body.attachmentTypeId !== undefined) {
+        const selected = await trx.selectFrom('Funding_Opportunity_Attachment_Type').select('id')
+          .where('egcs_fo_fundingopportunity', '=', resolved.fundingCaseScope.opportunityId)
+          .where('egcs_fo_attachmenttype', '=', body.attachmentTypeId)
+          .where('_deleted', '=', false).forShare().executeTakeFirst()
+        if (!selected) return await badRequest(event, 'ATTACHMENT_TYPE_INVALID', 'apiErrors.attachments.type_invalid')
+      }
       let metadata: GcsFileStorageJsonObject | null = null
       let providerUpdate: null | {
         provider: Awaited<ReturnType<typeof resolveAgencyStorageProvider>> & {}
@@ -108,7 +115,7 @@ export default defineEventHandler(async event => {
           const previousMetadata = await runBoundedExtensionOperation(
             'storage:read-provider-metadata', async signal => {
               if (signal.aborted) throw signal.reason
-              return await adapter.readProviderMetadata(operationContext)
+              return await adapter.readProviderMetadata({ ...operationContext, signal })
             })
           restorationId = await reserveStorageMetadataRestoration(
             event.context.$db, sagaWorkerId,
@@ -122,7 +129,7 @@ export default defineEventHandler(async event => {
           )
           await runBoundedExtensionOperation('storage:update-provider-metadata', async signal => {
             if (signal.aborted) throw signal.reason
-            await adapter.updateProviderMetadata({ ...operationContext, metadata: metadata ?? {} })
+            await adapter.updateProviderMetadata({ ...operationContext, signal, metadata: metadata ?? {} })
           })
           await completeReservedStorageCleanup(trx, restorationId, sagaWorkerId)
         } catch {

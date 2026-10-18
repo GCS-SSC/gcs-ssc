@@ -95,7 +95,7 @@ const createFundingCaseIntakeEvidence = async (
       .select(['id', 'egcs_fi_applicationid', 'egcs_fi_fundingopportunity', 'egcs_fi_applicantrecipient',
         'egcs_fi_sourcesystem', 'egcs_fi_externalsourceid', 'egcs_fi_sourceexport', '_deleted'])
       .where('id', '=', intakeId).forUpdate().executeTakeFirst()
-    if (!byId || byId._deleted || String(byId.egcs_fi_applicationid) !== applicationId
+    if (!byId || String(byId.egcs_fi_applicationid) !== applicationId
       || String(byId.egcs_fi_fundingopportunity) !== opportunityId
       || String(byId.egcs_fi_applicantrecipient) !== applicantRecipientId
       || byId.egcs_fi_sourcesystem !== input.sourceSystem
@@ -116,7 +116,7 @@ const createFundingCaseIntakeEvidence = async (
     .where('egcs_fi_externalsourceid', '=', input.sourceSubmissionId)
     .forUpdate().executeTakeFirst()
   if (existing) {
-    if (existing._deleted || String(existing.egcs_fi_applicationid) !== applicationId
+    if (String(existing.egcs_fi_applicationid) !== applicationId
       || String(existing.egcs_fi_fundingopportunity) !== opportunityId
       || String(existing.egcs_fi_applicantrecipient) !== applicantRecipientId
       || !isDeepStrictEqual(existing.egcs_fi_sourceexport, input.sourceExport)) {

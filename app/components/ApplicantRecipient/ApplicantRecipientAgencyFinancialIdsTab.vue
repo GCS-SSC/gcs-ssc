@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ApplicantRecipientAgencyFinancialIdForm } from '~~/shared/types/applicant-recipient-ui'
+import type { ApplicantRecipientProfileRow, ApplicantRecipientAgencyFinancialIdForm } from '~~/shared/types/applicant-recipient-ui'
 import { ApplicantRecipientAgencyFinancialIdCreateSchema } from '~~/shared/types/schemas'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 import { onBeforeUnmount, ref, watch, watchEffect } from 'vue'
@@ -18,14 +18,38 @@ type FinancialIdWarning = {
   resolve: (confirmed: boolean) => void
 }
 
-const { applicantRecipientId, canCreate, canUpdate, canDelete } = defineProps<{
+const { applicantRecipientId, canCreateRole = false, canUpdateRole = false, canDeleteRole = false } = defineProps<{
   applicantRecipientId: string
   canCreate: boolean
   canUpdate: boolean
   canDelete: boolean
+  canCreateRole?: boolean
+  canUpdateRole?: boolean
+  canDeleteRole?: boolean
 }>()
 
 const { t } = useI18n()
+const toast = useLocalizedToast()
+const { showError } = useApiErrorToast()
+/** Rechecks the exact Proponent before opening or executing a child mutation.
+ * @param action Child operation being activated.
+ * @param current Whether the original CRUD session still owns this action.
+ * @returns Whether the live assignment permits the operation.
+ */
+const checkPrerequisite = async (action: 'create' | 'update' | 'delete', current: () => boolean) => {
+  const ownerId = applicantRecipientId
+  try {
+    const profile = await $fetch<Pick<ApplicantRecipientProfileRow, 'can_create_child_records' | 'can_update_child_records' | 'can_delete_child_records'>, string>(`/api/applicant-recipients/${ownerId}`)
+    if (!current() || ownerId !== applicantRecipientId) return false
+    const allowed = action === 'create' ? profile.can_create_child_records : action === 'update' ? profile.can_update_child_records : profile.can_delete_child_records
+    if (allowed) return true
+    toast.add({ title: toast.localized('common.warning'), description: toast.localized('workflow.action_prerequisite_unavailable'), color: 'warning' })
+  } catch (error: unknown) {
+    if (current() && ownerId === applicantRecipientId) showError(error)
+  }
+  return false
+}
+const beforeOpen = (action: 'create' | 'update', _original: unknown, current: () => boolean) => checkPrerequisite(action, current)
 const { getBilingualValue } = useBilingualValue()
 const warning: Ref<FinancialIdWarning | null> = ref(null)
 const warningOpen: Ref<boolean> = ref(false)
@@ -107,6 +131,7 @@ const confirmUses = async (id: string, operation: 'disable' | 'delete', shouldPr
  * @returns Whether saving may continue.
  */
 const beforeSave = async (state: Record<string, unknown>, original: Record<string, unknown> | null, shouldProceed: () => boolean) => {
+  if (!await checkPrerequisite(original ? 'update' : 'create', shouldProceed)) return false
   if (typeof state.id !== 'string' || original?.egcs_ar_active !== true || state.egcs_ar_active !== false) return true
   return (await confirmUses(state.id, 'disable', shouldProceed)) ?? true
 }
@@ -116,7 +141,10 @@ const beforeSave = async (state: Record<string, unknown>, original: Record<strin
  * @param shouldProceed Whether the original resource still owns the delete.
  * @returns Confirmation or undefined for the normal delete confirmation.
  */
-const beforeDelete = (id: string, shouldProceed: () => boolean) => confirmUses(id, 'delete', shouldProceed)
+const beforeDelete = async (id: string, shouldProceed: () => boolean) => {
+  if (!await checkPrerequisite('delete', shouldProceed)) return false
+  return await confirmUses(id, 'delete', shouldProceed)
+}
 
 const columns: TableColumnInput<{ id: string } & Record<string, unknown>>[] = [
   { id: 'agency_name_en', accessorKey: 'agency_name_en', headerKey: 'applicant_recipient.agency_financial_ids.agency' },
@@ -148,17 +176,18 @@ const getAgencyLookupUrl = (state: ApplicantRecipientAgencyFinancialIdForm) => {
     :title="t('applicant_recipient.agency_financial_ids.title')"
     icon="i-lucide-landmark"
     :fetch-url="`/api/applicant-recipients/${applicantRecipientId}/agency-financial-ids`"
-    :post-url="canCreate ? `/api/applicant-recipients/${applicantRecipientId}/agency-financial-ids` : undefined"
-    :update-url-base="canUpdate ? `/api/applicant-recipients/${applicantRecipientId}/agency-financial-ids` : undefined"
-    :delete-url-base="canDelete ? `/api/applicant-recipients/${applicantRecipientId}/agency-financial-ids` : undefined"
+    :post-url="canCreateRole ? `/api/applicant-recipients/${applicantRecipientId}/agency-financial-ids` : undefined"
+    :update-url-base="canUpdateRole ? `/api/applicant-recipients/${applicantRecipientId}/agency-financial-ids` : undefined"
+    :delete-url-base="canDeleteRole ? `/api/applicant-recipients/${applicantRecipientId}/agency-financial-ids` : undefined"
     :schema="ApplicantRecipientAgencyFinancialIdCreateSchema"
     :initial-new-item="{ egcs_ar_active: true }"
+    :before-open="beforeOpen"
     :before-save="beforeSave"
     :before-delete="beforeDelete"
     :columns="columns"
     :bilingual-columns="bilingualColumns"
     :button-label="t('common.add')"
-    :show-button="canCreate"
+    :show-button="canCreateRole"
     :modal-title="t('applicant_recipient.agency_financial_ids.add')"
     :update-title="t('applicant_recipient.agency_financial_ids.edit')"
     :search-placeholder="t('applicant_recipient.agency_financial_ids.search')">

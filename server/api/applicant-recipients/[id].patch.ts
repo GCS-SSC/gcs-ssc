@@ -2,6 +2,7 @@ import { authorize } from '~~/server/utils/authorize'
 import { badRequest, throwApiError } from '~~/server/utils/api-errors'
 import { patchApplicantRecipientProfile } from '~~/server/utils/applicant-recipient'
 import { resolveApplicantRecipientAuthorization } from '~~/server/utils/applicant-recipient-auth'
+import { handleExtensionCreateOperationError } from '~~/server/utils/extensions'
 import { ExtensionAdmissionTimeoutError } from '~~/server/utils/extension-admission'
 
 export default defineEventHandler(async event => {
@@ -23,6 +24,6 @@ export default defineEventHandler(async event => {
         key: 'apiErrors.extensions.operation_timeout'
       })
     }
-    throw error
+    return await handleExtensionCreateOperationError(event, error)
   }
 })

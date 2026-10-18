@@ -256,6 +256,7 @@ const validateAgencyFinancialIdAgency = async (
         ])
       : eb('egcs_ay_active', '=', true))
     .select('id')
+    .forShare()
     .executeTakeFirst()
 
   if (!agency) {

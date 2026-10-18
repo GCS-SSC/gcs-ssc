@@ -154,7 +154,7 @@ export const resolveApplicantRecipientMutationPermissions = async (
   context: AuthContext,
   applicantRecipientIds: string[],
   db: Kysely<Database>
-): Promise<Map<string, { canCreate: boolean; canUpdate: boolean; canDelete: boolean }>> => {
+): Promise<Map<string, { canCreate: boolean; canUpdate: boolean; canDelete: boolean; canCreateRole: boolean; canUpdateRole: boolean; canDeleteRole: boolean }>> => {
   const [access, createVisibility, updateVisibility, deleteVisibility] = await Promise.all([
     resolveApplicantRecipientAccess(context, db, applicantRecipientIds, true),
     resolveApplicantRecipientVisibility(context, 'create', db),
@@ -164,6 +164,9 @@ export const resolveApplicantRecipientMutationPermissions = async (
   return new Map(applicantRecipientIds.map(id => {
     const itemAccess = access.get(String(id))
     return [String(id), {
+      canCreateRole: createVisibility.hasGlobalAccess || createVisibility.agencyIds.length > 0,
+      canUpdateRole: updateVisibility.hasGlobalAccess || updateVisibility.agencyIds.length > 0,
+      canDeleteRole: deleteVisibility.hasGlobalAccess || deleteVisibility.agencyIds.length > 0,
       canCreate: allowsApplicantRecipientAction(createVisibility, itemAccess, 'create'),
       canUpdate: allowsApplicantRecipientAction(updateVisibility, itemAccess, 'update'),
       canDelete: allowsApplicantRecipientAction(deleteVisibility, itemAccess, 'delete')

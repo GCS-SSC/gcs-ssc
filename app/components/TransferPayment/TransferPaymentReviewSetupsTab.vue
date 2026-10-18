@@ -145,11 +145,11 @@ const removeLink = async (link: ReviewSetLink) => {
           <UFormField :label="t('transfer_payment.review_set')" name="egcs_tp_reviewset" required>
             <CommonServerLookupSelect
               v-model="state.egcs_tp_reviewset"
-              :fetch-url="`/api/agency/${agencyId}/review-sets`"
+              :fetch-url="`/api/transfer-payments/${transferPaymentId}/streams/${streamId}/lookups/review-sets`"
               value-key="id"
-              label-en-key="egcs_cn_name_en"
+              :include-deleted-query="false" selected-values-query-key="ids" label-en-key="egcs_cn_name_en"
               label-fr-key="egcs_cn_name_fr"
-              :query="{ publicationState: 'published' }"
+              :query="{}"
               aria-required="true" />
           </UFormField>
           <div class="flex justify-end gap-2">

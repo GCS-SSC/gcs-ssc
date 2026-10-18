@@ -1,3 +1,4 @@
+import { dateOnlySql } from '~~/server/utils/database-date'
 import { z } from 'zod'
 import { TransferPaymentProfileBaseSchema } from '~~/shared/types/schemas'
 import type { Transaction } from 'kysely'
@@ -81,7 +82,12 @@ export default defineEventHandler(async event => {
 
     return await trx
       .updateTable('Transfer_Payment_Profile')
-      .set({ ...safeUpdate, ...(transferRequested ? { egcs_tp_agency: String(validated.egcs_tp_agency) } : {}) })
+      .set({
+        ...safeUpdate,
+        ...(validated.egcs_tp_datestart !== undefined ? { egcs_tp_datestart: dateOnlySql(validated.egcs_tp_datestart) } : {}),
+        ...(validated.egcs_tp_dateend !== undefined ? { egcs_tp_dateend: dateOnlySql(validated.egcs_tp_dateend) } : {}),
+        ...(transferRequested ? { egcs_tp_agency: String(validated.egcs_tp_agency) } : {})
+      })
       .where('id', '=', id)
       .where('_deleted', '=', false)
       .returningAll()

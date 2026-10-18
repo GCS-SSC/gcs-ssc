@@ -451,7 +451,11 @@ export const executeAgreementClaimMutation = async <T>(
   initialContext: AgreementScopeContext,
   aggregateLocks: AgreementAggregateLock[] | ((trx: Transaction<Database>) => Promise<AgreementAggregateLock[]>),
   callback: (trx: Transaction<Database>) => Promise<T>,
-  options: { action?: 'create' | 'update' | 'delete', businessStatusMode?: 'ordinary' | 'workflow' | 'engine' } = {}
+  options: { operation: 'createReconcile' } | {
+    operation?: 'mutate'
+    action?: 'create' | 'update' | 'delete'
+    businessStatusMode?: 'ordinary' | 'workflow' | 'engine'
+  } = {}
 ): Promise<T> => {
   const resolveAndLockTargets = async (trx: Transaction<Database>) => {
     const locks = typeof aggregateLocks === 'function' ? await aggregateLocks(trx) : aggregateLocks
@@ -468,10 +472,16 @@ export const executeAgreementClaimMutation = async <T>(
     initialContext,
     async trx => await callback(trx),
     {
-      businessStatusMode: options.businessStatusMode,
+      businessStatusMode: options.operation === 'createReconcile' ? undefined : options.businessStatusMode,
       authorize: async (trx, _agreementContext, authContext) => {
         const workLocks = await resolveAndLockTargets(trx)
         if (workLocks.length === 0) return await forbidden(event)
+        if (options.operation === 'createReconcile') {
+          const sourceClaim = workLocks[0]
+          if (workLocks.length !== 1 || sourceClaim?.type !== 'claim') return await forbidden(event)
+          await authorizeFreshAssignedItem(event, trx, authContext, 'fundingcaseagreementclaim', sourceClaim.id, 'create')
+          return
+        }
         for (const lock of workLocks) {
           const entityType = lock.type === 'claim' ? 'fundingcaseagreementclaim' : 'fundingclaimreconcile'
           await assertBusinessStatusMutationAllowed(event, trx, entityType, lock.id, options.businessStatusMode)

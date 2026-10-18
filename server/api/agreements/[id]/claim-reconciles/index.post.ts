@@ -15,7 +15,7 @@ import type { FundingCaseAgreementClaimReconcileTable } from '~~/shared/types/da
 import { FundingCaseAgreementClaimReconcileCreateSchema } from '~~/shared/types/schemas'
 import { createPrimaryEntityAssignment } from '~~/server/utils/entity-assignment'
 import { authorizeAssignedItem } from '~~/server/utils/authorize'
-import { lockAgencyDraftStatus, transitionBusinessStatus } from '~~/server/utils/business-status-runtime'
+import { BusinessStatusViolation, lockAgencyDraftStatus, lockBusinessStatus, transitionBusinessStatus } from '~~/server/utils/business-status-runtime'
 
 export default defineEventHandler(async event => {
   const validated = await readValidatedBodyI18n(event, FundingCaseAgreementClaimReconcileCreateSchema)
@@ -97,6 +97,12 @@ export default defineEventHandler(async event => {
           .where('_deleted', '=', false)
           .executeTakeFirst()
         if (agencyConfiguration?.egcs_ay_claimreconciliationstartstatus) {
+          try {
+            await lockBusinessStatus(trx, 'fundingcaseagreementclaim', validated.egcs_fc_fundingagreementclaim, 'engine')
+          } catch (error: unknown) {
+            if (error instanceof BusinessStatusViolation && error.code === 'BUSINESS_STATUS_TERMINAL') return reconcile
+            throw error
+          }
           await transitionBusinessStatus(
             trx,
             'fundingcaseagreementclaim',
@@ -107,10 +113,7 @@ export default defineEventHandler(async event => {
 
         return reconcile
       },
-      // Claim completion/read-only evidence is the prerequisite boundary for
-      // spawning independently assigned reconciliation casework. Engine mode
-      // preserves the terminal guard while allowing that downstream creation.
-      { action: 'create', businessStatusMode: 'engine' }
+      { operation: 'createReconcile' }
     )
   } catch (error: unknown) {
     await throwIfAgreementUniqueConstraintError(event, error)

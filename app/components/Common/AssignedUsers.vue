@@ -305,7 +305,7 @@ const remove = async (userId: string, name: string) => {
     <div v-if="(entityType === 'commonreview' || entityType === 'fundingcaseintake') && rosterStatus === 'success'" class="flex flex-col gap-3 rounded-sm bg-slate-200/60 p-4 dark:bg-slate-700/35 sm:flex-row sm:items-end">
       <UFormField v-if="canManage" :label="t('groups.group')" :name="entityType === 'commonreview' ? 'egcs_cn_group' : 'egcs_fi_group'" class="min-w-0 flex-1">
         <USelectMenu
-          :model-value="currentGroupId ?? undefined"
+          :model-value="currentGroupId ?? ''"
           :items="groupOptions"
           value-key="value"
           label-key="label"

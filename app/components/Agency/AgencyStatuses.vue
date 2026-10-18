@@ -67,6 +67,9 @@ watch(() => agencyId, requestedAgencyId => {
 
 const saveReconciliationStatuses = async () => {
   if (reconciliationStatusesPending.value) return
+  const requestedAgencyId = agencyId
+  const generation = agencyRefreshGeneration
+  const isCurrent = () => generation === agencyRefreshGeneration && requestedAgencyId === agencyId
   try {
     reconciliationStatusesPending.value = true
     const response = await fetch(getClientRequestUrl(`/api/agency/${agencyId}/claim-reconciliation-statuses`), {
@@ -75,12 +78,14 @@ const saveReconciliationStatuses = async () => {
       body: JSON.stringify(reconciliationStatuses.value)
     })
     if (!response.ok) await throwFetchResponseError(response)
-    reconciliationStatuses.value = await response.json() as AgencyClaimReconciliationStatusConfiguration
+    const savedStatuses = await response.json() as AgencyClaimReconciliationStatusConfiguration
+    if (!isCurrent()) return
+    reconciliationStatuses.value = savedStatuses
     toast.add({ title: toast.localized('common.success'), description: toast.localized('agency.statuses.reconciliation_saved'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (isCurrent()) showError(error)
   } finally {
-    reconciliationStatusesPending.value = false
+    if (isCurrent()) reconciliationStatusesPending.value = false
   }
 }
 

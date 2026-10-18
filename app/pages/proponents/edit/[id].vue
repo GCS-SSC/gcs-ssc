@@ -17,6 +17,11 @@ definePageMeta({
 })
 
 type ApplicantRecipientDetailForm = ApplicantRecipientProfileForm & {
+  can_update_role?: boolean
+  can_delete_role?: boolean
+  can_create_child_records_role?: boolean
+  can_update_child_records_role?: boolean
+  can_delete_child_records_role?: boolean
   can_update?: boolean
   can_delete?: boolean
   can_create_child_records?: boolean
@@ -74,13 +79,22 @@ watch(profile, value => {
  * Saves applicant recipient changes from the inline edit view and refreshes the detail page.
  */
 const submit = async () => {
-  if (disposed || isChildDetailRoute.value || !selectedProfile.value || !profile.value?.can_update || isSaving.value) {
-    return
-  }
+  if (disposed || isChildDetailRoute.value || !selectedProfile.value || !profile.value?.can_update_role || isSaving.value) return
 
   try {
     isSaving.value = true
+    const current = await $fetch<{ can_update?: boolean }, string>(`/api/applicant-recipients/${id}`)
+    if (disposed || isChildDetailRoute.value) return
+    if (!current.can_update) {
+      toast.add({ title: toast.localized('common.warning'), description: toast.localized('workflow.action_prerequisite_unavailable'), color: 'warning' })
+      return
+    }
     const {
+      can_update_role: _canUpdateRole,
+      can_delete_role: _canDeleteRole,
+      can_create_child_records_role: _canCreateChildRecordsRole,
+      can_update_child_records_role: _canUpdateChildRecordsRole,
+      can_delete_child_records_role: _canDeleteChildRecordsRole,
       can_create_child_records: _canCreateChildRecords,
       can_update_child_records: _canUpdateChildRecords,
       can_delete_child_records: _canDeleteChildRecords,
@@ -157,7 +171,7 @@ const retryProfile = async () => {
 
           <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="proponent-detail-content">
             <ApplicantRecipientProfileFormPage
-              v-if="isGeneralTab && selectedProfile && profile.can_update"
+              v-if="isGeneralTab && selectedProfile && profile.can_update_role"
               v-model:model="selectedProfile"
               :persisted-profile="profile"
               :submit-label="t('common.update')"

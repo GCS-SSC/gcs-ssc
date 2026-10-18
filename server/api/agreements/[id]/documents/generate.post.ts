@@ -1,3 +1,5 @@
+import { cleanupStoredFileUploads, type StoredFileUpload } from '~~/server/utils/file-storage'
+import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import {
@@ -21,6 +23,7 @@ export default defineEventHandler(async event => {
   if (!agreementId) {
     return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')
   }
+  if (![agreementId].every(isPositivePostgresBigintText)) return await badRequest(event, 'INVALID_IDS', 'apiErrors.request.invalid')
 
   const agreementContext = await authorizeAgreementResource(event, 'create', agreementId, db)
   if (!agreementContext) {
@@ -33,6 +36,10 @@ export default defineEventHandler(async event => {
   if (!release) return await throwApiError(event, {
     statusCode: 429, code: 'DOCUMENT_RENDER_BUSY', key: 'apiErrors.document_generation.busy'
   })
+  const uploads: StoredFileUpload[] = []
+  const registerUpload = (upload: StoredFileUpload): void => {
+    uploads.push(upload)
+  }
   try {
     const renderSnapshot = await executeFreshReadSnapshot(event, async trx => {
       const current = await authorizeAgreementResource(event, 'create', agreementId, trx)
@@ -50,12 +57,16 @@ export default defineEventHandler(async event => {
       agreementContext,
       async trx => await persistPreparedAgreementDocument(
         trx,
+        registerUpload,
         agreementId,
         body.templateId,
         await (async () => {
           const currentContext = await buildAgreementDocumentContext(agreementId, trx, undefined, body.language)
           const currentHash = createHash('sha256').update(JSON.stringify(currentContext)).digest('hex')
-          if (currentHash !== renderInput.coreContextHash) return await throwApiError(event, {
+          const currentInput = await loadAgreementDocumentRenderInput(
+            event, agreementId, body.templateId, body.language, body.outputFormat, trx, { coreContext: currentContext, lockTemplate: true }
+          )
+          if (currentHash !== renderInput.coreContextHash || currentInput.templateHash !== renderInput.templateHash) return await throwApiError(event, {
             statusCode: 409, code: 'DOCUMENT_RENDER_INPUT_CHANGED', key: 'apiErrors.document_generation.input_changed'
           })
           return prepared
@@ -65,6 +76,9 @@ export default defineEventHandler(async event => {
       ),
       { action: 'create' }
     )
+  } catch (error) {
+    await cleanupStoredFileUploads(db, uploads)
+    throw error
   } finally {
     release()
   }

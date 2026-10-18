@@ -1,12 +1,7 @@
 import { z } from 'zod'
+import { PositivePostgresBigintIdSchema } from './common'
 
-const IdSchema = z.preprocess(value => {
-  if (value === undefined || value === null) {
-    return ''
-  }
-
-  return value
-}, z.coerce.string({ error: 'validation.id_required' }).min(1, { error: 'validation.id_required' })).meta({ formRequired: true })
+const IdSchema = PositivePostgresBigintIdSchema.meta({ formRequired: true })
 
 export const AdditionalReviewerInputSchema = z.object({
   egcs_cn_user: IdSchema.optional(),

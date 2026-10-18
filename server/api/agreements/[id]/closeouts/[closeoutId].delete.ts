@@ -1,3 +1,4 @@
+import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import { badRequest, notFound, throwApiError } from '~~/server/utils/api-errors'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
@@ -7,6 +8,7 @@ export default defineEventHandler(async event => {
   const agreementId = getRouterParam(event, 'id')
   const closeoutId = getRouterParam(event, 'closeoutId')
   if (!agreementId || !closeoutId) return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')
+  if (![agreementId, closeoutId].every(isPositivePostgresBigintText)) return await badRequest(event, 'INVALID_IDS', 'apiErrors.request.invalid')
   const db = event.context.$db
   const assignmentTarget = { entityType: 'fundingcaseagreementcloseout' as const, entityId: closeoutId }
   const context = await authorizeAgreementResource(event, 'delete', agreementId, db, { assignmentTarget })
@@ -20,5 +22,5 @@ export default defineEventHandler(async event => {
     if (!protection?.isDraft) return await throwApiError(event, { statusCode: 409, code: 'AGREEMENT_CLOSEOUT_DELETE_NOT_ALLOWED', key: 'apiErrors.request.invalid_status' })
     return await trx.updateTable('Funding_Case_Agreement_Closeout').set({ _deleted: true, egcs_fc_isopen: false })
       .where('id', '=', closeoutId).returningAll().executeTakeFirstOrThrow()
-  }, { action: 'delete', assignmentTarget })
+  }, { action: 'delete', assignmentTarget, businessStatusTarget: assignmentTarget })
 })

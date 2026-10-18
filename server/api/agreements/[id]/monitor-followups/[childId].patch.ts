@@ -1,3 +1,4 @@
+import { readAgreementMonitorBody } from '~~/server/utils/agreement-monitor-validation'
 import { z } from 'zod'
 import { FundingCaseAgreementMonitorFollowupBaseSchema } from '~~/shared/types/schemas'
 import { badRequest } from '~~/server/utils/api-errors'
@@ -18,7 +19,7 @@ export default defineEventHandler(async event => {
     .omit({ egcs_fc_fundingagreementmonitor: true, egcs_fc_requiresreceivable: true })
     .partial()
     .extend({ egcs_fc_requiresreceivable: z.boolean().optional() })
-  const validated = await readValidatedBodyI18n(event, patchSchema)
+  const validated = await readAgreementMonitorBody(event, patchSchema)
   if (Object.keys(validated).length === 0)
     return await badRequest(event, 'NO_UPDATABLE_FIELDS', 'apiErrors.request.no_updatable_fields')
   return await executeAgreementMonitorMutation(event, db, agreementId, agreementContext, monitorId, async trx => {

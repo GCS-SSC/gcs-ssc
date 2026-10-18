@@ -120,6 +120,8 @@ export default defineEventHandler(async event => await executeFreshReadSnapshot(
 
     return {
       ...item,
+      can_update_role: itemPermissions?.canUpdateRole === true,
+      can_delete_role: itemPermissions?.canDeleteRole === true,
       can_update: itemPermissions?.canUpdate === true,
       can_delete: itemPermissions?.canDelete === true
     }

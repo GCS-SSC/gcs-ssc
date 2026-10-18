@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc */
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { z } from 'zod'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import type { Ref } from 'vue'
@@ -34,6 +34,7 @@ const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const selectedWorkflowId: Ref<string | undefined> = ref(undefined)
 const isLinkOpen = ref(false)
 const isSaving = ref(false)
+const isDeleting = ref(false)
 const { createValidator } = useZodI18n()
 const LinkSchema = z.object({
   egcs_tp_workflow: z.string({ error: 'validation.required' }).min(1, { error: 'validation.required' })
@@ -65,40 +66,63 @@ watch(() => items.value.length, () => {
   pagination.value.pageIndex = Math.min(pagination.value.pageIndex,
     Math.max(0, Math.ceil(filteredItems.value.length / pagination.value.pageSize) - 1))
 })
-watch([endpoint, () => entityType], () => {
+let session = 0
+let disposed = false
+const isCurrentSession = (captured: number) => !disposed && captured === session
+watch(isLinkOpen, () => {
+  session += 1
+}, { flush: 'sync' })
+onBeforeUnmount(() => {
+  disposed = true
+})
+watch([endpoint, () => entityType, () => canUpdateChild], () => {
+  session += 1
   selectedWorkflowId.value = undefined
   isLinkOpen.value = false
   search.value = ''
   pagination.value.pageIndex = 0
-})
+}, { flush: 'sync' })
 const openLink = () => {
   selectedWorkflowId.value = undefined
+  session += 1
   isLinkOpen.value = true
 }
 const add = async () => {
-  if (!selectedWorkflowId.value || isSaving.value) return
+  if (!canUpdateChild || !selectedWorkflowId.value || isSaving.value) return
+  const capturedSession = session
+  const capturedEndpoint = endpoint.value
   isSaving.value = true
   try {
-    const response = await fetch(getClientRequestUrl(endpoint.value), {
+    const response = await fetch(getClientRequestUrl(capturedEndpoint), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ egcs_tp_workflow: selectedWorkflowId.value })
     })
     if (!response.ok) await throwFetchResponseError(response)
+    if (!isCurrentSession(capturedSession)) return
+    await refresh()
+    if (!isCurrentSession(capturedSession)) return
     selectedWorkflowId.value = undefined
     isLinkOpen.value = false
-    await refresh()
   } catch (error) {
-    showError(error)
+    if (isCurrentSession(capturedSession)) showError(error)
   } finally {
     isSaving.value = false
   }
 }
 const remove = async (item: LinkedWorkflow) => {
+  if (!canUpdateChild || disposed || isDeleting.value) return
+  const capturedSession = session
+  isDeleting.value = true
   try {
-    if (await confirmDeleteRequest(`${endpoint.value}/${item.id}`)) await refresh()
+    const removed = await confirmDeleteRequest(`${endpoint.value}/${item.id}`, {
+      shouldProceed: () => isCurrentSession(capturedSession) && canUpdateChild
+    })
+    if (removed && isCurrentSession(capturedSession)) await refresh()
   } catch (error) {
-    showError(error)
+    if (isCurrentSession(capturedSession)) showError(error)
+  } finally {
+    isDeleting.value = false
   }
 }
 const name = (item: LinkedWorkflow) => (locale.value === 'fr' ? item.egcs_cn_name_fr : item.egcs_cn_name_en)
@@ -135,7 +159,7 @@ const name = (item: LinkedWorkflow) => (locale.value === 'fr' ? item.egcs_cn_nam
         <div class="flex justify-end gap-2">
           <CommonActionButton
             v-if="canUpdateChild" icon="i-lucide-unlink" variant="ghost" color="error" size="sm"
-            :aria-label="t('common.delete_named', { name: name(row.original) })" @click="remove(row.original)" />
+            :aria-label="t('common.delete_named', { name: name(row.original) })" :disabled="isDeleting" @click="remove(row.original)" />
         </div>
       </template>
     </CommonResourceLayoutCard>
@@ -144,9 +168,9 @@ const name = (item: LinkedWorkflow) => (locale.value === 'fr' ? item.egcs_cn_nam
         <UForm v-if="agencyId" :state="linkState" :validate="createValidator(LinkSchema)" class="space-y-4" @submit="add">
           <UFormField :label="t('workflow.title')" name="egcs_tp_workflow" required>
             <CommonServerLookupSelect
-              v-model="selectedWorkflowId" :fetch-url="`/api/agency/${agencyId}/workflows`" value-key="id"
-              label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr"
-              :query="{ limit: 100, publicationState: 'published', ...(entityType ? { entityType } : {}) }" aria-required="true" />
+              v-model="selectedWorkflowId" :fetch-url="`/api/transfer-payments/${transferPaymentId}/streams/${streamId}/lookups/workflows`" value-key="id"
+              :include-deleted-query="false" selected-values-query-key="ids" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr"
+              :query="{ limit: 100, ...(entityType ? { entityType } : {}) }" aria-required="true" />
           </UFormField>
           <div class="flex justify-end gap-2">
             <UButton color="neutral" variant="ghost" :label="t('common.cancel')" @click="isLinkOpen = false" />

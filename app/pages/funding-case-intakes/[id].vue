@@ -20,12 +20,13 @@ const { getBilingualValue } = useBilingualValue()
 const localePath = useLocalePath()
 const { can } = useCan()
 const { showError } = useApiErrorToast()
+const toast = useLocalizedToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const { getHeroCollapsed } = useDashboard()
 const { isStatusLocked } = useBusinessStatusState()
 const { data: profile, error, status, refresh } = await useFetch<Intake, Error, string>(`/api/funding-case-intakes/${id}`)
 usePageResourceError({ identity: () => route.path, errors: [error], pending: () => status.value === 'pending', hasContent: () => Boolean(profile.value) })
-const { isAssigned } = useEntityAssignmentRoster('fundingcaseintake', id)
+const { isAssigned, refresh: refreshRoster } = useEntityAssignmentRoster('fundingcaseintake', id)
 const isHeroCollapsed = getHeroCollapsed('funding-case-intake-detail')
 
 const tabs = computed(() => [
@@ -47,13 +48,22 @@ const scope = computed(() => profile.value && ({
   path: [{ type: 'transfer_payment' as const, id: String(profile.value.program_id) }]
 }))
 const isLocked = computed(() => isStatusLocked(profile.value?.egcs_fi_status))
-const canEdit = computed(() => Boolean(scope.value && isAssigned.value && !isLocked.value && can('funding_case', 'update', scope.value)))
-const canDelete = computed(() => Boolean(scope.value && isAssigned.value && !isLocked.value && can('funding_case', 'delete', scope.value)))
+const canEditRole = computed(() => Boolean(scope.value && can('funding_case', 'update', scope.value)))
+const canEdit = computed(() => canEditRole.value && isAssigned.value && !isLocked.value)
+const workWarning = computed(() => !isAssigned.value
+  ? toast.localized('assignments.read_only_description')
+  : isLocked.value ? toast.localized('workflow.action_prerequisite_unavailable') : undefined)
+const canDelete = computed(() => Boolean(scope.value && can('funding_case', 'delete', scope.value)))
 /**
  *
  */
 const remove = async () => {
   try {
+    await Promise.all([refresh(), refreshRoster()])
+    if (!isAssigned.value || isLocked.value) {
+      toast.add({ title: toast.localized('common.warning'), description: toast.localized(!isAssigned.value ? 'assignments.read_only_description' : 'workflow.action_prerequisite_unavailable'), color: 'warning' })
+      return
+    }
     if (!await confirmDeleteRequest(`/api/funding-case-intakes/${id}`)) return
     await navigateTo(localePath(appRouteLocations.fundingCaseIntakes()))
   } catch (cause: unknown) {
@@ -106,10 +116,10 @@ const breadcrumbs = computed(() => [
           </CommonSection>
           <CommonSubmittedApplication v-else-if="selectedTab === 'application'" :snapshot="profile.egcs_fi_sourceexport ?? profile.egcs_fi_application" :external-source-id="profile.egcs_fi_externalsourceid" />
           <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcaseintake" :entity-id="id" />
-          <CommonReviewsTab v-else-if="selectedTab === 'reviews'" entity-type="fundingcaseintake" :entity-id="id" :can-update="canEdit" @changed="refresh" />
-          <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcaseintake" :entity-id="id" purpose="standard" :can-edit="canEdit" @changed="refresh" />
+          <CommonReviewsTab v-else-if="selectedTab === 'reviews'" entity-type="fundingcaseintake" :entity-id="id" :can-update="canEdit" :action-role-allowed="canEditRole" :action-prerequisite-warning="workWarning" @changed="refresh" />
+          <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcaseintake" :entity-id="id" purpose="standard" :can-edit="canEdit" :action-role-allowed="canEditRole" :action-prerequisite-warning="workWarning" @changed="refresh" />
           <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" :show-header="false" entity-type="fundingcaseintake" :entity-id="id" />
-          <CommonWorkflowSection v-else-if="selectedTab === 'approval'" entity-type="fundingcaseintake" :entity-id="id" purpose="approval_submission" :can-edit="canEdit" @changed="refresh" />
+          <CommonWorkflowSection v-else-if="selectedTab === 'approval'" entity-type="fundingcaseintake" :entity-id="id" purpose="approval_submission" :can-edit="canEdit" :action-role-allowed="canEditRole" :action-prerequisite-warning="workWarning" @changed="refresh" />
           <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" :show-header="false" entity-type="fundingcaseintake" :entity-id="id" />
         </CommonDetailWorkspace>
       </div>

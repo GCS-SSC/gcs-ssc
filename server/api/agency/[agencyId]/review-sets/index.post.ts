@@ -145,10 +145,12 @@ export default defineEventHandler(async event => {
               egcs_cn_approvaltemplate: member.egcs_cn_approvaltemplate,
               egcs_cn_reviewschema: member.egcs_cn_reviewschema,
               egcs_cn_defaultgroup: member.egcs_cn_defaultgroup ?? null,
+              egcs_cn_failonchecklistfailure: member.egcs_cn_failonchecklistfailure,
+              egcs_cn_failurethreshold: member.egcs_cn_failurethreshold,
               _deleted: false
             }))
           )
-          .returning(['id', 'egcs_cn_reviewset', 'egcs_cn_reviewschema', 'egcs_cn_order', 'egcs_cn_approvaltemplate', 'egcs_cn_defaultgroup', '_deleted'])
+          .returning(['id', 'egcs_cn_reviewset', 'egcs_cn_reviewschema', 'egcs_cn_order', 'egcs_cn_approvaltemplate', 'egcs_cn_defaultgroup', 'egcs_cn_failonchecklistfailure', 'egcs_cn_failurethreshold', '_deleted'])
           .execute()
       : []
 

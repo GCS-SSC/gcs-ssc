@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- local table presentation helpers are self-documenting */
 import { getPaginationRowModel } from '@tanstack/table-core'
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import type { FundingHistoryRow, VisibleFundingHistoryRow } from '~/types/funding-history'
@@ -11,11 +11,12 @@ import { formatMoneyText, type Money } from '~~/shared/utils/money'
 const {
   applicantRecipientId,
   applicantRecipientLabel,
-  canCreate = false
+  canCreateRole = false
 } = defineProps<{
   applicantRecipientId: string
   applicantRecipientLabel: string
   canCreate?: boolean
+  canCreateRole?: boolean
 }>()
 
 const fundingHistoryUrl = computed(() =>
@@ -25,8 +26,13 @@ const fundingHistoryUrl = computed(() =>
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
 const { showError } = useApiErrorToast()
+const toast = useLocalizedToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 
+let disposed = false
+onBeforeUnmount(() => {
+  disposed = true
+})
 const listView = ref('all')
 watch(() => applicantRecipientId, () => {
   listView.value = 'all'
@@ -44,6 +50,10 @@ const {
   query: listViewQuery,
   fetchUrl: fundingHistoryUrl
 })
+
+watch(listView, () => {
+  pagination.value.pageIndex = 0
+}, { flush: 'sync' })
 
 const isWizardOpen: Ref<boolean> = ref(false)
 const selectedHistory: Ref<VisibleFundingHistoryRow | null> = ref(null)
@@ -87,12 +97,47 @@ const formatDate = (value?: string | null): string => {
 const formatMoney = (amount: Money, currency: string): string =>
   formatMoneyText(amount, locale.value, currency.toUpperCase())
 
-const openCreate = () => {
+const warnPrerequisite = () => toast.add({ title: toast.localized('common.warning'), description: toast.localized('workflow.action_prerequisite_unavailable'), color: 'warning' })
+const actionPending: Ref<boolean> = ref(false)
+const checkPrerequisite = async (action: 'create' | 'update' | 'delete', history?: VisibleFundingHistoryRow) => {
+  if (actionPending.value) return false
+  actionPending.value = true
+  const ownerId = applicantRecipientId
+  try {
+    if (action === 'create') {
+      const profile = await $fetch<{ can_create_child_records?: boolean }, string>(`/api/applicant-recipients/${ownerId}`)
+      if (disposed || ownerId !== applicantRecipientId) return false
+      if (profile.can_create_child_records) return true
+    } else {
+      let page = 1
+      while (true) {
+        const response = await $fetch<{ items: FundingHistoryRow[]; total: number }, string>(`/api/applicant-recipients/${ownerId}/funding-history`, { query: { page, limit: 100, search: history?.agreementNumber } })
+        if (disposed || ownerId !== applicantRecipientId) return false
+        const row = response.items.find(item => !item.restricted && item.historyId === history?.historyId)
+        if (row && !row.restricted) {
+          if (action === 'update' ? row.canUpdate : row.canDelete) return true
+          break
+        }
+        if (page * 100 >= response.total || response.items.length === 0) break
+        page += 1
+      }
+    }
+    warnPrerequisite()
+  } catch (error: unknown) {
+    if (!disposed && ownerId === applicantRecipientId) showError(error)
+  } finally {
+    actionPending.value = false
+  }
+  return false
+}
+const openCreate = async () => {
+  if (!await checkPrerequisite('create')) return
   selectedHistory.value = null
   isWizardOpen.value = true
 }
 
-const openEdit = (history: VisibleFundingHistoryRow) => {
+const openEdit = async (history: VisibleFundingHistoryRow) => {
+  if (!await checkPrerequisite('update', history)) return
   selectedHistory.value = history
   isWizardOpen.value = true
 }
@@ -103,30 +148,33 @@ const openSystemAgreement = async (history: VisibleFundingHistoryRow) => {
 }
 
 const unlink = async (history: VisibleFundingHistoryRow) => {
-  if (!history.historyId) return
+  const ownerId = applicantRecipientId
+  const current = () => !disposed && ownerId === applicantRecipientId
+  if (!history.historyId || !await checkPrerequisite('delete', history) || !current()) return
   try {
     const deleted = await confirmDeleteRequest(
-      `/api/applicant-recipients/${applicantRecipientId}/funding-history/${history.historyId}`,
+      `/api/applicant-recipients/${ownerId}/funding-history/${history.historyId}`,
       {
         title: t('applicant_recipient.funding_history.unlink.title'),
-        description: t('applicant_recipient.funding_history.unlink.description')
+        description: t('applicant_recipient.funding_history.unlink.description'),
+        shouldProceed: current
       }
     )
-    if (deleted) await refresh()
+    if (deleted && current()) await refresh()
   } catch (error: unknown) {
-    showError(error)
+    if (current()) showError(error)
   }
 }
 
 const menuItems = (history: VisibleFundingHistoryRow) => [[
-  ...(history.canUpdate
+  ...(history.canUpdateRole
     ? [{
         label: t('common.edit'),
         icon: 'i-lucide-pencil',
         onSelect: () => openEdit(history)
       }]
     : []),
-  ...(history.canDelete
+  ...(history.canDeleteRole
     ? [{
         label: t('applicant_recipient.funding_history.actions.unlink'),
         icon: 'i-lucide-unlink',
@@ -136,7 +184,7 @@ const menuItems = (history: VisibleFundingHistoryRow) => [[
     : [])
 ]]
 
-const hasExternalActions = (history: VisibleFundingHistoryRow): boolean => Boolean(history.canUpdate || history.canDelete)
+const hasExternalActions = (history: VisibleFundingHistoryRow): boolean => Boolean(history.canUpdateRole || history.canDeleteRole)
 const visibleRows = computed(() => items.value)
 </script>
 
@@ -159,7 +207,7 @@ const visibleRows = computed(() => items.value)
       :request-status="status"
       :pagination-options="{ getPaginationRowModel: getPaginationRowModel() }"
       :button-label="t('applicant_recipient.funding_history.actions.add_external')"
-      :show-button="canCreate"
+      :show-button="canCreateRole"
       :search-placeholder="t('applicant_recipient.funding_history.search')"
       table-class="min-w-[1100px]"
       @add="openCreate"

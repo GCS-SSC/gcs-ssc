@@ -245,7 +245,7 @@ const adopt = (guide: HelpGuide) => {
   if (!version) return
   selected.value = null
   document.value = null
-  selectedCatalog.value = { id: '', sourceVersionDocument: version.document, egcs_ay_guide: guide.id, egcs_ay_sourceversion: version.id, egcs_ay_discoveryscreens: [], egcs_ay_roles: [] }
+  selectedCatalog.value = { id: '', egcs_ay_enabled: false, sourceVersionDocument: version.document, egcs_ay_guide: guide.id, egcs_ay_sourceversion: version.id, egcs_ay_discoveryscreens: [], egcs_ay_roles: [] }
   settings.value = catalogDraft(selectedCatalog.value)
   versions.value = guide.versions
 }
@@ -369,7 +369,7 @@ const breadcrumbItems = computed(() => [{ label: t('guided_help.title'), ...(det
 const pinnedVersion = computed(() => versions.value.find(version => version.id === settings.value?.egcs_ay_sourceversion))
 const ownerAttribution = computed(() => selected.value?.sourceAttribution ?? selectedCatalog.value?.sourceAttribution)
 const ownerName = computed(() => ownerAttribution.value ? ownerAttribution.value.ownerType === 'system' ? t('guided_help.system') : label(ownerAttribution.value.agencyName) : contextTitle.value)
-const state = computed(() => isCatalog.value ? selectedCatalog.value?.publicationState : selected.value?.publicationState)
+const state = computed(() => isCatalog.value ? selectedCatalog.value?.egcs_ay_enabled === false ? 'draft' : selectedCatalog.value?.publicationState : selected.value?.publicationState)
 const hasUnpublishedChanges = computed(() => isCatalog.value ? catalogDirty.value || selectedCatalog.value?.hasUnpublishedChanges === true : guideDirty.value || selected.value?.hasUnpublishedChanges === true)
 const publicationVersion = computed(() => (isCatalog.value ? selectedCatalog.value?.publicationVersion : selected.value?.publicationVersion) ?? null)
 const heroDescription = computed(() => `${contextTitle.value}${selected.value ? ` · ${t('guided_help.source_guide', { id: selected.value.id })}` : ''} · ${t('guided_help.owner')}: ${ownerName.value}`)
@@ -383,7 +383,7 @@ const secondaryActions = computed<DropdownMenuItem[][]>(() => [
   [{ label: t('guided_help.preview'), icon: 'i-lucide-play', disabled: pending.value || (isCatalog.value ? !pinnedVersion.value : !document.value), onSelect: previewCurrent }],
   [
     ...(isCatalog.value && canEdit.value && settings.value ? [{ label: t('guided_help.clone'), icon: 'i-lucide-copy', disabled: pending.value, onSelect: () => clone(settings.value!.egcs_ay_sourceversion) }] : []),
-    ...(isCatalog.value && canEdit.value && selectedCatalog.value?.publicationState === 'published' ? [{ label: t('guided_help.unpublish'), icon: 'i-lucide-eye-off', disabled: pending.value, onSelect: () => catalogAction('unpublish') }] : []),
+    ...(isCatalog.value && canEdit.value && state.value === 'published' ? [{ label: t('guided_help.unpublish'), icon: 'i-lucide-eye-off', disabled: pending.value, onSelect: () => catalogAction('unpublish') }] : []),
     ...(!isCatalog.value && canDelete.value && selected.value?.capabilities?.canDelete ? [{ label: t('common.delete'), icon: 'i-lucide-trash', color: 'error' as const, disabled: pending.value, onSelect: () => guideAction('delete') }] : [])
   ]
 ].filter(items => items.length > 0))

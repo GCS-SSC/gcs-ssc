@@ -3,7 +3,7 @@ import type { H3Event } from 'h3'
 import { sql } from 'kysely'
 import { z } from 'zod'
 import type { JsonValue } from '~~/shared/types/database'
-import { AgencyReviewSchemaCreateSchema, AssessmentReviewSchemaPatchSchema, createAssessmentReviewSchemaPatchSchema } from '~~/shared/types/schemas'
+import { AgencyProfileSchema, AgencyReviewSchemaCreateSchema, AssessmentReviewSchemaPatchSchema, createAssessmentReviewSchemaPatchSchema } from '~~/shared/types/schemas'
 import { ChecklistDefinitionSchema } from '~~/shared/types/schemas/checklist/checklist'
 import { authorize } from './authorize'
 import { notFound, throwApiError } from './api-errors'
@@ -14,10 +14,19 @@ import { fetchAssessmentReviewSchemaForAgency } from './transfer-payment-assessm
 import { buildReviewSchemaDefinition, mapAssessmentReviewSchema } from './review-schema-versioning'
 import { DEFAULT_CHECKLIST_DEFINITION, buildChecklistReviewSchemaDefinition, fetchChecklistReviewSchemaForAgency, mapChecklistSchema } from './transfer-payment-checklist-schemas'
 import { publishDefinition, retirePublication } from './system-publication'
+import { throwIfMappedConstraintError } from './database-constraint-errors'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 const EMPTY_ASSESSMENT_DEFINITION = { sections: [], sectionMatrix: [], outcomes: [] }
+const StorageText = AgencyProfileSchema.shape.egcs_ay_name_en
+const BilingualText = {
+  egcs_cn_name_en: AgencyReviewSchemaCreateSchema.shape.egcs_cn_name_en.trim().min(1, { error: 'validation.name_en_required' }).pipe(StorageText),
+  egcs_cn_name_fr: AgencyReviewSchemaCreateSchema.shape.egcs_cn_name_fr.trim().min(1, { error: 'validation.name_fr_required' }).pipe(StorageText),
+  egcs_cn_outcomename_en: AgencyReviewSchemaCreateSchema.shape.egcs_cn_outcomename_en.trim().min(1, { error: 'validation.outcome_name_en_required' }).pipe(StorageText),
+  egcs_cn_outcomename_fr: AgencyReviewSchemaCreateSchema.shape.egcs_cn_outcomename_fr.trim().min(1, { error: 'validation.outcome_name_fr_required' }).pipe(StorageText)
+}
 const CreateSchema = AgencyReviewSchemaCreateSchema.extend({
+  ...BilingualText,
   egcs_cn_scoringmatrix: z.array(z.unknown()).optional(),
   egcs_cn_assessmentschema: z.record(z.string(), z.unknown()).optional(),
   egcs_cn_checklistschema: ChecklistDefinitionSchema.optional(),
@@ -26,15 +35,15 @@ const CreateSchema = AgencyReviewSchemaCreateSchema.extend({
   egcs_cn_disablereviewers: z.boolean().optional().default(false)
 }).strict()
 const ChecklistPatchSchema = z.object({
-  egcs_cn_name_en: z.string().trim().min(1).optional(),
-  egcs_cn_name_fr: z.string().trim().min(1).optional(),
-  egcs_cn_outcomename_en: z.string().trim().min(1).optional(),
-  egcs_cn_outcomename_fr: z.string().trim().min(1).optional(),
+  egcs_cn_name_en: BilingualText.egcs_cn_name_en.optional(),
+  egcs_cn_name_fr: BilingualText.egcs_cn_name_fr.optional(),
+  egcs_cn_outcomename_en: BilingualText.egcs_cn_outcomename_en.optional(),
+  egcs_cn_outcomename_fr: BilingualText.egcs_cn_outcomename_fr.optional(),
   egcs_cn_disablereviewers: z.boolean().optional(),
   egcs_cn_checklistschema: ChecklistDefinitionSchema.optional()
 }).strict()
 
-export const agencyReviewSchemaRoute = async (event: H3Event, action: 'create' | 'read' | 'update' | 'publish' | 'retire' | 'delete') => {
+const runAgencyReviewSchemaRoute = async (event: H3Event, action: 'create' | 'read' | 'update' | 'publish' | 'retire' | 'delete') => {
   const agencyId = getRouterParam(event, 'agencyId') ?? ''
   const schemaId = getRouterParam(event, 'schemaId') ?? ''
   if (!isPositivePostgresBigintText(agencyId)) return await notFound(event, 'AGENCY_NOT_FOUND', 'apiErrors.agency.not_found')
@@ -139,4 +148,15 @@ export const agencyReviewSchemaRoute = async (event: H3Event, action: 'create' |
     const definition = checklist ? buildChecklistReviewSchemaDefinition(checklist) : buildReviewSchemaDefinition(schema)
     return await publishDefinition(trx, { publicationId: schemaId, kind: 'review_schema', definition, actorId: actor.id })
   })
+}
+
+export const agencyReviewSchemaRoute = async (event: H3Event, action: Parameters<typeof runAgencyReviewSchemaRoute>[1]) => {
+  try {
+    return await runAgencyReviewSchemaRoute(event, action)
+  } catch (error) {
+    return await throwIfMappedConstraintError(event, error, ['23505'], {
+      cn_idx_reviewschemaagencynametypeen: { code: 'DUPLICATE_REVIEW_SCHEMA_NAME_EN', key: 'apiErrors.request.invalid_resource' },
+      cn_idx_reviewschemaagencynametypefr: { code: 'DUPLICATE_REVIEW_SCHEMA_NAME_FR', key: 'apiErrors.request.invalid_resource' }
+    })
+  }
 }

@@ -1120,7 +1120,7 @@
       "duplicate_agreement_number": "A funding history record with this agreement number already exists.",
       "current_recipient_required": "The current proponent must remain linked to this funding history record.",
       "duplicate_recipient": "This proponent is already linked to the funding history record.",
-      "invalid_recipient": "One or more selected proponents are invalid.",
+      "invalid_recipient": "One or more selected proponents are unavailable, or you lack the permissions and assignments needed to save. Check your selections and try again.",
       "not_found": "Funding history record not found.",
       "similarity_confirmation_required": "Review and confirm the similar funding history records before saving."
     },
@@ -3812,7 +3812,7 @@
     "no_change": "No change",
     "owner_pause_title": "Workflow paused for owner resolution",
     "owner_pause_help": "One or more configured owners are unavailable or no longer eligible. Select an eligible replacement to continue.",
-    "owner_pause_readonly_help": "One or more configured owners are unavailable or no longer eligible. An authorized workflow actor or assignment manager must select a replacement.",
+    "owner_pause_readonly_help": "One or more configured owners are unavailable or no longer eligible. An assigned Contributor authorized to recover this workflow must select a replacement.",
     "replacement_owner": "Replacement owner",
     "resume": "Resume workflow",
     "transition_history": "Parent status history",
@@ -4301,6 +4301,7 @@
     "no_answers": "No answers were provided for this form."
   },
   "journal_voucher": {
+    "save_before_completion": "Save your accounting entry before Completion.",
     "title": "Journal Vouchers",
     "description": "Prepare balanced accounting corrections to finalized Payments.",
     "create": "Create Journal Voucher",

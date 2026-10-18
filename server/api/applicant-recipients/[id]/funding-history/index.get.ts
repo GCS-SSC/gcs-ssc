@@ -6,6 +6,7 @@ import { badRequest, throwApiError } from '~~/server/utils/api-errors'
 import { canAccessAgreement, buildAgreementScope } from '~~/server/utils/agreement'
 import {
   canAccessApplicantRecipientIds,
+  resolveApplicantRecipientVisibility,
   resolveApplicantRecipientAuthorization
 } from '~~/server/utils/applicant-recipient-auth'
 import { assertApplicantRecipientProfileExists } from '~~/server/utils/applicant-recipient-child-resources'
@@ -263,6 +264,10 @@ export default defineEventHandler(async event => {
       if (!await canAccessApplicantRecipientIds(authContext, recipientIds, 'read', db)) {
         return { rowKey: `external:${historyId}`, source: 'external' as const, restricted: true }
       }
+      const [updateVisibility, deleteVisibility] = await Promise.all([
+        resolveApplicantRecipientVisibility(authContext, 'update', db),
+        resolveApplicantRecipientVisibility(authContext, 'delete', db)
+      ])
       const [canUpdate, canDelete] = await Promise.all([
         canAccessApplicantRecipientIds(authContext, recipientIds, 'update', db),
         canAccessApplicantRecipientIds(authContext, [applicantRecipientId], 'delete', db)
@@ -285,6 +290,8 @@ export default defineEventHandler(async event => {
         endDate: record.endDate,
         totals: [{ currency: record.currency, amount: parseDatabaseMoney(record.amount) }],
         recipients,
+        canUpdateRole: updateVisibility.hasGlobalAccess || updateVisibility.agencyIds.length > 0,
+        canDeleteRole: deleteVisibility.hasGlobalAccess || deleteVisibility.agencyIds.length > 0,
         canUpdate,
         canDelete
       }

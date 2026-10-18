@@ -3,8 +3,7 @@ import { sql } from 'kysely'
 import { PaginationSchema, PositivePostgresBigintIdSchema } from '~~/shared/types/schemas'
 import { badRequest } from '~~/server/utils/api-errors'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
-import { authorize } from '~~/server/utils/authorize'
-import { canAccessAgreement, resolveAgreementScopeContext } from '~~/server/utils/agreement'
+import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
 
 const QuerySchema = PaginationSchema.extend({
@@ -16,12 +15,8 @@ export default defineEventHandler(async event => {
   const db = event.context.$db
   const agreementId = getRouterParam(event, 'id')
   if (!agreementId) return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')
-  const agreementContext = await resolveAgreementScopeContext(agreementId, db)
+  const agreementContext = await authorizeAgreementResource(event, 'read', agreementId, db)
   if (!agreementContext) return await badRequest(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
-  await authorize(event, 'agreement', 'read', async ({ context }) => {
-    if (await canAccessAgreement(context, 'read', agreementContext.scope, db)) return { bypass: true }
-    return { denied: true }
-  })
 
   const { page, limit, search, selected_ids: selectedIds } = await getValidatedQueryI18n(event, QuerySchema)
   let query = db.selectFrom('Transfer_Payment_Stream_Funding_Subtype as link')

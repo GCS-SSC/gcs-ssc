@@ -1,4 +1,4 @@
-import { computed, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { FetchError } from 'ofetch'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -68,6 +68,10 @@ export const useChecklistDetailPage = () => {
   const responses: Ref<EditableChecklistResponse[]> = ref([])
   const persistedResponses: Ref<string> = ref('[]')
   const isSaving: Ref<boolean> = ref(false)
+  let saveGeneration = 0
+  onScopeDispose(() => {
+    saveGeneration++
+  }, true)
   const totalAdditionalReviewerCount: Ref<number> = ref(0)
   const pendingAdditionalReviewerCount: Ref<number> = ref(0)
   const { showError } = useApiErrorToast()
@@ -87,11 +91,12 @@ export const useChecklistDetailPage = () => {
     }
   }, { immediate: true })
   watch(reviewId, () => {
+    saveGeneration++
     checklist.value = undefined
     responses.value = []
     persistedResponses.value = '[]'
     isSaving.value = false
-  })
+  }, { flush: 'sync' })
 
   const sections = computed(() => checklist.value?.checklistDefinition?.sections ?? [])
   const liveEvaluation = computed(() => {
@@ -172,6 +177,7 @@ export const useChecklistDetailPage = () => {
   const saveChecklist = async () => {
     if (!canUpdate.value || isSaving.value) return
     const targetReviewId = reviewId.value
+    const generation = ++saveGeneration
     const submittedResponses = responses.value
       .filter(response => response.answer !== null)
       .map(response => ({ questionKey: response.questionKey, answer: response.answer, comment: response.comment }))
@@ -186,15 +192,15 @@ export const useChecklistDetailPage = () => {
         })
       })
       if (!response.ok) await throwFetchResponseError(response)
-      if (reviewId.value !== targetReviewId) return
+      if (generation !== saveGeneration) return
       persistedResponses.value = submittedDraft
       await refresh()
-      if (reviewId.value !== targetReviewId) return
+      if (generation !== saveGeneration) return
       toast.add({ title: toast.localized('common.success'), description: toast.localized('checklist.saved'), color: 'success' })
     } catch (error) {
-      showError(error)
+      if (generation === saveGeneration) showError(error)
     } finally {
-      isSaving.value = false
+      if (generation === saveGeneration) isSaving.value = false
     }
   }
 

@@ -836,8 +836,8 @@ const cancelAmendment = async () => {
             v-else-if="selectedTab === 'documents' && profile?.can_read_agreement"
             :agreement-id="agreementId"
             :amendment-id="amendmentId"
-            :can-create="canEditAmendment"
-            :can-delete="isAssigned && amendment.can_delete_documents === true" />
+            :can-create="profile?.can_create_agreement_role === true"
+            :can-delete="profile?.can_delete_agreement_role === true" />
           <CommonAttachmentsTab
             v-else-if="selectedTab === 'attachments'"
             entity-type="fundingcaseamendment"

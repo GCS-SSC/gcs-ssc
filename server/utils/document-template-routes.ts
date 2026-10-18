@@ -5,9 +5,10 @@ import type { z } from 'zod'
 import { parseI18n } from './api-validate'
 import { badRequest, notFound } from './api-errors'
 import {
-  bestEffortStorageCleanup,
-  deleteStoredFile,
+  cleanupStoredFileUploads,
   writeStoredTemplateFile,
+  type RegisterStoredFileUpload,
+  type StoredFileUpload,
   type StoredFileRecord
 } from './file-storage'
 import {
@@ -237,7 +238,8 @@ export const storeTemplateUpload = async (
   db: Kysely<Database>,
   agencyId: string,
   metadata: AgencyDocumentTemplateCreate | AgencyDocumentTemplatePatch,
-  file: TemplateUploadFile
+  file: TemplateUploadFile,
+  registerUpload: RegisterStoredFileUpload
 ): Promise<StoredFileRecord> => await writeStoredTemplateFile(db, {
   agencyId,
   bytes: file.data,
@@ -251,21 +253,11 @@ export const storeTemplateUpload = async (
   descriptionFr: metadata.egcs_ay_description_fr || metadata.egcs_ay_name_fr || file.filename,
   folder: `agency-${agencyId}-document-templates`,
   target: { entityType: 'agency', entityId: agencyId }
-})
+}, registerUpload)
 
 export const cleanupTemplateUploads = async (
-  event: H3Event, db: Kysely<Database>, agencyId: string, uploads: StoredFileRecord[]
-) => {
-  const requestId = event.context?.requestId
-  await Promise.all(uploads.map(async stored => await bestEffortStorageCleanup(
-    async () => await deleteStoredFile(db, agencyId, {
-      egcs_cn_provider: stored.providerId,
-      egcs_cn_providerobjectid: stored.objectId,
-      egcs_cn_providerlocator: stored.locator
-    }, 'document-template', { entityType: 'agency', entityId: agencyId }),
-    { providerId: stored.providerId, objectId: stored.objectId, purpose: 'document-template', requestId }
-  )))
-}
+  event: H3Event, db: Kysely<Database>, _agencyId: string, uploads: StoredFileUpload[]
+) => await cleanupStoredFileUploads(db, uploads, event.context?.requestId)
 
 export const buildDocumentTemplateCreateValues = (
   agencyId: string,
@@ -291,14 +283,12 @@ export const buildDocumentTemplateCreateValues = (
 
 export const createAgencyDocumentTemplate = async (
   event: H3Event, db: Kysely<Database>, agencyId: string,
-  registerUpload: (stored: StoredFileRecord) => void
+  registerUpload: RegisterStoredFileUpload
 ) => {
   const { metadata, fileEn, fileFr } = await parseDocumentTemplateMultipart<AgencyDocumentTemplateCreate>(event, 'create')
   if (!fileEn || !fileFr) return await badRequest(event, 'TEMPLATE_FILE_REQUIRED', 'apiErrors.document_generation.file_required')
-  const attachmentEn = await storeTemplateUpload(db, agencyId, metadata, fileEn)
-  registerUpload(attachmentEn)
-  const attachmentFr = await storeTemplateUpload(db, agencyId, metadata, fileFr)
-  registerUpload(attachmentFr)
+  const attachmentEn = await storeTemplateUpload(db, agencyId, metadata, fileEn, registerUpload)
+  const attachmentFr = await storeTemplateUpload(db, agencyId, metadata, fileFr, registerUpload)
   const values = buildDocumentTemplateCreateValues(agencyId, metadata, fileEn, fileFr, attachmentEn.id, attachmentFr.id)
   return await db.insertInto('Agency_Document_Template').values({
     ...values,
@@ -309,7 +299,7 @@ export const createAgencyDocumentTemplate = async (
 export const patchAgencyDocumentTemplate = async (
   event: H3Event, db: Kysely<Database>, agencyId: string, templateId: string,
   deferReplacedAttachmentCleanup: (attachmentIds: string[]) => void,
-  registerUpload: (stored: StoredFileRecord) => void
+  registerUpload: RegisterStoredFileUpload
 ) => {
   const existing = await db.selectFrom('Agency_Document_Template')
     .where('id', '=', templateId).where('egcs_ay_organizationagency', '=', agencyId)
@@ -329,17 +319,15 @@ export const patchAgencyDocumentTemplate = async (
   const uploads: StoredFileRecord[] = []
   const replacedAttachmentIds: string[] = []
   if (fileEn) {
-    const stored = await storeTemplateUpload(db, agencyId, { ...existing, ...metadata }, fileEn)
+    const stored = await storeTemplateUpload(db, agencyId, { ...existing, ...metadata }, fileEn, registerUpload)
     values.egcs_ay_templateattachment_en = stored.id
     uploads.push(stored)
-    registerUpload(stored)
     replacedAttachmentIds.push(String(existing.egcs_ay_templateattachment_en))
   }
   if (fileFr) {
-    const stored = await storeTemplateUpload(db, agencyId, { ...existing, ...metadata }, fileFr)
+    const stored = await storeTemplateUpload(db, agencyId, { ...existing, ...metadata }, fileFr, registerUpload)
     values.egcs_ay_templateattachment_fr = stored.id
     uploads.push(stored)
-    registerUpload(stored)
     replacedAttachmentIds.push(String(existing.egcs_ay_templateattachment_fr))
   }
   if (!Object.keys(values).length) return await badRequest(event, 'NO_UPDATABLE_FIELDS', 'apiErrors.request.no_updatable_fields')

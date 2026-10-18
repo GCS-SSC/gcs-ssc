@@ -116,6 +116,7 @@ watch(() => modelValue.value, () => {
       <UCalendar
         :calendar-label="t('common.calendar_date')"
         :model-value="inputDateValue as CalendarProps['modelValue']"
+        :disabled="disabled"
         class="p-2"
         @update:model-value="value => inputDateValue = value as InputCalendarValue" />
     </template>

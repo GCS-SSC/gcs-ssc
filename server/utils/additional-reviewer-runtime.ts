@@ -15,6 +15,9 @@ import { resolveAgreementAmendmentRuntimeContext } from '~~/server/utils/agreeme
 import { resolveAgreementScopeContext } from '~~/server/utils/agreement'
 import type { ReviewRuntimeEntityContext } from '~~/server/utils/review-runtime-access'
 import { getActiveStructuralRoleAssignments, selectActiveStructuralRoleIds } from '~~/server/utils/active-user-scopes'
+import { authorizeReviewRuntimeAction } from './review-runtime-access'
+import { assertReviewNotLocked } from './review-runtime-state'
+import { badRequest, forbidden, notFound } from './api-errors'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
 
 const agreementOwnerResolvers = {
@@ -412,3 +415,37 @@ export const countPendingReviewAdditionalReviewers = async (
   db: Kysely<Database>,
   reviewId: string
 ): Promise<number> => await countReviewAdditionalReviewersBase(db, reviewId, true)
+
+/**
+ * Authorizes catalog access for ordinary editors or an explicitly bound own-row editor.
+ * @param event Authenticated lookup request.
+ * @param reviewId Review containing the row being edited.
+ * @param additionalReviewerId Optional canonical own-row editing context.
+ * @returns The live canonical Review context.
+ */
+export const authorizeAdditionalReviewerLookup = async (
+  event: H3Event,
+  reviewId: string,
+  additionalReviewerId?: string
+): Promise<AdditionalReviewerExecutableContext> => {
+  const db = event.context.$db
+  const context = await resolveAdditionalReviewerExecutableContextFromReview(db, reviewId)
+  if (!context) return await notFound(event, 'ASSESSMENT_NOT_FOUND', 'apiErrors.admin_common.not_found')
+  if (!additionalReviewerId) {
+    await authorizeReviewRuntimeAction(event, 'save_assessment', context.runtimeEntity)
+    return context
+  }
+
+  const rowContext = await resolveAdditionalReviewerRowContext(db, additionalReviewerId)
+  if (!rowContext || rowContext.reviewId !== reviewId) {
+    return await notFound(event, 'ADDITIONAL_REVIEWER_NOT_FOUND', 'apiErrors.admin_common.not_found')
+  }
+  await authorizeReviewRuntimeAction(event, 'read_assessment', rowContext.runtimeEntity)
+  await assertReviewNotLocked(event, rowContext.reviewRuntimeState, rowContext.reviewSetRuntimeState)
+  const currentUser = await resolveCurrentCommonUser(event, db)
+  if (!currentUser || currentUser.id !== rowContext.row.assignedUserId) return await forbidden(event)
+  if (rowContext.row.completedAt) {
+    return await badRequest(event, 'ADDITIONAL_REVIEWER_ALREADY_COMPLETED', 'apiErrors.request.invalid')
+  }
+  return rowContext
+}

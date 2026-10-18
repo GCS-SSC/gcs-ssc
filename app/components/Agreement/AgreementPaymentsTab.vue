@@ -17,8 +17,7 @@ import type {
   FundingCaseAgreementPaymentForm,
   FundingCaseAgreementPaymentOverviewRow,
   FundingCaseAgreementPaymentRow,
-  FundingCaseAgreementProfileRow,
-  FundingCaseAgreementCommitmentRow
+  FundingCaseAgreementProfileRow
 } from '~~/shared/types/funding-case-agreement-ui'
 import { FundingCaseAgreementPaymentCreateSchema } from '~~/shared/types/schemas'
 import { compareMoney, formatMoneyText, parseMoney, type Money } from '~~/shared/utils/money'
@@ -70,19 +69,25 @@ const toast = useLocalizedToast()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
 const { saveJson, sendJson } = useJsonRequest()
-const { isRecordLocked, getDefinition, isTerminalStatus } = useBusinessStatusState()
+const { isRecordLocked } = useBusinessStatusState()
 const {
   appendActions: extensionAppendCreateActions,
   replacementAction: extensionReplacementCreateAction,
   hasReplacement: hasExtensionCreateReplacement,
-  hasConflict: hasExtensionCreateConflict
+  labelForAction: extensionCreateLabel,
+  hasConflict: hasExtensionCreateConflict,
+  error: extensionCreateError,
+  refresh: refreshExtensionCreateActions
 } = useExtensionCreateActions({
   operation: 'agreement.payments.create',
   agreementId: agreementIdRef
 })
 const {
   calculator: paymentAmountCalculator,
-  hasConflict: hasPaymentAmountCalculatorConflict
+  hasConflict: hasPaymentAmountCalculatorConflict,
+  isReady: paymentCalculatorsReady,
+  error: paymentCalculatorsError,
+  refresh: refreshPaymentCalculators
 } = useExtensionPaymentAmountCalculators({
   agreementId: agreementIdRef
 })
@@ -184,6 +189,7 @@ const validatePayment = withFormRequirements(async (state: PaymentWizardForm) =>
 }, FundingCaseAgreementPaymentCreateSchema)
 const preparePaymentOffset = async () => {
   if (!selectedPayment.value || isSavingPayment.value || isPaymentAboveCalculatorCeiling.value || paymentCalculatorResult.value?.loading) return false
+  if (!selectedPayment.value.id && (!paymentCalculatorsReady.value || hasPaymentAmountCalculatorConflict.value)) return false
   const header = paymentHeader()
   const session = paymentModal.captureSession()
   const signature = paymentHeaderSignature.value
@@ -329,15 +335,6 @@ const loadWorkableRecord = async (recordId: string, action: 'update' | 'delete',
       warnRecordPrerequisite()
       return null
     }
-    const commitment = await $fetch<FundingCaseAgreementCommitmentRow, string>(`/api/agreements/${owner}/commitments/${record.egcs_fc_fundingagreementcommitment}`)
-    if (disposed || owner !== agreementId || generation !== recordActionGeneration || !isCurrent()) return null
-    if (!getDefinition(commitment.egcs_fc_status)) await statusCatalog.load()
-    if (disposed || owner !== agreementId || generation !== recordActionGeneration || !isCurrent()) return null
-    // Commitment completion/read-only activates downstream Payment work; terminal status still blocks.
-    if (!getDefinition(commitment.egcs_fc_status) || isTerminalStatus(commitment.egcs_fc_status)) {
-      warnRecordPrerequisite()
-      return null
-    }
     return record
   } catch {
     if (!disposed && owner === agreementId && generation === recordActionGeneration && isCurrent()) warnRecordPrerequisite()
@@ -390,6 +387,28 @@ const openCreatePayment = async () => {
     paymentModal.openCreate()
   } finally {
     if (generation === recordActionGeneration) isOpeningCreate.value = false
+  }
+}
+
+const readyExtensionCreateActions = ref<Set<string>>(new Set())
+const pendingExtensionCreateAction = ref<string | null>(null)
+let extensionCreateGeneration = 0
+watch([agreementIdRef, () => canCreate, () => canCreateRole,
+  extensionReplacementCreateAction, extensionAppendCreateActions], () => {
+  extensionCreateGeneration += 1
+  readyExtensionCreateActions.value = new Set()
+  pendingExtensionCreateAction.value = null
+}, { flush: 'sync' })
+const activateExtensionCreateAction = async (value: string) => {
+  if (!(canCreateRole ?? canCreate) || pendingExtensionCreateAction.value !== null) return
+  const generation = extensionCreateGeneration
+  const isCurrent = () => !disposed && generation === extensionCreateGeneration
+  pendingExtensionCreateAction.value = value
+  try {
+    if (!await checkCreationPrerequisites(isCurrent) || !isCurrent()) return
+    readyExtensionCreateActions.value = new Set([...readyExtensionCreateActions.value, value])
+  } finally {
+    if (isCurrent()) pendingExtensionCreateAction.value = null
   }
 }
 
@@ -505,6 +524,7 @@ const savePayment = async () => {
   if (isPaymentAboveCalculatorCeiling.value) {
     return
   }
+  if (!selectedPayment.value.id && (!paymentCalculatorsReady.value || hasPaymentAmountCalculatorConflict.value)) return
   const paymentState = selectedPayment.value
   const isUpdate = Boolean(paymentState.id)
   if (currentStep.value !== 'review' || !offsetPreview.value || paymentCalculatorResult.value?.loading) {
@@ -586,8 +606,14 @@ const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', 
       @add="openCreatePayment"
       @retry="refreshOverview">
       <template #actions>
+        <UAlert
+          v-if="(canCreateRole ?? canCreate) && extensionCreateError"
+          role="alert"
+          color="error"
+          :title="t('common.load_failed')"
+          :actions="[{ label: t('common.retry'), onClick: () => refreshExtensionCreateActions() }]" />
         <div
-          v-if="canCreate && hasExtensionCreateConflict"
+          v-if="(canCreateRole ?? canCreate) && hasExtensionCreateConflict"
           role="status"
           tabindex="0"
           :aria-label="t('extensions.create_operation_conflict')"
@@ -604,16 +630,33 @@ const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', 
           <UIcon name="i-lucide-alert-triangle" aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
           <span>{{ t('extensions.payment_amount_calculator_conflict') }}</span>
         </div>
-        <ExtensionCreateActionHost
-          v-if="canCreate && extensionReplacementCreateAction && !hasExtensionCreateConflict"
-          :item="extensionReplacementCreateAction"
-          @created="handleExtensionCreated" />
-        <template v-if="canCreate">
+        <template v-if="(canCreateRole ?? canCreate) && extensionReplacementCreateAction && !hasExtensionCreateConflict">
           <ExtensionCreateActionHost
-            v-for="action in extensionAppendCreateActions"
-            :key="action.value"
-            :item="action"
+            v-if="canCreate || readyExtensionCreateActions.has(extensionReplacementCreateAction.value)"
+            :item="extensionReplacementCreateAction"
             @created="handleExtensionCreated" />
+          <UButton
+            v-else
+            :label="extensionCreateLabel(extensionReplacementCreateAction)"
+            :icon="extensionReplacementCreateAction.icon"
+            :loading="pendingExtensionCreateAction === extensionReplacementCreateAction.value"
+            :disabled="pendingExtensionCreateAction !== null"
+            @click="activateExtensionCreateAction(extensionReplacementCreateAction.value)" />
+        </template>
+        <template v-if="canCreateRole ?? canCreate">
+          <template v-for="action in extensionAppendCreateActions" :key="action.value">
+            <ExtensionCreateActionHost
+              v-if="canCreate || readyExtensionCreateActions.has(action.value)"
+              :item="action"
+              @created="handleExtensionCreated" />
+            <UButton
+              v-else
+              :label="extensionCreateLabel(action)"
+              :icon="action.icon"
+              :loading="pendingExtensionCreateAction === action.value"
+              :disabled="pendingExtensionCreateAction !== null"
+              @click="activateExtensionCreateAction(action.value)" />
+          </template>
         </template>
       </template>
 
@@ -739,9 +782,19 @@ const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', 
             :error-summary-label="t('agreement.payments.wizard.errors_summary', { count: wizardErrors.length })"
             :error-steps-label="t('agreement.payments.wizard.errors_steps')"
             :error-current-step-label="t('agreement.payments.wizard.errors_current_step')"
-            :pending="isSavingPayment || isPaymentAboveCalculatorCeiling || paymentCalculatorResult?.loading === true"
+            :pending="isSavingPayment || isPaymentAboveCalculatorCeiling || paymentCalculatorResult?.loading === true || (!selectedPayment.id && (!paymentCalculatorsReady || hasPaymentAmountCalculatorConflict))"
             @update:current-step="changePaymentStep" @jump-to-step="changePaymentStep"
             @next="nextPaymentStep" @previous="prevStep" @cancel="paymentModal.close()">
+            <UAlert
+              v-if="!selectedPayment.id && hasPaymentAmountCalculatorConflict"
+              color="error"
+              :title="t('extensions.payment_amount_calculator_conflict')"
+              :actions="[{ label: t('common.retry'), onClick: () => refreshPaymentCalculators() }]" />
+            <UAlert
+              v-if="!selectedPayment.id && paymentCalculatorsError"
+              color="error"
+              :title="t('common.resource_table_load_failed')"
+              :actions="[{ label: t('common.retry'), onClick: () => refreshPaymentCalculators() }]" />
             <AgreementPaymentFields
               v-show="currentStep === 'payment'"
               v-model:state="selectedPayment"

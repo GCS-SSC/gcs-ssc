@@ -146,7 +146,7 @@ defineExpose({
     </div>
 
     <div v-if="showTable && !isInitialLoading" class="border-default flex items-center justify-between gap-3 border-t bg-white p-6 dark:bg-zinc-900">
-      <div class="text-xs font-bold tracking-widest text-zinc-400 uppercase">
+      <div class="text-xs font-bold tracking-widest text-zinc-600 uppercase dark:text-zinc-400">
         <slot name="footer-left">
           <span class="text-zinc-900 dark:text-white">
             {{ table?.tableApi?.getFilteredSelectedRowModel().rows.length || 0 }}

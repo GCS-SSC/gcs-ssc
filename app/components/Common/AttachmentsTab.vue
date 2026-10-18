@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- component-local handlers are self-describing */
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { getClientRequestUrl } from '~/utils/client-request-url'
@@ -30,6 +30,8 @@ interface AttachmentItem {
   provider_metadata?: JsonObject | null
   provider_metadata_component_name?: string | null
   provider_metadata_mutability?: 'upload-only' | 'editable' | null
+  can_update_role?: boolean
+  can_delete_role?: boolean
   can_update?: boolean
   can_delete?: boolean
 }
@@ -37,6 +39,7 @@ interface AttachmentItem {
 interface AttachmentListResponse {
   items: AttachmentItem[]
   total: number
+  can_upload_role?: boolean
   can_upload?: boolean
   agency_id?: string
   provider_metadata?: {
@@ -109,6 +112,12 @@ const {
 const attachmentResponse = computed(() => response.value as AttachmentListResponse | null | undefined)
 const hasAttachmentListError = computed(() => status.value === 'error' || error.value !== undefined)
 const canUpload = computed(() => status.value === 'success' && attachmentResponse.value?.can_upload === true)
+const canUploadRole = computed(() => status.value === 'success' && attachmentResponse.value?.can_upload_role === true)
+const warnPrerequisite = () => toast.add({
+  title: toast.localized('common.warning'),
+  description: toast.localized('workflow.action_prerequisite_unavailable'),
+  color: 'warning'
+})
 const isEditing = computed(() => selectedAttachment.value !== null)
 const validateMetadata = withFormRequirements(async (state: AttachmentFormState) => {
   const errors = await validateHostMetadata(state)
@@ -161,14 +170,21 @@ const emptyState = (): AttachmentFormState => ({
 })
 
 const openUpload = () => {
-  if (!canUpload.value) return
+  if (!canUpload.value) {
+    warnPrerequisite()
+    return
+  }
   selectedAttachment.value = null
   formState.value = emptyState()
   isModalOpen.value = true
 }
 
 const openEdit = (item: AttachmentItem) => {
-  if (status.value !== 'success' || item.can_update !== true) return
+  if (status.value !== 'success') return
+  if (item.can_update !== true) {
+    warnPrerequisite()
+    return
+  }
   selectedAttachment.value = item
   formState.value = {
     attachmentTypeId: item.attachment_type_id,
@@ -188,6 +204,12 @@ const resetModalState = () => {
   formState.value = null
 }
 
+let identityGeneration = 0
+watch([() => entityType, () => entityId, selectedAgencyId], () => {
+  identityGeneration += 1
+  resetModalState()
+}, { flush: 'sync' })
+
 const selectAgency = (value: string | number | undefined) => {
   resetModalState()
   selectedAgencyId.value = String(value ?? '')
@@ -206,8 +228,8 @@ const onFileChange = (event: Event) => {
 
 const cloneJsonObject = (value: JsonObject): JsonObject => JSON.parse(JSON.stringify(value)) as JsonObject
 
-const patchAttachment = async (attachmentId: string, patchBody: AttachmentHostPatch | { providerMetadata: JsonObject }) => {
-  const responseValue = await fetch(getClientRequestUrl(withAgency(`${baseUrl.value}/${attachmentId}`)), {
+const patchAttachment = async (url: string, patchBody: AttachmentHostPatch | { providerMetadata: JsonObject }) => {
+  const responseValue = await fetch(getClientRequestUrl(url), {
     method: 'PATCH',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(patchBody)
@@ -227,13 +249,15 @@ const applyHostPatch = (attachment: AttachmentItem, patch: AttachmentHostPatch):
 const rebasePartiallySavedEdit = async (
   attachment: AttachmentItem,
   hostPatch: AttachmentHostPatch,
-  providerMetadataDraft: JsonObject
+  providerMetadataDraft: JsonObject,
+  generation: number
 ) => {
   try {
     await refresh()
   } catch {
     // The list publishes its own retryable error; retain a deterministic local view of the saved host fields.
   }
+  if (generation !== identityGeneration) return
   const refreshedAttachment = items.value.find(item => item.id === attachment.id)
   const rebasedAttachment = applyHostPatch(refreshedAttachment ?? attachment, hostPatch)
   selectedAttachment.value = rebasedAttachment
@@ -253,6 +277,10 @@ const save = async () => {
   if (!formState.value || isSaving.value) return
   if (!isEditing.value && !formState.value.file) return
 
+  const generation = identityGeneration
+  const url = requestUrl.value
+  const attachmentUrl = withAgency(`${baseUrl.value}/${selectedAttachment.value?.id ?? ''}`)
+  const providerMetadataDraft = cloneJsonObject(formState.value.providerMetadata)
   let savedHostPatch: AttachmentHostPatch | null = null
   let failedProviderMetadataDraft: JsonObject | null = null
   let editingAttachment: AttachmentItem | null = null
@@ -283,12 +311,13 @@ const save = async () => {
         return
       }
       if (hasHostPatch) {
-        await patchAttachment(attachment.id, hostPatch)
+        await patchAttachment(attachmentUrl, hostPatch)
+        if (generation !== identityGeneration) return
         savedHostPatch = hostPatch
       }
       if (providerMetadataChanged) {
-        failedProviderMetadataDraft = cloneJsonObject(formState.value.providerMetadata)
-        await patchAttachment(attachment.id, { providerMetadata: formState.value.providerMetadata })
+        failedProviderMetadataDraft = providerMetadataDraft
+        await patchAttachment(attachmentUrl, { providerMetadata: providerMetadataDraft })
         providerMetadataSaved = true
       }
     } else {
@@ -300,19 +329,22 @@ const save = async () => {
       body.set('descriptionEn', formState.value.descriptionEn)
       body.set('descriptionFr', formState.value.descriptionFr)
       body.set('providerMetadata', JSON.stringify(formState.value.providerMetadata))
-      const responseValue = await fetch(getClientRequestUrl(requestUrl.value), { method: 'POST', body })
+      const responseValue = await fetch(getClientRequestUrl(url), { method: 'POST', body })
       if (!responseValue.ok) await throwFetchResponseError(responseValue)
     }
+    if (generation !== identityGeneration) return
     resetModalState()
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
     try {
       await refresh()
     } catch (refreshError) {
-      showError(refreshError)
+      if (generation === identityGeneration) showError(refreshError)
     }
   } catch (error: unknown) {
+    if (generation !== identityGeneration) return
     if (editingAttachment && savedHostPatch && failedProviderMetadataDraft && !providerMetadataSaved) {
-      await rebasePartiallySavedEdit(editingAttachment, savedHostPatch, failedProviderMetadataDraft)
+      await rebasePartiallySavedEdit(editingAttachment, savedHostPatch, failedProviderMetadataDraft, generation)
+      if (generation !== identityGeneration) return
       toast.add({
         title: toast.localized('attachments.partial_update_title'),
         description: toast.localized('attachments.partial_update_metadata_failed'),
@@ -327,10 +359,12 @@ const save = async () => {
 
 const download = async (item: AttachmentItem) => {
   if (status.value !== 'success') return
+  const generation = identityGeneration
   try {
     const responseValue = await fetch(getClientRequestUrl(withAgency(`${baseUrl.value}/${item.id}/download`)))
     if (!responseValue.ok) await throwFetchResponseError(responseValue)
     const blob = await responseValue.blob()
+    if (generation !== identityGeneration) return
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
@@ -338,19 +372,24 @@ const download = async (item: AttachmentItem) => {
     link.click()
     URL.revokeObjectURL(url)
   } catch (error: unknown) {
-    showError(error)
+    if (generation === identityGeneration) showError(error)
   }
 }
 
 const remove = async (item: AttachmentItem) => {
-  if (status.value !== 'success' || item.can_delete !== true) return
+  if (status.value !== 'success') return
+  if (item.can_delete !== true) {
+    warnPrerequisite()
+    return
+  }
+  const generation = identityGeneration
   const deleted = await confirmDeleteRequest(withAgency(`${baseUrl.value}/${item.id}`))
-  if (!deleted) return
+  if (!deleted || generation !== identityGeneration) return
   toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   try {
     await refresh()
   } catch (error) {
-    showError(error)
+    if (generation === identityGeneration) showError(error)
   }
 }
 
@@ -402,7 +441,7 @@ const retryAttachmentList = async () => {
       :total-records="totalRecords"
       :loading="status === 'pending'"
       :button-label="t('attachments.upload')"
-      :show-button="canUpload"
+      :show-button="canUploadRole"
       search-placeholder=""
       @add="openUpload">
       <template #name-cell="{ row }">
@@ -429,8 +468,8 @@ const retryAttachmentList = async () => {
       <template #actions-cell="{ row }">
         <div v-if="status === 'success'" class="flex items-center justify-end gap-1">
           <CommonActionButton icon="i-lucide-download" color="neutral" variant="ghost" :aria-label="`${t('common.download')}: ${getAttachmentLabel(row.original)}`" @click="download(row.original)" />
-          <CommonActionButton v-if="row.original.can_update" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="t('common.edit_named', { name: getAttachmentLabel(row.original) })" @click="openEdit(row.original)" />
-          <CommonActionButton v-if="row.original.can_delete" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('common.delete_named', { name: getAttachmentLabel(row.original) })" @click="remove(row.original)" />
+          <CommonActionButton v-if="row.original.can_update_role" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="t('common.edit_named', { name: getAttachmentLabel(row.original) })" @click="openEdit(row.original)" />
+          <CommonActionButton v-if="row.original.can_delete_role" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('common.delete_named', { name: getAttachmentLabel(row.original) })" @click="remove(row.original)" />
         </div>
       </template>
     </CommonResourceLayoutCard>

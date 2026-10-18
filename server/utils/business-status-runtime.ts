@@ -47,7 +47,6 @@ type BusinessStatusRegistryEntry = {
   table: string
   authorizationRoot: 'self' | 'agreement'
   ancestors: readonly CoreLifecycleEntityType[]
-  ordinaryLockExemptAncestors?: readonly CoreLifecycleEntityType[]
 }
 
 export const BUSINESS_STATUS_REGISTRY = {
@@ -59,10 +58,7 @@ export const BUSINESS_STATUS_REGISTRY = {
   fundingclaimreconcile: {
     table: 'Funding_Case_Agreement_Claim_Reconcile',
     authorizationRoot: 'agreement',
-    ancestors: ['fundingcaseagreement', 'fundingcaseagreementclaim'],
-    // Claim completion is the prerequisite for starting independently assigned
-    // reconciliation casework. It must not freeze that downstream record.
-    ordinaryLockExemptAncestors: ['fundingcaseagreementclaim']
+    ancestors: ['fundingcaseagreement']
   },
   fundingcaseagreementcommitment: { table: 'Funding_Case_Agreement_Commitment', authorizationRoot: 'agreement', ancestors: ['fundingcaseagreement'] },
   fundingcaseaccountreceivable: { table: 'Funding_Case_Agreement_Account_Receivable', authorizationRoot: 'agreement', ancestors: [] },
@@ -73,11 +69,7 @@ export const BUSINESS_STATUS_REGISTRY = {
   fundingcasepayment: {
     table: 'Funding_Case_Agreement_Payment',
     authorizationRoot: 'agreement',
-    ancestors: ['fundingcaseagreement', 'fundingcaseagreementcommitment'],
-    // Commitment completion activates the authoritative commitment used by
-    // downstream Payments. It must not freeze independently assigned Payment
-    // casework created from that completed commitment.
-    ordinaryLockExemptAncestors: ['fundingcaseagreementcommitment']
+    ancestors: ['fundingcaseagreement']
   },
   fundingcaseforecast: { table: 'Funding_Case_Agreement_Forecast', authorizationRoot: 'agreement', ancestors: ['fundingcaseagreement'] },
   fundingcasemonitor: { table: 'Funding_Case_Agreement_Monitor', authorizationRoot: 'agreement', ancestors: ['fundingcaseagreement'] }
@@ -181,12 +173,11 @@ const resolveLineage = async (
   if (entityType === 'fundingclaimreconcile') {
     const row = await db.selectFrom('Funding_Case_Agreement_Claim_Reconcile')
       .innerJoin('Funding_Case_Agreement_Claim', 'Funding_Case_Agreement_Claim.id', 'Funding_Case_Agreement_Claim_Reconcile.egcs_fc_fundingagreementclaim')
-      .select(['Funding_Case_Agreement_Claim_Reconcile.egcs_fc_fundingagreementclaim as claimId', 'Funding_Case_Agreement_Claim.egcs_fc_fundingagreement as agreementId'])
+      .select(['Funding_Case_Agreement_Claim.egcs_fc_fundingagreement as agreementId'])
       .where('Funding_Case_Agreement_Claim_Reconcile.id', '=', entityId).where('Funding_Case_Agreement_Claim_Reconcile._deleted', '=', false).executeTakeFirst()
     if (!row) return null
     return { agreementId: String(row.agreementId), carriers: [
       { entityType: 'fundingcaseagreement', entityId: String(row.agreementId) },
-      { entityType: 'fundingcaseagreementclaim', entityId: String(row.claimId) },
       { entityType, entityId }
     ] }
   }
@@ -214,12 +205,11 @@ const resolveLineage = async (
   if (entityType === 'fundingcasepayment') {
     const row = await db.selectFrom('Funding_Case_Agreement_Payment')
       .innerJoin('Funding_Case_Agreement_Commitment', 'Funding_Case_Agreement_Commitment.id', 'Funding_Case_Agreement_Payment.egcs_fc_fundingagreementcommitment')
-      .select(['Funding_Case_Agreement_Payment.egcs_fc_fundingagreementcommitment as commitmentId', 'Funding_Case_Agreement_Commitment.egcs_fc_fundingagreement as agreementId'])
+      .select(['Funding_Case_Agreement_Commitment.egcs_fc_fundingagreement as agreementId'])
       .where('Funding_Case_Agreement_Payment.id', '=', entityId).where('Funding_Case_Agreement_Payment._deleted', '=', false).executeTakeFirst()
     if (!row) return null
     return { agreementId: String(row.agreementId), carriers: [
       { entityType: 'fundingcaseagreement', entityId: String(row.agreementId) },
-      { entityType: 'fundingcaseagreementcommitment', entityId: String(row.commitmentId) },
       { entityType, entityId }
     ] }
   }
@@ -359,13 +349,8 @@ export const lockBusinessStatus = async (
   const terminal = lockedCarriers.find(carrier => carrier.status.terminal)
   if (terminal) throw new BusinessStatusViolation('BUSINESS_STATUS_TERMINAL', 'A terminal business record cannot be changed')
   if (mode === 'ordinary') {
-    const registryEntry: BusinessStatusRegistryEntry = BUSINESS_STATUS_REGISTRY[entityType]
-    const exemptAncestors = new Set<CoreLifecycleEntityType>(registryEntry.ordinaryLockExemptAncestors ?? [])
-    const ordinaryBlockers = lockedCarriers.filter(carrier =>
-      carrier.entityType === entityType || !exemptAncestors.has(carrier.entityType)
-    )
-    if (ordinaryBlockers.some(carrier => carrier.completed)) throw new BusinessStatusViolation('BUSINESS_COMPLETED', 'A completed business record cannot be changed')
-    if (ordinaryBlockers.some(carrier => carrier.status.readOnly)) throw new BusinessStatusViolation('BUSINESS_STATUS_READ_ONLY', 'A read-only business record cannot be changed')
+    if (lockedCarriers.some(carrier => carrier.completed)) throw new BusinessStatusViolation('BUSINESS_COMPLETED', 'A completed business record cannot be changed')
+    if (lockedCarriers.some(carrier => carrier.status.readOnly)) throw new BusinessStatusViolation('BUSINESS_STATUS_READ_ONLY', 'A read-only business record cannot be changed')
   }
   return {
     ...target,

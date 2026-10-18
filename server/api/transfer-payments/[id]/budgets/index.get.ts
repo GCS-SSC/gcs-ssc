@@ -1,3 +1,4 @@
+import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 import { sql } from 'kysely'
 import { TransferPaymentBudgetListQuerySchema } from '~~/shared/types/schemas'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
@@ -6,22 +7,21 @@ import { databaseMoneyText, parseDatabaseMoney } from '~~/server/utils/database-
 
 /** Lists active fiscal-year budgets scoped to the requested transfer payment and agency. */
 export default defineEventHandler(async event => {
-  const db = event.context.$db
   const profileId = getRouterParam(event, 'id')
   if (!profileId) {
     return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')
   }
 
-  const access = await authorizeTransferPaymentProfileResource(event, 'read', profileId)
-  if (!access) return await notFound(event, 'TRANSFER_PAYMENT_PROFILE_NOT_FOUND', 'apiErrors.transfer_payment.profile_not_found')
-  const agencyId = access.agencyId
-  const resolvedProfileId = profileId
+  return await executeFreshReadSnapshot(event, async trx => {
+    const access = await authorizeTransferPaymentProfileResource(event, 'read', profileId)
+    if (!access) return await notFound(event, 'TRANSFER_PAYMENT_PROFILE_NOT_FOUND', 'apiErrors.transfer_payment.profile_not_found')
+    const agencyId = access.agencyId
+    const resolvedProfileId = profileId
 
-  const query = await getValidatedQueryI18n(event, TransferPaymentBudgetListQuerySchema)
-  const { page, limit, search } = query
-  const offset = (page - 1) * limit
+    const query = await getValidatedQueryI18n(event, TransferPaymentBudgetListQuerySchema)
+    const { page, limit, search } = query
+    const offset = (page - 1) * limit
 
-  return await db.transaction().setIsolationLevel('repeatable read').setAccessMode('read only').execute(async trx => {
     let baseQuery = trx
       .selectFrom('Transfer_Payment_Fiscal_Year_Budget')
       .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Transfer_Payment_Fiscal_Year_Budget.egcs_tp_fiscalyear')
@@ -89,5 +89,5 @@ export default defineEventHandler(async event => {
       page,
       limit
     }
-  })
+  }, { authorization: 'snapshot' })
 })

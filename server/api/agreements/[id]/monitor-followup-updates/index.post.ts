@@ -1,3 +1,4 @@
+import { readAgreementMonitorBody } from '~~/server/utils/agreement-monitor-validation'
 import { FundingCaseAgreementMonitorFollowupUpdateCreateSchema } from '~~/shared/types/schemas'
 import {
   assertAgreementMonitorFollowupExists,
@@ -11,7 +12,7 @@ import { requireAuthContext } from '~~/server/utils/authorize'
 
 export default defineEventHandler(async event => {
   await requireAuthContext(event)
-  const validated = await readValidatedBodyI18n(event, FundingCaseAgreementMonitorFollowupUpdateCreateSchema)
+  const validated = await readAgreementMonitorBody(event, FundingCaseAgreementMonitorFollowupUpdateCreateSchema)
   const followup = await event.context.$db
     .selectFrom('Funding_Case_Agreement_Monitor_Followup')
     .select('egcs_fc_fundingagreementmonitor')

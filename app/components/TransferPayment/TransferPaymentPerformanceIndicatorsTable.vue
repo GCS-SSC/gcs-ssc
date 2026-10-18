@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ResourceTableStatus } from '~~/shared/types/resource-table'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 import type { TransferPaymentPerformanceIndicatorRow, TransferPaymentOutcomeRow } from '~~/shared/types/transfer-payment-ui'
 
@@ -7,6 +8,7 @@ const {
   indicators,
   totalRecords,
   loading = false,
+  requestStatus,
   canUpdateChild,
   canDeleteChild
 } = defineProps<{
@@ -14,12 +16,13 @@ const {
   indicators: TransferPaymentPerformanceIndicatorRow[]
   totalRecords: number
   loading?: boolean
+  requestStatus?: ResourceTableStatus
   canUpdateChild: boolean
   canDeleteChild: boolean
 }>()
 
 const emit = defineEmits<{
-  (event: 'add'): void
+  (event: 'add' | 'retry'): void
   (event: 'edit' | 'delete', row: TransferPaymentPerformanceIndicatorRow): void
 }>()
 
@@ -81,9 +84,11 @@ const indicatorBilingualColumns = computed<BilingualColumnConfig<TransferPayment
     :bilingual-columns="indicatorBilingualColumns"
     :total-records="totalRecords"
     :loading="loading"
+    :request-status="requestStatus"
     :button-label="t('common.add')"
     :show-button="canUpdateChild"
-    @add="emit('add')">
+    @add="emit('add')"
+    @retry="emit('retry')">
     <template #filters>
       <CommonBilingualSelectMenu
         v-model="selectedOutcomeId"

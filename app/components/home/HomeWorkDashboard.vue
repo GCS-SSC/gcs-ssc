@@ -28,7 +28,7 @@ const closeDataCollection = async () => {
 const { showError } = useApiErrorToast()
 const { getHeroCollapsed } = useDashboard()
 const isHeroCollapsed = getHeroCollapsed('home')
-const busyGroupItemId: Ref<string | null> = ref(null)
+const busyGroupItemKey: Ref<string | null> = ref(null)
 const groupPage: Ref<number> = ref(1)
 const sectionPages: Ref<Record<Section, number>> = ref({ direct: 1, shared: 1, proponents: 1, agreements: 1 })
 const loadedAssigned: Ref<AssignedItem[]> = ref([])
@@ -134,6 +134,7 @@ const stats = computed(() => [
           : status.value === 'success' ? agreementItems.value.length : '—', icon: 'i-lucide-handshake', color: 'blue' }])
 ])
 const claimGroupItem = async (item: GroupItem) => {
+  if (busyGroupItemKey.value !== null) return
   const url = item.kind === 'intake'
     ? `/api/funding-case-intakes/${item.id}/claim`
     : item.kind === 'data_collection'
@@ -146,7 +147,7 @@ const claimGroupItem = async (item: GroupItem) => {
             ? `/api/additional-reviewers/${item.id}/claim`
             : `/api/approvals/${item.id}/claim`
   try {
-    busyGroupItemId.value = item.id
+    busyGroupItemKey.value = `${item.kind}:${item.id}`
     const response = await fetch(getClientRequestUrl(url), { method: 'POST' })
     if (!response.ok) await throwFetchResponseError(response)
     groupPage.value = 1
@@ -154,7 +155,7 @@ const claimGroupItem = async (item: GroupItem) => {
   } catch (claimError) {
     showError(claimError)
   } finally {
-    busyGroupItemId.value = null
+    busyGroupItemKey.value = null
   }
 }
 </script>
@@ -245,7 +246,7 @@ const claimGroupItem = async (item: GroupItem) => {
                 <p class="mt-1 text-sm text-muted">
                   {{ t('home_dashboard.available_work_description') }}
                 </p>
-                <HomeGroupWorkList v-if="groupStatus === 'success'" :items="groupItems" claimable :busy-id="busyGroupItemId" @claim="claimGroupItem" />
+                <HomeGroupWorkList v-if="groupStatus === 'success'" :items="groupItems" claimable :busy-key="busyGroupItemKey" @claim="claimGroupItem" />
                 <HomeWorkPager v-if="groupStatus === 'success'" :title="t('groups.available')" :page="groupPage" :has-next="groupPage * groupPageSize < (groupData?.total ?? 0)" @previous="groupPage -= 1" @next="groupPage += 1" />
               </section>
               <section aria-labelledby="assigned-roots-heading" class="min-w-0 border-t-4 border-primary/35 pt-4 lg:col-span-2">

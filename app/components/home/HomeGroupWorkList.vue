@@ -6,7 +6,7 @@ import type { GroupWorkItem } from '~~/shared/types/assigned-work'
 import { appRouteLocations } from '~/utils/route-locations'
 
 type GroupItem = GroupWorkItem
-const { items, claimable = false, busyId = null } = defineProps<{ items: GroupItem[], claimable?: boolean, busyId?: string | null }>()
+const { items, claimable = false, busyKey = null } = defineProps<{ items: GroupItem[], claimable?: boolean, busyKey?: string | null }>()
 const emit = defineEmits<{ claim: [item: GroupItem] }>()
 const { t } = useI18n()
 const localePath = useLocalePath()
@@ -67,7 +67,7 @@ const itemUrl = (item: GroupItem): string | null => {
         <span class="block break-words text-xs text-muted">{{ itemDescription(item) }}</span>
         <span class="block truncate text-xs text-muted">{{ getBilingualValue(item, 'group_name', item.id) }}</span>
       </span>
-      <UButton v-if="claimable" size="sm" :label="t('groups.claim')" :loading="busyId === item.id" @click="emit('claim', item)" />
+      <UButton v-if="claimable" size="sm" :label="t('groups.claim')" :loading="busyKey === `${item.kind}:${item.id}`" @click="emit('claim', item)" />
       <UIcon v-else name="i-lucide-arrow-up-right" class="size-4 text-muted" />
     </li>
     <li v-if="items.length === 0" class="px-5 py-8 text-sm text-muted">

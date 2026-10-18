@@ -107,11 +107,13 @@ const refreshUserLookup = async () => {
   const requestGeneration = ++userLookupGeneration
   const requestedReviewId = reviewId
   const requestedSearch = debouncedUserSearchTerm.value
+  const requestedRowId = lookupRowId.value
   userLookupStatus.value = 'pending'
 
   const requestUrl = getClientRequestUrl(`/api/reviews/${requestedReviewId}/additional-reviewers/lookups/users`)
   requestUrl.searchParams.set('page', '1')
   requestUrl.searchParams.set('limit', '20')
+  if (requestedRowId) requestUrl.searchParams.set('additionalReviewerId', requestedRowId)
   if (requestedSearch) {
     requestUrl.searchParams.set('search', requestedSearch)
   }
@@ -119,11 +121,11 @@ const refreshUserLookup = async () => {
     const response = await fetch(requestUrl)
     if (!response.ok) await throwFetchResponseError(response)
     const nextResponse = await response.json() as ListResponse<UserOptionItem>
-    if (requestGeneration !== userLookupGeneration || requestedReviewId !== reviewId || requestedSearch !== debouncedUserSearchTerm.value) return
+    if (requestGeneration !== userLookupGeneration || requestedReviewId !== reviewId || requestedSearch !== debouncedUserSearchTerm.value || requestedRowId !== lookupRowId.value) return
     userLookupResponse.value = nextResponse
     userLookupStatus.value = 'success'
   } catch {
-    if (requestGeneration !== userLookupGeneration || requestedReviewId !== reviewId || requestedSearch !== debouncedUserSearchTerm.value) return
+    if (requestGeneration !== userLookupGeneration || requestedReviewId !== reviewId || requestedSearch !== debouncedUserSearchTerm.value || requestedRowId !== lookupRowId.value) return
     userLookupResponse.value = { items: [], total: 0, stats: { total: 0, active: 0 }, page: 1, limit: 20 }
     userLookupStatus.value = 'error'
   }
@@ -189,6 +191,18 @@ const canSaveReviewer = computed(() => {
       : canUpdateAssessment && !reviewersDisabled))
 })
 const selectedUserOption: Ref<UserOptionItem | null> = ref(null)
+const lookupRowId = computed(() => isReviewerModalOpen.value && canSaveReviewer.value
+  ? selectedReviewer.value?.id
+  : undefined)
+const groupLookupUrl = computed(() => {
+  const base = `/api/reviews/${reviewId}/additional-reviewers/lookups/groups`
+  return lookupRowId.value ? `${base}?additionalReviewerId=${lookupRowId.value}` : base
+})
+watch(lookupRowId, () => {
+  userLookupGeneration += 1
+  userLookupResponse.value = { items: [], total: 0, stats: { total: 0, active: 0 }, page: 1, limit: 20 }
+  void refreshUserLookup()
+})
 
 // Keep the selected identity readable when paging/search replaces the option list.
 watch([() => selectedReviewer.value?.egcs_cn_user, userOptions, rows], ([userId, options, reviewers]) => {
@@ -558,7 +572,7 @@ const deleteRow = async (rowId: string) => {
               @update:search-term="userSearchTerm = String($event ?? '')" />
           </UFormField>
           <UFormField v-else :label="t('groups.group')" name="egcs_cn_group" required>
-            <CommonServerLookupSelect v-model="selectedGroup" :fetch-url="`/api/reviews/${reviewId}/additional-reviewers/lookups/groups`" value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" />
+            <CommonServerLookupSelect v-model="selectedGroup" :fetch-url="groupLookupUrl" value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" close-on-select />
           </UFormField>
 
           <UFormField

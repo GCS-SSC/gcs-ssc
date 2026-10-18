@@ -2,6 +2,7 @@
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
+import { toRef, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 import type { TransferPaymentPerformanceIndicatorItem } from '~~/shared/types/schemas'
 import type { TransferPaymentPerformanceIndicatorRow } from '~~/shared/types/transfer-payment-ui'
@@ -18,8 +19,8 @@ const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 
 const { outcomes, selectedOutcomeId, outcomeSelectionEnabled } = await useOutcomeSelection({
-  programId,
-  outcomesRefreshKey
+  programId: () => programId,
+  outcomesRefreshKey: toRef(() => outcomesRefreshKey)
 })
 
 const indicatorFetchUrl: ComputedRef<string> = computed(() => {
@@ -71,6 +72,16 @@ const openUpdateIndicator = (row: TransferPaymentPerformanceIndicatorRow) => {
 const indicatorPending = useCrudModalPending(indicatorModal.captureSession)
 const isSavingIndicator = indicatorPending.isPending
 
+let indicatorModalGeneration = 0
+watch(isIndicatorModalOpen, open => {
+  if (open) indicatorModalGeneration += 1
+}, { flush: 'sync' })
+let indicatorContext = 0
+watch([() => programId, selectedOutcomeId], () => {
+  indicatorContext += 1
+  indicatorModal.close()
+}, { flush: 'sync' })
+
 /**
  * Saves the currently selected performance indicator record.
  * Performs a PATCH if the record has an ID (update), or a POST if it doesn't (new).
@@ -85,6 +96,8 @@ const saveIndicator = async () => {
     toast.add({ title: toast.localized('common.warning'), description: toast.localized('validation.outcome_required'), color: 'warning' })
     return
   }
+  const requestedContext = indicatorContext
+  const requestedModalGeneration = indicatorModalGeneration
   const session = indicatorModal.captureSession()
   if (!indicatorPending.begin(session)) return
   try {
@@ -99,11 +112,13 @@ const saveIndicator = async () => {
       })
     })
     if (!response.ok) await throwFetchResponseError(response)
+    if (requestedContext !== indicatorContext || !indicatorModal.isCurrentSession(session)) return
     indicatorModal.closeSession(session)
     await refreshIndicators()
+    if (requestedContext !== indicatorContext || requestedModalGeneration !== indicatorModalGeneration) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (requestedContext === indicatorContext && indicatorModal.isCurrentSession(session)) showError(error)
   } finally {
     indicatorPending.end(session)
   }
@@ -122,13 +137,17 @@ const deleteIndicator = async (row: TransferPaymentPerformanceIndicatorRow) => {
     ? row.egcs_tp_transferpaymentoutcome
     : selectedOutcomeId.value
   if (!outcomeId) return
+  const requestedContext = indicatorContext
   try {
-    const ok = await confirmDeleteRequest(`/api/transfer-payments/${programId}/outcomes/${outcomeId}/performance-indicators/${row.id}`)
-    if (!ok) return
+    const ok = await confirmDeleteRequest(`/api/transfer-payments/${programId}/outcomes/${outcomeId}/performance-indicators/${row.id}`, {
+      shouldProceed: () => requestedContext === indicatorContext
+    })
+    if (!ok || requestedContext !== indicatorContext) return
     await refreshIndicators()
+    if (requestedContext !== indicatorContext) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (requestedContext === indicatorContext) showError(error)
   }
 }
 </script>
@@ -143,8 +162,10 @@ const deleteIndicator = async (row: TransferPaymentPerformanceIndicatorRow) => {
       :indicators="performanceIndicators"
       :total-records="indicatorTotal"
       :loading="indicatorStatusState === 'pending'"
+      :request-status="indicatorStatusState"
       :can-update-child="canUpdateChild"
       :can-delete-child="canDeleteChild"
+      @retry="refreshIndicators"
       @add="openCreateIndicator"
       @edit="openUpdateIndicator"
       @delete="deleteIndicator" />

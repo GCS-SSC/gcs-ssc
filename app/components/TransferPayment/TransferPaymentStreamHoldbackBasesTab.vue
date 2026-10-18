@@ -167,7 +167,7 @@ const retryAgencyHoldbacks = async () => {
     </template>
     <template #actions-cell="{ row }">
       <div class="flex items-center gap-2">
-        <CommonActionButton icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('common.delete_named', { name: getActionTarget(row.original) })" :disabled="!canDeleteChild || isDeleting" @click="remove(row.original)" />
+        <CommonActionButton v-if="canDeleteChild" icon="i-lucide-trash" color="error" variant="ghost" size="sm" :aria-label="t('common.delete_named', { name: getActionTarget(row.original) })" :disabled="isDeleting" @click="remove(row.original)" />
       </div>
     </template>
   </CommonResourceLayoutCard>

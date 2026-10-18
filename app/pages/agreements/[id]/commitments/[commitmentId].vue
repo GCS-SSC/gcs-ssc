@@ -16,7 +16,7 @@ import type {
   FundingCaseAgreementCommitmentLineBalanceRow
 } from '~~/shared/types/funding-case-agreement-ui'
 import { FundingCaseAgreementCommitmentLineCreateSchema } from '~~/shared/types/schemas'
-import { formatAccountingDimension, getAccountingDimensionSearchValues } from '~~/shared/utils/accounting-dimensions'
+import { formatAccountingDimension, formatAccountingDimensions, getAccountingDimensionSearchValues } from '~~/shared/utils/accounting-dimensions'
 import { compareMoney, formatMoneyText, sumMoney, type Money } from '~~/shared/utils/money'
 
 definePageMeta({
@@ -77,6 +77,10 @@ const lineModal = useCrudModal<FundingCaseAgreementCommitmentLineBalanceRow, Fun
 })
 
 const selectedLine = lineModal.selected
+const savedCodingOptions = computed(() => (commitment.value?.lines ?? []).filter(line => line.id === selectedLine.value?.id).map(line => ({
+  value: String(line.egcs_fc_transferpaymentstreamchartofaccount),
+  label: `${line.fiscal_year_display} - ${formatAccountingDimensions(line.accounting_dimensions, locale.value === 'fr' ? 'fr' : 'en', ' - ')}`
+})))
 const isLineModalOpen = lineModal.isOpen
 const validateLine = createValidator(FundingCaseAgreementCommitmentLineCreateSchema)
 const linePending = useCrudModalPending(lineModal.captureSession)
@@ -424,6 +428,8 @@ const handleCompleted = async () => {
               v-model="selectedLine.egcs_fc_transferpaymentstreamchartofaccount"
               :fetch-url="`/api/agreements/${agreementId}/commitment-lines/lookups/chart-of-accounts`"
               :query="{ permission_action: 'update', commitmentId, ...(commitment ? { currency: commitment.egcs_fc_currency } : {}) }"
+              selected-values-query-key="selected_ids"
+              :prepend-items="savedCodingOptions"
               value-key="id"
               label-en-key="label_en"
               label-fr-key="label_fr"

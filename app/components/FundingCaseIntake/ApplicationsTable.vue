@@ -17,7 +17,7 @@ const { t } = useI18n()
 const localePath = useLocalePath()
 const { getBilingualValue } = useBilingualValue()
 const { showError } = useApiErrorToast()
-const props = defineProps<{ opportunityId?: string; canCreate: boolean }>()
+const props = withDefaults(defineProps<{ opportunityId?: string; canCreate: boolean; createAvailable?: boolean }>(), { createAvailable: true })
 const { search, pagination, items, totalRecords, refresh, retry, status } = useResourceTable<Row>({
   fetchUrl: '/api/funding-case-intakes',
   query: computed(() => ({ egcs_fi_fundingopportunity: props.opportunityId }))
@@ -38,7 +38,11 @@ const form: Ref<IntakeForm> = ref({ attachments: [] })
  *
  */
 const openCreate = () => {
-  if (!props.canCreate) return
+  if (!props.canCreate || pending.value) return
+  if (props.createAvailable === false) {
+    toast.add({ title: toast.localized('common.warning'), description: toast.localized('workflow.action_prerequisite_unavailable'), color: 'warning' })
+    return
+  }
   form.value = {
     egcs_fi_fundingopportunity: props.opportunityId,
     attachments: []

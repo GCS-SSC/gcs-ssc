@@ -35,7 +35,7 @@ export default defineAppConfig({
         list: 'gap-x-8 gap-y-0 flex-wrap',
         indicator: 'bg-primary h-1 rounded-full bottom-0',
         trigger:
-          'px-0 py-5 font-black uppercase tracking-widest text-xs opacity-60 data-[state=active]:opacity-100 transition-opacity'
+          'px-0 py-5 font-black uppercase tracking-widest text-xs opacity-100 data-[state=inactive]:text-zinc-600 dark:data-[state=inactive]:text-zinc-400 data-[state=active]:opacity-100 transition-opacity'
       }
     },
     breadcrumb: {

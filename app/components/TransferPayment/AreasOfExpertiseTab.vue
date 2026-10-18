@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onBeforeUnmount, watch } from 'vue'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { useBilingualValue } from '~/composables/useBilingualValue'
 import { throwFetchResponseError } from '~/utils/fetch-error'
@@ -37,7 +38,7 @@ const {
   refresh,
   status
 } = useResourceTable<TransferPaymentStreamAreaOfExpertiseItem>({
-  fetchUrl: `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/areas-of-expertise`
+  fetchUrl: computed(() => `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/areas-of-expertise`)
 })
 
 const columns: TableColumnInput<TransferPaymentStreamAreaOfExpertiseItem>[] = [
@@ -71,6 +72,19 @@ const openUpdate = (row: TransferPaymentStreamAreaOfExpertiseItem) => {
   if (canUpdateChild) updateArea(row)
 }
 
+let contextGeneration = 0
+let disposed = false
+const isCurrentContext = (generation: number) => !disposed && generation === contextGeneration
+watch([() => transferPaymentId, () => streamId], () => {
+  contextGeneration += 1
+  isModalOpen.value = false
+  selectedItem.value = null
+}, { flush: 'sync' })
+onBeforeUnmount(() => {
+  disposed = true
+  contextGeneration += 1
+})
+
 const validate = createValidator(TransferPaymentStreamAreaOfExpertiseSchema)
 const pending = useCrudModalPending(captureSession)
 const isSaving = pending.isPending
@@ -99,7 +113,8 @@ const sendJson = async (url: string, method: 'PATCH' | 'POST', body: unknown) =>
  * Closes the modal, refreshes the table data, and provides success feedback on completion.
  */
 const save = async () => {
-  if (!selectedItem.value || !canUpdateChild) return
+  if (disposed || !selectedItem.value || !canUpdateChild) return
+  const generation = contextGeneration
   const itemState = selectedItem.value
   const itemId = itemState.id
   const isUpdate = Boolean(itemId)
@@ -119,15 +134,16 @@ const save = async () => {
         itemState
       )
     }
-    closeSession(session)
+    if (!isCurrentContext(generation) || !closeSession(session)) return
     await refresh()
+    if (!isCurrentContext(generation) || captureSession() !== null || status.value === 'error') return
     toast.add({
       title: toast.localized('common.success'),
       description: isUpdate ? toast.localized('common.updated_success') : toast.localized('common.created_success'),
       color: 'success'
     })
   } catch (error: unknown) {
-    showError(error)
+    if (isCurrentContext(generation) && captureSession() === session) showError(error)
   } finally {
     pending.end(session)
   }
@@ -141,16 +157,19 @@ const save = async () => {
  * @param {TransferPaymentStreamAreaOfExpertiseItem} row - The expertise record to be deleted.
  */
 const deleteItem = async (row: TransferPaymentStreamAreaOfExpertiseItem) => {
-  if (!canDeleteChild) return
+  if (disposed || !canDeleteChild) return
+  const generation = contextGeneration
   try {
     const ok = await confirmDeleteRequest(
-      `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/areas-of-expertise/${row.id}`
+      `/api/transfer-payments/${transferPaymentId}/streams/${streamId}/areas-of-expertise/${row.id}`,
+      { shouldProceed: () => isCurrentContext(generation) && canDeleteChild }
     )
-    if (!ok) return
+    if (!ok || !isCurrentContext(generation)) return
     await refresh()
+    if (!isCurrentContext(generation) || status.value !== 'success') return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (isCurrentContext(generation)) showError(error)
   }
 }
 </script>
@@ -163,9 +182,11 @@ const deleteItem = async (row: TransferPaymentStreamAreaOfExpertiseItem) => {
     :columns="columns"
     :total-records="totalRecords"
     :loading="status === 'pending'"
+    :request-status="status"
     :button-label="t('common.add')"
     :show-button="canUpdateChild"
-    @add="openCreate">
+    @add="openCreate"
+    @retry="refresh">
     <template #actions-cell="{ row }">
       <div class="flex items-center gap-2">
         <CommonActionButton

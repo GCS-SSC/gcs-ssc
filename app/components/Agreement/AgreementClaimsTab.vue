@@ -481,6 +481,7 @@ const deleteClaim = (recordId: string) => runRecordAction(recordId, 'delete', as
             <CommonServerLookupSelect
               v-model="selectedClaim.egcs_fc_applicantrecipient"
               :fetch-url="`/api/agreements/${agreementId}/claims/lookups/proponents`"
+              selected-values-query-key="selected"
               value-key="id" label-en-key="label_en" label-fr-key="label_fr"
               :limit="100" :show-value-in-label="false" close-on-select
               :query="selectedClaim.id ? { permission_action: 'update', claimId: selectedClaim.id } : { permission_action: 'create' }" />

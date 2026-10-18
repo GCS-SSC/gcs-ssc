@@ -52,7 +52,7 @@ const canAccessExtensionOperation = async (
   rbac: GcsExtensionRbacRequirement
 ) => await canAccessExtensionEntity(authContext, rbac, entityContext, db)
 
-/** Lists agreement-create descriptors enabled for the entity and permitted by canAccessExtensionOperation. */
+/** Lists enabled agreement-create descriptors permitted by role; activation retains assignment prerequisites. */
 export const listExtensionCreateActionItems = async (
   db: Kysely<Database>,
   authContext: AuthContext,
@@ -71,7 +71,8 @@ export const listExtensionCreateActionItems = async (
       const componentName = resolveComponentName(createAction)
       if (!componentName) continue
 
-      const canAccessAction = await canAccessExtensionOperation(authContext, db, entityContext, createAction.rbac)
+      const canAccessAction = createAction.rbac.subject === 'agreement'
+        && authContext.userAbilities.authorize('agreement', createAction.rbac.action, entityContext.scope)
       if (!canAccessAction) continue
 
       items.push({

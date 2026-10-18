@@ -34,6 +34,10 @@ const {
   fetchUrl: computed(() => `/api/applicant-recipients/${applicantRecipientId}/agreements`)
 })
 
+watch(listView, () => {
+  pagination.value.pageIndex = 0
+}, { flush: 'sync' })
+
 const canCreateAgreement: ComputedRef<boolean> = computed(() => {
   if (typeof permissions.canAny !== 'function') {
     return false

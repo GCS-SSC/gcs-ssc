@@ -237,6 +237,8 @@ export const authorizeTransferPaymentStreamBudgetResource = async (
       const row = await db.selectFrom('Transfer_Payment_Stream_Budget')
         .innerJoin('Transfer_Payment_Stream', 'Transfer_Payment_Stream.id', 'Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentstream')
         .innerJoin('Transfer_Payment_Profile', 'Transfer_Payment_Profile.id', 'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile')
+        .innerJoin('Agency_Profile', 'Agency_Profile.id', 'Transfer_Payment_Profile.egcs_tp_agency')
+        .where('Agency_Profile._deleted', '=', false)
         .where('Transfer_Payment_Stream_Budget.id', '=', streamBudgetId)
         .where('Transfer_Payment_Stream_Budget.egcs_tp_transferpaymentstream', '=', streamId)
         .where('Transfer_Payment_Stream.egcs_tp_transferpaymentprofile', '=', profileId)

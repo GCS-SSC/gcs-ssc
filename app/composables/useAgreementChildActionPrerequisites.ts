@@ -5,7 +5,7 @@ export type AgreementChildActionTarget =
   | { kind: 'agreement'; agreementId: string }
   | { kind: 'amendment'; agreementId: string; amendmentId: string }
 export type AgreementChildAction = 'create' | 'update' | 'delete'
-export type AgreementChildArea = 'activity' | 'budget-line' | 'budget-year'
+export type AgreementChildArea = 'activity' | 'budget-line' | 'budget-year' | 'address' | 'proponent-relationship' | 'profile' | 'note'
 
 type AmendmentPrerequisites = {
   egcs_fc_status: string
@@ -59,9 +59,15 @@ export const useAgreementChildActionPrerequisites = (target: MaybeRefOrGetter<Ag
         }
         const status = catalog.getById(record.egcs_fc_status)
         const role = action === 'create' ? record.can_create_child_records_role : action === 'update' ? record.can_update_child_records_role : record.can_delete_child_records_role
-        const capability = action === 'create' ? record.can_create_child_records : action === 'update' ? record.can_update_child_records : record.can_delete_child_records
+        const capability = area === 'profile'
+          ? action === 'update' ? record.can_update : action === 'delete' ? record.can_delete : false
+          : action === 'create' ? record.can_create_child_records : action === 'update' ? record.can_update_child_records : record.can_delete_child_records
         if (role === true && capability === true && status && !status.deleted && !status.readOnly && !status.terminal && record.isCompleted !== true) return true
       } else {
+        if (area === 'address' || area === 'proponent-relationship' || area === 'profile' || area === 'note') {
+          if (shouldProceed()) warn()
+          return false
+        }
         const [record, context, roster] = await Promise.all([
           $fetch<AmendmentPrerequisites, string>(`/api/agreements/${owner.agreementId}/amendments/${owner.amendmentId}`),
           $fetch<Record<string, unknown>, string>(`/api/entity-assignments/fundingcaseamendment/${owner.amendmentId}/context`),

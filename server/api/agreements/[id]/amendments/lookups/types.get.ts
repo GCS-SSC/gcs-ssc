@@ -1,3 +1,6 @@
+import { assertAgreementAmendmentExists } from '~~/server/utils/agreement-amendment'
+import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
+import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { badRequest } from '~~/server/utils/api-errors'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
@@ -14,10 +17,11 @@ export const AmendmentTypeLookupQuerySchema = AdminCommonListQuerySchema.pick({
   amendmentId: PositivePostgresBigintIdSchema.optional()
 }).strict()
 
-export default defineEventHandler(async event => {
+const readRoute = defineEventHandler(async event => {
   const db = event.context.$db
   const agreementId = getRouterParam(event, 'id')
   if (!agreementId) return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')
+  if (![agreementId].every(isPositivePostgresBigintText)) return await badRequest(event, 'INVALID_IDS', 'apiErrors.request.invalid')
   const { amendmentId, page, limit, search, deleted } = await getValidatedQueryI18n(event, AmendmentTypeLookupQuerySchema)
   let assignmentTarget
   if (amendmentId) {
@@ -25,6 +29,7 @@ export default defineEventHandler(async event => {
   }
   const context = await authorizeAgreementResource(event, 'read', agreementId, db, { assignmentTarget })
   if (!context) return await badRequest(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
+  if (amendmentId) await assertAgreementAmendmentExists(event, db, agreementId, amendmentId)
 
   let query = db.selectFrom('Transfer_Payment_Amendment_Type')
     .where('egcs_tp_transferpaymentstream', '=', context.streamId)
@@ -64,3 +69,6 @@ export default defineEventHandler(async event => {
     limit
   }
 })
+
+export default defineEventHandler(async event =>
+  await executeFreshReadSnapshot(event, async () => await readRoute(event)))

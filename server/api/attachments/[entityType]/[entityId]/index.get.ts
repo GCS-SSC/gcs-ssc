@@ -4,6 +4,7 @@ import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { authorizeAttachmentTarget, getAttachmentTargetSubject } from '~~/server/utils/attachment-target'
 import { getAttachmentRouteTarget } from '~~/server/utils/attachment-route'
 import { resolveAssignedItemTargetGrant } from '~~/server/utils/rbac'
+import { resolveBusinessStatusProtection } from '~~/server/utils/business-status-runtime'
 import { isEntityAssignmentRosterWorkable } from '~~/server/utils/entity-assignment'
 import { createFileStorageSecretReader, getRegisteredExtensions } from '~~/server/utils/extensions'
 import { readNamespacedProviderMetadata, resolveAgencyStorageProvider } from '~~/server/utils/file-storage-provider'
@@ -71,15 +72,23 @@ export default defineEventHandler(async event => {
   const scope = resolved.creditMemoContext?.scope ?? resolved.fundingCaseScope?.scope ?? resolved.agreementContext?.scope
     ?? { type: 'agency' as const, agencyId: resolved.agencyId }
   const subject = getAttachmentTargetSubject(target.entityType)
-  const [grant, targetWorkable, canUpdateScopes, canDeleteScopes] = await Promise.all([
+  const agreementId = resolved.agreementContext?.agreementId
+  const agreementGateApplies = agreementId !== undefined
+    && target.entityType !== 'fundingcaseaccountreceivable'
+    && target.entityType !== 'fundingcaseaccountreceivableadjustment'
+  const [grant, targetWorkable, canUpdateScopes, canDeleteScopes, agreementProtection] = await Promise.all([
     resolveAssignedItemTargetGrant(auth.userId, target, db),
     isEntityAssignmentRosterWorkable(db, target.entityType, target.entityId),
     canAccessCreditMemoTargetScopes(db, auth, target.entityType, target.entityId, 'update'),
-    canAccessCreditMemoTargetScopes(db, auth, target.entityType, target.entityId, 'delete')
+    canAccessCreditMemoTargetScopes(db, auth, target.entityType, target.entityId, 'delete'),
+    agreementGateApplies ? resolveBusinessStatusProtection(db, 'fundingcaseagreement', agreementId) : null
   ])
-  const canUpdate = targetWorkable && canUpdateScopes && auth.userAbilities.authorize(subject, 'update', scope)
+  const canUpdateRole = canUpdateScopes && auth.userAbilities.authorize(subject, 'update', scope)
+  const canDeleteRole = canDeleteScopes && auth.userAbilities.authorize(subject, 'delete', scope)
+  const workable = targetWorkable && (!agreementGateApplies || agreementProtection?.locked === false)
+  const canUpdate = workable && canUpdateRole
     && grant?.actions.has('update') === true
-  const canDelete = targetWorkable && canDeleteScopes && auth.userAbilities.authorize(subject, 'delete', scope)
+  const canDelete = workable && canDeleteRole
     && grant?.actions.has('delete') === true
   const registered = await getRegisteredExtensions()
   const providers = new Map(registered.filter(item => item.fileStorageProvider).map(item => [item.key, item]))
@@ -136,6 +145,8 @@ export default defineEventHandler(async event => {
       provider_metadata: providerMetadata,
       provider_metadata_component_name: compatibleDeclaration?.component.componentName ?? null,
       provider_metadata_mutability: compatibleDeclaration?.mutability ?? null,
+      can_update_role: canUpdateRole,
+      can_delete_role: canDeleteRole,
       can_update: canUpdate,
       can_delete: canDelete
     }
@@ -144,6 +155,7 @@ export default defineEventHandler(async event => {
     items: decoratedItems,
     total: Number(count.count),
     stats: { total: Number(count.count), page: query.page, limit: query.limit },
+    can_upload_role: canUpdateRole,
     can_upload: canUpdate && uploadProvider !== null,
     agency_id: resolved.agencyId,
     provider_metadata: uploadProvider?.extension.fileStorageProvider?.metadata

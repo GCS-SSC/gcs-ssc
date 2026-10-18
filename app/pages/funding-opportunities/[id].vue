@@ -30,6 +30,7 @@ const { getBilingualValue } = useBilingualValue()
 const { toDateInput } = useDateHelpers()
 const { getHeroCollapsed } = useDashboard()
 const { showError } = useApiErrorToast()
+const toast = useLocalizedToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const statusCatalog = useStatusCatalog()
 void statusCatalog.load()
@@ -55,16 +56,16 @@ const scope = computed(() => profile.value && ({
 const statusDefinition = computed(() => statusCatalog.getById(profile.value?.egcs_fo_status))
 const isWritable = computed(() => Boolean(statusDefinition.value && !statusDefinition.value.deleted
   && !statusDefinition.value.readOnly && !statusDefinition.value.terminal))
-const canEdit = computed(() => Boolean(scope.value && isWritable.value && can('transfer_payment', 'update', scope.value)))
-const canDelete = computed(() => Boolean(scope.value && isWritable.value && can('transfer_payment', 'delete', scope.value)))
+const canEdit = computed(() => Boolean(scope.value && can('transfer_payment', 'update', scope.value)))
+const canDelete = computed(() => Boolean(scope.value && can('transfer_payment', 'delete', scope.value)))
 const isWithinIntakeWindow = computed(() => {
   if (!profile.value) return false
   const today = new Date().toISOString().slice(0, 10)
   return toDateInput(profile.value.egcs_fo_datestart) <= today
     && toDateInput(profile.value.egcs_fo_dateend) >= today
 })
-const canCreateIntake = computed(() => Boolean(scope.value && isWritable.value && !statusDefinition.value?.isDraft
-  && isWithinIntakeWindow.value && can('funding_case', 'create', scope.value)))
+const canCreateIntake = computed(() => Boolean(scope.value && can('funding_case', 'create', scope.value)))
+const intakeAvailable = computed(() => isWritable.value && !statusDefinition.value?.isDraft && isWithinIntakeWindow.value)
 const modalOpen = ref(false)
 const pending = ref(false)
 const form = ref<OpportunityForm>({ egcs_fo_transferpaymentstreams: [], egcs_fo_applicationschema: null })
@@ -72,7 +73,11 @@ const form = ref<OpportunityForm>({ egcs_fo_transferpaymentstreams: [], egcs_fo_
  *
  */
 const edit = () => {
-  if (!profile.value) return
+  if (!profile.value || pending.value) return
+  if (!isWritable.value) {
+    toast.add({ title: toast.localized('common.warning'), description: toast.localized('workflow.action_prerequisite_unavailable'), color: 'warning' })
+    return
+  }
   form.value = {
     id: profile.value.id,
     program_id: profile.value.program_id,
@@ -120,6 +125,10 @@ const submit = async () => {
  *
  */
 const remove = async () => {
+  if (!isWritable.value) {
+    toast.add({ title: toast.localized('common.warning'), description: toast.localized('workflow.action_prerequisite_unavailable'), color: 'warning' })
+    return
+  }
   try {
     if (!await confirmDeleteRequest(`/api/funding-opportunities/${id}`)) return
     await navigateTo(localePath(appRouteLocations.fundingOpportunities()))
@@ -202,7 +211,7 @@ const breadcrumbs = computed(() => [
             </CommonSection>
           </div>
           <div v-else-if="selectedTab === 'applications'" class="space-y-5">
-            <FundingCaseIntakeApplicationsTable :opportunity-id="id" :can-create="canCreateIntake" />
+            <FundingCaseIntakeApplicationsTable :opportunity-id="id" :can-create="canCreateIntake" :create-available="intakeAvailable" />
           </div>
           <FundingOpportunitySetupRelationshipsTab v-else-if="selectedTab === 'workflows'" :opportunity-id="id" :stream-ids="profile.egcs_fo_transferpaymentstreams" :linked-setups="profile.workflow_setups" kind="workflow" :can-edit="canEdit" @refresh="refresh" />
           <FundingOpportunitySetupRelationshipsTab v-else-if="selectedTab === 'reviews'" :opportunity-id="id" :stream-ids="profile.egcs_fo_transferpaymentstreams" :linked-setups="profile.review_setups" kind="review" :can-edit="canEdit" @refresh="refresh" />

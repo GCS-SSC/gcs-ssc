@@ -1,4 +1,5 @@
 /* eslint-disable jsdoc/require-jsdoc -- Agency Recommendation Set route implementations. */
+import { randomUUID } from 'node:crypto'
 import type { H3Event } from 'h3'
 import { getRouterParam } from 'h3'
 import { PaginationSchema, TransferPaymentStreamRecommendationSetupCreateSchema, TransferPaymentStreamRecommendationSetupPatchSchema, TransferPaymentStreamRecommendationSetupMemberCreateSchema, TransferPaymentStreamRecommendationSetupMemberPatchSchema, TransferPaymentStreamRecommendationSetupSchemaCreateSchema } from '~~/shared/types/schemas'
@@ -256,9 +257,17 @@ export const deleteAgencyRecommendationMember = async (event: H3Event) => {
     const deleted = await trx.updateTable('Common_Recommendation_Setup').set({ _deleted: true }).where('id', '=', itemId)
       .where('egcs_cn_recommendationset', '=', setId).where('_deleted', '=', false).returning('id').executeTakeFirst()
     if (!deleted) return await notFound(event, 'RECOMMENDATION_SETUP_MEMBER_NOT_FOUND', 'apiErrors.transfer_payment.recommendation_schema_not_found')
-    const remaining = await trx.selectFrom('Common_Recommendation_Setup').select('id')
+    const remaining = await trx.selectFrom('Common_Recommendation_Setup').select(['id', 'egcs_cn_order'])
       .where('egcs_cn_recommendationset', '=', setId).where('_deleted', '=', false).orderBy('egcs_cn_order', 'asc').forUpdate().execute()
-    for (const [index, member] of remaining.entries()) await trx.updateTable('Common_Recommendation_Setup').set({ egcs_cn_order: index + 1 }).where('id', '=', String(member.id)).execute()
+    // Large signed-order sets must end at SMALLINT max rather than overflow positive orders.
+    const firstOrder = Math.min(1, 32768 - remaining.length)
+    // Move down from the start, then up from the end, so occupied orders are freed first.
+    for (const [index, member] of remaining.entries()) {
+      if (member.egcs_cn_order > index + firstOrder) await trx.updateTable('Common_Recommendation_Setup').set({ egcs_cn_order: index + firstOrder }).where('id', '=', String(member.id)).execute()
+    }
+    for (const [index, member] of Array.from(remaining.entries()).reverse()) {
+      if (member.egcs_cn_order < index + firstOrder) await trx.updateTable('Common_Recommendation_Setup').set({ egcs_cn_order: index + firstOrder }).where('id', '=', String(member.id)).execute()
+    }
     return { success: true }
   })
 }
@@ -290,7 +299,7 @@ export const createAgencyRecommendationMemberSchema = async (event: H3Event) => 
       const duplicate = await trx.selectFrom('Common_Recommendation_Setup').select('id').where('egcs_cn_recommendationset', '=', setId)
         .where('egcs_cn_order', '=', body.egcs_cn_order).where('_deleted', '=', false).executeTakeFirst()
       if (duplicate) return await badRequest(event, 'DUPLICATE_RECOMMENDATION_SETUP_ORDER', 'apiErrors.transfer_payment.duplicate_recommendation_setup_order')
-      const suffix = `${setId}-${body.egcs_cn_order}`
+      const suffix = randomUUID()
       const schema = await trx.insertInto('Common_Recommendation_Schema').values({ egcs_cn_agency: agencyId,
         egcs_cn_name_en: `Untitled recommendation ${suffix}`, egcs_cn_name_fr: `Recommandation sans titre ${suffix}`,
         egcs_cn_result: {}, egcs_cn_recommendationschema: EMPTY_RECOMMENDATION_DEFINITION, _deleted: false }).returning('id').executeTakeFirstOrThrow()

@@ -16,7 +16,7 @@ const emit = defineEmits<{ saved: [] }>()
 const open = defineModel<boolean>('open', { default: false })
 const state = defineModel<Partial<TransferPaymentMonitorTypeItem>>('state', { required: true })
 
-const { transferPaymentId, streamId, agencyId, captureSession, closeSession } = defineProps<{
+const { transferPaymentId, streamId, captureSession, closeSession } = defineProps<{
   transferPaymentId: string
   streamId: string
   agencyId: string
@@ -70,7 +70,16 @@ const onSubmit = async (event: FormSubmitEvent<z.infer<typeof schema>>) => {
   <UModal v-model:open="open" :title="t('transfer_payment.monitor_type_create')">
     <template #body>
       <UForm :state="state" :validate="validate" class="space-y-4" @submit="onSubmit">
-        <TransferPaymentFieldsTransferPaymentMonitorTypeFields :model="state" :lookup-url="`/api/agency/${agencyId}/monitor-types`" />
+        <UFormField :label="t('transfer_payment.monitor_types')" name="egcs_tp_agencymonitortype" required>
+          <CommonServerLookupSelect
+            v-model="state.egcs_tp_agencymonitortype"
+            :fetch-url="`/api/transfer-payments/${transferPaymentId}/streams/${streamId}/lookups/monitor-types`"
+            :include-deleted-query="false"
+            selected-values-query-key="ids"
+            value-key="id"
+            label-en-key="egcs_ay_name_en"
+            label-fr-key="egcs_ay_name_fr" />
+        </UFormField>
 
         <div class="flex justify-end gap-2">
           <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="open = false" />

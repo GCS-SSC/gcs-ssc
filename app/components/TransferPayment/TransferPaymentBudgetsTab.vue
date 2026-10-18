@@ -178,19 +178,20 @@ const deleteBudget = async (budget: TransferPaymentBudgetRow) => {
       <template #actions-cell="{ row }">
         <div class="flex items-center gap-2">
           <CommonActionButton
+            v-if="canUpdateChild"
             icon="i-lucide-pencil"
             color="neutral"
             variant="ghost"
             size="sm"
-            :disabled="!canUpdateChild || !agencyId"
+            :disabled="!agencyId"
             :aria-label="t('common.edit_named', { name: getBudgetName(row.original) })"
             @click="openUpdateBudget(row.original)" />
           <CommonActionButton
+            v-if="canDeleteChild"
             icon="i-lucide-trash"
             color="error"
             variant="ghost"
             size="sm"
-            :disabled="!canDeleteChild"
             :aria-label="t('common.delete_named', { name: getBudgetName(row.original) })"
             @click="deleteBudget(row.original)" />
         </div>

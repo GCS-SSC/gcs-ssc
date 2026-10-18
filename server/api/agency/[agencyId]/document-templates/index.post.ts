@@ -4,7 +4,7 @@ import { assertActiveAgencyProfile, withActiveAgencyMutationTransaction } from '
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import { cleanupTemplateUploads, createAgencyDocumentTemplate } from '~~/server/utils/document-template-routes'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
-import type { StoredFileRecord } from '~~/server/utils/file-storage'
+import type { StoredFileUpload } from '~~/server/utils/file-storage'
 
 export default defineEventHandler(async event => {
   const agencyId = getRouterParam(event, 'agencyId')
@@ -12,7 +12,7 @@ export default defineEventHandler(async event => {
   if (!isPositivePostgresBigintText(agencyId)) return await notFound(event, 'AGENCY_NOT_FOUND', 'apiErrors.agency.not_found')
   await authorize(event, 'agency', 'update', { type: 'agency', agencyId })
   await assertActiveAgencyProfile(event, agencyId)
-  const uploads: StoredFileRecord[] = []
+  const uploads: StoredFileUpload[] = []
   try {
     return await withActiveAgencyMutationTransaction(event, agencyId, async trx =>
       await createAgencyDocumentTemplate(event, trx, agencyId, stored => uploads.push(stored))

@@ -92,6 +92,33 @@ export default defineEventHandler(async event => {
         authorizedCollectionIds.push(String(candidate.id))
       }
     }
+    // Group participation exposes minimal identity, not parent read permission.
+    // Resolve the live owner before counts/pages for Review-backed work too.
+    const reviewCandidates = await sql<{ id: string }>`
+      SELECT DISTINCT candidate.review_id::text id FROM (
+        SELECT review.id review_id, review.egcs_cn_group group_id, review.egcs_cn_groupclaimedby claimed_by
+        FROM "Common_Review" review WHERE NOT review._deleted AND review.egcs_cn_group IS NOT NULL
+        UNION ALL
+        SELECT reviewer.egcs_cn_entityid, reviewer.egcs_cn_group, reviewer.egcs_cn_user
+        FROM "Common_Additional_Reviewers" reviewer
+        WHERE NOT reviewer._deleted AND reviewer.egcs_cn_group IS NOT NULL AND reviewer.egcs_cn_completedat IS NULL
+        UNION ALL
+        SELECT slip.egcs_cn_entityid, approval.egcs_cn_assignedgroup, approval.egcs_cn_assigneduser
+        FROM "Common_Approval" approval
+        JOIN "Common_Routing_Slip" slip ON slip.id = approval.egcs_cn_routingslip AND NOT slip._deleted
+        WHERE slip.egcs_cn_entitytype = 'commonreview' AND approval.egcs_cn_assignedgroup IS NOT NULL
+          AND approval.egcs_cn_approvalvalue IS NULL
+      ) candidate
+      JOIN "Common_Group" candidate_group ON candidate_group.id = candidate.group_id AND NOT candidate_group._deleted
+      LEFT JOIN "Common_Group_Member" member ON member.egcs_cn_group = candidate.group_id
+        AND member.egcs_cn_user = ${actor.id}::bigint AND NOT member._deleted
+      WHERE (${query.view} = 'mine' AND candidate.claimed_by = ${actor.id}::bigint)
+        OR (${query.view} = 'available' AND candidate.claimed_by IS NULL AND member.id IS NOT NULL)
+    `.execute(trx)
+    const liveReviewIds: string[] = []
+    for (const candidate of reviewCandidates.rows) {
+      if (await resolveEntityAssignmentOwner(trx, 'commonreview', candidate.id)) liveReviewIds.push(candidate.id)
+    }
     const grants = auth.userAbilities.getGrants()
     /**
      * Builds the parent access predicate for one authorization subject and action.
@@ -358,6 +385,7 @@ export default defineEventHandler(async event => {
       WHERE ((${query.view} = 'mine' AND work.claimed_by = ${actor.id}::bigint)
         OR (${query.view} = 'available' AND work.claimed_by IS NULL AND member.egcs_cn_group IS NOT NULL))
         AND (memo_source.work_id IS NULL OR (credit_memo.id IS NOT NULL AND memo_agency.id IS NOT NULL AND proponent.id IS NOT NULL))
+        AND (work.review_id IS NULL OR work.review_id = ANY(${liveReviewIds}::bigint[]))
         AND (work.kind <> 'recommendation' OR work.id = ANY(${authorizedRecommendationIds}::bigint[]))
         AND (work.kind <> 'data_collection' OR work.id = ANY(${authorizedCollectionIds}::bigint[]))
         AND (work.kind <> 'intake' OR (${query.view} = 'mine' AND ${intakeRead})

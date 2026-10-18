@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { onUnmounted, watch } from 'vue'
+import { useAgreementChildActionPrerequisites } from '~/composables/useAgreementChildActionPrerequisites'
 import type { FundingCaseAgreementAddressForm } from '~~/shared/types/funding-case-agreement-ui'
 import { FundingCaseAgreementAddressCreateSchema } from '~~/shared/types/schemas'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
@@ -11,6 +13,43 @@ const { agreementId, canCreate, canUpdate, canDelete } = defineProps<{
 }>()
 
 const { t } = useI18n()
+const { check } = useAgreementChildActionPrerequisites(() => ({ kind: 'agreement', agreementId }))
+const confirmDelete = useDeleteConfirm()
+let actionGeneration = 0
+watch(() => [agreementId, canCreate, canUpdate, canDelete], () => {
+  actionGeneration += 1
+}, { flush: 'sync' })
+onUnmounted(() => {
+  actionGeneration += 1
+})
+const permitted = (action: 'create' | 'update' | 'delete') => action === 'create' ? canCreate : action === 'update' ? canUpdate : canDelete
+/**
+ * Checks current action prerequisites before opening the editor.
+ * @param action Requested editor action.
+ * @param _original Original record supplied by the editor.
+ * @param current Whether the captured editor context remains current.
+ * @returns Whether the editor may open.
+ */
+const beforeOpen = (action: 'create' | 'update', _original: unknown, current: () => boolean) => {
+  const generation = actionGeneration
+  const proceed = () => generation === actionGeneration && current() && permitted(action)
+  return proceed() ? check(action, 'address', proceed) : Promise.resolve(false)
+}
+const beforeSave = (_state: unknown, original: unknown, current: () => boolean) => beforeOpen(original ? 'update' : 'create', original, current)
+/**
+ * Checks current delete prerequisites before and after confirmation.
+ * @param _id Record identifier supplied by the table.
+ * @param current Whether the captured delete context remains current.
+ * @returns Whether deletion may proceed.
+ */
+const beforeDelete = async (_id: string, current: () => boolean) => {
+  const generation = actionGeneration
+  const proceed = () => generation === actionGeneration && current() && permitted('delete')
+  if (!proceed() || !await check('delete', 'address', proceed)) return false
+  if (!await confirmDelete({ description: t('agency.delete_confirm') }) || !proceed()) return false
+  return await check('delete', 'address', proceed) && proceed()
+}
+
 const { items: jurisdictionItems } = useEnumSelectOptions({ name: 'jurisdiction' })
 
 const columns: TableColumnInput<{ id: string } & Record<string, unknown>>[] = [
@@ -95,6 +134,9 @@ const getAddressTypeLookupUrl = (state: FundingCaseAgreementAddressForm) => {
     :can-create="canCreate"
     :can-update="canUpdate"
     :can-delete="canDelete"
+    :before-open="beforeOpen"
+    :before-save="beforeSave"
+    :before-delete="beforeDelete"
     :schema="FundingCaseAgreementAddressCreateSchema"
     :columns="columns"
     :bilingual-columns="bilingualColumns"

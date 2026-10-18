@@ -82,17 +82,13 @@ const CONSTRAINT_ERROR_MAP: Record<string, ConstraintErrorMapping> = {
     code: 'TRANSFER_PAYMENT_DUPLICATE_STREAM_AGREEMENT_SUBTYPE',
     key: 'apiErrors.transfer_payment.duplicate_stream_agreement_subtype'
   },
-  tp_idx_monitortypetransferpaymentstreamnameen: {
+  tp_idx_monitortypetransferpaymentstreamagencytype: {
     code: 'TRANSFER_PAYMENT_DUPLICATE_STREAM_MONITOR_TYPE',
     key: 'apiErrors.transfer_payment.duplicate_stream_monitor_type'
   },
   tp_idx_commitmenttypetransferpaymentstreamagencytype: {
     code: 'TRANSFER_PAYMENT_DUPLICATE_STREAM_COMMITMENT_TYPE',
     key: 'apiErrors.transfer_payment.duplicate_stream_commitment_type'
-  },
-  tp_idx_monitortypetransferpaymentstreamnamefr: {
-    code: 'TRANSFER_PAYMENT_DUPLICATE_STREAM_MONITOR_TYPE',
-    key: 'apiErrors.transfer_payment.duplicate_stream_monitor_type'
   },
   tp_idx_streamriskratingtransferpaymentstreamriskscore: {
     code: 'TRANSFER_PAYMENT_DUPLICATE_STREAM_RISK_RATING',

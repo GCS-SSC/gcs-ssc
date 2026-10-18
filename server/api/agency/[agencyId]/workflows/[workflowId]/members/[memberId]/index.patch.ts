@@ -60,7 +60,7 @@ export default defineEventHandler(async event => {
       }
     }
     const updated = Object.keys(values).length === 0
-      ? current
+      ? await trx.selectFrom('Common_Workflow_Setup_Member').selectAll().where('id', '=', memberId).executeTakeFirstOrThrow()
       : await trx.updateTable('Common_Workflow_Setup_Member').set(values).where('id', '=', memberId)
           .where('egcs_cn_workflowsetup', '=', workflowSetupId).where('_deleted', '=', false).returningAll().executeTakeFirstOrThrow()
     if (owners && !await replaceWorkflowSetupMemberOwners(trx, updated, owners)) {

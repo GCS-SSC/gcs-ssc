@@ -21,11 +21,33 @@ onBeforeUnmount(() => {
 })
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
 const { showError } = useApiErrorToast()
+const toast = useLocalizedToast()
+const warnPrerequisite = () => toast.add({ title: toast.localized('common.warning'), description: toast.localized('workflow.action_prerequisite_unavailable'), color: 'warning' })
 const { search, pagination, items, totalRecords, status, retry, refresh, response } = useResourceTable<ProponentCreditMemoRow>({
   fetchUrl: computed(() => `/api/applicant-recipients/${applicantRecipientId}/credit-memos`)
 })
 const canCreate = computed(() => status.value === 'success' && profile !== null
-  && (response.value as { egcs_fc_cancreate?: boolean } | undefined)?.egcs_fc_cancreate === true)
+  && (response.value as { egcs_fc_cancreate_role?: boolean } | undefined)?.egcs_fc_cancreate_role === true)
+const createPending: Ref<boolean> = ref(false)
+/** Refreshes creation prerequisites without discarding the visible role action. */
+const openCreate = async () => {
+  if (createPending.value) return
+  const ownerId = applicantRecipientId
+  createPending.value = true
+  try {
+    const result = await $fetch<{ egcs_fc_cancreate?: boolean }, string>(`/api/applicant-recipients/${ownerId}/credit-memos`, { query: { page: 1, limit: 1 } })
+    if (disposed || ownerId !== applicantRecipientId) return
+    if (!result.egcs_fc_cancreate) {
+      warnPrerequisite()
+      return
+    }
+    createOpen.value = true
+  } catch (error: unknown) {
+    if (!disposed && ownerId === applicantRecipientId) showError(error)
+  } finally {
+    createPending.value = false
+  }
+}
 /**
  * Retains both Proponent names when the modal changes language.
  * @param language - Requested name language.
@@ -55,13 +77,26 @@ const created = async (id: string, proponentId: string) => {
  * @param memo - Independently authorized collection row.
  */
 const deleteMemo = async (memo: ProponentCreditMemoRow) => {
-  if (memo.egcs_fc_kind !== 'cash' || !memo.egcs_fc_candelete || deletingId.value || status.value !== 'success') return
+  if (memo.egcs_fc_kind !== 'cash' || !memo.egcs_fc_candelete_role || deletingId.value || status.value !== 'success') return
   const ownerId = applicantRecipientId
   deletingId.value = memo.id
   try {
+    let page = 1
+    let current: ProponentCreditMemoRow | undefined
+    while (true) {
+      const result = await $fetch<{ items: ProponentCreditMemoRow[]; total: number }, string>(`/api/applicant-recipients/${ownerId}/credit-memos`, { query: { page, limit: 100, search: memo.id } })
+      if (disposed || ownerId !== applicantRecipientId) return
+      current = result.items.find(item => item.id === memo.id && item.egcs_fc_kind === 'cash')
+      if (current || page * 100 >= result.total || result.items.length === 0) break
+      page += 1
+    }
+    if (!current || current.egcs_fc_kind !== 'cash' || !current.egcs_fc_candelete) {
+      warnPrerequisite()
+      return
+    }
     const deleted = await confirmDeleteRequest(`/api/account-receivable-credit-memos/${memo.id}`, {
       shouldProceed: () => !disposed && applicantRecipientId === ownerId && status.value === 'success' && items.value.some(item => item.id === memo.id
-        && item.egcs_fc_kind === 'cash' && item.egcs_fc_candelete)
+        && item.egcs_fc_kind === 'cash' && item.egcs_fc_candelete_role)
     })
     if (deleted && !disposed && applicantRecipientId === ownerId) await refresh()
   } catch (error: unknown) {
@@ -107,7 +142,7 @@ const memoDetailPath = (memo: ProponentCreditMemoRow): string | undefined => {
         :data="items" :columns="columns" :total-records="totalRecords"
         :loading="status === 'pending'" :request-status="status" :show-button="canCreate"
         :button-label="t('account_receivable.create_credit_memo')"
-        :search-placeholder="t('account_receivable.credit_memos_search')" @retry="retry" @add="createOpen = true">
+        :search-placeholder="t('account_receivable.credit_memos_search')" @retry="retry" @add="openCreate">
         <template #egcs_fc_creditmemoreference-cell="{ row }">
           <ULink
             v-if="memoDetailPath(row.original)" :to="memoDetailPath(row.original)"
@@ -166,7 +201,7 @@ const memoDetailPath = (memo: ProponentCreditMemoRow): string | undefined => {
               :aria-label="`${t('common.view_details')}: ${row.original.egcs_fc_creditmemoreference}`"
               :to="memoDetailPath(row.original)" />
             <CommonActionButton
-              v-if="row.original.egcs_fc_kind === 'cash' && row.original.egcs_fc_candelete"
+              v-if="row.original.egcs_fc_kind === 'cash' && row.original.egcs_fc_candelete_role"
               icon="i-lucide-trash" color="error" variant="ghost"
               :aria-label="`${t('common.delete')}: ${row.original.egcs_fc_creditmemoreference}`"
               :loading="deletingId === row.original.id" :disabled="deletingId !== null || status !== 'success'"

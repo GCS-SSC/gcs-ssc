@@ -142,7 +142,7 @@ defineExpose({
       </div>
 
       <div class="border-default flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <div class="text-xs font-bold tracking-widest text-zinc-400 uppercase">
+        <div class="text-xs font-bold tracking-widest text-zinc-600 uppercase dark:text-zinc-400">
           <slot name="footer-left">
             {{ totalRecords }} {{ t('common.records') }}
           </slot>

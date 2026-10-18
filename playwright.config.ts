@@ -35,7 +35,10 @@ export default defineConfig({
     ? [['list'], [uiActionReporterPath]]
     : 'list',
   testDir: './tooling/gcs-ssc/tests/e2e',
-  testIgnore: process.env.E2E_REVIEW_SCRATCH === '1' ? [] : ['**/*.tmp.spec.ts'],
+  testIgnore: [
+    ...(process.env.E2E_REVIEW_SCRATCH === '1' ? [] : ['**/*.tmp.spec.ts']),
+    ...(process.env.GCS_E2E_PROFILE_FIXTURE === '1' ? [] : ['**/agreement-extension-persistence.spec.ts'])
+  ],
   // Constrain local resource usage by default; can be overridden per run.
   workers: toWorkers(process.env.PLAYWRIGHT_WORKERS, 1),
   fullyParallel: false,

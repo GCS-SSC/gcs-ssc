@@ -125,20 +125,22 @@ const canDeleteProfile = (profile: ApplicantRecipientProfileRow) => {
     <template #actions-cell="{ row }">
       <div class="flex items-center gap-2">
         <CommonActionButton
+          v-if="canUpdateProfile(row.original)"
           icon="i-lucide-edit-3"
           color="neutral"
           variant="ghost"
           size="sm"
           :aria-label="`${t('common.edit')}: ${getDisplayName(row.original)}`"
-          :disabled="!canUpdateProfile(row.original)"
+          :disabled="loading || requestStatus === 'pending'"
           @click="emit('edit', row.original)" />
         <CommonActionButton
+          v-if="canDeleteProfile(row.original)"
           icon="i-lucide-trash"
           color="error"
           variant="ghost"
           size="sm"
           :aria-label="`${t('common.delete')}: ${getDisplayName(row.original)}`"
-          :disabled="!canDeleteProfile(row.original)"
+          :disabled="loading || requestStatus === 'pending'"
           @click="emit('delete', row.original)" />
       </div>
     </template>

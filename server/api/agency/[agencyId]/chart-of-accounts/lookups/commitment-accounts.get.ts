@@ -9,7 +9,7 @@ import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { formatAccountingDimensions } from '~~/shared/utils/accounting-dimensions'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
-import { badRequest, notFound } from '~~/server/utils/api-errors'
+import { badRequest, notFound, throwApiError } from '~~/server/utils/api-errors'
 
 const QuerySchema = PaginationSchema.extend({
   fiscalYearId: PositivePostgresBigintIdSchema,
@@ -33,10 +33,14 @@ export default defineEventHandler(async event => {
     if (input.search) query = query.where(sql<boolean>`egcs_ay_accountingdimensions::text ILIKE ${`%${escapeLikePattern(input.search)}%`}`)
     const count = await query.clearSelect().select(sql<string>`count(*)::text`.as('total')).executeTakeFirstOrThrow()
     const accounts = await query.orderBy('id').limit(input.limit).offset((input.page - 1) * input.limit).execute()
-    const items = accounts.map(account => {
-      const dimensions = z.array(TransferPaymentStreamChartOfAccountDimensionSchema).parse(account.egcs_ay_accountingdimensions)
-      return { id: String(account.id), label_en: formatAccountingDimensions(dimensions, 'en'), label_fr: formatAccountingDimensions(dimensions, 'fr') }
-    })
+    const items: Array<{ id: string; label_en: string; label_fr: string }> = []
+    for (const account of accounts) {
+      const dimensions = z.array(TransferPaymentStreamChartOfAccountDimensionSchema).safeParse(account.egcs_ay_accountingdimensions)
+      if (!dimensions.success) return await throwApiError(event, {
+        statusCode: 500, code: 'AGENCY_CHART_DIMENSIONS_INVALID', key: 'common.unknown_error'
+      })
+      items.push({ id: String(account.id), label_en: formatAccountingDimensions(dimensions.data, 'en'), label_fr: formatAccountingDimensions(dimensions.data, 'fr') })
+    }
     return { items, total: Number(count.total), page: input.page, limit: input.limit }
   })
 })

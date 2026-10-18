@@ -54,6 +54,7 @@ export default defineEventHandler(async event => {
         .innerJoin('Transfer_Payment_Amendment_Subtype', 'Transfer_Payment_Amendment_Subtype.id', 'Transfer_Payment_Amendment_Subtype_Type.egcs_tp_amendmentsubtype')
         .select('Transfer_Payment_Amendment_Subtype_Type.id')
         .where('Transfer_Payment_Amendment_Subtype_Type.egcs_tp_amendmenttype', '=', amendmentTypeId)
+        .where('Transfer_Payment_Amendment_Subtype_Type._deleted', '=', false)
         .where('Transfer_Payment_Amendment_Subtype.egcs_tp_transferpaymentstream', '=', streamId)
         .where('Transfer_Payment_Amendment_Subtype._deleted', '=', false)
         .orderBy('Transfer_Payment_Amendment_Subtype_Type.id', 'asc')

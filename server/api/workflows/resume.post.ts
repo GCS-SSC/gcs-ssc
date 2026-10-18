@@ -1,12 +1,12 @@
 import type { Transaction } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
-import { forbidden, notFound } from '~~/server/utils/api-errors'
+import { forbidden, notFound, throwApiError } from '~~/server/utils/api-errors'
 import { resolveCompletionRuntimeEntityFromEntity, respondCompletionRuntimeEntityNotFound } from '~~/server/utils/completion-runtime'
 import { resolveCurrentCommonUser } from '~~/server/utils/additional-reviewer-runtime'
-import { canManageEntityAssignments } from '~~/server/utils/entity-assignment'
+import { canManageEntityAssignments, canManageEntityAssignmentsWithContext } from '~~/server/utils/entity-assignment'
 import {
-  canAuthorizeReviewRuntimeAction,
+  canAuthorizeWorkflowOwnerRecovery,
   executeFreshAuthorizedReviewRuntimeWrite,
   executeFreshAuthorizedWorkflowOwnerRecovery
 } from '~~/server/utils/review-runtime-access'
@@ -19,8 +19,9 @@ import {
   resolveExtensionLifecycleRuntime
 } from '~~/server/utils/extension-lifecycle-runtime'
 import { canManageExtensionEntityAssignments } from '~~/server/utils/extension-entity-assignment'
+import { requireQualifiedRuntimeLockEvidence } from '~~/server/utils/qualified-runtime-transaction'
 
-// eslint-disable-next-line local/require-authorize -- authorization is selected below between the fresh casework and assignment-management transaction wrappers
+// eslint-disable-next-line local/require-authorize -- ordinary work authority is required before fresh recovery authorization and actor/redirect checks
 export default defineEventHandler(async event => {
   const body = await readValidatedBodyI18n(event, WorkflowResumeSchema)
   const extensionRuntime = body.entityType.includes(':')
@@ -32,6 +33,7 @@ export default defineEventHandler(async event => {
   if (extensionRuntime) await authorizeExtensionLifecycleRead(event, extensionRuntime)
   const actor = await resolveCurrentCommonUser(event)
   if (!actor) return await notFound(event, 'COMMON_USER_NOT_FOUND', 'apiErrors.admin_common.not_found')
+  if (!await canAuthorizeWorkflowOwnerRecovery(event, context, extensionRuntime)) return await forbidden(event)
   /**
    * Revalidates the paused run and resumes it inside the selected fresh-authorization transaction.
    * @param trx Locked fresh-authorization transaction.
@@ -81,12 +83,27 @@ export default defineEventHandler(async event => {
           extensionRuntime.lockedEntity.owner.owner === 'agreement' ? 'fundingcaseagreement' : 'applicantrecipient',
           extensionRuntime.lockedEntity.owner.ownerId
         )
-    return await executeExtensionLifecycleWrite(event, extensionRuntime, async (trx) => await resume(trx, administrative))
+    return await executeExtensionLifecycleWrite(event, extensionRuntime, async (trx, current) => {
+      if (current.lockedEntity.status.terminal) {
+        return await throwApiError(event, {
+          statusCode: 409,
+          code: 'EXTENSION_LIFECYCLE_ENTITY_LOCKED',
+          key: 'apiErrors.request.invalid_status'
+        })
+      }
+      const evidence = requireQualifiedRuntimeLockEvidence(trx, current.context.entityType, current.context.entityId)
+      const owner = current.lockedEntity.owner
+      const freshAdministrative = administrative && (current.loaded.definition.assignmentMode === 'independent' && owner.owner === 'proponent'
+        ? evidence.auth.userAbilities.canManageAssignments('applicant_recipient', { type: 'agency', agencyId: owner.agencyId })
+        : await canManageEntityAssignmentsWithContext(
+            evidence.auth, trx, owner.owner === 'agreement' ? 'fundingcaseagreement' : 'applicantrecipient', owner.ownerId
+          ))
+      return await resume(trx, freshAdministrative)
+    })
   }
   if (isAssignableEntityType(context.entityType)
     && await canManageEntityAssignments(event, context.entityType, context.entityId)) {
     return await executeFreshAuthorizedWorkflowOwnerRecovery(event, context, async trx => await resume(trx, true))
   }
-  if (!await canAuthorizeReviewRuntimeAction(event, 'save_assessment', context)) return await forbidden(event)
   return await executeFreshAuthorizedReviewRuntimeWrite(event, context, async trx => await resume(trx, false))
 })

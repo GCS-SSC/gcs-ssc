@@ -8,7 +8,7 @@ import {
   resolveAgencyValidEntityAssigneeIdsWithDb,
   resolveEntityAssignmentOwner
 } from '~~/server/utils/entity-assignment'
-import { canAuthorizeReviewRuntimeAction } from '~~/server/utils/review-runtime-access'
+import { canAuthorizeWorkflowOwnerRecovery } from '~~/server/utils/review-runtime-access'
 import { readWorkflowRuntimeConfiguration } from '~~/server/utils/workflow-runtime'
 import { WorkflowOwnerCandidatesQuerySchema } from '~~/shared/types/schemas/workflow'
 import { isAssignableEntityType } from '~~/shared/utils/entity-assignments'
@@ -21,7 +21,7 @@ import { resolveExtensionEligibleAssigneeIds } from '~~/server/utils/extension-l
 import type { AssignableEntityType } from '~~/shared/types/database'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
-// eslint-disable-next-line local/require-authorize -- delegates to exact casework or independent assignment-management authorization below
+// eslint-disable-next-line local/require-authorize -- delegates to ordinary exact work authority plus actor/redirect authorization below
 export default defineEventHandler(async event => {
   const query = await getValidatedQueryI18n(event, WorkflowOwnerCandidatesQuerySchema)
   const extensionRuntime = query.entityType?.includes(':')
@@ -57,9 +57,7 @@ export default defineEventHandler(async event => {
     || blockers.some(blocker => String(blocker.egcs_cn_triggeredby) === actor.id)
   const canRedirect = blockers.every(blocker => configuration.members
     .find(member => member.memberId === String(blocker.egcs_cn_workflowsetupmember))?.allowOwnerRedirect)
-  const canWork = ordinaryActor && canRedirect && (extensionRuntime
-    ? true
-    : await canAuthorizeReviewRuntimeAction(event, 'save_assessment', context))
+  const hasWorkAuthority = await canAuthorizeWorkflowOwnerRecovery(event, context, extensionRuntime)
   const canManage = extensionRuntime
     ? extensionRuntime.loaded.definition.assignmentMode === 'independent'
       ? await canManageExtensionEntityAssignments(event, extensionRuntime)
@@ -69,7 +67,7 @@ export default defineEventHandler(async event => {
           extensionRuntime.lockedEntity.owner.ownerId
         )
     : await canManageEntityAssignments(event, context.entityType as AssignableEntityType, context.entityId)
-  if (!canWork && !canManage) return await forbidden(event)
+  if (!hasWorkAuthority || (!canManage && !(ordinaryActor && canRedirect))) return await forbidden(event)
   const owner = extensionRuntime
     ? resolveExtensionEntityAssignmentOwner(extensionRuntime)
     : await resolveEntityAssignmentOwner(event.context.$db, context.entityType as AssignableEntityType, context.entityId)

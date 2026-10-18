@@ -16,8 +16,10 @@ export default defineEventHandler(async event => {
     .innerJoin('Funding_Case_Agreement_Profile as a', 'a.id', 'payment.egcs_fc_fundingagreement')
     .innerJoin('Transfer_Payment_Stream as s', 's.id', 'a.egcs_fc_transferpaymentstream')
     .innerJoin('Transfer_Payment_Profile as p', 'p.id', 's.egcs_tp_transferpaymentprofile')
+    .innerJoin('Agency_Profile as agency', 'agency.id', 'p.egcs_tp_agency')
     .innerJoin('Common_Status as status', 'status.id', 'payment.egcs_fc_status')
     .where('payment._deleted', '=', false).where('a._deleted', '=', false).where('s._deleted', '=', false).where('p._deleted', '=', false)
+    .where('agency._deleted', '=', false)
     .where('status._deleted', '=', false).where('status.egcs_cn_terminal', '=', true)
     .where(journalVoucherPaymentIsFinal('payment'))
   for (const grants of [read, create]) {

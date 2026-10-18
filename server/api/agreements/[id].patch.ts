@@ -1,5 +1,6 @@
 import { authorize } from '~~/server/utils/authorize'
 import { resolveAgreementScopeContext } from '~~/server/utils/agreement'
+import { handleExtensionCreateOperationError } from '~~/server/utils/extensions'
 import { patchAgreementProfile } from '~~/server/utils/agreement-profile-routes'
 
 export default defineEventHandler(async event => {
@@ -18,5 +19,9 @@ export default defineEventHandler(async event => {
   // Authenticate at the route boundary; authorization is evaluated against the locked current scope.
   await authorize(event, 'agreement', 'update', async () => ({ bypass: true }))
 
-  return await patchAgreementProfile(event, db, id, existingContext)
+  try {
+    return await patchAgreementProfile(event, db, id, existingContext)
+  } catch (error: unknown) {
+    return await handleExtensionCreateOperationError(event, error)
+  }
 })

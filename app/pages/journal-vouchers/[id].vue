@@ -36,8 +36,13 @@ type FormState = {
   egcs_fc_allocations: JournalVoucherAllocationDraft[]
 }
 const state: Ref<FormState | null> = ref(null)
-watch(voucher, current => {
-  if (!current) return
+const savedState: Ref<string> = ref('')
+const dirty = computed(() => state.value !== null && JSON.stringify(state.value) !== savedState.value)
+/**
+ * Restores the accepted accounting entry and its saved draft baseline.
+ * @param current - Retained entry returned by the server.
+ */
+const hydrate = (current: JournalVoucherDetail) => {
   state.value = {
     egcs_fc_requesteddate: current.egcs_fc_requesteddate.slice(0, 10),
     egcs_fc_narrative_en: current.egcs_fc_narrative_en, egcs_fc_narrative_fr: current.egcs_fc_narrative_fr,
@@ -48,6 +53,11 @@ watch(voucher, current => {
       egcs_fc_agreementcodingmatched: line.egcs_fc_agreementcodingmatched
     }))
   }
+  savedState.value = JSON.stringify(state.value)
+}
+watch(voucher, current => {
+  if (!current) return
+  if (!dirty.value || !current.egcs_fc_canedit) hydrate(current)
 }, { immediate: true })
 const tabs = [
   { key: 'journal_voucher.accounting_entry', value: 'entry', icon: 'i-lucide-book-open-check' },
@@ -135,7 +145,8 @@ const refreshPage = async () => {
  *
  */
 const save = async () => {
-  if (!state.value || saving.value) return
+  if (!state.value || !voucher.value?.egcs_fc_canedit || saving.value) return
+  const submitted = JSON.stringify(state.value)
   saving.value = true
   try {
     const payload = { ...state.value, egcs_fc_allocations: state.value.egcs_fc_allocations.map(line => ({
@@ -143,6 +154,7 @@ const save = async () => {
     })) }
     await sendJson(`/api/journal-vouchers/${id}`, 'PATCH', payload)
     await refreshPage()
+    if (!error.value && voucher.value && JSON.stringify(state.value) === submitted) hydrate(voucher.value)
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.updated_success'), color: 'success' })
   } catch (failure) {
     showError(failure)
@@ -245,14 +257,14 @@ const applyAllocation = (line: JournalVoucherAllocationDraft) => {
                 </dl>
                 <div class="grid gap-6 md:grid-cols-2">
                   <UFormField name="egcs_fc_requesteddate" :label="t('journal_voucher.requested_date')">
-                    <CommonDatePicker v-model="state.egcs_fc_requesteddate" :disabled="!voucher.egcs_fc_canedit" />
+                    <CommonDatePicker v-model="state.egcs_fc_requesteddate" :disabled="!voucher.egcs_fc_canedit || saving" />
                   </UFormField>
                   <div class="grid gap-6 md:col-span-2 md:grid-cols-2">
                     <UFormField name="egcs_fc_narrative_en" :label="t('journal_voucher.narrative_en')">
-                      <CommonTextarea v-model="state.egcs_fc_narrative_en" class="w-full" :rows="3" :disabled="!voucher.egcs_fc_canedit" />
+                      <CommonTextarea v-model="state.egcs_fc_narrative_en" class="w-full" :rows="3" :disabled="!voucher.egcs_fc_canedit || saving" />
                     </UFormField>
                     <UFormField name="egcs_fc_narrative_fr" :label="t('journal_voucher.narrative_fr')">
-                      <CommonTextarea v-model="state.egcs_fc_narrative_fr" class="w-full" :rows="3" :disabled="!voucher.egcs_fc_canedit" />
+                      <CommonTextarea v-model="state.egcs_fc_narrative_fr" class="w-full" :rows="3" :disabled="!voucher.egcs_fc_canedit || saving" />
                     </UFormField>
                   </div>
                 </div>
@@ -349,7 +361,10 @@ const applyAllocation = (line: JournalVoucherAllocationDraft) => {
               <CommonSaveButton v-if="voucher.egcs_fc_canedit" :label="t('common.save')" :loading="saving" :disabled="saving" />
             </div>
           </UForm>
-          <CommonCompletionPanel v-else-if="selectedTab === 'completion'" entity-type="fundingcasejournalvoucher" :entity-id="id" :can-complete="voucher.egcs_fc_canwork && !voucher.isCompleted" :can-work-workflow="voucher.egcs_fc_canwork" :show-header="false" :show-divider="false" title-key="journal_voucher.completion.title" description-key="journal_voucher.completion.description" status-complete-key="journal_voucher.completion.status_complete" status-locked-key="journal_voucher.completion.status_locked" comment-placeholder-key="journal_voucher.completion.comment_placeholder" complete-action-key="journal_voucher.completion.complete" completed-success-key="journal_voucher.completion.completed_success" :refresh-key="refreshKey" @changed="refreshPage" />
+          <div v-else-if="selectedTab === 'completion'" class="space-y-4">
+            <UAlert v-if="dirty" color="warning" :title="t('journal_voucher.save_before_completion')" />
+            <CommonCompletionPanel entity-type="fundingcasejournalvoucher" :entity-id="id" :can-complete="voucher.egcs_fc_canwork && !voucher.isCompleted && !dirty && !saving && status === 'success'" :can-work-workflow="voucher.egcs_fc_canwork" :show-header="false" :show-divider="false" title-key="journal_voucher.completion.title" description-key="journal_voucher.completion.description" status-complete-key="journal_voucher.completion.status_complete" status-locked-key="journal_voucher.completion.status_locked" comment-placeholder-key="journal_voucher.completion.comment_placeholder" complete-action-key="journal_voucher.completion.complete" completed-success-key="journal_voucher.completion.completed_success" :refresh-key="refreshKey" @changed="refreshPage" />
+          </div>
           <CommonReviewsTab v-else-if="selectedTab === 'reviews'" entity-type="fundingcasejournalvoucher" :entity-id="id" :can-update="voucher.egcs_fc_canwork" @changed="refreshPage" />
           <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcasejournalvoucher" :entity-id="id" purpose="standard" :can-edit="voucher.egcs_fc_canwork" :refresh-key="refreshKey" @changed="refreshPage" />
           <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" :show-header="false" entity-type="fundingcasejournalvoucher" :entity-id="id" />

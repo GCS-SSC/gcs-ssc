@@ -24,7 +24,8 @@ export class AgreementApprovalSubmissionPromotionError extends Error {}
 export const assertAgreementApprovalSubmissionUnlocked = async (
   event: H3Event,
   trx: Kysely<Database> | Transaction<Database>,
-  agreementId: string
+  agreementId: string,
+  { excludedAmendmentId }: { excludedAmendmentId?: string } = {}
 ): Promise<void> => {
   const activeRun = await trx.selectFrom('Common_Runtime')
     .innerJoin('Common_Workflow_Run', 'Common_Workflow_Run.id', 'Common_Runtime.id')
@@ -42,7 +43,12 @@ export const assertAgreementApprovalSubmissionUnlocked = async (
         eb('Common_Runtime.egcs_cn_entitytype', '=', 'fundingcaseagreement'),
         eb('Common_Runtime.egcs_cn_entityid', '=', agreementId)
       ]),
-      eb('Funding_Case_Agreement_Amendment.egcs_fc_fundingagreement', '=', agreementId)
+      eb.and([
+        eb('Funding_Case_Agreement_Amendment.egcs_fc_fundingagreement', '=', agreementId),
+        ...(excludedAmendmentId
+          ? [eb('Funding_Case_Agreement_Amendment.id', '!=', excludedAmendmentId)]
+          : [])
+      ])
     ]))
     .forUpdate(['Common_Runtime', 'Common_Workflow_Run'])
     .executeTakeFirst()

@@ -51,25 +51,25 @@ const TRANSFER_PAYMENT_LIST_STATUS_ENUM = ['all', 'active', 'inactive'] as const
 
 export const TransferPaymentListQuerySchema = PaginationSchema.extend({
   status: z.enum(TRANSFER_PAYMENT_LIST_STATUS_ENUM).default('all'),
-  agency_id: RequiredId().optional()
+  agency_id: PositivePostgresBigintIdSchema.optional()
 })
 
 export type TransferPaymentListQuery = z.infer<typeof TransferPaymentListQuerySchema>
 
 export const TransferPaymentProfileBaseSchema = z.object({
-  egcs_tp_agency: RequiredId(),
+  egcs_tp_agency: PositivePostgresBigintIdSchema,
   egcs_tp_datestart: RequiredDateSchema,
   egcs_tp_dateend: RequiredDateSchema,
-  egcs_tp_name_en: RequiredString(),
-  egcs_tp_name_fr: RequiredString(),
-  egcs_tp_abbreviation_en: RequiredString(),
-  egcs_tp_abbreviation_fr: RequiredString(),
-  egcs_tp_description_en: RequiredString(),
-  egcs_tp_description_fr: RequiredString(),
-  egcs_tp_purpose_en: RequiredString(),
-  egcs_tp_purpose_fr: RequiredString(),
-  egcs_tp_tclink_en: RequiredString().url({ message: 'validation.invalid_url' }),
-  egcs_tp_tclink_fr: RequiredString().url({ message: 'validation.invalid_url' }),
+  egcs_tp_name_en: StreamStorageText(255),
+  egcs_tp_name_fr: StreamStorageText(255),
+  egcs_tp_abbreviation_en: StreamStorageText(255),
+  egcs_tp_abbreviation_fr: StreamStorageText(255),
+  egcs_tp_description_en: StreamStorageText(),
+  egcs_tp_description_fr: StreamStorageText(),
+  egcs_tp_purpose_en: StreamStorageText(),
+  egcs_tp_purpose_fr: StreamStorageText(),
+  egcs_tp_tclink_en: StreamStorageText(2000).url({ message: 'validation.invalid_url' }),
+  egcs_tp_tclink_fr: StreamStorageText(2000).url({ message: 'validation.invalid_url' }),
   egcs_tp_active: z.boolean().default(false)
 })
 
@@ -401,8 +401,8 @@ export const TransferPaymentAmendmentTypeSchema = z.object({
   egcs_tp_amended: z.enum(AMENDED_TYPE_ENUM, {
     error: 'validation.required'
   }),
-  egcs_tp_name_en: RequiredString(),
-  egcs_tp_name_fr: RequiredString(),
+  egcs_tp_name_en: StreamStorageText(255),
+  egcs_tp_name_fr: StreamStorageText(255),
   egcs_tp_requiresamendmentsubtype: z.boolean().default(false),
   egcs_tp_transferpaymentstream: RequiredId()
 })
@@ -412,10 +412,10 @@ export type TransferPaymentAmendmentTypeItem = WithId<TransferPaymentAmendmentTy
 
 export const TransferPaymentAmendmentSubtypesSchema = z.object({
   amendment_type_ids: RequiredUniqueSelectionIdsSchema(),
-  egcs_tp_name_en: RequiredString(),
-  egcs_tp_name_fr: RequiredString(),
-  egcs_tp_description_en: RequiredString(),
-  egcs_tp_description_fr: RequiredString(),
+  egcs_tp_name_en: StreamStorageText(255),
+  egcs_tp_name_fr: StreamStorageText(255),
+  egcs_tp_description_en: StreamStorageText(),
+  egcs_tp_description_fr: StreamStorageText(),
   egcs_tp_transferpaymentstream: RequiredId()
 })
 
@@ -574,9 +574,9 @@ export type AgreementGeneratedDocumentItem = WithId<{
   attachment_filesize?: number
 }>
 export const TransferPaymentStreamChartOfAccountDimensionSchema = z.object({
-  label_en: z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' }),
-  label_fr: z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' }),
-  value: z.string({ error: 'validation.required' }).trim().min(1, { error: 'validation.required' })
+  label_en: StreamStorageText(),
+  label_fr: StreamStorageText(),
+  value: StreamStorageText()
 })
 
 export type TransferPaymentStreamChartOfAccountDimension = z.infer<typeof TransferPaymentStreamChartOfAccountDimensionSchema>
@@ -697,10 +697,10 @@ export type TransferPaymentMonitorTypeItem = WithId<TransferPaymentMonitorType &
 
 export const TransferPaymentStreamAreaOfExpertiseSchema = z.object({
   egcs_tp_transferpaymentstream: RequiredId(),
-  egcs_tp_name_en: RequiredString(),
-  egcs_tp_name_fr: RequiredString(),
-  egcs_tp_description_en: RequiredString(),
-  egcs_tp_description_fr: RequiredString()
+  egcs_tp_name_en: StreamStorageText(255),
+  egcs_tp_name_fr: StreamStorageText(255),
+  egcs_tp_description_en: StreamStorageText(),
+  egcs_tp_description_fr: StreamStorageText()
 })
 
 export type TransferPaymentStreamAreaOfExpertise = z.infer<typeof TransferPaymentStreamAreaOfExpertiseSchema>
@@ -712,8 +712,8 @@ export const TransferPaymentStreamRiskRatingSchema = z.object({
     .finite({ error: 'validation.invalid_number' })
     .nonnegative({ error: 'validation.invalid_number' })
     .refine(value => isRepresentableByNumeric(value, 8, 2), { error: 'validation.numeric_not_representable' }).meta({ formRequired: false }),
-  egcs_tp_name_en: RequiredString(),
-  egcs_tp_name_fr: RequiredString()
+  egcs_tp_name_en: StreamStorageText(255),
+  egcs_tp_name_fr: StreamStorageText(255)
 })
 
 export type TransferPaymentStreamRiskRating = z.infer<typeof TransferPaymentStreamRiskRatingSchema>

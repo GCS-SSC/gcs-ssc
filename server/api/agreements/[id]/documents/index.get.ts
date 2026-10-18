@@ -1,14 +1,17 @@
+import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
+import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import { PaginationSchema } from '~~/shared/types/schemas'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { listAgreementGeneratedDocumentPage } from '~~/server/utils/document-generation'
 
-export default defineEventHandler(async event => {
+const readRoute = defineEventHandler(async event => {
   const db = event.context.$db
   const agreementId = getRouterParam(event, 'id')
   if (!agreementId) {
     return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')
   }
+  if (![agreementId].every(isPositivePostgresBigintText)) return await badRequest(event, 'INVALID_IDS', 'apiErrors.request.invalid')
 
   const agreementContext = await authorizeAgreementResource(event, 'read', agreementId, db)
   if (!agreementContext) {
@@ -28,3 +31,6 @@ export default defineEventHandler(async event => {
     limit
   }
 })
+
+export default defineEventHandler(async event =>
+  await executeFreshReadSnapshot(event, async () => await readRoute(event)))

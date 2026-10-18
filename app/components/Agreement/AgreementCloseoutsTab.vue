@@ -1,6 +1,8 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- component-local callbacks are self-descriptive */
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
+import type { FundingCaseAgreementProfileRow } from '~~/shared/types/funding-case-agreement-ui'
 import type { Ref } from 'vue'
 import type { Selectable } from 'kysely'
 import type { AgreementCloseoutReadiness, CloseoutBlocker } from '~~/shared/types/agreement-closeout'
@@ -28,6 +30,12 @@ type CloseoutRow = Selectable<FundingCaseAgreementCloseoutTable> & BusinessRecor
 const readiness: Ref<AgreementCloseoutReadiness | null> = ref(null)
 const closeouts: Ref<CloseoutRow[]> = ref([])
 let loadGeneration = 0
+let ownerGeneration = 0
+const { isRecordLocked } = useBusinessStatusState()
+onBeforeUnmount(() => {
+  loadGeneration++
+  ownerGeneration++
+})
 const fetchJson = async (path: string): Promise<unknown> => {
   const response = await fetch(getClientRequestUrl(path))
   if (!response.ok) await throwFetchResponseError(response)
@@ -57,15 +65,14 @@ const refreshAll = async () => {
   }
 }
 watch(() => agreementId, () => {
+  ownerGeneration++
+  isCreating.value = false
   readiness.value = null
   closeouts.value = []
   void refreshAll()
-}, { immediate: true })
+}, { immediate: true, flush: 'sync' })
 const openCloseout = computed(() => closeouts.value.find(closeout => closeout.egcs_fc_isopen))
 const isAgreementClosed = computed(() => readiness.value?.agreementTerminal === true)
-const canCreateCloseout = computed(() => canCreate
-  && readiness.value?.agreementTerminal === false
-  && !openCloseout.value)
 const statusCatalog = useStatusCatalog()
 void statusCatalog.load()
 const blockerStatusLabel = (blocker: CloseoutBlocker) => {
@@ -76,21 +83,43 @@ const blockerStatusLabel = (blocker: CloseoutBlocker) => {
 const blockerLabel = (blocker: CloseoutBlocker): string =>
   locale.value === 'fr' ? blocker.labelFr : blocker.labelEn
 
+const warnCreatePrerequisite = (missingAssignment = false) => toast.add({
+  title: toast.localized('common.warning'),
+  description: toast.localized(missingAssignment ? 'assignments.read_only_description' : 'agreement.child_records.work_prerequisite'),
+  color: 'warning'
+})
 const createCloseout = async () => {
-  if (!canCreateCloseout.value || isCreating.value) return
+  if (!canCreate || isCreating.value) return
   const requestedAgreementId = agreementId
+  const generation = ownerGeneration
+  const current = () => generation === ownerGeneration && requestedAgreementId === agreementId
   try {
     isCreating.value = true
+    const [record, roster, refreshed] = await Promise.all([
+      fetchJson(`/api/agreements/${requestedAgreementId}`) as Promise<FundingCaseAgreementProfileRow>,
+      fetchJson(`/api/entity-assignments/fundingcaseagreement/${requestedAgreementId}`) as Promise<{ is_assigned: boolean }>,
+      refreshAll()
+    ])
+    if (!current()) return
+    if (roster.is_assigned !== true) {
+      warnCreatePrerequisite(true)
+      return
+    }
+    if (!refreshed || record.can_create_child_records_role !== true || record.can_create_child_records !== true
+      || isRecordLocked(record) || readiness.value?.agreementTerminal !== false || openCloseout.value) {
+      warnCreatePrerequisite()
+      return
+    }
     const response = await fetch(getClientRequestUrl(`/api/agreements/${requestedAgreementId}/closeouts`), { method: 'POST' })
     if (!response.ok) await throwFetchResponseError(response)
     const closeout = await response.json() as CloseoutRow
-    if (requestedAgreementId !== agreementId || !await refreshAll()) return
+    if (!current() || !await refreshAll() || !current()) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('agreement.closeout.created_success'), color: 'success' })
     await router.push(localePath(appRouteLocations.agreementCloseoutDetail(requestedAgreementId, String(closeout.id))))
   } catch (error: unknown) {
-    showError(error)
+    if (current()) showError(error)
   } finally {
-    isCreating.value = false
+    if (current()) isCreating.value = false
   }
 }
 </script>
@@ -102,11 +131,10 @@ const createCloseout = async () => {
     :description="t('agreement.closeout.description')">
     <template #action>
       <UButton
-        v-if="canCreate && !isAgreementClosed"
+        v-if="canCreate"
         icon="i-lucide-package-check"
         :label="t('agreement.closeout.create')"
         :loading="isCreating"
-        :disabled="!canCreateCloseout"
         @click="createCloseout" />
     </template>
 

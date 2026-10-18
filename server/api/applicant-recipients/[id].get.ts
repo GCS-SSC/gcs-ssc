@@ -54,6 +54,11 @@ export default defineEventHandler(async event => {
 
     return {
       ...profile,
+      can_update_role: permissions?.canUpdateRole === true,
+      can_delete_role: permissions?.canDeleteRole === true,
+      can_create_child_records_role: permissions?.canCreateRole === true,
+      can_update_child_records_role: permissions?.canUpdateRole === true,
+      can_delete_child_records_role: permissions?.canDeleteRole === true,
       can_update: canUpdate,
       can_delete: canDelete,
       can_create_child_records: permissions?.canCreate === true,

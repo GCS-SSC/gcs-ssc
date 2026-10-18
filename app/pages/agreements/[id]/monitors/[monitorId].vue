@@ -326,6 +326,12 @@ watchEffect(() => {
   }
 })
 
+const savedMonitorTypeOptions = computed(() => {
+  const saved = monitor.value
+  if (!saved || monitorMetadata.value?.egcs_fc_type !== saved.egcs_fc_type) return []
+  return [{ value: saved.egcs_fc_type, label: getBilingualValue(saved, 'monitor_type_name', saved.egcs_fc_type) }]
+})
+
 const openMetadataEditor = () => {
   if (!guardMonitorAction('update') || !monitor.value) return
   monitorMetadata.value = {
@@ -757,8 +763,10 @@ const handleCompleted = async () => {
               <CommonServerLookupSelect
                 v-if="canUpdateMonitorRole && !monitor.isCompleted"
                 v-model="monitorMetadata.egcs_fc_type"
+                :prepend-items="savedMonitorTypeOptions"
                 :fetch-url="`/api/agreements/${agreementId}/monitors/lookups/monitor-types`"
                 :query="{ permission_action: 'update', monitorId }"
+                selected-values-query-key="selected_ids"
                 value-key="id"
                 label-en-key="label_en"
                 label-fr-key="label_fr"
@@ -774,6 +782,7 @@ const handleCompleted = async () => {
                 v-model="monitorMetadata.egcs_fc_tentativefiscalyear"
                 :fetch-url="`/api/agreements/${agreementId}/monitors/lookups/fiscal-years`"
                 :query="{ permission_action: 'update', monitorId }"
+                selected-values-query-key="selected_ids"
                 value-key="id"
                 label-en-key="label_en"
                 label-fr-key="label_fr"

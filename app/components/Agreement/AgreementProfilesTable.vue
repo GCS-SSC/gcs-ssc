@@ -132,19 +132,19 @@ const getAgreementActionTarget = (agreement: FundingCaseAgreementProfileRow) => 
     <template #actions-cell="{ row }">
       <div class="flex items-center gap-2">
         <CommonActionButton
+          v-if="canUpdate(row.original)"
           icon="i-lucide-edit-3"
           color="neutral"
           variant="ghost"
           size="sm"
-          :disabled="!canUpdate(row.original)"
           :aria-label="t('common.edit_named', { name: getAgreementActionTarget(row.original) })"
           @click="emit('edit', row.original)" />
         <CommonActionButton
+          v-if="canDelete(row.original)"
           icon="i-lucide-trash"
           color="error"
           variant="ghost"
           size="sm"
-          :disabled="!canDelete(row.original)"
           :aria-label="t('common.delete_named', { name: getAgreementActionTarget(row.original) })"
           @click="emit('delete', row.original)" />
       </div>

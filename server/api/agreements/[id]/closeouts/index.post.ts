@@ -1,3 +1,4 @@
+import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import { badRequest, notFound, throwApiError } from '~~/server/utils/api-errors'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
@@ -7,6 +8,7 @@ import { lockAgencyDraftStatus } from '~~/server/utils/business-status-runtime'
 export default defineEventHandler(async event => {
   const agreementId = getRouterParam(event, 'id')
   if (!agreementId) return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')
+  if (![agreementId].every(isPositivePostgresBigintText)) return await badRequest(event, 'INVALID_IDS', 'apiErrors.request.invalid')
   const db = event.context.$db
   const context = await authorizeAgreementResource(event, 'create', agreementId, db)
   if (!context) return await notFound(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { watch } from 'vue'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import type { z } from 'zod'
@@ -26,6 +27,17 @@ if (Boolean(captureSession) !== Boolean(closeSession)) {
 }
 
 const isUpdate = computed(() => !!state.value.id)
+let editStartScore: number | undefined
+watch([
+  () => open.value,
+  () => transferPaymentId,
+  () => streamId,
+  () => state.value,
+  () => state.value.id,
+  () => captureSession ? captureSession() : null
+], () => {
+  editStartScore = open.value ? state.value.egcs_tp_riskscore : undefined
+}, { immediate: true, flush: 'sync' })
 
 const schema = TransferPaymentStreamRiskRatingSchema.omit({ egcs_tp_transferpaymentstream: true })
 const validate = createValidator(schema)
@@ -38,7 +50,10 @@ const isSaving = pending.isPending
  * @param event - Validated risk rating form submission.
  */
 const onSubmit = async (event: FormSubmitEvent<z.infer<typeof schema>>) => {
-  const body = event.data
+  const body: Partial<z.infer<typeof schema>> = { ...event.data }
+  if (isUpdate.value && body.egcs_tp_riskscore === editStartScore) {
+    delete body.egcs_tp_riskscore
+  }
   const session = captureSession ? captureSession() : null
   if (!pending.begin(session)) return
   try {

@@ -10,6 +10,8 @@ import {
   assertDirectReviewRuntimeEntitySupported,
   authorizeReviewRuntimeAction,
   canAuthorizeReviewRuntimeWorkOwnerRole,
+  canAuthorizeReviewSetSourceRole,
+  resolveReviewRuntimeEntityFromReviewSet,
   resolveReviewRuntimeEntityFromEntity,
   respondReviewRuntimeEntityNotFound
 } from '~~/server/utils/review-runtime-access'
@@ -47,12 +49,14 @@ export default defineEventHandler(async event => {
   if (extensionRuntime) await authorizeExtensionLifecycleRead(event, extensionRuntime)
   else await authorizeReviewRuntimeAction(event, 'list_review_sets', runtimeEntity)
 
+  const canCreateRole = await canAuthorizeReviewSetSourceRole(event, 'create_review_set', runtimeEntity)
+
   const proponentVisibility = entityType === 'applicantrecipient'
     ? await resolveApplicantRecipientVisibility(auth, 'read', db)
     : null
   const readableAgencyIds = proponentVisibility?.agencyIds ?? []
   if (proponentVisibility && !proponentVisibility.hasGlobalAccess && readableAgencyIds.length === 0) {
-    return { items: [], total: 0, stats: { total: 0, active: 0 }, page, limit }
+    return { items: [], total: 0, stats: { total: 0, active: 0 }, page, limit, can_create_role: canCreateRole }
   }
 
   const offset = (page - 1) * limit
@@ -159,9 +163,16 @@ export default defineEventHandler(async event => {
     return acc
   }, new Map<string, typeof reviews>())
 
+  const cancelRoles = new Map(await Promise.all(sets.map(async set => {
+    const id = String(set.id)
+    const context = await resolveReviewRuntimeEntityFromReviewSet(db, id)
+    return [id, context ? await canAuthorizeReviewSetSourceRole(event, 'cancel_review_set', context) : false] as const
+  })))
+
   const total = Number(countResult?.total ?? 0)
 
   return {
+    can_create_role: canCreateRole,
     items: sets.map(set => {
       const runtimeConfiguration = readRuntimeReviewConfiguration(set.definition)
       const setReviews = reviewsBySetId.get(String(set.id)) ?? []
@@ -169,6 +180,7 @@ export default defineEventHandler(async event => {
 
       return {
         id: String(set.id),
+        can_cancel_role: cancelRoles.get(String(set.id)) ?? false,
         runtimeId: String(set.runtimeId),
         runtimeKind: set.runtimeKind,
         runtimeItemId: String(set.runtimeItemId),

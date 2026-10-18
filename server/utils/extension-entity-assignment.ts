@@ -4,12 +4,12 @@ import type { Kysely, Transaction } from 'kysely'
 import type { AuthorizationResourceOwner } from '@gcs-ssc/authorization'
 import type { Database, Entity_Type } from '~~/shared/types/database'
 import { forbidden, notFound } from './api-errors'
-import { requireAuthContext, requireFreshAuthContext } from './authorize'
+import { requireAuthContext } from './authorize'
 import { resolveAgreementScopeContext } from './agreement'
-import { resolveAssignedItemGrant } from './rbac'
+import { resolveCompletionEvidenceId } from './completion-runtime-core'
+import { executeQualifiedRuntimeTransaction } from './qualified-runtime-transaction'
 import {
   authorizeExtensionLifecycleRead,
-  executeExtensionLifecycleWrite,
   resolveExtensionLifecycleRuntime
 } from './extension-lifecycle-runtime'
 import {
@@ -51,7 +51,11 @@ export const resolveExtensionEntityAssignmentRuntime = async (
 export const authorizeExtensionEntityAssignmentRead = async (
   event: H3Event,
   runtime: ResolvedExtensionLifecycleRuntime
-) => await authorizeExtensionLifecycleRead(event, runtime)
+) => {
+  const auth = await requireAuthContext(event)
+  if (await hasManageGrant(auth, event.context.$db, runtime)) return auth
+  return await authorizeExtensionLifecycleRead(event, runtime)
+}
 
 export const resolveExtensionEntityAssignmentOwner = (
   runtime: ResolvedExtensionLifecycleRuntime
@@ -62,14 +66,9 @@ export const canManageExtensionEntityAssignments = async (
   runtime: ResolvedExtensionLifecycleRuntime
 ): Promise<boolean> => {
   if (runtime.lockedEntity.status.readOnly || runtime.lockedEntity.status.terminal) return false
+  if (await resolveCompletionEvidenceId(event.context.$db, runtime.context.entityType, runtime.context.entityId)) return false
   const auth = await requireAuthContext(event)
-  if (!await hasManageGrant(auth, event.context.$db, runtime)) return false
-  return Boolean(await resolveAssignedItemGrant(
-    auth.userId,
-    runtime.context.entityType,
-    runtime.context.entityId,
-    event.context.$db
-  ))
+  return await hasManageGrant(auth, event.context.$db, runtime)
 }
 
 export const executeExtensionEntityAssignmentManagement = async <Result>(
@@ -85,25 +84,28 @@ export const executeExtensionEntityAssignmentManagement = async <Result>(
         .where('_deleted', '=', false)
         .executeTakeFirst()
     : undefined
-  return await executeExtensionLifecycleWrite(event, runtime, async (trx, current) => {
-    const auth = await requireFreshAuthContext(event, trx)
-    if (!await hasManageGrant(auth, trx, current)) return await forbidden(event)
-    if (current.lockedEntity.status.readOnly || current.lockedEntity.status.terminal) return await forbidden(event)
-    if (assigneeUserId) {
-      const eligible = await resolveExtensionEligibleAssigneeIds(trx, current, [assigneeUserId])
-      if (!eligible.has(assigneeUserId)) return await forbidden(event)
+  return await executeQualifiedRuntimeTransaction(event, runtime, {
+    lockUserIds: assigneeApplicationUserId ? [String(assigneeApplicationUserId.egcs_cn_auth_user_id)] : [],
+    work: async ({ trx, auth, runtime: current }) => {
+      if (!await hasManageGrant(auth, trx, current)) return await forbidden(event)
+      if (current.lockedEntity.status.readOnly || current.lockedEntity.status.terminal) return await forbidden(event)
+      if (await resolveCompletionEvidenceId(trx, current.context.entityType, current.context.entityId)) return await forbidden(event)
+      if (assigneeUserId) {
+        const eligible = await resolveExtensionEligibleAssigneeIds(trx, current, [assigneeUserId])
+        if (!eligible.has(assigneeUserId)) return await forbidden(event)
+      }
+      const identity = await trx.selectFrom('Common_Entity').select('id')
+        .where('id', '=', current.context.entityId)
+        .where('egcs_cn_entitytype', '=', current.context.entityType)
+        .where('_deleted', '=', false)
+        .forUpdate().executeTakeFirst()
+      if (!identity) return await notFound(event, 'ASSIGNMENT_TARGET_NOT_FOUND', 'apiErrors.request.not_found')
+      await trx.selectFrom('Common_Entity_Assignment').select('id')
+        .where('egcs_cn_entityid', '=', current.context.entityId)
+        .where('egcs_cn_entitytype', '=', current.context.entityType)
+        .where('_deleted', '=', false)
+        .orderBy('id').forUpdate().execute()
+      return await callback(trx)
     }
-    const identity = await trx.selectFrom('Common_Entity').select('id')
-      .where('id', '=', current.context.entityId)
-      .where('egcs_cn_entitytype', '=', current.context.entityType)
-      .where('_deleted', '=', false)
-      .forUpdate().executeTakeFirst()
-    if (!identity) return await notFound(event, 'ASSIGNMENT_TARGET_NOT_FOUND', 'apiErrors.request.not_found')
-    await trx.selectFrom('Common_Entity_Assignment').select('id')
-      .where('egcs_cn_entityid', '=', current.context.entityId)
-      .where('egcs_cn_entitytype', '=', current.context.entityType)
-      .where('_deleted', '=', false)
-      .orderBy('id').forUpdate().execute()
-    return await callback(trx)
-  }, { lockUserIds: assigneeApplicationUserId ? [String(assigneeApplicationUserId.egcs_cn_auth_user_id)] : [] })
+  })
 }

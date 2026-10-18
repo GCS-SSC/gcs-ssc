@@ -6,6 +6,8 @@ import { isFundingOpportunityNameAvailable, listFundingOpportunityStreamIds, rep
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import type { JsonValue } from '~~/shared/types/database'
 import { sql } from 'kysely'
+import { lockRegisteredExtensionAgreementScopes } from '~~/server/utils/extensions'
+import { lockTransferPaymentStreams } from '~~/server/utils/transfer-payment-stream-lock'
 import { assertFundingOpportunityWritable, getFundingOpportunityStatus } from '~~/server/utils/funding-opportunity-status'
 
 export default defineEventHandler(async event => {
@@ -18,9 +20,24 @@ export default defineEventHandler(async event => {
   return await db.transaction().execute(async trx => {
     const auth = await requireFreshAuthContext(event, trx)
     const scope = await requireFundingOpportunityAccess(event, id, 'update', trx, auth)
+    const lifecycleStreamIds = [...new Set([...scope.streamIds, ...requested.egcs_fo_transferpaymentstreams?.map(String) ?? []])]
+    await lockRegisteredExtensionAgreementScopes(trx, scope.agencyId, lifecycleStreamIds)
+    const agency = await trx.selectFrom('Agency_Profile').select('id')
+      .where('id', '=', scope.agencyId).where('_deleted', '=', false).forShare().executeTakeFirst()
+    const program = await trx.selectFrom('Transfer_Payment_Profile').select('egcs_tp_agency')
+      .where('id', '=', scope.transferPaymentId).where('_deleted', '=', false).forUpdate().executeTakeFirst()
+    if (!agency || !program || String(program.egcs_tp_agency) !== scope.agencyId) {
+      return await badRequest(event, 'FUNDING_OPPORTUNITY_STREAM_INVALID', 'apiErrors.request.invalid')
+    }
+    await lockTransferPaymentStreams(trx, lifecycleStreamIds)
     const current = await trx.selectFrom('Funding_Opportunity_Profile').selectAll()
       .where('id', '=', id).where('_deleted', '=', false).forUpdate().executeTakeFirst()
     if (!current) return await notFound(event, 'FUNDING_OPPORTUNITY_NOT_FOUND', 'apiErrors.admin_common.not_found')
+    const lockedScope = await requireFundingOpportunityAccess(event, id, 'update', trx, auth)
+    if (lockedScope.agencyId !== scope.agencyId || lockedScope.transferPaymentId !== scope.transferPaymentId
+      || lockedScope.streamIds.some(streamId => !lifecycleStreamIds.includes(streamId))) {
+      return await badRequest(event, 'FUNDING_OPPORTUNITY_STREAM_INVALID', 'apiErrors.request.invalid')
+    }
     await assertFundingOpportunityWritable(event,
       await getFundingOpportunityStatus(trx, String(current.egcs_fo_status), scope.agencyId))
     if (requested.egcs_fo_status !== undefined) {

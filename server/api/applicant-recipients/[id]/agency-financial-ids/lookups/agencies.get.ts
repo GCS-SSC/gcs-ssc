@@ -5,6 +5,7 @@ import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { assertApplicantRecipientProfileExists } from '~~/server/utils/applicant-recipient-child-resources'
 import { resolveApplicantRecipientAuthorization } from '~~/server/utils/applicant-recipient-auth'
 import { z } from 'zod'
+import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
 const QuerySchema = PaginationSchema.extend({
   permission_action: z.enum(['create', 'update']).default('create'),
@@ -43,17 +44,22 @@ export default defineEventHandler(async event => {
         ])
       : eb('egcs_ay_active', '=', true))
 
+  const searchId = search && isPositivePostgresBigintText(search) ? search : undefined
   if (search) {
     const escapedSearch = escapeLikePattern(search)
     baseQuery = baseQuery.where(eb => eb.or([
       eb('egcs_ay_name_en', 'ilike', `%${escapedSearch}%`),
-      eb('egcs_ay_name_fr', 'ilike', `%${escapedSearch}%`)
+      eb('egcs_ay_name_fr', 'ilike', `%${escapedSearch}%`),
+      ...(searchId ? [eb('id', '=', searchId)] : [])
     ]))
   }
 
   const [items, totalResult] = await Promise.all([
     baseQuery
       .select(['id', 'egcs_ay_name_en', 'egcs_ay_name_fr'])
+      .orderBy(eb => searchId
+        ? eb.case().when('id', '=', searchId).then(0).else(1).end()
+        : eb.val(0))
       .orderBy('id', 'asc')
       .limit(limit)
       .offset(offset)

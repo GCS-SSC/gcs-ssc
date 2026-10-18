@@ -1,11 +1,11 @@
-import { isRef } from 'vue'
+import { isRef, toValue } from 'vue'
 import type { FetchError } from 'ofetch'
-import type { ComputedRef, Ref } from 'vue'
+import type { ComputedRef, MaybeRefOrGetter, Ref } from 'vue'
 import type { TransferPaymentOutcomeItem } from '~~/shared/types/schemas'
 import type { TransferPaymentOutcomeRow } from '~~/shared/types/transfer-payment-ui'
 
 type OutcomeSelectionOptions = {
-  programId: string
+  programId: MaybeRefOrGetter<string>
   outcomesRefreshKey?: Ref<number> | number
   initialOutcomeId?: string
 }
@@ -30,7 +30,7 @@ export const useOutcomeSelection = async ({
     data: outcomesResponse,
     refresh: refreshOutcomes
   } = useFetch<{ items: TransferPaymentOutcomeRow[] }, FetchError, string>(
-    `/api/transfer-payments/${programId}/outcomes`,
+    () => `/api/transfer-payments/${toValue(programId)}/outcomes`,
     {
       query: {
         page: 1,
@@ -43,9 +43,15 @@ export const useOutcomeSelection = async ({
     void refreshOutcomes()
   })
 
-  const outcomes: ComputedRef<TransferPaymentOutcomeItem[]> = computed(() => outcomesResponse.value?.items || [])
+  const outcomes: ComputedRef<TransferPaymentOutcomeItem[]> = computed(() =>
+    (outcomesResponse.value?.items || []).filter(item => String(item.egcs_tp_transferpaymentprofile) === toValue(programId))
+  )
 
   const selectedOutcomeId: Ref<string> = ref(initialOutcomeId)
+
+  watch(() => toValue(programId), () => {
+    selectedOutcomeId.value = 'all'
+  }, { flush: 'sync' })
 
   watch(
     outcomes,

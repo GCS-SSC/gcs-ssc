@@ -1,3 +1,4 @@
+import { readAgreementMonitorBody } from '~~/server/utils/agreement-monitor-validation'
 import { FundingCaseAgreementMonitorPromisingPracticePatchSchema } from '~~/shared/types/schemas'
 import { badRequest } from '~~/server/utils/api-errors'
 import { executeAgreementMonitorMutation, prepareAgreementMonitorRoute } from '~~/server/utils/agreement-monitor'
@@ -15,7 +16,8 @@ export default defineEventHandler(async event => {
   const prepared = await prepareAgreementMonitorRoute(event, 'update', { entityType: 'fundingcasemonitor', entityId: monitorId })
   if (!prepared || !('agreementId' in prepared)) return prepared
   const { agreementId, agreementContext, db } = prepared
-  const validated = await readValidatedBodyI18n(event, FundingCaseAgreementMonitorPromisingPracticePatchSchema)
+  const validated = await readAgreementMonitorBody(event, FundingCaseAgreementMonitorPromisingPracticePatchSchema)
+  if (Object.keys(validated).length === 0) return await badRequest(event, 'NO_UPDATABLE_FIELDS', 'apiErrors.request.no_updatable_fields')
   return await executeAgreementMonitorMutation(event, db, agreementId, agreementContext, monitorId, async trx => {
     const updated = await trx
       .updateTable('Funding_Case_Agreement_Monitor_Promising_Practice')

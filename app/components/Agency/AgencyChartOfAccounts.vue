@@ -92,6 +92,7 @@ const addDimension = (state: Partial<AgencyChartOfAccountItem>) => {
           :model-value="state.egcs_ay_commitmentchartofaccount ?? undefined"
           :fetch-url="`/api/agency/${agencyId}/chart-of-accounts/lookups/commitment-accounts`"
           :query="{ fiscalYearId: state.egcs_ay_fiscalyear, currency: state.egcs_ay_currency }"
+          selected-values-query-key="selectedIds"
           value-key="id"
           label-en-key="label_en"
           label-fr-key="label_fr"

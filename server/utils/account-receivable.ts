@@ -1,3 +1,4 @@
+import { executeFreshReadSnapshot } from './fresh-read-snapshot'
 import { readAccountReceivableCashBalance } from './account-receivable-cash-balance'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- AR aggregate domain, retained reads and exact assigned writes. */
 import type { H3Event } from 'h3'
@@ -474,7 +475,7 @@ const omitIndividualRecoveryBalances = <T extends object>(line: T) => {
   return source
 }
 
-export const getAccountReceivableDetail = async (event: H3Event, id: string) => {
+export const getAccountReceivableDetail = async (event: H3Event, id: string) => await executeFreshReadSnapshot(event, async () => {
   const context = await authorizeAccountReceivable(event, id)
   const auth = await requireAuthContext(event)
   const db = event.context.$db
@@ -585,9 +586,9 @@ export const getAccountReceivableDetail = async (event: H3Event, id: string) => 
     egcs_fc_cancreditmemo: debt.egcs_fc_outcome === 'posted' && !debt.egcs_fc_linkedreceivable && auth.userAbilities.authorize('account_receivable', 'create', { type: 'agency', agencyId: context.agencyId }),
     egcs_fc_agreementreadable: auth.userAbilities.authorize('agreement', 'read', context.scope),
     egcs_fc_sourcereadable: auth.userAbilities.authorize('agreement', 'read', context.scope) }
-}
+}, { authorization: 'snapshot' })
 
-export const listAccountReceivables = async (event: H3Event, agreementId: string, input: { page: number; limit: number; search?: string }) => {
+export const listAccountReceivables = async (event: H3Event, agreementId: string, input: { page: number; limit: number; search?: string }) => await executeFreshReadSnapshot(event, async () => {
   const context = await authorizeAccountReceivableAgreement(event, agreementId)
   const auth = await requireAuthContext(event)
   let query = event.context.$db.selectFrom('Funding_Case_Agreement_Account_Receivable').where('egcs_fc_fundingagreement', '=', agreementId).where('egcs_fc_linkedreceivable', 'is', null).where('_deleted', '=', false)
@@ -604,4 +605,4 @@ export const listAccountReceivables = async (event: H3Event, agreementId: string
   }))
   return { items, total: Number(count.total), page: input.page, limit: input.limit, ...agreement,
     egcs_fc_cancreate: auth.userAbilities.authorize('account_receivable', 'create', context.scope) }
-}
+}, { authorization: 'snapshot' })

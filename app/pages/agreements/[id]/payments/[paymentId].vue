@@ -16,7 +16,7 @@ import type {
   FundingCaseAgreementPaymentLineRow
 } from '~~/shared/types/funding-case-agreement-ui'
 import { FundingCaseAgreementPaymentLineCreateSchema } from '~~/shared/types/schemas'
-import { formatAccountingDimension, getAccountingDimensionSearchValues } from '~~/shared/utils/accounting-dimensions'
+import { formatAccountingDimension, formatAccountingDimensions, getAccountingDimensionSearchValues } from '~~/shared/utils/accounting-dimensions'
 import { formatMoneyText, sumMoney, type Money } from '~~/shared/utils/money'
 
 definePageMeta({
@@ -86,6 +86,10 @@ const lineModal = useCrudModal<FundingCaseAgreementPaymentLineRow, FundingCaseAg
 })
 
 const selectedLine = lineModal.selected
+const savedCodingOptions = computed(() => (payment.value?.lines ?? []).filter(line => line.id === selectedLine.value?.id).map(line => ({
+  value: String(line.egcs_fc_fundingagreementcommitmentline),
+  label: `${t('agreement.payments.commitment_line_prefix')} ${line.commitment_line_number} - ${formatAccountingDimensions(line.accounting_dimensions, locale.value === 'fr' ? 'fr' : 'en', ' - ')}`
+})))
 const isLineModalOpen = lineModal.isOpen
 const validateLine = createValidator(FundingCaseAgreementPaymentLineCreateSchema)
 const linePending = useCrudModalPending(lineModal.captureSession)
@@ -290,7 +294,7 @@ const handleCompleted = async () => {
           <CommonEntityHero
             :is-collapsed="isHeroCollapsed"
             icon="i-lucide-wallet-cards"
-            :actions="receivableEntry.entry.value ? [{ label: t('account_receivable.create'), icon: 'i-lucide-receipt-text', onClick: () => { receivableEntry.open.value = true } }] : []"
+            :actions="receivableEntry.canCreate.value && payment?.egcs_fc_paymenttype === 'advance' ? [{ label: t('account_receivable.create'), icon: 'i-lucide-receipt-text', loading: receivableEntry.starting.value, onClick: receivableEntry.start }] : []"
             :title="t(`enums.payment_type.${payment.egcs_fc_paymenttype}`)"
             :meta-items="[payment.agreement_number, getBilingualValue(payment, 'agreement_title', agreementId), `${t('agreement.payments.payee')}: ${getBilingualValue(payment, 'egcs_fc_payeename', t('agreement.payments.payee_unattributed'))}`, payment.egcs_fc_currency.toUpperCase()]"
             :badges="[{
@@ -422,6 +426,8 @@ const handleCompleted = async () => {
             <CommonServerLookupSelect
               v-model="selectedLine.egcs_fc_fundingagreementcommitmentline"
               :fetch-url="`/api/agreements/${agreementId}/payment-lines/lookups/commitment-lines`"
+              selected-values-query-key="selected_ids"
+              :prepend-items="savedCodingOptions"
               value-key="id"
               label-en-key="label_en"
               label-fr-key="label_fr"

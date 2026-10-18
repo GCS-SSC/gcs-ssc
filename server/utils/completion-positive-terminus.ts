@@ -1,6 +1,6 @@
 import type { Transaction } from 'kysely'
 import type { Database, Entity_Type } from '~~/shared/types/database'
-import { transitionBusinessStatus } from '~~/server/utils/business-status-runtime'
+import { BusinessStatusViolation, lockBusinessStatus, transitionBusinessStatus } from '~~/server/utils/business-status-runtime'
 import { assertAgreementCorrectionFinancialUnlocked } from './correction-lock'
 import { getAgreementCommitmentCodingTotals, validateAgreementCommitmentPriorPaidCoverage } from './agreement-commitment'
 import { assertAgreementFinancialBudgetControls } from './agreement-financial-budget-controls'
@@ -58,6 +58,12 @@ export const applyCompletionPositiveTerminusEffects = async (
       .where('_deleted', '=', false)
       .executeTakeFirst()
     if (agencyConfiguration?.egcs_ay_claimreconciliationfinalstatus) {
+      try {
+        await lockBusinessStatus(trx, 'fundingcaseagreementclaim', String(reconcile.claim_id), 'engine')
+      } catch (error: unknown) {
+        if (error instanceof BusinessStatusViolation && error.code === 'BUSINESS_STATUS_TERMINAL') return
+        throw error
+      }
       await transitionBusinessStatus(
         trx,
         'fundingcaseagreementclaim',

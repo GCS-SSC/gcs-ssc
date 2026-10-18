@@ -22,6 +22,7 @@ import type { Scope } from '~~/shared/utils/scopes'
 import type { EditorMutationToken } from '~/composables/useEditorMutationCoordinator'
 import { useEditorMutationCoordinator } from '~/composables/useEditorMutationCoordinator'
 import { z } from 'zod'
+import { AgencyProfileSchema, AgencyReviewSchemaCreateSchema } from '~~/shared/types/schemas'
 
 type EditorSubSection = Omit<ChecklistDefinition['sections'][number]['subSections'][number], 'questions'> & {
   _key: string
@@ -177,11 +178,13 @@ const isPublishing = computed(() => mutation.isActionPending('publish'))
 const isRetiring = computed(() => mutation.isActionPending('retire'))
 const canEditFields = computed(() => canEdit.value && !mutation.isPending.value)
 const ChecklistMetadataSchema = z.object({
-  egcs_cn_name_en: z.string().trim().min(1, 'validation.name_en_required'),
-  egcs_cn_name_fr: z.string().trim().min(1, 'validation.name_fr_required'),
-  egcs_cn_outcomename_en: z.string().trim().min(1, 'validation.required'),
-  egcs_cn_outcomename_fr: z.string().trim().min(1, 'validation.required')
+  egcs_cn_name_en: AgencyReviewSchemaCreateSchema.shape.egcs_cn_name_en.trim().min(1, { error: 'validation.name_en_required' }).pipe(AgencyProfileSchema.shape.egcs_ay_name_en),
+  egcs_cn_name_fr: AgencyReviewSchemaCreateSchema.shape.egcs_cn_name_fr.trim().min(1, { error: 'validation.name_fr_required' }).pipe(AgencyProfileSchema.shape.egcs_ay_name_en),
+  egcs_cn_outcomename_en: AgencyReviewSchemaCreateSchema.shape.egcs_cn_outcomename_en.trim().min(1, { error: 'validation.outcome_name_en_required' }).pipe(AgencyProfileSchema.shape.egcs_ay_name_en),
+  egcs_cn_outcomename_fr: AgencyReviewSchemaCreateSchema.shape.egcs_cn_outcomename_fr.trim().min(1, { error: 'validation.outcome_name_fr_required' }).pipe(AgencyProfileSchema.shape.egcs_ay_name_en)
 })
+const { createValidator } = useZodI18n()
+const validateMetadata = createValidator(ChecklistMetadataSchema)
 const importDefinition = (value: ChecklistDefinition) => {
   if (!canEditFields.value) return
   definition.value = toEditorDefinition(value)
@@ -444,7 +447,7 @@ const retire = async () => {
             </aside>
           </template>
 
-          <UForm ref="checklistForm" :state="state" :schema="ChecklistMetadataSchema">
+          <UForm ref="checklistForm" :state="state" :validate="validateMetadata">
             <fieldset :disabled="!canEditFields">
               <CommonDesignTimeEditorSections>
                 <AssessmentSchemaPageSection section-id="checklist-general" :title="t('checklist_schema.general')" role="tabpanel" :aria-label="t('checklist_schema.general')">

@@ -82,7 +82,9 @@ export const getCommitmentLinePaymentCoverage = async (
   const typedFloor = coding.typedAvailable === null ? ZERO_MONEY : subtractMoney(parseDatabaseMoney(line.amount), coding.typedAvailable)
   const adjustedFloor = [ownPaid, codingPaidFloor, typedFloor].reduce((maximum, floor) => compareMoney(floor, maximum) > 0 ? floor : maximum, ZERO_MONEY)
   return {
-    hasActivePaymentLine: rows.length > 0 || coding.adjustments.length > 0,
+    hasActivePaymentLine: rows.length > 0
+      || coding.adjustments.some(row => String(row.commitmentLineId) === commitmentLineId)
+      || compareMoney(adjustedFloor, ZERO_MONEY) > 0,
     paidAmount: compareMoney(adjustedFloor, ZERO_MONEY) < 0 ? ZERO_MONEY : adjustedFloor
   }
 }

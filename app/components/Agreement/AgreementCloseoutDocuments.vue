@@ -1,9 +1,11 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- component-local callbacks are self-descriptive */
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { AgreementGeneratedDocumentItem, TransferPaymentStreamDocumentTemplateItem } from '~~/shared/types/schemas'
 import type { TransferPaymentDocumentTemplateOutputFormat } from '~~/shared/types/database'
+import type { CloseoutDocumentPersistence } from '~~/shared/types/agreement-closeout'
+import type { EntityAssignmentContext } from '~~/shared/types/schemas/entity-assignment'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 
@@ -19,6 +21,11 @@ const outputFormat: Ref<TransferPaymentDocumentTemplateOutputFormat> = ref('docx
 const isGenerating: Ref<boolean> = ref(false)
 const loadStatus: Ref<'pending' | 'success' | 'error'> = ref('pending')
 let loadGeneration = 0
+let ownerGeneration = 0
+onBeforeUnmount(() => {
+  loadGeneration++
+  ownerGeneration++
+})
 const selectedTemplate = computed(() => templates.value.find(template => template.id === selectedTemplateId.value))
 const outputFormats = computed(() => selectedTemplate.value?.egcs_ay_outputformats ?? [])
 watch(outputFormats, formats => {
@@ -54,22 +61,28 @@ const refresh = async () => {
 }
 
 const load = async () => {
+  const generation = ownerGeneration
+  const request = loadGeneration + 1
   try {
     await refresh()
   } catch (error: unknown) {
+    if (generation !== ownerGeneration || request !== loadGeneration) return
     loadStatus.value = 'error'
     showError(error)
   }
 }
 watch(baseUrl, () => {
+  ownerGeneration++
+  isGenerating.value = false
   templates.value = []
   documents.value = []
   selectedTemplateId.value = undefined
   void load()
-}, { immediate: true })
+}, { immediate: true, flush: 'sync' })
 
-const saveBlob = async (response: Response, fallbackName: string) => {
+const saveBlob = async (response: Response, fallbackName: string, current: () => boolean) => {
   const blob = await response.blob()
+  if (!current()) return
   const disposition = response.headers.get('content-disposition') ?? ''
   const filename = /filename="?([^";]+)"?/i.exec(disposition)?.[1] ?? fallbackName
   const url = URL.createObjectURL(blob)
@@ -83,41 +96,73 @@ const saveBlob = async (response: Response, fallbackName: string) => {
   setTimeout(() => URL.revokeObjectURL(url), 0)
 }
 
+const readJson = async (path: string): Promise<unknown> => {
+  const response = await fetch(getClientRequestUrl(path))
+  if (!response.ok) await throwFetchResponseError(response)
+  return await response.json()
+}
+const checkPersistencePrerequisites = async (requestedBase: string, current: () => boolean): Promise<boolean> => {
+  const [record, roster, profile] = await Promise.all([
+    readJson(requestedBase) as Promise<Pick<CloseoutDocumentPersistence, 'can_persist_documents'>>,
+    readJson(`/api/entity-assignments/fundingcaseagreementcloseout/${closeoutId}`) as Promise<{ is_assigned: boolean }>,
+    readJson(`/api/entity-assignments/fundingcaseagreementcloseout/${closeoutId}/context`) as Promise<EntityAssignmentContext>
+  ])
+  if (!current()) return false
+  if (roster.is_assigned === true && profile.can_create_agreement_role === true && record.can_persist_documents === true) return true
+  toast.add({
+    title: toast.localized('common.warning'),
+    description: toast.localized(roster.is_assigned !== true ? 'assignments.read_only_description' : 'agreement.child_records.work_prerequisite'),
+    color: 'warning'
+  })
+  return false
+}
+
 const generate = async (persist: boolean) => {
   if (!selectedTemplateId.value || isGenerating.value) return
+  const generation = ownerGeneration
+  const requestedBase = baseUrl.value
+  const fallbackName = `closeout-${closeoutId}.${outputFormat.value}`
+  const current = () => generation === ownerGeneration
   try {
     isGenerating.value = true
-    const response = await fetch(getClientRequestUrl(`${baseUrl.value}/documents/${persist ? 'generate' : 'preview'}`), {
+    if (persist && (!canPersist || !await checkPersistencePrerequisites(requestedBase, current))) return
+    if (!current()) return
+    const response = await fetch(getClientRequestUrl(`${requestedBase}/documents/${persist ? 'generate' : 'preview'}`), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ templateId: selectedTemplateId.value, language: language.value, outputFormat: outputFormat.value })
     })
     if (!response.ok) await throwFetchResponseError(response)
+    if (!current()) return
     if (persist) {
       try {
-        await refresh()
+        if (!await refresh() || !current()) return
       } catch (error: unknown) {
+        if (!current()) return
         loadStatus.value = 'error'
-        showError(error)
+        if (current()) showError(error)
         return
       }
       toast.add({ title: toast.localized('common.success'), description: toast.localized('agreement.documents.generated_success'), color: 'success' })
     } else {
-      await saveBlob(response, `closeout-${closeoutId}.${outputFormat.value}`)
+      await saveBlob(response, fallbackName, current)
     }
   } catch (error: unknown) {
-    showError(error)
+    if (current()) showError(error)
   } finally {
-    isGenerating.value = false
+    if (current()) isGenerating.value = false
   }
 }
 
 const download = async (item: AgreementGeneratedDocumentItem) => {
+  const generation = ownerGeneration
+  const requestedBase = baseUrl.value
+  const current = () => generation === ownerGeneration
   try {
-    const response = await fetch(getClientRequestUrl(`${baseUrl.value}/documents/${item.id}/download`))
+    const response = await fetch(getClientRequestUrl(`${requestedBase}/documents/${item.id}/download`))
     if (!response.ok) await throwFetchResponseError(response)
-    await saveBlob(response, `${item.egcs_fc_name_en}.${item.egcs_fc_outputformat}`)
-  } catch (error: unknown) { showError(error) }
+    await saveBlob(response, `${item.egcs_fc_name_en}.${item.egcs_fc_outputformat}`, current)
+  } catch (error: unknown) { if (current()) showError(error) }
 }
 </script>
 

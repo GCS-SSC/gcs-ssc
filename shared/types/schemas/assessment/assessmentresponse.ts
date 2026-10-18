@@ -147,6 +147,18 @@ export const createAssessmentResponseValidationSchema = (
     })
   }
 
+  value.answers.forEach((answer, index) => {
+    const question = schema.sections
+      .find(section => section.name === answer.section)?.subSections
+      .find(subsection => subsection.name === answer.subsection)?.questions
+      .find(item => item.name === answer.question)
+    if (!question || question.type !== 'question') {
+      ctx.addIssue({ code: 'custom', path: ['answers', index, 'question'], message: 'validation.invalid_selection' })
+    } else if (answer.value !== null && !question.options.some(option => option.value === answer.value)) {
+      ctx.addIssue({ code: 'custom', path: ['answers', index, 'value'], message: 'validation.invalid_selection' })
+    }
+  })
+
   const runtimeSummary = buildAssessmentRuntimeSummary(value, {
     ...schema,
     scoringMatrix

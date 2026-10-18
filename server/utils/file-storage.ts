@@ -1,5 +1,6 @@
 /* eslint-disable jsdoc/require-jsdoc -- Storage facade helpers use explicit typed contracts. */
 import type { Insertable, Kysely } from 'kysely'
+import { enqueueStorageCleanup } from './storage-cleanup-outbox'
 import { nanoid } from 'nanoid'
 import { withAuditCreationOwner } from './audit-context'
 import type { GcsFileStoragePurpose, GcsFileStorageTarget } from '@gcs-ssc/extensions/server'
@@ -29,6 +30,34 @@ export interface StoredFileRecord {
   providerId: string
   objectId: string
   locator: JsonValue
+}
+
+export interface StoredFileUpload extends Omit<StoredFileRecord, 'id'> {
+  agencyId: string
+  purpose: GcsFileStoragePurpose
+  target?: GcsFileStorageTarget
+}
+
+export type RegisterStoredFileUpload = (upload: StoredFileUpload) => void
+
+export const cleanupStoredFileUploads = async (
+  db: Kysely<Database>, uploads: StoredFileUpload[], requestId?: string
+): Promise<void> => {
+  if (db.isTransaction) throw new Error('Stored-file compensation requires a settled transaction and its root database')
+  await Promise.all(uploads.map(async upload => await bestEffortStorageCleanup(async () => {
+    try {
+      await deleteStoredFile(db, upload.agencyId, {
+        egcs_cn_provider: upload.providerId,
+        egcs_cn_providerobjectid: upload.objectId,
+        egcs_cn_providerlocator: upload.locator
+      }, upload.purpose, upload.target)
+    } catch {
+      await db.transaction().execute(async trx => await enqueueStorageCleanup(trx, {
+        agency_id: upload.agencyId, provider_key: upload.providerId,
+        object_id: upload.objectId, locator: upload.locator, purpose: upload.purpose
+      }))
+    }
+  }, { providerId: upload.providerId, objectId: upload.objectId, purpose: upload.purpose, requestId })))
 }
 
 export type StoredFileLocation = Pick<CommonAttachmentTable, 'egcs_cn_provider' | 'egcs_cn_providerobjectid' | 'egcs_cn_providerlocator'>
@@ -118,7 +147,7 @@ export const deleteStoredFile = async (
   })
 }
 
-export const writeStoredFile = async (db: Kysely<Database>, input: StoredFileInput): Promise<StoredFileRecord> => {
+export const writeStoredFile = async (db: Kysely<Database>, input: StoredFileInput, registerUpload: RegisterStoredFileUpload): Promise<StoredFileRecord> => {
   const attachmentTypeId = await ensureAttachmentType(
     db, input.agencyId,
     input.attachmentTypeNameEn || 'Document Template',
@@ -136,6 +165,8 @@ export const writeStoredFile = async (db: Kysely<Database>, input: StoredFileInp
   const reference = await writeProviderObject({
     provider, objectName, bytes: input.bytes, contentType: input.mimeType, purpose, target: input.target
   })
+  registerUpload({ agencyId: input.agencyId, providerId: provider.extension.key,
+    objectId: reference.objectId, locator: reference.locator, purpose, target: input.target })
   const values: Insertable<CommonAttachmentTable> = {
     egcs_cn_attachmenttype: attachmentTypeId,
     egcs_cn_name_en: input.nameEn,
@@ -152,19 +183,10 @@ export const writeStoredFile = async (db: Kysely<Database>, input: StoredFileInp
     _deleted: false
   }
 
-  let attachment: { id: string | number }
-  try {
-    attachment = await withAuditCreationOwner('public.Common_Attachment',
-      { egcs_cn_provider: provider.extension.key, egcs_cn_providerobjectid: reference.objectId },
-      input.target ?? { entityType: 'agency', entityId: input.agencyId },
-      async () => await db.insertInto('Common_Attachment').values(values).returning('id').executeTakeFirstOrThrow())
-  } catch (error: unknown) {
-    await bestEffortStorageCleanup(
-      async () => await deleteProviderObject({ provider, reference, purpose, target: input.target }),
-      { providerId: provider.extension.key, objectId: reference.objectId, purpose }
-    )
-    throw error
-  }
+  const attachment = await withAuditCreationOwner('public.Common_Attachment',
+    { egcs_cn_provider: provider.extension.key, egcs_cn_providerobjectid: reference.objectId },
+    input.target ?? { entityType: 'agency', entityId: input.agencyId },
+    async () => await db.insertInto('Common_Attachment').values(values).returning('id').executeTakeFirstOrThrow())
   return { id: String(attachment.id), providerId: provider.extension.key, objectId: reference.objectId, locator: reference.locator }
 }
 

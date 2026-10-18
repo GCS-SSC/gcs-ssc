@@ -62,6 +62,9 @@ const {
   appendActions: extensionAppendCreateActions,
   replacementAction: extensionReplacementCreateAction,
   hasReplacement: hasExtensionCreateReplacement,
+  labelForAction: extensionCreateLabel,
+  error: extensionCreateError,
+  refresh: refreshExtensionCreateActions,
   hasConflict: hasExtensionCreateConflict
 } = useExtensionCreateActions({
   operation: 'agreement.commitments.create',
@@ -232,6 +235,28 @@ const openCreateCommitment = async () => {
   }
 }
 
+const readyExtensionCreateActions = ref<Set<string>>(new Set())
+const pendingExtensionCreateAction = ref<string | null>(null)
+let extensionCreateGeneration = 0
+watch([agreementIdRef, () => canCreate, () => canCreateRole,
+  extensionReplacementCreateAction, extensionAppendCreateActions], () => {
+  extensionCreateGeneration += 1
+  readyExtensionCreateActions.value = new Set()
+  pendingExtensionCreateAction.value = null
+}, { flush: 'sync' })
+const activateExtensionCreateAction = async (value: string) => {
+  if (!(canCreateRole ?? canCreate) || pendingExtensionCreateAction.value !== null) return
+  const generation = extensionCreateGeneration
+  const isCurrent = () => !disposed && generation === extensionCreateGeneration
+  pendingExtensionCreateAction.value = value
+  try {
+    if (!await checkCreationPrerequisites(isCurrent) || !isCurrent()) return
+    readyExtensionCreateActions.value = new Set([...readyExtensionCreateActions.value, value])
+  } finally {
+    if (isCurrent()) pendingExtensionCreateAction.value = null
+  }
+}
+
 const handleExtensionCreated = async () => {
   await refreshOverview()
   toast.add({
@@ -324,8 +349,14 @@ const deleteCommitment = (recordId: string) => runRecordAction(recordId, 'delete
       @add="openCreateCommitment"
       @retry="refreshOverview">
       <template #actions>
+        <UAlert
+          v-if="(canCreateRole ?? canCreate) && extensionCreateError"
+          role="alert"
+          color="error"
+          :title="t('common.load_failed')"
+          :actions="[{ label: t('common.retry'), onClick: () => refreshExtensionCreateActions() }]" />
         <div
-          v-if="canCreate && hasExtensionCreateConflict"
+          v-if="(canCreateRole ?? canCreate) && hasExtensionCreateConflict"
           role="status"
           tabindex="0"
           :aria-label="t('extensions.create_operation_conflict')"
@@ -333,16 +364,33 @@ const deleteCommitment = (recordId: string) => runRecordAction(recordId, 'delete
           <UIcon name="i-lucide-alert-triangle" aria-hidden="true" class="mt-0.5 size-4 shrink-0" />
           <span>{{ t('extensions.create_operation_conflict') }}</span>
         </div>
-        <ExtensionCreateActionHost
-          v-if="canCreate && extensionReplacementCreateAction && !hasExtensionCreateConflict"
-          :item="extensionReplacementCreateAction"
-          @created="handleExtensionCreated" />
-        <template v-if="canCreate">
+        <template v-if="(canCreateRole ?? canCreate) && extensionReplacementCreateAction && !hasExtensionCreateConflict">
           <ExtensionCreateActionHost
-            v-for="action in extensionAppendCreateActions"
-            :key="action.value"
-            :item="action"
+            v-if="canCreate || readyExtensionCreateActions.has(extensionReplacementCreateAction.value)"
+            :item="extensionReplacementCreateAction"
             @created="handleExtensionCreated" />
+          <UButton
+            v-else
+            :label="extensionCreateLabel(extensionReplacementCreateAction)"
+            :icon="extensionReplacementCreateAction.icon"
+            :loading="pendingExtensionCreateAction === extensionReplacementCreateAction.value"
+            :disabled="pendingExtensionCreateAction !== null"
+            @click="activateExtensionCreateAction(extensionReplacementCreateAction.value)" />
+        </template>
+        <template v-if="canCreateRole ?? canCreate">
+          <template v-for="action in extensionAppendCreateActions" :key="action.value">
+            <ExtensionCreateActionHost
+              v-if="canCreate || readyExtensionCreateActions.has(action.value)"
+              :item="action"
+              @created="handleExtensionCreated" />
+            <UButton
+              v-else
+              :label="extensionCreateLabel(action)"
+              :icon="action.icon"
+              :loading="pendingExtensionCreateAction === action.value"
+              :disabled="pendingExtensionCreateAction !== null"
+              @click="activateExtensionCreateAction(action.value)" />
+          </template>
         </template>
       </template>
 
@@ -413,6 +461,7 @@ const deleteCommitment = (recordId: string) => runRecordAction(recordId, 'delete
             <CommonServerLookupSelect
               v-model="selectedCommitment.egcs_fc_type"
               :fetch-url="`/api/agreements/${agreementId}/commitments/lookups/types`"
+              selected-values-query-key="selected_ids"
               value-key="id"
               label-en-key="label_en"
               label-fr-key="label_fr"

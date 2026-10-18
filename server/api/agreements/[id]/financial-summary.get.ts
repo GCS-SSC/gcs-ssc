@@ -20,6 +20,9 @@ export default defineEventHandler(async event => {
     const agreement = await assertAgreementExists(event, agreementId, db)
     if (!agreement || typeof agreement !== 'object' || !('id' in agreement)) return agreement
 
+    const { egcs_fc_currency: agreementCurrency } = await db.selectFrom('Funding_Case_Agreement_Profile')
+      .select('egcs_fc_currency').where('id', '=', agreementId).executeTakeFirstOrThrow()
+
     const [yearRows, budgetRows, forecastRows, forecastLineRows, claimRows, reconcileRows, paymentRows] = await Promise.all([
       db.selectFrom('Funding_Case_Agreement_Budget_Fiscal_Year')
         .innerJoin('Funding_Case_Agreement_Budget_Version', 'Funding_Case_Agreement_Budget_Version.id', 'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_budgetversion')
@@ -168,7 +171,7 @@ export default defineEventHandler(async event => {
       })
     }
     const finalizedIds = new Set(accounting.entries.filter(entry => entry.kind === 'cash_payment').map(entry => entry.id))
-    return buildAgreementFinancialSummary(years, budgets, forecasts, forecastLines, claims, reconciliations,
+    return buildAgreementFinancialSummary(agreementCurrency, years, budgets, forecasts, forecastLines, claims, reconciliations,
       payments.filter(payment => finalizedIds.has(payment.id)), accounting.entries.flatMap(entry =>
         entry.kind === 'cash_payment' ? [] : [{ ...entry, kind: entry.kind }]), await readEffectiveAccountReceivableClaimRecoveries(db, agreementId))
   })

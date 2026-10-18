@@ -17,6 +17,8 @@ const DEFAULT_PORT_SCAN_LIMIT = 50
 const DEFAULT_PLAYWRIGHT_WORKERS = '1'
 const E2E_POSTGRES_TEST_URL_ENV = 'E2E_POSTGRES_TEST_URL'
 
+export const extensionProfileE2eSpecPath = 'tests/e2e/agreement-extension-persistence.spec.ts'
+
 export const postgresE2eSpecPaths = [
   'tests/e2e/stream-wizard-budget-reference-review.spec.ts',
   'tests/e2e/proponent-profile-list-review.spec.ts',
@@ -25,6 +27,7 @@ export const postgresE2eSpecPaths = [
   'tests/e2e/stream-eligible-recipients-list-review.spec.ts',
   'tests/e2e/agreement-budget-legacy-fiscal-year.spec.ts',
   'tests/e2e/agreement-financial-summary-lineage.spec.ts',
+  'tests/e2e/agreement-financial-summary-postgres.spec.ts',
   'tests/e2e/agreement-activity-readonly-lock.spec.ts',
   'tests/e2e/agreement-address-readonly-lock.spec.ts',
   'tests/e2e/agreement-address-review.spec.ts',
@@ -32,7 +35,6 @@ export const postgresE2eSpecPaths = [
   'tests/e2e/agreement-child-id-search-boundaries.spec.ts',
   'tests/e2e/agreement-proponent-relationships.spec.ts',
   'tests/e2e/applicant-recipient-cross-agency.spec.ts',
-  'tests/e2e/agreement-extension-persistence.spec.ts',
   'tests/e2e/transfer-payment-stream-identity.spec.ts',
   'tests/e2e/program-budget-legacy-fiscal-year.spec.ts',
   'tests/e2e/workflow-owner-recovery.spec.ts'
@@ -98,6 +100,7 @@ export const lifecycleFixturePgliteE2eSpecPaths = [
   'tests/e2e/agreements.spec.ts',
   'tests/e2e/amendment-document-ui.spec.ts',
   'tests/e2e/assigned-work-deleted-owner.spec.ts',
+  'tests/e2e/assigned-users-group-retry.spec.ts',
   'tests/e2e/assignment-management.spec.ts',
   'tests/e2e/attachment-member-ids.spec.ts',
   'tests/e2e/budget-percentage.spec.ts',
@@ -115,6 +118,8 @@ export const lifecycleFixturePgliteE2eSpecPaths = [
   'tests/e2e/funding-source-retained-budget.spec.ts',
   'tests/e2e/hostile-deep-links.spec.ts',
   'tests/e2e/journal-vouchers.spec.ts',
+  'tests/e2e/monitor-historical-reference.spec.ts',
+  'tests/e2e/review-group-claim-clone-caller.spec.ts',
   'tests/e2e/lifecycle-approval-helper-outcomes.spec.ts',
   'tests/e2e/qualified-assignment-route-review.spec.ts',
   'tests/e2e/stream-agreement-subtypes-delete-review.spec.ts',
@@ -124,7 +129,12 @@ export const lifecycleFixturePgliteE2eSpecPaths = [
   'tests/e2e/transfer-payment-amendment-subtypes.spec.ts',
   'tests/e2e/workflow-amendment-conditions.spec.ts',
   'tests/e2e/workflow-group-owners.spec.ts',
-  'tests/e2e/workflow-profile-conditions.spec.ts'
+  'tests/e2e/workflow-profile-conditions.spec.ts',
+  'tests/e2e/maple-finance-ready.spec.ts',
+  'tests/e2e/additional-reviewer-lookup-review.spec.ts',
+  'tests/e2e/checklist-load-recovery.spec.ts',
+  'tests/e2e/supplementary-information.spec.ts',
+  'tests/e2e/workflow-data-collection-inline.spec.ts'
 ] as const
 
 export const freshResetE2eSpecPaths = [
@@ -132,6 +142,10 @@ export const freshResetE2eSpecPaths = [
   ...lifecycleFixturePgliteE2eSpecPaths,
   'tests/e2e/ncia-demo-seed.spec.ts',
   'tests/e2e/account-receivable-claim-reductions.spec.ts',
+  'tests/e2e/account-receivable-create-claim.spec.ts',
+  'tests/e2e/three-role-contribution-journey.spec.ts',
+  'tests/e2e/agency-publication-authoring.spec.ts',
+  'tests/e2e/data-collection-workflow.spec.ts',
   'tests/e2e/advance-direct-repayment-hold.spec.ts',
   'tests/e2e/payment-offset-coding-wizard.spec.ts',
   'tests/e2e/payment-accounting-boundaries.spec.ts',
@@ -142,6 +156,9 @@ export const freshResetE2eSpecPaths = [
   'tests/e2e/assessment-calculated-fields.spec.ts',
   'tests/e2e/mixed-review-set-lifecycle.spec.ts',
   'tests/e2e/assessment-approval-execution.spec.ts',
+  'tests/e2e/workflow-r3-approval-authority.spec.ts',
+  'tests/e2e/intake-reviews-add-remedy.spec.ts',
+  'tests/e2e/intake-reviews-role-projection.spec.ts',
   'tests/e2e/agreement-completion-lifecycle.spec.ts',
   'tests/e2e/agreement-record-state-presentation.spec.ts',
   'tests/e2e/agreement-risk-rating-workflow.spec.ts',
@@ -154,7 +171,7 @@ export const freshResetE2eSpecPaths = [
 
 export const reviewScratchE2eFilePattern = String.raw`.*\.tmp\.spec\.ts$`
 
-const postgresE2eBasenames = postgresE2eSpecPaths.map(path => path.split('/').at(-1))
+const postgresE2eBasenames = [...postgresE2eSpecPaths, extensionProfileE2eSpecPath].map(path => path.split('/').at(-1))
 const escapedPostgresE2eBasenames = postgresE2eBasenames
   .map(name => name?.replaceAll('.', String.raw`\.`))
   .join('|')
@@ -515,7 +532,11 @@ const assertCanonicalExistingSpecPath = (selectedSpec: string): void => {
 const assertSpecBelongsToSuite = (suite: E2eSuite, selectedSpec: string): void => {
   assertCanonicalExistingSpecPath(selectedSpec)
   const isReviewScratchSpec = selectedSpec.endsWith('.tmp.spec.ts')
-  const isPostgresSpec = postgresE2eSpecPaths.some(path => path === selectedSpec)
+  const isProfileFixtureSpec = selectedSpec === extensionProfileE2eSpecPath
+  if (isProfileFixtureSpec && process.env.GCS_E2E_PROFILE_FIXTURE !== '1') {
+    throw new Error('The synthetic profile fixture requires bun run test:e2e:extension-profile.')
+  }
+  const isPostgresSpec = isProfileFixtureSpec || postgresE2eSpecPaths.some(path => path === selectedSpec)
   const isAmendmentRefreshSpec = amendmentRefreshE2eSpecPaths.some(path => path === selectedSpec)
   const isAgreementCloseoutSpec = agreementCloseoutE2eSpecPaths.some(path => path === selectedSpec)
   const isWorkflowRecommendationSpec = workflowRecommendationE2eSpecPaths.some(path => path === selectedSpec)

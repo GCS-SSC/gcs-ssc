@@ -1120,7 +1120,7 @@
       "duplicate_agreement_number": "Une entrée d'historique du financement portant ce numéro d'entente existe déjà.",
       "current_recipient_required": "Le promoteur actuel doit demeurer lié à cette entrée d'historique du financement.",
       "duplicate_recipient": "Ce promoteur est déjà lié à l'entrée d'historique du financement.",
-      "invalid_recipient": "Un ou plusieurs promoteurs sélectionnés sont invalides.",
+      "invalid_recipient": "Un ou plusieurs promoteurs sélectionnés ne sont pas disponibles, ou vous ne disposez pas des autorisations et des affectations nécessaires pour enregistrer. Vérifiez vos sélections et réessayez.",
       "not_found": "Entrée d'historique du financement introuvable.",
       "similarity_confirmation_required": "Examinez et confirmez les entrées similaires d'historique du financement avant d'enregistrer."
     },
@@ -3812,7 +3812,7 @@
     "no_change": "Aucun changement",
     "owner_pause_title": "Processus en pause : responsable à remplacer",
     "owner_pause_help": "Un ou plusieurs responsables configurés ne sont plus disponibles ou admissibles. Sélectionnez un remplacement admissible pour continuer.",
-    "owner_pause_readonly_help": "Un ou plusieurs responsables configurés ne sont plus disponibles ou admissibles. Une personne autorisée pour le processus ou la gestion des affectations doit sélectionner un remplacement.",
+    "owner_pause_readonly_help": "Un ou plusieurs responsables configurés ne sont plus disponibles ou admissibles. Une personne affectée disposant des droits de contribution et de reprise du processus doit sélectionner un remplacement.",
     "replacement_owner": "Responsable de remplacement",
     "resume": "Reprendre le processus",
     "transition_history": "Historique de l’état parent",
@@ -4301,6 +4301,7 @@
     "no_answers": "Aucune réponse n’a été fournie pour ce formulaire."
   },
   "journal_voucher": {
+    "save_before_completion": "Enregistrez votre écriture comptable avant l’achèvement.",
     "title": "Pièces de journal",
     "description": "Préparer des corrections comptables équilibrées pour des paiements définitifs.",
     "create": "Créer une pièce de journal",

@@ -1,15 +1,18 @@
 import { z } from 'zod'
 import { sql } from 'kysely'
+import { PositivePostgresBigintIdSchema } from '~~/shared/types/schemas/common'
 import { PaginationSchema } from '~~/shared/types/schemas'
 import { requireAuthContext } from '~~/server/utils/authorize'
-import { resolveAdditionalReviewerExecutableContextFromReview } from '~~/server/utils/additional-reviewer-runtime'
-import { authorizeReviewRuntimeAction } from '~~/server/utils/review-runtime-access'
+import { authorizeAdditionalReviewerLookup } from '~~/server/utils/additional-reviewer-runtime'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
 
-const GroupLookupQuerySchema = PaginationSchema.extend({ search: z.string().optional() })
+const GroupLookupQuerySchema = PaginationSchema.extend({
+  search: z.string().optional(),
+  additionalReviewerId: PositivePostgresBigintIdSchema.optional()
+})
 
 export default defineEventHandler(async event => {
   const db = event.context.$db
@@ -19,12 +22,11 @@ export default defineEventHandler(async event => {
   if (!isPositivePostgresBigintText(reviewId)) {
     return await notFound(event, 'ASSESSMENT_NOT_FOUND', 'apiErrors.admin_common.not_found')
   }
-  const { page, limit, search } = await getValidatedQueryI18n(event, GroupLookupQuerySchema)
-  const context = await resolveAdditionalReviewerExecutableContextFromReview(db, reviewId)
+  const { page, limit, search, additionalReviewerId } = await getValidatedQueryI18n(event, GroupLookupQuerySchema)
+  const context = await authorizeAdditionalReviewerLookup(event, reviewId, additionalReviewerId)
   if (!context?.runtimeEntity.schemaAgencyId) {
     return await notFound(event, 'ASSESSMENT_NOT_FOUND', 'apiErrors.admin_common.not_found')
   }
-  await authorizeReviewRuntimeAction(event, 'save_assessment', context.runtimeEntity)
 
   return await db.transaction().setIsolationLevel('repeatable read').setAccessMode('read only').execute(async trx => {
     let query = trx.selectFrom('Common_Group')

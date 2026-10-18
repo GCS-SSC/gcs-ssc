@@ -1,5 +1,6 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- local request helpers are self-documenting and not public APIs */
+import type { LocalizedToastText } from '~/composables/useLocalizedToast'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { getGroupedRowModel } from '@tanstack/vue-table'
@@ -10,12 +11,16 @@ import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useT
 import { appRouteLocations } from '~/utils/route-locations'
 import { RUNTIME_TERMINAL_STATES } from '~~/shared/constants/system-lifecycle'
 import type { ReviewTargetEntityType } from '~~/shared/constants/enums'
+import { ReviewSetListRoleCapabilitiesSchema, ReviewSetRoleCapabilitiesSchema } from '~~/shared/types/schemas/review-set-role-capabilities'
+import type { ReviewSetRoleCapabilities } from '~~/shared/types/schemas/review-set-role-capabilities'
 import type { RuntimeKind, RuntimeState } from '~~/shared/constants/system-lifecycle'
 
-const { entityType, entityId, canUpdate = false } = defineProps<{
+const { entityType, entityId, canUpdate = false, actionRoleAllowed = undefined, actionPrerequisiteWarning } = defineProps<{
   entityType: ReviewTargetEntityType
   entityId: string
   canUpdate?: boolean
+  actionRoleAllowed?: boolean
+  actionPrerequisiteWarning?: LocalizedToastText
 }>()
 
 const emit = defineEmits<{ changed: [] }>()
@@ -32,7 +37,7 @@ type EntityReview = {
   egcs_cn_reviewtype?: 'assessment' | 'checklist'
 }
 
-type EntityReviewSet = {
+type EntityReviewSet = ReviewSetRoleCapabilities & {
   id: string
   runtimeId: string
   runtimeKind: RuntimeKind
@@ -63,6 +68,7 @@ type ReviewLeafRow = {
   agencyNameFr: string
   reviewSetupSequential: boolean
   reviewSetId: string
+  canCancelRole: boolean
   canRetry: boolean
   reviewSetRuntimeKind: RuntimeKind
   reviewSetRuntimeState: RuntimeState
@@ -85,6 +91,7 @@ type GroupedReviewRow = {
 }
 
 const { t } = useI18n()
+const toast = useLocalizedToast()
 const { getGroupedDisclosureControlsId, getGroupedDisclosureContentId } = useGroupedDisclosureIds()
 const localePath = useLocalePath()
 const router = useRouter()
@@ -92,6 +99,7 @@ const route = useRoute()
 const { showError } = useApiErrorToast()
 const isCreateModalOpen: Ref<boolean> = ref(false)
 const isSubmitting: Ref<boolean> = ref(false)
+const cancellingSetIds: Ref<Set<string>> = ref(new Set())
 const selectedReviewSetSetupId: Ref<string> = ref('')
 
 const REVIEW_SET_GROUP_COLUMN_ID = 'reviewSetGroup'
@@ -120,6 +128,7 @@ onBeforeUnmount(() => {
 watch(() => [entityType, entityId], () => {
   requestGeneration += 1
   isSubmitting.value = false
+  cancellingSetIds.value = new Set()
   isCreateModalOpen.value = false
   selectedReviewSetSetupId.value = ''
   expandedRows.value = {}
@@ -152,6 +161,20 @@ const bilingualColumns: BilingualColumnConfig<ReviewLeafRow>[] = [
   }
 ]
 
+const listRoleCapabilities = computed(() => ReviewSetListRoleCapabilitiesSchema.safeParse(response.value))
+const hasCurrentResponse = computed(() => status.value === 'success' && response.value !== undefined)
+const legacyRoleAllowed = computed(() => actionRoleAllowed ?? canUpdate)
+const canShowAdd = computed(() => {
+  if (!hasCurrentResponse.value) return false
+  const result = listRoleCapabilities.value
+  return result.success ? result.data.can_create_role ?? legacyRoleAllowed.value : false
+})
+const canCancelSetRole = (item: EntityReviewSet) => {
+  if (!hasCurrentResponse.value) return false
+  const result = ReviewSetRoleCapabilitiesSchema.safeParse(item)
+  return result.success ? result.data.can_cancel_role ?? legacyRoleAllowed.value : false
+}
+
 const tableRows = computed<ReviewLeafRow[]>(() => items.value
   .flatMap(item => (item.reviews ?? []).map(review => ({
     id: review.id,
@@ -163,6 +186,7 @@ const tableRows = computed<ReviewLeafRow[]>(() => items.value
     agencyNameFr: item.agency_name_fr,
     reviewSetupSequential: item.egcs_cn_sequential,
     reviewSetId: item.id,
+    canCancelRole: canCancelSetRole(item),
     canRetry: review.can_retry,
     reviewSetRuntimeKind: item.runtimeKind,
     reviewSetRuntimeState: item.runtimeState,
@@ -206,8 +230,20 @@ const updateExpandedRows = (value: ExpandedState) => {
 const isTerminalRuntimeState = (runtimeState: RuntimeState) => RUNTIME_TERMINAL_STATES.has(runtimeState)
 const isRetryableReviewState = (runtimeState: RuntimeState) =>
   isTerminalRuntimeState(runtimeState) && runtimeState !== 'succeeded' && runtimeState !== 'approved'
+const guardCreate = () => {
+  if (isSubmitting.value || !canShowAdd.value) return false
+  if (actionPrerequisiteWarning || !canUpdate) {
+    toast.add({
+      title: toast.localized('common.unavailable'),
+      description: actionPrerequisiteWarning || toast.localized('workflow.action_prerequisite_unavailable'),
+      color: 'warning'
+    })
+    return false
+  }
+  return canUpdate
+}
 const openCreateModal = () => {
-  if (!canUpdate || isSubmitting.value) return
+  if (!guardCreate()) return
   selectedReviewSetSetupId.value = ''
   isCreateModalOpen.value = true
 }
@@ -236,7 +272,7 @@ const postJson = async (url: string, body?: unknown) => {
  * Submits a manual runtime review-set creation request for the explicit entity target.
  */
 const createReviewSet = async () => {
-  if (!canUpdate || !selectedReviewSetSetupId.value || isSubmitting.value) {
+  if (!selectedReviewSetSetupId.value || !guardCreate()) {
     return
   }
 
@@ -265,8 +301,19 @@ const createReviewSet = async () => {
  * @param reviewSetId - Runtime review-set identifier.
  */
 const cancelReviewSet = async (reviewSetId: string) => {
-  if (!canUpdate) return
+  const row = tableRows.value.find(candidate => candidate.reviewSetId === reviewSetId)
+  if (!row?.canCancelRole || isTerminalRuntimeState(row.reviewSetRuntimeState)
+    || cancellingSetIds.value.has(reviewSetId)) return
+  if (actionPrerequisiteWarning || !canUpdate) {
+    toast.add({
+      title: toast.localized('common.unavailable'),
+      description: actionPrerequisiteWarning || toast.localized('workflow.action_prerequisite_unavailable'),
+      color: 'warning'
+    })
+    return
+  }
   const generation = requestGeneration
+  cancellingSetIds.value.add(reviewSetId)
   try {
     await postJson(`/api/review-sets/${reviewSetId}/cancel`)
     if (generation === requestGeneration) {
@@ -275,6 +322,8 @@ const cancelReviewSet = async (reviewSetId: string) => {
     }
   } catch (error: unknown) {
     if (generation === requestGeneration) showError(error)
+  } finally {
+    if (generation === requestGeneration) cancellingSetIds.value.delete(reviewSetId)
   }
 }
 
@@ -327,8 +376,8 @@ const expandedOptions = { autoResetExpanded: false }
       :total-records="totalRecords"
       :loading="status === 'pending'"
       :request-status="status"
-      :button-label="canUpdate ? t('common.add') : undefined"
-      :show-button="canUpdate"
+      :button-label="canShowAdd ? t('common.add') : undefined"
+      :show-button="canShowAdd"
       @add="openCreateModal"
       @retry="refresh"
       @update:expanded="updateExpandedRows">
@@ -391,9 +440,10 @@ const expandedOptions = { autoResetExpanded: false }
       </template>
 
       <template #actions-cell="{ row }">
-        <div v-if="isReviewSetGroupRow(row) && canUpdate" class="flex justify-end gap-2">
+        <div v-if="isReviewSetGroupRow(row) && row.original.canCancelRole" class="flex justify-end gap-2">
           <CommonActionButton
             v-if="!isTerminalRuntimeState(row.original.reviewSetRuntimeState)"
+            :loading="cancellingSetIds.has(row.original.reviewSetId)"
             icon="i-lucide-ban"
             color="error"
             variant="ghost"

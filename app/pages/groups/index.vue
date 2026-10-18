@@ -43,6 +43,7 @@ const expandedGroupIds: Ref<string[]> = ref([])
 const membersByGroup: Ref<Record<string, Member[]>> = ref({})
 const userResponse: Ref<{ items: UserOption[] } | null> = ref(null)
 const memberModalOpen: Ref<boolean> = ref(false)
+const addingMember = ref(false)
 const removingMemberIds = ref<string[]>([])
 const memberForm = reactive({ egcs_cn_user: '' })
 const validateMember = createValidator(GroupMemberSchema)
@@ -57,16 +58,15 @@ const refreshUsers = async (groupId: string) => {
   const response = await loadJson<{ items: UserOption[] }>(`/api/groups/${groupId}/members/lookups`)
   if (selectedGroup.value?.id === groupId) userResponse.value = response
 }
-watch(selectedGroup, async group => {
-  if (!group) return
+const loadGroupMembers = async (group: Group) => {
   try {
     userResponse.value = null
     await refreshMembers(group.id)
-    if (can('group', 'update', { type: 'agency', agencyId: group.egcs_cn_agency })) await refreshUsers(group.id)
+    if (selectedGroup.value?.id === group.id && can('group', 'update', { type: 'agency', agencyId: group.egcs_cn_agency })) await refreshUsers(group.id)
   } catch (error) {
     showError(error)
   }
-})
+}
 const toggleGroup = (group: Group) => {
   if (expandedGroupIds.value.includes(group.id)) {
     expandedGroupIds.value = expandedGroupIds.value.filter(id => id !== group.id)
@@ -74,9 +74,11 @@ const toggleGroup = (group: Group) => {
   }
   expandedGroupIds.value = [...expandedGroupIds.value, group.id]
   selectedGroup.value = group
+  void loadGroupMembers(group)
 }
 const openMemberPicker = (group: Group) => {
   selectedGroup.value = group
+  void loadGroupMembers(group)
   memberForm.egcs_cn_user = ''
   memberModalOpen.value = true
   if (!expandedGroupIds.value.includes(group.id)) expandedGroupIds.value = [...expandedGroupIds.value, group.id]
@@ -119,13 +121,14 @@ const openCreate = () => {
  */
 const openEdit = (group: Group) => {
   editing.value = group
-  Object.assign(form, group)
+  Object.assign(form, { egcs_cn_agency: group.egcs_cn_agency, egcs_cn_name_en: group.egcs_cn_name_en, egcs_cn_name_fr: group.egcs_cn_name_fr, egcs_cn_email: group.egcs_cn_email })
   modalOpen.value = true
 }
 /**
  *
  */
 const save = async () => {
+  if (saving.value) return
   try {
     saving.value = true
     const body = editing.value
@@ -156,14 +159,21 @@ const remove = async (group: Group) => {
  *
  */
 const addMember = async () => {
-  if (!selectedGroup.value || !memberForm.egcs_cn_user) return
+  if (addingMember.value || !selectedGroup.value || !memberForm.egcs_cn_user) return
+  const groupId = selectedGroup.value.id
+  addingMember.value = true
   try {
-    const groupId = selectedGroup.value.id
     await loadJson(`/api/groups/${groupId}/members`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(memberForm) })
-    memberForm.egcs_cn_user = ''
     await refreshMembers(groupId)
-    memberModalOpen.value = false
-  } catch (error) { showError(error) }
+    if (selectedGroup.value?.id === groupId) {
+      memberForm.egcs_cn_user = ''
+      memberModalOpen.value = false
+    }
+  } catch (error) {
+    showError(error)
+  } finally {
+    addingMember.value = false
+  }
 }
 /**
  *
@@ -231,7 +241,7 @@ const removeMember = async (group: Group, member: Member) => {
           </template>
         </CommonResourceLayoutPage>
       </div>
-      <UModal v-model:open="memberModalOpen" :title="t('groups.add_member')">
+      <UModal v-model:open="memberModalOpen" :dismissible="!addingMember" :close="!addingMember" :title="t('groups.add_member')">
         <template #body>
           <UForm :state="memberForm" :validate="validateMember" class="space-y-4" @submit="addMember">
             <UFormField :label="t('groups.user')" name="egcs_cn_user" required>
@@ -248,12 +258,12 @@ const removeMember = async (group: Group, member: Member) => {
                 class="w-full" />
             </UFormField>
             <div class="flex justify-end">
-              <CommonSaveButton type="submit" :label="t('common.add')" :disabled="!memberForm.egcs_cn_user" />
+              <CommonSaveButton type="submit" :label="t('common.add')" :loading="addingMember" :disabled="addingMember || !memberForm.egcs_cn_user" />
             </div>
           </UForm>
         </template>
       </UModal>
-      <UModal v-model:open="modalOpen" :title="t('groups.title')">
+      <UModal v-model:open="modalOpen" :dismissible="!saving" :close="!saving" :title="t('groups.title')">
         <template #body>
           <UForm :state="form" :validate="validate" class="space-y-4" @submit="save">
             <UFormField v-if="!editing" :label="t('nav.agencies')" name="egcs_cn_agency" required>

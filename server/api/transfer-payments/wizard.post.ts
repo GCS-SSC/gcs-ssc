@@ -1,3 +1,4 @@
+import { dateOnlySql } from '~~/server/utils/database-date'
 import { TransferPaymentWizardSchema } from '~~/shared/types/schemas'
 import {
   authorize,
@@ -64,8 +65,8 @@ export default defineEventHandler(async event => {
         .insertInto('Transfer_Payment_Profile')
         .values({
           egcs_tp_agency: validated.profile.egcs_tp_agency,
-          egcs_tp_datestart: validated.profile.egcs_tp_datestart,
-          egcs_tp_dateend: validated.profile.egcs_tp_dateend,
+          egcs_tp_datestart: dateOnlySql(validated.profile.egcs_tp_datestart),
+          egcs_tp_dateend: dateOnlySql(validated.profile.egcs_tp_dateend),
           egcs_tp_name_en: validated.profile.egcs_tp_name_en,
           egcs_tp_name_fr: validated.profile.egcs_tp_name_fr,
           egcs_tp_abbreviation_en: validated.profile.egcs_tp_abbreviation_en,

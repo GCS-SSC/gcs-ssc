@@ -44,7 +44,7 @@ const { data: setup, error: loadError, status: loadStatus, refresh } = await use
 const detailContent = useTemplateRef<HTMLElement>('detailContent')
 const cloneSetup = (value: SetupDetail): SetupDetail => ({
   ...value,
-  members: value.members.map(member => ({ ...member }))
+  members: value.members.map(member => ({ ...member, egcs_cn_approvaltemplate: member.egcs_cn_approvaltemplate ?? undefined }))
 })
 const state: Ref<SetupDetail | null> = ref(setup.value ? cloneSetup(setup.value) : null)
 const selectedSection: Ref<string> = ref('recommendation-identity')
@@ -55,7 +55,11 @@ const selectedMember: Ref<Partial<TransferPaymentStreamRecommendationSetupMember
 const schemaCreateState: Ref<Record<string, unknown> | null> = ref(null)
 const formRef = useTemplateRef<{ validate: () => Promise<unknown> }>('recommendationSetupForm')
 const isHeroCollapsed = getHeroCollapsed('transfer-payment-recommendation-setup-detail')
-const validate = withFormRequirements(createValidator(TransferPaymentStreamRecommendationSetupPatchSchema), TransferPaymentStreamRecommendationSetupCreateSchema)
+const validateDraft = createValidator(TransferPaymentStreamRecommendationSetupPatchSchema)
+const validate = withFormRequirements(
+  async () => await validateDraft(getDraft()),
+  TransferPaymentStreamRecommendationSetupCreateSchema
+)
 const canManagePublication = computed(() => Boolean(agency.value) && can('agency', 'update', { type: 'agency', agencyId }))
 const isEditable = computed(() => state.value?.publicationState !== 'retired')
 const canUpdate = computed(() => canManagePublication.value && isEditable.value)

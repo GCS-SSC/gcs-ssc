@@ -1,16 +1,19 @@
+import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { sql } from 'kysely'
 import { z } from 'zod'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
-import { PaginationSchema } from '~~/shared/types/schemas/common'
+import { PaginationSchema, PositivePostgresBigintIdSchema } from '~~/shared/types/schemas/common'
 import { prepareAgreementCommitmentRoute } from '~~/server/utils/agreement-commitment'
 import { formatAccountingDimensions } from '~~/shared/utils/accounting-dimensions'
 import type { TransferPaymentStreamChartOfAccountDimension } from '~~/shared/types/schemas/transfer-payment'
 import { CURRENCY_CODES_ENUM } from '~~/shared/constants/enums'
 
 const QuerySchema = PaginationSchema.extend({
-  commitmentId: z.union([z.string().min(1), z.number()]).transform(String).optional(),
+  selected_ids: z.preprocess(value => value === undefined ? undefined : Array.isArray(value) ? value : [value],
+    z.array(PositivePostgresBigintIdSchema).max(100).optional()),
+  commitmentId: PositivePostgresBigintIdSchema.optional(),
   currency: z.enum(CURRENCY_CODES_ENUM).optional(),
   permission_action: z.enum(['create', 'update']).default('create')
 }).superRefine((query, ctx) => {
@@ -20,64 +23,68 @@ const QuerySchema = PaginationSchema.extend({
 })
 
 export default defineEventHandler(async event => {
-  const { page, limit, search, commitmentId, permission_action, currency: requestedCurrency } = await getValidatedQueryI18n(event, QuerySchema)
-  const assignmentTarget = commitmentId
-    ? { entityType: 'fundingcaseagreementcommitment' as const, entityId: commitmentId }
-    : undefined
-  const prepared = await prepareAgreementCommitmentRoute(event, permission_action, assignmentTarget)
-  if (!prepared || !('agreementId' in prepared)) return prepared
+  return await executeFreshReadSnapshot(event, async () => {
+    const { page, limit, search, selected_ids: selectedIds, commitmentId, permission_action, currency: requestedCurrency } = await getValidatedQueryI18n(event, QuerySchema)
+    const assignmentTarget = commitmentId
+      ? { entityType: 'fundingcaseagreementcommitment' as const, entityId: commitmentId }
+      : undefined
+    const prepared = await prepareAgreementCommitmentRoute(event, permission_action, assignmentTarget)
+    if (!prepared || !('agreementId' in prepared)) return prepared
 
-  const { agreementContext, db } = prepared
-  const currency = await assertAgreementCurrency(event, db, prepared.agreementId, requestedCurrency)
-  const offset = (page - 1) * limit
-  let baseQuery = db
-    .selectFrom('Transfer_Payment_Stream_Chart_of_Account')
-    .innerJoin('Agency_Chart_of_Account', 'Agency_Chart_of_Account.id', 'Transfer_Payment_Stream_Chart_of_Account.egcs_tp_agencychartofaccount')
-    .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Agency_Chart_of_Account.egcs_ay_fiscalyear')
-    .where('Transfer_Payment_Stream_Chart_of_Account.egcs_tp_transferpaymentstream', '=', agreementContext.streamId)
-    .where('Transfer_Payment_Stream_Chart_of_Account._deleted', '=', false)
-    .where('Agency_Chart_of_Account._deleted', '=', false)
-    .where('Agency_Chart_of_Account.egcs_ay_kind', '=', 'commitment')
-    .where('Agency_Fiscal_Year._deleted', '=', false)
-  if (currency) baseQuery = baseQuery.where('Agency_Chart_of_Account.egcs_ay_currency', '=', currency)
-  if (commitmentId) baseQuery = baseQuery.where(sql<boolean>`"Agency_Chart_of_Account".egcs_ay_currency = (
-    SELECT commitment.egcs_fc_currency FROM "Funding_Case_Agreement_Commitment" commitment
-    WHERE commitment.id = ${commitmentId} AND commitment.egcs_fc_fundingagreement = ${prepared.agreementId} AND NOT commitment._deleted
-  )`)
-
-  if (search) {
-    const pattern = `%${escapeLikePattern(search)}%`
-    baseQuery = baseQuery.where(sql<boolean>`(
-      CAST(${sql.ref('Agency_Chart_of_Account.egcs_ay_accountingdimensions')} AS text) ILIKE ${pattern}
-      OR ${sql.ref('Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay')} ILIKE ${pattern}
+    const { agreementContext, db } = prepared
+    const currency = await assertAgreementCurrency(event, db, prepared.agreementId, requestedCurrency)
+    const offset = (page - 1) * limit
+    let baseQuery = db
+      .selectFrom('Transfer_Payment_Stream_Chart_of_Account')
+      .innerJoin('Agency_Chart_of_Account', 'Agency_Chart_of_Account.id', 'Transfer_Payment_Stream_Chart_of_Account.egcs_tp_agencychartofaccount')
+      .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Agency_Chart_of_Account.egcs_ay_fiscalyear')
+      .where('Transfer_Payment_Stream_Chart_of_Account.egcs_tp_transferpaymentstream', '=', agreementContext.streamId)
+      .where('Transfer_Payment_Stream_Chart_of_Account._deleted', '=', false)
+      .where('Agency_Chart_of_Account._deleted', '=', false)
+      .where('Agency_Chart_of_Account.egcs_ay_kind', '=', 'commitment')
+      .where('Agency_Fiscal_Year._deleted', '=', false)
+    if (currency) baseQuery = baseQuery.where('Agency_Chart_of_Account.egcs_ay_currency', '=', currency)
+    if (commitmentId) baseQuery = baseQuery.where(sql<boolean>`"Agency_Chart_of_Account".egcs_ay_currency = (
+      SELECT commitment.egcs_fc_currency FROM "Funding_Case_Agreement_Commitment" commitment
+      WHERE commitment.id = ${commitmentId} AND commitment.egcs_fc_fundingagreement = ${prepared.agreementId} AND NOT commitment._deleted
     )`)
-  }
 
-  const [rows, countResult] = await Promise.all([
-    baseQuery
-      .select([
-        'Transfer_Payment_Stream_Chart_of_Account.id as id',
-        'Agency_Chart_of_Account.egcs_ay_accountingdimensions as accounting_dimensions',
-        'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display'
-      ])
-      .orderBy('Agency_Fiscal_Year.egcs_ay_fiscalyear', 'asc')
-      .orderBy(sql`LOWER("Agency_Chart_of_Account"."egcs_ay_accountingdimensions"->0->>'value')`, 'asc')
-      .orderBy('Transfer_Payment_Stream_Chart_of_Account.id', 'asc')
-      .limit(limit)
-      .offset(offset)
-      .execute(),
-    baseQuery.select(eb => eb.fn.count('Transfer_Payment_Stream_Chart_of_Account.id').as('total')).executeTakeFirst()
-  ])
+    if (selectedIds?.length) baseQuery = baseQuery.where('Transfer_Payment_Stream_Chart_of_Account.id', 'in', selectedIds)
 
-  const items = rows.map(row => {
-    const dimensions = row.accounting_dimensions as TransferPaymentStreamChartOfAccountDimension[]
-    return {
-      id: String(row.id),
-      fiscal_year_display: row.fiscal_year_display,
-      label_en: `${row.fiscal_year_display} - ${formatAccountingDimensions(dimensions, 'en', ' - ')}`,
-      label_fr: `${row.fiscal_year_display} - ${formatAccountingDimensions(dimensions, 'fr', ' - ')}`
+    if (search) {
+      const pattern = `%${escapeLikePattern(search)}%`
+      baseQuery = baseQuery.where(sql<boolean>`(
+        CAST(${sql.ref('Agency_Chart_of_Account.egcs_ay_accountingdimensions')} AS text) ILIKE ${pattern}
+        OR ${sql.ref('Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay')} ILIKE ${pattern}
+      )`)
     }
+
+    const [rows, countResult] = await Promise.all([
+      baseQuery
+        .select([
+          'Transfer_Payment_Stream_Chart_of_Account.id as id',
+          'Agency_Chart_of_Account.egcs_ay_accountingdimensions as accounting_dimensions',
+          'Agency_Fiscal_Year.egcs_ay_fiscalyeardisplay as fiscal_year_display'
+        ])
+        .orderBy('Agency_Fiscal_Year.egcs_ay_fiscalyear', 'asc')
+        .orderBy(sql`LOWER("Agency_Chart_of_Account"."egcs_ay_accountingdimensions"->0->>'value')`, 'asc')
+        .orderBy('Transfer_Payment_Stream_Chart_of_Account.id', 'asc')
+        .limit(limit)
+        .offset(offset)
+        .execute(),
+      baseQuery.select(eb => eb.fn.count('Transfer_Payment_Stream_Chart_of_Account.id').as('total')).executeTakeFirst()
+    ])
+
+    const items = rows.map(row => {
+      const dimensions = row.accounting_dimensions as TransferPaymentStreamChartOfAccountDimension[]
+      return {
+        id: String(row.id),
+        fiscal_year_display: row.fiscal_year_display,
+        label_en: `${row.fiscal_year_display} - ${formatAccountingDimensions(dimensions, 'en', ' - ')}`,
+        label_fr: `${row.fiscal_year_display} - ${formatAccountingDimensions(dimensions, 'fr', ' - ')}`
+      }
+    })
+    const total = Number(countResult?.total ?? 0)
+    return { items, total, stats: { total, active: total }, page, limit }
   })
-  const total = Number(countResult?.total ?? 0)
-  return { items, total, stats: { total, active: total }, page, limit }
 })

@@ -326,7 +326,8 @@ export const patchAgreementMonitorForRoute = async (
   const validated = await readValidatedBodyI18n(event, FundingCaseAgreementMonitorPatchSchema)
 
   return await executeAgreementMonitorMutation(event, db, agreementId, initialContext, monitorId, async (trx, currentContext) => {
-    if (validated.egcs_fc_type) {
+    const currentMonitor = validated.egcs_fc_type ? await getAgreementMonitor(trx, agreementId, monitorId) : null
+    if (validated.egcs_fc_type && validated.egcs_fc_type !== currentMonitor?.egcs_fc_type) {
       const monitorType = await assertMonitorTypeBelongsToAgreementStream(event, trx, currentContext.streamId, validated.egcs_fc_type, { lockReference: true })
       if (!monitorType || !('id' in monitorType)) return monitorType
       if (!monitorType.egcs_ay_receivableeligible) {

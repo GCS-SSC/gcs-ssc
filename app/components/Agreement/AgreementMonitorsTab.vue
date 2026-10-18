@@ -2,13 +2,13 @@
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
 /* eslint-disable jsdoc/require-jsdoc -- Monitor table callbacks are exercised by focused component tests. */
-import { computed, ref, shallowReactive, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, shallowReactive, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 import { useAgreementOverview } from '~/composables/useAgreementOverview'
 import { useJsonRequest } from '~/composables/useJsonRequest'
 import { appRouteLocations } from '~/utils/route-locations'
-import type { FundingCaseAgreementMonitorForm, FundingCaseAgreementMonitorRow } from '~~/shared/types/funding-case-agreement-ui'
+import type { FundingCaseAgreementMonitorForm, FundingCaseAgreementMonitorRow, FundingCaseAgreementProfileRow } from '~~/shared/types/funding-case-agreement-ui'
 import { FundingCaseAgreementMonitorCreateSchema } from '~~/shared/types/schemas'
 
 const { agreementId, canCreate, canUpdate, canDelete } = defineProps<{
@@ -25,6 +25,8 @@ const toast = useLocalizedToast()
 const { createValidator } = useZodI18n()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
+const confirmDelete = useDeleteConfirm()
+const statusCatalog = useStatusCatalog()
 const { getBilingualValue } = useBilingualValue()
 const { saveJson } = useJsonRequest()
 const { isRecordLocked } = useBusinessStatusState()
@@ -32,6 +34,14 @@ const { isRecordLocked } = useBusinessStatusState()
 const search: Ref<string> = ref('')
 const pagination: Ref<{ pageIndex: number, pageSize: number }> = ref({ pageIndex: 0, pageSize: 25 })
 const pendingMonitorDeletes = shallowReactive(new Set<string>())
+const pendingMonitorActions = shallowReactive(new Set<string>())
+let actionGeneration = 0
+let modalIntent = 0
+let disposed = false
+onBeforeUnmount(() => {
+  disposed = true
+  actionGeneration += 1
+})
 
 const monitorModal = useCrudModal<FundingCaseAgreementMonitorRow, FundingCaseAgreementMonitorForm>({
   createState: () => ({
@@ -48,9 +58,19 @@ const monitorModal = useCrudModal<FundingCaseAgreementMonitorRow, FundingCaseAgr
 })
 const monitorPending = useCrudModalPending(monitorModal.captureSession)
 const isSavingMonitor = monitorPending.isPending
-watch(agreementIdRef, () => monitorModal.close(), { flush: 'sync' })
+watch(agreementIdRef, () => {
+  actionGeneration += 1
+  monitorModal.close()
+  pendingMonitorActions.clear()
+}, { flush: 'sync' })
 
+const editingMonitor: Ref<FundingCaseAgreementMonitorRow | null> = ref(null)
 const selectedMonitor = monitorModal.selected
+const savedMonitorTypeOptions = computed(() => {
+  const saved = editingMonitor.value
+  if (!saved || selectedMonitor.value?.id !== saved.id || selectedMonitor.value.egcs_fc_type !== saved.egcs_fc_type) return []
+  return [{ value: saved.egcs_fc_type, label: getBilingualValue(saved, 'monitor_type_name', saved.egcs_fc_type) }]
+})
 const isMonitorModalOpen = monitorModal.isOpen
 const validateMonitor = createValidator(FundingCaseAgreementMonitorCreateSchema)
 const {
@@ -84,43 +104,96 @@ const monitors = computed<FundingCaseAgreementMonitorRow[]>(() =>
   })
 )
 
+const checkPrerequisites = async (action: 'create' | 'update' | 'delete', monitorId?: string, isCurrent: () => boolean = () => true) => {
+  const owner = agreementId
+  const generation = actionGeneration
+  const current = () => !disposed && owner === agreementId && generation === actionGeneration && isCurrent()
+  try {
+    const [parent, record, roster] = await Promise.all([
+      $fetch<FundingCaseAgreementProfileRow, string>(`/api/agreements/${owner}`),
+      monitorId ? $fetch<FundingCaseAgreementMonitorRow, string>(`/api/agreements/${owner}/monitors/${monitorId}`) : Promise.resolve(null),
+      monitorId ? $fetch<{ is_assigned: boolean }, string>(`/api/entity-assignments/fundingcasemonitor/${monitorId}`) : Promise.resolve(null)
+    ])
+    if (!current()) return false
+    await statusCatalog.load()
+    if (!current()) return false
+    const permitted = action === 'create'
+      ? parent.can_create_child_records_role
+      : action === 'update' ? parent.can_update_child_records_role : parent.can_delete_child_records_role
+    if (permitted === true && !isRecordLocked(parent)
+      && (action === 'create' ? parent.can_create_child_records === true : record && !isRecordLocked(record) && roster?.is_assigned === true)) return record ?? true
+    toast.add({ title: toast.localized('common.warning'), description: toast.localized(action === 'create' ? 'agreement.child_records.create_prerequisite' : 'agreement.child_records.work_prerequisite'), color: 'warning' })
+  } catch (error) {
+    if (current()) showError(error)
+  }
+  return false
+}
+const openMonitor = async (monitor?: FundingCaseAgreementMonitorRow) => {
+  const key = monitor ? String(monitor.id) : 'create'
+  if (pendingMonitorActions.has(key) || pendingMonitorDeletes.has(key)) return
+  const session = monitorModal.captureSession()
+  const intent = ++modalIntent
+  const generation = actionGeneration
+  pendingMonitorActions.add(key)
+  try {
+    const ready = await checkPrerequisites(monitor ? 'update' : 'create', monitor ? String(monitor.id) : undefined,
+      () => intent === modalIntent && monitorModal.captureSession() === session)
+    if (!ready) return
+    editingMonitor.value = monitor && typeof ready === 'object' ? ready : null
+    if (editingMonitor.value) monitorModal.openUpdate(editingMonitor.value)
+    else monitorModal.openCreate()
+  } finally { if (generation === actionGeneration) pendingMonitorActions.delete(key) }
+}
+
 const saveMonitor = async () => {
   if (!selectedMonitor.value) {
     return
   }
   const monitorState = selectedMonitor.value
+  const owner = agreementId
+  const generation = actionGeneration
   const isUpdate = Boolean(monitorState.id)
   const session = monitorModal.captureSession()
   if (!monitorPending.begin(session)) return
 
   try {
+    if (!await checkPrerequisites(isUpdate ? 'update' : 'create', isUpdate ? String(monitorState.id) : undefined,
+      () => monitorModal.captureSession() === session)) return
     await saveJson(
       isUpdate
-        ? `/api/agreements/${agreementId}/monitors/${monitorState.id}`
-        : `/api/agreements/${agreementId}/monitors`,
+        ? `/api/agreements/${owner}/monitors/${monitorState.id}`
+        : `/api/agreements/${owner}/monitors`,
       isUpdate ? 'PATCH' : 'POST',
       monitorState
     )
     if (!monitorModal.closeSession(session)) return
-    if (!await refreshOverview()) return
+    if (!await refreshOverview() || disposed || owner !== agreementId || generation !== actionGeneration) return
     toast.add({ title: toast.localized('common.success'), description: isUpdate ? toast.localized('common.updated_success') : toast.localized('common.added_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (!disposed && owner === agreementId && generation === actionGeneration && monitorModal.captureSession() === session) showError(error)
   } finally {
     monitorPending.end(session)
   }
 }
 
 const deleteMonitor = async (monitorId: string) => {
-  if (pendingMonitorDeletes.has(monitorId)) return
+  if (pendingMonitorDeletes.has(monitorId) || pendingMonitorActions.has(monitorId)) return
   pendingMonitorDeletes.add(monitorId)
+  const owner = agreementId
+  const generation = actionGeneration
+  const current = () => !disposed && owner === agreementId && generation === actionGeneration
   try {
-    const ok = await confirmDeleteRequest(`/api/agreements/${agreementId}/monitors/${monitorId}`)
-    if (!ok) return
+    if (!await checkPrerequisites('delete', monitorId, current)) return
+    const ok = await confirmDeleteRequest(`/api/agreements/${owner}/monitors/${monitorId}`, {
+      shouldProceed: current,
+      confirm: async () => Boolean(await confirmDelete()) && current() && Boolean(await checkPrerequisites('delete', monitorId, current))
+    })
+    if (!ok || !current()) return
     await refreshOverview()
+    if (!current()) return
     toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (current()) showError(error)
   } finally {
     pendingMonitorDeletes.delete(monitorId)
   }
@@ -139,8 +212,9 @@ const deleteMonitor = async (monitorId: string) => {
       :request-status="overviewStatus"
       :button-label="t('agreement.monitors.add')"
       :show-button="canCreate"
+      :button-disabled="pendingMonitorActions.has('create')"
       :search-placeholder="t('agreement.monitors.search')"
-      @add="monitorModal.openCreate"
+      @add="openMonitor()"
       @retry="refreshOverview">
       <template #type-cell="{ row }">
         <ULink
@@ -170,20 +244,21 @@ const deleteMonitor = async (monitorId: string) => {
             class="cursor-default"
             :aria-label="t('common.open')" />
           <CommonActionButton
-            v-if="canUpdate && !isRecordLocked(row.original)"
+            v-if="canUpdate"
             icon="i-lucide-pencil"
             color="neutral"
             variant="ghost"
             class="cursor-default"
+            :disabled="pendingMonitorActions.has(String(row.original.id)) || pendingMonitorDeletes.has(String(row.original.id))"
             :aria-label="t('common.edit')"
-            @click="monitorModal.openUpdate(row.original)" />
+            @click="openMonitor(row.original)" />
           <CommonActionButton
-            v-if="canDelete && !isRecordLocked(row.original)"
+            v-if="canDelete"
             icon="i-lucide-trash"
             color="error"
             variant="ghost"
             class="cursor-default"
-            :disabled="pendingMonitorDeletes.has(String(row.original.id))"
+            :disabled="pendingMonitorDeletes.has(String(row.original.id)) || pendingMonitorActions.has(String(row.original.id))"
             :aria-label="t('common.delete')"
             @click="deleteMonitor(String(row.original.id))" />
         </div>
@@ -199,7 +274,9 @@ const deleteMonitor = async (monitorId: string) => {
           <UFormField :label="t('agreement.monitors.type')" name="egcs_fc_type">
             <CommonServerLookupSelect
               v-model="selectedMonitor.egcs_fc_type"
+              :prepend-items="savedMonitorTypeOptions"
               :fetch-url="`/api/agreements/${agreementId}/monitors/lookups/monitor-types`"
+              selected-values-query-key="selected_ids"
               value-key="id"
               label-en-key="label_en"
               label-fr-key="label_fr"
@@ -214,6 +291,7 @@ const deleteMonitor = async (monitorId: string) => {
               label-en-key="label_en"
               label-fr-key="label_fr"
               :show-value-in-label="false"
+              selected-values-query-key="selected_ids"
               :query="selectedMonitor.id ? { permission_action: 'update', monitorId: selectedMonitor.id } : { permission_action: 'create' }"
               searchable />
           </UFormField>

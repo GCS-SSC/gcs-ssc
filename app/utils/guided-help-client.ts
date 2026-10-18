@@ -22,6 +22,7 @@ export type HelpGuide = {
   capabilities?: { canEdit: boolean, canPublish: boolean, canRetire: boolean, canDelete: boolean }
 }
 export type HelpCatalog = {
+  egcs_ay_enabled: boolean
   id: string
   egcs_ay_guide: string
   egcs_ay_sourceversion: string

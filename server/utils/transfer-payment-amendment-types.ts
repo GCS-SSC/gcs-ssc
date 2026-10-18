@@ -50,10 +50,12 @@ export const resolveTransferPaymentAmendmentTypeScopeContext = async (
       'Transfer_Payment_Profile.id',
       'Transfer_Payment_Stream.egcs_tp_transferpaymentprofile'
     )
+    .innerJoin('Agency_Profile', 'Agency_Profile.id', 'Transfer_Payment_Profile.egcs_tp_agency')
     .where('Transfer_Payment_Amendment_Type.id', '=', amendmentTypeId)
     .where('Transfer_Payment_Amendment_Type.egcs_tp_transferpaymentstream', '=', streamId)
     .where('Transfer_Payment_Stream.egcs_tp_transferpaymentprofile', '=', profileId)
     .where('Transfer_Payment_Amendment_Type._deleted', '=', false)
+    .where('Agency_Profile._deleted', '=', false)
     .where('Transfer_Payment_Stream._deleted', '=', false)
     .where('Transfer_Payment_Profile._deleted', '=', false)
     .select(['Transfer_Payment_Profile.egcs_tp_agency as agency_id'])

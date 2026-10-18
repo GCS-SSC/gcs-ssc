@@ -1,3 +1,5 @@
+import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+import { readAgreementMonitorBody } from '~~/server/utils/agreement-monitor-validation'
 import { FundingCaseAgreementMonitorItemsCreateSchema, FundingCaseAgreementMonitorItemsPatchSchema } from '~~/shared/types/schemas'
 import { parseI18n } from '~~/server/utils/api-validate'
 import { badRequest } from '~~/server/utils/api-errors'
@@ -6,13 +8,15 @@ import { assertMonitorLinkedRecord, executeAgreementMonitorMutation, prepareAgre
 export default defineEventHandler(async event => {
   const childId = getRouterParam(event, 'childId')
   if (!childId) return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')
+  if (!isPositivePostgresBigintText(childId)) return await badRequest(event, 'AGREEMENT_MONITOR_ITEM_NOT_FOUND', 'apiErrors.agreement.monitor_item_not_found')
   const existing = await event.context.$db.selectFrom('Funding_Case_Agreement_Monitor_Items').where('id', '=', childId).where('_deleted', '=', false).selectAll().executeTakeFirst()
   if (!existing) return await badRequest(event, 'AGREEMENT_MONITOR_ITEM_NOT_FOUND', 'apiErrors.agreement.monitor_item_not_found')
   const monitorId = String(existing.egcs_fc_fundingagreementmonitor)
   const prepared = await prepareAgreementMonitorRoute(event, 'update', { entityType: 'fundingcasemonitor', entityId: monitorId })
   if (!prepared || !('agreementId' in prepared)) return prepared
   const { agreementId, agreementContext, db } = prepared
-  const validated = await readValidatedBodyI18n(event, FundingCaseAgreementMonitorItemsPatchSchema)
+  const validated = await readAgreementMonitorBody(event, FundingCaseAgreementMonitorItemsPatchSchema)
+  if (Object.keys(validated).length === 0) return await badRequest(event, 'NO_UPDATABLE_FIELDS', 'apiErrors.request.no_updatable_fields')
   return await executeAgreementMonitorMutation(event, db, agreementId, agreementContext, monitorId, async trx => {
     const current = await trx.selectFrom('Funding_Case_Agreement_Monitor_Items')
       .where('id', '=', childId)

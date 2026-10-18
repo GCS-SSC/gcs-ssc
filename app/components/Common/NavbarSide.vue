@@ -32,7 +32,7 @@ const onLocaleToggle = (value: boolean | 'indeterminate') => {
       class="border-default flex items-center gap-2 rounded-lg border bg-zinc-100 px-2 py-1 shadow-sm dark:bg-zinc-800/50">
       <span
         class="text-xs font-black tracking-widest uppercase"
-        :class="!isFrench ? 'text-primary' : 'text-zinc-400'">
+        :class="!isFrench ? 'text-primary dark:text-blue-300' : 'text-zinc-600 dark:text-zinc-400'">
         EN
       </span>
       <USwitch
@@ -44,7 +44,7 @@ const onLocaleToggle = (value: boolean | 'indeterminate') => {
         @update:model-value="onLocaleToggle" />
       <span
         class="text-xs font-black tracking-widest uppercase"
-        :class="isFrench ? 'text-primary' : 'text-zinc-400'">
+        :class="isFrench ? 'text-primary dark:text-blue-300' : 'text-zinc-600 dark:text-zinc-400'">
         FR
       </span>
     </div>

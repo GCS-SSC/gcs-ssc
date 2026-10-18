@@ -6,12 +6,14 @@ import { createHash } from 'node:crypto'
 import type { H3Event } from 'h3'
 import { sql, type Insertable, type Kysely, type Selectable } from 'kysely'
 import { badRequest, notFound, throwApiError } from './api-errors'
-import { bestEffortStorageCleanup, deleteStoredAttachmentById, readStoredFile, writeStoredFile } from './file-storage'
+import { readStoredFile, writeStoredFile, type RegisterStoredFileUpload } from './file-storage'
 import { escapeLikePattern } from './sql-like'
 import type { AgencyDocumentTemplateTable, Database, FundingCaseAgreementGeneratedDocumentTable, Language_Preference, TransferPaymentDocumentTemplateEntityType, TransferPaymentDocumentTemplateOutputFormat } from '~~/shared/types/database'
 import { readAssignedAgencyCustomFieldDefinitions } from './agreement-custom-fields'
 import { buildAgreementDocumentCustomFields } from './agreement-document-custom-fields'
-import { buildAgreementCloseoutReadiness } from './agreement-closeout'
+import { buildAgreementCloseoutReadiness, hasActiveAgreementCloseoutWorkflow, hasCompetingAgreementCloseoutWorkflow } from './agreement-closeout'
+import { resolveBusinessStatusProtection } from './business-status-runtime'
+import type { CloseoutDocumentPersistence } from '~~/shared/types/agreement-closeout'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { databaseMoneyText, parseDatabaseMoney } from './database-money'
 import { budgetFundingSourcesByLine, loadBudgetFundingSources } from './agreement-budget-funding'
@@ -36,6 +38,7 @@ type TemplateRow = AgencyDocumentTemplateTable & {
   egcs_cn_providerobjectid_fr: string
   egcs_cn_providerlocator_fr: import('~~/shared/types/database').JsonValue
   agencyId: string
+  agencyTemplateId: string
 }
 
 export const readDocumentStoredFile = async (
@@ -125,7 +128,8 @@ const loadAgreementDocumentTemplate = async (
   agreementId: string,
   templateId: string,
   db: Kysely<Database>,
-  entityType: TransferPaymentDocumentTemplateEntityType = 'fundingcaseagreement'
+  entityType: TransferPaymentDocumentTemplateEntityType = 'fundingcaseagreement',
+  lockTemplate = false
 ): Promise<TemplateRow | undefined> => {
   const template = await db
     .selectFrom('Transfer_Payment_Stream_Document_Template')
@@ -145,6 +149,7 @@ const loadAgreementDocumentTemplate = async (
     .where('AttachmentFr._deleted', '=', false)
     .selectAll('Agency_Document_Template')
     .select([
+      'Agency_Document_Template.id as agencyTemplateId',
       'Transfer_Payment_Stream_Document_Template.id as id',
       'Transfer_Payment_Stream_Document_Template.egcs_tp_transferpaymentstream as egcs_tp_transferpaymentstream',
       'AttachmentEn.egcs_cn_provider as egcs_cn_provider_en',
@@ -155,6 +160,7 @@ const loadAgreementDocumentTemplate = async (
       'AttachmentFr.egcs_cn_providerlocator as egcs_cn_providerlocator_fr',
       'Transfer_Payment_Profile.egcs_tp_agency as agencyId'
     ])
+    .$if(lockTemplate, query => query.forShare(['Agency_Document_Template', 'Transfer_Payment_Stream_Document_Template', 'AttachmentEn', 'AttachmentFr']))
     .executeTakeFirst()
 
   return template as TemplateRow | undefined
@@ -210,6 +216,7 @@ export const renderGeneratedAgreementDocument = async (
 
 const storeGeneratedAgreementDocument = async (
   db: Kysely<Database>,
+  registerUpload: RegisterStoredFileUpload,
   template: TemplateRow,
   agreementId: string,
   generated: GeneratedAgreementDocument,
@@ -231,7 +238,7 @@ const storeGeneratedAgreementDocument = async (
   attachmentTypeNameFr: 'Document genere',
   attachmentTypeDescriptionEn: 'Generated agreement documents.',
   attachmentTypeDescriptionFr: 'Documents d entente generes.'
-})
+}, registerUpload)
 
 const generatedDocumentStorageTarget = (agreementId: string, scope: { closeoutId?: string, amendmentId?: string }) =>
   scope.amendmentId
@@ -270,6 +277,7 @@ const insertGeneratedAgreementDocumentRecord = async (
 
 export const persistGeneratedDocumentWithRollback = async (
   db: Kysely<Database>,
+  registerUpload: RegisterStoredFileUpload,
   agreementId: string,
   templateId: string,
   template: TemplateRow,
@@ -279,28 +287,11 @@ export const persistGeneratedDocumentWithRollback = async (
   closeoutId?: string,
   amendmentId?: string
 ) => {
-  const stored = await storeGeneratedAgreementDocument(db, template, agreementId, generated, closeoutId, amendmentId)
+  const stored = await storeGeneratedAgreementDocument(db, registerUpload, template, agreementId, generated, closeoutId, amendmentId)
 
-  try {
-    return await insertGeneratedAgreementDocumentRecord(
-      db,
-      agreementId,
-      templateId,
-      template,
-      stored.id,
-      language,
-      outputFormat,
-      closeoutId,
-      amendmentId
-    )
-  } catch (error: unknown) {
-    await bestEffortStorageCleanup(async () => await deleteStoredAttachmentById(db, stored.id, 'generated-document', generatedDocumentStorageTarget(agreementId, { closeoutId, amendmentId })), {
-      providerId: stored.providerId,
-      objectId: stored.objectId,
-      purpose: 'generated-document'
-    })
-    throw error
-  }
+  return await insertGeneratedAgreementDocumentRecord(
+    db, agreementId, templateId, template, stored.id, language, outputFormat, closeoutId, amendmentId
+  )
 }
 
 export const listAgreementDocumentTemplates = async (
@@ -880,12 +871,12 @@ export const loadAgreementDocumentRenderInput = async (
   language: Language_Preference,
   outputFormat: TransferPaymentDocumentTemplateOutputFormat,
   db: Kysely<Database>,
-  options: { entityType?: TransferPaymentDocumentTemplateEntityType, coreContext?: Record<string, unknown> } = {}
+  options: { entityType?: TransferPaymentDocumentTemplateEntityType, coreContext?: Record<string, unknown>, lockTemplate?: boolean } = {}
 ) => {
   if (!isPositivePostgresBigintText(agreementId) || !isPositivePostgresBigintText(templateId)) {
     return await notFound(event, 'DOCUMENT_TEMPLATE_NOT_FOUND', 'apiErrors.document_generation.template_not_found')
   }
-  const template = await loadAgreementDocumentTemplate(agreementId, templateId, db, options.entityType)
+  const template = await loadAgreementDocumentTemplate(agreementId, templateId, db, options.entityType, options.lockTemplate)
 
   if (!template) {
     return await notFound(event, 'DOCUMENT_TEMPLATE_NOT_FOUND', 'apiErrors.document_generation.template_not_found')
@@ -898,6 +889,7 @@ export const loadAgreementDocumentRenderInput = async (
   const coreContext = options.coreContext ?? await buildAgreementDocumentContext(agreementId, db, undefined, language)
   return {
     agreementId, template, coreContext,
+    templateHash: createHash('sha256').update(JSON.stringify(template)).digest('hex'),
     coreContextHash: createHash('sha256').update(JSON.stringify(coreContext)).digest('hex')
   }
 }
@@ -959,100 +951,103 @@ export const prepareAgreementDocument = async (
 )
 
 export const persistPreparedAgreementDocument = async (
-  db: Kysely<Database>, agreementId: string, templateId: string,
+  db: Kysely<Database>, registerUpload: RegisterStoredFileUpload, agreementId: string, templateId: string,
   prepared: Awaited<ReturnType<typeof prepareAgreementDocument>>,
   language: Language_Preference, outputFormat: TransferPaymentDocumentTemplateOutputFormat
 ): Promise<Selectable<FundingCaseAgreementGeneratedDocumentTable>> =>
   await persistGeneratedDocumentWithRollback(
-    db, agreementId, templateId, prepared.template, prepared.generated, language, outputFormat
+    db, registerUpload, agreementId, templateId, prepared.template, prepared.generated, language, outputFormat
   )
 
 export const generateAgreementDocument = async (
   event: H3Event, agreementId: string, templateId: string, language: Language_Preference,
-  outputFormat: TransferPaymentDocumentTemplateOutputFormat, db: Kysely<Database>
+  outputFormat: TransferPaymentDocumentTemplateOutputFormat, db: Kysely<Database>, registerUpload: RegisterStoredFileUpload
 ): Promise<Selectable<FundingCaseAgreementGeneratedDocumentTable>> => {
   const prepared = await prepareAgreementDocument(event, agreementId, templateId, language, outputFormat, db)
-  return await persistPreparedAgreementDocument(db, agreementId, templateId, prepared, language, outputFormat)
+  return await persistPreparedAgreementDocument(db, registerUpload, agreementId, templateId, prepared, language, outputFormat)
 }
 
-const renderCloseoutDocument = async (
+export const resolveCloseoutDocumentPersistence = async (
+  db: Kysely<Database>, agreementId: string, closeoutId: string
+): Promise<CloseoutDocumentPersistence> => {
+  const [closeout, parentStatus, closeoutStatus, competing, active] = await Promise.all([
+    db.selectFrom('Funding_Case_Agreement_Closeout').select('egcs_fc_isopen')
+      .where('id', '=', closeoutId).where('egcs_fc_fundingagreement', '=', agreementId).where('_deleted', '=', false).executeTakeFirst(),
+    resolveBusinessStatusProtection(db, 'fundingcaseagreement', agreementId),
+    resolveBusinessStatusProtection(db, 'fundingcaseagreementcloseout', closeoutId),
+    hasCompetingAgreementCloseoutWorkflow(db, agreementId, closeoutId),
+    hasActiveAgreementCloseoutWorkflow(db, agreementId)
+  ])
+  if (!closeout) return { can_persist_documents: false, code: 'AGREEMENT_CLOSEOUT_NOT_FOUND' }
+  if (!parentStatus || !closeoutStatus) return { can_persist_documents: false, code: 'BUSINESS_STATUS_NOT_FOUND' }
+  if (parentStatus.terminal || closeoutStatus.terminal) return { can_persist_documents: false, code: 'BUSINESS_STATUS_TERMINAL' }
+  if (!closeout.egcs_fc_isopen) return { can_persist_documents: false, code: 'AGREEMENT_CLOSEOUT_CLOSED' }
+  if (competing) return { can_persist_documents: false, code: 'AGREEMENT_CLOSEOUT_LOCKED' }
+  if (!active) {
+    if (parentStatus.completed || closeoutStatus.completed) return { can_persist_documents: false, code: 'BUSINESS_COMPLETED' }
+    if (parentStatus.readOnly || closeoutStatus.readOnly) return { can_persist_documents: false, code: 'BUSINESS_STATUS_READ_ONLY' }
+  }
+  return { can_persist_documents: true }
+}
+
+export const loadCloseoutDocumentRenderInput = async (
   event: H3Event,
   agreementId: string,
   closeoutId: string,
   templateId: string,
   language: Language_Preference,
   outputFormat: TransferPaymentDocumentTemplateOutputFormat,
-  db: Kysely<Database>
-): Promise<{ generated: GeneratedAgreementDocument, template: TemplateRow }> => {
-  const [template, closeout, readiness] = await Promise.all([
-    loadAgreementDocumentTemplate(agreementId, templateId, db, 'fundingcaseagreementcloseout'),
+  db: Kysely<Database>,
+  options: { lockTemplate?: boolean } = {}
+) => {
+  const [closeout, readiness, agreementContext, latestSnapshot] = await Promise.all([
     db.selectFrom('Funding_Case_Agreement_Closeout').selectAll()
       .where('id', '=', closeoutId).where('egcs_fc_fundingagreement', '=', agreementId)
       .where('_deleted', '=', false).executeTakeFirst(),
-    buildAgreementCloseoutReadiness(db, agreementId)
-  ])
-  if (!template) return await notFound(event, 'DOCUMENT_TEMPLATE_NOT_FOUND', 'apiErrors.document_generation.template_not_found')
-  if (!closeout || !readiness) return await notFound(event, 'AGREEMENT_CLOSEOUT_NOT_FOUND', 'apiErrors.agreement.closeout_not_found')
-  if (!template.egcs_ay_outputformats.includes(outputFormat)) {
-    return await badRequest(event, 'DOCUMENT_OUTPUT_NOT_ALLOWED', 'apiErrors.document_generation.output_not_allowed')
-  }
-
-  const [templateBytes, agreementContext, latestSnapshot] = await Promise.all([
-    readDocumentStoredFile(event, db, String(template.agencyId), getLocalizedTemplateAttachment(template, language)),
-    buildAgreementDocumentContext(agreementId, db, event, language),
+    buildAgreementCloseoutReadiness(db, agreementId),
+    buildAgreementDocumentContext(agreementId, db, undefined, language),
     db.selectFrom('Funding_Case_Agreement_Closeout_Snapshot').selectAll()
       .where('egcs_fc_closeout', '=', closeoutId).orderBy('egcs_fc_capturedat', 'desc').executeTakeFirst()
   ])
-  const context = deepMergeContext(agreementContext, {
-    closeout: {
-      id: String(closeout.id),
-      number: closeout.egcs_fc_closeoutnumber,
-      status: closeout.egcs_fc_status,
-      isOpen: closeout.egcs_fc_isopen,
-      financial: readiness.financial,
-      outstandingFollowups: readiness.outstandingFollowups,
-      blockers: readiness.blockers.map(blocker => ({
-        ...blocker,
-        label: language === 'fra' ? blocker.labelFr : blocker.labelEn
-      })),
-      ready: readiness.ready,
-      snapshot: latestSnapshot?.egcs_fc_packet ?? null,
-      snapshotHash: latestSnapshot?.egcs_fc_canonicalhash ?? null
-    }
+  if (!closeout || !readiness) return await notFound(event, 'AGREEMENT_CLOSEOUT_NOT_FOUND', 'apiErrors.agreement.closeout_not_found')
+  const closeoutContext = {
+    id: String(closeout.id),
+    number: closeout.egcs_fc_closeoutnumber,
+    status: closeout.egcs_fc_status,
+    isOpen: closeout.egcs_fc_isopen,
+    financial: readiness.financial,
+    outstandingFollowups: readiness.outstandingFollowups,
+    blockers: readiness.blockers.map(blocker => ({
+      ...blocker,
+      label: language === 'fra' ? blocker.labelFr : blocker.labelEn
+    })),
+    ready: readiness.ready,
+    snapshot: latestSnapshot?.egcs_fc_packet ?? null,
+    snapshotHash: latestSnapshot?.egcs_fc_canonicalhash ?? null
+  }
+  const snapshot = await loadAgreementDocumentRenderInput(event, agreementId, templateId, language, outputFormat, db, {
+    entityType: 'fundingcaseagreementcloseout',
+    coreContext: deepMergeContext(agreementContext, { closeout: closeoutContext }),
+    lockTemplate: options.lockTemplate
   })
-  const baseFilename = `${buildGeneratedDocumentBaseFilename(context, template, agreementId, language)}-closeout-${closeout.egcs_fc_closeoutnumber}`
+  return { ...snapshot, closeoutContext }
+}
+
+export const hydrateCloseoutDocumentRenderInput = async (
+  event: H3Event,
+  snapshot: Awaited<ReturnType<typeof loadCloseoutDocumentRenderInput>>,
+  language: Language_Preference,
+  db: Kysely<Database>
+) => {
+  const input = await hydrateAgreementDocumentRenderInput(event, snapshot, language, db)
+  // Host Closeout fields retain precedence over extension fields, as in the original renderer.
+  const context = deepMergeContext(input.context, { closeout: snapshot.closeoutContext })
   return {
-    generated: await renderGeneratedAgreementDocument(event, template, templateBytes, context, language, outputFormat, baseFilename),
-    template
+    ...input,
+    context,
+    baseFilename: `${buildGeneratedDocumentBaseFilename(context, input.template, input.agreementId, language)}-closeout-${snapshot.closeoutContext.number}`
   }
 }
-
-export const generateCloseoutDocument = async (
-  event: H3Event,
-  agreementId: string,
-  closeoutId: string,
-  templateId: string,
-  language: Language_Preference,
-  outputFormat: TransferPaymentDocumentTemplateOutputFormat,
-  db: Kysely<Database>
-): Promise<Selectable<FundingCaseAgreementGeneratedDocumentTable>> => {
-  const { generated, template } = await renderCloseoutDocument(event, agreementId, closeoutId, templateId, language, outputFormat, db)
-  return await persistGeneratedDocumentWithRollback(
-    db, agreementId, templateId, template, generated, language, outputFormat, closeoutId
-  )
-}
-
-export const previewCloseoutDocument = async (
-  event: H3Event,
-  agreementId: string,
-  closeoutId: string,
-  templateId: string,
-  language: Language_Preference,
-  outputFormat: TransferPaymentDocumentTemplateOutputFormat,
-  db: Kysely<Database>
-): Promise<GeneratedAgreementDocument> => (await renderCloseoutDocument(
-  event, agreementId, closeoutId, templateId, language, outputFormat, db
-)).generated
 
 const generatedDocumentListSelection = [
   'Funding_Case_Agreement_Generated_Document.id as id',

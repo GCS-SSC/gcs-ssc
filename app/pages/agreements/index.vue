@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { ComputedRef } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
 import type { FundingCaseAgreementProfileRow } from '~~/shared/types/funding-case-agreement-ui'
@@ -15,10 +15,15 @@ definePageMeta({
 
 const { t } = useI18n()
 const toast = useLocalizedToast()
-const { canAny } = useCan()
+const { can, canAny } = useCan()
+const { user, permissionRevision } = useAuth()
 const { showError } = useApiErrorToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
-const { isRecordLocked } = useBusinessStatusState()
+const confirmDelete = useDeleteConfirm()
+const actionOwner = ref<{ kind: 'agreement'; agreementId: string }>()
+const { check } = useAgreementChildActionPrerequisites(actionOwner)
+let actionGeneration = 0
+let actionPending = false
 const localePath = useLocalePath()
 
 const listView = ref('all')
@@ -38,33 +43,69 @@ const {
   fetchUrl: '/api/agreements'
 })
 
+watch(listView, () => {
+  pagination.value.pageIndex = 0
+}, { flush: 'sync' })
+
 const openCreateAgreement = async () => {
   await navigateTo(localePath(appRouteLocations.agreementCreate()))
 }
 
-const openUpdateAgreement = async (agreement: FundingCaseAgreementProfileRow) => {
-  await navigateTo(localePath(appRouteLocations.agreementDetail(String(agreement.id))))
+/** Invalidates pending actions when their captured context changes. */
+const invalidateAction = () => {
+  actionGeneration += 1
+  actionPending = false
+  actionOwner.value = undefined
 }
+watch([
+  () => user.value?.id,
+  permissionRevision,
+  listView,
+  search,
+  () => pagination.value.pageIndex,
+  () => pagination.value.pageSize,
+  () => agreements.value.map(row => `${row.id}:${row.agency_id}:${row.program_id}`).join('|')
+], invalidateAction, { flush: 'sync' })
+onBeforeUnmount(invalidateAction)
 
 /**
- * Soft deletes the selected agreement profile.
- *
- * @param agreement - Agreement to delete.
+ * Checks current Agreement prerequisites before edit or delete.
+ * @param agreement Agreement selected for the action.
+ * @param action Requested Agreement action.
  */
-const deleteAgreement = async (agreement: FundingCaseAgreementProfileRow) => {
+const runAgreementAction = async (agreement: FundingCaseAgreementProfileRow, action: 'update' | 'delete') => {
+  if (actionPending || !can('agreement', action, { type: 'program', agencyId: agreement.agency_id, transferPaymentId: agreement.program_id })) return
+  actionPending = true
+  const generation = ++actionGeneration
+  const agreementId = String(agreement.id)
+  const agencyId = agreement.agency_id
+  const programId = agreement.program_id
+  actionOwner.value = { kind: 'agreement', agreementId }
+  const current = () => generation === actionGeneration && agreements.value.some(row =>
+    String(row.id) === agreementId && row.agency_id === agencyId && row.program_id === programId
+  ) && can('agreement', action, { type: 'program', agencyId, transferPaymentId: programId })
   try {
-    const deleted = await confirmDeleteRequest(`/api/agreements/${agreement.id}`)
-    if (!deleted) return
-    await refresh()
-    toast.add({
-      title: toast.localized('common.success'),
-      description: toast.localized('common.deleted_success'),
-      color: 'success'
+    if (!await check(action, 'profile', current) || !current()) return
+    if (action === 'update') {
+      await navigateTo(localePath(appRouteLocations.agreementDetail(agreementId)))
+      return
+    }
+    const deleted = await confirmDeleteRequest(`/api/agreements/${agreementId}`, {
+      shouldProceed: current,
+      confirm: async () => Boolean(await confirmDelete()) && current() && await check('delete', 'profile', current)
     })
+    if (!deleted || !current()) return
+    await refresh()
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
   } catch (error: unknown) {
-    showError(error)
+    if (current()) showError(error)
+  } finally {
+    if (generation === actionGeneration) actionPending = false
   }
 }
+
+const openUpdateAgreement = (agreement: FundingCaseAgreementProfileRow) => runAgreementAction(agreement, 'update')
+const deleteAgreement = (agreement: FundingCaseAgreementProfileRow) => runAgreementAction(agreement, 'delete')
 
 const { getHeroCollapsed } = useDashboard()
 const isHeroCollapsed = getHeroCollapsed('agreements')
@@ -77,22 +118,10 @@ const agreementHeroStats = computed(() => [
 ])
 const canCreateAgreement: ComputedRef<boolean> = computed(() => canAny('agreement', 'create'))
 
-/**
- * Evaluates whether the current user can update the provided agreement.
- *
- * @param agreement - Agreement row rendered in the table.
- * @returns True when update actions should be enabled.
- */
-const canUpdateAgreement = (agreement: FundingCaseAgreementProfileRow) => Boolean(agreement.can_update)
-
-/**
- * Evaluates whether the current user can delete the provided agreement.
- *
- * @param agreement - Agreement row rendered in the table.
- * @returns True when delete actions should be enabled.
- */
+const canUpdateAgreement = (agreement: FundingCaseAgreementProfileRow) =>
+  can('agreement', 'update', { type: 'program', agencyId: agreement.agency_id, transferPaymentId: agreement.program_id })
 const canDeleteAgreement = (agreement: FundingCaseAgreementProfileRow) =>
-  Boolean(agreement.can_delete) && !isRecordLocked(agreement)
+  can('agreement', 'delete', { type: 'program', agencyId: agreement.agency_id, transferPaymentId: agreement.program_id })
 </script>
 
 <template>

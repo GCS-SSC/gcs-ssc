@@ -1,3 +1,4 @@
+import { cleanupStoredFileUploads, type StoredFileUpload } from '~~/server/utils/file-storage'
 import { badRequest, throwApiError } from '~~/server/utils/api-errors'
 import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import { assertDraftAgreementAmendment } from '~~/server/utils/agreement-amendment'
@@ -22,6 +23,10 @@ export default defineEventHandler(async event => {
   const release = acquireDocumentRenderSlot(context.agencyId, actor.userId)
   if (!release) return await throwApiError(event, { statusCode: 429, code: 'DOCUMENT_RENDER_BUSY', key: 'apiErrors.document_generation.busy' })
   const assignmentTarget = { entityType: 'fundingcaseamendment' as const, entityId: amendmentId }
+  const uploads: StoredFileUpload[] = []
+  const registerUpload = (upload: StoredFileUpload): void => {
+    uploads.push(upload)
+  }
   try {
     const snapshot = await executeFreshReadSnapshot(event, async trx => {
       await authorizeAmendmentDocumentResource(event, trx, agreementId, amendmentId, 'create')
@@ -37,10 +42,16 @@ export default defineEventHandler(async event => {
       await authorizeAmendmentDocumentResource(event, trx, agreementId, amendmentId, 'create')
       await assertDraftAgreementAmendment(event, trx, agreementId, amendmentId)
       const currentContext = await buildAmendmentDocumentContext(event, trx, agreementId, amendmentId, body.language)
-      if (amendmentDocumentContextHash(currentContext) !== input.coreContextHash) {
+      const currentInput = await loadAgreementDocumentRenderInput(event, agreementId, body.templateId, body.language, body.outputFormat, trx, {
+        entityType: 'fundingcaseamendment', coreContext: currentContext, lockTemplate: true
+      })
+      if (amendmentDocumentContextHash(currentContext) !== input.coreContextHash || currentInput.templateHash !== input.templateHash) {
         return await throwApiError(event, { statusCode: 409, code: 'DOCUMENT_RENDER_INPUT_CHANGED', key: 'apiErrors.document_generation.input_changed' })
       }
-      return await persistGeneratedDocumentWithRollback(trx, agreementId, body.templateId, prepared.template, prepared.generated, body.language, body.outputFormat, undefined, amendmentId)
+      return await persistGeneratedDocumentWithRollback(trx, registerUpload, agreementId, body.templateId, prepared.template, prepared.generated, body.language, body.outputFormat, undefined, amendmentId)
     }, { action: 'create', assignmentTarget, businessStatusTarget: assignmentTarget })
+  } catch (error) {
+    await cleanupStoredFileUploads(db, uploads)
+    throw error
   } finally { release() }
 })

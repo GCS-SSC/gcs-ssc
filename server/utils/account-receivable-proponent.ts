@@ -37,9 +37,9 @@ const authorizeProponent = async (event: H3Event, id: string) => {
   return auth
 }
 
-const financialAgencies = async (db: Kysely<Database>, auth: AuthContext, action: 'read' | 'create') => {
+const financialAgencies = async (db: Kysely<Database>, auth: AuthContext, action: 'read' | 'create', activeOnly = action === 'create') => {
   let query = db.selectFrom('Agency_Profile').select(['id', 'egcs_ay_name_en', 'egcs_ay_name_fr']).where('_deleted', '=', false)
-  if (action === 'create') query = query.where('egcs_ay_active', '=', true)
+  if (activeOnly) query = query.where('egcs_ay_active', '=', true)
   const agencies = await query.orderBy('egcs_ay_name_en').orderBy('id').execute()
   return agencies.filter(agency => auth.userAbilities.authorize('account_receivable', action, { type: 'agency', agencyId: String(agency.id) }))
 }
@@ -179,9 +179,10 @@ export const listProponentCreditMemos = async (event: H3Event, id: string, reque
   return await executeFreshReadSnapshot(event, async db => {
     const auth = await authorizeProponent(event, id)
     const input = requestedInput ?? await getValidatedQueryI18n(event, PaginationSchema)
-    const [agencies, createAgencies] = await Promise.all([financialAgencies(db, auth, 'read'), financialAgencies(db, auth, 'create')])
+    const [agencies, createAgencies, createRoleAgencies] = await Promise.all([financialAgencies(db, auth, 'read'), financialAgencies(db, auth, 'create'), financialAgencies(db, auth, 'create', false)])
+    const canCreateRole = createRoleAgencies.length > 0
     const canCreate = createAgencies.length > 0 && await hasActiveProponent(db, id)
-    if (!agencies.length) return { ...pageResult<ProponentCreditMemoRow>([], 0, input), egcs_fc_cancreate: canCreate }
+    if (!agencies.length) return { ...pageResult<ProponentCreditMemoRow>([], 0, input), egcs_fc_cancreate: canCreate, egcs_fc_cancreate_role: canCreateRole }
     const agencyById = new Map(agencies.map(agency => [String(agency.id), agency]))
     const search = input.search?.trim()
     const pattern = search ? `%${escapeLikePattern(search)}%` : undefined
@@ -239,6 +240,7 @@ export const listProponentCreditMemos = async (event: H3Event, id: string, reque
       if (!agency) throw new Error('CREDIT_MEMO_OWNER_CHANGED')
       return {
         id: String(memo.id), egcs_fc_kind: 'cash' as const, egcs_fc_status: String(memo.egcs_fc_status),
+        egcs_fc_candelete_role: auth.userAbilities.authorize('account_receivable', 'delete', { type: 'agency', agencyId: String(memo.egcs_fc_agency) }),
         egcs_fc_candelete: await canDeleteCashMemo(db, auth, memo),
         egcs_fc_creditmemoreference: String(memo.id),
         egcs_fc_agency: String(agency.id), egcs_fc_agencyname_en: agency.egcs_ay_name_en, egcs_fc_agencyname_fr: agency.egcs_ay_name_fr,
@@ -254,7 +256,7 @@ export const listProponentCreditMemos = async (event: H3Event, id: string, reque
       if (!item) throw new Error('CREDIT_MEMO_PAGE_CHANGED')
       return item
     })
-    return { ...pageResult(items, Number(count.total), input), egcs_fc_cancreate: canCreate }
+    return { ...pageResult(items, Number(count.total), input), egcs_fc_cancreate: canCreate, egcs_fc_cancreate_role: canCreateRole }
   })
 }
 

@@ -1,3 +1,4 @@
+import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import { listAgreementDocumentTemplates } from '~~/server/utils/document-generation'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
@@ -8,6 +9,7 @@ const readRoute = defineEventHandler(async event => {
   if (!agreementId) {
     return await badRequest(event, 'MISSING_ID', 'apiErrors.request.missing_id')
   }
+  if (![agreementId].every(isPositivePostgresBigintText)) return await badRequest(event, 'INVALID_IDS', 'apiErrors.request.invalid')
 
   const agreementContext = await authorizeAgreementResource(event, 'read', agreementId, db)
   if (!agreementContext) {
