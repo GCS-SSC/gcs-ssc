@@ -143,6 +143,8 @@ export const freshResetE2eSpecPaths = [
   'tests/e2e/ncia-demo-seed.spec.ts',
   'tests/e2e/account-receivable-claim-reductions.spec.ts',
   'tests/e2e/account-receivable-create-claim.spec.ts',
+  'tests/e2e/account-receivable-errors.spec.ts',
+  'tests/e2e/account-receivable-source-action-review.spec.ts',
   'tests/e2e/three-role-contribution-journey.spec.ts',
   'tests/e2e/agency-publication-authoring.spec.ts',
   'tests/e2e/data-collection-workflow.spec.ts',

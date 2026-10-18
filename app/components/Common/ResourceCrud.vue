@@ -1,4 +1,5 @@
 <script setup lang="ts" generic="T extends { id: string } & Record<string, unknown>">
+import { useGuidedHelpDiscovery } from '~/composables/useGuidedHelpDiscovery'
 import { useResourceCrudState } from '~/composables/useResourceCrudState'
 import type { z } from 'zod'
 import { useSlots, type Ref } from 'vue'
@@ -83,6 +84,7 @@ const emit = defineEmits(['added', 'updated', 'deleted', 'update:statusFilter'])
 const statusFilter = defineModel<string>('statusFilter')
 
 const { t } = useI18n()
+const { active: guidedHelpActive } = useGuidedHelpDiscovery()
 const slots = useSlots()
 const forwardedSlotNames = computed(() => Object.keys(slots).filter(name => name !== 'actions-cell'))
 
@@ -230,7 +232,7 @@ defineExpose({
       @after:enter="completeHelpModal"
       @after:leave="helpCreatePending = false">
       <template #body>
-        <UForm v-if="formState" :state="formState" :validate="validate" :validate-on="[]" :disabled="isSaving" class="space-y-4" @submit="saveItem">
+        <UForm v-if="formState" :state="formState" :validate="validate" :validate-on="helpSaveTarget && guidedHelpActive ? ['input', 'blur', 'change'] : []" :disabled="isSaving" class="space-y-4" @submit="saveItem">
           <slot name="form" :state="formState" />
 
           <div class="flex justify-end gap-2 pt-4">
