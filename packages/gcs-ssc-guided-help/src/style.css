@@ -36,18 +36,21 @@ body.driver-active .driver-active-element { pointer-events: auto !important; }
 .gcs-guide-modal-inline .driver-popover-arrow { display: none; }
 
 /* Follow Driver's padded opening without changing the native control's styles. */
-.gcs-guide-spotlight-border {
+.gcs-guide-spotlight-border, .gcs-guide-spotlight-trail {
   fill: none;
   stroke: var(--color-violet-800, #5b21b6);
-  stroke-width: 4px;
+  stroke-width: 3px;
+  stroke-linecap: butt;
   pointer-events: none;
-  animation: gcs-guide-spotlight-pulse 2s ease-in-out infinite;
 }
-.dark .gcs-guide-spotlight-border { stroke: var(--color-violet-200, #ddd6fe); }
-@keyframes gcs-guide-spotlight-pulse {
-  0%, 100% { stroke-width: 4px; stroke-opacity: .7; }
-  50% { stroke-width: 8px; stroke-opacity: 1; }
+.gcs-guide-spotlight-border { stroke-opacity: 0; }
+.gcs-guide-spotlight-trail { animation: gcs-guide-spotlight-travel var(--gcs-guide-lap) linear infinite; }
+.dark :is(.gcs-guide-spotlight-border, .gcs-guide-spotlight-trail) { stroke: var(--color-violet-200, #ddd6fe); }
+@keyframes gcs-guide-spotlight-travel {
+  from { stroke-dashoffset: var(--gcs-guide-start); }
+  to { stroke-dashoffset: var(--gcs-guide-end); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .gcs-guide-spotlight-border { animation: none; }
+  .gcs-guide-spotlight-border { stroke-opacity: 1; }
+  .gcs-guide-spotlight-trail { display: none; animation: none; }
 }

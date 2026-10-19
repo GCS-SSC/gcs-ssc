@@ -293,18 +293,32 @@ describe('exact native target resolution', () => {
     active = createGuideRuntime({ document: guide([{ ...step('answer', 'text'), advanceOn: 'manual' }]), locale: 'en', currentView: 'packing', observedContext: context })
     await vi.waitFor(() => expect(document.querySelector('.gcs-guide-spotlight-border')).not.toBeNull())
     const native = document.querySelector('.driver-overlay path:not(.gcs-guide-spotlight-border)')!
-    const border = document.querySelector('.gcs-guide-spotlight-border')!
+    const border = document.querySelector<SVGPathElement>('.gcs-guide-spotlight-border')!
     expect(border.getAttribute('d')).toBe(native.getAttribute('d')!.split('Z')[1]!.trim())
     expect(border.getAttribute('d')).toContain('M95,190')
     expect(border.getAttribute('d')).not.toContain('M1024,0')
     expect(target.getAttribute('style')).toBeNull()
     expect(border.getAttribute('aria-hidden')).toBe('true')
+    const trails = [...document.querySelectorAll<SVGPathElement>('.gcs-guide-spotlight-trail')]
+    expect(trails).toHaveLength(64)
+    expect(trails.every(trail => trail.getAttribute('d') === border.getAttribute('d'))).toBe(true)
+    expect(trails[0]!.parentElement!.style.getPropertyValue('--gcs-guide-lap')).toBe('2.5s')
+    expect(trails[0]!.getAttribute('stroke-dasharray')).toBe('150 450')
+    expect(Number(trails[0]!.style.strokeOpacity)).toBeLessThan(Number(trails[63]!.style.strokeOpacity))
     bounds = new DOMRect(100, 140, 240, 40)
     window.dispatchEvent(new Event('scroll'))
     await vi.waitFor(() => expect(border.getAttribute('d')).toContain('M95,130'))
+    expect(trails.every(trail => trail.getAttribute('d') === border.getAttribute('d'))).toBe(true)
     expect(document.querySelector('.gcs-guide-spotlight-border')).toBe(border)
+    const measure = vi.spyOn(border, 'getTotalLength').mockReturnValue(1200)
+    bounds = new DOMRect(100, 140, 540, 40)
+    window.dispatchEvent(new Event('scroll'))
+    await vi.waitFor(() => expect(trails[0]!.parentElement!.style.getPropertyValue('--gcs-guide-lap')).toBe('5s'))
+    expect(trails[0]!.getAttribute('stroke-dasharray')).toBe('300 900')
+    measure.mockRestore()
     active.destroy()
     expect(document.querySelector('.gcs-guide-spotlight-border')).toBeNull()
+    expect(document.querySelector('.gcs-guide-spotlight-trail')).toBeNull()
   })
 
   it.each(['spotlight', 'anchor-only'].flatMap(appearance => ['nested', 'window'].map(scroll => ({ appearance, scroll }))))('tracks scrolling in $appearance mode on $scroll without rebuilding or moving focus', async ({ appearance, scroll }) => {

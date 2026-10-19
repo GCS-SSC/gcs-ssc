@@ -188,7 +188,7 @@ export const createGuideRuntime = (options: GuideRuntimeOptions) => {
   const canSelect = (step: GuideStep) => selectionPath(step) !== null
   const anchorOnly = () => !presentation && state.value.step.appearance === 'anchor-only'
   let borderObserver: MutationObserver | null = null
-  let spotlightBorder: SVGPathElement | null = null
+  let spotlightBorder: SVGGElement | null = null
   /** Dispose the decorative copy before Driver releases its authoritative stage. */
   const releaseSpotlightBorder = () => {
     borderObserver?.disconnect()
@@ -207,16 +207,41 @@ export const createGuideRuntime = (options: GuideRuntimeOptions) => {
     const border = window.document.createElementNS('http://www.w3.org/2000/svg', 'path')
     border.classList.add('gcs-guide-spotlight-border')
     border.setAttribute('aria-hidden', 'true')
+    const outline = window.document.createElementNS('http://www.w3.org/2000/svg', 'g')
+    outline.setAttribute('aria-hidden', 'true')
+    const segments = Array.from({ length: 64 }, (_, index) => {
+      const segment = window.document.createElementNS('http://www.w3.org/2000/svg', 'path')
+      segment.classList.add('gcs-guide-spotlight-trail')
+      // Nested dashes build a seamless fade, reaching full opacity at the tip.
+      segment.style.strokeOpacity = String(1 / (64 - index))
+      return segment
+    })
+    outline.append(border, ...segments)
+    overlay.append(outline)
+    spotlightBorder = outline
     /** Refresh only the decorative inner contour from native geometry. */
     const sync = () => {
       // Driver's overlay is one closed viewport polygon followed by its rounded hole.
       const hole = /^M[^zZ]+Z\s*(M[^zZ]+z)\s*$/u.exec(nativePath.getAttribute('d') ?? '')?.[1]
-      if (hole) border.setAttribute('d', hole)
-      else border.removeAttribute('d')
+      for (const contour of [border, ...segments]) {
+        if (hole) contour.setAttribute('d', hole)
+        else contour.removeAttribute('d')
+      }
+      if (!hole) return
+      const perimeter = border.getTotalLength()
+      if (perimeter <= 0) return
+      const segmentLength = perimeter / 4 / segments.length
+      outline.style.setProperty('--gcs-guide-lap', `${perimeter / 240}s`)
+      segments.forEach((segment, index) => {
+        const offset = -index * segmentLength
+        const dashLength = segmentLength * (segments.length - index)
+        segment.setAttribute('stroke-dasharray', `${dashLength} ${perimeter - dashLength}`)
+        segment.style.setProperty('--gcs-guide-start', String(offset))
+        // Driver's inner contour runs clockwise; negative dash offsets follow it.
+        segment.style.setProperty('--gcs-guide-end', String(offset - perimeter))
+      })
     }
     sync()
-    overlay.append(border)
-    spotlightBorder = border
     borderObserver = new MutationObserver(sync)
     borderObserver.observe(nativePath, { attributes: true, attributeFilter: ['d'] })
   }
