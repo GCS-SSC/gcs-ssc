@@ -1,5 +1,14 @@
 {
-  "extends": "./tooling/gcs-ssc/tsconfig.host-scripts.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "baseUrl": ".",
+    "paths": {
+      "~~/*": ["./*"],
+      "~/*": ["app/*"]
+    }
+  },
   // https://nuxt.com/docs/guide/concepts/typescript
   "files": [],
   "references": [
