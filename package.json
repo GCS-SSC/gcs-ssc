@@ -92,7 +92,7 @@
     "test:all:manual": "bun run lint && bun run typecheck && bun run test:coverage && bun run test:integration:postgres && bun run test:e2e:pglite && bun run test:e2e:amendment-refresh && bun run test:e2e:agreement-closeout && bun run test:e2e:workflow-recommendation && bun run test:e2e:workflow-setup-retired && bun run test:e2e:agreement-amendments && bun run test:e2e:attachments && bun run test:e2e:agency-statuses && bun run test:e2e:fresh-reset --group standalone && bun run test:e2e:postgres && bun run test:e2e:extension-profile",
     "webcontainer:preview": "bun scripts/webcontainer.ts --stage-demo && npx serve .agent/reports/webcontainer-preview",
     "forms:inventory": "bun scripts/form-field-inventory.ts",
-    "forms:audit": "bun --tsconfig-override scripts/tsconfig.form-fields.json scripts/form-field-contract-audit.ts",
+    "forms:audit": "bun scripts/form-field-contract-audit.ts",
     "forms:check": "bun run forms:audit --check",
     "test:guided-help": "bun run --cwd packages/gcs-ssc-guided-help test:unit",
     "test:coverage:guided-help": "bun run --cwd packages/gcs-ssc-guided-help test:coverage",

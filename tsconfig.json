@@ -1,4 +1,5 @@
 {
+  "extends": "./tooling/gcs-ssc/tsconfig.host-scripts.json",
   // https://nuxt.com/docs/guide/concepts/typescript
   "files": [],
   "references": [

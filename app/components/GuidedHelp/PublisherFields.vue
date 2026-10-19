@@ -15,14 +15,14 @@ const stepIndex = computed(() => document.value.steps.findIndex(step => step.id 
 const step = computed(() => document.value.steps[stepIndex.value])
 const journeyDefinition = computed(() => guidedHelpJourneys.find(item => item.adapter === document.value.journey?.adapter))
 const stageId = computed(() => document.value.journey?.stages.find(stage => stage.guideStepIds.includes(selectedStep.value) || (stage.kind === 'tasks' ? stage.taskTemplates : undefined)?.some(template => template.guideStepIds.includes(selectedStep.value)))?.id ?? '')
-const journeyOptions = computed(() => [{ value: '', label: t('guided_help.journey_none') }, ...guidedHelpJourneys.map(item => ({ value: item.adapter, label: label(item.label) }))])
+const journeyOptions = computed(() => [{ value: 'none', label: t('guided_help.journey_none') }, ...guidedHelpJourneys.map(item => ({ value: item.adapter, label: label(item.label) }))])
 const stageOptions = computed(() => journeyDefinition.value?.stages.map(stage => ({ value: stage.id, label: label(stage.label) })) ?? [])
 const templateKey = computed(() => {
   const stage = document.value.journey?.stages.find(item => item.id === stageId.value)
   return stage?.kind === 'tasks' ? stage.taskTemplates?.find(template => template.guideStepIds.includes(selectedStep.value))?.key ?? '' : ''
 })
 const registeredStage = computed(() => journeyDefinition.value?.stages.find(stage => stage.id === stageId.value))
-const templateOptions = computed(() => [{ value: '', label: t('guided_help.journey_template_generic') }, ...(registeredStage.value?.taskTemplates ?? []).map(template => ({ value: template.key, label: label(template.label) }))])
+const templateOptions = computed(() => [{ value: 'generic', label: t('guided_help.journey_template_generic') }, ...(registeredStage.value?.taskTemplates ?? []).map(template => ({ value: template.key, label: label(template.label) }))])
 const allowedViews = computed(() => registeredStage.value?.taskTemplates?.find(template => template.key === templateKey.value)?.allowedViews ?? registeredStage.value?.allowedViews)
 const views = computed(() => guidedHelpLedger.views.filter(view => !allowedViews.value || allowedViews.value.includes(view.key)).map(view => ({ label: label(view.label), value: view.key })))
 const hasBranches = computed(() => document.value.steps.some(item => item.flow))
@@ -31,7 +31,7 @@ const hasBranches = computed(() => document.value.steps.some(item => item.flow))
  * @param adapter Registered workflow adapter key.
  */
 const chooseJourney = (adapter: string) => {
-  if (!adapter) {
+  if (adapter === 'none') {
     const { journey: _journey, ...linear } = document.value
     document.value = linear
     return
@@ -113,7 +113,7 @@ const chooseTarget = (key: string) => {
         </section>
       </div>
       <UFormField :label="t('guided_help.journey')" :required="false" name="journey" :description="t('guided_help.journey_hint')">
-        <USelect :model-value="document.journey?.adapter ?? ''" :items="journeyOptions" :disabled="hasBranches" class="w-full" @update:model-value="chooseJourney(String($event))" />
+        <USelect :model-value="document.journey?.adapter ?? 'none'" :items="journeyOptions" :disabled="hasBranches" class="w-full" @update:model-value="chooseJourney(String($event))" />
         <p v-if="hasBranches" class="mt-2 text-sm text-muted">
           {{ t('guided_help.journey_branch_conflict') }}
         </p>
@@ -127,7 +127,7 @@ const chooseTarget = (key: string) => {
             <USelect :model-value="stageId" :items="stageOptions" class="w-full" @update:model-value="chooseStage(String($event))" />
           </UFormField>
           <UFormField v-if="registeredStage?.kind === 'tasks'" :label="t('guided_help.journey_template')" :required="false" name="journey">
-            <USelect :model-value="templateKey" :items="templateOptions" class="w-full" @update:model-value="chooseStage(stageId, String($event))" />
+            <USelect :model-value="templateKey || 'generic'" :items="templateOptions" class="w-full" @update:model-value="chooseStage(stageId, $event === 'generic' ? '' : String($event))" />
           </UFormField>
           <UFormField :label="t('guided_help.screen')" :required="false" :hint="t('guided_help.required_for_publication')">
             <USelect :model-value="step.view" :items="views" class="w-full" @update:model-value="chooseView(String($event))" />
