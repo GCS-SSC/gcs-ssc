@@ -238,6 +238,7 @@ describe('exact native target resolution', () => {
     await vi.waitFor(() => expect(document.querySelector<SVGElement>('.driver-overlay')?.style.display).toBe('none'))
     expect(target.classList.contains('driver-active-element')).toBe(false)
     expect(document.querySelector('.driver-popover')?.classList.contains('gcs-guide-anchor-only')).toBe(true)
+    expect(document.querySelector('.gcs-guide-spotlight-border')).toBeNull()
     draft.focus()
     const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
     draft.dispatchEvent(tab)
@@ -282,6 +283,28 @@ describe('exact native target resolution', () => {
       expect(draft.value).toBe('Evidence')
       expect(active.state.value.step.id).toBe('answer')
     } finally { visible.mockRestore() }
+  })
+
+  it('outlines only the padded native spotlight opening and follows native path refreshes', async () => {
+    document.body.innerHTML = '<input data-help-target="answer" value="Evidence">'
+    const target = document.querySelector('input')!
+    let bounds = new DOMRect(100, 200, 240, 40)
+    vi.spyOn(target, 'getBoundingClientRect').mockImplementation(() => bounds)
+    active = createGuideRuntime({ document: guide([{ ...step('answer', 'text'), advanceOn: 'manual' }]), locale: 'en', currentView: 'packing', observedContext: context })
+    await vi.waitFor(() => expect(document.querySelector('.gcs-guide-spotlight-border')).not.toBeNull())
+    const native = document.querySelector('.driver-overlay path:not(.gcs-guide-spotlight-border)')!
+    const border = document.querySelector('.gcs-guide-spotlight-border')!
+    expect(border.getAttribute('d')).toBe(native.getAttribute('d')!.split('Z')[1]!.trim())
+    expect(border.getAttribute('d')).toContain('M95,190')
+    expect(border.getAttribute('d')).not.toContain('M1024,0')
+    expect(target.getAttribute('style')).toBeNull()
+    expect(border.getAttribute('aria-hidden')).toBe('true')
+    bounds = new DOMRect(100, 140, 240, 40)
+    window.dispatchEvent(new Event('scroll'))
+    await vi.waitFor(() => expect(border.getAttribute('d')).toContain('M95,130'))
+    expect(document.querySelector('.gcs-guide-spotlight-border')).toBe(border)
+    active.destroy()
+    expect(document.querySelector('.gcs-guide-spotlight-border')).toBeNull()
   })
 
   it.each(['spotlight', 'anchor-only'].flatMap(appearance => ['nested', 'window'].map(scroll => ({ appearance, scroll }))))('tracks scrolling in $appearance mode on $scroll without rebuilding or moving focus', async ({ appearance, scroll }) => {

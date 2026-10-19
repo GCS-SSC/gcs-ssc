@@ -62,6 +62,22 @@ export const useNavigationCatalog = (workspaces: MaybeRefOrGetter<ExtensionAgenc
     add('common', 'admin_common.resources.gwcoa', 'i-lucide-database', appRouteLocations.adminGwcoa(), can('system', 'read', { type: 'global' }))
     return entries
   })
-  const items = computed<NavigationMenuItem[][]>(() => [pages.value, []])
+  const items = computed<NavigationMenuItem[][]>(() => {
+    const adminIds = new Set(['assignment', 'guided-help', 'roles', 'users', 'audit', 'extension:gcs-outcome-cost-allocation', 'common'])
+    const adminPages = pages.value.filter(page => adminIds.has(page.id))
+    const mainPages: NavigationMenuItem[] = pages.value.filter(page => !adminIds.has(page.id))
+    if (adminPages.length) {
+      mainPages.push({
+        'id': 'admin',
+        'label': t('nav.admin'),
+        'aria-label': t('nav.admin'),
+        'icon': 'i-lucide-settings-2',
+        'type': 'trigger',
+        'popover': true,
+        'children': adminPages
+      })
+    }
+    return [mainPages, []]
+  })
   return { items, pages }
 }

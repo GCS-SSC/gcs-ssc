@@ -42,6 +42,9 @@ const actions = computed(() => canUpdate
     :meta-items="metaItems"
     :badges="badges"
     :actions="actions">
+    <template #collapsed-actions>
+      <GuidedHelpLauncher />
+    </template>
     <template #actions>
       <GuidedHelpLauncher />
     </template>

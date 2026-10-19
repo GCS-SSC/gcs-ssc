@@ -108,6 +108,7 @@ defineEmits(['add'])
         :disabled="buttonDisabled"
         class="shadow-primary/20 shadow-lg"
         @click="$emit('add')" />
+      <slot name="trailing-actions" />
     </div>
   </div>
 </template>

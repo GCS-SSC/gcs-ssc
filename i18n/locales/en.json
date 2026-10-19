@@ -140,6 +140,7 @@
     "delete_confirm": "Delete this group and its membership?"
   },
   "nav": {
+    "admin": "Administration",
     "home": "Home",
     "agencies": "Agencies",
     "transfer_payments": "Programs",

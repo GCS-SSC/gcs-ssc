@@ -92,6 +92,7 @@ const userMenuItems = computed<DropdownMenuItem[][]>(() => [
 <template>
   <UDashboardGroup unit="rem">
     <UDashboardSidebar
+      :default-size="18"
       collapsible
       resizable
       :ui="{

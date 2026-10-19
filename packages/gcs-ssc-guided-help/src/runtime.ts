@@ -187,11 +187,45 @@ export const createGuideRuntime = (options: GuideRuntimeOptions) => {
   }
   const canSelect = (step: GuideStep) => selectionPath(step) !== null
   const anchorOnly = () => !presentation && state.value.step.appearance === 'anchor-only'
+  let borderObserver: MutationObserver | null = null
+  let spotlightBorder: SVGPathElement | null = null
+  /** Dispose the decorative copy before Driver releases its authoritative stage. */
+  const releaseSpotlightBorder = () => {
+    borderObserver?.disconnect()
+    borderObserver = null
+    spotlightBorder?.remove()
+    spotlightBorder = null
+  }
+  /** Copy Driver's rounded inner stage, never its outer viewport polygon.
+   * @param overlay The native overlay owned by this reader.
+   */
+  const mountSpotlightBorder = (overlay: SVGElement) => {
+    releaseSpotlightBorder()
+    if (anchorOnly() || !target) return
+    const nativePath = overlay.querySelector('path')
+    if (!nativePath) return
+    const border = window.document.createElementNS('http://www.w3.org/2000/svg', 'path')
+    border.classList.add('gcs-guide-spotlight-border')
+    border.setAttribute('aria-hidden', 'true')
+    /** Refresh only the decorative inner contour from native geometry. */
+    const sync = () => {
+      // Driver's overlay is one closed viewport polygon followed by its rounded hole.
+      const hole = /^M[^zZ]+Z\s*(M[^zZ]+z)\s*$/u.exec(nativePath.getAttribute('d') ?? '')?.[1]
+      if (hole) border.setAttribute('d', hole)
+      else border.removeAttribute('d')
+    }
+    sync()
+    overlay.append(border)
+    spotlightBorder = border
+    borderObserver = new MutationObserver(sync)
+    borderObserver.observe(nativePath, { attributes: true, attributeFilter: ['d'] })
+  }
   const spotlight = driver({ animate: false, allowKeyboardControl: false, disableActiveInteraction: false, allowClose: false, overlayClickBehavior: 'none', overlayOpacity: 0.45, popoverClass: 'gcs-guide-popover', /** Keep portalled business controls interactive. */
     onHighlighted: () => {
       window.document.querySelectorAll<SVGElement>('.driver-overlay').forEach(overlay => {
         overlay.style.pointerEvents = 'none'
         overlay.style.display = anchorOnly() ? 'none' : ''
+        mountSpotlightBorder(overlay)
         // The spotlight and popover must share the dialog's stacking context.
         if (modalHost && overlay.parentElement !== modalHost) modalHost.prepend(overlay)
       })
@@ -325,6 +359,7 @@ export const createGuideRuntime = (options: GuideRuntimeOptions) => {
     destroyed = true
     observer?.disconnect()
     spotlight.getActiveElement()?.classList.add('driver-active-element')
+    releaseSpotlightBorder()
     spotlight.destroy()
     releaseModalHost()
     window.removeEventListener('keydown', onKeydown, true)
@@ -547,6 +582,7 @@ export const createGuideRuntime = (options: GuideRuntimeOptions) => {
     rebuilding = true
     observer?.disconnect()
     spotlight.getActiveElement()?.classList.add('driver-active-element')
+    releaseSpotlightBorder()
     spotlight.destroy()
     releaseModalHost()
     const step = state.value.step

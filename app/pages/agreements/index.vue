@@ -140,7 +140,6 @@ const canDeleteAgreement = (agreement: FundingCaseAgreementProfileRow) =>
         </template>
         <template #right>
           <div class="flex items-center gap-2">
-            <GuidedHelpLauncher />
             <CommonActionButton
               color="neutral"
               variant="ghost"
@@ -178,6 +177,9 @@ const canDeleteAgreement = (agreement: FundingCaseAgreementProfileRow) =>
             @select="selectGuidedAgreement"
             @edit="openUpdateAgreement"
             @delete="deleteAgreement">
+            <template #trailing-actions>
+              <GuidedHelpLauncher />
+            </template>
             <template #filters>
               <CommonAssignedListViewSelect v-model="listView" resource="agreement" />
             </template>

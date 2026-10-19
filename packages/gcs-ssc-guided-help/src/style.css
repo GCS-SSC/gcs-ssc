@@ -34,3 +34,20 @@ body.driver-active .driver-active-element { pointer-events: auto !important; }
    covering fields or actions. The modal's existing scroll body stays available. */
 .gcs-guide-popover.gcs-guide-modal-inline { z-index: 1000000002; position: relative !important; inset: auto !important; width: auto !important; max-width: none !important; max-height: 40dvh; overflow: hidden; flex-shrink: 0; margin: .75rem; }
 .gcs-guide-modal-inline .driver-popover-arrow { display: none; }
+
+/* Follow Driver's padded opening without changing the native control's styles. */
+.gcs-guide-spotlight-border {
+  fill: none;
+  stroke: var(--color-violet-800, #5b21b6);
+  stroke-width: 4px;
+  pointer-events: none;
+  animation: gcs-guide-spotlight-pulse 2s ease-in-out infinite;
+}
+.dark .gcs-guide-spotlight-border { stroke: var(--color-violet-200, #ddd6fe); }
+@keyframes gcs-guide-spotlight-pulse {
+  0%, 100% { stroke-width: 4px; stroke-opacity: .7; }
+  50% { stroke-width: 8px; stroke-opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gcs-guide-spotlight-border { animation: none; }
+}

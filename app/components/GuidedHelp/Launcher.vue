@@ -26,9 +26,9 @@ const launch = (id: string) => {
 
 <template>
   <template v-if="items.length && !active">
-    <UButton v-if="items.length === 1" :label="t('guided_help.help')" icon="i-lucide-circle-help" color="warning" variant="soft" class="px-6" :disabled="loading" @click="launch(items[0]!.id)" />
+    <UButton v-if="items.length === 1" :label="t('guided_help.help')" icon="i-lucide-circle-help" color="neutral" variant="soft" class="bg-violet-100 px-6 text-violet-800 hover:bg-violet-200 focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-violet-400/15 dark:text-violet-200 dark:hover:bg-violet-400/25 dark:focus-visible:ring-violet-300 dark:focus-visible:ring-offset-zinc-900" :disabled="loading" @click="launch(items[0]!.id)" />
     <UPopover v-else v-model:open="open" :content="{ align: 'end' }">
-      <UButton :label="t('guided_help.help')" icon="i-lucide-circle-help" color="warning" variant="soft" class="px-6" :disabled="loading" />
+      <UButton :label="t('guided_help.help')" icon="i-lucide-circle-help" color="neutral" variant="soft" class="bg-violet-100 px-6 text-violet-800 hover:bg-violet-200 focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-violet-400/15 dark:text-violet-200 dark:hover:bg-violet-400/25 dark:focus-visible:ring-violet-300 dark:focus-visible:ring-offset-zinc-900" :disabled="loading" />
       <template #content>
         <div class="max-w-sm p-3">
           <h2 class="mb-2 font-semibold">

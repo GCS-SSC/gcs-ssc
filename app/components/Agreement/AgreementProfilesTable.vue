@@ -87,6 +87,9 @@ const getAgreementActionTarget = (agreement: FundingCaseAgreementProfileRow) => 
       <template #filters>
         <slot name="filters" />
       </template>
+      <template #trailing-actions>
+        <slot name="trailing-actions" />
+      </template>
       <template #id-cell="{ row }">
         <span class="font-mono text-xs font-bold text-zinc-400 dark:text-zinc-500">
           {{ row.original.id }}

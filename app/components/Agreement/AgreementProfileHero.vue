@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GuidedHelpLauncher from '~/components/GuidedHelp/Launcher.vue'
 import { computed } from 'vue'
 import type { StatusId } from '~~/shared/types/status'
 import type { FundingCaseAgreementProfileForm, FundingCaseAgreementProfileRow } from '~~/shared/types/funding-case-agreement-ui'
@@ -42,5 +43,12 @@ const badges = computed(() => profile.egcs_fc_status
     icon="i-lucide-file-signature"
     :title="title"
     :meta-items="metaItems"
-    :badges="badges" />
+    :badges="badges">
+    <template #collapsed-actions>
+      <GuidedHelpLauncher />
+    </template>
+    <template #actions>
+      <GuidedHelpLauncher />
+    </template>
+  </CommonEntityHero>
 </template>
