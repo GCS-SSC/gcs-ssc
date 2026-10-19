@@ -141,6 +141,7 @@
   },
   "nav": {
     "admin": "Administration",
+    "management": "Gestion",
     "home": "Accueil",
     "agencies": "Organismes",
     "transfer_payments": "Programmes",

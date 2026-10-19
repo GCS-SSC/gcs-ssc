@@ -34,6 +34,7 @@ export default defineEventHandler(async event => {
     return agencies.length
       ? [{
           key: extension.key,
+          navigation: extension.admin.agencyWorkspace!.navigation,
           label: extension.admin.agencyWorkspace!.label,
           icon: extension.admin.agencyWorkspace!.icon,
           agencies

@@ -125,6 +125,7 @@ const userMenuItems = computed<DropdownMenuItem[][]>(() => [
           :label="t('nav.main_navigation')"
           :collapsed="collapsed"
           :items="items[0]"
+          type="single"
           orientation="vertical"
           :ui="{
             link: `font-black uppercase tracking-widest text-xs py-3 ${collapsed ? 'px-1.5' : 'px-4'} rounded-lg transition-colors data-[active]:text-primary dark:data-[active]:text-blue-300 data-[active]:bg-primary/5 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-zinc-800/50`

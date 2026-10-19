@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { GcsExtensionWorkspaceNavigation } from '@gcs-ssc/extensions'
 import type { WithId } from './common'
 import type {
   GcsExtensionEntityTabTarget,
@@ -64,6 +65,7 @@ export interface ExtensionAgencyRegistryItem {
 }
 
 export interface ExtensionAgencyWorkspaceListItem {
+  navigation: GcsExtensionWorkspaceNavigation
   key: string
   label: { en: string; fr: string }
   icon?: string

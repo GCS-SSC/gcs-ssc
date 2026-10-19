@@ -233,7 +233,7 @@
       "name": "@gcs-ssc/gcs-outcome-cost-allocation",
       "version": "0.1.0",
       "dependencies": {
-        "@gcs-ssc/extensions": "^0.3.17",
+        "@gcs-ssc/extensions": "^0.3.19",
       },
       "devDependencies": {
         "@electric-sql/pglite": "0.3.16",
@@ -259,7 +259,7 @@
       "name": "@gcs-ssc/gcs-ssc-portal-connector",
       "version": "0.1.0",
       "dependencies": {
-        "@gcs-ssc/extensions": "^0.3.18",
+        "@gcs-ssc/extensions": "^0.3.19",
         "@gcs-ssc/survey": "file:vendor/survey",
         "nanoid": "^5.1.6",
         "zod": "^4.3.6",
@@ -335,7 +335,7 @@
     },
     "packages/gcs-ssc-extensions": {
       "name": "@gcs-ssc/extensions",
-      "version": "0.3.18",
+      "version": "0.3.19",
       "devDependencies": {
         "@types/node": "^25.3.0",
         "h3": "^1.15.5",

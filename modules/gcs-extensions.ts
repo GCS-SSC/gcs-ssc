@@ -46,6 +46,7 @@ const EXTENSION_SERVER_HANDLER_METHODS = new Set(['get', 'post', 'put', 'patch',
 const EXTENSION_HOST_CAPABILITIES = new Set([
   'agency-config',
   'agency-workspace',
+  'agency-workspace-navigation',
   'stream-config-modal',
   'stream-config-page',
   'entity-tabs',
@@ -325,6 +326,7 @@ const inferRequiredHostCapabilities = (definition: GcsExtensionDefinition): Set<
   const capabilities = new Set<GcsExtensionHostCapability>()
   addImpliedCapability(capabilities, Boolean(definition.admin?.agency), 'agency-config')
   addImpliedCapability(capabilities, Boolean(definition.admin?.agencyWorkspace), 'agency-workspace')
+  addImpliedCapability(capabilities, Boolean(definition.admin?.agencyWorkspace), 'agency-workspace-navigation')
   addImpliedCapability(capabilities, Boolean(definition.admin?.streamConfig), 'stream-config-modal')
   addImpliedCapability(capabilities, Boolean(definition.admin?.streamConfigPage), 'stream-config-page')
   addImpliedCapability(capabilities, (definition.client?.tabs ?? []).length > 0, 'entity-tabs')
@@ -487,6 +489,11 @@ export const validateExtensionDefinition = (definition: GcsExtensionDefinition, 
     const workspace = definition.admin.agencyWorkspace
     if (!definition.admin.agency || !workspace.label?.en || !workspace.label?.fr || !workspace.tabs.length) {
       throw new Error(`Extension ${definition.key} agency workspace requires an agency component, bilingual label and tabs`)
+    }
+    if (!workspace.navigation
+      || (workspace.navigation.category !== 'management' && workspace.navigation.category !== 'administration')
+      || !Number.isSafeInteger(workspace.navigation.order)) {
+      throw new Error(`Extension ${definition.key} agency workspace navigation requires a management or administration category and a safe integer order`)
     }
     const tabIds = new Set<string>()
     for (const tab of workspace.tabs) {
