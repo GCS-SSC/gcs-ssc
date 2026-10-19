@@ -284,8 +284,7 @@ const handleCompleted = async () => {
         <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" :loading="isLoadingDetail" @click="retryLoad" />
       </template>
     </UAlert>
-    <div v-else-if="isLoadingDetail && (!profile || !payment)" role="status" aria-live="polite" class="flex min-h-32 items-center justify-center gap-2 text-sm text-muted">
-      <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin" aria-hidden="true" />
+    <div v-else-if="isLoadingDetail && (!profile || !payment)" role="status" aria-live="polite" class="sr-only">
       <span>{{ t('common.loading_records') }}</span>
     </div>
     <CommonDetailPage v-if="payment" id="agreement-payment-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" class="w-full">
@@ -310,8 +309,7 @@ const handleCompleted = async () => {
 
           <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="agreement-payment-detail-content">
             <template #notices>
-              <p v-if="extensionTabsStatus === 'pending'" role="status" aria-live="polite" class="flex items-center gap-2 text-sm text-muted">
-                <UIcon name="i-lucide-loader-circle" class="size-4 animate-spin" aria-hidden="true" />
+              <p v-if="extensionTabsStatus === 'pending'" role="status" aria-live="polite" class="sr-only">
                 {{ t('extensions.entity_tabs_loading') }}
               </p>
               <UAlert v-else-if="extensionTabsError" color="error" icon="i-lucide-circle-alert" :title="t('extensions.entity_tabs_load_failed')" :description="t('extensions.entity_tabs_load_failed_description')">

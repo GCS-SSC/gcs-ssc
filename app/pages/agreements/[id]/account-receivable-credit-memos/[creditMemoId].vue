@@ -43,8 +43,7 @@ const retry = async () => {
         <UButton :label="t('common.retry')" color="error" variant="soft" icon="i-lucide-refresh-cw" @click="retry" />
       </template>
     </UAlert>
-    <div v-else role="status" aria-live="polite" class="flex min-h-32 items-center justify-center gap-2 text-sm text-muted">
-      <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin" aria-hidden="true" />
+    <div v-else role="status" aria-live="polite" class="sr-only">
       <span>{{ t('common.loading_records') }}</span>
     </div>
   </div>

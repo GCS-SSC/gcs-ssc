@@ -422,8 +422,7 @@ const cancel = () => {
 <template>
   <NuxtPage v-if="isChildDetailRoute" />
   <div v-else class="flex min-w-0 flex-1 flex-col">
-    <div v-if="status === 'pending' && !profile" role="status" aria-live="polite" class="flex min-h-32 items-center justify-center gap-2 text-sm text-muted">
-      <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin" aria-hidden="true" />
+    <div v-if="status === 'pending' && !profile" role="status" aria-live="polite" class="sr-only">
       <span>{{ t('common.loading_records') }}</span>
     </div>
     <UAlert v-else-if="status === 'error'" color="error" icon="i-lucide-circle-alert" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
@@ -443,8 +442,7 @@ const cancel = () => {
 
           <CommonDetailWorkspace v-model="selectedTab" content-test-id="agreement-detail-content" :items="tabs" help-navigation-target="agreement.detail.risk-navigation" help-navigation-value="risk-rating">
             <template #notices>
-              <p v-if="extensionTabsStatus === 'pending'" role="status" aria-live="polite" class="flex items-center gap-2 text-sm text-muted">
-                <UIcon name="i-lucide-loader-circle" class="size-4 animate-spin" aria-hidden="true" />
+              <p v-if="extensionTabsStatus === 'pending'" role="status" aria-live="polite" class="sr-only">
                 {{ t('extensions.entity_tabs_loading') }}
               </p>
               <UAlert v-else-if="extensionTabsError" color="error" icon="i-lucide-circle-alert" :title="t('extensions.entity_tabs_load_failed')" :description="t('extensions.entity_tabs_load_failed_description')">

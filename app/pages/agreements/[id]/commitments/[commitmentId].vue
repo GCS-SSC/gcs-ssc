@@ -281,8 +281,7 @@ const handleCompleted = async () => {
         <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" :loading="isLoadingDetail" @click="retryLoad" />
       </template>
     </UAlert>
-    <div v-else-if="isLoadingDetail && (!profile || !commitment)" role="status" aria-live="polite" class="flex min-h-32 items-center justify-center gap-2 text-sm text-muted">
-      <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin" aria-hidden="true" />
+    <div v-else-if="isLoadingDetail && (!profile || !commitment)" role="status" aria-live="polite" class="sr-only">
       <span>{{ t('common.loading_records') }}</span>
     </div>
     <CommonDetailPage v-if="profile && commitment" id="agreement-commitment-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" class="w-full">

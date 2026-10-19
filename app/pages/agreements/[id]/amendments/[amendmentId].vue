@@ -845,8 +845,7 @@ const cancelAmendment = async () => {
         </CommonDetailWorkspace>
       </div>
 
-      <div v-else-if="isLoadingDetail" role="status" aria-live="polite" class="flex flex-1 items-center justify-center gap-2 p-8 text-sm text-muted">
-        <UIcon name="i-lucide-loader-circle" class="size-8 animate-spin text-primary" aria-hidden="true" />
+      <div v-else-if="isLoadingDetail" role="status" aria-live="polite" class="sr-only">
         <span>{{ t('common.loading_records') }}</span>
       </div>
 

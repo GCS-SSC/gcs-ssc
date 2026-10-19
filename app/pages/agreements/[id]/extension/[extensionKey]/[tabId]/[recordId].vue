@@ -32,8 +32,7 @@ const item = computed(() => items.value.find(tab =>
     <ExtensionEntityTabPanel v-if="status === 'success' && item" :item="item" :record-id="recordId" />
     <CommonDetailPage v-else id="agreement-extension-record-loading" v-model:collapsed="collapsed" :breadcrumb-items="breadcrumbs">
       <template #body>
-        <div v-if="status === 'idle' || status === 'pending'" role="status" aria-live="polite" class="flex min-h-32 items-center justify-center gap-2 text-sm text-muted">
-          <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin" aria-hidden="true" />
+        <div v-if="status === 'idle' || status === 'pending'" role="status" aria-live="polite" class="sr-only">
           <span>{{ t('common.loading_records') }}</span>
         </div>
         <UAlert v-else-if="status === 'error'" color="error" icon="i-lucide-circle-alert" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">

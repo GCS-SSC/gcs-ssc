@@ -1038,8 +1038,7 @@ const handleApprovalChanged = async () => {
             embedded
             @changed="handleApprovalChanged" />
           <template #fallback>
-            <div role="status" class="flex items-center gap-3 py-8 text-sm text-muted">
-              <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin" aria-hidden="true" />
+            <div role="status" class="sr-only">
               {{ t('common.loading') }}
             </div>
           </template>

@@ -156,8 +156,8 @@ const linkedCreated = async (id: string) => {
         <UButton color="error" variant="soft" :label="t('common.retry')" icon="i-lucide-refresh-cw" @click="retryLoad" />
       </template>
     </UAlert>
-    <div v-else-if="!correction && status === 'pending'" role="status" aria-live="polite" class="flex min-h-32 items-center justify-center gap-2 text-sm text-muted">
-      <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin" aria-hidden="true" /><span>{{ t('common.loading_records') }}</span>
+    <div v-else-if="!correction && status === 'pending'" role="status" aria-live="polite" class="sr-only">
+      <span>{{ t('common.loading_records') }}</span>
     </div>
     <CommonDetailPage v-if="correction && state" id="agreement-correction-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbs" class="min-w-0 flex-1">
       <template #body>

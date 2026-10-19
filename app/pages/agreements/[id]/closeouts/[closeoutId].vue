@@ -185,8 +185,8 @@ const { selectedTab } = useUrlTabState({ tabs, defaultTab: 'workflow' })
         </CommonDetailWorkspace>
       </div>
 
-      <div v-else-if="isLoading" class="flex flex-1 items-center justify-center p-8">
-        <UIcon name="i-lucide-loader-circle" class="size-8 animate-spin text-primary" />
+      <div v-else-if="isLoading" class="sr-only" role="status" aria-live="polite">
+        {{ t('common.loading') }}
       </div>
     </template>
   </CommonDetailPage>

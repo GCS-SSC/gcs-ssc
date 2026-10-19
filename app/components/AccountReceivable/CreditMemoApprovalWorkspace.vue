@@ -94,8 +94,8 @@ const breadcrumbs = computed(() => [
 </script>
 
 <template>
-  <div v-if="status === 'pending'" role="status" aria-live="polite" class="flex min-h-32 items-center justify-center gap-2 text-sm text-muted">
-    <UIcon name="i-lucide-loader-circle" class="size-5 animate-spin" aria-hidden="true" /><span>{{ t('common.loading_records') }}</span>
+  <div v-if="status === 'pending'" role="status" aria-live="polite" class="sr-only">
+    <span>{{ t('common.loading_records') }}</span>
   </div>
   <UAlert v-else-if="status === 'error'" color="error" icon="i-lucide-circle-alert" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
     <template #actions>
