@@ -41,8 +41,8 @@ export const useNavigationCatalog = (workspaces: MaybeRefOrGetter<ExtensionAgenc
     }
     add('home', 'nav.home', 'i-lucide-house', appRouteLocations.home(), { category: 'primary', order: 10 })
     add('agencies', 'nav.agencies', 'i-lucide-settings', appRouteLocations.agencies(), { category: 'management', order: 10 }, canAny('agency', 'read'))
-    add('programs', 'nav.transfer_payments', 'i-lucide-banknote', appRouteLocations.transferPayments(), { category: 'management', order: 30 }, canAny('transfer_payment', 'read'))
-    add('opportunities', 'nav.funding_opportunities', 'i-lucide-megaphone', appRouteLocations.fundingOpportunities(), { category: 'management', order: 20 }, canAny('transfer_payment', 'read'))
+    add('programs', 'nav.transfer_payments', 'i-lucide-banknote', appRouteLocations.transferPayments(), { category: 'primary', order: 60 }, canAny('transfer_payment', 'read'))
+    add('opportunities', 'nav.funding_opportunities', 'i-lucide-megaphone', appRouteLocations.fundingOpportunities(), { category: 'primary', order: 50 }, canAny('transfer_payment', 'read'))
     add('intakes', 'nav.funding_case_intakes', 'i-lucide-inbox', appRouteLocations.fundingCaseIntakes(), { category: 'primary', order: 40 }, canAny('funding_case', 'read'))
     add('journal-vouchers', 'journal_voucher.title', 'i-lucide-book-open-check', '/journal-vouchers', { category: 'management', order: 70 }, canAny('journal_voucher', 'read'))
     add('agreements', 'nav.agreements', 'i-lucide-file-signature', appRouteLocations.agreements(), { category: 'primary', order: 20 }, canAny('agreement', 'read'))
