@@ -104,7 +104,7 @@ const sheetTitle = required('--sheet')
 const row = positiveInteger('--row')
 const count = positiveInteger('--count', 1)
 const accessToken = await getGoogleSheetsAccessToken()
-const boundedRead = action === 'read' || action === 'format'
+const boundedRead = action !== 'move' && action !== 'insert'
 let workbook = await readWorkbookSnapshot(accessToken, DATA_MODEL_SPREADSHEET_ID,
   boundedRead ? { sheetTitle, startRowIndex: row - 1, count } : undefined)
 let sheet = requireSheet(workbook, sheetTitle)
@@ -149,9 +149,12 @@ if (action === 'cell') {
       }
     }] })
   })
-  workbook = await readWorkbookSnapshot(accessToken)
+  const verificationStart = Math.max(0, startRowIndex - 1)
+  const verificationCount = Math.min(sheet.properties.gridProperties.rowCount - verificationStart, 3)
+  workbook = await readWorkbookSnapshot(accessToken, DATA_MODEL_SPREADSHEET_ID,
+    { sheetTitle, startRowIndex: verificationStart, count: verificationCount })
   sheet = requireSheet(workbook, sheetTitle)
-  printRows(sheet, Math.max(0, startRowIndex - 1), Math.min(sheet.properties.gridProperties.rowCount, 3))
+  printRows(sheet, verificationStart, verificationCount)
   process.exit(0)
 }
 
@@ -260,9 +263,12 @@ await sheetsRequest(accessToken, `${DATA_MODEL_SPREADSHEET_ID}:batchUpdate`, {
 const verificationStart = action === 'move'
   ? Math.max(0, Math.min(startRowIndex, positiveInteger('--before-row') - 1) - 1)
   : Math.max(0, startRowIndex - 1)
+const verificationRowCount = sheet.properties.gridProperties.rowCount
+  + (action === 'insert' ? count : action === 'delete' ? -count : 0)
+const verificationCount = Math.min(verificationRowCount - verificationStart, count + 3)
 workbook = await readWorkbookSnapshot(accessToken, DATA_MODEL_SPREADSHEET_ID,
-  action === 'format'
-    ? { sheetTitle, startRowIndex: verificationStart, count: Math.min(sheet.properties.gridProperties.rowCount - verificationStart, count + 3) }
-    : undefined)
+  action === 'move'
+    ? undefined
+    : { sheetTitle, startRowIndex: verificationStart, count: verificationCount })
 sheet = requireSheet(workbook, sheetTitle)
-printRows(sheet, verificationStart, Math.min(sheet.properties.gridProperties.rowCount - verificationStart, count + 3))
+printRows(sheet, verificationStart, verificationCount)
