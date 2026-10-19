@@ -41,6 +41,17 @@ it('rejects duplicate draft identities and unsafe draft markup too', () => {
 })
 const ledger = { formatVersion: 1 as const, views: [{ key: 'agency.address-types', label: { en: 'Address types', fr: 'Types d’adresse' }, targets: [{ key: 'agency.address-type.name', label: { en: 'Name', fr: 'Nom' }, kind: 'text' as const }] }] }
 
+it('validates ledger-owned completion and instance scope without extending authored steps', () => {
+  const target = ledger.views[0]!.targets[0]!
+  for (const completion of [{ kind: 'location', fact: 'task.arrived' }, { kind: 'success', action: 'save-success' }]) {
+    expect(TargetLedgerSchema.safeParse({ ...ledger, views: [{ ...ledger.views[0], targets: [{ ...target, scope: 'instance', completion }] }] }).success).toBe(true)
+  }
+  for (const completion of [{ kind: 'location', fact: '#selector' }, { kind: 'success', action: 'click' }, { kind: 'executable', code: 'run()' }]) {
+    expect(TargetLedgerSchema.safeParse({ ...ledger, views: [{ ...ledger.views[0], targets: [{ ...target, completion }] }] }).success).toBe(false)
+  }
+  expect(GuideDocumentSchema.safeParse({ ...guide, steps: [{ ...guide.steps[0], completion: { kind: 'location', fact: 'task.arrived' } }] }).success).toBe(false)
+})
+
 it('offers a validated bilingual catalog and reports broken guide references', () => {
   expect(TargetLedgerSchema.parse(ledger)).toEqual(ledger)
   expect(checkGuideCompatibility(GuideDocumentSchema.parse(guide), ledger)).toEqual([])
@@ -83,4 +94,12 @@ it('marks modal-only authoring views undiscoverable without changing existing le
   const view = { key: 'agency.edit', label: { en: 'Edit agency', fr: 'Modifier l’organisme' }, targets: [] }
   expect(TargetLedgerSchema.parse({ formatVersion: 1, views: [view] }).views[0]).not.toHaveProperty('discoverable')
   expect(TargetLedgerSchema.parse({ formatVersion: 1, views: [{ ...view, discoverable: false }] }).views[0]?.discoverable).toBe(false)
+})
+
+it('accepts only registered step appearances and retains the anchor requirement', () => {
+  for (const appearance of ['spotlight', 'anchor-only']) {
+    expect(GuideDocumentSchema.parse({ ...guide, steps: [{ ...guide.steps[0], appearance }] }).steps[0]?.appearance).toBe(appearance)
+  }
+  expect(GuideDocumentSchema.safeParse({ ...guide, steps: [{ ...guide.steps[0], appearance: 'overlay-free' }] }).success).toBe(false)
+  expect(GuideDocumentSchema.safeParse({ ...guide, steps: [{ ...guide.steps[0], appearance: 'anchor-only', target: '' }] }).success).toBe(false)
 })

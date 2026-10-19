@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import { useId, computed, onUnmounted, ref, watch } from 'vue'
+import type { GuideObservedContext } from '@gcs-ssc/guided-help/runtime'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import { agreementCalendarDate } from '~/utils/agreement-calendar-date'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
-import { computed, onUnmounted, ref, watch } from 'vue'
 import { useAgreementChildActionPrerequisites } from '~/composables/useAgreementChildActionPrerequisites'
 import type { Ref } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
@@ -304,6 +305,14 @@ const { selectedTab } = useUrlTabState({
 })
 const selectedExtensionTab = computed(() => getExtensionTabItem(selectedTab.value))
 
+const helpVisitId = useId()
+const helpContext = computed<GuideObservedContext>(() => profile.value && String(profile.value.id) === String(route.params.id)
+  ? {
+      kind: 'owner', binding: { resourceType: 'fundingcaseagreement', resourceId: String(profile.value.id) }, execution: null, view: selectedTab.value === 'risk-rating' ? 'agreement.risk-rating' : 'agreement.detail',
+      facts: ['agreement.selected', ...(selectedTab.value === 'risk-rating' ? ['agreement.risk-rating'] : [])],
+      visitId: helpVisitId, draftRevision: 0
+    }
+  : { kind: 'pending' })
 const breadcrumbItems = computed(() => [
   { label: t('agreement.title'), to: localePath(appRouteLocations.agreements()) },
   { label: getBilingualValue(profile.value, 'egcs_fc_title', id) }
@@ -422,7 +431,7 @@ const cancel = () => {
         <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" @click="() => { void refreshProfile() }" />
       </template>
     </UAlert>
-    <CommonDetailPage v-if="profile" id="agreement-detail" v-model:collapsed="isHeroCollapsed" class="min-w-0 flex-1" :breadcrumb-items="breadcrumbItems">
+    <CommonDetailPage v-if="profile" id="agreement-detail" v-model:collapsed="isHeroCollapsed" data-help-view="agreement.detail" :data-help-context="JSON.stringify(helpContext)" :data-help-agency="profile.agency_id" :data-help-agreement-id="id" class="min-w-0 flex-1" :breadcrumb-items="breadcrumbItems">
       <template #body>
         <div class="flex min-w-0 flex-1 flex-col">
           <AgreementProfileHero
@@ -432,7 +441,7 @@ const cancel = () => {
             :subtitle="t('agreement.update_title')"
             show-context />
 
-          <CommonDetailWorkspace v-model="selectedTab" content-test-id="agreement-detail-content" :items="tabs">
+          <CommonDetailWorkspace v-model="selectedTab" content-test-id="agreement-detail-content" :items="tabs" help-navigation-target="agreement.detail.risk-navigation" help-navigation-value="risk-rating">
             <template #notices>
               <p v-if="extensionTabsStatus === 'pending'" role="status" aria-live="polite" class="flex items-center gap-2 text-sm text-muted">
                 <UIcon name="i-lucide-loader-circle" class="size-4 animate-spin" aria-hidden="true" />
@@ -515,80 +524,87 @@ const cancel = () => {
               :can-edit="Boolean(profile.can_update)"
               @changed="refreshProfile" />
 
-            <div v-else-if="selectedTab === 'risk-rating'" class="space-y-4">
+            <div v-else-if="selectedTab === 'risk-rating'" data-help-view="agreement.risk-rating" :data-help-agency="profile.agency_id" :data-help-agreement-id="id" class="space-y-4">
               <UAlert
                 :title="t('agreement.risk_rating_workflow')"
                 :description="profile.risk_workflow_managed ? t('agreement.risk_rating_managed_help') : t('agreement.risk_rating_manual_help')"
                 :icon="profile.risk_workflow_managed ? 'i-lucide-workflow' : 'i-lucide-pencil'" />
-              <CommonSection :show-header="false" :title="t('agreement.risk_rating_workflow')" :grid-cols="1">
-                <dl class="grid gap-3 md:grid-cols-2">
-                  <div>
-                    <dt class="text-sm text-muted">
-                      {{ t('agreement.risk_score') }}
-                    </dt><dd>{{ formatRiskScore(profile.egcs_fc_riskscore) }}</dd>
-                  </div>
-                  <div>
-                    <dt class="text-sm text-muted">
-                      {{ t('common.status') }}
-                    </dt><dd>{{ profile.risk_workflow_managed ? t('agreement.risk_rating_managed') : t('agreement.risk_rating_manual') }}</dd>
-                  </div>
-                  <div>
-                    <dt class="text-sm text-muted">
-                      {{ t('agreement.risk_source') }}
-                    </dt>
-                    <dd>{{ riskSourceLabel }}</dd>
-                  </div>
-                  <div v-if="riskSourceWorkflowLabel">
-                    <dt class="text-sm text-muted">
-                      {{ t('agreement.risk_rating_workflow_name') }}
-                    </dt>
-                    <dd>{{ riskSourceWorkflowLabel }}</dd>
-                  </div>
-                  <div v-if="riskSourceCompletedAt">
-                    <dt class="text-sm text-muted">
-                      {{ t('agreement.risk_rating_completed') }}
-                    </dt>
-                    <dd>{{ formatDate(riskSourceCompletedAt) }}</dd>
-                  </div>
-                  <template v-if="profile.latest_risk_rating_run">
-                    <h3 class="text-sm font-semibold md:col-span-2">
-                      {{ t('agreement.risk_rating_latest_history') }}
-                    </h3>
+              <section data-help-target="agreement.risk-rating.result" data-help-kind="section">
+                <CommonSection :show-header="false" :title="t('agreement.risk_rating_workflow')" :grid-cols="1">
+                  <dl class="grid gap-3 md:grid-cols-2">
                     <div>
+                      <dt class="text-sm text-muted">
+                        {{ t('agreement.risk_score') }}
+                      </dt><dd>{{ formatRiskScore(profile.egcs_fc_riskscore) }}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-sm text-muted">
+                        {{ t('common.status') }}
+                      </dt><dd>{{ profile.risk_workflow_managed ? t('agreement.risk_rating_managed') : t('agreement.risk_rating_manual') }}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-sm text-muted">
+                        {{ t('agreement.risk_source') }}
+                      </dt>
+                      <dd>{{ riskSourceLabel }}</dd>
+                    </div>
+                    <div v-if="riskSourceWorkflowLabel">
                       <dt class="text-sm text-muted">
                         {{ t('agreement.risk_rating_workflow_name') }}
-                      </dt><dd>{{ getLocalizedWorkflowName(profile.latest_risk_rating_run.workflowName) }}</dd>
+                      </dt>
+                      <dd>{{ riskSourceWorkflowLabel }}</dd>
                     </div>
-                    <div>
-                      <dt class="text-sm text-muted">
-                        {{ t('agreement.risk_rating_run_status') }}
-                      </dt><dd><CommonLifecycleBadge engine="runtime" :state="profile.latest_risk_rating_run.status" /></dd>
-                    </div>
-                    <div>
-                      <dt class="text-sm text-muted">
-                        {{ t('agreement.risk_rating_assessment_score') }}
-                      </dt><dd>{{ formatRiskScore(profile.latest_risk_rating_run.assessmentScore) }}</dd>
-                    </div>
-                    <div>
-                      <dt class="text-sm text-muted">
-                        {{ t('agreement.risk_rating_mapped_score') }}
-                      </dt><dd>{{ formatRiskScore(profile.latest_risk_rating_run.mappedRating?.score) }}</dd>
-                    </div>
-                    <div>
+                    <div v-if="riskSourceCompletedAt">
                       <dt class="text-sm text-muted">
                         {{ t('agreement.risk_rating_completed') }}
-                      </dt><dd>{{ formatDate(profile.latest_risk_rating_run.completedAt) }}</dd>
+                      </dt>
+                      <dd>{{ formatDate(riskSourceCompletedAt) }}</dd>
                     </div>
-                  </template>
-                </dl>
-              </CommonSection>
-              <CommonWorkflowSection
-                v-if="profile.risk_workflow_managed || profile.has_risk_rating_runs"
-                entity-type="fundingcaseagreement"
-                :entity-id="id"
-                purpose="risk_rating"
-                :can-edit="Boolean(profile.can_update)"
-                @changed="refreshProfile" />
+                    <template v-if="profile.latest_risk_rating_run">
+                      <h3 class="text-sm font-semibold md:col-span-2">
+                        {{ t('agreement.risk_rating_latest_history') }}
+                      </h3>
+                      <div>
+                        <dt class="text-sm text-muted">
+                          {{ t('agreement.risk_rating_workflow_name') }}
+                        </dt><dd>{{ getLocalizedWorkflowName(profile.latest_risk_rating_run.workflowName) }}</dd>
+                      </div>
+                      <div>
+                        <dt class="text-sm text-muted">
+                          {{ t('agreement.risk_rating_run_status') }}
+                        </dt><dd><CommonLifecycleBadge engine="runtime" :state="profile.latest_risk_rating_run.status" /></dd>
+                      </div>
+                      <div>
+                        <dt class="text-sm text-muted">
+                          {{ t('agreement.risk_rating_assessment_score') }}
+                        </dt><dd>{{ formatRiskScore(profile.latest_risk_rating_run.assessmentScore) }}</dd>
+                      </div>
+                      <div>
+                        <dt class="text-sm text-muted">
+                          {{ t('agreement.risk_rating_mapped_score') }}
+                        </dt><dd>{{ formatRiskScore(profile.latest_risk_rating_run.mappedRating?.score) }}</dd>
+                      </div>
+                      <div>
+                        <dt class="text-sm text-muted">
+                          {{ t('agreement.risk_rating_completed') }}
+                        </dt><dd>{{ formatDate(profile.latest_risk_rating_run.completedAt) }}</dd>
+                      </div>
+                    </template>
+                  </dl>
+                </CommonSection>
+              </section>
+              <section data-help-target="agreement.risk-rating.workflow" data-help-kind="section">
+                <CommonWorkflowSection
+                  v-if="profile.risk_workflow_managed || profile.has_risk_rating_runs"
+                  entity-type="fundingcaseagreement"
+                  :entity-id="id"
+                  purpose="risk_rating"
+                  help-start-target="agreement.risk-rating.start"
+                  help-step-target="agreement.risk-rating.step-view"
+                  help-review-open-target="agreement.risk-rating.review-open"
+                  :can-edit="Boolean(profile.can_update)"
+                  @changed="refreshProfile" />
+              </section>
             </div>
 
             <CommonReviewsTab

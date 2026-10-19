@@ -1,6 +1,6 @@
 import { getRiskReadiness } from '~~/server/utils/risk-readiness'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
-import { authorizeReviewRuntimeAction, canAuthorizeWorkflowOwnerRecovery } from '~~/server/utils/review-runtime-access'
+import { authorizeReviewRuntimeAction, canAuthorizeReviewRuntimeAction, canAuthorizeWorkflowOwnerRecovery, resolveReviewRuntimeEntityFromReview } from '~~/server/utils/review-runtime-access'
 import { resolveCompletionRuntimeEntityFromEntity, respondCompletionRuntimeEntityNotFound } from '~~/server/utils/completion-runtime'
 import {
   getWorkflowRuntime,
@@ -148,6 +148,11 @@ export default defineEventHandler(async event => {
     return { ...collection, canUpdate: runtime.current?.runtimeState === 'active' && collection.runtimeState === 'active'
       && grant?.actions.has('update') === true && hasUpdateRole }
   }))
+  const reviews = await Promise.all((runtime.reviews ?? []).map(async review => {
+    const reviewContext = await resolveReviewRuntimeEntityFromReview(event.context.$db, String(review.id))
+    return { ...review, canUpdate: runtime.current?.runtimeState === 'active' && review.runtimeState === 'active'
+      && reviewContext !== null && await canAuthorizeReviewRuntimeAction(event, 'save_assessment', reviewContext) }
+  }))
   let canResumeOwners = false
   const independentlyAssignable = isAssignableEntityType(context.entityType) || Boolean(extensionRuntime)
   if (runtime.current?.runtimeState === 'paused' && independentlyAssignable) {
@@ -173,6 +178,7 @@ export default defineEventHandler(async event => {
     canRetry: runtime.canRetry && !hasActiveRuntime && targetOpen && !riskFrozen,
     recommendations,
     dataCollections,
+    reviews,
     riskReadiness,
     canStart,
     startBlocker,

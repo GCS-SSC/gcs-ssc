@@ -19,6 +19,7 @@ const {
   selectable = false,
   getRowSelectionLabel,
   searchPlaceholder,
+  helpSearchTarget,
   tableClass
 } = defineProps<{
   data: T[]
@@ -34,6 +35,7 @@ const {
   buttonDisabled?: boolean
   selectable?: boolean
   getRowSelectionLabel?: (row: T, index: number) => string
+  helpSearchTarget?: string
   searchPlaceholder?: string
   tableClass?: string
 }>()
@@ -74,6 +76,7 @@ defineExpose({
       :show-button="showButton"
       :button-disabled="buttonDisabled"
       :search-placeholder="searchPlaceholder"
+      :help-search-target="helpSearchTarget"
       :table="table"
       sticky
       @add="$emit('add')">

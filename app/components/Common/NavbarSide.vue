@@ -3,6 +3,7 @@ import { localizeSectionUrl } from '~/utils/section-url-values'
 
 const { t, locale } = useI18n()
 const switchLocalePath = useSwitchLocalePath()
+const router = useRouter()
 const isFrench = computed(() => locale.value === 'fr')
 const colorMode = useColorMode()
 const isDark = computed(() => colorMode.value === 'dark')
@@ -14,7 +15,7 @@ const onThemeToggle = () => {
 
 const onLocaleToggle = (value: boolean | 'indeterminate') => {
   const nextLocale = value === true ? 'fr' : 'en'
-  navigateTo(localizeSectionUrl(switchLocalePath(nextLocale), nextLocale))
+  return router.push(localizeSectionUrl(switchLocalePath(nextLocale), nextLocale))
 }
 </script>
 

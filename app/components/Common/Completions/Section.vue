@@ -2,7 +2,9 @@
 import type { LocalizedToastText } from '~/composables/useLocalizedToast'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
-import { computed, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
+import type { GuideObservedContext } from '@gcs-ssc/guided-help/runtime'
+import { beginGuidedHelpAction } from '~/utils/guided-help-actions'
 import type { Ref } from 'vue'
 import type { Entity_Type } from '~~/shared/types/database'
 import type { GcsExtensionCompletionLabels } from '@gcs-ssc/extensions/ui'
@@ -24,6 +26,8 @@ type CompletionResponse = {
 const {
   entityType,
   entityId,
+  helpCompleteTarget,
+  helpContext,
   actionRoleAllowed = undefined,
   actionPrerequisiteWarning,
   completePayload,
@@ -43,6 +47,8 @@ const {
 } = defineProps<{
   entityType: Entity_Type
   entityId: string
+  helpCompleteTarget?: string
+  helpContext?: GuideObservedContext
   /** Optional role-only visibility; omission preserves legacy readiness-based presentation. */
   actionRoleAllowed?: boolean
   /** Localized owning-page prerequisite, separate from role permission. */
@@ -68,6 +74,8 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const helpRoot = ref<HTMLElement | null>(null)
+const guidedHelpActions = useGuidedHelpActions()
 const resolvedLabels = computed(() => ({
   title: labels?.title ?? t(titleKey ?? 'assessment.completion.title'),
   description: labels?.description ?? t(descriptionKey ?? 'assessment.completion.description'),
@@ -103,6 +111,10 @@ const state: Ref<{ comments: string }> = ref({
 const isSubmitting: Ref<boolean> = ref(false)
 let completionRequestGeneration = 0
 let completionSubmissionGeneration = 0
+onScopeDispose(() => {
+  completionRequestGeneration += 1
+  completionSubmissionGeneration += 1
+})
 /**
  *
  */
@@ -165,6 +177,7 @@ const submitCompletion = async () => {
     return
   }
 
+  const completeHelp = beginGuidedHelpAction(guidedHelpActions, helpRoot.value, helpCompleteTarget, 'save-success', helpContext ?? { kind: 'pending' })
   const submittedIdentity = completionIdentity.value
   const submittedGeneration = completionRequestGeneration
   const submissionGeneration = ++completionSubmissionGeneration
@@ -190,6 +203,7 @@ const submitCompletion = async () => {
     await refreshCompletion()
     if (submittedIdentity !== completionIdentity.value || submissionGeneration !== completionSubmissionGeneration) return
     state.value.comments = ''
+    completeHelp()
     emit('completed')
     toast.add({
       title: toast.localized('common.success'),
@@ -208,6 +222,7 @@ const submitCompletion = async () => {
 
 <template>
   <div
+    ref="helpRoot"
     class="space-y-6"
     :class="showHeader && showDivider ? 'border-t border-primary-500 pt-8 dark:border-primary-600' : ''">
     <div v-if="showHeader" class="space-y-3">
@@ -315,6 +330,7 @@ const submitCompletion = async () => {
 
           <div class="flex justify-start">
             <UButton
+              :data-help-target="helpCompleteTarget"
               color="primary"
               icon="i-lucide-circle-check-big"
               class="cursor-default"

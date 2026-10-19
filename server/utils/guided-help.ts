@@ -1,7 +1,7 @@
 /* eslint-disable jsdoc/require-jsdoc -- typed public operations describe the guided help boundary */
 import type { H3Event } from 'h3'
 import type { Kysely, Transaction } from 'kysely'
-import { GuideDocumentSchema, checkGuideCompatibility } from '@gcs-ssc/guided-help/contracts'
+import { GuideDocumentSchema } from '@gcs-ssc/guided-help/contracts'
 import type { GuideDraft } from '@gcs-ssc/guided-help/contracts'
 import type { Database, JsonValue } from '~~/shared/types/database'
 import type { Scope } from '~~/shared/utils/scopes'
@@ -12,7 +12,10 @@ import { throwApiError } from './api-errors'
 import { getDatabaseConstraintName } from './database-constraint-errors'
 import { withAuditExecution } from './audit-context'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
+import { authorizeReviewRuntimeAction, getReviewRuntimeOwnerAgencyId, resolveReviewRuntimeEntityFromReview } from './review-runtime-access'
+import { authorizeAgreementResource, resolveAgreementVisibility } from './agreement'
 import { guidedHelpLedger } from '~~/shared/guided-help/catalog'
+import { checkHostGuideCompatibility } from '~~/shared/guided-help/journeys'
 
 type Db = Kysely<Database> | Transaction<Database>
 type Action = 'read' | 'create' | 'update' | 'delete'
@@ -61,7 +64,7 @@ const version = async (event: H3Event, db: Db, id: string, guideId?: string) => 
 }
 const compatibility = (document: unknown) => {
   const parsed = GuideDocumentSchema.safeParse(document)
-  return parsed.success ? checkGuideCompatibility(parsed.data, guidedHelpLedger) : [{ code: 'invalid-document', message: 'Invalid published guide' }]
+  return parsed.success ? checkHostGuideCompatibility(parsed.data, guidedHelpLedger) : [{ code: 'invalid-document', message: 'Invalid published guide' }]
 }
 const validateDocument = async (event: H3Event, document: unknown) => {
   const parsed = GuideDocumentSchema.safeParse(document)
@@ -278,14 +281,44 @@ export const cloneGuidedHelp = async (event: H3Event, agencyId: string, sourceVe
   return readGuidedHelp(event, id)
 }
 
-const authorizeScreen = async (event: H3Event, agencyId: string, view: string) => {
+const visibleAgreementAgencies = async (event: H3Event) => {
+  const auth = await requireAuthContext(event)
+  const db = event.context.$db
+  const visibility = await resolveAgreementVisibility(auth, 'read', db)
+  let query = db.selectFrom('Agency_Profile').select('Agency_Profile.id').where('Agency_Profile._deleted', '=', false)
+  if (!visibility.hasGlobalAccess) query = query.where(eb => eb.or([
+    ...(visibility.agencyIds.length ? [eb('Agency_Profile.id', 'in', visibility.agencyIds)] : []),
+    ...(visibility.transferPaymentIds.length ? [eb.exists(eb.selectFrom('Transfer_Payment_Profile').select('id').whereRef('egcs_tp_agency', '=', 'Agency_Profile.id').where('id', 'in', visibility.transferPaymentIds).where('_deleted', '=', false))] : []),
+    ...(visibility.agreementIds.length ? [eb.exists(eb.selectFrom('Funding_Case_Agreement_Profile as Agreement').innerJoin('Transfer_Payment_Stream as Stream', 'Stream.id', 'Agreement.egcs_fc_transferpaymentstream').innerJoin('Transfer_Payment_Profile as Program', 'Program.id', 'Stream.egcs_tp_transferpaymentprofile').select('Agreement.id').whereRef('Program.egcs_tp_agency', '=', 'Agency_Profile.id').where('Agreement.id', 'in', visibility.agreementIds).where('Agreement._deleted', '=', false).where('Stream._deleted', '=', false).where('Program._deleted', '=', false))] : [])
+  ]))
+  return (await query.execute()).map(row => String(row.id))
+}
+const authorizeScreen = async (event: H3Event, agencyId: string, view: string, reviewId?: string, agreementId?: string) => {
+  await requireAuthContext(event)
+  if (agreementId !== undefined) {
+    if (!isPositivePostgresBigintText(agreementId)) return fail(event, 'not_found')
+    const agreement = await authorizeAgreementResource(event, 'read', agreementId, event.context.$db)
+    if (!agreement || agreement.agencyId !== agencyId) return fail(event, 'not_found')
+  }
+  if (view === 'agreements.list' || view === 'agreement.risk-rating') {
+    if (view === 'agreement.risk-rating' && !agreementId) return fail(event, 'unavailable', 409)
+    if (view === 'agreements.list' && !(await visibleAgreementAgencies(event)).includes(agencyId)) return fail(event, 'not_found')
+    return
+  }
+  if (view === 'assessment.detail') {
+    if (!reviewId || !isPositivePostgresBigintText(reviewId)) return fail(event, 'unavailable', 409)
+    const context = await resolveReviewRuntimeEntityFromReview(event.context.$db, reviewId)
+    if (!context || getReviewRuntimeOwnerAgencyId(context) !== agencyId || (agreementId && context.agreementId !== agreementId)) return fail(event, 'not_found')
+    await authorizeReviewRuntimeAction(event, 'read_assessment', context)
+    return
+  }
   // Each supported view has a trusted host-owned authorization mapping. A ledger entry alone grants nothing.
   if (!['agency.general', 'agency.address-types', 'agency.agreement-types'].includes(view)) return fail(event, 'unavailable', 409)
   await authorize(event, 'agency', 'read', { type: 'agency', agencyId })
   await ensureAgency(event, event.context.$db, agencyId)
 }
-const eligibleCatalogs = async (event: H3Event, agencyId: string, view: string) => {
-  await authorizeScreen(event, agencyId, view)
+const eligibleCatalogs = async (event: H3Event, agencyId: string, view: string, reviewId?: string, agreementId?: string) => {
+  await authorizeScreen(event, agencyId, view, reviewId, agreementId)
   const auth = await requireAuthContext(event)
   const assignments = await getActiveStructuralRoleAssignments(event.context.$db, [auth.userId])
   const roleIds = new Set(assignments.filter(item => item.scopeType === 'global' || item.agencyId === agencyId).map(item => item.roleId))
@@ -295,8 +328,8 @@ const eligibleCatalogs = async (event: H3Event, agencyId: string, view: string) 
     return definition.discoveryScreens.includes(view) && definition.roles.some(role => roleIds.has(role))
   })
 }
-export const discoverGuidedHelp = async (event: H3Event, agencyId: string, view: string) => {
-  const rows = await eligibleCatalogs(event, agencyId, view)
+export const discoverGuidedHelp = async (event: H3Event, agencyId: string, view: string, reviewId?: string, agreementId?: string) => {
+  const rows = await eligibleCatalogs(event, agencyId, view, reviewId, agreementId)
   const items = []
   for (const row of rows) {
     const local = row.definition as unknown as Settings
@@ -305,11 +338,27 @@ export const discoverGuidedHelp = async (event: H3Event, agencyId: string, view:
   }
   return { items }
 }
-export const launchGuidedHelp = async (event: H3Event, agencyId: string, id: string, view: string) => {
-  const eligible = (await eligibleCatalogs(event, agencyId, view)).find(row => String(row.id) === id)
+export const launchGuidedHelp = async (event: H3Event, agencyId: string, id: string, view: string, reviewId?: string, agreementId?: string) => {
+  const eligible = (await eligibleCatalogs(event, agencyId, view, reviewId, agreementId)).find(row => String(row.id) === id)
   if (!eligible) return fail(event, 'not_found')
   const local = eligible.definition as unknown as Settings
   const source = await version(event, event.context.$db, local.sourceVersionId, String(eligible.egcs_ay_guide))
   const document = await validateDocument(event, source.egcs_cn_definition)
   return { agencyId, catalogId: id, publicationVersionId: String(eligible.publicationVersionId), sourceVersionId: String(source.id), document }
+}
+
+export const discoverCollectionGuidedHelp = async (event: H3Event, view: string) => {
+  await requireAuthContext(event)
+  if (view !== 'agreements.list') return fail(event, 'unavailable', 409)
+  const agencyIds = await visibleAgreementAgencies(event)
+  if (!agencyIds.length) return { items: [] }
+  const agencies = await event.context.$db.selectFrom('Agency_Profile')
+    .select(['id', 'egcs_ay_name_en', 'egcs_ay_name_fr']).where('id', 'in', agencyIds).execute()
+  const groups = await Promise.all(agencyIds.map(async agencyId => {
+    const result = await discoverGuidedHelp(event, agencyId, view)
+    const agency = agencies.find(item => String(item.id) === agencyId)
+    const agencyName = { en: agency?.egcs_ay_name_en ?? '', fr: agency?.egcs_ay_name_fr ?? '' }
+    return result.items.map(item => ({ ...item, agencyId, agencyName }))
+  }))
+  return { items: groups.flat() }
 }

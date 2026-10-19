@@ -1,5 +1,6 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- local status presentation helpers are self-describing */
+import { computed } from 'vue'
 import type { ReviewRuntimeNavigationItem, ReviewRuntimeStatus } from '~/types/review-runtime'
 
 const {
@@ -8,7 +9,9 @@ const {
   items,
   selectedValue,
   isSaving = false,
-  canSave = true
+  canSave = true,
+  helpSaveTarget,
+  helpReviewTarget
 } = defineProps<{
   eyebrow: string
   title: string
@@ -16,6 +19,8 @@ const {
   selectedValue: string
   isSaving?: boolean
   canSave?: boolean
+  helpSaveTarget?: string
+  helpReviewTarget?: string
 }>()
 
 const emit = defineEmits<{
@@ -24,7 +29,10 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const reviewItem = computed(() => items.find(item => item.key === 'review'))
+const ordinaryItems = computed(() => items.filter(item => item.key !== 'review'))
 const getStatusIcon = (status: ReviewRuntimeStatus) => {
+  if (status === 'optional') return 'i-lucide-circle-minus'
   if (status === 'completed') return 'i-lucide-circle-check-big'
   if (status === 'in_progress') return 'i-lucide-circle-dot'
   return 'i-lucide-circle-dashed'
@@ -57,6 +65,7 @@ const handleSave = () => {
         </div>
 
         <CommonSaveButton
+          :data-help-target="helpSaveTarget"
           :label="t('common.save')"
           :loading="isSaving"
           :disabled="isSaving || !canSave"
@@ -70,7 +79,7 @@ const handleSave = () => {
     <div class="space-y-4 px-4 py-4">
       <div class="divide-y divide-primary-500/40 dark:divide-primary-600/40">
         <button
-          v-for="item in items"
+          v-for="item in ordinaryItems"
           :key="item.key"
           type="button"
           :aria-current="selectedValue === item.value ? 'location' : undefined"
@@ -119,6 +128,57 @@ const handleSave = () => {
             </div>
           </div>
         </button>
+        <div v-if="reviewItem">
+          <button
+            :data-help-target="helpReviewTarget"
+            type="button"
+            :aria-current="selectedValue === reviewItem.value ? 'location' : undefined"
+            class="group block w-full cursor-default px-3 py-3 text-left transition-colors"
+            :class="selectedValue === reviewItem.value
+              ? 'bg-primary-50 dark:bg-primary-950/20'
+              : 'hover:bg-primary-50/70 dark:hover:bg-primary-950/14'"
+            @click="handleSelect(reviewItem.value)">
+            <div class="flex items-start gap-3">
+              <UIcon
+                :name="reviewItem.icon"
+                class="mt-0.5 size-4 shrink-0 text-primary-700 dark:text-primary-200" />
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center justify-between gap-3">
+                  <div class="text-sm font-semibold text-zinc-950 dark:text-white">
+                    {{ reviewItem.label }}
+                  </div>
+                  <UIcon
+                    v-if="reviewItem.status"
+                    :name="getStatusIcon(reviewItem.status)"
+                    aria-hidden="true"
+                    class="size-4 shrink-0"
+                    :class="getStatusIconClass(reviewItem.status)" />
+                  <span v-if="reviewItem.status" class="sr-only">
+                    {{ getStatusLabel(reviewItem.status) }}
+                  </span>
+                </div>
+                <div v-if="reviewItem.rows.length > 0" class="mt-2 space-y-1.5">
+                  <div
+                    v-for="row in reviewItem.rows"
+                    :key="row.key"
+                    class="flex items-center justify-between gap-3 text-sm text-zinc-700 dark:text-zinc-300">
+                    <span class="min-w-0 flex-1 truncate">
+                      {{ row.label }}
+                    </span>
+                    <UIcon
+                      :name="getStatusIcon(row.status)"
+                      aria-hidden="true"
+                      class="size-4 shrink-0"
+                      :class="getStatusIconClass(row.status)" />
+                    <span class="sr-only">
+                      {{ getStatusLabel(row.status) }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </button>
+        </div>
       </div>
 
       <slot name="result" />

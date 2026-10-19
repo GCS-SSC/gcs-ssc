@@ -3,6 +3,7 @@ import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-jsdoc -- concise page-local interaction handlers are self-documenting */
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
+import type { GuideObservedContext } from '@gcs-ssc/guided-help/runtime'
 import type { JsonValue } from '~~/shared/types/database'
 import type { RuntimeState } from '~~/shared/constants/system-lifecycle'
 import { appRouteLocations } from '~/utils/route-locations'
@@ -48,12 +49,14 @@ const mutateQuestionnaire = $fetch as unknown as (
   options: { method: 'PATCH' | 'PUT' | 'POST'; body: unknown; query?: Record<string, unknown> }
 ) => Promise<unknown>
 
-const { entityId, configuration, embedded = false } = defineProps<{
+const { entityId, configuration, embedded = false, helpContext } = defineProps<{
   entityId: string
   configuration: QuestionnaireRuntimeConfiguration
   embedded?: boolean
+  helpContext?: GuideObservedContext
 }>()
 const emit = defineEmits<{ changed: [] }>()
+const guidedHelpActions = useGuidedHelpActions()
 const route = useRoute()
 const { t } = useI18n()
 const localePath = useLocalePath()
@@ -257,6 +260,7 @@ const save = async (submit: boolean) => {
   const requestedEntityType = configuration.entityType
   validationIssues.value = submit ? configuration.validate(data.value.definition, responses.value) : []
   if (validationIssues.value.length > 0) return
+  const invalidate = guidedHelpActions.begin({ kind: 'invalidated', binding: helpContext?.kind === 'task' ? helpContext.execution.binding : helpContext?.kind === 'owner' && helpContext.binding ? helpContext.binding : { resourceType: configuration.entityType, resourceId: requestedEntityId } })
   const payload = { responses: copyQuestionnaireResponses(responses.value), revision: data.value.egcs_cn_revision }
   await mutation.run(submit ? 'submit' : 'save', async token => {
     try {
@@ -272,6 +276,7 @@ const save = async (submit: boolean) => {
         mergeMetadata: () => { data.value = refreshed }
       })
       toast.add({ title: toast.localized('common.success'), description: toast.localized(`${configuration.messagePrefix}.${submit ? 'submitted_success' : 'saved_success'}`), color: 'success' })
+      invalidate()
       emit('changed')
     } catch (caughtError: unknown) {
       if (!mutation.isTokenCurrent(token) || !isCurrentTarget(generation, requestedEndpoint)) return
@@ -294,7 +299,6 @@ const save = async (submit: boolean) => {
           :title="title"
           :meta-items="[t(`${configuration.messagePrefix}.identifier`, { id: entityId })]"
           :badges="heroBadges" />
-
         <div :class="embedded ? 'min-w-0 space-y-8' : 'mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-6 py-6'">
           <UButton
             v-if="data.can_claim"

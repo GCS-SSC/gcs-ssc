@@ -20,6 +20,7 @@ type EntityHeroAction = EntityHeroActionBase & (
 
 const {
   isCollapsed = false,
+  retainTitleWhenCollapsed = false,
   icon,
   iconText,
   title,
@@ -30,6 +31,7 @@ const {
   actions = []
 } = defineProps<{
   isCollapsed?: boolean
+  retainTitleWhenCollapsed?: boolean
   icon?: string
   iconText?: string
   title: string
@@ -75,9 +77,9 @@ const visibleActions = computed(() => actions.filter(action =>
 
     <div class="relative flex flex-col justify-between gap-6 md:flex-row md:items-end">
       <div class="space-y-2">
-        <h1 v-if="!isCollapsed" class="flex items-center gap-4 text-2xl font-black tracking-tight text-zinc-900 md:text-4xl dark:text-white">
+        <h1 v-if="!isCollapsed || retainTitleWhenCollapsed" class="flex items-center gap-4 font-black tracking-tight text-zinc-900 dark:text-white" :class="isCollapsed ? 'text-lg' : 'text-2xl md:text-4xl'">
           <span
-            v-if="icon || iconText"
+            v-if="!isCollapsed && (icon || iconText)"
             class="bg-primary/10 border-primary/20 hidden h-14 min-w-14 shrink-0 items-center justify-center rounded-lg border px-4 shadow-sm md:flex">
             <UIcon v-if="icon" :name="icon" class="text-primary size-8" />
             <span v-else class="text-primary text-2xl font-black tracking-tighter">
@@ -125,6 +127,10 @@ const visibleActions = computed(() => actions.filter(action =>
             </div>
           </template>
         </div>
+      </div>
+
+      <div v-if="isCollapsed && slots['collapsed-actions']" class="flex flex-wrap items-center gap-2 md:justify-end">
+        <slot name="collapsed-actions" />
       </div>
 
       <div v-if="!isCollapsed && (visibleStats.length > 0 || visibleActions.length > 0 || slots.actions)" class="flex flex-wrap items-center gap-4 md:justify-end">

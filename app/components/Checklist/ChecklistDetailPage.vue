@@ -7,6 +7,7 @@ import AssessmentAdditionalReviewersTab from '~/components/Assessment/Assessment
 import AssessmentApprovalsSection from '~/components/Common/Approvals/Section.vue'
 import CommonCompletionSection from '~/components/Common/Completions/Section.vue'
 import ReviewRuntimeSidebar from '~/components/Review/ReviewRuntimeSidebar.vue'
+import { beginGuidedHelpAction } from '~/utils/guided-help-actions'
 import { scrollReviewPageToTop } from '~/utils/scrollReviewPageToTop'
 import { useChecklistDetailPage } from '~/composables/useChecklistDetailPage'
 import type { ReviewRuntimeNavigationItem, ReviewRuntimeStatus } from '~/types/review-runtime'
@@ -17,6 +18,8 @@ import {
   isChecklistQuestionResponseComplete
 } from '~~/shared/utils/checklist-evaluation'
 
+const guidedHelpActions = useGuidedHelpActions()
+const helpRoot = ref<HTMLElement | null>(null)
 const route = useRoute()
 const { t } = useI18n()
 const { getBilingualValue } = useBilingualValue()
@@ -107,6 +110,23 @@ watch(sections, value => {
 
 const selectedSectionIndex = computed(() => sections.value.findIndex(section => sectionValue(section.key) === selectedValue.value))
 const selectedSection = computed(() => sections.value[selectedSectionIndex.value])
+const { context: helpContext } = useGuidedHelpReviewContext({
+  view: 'checklist.detail', record: checklist,
+  reviewId: () => String(route.params.reviewId), draft: responses,
+  facts: () => selectedValue.value === REVIEW_VALUE
+    ? ['checklist.additional-review']
+    : [
+        `section:${selectedSection.value?.key ?? ''}`,
+        ...(selectedSection.value && getQuestionStatus(getChecklistSectionQuestions(selectedSection.value)) === 'completed' ? ['checklist.section-complete'] : []),
+        ...(selectedSectionIndex.value === sections.value.length - 1 ? ['checklist.final-section'] : [])
+      ]
+})
+const helpReturnTarget = computed(() => checklist.value?.egcs_cn_entitytype === 'fundingcaseagreement' ? 'checklist.detail.return' : undefined)
+
+const handleSave = async () => {
+  const complete = beginGuidedHelpAction(guidedHelpActions, helpRoot.value, 'checklist.detail.save', 'save-success', helpContext.value)
+  await saveChecklist(complete)
+}
 const selectedSectionBlocks = computed(() => {
   const section = selectedSection.value
   if (!section) return []
@@ -162,40 +182,22 @@ const resultExplanation = computed(() => {
     : t('checklist.result_policy.runtime_no_group_matched')
 })
 const handleCompleted = async () => {
+  const invalidate = helpContext.value.kind === 'task' ? guidedHelpActions.begin({ kind: 'invalidated', binding: helpContext.value.execution.binding }) : () => {}
   await refresh()
+  invalidate()
   approvalsRefreshKey.value += 1
 }
 const handleApprovalChanged = async () => {
+  const invalidate = helpContext.value.kind === 'task' ? guidedHelpActions.begin({ kind: 'invalidated', binding: helpContext.value.execution.binding }) : () => {}
   await refresh()
+  invalidate()
 }
 </script>
 
 <template>
-  <CommonDetailPage id="checklist-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems">
+  <CommonDetailPage v-if="!loadError && checklist && String(checklist.id) === String(route.params.reviewId)" id="checklist-detail" v-model:collapsed="isHeroCollapsed" data-help-view="checklist.detail" :data-help-review-id="checklist.id" :breadcrumb-items="breadcrumbItems" help-return-target="checklist.detail.return" :help-return-enabled="Boolean(helpReturnTarget)" :data-help-context="JSON.stringify(helpContext)" :data-help-return-target="helpReturnTarget">
     <template #body>
-      <div v-if="loadError" class="p-6" data-testid="checklist-load-error">
-        <UAlert
-          color="error"
-          icon="i-lucide-circle-alert"
-          :title="t('checklist.load_failed')"
-          :description="t('checklist.load_failed_description')">
-          <template #actions>
-            <UButton
-              color="error"
-              variant="soft"
-              size="sm"
-              icon="i-lucide-refresh-cw"
-              :label="t('common.retry')"
-              @click="() => refresh()" />
-          </template>
-        </UAlert>
-      </div>
-
-      <div v-else-if="loadStatus === 'pending' && !checklist" class="p-6" data-testid="checklist-loading" role="status" aria-live="polite">
-        <CommonLoadingState :label="t('common.loading')" />
-      </div>
-
-      <div v-else class="flex flex-1 flex-col">
+      <div ref="helpRoot" :data-help-context="JSON.stringify(helpContext)" :data-help-return-target="helpReturnTarget" class="flex flex-1 flex-col">
         <CommonEntityHero
           :is-collapsed="isHeroCollapsed"
           icon="i-lucide-list-checks"
@@ -208,7 +210,7 @@ const handleApprovalChanged = async () => {
 
         <div class="flex min-h-0 flex-1 flex-col gap-6 overflow-visible px-6 pt-0 pb-6 lg:flex-row lg:items-start lg:gap-8">
           <main ref="sectionContent" class="min-h-0 min-w-0 flex-1 pt-6">
-            <div v-if="selectedValue === REVIEW_VALUE && checklist?.id" class="space-y-8">
+            <div v-if="selectedValue === REVIEW_VALUE && checklist?.id" data-help-target="checklist.detail.completion" data-help-kind="section" class="space-y-8">
               <AssessmentAdditionalReviewersTab
                 :review-id="String(checklist.id)"
                 :can-update-assessment="canUpdate"
@@ -217,6 +219,8 @@ const handleApprovalChanged = async () => {
                 @progress-change="setAdditionalReviewerProgress" />
               <CommonAssignedUsers entity-type="commonreview" :entity-id="String(checklist.id)" />
               <CommonCompletionSection
+                help-complete-target="checklist.detail.complete"
+                :help-context="helpContext"
                 entity-type="commonreview"
                 :entity-id="String(checklist.id)"
                 :complete-payload="{ checklistResponse: { responses } }"
@@ -238,6 +242,9 @@ const handleApprovalChanged = async () => {
             </div>
 
             <div v-else-if="selectedSection" class="space-y-8">
+              <section data-help-target="checklist.detail.question-heading" data-help-kind="section">
+                <AssessmentSchemaSectionTitle :title="getLabel(selectedSection.label, selectedSection.key)" compact />
+              </section>
               <section
                 v-for="(block, blockIndex) in selectedSectionBlocks"
                 :key="block.key"
@@ -265,92 +272,121 @@ const handleApprovalChanged = async () => {
           </main>
 
           <aside class="w-full shrink-0 pt-6 lg:sticky lg:top-6 lg:order-last lg:w-96 lg:border-l lg:border-zinc-200 lg:pl-6 dark:lg:border-zinc-800 xl:w-[28rem]">
-            <ReviewRuntimeSidebar
-              :eyebrow="t('checklist.title')"
-              :title="t('checklist.result_summary')"
-              :items="navigationItems"
-              :selected-value="selectedValue"
-              :is-saving="isSaving"
-              :can-save="canUpdate"
-              @select="value => selectedValue = value"
-              @save="saveChecklist">
-              <template #result>
-                <div v-if="result" class="space-y-1 pt-1">
-                  <div
-                    class="space-y-3 rounded-sm border px-3 py-3"
-                    :class="{
-                      'border-success-500 bg-success-500/10': result === 'pass',
-                      'border-error-500 bg-error-500/10': result === 'fail',
-                      'border-warning-500 bg-warning-500/10': result === 'pass_with_considerations'
-                    }">
+            <section data-help-target="checklist.detail.navigation" data-help-kind="section">
+              <ReviewRuntimeSidebar
+                help-save-target="checklist.detail.save"
+                help-review-target="checklist.detail.additional-review"
+                :eyebrow="t('checklist.title')"
+                :title="t('checklist.result_summary')"
+                :items="navigationItems"
+                :selected-value="selectedValue"
+                :is-saving="isSaving"
+                :can-save="canUpdate"
+                @select="value => selectedValue = value"
+                @save="handleSave">
+                <template #result>
+                  <div v-if="result" class="space-y-1 pt-1">
                     <div
-                      class="flex items-start gap-3">
-                      <UIcon :name="resultIcon" class="mt-0.5 size-5 shrink-0" :class="resultIconClass" />
-                      <p class="min-w-0 flex-1 text-sm font-semibold text-zinc-950 dark:text-white">
-                        {{ t('checklist.results') }}: {{ t(`checklist.result.${result}`) }}
+                      class="space-y-3 rounded-sm border px-3 py-3"
+                      :class="{
+                        'border-success-500 bg-success-500/10': result === 'pass',
+                        'border-error-500 bg-error-500/10': result === 'fail',
+                        'border-warning-500 bg-warning-500/10': result === 'pass_with_considerations'
+                      }">
+                      <div
+                        class="flex items-start gap-3">
+                        <UIcon :name="resultIcon" class="mt-0.5 size-5 shrink-0" :class="resultIconClass" />
+                        <p class="min-w-0 flex-1 text-sm font-semibold text-zinc-950 dark:text-white">
+                          {{ t('checklist.results') }}: {{ t(`checklist.result.${result}`) }}
+                        </p>
+                      </div>
+                      <p v-if="evaluationTrace" class="text-sm">
+                        {{ t('checklist.na_summary', { count: evaluationTrace.overall.notApplicable ?? 0 }) }}
+                      </p>
+                      <p v-if="evaluationTrace && evaluationTrace.overall.pass + evaluationTrace.overall.fail === 0" class="text-sm">
+                        {{ t('checklist.no_applicable_answers') }}
+                      </p>
+                      <UModal
+                        v-model:open="isResultExplanationOpen"
+                        :title="t('checklist.why_result')"
+                        :description="t(`checklist.result.${result}`)"
+                        :ui="{ content: 'sm:max-w-4xl', body: 'max-h-[75vh] space-y-6 overflow-y-auto' }">
+                        <UButton
+                          icon="i-lucide-list-tree"
+                          :label="t('checklist.explain')"
+                          color="neutral"
+                          variant="outline"
+                          class="w-full cursor-default justify-center"
+                          @click="isResultExplanationOpen = true" />
+                        <template #body>
+                          <div class="space-y-2">
+                            <UBadge :color="resultColor" variant="subtle">{{ t(`checklist.result.${result}`) }}</UBadge>
+                            <p class="text-sm leading-6 text-zinc-700 dark:text-zinc-300">{{ resultExplanation }}</p>
+                            <p class="text-sm">{{ t('checklist.result_policy.na_help') }}</p>
+                          </div>
+                          <div
+                            v-if="evaluationTrace?.groups.length && checklist?.checklistDefinition"
+                            class="space-y-4 border-t border-zinc-200 pt-5 dark:border-zinc-800">
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
+                              {{ t('checklist.evaluated_rule_tree') }}
+                            </p>
+                            <ChecklistResultTraceGroup
+                              v-for="group in evaluationTrace.groups"
+                              :key="group.key"
+                              :group="group"
+                              :definition="checklist.checklistDefinition" />
+                          </div>
+                          <div v-if="triggeringQuestionLabels.length > 0" class="space-y-3">
+                            <p class="text-sm font-semibold text-zinc-950 dark:text-white">{{ t('checklist.result_policy.triggering_questions') }}</p>
+                            <ul class="space-y-2">
+                              <li v-for="item in triggeringQuestionLabels" :key="item.key" class="flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+                                <UIcon name="i-lucide-circle-x" class="mt-0.5 size-4 shrink-0 text-error" />
+                                <span>{{ item.label }}</span>
+                              </li>
+                            </ul>
+                          </div>
+                        </template>
+                      </UModal>
+                    </div>
+
+                    <div v-for="section in sections" :key="section.key" class="flex items-start gap-3 px-3 py-2 text-sm text-zinc-800 dark:text-zinc-200">
+                      <UIcon name="i-lucide-list-checks" class="mt-0.5 size-4 shrink-0 text-primary-700 dark:text-primary-200" />
+                      <p class="min-w-0 flex-1">
+                        {{ getLabel(section.label, section.key) }}:
+                        {{ t('checklist.section_answer_summary', sectionAnswerSummary(section)) }}
                       </p>
                     </div>
-                    <p v-if="evaluationTrace" class="text-sm">
-                      {{ t('checklist.na_summary', { count: evaluationTrace.overall.notApplicable ?? 0 }) }}
-                    </p>
-                    <p v-if="evaluationTrace && evaluationTrace.overall.pass + evaluationTrace.overall.fail === 0" class="text-sm">
-                      {{ t('checklist.no_applicable_answers') }}
-                    </p>
-                    <UModal
-                      v-model:open="isResultExplanationOpen"
-                      :title="t('checklist.why_result')"
-                      :description="t(`checklist.result.${result}`)"
-                      :ui="{ content: 'sm:max-w-4xl', body: 'max-h-[75vh] space-y-6 overflow-y-auto' }">
-                      <UButton
-                        icon="i-lucide-list-tree"
-                        :label="t('checklist.explain')"
-                        color="neutral"
-                        variant="outline"
-                        class="w-full cursor-default justify-center"
-                        @click="isResultExplanationOpen = true" />
-                      <template #body>
-                        <div class="space-y-2">
-                          <UBadge :color="resultColor" variant="subtle">{{ t(`checklist.result.${result}`) }}</UBadge>
-                          <p class="text-sm leading-6 text-zinc-700 dark:text-zinc-300">{{ resultExplanation }}</p>
-                          <p class="text-sm">{{ t('checklist.result_policy.na_help') }}</p>
-                        </div>
-                        <div
-                          v-if="evaluationTrace?.groups.length && checklist?.checklistDefinition"
-                          class="space-y-4 border-t border-zinc-200 pt-5 dark:border-zinc-800">
-                          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
-                            {{ t('checklist.evaluated_rule_tree') }}
-                          </p>
-                          <ChecklistResultTraceGroup
-                            v-for="group in evaluationTrace.groups"
-                            :key="group.key"
-                            :group="group"
-                            :definition="checklist.checklistDefinition" />
-                        </div>
-                        <div v-if="triggeringQuestionLabels.length > 0" class="space-y-3">
-                          <p class="text-sm font-semibold text-zinc-950 dark:text-white">{{ t('checklist.result_policy.triggering_questions') }}</p>
-                          <ul class="space-y-2">
-                            <li v-for="item in triggeringQuestionLabels" :key="item.key" class="flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">
-                              <UIcon name="i-lucide-circle-x" class="mt-0.5 size-4 shrink-0 text-error" />
-                              <span>{{ item.label }}</span>
-                            </li>
-                          </ul>
-                        </div>
-                      </template>
-                    </UModal>
                   </div>
-
-                  <div v-for="section in sections" :key="section.key" class="flex items-start gap-3 px-3 py-2 text-sm text-zinc-800 dark:text-zinc-200">
-                    <UIcon name="i-lucide-list-checks" class="mt-0.5 size-4 shrink-0 text-primary-700 dark:text-primary-200" />
-                    <p class="min-w-0 flex-1">
-                      {{ getLabel(section.label, section.key) }}:
-                      {{ t('checklist.section_answer_summary', sectionAnswerSummary(section)) }}
-                    </p>
-                  </div>
-                </div>
-              </template>
-            </ReviewRuntimeSidebar>
+                </template>
+              </ReviewRuntimeSidebar>
+            </section>
           </aside>
         </div>
+      </div>
+    </template>
+  </CommonDetailPage>
+  <CommonDetailPage v-else id="checklist-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems">
+    <template #body>
+      <div v-if="loadError" class="p-6" data-testid="checklist-load-error">
+        <UAlert
+          color="error"
+          icon="i-lucide-circle-alert"
+          :title="t('checklist.load_failed')"
+          :description="t('checklist.load_failed_description')">
+          <template #actions>
+            <UButton
+              color="error"
+              variant="soft"
+              size="sm"
+              icon="i-lucide-refresh-cw"
+              :label="t('common.retry')"
+              @click="() => refresh()" />
+          </template>
+        </UAlert>
+      </div>
+
+      <div v-else class="p-6" data-testid="checklist-loading" role="status" aria-live="polite">
+        <CommonLoadingState :label="t('common.loading')" />
       </div>
     </template>
   </CommonDetailPage>

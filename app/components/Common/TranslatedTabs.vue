@@ -12,6 +12,8 @@ const {
   mobileCollapsible = true,
   mobileAutoCloseOnSelect = true,
   externalPanelId,
+  helpNavigationTarget,
+  helpNavigationValue,
   ui
 } = defineProps<{
   items: TranslatedTabItem[]
@@ -22,6 +24,8 @@ const {
   mobileCollapsible?: boolean
   mobileAutoCloseOnSelect?: boolean
   externalPanelId?: string
+  helpNavigationTarget?: string
+  helpNavigationValue?: string
   ui?: Record<string, string>
 }>()
 
@@ -57,6 +61,8 @@ const associateExternalPanel = async () => {
     for (const [index, trigger] of triggers.entries()) {
       const element = trigger?.$el
       if (!(element instanceof HTMLElement)) continue
+      if (helpNavigationTarget && translatedItems.value[index]?.value === helpNavigationValue) element.setAttribute('data-help-target', helpNavigationTarget)
+      else element.removeAttribute('data-help-target')
       const panelId = content ? undefined : translatedItems.value[index]?.panelId ?? externalPanelId
       if (panelId) {
         if (!nativePanelIds.has(element)) nativePanelIds.set(element, element.getAttribute('aria-controls'))

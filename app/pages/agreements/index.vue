@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GuidedHelpLauncher from '~/components/GuidedHelp/Launcher.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { ComputedRef } from 'vue'
 import { appRouteLocations } from '~/utils/route-locations'
@@ -25,6 +26,11 @@ const { check } = useAgreementChildActionPrerequisites(actionOwner)
 let actionGeneration = 0
 let actionPending = false
 const localePath = useLocalePath()
+
+const guidedHelpActions = useGuidedHelpActions()
+const selectGuidedAgreement = (agreement: FundingCaseAgreementProfileRow) => {
+  guidedHelpActions.begin({ kind: 'selected', binding: { resourceType: 'fundingcaseagreement', resourceId: String(agreement.id) } })()
+}
 
 const listView = ref('all')
 const listViewQuery = computed(() => ({ list_view: listView.value }))
@@ -87,6 +93,7 @@ const runAgreementAction = async (agreement: FundingCaseAgreementProfileRow, act
   try {
     if (!await check(action, 'profile', current) || !current()) return
     if (action === 'update') {
+      selectGuidedAgreement(agreement)
       await navigateTo(localePath(appRouteLocations.agreementDetail(agreementId)))
       return
     }
@@ -133,6 +140,7 @@ const canDeleteAgreement = (agreement: FundingCaseAgreementProfileRow) =>
         </template>
         <template #right>
           <div class="flex items-center gap-2">
+            <GuidedHelpLauncher />
             <CommonActionButton
               color="neutral"
               variant="ghost"
@@ -154,24 +162,27 @@ const canDeleteAgreement = (agreement: FundingCaseAgreementProfileRow) =>
           :description="t('agreement.description')"
           :stats="agreementHeroStats" />
 
-        <AgreementProfilesTable
-          v-model:search="search"
-          v-model:pagination="pagination"
-          :agreements="agreements"
-          :total-records="totalRecords"
-          :loading="status === 'pending'"
-          :request-status="status"
-          :can-create="canCreateAgreement"
-          :can-update="canUpdateAgreement"
-          :can-delete="canDeleteAgreement"
-          @retry="retry"
-          @add="openCreateAgreement"
-          @edit="openUpdateAgreement"
-          @delete="deleteAgreement">
-          <template #filters>
-            <CommonAssignedListViewSelect v-model="listView" resource="agreement" />
-          </template>
-        </AgreementProfilesTable>
+        <section class="min-h-0 flex-1 overflow-auto">
+          <AgreementProfilesTable
+            v-model:search="search"
+            v-model:pagination="pagination"
+            :agreements="agreements"
+            :total-records="totalRecords"
+            :loading="status === 'pending'"
+            :request-status="status"
+            :can-create="canCreateAgreement"
+            :can-update="canUpdateAgreement"
+            :can-delete="canDeleteAgreement"
+            @retry="retry"
+            @add="openCreateAgreement"
+            @select="selectGuidedAgreement"
+            @edit="openUpdateAgreement"
+            @delete="deleteAgreement">
+            <template #filters>
+              <CommonAssignedListViewSelect v-model="listView" resource="agreement" />
+            </template>
+          </AgreementProfilesTable>
+        </section>
       </div>
     </template>
   </UDashboardPanel>

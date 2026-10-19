@@ -6290,7 +6290,18 @@
                   },
                   "questions": [
                     {
-                      "help": [],
+                      "help": [
+                        {
+                          "title": {
+                            "en": "Fictional training brief",
+                            "fr": "Mise en situation fictive"
+                          },
+                          "description": {
+                            "en": "Fictional NCIA training facts, supplied for practice only: the project has an experienced delivery lead, confirmed staffing and a confirmed timetable. No significant unresolved delivery gap is identified. Use these facts with the rating criteria and explain your reasoning in the required answer comment. These are not verified agreement records or agency policy.",
+                            "fr": "Faits fictifs de formation de l’AICN, fournis uniquement pour l’exercice : le projet dispose d’une personne responsable expérimentée, d’effectifs confirmés et d’un échéancier confirmé. Aucune lacune importante non résolue n’est relevée. Utilisez ces faits et les critères de cotation, puis justifiez votre choix dans le commentaire obligatoire. Il ne s’agit ni de renseignements vérifiés du dossier ni de politiques de l’organisme."
+                          }
+                        }
+                      ],
                       "name": "capacity",
                       "type": "question",
                       "weight": {
@@ -6305,8 +6316,8 @@
                           },
                           "value": 2,
                           "description": {
-                            "en": "Low",
-                            "fr": "Faible"
+                            "en": "Low (2): An experienced delivery lead, confirmed staffing and a confirmed timetable support delivery; no significant unresolved delivery gap is identified.",
+                            "fr": "Faible (2) : Une personne responsable expérimentée, des effectifs confirmés et un échéancier confirmé appuient la réalisation; aucune lacune importante non résolue n’est relevée."
                           }
                         },
                         {
@@ -6316,8 +6327,8 @@
                           },
                           "value": 4,
                           "description": {
-                            "en": "Moderate",
-                            "fr": "Modéré"
+                            "en": "Moderate (4): A delivery milestone remains unresolved, but credible mitigation and regular monitoring are in place.",
+                            "fr": "Modéré (4) : Un jalon de réalisation demeure non résolu, mais des mesures d’atténuation crédibles et un suivi régulier sont en place."
                           }
                         },
                         {
@@ -6327,8 +6338,8 @@
                           },
                           "value": 5,
                           "description": {
-                            "en": "High",
-                            "fr": "Élevé"
+                            "en": "High (5): Critical delivery gaps remain without credible controls or mitigation.",
+                            "fr": "Élevé (5) : Des lacunes critiques dans la réalisation subsistent sans contrôles ni mesures d’atténuation crédibles."
                           }
                         }
                       ],
@@ -6377,7 +6388,7 @@
         "disableReviewers": false,
         "disableCustomOutcomes": true
       },
-      "egcs_cn_hash": "55cd66e6c6c66f7a3a65ed84d2cdb9fc09260164cdd94a5a875e4be6ab215dd6",
+      "egcs_cn_hash": "4e04eb0624b6ab0e4f8ac3a123f2fed7e548a2b3b2dbe1ad5c2fac4f56fbf37c",
       "egcs_cn_actor": 1,
       "egcs_cn_createdat": "2026-10-06T20:22:32.207+00:00"
     },
@@ -6463,7 +6474,18 @@
                           },
                           "questions": [
                             {
-                              "help": [],
+                              "help": [
+                                {
+                                  "title": {
+                                    "en": "Fictional training brief",
+                                    "fr": "Mise en situation fictive"
+                                  },
+                                  "description": {
+                                    "en": "Fictional NCIA training facts, supplied for practice only: the project has an experienced delivery lead, confirmed staffing and a confirmed timetable. No significant unresolved delivery gap is identified. Use these facts with the rating criteria and explain your reasoning in the required answer comment. These are not verified agreement records or agency policy.",
+                                    "fr": "Faits fictifs de formation de l’AICN, fournis uniquement pour l’exercice : le projet dispose d’une personne responsable expérimentée, d’effectifs confirmés et d’un échéancier confirmé. Aucune lacune importante non résolue n’est relevée. Utilisez ces faits et les critères de cotation, puis justifiez votre choix dans le commentaire obligatoire. Il ne s’agit ni de renseignements vérifiés du dossier ni de politiques de l’organisme."
+                                  }
+                                }
+                              ],
                               "name": "capacity",
                               "type": "question",
                               "weight": {
@@ -6478,8 +6500,8 @@
                                   },
                                   "value": 2,
                                   "description": {
-                                    "en": "Low",
-                                    "fr": "Faible"
+                                    "en": "Low (2): An experienced delivery lead, confirmed staffing and a confirmed timetable support delivery; no significant unresolved delivery gap is identified.",
+                                    "fr": "Faible (2) : Une personne responsable expérimentée, des effectifs confirmés et un échéancier confirmé appuient la réalisation; aucune lacune importante non résolue n’est relevée."
                                   }
                                 },
                                 {
@@ -6489,8 +6511,8 @@
                                   },
                                   "value": 4,
                                   "description": {
-                                    "en": "Moderate",
-                                    "fr": "Modéré"
+                                    "en": "Moderate (4): A delivery milestone remains unresolved, but credible mitigation and regular monitoring are in place.",
+                                    "fr": "Modéré (4) : Un jalon de réalisation demeure non résolu, mais des mesures d’atténuation crédibles et un suivi régulier sont en place."
                                   }
                                 },
                                 {
@@ -6500,8 +6522,8 @@
                                   },
                                   "value": 5,
                                   "description": {
-                                    "en": "High",
-                                    "fr": "Élevé"
+                                    "en": "High (5): Critical delivery gaps remain without credible controls or mitigation.",
+                                    "fr": "Élevé (5) : Des lacunes critiques dans la réalisation subsistent sans contrôles ni mesures d’atténuation crédibles."
                                   }
                                 }
                               ],
@@ -6629,7 +6651,18 @@
                           },
                           "questions": [
                             {
-                              "help": [],
+                              "help": [
+                                {
+                                  "title": {
+                                    "en": "Fictional training brief",
+                                    "fr": "Mise en situation fictive"
+                                  },
+                                  "description": {
+                                    "en": "Fictional NCIA training facts, supplied for practice only: a procurement milestone remains unresolved. A credible mitigation plan and monthly monitoring are in place. Use these facts with the rating criteria and explain your reasoning in the required answer comment. This second assessment supplies the workflow’s final risk score. These are not verified agreement records or agency policy.",
+                                    "fr": "Faits fictifs de formation de l’AICN, fournis uniquement pour l’exercice : un jalon d’approvisionnement demeure non résolu. Un plan d’atténuation crédible et un suivi mensuel sont en place. Utilisez ces faits et les critères de cotation, puis justifiez votre choix dans le commentaire obligatoire. Cette deuxième évaluation fournit la cote finale du processus. Il ne s’agit ni de renseignements vérifiés du dossier ni de politiques de l’organisme."
+                                  }
+                                }
+                              ],
                               "name": "capacity",
                               "type": "question",
                               "weight": {
@@ -6644,8 +6677,8 @@
                                   },
                                   "value": 2,
                                   "description": {
-                                    "en": "Low",
-                                    "fr": "Faible"
+                                    "en": "Low (2): An experienced delivery lead, confirmed staffing and a confirmed timetable support delivery; no significant unresolved delivery gap is identified.",
+                                    "fr": "Faible (2) : Une personne responsable expérimentée, des effectifs confirmés et un échéancier confirmé appuient la réalisation; aucune lacune importante non résolue n’est relevée."
                                   }
                                 },
                                 {
@@ -6655,8 +6688,8 @@
                                   },
                                   "value": 4,
                                   "description": {
-                                    "en": "Moderate",
-                                    "fr": "Modéré"
+                                    "en": "Moderate (4): A delivery milestone remains unresolved, but credible mitigation and regular monitoring are in place.",
+                                    "fr": "Modéré (4) : Un jalon de réalisation demeure non résolu, mais des mesures d’atténuation crédibles et un suivi régulier sont en place."
                                   }
                                 },
                                 {
@@ -6666,8 +6699,8 @@
                                   },
                                   "value": 5,
                                   "description": {
-                                    "en": "High",
-                                    "fr": "Élevé"
+                                    "en": "High (5): Critical delivery gaps remain without credible controls or mitigation.",
+                                    "fr": "Élevé (5) : Des lacunes critiques dans la réalisation subsistent sans contrôles ni mesures d’atténuation crédibles."
                                   }
                                 }
                               ],
@@ -6737,7 +6770,7 @@
         "directReview": false,
         "reviewSetupId": "388"
       },
-      "egcs_cn_hash": "400f3ce76bdcbeb6cf819825e3f5be4259ea934d682f049fbc2e07f0729f848d",
+      "egcs_cn_hash": "b4fff6956abbca738c83e293f1f2917429c46d32878bc7ab7b3865afca0c5b28",
       "egcs_cn_actor": 1,
       "egcs_cn_createdat": "2026-10-06T20:22:32.207+00:00"
     },
@@ -6832,7 +6865,18 @@
                                 },
                                 "questions": [
                                   {
-                                    "help": [],
+                                    "help": [
+                                      {
+                                        "title": {
+                                          "en": "Fictional training brief",
+                                          "fr": "Mise en situation fictive"
+                                        },
+                                        "description": {
+                                          "en": "Fictional NCIA training facts, supplied for practice only: the project has an experienced delivery lead, confirmed staffing and a confirmed timetable. No significant unresolved delivery gap is identified. Use these facts with the rating criteria and explain your reasoning in the required answer comment. These are not verified agreement records or agency policy.",
+                                          "fr": "Faits fictifs de formation de l’AICN, fournis uniquement pour l’exercice : le projet dispose d’une personne responsable expérimentée, d’effectifs confirmés et d’un échéancier confirmé. Aucune lacune importante non résolue n’est relevée. Utilisez ces faits et les critères de cotation, puis justifiez votre choix dans le commentaire obligatoire. Il ne s’agit ni de renseignements vérifiés du dossier ni de politiques de l’organisme."
+                                        }
+                                      }
+                                    ],
                                     "name": "capacity",
                                     "type": "question",
                                     "weight": {
@@ -6847,8 +6891,8 @@
                                         },
                                         "value": 2,
                                         "description": {
-                                          "en": "Low",
-                                          "fr": "Faible"
+                                          "en": "Low (2): An experienced delivery lead, confirmed staffing and a confirmed timetable support delivery; no significant unresolved delivery gap is identified.",
+                                          "fr": "Faible (2) : Une personne responsable expérimentée, des effectifs confirmés et un échéancier confirmé appuient la réalisation; aucune lacune importante non résolue n’est relevée."
                                         }
                                       },
                                       {
@@ -6858,8 +6902,8 @@
                                         },
                                         "value": 4,
                                         "description": {
-                                          "en": "Moderate",
-                                          "fr": "Modéré"
+                                          "en": "Moderate (4): A delivery milestone remains unresolved, but credible mitigation and regular monitoring are in place.",
+                                          "fr": "Modéré (4) : Un jalon de réalisation demeure non résolu, mais des mesures d’atténuation crédibles et un suivi régulier sont en place."
                                         }
                                       },
                                       {
@@ -6869,8 +6913,8 @@
                                         },
                                         "value": 5,
                                         "description": {
-                                          "en": "High",
-                                          "fr": "Élevé"
+                                          "en": "High (5): Critical delivery gaps remain without credible controls or mitigation.",
+                                          "fr": "Élevé (5) : Des lacunes critiques dans la réalisation subsistent sans contrôles ni mesures d’atténuation crédibles."
                                         }
                                       }
                                     ],
@@ -6998,7 +7042,18 @@
                                 },
                                 "questions": [
                                   {
-                                    "help": [],
+                                    "help": [
+                                      {
+                                        "title": {
+                                          "en": "Fictional training brief",
+                                          "fr": "Mise en situation fictive"
+                                        },
+                                        "description": {
+                                          "en": "Fictional NCIA training facts, supplied for practice only: a procurement milestone remains unresolved. A credible mitigation plan and monthly monitoring are in place. Use these facts with the rating criteria and explain your reasoning in the required answer comment. This second assessment supplies the workflow’s final risk score. These are not verified agreement records or agency policy.",
+                                          "fr": "Faits fictifs de formation de l’AICN, fournis uniquement pour l’exercice : un jalon d’approvisionnement demeure non résolu. Un plan d’atténuation crédible et un suivi mensuel sont en place. Utilisez ces faits et les critères de cotation, puis justifiez votre choix dans le commentaire obligatoire. Cette deuxième évaluation fournit la cote finale du processus. Il ne s’agit ni de renseignements vérifiés du dossier ni de politiques de l’organisme."
+                                        }
+                                      }
+                                    ],
                                     "name": "capacity",
                                     "type": "question",
                                     "weight": {
@@ -7013,8 +7068,8 @@
                                         },
                                         "value": 2,
                                         "description": {
-                                          "en": "Low",
-                                          "fr": "Faible"
+                                          "en": "Low (2): An experienced delivery lead, confirmed staffing and a confirmed timetable support delivery; no significant unresolved delivery gap is identified.",
+                                          "fr": "Faible (2) : Une personne responsable expérimentée, des effectifs confirmés et un échéancier confirmé appuient la réalisation; aucune lacune importante non résolue n’est relevée."
                                         }
                                       },
                                       {
@@ -7024,8 +7079,8 @@
                                         },
                                         "value": 4,
                                         "description": {
-                                          "en": "Moderate",
-                                          "fr": "Modéré"
+                                          "en": "Moderate (4): A delivery milestone remains unresolved, but credible mitigation and regular monitoring are in place.",
+                                          "fr": "Modéré (4) : Un jalon de réalisation demeure non résolu, mais des mesures d’atténuation crédibles et un suivi régulier sont en place."
                                         }
                                       },
                                       {
@@ -7035,8 +7090,8 @@
                                         },
                                         "value": 5,
                                         "description": {
-                                          "en": "High",
-                                          "fr": "Élevé"
+                                          "en": "High (5): Critical delivery gaps remain without credible controls or mitigation.",
+                                          "fr": "Élevé (5) : Des lacunes critiques dans la réalisation subsistent sans contrôles ni mesures d’atténuation crédibles."
                                         }
                                       }
                                     ],
@@ -7148,7 +7203,7 @@
         ],
         "executionFailureStatus": "382"
       },
-      "egcs_cn_hash": "f81c5aa4ea9771cbf661630374959be78d9e9f987fbece062f5eeb2857eff0af",
+      "egcs_cn_hash": "5856c61a6379b0af1db03bf7e48b7e5ec6b31c25216fc9c31b7d786981d4e4dd",
       "egcs_cn_actor": 1,
       "egcs_cn_createdat": "2026-10-06T20:22:32.207+00:00"
     },
@@ -7223,7 +7278,18 @@
                   },
                   "questions": [
                     {
-                      "help": [],
+                      "help": [
+                        {
+                          "title": {
+                            "en": "Fictional training brief",
+                            "fr": "Mise en situation fictive"
+                          },
+                          "description": {
+                            "en": "Fictional NCIA training facts, supplied for practice only: a procurement milestone remains unresolved. A credible mitigation plan and monthly monitoring are in place. Use these facts with the rating criteria and explain your reasoning in the required answer comment. This second assessment supplies the workflow’s final risk score. These are not verified agreement records or agency policy.",
+                            "fr": "Faits fictifs de formation de l’AICN, fournis uniquement pour l’exercice : un jalon d’approvisionnement demeure non résolu. Un plan d’atténuation crédible et un suivi mensuel sont en place. Utilisez ces faits et les critères de cotation, puis justifiez votre choix dans le commentaire obligatoire. Cette deuxième évaluation fournit la cote finale du processus. Il ne s’agit ni de renseignements vérifiés du dossier ni de politiques de l’organisme."
+                          }
+                        }
+                      ],
                       "name": "capacity",
                       "type": "question",
                       "weight": {
@@ -7238,8 +7304,8 @@
                           },
                           "value": 2,
                           "description": {
-                            "en": "Low",
-                            "fr": "Faible"
+                            "en": "Low (2): An experienced delivery lead, confirmed staffing and a confirmed timetable support delivery; no significant unresolved delivery gap is identified.",
+                            "fr": "Faible (2) : Une personne responsable expérimentée, des effectifs confirmés et un échéancier confirmé appuient la réalisation; aucune lacune importante non résolue n’est relevée."
                           }
                         },
                         {
@@ -7249,8 +7315,8 @@
                           },
                           "value": 4,
                           "description": {
-                            "en": "Moderate",
-                            "fr": "Modéré"
+                            "en": "Moderate (4): A delivery milestone remains unresolved, but credible mitigation and regular monitoring are in place.",
+                            "fr": "Modéré (4) : Un jalon de réalisation demeure non résolu, mais des mesures d’atténuation crédibles et un suivi régulier sont en place."
                           }
                         },
                         {
@@ -7260,8 +7326,8 @@
                           },
                           "value": 5,
                           "description": {
-                            "en": "High",
-                            "fr": "Élevé"
+                            "en": "High (5): Critical delivery gaps remain without credible controls or mitigation.",
+                            "fr": "Élevé (5) : Des lacunes critiques dans la réalisation subsistent sans contrôles ni mesures d’atténuation crédibles."
                           }
                         }
                       ],
@@ -7310,7 +7376,7 @@
         "disableReviewers": false,
         "disableCustomOutcomes": true
       },
-      "egcs_cn_hash": "03f911c0ab67f23c206425d605b39fc9d7d64b92e5144fc935cbbd39fbe34d38",
+      "egcs_cn_hash": "014b32b4ef26649ed799279ab7d16f288b4c73c3a24bf765c87558354499b040",
       "egcs_cn_actor": 1,
       "egcs_cn_createdat": "2026-10-06T20:22:32.207+00:00"
     },
@@ -31040,7 +31106,18 @@
                 },
                 "questions": [
                   {
-                    "help": [],
+                    "help": [
+                      {
+                        "title": {
+                          "en": "Fictional training brief",
+                          "fr": "Mise en situation fictive"
+                        },
+                        "description": {
+                          "en": "Fictional NCIA training facts, supplied for practice only: the project has an experienced delivery lead, confirmed staffing and a confirmed timetable. No significant unresolved delivery gap is identified. Use these facts with the rating criteria and explain your reasoning in the required answer comment. These are not verified agreement records or agency policy.",
+                          "fr": "Faits fictifs de formation de l’AICN, fournis uniquement pour l’exercice : le projet dispose d’une personne responsable expérimentée, d’effectifs confirmés et d’un échéancier confirmé. Aucune lacune importante non résolue n’est relevée. Utilisez ces faits et les critères de cotation, puis justifiez votre choix dans le commentaire obligatoire. Il ne s’agit ni de renseignements vérifiés du dossier ni de politiques de l’organisme."
+                        }
+                      }
+                    ],
                     "name": "capacity",
                     "type": "question",
                     "weight": {
@@ -31055,8 +31132,8 @@
                         },
                         "value": 2,
                         "description": {
-                          "en": "Low",
-                          "fr": "Faible"
+                          "en": "Low (2): An experienced delivery lead, confirmed staffing and a confirmed timetable support delivery; no significant unresolved delivery gap is identified.",
+                          "fr": "Faible (2) : Une personne responsable expérimentée, des effectifs confirmés et un échéancier confirmé appuient la réalisation; aucune lacune importante non résolue n’est relevée."
                         }
                       },
                       {
@@ -31066,8 +31143,8 @@
                         },
                         "value": 4,
                         "description": {
-                          "en": "Moderate",
-                          "fr": "Modéré"
+                          "en": "Moderate (4): A delivery milestone remains unresolved, but credible mitigation and regular monitoring are in place.",
+                          "fr": "Modéré (4) : Un jalon de réalisation demeure non résolu, mais des mesures d’atténuation crédibles et un suivi régulier sont en place."
                         }
                       },
                       {
@@ -31077,8 +31154,8 @@
                         },
                         "value": 5,
                         "description": {
-                          "en": "High",
-                          "fr": "Élevé"
+                          "en": "High (5): Critical delivery gaps remain without credible controls or mitigation.",
+                          "fr": "Élevé (5) : Des lacunes critiques dans la réalisation subsistent sans contrôles ni mesures d’atténuation crédibles."
                         }
                       }
                     ],
@@ -31189,7 +31266,18 @@
                 },
                 "questions": [
                   {
-                    "help": [],
+                    "help": [
+                      {
+                        "title": {
+                          "en": "Fictional training brief",
+                          "fr": "Mise en situation fictive"
+                        },
+                        "description": {
+                          "en": "Fictional NCIA training facts, supplied for practice only: a procurement milestone remains unresolved. A credible mitigation plan and monthly monitoring are in place. Use these facts with the rating criteria and explain your reasoning in the required answer comment. This second assessment supplies the workflow’s final risk score. These are not verified agreement records or agency policy.",
+                          "fr": "Faits fictifs de formation de l’AICN, fournis uniquement pour l’exercice : un jalon d’approvisionnement demeure non résolu. Un plan d’atténuation crédible et un suivi mensuel sont en place. Utilisez ces faits et les critères de cotation, puis justifiez votre choix dans le commentaire obligatoire. Cette deuxième évaluation fournit la cote finale du processus. Il ne s’agit ni de renseignements vérifiés du dossier ni de politiques de l’organisme."
+                        }
+                      }
+                    ],
                     "name": "capacity",
                     "type": "question",
                     "weight": {
@@ -31204,8 +31292,8 @@
                         },
                         "value": 2,
                         "description": {
-                          "en": "Low",
-                          "fr": "Faible"
+                          "en": "Low (2): An experienced delivery lead, confirmed staffing and a confirmed timetable support delivery; no significant unresolved delivery gap is identified.",
+                          "fr": "Faible (2) : Une personne responsable expérimentée, des effectifs confirmés et un échéancier confirmé appuient la réalisation; aucune lacune importante non résolue n’est relevée."
                         }
                       },
                       {
@@ -31215,8 +31303,8 @@
                         },
                         "value": 4,
                         "description": {
-                          "en": "Moderate",
-                          "fr": "Modéré"
+                          "en": "Moderate (4): A delivery milestone remains unresolved, but credible mitigation and regular monitoring are in place.",
+                          "fr": "Modéré (4) : Un jalon de réalisation demeure non résolu, mais des mesures d’atténuation crédibles et un suivi régulier sont en place."
                         }
                       },
                       {
@@ -31226,8 +31314,8 @@
                         },
                         "value": 5,
                         "description": {
-                          "en": "High",
-                          "fr": "Élevé"
+                          "en": "High (5): Critical delivery gaps remain without credible controls or mitigation.",
+                          "fr": "Élevé (5) : Des lacunes critiques dans la réalisation subsistent sans contrôles ni mesures d’atténuation crédibles."
                         }
                       }
                     ],

@@ -12,7 +12,8 @@
     "./markdown": "./src/markdown.ts",
     "./session": "./src/session.ts",
     "./style.css": "./src/style.css",
-    "./components/*": "./src/components/*"
+    "./components/*": "./src/components/*",
+    "./journey": "./src/journey.ts"
   },
   "scripts": {
     "test:unit": "vitest run --config vitest.config.ts",

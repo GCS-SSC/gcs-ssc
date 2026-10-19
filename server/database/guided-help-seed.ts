@@ -1,6 +1,7 @@
 import type { Transaction } from 'kysely'
 import type { Database, JsonValue } from '~~/shared/types/database'
 import { agreementTypeGuide } from '../../shared/guided-help/agreement-type-guide'
+import { riskAssessmentGuide } from '../../shared/guided-help/risk-assessment-guide'
 import { addressTypeGuide } from '../../shared/guided-help/address-type-guide'
 import { createPublication, publishDefinition } from '../utils/system-publication'
 
@@ -27,7 +28,8 @@ export const seedGuidedHelpExample = async (db: Transaction<Database>): Promise<
   const roleIds = roles.map(role => String(role.id))
   for (const example of [
     { document: addressTypeGuide, screens: ['agency.general', 'agency.address-types'] },
-    { document: agreementTypeGuide, screens: ['agency.agreement-types'] }
+    { document: agreementTypeGuide, screens: ['agency.agreement-types'] },
+    { document: riskAssessmentGuide, screens: ['agreements.list'] }
   ]) {
     const document = example.document as unknown as JsonValue
     const guideId = await createPublication(db, 'guided_help')

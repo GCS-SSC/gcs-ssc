@@ -12,6 +12,8 @@ const {
   mobileCollapsible = true,
   mobileAutoCloseOnSelect = true,
   externalPanelId,
+  helpNavigationTarget,
+  helpNavigationValue,
   priorityValues = [],
   ui
 } = defineProps<{
@@ -24,6 +26,8 @@ const {
   mobileCollapsible?: boolean
   mobileAutoCloseOnSelect?: boolean
   externalPanelId?: string
+  helpNavigationTarget?: string
+  helpNavigationValue?: string
   priorityValues?: string[]
   ui?: Record<string, string>
 }>()
@@ -64,5 +68,7 @@ const sortedItems = computed(() => {
     :mobile-collapsible="mobileCollapsible"
     :mobile-auto-close-on-select="mobileAutoCloseOnSelect"
     :external-panel-id="externalPanelId"
+    :help-navigation-target="helpNavigationTarget"
+    :help-navigation-value="helpNavigationValue"
     :ui="ui" />
 </template>

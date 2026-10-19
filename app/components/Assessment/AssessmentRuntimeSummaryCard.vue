@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import ReviewRuntimeSidebar from '~/components/Review/ReviewRuntimeSidebar.vue'
-import type { ReviewRuntimeNavigationItem } from '~/types/review-runtime'
+import type { ReviewRuntimeNavigationItem, ReviewRuntimeNavigationRow } from '~/types/review-runtime'
 import type { AssessmentRuntimeSummary } from '~~/shared/types/schemas/assessment/currentassessment'
 
 type SectionTabItem = {
@@ -22,7 +22,9 @@ const {
   reviewLabel = '',
   reviewValue = '',
   isSaving = false,
-  canSave = true
+  canSave = true,
+  helpSaveTarget,
+  helpReviewTarget
 } = defineProps<{
   summary: AssessmentRuntimeSummary | null
   sectionTabs: SectionTabItem[]
@@ -33,6 +35,8 @@ const {
   reviewValue?: string
   isSaving?: boolean
   canSave?: boolean
+  helpSaveTarget?: string
+  helpReviewTarget?: string
 }>()
 
 const emit = defineEmits<{ select: [value: string]; save: [] }>()
@@ -80,10 +84,12 @@ const navigationItems = computed<ReviewRuntimeNavigationItem[]>(() => [
         label: reviewLabel,
         icon: 'i-lucide-messages-square',
         value: reviewValue,
-        rows: (summary?.reviewStatuses ?? []).map(reviewStatus => ({
+        rows: (summary?.reviewStatuses ?? []).map<ReviewRuntimeNavigationRow>(reviewStatus => ({
           key: reviewStatus.name,
           label: reviewStatusLabelMap.value[reviewStatus.name as ReviewStatusLabelKey] ?? reviewStatus.name,
-          status: reviewStatus.status
+          status: reviewStatus.name === 'additional_reviewers' && reviewStatus.totalCount === 0 && reviewStatus.status === 'empty'
+            ? 'optional'
+            : reviewStatus.status
         }))
       }]
     : [])
@@ -92,6 +98,8 @@ const navigationItems = computed<ReviewRuntimeNavigationItem[]>(() => [
 
 <template>
   <ReviewRuntimeSidebar
+    :help-save-target="helpSaveTarget"
+    :help-review-target="helpReviewTarget"
     :eyebrow="t('transfer_payment.assessment')"
     :title="t('transfer_payment.assessment_score_summary')"
     :items="navigationItems"
@@ -101,7 +109,10 @@ const navigationItems = computed<ReviewRuntimeNavigationItem[]>(() => [
     @select="value => emit('select', value)"
     @save="emit('save')">
     <template #result>
-      <div v-if="summary" class="space-y-1 pt-1">
+      <p v-if="summary && !summary.answersComplete" class="px-3 py-3 text-sm text-muted">
+        {{ t('assessment.result_incomplete') }}
+      </p>
+      <div v-else-if="summary" class="space-y-1 pt-1">
         <div
           class="rounded-sm border px-3 py-3"
           :style="{

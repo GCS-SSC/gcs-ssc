@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { LocalizedToastText } from '~/composables/useLocalizedToast'
 /* eslint-disable jsdoc/require-jsdoc */
-import { computed, ref, watch, h } from 'vue'
+import { computed, ref, watch, h, useId } from 'vue'
 import type { Ref } from 'vue'
+import type { GuideObservedContext } from '@gcs-ssc/guided-help/runtime'
+import { beginGuidedHelpAction } from '~/utils/guided-help-actions'
 import type { TableColumn } from '@nuxt/ui'
 import type { RuntimeState } from '~~/shared/constants/system-lifecycle'
 import type { JsonValue, Workflow_Purpose, Workflow_Target_Entity_Type } from '~~/shared/types/database'
@@ -17,6 +19,7 @@ import { dataCollectionRuntimeConfiguration as dataCollectionConfiguration } fro
 
 type RuntimeRecommendation = {
   id: string
+  workflowMemberOrder?: number | null
   runtimeItemId: string
   runtimeState: RuntimeState
   egcs_cn_outcome?: string | null
@@ -39,6 +42,7 @@ type RuntimeDataCollection = {
 }
 type RuntimeReview = {
   id: string
+  canUpdate: boolean
   runtimeItemId: string
   runtimeState: RuntimeState
   egcs_cn_reviewtype: 'assessment' | 'checklist'
@@ -143,7 +147,10 @@ const {
   showPreActionWhenUnconfigured = false,
   preActionShowHeader = true,
   preActionTitleKey,
-  preActionDescriptionKey
+  preActionDescriptionKey,
+  helpStartTarget,
+  helpStepTarget,
+  helpReviewOpenTarget
 } = defineProps<{
   entityType: Workflow_Target_Entity_Type
   entityId: string
@@ -159,11 +166,18 @@ const {
   preActionShowHeader?: boolean
   preActionTitleKey?: string
   preActionDescriptionKey?: string
+  helpStartTarget?: string
+  helpStepTarget?: string
+  helpReviewOpenTarget?: string
 }>()
 const emit = defineEmits<{ changed: [] }>()
 const { locale, t } = useI18n()
 const localePath = useLocalePath()
 const route = useRoute()
+const guidedHelpActions = useGuidedHelpActions()
+const helpRoot = ref<HTMLElement | null>(null)
+const helpVisitId = useId()
+const captureJourneyInvalidation = () => guidedHelpActions.begin({ kind: 'invalidated', binding: { resourceType: entityType, resourceId: entityId } })
 const { showError } = useApiErrorToast()
 const isSaving: Ref<boolean> = ref(false)
 const isStarting: Ref<boolean> = ref(false)
@@ -187,6 +201,32 @@ let availableWorkflowsRequestGeneration = 0
 const endpoint = computed(() => `/api/workflows/runtime?entityType=${entityType}&entityId=${entityId}&purpose=${purpose}${selectedAttemptId.value ? `&runtimeId=${selectedAttemptId.value}` : ''}`)
 const { data, refresh, status, error = ref(undefined) } = await useFetch<RuntimeResponse, Error, string>(endpoint)
 const runtimeIdentity = computed(() => `${entityType}:${entityId}:${purpose}`)
+const helpDraftRevision = ref(0)
+watch(() => JSON.stringify(responses.value), () => {
+  helpDraftRevision.value += 1
+}, { flush: 'sync' })
+const helpContext = computed<GuideObservedContext>(() => {
+  if (!data.value) return { kind: 'pending' }
+  if (entityType !== 'fundingcaseagreement' || purpose !== 'risk_rating') return { kind: 'elsewhere', view: '' }
+  const binding = { resourceType: entityType, resourceId: entityId }
+  const execution = data.value.current ? { binding, executionId: data.value.current.runtimeId } : null
+  const base = {
+    execution, view: 'agreement.risk-rating',
+    facts: ['agreement.risk-rating', ...(execution ? ['agreement.workflow.started'] : [])],
+    visitId: helpVisitId, draftRevision: helpDraftRevision.value
+  }
+  if (!execution) return { ...base, kind: 'owner', binding }
+  const approvalMember = data.value.steps?.find(member => selectedStepId.value === `review-approval-${member.memberId}`
+    || selectedStepId.value === `recommendation-approval-${member.memberId}` || selectedStepId.value === `approval-${member.memberId}`)
+  const approval = approvalMember?.kind === 'approval_template' ? approvalMember.runtimeItem : approvalMember?.approvalStage
+  const approvalId = approval?.runtimeItemId ?? (selectedStepId.value === finalApprovalStepId ? data.value.sourceApprovalStage?.runtimeItemId : undefined)
+  const taskId = selectedRecommendation.value
+    ? `recommendation:${selectedRecommendation.value.id}`
+    : selectedDataCollection.value
+      ? `collection:${selectedDataCollection.value.id}`
+      : approvalId ? `approval:${approvalId}` : null
+  return taskId ? { ...base, execution, kind: 'task', taskId, facts: [...base.facts, 'task.arrived'] } : { ...base, kind: 'owner', binding }
+})
 let runtimeIdentityGeneration = 0
 watch(runtimeIdentity, () => {
   runtimeIdentityGeneration += 1
@@ -433,9 +473,9 @@ const workflowSteps = computed<WorkflowDisplayStep[]>(() => {
         })
       } else if (member.kind === 'recommendation_set') {
         for (const nested of member.recommendationPlan?.members ?? []) {
-          const recommendation = data.value?.recommendations?.find(item => String(item.egcs_cn_recommendationsetup) === nested.memberId)
+          const recommendation = data.value?.recommendations?.find(item => String(item.egcs_cn_recommendationsetup) === nested.memberId && item.workflowMemberOrder === member.sequence)
           steps.push({
-            id: nested.memberId, ordinal: ++ordinal,
+            id: `recommendation-${member.memberId}-${nested.memberId}`, ordinal: ++ordinal,
             name: locale.value === 'fr' ? nested.schemaNameFr : nested.schemaNameEn,
             status: recommendation?.runtimeState ?? unmaterializedStepStatus(runStatus),
             outcome: recommendation?.egcs_cn_outcome ?? null,
@@ -497,8 +537,12 @@ const workflowSteps = computed<WorkflowDisplayStep[]>(() => {
     kind: 'final_approval' as const
   }]
 })
+const recommendationStepId = (item: RuntimeRecommendation) => {
+  const member = data.value?.steps?.find(stage => stage.kind === 'recommendation_set' && stage.sequence === item.workflowMemberOrder)
+  return member ? `recommendation-${member.memberId}-${item.egcs_cn_recommendationsetup}` : String(item.egcs_cn_recommendationsetup)
+}
 const selectedRecommendation = computed(() => data.value?.recommendations?.find(
-  item => String(item.egcs_cn_recommendationsetup) === selectedStepId.value
+  item => recommendationStepId(item) === selectedStepId.value
 ) ?? null)
 const selectedDataCollection = computed(() => data.value?.dataCollections?.find(item => `data-collection-${item.workflowMemberId}` === selectedStepId.value) ?? null)
 const dataCollectionEditorKey = computed(() => `${runtimeIdentity.value}:${data.value?.current?.runtimeId}:${selectedDataCollection.value?.id}`)
@@ -522,6 +566,11 @@ const selectedReviews = computed(() => {
 const selectStep = (step: WorkflowDisplayStep) => {
   if (isStepViewable(step)) selectedStepId.value = String(step.id)
 }
+watch([() => route.query.workflowStepId, workflowSteps], ([stepId]) => {
+  if (typeof stepId !== 'string') return
+  const step = workflowSteps.value.find(item => item.id === stepId)
+  if (step) selectStep(step)
+}, { immediate: true })
 const selectAttempt = async (attempt: { runtimeId: string }) => {
   selectedAttemptId.value = attempt.runtimeId
   selectedStepId.value = null
@@ -530,7 +579,7 @@ const selectAttempt = async (attempt: { runtimeId: string }) => {
 watch([currentRecommendation, () => data.value?.current?.runtimeState,
   () => data.value?.dataCollections?.find(item => item.runtimeState === 'active' || item.runtimeState === 'awaiting_action')?.id], ([recommendation]) => {
   if (recommendation) {
-    selectedStepId.value = String(recommendation.egcs_cn_recommendationsetup)
+    selectedStepId.value = recommendationStepId(recommendation)
   } else if (data.value?.dataCollections?.some(item => item.runtimeState === 'active' || item.runtimeState === 'awaiting_action')) {
     const collection = data.value.dataCollections.find(item => item.runtimeState === 'active' || item.runtimeState === 'awaiting_action')!
     selectedStepId.value = `data-collection-${collection.workflowMemberId}`
@@ -554,6 +603,8 @@ const start = async () => {
     availableWorkflowsStatus.value !== 'success'
     || selectedAvailableWorkflow.value?.eligible !== true
   )) return
+  const completeHelp = beginGuidedHelpAction(guidedHelpActions, helpRoot.value, helpStartTarget, 'save-success', helpContext.value)
+  const invalidate = captureJourneyInvalidation()
   const generation = captureRuntimeIdentity()
   try {
     isStarting.value = true
@@ -572,6 +623,8 @@ const start = async () => {
     isChooserOpen.value = false
     await refresh()
     if (!isCurrentRuntimeIdentity(generation)) return
+    completeHelp()
+    invalidate()
     emit('changed')
   } catch (error) {
     if (isCurrentRuntimeIdentity(generation)) showError(error)
@@ -581,6 +634,7 @@ const start = async () => {
 }
 const retry = async () => {
   if (!data.value?.current || isRetrying.value || !guardParentAction('retry')) return
+  const invalidate = captureJourneyInvalidation()
   const generation = captureRuntimeIdentity()
   try {
     isRetrying.value = true
@@ -594,6 +648,7 @@ const retry = async () => {
     await refresh()
     if (!isCurrentRuntimeIdentity(generation)) return
     activeWorkflowTab.value = 'current'
+    invalidate()
     emit('changed')
   } catch (error) {
     if (isCurrentRuntimeIdentity(generation)) showError(error)
@@ -603,6 +658,7 @@ const retry = async () => {
 }
 const cancel = async () => {
   if (!data.value?.current || isCancelling.value || !guardParentAction('cancel') || !window.confirm(t('workflow.cancel_confirmation'))) return
+  const invalidate = captureJourneyInvalidation()
   const generation = captureRuntimeIdentity()
   try {
     isCancelling.value = true
@@ -615,6 +671,7 @@ const cancel = async () => {
     if (!isCurrentRuntimeIdentity(generation)) return
     await refresh()
     if (!isCurrentRuntimeIdentity(generation)) return
+    invalidate()
     emit('changed')
   } catch (error) {
     if (isCurrentRuntimeIdentity(generation)) showError(error)
@@ -626,6 +683,7 @@ const resume = async () => {
   const blockers = data.value?.ownerBlockers?.filter(blocker => !blocker.egcs_cn_resolvedat) ?? []
   resumeAttempted.value = true
   if (!data.value?.current || blockers.some(blocker => !replacementOwners.value[blocker.id])) return
+  const invalidate = captureJourneyInvalidation()
   const generation = captureRuntimeIdentity()
   try {
     isResuming.value = true
@@ -640,6 +698,7 @@ const resume = async () => {
     if (!isCurrentRuntimeIdentity(generation)) return
     await refresh()
     if (!isCurrentRuntimeIdentity(generation)) return
+    invalidate()
     emit('changed')
   } catch (error) {
     if (isCurrentRuntimeIdentity(generation)) showError(error)
@@ -653,6 +712,7 @@ const persist = async (submit: boolean) => {
     validationIssues.value = validateRecommendationResponses(selectedRecommendation.value.egcs_cn_definition, responses.value)
     if (validationIssues.value.length > 0) return
   }
+  const invalidate = captureJourneyInvalidation()
   const generation = captureRuntimeIdentity()
   try {
     isSaving.value = true
@@ -666,6 +726,7 @@ const persist = async (submit: boolean) => {
     if (!isCurrentRuntimeIdentity(generation)) return
     await refresh()
     if (!isCurrentRuntimeIdentity(generation)) return
+    invalidate()
     emit('changed')
   } catch (error) {
     if (isCurrentRuntimeIdentity(generation)) {
@@ -678,15 +739,17 @@ const persist = async (submit: boolean) => {
   }
 }
 const handleApprovalChanged = async () => {
+  const invalidate = captureJourneyInvalidation()
   const generation = captureRuntimeIdentity()
   await refresh()
   if (!isCurrentRuntimeIdentity(generation)) return
+  invalidate()
   emit('changed')
 }
 </script>
 
 <template>
-  <section v-if="shouldRenderSection" class="min-w-0 space-y-6" :aria-label="t('workflow.title')">
+  <section v-if="shouldRenderSection" ref="helpRoot" :data-help-context="JSON.stringify(helpContext)" :data-help-runtime-id="data?.current?.runtimeId" :data-help-workflow-step-id="selectedStepId" class="min-w-0 space-y-6" :aria-label="t('workflow.title')">
     <div v-if="status === 'success' && purpose === 'standard' && activeWorkflowTab !== 'previous' && canShowParentAction && (roleVisibleActions || (!hasActiveWorkflow && data?.canStart))" class="flex justify-end">
       <UButton
         icon="i-lucide-plus"
@@ -805,6 +868,7 @@ const handleApprovalChanged = async () => {
         <slot v-if="$slots['pre-action-action']" name="pre-action-action" />
         <UButton
           v-else
+          :data-help-target="helpStartTarget"
           :icon="workflowStartIcon"
           :label="workflowStartLabel"
           :loading="isStarting"
@@ -917,6 +981,8 @@ const handleApprovalChanged = async () => {
             <td class="px-4 py-4 text-right">
               <UButton
                 v-if="selectable"
+                :data-help-target="helpStepTarget"
+                :data-help-instance="step.id"
                 color="neutral"
                 variant="ghost"
                 size="sm"
@@ -966,6 +1032,7 @@ const handleApprovalChanged = async () => {
         <Suspense>
           <CommonQuestionnaireRuntimeDetail
             :key="dataCollectionEditorKey"
+            :help-context="helpContext"
             :entity-id="selectedDataCollection.id"
             :configuration="dataCollectionConfiguration"
             embedded
@@ -994,6 +1061,8 @@ const handleApprovalChanged = async () => {
             <CommonLifecycleBadge engine="runtime" :state="review.runtimeState" class="mt-1" />
           </div>
           <UButton
+            :data-help-target="helpReviewOpenTarget" data-help-kind="navigation"
+            :data-help-instance="`review:${review.id}`"
             :to="reviewLocation(review)"
             color="neutral" variant="outline" icon="i-lucide-panel-top-open" class="cursor-default"
             :label="t('workflow.open_review')" />

@@ -128,6 +128,11 @@ export const useUrlTabState = ({
 }: UrlTabStateOptions) => {
   const { locale, getLocaleMessage } = useI18n()
   const route = useRoute()
+  const getRouteBaseName = useRouteBaseName()
+  const routeIdentity = computed(() => {
+    const name = getRouteBaseName(route)
+    return name ? JSON.stringify([name, route.params]) : null
+  })
   const router = useRouter()
   const selectedTab: Ref<string> = ref('')
   const selectedTabKey: Ref<string> = ref('')
@@ -269,7 +274,7 @@ export const useUrlTabState = ({
   }
 
   watch(
-    [() => route.path, () => route.query[queryKey], tabValues, resolvedDefaultTab, enabledRef, locale],
+    [() => route.path, () => route.query[queryKey], tabValues, resolvedDefaultTab, enabledRef, locale, routeIdentity],
     ([routePath, queryTab, , defaultValue, isEnabled], previousValues) => {
       if (deferredSelection && (
         deferredSelection.path !== routePath
@@ -282,10 +287,10 @@ export const useUrlTabState = ({
         return
       }
 
-      // Discovery and locale hydration must not overwrite a UI choice whose URL write is pending or deferred.
+      // A locale navigation can cancel the pending section write before committing its new path.
       const preservePendingSelection = previousValues !== undefined
-        && (pendingNavigation !== null || !routeLocaleMatches.value || locale.value !== previousValues[5])
-        && routePath === previousValues[0]
+        && (pendingNavigation !== null || !routeLocaleMatches.value || locale.value !== previousValues[5] || routePath !== previousValues[0])
+        && (routePath === previousValues[0] || (routeIdentity.value !== null && routeIdentity.value === previousValues[6]))
         && resolveQueryParamValue(queryTab) === resolveQueryParamValue(previousValues[1])
         && defaultValue === previousValues[3]
         && isEnabled === previousValues[4]

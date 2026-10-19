@@ -3588,6 +3588,18 @@
     "retired": "Review setup retired."
   },
   "workflow": {
+    "help": {
+      "journey_unavailable": "This agreement is no longer available for this guide. Choose another agreement or exit the guide.",
+      "journey_loading": "Checking your agreement and current workflow…",
+      "journey_wrong_record": "This guide is following a different record. Use the highlighted return link to return to the agreement.",
+      "journey_other_agency": "This guide belongs to another agency. Exit this guide and select an eligible guide for the agreement’s agency.",
+      "approval": "This task is waiting for approval. Check its approvals to see who acts next.",
+      "assignment": "You do not currently have permission to work on this task. Check its assigned users or ask your manager to arrange the required access.",
+      "pending": "Waiting for earlier workflow work to finish. Complete the available task first. If none is available, check the current workflow’s prerequisites and assignments.",
+      "paused": "The workflow is paused. Check the owner warning and ask an authorized manager to resolve the assignment before continuing.",
+      "stopped": "This task or workflow ended before this task completed. Check the current workflow’s result and available retry actions.",
+      "reviews": "Reviews"
+    },
     "flow": {
       "title": "Flow",
       "description": "Conditions select the route at start. Selected members run in order; retry captures current values using the original published version.",
@@ -4101,7 +4113,9 @@
     "na_description_fr": "L’exigence ne s’applique pas."
   },
   "assessment": {
+    "result_incomplete": "Result available after all required answers are complete.",
     "runtime_status": {
+      "optional": "Optional — none requested",
       "empty": "Not started",
       "in_progress": "In progress",
       "completed": "Completed"
@@ -4797,6 +4811,10 @@
     "remove_step": "Remove step",
     "screen": "Screen",
     "control": "Control",
+    "appearance": "Step appearance",
+    "appearance_spotlight": "Highlight the control",
+    "appearance_anchor_only": "Popover only",
+    "appearance_hint": "Popover only anchors the instructions to the control while keeping the whole page available.",
     "progression": "Progression",
     "progression_completion": "After completing the action",
     "progression_manual": "Next button only",
@@ -4850,6 +4868,13 @@
     "duplicate_branch": "This condition already exists.",
     "no_branch_fields": "No structured fields on this screen.",
     "routes_to": "to",
-    "move_breaks_branch": "This move would make a branch go backwards. Update the incoming or outgoing routes first."
+    "move_breaks_branch": "This move would make a branch go backwards. Update the incoming or outgoing routes first.",
+    "journey": "Workflow journey",
+    "journey_none": "Standard guide",
+    "journey_hint": "Choose a registered journey to guide work across records and workflow tasks.",
+    "journey_stage": "Journey stage",
+    "journey_branch_conflict": "Remove branching routes before selecting a workflow journey.",
+    "journey_template": "Task instructions",
+    "journey_template_generic": "General task instructions"
   }
 }

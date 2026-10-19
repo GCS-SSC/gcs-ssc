@@ -10,6 +10,7 @@ import { commentsRequired, questionSubsectionNeedsAnswering } from '~~/shared/ut
 import AssessmentAdditionalReviewersTab from '~/components/Assessment/AssessmentAdditionalReviewersTab.vue'
 import AssessmentApprovalsSection from '~/components/Common/Approvals/Section.vue'
 import CommonCompletionSection from '~/components/Common/Completions/Section.vue'
+import { beginGuidedHelpAction } from '~/utils/guided-help-actions'
 import { scrollReviewPageToTop } from '~/utils/scrollReviewPageToTop'
 
 const route = useRoute()
@@ -94,6 +95,22 @@ const isReviewTab = computed(() =>
   || selectedTab.value === reviewTabValue.value
 )
 const selectedSectionName = computed(() => selectedSection.value?.name ?? '')
+const helpRoot = ref<HTMLElement | null>(null)
+const guidedHelpActions = useGuidedHelpActions()
+const { context: helpContext } = useGuidedHelpReviewContext({
+  view: 'assessment.detail', record: assessment,
+  reviewId: () => String(route.params.reviewId), draft: assessmentResponse,
+  /** Loaded section facts; navigating does not imply saved business data. */
+  facts: () => isReviewTab.value
+    ? ['assessment.additional-review']
+    : [
+        `section:${selectedSectionName.value || selectedTab.value}`,
+        ...(runtimeSummary.value?.sectionStatuses.find(section => section.name === selectedSectionName.value)?.status === 'completed' ? ['assessment.section-complete'] : []),
+        ...(sectionTabs.value.at(-1)?.value === selectedTab.value ? ['assessment.final-section'] : [])
+      ]
+})
+const helpReturnTarget = computed(() => assessment.value?.egcs_cn_entitytype === 'fundingcaseagreement' ? 'assessment.detail.return' : undefined)
+
 const filteredSubSections = computed(() => {
   if (!selectedSection.value) {
     return []
@@ -233,39 +250,43 @@ const handleSave = async () => {
     return
   }
 
+  const complete = beginGuidedHelpAction(guidedHelpActions, helpRoot.value, 'assessment.detail.save', 'save-success', helpContext.value)
   if (!await validateActiveForm()) {
     return
   }
 
-  await saveAssessment()
+  await saveAssessment(complete)
 }
+/**
+ *
+ */
 const handleCompleted = async () => {
+  const invalidate = helpContext.value.kind === 'task' ? guidedHelpActions.begin({ kind: 'invalidated', binding: helpContext.value.execution.binding }) : () => {}
   await refreshAssessment()
+  invalidate()
   approvalsRefreshKey.value += 1
 }
 
+/**
+ *
+ */
 const handleApprovalChanged = async () => {
+  const invalidate = helpContext.value.kind === 'task' ? guidedHelpActions.begin({ kind: 'invalidated', binding: helpContext.value.execution.binding }) : () => {}
   await refreshAssessment()
+  invalidate()
 }
 </script>
 
 <template>
-  <CommonDetailPage id="assessment-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems">
+  <CommonDetailPage v-if="!loadError && assessment && String(assessment.id) === String(route.params.reviewId)" id="assessment-detail" v-model:collapsed="isHeroCollapsed" data-help-view="assessment.detail" :data-help-agency="assessment.egcs_cn_agency" :data-help-review-id="String(assessment.id)" :breadcrumb-items="breadcrumbItems" help-return-target="assessment.detail.return" :help-return-enabled="Boolean(helpReturnTarget)" :data-help-context="JSON.stringify(helpContext)" :data-help-return-target="helpReturnTarget">
     <template #body>
-      <CommonLoadingState v-if="loadStatus === 'pending' && !assessment" :label="t('common.loading')" />
-      <UAlert v-else-if="loadError" color="error" icon="i-lucide-circle-alert" :title="t('common.load_failed')" :description="t('common.try_again')">
-        <template #actions>
-          <UButton :label="t('common.retry')" color="error" variant="soft" @click="() => refreshAssessment()" />
-        </template>
-      </UAlert>
-      <div v-else-if="assessment" class="flex flex-1 flex-col">
+      <div ref="helpRoot" :data-help-context="JSON.stringify(helpContext)" :data-help-return-target="helpReturnTarget" class="flex flex-1 flex-col">
         <AssessmentDetailHero
           :name="heroName"
           :entity-name="entityName"
           :runtime-state="assessment?.runtimeState"
           :publication-version="assessment?.publicationVersion"
           :is-collapsed="isHeroCollapsed" />
-
         <div class="flex min-h-0 flex-1 flex-col gap-6 overflow-visible px-6 pt-0 pb-6 lg:flex-row lg:items-start lg:gap-8">
           <div ref="sectionContent" class="min-h-0 min-w-0 flex-1 pt-6">
             <UForm
@@ -426,7 +447,7 @@ const handleApprovalChanged = async () => {
               </div>
             </UForm>
 
-            <div v-else-if="isReviewTab && assessment?.id" class="space-y-8">
+            <div v-else-if="isReviewTab && assessment?.id" data-help-target="assessment.detail.completion" data-help-kind="section" class="space-y-8">
               <UForm
                 ref="reviewAlignmentForm"
                 :state="assessmentResponse"
@@ -440,7 +461,9 @@ const handleApprovalChanged = async () => {
                       {{ t('assessment.current_assessment_result') }}
                     </p>
                     <p class="text-base font-semibold text-zinc-900 dark:text-white">
-                      {{ currentOverallResultOption ? getLocalizedLabel(currentOverallResultOption.label) : formatScore(runtimeSummary?.score.weightedScore ?? 0) }}
+                      {{ !runtimeSummary?.answersComplete
+                        ? t('assessment.result_incomplete')
+                        : currentOverallResultOption ? getLocalizedLabel(currentOverallResultOption.label) : formatScore(runtimeSummary.score.weightedScore) }}
                     </p>
                   </div>
 
@@ -509,6 +532,8 @@ const handleApprovalChanged = async () => {
               <CommonAssignedUsers entity-type="commonreview" :entity-id="String(assessment.id)" />
 
               <CommonCompletionSection
+                help-complete-target="assessment.detail.complete"
+                :help-context="helpContext"
                 entity-type="commonreview"
                 :entity-id="String(assessment.id)"
                 :complete-payload="{ assessmentResponse }"
@@ -536,6 +561,9 @@ const handleApprovalChanged = async () => {
               :state="assessmentResponse"
               :validate="validateAssessmentResponse"
               class="space-y-8">
+              <section data-help-target="assessment.detail.question-heading" data-help-kind="section">
+                <AssessmentSchemaSectionTitle :title="getLocalizedLabel(selectedSection.label)" compact />
+              </section>
               <section
                 v-for="(subSection, subSectionIndex) in filteredSubSections"
                 :key="subSection._key"
@@ -591,21 +619,35 @@ const handleApprovalChanged = async () => {
           </div>
 
           <aside class="w-full shrink-0 pt-6 lg:sticky lg:top-6 lg:order-last lg:w-96 lg:border-l lg:border-zinc-200 lg:pl-6 dark:lg:border-zinc-800 xl:w-[28rem]">
-            <AssessmentRuntimeSummaryCard
-              :summary="runtimeSummary"
-              :section-tabs="sectionTabs"
-              :selected-value="selectedTab"
-              :outcomes-label="outcomeTabLabel"
-              :outcomes-value="outcomesTabValue"
-              :review-label="t('assessment.review_tab')"
-              :review-value="reviewTabValue"
-              :is-saving="isSaving"
-              :can-save="canUpdateAssessment"
-              @select="selectSummarySection"
-              @save="handleSave" />
+            <section data-help-target="assessment.detail.navigation">
+              <AssessmentRuntimeSummaryCard
+                help-save-target="assessment.detail.save"
+                help-review-target="assessment.detail.additional-review"
+                :summary="runtimeSummary"
+                :section-tabs="sectionTabs"
+                :selected-value="selectedTab"
+                :outcomes-label="outcomeTabLabel"
+                :outcomes-value="outcomesTabValue"
+                :review-label="t('assessment.review_tab')"
+                :review-value="reviewTabValue"
+                :is-saving="isSaving"
+                :can-save="canUpdateAssessment"
+                @select="selectSummarySection"
+                @save="handleSave" />
+            </section>
           </aside>
         </div>
       </div>
+    </template>
+  </CommonDetailPage>
+  <CommonDetailPage v-else id="assessment-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems">
+    <template #body>
+      <UAlert v-if="loadError" color="error" icon="i-lucide-circle-alert" :title="t('common.load_failed')" :description="t('common.try_again')">
+        <template #actions>
+          <UButton :label="t('common.retry')" color="error" variant="soft" @click="() => refreshAssessment()" />
+        </template>
+      </UAlert>
+      <CommonLoadingState v-else :label="t('common.loading')" />
     </template>
   </CommonDetailPage>
 </template>

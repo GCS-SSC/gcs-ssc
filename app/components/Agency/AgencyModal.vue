@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
-import { computed, nextTick } from 'vue'
+import { computed, nextTick, ref, useId } from 'vue'
+import type { GuideObservedContext } from '@gcs-ssc/guided-help/runtime'
+import { beginGuidedHelpAction } from '~/utils/guided-help-actions'
 import { AgencyProfileSchema, type AgencyProfileItem } from '~~/shared/types/schemas'
 
 const { title, submitLabel, pending = false } = defineProps<{
@@ -33,22 +35,26 @@ const selectedGwcoaFetchUrl = computed(() => {
   return `/api/agency/lookups/gwcoa/${gwcoaNumber}?${params.toString()}`
 })
 
+const guidedHelpActions = useGuidedHelpActions()
+const helpForm = ref<{ $el: HTMLElement } | null>(null)
+const helpVisitId = useId()
+const helpContext = computed<GuideObservedContext>(() => ({ kind: 'owner', binding: null, execution: null, view: 'agency.edit', facts: [], visitId: helpVisitId, draftRevision: 0 }))
+
 const onSubmit = () => {
   emit('submit')
 }
 /** Signal a real structured-field edit after Vue updates the business control. */
 const completeActiveHelp = async () => {
+  const complete = beginGuidedHelpAction(guidedHelpActions, helpForm.value?.$el ?? null, 'agency.edit.active', 'field-change', helpContext.value)
   await nextTick()
-  window.dispatchEvent(new CustomEvent('guided-help:completed', {
-    detail: { target: 'agency.edit.active', action: 'field-change' }
-  }))
+  complete()
 }
 </script>
 
 <template>
   <UModal v-model:open="open" :title="title" :description="t('common.form_dialog_description')">
     <template #body>
-      <UForm :state="state" :validate="validate" class="space-y-4" data-help-view="agency.edit" @submit="onSubmit">
+      <UForm ref="helpForm" :data-help-context="JSON.stringify(helpContext)" :state="state" :validate="validate" class="space-y-4" data-help-view="agency.edit" @submit="onSubmit">
         <UFormField :label="t('agency.gwcoa_number')" name="egcs_ay_gwcoa_number">
           <CommonServerLookupSelect
             v-model="state.egcs_ay_gwcoa_number"

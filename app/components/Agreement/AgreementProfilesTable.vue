@@ -26,7 +26,7 @@ const {
 
 const emit = defineEmits<{
   (event: 'add' | 'retry'): void
-  (event: 'edit' | 'delete', agreement: FundingCaseAgreementProfileRow): void
+  (event: 'edit' | 'delete' | 'select', agreement: FundingCaseAgreementProfileRow): void
 }>()
 
 const search = defineModel<string>('search', { default: '' })
@@ -66,88 +66,93 @@ const getAgreementActionTarget = (agreement: FundingCaseAgreementProfileRow) => 
 </script>
 
 <template>
-  <CommonResourceLayoutPage
-    v-model:search="search"
-    v-model:pagination="pagination"
-    :data="agreements"
-    :columns="columns"
-    :bilingual-columns="bilingualColumns"
-    :total-records="totalRecords"
-    :loading="loading"
-    :request-status="requestStatus"
-    :pagination-options="{ getPaginationRowModel: getPaginationRowModel() }"
-    :button-label="t('agreement.new')"
-    :show-button="canCreate"
-    :search-placeholder="t('agreement.search_placeholder')"
-    v-bind="$attrs"
-    @add="emit('add')"
-    @retry="emit('retry')">
-    <template #filters>
-      <slot name="filters" />
-    </template>
-    <template #id-cell="{ row }">
-      <span class="font-mono text-xs font-bold text-zinc-400 dark:text-zinc-500">
-        {{ row.original.id }}
-      </span>
-    </template>
+  <section data-help-view="agreements.list" data-help-target="agreements.list.records" data-help-kind="section" class="flex min-w-0 flex-1 flex-col overflow-hidden">
+    <CommonResourceLayoutPage
+      v-model:search="search"
+      v-model:pagination="pagination"
+      :data="agreements"
+      :columns="columns"
+      :bilingual-columns="bilingualColumns"
+      :total-records="totalRecords"
+      :loading="loading"
+      :request-status="requestStatus"
+      :pagination-options="{ getPaginationRowModel: getPaginationRowModel() }"
+      :button-label="t('agreement.new')"
+      :show-button="canCreate"
+      :search-placeholder="t('agreement.search_placeholder')"
+      help-search-target="agreements.list.search"
+      v-bind="$attrs"
+      @add="emit('add')"
+      @retry="emit('retry')">
+      <template #filters>
+        <slot name="filters" />
+      </template>
+      <template #id-cell="{ row }">
+        <span class="font-mono text-xs font-bold text-zinc-400 dark:text-zinc-500">
+          {{ row.original.id }}
+        </span>
+      </template>
 
-    <template #egcs_fc_title_en-cell="{ row }">
-      <CommonBilingualName
-        :name-en="row.original.egcs_fc_title_en"
-        :name-fr="row.original.egcs_fc_title_fr"
-        :to="localePath(appRouteLocations.agreementDetail(String(row.original.id)))" />
-    </template>
+      <template #egcs_fc_title_en-cell="{ row }">
+        <div @click="emit('select', row.original)">
+          <CommonBilingualName
+            :name-en="row.original.egcs_fc_title_en"
+            :name-fr="row.original.egcs_fc_title_fr"
+            :to="localePath(appRouteLocations.agreementDetail(String(row.original.id)))" />
+        </div>
+      </template>
 
-    <template #egcs_fc_status-cell="{ row }">
-      <CommonRecordState
-        :status-id="row.original.egcs_fc_status"
-        :is-completed="row.original.isCompleted"
-        :wrap="false" />
-    </template>
+      <template #egcs_fc_status-cell="{ row }">
+        <CommonRecordState
+          :status-id="row.original.egcs_fc_status"
+          :is-completed="row.original.isCompleted"
+          :wrap="false" />
+      </template>
 
-    <template #agency-cell="{ row }">
-      <span class="font-semibold text-zinc-700 dark:text-zinc-300">
-        {{ getBilingualValue(row.original, 'agency_name', '-') }}
-      </span>
-    </template>
+      <template #agency-cell="{ row }">
+        <span class="font-semibold text-zinc-700 dark:text-zinc-300">
+          {{ getBilingualValue(row.original, 'agency_name', '-') }}
+        </span>
+      </template>
 
-    <template #program-cell="{ row }">
-      <span class="font-semibold text-zinc-700 dark:text-zinc-300">
-        {{ getBilingualValue(row.original, 'program_name', '-') }}
-      </span>
-    </template>
+      <template #program-cell="{ row }">
+        <span class="font-semibold text-zinc-700 dark:text-zinc-300">
+          {{ getBilingualValue(row.original, 'program_name', '-') }}
+        </span>
+      </template>
 
-    <template #stream-cell="{ row }">
-      <span class="font-semibold text-zinc-700 dark:text-zinc-300">
-        {{ getBilingualValue(row.original, 'stream_name', '-') }}
-      </span>
-    </template>
+      <template #stream-cell="{ row }">
+        <span class="font-semibold text-zinc-700 dark:text-zinc-300">
+          {{ getBilingualValue(row.original, 'stream_name', '-') }}
+        </span>
+      </template>
 
-    <template #egcs_fc_agreementtype-cell="{ row }">
-      <span class="font-semibold text-zinc-700 dark:text-zinc-300">
-        {{ getAgreementTypeLabel(row.original.egcs_fc_agreementtype) }}
-      </span>
-    </template>
+      <template #egcs_fc_agreementtype-cell="{ row }">
+        <span class="font-semibold text-zinc-700 dark:text-zinc-300">
+          {{ getAgreementTypeLabel(row.original.egcs_fc_agreementtype) }}
+        </span>
+      </template>
 
-    <template #actions-cell="{ row }">
-      <div class="flex items-center gap-2">
-        <CommonActionButton
-          v-if="canUpdate(row.original)"
-          icon="i-lucide-edit-3"
-          color="neutral"
-          variant="ghost"
-          size="sm"
-          :aria-label="t('common.edit_named', { name: getAgreementActionTarget(row.original) })"
-          @click="emit('edit', row.original)" />
-        <CommonActionButton
-          v-if="canDelete(row.original)"
-          icon="i-lucide-trash"
-          color="error"
-          variant="ghost"
-          size="sm"
-          :aria-label="t('common.delete_named', { name: getAgreementActionTarget(row.original) })"
-          @click="emit('delete', row.original)" />
-      </div>
-    </template>
-  </CommonResourceLayoutPage>
+      <template #actions-cell="{ row }">
+        <div class="flex items-center gap-2">
+          <CommonActionButton
+            v-if="canUpdate(row.original)"
+            icon="i-lucide-edit-3"
+            color="neutral"
+            variant="ghost"
+            size="sm"
+            :aria-label="t('common.edit_named', { name: getAgreementActionTarget(row.original) })"
+            @click="emit('edit', row.original)" />
+          <CommonActionButton
+            v-if="canDelete(row.original)"
+            icon="i-lucide-trash"
+            color="error"
+            variant="ghost"
+            size="sm"
+            :aria-label="t('common.delete_named', { name: getAgreementActionTarget(row.original) })"
+            @click="emit('delete', row.original)" />
+        </div>
+      </template>
+    </CommonResourceLayoutPage>
+  </section>
 </template>

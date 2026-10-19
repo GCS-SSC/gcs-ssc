@@ -3,5 +3,5 @@ import { discoverGuidedHelp } from '~~/server/utils/guided-help'
 // eslint-disable-next-line local/require-authorize -- operation independently authorizes its resolved owner or business screen
 export default defineEventHandler(async event => {
   const query = getQuery(event)
-  return discoverGuidedHelp(event, getRouterParam(event, 'agencyId') ?? '', typeof query.view === 'string' ? query.view : '')
+  return discoverGuidedHelp(event, getRouterParam(event, 'agencyId') ?? '', typeof query.view === 'string' ? query.view : '', typeof query.reviewId === 'string' ? query.reviewId : undefined, typeof query.agreementId === 'string' ? query.agreementId : undefined)
 })

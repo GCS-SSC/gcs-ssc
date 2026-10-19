@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createGuideRuntime } from '../../src/runtime'
+import { createGuideRuntime, signalGuideCompletion } from './runtime-fixture'
 
 const guide = { formatVersion: 1 as const, title: { en: 'Help', fr: 'Aide' }, description: { en: 'Help', fr: 'Aide' }, steps: [
   { id: 'name', view: 'agency.general', target: 'agency.name', kind: 'text' as const, title: { en: 'Name', fr: 'Nom' }, instructions: { en: 'Type here', fr: 'Saisir ici' } },
@@ -99,7 +99,7 @@ it('renders a real anchored popover with safe Markdown and explicit manual contr
   expect(onSelect).toHaveBeenCalledWith('save', ['name', 'save'])
   expect(document.querySelector('.driver-popover-next-btn')?.textContent).toBe('Exit')
   expect(document.querySelector<HTMLButtonElement>('.driver-popover-next-btn')!.disabled).toBe(true)
-  window.dispatchEvent(new CustomEvent('guided-help:completed', { detail: { target: 'agency.save', action: 'save-success' } }))
+  signalGuideCompletion({ target: 'agency.save', action: 'save-success' })
   expect(onExit).toHaveBeenCalledOnce()
   expect(document.querySelector('.driver-popover')).toBeNull()
   runtime.select('name')
@@ -206,7 +206,7 @@ it('accepts matching host completion only and does not advance on a save click o
   document.body.innerHTML = '<button data-help-target="agency.save">Save</button>'
   const onExit = vi.fn()
   const runtime = createGuideRuntime({ document: guide, initialStepId: 'save', locale: 'en', currentView: 'agency.general', onExit })
-  const signal = (detail: unknown) => window.dispatchEvent(new CustomEvent('guided-help:completed', { detail }))
+  const signal = (detail: unknown) => signalGuideCompletion(detail)
   document.querySelector('button')!.click()
   for (const detail of [null, {}, { target: 'other', action: 'save-success' }, { target: 'agency.save', action: 'save-failed' }]) signal(detail)
   expect(onExit).not.toHaveBeenCalled()
@@ -220,7 +220,7 @@ it('advances a button when the host confirms its modal opened and preserves manu
   const documentGuide = { ...guide, steps: [{ ...guide.steps[1]!, id: 'add' }, ...guide.steps] }
   document.body.innerHTML = '<button data-help-target="agency.save">Add</button><input data-help-target="agency.name">'
   const runtime = createGuideRuntime({ document: documentGuide, locale: 'en', currentView: 'agency.general' })
-  window.dispatchEvent(new CustomEvent('guided-help:completed', { detail: { target: 'agency.save', action: 'modal-open' } }))
+  signalGuideCompletion({ target: 'agency.save', action: 'modal-open' })
   expect(runtime.state.value.step.id).toBe('name')
   runtime.destroy()
   const manual = createGuideRuntime({ document: { ...guide, steps: guide.steps.map(step => ({ ...step, advanceOn: 'manual' as const })) }, locale: 'en', currentView: 'agency.general' })
@@ -230,7 +230,7 @@ it('advances a button when the host confirms its modal opened and preserves manu
   input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
   expect(manual.state.value.step.id).toBe('name')
   manual.select('save')
-  window.dispatchEvent(new CustomEvent('guided-help:completed', { detail: { target: 'agency.save', action: 'save-success' } }))
+  signalGuideCompletion({ target: 'agency.save', action: 'save-success' })
   expect(document.querySelector('.driver-popover')).not.toBeNull()
   manual.destroy()
 })
@@ -292,7 +292,7 @@ it('does not infer complete dates from individual date segments', () => {
 it('keeps automatic completion focus on the next business control instead of Driver controls', () => {
   document.body.innerHTML = '<button data-help-target="agency.add">Add</button><div role="dialog" data-state="open"><input data-help-target="agency.name"><button data-help-target="agency.save">Save</button></div>'
   const runtime = createGuideRuntime({ document: { ...guide, steps: [{ ...guide.steps[1]!, id: 'add', target: 'agency.add' }, ...guide.steps] }, locale: 'en', currentView: 'agency.general' })
-  window.dispatchEvent(new CustomEvent('guided-help:completed', { detail: { target: 'agency.add', action: 'modal-open' } }))
+  signalGuideCompletion({ target: 'agency.add', action: 'modal-open' })
   const input = document.querySelector('input')!
   expect(document.activeElement).toBe(input)
   input.value = 'Entered'
@@ -312,7 +312,7 @@ it('gates Next, chooser and public forward selection on completed actions while 
   runtime.select('save')
   expect(runtime.state.value.step.id).toBe('add')
   document.body.insertAdjacentHTML('beforeend', '<div role="dialog" data-state="open"><input data-help-target="agency.name"><button data-help-target="agency.save">Save</button></div>')
-  window.dispatchEvent(new CustomEvent('guided-help:completed', { detail: { target: 'agency.add', action: 'modal-open' } }))
+  signalGuideCompletion({ target: 'agency.add', action: 'modal-open' })
   expect(runtime.state.value.step.id).toBe('add')
   expect(document.querySelector<HTMLButtonElement>('.driver-popover-next-btn')!.disabled).toBe(false)
   document.querySelector<HTMLButtonElement>('.driver-popover-next-btn')!.click()
@@ -320,7 +320,7 @@ it('gates Next, chooser and public forward selection on completed actions while 
   document.querySelector<HTMLButtonElement>('.driver-popover-next-btn')!.click()
   expect(runtime.state.value.step.id).toBe('save')
   expect(document.querySelector<HTMLButtonElement>('.driver-popover-next-btn')!.disabled).toBe(true)
-  window.dispatchEvent(new CustomEvent('guided-help:completed', { detail: { target: 'agency.save', action: 'save-success' } }))
+  signalGuideCompletion({ target: 'agency.save', action: 'save-success' })
   document.querySelector('[role="dialog"]')!.remove()
   await Promise.resolve()
   expect(runtime.state.value.step.id).toBe('save')
@@ -337,7 +337,7 @@ it('requires reopening a cancelled modal and restores stale session steps to the
   expect(runtime.state.value.step.id).toBe('add')
   expect(onSelect).toHaveBeenCalledWith('add', ['add'])
   document.body.insertAdjacentHTML('beforeend', '<div role="dialog" data-state="open"><input data-help-target="agency.name"></div>')
-  window.dispatchEvent(new CustomEvent('guided-help:completed', { detail: { target: 'agency.add', action: 'modal-open' } }))
+  signalGuideCompletion({ target: 'agency.add', action: 'modal-open' })
   expect(runtime.state.value.step.id).toBe('name')
   document.querySelector('[role="dialog"]')!.remove()
   await vi.waitFor(() => expect(runtime.state.value.step.id).toBe('add'))
@@ -350,7 +350,7 @@ it('requires reopening a cancelled modal and restores stale session steps to the
 it('keeps an open modal workflow when a portalled dropdown temporarily hides it from accessibility', async () => {
   document.body.innerHTML = '<button data-help-target="agency.add">Add</button><div role="dialog" data-state="open"><input data-help-target="agency.name"></div>'
   const runtime = createGuideRuntime({ document: { ...guide, steps: [{ ...guide.steps[1]!, id: 'add', target: 'agency.add' }, ...guide.steps] }, locale: 'en', currentView: 'agency.general' })
-  window.dispatchEvent(new CustomEvent('guided-help:completed', { detail: { target: 'agency.add', action: 'modal-open' } }))
+  signalGuideCompletion({ target: 'agency.add', action: 'modal-open' })
   const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!
   dialog.setAttribute('aria-hidden', 'true')
   await vi.waitFor(() => expect(runtime.state.value.status).toBe('unavailable'))
@@ -364,7 +364,7 @@ it('keeps an open modal workflow when a portalled dropdown temporarily hides it 
 it('revokes modal completion when a retained dialog changes to closed', async () => {
   document.body.innerHTML = '<button data-help-target="agency.add">Add</button><div role="dialog" data-state="open"><input data-help-target="agency.name"></div>'
   const runtime = createGuideRuntime({ document: { ...guide, steps: [{ ...guide.steps[1]!, id: 'add', target: 'agency.add' }, ...guide.steps] }, locale: 'en', currentView: 'agency.general' })
-  window.dispatchEvent(new CustomEvent('guided-help:completed', { detail: { target: 'agency.add', action: 'modal-open' } }))
+  signalGuideCompletion({ target: 'agency.add', action: 'modal-open' })
   expect(runtime.state.value.step.id).toBe('name')
   document.querySelector<HTMLElement>('[role="dialog"]')!.dataset.state = 'closed'
   await vi.waitFor(() => expect(runtime.state.value.step.id).toBe('add'))
@@ -498,4 +498,168 @@ it('places a narrow switch popover outside the entire modal rather than over oth
   runtime.destroy()
   geometry.mockRestore()
   Object.defineProperty(window, 'innerWidth', { value: previousWidth, configurable: true })
+})
+
+it('finishes instruction groups without exiting or implying business completion', () => {
+  document.body.innerHTML = '<main data-help-view="agency.general"><section data-help-target="agency.name"></section></main>'
+  const onFinish = vi.fn()
+  const onExit = vi.fn()
+  const documentGuide = { ...guide, steps: [{ ...guide.steps[0]!, kind: 'section' as const }] }
+  const runtime = createGuideRuntime({ document: documentGuide, locale: 'en', currentView: 'agency.general', finishLabel: 'Instructions reviewed', onFinish, onExit })
+  const next = document.querySelector<HTMLButtonElement>('.driver-popover-next-btn')!
+  expect(next.textContent).toBe('Instructions reviewed')
+  next.click()
+  expect(onFinish).toHaveBeenCalledOnce()
+  expect(onExit).not.toHaveBeenCalled()
+  expect(document.querySelector('.driver-popover')).not.toBeNull()
+  document.querySelector<HTMLButtonElement>('.driver-popover-close-btn')!.click()
+  expect(onExit).toHaveBeenCalledOnce()
+  runtime.destroy()
+})
+
+it('keeps task context and waits inside the standard spotlight controls', () => {
+  document.body.innerHTML = '<main data-help-view="agency.general"><section data-help-target="agency.name"></section></main>'
+  const onFinish = vi.fn()
+  const single = { ...guide, steps: [{ ...guide.steps[0]!, kind: 'section' as const }] }
+  const runtime = createGuideRuntime({ document: single, locale: 'en', currentView: 'agency.general', context: 'Reviews · First review', finishLabel: 'Next', onFinish })
+  expect(document.querySelector('.driver-popover-description')?.textContent).toContain('Reviews · First review')
+  expect(document.querySelector('.gcs-guide-retry')).toBeNull()
+  document.querySelector<HTMLButtonElement>('.driver-popover-next-btn')!.click()
+  expect(onFinish).toHaveBeenCalledOnce()
+  runtime.updateContext({ currentView: 'agency.general', locale: 'en', statusMessage: 'Complete the work to continue.', finishDisabled: true })
+  expect(document.querySelector('.driver-popover [role="status"]')?.textContent).toBe('Complete the work to continue.')
+  expect(document.querySelector('.gcs-guide-step-select')).not.toBeNull()
+  expect(document.querySelector('.driver-popover-prev-btn')).not.toBeNull()
+  expect(document.querySelector('.driver-popover-close-btn')).not.toBeNull()
+  document.querySelector<HTMLButtonElement>('.driver-popover-next-btn')!.click()
+  expect(onFinish).toHaveBeenCalledOnce()
+  runtime.updateContext({ currentView: 'agency.general', locale: 'fr', statusMessage: undefined, finishDisabled: false, finishLabel: 'Suivant' })
+  expect(document.querySelector('.driver-popover-next-btn')?.textContent).toBe('Suivant')
+  expect(document.querySelector('.driver-popover [role="status"]')).toBeNull()
+  expect(document.querySelector('.gcs-guide-retry')).toBeNull()
+  document.querySelector<HTMLButtonElement>('.driver-popover-next-btn')!.click()
+  expect(onFinish).toHaveBeenCalledTimes(2)
+  runtime.destroy()
+})
+
+it('suspends all task instructions, highlighting and navigation outside an authorized business context', () => {
+  document.body.innerHTML = '<main data-help-view="agency.general"><input data-help-target="agency.name"><button data-help-target="agency.save">Save</button></main>'
+  const onSelect = vi.fn()
+  const onFinish = vi.fn()
+  const runtime = createGuideRuntime({ document: guide, locale: 'en', currentView: 'agency.general', suspended: true, statusMessage: 'Return to the selected record.', onSelect, onFinish })
+  expect(runtime.state.value.status).toBe('unavailable')
+  const popover = document.querySelector('.driver-popover')!
+  expect(popover.textContent).toContain('Return to the selected record.')
+  expect(popover.querySelector<HTMLElement>('.driver-popover-description')?.style.display).toBe('block')
+  expect(popover.textContent).not.toContain('Type here')
+  expect(popover.textContent).not.toContain('Click Save')
+  expect(popover.querySelector('.gcs-guide-step-select')).toBeNull()
+  expect(document.querySelector('[data-help-target].driver-active-element')).toBeNull()
+  runtime.select('save')
+  document.querySelector<HTMLButtonElement>('.driver-popover-next-btn')!.click()
+  signalGuideCompletion({ target: 'agency.save', action: 'save-success' })
+  expect(runtime.state.value.step.id).toBe('name')
+  expect(onSelect).not.toHaveBeenCalled()
+  expect(onFinish).not.toHaveBeenCalled()
+  runtime.updateContext({ currentView: 'agency.general', locale: 'en', suspended: false, statusMessage: undefined })
+  expect(document.querySelector('.driver-popover-description')?.textContent).toContain('Type here')
+  expect(document.querySelector('.gcs-guide-step-select')).not.toBeNull()
+  expect(runtime.state.value.status).toBe('ready')
+  runtime.destroy()
+})
+
+it('accepts Save completion only for a unique visible target on the active guided view', () => {
+  document.body.innerHTML = '<button data-help-target="agency.save">Save</button>'
+  const saveOnly = { ...guide, steps: [{ ...guide.steps[1]!, advanceOn: 'manual' as const }] }
+  const onExit = vi.fn()
+  const runtime = createGuideRuntime({ document: saveOnly, locale: 'en', currentView: '', onExit })
+  const signal = () => signalGuideCompletion({ target: 'agency.save', action: 'save-success' })
+  const next = () => document.querySelector<HTMLButtonElement>('.driver-popover-next-btn')!.click()
+  signal()
+  next()
+  expect(onExit).not.toHaveBeenCalled()
+  runtime.updateContext({ currentView: 'agency.general', locale: 'en' })
+  document.querySelector<HTMLButtonElement>('[data-help-target]')!.hidden = true
+  signal()
+  next()
+  expect(onExit).not.toHaveBeenCalled()
+  document.querySelector<HTMLButtonElement>('[data-help-target]')!.hidden = false
+  const duplicate = document.createElement('button')
+  duplicate.dataset.helpTarget = 'agency.save'
+  document.body.appendChild(duplicate)
+  signal()
+  next()
+  expect(onExit).not.toHaveBeenCalled()
+  duplicate.remove()
+  const target = document.querySelector<HTMLButtonElement>('[data-help-target]')!
+  target.remove()
+  signal()
+  next()
+  expect(onExit).not.toHaveBeenCalled()
+  document.body.appendChild(target)
+  signal()
+  next()
+  expect(onExit).toHaveBeenCalledOnce()
+  runtime.destroy()
+})
+
+it('keeps navigation outside the scrollable long-instruction body', () => {
+  document.body.innerHTML = '<input data-help-target="agency.name">'
+  const longGuide = { ...guide, steps: [{ ...guide.steps[0]!, instructions: { en: 'Long instructions.\n\n'.repeat(100), fr: 'Longues instructions.\n\n'.repeat(100) } }] }
+  const runtime = createGuideRuntime({ document: longGuide, locale: 'en', currentView: 'agency.general' })
+  const popover = document.querySelector<HTMLElement>('.driver-popover')!
+  expect(popover.style.display).toBe('flex')
+  const body = popover.querySelector<HTMLElement>('.driver-popover-description')!
+  expect(body.textContent).toContain('Long instructions.')
+  for (const selector of ['.driver-popover-title', '.gcs-guide-step-label', '.driver-popover-footer', '.driver-popover-close-btn']) {
+    const control = popover.querySelector(selector)
+    expect(control).not.toBeNull()
+    expect(body.contains(control)).toBe(false)
+  }
+  const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
+  const styles = readFileSync(resolve(packageRoot, 'src/style.css'), 'utf8')
+  expect(styles).toContain('max-height: min(32rem, calc(100dvh - 24px))')
+  expect(styles).toContain('.gcs-guide-popover .driver-popover-description { min-height: 0; overflow-y: auto;')
+  runtime.destroy()
+})
+
+it('re-resolves nonmodal targets and refreshes native viewport placement on resize', () => {
+  document.body.innerHTML = '<input data-help-target="agency.name">'
+  const runtime = createGuideRuntime({ document: guide, locale: 'en', currentView: 'agency.general' })
+  const original = document.querySelector('.driver-popover')
+  document.querySelector('input')!.remove()
+  window.dispatchEvent(new Event('resize'))
+  expect(runtime.state.value.status).toBe('unavailable')
+  expect(document.querySelector('.driver-popover')).not.toBe(original)
+  const input = document.createElement('input')
+  input.dataset.helpTarget = 'agency.name'
+  document.body.appendChild(input)
+  window.dispatchEvent(new Event('resize'))
+  expect(runtime.state.value.status).toBe('ready')
+  expect(runtime.state.value.step.id).toBe('name')
+  runtime.destroy()
+})
+
+it('prefers native side placement for a section when bottom placement would cover its controls', () => {
+  document.body.innerHTML = '<main data-help-view="agency.general"><section data-help-target="agency.name"></section><input></main>'
+  const viewportWidth = window.innerWidth
+  const viewportHeight = window.innerHeight
+  Object.defineProperty(window, 'innerWidth', { value: 1280, configurable: true })
+  Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true })
+  const target = document.querySelector('section')!
+  const geometry = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    if (this === target) return new DOMRect(278, 215, 483, 52)
+    if (this.classList.contains('driver-popover')) return new DOMRect(0, 0, 400, 300)
+    return new DOMRect()
+  })
+  const runtime = createGuideRuntime({ document: { ...guide, steps: [{ ...guide.steps[0]!, kind: 'section' as const }] }, locale: 'en', currentView: 'agency.general' })
+  const popover = document.querySelector<HTMLElement>('.driver-popover')!
+  expect(popover.querySelector('.driver-popover-arrow-side-right')).not.toBeNull()
+  const left = window.innerWidth - Number.parseFloat(popover.style.right) - 400
+  expect(left).toBeGreaterThan(target.getBoundingClientRect().right)
+  expect(left + 400).toBeLessThanOrEqual(window.innerWidth)
+  runtime.destroy()
+  geometry.mockRestore()
+  Object.defineProperty(window, 'innerWidth', { value: viewportWidth, configurable: true })
+  Object.defineProperty(window, 'innerHeight', { value: viewportHeight, configurable: true })
 })

@@ -22,7 +22,7 @@ export const booleanAttribute = (value: unknown): boolean => value === '' || val
  * @param options.bilingualText Register plain bilingual text controls with their owning form.
  * @returns A control preserving the original public type and behavior.
  */
-export const createRequiredControl = <T>(component: T, kind: 'standard' | 'select-menu' | 'segmented' | 'group' | 'range' = 'standard', options: { bilingualText?: boolean } = {}): T => defineComponent({
+export const createRequiredControl = <T>(component: T, kind: 'standard' | 'select-menu' | 'segmented' | 'group' | 'range' | 'radio-group' = 'standard', options: { bilingualText?: boolean } = {}): T => defineComponent({
   name: 'RequiredControl',
   inheritAttrs: false,
   props: { required: { type: Boolean, default: undefined }, disabled: { type: Boolean, default: undefined }, readonly: { type: Boolean, default: undefined } },
@@ -138,6 +138,19 @@ export const createRequiredControl = <T>(component: T, kind: 'standard' | 'selec
       }
       // Reka's fully-hidden form proxies duplicate the visible control's name/state.
       const root = elementOf(exposed.$el) ?? targets[0]?.parentElement
+      // Reka caches radio label text; reference the live title instead.
+      if (kind === 'radio-group' && root) {
+        const labels = [...root.querySelectorAll<HTMLElement>('[data-slot="label"][for]')]
+        for (const radio of root.querySelectorAll<HTMLElement>('[role="radio"][id]')) {
+          const label = labels.find(item => item.getAttribute('for') === radio.id)
+          if (!label) continue
+          const labelledBy = radio.getAttribute('aria-labelledby')
+          if (labelledBy && labelledBy !== label.id) continue
+          label.id ||= `${radio.id}-label`
+          radio.setAttribute('aria-labelledby', label.id)
+          radio.removeAttribute('aria-label')
+        }
+      }
       if (targets.length) for (const proxy of root?.querySelectorAll<HTMLInputElement>('input[data-hidden][tabindex="-1"]') ?? []) {
         proxy.setAttribute('aria-hidden', 'true')
         proxy.hidden = true

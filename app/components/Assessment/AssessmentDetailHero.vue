@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import GuidedHelpLauncher from '~/components/GuidedHelp/Launcher.vue'
 import { computed } from 'vue'
 import type { RuntimeState } from '~~/shared/constants/system-lifecycle'
 
@@ -27,8 +28,16 @@ const badges = computed(() => [
 <template>
   <CommonEntityHero
     :is-collapsed="isCollapsed"
+    retain-title-when-collapsed
     icon="i-lucide-clipboard-check"
     :title="name"
     :meta-items="[entityName]"
-    :badges="badges" />
+    :badges="badges">
+    <template #collapsed-actions>
+      <GuidedHelpLauncher />
+    </template>
+    <template #actions>
+      <GuidedHelpLauncher />
+    </template>
+  </CommonEntityHero>
 </template>

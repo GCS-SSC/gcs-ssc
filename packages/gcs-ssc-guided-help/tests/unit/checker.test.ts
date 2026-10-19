@@ -5,6 +5,50 @@ import type { TargetLedger } from '../../src/contracts'
 const ledger: TargetLedger = { formatVersion: 1, views: [{ key: 'agency.general', label: { en: 'Agency', fr: 'Organisme' }, targets: [{ key: 'agency.name', label: { en: 'Name', fr: 'Nom' }, kind: 'text' }] }] }
 const check = (source: string) => checkVueContracts({ ledger, sources: [{ filename: 'Agency.vue', source }] })
 
+describe('instance-scoped and native control forwarding', () => {
+  const scoped: TargetLedger = { formatVersion: 1, views: [{ key: 'shipment', label: { en: 'Shipment', fr: 'Envoi' }, targets: [{ key: 'shipment.open', label: { en: 'Open', fr: 'Ouvrir' }, kind: 'navigation', scope: 'instance' }] }] }
+  it('accepts one repeated logical target with an explicit business instance and rejects unqualified repetition', () => {
+    const source = '<template><main data-help-view="shipment"><a v-for="row in rows" data-help-target="shipment.open" :data-help-instance="row.id" /></main></template>'
+    expect(checkVueContracts({ ledger: scoped, sources: [{ filename: 'Shipment.vue', source }] })).toEqual([])
+    for (const replacement of ['', 'data-help-instance="fixed"', ':data-help-instance="\'fixed\'"']) {
+      expect(checkVueContracts({ ledger: scoped, sources: [{ filename: 'Shipment.vue', source: source.replace(':data-help-instance="row.id"', replacement) }] }).map(item => item.code)).toContain('repeated-instance')
+    }
+  })
+  it('verifies repeated forwarding endpoints and every intermediary without allowing dynamic owning callers', () => {
+    const options = {
+      ledger: scoped,
+      sources: [
+        { filename: 'Shipment.vue', source: '<template><main data-help-view="shipment"><TaskHost help-target="shipment.open" /></main></template>' },
+        { filename: 'TaskHost.vue', source: '<template><TaskBody :help-target="helpTarget" /></template>' },
+        { filename: 'TaskBody.vue', source: '<template><a v-for="row in rows" :data-help-target="helpTarget" :data-help-instance="row.id" /></template>' }
+      ],
+      forwardedTargets: [
+        { component: 'TaskHost', prop: 'helpTarget', kind: 'navigation' as const, scope: 'instance' as const, filename: 'TaskBody.vue', via: [{ filename: 'TaskHost.vue', component: 'TaskBody' }] },
+        { component: 'TaskBody', prop: 'helpTarget', kind: 'navigation' as const, scope: 'instance' as const, filename: 'TaskBody.vue' }
+      ]
+    }
+    expect(checkVueContracts(options)).toEqual([])
+    expect(checkVueContracts({ ...options, sources: options.sources.map(item => item.filename === 'Shipment.vue' ? { ...item, source: item.source.replace('help-target="shipment.open"', ':help-target="dynamic"') } : item) }).map(item => item.code)).toContain('dynamic-declaration')
+    expect(checkVueContracts({ ...options, sources: options.sources.map(item => item.filename === 'TaskBody.vue' ? { ...item, source: item.source.replace(':data-help-instance="row.id"', '') } : item) }).map(item => item.code)).toContain('invalid-forwarding')
+  })
+  it('requires an actual parsed native attribute setter and exact prop forwarding', () => {
+    const targetLedger: TargetLedger = { ...ledger, views: [{ ...ledger.views[0]!, targets: [{ ...ledger.views[0]!.targets[0]!, kind: 'button' }] }] }
+    const options = {
+      ledger: targetLedger,
+      sources: [
+        { filename: 'Agency.vue', source: '<template><main data-help-view="agency.general"><TabsHost help-target="agency.name" /></main></template>' },
+        { filename: 'TabsHost.vue', source: '<template><TabsBody :help-target="helpTarget" /></template>' },
+        { filename: 'TabsBody.vue', source: '<script setup lang="ts">element.setAttribute(\'data-help-target\', helpTarget)</script><template><div /></template>' }
+      ],
+      forwardedTargets: [{ component: 'TabsHost', prop: 'helpTarget', kind: 'button' as const, nativeAttribute: true as const, filename: 'TabsBody.vue', via: [{ filename: 'TabsHost.vue', component: 'TabsBody' }] }]
+    }
+    expect(checkVueContracts(options)).toEqual([])
+    for (const replacement of ['// element.setAttribute(\'data-help-target\', helpTarget)', 'element.setAttribute(\'data-other\', helpTarget)', 'element.setAttribute(\'data-help-target\', otherTarget)']) {
+      expect(checkVueContracts({ ...options, sources: options.sources.map(item => item.filename === 'TabsBody.vue' ? { ...item, source: `<script setup lang="ts">${replacement}\n</script><template><div /></template>` } : item) }).map(item => item.code)).toContain('invalid-forwarding')
+    }
+  })
+})
+
 describe('Vue source help compatibility', () => {
   it('accepts a declared view and actual field through ordinary layout and label changes', () => {
     expect(check('<template><main data-help-view="agency.general"><label>Nom</label><section><UInput data-help-target="agency.name" /></section></main></template>')).toEqual([])

@@ -5,6 +5,15 @@ import { useGuidedHelpDiscovery } from '~/composables/useGuidedHelpDiscovery'
 const { t, locale } = useI18n()
 const { items, loading, active, requestedGuideId } = useGuidedHelpDiscovery()
 const open = ref(false)
+/** Distinguish eligible agency publications on collection screens.
+ * @param item Published catalog guide.
+ * @returns Localized title and agency when supplied by collection discovery.
+ */
+const guideLabel = (item: (typeof items.value)[number]) => {
+  const language = locale.value === 'fr' ? 'fr' : 'en'
+  const agency = item.agencyName?.[language]
+  return item.document.title[language] + (agency ? ` — ${agency}` : '')
+}
 /**
  * Start a chosen guide through the launch authorization boundary.
  * @param id Agency catalog guide identity.
@@ -27,7 +36,7 @@ const launch = (id: string) => {
           </h2>
           <ul class="space-y-1">
             <li v-for="item in items" :key="item.id">
-              <UButton :label="item.document.title[locale === 'fr' ? 'fr' : 'en']" variant="ghost" color="neutral" :ui="{ label: 'whitespace-normal break-words' }" class="w-full justify-start whitespace-normal text-left" @click="launch(item.id)" />
+              <UButton :label="guideLabel(item)" variant="ghost" color="neutral" :ui="{ label: 'whitespace-normal break-words' }" class="w-full justify-start whitespace-normal text-left" @click="launch(item.id)" />
             </li>
           </ul>
         </div>

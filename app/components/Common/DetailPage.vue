@@ -1,12 +1,18 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { BreadcrumbItem } from '@nuxt/ui'
 
-const { id, breadcrumbItems } = defineProps<{
+const { id, breadcrumbItems, helpReturnTarget, helpReturnEnabled = true } = defineProps<{
   id: string
   breadcrumbItems: BreadcrumbItem[]
+  helpReturnTarget?: string
+  helpReturnEnabled?: boolean
 }>()
 const collapsed = defineModel<boolean>('collapsed', { required: true })
 const { t } = useI18n()
+const renderedBreadcrumbItems = computed(() => breadcrumbItems.map((item, index) =>
+  index === 0 && helpReturnEnabled && helpReturnTarget && item.to ? { ...item, to: undefined, slot: 'help-return', ui: { ...item.ui, item: [item.ui?.item, 'shrink-0 max-w-full'] } } : item
+))
 </script>
 
 <template>
@@ -15,7 +21,13 @@ const { t } = useI18n()
       <UDashboardNavbar>
         <template #leading>
           <UDashboardSidebarCollapse />
-          <UBreadcrumb :aria-label="t('common.breadcrumb')" :items="breadcrumbItems" class="ml-2" />
+          <UBreadcrumb :aria-label="t('common.breadcrumb')" :items="renderedBreadcrumbItems" :ui="{ list: 'overflow-hidden' }" class="ml-2">
+            <template #help-return>
+              <NuxtLink v-if="breadcrumbItems[0]?.to" :to="breadcrumbItems[0].to" :data-help-target="helpReturnTarget" class="truncate min-w-0 py-3 text-muted hover:text-default">
+                {{ breadcrumbItems[0].label }}
+              </NuxtLink>
+            </template>
+          </UBreadcrumb>
         </template>
         <template #right>
           <div class="flex items-center gap-2">

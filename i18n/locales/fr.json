@@ -3588,6 +3588,18 @@
     "retired": "La configuration d’examen a été retirée."
   },
   "workflow": {
+    "help": {
+      "journey_unavailable": "Cette entente n’est plus disponible pour ce guide. Choisissez une autre entente ou quittez le guide.",
+      "journey_loading": "Vérification de votre entente et du processus actuel…",
+      "journey_wrong_record": "Ce guide suit un autre dossier. Utilisez le lien de retour en évidence pour revenir à l’entente.",
+      "journey_other_agency": "Ce guide appartient à un autre organisme. Quittez ce guide et choisissez un guide admissible pour l’organisme de l’entente.",
+      "approval": "Cette tâche attend une approbation. Consultez ses approbations pour savoir qui doit agir ensuite.",
+      "assignment": "Vous n’avez pas actuellement l’autorisation d’effectuer cette tâche. Vérifiez ses utilisateurs affectés ou demandez à votre gestionnaire d’organiser l’accès requis.",
+      "pending": "En attente de la fin des travaux précédents. Terminez d’abord la tâche disponible. Si aucune tâche n’est disponible, vérifiez les prérequis et les affectations du processus actuel.",
+      "paused": "Le processus est en pause. Vérifiez l’avertissement relatif au responsable et demandez à un gestionnaire autorisé de résoudre l’affectation avant de continuer.",
+      "stopped": "Cette tâche ou ce processus a pris fin avant l’achèvement de cette tâche. Vérifiez le résultat du processus actuel et les options de nouvelle tentative.",
+      "reviews": "Examens"
+    },
     "flow": {
       "title": "Flux",
       "description": "Les conditions sélectionnent le parcours au démarrage. Les membres retenus s’exécutent dans l’ordre; une nouvelle tentative capture les valeurs actuelles avec la version publiée d’origine.",
@@ -4101,7 +4113,9 @@
     "na_description_fr": "L’exigence ne s’applique pas."
   },
   "assessment": {
+    "result_incomplete": "Le résultat sera disponible lorsque toutes les réponses obligatoires seront complètes.",
     "runtime_status": {
+      "optional": "Facultatif — aucun demandé",
       "empty": "Non commencé",
       "in_progress": "En cours",
       "completed": "Terminé"
@@ -4797,6 +4811,10 @@
     "remove_step": "Supprimer cette étape",
     "screen": "Écran",
     "control": "Commande",
+    "appearance": "Présentation de l’étape",
+    "appearance_spotlight": "Mettre le contrôle en évidence",
+    "appearance_anchor_only": "Fenêtre d’aide seulement",
+    "appearance_hint": "La fenêtre d’aide s’ancre au contrôle et laisse toute la page accessible.",
     "progression": "Progression",
     "progression_completion": "Après réalisation de l’action",
     "progression_manual": "Uniquement avec Suivant",
@@ -4850,6 +4868,13 @@
     "duplicate_branch": "Cette condition existe déjà.",
     "no_branch_fields": "Aucun champ structuré sur cet écran.",
     "routes_to": "vers",
-    "move_breaks_branch": "Ce déplacement ferait revenir une branche en arrière. Modifiez d’abord les routes entrantes ou sortantes."
+    "move_breaks_branch": "Ce déplacement ferait revenir une branche en arrière. Modifiez d’abord les routes entrantes ou sortantes.",
+    "journey": "Parcours du processus",
+    "journey_none": "Guide standard",
+    "journey_hint": "Choisissez un parcours enregistré pour guider le travail dans les dossiers et les tâches du processus.",
+    "journey_stage": "Étape du parcours",
+    "journey_branch_conflict": "Supprimez les embranchements avant de choisir un parcours de processus.",
+    "journey_template": "Instructions de la tâche",
+    "journey_template_generic": "Instructions générales de la tâche"
   }
 }

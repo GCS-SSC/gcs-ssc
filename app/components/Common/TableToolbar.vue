@@ -9,6 +9,7 @@ const {
   buttonLabel,
   helpAddTarget,
   searchPlaceholder,
+  helpSearchTarget,
   table,
   showButton = true,
   buttonDisabled = false,
@@ -20,6 +21,7 @@ const {
   statusFilterLabel?: string
   helpAddTarget?: string
   buttonLabel?: string
+  helpSearchTarget?: string
   searchPlaceholder?: string
   table?: ToolbarTableLike
   showButton?: boolean
@@ -47,6 +49,7 @@ defineEmits(['add'])
       <UInput
         v-if="showSearch"
         v-model="search"
+        :data-help-target="helpSearchTarget"
         icon="i-lucide-search"
         :placeholder="searchPlaceholder || t('common.search')"
         :aria-label="searchPlaceholder || t('common.search')"

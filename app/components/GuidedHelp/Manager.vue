@@ -4,12 +4,13 @@ import GuidedHelpPublisherFlow from './PublisherFlow.vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { DropdownMenuItem } from '@nuxt/ui'
-import { GuideDraftSchema, GuideDocumentSchema, checkGuideCompatibility } from '@gcs-ssc/guided-help/contracts'
+import { GuideDraftSchema, GuideDocumentSchema } from '@gcs-ssc/guided-help/contracts'
 import type { ContractDiagnostic, GuideDraft } from '@gcs-ssc/guided-help/contracts'
 import { blankGuide, catalogDraft, helpRequest } from '~/utils/guided-help-client'
 import type { HelpAttribution, HelpCatalog, HelpGuide, HelpOption, HelpVersion } from '~/utils/guided-help-client'
 import { clearHelpPicker, readHelpPicker, saveHelpPicker } from '~/utils/guided-help-picker'
 import { GuidedHelpCatalogSettingsSchema } from '~~/shared/types/schemas/guided-help'
+import { checkHostGuideCompatibility } from '~~/shared/guided-help/journeys'
 import { guidedHelpLedger } from '~~/shared/guided-help/catalog'
 import type { PublisherGroup } from '~/utils/guided-help-publisher'
 import { appRouteLocations } from '~/utils/route-locations'
@@ -287,7 +288,7 @@ const clone = (versionId: string) => mutate('clone', async () => {
 })
 const preview = (draft: GuideDraft, previewContext = context.value) => {
   const parsed = GuideDocumentSchema.safeParse(draft)
-  previewDiagnostics.value = parsed.success ? checkGuideCompatibility(parsed.data, guidedHelpLedger) : []
+  previewDiagnostics.value = parsed.success ? checkHostGuideCompatibility(parsed.data, guidedHelpLedger) : []
   if (!parsed.success) {
     showError(new Error(t('guided_help.preview_incomplete')))
     return

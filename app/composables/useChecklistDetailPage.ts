@@ -12,7 +12,8 @@ import type {
 import type { ChecklistEvaluationTrace } from '~~/shared/utils/checklist-evaluation'
 import { evaluateChecklist } from '~~/shared/utils/checklist-evaluation'
 import { appRouteLocations } from '~/utils/route-locations'
-import { getReviewReturnPath } from '~/utils/review-navigation'
+import { localizeSectionUrl } from '~/utils/section-url-values'
+import { resolveOwnedReviewReturnLocation } from '~/utils/review-navigation'
 import type { RuntimeState } from '~~/shared/constants/system-lifecycle'
 
 export type ChecklistAnswerValue = ChecklistAnswer | null
@@ -58,7 +59,8 @@ type ChecklistDetailResponse = {
 /** Coordinates checklist runtime loading, editing, and persistence. */
 export const useChecklistDetailPage = () => {
   const route = useRoute()
-  const { t } = useI18n()
+  const returnRouter = useRouter()
+  const { t, locale } = useI18n()
   const localePath = useLocalePath()
   const { getBilingualValue } = useBilingualValue()
   const { getHeroCollapsed } = useDashboard()
@@ -116,10 +118,10 @@ export const useChecklistDetailPage = () => {
     getBilingualValue(checklist.value, 'entity_operating_name', entityId.value || reviewId.value)
   ))
   const breadcrumbItems = computed(() => {
-    const returnPath = getReviewReturnPath(route.query.returnTo)
+    const returnPath = resolveOwnedReviewReturnLocation(route.query.returnTo, returnRouter, checklist.value ? { type: checklist.value.egcs_cn_entitytype, id: checklist.value.egcs_cn_entityid } : null)
     if (returnPath) {
       return [
-        { label: t('workflow.back_to_entity'), to: returnPath },
+        { label: t('workflow.back_to_entity'), to: localizeSectionUrl(localePath(returnPath), locale.value) },
         { label: heroName.value }
       ]
     }
@@ -174,7 +176,7 @@ export const useChecklistDetailPage = () => {
     totalAdditionalReviewerCount.value = value.total
     pendingAdditionalReviewerCount.value = value.pending
   }
-  const saveChecklist = async () => {
+  const saveChecklist = async (onSaved?: () => void) => {
     if (!canUpdate.value || isSaving.value) return
     const targetReviewId = reviewId.value
     const generation = ++saveGeneration
@@ -195,7 +197,8 @@ export const useChecklistDetailPage = () => {
       if (generation !== saveGeneration) return
       persistedResponses.value = submittedDraft
       await refresh()
-      if (generation !== saveGeneration) return
+      if (generation !== saveGeneration || reviewId.value !== targetReviewId || String(checklist.value?.id) !== targetReviewId) return
+      onSaved?.()
       toast.add({ title: toast.localized('common.success'), description: toast.localized('checklist.saved'), color: 'success' })
     } catch (error) {
       if (generation === saveGeneration) showError(error)

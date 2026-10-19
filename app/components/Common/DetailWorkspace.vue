@@ -2,10 +2,12 @@
 import { computed, useId } from 'vue'
 import type { TranslatedTabItem } from '~~/shared/types/ui'
 
-const { items, contentTestId, priorityValues = [], sectionDescription } = defineProps<{
+const { items, contentTestId, priorityValues = [], sectionDescription, helpNavigationTarget, helpNavigationValue } = defineProps<{
   items: TranslatedTabItem[]
   contentTestId?: string
   priorityValues?: string[]
+  helpNavigationTarget?: string
+  helpNavigationValue?: string
   sectionDescription?: string
 }>()
 const selectedTab = defineModel<string>({ required: true })
@@ -18,7 +20,9 @@ const title = computed(() => selectedItem.value?.label ?? (selectedItem.value ? 
 <template>
   <CommonEntityEditorWorkspace :content-test-id="contentTestId">
     <template #sidebar>
-      <CommonRouteTabs v-model="selectedTab" :items="items" :priority-values="priorityValues" :external-panel-id="panelId" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
+      <div>
+        <CommonRouteTabs v-model="selectedTab" :items="items" :help-navigation-target="helpNavigationTarget" :help-navigation-value="helpNavigationValue" :priority-values="priorityValues" :external-panel-id="panelId" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
+      </div>
     </template>
     <CommonDetailSection :id="panelId" role="tabpanel" :aria-label="title" :title="title" :description="sectionDescription">
       <template v-if="$slots.actions" #actions>

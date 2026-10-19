@@ -1,10 +1,11 @@
-import { parse } from '@vue/compiler-sfc'
+import { babelParse, parse } from '@vue/compiler-sfc'
+import { z } from 'zod'
 import { parse as parseTemplate, NodeTypes } from '@vue/compiler-dom'
 import type { ElementNode, RootNode, TemplateChildNode } from '@vue/compiler-dom'
 import type { ContractDiagnostic, TargetKind, TargetLedger } from './contracts'
 
 export type VueContractSource = { filename: string; source: string }
-export type ForwardedTarget = { component: string; prop: string; kind: TargetKind; filename: string; via?: { filename: string; component: string }[] }
+export type ForwardedTarget = { component: string; prop: string; kind: TargetKind; filename: string; scope?: 'instance'; nativeAttribute?: true; via?: { filename: string; component: string }[] }
 export type VueContractOptions = { ledger: TargetLedger; sources: VueContractSource[]; componentKinds?: Record<string, TargetKind>; forwardedTargets?: ForwardedTarget[] }
 const defaults: Record<string, TargetKind> = {
   textarea: 'textarea', select: 'select', button: 'button', a: 'navigation', section: 'section',
@@ -18,6 +19,32 @@ const attribute = (node: ElementNode, name: string): string | undefined => {
 const binding = (node: ElementNode, name: string): string | undefined => {
   const prop = node.props.find(item => item.type === NodeTypes.DIRECTIVE && item.name === 'bind' && item.arg?.type === NodeTypes.SIMPLE_EXPRESSION && item.arg.content === name)
   return prop?.type === NodeTypes.DIRECTIVE && prop.exp?.type === NodeTypes.SIMPLE_EXPRESSION ? prop.exp.content : undefined
+}
+const instanceBinding = (node: ElementNode): string | undefined => {
+  const expression = binding(node, 'data-help-instance')?.trim()
+  return expression && !/^(?:(['"]).*\1|[0-9]+|null|undefined|true|false)$/.test(expression) ? expression : undefined
+}
+const nativeAttributeCall = z.looseObject({ type: z.literal('CallExpression'), callee: z.looseObject({ type: z.literal('MemberExpression'), computed: z.literal(false), property: z.looseObject({ type: z.literal('Identifier'), name: z.literal('setAttribute') }) }), arguments: z.tuple([z.looseObject({ type: z.literal('StringLiteral'), value: z.literal('data-help-target') }), z.looseObject({ type: z.literal('Identifier'), name: z.string() })]) })
+
+/**
+ * Inspect parsed code, so comments and unrelated attribute setters prove no forwarding.
+ * @param source Endpoint component script.
+ * @returns Identifiers passed to actual native target attribute setters.
+ */
+const nativeBindings = (source: string): string[] => {
+  const bindings: string[] = []
+  /** Collect verified setters from the parsed syntax tree.
+   * @param node Current syntax node or child collection.
+   */
+  const visit = (node: unknown) => {
+    if (!node || typeof node !== 'object') return
+    const parsed = nativeAttributeCall.safeParse(node)
+    if (parsed.success) bindings.push(parsed.data.arguments[1].name)
+    if (Array.isArray(node)) node.forEach(visit)
+    else Object.values(node).forEach(visit)
+  }
+  visit(babelParse(source, { sourceType: 'module', plugins: ['typescript'] }))
+  return bindings
 }
 /**
  * Identify the semantic kind from the actual control declaration.
@@ -56,11 +83,13 @@ export const checkVueContracts = ({ ledger, sources, componentKinds = {}, forwar
   const seenTargets = new Set<string>()
   const roots = new Map<string, RootNode>()
   const nodes = new Map<string, ElementNode[]>()
+  const scriptBindings = new Map<string, string[]>()
   const repeatedNodes = new Set<ElementNode>()
   for (const { filename, source } of sources) {
     try {
       const parsed = parse(source, { filename })
       if (parsed.errors.length) throw new Error('Invalid SFC')
+      if (forwardedTargets.some(contract => contract.nativeAttribute && contract.filename === filename)) scriptBindings.set(filename, nativeBindings([parsed.descriptor.script?.content, parsed.descriptor.scriptSetup?.content].filter(Boolean).join('\n')))
       if (!parsed.descriptor.template) continue
       const root = parseTemplate(parsed.descriptor.template.content)
       roots.set(filename, root)
@@ -88,14 +117,26 @@ export const checkVueContracts = ({ ledger, sources, componentKinds = {}, forwar
   const propAttribute = (node: ElementNode, prop: string) => attribute(node, prop) ?? attribute(node, kebab(prop))
   const validForwarding = new Set<ForwardedTarget>()
   const allowedDynamic = new Set<ElementNode>()
+  const allowedForwarded = new Map<ElementNode, Set<string>>()
   for (const contract of forwardedTargets) {
     const endpoints = (nodes.get(contract.filename) ?? []).filter(node => binding(node, 'data-help-target') === contract.prop)
-    const valid = endpoints.length === 1 && !repeatedNodes.has(endpoints[0]!) && kindOf(endpoints[0]!, kinds) === contract.kind
+    const endpointValid = contract.nativeAttribute
+      ? contract.kind === 'button' && (scriptBindings.get(contract.filename) ?? []).filter(name => name === contract.prop).length === 1
+      : endpoints.length === 1 && (contract.scope === 'instance' ? Boolean(instanceBinding(endpoints[0]!)) : !repeatedNodes.has(endpoints[0]!)) && kindOf(endpoints[0]!, kinds) === contract.kind
+    const valid = endpointValid
       && (contract.via ?? []).every(hop => (nodes.get(hop.filename) ?? []).filter(node => node.tag === hop.component && !repeatedNodes.has(node) && propBinding(node, contract.prop) === contract.prop).length === 1)
     if (!valid) diagnostics.push({ code: 'invalid-forwarding', filename: contract.filename, message: `${contract.component}.${contract.prop}: expected independently verified forwarding to ${contract.kind}.` })
     else {
       validForwarding.add(contract)
       endpoints.forEach(node => allowedDynamic.add(node))
+      for (const hop of contract.via ?? []) {
+        for (const node of nodes.get(hop.filename) ?? []) {
+          if (node.tag !== hop.component || propBinding(node, contract.prop) !== contract.prop) continue
+          const props = allowedForwarded.get(node) ?? new Set<string>()
+          props.add(contract.prop)
+          allowedForwarded.set(node, props)
+        }
+      }
     }
   }
   for (const [filename, root] of roots) {
@@ -115,7 +156,7 @@ export const checkVueContracts = ({ ledger, sources, componentKinds = {}, forwar
       let target = targets[0]
       const report = (code: string, detail: string) => diagnostics.push({ code, filename, view, target, message: `${filename}: guided-help ${view ?? '(no view)'}/${target ?? '(no target)'}: ${detail}` })
       if (node.props.some(item => item.type === NodeTypes.ATTRIBUTE && ['data-help-view', 'data-help-target'].includes(item.name) && !item.value?.content)) report('invalid-declaration', 'help identifiers require nonempty literal values.')
-      if (forwardedTargets.some(contract => contract.component === node.tag && propBinding(node, contract.prop) !== undefined)) report('dynamic-declaration', 'forwarded help identifiers require static literals at the owning view.')
+      if (forwardedTargets.some(contract => contract.component === node.tag && propBinding(node, contract.prop) !== undefined && !allowedForwarded.get(node)?.has(contract.prop))) report('dynamic-declaration', 'forwarded help identifiers require static literals at the owning view.')
       if (binding(node, 'data-help-view') !== undefined || (binding(node, 'data-help-target') !== undefined && !allowedDynamic.has(node))) report('dynamic-declaration', 'help identifiers must be static literals.')
       if (declaredView !== undefined) {
         if (!ledger.views.some(item => item.key === declaredView)) report('unknown-view', 'view is absent from approved ledger.')
@@ -125,8 +166,11 @@ export const checkVueContracts = ({ ledger, sources, componentKinds = {}, forwar
       for (const declaredTarget of targets) {
         target = declaredTarget
         const forwardedContract = forwarded.find(contract => propAttribute(node, contract.prop) === target)
-        if (repeated) report('repeated-declaration', 'repeated targets require an explicit unique-context convention.')
         const expected = ledger.views.find(item => item.key === view)?.targets.find(item => item.key === target)
+        const instance = instanceBinding(node) ?? attribute(node, 'data-help-instance')?.trim()
+        if (repeated && expected?.scope !== 'instance') report('repeated-declaration', 'repeated targets require an instance-scoped ledger declaration.')
+        if (expected?.scope === 'instance' && !instance && !(forwardedContract?.scope === 'instance' && validForwarding.has(forwardedContract))) report('missing-instance', 'instance-scoped targets require an explicit nonempty data-help-instance binding.')
+        if (repeated && expected?.scope === 'instance' && !instanceBinding(node)) report('repeated-instance', 'repeated targets require a dynamic instance binding.')
         if (!view) report('unscoped-target', 'target must belong to an explicit view.')
         else if (!expected) report('unknown-target', 'target is absent from this view in approved ledger.')
         if (seenTargets.has(target)) report('duplicate-target', 'target is declared more than once.')

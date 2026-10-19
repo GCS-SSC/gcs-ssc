@@ -1976,6 +1976,7 @@ const getWorkflowRuntimeInSnapshot = async (
       'Common_Recommendation.egcs_cn_revision',
       'Common_Recommendation.egcs_cn_resultoptionkey',
       'Common_Recommendation.egcs_cn_recommendationsetup',
+      'Common_Recommendation.egcs_cn_recommendationset',
       'Recommendation_Item.id as runtimeItemId',
       'Recommendation_Item.egcs_cn_state as runtimeState',
       'Schema_Version.egcs_cn_definition as egcs_cn_definition',
@@ -2120,6 +2121,7 @@ const getWorkflowRuntimeInSnapshot = async (
     workflowItems: workflowItems.map(runtimeItemSummary),
     recommendations: recommendationRows.map(recommendation => ({
       ...recommendation,
+      workflowMemberOrder: recommendationSets.find(set => String(set.id) === String(recommendation.egcs_cn_recommendationset))?.runtimeOrder,
       egcs_cn_definition: readPublishedRecommendationSchema(recommendation.egcs_cn_definition).definition
     })),
     dataCollections: dataCollectionRows.map(row => {

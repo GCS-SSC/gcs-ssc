@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { GuideJourneySchema } from './journey'
 
 const invalid = { error: 'validation.guided_help_document_invalid' }
 
@@ -13,8 +14,8 @@ const text = (max: number) => z.string(invalid).max(max, invalid).refine(value =
 'validation.guided_help_content_invalid')
 const bilingual = (max: number) => z.strictObject({ en: text(max), fr: text(max) }, invalid)
 const flow = z.strictObject({ next: text(160).nullable(), branches: z.array(z.strictObject({ target: text(160), equals: z.union([text(160), z.boolean(invalid)], invalid), next: text(160).nullable() }, invalid), invalid).max(50, invalid) }, invalid)
-const step = z.strictObject({ id: key, view: text(160), target: text(160), kind: TargetKindSchema, advanceOn: z.enum(['completion', 'manual'], invalid).optional(), title: bilingual(255), instructions: bilingual(8000), flow: flow.optional() }, invalid)
-const base = z.strictObject({ formatVersion: z.literal(1, invalid), title: bilingual(255), description: bilingual(4000), steps: z.array(step, invalid).max(100, invalid) }, invalid)
+const step = z.strictObject({ id: key, view: text(160), target: text(160), kind: TargetKindSchema, appearance: z.enum(['spotlight', 'anchor-only'], invalid).optional(), advanceOn: z.enum(['completion', 'manual'], invalid).optional(), title: bilingual(255), instructions: bilingual(8000), flow: flow.optional() }, invalid)
+const base = z.strictObject({ formatVersion: z.literal(1, invalid), title: bilingual(255), description: bilingual(4000), steps: z.array(step, invalid).max(100, invalid), journey: GuideJourneySchema.optional() }, invalid)
 
 export const GuideDraftSchema = base.superRefine((value, ctx) => {
   const ids = new Set<string>()
@@ -25,6 +26,24 @@ export const GuideDraftSchema = base.superRefine((value, ctx) => {
       if (item[field] && !key.safeParse(item[field]).success) ctx.addIssue({ code: 'custom', path: ['steps', index, field], message: 'validation.guided_help_reference_invalid' })
     }
   })
+  if (value.journey) {
+    const stages = new Set<string>()
+    const assigned = new Set<string>()
+    for (const stage of value.journey.stages) {
+      if (stages.has(stage.id)) ctx.addIssue({ code: 'custom', path: ['journey'], message: 'validation.guided_help_duplicate_key' })
+      stages.add(stage.id)
+      const templateKeys = new Set<string>()
+      for (const template of stage.kind === 'tasks' ? stage.taskTemplates ?? [] : []) {
+        if (templateKeys.has(template.key)) ctx.addIssue({ code: 'custom', path: ['journey'], message: 'validation.guided_help_duplicate_key' })
+        templateKeys.add(template.key)
+      }
+      for (const id of [...stage.guideStepIds, ...(stage.kind === 'tasks' ? stage.taskTemplates?.flatMap(template => template.guideStepIds) ?? [] : [])]) {
+        if (assigned.has(id) || !ids.has(id)) ctx.addIssue({ code: 'custom', path: ['journey'], message: 'validation.guided_help_reference_invalid' })
+        assigned.add(id)
+      }
+    }
+    if (value.steps.some(item => item.flow)) ctx.addIssue({ code: 'custom', path: ['journey'], message: 'validation.guided_help_reference_invalid' })
+  }
   if (JSON.stringify(value).length > 256000) ctx.addIssue({ code: 'custom', message: 'validation.guided_help_document_too_large' })
 })
 export const GuideDocumentSchema = GuideDraftSchema.superRefine((value, ctx) => {
@@ -38,6 +57,10 @@ export const GuideDocumentSchema = GuideDraftSchema.superRefine((value, ctx) => 
     for (const locale of ['en', 'fr'] as const) {
       if (!content[locale].trim()) ctx.addIssue({ code: 'custom', path: [...path, locale], message: 'validation.required' })
     }
+  }
+  if (value.journey) {
+    const assigned = value.journey.stages.flatMap(stage => [...stage.guideStepIds, ...(stage.kind === 'tasks' ? stage.taskTemplates?.flatMap(template => template.guideStepIds) ?? [] : [])])
+    if (value.journey.stages.some(stage => !stage.guideStepIds.length || (stage.kind === 'tasks' && stage.taskTemplates?.some(template => !template.guideStepIds.length))) || value.steps.some(item => !assigned.includes(item.id))) ctx.addIssue({ code: 'custom', path: ['journey'], message: 'validation.guided_help_reference_invalid' })
   }
   complete(value.title, ['title'])
   complete(value.description, ['description'])
@@ -66,9 +89,14 @@ export type GuideDraft = z.infer<typeof GuideDraftSchema>
 export type GuideStep = GuideDocument['steps'][number]
 
 const label = z.strictObject({ en: text(255).refine(value => !!value.trim(), 'validation.required'), fr: text(255).refine(value => !!value.trim(), 'validation.required') }, invalid)
+export const GuideCompletionRuleSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('location'), fact: key }, invalid),
+  z.strictObject({ kind: z.literal('success'), action: z.enum(['modal-open', 'save-success', 'field-change'], invalid) }, invalid)
+])
+export type GuideCompletionRule = z.infer<typeof GuideCompletionRuleSchema>
 export const TargetLedgerSchema = z.strictObject({
   formatVersion: z.literal(1, invalid),
-  views: z.array(z.strictObject({ key, label, discoverable: z.boolean(invalid).optional(), targets: z.array(z.strictObject({ key, label, kind: TargetKindSchema, choices: z.array(z.strictObject({ value: key, label }, invalid), invalid).min(1, invalid).max(500, invalid).optional() }, invalid), invalid).max(500, invalid) }, invalid), invalid).max(500, invalid)
+  views: z.array(z.strictObject({ key, label, discoverable: z.boolean(invalid).optional(), targets: z.array(z.strictObject({ key, label, kind: TargetKindSchema, scope: z.literal('instance', invalid).optional(), completion: GuideCompletionRuleSchema.optional(), choices: z.array(z.strictObject({ value: key, label }, invalid), invalid).min(1, invalid).max(500, invalid).optional() }, invalid), invalid).max(500, invalid) }, invalid), invalid).max(500, invalid)
 }, invalid).superRefine((value, ctx) => {
   const views = new Set<string>()
   const targets = new Set<string>()

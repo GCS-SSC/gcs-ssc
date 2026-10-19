@@ -2,7 +2,9 @@
 import { useGuidedHelpDiscovery } from '~/composables/useGuidedHelpDiscovery'
 import { useResourceCrudState } from '~/composables/useResourceCrudState'
 import type { z } from 'zod'
-import { useSlots, type Ref } from 'vue'
+import { useId, useSlots, type Ref } from 'vue'
+import type { GuideObservedContext } from '@gcs-ssc/guided-help/runtime'
+import { beginGuidedHelpAction } from '~/utils/guided-help-actions'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 import type { EnumKey } from '~/types/enums'
 
@@ -89,15 +91,18 @@ const slots = useSlots()
 const forwardedSlotNames = computed(() => Object.keys(slots).filter(name => name !== 'actions-cell'))
 
 const tableRef: Ref<unknown | null> = ref(null)
-let helpCreatePending = false
-
-/** Notify guidance only after the business operation completes successfully.
- * @param target Registered control that performed the action.
- * @param action Completed business action.
- */
-const completeHelpAction = (target: string | undefined, action: 'modal-open' | 'save-success') => {
-  if (target) window.dispatchEvent(new CustomEvent('guided-help:completed', { detail: { target, action } }))
-}
+const helpRoot = ref<HTMLElement | null>(null)
+const helpForm = ref<{ $el: HTMLElement } | null>(null)
+const guidedHelpActions = useGuidedHelpActions()
+const helpInstanceId = useId()
+const helpModalVisit = ref(0)
+const helpContext = computed<GuideObservedContext>(() => ({
+  kind: 'owner', binding: null, execution: null,
+  view: helpRoot.value?.closest<HTMLElement>('[data-help-view]')?.dataset.helpView ?? '',
+  facts: [], visitId: `${helpInstanceId}:${helpModalVisit.value}`, draftRevision: 0
+}))
+let helpCreateCompleted: (() => void) | null = null
+let helpSaveCompleted: (() => void) | null = null
 
 const {
   validate,
@@ -141,25 +146,37 @@ const {
   statusFilter,
   emitAdded: () => {
     emit('added')
-    completeHelpAction(helpSaveTarget, 'save-success')
+    helpSaveCompleted?.()
   },
   emitUpdated: () => {
     emit('updated')
-    completeHelpAction(helpSaveTarget, 'save-success')
+    helpSaveCompleted?.()
   },
   emitDeleted: () => emit('deleted')
 })
 
-/** Track an actual Add action, rather than any modal opened for editing. */
+/** Captures Add before opening, and confirms only after the modal is rendered. */
 const openGuidedCreate = async () => {
+  helpModalVisit.value += 1
+  const complete = beginGuidedHelpAction(guidedHelpActions, helpRoot.value, helpAddTarget, 'modal-open', helpContext.value)
   await openCreate()
-  helpCreatePending = Boolean(isModalOpen.value)
+  helpCreateCompleted = isModalOpen.value ? complete : null
 }
 
-/** Wait until the modal's controls are rendered before advancing guidance. */
 const completeHelpModal = () => {
-  if (helpCreatePending && isModalOpen.value) completeHelpAction(helpAddTarget, 'modal-open')
-  helpCreatePending = false
+  if (isModalOpen.value) helpCreateCompleted?.()
+  helpCreateCompleted = null
+}
+
+/** Retains the submitted control identity when successful Save closes its modal. */
+const saveGuidedItem = async () => {
+  if (isSaving.value) return
+  helpSaveCompleted = beginGuidedHelpAction(guidedHelpActions, helpForm.value?.$el ?? null, helpSaveTarget, 'save-success', helpContext.value)
+  try {
+    await saveItem()
+  } finally {
+    helpSaveCompleted = null
+  }
 }
 
 defineExpose({
@@ -172,7 +189,7 @@ defineExpose({
 </script>
 
 <template>
-  <div class="min-w-0">
+  <div ref="helpRoot" :data-help-context="JSON.stringify(helpContext)" class="min-w-0">
     <CommonResourceLayoutCard
       ref="tableRef"
       v-model:search="search"
@@ -230,9 +247,9 @@ defineExpose({
       :fullscreen="modalFullscreen"
       :ui="modalUi"
       @after:enter="completeHelpModal"
-      @after:leave="helpCreatePending = false">
+      @after:leave="helpCreateCompleted = null">
       <template #body>
-        <UForm v-if="formState" :state="formState" :validate="validate" :validate-on="helpSaveTarget && guidedHelpActive ? ['input', 'blur', 'change'] : []" :disabled="isSaving" class="space-y-4" @submit="saveItem">
+        <UForm v-if="formState" ref="helpForm" :data-help-context="JSON.stringify(helpContext)" :state="formState" :validate="validate" :validate-on="helpSaveTarget && guidedHelpActive ? ['input', 'blur', 'change'] : []" :disabled="isSaving" class="space-y-4" @submit="saveGuidedItem">
           <slot name="form" :state="formState" />
 
           <div class="flex justify-end gap-2 pt-4">

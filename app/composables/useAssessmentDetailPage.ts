@@ -22,7 +22,8 @@ import { normalizeAssessmentDefinitionEditorState } from '~/composables/useAsses
 import type { TranslatedTabItem } from '~~/shared/types/ui'
 import type { RuntimeState } from '~~/shared/constants/system-lifecycle'
 import { appRouteLocations } from '~/utils/route-locations'
-import { getReviewReturnPath } from '~/utils/review-navigation'
+import { localizeSectionUrl } from '~/utils/section-url-values'
+import { resolveOwnedReviewReturnLocation } from '~/utils/review-navigation'
 import { useUrlTabState } from '~/composables/useUrlTabState'
 
 type AssessmentDetailResponse = {
@@ -90,6 +91,7 @@ const getCurrentOverallResultOption = (
  */
 export const useAssessmentDetailPage = () => {
   const route = useRoute()
+  const returnRouter = useRouter()
   const localePath = useLocalePath()
   const toast = useLocalizedToast()
   const { showError } = useApiErrorToast()
@@ -409,7 +411,7 @@ export const useAssessmentDetailPage = () => {
   }
 
   /** Validates and persists the current full assessment response payload. */
-  const saveAssessment = async () => {
+  const saveAssessment = async (onSaved?: () => void) => {
     if (isSaving.value) {
       return
     }
@@ -446,7 +448,8 @@ export const useAssessmentDetailPage = () => {
       if (generation !== saveGeneration) return
       persistedResponse.value = submittedDraft
       await refresh()
-      if (generation !== saveGeneration) return
+      if (generation !== saveGeneration || reviewId.value !== targetReviewId || String(assessment.value?.id) !== targetReviewId) return
+      onSaved?.()
       toast.add({
         title: toast.localized('common.success'),
         description: toast.localized('common.updated_success'),
@@ -523,10 +526,10 @@ export const useAssessmentDetailPage = () => {
   ))
 
   const breadcrumbItems = computed(() => {
-    const returnPath = getReviewReturnPath(route.query.returnTo)
+    const returnPath = resolveOwnedReviewReturnLocation(route.query.returnTo, returnRouter, assessment.value ? { type: assessment.value.egcs_cn_entitytype, id: assessment.value.egcs_cn_entityid } : null)
     if (returnPath) {
       return [
-        { label: t('workflow.back_to_entity'), to: returnPath },
+        { label: t('workflow.back_to_entity'), to: localizeSectionUrl(localePath(returnPath), locale.value) },
         { label: getBilingualValue(assessment.value, 'egcs_cn_name', String(assessment.value?.id ?? '')) }
       ]
     }

@@ -1,4 +1,4 @@
-export type ReviewRuntimeStatus = 'empty' | 'in_progress' | 'completed'
+export type ReviewRuntimeStatus = 'empty' | 'in_progress' | 'completed' | 'optional'
 
 export type ReviewRuntimeNavigationRow = {
   key: string

@@ -2,7 +2,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { GuideDocumentSchema, GuideDraftSchema, TargetLedgerSchema, checkGuideCompatibility, isGuidePath } from '../../src/contracts'
 import type { GuideDocument, GuideStep } from '../../src/contracts'
-import { createGuideRuntime, readGuideTargetValue } from '../../src/runtime'
+import { readGuideTargetValue } from '../../src/runtime'
+import { createGuideRuntime, signalGuideCompletion } from './runtime-fixture'
 import { createGuideSession } from '../../src/session'
 
 const bilingual = (value: string) => ({ en: value, fr: value })
@@ -79,7 +80,7 @@ describe('evaluated reader paths', () => {
     expect(runtime.path).toEqual(['choice', 'save'])
     runtime.select('finish')
     expect(runtime.state.value.step.id).toBe('save')
-    window.dispatchEvent(new CustomEvent('guided-help:completed', { detail: { target: 'save', action: 'save-success' } }))
+    signalGuideCompletion({ target: 'save', action: 'save-success' })
     runtime.select('finish')
     expect(runtime.path).toEqual(['choice', 'save', 'finish'])
     runtime.destroy()
@@ -119,7 +120,7 @@ describe('evaluated reader paths', () => {
     const booleanGuide: GuideDocument = { ...guide, steps: [{ ...node('choice', 'checkbox'), advanceOn: 'completion', flow: { next: null, branches: [{ target: 'choice', equals: true, next: 'finish' }] } }, node('finish')] }
     const composite = createGuideRuntime({ document: booleanGuide, locale: 'en', currentView: 'example', readTargetValue: () => checked })
     checked = true
-    window.dispatchEvent(new CustomEvent('guided-help:completed', { detail: { target: 'choice', action: 'field-change' } }))
+    signalGuideCompletion({ target: 'choice', action: 'field-change' })
     expect(composite.state.value.step.id).toBe('finish')
     composite.destroy()
   })
@@ -197,8 +198,8 @@ it('waits for trusted composite completion after a switch proxy changes before i
   expect(runtime.state.value.step.id).toBe('enabled')
   expect(onSelect).not.toHaveBeenCalled()
   document.querySelector('[role="switch"]')!.setAttribute('aria-checked', 'false')
-  window.dispatchEvent(new CustomEvent('guided-help:completed', { detail: { target: 'enabled', action: 'field-change' } }))
-  window.dispatchEvent(new CustomEvent('guided-help:completed', { detail: { target: 'enabled', action: 'field-change' } }))
+  signalGuideCompletion({ target: 'enabled', action: 'field-change' })
+  signalGuideCompletion({ target: 'enabled', action: 'field-change' })
   expect(runtime.path).toEqual(['enabled', 'inactive'])
   expect(onSelect).toHaveBeenCalledOnce()
   runtime.destroy()
@@ -211,7 +212,7 @@ it('keeps the next business switch visible within a scrollable modal after autom
   control.scrollIntoView = scroll
   const documentGuide: GuideDocument = { ...guide, steps: [{ ...node('enabled', 'checkbox'), advanceOn: 'completion', flow: { next: 'details', branches: [] } }, { ...node('details', 'checkbox'), target: 'enabled' }] }
   const runtime = createGuideRuntime({ document: documentGuide, locale: 'en', currentView: 'example' })
-  window.dispatchEvent(new CustomEvent('guided-help:completed', { detail: { target: 'enabled', action: 'field-change' } }))
+  signalGuideCompletion({ target: 'enabled', action: 'field-change' })
   expect(runtime.state.value.step.id).toBe('details')
   expect(document.activeElement).toBe(control)
   expect(scroll).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' })
