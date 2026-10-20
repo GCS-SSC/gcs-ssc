@@ -154,29 +154,6 @@ const packetBudgetOverview = computed<FundingCaseAgreementBudgetOverviewRow>(() 
           funding_type_incostsharing: Boolean(source.inCostSharing)
         }
       })
-      if (line.fundingSources === undefined) {
-        for (const [key, label] of [
-          ['otherFederalFunding', 'other_federal_funding'],
-          ['otherGovernmentFunding', 'other_gov_funding'],
-          ['otherFunding', 'other_funding']
-        ] as const) {
-          const amount = toAmount(line[key])
-          if (!amount) continue
-          fundingSources.push({
-            id: `packet-legacy-${index}-${key}`,
-            egcs_fc_fundingsubtype: `packet-legacy-${key}`,
-            egcs_fc_amount: amount,
-            egcs_fc_description_en: '',
-            egcs_fc_description_fr: '',
-            funding_type_name_en: t(`agreement.budget.${label}`),
-            funding_type_name_fr: t(`agreement.budget.${label}`),
-            funding_subtype_name_en: '',
-            funding_subtype_name_fr: '',
-            funding_type_instacking: false,
-            funding_type_incostsharing: false
-          })
-        }
-      }
       return {
         id: `packet-line-${index}`,
         fiscal_year_id: fiscalYearId,

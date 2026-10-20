@@ -27,16 +27,15 @@ export const withPaymentRecoveryErrors = async <T>(event: H3Event, operation: ()
 }
 
 export const assertPaymentRecoveryAllowed = async (
-  event: H3Event, db: Kysely<Database>, input: { agreementId: string; applicantRecipientId: string | null; currency: Currency_Codes; paymentId?: string }
+  event: H3Event, db: Kysely<Database>, input: { agreementId: string; applicantRecipientId: string; currency: Currency_Codes; paymentId?: string }
 ) => {
-  if (!input.applicantRecipientId) return await throwApiError(event, { statusCode: 409, code: 'AR_PAYMENT_PAYEE_REQUIRED', key: 'apiErrors.account_receivable.payment_payee_unavailable' })
   const payee = await db.selectFrom('Funding_Case_Agreement_Applicant_Recipient as link')
     .innerJoin('Applicant_Recipient_Profile as profile', 'profile.id', 'link.egcs_fc_applicantrecipient')
     .select('profile.id').where('link.egcs_fc_fundingagreement', '=', input.agreementId)
     .where('link.egcs_fc_applicantrecipient', '=', input.applicantRecipientId).where('link._deleted', '=', false)
     .where('profile._deleted', '=', false).where('profile.egcs_ar_active', '=', true).executeTakeFirst()
   if (!payee) return await throwApiError(event, { statusCode: 409, code: 'AR_PAYMENT_PAYEE_INVALID', key: 'apiErrors.account_receivable.payment_payee_unavailable' })
-  await withPaymentRecoveryErrors(event, () => assertAccountReceivablePaymentAllowed(db, { ...input, applicantRecipientId: input.applicantRecipientId! }))
+  await withPaymentRecoveryErrors(event, () => assertAccountReceivablePaymentAllowed(db, input))
 }
 
 export const assertPaymentMutationRecoveryAllowed = async (

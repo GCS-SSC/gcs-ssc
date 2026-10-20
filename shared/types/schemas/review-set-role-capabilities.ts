@@ -1,14 +1,11 @@
 import { z } from 'zod'
 
-// Only missing legacy metadata permits a client fallback. Supplied invalid values fail closed.
-const OptionalRoleCapabilitySchema = z.boolean().catch(false).optional()
-
 export const ReviewSetListRoleCapabilitiesSchema = z.object({
-  can_create_role: OptionalRoleCapabilitySchema
+  can_create_role: z.boolean()
 })
 
 export const ReviewSetRoleCapabilitiesSchema = z.object({
-  can_cancel_role: OptionalRoleCapabilitySchema
+  can_cancel_role: z.boolean()
 })
 
 export type ReviewSetListRoleCapabilities = z.infer<typeof ReviewSetListRoleCapabilitiesSchema>

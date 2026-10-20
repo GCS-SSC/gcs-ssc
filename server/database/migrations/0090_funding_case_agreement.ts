@@ -464,7 +464,7 @@ CREATE TABLE "Funding_Case_Agreement_Approval_Submission" (
   CONSTRAINT "fc_uq_agreement_approval_submission_workflowrun" UNIQUE (egcs_fc_workflowrun),
   CONSTRAINT "Funding_Case_Agreement_Approval_Submission_pkey" PRIMARY KEY (id),
   CONSTRAINT "fc_chk_approvalsubmissionhash" CHECK (((egcs_fc_canonicalhash)::text ~ '^[0-9a-f]{64}$'::text)),
-  CONSTRAINT "fc_chk_approvalsubmissionversion" CHECK ((egcs_fc_snapshotschemaversion IN (1, 2, 3)))
+  CONSTRAINT "fc_chk_approvalsubmissionversion" CHECK ((egcs_fc_snapshotschemaversion IN (2, 3)))
 );
 
 CREATE TABLE "Funding_Case_Agreement_Budget_Fiscal_Year" (
@@ -1072,7 +1072,7 @@ CREATE TABLE "Funding_Case_Agreement_Payment" (
   "egcs_fc_comment" text,
   "egcs_fc_status" bigint NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
-  "egcs_fc_applicantrecipient" bigint,
+  "egcs_fc_applicantrecipient" bigint NOT NULL,
   CONSTRAINT "fc_chk_paymentevidence" CHECK (egcs_fc_evidence IS NULL OR
     (jsonb_typeof(egcs_fc_evidence) = 'object' AND egcs_fc_evidence->>'version' = '1'
      AND jsonb_typeof(egcs_fc_evidence->'capturedAt') = 'string'
@@ -1304,7 +1304,6 @@ AS $function$
       SELECT program.egcs_tp_agency INTO owner_agency FROM "Funding_Case_Agreement_Profile" agreement
         JOIN "Transfer_Payment_Stream" stream ON stream.id=agreement.egcs_fc_transferpaymentstream
         JOIN "Transfer_Payment_Profile" program ON program.id=stream.egcs_tp_transferpaymentprofile WHERE agreement.id=agreement_id;
-      IF debtor_id IS NULL THEN RETURN 'payee_required'; END IF;
       PERFORM id FROM "Funding_Case_Account_Receivable_Pool" WHERE egcs_fc_agency=owner_agency AND egcs_fc_applicantrecipient=debtor_id ORDER BY id FOR UPDATE;
       IF EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Account_Receivable" debt
         JOIN "Funding_Case_Account_Receivable_Pool" pool ON pool.id=debt.egcs_fc_pool

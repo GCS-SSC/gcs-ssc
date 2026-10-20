@@ -4,6 +4,7 @@ import type { H3Event } from 'h3'
 import type { Database } from '~~/shared/types/database'
 import { agreementCustomFieldMergeSchema, type AgreementCustomFieldSection, type AgreementCustomFieldPatch, type AgreementCustomFieldValues, type AssignedAgencyCustomFieldDefinition, type AgencyCustomFieldDefinition } from '~~/shared/types/schemas/agreement-custom-fields'
 import { parseI18n } from './api-validate'
+import { throwApiError } from './api-errors'
 
 export const readAgreementCustomFieldSections = async (db: Kysely<Database>, streamId: string): Promise<AgreementCustomFieldSection[]> =>
   (await db.selectFrom('Transfer_Payment_Stream_Field_Section').selectAll()
@@ -103,4 +104,19 @@ export const mergeAgreementCustomFields = async (
     egcs_fc_customfields: agreementCustomFieldMergeSchema(definitions, current)
   }), { egcs_fc_customfields: patch })
   return result.egcs_fc_customfields
+}
+
+/**
+ * Rejects malformed stored relational selections before projecting them to callers.
+ * @param event - Localized request event.
+ * @param definitions - Assigned field definitions from the same read snapshot.
+ * @param values - Stored Agreement values.
+ */
+export const validatePersistedAgreementCustomFieldSelections = async (
+  event: H3Event, definitions: AssignedAgencyCustomFieldDefinition[], values: AgreementCustomFieldValues
+): Promise<void> => {
+  if (definitions.some(field => field.egcs_ay_kind === 'relational'
+    && values[field.id] !== undefined && !Array.isArray(values[field.id]))) {
+    await throwApiError(event, { statusCode: 500, code: 'AGREEMENT_CUSTOM_FIELDS_INVALID', key: 'apiErrors.agreement.custom_fields_invalid' })
+  }
 }

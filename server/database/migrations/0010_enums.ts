@@ -42,8 +42,6 @@ CREATE TYPE "holdback_bases" AS ENUM ('fullagreement', 'finalfiscal');
 
 CREATE TYPE "jurisdiction" AS ENUM ('ab', 'bc', 'mb', 'nb', 'nl', 'ns', 'nt', 'nu', 'on', 'pe', 'qc', 'sk', 'yt');
 
-CREATE TYPE "language_preference" AS ENUM ('eng', 'fra');
-
 CREATE TYPE "payment_type" AS ENUM ('reimbursement', 'advance');
 
 CREATE TYPE "registry_type" AS ENUM ('provincialbusinessnumber', 'federalbusinessnumber', 'craprogramaccountnumber', 'noc', 'naics', 'other');

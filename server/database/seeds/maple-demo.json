@@ -9453,7 +9453,6 @@
       "egcs_cn_recommendationsetup": "10001",
       "egcs_cn_entitytype": "fundingcaseagreement",
       "egcs_cn_entityid": "10135",
-      "egcs_cn_recommendation": null,
       "egcs_cn_group": null,
       "egcs_cn_groupclaimedby": null,
       "egcs_cn_response": {

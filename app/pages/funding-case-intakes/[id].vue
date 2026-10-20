@@ -116,7 +116,7 @@ const breadcrumbs = computed(() => [
           </CommonSection>
           <CommonSubmittedApplication v-else-if="selectedTab === 'application'" :snapshot="profile.egcs_fi_sourceexport ?? profile.egcs_fi_application" :external-source-id="profile.egcs_fi_externalsourceid" />
           <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcaseintake" :entity-id="id" />
-          <CommonReviewsTab v-else-if="selectedTab === 'reviews'" entity-type="fundingcaseintake" :entity-id="id" :can-update="canEdit" :action-role-allowed="canEditRole" :action-prerequisite-warning="workWarning" @changed="refresh" />
+          <CommonReviewsTab v-else-if="selectedTab === 'reviews'" entity-type="fundingcaseintake" :entity-id="id" :can-update="canEdit" :action-prerequisite-warning="workWarning" @changed="refresh" />
           <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcaseintake" :entity-id="id" purpose="standard" :can-edit="canEdit" :action-role-allowed="canEditRole" :action-prerequisite-warning="workWarning" @changed="refresh" />
           <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" :show-header="false" entity-type="fundingcaseintake" :entity-id="id" />
           <CommonWorkflowSection v-else-if="selectedTab === 'approval'" entity-type="fundingcaseintake" :entity-id="id" purpose="approval_submission" :can-edit="canEdit" :action-role-allowed="canEditRole" :action-prerequisite-warning="workWarning" @changed="refresh" />

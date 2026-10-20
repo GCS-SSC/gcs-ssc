@@ -70,7 +70,6 @@ export const releaseAccountReceivablePaymentOffset = async (trx: Transaction<Dat
 export const rebuildAccountReceivablePaymentOffset = async (trx: Transaction<Database>, paymentId: string, options: { plans?: PaymentOffsetCodingPlan[] } = {}) => {
   const payment = await trx.selectFrom('Funding_Case_Agreement_Payment').selectAll()
     .select(databaseMoneyText(sql.ref('egcs_fc_paymentamount')).as('gross')).where('id', '=', paymentId).where('_deleted', '=', false).executeTakeFirstOrThrow()
-  if (!payment.egcs_fc_applicantrecipient) throw new Error('AR_PAYMENT_PAYEE_REQUIRED')
   const context = await resolveAgreementScopeContext(String(payment.egcs_fc_fundingagreement), trx)
   if (!context) throw new Error('AR_PAYMENT_OWNER_UNAVAILABLE')
   const { pool } = await lockAccountReceivablePaymentPoolAgreements(trx, { agencyId: context.agencyId,
@@ -145,7 +144,7 @@ export const readAccountReceivablePaymentOffset = async (db: Kysely<Database>, p
   const gross = parseDatabaseMoney(payment.gross)
   const offset = sumMoney(recoveries.map(row => parseDatabaseMoney(row.amount)))
   let control: 'allowed' | 'direct_repayment_hold' | 'recovery_pending' = 'allowed'
-  if (payment.egcs_fc_applicantrecipient && !settled) {
+  if (!settled) {
     try {
       await assertAccountReceivablePaymentAllowed(db, { agreementId: String(payment.egcs_fc_fundingagreement),
         applicantRecipientId: String(payment.egcs_fc_applicantrecipient), currency: payment.egcs_fc_currency, paymentId })
@@ -178,7 +177,7 @@ export const captureAccountReceivablePaymentOffsetPacket = async (db: Kysely<Dat
       'payee.egcs_ar_legalname_en as egcs_fc_payeename_en', 'payee.egcs_ar_legalname_fr as egcs_fc_payeename_fr'])
     .where('payment.id', '=', paymentId).executeTakeFirstOrThrow()
   const owner = await resolveAgreementScopeContext(String(payment.egcs_fc_fundingagreement), db)
-  if (owner && payment.egcs_fc_applicantrecipient) {
+  if (owner) {
     const pool = await db.selectFrom('Funding_Case_Account_Receivable_Pool').select('id').where('egcs_fc_agency', '=', owner.agencyId)
       .where('egcs_fc_applicantrecipient', '=', String(payment.egcs_fc_applicantrecipient)).where('egcs_fc_currency', '=', payment.egcs_fc_currency).executeTakeFirst()
     return { schemaVersion: 5 as const, ...summary, payment: { ...payment, egcs_fc_paymentamount: summary.egcs_fc_grossamount },
@@ -190,7 +189,6 @@ export const captureAccountReceivablePaymentOffsetPacket = async (db: Kysely<Dat
 
 export const validateAccountReceivablePaymentOffset = async (trx: Transaction<Database>, paymentId: string, options: { packet?: JsonValue } = {}) => {
   const payment = await trx.selectFrom('Funding_Case_Agreement_Payment').select(['egcs_fc_fundingagreement', 'egcs_fc_applicantrecipient', 'egcs_fc_currency']).where('id', '=', paymentId).executeTakeFirstOrThrow()
-  if (!payment.egcs_fc_applicantrecipient) throw new Error('AR_PAYMENT_PAYEE_REQUIRED')
   await assertAccountReceivablePaymentAllowed(trx, { agreementId: String(payment.egcs_fc_fundingagreement), applicantRecipientId: String(payment.egcs_fc_applicantrecipient), currency: payment.egcs_fc_currency, paymentId })
   const packet = await captureAccountReceivablePaymentOffsetPacket(trx, paymentId)
   if (options.packet && hashPublicationDefinition(json(packet)) !== hashPublicationDefinition(options.packet)) throw new Error('AR_OFFSET_BASIS_CHANGED')

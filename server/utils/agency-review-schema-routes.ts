@@ -4,6 +4,8 @@ import { sql } from 'kysely'
 import { z } from 'zod'
 import type { JsonValue } from '~~/shared/types/database'
 import { AgencyProfileSchema, AgencyReviewSchemaCreateSchema, AssessmentReviewSchemaPatchSchema, createAssessmentReviewSchemaPatchSchema } from '~~/shared/types/schemas'
+import { AssessmentDefinitionSchema, AssessmentScoringMatrixSchema, createAssessmentDefinitionSchemaForEntityType } from '~~/shared/types/schemas/assessment/assessment'
+import { InvalidPersistedAssessmentDefinitionError, normalizeAssessmentRuntimeSchema } from './assessment-runtime-schema'
 import { ChecklistDefinitionSchema } from '~~/shared/types/schemas/checklist/checklist'
 import { authorize } from './authorize'
 import { notFound, throwApiError } from './api-errors'
@@ -17,6 +19,7 @@ import { publishDefinition, retirePublication } from './system-publication'
 import { throwIfMappedConstraintError } from './database-constraint-errors'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 
+const AssessmentAuthoringDefinitionSchema = z.union([AssessmentDefinitionSchema, z.object({}).strict()])
 const EMPTY_ASSESSMENT_DEFINITION = { sections: [], sectionMatrix: [], outcomes: [] }
 const StorageText = AgencyProfileSchema.shape.egcs_ay_name_en
 const BilingualText = {
@@ -27,8 +30,8 @@ const BilingualText = {
 }
 const CreateSchema = AgencyReviewSchemaCreateSchema.extend({
   ...BilingualText,
-  egcs_cn_scoringmatrix: z.array(z.unknown()).optional(),
-  egcs_cn_assessmentschema: z.record(z.string(), z.unknown()).optional(),
+  egcs_cn_scoringmatrix: AssessmentScoringMatrixSchema.optional(),
+  egcs_cn_assessmentschema: AssessmentAuthoringDefinitionSchema.optional(),
   egcs_cn_checklistschema: ChecklistDefinitionSchema.optional(),
   egcs_cn_disablecustomoutcomes: z.boolean().optional().default(false),
   egcs_cn_disablealignment: z.boolean().optional().default(false),
@@ -53,6 +56,9 @@ const runAgencyReviewSchemaRoute = async (event: H3Event, action: 'create' | 're
   await authorize(event, 'agency', action === 'read' ? 'read' : 'update', { type: 'agency', agencyId })
   if (action === 'create') {
     const body = await readValidatedBodyI18n(event, CreateSchema)
+    if (body.egcs_cn_reviewtype === 'assessment' && body.egcs_cn_assessmentschema !== undefined) {
+      await parseI18n(event, z.object({ egcs_cn_assessmentschema: z.union([createAssessmentDefinitionSchemaForEntityType(body.egcs_cn_entitytype), z.object({}).strict()]) }), body)
+    }
     return await withActiveAgencyMutationTransaction(event, agencyId, async trx => {
       const isChecklist = body.egcs_cn_reviewtype === 'checklist'
       const schema = await trx.insertInto('Common_Review_Schema').values({
@@ -96,7 +102,9 @@ const runAgencyReviewSchemaRoute = async (event: H3Event, action: 'create' | 're
       return row ? await mapChecklistSchema(trx, row) : await notFound(event, 'REVIEW_SCHEMA_NOT_FOUND', 'apiErrors.transfer_payment.review_schema_not_found')
     }
     const row = await fetchAssessmentReviewSchemaForAgency(trx, agencyId, schemaId)
-    return row ? await mapAssessmentReviewSchema(trx, row) : await notFound(event, 'REVIEW_SCHEMA_NOT_FOUND', 'apiErrors.transfer_payment.review_schema_not_found')
+    if (!row) return await notFound(event, 'REVIEW_SCHEMA_NOT_FOUND', 'apiErrors.transfer_payment.review_schema_not_found')
+    normalizeAssessmentRuntimeSchema(row)
+    return await mapAssessmentReviewSchema(trx, row)
   })
 
   const patchBody = action === 'update' ? await readValidatedBodyI18n(event, z.union([AssessmentReviewSchemaPatchSchema.strict(), ChecklistPatchSchema])) : null
@@ -145,6 +153,7 @@ const runAgencyReviewSchemaRoute = async (event: H3Event, action: 'create' | 're
     if (schema.egcs_cn_reviewtype === 'checklist' && !checklist) {
       return await notFound(event, 'REVIEW_SCHEMA_NOT_FOUND', 'apiErrors.transfer_payment.review_schema_not_found')
     }
+    if (!checklist) normalizeAssessmentRuntimeSchema(schema)
     const definition = checklist ? buildChecklistReviewSchemaDefinition(checklist) : buildReviewSchemaDefinition(schema)
     return await publishDefinition(trx, { publicationId: schemaId, kind: 'review_schema', definition, actorId: actor.id })
   })
@@ -154,6 +163,7 @@ export const agencyReviewSchemaRoute = async (event: H3Event, action: Parameters
   try {
     return await runAgencyReviewSchemaRoute(event, action)
   } catch (error) {
+    if (error instanceof InvalidPersistedAssessmentDefinitionError) return await throwApiError(event, { statusCode: 500, code: 'ASSESSMENT_DEFINITION_INVALID', key: 'apiErrors.assessment.definition_invalid' })
     return await throwIfMappedConstraintError(event, error, ['23505'], {
       cn_idx_reviewschemaagencynametypeen: { code: 'DUPLICATE_REVIEW_SCHEMA_NAME_EN', key: 'apiErrors.request.invalid_resource' },
       cn_idx_reviewschemaagencynametypefr: { code: 'DUPLICATE_REVIEW_SCHEMA_NAME_FR', key: 'apiErrors.request.invalid_resource' }

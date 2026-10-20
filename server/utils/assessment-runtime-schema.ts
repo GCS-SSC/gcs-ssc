@@ -81,17 +81,7 @@ const parseAssessmentDefinition = (value: unknown): AssessmentDefinition => {
     return emptyAssessmentDefinition()
   }
 
-  if (typeof value !== 'object' || value === null || Array.isArray(value) || !('sections' in value)) {
-    const result = AssessmentDefinitionSchema.safeParse(value)
-    throw new InvalidPersistedAssessmentDefinitionError(result.success ? [] : result.error.issues)
-  }
-
-  const record = value as Record<string, unknown>
-  const result = AssessmentDefinitionSchema.safeParse({
-    ...record,
-    sectionMatrix: record.sectionMatrix ?? [],
-    outcomes: record.outcomes ?? []
-  })
+  const result = AssessmentDefinitionSchema.safeParse(value)
   if (!result.success) throw new InvalidPersistedAssessmentDefinitionError(result.error.issues)
   return result.data
 }

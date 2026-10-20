@@ -56,7 +56,7 @@ export const getAgreementPaymentCompletionRuntime = async (
     if (!payment) return null
     try {
       await assertPaymentRecoveryAllowed(event, trx, { agreementId: context.agreementId, paymentId,
-        applicantRecipientId: payment.egcs_fc_applicantrecipient === null ? null : String(payment.egcs_fc_applicantrecipient),
+        applicantRecipientId: payment.egcs_fc_applicantrecipient,
         currency: payment.egcs_fc_currency })
     } catch (error) {
       const failure = error as { statusCode?: number; data?: { code?: string } }

@@ -3,8 +3,8 @@ import type { H3Event } from 'h3'
 import { z } from 'zod'
 import type { RuntimeState } from '~~/shared/constants/system-lifecycle'
 import { parseI18n } from '~~/server/utils/api-validate'
-import { normalizeAssessmentRuntimeSchema } from '~~/server/utils/assessment-runtime-schema'
-import type { ReviewSchemaContentSource } from '~~/server/utils/review-schema-versioning'
+import { InvalidPersistedAssessmentDefinitionError, normalizeAssessmentRuntimeSchema } from '~~/server/utils/assessment-runtime-schema'
+import { readPublishedReviewSchema, type ReviewSchemaContentSource } from '~~/server/utils/review-schema-versioning'
 import type { Database, JsonValue } from '~~/shared/types/database'
 import {
   createAssessmentResponseValidationSchema,
@@ -12,6 +12,7 @@ import {
 } from '~~/shared/types/schemas/assessment/assessmentresponse'
 import type { AssessmentRuntimeSummary } from '~~/shared/types/schemas/assessment/currentassessment'
 import { buildAssessmentRuntimeSummary } from '~~/shared/utils/assessment'
+import { throwApiError } from './api-errors'
 import { isRepresentableByNumeric } from '~~/shared/utils/decimal'
 
 const PersistedAssessmentNumericSchema = z.number()
@@ -38,7 +39,7 @@ export type AssessmentMutationReview = {
   egcs_cn_reviewschema: string | number
   publicationVersionId: string | number
   egcs_cn_pinnedversion?: number | string | null
-  egcs_cn_definition?: JsonValue | null
+  egcs_cn_definition: JsonValue
   egcs_cn_helpers?: JsonValue
   egcs_cn_disablecustomoutcomes: boolean
   egcs_cn_disablealignment: boolean
@@ -58,21 +59,14 @@ export type AssessmentMutationReview = {
 }
 
 /**
- * Resolves only the immutable pinned schema-version payload.
- * Missing or malformed definitions intentionally yield empty content.
- *
+ * Resolves and validates the immutable pinned schema-version envelope.
  * @param review - Runtime assessment and its pinned schema-version definition.
- * @returns Schema content used for assessment normalization and validation.
+ * @returns Pinned assessment content, including explicit unauthored null/empty values.
  */
 const getPinnedAssessmentContent = (review: AssessmentMutationReview): ReviewSchemaContentSource => {
-  const definition = review.egcs_cn_definition
-  if (definition !== null && definition !== undefined && typeof definition === 'object' && !Array.isArray(definition)) {
-    return {
-      egcs_cn_scoringmatrix: 'scoringMatrix' in definition ? definition.scoringMatrix as JsonValue : null,
-      egcs_cn_assessmentschema: 'assessmentSchema' in definition ? definition.assessmentSchema as JsonValue : null
-    }
-  }
-  return { egcs_cn_scoringmatrix: null, egcs_cn_assessmentschema: null }
+  const definition = readPublishedReviewSchema(review.egcs_cn_definition)
+  if (!definition) throw new InvalidPersistedAssessmentDefinitionError([])
+  return { egcs_cn_scoringmatrix: definition.scoringMatrix, egcs_cn_assessmentschema: definition.assessmentSchema }
 }
 
 export type PersistedAssessmentResponse = AssessmentResponse & {
@@ -133,8 +127,15 @@ export const prepareAssessmentPersistence = async (
   }
 ): Promise<AssessmentPersistenceResult> => {
   const helperValues = getHelperRecord(review.egcs_cn_helpers)
-  const schemaContentSource = getPinnedAssessmentContent(review)
-  const runtimeSchema = normalizeAssessmentRuntimeSchema(schemaContentSource)
+  let runtimeSchema: ReturnType<typeof normalizeAssessmentRuntimeSchema>
+  try {
+    runtimeSchema = normalizeAssessmentRuntimeSchema(getPinnedAssessmentContent(review))
+  } catch (error) {
+    if (error instanceof InvalidPersistedAssessmentDefinitionError) return await throwApiError(event, {
+      statusCode: 500, code: 'ASSESSMENT_DEFINITION_INVALID', key: 'apiErrors.assessment.definition_invalid'
+    })
+    throw error
+  }
 
   const assessmentResponse = await parseI18n(
     event,

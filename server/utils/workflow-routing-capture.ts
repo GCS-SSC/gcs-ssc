@@ -98,11 +98,13 @@ export const captureWorkflowRoutingSnapshot = async (
     const fields = await readAssignedAgencyCustomFieldDefinitions(trx, agreement.egcs_fc_transferpaymentstream)
     for (const fieldId of referencedIds) {
       const field = fields.find(candidate => candidate.id === fieldId)
-      const value = customFieldOptionIds(agreement.egcs_fc_customfields[fieldId])
       // A published condition can outlive a Stream assignment. Missing or
       // inactive assignments evaluate false without invalidating the packet.
-      if (!field?.egcs_tp_active || field.egcs_ay_kind !== 'relational' || !value.length
-        || value.some(optionId => !field.options.some(option => option.id === optionId))) continue
+      if (!field?.egcs_tp_active || field.egcs_ay_kind !== 'relational') continue
+      const saved = agreement.egcs_fc_customfields[fieldId]
+      if (saved !== undefined && !Array.isArray(saved)) throw new WorkflowRouteValidationError('Relational custom-field values must be option-ID arrays')
+      const value = customFieldOptionIds(saved)
+      if (!value.length || value.some(optionId => !field.options.some(option => option.id === optionId))) continue
       values[fieldId] = value
       for (const optionId of value) {
         const option = field.options.find(candidate => candidate.id === optionId)!

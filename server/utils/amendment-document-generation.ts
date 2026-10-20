@@ -31,7 +31,7 @@ export const buildAmendmentDocumentContext = async (
 ): Promise<Record<string, unknown>> => {
   const amendment = await assertAgreementAmendmentExists(event, db, agreementId, amendmentId)
   const [agreementContext, types, subtypes, budgetVersion, activityVersion] = await Promise.all([
-    buildAgreementDocumentContext(agreementId, db, undefined, language),
+    buildAgreementDocumentContext(agreementId, db, undefined, language, { validationEvent: event }),
     db.selectFrom('Funding_Case_Agreement_Amendment_Type')
       .innerJoin('Transfer_Payment_Amendment_Type', 'Transfer_Payment_Amendment_Type.id', 'Funding_Case_Agreement_Amendment_Type.egcs_fc_amendmenttype')
       .where('Funding_Case_Agreement_Amendment_Type.egcs_fc_amendment', '=', amendmentId)
@@ -53,6 +53,7 @@ export const buildAmendmentDocumentContext = async (
   ])
   const proposedContext = budgetVersion || activityVersion
     ? await buildAgreementDocumentContext(agreementId, db, undefined, language, {
+        validationEvent: event,
         budgetVersionId: budgetVersion ? String(budgetVersion.id) : undefined,
         activityVersionId: activityVersion ? String(activityVersion.id) : undefined
       })

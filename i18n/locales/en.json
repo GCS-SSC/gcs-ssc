@@ -989,7 +989,6 @@
       "egcs_cn_sequential": "Sequential",
       "egcs_cn_active": "Active",
       "egcs_cn_recommendationsetup": "Recommendation Setup",
-      "egcs_cn_recommendation": "Recommendation",
       "egcs_cn_response": "Response",
       "egcs_cn_assessmentresult": "Assessment Result",
       "egcs_cn_assessmentschema": "Assessment Schema",
@@ -1322,6 +1321,7 @@
       "libreoffice_unavailable": "LibreOffice is required to convert DOCX templates to PDF. Install LibreOffice on the server or use an HTML PDF template."
     },
     "agreement": {
+      "custom_fields_invalid": "The saved Agreement custom-field selections are invalid.",
       "invalid_coding_allocation": "Coding lines must belong to this stream, match the total amount, and cover amounts already paid.",
       "invalid_financial_id": "Select an active financial ID for this Proponent from the Agreement’s agency.",
       "financial_id_required": "Select a financial ID for every Proponent on this Agreement.",

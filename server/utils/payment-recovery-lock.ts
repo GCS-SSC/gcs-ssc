@@ -15,7 +15,7 @@ export const lockPaymentRecoveryAgreements = async (
     .where('egcs_fc_fundingagreement', '=', input.agreementId).where('_deleted', '=', false).execute()
   const identities = new Map<string, { applicantRecipientId: string; currency: Currency_Codes }>()
   for (const row of payments) {
-    if (row.egcs_fc_applicantrecipient) identities.set(`${row.egcs_fc_applicantrecipient}:${row.egcs_fc_currency}`,
+    identities.set(`${row.egcs_fc_applicantrecipient}:${row.egcs_fc_currency}`,
       { applicantRecipientId: String(row.egcs_fc_applicantrecipient), currency: row.egcs_fc_currency })
   }
   for (const payee of input.payees ?? []) identities.set(`${payee.applicantRecipientId}:${payee.currency}`, payee)

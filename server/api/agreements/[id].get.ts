@@ -2,6 +2,7 @@ import { authorizeWithFreshAuthContext, requireFreshAuthContext } from '~~/serve
 import { canAccessAgreement, resolveAgreementScopeContext } from '~~/server/utils/agreement'
 import { withBusinessRecordState } from '~~/server/utils/business-record-state'
 import { hasAgreementRiskRatingRuns, isAgreementRiskRatingWorkflowManaged, resolveLatestAgreementRiskRating, resolveAgreementRiskSource } from '~~/server/utils/agreement-risk-rating'
+import { readAssignedAgencyCustomFieldDefinitions, validatePersistedAgreementCustomFieldSelections } from '~~/server/utils/agreement-custom-fields'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 
 // eslint-disable-next-line local/require-authorize -- executeFreshReadSnapshot rebuilds auth before the in-snapshot authorization.
@@ -115,6 +116,9 @@ export default defineEventHandler(async event => {
     if (!agreement) {
       return await notFound(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
     }
+
+    await validatePersistedAgreementCustomFieldSelections(event,
+      await readAssignedAgencyCustomFieldDefinitions(db, String(agreement.egcs_fc_transferpaymentstream)), agreement.egcs_fc_customfields)
 
     const [agreementWithState] = await withBusinessRecordState(db, 'fundingcaseagreement', [agreement])
 

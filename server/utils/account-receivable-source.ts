@@ -80,7 +80,6 @@ export const accountReceivableError = async (event: H3Event, code: string): Prom
     AR_PACKET_BASIS_CHANGED: 'packet_basis_changed',
     AR_OFFSET_BASIS_CHANGED: 'packet_basis_changed',
     AR_PAYMENT_OWNER_UNAVAILABLE: 'payment_owner_unavailable',
-    AR_PAYMENT_PAYEE_REQUIRED: 'payment_payee_unavailable',
     AR_DIRECT_REPAYMENT_HOLD: 'payment_direct_repayment_hold',
     AR_OFFSET_PINNED: 'offset_pinned',
     AR_OFFSET_CODING_REQUIRED: 'payment_offset_coding_required',
@@ -171,7 +170,7 @@ export const readAccountReceivableSources = async (db: Kysely<Database>, input: 
     const debtors = new Set(rows.filter(eligible).map(row => row.egcs_fc_applicantrecipient))
     if (!debtors.has(input.applicantRecipientId)) continue
     // A Correction without unequivocal paid-source attribution cannot create a debtor balance.
-    if (debtors.size !== 1 || debtors.has(null) || !applyPaidEffect(effect.amount, eligible)) return []
+    if (debtors.size !== 1 || !applyPaidEffect(effect.amount, eligible)) return []
   }
   const effectiveRecoveries = recoveries.filter(row => row.currency === input.currency)
   const recoveredDebtors = effectiveRecoveries.length

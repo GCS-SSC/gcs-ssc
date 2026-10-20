@@ -98,29 +98,28 @@ export default defineEventHandler(async event => {
   }
 
   const enumTypeNameByKey: Record<string, string> = {
-    agreement_applicant_recipient_type: 'Agreement_Applicant_Recipient_Type',
-    amended_type: 'Amended_Type',
-    applicant_recipient_type: 'Applicant_Recipient_Type',
-    agreement_type: 'Agreement_Type',
-    holdback_bases: 'Holdback_Bases',
-    countries: 'Countries',
-    currency_codes: 'Currency_Codes',
-    decision_type: 'Decision_Type',
+    agreement_applicant_recipient_type: 'agreement_applicant_recipient_type',
+    amended_type: 'amended_type',
+    applicant_recipient_type: 'applicant_recipient_type',
+    agreement_type: 'agreement_type',
+    holdback_bases: 'holdback_bases',
+    countries: 'countries',
+    currency_codes: 'currency_codes',
+    decision_type: 'decision_type',
     entity_type: 'Entity_Type',
     execution_entity_type: 'Execution_Entity_Type',
     transfer_payment_config_entity_type: 'Transfer_Payment_Config_Entity_Type',
-    follow_up_status: 'Follow_Up_Status',
+    follow_up_status: 'follow_up_status',
     language_preference: 'Language_Preference',
-    jurisdiction: 'Jurisdiction',
-    payment_type: 'Payment_Type',
+    jurisdiction: 'jurisdiction',
+    payment_type: 'payment_type',
     monitor_action_type: 'Monitor_Action_Type',
     monitor_responsible_party: 'Monitor_Responsible_Party',
     review_type: 'Review_Type'
   }
   const enumTypeName = enumTypeNameByKey[requestedEnum] ?? requestedEnum
 
-  // Resolve one public enum type. Both quoted and legacy unquoted types can
-  // exist after supported migrations; their values must not be merged.
+  // Resolve the exact public type installed by the current baseline.
   // A structured catalog read is safe before authentication and remains audited.
   const enumQuery = db.withTables<{
     'pg_catalog.pg_type': { oid: number; typname: string; typnamespace: number }
@@ -135,10 +134,5 @@ export default defineEventHandler(async event => {
     .orderBy('e.enumsortorder')
 
   const result = await enumQuery.where('t.typname', '=', enumTypeName).execute()
-  if (result.length > 0 || enumTypeName === enumTypeName.toLowerCase()) {
-    return result.map(row => row.enumlabel)
-  }
-
-  const legacyResult = await enumQuery.where('t.typname', '=', enumTypeName.toLowerCase()).execute()
-  return legacyResult.map(row => row.enumlabel)
+  return result.map(row => row.enumlabel)
 })

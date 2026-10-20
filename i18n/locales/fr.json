@@ -989,7 +989,6 @@
       "egcs_cn_sequential": "Séquentiel",
       "egcs_cn_active": "Actif",
       "egcs_cn_recommendationsetup": "Configuration de recommandation",
-      "egcs_cn_recommendation": "Recommandation",
       "egcs_cn_response": "Réponse",
       "egcs_cn_assessmentresult": "Résultat d'évaluation",
       "egcs_cn_assessmentschema": "Schéma d'évaluation",
@@ -1322,6 +1321,7 @@
       "libreoffice_unavailable": "LibreOffice est requis pour convertir les modèles DOCX en PDF. Installez LibreOffice sur le serveur ou utilisez un modèle PDF HTML."
     },
     "agreement": {
+      "custom_fields_invalid": "Les sélections de champs personnalisés enregistrées de l’entente sont invalides.",
       "invalid_coding_allocation": "Les lignes de codage doivent appartenir à ce volet, correspondre au montant total et couvrir les montants déjà payés.",
       "invalid_financial_id": "Sélectionnez un identifiant financier actif pour ce promoteur auprès de l'organisme de l'entente.",
       "financial_id_required": "Sélectionnez un identifiant financier pour chaque promoteur de cette entente.",

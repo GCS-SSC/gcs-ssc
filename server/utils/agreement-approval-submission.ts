@@ -61,8 +61,8 @@ export const assertAgreementApprovalSubmissionUnlocked = async (
   }
 }
 
-export type AgreementApprovalSnapshotV1 = {
-  schemaVersion: 1
+export type AgreementApprovalSnapshotV2 = {
+  schemaVersion: 2
   agreement: Record<string, JsonValue> | null
   proponents: Array<Record<string, JsonValue>>
   amendment: Record<string, JsonValue> | null
@@ -72,12 +72,11 @@ export type AgreementApprovalSnapshotV1 = {
   amendmentTypes: Array<Record<string, JsonValue>>
   amendmentSubtypes: Array<Record<string, JsonValue>>
 }
-export type AgreementApprovalSnapshotV2 = Omit<AgreementApprovalSnapshotV1, 'schemaVersion'> & { schemaVersion: 2 }
 export type AgreementApprovalSnapshotV3 = Omit<AgreementApprovalSnapshotV2, 'schemaVersion'> & {
   schemaVersion: 3
   risk: SubmissionRisk
 }
-export type AgreementApprovalSnapshot = AgreementApprovalSnapshotV1 | AgreementApprovalSnapshotV2 | AgreementApprovalSnapshotV3
+export type AgreementApprovalSnapshot = AgreementApprovalSnapshotV2 | AgreementApprovalSnapshotV3
 
 export const resolveApprovalPacketDomains = (
   entityType: 'fundingcaseagreement' | 'fundingcaseamendment',

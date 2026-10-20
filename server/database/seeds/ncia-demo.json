@@ -24330,7 +24330,7 @@
       "egcs_fc_fundingagreement": 120,
       "egcs_fc_amendment": null,
       "egcs_fc_workflowrun": 10,
-      "egcs_fc_snapshotschemaversion": 1,
+      "egcs_fc_snapshotschemaversion": 2,
       "egcs_fc_packet": {
         "budget": {
           "lineItems": [
@@ -24459,7 +24459,7 @@
       "egcs_fc_fundingagreement": 123,
       "egcs_fc_amendment": null,
       "egcs_fc_workflowrun": 12,
-      "egcs_fc_snapshotschemaversion": 1,
+      "egcs_fc_snapshotschemaversion": 2,
       "egcs_fc_packet": {
         "budget": {
           "lineItems": [
@@ -24588,7 +24588,7 @@
       "egcs_fc_fundingagreement": 126,
       "egcs_fc_amendment": null,
       "egcs_fc_workflowrun": 14,
-      "egcs_fc_snapshotschemaversion": 1,
+      "egcs_fc_snapshotschemaversion": 2,
       "egcs_fc_packet": {
         "budget": {
           "lineItems": [
@@ -24717,7 +24717,7 @@
       "egcs_fc_fundingagreement": 129,
       "egcs_fc_amendment": null,
       "egcs_fc_workflowrun": 16,
-      "egcs_fc_snapshotschemaversion": 1,
+      "egcs_fc_snapshotschemaversion": 2,
       "egcs_fc_packet": {
         "budget": {
           "lineItems": [
@@ -24846,7 +24846,7 @@
       "egcs_fc_fundingagreement": 132,
       "egcs_fc_amendment": null,
       "egcs_fc_workflowrun": 18,
-      "egcs_fc_snapshotschemaversion": 1,
+      "egcs_fc_snapshotschemaversion": 2,
       "egcs_fc_packet": {
         "budget": {
           "lineItems": [
@@ -24975,7 +24975,7 @@
       "egcs_fc_fundingagreement": 135,
       "egcs_fc_amendment": null,
       "egcs_fc_workflowrun": 20,
-      "egcs_fc_snapshotschemaversion": 1,
+      "egcs_fc_snapshotschemaversion": 2,
       "egcs_fc_packet": {
         "budget": {
           "lineItems": [
@@ -25104,7 +25104,7 @@
       "egcs_fc_fundingagreement": 138,
       "egcs_fc_amendment": null,
       "egcs_fc_workflowrun": 22,
-      "egcs_fc_snapshotschemaversion": 1,
+      "egcs_fc_snapshotschemaversion": 2,
       "egcs_fc_packet": {
         "budget": {
           "lineItems": [
@@ -25233,7 +25233,7 @@
       "egcs_fc_fundingagreement": 141,
       "egcs_fc_amendment": null,
       "egcs_fc_workflowrun": 24,
-      "egcs_fc_snapshotschemaversion": 1,
+      "egcs_fc_snapshotschemaversion": 2,
       "egcs_fc_packet": {
         "budget": {
           "lineItems": [
@@ -25362,7 +25362,7 @@
       "egcs_fc_fundingagreement": 144,
       "egcs_fc_amendment": null,
       "egcs_fc_workflowrun": 26,
-      "egcs_fc_snapshotschemaversion": 1,
+      "egcs_fc_snapshotschemaversion": 2,
       "egcs_fc_packet": {
         "budget": {
           "lineItems": [
@@ -25491,7 +25491,7 @@
       "egcs_fc_fundingagreement": 147,
       "egcs_fc_amendment": null,
       "egcs_fc_workflowrun": 28,
-      "egcs_fc_snapshotschemaversion": 1,
+      "egcs_fc_snapshotschemaversion": 2,
       "egcs_fc_packet": {
         "budget": {
           "lineItems": [
@@ -25620,7 +25620,7 @@
       "egcs_fc_fundingagreement": 150,
       "egcs_fc_amendment": null,
       "egcs_fc_workflowrun": 30,
-      "egcs_fc_snapshotschemaversion": 1,
+      "egcs_fc_snapshotschemaversion": 2,
       "egcs_fc_packet": {
         "budget": {
           "lineItems": [
@@ -32919,7 +32919,6 @@
       "egcs_cn_recommendationsetup": 1,
       "egcs_cn_entitytype": "fundingcaseagreement",
       "egcs_cn_entityid": 177,
-      "egcs_cn_recommendation": null,
       "egcs_cn_group": null,
       "egcs_cn_groupclaimedby": null,
       "egcs_cn_response": {

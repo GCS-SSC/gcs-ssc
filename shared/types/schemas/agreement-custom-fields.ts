@@ -109,8 +109,16 @@ export type AgencyCustomFieldDefinition = z.infer<typeof AgencyCustomFieldCreate
 
 export type AgreementCustomFieldValues = Record<string, string | number | string[]>
 
-export const customFieldOptionIds = (value: string | number | string[] | null | undefined): string[] =>
-  Array.isArray(value) ? value : typeof value === 'string' && value.trim() ? [value] : []
+/**
+ * Reads canonical relational selections without interpreting scalar field values.
+ * @param value - Stored relational value or an absent selection.
+ * @returns Selected option IDs.
+ */
+export const customFieldOptionIds = (value: string | number | string[] | null | undefined): string[] => {
+  if (value === null || value === undefined) return []
+  if (!Array.isArray(value)) throw new TypeError('Relational custom-field values must be option-ID arrays')
+  return value
+}
 
 export const customFieldHasValue = (value: string | number | string[] | null | undefined): boolean =>
   Array.isArray(value) ? value.length > 0 : typeof value === 'string' ? value.trim().length > 0 : typeof value === 'number'
@@ -143,6 +151,15 @@ export const agreementCustomFieldMergeSchema = (
       Reflect.deleteProperty(merged, id)
       continue
     }
+    if (kind === 'relational' && !Array.isArray(supplied)) {
+      issue(id, 'validation.invalid_selection')
+      continue
+    }
+    const previousValue = current[id]
+    if (kind === 'relational' && previousValue !== undefined && !Array.isArray(previousValue)) {
+      issue(id, 'validation.invalid_selection')
+      continue
+    }
     const unchanged = kind === 'relational'
       ? JSON.stringify([...customFieldOptionIds(supplied)].sort()) === JSON.stringify([...customFieldOptionIds(current[id])].sort())
       : supplied === current[id]
@@ -158,7 +175,7 @@ export const agreementCustomFieldMergeSchema = (
       if (typeof supplied !== 'number' || !Number.isFinite(supplied)) issue(id, 'validation.custom_field_number')
       else merged[id] = supplied
     } else {
-      const parsed = z.array(PositivePostgresBigintIdSchema).safeParse(Array.isArray(supplied) ? supplied : [supplied])
+      const parsed = z.array(PositivePostgresBigintIdSchema).safeParse(supplied)
       if (parsed.success && !field.egcs_ay_multiple && parsed.data.length > 1) {
         issue(id, 'validation.custom_field_single_selection')
         continue
@@ -172,6 +189,7 @@ export const agreementCustomFieldMergeSchema = (
     }
   }
   for (const field of definitions) {
+    if (field.egcs_ay_kind === 'relational' && merged[field.id] !== undefined && !Array.isArray(merged[field.id])) issue(field.id, 'validation.invalid_selection')
     if (field.egcs_tp_active && field.egcs_tp_required && !customFieldHasValue(merged[field.id])) issue(field.id, 'validation.required')
   }
   return merged

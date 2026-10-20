@@ -1813,8 +1813,7 @@ export interface FundingCaseAgreementJournalVoucherLineTable {
 
 export interface FundingCaseAgreementPaymentTable {
   egcs_fc_evidence: Generated<PaymentEvidence | null>
-  /** Legacy multi-Proponent payments remain unattributed until explicitly resolved. */
-  egcs_fc_applicantrecipient: Generated<string | null>
+  egcs_fc_applicantrecipient: string
   id: Generated<string>
   egcs_fc_fundingagreementcommitment: string
   egcs_fc_fundingagreement: Generated<string>
@@ -2183,7 +2182,6 @@ export interface CommonRecommendationTable {
   egcs_cn_runtimeitem: string
   egcs_cn_group?: string | null
   egcs_cn_groupclaimedby?: string | null
-  egcs_cn_recommendation?: number | null
   egcs_cn_response: JsonValue
   egcs_cn_resultoptionkey?: string | null
   egcs_cn_outcome?: Recommendation_Outcome | null

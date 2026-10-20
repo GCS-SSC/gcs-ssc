@@ -61,7 +61,7 @@ export default defineEventHandler(async event => {
         agreementId,
         body.templateId,
         await (async () => {
-          const currentContext = await buildAgreementDocumentContext(agreementId, trx, undefined, body.language)
+          const currentContext = await buildAgreementDocumentContext(agreementId, trx, undefined, body.language, { validationEvent: event })
           const currentHash = createHash('sha256').update(JSON.stringify(currentContext)).digest('hex')
           const currentInput = await loadAgreementDocumentRenderInput(
             event, agreementId, body.templateId, body.language, body.outputFormat, trx, { coreContext: currentContext, lockTemplate: true }

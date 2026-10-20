@@ -102,7 +102,7 @@ const paymentModal = useCrudModal<FundingCaseAgreementPaymentRow, PaymentWizardF
   createState: () => ({ egcs_fc_currency: agreementCurrency }),
   updateState: payment => ({
     id: payment.id,
-    egcs_fc_applicantrecipient: payment.egcs_fc_applicantrecipient ?? undefined,
+    egcs_fc_applicantrecipient: payment.egcs_fc_applicantrecipient,
     egcs_fc_commitmenttype: payment.commitment_type ?? undefined,
     egcs_fc_fiscalyear: payment.egcs_fc_fiscalyear,
     egcs_fc_paymenttype: payment.egcs_fc_paymenttype,

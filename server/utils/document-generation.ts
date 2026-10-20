@@ -9,7 +9,7 @@ import { badRequest, notFound, throwApiError } from './api-errors'
 import { readStoredFile, writeStoredFile, type RegisterStoredFileUpload } from './file-storage'
 import { escapeLikePattern } from './sql-like'
 import type { AgencyDocumentTemplateTable, Database, FundingCaseAgreementGeneratedDocumentTable, Language_Preference, TransferPaymentDocumentTemplateEntityType, TransferPaymentDocumentTemplateOutputFormat } from '~~/shared/types/database'
-import { readAssignedAgencyCustomFieldDefinitions } from './agreement-custom-fields'
+import { readAssignedAgencyCustomFieldDefinitions, validatePersistedAgreementCustomFieldSelections } from './agreement-custom-fields'
 import { buildAgreementDocumentCustomFields } from './agreement-document-custom-fields'
 import { buildAgreementCloseoutReadiness, hasActiveAgreementCloseoutWorkflow, hasCompetingAgreementCloseoutWorkflow } from './agreement-closeout'
 import { resolveBusinessStatusProtection } from './business-status-runtime'
@@ -358,7 +358,7 @@ export const buildAgreementDocumentContext = async (
   db: Kysely<Database>,
   event?: H3Event,
   language: Language_Preference = 'eng',
-  versions: { budgetVersionId?: string, activityVersionId?: string } = {}
+  versions: { budgetVersionId?: string, activityVersionId?: string, validationEvent?: H3Event } = {}
 ): Promise<Record<string, unknown>> => {
   const localized = <T extends { en: unknown, fr: unknown }>(value: T): unknown => language === 'fra' ? value.fr : value.en
   const localizedValue = (value: unknown): string => valueOrFallback(value, language)
@@ -583,6 +583,8 @@ export const buildAgreementDocumentContext = async (
       .execute(),
     readAssignedAgencyCustomFieldDefinitions(db, String(agreement.streamId))
   ])
+
+  if (versions.validationEvent) await validatePersistedAgreementCustomFieldSelections(versions.validationEvent, customFieldDefinitions, agreement.customFieldValues)
 
   const zeroMoney = parseMoney('0')
   const accountingProjection = await getAgreementPaidAccountingProjection(db, agreementId, { paymentMode: 'finalized' })
@@ -886,7 +888,7 @@ export const loadAgreementDocumentRenderInput = async (
     return await badRequest(event, 'DOCUMENT_OUTPUT_NOT_ALLOWED', 'apiErrors.document_generation.output_not_allowed')
   }
 
-  const coreContext = options.coreContext ?? await buildAgreementDocumentContext(agreementId, db, undefined, language)
+  const coreContext = options.coreContext ?? await buildAgreementDocumentContext(agreementId, db, undefined, language, { validationEvent: event })
   return {
     agreementId, template, coreContext,
     templateHash: createHash('sha256').update(JSON.stringify(template)).digest('hex'),
@@ -1005,7 +1007,7 @@ export const loadCloseoutDocumentRenderInput = async (
       .where('id', '=', closeoutId).where('egcs_fc_fundingagreement', '=', agreementId)
       .where('_deleted', '=', false).executeTakeFirst(),
     buildAgreementCloseoutReadiness(db, agreementId),
-    buildAgreementDocumentContext(agreementId, db, undefined, language),
+    buildAgreementDocumentContext(agreementId, db, undefined, language, { validationEvent: event }),
     db.selectFrom('Funding_Case_Agreement_Closeout_Snapshot').selectAll()
       .where('egcs_fc_closeout', '=', closeoutId).orderBy('egcs_fc_capturedat', 'desc').executeTakeFirst()
   ])

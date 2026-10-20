@@ -15,11 +15,10 @@ import { ReviewSetListRoleCapabilitiesSchema, ReviewSetRoleCapabilitiesSchema } 
 import type { ReviewSetRoleCapabilities } from '~~/shared/types/schemas/review-set-role-capabilities'
 import type { RuntimeKind, RuntimeState } from '~~/shared/constants/system-lifecycle'
 
-const { entityType, entityId, canUpdate = false, actionRoleAllowed = undefined, actionPrerequisiteWarning } = defineProps<{
+const { entityType, entityId, canUpdate = false, actionPrerequisiteWarning } = defineProps<{
   entityType: ReviewTargetEntityType
   entityId: string
   canUpdate?: boolean
-  actionRoleAllowed?: boolean
   actionPrerequisiteWarning?: LocalizedToastText
 }>()
 
@@ -163,16 +162,15 @@ const bilingualColumns: BilingualColumnConfig<ReviewLeafRow>[] = [
 
 const listRoleCapabilities = computed(() => ReviewSetListRoleCapabilitiesSchema.safeParse(response.value))
 const hasCurrentResponse = computed(() => status.value === 'success' && response.value !== undefined)
-const legacyRoleAllowed = computed(() => actionRoleAllowed ?? canUpdate)
 const canShowAdd = computed(() => {
   if (!hasCurrentResponse.value) return false
   const result = listRoleCapabilities.value
-  return result.success ? result.data.can_create_role ?? legacyRoleAllowed.value : false
+  return result.success ? result.data.can_create_role : false
 })
 const canCancelSetRole = (item: EntityReviewSet) => {
   if (!hasCurrentResponse.value) return false
   const result = ReviewSetRoleCapabilitiesSchema.safeParse(item)
-  return result.success ? result.data.can_cancel_role ?? legacyRoleAllowed.value : false
+  return result.success ? result.data.can_cancel_role : false
 }
 
 const tableRows = computed<ReviewLeafRow[]>(() => items.value
