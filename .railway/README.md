@@ -6,7 +6,7 @@ This configuration manages the existing **GCS Demo / demo** environment:
   populated, otherwise GitHub `GCS-SSC/gcs-ssc` branch `main` and the canonical Dockerfile.
 - Database: existing `GCS DB` service (PostgreSQL 18), with the application's existing `DATABASE_URL` preserved.
 - Domain: https://gcs-ssc-demo.up.railway.app, retained by Railway on the existing service.
-- Volumes: existing `gcs-ssc-volume` at `/app/.data` and `gcs-db-volume-forecast-versions-reset-20261014` on `GCS DB`, each 5000 MB. Verify every previous GCS database volume is detached and absent or pending Railway deletion.
+- Volumes: existing `gcs-ssc-volume` at `/app/.data` and `gcs-db-volume-core-cutover-reset-20261020` on `GCS DB`, each 5000 MB. Verify every previous GCS database volume is detached and absent or pending Railway deletion.
 - Metabase, `Metabase DB`, and their `postgres-volume-4aPn` are included so an IaC apply preserves them.
 - Portal: `gcs-ssc-portal` uses a pinned public GHCR digest from `deployment/portal-demo-image.json` and its own `Portal DB` PostgreSQL service and `portal-db-volume`. It shares this project, not a database, with GCS and Metabase.
 - Canvas groups: `Metabase`, `GCS`, and `Portal` each contain the corresponding app and PostgreSQL service.
@@ -85,61 +85,39 @@ the next IaC apply. Verify the live attachment independently: Railway's plan
 readback can omit the former database attachment. Preserve the application
 attachment volume, Portal volume, and Metabase volume.
 
-The Forecast version release uses source commit
-`4779e845e2b616b9bc86d173e633893b37457e56` and the public image digest
-`sha256:ddb378d6fffa60cab9a9523b3bce178a3f94eece664c32248ca51f602fa81032`
-from [verified build 38647016380](https://github.com/GCS-SSC/gcs-ssc/actions/runs/38647016380).
-The schema cutover replaces and reseeds the disposable GCS database; the
-application's attachment storage is retained.
+The current core compatibility cutover uses source commit
+`ad6193c9ed649bd2d3c40ce2e6922894c4893147` and the public image digest
+`sha256:8f1d8e7d0ead3f3a9ef7ff34ef3529a34f97878a5ce211115df0bdef210c63db`
+from [verified build 39409972545](https://github.com/GCS-SSC/gcs-ssc/actions/runs/39409972545).
+The same digest is published as `ghcr.io/gcs-ssc/gcs-ssc-demo:latest`;
+Railway uses the immutable digest. This release replaces and reseeds only the
+GCS database, retaining the application's attachment storage.
 
-Railway deployment `037270f1-bd33-4d98-885b-dcd4a28bb01c` reached `SUCCESS`
-with that exact digest on 2026-10-14. Public health and demo login passed;
-NCIA's thirteen agreements and terminal, successfully completed Payments
-168/172 were verified. The live Forecast overview returned nineteen Forecast
-headers with versions `0`/`1`, twelve active annual Forecasts, and no monthly-line
-version fields.
+Railway deployment `2709beb4-0f17-4d6a-a8a4-c2edbf4b0345` reached `SUCCESS`
+with that exact digest on 2026-10-20, and public health passed. Its new database
+deployment `891d35f6-fd13-415a-a847-48ac39244cb6` also reached `SUCCESS`.
+Demo login, NCIA's thirteen Agreements, terminal Payments 168/172, and fourteen
+bilingual template downloads passed live verification. The actual Payment UI
+passed in English and French using the locale switch.
+Live Claim-based and paid-advance Receivable draft creation also passed; both
+smoke-test drafts were soft-deleted after verification.
+The replacement database volume `gcs-db-volume-core-cutover-reset-20261020`
+(`8c16e9f0-cac6-497c-a106-24d4a63fbb94`) is attached to `GCS DB` at
+`/var/lib/postgresql/data`, with 5000 MB and storage state `READY`.
+The former `gcs-db-volume-forecast-versions-reset-20261014`
+(`3e62e951-d0b0-4672-8c8a-355a63f620ec`) is explicitly detached and pending
+Railway deletion at `2026-10-22T10:57:27.823Z`.
 
-Its replacement database volume `gcs-db-volume-forecast-versions-reset-20261014`
-(`3e62e951-d0b0-4672-8c8a-355a63f620ec`) is attached to `GCS DB` at
-`/var/lib/postgresql/data` with 5000 MB and storage state `READY`. The previous
-`gcs-db-volume-budget-controls-reset-20261014-v2`
-(`a544fc30-e733-4d41-9f86-cafef5d22f2c`) is detached and pending Railway deletion
-at `2026-10-16T23:11:01.060Z`. The older
-`gcs-db-volume-payment-evidence-reset` (`8729b72f-801e-4ea0-9b8d-98022cd2f95c`)
-and intermediate `gcs-db-volume-budget-controls-reset-20261014`
-(`ad90fe1f-a25c-49e6-bd41-b11cd2008b26`) remain detached and pending Railway
-deletion on 2026-10-16. The earlier clean-reset and ar-paid-reset volumes are
-absent from the live project inventory.
+The application volume (`694b3ed2-c5ec-4eac-aa84-8188d9322c13`), Portal database
+volume (`87fb3dc0-ad6b-4ed8-ad49-3e21031445d3`), and Metabase database volume
+(`a1710bdf-1f9a-4d63-831a-83911e2c6ab5`) retain their exact prior attachments.
+All Portal and Metabase service configurations are unchanged. The app changes
+only its image; GCS DB changes only its database-volume attachment.
 
-The earlier Commitment budget payment-hold release uses source commit
-`274dbb7edeb8dfe755a4b28c42e8e7c8ef3fdc53` and public image digest
-`sha256:38e90328b31759f83c80d222fe83da202e63a2f9676939da7ec58045b1db587c`
-from [verified build 38753855922](https://github.com/GCS-SSC/gcs-ssc/actions/runs/38753855922).
-The verified main image is also published as `ghcr.io/gcs-ssc/gcs-ssc-demo:latest`
-for the AWS refresh command; Railway uses the immutable digest.
-Railway deployment `8a690ce5-fc5a-4176-8fac-1335d6a3d9bb` reached `SUCCESS`
-on 2026-10-15. Only the pending `9999_z_commitment_budget_payment_hold`
-migration ran; the existing seed journal and all volume attachments were preserved.
-Live verification retained fifteen Agreements and nine Payments, including
-Agreement 10139, Amendment 10147, inactive Commitment 10140 (CAD 120,000),
-active Commitment 10149 (CAD 50,000), and historical paid Payment 10142 (CAD 30,000).
-Public health, authenticated reads and the Amendment page passed. No database
-reset or seed replay is needed for this hotfix; Portal and Metabase are unchanged.
-
-The current Claim recovery hotfix uses source commit
-`da9ec0568c178358a4852abbdf77d30407566198` and public image digest
-`sha256:2891db198dfafedbd0e2d284670d2ee605adf3d00e793079a86d4280a321201d`
-from [verified build 38772040704](https://github.com/GCS-SSC/gcs-ssc/actions/runs/38772040704).
-The same digest is published as `ghcr.io/gcs-ssc/gcs-ssc-demo:latest`.
-Railway deployment `221b5ef9-1650-4283-bebf-7ab2b42e7e36` reached `SUCCESS`
-on 2026-10-15. This code-only release adds no migrations and performs no reset or
-seed replay. Before/after authenticated financial snapshots match: seventeen
-Agreements and eleven Payments, including Amendment 10167, fully recovered
-Claim AR 10165, posted Credit Memo 10166 and Payments 168/172. Public health and
-the Amendment and AR pages passed. All volume attachments are unchanged.
-The hotfix credits actual posted Claim AR collections when checking budget
-reductions and requires original Claim ARs to allocate their full principal
-in a Claim reduction plan before submission; partial Credit Memos remain valid.
+The earlier Commitment budget payment-hold migration remains the explicitly
+authorized incremental exception. Its release preserved the existing seed
+journal and volumes; ordinary redeploys continue to preserve storage. Baseline
+schema changes use an explicitly authorized clean cutover instead.
 
 The Portal release uses source commit
 `54117871c2f6a0468e7a877ee6eb2a05284701cd` and pinned public image digest
