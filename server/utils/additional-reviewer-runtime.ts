@@ -237,11 +237,11 @@ export const resolveCurrentCommonUser = async (
 
   const commonUser = await db
     .selectFrom('user')
-    .innerJoin('Common_User', 'Common_User.egcs_cn_auth_user_id', 'user.id')
+    .innerJoin('Common_User', 'Common_User.egcs_cn_authuserid', 'user.id')
     .select([
       'Common_User.id as id',
       'Common_User.egcs_cn_name as name',
-      'Common_User.egcs_cn_position_title as positionTitle'
+      'Common_User.egcs_cn_positiontitle as positionTitle'
     ])
     .where('user.id', '=', context.userId)
     .where('user._deleted', '=', false)
@@ -285,7 +285,7 @@ export const listAgencyScopedCommonUsers = async (
 
   const users = await db
     .selectFrom('Common_User')
-    .innerJoin('user', 'user.id', 'Common_User.egcs_cn_auth_user_id')
+    .innerJoin('user', 'user.id', 'Common_User.egcs_cn_authuserid')
     .select([
       'Common_User.id as id',
       'Common_User.egcs_cn_name as name',
@@ -329,7 +329,7 @@ export const listAgencyScopedCommonUsersPage = async (
   search?: string
 ): Promise<{ items: Array<{ id: string, name: string }>, total: number }> => {
   let query = db.selectFrom('Common_User')
-    .innerJoin('user', 'user.id', 'Common_User.egcs_cn_auth_user_id')
+    .innerJoin('user', 'user.id', 'Common_User.egcs_cn_authuserid')
     .innerJoin('user_role_assignment', 'user_role_assignment.user_id', 'user.id')
     .innerJoin('role', 'role.id', 'user_role_assignment.role_id')
     .where('Common_User._deleted', '=', false)

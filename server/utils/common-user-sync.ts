@@ -23,7 +23,7 @@ export const syncCommonUser = async (
   const existing = await db
     .selectFrom('Common_User')
     .select('id')
-    .where('egcs_cn_auth_user_id', '=', input.userId)
+    .where('egcs_cn_authuserid', '=', input.userId)
     .executeTakeFirst()
   const now = new Date()
 
@@ -31,12 +31,12 @@ export const syncCommonUser = async (
     await db
       .updateTable('Common_User')
       .set({
-        egcs_cn_auth_user_id: input.userId,
+        egcs_cn_authuserid: input.userId,
         egcs_cn_name: input.name,
         egcs_cn_email: input.email,
-        egcs_cn_email_verified: input.emailVerified,
+        egcs_cn_emailverified: input.emailVerified,
         egcs_cn_image: input.image === null ? sql<string>`NULL` : input.image,
-        egcs_cn_updated_at: now,
+        egcs_cn_updatedat: now,
         _deleted: false
       })
       .where('id', '=', String(existing.id))
@@ -47,14 +47,14 @@ export const syncCommonUser = async (
   const created = await db
     .insertInto('Common_User')
     .values({
-      egcs_cn_auth_user_id: input.userId,
+      egcs_cn_authuserid: input.userId,
       egcs_cn_name: input.name,
-      egcs_cn_position_title: 'Program Officer',
+      egcs_cn_positiontitle: 'Program Officer',
       egcs_cn_email: input.email,
-      egcs_cn_email_verified: input.emailVerified,
+      egcs_cn_emailverified: input.emailVerified,
       egcs_cn_image: input.image ?? undefined,
-      egcs_cn_created_at: now,
-      egcs_cn_updated_at: now,
+      egcs_cn_createdat: now,
+      egcs_cn_updatedat: now,
       _deleted: false
     })
     .returning('id')

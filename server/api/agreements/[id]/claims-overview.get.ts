@@ -208,7 +208,7 @@ const readRoute = async (event: H3Event, claimId?: string) => {
         'Funding_Case_Agreement_Claim_Reconcile.egcs_fc_status as egcs_fc_status',
         'Funding_Case_Agreement_Claim_Reconcile.egcs_fc_isfinal as egcs_fc_isfinal',
         'Common_User.egcs_cn_name as user_name',
-        'Common_User.egcs_cn_position_title as user_position_title'
+        'Common_User.egcs_cn_positiontitle as user_position_title'
       ])
       .execute(),
     db

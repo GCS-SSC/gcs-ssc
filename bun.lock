@@ -269,6 +269,9 @@
         "@types/node": "^25.3.0",
         "@types/pg": "^8.23.1",
         "@vitejs/plugin-vue": "^6.0.4",
+        "@vitest/coverage-v8": "^4.0.18",
+        "@vue/test-utils": "^2.4.6",
+        "jsdom": "^28.1.0",
         "kysely": "^0.28.11",
         "kysely-pglite": "^0.6.1",
         "pg": "^8.23.0",
@@ -368,6 +371,7 @@
   },
   "patchedDependencies": {
     "nitropack@2.13.1": "patches/nitropack@2.13.1.patch",
+    "@nuxt/ui@4.4.0": "patches/@nuxt%2Fui@4.4.0.patch",
   },
   "packages": {
     "@acemir/cssom": ["@acemir/cssom@0.9.31", "", {}, "sha512-ZnR3GSaH+/vJ0YlHau21FjfLYjMpYVIzTD8M8vIEQvIGxeOXyXdzCI140rrCY862p/C/BbzWsjc1dgnM9mkoTA=="],

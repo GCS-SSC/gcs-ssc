@@ -23,7 +23,7 @@ export default defineEventHandler(async event => {
     .innerJoin('Common_Attachment', 'Common_Attachment.id', 'Common_Entity_Attachment.egcs_cn_attachment')
     .innerJoin('Common_Attachment_Types', 'Common_Attachment_Types.id', 'Common_Attachment.egcs_cn_attachmenttype')
     .innerJoin('Common_User', 'Common_User.id', 'Common_Entity_Attachment.egcs_cn_uploadedby')
-    .innerJoin('user', 'user.id', 'Common_User.egcs_cn_auth_user_id')
+    .innerJoin('user', 'user.id', 'Common_User.egcs_cn_authuserid')
     .where('Common_Entity_Attachment.egcs_cn_entitytype', '=', target.entityType)
     .where('Common_Entity_Attachment.egcs_cn_entityid', '=', target.entityId)
     .where('Common_Entity_Attachment._deleted', '=', false)

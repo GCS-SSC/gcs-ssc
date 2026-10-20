@@ -47,7 +47,7 @@ export const SEARCH_SOURCES: readonly SearchSource[] = [
   { type: 'agency', table: 'Agency_Profile', subject: 'agency',
     names: ['egcs_ay_name_en', 'egcs_ay_name_fr'],
     references: ['egcs_ay_abbreviation_en', 'egcs_ay_abbreviation_fr'],
-    numericReferences: ['egcs_ay_gwcoa_number', 'egcs_ay_agencyfinancialsystemid'], active: 'egcs_ay_active' }
+    numericReferences: ['egcs_ay_gwcoanumber', 'egcs_ay_agencyfinancialsystemid'], active: 'egcs_ay_active' }
 ]
 
 export interface SearchCandidate {

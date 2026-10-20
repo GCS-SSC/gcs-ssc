@@ -2,10 +2,10 @@
 export const ACCOUNT_RECEIVABLE_CLAIM_REDUCTION_SQL = `
 CREATE TABLE "Funding_Case_Account_Receivable_Claim_Reduction" (
   id bigserial PRIMARY KEY,
-  egcs_fc_receivable bigint NOT NULL REFERENCES "Funding_Case_Agreement_Account_Receivable"(id),
-  egcs_fc_claim bigint NOT NULL REFERENCES "Funding_Case_Agreement_Claim"(id),
-  egcs_fc_claimline bigint NOT NULL REFERENCES "Funding_Case_Agreement_Claim_Line_Item"(id),
-  egcs_fc_amount numeric(19,2) NOT NULL CHECK (egcs_fc_amount > 0),
+  egcs_fc_receivable bigint NOT NULL CONSTRAINT "fc_fk_receivable_claim_reduction_receivable" REFERENCES "Funding_Case_Agreement_Account_Receivable"(id),
+  egcs_fc_claim bigint NOT NULL CONSTRAINT "fc_fk_receivable_claim_reduction_claim" REFERENCES "Funding_Case_Agreement_Claim"(id),
+  egcs_fc_claimline bigint NOT NULL CONSTRAINT "fc_fk_receivable_claim_reduction_claimline" REFERENCES "Funding_Case_Agreement_Claim_Line_Item"(id),
+  egcs_fc_amount numeric(19,2) NOT NULL CONSTRAINT "fc_chk_receivable_claim_reduction_amount" CHECK (egcs_fc_amount > 0),
   egcs_fc_appliedat timestamptz,
   _deleted boolean NOT NULL DEFAULT false
 );

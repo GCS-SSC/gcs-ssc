@@ -182,7 +182,7 @@ export const resolveExtensionEligibleAssigneeIds = async (
   const uniqueIds = [...new Set(commonUserIds.map(String))]
   if (uniqueIds.length === 0) return new Set()
   const users = await db.selectFrom('Common_User')
-    .innerJoin('user', 'user.id', 'Common_User.egcs_cn_auth_user_id')
+    .innerJoin('user', 'user.id', 'Common_User.egcs_cn_authuserid')
     .select(['Common_User.id as commonUserId', 'user.id as applicationUserId'])
     .where('Common_User.id', 'in', uniqueIds)
     .where('Common_User._deleted', '=', false)

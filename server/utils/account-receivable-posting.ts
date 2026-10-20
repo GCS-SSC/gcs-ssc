@@ -51,7 +51,7 @@ export const captureAccountReceivableCreditMemoPacket = async (db: Kysely<Databa
     egcs_fc_agencyname_en: agency.egcs_ay_name_en, egcs_fc_agencyname_fr: agency.egcs_ay_name_fr,
     egcs_fc_receivablereference: String(repayment.egcs_fc_receivable),
     egcs_fc_receivablerecovered: balance.egcs_fc_recovered, egcs_fc_receivablereserved: balance.egcs_fc_reserved,
-    egcs_fc_receivableoutstanding: balance.egcs_fc_outstanding, egcs_fc_receivableavailable: balance.egcs_fc_available }), recoveryId: null, allocations: [] as JsonValue,
+    egcs_fc_receivableoutstanding: balance.egcs_fc_outstanding, egcs_fc_receivableavailable: balance.egcs_fc_available }),
   attachments: json(await retainedAttachments(db, 'fundingcaseaccountreceivablecreditmemo', id)) }
 }
 
@@ -139,7 +139,6 @@ export const recordAccountReceivableCreditMemoTerminalOutcome = async (trx: Tran
   if (!options.actorId && !(outcome === 'failed' && options.runtimeId && options.reason?.trim())) throw new Error('AR_TERMINAL_ACTOR_REQUIRED')
   await lockAccountReceivableSubmission(trx, 'fundingcaseaccountreceivablecreditmemo', id, options.runtimeId)
   if (!(await resolveBusinessStatusProtection(trx, 'fundingcaseaccountreceivablecreditmemo', id))?.terminal) throw new Error('AR_TERMINAL_STATUS_REQUIRED')
-  await trx.updateTable('Funding_Case_Account_Receivable_Recovery').set({ egcs_fc_outcome: 'released', egcs_fc_releasedat: new Date() }).where('egcs_fc_creditmemo', '=', id).where('egcs_fc_outcome', '=', 'open').execute()
   await trx.updateTable('Funding_Case_Account_Receivable_Credit_Memo').set({ egcs_fc_outcome: outcome, egcs_fc_postingruntime: options.runtimeId, egcs_fc_terminalby: options.actorId ?? null,
     egcs_fc_terminalat: new Date(), egcs_fc_terminalreason: options.reason ?? null }).where('id', '=', id).execute()
 }

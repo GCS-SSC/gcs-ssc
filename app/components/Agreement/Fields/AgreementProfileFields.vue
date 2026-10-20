@@ -280,6 +280,15 @@ const selectedSubtype = computed(() => {
   return subtypeItems.value.find(item => String(item.id) === String(subtypeId)) ?? null
 })
 
+/**
+ * Replaces the draft for an intentional subtype change, including another subtype of the same type.
+ * @param subtypeId - The user-selected subtype identity.
+ */
+const selectSubtype = (subtypeId: string | undefined) => {
+  if (model.value.egcs_fc_agreementsubtype === subtypeId) return
+  model.value = { ...model.value, egcs_fc_agreementsubtype: subtypeId }
+}
+
 watch(selectedStreamId, value => {
   if (!value) {
     subtypeRequestGeneration += 1
@@ -345,10 +354,13 @@ watch(riskScoreSelection, value => {
   }
 })
 
-watch(selectedSubtype, value => {
+watch([selectedSubtype, subtypeStatus], ([value, lookupStatus]) => {
+  if (lookupStatus === 'pending' && model.value.egcs_fc_agreementsubtype) return
+  const agreementType = value?.agreement_type
+  if (model.value.egcs_fc_agreementtype === agreementType) return
   model.value = {
     ...model.value,
-    egcs_fc_agreementtype: value?.agreement_type
+    egcs_fc_agreementtype: agreementType
   }
 }, { immediate: true })
 </script>
@@ -398,7 +410,7 @@ watch(selectedSubtype, value => {
       <UFormField :label="t('agreement.agreement_subtype')" :name="field('egcs_fc_agreementsubtype')">
         <CommonServerLookupSelect
           v-if="selectedStreamId"
-          v-model="model.egcs_fc_agreementsubtype"
+          :model-value="model.egcs_fc_agreementsubtype"
           fetch-url="/api/agreements/lookups/agreement-subtypes"
           value-key="id"
           label-en-key="label_en"
@@ -415,7 +427,8 @@ watch(selectedSubtype, value => {
             }"
           :disabled="!selectedStreamId || subtypeStatus === 'pending'"
           :placeholder="t('agreement.agreement_subtype_placeholder')"
-          searchable />
+          searchable
+          @update:model-value="selectSubtype" />
         <USelectMenu v-else :items="[]" disabled :placeholder="t('agreement.agreement_subtype_placeholder')" />
       </UFormField>
 

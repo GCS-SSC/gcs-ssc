@@ -465,7 +465,7 @@
       "_deleted": false,
       "egcs_ay_claimreconciliationstartstatus": null,
       "egcs_ay_claimreconciliationfinalstatus": null,
-      "egcs_ay_gwcoa_number": "113"
+      "egcs_ay_gwcoanumber": "113"
     }
   ],
   "Applicant_Recipient_Agency_Financial_Id": [
@@ -8285,7 +8285,7 @@
       "egcs_ay_organizationagency": "10021",
       "egcs_ay_name_en": "Acting",
       "egcs_ay_name_fr": "Intérimaire",
-      "egcs_ay_require_actual": true,
+      "egcs_ay_requireactual": true,
       "_deleted": false
     },
     {
@@ -8293,7 +8293,7 @@
       "egcs_ay_organizationagency": "10021",
       "egcs_ay_name_en": "Delegated Authority",
       "egcs_ay_name_fr": "Autorité déléguée",
-      "egcs_ay_require_actual": false,
+      "egcs_ay_requireactual": false,
       "_deleted": false
     }
   ],

@@ -36,7 +36,7 @@ const resolveFreshCurrentCommonUser = async (
 ) => {
   const commonUser = await trx
     .selectFrom('user')
-    .innerJoin('Common_User', 'Common_User.egcs_cn_auth_user_id', 'user.id')
+    .innerJoin('Common_User', 'Common_User.egcs_cn_authuserid', 'user.id')
     .select([
       'Common_User.id as id',
       'Common_User.egcs_cn_name as name'

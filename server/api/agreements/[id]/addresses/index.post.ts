@@ -32,7 +32,7 @@ export default defineEventHandler(async event => {
     egcs_cn_addresscity: validated.egcs_cn_addresscity,
     egcs_cn_addresscountry: validated.egcs_cn_addresscountry,
     egcs_cn_addresssubdivision: validated.egcs_cn_addresssubdivision,
-    egcs_cn_gc_addressid: validated.egcs_cn_gc_addressid,
+    egcs_cn_gcaddressid: validated.egcs_cn_gcaddressid,
     egcs_cn_latitude: validated.egcs_cn_latitude,
     egcs_cn_longitude: validated.egcs_cn_longitude,
     egcs_cn_mainphone: validated.egcs_cn_mainphone,

@@ -2,7 +2,6 @@
 import type { Transaction } from 'kysely'
 import type { H3Event } from 'h3'
 import type { Currency_Codes, Database } from '~~/shared/types/database'
-import { hasAccountingTable } from './correction-schema'
 import { lockAccountReceivableRecoveryPool, lockExistingAccountReceivableRecoveryPool } from './account-receivable-context'
 import { assertAgreementCorrectionFinancialUnlocked, assertAgreementCorrectionFinancialWriteAllowed } from './correction-lock'
 
@@ -11,7 +10,6 @@ export const lockPaymentRecoveryAgreements = async (
   trx: Transaction<Database>,
   input: { agreementId: string; agencyId: string; payees?: Array<{ applicantRecipientId: string; currency: Currency_Codes }>; event?: H3Event; readOnly?: boolean }
 ) => {
-  if (!await hasAccountingTable(trx, 'Funding_Case_Account_Receivable_Pool')) return
   const payments = await trx.selectFrom('Funding_Case_Agreement_Payment')
     .select(['egcs_fc_applicantrecipient', 'egcs_fc_currency'])
     .where('egcs_fc_fundingagreement', '=', input.agreementId).where('_deleted', '=', false).execute()

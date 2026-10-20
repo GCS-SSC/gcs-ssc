@@ -855,7 +855,7 @@ const assignedApproverPositionTitle = computed(() => {
 
   return selectedActionStep.value.assigned_user_position_title || selectedActionStep.value.default_user_position_title
 })
-const requiresActual = computed(() => Boolean((selectedActionState.value?.isOnBehalf === true && selectedBehalfType.value?.egcs_ay_require_actual === true)
+const requiresActual = computed(() => Boolean((selectedActionState.value?.isOnBehalf === true && selectedBehalfType.value?.egcs_ay_requireactual === true)
   || (selectedActionStep.value?.egcs_cn_defaultgroup && selectedActionStep.value.egcs_cn_requiregroupdetails === true
     && selectedActionStep.value.claimant_matches_default === true)))
 

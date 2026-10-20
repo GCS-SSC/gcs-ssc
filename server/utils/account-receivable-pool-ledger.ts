@@ -8,9 +8,6 @@ import { readAccountReceivableCashBalance } from './account-receivable-cash-bala
 const ZERO = parseMoney('0.00')
 const positive = (amount: Money) => moneyToCents(amount) > BigInt(0) ? amount : ZERO
 
-export const hasAccountReceivablePoolLedger = async (db: Kysely<Database>): Promise<boolean> =>
-  (await sql<{ installed: boolean }>`SELECT to_regprocedure('public.ar_pool_net(bigint)') IS NOT NULL AS installed`.execute(db)).rows[0]?.installed === true
-
 /** Caller must authorize the complete Agency-owned pool before reading its totals. */
 export const readAccountReceivablePoolBalance = async (db: Kysely<Database>, poolId: string, options: { excludedCreditMemoId?: string } = {}) => {
   const totals = (await sql<{ debit: string; credit: string; reserved: string }>`SELECT
@@ -18,8 +15,8 @@ export const readAccountReceivablePoolBalance = async (db: Kysely<Database>, poo
       JOIN "Funding_Case_Agreement_Account_Receivable_Line" line ON line.egcs_fc_receivable=debt.id
       WHERE debt.egcs_fc_pool=${poolId}::bigint AND debt.egcs_fc_outcome='posted' AND NOT debt._deleted AND NOT line._deleted),0)::text AS debit,
     (coalesce((SELECT sum(egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Credit_Memo" WHERE egcs_fc_pool=${poolId}::bigint AND egcs_fc_outcome='posted' AND NOT _deleted),0)
-      +coalesce((SELECT sum(egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Recovery" WHERE egcs_fc_pool=${poolId}::bigint AND egcs_fc_payment IS NOT NULL AND egcs_fc_outcome='posted' AND NOT _deleted),0))::text AS credit,
-    (coalesce((SELECT sum(egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Recovery" WHERE egcs_fc_pool=${poolId}::bigint AND egcs_fc_payment IS NOT NULL AND egcs_fc_outcome='open' AND NOT _deleted),0)
+      +coalesce((SELECT sum(egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Recovery" WHERE egcs_fc_pool=${poolId}::bigint AND egcs_fc_outcome='posted' AND NOT _deleted),0))::text AS credit,
+    (coalesce((SELECT sum(egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Recovery" WHERE egcs_fc_pool=${poolId}::bigint AND egcs_fc_outcome='open' AND NOT _deleted),0)
       + coalesce((SELECT sum(egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Credit_Memo"
         WHERE egcs_fc_pool=${poolId}::bigint AND egcs_fc_outcome='open' AND NOT _deleted
           ${options.excludedCreditMemoId ? sql`AND id<>${options.excludedCreditMemoId}::bigint` : sql``}),0))::text AS reserved`.execute(db)).rows[0]!

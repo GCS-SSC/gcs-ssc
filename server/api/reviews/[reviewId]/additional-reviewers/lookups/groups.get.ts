@@ -34,7 +34,7 @@ export default defineEventHandler(async event => {
       .where('Common_Group._deleted', '=', false)
       .where(eb => eb.exists(eb.selectFrom('Common_Group_Member')
         .innerJoin('Common_User', 'Common_User.id', 'Common_Group_Member.egcs_cn_user')
-        .innerJoin('user', 'user.id', 'Common_User.egcs_cn_auth_user_id')
+        .innerJoin('user', 'user.id', 'Common_User.egcs_cn_authuserid')
         .select('Common_Group_Member.id')
         .whereRef('Common_Group_Member.egcs_cn_group', '=', 'Common_Group.id')
         .where('Common_Group_Member._deleted', '=', false)

@@ -25,6 +25,8 @@ const fundingHistoryUrl = computed(() =>
 
 const { t, locale } = useI18n()
 const localePath = useLocalePath()
+const { canAny, permissionsReady } = useCan()
+const canFilterAgreements = computed(() => permissionsReady.value && canAny('agreement', 'read'))
 const { showError } = useApiErrorToast()
 const toast = useLocalizedToast()
 const { confirmDeleteRequest } = useConfirmDeleteRequest()
@@ -34,6 +36,9 @@ onBeforeUnmount(() => {
   disposed = true
 })
 const listView = ref('all')
+watch(canFilterAgreements, (allowed, previouslyAllowed) => {
+  if (previouslyAllowed && !allowed && listView.value !== 'all') listView.value = 'all'
+}, { flush: 'sync' })
 watch(() => applicantRecipientId, () => {
   listView.value = 'all'
 })
@@ -213,7 +218,7 @@ const visibleRows = computed(() => items.value)
       @add="openCreate"
       @retry="refresh">
       <template #filters>
-        <CommonAssignedListViewSelect v-model="listView" resource="agreement" />
+        <CommonAssignedListViewSelect v-if="canFilterAgreements" v-model="listView" resource="agreement" />
       </template>
       <template #source-cell="{ row }">
         <CommonStatusBadge

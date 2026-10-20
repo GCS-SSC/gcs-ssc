@@ -285,7 +285,6 @@ export interface FundingCaseAgreementPaymentRow extends FundingCaseAgreementPaym
   egcs_fc_offsetamount?: Money
   egcs_fc_netamount?: Money
   egcs_fc_recoverycontrol?: 'allowed' | 'direct_repayment_hold' | 'recovery_pending'
-  egcs_fc_offsets?: Array<{ egcs_fc_number: string; egcs_fc_amount: Money; egcs_fc_creditmemoreference: string }>
   egcs_fc_creditmemos?: AccountReceivablePaymentCreditMemo[]
   commitment_type?: string | null
   commitment_type_name_en?: string | null

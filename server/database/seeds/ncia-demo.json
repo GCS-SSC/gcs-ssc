@@ -273,7 +273,7 @@
       "_deleted": false,
       "egcs_ay_claimreconciliationstartstatus": null,
       "egcs_ay_claimreconciliationfinalstatus": null,
-      "egcs_ay_gwcoa_number": 113
+      "egcs_ay_gwcoanumber": 113
     }
   ],
   "Applicant_Recipient_Agency_Financial_Id": [
@@ -17848,62 +17848,62 @@
   "Common_User": [
     {
       "id": 1,
-      "egcs_cn_auth_user_id": 1,
+      "egcs_cn_authuserid": 1,
       "egcs_cn_name": "Sophie McAllister",
-      "egcs_cn_position_title": "Program Director",
+      "egcs_cn_positiontitle": "Program Director",
       "egcs_cn_email": "root@example.com",
-      "egcs_cn_email_verified": true,
+      "egcs_cn_emailverified": true,
       "egcs_cn_image": null,
-      "egcs_cn_created_at": "2026-09-28T11:40:18.159+00:00",
-      "egcs_cn_updated_at": "2026-09-28T11:40:18.159+00:00",
+      "egcs_cn_createdat": "2026-09-28T11:40:18.159+00:00",
+      "egcs_cn_updatedat": "2026-09-28T11:40:18.159+00:00",
       "_deleted": false
     },
     {
       "id": 4,
-      "egcs_cn_auth_user_id": 4,
+      "egcs_cn_authuserid": 4,
       "egcs_cn_name": "Morgan Patel",
-      "egcs_cn_position_title": "Finance Manager",
+      "egcs_cn_positiontitle": "Finance Manager",
       "egcs_cn_email": "user03@example.com",
-      "egcs_cn_email_verified": true,
+      "egcs_cn_emailverified": true,
       "egcs_cn_image": null,
-      "egcs_cn_created_at": "2026-09-28T11:40:18.17+00:00",
-      "egcs_cn_updated_at": "2026-09-28T11:40:18.17+00:00",
+      "egcs_cn_createdat": "2026-09-28T11:40:18.17+00:00",
+      "egcs_cn_updatedat": "2026-09-28T11:40:18.17+00:00",
       "_deleted": false
     },
     {
       "id": 5,
-      "egcs_cn_auth_user_id": 5,
+      "egcs_cn_authuserid": 5,
       "egcs_cn_name": "Taylor Kim",
-      "egcs_cn_position_title": "Program Officer",
+      "egcs_cn_positiontitle": "Program Officer",
       "egcs_cn_email": "user04@example.com",
-      "egcs_cn_email_verified": true,
+      "egcs_cn_emailverified": true,
       "egcs_cn_image": null,
-      "egcs_cn_created_at": "2026-09-28T11:40:18.173+00:00",
-      "egcs_cn_updated_at": "2026-09-28T11:40:18.173+00:00",
+      "egcs_cn_createdat": "2026-09-28T11:40:18.173+00:00",
+      "egcs_cn_updatedat": "2026-09-28T11:40:18.173+00:00",
       "_deleted": false
     },
     {
       "id": 6,
-      "egcs_cn_auth_user_id": 6,
+      "egcs_cn_authuserid": 6,
       "egcs_cn_name": "Casey Tremblay",
-      "egcs_cn_position_title": "Program Officer",
+      "egcs_cn_positiontitle": "Program Officer",
       "egcs_cn_email": "user05@example.com",
-      "egcs_cn_email_verified": true,
+      "egcs_cn_emailverified": true,
       "egcs_cn_image": null,
-      "egcs_cn_created_at": "2026-09-28T11:40:18.176+00:00",
-      "egcs_cn_updated_at": "2026-09-28T11:40:18.176+00:00",
+      "egcs_cn_createdat": "2026-09-28T11:40:18.176+00:00",
+      "egcs_cn_updatedat": "2026-09-28T11:40:18.176+00:00",
       "_deleted": false
     },
     {
       "id": 7,
-      "egcs_cn_auth_user_id": 7,
+      "egcs_cn_authuserid": 7,
       "egcs_cn_name": "Riley Chen",
-      "egcs_cn_position_title": "Program Officer",
+      "egcs_cn_positiontitle": "Program Officer",
       "egcs_cn_email": "user06@example.com",
-      "egcs_cn_email_verified": true,
+      "egcs_cn_emailverified": true,
       "egcs_cn_image": null,
-      "egcs_cn_created_at": "2026-09-28T11:40:18.179+00:00",
-      "egcs_cn_updated_at": "2026-09-28T11:40:18.179+00:00",
+      "egcs_cn_createdat": "2026-09-28T11:40:18.179+00:00",
+      "egcs_cn_updatedat": "2026-09-28T11:40:18.179+00:00",
       "_deleted": false
     }
   ],
@@ -20012,7 +20012,7 @@
       "id": 53,
       "egcs_cn_completion": 59,
       "egcs_cn_routing": {
-        "hash": "625e3ac3422f7df933872a62b070187caec25a0b8b097acf9f4c25cad5a9b4f7",
+        "hash": "64180d35efcdd60e5fee72a51422221e8864ec4950ce3e4ad94833be61f7345c",
         "fields": [],
         "values": {},
         "version": 2,
@@ -20036,19 +20036,15 @@
             "egcs_fc_fundingagreement": "120",
             "egcs_fc_applicantrecipient": "119"
           },
-          "debtBasisHash": null,
           "poolBasisHash": "3b18244aa2cc837ed35a623df3bb142e16900431e1689c7bd7c4a301107bf8a1",
-          "schemaVersion": 3,
-          "egcs_fc_offsets": [],
+          "schemaVersion": 5,
           "egcs_fc_netamount": "21000.00",
-          "allocationBasisHash": null,
           "egcs_fc_creditmemos": [],
           "egcs_fc_grossamount": "21000.00",
           "egcs_fc_offsetamount": "0.00",
-          "egcs_fc_recoverycontrol": "allowed",
-          "egcs_fc_creditmemoreference": null
+          "egcs_fc_recoverycontrol": "allowed"
         },
-        "paymentOffsetPacketHash": "659973cb78d9d096c6de9ae20e71ae7f0ef1f498e673af9df3c37a18588e26c4"
+        "paymentOffsetPacketHash": "e7af28ffd093b3bdc0fbd5c6786ed5fd2489a86df9875a29d3fc1e9cb89d1213"
       }
     },
     {
@@ -20074,7 +20070,7 @@
       "id": 57,
       "egcs_cn_completion": 62,
       "egcs_cn_routing": {
-        "hash": "db87685ecf2f28d6c12767b56c7eacdcacc5ea9c60432986522968e183c04219",
+        "hash": "bef60e8b639dc91935b0a0d02ba9047623d96e131a37bc723f2e166e7d18032f",
         "fields": [],
         "values": {},
         "version": 2,
@@ -20098,19 +20094,15 @@
             "egcs_fc_fundingagreement": 150,
             "egcs_fc_applicantrecipient": 171
           },
-          "debtBasisHash": null,
           "poolBasisHash": "6dcf817075b5ec2109de48983e56e225b144f76b65d4aa00a02cec990343add6",
-          "schemaVersion": 4,
-          "egcs_fc_offsets": [],
+          "schemaVersion": 5,
           "egcs_fc_netamount": "10000.00",
-          "allocationBasisHash": null,
           "egcs_fc_creditmemos": [],
           "egcs_fc_grossamount": "10000.00",
           "egcs_fc_offsetamount": "0.00",
-          "egcs_fc_recoverycontrol": "allowed",
-          "egcs_fc_creditmemoreference": null
+          "egcs_fc_recoverycontrol": "allowed"
         },
-        "paymentOffsetPacketHash": "1d04df1caef54ec06c4868a3501068bf9a925ea23f88f7d1648a0dcb1466ca6d"
+        "paymentOffsetPacketHash": "ba9078280d8c7d2e8a38c1ffdcb468a3512ea99b85706edfcc383e60d93fbcdd"
       }
     },
     {
@@ -20256,7 +20248,7 @@
       "id": 65,
       "egcs_cn_completion": 67,
       "egcs_cn_routing": {
-        "hash": "1d1b43e031d2052ab10ac294fea2cfc81ec029dfcff21a47826d9166ec5fb6e8",
+        "hash": "535003e0d34e4a72410a2ca37b931422118c66e8599ded87e4d13e53d52dd76d",
         "fields": [],
         "values": {},
         "version": 2,
@@ -20280,19 +20272,15 @@
             "egcs_fc_fundingagreement": "177",
             "egcs_fc_applicantrecipient": "176"
           },
-          "debtBasisHash": null,
           "poolBasisHash": "e256940797a9665f29fb0344c51cab0aa1c501fc955ada7aefbb7a6c6228389d",
-          "schemaVersion": 4,
-          "egcs_fc_offsets": [],
+          "schemaVersion": 5,
           "egcs_fc_netamount": "3000.00",
-          "allocationBasisHash": null,
           "egcs_fc_creditmemos": [],
           "egcs_fc_grossamount": "3000.00",
           "egcs_fc_offsetamount": "0.00",
-          "egcs_fc_recoverycontrol": "allowed",
-          "egcs_fc_creditmemoreference": null
+          "egcs_fc_recoverycontrol": "allowed"
         },
-        "paymentOffsetPacketHash": "3e80caa0826246b9a99ed4bac1c52d2d58e9644d75420a35a4b856f0dd1c33fe"
+        "paymentOffsetPacketHash": "37ef1c7e17946709a6741042896d5b530b25ac82490b34dff53e3de6b9f9bef1"
       }
     },
     {
@@ -20460,7 +20448,7 @@
       "id": 67,
       "egcs_cn_completion": 69,
       "egcs_cn_routing": {
-        "hash": "5d7559798cd6fac6d285f095783eefc3cfa7b37003583438a9b3ec3c73667457",
+        "hash": "27177f8ca9f99a4d3ac50f73399bbb1c55ec82ce545557f5e9ca5fdc0d017ae0",
         "fields": [],
         "values": {},
         "version": 2,
@@ -20496,8 +20484,6 @@
             }
           ],
           "total": "250.00",
-          "recoveryId": null,
-          "allocations": [],
           "attachments": [],
           "schemaVersion": 6,
           "accountReceivableCreditMemo": {
@@ -20514,7 +20500,6 @@
             "egcs_fc_postedat": null,
             "egcs_fc_createdat": "2026-10-10T23:21:11.101Z",
             "egcs_fc_createdby": "1",
-            "egcs_fc_ledgerkind": "pool",
             "egcs_fc_receivable": "183",
             "egcs_fc_terminalat": null,
             "egcs_fc_terminalby": null,
@@ -20540,14 +20525,14 @@
             "egcs_fc_receivableoutstanding": "500.00"
           }
         },
-        "accountReceivableCreditMemoPacketHash": "a520809523d1ee144636268a2f7f957862c600f040b9706ed98d838500e103d2"
+        "accountReceivableCreditMemoPacketHash": "47596865757adb013db26b422f01e9a5d67d86ee2728d6d7bd5cf5247e958253"
       }
     },
     {
       "id": 68,
       "egcs_cn_completion": 70,
       "egcs_cn_routing": {
-        "hash": "e8e3e1393b988997069187a02745668ecfa89a46e64a5f0dc518e1412bea2d71",
+        "hash": "d1aedbb0fdaccd26772afe49aafdc46782678191493bc64c074e01449b9897bc",
         "fields": [],
         "values": {},
         "version": 2,
@@ -20583,8 +20568,6 @@
             }
           ],
           "total": "250.00",
-          "recoveryId": null,
-          "allocations": [],
           "attachments": [],
           "schemaVersion": 6,
           "accountReceivableCreditMemo": {
@@ -20601,7 +20584,6 @@
             "egcs_fc_postedat": null,
             "egcs_fc_createdat": "2026-10-10T23:22:41.714Z",
             "egcs_fc_createdby": "1",
-            "egcs_fc_ledgerkind": "pool",
             "egcs_fc_receivable": "183",
             "egcs_fc_terminalat": null,
             "egcs_fc_terminalby": null,
@@ -20627,13 +20609,13 @@
             "egcs_fc_receivableoutstanding": "250.00"
           }
         },
-        "accountReceivableCreditMemoPacketHash": "ef09576411bf06487f729dde6ab366dec443bb75c183451d91cccc920329d187"
+        "accountReceivableCreditMemoPacketHash": "3174c874310e154eadcdb6bb535bb6f4a9d956b3a87d427ed4f12a12a4383050"
       }
     },
     {
       "id": 69,
       "egcs_cn_routing": {
-        "hash": "60c3d5fba0868dc20fb5923721a6959904dade5ad4d8435f103f50f89494f3a6",
+        "hash": "109d647fba70a6b9178684b7384b0d067559083f003dfa0acf8ec47884a0a613",
         "fields": [],
         "values": {},
         "version": 2,
@@ -20657,26 +20639,22 @@
             "egcs_fc_fundingagreement": "123",
             "egcs_fc_applicantrecipient": "186"
           },
-          "debtBasisHash": null,
           "poolBasisHash": "7cce314d0f12fece397bcf3080523d06cbfc46140c64738e6deded01b5663f7f",
           "schemaVersion": 5,
-          "egcs_fc_offsets": [],
           "egcs_fc_netamount": "5000.00",
-          "allocationBasisHash": null,
           "egcs_fc_creditmemos": [],
           "egcs_fc_grossamount": "5000.00",
           "egcs_fc_offsetamount": "0.00",
-          "egcs_fc_recoverycontrol": "allowed",
-          "egcs_fc_creditmemoreference": null
+          "egcs_fc_recoverycontrol": "allowed"
         },
-        "paymentOffsetPacketHash": "e54bbc8697b0e61814347ca8f6f23f27bd1bde44813f628785ff5b04d2ce6ed5"
+        "paymentOffsetPacketHash": "b8ae63497e03da03b33f15e4072a46cc6f0e6abc77fd29fc7c53bec64196d81c"
       },
       "egcs_cn_completion": 71
     },
     {
       "id": 70,
       "egcs_cn_routing": {
-        "hash": "701f23b430874eb4767a692737e7779da2ab84b015473bd5e219056aa840cbab",
+        "hash": "34ab091380a51fe9cf4e1ac10bd44470737f5a2bff8d94a412cd62d1dff4182f",
         "fields": [],
         "values": {},
         "version": 2,
@@ -20700,26 +20678,22 @@
             "egcs_fc_fundingagreement": "126",
             "egcs_fc_applicantrecipient": "188"
           },
-          "debtBasisHash": null,
           "poolBasisHash": "ab6856a6a97a68cf6dae56f6223b1ed2ec10c5493141572b27a9bf379fe543a9",
           "schemaVersion": 5,
-          "egcs_fc_offsets": [],
           "egcs_fc_netamount": "5000.00",
-          "allocationBasisHash": null,
           "egcs_fc_creditmemos": [],
           "egcs_fc_grossamount": "5000.00",
           "egcs_fc_offsetamount": "0.00",
-          "egcs_fc_recoverycontrol": "allowed",
-          "egcs_fc_creditmemoreference": null
+          "egcs_fc_recoverycontrol": "allowed"
         },
-        "paymentOffsetPacketHash": "6c0c1d33f3981a28478d30bf305182cf0359b3c97ee21a3de0c39ece4f0f00f9"
+        "paymentOffsetPacketHash": "c1f85ea7020de57abc80a48e05fa47cefc33c785907af798900fb568eae2895c"
       },
       "egcs_cn_completion": 72
     },
     {
       "id": 71,
       "egcs_cn_routing": {
-        "hash": "9228b81550066e44f05cfc14634075a5a4a0116aa69479eedfa87ce24c18157f",
+        "hash": "81a5cf703a71e14e15afc6061f49cd51eac441aba46f856b862c431503f50c4a",
         "fields": [],
         "values": {},
         "version": 2,
@@ -20743,19 +20717,15 @@
             "egcs_fc_fundingagreement": "129",
             "egcs_fc_applicantrecipient": "190"
           },
-          "debtBasisHash": null,
           "poolBasisHash": "bf1e771ff41f9b550743b5f46c681911342033dd4f122dd1e6149dbee528ae0d",
           "schemaVersion": 5,
-          "egcs_fc_offsets": [],
           "egcs_fc_netamount": "5000.00",
-          "allocationBasisHash": null,
           "egcs_fc_creditmemos": [],
           "egcs_fc_grossamount": "5000.00",
           "egcs_fc_offsetamount": "0.00",
-          "egcs_fc_recoverycontrol": "allowed",
-          "egcs_fc_creditmemoreference": null
+          "egcs_fc_recoverycontrol": "allowed"
         },
-        "paymentOffsetPacketHash": "b7c4d49911e33bb31f74ee019a57af274931a755f2cdcb0da028f97a3ed3be66"
+        "paymentOffsetPacketHash": "605923994355cd3ddcd424bac7bc56a383dce4ca17abb22224b9a230282001b8"
       },
       "egcs_cn_completion": 73
     },
@@ -21012,7 +20982,7 @@
     {
       "id": 77,
       "egcs_cn_routing": {
-        "hash": "ef9093d14360ce9e0dd385e7586d9fdb927e5a73c28986ae9c7820a38b6a2395",
+        "hash": "5998581d8eab40b7c49a6c2660b103f018c4333040b98805a41bb79193875085",
         "fields": [],
         "values": {},
         "version": 2,
@@ -21048,8 +21018,6 @@
             }
           ],
           "total": "250.00",
-          "recoveryId": null,
-          "allocations": [],
           "attachments": [],
           "schemaVersion": 6,
           "accountReceivableCreditMemo": {
@@ -21066,7 +21034,6 @@
             "egcs_fc_postedat": null,
             "egcs_fc_createdat": "2026-10-12T00:01:51.339Z",
             "egcs_fc_createdby": "1",
-            "egcs_fc_ledgerkind": "pool",
             "egcs_fc_receivable": "196",
             "egcs_fc_terminalat": null,
             "egcs_fc_terminalby": null,
@@ -21092,7 +21059,7 @@
             "egcs_fc_receivableoutstanding": "500.00"
           }
         },
-        "accountReceivableCreditMemoPacketHash": "2141b905641fa3d8a5a6fc6a65dd0151779320f0ac22b6070b769d88f320fea1"
+        "accountReceivableCreditMemoPacketHash": "74c6c4c2bbcd2cd3f57856786e25b4af9a7b8d1a5362960d9d08dc4005de2415"
       },
       "egcs_cn_completion": 79
     },
@@ -21434,7 +21401,7 @@
     {
       "id": 80,
       "egcs_cn_routing": {
-        "hash": "7b37d4a65dc11efdbe2b77efb858942bdd96c593291a50c3261eacbcccf2f4ec",
+        "hash": "cf2f764abaec2130af19a3b205d46401cc7d62d1e6f8be54d65ccc203c8dec02",
         "fields": [],
         "values": {},
         "version": 2,
@@ -21470,8 +21437,6 @@
             }
           ],
           "total": "500.00",
-          "recoveryId": null,
-          "allocations": [],
           "attachments": [],
           "schemaVersion": 6,
           "accountReceivableCreditMemo": {
@@ -21488,7 +21453,6 @@
             "egcs_fc_postedat": null,
             "egcs_fc_createdat": "2026-10-12T00:01:52.089Z",
             "egcs_fc_createdby": "1",
-            "egcs_fc_ledgerkind": "pool",
             "egcs_fc_receivable": "199",
             "egcs_fc_terminalat": null,
             "egcs_fc_terminalby": null,
@@ -21514,14 +21478,14 @@
             "egcs_fc_receivableoutstanding": "500.00"
           }
         },
-        "accountReceivableCreditMemoPacketHash": "22fefad47a6696036dad968b2514536b99b1784d6033e9935b147604f89a84a9"
+        "accountReceivableCreditMemoPacketHash": "2494561f322d400aac24c3872d80b895608b593cb45b4bad1838e8043c7ede1d"
       },
       "egcs_cn_completion": 82
     },
     {
       "id": 81,
       "egcs_cn_routing": {
-        "hash": "026c08426c8cd1bd3ede23dd3e88f69e7fc3f09fdc22826e45efadccdc485d78",
+        "hash": "01e0650c3eff3958f81057fde7da972705436282dbc50c95513492d9c20d62d3",
         "fields": [],
         "values": {},
         "version": 2,
@@ -21545,19 +21509,15 @@
             "egcs_fc_fundingagreement": "132",
             "egcs_fc_applicantrecipient": "203"
           },
-          "debtBasisHash": null,
           "poolBasisHash": "f5190585a2a055ca0c4d4a1369a997956d649aa8d3f4f4522a7c1ea1ce3a075e",
           "schemaVersion": 5,
-          "egcs_fc_offsets": [],
           "egcs_fc_netamount": "5000.00",
-          "allocationBasisHash": null,
           "egcs_fc_creditmemos": [],
           "egcs_fc_grossamount": "5000.00",
           "egcs_fc_offsetamount": "0.00",
-          "egcs_fc_recoverycontrol": "allowed",
-          "egcs_fc_creditmemoreference": null
+          "egcs_fc_recoverycontrol": "allowed"
         },
-        "paymentOffsetPacketHash": "e7f78cfaba436423e19746a4580fb0f55367f6e0d6140adc228ab5114ee79afd"
+        "paymentOffsetPacketHash": "b3a4f22fa35e1b8a5900e1428ddbc673eb6cd6195aae7be1fe97f7f2cbb7c6a9"
       },
       "egcs_cn_completion": 83
     },
@@ -21725,7 +21685,7 @@
     {
       "id": 83,
       "egcs_cn_routing": {
-        "hash": "7d6e383050f35699e351dcff2f0239da85015b1b23a8f7f556c8eb05087f4fd6",
+        "hash": "a25e58029629318c08855d377a45073e5d9c58a1a1deceba65129004482f0de3",
         "fields": [],
         "values": {},
         "version": 2,
@@ -21761,8 +21721,6 @@
             }
           ],
           "total": "250.00",
-          "recoveryId": null,
-          "allocations": [],
           "attachments": [],
           "schemaVersion": 6,
           "accountReceivableCreditMemo": {
@@ -21779,7 +21737,6 @@
             "egcs_fc_postedat": null,
             "egcs_fc_createdat": "2026-10-12T00:13:35.414Z",
             "egcs_fc_createdby": "1",
-            "egcs_fc_ledgerkind": "pool",
             "egcs_fc_receivable": "205",
             "egcs_fc_terminalat": null,
             "egcs_fc_terminalby": null,
@@ -21805,7 +21762,7 @@
             "egcs_fc_receivableoutstanding": "500.00"
           }
         },
-        "accountReceivableCreditMemoPacketHash": "975e3e1ce3fd1a93dc119d53a44ee46ed464d8f1bbeade54f83930df02d6f08b"
+        "accountReceivableCreditMemoPacketHash": "8333b2922dde61ba3fb0bc6c39ebd0a85f3b9d262dafecd490ce8495d475fa8a"
       },
       "egcs_cn_completion": 85
     },
@@ -21969,7 +21926,7 @@
     {
       "id": 20005,
       "egcs_cn_routing": {
-        "hash": "1e28959366c146b071d492e2cd967b7bf922e342f91536ea356c42f00895935c",
+        "hash": "fc58798c34647236e1e75ee79f1edf0cf6b80d68f2f20c4aa9d1a8f2a4913f0f",
         "fields": [],
         "values": {},
         "version": 2,
@@ -22005,8 +21962,6 @@
             }
           ],
           "total": "21000.00",
-          "recoveryId": null,
-          "allocations": [],
           "attachments": [],
           "schemaVersion": 6,
           "accountReceivableCreditMemo": {
@@ -22023,7 +21978,6 @@
             "egcs_fc_postedat": null,
             "egcs_fc_createdat": "2026-10-07T02:03:45.054Z",
             "egcs_fc_createdby": "1",
-            "egcs_fc_ledgerkind": "pool",
             "egcs_fc_receivable": "169",
             "egcs_fc_terminalat": null,
             "egcs_fc_terminalby": null,
@@ -22050,7 +22004,7 @@
             "egcs_fc_receivableoutstanding": "21000.00"
           }
         },
-        "accountReceivableCreditMemoPacketHash": "e2ed6632388d9f7e8b7c4936719b5ede7f642a8a6b4c1b69de57917d3f142b3d"
+        "accountReceivableCreditMemoPacketHash": "dd0d62bd7123ff52dc62d15403b7d323120dac2df69366f98c01ea9e2eabcfa3"
       },
       "egcs_cn_completion": 20004
     }
@@ -30482,7 +30436,7 @@
       "egcs_ay_organizationagency": 21,
       "egcs_ay_name_en": "Acting",
       "egcs_ay_name_fr": "Intérimaire",
-      "egcs_ay_require_actual": true,
+      "egcs_ay_requireactual": true,
       "_deleted": false
     },
     {
@@ -30490,7 +30444,7 @@
       "egcs_ay_organizationagency": 21,
       "egcs_ay_name_en": "Delegated Authority",
       "egcs_ay_name_fr": "Autorité déléguée",
-      "egcs_ay_require_actual": false,
+      "egcs_ay_requireactual": false,
       "_deleted": false
     }
   ],
@@ -32579,7 +32533,6 @@
       "egcs_fc_postedat": "2026-10-13T17:47:11.604+00:00",
       "egcs_fc_createdat": "2026-10-07T02:03:45.054+00:00",
       "egcs_fc_createdby": 1,
-      "egcs_fc_ledgerkind": "pool",
       "egcs_fc_receivable": 169,
       "egcs_fc_terminalat": "2026-10-13T17:47:11.604+00:00",
       "egcs_fc_terminalby": 4,
@@ -32607,7 +32560,6 @@
       "egcs_fc_postedat": "2026-10-10 23:21:57.489+00",
       "egcs_fc_createdat": "2026-10-10 23:21:11.101+00",
       "egcs_fc_createdby": 1,
-      "egcs_fc_ledgerkind": "pool",
       "egcs_fc_receivable": 183,
       "egcs_fc_terminalat": "2026-10-10 23:21:57.489+00",
       "egcs_fc_terminalby": 4,
@@ -32635,7 +32587,6 @@
       "egcs_fc_postedat": "2026-10-10 23:23:03.589+00",
       "egcs_fc_createdat": "2026-10-10 23:22:41.714+00",
       "egcs_fc_createdby": 1,
-      "egcs_fc_ledgerkind": "pool",
       "egcs_fc_receivable": 183,
       "egcs_fc_terminalat": "2026-10-10 23:23:03.589+00",
       "egcs_fc_terminalby": 4,
@@ -32664,7 +32615,6 @@
       "egcs_fc_postedat": "2026-10-12T00:01:51.533+00:00",
       "egcs_fc_createdat": "2026-10-12T00:01:51.339+00:00",
       "egcs_fc_createdby": 1,
-      "egcs_fc_ledgerkind": "pool",
       "egcs_fc_receivable": 196,
       "egcs_fc_terminalat": "2026-10-12T00:01:51.533+00:00",
       "egcs_fc_terminalby": 4,
@@ -32692,7 +32642,6 @@
       "egcs_fc_postedat": "2026-10-12T00:01:52.268+00:00",
       "egcs_fc_createdat": "2026-10-12T00:01:52.089+00:00",
       "egcs_fc_createdby": 1,
-      "egcs_fc_ledgerkind": "pool",
       "egcs_fc_receivable": 199,
       "egcs_fc_terminalat": "2026-10-12T00:01:52.268+00:00",
       "egcs_fc_terminalby": 4,
@@ -32720,7 +32669,6 @@
       "egcs_fc_postedat": "2026-10-12T00:13:35.628+00:00",
       "egcs_fc_createdat": "2026-10-12T00:13:35.414+00:00",
       "egcs_fc_createdby": 1,
-      "egcs_fc_ledgerkind": "pool",
       "egcs_fc_receivable": 205,
       "egcs_fc_terminalat": "2026-10-12T00:13:35.628+00:00",
       "egcs_fc_terminalby": 4,
@@ -33005,7 +32953,6 @@
       "_deleted": false,
       "egcs_fc_amount": "500.00",
       "egcs_fc_recovery": 1,
-      "egcs_fc_allocation": null,
       "egcs_fc_offsetmemo": 1
     }
   ],
@@ -33038,8 +32985,6 @@
       "egcs_fc_payment": 201,
       "egcs_fc_postedat": null,
       "egcs_fc_createdat": "2026-10-12T00:01:52.279+00:00",
-      "egcs_fc_creditmemo": null,
-      "egcs_fc_ledgerkind": "pool",
       "egcs_fc_releasedat": null,
       "egcs_fc_postingruntime": null
     }

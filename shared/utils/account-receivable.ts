@@ -79,10 +79,3 @@ export const allocateAccountReceivableCoding = (amount: Money, coding: readonly 
   }
   return rows.map(line => ({ id: line.id, egcs_fc_amount: moneyFromCents(line.allocated * sign) }))
 }
-
-/**
- * Canonical settlement reference shared by manual and automatic Credit Memos.
- * @param recoveryId - Immutable recovery execution identity.
- * @returns The canonical Credit Memo settlement reference.
- */
-export const formatAccountReceivableCreditMemoSettlementReference = (recoveryId: string): string => `CM-${recoveryId}`

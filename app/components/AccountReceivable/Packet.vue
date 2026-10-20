@@ -14,7 +14,6 @@ const record = (value: JsonValue | undefined): RecordValue => value !== null && 
 const records = (value: JsonValue | undefined): RecordValue[] => Array.isArray(value) ? value.map(record) : []
 const packet = computed(() => record(submission.egcs_fc_packet))
 const header = computed(() => record(creditMemo ? packet.value.accountReceivableCreditMemo : packet.value.accountReceivable))
-const standaloneCredit = computed(() => creditMemo && (packet.value.schemaVersion === 2 || header.value.egcs_fc_ledgerkind === 'pool'))
 const text = (value: JsonValue | undefined) => typeof value === 'string' || typeof value === 'number' ? String(value) : t('common.none')
 const currency = computed(() => text(header.value.egcs_fc_currency))
 const amount = (value: JsonValue | undefined) => formatAccountReceivableAmount(typeof value === 'string' ? value : undefined, locale.value, currency.value) ?? t('common.not_available')
@@ -24,7 +23,6 @@ const lines = computed(() => records(packet.value.lines).map(line => ({ ...line,
   egcs_fc_coding: coding.value.filter(item => item.egcs_fc_receivableline === line.id)
 })) as unknown as AccountReceivableLine[])
 const creditMemoLines = computed(() => records(packet.value.lines))
-const allocations = computed(() => records(packet.value.allocations))
 const attachments = computed(() => records(packet.value.attachments))
 const claimReductions = computed(() => records(packet.value.claimReductions))
 const balanceFields = [
@@ -34,16 +32,15 @@ const balanceFields = [
   { key: 'egcs_fc_receivableavailable', label: 'account_receivable.memo_ar_available' }
 ] as const
 const labels = computed(() => [
-  ...(standaloneCredit.value
+  ...(creditMemo
     ? [{ label: 'account_receivable.credit_memo_agency', value: getBilingualValue(header.value, 'egcs_fc_agencyname', t('common.none')) }]
     : [{ label: 'account_receivable.agreement', value: header.value.egcs_fc_agreementnumber }]),
-  { label: standaloneCredit.value ? 'account_receivable.proponent' : 'account_receivable.debtor', value: getBilingualValue(header.value, 'egcs_fc_debtorname', t('common.none')) },
+  { label: creditMemo ? 'account_receivable.proponent' : 'account_receivable.debtor', value: getBilingualValue(header.value, 'egcs_fc_debtorname', t('common.none')) },
   { label: 'common.currency', value: currency.value.toUpperCase() },
   ...(creditMemo
     ? [
         { label: 'account_receivable.credit_memo_receivable', value: header.value.egcs_fc_receivablereference },
-        { label: 'account_receivable.received_date', value: typeof header.value.egcs_fc_receiveddate === 'string' ? formatDate(header.value.egcs_fc_receiveddate) : null },
-        ...(typeof header.value.egcs_fc_receiptreference === 'string' ? [{ label: 'account_receivable.receipt_reference', value: header.value.egcs_fc_receiptreference }] : [])
+        { label: 'account_receivable.received_date', value: typeof header.value.egcs_fc_receiveddate === 'string' ? formatDate(header.value.egcs_fc_receiveddate) : null }
       ]
     : [
         { label: 'agreement.payments.fiscal_year', value: header.value.egcs_fc_fiscalyeardisplay },
@@ -71,7 +68,7 @@ const labels = computed(() => [
           </dd>
         </div><div v-if="creditMemo">
           <dt class="text-muted">
-            {{ t(standaloneCredit ? 'account_receivable.credit_memo_amount' : 'account_receivable.received_amount') }}
+            {{ t('account_receivable.credit_memo_amount') }}
           </dt><dd class="mt-1 font-semibold">
             {{ amount(header.egcs_fc_amount) }}
           </dd>
@@ -103,24 +100,6 @@ const labels = computed(() => [
       </AccountReceivableSourceLines><p class="text-sm text-muted">
         {{ t('account_receivable.basis_provenance') }}
       </p>
-    </CommonSection>
-    <CommonSection v-else-if="!standaloneCredit" :title="t('account_receivable.historical_credit_memo_allocations')" :grid-cols="1">
-      <p class="text-sm text-muted">
-        {{ t('account_receivable.historical_credit_memo_allocations_description') }}
-      </p>
-      <dl v-for="allocation in allocations" :key="text(allocation.egcs_fc_receivableline)" class="grid gap-3 border-t border-default pt-3 text-sm sm:grid-cols-2">
-        <div>
-          <dt class="text-muted">
-            {{ t('account_receivable.number') }}
-          </dt><dd>{{ t('account_receivable.allocation_reference', { agreement: text(allocation.egcs_fc_agreementnumber), number: text(allocation.egcs_fc_number) }) }}</dd>
-        </div><div>
-          <dt class="text-muted">
-            {{ t('account_receivable.recovery_amount') }}
-          </dt><dd class="font-semibold">
-            {{ amount(allocation.egcs_fc_amount) }}
-          </dd>
-        </div>
-      </dl>
     </CommonSection>
     <CommonSection v-if="creditMemo && creditMemoLines.length" :title="t('account_receivable.credit_memo_lines')" :grid-cols="1">
       <div v-for="line in creditMemoLines" :key="text(line.id)" class="border-b border-default py-3 last:border-0">
@@ -193,22 +172,12 @@ const labels = computed(() => [
         </div>
       </dl>
     </CommonSection>
-    <CommonSection v-if="creditMemo && header.egcs_fc_creditmemoaccountingdimensions" :title="t('account_receivable.credit_memo_coding')" :grid-cols="1">
-      <dl class="flex flex-wrap gap-4 text-sm">
-        <div v-for="dimension in records(header.egcs_fc_creditmemoaccountingdimensions)" :key="text(dimension.label_en)">
-          <dt class="text-muted">
-            {{ getBilingualValue(dimension, 'label', t('common.none')) }}
-          </dt>
-          <dd>{{ text(dimension.value) }}</dd>
-        </div>
-      </dl>
-    </CommonSection>
     <CommonSection v-if="creditMemo && typeof header.egcs_fc_reason === 'string'" :title="t('account_receivable.reason')" :grid-cols="1">
       <p class="whitespace-pre-wrap text-sm">
         {{ text(header.egcs_fc_reason) }}
       </p>
     </CommonSection>
-    <CommonSection v-else :title="t('account_receivable.rationale')" :grid-cols="2">
+    <CommonSection v-if="!creditMemo" :title="t('account_receivable.rationale')" :grid-cols="2">
       <div>
         <h4 class="mb-2 text-sm font-semibold">
           {{ t('account_receivable.narrative_en') }}

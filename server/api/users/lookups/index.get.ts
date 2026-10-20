@@ -170,7 +170,7 @@ export default defineEventHandler(async event => {
 
     if (agencyId) {
       baseQuery = baseQuery
-        .innerJoin('user', 'user.id', 'Common_User.egcs_cn_auth_user_id')
+        .innerJoin('user', 'user.id', 'Common_User.egcs_cn_authuserid')
         .innerJoin('user_role_assignment', 'user_role_assignment.user_id', 'user.id')
         .innerJoin('role', 'role.id', 'user_role_assignment.role_id')
         .where('user._deleted', '=', false)
@@ -179,7 +179,7 @@ export default defineEventHandler(async event => {
         .where('role.agency_id', '=', agencyId)
 
       statsQuery = statsQuery
-        .innerJoin('user', 'user.id', 'Common_User_Stats.egcs_cn_auth_user_id')
+        .innerJoin('user', 'user.id', 'Common_User_Stats.egcs_cn_authuserid')
         .innerJoin('user_role_assignment', 'user_role_assignment.user_id', 'user.id')
         .innerJoin('role', 'role.id', 'user_role_assignment.role_id')
         .where('user._deleted', '=', false)

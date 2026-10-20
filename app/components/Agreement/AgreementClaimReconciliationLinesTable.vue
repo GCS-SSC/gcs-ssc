@@ -5,13 +5,14 @@ import type { Ref } from 'vue'
 import type { AgreementClaimReconciliationTableLine } from '~~/shared/types/agreement-claim-reconciliation-ui'
 import { formatMoneyText, parseMoney, subtractMoney, sumMoney, type Money } from '~~/shared/utils/money'
 
-const { currency, lines = [], totalSubmitted = parseMoney('0'), totalReconciled = parseMoney('0'), totalSampled = parseMoney('0'), editMode = 'inline' } = defineProps<{
+const { currency, lines = [], totalSubmitted = parseMoney('0'), totalReconciled = parseMoney('0'), totalSampled = parseMoney('0'), editMode = 'inline', actionPending = false } = defineProps<{
   currency: string
   lines?: AgreementClaimReconciliationTableLine[]
   totalSubmitted?: Money
   totalReconciled?: Money
   totalSampled?: Money
   editMode?: 'inline' | 'action'
+  actionPending?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -264,6 +265,7 @@ const getCategoryLines = (category: ReconciliationCategoryGroup) => category.sub
                     variant="ghost"
                     size="sm"
                     :icon="line.editable ? 'i-lucide-pencil' : 'i-lucide-eye'"
+                    :disabled="line.editable && actionPending"
                     class="cursor-default"
                     :aria-label="t(line.editable ? 'agreement.claims.edit_reconcile_line_for' : 'agreement.claims.view_reconcile_line_for', { name: line.name })"
                     @click="emit('edit', line)" />

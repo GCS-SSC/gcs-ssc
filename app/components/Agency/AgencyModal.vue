@@ -27,11 +27,11 @@ const gwcoaLookupQuery = computed(() => ({
   ...(state.value.id ? { agency_id: state.value.id } : {})
 }))
 const selectedGwcoaFetchUrl = computed(() => {
-  if (state.value.egcs_ay_gwcoa_number === undefined || state.value.egcs_ay_gwcoa_number === '') return undefined
+  if (state.value.egcs_ay_gwcoanumber === undefined || state.value.egcs_ay_gwcoanumber === '') return undefined
 
   const params = new URLSearchParams({ permission_action: gwcoaPermissionAction.value })
   if (state.value.id) params.set('agency_id', state.value.id)
-  const gwcoaNumber = encodeURIComponent(String(state.value.egcs_ay_gwcoa_number))
+  const gwcoaNumber = encodeURIComponent(String(state.value.egcs_ay_gwcoanumber))
   return `/api/agency/lookups/gwcoa/${gwcoaNumber}?${params.toString()}`
 })
 
@@ -55,9 +55,9 @@ const completeActiveHelp = async () => {
   <UModal v-model:open="open" :title="title" :description="t('common.form_dialog_description')">
     <template #body>
       <UForm ref="helpForm" :data-help-context="JSON.stringify(helpContext)" :state="state" :validate="validate" class="space-y-4" data-help-view="agency.edit" @submit="onSubmit">
-        <UFormField :label="t('agency.gwcoa_number')" name="egcs_ay_gwcoa_number">
+        <UFormField :label="t('agency.gwcoa_number')" name="egcs_ay_gwcoanumber">
           <CommonServerLookupSelect
-            v-model="state.egcs_ay_gwcoa_number"
+            v-model="state.egcs_ay_gwcoanumber"
             fetch-url="/api/agency/lookups/gwcoa"
             value-key="egcs_cn_number"
             label-en-key="egcs_cn_name_en"

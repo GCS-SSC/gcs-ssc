@@ -9,15 +9,11 @@ import type { Database } from '../../../shared/types/database'
 /** Installs the current up definitions for this subject on a fresh database. */
 export const up = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
-CREATE SEQUENCE "Funding_Case_Account_Receivable_Allocation_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
-
 CREATE SEQUENCE "Funding_Case_Account_Receivable_Offset_Memo_Application_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
 
 CREATE SEQUENCE "Funding_Case_Account_Receivable_Offset_Memo_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
 
 CREATE SEQUENCE "Funding_Case_Account_Receivable_Pool_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
-
-CREATE SEQUENCE "Funding_Case_Account_Receivable_Posting_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
 
 CREATE SEQUENCE "Funding_Case_Account_Receivable_Recovery_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
 
@@ -95,25 +91,11 @@ CREATE SEQUENCE "Funding_Case_Agreement_Responsible_Party_Activity_id_seq" AS bi
 
 CREATE SEQUENCE "Funding_Case_Agreement_Revision_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
 
-CREATE TABLE "Funding_Case_Account_Receivable_Allocation" (
-  "id" bigint DEFAULT nextval('"Funding_Case_Account_Receivable_Allocation_id_seq"'::regclass) NOT NULL,
-  "egcs_fc_recovery" bigint NOT NULL,
-  "egcs_fc_receivable" bigint NOT NULL,
-  "egcs_fc_receivableline" bigint NOT NULL,
-  "egcs_fc_fundingagreement" bigint NOT NULL,
-  "egcs_fc_amount" numeric(19,2) NOT NULL,
-  "_deleted" boolean DEFAULT false NOT NULL,
-  CONSTRAINT "fc_uq_ar_allocation_identity" UNIQUE (id, egcs_fc_recovery),
-  CONSTRAINT "fc_uq_ar_allocation_source" UNIQUE (egcs_fc_recovery, egcs_fc_receivableline),
-  CONSTRAINT "Funding_Case_Account_Receivable_Allocation_pkey" PRIMARY KEY (id),
-  CONSTRAINT "Funding_Case_Account_Receivable_Allocation_egcs_fc_amount_check" CHECK ((egcs_fc_amount > (0)::numeric))
-);
-
 CREATE TABLE "Funding_Case_Account_Receivable_Credit_Memo" (
   "egcs_fc_allocationevidence" jsonb,
   "id" bigint NOT NULL,
-  "egcs_fc_receivables" jsonb DEFAULT '[]'::jsonb NOT NULL CHECK (jsonb_typeof(egcs_fc_receivables)='array'),
-  "egcs_fc_totalamount" numeric(19,2) DEFAULT 0 NOT NULL CHECK (egcs_fc_totalamount >= 0),
+  "egcs_fc_receivables" jsonb DEFAULT '[]'::jsonb NOT NULL CONSTRAINT "fc_chk_receivable_credit_memo_receivables" CHECK (jsonb_typeof(egcs_fc_receivables)='array'),
+  "egcs_fc_totalamount" numeric(19,2) DEFAULT 0 NOT NULL CONSTRAINT "fc_chk_receivable_credit_memo_totalamount" CHECK (egcs_fc_totalamount >= 0),
   "egcs_fc_receivable" bigint NOT NULL,
   "egcs_fc_agency" bigint NOT NULL,
   "egcs_fc_pool" bigint NOT NULL,
@@ -144,28 +126,26 @@ CASE
     WHEN _deleted THEN NULL::boolean
     ELSE false
 END) STORED,
-  "egcs_fc_ledgerkind" character varying(16) DEFAULT 'pool'::character varying NOT NULL,
   CONSTRAINT "fc_uq_ar_creditmemo_number" UNIQUE (egcs_fc_agency, egcs_fc_number),
   CONSTRAINT "Funding_Case_Account_Receivable_Credit_Memo_pkey" PRIMARY KEY (id),
   CONSTRAINT "fc_chk_ar_creditmemo_posting" CHECK ((((egcs_fc_outcome)::text = 'posted'::text) = ((egcs_fc_postedat IS NOT NULL) AND (egcs_fc_postingruntime IS NOT NULL)))),
   CONSTRAINT "fc_chk_ar_creditmemo_terminal" CHECK ((((egcs_fc_outcome)::text = 'open'::text) = (egcs_fc_terminalat IS NULL))),
-  CONSTRAINT "Funding_Case_Account_Receivable_Credit_egcs_fc_ledgerkind_check" CHECK (((egcs_fc_ledgerkind)::text = ANY ((ARRAY['legacy'::character varying, 'pool'::character varying])::text[]))),
-  CONSTRAINT "Funding_Case_Account_Receivable_Credit_Me_egcs_fc_outcome_check" CHECK (((egcs_fc_outcome)::text = ANY ((ARRAY['open'::character varying, 'posted'::character varying, 'denied'::character varying, 'failed'::character varying, 'cancelled'::character varying])::text[]))),
-  CONSTRAINT "Funding_Case_Account_Receivable_Credit_Mem_egcs_fc_amount_check" CHECK ((egcs_fc_amount >= (0)::numeric)),
-  CONSTRAINT "Funding_Case_Account_Receivable_Credit_Mem_egcs_fc_number_check" CHECK ((egcs_fc_number > 0))
+  CONSTRAINT "fc_chk_receivable_credit_memo_outcome" CHECK (((egcs_fc_outcome)::text = ANY ((ARRAY['open'::character varying, 'posted'::character varying, 'denied'::character varying, 'failed'::character varying, 'cancelled'::character varying])::text[]))),
+  CONSTRAINT "fc_chk_receivable_credit_memo_amount" CHECK ((egcs_fc_amount >= (0)::numeric)),
+  CONSTRAINT "fc_chk_receivable_credit_memo_number" CHECK ((egcs_fc_number > 0))
 );
 
 CREATE INDEX fc_idx_ar_creditmemo_receivable ON "Funding_Case_Account_Receivable_Credit_Memo" (egcs_fc_receivable) WHERE NOT _deleted;
 
 CREATE TABLE "Funding_Case_Account_Receivable_Credit_Memo_Line" (
   "id" bigserial PRIMARY KEY,
-  "egcs_fc_creditmemo" bigint NOT NULL REFERENCES "Funding_Case_Account_Receivable_Credit_Memo"(id) ON DELETE RESTRICT,
-  "egcs_fc_linenumber" smallint NOT NULL CHECK (egcs_fc_linenumber > 0),
+  "egcs_fc_creditmemo" bigint NOT NULL CONSTRAINT "fc_fk_receivable_credit_memo_line_creditmemo" REFERENCES "Funding_Case_Account_Receivable_Credit_Memo"(id) ON DELETE RESTRICT,
+  "egcs_fc_linenumber" smallint NOT NULL CONSTRAINT "fc_chk_receivable_credit_memo_line_linenumber" CHECK (egcs_fc_linenumber > 0),
   "egcs_fc_receivable" bigint NOT NULL,
-  "egcs_fc_commitmentchartofaccount" bigint REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT,
-  "egcs_fc_creditmemochartofaccount" bigint NOT NULL REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT,
+  "egcs_fc_commitmentchartofaccount" bigint CONSTRAINT "fc_fk_receivable_credit_memo_line_commitmentchartofaccount" REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT,
+  "egcs_fc_creditmemochartofaccount" bigint NOT NULL CONSTRAINT "fc_fk_receivable_credit_memo_line_creditmemochartofaccount" REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT,
   "egcs_fc_creditmemoaccountingdimensions" jsonb DEFAULT '[]'::jsonb NOT NULL,
-  "egcs_fc_amount" numeric(19,2) NOT NULL CHECK (egcs_fc_amount > 0),
+  "egcs_fc_amount" numeric(19,2) NOT NULL CONSTRAINT "fc_chk_receivable_credit_memo_line_amount" CHECK (egcs_fc_amount > 0),
   "_deleted" boolean DEFAULT false NOT NULL
 );
 
@@ -181,22 +161,22 @@ CREATE TABLE "Funding_Case_Account_Receivable_Offset_Memo" (
   "egcs_fc_createdat" timestamp with time zone DEFAULT now() NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Funding_Case_Account_Receivable_Offset_Memo_pkey" PRIMARY KEY (id),
-  CONSTRAINT "Funding_Case_Account_Receivable_Offset_Mem_egcs_fc_amount_check" CHECK ((egcs_fc_amount > (0)::numeric)),
-  CONSTRAINT "Funding_Case_Account_Receivable_Offset_Memo__deleted_check" CHECK ((_deleted = false))
+  CONSTRAINT "fc_chk_receivable_offset_memo_amount" CHECK ((egcs_fc_amount > (0)::numeric)),
+  CONSTRAINT "fc_chk_receivable_offset_memo_notdeleted" CHECK ((_deleted = false))
 );
 
 CREATE INDEX fc_idx_ar_offset_memo_receivable ON "Funding_Case_Account_Receivable_Offset_Memo" USING btree (egcs_fc_receivable);
 
 CREATE TABLE "Funding_Case_Account_Receivable_Offset_Memo_Line" (
   "id" bigserial PRIMARY KEY,
-  "egcs_fc_offsetmemo" bigint NOT NULL REFERENCES "Funding_Case_Account_Receivable_Offset_Memo"(id) ON DELETE RESTRICT,
-  "egcs_fc_linenumber" smallint NOT NULL CHECK (egcs_fc_linenumber > 0),
+  "egcs_fc_offsetmemo" bigint NOT NULL CONSTRAINT "fc_fk_receivable_offset_memo_line_offsetmemo" REFERENCES "Funding_Case_Account_Receivable_Offset_Memo"(id) ON DELETE RESTRICT,
+  "egcs_fc_linenumber" smallint NOT NULL CONSTRAINT "fc_chk_receivable_offset_memo_line_linenumber" CHECK (egcs_fc_linenumber > 0),
   "egcs_fc_transferpaymentstreamchartofaccount" bigint NOT NULL,
-  "egcs_fc_creditmemochartofaccount" bigint NOT NULL REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT,
+  "egcs_fc_creditmemochartofaccount" bigint NOT NULL CONSTRAINT "fc_fk_receivable_offset_memo_line_creditmemochartofaccount" REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT,
   "egcs_fc_creditmemoaccountingdimensions" jsonb NOT NULL,
-  "egcs_fc_commitmentchartofaccount" bigint REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT,
-  "egcs_fc_amount" numeric(19,2) NOT NULL CHECK (egcs_fc_amount > 0),
-  "_deleted" boolean DEFAULT false NOT NULL CHECK (_deleted = false),
+  "egcs_fc_commitmentchartofaccount" bigint CONSTRAINT "fc_fk_receivable_offset_memo_line_commitmentchartofaccount" REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT,
+  "egcs_fc_amount" numeric(19,2) NOT NULL CONSTRAINT "fc_chk_receivable_offset_memo_line_amount" CHECK (egcs_fc_amount > 0),
+  "_deleted" boolean DEFAULT false NOT NULL CONSTRAINT "fc_chk_receivable_offset_memo_line_notdeleted" CHECK (_deleted = false),
   CONSTRAINT fc_uq_ar_offset_line_number UNIQUE (egcs_fc_offsetmemo, egcs_fc_linenumber),
   CONSTRAINT fc_uq_ar_offset_line_account UNIQUE (egcs_fc_offsetmemo, egcs_fc_creditmemochartofaccount)
 );
@@ -204,15 +184,12 @@ CREATE TABLE "Funding_Case_Account_Receivable_Offset_Memo_Line" (
 CREATE TABLE "Funding_Case_Account_Receivable_Offset_Memo_Application" (
   "id" bigint DEFAULT nextval('"Funding_Case_Account_Receivable_Offset_Memo_Application_id_seq"'::regclass) NOT NULL,
   "egcs_fc_offsetmemo" bigint NOT NULL,
-  "egcs_fc_allocation" bigint,
   "_deleted" boolean DEFAULT false NOT NULL,
-  "egcs_fc_recovery" bigint,
-  "egcs_fc_amount" numeric(19,2),
-  CONSTRAINT "Funding_Case_Account_Receivable_Offset_M_egcs_fc_allocation_key" UNIQUE (egcs_fc_allocation),
+  "egcs_fc_recovery" bigint NOT NULL,
+  "egcs_fc_amount" numeric(19,2) NOT NULL,
   CONSTRAINT "Funding_Case_Account_Receivable_Offset_Memo_Application_pkey" PRIMARY KEY (id),
-  CONSTRAINT "fc_chk_offset_application_basis" CHECK (((num_nonnulls(egcs_fc_allocation, egcs_fc_recovery) = 1) AND ((egcs_fc_recovery IS NULL) = (egcs_fc_amount IS NULL)))),
-  CONSTRAINT "Funding_Case_Account_Receivable_Offset_Me_egcs_fc_amount_check1" CHECK ((egcs_fc_amount > (0)::numeric)),
-  CONSTRAINT "Funding_Case_Account_Receivable_Offset_Memo_Appl__deleted_check" CHECK ((_deleted = false))
+  CONSTRAINT "fc_chk_receivable_offset_memo_application_amount" CHECK ((egcs_fc_amount > (0)::numeric)),
+  CONSTRAINT "fc_chk_receivable_offset_memo_application_notdeleted" CHECK ((_deleted = false))
 );
 
 CREATE UNIQUE INDEX fc_uq_ar_memo_application ON "Funding_Case_Account_Receivable_Offset_Memo_Application" USING btree (egcs_fc_offsetmemo);
@@ -228,36 +205,10 @@ CREATE TABLE "Funding_Case_Account_Receivable_Pool" (
   CONSTRAINT "Funding_Case_Account_Receivable_Pool_pkey" PRIMARY KEY (id)
 );
 
-CREATE TABLE "Funding_Case_Account_Receivable_Posting" (
-  "egcs_fc_accountreceivablechartofaccount" bigint NOT NULL,
-  "egcs_fc_accountreceivableaccountingdimensions" jsonb NOT NULL,
-  "id" bigint DEFAULT nextval('"Funding_Case_Account_Receivable_Posting_id_seq"'::regclass) NOT NULL,
-  "egcs_fc_recovery" bigint NOT NULL,
-  "egcs_fc_allocation" bigint NOT NULL,
-  "egcs_fc_coding" bigint NOT NULL,
-  "egcs_fc_receivable" bigint NOT NULL,
-  "egcs_fc_fundingagreement" bigint NOT NULL,
-  "egcs_fc_commitmentline" bigint NOT NULL,
-  "egcs_fc_chartofaccount" bigint NOT NULL,
-  "egcs_fc_agencychartofaccount" bigint NOT NULL,
-  "egcs_fc_agencyfiscalyear" bigint NOT NULL,
-  "egcs_fc_periodstart" integer NOT NULL,
-  "egcs_fc_periodend" integer NOT NULL,
-  "egcs_fc_amount" numeric(19,2) NOT NULL,
-  "_deleted" boolean DEFAULT false NOT NULL,
-  CONSTRAINT "fc_uq_ar_posting_coding" UNIQUE (egcs_fc_allocation, egcs_fc_coding),
-  CONSTRAINT "Funding_Case_Account_Receivable_Posting_pkey" PRIMARY KEY (id),
-  CONSTRAINT "fc_chk_ar_posting_retained" CHECK ((_deleted = false)),
-  CONSTRAINT "Funding_Case_Account_Receivable_Posti_egcs_fc_periodstart_check" CHECK (((egcs_fc_periodstart >= 0) AND (egcs_fc_periodstart <= 11))),
-  CONSTRAINT "Funding_Case_Account_Receivable_Posting_check" CHECK ((((egcs_fc_periodend >= 0) AND (egcs_fc_periodend <= 11)) AND (egcs_fc_periodend >= egcs_fc_periodstart))),
-  CONSTRAINT "Funding_Case_Account_Receivable_Posting_egcs_fc_amount_check" CHECK ((egcs_fc_amount > (0)::numeric))
-);
-
 CREATE TABLE "Funding_Case_Account_Receivable_Recovery" (
   "id" bigint DEFAULT nextval('"Funding_Case_Account_Receivable_Recovery_id_seq"'::regclass) NOT NULL,
   "egcs_fc_pool" bigint NOT NULL,
-  "egcs_fc_payment" bigint,
-  "egcs_fc_creditmemo" bigint,
+  "egcs_fc_payment" bigint NOT NULL,
   "egcs_fc_amount" numeric(19,2) NOT NULL,
   "egcs_fc_outcome" character varying(16) DEFAULT 'open'::character varying NOT NULL,
   "egcs_fc_createdat" timestamp with time zone DEFAULT now() NOT NULL,
@@ -265,22 +216,17 @@ CREATE TABLE "Funding_Case_Account_Receivable_Recovery" (
   "egcs_fc_postingruntime" bigint,
   "egcs_fc_releasedat" timestamp with time zone,
   "_deleted" boolean DEFAULT false NOT NULL,
-  "egcs_fc_ledgerkind" character varying(16) DEFAULT 'legacy'::character varying NOT NULL,
   CONSTRAINT "Funding_Case_Account_Receivable_Recovery_pkey" PRIMARY KEY (id),
-  CONSTRAINT "fc_chk_ar_recovery_author" CHECK ((num_nonnulls(egcs_fc_payment, egcs_fc_creditmemo) = 1)),
   CONSTRAINT "fc_chk_ar_recovery_posting" CHECK ((((egcs_fc_outcome)::text = 'posted'::text) = ((egcs_fc_postedat IS NOT NULL) AND (egcs_fc_postingruntime IS NOT NULL)))),
   CONSTRAINT "fc_chk_ar_recovery_release" CHECK ((((egcs_fc_outcome)::text = 'released'::text) = (egcs_fc_releasedat IS NOT NULL))),
   CONSTRAINT "fc_chk_ar_recovery_retained" CHECK ((_deleted = false)),
-  CONSTRAINT "Funding_Case_Account_Receivable_Recove_egcs_fc_ledgerkind_check" CHECK (((egcs_fc_ledgerkind)::text = ANY ((ARRAY['legacy'::character varying, 'pool'::character varying])::text[]))),
-  CONSTRAINT "Funding_Case_Account_Receivable_Recovery_egcs_fc_amount_check" CHECK ((egcs_fc_amount >= (0)::numeric)),
-  CONSTRAINT "Funding_Case_Account_Receivable_Recovery_egcs_fc_outcome_check" CHECK (((egcs_fc_outcome)::text = ANY ((ARRAY['open'::character varying, 'posted'::character varying, 'released'::character varying])::text[])))
+  CONSTRAINT "fc_chk_receivable_recovery_amount" CHECK ((egcs_fc_amount >= (0)::numeric)),
+  CONSTRAINT "fc_chk_receivable_recovery_outcome" CHECK (((egcs_fc_outcome)::text = ANY ((ARRAY['open'::character varying, 'posted'::character varying, 'released'::character varying])::text[])))
 );
-
-CREATE UNIQUE INDEX fc_uq_ar_creditmemo_recovery ON "Funding_Case_Account_Receivable_Recovery" USING btree (egcs_fc_creditmemo) WHERE ((egcs_fc_creditmemo IS NOT NULL) AND ((egcs_fc_outcome)::text <> 'released'::text) AND (NOT _deleted));
 
 CREATE UNIQUE INDEX fc_uq_ar_open_pool ON "Funding_Case_Account_Receivable_Recovery" USING btree (egcs_fc_pool) WHERE (((egcs_fc_outcome)::text = 'open'::text) AND (NOT _deleted));
 
-CREATE UNIQUE INDEX fc_uq_ar_payment_recovery ON "Funding_Case_Account_Receivable_Recovery" USING btree (egcs_fc_payment) WHERE ((egcs_fc_payment IS NOT NULL) AND ((egcs_fc_outcome)::text <> 'released'::text) AND (NOT _deleted));
+CREATE UNIQUE INDEX fc_uq_ar_payment_recovery ON "Funding_Case_Account_Receivable_Recovery" USING btree (egcs_fc_payment) WHERE (((egcs_fc_outcome)::text <> 'released'::text) AND (NOT _deleted));
 
 CREATE TABLE "Funding_Case_Agreement_Account_Receivable" (
   "egcs_fc_allocationevidence" jsonb,
@@ -344,11 +290,11 @@ END) STORED,
   CONSTRAINT "fc_chk_ar_self" CHECK ((id IS DISTINCT FROM egcs_fc_linkedreceivable)),
   CONSTRAINT "fc_chk_ar_terminal" CHECK ((((egcs_fc_outcome)::text = 'open'::text) = (egcs_fc_terminalat IS NULL))),
   CONSTRAINT "fc_chk_ar_type_source" CHECK ((egcs_fc_advancepaymentrelated <> egcs_fc_claimrelated)),
-  CONSTRAINT "Funding_Case_Agreement_Accoun_egcs_fc_recipientpreference_check" CHECK (((egcs_fc_recipientpreference)::text = ANY ((ARRAY['offset'::character varying, 'direct_repayment'::character varying])::text[]))),
-  CONSTRAINT "Funding_Case_Agreement_Account__egcs_fc_fiscaloutstanding_check" CHECK ((egcs_fc_fiscaloutstanding >= (0)::numeric)),
-  CONSTRAINT "Funding_Case_Agreement_Account_Rec_egcs_fc_recoverymethod_check" CHECK (((egcs_fc_recoverymethod)::text = ANY ((ARRAY['offset'::character varying, 'direct_repayment'::character varying])::text[]))),
-  CONSTRAINT "Funding_Case_Agreement_Account_Receivable_egcs_fc_number_check" CHECK ((egcs_fc_number > 0)),
-  CONSTRAINT "Funding_Case_Agreement_Account_Receivable_egcs_fc_outcome_check" CHECK (((egcs_fc_outcome)::text = ANY ((ARRAY['open'::character varying, 'posted'::character varying, 'denied'::character varying, 'failed'::character varying, 'cancelled'::character varying])::text[])))
+  CONSTRAINT "fc_chk_agreement_receivable_recipientpreference" CHECK (((egcs_fc_recipientpreference)::text = ANY ((ARRAY['offset'::character varying, 'direct_repayment'::character varying])::text[]))),
+  CONSTRAINT "fc_chk_agreement_receivable_fiscaloutstanding" CHECK ((egcs_fc_fiscaloutstanding >= (0)::numeric)),
+  CONSTRAINT "fc_chk_agreement_receivable_recoverymethod" CHECK (((egcs_fc_recoverymethod)::text = ANY ((ARRAY['offset'::character varying, 'direct_repayment'::character varying])::text[]))),
+  CONSTRAINT "fc_chk_agreement_receivable_number" CHECK ((egcs_fc_number > 0)),
+  CONSTRAINT "fc_chk_agreement_receivable_outcome" CHECK (((egcs_fc_outcome)::text = ANY ((ARRAY['open'::character varying, 'posted'::character varying, 'denied'::character varying, 'failed'::character varying, 'cancelled'::character varying])::text[])))
 );
 
 CREATE TABLE "Funding_Case_Agreement_Account_Receivable_Coding" (
@@ -370,10 +316,10 @@ CREATE TABLE "Funding_Case_Agreement_Account_Receivable_Coding" (
   CONSTRAINT "fc_uq_ar_coding_basis" UNIQUE (egcs_fc_receivableline, egcs_fc_commitmentline, egcs_fc_chartofaccount, egcs_fc_periodstart, egcs_fc_periodend),
   CONSTRAINT "fc_uq_ar_coding_line" UNIQUE (id, egcs_fc_receivableline),
   CONSTRAINT "Funding_Case_Agreement_Account_Receivable_Coding_pkey" PRIMARY KEY (id),
-  CONSTRAINT "Funding_Case_Agreement_Account_Re_egcs_fc_sharedpaidbasis_check" CHECK ((egcs_fc_sharedpaidbasis >= (0)::numeric)),
-  CONSTRAINT "Funding_Case_Agreement_Account_Recei_egcs_fc_periodstart_check1" CHECK (((egcs_fc_periodstart >= 0) AND (egcs_fc_periodstart <= 11))),
-  CONSTRAINT "Funding_Case_Agreement_Account_Receivab_egcs_fc_paidbasis_check" CHECK ((egcs_fc_paidbasis > (0)::numeric)),
-  CONSTRAINT "Funding_Case_Agreement_Account_Receivable_Coding_check" CHECK ((((egcs_fc_periodend >= 0) AND (egcs_fc_periodend <= 11)) AND (egcs_fc_periodend >= egcs_fc_periodstart)))
+  CONSTRAINT "fc_chk_agreement_receivable_coding_sharedpaidbasis" CHECK ((egcs_fc_sharedpaidbasis >= (0)::numeric)),
+  CONSTRAINT "fc_chk_agreement_receivable_coding_periodstart" CHECK (((egcs_fc_periodstart >= 0) AND (egcs_fc_periodstart <= 11))),
+  CONSTRAINT "fc_chk_agreement_receivable_coding_paidbasis" CHECK ((egcs_fc_paidbasis > (0)::numeric)),
+  CONSTRAINT "fc_chk_agreement_receivable_coding_period" CHECK ((((egcs_fc_periodend >= 0) AND (egcs_fc_periodend <= 11)) AND (egcs_fc_periodend >= egcs_fc_periodstart)))
 );
 
 CREATE TABLE "Funding_Case_Agreement_Account_Receivable_Line" (
@@ -396,9 +342,9 @@ CREATE TABLE "Funding_Case_Agreement_Account_Receivable_Line" (
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "fc_uq_ar_line_identity" UNIQUE (id, egcs_fc_receivable, egcs_fc_fundingagreement),
   CONSTRAINT "Funding_Case_Agreement_Account_Receivable_Line_pkey" PRIMARY KEY (id),
-  CONSTRAINT "Funding_Case_Agreement_Account_Recei_egcs_fc_sourceamount_check" CHECK ((egcs_fc_sourceamount > (0)::numeric)),
-  CONSTRAINT "Funding_Case_Agreement_Account_Receiv_egcs_fc_periodstart_check" CHECK (((egcs_fc_periodstart >= 0) AND (egcs_fc_periodstart <= 11))),
-  CONSTRAINT "Funding_Case_Agreement_Account_Receivable_Line_check" CHECK ((((egcs_fc_periodend >= 0) AND (egcs_fc_periodend <= 11)) AND (egcs_fc_periodend >= egcs_fc_periodstart)))
+  CONSTRAINT "fc_chk_agreement_receivable_line_sourceamount" CHECK ((egcs_fc_sourceamount > (0)::numeric)),
+  CONSTRAINT "fc_chk_agreement_receivable_line_periodstart" CHECK (((egcs_fc_periodstart >= 0) AND (egcs_fc_periodstart <= 11))),
+  CONSTRAINT "fc_chk_agreement_receivable_line_period" CHECK ((((egcs_fc_periodend >= 0) AND (egcs_fc_periodend <= 11)) AND (egcs_fc_periodend >= egcs_fc_periodstart)))
 );
 
 CREATE TABLE "Funding_Case_Agreement_Activity" (
@@ -515,7 +461,7 @@ CREATE TABLE "Funding_Case_Agreement_Approval_Submission" (
   "egcs_fc_packet" jsonb NOT NULL,
   "egcs_fc_canonicalhash" character varying(64) NOT NULL,
   "egcs_fc_submittedat" timestamp with time zone DEFAULT now() NOT NULL,
-  CONSTRAINT "Funding_Case_Agreement_Approval_Submiss_egcs_fc_workflowrun_key" UNIQUE (egcs_fc_workflowrun),
+  CONSTRAINT "fc_uq_agreement_approval_submission_workflowrun" UNIQUE (egcs_fc_workflowrun),
   CONSTRAINT "Funding_Case_Agreement_Approval_Submission_pkey" PRIMARY KEY (id),
   CONSTRAINT "fc_chk_approvalsubmissionhash" CHECK (((egcs_fc_canonicalhash)::text ~ '^[0-9a-f]{64}$'::text)),
   CONSTRAINT "fc_chk_approvalsubmissionversion" CHECK ((egcs_fc_snapshotschemaversion IN (1, 2, 3)))
@@ -575,7 +521,7 @@ CREATE TABLE "Funding_Case_Agreement_Budget_Line_Item_Funding" (
   "egcs_fc_description_fr" character varying(255),
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Funding_Case_Agreement_Budget_Line_Item_Funding_pkey" PRIMARY KEY (id),
-  CONSTRAINT "Funding_Case_Agreement_Budget_Line_Item_Fu_egcs_fc_amount_check" CHECK ((egcs_fc_amount >= (0)::numeric))
+  CONSTRAINT "fc_chk_agreement_budget_lineitem_funding_amount" CHECK ((egcs_fc_amount >= (0)::numeric))
 );
 
 CREATE UNIQUE INDEX fc_uq_budget_line_funding_active ON "Funding_Case_Agreement_Budget_Line_Item_Funding" USING btree (egcs_fc_budgetlineitem, egcs_fc_fundingsubtype) WHERE (_deleted = false);
@@ -645,7 +591,7 @@ CREATE TABLE "Funding_Case_Agreement_Claim_Line_Item_Funding" (
   "egcs_fc_amount" numeric(19,2) NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Funding_Case_Agreement_Claim_Line_Item_Funding_pkey" PRIMARY KEY (id),
-  CONSTRAINT "Funding_Case_Agreement_Claim_Line_Item_Fun_egcs_fc_amount_check" CHECK ((egcs_fc_amount >= (0)::numeric))
+  CONSTRAINT "fc_chk_agreement_claim_lineitem_funding_amount" CHECK ((egcs_fc_amount >= (0)::numeric))
 );
 
 CREATE UNIQUE INDEX fc_uq_claim_line_funding_active ON "Funding_Case_Agreement_Claim_Line_Item_Funding" USING btree (egcs_fc_claimlineitem, egcs_fc_fundingsubtype) WHERE (_deleted = false);
@@ -703,7 +649,7 @@ CREATE TABLE "Funding_Case_Agreement_Closeout_Snapshot" (
   "egcs_fc_packet" jsonb NOT NULL,
   "egcs_fc_canonicalhash" character varying(64) NOT NULL,
   "egcs_fc_capturedat" timestamp with time zone DEFAULT now() NOT NULL,
-  CONSTRAINT "Funding_Case_Agreement_Closeout_Snapsho_egcs_fc_workflowrun_key" UNIQUE (egcs_fc_workflowrun),
+  CONSTRAINT "fc_uq_agreement_closeout_snapshot_workflowrun" UNIQUE (egcs_fc_workflowrun),
   CONSTRAINT "Funding_Case_Agreement_Closeout_Snapshot_pkey" PRIMARY KEY (id),
   CONSTRAINT "fc_chk_closeoutsnapshothash" CHECK (((egcs_fc_canonicalhash)::text ~ '^[0-9a-f]{64}$'::text)),
   CONSTRAINT "fc_chk_closeoutsnapshotversion" CHECK ((egcs_fc_snapshotschemaversion = 1))
@@ -711,7 +657,7 @@ CREATE TABLE "Funding_Case_Agreement_Closeout_Snapshot" (
 
 CREATE TABLE "Funding_Case_Agreement_Commitment" (
   "id" bigint NOT NULL,
-  "egcs_fc_totalamount" numeric(19,2) DEFAULT 0 NOT NULL CHECK (egcs_fc_totalamount >= 0),
+  "egcs_fc_totalamount" numeric(19,2) DEFAULT 0 NOT NULL CONSTRAINT "fc_chk_agreement_commitment_totalamount" CHECK (egcs_fc_totalamount >= 0),
   "egcs_fc_fundingagreement" bigint NOT NULL,
   "egcs_fc_transferpaymentstream" bigint NOT NULL,
   "egcs_fc_type" bigint NOT NULL,
@@ -782,8 +728,8 @@ END) STORED,
   CONSTRAINT "fc_chk_correction_posting" CHECK ((((egcs_fc_outcome)::text = 'posted'::text) = ((egcs_fc_postedat IS NOT NULL) AND (egcs_fc_postingruntime IS NOT NULL)))),
   CONSTRAINT "fc_chk_correction_self" CHECK ((id IS DISTINCT FROM egcs_fc_linkedcorrection)),
   CONSTRAINT "fc_chk_correction_terminal" CHECK ((((egcs_fc_outcome)::text = 'open'::text) = (egcs_fc_terminalat IS NULL))),
-  CONSTRAINT "Funding_Case_Agreement_Correction_egcs_fc_number_check" CHECK ((egcs_fc_number > 0)),
-  CONSTRAINT "Funding_Case_Agreement_Correction_egcs_fc_outcome_check" CHECK (((egcs_fc_outcome)::text = ANY ((ARRAY['open'::character varying, 'posted'::character varying, 'denied'::character varying, 'failed'::character varying, 'cancelled'::character varying])::text[])))
+  CONSTRAINT "fc_chk_agreement_correction_number" CHECK ((egcs_fc_number > 0)),
+  CONSTRAINT "fc_chk_agreement_correction_outcome" CHECK (((egcs_fc_outcome)::text = ANY ((ARRAY['open'::character varying, 'posted'::character varying, 'denied'::character varying, 'failed'::character varying, 'cancelled'::character varying])::text[])))
 );
 
 CREATE UNIQUE INDEX fc_uq_correction_open ON "Funding_Case_Agreement_Correction" USING btree (egcs_fc_fundingagreement) WHERE ((_deleted = false) AND ((egcs_fc_outcome)::text = 'open'::text));
@@ -799,7 +745,7 @@ CREATE TABLE "Funding_Case_Agreement_Correction_Adjustment" (
   "egcs_fc_amount" numeric(19,2) NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Funding_Case_Agreement_Correction_Adjustment_pkey" PRIMARY KEY (id),
-  CONSTRAINT "Funding_Case_Agreement_Correction_Adjustme_egcs_fc_amount_check" CHECK ((egcs_fc_amount <> (0)::numeric))
+  CONSTRAINT "fc_chk_agreement_correction_adjustment_amount" CHECK ((egcs_fc_amount <> (0)::numeric))
 );
 
 CREATE INDEX fc_idx_correction_adjustment_agreement ON "Funding_Case_Agreement_Correction_Adjustment" USING btree (egcs_fc_fundingagreement, egcs_fc_agencyfiscalyear) WHERE (_deleted = false);
@@ -825,10 +771,10 @@ CREATE TABLE "Funding_Case_Agreement_Correction_Line" (
   "egcs_fc_arrecoveries" numeric(19,2) DEFAULT 0 NOT NULL,
   CONSTRAINT "fc_uq_correction_line_root" UNIQUE (id, egcs_fc_correction, egcs_fc_fundingagreement),
   CONSTRAINT "Funding_Case_Agreement_Correction_Line_pkey" PRIMARY KEY (id),
-  CONSTRAINT "Funding_Case_Agreement_Corre_egcs_fc_accountingdimensions_check" CHECK ((jsonb_typeof(egcs_fc_accountingdimensions) = 'array'::text)),
-  CONSTRAINT "Funding_Case_Agreement_Correctio_egcs_fc_commitmentamount_check" CHECK ((egcs_fc_commitmentamount >= (0)::numeric)),
-  CONSTRAINT "Funding_Case_Agreement_Correction_Li_egcs_fc_arrecoveries_check" CHECK ((egcs_fc_arrecoveries <= (0)::numeric)),
-  CONSTRAINT "Funding_Case_Agreement_Correction_Li_egcs_fc_originalpaid_check" CHECK ((egcs_fc_originalpaid >= (0)::numeric))
+  CONSTRAINT "fc_chk_agreement_correction_line_accountingdimensions" CHECK ((jsonb_typeof(egcs_fc_accountingdimensions) = 'array'::text)),
+  CONSTRAINT "fc_chk_agreement_correction_line_commitmentamount" CHECK ((egcs_fc_commitmentamount >= (0)::numeric)),
+  CONSTRAINT "fc_chk_agreement_correction_line_arrecoveries" CHECK ((egcs_fc_arrecoveries <= (0)::numeric)),
+  CONSTRAINT "fc_chk_agreement_correction_line_originalpaid" CHECK ((egcs_fc_originalpaid >= (0)::numeric))
 );
 
 CREATE UNIQUE INDEX fc_uq_correction_line_active ON "Funding_Case_Agreement_Correction_Line" USING btree (egcs_fc_correction, egcs_fc_commitmentline) WHERE (_deleted = false);
@@ -843,7 +789,7 @@ CREATE TABLE "Funding_Case_Agreement_Correction_Notification" (
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "fc_uq_correction_notification" UNIQUE (egcs_fc_correction, egcs_fc_user),
   CONSTRAINT "Funding_Case_Agreement_Correction_Notification_pkey" PRIMARY KEY (id),
-  CONSTRAINT "Funding_Case_Agreement_Correction_Notific_egcs_fc_outcome_check" CHECK (((egcs_fc_outcome)::text = ANY ((ARRAY['posted'::character varying, 'denied'::character varying, 'failed'::character varying, 'cancelled'::character varying])::text[])))
+  CONSTRAINT "fc_chk_agreement_correction_notification_outcome" CHECK (((egcs_fc_outcome)::text = ANY ((ARRAY['posted'::character varying, 'denied'::character varying, 'failed'::character varying, 'cancelled'::character varying])::text[])))
 );
 
 CREATE TABLE "Funding_Case_Agreement_Correction_Source" (
@@ -854,7 +800,7 @@ CREATE TABLE "Funding_Case_Agreement_Correction_Source" (
   "egcs_fc_evidence" jsonb NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Funding_Case_Agreement_Correction_Source_pkey" PRIMARY KEY (id),
-  CONSTRAINT "Funding_Case_Agreement_Correction_Source_egcs_fc_evidence_check" CHECK (((jsonb_typeof(egcs_fc_evidence) = 'object'::text) AND (egcs_fc_evidence ? 'header'::text) AND (jsonb_typeof((egcs_fc_evidence -> 'allocations'::text)) = 'array'::text)))
+  CONSTRAINT "fc_chk_agreement_correction_source_evidence" CHECK (((jsonb_typeof(egcs_fc_evidence) = 'object'::text) AND (egcs_fc_evidence ? 'header'::text) AND (jsonb_typeof((egcs_fc_evidence -> 'allocations'::text)) = 'array'::text)))
 );
 
 CREATE UNIQUE INDEX fc_uq_correction_source_active ON "Funding_Case_Agreement_Correction_Source" USING btree (egcs_fc_correction, egcs_fc_payment) WHERE (_deleted = false);
@@ -900,7 +846,7 @@ CREATE TABLE "Funding_Case_Agreement_Forecast_Line_Item_Funding" (
   "egcs_fc_amount" numeric(19,2) NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Funding_Case_Agreement_Forecast_Line_Item_Funding_pkey" PRIMARY KEY (id),
-  CONSTRAINT "Funding_Case_Agreement_Forecast_Line_Item__egcs_fc_amount_check" CHECK ((egcs_fc_amount >= (0)::numeric))
+  CONSTRAINT "fc_chk_agreement_forecast_lineitem_funding_amount" CHECK ((egcs_fc_amount >= (0)::numeric))
 );
 
 CREATE UNIQUE INDEX fc_uq_forecast_line_funding_active ON "Funding_Case_Agreement_Forecast_Line_Item_Funding" USING btree (egcs_fc_forecastlineitem, egcs_fc_fundingsubtype) WHERE (_deleted = false);
@@ -950,7 +896,7 @@ CREATE TABLE "Funding_Case_Agreement_Journal_Voucher" (
   CONSTRAINT "Funding_Case_Agreement_Journal_Voucher_pkey" PRIMARY KEY (id),
   CONSTRAINT "fc_chk_jv_links" CHECK (((egcs_fc_reversalof IS NULL) OR (egcs_fc_replacementof IS NULL))),
   CONSTRAINT "fc_chk_jv_self" CHECK (((id IS DISTINCT FROM egcs_fc_reversalof) AND (id IS DISTINCT FROM egcs_fc_replacementof))),
-  CONSTRAINT "Funding_Case_Agreement_Journal_Voucher_egcs_fc_number_check" CHECK ((egcs_fc_number > 0))
+  CONSTRAINT "fc_chk_agreement_journal_voucher_number" CHECK ((egcs_fc_number > 0))
 );
 
 CREATE INDEX fc_idx_jv_payment ON "Funding_Case_Agreement_Journal_Voucher" USING btree (egcs_fc_payment);
@@ -972,8 +918,8 @@ CREATE TABLE "Funding_Case_Agreement_Journal_Voucher_Line" (
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Funding_Case_Agreement_Journal_Voucher_Line_pkey" PRIMARY KEY (id),
   CONSTRAINT "fc_chk_jv_line_amount" CHECK ((((egcs_fc_kind)::text = 'adjustment'::text) OR (egcs_fc_amount >= (0)::numeric))),
-  CONSTRAINT "Funding_Case_Agreement_Journ_egcs_fc_accountingdimensions_check" CHECK ((jsonb_typeof(egcs_fc_accountingdimensions) = 'array'::text)),
-  CONSTRAINT "Funding_Case_Agreement_Journal_Voucher_Line_egcs_fc_kind_check" CHECK (((egcs_fc_kind)::text = ANY ((ARRAY['original'::character varying, 'corrected'::character varying, 'adjustment'::character varying])::text[])))
+  CONSTRAINT "fc_chk_agreement_journal_voucher_line_accountingdimensions" CHECK ((jsonb_typeof(egcs_fc_accountingdimensions) = 'array'::text)),
+  CONSTRAINT "fc_chk_agreement_journal_voucher_line_kind" CHECK (((egcs_fc_kind)::text = ANY ((ARRAY['original'::character varying, 'corrected'::character varying, 'adjustment'::character varying])::text[])))
 );
 
 CREATE INDEX fc_idx_jv_lines_root ON "Funding_Case_Agreement_Journal_Voucher_Line" USING btree (egcs_fc_journalvoucher);
@@ -1219,15 +1165,11 @@ CREATE UNIQUE INDEX fc_idx_revisionamendment ON "Funding_Case_Agreement_Revision
 
 CREATE UNIQUE INDEX fc_idx_revisionapprovalsubmission ON "Funding_Case_Agreement_Revision" USING btree (egcs_fc_approvalsubmission) WHERE (_deleted = false);
 
-ALTER SEQUENCE "Funding_Case_Account_Receivable_Allocation_id_seq" OWNED BY "Funding_Case_Account_Receivable_Allocation"."id";
-
 ALTER SEQUENCE "Funding_Case_Account_Receivable_Offset_Memo_Application_id_seq" OWNED BY "Funding_Case_Account_Receivable_Offset_Memo_Application"."id";
 
 ALTER SEQUENCE "Funding_Case_Account_Receivable_Offset_Memo_id_seq" OWNED BY "Funding_Case_Account_Receivable_Offset_Memo"."id";
 
 ALTER SEQUENCE "Funding_Case_Account_Receivable_Pool_id_seq" OWNED BY "Funding_Case_Account_Receivable_Pool"."id";
-
-ALTER SEQUENCE "Funding_Case_Account_Receivable_Posting_id_seq" OWNED BY "Funding_Case_Account_Receivable_Posting"."id";
 
 ALTER SEQUENCE "Funding_Case_Account_Receivable_Recovery_id_seq" OWNED BY "Funding_Case_Account_Receivable_Recovery"."id";
 
@@ -1353,21 +1295,6 @@ AS $function$
         AND NOT line._deleted AND NOT root._deleted
   $function$;
 
-CREATE FUNCTION ar_outstanding(root_id bigint)
- RETURNS numeric
- LANGUAGE sql
- STABLE
-AS $function$
-    SELECT COALESCE((SELECT sum(line.egcs_fc_amount) FROM "Funding_Case_Agreement_Account_Receivable_Line" line
-      JOIN "Funding_Case_Agreement_Account_Receivable" root ON root.id = line.egcs_fc_receivable
-      WHERE (root.id = root_id OR root.egcs_fc_linkedreceivable = root_id) AND root.egcs_fc_outcome = 'posted'
-        AND NOT root._deleted AND NOT line._deleted),0)
-      - COALESCE((SELECT sum(allocation.egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Allocation" allocation
-        JOIN "Funding_Case_Account_Receivable_Recovery" recovery ON recovery.id = allocation.egcs_fc_recovery
-        WHERE allocation.egcs_fc_receivable = root_id AND recovery.egcs_fc_outcome = 'posted'
-          AND NOT allocation._deleted AND NOT recovery._deleted),0)
-  $function$;
-
 CREATE FUNCTION ar_payment_control(payment_id bigint, agreement_id bigint, debtor_id bigint)
  RETURNS text
  LANGUAGE plpgsql
@@ -1402,7 +1329,7 @@ AS $function$
       - coalesce((SELECT sum(memo.egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Credit_Memo" memo
         WHERE memo.egcs_fc_pool=pool_id AND memo.egcs_fc_outcome='posted' AND NOT memo._deleted),0)
       - coalesce((SELECT sum(recovery.egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Recovery" recovery
-        WHERE recovery.egcs_fc_pool=pool_id AND recovery.egcs_fc_payment IS NOT NULL AND recovery.egcs_fc_outcome='posted' AND NOT recovery._deleted),0)
+        WHERE recovery.egcs_fc_pool=pool_id AND recovery.egcs_fc_outcome='posted' AND NOT recovery._deleted),0)
   $function$;
 
 CREATE FUNCTION ar_successful_submission(root_id bigint, target_type text, runtime_id bigint)
@@ -1438,9 +1365,6 @@ CREATE FUNCTION ar_receivable_cash_net(receivable_id bigint, excluded_memo bigin
         JOIN "Funding_Case_Account_Receivable_Recovery" recovery ON recovery.id=application.egcs_fc_recovery
         WHERE memo.egcs_fc_receivable=receivable_id AND recovery.egcs_fc_outcome='posted' AND NOT recovery._deleted),0)
   $function$;
-
-
-
 
 CREATE FUNCTION correction_has_lifecycle_evidence(root_id bigint)
  RETURNS boolean
@@ -2326,7 +2250,7 @@ AS $function$
               AND (newer_runtime.egcs_cn_attempt,newer_runtime.id)>(runtime.egcs_cn_attempt,runtime.id))) THEN
         RAISE EXCEPTION 'AR terminal outcomes require their latest Completion-linked Workflow outcome' USING ERRCODE='23514';
       END IF;
-      IF target_type='fundingcaseaccountreceivablecreditmemo' AND to_jsonb(root)->>'egcs_fc_ledgerkind'='pool' THEN
+      IF target_type='fundingcaseaccountreceivablecreditmemo' THEN
         IF root.egcs_fc_outcome='posted' AND NOT ar_successful_submission(root_id,target_type,root.egcs_fc_postingruntime) THEN
           RAISE EXCEPTION 'Credit memo requires latest successful Completion approval' USING ERRCODE='23514';
         END IF; RETURN NULL;
@@ -2390,27 +2314,11 @@ AS $function$
                 AND (other.egcs_fc_outcome = 'posted' OR (other.egcs_fc_outcome = 'open' AND ar_has_lifecycle_evidence(other.id,other.egcs_fc_entitytype)))
                 GROUP BY other.id,other.egcs_fc_outcome) usage;
             IF root.egcs_fc_advancepaymentrelated AND (root.egcs_fc_linkedreceivable IS NULL OR proposal_total>0) THEN
-              consumed := consumed - COALESCE((SELECT sum(allocation.egcs_fc_amount)
-                FROM "Funding_Case_Account_Receivable_Allocation" allocation
-                JOIN "Funding_Case_Account_Receivable_Recovery" recovery ON recovery.id = allocation.egcs_fc_recovery
-                JOIN "Funding_Case_Agreement_Account_Receivable_Line" original ON original.id = allocation.egcs_fc_receivableline
-                JOIN "Funding_Case_Agreement_Account_Receivable" originaldebt ON originaldebt.id = original.egcs_fc_receivable
-                WHERE original.egcs_fc_fundingagreement = root.egcs_fc_fundingagreement AND original.egcs_fc_sourcekey = source.egcs_fc_sourcekey
-                  AND originaldebt.egcs_fc_applicantrecipient = root.egcs_fc_applicantrecipient
-                  AND recovery.egcs_fc_outcome = 'posted' AND NOT allocation._deleted AND NOT recovery._deleted),0);
               fiscal_capacity := root.egcs_fc_fiscaloutstanding;
               IF fiscal_capacity IS NULL THEN
                 RAISE EXCEPTION 'Advance AR requires retained fiscal outstanding capacity' USING ERRCODE = '23514';
               END IF;
               SELECT COALESCE(sum(CASE WHEN usage.outcome='posted' OR usage.id=root_id THEN usage.amount ELSE greatest(usage.amount,0) END),0)
-                - COALESCE((SELECT sum(allocation.egcs_fc_amount)
-                  FROM "Funding_Case_Account_Receivable_Allocation" allocation
-                  JOIN "Funding_Case_Account_Receivable_Recovery" recovery ON recovery.id = allocation.egcs_fc_recovery
-                  JOIN "Funding_Case_Agreement_Account_Receivable" originaldebt ON originaldebt.id = allocation.egcs_fc_receivable
-                  WHERE originaldebt.egcs_fc_fundingagreement = root.egcs_fc_fundingagreement
-                    AND originaldebt.egcs_fc_applicantrecipient = root.egcs_fc_applicantrecipient
-                    AND originaldebt.egcs_fc_agencyfiscalyear = root.egcs_fc_agencyfiscalyear AND originaldebt.egcs_fc_advancepaymentrelated
-                    AND recovery.egcs_fc_outcome = 'posted' AND NOT allocation._deleted AND NOT recovery._deleted),0)
                 INTO principal
                 FROM (SELECT other.id,other.egcs_fc_outcome AS outcome,sum(line.egcs_fc_amount) AS amount
                 FROM "Funding_Case_Agreement_Account_Receivable_Line" line
@@ -2451,22 +2359,10 @@ AS $function$
                 AND NOT retained._deleted AND NOT other._deleted
                 AND (other.egcs_fc_outcome = 'posted' OR (other.egcs_fc_outcome = 'open' AND ar_has_lifecycle_evidence(other.id,other.egcs_fc_entitytype)))
                 GROUP BY other.id,other.egcs_fc_outcome) usage;
-            consumed := consumed - COALESCE((SELECT sum(posting.egcs_fc_amount)
-              FROM "Funding_Case_Account_Receivable_Posting" posting
-              JOIN "Funding_Case_Account_Receivable_Recovery" recovery ON recovery.id = posting.egcs_fc_recovery
-              WHERE posting.egcs_fc_fundingagreement = root.egcs_fc_fundingagreement AND recovery.egcs_fc_pool = root.egcs_fc_pool
-                AND (posting.egcs_fc_commitmentline,posting.egcs_fc_chartofaccount,posting.egcs_fc_agencyfiscalyear,posting.egcs_fc_periodstart,posting.egcs_fc_periodend)
-                  = (coding.egcs_fc_commitmentline,coding.egcs_fc_chartofaccount,coding.egcs_fc_agencyfiscalyear,coding.egcs_fc_periodstart,coding.egcs_fc_periodend)
-                AND recovery.egcs_fc_outcome = 'posted' AND NOT posting._deleted AND NOT recovery._deleted),0);
             consumed := greatest(consumed,0); IF consumed > coding.paid_basis THEN
               RAISE EXCEPTION 'AR coding principal is already reserved or established against its shared paid basis' USING ERRCODE = '23514';
             END IF;
           END LOOP;
-        ELSE
-          IF NOT EXISTS (SELECT 1 FROM "Funding_Case_Account_Receivable_Recovery" recovery WHERE recovery.egcs_fc_creditmemo = root_id
-            AND recovery.egcs_fc_outcome = 'posted' AND recovery.egcs_fc_amount = root.egcs_fc_amount AND NOT recovery._deleted) THEN
-            RAISE EXCEPTION 'Approved Credit Memo must post its received amount exactly once' USING ERRCODE = '23514';
-          END IF;
         END IF;
       END IF;
       RETURN NULL;
@@ -2509,7 +2405,7 @@ CREATE FUNCTION trg_fn_validate_ar_offset_memo()
       ELSE
         SELECT * INTO memo FROM "Funding_Case_Account_Receivable_Offset_Memo" WHERE id=NEW.egcs_fc_offsetmemo FOR UPDATE;
         SELECT * INTO recovery FROM "Funding_Case_Account_Receivable_Recovery" WHERE id=NEW.egcs_fc_recovery;
-        IF NEW.egcs_fc_allocation IS NOT NULL OR recovery.id IS NULL OR recovery.egcs_fc_ledgerkind<>'pool'
+        IF recovery.id IS NULL
           OR recovery.egcs_fc_pool<>memo.egcs_fc_pool OR recovery.egcs_fc_outcome<>'open' OR memo.egcs_fc_amount<>NEW.egcs_fc_amount THEN
           RAISE EXCEPTION 'Offset application must preserve its one-AR Credit Memo within the Payment Agency' USING ERRCODE='23514'; END IF;
         SELECT coalesce(sum(application.egcs_fc_amount),0) INTO consumed
@@ -2541,188 +2437,52 @@ CREATE FUNCTION trg_fn_validate_ar_recovery()
  RETURNS trigger
  LANGUAGE plpgsql
 AS $function$
-    DECLARE recovery record; pool record; root record; source record; allocation record; coding record; operation record; principal numeric; consumed numeric; recovery_id bigint;
+    DECLARE pool record;
     BEGIN
-      IF TG_OP='INSERT' AND (TG_TABLE_NAME='Funding_Case_Account_Receivable_Allocation' OR TG_TABLE_NAME='Funding_Case_Account_Receivable_Recovery' AND to_jsonb(NEW)->>'egcs_fc_ledgerkind'<>'pool') THEN
-        RAISE EXCEPTION 'New credits are never matched to individual ARs' USING ERRCODE='23514';
+      IF TG_OP='DELETE' OR TG_OP='UPDATE' AND (OLD.egcs_fc_outcome<>'open' AND to_jsonb(OLD) IS DISTINCT FROM to_jsonb(NEW)
+        OR (to_jsonb(OLD)-ARRAY['egcs_fc_outcome','egcs_fc_postedat','egcs_fc_postingruntime','egcs_fc_releasedat']) IS DISTINCT FROM
+          (to_jsonb(NEW)-ARRAY['egcs_fc_outcome','egcs_fc_postedat','egcs_fc_postingruntime','egcs_fc_releasedat'])) THEN
+        RAISE EXCEPTION 'Pool deduction evidence is immutable' USING ERRCODE='23514';
       END IF;
-      IF TG_TABLE_NAME='Funding_Case_Account_Receivable_Recovery' AND to_jsonb(NEW)->>'egcs_fc_ledgerkind'='pool' THEN
-        IF TG_OP='DELETE' OR TG_OP='UPDATE' AND (OLD.egcs_fc_outcome<>'open' AND to_jsonb(OLD) IS DISTINCT FROM to_jsonb(NEW)
-          OR (to_jsonb(OLD)-ARRAY['egcs_fc_outcome','egcs_fc_postedat','egcs_fc_postingruntime','egcs_fc_releasedat']) IS DISTINCT FROM
-            (to_jsonb(NEW)-ARRAY['egcs_fc_outcome','egcs_fc_postedat','egcs_fc_postingruntime','egcs_fc_releasedat'])) THEN
-          RAISE EXCEPTION 'Pool deduction evidence is immutable' USING ERRCODE='23514';
-        END IF;
-        SELECT * INTO pool FROM "Funding_Case_Account_Receivable_Pool" WHERE id=NEW.egcs_fc_pool FOR UPDATE;
-        IF EXISTS (SELECT 1 FROM "Funding_Case_Account_Receivable_Credit_Memo" memo WHERE memo.egcs_fc_pool=pool.id
-          AND memo.egcs_fc_outcome='open' AND NOT memo._deleted) THEN
-          RAISE EXCEPTION 'Pending Credit Memo blocks Payment offset processing' USING ERRCODE='23514';
-        END IF;
-        IF NEW.egcs_fc_creditmemo IS NOT NULL OR NEW.egcs_fc_outcome<>'released' AND NOT EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Payment" payment
-          JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.id=payment.egcs_fc_fundingagreement
-          JOIN "Transfer_Payment_Stream" stream ON stream.id=agreement.egcs_fc_transferpaymentstream
-          JOIN "Transfer_Payment_Profile" program ON program.id=stream.egcs_tp_transferpaymentprofile
-          WHERE payment.id=NEW.egcs_fc_payment AND payment.egcs_fc_applicantrecipient=pool.egcs_fc_applicantrecipient
-            AND payment.egcs_fc_currency=pool.egcs_fc_currency AND program.egcs_tp_agency=pool.egcs_fc_agency
-            AND payment.egcs_fc_paymentamount>=NEW.egcs_fc_amount AND NOT payment._deleted) THEN
-          RAISE EXCEPTION 'Pool deduction requires matching Payment payee Agency currency and gross' USING ERRCODE='23514';
-        END IF;
-        IF TG_OP='INSERT' AND (NEW.egcs_fc_outcome<>'open' OR NEW.egcs_fc_amount<=0 OR NEW.egcs_fc_amount>greatest(ar_pool_net(pool.id)-coalesce((
-          SELECT sum(prior.egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Recovery" prior
-          WHERE prior.egcs_fc_pool=pool.id AND prior.egcs_fc_payment IS NOT NULL AND prior.egcs_fc_outcome='open' AND NOT prior._deleted),0),0)) THEN
-          RAISE EXCEPTION 'Pool deduction exceeds aggregate receivable balance' USING ERRCODE='23514';
-        END IF; RETURN NEW;
+      SELECT * INTO pool FROM "Funding_Case_Account_Receivable_Pool" WHERE id=NEW.egcs_fc_pool FOR UPDATE;
+      IF EXISTS (SELECT 1 FROM "Funding_Case_Account_Receivable_Credit_Memo" memo WHERE memo.egcs_fc_pool=pool.id
+        AND memo.egcs_fc_outcome='open' AND NOT memo._deleted) THEN
+        RAISE EXCEPTION 'Pending Credit Memo blocks Payment offset processing' USING ERRCODE='23514';
       END IF;
-      IF TG_TABLE_NAME IN ('Funding_Case_Account_Receivable_Allocation','Funding_Case_Account_Receivable_Posting') AND EXISTS (
-        SELECT 1 FROM "Funding_Case_Account_Receivable_Recovery" WHERE id=(to_jsonb(NEW)->>'egcs_fc_recovery')::bigint AND egcs_fc_ledgerkind='pool') THEN
-        RAISE EXCEPTION 'Pool credits are never matched to individual AR sources' USING ERRCODE='23514';
+      IF NEW.egcs_fc_outcome<>'released' AND NOT EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Payment" payment
+        JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.id=payment.egcs_fc_fundingagreement
+        JOIN "Transfer_Payment_Stream" stream ON stream.id=agreement.egcs_fc_transferpaymentstream
+        JOIN "Transfer_Payment_Profile" program ON program.id=stream.egcs_tp_transferpaymentprofile
+        WHERE payment.id=NEW.egcs_fc_payment AND payment.egcs_fc_applicantrecipient=pool.egcs_fc_applicantrecipient
+          AND payment.egcs_fc_currency=pool.egcs_fc_currency AND program.egcs_tp_agency=pool.egcs_fc_agency
+          AND payment.egcs_fc_paymentamount>=NEW.egcs_fc_amount AND NOT payment._deleted) THEN
+        RAISE EXCEPTION 'Pool deduction requires matching Payment payee Agency currency and gross' USING ERRCODE='23514';
       END IF;
-      IF TG_TABLE_NAME = 'Funding_Case_Account_Receivable_Recovery' THEN
-        IF TG_OP = 'DELETE' THEN RAISE EXCEPTION 'Recovery reservations retain evidence' USING ERRCODE = '23514'; END IF;
-        SELECT * INTO pool FROM "Funding_Case_Account_Receivable_Pool" WHERE id = NEW.egcs_fc_pool FOR UPDATE;
-        IF TG_OP = 'UPDATE' THEN
-          IF (OLD.egcs_fc_pool,OLD.egcs_fc_payment,OLD.egcs_fc_creditmemo) IS DISTINCT FROM (NEW.egcs_fc_pool,NEW.egcs_fc_payment,NEW.egcs_fc_creditmemo) THEN
-            RAISE EXCEPTION 'Recovery owner identity is immutable' USING ERRCODE = '23514';
-          END IF;
-          IF OLD.egcs_fc_outcome <> 'open' AND to_jsonb(OLD) IS DISTINCT FROM to_jsonb(NEW) THEN RAISE EXCEPTION 'Completed recovery is immutable' USING ERRCODE = '23514'; END IF;
-          IF NEW.egcs_fc_payment IS NOT NULL AND ar_has_lifecycle_evidence(NEW.egcs_fc_payment,'fundingcasepayment') AND NEW.egcs_fc_amount <> OLD.egcs_fc_amount THEN
-            RAISE EXCEPTION 'Submitted offset allocation is immutable' USING ERRCODE = '23514';
-          END IF;
-          IF NEW.egcs_fc_creditmemo IS NOT NULL AND ar_has_lifecycle_evidence(NEW.egcs_fc_creditmemo,'fundingcaseaccountreceivablecreditmemo') AND NEW.egcs_fc_amount <> OLD.egcs_fc_amount THEN
-            RAISE EXCEPTION 'Submitted repayment allocation is immutable' USING ERRCODE = '23514';
-          END IF;
-        END IF;
-        IF NEW.egcs_fc_outcome = 'open' AND NOT NEW._deleted AND EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Account_Receivable" adjustment
-          WHERE adjustment.egcs_fc_pool = NEW.egcs_fc_pool AND adjustment.egcs_fc_linkedreceivable IS NOT NULL
-            AND adjustment.egcs_fc_outcome = 'open' AND NOT adjustment._deleted) THEN
-          RAISE EXCEPTION 'Pending AR adjustment blocks recovery processing' USING ERRCODE = '23514';
-        END IF;
-        IF NEW.egcs_fc_payment IS NOT NULL THEN
-          IF NOT EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Payment" payment
-            JOIN "Funding_Case_Agreement_Profile" agreement ON agreement.id = payment.egcs_fc_fundingagreement
-            JOIN "Transfer_Payment_Stream" stream ON stream.id = agreement.egcs_fc_transferpaymentstream
-            JOIN "Transfer_Payment_Profile" program ON program.id = stream.egcs_tp_transferpaymentprofile
-            WHERE payment.id = NEW.egcs_fc_payment AND payment.egcs_fc_applicantrecipient = pool.egcs_fc_applicantrecipient
-              AND program.egcs_tp_agency = pool.egcs_fc_agency AND payment.egcs_fc_currency = pool.egcs_fc_currency
-              AND payment.egcs_fc_paymentamount >= NEW.egcs_fc_amount AND NOT payment._deleted) THEN
-            RAISE EXCEPTION 'Offset must match actual Payment payee Agency currency and gross amount' USING ERRCODE = '23514';
-          END IF;
-        ELSE
-          IF NOT EXISTS (SELECT 1 FROM "Funding_Case_Account_Receivable_Credit_Memo" repayment WHERE repayment.id = NEW.egcs_fc_creditmemo
-            AND repayment.egcs_fc_pool = NEW.egcs_fc_pool AND repayment.egcs_fc_amount = NEW.egcs_fc_amount AND NOT repayment._deleted) THEN
-            RAISE EXCEPTION 'Recovery must match received repayment amount and Agency pool' USING ERRCODE = '23514';
-          END IF;
-        END IF;
-        RETURN NEW;
-      END IF;
-      recovery_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.egcs_fc_recovery ELSE NEW.egcs_fc_recovery END;
-      SELECT * INTO recovery FROM "Funding_Case_Account_Receivable_Recovery" WHERE id = recovery_id FOR UPDATE;
-      SELECT * INTO pool FROM "Funding_Case_Account_Receivable_Pool" WHERE id = recovery.egcs_fc_pool FOR UPDATE;
-      IF recovery.egcs_fc_outcome <> 'open' THEN RAISE EXCEPTION 'Completed recovery evidence is immutable' USING ERRCODE = '23514'; END IF;
-      IF TG_TABLE_NAME = 'Funding_Case_Account_Receivable_Allocation' THEN
-        IF (recovery.egcs_fc_payment IS NOT NULL AND ar_has_lifecycle_evidence(recovery.egcs_fc_payment,'fundingcasepayment'))
-          OR (recovery.egcs_fc_creditmemo IS NOT NULL AND ar_has_lifecycle_evidence(recovery.egcs_fc_creditmemo,'fundingcaseaccountreceivablecreditmemo')) THEN
-          RAISE EXCEPTION 'Submitted recovery allocations are immutable' USING ERRCODE = '23514';
-        END IF;
-        IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
-        SELECT * INTO root FROM "Funding_Case_Agreement_Account_Receivable" WHERE id = NEW.egcs_fc_receivable FOR UPDATE;
-        IF root.egcs_fc_pool <> recovery.egcs_fc_pool OR root.egcs_fc_outcome <> 'posted' OR root.egcs_fc_linkedreceivable IS NOT NULL OR root._deleted THEN
-          RAISE EXCEPTION 'Recovery allocation requires original established debt in its pool' USING ERRCODE = '23514';
-        END IF;
-        IF recovery.egcs_fc_payment IS NOT NULL AND COALESCE((SELECT latest.egcs_fc_recoverymethod FROM "Funding_Case_Agreement_Account_Receivable" latest
-          WHERE (latest.id = root.id OR latest.egcs_fc_linkedreceivable = root.id) AND latest.egcs_fc_outcome = 'posted' AND NOT latest._deleted
-          ORDER BY latest.egcs_fc_postedat DESC,latest.id DESC LIMIT 1),root.egcs_fc_recoverymethod) <> 'offset' THEN
-          RAISE EXCEPTION 'Automatic recovery must apply approved AR offset policy' USING ERRCODE = '23514';
-        END IF;
-        IF NOT EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Account_Receivable_Line" line WHERE line.id = NEW.egcs_fc_receivableline
-          AND line.egcs_fc_originalline IS NULL AND line.egcs_fc_receivable = root.id AND NOT line._deleted) THEN
-          RAISE EXCEPTION 'Recovery must allocate original source lines' USING ERRCODE = '23514';
-        END IF;
-        principal := ar_line_principal(NEW.egcs_fc_receivableline);
-        SELECT COALESCE(sum(existing.egcs_fc_amount),0) INTO consumed FROM "Funding_Case_Account_Receivable_Allocation" existing
-          JOIN "Funding_Case_Account_Receivable_Recovery" prior ON prior.id = existing.egcs_fc_recovery
-          WHERE existing.egcs_fc_receivableline = NEW.egcs_fc_receivableline AND existing.id <> COALESCE(NEW.id,-1)
-            AND prior.egcs_fc_outcome IN ('open','posted') AND NOT existing._deleted AND NOT prior._deleted;
-        IF NOT NEW._deleted AND consumed + NEW.egcs_fc_amount > principal THEN RAISE EXCEPTION 'Recovery exceeds available source principal' USING ERRCODE = '23514'; END IF;
-        IF EXISTS (SELECT 1 FROM "Funding_Case_Agreement_Correction" correction WHERE correction.egcs_fc_fundingagreement = root.egcs_fc_fundingagreement AND correction.egcs_fc_outcome = 'open' AND NOT correction._deleted) THEN
-          RAISE EXCEPTION 'An open Correction locks recovery source accounting' USING ERRCODE = '23514';
-        END IF;
-      ELSE
-        IF TG_OP <> 'INSERT' THEN RAISE EXCEPTION 'Recovery postings are immutable' USING ERRCODE = '23514'; END IF;
-        SELECT * INTO allocation FROM "Funding_Case_Account_Receivable_Allocation" WHERE id = NEW.egcs_fc_allocation;
-        SELECT * INTO coding FROM "Funding_Case_Agreement_Account_Receivable_Coding" WHERE id = NEW.egcs_fc_coding;
-        SELECT * INTO source FROM "Funding_Case_Agreement_Account_Receivable_Line" WHERE id = allocation.egcs_fc_receivableline;
-        IF (NEW.egcs_fc_accountreceivablechartofaccount,NEW.egcs_fc_accountreceivableaccountingdimensions)
-          IS DISTINCT FROM (source.egcs_fc_accountreceivablechartofaccount,source.egcs_fc_accountreceivableaccountingdimensions) THEN
-          RAISE EXCEPTION 'Recovery posting must preserve its retained AR account and dimensions' USING ERRCODE = '23514';
-        END IF;
-        IF coding.egcs_fc_receivableline <> allocation.egcs_fc_receivableline
-          OR (NEW.egcs_fc_receivable,NEW.egcs_fc_fundingagreement,NEW.egcs_fc_commitmentline,NEW.egcs_fc_chartofaccount,NEW.egcs_fc_agencychartofaccount,NEW.egcs_fc_agencyfiscalyear,NEW.egcs_fc_periodstart,NEW.egcs_fc_periodend)
-          IS DISTINCT FROM (coding.egcs_fc_receivable,coding.egcs_fc_fundingagreement,coding.egcs_fc_commitmentline,coding.egcs_fc_chartofaccount,coding.egcs_fc_agencychartofaccount,coding.egcs_fc_agencyfiscalyear,coding.egcs_fc_periodstart,coding.egcs_fc_periodend) THEN
-          RAISE EXCEPTION 'Recovery posting must preserve exact source coding and period' USING ERRCODE = '23514';
-        END IF;
-        SELECT COALESCE(sum(posting.egcs_fc_amount),0) INTO consumed FROM "Funding_Case_Account_Receivable_Posting" posting
-          JOIN "Funding_Case_Account_Receivable_Recovery" prior ON prior.id = posting.egcs_fc_recovery
-          WHERE posting.egcs_fc_coding = coding.id AND prior.egcs_fc_outcome IN ('open','posted') AND NOT posting._deleted AND NOT prior._deleted;
-        SELECT COALESCE(sum(adjusted.egcs_fc_amount),0) INTO principal FROM "Funding_Case_Agreement_Account_Receivable_Coding" adjusted
-          JOIN "Funding_Case_Agreement_Account_Receivable_Line" adjusted_line ON adjusted_line.id = adjusted.egcs_fc_receivableline
-          JOIN "Funding_Case_Agreement_Account_Receivable" adjusted_root ON adjusted_root.id = adjusted.egcs_fc_receivable
-          WHERE adjusted_line.egcs_fc_originalline = coding.egcs_fc_receivableline
-            AND adjusted.egcs_fc_commitmentline = coding.egcs_fc_commitmentline AND adjusted.egcs_fc_chartofaccount = coding.egcs_fc_chartofaccount
-            AND adjusted.egcs_fc_periodstart = coding.egcs_fc_periodstart AND adjusted.egcs_fc_periodend = coding.egcs_fc_periodend
-            AND adjusted_root.egcs_fc_outcome = 'posted' AND NOT adjusted._deleted AND NOT adjusted_root._deleted;
-        IF consumed + NEW.egcs_fc_amount > coding.egcs_fc_amount + principal THEN
-          RAISE EXCEPTION 'Recovery posting exceeds retained coding principal' USING ERRCODE = '23514';
-        END IF;
-      END IF;
-      RETURN NEW;
+      IF TG_OP='INSERT' AND (NEW.egcs_fc_outcome<>'open' OR NEW.egcs_fc_amount<=0 OR NEW.egcs_fc_amount>greatest(ar_pool_net(pool.id)-coalesce((
+        SELECT sum(prior.egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Recovery" prior
+        WHERE prior.egcs_fc_pool=pool.id AND prior.egcs_fc_outcome='open' AND NOT prior._deleted),0),0)) THEN
+        RAISE EXCEPTION 'Pool deduction exceeds aggregate receivable balance' USING ERRCODE='23514';
+      END IF; RETURN NEW;
     END $function$;
 
 CREATE FUNCTION trg_fn_validate_ar_recovery_posting()
  RETURNS trigger
  LANGUAGE plpgsql
 AS $function$
-    DECLARE recovery_id bigint; recovery record; operation record; target_id bigint; target_type text;
+    DECLARE recovery record;
     BEGIN
-      recovery_id := CASE WHEN TG_TABLE_NAME = 'Funding_Case_Account_Receivable_Recovery' THEN NEW.id ELSE (to_jsonb(NEW)->>'egcs_fc_recovery')::bigint END;
-      SELECT * INTO recovery FROM "Funding_Case_Account_Receivable_Recovery" WHERE id = recovery_id;
-      IF recovery.egcs_fc_ledgerkind='pool' THEN
-        IF coalesce((SELECT sum(application.egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Offset_Memo_Application" application
-          JOIN "Funding_Case_Account_Receivable_Offset_Memo" memo ON memo.id=application.egcs_fc_offsetmemo
-          WHERE application.egcs_fc_recovery=recovery.id AND memo.egcs_fc_pool=recovery.egcs_fc_pool),0)<>recovery.egcs_fc_amount THEN
-          RAISE EXCEPTION 'Payment deduction requires exact one-AR Credit Memo applications' USING ERRCODE='23514';
-        END IF;
-        IF EXISTS (SELECT 1 FROM "Funding_Case_Account_Receivable_Offset_Memo_Application" application
-          JOIN "Funding_Case_Account_Receivable_Offset_Memo" memo ON memo.id=application.egcs_fc_offsetmemo
-          WHERE application.egcs_fc_recovery=recovery.id AND ar_receivable_cash_net(memo.egcs_fc_receivable)<0) THEN
-          RAISE EXCEPTION 'Payment Credit Memo cannot overdraw its own AR' USING ERRCODE='23514'; END IF;
-        IF recovery.egcs_fc_outcome='posted' AND (NOT ar_successful_submission(recovery.egcs_fc_payment,'fundingcasepayment',recovery.egcs_fc_postingruntime)
-          OR ar_pool_net(recovery.egcs_fc_pool)<0) THEN RAISE EXCEPTION 'Pool deduction requires latest approval and available aggregate debt' USING ERRCODE='23514'; END IF;
-        RETURN NULL;
+      SELECT * INTO recovery FROM "Funding_Case_Account_Receivable_Recovery" WHERE id=NEW.id;
+      IF coalesce((SELECT sum(application.egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Offset_Memo_Application" application
+        JOIN "Funding_Case_Account_Receivable_Offset_Memo" memo ON memo.id=application.egcs_fc_offsetmemo
+        WHERE application.egcs_fc_recovery=recovery.id AND memo.egcs_fc_pool=recovery.egcs_fc_pool),0)<>recovery.egcs_fc_amount THEN
+        RAISE EXCEPTION 'Payment deduction requires exact one-AR Credit Memo applications' USING ERRCODE='23514';
       END IF;
-      IF recovery.egcs_fc_outcome='posted' AND recovery.egcs_fc_payment IS NOT NULL AND ar_pool_net(recovery.egcs_fc_pool)<0 THEN
-        RAISE EXCEPTION 'Retained Payment deduction cannot exceed the current aggregate receivable balance' USING ERRCODE='23514';
-      END IF;
-      IF NOT recovery._deleted AND recovery.egcs_fc_outcome IN ('open','posted') AND COALESCE((SELECT sum(egcs_fc_amount)
-        FROM "Funding_Case_Account_Receivable_Allocation" WHERE egcs_fc_recovery = recovery_id AND NOT _deleted),0) <> recovery.egcs_fc_amount THEN
-        RAISE EXCEPTION 'Recovery allocations must sum exactly to received or offset principal' USING ERRCODE = '23514';
-      END IF;
-      IF recovery.egcs_fc_outcome = 'posted' THEN
-        target_id := COALESCE(recovery.egcs_fc_payment,recovery.egcs_fc_creditmemo);
-        target_type := CASE WHEN recovery.egcs_fc_payment IS NOT NULL THEN 'fundingcasepayment' ELSE 'fundingcaseaccountreceivablecreditmemo' END;
-        IF NOT ar_successful_submission(target_id,target_type,recovery.egcs_fc_postingruntime) THEN
-          RAISE EXCEPTION 'Recovery posting requires its latest successful approval submission' USING ERRCODE = '23514';
-        END IF;
-        IF recovery.egcs_fc_creditmemo IS NOT NULL AND NOT EXISTS (SELECT 1 FROM "Funding_Case_Account_Receivable_Credit_Memo" repayment WHERE repayment.id = recovery.egcs_fc_creditmemo
-          AND repayment.egcs_fc_outcome = 'posted' AND repayment.egcs_fc_postingruntime = recovery.egcs_fc_postingruntime) THEN
-          RAISE EXCEPTION 'Recovery and repayment must post atomically' USING ERRCODE = '23514';
-        END IF;
-        IF EXISTS (SELECT 1 FROM "Funding_Case_Account_Receivable_Allocation" allocation WHERE allocation.egcs_fc_recovery = recovery_id AND NOT allocation._deleted
-          AND allocation.egcs_fc_amount <> COALESCE((SELECT sum(posting.egcs_fc_amount) FROM "Funding_Case_Account_Receivable_Posting" posting WHERE posting.egcs_fc_allocation = allocation.id AND NOT posting._deleted),0)) THEN
-          RAISE EXCEPTION 'Recovery coding must post every allocated source amount once' USING ERRCODE = '23514';
-        END IF;
-      ELSIF EXISTS (SELECT 1 FROM "Funding_Case_Account_Receivable_Posting" posting WHERE posting.egcs_fc_recovery = recovery_id) THEN
-        RAISE EXCEPTION 'Only successful recoveries may retain accounting postings' USING ERRCODE = '23514';
-      END IF;
+      IF EXISTS (SELECT 1 FROM "Funding_Case_Account_Receivable_Offset_Memo_Application" application
+        JOIN "Funding_Case_Account_Receivable_Offset_Memo" memo ON memo.id=application.egcs_fc_offsetmemo
+        WHERE application.egcs_fc_recovery=recovery.id AND ar_receivable_cash_net(memo.egcs_fc_receivable)<0) THEN
+        RAISE EXCEPTION 'Payment Credit Memo cannot overdraw its own AR' USING ERRCODE='23514'; END IF;
+      IF recovery.egcs_fc_outcome='posted' AND (NOT ar_successful_submission(recovery.egcs_fc_payment,'fundingcasepayment',recovery.egcs_fc_postingruntime)
+        OR ar_pool_net(recovery.egcs_fc_pool)<0) THEN RAISE EXCEPTION 'Pool deduction requires latest approval and available aggregate debt' USING ERRCODE='23514'; END IF;
       RETURN NULL;
     END $function$;
 
@@ -2732,9 +2492,6 @@ CREATE FUNCTION trg_fn_validate_ar_root()
 AS $function$
     DECLARE owner_agency bigint; owner_currency currency_codes; pool record; definition record; linked record; target_type text;
     BEGIN
-      IF TG_OP='INSERT' AND TG_ARGV[0]='fundingcaseaccountreceivablecreditmemo' AND to_jsonb(NEW)->>'egcs_fc_ledgerkind'<>'pool' THEN
-        RAISE EXCEPTION 'Legacy credit matching is retained evidence only' USING ERRCODE='23514';
-      END IF;
       IF TG_ARGV[0]='fundingcaseaccountreceivablecreditmemo' THEN
         PERFORM ar_validate_pool_credit_memo(to_jsonb(OLD),to_jsonb(NEW),TG_OP);
         NEW.egcs_fc_statusagency:=NEW.egcs_fc_agency; RETURN NEW;
@@ -2939,10 +2696,10 @@ AS $function$
       IF TG_TABLE_NAME = 'Funding_Case_Agreement_Correction' THEN root_id := NEW.id; ELSE root_id := NEW.egcs_fc_correction; END IF;
       SELECT * INTO root FROM "Funding_Case_Agreement_Correction" WHERE id = root_id;
       IF NOT root._deleted AND root.egcs_fc_outcome = 'open' AND EXISTS (SELECT 1 FROM "Common_Status" WHERE id = root.egcs_fc_status AND egcs_cn_terminal) THEN
-        RAISE EXCEPTION 'Open Corrections require a nonterminal Agency status' USING ERRCODE = '23514', CONSTRAINT = 'cn_chk_correction_status_outcome';
+        RAISE EXCEPTION 'Open Corrections require a nonterminal Agency status' USING ERRCODE = '23514', CONSTRAINT = 'fc_chk_correction_status_outcome';
       END IF;
       IF NOT root._deleted AND root.egcs_fc_outcome <> 'open' AND NOT EXISTS (SELECT 1 FROM "Common_Status" WHERE id = root.egcs_fc_status AND egcs_cn_terminal) THEN
-        RAISE EXCEPTION 'Terminal Correction outcomes require a terminal Agency status' USING ERRCODE = '23514', CONSTRAINT = 'cn_chk_correction_status_outcome';
+        RAISE EXCEPTION 'Terminal Correction outcomes require a terminal Agency status' USING ERRCODE = '23514', CONSTRAINT = 'fc_chk_correction_status_outcome';
       END IF;
       IF root.egcs_fc_outcome = 'posted' THEN
         IF NOT EXISTS (SELECT 1 FROM "Common_Runtime" runtime
@@ -3158,24 +2915,19 @@ export const installForeignKeys = async (db: Kysely<Database>): Promise<void> =>
   await sql`DO $baseline$ BEGIN
 ALTER TABLE "Funding_Case_Account_Receivable_Credit_Memo_Line" ADD CONSTRAINT "fc_fk_credit_line_receivable" FOREIGN KEY (egcs_fc_receivable) REFERENCES "Funding_Case_Agreement_Account_Receivable"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Account_Receivable_Allocation" ADD CONSTRAINT "fc_fk_ar_allocation_line" FOREIGN KEY (egcs_fc_receivableline, egcs_fc_receivable, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Account_Receivable_Line"(id, egcs_fc_receivable, egcs_fc_fundingagreement) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Account_Receivable_Credit_Memo" ADD CONSTRAINT "fc_fk_receivable_credit_memo_status_in_use" FOREIGN KEY (egcs_fc_status, egcs_fc_statusagency, egcs_fc_statusdeleted) REFERENCES "Common_Status"(id, egcs_cn_agency, _deleted) DEFERRABLE INITIALLY DEFERRED;
 
-ALTER TABLE "Funding_Case_Account_Receivable_Allocation" ADD CONSTRAINT "Funding_Case_Account_Receivable_Allocatio_egcs_fc_recovery_fkey" FOREIGN KEY (egcs_fc_recovery) REFERENCES "Funding_Case_Account_Receivable_Recovery"(id) ON DELETE RESTRICT;
-
-ALTER TABLE "Funding_Case_Account_Receivable_Credit_Memo" ADD CONSTRAINT "cn_chk_ar_creditmemo_status_in_use" FOREIGN KEY (egcs_fc_status, egcs_fc_statusagency, egcs_fc_statusdeleted) REFERENCES "Common_Status"(id, egcs_cn_agency, _deleted) DEFERRABLE INITIALLY DEFERRED;
-
-ALTER TABLE "Funding_Case_Account_Receivable_Credit_Memo" ADD CONSTRAINT "cn_chk_ar_creditmemo_status_outcome" FOREIGN KEY (egcs_fc_status, egcs_fc_statusterminal) REFERENCES "Common_Status"(id, egcs_cn_terminal) DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "Funding_Case_Account_Receivable_Credit_Memo" ADD CONSTRAINT "fc_fk_receivable_credit_memo_status_outcome" FOREIGN KEY (egcs_fc_status, egcs_fc_statusterminal) REFERENCES "Common_Status"(id, egcs_cn_terminal) DEFERRABLE INITIALLY DEFERRED;
 
 ALTER TABLE "Funding_Case_Account_Receivable_Credit_Memo" ADD CONSTRAINT "fc_fk_ar_creditmemo_receivable" FOREIGN KEY (egcs_fc_receivable) REFERENCES "Funding_Case_Agreement_Account_Receivable"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Account_Receivable_Credit_Memo" ADD CONSTRAINT "fc_fk_ar_creditmemo_pool" FOREIGN KEY (egcs_fc_pool, egcs_fc_applicantrecipient, egcs_fc_currency) REFERENCES "Funding_Case_Account_Receivable_Pool"(id, egcs_fc_applicantrecipient, egcs_fc_currency) ON DELETE RESTRICT;
 
+ALTER TABLE "Funding_Case_Account_Receivable_Credit_Memo" ADD CONSTRAINT "fc_fk_receivable_credit_memo_postingruntime" FOREIGN KEY (egcs_fc_postingruntime) REFERENCES "Common_Runtime"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Account_Receivable_Credit_Memo" ADD CONSTRAINT "Funding_Case_Account_Receivable_Cre_egcs_fc_postingruntime_fkey" FOREIGN KEY (egcs_fc_postingruntime) REFERENCES "Common_Runtime"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Account_Receivable_Credit_Memo" ADD CONSTRAINT "fc_fk_receivable_credit_memo_terminalby" FOREIGN KEY (egcs_fc_terminalby) REFERENCES "Common_User"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Account_Receivable_Credit_Memo" ADD CONSTRAINT "Funding_Case_Account_Receivable_Credit__egcs_fc_terminalby_fkey" FOREIGN KEY (egcs_fc_terminalby) REFERENCES "Common_User"(id) ON DELETE RESTRICT;
-
-ALTER TABLE "Funding_Case_Account_Receivable_Credit_Memo" ADD CONSTRAINT "Funding_Case_Account_Receivable_Credit_M_egcs_fc_createdby_fkey" FOREIGN KEY (egcs_fc_createdby) REFERENCES "Common_User"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Account_Receivable_Credit_Memo" ADD CONSTRAINT "fc_fk_receivable_credit_memo_createdby" FOREIGN KEY (egcs_fc_createdby) REFERENCES "Common_User"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Account_Receivable_Credit_Memo" ADD CONSTRAINT "Funding_Case_Account_Receivable_Credit_Memo_egcs_fc_agency_fkey" FOREIGN KEY (egcs_fc_agency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
 
@@ -3185,41 +2937,19 @@ ALTER TABLE "Funding_Case_Account_Receivable_Credit_Memo" ADD CONSTRAINT "Fundin
 
 ALTER TABLE "Funding_Case_Account_Receivable_Offset_Memo_Line" ADD CONSTRAINT fc_fk_ar_offset_line_selection FOREIGN KEY (egcs_fc_transferpaymentstreamchartofaccount) REFERENCES "Transfer_Payment_Stream_Chart_of_Account"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Account_Receivable_Offset_Memo" ADD CONSTRAINT "Funding_Case_Account_Receivable_Offset__egcs_fc_receivable_fkey" FOREIGN KEY (egcs_fc_receivable) REFERENCES "Funding_Case_Agreement_Account_Receivable"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Account_Receivable_Offset_Memo" ADD CONSTRAINT "fc_fk_receivable_offset_memo_receivable" FOREIGN KEY (egcs_fc_receivable) REFERENCES "Funding_Case_Agreement_Account_Receivable"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Account_Receivable_Offset_Memo" ADD CONSTRAINT "Funding_Case_Account_Receivable_Offset_Memo_egcs_fc_pool_fkey" FOREIGN KEY (egcs_fc_pool) REFERENCES "Funding_Case_Account_Receivable_Pool"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Account_Receivable_Offset_Memo_Application" ADD CONSTRAINT "Funding_Case_Account_Receivable_Offset__egcs_fc_allocation_fkey" FOREIGN KEY (egcs_fc_allocation) REFERENCES "Funding_Case_Account_Receivable_Allocation"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Account_Receivable_Offset_Memo_Application" ADD CONSTRAINT "fc_fk_receivable_offset_memo_application_offsetmemo" FOREIGN KEY (egcs_fc_offsetmemo) REFERENCES "Funding_Case_Account_Receivable_Offset_Memo"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Account_Receivable_Offset_Memo_Application" ADD CONSTRAINT "Funding_Case_Account_Receivable_Offset__egcs_fc_offsetmemo_fkey" FOREIGN KEY (egcs_fc_offsetmemo) REFERENCES "Funding_Case_Account_Receivable_Offset_Memo"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Account_Receivable_Offset_Memo_Application" ADD CONSTRAINT "fc_fk_receivable_offset_memo_application_recovery" FOREIGN KEY (egcs_fc_recovery) REFERENCES "Funding_Case_Account_Receivable_Recovery"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Account_Receivable_Offset_Memo_Application" ADD CONSTRAINT "Funding_Case_Account_Receivable_Offset_Me_egcs_fc_recovery_fkey" FOREIGN KEY (egcs_fc_recovery) REFERENCES "Funding_Case_Account_Receivable_Recovery"(id) ON DELETE RESTRICT;
-
-ALTER TABLE "Funding_Case_Account_Receivable_Pool" ADD CONSTRAINT "Funding_Case_Account_Receivable_egcs_fc_applicantrecipient_fkey" FOREIGN KEY (egcs_fc_applicantrecipient) REFERENCES "Applicant_Recipient_Profile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Account_Receivable_Pool" ADD CONSTRAINT "fc_fk_receivable_pool_recipient" FOREIGN KEY (egcs_fc_applicantrecipient) REFERENCES "Applicant_Recipient_Profile"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Account_Receivable_Pool" ADD CONSTRAINT "Funding_Case_Account_Receivable_Pool_egcs_fc_agency_fkey" FOREIGN KEY (egcs_fc_agency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Account_Receivable_Posting" ADD CONSTRAINT "fc_fk_ar_posting_allocation" FOREIGN KEY (egcs_fc_allocation, egcs_fc_recovery) REFERENCES "Funding_Case_Account_Receivable_Allocation"(id, egcs_fc_recovery) ON DELETE RESTRICT;
-
-ALTER TABLE "Funding_Case_Account_Receivable_Posting" ADD CONSTRAINT "Funding_Case_Account_Receivab_egcs_fc_accountreceivablecha_fkey" FOREIGN KEY (egcs_fc_accountreceivablechartofaccount) REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT;
-
-ALTER TABLE "Funding_Case_Account_Receivable_Posting" ADD CONSTRAINT "Funding_Case_Account_Receivab_egcs_fc_agencychartofaccount_fkey" FOREIGN KEY (egcs_fc_agencychartofaccount) REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT;
-
-ALTER TABLE "Funding_Case_Account_Receivable_Posting" ADD CONSTRAINT "Funding_Case_Account_Receivable_P_egcs_fc_agencyfiscalyear_fkey" FOREIGN KEY (egcs_fc_agencyfiscalyear) REFERENCES "Agency_Fiscal_Year"(id) ON DELETE RESTRICT;
-
-ALTER TABLE "Funding_Case_Account_Receivable_Posting" ADD CONSTRAINT "Funding_Case_Account_Receivable_P_egcs_fc_fundingagreement_fkey" FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
-
-ALTER TABLE "Funding_Case_Account_Receivable_Posting" ADD CONSTRAINT "Funding_Case_Account_Receivable_Pos_egcs_fc_chartofaccount_fkey" FOREIGN KEY (egcs_fc_chartofaccount) REFERENCES "Transfer_Payment_Stream_Chart_of_Account"(id) ON DELETE RESTRICT;
-
-ALTER TABLE "Funding_Case_Account_Receivable_Posting" ADD CONSTRAINT "Funding_Case_Account_Receivable_Pos_egcs_fc_commitmentline_fkey" FOREIGN KEY (egcs_fc_commitmentline) REFERENCES "Funding_Case_Agreement_Commitment_Line"(id) ON DELETE RESTRICT;
-
-ALTER TABLE "Funding_Case_Account_Receivable_Posting" ADD CONSTRAINT "Funding_Case_Account_Receivable_Posting_egcs_fc_coding_fkey" FOREIGN KEY (egcs_fc_coding) REFERENCES "Funding_Case_Agreement_Account_Receivable_Coding"(id) ON DELETE RESTRICT;
-
-ALTER TABLE "Funding_Case_Account_Receivable_Posting" ADD CONSTRAINT "Funding_Case_Account_Receivable_Posting_egcs_fc_receivable_fkey" FOREIGN KEY (egcs_fc_receivable) REFERENCES "Funding_Case_Agreement_Account_Receivable"(id) ON DELETE RESTRICT;
-
-ALTER TABLE "Funding_Case_Account_Receivable_Recovery" ADD CONSTRAINT "Funding_Case_Account_Receivable_Rec_egcs_fc_postingruntime_fkey" FOREIGN KEY (egcs_fc_postingruntime) REFERENCES "Common_Runtime"(id) ON DELETE RESTRICT;
-
-ALTER TABLE "Funding_Case_Account_Receivable_Recovery" ADD CONSTRAINT "Funding_Case_Account_Receivable_Recover_egcs_fc_creditmemo_fkey" FOREIGN KEY (egcs_fc_creditmemo) REFERENCES "Funding_Case_Account_Receivable_Credit_Memo"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Account_Receivable_Recovery" ADD CONSTRAINT "fc_fk_receivable_recovery_postingruntime" FOREIGN KEY (egcs_fc_postingruntime) REFERENCES "Common_Runtime"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Account_Receivable_Recovery" ADD CONSTRAINT "Funding_Case_Account_Receivable_Recovery_egcs_fc_payment_fkey" FOREIGN KEY (egcs_fc_payment) REFERENCES "Funding_Case_Agreement_Payment"(id) ON DELETE RESTRICT;
 
@@ -3231,27 +2961,27 @@ ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT fc_chk_ar
 ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT fc_fk_ar_typed_entity FOREIGN KEY (id,egcs_fc_entitytype) REFERENCES "Common_Entity"(id,egcs_cn_entitytype);
 ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT fc_fk_ar_financial_id FOREIGN KEY (egcs_fc_agencyfinancialid) REFERENCES "Applicant_Recipient_Agency_Financial_Id"(id);
 
-ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT "cn_chk_ar_status_in_use" FOREIGN KEY (egcs_fc_status, egcs_fc_statusagency, egcs_fc_statusdeleted) REFERENCES "Common_Status"(id, egcs_cn_agency, _deleted) DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT "fc_fk_agreement_receivable_status_in_use" FOREIGN KEY (egcs_fc_status, egcs_fc_statusagency, egcs_fc_statusdeleted) REFERENCES "Common_Status"(id, egcs_cn_agency, _deleted) DEFERRABLE INITIALLY DEFERRED;
 
-ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT "cn_chk_ar_status_outcome" FOREIGN KEY (egcs_fc_status, egcs_fc_statusterminal) REFERENCES "Common_Status"(id, egcs_cn_terminal) DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT "fc_fk_agreement_receivable_status_outcome" FOREIGN KEY (egcs_fc_status, egcs_fc_statusterminal) REFERENCES "Common_Status"(id, egcs_cn_terminal) DEFERRABLE INITIALLY DEFERRED;
 
 ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT "fc_fk_ar_link" FOREIGN KEY (egcs_fc_linkedreceivable, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Account_Receivable"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT "fc_fk_ar_pool" FOREIGN KEY (egcs_fc_pool, egcs_fc_applicantrecipient, egcs_fc_currency) REFERENCES "Funding_Case_Account_Receivable_Pool"(id, egcs_fc_applicantrecipient, egcs_fc_currency) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT "Funding_Case_Agreement_Account__egcs_fc_applicantrecipient_fkey" FOREIGN KEY (egcs_fc_applicantrecipient) REFERENCES "Applicant_Recipient_Profile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT "fc_fk_agreement_receivable_recipient" FOREIGN KEY (egcs_fc_applicantrecipient) REFERENCES "Applicant_Recipient_Profile"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT "Funding_Case_Agreement_Account_Re_egcs_fc_agencyfiscalyear_fkey" FOREIGN KEY (egcs_fc_agencyfiscalyear) REFERENCES "Agency_Fiscal_Year"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT "fc_fk_agreement_receivable_agencyfiscalyear" FOREIGN KEY (egcs_fc_agencyfiscalyear) REFERENCES "Agency_Fiscal_Year"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT "Funding_Case_Agreement_Account_Re_egcs_fc_fundingagreement_fkey" FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT "fc_fk_agreement_receivable_" FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT "Funding_Case_Agreement_Account_Rec_egcs_fc_monitorfollowup_fkey" FOREIGN KEY (egcs_fc_monitorfollowup) REFERENCES "Funding_Case_Agreement_Monitor_Followup"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT "fc_fk_agreement_receivable_monitorfollowup" FOREIGN KEY (egcs_fc_monitorfollowup) REFERENCES "Funding_Case_Agreement_Monitor_Followup"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT "Funding_Case_Agreement_Account_Rece_egcs_fc_postingruntime_fkey" FOREIGN KEY (egcs_fc_postingruntime) REFERENCES "Common_Runtime"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT "fc_fk_agreement_receivable_postingruntime" FOREIGN KEY (egcs_fc_postingruntime) REFERENCES "Common_Runtime"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT "Funding_Case_Agreement_Account_Receivab_egcs_fc_terminalby_fkey" FOREIGN KEY (egcs_fc_terminalby) REFERENCES "Common_User"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT "fc_fk_agreement_receivable_terminalby" FOREIGN KEY (egcs_fc_terminalby) REFERENCES "Common_User"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT "Funding_Case_Agreement_Account_Receivabl_egcs_fc_createdby_fkey" FOREIGN KEY (egcs_fc_createdby) REFERENCES "Common_User"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT "fc_fk_agreement_receivable_createdby" FOREIGN KEY (egcs_fc_createdby) REFERENCES "Common_User"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT "Funding_Case_Agreement_Account_Receivable_egcs_fc_status_fkey" FOREIGN KEY (egcs_fc_status) REFERENCES "Common_Status"(id) ON DELETE RESTRICT;
 
@@ -3261,27 +2991,27 @@ ALTER TABLE "Funding_Case_Agreement_Account_Receivable" ADD CONSTRAINT "Funding_
 
 ALTER TABLE "Funding_Case_Agreement_Account_Receivable_Coding" ADD CONSTRAINT "fc_fk_ar_coding_line" FOREIGN KEY (egcs_fc_receivableline, egcs_fc_receivable, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Account_Receivable_Line"(id, egcs_fc_receivable, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Account_Receivable_Coding" ADD CONSTRAINT "Funding_Case_Agreement_Accoun_egcs_fc_agencychartofaccount_fkey" FOREIGN KEY (egcs_fc_agencychartofaccount) REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Account_Receivable_Coding" ADD CONSTRAINT "fc_fk_agreement_receivable_coding_agencychartofaccount" FOREIGN KEY (egcs_fc_agencychartofaccount) REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Account_Receivable_Coding" ADD CONSTRAINT "Funding_Case_Agreement_Account_R_egcs_fc_agencyfiscalyear_fkey1" FOREIGN KEY (egcs_fc_agencyfiscalyear) REFERENCES "Agency_Fiscal_Year"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Account_Receivable_Coding" ADD CONSTRAINT "fc_fk_agreement_receivable_coding_agencyfiscalyear" FOREIGN KEY (egcs_fc_agencyfiscalyear) REFERENCES "Agency_Fiscal_Year"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Account_Receivable_Coding" ADD CONSTRAINT "Funding_Case_Agreement_Account_Rece_egcs_fc_chartofaccount_fkey" FOREIGN KEY (egcs_fc_chartofaccount) REFERENCES "Transfer_Payment_Stream_Chart_of_Account"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Account_Receivable_Coding" ADD CONSTRAINT "fc_fk_agreement_receivable_coding_chartofaccount" FOREIGN KEY (egcs_fc_chartofaccount) REFERENCES "Transfer_Payment_Stream_Chart_of_Account"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Account_Receivable_Coding" ADD CONSTRAINT "Funding_Case_Agreement_Account_Rece_egcs_fc_commitmentline_fkey" FOREIGN KEY (egcs_fc_commitmentline) REFERENCES "Funding_Case_Agreement_Commitment_Line"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Account_Receivable_Coding" ADD CONSTRAINT "fc_fk_agreement_receivable_coding_commitmentline" FOREIGN KEY (egcs_fc_commitmentline) REFERENCES "Funding_Case_Agreement_Commitment_Line"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Account_Receivable_Line" ADD CONSTRAINT "fc_fk_ar_line_original" FOREIGN KEY (egcs_fc_originalline) REFERENCES "Funding_Case_Agreement_Account_Receivable_Line"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Account_Receivable_Line" ADD CONSTRAINT "fc_fk_ar_line_root" FOREIGN KEY (egcs_fc_receivable, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Account_Receivable"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Account_Receivable_Line" ADD CONSTRAINT "Funding_Case_Agreement_Accoun_egcs_fc_accountreceivablecha_fkey" FOREIGN KEY (egcs_fc_accountreceivablechartofaccount) REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Account_Receivable_Line" ADD CONSTRAINT "fc_fk_agreement_receivable_line_accountreceivablechartofaccount" FOREIGN KEY (egcs_fc_accountreceivablechartofaccount) REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Account_Receivable_Line" ADD CONSTRAINT "Funding_Case_Agreement_Account_Recei_egcs_fc_reconcileline_fkey" FOREIGN KEY (egcs_fc_reconcileline) REFERENCES "Funding_Case_Agreement_Claim_Reconcile_Line_Item"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Account_Receivable_Line" ADD CONSTRAINT "fc_fk_agreement_receivable_line_reconcileline" FOREIGN KEY (egcs_fc_reconcileline) REFERENCES "Funding_Case_Agreement_Claim_Reconcile_Line_Item"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Account_Receivable_Line" ADD CONSTRAINT "Funding_Case_Agreement_Account_Receivabl_egcs_fc_claimline_fkey" FOREIGN KEY (egcs_fc_claimline) REFERENCES "Funding_Case_Agreement_Claim_Line_Item"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Account_Receivable_Line" ADD CONSTRAINT "fc_fk_agreement_receivable_line_claimline" FOREIGN KEY (egcs_fc_claimline) REFERENCES "Funding_Case_Agreement_Claim_Line_Item"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Account_Receivable_Line" ADD CONSTRAINT "Funding_Case_Agreement_Account_Receivable__egcs_fc_payment_fkey" FOREIGN KEY (egcs_fc_payment) REFERENCES "Funding_Case_Agreement_Payment"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Account_Receivable_Line" ADD CONSTRAINT "fc_fk_agreement_receivable_line_payment" FOREIGN KEY (egcs_fc_payment) REFERENCES "Funding_Case_Agreement_Payment"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Account_Receivable_Line" ADD CONSTRAINT "Funding_Case_Agreement_Account_Receivable_Li_egcs_fc_claim_fkey" FOREIGN KEY (egcs_fc_claim) REFERENCES "Funding_Case_Agreement_Claim"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Account_Receivable_Line" ADD CONSTRAINT "fc_fk_agreement_receivable_line_claim" FOREIGN KEY (egcs_fc_claim) REFERENCES "Funding_Case_Agreement_Claim"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Activity" ADD CONSTRAINT "fc_ref_activityversionagreement" FOREIGN KEY (egcs_fc_activityversion, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Activity_Version"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
@@ -3291,7 +3021,7 @@ ALTER TABLE "Funding_Case_Agreement_Activity_Version" ADD CONSTRAINT "fc_ref_act
 
 ALTER TABLE "Funding_Case_Agreement_Activity_Version" ADD CONSTRAINT "fc_ref_activityversionsourceagreement" FOREIGN KEY (egcs_fc_sourceversion, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Activity_Version"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Activity_Version" ADD CONSTRAINT "Funding_Case_Agreement_Activity_V_egcs_fc_fundingagreement_fkey" FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Activity_Version" ADD CONSTRAINT "fc_fk_agreement_activity_version_" FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Address" ADD CONSTRAINT "Funding_Case_Agreement_Address_egcs_fc_address_fkey" FOREIGN KEY (egcs_fc_address) REFERENCES "Common_Address"(id) ON DELETE RESTRICT;
 
@@ -3305,53 +3035,53 @@ ALTER TABLE "Funding_Case_Agreement_Amendment" ADD CONSTRAINT "Funding_Case_Agre
 
 ALTER TABLE "Funding_Case_Agreement_Amendment" ADD CONSTRAINT "Funding_Case_Agreement_Amendment_id_fkey" FOREIGN KEY (id) REFERENCES "Common_Entity"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Amendment_Subtype" ADD CONSTRAINT "Funding_Case_Agreement_Amendment__egcs_fc_amendmentsubtype_fkey" FOREIGN KEY (egcs_fc_amendmentsubtype) REFERENCES "Transfer_Payment_Amendment_Subtype"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Amendment_Subtype" ADD CONSTRAINT "fc_fk_agreement_amendment_subtype_amendmentsubtype" FOREIGN KEY (egcs_fc_amendmentsubtype) REFERENCES "Transfer_Payment_Amendment_Subtype"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Amendment_Subtype" ADD CONSTRAINT "Funding_Case_Agreement_Amendment_Subtype_egcs_fc_amendment_fkey" FOREIGN KEY (egcs_fc_amendment) REFERENCES "Funding_Case_Agreement_Amendment"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Amendment_Type" ADD CONSTRAINT "Funding_Case_Agreement_Amendment_Typ_egcs_fc_amendmenttype_fkey" FOREIGN KEY (egcs_fc_amendmenttype) REFERENCES "Transfer_Payment_Amendment_Type"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Amendment_Type" ADD CONSTRAINT "fc_fk_agreement_amendment_type_amendmenttype" FOREIGN KEY (egcs_fc_amendmenttype) REFERENCES "Transfer_Payment_Amendment_Type"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Amendment_Type" ADD CONSTRAINT "Funding_Case_Agreement_Amendment_Type_egcs_fc_amendment_fkey" FOREIGN KEY (egcs_fc_amendment) REFERENCES "Funding_Case_Agreement_Amendment"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Applicant_Recipient" ADD CONSTRAINT fc_fk_agreement_proponent_financial_id FOREIGN KEY (egcs_fc_agencyfinancialid) REFERENCES "Applicant_Recipient_Agency_Financial_Id"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Applicant_Recipient" ADD CONSTRAINT "Funding_Case_Agreement_Applic_egcs_fc_applicantrecipientsu_fkey" FOREIGN KEY (egcs_fc_applicantrecipientsubtype) REFERENCES "Agency_Applicant_Recipient_Subtype"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Applicant_Recipient" ADD CONSTRAINT "fc_fk_agreement_applicant_recipient_recipientsubtype" FOREIGN KEY (egcs_fc_applicantrecipientsubtype) REFERENCES "Agency_Applicant_Recipient_Subtype"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Applicant_Recipient" ADD CONSTRAINT "Funding_Case_Agreement_Applican_egcs_fc_applicantrecipient_fkey" FOREIGN KEY (egcs_fc_applicantrecipient) REFERENCES "Applicant_Recipient_Profile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Applicant_Recipient" ADD CONSTRAINT "fc_fk_agreement_applicant_recipient_recipient" FOREIGN KEY (egcs_fc_applicantrecipient) REFERENCES "Applicant_Recipient_Profile"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Applicant_Recipient" ADD CONSTRAINT "Funding_Case_Agreement_Applicant__egcs_fc_fundingagreement_fkey" FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Applicant_Recipient" ADD CONSTRAINT "fc_fk_agreement_applicant_recipient_" FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Approval_Submission" ADD CONSTRAINT "fc_ref_approvalsubmissionamendmentagreement" FOREIGN KEY (egcs_fc_amendment, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Amendment"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Approval_Submission" ADD CONSTRAINT "Funding_Case_Agreement_Approval_S_egcs_fc_fundingagreement_fkey" FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Approval_Submission" ADD CONSTRAINT "fc_fk_agreement_approval_submission_" FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Approval_Submission" ADD CONSTRAINT "Funding_Case_Agreement_Approval_Submis_egcs_fc_workflowrun_fkey" FOREIGN KEY (egcs_fc_workflowrun) REFERENCES "Common_Workflow_Run"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Approval_Submission" ADD CONSTRAINT "fc_fk_agreement_approval_submission_workflowrun" FOREIGN KEY (egcs_fc_workflowrun) REFERENCES "Common_Workflow_Run"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Budget_Fiscal_Year" ADD CONSTRAINT "fc_ref_budgetfiscalyearoriginalagreement" FOREIGN KEY (egcs_fc_originalbudgetfiscalyear, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Budget_Fiscal_Year"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Budget_Fiscal_Year" ADD CONSTRAINT "fc_ref_budgetfiscalyearversionagreement" FOREIGN KEY (egcs_fc_budgetversion, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Budget_Version"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Budget_Fiscal_Year" ADD CONSTRAINT "Funding_Case_Agreement_Budget_Fis_egcs_fc_fundingagreement_fkey" FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Budget_Fiscal_Year" ADD CONSTRAINT "fc_fk_agreement_budget_fiscal_year_" FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Budget_Fiscal_Year" ADD CONSTRAINT "Funding_Case_Agreement_Budget_Fiscal_Ye_egcs_fc_fiscalyear_fkey" FOREIGN KEY (egcs_fc_fiscalyear) REFERENCES "Agency_Fiscal_Year"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Budget_Fiscal_Year" ADD CONSTRAINT "fc_fk_agreement_budget_fiscal_year_fiscalyear" FOREIGN KEY (egcs_fc_fiscalyear) REFERENCES "Agency_Fiscal_Year"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Budget_Line_Item" ADD CONSTRAINT "fc_ref_budgetlineitemfiscalyearagreement" FOREIGN KEY (egcs_fc_fundingagreementbudgetfiscalyear, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Budget_Fiscal_Year"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Budget_Line_Item" ADD CONSTRAINT "fc_ref_budgetlineitemoriginalagreement" FOREIGN KEY (egcs_fc_originalbudgetlineitem, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Budget_Line_Item"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Budget_Line_Item" ADD CONSTRAINT "Funding_Case_Agreement_Budget_egcs_fc_organizationcostcate_fkey" FOREIGN KEY (egcs_fc_organizationcostcategory) REFERENCES "Transfer_Payment_Stream_Cost_Category_Line_Item"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Budget_Line_Item" ADD CONSTRAINT "fc_fk_agreement_budget_lineitem_costcategory" FOREIGN KEY (egcs_fc_organizationcostcategory) REFERENCES "Transfer_Payment_Stream_Cost_Category_Line_Item"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Budget_Line_Item" ADD CONSTRAINT "Funding_Case_Agreement_Budget_Line__egcs_fc_sourcecategory_fkey" FOREIGN KEY (egcs_fc_sourcecategory) REFERENCES "Agency_Cost_Category"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Budget_Line_Item" ADD CONSTRAINT "fc_fk_agreement_budget_lineitem_sourcecategory" FOREIGN KEY (egcs_fc_sourcecategory) REFERENCES "Agency_Cost_Category"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Budget_Line_Item_Funding" ADD CONSTRAINT "Funding_Case_Agreement_Budget_Line__egcs_fc_budgetlineitem_fkey" FOREIGN KEY (egcs_fc_budgetlineitem) REFERENCES "Funding_Case_Agreement_Budget_Line_Item"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Budget_Line_Item_Funding" ADD CONSTRAINT "fc_fk_agreement_budget_lineitem_funding_budgetlineitem" FOREIGN KEY (egcs_fc_budgetlineitem) REFERENCES "Funding_Case_Agreement_Budget_Line_Item"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Budget_Line_Item_Funding" ADD CONSTRAINT "Funding_Case_Agreement_Budget_Line__egcs_fc_fundingsubtype_fkey" FOREIGN KEY (egcs_fc_fundingsubtype) REFERENCES "Agency_Funding_Subtype"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Budget_Line_Item_Funding" ADD CONSTRAINT "fc_fk_agreement_budget_lineitem_funding_fundingsubtype" FOREIGN KEY (egcs_fc_fundingsubtype) REFERENCES "Agency_Funding_Subtype"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Budget_Version" ADD CONSTRAINT "fc_ref_budgetversionamendmentagreement" FOREIGN KEY (egcs_fc_amendment, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Amendment"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Budget_Version" ADD CONSTRAINT "fc_ref_budgetversionsourceagreement" FOREIGN KEY (egcs_fc_sourceversion, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Budget_Version"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Budget_Version" ADD CONSTRAINT "Funding_Case_Agreement_Budget_Ver_egcs_fc_fundingagreement_fkey" FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Budget_Version" ADD CONSTRAINT "fc_fk_agreement_budget_version_" FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Claim" ADD CONSTRAINT "fc_ref_claimfiscalyearagreement" FOREIGN KEY (egcs_fc_fiscalyear, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Budget_Fiscal_Year"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
@@ -3369,15 +3099,15 @@ ALTER TABLE "Funding_Case_Agreement_Claim_Line_Item" ADD CONSTRAINT "fc_ref_clai
 
 ALTER TABLE "Funding_Case_Agreement_Claim_Line_Item" ADD CONSTRAINT "fc_ref_claimlineclaimagreement" FOREIGN KEY (egcs_fc_fundingagreementclaim, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Claim"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Claim_Line_Item" ADD CONSTRAINT "Funding_Case_Agreement_Claim__egcs_fc_fundingagreementbudg_fkey" FOREIGN KEY (egcs_fc_fundingagreementbudgetlineitem) REFERENCES "Funding_Case_Agreement_Budget_Line_Item"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Claim_Line_Item" ADD CONSTRAINT "fc_fk_agreement_claim_lineitem_budgetlineitem" FOREIGN KEY (egcs_fc_fundingagreementbudgetlineitem) REFERENCES "Funding_Case_Agreement_Budget_Line_Item"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Claim_Line_Item" ADD CONSTRAINT "Funding_Case_Agreement_Claim__egcs_fc_fundingagreementclai_fkey" FOREIGN KEY (egcs_fc_fundingagreementclaim) REFERENCES "Funding_Case_Agreement_Claim"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Claim_Line_Item" ADD CONSTRAINT "fc_fk_agreement_claim_lineitem_claim" FOREIGN KEY (egcs_fc_fundingagreementclaim) REFERENCES "Funding_Case_Agreement_Claim"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Claim_Line_Item_Funding" ADD CONSTRAINT "Funding_Case_Agreement_Claim_Line_I_egcs_fc_fundingsubtype_fkey" FOREIGN KEY (egcs_fc_fundingsubtype) REFERENCES "Agency_Funding_Subtype"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Claim_Line_Item_Funding" ADD CONSTRAINT "fc_fk_agreement_claim_lineitem_funding_fundingsubtype" FOREIGN KEY (egcs_fc_fundingsubtype) REFERENCES "Agency_Funding_Subtype"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Claim_Line_Item_Funding" ADD CONSTRAINT "Funding_Case_Agreement_Claim_Line_It_egcs_fc_claimlineitem_fkey" FOREIGN KEY (egcs_fc_claimlineitem) REFERENCES "Funding_Case_Agreement_Claim_Line_Item"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Claim_Line_Item_Funding" ADD CONSTRAINT "fc_fk_agreement_claim_lineitem_funding_claimlineitem" FOREIGN KEY (egcs_fc_claimlineitem) REFERENCES "Funding_Case_Agreement_Claim_Line_Item"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Claim_Reconcile" ADD CONSTRAINT "Funding_Case_Agreement_Claim_egcs_fc_fundingagreementclai_fkey1" FOREIGN KEY (egcs_fc_fundingagreementclaim) REFERENCES "Funding_Case_Agreement_Claim"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Claim_Reconcile" ADD CONSTRAINT "fc_fk_agreement_claim_reconcile_claim" FOREIGN KEY (egcs_fc_fundingagreementclaim) REFERENCES "Funding_Case_Agreement_Claim"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Claim_Reconcile" ADD CONSTRAINT "Funding_Case_Agreement_Claim_Reconcile_egcs_fc_status_fkey" FOREIGN KEY (egcs_fc_status) REFERENCES "Common_Status"(id) ON DELETE RESTRICT;
 
@@ -3389,9 +3119,9 @@ ALTER TABLE "Funding_Case_Agreement_Claim_Reconcile_Line_Item" ADD CONSTRAINT "f
 
 ALTER TABLE "Funding_Case_Agreement_Claim_Reconcile_Line_Item" ADD CONSTRAINT "fc_ref_reconcilelineclaimline" FOREIGN KEY (egcs_fc_lineitem, egcs_fc_fundingagreementclaim) REFERENCES "Funding_Case_Agreement_Claim_Line_Item"(id, egcs_fc_fundingagreementclaim) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Claim_Reconcile_Line_Item" ADD CONSTRAINT "Funding_Case_Agreement_Claim_egcs_fc_fundingagreementclai_fkey2" FOREIGN KEY (egcs_fc_fundingagreementclaimreconcile) REFERENCES "Funding_Case_Agreement_Claim_Reconcile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Claim_Reconcile_Line_Item" ADD CONSTRAINT "fc_fk_agreement_claim_reconcile_lineitem_claimreconcile" FOREIGN KEY (egcs_fc_fundingagreementclaimreconcile) REFERENCES "Funding_Case_Agreement_Claim_Reconcile"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Claim_Reconcile_Line_Item" ADD CONSTRAINT "Funding_Case_Agreement_Claim_Reconcile_Li_egcs_fc_lineitem_fkey" FOREIGN KEY (egcs_fc_lineitem) REFERENCES "Funding_Case_Agreement_Claim_Line_Item"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Claim_Reconcile_Line_Item" ADD CONSTRAINT "fc_fk_agreement_claim_reconcile_lineitem_lineitem" FOREIGN KEY (egcs_fc_lineitem) REFERENCES "Funding_Case_Agreement_Claim_Line_Item"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Closeout" ADD CONSTRAINT "Funding_Case_Agreement_Closeout_egcs_fc_fundingagreement_fkey" FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
 
@@ -3401,9 +3131,9 @@ ALTER TABLE "Funding_Case_Agreement_Closeout" ADD CONSTRAINT "Funding_Case_Agree
 
 ALTER TABLE "Funding_Case_Agreement_Closeout_Snapshot" ADD CONSTRAINT "fc_ref_closeoutsnapshotcloseoutagreement" FOREIGN KEY (egcs_fc_closeout, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Closeout"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Closeout_Snapshot" ADD CONSTRAINT "Funding_Case_Agreement_Closeout_S_egcs_fc_fundingagreement_fkey" FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Closeout_Snapshot" ADD CONSTRAINT "fc_fk_agreement_closeout_snapshot_" FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Closeout_Snapshot" ADD CONSTRAINT "Funding_Case_Agreement_Closeout_Snapsh_egcs_fc_workflowrun_fkey" FOREIGN KEY (egcs_fc_workflowrun) REFERENCES "Common_Workflow_Run"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Closeout_Snapshot" ADD CONSTRAINT "fc_fk_agreement_closeout_snapshot_workflowrun" FOREIGN KEY (egcs_fc_workflowrun) REFERENCES "Common_Workflow_Run"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Commitment" ADD CONSTRAINT "fc_ref_commitmenttypestream" FOREIGN KEY (egcs_fc_type, egcs_fc_transferpaymentstream) REFERENCES "Transfer_Payment_Stream_Commitment_Type"(id, egcs_tp_transferpaymentstream) ON DELETE RESTRICT;
 
@@ -3419,13 +3149,13 @@ ALTER TABLE "Funding_Case_Agreement_Commitment_Line" ADD CONSTRAINT "fc_ref_comm
 
 ALTER TABLE "Funding_Case_Agreement_Commitment_Line" ADD CONSTRAINT "fc_ref_commitmentlinestreamconfig" FOREIGN KEY (egcs_fc_transferpaymentstreamchartofaccount, egcs_fc_transferpaymentstream) REFERENCES "Transfer_Payment_Stream_Chart_of_Account"(id, egcs_tp_transferpaymentstream) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Commitment_Line" ADD CONSTRAINT "Funding_Case_Agreement_Commit_egcs_fc_transferpaymentstrea_fkey" FOREIGN KEY (egcs_fc_transferpaymentstreamchartofaccount) REFERENCES "Transfer_Payment_Stream_Chart_of_Account"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Commitment_Line" ADD CONSTRAINT "fc_fk_agreement_commitment_line_streamchartofaccount" FOREIGN KEY (egcs_fc_transferpaymentstreamchartofaccount) REFERENCES "Transfer_Payment_Stream_Chart_of_Account"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Commitment_Line" ADD CONSTRAINT "Funding_Case_Agreement_Commitment_Line_egcs_fc_commitment_fkey" FOREIGN KEY (egcs_fc_commitment) REFERENCES "Funding_Case_Agreement_Commitment"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Correction" ADD CONSTRAINT "cn_chk_correction_status_in_use" FOREIGN KEY (egcs_fc_status, egcs_fc_statusagency, egcs_fc_statusdeleted) REFERENCES "Common_Status"(id, egcs_cn_agency, _deleted) DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "Funding_Case_Agreement_Correction" ADD CONSTRAINT "fc_fk_agreement_correction_status_in_use" FOREIGN KEY (egcs_fc_status, egcs_fc_statusagency, egcs_fc_statusdeleted) REFERENCES "Common_Status"(id, egcs_cn_agency, _deleted) DEFERRABLE INITIALLY DEFERRED;
 
-ALTER TABLE "Funding_Case_Agreement_Correction" ADD CONSTRAINT "cn_chk_correction_status_outcome" FOREIGN KEY (egcs_fc_status, egcs_fc_statusterminal) REFERENCES "Common_Status"(id, egcs_cn_terminal) DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE "Funding_Case_Agreement_Correction" ADD CONSTRAINT "fc_fk_agreement_correction_status_outcome" FOREIGN KEY (egcs_fc_status, egcs_fc_statusterminal) REFERENCES "Common_Status"(id, egcs_cn_terminal) DEFERRABLE INITIALLY DEFERRED;
 
 ALTER TABLE "Funding_Case_Agreement_Correction" ADD CONSTRAINT "fc_fk_correction_commitment" FOREIGN KEY (egcs_fc_commitment, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Commitment"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
@@ -3447,25 +3177,25 @@ ALTER TABLE "Funding_Case_Agreement_Correction_Adjustment" ADD CONSTRAINT "fc_fk
 
 ALTER TABLE "Funding_Case_Agreement_Correction_Adjustment" ADD CONSTRAINT "fc_fk_correction_adjustment_root" FOREIGN KEY (egcs_fc_correction, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Correction"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Correction_Adjustment" ADD CONSTRAINT "Funding_Case_Agreement_Correctio_egcs_fc_agencyfiscalyear_fkey1" FOREIGN KEY (egcs_fc_agencyfiscalyear) REFERENCES "Agency_Fiscal_Year"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Correction_Adjustment" ADD CONSTRAINT "fc_fk_agreement_correction_adjustment_agencyfiscalyear" FOREIGN KEY (egcs_fc_agencyfiscalyear) REFERENCES "Agency_Fiscal_Year"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Correction_Adjustment" ADD CONSTRAINT "Funding_Case_Agreement_Correction_A_egcs_fc_chartofaccount_fkey" FOREIGN KEY (egcs_fc_chartofaccount) REFERENCES "Transfer_Payment_Stream_Chart_of_Account"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Correction_Adjustment" ADD CONSTRAINT "fc_fk_agreement_correction_adjustment_chartofaccount" FOREIGN KEY (egcs_fc_chartofaccount) REFERENCES "Transfer_Payment_Stream_Chart_of_Account"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Correction_Adjustment" ADD CONSTRAINT "Funding_Case_Agreement_Correction_A_egcs_fc_commitmentline_fkey" FOREIGN KEY (egcs_fc_commitmentline) REFERENCES "Funding_Case_Agreement_Commitment_Line"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Correction_Adjustment" ADD CONSTRAINT "fc_fk_agreement_correction_adjustment_commitmentline" FOREIGN KEY (egcs_fc_commitmentline) REFERENCES "Funding_Case_Agreement_Commitment_Line"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Correction_Line" ADD CONSTRAINT "fc_fk_correction_line_root" FOREIGN KEY (egcs_fc_correction, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Correction"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Correction_Line" ADD CONSTRAINT "Funding_Case_Agreement_Correction_egcs_fc_agencyfiscalyear_fkey" FOREIGN KEY (egcs_fc_agencyfiscalyear) REFERENCES "Agency_Fiscal_Year"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Correction_Line" ADD CONSTRAINT "fc_fk_agreement_correction_line_agencyfiscalyear" FOREIGN KEY (egcs_fc_agencyfiscalyear) REFERENCES "Agency_Fiscal_Year"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Correction_Line" ADD CONSTRAINT "Funding_Case_Agreement_Correction_L_egcs_fc_chartofaccount_fkey" FOREIGN KEY (egcs_fc_chartofaccount) REFERENCES "Transfer_Payment_Stream_Chart_of_Account"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Correction_Line" ADD CONSTRAINT "fc_fk_agreement_correction_line_chartofaccount" FOREIGN KEY (egcs_fc_chartofaccount) REFERENCES "Transfer_Payment_Stream_Chart_of_Account"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Correction_Line" ADD CONSTRAINT "Funding_Case_Agreement_Correction_L_egcs_fc_commitmentline_fkey" FOREIGN KEY (egcs_fc_commitmentline) REFERENCES "Funding_Case_Agreement_Commitment_Line"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Correction_Line" ADD CONSTRAINT "fc_fk_agreement_correction_line_commitmentline" FOREIGN KEY (egcs_fc_commitmentline) REFERENCES "Funding_Case_Agreement_Commitment_Line"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Correction_Notification" ADD CONSTRAINT "Funding_Case_Agreement_Correction_Notif_egcs_fc_correction_fkey" FOREIGN KEY (egcs_fc_correction) REFERENCES "Funding_Case_Agreement_Correction"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Correction_Notification" ADD CONSTRAINT "fc_fk_agreement_correction_notification_correction" FOREIGN KEY (egcs_fc_correction) REFERENCES "Funding_Case_Agreement_Correction"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Correction_Notification" ADD CONSTRAINT "Funding_Case_Agreement_Correction_Notifica_egcs_fc_runtime_fkey" FOREIGN KEY (egcs_fc_runtime) REFERENCES "Common_Runtime"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Correction_Notification" ADD CONSTRAINT "fc_fk_agreement_correction_notification_runtime" FOREIGN KEY (egcs_fc_runtime) REFERENCES "Common_Runtime"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Correction_Notification" ADD CONSTRAINT "Funding_Case_Agreement_Correction_Notificatio_egcs_fc_user_fkey" FOREIGN KEY (egcs_fc_user) REFERENCES "Common_User"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Correction_Notification" ADD CONSTRAINT "fc_fk_agreement_correction_notification_user" FOREIGN KEY (egcs_fc_user) REFERENCES "Common_User"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Correction_Source" ADD CONSTRAINT "fc_fk_correction_source_payment" FOREIGN KEY (egcs_fc_payment, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Payment"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
@@ -3485,13 +3215,13 @@ ALTER TABLE "Funding_Case_Agreement_Forecast_Line_Item" ADD CONSTRAINT "fc_ref_f
 
 ALTER TABLE "Funding_Case_Agreement_Forecast_Line_Item" ADD CONSTRAINT "fc_ref_forecastlineforecastagreement" FOREIGN KEY (egcs_fc_agreementforecast, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Forecast"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Forecast_Line_Item" ADD CONSTRAINT "Funding_Case_Agreement_Foreca_egcs_fc_fundingagreementbudg_fkey" FOREIGN KEY (egcs_fc_fundingagreementbudgetlineitem) REFERENCES "Funding_Case_Agreement_Budget_Line_Item"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Forecast_Line_Item" ADD CONSTRAINT "fc_fk_agreement_forecast_lineitem_budgetlineitem" FOREIGN KEY (egcs_fc_fundingagreementbudgetlineitem) REFERENCES "Funding_Case_Agreement_Budget_Line_Item"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Forecast_Line_Item" ADD CONSTRAINT "Funding_Case_Agreement_Forecast__egcs_fc_agreementforecast_fkey" FOREIGN KEY (egcs_fc_agreementforecast) REFERENCES "Funding_Case_Agreement_Forecast"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Forecast_Line_Item" ADD CONSTRAINT "fc_fk_agreement_forecast_lineitem_forecast" FOREIGN KEY (egcs_fc_agreementforecast) REFERENCES "Funding_Case_Agreement_Forecast"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Forecast_Line_Item_Funding" ADD CONSTRAINT "Funding_Case_Agreement_Forecast_L_egcs_fc_forecastlineitem_fkey" FOREIGN KEY (egcs_fc_forecastlineitem) REFERENCES "Funding_Case_Agreement_Forecast_Line_Item"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Forecast_Line_Item_Funding" ADD CONSTRAINT "fc_fk_agreement_forecast_lineitem_funding_forecastlineitem" FOREIGN KEY (egcs_fc_forecastlineitem) REFERENCES "Funding_Case_Agreement_Forecast_Line_Item"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Forecast_Line_Item_Funding" ADD CONSTRAINT "Funding_Case_Agreement_Forecast_Lin_egcs_fc_fundingsubtype_fkey" FOREIGN KEY (egcs_fc_fundingsubtype) REFERENCES "Agency_Funding_Subtype"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Forecast_Line_Item_Funding" ADD CONSTRAINT "fc_fk_agreement_forecast_lineitem_funding_fundingsubtype" FOREIGN KEY (egcs_fc_fundingsubtype) REFERENCES "Agency_Funding_Subtype"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Generated_Document" ADD CONSTRAINT "fc_ref_generateddocumentagreementstream" FOREIGN KEY (egcs_fc_fundingagreement, egcs_fc_transferpaymentstream) REFERENCES "Funding_Case_Agreement_Profile"(id, egcs_fc_transferpaymentstream) ON DELETE RESTRICT;
 
@@ -3501,11 +3231,11 @@ ALTER TABLE "Funding_Case_Agreement_Generated_Document" ADD CONSTRAINT "fc_ref_g
 
 ALTER TABLE "Funding_Case_Agreement_Generated_Document" ADD CONSTRAINT "fc_ref_generateddocumenttemplatestream" FOREIGN KEY (egcs_fc_documenttemplate, egcs_fc_transferpaymentstream) REFERENCES "Transfer_Payment_Stream_Document_Template"(id, egcs_tp_transferpaymentstream) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Generated_Document" ADD CONSTRAINT "Funding_Case_Agreement_Generat_egcs_fc_generatedattachment_fkey" FOREIGN KEY (egcs_fc_generatedattachment) REFERENCES "Common_Attachment"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Generated_Document" ADD CONSTRAINT "fc_fk_agreement_generated_document_generatedattachment" FOREIGN KEY (egcs_fc_generatedattachment) REFERENCES "Common_Attachment"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Generated_Document" ADD CONSTRAINT "Funding_Case_Agreement_Generated__egcs_fc_documenttemplate_fkey" FOREIGN KEY (egcs_fc_documenttemplate) REFERENCES "Transfer_Payment_Stream_Document_Template"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Generated_Document" ADD CONSTRAINT "fc_fk_agreement_generated_document_documenttemplate" FOREIGN KEY (egcs_fc_documenttemplate) REFERENCES "Transfer_Payment_Stream_Document_Template"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Generated_Document" ADD CONSTRAINT "Funding_Case_Agreement_Generated__egcs_fc_fundingagreement_fkey" FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Generated_Document" ADD CONSTRAINT "fc_fk_agreement_generated_document_" FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Journal_Voucher" ADD CONSTRAINT "fc_fk_jv_payment_agreement" FOREIGN KEY (egcs_fc_payment, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Payment"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
@@ -3513,9 +3243,9 @@ ALTER TABLE "Funding_Case_Agreement_Journal_Voucher" ADD CONSTRAINT "fc_fk_jv_re
 
 ALTER TABLE "Funding_Case_Agreement_Journal_Voucher" ADD CONSTRAINT "fc_fk_jv_reversal" FOREIGN KEY (egcs_fc_reversalof, egcs_fc_payment) REFERENCES "Funding_Case_Agreement_Journal_Voucher"(id, egcs_fc_payment) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Journal_Voucher" ADD CONSTRAINT "Funding_Case_Agreement_Journal_Vo_egcs_fc_agencyfiscalyear_fkey" FOREIGN KEY (egcs_fc_agencyfiscalyear) REFERENCES "Agency_Fiscal_Year"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Journal_Voucher" ADD CONSTRAINT "fc_fk_agreement_journal_voucher_agencyfiscalyear" FOREIGN KEY (egcs_fc_agencyfiscalyear) REFERENCES "Agency_Fiscal_Year"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Journal_Voucher" ADD CONSTRAINT "Funding_Case_Agreement_Journal_Vo_egcs_fc_fundingagreement_fkey" FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Journal_Voucher" ADD CONSTRAINT "fc_fk_agreement_journal_voucher_" FOREIGN KEY (egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Profile"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Journal_Voucher" ADD CONSTRAINT "Funding_Case_Agreement_Journal_Voucher_egcs_fc_fiscalyear_fkey" FOREIGN KEY (egcs_fc_fiscalyear) REFERENCES "Funding_Case_Agreement_Budget_Fiscal_Year"(id) ON DELETE RESTRICT;
 
@@ -3525,9 +3255,9 @@ ALTER TABLE "Funding_Case_Agreement_Journal_Voucher" ADD CONSTRAINT "Funding_Cas
 
 ALTER TABLE "Funding_Case_Agreement_Journal_Voucher_Line" ADD CONSTRAINT "fc_fk_jv_line_root" FOREIGN KEY (egcs_fc_journalvoucher, egcs_fc_payment) REFERENCES "Funding_Case_Agreement_Journal_Voucher"(id, egcs_fc_payment) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Journal_Voucher_Line" ADD CONSTRAINT "Funding_Case_Agreement_Journal_Vouc_egcs_fc_chartofaccount_fkey" FOREIGN KEY (egcs_fc_chartofaccount) REFERENCES "Transfer_Payment_Stream_Chart_of_Account"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Journal_Voucher_Line" ADD CONSTRAINT "fc_fk_agreement_journal_voucher_line_chartofaccount" FOREIGN KEY (egcs_fc_chartofaccount) REFERENCES "Transfer_Payment_Stream_Chart_of_Account"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Journal_Voucher_Line" ADD CONSTRAINT "Funding_Case_Agreement_Journal_Vouc_egcs_fc_commitmentline_fkey" FOREIGN KEY (egcs_fc_commitmentline) REFERENCES "Funding_Case_Agreement_Commitment_Line"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Journal_Voucher_Line" ADD CONSTRAINT "fc_fk_agreement_journal_voucher_line_commitmentline" FOREIGN KEY (egcs_fc_commitmentline) REFERENCES "Funding_Case_Agreement_Commitment_Line"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Monitor" ADD CONSTRAINT "fc_ref_monitoragreementstream" FOREIGN KEY (egcs_fc_fundingagreement, egcs_fc_transferpaymentstream) REFERENCES "Funding_Case_Agreement_Profile"(id, egcs_fc_transferpaymentstream) ON DELETE RESTRICT;
 
@@ -3545,21 +3275,21 @@ ALTER TABLE "Funding_Case_Agreement_Monitor" ADD CONSTRAINT "Funding_Case_Agreem
 
 ALTER TABLE "Funding_Case_Agreement_Monitor_Finding" ADD CONSTRAINT "fc_fk_monitor_finding_item" FOREIGN KEY (egcs_fc_monitoritem, egcs_fc_fundingagreementmonitor) REFERENCES "Funding_Case_Agreement_Monitor_Items"(id, egcs_fc_fundingagreementmonitor) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Monitor_Finding" ADD CONSTRAINT "Funding_Case_Agreement_Monit_egcs_fc_fundingagreementmoni_fkey2" FOREIGN KEY (egcs_fc_fundingagreementmonitor) REFERENCES "Funding_Case_Agreement_Monitor"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Monitor_Finding" ADD CONSTRAINT "fc_fk_agreement_monitor_finding_monitor" FOREIGN KEY (egcs_fc_fundingagreementmonitor) REFERENCES "Funding_Case_Agreement_Monitor"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Monitor_Followup" ADD CONSTRAINT "fc_fk_monitor_followup_finding" FOREIGN KEY (egcs_fc_monitorfinding, egcs_fc_fundingagreementmonitor) REFERENCES "Funding_Case_Agreement_Monitor_Finding"(id, egcs_fc_fundingagreementmonitor) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Monitor_Followup" ADD CONSTRAINT "Funding_Case_Agreement_Monit_egcs_fc_fundingagreementmoni_fkey3" FOREIGN KEY (egcs_fc_fundingagreementmonitor) REFERENCES "Funding_Case_Agreement_Monitor"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Monitor_Followup" ADD CONSTRAINT "fc_fk_agreement_monitor_followup_monitor" FOREIGN KEY (egcs_fc_fundingagreementmonitor) REFERENCES "Funding_Case_Agreement_Monitor"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Monitor_Followup_Update" ADD CONSTRAINT "Funding_Case_Agreement_Monit_egcs_fc_fundingagreementmoni_fkey4" FOREIGN KEY (egcs_fc_fundingagreementmonitorfollowup) REFERENCES "Funding_Case_Agreement_Monitor_Followup"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Monitor_Followup_Update" ADD CONSTRAINT "fc_fk_agreement_monitor_followup_update_monitorfollowup" FOREIGN KEY (egcs_fc_fundingagreementmonitorfollowup) REFERENCES "Funding_Case_Agreement_Monitor_Followup"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Monitor_Items" ADD CONSTRAINT "fc_fk_monitor_item_planning" FOREIGN KEY (egcs_fc_monitorplanning, egcs_fc_fundingagreementmonitor) REFERENCES "Funding_Case_Agreement_Monitor_Planning"(id, egcs_fc_fundingagreementmonitor) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Monitor_Items" ADD CONSTRAINT "Funding_Case_Agreement_Monit_egcs_fc_fundingagreementmoni_fkey1" FOREIGN KEY (egcs_fc_fundingagreementmonitor) REFERENCES "Funding_Case_Agreement_Monitor"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Monitor_Items" ADD CONSTRAINT "fc_fk_agreement_monitor_items_monitor" FOREIGN KEY (egcs_fc_fundingagreementmonitor) REFERENCES "Funding_Case_Agreement_Monitor"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Monitor_Planning" ADD CONSTRAINT "Funding_Case_Agreement_Monito_egcs_fc_fundingagreementmoni_fkey" FOREIGN KEY (egcs_fc_fundingagreementmonitor) REFERENCES "Funding_Case_Agreement_Monitor"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Monitor_Planning" ADD CONSTRAINT "fc_fk_agreement_monitor_planning_monitor" FOREIGN KEY (egcs_fc_fundingagreementmonitor) REFERENCES "Funding_Case_Agreement_Monitor"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Monitor_Promising_Practice" ADD CONSTRAINT "Funding_Case_Agreement_Monit_egcs_fc_fundingagreementmoni_fkey5" FOREIGN KEY (egcs_fc_fundingagreementmonitor) REFERENCES "Funding_Case_Agreement_Monitor"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Monitor_Promising_Practice" ADD CONSTRAINT "fc_fk_agreement_monitor_promising_practice_monitor" FOREIGN KEY (egcs_fc_fundingagreementmonitor) REFERENCES "Funding_Case_Agreement_Monitor"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Note" ADD CONSTRAINT "Funding_Case_Agreement_Note_egcs_fc_createdby_fkey" FOREIGN KEY (egcs_fc_createdby) REFERENCES "Common_User"(id) ON DELETE RESTRICT;
 
@@ -3575,7 +3305,7 @@ ALTER TABLE "Funding_Case_Agreement_Payment" ADD CONSTRAINT "fc_ref_paymentcommi
 
 ALTER TABLE "Funding_Case_Agreement_Payment" ADD CONSTRAINT "fc_ref_paymentfiscalyearagreement" FOREIGN KEY (egcs_fc_fiscalyear, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Budget_Fiscal_Year"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Payment" ADD CONSTRAINT "Funding_Case_Agreement_Paymen_egcs_fc_fundingagreementcomm_fkey" FOREIGN KEY (egcs_fc_fundingagreementcommitment) REFERENCES "Funding_Case_Agreement_Commitment"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Payment" ADD CONSTRAINT "fc_fk_agreement_payment_commitment" FOREIGN KEY (egcs_fc_fundingagreementcommitment) REFERENCES "Funding_Case_Agreement_Commitment"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Payment" ADD CONSTRAINT "Funding_Case_Agreement_Payment_egcs_fc_applicantrecipient_fkey" FOREIGN KEY (egcs_fc_applicantrecipient) REFERENCES "Applicant_Recipient_Profile"(id) ON DELETE RESTRICT;
 
@@ -3589,15 +3319,15 @@ ALTER TABLE "Funding_Case_Agreement_Payment_Line" ADD CONSTRAINT "fc_ref_payment
 
 ALTER TABLE "Funding_Case_Agreement_Payment_Line" ADD CONSTRAINT "fc_ref_paymentlinepaymentcommitment" FOREIGN KEY (egcs_fc_fundingagreementpayment, egcs_fc_fundingagreementcommitment) REFERENCES "Funding_Case_Agreement_Payment"(id, egcs_fc_fundingagreementcommitment) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Payment_Line" ADD CONSTRAINT "Funding_Case_Agreement_Payme_egcs_fc_fundingagreementcomm_fkey1" FOREIGN KEY (egcs_fc_fundingagreementcommitmentline) REFERENCES "Funding_Case_Agreement_Commitment_Line"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Payment_Line" ADD CONSTRAINT "fc_fk_agreement_payment_line_commitmentline" FOREIGN KEY (egcs_fc_fundingagreementcommitmentline) REFERENCES "Funding_Case_Agreement_Commitment_Line"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Payment_Line" ADD CONSTRAINT "Funding_Case_Agreement_Paymen_egcs_fc_fundingagreementpaym_fkey" FOREIGN KEY (egcs_fc_fundingagreementpayment) REFERENCES "Funding_Case_Agreement_Payment"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Payment_Line" ADD CONSTRAINT "fc_fk_agreement_payment_line_payment" FOREIGN KEY (egcs_fc_fundingagreementpayment) REFERENCES "Funding_Case_Agreement_Payment"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Profile" ADD CONSTRAINT "fc_ref_holdbackbasisstream" FOREIGN KEY (egcs_fc_holdbackbasis, egcs_fc_transferpaymentstream) REFERENCES "Transfer_Payment_Stream_Holdback_Basis"(id, egcs_tp_transferpaymentstream) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Profile" ADD CONSTRAINT "fc_ref_profileagreementsubtypetransferpaymentstream" FOREIGN KEY (egcs_fc_agreementsubtype, egcs_fc_transferpaymentstream) REFERENCES "Transfer_Payment_Agreement_Subtype"(id, egcs_tp_transferpaymentstream) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Profile" ADD CONSTRAINT "Funding_Case_Agreement_Profil_egcs_fc_transferpaymentstrea_fkey" FOREIGN KEY (egcs_fc_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Profile" ADD CONSTRAINT "fc_fk_agreement_profile_stream" FOREIGN KEY (egcs_fc_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Profile" ADD CONSTRAINT "Funding_Case_Agreement_Profile_egcs_fc_holdbackbasis_fkey" FOREIGN KEY (egcs_fc_holdbackbasis) REFERENCES "Transfer_Payment_Stream_Holdback_Basis"(id) ON DELETE RESTRICT;
 
@@ -3605,9 +3335,9 @@ ALTER TABLE "Funding_Case_Agreement_Profile" ADD CONSTRAINT "Funding_Case_Agreem
 
 ALTER TABLE "Funding_Case_Agreement_Profile" ADD CONSTRAINT "Funding_Case_Agreement_Profile_id_fkey" FOREIGN KEY (id) REFERENCES "Common_Entity"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Responsible_Party_Activity" ADD CONSTRAINT "Funding_Case_Agreement_Responsibl_egcs_fc_responsibleparty_fkey" FOREIGN KEY (egcs_fc_responsibleparty) REFERENCES "Funding_Case_Agreement_Applicant_Recipient"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Responsible_Party_Activity" ADD CONSTRAINT "fc_fk_agreement_responsibleparty_activity_party" FOREIGN KEY (egcs_fc_responsibleparty) REFERENCES "Funding_Case_Agreement_Applicant_Recipient"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Funding_Case_Agreement_Responsible_Party_Activity" ADD CONSTRAINT "Funding_Case_Agreement_Responsible_Party__egcs_fc_activity_fkey" FOREIGN KEY (egcs_fc_activity) REFERENCES "Funding_Case_Agreement_Activity"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Case_Agreement_Responsible_Party_Activity" ADD CONSTRAINT "fc_fk_agreement_responsibleparty_activity_activity" FOREIGN KEY (egcs_fc_activity) REFERENCES "Funding_Case_Agreement_Activity"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Revision" ADD CONSTRAINT "fc_ref_revisionamendmentagreement" FOREIGN KEY (egcs_fc_amendment, egcs_fc_fundingagreement) REFERENCES "Funding_Case_Agreement_Amendment"(id, egcs_fc_fundingagreement) ON DELETE RESTRICT;
 
@@ -3620,12 +3350,6 @@ END $baseline$`.execute(db)
 /** Installs the current installTriggers definitions for this subject on a fresh database. */
 export const installTriggers = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
-CREATE CONSTRAINT TRIGGER trg_require_ar_offset_memo_application AFTER INSERT OR UPDATE ON "Funding_Case_Account_Receivable_Allocation" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_require_ar_offset_memo_application();
-
-CREATE TRIGGER trg_validate_ar_recovery BEFORE INSERT OR DELETE OR UPDATE ON "Funding_Case_Account_Receivable_Allocation" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_ar_recovery();
-
-CREATE CONSTRAINT TRIGGER trg_validate_ar_recovery_posting AFTER INSERT OR UPDATE ON "Funding_Case_Account_Receivable_Allocation" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_ar_recovery_posting();
-
 CREATE TRIGGER trg_validate_ar_creditmemo_line BEFORE INSERT OR UPDATE OR DELETE ON "Funding_Case_Account_Receivable_Credit_Memo_Line" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_ar_creditmemo_line();
 
 CREATE CONSTRAINT TRIGGER trg_validate_ar_creditmemo_lines_total AFTER INSERT OR UPDATE ON "Funding_Case_Account_Receivable_Credit_Memo_Line" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_ar_creditmemo_lines_total();
@@ -3655,12 +3379,6 @@ CREATE CONSTRAINT TRIGGER trg_validate_ar_offset_memo_lines_total AFTER INSERT O
 CREATE TRIGGER trg_validate_ar_offset_memo BEFORE INSERT OR DELETE OR UPDATE ON "Funding_Case_Account_Receivable_Offset_Memo_Application" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_ar_offset_memo();
 
 CREATE TRIGGER trg_protect_ar_pool BEFORE DELETE OR UPDATE ON "Funding_Case_Account_Receivable_Pool" FOR EACH ROW EXECUTE FUNCTION trg_fn_protect_ar_pool();
-
-CREATE TRIGGER trg_validate_ar_recovery BEFORE INSERT OR DELETE OR UPDATE ON "Funding_Case_Account_Receivable_Posting" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_ar_recovery();
-
-CREATE CONSTRAINT TRIGGER trg_validate_ar_recovery_posting AFTER INSERT OR UPDATE ON "Funding_Case_Account_Receivable_Posting" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_ar_recovery_posting();
-
-CREATE CONSTRAINT TRIGGER trg_require_ar_offset_memo_application AFTER INSERT OR UPDATE ON "Funding_Case_Account_Receivable_Recovery" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_require_ar_offset_memo_application();
 
 CREATE TRIGGER trg_validate_ar_recovery BEFORE INSERT OR DELETE OR UPDATE ON "Funding_Case_Account_Receivable_Recovery" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_ar_recovery();
 
@@ -3798,7 +3516,6 @@ CREATE CONSTRAINT TRIGGER trg_validate_completed_commitment_header AFTER INSERT 
 CREATE CONSTRAINT TRIGGER trg_validate_completed_commitment_lines AFTER INSERT OR UPDATE ON "Funding_Case_Agreement_Commitment_Line" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_completed_commitment_coding();
 
 CREATE CONSTRAINT TRIGGER trg_validate_commitment_completion_coding AFTER INSERT OR UPDATE ON "Common_Completion" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (NEW.egcs_cn_entitytype='fundingcaseagreementcommitment') EXECUTE FUNCTION trg_fn_validate_completed_commitment_coding();
-
 
 CREATE CONSTRAINT TRIGGER trg_enforce_correction_roster AFTER INSERT OR UPDATE OF _deleted ON "Funding_Case_Agreement_Correction" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trg_fn_enforce_assignable_entity_roster('fundingcasecorrection');
 

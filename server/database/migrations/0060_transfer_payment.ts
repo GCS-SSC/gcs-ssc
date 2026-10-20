@@ -278,7 +278,7 @@ CREATE TABLE "Transfer_Payment_Stream_Chart_of_Account" (
   "egcs_tp_agencychartofaccount" bigint NOT NULL,
   "egcs_tp_transferpaymentstream" bigint NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
-  CONSTRAINT "fc_unq_chartofaccountidstream" UNIQUE (id, egcs_tp_transferpaymentstream),
+  CONSTRAINT "tp_uq_chartofaccountidstream" UNIQUE (id, egcs_tp_transferpaymentstream),
   CONSTRAINT "Transfer_Payment_Stream_Chart_of_Account_pkey" PRIMARY KEY (id)
 );
 
@@ -340,7 +340,7 @@ CREATE TABLE "Transfer_Payment_Stream_Field_Assignment" (
   "egcs_tp_displayorder" integer DEFAULT 0 NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Transfer_Payment_Stream_Field_Assignment_pkey" PRIMARY KEY (id),
-  CONSTRAINT "Transfer_Payment_Stream_Field_Assign_egcs_tp_displayorder_check" CHECK ((egcs_tp_displayorder >= 0))
+  CONSTRAINT "tp_chk_stream_field_assignment_displayorder" CHECK ((egcs_tp_displayorder >= 0))
 );
 
 CREATE UNIQUE INDEX tp_idx_unique_live_field_assignment ON "Transfer_Payment_Stream_Field_Assignment" USING btree (egcs_tp_transferpaymentstream, egcs_tp_agencyfield) WHERE (_deleted = false);
@@ -352,9 +352,9 @@ CREATE TABLE "Transfer_Payment_Stream_Field_Section" (
   "egcs_tp_name_fr" text NOT NULL,
   "egcs_tp_displayorder" integer DEFAULT 0 NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
-  CONSTRAINT "Transfer_Payment_Stream_Field_id_egcs_tp_transferpaymentstr_key" UNIQUE (id, egcs_tp_transferpaymentstream),
+  CONSTRAINT "tp_uq_stream_field_section_id_stream" UNIQUE (id, egcs_tp_transferpaymentstream),
   CONSTRAINT "Transfer_Payment_Stream_Field_Section_pkey" PRIMARY KEY (id),
-  CONSTRAINT "Transfer_Payment_Stream_Field_Sectio_egcs_tp_displayorder_check" CHECK ((egcs_tp_displayorder >= 0))
+  CONSTRAINT "tp_chk_stream_field_section_displayorder" CHECK ((egcs_tp_displayorder >= 0))
 );
 
 CREATE TABLE "Transfer_Payment_Stream_Funding_Subtype" (
@@ -1085,33 +1085,33 @@ END $baseline$`.execute(db)
 /** Installs the current installForeignKeys definitions for this subject on a fresh database. */
 export const installForeignKeys = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
-ALTER TABLE "Transfer_Payment_Agreement_Subtype" ADD CONSTRAINT "Transfer_Payment_Agreement_Su_egcs_tp_transferpaymentstrea_fkey" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Agreement_Subtype" ADD CONSTRAINT "tp_fk_agreement_subtype_stream" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Transfer_Payment_Agreement_Subtype" ADD CONSTRAINT "Transfer_Payment_Agreement_Subtype_egcs_tp_agreementtype_fkey" FOREIGN KEY (egcs_tp_agreementtype) REFERENCES "Agency_Agreement_Type"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Amendment_Subtype" ADD CONSTRAINT "Transfer_Payment_Amendment_Su_egcs_tp_transferpaymentstrea_fkey" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Amendment_Subtype" ADD CONSTRAINT "tp_fk_amendment_subtype_stream" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Amendment_Subtype_Type" ADD CONSTRAINT "Transfer_Payment_Amendment_Subtyp_egcs_tp_amendmentsubtype_fkey" FOREIGN KEY (egcs_tp_amendmentsubtype) REFERENCES "Transfer_Payment_Amendment_Subtype"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Amendment_Subtype_Type" ADD CONSTRAINT "tp_fk_amendment_subtype_type_amendmentsubtype" FOREIGN KEY (egcs_tp_amendmentsubtype) REFERENCES "Transfer_Payment_Amendment_Subtype"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Amendment_Subtype_Type" ADD CONSTRAINT "Transfer_Payment_Amendment_Subtype_T_egcs_tp_amendmenttype_fkey" FOREIGN KEY (egcs_tp_amendmenttype) REFERENCES "Transfer_Payment_Amendment_Type"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Amendment_Subtype_Type" ADD CONSTRAINT "tp_fk_amendment_subtype_type_amendmenttype" FOREIGN KEY (egcs_tp_amendmenttype) REFERENCES "Transfer_Payment_Amendment_Type"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Amendment_Type" ADD CONSTRAINT "Transfer_Payment_Amendment_Ty_egcs_tp_transferpaymentstrea_fkey" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Amendment_Type" ADD CONSTRAINT "tp_fk_amendment_type_stream" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Financial_Limits" ADD CONSTRAINT "Transfer_Payment_Financial_Li_egcs_tp_transferpaymentstrea_fkey" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Financial_Limits" ADD CONSTRAINT "tp_fk_financial_limits_stream" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Fiscal_Year_Budget" ADD CONSTRAINT "Transfer_Payment_Fiscal_Year__egcs_tp_transferpaymentprofi_fkey" FOREIGN KEY (egcs_tp_transferpaymentprofile) REFERENCES "Transfer_Payment_Profile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Fiscal_Year_Budget" ADD CONSTRAINT "tp_fk_fiscal_year_budget_transferpaymentprofile" FOREIGN KEY (egcs_tp_transferpaymentprofile) REFERENCES "Transfer_Payment_Profile"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Transfer_Payment_Fiscal_Year_Budget" ADD CONSTRAINT "Transfer_Payment_Fiscal_Year_Budget_egcs_tp_fiscalyear_fkey" FOREIGN KEY (egcs_tp_fiscalyear) REFERENCES "Agency_Fiscal_Year"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Transfer_Payment_Monitor_Type" ADD CONSTRAINT "Transfer_Payment_Monitor_Type_egcs_tp_agencymonitortype_fkey" FOREIGN KEY (egcs_tp_agencymonitortype) REFERENCES "Agency_Monitor_Type"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Monitor_Type" ADD CONSTRAINT "Transfer_Payment_Monitor_Type_egcs_tp_transferpaymentstrea_fkey" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Monitor_Type" ADD CONSTRAINT "tp_fk_monitor_type_stream" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Transfer_Payment_Objective" ADD CONSTRAINT "Transfer_Payment_Objective_egcs_tp_transferpaymentprofile_fkey" FOREIGN KEY (egcs_tp_transferpaymentprofile) REFERENCES "Transfer_Payment_Profile"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Transfer_Payment_Outcome" ADD CONSTRAINT "Transfer_Payment_Outcome_egcs_tp_transferpaymentprofile_fkey" FOREIGN KEY (egcs_tp_transferpaymentprofile) REFERENCES "Transfer_Payment_Profile"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Outcome_Performance_Indicator" ADD CONSTRAINT "Transfer_Payment_Outcome_Perf_egcs_tp_transferpaymentoutco_fkey" FOREIGN KEY (egcs_tp_transferpaymentoutcome) REFERENCES "Transfer_Payment_Outcome"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Outcome_Performance_Indicator" ADD CONSTRAINT "tp_fk_outcome_performance_indicator_transferpaymentoutcome" FOREIGN KEY (egcs_tp_transferpaymentoutcome) REFERENCES "Transfer_Payment_Outcome"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Transfer_Payment_Profile" ADD CONSTRAINT "Transfer_Payment_Profile_egcs_tp_agency_fkey" FOREIGN KEY (egcs_tp_agency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
 
@@ -1121,59 +1121,59 @@ ALTER TABLE "Transfer_Payment_Stream" ADD CONSTRAINT "Transfer_Payment_Stream_eg
 
 ALTER TABLE "Transfer_Payment_Stream" ADD CONSTRAINT "Transfer_Payment_Stream_egcs_tp_transferpaymentprofile_fkey" FOREIGN KEY (egcs_tp_transferpaymentprofile) REFERENCES "Transfer_Payment_Profile"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Stream_Area_of_Expertise" ADD CONSTRAINT "Transfer_Payment_Stream_Area__egcs_tp_transferpaymentstrea_fkey" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Stream_Area_of_Expertise" ADD CONSTRAINT "tp_fk_stream_area_of_expertise_stream" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Stream_Budget" ADD CONSTRAINT "Transfer_Payment_Stream_Budge_egcs_tp_transferpaymentbudge_fkey" FOREIGN KEY (egcs_tp_transferpaymentbudget) REFERENCES "Transfer_Payment_Fiscal_Year_Budget"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Stream_Budget" ADD CONSTRAINT "tp_fk_stream_budget_transferpaymentbudget" FOREIGN KEY (egcs_tp_transferpaymentbudget) REFERENCES "Transfer_Payment_Fiscal_Year_Budget"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Stream_Budget" ADD CONSTRAINT "Transfer_Payment_Stream_Budge_egcs_tp_transferpaymentstrea_fkey" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Stream_Budget" ADD CONSTRAINT "tp_fk_stream_budget_stream" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Stream_Chart_of_Account" ADD CONSTRAINT "Transfer_Payment_Stream_Chart_egcs_tp_agencychartofaccount_fkey" FOREIGN KEY (egcs_tp_agencychartofaccount) REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Stream_Chart_of_Account" ADD CONSTRAINT "tp_fk_stream_chart_of_account_agencychartofaccount" FOREIGN KEY (egcs_tp_agencychartofaccount) REFERENCES "Agency_Chart_of_Account"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Stream_Chart_of_Account" ADD CONSTRAINT "Transfer_Payment_Stream_Chart_egcs_tp_transferpaymentstrea_fkey" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Stream_Chart_of_Account" ADD CONSTRAINT "tp_fk_stream_chart_of_account_stream" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Stream_Commitment_Type" ADD CONSTRAINT "Transfer_Payment_Stream_Commi_egcs_tp_agencycommitmenttype_fkey" FOREIGN KEY (egcs_tp_agencycommitmenttype) REFERENCES "Agency_Commitment_Type"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Stream_Commitment_Type" ADD CONSTRAINT "tp_fk_stream_commitment_type_agencycommitmenttype" FOREIGN KEY (egcs_tp_agencycommitmenttype) REFERENCES "Agency_Commitment_Type"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Stream_Commitment_Type" ADD CONSTRAINT "Transfer_Payment_Stream_Commi_egcs_tp_transferpaymentstrea_fkey" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Stream_Commitment_Type" ADD CONSTRAINT "tp_fk_stream_commitment_type_stream" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Stream_Cost_Category_Line_Item" ADD CONSTRAINT "Transfer_Payment_Stream_Cost__egcs_tp_organizationcostcate_fkey" FOREIGN KEY (egcs_tp_organizationcostcategory) REFERENCES "Agency_Cost_Category_Line_Item"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Stream_Cost_Category_Line_Item" ADD CONSTRAINT "tp_fk_stream_cost_category_lineitem_costcategory" FOREIGN KEY (egcs_tp_organizationcostcategory) REFERENCES "Agency_Cost_Category_Line_Item"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Stream_Cost_Category_Line_Item" ADD CONSTRAINT "Transfer_Payment_Stream_Cost__egcs_tp_transferpaymentstrea_fkey" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Stream_Cost_Category_Line_Item" ADD CONSTRAINT "tp_fk_stream_cost_category_lineitem_stream" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Stream_Document_Template" ADD CONSTRAINT "Transfer_Payment_Stream_Docum_egcs_tp_agencydocumenttempla_fkey" FOREIGN KEY (egcs_tp_agencydocumenttemplate) REFERENCES "Agency_Document_Template"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Stream_Document_Template" ADD CONSTRAINT "tp_fk_stream_document_template_agencydocumenttemplate" FOREIGN KEY (egcs_tp_agencydocumenttemplate) REFERENCES "Agency_Document_Template"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Stream_Document_Template" ADD CONSTRAINT "Transfer_Payment_Stream_Docum_egcs_tp_transferpaymentstrea_fkey" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Stream_Document_Template" ADD CONSTRAINT "tp_fk_stream_document_template_stream" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Stream_Eligible_Recipient" ADD CONSTRAINT "Transfer_Payment_Stream_Eligi_egcs_tp_applicantrecipientsu_fkey" FOREIGN KEY (egcs_tp_applicantrecipientsubtype) REFERENCES "Agency_Applicant_Recipient_Subtype"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Stream_Eligible_Recipient" ADD CONSTRAINT "tp_fk_stream_eligible_recipient_recipientsubtype" FOREIGN KEY (egcs_tp_applicantrecipientsubtype) REFERENCES "Agency_Applicant_Recipient_Subtype"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Stream_Eligible_Recipient" ADD CONSTRAINT "Transfer_Payment_Stream_Eligi_egcs_tp_transferpaymentstrea_fkey" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Stream_Eligible_Recipient" ADD CONSTRAINT "tp_fk_stream_eligible_recipient_stream" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Transfer_Payment_Stream_Field_Assignment" ADD CONSTRAINT "tp_ref_field_assignment_section_stream" FOREIGN KEY (egcs_tp_section, egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream_Field_Section"(id, egcs_tp_transferpaymentstream) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Stream_Field_Assignment" ADD CONSTRAINT "Transfer_Payment_Stream_Fiel_egcs_tp_transferpaymentstrea_fkey1" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Stream_Field_Assignment" ADD CONSTRAINT "tp_fk_stream_field_assignment_stream" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Stream_Field_Assignment" ADD CONSTRAINT "Transfer_Payment_Stream_Field_Assignme_egcs_tp_agencyfield_fkey" FOREIGN KEY (egcs_tp_agencyfield) REFERENCES "Agency_Custom_Field"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Stream_Field_Assignment" ADD CONSTRAINT "tp_fk_stream_field_assignment_agencyfield" FOREIGN KEY (egcs_tp_agencyfield) REFERENCES "Agency_Custom_Field"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Stream_Field_Section" ADD CONSTRAINT "Transfer_Payment_Stream_Field_egcs_tp_transferpaymentstrea_fkey" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Stream_Field_Section" ADD CONSTRAINT "tp_fk_stream_field_section_stream" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Stream_Funding_Subtype" ADD CONSTRAINT "Transfer_Payment_Stream_Fundi_egcs_tp_transferpaymentstrea_fkey" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Stream_Funding_Subtype" ADD CONSTRAINT "tp_fk_stream_funding_subtype_stream" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Stream_Funding_Subtype" ADD CONSTRAINT "Transfer_Payment_Stream_Funding_Sub_egcs_tp_fundingsubtype_fkey" FOREIGN KEY (egcs_tp_fundingsubtype) REFERENCES "Agency_Funding_Subtype"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Stream_Funding_Subtype" ADD CONSTRAINT "tp_fk_stream_funding_subtype_fundingsubtype" FOREIGN KEY (egcs_tp_fundingsubtype) REFERENCES "Agency_Funding_Subtype"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Stream_Holdback_Basis" ADD CONSTRAINT "Transfer_Payment_Stream_Holdb_egcs_tp_transferpaymentstrea_fkey" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Stream_Holdback_Basis" ADD CONSTRAINT "tp_fk_stream_holdback_basis_stream" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Stream_Holdback_Basis" ADD CONSTRAINT "Transfer_Payment_Stream_Holdback_Ba_egcs_tp_agencyholdback_fkey" FOREIGN KEY (egcs_tp_agencyholdback) REFERENCES "Agency_Holdback_Basis"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Stream_Holdback_Basis" ADD CONSTRAINT "tp_fk_stream_holdback_basis_agencyholdback" FOREIGN KEY (egcs_tp_agencyholdback) REFERENCES "Agency_Holdback_Basis"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Stream_Outcome" ADD CONSTRAINT "Transfer_Payment_Stream_Outco_egcs_tp_transferpaymentoutco_fkey" FOREIGN KEY (egcs_tp_transferpaymentoutcome) REFERENCES "Transfer_Payment_Outcome"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Stream_Outcome" ADD CONSTRAINT "tp_fk_stream_outcome_transferpaymentoutcome" FOREIGN KEY (egcs_tp_transferpaymentoutcome) REFERENCES "Transfer_Payment_Outcome"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Stream_Outcome" ADD CONSTRAINT "Transfer_Payment_Stream_Outco_egcs_tp_transferpaymentstrea_fkey" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Stream_Outcome" ADD CONSTRAINT "tp_fk_stream_outcome_stream" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Stream_Review_Set" ADD CONSTRAINT "Transfer_Payment_Stream_Revie_egcs_tp_transferpaymentstrea_fkey" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Stream_Review_Set" ADD CONSTRAINT "tp_fk_stream_review_set_stream" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Transfer_Payment_Stream_Review_Set" ADD CONSTRAINT "Transfer_Payment_Stream_Review_Set_egcs_tp_reviewset_fkey" FOREIGN KEY (egcs_tp_reviewset) REFERENCES "Common_Review_Set_Setup"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Stream_Risk_Rating" ADD CONSTRAINT "Transfer_Payment_Stream_Risk__egcs_tp_transferpaymentstrea_fkey" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Stream_Risk_Rating" ADD CONSTRAINT "tp_fk_stream_risk_rating_stream" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Transfer_Payment_Stream_Workflow" ADD CONSTRAINT "Transfer_Payment_Stream_Workf_egcs_tp_transferpaymentstrea_fkey" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
+ALTER TABLE "Transfer_Payment_Stream_Workflow" ADD CONSTRAINT "tp_fk_stream_workflow_stream" FOREIGN KEY (egcs_tp_transferpaymentstream) REFERENCES "Transfer_Payment_Stream"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Transfer_Payment_Stream_Workflow" ADD CONSTRAINT "Transfer_Payment_Stream_Workflow_egcs_tp_workflow_fkey" FOREIGN KEY (egcs_tp_workflow) REFERENCES "Common_Workflow_Setup"(id) ON DELETE RESTRICT;
 END $baseline$`.execute(db)

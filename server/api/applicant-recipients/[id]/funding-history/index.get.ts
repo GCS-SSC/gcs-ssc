@@ -5,8 +5,7 @@ import { authorizeWithFreshAuthContext, requireFreshAuthContext, type AuthContex
 import { badRequest, throwApiError } from '~~/server/utils/api-errors'
 import { canAccessAgreement, buildAgreementScope } from '~~/server/utils/agreement'
 import {
-  canAccessApplicantRecipientIds,
-  resolveApplicantRecipientVisibility,
+  resolveApplicantRecipientMutationPermissions,
   resolveApplicantRecipientAuthorization
 } from '~~/server/utils/applicant-recipient-auth'
 import { assertApplicantRecipientProfileExists } from '~~/server/utils/applicant-recipient-child-resources'
@@ -253,7 +252,15 @@ export default defineEventHandler(async event => {
       const historyId = String(recipient.historyId)
       recipientsByHistory.set(historyId, [...(recipientsByHistory.get(historyId) ?? []), recipient])
     }
-    const externalRows = await Promise.all(externalRecords.map(async record => {
+    const recipientPermissions: Awaited<ReturnType<typeof resolveApplicantRecipientMutationPermissions>> = externalRecords.length === 0
+      ? new Map()
+      : await resolveApplicantRecipientMutationPermissions(
+          authContext,
+          [...new Set([applicantRecipientId, ...recipientRecords.map(recipient => String(recipient.id))])],
+          db
+        )
+    const targetPermissions = recipientPermissions.get(applicantRecipientId)
+    const externalRows = externalRecords.map(record => {
       const historyId = String(record.historyId)
       const recipients = (recipientsByHistory.get(historyId) ?? []).map(recipient => ({
         id: String(recipient.id),
@@ -261,17 +268,9 @@ export default defineEventHandler(async event => {
         labelFr: recipient.labelFr
       }))
       const recipientIds = recipients.map(recipient => recipient.id)
-      if (!await canAccessApplicantRecipientIds(authContext, recipientIds, 'read', db)) {
+      if (!recipientIds.every(id => recipientPermissions.get(id)?.canRead === true)) {
         return { rowKey: `external:${historyId}`, source: 'external' as const, restricted: true }
       }
-      const [updateVisibility, deleteVisibility] = await Promise.all([
-        resolveApplicantRecipientVisibility(authContext, 'update', db),
-        resolveApplicantRecipientVisibility(authContext, 'delete', db)
-      ])
-      const [canUpdate, canDelete] = await Promise.all([
-        canAccessApplicantRecipientIds(authContext, recipientIds, 'update', db),
-        canAccessApplicantRecipientIds(authContext, [applicantRecipientId], 'delete', db)
-      ])
       return {
         rowKey: `external:${historyId}`,
         source: 'external' as const,
@@ -290,12 +289,12 @@ export default defineEventHandler(async event => {
         endDate: record.endDate,
         totals: [{ currency: record.currency, amount: parseDatabaseMoney(record.amount) }],
         recipients,
-        canUpdateRole: updateVisibility.hasGlobalAccess || updateVisibility.agencyIds.length > 0,
-        canDeleteRole: deleteVisibility.hasGlobalAccess || deleteVisibility.agencyIds.length > 0,
-        canUpdate,
-        canDelete
+        canUpdateRole: targetPermissions?.canUpdateRole === true,
+        canDeleteRole: targetPermissions?.canDeleteRole === true,
+        canUpdate: recipientIds.every(id => recipientPermissions.get(id)?.canUpdate === true),
+        canDelete: targetPermissions?.canDelete === true
       }
-    }))
+    })
 
     const normalizedSearch = (query.search || '').trim().toLocaleLowerCase('en-CA')
     const rows = [...systemRows, ...externalRows]

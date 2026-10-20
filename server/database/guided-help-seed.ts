@@ -12,7 +12,7 @@ import { createPublication, publishDefinition } from '../utils/system-publicatio
 export const seedGuidedHelpExample = async (db: Transaction<Database>): Promise<void> => {
   const administrator = await db.selectFrom('user').select('id').where('email', '=', 'root@example.com').where('_deleted', '=', false).executeTakeFirstOrThrow()
   const publicationActor = await db.selectFrom('Common_User').select('id')
-    .where('egcs_cn_auth_user_id', '=', String(administrator.id)).where('_deleted', '=', false).executeTakeFirstOrThrow()
+    .where('egcs_cn_authuserid', '=', String(administrator.id)).where('_deleted', '=', false).executeTakeFirstOrThrow()
   const globalAdministrators = await db.selectFrom('role').innerJoin('role_permission', 'role_permission.role_id', 'role.id')
     .select('role.id').where('role.agency_id', 'is', null).where('role._deleted', '=', false)
     .where('role_permission._deleted', '=', false).where('role_permission.subject', '=', 'system')

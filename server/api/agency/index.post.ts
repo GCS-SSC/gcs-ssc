@@ -22,7 +22,7 @@ export default defineEventHandler(async event => {
       const authContext = await requireFreshAuthContext(event, trx)
       await authorizeWithFreshAuthContext(event, authContext, 'agency', 'create', { type: 'global' })
       const gwcoa = await trx.selectFrom('Common_GWCOA').select('id')
-        .where('egcs_cn_number', '=', Number(validated.egcs_ay_gwcoa_number))
+        .where('egcs_cn_number', '=', Number(validated.egcs_ay_gwcoanumber))
         .where('_deleted', '=', false)
         .forShare().executeTakeFirst()
       if (!gwcoa) {
@@ -32,7 +32,7 @@ export default defineEventHandler(async event => {
       const agency = await trx
         .insertInto('Agency_Profile')
         .values({
-          egcs_ay_gwcoa_number: Number(validated.egcs_ay_gwcoa_number),
+          egcs_ay_gwcoanumber: Number(validated.egcs_ay_gwcoanumber),
           egcs_ay_agencyfinancialsystemid: validated.egcs_ay_agencyfinancialsystemid,
           egcs_ay_name_en: validated.egcs_ay_name_en,
           egcs_ay_name_fr: validated.egcs_ay_name_fr,

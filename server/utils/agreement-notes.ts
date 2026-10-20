@@ -34,9 +34,9 @@ export const listAgreementNotes = async (event: H3Event) => await executeFreshRe
     : base
   const [items, count] = await Promise.all([
     filtered.innerJoin('Common_User as author', 'author.id', 'Funding_Case_Agreement_Note.egcs_fc_createdby')
-      .innerJoin('user as author_user', 'author_user.id', 'author.egcs_cn_auth_user_id')
+      .innerJoin('user as author_user', 'author_user.id', 'author.egcs_cn_authuserid')
       .innerJoin('Common_User as editor', 'editor.id', 'Funding_Case_Agreement_Note.egcs_fc_updatedby')
-      .innerJoin('user as editor_user', 'editor_user.id', 'editor.egcs_cn_auth_user_id')
+      .innerJoin('user as editor_user', 'editor_user.id', 'editor.egcs_cn_authuserid')
       .selectAll('Funding_Case_Agreement_Note').select(['author_user.name as author_name', 'editor_user.name as modified_by_name'])
       .orderBy('egcs_fc_createdat', 'desc').orderBy('Funding_Case_Agreement_Note.id', 'desc')
       .limit(limit).offset((page - 1) * limit).execute(),

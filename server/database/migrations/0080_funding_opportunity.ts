@@ -136,7 +136,7 @@ END $baseline$`.execute(db)
 /** Installs the current installForeignKeys definitions for this subject on a fresh database. */
 export const installForeignKeys = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
-ALTER TABLE "Funding_Opportunity_Attachment_Type" ADD CONSTRAINT "Funding_Opportunity_Attachment__egcs_fo_fundingopportunity_fkey" FOREIGN KEY (egcs_fo_fundingopportunity) REFERENCES "Funding_Opportunity_Profile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Funding_Opportunity_Attachment_Type" ADD CONSTRAINT "fo_fk_attachment_type_fundingopportunity" FOREIGN KEY (egcs_fo_fundingopportunity) REFERENCES "Funding_Opportunity_Profile"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Opportunity_Attachment_Type" ADD CONSTRAINT "Funding_Opportunity_Attachment_Type_egcs_fo_attachmenttype_fkey" FOREIGN KEY (egcs_fo_attachmenttype) REFERENCES "Common_Attachment_Types"(id) ON DELETE RESTRICT;
 

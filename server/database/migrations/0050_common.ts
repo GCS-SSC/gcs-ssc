@@ -124,7 +124,7 @@ CREATE TABLE "Common_Address" (
   "egcs_cn_addresscity" character varying(255) NOT NULL,
   "egcs_cn_addresscountry" countries NOT NULL,
   "egcs_cn_addresssubdivision" character varying(255) NOT NULL,
-  "egcs_cn_gc_addressid" bigint,
+  "egcs_cn_gcaddressid" bigint,
   "egcs_cn_latitude" numeric(10,7),
   "egcs_cn_longitude" numeric(10,7),
   "egcs_cn_mainphone" bigint NOT NULL,
@@ -603,9 +603,9 @@ CREATE TABLE "Common_Publication_Version" (
   CONSTRAINT "cn_uq_publicationversionpublication" UNIQUE (id, egcs_cn_publication),
   CONSTRAINT "cn_uq_publicationversionpublicationkind" UNIQUE (id, egcs_cn_publication, egcs_cn_kind),
   CONSTRAINT "Common_Publication_Version_pkey" PRIMARY KEY (id),
-  CONSTRAINT "Common_Publication_Version_egcs_cn_definition_check" CHECK ((jsonb_typeof(egcs_cn_definition) = 'object'::text)),
-  CONSTRAINT "Common_Publication_Version_egcs_cn_hash_check" CHECK ((egcs_cn_hash ~ '^[0-9a-f]{64}$'::text)),
-  CONSTRAINT "Common_Publication_Version_egcs_cn_version_check" CHECK ((egcs_cn_version > 0))
+  CONSTRAINT "cn_chk_pub_version_definition" CHECK ((jsonb_typeof(egcs_cn_definition) = 'object'::text)),
+  CONSTRAINT "cn_chk_pub_version_hash" CHECK ((egcs_cn_hash ~ '^[0-9a-f]{64}$'::text)),
+  CONSTRAINT "cn_chk_pub_version_version" CHECK ((egcs_cn_version > 0))
 );
 
 CREATE TABLE "Common_Publication_Version_Reference" (
@@ -619,7 +619,7 @@ CREATE TABLE "Common_Publication_Version_Reference" (
   "egcs_cn_version" integer NOT NULL,
   CONSTRAINT "cn_uq_publicationversionreference" UNIQUE NULLS NOT DISTINCT (egcs_cn_parentversion, egcs_cn_path, egcs_cn_order),
   CONSTRAINT "Common_Publication_Version_Reference_pkey" PRIMARY KEY (id),
-  CONSTRAINT "Common_Publication_Version_Reference_egcs_cn_version_check" CHECK ((egcs_cn_version > 0))
+  CONSTRAINT "cn_chk_pub_version_reference_version" CHECK ((egcs_cn_version > 0))
 );
 
 CREATE TABLE "Common_Data_Collection_Setup" (
@@ -696,7 +696,7 @@ CREATE TABLE "Common_Recommendation_Schema" (
   "egcs_cn_recommendationschema" jsonb NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Common_Recommendation_Schema_pkey" PRIMARY KEY (id),
-  CONSTRAINT "Common_Recommendation_Schema_egcs_cn_publicationkind_check" CHECK (((egcs_cn_publicationkind)::text = 'recommendation_schema'::text))
+  CONSTRAINT "cn_chk_recommendation_schema_publicationkind" CHECK (((egcs_cn_publicationkind)::text = 'recommendation_schema'::text))
 );
 
 CREATE UNIQUE INDEX cn_idx_recommendationschemaagencynameen ON "Common_Recommendation_Schema" USING btree (egcs_cn_agency, egcs_cn_name_en) WHERE (_deleted = false);
@@ -729,7 +729,7 @@ CREATE TABLE "Common_Recommendation_Set_Setup" (
   "egcs_cn_approvaltemplate" bigint,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Common_Recommendation_Set_Setup_pkey" PRIMARY KEY (id),
-  CONSTRAINT "Common_Recommendation_Set_Setup_egcs_cn_publicationkind_check" CHECK (((egcs_cn_publicationkind)::text = 'recommendation_set_setup'::text))
+  CONSTRAINT "cn_chk_recommendation_set_setup_publicationkind" CHECK (((egcs_cn_publicationkind)::text = 'recommendation_set_setup'::text))
 );
 
 CREATE INDEX cn_idx_recommendationsetsetupagencynameen ON "Common_Recommendation_Set_Setup" USING btree (egcs_cn_agency, egcs_cn_name_en) WHERE (_deleted = false);
@@ -809,7 +809,7 @@ CREATE TABLE "Common_Review_Schema" (
   "egcs_cn_assessmentschema" jsonb,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Common_Review_Schema_pkey" PRIMARY KEY (id),
-  CONSTRAINT "Common_Review_Schema_egcs_cn_publicationkind_check" CHECK (((egcs_cn_publicationkind)::text = 'review_schema'::text))
+  CONSTRAINT "cn_chk_review_schema_publicationkind" CHECK (((egcs_cn_publicationkind)::text = 'review_schema'::text))
 );
 
 CREATE UNIQUE INDEX cn_idx_reviewschemaagencynametypeen ON "Common_Review_Schema" USING btree (egcs_cn_agency, egcs_cn_entitytype, egcs_cn_name_en) WHERE (_deleted = false);
@@ -921,8 +921,8 @@ CREATE TABLE "Common_Runtime" (
   CONSTRAINT "cn_chk_runtimekind" CHECK (((egcs_cn_kind)::text = ANY ((ARRAY['workflow'::character varying, 'review_set'::character varying])::text[]))),
   CONSTRAINT "cn_chk_runtimestate" CHECK (((egcs_cn_state)::text = ANY ((ARRAY['pending'::character varying, 'active'::character varying, 'awaiting_action'::character varying, 'paused'::character varying, 'succeeded'::character varying, 'approved'::character varying, 'unsuccessful'::character varying, 'denied'::character varying, 'cancelled'::character varying, 'failed'::character varying])::text[]))),
   CONSTRAINT "cn_chk_runtimetimestamps" CHECK (((((egcs_cn_state)::text = 'pending'::text) AND (egcs_cn_startedat IS NULL) AND (egcs_cn_completedat IS NULL)) OR (((egcs_cn_state)::text = ANY ((ARRAY['active'::character varying, 'awaiting_action'::character varying, 'paused'::character varying])::text[])) AND (egcs_cn_startedat IS NOT NULL) AND (egcs_cn_completedat IS NULL)) OR (((egcs_cn_state)::text = ANY ((ARRAY['succeeded'::character varying, 'approved'::character varying, 'unsuccessful'::character varying, 'denied'::character varying, 'cancelled'::character varying, 'failed'::character varying])::text[])) AND (egcs_cn_completedat IS NOT NULL)))),
-  CONSTRAINT "Common_Runtime_egcs_cn_attempt_check" CHECK ((egcs_cn_attempt > 0)),
-  CONSTRAINT "Common_Runtime_egcs_cn_sourceversion_check" CHECK ((egcs_cn_sourceversion > 0))
+  CONSTRAINT "cn_chk_runtime_attempt" CHECK ((egcs_cn_attempt > 0)),
+  CONSTRAINT "cn_chk_runtime_sourceversion" CHECK ((egcs_cn_sourceversion > 0))
 );
 
 CREATE UNIQUE INDEX cn_idx_runtime_active_target ON "Common_Runtime" USING btree (egcs_cn_kind, egcs_cn_entitytype, egcs_cn_entityid, egcs_cn_purpose, egcs_cn_sourcepublication) WHERE (((egcs_cn_kind)::text <> 'workflow'::text) AND (_deleted = false) AND ((egcs_cn_state)::text = ANY ((ARRAY['pending'::character varying, 'active'::character varying, 'awaiting_action'::character varying, 'paused'::character varying])::text[])));
@@ -953,8 +953,8 @@ CREATE TABLE "Common_Runtime_Item" (
   CONSTRAINT "cn_chk_runtimeitemkind" CHECK (((egcs_cn_kind)::text = ANY ((ARRAY['review_set'::character varying, 'review'::character varying, 'recommendation_set'::character varying, 'recommendation'::character varying, 'data_collection'::character varying, 'routing_slip'::character varying, 'approval_step'::character varying])::text[]))),
   CONSTRAINT "cn_chk_runtimeitemstate" CHECK (((egcs_cn_state)::text = ANY ((ARRAY['pending'::character varying, 'active'::character varying, 'awaiting_action'::character varying, 'paused'::character varying, 'succeeded'::character varying, 'approved'::character varying, 'unsuccessful'::character varying, 'denied'::character varying, 'cancelled'::character varying, 'failed'::character varying])::text[]))),
   CONSTRAINT "cn_chk_runtimeitemtimestamps" CHECK (((((egcs_cn_state)::text = 'pending'::text) AND (egcs_cn_startedat IS NULL) AND (egcs_cn_completedat IS NULL)) OR (((egcs_cn_state)::text = ANY ((ARRAY['active'::character varying, 'awaiting_action'::character varying, 'paused'::character varying])::text[])) AND (egcs_cn_startedat IS NOT NULL) AND (egcs_cn_completedat IS NULL)) OR (((egcs_cn_state)::text = ANY ((ARRAY['succeeded'::character varying, 'approved'::character varying, 'unsuccessful'::character varying, 'denied'::character varying, 'cancelled'::character varying, 'failed'::character varying])::text[])) AND (egcs_cn_completedat IS NOT NULL)))),
-  CONSTRAINT "Common_Runtime_Item_egcs_cn_order_check" CHECK ((egcs_cn_order > (0)::numeric)),
-  CONSTRAINT "Common_Runtime_Item_egcs_cn_version_check" CHECK ((egcs_cn_version > 0))
+  CONSTRAINT "cn_chk_runtime_item_order" CHECK ((egcs_cn_order > (0)::numeric)),
+  CONSTRAINT "cn_chk_runtime_item_version" CHECK ((egcs_cn_version > 0))
 );
 
 CREATE UNIQUE INDEX cn_idx_runtimeitem_currentapprovalstep ON "Common_Runtime_Item" USING btree (egcs_cn_parentruntimeitem) WHERE (((egcs_cn_kind)::text = 'approval_step'::text) AND ((egcs_cn_state)::text = 'awaiting_action'::text) AND (_deleted = false));
@@ -1001,16 +1001,16 @@ CREATE UNIQUE INDEX cn_idx_status_name_fr_per_agency ON "Common_Status" USING bt
 
 CREATE TABLE "Common_User" (
   "id" bigint DEFAULT nextval('"Common_User_id_seq"'::regclass) NOT NULL,
-  "egcs_cn_auth_user_id" bigint NOT NULL,
+  "egcs_cn_authuserid" bigint NOT NULL,
   "egcs_cn_name" text NOT NULL,
-  "egcs_cn_position_title" text NOT NULL,
+  "egcs_cn_positiontitle" text NOT NULL,
   "egcs_cn_email" citext NOT NULL,
-  "egcs_cn_email_verified" boolean NOT NULL,
+  "egcs_cn_emailverified" boolean NOT NULL,
   "egcs_cn_image" text,
-  "egcs_cn_created_at" timestamp with time zone NOT NULL,
-  "egcs_cn_updated_at" timestamp with time zone NOT NULL,
+  "egcs_cn_createdat" timestamp with time zone NOT NULL,
+  "egcs_cn_updatedat" timestamp with time zone NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
-  CONSTRAINT "Common_User_egcs_cn_auth_user_id_key" UNIQUE (egcs_cn_auth_user_id),
+  CONSTRAINT "Common_User_egcs_cn_authuserid_key" UNIQUE (egcs_cn_authuserid),
   CONSTRAINT "Common_User_pkey" PRIMARY KEY (id)
 );
 
@@ -1060,7 +1060,7 @@ CREATE TABLE "Common_Workflow_Publication_Condition" (
   "egcs_cn_field" bigint NOT NULL,
   "egcs_cn_option" bigint NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
-  CONSTRAINT "Common_Workflow_Publication_C_egcs_cn_publicationversion_eg_key" UNIQUE (egcs_cn_publicationversion, egcs_cn_workflowsetupmember, egcs_cn_field, egcs_cn_option),
+  CONSTRAINT "cn_uq_workflow_pub_condition_version_member_field_option" UNIQUE (egcs_cn_publicationversion, egcs_cn_workflowsetupmember, egcs_cn_field, egcs_cn_option),
   CONSTRAINT "Common_Workflow_Publication_Condition_pkey" PRIMARY KEY (id)
 );
 
@@ -1072,8 +1072,8 @@ CREATE TABLE "Common_Workflow_Publication_Status" (
   "egcs_cn_order" integer NOT NULL,
   CONSTRAINT "cn_uq_workflowpublicationstatus" UNIQUE (egcs_cn_publicationversion, egcs_cn_role, egcs_cn_order),
   CONSTRAINT "Common_Workflow_Publication_Status_pkey" PRIMARY KEY (id),
-  CONSTRAINT "Common_Workflow_Publication_Status_egcs_cn_order_check" CHECK ((egcs_cn_order > 0)),
-  CONSTRAINT "Common_Workflow_Publication_Status_egcs_cn_role_check" CHECK (((egcs_cn_role)::text = ANY ((ARRAY['allowed_start'::character varying, 'materialization'::character varying, 'success'::character varying, 'failure'::character varying, 'cancellation'::character varying, 'execution_failure'::character varying])::text[])))
+  CONSTRAINT "cn_chk_workflow_pub_status_order" CHECK ((egcs_cn_order > 0)),
+  CONSTRAINT "cn_chk_workflow_pub_status_role" CHECK (((egcs_cn_role)::text = ANY ((ARRAY['allowed_start'::character varying, 'materialization'::character varying, 'success'::character varying, 'failure'::character varying, 'cancellation'::character varying, 'execution_failure'::character varying])::text[])))
 );
 
 CREATE TABLE "Common_Workflow_Run" (
@@ -1102,7 +1102,7 @@ CREATE TABLE "Common_Workflow_Setup" (
   CONSTRAINT "Common_Workflow_Setup_pkey" PRIMARY KEY (id),
   CONSTRAINT "cn_chk_workflowriskrequiredpurpose" CHECK (NOT egcs_cn_riskratingrequired OR egcs_cn_purpose = 'risk_rating'),
   CONSTRAINT "cn_chk_workflowsetuppurpose" CHECK (((egcs_cn_purpose)::text = ANY ((ARRAY['standard'::character varying, 'approval_submission'::character varying, 'risk_rating'::character varying])::text[]))),
-  CONSTRAINT "Common_Workflow_Setup_egcs_cn_publicationkind_check" CHECK (((egcs_cn_publicationkind)::text = 'workflow_setup'::text))
+  CONSTRAINT "cn_chk_workflow_setup_publicationkind" CHECK (((egcs_cn_publicationkind)::text = 'workflow_setup'::text))
 );
 
 CREATE INDEX cn_idx_workflowsetup_agency_entity ON "Common_Workflow_Setup" USING btree (egcs_cn_agency, egcs_cn_entitytype, egcs_cn_purpose) WHERE (_deleted = false);
@@ -1114,7 +1114,7 @@ CREATE TABLE "Common_Workflow_Setup_Allowed_Start_Status" (
   "egcs_cn_order" smallint NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Common_Workflow_Setup_Allowed_Start_Status_pkey" PRIMARY KEY (id),
-  CONSTRAINT "Common_Workflow_Setup_Allowed_Start_Status_egcs_cn_order_check" CHECK ((egcs_cn_order > 0))
+  CONSTRAINT "cn_chk_workflow_setup_allowed_start_status_order" CHECK ((egcs_cn_order > 0))
 );
 
 CREATE UNIQUE INDEX cn_idx_workflowallowedstartorder ON "Common_Workflow_Setup_Allowed_Start_Status" USING btree (egcs_cn_workflowsetup, egcs_cn_order) WHERE (_deleted = false);
@@ -1145,10 +1145,10 @@ CREATE TABLE "Common_Workflow_Setup_Member" (
     AND (egcs_cn_kind = 'recommendation_set') = (egcs_cn_recommendationset IS NOT NULL)
     AND (egcs_cn_kind = 'data_collection') = (egcs_cn_datacollection IS NOT NULL)
     AND (egcs_cn_kind = 'approval_template') = (egcs_cn_approvaltemplate IS NOT NULL)),
-  CONSTRAINT "Common_Workflow_Setup_Member_egcs_cn_kind_check" CHECK (egcs_cn_kind IN ('review_set', 'recommendation_set', 'data_collection', 'approval_template')),
-  CONSTRAINT "Common_Workflow_Setup_Member_egcs_cn_profileconditions_check" CHECK ((jsonb_typeof(egcs_cn_profileconditions) = 'array'::text)),
+  CONSTRAINT "cn_chk_workflow_setup_member_kind" CHECK (egcs_cn_kind IN ('review_set', 'recommendation_set', 'data_collection', 'approval_template')),
+  CONSTRAINT "cn_chk_workflow_setup_member_profileconditions" CHECK ((jsonb_typeof(egcs_cn_profileconditions) = 'array'::text)),
   CONSTRAINT "cn_chk_workflowmemberrisksource" CHECK (egcs_cn_setsriskrating = (egcs_cn_riskreviewsetup IS NOT NULL) AND (NOT egcs_cn_setsriskrating OR egcs_cn_kind = 'review_set')),
-  CONSTRAINT "Common_Workflow_Setup_Member_egcs_cn_sequence_check" CHECK ((egcs_cn_sequence > 0))
+  CONSTRAINT "cn_chk_workflow_setup_member_sequence" CHECK ((egcs_cn_sequence > 0))
 );
 
 CREATE UNIQUE INDEX cn_idx_workflowmemberrisksource ON "Common_Workflow_Setup_Member" (egcs_cn_workflowsetup) WHERE (_deleted = false AND egcs_cn_setsriskrating = true);
@@ -1185,7 +1185,7 @@ CREATE TABLE "Common_Workflow_Status_Transition" (
   "egcs_cn_actor" bigint,
   "egcs_cn_createdat" timestamp with time zone DEFAULT now() NOT NULL,
   CONSTRAINT "Common_Workflow_Status_Transition_pkey" PRIMARY KEY (id),
-  CONSTRAINT "Common_Workflow_Status_Transition_egcs_cn_event_check" CHECK (((egcs_cn_event)::text = ANY ((ARRAY['materialized'::character varying, 'succeeded'::character varying, 'failed'::character varying, 'cancelled'::character varying, 'execution_failed'::character varying])::text[])))
+  CONSTRAINT "cn_chk_workflow_status_transition_event" CHECK (((egcs_cn_event)::text = ANY ((ARRAY['materialized'::character varying, 'succeeded'::character varying, 'failed'::character varying, 'cancelled'::character varying, 'execution_failed'::character varying])::text[])))
 );
 
 ALTER SEQUENCE "Common_Additional_Reviewers_id_seq" OWNED BY "Common_Additional_Reviewers"."id";
@@ -1328,10 +1328,10 @@ INSERT INTO "Common_Entity_Type" ("_deleted", "egcs_cn_type", "egcs_cn_label_en"
 INSERT INTO "Common_Entity_Type" ("_deleted", "egcs_cn_type", "egcs_cn_label_en", "egcs_cn_label_fr", "egcs_cn_localtype", "egcs_cn_ownerkind", "egcs_cn_completion", "egcs_cn_riskrating", "egcs_cn_extensionkey", "egcs_cn_assignmentmode", "egcs_cn_standardworkflow", "egcs_cn_approvalsubmission", "egcs_cn_supportsdirectreviews") VALUES (false, 'fundingcaseaccountreceivablecreditmemo', 'Accounts Receivable Credit Memo', 'Note de crédit de compte débiteur', 'fundingcaseaccountreceivablecreditmemo', 'agency', 'supported', 'none', NULL, 'independent', 'explicit', 'on_completion', true);
 CREATE TABLE "Common_Guided_Help" (
   id bigint PRIMARY KEY,
-  egcs_cn_publicationkind varchar(64) NOT NULL DEFAULT 'guided_help' CHECK (egcs_cn_publicationkind = 'guided_help'),
-  egcs_cn_ownertype varchar(16) NOT NULL CHECK (egcs_cn_ownertype IN ('system', 'agency')),
+  egcs_cn_publicationkind varchar(64) NOT NULL DEFAULT 'guided_help' CONSTRAINT "cn_chk_guided_help_publicationkind" CHECK (egcs_cn_publicationkind = 'guided_help'),
+  egcs_cn_ownertype varchar(16) NOT NULL CONSTRAINT "cn_chk_guided_help_ownertype" CHECK (egcs_cn_ownertype IN ('system', 'agency')),
   egcs_cn_agency bigint,
-  egcs_cn_document jsonb NOT NULL CHECK (jsonb_typeof(egcs_cn_document) = 'object'),
+  egcs_cn_document jsonb NOT NULL CONSTRAINT "cn_chk_guided_help_document" CHECK (jsonb_typeof(egcs_cn_document) = 'object'),
   egcs_cn_shared boolean NOT NULL DEFAULT false,
   egcs_cn_clonedfromversion bigint,
   _deleted boolean NOT NULL DEFAULT false,
@@ -1870,7 +1870,7 @@ AS $function$
     BEGIN
       IF NEW.egcs_cn_approvalvalue IS NULL OR OLD.egcs_cn_approvalvalue IS NOT NULL THEN RETURN NEW; END IF;
       IF NEW.egcs_cn_defaultuser IS NULL OR NEW.egcs_cn_defaultuser <> NEW.egcs_cn_assigneduser THEN RETURN NEW; END IF;
-      SELECT egcs_cn_position_title INTO user_position_title FROM "Common_User" WHERE id = NEW.egcs_cn_assigneduser;
+      SELECT egcs_cn_positiontitle INTO user_position_title FROM "Common_User" WHERE id = NEW.egcs_cn_assigneduser;
       NEW.egcs_cn_approvaldate := NOW();
       NEW.egcs_cn_approvalpositiontitle := user_position_title;
       RETURN NEW;
@@ -2558,7 +2558,7 @@ AS $function$
         RETURN NEW;
       END IF;
 
-      SELECT egcs_ay_require_actual INTO requires_actual
+      SELECT egcs_ay_requireactual INTO requires_actual
       FROM "Agency_Approval_Behalf_Type"
       WHERE id = NEW.egcs_cn_onbehalf;
 
@@ -2855,7 +2855,7 @@ AS $function$
           SELECT 1 FROM "Common_Group_Member" member
           JOIN "Common_Group" grp ON grp.id = member.egcs_cn_group
           JOIN "Common_User" actor ON actor.id = member.egcs_cn_user
-          JOIN "user" auth_user ON auth_user.id = actor.egcs_cn_auth_user_id
+          JOIN "user" auth_user ON auth_user.id = actor.egcs_cn_authuserid
           WHERE member.egcs_cn_group = NEW.egcs_cn_defaultgroup
             AND member.egcs_cn_user = NEW.egcs_cn_assigneduser
             AND member._deleted = false AND grp._deleted = false
@@ -4203,11 +4203,11 @@ ALTER TABLE "Common_Runtime_Transition" ADD CONSTRAINT "Common_Runtime_Transitio
 
 ALTER TABLE "Common_Status" ADD CONSTRAINT "Common_Status_egcs_cn_agency_fkey" FOREIGN KEY (egcs_cn_agency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Common_User" ADD CONSTRAINT "Common_User_egcs_cn_auth_user_id_fkey" FOREIGN KEY (egcs_cn_auth_user_id) REFERENCES "user"(id) ON DELETE RESTRICT;
+ALTER TABLE "Common_User" ADD CONSTRAINT "Common_User_egcs_cn_authuserid_fkey" FOREIGN KEY (egcs_cn_authuserid) REFERENCES "user"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Common_Workflow_Member_Condition" ADD CONSTRAINT "Common_Workflow_Member_Condit_egcs_cn_option_egcs_cn_field_fkey" FOREIGN KEY (egcs_cn_option, egcs_cn_field) REFERENCES "Agency_Custom_Field_Option"(id, egcs_ay_field) ON DELETE RESTRICT;
+ALTER TABLE "Common_Workflow_Member_Condition" ADD CONSTRAINT "cn_fk_workflow_member_condition_option_field" FOREIGN KEY (egcs_cn_option, egcs_cn_field) REFERENCES "Agency_Custom_Field_Option"(id, egcs_ay_field) ON DELETE RESTRICT;
 
-ALTER TABLE "Common_Workflow_Member_Condition" ADD CONSTRAINT "Common_Workflow_Member_Conditi_egcs_cn_workflowsetupmember_fkey" FOREIGN KEY (egcs_cn_workflowsetupmember) REFERENCES "Common_Workflow_Setup_Member"(id) ON DELETE RESTRICT;
+ALTER TABLE "Common_Workflow_Member_Condition" ADD CONSTRAINT "cn_fk_workflow_member_condition_member" FOREIGN KEY (egcs_cn_workflowsetupmember) REFERENCES "Common_Workflow_Setup_Member"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Common_Workflow_Member_Condition" ADD CONSTRAINT "Common_Workflow_Member_Condition_egcs_cn_field_fkey" FOREIGN KEY (egcs_cn_field) REFERENCES "Agency_Custom_Field"(id) ON DELETE RESTRICT;
 
@@ -4227,15 +4227,15 @@ ALTER TABLE "Common_Workflow_Owner_Blocker" ADD CONSTRAINT "Common_Workflow_Owne
 
 ALTER TABLE "Common_Workflow_Owner_Blocker" ADD CONSTRAINT "Common_Workflow_Owner_Blocker_egcs_cn_workflowsetupmember_fkey" FOREIGN KEY (egcs_cn_workflowsetupmember) REFERENCES "Common_Workflow_Setup_Member"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Common_Workflow_Publication_Condition" ADD CONSTRAINT "Common_Workflow_Publication_C_egcs_cn_option_egcs_cn_field_fkey" FOREIGN KEY (egcs_cn_option, egcs_cn_field) REFERENCES "Agency_Custom_Field_Option"(id, egcs_ay_field) ON DELETE RESTRICT;
+ALTER TABLE "Common_Workflow_Publication_Condition" ADD CONSTRAINT "cn_fk_workflow_pub_condition_option_field" FOREIGN KEY (egcs_cn_option, egcs_cn_field) REFERENCES "Agency_Custom_Field_Option"(id, egcs_ay_field) ON DELETE RESTRICT;
 
-ALTER TABLE "Common_Workflow_Publication_Condition" ADD CONSTRAINT "Common_Workflow_Publication_Co_egcs_cn_workflowsetupmember_fkey" FOREIGN KEY (egcs_cn_workflowsetupmember) REFERENCES "Common_Workflow_Setup_Member"(id) ON DELETE RESTRICT;
+ALTER TABLE "Common_Workflow_Publication_Condition" ADD CONSTRAINT "cn_fk_workflow_pub_condition_member" FOREIGN KEY (egcs_cn_workflowsetupmember) REFERENCES "Common_Workflow_Setup_Member"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Common_Workflow_Publication_Condition" ADD CONSTRAINT "Common_Workflow_Publication_Con_egcs_cn_publicationversion_fkey" FOREIGN KEY (egcs_cn_publicationversion) REFERENCES "Common_Publication_Version"(id) ON DELETE RESTRICT;
+ALTER TABLE "Common_Workflow_Publication_Condition" ADD CONSTRAINT "cn_fk_workflow_pub_condition_version" FOREIGN KEY (egcs_cn_publicationversion) REFERENCES "Common_Publication_Version"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Common_Workflow_Publication_Condition" ADD CONSTRAINT "Common_Workflow_Publication_Condition_egcs_cn_field_fkey" FOREIGN KEY (egcs_cn_field) REFERENCES "Agency_Custom_Field"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Common_Workflow_Publication_Status" ADD CONSTRAINT "Common_Workflow_Publication_Sta_egcs_cn_publicationversion_fkey" FOREIGN KEY (egcs_cn_publicationversion) REFERENCES "Common_Publication_Version"(id) ON DELETE RESTRICT;
+ALTER TABLE "Common_Workflow_Publication_Status" ADD CONSTRAINT "cn_fk_workflow_pub_status_version" FOREIGN KEY (egcs_cn_publicationversion) REFERENCES "Common_Publication_Version"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Common_Workflow_Publication_Status" ADD CONSTRAINT "Common_Workflow_Publication_Status_egcs_cn_status_fkey" FOREIGN KEY (egcs_cn_status) REFERENCES "Common_Status"(id) ON DELETE RESTRICT;
 
@@ -4253,7 +4253,7 @@ ALTER TABLE "Common_Workflow_Setup" ADD CONSTRAINT "Common_Workflow_Setup_egcs_c
 
 ALTER TABLE "Common_Workflow_Setup" ADD CONSTRAINT "Common_Workflow_Setup_egcs_cn_executionfailurestatus_fkey" FOREIGN KEY (egcs_cn_executionfailurestatus) REFERENCES "Common_Status"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Common_Workflow_Setup_Allowed_Start_Status" ADD CONSTRAINT "Common_Workflow_Setup_Allowed_Start__egcs_cn_workflowsetup_fkey" FOREIGN KEY (egcs_cn_workflowsetup) REFERENCES "Common_Workflow_Setup"(id) ON DELETE RESTRICT;
+ALTER TABLE "Common_Workflow_Setup_Allowed_Start_Status" ADD CONSTRAINT "cn_fk_workflow_setup_allowed_start_status_workflowsetup" FOREIGN KEY (egcs_cn_workflowsetup) REFERENCES "Common_Workflow_Setup"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Common_Workflow_Setup_Allowed_Start_Status" ADD CONSTRAINT "Common_Workflow_Setup_Allowed_Start_Status_egcs_cn_status_fkey" FOREIGN KEY (egcs_cn_status) REFERENCES "Common_Status"(id) ON DELETE RESTRICT;
 
@@ -4273,9 +4273,9 @@ ALTER TABLE "Common_Workflow_Setup_Member" ADD CONSTRAINT "Common_Workflow_Setup
 
 ALTER TABLE "Common_Workflow_Setup_Member" ADD CONSTRAINT "Common_Workflow_Setup_Member_egcs_cn_workflowsetup_fkey" FOREIGN KEY (egcs_cn_workflowsetup) REFERENCES "Common_Workflow_Setup"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Common_Workflow_Setup_Member_Owner" ADD CONSTRAINT "Common_Workflow_Setup_Member_O_egcs_cn_recommendationsetup_fkey" FOREIGN KEY (egcs_cn_recommendationsetup) REFERENCES "Common_Recommendation_Setup"(id) ON DELETE RESTRICT;
+ALTER TABLE "Common_Workflow_Setup_Member_Owner" ADD CONSTRAINT "cn_fk_workflow_setup_member_owner_recommendationsetup" FOREIGN KEY (egcs_cn_recommendationsetup) REFERENCES "Common_Recommendation_Setup"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Common_Workflow_Setup_Member_Owner" ADD CONSTRAINT "Common_Workflow_Setup_Member_O_egcs_cn_workflowsetupmember_fkey" FOREIGN KEY (egcs_cn_workflowsetupmember) REFERENCES "Common_Workflow_Setup_Member"(id) ON DELETE RESTRICT;
+ALTER TABLE "Common_Workflow_Setup_Member_Owner" ADD CONSTRAINT "cn_fk_workflow_setup_member_owner_member" FOREIGN KEY (egcs_cn_workflowsetupmember) REFERENCES "Common_Workflow_Setup_Member"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Common_Workflow_Setup_Member_Owner" ADD CONSTRAINT "Common_Workflow_Setup_Member_Owner_egcs_cn_defaultgroup_fkey" FOREIGN KEY (egcs_cn_defaultgroup) REFERENCES "Common_Group"(id) ON DELETE RESTRICT;
 

@@ -299,7 +299,7 @@ export default defineEventHandler(async event => {
       SELECT work.id::text entity_id, work.entity_type, work.stable_reference, work.label_en, work.label_fr,
         work.status, work.owner_subject, work.agency_id, work.program_id, work.agency_name_en, work.agency_name_fr,
         work.program_name_en, work.program_name_fr, primary_user.egcs_cn_name primary_assignee,
-        primary_user.egcs_cn_auth_user_id primary_auth_user_id, primary_user._deleted primary_deleted,
+        primary_user.egcs_cn_authuserid primary_auth_user_id, primary_user._deleted primary_deleted,
         count(assignment.id)::int assignee_count
       FROM work
       JOIN "Common_Entity_Assignment" assignment ON assignment.egcs_cn_entityid = work.id
@@ -317,7 +317,7 @@ export default defineEventHandler(async event => {
       GROUP BY work.id, work.entity_type, work.stable_reference, work.label_en, work.label_fr, work.status,
         work.owner_subject, work.agency_id, work.program_id, work.agency_name_en, work.agency_name_fr,
         work.program_name_en, work.program_name_fr, primary_user.id, primary_user.egcs_cn_name,
-        primary_user.egcs_cn_auth_user_id, primary_user._deleted
+        primary_user.egcs_cn_authuserid, primary_user._deleted
     )
     SELECT roster.entity_id, roster.entity_type, roster.stable_reference, roster.label_en, roster.label_fr,
       roster.status, roster.primary_assignee, roster.assignee_count, roster.agency_name_en, roster.agency_name_fr,

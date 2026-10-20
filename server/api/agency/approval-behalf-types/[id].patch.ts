@@ -12,7 +12,7 @@ export default defineEventHandler(async event => {
     'update',
     { code: 'APPROVAL_BEHALF_TYPE_NOT_FOUND', key: 'apiErrors.agency.approval_behalf_type_not_found' }
   )
-  const body = await readValidatedBodyI18n(event, AgencyApprovalBehalfTypeSchema.omit({ egcs_ay_require_actual: true }).partial().extend({ egcs_ay_require_actual: AgencyApprovalBehalfTypeSchema.shape.egcs_ay_require_actual.removeDefault().optional() }))
+  const body = await readValidatedBodyI18n(event, AgencyApprovalBehalfTypeSchema.omit({ egcs_ay_requireactual: true }).partial().extend({ egcs_ay_requireactual: AgencyApprovalBehalfTypeSchema.shape.egcs_ay_requireactual.removeDefault().optional() }))
   if (Object.keys(body).length === 0) {
     return await badRequest(event, 'NO_UPDATABLE_FIELDS', 'apiErrors.request.no_updatable_fields')
   }

@@ -41,7 +41,7 @@ export default defineEventHandler(async event => {
       eb.exists(eb.selectFrom('Agency_Profile').select('Agency_Profile.id')
         .where('Agency_Profile.id', '=', agencyId)
         .where('Agency_Profile._deleted', '=', false)
-        .whereRef('Agency_Profile.egcs_ay_gwcoa_number', '=', 'Common_GWCOA.egcs_cn_number'))
+        .whereRef('Agency_Profile.egcs_ay_gwcoanumber', '=', 'Common_GWCOA.egcs_cn_number'))
     ]))
   } else {
     selection = selection.where('_deleted', '=', false)

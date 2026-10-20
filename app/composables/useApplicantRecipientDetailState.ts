@@ -58,6 +58,7 @@ export const useApplicantRecipientDetailState = (id: string, options: { enabled?
   const localePath = useLocalePath()
   const { getHeroCollapsed } = useDashboard()
   const { getBilingualValue } = useBilingualValue()
+  const { canAny, permissionsReady } = useCan()
 
   const isEnabled = computed(() => options.enabled === undefined ? true : toValue(options.enabled))
   const profile: Ref<ApplicantRecipientDetailProfile | null> = ref(null)
@@ -215,7 +216,7 @@ export const useApplicantRecipientDetailState = (id: string, options: { enabled?
         component: ApplicantRecipientReviewsTab,
         getProps: getReviewsTabProps
       })
-      nextTabMap.set('agreements', {
+      if (permissionsReady.value && canAny('agreement', 'read')) nextTabMap.set('agreements', {
         key: APPLICANT_RECIPIENT_DETAIL_TAB_KEYS.agreements,
         icon: 'i-lucide-file-signature',
         component: ApplicantRecipientAgreementsTab,
@@ -288,7 +289,7 @@ export const useApplicantRecipientDetailState = (id: string, options: { enabled?
   const { tabs, selectedTab, selectedTabKey, activeTabComponent, activeTabProps } = useRouteTabMap({
     tabMap,
     defaultTabId: 'general',
-    enabled: computed(() => isEnabled.value && Boolean(profile.value))
+    enabled: computed(() => isEnabled.value && Boolean(profile.value) && permissionsReady.value)
   })
 
   const breadcrumbItems = computed(() => [

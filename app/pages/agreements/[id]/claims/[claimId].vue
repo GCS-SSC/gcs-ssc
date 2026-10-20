@@ -349,9 +349,10 @@ const reconcileWorkflowPrerequisiteWarning = computed(() => {
 })
 const reconcileEditPrerequisiteWarning = computed(() => reconcileWorkflowPrerequisiteWarning.value
   ?? (!canUpdateReconcile.value || isRecordLocked(activeReconcile.value) ? toast.localized('agreement.claims.action_unavailable') : undefined))
+const isReconcileActionPending = computed(() => !selectedReconcileDetail.value || isLoadingDetail.value
+  || (!getDefinition(activeReconcile.value?.egcs_fc_status) && statusCatalog.state.value.status === 'pending'))
 const guardReconcileAction = (warning: LocalizedToastText | undefined): boolean => {
-  if (!selectedReconcileDetail.value || isLoadingDetail.value
-    || (!getDefinition(activeReconcile.value?.egcs_fc_status) && statusCatalog.state.value.status === 'pending')) return false
+  if (isReconcileActionPending.value) return false
   if (!canUpdateReconcileRole.value || warning) {
     toast.add({ title: toast.localized('common.warning'), description: warning ?? toast.localized('agreement.claims.action_unavailable'), color: 'warning' })
     return false
@@ -876,6 +877,7 @@ const canEditActiveReconcileFinal = computed(() =>
   Boolean(activeReconcile.value)
   && canUpdateReconcileRole.value
   && !isReconcileMutationPending.value
+  && !isReconcileActionPending.value
 )
 
 const openSubmissionEditor = (line: ClaimSubmissionTableRow) => {
@@ -1519,14 +1521,14 @@ const cancelReconciliation = async () => {
                           icon="i-lucide-ban"
                           :label="t('agreement.claims.cancel_reconcile')"
                           :loading="isCancellingReconcile"
-                          :disabled="isCancellingReconcile"
+                          :disabled="isCancellingReconcile || isReconcileActionPending"
                           @click="cancelReconciliation" />
                         <CommonSaveButton
                           v-if="canUpdateReconcileRole"
                           type="button"
                           :label="t('agreement.claims.save_reconcile')"
                           :loading="isSavingReconcile"
-                          :disabled="isSavingReconcile"
+                          :disabled="isSavingReconcile || isReconcileActionPending"
                           @click="saveReconcile" />
                       </div>
                     </div>
@@ -1548,6 +1550,7 @@ const cancelReconciliation = async () => {
                       :total-reconciled="totalReconciled"
                       :total-sampled="totalSampled"
                       edit-mode="action"
+                      :action-pending="isReconcileActionPending || isReconcileMutationPending"
                       @edit="openReconcileLineEditor" />
                   </div>
                 </CommonSection>
@@ -1709,7 +1712,7 @@ const cancelReconciliation = async () => {
               type="submit"
               :label="t('common.save')"
               :loading="isSavingReconcileLine"
-              :disabled="isSavingReconcileLine" />
+              :disabled="isSavingReconcileLine || isReconcileActionPending" />
           </div>
         </form>
       </template>

@@ -16,7 +16,6 @@ const packet = computed(() => asRecord(submission.egcs_fc_packet))
 const header = computed(() => asRecord(packet.value.payment))
 const text = (value: JsonValue | undefined) => typeof value === 'string' || typeof value === 'number' ? String(value) : t('common.none')
 const payment = computed(() => ({
-  egcs_fc_creditmemoreference: typeof packet.value.egcs_fc_creditmemoreference === 'string' ? packet.value.egcs_fc_creditmemoreference : null,
   egcs_fc_paymentamount: text(packet.value.egcs_fc_grossamount),
   egcs_fc_grossamount: text(packet.value.egcs_fc_grossamount),
   egcs_fc_offsetamount: text(packet.value.egcs_fc_offsetamount),
@@ -59,12 +58,6 @@ const payment = computed(() => ({
               }
             : {})
         }
-      })
-    : [],
-  egcs_fc_offsets: Array.isArray(packet.value.egcs_fc_offsets)
-    ? packet.value.egcs_fc_offsets.map(value => {
-        const allocation = asRecord(value)
-        return { egcs_fc_number: text(allocation.egcs_fc_number), egcs_fc_amount: text(allocation.egcs_fc_amount) }
       })
     : []
 }))

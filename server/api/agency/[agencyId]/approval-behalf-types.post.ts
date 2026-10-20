@@ -28,7 +28,7 @@ export default defineEventHandler(async event => {
           egcs_ay_organizationagency: agencyId,
           egcs_ay_name_en: validated.egcs_ay_name_en,
           egcs_ay_name_fr: validated.egcs_ay_name_fr,
-          egcs_ay_require_actual: validated.egcs_ay_require_actual
+          egcs_ay_requireactual: validated.egcs_ay_requireactual
         })
         .returningAll()
         .executeTakeFirstOrThrow()

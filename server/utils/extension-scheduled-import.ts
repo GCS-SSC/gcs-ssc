@@ -20,7 +20,7 @@ import { createScheduledFundingCaseIntake, ExternalFundingCaseIntakeInputSchema 
 const primaryAssignee = async (trx: Transaction<Database>, agreementId: string): Promise<string> => {
   const assignee = await trx.selectFrom('Common_Entity_Assignment as assignment')
     .innerJoin('Common_User as commonUser', 'commonUser.id', 'assignment.egcs_cn_user')
-    .innerJoin('user as authUser', 'authUser.id', 'commonUser.egcs_cn_auth_user_id')
+    .innerJoin('user as authUser', 'authUser.id', 'commonUser.egcs_cn_authuserid')
     .select('commonUser.id')
     .where('assignment.egcs_cn_entitytype', '=', 'fundingcaseagreement')
     .where('assignment.egcs_cn_entityid', '=', agreementId)

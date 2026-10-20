@@ -43,7 +43,7 @@ const applyAgencyListFilters = <Query extends {
         eb('egcs_ay_name_fr', 'ilike', `%${escapedSearch}%`),
         eb('egcs_ay_abbreviation_en', 'ilike', `%${escapedSearch}%`),
         eb('egcs_ay_abbreviation_fr', 'ilike', `%${escapedSearch}%`),
-        eb(sql<string>`CAST(egcs_ay_gwcoa_number AS TEXT)`, 'ilike', `%${escapedSearch}%`),
+        eb(sql<string>`CAST(egcs_ay_gwcoanumber AS TEXT)`, 'ilike', `%${escapedSearch}%`),
         eb(sql<string>`CAST(egcs_ay_agencyfinancialsystemid AS TEXT)`, 'ilike', `%${escapedSearch}%`)
       ])
     )

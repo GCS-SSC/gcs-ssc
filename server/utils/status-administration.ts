@@ -6,7 +6,7 @@ import type { CommonStatusTable, Database } from '~~/shared/types/database'
 import { authorize } from '~~/server/utils/authorize'
 import { notFound, throwApiError } from '~~/server/utils/api-errors'
 import { throwIfMappedConstraintError } from '~~/server/utils/database-constraint-errors'
-import { hasAccountingTable, hasCorrectionSchema } from './correction-schema'
+import { hasCorrectionSchema } from './correction-schema'
 
 const BUSINESS_STATUS_TABLES = [
   'Funding_Case_Agreement_Profile',
@@ -29,8 +29,9 @@ const STATUS_CONSTRAINT_ERRORS = {
   cn_idx_status_name_en_per_agency: { code: 'STATUS_NAME_EN_CONFLICT', key: 'apiErrors.status.name_conflict' },
   cn_idx_status_name_fr_per_agency: { code: 'STATUS_NAME_FR_CONFLICT', key: 'apiErrors.status.name_conflict' },
   cn_chk_status_claim_reconciliation_in_use: { code: 'STATUS_REFERENCED', key: 'apiErrors.status.referenced' },
-  cn_chk_correction_status_in_use: { code: 'STATUS_REFERENCED', key: 'apiErrors.status.referenced' },
-  cn_chk_correction_status_outcome: { code: 'STATUS_PUBLISHED_WORKFLOW_CONFLICT', key: 'apiErrors.status.published_workflow_conflict' }
+  fc_fk_agreement_correction_status_in_use: { code: 'STATUS_REFERENCED', key: 'apiErrors.status.referenced' },
+  fc_chk_correction_status_outcome: { code: 'STATUS_PUBLISHED_WORKFLOW_CONFLICT', key: 'apiErrors.status.published_workflow_conflict' },
+  fc_fk_agreement_correction_status_outcome: { code: 'STATUS_PUBLISHED_WORKFLOW_CONFLICT', key: 'apiErrors.status.published_workflow_conflict' }
 } as const
 
 /** A preparation Workflow cannot acquire a terminal output through mutable Agency status metadata. */
@@ -88,7 +89,6 @@ export const findLiveStatusReference = async (
   if (intake) return 'Funding_Case_Intake_Profile'
   for (const table of BUSINESS_STATUS_TABLES) {
     if (table === 'Funding_Case_Agreement_Correction' && !await hasCorrectionSchema(trx)) continue
-    if ((table === 'Funding_Case_Agreement_Account_Receivable' || table === 'Funding_Case_Account_Receivable_Credit_Memo') && !await hasAccountingTable(trx, 'Funding_Case_Agreement_Account_Receivable')) continue
     const record = await trx.selectFrom(table)
       .select('id')
       .where('egcs_fc_status', '=', statusId)
@@ -247,12 +247,10 @@ export const assertTerminalStatusCompatibleWithPublishedWorkflows = async (
       statusCode: 409, code: 'STATUS_PUBLISHED_WORKFLOW_CONFLICT', key: 'apiErrors.status.published_workflow_conflict'
     })
   }
-  if (await hasAccountingTable(trx, 'Funding_Case_Agreement_Account_Receivable')) {
-    for (const table of ['Funding_Case_Agreement_Account_Receivable', 'Funding_Case_Account_Receivable_Credit_Memo'] as const) {
-      const pending = await trx.selectFrom(table).select('id').where('egcs_fc_status', '=', statusId)
-        .where('egcs_fc_outcome', '=', 'open').where('_deleted', '=', false).executeTakeFirst()
-      if (pending) return await throwApiError(event, { statusCode: 409, code: 'STATUS_PUBLISHED_WORKFLOW_CONFLICT', key: 'apiErrors.status.published_workflow_conflict' })
-    }
+  for (const table of ['Funding_Case_Agreement_Account_Receivable', 'Funding_Case_Account_Receivable_Credit_Memo'] as const) {
+    const pending = await trx.selectFrom(table).select('id').where('egcs_fc_status', '=', statusId)
+      .where('egcs_fc_outcome', '=', 'open').where('_deleted', '=', false).executeTakeFirst()
+    if (pending) return await throwApiError(event, { statusCode: 409, code: 'STATUS_PUBLISHED_WORKFLOW_CONFLICT', key: 'apiErrors.status.published_workflow_conflict' })
   }
   const allowedStart = await trx.selectFrom('Common_Workflow_Setup_Allowed_Start_Status as allowed')
     .innerJoin('Common_Workflow_Setup as workflow', 'workflow.id', 'allowed.egcs_cn_workflowsetup')

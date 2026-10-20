@@ -35,7 +35,7 @@ export const createPrimaryEntityAssignment = async (
 }
 
 export const resolveAssignmentCommonUserId = async (db: Kysely<Database>, applicationUserId: string): Promise<string | null> => {
-  const row = await db.selectFrom('user').innerJoin('Common_User', 'Common_User.egcs_cn_auth_user_id', 'user.id')
+  const row = await db.selectFrom('user').innerJoin('Common_User', 'Common_User.egcs_cn_authuserid', 'user.id')
     .select('Common_User.id').where('user.id', '=', applicationUserId).where('user._deleted', '=', false).where('Common_User._deleted', '=', false).executeTakeFirst()
   return row ? String(row.id) : null
 }
@@ -548,7 +548,7 @@ export const resolveAgencyValidEntityAssigneeIdsWithDb = async (
   if (!isPositivePostgresBigintText(entityId)) return new Set()
   const uniqueCommonUserIds = [...new Set(commonUserIds.map(String))]
   if (uniqueCommonUserIds.length === 0) return new Set()
-  const applicationUsers = await db.selectFrom('Common_User').innerJoin('user', 'user.id', 'Common_User.egcs_cn_auth_user_id')
+  const applicationUsers = await db.selectFrom('Common_User').innerJoin('user', 'user.id', 'Common_User.egcs_cn_authuserid')
     .where('Common_User.id', 'in', uniqueCommonUserIds).where('Common_User._deleted', '=', false).where('user._deleted', '=', false)
     .select(['Common_User.id as common_user_id', 'user.id as application_user_id']).execute()
   if (applicationUsers.length === 0) return new Set()
@@ -610,7 +610,7 @@ export const resolveAgencyValidEntityAssigneeIdsWithDb = async (
  */
 export const listActiveCommonUsersForProponentAssignments = async (db: Kysely<Database>): Promise<Array<{ id: string; name: string }>> =>
   (await db.selectFrom('Common_User')
-    .innerJoin('user', 'user.id', 'Common_User.egcs_cn_auth_user_id')
+    .innerJoin('user', 'user.id', 'Common_User.egcs_cn_authuserid')
     .select(['Common_User.id as id', 'Common_User.egcs_cn_name as name'])
     .where('Common_User._deleted', '=', false)
     .where('user._deleted', '=', false)

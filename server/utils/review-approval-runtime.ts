@@ -355,7 +355,7 @@ export const reassignReviewApproval = async (
 
 export const listReviewApprovalBehalfTypes = async (db: DbClient, agencyId: string) => await db
   .selectFrom('Agency_Approval_Behalf_Type')
-  .select(['id', 'egcs_ay_name_en', 'egcs_ay_name_fr', 'egcs_ay_require_actual'])
+  .select(['id', 'egcs_ay_name_en', 'egcs_ay_name_fr', 'egcs_ay_requireactual'])
   .where('egcs_ay_organizationagency', '=', agencyId)
   .where('_deleted', '=', false)
   .orderBy('egcs_ay_name_en', 'asc')

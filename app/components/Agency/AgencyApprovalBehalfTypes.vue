@@ -8,7 +8,7 @@ const { agencyId, canCreate, canUpdate, canDelete } = defineProps<{ agencyId: st
 
 const columns: TableColumnInput<AgencyApprovalBehalfTypeItem>[] = [
   { id: 'name', headerKey: 'agency.name_en' },
-  { accessorKey: 'egcs_ay_require_actual', headerKey: 'common.require_details' },
+  { accessorKey: 'egcs_ay_requireactual', headerKey: 'common.require_details' },
   { id: 'actions', headerKey: 'common.actions' }
 ]
 
@@ -33,8 +33,8 @@ const initialNewItem = { ...AgencyApprovalBehalfTypeInitial }
       <CommonBilingualName :name-en="row.original.egcs_ay_name_en" :name-fr="row.original.egcs_ay_name_fr" />
     </template>
 
-    <template #egcs_ay_require_actual-cell="{ row }">
-      <CommonStatusBadge :variant="row.original.egcs_ay_require_actual ? 'yes' : 'no'" />
+    <template #egcs_ay_requireactual-cell="{ row }">
+      <CommonStatusBadge :variant="row.original.egcs_ay_requireactual ? 'yes' : 'no'" />
     </template>
 
     <template #form="{ state }">
@@ -47,9 +47,9 @@ const initialNewItem = { ...AgencyApprovalBehalfTypeInitial }
 
       <UFormField
         :label="t('common.require_details')"
-        name="egcs_ay_require_actual"
+        name="egcs_ay_requireactual"
         class="flex items-center justify-between">
-        <USwitch v-model="state.egcs_ay_require_actual" />
+        <USwitch v-model="state.egcs_ay_requireactual" />
       </UFormField>
     </template>
   </CommonResourceCrud>

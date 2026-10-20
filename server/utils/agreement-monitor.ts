@@ -1,4 +1,3 @@
-import { hasAccountingTable } from './correction-schema'
 /* eslint-disable jsdoc/require-jsdoc -- Existing exported monitor helpers are intentionally documented by their descriptive names. */
 import { getRouterParam, type H3Event } from 'h3'
 import type { Kysely, Transaction } from 'kysely'
@@ -403,7 +402,7 @@ export const syncAgreementMonitorFollowupStatus = async (
     .executeTakeFirst()
 
   const status = latestUpdate?.egcs_fc_status ?? 'open'
-  if (status === 'completed' && await hasAccountingTable(db, 'Funding_Case_Agreement_Account_Receivable')) {
+  if (status === 'completed') {
     const followup = await db.selectFrom('Funding_Case_Agreement_Monitor_Followup').select('egcs_fc_requiresreceivable')
       .where('id', '=', followupId).where('_deleted', '=', false).executeTakeFirst()
     if (followup?.egcs_fc_requiresreceivable) {

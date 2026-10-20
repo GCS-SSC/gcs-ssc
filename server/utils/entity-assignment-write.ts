@@ -40,11 +40,11 @@ const resolveAssigneeApplicationUserId = async (
 ): Promise<string | undefined> => {
   if (!commonUserId) return undefined
   const candidate = await db.selectFrom('Common_User')
-    .select('egcs_cn_auth_user_id')
+    .select('egcs_cn_authuserid')
     .where('id', '=', commonUserId)
     .where('_deleted', '=', false)
     .executeTakeFirst()
-  return candidate ? String(candidate.egcs_cn_auth_user_id) : undefined
+  return candidate ? String(candidate.egcs_cn_authuserid) : undefined
 }
 
 const ownerMatches = (
@@ -129,7 +129,7 @@ const lockAndValidateAssignee = async (
   target: CoreEntityAssignmentTarget
 ): Promise<void> => {
   const commonUser = await trx.selectFrom('Common_User')
-    .select(['id', 'egcs_cn_auth_user_id'])
+    .select(['id', 'egcs_cn_authuserid'])
     .where('id', '=', commonUserId)
     .where('_deleted', '=', false)
     .executeTakeFirst()
@@ -139,7 +139,7 @@ const lockAndValidateAssignee = async (
 
   const applicationUser = await trx.selectFrom('user')
     .select('id')
-    .where('id', '=', commonUser.egcs_cn_auth_user_id)
+    .where('id', '=', commonUser.egcs_cn_authuserid)
     .where('_deleted', '=', false)
     .forUpdate()
     .executeTakeFirst()
@@ -149,7 +149,7 @@ const lockAndValidateAssignee = async (
   const lockedCommonUser = await trx.selectFrom('Common_User')
     .select('id')
     .where('id', '=', commonUserId)
-    .where('egcs_cn_auth_user_id', '=', String(applicationUser.id))
+    .where('egcs_cn_authuserid', '=', String(applicationUser.id))
     .where('_deleted', '=', false)
     .forUpdate()
     .executeTakeFirst()

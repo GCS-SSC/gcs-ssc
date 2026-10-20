@@ -11,14 +11,17 @@ const { t } = useI18n()
 const toast = useLocalizedToast()
 const localePath = useLocalePath()
 const abilityHelpers = useCan()
-const { can } = abilityHelpers
-const { user, signOut } = useAuth()
+const { can, canAny, permissionsReady } = abilityHelpers
+const { user, signOut, permissionRevision } = useAuth()
+const canLoadAgencyWorkspaces = computed(() => permissionsReady.value && canAny('agency', 'read'))
 const route = useRoute()
 const agencyWorkspaces: Ref<ExtensionAgencyWorkspaceListItem[]> = ref([])
 let workspaceRequestSequence = 0
 /** Refreshes Portal-style main-menu entries after navigation or RBAC changes. */
 const loadAgencyWorkspaces = async () => {
   const sequence = ++workspaceRequestSequence
+  agencyWorkspaces.value = []
+  if (!canLoadAgencyWorkspaces.value) return
   try {
     const response = await fetch(getClientRequestUrl('/api/extensions/workspaces'))
     const result = response.ok
@@ -31,7 +34,7 @@ const loadAgencyWorkspaces = async () => {
     agencyWorkspaces.value = []
   }
 }
-watch(() => route.fullPath, loadAgencyWorkspaces, { immediate: true })
+watch([() => route.fullPath, canLoadAgencyWorkspaces, permissionRevision], loadAgencyWorkspaces, { immediate: true })
 
 const canViewAdminGwcoa = computed(() => can('system', 'read', { type: 'global' }))
 const { items, pages } = useNavigationCatalog(agencyWorkspaces)

@@ -11,6 +11,7 @@ import { compareMoney, moneyToCents, moneyFromCents, parseMoney, sumMoney, subtr
 import { TransferPaymentStreamChartOfAccountDimensionSchema } from '~~/shared/types/schemas'
 import { allocateAgreementCoding, validateCodingAllocation, type AgreementCodingAllocation } from './agreement-coding-allocator'
 import { readAccountReceivablePoolDebts } from './account-receivable-recovery'
+import { readAccountReceivableLinePrincipals } from './account-receivable'
 import { readAccountReceivableCashBalance } from './account-receivable-cash-balance'
 import { captureAccountReceivablePoolBasis } from './account-receivable-pool-ledger'
 import { resolveAgreementScopeContext } from './agreement'
@@ -146,7 +147,8 @@ export const prepareAgreementPaymentOffsetPlan = async (
   const offset = sumMoney(plans.map(plan => plan.amount))
   const hash = hashPublicationDefinition(asJson({ context, effectiveDate, paymentHeader, paymentId: options.paymentId ?? null,
     poolBasis: pool && debts.length ? await captureAccountReceivablePoolBasis(trx, String(pool.id)) : null,
-    debtBasis: debts.map(debt => ({ id: String(debt.id), method: debt.egcs_fc_recoverymethod, lines: debt.lines })),
+    debtBasis: await Promise.all(debts.map(async debt => ({ id: String(debt.id), method: debt.egcs_fc_recoverymethod,
+      lines: await readAccountReceivableLinePrincipals(trx, String(debt.id)) }))),
     plans, creditMemos, allocatorScopes }))
   return { preview: { egcs_fc_offsetdate: effectiveDate, egcs_fc_offsetdatetoken: token, egcs_fc_grossamount: header.egcs_fc_paymentamount, egcs_fc_offsetamount: offset,
     egcs_fc_netamount: subtractMoney(header.egcs_fc_paymentamount, offset), egcs_fc_offsetplanhash: hash, egcs_fc_creditmemos: creditMemos }, plans }

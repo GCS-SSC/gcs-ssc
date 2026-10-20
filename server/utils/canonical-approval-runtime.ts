@@ -482,7 +482,7 @@ const assertAgencyBehalfType = async (
   if (!behalfTypeId) return null
   if (!agencyId) return await forbidden(event)
   const behalfType = await trx.selectFrom('Agency_Approval_Behalf_Type')
-    .select(['id', 'egcs_ay_require_actual'])
+    .select(['id', 'egcs_ay_requireactual'])
     .where('id', '=', behalfTypeId)
     .where('egcs_ay_organizationagency', '=', agencyId)
     .where('_deleted', '=', false)
@@ -674,7 +674,7 @@ export const decideCanonicalApproval = async (
       egcs_cn_assigneduser: assignedUserId,
       egcs_cn_claimantmatchesdefault: claimantMatchesDefault,
       egcs_cn_onbehalf: body.egcs_cn_onbehalf,
-      egcs_ay_require_actual: behalfType?.egcs_ay_require_actual === true,
+      egcs_ay_requireactual: behalfType?.egcs_ay_requireactual === true,
       egcs_cn_requiregroupdetails: approval.egcs_cn_requiregroupdetails,
       egcs_cn_approvername: body.egcs_cn_approvername,
       egcs_cn_approvalpositiontitle: body.egcs_cn_approvalpositiontitle,
@@ -686,7 +686,7 @@ export const decideCanonicalApproval = async (
     ? decisionEvidence.egcs_cn_approvalpositiontitle ?? actor.positionTitle
     : actor.positionTitle
   let approvalDate = decisionEvidence.egcs_cn_approvaldate ?? new Date()
-  const requiresAdditionalDetails = Boolean(decisionEvidence.egcs_ay_require_actual
+  const requiresAdditionalDetails = Boolean(decisionEvidence.egcs_ay_requireactual
     || (approval.egcs_cn_defaultgroup && approval.egcs_cn_requiregroupdetails && claimantMatchesDefault))
   if (requiresAdditionalDetails) {
     if (!decisionEvidence.egcs_cn_approvername || !decisionEvidence.egcs_cn_approvalpositiontitle || !decisionEvidence.egcs_cn_approvaldate) {

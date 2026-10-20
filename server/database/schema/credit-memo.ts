@@ -89,7 +89,7 @@ export const installCreditMemoFunctions = async (db: Kysely<Database>): Promise<
           RAISE EXCEPTION 'Credit memo creation requires active Draft status' USING ERRCODE='23514';
         END IF;
       ELSE
-        IF previous->>'egcs_fc_ledgerkind'<>'pool' OR previous->>'egcs_fc_outcome'<>'open' AND previous IS DISTINCT FROM current_row THEN
+        IF previous->>'egcs_fc_outcome'<>'open' AND previous IS DISTINCT FROM current_row THEN
           RAISE EXCEPTION 'Completed credit memo evidence is immutable' USING ERRCODE='23514';
         END IF;
         IF (previous - ARRAY['egcs_fc_allocationevidence','egcs_fc_amount','egcs_fc_totalamount','egcs_fc_receiveddate','egcs_fc_reason','_deleted','egcs_fc_status','egcs_fc_statusagency','egcs_fc_outcome','egcs_fc_postedat','egcs_fc_postingruntime','egcs_fc_terminalby','egcs_fc_terminalat','egcs_fc_terminalreason','egcs_fc_statusterminal','egcs_fc_statusdeleted'])
@@ -117,7 +117,7 @@ export const installCreditMemoFunctions = async (db: Kysely<Database>): Promise<
       PERFORM 1 FROM "Funding_Case_Account_Receivable_Pool" WHERE id=(SELECT egcs_fc_pool FROM "Funding_Case_Account_Receivable_Credit_Memo" WHERE id=NEW.egcs_fc_creditmemo) FOR UPDATE;
       SELECT * INTO memo FROM "Funding_Case_Account_Receivable_Credit_Memo" WHERE id=NEW.egcs_fc_creditmemo FOR UPDATE;
       SELECT * INTO status FROM "Common_Status" WHERE id=memo.egcs_fc_status;
-      IF memo.id IS NULL OR memo._deleted OR memo.egcs_fc_ledgerkind<>'pool' OR memo.egcs_fc_outcome<>'open'
+      IF memo.id IS NULL OR memo._deleted OR memo.egcs_fc_outcome<>'open'
         OR status.id IS NULL OR status._deleted OR status.egcs_cn_readonly OR status.egcs_cn_terminal OR ar_has_lifecycle_evidence(memo.id,'fundingcaseaccountreceivablecreditmemo') THEN
         RAISE EXCEPTION 'Credit lines require a workable unsubmitted parent' USING ERRCODE='23514';
       END IF;

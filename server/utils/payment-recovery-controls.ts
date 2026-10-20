@@ -4,7 +4,6 @@ import type { Kysely } from 'kysely'
 import type { Currency_Codes, Database } from '~~/shared/types/database'
 import { throwApiError } from './api-errors'
 import { assertAccountReceivablePaymentAllowed } from './account-receivable-recovery'
-import { hasAccountingTable } from './correction-schema'
 
 const paymentRecoveryErrorKeys: Readonly<Record<string, string>> = {
   AR_DIRECT_REPAYMENT_HOLD: 'apiErrors.account_receivable.payment_direct_repayment_hold',
@@ -30,7 +29,6 @@ export const withPaymentRecoveryErrors = async <T>(event: H3Event, operation: ()
 export const assertPaymentRecoveryAllowed = async (
   event: H3Event, db: Kysely<Database>, input: { agreementId: string; applicantRecipientId: string | null; currency: Currency_Codes; paymentId?: string }
 ) => {
-  if (!await hasAccountingTable(db, 'Funding_Case_Account_Receivable_Pool')) return
   if (!input.applicantRecipientId) return await throwApiError(event, { statusCode: 409, code: 'AR_PAYMENT_PAYEE_REQUIRED', key: 'apiErrors.account_receivable.payment_payee_unavailable' })
   const payee = await db.selectFrom('Funding_Case_Agreement_Applicant_Recipient as link')
     .innerJoin('Applicant_Recipient_Profile as profile', 'profile.id', 'link.egcs_fc_applicantrecipient')
@@ -45,7 +43,7 @@ export const assertPaymentMutationRecoveryAllowed = async (
   event: H3Event, db: Kysely<Database>,
   input: { agreementId: string; paymentId: string; operation: string; changes?: Record<string, unknown> }
 ) => {
-  if (input.operation === 'payment.delete' || !await hasAccountingTable(db, 'Funding_Case_Account_Receivable_Pool')) return
+  if (input.operation === 'payment.delete') return
   const destination = input.changes?.egcs_fc_fundingagreementpayment
   const paymentIds = [...new Set([input.paymentId, ...(typeof destination === 'string' ? [destination] : [])])]
   for (const paymentId of paymentIds) {

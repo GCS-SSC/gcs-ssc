@@ -239,11 +239,11 @@ export const CommonAddressBaseSchema = z.object({
   egcs_cn_federalridingid: z.coerce.number({ error: 'validation.federal_riding_id_required' })
     .int({ error: 'validation.invalid_number' })
     .min(-2147483648, { error: 'validation.invalid_number' })
-    .max(2147483647, { error: 'validation.invalid_number' }),
+    .max(2147483647, { error: 'validation.invalid_number' }).meta({ formRequired: true }),
   egcs_cn_addresscity: AddressTextSchema(RequiredString('validation.city_required')),
   egcs_cn_addresscountry: z.enum(COUNTRIES_ENUM),
   egcs_cn_addresssubdivision: AddressTextSchema(RequiredString('validation.required')),
-  egcs_cn_gc_addressid: z.preprocess(value => isEmptyFilterValue(value) ? undefined : value,
+  egcs_cn_gcaddressid: z.preprocess(value => isEmptyFilterValue(value) ? undefined : value,
     AddressBigintSchema('validation.invalid_number').optional()).meta({ formRequired: false }),
   egcs_cn_latitude: AddressCoordinateSchema.optional(),
   egcs_cn_longitude: AddressCoordinateSchema.optional(),

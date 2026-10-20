@@ -70,7 +70,7 @@ export default defineEventHandler(async event => {
         .innerJoin('Common_Routing_Slip', 'Common_Routing_Slip.id', 'Common_Approval.egcs_cn_routingslip')
         .innerJoin('Common_Runtime_Item as Routing_Item', 'Routing_Item.id', 'Common_Routing_Slip.egcs_cn_runtimeitem')
         .select('Common_Approval.id')
-        .where('Common_User.egcs_cn_auth_user_id', '=', actor.auth.userId)
+        .where('Common_User.egcs_cn_authuserid', '=', actor.auth.userId)
         .where('Common_User._deleted', '=', false)
         .where('Common_Routing_Slip.egcs_cn_entitytype', '=', 'commonrecommendation')
         .where('Common_Routing_Slip.egcs_cn_entityid', '=', recommendationId)

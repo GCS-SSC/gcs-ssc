@@ -122,7 +122,7 @@ CREATE TABLE "Agency_Approval_Behalf_Type" (
   "egcs_ay_organizationagency" bigint NOT NULL,
   "egcs_ay_name_en" character varying(255) NOT NULL,
   "egcs_ay_name_fr" character varying(255) NOT NULL,
-  "egcs_ay_require_actual" boolean NOT NULL,
+  "egcs_ay_requireactual" boolean NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Agency_Approval_Behalf_Type_pkey" PRIMARY KEY (id)
 );
@@ -216,8 +216,8 @@ CREATE TABLE "Agency_Custom_Field" (
   "egcs_ay_discriminator" boolean DEFAULT false NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Agency_Custom_Field_pkey" PRIMARY KEY (id),
-  CONSTRAINT "Agency_Custom_Field_egcs_ay_kind_check" CHECK ((egcs_ay_kind = ANY (ARRAY['text'::text, 'number'::text, 'relational'::text]))),
-  CONSTRAINT "Agency_Custom_Field_egcs_ay_presentation_check" CHECK ((egcs_ay_presentation = ANY (ARRAY['single_line'::text, 'multiline'::text]))),
+  CONSTRAINT "ay_chk_custom_field_kind" CHECK ((egcs_ay_kind = ANY (ARRAY['text'::text, 'number'::text, 'relational'::text]))),
+  CONSTRAINT "ay_chk_custom_field_presentation" CHECK ((egcs_ay_presentation = ANY (ARRAY['single_line'::text, 'multiline'::text]))),
   CONSTRAINT "ay_chk_custom_field_discriminator_kind" CHECK (((NOT egcs_ay_discriminator) OR (egcs_ay_kind = 'relational'::text))),
   CONSTRAINT "ay_chk_custom_field_multiple_kind" CHECK (((NOT egcs_ay_multiple) OR (egcs_ay_kind = 'relational'::text))),
   CONSTRAINT "ay_chk_custom_field_presentation_kind" CHECK (((egcs_ay_kind = 'text'::text) OR (egcs_ay_presentation = 'single_line'::text)))
@@ -235,7 +235,7 @@ CREATE TABLE "Agency_Custom_Field_Option" (
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "Agency_Custom_Field_Option_id_egcs_ay_field_key" UNIQUE (id, egcs_ay_field),
   CONSTRAINT "Agency_Custom_Field_Option_pkey" PRIMARY KEY (id),
-  CONSTRAINT "Agency_Custom_Field_Option_egcs_ay_displayorder_check" CHECK ((egcs_ay_displayorder >= 0)),
+  CONSTRAINT "ay_chk_custom_field_option_displayorder" CHECK ((egcs_ay_displayorder >= 0)),
   CONSTRAINT "ay_chk_custom_field_option_categories" CHECK (((egcs_ay_category_en IS NULL) = (egcs_ay_category_fr IS NULL)))
 );
 
@@ -353,7 +353,7 @@ CREATE TABLE "Agency_Profile" (
   "_deleted" boolean DEFAULT false NOT NULL,
   "egcs_ay_claimreconciliationstartstatus" bigint,
   "egcs_ay_claimreconciliationfinalstatus" bigint,
-  "egcs_ay_gwcoa_number" bigint NOT NULL,
+  "egcs_ay_gwcoanumber" bigint NOT NULL,
   CONSTRAINT "Agency_Profile_pkey" PRIMARY KEY (id)
 );
 
@@ -410,16 +410,16 @@ CREATE INDEX ay_profile_search_abbreviation_fr_trgm ON "Agency_Profile" USING gi
 CREATE INDEX ay_profile_search_abbreviation_en_exact ON "Agency_Profile" USING btree (lower(coalesce(egcs_ay_abbreviation_en, '')) text_pattern_ops) WHERE (_deleted = false AND egcs_ay_active = true);
 CREATE INDEX ay_profile_search_abbreviation_fr_exact ON "Agency_Profile" USING btree (lower(coalesce(egcs_ay_abbreviation_fr, '')) text_pattern_ops) WHERE (_deleted = false AND egcs_ay_active = true);
 CREATE INDEX ay_profile_search_agencyfinancialsystemid_exact ON "Agency_Profile" USING btree (egcs_ay_agencyfinancialsystemid) WHERE (_deleted = false AND egcs_ay_active = true);
-CREATE INDEX ay_profile_search_gwcoa_number_exact ON "Agency_Profile" USING btree (egcs_ay_gwcoa_number) WHERE (_deleted = false AND egcs_ay_active = true);
+CREATE INDEX ay_profile_search_gwcoa_number_exact ON "Agency_Profile" USING btree (egcs_ay_gwcoanumber) WHERE (_deleted = false AND egcs_ay_active = true);
 CREATE TABLE "Agency_Guided_Help" (
   id bigint PRIMARY KEY,
-  egcs_ay_publicationkind varchar(64) NOT NULL DEFAULT 'guided_help_catalog' CHECK (egcs_ay_publicationkind = 'guided_help_catalog'),
+  egcs_ay_publicationkind varchar(64) NOT NULL DEFAULT 'guided_help_catalog' CONSTRAINT "ay_chk_guided_help_publicationkind" CHECK (egcs_ay_publicationkind = 'guided_help_catalog'),
   egcs_ay_agency bigint NOT NULL,
   egcs_ay_guide bigint NOT NULL,
   egcs_ay_sourceversion bigint NOT NULL,
-  egcs_ay_sourcekind varchar(64) NOT NULL DEFAULT 'guided_help' CHECK (egcs_ay_sourcekind = 'guided_help'),
-  egcs_ay_discoveryscreens jsonb NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(egcs_ay_discoveryscreens) = 'array'),
-  egcs_ay_roles jsonb NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(egcs_ay_roles) = 'array'),
+  egcs_ay_sourcekind varchar(64) NOT NULL DEFAULT 'guided_help' CONSTRAINT "ay_chk_guided_help_sourcekind" CHECK (egcs_ay_sourcekind = 'guided_help'),
+  egcs_ay_discoveryscreens jsonb NOT NULL DEFAULT '[]'::jsonb CONSTRAINT "ay_chk_guided_help_discoveryscreens" CHECK (jsonb_typeof(egcs_ay_discoveryscreens) = 'array'),
+  egcs_ay_roles jsonb NOT NULL DEFAULT '[]'::jsonb CONSTRAINT "ay_chk_guided_help_roles" CHECK (jsonb_typeof(egcs_ay_roles) = 'array'),
   egcs_ay_enabled boolean NOT NULL DEFAULT true,
   _deleted boolean NOT NULL DEFAULT false
 );
@@ -681,7 +681,7 @@ ALTER TABLE "Agency_Address_Type" ADD CONSTRAINT "Agency_Address_Type_egcs_ay_or
 
 ALTER TABLE "Agency_Agreement_Type" ADD CONSTRAINT "Agency_Agreement_Type_egcs_ay_organizationagency_fkey" FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Agency_Applicant_Recipient_Subtype" ADD CONSTRAINT "Agency_Applicant_Recipient_Subt_egcs_ay_organizationagency_fkey" FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Agency_Applicant_Recipient_Subtype" ADD CONSTRAINT "ay_fk_applicant_recipient_subtype_agency" FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Agency_Approval_Behalf_Type" ADD CONSTRAINT "Agency_Approval_Behalf_Type_egcs_ay_organizationagency_fkey" FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
 
@@ -695,7 +695,7 @@ ALTER TABLE "Agency_Commitment_Type" ADD CONSTRAINT "Agency_Commitment_Type_egcs
 
 ALTER TABLE "Agency_Cost_Category" ADD CONSTRAINT "Agency_Cost_Category_egcs_ay_organizationagency_fkey" FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Agency_Cost_Category_Line_Item" ADD CONSTRAINT "Agency_Cost_Category_Line_Ite_egcs_ay_organizationcostcate_fkey" FOREIGN KEY (egcs_ay_organizationcostcategory) REFERENCES "Agency_Cost_Category"(id) ON DELETE RESTRICT;
+ALTER TABLE "Agency_Cost_Category_Line_Item" ADD CONSTRAINT "ay_fk_cost_category_lineitem_costcategory" FOREIGN KEY (egcs_ay_organizationcostcategory) REFERENCES "Agency_Cost_Category"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Agency_Cost_Category_Line_Item" ADD CONSTRAINT "Agency_Cost_Category_Line_Item_egcs_ay_sourcecategory_fkey" FOREIGN KEY (egcs_ay_sourcecategory) REFERENCES "Agency_Cost_Category"(id) ON DELETE RESTRICT;
 
@@ -723,7 +723,7 @@ ALTER TABLE "Agency_Profile" ADD CONSTRAINT "Agency_Profile_egcs_ay_claimreconci
 
 ALTER TABLE "Agency_Profile" ADD CONSTRAINT "Agency_Profile_egcs_ay_claimreconciliationstartstatus_fkey" FOREIGN KEY (egcs_ay_claimreconciliationstartstatus) REFERENCES "Common_Status"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Agency_Profile" ADD CONSTRAINT "ay_ref_profilegwcoanumber" FOREIGN KEY (egcs_ay_gwcoa_number) REFERENCES "Common_GWCOA"(egcs_cn_number) ON DELETE RESTRICT;
+ALTER TABLE "Agency_Profile" ADD CONSTRAINT "ay_ref_profilegwcoanumber" FOREIGN KEY (egcs_ay_gwcoanumber) REFERENCES "Common_GWCOA"(egcs_cn_number) ON DELETE RESTRICT;
 ALTER TABLE "Agency_Guided_Help" ADD FOREIGN KEY (egcs_ay_agency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
 ALTER TABLE "Agency_Guided_Help" ADD FOREIGN KEY (egcs_ay_guide) REFERENCES "Common_Guided_Help"(id) ON DELETE RESTRICT;
 ALTER TABLE "Agency_Guided_Help" ADD CONSTRAINT ay_ref_guidedhelppublication FOREIGN KEY (id, egcs_ay_publicationkind) REFERENCES "Common_Publication"(id, egcs_cn_kind) ON DELETE RESTRICT;

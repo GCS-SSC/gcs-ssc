@@ -123,6 +123,7 @@ export const createGuideRuntime = (options: GuideRuntimeOptions) => {
   let observedDialog: HTMLElement | null = null
   let deferredDialog: HTMLElement | null = null
   let automaticFocusStepId: string | null = null
+  let revisitedStepId: string | null = null
   const definition = (step: GuideStep) => options.ledger?.views.find(view => view.key === step.view)?.targets.find(candidate => candidate.key === step.target)
   const stepTarget = (step: GuideStep): GuideTargetRef => definition(step)?.scope === 'instance' && observedContext.kind === 'task'
     ? { kind: 'instance', key: step.target, instance: observedContext.taskId }
@@ -451,6 +452,8 @@ export const createGuideRuntime = (options: GuideRuntimeOptions) => {
     if (source.action === 'save-success' && options.document.steps.some(step => guideTargetIdentity(stepTarget(step)) === guideTargetIdentity(source.target))) modalWorkflow = null
     const step = state.value.step
     if (guideTargetIdentity(source.target) === guideTargetIdentity(stepTarget(step))) {
+      const completion = definition(step)?.completion
+      if (completion?.kind === 'success' && completion.action === source.action) revisitedStepId = null
       if (source.action === 'field-change') {
         if (completionEnabled() && ['select', 'checkbox'].includes(step.kind) && readValue(step.target, step.view) !== undefined) advance(true)
         else retry()
@@ -550,7 +553,9 @@ export const createGuideRuntime = (options: GuideRuntimeOptions) => {
   }
   /** Refresh existing geometry without rebuilding, focusing, or scrolling a native control. */
   const refreshPageGeometry = () => {
-    if (destroyed || !target || modalDialog || deferredDialog) return
+    if (destroyed || !target || deferredDialog) return
+    if (!suspended && state.value.status === 'ready' && target.isConnected && spotlight.getActiveElement() === target && !anchorOnly() && !target.classList.contains('driver-active-element')) target.classList.add('driver-active-element')
+    if (modalDialog) return
     const bounds = target.getBoundingClientRect()
     if (targetBounds && bounds.x === targetBounds.x && bounds.y === targetBounds.y && bounds.width === targetBounds.width && bounds.height === targetBounds.height) return
     targetBounds = bounds
@@ -771,6 +776,7 @@ export const createGuideRuntime = (options: GuideRuntimeOptions) => {
       }
     } })
     if (restoreFocus?.isConnected) restoreFocus.focus({ preventScroll: true })
+    if (layout?.side === 'inline' && restoreFocus?.isConnected && dialog?.contains(restoreFocus) && window.document.activeElement === restoreFocus) restoreFocus.scrollIntoView?.({ behavior: 'instant', block: 'nearest', inline: 'nearest' })
     targetBounds = target?.getBoundingClientRect() ?? null
     rebuilding = false
     observeTargets()
@@ -788,6 +794,8 @@ export const createGuideRuntime = (options: GuideRuntimeOptions) => {
     if (!step || destroyed || suspended || presentation || observedContext.kind === 'pending') return
     const selectedPath = selectionPath(step)
     if (!selectedPath) return
+    if (selectedPath.length < path.length) revisitedStepId = step.id
+    else if (step !== state.value.step) revisitedStepId = null
     if (automaticFocusStepId !== stepId) automaticFocusStepId = null
     path = selectedPath
     editedControls = new WeakSet<Element>()
@@ -795,7 +803,7 @@ export const createGuideRuntime = (options: GuideRuntimeOptions) => {
     state.value = { step, status: 'unavailable' }
     retry()
     options.onSelect?.(stepId, [...path])
-    if (options.ledger && definition(step)?.completion && step.advanceOn !== 'manual' && proven(step)) queueMicrotask(() => reconcileCompletion())
+    if (revisitedStepId !== step.id && options.ledger && definition(step)?.completion && step.advanceOn !== 'manual' && proven(step)) queueMicrotask(() => reconcileCompletion())
   }
   /** Let native page/dialog Tab handlers run before bypassing Driver's target-only trap.
    * @param event Native keyboard event after page and dialog handlers.
@@ -822,7 +830,7 @@ export const createGuideRuntime = (options: GuideRuntimeOptions) => {
     }
     for (let count = 0; count < options.document.steps.length; count++) {
       const step = state.value.step
-      if (step.advanceOn === 'manual' || !definition(step)?.completion || !proven(step)) break
+      if (revisitedStepId === step.id || step.advanceOn === 'manual' || !definition(step)?.completion || !proven(step)) break
       const decision = nextDecision(step)
       if (!decision.available || !decision.next) {
         if (decision.available && !finishDisabled) advance(true)
@@ -881,7 +889,10 @@ export const createGuideRuntime = (options: GuideRuntimeOptions) => {
             const normalize = (context: GuideObservedContext) => receipt.action === 'modal-open' && (context.kind === 'owner' || context.kind === 'task') ? { ...context, draftRevision: 0 } : context
             if (guideContextIdentity(normalize(receipt.context)) !== guideContextIdentity(normalize(observedContext))) receipts.delete(key)
           }
-          if (guideContextIdentity({ ...observedContext, draftRevision: 0 }) !== guideContextIdentity(lastLoadedContext.kind === 'owner' || lastLoadedContext.kind === 'task' ? { ...lastLoadedContext, draftRevision: 0 } : lastLoadedContext)) completedButtons.clear()
+          if (guideContextIdentity({ ...observedContext, draftRevision: 0 }) !== guideContextIdentity(lastLoadedContext.kind === 'owner' || lastLoadedContext.kind === 'task' ? { ...lastLoadedContext, draftRevision: 0 } : lastLoadedContext)) {
+            completedButtons.clear()
+            revisitedStepId = null
+          }
           lastLoadedContext = observedContext
         }
       }

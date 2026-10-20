@@ -296,7 +296,7 @@ export const listApprovalLookupBehalfTypesPage = async (
   }
 
   const [items, count] = await Promise.all([
-    query.select(['id', 'egcs_ay_name_en', 'egcs_ay_name_fr', 'egcs_ay_require_actual'])
+    query.select(['id', 'egcs_ay_name_en', 'egcs_ay_name_fr', 'egcs_ay_requireactual'])
       .orderBy('egcs_ay_name_en', 'asc').orderBy('id', 'asc')
       .limit(limit).offset((page - 1) * limit).execute(),
     query.select(eb => eb.fn.count('id').as('total')).executeTakeFirst()

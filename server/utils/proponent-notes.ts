@@ -51,9 +51,9 @@ export const listProponentNotes = async (event: H3Event) => {
         FROM "Applicant_Recipient_Note" note
         JOIN "Agency_Profile" agency ON agency.id = note.egcs_ar_agency
         JOIN "Common_User" created_user ON created_user.id = note.egcs_ar_createdby
-        JOIN "user" creator ON creator.id = created_user.egcs_cn_auth_user_id
+        JOIN "user" creator ON creator.id = created_user.egcs_cn_authuserid
         JOIN "Common_User" modified_user ON modified_user.id = note.egcs_ar_updatedby
-        JOIN "user" editor ON editor.id = modified_user.egcs_cn_auth_user_id
+        JOIN "user" editor ON editor.id = modified_user.egcs_cn_authuserid
         WHERE note.egcs_ar_applicantrecipient = ${parentId(event)} AND NOT note._deleted
           AND ${agencyPredicate} AND ${searchPredicate}
         ORDER BY note.egcs_ar_createdat DESC, note.id DESC

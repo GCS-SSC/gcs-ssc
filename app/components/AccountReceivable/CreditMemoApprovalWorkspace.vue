@@ -9,7 +9,7 @@ import { throwFetchResponseError } from '~/utils/fetch-error'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import { useBilingualValue } from '~/composables/useBilingualValue'
 
-const { agreementId, proponentId, creditMemoId } = defineProps<{ agreementId?: string, proponentId?: string, creditMemoId: string }>()
+const { proponentId, creditMemoId } = defineProps<{ proponentId: string, creditMemoId: string }>()
 const { t } = useI18n()
 const { getBilingualValue } = useBilingualValue()
 const { getHeroCollapsed } = useDashboard()
@@ -28,7 +28,7 @@ type ApprovalRuntime = {
   submission?: { egcs_fc_packet: JsonValue } | null
 }
 const context: Ref<ApprovalContext | null> = ref(null)
-const identity = computed(() => `${proponentId ?? agreementId}:${creditMemoId}`)
+const identity = computed(() => `${proponentId}:${creditMemoId}`)
 usePageResourceError({
   identity,
   errors: [loadError],
@@ -58,14 +58,14 @@ const refresh = async () => {
     const header = packetRecord?.accountReceivableCreditMemo
     if (!header || typeof header !== 'object' || Array.isArray(header)
       || header.id !== creditMemoId
-      || (proponentId !== undefined ? header.egcs_fc_applicantrecipient !== proponentId : header.egcs_fc_fundingagreement !== agreementId)
+      || header.egcs_fc_applicantrecipient !== proponentId
       || typeof header.egcs_fc_number !== 'number'
       || !runtime.current) throw new Error('Accounts Receivable approval route containment failed')
     if (disposed || generation !== requestGeneration || identity.value !== requestIdentity) return
     context.value = {
       reference: header.id,
-      parentNameEn: proponentId !== undefined ? String(header.egcs_fc_debtorname_en ?? '') : String(header.egcs_fc_agreementnumber ?? ''),
-      parentNameFr: proponentId !== undefined ? String(header.egcs_fc_debtorname_fr ?? '') : String(header.egcs_fc_agreementnumber ?? ''),
+      parentNameEn: String(header.egcs_fc_debtorname_en ?? ''),
+      parentNameFr: String(header.egcs_fc_debtorname_fr ?? ''),
       runtimeState: runtime.current.runtimeState
     }
     status.value = 'success'
@@ -86,7 +86,7 @@ onBeforeUnmount(() => {
 })
 const tabs = [{ key: 'account_receivable.credit_memo_approval_workspace', value: 'approval', icon: 'i-lucide-circle-check-big' }]
 const breadcrumbs = computed(() => [
-  { label: t(proponentId !== undefined ? 'applicant_recipient.title' : 'agreement.title') },
+  { label: t('applicant_recipient.title') },
   { label: getBilingualValue({ name_en: context.value?.parentNameEn, name_fr: context.value?.parentNameFr }, 'name', '') },
   { label: t('account_receivable.credit_memos_title') },
   { label: context.value?.reference ?? '' }

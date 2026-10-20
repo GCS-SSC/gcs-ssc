@@ -38,7 +38,7 @@ export class AssignedItemAuthorizationRepository {
     if (options.lock) this.assertFreshContext()
 
     let query = this.db.selectFrom('user')
-      .innerJoin('Common_User', 'Common_User.egcs_cn_auth_user_id', 'user.id')
+      .innerJoin('Common_User', 'Common_User.egcs_cn_authuserid', 'user.id')
       .innerJoin('Common_Entity_Assignment', 'Common_Entity_Assignment.egcs_cn_user', 'Common_User.id')
       .innerJoin('Common_Entity', join => join
         .onRef('Common_Entity.id', '=', 'Common_Entity_Assignment.egcs_cn_entityid')
@@ -152,7 +152,7 @@ export const assignedEntityIdsQuery = (
   entityType: Entity_Type
 ) => db.selectFrom('Common_Entity_Assignment')
   .innerJoin('Common_User', 'Common_User.id', 'Common_Entity_Assignment.egcs_cn_user')
-  .innerJoin('user', 'user.id', 'Common_User.egcs_cn_auth_user_id')
+  .innerJoin('user', 'user.id', 'Common_User.egcs_cn_authuserid')
   .innerJoin('Common_Entity', join => join
     .onRef('Common_Entity.id', '=', 'Common_Entity_Assignment.egcs_cn_entityid')
     .onRef('Common_Entity.egcs_cn_entitytype', '=', 'Common_Entity_Assignment.egcs_cn_entitytype'))

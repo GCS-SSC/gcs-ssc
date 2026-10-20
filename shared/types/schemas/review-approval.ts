@@ -59,7 +59,7 @@ export const ReviewApprovalDecisionEvidenceSchema = z.object({
   egcs_cn_assigneduser: RequiredStringId(),
   egcs_cn_claimantmatchesdefault: z.boolean(),
   egcs_cn_onbehalf: OptionalNullableId(),
-  egcs_ay_require_actual: z.boolean(),
+  egcs_ay_requireactual: z.boolean(),
   egcs_cn_requiregroupdetails: z.boolean().default(false),
   egcs_cn_approvername: OptionalNullableTrimmedString(),
   egcs_cn_approvalpositiontitle: OptionalNullableTrimmedString(),
@@ -83,7 +83,7 @@ export const ReviewApprovalDecisionEvidenceSchema = z.object({
     })
     return
   }
-  if (!data.egcs_ay_require_actual && !(data.egcs_cn_defaultgroup && data.egcs_cn_requiregroupdetails && !isDelegated)) {
+  if (!data.egcs_ay_requireactual && !(data.egcs_cn_defaultgroup && data.egcs_cn_requiregroupdetails && !isDelegated)) {
     return
   }
   if (!data.egcs_cn_approvername) {

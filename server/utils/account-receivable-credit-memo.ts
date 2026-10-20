@@ -76,7 +76,7 @@ export const createAccountReceivableCreditMemo = async (event: H3Event, input: A
       .where('egcs_fc_agency', '=', context.agencyId).executeTakeFirstOrThrow()
     const created = await trx.insertInto('Funding_Case_Account_Receivable_Credit_Memo').values({
       egcs_fc_receivable: input.egcs_fc_receivable, egcs_fc_receivables: sql<import('~~/shared/types/database').JsonValue>`${JSON.stringify(context.receivableIds)}::jsonb`,
-      egcs_fc_totalamount: databaseMoneyValue(input.egcs_fc_totalamount), egcs_fc_ledgerkind: 'pool',
+      egcs_fc_totalamount: databaseMoneyValue(input.egcs_fc_totalamount),
       egcs_fc_agency: context.agencyId, egcs_fc_pool: poolId, egcs_fc_applicantrecipient: input.egcs_fc_applicantrecipient,
       egcs_fc_currency: context.currency, egcs_fc_number: (sequence.maximum ?? 0) + 1,
       egcs_fc_receiveddate: sql<Date>`${input.egcs_fc_receiveddate.toISOString().slice(0, 10)}::date`, egcs_fc_amount: databaseMoneyValue(parseDatabaseMoney('0.00')),
@@ -94,21 +94,14 @@ const allocateCashCreditMemo = async (event: H3Event, trx: Transaction<Database>
   const evidence = retainedEvidence && typeof retainedEvidence === 'object' && !Array.isArray(retainedEvidence) ? retainedEvidence : null
   type ReceivableEvidence = { receivableId: string; policy: JsonValue; accounts: JsonValue[]; scope?: 'agency' }
   const retainedByReceivable = new Map<string, ReceivableEvidence>()
-  if (evidence) {
-    if (evidence.version === 2) {
-      if (!Array.isArray(evidence.receivables)) return await accountReceivableError(event, 'AR_ACCOUNT_UNAVAILABLE')
-      for (const value of evidence.receivables) {
-        if (!value || typeof value !== 'object' || Array.isArray(value) || typeof value.receivableId !== 'string'
-          || !receivableIds.includes(value.receivableId) || retainedByReceivable.has(value.receivableId)
-          || !('policy' in value) || !Array.isArray(value.accounts)) return await accountReceivableError(event, 'AR_ACCOUNT_UNAVAILABLE')
-        retainedByReceivable.set(value.receivableId, { receivableId: value.receivableId, policy: value.policy ?? null, accounts: value.accounts,
-          ...(value.scope === 'agency' || evidence.scope === 'agency' ? { scope: 'agency' as const } : {}) })
-      }
-    } else {
-      // A legacy shared policy is unambiguous only when the memo tags one AR.
-      if (evidence.version !== undefined || receivableIds.length !== 1 || !Array.isArray(evidence.accounts)) return await accountReceivableError(event, 'AR_ACCOUNT_UNAVAILABLE')
-      retainedByReceivable.set(receivableIds[0]!, { receivableId: receivableIds[0]!, policy: evidence.policy ?? null, accounts: evidence.accounts,
-        ...(evidence.scope === 'agency' ? { scope: 'agency' as const } : {}) })
+  if (retainedEvidence !== undefined && retainedEvidence !== null) {
+    if (!evidence || evidence.version !== 2 || !Array.isArray(evidence.receivables)) return await accountReceivableError(event, 'AR_ACCOUNT_UNAVAILABLE')
+    for (const value of evidence.receivables) {
+      if (!value || typeof value !== 'object' || Array.isArray(value) || typeof value.receivableId !== 'string'
+        || !receivableIds.includes(value.receivableId) || retainedByReceivable.has(value.receivableId)
+        || !('policy' in value) || !Array.isArray(value.accounts)) return await accountReceivableError(event, 'AR_ACCOUNT_UNAVAILABLE')
+      retainedByReceivable.set(value.receivableId, { receivableId: value.receivableId, policy: value.policy ?? null, accounts: value.accounts,
+        ...(value.scope === 'agency' || evidence.scope === 'agency' ? { scope: 'agency' as const } : {}) })
     }
   }
   const allocations: Array<AgreementCodingAllocation & { receivableId: string }> = []
@@ -212,7 +205,6 @@ export const deleteAccountReceivableCreditMemo = async (event: H3Event, id: stri
     const attachment = await trx.selectFrom('Common_Entity_Attachment').select('id').where('egcs_cn_entitytype', '=', 'fundingcaseaccountreceivablecreditmemo').where('egcs_cn_entityid', '=', id).where('_deleted', '=', false).executeTakeFirst()
     const workflow = await trx.selectFrom('Common_Runtime').select('id').where('egcs_cn_entitytype', '=', 'fundingcaseaccountreceivablecreditmemo').where('egcs_cn_entityid', '=', id).executeTakeFirst()
     if (!row.egcs_cn_isdraft || attachment || workflow) return await accountReceivableError(event, 'AR_RETAINED_EVIDENCE')
-    await trx.updateTable('Funding_Case_Account_Receivable_Recovery').set({ egcs_fc_outcome: 'released', egcs_fc_releasedat: new Date() }).where('egcs_fc_creditmemo', '=', id).where('egcs_fc_outcome', '=', 'open').execute()
     await trx.updateTable('Funding_Case_Account_Receivable_Credit_Memo_Line').set({ _deleted: true }).where('egcs_fc_creditmemo', '=', id).where('_deleted', '=', false).execute()
     await trx.updateTable('Funding_Case_Account_Receivable_Credit_Memo').set({ _deleted: true, egcs_fc_amount: databaseMoneyValue(parseDatabaseMoney('0.00')) }).where('id', '=', id).execute()
     await trx.updateTable('Common_Entity_Assignment').set({ _deleted: true }).where('egcs_cn_entitytype', '=', 'fundingcaseaccountreceivablecreditmemo').where('egcs_cn_entityid', '=', id).execute()
@@ -264,7 +256,7 @@ export const getAccountReceivableCreditMemoDetail = async (event: H3Event, id: s
     egcs_fc_totalamount: parseDatabaseMoney(repayment.egcs_fc_totalamount), egcs_fc_receivables: Array.isArray(repayment.egcs_fc_receivables) ? repayment.egcs_fc_receivables.map(String) : [], egcs_fc_receivablereadable: receivableReadable, egcs_fc_receivablereference: String(repayment.egcs_fc_receivable), egcs_fc_amount: parseDatabaseMoney(repayment.egcs_fc_amount),
     egcs_fc_creditmemoreference: String(repayment.id),
     egcs_fc_debtorname_en: proponent.egcs_ar_legalname_en, egcs_fc_debtorname_fr: proponent.egcs_ar_legalname_fr,
-    egcs_fc_cancomplete: editable && work, egcs_fc_canedit: repayment.egcs_fc_ledgerkind === 'pool' && editable && work, egcs_fc_canwork: work && repayment.egcs_fc_outcome === 'open',
+    egcs_fc_cancomplete: editable && work, egcs_fc_canedit: editable && work, egcs_fc_canwork: work && repayment.egcs_fc_outcome === 'open',
     egcs_fc_candelete: editable && Boolean(assignment)
       && status.egcs_cn_isdraft && context.contexts.every(owner => auth.userAbilities.authorize('account_receivable', 'delete', owner.scope)),
     egcs_fc_agencyname_en: agency.egcs_ay_name_en, egcs_fc_agencyname_fr: agency.egcs_ay_name_fr,

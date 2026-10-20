@@ -311,7 +311,7 @@ export const searchAssignedWork = async (
 ): Promise<{ items: SearchResult[]; hasMore: boolean }> => {
   if (!auth.userAbilities.getGrants().some(grant => grant.action === 'read' && ASSIGNED_WORK_OWNER_SUBJECTS.has(grant.subject))) return { items: [], hasMore: false }
   const commonUser = await db.selectFrom('Common_User')
-    .select('id').where('egcs_cn_auth_user_id', '=', auth.userId).where('_deleted', '=', false).executeTakeFirst()
+    .select('id').where('egcs_cn_authuserid', '=', auth.userId).where('_deleted', '=', false).executeTakeFirst()
   if (!commonUser) return { items: [], hasMore: false }
   const query = await buildAssignedWorkSearchCandidates({ commonUserId: commonUser.id, auth, search })
   const result = await query.execute(db)

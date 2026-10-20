@@ -5,9 +5,6 @@ import type { AccountReceivableOffsetMemo, AccountReceivablePaymentCreditMemo } 
 import { hashPublicationDefinition } from './system-publication'
 import { sumMoney, parseMoney } from '~~/shared/utils/money'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from './database-money'
-import { hasAccountReceivablePoolLedger } from './account-receivable-pool-ledger'
-import { hasAccountingTable } from './correction-schema'
-import { readAccountReceivableLineBalances } from './account-receivable'
 import { readAccountReceivableCashBalance } from './account-receivable-cash-balance'
 import type { AgreementCodingAllocation } from './agreement-coding-allocator'
 
@@ -16,7 +13,7 @@ const isoDate = (value: Date | string): string => new Date(value).toISOString()
 
 /** Agency/global AR authority is required before projecting a complete pool. */
 export const readAccountReceivableOffsetMemos = async (db: Kysely<Database>, poolIds: string[], memoIds?: string[]): Promise<AccountReceivableOffsetMemo[]> => {
-  if (!poolIds.length || (memoIds && !memoIds.length) || !await hasAccountReceivablePoolLedger(db)) return []
+  if (!poolIds.length || (memoIds && !memoIds.length)) return []
   let query = db.selectFrom('Funding_Case_Account_Receivable_Offset_Memo').selectAll()
     .select(databaseMoneyText(sql.ref('egcs_fc_amount')).as('amount')).where('egcs_fc_pool', 'in', poolIds)
     .where('_deleted', '=', false)
@@ -75,13 +72,13 @@ export const linkAccountReceivablePoolOffsetApplication = async (trx: Transactio
         egcs_fc_amount: databaseMoneyValue(line.amount) }).execute()
     }
     await trx.insertInto('Funding_Case_Account_Receivable_Offset_Memo_Application').values({ egcs_fc_offsetmemo: String(memo.id),
-      egcs_fc_allocation: null, egcs_fc_recovery: recoveryId, egcs_fc_amount: databaseMoneyValue(plan.amount) }).execute()
+      egcs_fc_recovery: recoveryId, egcs_fc_amount: databaseMoneyValue(plan.amount) }).execute()
   }
 }
 
 /** Authorized Payment projection excludes source identities and unrelated Agreement navigation. */
 export const readAccountReceivablePaymentCreditMemos = async (db: Kysely<Database>, recoveryId: string | undefined): Promise<AccountReceivablePaymentCreditMemo[]> => {
-  if (!recoveryId || !await hasAccountReceivablePoolLedger(db)) return []
+  if (!recoveryId) return []
   const recovery = await db.selectFrom('Funding_Case_Account_Receivable_Recovery').select('egcs_fc_pool').where('id', '=', recoveryId).executeTakeFirstOrThrow()
   const memos = await readAccountReceivableOffsetMemos(db, [String(recovery.egcs_fc_pool)])
   return memos.flatMap(memo => {
@@ -93,38 +90,6 @@ export const readAccountReceivablePaymentCreditMemos = async (db: Kysely<Databas
       egcs_fc_appliedamount: outcome === 'released' ? ZERO : sumMoney(applications.map(row => row.egcs_fc_amount)),
       egcs_fc_receivablereserved: memo.egcs_fc_receivablereserved, egcs_fc_receivablerecovered: memo.egcs_fc_receivablerecovered, egcs_fc_receivableoutstanding: memo.egcs_fc_receivableoutstanding, egcs_fc_receivableavailable: memo.egcs_fc_receivableavailable, egcs_fc_outcome: outcome }]
   })
-}
-
-/** Reconstruct only pinned v2 evidence; current APIs never expose these old AR-owned plans. */
-export const readRetainedAccountReceivablePaymentCreditMemos = async (
-  db: Kysely<Database>, recoveryId: string | undefined
-): Promise<AccountReceivablePaymentCreditMemo[]> => {
-  if (!recoveryId || !await hasAccountingTable(db, 'Funding_Case_Account_Receivable_Offset_Memo')) return []
-  const ownerColumn = 'egcs_fc_receivable'
-  const memos = (await sql<{ id: string; receivable: string; amount: string }>`SELECT DISTINCT memo.id::text,
-    ${sql.ref(`memo.${ownerColumn}`)}::text AS receivable, memo.egcs_fc_amount::text AS amount
-    FROM "Funding_Case_Account_Receivable_Offset_Memo" memo
-    JOIN "Funding_Case_Account_Receivable_Offset_Memo_Application" application ON application.egcs_fc_offsetmemo=memo.id
-    JOIN "Funding_Case_Account_Receivable_Allocation" allocation ON allocation.id=application.egcs_fc_allocation
-    WHERE allocation.egcs_fc_recovery=${recoveryId}::bigint ORDER BY memo.id::text`.execute(db)).rows
-  const result: AccountReceivablePaymentCreditMemo[] = []
-  for (const memo of memos) {
-    const balances = await readAccountReceivableLineBalances(db, memo.receivable)
-    const remaining = sumMoney(balances.map(line => line.egcs_fc_outstanding))
-    const available = sumMoney(balances.map(line => line.egcs_fc_available))
-    const applications = await db.selectFrom('Funding_Case_Account_Receivable_Offset_Memo_Application as application')
-      .innerJoin('Funding_Case_Account_Receivable_Allocation as allocation', 'allocation.id', 'application.egcs_fc_allocation')
-      .innerJoin('Funding_Case_Account_Receivable_Recovery as recovery', 'recovery.id', 'allocation.egcs_fc_recovery')
-      .select(['recovery.id', 'recovery.egcs_fc_outcome'])
-      .select(databaseMoneyText(sql.ref('allocation.egcs_fc_amount')).as('amount'))
-      .where('application.egcs_fc_offsetmemo', '=', memo.id).orderBy('application.id').execute()
-    const outcome = applications.find(application => String(application.id) === recoveryId)!.egcs_fc_outcome
-    result.push({ id: memo.id, egcs_fc_offsetmemo: memo.id, egcs_fc_creditmemoreference: `OCM-${memo.id}`,
-      egcs_fc_amount: parseDatabaseMoney(memo.amount),
-      egcs_fc_appliedamount: outcome === 'released' ? ZERO : sumMoney(applications.filter(application => String(application.id) === recoveryId).map(application => parseDatabaseMoney(application.amount))),
-      egcs_fc_receivablereserved: sumMoney(balances.map(line => line.egcs_fc_reserved)), egcs_fc_receivablerecovered: sumMoney(balances.map(line => line.egcs_fc_recovered)), egcs_fc_receivableoutstanding: remaining, egcs_fc_receivableavailable: available, egcs_fc_outcome: outcome })
-  }
-  return result
 }
 
 /** Payment readers may receive their retained approval basis, never unauthorized live pool totals. */

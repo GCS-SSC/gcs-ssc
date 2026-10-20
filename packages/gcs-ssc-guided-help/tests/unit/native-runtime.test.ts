@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { reactive } from 'vue'
+import { createApp, h, nextTick, reactive, ref } from 'vue'
 import { createGuideActionChannel, createGuideRuntime, GuideObservedContextSchema } from '../../src/runtime'
 import type { GuideActionChannel, GuideActionSource, GuideObservedContext } from '../../src/runtime'
 import type { GuideDocument, GuideStep, TargetLedger } from '../../src/contracts'
@@ -22,6 +22,125 @@ afterEach(() => {
 })
 
 describe('reader operation lease', () => {
+  it('keeps Previous at a completed decision until explicit forward navigation or a new matching action', async () => {
+    document.body.innerHTML = '<div role="dialog" data-state="open"><input value="Unsaved agency draft"><input type="checkbox" checked data-help-target="choice"></div>'
+    const target = document.querySelector<HTMLInputElement>('[data-help-target="choice"]')!
+    const channel = createGuideActionChannel()
+    let observed = context
+    target.addEventListener('change', () => success(channel, source('choice', { action: 'field-change', context: observed })))
+    const decision: GuideStep = { ...step('decision', 'checkbox'), target: 'choice', flow: { next: 'inactive', branches: [{ target: 'choice', equals: true, next: 'active' }] } }
+    const activeStep: GuideStep = { ...step('active', 'checkbox'), target: 'choice', advanceOn: 'manual', flow: { next: null, branches: [] } }
+    const inactive: GuideStep = { ...activeStep, id: 'inactive' }
+    const ledger: TargetLedger = { formatVersion: 1, views: [{ key: 'packing', label: bilingual('Packing'), targets: [{ key: 'choice', label: bilingual('Active'), kind: 'checkbox', completion: { kind: 'success', action: 'field-change' } }] }] }
+    active = createGuideRuntime({ document: guide([decision, activeStep, inactive]), ledger, locale: 'en', currentView: 'packing', observedContext: observed, actionChannel: channel })
+    target.focus()
+    target.click()
+    expect(active.state.value.step.id).toBe('inactive')
+    document.querySelector<HTMLButtonElement>('.driver-popover-prev-btn')!.click()
+    await Promise.resolve()
+    await nextTick()
+    expect(active.state.value.step.id).toBe('decision')
+    expect(active.path).toEqual(['decision'])
+    expect(document.querySelector<HTMLButtonElement>('.driver-popover-next-btn')!.disabled).toBe(false)
+    active.updateContext({ currentView: 'packing', locale: 'fr', observedContext: { ...observed } })
+    success(channel, source('unrelated'))
+    await Promise.resolve()
+    expect(active.state.value.step.id).toBe('decision')
+    next()
+    expect(active.state.value.step.id).toBe('inactive')
+    document.querySelector<HTMLButtonElement>('.driver-popover-prev-btn')!.click()
+    await Promise.resolve()
+    expect(active.state.value.step.id).toBe('decision')
+    target.focus()
+    target.click()
+    expect(active.state.value.step.id).toBe('active')
+    expect(active.path).toEqual(['decision', 'active'])
+    expect(document.activeElement).toBe(target)
+    expect(document.querySelector<HTMLInputElement>('input:not([type="checkbox"])')?.value).toBe('Unsaved agency draft')
+    document.querySelector<HTMLButtonElement>('.driver-popover-prev-btn')!.click()
+    await Promise.resolve()
+    observed = { ...context, visitId: 'new-visit' }
+    active.updateContext({ currentView: 'packing', locale: 'fr', observedContext: observed })
+    expect(active.state.value.step.id).toBe('decision')
+    expect(document.querySelector<HTMLButtonElement>('.driver-popover-next-btn')!.disabled).toBe(true)
+    success(channel, source('choice', { action: 'field-change' }))
+    expect(active.state.value.step.id).toBe('decision')
+    target.click()
+    expect(active.state.value.step.id).toBe('inactive')
+  })
+  it('settles the focused switch after its new inline branch popover participates in modal layout', async () => {
+    const width = window.innerWidth
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 })
+    document.body.innerHTML = '<div role="dialog" data-state="open"><input value="Unsaved agency draft"><button role="switch" aria-checked="true" data-help-target="answer">Active</button></div>'
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!
+    const target = dialog.querySelector('button')!
+    vi.spyOn(dialog, 'getBoundingClientRect').mockReturnValue(new DOMRect(16, 16, 358, 812))
+    const scrollStates: Array<{ popover: Element | null; focused: boolean }> = []
+    target.scrollIntoView = vi.fn(() => {
+      scrollStates.push({ popover: dialog.querySelector('.gcs-guide-modal-inline'), focused: document.activeElement === target })
+    })
+    const channel = createGuideActionChannel()
+    const decision: GuideStep = { ...step('decision', 'checkbox'), target: 'answer', flow: { next: 'inactive', branches: [] } }
+    const inactive: GuideStep = { ...step('inactive', 'checkbox'), target: 'answer', advanceOn: 'manual', flow: { next: null, branches: [] } }
+    const ledger: TargetLedger = { formatVersion: 1, views: [{ key: 'packing', label: bilingual('Packing'), targets: [{ key: 'answer', label: bilingual('Active'), kind: 'checkbox', completion: { kind: 'success', action: 'field-change' } }] }] }
+    try {
+      active = createGuideRuntime({ document: guide([decision, inactive]), ledger, locale: 'fr', currentView: 'packing', observedContext: context, actionChannel: channel })
+      target.focus()
+      target.setAttribute('aria-checked', 'false')
+      success(channel, source('answer', { action: 'field-change' }))
+      expect(active.state.value.step.id).toBe('inactive')
+      const popover = dialog.querySelector('.gcs-guide-modal-inline')
+      expect(popover).not.toBeNull()
+      expect(scrollStates.at(-1)).toEqual({ popover, focused: true })
+      await nextTick()
+      expect(dialog.querySelector('button[role="switch"]')).toBe(target)
+      expect(document.activeElement).toBe(target)
+      expect(dialog.querySelector('.gcs-guide-modal-inline')).toBe(popover)
+      expect(dialog.querySelector('input')?.value).toBe('Unsaved agency draft')
+    } finally {
+      active?.destroy()
+      active = null
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: width })
+    }
+  })
+  it.each(['spotlight', 'anchor-only'] as const)('retains native modal input identity and guidance through a Vue validation render in %s mode', async appearance => {
+    const invalid = ref(false)
+    const host = document.createElement('div')
+    document.body.append(host)
+    const app = createApp({ render: () => h('div', { 'role': 'dialog', 'data-state': 'open' }, [h('input', { 'data-help-target': 'answer', 'aria-invalid': invalid.value, 'class': invalid.value ? 'validation-error' : 'validation-ready', 'value': 'Unsaved evidence' })]) })
+    app.mount(host)
+    const input = host.querySelector('input')!
+    const mutations = vi.fn()
+    const observer = new MutationObserver(mutations)
+    try {
+      input.focus()
+      active = createGuideRuntime({ document: guide([{ ...step('answer', 'text'), appearance, advanceOn: 'manual' }]), locale: 'fr', currentView: 'packing' })
+      await vi.waitFor(() => expect(document.querySelector('.driver-popover')).not.toBeNull())
+      const popover = document.querySelector('.driver-popover')
+      const controls = input.getAttribute('aria-controls')
+      expect(controls).toBe('driver-popover-content')
+      observer.observe(input, { attributes: true, attributeFilter: ['class'] })
+      invalid.value = true
+      await nextTick()
+      await vi.waitFor(() => expect(input.classList.contains('driver-active-element')).toBe(appearance === 'spotlight'))
+      expect(host.querySelector('input')).toBe(input)
+      expect(document.activeElement).toBe(input)
+      expect(input.value).toBe('Unsaved evidence')
+      expect(input.getAttribute('aria-invalid')).toBe('true')
+      expect(input.getAttribute('aria-controls')).toBe(controls)
+      expect(document.querySelector('.driver-popover')).toBe(popover)
+      await Promise.resolve()
+      const settled = mutations.mock.calls.length
+      await nextTick()
+      await Promise.resolve()
+      expect(mutations).toHaveBeenCalledTimes(settled)
+    } finally {
+      observer.disconnect()
+      active?.destroy()
+      active = null
+      app.unmount()
+    }
+  })
   it('captures reactive source, supersedes older drafts, publishes once and rejects released tickets', () => {
     const channel = createGuideActionChannel()
     const receive = vi.fn()

@@ -53,7 +53,6 @@ export const readEffectiveCorrectionAdjustments = async (
 export const readEffectiveAccountReceivableRecoveries = async (
   db: Kysely<Database>, agreementId: string, options: { currency?: Currency_Codes } = {}
 ): Promise<CreditMemoPaidAdjustment[]> => {
-  if (!await hasAccountingTable(db, 'Funding_Case_Account_Receivable_Credit_Memo_Line')) return []
   const manual = await sql<CreditMemoCodingRow>`
     SELECT line.id::text AS id, line.egcs_fc_commitmentchartofaccount::text AS "agencyChartId",
       account.egcs_ay_fiscalyear::text AS "agencyFiscalYearId", account.egcs_ay_fiscalyear::text AS "sourceAgencyFiscalYearId",
@@ -68,8 +67,7 @@ export const readEffectiveAccountReceivableRecoveries = async (
       AND (${options.currency ?? null}::text IS NULL OR memo.egcs_fc_currency=${options.currency ?? null})
     ORDER BY memo.egcs_fc_receiveddate, memo.id, line.id
   `.execute(db)
-  const offsets = await hasAccountingTable(db, 'Funding_Case_Account_Receivable_Offset_Memo')
-    ? await sql<CreditMemoCodingRow>`
+  const offsets = await sql<CreditMemoCodingRow>`
       SELECT ('offset:' || credit_line.id::text) AS id, credit_line.egcs_fc_commitmentchartofaccount::text AS "agencyChartId",
         account.egcs_ay_fiscalyear::text AS "agencyFiscalYearId", account.egcs_ay_fiscalyear::text AS "sourceAgencyFiscalYearId",
         debt.id::text AS "receivableId", pool.egcs_fc_currency AS currency, memo.egcs_fc_createdat AS "accountingDate",
@@ -86,7 +84,6 @@ export const readEffectiveAccountReceivableRecoveries = async (
         AND (${options.currency ?? null}::text IS NULL OR pool.egcs_fc_currency=${options.currency ?? null})
       ORDER BY memo.id, credit_line.egcs_fc_linenumber
     `.execute(db)
-    : { rows: [] as CreditMemoCodingRow[] }
   if (!manual.rows.length && !offsets.rows.length) return []
   const lines = await getAgreementAccountingLines(db, agreementId, { omitCreditMemos: true })
   const paidByLine = new Map(lines.map(line => [String(line.id), line.egcs_fc_correctedpaid]))
@@ -122,7 +119,6 @@ export const readEffectiveAccountReceivableClaimRecoveries = async (
   db: Kysely<Database>, agreementId: string,
   options: { currency?: Currency_Codes; fiscalYearBasis?: 'current-budget' | 'claim-source' } = {}
 ) => {
-  if (!await hasAccountingTable(db, 'Funding_Case_Account_Receivable_Claim_Reduction')) return []
   const rows = await db.selectFrom('Funding_Case_Account_Receivable_Claim_Reduction as reduction')
     .innerJoin('Funding_Case_Agreement_Account_Receivable as debt', 'debt.id', 'reduction.egcs_fc_receivable')
     .innerJoin('Funding_Case_Agreement_Claim as claim', 'claim.id', 'reduction.egcs_fc_claim')

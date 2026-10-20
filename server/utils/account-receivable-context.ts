@@ -127,16 +127,7 @@ export const executeFreshAccountReceivableWrite = async <T>(
 
 /** Claim keys remain unique; fiscal advance consumption belongs to its explicit debtor. */
 export const accountReceivableSourceUsage = (agreementId: string, sourceKey: string, excludedId?: string, options: { applicantRecipientId?: string } = {}) => sql<string>`(
-  SELECT (COALESCE(SUM(CASE WHEN usage.outcome = 'posted' THEN usage.amount ELSE greatest(usage.amount,0) END),0) - CASE WHEN ${sourceKey.startsWith('advance:')} THEN COALESCE((
-    SELECT SUM(allocation.egcs_fc_amount)
-    FROM "Funding_Case_Account_Receivable_Allocation" allocation
-    JOIN "Funding_Case_Account_Receivable_Recovery" recovery ON recovery.id = allocation.egcs_fc_recovery
-    JOIN "Funding_Case_Agreement_Account_Receivable_Line" source ON source.id = allocation.egcs_fc_receivableline
-    JOIN "Funding_Case_Agreement_Account_Receivable" source_debt ON source_debt.id = source.egcs_fc_receivable
-    WHERE source.egcs_fc_sourcekey = ${sourceKey} AND source.egcs_fc_fundingagreement = ${agreementId}
-      AND recovery.egcs_fc_outcome = 'posted' AND NOT recovery._deleted AND NOT allocation._deleted
-      ${sourceKey.startsWith('advance:') && options.applicantRecipientId ? sql`AND source_debt.egcs_fc_applicantrecipient = ${options.applicantRecipientId}` : sql``}
-  ),0) ELSE 0 END)::text
+  SELECT COALESCE(SUM(CASE WHEN usage.outcome = 'posted' THEN usage.amount ELSE greatest(usage.amount,0) END),0)::text
   FROM (SELECT debt.id, debt.egcs_fc_outcome AS outcome, SUM(line.egcs_fc_amount) AS amount
   FROM "Funding_Case_Agreement_Account_Receivable_Line" line
   JOIN "Funding_Case_Agreement_Account_Receivable" debt ON debt.id = line.egcs_fc_receivable
@@ -148,15 +139,7 @@ export const accountReceivableSourceUsage = (agreementId: string, sourceKey: str
 )`
 
 export const accountReceivableAdvanceUsage = (agreementId: string, applicantRecipientId: string, agencyFiscalYearId: string, excludedId?: string) => sql<string>`(
-  SELECT (COALESCE(SUM(CASE WHEN usage.outcome = 'posted' THEN usage.amount ELSE greatest(usage.amount,0) END),0) - COALESCE((
-    SELECT SUM(allocation.egcs_fc_amount)
-    FROM "Funding_Case_Account_Receivable_Allocation" allocation
-    JOIN "Funding_Case_Account_Receivable_Recovery" recovery ON recovery.id = allocation.egcs_fc_recovery
-    JOIN "Funding_Case_Agreement_Account_Receivable" source_debt ON source_debt.id = allocation.egcs_fc_receivable
-    WHERE source_debt.egcs_fc_fundingagreement = ${agreementId} AND source_debt.egcs_fc_applicantrecipient = ${applicantRecipientId}
-      AND source_debt.egcs_fc_agencyfiscalyear = ${agencyFiscalYearId} AND source_debt.egcs_fc_advancepaymentrelated
-      AND recovery.egcs_fc_outcome = 'posted' AND NOT recovery._deleted AND NOT allocation._deleted
-  ),0))::text
+  SELECT COALESCE(SUM(CASE WHEN usage.outcome = 'posted' THEN usage.amount ELSE greatest(usage.amount,0) END),0)::text
   FROM (SELECT debt.id, debt.egcs_fc_outcome AS outcome, SUM(line.egcs_fc_amount) AS amount
   FROM "Funding_Case_Agreement_Account_Receivable_Line" line
   JOIN "Funding_Case_Agreement_Account_Receivable" debt ON debt.id = line.egcs_fc_receivable

@@ -256,7 +256,7 @@ export const resolvePublicationActorId = async (
   authUserId: string
 ): Promise<string | null> => {
   const user = await db.selectFrom('Common_User').select('id')
-    .where('egcs_cn_auth_user_id', '=', authUserId)
+    .where('egcs_cn_authuserid', '=', authUserId)
     .where('_deleted', '=', false)
     .executeTakeFirst()
   return user ? String(user.id) : null

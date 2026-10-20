@@ -71,7 +71,11 @@ const EXPECTED_CORE_MIGRATIONS = [
   '9999_z_commitment_budget_payment_hold'
 ] as const
 
-const EXPECTED_SEEDED_EXTENSION_KEYS = ['gcs-automated-payments', 'gcs-storage-local'] as const
+const EXPECTED_SEEDED_EXTENSION_KEYS = [
+  'gcs-automated-payments',
+  'gcs-outcome-cost-allocation',
+  'gcs-storage-local'
+] as const
 
 const EXPECTED_PACKAGED_STORAGE_PROVIDER_KEYS = [
   'gcs-storage-local',
@@ -598,12 +602,12 @@ const verifyGcFormsSchema = async (pg: PGlite): Promise<void> => {
     await queryCanonicalColumns(
       pg,
       'extensions',
-      'gcs_gcforms_credentials',
+      'gcs_gcforms_integration_credentials',
       ['_deleted']
     ),
     [{
       table_schema: 'extensions',
-      table_name: 'gcs_gcforms_credentials',
+      table_name: 'gcs_gcforms_integration_credentials',
       column_name: '_deleted',
       data_type: 'boolean',
       is_nullable: 'NO',

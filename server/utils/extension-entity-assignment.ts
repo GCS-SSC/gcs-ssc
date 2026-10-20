@@ -79,13 +79,13 @@ export const executeExtensionEntityAssignmentManagement = async <Result>(
 ): Promise<Result | null> => {
   const assigneeApplicationUserId = assigneeUserId
     ? await event.context.$db.selectFrom('Common_User')
-        .select('egcs_cn_auth_user_id')
+        .select('egcs_cn_authuserid')
         .where('id', '=', assigneeUserId)
         .where('_deleted', '=', false)
         .executeTakeFirst()
     : undefined
   return await executeQualifiedRuntimeTransaction(event, runtime, {
-    lockUserIds: assigneeApplicationUserId ? [String(assigneeApplicationUserId.egcs_cn_auth_user_id)] : [],
+    lockUserIds: assigneeApplicationUserId ? [String(assigneeApplicationUserId.egcs_cn_authuserid)] : [],
     work: async ({ trx, auth, runtime: current }) => {
       if (!await hasManageGrant(auth, trx, current)) return await forbidden(event)
       if (current.lockedEntity.status.readOnly || current.lockedEntity.status.terminal) return await forbidden(event)

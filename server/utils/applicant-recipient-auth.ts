@@ -49,7 +49,7 @@ const resolveApplicantRecipientAccess = async (
   let assignedIds = new Set<string>()
   if (includeAssignments) {
     const assignments = await db.selectFrom('user')
-      .innerJoin('Common_User', 'Common_User.egcs_cn_auth_user_id', 'user.id')
+      .innerJoin('Common_User', 'Common_User.egcs_cn_authuserid', 'user.id')
       .innerJoin('Common_Entity_Assignment', 'Common_Entity_Assignment.egcs_cn_user', 'Common_User.id')
       .innerJoin('Common_Entity', join => join
         .onRef('Common_Entity.id', '=', 'Common_Entity_Assignment.egcs_cn_entityid')
@@ -154,9 +154,10 @@ export const resolveApplicantRecipientMutationPermissions = async (
   context: AuthContext,
   applicantRecipientIds: string[],
   db: Kysely<Database>
-): Promise<Map<string, { canCreate: boolean; canUpdate: boolean; canDelete: boolean; canCreateRole: boolean; canUpdateRole: boolean; canDeleteRole: boolean }>> => {
-  const [access, createVisibility, updateVisibility, deleteVisibility] = await Promise.all([
+): Promise<Map<string, { canRead: boolean; canCreate: boolean; canUpdate: boolean; canDelete: boolean; canCreateRole: boolean; canUpdateRole: boolean; canDeleteRole: boolean }>> => {
+  const [access, readVisibility, createVisibility, updateVisibility, deleteVisibility] = await Promise.all([
     resolveApplicantRecipientAccess(context, db, applicantRecipientIds, true),
+    resolveApplicantRecipientVisibility(context, 'read', db),
     resolveApplicantRecipientVisibility(context, 'create', db),
     resolveApplicantRecipientVisibility(context, 'update', db),
     resolveApplicantRecipientVisibility(context, 'delete', db)
@@ -167,6 +168,7 @@ export const resolveApplicantRecipientMutationPermissions = async (
       canCreateRole: createVisibility.hasGlobalAccess || createVisibility.agencyIds.length > 0,
       canUpdateRole: updateVisibility.hasGlobalAccess || updateVisibility.agencyIds.length > 0,
       canDeleteRole: deleteVisibility.hasGlobalAccess || deleteVisibility.agencyIds.length > 0,
+      canRead: allowsApplicantRecipientAction(readVisibility, itemAccess, 'read'),
       canCreate: allowsApplicantRecipientAction(createVisibility, itemAccess, 'create'),
       canUpdate: allowsApplicantRecipientAction(updateVisibility, itemAccess, 'update'),
       canDelete: allowsApplicantRecipientAction(deleteVisibility, itemAccess, 'delete')

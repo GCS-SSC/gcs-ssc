@@ -9,7 +9,7 @@ export const AGREEMENT_ADDRESS_SELECT_COLUMNS = [
   'Common_Address.egcs_cn_addresscity as egcs_cn_addresscity',
   'Common_Address.egcs_cn_addresscountry as egcs_cn_addresscountry',
   'Common_Address.egcs_cn_addresssubdivision as egcs_cn_addresssubdivision',
-  'Common_Address.egcs_cn_gc_addressid as egcs_cn_gc_addressid',
+  'Common_Address.egcs_cn_gcaddressid as egcs_cn_gcaddressid',
   'Common_Address.egcs_cn_latitude as egcs_cn_latitude',
   'Common_Address.egcs_cn_longitude as egcs_cn_longitude',
   'Common_Address.egcs_cn_mainphone as egcs_cn_mainphone',

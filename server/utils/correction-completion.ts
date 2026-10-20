@@ -17,7 +17,7 @@ import { authorize } from './authorize'
 import { notFound } from './api-errors'
 
 const resolveFreshCorrectionActor = async (trx: Transaction<Database>, authUserId: string) => {
-  const actor = await trx.selectFrom('Common_User').innerJoin('user', 'user.id', 'Common_User.egcs_cn_auth_user_id')
+  const actor = await trx.selectFrom('Common_User').innerJoin('user', 'user.id', 'Common_User.egcs_cn_authuserid')
     .select(['Common_User.id', 'Common_User.egcs_cn_name as name'])
     .where('user.id', '=', authUserId).where('user._deleted', '=', false).where('Common_User._deleted', '=', false)
     .executeTakeFirst()

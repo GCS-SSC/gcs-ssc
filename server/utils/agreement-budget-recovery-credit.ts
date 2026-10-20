@@ -2,7 +2,6 @@ import { sql, type Kysely } from 'kysely'
 import type { Currency_Codes, Database } from '~~/shared/types/database'
 import { compareMoney, parseMoneyText, subtractMoney } from '~~/shared/utils/money'
 import { parseDatabaseMoney } from './database-money'
-import { hasAccountingTable } from './correction-schema'
 
 const ZERO = parseMoneyText('0.00')
 
@@ -17,9 +16,7 @@ const ZERO = parseMoneyText('0.00')
 export const readAgreementBudgetRecoveryCredits = async (
   db: Kysely<Database>, agreementId: string, currency: Currency_Codes
 ) => {
-  if (!await hasAccountingTable(db, 'Funding_Case_Account_Receivable_Credit_Memo_Line')) return []
-  const offsets = await hasAccountingTable(db, 'Funding_Case_Account_Receivable_Offset_Memo')
-    ? sql`COALESCE((SELECT SUM(application.egcs_fc_amount)
+  const offsets = sql`COALESCE((SELECT SUM(application.egcs_fc_amount)
         FROM "Funding_Case_Account_Receivable_Offset_Memo" memo
         JOIN "Funding_Case_Account_Receivable_Offset_Memo_Application" application ON application.egcs_fc_offsetmemo=memo.id
         JOIN "Funding_Case_Account_Receivable_Recovery" recovery ON recovery.id=application.egcs_fc_recovery
@@ -27,7 +24,6 @@ export const readAgreementBudgetRecoveryCredits = async (
         WHERE memo.egcs_fc_receivable=source."receivableId"::bigint
           AND pool.egcs_fc_currency=${currency} AND recovery.egcs_fc_outcome='posted'
           AND NOT memo._deleted AND NOT application._deleted AND NOT recovery._deleted),0)`
-    : sql`0`
   const rows = (await sql<{ claimId: string; fiscalYearId: string; recovered: string; applied: string }>`
     WITH source AS (
       SELECT debt.id::text AS "receivableId", MIN(claim.id)::text AS "claimId",

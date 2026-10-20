@@ -4,7 +4,7 @@ export type ApprovalLookupBehalfType = {
   id: string
   egcs_ay_name_en: string
   egcs_ay_name_fr: string
-  egcs_ay_require_actual: boolean
+  egcs_ay_requireactual: boolean
 }
 
 export type ApprovalCertificationItem = {

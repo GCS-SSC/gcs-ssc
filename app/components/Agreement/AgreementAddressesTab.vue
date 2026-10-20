@@ -72,7 +72,7 @@ const bilingualColumns: BilingualColumnConfig<{ id: string } & Record<string, un
 ]
 
 type NumericAddressField =
-  | 'egcs_cn_gc_addressid'
+  | 'egcs_cn_gcaddressid'
   | 'egcs_cn_federalridingid'
   | 'egcs_cn_mainphone'
   | 'egcs_cn_mainphoneextension'
@@ -107,7 +107,7 @@ const getNumericFieldModelValue = (state: FundingCaseAgreementAddressForm, key: 
  * @param value - Exact input text.
  */
 const updateNumericFieldValue = (state: FundingCaseAgreementAddressForm, key: NumericAddressField, value: string) => {
-  if (key === 'egcs_cn_gc_addressid') {
+  if (key === 'egcs_cn_gcaddressid') {
     state[key] = value === '' ? undefined : value
   } else if (key === 'egcs_cn_mainphone') {
     state[key] = value
@@ -187,8 +187,8 @@ const getAddressTypeLookupUrl = (state: FundingCaseAgreementAddressForm) => {
           :model-value="String((state as FundingCaseAgreementAddressForm).egcs_cn_addresssubdivision ?? '')"
           @update:model-value="value => (state as FundingCaseAgreementAddressForm).egcs_cn_addresssubdivision = value" />
       </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_gc_addressid')" name="egcs_cn_gc_addressid">
-        <UInput :model-value="getNumericFieldModelValue(state as FundingCaseAgreementAddressForm, 'egcs_cn_gc_addressid')" type="text" inputmode="numeric" @update:model-value="value => updateNumericFieldValue(state as FundingCaseAgreementAddressForm, 'egcs_cn_gc_addressid', value)" />
+      <UFormField :label="t('admin_common.fields.egcs_cn_gcaddressid')" name="egcs_cn_gcaddressid">
+        <UInput :model-value="getNumericFieldModelValue(state as FundingCaseAgreementAddressForm, 'egcs_cn_gcaddressid')" type="text" inputmode="numeric" @update:model-value="value => updateNumericFieldValue(state as FundingCaseAgreementAddressForm, 'egcs_cn_gcaddressid', value)" />
       </UFormField>
       <UFormField :label="t('admin_common.fields.egcs_cn_federalridingid')" name="egcs_cn_federalridingid">
         <UInput :model-value="getNumericFieldModelValue(state as FundingCaseAgreementAddressForm, 'egcs_cn_federalridingid')" type="number" @update:model-value="value => updateNumericFieldValue(state as FundingCaseAgreementAddressForm, 'egcs_cn_federalridingid', value)" />

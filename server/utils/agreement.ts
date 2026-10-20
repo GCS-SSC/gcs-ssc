@@ -586,7 +586,7 @@ export const resolveAgreementPageMutationPermissions = async (
   if (items.length === 0) return new Map()
   const ids = [...new Set(items.map(item => item.agreementId))]
   const assignments = await db.selectFrom('user')
-    .innerJoin('Common_User', 'Common_User.egcs_cn_auth_user_id', 'user.id')
+    .innerJoin('Common_User', 'Common_User.egcs_cn_authuserid', 'user.id')
     .innerJoin('Common_Entity_Assignment', 'Common_Entity_Assignment.egcs_cn_user', 'Common_User.id')
     .innerJoin('Common_Entity', join => join
       .onRef('Common_Entity.id', '=', 'Common_Entity_Assignment.egcs_cn_entityid')

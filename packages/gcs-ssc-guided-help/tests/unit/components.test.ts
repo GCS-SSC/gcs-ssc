@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest'
-import { nextTick } from 'vue'
+import { h, nextTick } from 'vue'
 import type { GuideDraft } from '../../src/contracts'
 import { mount } from '@vue/test-utils'
 import GuidedHelpEditor from '../../src/components/GuidedHelpEditor.vue'
@@ -15,6 +15,15 @@ afterEach(() => {
   document.body.innerHTML = ''
 })
 describe('guide public components', () => {
+  it('mounts and removes guidance without becoming a sibling in the host layout', async () => {
+    const host = mount({ render: () => h('div', [h('main', 'Workspace'), h(GuidedHelpPanel, { document: guide, locale: 'en', currentView: 'other' })]) }, { attachTo: document.body })
+    try {
+      await nextTick()
+      expect(document.querySelector('.driver-popover')).not.toBeNull()
+      expect(host.element.lastElementChild?.tagName).toBe('MAIN')
+    } finally { host.unmount() }
+    expect(document.querySelector('.driver-popover')).toBeNull()
+  })
   it('allows manual step selection and switches language without losing position', async () => {
     const panel = mount(GuidedHelpPanel, { props: { document: guide, locale: 'en', currentView: 'other' } })
     await nextTick()

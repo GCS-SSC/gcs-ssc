@@ -18,7 +18,7 @@ export class ApprovalItemAuthorizationRepository {
   ): Promise<ApprovalItemGrant | null> {
     const row = await this.db
       .selectFrom('user')
-      .innerJoin('Common_User', 'Common_User.egcs_cn_auth_user_id', 'user.id')
+      .innerJoin('Common_User', 'Common_User.egcs_cn_authuserid', 'user.id')
       .innerJoin('Common_Approval', join => join.on(eb => eb.or([
         eb('Common_Approval.egcs_cn_assigneduser', '=', eb.ref('Common_User.id')),
         eb.and([

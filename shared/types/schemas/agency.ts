@@ -59,7 +59,7 @@ const AgencyLabelSchema = (requiredKey: string) => z.string({ error: requiredKey
 
 // --- Agency Profile ---
 export const AgencyProfileSchema = z.object({
-  egcs_ay_gwcoa_number: AgencyGwcoaIdSchema,
+  egcs_ay_gwcoanumber: AgencyGwcoaIdSchema,
   egcs_ay_agencyfinancialsystemid: AgencyRequiredIdSchema,
   egcs_ay_name_en: AgencyLabelSchema('validation.name_en_required'),
   egcs_ay_name_fr: AgencyLabelSchema('validation.name_fr_required'),
@@ -283,7 +283,7 @@ export const AgencyApplicantRecipientSubtypeInitial: AgencyApplicantRecipientSub
 export const AgencyApprovalBehalfTypeSchema = z.object({
   egcs_ay_name_en: AgencyLabelSchema('validation.name_en_required'),
   egcs_ay_name_fr: AgencyLabelSchema('validation.name_fr_required'),
-  egcs_ay_require_actual: z.boolean().default(false)
+  egcs_ay_requireactual: z.boolean().default(false)
 })
 export type AgencyApprovalBehalfType = z.infer<typeof AgencyApprovalBehalfTypeSchema>
 export type AgencyApprovalBehalfTypeItem = WithId<AgencyApprovalBehalfType>
@@ -292,7 +292,7 @@ export const AgencyApprovalBehalfTypeInitial: AgencyApprovalBehalfTypeItem = {
   id: '',
   egcs_ay_name_en: '',
   egcs_ay_name_fr: '',
-  egcs_ay_require_actual: false
+  egcs_ay_requireactual: false
 }
 
 // --- Agreement Type ---

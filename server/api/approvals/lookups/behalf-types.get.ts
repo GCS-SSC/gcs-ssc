@@ -42,7 +42,7 @@ export default defineEventHandler(async event => {
       id: String(item.id),
       egcs_ay_name_en: item.egcs_ay_name_en,
       egcs_ay_name_fr: item.egcs_ay_name_fr,
-      egcs_ay_require_actual: item.egcs_ay_require_actual
+      egcs_ay_requireactual: item.egcs_ay_requireactual
     })),
     total: result.total,
     stats: {

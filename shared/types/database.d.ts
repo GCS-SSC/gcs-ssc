@@ -403,7 +403,7 @@ export interface HostManagedExtensionsDatabase {
 
 /** Extension tables referenced by demo seeding; ownership is declared by the extension SDK. */
 export interface ExtensionsDatabase extends HostManagedExtensionsDatabase {
-  'extensions.gcs_gcforms_credentials': ExtensionsGcsGcFormsCredentialTable
+  'extensions.gcs_gcforms_integration_credentials': ExtensionsGcsGcFormsCredentialTable
 }
 
 export interface AuditDatabase {
@@ -488,8 +488,6 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Funding_Case_Account_Receivable_Offset_Memo: FundingCaseAccountReceivableOffsetMemoTable
   Funding_Case_Account_Receivable_Offset_Memo_Line: FundingCaseAccountReceivableOffsetMemoLineTable
   Funding_Case_Account_Receivable_Offset_Memo_Application: FundingCaseAccountReceivableOffsetMemoApplicationTable
-  Funding_Case_Account_Receivable_Allocation: FundingCaseAccountReceivableAllocationTable
-  Funding_Case_Account_Receivable_Posting: FundingCaseAccountReceivablePostingTable
   Funding_Case_Agreement_Correction: FundingCaseAgreementCorrectionTable
   Funding_Case_Agreement_Correction_Line: FundingCaseAgreementCorrectionLineTable
   Funding_Case_Agreement_Correction_Source: FundingCaseAgreementCorrectionSourceTable
@@ -778,7 +776,7 @@ export interface SecurityAuditEventTable extends AuditAttributionColumns {
 
 export interface AgencyProfileTable {
   id: Generated<string>
-  egcs_ay_gwcoa_number: number
+  egcs_ay_gwcoanumber: number
   egcs_ay_agencyfinancialsystemid: string
   egcs_ay_name_en: string
   egcs_ay_name_fr: string
@@ -931,7 +929,7 @@ export interface AgencyApprovalBehalfTypeTable {
   egcs_ay_organizationagency: string
   egcs_ay_name_en: string
   egcs_ay_name_fr: string
-  egcs_ay_require_actual: boolean
+  egcs_ay_requireactual: boolean
   _deleted: Generated<boolean>
 }
 
@@ -1156,7 +1154,7 @@ export interface CommonAddressTable {
   egcs_cn_addresscity: string
   egcs_cn_addresscountry: Countries
   egcs_cn_addresssubdivision: string
-  egcs_cn_gc_addressid?: ColumnType<string, string | number, string | number>
+  egcs_cn_gcaddressid?: ColumnType<string, string | number, string | number>
   egcs_cn_latitude?: number
   egcs_cn_longitude?: number
   egcs_cn_mainphone: ColumnType<string, string | number, string | number>
@@ -1314,14 +1312,14 @@ export interface CommonAssessmentCustomOutcomeTable {
 
 export interface CommonUserTable {
   id: Generated<string>
-  egcs_cn_auth_user_id: string
+  egcs_cn_authuserid: string
   egcs_cn_name: string
-  egcs_cn_position_title: string
+  egcs_cn_positiontitle: string
   egcs_cn_email: string
-  egcs_cn_email_verified: boolean
+  egcs_cn_emailverified: boolean
   egcs_cn_image?: string
-  egcs_cn_created_at: Date
-  egcs_cn_updated_at: Date
+  egcs_cn_createdat: Date
+  egcs_cn_updatedat: Date
   _deleted: Generated<boolean>
 }
 
@@ -2785,7 +2783,6 @@ export interface FundingCaseAccountReceivableCreditMemoTable {
   egcs_fc_totalamount: Generated<number>
   id: Generated<string>
   egcs_fc_receivable: string
-  egcs_fc_ledgerkind: Generated<'legacy' | 'pool'>
   egcs_fc_agency: string
   egcs_fc_pool: string
   egcs_fc_applicantrecipient: string
@@ -2893,53 +2890,21 @@ export interface FundingCaseAccountReceivableOffsetMemoLineTable {
 export interface FundingCaseAccountReceivableOffsetMemoApplicationTable {
   id: Generated<string>
   egcs_fc_offsetmemo: string
-  egcs_fc_allocation: string | null
-  egcs_fc_recovery: string | null
-  egcs_fc_amount: number | null
+  egcs_fc_recovery: string
+  egcs_fc_amount: number
   _deleted: Generated<boolean>
 }
 
 export interface FundingCaseAccountReceivableRecoveryTable {
   id: Generated<string>
   egcs_fc_pool: string
-  egcs_fc_payment: string | null
-  egcs_fc_creditmemo: string | null
-  egcs_fc_ledgerkind: Generated<'legacy' | 'pool'>
+  egcs_fc_payment: string
   egcs_fc_amount: number
   egcs_fc_outcome: Generated<'open' | 'posted' | 'released'>
   egcs_fc_createdat: Generated<Date>
   egcs_fc_postedat: Date | null
   egcs_fc_postingruntime: string | null
   egcs_fc_releasedat: Date | null
-  _deleted: Generated<boolean>
-}
-
-export interface FundingCaseAccountReceivableAllocationTable {
-  id: Generated<string>
-  egcs_fc_recovery: string
-  egcs_fc_receivable: string
-  egcs_fc_receivableline: string
-  egcs_fc_fundingagreement: string
-  egcs_fc_amount: number
-  _deleted: Generated<boolean>
-}
-
-export interface FundingCaseAccountReceivablePostingTable {
-  egcs_fc_accountreceivablechartofaccount: string
-  egcs_fc_accountreceivableaccountingdimensions: JsonValue
-  id: Generated<string>
-  egcs_fc_recovery: string
-  egcs_fc_allocation: string
-  egcs_fc_coding: string
-  egcs_fc_receivable: string
-  egcs_fc_fundingagreement: string
-  egcs_fc_commitmentline: string
-  egcs_fc_chartofaccount: string
-  egcs_fc_agencychartofaccount: string
-  egcs_fc_agencyfiscalyear: string
-  egcs_fc_periodstart: number
-  egcs_fc_periodend: number
-  egcs_fc_amount: number
   _deleted: Generated<boolean>
 }
 

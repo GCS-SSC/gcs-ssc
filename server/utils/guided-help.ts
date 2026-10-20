@@ -38,7 +38,7 @@ const transaction = async <T>(event: H3Event, owner: Owner, action: Action, work
     const auth = await requireFreshAuthContext(event, db, { lockRoleIds })
     if (owner.agencyId !== null) await ensureAgency(event, db, owner.agencyId, true)
     await authorizeWithFreshAuthContext(event, auth, 'guided_help', action, scope(owner))
-    const actor = await db.selectFrom('Common_User').select('id').where('egcs_cn_auth_user_id', '=', auth.userId).where('_deleted', '=', false).executeTakeFirst()
+    const actor = await db.selectFrom('Common_User').select('id').where('egcs_cn_authuserid', '=', auth.userId).where('_deleted', '=', false).executeTakeFirst()
     if (!actor) return fail(event, 'forbidden', 403)
     return withAuditExecution(owner.agencyId === null ? { type: 'global' } : { type: 'agency', agencyId: owner.agencyId }, () => work(db, String(actor.id)))
   }).catch((error: unknown) => {

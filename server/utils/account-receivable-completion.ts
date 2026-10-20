@@ -11,7 +11,6 @@ import { resolveCompletionRecord, resolveCompletionEvidenceId, emitCompletionHoo
 import { resolveBusinessStatusProtection } from './business-status-runtime'
 import { resolveReviewRuntimeEntityFromEntity } from './review-runtime-access'
 import { createCompletionTransition, resolveActiveWorkflowSetup } from './workflow-runtime'
-import { validateAccountReceivableRecovery } from './account-receivable-recovery'
 import { resolveAssignmentCommonUserId } from './entity-assignment'
 import { forbidden } from './api-errors'
 
@@ -44,21 +43,11 @@ const executeCompletion = async (event: H3Event, input: CompletionExecuteInput, 
         return await accountReceivableError(event, error instanceof Error ? error.message : 'AR_INVALID_BASIS')
       }
     } else {
-      const memo = await assertAccountReceivableCreditMemoEditable(event, trx, id)
-      if (memo.egcs_fc_ledgerkind === 'pool') {
-        try {
-          await validateAccountReceivableCreditMemoLines(trx, id)
-        } catch (error) {
-          return await accountReceivableError(event, error instanceof Error ? error.message : 'AR_ACCOUNT_UNAVAILABLE')
-        }
-      }
-      if (memo.egcs_fc_ledgerkind !== 'pool') {
-        const recovery = await trx.selectFrom('Funding_Case_Account_Receivable_Recovery').select('id').where('egcs_fc_creditmemo', '=', id).where('egcs_fc_outcome', '=', 'open').where('_deleted', '=', false).executeTakeFirstOrThrow()
-        try {
-          await validateAccountReceivableRecovery(trx, String(recovery.id))
-        } catch (error) {
-          return await accountReceivableError(event, error instanceof Error ? error.message : 'AR_REPAYMENT_INVALID')
-        }
+      await assertAccountReceivableCreditMemoEditable(event, trx, id)
+      try {
+        await validateAccountReceivableCreditMemoLines(trx, id)
+      } catch (error) {
+        return await accountReceivableError(event, error instanceof Error ? error.message : 'AR_ACCOUNT_UNAVAILABLE')
       }
     }
     const runtimeContext = await resolveReviewRuntimeEntityFromEntity(trx, entityType, id)

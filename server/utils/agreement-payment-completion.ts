@@ -1,6 +1,5 @@
 import { assertAgreementPaymentCommitmentCurrent, getAgreementPaymentCommitmentViolation } from './agreement-payment-commitment-controls'
 import { assertPaymentRecoveryAllowed, withPaymentRecoveryErrors } from './payment-recovery-controls'
-import { hasAccountingTable } from './correction-schema'
 import { rebuildAccountReceivablePaymentOffset } from './account-receivable-recovery'
 /* eslint-disable jsdoc/require-jsdoc -- Temporary coverage while payment completion helpers receive complete documentation. */
 import type { H3Event } from 'h3'
@@ -53,18 +52,16 @@ export const getAgreementPaymentCompletionRuntime = async (
     const forecastViolation = item ? null : await getAgreementPaymentForecastViolation(trx, paymentId)
     const commitmentViolation = item ? false : await getAgreementPaymentCommitmentViolation(trx, paymentId)
     let recoveryBlocked = false
-    if (await hasAccountingTable(trx, 'Funding_Case_Agreement_Account_Receivable')) {
-      const payment = await getAgreementPayment(trx, context.agreementId, paymentId)
-      if (!payment) return null
-      try {
-        await assertPaymentRecoveryAllowed(event, trx, { agreementId: context.agreementId, paymentId,
-          applicantRecipientId: payment.egcs_fc_applicantrecipient === null ? null : String(payment.egcs_fc_applicantrecipient),
-          currency: payment.egcs_fc_currency })
-      } catch (error) {
-        const failure = error as { statusCode?: number; data?: { code?: string } }
-        if (failure?.statusCode !== 409 || typeof failure.data?.code !== 'string' || !failure.data.code.startsWith('AR_')) throw error
-        recoveryBlocked = true
-      }
+    const payment = await getAgreementPayment(trx, context.agreementId, paymentId)
+    if (!payment) return null
+    try {
+      await assertPaymentRecoveryAllowed(event, trx, { agreementId: context.agreementId, paymentId,
+        applicantRecipientId: payment.egcs_fc_applicantrecipient === null ? null : String(payment.egcs_fc_applicantrecipient),
+        currency: payment.egcs_fc_currency })
+    } catch (error) {
+      const failure = error as { statusCode?: number; data?: { code?: string } }
+      if (failure?.statusCode !== 409 || typeof failure.data?.code !== 'string' || !failure.data.code.startsWith('AR_')) throw error
+      recoveryBlocked = true
     }
 
     return {

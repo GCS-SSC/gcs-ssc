@@ -292,7 +292,7 @@ ALTER TABLE "Applicant_Recipient_Address" ADD CONSTRAINT "Applicant_Recipient_Ad
 
 ALTER TABLE "Applicant_Recipient_Address" ADD CONSTRAINT "Applicant_Recipient_Address_egcs_ar_applicantrecipient_fkey" FOREIGN KEY (egcs_ar_applicantrecipient) REFERENCES "Applicant_Recipient_Profile"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Applicant_Recipient_Agency_Financial_Id" ADD CONSTRAINT "Applicant_Recipient_Agency_Fina_egcs_ar_applicantrecipient_fkey" FOREIGN KEY (egcs_ar_applicantrecipient) REFERENCES "Applicant_Recipient_Profile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Applicant_Recipient_Agency_Financial_Id" ADD CONSTRAINT "ar_fk_agency_financial_id_recipient" FOREIGN KEY (egcs_ar_applicantrecipient) REFERENCES "Applicant_Recipient_Profile"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Applicant_Recipient_Agency_Financial_Id" ADD CONSTRAINT "Applicant_Recipient_Agency_Financial_Id_egcs_ar_agency_fkey" FOREIGN KEY (egcs_ar_agency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
 
@@ -300,9 +300,9 @@ ALTER TABLE "Applicant_Recipient_Contact" ADD CONSTRAINT "Applicant_Recipient_Co
 
 ALTER TABLE "Applicant_Recipient_Contact" ADD CONSTRAINT "Applicant_Recipient_Contact_egcs_ar_contact_fkey" FOREIGN KEY (egcs_ar_contact) REFERENCES "Common_Contact"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Applicant_Recipient_Funding_History_Recipient" ADD CONSTRAINT "Applicant_Recipient_Funding_His_egcs_ar_applicantrecipient_fkey" FOREIGN KEY (egcs_ar_applicantrecipient) REFERENCES "Applicant_Recipient_Profile"(id) ON DELETE RESTRICT;
+ALTER TABLE "Applicant_Recipient_Funding_History_Recipient" ADD CONSTRAINT "ar_fk_funding_history_recipient_recipient" FOREIGN KEY (egcs_ar_applicantrecipient) REFERENCES "Applicant_Recipient_Profile"(id) ON DELETE RESTRICT;
 
-ALTER TABLE "Applicant_Recipient_Funding_History_Recipient" ADD CONSTRAINT "Applicant_Recipient_Funding_History_egcs_ar_fundinghistory_fkey" FOREIGN KEY (egcs_ar_fundinghistory) REFERENCES "Applicant_Recipient_Funding_History"(id) ON DELETE RESTRICT;
+ALTER TABLE "Applicant_Recipient_Funding_History_Recipient" ADD CONSTRAINT "ar_fk_funding_history_recipient_fundinghistory" FOREIGN KEY (egcs_ar_fundinghistory) REFERENCES "Applicant_Recipient_Funding_History"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Applicant_Recipient_Note" ADD CONSTRAINT "Applicant_Recipient_Note_egcs_ar_agency_fkey" FOREIGN KEY (egcs_ar_agency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
 

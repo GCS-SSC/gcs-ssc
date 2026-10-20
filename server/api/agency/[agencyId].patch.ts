@@ -26,14 +26,14 @@ export default defineEventHandler(async event => {
   let result
   try {
     result = await withActiveAgencyMutationTransaction(event, id, async trx => {
-      if (validated.egcs_ay_gwcoa_number !== undefined) {
+      if (validated.egcs_ay_gwcoanumber !== undefined) {
         // The parent helper already holds this Agency's row lock. An unchanged
         // historical reference remains valid even after the GWCOA is retired.
         const current = await trx.selectFrom('Agency_Profile')
-          .select('egcs_ay_gwcoa_number').where('id', '=', id).executeTakeFirstOrThrow()
-        if (String(current.egcs_ay_gwcoa_number) !== validated.egcs_ay_gwcoa_number) {
+          .select('egcs_ay_gwcoanumber').where('id', '=', id).executeTakeFirstOrThrow()
+        if (String(current.egcs_ay_gwcoanumber) !== validated.egcs_ay_gwcoanumber) {
           const selected = await trx.selectFrom('Common_GWCOA').select('id')
-            .where('egcs_cn_number', '=', Number(validated.egcs_ay_gwcoa_number))
+            .where('egcs_cn_number', '=', Number(validated.egcs_ay_gwcoanumber))
             .where('_deleted', '=', false).forShare().executeTakeFirst()
           if (!selected) {
             return await badRequest(event, 'AGENCY_INVALID_GWCOA_NUMBER', 'apiErrors.agency.invalid_gwcoa_number')

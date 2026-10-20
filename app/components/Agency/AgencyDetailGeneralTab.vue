@@ -35,7 +35,7 @@ const statusLabel = computed(() => t(agency.egcs_ay_active ? 'common.active' : '
           <CommonSection :title="t('agency.detail.system_config')" badge="02">
             <CommonValueCard
               :label="t('agency.detail.gwcoa_link')"
-              :value="agency.egcs_ay_gwcoa_number"
+              :value="agency.egcs_ay_gwcoanumber"
               :sub-value="t('agency.detail.chart_of_accounts')"
               icon="i-lucide-landmark"
               variant="ghost" />
