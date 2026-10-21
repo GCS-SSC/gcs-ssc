@@ -258,10 +258,18 @@ const checkSnapshotPrerequisites = async (domain: SnapshotDomain, shouldProceed:
     const enabled = record.amendment_types.some(type => domain === 'budget'
       ? type.egcs_tp_amended === 'budget' || type.egcs_tp_amended === 'duration'
       : type.egcs_tp_amended === 'activities')
+    if (!enabled) {
+      toast.add({
+        title: toast.localized('common.warning'),
+        description: toast.localized(domain === 'activity' ? 'apiErrors.agreement.amendment_activities_not_enabled' : 'apiErrors.agreement.amendment_budget_not_enabled'),
+        color: 'warning'
+      })
+      return false
+    }
     const missing = domain === 'budget' ? record.has_budget_snapshot === false : record.has_activity_snapshot === false
     if (context.can_create_agreement_role === true && record.can_create_snapshot === true
       && definition?.isDraft === true && !definition.deleted && !definition.readOnly && !definition.terminal
-      && record.isCompleted !== true && enabled && missing) return true
+      && record.isCompleted !== true && missing) return true
   } catch {
     if (!shouldProceed()) return false
   }
