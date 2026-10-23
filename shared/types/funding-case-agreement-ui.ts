@@ -165,11 +165,14 @@ export interface FundingCaseAgreementBudgetLineItemRow extends Omit<FundingCaseA
   organization_cost_category_name_fr?: string | null
   line_item_name_en?: string | null
   line_item_name_fr?: string | null
+  applicant_recipient_name_en?: string | null
+  applicant_recipient_name_fr?: string | null
 }
 
 export interface FundingCaseAgreementBudgetOverviewRow {
   fiscalYears: FundingCaseAgreementBudgetFiscalYearRow[]
   lineItems: FundingCaseAgreementBudgetLineItemRow[]
+  proponents: Array<{ id: string, label_en: string, label_fr: string }>
   budget_differences?: FundingCaseAgreementBudgetDifference[]
 }
 

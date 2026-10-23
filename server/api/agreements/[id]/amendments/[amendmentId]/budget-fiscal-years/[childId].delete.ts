@@ -1,3 +1,4 @@
+import { assertAgreementBudgetFinancialLimits } from '~~/server/utils/agreement-budget-financial-limits'
 import { hasAgreementFiscalYearForecastHistory } from '~~/server/utils/agreement-forecast-versions'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
@@ -16,7 +17,7 @@ export default defineEventHandler(async event => {
   })
   if (!context) return await badRequest(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
 
-  return await executeFreshAuthorizedAgreementWrite(event, db, agreementId, context, async trx => {
+  return await executeFreshAuthorizedAgreementWrite(event, db, agreementId, context, async (trx, currentContext) => {
     const amendment = await assertDraftAgreementAmendmentCapability(event, trx, agreementId, amendmentId, ['budget', 'duration'])
     if (!('id' in amendment)) return amendment
     const versionId = await resolveDraftAgreementAmendmentBudgetVersion(event, trx, agreementId, amendmentId)
@@ -57,6 +58,7 @@ export default defineEventHandler(async event => {
     await trx.updateTable('Funding_Case_Agreement_Budget_Line_Item').set({ _deleted: true })
       .where('egcs_fc_fundingagreementbudgetfiscalyear', '=', String(row.id)).where('_deleted', '=', false).execute()
     await trx.updateTable('Funding_Case_Agreement_Budget_Fiscal_Year').set({ _deleted: true }).where('id', '=', String(row.id)).where('egcs_fc_budgetversion', '=', versionId).execute()
+    await assertAgreementBudgetFinancialLimits(trx, { agreementId, versionId, streamId: currentContext.streamId })
     return { success: true }
   }, {
     action: 'delete',

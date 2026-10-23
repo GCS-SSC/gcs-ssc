@@ -2,6 +2,7 @@
 import type { H3Event } from 'h3'
 import { sql, type Kysely, type Transaction } from 'kysely'
 import { agreementForecastYearsRetained } from './agreement-forecast-versions'
+import { assertAgreementBudgetFinancialLimits } from './agreement-budget-financial-limits'
 import { assertAgreementCurrentBudgetUsage } from './agreement-financial-budget-controls'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import { agreementBudgetFiscalYearsOverlapDuration } from '~~/server/utils/agreement-fiscal-year-duration'
@@ -318,7 +319,7 @@ const cloneBudgetVersionRows = async (
     const lines = await trx
       .selectFrom('Funding_Case_Agreement_Budget_Line_Item')
       .select([
-        'id', 'egcs_fc_originalbudgetlineitem', 'egcs_fc_organizationcostcategory',
+        'id', 'egcs_fc_originalbudgetlineitem', 'egcs_fc_organizationcostcategory', 'egcs_fc_applicantrecipient',
         'egcs_fc_costsubsection', 'egcs_fc_description',
         'egcs_fc_calculationmode', 'egcs_fc_sourcecategory', 'egcs_fc_percentage', 'egcs_fc_allowpercentageoverride',
         databaseMoneyText(sql.ref('egcs_fc_totalamount')).as('egcs_fc_totalamount'),
@@ -335,6 +336,7 @@ const cloneBudgetVersionRows = async (
         egcs_fc_fundingagreement: agreementId,
         egcs_fc_fundingagreementbudgetfiscalyear: String(clonedYear.id),
         egcs_fc_originalbudgetlineitem: line.egcs_fc_originalbudgetlineitem ?? line.id,
+        egcs_fc_applicantrecipient: line.egcs_fc_applicantrecipient,
         egcs_fc_organizationcostcategory: line.egcs_fc_organizationcostcategory,
         egcs_fc_calculationmode: line.egcs_fc_calculationmode,
         egcs_fc_sourcecategory: line.egcs_fc_sourcecategory,
@@ -439,6 +441,7 @@ export const promoteApprovedAgreementAmendment = async (
   if (approvedDomains) budgetSnapshotQuery = budgetSnapshotQuery.where('id', '=', approvedDomains.budgetVersionId ?? '-1')
   const budgetSnapshot = await budgetSnapshotQuery.executeTakeFirst()
   if (approvedDomains?.budgetVersionId && !budgetSnapshot) return false
+  if (budgetSnapshot) await assertAgreementBudgetFinancialLimits(trx, { agreementId: context.agreementId, versionId: String(budgetSnapshot.id), streamId: context.streamId })
   if (budgetSnapshot && !await agreementForecastYearsRetained(trx, context.agreementId, String(budgetSnapshot.id))) return false
 
   if (

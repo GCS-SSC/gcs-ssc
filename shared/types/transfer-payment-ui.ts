@@ -54,7 +54,7 @@ export interface TransferPaymentFinancialLimitsRow extends Omit<TransferPaymentF
 }
 
 export type TransferPaymentFinancialLimitsForm = Partial<
-  Omit<TransferPaymentFinancialLimitsItem, 'egcs_tp_maxallowableperrecipient'> & {
+  Omit<TransferPaymentFinancialLimitsItem, 'egcs_tp_maxallowableperrecipient' | 'egcs_tp_maxpercentofretroactivecostsallowable'> & {
     egcs_tp_maxallowableperrecipient: string
   }
 >

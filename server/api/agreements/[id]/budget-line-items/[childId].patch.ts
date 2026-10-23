@@ -1,3 +1,4 @@
+import { resolveAgreementBudgetProponent } from '~~/server/utils/agreement-budget-proponent'
 import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { fetchAgreementBudgetCostCategory } from '~~/server/utils/cost-configuration-integrity'
 import { prepareBudgetCalculation, recalculateAgreementBudget } from '~~/server/utils/agreement-budget-calculation'
@@ -95,6 +96,7 @@ const getExistingBudgetLineItem = async (
     .select([
       'Funding_Case_Agreement_Budget_Line_Item.id as id',
       budgetLineItemStableId.as('egcs_fc_budgetlineitemidentity'),
+      'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_applicantrecipient',
       'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_organizationcostcategory',
       'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreementbudgetfiscalyear as egcs_fc_fundingagreementbudgetfiscalyear',
       budgetFiscalYearStableId.as('egcs_fc_budgetfiscalyearidentity'),
@@ -189,6 +191,7 @@ const fetchBudgetLineItemResponse = async (
     'Funding_Case_Agreement_Budget_Fiscal_Year.id',
     'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreementbudgetfiscalyear'
   )
+  .innerJoin('Applicant_Recipient_Profile', 'Applicant_Recipient_Profile.id', 'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_applicantrecipient')
   .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fiscalyear')
   .innerJoin(
     'Transfer_Payment_Stream_Cost_Category_Line_Item',
@@ -206,6 +209,9 @@ const fetchBudgetLineItemResponse = async (
     'Funding_Case_Agreement_Budget_Line_Item.id as row_id',
     budgetFiscalYearStableId.as('egcs_fc_fundingagreementbudgetfiscalyear'),
     'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_organizationcostcategory as egcs_fc_organizationcostcategory',
+    'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_applicantrecipient',
+    sql<string>`COALESCE("Applicant_Recipient_Profile".egcs_ar_legalname_en, "Applicant_Recipient_Profile".egcs_ar_operatingname_en, "Applicant_Recipient_Profile".id::text)`.as('applicant_recipient_name_en'),
+    sql<string>`COALESCE("Applicant_Recipient_Profile".egcs_ar_legalname_fr, "Applicant_Recipient_Profile".egcs_ar_operatingname_fr, "Applicant_Recipient_Profile".id::text)`.as('applicant_recipient_name_fr'),
     'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_calculationmode',
     'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_sourcecategory',
     'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_percentage',
@@ -280,7 +286,7 @@ const assertClaimLinkedBudgetLineCanMove = async (
 
 const resolveBudgetLinePatchInput = async (
   event: H3Event,
-  db: AgreementBudgetLineDb,
+  db: Transaction<Database>,
   agreementId: string,
   childId: string,
   streamId: string
@@ -291,6 +297,7 @@ const resolveBudgetLinePatchInput = async (
   }
 
   const patchValues = await readValidatedBodyI18n(event, FundingCaseAgreementBudgetLineItemPatchSchema)
+  patchValues.egcs_fc_applicantrecipient = await resolveAgreementBudgetProponent(event, db, { agreementId, proponentId: patchValues.egcs_fc_applicantrecipient, savedProponentId: existing.egcs_fc_applicantrecipient })
   if (patchValues.egcs_fc_currency !== undefined) await assertAgreementCurrency(event, db, agreementId, patchValues.egcs_fc_currency)
   const referenceGuard = await assertBudgetLinePatchReferences(event, db, agreementId, streamId, patchValues, String(existing.egcs_fc_organizationcostcategory))
   if ('response' in referenceGuard) {

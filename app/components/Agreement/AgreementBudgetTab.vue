@@ -2,6 +2,7 @@
 import { withFormRequirements } from '~~/shared/utils/form-requirements'
 import type { Currency_Codes } from '~~/shared/types/database'
 import { useBudgetCalculationPreview } from '~/composables/useBudgetCalculationPreview'
+import { useBilingualValue } from '~/composables/useBilingualValue'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 /* eslint-disable jsdoc/require-jsdoc -- Budget table callbacks are exercised by focused component tests. */
 import { computed, onUnmounted, ref, watch } from 'vue'
@@ -60,6 +61,8 @@ type BudgetLeafRow = {
   lineItemId?: string
   lineItemNameEn: string
   lineItemNameFr: string
+  proponentNameEn?: string | null
+  proponentNameFr?: string | null
   description: string
   totalAmount?: Money
   programFunding?: Money
@@ -88,6 +91,7 @@ const {
   actionTarget,
   fiscalYearLookupUrl,
   snapshotOverview,
+  agreementProponentCount,
   staticMode = false,
   embedded = false
 } = defineProps<{
@@ -104,11 +108,13 @@ const {
   apiBase?: string
   fiscalYearLookupUrl?: string
   snapshotOverview?: FundingCaseAgreementBudgetOverviewRow
+  agreementProponentCount?: number
   staticMode?: boolean
   embedded?: boolean
 }>()
 
 const { t, locale } = useI18n()
+const { getBilingualValue } = useBilingualValue()
 const { getGroupedDisclosureControlsId, getGroupedDisclosureContentId } = useGroupedDisclosureIds()
 const toast = useLocalizedToast()
 const { createValidator } = useZodI18n()
@@ -131,6 +137,7 @@ const fiscalYearModal = useCrudModal<FundingCaseAgreementBudgetFiscalYearRow, Fu
 const lineItemModal = useCrudModal<FundingCaseAgreementBudgetLineItemRow, FundingCaseAgreementBudgetLineItemForm>({
   createState: () => ({
     egcs_fc_currency: agreementCurrency,
+    egcs_fc_applicantrecipient: proponents.value.length === 1 ? proponents.value[0]?.id : undefined,
     egcs_fc_fundingsources: []
   }),
   updateState: lineItem => ({
@@ -162,6 +169,9 @@ const validateLineItem = withFormRequirements(async (state: FundingCaseAgreement
   } as Parameters<typeof lineItemValidator>[0])
   if (isManual && state.egcs_fc_programfunding === undefined) {
     errors.push({ name: 'egcs_fc_programfunding', message: t('validation.required') })
+  }
+  if (!state.egcs_fc_applicantrecipient && !errors.some(error => error.name === 'egcs_fc_applicantrecipient')) {
+    errors.push({ name: 'egcs_fc_applicantrecipient', message: t('validation.required') })
   }
   return errors
 }, FundingCaseAgreementBudgetLineItemCreateSchema)
@@ -252,6 +262,28 @@ const bilingualColumns: BilingualColumnConfig<BudgetLeafRow>[] = [
 
 const fiscalYears = computed<FundingCaseAgreementBudgetFiscalYearRow[]>(() => overview.value?.fiscalYears ?? [])
 const lineItems = computed<FundingCaseAgreementBudgetLineItemRow[]>(() => overview.value?.lineItems ?? [])
+const proponents = computed(() => overview.value?.proponents ?? [])
+const hasMultipleProponents = computed(() => (agreementProponentCount ?? proponents.value.length) > 1)
+const isSoleProponentSelected = computed(() => proponents.value.length === 1
+  && selectedLineItem.value?.egcs_fc_applicantrecipient === proponents.value[0]?.id)
+const proponentOptions = computed(() => {
+  const current = selectedLineItem.value
+  const saved = current?.id ? lineItems.value.find(item => item.id === current.id) : undefined
+  if (!saved || current?.egcs_fc_applicantrecipient !== saved.egcs_fc_applicantrecipient
+    || proponents.value.some(item => item.id === saved.egcs_fc_applicantrecipient)) return proponents.value
+  return [...proponents.value, {
+    id: saved.egcs_fc_applicantrecipient,
+    label_en: saved.applicant_recipient_name_en,
+    label_fr: saved.applicant_recipient_name_fr,
+    disabled: true
+  }]
+})
+watch(proponents, items => {
+  if (items.length === 1 && selectedLineItem.value && !selectedLineItem.value.id
+    && selectedLineItem.value.egcs_fc_applicantrecipient === undefined) {
+    selectedLineItem.value.egcs_fc_applicantrecipient = items[0]?.id
+  }
+})
 // Saved labels keep inactive references readable without adding them to new-line lookups.
 const retainedCostCategoryOptions = computed(() => {
   const current = selectedLineItem.value
@@ -324,6 +356,8 @@ const filteredLineItems = computed(() => {
       lineItem.egcs_fc_costsubsection,
       lineItem.line_item_name_en,
       lineItem.line_item_name_fr,
+      lineItem.applicant_recipient_name_en,
+      lineItem.applicant_recipient_name_fr,
       lineItem.egcs_fc_description
     ]
 
@@ -394,6 +428,8 @@ const tableRows = computed<BudgetLeafRow[]>(() => filteredFiscalYears.value.flat
     lineItemId: lineItem.id,
     lineItemNameEn: lineItem.line_item_name_en ?? '',
     lineItemNameFr: lineItem.line_item_name_fr ?? '',
+    proponentNameEn: lineItem.applicant_recipient_name_en,
+    proponentNameFr: lineItem.applicant_recipient_name_fr,
     description: lineItem.egcs_fc_description,
     totalAmount: lineItem.egcs_fc_totalamount,
     programFunding: lineItem.egcs_fc_programfunding,
@@ -818,16 +854,19 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
           </div>
 
           <div v-else class="flex min-w-0 max-w-full flex-col gap-1 pl-16">
-            <CommonBilingualName
-              :name-en="row.original.lineItemNameEn"
-              :name-fr="row.original.lineItemNameFr" />
+            <p :lang="locale" class="leading-tight font-bold text-zinc-900 dark:text-white">
+              {{ getBilingualValue({ name_en: row.original.lineItemNameEn, name_fr: row.original.lineItemNameFr }, 'name', '') }}
+            </p>
+            <p class="min-w-0 max-w-full whitespace-normal break-words text-sm text-zinc-500 dark:text-zinc-400">
+              {{ row.original.description }}
+            </p>
+            <p v-if="hasMultipleProponents && (row.original.proponentNameEn || row.original.proponentNameFr)" :lang="locale" class="text-xs text-muted">
+              {{ getBilingualValue({ name_en: row.original.proponentNameEn, name_fr: row.original.proponentNameFr }, 'name', '') }}
+            </p>
             <p v-if="getLineItemById(row.original.id)?.egcs_fc_calculationmode && getLineItemById(row.original.id)?.egcs_fc_calculationmode !== 'manual'" class="text-xs text-muted">
               {{ t(`budget_calculation.${getLineItemById(row.original.id)?.egcs_fc_calculationmode}`) }}
               {{ getLineItemById(row.original.id)?.egcs_fc_percentage }}{{ t('budget_calculation.percent_symbol') }}
               {{ locale === 'fr' ? getLineItemById(row.original.id)?.calculation_source_name_fr : getLineItemById(row.original.id)?.calculation_source_name_en }}
-            </p>
-            <p class="min-w-0 max-w-full whitespace-normal break-words text-sm text-zinc-500 dark:text-zinc-400">
-              {{ row.original.description }}
             </p>
           </div>
         </div>
@@ -1027,6 +1066,20 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
                 value-key="id"
                 label-en-key="label_en"
                 label-fr-key="label_fr"
+                searchable />
+            </UFormField>
+
+            <UFormField
+              :label="t('agreement.budget.proponent')"
+              name="egcs_fc_applicantrecipient"
+              required>
+              <CommonBilingualSelectMenu
+                v-model="selectedLineItem.egcs_fc_applicantrecipient"
+                :items="proponentOptions"
+                value-key="id"
+                label-en-key="label_en"
+                label-fr-key="label_fr"
+                :disabled="isSoleProponentSelected"
                 searchable />
             </UFormField>
 

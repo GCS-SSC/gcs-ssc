@@ -43,6 +43,7 @@ export default defineEventHandler(async event => {
         .values({
           ...validated,
           egcs_tp_maxallowableperrecipient: databaseMoneyValue(validated.egcs_tp_maxallowableperrecipient),
+          egcs_tp_maxpercentofretroactivecostsallowable: 0,
           _deleted: false
         }).returning([
           'id', 'egcs_tp_transferpaymentstream',

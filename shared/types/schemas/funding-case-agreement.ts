@@ -411,12 +411,13 @@ export const FundingCaseAgreementLineFundingAmountSchema = z.object({
 export type FundingCaseAgreementLineFundingAmount = z.infer<typeof FundingCaseAgreementLineFundingAmountSchema>
 
 export const FundingCaseAgreementBudgetLineItemBaseSchema = z.object({
+  egcs_fc_applicantrecipient: RequiredBigintSelectionId().optional(),
   egcs_fc_fundingagreementbudgetfiscalyear: RequiredBigintSelectionId(),
   egcs_fc_organizationcostcategory: RequiredBigintSelectionId(),
   egcs_fc_costsubsection: RequiredString().max(255, { error: 'validation.max_length' }),
   egcs_fc_description: RequiredString(),
-  egcs_fc_totalamount: MoneySchema,
-  egcs_fc_programfunding: MoneySchema.optional(),
+  egcs_fc_totalamount: NonNegativeMoneySchema,
+  egcs_fc_programfunding: NonNegativeMoneySchema.optional(),
   egcs_fc_percentage: BudgetPercentageSchema.optional(),
   egcs_fc_fundingsources: z.array(FundingCaseAgreementFundingSourceSchema).optional(),
   egcs_fc_currency: z.enum(CURRENCY_CODES_ENUM, { error: 'validation.required' })
@@ -441,7 +442,9 @@ export const FundingCaseAgreementBudgetLineItemPatchSchema = FundingCaseAgreemen
 
 export type FundingCaseAgreementBudgetLineItem = z.infer<typeof FundingCaseAgreementBudgetLineItemCreateSchema>
 export type FundingCaseAgreementBudgetLineItemPatch = z.infer<typeof FundingCaseAgreementBudgetLineItemPatchSchema>
-export type FundingCaseAgreementBudgetLineItemItem = WithId<FundingCaseAgreementBudgetLineItem>
+export type FundingCaseAgreementBudgetLineItemItem = WithId<Omit<FundingCaseAgreementBudgetLineItem, 'egcs_fc_applicantrecipient'> & {
+  egcs_fc_applicantrecipient: string
+}>
 
 const RequiredIntegerInRange = (min: number, max: number) => RequiredNumberInput()
   .refine(value => Number.isInteger(value), { error: 'validation.invalid_number' })

@@ -16,7 +16,7 @@ export default defineEventHandler(async event => {
   })
   if (!context) return await badRequest(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
 
-  return await executeFreshAuthorizedAgreementWrite(event, db, agreementId, context, async trx => {
+  return await executeFreshAuthorizedAgreementWrite(event, db, agreementId, context, async (trx, currentContext) => {
     const amendment = await assertDraftAgreementAmendmentCapability(event, trx, agreementId, amendmentId, ['budget'])
     if (!('id' in amendment)) return amendment
     const versionId = await resolveDraftAgreementAmendmentBudgetVersion(event, trx, agreementId, amendmentId)
@@ -38,7 +38,7 @@ export default defineEventHandler(async event => {
       .executeTakeFirst()
     if (activeClaimLine) return await badRequest(event, 'AGREEMENT_BUDGET_LINE_ITEM_CLAIM_IN_USE', 'apiErrors.agreement.budget_line_item_claim_in_use')
     await trx.updateTable('Funding_Case_Agreement_Budget_Line_Item').set({ _deleted: true }).where('id', '=', String(existing.id)).where('_deleted', '=', false).execute()
-    await recalculateAgreementBudget(event, trx, String(existing.id), context.streamId)
+    await recalculateAgreementBudget(event, trx, String(existing.id), currentContext.streamId)
     return { success: true }
   }, {
     action: 'delete',

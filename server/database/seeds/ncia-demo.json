@@ -3106,6 +3106,16 @@
       "id": 206,
       "_deleted": false,
       "egcs_cn_entitytype": "fundingcaseaccountreceivablecreditmemo"
+    },
+    {
+      "id": 207,
+      "egcs_cn_entitytype": "fundingopportunity",
+      "_deleted": false
+    },
+    {
+      "id": 208,
+      "egcs_cn_entitytype": "fundingcaseintake",
+      "_deleted": false
     }
   ],
   "Common_Entity_Assignment": [
@@ -3988,6 +3998,16 @@
       "egcs_cn_createdby": 1,
       "egcs_cn_isprimary": true,
       "egcs_cn_entitytype": "fundingcaseaccountreceivablecreditmemo"
+    },
+    {
+      "id": 186,
+      "egcs_cn_entityid": 208,
+      "egcs_cn_entitytype": "fundingcaseintake",
+      "egcs_cn_user": 1,
+      "egcs_cn_isprimary": true,
+      "egcs_cn_createdby": 1,
+      "egcs_cn_createdat": "2026-10-22T12:00:00+00:00",
+      "_deleted": false
     }
   ],
   "Common_GWCOA": [
@@ -26007,7 +26027,8 @@
       "egcs_fc_sourcecategory": null,
       "egcs_fc_percentage": null,
       "egcs_fc_allowpercentageoverride": false,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_applicantrecipient": 119
     },
     {
       "id": 15,
@@ -26025,7 +26046,8 @@
       "egcs_fc_sourcecategory": null,
       "egcs_fc_percentage": null,
       "egcs_fc_allowpercentageoverride": false,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_applicantrecipient": 186
     },
     {
       "id": 16,
@@ -26043,7 +26065,8 @@
       "egcs_fc_sourcecategory": null,
       "egcs_fc_percentage": null,
       "egcs_fc_allowpercentageoverride": false,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_applicantrecipient": 188
     },
     {
       "id": 17,
@@ -26061,7 +26084,8 @@
       "egcs_fc_sourcecategory": null,
       "egcs_fc_percentage": null,
       "egcs_fc_allowpercentageoverride": false,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_applicantrecipient": 190
     },
     {
       "id": 18,
@@ -26079,7 +26103,8 @@
       "egcs_fc_sourcecategory": null,
       "egcs_fc_percentage": null,
       "egcs_fc_allowpercentageoverride": false,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_applicantrecipient": 203
     },
     {
       "id": 19,
@@ -26097,7 +26122,8 @@
       "egcs_fc_sourcecategory": null,
       "egcs_fc_percentage": null,
       "egcs_fc_allowpercentageoverride": false,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_applicantrecipient": 119
     },
     {
       "id": 20,
@@ -26115,7 +26141,8 @@
       "egcs_fc_sourcecategory": null,
       "egcs_fc_percentage": null,
       "egcs_fc_allowpercentageoverride": false,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_applicantrecipient": 119
     },
     {
       "id": 21,
@@ -26133,7 +26160,8 @@
       "egcs_fc_sourcecategory": null,
       "egcs_fc_percentage": null,
       "egcs_fc_allowpercentageoverride": false,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_applicantrecipient": 119
     },
     {
       "id": 22,
@@ -26151,7 +26179,8 @@
       "egcs_fc_sourcecategory": null,
       "egcs_fc_percentage": null,
       "egcs_fc_allowpercentageoverride": false,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_applicantrecipient": 119
     },
     {
       "id": 23,
@@ -26169,7 +26198,8 @@
       "egcs_fc_sourcecategory": null,
       "egcs_fc_percentage": null,
       "egcs_fc_allowpercentageoverride": false,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_applicantrecipient": 119
     },
     {
       "id": 24,
@@ -26187,7 +26217,8 @@
       "egcs_fc_sourcecategory": null,
       "egcs_fc_percentage": null,
       "egcs_fc_allowpercentageoverride": false,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_applicantrecipient": 171
     },
     {
       "id": 25,
@@ -26205,7 +26236,8 @@
       "egcs_fc_sourcecategory": null,
       "egcs_fc_percentage": null,
       "egcs_fc_allowpercentageoverride": false,
-      "_deleted": false
+      "_deleted": false,
+      "egcs_fc_applicantrecipient": 176
     }
   ],
   "Funding_Case_Agreement_Budget_Version": [
@@ -32997,6 +33029,45 @@
       "egcs_fc_appliedat": "2026-10-13T17:47:11.612+00:00",
       "egcs_fc_claimline": 17,
       "egcs_fc_receivable": 169
+    }
+  ],
+  "Funding_Opportunity_Profile": [
+    {
+      "id": 207,
+      "egcs_fo_transferpaymentstream": 118,
+      "egcs_fo_datestart": "2026-04-01",
+      "egcs_fo_dateend": "2029-03-31",
+      "egcs_fo_name_en": "Northern Community Infrastructure Call 2026–2029",
+      "egcs_fo_name_fr": "Appel pour les infrastructures communautaires nordiques 2026–2029",
+      "egcs_fo_objective_en": "Support accessible, energy-efficient community facilities and resilient services in northern communities.",
+      "egcs_fo_objective_fr": "Soutenir des installations communautaires accessibles et écoénergétiques ainsi que des services résilients dans les collectivités nordiques.",
+      "egcs_fo_applicationschema": null,
+      "_deleted": false,
+      "egcs_fo_status": 382
+    }
+  ],
+  "Funding_Opportunity_Stream": [
+    {
+      "id": 1,
+      "egcs_fo_fundingopportunity": 207,
+      "egcs_fo_transferpaymentstream": 118,
+      "_deleted": false
+    }
+  ],
+  "Funding_Case_Intake_Profile": [
+    {
+      "id": 208,
+      "egcs_fi_applicationid": null,
+      "egcs_fi_application": {},
+      "egcs_fi_fundingopportunity": 207,
+      "egcs_fi_applicantrecipient": 119,
+      "egcs_fi_status": 381,
+      "_deleted": false,
+      "egcs_fi_sourcesystem": null,
+      "egcs_fi_externalsourceid": null,
+      "egcs_fi_sourceexport": null,
+      "egcs_fi_group": null,
+      "egcs_fi_groupclaimedby": null
     }
   ]
 }

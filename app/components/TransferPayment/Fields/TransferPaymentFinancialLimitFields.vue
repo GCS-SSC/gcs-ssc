@@ -19,10 +19,11 @@ const field = useFormFieldPath(() => namePrefix)
   <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }">
     <UFormField
       :label="t('transfer_payment.financial_limit_max_allowable_per_recipient')"
+      :description="t('transfer_payment.financial_limit_max_allowable_currency_help')"
       :name="field('egcs_tp_maxallowableperrecipient')">
       <CommonCurrencyInput
         v-model="model.egcs_tp_maxallowableperrecipient"
-        :currency="'cad'" />
+        :currency="null" />
     </UFormField>
 
     <UFormField
@@ -30,6 +31,8 @@ const field = useFormFieldPath(() => namePrefix)
       :name="field('egcs_tp_maxpercentofsupportavailableperrecipient')" required>
       <UInputNumber
         v-model="model.egcs_tp_maxpercentofsupportavailableperrecipient"
+        :min="0"
+        :max="1"
         :step="0.01"
         :format-options="{ style: 'percent' }" />
     </UFormField>
@@ -38,9 +41,11 @@ const field = useFormFieldPath(() => namePrefix)
   <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }">
     <UFormField
       :label="t('transfer_payment.financial_limit_max_percent_retroactive_costs')"
-      :name="field('egcs_tp_maxpercentofretroactivecostsallowable')" required>
+      :name="field('egcs_tp_maxpercentofretroactivecostsallowable')"
+      :description="t('transfer_payment.financial_limit_retroactive_costs_unavailable')"
+      :required="false">
       <UInputNumber
-        v-model="model.egcs_tp_maxpercentofretroactivecostsallowable"
+        disabled
         :step="0.01"
         :format-options="{ style: 'percent' }" />
     </UFormField>
@@ -50,6 +55,8 @@ const field = useFormFieldPath(() => namePrefix)
       :name="field('egcs_tp_stackinglimit')" required>
       <UInputNumber
         v-model="model.egcs_tp_stackinglimit"
+        :min="0"
+        :max="1"
         :step="0.01"
         :format-options="{ style: 'percent' }" />
     </UFormField>

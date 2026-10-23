@@ -442,7 +442,6 @@ export const useTransferPaymentStreamWizardModal = ({
     state.value.financialLimit = {
       egcs_tp_maxallowableperrecipient: '0',
       egcs_tp_maxpercentofsupportavailableperrecipient: 0,
-      egcs_tp_maxpercentofretroactivecostsallowable: 0,
       egcs_tp_stackinglimit: 0,
       egcs_tp_active: true
     }

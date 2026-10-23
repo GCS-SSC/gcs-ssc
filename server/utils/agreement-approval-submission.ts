@@ -9,6 +9,7 @@ import { throwApiError } from './api-errors'
 import { databaseMoneyText, parseDatabaseMoney } from './database-money'
 import { budgetFundingSourcesByLine, loadBudgetFundingSources } from './agreement-budget-funding'
 import type { SubmissionRisk } from '~~/shared/types/risk'
+import { assertAgreementBudgetFinancialLimits } from './agreement-budget-financial-limits'
 import { captureSubmissionRisk } from './risk-readiness'
 
 export const ACTIVE_WORKFLOW_RUN_STATUSES = [
@@ -261,6 +262,7 @@ export const buildAgreementApprovalSnapshot = async (
       key: 'apiErrors.agreement.amendment_budget_snapshot_not_found'
     })
   }
+  if (budgetVersion) await assertAgreementBudgetFinancialLimits(trx, { agreementId, versionId: String(budgetVersion.id), streamId: String(agreement.egcs_fc_transferpaymentstream) })
   const activityVersion = includesActivities
     ? amendment
       ? await trx.selectFrom('Funding_Case_Agreement_Activity_Version').selectAll()
@@ -287,6 +289,7 @@ export const buildAgreementApprovalSnapshot = async (
       .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
       .orderBy('Agency_Fiscal_Year.egcs_ay_fiscalyear').orderBy('Funding_Case_Agreement_Budget_Fiscal_Year.id').execute() : [],
     budgetVersion ? trx.selectFrom('Funding_Case_Agreement_Budget_Line_Item')
+      .innerJoin('Applicant_Recipient_Profile', 'Applicant_Recipient_Profile.id', 'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_applicantrecipient')
       .innerJoin('Transfer_Payment_Stream_Cost_Category_Line_Item', 'Transfer_Payment_Stream_Cost_Category_Line_Item.id', 'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_organizationcostcategory')
       .innerJoin('Agency_Cost_Category_Line_Item', 'Agency_Cost_Category_Line_Item.id', 'Transfer_Payment_Stream_Cost_Category_Line_Item.egcs_tp_organizationcostcategory')
       .innerJoin('Agency_Cost_Category', 'Agency_Cost_Category.id', 'Agency_Cost_Category_Line_Item.egcs_ay_organizationcostcategory')
@@ -294,6 +297,9 @@ export const buildAgreementApprovalSnapshot = async (
       .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fiscalyear')
       .select([
         'Funding_Case_Agreement_Budget_Line_Item.id as row_id',
+        'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_applicantrecipient',
+        sql<string>`COALESCE("Applicant_Recipient_Profile".egcs_ar_legalname_en, "Applicant_Recipient_Profile".egcs_ar_operatingname_en, "Applicant_Recipient_Profile".id::text)`.as('applicant_recipient_name_en'),
+        sql<string>`COALESCE("Applicant_Recipient_Profile".egcs_ar_legalname_fr, "Applicant_Recipient_Profile".egcs_ar_operatingname_fr, "Applicant_Recipient_Profile".id::text)`.as('applicant_recipient_name_fr'),
         'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_calculationmode',
         sql<string | null>`(SELECT source.egcs_ay_name_en FROM "Agency_Cost_Category" source WHERE source.id = "Funding_Case_Agreement_Budget_Line_Item".egcs_fc_sourcecategory)`.as('calculation_source_name_en'),
         sql<string | null>`(SELECT source.egcs_ay_name_fr FROM "Agency_Cost_Category" source WHERE source.id = "Funding_Case_Agreement_Budget_Line_Item".egcs_fc_sourcecategory)`.as('calculation_source_name_fr'),
@@ -314,6 +320,7 @@ export const buildAgreementApprovalSnapshot = async (
       ])
       .where('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_budgetversion', '=', String(budgetVersion.id))
       .where('Funding_Case_Agreement_Budget_Line_Item._deleted', '=', false)
+      .where('Funding_Case_Agreement_Budget_Fiscal_Year._deleted', '=', false)
       .orderBy('Funding_Case_Agreement_Budget_Line_Item.egcs_fc_fundingagreementbudgetfiscalyear').orderBy('Funding_Case_Agreement_Budget_Line_Item.id').execute() : [],
     activityVersion ? trx.selectFrom('Funding_Case_Agreement_Activity').select(['id', 'egcs_fc_name_en', 'egcs_fc_name_fr', 'egcs_fc_description_en', 'egcs_fc_description_fr', 'egcs_fc_startdate', 'egcs_fc_enddate', 'egcs_fc_expectedresults_en', 'egcs_fc_expectedresults_fr']).where('egcs_fc_activityversion', '=', String(activityVersion.id)).where('_deleted', '=', false).orderBy('egcs_fc_startdate').orderBy('id').execute() : [],
     amendment ? trx.selectFrom('Funding_Case_Agreement_Amendment_Subtype').innerJoin('Transfer_Payment_Amendment_Subtype', 'Transfer_Payment_Amendment_Subtype.id', 'Funding_Case_Agreement_Amendment_Subtype.egcs_fc_amendmentsubtype').select(['Transfer_Payment_Amendment_Subtype.egcs_tp_name_en', 'Transfer_Payment_Amendment_Subtype.egcs_tp_name_fr']).where('Funding_Case_Agreement_Amendment_Subtype.egcs_fc_amendment', '=', entityId).where('Funding_Case_Agreement_Amendment_Subtype._deleted', '=', false).where('Transfer_Payment_Amendment_Subtype._deleted', '=', false).orderBy('Transfer_Payment_Amendment_Subtype.id').execute() : []
@@ -396,6 +403,7 @@ export const buildAgreementApprovalSnapshot = async (
       fiscalYears: fiscalYears.map(row => normalizeRow({ display: row.egcs_ay_fiscalyeardisplay, year: row.egcs_ay_fiscalyear, startDate: row.egcs_ay_startdate, endDate: row.egcs_ay_enddate })),
       lineItems: lineItems.map(row => normalizeRow({
         fiscalYear: row.fiscal_year_display,
+        applicantRecipient: { id: row.egcs_fc_applicantrecipient, name: bilingualValue(row.applicant_recipient_name_en, row.applicant_recipient_name_fr) },
         organizationCostCategory: bilingualValue(row.organization_cost_category_name_en, row.organization_cost_category_name_fr),
         lineItem: bilingualValue(row.line_item_name_en, row.line_item_name_fr),
         calculationMode: row.egcs_fc_calculationmode,

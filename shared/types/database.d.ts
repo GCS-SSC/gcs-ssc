@@ -1568,6 +1568,7 @@ export interface FundingCaseAgreementBudgetLineItemTable {
   egcs_fc_allowpercentageoverride: Generated<boolean>
   id: Generated<string>
   egcs_fc_fundingagreement: Generated<string>
+  egcs_fc_applicantrecipient: string
   egcs_fc_budgetversion: Generated<string>
   egcs_fc_originalbudgetlineitem?: string | null
   egcs_fc_fundingagreementbudgetfiscalyear: string

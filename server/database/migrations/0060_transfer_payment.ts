@@ -119,7 +119,12 @@ CREATE TABLE "Transfer_Payment_Financial_Limits" (
   "egcs_tp_stackinglimit" numeric(5,2) NOT NULL,
   "egcs_tp_active" boolean DEFAULT false NOT NULL,
   "_deleted" boolean DEFAULT false NOT NULL,
-  CONSTRAINT "Transfer_Payment_Financial_Limits_pkey" PRIMARY KEY (id)
+  CONSTRAINT "Transfer_Payment_Financial_Limits_pkey" PRIMARY KEY (id),
+  CONSTRAINT tp_chk_financial_limit_nonnegative CHECK (egcs_tp_maxallowableperrecipient >= 0),
+  CONSTRAINT tp_chk_financial_limit_ratios CHECK (
+    egcs_tp_maxpercentofsupportavailableperrecipient BETWEEN 0 AND 1
+    AND egcs_tp_stackinglimit BETWEEN 0 AND 1
+  )
 );
 
 CREATE UNIQUE INDEX tp_idx_financiallimitstransferpaymentstreamstatus ON "Transfer_Payment_Financial_Limits" USING btree (egcs_tp_transferpaymentstream, egcs_tp_active) WHERE (_deleted = false);
