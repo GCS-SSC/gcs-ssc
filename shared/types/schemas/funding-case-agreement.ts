@@ -534,15 +534,30 @@ export type FundingCaseAgreementForecastLineItem = z.infer<typeof FundingCaseAgr
 export type FundingCaseAgreementForecastLineItemPatch = z.infer<typeof FundingCaseAgreementForecastLineItemPatchSchema>
 export type FundingCaseAgreementForecastLineItemItem = WithId<FundingCaseAgreementForecastLineItem>
 
+const ForecastFundingAmountsSchema = z.array(FundingCaseAgreementLineFundingAmountSchema).superRefine((sources, ctx) => {
+  const ids = new Set<string>()
+  sources.forEach((source, index) => {
+    if (ids.has(source.egcs_fc_fundingsubtype)) {
+      ctx.addIssue({ code: 'custom', path: [index, 'egcs_fc_fundingsubtype'], message: 'validation.duplicate' })
+    }
+    ids.add(source.egcs_fc_fundingsubtype)
+  })
+})
 export const FundingCaseAgreementForecastBreakdownCellSchema = z.object({
   egcs_fc_fundingagreementbudgetlineitem: RequiredBigintSelectionId(),
   egcs_fc_month: RequiredForecastMonth(),
   egcs_fc_amount: NonNegativeMoneySchema,
+  egcs_fc_fundingsources: ForecastFundingAmountsSchema.optional(),
   expected: z.object({
     id: RequiredBigintSelectionId(),
-    egcs_fc_amount: NonNegativeMoneySchema
+    egcs_fc_amount: NonNegativeMoneySchema,
+    egcs_fc_fundingsources: ForecastFundingAmountsSchema.optional()
   }).strict().nullable()
-}).strict()
+}).strict().superRefine((cell, ctx) => {
+  if (cell.egcs_fc_fundingsources !== undefined && cell.expected !== null && cell.expected.egcs_fc_fundingsources === undefined) {
+    ctx.addIssue({ code: 'custom', path: ['expected', 'egcs_fc_fundingsources'], message: 'validation.required' })
+  }
+})
 
 export const FundingCaseAgreementForecastBreakdownPatchSchema = z.object({
   cells: z.array(FundingCaseAgreementForecastBreakdownCellSchema)

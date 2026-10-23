@@ -79,9 +79,11 @@ export const useApiErrorToast = () => {
     const metadata = ApiErrorTranslationSchema.safeParse(
       data && typeof data === 'object' && 'translation' in data ? data.translation : undefined
     )
-    const renderedDescription = metadata.success && te(metadata.data.key)
-      ? () => h('span', t(metadata.data.key, localizeBilingualIssueParams(metadata.data.params ?? {}, locale.value === 'fr' ? 'fr' : 'en')))
-      : description || toast.localized('common.unknown_error')
+    const renderedDescription = resolveApiErrorDetails(error).length > 0
+      ? () => h('div', { class: 'space-y-1' }, resolveDetails(error).map(message => h('p', message)))
+      : metadata.success && te(metadata.data.key)
+        ? () => h('span', t(metadata.data.key, localizeBilingualIssueParams(metadata.data.params ?? {}, locale.value === 'fr' ? 'fr' : 'en')))
+        : description || toast.localized('common.unknown_error')
     toast.add({ title: toast.localized('common.error'), description: renderedDescription, color: 'error' })
   }
 

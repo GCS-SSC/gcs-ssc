@@ -6,6 +6,7 @@ import { useBilingualValue } from '~/composables/useBilingualValue'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 /* eslint-disable jsdoc/require-jsdoc -- Budget table callbacks are exercised by focused component tests. */
 import { computed, onUnmounted, ref, watch } from 'vue'
+import type { ExpandedState, Updater } from '@tanstack/vue-table'
 import type { Ref } from 'vue'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 import { useGroupedTableExpansion, type GroupedTableRow } from '~/composables/useGroupedTableExpansion'
@@ -19,7 +20,8 @@ import type {
 } from '~~/shared/types/funding-case-agreement-ui'
 import {
   FundingCaseAgreementBudgetFiscalYearCreateSchema,
-  FundingCaseAgreementBudgetLineItemCreateSchema
+  FundingCaseAgreementBudgetLineItemCreateSchema,
+  FundingCaseAgreementFundingSourceSchema
 } from '~~/shared/types/schemas'
 import {
   compareMoney,
@@ -69,9 +71,12 @@ type BudgetLeafRow = {
   fundingSources?: FundingCaseAgreementBudgetLineItemRow['egcs_fc_fundingsources']
   currency?: string
   isPlaceholder: boolean
+  fundingKind?: 'program' | 'other'
 }
 
 type GroupedBudgetRow = GroupedTableRow<BudgetLeafRow>
+type BudgetFundingSource = FundingCaseAgreementBudgetLineItemRow['egcs_fc_fundingsources'][number]
+type FundingSourceEdit = { lineId: string, originalSubtype: string | null, source: BudgetFundingSource }
 
 const FISCAL_YEAR_GROUP_COLUMN_ID = 'fiscalYearGroup'
 const COST_CATEGORY_GROUP_COLUMN_ID = 'costCategoryGroup'
@@ -155,6 +160,18 @@ const lineItemModal = useCrudModal<FundingCaseAgreementBudgetLineItemRow, Fundin
 })
 
 const selectedFiscalYear = fiscalYearModal.selected
+const fundingSourceModal = useCrudModal<FundingSourceEdit, FundingSourceEdit>({ updateState: item => ({ ...item, source: { ...item.source } }) })
+const selectedFundingSource = fundingSourceModal.selected
+const isFundingSourceModalOpen = fundingSourceModal.isOpen
+const validateFundingSource = createValidator(FundingCaseAgreementFundingSourceSchema)
+const fundingSourcePending = useCrudModalPending(fundingSourceModal.captureSession)
+const retainedFundingOption = computed(() => {
+  const source = selectedFundingSource.value?.source
+  if (!source || source.egcs_fc_fundingsubtype !== selectedFundingSource.value?.originalSubtype) return []
+  const typeName = locale.value === 'fr' ? source.funding_type_name_fr : source.funding_type_name_en
+  const subtypeName = locale.value === 'fr' ? source.funding_subtype_name_fr : source.funding_subtype_name_en
+  return subtypeName ? [{ value: source.egcs_fc_fundingsubtype, label: typeName ? `${typeName} / ${subtypeName}` : subtypeName }] : []
+})
 const isFiscalYearModalOpen = fiscalYearModal.isOpen
 const selectedLineItem = lineItemModal.selected
 const isLineItemModalOpen = lineItemModal.isOpen
@@ -192,6 +209,7 @@ watch([() => agreementId, resourceBase, fiscalYearLookupEndpoint, targetKey, () 
   pendingDeletes.clear()
   fiscalYearModal.close()
   lineItemModal.close()
+  fundingSourceModal.close()
 }, { flush: 'sync' })
 onUnmounted(() => {
   fiscalYearContextGeneration += 1
@@ -461,8 +479,9 @@ const {
   expandedRows,
   grouping,
   columnVisibility,
-  groupingOptions,
+  groupingOptions: groupedBudgetOptions,
   expandedOptions,
+  getGroupRowId,
   isGroupedRow,
   isGroupRow,
   getLeafRows: getRealLeafRows,
@@ -485,8 +504,46 @@ const {
       getValue: row => row.costSubsectionGroup
     }
   ],
-  isPlaceholder: row => row.isPlaceholder
+  isPlaceholder: row => row.isPlaceholder || Boolean(row.fundingKind)
 })
+const groupingOptions = {
+  ...groupedBudgetOptions,
+  getSubRows: (row: BudgetLeafRow): BudgetLeafRow[] | undefined => {
+    if (row.isPlaceholder || row.fundingKind) return undefined
+    return [{
+      ...row,
+      id: `${row.id}:program`,
+      fundingKind: 'program',
+      lineItemNameEn: t('agreement.budget.program_funding'),
+      lineItemNameFr: t('agreement.budget.program_funding'),
+      description: '',
+      totalAmount: row.programFunding,
+      fundingSources: []
+    }, ...(row.fundingSources ?? []).map(source => ({
+      ...row,
+      id: `${row.id}:source:${source.id ?? source.egcs_fc_fundingsubtype}`,
+      fundingKind: 'other' as const,
+      lineItemNameEn: `${source.funding_type_name_en ?? ''} / ${source.funding_subtype_name_en ?? ''}`,
+      lineItemNameFr: `${source.funding_type_name_fr ?? ''} / ${source.funding_subtype_name_fr ?? ''}`,
+      description: (locale.value === 'fr' ? source.egcs_fc_description_fr : source.egcs_fc_description_en) ?? '',
+      totalAmount: source.egcs_fc_amount,
+      programFunding: undefined,
+      fundingSources: [source]
+    }))]
+  }
+}
+const expandedFundingRows: Ref<Record<string, boolean>> = ref({})
+const tableExpandedRows = computed<ExpandedState>(() => ({
+  ...(expandedRows.value === true
+    ? Object.fromEntries(tableRows.value.flatMap(row => [0, 1, 2].map(index => [getGroupRowId(row, index), true])))
+    : expandedRows.value),
+  ...expandedFundingRows.value
+}))
+const updateTableExpandedRows = (value: Updater<ExpandedState>) => {
+  const next = typeof value === 'function' ? value(tableExpandedRows.value) : value
+  updateExpandedRows(next)
+  expandedFundingRows.value = Object.fromEntries(tableRows.value.map(row => [row.id, next === true || next[row.id] === true]))
+}
 const isFiscalYearGroupRow = (row: GroupedBudgetRow) => isGroupRow(row, FISCAL_YEAR_GROUP_COLUMN_ID)
 const isCostCategoryGroupRow = (row: GroupedBudgetRow) => isGroupRow(row, COST_CATEGORY_GROUP_COLUMN_ID)
 const isCostSubsectionGroupRow = (row: GroupedBudgetRow) => isGroupRow(row, COST_SUBSECTION_GROUP_COLUMN_ID)
@@ -666,6 +723,7 @@ const saveLineItem = async () => {
       isUpdate ? 'PATCH' : 'POST',
       {
         ...lineItemState,
+        egcs_fc_fundingsources: isUpdate ? undefined : lineItemState.egcs_fc_fundingsources,
         egcs_fc_programfunding: lineItemState.egcs_fc_calculationmode && lineItemState.egcs_fc_calculationmode !== 'manual' ? undefined : lineItemState.egcs_fc_programfunding,
         egcs_fc_percentage: lineItemState.egcs_fc_allowpercentageoverride ? lineItemState.egcs_fc_percentage ?? undefined : undefined
       }
@@ -730,6 +788,79 @@ const deleteBudgetRecord = async (id: string, area: 'budget-year' | 'budget-line
 const deleteFiscalYear = (id: string) => deleteBudgetRecord(id, 'budget-year')
 const deleteLineItem = (id: string) => deleteBudgetRecord(id, 'budget-line')
 
+const openUpdateFundingSource = (row: BudgetLeafRow) => openBudgetAction('update', 'budget-line', () => {
+  const source = row.fundingSources?.[0]
+  if (row.fundingKind !== 'other' || !row.lineItemId || !source) return
+  fundingSourceModal.openUpdate({ lineId: row.lineItemId, originalSubtype: source.egcs_fc_fundingsubtype, source })
+})
+const openCreateFundingSource = (row: BudgetLeafRow) => openBudgetAction('update', 'budget-line', () => {
+  if (row.isPlaceholder || row.fundingKind || !row.lineItemId) return
+  fundingSourceModal.openUpdate({
+    lineId: row.lineItemId,
+    originalSubtype: null,
+    source: { egcs_fc_fundingsubtype: '', egcs_fc_amount: ZERO_MONEY, egcs_fc_description_en: '', egcs_fc_description_fr: '' }
+  })
+})
+const persistFundingSource = async (lineId: string, originalSubtype: string | null, replacement: BudgetFundingSource | null, current: () => boolean) => {
+  const base = resourceBase.value
+  const fresh = await $fetch<FundingCaseAgreementBudgetOverviewRow, string>(`${base}/budget-overview`)
+  if (!current()) return false
+  const line = fresh.lineItems.find(item => item.id === lineId)
+  if (!line || (originalSubtype !== null && !line.egcs_fc_fundingsources.some(source => source.egcs_fc_fundingsubtype === originalSubtype))) {
+    throw new Error(t('apiErrors.request.not_found'))
+  }
+  const sources = line.egcs_fc_fundingsources.flatMap(source => source.egcs_fc_fundingsubtype === originalSubtype
+    ? replacement ? [replacement] : []
+    : [source])
+  if (originalSubtype === null && replacement) sources.push(replacement)
+  await saveJson(`${base}/budget-line-items/${lineId}`, 'PATCH', { egcs_fc_fundingsources: sources })
+  return current()
+}
+const saveFundingSource = async () => {
+  const selected = selectedFundingSource.value
+  if (!selected || !permitted('update', 'budget-line')) return
+  const session = fundingSourceModal.captureSession()
+  const generation = fiscalYearContextGeneration
+  const current = () => generation === fiscalYearContextGeneration && fundingSourceModal.isCurrentSession(session) && permitted('update', 'budget-line')
+  if (!fundingSourcePending.begin(session)) return
+  try {
+    if (!current() || (actionTarget && !await check('update', 'budget-line', current)) || !current()) return
+    if (!await persistFundingSource(selected.lineId, selected.originalSubtype, selected.source, current)) return
+    if (!fundingSourceModal.closeSession(session)) return
+    await refreshOverview()
+    if (generation !== fiscalYearContextGeneration || overviewStatus.value === 'error') return
+    expandedFundingRows.value[selected.lineId] = true
+    toast.add({ title: toast.localized('common.success'), description: toast.localized(selected.originalSubtype === null ? 'common.added_success' : 'common.updated_success'), color: 'success' })
+  } catch (error: unknown) {
+    if (current()) showError(error)
+  } finally {
+    fundingSourcePending.end(session)
+  }
+}
+const deleteFundingSource = async (row: BudgetLeafRow) => {
+  const source = row.fundingSources?.[0]
+  const lineId = row.lineItemId
+  if (row.fundingKind !== 'other' || !lineId || !source || !permitted('delete', 'budget-line')) return
+  const key = `funding:${row.id}`
+  if (pendingDeletes.has(key)) return
+  const token = Symbol(key)
+  pendingDeletes.set(key, token)
+  const generation = fiscalYearContextGeneration
+  const current = () => generation === fiscalYearContextGeneration && pendingDeletes.get(key) === token && permitted('delete', 'budget-line')
+  try {
+    if (!await check('delete', 'budget-line', current) || !current() || !await confirmDelete() || !current()) return
+    if (!await check('delete', 'budget-line', current) || !current()) return
+    if (!await persistFundingSource(lineId, source.egcs_fc_fundingsubtype, null, current)) return
+    await refreshOverview()
+    if (!current() || overviewStatus.value === 'error') return
+    toast.add({ title: toast.localized('common.success'), description: toast.localized('common.deleted_success'), color: 'success' })
+  } catch (error: unknown) {
+    if (current()) showError(error)
+  } finally {
+    if (pendingDeletes.get(key) === token) pendingDeletes.delete(key)
+  }
+}
+
 const getOtherFundingTotal = (row: BudgetLeafRow) => sumMoney([
   ...(row.fundingSources ?? []).map(source => source.egcs_fc_amount)
 ])
@@ -763,7 +894,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
       :grouping-options="groupingOptions"
       :expanded-options="expandedOptions"
       :column-visibility="columnVisibility"
-      :expanded="expandedRows"
+      :expanded="tableExpandedRows"
       :total-records="totalRecords"
       :loading="overviewStatus === 'pending'"
       :request-status="overviewStatus"
@@ -773,7 +904,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
       :search-placeholder="t('agreement.budget.search')"
       @add="openCreateFiscalYear"
       @retry="refreshOverview"
-      @update:expanded="updateExpandedRows">
+      @update:expanded="updateTableExpandedRows">
       <template #name-cell="{ row }">
         <div :id="getGroupedDisclosureContentId(row as GroupedBudgetRow)" class="contents">
           <div v-if="isFiscalYearGroupRow(row as GroupedBudgetRow)" class="flex w-full items-center gap-3 py-1">
@@ -853,21 +984,46 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
             {{ t('agreement.budget.no_line_items') }}
           </div>
 
-          <div v-else class="flex min-w-0 max-w-full flex-col gap-1 pl-16">
-            <p :lang="locale" class="leading-tight font-bold text-zinc-900 dark:text-white">
-              {{ getBilingualValue({ name_en: row.original.lineItemNameEn, name_fr: row.original.lineItemNameFr }, 'name', '') }}
+          <div v-else-if="row.original.fundingKind" class="space-y-1 pl-28">
+            <p :lang="locale" class="text-sm text-zinc-700 dark:text-zinc-200">
+              {{ row.original.fundingKind === 'program' ? t('agreement.budget.program_funding') : getBilingualValue({ name_en: row.original.lineItemNameEn, name_fr: row.original.lineItemNameFr }, 'name', '') }}
             </p>
-            <p class="min-w-0 max-w-full whitespace-normal break-words text-sm text-zinc-500 dark:text-zinc-400">
+            <p v-if="row.original.description" class="whitespace-normal break-words text-sm text-muted">
               {{ row.original.description }}
             </p>
-            <p v-if="hasMultipleProponents && (row.original.proponentNameEn || row.original.proponentNameFr)" :lang="locale" class="text-xs text-muted">
-              {{ getBilingualValue({ name_en: row.original.proponentNameEn, name_fr: row.original.proponentNameFr }, 'name', '') }}
+            <p v-if="row.original.fundingSources?.some(source => source.funding_type_instacking || source.funding_type_incostsharing)" class="text-xs text-muted">
+              <span v-if="row.original.fundingSources?.[0]?.funding_type_instacking">{{ t('agreement.funding_sources.in_stacking') }}</span>
+              <span v-if="row.original.fundingSources?.[0]?.funding_type_incostsharing"> · {{ t('agreement.funding_sources.in_cost_sharing') }}</span>
             </p>
-            <p v-if="getLineItemById(row.original.id)?.egcs_fc_calculationmode && getLineItemById(row.original.id)?.egcs_fc_calculationmode !== 'manual'" class="text-xs text-muted">
-              {{ t(`budget_calculation.${getLineItemById(row.original.id)?.egcs_fc_calculationmode}`) }}
-              {{ getLineItemById(row.original.id)?.egcs_fc_percentage }}{{ t('budget_calculation.percent_symbol') }}
-              {{ locale === 'fr' ? getLineItemById(row.original.id)?.calculation_source_name_fr : getLineItemById(row.original.id)?.calculation_source_name_en }}
-            </p>
+          </div>
+
+          <div v-else class="flex min-w-0 max-w-full items-start gap-3 pl-16">
+            <CommonGroupedDisclosureButton
+              class="group mt-0.5 shrink-0 cursor-default"
+              :expanded="row.getIsExpanded?.() === true"
+              :controls="getGroupedDisclosureControlsId(row.id)"
+              :label="getBilingualValue({ name_en: row.original.lineItemNameEn, name_fr: row.original.lineItemNameFr }, 'name', '')"
+              @toggle="row.toggleExpanded?.()">
+              <UIcon
+                :name="row.getIsExpanded?.() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+                class="size-4 text-zinc-400 transition-colors group-hover:text-primary" />
+            </CommonGroupedDisclosureButton>
+            <div class="flex min-w-0 max-w-full flex-col gap-1">
+              <p :lang="locale" class="leading-tight font-bold text-zinc-900 dark:text-white">
+                {{ getBilingualValue({ name_en: row.original.lineItemNameEn, name_fr: row.original.lineItemNameFr }, 'name', '') }}
+              </p>
+              <p class="min-w-0 max-w-full whitespace-normal break-words text-sm text-zinc-500 dark:text-zinc-400">
+                {{ row.original.description }}
+              </p>
+              <p v-if="hasMultipleProponents && (row.original.proponentNameEn || row.original.proponentNameFr)" :lang="locale" class="text-xs text-muted">
+                {{ getBilingualValue({ name_en: row.original.proponentNameEn, name_fr: row.original.proponentNameFr }, 'name', '') }}
+              </p>
+              <p v-if="getLineItemById(row.original.id)?.egcs_fc_calculationmode && getLineItemById(row.original.id)?.egcs_fc_calculationmode !== 'manual'" class="text-xs text-muted">
+                {{ t(`budget_calculation.${getLineItemById(row.original.id)?.egcs_fc_calculationmode}`) }}
+                {{ getLineItemById(row.original.id)?.egcs_fc_percentage }}{{ t('budget_calculation.percent_symbol') }}
+                {{ locale === 'fr' ? getLineItemById(row.original.id)?.calculation_source_name_fr : getLineItemById(row.original.id)?.calculation_source_name_en }}
+              </p>
+            </div>
           </div>
         </div>
       </template>
@@ -876,7 +1032,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
         <span v-if="isGroupedRow(row as GroupedBudgetRow)" class="font-medium text-zinc-700 dark:text-zinc-200">
           {{ formatGroupedMoney(row as GroupedBudgetRow, 'totalAmount') }}
         </span>
-        <span v-else-if="!row.original.isPlaceholder" class="font-medium text-zinc-700 dark:text-zinc-200">
+        <span v-else-if="!row.original.isPlaceholder && !row.original.fundingKind" class="font-medium text-zinc-700 dark:text-zinc-200">
           {{ formatMoney(row.original.totalAmount, row.original.currency) }}
         </span>
         <span v-else>&nbsp;</span>
@@ -886,7 +1042,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
         <span v-if="isGroupedRow(row as GroupedBudgetRow)" class="font-medium text-zinc-700 dark:text-zinc-200">
           {{ formatGroupedMoney(row as GroupedBudgetRow, 'programFunding') }}
         </span>
-        <span v-else-if="!row.original.isPlaceholder" class="font-medium text-zinc-700 dark:text-zinc-200">
+        <span v-else-if="!row.original.isPlaceholder && row.original.fundingKind !== 'other'" class="font-medium text-zinc-700 dark:text-zinc-200">
           {{ formatMoney(row.original.programFunding, row.original.currency) }}
         </span>
         <span v-else>&nbsp;</span>
@@ -896,22 +1052,10 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
         <span v-if="isGroupedRow(row as GroupedBudgetRow)" class="font-medium text-zinc-700 dark:text-zinc-200">
           {{ formatGroupedMoney(row as GroupedBudgetRow, 'otherFunding') }}
         </span>
-        <div v-else-if="!row.original.isPlaceholder" class="space-y-1">
+        <div v-else-if="!row.original.isPlaceholder && row.original.fundingKind !== 'program'" class="space-y-1">
           <span class="font-medium text-zinc-700 dark:text-zinc-200">
             {{ formatMoney(getOtherFundingTotal(row.original), row.original.currency) }}
           </span>
-          <ul v-if="row.original.fundingSources?.length" class="space-y-1 text-xs text-muted">
-            <li v-for="source in row.original.fundingSources" :key="source.id ?? source.egcs_fc_fundingsubtype">
-              {{ locale === 'fr' ? source.funding_type_name_fr : source.funding_type_name_en }} /
-              {{ locale === 'fr' ? source.funding_subtype_name_fr : source.funding_subtype_name_en }}:
-              {{ formatMoney(source.egcs_fc_amount, row.original.currency) }}
-              <span v-if="locale === 'fr' ? source.egcs_fc_description_fr : source.egcs_fc_description_en" class="block ps-2">
-                {{ locale === 'fr' ? source.egcs_fc_description_fr : source.egcs_fc_description_en }}
-              </span>
-              <span v-if="source.funding_type_instacking"> · {{ t('agreement.funding_sources.in_stacking') }}</span>
-              <span v-if="source.funding_type_incostsharing"> · {{ t('agreement.funding_sources.in_cost_sharing') }}</span>
-            </li>
-          </ul>
         </div>
         <span v-else>&nbsp;</span>
       </template>
@@ -971,7 +1115,34 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
             @click="openCreateLineItem(row.original.fiscalYearId, row.original.costCategoryId, row.original.costSubsectionGroup === '__all__' ? '' : row.original.costSubsectionLabel)" />
         </div>
 
-        <div v-else-if="!row.original.isPlaceholder" class="flex items-center gap-2">
+        <div v-else-if="row.original.fundingKind === 'other'" class="flex items-center gap-2">
+          <CommonActionButton
+            v-if="canUpdate"
+            icon="i-lucide-pencil"
+            color="neutral"
+            variant="ghost"
+            size="sm"
+            :aria-label="`${t('common.edit')}: ${getBilingualValue({ name_en: row.original.lineItemNameEn, name_fr: row.original.lineItemNameFr }, 'name', '')}`"
+            @click="openUpdateFundingSource(row.original)" />
+          <CommonActionButton
+            v-if="canDelete"
+            icon="i-lucide-trash"
+            color="error"
+            variant="ghost"
+            size="sm"
+            :aria-label="`${t('common.delete')}: ${getBilingualValue({ name_en: row.original.lineItemNameEn, name_fr: row.original.lineItemNameFr }, 'name', '')}`"
+            @click="deleteFundingSource(row.original)" />
+        </div>
+
+        <div v-else-if="!row.original.isPlaceholder && !row.original.fundingKind" class="flex items-center gap-2">
+          <CommonActionButton
+            v-if="canUpdate && row.original.lineItemId"
+            icon="i-lucide-plus"
+            color="primary"
+            variant="ghost"
+            size="sm"
+            :aria-label="`${t('agreement.funding_sources.add')}: ${getBilingualValue({ name_en: row.original.lineItemNameEn, name_fr: row.original.lineItemNameFr }, 'name', '')}`"
+            @click="openCreateFundingSource(row.original)" />
           <CommonActionButton
             v-if="canUpdate && row.original.lineItemId && getLineItemById(row.original.lineItemId)"
             icon="i-lucide-pencil"
@@ -1129,10 +1300,11 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
               </UFormField>
             </div>
             <AgreementFundingSourcesEditor
+              v-if="!selectedLineItem.id"
               :model-value="selectedLineItem.egcs_fc_fundingsources ?? []"
               :agreement-id="agreementId"
               :currency="selectedLineItem.egcs_fc_currency!"
-              :identity="`${agreementId}:${selectedLineItem.id ?? 'new'}:${selectedLineItem.egcs_fc_organizationcostcategory ?? ''}`"
+              :identity="`${agreementId}:new:${selectedLineItem.egcs_fc_organizationcostcategory ?? ''}`"
               allow-description
               class="lg:col-span-2"
               @update:model-value="selectedLineItem.egcs_fc_fundingsources = $event" />
@@ -1151,6 +1323,45 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
               :label="selectedLineItem.id ? t('common.update') : t('common.add')"
               :loading="isSavingLineItem"
               :disabled="isSavingLineItem" />
+          </div>
+        </UForm>
+      </template>
+    </UModal>
+
+    <UModal
+      v-if="selectedFundingSource"
+      v-model:open="isFundingSourceModalOpen"
+      :title="selectedFundingSource.originalSubtype === null ? t('agreement.funding_sources.add') : `${t('common.edit')}: ${t('agreement.funding_sources.title')}`">
+      <template #body>
+        <UForm :state="selectedFundingSource.source" :validate="validateFundingSource" :validate-on="[]" class="space-y-6" @submit="saveFundingSource">
+          <div class="space-y-4">
+            <UFormField :label="t('agreement.funding_sources.subtype')" name="egcs_fc_fundingsubtype" required>
+              <CommonServerLookupSelect
+                v-model="selectedFundingSource.source.egcs_fc_fundingsubtype"
+                :fetch-url="`/api/agreements/${agreementId}/funding-subtypes`"
+                selected-values-query-key="selected_ids"
+                :prepend-items="retainedFundingOption"
+                value-key="id"
+                label-en-key="label_en"
+                label-fr-key="label_fr"
+                :show-value-in-label="false"
+                close-on-select />
+            </UFormField>
+            <UFormField :label="t('agreement.funding_sources.amount')" name="egcs_fc_amount" required>
+              <CommonCurrencyInput
+                v-model="selectedFundingSource.source.egcs_fc_amount"
+                :currency="getLineItemById(selectedFundingSource.lineId)?.egcs_fc_currency" />
+            </UFormField>
+            <UFormField :label="t('agreement.funding_sources.description_en')" name="egcs_fc_description_en">
+              <CommonTextarea v-model="selectedFundingSource.source.egcs_fc_description_en" :rows="2" />
+            </UFormField>
+            <UFormField :label="t('agreement.funding_sources.description_fr')" name="egcs_fc_description_fr">
+              <CommonTextarea v-model="selectedFundingSource.source.egcs_fc_description_fr" :rows="2" />
+            </UFormField>
+          </div>
+          <div class="flex justify-end gap-2 pt-4">
+            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="fundingSourceModal.close()" />
+            <CommonSaveButton :label="selectedFundingSource.originalSubtype === null ? t('common.add') : t('common.update')" :loading="fundingSourcePending.isPending.value" :disabled="fundingSourcePending.isPending.value || !canUpdate || staticMode" />
           </div>
         </UForm>
       </template>
