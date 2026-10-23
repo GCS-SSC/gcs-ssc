@@ -12,7 +12,7 @@ This configuration manages the existing **GCS Demo / demo** environment:
   business database are not automatically moved. The business database, Portal,
   Metabase and existing volumes retain their identities.
 - Domain: https://gcs-ssc-demo.up.railway.app, retained by Railway on the existing service.
-- Volumes: existing `gcs-ssc-volume` at `/app/.data` and `gcs-db-volume-core-cutover-reset-20261020` on `GCS DB`, each 5000 MB. Verify every previous GCS database volume is detached and absent or pending Railway deletion.
+- Volumes: existing `gcs-ssc-volume` at `/app/.data` and `gcs-db-volume-queues-reset-20261023` on `GCS DB`, each 5000 MB. Verify every previous GCS database volume is detached and absent or pending Railway deletion.
 - Metabase, `Metabase DB`, and their `postgres-volume-4aPn` are included so an IaC apply preserves them.
 - Portal: `gcs-ssc-portal` uses a pinned public GHCR digest from `deployment/portal-demo-image.json` and its own `Portal DB` PostgreSQL service and `portal-db-volume`. It shares this project, not a database, with GCS and Metabase.
 - Canvas groups: `Metabase`, `GCS`, and `Portal` each contain the corresponding app and PostgreSQL service.
@@ -56,6 +56,19 @@ Metabase changes. Check live storage independently of the plan.
 `config apply` reports no change to those resources. Check the live service and
 volume state before treating these readback entries as drift.
 
+CLI 5.54.1 can also create a default volume when provisioning a new `postgres()`
+service, while leaving its explicitly declared volume unattached at `/tmp`.
+A successful apply therefore does not prove that the intended access-history
+volume is mounted. Before starting GCS, stop the new access database, check its
+actual `PGDATA`, and verify the declared volume is mounted at
+`/var/lib/postgresql/data` (covering `PGDATA`'s `pgdata` child directory).
+If the default volume was created instead, detach it, verify it is unattached,
+attach the declared volume at that path, and start one fresh database deployment.
+Remove only the unintended newly created default volume after confirming it is
+detached. Keep GCS stopped until PostgreSQL accepts connections; verify the final
+exact database deployment reaches `SUCCESS` and there are no intermediate active
+deployments. Preserve existing database volumes and data during this correction.
+
 `config apply` reconciles infrastructure and can trigger deployments. Source
 changes are deployed from GitHub `main` in source mode; image mode uses the
 pinned public GHCR digest. Follow the
@@ -91,7 +104,36 @@ the next IaC apply. Verify the live attachment independently: Railway's plan
 readback can omit the former database attachment. Preserve the application
 attachment volume, Portal volume, and Metabase volume.
 
-The current core compatibility cutover uses source commit
+The 2026-10-23 queue release uses runtime source
+`60e553f4037c91040ef4fb18c2dca851995a56d2` and public image
+`ghcr.io/gcs-ssc/gcs-ssc-demo@sha256:de7e79244eb1878ed24fa5b10a11adf05229adbf1cd91fa7a6a6910dae929da2`
+from [verified build 40030239051](https://github.com/GCS-SSC/gcs-ssc/actions/runs/40030239051).
+Application deployment `455f4109-7de8-4d71-b78a-50d38b87f1b9` reached
+`SUCCESS` with that exact digest. Public health and actual English/French login,
+queue administration and Contribution Agreement template downloads passed.
+The queue screen shows all five host subscriptions across levels 0–3.
+
+The fresh business volume `gcs-db-volume-queues-reset-20261023`
+(`d1719894-5251-48ff-a90a-59091fc74e26`) is mounted on `GCS DB` at
+`/var/lib/postgresql/data`, 5000 MB, `Ready`. The dedicated access volume
+`gcs-access-db-volume` (`40802d7e-28db-4063-9ee2-edadd845bdea`) is mounted at
+the same path on the separate `GCS Access DB`. Its generated private endpoint is
+`gcs-access-db`; IaC retains that existing endpoint. Both final database
+deployments reached `SUCCESS`. Enabling the declared access-database sleep policy
+through a targeted configuration update retained the successful deployment ID.
+The two PostgreSQL system identifiers differ, and access events were observed in
+the independent store. The fresh seed contains thirteen NCIA agreements, eight
+payments, and successful terminal Payments 168/172; all 28 seeded bilingual
+catalog-template files matched their recorded sizes.
+
+The former business volume `8c16e9f0-cac6-497c-a106-24d4a63fbb94` and the
+unintended newly provisioned default access volume
+`c1150171-da24-4fa8-825a-57096cd0cd39` are detached and pending Railway deletion;
+physical deletion has not been observed. The application's existing file volume,
+Portal and Metabase volumes, and all Portal/Metabase service identities, image
+sources and deployment IDs were retained.
+
+The 2026-10-20 core compatibility cutover used source commit
 `ad6193c9ed649bd2d3c40ce2e6922894c4893147` and the public image digest
 `sha256:8f1d8e7d0ead3f3a9ef7ff34ef3529a34f97878a5ce211115df0bdef210c63db`
 from [verified build 39409972545](https://github.com/GCS-SSC/gcs-ssc/actions/runs/39409972545).
