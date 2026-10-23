@@ -1,3 +1,4 @@
+import { assertAgreementBudgetFinancialLimits } from './agreement-budget-financial-limits'
 import { assertAgreementPaymentCommitmentCurrent } from './agreement-payment-commitment-controls'
 import { extensionLifecycleAdapterContext,
   resolveExtensionEligibleAssigneeIds,
@@ -493,6 +494,11 @@ const promoteApprovalSubmission = async (trx: Transaction<Database>, run: Workfl
   const agreementId = String(submission.egcs_fc_fundingagreement)
   await assertAgreementCorrectionFinancialUnlocked(trx, agreementId)
   const amendmentId = submission.egcs_fc_amendment === null ? null : String(submission.egcs_fc_amendment)
+  if (!amendmentId && packet.sourceVersions.budget) {
+    const agreement = await trx.selectFrom('Funding_Case_Agreement_Profile')
+      .select('egcs_fc_transferpaymentstream').where('id', '=', agreementId).where('_deleted', '=', false).executeTakeFirstOrThrow()
+    await assertAgreementBudgetFinancialLimits(trx, { agreementId, versionId: packet.sourceVersions.budget, streamId: String(agreement.egcs_fc_transferpaymentstream) })
+  }
   const latest = await trx.selectFrom('Funding_Case_Agreement_Revision')
     .select('egcs_fc_revisionnumber')
     .where('egcs_fc_fundingagreement', '=', agreementId)

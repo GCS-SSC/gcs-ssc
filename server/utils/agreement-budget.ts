@@ -25,6 +25,7 @@ import { assertFiscalYearOverlapsDuration } from '~~/server/utils/agreement-fisc
 import { budgetFiscalYearStableId, budgetLineItemStableId } from '~~/server/utils/agreement-budget-lineage'
 import { databaseMoneyText, databaseMoneyValue, parseDatabaseMoney } from '~~/server/utils/database-money'
 import { moneyToCents, type Money } from '~~/shared/utils/money'
+import { loadAgreementBudgetProponentName, resolveAgreementBudgetProponent } from './agreement-budget-proponent'
 import { loadBudgetFundingSources, replaceBudgetFundingSources, validateBudgetFundingSources } from './agreement-budget-funding'
 
 type DbClient = Kysely<Database> | Transaction<Database>
@@ -459,6 +460,7 @@ export const createAgreementBudgetLineItem = async (
       return await routeBadRequest(event, 'INVALID_AGREEMENT_BUDGET_LINE_ITEM', 'apiErrors.agreement.invalid_cost_category_line_item')
     }
 
+    const proponentId = await resolveAgreementBudgetProponent(event, trx, { agreementId, proponentId: validated.egcs_fc_applicantrecipient })
     await assertAgreementCurrency(event, trx, agreementId, validated.egcs_fc_currency)
     const calculation = await prepareBudgetCalculation(event, trx, validated, undefined, String(fiscalYear.id))
     const programFunding = calculation.egcs_fc_programfunding ?? validated.egcs_fc_programfunding!
@@ -471,12 +473,14 @@ export const createAgreementBudgetLineItem = async (
       .values({
         ...lineValues,
         ...calculation,
+        egcs_fc_applicantrecipient: proponentId,
         egcs_fc_totalamount: databaseMoneyValue(validated.egcs_fc_totalamount),
         egcs_fc_programfunding: databaseMoneyValue(programFunding),
         egcs_fc_fundingagreement: agreementId,
         egcs_fc_fundingagreementbudgetfiscalyear: String(fiscalYear.id)
       })
       .returning([
+        'egcs_fc_applicantrecipient',
         'egcs_fc_calculationmode', 'egcs_fc_sourcecategory', 'egcs_fc_percentage', 'egcs_fc_allowpercentageoverride',
         'id', 'egcs_fc_originalbudgetlineitem', 'egcs_fc_fundingagreementbudgetfiscalyear',
         'egcs_fc_organizationcostcategory', 'egcs_fc_costsubsection', 'egcs_fc_description',
@@ -496,6 +500,7 @@ export const createAgreementBudgetLineItem = async (
 
     return {
       ...inserted,
+      ...await loadAgreementBudgetProponentName(trx, proponentId),
       egcs_fc_totalamount: parseDatabaseMoney(inserted.egcs_fc_totalamount),
       egcs_fc_programfunding: amounts.get(inserted.id) ?? parseDatabaseMoney(inserted.egcs_fc_programfunding),
       egcs_fc_fundingsources: fundingSources,

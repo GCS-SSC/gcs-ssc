@@ -61,10 +61,21 @@ const { isOpen, selected, openCreate, openUpdate, captureSession, closeSession }
     egcs_tp_active: true,
     egcs_tp_maxallowableperrecipient: '0',
     egcs_tp_maxpercentofsupportavailableperrecipient: 0,
-    egcs_tp_maxpercentofretroactivecostsallowable: 0,
     egcs_tp_stackinglimit: 0
   }),
-  updateState: row => ({ ...row })
+  /**
+   * Hydrates only supported editable fields from the persisted read model.
+   * @param row Persisted financial-limit read model.
+   * @returns Supported financial-limit form fields.
+   */
+  updateState: row => ({
+    id: row.id,
+    egcs_tp_transferpaymentstream: row.egcs_tp_transferpaymentstream,
+    egcs_tp_maxallowableperrecipient: row.egcs_tp_maxallowableperrecipient,
+    egcs_tp_maxpercentofsupportavailableperrecipient: row.egcs_tp_maxpercentofsupportavailableperrecipient,
+    egcs_tp_stackinglimit: row.egcs_tp_stackinglimit,
+    egcs_tp_active: row.egcs_tp_active
+  })
 })
 
 const isModalOpen: Ref<boolean> = isOpen
@@ -143,7 +154,7 @@ const onDelete = async (id: string) => {
       </template>
       <template #egcs_tp_maxallowableperrecipient-cell="{ row }">
         <span class="font-semibold text-zinc-700 dark:text-zinc-300">
-          {{ formatMoneyText(row.original.egcs_tp_maxallowableperrecipient, locale, 'CAD') }}
+          {{ formatMoneyText(row.original.egcs_tp_maxallowableperrecipient, locale, null) }}
         </span>
       </template>
       <template #egcs_tp_maxpercentofsupportavailableperrecipient-cell="{ row }">

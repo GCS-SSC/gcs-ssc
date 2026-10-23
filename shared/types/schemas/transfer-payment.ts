@@ -14,7 +14,7 @@ import {
   validateApprovalTemplateStepSequences
 } from './approval-template-common'
 import { DirectReviewEntityTypeIdentitySchema, PaginationSchema, PositivePostgresBigintIdSchema, RequiredStringId, type WithId } from './common'
-import { MoneySchema } from './money'
+import { MoneySchema, NonNegativeMoneySchema } from './money'
 import {
   AMENDED_TYPE_ENUM,
   AGENCY_CHART_KIND_ENUM,
@@ -127,10 +127,14 @@ export const TransferPaymentStreamWizardHoldbackBasisSchema = TransferPaymentStr
 
 export const TransferPaymentFinancialLimitsSchema = z.object({
   egcs_tp_transferpaymentstream: RequiredId(),
-  egcs_tp_maxallowableperrecipient: MoneySchema,
-  egcs_tp_maxpercentofsupportavailableperrecipient: RequiredNumeric(5, 2),
-  egcs_tp_maxpercentofretroactivecostsallowable: RequiredNumeric(5, 2),
-  egcs_tp_stackinglimit: RequiredNumeric(5, 2),
+  egcs_tp_maxallowableperrecipient: NonNegativeMoneySchema,
+  egcs_tp_maxpercentofsupportavailableperrecipient: RequiredNumeric(5, 2)
+    .min(0, { error: 'validation.invalid_number' })
+    .max(1, { error: 'validation.invalid_number' }),
+  egcs_tp_maxpercentofretroactivecostsallowable: z.never({ error: 'validation.retroactive_costs_not_supported' }).optional(),
+  egcs_tp_stackinglimit: RequiredNumeric(5, 2)
+    .min(0, { error: 'validation.invalid_number' })
+    .max(1, { error: 'validation.invalid_number' }),
   egcs_tp_active: z.boolean().default(false)
 })
 
@@ -140,7 +144,11 @@ export const TransferPaymentFinancialLimitsPatchSchema = TransferPaymentFinancia
   .extend({ egcs_tp_active: z.boolean().optional() })
 
 export type TransferPaymentFinancialLimits = z.infer<typeof TransferPaymentFinancialLimitsSchema>
-export type TransferPaymentFinancialLimitsItem = WithId<TransferPaymentFinancialLimits>
+export type TransferPaymentFinancialLimitsItem = WithId<
+  Omit<TransferPaymentFinancialLimits, 'egcs_tp_maxpercentofretroactivecostsallowable'> & {
+    egcs_tp_maxpercentofretroactivecostsallowable: number
+  }
+>
 
 export const TransferPaymentOutcomeSchema = z.object({
   egcs_tp_name_en: StreamStorageText(255),

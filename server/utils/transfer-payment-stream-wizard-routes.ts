@@ -591,8 +591,7 @@ const insertStreamWizardFinancialLimit = async (
       egcs_tp_maxallowableperrecipient: databaseMoneyValue(payload.financialLimit.egcs_tp_maxallowableperrecipient),
       egcs_tp_maxpercentofsupportavailableperrecipient:
         payload.financialLimit.egcs_tp_maxpercentofsupportavailableperrecipient,
-      egcs_tp_maxpercentofretroactivecostsallowable:
-        payload.financialLimit.egcs_tp_maxpercentofretroactivecostsallowable,
+      egcs_tp_maxpercentofretroactivecostsallowable: 0,
       egcs_tp_stackinglimit: payload.financialLimit.egcs_tp_stackinglimit,
       egcs_tp_active: payload.financialLimit.egcs_tp_active
     })

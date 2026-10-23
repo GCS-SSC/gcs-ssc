@@ -9,6 +9,13 @@ import type { Database } from '~~/shared/types/database'
  */
 export const agreementApplicantRecipientCanDelete = (): RawBuilder<boolean> => sql<boolean>`
   NOT EXISTS (
+    SELECT 1 FROM "Funding_Case_Agreement_Budget_Line_Item" AS budget_line
+    WHERE budget_line.egcs_fc_fundingagreement = "Funding_Case_Agreement_Applicant_Recipient".egcs_fc_fundingagreement
+      AND budget_line.egcs_fc_applicantrecipient = "Funding_Case_Agreement_Applicant_Recipient".egcs_fc_applicantrecipient
+      AND NOT budget_line._deleted
+  )
+  AND
+  NOT EXISTS (
     SELECT 1 FROM "Funding_Case_Agreement_Responsible_Party_Activity" AS responsible_party
     INNER JOIN "Funding_Case_Agreement_Activity" AS activity
       ON activity.id = responsible_party.egcs_fc_activity

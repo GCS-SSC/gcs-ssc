@@ -1,3 +1,4 @@
+import { loadAgreementBudgetProponentName, resolveAgreementBudgetProponent } from '~~/server/utils/agreement-budget-proponent'
 import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { fetchAgreementBudgetCostCategory } from '~~/server/utils/cost-configuration-integrity'
 import { FundingCaseAgreementBudgetLineItemFundingTotalsSchema, FundingCaseAgreementBudgetLineItemCreateSchema } from '~~/shared/types/schemas'
@@ -22,7 +23,7 @@ export default defineEventHandler(async event => {
   if (!context) return await badRequest(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
 
   const body = await readValidatedBodyI18n(event, FundingCaseAgreementBudgetLineItemCreateSchema)
-  return await executeFreshAuthorizedAgreementWrite(event, db, agreementId, context, async trx => {
+  return await executeFreshAuthorizedAgreementWrite(event, db, agreementId, context, async (trx, currentContext) => {
     const amendment = await assertDraftAgreementAmendmentCapability(event, trx, agreementId, amendmentId, ['budget'])
     if (!('id' in amendment)) return amendment
     const versionId = await resolveDraftAgreementAmendmentBudgetVersion(event, trx, agreementId, amendmentId)
@@ -30,21 +31,24 @@ export default defineEventHandler(async event => {
     const year = await trx.selectFrom('Funding_Case_Agreement_Budget_Fiscal_Year').select('id')
       .where(budgetFiscalYearStableId, '=', body.egcs_fc_fundingagreementbudgetfiscalyear).where('egcs_fc_budgetversion', '=', versionId).where('_deleted', '=', false).executeTakeFirst()
     if (!year) return await notFound(event, 'AGREEMENT_BUDGET_FISCAL_YEAR_NOT_FOUND', 'apiErrors.agreement.budget_fiscal_year_not_found')
-    const category = await fetchAgreementBudgetCostCategory(trx, context.streamId, body.egcs_fc_organizationcostcategory)
+    const category = await fetchAgreementBudgetCostCategory(trx, currentContext.streamId, body.egcs_fc_organizationcostcategory)
     if (!category) return await badRequest(event, 'INVALID_AGREEMENT_BUDGET_LINE_ITEM', 'apiErrors.agreement.invalid_cost_category_line_item')
+    const proponentId = await resolveAgreementBudgetProponent(event, trx, { agreementId, proponentId: body.egcs_fc_applicantrecipient })
     await assertAgreementCurrency(event, trx, agreementId, body.egcs_fc_currency)
     const calculation = await prepareBudgetCalculation(event, trx, body, undefined, String(year.id))
     await parseI18n(event, FundingCaseAgreementBudgetLineItemFundingTotalsSchema, { ...body, egcs_fc_programfunding: calculation.egcs_fc_programfunding ?? body.egcs_fc_programfunding })
-    await validateBudgetFundingSources(event, trx, context.streamId, body.egcs_fc_fundingsources ?? [])
+    await validateBudgetFundingSources(event, trx, currentContext.streamId, body.egcs_fc_fundingsources ?? [])
     const { egcs_fc_fundingsources, ...lineValues } = body
     const inserted = await trx.insertInto('Funding_Case_Agreement_Budget_Line_Item').values({
       ...lineValues,
       ...calculation,
+      egcs_fc_applicantrecipient: proponentId,
       egcs_fc_totalamount: databaseMoneyValue(body.egcs_fc_totalamount),
       egcs_fc_programfunding: databaseMoneyValue(calculation.egcs_fc_programfunding ?? body.egcs_fc_programfunding!),
       egcs_fc_fundingagreement: agreementId,
       egcs_fc_fundingagreementbudgetfiscalyear: String(year.id)
     }).returning([
+      'egcs_fc_applicantrecipient',
       'egcs_fc_calculationmode', 'egcs_fc_sourcecategory', 'egcs_fc_percentage', 'egcs_fc_allowpercentageoverride',
       'id', 'egcs_fc_originalbudgetlineitem', 'egcs_fc_fundingagreementbudgetfiscalyear',
       'egcs_fc_organizationcostcategory', 'egcs_fc_costsubsection', 'egcs_fc_description',
@@ -53,9 +57,10 @@ export default defineEventHandler(async event => {
       'egcs_fc_currency'
     ]).executeTakeFirstOrThrow()
     await replaceBudgetFundingSources(trx, String(inserted.id), egcs_fc_fundingsources ?? [])
-    const amounts = await recalculateAgreementBudget(event, trx, inserted.id, context.streamId)
+    const amounts = await recalculateAgreementBudget(event, trx, inserted.id, currentContext.streamId)
     return {
       ...inserted,
+      ...await loadAgreementBudgetProponentName(trx, proponentId),
       egcs_fc_totalamount: parseDatabaseMoney(inserted.egcs_fc_totalamount),
       egcs_fc_programfunding: amounts.get(inserted.id) ?? parseDatabaseMoney(inserted.egcs_fc_programfunding),
       egcs_fc_fundingsources: await loadBudgetFundingSources(trx, [String(inserted.id)]),

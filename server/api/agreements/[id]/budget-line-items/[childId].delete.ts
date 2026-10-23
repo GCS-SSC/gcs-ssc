@@ -37,7 +37,7 @@ export default defineEventHandler(async event => {
   })
 
   try {
-    return await executeFreshAuthorizedAgreementWrite(event, db, agreementId, agreementContext, async trx => {
+    return await executeFreshAuthorizedAgreementWrite(event, db, agreementId, agreementContext, async (trx, currentContext) => {
       const agreement = await assertAgreementExists(event, agreementId, trx)
       if (!agreement || typeof agreement !== 'object' || !('id' in agreement)) {
         return agreement
@@ -110,7 +110,7 @@ export default defineEventHandler(async event => {
         .where('_deleted', '=', false)
         .execute()
 
-      await recalculateAgreementBudget(event, trx, String(existing.id), agreementContext.streamId)
+      await recalculateAgreementBudget(event, trx, String(existing.id), currentContext.streamId)
       return { success: true }
     }, { action: 'delete', blocksApprovalSubmission: true, correctionFinancialMutation: true })
   } catch (error: unknown) {

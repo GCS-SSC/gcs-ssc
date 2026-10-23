@@ -131,11 +131,14 @@ const packetBudgetOverview = computed<FundingCaseAgreementBudgetOverviewRow>(() 
     return { id, egcs_fc_fiscalyear: id, fiscal_year_display: display(fiscalYear.display) }
   })
   return {
+    proponents: [],
     fiscalYears: mappedFiscalYears,
     lineItems: lineItems.value.map((line, index) => {
       const fiscalYearId = fiscalYearIdByDisplay.get(display(line.fiscalYear)) ?? `packet-fiscal-year-missing-${index}`
       const category = asRecord(line.organizationCostCategory)
       const item = asRecord(line.lineItem)
+      const applicantRecipient = asRecord(line.applicantRecipient)
+      const applicantRecipientName = asRecord(applicantRecipient.name)
       const fundingSources = asRecords(line.fundingSources).map((source, sourceIndex) => {
         const typeName = asRecord(source.fundingType)
         const subtypeName = asRecord(source.fundingSubtype)
@@ -159,6 +162,9 @@ const packetBudgetOverview = computed<FundingCaseAgreementBudgetOverviewRow>(() 
         fiscal_year_id: fiscalYearId,
         fiscal_year_display: display(line.fiscalYear),
         egcs_fc_fundingagreementbudgetfiscalyear: fiscalYearId,
+        egcs_fc_applicantrecipient: String(applicantRecipient.id ?? ''),
+        applicant_recipient_name_en: String(applicantRecipientName.en ?? ''),
+        applicant_recipient_name_fr: String(applicantRecipientName.fr ?? ''),
         egcs_fc_organizationcostcategory: `packet-category-${index}`,
         organization_cost_category_name_en: String(category.en ?? ''),
         organization_cost_category_name_fr: String(category.fr ?? ''),
@@ -330,6 +336,7 @@ const packetActivityRows = computed<FundingCaseAgreementActivityRow[]>(() => act
         :can-create-fiscal-year="false"
         :can-update-fiscal-year="false"
         :can-delete-fiscal-year="false"
+        :agreement-proponent-count="proponents.length"
         :snapshot-overview="packetBudgetOverview" />
     </CommonSection>
 

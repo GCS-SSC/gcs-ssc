@@ -486,6 +486,7 @@ CREATE UNIQUE INDEX fc_idx_budgetfiscalyearversionidentity ON "Funding_Case_Agre
 CREATE TABLE "Funding_Case_Agreement_Budget_Line_Item" (
   "id" bigint DEFAULT nextval('"Funding_Case_Agreement_Budget_Line_Item_id_seq"'::regclass) NOT NULL,
   "egcs_fc_fundingagreement" bigint NOT NULL,
+  "egcs_fc_applicantrecipient" bigint NOT NULL,
   "egcs_fc_budgetversion" bigint NOT NULL,
   "egcs_fc_originalbudgetlineitem" bigint,
   "egcs_fc_fundingagreementbudgetfiscalyear" bigint NOT NULL,
@@ -502,6 +503,7 @@ CREATE TABLE "Funding_Case_Agreement_Budget_Line_Item" (
   "_deleted" boolean DEFAULT false NOT NULL,
   CONSTRAINT "fc_unq_budgetlineitemidfundingagreement" UNIQUE (id, egcs_fc_fundingagreement),
   CONSTRAINT "Funding_Case_Agreement_Budget_Line_Item_pkey" PRIMARY KEY (id),
+  CONSTRAINT "fc_chk_budgetline_nonnegative" CHECK (egcs_fc_totalamount >= 0 AND egcs_fc_programfunding >= 0),
   CONSTRAINT "fc_chk_budgetlineitemoriginalnotself" CHECK (((egcs_fc_originalbudgetlineitem IS NULL) OR (egcs_fc_originalbudgetlineitem <> id))),
   CONSTRAINT "fc_chk_lineitemcalculation" CHECK (((((egcs_fc_calculationmode)::text = 'manual'::text) AND (egcs_fc_sourcecategory IS NULL) AND (egcs_fc_percentage IS NULL) AND (NOT egcs_fc_allowpercentageoverride)) OR (((egcs_fc_calculationmode)::text = ANY ((ARRAY['category'::character varying, 'all_other'::character varying])::text[])) AND (egcs_fc_percentage IS NOT NULL) AND ((egcs_fc_percentage >= (0)::numeric) AND (egcs_fc_percentage <= (100)::numeric)) AND ((((egcs_fc_calculationmode)::text = 'category'::text) AND (egcs_fc_sourcecategory IS NOT NULL)) OR (((egcs_fc_calculationmode)::text = 'all_other'::text) AND (egcs_fc_sourcecategory IS NULL))))))
 );
@@ -1654,6 +1656,53 @@ AS $function$
         RAISE EXCEPTION 'Budget line item original must be a root row'
           USING ERRCODE = '23514', CONSTRAINT = 'fc_chk_budgetlineitemoriginalroot';
       END IF;
+      RETURN NEW;
+    END
+    $function$;
+
+CREATE FUNCTION guard_budget_line_proponent()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+    BEGIN
+      IF NEW._deleted THEN RETURN NEW; END IF;
+      PERFORM id FROM "Funding_Case_Agreement_Profile"
+        WHERE id = NEW.egcs_fc_fundingagreement FOR UPDATE;
+      IF NOT EXISTS (
+        SELECT 1 FROM "Funding_Case_Agreement_Applicant_Recipient" relation
+        WHERE relation.egcs_fc_fundingagreement = NEW.egcs_fc_fundingagreement
+          AND relation.egcs_fc_applicantrecipient = NEW.egcs_fc_applicantrecipient
+          AND NOT relation._deleted
+      ) THEN
+        RAISE EXCEPTION 'Budget line Proponent must be linked to its Agreement'
+          USING ERRCODE = '23514', CONSTRAINT = 'fc_chk_budgetline_proponent';
+      END IF;
+      RETURN NEW;
+    END
+    $function$;
+
+CREATE FUNCTION guard_budget_proponent_reference()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+    BEGIN
+      IF TG_OP = 'UPDATE' AND NOT NEW._deleted
+        AND (OLD.egcs_fc_fundingagreement, OLD.egcs_fc_applicantrecipient)
+          IS NOT DISTINCT FROM (NEW.egcs_fc_fundingagreement, NEW.egcs_fc_applicantrecipient) THEN
+        RETURN NEW;
+      END IF;
+      PERFORM id FROM "Funding_Case_Agreement_Profile"
+        WHERE id = OLD.egcs_fc_fundingagreement FOR UPDATE;
+      IF EXISTS (
+        SELECT 1 FROM "Funding_Case_Agreement_Budget_Line_Item" line
+        WHERE line.egcs_fc_fundingagreement = OLD.egcs_fc_fundingagreement
+          AND line.egcs_fc_applicantrecipient = OLD.egcs_fc_applicantrecipient
+          AND NOT line._deleted
+      ) THEN
+        RAISE EXCEPTION 'An Agreement budget still references this Proponent'
+          USING ERRCODE = '23514', CONSTRAINT = 'fc_chk_budget_proponent_in_use';
+      END IF;
+      IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
       RETURN NEW;
     END
     $function$;
@@ -3070,6 +3119,8 @@ ALTER TABLE "Funding_Case_Agreement_Budget_Line_Item" ADD CONSTRAINT "fc_ref_bud
 
 ALTER TABLE "Funding_Case_Agreement_Budget_Line_Item" ADD CONSTRAINT "fc_fk_agreement_budget_lineitem_costcategory" FOREIGN KEY (egcs_fc_organizationcostcategory) REFERENCES "Transfer_Payment_Stream_Cost_Category_Line_Item"(id) ON DELETE RESTRICT;
 
+ALTER TABLE "Funding_Case_Agreement_Budget_Line_Item" ADD CONSTRAINT "fc_fk_budgetline_proponent" FOREIGN KEY (egcs_fc_applicantrecipient) REFERENCES "Applicant_Recipient_Profile"(id) ON DELETE RESTRICT;
+
 ALTER TABLE "Funding_Case_Agreement_Budget_Line_Item" ADD CONSTRAINT "fc_fk_agreement_budget_lineitem_sourcecategory" FOREIGN KEY (egcs_fc_sourcecategory) REFERENCES "Agency_Cost_Category"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Funding_Case_Agreement_Budget_Line_Item_Funding" ADD CONSTRAINT "fc_fk_agreement_budget_lineitem_funding_budgetlineitem" FOREIGN KEY (egcs_fc_budgetlineitem) REFERENCES "Funding_Case_Agreement_Budget_Line_Item"(id) ON DELETE RESTRICT;
@@ -3424,6 +3475,8 @@ CREATE TRIGGER guard_agreement_proponent_type AFTER INSERT OR UPDATE ON "Funding
 
 CREATE TRIGGER guard_future_proponent_type BEFORE INSERT OR UPDATE ON "Funding_Case_Agreement_Applicant_Recipient" FOR EACH ROW EXECUTE FUNCTION guard_future_proponent_type();
 
+CREATE TRIGGER guard_budget_proponent_reference BEFORE DELETE OR UPDATE ON "Funding_Case_Agreement_Applicant_Recipient" FOR EACH ROW EXECUTE FUNCTION guard_budget_proponent_reference();
+
 CREATE TRIGGER trg_immutable_agreement_approval_submission BEFORE DELETE OR UPDATE ON "Funding_Case_Agreement_Approval_Submission" FOR EACH ROW EXECUTE FUNCTION trg_fn_immutable_agreement_approval_submission();
 
 CREATE TRIGGER trg_validate_agreement_approval_submission BEFORE INSERT ON "Funding_Case_Agreement_Approval_Submission" FOR EACH ROW EXECUTE FUNCTION trg_fn_validate_agreement_approval_submission();
@@ -3441,6 +3494,8 @@ CREATE TRIGGER trg_enforce_budget_line_item_root BEFORE INSERT OR UPDATE OF egcs
 CREATE TRIGGER trg_resolve_budget_line_item_identity BEFORE INSERT OR UPDATE OF egcs_fc_fundingagreement, egcs_fc_fundingagreementbudgetfiscalyear, egcs_fc_originalbudgetlineitem, _deleted ON "Funding_Case_Agreement_Budget_Line_Item" FOR EACH ROW EXECUTE FUNCTION trg_fn_resolve_budget_line_item_identity();
 
 CREATE TRIGGER zz_guard_agreement_financial_currency BEFORE INSERT OR UPDATE ON "Funding_Case_Agreement_Budget_Line_Item" FOR EACH ROW EXECUTE FUNCTION guard_agreement_financial_currency();
+
+CREATE TRIGGER zz_guard_budget_line_proponent BEFORE INSERT OR UPDATE ON "Funding_Case_Agreement_Budget_Line_Item" FOR EACH ROW EXECUTE FUNCTION guard_budget_line_proponent();
 
 CREATE TRIGGER trg_correction_financial_lock BEFORE INSERT OR DELETE OR UPDATE ON "Funding_Case_Agreement_Budget_Line_Item_Funding" FOR EACH ROW EXECUTE FUNCTION trg_fn_correction_financial_lock();
 

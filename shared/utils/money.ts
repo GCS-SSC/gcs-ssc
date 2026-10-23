@@ -229,18 +229,17 @@ export const moneyToPresentationNumber = (value: Money): number => {
  *
  * @param value - Canonical monetary value.
  * @param locale - Locale understood by `Intl.NumberFormat`.
- * @param currency - ISO 4217 currency code.
+ * @param currency - ISO 4217 currency code, or null for a currency-independent configuration amount.
  * @returns Localized currency text with the exact cents preserved.
  */
-export const formatMoneyText = (value: Money, locale: string, currency: string): string => {
+export const formatMoneyText = (value: Money, locale: string, currency: string | null): string => {
   const cents = moneyToCents(value)
   const negative = cents < BigInt(0)
   const absoluteCents = negative ? -cents : cents
   const units = absoluteCents / CENTS_PER_UNIT
   const fraction = String(absoluteCents % CENTS_PER_UNIT).padStart(2, '0')
   const formatter = new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency,
+    ...(currency === null ? { style: 'decimal' as const } : { style: 'currency' as const, currency }),
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   })

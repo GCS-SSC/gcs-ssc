@@ -1,3 +1,4 @@
+import { loadAgreementBudgetProponents } from '~~/server/utils/agreement-budget-proponent'
 import { sql } from 'kysely'
 import { badRequest } from '~~/server/utils/api-errors'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
@@ -58,6 +59,7 @@ export default defineEventHandler(async event => {
           'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_budgetversion'
         )
         .innerJoin('Agency_Fiscal_Year', 'Agency_Fiscal_Year.id', 'Funding_Case_Agreement_Budget_Fiscal_Year.egcs_fc_fiscalyear')
+        .innerJoin('Applicant_Recipient_Profile', 'Applicant_Recipient_Profile.id', 'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_applicantrecipient')
         .innerJoin(
           'Transfer_Payment_Stream_Cost_Category_Line_Item',
           'Transfer_Payment_Stream_Cost_Category_Line_Item.id',
@@ -88,6 +90,9 @@ export default defineEventHandler(async event => {
           budgetFiscalYearStableId.as('egcs_fc_fundingagreementbudgetfiscalyear'),
           'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_organizationcostcategory as egcs_fc_organizationcostcategory',
           sql<boolean>`"Agency_Cost_Category".egcs_ay_active AND "Agency_Cost_Category_Line_Item".egcs_ay_active AND "Transfer_Payment_Stream_Cost_Category_Line_Item".egcs_tp_active`.as('cost_category_available'),
+          'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_applicantrecipient',
+          sql<string>`COALESCE("Applicant_Recipient_Profile".egcs_ar_legalname_en, "Applicant_Recipient_Profile".egcs_ar_operatingname_en, "Applicant_Recipient_Profile".id::text)`.as('applicant_recipient_name_en'),
+          sql<string>`COALESCE("Applicant_Recipient_Profile".egcs_ar_legalname_fr, "Applicant_Recipient_Profile".egcs_ar_operatingname_fr, "Applicant_Recipient_Profile".id::text)`.as('applicant_recipient_name_fr'),
           'Funding_Case_Agreement_Budget_Line_Item.egcs_fc_calculationmode',
           sql<string | null>`(SELECT source.egcs_ay_name_en FROM "Agency_Cost_Category" source WHERE source.id = "Funding_Case_Agreement_Budget_Line_Item".egcs_fc_sourcecategory)`.as('calculation_source_name_en'),
           sql<string | null>`(SELECT source.egcs_ay_name_fr FROM "Agency_Cost_Category" source WHERE source.id = "Funding_Case_Agreement_Budget_Line_Item".egcs_fc_sourcecategory)`.as('calculation_source_name_fr'),
@@ -114,9 +119,11 @@ export default defineEventHandler(async event => {
         .execute()
     ])
 
+    const proponents = await loadAgreementBudgetProponents(db, agreementId)
     const fundingSourcesByLine = budgetFundingSourcesByLine(await loadBudgetFundingSources(db, lineItems.map(line => String(line.row_id))))
     return {
       fiscalYears,
+      proponents,
       lineItems: lineItems.map(line => ({
         ...line,
         egcs_fc_totalamount: parseDatabaseMoney(line.egcs_fc_totalamount),
