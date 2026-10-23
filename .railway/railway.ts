@@ -50,6 +50,7 @@ export default defineRailway((ctx) => {
   const metabaseGroup = group('Metabase', [metabase, metabaseDatabase])
   const gcsGroup = group('GCS', [gcsSsc, database, accessDatabase])
   const portalDatabase = postgres('Portal DB', { region: 'us-east4-eqdc4a' })
+  portalDatabase.deploy = { sleepApplication: true }
   // Existing Portal storage stays attached; importing database mounts is lossy in CLI 5.54.1.
   // Keep its volume resource, without reapplying the attachment during a GCS-only release.
   const portal = service('gcs-ssc-portal', {
