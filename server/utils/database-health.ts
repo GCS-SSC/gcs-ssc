@@ -19,7 +19,7 @@ interface DestroyablePostgresClient extends PoolClient {
  * @param client - Checked-out PostgreSQL pool client.
  * @param error - Deadline error associated with the forced close.
  */
-const destroyUnderlyingConnection = (client: PoolClient, error: Error): void => {
+export const destroyUnderlyingConnection = (client: PoolClient, error: Error): void => {
   const destroyableClient = client as DestroyablePostgresClient
   const stream = destroyableClient.connection?.stream
   if (!stream) {

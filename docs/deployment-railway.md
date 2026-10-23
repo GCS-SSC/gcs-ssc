@@ -37,10 +37,21 @@ approval workflows, documented demo users, and successful terminal Payments 168/
 `ENVIRONMENT_TYPE` requires a rebuild and redeploy because the seed is
 intentionally absent from production images.
 
-Do not set `DATABASE_URL` when using PGlite. The image already sets
-`PGLITE_DATA_DIR=/app/.data/pglite`.
+For local PGlite development, leave both `DATABASE_URL` and
+`GCS_ACCESS_DATABASE_URL` unset. Business data uses `/app/.data/pglite`; access
+history uses its own sibling directory `/app/.data/pglite-access`, configurable
+through `PGLITE_ACCESS_DATA_DIR`.
 
-For PostgreSQL, set `DATABASE_URL` and optionally tune these finite server-side budgets (milliseconds):
+For Railway and other cloud PostgreSQL deployments, use two separate PostgreSQL
+instances. Set `DATABASE_URL` to the business instance and
+`GCS_ACCESS_DATABASE_URL` to the access-history instance. Both are required in
+PostgreSQL mode; do not use two databases on the same server. The Railway IaC
+adds `GCS Access DB` with its own volume and references its private URL.
+Change/security auditing remains transactional in the business database.
+Access delivery remains best effort, so destination outages can lose access
+evidence without blocking business requests once startup has completed.
+
+Optionally tune these finite server-side budgets (milliseconds):
 
 - `POSTGRES_STATEMENT_TIMEOUT_MS` defaults to `60000` and accepts `1000`–`600000`;
 - `POSTGRES_LOCK_TIMEOUT_MS` defaults to `5000` and accepts `100`–`600000`;
@@ -55,8 +66,9 @@ does not leave a database query running in the background.
 
 ## Persistent data
 
-Attach one Railway volume at `/app/.data`. This persists both the PGlite
-database under `/app/.data/pglite` and locally stored attachments under
+Attach one Railway volume at `/app/.data`. For local PGlite containers this persists the business
+database under `/app/.data/pglite`, access history under
+`/app/.data/pglite-access`, and locally stored attachments under
 `/app/.data/files`.
 
 Railway mounts volumes as root. If the deployment reports permission errors for

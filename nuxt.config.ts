@@ -14,6 +14,8 @@ export default defineNuxtConfig({
   runtimeConfig: {
     databaseUrl: '',
     pgliteDataDir: './.data/pglite',
+    accessDatabaseUrl: '',
+    pgliteAccessDataDir: '',
     postgresStatementTimeoutMs: 60_000,
     postgresLockTimeoutMs: 5_000,
     postgresIdleInTransactionSessionTimeoutMs: 60_000,

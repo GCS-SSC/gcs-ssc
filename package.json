@@ -29,6 +29,7 @@
     "bun:docgen:install": "bun run scripts/setup-docgen-tools.ts",
     "setup": "bun run scripts/setup-workspaces.ts",
     "tooling:setup": "bun run scripts/setup-private-tooling.ts",
+    "audit:measure": "bun run tooling/gcs-ssc/scripts/measure-access-logging.ts",
     "tooling:update": "git submodule update --init --remote -- tooling/gcs-ssc && bun run tooling:setup",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",

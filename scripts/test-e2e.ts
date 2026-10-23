@@ -16,6 +16,7 @@ const DEFAULT_AUTH_SECRET = ['abcdefghijklmnopqrstuvwxyz', '123456'].join('')
 const DEFAULT_PORT_SCAN_LIMIT = 50
 const DEFAULT_PLAYWRIGHT_WORKERS = '1'
 const E2E_POSTGRES_TEST_URL_ENV = 'E2E_POSTGRES_TEST_URL'
+const E2E_ACCESS_POSTGRES_TEST_URL_ENV = 'E2E_ACCESS_POSTGRES_TEST_URL'
 
 export const extensionProfileE2eSpecPath = 'tests/e2e/agreement-extension-persistence.spec.ts'
 
@@ -225,14 +226,17 @@ type E2eScriptConfig = {
   baseUrlFromEnv?: string
   timeoutMs: number
   pgliteDataDir: string
+  pgliteAccessDataDir: string
   localFileStorageDir: string
   cleanupDataPaths: () => Promise<void>
   serverMode: 'development' | 'production'
+  accessPostgresTestUrl?: string
   postgresTestUrl?: string
 }
 
 export type ManagedE2eDataPaths = {
   pgliteDataDir: string
+  pgliteAccessDataDir: string
   localFileStorageDir: string
   ownsPgliteDataDir: boolean
   ownsLocalFileStorageDir: boolean
@@ -713,24 +717,25 @@ export const resolveE2eTestSelection = (rawArgs: string[], specFromEnv?: string)
  * Validates the dedicated disposable database URL for managed PostgreSQL E2E.
  *
  * @param environment - Environment containing E2E_POSTGRES_TEST_URL.
+ * @param variableName - Explicit disposable database input to validate.
  * @returns The validated PostgreSQL URL.
  */
-export const requireDisposableE2ePostgresUrl = (environment: NodeJS.ProcessEnv): string => {
-  const value = environment[E2E_POSTGRES_TEST_URL_ENV]?.trim()
+export const requireDisposableE2ePostgresUrl = (environment: NodeJS.ProcessEnv, variableName = E2E_POSTGRES_TEST_URL_ENV): string => {
+  const value = environment[variableName]?.trim()
   if (!value) {
-    throw new Error(`${E2E_POSTGRES_TEST_URL_ENV} is required for the PostgreSQL E2E suite.`)
+    throw new Error(`${variableName} is required for the PostgreSQL E2E suite.`)
   }
 
   let url: URL
   try {
     url = new URL(value)
   } catch {
-    throw new Error(`${E2E_POSTGRES_TEST_URL_ENV} must be a valid PostgreSQL URL.`)
+    throw new Error(`${variableName} must be a valid PostgreSQL URL.`)
   }
 
   const databaseName = decodeURIComponent(url.pathname).split('/').filter(Boolean).at(-1) ?? ''
   if (!['postgres:', 'postgresql:'].includes(url.protocol) || !databaseName.endsWith('_test')) {
-    throw new Error(`${E2E_POSTGRES_TEST_URL_ENV} must be a PostgreSQL URL whose database name ends in _test.`)
+    throw new Error(`${variableName} must be a PostgreSQL URL whose database name ends in _test.`)
   }
 
   return value
@@ -823,11 +828,16 @@ export const createManagedE2eDataPaths = async (
   temporaryRoot = tmpdir()
 ): Promise<ManagedE2eDataPaths> => {
   const providedPgliteDataDir = environment.PGLITE_DATA_DIR
+  const providedPgliteAccessDataDir = environment.PGLITE_ACCESS_DATA_DIR
+  let ownedPgliteAccessDataDir: string | undefined
   const providedLocalFileStorageDir = environment.GCS_LOCAL_FILE_STORAGE_DIR
   let ownedPgliteDataDir: string | undefined
   let ownedLocalFileStorageDir: string | undefined
 
   try {
+    if (!providedPgliteAccessDataDir) {
+      ownedPgliteAccessDataDir = await mkdtemp(join(temporaryRoot, 'gcs-ssc-access-pglite-e2e-'))
+    }
     if (!providedPgliteDataDir) {
       ownedPgliteDataDir = await mkdtemp(join(temporaryRoot, DEFAULT_PGLITE_DATA_DIR_PREFIX))
     }
@@ -836,6 +846,7 @@ export const createManagedE2eDataPaths = async (
     }
   } catch (error) {
     await Promise.all([
+      ownedPgliteAccessDataDir ? rm(ownedPgliteAccessDataDir, { recursive: true, force: true }) : Promise.resolve(),
       ownedPgliteDataDir ? rm(ownedPgliteDataDir, { recursive: true, force: true }) : Promise.resolve(),
       ownedLocalFileStorageDir
         ? rm(ownedLocalFileStorageDir, { recursive: true, force: true })
@@ -845,14 +856,16 @@ export const createManagedE2eDataPaths = async (
   }
 
   const pgliteDataDir = providedPgliteDataDir || ownedPgliteDataDir
+  const pgliteAccessDataDir = providedPgliteAccessDataDir || ownedPgliteAccessDataDir
   const localFileStorageDir = providedLocalFileStorageDir || ownedLocalFileStorageDir
-  if (!pgliteDataDir || !localFileStorageDir) {
+  if (!pgliteDataDir || !pgliteAccessDataDir || !localFileStorageDir) {
     throw new Error('Managed E2E data paths could not be resolved.')
   }
 
   let cleanedUp = false
   return {
     pgliteDataDir,
+    pgliteAccessDataDir,
     localFileStorageDir,
     ownsPgliteDataDir: ownedPgliteDataDir !== undefined,
     ownsLocalFileStorageDir: ownedLocalFileStorageDir !== undefined,
@@ -860,6 +873,7 @@ export const createManagedE2eDataPaths = async (
       if (cleanedUp) return
       cleanedUp = true
       await Promise.all([
+        ownedPgliteAccessDataDir ? rm(ownedPgliteAccessDataDir, { recursive: true, force: true }) : Promise.resolve(),
         ownedPgliteDataDir ? rm(ownedPgliteDataDir, { recursive: true, force: true }) : Promise.resolve(),
         ownedLocalFileStorageDir
           ? rm(ownedLocalFileStorageDir, { recursive: true, force: true })
@@ -910,6 +924,14 @@ const resolveE2eScriptConfig = async (): Promise<E2eScriptConfig> => {
   const postgresTestUrl = selection.suite === 'postgres'
     ? requireDisposableE2ePostgresUrl(process.env)
     : undefined
+  const accessPostgresTestUrl = selection.suite === 'postgres'
+    ? requireDisposableE2ePostgresUrl(process.env, E2E_ACCESS_POSTGRES_TEST_URL_ENV)
+    : undefined
+  if (postgresTestUrl && accessPostgresTestUrl) {
+    const business = new URL(postgresTestUrl)
+    const access = new URL(accessPostgresTestUrl)
+    if (business.host === access.host) throw new Error('E2E_ACCESS_POSTGRES_TEST_URL must use a separate PostgreSQL instance.')
+  }
   const dataPaths = await createManagedE2eDataPaths()
 
   return {
@@ -924,10 +946,11 @@ const resolveE2eScriptConfig = async (): Promise<E2eScriptConfig> => {
     baseUrlFromEnv,
     timeoutMs,
     pgliteDataDir: dataPaths.pgliteDataDir,
+    pgliteAccessDataDir: dataPaths.pgliteAccessDataDir,
     localFileStorageDir: dataPaths.localFileStorageDir,
     cleanupDataPaths: dataPaths.cleanup,
     serverMode,
-    ...(postgresTestUrl ? { postgresTestUrl } : {})
+    ...(postgresTestUrl ? { postgresTestUrl, accessPostgresTestUrl } : {})
   }
 }
 
@@ -936,11 +959,14 @@ export const buildE2eEnv = (
   pgliteDataDir: string,
   localFileStorageDir: string,
   suite: E2eSuite,
-  postgresConnectionString?: string
+  postgresConnectionString?: string,
+  accessPostgresConnectionString?: string,
+  pgliteAccessDataDir = join(pgliteDataDir, 'access-history')
 ): NodeJS.ProcessEnv => {
   const env = {
     ...process.env,
     PGLITE_DATA_DIR: pgliteDataDir,
+    PGLITE_ACCESS_DATA_DIR: pgliteAccessDataDir,
     GCS_LOCAL_FILE_STORAGE_DIR: localFileStorageDir,
     BETTER_AUTH_SECRET: getProcessEnvValue('BETTER_AUTH_SECRET', DEFAULT_AUTH_SECRET),
     BETTER_AUTH_URL: getProcessEnvValue('BETTER_AUTH_URL', baseUrl),
@@ -954,6 +980,10 @@ export const buildE2eEnv = (
   if (suite === 'agreement-amendments') Object.assign(env, { E2E_ISOLATED_AMENDMENT_AGREEMENT: '1' })
   delete env.GCS_E2E_FIXTURE_ISOLATION
   delete env.DATABASE_URL
+  delete env.GCS_ACCESS_DATABASE_URL
+  delete env.NUXT_ACCESS_DATABASE_URL
+  delete env.NUXT_PGLITE_ACCESS_DATA_DIR
+  delete env.E2E_ACCESS_POSTGRES_TEST_URL
   delete env.NUXT_DATABASE_URL
   delete env.E2E_POSTGRES_TEST_URL
   delete env.PGOPTIONS
@@ -961,7 +991,9 @@ export const buildE2eEnv = (
 
   if (suite === 'postgres') {
     if (!postgresConnectionString) throw new Error('PostgreSQL E2E isolation was not prepared.')
+    if (!accessPostgresConnectionString) throw new Error('PostgreSQL access E2E isolation was not prepared.')
     env.DATABASE_URL = postgresConnectionString
+    env.GCS_ACCESS_DATABASE_URL = accessPostgresConnectionString
   }
   if (suite === 'review-scratch') {
     env.E2E_REVIEW_SCRATCH = '1'
@@ -1108,9 +1140,11 @@ const main = async (): Promise<void> => {
   logPortSelection(config)
 
   let postgresIsolation: PostgresE2eIsolation | undefined
+  let accessPostgresIsolation: PostgresE2eIsolation | undefined
   const cleanupManagedResources = async (): Promise<void> => {
     const results = await Promise.allSettled([
       postgresIsolation?.cleanup(),
+      accessPostgresIsolation?.cleanup(),
       config.cleanupDataPaths()
     ])
     const failure = results.find(result => result.status === 'rejected')
@@ -1119,6 +1153,8 @@ const main = async (): Promise<void> => {
 
   try {
     if (config.postgresTestUrl) {
+      if (!config.accessPostgresTestUrl) throw new Error('E2E_ACCESS_POSTGRES_TEST_URL is required for the PostgreSQL E2E suite.')
+      accessPostgresIsolation = await createPostgresE2eIsolation(config.accessPostgresTestUrl)
       postgresIsolation = await createPostgresE2eIsolation(config.postgresTestUrl)
       console.info(`[e2e] Reset and exclusively locked disposable PostgreSQL database ${postgresIsolation.databaseName}.`)
     }
@@ -1128,7 +1164,9 @@ const main = async (): Promise<void> => {
       config.pgliteDataDir,
       config.localFileStorageDir,
       config.suite,
-      postgresIsolation?.connectionString
+      postgresIsolation?.connectionString,
+      accessPostgresIsolation?.connectionString,
+      config.pgliteAccessDataDir
     )
     const fixtureIsolation = resolveFixtureIsolationCapability({
       spec: config.selectedSpec,

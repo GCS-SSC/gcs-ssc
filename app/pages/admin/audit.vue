@@ -8,13 +8,13 @@ const { t } = useI18n()
 const tab: Ref<string> = ref('events')
 const auditPanelId = `audit-panel-${useId()}`
 const filters = reactive({ actor: '', table: '', recordId: '', operation: '', requestId: '', from: '', to: '' })
-const filterKeys = ['actor', 'table', 'recordId', 'operation', 'requestId', 'from', 'to'] as const
+const filterKeys = ['recordId', 'requestId', 'from', 'to'] as const
 const query = computed(() => ({
   ...Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== '').map(([key, value]) =>
     [key, key === 'from' || key === 'to' ? new Date(value).toISOString() : value]))
 }))
 const { permissionRevision } = useAuth()
-const { items: rows, totalRecords, status, refresh, pagination } = useResourceTable<AuditSummary>({ fetchUrl: computed(() => `/api/admin/audit/${tab.value}`), query, contextKey: permissionRevision, initialPageSize: 20 })
+const { items: rows, totalRecords, status, refresh, pagination } = useResourceTable<AuditSummary>({ fetchUrl: '/api/admin/audit/events', enabled: computed(() => tab.value === 'events'), query, contextKey: permissionRevision, initialPageSize: 20 })
 const { data: retention, error: retentionError, refresh: refreshRetention } = await useFetch<{ auditDays: number; accessDays: number }, Error, string>('/api/admin/audit/config' as string)
 const selected: Ref<{ id: string; kind: string } | null> = ref(null)
 const detail: Ref<AuditDetail | null> = ref(null)
@@ -126,13 +126,18 @@ const isHeroCollapsed = getHeroCollapsed('admin-audit')
               :title="t('audit.retention', { audit: retention.auditDays, access: retention.accessDays })" />
             <UButton v-if="retentionError" :label="t('audit.retry')" @click="refreshRetention()" />
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              <AdminAuditActorFilter v-model="filters.actor" />
+              <AdminAuditTableFilter v-model="filters.table" :kind="tab === 'access' ? 'access' : 'events'" />
+              <AdminAuditOperationFilter v-model="filters.operation" :kind="tab === 'access' ? 'access' : 'events'" />
               <UFormField v-for="key in filterKeys" :key="key" :label="t(`audit.${key}`)">
                 <UInput v-model="filters[key]" :type="key === 'from' || key === 'to' ? 'datetime-local' : 'text'" />
               </UFormField>
             </div>
           </div>
           <div :id="auditPanelId" role="tabpanel" :aria-label="t(tab === 'events' ? 'audit.title' : 'audit.access')">
+            <AdminAuditAccessHistory v-if="tab === 'access'" :query="query" :context-key="permissionRevision" @select="openDetail" />
             <CommonResourceLayoutCard
+              v-else
               v-model:pagination="pagination"
               :data="rows" :columns="columns" :total-records="totalRecords" :request-status="status" :show-toolbar="false" @retry="refresh()">
               <template #actions-cell="{ row }">

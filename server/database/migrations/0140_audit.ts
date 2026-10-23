@@ -1,5 +1,6 @@
 import { sql, type Kysely } from 'kysely'
 import type { Database } from '../../../shared/types/database'
+import { ACCESS_EVENT_TABLE_SQL } from '../access-log-schema'
 
 // Clean-cutover baseline: audit. Edit this subject directly.
 import { installAuditOwnershipFunctions } from '../audit-ownership-functions'
@@ -14,51 +15,7 @@ CREATE SEQUENCE "audit"."change_event_id_seq" AS bigint START WITH 1 INCREMENT B
 
 CREATE SEQUENCE "audit"."security_audit_event_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
 
-CREATE TABLE "audit"."access_event" (
-  "id" uuid NOT NULL,
-  "created_at" timestamp with time zone NOT NULL,
-  "actor_user_id" text,
-  "actor_kind" text NOT NULL,
-  "request_id" text,
-  "sql" text NOT NULL,
-  "parameters" jsonb NOT NULL,
-  "duration_ms" double precision NOT NULL,
-  "outcome" text NOT NULL,
-  "transaction_outcome" text NOT NULL,
-  "row_count" text,
-  "returned_identities" jsonb NOT NULL,
-  "limitations" jsonb NOT NULL,
-  "scope_type" text DEFAULT COALESCE(NULLIF(current_setting('app.audit_scope'::text, true), ''::text), 'global'::text) NOT NULL,
-  "agency_id" text DEFAULT NULLIF(current_setting('app.audit_agency_id'::text, true), ''::text),
-  "agency_ids" text[] DEFAULT COALESCE((NULLIF(current_setting('app.audit_agency_ids'::text, true), ''::text))::text[],
-CASE
-    WHEN (NULLIF(current_setting('app.audit_agency_id'::text, true), ''::text) IS NOT NULL) THEN ARRAY[current_setting('app.audit_agency_id'::text, true)]
-    ELSE '{}'::text[]
-END) NOT NULL,
-  "transaction_id" text DEFAULT NULLIF(current_setting('app.audit_transaction_id'::text, true), ''::text),
-  "attribution_error" text,
-  "inputs" jsonb DEFAULT (NULLIF(current_setting('app.audit_inputs'::text, true), ''::text))::jsonb,
-  "table_name" text,
-  "error_code" text,
-  CONSTRAINT "access_event_pkey" PRIMARY KEY (id),
-  CONSTRAINT "access_event_check" CHECK (((scope_type = 'agency'::text) = (agency_id IS NOT NULL))),
-  CONSTRAINT "access_event_inputs_check" CHECK ((octet_length((inputs)::text) <= 32768)),
-  CONSTRAINT "access_event_scope_type_check" CHECK ((scope_type = ANY (ARRAY['historical'::text, 'global'::text, 'agency'::text, 'unresolved'::text])))
-);
-
-CREATE INDEX access_event_actor_user_id_created_at_idx ON audit.access_event USING btree (actor_user_id, created_at);
-
-CREATE INDEX access_event_agency_id_created_at_id_idx ON audit.access_event USING btree (agency_id, created_at, id);
-
-CREATE INDEX access_event_agency_ids_idx ON audit.access_event USING gin (agency_ids) WHERE (scope_type = 'agency'::text);
-
-CREATE INDEX access_event_created_at_id_idx ON audit.access_event USING btree (created_at, id);
-
-CREATE INDEX access_event_request_id_idx ON audit.access_event USING btree (request_id);
-
-CREATE INDEX access_event_returned_identities_idx ON audit.access_event USING gin (returned_identities);
-
-CREATE INDEX access_event_table_name_created_at_idx ON audit.access_event USING btree (table_name, created_at);
+${sql.raw(ACCESS_EVENT_TABLE_SQL)}
 
 CREATE TABLE "audit"."capture_policy" (
   "table_schema" text NOT NULL,

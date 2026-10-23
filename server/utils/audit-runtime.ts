@@ -116,7 +116,31 @@ export const startAuditRuntime = async (db: Kysely<Database>): Promise<() => Pro
   if (control) control.enabled = true
   let running: Promise<void> | undefined
   let continuation: ReturnType<typeof setTimeout> | undefined
+  let accessRunning: Promise<void> | undefined
+  let accessContinuation: ReturnType<typeof setTimeout> | undefined
   let stopped = false
+  const cleanAccess = async (): Promise<void> => {
+    if (stopped || !control?.expireAccess) return
+    if (accessRunning) return await accessRunning
+    accessRunning = (async () => {
+      try {
+        const removed = await control.expireAccess!(retention.accessDays)
+        if (removed) console.info({ event: 'audit.access_retention', removed })
+        if (removed >= 1000 && !stopped) {
+          accessContinuation = setTimeout(() => {
+            accessContinuation = undefined
+            void cleanAccess()
+          }, 10_000)
+          accessContinuation.unref()
+        }
+      } catch {
+        console.error({ event: 'audit.access_retention_failed' })
+      }
+    })().finally(() => {
+      accessRunning = undefined
+    })
+    await accessRunning
+  }
   const clean = async () => {
     if (stopped) return
     if (running) return await running
@@ -149,8 +173,11 @@ export const startAuditRuntime = async (db: Kysely<Database>): Promise<() => Pro
     await running
   }
   await clean()
+  // Best-effort history outages must not delay business readiness.
+  void cleanAccess()
   const interval = setInterval(() => {
     void clean()
+    if (!accessContinuation) void cleanAccess()
   }, 60 * 60 * 1000)
   const retry = setInterval(() => {
     void control?.flush?.()
@@ -160,8 +187,10 @@ export const startAuditRuntime = async (db: Kysely<Database>): Promise<() => Pro
   return async () => {
     stopped = true
     if (continuation) clearTimeout(continuation)
+    if (accessContinuation) clearTimeout(accessContinuation)
     clearInterval(interval)
     clearInterval(retry)
     await running
+    await accessRunning
   }
 }

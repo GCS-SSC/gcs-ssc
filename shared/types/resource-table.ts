@@ -4,6 +4,11 @@ import type { ListResponse } from './admin'
 
 export type ResourceTableStatus = 'idle' | 'pending' | 'success' | 'error'
 
+export interface CursorPagination {
+  availablePages: number
+  hasNextPage: boolean
+}
+
 export interface UseResourceTableOptions {
   fetchUrl: string | Ref<string> | ComputedRef<string>
   query?: Record<string, unknown> | Ref<Record<string, unknown>> | ComputedRef<Record<string, unknown>>

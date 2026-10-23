@@ -5,6 +5,12 @@ This configuration manages the existing **GCS Demo / demo** environment:
 - App: `gcs-ssc`, the shared GHCR digest in `deployment/demo-image.json` when
   populated, otherwise GitHub `GCS-SSC/gcs-ssc` branch `main` and the canonical Dockerfile.
 - Database: existing `GCS DB` service (PostgreSQL 18), with the application's existing `DATABASE_URL` preserved.
+- Access history: separate `GCS Access DB` PostgreSQL service with its own
+  `gcs-access-db-volume`; the app references its private `DATABASE_URL` through
+  `GCS_ACCESS_DATABASE_URL`. Applying this change provisions that service and
+  requires reviewing the plan before deployment. Existing access rows in the
+  business database are not automatically moved. The business database, Portal,
+  Metabase and existing volumes retain their identities.
 - Domain: https://gcs-ssc-demo.up.railway.app, retained by Railway on the existing service.
 - Volumes: existing `gcs-ssc-volume` at `/app/.data` and `gcs-db-volume-core-cutover-reset-20261020` on `GCS DB`, each 5000 MB. Verify every previous GCS database volume is detached and absent or pending Railway deletion.
 - Metabase, `Metabase DB`, and their `postgres-volume-4aPn` are included so an IaC apply preserves them.

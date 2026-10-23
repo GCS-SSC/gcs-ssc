@@ -28,6 +28,8 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 30_000
 const DEFAULT_AUTH_SECRET = 'production-artifact-test-secret-123456'
 const DEFAULT_EXTENSION_SECRET = 'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY='
 const BUILD_DATABASE_URL_CANARY = 'postgres://artifact-build-canary:must-not-be-bundled@db-build-canary.invalid:6543/artifact'
+const BUILD_ACCESS_DATABASE_URL_CANARY = 'postgres://access-build-canary:must-not-be-bundled@access-build-canary.invalid:6544/access'
+const BUILD_PGLITE_ACCESS_DATA_DIR_CANARY = '/gcs-artifact-build-canary/pglite-access-must-not-be-bundled'
 const BUILD_PGLITE_DATA_DIR_CANARY = '/gcs-artifact-build-canary/pglite-data-must-not-be-bundled'
 const BUILD_GITHUB_CLIENT_ID_CANARY = 'artifact-build-github-client-id-must-not-be-bundled'
 const BUILD_GITHUB_CLIENT_SECRET_CANARY = 'artifact-build-github-client-secret-must-not-be-bundled'
@@ -41,6 +43,8 @@ const DATABASE_URL_PRECEDENCE_CANARY = 'postgres://artifact-runtime-canary:runti
 
 export const BUILD_RUNTIME_CONFIG_CANARIES = [
   BUILD_DATABASE_URL_CANARY,
+  BUILD_ACCESS_DATABASE_URL_CANARY,
+  BUILD_PGLITE_ACCESS_DATA_DIR_CANARY,
   BUILD_PGLITE_DATA_DIR_CANARY,
   BUILD_GITHUB_CLIENT_ID_CANARY,
   BUILD_GITHUB_CLIENT_SECRET_CANARY,
@@ -445,12 +449,16 @@ const runBuild = async (): Promise<void> => {
     BETTER_AUTH_TRUSTED_ORIGINS: BUILD_AUTH_TRUSTED_ORIGINS_CANARY,
     BETTER_AUTH_URL: BUILD_AUTH_URL_CANARY,
     DATABASE_URL: BUILD_DATABASE_URL_CANARY,
+    GCS_ACCESS_DATABASE_URL: BUILD_ACCESS_DATABASE_URL_CANARY,
+    PGLITE_ACCESS_DATA_DIR: BUILD_PGLITE_ACCESS_DATA_DIR_CANARY,
     GCS_EXTENSION_SECRETS_KEY: BUILD_EXTENSION_SECRET_CANARY,
     NUXT_GITHUB_CLIENT_ID: BUILD_GITHUB_CLIENT_ID_CANARY,
     NUXT_GITHUB_CLIENT_SECRET: BUILD_GITHUB_CLIENT_SECRET_CANARY,
     PGLITE_DATA_DIR: BUILD_PGLITE_DATA_DIR_CANARY,
     NUXT_DISABLE_SOURCEMAPS: 'true'
   }
+  delete buildEnvironment.NUXT_ACCESS_DATABASE_URL
+  delete buildEnvironment.NUXT_PGLITE_ACCESS_DATA_DIR
   delete buildEnvironment.NUXT_DATABASE_URL
   delete buildEnvironment.NUXT_PGLITE_DATA_DIR
 
@@ -582,6 +590,10 @@ const startArtifact = (
     NUXT_AUTH_URL: baseUrl,
     NUXT_AUTH_TRUSTED_ORIGINS: baseUrl
   }
+  delete environment.GCS_ACCESS_DATABASE_URL
+  delete environment.PGLITE_ACCESS_DATA_DIR
+  delete environment.NUXT_ACCESS_DATABASE_URL
+  delete environment.NUXT_PGLITE_ACCESS_DATA_DIR
   delete environment.DATABASE_URL
   delete environment.PGLITE_DATA_DIR
   delete environment.NUXT_DATABASE_URL
@@ -598,6 +610,13 @@ const startArtifact = (
   }
   if (runtimeConfig.nuxtPgliteDataDir !== undefined) {
     environment.NUXT_PGLITE_DATA_DIR = runtimeConfig.nuxtPgliteDataDir
+  }
+
+  if (runtimeConfig.databaseUrl !== undefined || runtimeConfig.nuxtDatabaseUrl !== undefined) {
+    // A separate unreachable instance keeps this probe focused on business URL precedence.
+    environment.GCS_ACCESS_DATABASE_URL = 'postgres://artifact-access-canary:runtime-only@127.0.0.1:1/access'
+  } else {
+    environment.PGLITE_ACCESS_DATA_DIR = `${runtimeConfig.storageDir}-access-pglite`
   }
 
   const outputChunks: string[] = []
@@ -956,9 +975,8 @@ export const runProductionArtifactTest = async (
     console.info('[artifact] Verified NUXT_DATABASE_URL translation and precedence over NUXT_PGLITE_DATA_DIR.')
   } finally {
     if (artifact !== null) {
-      await stopArtifact(artifact).catch(error => {
-        console.error('[artifact] Failed to stop artifact during cleanup.', error)
-      })
+      // Keep both database directories intact if server termination cannot be confirmed.
+      await stopArtifact(artifact)
     }
     await makeDirectoriesWritable(artifactDir).catch(() => {})
     await rm(temporaryRoot, { recursive: true, force: true })

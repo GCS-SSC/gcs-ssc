@@ -1095,6 +1095,9 @@
     "return_home": "Retourner au tableau de bord"
   },
   "apiErrors": {
+    "audit": {
+      "access_unavailable": "L’historique des accès est temporairement indisponible. Réessayez plus tard."
+    },
     "custom_fields": {
       "multiple_to_single": "Un champ à sélections multiples ne peut pas être converti en champ à sélection unique.",
       "section_in_use": "Déplacez ou supprimez les champs de cette section avant de la supprimer.",
@@ -4215,14 +4218,16 @@
     }
   },
   "audit": {
+    "accessWindow": "L’historique des accès couvre les 7 derniers jours par défaut. Modifiez les dates pour rechercher une autre période.",
+    "accessPageRecords": "{count} enregistrements sur cette page",
     "title": "Audit",
     "access": "Accès",
     "description": "Modifications validées, événements de sécurité et requêtes de la base de données de l’application.",
     "retention": "Audit : {audit} jours. Accès : {access} jours. Les paramètres de déploiement s’appliquent après le redémarrage.",
-    "actor": "ID de l’acteur",
+    "actor": "Acteur",
     "table": "Table",
     "recordId": "ID de l’enregistrement",
-    "operation": "Opération / résultat",
+    "operation": "Opération",
     "requestId": "ID de la requête",
     "from": "Du",
     "to": "Au",
@@ -4272,7 +4277,31 @@
       "global": "Globale",
       "agency": "Organisme",
       "historical": "Historique (accès global requis)"
-    }
+    },
+    "outcome": "Résultat",
+    "operations": {
+      "role_created": "Rôle créé",
+      "role_profile_updated": "Rôle modifié",
+      "role_deleted": "Rôle supprimé",
+      "role_permission_updated": "Permission du rôle modifiée",
+      "user_created": "Utilisateur créé",
+      "user_profile_updated": "Utilisateur modifié",
+      "user_deleted": "Utilisateur supprimé",
+      "user_activated": "Utilisateur activé",
+      "user_role_assignment_created": "Rôle attribué à l’utilisateur",
+      "user_role_assignment_deleted": "Rôle retiré à l’utilisateur",
+      "insert": "Insertion",
+      "update": "Modification",
+      "delete": "Suppression",
+      "soft_delete": "Suppression logique",
+      "restore": "Restauration",
+      "departure": "Départ de l’agence",
+      "arrival": "Arrivée à l’agence",
+      "success": "Réussite",
+      "failed": "Échec"
+    },
+    "dataChanges": "Modifications des données",
+    "securityEvents": "Événements de sécurité"
   },
   "budget_calculation": {
     "mode": "Calcul",

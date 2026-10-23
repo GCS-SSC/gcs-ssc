@@ -34,6 +34,11 @@ export interface AuditControl {
   ownershipRegistry?: Readonly<Record<string, import('../database/audit-ownership-registry').AuditOwnershipRule>>
   ownershipEnabled?: boolean
   accessEnabled?: boolean
+  persistAccess?: (events: AccessEvidence[]) => Promise<void>
+  recordAccess?: (event: AccessEvidence, request?: AccessLogRequest) => void
+  accessDatabase?: () => Promise<import('kysely').Kysely<import('../../shared/types/database').Database>>
+  expireAccess?: (days: number) => Promise<number>
+  accessMaxBatchesPerFlush?: number
   accessRequest?: () => AccessLogRequest | undefined
   identity: () => AuditIdentity
   report: (event: Record<string, unknown>) => void
@@ -152,6 +157,7 @@ export const createAuditDialect = (dialect: Dialect, serialize: boolean, control
       }
     }
     const queue = createAccessLogQueue(async events => {
+      if (control.persistAccess) return await control.persistAccess(events)
       const connection = await rawLease()
       try {
         await connection.raw.executeQuery(CompiledQuery.raw(`INSERT INTO audit.access_event
@@ -164,7 +170,10 @@ export const createAuditDialect = (dialect: Dialect, serialize: boolean, control
           connection.unlock()
         }
       }
-    }, control.report)
+    }, control.report, { maxBatchesPerFlush: control.accessMaxBatchesPerFlush })
+    control.recordAccess = (event, request) => {
+      queue.add(event, () => !request || request.complete)
+    }
     control.flush = () => queue.flush()
     const state = (connection: DatabaseConnection): Lease => {
       const value = leases.get(connection)

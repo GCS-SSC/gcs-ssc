@@ -1,13 +1,14 @@
 <script setup lang="ts" generic="T extends object">
 import type { EnumKey } from '~/types/enums'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
-import type { ResourceTableStatus } from '~~/shared/types/resource-table'
+import type { CursorPagination, ResourceTableStatus } from '~~/shared/types/resource-table'
 
 const {
   data,
   columns,
   bilingualColumns,
   totalRecords,
+  cursor,
   loading = false,
   requestStatus,
   statusEnumName,
@@ -26,7 +27,8 @@ const {
   data: T[]
   columns: TableColumnInput<T>[]
   bilingualColumns?: BilingualColumnConfig<T>[]
-  totalRecords: number
+  totalRecords?: number
+  cursor?: CursorPagination
   loading?: boolean
   requestStatus?: ResourceTableStatus
   statusEnumName?: EnumKey
@@ -144,7 +146,9 @@ defineExpose({
       <div class="border-default flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div class="text-xs font-bold tracking-widest text-zinc-600 uppercase dark:text-zinc-400">
           <slot name="footer-left">
-            {{ totalRecords }} {{ t('common.records') }}
+            <template v-if="totalRecords !== undefined">
+              {{ totalRecords }} {{ t('common.records') }}
+            </template>
           </slot>
         </div>
 
@@ -157,9 +161,11 @@ defineExpose({
             size="xs"
             @update:model-value="val => (pagination.pageIndex = 0)" />
           <CommonPagination
+            v-if="totalRecords !== undefined || cursor"
             :page="pagination.pageIndex + 1"
             :items-per-page="pagination.pageSize"
             :total="totalRecords"
+            :cursor="cursor"
             @update:page="val => (pagination.pageIndex = val - 1)" />
         </div>
       </div>

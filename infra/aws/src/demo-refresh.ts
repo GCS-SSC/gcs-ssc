@@ -78,8 +78,11 @@ export const cloneTaskDefinition = (definition: TaskDefinition, image: string): 
   const env = Object.fromEntries((container?.environment ?? []).map(item => [item.name, item.value]))
   if (input.containerDefinitions.length !== 1 || container?.name !== 'Application' || env.ENVIRONMENT_TYPE !== 'demo'
     || env.AWS_DB_USER !== 'gcs_ssc' || !env.AWS_DB_HOST?.endsWith('.ca-central-1.rds.amazonaws.com')
+    || env.AWS_ACCESS_DB_USER !== 'gcs_access' || !env.AWS_ACCESS_DB_HOST?.endsWith('.ca-central-1.rds.amazonaws.com')
+    || env.AWS_ACCESS_DB_HOST === env.AWS_DB_HOST
     || container.command?.join(' ') !== 'node .output/server/aws-start.mjs'
-    || !container.secrets?.some(secret => secret.name === 'AWS_DB_PASSWORD')) throw new Error('Refusing a task outside the AWS GCS demo runtime contract')
+    || !container.secrets?.some(secret => secret.name === 'AWS_DB_PASSWORD')
+    || !container.secrets.some(secret => secret.name === 'AWS_ACCESS_DB_PASSWORD')) throw new Error('Refusing a task outside the AWS GCS demo runtime contract')
   container.image = image
   return input
 }
@@ -89,21 +92,23 @@ export const databaseTaskScript = `
 import pg from 'pg';
 import { readFileSync } from 'node:fs';
 if (process.env.ENVIRONMENT_TYPE !== 'demo' || process.env.AWS_DB_USER !== 'gcs_ssc') throw new Error('Not the GCS demo database');
-const client = new pg.Client({host:process.env.AWS_DB_HOST,user:process.env.AWS_DB_USER,password:process.env.AWS_DB_PASSWORD,database:'gcs_ssc',connectionTimeoutMillis:10000,statement_timeout:60000,ssl:{ca:readFileSync('/app/.output/rds-ca.pem','utf8'),rejectUnauthorized:true}});
-try {
-  await client.connect();
-  const {rows:[row]} = await client.query('SELECT current_database() AS db, current_user AS role');
-  if (row.db !== 'gcs_ssc' || row.role !== 'gcs_ssc') throw new Error('Unexpected database identity');
-  if (process.argv.includes('--reset-db')) {
-    await client.query('BEGIN');
-    await client.query('DROP SCHEMA IF EXISTS audit CASCADE; DROP SCHEMA IF EXISTS extensions CASCADE; DROP SCHEMA public CASCADE; CREATE SCHEMA public AUTHORIZATION gcs_ssc; GRANT USAGE ON SCHEMA public TO PUBLIC;');
-    await client.query('COMMIT');
-    console.log('GCS demo schemas reset; attachment files preserved');
-  } else console.log('GCS database connectivity and TLS verified');
-} catch {
-  console.error('GCS database task failed; inspect its CloudWatch logs.');
-  process.exitCode = 1;
-} finally { await client.end(); }
+for (const target of [{prefix:'AWS_DB',database:'gcs_ssc',role:'gcs_ssc'}, {prefix:'AWS_ACCESS_DB',database:'gcs_access',role:'gcs_access'}]) {
+  const client = new pg.Client({host:process.env[target.prefix+'_HOST'],user:target.role,password:process.env[target.prefix+'_PASSWORD'],database:target.database,connectionTimeoutMillis:10000,statement_timeout:60000,ssl:{ca:readFileSync('/app/.output/rds-ca.pem','utf8'),rejectUnauthorized:true}});
+  try {
+    await client.connect();
+    const {rows:[row]} = await client.query('SELECT current_database() AS db, current_user AS role');
+    if (row.db !== target.database || row.role !== target.role) throw new Error('Unexpected database identity');
+    if (process.argv.includes('--reset-db') && target.database === 'gcs_ssc') {
+      await client.query('BEGIN');
+      await client.query('DROP SCHEMA IF EXISTS audit CASCADE; DROP SCHEMA IF EXISTS extensions CASCADE; DROP SCHEMA public CASCADE; CREATE SCHEMA public AUTHORIZATION gcs_ssc; GRANT USAGE ON SCHEMA public TO PUBLIC;');
+      await client.query('COMMIT');
+      console.log('GCS demo schemas reset; access history and attachment files preserved');
+    } else console.log('GCS database connectivity and TLS verified');
+  } catch {
+    console.error('GCS database task failed; inspect its CloudWatch logs.');
+    process.exitCode = 1;
+  } finally { await client.end(); }
+}
 `
 
 type Dependencies = {

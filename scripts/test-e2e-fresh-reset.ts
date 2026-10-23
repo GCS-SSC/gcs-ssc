@@ -29,6 +29,10 @@ const defaultOrchestrationHooks: FreshResetOrchestrationHooks = {
 
 const buildFreshResetChildEnvironment = (environment: NodeJS.ProcessEnv): NodeJS.ProcessEnv => {
   const childEnvironment = { ...environment, PLAYWRIGHT_WORKERS: '1' }
+  delete childEnvironment.PGLITE_ACCESS_DATA_DIR
+  delete childEnvironment.NUXT_PGLITE_ACCESS_DATA_DIR
+  delete childEnvironment.GCS_ACCESS_DATABASE_URL
+  delete childEnvironment.NUXT_ACCESS_DATABASE_URL
   delete childEnvironment.PGLITE_DATA_DIR
   delete childEnvironment.GCS_LOCAL_FILE_STORAGE_DIR
   delete childEnvironment.PLAYWRIGHT_BASE_URL

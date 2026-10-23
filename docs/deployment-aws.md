@@ -23,9 +23,11 @@ database is migrated separately.
   and LibreOffice, one Portal task with 0.5 vCPU and 1 GiB RAM, and one Metabase
   task with 1 vCPU and 2 GiB RAM. None of the services autoscales. Each task has a public IP for outbound image pulls and
   integrations and accepts application traffic only from its private load balancer.
-- Three separate encrypted, private, single-AZ PostgreSQL 17 RDS `db.t4g.micro` instances:
+- Four separate encrypted, private, single-AZ PostgreSQL 17 RDS `db.t4g.micro` instances:
   20 GiB gp3 storage, storage growth capped at 50 GiB, seven-day backups,
-  deletion protection, and a final snapshot on removal.
+  deletion protection, and a final snapshot on removal. GCS business data and
+  access history each have their own instance; Portal and Metabase retain their
+  existing independent instances.
 - Encrypted EFS storage mounted only at `/app/.data/files`, preserving the local
   storage provider's demo templates and uploaded files across replacements.
   Access uses IAM, encrypted NFS, and an access point enforcing UID/GID 1000.
@@ -54,6 +56,12 @@ The two subnet pairs use physical AZ IDs `cac1-az1` and `cac1-az2`. CloudFront
 VPC origins do not support `cac1-az3`; AZ names vary between AWS accounts.
 
 ## Budget
+
+The dedicated GCS access-history instance adds its own RDS compute, storage,
+backup, and secret costs. It is new infrastructure; applying this source change
+requires an operator-reviewed CDK diff. Existing GCS, Portal and Metabase
+resource identities are preserved. Historical access rows from the business
+database are not automatically copied into the new store.
 
 The previous single-app estimate was **CAD 150–220/month** before tax. Portal
 and Metabase add two tasks, two databases, two load balancers, two CloudFront
@@ -268,7 +276,9 @@ undo database migrations. Review migration compatibility and take a manual RDS
 snapshot before consequential upgrades. A first deployment has no prior revision
 to roll back to.
 
-The AWS startup wrapper assembles `DATABASE_URL` from ECS-injected credentials,
+The AWS startup wrapper assembles `DATABASE_URL` and
+`GCS_ACCESS_DATABASE_URL` from separate ECS-injected credentials
+(`AWS_DB_*` and `AWS_ACCESS_DB_*`),
 requires full RDS certificate verification against a build-time regional CA
 bundle, and derives a stable 32-byte extension key from a retained random secret.
 It then imports the normal Nitro server in the same Node process. Rebuild images

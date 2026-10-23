@@ -146,6 +146,33 @@ export const createDemoStack = (scope: Construct, id: string, props: StackProps)
     autoMinorVersionUpgrade: true
   })
   database.connections.allowDefaultPortFrom(appSecurityGroup)
+  const accessDatabaseSecret = new secretsmanager.Secret(stack, 'AccessDatabaseSecret', {
+    generateSecretString: {
+      secretStringTemplate: JSON.stringify({ username: 'gcs_access' }),
+      generateStringKey: 'password', passwordLength: 64, excludePunctuation: true
+    },
+    removalPolicy: RemovalPolicy.RETAIN
+  })
+  const accessDatabase = new rds.DatabaseInstance(stack, 'AccessDatabase', {
+    vpc,
+    vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+    engine: rds.DatabaseInstanceEngine.postgres({ version: rds.PostgresEngineVersion.VER_17_9 }),
+    instanceType: ec2.InstanceType.of(ec2.InstanceClass.T4G, ec2.InstanceSize.MICRO),
+    credentials: rds.Credentials.fromSecret(accessDatabaseSecret),
+    databaseName: 'gcs_access',
+    allocatedStorage: 20,
+    maxAllocatedStorage: 50,
+    storageType: rds.StorageType.GP3,
+    storageEncrypted: true,
+    multiAz: false,
+    publiclyAccessible: false,
+    backupRetention: Duration.days(7),
+    deletionProtection: true,
+    removalPolicy: RemovalPolicy.SNAPSHOT,
+    parameters: { 'rds.force_ssl': '1' },
+    autoMinorVersionUpgrade: true
+  })
+  accessDatabase.connections.allowDefaultPortFrom(appSecurityGroup)
   const authSecret = new secretsmanager.Secret(stack, 'AuthSecret', {
     generateSecretString: { passwordLength: 64, excludePunctuation: true },
     removalPolicy: RemovalPolicy.RETAIN
@@ -212,12 +239,15 @@ export const createDemoStack = (scope: Construct, id: string, props: StackProps)
       AWS_REGION: 'ca-central-1',
       AWS_DB_HOST: database.dbInstanceEndpointAddress,
       AWS_DB_USER: 'gcs_ssc',
+      AWS_ACCESS_DB_HOST: accessDatabase.dbInstanceEndpointAddress,
+      AWS_ACCESS_DB_USER: 'gcs_access',
       BETTER_AUTH_URL: publicUrl,
       BETTER_AUTH_TRUSTED_ORIGINS: publicUrl,
       GCS_LOCAL_FILE_STORAGE_DIR: '/app/.data/files'
     },
     secrets: {
       AWS_DB_PASSWORD: ecs.Secret.fromSecretsManager(databaseSecret, 'password'),
+      AWS_ACCESS_DB_PASSWORD: ecs.Secret.fromSecretsManager(accessDatabaseSecret, 'password'),
       BETTER_AUTH_SECRET: ecs.Secret.fromSecretsManager(authSecret),
       AWS_EXTENSION_SECRET_SEED: ecs.Secret.fromSecretsManager(extensionSeed)
     },
@@ -238,7 +268,7 @@ export const createDemoStack = (scope: Construct, id: string, props: StackProps)
   })
   service.connections.allowFrom(alb, ec2.Port.tcp(3000))
   service.attachToApplicationTargetGroup(targets)
-  service.node.addDependency(files.mountTargetsAvailable, database, listener)
+  service.node.addDependency(files.mountTargetsAvailable, database, accessDatabase, listener)
 
   const portalSecurityGroup = new ec2.SecurityGroup(stack, 'PortalAppSecurityGroup', { vpc })
   const portalAlb = new elbv2.ApplicationLoadBalancer(stack, 'PortalLoadBalancer', {

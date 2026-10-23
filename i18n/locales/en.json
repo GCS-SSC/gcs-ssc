@@ -1095,6 +1095,9 @@
     "return_home": "Return to dashboard"
   },
   "apiErrors": {
+    "audit": {
+      "access_unavailable": "Access history is temporarily unavailable. Try again later."
+    },
     "custom_fields": {
       "multiple_to_single": "A multiple-selection field cannot be changed to single selection.",
       "section_in_use": "Move or delete the fields in this section before deleting it.",
@@ -4215,14 +4218,16 @@
     }
   },
   "audit": {
+    "accessWindow": "Access history defaults to the last 7 days. Set dates to search another period.",
+    "accessPageRecords": "{count} records on this page",
     "title": "Audit",
     "access": "Access",
     "description": "Committed changes, security events and application database queries.",
     "retention": "Audit: {audit} days. Access: {access} days. Deployment settings apply after restart.",
-    "actor": "Actor ID",
+    "actor": "Actor",
     "table": "Table",
     "recordId": "Record ID",
-    "operation": "Operation / outcome",
+    "operation": "Operation",
     "requestId": "Request ID",
     "from": "From",
     "to": "To",
@@ -4272,7 +4277,31 @@
       "global": "Global",
       "agency": "Agency",
       "historical": "Historical (global access required)"
-    }
+    },
+    "outcome": "Outcome",
+    "operations": {
+      "role_created": "Role created",
+      "role_profile_updated": "Role updated",
+      "role_deleted": "Role deleted",
+      "role_permission_updated": "Role permission updated",
+      "user_created": "User created",
+      "user_profile_updated": "User updated",
+      "user_deleted": "User deleted",
+      "user_activated": "User activated",
+      "user_role_assignment_created": "User role assigned",
+      "user_role_assignment_deleted": "User role removed",
+      "insert": "Insert",
+      "update": "Update",
+      "delete": "Delete",
+      "soft_delete": "Soft delete",
+      "restore": "Restore",
+      "departure": "Departure from agency",
+      "arrival": "Arrival at agency",
+      "success": "Success",
+      "failed": "Failed"
+    },
+    "dataChanges": "Data changes",
+    "securityEvents": "Security events"
   },
   "budget_calculation": {
     "mode": "Calculation",

@@ -278,9 +278,14 @@ export const runManagedExtensionE2e = async (
       GCS_LOCAL_FILE_STORAGE_DIR: dataPaths.localFileStorageDir,
       NUXT_DISABLE_SOURCEMAPS: 'true',
       PGLITE_DATA_DIR: dataPaths.pgliteDataDir,
+      PGLITE_ACCESS_DATA_DIR: `${dataPaths.pgliteDataDir}-access`,
       PLAYWRIGHT_BASE_URL: baseUrl,
       PLAYWRIGHT_WORKERS: '1'
     }
+    delete environment.GCS_ACCESS_DATABASE_URL
+    delete environment.NUXT_ACCESS_DATABASE_URL
+    delete environment.NUXT_PGLITE_ACCESS_DATA_DIR
+    delete environment.E2E_ACCESS_POSTGRES_TEST_URL
     delete environment.DATABASE_URL
     delete environment.E2E_POSTGRES_TEST_URL
     delete environment.NUXT_DATABASE_URL

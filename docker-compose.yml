@@ -11,11 +11,13 @@ services:
       NODE_ENV: production
       ENVIRONMENT_TYPE: ${ENVIRONMENT_TYPE:?ENVIRONMENT_TYPE must be demo or production}
       PGLITE_DATA_DIR: /app/.data/pglite
+      PGLITE_ACCESS_DATA_DIR: /app/.data/pglite-access
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:8995}
       BETTER_AUTH_TRUSTED_ORIGINS: ${BETTER_AUTH_TRUSTED_ORIGINS:-http://localhost:8995}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-dev_only_local_secret_abcdefghijklmnopqrstuvwxyz123456}
     volumes:
       - pglite-data:/app/.data/pglite
+      - pglite-access-data:/app/.data/pglite-access
     healthcheck:
       test:
         - CMD
@@ -30,3 +32,4 @@ services:
 
 volumes:
   pglite-data:
+  pglite-access-data:

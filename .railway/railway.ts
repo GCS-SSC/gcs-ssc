@@ -13,6 +13,11 @@ export default defineRailway((ctx) => {
   const database = postgres('GCS DB', { region: 'us-east4-eqdc4a' })
   database.deploy = { sleepApplication: true, limitOverride: { containers: { cpu: 2, memoryBytes: 3000000000 } } }
   database.networking = { privateNetworkEndpoint: 'postgres' }
+  const accessDatabase = postgres('GCS Access DB', { region: 'us-east4-eqdc4a' })
+  accessDatabase.deploy = { sleepApplication: true }
+  accessDatabase.networking = { privateNetworkEndpoint: 'gcs-access-postgres' }
+  const accessVolume = volume('gcs-access-db-volume', { allowOnlineResize: true, region: 'us-east4-eqdc4a', sizeMB: 5000 })
+  accessDatabase.volumeAttachments = { 'gcs-access-db-volume': { volume: accessVolume.address, mountPath: '/var/lib/postgresql/data' } }
   const metabaseDatabase = postgres('Metabase DB', { region: 'us-east4-eqdc4a' })
   metabaseDatabase.deploy = { sleepApplication: true }
   metabaseDatabase.networking = { privateNetworkEndpoint: 'postgres-xwyo' }
@@ -33,7 +38,7 @@ export default defineRailway((ctx) => {
     replicas: { 'us-east4-eqdc4a': 1 },
     deploy: { healthcheckPath: '/api/health', healthcheckTimeout: 300, sleepApplication: true, limitOverride: { containers: { cpu: 8, memoryBytes: 8000000000 } } },
     volumeMounts: { '/app/.data': gcsSscVolume },
-    env: { DATABASE_URL: preserve(), BETTER_AUTH_SECRET: preserve(), BETTER_AUTH_TRUSTED_ORIGINS: preserve(), BETTER_AUTH_URL: preserve(), ENVIRONMENT_TYPE: 'demo', GCS_EXTENSION_SECRETS_KEY: preserve(), RAILWAY_RUN_UID: preserve() }
+    env: { DATABASE_URL: preserve(), GCS_ACCESS_DATABASE_URL: accessDatabase.env.DATABASE_URL, BETTER_AUTH_SECRET: preserve(), BETTER_AUTH_TRUSTED_ORIGINS: preserve(), BETTER_AUTH_URL: preserve(), ENVIRONMENT_TYPE: 'demo', GCS_EXTENSION_SECRETS_KEY: preserve(), RAILWAY_RUN_UID: preserve() }
   })
   const metabase = service('Metabase', {
     source: image('metabase/metabase'),
@@ -43,7 +48,7 @@ export default defineRailway((ctx) => {
     env: { ENABLE_ALPINE_PRIVATE_NETWORKING: preserve(), MB_DB_DBNAME: preserve(), MB_DB_HOST: preserve(), MB_DB_PASS: preserve(), MB_DB_PORT: preserve(), MB_DB_TYPE: preserve(), MB_DB_USER: preserve(), MB_PASSWORD_COMPLEXITY: preserve(), MB_SITE_URL: preserve(), PORT: preserve() }
   })
   const metabaseGroup = group('Metabase', [metabase, metabaseDatabase])
-  const gcsGroup = group('GCS', [gcsSsc, database])
+  const gcsGroup = group('GCS', [gcsSsc, database, accessDatabase])
   const portalDatabase = postgres('Portal DB', { region: 'us-east4-eqdc4a' })
   // Existing Portal storage stays attached; importing database mounts is lossy in CLI 5.54.1.
   // Keep its volume resource, without reapplying the attachment during a GCS-only release.
@@ -63,6 +68,6 @@ export default defineRailway((ctx) => {
   const portalGroup = group('Portal', [portal, portalDatabase])
 
   return project('GCS Demo', {
-    resources: [gcsGroup, portalGroup, freshPostgresVolume, gcsSscVolume, portalVolume, metabaseVolume, metabaseGroup]
+    resources: [gcsGroup, portalGroup, accessVolume, freshPostgresVolume, gcsSscVolume, portalVolume, metabaseVolume, metabaseGroup]
   })
 })

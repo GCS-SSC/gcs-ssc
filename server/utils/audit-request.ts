@@ -4,6 +4,26 @@ import { getGcsExtensionByKey } from '#gcs-extensions/server-registry'
 import type { GcsRegisteredExtension } from '../../shared/utils/extensions'
 import { sanitizeAuditInput } from './audit-inputs'
 
+const querySnapshots = new WeakMap<H3Event, { path: string; query: unknown }>()
+
+const freezeSnapshot = (value: unknown): unknown => {
+  if (value && typeof value === 'object') {
+    for (const child of Object.values(value)) freezeSnapshot(child)
+    Object.freeze(value)
+  }
+  return value
+}
+
+const requestQuerySnapshot = (event: H3Event): unknown => {
+  // H3 getQuery parses event.path, independently of body capture and route params.
+  const path = event.path
+  const cached = querySnapshots.get(event)
+  if (cached?.path === path) return cached.query
+  const query = freezeSnapshot(sanitizeAuditInput(getQuery(event)))
+  querySnapshots.set(event, { path, query })
+  return query
+}
+
 /** Restriction is sticky for the complete request, including later host queries.
  * @param event - Host request whose input snapshots need classification.
  * @param extension - Registered extension metadata.
@@ -59,7 +79,7 @@ export const auditRequestSnapshot = (event: H3Event) => {
   return {
     method: event.method,
     params: sanitizeAuditInput(getRouterParams(event)),
-    query: sanitizeAuditInput(getQuery(event)),
+    query: requestQuerySnapshot(event),
     body: Object.hasOwn(event.context, 'auditRequestBody') ? event.context.auditRequestBody : { state: 'unavailable' }
   }
 }

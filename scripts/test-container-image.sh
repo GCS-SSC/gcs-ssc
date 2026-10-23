@@ -5,11 +5,12 @@ image=${1:?Pass the locally built demo image reference}
 prefix="gcs-image-test-$$-${RANDOM}"
 network="${prefix}-network"
 database="${prefix}-db"
+access_database="${prefix}-access-db"
 application="${prefix}-app"
 volume="${prefix}-data"
 
 cleanup() {
-  docker rm -f "$application" "$database" >/dev/null 2>&1 || true
+  docker rm -f "$application" "$database" "$access_database" >/dev/null 2>&1 || true
   docker volume rm "$volume" >/dev/null 2>&1 || true
   docker network rm "$network" >/dev/null 2>&1 || true
 }
@@ -17,27 +18,31 @@ trap cleanup EXIT
 
 docker network create "$network" >/dev/null
 docker volume create "$volume" >/dev/null
-docker run -d --name "$database" --network "$network" \
-  -e POSTGRES_DB=gcs_ssc -e POSTGRES_USER=gcs_ssc \
-  -e POSTGRES_PASSWORD=container-test-only postgres:17 >/dev/null
+for database_container in "$database" "$access_database"; do
+  docker run -d --name "$database_container" --network "$network" \
+    -e POSTGRES_DB=gcs_ssc -e POSTGRES_USER=gcs_ssc \
+    -e POSTGRES_PASSWORD=container-test-only postgres:17 >/dev/null
 
-database_ready=false
-for ((attempt=0; attempt<60; attempt++)); do
-  if docker exec "$database" pg_isready -U gcs_ssc -d gcs_ssc >/dev/null 2>&1; then
-    database_ready=true
-    break
+  database_ready=false
+  for ((attempt=0; attempt<60; attempt++)); do
+    if docker exec "$database_container" pg_isready -U gcs_ssc -d gcs_ssc >/dev/null 2>&1; then
+      database_ready=true
+      break
+    fi
+    sleep 2
+  done
+  if [ "$database_ready" != true ]; then
+    docker logs "$database_container"
+    exit 1
   fi
-  sleep 2
+
 done
-if [ "$database_ready" != true ]; then
-  docker logs "$database"
-  exit 1
-fi
 
 start_application() {
   docker run -d --name "$application" --network "$network" \
     -p 127.0.0.1::3000 -v "${volume}:/app/.data" \
     -e "DATABASE_URL=postgresql://gcs_ssc:container-test-only@${database}:5432/gcs_ssc" \
+    -e "GCS_ACCESS_DATABASE_URL=postgresql://gcs_ssc:container-test-only@${access_database}:5432/gcs_ssc" \
     -e BETTER_AUTH_SECRET=container-image-smoke-test-secret-only \
     -e BETTER_AUTH_URL=http://localhost:3000 \
     "$image" >/dev/null
@@ -99,4 +104,72 @@ if [ "$seed" != '1|1|13|8|2' ]; then
   echo "Unexpected NCIA seed state: $seed" >&2
   exit 1
 fi
-echo 'Shared demo image passed PostgreSQL startup, bilingual page, and file persistence checks.'
+# Exercise a real audited business read and verify persistence uses the other server.
+address=$(docker port "$application" 3000/tcp)
+curl --fail --silent --max-time 5 "http://${address}/api/metadata/enums?name=agreement_type" >/dev/null
+access_count=0
+for ((attempt=0; attempt<30; attempt++)); do
+  # Initialization is lazy, so the first flush can still be creating the schema.
+  access_count=$(docker exec "$access_database" psql -X -U gcs_ssc -d gcs_ssc -At \
+    -v ON_ERROR_STOP=1 -c 'SELECT count(*) FROM audit.access_event' 2>/dev/null) || access_count=0
+  if ((access_count > 0)); then break; fi
+  sleep 1
+done
+if ((access_count == 0)); then
+  echo 'Audited enum read did not reach the separate access database.' >&2
+  docker logs "$application"
+  exit 1
+fi
+business_access_relation=$(docker exec "$database" psql -X -U gcs_ssc -d gcs_ssc -At \
+  -v ON_ERROR_STOP=1 -c "SELECT to_regclass('audit.access_event')")
+if [ -n "$business_access_relation" ]; then
+  business_access_count=$(docker exec "$database" psql -X -U gcs_ssc -d gcs_ssc -At \
+    -v ON_ERROR_STOP=1 -c 'SELECT count(*) FROM audit.access_event')
+  if [ "$business_access_count" != 0 ]; then
+    echo 'Access events unexpectedly persisted in the business database.' >&2
+    exit 1
+  fi
+fi
+access_has_no_users=$(docker exec "$access_database" psql -X -U gcs_ssc -d gcs_ssc -At \
+  -v ON_ERROR_STOP=1 -c "SELECT to_regclass('public.\"user\"') IS NULL")
+if [ "$access_has_no_users" != t ]; then
+  echo 'Business user table unexpectedly exists in the access database.' >&2
+  exit 1
+fi
+
+# Freeze the destination transport: business reads and readiness must keep working.
+failure_since=$(date +%s)
+docker pause "$access_database" >/dev/null
+curl --fail --silent --max-time 5 "http://${address}/api/metadata/enums?name=agreement_type" >/dev/null
+curl --fail --silent --max-time 5 "http://${address}/api/health" >/dev/null
+failure_reported=false
+for ((attempt=0; attempt<20; attempt++)); do
+  application_logs=$(docker logs --since "$failure_since" "$application" 2>&1)
+  if [[ "$application_logs" == *audit.access_persistence_failed* ]]; then
+    failure_reported=true
+    break
+  fi
+  sleep 1
+done
+if [ "$failure_reported" != true ]; then
+  echo 'Frozen access transport did not produce bounded persistence-failure reporting.' >&2
+  exit 1
+fi
+docker unpause "$access_database" >/dev/null
+curl --fail --silent --max-time 5 "http://${address}/api/metadata/enums?name=agreement_type" >/dev/null
+recovered=false
+for ((attempt=0; attempt<30; attempt++)); do
+  recovered_count=$(docker exec "$access_database" psql -X -U gcs_ssc -d gcs_ssc -At \
+    -v ON_ERROR_STOP=1 -c 'SELECT count(*) FROM audit.access_event')
+  if ((recovered_count > access_count)); then
+    recovered=true
+    break
+  fi
+  sleep 1
+done
+if [ "$recovered" != true ]; then
+  echo 'Access delivery did not recover after its separate database resumed.' >&2
+  docker logs "$application"
+  exit 1
+fi
+echo 'Shared demo image passed two-instance access isolation, outage recovery, bilingual page, and file persistence checks.'

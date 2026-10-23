@@ -19,6 +19,8 @@ import {
 } from './database-config'
 import { executeBoundedPostgresHealthQuery } from './database-health'
 import { clearMigrationStateForDatabaseGeneration } from './migration-readiness'
+import { createAccessLogStore } from './access-log-store'
+import { resolveAccessLogStorageConfig, resolveAccessLogFlushBudget } from './access-log-storage'
 
 declare const useEvent: typeof import('nitropack/runtime').useEvent
 
@@ -50,6 +52,8 @@ const databaseState = nodeProcess as NodeJS.Process & {
 interface DatabaseRuntimeConfig extends PostgresTimeoutRuntimeConfig {
   databaseUrl?: string
   pgliteDataDir?: string
+  accessDatabaseUrl?: string
+  pgliteAccessDataDir?: string
 }
 
 interface ResolvedDatabaseConfig {
@@ -144,6 +148,23 @@ const createDatabase = (): Omit<DatabaseGeneration, 'id' | 'leases'> => {
     throw new Error('No database configuration provided (DATABASE_URL or PGLITE_DATA_DIR)')
   }
 
+  const accessConfig = resolveAccessLogStorageConfig({ databaseUrl, pgliteDataDir }, config)
+  audit.accessMaxBatchesPerFlush = resolveAccessLogFlushBudget()
+  let accessStore: ReturnType<typeof createAccessLogStore> | undefined
+  /**
+   * Creates the independent destination only when history work first needs it.
+   * @returns Generation-owned independent store.
+   */
+  const getAccessStore = () => accessStore ??= createAccessLogStore(accessConfig, audit.report)
+  audit.persistAccess = async events => await getAccessStore().persist(events)
+  audit.expireAccess = async days => await getAccessStore().expire(days)
+  /** @returns Initialized access database without acquiring a business connection. */
+  audit.accessDatabase = async () => {
+    const store = getAccessStore()
+    await store.initialize()
+    return store.database
+  }
+
   if (databaseUrl) {
     const timeouts = resolvePostgresTimeoutConfig(config)
     pg.types.setTypeParser(pg.types.builtins.NUMERIC, parseSafeDecimal)
@@ -169,7 +190,9 @@ const createDatabase = (): Omit<DatabaseGeneration, 'id' | 'leases'> => {
           database.destroy(),
           healthPool.end()
         ])
-        const failure = results.find((result): result is PromiseRejectedResult => result.status === 'rejected')
+        // The business driver drains its best-effort queue before closing the destination.
+        const accessResult = await Promise.allSettled([accessStore?.destroy()])
+        const failure = [...results, ...accessResult].find((result): result is PromiseRejectedResult => result.status === 'rejected')
         if (failure) throw failure.reason
       }
     }
@@ -190,7 +213,14 @@ const createDatabase = (): Omit<DatabaseGeneration, 'id' | 'leases'> => {
     healthCheck: async () => {
       await withoutAuditCapture(() => sql`SELECT 1`.execute(database))
     },
-    destroy: async () => await database.destroy()
+    /** Stops business capture before closing the second local database. */
+    destroy: async () => {
+      try {
+        await database.destroy()
+      } finally {
+        await accessStore?.destroy()
+      }
+    }
   }
 }
 
