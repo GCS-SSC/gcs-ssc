@@ -1,5 +1,5 @@
-import { computed } from 'vue'
-import type { ComputedRef } from 'vue'
+import { computed, toValue } from 'vue'
+import type { ComputedRef, MaybeRefOrGetter } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
 
 export type LocaleAccessorKey = {
@@ -41,18 +41,18 @@ const resolveAccessorKey = <T>(accessorKey: BilingualColumnConfig<T>['accessorKe
  * @returns Localized table columns.
  */
 export const useTableColumns = <T>(
-  columns: TableColumnInput<T>[],
-  bilingualColumns?: BilingualColumnConfig<T>[]
+  columns: MaybeRefOrGetter<TableColumnInput<T>[]>,
+  bilingualColumns?: MaybeRefOrGetter<BilingualColumnConfig<T>[] | undefined>
 ): ComputedRef<TableColumn<T>[]> => {
   const { t, locale } = useI18n()
 
   return computed(() => {
     const bilingualMap = new Map<string, BilingualColumnConfig<T>>()
-    bilingualColumns?.forEach(config => {
+    toValue(bilingualColumns)?.forEach(config => {
       bilingualMap.set(config.id, config)
     })
 
-    return columns.map(column => {
+    return toValue(columns).map(column => {
       const bilingual = column.id ? bilingualMap.get(String(column.id)) : undefined
       const { headerKey, accessorKey: baseAccessorKey, ...rest } = column as TableColumnInput<T>
       const resolvedHeaderKey = headerKey ?? bilingual?.headerKey

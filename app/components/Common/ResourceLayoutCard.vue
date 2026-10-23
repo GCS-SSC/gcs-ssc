@@ -53,7 +53,7 @@ const pagination = defineModel<{ pageIndex: number; pageSize: number }>('paginat
 
 const { t } = useI18n()
 const table = ref()
-const resolvedColumns = useTableColumns<T>(columns, bilingualColumns)
+const resolvedColumns = useTableColumns<T>(() => columns, () => bilingualColumns)
 const hasStaleRows = computed(() => requestStatus === 'error' && data.length > 0)
 const isInitialLoading = computed(() => requestStatus === 'pending' && data.length === 0)
 const rowsAreDisabled = computed(() => hasStaleRows.value || (requestStatus === 'pending' && data.length > 0))
