@@ -1,6 +1,6 @@
 import { nanoid } from 'nanoid'
 import { acquireDbLease, type DatabaseLease } from '../utils/db'
-import { assertAgencyAuditReady, auditControls, startAuditRuntime } from '../utils/audit-runtime'
+import { assertAgencyAuditReady, auditControls, initializeAuditRuntime } from '../utils/audit-runtime'
 import { processStorageCleanupBatch, pruneCompletedStorageCleanupJobs } from '../utils/storage-cleanup-outbox'
 
 /**
@@ -9,7 +9,6 @@ import { processStorageCleanupBatch, pruneCompletedStorageCleanupJobs } from '..
  */
 export const drainStorageCleanup = async (providedLease?: DatabaseLease): Promise<void> => {
   const lease = providedLease ?? await acquireDbLease()
-  let stopAudit: (() => Promise<void>) | undefined
   let auditControl: ReturnType<typeof auditControls.get>
   const workerId = process.env.GCS_STORAGE_CLEANUP_WORKER_ID?.trim() || `cli:${process.pid}:${nanoid()}`
   const batchLimit = Math.max(1, Math.min(100, Number.parseInt(process.env.GCS_STORAGE_CLEANUP_BATCH_SIZE ?? '20', 10) || 20))
@@ -19,9 +18,8 @@ export const drainStorageCleanup = async (providedLease?: DatabaseLease): Promis
     // runtime verifies that the deployed audit schema is ready, reconciles its
     // triggers, and enables capture on this process's database generation.
     await assertAgencyAuditReady(lease.database)
-    stopAudit = await startAuditRuntime(lease.database)
+    await initializeAuditRuntime(lease.database)
     auditControl = auditControls.get(lease.database)
-    if (auditControl) auditControl.stop = stopAudit
     let totals = { claimed: 0, completed: 0, retried: 0, deadLettered: 0 }
     while (true) {
       const result = await processStorageCleanupBatch(lease.database, workerId, batchLimit)
@@ -41,14 +39,9 @@ export const drainStorageCleanup = async (providedLease?: DatabaseLease): Promis
     console.info(JSON.stringify({ workerId, ...totals, pruned }))
   } finally {
     try {
-      try {
-        // A short-lived worker cannot rely on the periodic retry timer to
-        // persist access evidence queued by its final statement.
-        await auditControl?.flush?.()
-      } finally {
-        await stopAudit?.()
-      }
-    } finally {
+      // A short-lived worker cannot wait for the next Level 0 cycle.
+      await auditControl?.flush?.()
+    } catch { /* Generation shutdown reports any remaining best-effort evidence loss. */ } finally {
       await lease.release()
     }
   }

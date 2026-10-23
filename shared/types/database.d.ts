@@ -592,7 +592,8 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Common_Attachment_Types: CommonAttachmentTypesTable
   Common_Attachment: CommonAttachmentTable
   Common_Entity_Attachment: CommonEntityAttachmentTable
-  l1_queue: L1QueueTable
+  background_queue_schedule: BackgroundQueueScheduleTable
+  background_queue_handler: BackgroundQueueHandlerTable
   storage_cleanup_outbox: StorageCleanupOutboxTable
   // Better Auth & RBAC
   user: UserTable
@@ -2320,11 +2321,22 @@ export interface CommonEntityAttachmentTable {
   _deleted: Generated<boolean>
 }
 
-export interface L1QueueTable {
+export interface BackgroundQueueScheduleTable {
+  id: Generated<string>
+  queue_level: number
+  current_cycle_at?: Date | null
+  next_run_at: Date
+  updated_at: Generated<Date>
+}
+
+export interface BackgroundQueueHandlerTable {
   id: Generated<string>
   handler_id: string
-  next_run_at: Generated<Date>
+  queue_level: number
+  last_cycle_at?: Date | null
+  lease_cycle_at?: Date | null
   attempt_count: Generated<number>
+  retry_not_before?: Date | null
   lease_owner?: string | null
   lease_expires_at?: Date | null
   last_error?: string | null

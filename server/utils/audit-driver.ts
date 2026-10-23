@@ -42,7 +42,6 @@ export interface AuditControl {
   accessRequest?: () => AccessLogRequest | undefined
   identity: () => AuditIdentity
   report: (event: Record<string, unknown>) => void
-  stop?: () => Promise<void>
   flush?: () => Promise<void>
 }
 
@@ -455,9 +454,11 @@ export const createAuditDialect = (dialect: Dialect, serialize: boolean, control
         }
       },
       destroy: async () => {
-        await control.stop?.()
-        await queue.shutdown()
-        await driver.destroy()
+        try {
+          await queue.shutdown()
+        } finally {
+          await driver.destroy()
+        }
       }
     }
     return wrapper

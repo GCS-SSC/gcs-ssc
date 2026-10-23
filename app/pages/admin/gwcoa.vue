@@ -7,7 +7,7 @@ import { CommonGwcoaCreateSchema } from '~~/shared/types/schemas'
 import type { AdminCommonField, AdminCommonResourceStatsResponse } from '~~/shared/types/admin-common-ui'
 
 definePageMeta({
-  middleware: 'admin-gwcoa',
+  middleware: 'admin-system',
   i18n: {
     paths: {
       en: '/admin/gwcoa',

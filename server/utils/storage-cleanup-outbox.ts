@@ -93,10 +93,11 @@ export const processStorageCleanupBatch = async (
       completed++
     } catch (error: unknown) {
       const attempts = job.attempt_count + 1
+      const retryNow = now ?? new Date()
       await db.updateTable('storage_cleanup_outbox').set({
         status: 'pending', attempt_count: attempts,
-        next_attempt_at: new Date(jobNow.getTime() + Math.min(MAX_RETRY_MS, BASE_RETRY_MS * 2 ** Math.min(attempts - 1, 6))),
-        lease_owner: null, lease_expires_at: null, updated_at: jobNow,
+        next_attempt_at: new Date(retryNow.getTime() + Math.min(MAX_RETRY_MS, BASE_RETRY_MS * 2 ** Math.min(attempts - 1, 6))),
+        lease_owner: null, lease_expires_at: null, updated_at: retryNow,
         last_error: (error instanceof Error ? error.message : String(error)).slice(0, 1000)
       }).where('id', '=', String(job.id)).where('status', '=', 'processing')
         .where('lease_owner', '=', workerId).execute()

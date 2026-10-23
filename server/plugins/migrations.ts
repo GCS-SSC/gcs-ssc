@@ -1,4 +1,4 @@
-import { auditControls, startAuditRuntime } from '../utils/audit-runtime'
+import { initializeAuditRuntime } from '../utils/audit-runtime'
 import { assertReferencedFileStorageProvidersRegistered } from '../utils/extensions'
 import {
   getMigrationPromise,
@@ -74,9 +74,7 @@ export default defineNitroPlugin(async () => {
     const migrationPromise = Promise.resolve().then(async () => {
       await recoverStartup(async () => {
         await runMigrations(dbLease.database)
-        const stopAudit = await startAuditRuntime(dbLease.database)
-        const auditControl = auditControls.get(dbLease.database)
-        if (auditControl) auditControl.stop = stopAudit
+        await initializeAuditRuntime(dbLease.database)
       }, () => setMigrationReadiness(dbLease.generationId, migrationPromise, 'failed'))
       setMigrationReadiness(dbLease.generationId, migrationPromise, 'ready')
     })

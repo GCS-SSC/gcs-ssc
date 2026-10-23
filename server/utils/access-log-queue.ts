@@ -61,8 +61,6 @@ export const createAccessLogQueue = (
   // Keep split batches across ticks so a poison batch cannot repeatedly consume the budget
   // before any of its smaller neighbors have a chance to be persisted.
   const batches: BufferedAccess[][] = []
-  let failures = 0
-  let nextAttempt = 0
   let flushing: Promise<void> | undefined
   let stopping = false
   let shutdownDeadline = Infinity
@@ -76,6 +74,7 @@ export const createAccessLogQueue = (
     let sent = 0
     let attemptedBatches = 0
     let persistenceDurationMs = 0
+    let failed = false
     const scheduled = new Set(batches.flat())
     // Eligibility is monotonic: response completion and lease release never revert.
     const ready = [...pending].filter(item => !scheduled.has(item) && item.ready())
@@ -91,8 +90,6 @@ export const createAccessLogQueue = (
         await persist(batch.map(item => item.event))
         sent += batch.length
         for (const item of batch) remove(item)
-        failures = 0
-        nextAttempt = 0
       } catch (error) {
         const code = typeof error === 'object' && error !== null && 'code' in error
           && /^[A-Z0-9]{5}$/.test(String(error.code))
@@ -108,10 +105,8 @@ export const createAccessLogQueue = (
           }
         } else {
           batches.unshift(batch)
-          failures++
-          const retryMs = Math.min(300_000, 10_000 * 2 ** Math.min(failures - 1, 5))
-          nextAttempt = Date.now() + retryMs
-          report({ event: 'audit.access_persistence_failed', code, retryMs, ...stats() })
+          failed = true
+          report({ event: 'audit.access_persistence_failed', code, ...stats() })
           break
         }
       } finally {
@@ -120,10 +115,11 @@ export const createAccessLogQueue = (
     }
     if (sent || pending.size) report({ event: 'audit.access_queue', sent, attemptedBatches,
       persistenceDurationMs, eligibleBacklog: batches.reduce((count, batch) => count + batch.length, 0), ...stats() })
+    if (failed) throw new Error('Access log persistence failed')
   }
   const flush = async (force = false, deadline = Infinity): Promise<void> => {
     if (flushing) return await flushing
-    if ((!force && (stopping || Date.now() < nextAttempt)) || pending.size === 0) return
+    if ((!force && stopping) || pending.size === 0) return
     flushing = drain(deadline, force ? Infinity : maxBatchesPerFlush).finally(() => {
       flushing = undefined
     })
@@ -147,12 +143,15 @@ export const createAccessLogQueue = (
       // Stop starting new batches after five seconds; an in-flight DB operation must settle
       // before its driver is destroyed (PostgreSQL acquisition/statement timeouts still apply).
       shutdownDeadline = Date.now() + 5000
-      await flushing
-      await flush(true, shutdownDeadline)
-      if (pending.size) report({ event: 'audit.access_dropped', reason: 'shutdown', ...stats() })
-      batches.length = 0
-      pending.clear()
-      bytes = 0
+      await flushing?.catch(() => {})
+      try {
+        await flush(true, shutdownDeadline)
+      } catch { /* The final attempt is best effort; remaining evidence is reported below. */ } finally {
+        if (pending.size) report({ event: 'audit.access_dropped', reason: 'shutdown', ...stats() })
+        batches.length = 0
+        pending.clear()
+        bytes = 0
+      }
     }
   }
 }

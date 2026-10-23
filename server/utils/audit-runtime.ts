@@ -107,90 +107,11 @@ export const reconcileAuditCapture = async (db: Kysely<Database>): Promise<void>
   })
 }
 
-export const startAuditRuntime = async (db: Kysely<Database>): Promise<() => Promise<void>> => {
-  const retention = resolveAuditRetention()
+export const initializeAuditRuntime = async (db: Kysely<Database>): Promise<void> => {
+  resolveAuditRetention()
   await withoutAuditCapture(async () => {
     await reconcileAuditCapture(db)
   })
   const control = auditControls.get(db)
   if (control) control.enabled = true
-  let running: Promise<void> | undefined
-  let continuation: ReturnType<typeof setTimeout> | undefined
-  let accessRunning: Promise<void> | undefined
-  let accessContinuation: ReturnType<typeof setTimeout> | undefined
-  let stopped = false
-  const cleanAccess = async (): Promise<void> => {
-    if (stopped || !control?.expireAccess) return
-    if (accessRunning) return await accessRunning
-    accessRunning = (async () => {
-      try {
-        const removed = await control.expireAccess!(retention.accessDays)
-        if (removed) console.info({ event: 'audit.access_retention', removed })
-        if (removed >= 1000 && !stopped) {
-          accessContinuation = setTimeout(() => {
-            accessContinuation = undefined
-            void cleanAccess()
-          }, 10_000)
-          accessContinuation.unref()
-        }
-      } catch {
-        console.error({ event: 'audit.access_retention_failed' })
-      }
-    })().finally(() => {
-      accessRunning = undefined
-    })
-    await accessRunning
-  }
-  const clean = async () => {
-    if (stopped) return
-    if (running) return await running
-    if (continuation) clearTimeout(continuation)
-    continuation = undefined
-    running = withoutAuditCapture(async () => {
-      try {
-        let total = 0
-        let removed = 0
-        for (let batch = 0; batch < 10 && !stopped; batch++) {
-          const result = await sql<{ removed: number }>`SELECT audit.expire_events(${retention.auditDays}, ${retention.accessDays}, 1000) AS removed`.execute(db)
-          removed = result.rows[0]?.removed ?? 0
-          total += removed
-          if (removed < 1000) break
-        }
-        console.info({ event: 'audit.retention', removed: total })
-        if (removed >= 1000 && !stopped) {
-          continuation = setTimeout(() => {
-            continuation = undefined
-            void clean()
-          }, 1000)
-          continuation.unref()
-        }
-      } catch {
-        console.error({ event: 'audit.retention_failed' })
-      }
-    }).finally(() => {
-      running = undefined
-    })
-    await running
-  }
-  await clean()
-  // Best-effort history outages must not delay business readiness.
-  void cleanAccess()
-  const interval = setInterval(() => {
-    void clean()
-    if (!accessContinuation) void cleanAccess()
-  }, 60 * 60 * 1000)
-  const retry = setInterval(() => {
-    void control?.flush?.()
-  }, 10_000)
-  interval.unref()
-  retry.unref()
-  return async () => {
-    stopped = true
-    if (continuation) clearTimeout(continuation)
-    if (accessContinuation) clearTimeout(accessContinuation)
-    clearInterval(interval)
-    clearInterval(retry)
-    await running
-    await accessRunning
-  }
 }

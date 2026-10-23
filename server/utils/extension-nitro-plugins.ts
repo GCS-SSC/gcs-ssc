@@ -2,6 +2,7 @@ import type { Kysely } from 'kysely'
 import { loadGcsExtensionModule } from '#gcs-extensions/server-registry'
 import type { Database } from '~~/shared/types/database'
 import type { GcsRegisteredExtension } from '~~/shared/utils/extensions'
+import { activateExtensionQueueHandlers } from './queue-registry'
 
 type NitroApp = ReturnType<typeof import('nitropack/runtime').useNitroApp>
 
@@ -52,10 +53,13 @@ export const activateEnabledExtensionNitroPlugins = async (
         const module = await loadGcsExtensionModule(extension.nitroPlugin!.id) as {
           default?: (app: NitroApp) => Promise<void> | void
         }
-        if (typeof module.default !== 'function') {
+        const plugin = module.default
+        if (typeof plugin !== 'function') {
           throw new Error(`Extension "${extension.key}" Nitro plugin must export a default function`)
         }
-        await module.default(app)
+        await activateExtensionQueueHandlers(app, extension.key, async () => {
+          await plugin(app)
+        })
       })()
       active.set(extension.key, activation)
     }

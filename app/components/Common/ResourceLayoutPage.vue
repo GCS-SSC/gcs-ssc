@@ -1,5 +1,5 @@
 <script setup lang="ts" generic="T extends object">
-import { computed, useId } from 'vue'
+import { computed } from 'vue'
 import type { EnumKey } from '~/types/enums'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
 import type { ResourceTableStatus } from '~~/shared/types/resource-table'
@@ -49,7 +49,6 @@ const pagination = defineModel<{ pageIndex: number; pageSize: number }>('paginat
 })
 
 const { t } = useI18n()
-const pageSizeId = useId()
 const table = ref()
 const resolvedColumns = useTableColumns<T>(() => columns, () => bilingualColumns)
 const hasStaleRows = computed(() => requestStatus === 'error' && data.length > 0)
@@ -148,29 +147,31 @@ defineExpose({
       </div>
     </div>
 
-    <div v-if="showTable && !isInitialLoading" class="border-default flex items-center justify-between gap-3 border-t bg-white p-6 dark:bg-zinc-900">
+    <div v-if="showTable && !isInitialLoading" data-testid="resource-table-footer" class="border-default flex flex-col gap-3 border-t bg-white p-6 sm:flex-row sm:items-center sm:justify-between dark:bg-zinc-900">
       <div class="text-xs font-bold tracking-widest text-zinc-600 uppercase dark:text-zinc-400">
         <slot name="footer-left">
-          <span class="text-zinc-900 dark:text-white">
-            {{ table?.tableApi?.getFilteredSelectedRowModel().rows.length || 0 }}
-          </span>
-          /
-          {{ totalRecords }}
-          {{ t('common.selected') }}
+          <template v-if="selectable">
+            <span class="text-zinc-900 dark:text-white">{{ table?.tableApi?.getFilteredSelectedRowModel().rows.length || 0 }}</span>
+            / {{ totalRecords }} {{ t('common.selected') }}
+          </template>
+          <template v-else>
+            <span class="text-zinc-900 dark:text-white">{{ totalRecords }}</span>
+            {{ t('common.records') }}
+          </template>
         </slot>
       </div>
 
-      <div class="flex items-center gap-4">
-        <div class="flex items-center gap-1.5">
-          <label :for="pageSizeId" class="text-xs font-medium text-zinc-500">{{ t('common.rows_per_page') }}</label>
-          <USelect
-            :id="pageSizeId"
-            v-model="pagination.pageSize"
-            :items="[5, 10, 20, 50]"
-            variant="ghost"
-            size="xs"
-            @update:model-value="val => (pagination.pageIndex = 0)" />
-        </div>
+      <div class="flex w-full min-w-0 flex-wrap items-center justify-between gap-2 sm:w-auto sm:justify-start sm:gap-4">
+        <USelect
+          v-model="pagination.pageSize"
+          :required="false"
+          :aria-required="false"
+          :items="[5, 10, 20, 50]"
+          :aria-label="t('common.rows_per_page_label')"
+          variant="ghost"
+          size="xs"
+          class="w-16 shrink-0"
+          @update:model-value="val => (pagination.pageIndex = 0)" />
         <CommonPagination
           :page="pagination.pageIndex + 1"
           :items-per-page="pagination.pageSize"

@@ -75,7 +75,7 @@ const EXTENSION_HOST_CAPABILITIES = new Set([
   'configuration-access',
   'scheduled-agreement-import',
   'scheduled-intake-import',
-  'l1-queue',
+  'background-queue',
   'agency-only-configuration',
   'audit-ownership',
   'file-storage-provider'
@@ -1064,7 +1064,7 @@ export const isDeferredExtensionNitroPlugin = (
   extension: Pick<GcsResolvedExtension, 'nitroPlugin' | 'requiredHostCapabilities'>
 ): boolean => Boolean(extension.nitroPlugin && (extension.requiredHostCapabilities.includes('scheduled-agreement-import')
   || extension.requiredHostCapabilities.includes('scheduled-intake-import')
-  || extension.requiredHostCapabilities.includes('l1-queue')))
+  || extension.requiredHostCapabilities.includes('background-queue')))
 
 export const resolveFileStorageProvider = async (
   extensionDir: string,
@@ -1630,7 +1630,7 @@ const configureExtensionNitro = (
 
     for (const extension of extensions) {
       // Ordinary lifecycle guards must be present even before first enablement.
-      // Scheduled import plugins query their own tables and wait for migrations.
+      // Background plugins query their own tables and wait for migrations.
       if (extension.nitroPlugin && !isDeferredExtensionNitroPlugin(extension)) {
         nitroConfig.plugins.push(extension.nitroPlugin)
       }
