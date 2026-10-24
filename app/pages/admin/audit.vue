@@ -186,7 +186,7 @@ const isHeroCollapsed = getHeroCollapsed('admin-audit')
                 <pre v-else class="overflow-auto whitespace-pre-wrap break-all">{{ displayValue(detail[key]) }}</pre>
               </div>
             </template>
-            <UTable v-else :data="changes" :columns="[{ accessorKey: 'field', header: t('audit.field') }, { accessorKey: 'old', header: t('audit.old') }, { accessorKey: 'new', header: t('audit.new') }]" />
+            <CommonCompactTable v-else :data="changes" :columns="[{ accessorKey: 'field', header: t('audit.field') }, { accessorKey: 'old', header: t('audit.old') }, { accessorKey: 'new', header: t('audit.new') }]" />
           </div>
         </template>
       </UModal>
