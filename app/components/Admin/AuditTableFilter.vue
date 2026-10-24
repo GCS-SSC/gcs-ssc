@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { kind } = defineProps<{ kind: 'events' | 'access' }>()
+const { kind, showLabel = true } = defineProps<{ kind: 'events' | 'access'; showLabel?: boolean }>()
 const model = defineModel<string>({ default: '' })
 const { t } = useI18n()
 const { data, error, refresh } = useFetch<{ events: string[]; access: string[] }, Error, string>('/api/admin/audit/tables' as string)
@@ -10,10 +10,11 @@ watch([() => kind, data], () => {
 </script>
 
 <template>
-  <UFormField :label="t('audit.table')">
+  <UFormField :label="showLabel ? t('audit.table') : undefined">
     <CommonBilingualSelectMenu
       :model-value="model || 'all'" :items="items" value-key="value" label-key="label"
-      :disabled="Boolean(error)" :prepend-options="[{ label: t('common.all'), value: 'all' }]"
+      :aria-label="t('audit.table')"
+      :disabled="Boolean(error)" :prepend-options="[{ label: t(showLabel ? 'common.all' : 'audit.allTables'), value: 'all' }]"
       @update:model-value="model = !$event || $event === 'all' ? '' : $event" />
     <div v-if="error" role="alert">
       {{ t('common.lookup_load_failed') }}

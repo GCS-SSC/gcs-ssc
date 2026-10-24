@@ -23,7 +23,7 @@ const { search, pagination, items, totalRecords, refresh, retry, status } = useR
   query: computed(() => ({ egcs_fi_fundingopportunity: props.opportunityId }))
 })
 const columns = computed<TableColumnInput<Row>[]>(() => [
-  { accessorKey: 'id', headerKey: 'funding_case_intake.application_id' },
+  { accessorKey: 'id', headerKey: 'common.id' },
   ...(props.opportunityId ? [] : [{ id: 'opportunity', headerKey: 'funding_case_intake.opportunity' }]),
   { id: 'proponent', headerKey: 'funding_case_intake.proponent' },
   { accessorKey: 'egcs_fi_externalsourceid', headerKey: 'funding_case_intake.external_source_id' },
@@ -109,7 +109,9 @@ const submit = async () => {
   <div class="space-y-5">
     <component :is="opportunityId ? CommonResourceLayoutCard : CommonResourceLayoutPage" v-model:search="search" v-model:pagination="pagination" :data="items" :columns="columns" :total-records="totalRecords" :request-status="status" :show-button="canCreate" :button-label="t(opportunityId ? 'funding_opportunity.add_application' : 'funding_case_intake.create')" @add="openCreate" @retry="retry">
       <template #id-cell="{ row }">
-        <UButton variant="link" :label="String(row.original.id)" :to="localePath(appRouteLocations.fundingCaseIntakeDetail(String(row.original.id)))" />
+        <span class="font-mono text-xs font-bold text-zinc-400 dark:text-zinc-500">
+          {{ row.original.id }}
+        </span>
       </template>
       <template #opportunity-cell="{ row }">
         {{ getBilingualValue(row.original, 'opportunity_name', row.original.egcs_fi_fundingopportunity) }}

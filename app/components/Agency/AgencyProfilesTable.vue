@@ -40,7 +40,6 @@ const availabilityItems = computed(() => [
 ])
 
 const columns: TableColumnInput<AgencyProfileItem>[] = [
-  { id: 'select' },
   { accessorKey: 'id', headerKey: 'common.id' },
   { id: 'abbreviation', header: '' },
   { id: 'name', accessorKey: 'egcs_ay_name_en', headerKey: 'agency.name_en' },
@@ -71,7 +70,6 @@ const bilingualColumns: BilingualColumnConfig<AgencyProfileItem>[] = [
     :pagination-options="{ getPaginationRowModel: getPaginationRowModel() }"
     :button-label="t('agency.new')"
     :show-button="canCreate"
-    selectable
     v-bind="$attrs"
     @add="emit('add')"
     @retry="emit('retry')">

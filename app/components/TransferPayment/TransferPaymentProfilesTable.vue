@@ -44,7 +44,6 @@ const availabilityItems = computed(() => [
 ])
 
 const columns: TableColumnInput<TransferPaymentProfileRow>[] = [
-  { id: 'select' },
   { accessorKey: 'id', headerKey: 'common.id' },
   { accessorKey: 'egcs_tp_name_en', headerKey: 'transfer_payment.name_en' },
   { id: 'abbreviation', accessorKey: 'egcs_tp_abbreviation_en', headerKey: 'transfer_payment.abbreviation' },
@@ -72,7 +71,6 @@ const bilingualColumns: BilingualColumnConfig<TransferPaymentProfileRow>[] = [
     :pagination-options="{ getPaginationRowModel: getPaginationRowModel() }"
     :button-label="t('transfer_payment.new')"
     :show-button="canCreate"
-    selectable
     v-bind="$attrs"
     @add="emit('add')"
     @retry="emit('retry')">

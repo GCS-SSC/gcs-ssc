@@ -61,7 +61,8 @@ export const useNavigationCatalog = (workspaces: MaybeRefOrGetter<ExtensionAgenc
     add('roles', 'role.title', 'i-lucide-shield', appRouteLocations.roles(), { category: 'management', order: 50 }, canAny('role', 'read'))
     add('users', 'nav.users', 'i-lucide-user-round', appRouteLocations.users(), { category: 'administration', order: 20 }, canAny('user', 'read'))
     add('groups', 'nav.groups', 'i-lucide-users', appRouteLocations.groups(), { category: 'administration', order: 30 }, canAny('group', 'read'))
-    add('audit', 'audit.title', 'i-lucide-clipboard-list', '/admin/audit', { category: 'administration', order: 40 }, canAny('audit', 'read', ['global', 'agency']))
+    add('audit', 'audit.title', 'i-lucide-clipboard-list', appRouteLocations.adminAudit(), { category: 'administration', order: 40 }, canAny('audit', 'read', ['global', 'agency']))
+    add('access', 'audit.access', 'i-lucide-eye', appRouteLocations.adminAccess(), { category: 'administration', order: 45 }, canAny('audit', 'read', ['global', 'agency']))
     add('common', 'admin_common.resources.gwcoa', 'i-lucide-database', appRouteLocations.adminGwcoa(), { category: 'administration', order: 50 }, can('system', 'read', { type: 'global' }))
     add('queues', 'queues.title', 'i-lucide-list-restart', appRouteLocations.adminQueues(), { category: 'administration', order: 60 }, can('system', 'read', { type: 'global' }))
     return entries

@@ -67,26 +67,25 @@ const columns = computed(() => [
 </script>
 
 <template>
-  <div class="space-y-3">
-    <p class="text-sm text-muted">
-      {{ t('audit.accessWindow') }}
-    </p>
-    <CommonResourceLayoutCard
-      v-model:pagination="pagination"
-      :data="data?.items ?? []"
-      :columns="columns"
-      :request-status="status"
-      :cursor="{ availablePages: cursors.length, hasNextPage: Boolean(data?.nextCursor) }"
-      :show-toolbar="false"
-      @retry="load()">
-      <template #actions-cell="{ row }">
-        <div class="flex justify-end gap-2">
-          <CommonActionButton icon="i-lucide-eye" color="neutral" variant="ghost" :aria-label="t('audit.details')" @click="emit('select', row.original)" />
-        </div>
-      </template>
-      <template #footer-left>
-        {{ t('audit.accessPageRecords', { count: data?.items.length ?? 0 }) }}
-      </template>
-    </CommonResourceLayoutCard>
-  </div>
+  <CommonResourceLayoutPage
+    v-model:pagination="pagination"
+    :data="data?.items ?? []"
+    :columns="columns"
+    :request-status="status"
+    :cursor="{ availablePages: cursors.length, hasNextPage: Boolean(data?.nextCursor) }"
+    :show-search="false"
+    :show-button="false"
+    @retry="load()">
+    <template #filters>
+      <slot name="filters" />
+    </template>
+    <template #actions-cell="{ row }">
+      <div class="flex justify-end gap-2">
+        <CommonActionButton icon="i-lucide-eye" color="neutral" variant="ghost" :aria-label="t('audit.details')" @click="emit('select', row.original)" />
+      </div>
+    </template>
+    <template #footer-left>
+      {{ t('audit.accessPageRecords', { count: data?.items.length ?? 0 }) }}
+    </template>
+  </CommonResourceLayoutPage>
 </template>

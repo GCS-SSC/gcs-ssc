@@ -2,19 +2,21 @@
 import { computed } from 'vue'
 import type { EnumKey } from '~/types/enums'
 import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useTableColumns'
-import type { ResourceTableStatus } from '~~/shared/types/resource-table'
+import type { CursorPagination, ResourceTableStatus } from '~~/shared/types/resource-table'
 
 const {
   data,
   columns,
   bilingualColumns,
   totalRecords,
+  cursor,
   loading = false,
   requestStatus,
   statusEnumName,
   statusFilterLabel,
   buttonLabel,
   showButton = true,
+  showSearch = true,
   buttonDisabled = false,
   selectable = false,
   getRowSelectionLabel,
@@ -25,13 +27,15 @@ const {
   data: T[]
   columns: TableColumnInput<T>[]
   bilingualColumns?: BilingualColumnConfig<T>[]
-  totalRecords: number
+  totalRecords?: number
+  cursor?: CursorPagination
   loading?: boolean
   requestStatus?: ResourceTableStatus
   statusEnumName?: EnumKey
   statusFilterLabel?: string
   buttonLabel?: string
   showButton?: boolean
+  showSearch?: boolean
   buttonDisabled?: boolean
   selectable?: boolean
   getRowSelectionLabel?: (row: T, index: number) => string
@@ -73,6 +77,7 @@ defineExpose({
       :status-filter-label="statusFilterLabel"
       :button-label="buttonLabel"
       :show-button="showButton"
+      :show-search="showSearch"
       :button-disabled="buttonDisabled"
       :search-placeholder="searchPlaceholder"
       :help-search-target="helpSearchTarget"
@@ -154,7 +159,7 @@ defineExpose({
             <span class="text-zinc-900 dark:text-white">{{ table?.tableApi?.getFilteredSelectedRowModel().rows.length || 0 }}</span>
             / {{ totalRecords }} {{ t('common.selected') }}
           </template>
-          <template v-else>
+          <template v-else-if="totalRecords !== undefined">
             <span class="text-zinc-900 dark:text-white">{{ totalRecords }}</span>
             {{ t('common.records') }}
           </template>
@@ -173,9 +178,11 @@ defineExpose({
           class="w-16 shrink-0"
           @update:model-value="val => (pagination.pageIndex = 0)" />
         <CommonPagination
+          v-if="totalRecords !== undefined || cursor"
           :page="pagination.pageIndex + 1"
           :items-per-page="pagination.pageSize"
           :total="totalRecords"
+          :cursor="cursor"
           @update:page="val => (pagination.pageIndex = val - 1)" />
       </div>
     </div>

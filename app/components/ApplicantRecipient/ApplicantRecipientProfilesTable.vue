@@ -43,7 +43,6 @@ const availabilityItems = computed(() => [
 ])
 
 const columns: TableColumnInput<ApplicantRecipientProfileRow>[] = [
-  { id: 'select' },
   { accessorKey: 'id', headerKey: 'common.id' },
   { id: 'name', accessorKey: 'egcs_ar_legalname_en', headerKey: 'applicant_recipient.name' },
   { id: 'lead_agency', headerKey: 'applicant_recipient.lead_agency' },
@@ -91,7 +90,6 @@ const canDeleteProfile = (profile: ApplicantRecipientProfileRow) => {
     :pagination-options="{ getPaginationRowModel: getPaginationRowModel() }"
     :button-label="t('applicant_recipient.new')"
     :show-button="canCreate"
-    selectable
     @add="emit('add')"
     @retry="emit('retry')">
     <template #filters>

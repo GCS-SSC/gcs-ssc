@@ -24,7 +24,6 @@ const {
   pagination,
   columnFilters,
   columnVisibility,
-  rowSelection,
   items: agencies,
   totalRecords,
   response,
@@ -126,7 +125,6 @@ const canUpdateAgency = (agency: AgencyProfileItem) => can('agency', 'update', {
           v-model:pagination="pagination"
           v-model:column-filters="columnFilters"
           v-model:column-visibility="columnVisibility"
-          v-model:row-selection="rowSelection"
           :agencies="agencies"
           :total-records="totalRecords"
           :loading="status === 'pending'"

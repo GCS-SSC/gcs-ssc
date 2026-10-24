@@ -32,7 +32,6 @@ const {
   pagination,
   columnFilters,
   columnVisibility,
-  rowSelection,
   items: profiles,
   totalRecords,
   response,
@@ -202,7 +201,6 @@ const canDeleteProfile = (profile: TransferPaymentProfileRow) => {
           v-model:pagination="pagination"
           v-model:column-filters="columnFilters"
           v-model:column-visibility="columnVisibility"
-          v-model:row-selection="rowSelection"
           :profiles="profiles"
           :total-records="totalRecords"
           :loading="status === 'pending'"
