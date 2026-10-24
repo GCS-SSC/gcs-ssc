@@ -223,7 +223,7 @@ export const createAuditDialect = (dialect: Dialect, serialize: boolean, control
               next = resolve
             })
             await previous
-            const event: AccessEvidence | undefined = control.accessEnabled === false
+            const event: AccessEvidence | undefined = control.accessEnabled === false || auditScope.getStore()?.accessLogDisabled
               ? undefined
               : {
                   id: queryId, created_at: new Date().toISOString(), actor_user_id: identity.actorUserId,

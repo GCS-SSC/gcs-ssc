@@ -3,7 +3,7 @@ import { getMigrationPromise } from '../utils/migration-readiness'
 import { activateEnabledExtensionNitroPlugins } from '../utils/extension-nitro-plugins'
 import { getRegisteredExtensions } from '../utils/extensions'
 import { createScheduledExtensionWriteAuthorization } from '../utils/extension-scheduled-import'
-import { withAuditExecution } from '../utils/audit-context'
+import { withAuditExecution, withoutAccessLogCapture } from '../utils/audit-context'
 import { prepareQueueSchedules, runQueueHandler } from '../utils/queue'
 import { getRegisteredQueueHandlers, getQueueEnabledExtensionKeys } from '../utils/queue-registry'
 import type { HostQueueContext } from '../utils/queue-registry'
@@ -38,7 +38,7 @@ export default defineNitroPlugin(app => {
     const db = currentLease.database
     await activateEnabledExtensionNitroPlugins(db, app, await getRegisteredExtensions())
     const handlers = getRegisteredQueueHandlers(app).filter(handler => handler.executionScope !== 'process')
-    const enabledKeys = await getQueueEnabledExtensionKeys(db)
+    const enabledKeys = await withoutAccessLogCapture(() => getQueueEnabledExtensionKeys(db))
     if (stopped) return
     await prepareQueueSchedules(db, handlers)
     if (stopped) return

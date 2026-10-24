@@ -10,10 +10,13 @@ export type AuditCreationOwner = {
   ownerTable: string
   ownerRow: Readonly<Record<string, string>>
 }
-type AuditScope = { identity?: AuditIdentity; bypass?: boolean; execution?: AuditExecutionScope; creationOwner?: AuditCreationOwner }
+type AuditScope = { identity?: AuditIdentity; bypass?: boolean; accessLogDisabled?: boolean; execution?: AuditExecutionScope; creationOwner?: AuditCreationOwner }
 const state = nodeProcess as NodeJS.Process & { __gcsAuditScope?: AsyncLocalStorage<AuditScope> }
 export const auditScope = state.__gcsAuditScope ??= new AsyncLocalStorage<AuditScope>()
 export const withoutAuditCapture = <T>(work: () => Promise<T>): Promise<T> => auditScope.run({ bypass: true }, work)
+/** Suppresses access evidence for internal bookkeeping while preserving all other audit controls. */
+export const withoutAccessLogCapture = <T>(work: () => Promise<T>): Promise<T> =>
+  auditScope.run({ ...auditScope.getStore(), accessLogDisabled: true }, work)
 export const withAnonymousAudit = <T>(requestId: string | null, work: () => Promise<T>): Promise<T> =>
   auditScope.run({ identity: { actorKind: 'anonymous', actorUserId: null, requestId, protected: false } }, work)
 

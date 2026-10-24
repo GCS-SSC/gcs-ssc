@@ -2,6 +2,7 @@ import type { Kysely } from 'kysely'
 import { loadGcsExtensionModule } from '#gcs-extensions/server-registry'
 import type { Database } from '~~/shared/types/database'
 import type { GcsRegisteredExtension } from '~~/shared/utils/extensions'
+import { withoutAccessLogCapture } from './audit-context'
 import { activateExtensionQueueHandlers } from './queue-registry'
 
 type NitroApp = ReturnType<typeof import('nitropack/runtime').useNitroApp>
@@ -34,14 +35,14 @@ export const activateEnabledExtensionNitroPlugins = async (
   app: NitroApp,
   extensions: GcsRegisteredExtension[]
 ): Promise<void> => {
-  const enabledRows = await db.selectFrom('extensions.agency_enablement as enablement')
+  const enabledRows = await withoutAccessLogCapture(() => db.selectFrom('extensions.agency_enablement as enablement')
     .innerJoin('Agency_Profile as agency', 'agency.id', 'enablement.agency_id')
     .select('enablement.extension_key')
     .where('enablement.enabled', '=', true)
     .where('enablement._deleted', '=', false)
     .where('agency._deleted', '=', false)
     .distinct()
-    .execute()
+    .execute())
   const enabledKeys = new Set(enabledRows.map(row => row.extension_key))
   const active = activationsFor(app)
 

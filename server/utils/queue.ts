@@ -1,5 +1,6 @@
 /* eslint-disable jsdoc/require-param, jsdoc/require-returns -- Internal scheduling helpers have explicit typed contracts. */
 import { randomUUID } from 'node:crypto'
+import { withoutAccessLogCapture } from './audit-context'
 import { sql, type Kysely, type Selectable } from 'kysely'
 import type { ClusterQueueHandler, HostQueueContext } from './queue-registry'
 import type { Database } from '../../shared/types/database'
@@ -12,7 +13,7 @@ const currentCycleSql = (cadenceMs: number) =>
 
 /** Publishes shared aligned cycles; new subscriptions join the next future beat. */
 export const prepareQueueSchedules = async (db: Kysely<Database>, handlers: ClusterQueueHandler[]): Promise<void> => {
-  await db.transaction().execute(async trx => {
+  await withoutAccessLogCapture(() => db.transaction().execute(async trx => {
     for (const definition of QUEUE_LEVELS) {
       const cycle = currentCycleSql(definition.cadenceMs)
       await trx.insertInto('background_queue_schedule').values({
@@ -47,12 +48,12 @@ export const prepareQueueSchedules = async (db: Kysely<Database>, handlers: Clus
       }).where('queue_level', '=', definition.level)
         .where('next_run_at', '<=', sql<Date>`statement_timestamp()`).execute()
     }
-  })
+  }))
 }
 
 /** Claims one current shared cycle without allowing concurrent ordinary execution. */
 export const claimQueueHandler = async (db: Kysely<Database>, handler: ClusterQueueHandler, owner: string) => {
-  const result = await sql<Selectable<Database['background_queue_handler']>>`
+  const result = await withoutAccessLogCapture(() => sql<Selectable<Database['background_queue_handler']>>`
     UPDATE background_queue_handler AS handler SET
       lease_owner = ${owner},
       lease_expires_at = clock_timestamp() + ${QUEUE_LEASE_MS} * interval '1 millisecond',
@@ -66,7 +67,7 @@ export const claimQueueHandler = async (db: Kysely<Database>, handler: ClusterQu
       AND (handler.last_cycle_at IS NULL OR handler.last_cycle_at < schedule.current_cycle_at)
       AND (handler.retry_not_before IS NULL OR handler.retry_not_before <= schedule.current_cycle_at)
       AND (handler.lease_owner IS NULL OR handler.lease_expires_at <= clock_timestamp())
-    RETURNING handler.*`.execute(db)
+    RETURNING handler.*`.execute(db))
   return result.rows[0]
 }
 
@@ -81,17 +82,17 @@ export const runQueueHandler = async (
   if (!job) return false
   // Registration and shutdown can change while the database claim is pending.
   if (!mayDispatch()) {
-    await db.updateTable('background_queue_handler').set({
+    await withoutAccessLogCapture(() => db.updateTable('background_queue_handler').set({
       lease_owner: null, lease_expires_at: null, lease_cycle_at: null,
       updated_at: sql<Date>`clock_timestamp()`
-    }).where('id', '=', job.id).where('lease_owner', '=', owner).execute()
+    }).where('id', '=', job.id).where('lease_owner', '=', owner).execute())
     return false
   }
   let renewal: Promise<unknown> = Promise.resolve()
   const heartbeat = setInterval(() => {
-    renewal = renewal.then(() => db.updateTable('background_queue_handler').set({
+    renewal = renewal.then(() => withoutAccessLogCapture(() => db.updateTable('background_queue_handler').set({
       lease_expires_at: sql<Date>`clock_timestamp() + ${QUEUE_LEASE_MS} * interval '1 millisecond'`
-    }).where('id', '=', job.id).where('lease_owner', '=', owner).execute())
+    }).where('id', '=', job.id).where('lease_owner', '=', owner).execute()))
       .catch(error => console.error(`Queue lease renewal failed for ${handler.id}`, error))
   }, QUEUE_LEASE_MS / 4)
   heartbeat.unref?.()
@@ -106,7 +107,7 @@ export const runQueueHandler = async (
     clearInterval(heartbeat)
     await renewal
   }
-  await db.updateTable('background_queue_handler').set({
+  await withoutAccessLogCapture(() => db.updateTable('background_queue_handler').set({
     last_cycle_at: sql<Date>`greatest(lease_cycle_at, ${currentCycleSql(definition.cadenceMs)})`,
     attempt_count: !failed ? 0 : Math.min(job.attempt_count + 1, 2_147_483_647),
     retry_not_before: failed && definition.retry
@@ -117,7 +118,7 @@ export const runQueueHandler = async (
     lease_cycle_at: null,
     last_error: !failed ? null : (failure instanceof Error ? failure.message : String(failure)).slice(0, 1000),
     updated_at: sql<Date>`clock_timestamp()`
-  }).where('id', '=', job.id).where('lease_owner', '=', owner).execute()
+  }).where('id', '=', job.id).where('lease_owner', '=', owner).execute())
   if (failed) console.error(`Queue handler failed: ${handler.id}`, failure)
   return true
 }
