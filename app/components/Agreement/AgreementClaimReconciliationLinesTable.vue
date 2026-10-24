@@ -106,7 +106,7 @@ const getCategoryLines = (category: ReconciliationCategoryGroup) => category.sub
 </script>
 
 <template>
-  <CommonTableSurface>
+  <CommonTableSurface data-field-tooltip-context="agreement" data-field-scope="agreement.claim-reconciliation-lines-table" data-scope-label-en="Agreements > Claims > Reconciliation lines" data-scope-label-fr="Ententes > Demandes de remboursement > Lignes de rapprochement">
     <table class="min-w-full divide-y divide-zinc-200 text-sm dark:divide-zinc-800">
       <caption class="sr-only">
         {{ t('agreement.claims.reconcile_breakdown_caption') }}
@@ -227,9 +227,9 @@ const getCategoryLines = (category: ReconciliationCategoryGroup) => category.sub
                     required
                     :aria-invalid="tryParseMoney(line.reconciledAmount) === null"
                     :aria-describedby="tryParseMoney(line.reconciledAmount) === null ? `reconciled-error-${line.id}` : undefined"
-                    :aria-label="t('agreement.claims.reconciled_amount_for', { name: line.name })"
+                    data-field-label-en="Reconciled amount" data-field-label-fr="Montant rapproché" :aria-label="t('agreement.claims.reconciled_amount_for', { name: line.name })"
                     class="w-40"
-                    @update:model-value="value => emit('update:reconciled', line.id, value)" />
+                    data-ui-target="agreement.claim-reconciliation-lines-table.line.reconciledAmount" @update:model-value="value => emit('update:reconciled', line.id, value)" />
                   <span v-else>{{ formatMoney(tryParseMoney(line.reconciledAmount) ?? parseMoney('0')) }}</span>
                   <p v-if="line.editable && editMode === 'inline' && tryParseMoney(line.reconciledAmount) === null" :id="`reconciled-error-${line.id}`" class="mt-1 text-xs text-error">
                     {{ t('validation.invalid_number') }}
@@ -240,9 +240,9 @@ const getCategoryLines = (category: ReconciliationCategoryGroup) => category.sub
                     v-if="line.editable && editMode === 'inline'"
                     :model-value="line.sampledAmount"
                     :currency="currency"
-                    :aria-label="t('agreement.claims.sampled_amount_for', { name: line.name })"
+                    data-field-label-en="Sampled amount" data-field-label-fr="Montant échantillonné" :aria-label="t('agreement.claims.sampled_amount_for', { name: line.name })"
                     class="w-40"
-                    @update:model-value="value => emit('update:sampled', line.id, value)" />
+                    data-ui-target="agreement.claim-reconciliation-lines-table.line.sampledAmount" @update:model-value="value => emit('update:sampled', line.id, value)" />
                   <span v-else>{{ formatMoney(tryParseMoney(line.sampledAmount) ?? parseMoney('0')) }}</span>
                 </td>
                 <td class="px-4 py-4">
@@ -250,9 +250,9 @@ const getCategoryLines = (category: ReconciliationCategoryGroup) => category.sub
                     <UInput
                       v-if="line.editable"
                       :model-value="line.rationale"
-                      :aria-label="t('agreement.claims.rationale_for', { name: line.name })"
+                      data-field-label-en="Rationale" data-field-label-fr="Justification" :aria-label="t('agreement.claims.rationale_for', { name: line.name })"
                       class="min-w-64"
-                      @update:model-value="value => emit('update:rationale', line.id, value)" />
+                      data-ui-target="agreement.claim-reconciliation-lines-table.line.rationale" @update:model-value="value => emit('update:rationale', line.id, value)" />
                     <span v-else>{{ line.rationale || t('common.none') }}</span>
                   </template>
                   <span v-else class="font-semibold text-primary">

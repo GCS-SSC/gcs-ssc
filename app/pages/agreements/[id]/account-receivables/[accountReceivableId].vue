@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-jsdoc -- Independent AR casework follows the Correction request and workspace shell. */
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
@@ -176,10 +177,12 @@ const adjustmentCreated = async (id: string) => {
 const creditMemoCreated = async (id: string, proponentId: string) => {
   await navigateTo(localePath(appRouteLocations.proponentCreditMemoDetail(proponentId, id)))
 }
+
+useFieldTooltipProvider(() => receivable.value && String(receivable.value.id) === String(route.params.accountReceivableId) ? { entityType: 'fundingcaseaccountreceivable', entityId: receivable.value.id } : null)
 </script>
 
 <template>
-  <div ref="detailContent" tabindex="-1" class="flex w-full min-w-0 flex-col">
+  <div ref="detailContent" data-field-tooltip-context="agreement" data-field-scope="agreements.account-receivables" data-scope-label-en="Agreements > Receivables > General" data-scope-label-fr="Ententes > Créances > Général" tabindex="-1" class="flex w-full min-w-0 flex-col">
     <AccountReceivableApprovalWorkspace v-if="approvalOnly" :agreement-id="agreementId" :account-receivable-id="accountReceivableId" :entity-type="entityType" />
     <UAlert v-else-if="status === 'error'" color="error" icon="i-lucide-circle-alert" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
       <template #actions>
@@ -193,7 +196,7 @@ const creditMemoCreated = async (id: string, proponentId: string) => {
       <template #body>
         <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-hand-coins" :title="accountReceivableReference(receivable)" :meta-items="[getBilingualValue(receivable, 'egcs_fc_debtorname', t('common.not_available')), receivable.egcs_fc_fiscalyeardisplay, receivable.egcs_fc_currency.toUpperCase()]" :badges="heroBadges" :actions="heroActions" />
         <ULink v-if="receivable.egcs_fc_linkedreceivable && receivable.egcs_fc_parentreadable" :to="localePath(appRouteLocations.agreementAccountReceivableDetail(agreementId, receivable.egcs_fc_linkedreceivable))" class="mb-4 text-sm">{{ t('account_receivable.linked_receivable') }}</ULink>
-        <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="agreement-account-receivable-detail-content">
+        <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-account-receivable-detail-content">
           <AccountReceivableDetailLines v-if="selectedTab === 'lines'" :account-receivable-id="accountReceivableId" :lines="receivable.egcs_fc_lines" :currency="receivable.egcs_fc_currency" :fiscal-year-id="receivable.egcs_fc_agencyfiscalyear" :is-adjustment="Boolean(receivable.egcs_fc_linkedreceivable)" :can-edit="!receivable.egcs_fc_automaticcoding && receivable.egcs_fc_canedit && !saving && status === 'success'" :can-delete="receivable.egcs_fc_candeletelines && !saving && status === 'success'" :can-update="!receivable.egcs_fc_automaticcoding && receivable.egcs_fc_caneditrole" @changed="refreshPage" />
           <div v-else-if="selectedTab === 'summary'" class="space-y-8" data-testid="receivable-summary">
             <CommonSection :title="t('account_receivable.financial_summary')" badge="01">

@@ -65,7 +65,7 @@ const updateGroup = (index: number, group: EditorResultPolicy['groups'][number])
 </script>
 
 <template>
-  <div class="space-y-7">
+  <div class="space-y-7" data-field-scope="checklist-schema.result-policy-editor">
     <div class="flex flex-col gap-4 border-y border-zinc-200 py-5 sm:flex-row sm:items-start sm:justify-between dark:border-zinc-800">
       <div class="max-w-3xl space-y-1">
         <p class="font-semibold text-zinc-900 dark:text-white">
@@ -79,7 +79,7 @@ const updateGroup = (index: number, group: EditorResultPolicy['groups'][number])
         :model-value="currentPolicy.anyFailureFails"
         :aria-label="t('checklist_schema.policy.any_failure_fails')"
         class="mt-1 shrink-0"
-        @update:model-value="updateAnyFailureFails($event)" />
+        data-ui-target="checklist-schema.result-policy-editor.currentPolicy.anyFailureFails" @update:model-value="updateAnyFailureFails($event)" />
     </div>
 
     <UAlert
@@ -119,6 +119,7 @@ const updateGroup = (index: number, group: EditorResultPolicy['groups'][number])
             <CommonActionButton icon="i-lucide-arrow-down" color="neutral" variant="ghost" class="cursor-default" :disabled="groupIndex === currentPolicy.groups.length - 1 || currentPolicy.anyFailureFails" :aria-label="t('checklist_schema.policy.move_group_down')" @click="moveGroup(groupIndex, 1)" />
           </div>
           <ChecklistSchemaResultPolicyGroup
+            data-field-container="Composite editor; its individual field declarations own their identities."
             :model-value="group"
             :depth="1"
             :question-options="questionOptions"

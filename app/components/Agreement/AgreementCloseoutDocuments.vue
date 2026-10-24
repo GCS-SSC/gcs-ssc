@@ -167,20 +167,20 @@ const download = async (item: AgreementGeneratedDocumentItem) => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6" data-field-tooltip-context="agreement" data-field-scope="agreement.closeout-documents" data-scope-label-en="Agreements > Closeouts > Documents" data-scope-label-fr="Ententes > Clôtures > Documents">
     <UAlert v-if="loadStatus === 'error'" color="error" icon="i-lucide-circle-alert" :title="t('common.error')">
       <template #actions>
         <UButton color="error" variant="soft" size="sm" icon="i-lucide-refresh-cw" :label="t('common.retry')" @click="load" />
       </template>
     </UAlert>
     <div v-if="templates.length" class="grid gap-4 rounded-lg border border-default p-4 md:grid-cols-[minmax(0,2fr)_1fr_1fr_auto] md:items-end">
-      <UFormField :label="t('transfer_payment.document_templates.title')" required>
+      <UFormField :label="t('transfer_payment.document_templates.title')" required data-ui-target="agreement.closeout-documents.transfer_payment.document_templates.title">
         <CommonBilingualSelectMenu v-model="selectedTemplateId" :items="templates" value-key="id" label-en-key="egcs_ay_name_en" label-fr-key="egcs_ay_name_fr" class="w-full" />
       </UFormField>
-      <UFormField :label="t('agency.detail.language')" required>
+      <UFormField :label="t('agency.detail.language')" required data-ui-target="agreement.closeout-documents.agency.detail.language">
         <CommonEnumSelect v-model="language" name="language_preference" class="w-full" />
       </UFormField>
-      <UFormField :label="t('transfer_payment.document_templates.output_format')" required>
+      <UFormField :label="t('transfer_payment.document_templates.output_format')" required data-ui-target="agreement.closeout-documents.transfer_payment.document_templates.output_format">
         <CommonEnumSelect v-model="outputFormat" name="transfer_payment_document_template_output_format" :items="outputFormats.map(value => ({ value, label: t(`enums.transfer_payment_document_template_output_format.${value}`) }))" class="w-full" />
       </UFormField>
       <div class="flex gap-2">

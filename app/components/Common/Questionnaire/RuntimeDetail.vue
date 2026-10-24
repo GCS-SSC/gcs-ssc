@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-jsdoc -- concise page-local interaction handlers are self-documenting */
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
@@ -116,6 +117,12 @@ const {
     return isCurrentTarget(generation, requestedEndpoint) ? payload : null
   }
 )
+useFieldTooltipProvider(() => {
+  if (!data.value || String(data.value.id) !== entityId) return null
+  if (configuration.entityType === 'commonrecommendation') return { entityType: 'recommendation', entityId }
+  if (configuration.entityType === 'commondatacollection') return { entityType: 'data_collection', entityId }
+  return null
+})
 if (!embedded && !disposed) {
   usePageResourceError({ identity: () => route.path, errors: [error], pending: () => status.value === 'pending', hasContent: () => Boolean(data.value) })
 }

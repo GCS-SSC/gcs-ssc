@@ -35,7 +35,7 @@ const columns: TableColumnInput<ApplicantRecipientRegistryRow>[] = [
     :show-button="canCreate"
     :modal-title="t('applicant_recipient.registries.add')"
     :update-title="t('applicant_recipient.registries.edit')"
-    :search-placeholder="t('applicant_recipient.registries.search')">
+    :search-placeholder="t('applicant_recipient.registries.search')" data-field-scope="applicant-recipient.registries-tab">
     <template #egcs_ar_registry-cell="{ row }">
       {{ t(`enums.registry_type.${row.original.egcs_ar_registry}`) }}
     </template>

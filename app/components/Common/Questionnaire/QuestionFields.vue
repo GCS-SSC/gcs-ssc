@@ -78,18 +78,18 @@ const updateTextDescription = (language: 'en' | 'fr', value: string) => {
 </script>
 
 <template>
-  <div v-if="question" class="space-y-6" data-testid="questionnaire-question-fields">
+  <div v-if="question" class="space-y-6" data-testid="questionnaire-question-fields" data-field-scope="common.questionnaire.question-fields">
     <div class="grid gap-4 md:grid-cols-2">
-      <UFormField :label="t('recommendation_schema.question_en')" required>
+      <UFormField :label="t('recommendation_schema.question_en')" required data-ui-target="common.questionnaire.question-fields.recommendation_schema.question_en">
         <CommonTextarea v-model="question.question.en" :rows="3" />
       </UFormField>
-      <UFormField :label="t('recommendation_schema.question_fr')" required>
+      <UFormField :label="t('recommendation_schema.question_fr')" required data-ui-target="common.questionnaire.question-fields.recommendation_schema.question_fr">
         <CommonTextarea v-model="question.question.fr" :rows="3" />
       </UFormField>
-      <UFormField :label="t('recommendation_schema.language_independent_code')" required>
+      <UFormField :label="t('recommendation_schema.language_independent_code')" required data-ui-target="common.questionnaire.question-fields.recommendation_schema.language_independent_code">
         <UInput v-model="question.key" class="w-full font-mono" />
       </UFormField>
-      <UFormField :label="t('recommendation_schema.question_type')" required>
+      <UFormField :label="t('recommendation_schema.question_type')" required data-ui-target="common.questionnaire.question-fields.recommendation_schema.question_type">
         <CommonEnumSelect
           :model-value="question.type"
           name="review_type"
@@ -110,20 +110,20 @@ const updateTextDescription = (language: 'en' | 'fr', value: string) => {
 
     <div v-if="question.type === 'text'" class="space-y-4">
       <div class="grid gap-4 md:grid-cols-2">
-        <UFormField :label="t('recommendation_schema.subtitle_en')" :required="question.description !== undefined">
+        <UFormField :label="t('recommendation_schema.subtitle_en')" :required="question.description !== undefined" data-ui-target="common.questionnaire.question-fields.recommendation_schema.subtitle_en">
           <CommonTextarea
             :model-value="question.description?.en ?? ''"
             :rows="2"
             @update:model-value="value => updateTextDescription('en', value)" />
         </UFormField>
-        <UFormField :label="t('recommendation_schema.subtitle_fr')" :required="question.description !== undefined">
+        <UFormField :label="t('recommendation_schema.subtitle_fr')" :required="question.description !== undefined" data-ui-target="common.questionnaire.question-fields.recommendation_schema.subtitle_fr">
           <CommonTextarea
             :model-value="question.description?.fr ?? ''"
             :rows="2"
             @update:model-value="value => updateTextDescription('fr', value)" />
         </UFormField>
       </div>
-      <UFormField :label="t('recommendation_schema.max_length')" required>
+      <UFormField :label="t('recommendation_schema.max_length')" required data-ui-target="common.questionnaire.question-fields.recommendation_schema.max_length">
         <UInputNumber v-model="question.maxLength" :min="1" :max="10000" />
       </UFormField>
     </div>
@@ -144,10 +144,10 @@ const updateTextDescription = (language: 'en' | 'fr', value: string) => {
         <UButton icon="i-lucide-plus" variant="outline" :label="t('recommendation_schema.add_option')" class="cursor-default" @click="addOption" />
       </div>
       <div v-for="(option, optionIndex) in question.options" :key="option.key" class="grid items-end gap-3" :class="optionExtensionActive ? 'md:grid-cols-[1fr_1fr_minmax(12rem,0.7fr)_auto]' : 'md:grid-cols-[1fr_1fr_auto]'">
-        <UFormField :label="t('transfer_payment.name_en')" required>
+        <UFormField :label="t('transfer_payment.name_en')" required data-ui-target="common.questionnaire.question-fields.transfer_payment.name_en">
           <UInput v-model="option.label.en" class="w-full" />
         </UFormField>
-        <UFormField :label="t('transfer_payment.name_fr')" required>
+        <UFormField :label="t('transfer_payment.name_fr')" required data-ui-target="common.questionnaire.question-fields.transfer_payment.name_fr">
           <UInput v-model="option.label.fr" class="w-full" />
         </UFormField>
         <slot name="option-extension" :question="question" :option="option" />
@@ -176,16 +176,16 @@ const updateTextDescription = (language: 'en' | 'fr', value: string) => {
       </div>
       <div v-for="(helpItem, helpIndex) in question.help" :key="helpItem.key" class="space-y-4 rounded-md border border-default p-4">
         <div class="grid gap-4 md:grid-cols-2">
-          <UFormField :label="t('recommendation_schema.help_title_en')" required>
+          <UFormField :label="t('recommendation_schema.help_title_en')" required data-ui-target="common.questionnaire.question-fields.recommendation_schema.help_title_en">
             <UInput v-model="helpItem.title.en" class="w-full" />
           </UFormField>
-          <UFormField :label="t('recommendation_schema.help_title_fr')" required>
+          <UFormField :label="t('recommendation_schema.help_title_fr')" required data-ui-target="common.questionnaire.question-fields.recommendation_schema.help_title_fr">
             <UInput v-model="helpItem.title.fr" class="w-full" />
           </UFormField>
-          <UFormField :label="t('recommendation_schema.help_description_en')" required>
+          <UFormField :label="t('recommendation_schema.help_description_en')" required data-ui-target="common.questionnaire.question-fields.recommendation_schema.help_description_en">
             <CommonTextarea v-model="helpItem.description.en" :rows="3" />
           </UFormField>
-          <UFormField :label="t('recommendation_schema.help_description_fr')" required>
+          <UFormField :label="t('recommendation_schema.help_description_fr')" required data-ui-target="common.questionnaire.question-fields.recommendation_schema.help_description_fr">
             <CommonTextarea v-model="helpItem.description.fr" :rows="3" />
           </UFormField>
         </div>

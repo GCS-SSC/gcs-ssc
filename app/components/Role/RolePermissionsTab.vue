@@ -50,7 +50,7 @@ const updateAssignmentManagement = (subject: RoleAbilitySubject, enabled: boolea
 </script>
 
 <template>
-  <div class="w-full divide-y divide-default rounded-sm border border-default">
+  <div class="w-full divide-y divide-default rounded-sm border border-default" data-field-scope="role.permissions-tab" data-field-tooltip-unavailable="No owning agency is resolved for this administration screen.">
     <div v-for="subject in allowedSubjects" :key="subject" class="grid gap-4 p-4 md:grid-cols-[1fr_14rem_12rem] md:items-center">
       <div>
         <p class="font-medium">
@@ -73,7 +73,7 @@ const updateAssignmentManagement = (subject: RoleAbilitySubject, enabled: boolea
         :label="t('role.manage_assignments')"
         :aria-label="`${t('role.manage_assignments')}: ${t(`role.subjects.${subject}`)}`"
         :disabled="!canUpdateRole || pending"
-        @update:model-value="value => updateAssignmentManagement(subject, value)" />
+        data-ui-target="role.permissions-tab.manage-assignments" @update:model-value="value => updateAssignmentManagement(subject, value)" />
     </div>
   </div>
 </template>

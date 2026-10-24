@@ -70,7 +70,7 @@ defineExpose({
 </script>
 
 <template>
-  <div class="w-full min-w-0">
+  <div class="w-full min-w-0" data-field-scope="common.resource-layout-card">
     <CommonTableToolbar
       v-if="showToolbar"
       v-model:search="search"
@@ -159,7 +159,7 @@ defineExpose({
             :aria-label="t('common.rows_per_page_label')"
             variant="ghost"
             size="xs"
-            @update:model-value="val => (pagination.pageIndex = 0)" />
+            data-ui-target="common.resource-layout-card.pagination.pageSize" @update:model-value="val => (pagination.pageIndex = 0)" />
           <CommonPagination
             v-if="totalRecords !== undefined || cursor"
             :page="pagination.pageIndex + 1"

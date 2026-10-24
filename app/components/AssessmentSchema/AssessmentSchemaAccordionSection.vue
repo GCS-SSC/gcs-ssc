@@ -52,6 +52,7 @@ const triggerClass = computed(() => {
 <template>
   <UAccordion
     v-model="accordionValue"
+    data-field-container="Composite editor; its individual field declarations own their identities."
     :items="items"
     type="multiple"
     :unmount-on-hide="false"

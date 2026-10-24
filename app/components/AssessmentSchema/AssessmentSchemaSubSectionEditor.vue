@@ -39,7 +39,7 @@ const subSectionTitle = computed(() => {
 </script>
 
 <template>
-  <AssessmentSchemaAccordionSection :title="subSectionTitle" level="sub">
+  <AssessmentSchemaAccordionSection :title="subSectionTitle" level="sub" data-field-scope="assessment-schema.sub-section-editor">
     <div class="space-y-6">
       <div class="flex justify-end">
         <CommonActionButton
@@ -56,32 +56,34 @@ const subSectionTitle = computed(() => {
       </div>
 
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <UFormField :label="t('common.order')" :name="`sections.${sectionKey}.subSections.${subSectionIndex}.number`">
+        <UFormField :label="t('common.order')" :name="`sections.${sectionKey}.subSections.${subSectionIndex}.number`" data-ui-target="assessment-schema.sub-section-editor.sections.subSections.number">
           <UInput v-model="subSection.number" />
         </UFormField>
 
-        <UFormField :label="t('transfer_payment.language_independent_code')" :name="`sections.${sectionKey}.subSections.${subSectionIndex}.name`">
+        <UFormField :label="t('transfer_payment.language_independent_code')" :name="`sections.${sectionKey}.subSections.${subSectionIndex}.name`" data-ui-target="assessment-schema.sub-section-editor.sections.subSections.name">
           <UInput v-model="subSection.name" />
         </UFormField>
       </div>
 
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <UFormField :label="t('transfer_payment.name_en')" :name="`sections.${sectionKey}.subSections.${subSectionIndex}.label.en`">
+        <UFormField :label="t('transfer_payment.name_en')" :name="`sections.${sectionKey}.subSections.${subSectionIndex}.label.en`" data-ui-target="assessment-schema.sub-section-editor.sections.subSections.label.en">
           <UInput v-model="subSection.label.en" />
         </UFormField>
 
-        <UFormField :label="t('transfer_payment.name_fr')" :name="`sections.${sectionKey}.subSections.${subSectionIndex}.label.fr`">
+        <UFormField :label="t('transfer_payment.name_fr')" :name="`sections.${sectionKey}.subSections.${subSectionIndex}.label.fr`" data-ui-target="assessment-schema.sub-section-editor.sections.subSections.label.fr">
           <UInput v-model="subSection.label.fr" />
         </UFormField>
       </div>
 
       <AssessmentSchemaWeightSummaryField
         v-model="subSection.weight"
+        data-field-container="Composite editor; its individual field declarations own their identities."
         :answer-path-tree="answerPathTree"
         :name-prefix="`sections.${sectionKey}.subSections.${subSectionIndex}`" />
 
       <AssessmentSchemaDependencyTableField
         v-model="subSection.depends"
+        data-field-container="Composite editor; its individual field declarations own their identities."
         :answer-path-tree="answerPathTree" />
 
       <AssessmentSchemaAccordionSection :title="t('transfer_payment.assessment_questions')" level="sub">

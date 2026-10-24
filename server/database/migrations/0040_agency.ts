@@ -411,6 +411,23 @@ CREATE INDEX ay_profile_search_abbreviation_en_exact ON "Agency_Profile" USING b
 CREATE INDEX ay_profile_search_abbreviation_fr_exact ON "Agency_Profile" USING btree (lower(coalesce(egcs_ay_abbreviation_fr, '')) text_pattern_ops) WHERE (_deleted = false AND egcs_ay_active = true);
 CREATE INDEX ay_profile_search_agencyfinancialsystemid_exact ON "Agency_Profile" USING btree (egcs_ay_agencyfinancialsystemid) WHERE (_deleted = false AND egcs_ay_active = true);
 CREATE INDEX ay_profile_search_gwcoa_number_exact ON "Agency_Profile" USING btree (egcs_ay_gwcoanumber) WHERE (_deleted = false AND egcs_ay_active = true);
+CREATE TABLE "Agency_Field_Tooltip" (
+  id bigserial PRIMARY KEY,
+  egcs_ay_agency bigint NOT NULL,
+  egcs_ay_targetkey varchar(500) NOT NULL,
+  egcs_ay_text_en varchar(4000) NOT NULL,
+  egcs_ay_text_fr varchar(4000) NOT NULL,
+  egcs_ay_enabled boolean NOT NULL DEFAULT false,
+  egcs_ay_label_en text NOT NULL,
+  egcs_ay_label_fr text NOT NULL,
+  egcs_ay_screen_en text NOT NULL,
+  egcs_ay_screen_fr text NOT NULL,
+  egcs_ay_extension text,
+  _deleted boolean NOT NULL DEFAULT false,
+  CONSTRAINT ay_chk_fieldtooltipbilingual CHECK (NOT egcs_ay_enabled OR (length(btrim(egcs_ay_text_en)) > 0 AND length(btrim(egcs_ay_text_fr)) > 0))
+);
+CREATE UNIQUE INDEX ay_uq_fieldtooltipactive ON "Agency_Field_Tooltip" (egcs_ay_agency, egcs_ay_targetkey) WHERE NOT _deleted;
+
 CREATE TABLE "Agency_Guided_Help" (
   id bigint PRIMARY KEY,
   egcs_ay_publicationkind varchar(64) NOT NULL DEFAULT 'guided_help_catalog' CONSTRAINT "ay_chk_guided_help_publicationkind" CHECK (egcs_ay_publicationkind = 'guided_help_catalog'),
@@ -724,6 +741,7 @@ ALTER TABLE "Agency_Profile" ADD CONSTRAINT "Agency_Profile_egcs_ay_claimreconci
 ALTER TABLE "Agency_Profile" ADD CONSTRAINT "Agency_Profile_egcs_ay_claimreconciliationstartstatus_fkey" FOREIGN KEY (egcs_ay_claimreconciliationstartstatus) REFERENCES "Common_Status"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Agency_Profile" ADD CONSTRAINT "ay_ref_profilegwcoanumber" FOREIGN KEY (egcs_ay_gwcoanumber) REFERENCES "Common_GWCOA"(egcs_cn_number) ON DELETE RESTRICT;
+ALTER TABLE "Agency_Field_Tooltip" ADD CONSTRAINT ay_fk_fieldtooltipagency FOREIGN KEY (egcs_ay_agency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
 ALTER TABLE "Agency_Guided_Help" ADD FOREIGN KEY (egcs_ay_agency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
 ALTER TABLE "Agency_Guided_Help" ADD FOREIGN KEY (egcs_ay_guide) REFERENCES "Common_Guided_Help"(id) ON DELETE RESTRICT;
 ALTER TABLE "Agency_Guided_Help" ADD CONSTRAINT ay_ref_guidedhelppublication FOREIGN KEY (id, egcs_ay_publicationkind) REFERENCES "Common_Publication"(id, egcs_cn_kind) ON DELETE RESTRICT;

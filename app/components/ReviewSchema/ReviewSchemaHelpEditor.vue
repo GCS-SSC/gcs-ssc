@@ -19,7 +19,7 @@ const removeHelp = (helpIndex: number) => helpItems.value.splice(helpIndex, 1)
 </script>
 
 <template>
-  <AssessmentSchemaAccordionSection :title="t('transfer_payment.help_text')">
+  <AssessmentSchemaAccordionSection :title="t('transfer_payment.help_text')" data-field-scope="review-schema.help-editor">
     <div class="space-y-4">
       <div class="flex justify-end">
         <UButton
@@ -35,11 +35,11 @@ const removeHelp = (helpIndex: number) => helpItems.value.splice(helpIndex, 1)
         :key="helpItem._key"
         class="border-default space-y-4 border-t pt-4">
         <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-          <UFormField :label="t('transfer_payment.name_en')" :name="`item.help.${helpIndex}.title.en`">
+          <UFormField :label="t('transfer_payment.name_en')" :name="`item.help.${helpIndex}.title.en`" data-ui-target="review-schema.help-editor.item.help.title.en">
             <UInput v-model="helpItem.title.en" />
           </UFormField>
 
-          <UFormField :label="t('transfer_payment.name_fr')" :name="`item.help.${helpIndex}.title.fr`">
+          <UFormField :label="t('transfer_payment.name_fr')" :name="`item.help.${helpIndex}.title.fr`" data-ui-target="review-schema.help-editor.item.help.title.fr">
             <UInput v-model="helpItem.title.fr" />
           </UFormField>
 
@@ -54,11 +54,11 @@ const removeHelp = (helpIndex: number) => helpItems.value.splice(helpIndex, 1)
           </div>
         </div>
 
-        <UFormField :label="t('transfer_payment.description_en')" :name="`item.help.${helpIndex}.description.en`">
+        <UFormField :label="t('transfer_payment.description_en')" :name="`item.help.${helpIndex}.description.en`" data-ui-target="review-schema.help-editor.item.help.description.en">
           <CommonTextarea v-model="helpItem.description.en" :rows="3" />
         </UFormField>
 
-        <UFormField :label="t('transfer_payment.description_fr')" :name="`item.help.${helpIndex}.description.fr`">
+        <UFormField :label="t('transfer_payment.description_fr')" :name="`item.help.${helpIndex}.description.fr`" data-ui-target="review-schema.help-editor.item.help.description.fr">
           <CommonTextarea v-model="helpItem.description.fr" :rows="3" />
         </UFormField>
       </div>

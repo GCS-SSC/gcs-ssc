@@ -32,5 +32,5 @@ const selectItems = computed(() => {
 </script>
 
 <template>
-  <USelect v-model="modelValue" :items="selectItems" v-bind="$attrs" />
+  <USelect v-model="modelValue" :items="selectItems" v-bind="$attrs" data-field-exclude="Composite control internals; configurable help belongs to the owning business field." />
 </template>

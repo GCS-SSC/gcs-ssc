@@ -189,7 +189,7 @@ const save = async () => {
 </script>
 
 <template>
-  <div class="min-w-0">
+  <div class="min-w-0" data-field-tooltip-context="agreement" data-field-scope="account-receivable.claim-reductions" data-scope-label-en="Agreements > Receivables > Claim reductions" data-scope-label-fr="Ententes > Créances > Réductions des demandes">
     <p class="mb-4 text-sm text-muted">
       {{ t('account_receivable.claim_reductions_instruction') }}
     </p>

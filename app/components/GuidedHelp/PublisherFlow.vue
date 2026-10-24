@@ -8,7 +8,7 @@ import type { FlowDiagramDefinition } from '@gcs-ssc/diagrams'
 import { GuideDraftSchema } from '@gcs-ssc/guided-help/contracts'
 import type { GuideDraft, GuideStep } from '@gcs-ssc/guided-help/contracts'
 import { guidedHelpJourneys } from '~~/shared/guided-help/journeys'
-import { guidedHelpLedger } from '~~/shared/guided-help/catalog'
+import { guidedHelpLedger } from '#ui-targets'
 
 const document = defineModel<GuideDraft>({ required: true })
 const selectedStep = defineModel<string>('selectedStep', { default: '' })
@@ -158,7 +158,7 @@ const remove = () => {
       {{ t(disabled ? 'guided_help.flow_readonly_hint' : 'guided_help.flow_edit_hint') }}
     </p>
     <CommonFlowDiagram :definition="flow" :selected-node-id="selectedStep" :editable="!disabled" :branch-node-ids="branchable" direction="vertical" layout="branches" filename="guided-help" @select-node="edit" @add-node="create" @add-branch="addBranch" />
-    <GuidedHelpPublisherBranches v-if="!document.journey" v-model="document" v-model:open="branchOpen" :step-id="branchStep" :disabled="disabled" />
+    <GuidedHelpPublisherBranches v-if="!document.journey" v-model="document" v-model:open="branchOpen" data-field-container="Composite editor; its individual field declarations own their identities." :step-id="branchStep" :disabled="disabled" />
     <UModal v-model:open="open" :title="t(creating ? 'guided_help.create_step' : disabled ? 'guided_help.step_details' : 'guided_help.edit_step')" :description="t('guided_help.publication_required')" fullscreen :ui="{ content: 'rounded-none shadow-none ring-0' }" @after:leave="reset">
       <template #body>
         <UForm v-if="draft" :state="draft" :validate="validate" class="flex h-full flex-col" @submit="commit">
@@ -168,7 +168,7 @@ const remove = () => {
                 <UButton :label="t('guided_help.move_up')" icon="i-lucide-arrow-up" color="neutral" variant="outline" :disabled="!canMove(-1)" @click="move(-1)" />
                 <UButton :label="t('guided_help.move_down')" icon="i-lucide-arrow-down" color="neutral" variant="outline" :disabled="!canMove(1)" @click="move(1)" />
               </div>
-              <GuidedHelpPublisherFields v-model="draft" v-model:selected-step="selectedStep" section="steps" :disabled="disabled" @pick="pick" />
+              <GuidedHelpPublisherFields v-model="draft" v-model:selected-step="selectedStep" data-field-container="Composite editor; its individual field declarations own their identities." section="steps" :disabled="disabled" @pick="pick" />
             </div>
           </div>
           <div class="border-default flex flex-wrap items-center justify-end gap-3 border-t bg-white px-6 py-4 dark:bg-zinc-950 lg:px-8">

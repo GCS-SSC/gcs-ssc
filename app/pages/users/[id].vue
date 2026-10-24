@@ -220,7 +220,7 @@ const { tabs: routeTabs, selectedTab, activeTabComponent, activeTabProps } = use
 </script>
 
 <template>
-  <CommonDetailPage v-if="user" id="user-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems">
+  <CommonDetailPage v-if="user" id="user-detail" v-model:collapsed="isHeroCollapsed" data-field-tooltip-unavailable="No owning agency exists for global user administration or authentication." :breadcrumb-items="breadcrumbItems">
     <template #body>
       <div class="flex flex-1 flex-col">
         <CommonEntityHero
@@ -233,7 +233,7 @@ const { tabs: routeTabs, selectedTab, activeTabComponent, activeTabProps } = use
           }]"
           :actions="heroActions" />
 
-        <CommonDetailWorkspace v-model="selectedTab" :items="routeTabs">
+        <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="routeTabs">
           <component
             :is="activeTabComponent"
             v-if="activeTabComponent"

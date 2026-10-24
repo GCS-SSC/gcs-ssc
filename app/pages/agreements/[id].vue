@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { useId, computed, onUnmounted, ref, watch } from 'vue'
 import type { GuideObservedContext } from '@gcs-ssc/guided-help/runtime'
 import { usePageResourceError } from '~/composables/usePageResourceError'
@@ -417,6 +418,8 @@ const cancel = () => {
     egcs_fc_authorizedassistanceenddate: toDateInput(agreementCalendarDate(profile.value.egcs_fc_authorizedassistanceenddate))
   }
 }
+
+useFieldTooltipProvider(() => profile.value && String(profile.value.id) === String(route.params.id) ? { entityType: 'agreement', entityId: profile.value.id } : null)
 </script>
 
 <template>
@@ -440,7 +443,7 @@ const cancel = () => {
             :subtitle="t('agreement.update_title')"
             show-context />
 
-          <CommonDetailWorkspace v-model="selectedTab" content-test-id="agreement-detail-content" :items="tabs" help-navigation-target="agreement.detail.risk-navigation" help-navigation-value="risk-rating">
+          <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." content-test-id="agreement-detail-content" :items="tabs" help-navigation-target="agreement.detail.risk-navigation" help-navigation-value="risk-rating">
             <template #notices>
               <p v-if="extensionTabsStatus === 'pending'" role="status" aria-live="polite" class="sr-only">
                 {{ t('extensions.entity_tabs_loading') }}

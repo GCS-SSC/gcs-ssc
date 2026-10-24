@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-param, jsdoc/require-returns -- concise local helpers remain clear without repetitive tags */
 import { computed, ref, watch } from 'vue'
@@ -61,6 +62,9 @@ const {
   setReviewAlignmentNarrative,
   setAdditionalReviewerProgress
 } = useAssessmentDetailPage()
+useFieldTooltipProvider(() => assessment.value && String(assessment.value.id) === String(route.params.reviewId)
+  ? { entityType: 'review', entityId: String(assessment.value.id) }
+  : null)
 usePageResourceError({ identity: () => route.path, errors: [loadError], pending: () => loadStatus.value === 'pending', hasContent: () => Boolean(assessment.value) })
 
 type ValidatableForm = {
@@ -278,7 +282,7 @@ const handleApprovalChanged = async () => {
 </script>
 
 <template>
-  <CommonDetailPage v-if="!loadError && assessment && String(assessment.id) === String(route.params.reviewId)" id="assessment-detail" v-model:collapsed="isHeroCollapsed" data-help-view="assessment.detail" :data-help-agency="assessment.egcs_cn_agency" :data-help-review-id="String(assessment.id)" :breadcrumb-items="breadcrumbItems" help-return-target="assessment.detail.return" :help-return-enabled="Boolean(helpReturnTarget)" :data-help-context="JSON.stringify(helpContext)" :data-help-return-target="helpReturnTarget">
+  <CommonDetailPage v-if="!loadError && assessment && String(assessment.id) === String(route.params.reviewId)" id="assessment-detail" v-model:collapsed="isHeroCollapsed" data-help-view="assessment.detail" :data-help-agency="assessment.egcs_cn_agency" :data-help-review-id="String(assessment.id)" :breadcrumb-items="breadcrumbItems" help-return-target="assessment.detail.return" :help-return-enabled="Boolean(helpReturnTarget)" :data-help-context="JSON.stringify(helpContext)" :data-help-return-target="helpReturnTarget" data-field-scope="assessment.detail-page" data-scope-label-en="Reviews > Assessment" data-scope-label-fr="Examens > Évaluation" data-field-tooltip-context="agreement-or-intake">
     <template #body>
       <div ref="helpRoot" :data-help-context="JSON.stringify(helpContext)" :data-help-return-target="helpReturnTarget" class="flex flex-1 flex-col">
         <AssessmentDetailHero
@@ -308,6 +312,7 @@ const handleApprovalChanged = async () => {
                   <section
                     v-for="(outcome, outcomeIndex) in generatedOutcomes"
                     :key="`${outcome.section}-${outcome.subsection}-${outcome.nameEn}-${outcome.nameFr}`"
+                    data-field-exclude="Runtime assessment outcome fields use definition-provided help and are outside configurable field help."
                     class="space-y-4"
                     :class="outcomeIndex > 0 ? 'border-t border-primary-500 pt-8 dark:border-primary-600' : ''">
                     <div class="pl-4 md:pl-6">
@@ -426,14 +431,14 @@ const handleApprovalChanged = async () => {
                           </UButton>
                         </div>
 
-                        <UFormField :label="t('applicant_recipient.name')" :name="`customOutcomes.${customOutcomeIndex}.name`" class="mt-4" required>
+                        <UFormField :label="t('applicant_recipient.name')" :name="`customOutcomes.${customOutcomeIndex}.name`" class="mt-4" required data-ui-target="assessment.detail-page.customOutcomes.name">
                           <UInput
                             :disabled="!canUpdateAssessment"
                             :model-value="customOutcome.name"
                             @update:model-value="value => updateCustomOutcome(customOutcomeIndex, 'name', String(value ?? ''))" />
                         </UFormField>
 
-                        <UFormField :label="t('transfer_payment.custom_outcome_content')" :name="`customOutcomes.${customOutcomeIndex}.outcome`" class="mt-3" required>
+                        <UFormField :label="t('transfer_payment.custom_outcome_content')" :name="`customOutcomes.${customOutcomeIndex}.outcome`" class="mt-3" required data-ui-target="assessment.detail-page.customOutcomes.outcome">
                           <CommonTextarea
                             :rows="5"
                             :disabled="!canUpdateAssessment"
@@ -579,6 +584,7 @@ const handleApprovalChanged = async () => {
                       :key="question._key">
                       <AssessmentQuestionCard
                         v-if="question.type === 'question'"
+                        data-field-exclude="Authored runtime questions retain their own help and are outside static field help."
                         :question="question"
                         :question-number="`${subSectionIndex + 1}.${questionIndex + 1}`"
                         :model-value="getQuestionValueInput(selectedSectionName, subSection.name, question.name)"
@@ -640,7 +646,7 @@ const handleApprovalChanged = async () => {
       </div>
     </template>
   </CommonDetailPage>
-  <CommonDetailPage v-else id="assessment-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems">
+  <CommonDetailPage v-else id="assessment-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" data-field-scope="assessment.detail-page" data-scope-label-en="Reviews > Assessment" data-scope-label-fr="Examens > Évaluation" data-field-tooltip-context="agreement-or-intake">
     <template #body>
       <UAlert v-if="loadError" color="error" icon="i-lucide-circle-alert" :title="t('common.load_failed')" :description="t('common.try_again')">
         <template #actions>

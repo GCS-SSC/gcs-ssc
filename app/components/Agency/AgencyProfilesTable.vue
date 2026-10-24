@@ -71,10 +71,10 @@ const bilingualColumns: BilingualColumnConfig<AgencyProfileItem>[] = [
     :button-label="t('agency.new')"
     :show-button="canCreate"
     v-bind="$attrs"
-    @add="emit('add')"
-    @retry="emit('retry')">
+    data-field-scope="agency.profiles-table"
+    @add="emit('add')" @retry="emit('retry')">
     <template #filters>
-      <USelect v-model="statusFilter" :items="availabilityItems" :aria-label="t('common.status_filter')" class="min-w-40" />
+      <USelect v-model="statusFilter" :items="availabilityItems" :aria-label="t('common.status_filter')" class="min-w-40" data-ui-target="agency.profiles-table.statusFilter" />
     </template>
     <template #id-cell="{ row }">
       <span class="font-mono text-xs font-bold text-zinc-400 dark:text-zinc-500">

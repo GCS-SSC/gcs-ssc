@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import { useCrudModalPending } from '~/composables/useCrudModal'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
@@ -275,10 +276,12 @@ const deleteLine = async (lineId: string) => {
 const handleCompleted = async () => {
   await refreshPage()
 }
+
+useFieldTooltipProvider(() => payment.value && String(payment.value.id) === String(route.params.paymentId) ? { entityType: 'fundingcasepayment', entityId: payment.value.id } : null)
 </script>
 
 <template>
-  <div class="flex w-full flex-col">
+  <div data-field-tooltip-context="agreement" data-field-scope="agreements.payments" data-scope-label-en="Agreements > Payments > Lines" data-scope-label-fr="Ententes > Paiements > Lignes" class="flex w-full flex-col">
     <UAlert v-if="hasLoadError" color="error" icon="i-lucide-circle-alert" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
       <template #actions>
         <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" :loading="isLoadingDetail" @click="retryLoad" />
@@ -307,7 +310,7 @@ const handleCompleted = async () => {
               isCompleted: payment.isCompleted
             }]" />
 
-          <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="agreement-payment-detail-content">
+          <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-payment-detail-content">
             <template #notices>
               <p v-if="extensionTabsStatus === 'pending'" role="status" aria-live="polite" class="sr-only">
                 {{ t('extensions.entity_tabs_loading') }}

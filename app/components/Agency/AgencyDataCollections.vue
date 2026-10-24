@@ -44,7 +44,7 @@ const bilingualColumns: BilingualColumnConfig<CollectionRow>[] = [
   <CommonResourceCrud
     :title="t('data_collection.catalog_title')" icon="i-lucide-clipboard-list" :fetch-url="endpoint" :post-url="endpoint"
     :schema="DataCollectionSetupCreateSchema" :initial-new-item="initialNewItem" :columns="columns" :bilingual-columns="bilingualColumns"
-    :can-create="canUpdateChild" :can-update="false" :can-delete="false" :show-button="canUpdateChild" :modal-title="t('data_collection.create')" :modal-ui="{ content: 'sm:max-w-2xl' }">
+    :can-create="canUpdateChild" :can-update="false" :can-delete="false" :show-button="canUpdateChild" :modal-title="t('data_collection.create')" :modal-ui="{ content: 'sm:max-w-2xl' }" data-field-scope="agency.data-collections">
     <template #publicationState-cell="{ row }">
       <CommonLifecycleBadge engine="publication" :state="row.original.publicationState" />
     </template>

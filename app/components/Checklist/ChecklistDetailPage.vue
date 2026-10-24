@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-jsdoc, vue/singleline-html-element-content-newline -- local presentation helpers and compact result labels are self-describing */
 import { computed, ref, watch } from 'vue'
@@ -33,6 +34,9 @@ const {
   totalAdditionalReviewerCount, pendingAdditionalReviewerCount, isHeroCollapsed, getResponse, updateAnswer,
   updateComment, setAdditionalReviewerProgress, saveChecklist, refresh
 } = useChecklistDetailPage()
+useFieldTooltipProvider(() => checklist.value && String(checklist.value.id) === String(route.params.reviewId)
+  ? { entityType: 'review', entityId: String(checklist.value.id) }
+  : null)
 usePageResourceError({ identity: () => route.path, errors: [loadError], pending: () => loadStatus.value === 'pending', hasContent: () => Boolean(checklist.value) })
 
 const REVIEW_VALUE = 'review'
@@ -258,6 +262,7 @@ const handleApprovalChanged = async () => {
                     <ChecklistQuestion
                       v-for="(question, questionIndex) in block.questions"
                       :key="question.key"
+                      data-field-exclude="Authored runtime questions retain their own help and are outside static field help."
                       :question="question"
                       :number="`${blockIndex + 1}.${questionIndex + 1}`"
                       :model-value="getResponse(question.key)?.answer"

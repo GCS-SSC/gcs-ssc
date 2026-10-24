@@ -74,7 +74,7 @@ watch(
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="space-y-4" data-field-scope="assessment-schema.dependency-target-field">
     <UFormField :label="t('transfer_payment.dependency_type')" name="dependency.type" required>
       <USelect
         :model-value="modelValue.type"

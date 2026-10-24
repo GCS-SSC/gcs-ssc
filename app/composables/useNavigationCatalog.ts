@@ -57,7 +57,8 @@ export const useNavigationCatalog = (workspaces: MaybeRefOrGetter<ExtensionAgenc
     add('proponents', 'nav.applicant_recipients', 'i-lucide-store', appRouteLocations.proponents(), { category: 'primary', order: 30 }, canAny('applicant_recipient', 'read'))
     const assignmentSubjects = ['agreement', 'applicant_recipient', 'funding_case', 'journal_voucher', 'correction'] as const
     add('assignment', 'nav.assignment_management', 'i-lucide-user-round-check', appRouteLocations.assignmentManagement(), { category: 'administration', order: 10 }, assignmentSubjects.some(subject => canManageAssignments(subject)))
-    add('guided-help', 'guided_help.title', 'i-lucide-circle-help', appRouteLocations.guidedHelp(), { category: 'management', order: 60 }, canAny('guided_help', 'read', ['global', 'agency']))
+    add('field-help', 'field_tooltips.title', 'i-lucide-message-circle-question-mark', appRouteLocations.fieldHelp(), { category: 'management', order: 65 }, canAny('help', 'read', ['global', 'agency']))
+    add('guided-help', 'guided_help.title', 'i-lucide-book-open', appRouteLocations.guidedHelp(), { category: 'management', order: 60 }, canAny('help', 'read', ['global', 'agency']))
     add('roles', 'role.title', 'i-lucide-shield', appRouteLocations.roles(), { category: 'management', order: 50 }, canAny('role', 'read'))
     add('users', 'nav.users', 'i-lucide-user-round', appRouteLocations.users(), { category: 'administration', order: 20 }, canAny('user', 'read'))
     add('groups', 'nav.groups', 'i-lucide-users', appRouteLocations.groups(), { category: 'administration', order: 30 }, canAny('group', 'read'))

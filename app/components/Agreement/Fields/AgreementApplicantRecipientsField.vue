@@ -583,7 +583,7 @@ const removeSelectedId = (id: string) => {
 </script>
 
 <template>
-  <UFormField v-slot="fieldState" :label="t('agreement.applicant_recipients.title')" :name="name" required>
+  <UFormField v-slot="fieldState" :label="t('agreement.applicant_recipients.title')" :name="name" required data-ui-target="agreement.fields.applicant-recipients-field.name" data-field-tooltip-context="agreement" data-field-scope="agreement.fields.applicant-recipients-field" data-scope-label-en="Agreements > General" data-scope-label-fr="Ententes > Général">
     <div class="space-y-3">
       <div v-if="selectedItems.length > 0" class="flex flex-wrap gap-2">
         <div
@@ -638,26 +638,29 @@ const removeSelectedId = (id: string) => {
   <div
     v-for="(relationship, index) in model"
     :key="relationship.egcs_fc_applicantrecipient"
-    class="space-y-4">
+    class="space-y-4" data-field-tooltip-context="agreement" data-field-scope="agreement.fields.applicant-recipients-field" data-scope-label-en="Agreements > General" data-scope-label-fr="Ententes > Général">
     <AgreementProponentTypeField
       v-model="relationship.egcs_fc_applicantrecipientsubtype"
+      data-field-container="Composite editor; its individual field declarations own their identities."
       :proponent-id="relationship.egcs_fc_applicantrecipient"
       :stream-id="streamId"
       :name="`${name}.${index}.egcs_fc_applicantrecipientsubtype`"
       :label="`${getSelectedLabel(cachedItemsById[relationship.egcs_fc_applicantrecipient] ?? { id: relationship.egcs_fc_applicantrecipient })} — ${t('agreement.applicant_recipients.type')}`" />
     <AgreementFinancialIdField
       v-model="relationship.egcs_fc_agencyfinancialid"
+      data-field-container="Composite editor; its individual field declarations own their identities."
       :proponent-id="relationship.egcs_fc_applicantrecipient"
       :stream-id="streamId"
       :name="`${name}.${index}.egcs_fc_agencyfinancialid`"
       :label="`${getSelectedLabel(cachedItemsById[relationship.egcs_fc_applicantrecipient] ?? { id: relationship.egcs_fc_applicantrecipient })} — ${t('agreement.applicant_recipients.financial_id')}`" />
   </div>
 
-  <UModal v-model:open="isOpen" :content="pickerDialogContent" :title="t('agreement.applicant_recipients.select')" :description="t('agreement.applicant_recipients.search')">
+  <UModal v-model:open="isOpen" :content="pickerDialogContent" :title="t('agreement.applicant_recipients.select')" :description="t('agreement.applicant_recipients.search')" data-field-tooltip-context="agreement" data-field-scope="agreement.fields.applicant-recipients-field" data-scope-label-en="Agreements > General" data-scope-label-fr="Ententes > Général">
     <template #body>
       <UCommandPalette
         v-model="draftSelectedIds"
         v-model:search-term="searchTerm"
+        data-field-container="Composite editor; its individual field declarations own their identities."
         multiple
         selection-behavior="toggle"
         value-key="id"

@@ -14,7 +14,7 @@ import { withAuditExecution } from './audit-context'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { authorizeReviewRuntimeAction, getReviewRuntimeOwnerAgencyId, resolveReviewRuntimeEntityFromReview } from './review-runtime-access'
 import { authorizeAgreementResource, resolveAgreementVisibility } from './agreement'
-import { guidedHelpLedger } from '~~/shared/guided-help/catalog'
+import { guidedHelpLedger } from '#ui-targets'
 import { checkHostGuideCompatibility } from '~~/shared/guided-help/journeys'
 
 type Db = Kysely<Database> | Transaction<Database>
@@ -33,11 +33,11 @@ const ensureAgency = async (event: H3Event, db: Db, agencyId: string, lock = fal
   if (!await query.executeTakeFirst()) return fail(event, 'not_found')
 }
 const transaction = async <T>(event: H3Event, owner: Owner, action: Action, work: (db: Transaction<Database>, actorId: string) => Promise<T>, lockRoleIds: string[] = []) => {
-  await authorize(event, 'guided_help', action, scope(owner))
+  await authorize(event, 'help', action, scope(owner))
   return event.context.$db.transaction().execute(async db => {
     const auth = await requireFreshAuthContext(event, db, { lockRoleIds })
     if (owner.agencyId !== null) await ensureAgency(event, db, owner.agencyId, true)
-    await authorizeWithFreshAuthContext(event, auth, 'guided_help', action, scope(owner))
+    await authorizeWithFreshAuthContext(event, auth, 'help', action, scope(owner))
     const actor = await db.selectFrom('Common_User').select('id').where('egcs_cn_authuserid', '=', auth.userId).where('_deleted', '=', false).executeTakeFirst()
     if (!actor) return fail(event, 'forbidden', 403)
     return withAuditExecution(owner.agencyId === null ? { type: 'global' } : { type: 'agency', agencyId: owner.agencyId }, () => work(db, String(actor.id)))
@@ -89,11 +89,11 @@ export const listGuidedHelpContexts = async (event: H3Event) => {
   const auth = await requireAuthContext(event)
   // Explicitly authorize through the subject; individual eligible agency scopes are filtered below.
   const agencies = await event.context.$db.selectFrom('Agency_Profile').select(['id', 'egcs_ay_name_en', 'egcs_ay_name_fr']).where('_deleted', '=', false).execute()
-  const canSystem = auth.userAbilities.authorize('guided_help', 'read', { type: 'global' })
-  return { canSystem, items: agencies.filter(row => auth.userAbilities.authorize('guided_help', 'read', { type: 'agency', agencyId: String(row.id) })).map(row => ({ id: String(row.id), name: { en: row.egcs_ay_name_en, fr: row.egcs_ay_name_fr } })) }
+  const canSystem = auth.userAbilities.authorize('help', 'read', { type: 'global' })
+  return { canSystem, items: agencies.filter(row => auth.userAbilities.authorize('help', 'read', { type: 'agency', agencyId: String(row.id) })).map(row => ({ id: String(row.id), name: { en: row.egcs_ay_name_en, fr: row.egcs_ay_name_fr } })) }
 }
 export const listGuidedHelpRoles = async (event: H3Event, agencyId: string) => {
-  await authorize(event, 'guided_help', 'read', scope({ agencyId }))
+  await authorize(event, 'help', 'read', scope({ agencyId }))
   await ensureAgency(event, event.context.$db, agencyId)
   const roles = await getActiveStructuralRoles(event.context.$db)
   const ids = roles.filter(role => role.agencyId === null || role.agencyId === agencyId).map(role => role.roleId)
@@ -115,14 +115,14 @@ const versionEvidence = (item: { id: string; egcs_cn_version: number; egcs_cn_de
 export const readGuidedHelp = async (event: H3Event, id: string) => {
   await requireAuthContext(event)
   const row = await guide(event, event.context.$db, id)
-  const auth = await authorize(event, 'guided_help', 'read', scope(guideOwner(row)))
+  const auth = await authorize(event, 'help', 'read', scope(guideOwner(row)))
   const metadata = await readPublicationMetadata(event.context.$db, id, row.egcs_cn_document)
   const versions = await event.context.$db.selectFrom('Common_Publication_Version').selectAll().where('egcs_cn_publication', '=', id).orderBy('egcs_cn_version', 'desc').execute()
   const clonedVersion = row.egcs_cn_clonedfromversion ? await version(event, event.context.$db, String(row.egcs_cn_clonedfromversion)) : null
-  return { ...row, ...metadata, sourceAttribution: await sourceAttribution(event.context.$db, id), clonedFrom: clonedVersion ? { ...await sourceAttribution(event.context.$db, String(clonedVersion.egcs_cn_publication)), versionId: String(clonedVersion.id), version: clonedVersion.egcs_cn_version } : null, compatibility: compatibility(row.egcs_cn_document), versions: versions.map(versionEvidence), capabilities: { canEdit: auth.userAbilities.authorize('guided_help', 'update', scope(guideOwner(row))), canPublish: auth.userAbilities.authorize('guided_help', 'update', scope(guideOwner(row))), canRetire: auth.userAbilities.authorize('guided_help', 'delete', scope(guideOwner(row))), canDelete: auth.userAbilities.authorize('guided_help', 'delete', scope(guideOwner(row))) && metadata.publicationState === 'draft' } }
+  return { ...row, ...metadata, sourceAttribution: await sourceAttribution(event.context.$db, id), clonedFrom: clonedVersion ? { ...await sourceAttribution(event.context.$db, String(clonedVersion.egcs_cn_publication)), versionId: String(clonedVersion.id), version: clonedVersion.egcs_cn_version } : null, compatibility: compatibility(row.egcs_cn_document), versions: versions.map(versionEvidence), capabilities: { canEdit: auth.userAbilities.authorize('help', 'update', scope(guideOwner(row))), canPublish: auth.userAbilities.authorize('help', 'update', scope(guideOwner(row))), canRetire: auth.userAbilities.authorize('help', 'delete', scope(guideOwner(row))), canDelete: auth.userAbilities.authorize('help', 'delete', scope(guideOwner(row))) && metadata.publicationState === 'draft' } }
 }
 export const listGuidedHelp = async (event: H3Event, agencyId: string | null) => {
-  await authorize(event, 'guided_help', 'read', scope({ agencyId }))
+  await authorize(event, 'help', 'read', scope({ agencyId }))
   if (agencyId !== null) await ensureAgency(event, event.context.$db, agencyId)
   let query = event.context.$db.selectFrom('Common_Guided_Help').select('id').where('_deleted', '=', false)
   query = agencyId === null ? query.where('egcs_cn_agency', 'is', null) : query.where('egcs_cn_agency', '=', agencyId)
@@ -183,7 +183,7 @@ export const deleteGuidedHelp = async (event: H3Event, id: string) => {
 }
 
 export const listSharedGuidedHelp = async (event: H3Event, agencyId: string) => {
-  await authorize(event, 'guided_help', 'read', scope({ agencyId }))
+  await authorize(event, 'help', 'read', scope({ agencyId }))
   await ensureAgency(event, event.context.$db, agencyId)
   const rows = await event.context.$db.selectFrom('Common_Guided_Help as Guide').innerJoin('Common_Publication as Publication', 'Publication.id', 'Guide.id').innerJoin('Common_Publication_Version as Version', 'Version.id', 'Publication.egcs_cn_currentversion').select(['Guide.id', 'Guide.egcs_cn_ownertype', 'Guide.egcs_cn_agency', 'Version.id as sourceVersionId', 'Version.egcs_cn_version as version', 'Version.egcs_cn_definition as document']).where('Guide._deleted', '=', false).where('Guide.egcs_cn_shared', '=', true).where('Publication._deleted', '=', false).where('Publication.egcs_cn_state', '=', 'published').execute()
   return { items: await Promise.all(rows.map(async row => ({ ...row, sourceAttribution: await sourceAttribution(event.context.$db, String(row.id)), compatibility: compatibility(row.document) }))) }
@@ -209,7 +209,7 @@ const retainedGuideVersionIds = async (db: Db, agencyId: string, guideId: string
   return retainedIds
 }
 export const readGuidedHelpCatalog = async (event: H3Event, agencyId: string, id: string) => {
-  await authorize(event, 'guided_help', 'read', scope({ agencyId }))
+  await authorize(event, 'help', 'read', scope({ agencyId }))
   await ensureAgency(event, event.context.$db, agencyId)
   const row = await catalog(event, event.context.$db, agencyId, id)
   const sourceVersion = await version(event, event.context.$db, String(row.egcs_ay_sourceversion), String(row.egcs_ay_guide))
@@ -223,7 +223,7 @@ export const readGuidedHelpCatalog = async (event: H3Event, agencyId: string, id
   return { sourceAttribution: await sourceAttribution(event.context.$db, String(row.egcs_ay_guide)), sourceVersions: visibleVersions.map(versionEvidence), ...row, ...await readPublicationMetadata(event.context.$db, id, json(settings(row))), sourceVersionDocument: sourceVersion.egcs_cn_definition, latestSourceVersionId, compatibility: compatibility(sourceVersion.egcs_cn_definition) }
 }
 export const listGuidedHelpCatalog = async (event: H3Event, agencyId: string) => {
-  await authorize(event, 'guided_help', 'read', scope({ agencyId }))
+  await authorize(event, 'help', 'read', scope({ agencyId }))
   await ensureAgency(event, event.context.$db, agencyId)
   const rows = await event.context.$db.selectFrom('Agency_Guided_Help').select('id').where('egcs_ay_agency', '=', agencyId).where('_deleted', '=', false).execute()
   return { items: await Promise.all(rows.map(row => readGuidedHelpCatalog(event, agencyId, String(row.id)))) }
@@ -249,7 +249,7 @@ export const updateGuidedHelpCatalog = async (event: H3Event, agencyId: string, 
   return readGuidedHelpCatalog(event, agencyId, id)
 }
 export const publishGuidedHelpCatalog = async (event: H3Event, agencyId: string, id: string) => {
-  await authorize(event, 'guided_help', 'update', scope({ agencyId }))
+  await authorize(event, 'help', 'update', scope({ agencyId }))
   const initial = await catalog(event, event.context.$db, agencyId, id)
   const roleIds = initial.egcs_ay_roles as string[]
   await transaction(event, { agencyId }, 'update', async (db, actorId) => {

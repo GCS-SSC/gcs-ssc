@@ -21,5 +21,5 @@ const helperItems = computed(() => helperDefinitions.value.map(definition => ({
     :items="helperItems"
     value-key="value"
     label-key="label"
-    searchable />
+    searchable data-field-exclude="Composite helper selector; configurable help belongs to the owning business field." />
 </template>

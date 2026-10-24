@@ -130,7 +130,7 @@ const name = (item: LinkedWorkflow) => (locale.value === 'fr' ? item.egcs_cn_nam
 </script>
 
 <template>
-  <div class="space-y-5">
+  <div class="space-y-5" data-field-scope="transfer-payment.workflow-setups-tab">
     <CommonResourceLayoutCard
       v-model:search="search"
       v-model:pagination="pagination"

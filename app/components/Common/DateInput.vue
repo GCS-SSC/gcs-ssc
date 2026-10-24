@@ -33,6 +33,7 @@ defineExpose({ inputsRef })
     v-bind="{ ...$attrs, ...ariaAttrs }"
     :id="id"
     v-slot="{ segments }"
+    data-field-container="Composite editor; its individual field declarations own their identities."
     :name="name"
     :model-value="modelValue"
     :disabled="disabled"

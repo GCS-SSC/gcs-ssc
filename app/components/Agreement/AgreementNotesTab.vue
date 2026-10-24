@@ -78,7 +78,7 @@ const bilingualColumns: BilingualColumnConfig<Note>[] = [
     :show-button="canCreate"
     :schema="FundingCaseAgreementNoteCreateSchema" :columns="columns" :bilingual-columns="bilingualColumns"
     :button-label="t('common.add')" :modal-title="t('notes.add')" :update-title="t('notes.edit')"
-    :search-placeholder="t('notes.search')" :modal-ui="{ content: 'sm:max-w-2xl' }">
+    :search-placeholder="t('notes.search')" :modal-ui="{ content: 'sm:max-w-2xl' }" data-field-tooltip-context="agreement" data-field-scope="agreement.notes-tab" data-scope-label-en="Agreements > Notes to file" data-scope-label-fr="Ententes > Notes au dossier">
     <template #subject-cell="{ row }">
       {{ locale === 'fr' ? row.original.egcs_fc_subject_fr || row.original.egcs_fc_subject_en : row.original.egcs_fc_subject_en || row.original.egcs_fc_subject_fr }}
     </template>

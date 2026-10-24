@@ -36,7 +36,7 @@ const {
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="modalTitle">
+  <UModal v-model:open="open" :title="modalTitle" data-field-scope="agency.recommendation-set-modal">
     <template #body>
       <UForm v-if="state" :state="state" :validate="validate" class="space-y-4" @submit="onSubmit">
         <UFormField :label="t('transfer_payment.name_en')" name="egcs_cn_name_en">

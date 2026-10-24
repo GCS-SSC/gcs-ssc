@@ -67,7 +67,7 @@ const updateNumericFieldValue = (state: ApplicantRecipientAddressForm, key: Nume
     :show-button="canCreate"
     :modal-title="t('applicant_recipient.addresses.add')"
     :update-title="t('applicant_recipient.addresses.edit')"
-    :search-placeholder="t('applicant_recipient.addresses.search')">
+    :search-placeholder="t('applicant_recipient.addresses.search')" data-field-scope="applicant-recipient.addresses-tab">
     <template #form="{ state }">
       <UFormField :label="t('admin_common.fields.egcs_cn_street1')" name="egcs_cn_street1">
         <UInput :model-value="String((state as ApplicantRecipientAddressForm).egcs_cn_street1 ?? '')" @update:model-value="value => (state as ApplicantRecipientAddressForm).egcs_cn_street1 = value" />

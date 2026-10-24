@@ -363,7 +363,7 @@ const deleteClaim = (recordId: string) => runRecordAction(recordId, 'delete', as
 </script>
 
 <template>
-  <div class="w-full">
+  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.claims-tab" data-scope-label-en="Agreements > Claims" data-scope-label-fr="Ententes > Demandes de remboursement">
     <CommonResourceLayoutCard
       v-model:search="search"
       v-model:pagination="pagination"
@@ -500,7 +500,7 @@ const deleteClaim = (recordId: string) => runRecordAction(recordId, 'delete', as
               <USelect v-model="selectedClaim.egcs_fc_periodend" :items="MONTH_KEYS.map((key, index) => ({ label: t(`agreement.claims.months.${key}`), value: index }))" />
             </UFormField>
           </div>
-          <UCheckbox v-model="selectedClaim.egcs_fc_isfinalforyear" :label="t('agreement.claims.final_for_year')" />
+          <UCheckbox v-model="selectedClaim.egcs_fc_isfinalforyear" :label="t('agreement.claims.final_for_year')" data-ui-target="agreement.claims-tab.selectedClaim.egcs_fc_isfinalforyear" />
           <div class="flex justify-end gap-2 pt-4">
             <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isClaimModalOpen = false" />
             <CommonSaveButton :label="selectedClaim.id ? t('common.update') : t('common.add')" :loading="isSavingClaim" :disabled="isSavingClaim" />

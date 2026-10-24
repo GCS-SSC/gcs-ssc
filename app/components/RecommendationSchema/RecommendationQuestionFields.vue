@@ -56,14 +56,14 @@ const setOptionOutcome = (key: string, value: string | undefined) => {
 </script>
 
 <template>
-  <CommonQuestionnaireQuestionFields :model-value="question" :option-extension-active="question.type === 'radio' && question.isResult" @update:model-value="updateQuestion" @option-added="configureAddedOption">
+  <CommonQuestionnaireQuestionFields data-field-container="Composite editor; its individual field declarations own their identities." :model-value="question" :option-extension-active="question.type === 'radio' && question.isResult" data-field-scope="recommendation-schema.recommendation-question-fields" @update:model-value="updateQuestion" @option-added="configureAddedOption">
     <template #question-extension>
       <UFormField v-if="question.type === 'radio'" :label="t('recommendation_schema.result_question')" :description="t('recommendation_schema.result_question_help')" name="isResult">
         <USwitch :model-value="question.isResult" @update:model-value="setDecidingQuestion(Boolean($event))" />
       </UFormField>
     </template>
     <template #option-extension="{ option }">
-      <UFormField v-if="question.type === 'radio' && question.isResult" :label="t('recommendation_schema.canonical_outcome')" required>
+      <UFormField v-if="question.type === 'radio' && question.isResult" :label="t('recommendation_schema.canonical_outcome')" required data-ui-target="recommendation-schema.recommendation-question-fields.recommendation_schema.canonical_outcome">
         <CommonEnumSelect :model-value="getOptionOutcome(option.key)" name="recommendation_outcome" :items="outcomeOptions" class="w-full" @update:model-value="value => setOptionOutcome(option.key, value)" />
       </UFormField>
     </template>

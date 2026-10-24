@@ -107,6 +107,7 @@ watch(() => modelValue.value, () => {
 <template>
   <UPopover>
     <LocalizedDateInput
+      data-field-container="Composite editor; its individual field declarations own their identities."
       :model-value="inputDateValue as DateFieldRootProps['modelValue']"
       :disabled="disabled"
       class="w-full"
@@ -114,6 +115,7 @@ watch(() => modelValue.value, () => {
 
     <template #content>
       <UCalendar
+        data-field-container="Composite editor; its individual field declarations own their identities."
         :calendar-label="t('common.calendar_date')"
         :model-value="inputDateValue as CalendarProps['modelValue']"
         :disabled="disabled"

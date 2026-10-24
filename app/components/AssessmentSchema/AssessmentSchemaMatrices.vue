@@ -23,6 +23,7 @@ const { t } = useI18n()
       <AssessmentSchemaAccordionSection :title="t('transfer_payment.overall_scoring_matrix')">
         <AssessmentScoringBandArrayEditor
           v-model="overallScoringMatrix"
+          data-field-container="Composite editor; its individual field declarations own their identities."
           field-path="scoringMatrix"
           :title="t('transfer_payment.assessment_scoring_matrix')" />
       </AssessmentSchemaAccordionSection>
@@ -30,6 +31,7 @@ const { t } = useI18n()
       <AssessmentSchemaAccordionSection :title="t('transfer_payment.section_scoring_matrix')">
         <AssessmentScoringBandArrayEditor
           v-model="state.sectionMatrix"
+          data-field-container="Composite editor; its individual field declarations own their identities."
           field-path="assessmentSchema.sectionMatrix"
           :title="t('transfer_payment.assessment_section_matrix')" />
       </AssessmentSchemaAccordionSection>

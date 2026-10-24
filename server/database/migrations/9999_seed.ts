@@ -3,6 +3,7 @@ import { sql, type Kysely, type Migration } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import { restoreNciaTemplateObjects } from '../ncia-template-objects'
 import { seedGuidedHelpExample } from '../guided-help-seed'
+import { seedFieldTooltipExamples } from '../field-tooltip-seed'
 
 type DemoSnapshot = Record<string, Array<Record<string, unknown>>> & { user: Array<{ id: number }> }
 
@@ -79,6 +80,7 @@ const restoreSnapshot = async <DB>(db: Kysely<DB>): Promise<void> => {
   // Publication state and transition history are validated together at the end of the seed.
   await sql`SET CONSTRAINTS ALL DEFERRED`.execute(db)
   await seedGuidedHelpExample(db as unknown as import('kysely').Transaction<Database>)
+  await seedFieldTooltipExamples(db as unknown as import('kysely').Transaction<Database>)
   await sql`SET CONSTRAINTS ALL IMMEDIATE`.execute(db)
 }
 

@@ -915,7 +915,6 @@
       "manager": "Gestionnaire"
     },
     "subjects": {
-      "guided_help": "Aide guidée",
       "audit": "Audit",
       "system": "Système",
       "agency": "Organisme",
@@ -928,7 +927,8 @@
       "applicant_recipient": "Promoteurs",
       "journal_voucher": "Pièces de journal",
       "correction": "Corrections",
-      "account_receivable": "Comptes débiteurs"
+      "account_receivable": "Comptes débiteurs",
+      "help": "Aide"
     },
     "unknown_ability": "Autorisation inconnue ({action}:{subject})",
     "scope": {
@@ -4955,6 +4955,7 @@
     "role_count": "{count} rôles de public configurés",
     "configured_screens": "Écrans configurés",
     "create_in": "Créer un guide dans {name}",
+    "all_owners": "Tous les propriétaires",
     "owners": "propriétaires",
     "no_owned_guides": "Aucun guide dans ce groupe.",
     "inspect_step": "Consulter l’étape {name}",
@@ -4993,5 +4994,40 @@
     "journey_branch_conflict": "Supprimez les embranchements avant de choisir un parcours de processus.",
     "journey_template": "Instructions de la tâche",
     "journey_template_generic": "Instructions générales de la tâche"
+  },
+  "field_tooltips": {
+    "all_screens": "Tous les écrans",
+    "title": "Aide aux champs",
+    "description": "Configurez les infobulles des champs pour cet organisme. La liste des champs se met à jour automatiquement lorsque l’application change. Les entrées indisponibles sont conservées pour que vous puissiez les réaffecter ou les supprimer.",
+    "field": "Champ",
+    "screen": "Écran",
+    "add": "Ajouter une aide de champ",
+    "edit": "Aide de champ",
+    "inspect": "Voir l’aide de champ",
+    "retarget": "Champ / réaffectation",
+    "choose_field": "Rechercher un écran ou un champ",
+    "text_en": "Texte de l’infobulle (anglais)",
+    "text_fr": "Texte de l’infobulle (français)",
+    "enabled": "Activée",
+    "enabled_help": "Remplissez les deux langues avant l’activation. Les infobulles désactivées sont conservées comme ébauches.",
+    "preview": "Aperçu du texte",
+    "unavailable_help": "Ce champ est indisponible dans cette version. Il a peut-être été supprimé ou son identifiant a changé. Votre infobulle est conservée. Choisissez un autre champ pour la réaffecter ou supprimez l’entrée enregistrée.",
+    "extension_disabled_help": "L’extension propriétaire de ce champ est désactivée pour cet organisme. Votre infobulle est conservée et s’affichera lorsque l’extension sera réactivée.",
+    "help_for_field": "Aide pour {field}",
+    "status": {
+      "enabled": "Activée",
+      "disabled": "Désactivée",
+      "available": "Disponible",
+      "unavailable": "Champ indisponible",
+      "extension_disabled": "Extension désactivée"
+    },
+    "api": {
+      "not_found": "L’infobulle de champ est introuvable.",
+      "conflict": "Une infobulle existe déjà pour ce champ. Modifiez-la ou supprimez-la avant la réaffectation.",
+      "invalid": "Sélectionnez un champ disponible.",
+      "forbidden": "Vous n’avez pas la permission de gérer ces infobulles."
+    },
+    "agency": "Organisme",
+    "no_agencies": "Vous ne disposez d’aucun accès à l’aide pour un organisme."
   }
 }

@@ -15,7 +15,7 @@ const initialNewItem = { ...AgencyAddressTypeInitial }
 </script>
 
 <template>
-  <section data-help-view="agency.address-types">
+  <section data-help-view="agency.address-types" data-field-scope="agency.address-types">
     <CommonResourceCrud
       help-add-target="agency.address-types.add"
       help-save-target="agency.address-types.save"

@@ -109,6 +109,7 @@ const isHeroCollapsed = getHeroCollapsed('admin-gwcoa')
             :title="t('admin_common.resources.gwcoa')"
             icon="i-lucide-landmark"
             resource="gwcoa"
+            field-scope="admin.gwcoa"
             :schema="CommonGwcoaCreateSchema"
             :initial-new-item="{ egcs_cn_number: 0 }"
             :columns="columns"

@@ -126,7 +126,7 @@ const save = async () => {
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="t(adjustment ? 'account_receivable.adjust_receivable' : 'account_receivable.create')" :description="t(adjustment ? 'account_receivable.adjust_receivable_description' : 'account_receivable.description')" :ui="{ content: 'sm:max-w-4xl', header: 'shrink-0' }">
+  <UModal v-model:open="open" :title="t(adjustment ? 'account_receivable.adjust_receivable' : 'account_receivable.create')" :description="t(adjustment ? 'account_receivable.adjust_receivable_description' : 'account_receivable.description')" :ui="{ content: 'sm:max-w-4xl', header: 'shrink-0' }" data-field-tooltip-context="agreement" data-field-scope="account-receivable.create-modal" data-scope-label-en="Agreements > Receivables > Create or adjust" data-scope-label-fr="Ententes > Créances > Créer ou ajuster">
     <template #body>
       <UForm v-if="state" :state="state" :validate="createValidator(createSchema)" class="space-y-4" @submit="save">
         <UFormField v-if="!adjustment" name="egcs_fc_amount" :label="t('account_receivable.requested_amount')" required>

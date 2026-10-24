@@ -87,8 +87,8 @@ const indicatorBilingualColumns = computed<BilingualColumnConfig<TransferPayment
     :request-status="requestStatus"
     :button-label="t('common.add')"
     :show-button="canUpdateChild"
-    @add="emit('add')"
-    @retry="emit('retry')">
+    data-field-scope="transfer-payment.performance-indicators-table"
+    @add="emit('add')" @retry="emit('retry')">
     <template #filters>
       <CommonBilingualSelectMenu
         v-model="selectedOutcomeId"
@@ -103,7 +103,7 @@ const indicatorBilingualColumns = computed<BilingualColumnConfig<TransferPayment
         variant="outline"
         size="md"
         class="min-w-40"
-      />
+        data-ui-target="transfer-payment.performance-indicators-table.selectedOutcomeId" />
     </template>
 
     <template #name-cell="{ row }">

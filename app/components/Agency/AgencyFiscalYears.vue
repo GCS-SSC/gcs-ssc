@@ -32,7 +32,7 @@ const initialNewItem = createAgencyFiscalYearInitial()
     :can-delete="canDelete"
     :schema="AgencyFiscalYearSchema"
     :initial-new-item="initialNewItem"
-    :columns="columns">
+    :columns="columns" data-field-scope="agency.fiscal-years">
     <template #egcs_ay_fiscalyeardisplay-cell="{ row }">
       <span class="font-bold text-zinc-900 dark:text-white">{{ row.original.egcs_ay_fiscalyeardisplay }}</span>
     </template>

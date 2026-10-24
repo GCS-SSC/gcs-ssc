@@ -71,7 +71,7 @@ const handleModelValueUpdate = (value: string | number | null | undefined) => {
 <template>
   <div
     class="py-6"
-    :data-testid="testId">
+    :data-testid="testId" data-field-exclude="Runtime review, recommendation and data collection questions have authored help and are outside configurable field help.">
     <div class="flex gap-4">
       <div
         v-if="questionNumber"

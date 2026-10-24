@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import { useId, computed, onUnmounted, ref, watch } from 'vue'
 import CommonCompletionPanel from '~/components/Common/Completions/Panel.vue'
@@ -492,10 +493,12 @@ const cancelAmendment = async () => {
     isCancelling.value = false
   }
 }
+
+useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === String(route.params.amendmentId) ? { entityType: 'fundingcaseamendment', entityId: amendment.value.id } : null)
 </script>
 
 <template>
-  <CommonDetailPage id="agreement-amendment-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" class="w-full">
+  <CommonDetailPage id="agreement-amendment-detail" v-model:collapsed="isHeroCollapsed" data-field-tooltip-context="agreement" data-field-scope="agreements.amendments" data-scope-label-en="Agreements > Amendments > General" data-scope-label-fr="Ententes > Modifications > Général" :breadcrumb-items="breadcrumbItems" class="w-full">
     <template #body>
       <div v-if="amendment" class="flex flex-1 flex-col">
         <CommonEntityHero
@@ -508,15 +511,15 @@ const cancelAmendment = async () => {
             isCompleted: amendment.isCompleted
           }]" />
 
-        <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="agreement-amendment-detail-content">
+        <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-amendment-detail-content">
           <section v-if="selectedTab === 'general'" class="space-y-8">
             <CommonSection :title="t('agreement.amendments.sections.details')" badge="01" :grid-cols="1">
               <div class="space-y-4">
                 <div class="grid gap-4 md:grid-cols-2">
-                  <UFormField :label="t('agreement.amendments.name_en')">
+                  <UFormField data-ui-target="agreements.amendments.amendments.name_en" :label="t('agreement.amendments.name_en')">
                     <UInput v-model="amendmentNameEn" :aria-describedby="nameRequirementId" class="w-full" :disabled="!canEditAmendmentScope" />
                   </UFormField>
-                  <UFormField :label="t('agreement.amendments.name_fr')">
+                  <UFormField data-ui-target="agreements.amendments.amendments.name_fr" :label="t('agreement.amendments.name_fr')">
                     <UInput v-model="amendmentNameFr" :aria-describedby="nameRequirementId" class="w-full" :disabled="!canEditAmendmentScope" />
                   </UFormField>
                 </div>
@@ -531,7 +534,7 @@ const cancelAmendment = async () => {
                 <p class="text-sm text-zinc-500 dark:text-zinc-400">
                   {{ t('agreement.amendments.types_description') }}
                 </p>
-                <UFormField :label="t('agreement.amendments.types')" required>
+                <UFormField data-ui-target="agreements.amendments.amendments.types" :label="t('agreement.amendments.types')" required>
                   <CommonServerLookupMultiSelect
                     v-model="scopeTypeIds"
                     :fetch-url="`/api/agreements/${agreementId}/amendments/lookups/types?amendmentId=${encodeURIComponent(amendmentId)}`"
@@ -543,7 +546,7 @@ const cancelAmendment = async () => {
                     @update:model-value="onScopeTypesChanged"
                     @resolved-items="onResolvedScopeTypes" />
                 </UFormField>
-                <UFormField v-if="scopeTypeIds.length > 0" :label="t('agreement.amendments.subtypes')" :required="scopeSubtypeRequired">
+                <UFormField v-if="scopeTypeIds.length > 0" data-ui-target="agreements.amendments.amendments.subtypes" :label="t('agreement.amendments.subtypes')" :required="scopeSubtypeRequired">
                   <div v-if="isHistoricalAmendment" data-testid="historical-amendment-subtypes" class="flex flex-wrap gap-2">
                     <CommonStatusBadge
                       v-for="subtype in amendment.amendment_subtypes"
@@ -582,12 +585,12 @@ const cancelAmendment = async () => {
                   {{ t('agreement.amendments.duration_description') }}
                 </p>
                 <div class="grid gap-4 md:grid-cols-2">
-                  <UFormField :label="t('agreement.authorized_assistance_start_date')" required>
+                  <UFormField data-ui-target="agreements.amendments.agreement.authorized_assistance_start_date" :label="t('agreement.authorized_assistance_start_date')" required>
                     <CommonDatePicker
                       v-model="durationDates.egcs_fc_proposedauthorizedassistancestartdate"
                       :disabled="!canEditAmendmentScope" />
                   </UFormField>
-                  <UFormField :label="t('agreement.authorized_assistance_end_date')" required>
+                  <UFormField data-ui-target="agreements.amendments.agreement.authorized_assistance_end_date" :label="t('agreement.authorized_assistance_end_date')" required>
                     <CommonDatePicker
                       v-model="durationDates.egcs_fc_proposedauthorizedassistanceenddate"
                       :disabled="!canEditAmendmentScope" />

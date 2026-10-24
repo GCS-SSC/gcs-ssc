@@ -24,7 +24,7 @@ const lookupQuery = computed(() => ({
 </script>
 
 <template>
-  <UFormField :label="t('agreement.activities.responsible_parties')" :name="name">
+  <UFormField :label="t('agreement.activities.responsible_parties')" :name="name" data-ui-target="agreement.fields.activity-responsible-parties-field.name" data-field-tooltip-context="agreement" data-field-scope="agreement.fields.activity-responsible-parties-field" data-scope-label-en="Agreements > Activities" data-scope-label-fr="Ententes > Activités">
     <CommonServerLookupSelect
       v-model:values="model"
       :fetch-url="`/api/agreements/${encodeURIComponent(agreementId)}/activities/lookups/responsible-parties`"

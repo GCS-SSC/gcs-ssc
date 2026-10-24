@@ -144,7 +144,7 @@ const getAddressTypeLookupUrl = (state: FundingCaseAgreementAddressForm) => {
     :show-button="canCreate"
     :modal-title="t('agreement.addresses.add')"
     :update-title="t('agreement.addresses.edit')"
-    :search-placeholder="t('agreement.addresses.search')">
+    :search-placeholder="t('agreement.addresses.search')" data-field-tooltip-context="agreement" data-field-scope="agreement.addresses-tab" data-scope-label-en="Agreements > Addresses" data-scope-label-fr="Ententes > Adresses">
     <template #form="{ state }">
       <UFormField :label="t('agreement.addresses.address_type')" name="egcs_fc_addresstype">
         <CommonServerLookupSelect

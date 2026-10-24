@@ -35,7 +35,7 @@ const displayValue = computed(() => {
     inputmode="decimal"
     :readonly="readonly"
     :disabled="disabled"
+    data-field-exclude="Composite control internals; configurable help belongs to the owning business field."
     @update:model-value="emit('update:modelValue', String($event))"
-    @focus="focused = true"
-    @blur="focused = false" />
+    @focus="focused = true" @blur="focused = false" />
 </template>

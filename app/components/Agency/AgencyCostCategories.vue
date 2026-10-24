@@ -382,7 +382,7 @@ const deleteLineItem = async (lineItemId: string) => {
 </script>
 
 <template>
-  <div class="w-full">
+  <div class="w-full" data-field-scope="agency.cost-categories">
     <CommonResourceTableFeedback
       :status="status"
       :has-stale-rows="categories.length > 0 || lineItems.length > 0"
@@ -526,7 +526,7 @@ const deleteLineItem = async (lineItemId: string) => {
 
     <UModal v-if="selectedCategory" v-model:open="isCategoryModalOpen" :title="t('agency.tabs.cost_categories')">
       <template #body>
-        <UForm :state="selectedCategory" :validate="validateCategory" :validate-on="[]" class="space-y-4" @submit="saveCategory">
+        <UForm data-field-scope="agency.cost-category" :state="selectedCategory" :validate="validateCategory" :validate-on="[]" class="space-y-4" @submit="saveCategory">
           <UFormField :label="t('agency.name_en')" name="egcs_ay_name_en">
             <UInput v-model="selectedCategory.egcs_ay_name_en" />
           </UFormField>
@@ -548,7 +548,7 @@ const deleteLineItem = async (lineItemId: string) => {
 
     <UModal v-if="selectedLineItem" v-model:open="isLineItemModalOpen" :title="lineItemModalTitle">
       <template #body>
-        <UForm :state="selectedLineItem" :validate="validateLineItem" :validate-on="[]" class="space-y-4" @submit="saveLineItem">
+        <UForm data-field-scope="agency.cost-line-item" :state="selectedLineItem" :validate="validateLineItem" :validate-on="[]" class="space-y-4" @submit="saveLineItem">
           <p v-if="selectedLineItemCategoryName" class="text-sm text-muted">
             {{ t('agency.budget_category_context', { name: selectedLineItemCategoryName }) }}
           </p>
@@ -566,6 +566,7 @@ const deleteLineItem = async (lineItemId: string) => {
           <AgencyBudgetCalculationFields
             v-if="selectedLineItemCategoryId"
             v-model="selectedLineItem"
+            data-field-container="Composite editor; its individual field declarations own their identities."
             :category-id="selectedLineItemCategoryId" />
 
           <div class="flex justify-end gap-2 pt-4">

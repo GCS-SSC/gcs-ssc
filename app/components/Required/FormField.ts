@@ -3,6 +3,9 @@ import { computed, defineComponent, h, inject, provide, useId } from 'vue'
 import { useI18n } from '#imports'
 import { fieldLabelKey, fieldRequirementKey, formRequirementKey } from '~/utils/form-requirement-context'
 import { booleanAttribute } from '~/utils/required-control'
+import FieldHelpTooltip from '~/components/FieldHelp/Tooltip.vue'
+import { fieldScopeKey, fieldTooltipKey } from '~/utils/field-tooltip-context'
+import { resolveUiFieldTargetKey } from '~~/shared/ui-targets/identity'
 
 /** Renders a localized requirement and shares it with the actual input control. */
 export default defineComponent({
@@ -19,7 +22,21 @@ export default defineComponent({
   setup: (props, { attrs, slots }) => {
     const labelId = `field-label-${useId()}`
     provide(fieldLabelKey, computed(() => attrs.label || slots.label ? labelId : undefined))
-    const { t } = useI18n()
+    const { t, locale } = useI18n()
+    const fieldScope = inject(fieldScopeKey, undefined)
+    const tooltips = inject(fieldTooltipKey, undefined)
+    const targetKey = computed(() => resolveUiFieldTargetKey({
+      scope: fieldScope?.value,
+      name: props.name,
+      explicitTarget: typeof attrs['data-help-target'] === 'string'
+        ? attrs['data-help-target']
+        : typeof attrs['data-ui-target'] === 'string' ? attrs['data-ui-target'] : undefined
+    }))
+    const tooltip = computed(() => {
+      if (attrs['data-field-exclude']) return ''
+      const text = tooltips?.value.find(item => item.targetKey === targetKey.value)?.text
+      return text?.[locale.value.startsWith('fr') ? 'fr' : 'en']?.trim() ?? ''
+    })
     const form = inject(formRequirementKey, undefined)
     const required = computed(() => props.required !== undefined
       ? booleanAttribute(props.required)
@@ -27,6 +44,14 @@ export default defineComponent({
     provide(fieldRequirementKey, required)
     return () => h(OriginalFormField, { ...attrs, name: props.name, required: required.value }, {
       ...slots,
+      ...(tooltip.value
+        ? {
+            hint: (scope: Record<string, unknown>) => [
+              slots.hint ? slots.hint(scope) : attrs.hint,
+              h(FieldHelpTooltip, { text: tooltip.value, label: typeof attrs.label === 'string' ? attrs.label : '' })
+            ]
+          }
+        : {}),
       ...(attrs.label || slots.label
         ? {
             /** Includes the requirement in the label used by composite groups.

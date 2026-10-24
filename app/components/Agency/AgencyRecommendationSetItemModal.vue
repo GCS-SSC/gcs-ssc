@@ -79,7 +79,7 @@ const onSubmit = async (event: FormSubmitEvent<z.infer<typeof TransferPaymentStr
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="modalTitle">
+  <UModal v-model:open="open" :title="modalTitle" data-field-scope="agency.recommendation-set-item-modal">
     <template #body>
       <UForm v-if="state" :state="state" :validate="validate" @submit="onSubmit">
         <fieldset :disabled="isSubmitting || mutationPending" class="space-y-4">

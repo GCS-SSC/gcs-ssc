@@ -403,7 +403,7 @@ const retryAttachmentList = async () => {
 </script>
 
 <template>
-  <div class="w-full">
+  <div class="w-full" data-field-tooltip-context="agreement-or-intake" data-field-scope="common.attachments-tab" data-scope-label-en="Agreements or Intakes > Attachments" data-scope-label-fr="Ententes ou dossiers de demande > Pièces jointes">
     <div v-if="agencyRequired" class="mb-4">
       <label for="attachment-agency-context" class="mb-1 block text-sm font-medium">{{ t('attachments.agency_context') }} ({{ t('common.field_required') }})</label>
       <CommonServerLookupSelect
@@ -418,7 +418,7 @@ const retryAttachmentList = async () => {
         required
         aria-required="true"
         searchable
-        @update:model-value="selectAgency" />
+        data-ui-target="common.attachments-tab.selectedAgencyId" @update:model-value="selectAgency" />
     </div>
     <UAlert
       v-if="hasAttachmentListError"
@@ -503,6 +503,7 @@ const retryAttachmentList = async () => {
             :is="metadataComponent"
             v-if="metadataComponent"
             v-model="formState.providerMetadata"
+            data-field-container="Composite editor; its individual field declarations own their identities."
             :mode="isEditing ? 'update' : 'create'"
             :agency-id="attachmentResponse?.agency_id ?? ''"
             purpose="attachment"

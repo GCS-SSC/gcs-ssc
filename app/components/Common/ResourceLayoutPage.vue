@@ -69,7 +69,7 @@ defineExpose({
 </script>
 
 <template>
-  <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
+  <div class="flex min-w-0 flex-1 flex-col overflow-hidden" data-field-scope="common.resource-layout-page">
     <CommonTableToolbar
       v-model:search="search"
       v-model:status-filter="statusFilter"
@@ -134,14 +134,14 @@ defineExpose({
               <UCheckbox
                 :model-value="tableApi.getIsSomePageRowsSelected() ? 'indeterminate' : tableApi.getIsAllPageRowsSelected()"
                 :aria-label="t('common.select_all')"
-                @update:model-value="value => tableApi.toggleAllPageRowsSelected(!!value)" />
+                data-ui-target="common.resource-layout-page.select-all-rows" @update:model-value="value => tableApi.toggleAllPageRowsSelected(!!value)" />
             </template>
 
             <template v-if="selectable && !$slots['select-cell']" #select-cell="{ row }">
               <UCheckbox
                 :model-value="row.getIsSelected()"
                 :aria-label="getRowSelectionLabel?.(row.original, row.index) ?? t('common.select_row_named', { number: row.index + 1 })"
-                @update:model-value="value => row.toggleSelected(!!value)" />
+                data-ui-target="common.resource-layout-page.select-row" @update:model-value="value => row.toggleSelected(!!value)" />
             </template>
 
             <template v-for="(_, name) in $slots" #[name]="slotData">
@@ -176,7 +176,7 @@ defineExpose({
           variant="ghost"
           size="xs"
           class="w-16 shrink-0"
-          @update:model-value="val => (pagination.pageIndex = 0)" />
+          data-ui-target="common.resource-layout-page.pagination.pageSize" @update:model-value="val => (pagination.pageIndex = 0)" />
         <CommonPagination
           v-if="totalRecords !== undefined || cursor"
           :page="pagination.pageIndex + 1"

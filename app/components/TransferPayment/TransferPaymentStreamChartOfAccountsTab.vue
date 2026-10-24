@@ -109,6 +109,7 @@ const onDelete = async (id: string) => {
     <TransferPaymentStreamChartOfAccountModal
       v-if="canUpdateChild"
       v-model="isOpen"
+      data-field-container="Composite editor; its individual field declarations own their identities."
       :stream-id="streamId"
       :profile-id="profileId"
       :capture-session="captureSession"

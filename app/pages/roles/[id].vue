@@ -213,7 +213,7 @@ const { tabs: routeTabs, selectedTab, activeTabComponent, activeTabProps } = use
             onClick: openUpdateModal
           }]" />
 
-        <CommonDetailWorkspace v-model="selectedTab" :items="routeTabs" content-test-id="role-detail-content">
+        <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="routeTabs" content-test-id="role-detail-content">
           <component
             :is="activeTabComponent"
             v-if="activeTabComponent"

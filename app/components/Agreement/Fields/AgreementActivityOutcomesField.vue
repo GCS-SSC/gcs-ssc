@@ -24,7 +24,7 @@ const lookupQuery = computed(() => ({
 </script>
 
 <template>
-  <UFormField :label="t('agreement.activities.related_outcomes')" :name="name">
+  <UFormField :label="t('agreement.activities.related_outcomes')" :name="name" data-ui-target="agreement.fields.activity-outcomes-field.name" data-field-tooltip-context="agreement" data-field-scope="agreement.fields.activity-outcomes-field" data-scope-label-en="Agreements > Activities" data-scope-label-fr="Ententes > Activités">
     <CommonServerLookupSelect
       v-model:values="model"
       :fetch-url="`/api/agreements/${encodeURIComponent(agreementId)}/activities/lookups/outcomes`"

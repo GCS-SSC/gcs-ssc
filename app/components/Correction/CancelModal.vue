@@ -40,7 +40,7 @@ const cancel = async () => {
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="t('correction.cancel')" :description="t('correction.cancel_description')" :ui="{ content: 'sm:max-w-2xl' }">
+  <UModal v-model:open="open" :title="t('correction.cancel')" :description="t('correction.cancel_description')" :ui="{ content: 'sm:max-w-2xl' }" data-field-tooltip-context="agreement" data-field-scope="correction.cancel-modal" data-scope-label-en="Agreements > Corrections > Cancel" data-scope-label-fr="Ententes > Corrections > Annuler">
     <template #body>
       <UForm v-if="state" :state="state" :validate="createValidator(CorrectionCancelSchema)" class="space-y-4" @submit="cancel">
         <UFormField name="egcs_fc_reason" :label="t('correction.cancellation_reason')">

@@ -120,8 +120,8 @@ watch(
 </script>
 
 <template>
-  <div class="space-y-4">
-    <UFormField :label="t('transfer_payment.dependency_mode')">
+  <div class="space-y-4" data-field-scope="assessment-schema.dependency-rule-form">
+    <UFormField :label="t('transfer_payment.dependency_mode')" data-ui-target="assessment-schema.dependency-rule-form.transfer_payment.dependency_mode">
       <USelect v-model="rule.mode" :items="dependencyModeItems" value-key="value" label-key="label" />
     </UFormField>
 
@@ -146,7 +146,7 @@ watch(
       </div>
 
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <UFormField :label="t('transfer_payment.dependency_type')" required>
+        <UFormField :label="t('transfer_payment.dependency_type')" required data-ui-target="assessment-schema.dependency-rule-form.transfer_payment.dependency_type">
           <USelect
             :model-value="clause.onType"
             :items="dependencyOnTypeItems"
@@ -155,18 +155,18 @@ watch(
             @update:model-value="value => updateClauseOnType(clause, value)" />
         </UFormField>
 
-        <UFormField :label="t('transfer_payment.value_type')">
+        <UFormField :label="t('transfer_payment.value_type')" data-ui-target="assessment-schema.dependency-rule-form.transfer_payment.value_type">
           <USelect v-model="clause.valueType" :items="getDependencyValueTypeItems(clause)" value-key="value" label-key="label" />
         </UFormField>
       </div>
 
-      <UFormField v-if="clause.onType === 'helpers'" :label="t('transfer_payment.helper_field')" required>
+      <UFormField v-if="clause.onType === 'helpers'" :label="t('transfer_payment.helper_field')" required data-ui-target="assessment-schema.dependency-rule-form.transfer_payment.helper_field">
         <AssessmentSchemaHelperFieldSelect
           :model-value="clause.field"
           @update:model-value="value => updateClauseField(clause, String(value ?? ''))" />
       </UFormField>
 
-      <UFormField v-else :label="t('transfer_payment.assessment_item')" required>
+      <UFormField v-else :label="t('transfer_payment.assessment_item')" required data-ui-target="assessment-schema.dependency-rule-form.transfer_payment.assessment_item">
         <AssessmentSchemaAnswerPathTreeSelect
           :model-value="createAnswersDependencyValue(clause)"
           :tree="answerPathTree"
@@ -175,15 +175,15 @@ watch(
           @update:model-value="value => updateAnswersPath(clause, typeof value === 'string' ? value : '')" />
       </UFormField>
 
-      <UFormField v-if="clause.valueType === 'boolean'" :label="t('transfer_payment.boolean_value')">
+      <UFormField v-if="clause.valueType === 'boolean'" :label="t('transfer_payment.boolean_value')" data-ui-target="assessment-schema.dependency-rule-form.transfer_payment.boolean_value">
         <USelect v-model="clause.booleanValue" :items="booleanValueItems" value-key="value" label-key="label" />
       </UFormField>
 
-      <UFormField v-else-if="clause.valueType === 'number'" :label="t('transfer_payment.number_value')">
+      <UFormField v-else-if="clause.valueType === 'number'" :label="t('transfer_payment.number_value')" data-ui-target="assessment-schema.dependency-rule-form.transfer_payment.number_value">
         <UInput v-model.number="clause.numberValue" type="number" />
       </UFormField>
 
-      <UFormField v-else :label="t('transfer_payment.text_value')">
+      <UFormField v-else :label="t('transfer_payment.text_value')" data-ui-target="assessment-schema.dependency-rule-form.transfer_payment.text_value">
         <UInput v-model="clause.stringValue" />
       </UFormField>
     </div>

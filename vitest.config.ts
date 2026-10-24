@@ -11,6 +11,7 @@ export default defineConfig({
   resolve: {
     dedupe: ['vue'],
     alias: [
+      { find: '#ui-targets', replacement: fileURLToPath(new URL('./tooling/gcs-ssc/tests/fixtures/ui-targets.ts', import.meta.url)) },
       { find: '~', replacement: fileURLToPath(new URL('./app', import.meta.url)) },
       { find: '~~', replacement: fileURLToPath(new URL('.', import.meta.url)) },
       { find: /^@gcs-ssc\/extensions\/server$/, replacement: fileURLToPath(new URL('./packages/gcs-ssc-extensions/src/server.ts', import.meta.url)) },
@@ -55,7 +56,7 @@ export default defineConfig({
         'tests/**',
         'extensions/**/tests/**',
         'extensions/**',
-        'server/utils/!(applicant-recipient-auth|authorize|entity-team|entity-team-routes|rbac|team-auth|guided-help).ts',
+        'server/utils/!(applicant-recipient-auth|authorize|entity-team|entity-team-routes|rbac|team-auth|guided-help|field-tooltip).ts',
         'extensions/**/client/**',
         'extensions/**/extension.config.ts',
         'server/database/migrations/**',

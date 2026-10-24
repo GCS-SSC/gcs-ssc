@@ -38,7 +38,7 @@ const query = computed(() => ({
 </script>
 
 <template>
-  <UFormField :name="name" :label="label ?? t('agreement.applicant_recipients.financial_id')" required>
+  <UFormField :name="name" :label="label ?? t('agreement.applicant_recipients.financial_id')" required data-ui-target="agreement.financial-id-field.name" data-field-tooltip-context="agreement" data-field-scope="agreement.financial-id-field" data-scope-label-en="Agreements > Proponents" data-scope-label-fr="Ententes > Promoteurs">
     <CommonServerLookupSelect
       v-if="proponentId && (streamId || agreementId)"
       :model-value="model ?? undefined"

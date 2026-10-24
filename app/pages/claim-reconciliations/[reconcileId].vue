@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import type { LocalizedToastText } from '~/composables/useLocalizedToast'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import CommonCompletionSection from '~/components/Common/Completions/Section.vue'
@@ -335,10 +336,12 @@ const cancelReconciliation = async () => {
     isCancelling.value = false
   }
 }
+
+useFieldTooltipProvider(() => data.value && String(data.value.reconciliation.id) === String(route.params.reconcileId) ? { entityType: 'fundingclaimreconcile', entityId: data.value.reconciliation.id } : null)
 </script>
 
 <template>
-  <CommonDetailPage id="claim-reconciliation-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems">
+  <CommonDetailPage id="claim-reconciliation-detail" v-model:collapsed="isHeroCollapsed" data-field-tooltip-context="agreement" data-field-scope="claim-reconciliations" data-scope-label-en="Agreements > Claim reconciliations > General" data-scope-label-fr="Ententes > Rapprochements des demandes de remboursement > Général" :breadcrumb-items="breadcrumbItems">
     <template #body>
       <div v-if="data" ref="recoveryFocusTarget" tabindex="-1" class="flex flex-1 flex-col outline-none">
         <CommonEntityHero
@@ -358,7 +361,7 @@ const cancelReconciliation = async () => {
             ...(data.is_primary ? [{ variant: 'meta' as const, label: t('assignments.primary') }] : [])
           ]" />
 
-        <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="claim-reconciliation-detail-content">
+        <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="claim-reconciliation-detail-content">
           <UAlert
             v-if="selectedTab === 'reconciliation' && !data.can_update"
             color="neutral"
@@ -371,6 +374,7 @@ const cancelReconciliation = async () => {
             <div class="space-y-5">
               <div class="flex flex-wrap items-center justify-between gap-4 rounded-sm border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-950">
                 <UCheckbox
+                  data-ui-target="claim-reconciliations.claims.mark_reconcile_final"
                   :model-value="data.reconciliation.egcs_fc_isfinal"
                   :label="t('agreement.claims.mark_reconcile_final')"
                   :description="t('agreement.claims.mark_reconcile_final_description')"

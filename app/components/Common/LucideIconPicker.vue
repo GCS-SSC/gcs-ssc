@@ -42,7 +42,7 @@ const selectIcon = (icon: string): void => {
 </script>
 
 <template>
-  <UPopover v-model:open="isOpen">
+  <UPopover v-model:open="isOpen" data-field-exclude="Composite control internals; configurable help belongs to the owning business field.">
     <UButton
       :id="id"
       type="button"

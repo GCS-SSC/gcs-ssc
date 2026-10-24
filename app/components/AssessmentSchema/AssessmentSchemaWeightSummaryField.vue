@@ -112,12 +112,12 @@ const saveModal = () => {
 </script>
 
 <template>
-  <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-    <UFormField :label="t('transfer_payment.weight_shape')" :name="`${namePrefix}.weight.mode`">
+  <div class="grid grid-cols-1 gap-4 md:grid-cols-2" data-field-scope="assessment-schema.weight-summary-field">
+    <UFormField :label="t('transfer_payment.weight_shape')" :name="`${namePrefix}.weight.mode`" data-ui-target="assessment-schema.weight-summary-field.weight.mode">
       <USelect v-model="weightMode" :items="weightModeItems" value-key="value" label-key="label" />
     </UFormField>
 
-    <UFormField :label="t('common.weight')" :name="`${namePrefix}.weight`">
+    <UFormField :label="t('common.weight')" :name="`${namePrefix}.weight`" data-ui-target="assessment-schema.weight-summary-field.weight">
       <UInput v-if="weightMode === 'fixed'" v-model.number="fixedWeightValue" type="number" />
       <UButton v-else :label="summaryLabel" color="neutral" variant="outline" class="w-full cursor-default justify-between" @click="openModal" />
     </UFormField>
@@ -127,10 +127,10 @@ const saveModal = () => {
     v-model:open="isModalOpen"
     :title="t('common.weight')"
     :description="t('transfer_payment.weight_shape')"
-    :ui="{ content: 'sm:max-w-5xl' }">
+    :ui="{ content: 'sm:max-w-5xl' }" data-field-scope="assessment-schema.weight-summary-field">
     <template #body>
       <div class="space-y-4">
-        <AssessmentSchemaWeightEditor v-if="isModalOpen" v-model="draftWeight" :answer-path-tree="answerPathTree" />
+        <AssessmentSchemaWeightEditor v-if="isModalOpen" v-model="draftWeight" data-field-container="Composite editor; its individual field declarations own their identities." :answer-path-tree="answerPathTree" />
         <div class="flex justify-end gap-2">
           <UButton :label="t('common.cancel')" color="neutral" variant="ghost" class="cursor-default" @click="isModalOpen = false" />
           <UButton :label="t('common.save')" class="cursor-default" @click="saveModal" />

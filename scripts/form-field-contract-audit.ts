@@ -36,7 +36,10 @@ export interface FieldContractDecision {
 }
 const digest = (source: string): string => createHash('sha256').update(source).digest('hex')
 export const fieldContractFingerprint = (field: CatalogField): string => {
-  const semanticAttrs = (attrs: Record<string, string>): Record<string, string> => Object.fromEntries(Object.entries(attrs).filter(([key]) => !['class', ':class', 'style', ':style', ':ui', 'ui', 'key', ':key'].includes(key)).sort(([left], [right]) => left.localeCompare(right)))
+  const metadata = new Set(['class', 'style', 'ui', 'key', 'data-field-scope', 'data-ui-target', 'data-help-target', 'data-field-exclude', 'data-field-schema', 'data-field-schema-source', 'data-field-schema-scope', 'data-field-schema-label-en', 'data-field-schema-label-fr', 'data-field-tooltip-unavailable', 'data-field-tooltip-context', 'data-field-forward', 'data-field-label-en', 'data-field-label-fr', 'data-scope-label-en', 'data-scope-label-fr', 'data-field-container'])
+  const semanticAttrs = (attrs: Record<string, string>): Record<string, string> => Object.fromEntries(Object.entries(attrs)
+    .filter(([key]) => !metadata.has(key.replace(/^:/, '')))
+    .sort(([left], [right]) => left.localeCompare(right)))
   return digest(JSON.stringify({ file: field.file, kind: field.kind, tag: field.tag, name: field.name, label: field.label, conditions: field.conditions, attributes: semanticAttrs(field.attributes), form: field.form ? semanticAttrs(field.form) : null, controls: field.controls.map(control => ({ tag: control.tag, model: control.model, attributes: semanticAttrs(control.attributes) })) }))
 }
 const attrsOf = (node: ElementNode): Record<string, string> => Object.fromEntries(node.props.map(prop => {

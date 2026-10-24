@@ -545,7 +545,7 @@ const removeSelectedValue = (value: string) => {
 </script>
 
 <template>
-  <div class="space-y-2">
+  <div class="space-y-2" data-field-exclude="Composite control internals; configurable help belongs to the owning business field.">
     <div @keydown.enter.prevent.stop>
       <USelectMenu
         ref="selectMenuRef"

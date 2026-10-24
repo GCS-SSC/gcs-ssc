@@ -190,7 +190,7 @@ const deleteLine = async (line: AccountReceivableLine) => {
 </script>
 
 <template>
-  <div class="min-w-0 space-y-4" data-testid="account-receivable-lines">
+  <div class="min-w-0 space-y-4" data-testid="account-receivable-lines" data-field-tooltip-context="agreement" data-field-scope="account-receivable.detail-lines" data-scope-label-en="Agreements > Receivables > Lines" data-scope-label-fr="Ententes > Créances > Lignes">
     <CommonResourceLayoutCard
       v-model:search="search" v-model:pagination="pagination" :data="filtered" :columns="columns"
       :total-records="filtered.length" :pagination-options="{ manualPagination: false }"
@@ -228,7 +228,7 @@ const deleteLine = async (line: AccountReceivableLine) => {
           <p v-if="recodeMode" class="text-sm text-muted">
             {{ t('account_receivable.move_coding_instruction') }}
           </p>
-          <UFormField v-if="!selectedLineId && isAdjustment" name="egcs_fc_originalline" :label="t('account_receivable.source')" required>
+          <UFormField v-if="!selectedLineId && isAdjustment" name="egcs_fc_originalline" data-field-scope="account-receivable.detail-lines" data-scope-label-en="Agreements > Receivables > Adjustment lines" data-scope-label-fr="Ententes > Créances > Lignes d’ajustement" :label="t('account_receivable.source')" required>
             <CommonServerLookupSelect v-model="selected.egcs_fc_originalline" :fetch-url="`/api/account-receivables/${accountReceivableId}/lookups/sources`" selected-values-query-key="selectedIds" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :show-value-in-label="false" :disabled="isPending" close-on-select @resolved-items="resolveSource" />
           </UFormField>
           <UFormField v-else-if="!selectedLineId" name="egcs_fc_sourcekey" :label="t('account_receivable.source')" required>

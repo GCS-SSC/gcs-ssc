@@ -25,7 +25,7 @@ const columns: TableColumnInput<AgencyAttachmentTypeItem>[] = [
     :can-delete="canDelete"
     :schema="AgencyAttachmentTypeSchema"
     :initial-new-item="{}"
-    :columns="columns">
+    :columns="columns" data-field-scope="agency.attachment-types">
     <template #name-cell="{ row }">
       <CommonBilingualName :name-en="row.original.egcs_cn_name_en" :name-fr="row.original.egcs_cn_name_fr" />
     </template>

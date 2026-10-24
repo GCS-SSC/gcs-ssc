@@ -185,7 +185,7 @@ const remove = async (id: string): Promise<void> => {
 </script>
 
 <template>
-  <section class="space-y-4">
+  <section class="space-y-4" data-field-scope="funding-opportunity.attachment-types-tab">
     <UAlert
       v-if="mutationError"
       role="alert"
@@ -219,7 +219,7 @@ const remove = async (id: string): Promise<void> => {
             :required="false"
             :disabled="pending"
             :aria-label="t('funding_opportunity.internal_only_named', { name: label(row.original) })"
-            @update:model-value="value => setInternal(row.original.id, value)" />
+            data-ui-target="funding-opportunity.attachment-types-tab.row.original.egcs_fo_isinternal" @update:model-value="value => setInternal(row.original.id, value)" />
           <CommonActionButton
             v-if="canEdit"
             icon="i-lucide-unlink"
@@ -250,7 +250,7 @@ const remove = async (id: string): Promise<void> => {
               searchable
               @resolved-items="onResolvedType" />
           </UFormField>
-          <USwitch v-model="draft.egcs_fo_isinternal" :label="t('funding_opportunity.internal_only')" :description="t('funding_opportunity.internal_only_help')" :required="false" :disabled="pending" />
+          <USwitch v-model="draft.egcs_fo_isinternal" :label="t('funding_opportunity.internal_only')" :description="t('funding_opportunity.internal_only_help')" :required="false" :disabled="pending" data-ui-target="funding-opportunity.attachment-types-tab.draft.egcs_fo_isinternal" />
           <div class="flex justify-end gap-2">
             <UButton color="neutral" variant="ghost" :label="t('common.cancel')" :disabled="pending" @click="closeAdd" />
             <CommonSaveButton :label="t('common.add')" :loading="pending" :disabled="pending" />

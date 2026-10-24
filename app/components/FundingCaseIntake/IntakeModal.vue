@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { z } from 'zod'
 import { AttachmentMetadataBaseSchema, FundingCaseIntakeCreateSchema } from '~~/shared/types/schemas'
 import { MAX_ATTACHMENT_FILE_BYTES, MAX_ATTACHMENT_FILENAME_LENGTH } from '~~/shared/utils/attachment-limits'
@@ -30,6 +31,10 @@ export interface IntakeForm {
 const { pending = false, lockOpportunity = false } = defineProps<{ pending?: boolean; lockOpportunity?: boolean }>()
 const open = defineModel<boolean>('open', { default: false })
 const state = defineModel<IntakeForm>('state', { required: true })
+useFieldTooltipProvider(() => open.value && state.value.egcs_fi_fundingopportunity
+  ? { entityType: 'funding_case_intake_create', entityId: state.value.egcs_fi_fundingopportunity }
+  : null)
+
 const emit = defineEmits<{ submit: [] }>()
 const { t } = useI18n()
 const { createValidator } = useZodI18n()
@@ -116,7 +121,7 @@ watch([() => state.value.egcs_fi_fundingopportunity, open], async ([opportunityI
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="t(lockOpportunity ? 'funding_opportunity.add_application' : 'funding_case_intake.create')" :description="t('common.form_dialog_description')" :dismissible="!pending" :close="pending ? false : undefined" :ui="{ content: 'sm:max-w-4xl' }">
+  <UModal v-model:open="open" :title="t(lockOpportunity ? 'funding_opportunity.add_application' : 'funding_case_intake.create')" :description="t('common.form_dialog_description')" :dismissible="!pending" :close="pending ? false : undefined" :ui="{ content: 'sm:max-w-4xl' }" data-field-tooltip-context="intake" data-field-scope="funding-case-intake.intake-modal" data-scope-label-en="Intakes > General" data-scope-label-fr="Dossiers de demande > Général">
     <template #body>
       <UForm v-if="open" :state="state" :validate="validate" class="space-y-5" @submit="emit('submit')">
         <CommonSection :title="t('funding_case_intake.details')" :grid-cols="1">
@@ -146,21 +151,21 @@ watch([() => state.value.egcs_fi_fundingopportunity, open], async ([opportunityI
               </p>
               <CommonActionButton color="neutral" variant="ghost" icon="i-lucide-x" :aria-label="t('common.delete_named', { name: draft.file.name })" :disabled="pending" @click="removeFile(draft.key)" />
             </div>
-            <UFormField :label="t('attachments.type')" :name="`attachments.${index}.attachmentTypeId`" required>
+            <UFormField :label="t('attachments.type')" :name="`attachments.${index}.attachmentTypeId`" required data-ui-target="funding-case-intake.intake-modal.attachments.attachmentTypeId">
               <CommonServerLookupSelect v-if="state.egcs_fi_fundingopportunity" v-model="draft.attachmentTypeId" :disabled="pending" fetch-url="/api/funding-case-intakes/lookups/attachment-types" selected-values-query-key="ids" value-key="id" label-en-key="egcs_cn_name_en" label-fr-key="egcs_cn_name_fr" :show-value-in-label="false" :query="{ egcs_fi_fundingopportunity: state.egcs_fi_fundingopportunity }" close-on-select searchable class="w-full" />
               <USelectMenu v-else :items="[]" disabled :placeholder="t('funding_case_intake.select_opportunity_first')" />
             </UFormField>
             <div class="mt-4 grid gap-4 md:grid-cols-2">
-              <UFormField :label="t('attachments.name_en')" :name="`attachments.${index}.nameEn`" required>
+              <UFormField :label="t('attachments.name_en')" :name="`attachments.${index}.nameEn`" required data-ui-target="funding-case-intake.intake-modal.attachments.nameEn">
                 <UInput v-model="draft.nameEn" :disabled="pending" class="w-full" />
               </UFormField>
-              <UFormField :label="t('attachments.name_fr')" :name="`attachments.${index}.nameFr`" required>
+              <UFormField :label="t('attachments.name_fr')" :name="`attachments.${index}.nameFr`" required data-ui-target="funding-case-intake.intake-modal.attachments.nameFr">
                 <UInput v-model="draft.nameFr" :disabled="pending" class="w-full" />
               </UFormField>
-              <UFormField :label="t('attachments.description_en')" :name="`attachments.${index}.descriptionEn`" required>
+              <UFormField :label="t('attachments.description_en')" :name="`attachments.${index}.descriptionEn`" required data-ui-target="funding-case-intake.intake-modal.attachments.descriptionEn">
                 <CommonTextarea v-model="draft.descriptionEn" :disabled="pending" class="w-full" />
               </UFormField>
-              <UFormField :label="t('attachments.description_fr')" :name="`attachments.${index}.descriptionFr`" required>
+              <UFormField :label="t('attachments.description_fr')" :name="`attachments.${index}.descriptionFr`" required data-ui-target="funding-case-intake.intake-modal.attachments.descriptionFr">
                 <CommonTextarea v-model="draft.descriptionFr" :disabled="pending" class="w-full" />
               </UFormField>
             </div>

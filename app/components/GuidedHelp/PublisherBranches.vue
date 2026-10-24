@@ -2,7 +2,7 @@
 /* eslint-disable jsdoc/require-jsdoc -- Local declarative branch editor. */
 import { computed, ref, watch } from 'vue'
 import type { GuideDraft } from '@gcs-ssc/guided-help/contracts'
-import { guidedHelpLedger } from '~~/shared/guided-help/catalog'
+import { guidedHelpLedger } from '#ui-targets'
 
 const document = defineModel<GuideDraft>({ required: true })
 const open = defineModel<boolean>('open', { default: false })
@@ -69,7 +69,7 @@ const branchLabel = (branch: { target: string, equals: string | boolean }) => {
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="t('guided_help.manage_branches')" :description="t('guided_help.branch_hint')" :ui="{ content: 'sm:max-w-2xl' }">
+  <UModal v-model:open="open" :title="t('guided_help.manage_branches')" :description="t('guided_help.branch_hint')" :ui="{ content: 'sm:max-w-2xl' }" data-field-scope="guided-help.publisher-branches" data-field-tooltip-unavailable="No owning agency is resolved for this administration screen.">
     <template #body>
       <div class="space-y-6">
         <section v-if="branches.length" class="space-y-3">
@@ -88,13 +88,13 @@ const branchLabel = (branch: { target: string, equals: string | boolean }) => {
           <h3 class="font-semibold">
             {{ t(editing === null ? 'guided_help.add_branch' : 'guided_help.edit_branch') }}
           </h3>
-          <UFormField :label="t('guided_help.branch_field')" required>
+          <UFormField :label="t('guided_help.branch_field')" required data-ui-target="guided-help.publisher-branches.guided_help.branch_field">
             <USelect v-model="target" :items="fields.map(item => ({ value: item.key, label: label(item.label) }))" class="w-full" />
           </UFormField>
-          <UFormField :label="t('guided_help.branch_value')" required>
+          <UFormField :label="t('guided_help.branch_value')" required data-ui-target="guided-help.publisher-branches.guided_help.branch_value">
             <USelect v-model="value" :items="choices" class="w-full" />
           </UFormField>
-          <UFormField :label="t('guided_help.branch_destination')" required>
+          <UFormField :label="t('guided_help.branch_destination')" required data-ui-target="guided-help.publisher-branches.guided_help.branch_destination">
             <USelect v-model="destination" :items="destinations" class="w-full" />
           </UFormField>
           <UButton :label="t(editing === null ? 'guided_help.add_branch' : 'common.update')" icon="i-lucide-git-branch" color="neutral" variant="outline" @click="add" />
@@ -102,7 +102,7 @@ const branchLabel = (branch: { target: string, equals: string | boolean }) => {
         <p v-else-if="!fields.length" class="text-muted">
           {{ t('guided_help.no_branch_fields') }}
         </p>
-        <UFormField :label="t('guided_help.fallback_step')" :required="false" :description="t('guided_help.fallback_hint')">
+        <UFormField :label="t('guided_help.fallback_step')" :required="false" :description="t('guided_help.fallback_hint')" data-ui-target="guided-help.publisher-branches.guided_help.fallback_step">
           <USelect v-model="fallback" :items="destinations" :disabled="disabled" class="w-full" />
         </UFormField>
         <p v-if="error" role="alert" class="text-error">

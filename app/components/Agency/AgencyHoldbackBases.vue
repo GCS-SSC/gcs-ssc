@@ -31,7 +31,7 @@ const bilingualColumns: BilingualColumnConfig<AgencyHoldbackBasisItem>[] = [
     :schema="AgencyHoldbackBasisWriteSchema"
     :initial-new-item="{ egcs_ay_holdbackbasis: 'fullagreement' }"
     :columns="columns"
-    :bilingual-columns="bilingualColumns">
+    :bilingual-columns="bilingualColumns" data-field-scope="agency.holdback-bases">
     <template #egcs_ay_holdbackbasis-cell="{ row }">
       <CommonStatusBadge variant="meta" :label="t(`enums.holdback_bases.${row.original.egcs_ay_holdbackbasis}`)" />
     </template>

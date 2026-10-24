@@ -72,10 +72,10 @@ const bilingualColumns: BilingualColumnConfig<TransferPaymentProfileRow>[] = [
     :button-label="t('transfer_payment.new')"
     :show-button="canCreate"
     v-bind="$attrs"
-    @add="emit('add')"
-    @retry="emit('retry')">
+    data-field-scope="transfer-payment.profiles-table"
+    @add="emit('add')" @retry="emit('retry')">
     <template #filters>
-      <USelect v-model="statusFilter" :items="availabilityItems" :aria-label="t('common.status_filter')" class="min-w-40" />
+      <USelect v-model="statusFilter" :items="availabilityItems" :aria-label="t('common.status_filter')" class="min-w-40" data-ui-target="transfer-payment.profiles-table.statusFilter" />
     </template>
     <template #actions>
       <UButton

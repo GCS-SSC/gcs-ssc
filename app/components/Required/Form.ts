@@ -9,6 +9,7 @@ import { getFormValidatorSchema, resolveFormFieldRequirement } from '~~/shared/u
 import { formStateInjectionKey } from '@nuxt/ui/composables/useFormField'
 import { booleanAttribute } from '~/utils/required-control'
 import { fieldRequirementKey, formRequirementKey } from '~/utils/form-requirement-context'
+import { fieldScopeKey } from '~/utils/field-tooltip-context'
 
 /** Preserves Nuxt UI's form API and provides schema requirements to descendant fields. */
 export default defineComponent({
@@ -26,6 +27,10 @@ export default defineComponent({
   setup: (props, { attrs, slots, expose }) => {
     const parentRequirement = inject(formRequirementKey, undefined)
     const parentState = inject(formStateInjectionKey, undefined)
+    const parentFieldScope = inject(fieldScopeKey, undefined)
+    provide(fieldScopeKey, computed(() => typeof attrs['data-field-scope'] === 'string'
+      ? attrs['data-field-scope']
+      : parentFieldScope?.value))
     provide(fieldRequirementKey, computed(() => false))
     const nested = () => booleanAttribute(attrs.nested)
     const prefix = () => typeof attrs.name === 'string' || typeof attrs.name === 'number' ? String(attrs.name) : ''

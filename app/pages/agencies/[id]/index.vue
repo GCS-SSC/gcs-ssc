@@ -21,6 +21,7 @@ import AgencyRecommendationSets from '~/components/Agency/AgencyRecommendationSe
 import AgencyCostCategories from '~/components/Agency/AgencyCostCategories.vue'
 import AgencyFundingTypes from '~/components/Agency/AgencyFundingTypes.vue'
 import AgencyCustomFields from '~/components/Agency/AgencyCustomFields.vue'
+import AgencyFieldHelp from '~/components/Agency/AgencyFieldHelp.vue'
 import AgencyDetailGeneralTab from '~/components/Agency/AgencyDetailGeneralTab.vue'
 import AgencyFiscalYears from '~/components/Agency/AgencyFiscalYears.vue'
 import AgencyChartOfAccounts from '~/components/Agency/AgencyChartOfAccounts.vue'
@@ -56,7 +57,7 @@ const localePath = useLocalePath()
 const { showError } = useApiErrorToast()
 const route = useRoute()
 const id = route.params.id as string
-const { can } = useCan()
+const { can, permissionsReady } = useCan()
 provideBilingualFieldScope(() => ({ subject: 'agency', agencyId: id, permissionAction: 'update' }))
 
 const agencyScope = { type: 'agency' as const, agencyId: id }
@@ -75,6 +76,7 @@ const agencyResourceCapabilities = () => ({
 })
 
 const tabMap: TabMap = new Map([
+  ['fieldHelp', { key: 'field_tooltips.title', value: 'field-help', icon: 'i-lucide-message-circle-question-mark', component: AgencyFieldHelp, getProps: () => ({ agencyId: id }) }],
   ['general', { key: 'agency.tabs.general', icon: 'i-lucide-info', component: AgencyDetailGeneralTab, getProps: () => ({ agency: agency.value }) }],
   ['statuses', { key: 'agency.tabs.statuses', icon: 'i-lucide-tags', component: AgencyStatuses, getProps: () => ({ ...agencyResourceCapabilities(), showHeader: false }) }],
   ['customFields', { key: 'custom_fields.title', icon: 'i-lucide-list-filter', component: AgencyCustomFields, getProps: () => ({
@@ -223,7 +225,8 @@ const {
   activeTabComponent,
   activeTabProps
 } = useRouteTabMap({
-  tabMap,
+  tabMap: computed(() => new Map(Array.from(tabMap).filter(([key]) => key !== 'fieldHelp' || can('help', 'read', agencyScope)))),
+  enabled: permissionsReady,
   defaultTabId: 'general'
 })
 
@@ -248,7 +251,7 @@ const isHeroCollapsed = getHeroCollapsed('agency-detail')
       <div v-if="agency" class="flex flex-1 flex-col">
         <AgencyDetailHero :agency="agency" :is-collapsed="isHeroCollapsed" :can-update="canUpdateAgency" @edit="openUpdateModal" />
 
-        <CommonDetailWorkspace v-model="selectedTab" :items="routeTabs">
+        <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="routeTabs">
           <component :is="activeTabComponent" v-if="activeTabComponent" v-bind="activeTabProps" />
         </CommonDetailWorkspace>
       </div>

@@ -40,7 +40,7 @@ const importDefinition = () => {
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="t('review_schema_import.title')" :description="t('review_schema_import.description')" :ui="{ content: 'sm:max-w-4xl' }">
+  <UModal v-model:open="open" :title="t('review_schema_import.title')" :description="t('review_schema_import.description')" :ui="{ content: 'sm:max-w-4xl' }" data-field-scope="review-schema.import-modal">
     <template #body>
       <UForm v-if="state" :state="state" :validate="validate" class="space-y-4" @submit="importDefinition">
         <UFormField name="json" :label="t('review_schema_import.json')" required>

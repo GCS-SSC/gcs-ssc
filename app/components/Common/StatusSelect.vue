@@ -60,5 +60,5 @@ const items = computed(() => [
 </script>
 
 <template>
-  <USelectMenu v-model="model" :items="items" :loading="loading" :multiple="multiple" :disabled="disabled" value-key="value" searchable />
+  <USelectMenu v-model="model" :items="items" :loading="loading" :multiple="multiple" :disabled="disabled" value-key="value" searchable data-field-exclude="Composite control internals; configurable help belongs to the owning business field." />
 </template>

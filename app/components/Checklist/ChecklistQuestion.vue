@@ -59,6 +59,7 @@ const handleAnswer = (value: string | null) => {
 
 <template>
   <ReviewRuntimeQuestionCard
+    data-field-exclude="Authored runtime questions retain their own help and are outside static field help."
     :question-label="questionLabel"
     :question-number="number"
     :question-required="question.required && !disabled"

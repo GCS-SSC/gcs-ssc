@@ -139,7 +139,7 @@ const getApplicantRecipientLookupUrl = (state: FundingCaseAgreementApplicantReci
     :show-button="canCreate"
     :modal-title="t('agreement.applicant_recipients.add')"
     :update-title="t('agreement.applicant_recipients.edit')"
-    :search-placeholder="t('agreement.applicant_recipients.search')">
+    :search-placeholder="t('agreement.applicant_recipients.search')" data-field-tooltip-context="agreement" data-field-scope="agreement.applicant-recipients-tab" data-scope-label-en="Agreements > Proponents" data-scope-label-fr="Ententes > Promoteurs">
     <template #subtype-cell="{ row }">
       {{ getBilingualValue(row.original, 'subtype_name', t('agreement.applicant_recipients.not_selected')) }}
     </template>
@@ -181,12 +181,14 @@ const getApplicantRecipientLookupUrl = (state: FundingCaseAgreementApplicantReci
       </UFormField>
       <AgreementProponentTypeField
         v-model="(state as FundingCaseAgreementApplicantRecipientForm).egcs_fc_applicantrecipientsubtype"
+        data-field-container="Composite editor; its individual field declarations own their identities."
         :proponent-id="(state as FundingCaseAgreementApplicantRecipientForm).egcs_fc_applicantrecipient"
         :agreement-id="agreementId"
         :permission-action="state.id ? 'update' : 'create'" />
       <AgreementFinancialIdField
         :key="`${agreementId}:${state.id ?? 'create'}`"
         v-model="(state as FundingCaseAgreementApplicantRecipientForm).egcs_fc_agencyfinancialid"
+        data-field-container="Composite editor; its individual field declarations own their identities."
         :proponent-id="(state as FundingCaseAgreementApplicantRecipientForm).egcs_fc_applicantrecipient"
         :agreement-id="agreementId"
         :relationship-id="state.id"

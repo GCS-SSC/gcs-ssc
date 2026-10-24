@@ -56,7 +56,7 @@ const getOptionKey = (option: AssessmentOutcomeOptionRow) => option._key
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6" data-field-scope="assessment-schema.mitigation-fields">
     <div class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
       <UFormField :label="t('transfer_payment.language_independent_code')" name="outcome.name" required>
         <UInput v-model="outcome.name" />
@@ -85,7 +85,7 @@ const getOptionKey = (option: AssessmentOutcomeOptionRow) => option._key
           :title="getStrategyTitle(strategy, strategyIndex)">
           <div class="space-y-6">
             <div class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
-              <UFormField :label="t('transfer_payment.language_independent_code')" :name="`outcome.strategies.${strategyIndex}.name`" required>
+              <UFormField :label="t('transfer_payment.language_independent_code')" :name="`outcome.strategies.${strategyIndex}.name`" required data-ui-target="assessment-schema.mitigation-fields.outcome.strategies.name">
                 <UInput v-model="strategy.name" />
               </UFormField>
               <div class="flex items-end">
@@ -103,10 +103,10 @@ const getOptionKey = (option: AssessmentOutcomeOptionRow) => option._key
             </div>
 
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <UFormField :label="t('transfer_payment.name_en')" :name="`outcome.strategies.${strategyIndex}.label.en`" required>
+              <UFormField :label="t('transfer_payment.name_en')" :name="`outcome.strategies.${strategyIndex}.label.en`" required data-ui-target="assessment-schema.mitigation-fields.outcome.strategies.label.en">
                 <UInput v-model="strategy.label.en" />
               </UFormField>
-              <UFormField :label="t('transfer_payment.name_fr')" :name="`outcome.strategies.${strategyIndex}.label.fr`" required>
+              <UFormField :label="t('transfer_payment.name_fr')" :name="`outcome.strategies.${strategyIndex}.label.fr`" required data-ui-target="assessment-schema.mitigation-fields.outcome.strategies.label.fr">
                 <UInput v-model="strategy.label.fr" />
               </UFormField>
             </div>
@@ -122,10 +122,10 @@ const getOptionKey = (option: AssessmentOutcomeOptionRow) => option._key
                   :key="getOptionKey(option)"
                   class="border-default space-y-4 border-t pt-4">
                   <div class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-                    <UFormField :label="t('common.max')" :name="`outcome.strategies.${strategyIndex}.options.${optionIndex}.max`">
+                    <UFormField :label="t('common.max')" :name="`outcome.strategies.${strategyIndex}.options.${optionIndex}.max`" data-ui-target="assessment-schema.mitigation-fields.outcome.strategies.options.max">
                       <UInput v-model.number="option.max" type="number" />
                     </UFormField>
-                    <UFormField :label="t('common.value')" :name="`outcome.strategies.${strategyIndex}.options.${optionIndex}.value`">
+                    <UFormField :label="t('common.value')" :name="`outcome.strategies.${strategyIndex}.options.${optionIndex}.value`" data-ui-target="assessment-schema.mitigation-fields.outcome.strategies.options.value">
                       <UInput v-model="option.value" />
                     </UFormField>
                     <div class="flex items-end">
@@ -145,10 +145,10 @@ const getOptionKey = (option: AssessmentOutcomeOptionRow) => option._key
                   </div>
 
                   <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <UFormField :label="t('transfer_payment.name_en')" :name="`outcome.strategies.${strategyIndex}.options.${optionIndex}.label.en`">
+                    <UFormField :label="t('transfer_payment.name_en')" :name="`outcome.strategies.${strategyIndex}.options.${optionIndex}.label.en`" data-ui-target="assessment-schema.mitigation-fields.outcome.strategies.options.label.en">
                       <UInput v-model="option.label.en" />
                     </UFormField>
-                    <UFormField :label="t('transfer_payment.name_fr')" :name="`outcome.strategies.${strategyIndex}.options.${optionIndex}.label.fr`">
+                    <UFormField :label="t('transfer_payment.name_fr')" :name="`outcome.strategies.${strategyIndex}.options.${optionIndex}.label.fr`" data-ui-target="assessment-schema.mitigation-fields.outcome.strategies.options.label.fr">
                       <UInput v-model="option.label.fr" />
                     </UFormField>
                   </div>

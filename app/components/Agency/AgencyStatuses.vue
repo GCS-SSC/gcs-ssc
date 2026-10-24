@@ -172,7 +172,7 @@ const setDeleted = async (definition: StatusDefinition, deleted: boolean) => {
 </script>
 
 <template>
-  <section class="space-y-4">
+  <section class="space-y-4" data-field-scope="agency.statuses">
     <div class="flex items-center justify-between">
       <div>
         <h2 v-if="showHeader" class="text-xl font-semibold">
@@ -231,10 +231,10 @@ const setDeleted = async (definition: StatusDefinition, deleted: boolean) => {
         </p>
       </div>
       <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <UFormField :label="t('agency.statuses.reconciliation_start_status')">
+        <UFormField :label="t('agency.statuses.reconciliation_start_status')" data-ui-target="agency.statuses.agency.statuses.reconciliation_start_status">
           <CommonStatusSelect v-model="reconciliationStatuses.startStatusId" :agency-id="agencyId" allow-empty :empty-label="t('workflow.no_change')" :disabled="!canEdit" class="w-full" />
         </UFormField>
-        <UFormField :label="t('agency.statuses.reconciliation_final_status')">
+        <UFormField :label="t('agency.statuses.reconciliation_final_status')" data-ui-target="agency.statuses.agency.statuses.reconciliation_final_status">
           <CommonStatusSelect v-model="reconciliationStatuses.finalStatusId" :agency-id="agencyId" allow-empty :empty-label="t('workflow.no_change')" :disabled="!canEdit" class="w-full" />
         </UFormField>
       </div>
@@ -296,7 +296,7 @@ const setDeleted = async (definition: StatusDefinition, deleted: boolean) => {
             </UBadge>
           </div>
 
-          <UFormField v-if="canManageFlags" :label="t('agency.statuses.lifecycle')">
+          <UFormField v-if="canManageFlags" :label="t('agency.statuses.lifecycle')" data-ui-target="agency.statuses.agency.statuses.lifecycle">
             <URadioGroup v-model="lifecycle" :items="lifecycleOptions" variant="card" />
           </UFormField>
           <UAlert

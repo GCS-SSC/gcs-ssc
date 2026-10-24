@@ -37,7 +37,7 @@ const onSubmit = () => {
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="title" :description="t('common.form_dialog_description')" :ui="{ content: 'sm:max-w-4xl' }">
+  <UModal v-model:open="open" :title="title" :description="t('common.form_dialog_description')" :ui="{ content: 'sm:max-w-4xl' }" data-field-scope="transfer-payment.modal">
     <template #body>
       <UForm v-if="open" :state="state" :validate="validate" class="space-y-4" @submit="onSubmit">
         <TransferPaymentFieldsTransferPaymentProfileFields

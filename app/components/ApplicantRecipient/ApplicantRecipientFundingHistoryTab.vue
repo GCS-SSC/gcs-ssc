@@ -194,7 +194,7 @@ const visibleRows = computed(() => items.value)
 </script>
 
 <template>
-  <div class="w-full min-w-0 max-w-full space-y-4 overflow-hidden">
+  <div class="w-full min-w-0 max-w-full space-y-4 overflow-hidden" data-field-scope="applicant-recipient.funding-history-tab">
     <div class="flex items-start gap-3 rounded-lg border border-zinc-200 bg-zinc-50/70 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/40">
       <UIcon name="i-lucide-history" class="mt-0.5 size-5 shrink-0 text-zinc-500" />
       <p class="text-sm leading-6 text-zinc-600 dark:text-zinc-400">
@@ -218,7 +218,7 @@ const visibleRows = computed(() => items.value)
       @add="openCreate"
       @retry="refresh">
       <template #filters>
-        <CommonAssignedListViewSelect v-if="canFilterAgreements" v-model="listView" resource="agreement" />
+        <CommonAssignedListViewSelect v-if="canFilterAgreements" v-model="listView" data-field-label-en="List view" data-field-label-fr="Vue de la liste" resource="agreement" data-ui-target="applicant-recipient.funding-history-tab.listView" />
       </template>
       <template #source-cell="{ row }">
         <CommonStatusBadge

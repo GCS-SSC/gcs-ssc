@@ -23,6 +23,7 @@ const prependItems = computed(() => originalId
 
 <template>
   <CommonServerLookupSelect
+    data-field-label-en="Proponent" data-field-label-fr="Promoteur"
     :model-value="state.egcs_fc_applicantrecipient"
     :fetch-url="fetchUrl"
     :prepend-items="prependItems"
@@ -31,5 +32,5 @@ const prependItems = computed(() => originalId
     label-fr-key="label_fr"
     searchable
     :aria-label="label"
-    @update:model-value="value => emit('update:modelValue', value as string | undefined)" />
+    data-ui-target="agreement.proponent-lookup-field.state.egcs_fc_applicantrecipient" data-field-tooltip-context="agreement" data-field-scope="agreement.proponent-lookup-field" data-scope-label-en="Agreements > Proponents" data-scope-label-fr="Ententes > Promoteurs" @update:model-value="value => emit('update:modelValue', value as string | undefined)" />
 </template>

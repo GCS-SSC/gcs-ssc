@@ -38,7 +38,7 @@ const onSubmit = () => {
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="title">
+  <UModal v-model:open="open" :title="title" data-field-scope="role.modal" data-field-tooltip-unavailable="No owning agency is resolved for this administration screen.">
     <template #body>
       <UForm :state="state" :validate="validate" class="space-y-4" @submit="onSubmit">
         <UFormField :label="t('role.scope.label')" name="agency_id">

@@ -749,7 +749,7 @@ const handleApprovalChanged = async () => {
 </script>
 
 <template>
-  <section v-if="shouldRenderSection" ref="helpRoot" :data-help-context="JSON.stringify(helpContext)" :data-help-runtime-id="data?.current?.runtimeId" :data-help-workflow-step-id="selectedStepId" class="min-w-0 space-y-6" :aria-label="t('workflow.title')">
+  <section v-if="shouldRenderSection" ref="helpRoot" :data-help-context="JSON.stringify(helpContext)" :data-help-runtime-id="data?.current?.runtimeId" :data-help-workflow-step-id="selectedStepId" class="min-w-0 space-y-6" :aria-label="t('workflow.title')" data-field-tooltip-context="agreement-or-intake" data-field-scope="common.workflow.section" data-scope-label-en="Agreements or Intakes > Workflows" data-scope-label-fr="Ententes ou dossiers de demande > Processus">
     <div v-if="status === 'success' && purpose === 'standard' && activeWorkflowTab !== 'previous' && canShowParentAction && (roleVisibleActions || (!hasActiveWorkflow && data?.canStart))" class="flex justify-end">
       <UButton
         icon="i-lucide-plus"
@@ -795,6 +795,7 @@ const handleApprovalChanged = async () => {
     <CommonTranslatedTabs
       v-if="data?.current || data?.previous?.length"
       v-model="activeWorkflowTab"
+      data-field-container="Page navigation state, not a business input field."
       :items="[{ key: 'workflow.current', value: 'current' }, { key: 'workflow.previous', value: 'previous' }]"
       orientation="horizontal" />
     <CommonSelectableTable
@@ -916,7 +917,7 @@ const handleApprovalChanged = async () => {
       <div v-if="data.current.runtimeState === 'paused'" class="space-y-4 rounded-lg border border-warning/40 bg-warning/5 p-4">
         <UAlert color="warning" icon="i-lucide-pause-circle" :title="t('workflow.owner_pause_title')" :description="t(data.canResumeOwners ? 'workflow.owner_pause_help' : 'workflow.owner_pause_readonly_help')" />
         <template v-if="data.canResumeOwners">
-          <UFormField v-for="blocker in data.ownerBlockers?.filter(item => !item.egcs_cn_resolvedat)" :key="blocker.id" :label="t('workflow.replacement_owner')" required :error="resumeAttempted && !replacementOwners[blocker.id] ? t('validation.required') : undefined">
+          <UFormField v-for="blocker in data.ownerBlockers?.filter(item => !item.egcs_cn_resolvedat)" :key="blocker.id" :label="t('workflow.replacement_owner')" required :error="resumeAttempted && !replacementOwners[blocker.id] ? t('validation.required') : undefined" data-ui-target="common.workflow.section.workflow.replacement_owner">
             <CommonServerLookupSelect
               v-model="replacementOwners[blocker.id]"
               :fetch-url="ownerCandidatesUrl"

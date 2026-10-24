@@ -28,7 +28,7 @@ const initialNewItem = { ...AgencyApprovalBehalfTypeInitial }
     :can-delete="canDelete"
     :schema="AgencyApprovalBehalfTypeSchema"
     :initial-new-item="initialNewItem"
-    :columns="columns">
+    :columns="columns" data-field-scope="agency.approval-behalf-types">
     <template #name-cell="{ row }">
       <CommonBilingualName :name-en="row.original.egcs_ay_name_en" :name-fr="row.original.egcs_ay_name_fr" />
     </template>

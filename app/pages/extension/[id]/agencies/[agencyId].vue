@@ -132,7 +132,8 @@ const { selectedTab } = useUrlTabState({
           <CommonEntityEditorWorkspace content-test-id="extension-agency-workspace-content">
             <template #sidebar>
               <CommonRouteTabs
-                v-model="selectedTab" :items="tabs" :external-panel-id="workspacePanelId" orientation="vertical"
+                v-model="selectedTab"
+                data-field-container="Page navigation state, not a business input field." :items="tabs" :external-panel-id="workspacePanelId" orientation="vertical"
                 :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
             </template>
             <component

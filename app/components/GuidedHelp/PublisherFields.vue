@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import type { GuideDraft, GuideStep } from '@gcs-ssc/guided-help/contracts'
 import { guidedHelpJourneys } from '~~/shared/guided-help/journeys'
-import { guidedHelpLedger } from '~~/shared/guided-help/catalog'
+import { guidedHelpLedger } from '#ui-targets'
 
 const document = defineModel<GuideDraft>({ required: true })
 const selectedStep = defineModel<string>('selectedStep', { default: '' })
@@ -94,7 +94,7 @@ const chooseTarget = (key: string) => {
 </script>
 
 <template>
-  <div class="min-w-0 space-y-8" data-testid="help-publisher-fields">
+  <div class="min-w-0 space-y-8" data-testid="help-publisher-fields" data-field-scope="guided-help.publisher-fields" data-field-tooltip-unavailable="No owning agency is resolved for this administration screen.">
     <fieldset v-if="section === 'general'" :disabled="disabled" class="space-y-8">
       <p class="text-sm text-muted">
         {{ t('guided_help.publication_required') }}
@@ -104,10 +104,10 @@ const chooseTarget = (key: string) => {
           <h3 class="text-base font-semibold">
             {{ t(`guided_help.language_${language}`) }}
           </h3>
-          <UFormField :label="t('guided_help.field_title')" :required="false" :name="`title.${language}`" :hint="t('guided_help.required_for_publication')">
+          <UFormField :label="t('guided_help.field_title')" :required="false" :name="`title.${language}`" :hint="t('guided_help.required_for_publication')" data-ui-target="guided-help.publisher-fields.title">
             <UInput v-model="document.title[language]" :lang="language" :maxlength="255" class="w-full" :data-testid="`help-title-${language}`" />
           </UFormField>
-          <UFormField :label="t('guided_help.field_description')" :required="false" :name="`description.${language}`" :hint="t('guided_help.required_for_publication')">
+          <UFormField :label="t('guided_help.field_description')" :required="false" :name="`description.${language}`" :hint="t('guided_help.required_for_publication')" data-ui-target="guided-help.publisher-fields.description">
             <UTextarea v-model="document.description[language]" :lang="language" :maxlength="4000" :rows="4" class="w-full" />
           </UFormField>
         </section>
@@ -123,22 +123,22 @@ const chooseTarget = (key: string) => {
     <template v-else>
       <fieldset v-if="step" :disabled="disabled" class="space-y-8">
         <div class="grid gap-5 md:grid-cols-2">
-          <UFormField v-if="document.journey" :label="t('guided_help.journey_stage')" required name="journey">
+          <UFormField v-if="document.journey" :label="t('guided_help.journey_stage')" required name="journey" data-ui-target="guided-help.publisher-fields.journey-stage">
             <USelect :model-value="stageId" :items="stageOptions" class="w-full" @update:model-value="chooseStage(String($event))" />
           </UFormField>
-          <UFormField v-if="registeredStage?.kind === 'tasks'" :label="t('guided_help.journey_template')" :required="false" name="journey">
+          <UFormField v-if="registeredStage?.kind === 'tasks'" :label="t('guided_help.journey_template')" :required="false" name="journey" data-ui-target="guided-help.publisher-fields.journey-template">
             <USelect :model-value="templateKey || 'generic'" :items="templateOptions" class="w-full" @update:model-value="chooseStage(stageId, $event === 'generic' ? '' : String($event))" />
           </UFormField>
-          <UFormField :label="t('guided_help.screen')" :required="false" :hint="t('guided_help.required_for_publication')">
+          <UFormField :label="t('guided_help.screen')" :required="false" :hint="t('guided_help.required_for_publication')" data-ui-target="guided-help.publisher-fields.guided_help.screen">
             <USelect :model-value="step.view" :items="views" class="w-full" @update:model-value="chooseView(String($event))" />
           </UFormField>
-          <UFormField :label="t('guided_help.control')" :required="false" :hint="t('guided_help.required_for_publication')">
+          <UFormField :label="t('guided_help.control')" :required="false" :hint="t('guided_help.required_for_publication')" data-ui-target="guided-help.publisher-fields.guided_help.control">
             <USelect :model-value="step.target" :items="targets" class="w-full" @update:model-value="chooseTarget(String($event))" />
           </UFormField>
-          <UFormField :label="t('guided_help.progression')" :required="false" :description="t('guided_help.progression_hint')">
+          <UFormField :label="t('guided_help.progression')" :required="false" :description="t('guided_help.progression_hint')" data-ui-target="guided-help.publisher-fields.guided_help.progression">
             <USelect :model-value="step.advanceOn ?? 'completion'" :items="progressionOptions" class="w-full" @update:model-value="changeStep({ advanceOn: $event as 'completion' | 'manual' })" />
           </UFormField>
-          <UFormField :label="t('guided_help.appearance')" :required="false" :description="t('guided_help.appearance_hint')">
+          <UFormField :label="t('guided_help.appearance')" :required="false" :description="t('guided_help.appearance_hint')" data-ui-target="guided-help.publisher-fields.guided_help.appearance">
             <USelect :model-value="step.appearance ?? 'spotlight'" :items="appearanceOptions" class="w-full" @update:model-value="chooseAppearance(String($event))" />
           </UFormField>
           <div v-if="!disabled" class="flex items-start pt-6">
@@ -150,10 +150,10 @@ const chooseTarget = (key: string) => {
             <h3 class="text-base font-semibold">
               {{ t(`guided_help.language_${language}`) }}
             </h3>
-            <UFormField :label="t('guided_help.field_title')" :required="false" :name="`steps.${stepIndex}.title.${language}`" :hint="t('guided_help.required_for_publication')">
+            <UFormField :label="t('guided_help.field_title')" :required="false" :name="`steps.${stepIndex}.title.${language}`" :hint="t('guided_help.required_for_publication')" data-ui-target="guided-help.publisher-fields.steps.title">
               <UInput v-model="step.title[language]" :data-testid="`help-step-title-${language}`" :lang="language" :maxlength="255" class="w-full" />
             </UFormField>
-            <UFormField :label="t('guided_help.instructions')" :required="false" :name="`steps.${stepIndex}.instructions.${language}`" :hint="t('guided_help.required_for_publication')" :description="t('guided_help.markdown_hint')">
+            <UFormField :label="t('guided_help.instructions')" :required="false" :name="`steps.${stepIndex}.instructions.${language}`" :hint="t('guided_help.required_for_publication')" :description="t('guided_help.markdown_hint')" data-ui-target="guided-help.publisher-fields.steps.instructions">
               <UTextarea v-model="step.instructions[language]" :data-testid="`help-step-instructions-${language}`" :lang="language" :maxlength="8000" :rows="7" class="w-full" />
             </UFormField>
           </section>

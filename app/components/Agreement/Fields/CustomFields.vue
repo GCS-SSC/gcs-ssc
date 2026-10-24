@@ -50,7 +50,7 @@ const update = (id: string, value: unknown) => {
 </script>
 
 <template>
-  <div class="space-y-8">
+  <div class="space-y-8" data-field-exclude="Agency-defined custom inputs have separate configuration; outside static field help.">
     <UAlert v-if="error" color="error" :title="t('common.error')">
       <template #actions>
         <UButton :label="t('common.retry')" @click="refresh()" />

@@ -170,7 +170,7 @@ const saveLinks = async (row: SetupRow, action: 'associate' | 'disassociate') =>
     :total-records="filteredLinkedRows.length"
     :show-button="canEdit"
     :button-label="t('common.add')"
-    @add="openAssociation">
+    data-field-scope="funding-opportunity.setup-relationships-tab" @add="openAssociation">
     <template #name-cell="{ row }">
       <CommonBilingualName :name-en="row.original.label_en" :name-fr="row.original.label_fr" />
     </template>
@@ -195,10 +195,10 @@ const saveLinks = async (row: SetupRow, action: 'associate' | 'disassociate') =>
     :open="draft !== null"
     :title="t(kind === 'review' ? 'funding_opportunity.review_setups' : 'funding_opportunity.workflow_setups')"
     :description="t('funding_opportunity.available_setups')"
-    @update:open="value => { if (!value) closeAssociation() }">
+    data-field-scope="funding-opportunity.setup-relationships-tab" @update:open="value => { if (!value) closeAssociation() }">
     <template #body>
       <UForm v-if="draft" :state="draft" :validate="createValidator(LinkSchema)" class="space-y-4" @submit="associate">
-        <UFormField :label="t(kind === 'review' ? 'funding_opportunity.review_setups' : 'funding_opportunity.workflow_setups')" name="id" required>
+        <UFormField data-field-label-en="Review or workflow setup" data-field-label-fr="Configuration de révision ou de flux de travail" :label="t(kind === 'review' ? 'funding_opportunity.review_setups' : 'funding_opportunity.workflow_setups')" name="id" required>
           <CommonServerLookupSelect
             v-model="draft.id"
             fetch-url="/api/funding-opportunities/lookups/setups"

@@ -44,12 +44,13 @@ const hasAfterContent = computed(() =>
 <template>
   <template v-if="!hasAfterContent">
     <UTextarea
+      data-field-exclude="Composite control internals; configurable help belongs to the owning business field."
       :model-value="modelValue ?? ''"
       v-bind="attrs"
       @update:model-value="value => emit('update:modelValue', value)" />
   </template>
 
-  <div v-else class="space-y-2">
+  <div v-else class="space-y-2" data-field-exclude="Composite control internals; configurable help belongs to the owning business field.">
     <UTextarea
       :model-value="modelValue ?? ''"
       v-bind="attrs"

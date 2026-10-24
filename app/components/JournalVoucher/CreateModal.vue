@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { ref } from 'vue'
 import type { Ref } from 'vue'
 import { JournalVoucherCreateSchema } from '~~/shared/types/schemas/journal-voucher'
@@ -11,6 +12,10 @@ const { showError } = useApiErrorToast()
 const { sendJson } = useJsonRequest()
 const state: Ref<{ egcs_fc_payment: string; egcs_fc_requesteddate: string; egcs_fc_narrative_en: string; egcs_fc_narrative_fr: string } | null> = ref(null)
 const pending: Ref<boolean> = ref(false)
+useFieldTooltipProvider(() => open.value && state.value?.egcs_fc_payment
+  ? { entityType: 'fundingcasepayment', entityId: state.value.egcs_fc_payment }
+  : null)
+
 watch(open, value => {
   state.value = value ? { egcs_fc_payment: '', egcs_fc_requesteddate: new Date().toISOString().slice(0, 10), egcs_fc_narrative_en: '', egcs_fc_narrative_fr: '' } : null
 })
@@ -31,7 +36,7 @@ const save = async () => {
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="t('journal_voucher.create')" :description="t('journal_voucher.description')" :ui="{ content: 'sm:max-w-2xl' }">
+  <UModal v-model:open="open" :title="t('journal_voucher.create')" :description="t('journal_voucher.description')" :ui="{ content: 'sm:max-w-2xl' }" data-field-tooltip-context="agreement" data-field-scope="journal-voucher.create-modal" data-scope-label-en="Agreements > Journal Vouchers > Create" data-scope-label-fr="Ententes > Pièces de journal > Créer">
     <template #body>
       <UForm v-if="state" :state="state" :validate="createValidator(JournalVoucherCreateSchema)" class="space-y-4" @submit="save">
         <UFormField name="egcs_fc_payment" :label="t('journal_voucher.source_payment')">

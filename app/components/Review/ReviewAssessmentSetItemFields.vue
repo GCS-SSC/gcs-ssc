@@ -48,7 +48,7 @@ const reviewSchemaQuery = computed(() => ({
 </script>
 
 <template>
-  <div :class="stackedLayout ? 'space-y-4' : 'grid grid-cols-1 gap-4 md:grid-cols-2'">
+  <div :class="stackedLayout ? 'space-y-4' : 'grid grid-cols-1 gap-4 md:grid-cols-2'" data-field-scope="review.assessment-set-item-fields">
     <UFormField :label="t('common.order')" name="egcs_cn_order">
       <UInput
         type="number"
@@ -78,5 +78,5 @@ const reviewSchemaQuery = computed(() => ({
     label-en-key="egcs_cn_name_en"
     label-fr-key="egcs_cn_name_fr"
     :query="reviewSchemaQuery"
-    @update:model-value="value => (state.egcs_cn_reviewschema = value)" />
+    data-field-scope="review.assessment-set-item-fields" @update:model-value="value => (state.egcs_cn_reviewschema = value)" />
 </template>

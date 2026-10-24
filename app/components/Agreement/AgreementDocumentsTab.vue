@@ -237,7 +237,7 @@ const deleteDocument = async (generatedDocument: AgreementGeneratedDocumentItem)
 </script>
 
 <template>
-  <div class="w-full">
+  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.documents-tab" data-scope-label-en="Agreements > Documents" data-scope-label-fr="Ententes > Documents">
     <UAlert
       v-if="templatesStatus === 'error'"
       color="error"

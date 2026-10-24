@@ -20,7 +20,7 @@ const onLocaleToggle = (value: boolean | 'indeterminate') => {
 </script>
 
 <template>
-  <div class="mr-2 flex items-center gap-3">
+  <div class="mr-2 flex items-center gap-3" data-field-scope="common.navbar-side">
     <CommonActionButton
       :icon="isDark ? 'i-lucide-sun' : 'i-lucide-moon'"
       :aria-label="themeToggleLabel"
@@ -42,7 +42,7 @@ const onLocaleToggle = (value: boolean | 'indeterminate') => {
         size="sm"
         color="primary"
         class="scale-90"
-        @update:model-value="onLocaleToggle" />
+        data-ui-target="common.navbar-side.isFrench" @update:model-value="onLocaleToggle" />
       <span
         class="text-xs font-black tracking-widest uppercase"
         :class="isFrench ? 'text-primary dark:text-blue-300' : 'text-zinc-600 dark:text-zinc-400'">

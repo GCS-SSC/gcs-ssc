@@ -111,7 +111,7 @@ const onEndDateInput = (value: string | Date | null | undefined) => {
 </script>
 
 <template>
-  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }">
+  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }" data-field-scope="transfer-payment.fields.profile-fields">
     <UFormField :label="t('transfer_payment.agency')" :name="field('egcs_tp_agency')">
       <CommonServerLookupSelect
         v-model="model.egcs_tp_agency"
@@ -140,7 +140,7 @@ const onEndDateInput = (value: string | Date | null | undefined) => {
     </div>
   </div>
 
-  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }">
+  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }" data-field-scope="transfer-payment.fields.profile-fields">
     <UFormField :label="t('transfer_payment.name_en')" :name="field('egcs_tp_name_en')">
       <UInput v-model="model.egcs_tp_name_en" />
     </UFormField>
@@ -149,7 +149,7 @@ const onEndDateInput = (value: string | Date | null | undefined) => {
     </UFormField>
   </div>
 
-  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }">
+  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }" data-field-scope="transfer-payment.fields.profile-fields">
     <UFormField :label="t('transfer_payment.abbreviation_en')" :name="field('egcs_tp_abbreviation_en')">
       <UInput v-model="model.egcs_tp_abbreviation_en" />
     </UFormField>
@@ -158,7 +158,7 @@ const onEndDateInput = (value: string | Date | null | undefined) => {
     </UFormField>
   </div>
 
-  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }">
+  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }" data-field-scope="transfer-payment.fields.profile-fields">
     <UFormField :label="t('transfer_payment.terms_link_en')" :name="field('egcs_tp_tclink_en')">
       <UInput v-model="model.egcs_tp_tclink_en" type="url" placeholder="https://..." />
     </UFormField>
@@ -167,7 +167,7 @@ const onEndDateInput = (value: string | Date | null | undefined) => {
     </UFormField>
   </div>
 
-  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }">
+  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }" data-field-scope="transfer-payment.fields.profile-fields">
     <UFormField :label="t('transfer_payment.description_en')" :name="field('egcs_tp_description_en')">
       <CommonTextarea v-model="model.egcs_tp_description_en" :rows="3" />
     </UFormField>
@@ -176,7 +176,7 @@ const onEndDateInput = (value: string | Date | null | undefined) => {
     </UFormField>
   </div>
 
-  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }">
+  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }" data-field-scope="transfer-payment.fields.profile-fields">
     <UFormField :label="t('transfer_payment.purpose_en')" :name="field('egcs_tp_purpose_en')">
       <CommonTextarea v-model="model.egcs_tp_purpose_en" :rows="3" />
     </UFormField>

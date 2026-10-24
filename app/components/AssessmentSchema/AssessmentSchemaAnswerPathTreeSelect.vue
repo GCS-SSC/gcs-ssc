@@ -99,6 +99,7 @@ const handleSelection = (item: TreeItem | undefined) => {
         <div class="max-h-[28rem] overflow-y-auto rounded-lg border border-zinc-200 p-2 dark:border-zinc-800">
           <UTree
             :id="treeId"
+            data-field-container="Composite editor; its individual field declarations own their identities."
             :aria-label="label || placeholder"
             :items="treeItems"
             :model-value="undefined"

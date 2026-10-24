@@ -82,8 +82,8 @@ const remove = async (item: TransferPaymentStreamDocumentTemplateItem) => {
     :request-status="status"
     :button-label="canUpdateChild ? t('common.add') : undefined"
     :show-button="canUpdateChild"
-    @add="openCreate"
-    @retry="refresh">
+    data-field-scope="transfer-payment.document-templates-tab"
+    @add="openCreate" @retry="refresh">
     <template #name-cell="{ row }">
       <CommonBilingualName :name-en="row.original.egcs_ay_name_en" :name-fr="row.original.egcs_ay_name_fr" />
     </template>
@@ -100,7 +100,7 @@ const remove = async (item: TransferPaymentStreamDocumentTemplateItem) => {
         @click="remove(row.original)" />
     </template>
   </CommonResourceLayoutCard>
-  <UModal v-if="selected" v-model:open="isOpen" :title="t('transfer_payment.document_templates.create')" :description="t('common.form_dialog_description')">
+  <UModal v-if="selected" v-model:open="isOpen" :title="t('transfer_payment.document_templates.create')" :description="t('common.form_dialog_description')" data-field-scope="transfer-payment.document-templates-tab">
     <template #body>
       <UForm :state="selected" :validate="validate" class="space-y-4" @submit="save">
         <UFormField :label="t('transfer_payment.document_templates.title')" name="egcs_tp_agencydocumenttemplate" required>

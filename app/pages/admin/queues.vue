@@ -186,7 +186,7 @@ onBeforeUnmount(clear)
 </script>
 
 <template>
-  <UDashboardPanel id="admin-queues">
+  <UDashboardPanel id="admin-queues" data-field-scope="admin.queues">
     <template #header>
       <UDashboardNavbar :title="t('queues.title')">
         <template #leading>
@@ -228,9 +228,9 @@ onBeforeUnmount(clear)
             :expanded="Object.fromEntries(expanded.map(id => [id, true]))"
             @retry="refreshSnapshot">
             <template #filters>
-              <USelect v-model="owner" :required="false" :aria-label="t('queues.owner')" :aria-required="false" :items="ownerItems" class="min-w-40" />
-              <USelect v-model="state" :required="false" :aria-label="t('queues.state')" :aria-required="false" :items="stateItems" class="min-w-40" />
-              <USelect v-model="level" :required="false" :aria-label="t('queues.level')" :aria-required="false" :items="levelItems" class="min-w-40" />
+              <USelect v-model="owner" data-ui-target="admin.queues.owner" :required="false" :aria-label="t('queues.owner')" :aria-required="false" :items="ownerItems" class="min-w-40" />
+              <USelect v-model="state" data-ui-target="admin.queues.state" :required="false" :aria-label="t('queues.state')" :aria-required="false" :items="stateItems" class="min-w-40" />
+              <USelect v-model="level" data-ui-target="admin.queues.level" :required="false" :aria-label="t('queues.level')" :aria-required="false" :items="levelItems" class="min-w-40" />
             </template>
             <template #actions>
               <UButton color="neutral" variant="outline" icon="i-lucide-refresh-cw" :label="t('queues.refresh')" :loading="status === 'pending'" @click="refreshSnapshot()" />

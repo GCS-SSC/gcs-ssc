@@ -185,8 +185,8 @@ const deleteItem = async (row: TransferPaymentStreamAreaOfExpertiseItem) => {
     :request-status="status"
     :button-label="t('common.add')"
     :show-button="canUpdateChild"
-    @add="openCreate"
-    @retry="refresh">
+    data-field-scope="transfer-payment.areas-of-expertise-tab"
+    @add="openCreate" @retry="refresh">
     <template #actions-cell="{ row }">
       <div class="flex items-center gap-2">
         <CommonActionButton
@@ -212,7 +212,7 @@ const deleteItem = async (row: TransferPaymentStreamAreaOfExpertiseItem) => {
   <UModal
     v-if="selectedItem"
     v-model:open="isModalOpen"
-    :title="selectedItem.id ? t('transfer_payment.area_of_expertise_update') : t('transfer_payment.area_of_expertise_create')">
+    :title="selectedItem.id ? t('transfer_payment.area_of_expertise_update') : t('transfer_payment.area_of_expertise_create')" data-field-scope="transfer-payment.areas-of-expertise-tab">
     <template #body>
       <UForm :state="selectedItem" :validate="validate" class="space-y-4" @submit="save">
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">

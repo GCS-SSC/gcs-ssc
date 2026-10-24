@@ -107,7 +107,7 @@ const saveProfile = async () => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6" data-field-scope="agency.transfer-payments">
     <CommonResourceLayoutCard
       v-model:search="search"
       v-model:status-filter="statusFilter"
@@ -123,7 +123,7 @@ const saveProfile = async () => {
       @add="openCreateProfile"
       @retry="refresh">
       <template #filters>
-        <USelect v-model="statusFilter" :items="availabilityItems" :aria-label="t('common.status_filter')" class="min-w-40" />
+        <USelect v-model="statusFilter" :items="availabilityItems" :aria-label="t('common.status_filter')" class="min-w-40" data-ui-target="agency.transfer-payments.statusFilter" />
       </template>
       <template #actions>
         <UButton

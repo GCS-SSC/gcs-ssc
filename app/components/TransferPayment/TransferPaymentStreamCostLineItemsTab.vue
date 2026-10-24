@@ -153,8 +153,8 @@ const deleteCostCategoryLine = async (row: TransferPaymentCostCategoryLineRow) =
     :request-status="costLineStatusState"
     :show-button="canUpdateChild"
     :button-label="t('common.add')"
-    @add="openCreateCostCategoryLine"
-    @retry="refreshCostLines">
+    data-field-scope="transfer-payment.stream-cost-line-items-tab"
+    @add="openCreateCostCategoryLine" @retry="refreshCostLines">
     <template #line_item-cell="{ row }">
       <CommonBilingualName
         :name-en="row.original.line_item_name_en"
@@ -211,7 +211,7 @@ const deleteCostCategoryLine = async (row: TransferPaymentCostCategoryLineRow) =
   <UModal
     v-if="selectedCostCategoryLine && canUpdateChild"
     v-model:open="isCostCategoryModalOpen"
-    :title="selectedCostCategoryLine?.id ? t('common.update') : t('common.add')">
+    :title="selectedCostCategoryLine?.id ? t('common.update') : t('common.add')" data-field-scope="transfer-payment.stream-cost-line-items-tab">
     <template #body>
       <UForm
         :state="selectedCostCategoryLine"

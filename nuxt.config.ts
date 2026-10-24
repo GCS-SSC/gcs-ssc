@@ -1,7 +1,7 @@
 import lucideIcons from '@iconify-json/lucide/icons.json'
 
 export default defineNuxtConfig({
-  modules: ['./modules/gcs-extensions', '@nuxt/eslint', '@nuxt/ui', './modules/form-requirements', '@vueuse/nuxt', '@nuxtjs/i18n'],
+  modules: ['./modules/gcs-extensions', '@nuxt/eslint', '@nuxt/ui', './modules/form-requirements', './modules/ui-targets', '@vueuse/nuxt', '@nuxtjs/i18n'],
 
   ssr: false,
 

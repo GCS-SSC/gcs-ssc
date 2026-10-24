@@ -216,12 +216,12 @@ watchEffect(() => {
 </script>
 
 <template>
-  <fieldset class="space-y-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
+  <fieldset class="space-y-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800" data-field-scope="assessment-schema.calculation-node">
     <legend class="sr-only">
       {{ nodeLabel }}
     </legend>
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <UFormField :label="t('common.type')" required>
+      <UFormField :label="t('common.type')" required data-ui-target="assessment-schema.calculation-node.common.type">
         <USelect
           :model-value="currentKind"
           :items="expressionTypeItems"
@@ -230,7 +230,7 @@ watchEffect(() => {
           @update:model-value="updateKind" />
       </UFormField>
 
-      <UFormField v-if="expression.kind === 'operation'" :label="t('transfer_payment.calculation_operator')" required>
+      <UFormField v-if="expression.kind === 'operation'" :label="t('transfer_payment.calculation_operator')" required data-ui-target="assessment-schema.calculation-node.transfer_payment.calculation_operator">
         <USelect
           :model-value="expression.operator"
           :items="operatorItems"
@@ -240,15 +240,15 @@ watchEffect(() => {
       </UFormField>
     </div>
 
-    <UFormField v-if="expression.kind === 'number'" :label="t('common.value')">
+    <UFormField v-if="expression.kind === 'number'" :label="t('common.value')" data-ui-target="assessment-schema.calculation-node.number.value">
       <UInput v-model.number="expression.value" type="number" />
     </UFormField>
 
-    <UFormField v-else-if="expression.kind === 'boolean'" :label="t('common.value')">
+    <UFormField v-else-if="expression.kind === 'boolean'" :label="t('common.value')" data-ui-target="assessment-schema.calculation-node.boolean.value">
       <USelect v-model="expression.value" :items="booleanItems" value-key="value" label-key="label" />
     </UFormField>
 
-    <UFormField v-else-if="expression.kind === 'answer'" :label="t('transfer_payment.assessment_item')" required>
+    <UFormField v-else-if="expression.kind === 'answer'" :label="t('transfer_payment.assessment_item')" required data-ui-target="assessment-schema.calculation-node.transfer_payment.assessment_item">
       <AssessmentSchemaAnswerPathTreeSelect
         :model-value="getAnswerReferenceValue()"
         :tree="answerPathTree"
@@ -257,7 +257,7 @@ watchEffect(() => {
         @update:model-value="value => updateAnswerReference(String(value ?? ''))" />
     </UFormField>
 
-    <UFormField v-else-if="expression.kind === 'helper'" :label="t('transfer_payment.helper_field')" required>
+    <UFormField v-else-if="expression.kind === 'helper'" :label="t('transfer_payment.helper_field')" required data-ui-target="assessment-schema.calculation-node.transfer_payment.helper_field">
       <AssessmentSchemaHelperFieldSelect v-model="expression.field" />
     </UFormField>
 
@@ -296,6 +296,7 @@ watchEffect(() => {
         </div>
 
         <AssessmentSchemaCalculationNode
+          data-field-container="Composite editor; its individual field declarations own their identities."
           :model-value="argument"
           :answer-path-tree="answerPathTree"
           :depth="depth + 1"

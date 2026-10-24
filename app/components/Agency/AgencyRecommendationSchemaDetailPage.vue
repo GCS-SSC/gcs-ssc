@@ -211,7 +211,7 @@ const retire = async () => {
 </script>
 
 <template>
-  <CommonDetailPage id="recommendation-schema-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems">
+  <CommonDetailPage id="recommendation-schema-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" data-field-scope="agency.recommendation-schema-detail-page">
     <template #body>
       <div
         v-if="loadError"
@@ -264,6 +264,7 @@ const retire = async () => {
             <AssessmentSchemaDetailSidebar
               v-if="canEdit"
               v-model="selectedSection"
+              data-field-container="Composite editor; its individual field declarations own their identities."
               :section-tabs="sectionTabs"
               :is-saving="isSaving"
               :disabled="mutation.isPending.value"
@@ -271,7 +272,7 @@ const retire = async () => {
               @save="save" />
             <aside v-else class="w-full shrink-0 lg:sticky lg:top-6 lg:self-start lg:w-72 lg:border-r lg:border-zinc-200 lg:pr-4 dark:lg:border-zinc-800">
               <div class="pt-6">
-                <CommonRouteTabs v-model="selectedSection" :items="sectionTabs" orientation="vertical" />
+                <CommonRouteTabs v-model="selectedSection" data-field-container="Page navigation state, not a business input field." :items="sectionTabs" orientation="vertical" />
               </div>
             </aside>
           </template>
@@ -280,10 +281,10 @@ const retire = async () => {
             <CommonDesignTimeEditorSections>
               <AssessmentSchemaPageSection section-id="recommendation-general" :title="t('recommendation_schema.general')" role="tabpanel" :aria-label="t('recommendation_schema.general')">
                 <div class="grid gap-5 md:grid-cols-2">
-                  <UFormField :label="t('transfer_payment.name_en')" required>
+                  <UFormField :label="t('transfer_payment.name_en')" required data-ui-target="agency.recommendation-schema-detail-page.transfer_payment.name_en">
                     <UInput v-model="state.egcs_cn_name_en" class="w-full" />
                   </UFormField>
-                  <UFormField :label="t('transfer_payment.name_fr')" required>
+                  <UFormField :label="t('transfer_payment.name_fr')" required data-ui-target="agency.recommendation-schema-detail-page.transfer_payment.name_fr">
                     <UInput v-model="state.egcs_cn_name_fr" class="w-full" />
                   </UFormField>
                 </div>
@@ -295,7 +296,7 @@ const retire = async () => {
                   icon="i-lucide-circle-alert" color="warning" variant="subtle"
                   :title="t('recommendation_schema.validation_title')"
                   :description="definitionErrors.join(' ')" class="mb-5" />
-                <RecommendationSchemaRecommendationDefinitionEditor v-model="definition" />
+                <RecommendationSchemaRecommendationDefinitionEditor v-model="definition" data-field-container="Composite editor; its individual field declarations own their identities." />
               </AssessmentSchemaPageSection>
             </CommonDesignTimeEditorSections>
           </fieldset>

@@ -13,7 +13,7 @@ const field = useFormFieldPath(() => namePrefix)
 </script>
 
 <template>
-  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }">
+  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }" data-field-scope="transfer-payment.fields.objective-fields">
     <UFormField :label="t('transfer_payment.objective_en')" :name="field('egcs_tp_objective_en')">
       <CommonTextarea v-model="model.egcs_tp_objective_en" :rows="2" />
     </UFormField>

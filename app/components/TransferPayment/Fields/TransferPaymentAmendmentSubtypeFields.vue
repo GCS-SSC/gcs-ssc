@@ -37,7 +37,7 @@ const updateAmendmentTypeIds = (value: string[]) => {
 </script>
 
 <template>
-  <UFormField :label="t('transfer_payment.amendment_subtype_type')" :name="field(amendmentTypeField)">
+  <UFormField :label="t('transfer_payment.amendment_subtype_type')" :name="field(amendmentTypeField)" data-ui-target="transfer-payment.fields.amendment-subtype-fields.field-amendmentTypeField" data-field-scope="transfer-payment.fields.amendment-subtype-fields">
     <CommonServerLookupMultiSelect
       v-if="amendmentTypesFetchUrl"
       :model-value="amendmentTypeIds()"
@@ -57,16 +57,16 @@ const updateAmendmentTypeIds = (value: string[]) => {
       searchable
       @update:model-value="updateAmendmentTypeIds" />
   </UFormField>
-  <UFormField :label="t('transfer_payment.amendment_subtype_name_en')" :name="field('egcs_tp_name_en')">
+  <UFormField :label="t('transfer_payment.amendment_subtype_name_en')" :name="field('egcs_tp_name_en')" data-field-scope="transfer-payment.fields.amendment-subtype-fields">
     <UInput v-model="model.egcs_tp_name_en" />
   </UFormField>
-  <UFormField :label="t('transfer_payment.amendment_subtype_name_fr')" :name="field('egcs_tp_name_fr')">
+  <UFormField :label="t('transfer_payment.amendment_subtype_name_fr')" :name="field('egcs_tp_name_fr')" data-field-scope="transfer-payment.fields.amendment-subtype-fields">
     <UInput v-model="model.egcs_tp_name_fr" />
   </UFormField>
-  <UFormField :label="t('transfer_payment.amendment_subtype_description_en')" :name="field('egcs_tp_description_en')">
+  <UFormField :label="t('transfer_payment.amendment_subtype_description_en')" :name="field('egcs_tp_description_en')" data-field-scope="transfer-payment.fields.amendment-subtype-fields">
     <CommonTextarea v-model="model.egcs_tp_description_en" :rows="2" />
   </UFormField>
-  <UFormField :label="t('transfer_payment.amendment_subtype_description_fr')" :name="field('egcs_tp_description_fr')">
+  <UFormField :label="t('transfer_payment.amendment_subtype_description_fr')" :name="field('egcs_tp_description_fr')" data-field-scope="transfer-payment.fields.amendment-subtype-fields">
     <CommonTextarea v-model="model.egcs_tp_description_fr" :rows="2" />
   </UFormField>
 </template>

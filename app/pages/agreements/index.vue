@@ -132,7 +132,7 @@ const canDeleteAgreement = (agreement: FundingCaseAgreementProfileRow) =>
 </script>
 
 <template>
-  <UDashboardPanel id="agreements">
+  <UDashboardPanel id="agreements" data-field-scope="agreements">
     <template #header>
       <UDashboardNavbar :title="t('agreement.title')">
         <template #leading>
@@ -181,7 +181,7 @@ const canDeleteAgreement = (agreement: FundingCaseAgreementProfileRow) =>
               <GuidedHelpLauncher />
             </template>
             <template #filters>
-              <CommonAssignedListViewSelect v-model="listView" resource="agreement" />
+              <CommonAssignedListViewSelect v-model="listView" data-field-label-en="List view" data-field-label-fr="Vue de la liste" data-ui-target="agreements.list-view" resource="agreement" />
             </template>
           </AgreementProfilesTable>
         </section>

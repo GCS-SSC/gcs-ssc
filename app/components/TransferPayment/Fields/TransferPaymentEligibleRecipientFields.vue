@@ -13,7 +13,7 @@ const field = useFormFieldPath(() => namePrefix)
 </script>
 
 <template>
-  <UFormField :label="t('transfer_payment.applicant_recipient_subtype')" :name="field('egcs_tp_applicantrecipientsubtype')">
+  <UFormField :label="t('transfer_payment.applicant_recipient_subtype')" :name="field('egcs_tp_applicantrecipientsubtype')" data-field-scope="transfer-payment.fields.eligible-recipient-fields">
     <CommonBilingualSelectMenu
       v-model="model.egcs_tp_applicantrecipientsubtype"
       :items="recipientOptions"

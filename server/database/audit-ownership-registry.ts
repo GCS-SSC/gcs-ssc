@@ -43,6 +43,7 @@ type QualifiedCoreTable = { [Table in CoreTable]: Table extends `${string}.${str
 export const AUDIT_TABLE_OWNERSHIP: Readonly<Record<string, AuditOwnershipRule>> = {
   'public.Common_Guided_Help': { kind: 'switch', column: 'egcs_cn_ownertype', cases: { system: global('System-owned Guided Help'), agency: agency('egcs_cn_agency') } },
   'public.Agency_Guided_Help': agency('egcs_ay_agency'),
+  'public.Agency_Field_Tooltip': agency('egcs_ay_agency'),
   'public.Agency_Address_Type': parent('egcs_ay_organizationagency', 'public.Agency_Profile'),
   'public.Agency_Agreement_Type': parent('egcs_ay_organizationagency', 'public.Agency_Profile'),
   'public.Agency_Custom_Field': parent('egcs_ay_agency', 'public.Agency_Profile'),

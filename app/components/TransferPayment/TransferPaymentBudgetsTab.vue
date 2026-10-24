@@ -143,7 +143,7 @@ const deleteBudget = async (budget: TransferPaymentBudgetRow) => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6" data-field-scope="transfer-payment.budgets-tab">
     <CommonResourceLayoutCard
       v-model:search="budgetSearch"
       v-model:pagination="budgetPagination"

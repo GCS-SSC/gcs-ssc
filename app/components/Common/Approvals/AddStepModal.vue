@@ -71,7 +71,7 @@ const getCertificationLabel = (certification: AdditionalApprovalCertificationSta
     :dismissible="!isSubmitting"
     :title="t('assessment.approvals.add_step_title')"
     :description="t('assessment.approvals.add_step_description')"
-    @update:open="value => value ? (open = true) : emit('close')">
+    data-field-exclude="Runtime approval steps are outside configurable field help." @update:open="value => value ? (open = true) : emit('close')">
     <template #body>
       <UForm v-if="state && anchorStep && routingSlip" :state="validationState" :validate="validate" class="space-y-6" @submit="emit('submit')">
         <div class="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/60">

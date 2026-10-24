@@ -86,7 +86,7 @@ const save = async () => {
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="state?.id ? t('workflow.edit_setup') : t('workflow.add_setup')">
+  <UModal v-model:open="open" :title="state?.id ? t('workflow.edit_setup') : t('workflow.add_setup')" data-field-scope="agency.workflow-setup-modal">
     <template #body>
       <UForm v-if="state" :state="state" :validate="validate" :validate-on="[]" class="space-y-5" @submit="save">
         <UFormField :label="t('transfer_payment.entity_type')" name="egcs_cn_entitytype">

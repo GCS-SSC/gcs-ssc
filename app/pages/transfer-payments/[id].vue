@@ -123,7 +123,7 @@ const updateProfile = async () => {
               onClick: openUpdateProfile
             }]" />
 
-          <CommonDetailWorkspace v-model="selectedTab" :items="tabs">
+          <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs">
             <component
               :is="activeTabComponent"
               v-if="activeTabComponent"

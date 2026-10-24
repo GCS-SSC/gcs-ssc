@@ -91,10 +91,10 @@ const openAgreement = async (agreement: FundingCaseAgreementProfileRow) => {
     :button-label="t('agreement.new')"
     :show-button="canCreateAgreement"
     :search-placeholder="t('applicant_recipient.agreements.search')"
-    @add="openCreateAgreement"
-    @retry="refresh">
+    data-field-scope="applicant-recipient.agreements-tab"
+    @add="openCreateAgreement" @retry="refresh">
     <template #filters>
-      <CommonAssignedListViewSelect v-model="listView" resource="agreement" />
+      <CommonAssignedListViewSelect v-model="listView" data-field-label-en="List view" data-field-label-fr="Vue de la liste" resource="agreement" data-ui-target="applicant-recipient.agreements-tab.listView" />
     </template>
     <template #egcs_fc_title_en-cell="{ row }">
       <CommonBilingualName

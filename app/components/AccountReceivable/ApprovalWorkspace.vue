@@ -114,7 +114,7 @@ const breadcrumbs = computed(() => [
       <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-hand-coins" :title="context.reference" :description="t('account_receivable.approval_workspace_description')" :meta-items="[`${t('account_receivable.agreement')}: ${context.agreementNumber}`]" :badges="[{ lifecycleEngine: 'runtime', lifecycleState: context.runtimeState }]" />
       <CommonEntityEditorWorkspace content-test-id="account-receivable-approval-workspace">
         <template #sidebar>
-          <CommonRouteTabs v-model="selectedTab" :items="tabs" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
+          <CommonRouteTabs v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
         </template>
         <CommonWorkflowSection :entity-type="entityType" :entity-id="accountReceivableId" purpose="approval_submission" :can-edit="false" @changed="refresh" />
       </CommonEntityEditorWorkspace>

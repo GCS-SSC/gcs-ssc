@@ -89,7 +89,7 @@ const exportCorrections = async () => {
 </script>
 
 <template>
-  <div class="correction-collection min-w-0 space-y-4">
+  <div class="correction-collection min-w-0 space-y-4" data-field-tooltip-context="agreement" data-field-scope="correction.collection" data-scope-label-en="Agreements > Corrections" data-scope-label-fr="Ententes > Corrections">
     <p v-if="showDescription" class="text-sm text-muted">
       {{ t('correction.description') }}
     </p>
@@ -108,10 +108,10 @@ const exportCorrections = async () => {
       @retry="retry">
       <template #filters>
         <div class="flex w-full flex-col gap-3 sm:w-auto sm:shrink-0 sm:flex-row">
-          <UFormField :label="t('correction.outcome')" :required="false" :ui="{ label: 'sr-only' }">
+          <UFormField :label="t('correction.outcome')" :required="false" :ui="{ label: 'sr-only' }" data-ui-target="correction.collection.correction.outcome">
             <CommonEnumSelect v-model="outcome" name="correction_outcome" show-all-option :all-option-label="t('correction.all_outcomes')" />
           </UFormField>
-          <UFormField class="correction-fiscal-filter" :label="t('agreement.payments.fiscal_year')" :required="false" :ui="{ label: 'sr-only' }">
+          <UFormField class="correction-fiscal-filter" :label="t('agreement.payments.fiscal_year')" :required="false" :ui="{ label: 'sr-only' }" data-ui-target="correction.collection.agreement.payments.fiscal_year">
             <CommonBilingualSelectMenu v-model="fiscalYear" :items="fiscalYears" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :prepend-options="[{ label: t('correction.all_fiscal_years'), value: null }]" :placeholder="t('correction.all_fiscal_years')" />
           </UFormField>
         </div>

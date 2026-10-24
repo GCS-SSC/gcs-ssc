@@ -36,7 +36,7 @@ CREATE TABLE "role_permission" (
   CONSTRAINT "role_permission_access_level_check" CHECK (((access_level IS NULL) OR ((access_level)::text = ANY ((ARRAY['viewer'::character varying, 'contributor'::character varying, 'manager'::character varying])::text[])))),
   CONSTRAINT "role_permission_assignment_subject_check" CHECK (((can_manage_assignments = false) OR ((subject)::text = ANY ((ARRAY['agreement'::character varying, 'applicant_recipient'::character varying, 'funding_case'::character varying, 'journal_voucher'::character varying, 'correction'::character varying, 'account_receivable'::character varying])::text[])))),
   CONSTRAINT "role_permission_effective_check" CHECK (((access_level IS NOT NULL) OR (can_manage_assignments = true))),
-  CONSTRAINT "role_permission_subject_check" CHECK (((subject)::text = ANY ((ARRAY['guided_help'::character varying, 'audit'::character varying, 'system'::character varying, 'agency'::character varying, 'transfer_payment'::character varying, 'role'::character varying, 'user'::character varying, 'group'::character varying, 'agreement'::character varying, 'applicant_recipient'::character varying, 'funding_case'::character varying, 'journal_voucher'::character varying, 'correction'::character varying, 'account_receivable'::character varying])::text[])))
+  CONSTRAINT "role_permission_subject_check" CHECK (((subject)::text = ANY ((ARRAY['help'::character varying, 'audit'::character varying, 'system'::character varying, 'agency'::character varying, 'transfer_payment'::character varying, 'role'::character varying, 'user'::character varying, 'group'::character varying, 'agreement'::character varying, 'applicant_recipient'::character varying, 'funding_case'::character varying, 'journal_voucher'::character varying, 'correction'::character varying, 'account_receivable'::character varying])::text[])))
 );
 
 CREATE UNIQUE INDEX role_permission_unique_active ON role_permission USING btree (role_id, subject) WHERE (_deleted = false);
@@ -99,7 +99,7 @@ AS $function$
       SELECT count(*) INTO invalid_count FROM role_permission
       WHERE role_id = target_role_id AND _deleted = false AND (
         (subject = 'system' AND scope_type <> 'global')
-        OR (subject IN ('audit', 'agency', 'role', 'user', 'applicant_recipient', 'guided_help') AND scope_type = 'program')
+        OR (subject IN ('audit', 'agency', 'role', 'user', 'applicant_recipient', 'help') AND scope_type = 'program')
       );
       IF invalid_count > 0 THEN
         RAISE EXCEPTION 'role permission is incompatible with role scope'

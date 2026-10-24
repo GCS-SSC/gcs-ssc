@@ -32,7 +32,7 @@ const bilingualColumns: BilingualColumnConfig<AgencyCommitmentTypeItem>[] = [
     :schema="AgencyCommitmentTypeSchema"
     :initial-new-item="{}"
     :columns="columns"
-    :bilingual-columns="bilingualColumns">
+    :bilingual-columns="bilingualColumns" data-field-scope="agency.commitment-types">
     <template #name-cell="{ row }">
       <CommonBilingualName :name-en="row.original.egcs_ay_name_en" :name-fr="row.original.egcs_ay_name_fr" />
     </template>

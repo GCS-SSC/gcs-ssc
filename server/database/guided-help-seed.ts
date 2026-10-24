@@ -1,4 +1,6 @@
 import type { Transaction } from 'kysely'
+import { guidedHelpLedger } from '#ui-targets'
+import { checkHostGuideCompatibility } from '../../shared/guided-help/journeys'
 import type { Database, JsonValue } from '~~/shared/types/database'
 import { agreementTypeGuide } from '../../shared/guided-help/agreement-type-guide'
 import { riskAssessmentGuide } from '../../shared/guided-help/risk-assessment-guide'
@@ -19,8 +21,8 @@ export const seedGuidedHelpExample = async (db: Transaction<Database>): Promise<
     .where('role_permission.access_level', '=', 'manager').execute()
   for (const role of globalAdministrators) {
     const existing = await db.selectFrom('role_permission').select('id').where('role_id', '=', role.id)
-      .where('subject', '=', 'guided_help').where('_deleted', '=', false).executeTakeFirst()
-    if (!existing) await db.insertInto('role_permission').values({ role_id: role.id, subject: 'guided_help', access_level: 'manager', can_manage_assignments: false }).execute()
+      .where('subject', '=', 'help').where('_deleted', '=', false).executeTakeFirst()
+    if (!existing) await db.insertInto('role_permission').values({ role_id: role.id, subject: 'help', access_level: 'manager', can_manage_assignments: false }).execute()
   }
   const roles = await db.selectFrom('role').select('id').where('_deleted', '=', false)
     .where(eb => eb.or([eb('agency_id', '=', '21'), eb('agency_id', 'is', null)]))
@@ -31,6 +33,11 @@ export const seedGuidedHelpExample = async (db: Transaction<Database>): Promise<
     { document: agreementTypeGuide, screens: ['agency.agreement-types'] },
     { document: riskAssessmentGuide, screens: ['agreements.list'] }
   ]) {
+    const diagnostics = checkHostGuideCompatibility(example.document, guidedHelpLedger)
+    if (diagnostics.length) throw new Error(`Seeded guide is incompatible with the UI registry: ${JSON.stringify(diagnostics)}`)
+    if (example.screens.some(key => !guidedHelpLedger.views.some(view => view.key === key && view.discoverable !== false))) {
+      throw new Error('Seeded guide discovery screen is unavailable in the UI registry')
+    }
     const document = example.document as unknown as JsonValue
     const guideId = await createPublication(db, 'guided_help')
     await db.insertInto('Common_Guided_Help').values({

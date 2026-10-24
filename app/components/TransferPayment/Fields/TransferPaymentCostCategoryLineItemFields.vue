@@ -13,7 +13,7 @@ const field = useFormFieldPath(() => namePrefix)
 </script>
 
 <template>
-  <UFormField :label="t('transfer_payment.cost_category_line_items')" :name="field('egcs_tp_organizationcostcategory')">
+  <UFormField :label="t('transfer_payment.cost_category_line_items')" :name="field('egcs_tp_organizationcostcategory')" data-field-scope="transfer-payment.fields.cost-category-line-item-fields">
     <CommonBilingualSelectMenu
       v-model="model.egcs_tp_organizationcostcategory"
       :items="lineItemOptions"
@@ -23,13 +23,13 @@ const field = useFormFieldPath(() => namePrefix)
       :aria-label="t('transfer_payment.cost_category_line_items')"
       searchable />
   </UFormField>
-  <UFormField :label="t('transfer_payment.cost_sharing_ratio')" :name="field('egcs_tp_costsharingratio')" required>
+  <UFormField :label="t('transfer_payment.cost_sharing_ratio')" :name="field('egcs_tp_costsharingratio')" required data-field-scope="transfer-payment.fields.cost-category-line-item-fields">
     <UInputNumber
       v-model="model.egcs_tp_costsharingratio"
       :step="0.01"
       :format-options="{ style: 'percent' }" />
   </UFormField>
-  <UFormField :name="field('egcs_tp_active')" :description="t('transfer_payment.cost_line_active_help')">
+  <UFormField :name="field('egcs_tp_active')" :description="t('transfer_payment.cost_line_active_help')" data-field-scope="transfer-payment.fields.cost-category-line-item-fields">
     <USwitch v-model="model.egcs_tp_active" :label="t('common.active')" />
   </UFormField>
 </template>

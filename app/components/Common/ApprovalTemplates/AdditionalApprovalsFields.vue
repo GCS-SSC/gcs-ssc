@@ -50,7 +50,7 @@ const moveCertification = (index: number, direction: -1 | 1) => {
 </script>
 
 <template>
-  <div v-if="state" class="space-y-6">
+  <div v-if="state" class="space-y-6" data-field-scope="common.approval-templates.additional-approvals-fields">
     <div class="flex items-start justify-between gap-6 rounded-lg border border-zinc-200 px-4 py-4 dark:border-zinc-800">
       <div class="space-y-1">
         <p class="font-medium text-zinc-900 dark:text-white">
@@ -60,7 +60,7 @@ const moveCertification = (index: number, direction: -1 | 1) => {
           {{ t('approval_templates.additional_approvals.allow_help') }}
         </p>
       </div>
-      <USwitch v-model="state.egcs_cn_allowadditionalapprovals" :aria-label="t('approval_templates.additional_approvals.allow')" />
+      <USwitch v-model="state.egcs_cn_allowadditionalapprovals" :aria-label="t('approval_templates.additional_approvals.allow')" data-ui-target="common.approval-templates.additional-approvals-fields.state.egcs_cn_allowadditionalapprovals" />
     </div>
 
     <div v-if="state.egcs_cn_allowadditionalapprovals" class="space-y-6">
@@ -89,7 +89,7 @@ const moveCertification = (index: number, direction: -1 | 1) => {
               {{ t('approval_templates.additional_approvals.allow_name_changes_help') }}
             </span>
           </span>
-          <USwitch v-model="state.egcs_cn_allowaddedapprovalnamechanges" />
+          <USwitch v-model="state.egcs_cn_allowaddedapprovalnamechanges" data-field-label-en="Allow approval name changes" data-field-label-fr="Autoriser la modification des noms d’approbation" data-ui-target="common.approval-templates.additional-approvals-fields.state.egcs_cn_allowaddedapprovalnamechanges" />
         </label>
         <label class="flex items-start justify-between gap-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
           <span>
@@ -100,7 +100,7 @@ const moveCertification = (index: number, direction: -1 | 1) => {
               {{ t('approval_templates.additional_approvals.allow_certification_changes_help') }}
             </span>
           </span>
-          <USwitch v-model="state.egcs_cn_allowaddedapprovalcertificationchanges" />
+          <USwitch v-model="state.egcs_cn_allowaddedapprovalcertificationchanges" data-field-label-en="Allow certification changes" data-field-label-fr="Autoriser la modification des attestations" data-ui-target="common.approval-templates.additional-approvals-fields.state.egcs_cn_allowaddedapprovalcertificationchanges" />
         </label>
       </div>
 
@@ -172,26 +172,26 @@ const moveCertification = (index: number, direction: -1 | 1) => {
           </div>
 
           <div :class="compact ? 'space-y-4' : 'grid grid-cols-1 gap-4 md:grid-cols-2'">
-            <UFormField :label="t('common.order')" :name="`additionalApprovalCertifications.${index}.egcs_cn_order`" required>
+            <UFormField :label="t('common.order')" :name="`additionalApprovalCertifications.${index}.egcs_cn_order`" required data-ui-target="common.approval-templates.additional-approvals-fields.additionalApprovalCertifications.egcs_cn_order">
               <p class="py-2 text-sm tabular-nums text-zinc-700 dark:text-zinc-300">
                 {{ certification.egcs_cn_order }}
               </p>
             </UFormField>
             <UFormField
               :label="t('admin_common.fields.egcs_cn_optional')"
-              :name="`additionalApprovalCertifications.${index}.egcs_cn_optional`">
+              :name="`additionalApprovalCertifications.${index}.egcs_cn_optional`" data-ui-target="common.approval-templates.additional-approvals-fields.additionalApprovalCertifications.egcs_cn_optional">
               <USwitch v-model="certification.egcs_cn_optional" />
             </UFormField>
-            <UFormField :label="t('admin_common.fields.egcs_cn_name_en')" :name="`additionalApprovalCertifications.${index}.egcs_cn_name_en`" required>
+            <UFormField :label="t('admin_common.fields.egcs_cn_name_en')" :name="`additionalApprovalCertifications.${index}.egcs_cn_name_en`" required data-ui-target="common.approval-templates.additional-approvals-fields.additionalApprovalCertifications.egcs_cn_name_en">
               <UInput v-model="certification.egcs_cn_name_en" />
             </UFormField>
-            <UFormField :label="t('admin_common.fields.egcs_cn_name_fr')" :name="`additionalApprovalCertifications.${index}.egcs_cn_name_fr`" required>
+            <UFormField :label="t('admin_common.fields.egcs_cn_name_fr')" :name="`additionalApprovalCertifications.${index}.egcs_cn_name_fr`" required data-ui-target="common.approval-templates.additional-approvals-fields.additionalApprovalCertifications.egcs_cn_name_fr">
               <UInput v-model="certification.egcs_cn_name_fr" />
             </UFormField>
-            <UFormField :label="t('admin_common.fields.egcs_cn_description_en')" :name="`additionalApprovalCertifications.${index}.egcs_cn_description_en`" required>
+            <UFormField :label="t('admin_common.fields.egcs_cn_description_en')" :name="`additionalApprovalCertifications.${index}.egcs_cn_description_en`" required data-ui-target="common.approval-templates.additional-approvals-fields.additionalApprovalCertifications.egcs_cn_description_en">
               <CommonTextarea v-model="certification.egcs_cn_description_en" :rows="2" />
             </UFormField>
-            <UFormField :label="t('admin_common.fields.egcs_cn_description_fr')" :name="`additionalApprovalCertifications.${index}.egcs_cn_description_fr`" required>
+            <UFormField :label="t('admin_common.fields.egcs_cn_description_fr')" :name="`additionalApprovalCertifications.${index}.egcs_cn_description_fr`" required data-ui-target="common.approval-templates.additional-approvals-fields.additionalApprovalCertifications.egcs_cn_description_fr">
               <CommonTextarea v-model="certification.egcs_cn_description_fr" :rows="2" />
             </UFormField>
           </div>
@@ -200,13 +200,13 @@ const moveCertification = (index: number, direction: -1 | 1) => {
             <UFormField
               :label="t('admin_common.fields.egcs_cn_certification_en')"
               :name="`additionalApprovalCertifications.${index}.egcs_cn_certification_en`"
-              required>
+              required data-ui-target="common.approval-templates.additional-approvals-fields.additionalApprovalCertifications.egcs_cn_certification_en">
               <CommonTextarea v-model="certification.egcs_cn_certification_en" :rows="3" />
             </UFormField>
             <UFormField
               :label="t('admin_common.fields.egcs_cn_certification_fr')"
               :name="`additionalApprovalCertifications.${index}.egcs_cn_certification_fr`"
-              required>
+              required data-ui-target="common.approval-templates.additional-approvals-fields.additionalApprovalCertifications.egcs_cn_certification_fr">
               <CommonTextarea v-model="certification.egcs_cn_certification_fr" :rows="3" />
             </UFormField>
           </div>

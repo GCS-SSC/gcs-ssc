@@ -54,7 +54,7 @@ watch(() => [proponentId, streamId, agreementId], async (_value, previous, onCle
 </script>
 
 <template>
-  <UFormField :name="name" :label="label ?? t('agreement.applicant_recipients.type')" required>
+  <UFormField :name="name" :label="label ?? t('agreement.applicant_recipients.type')" required data-ui-target="agreement.proponent-type-field.name" data-field-tooltip-context="agreement" data-field-scope="agreement.proponent-type-field" data-scope-label-en="Agreements > Proponents" data-scope-label-fr="Ententes > Promoteurs">
     <CommonServerLookupSelect
       v-if="proponentId && (streamId || agreementId)"
       :model-value="model ?? undefined"

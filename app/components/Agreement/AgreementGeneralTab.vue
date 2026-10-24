@@ -126,6 +126,6 @@ const displayValue = (value: string | number | boolean | null | undefined) => {
       :stream-id="profileStreamId"
       permission-action="read"
       :context="agreementProfileExtensionContext" />
-    <AgreementFieldsCustomFields v-if="profile && profileStreamId" :model-value="profile.egcs_fc_customfields ?? {}" :stream-id="profileStreamId" :agreement-id="String(profile.id)" permission-action="read" readonly />
+    <AgreementFieldsCustomFields v-if="profile && profileStreamId" data-field-container="Composite editor; its individual field declarations own their identities." :model-value="profile.egcs_fc_customfields ?? {}" :stream-id="profileStreamId" :agreement-id="String(profile.id)" permission-action="read" readonly />
   </div>
 </template>

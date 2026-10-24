@@ -233,7 +233,7 @@ const deleteDraft = async () => {
 </script>
 
 <template>
-  <CommonDetailPage id="data-collection-setup-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems">
+  <CommonDetailPage id="data-collection-setup-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" data-field-scope="agency.data-collection-detail-page">
     <template #body>
       <div
         v-if="loadError"
@@ -290,6 +290,7 @@ const deleteDraft = async () => {
             <AssessmentSchemaDetailSidebar
               v-if="canEdit"
               v-model="selectedSection"
+              data-field-container="Composite editor; its individual field declarations own their identities."
               :section-tabs="sectionTabs"
               :is-saving="isSaving"
               :disabled="mutation.isPending.value"
@@ -297,7 +298,7 @@ const deleteDraft = async () => {
               @save="save" />
             <aside v-else class="w-full shrink-0 lg:sticky lg:top-6 lg:self-start lg:w-72 lg:border-r lg:border-zinc-200 lg:pr-4 dark:lg:border-zinc-800">
               <div class="pt-6">
-                <CommonRouteTabs v-model="selectedSection" :items="sectionTabs" orientation="vertical" />
+                <CommonRouteTabs v-model="selectedSection" data-field-container="Page navigation state, not a business input field." :items="sectionTabs" orientation="vertical" />
               </div>
             </aside>
           </template>
@@ -332,7 +333,7 @@ const deleteDraft = async () => {
                     icon="i-lucide-circle-alert" color="warning" variant="subtle"
                     :title="t('data_collection.validation_title')"
                     :description="definitionErrors.join(' ')" class="mb-5" />
-                  <CommonQuestionnaireDefinitionEditor v-model="definition" :persistence-key="`data-collection:${schemaId}`" />
+                  <CommonQuestionnaireDefinitionEditor v-model="definition" data-field-container="Composite editor; its individual field declarations own their identities." :persistence-key="`data-collection:${schemaId}`" />
                 </AssessmentSchemaPageSection>
               </CommonDesignTimeEditorSections>
             </fieldset>
