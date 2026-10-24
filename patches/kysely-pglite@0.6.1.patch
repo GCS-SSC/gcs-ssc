@@ -1,0 +1,13 @@
+diff --git a/dist/utils/create-kysely.js b/dist/utils/create-kysely.js
+index 859189b4add721a934f9ecd1bf3d74a69b0ac54c..bbb278d06be58930666c5ce06fd9806b99037c72 100644
+--- a/dist/utils/create-kysely.js
++++ b/dist/utils/create-kysely.js
+@@ -11,7 +11,7 @@ export function ensureDataDirExist(dataDir) {
+         path = dataDir.dataDir;
+     }
+     if (path) {
+-        fs.ensureDir(path);
++        fs.ensureDirSync(path);
+     }
+ }
+ export async function createKyselyPGlite(dataDir) {

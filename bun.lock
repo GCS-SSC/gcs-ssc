@@ -369,6 +369,7 @@
     },
   },
   "patchedDependencies": {
+    "kysely-pglite@0.6.1": "patches/kysely-pglite@0.6.1.patch",
     "nitropack@2.13.1": "patches/nitropack@2.13.1.patch",
     "@nuxt/ui@4.4.0": "patches/@nuxt%2Fui@4.4.0.patch",
   },
