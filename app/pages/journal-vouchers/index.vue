@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { appRouteLocations } from '~/utils/route-locations'
 import type { JournalVoucherRow } from '~~/shared/types/journal-voucher'
 import type { TableColumnInput } from '~/composables/useTableColumns'
 
@@ -20,7 +21,7 @@ const columns: TableColumnInput<JournalVoucherRow>[] = [
   { id: 'requesteddate', accessorKey: 'egcs_fc_requesteddate', headerKey: 'journal_voucher.requested_date' },
   { id: 'status', headerKey: 'common.status' }, { id: 'actions', headerKey: 'common.actions' }
 ]
-const created = async (id: string) => await navigateTo(localePath(`/journal-vouchers/${id}`))
+const created = async (id: string) => await navigateTo(localePath(appRouteLocations.journalVoucherDetail(id)))
 </script>
 
 <template>
@@ -48,7 +49,7 @@ const created = async (id: string) => await navigateTo(localePath(`/journal-vouc
         </template>
         <template #actions-cell="{ row }">
           <div class="flex justify-end">
-            <CommonActionButton icon="i-lucide-eye" color="neutral" variant="ghost" :aria-label="t('common.view_details')" :to="localePath(`/journal-vouchers/${row.original.id}`)" />
+            <CommonActionButton icon="i-lucide-eye" color="neutral" variant="ghost" :aria-label="t('common.view_details')" :to="localePath(appRouteLocations.journalVoucherDetail(row.original.id))" />
           </div>
         </template>
       </CommonResourceLayoutCard>

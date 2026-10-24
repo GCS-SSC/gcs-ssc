@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { sql } from 'kysely'
 import { z } from 'zod'
 import { authorize } from '~~/server/utils/authorize'

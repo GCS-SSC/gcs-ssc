@@ -93,9 +93,10 @@ export const StatusDefinitionBaseSchema = z.object({
   readOnly: z.boolean().default(false),
   terminal: z.boolean().default(false)
 })
-export const StatusDefinitionCreateSchema = StatusDefinitionBaseSchema.refine(value => !(value.readOnly && value.terminal), {
+const StatusDefinitionCreateSchema = StatusDefinitionBaseSchema.refine(value => !(value.readOnly && value.terminal), {
   message: 'validation.status_flags_exclusive', path: ['terminal']
 })
+export { StatusDefinitionCreateSchema }
 export const StatusDefinitionPatchSchema = z.object(StatusDefinitionFields).partial().superRefine((value, ctx) => {
   if (value.readOnly === true && value.terminal === true) {
     ctx.addIssue({ code: 'custom', message: 'validation.status_flags_exclusive', path: ['terminal'] })

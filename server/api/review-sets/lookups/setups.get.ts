@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { PaginationSchema } from '~~/shared/types/schemas'
 import { CoreOrExtensionEntityTargetSchema, validateCoreOrExtensionEntityTarget } from '~~/shared/types/schemas/common'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'

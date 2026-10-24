@@ -192,9 +192,9 @@ export const useTransferPaymentStreamDetailState = (
     tabMap,
     defaultTabId: 'general',
     enabled: computed(() => (
-      typeof route.params.schemaId !== 'string'
-      && typeof route.params.templateId !== 'string'
-      && typeof route.params.recommendationSetupId !== 'string'
+      (!('schemaId' in route.params) || typeof route.params.schemaId !== 'string')
+      && (!('templateId' in route.params) || typeof route.params.templateId !== 'string')
+      && (!('recommendationSetupId' in route.params) || typeof route.params.recommendationSetupId !== 'string')
     )),
     queryKey: 'section'
   })

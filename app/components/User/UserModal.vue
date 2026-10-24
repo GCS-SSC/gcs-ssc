@@ -32,7 +32,7 @@ const onSubmit = () => {
           <UInput v-model="state.email" type="email" />
         </UFormField>
         <UFormField :label="t('user.image_url')" name="image">
-          <UInput v-model="state.image" />
+          <UInput v-model.nullable="state.image" />
         </UFormField>
         <div class="flex justify-end gap-2 pt-4">
           <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="open = false" />

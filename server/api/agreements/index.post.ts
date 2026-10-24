@@ -1,3 +1,5 @@
+import { defineEventHandler } from 'h3'
+import { useNitroApp } from 'nitropack/runtime'
 import { isGcsExtensionUserError } from '@gcs-ssc/extensions/server'
 import { assertAgreementFinancialId } from '~~/server/utils/agreement-financial-ids'
 import { assertAgreementProponentType } from '~~/server/utils/agreement-proponent-type'

@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { JournalVoucherCreateSchema } from '~~/shared/types/schemas/journal-voucher'
 import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import { createJournalVoucher } from '~~/server/utils/journal-voucher'

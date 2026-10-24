@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { authorize } from '~~/server/utils/authorize'
 
 /** Returns the authenticated user's canonical static permission grants. */

@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import type { RouteParamsGeneric } from 'vue-router'
 import { appRouteLocations } from '~/utils/route-locations'
 
 definePageMeta({
-  key: route => JSON.stringify([route.params.id, route.params.extensionKey, route.params.tabId, route.params.recordId]),
+  key: route => {
+    const params: RouteParamsGeneric = route.params
+    return JSON.stringify([params.id, params.extensionKey, params.tabId, params.recordId])
+  },
   i18n: {
     paths: {
       en: '/agreements/[id]/extension/[extensionKey]/[tabId]/[recordId]',

@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { forbidden, notFound } from '~~/server/utils/api-errors'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { listAgencyScopedCommonUsers, resolveCurrentCommonUser } from '~~/server/utils/additional-reviewer-runtime'

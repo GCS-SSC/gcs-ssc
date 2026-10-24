@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { CommonGwcoaCreateSchema } from '~~/shared/types/schemas'
 import { authorize } from '~~/server/utils/authorize'
 import { readValidatedBodyI18n } from '~~/server/utils/api-validate'

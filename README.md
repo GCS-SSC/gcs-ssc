@@ -5,6 +5,9 @@ GCS-SSC is an internal grants and contributions system designed to manage the li
 ## 🎮 Live Demo
 
 Experience the application immediately: **[Launch Demo](https://gcs-ssc.github.io/gcs-ssc/)**
+
+Browser-hosted startup failed during migration verification; see [Known issues](#known-issues).
+
 Credentials:
 
 - **Username**: root@example.com
@@ -21,6 +24,28 @@ This demo uses **[WebContainers](https://webcontainers.io/)** to run the full No
 3.  **Resetting State:** If you break the configuration, or an update has new migrations, or want to start fresh:
     - **Clear Site Data:** Go to your browser's DevTools -> Application -> Storage -> "Clear site data".
     - **Incognito:** Alternatively, open the link in a new Incognito/Private window for a disposable session.
+
+## Known issues
+
+These observations and verification limits were recorded during pre-Nuxt 5 preparation on **2026-10-24**.
+
+### Observed behavior
+
+- Saving a User disables the Save button and can move focus to the page body before the error toast appears. No comparative runtime baseline establishes that the migration introduced this behavior.
+- Query-access history is best effort. Its queue drops new events at 2,000 events or 32 MiB of estimated payload. Separate test runs dropped 17,198, 18,360, and 46,671 events; these are separate observations, not one total. Query-access history is distinct from transactional change auditing. No loss-free capacity or comparative performance baseline is established.
+- One Chromium test process crashed with `SIGBUS` alongside transient disk consumption and core-dump staging. The cause remains unproven; a later passing run does not establish a root-cause fix.
+
+### Verification limits
+
+- The first temporary PostgreSQL cleanup lacked a retained before-state metadata snapshot. Its failed preservation comparison cannot be explained or reconstructed. Reviewed commands targeted only the owned test resources, and protected containers remained present; complete prior metadata equality is unproven.
+- Accessibility checks covered selected English/French journeys, browser accessibility trees, and scoped axe checks. They do not establish whole-application accessibility conformance or verify actual screen-reader speech.
+- Local checks passed, but hosted GitHub Actions and credentialed cloud checks were not run. Private-tooling read access was configured; hosted CI success remains unverified.
+
+### Deferred compatibility work
+
+- The tested browser-hosted WebContainer started but returned HTTP 503 for health and HTTP 500 for login when asynchronous audit context was lost. Resolution is deferred to separate work. Native artifact and container checks passed, but this verification did not establish a working browser-hosted demo.
+- `future.compatibilityVersion: 5` remains enabled with `experimental.nitroAutoImports: true`. Disabling Nitro auto-imports is deferred until the i18n integration supports it without a dependency patch.
+- The inherited, version-pinned Nitro 2.13.5 lifecycle patch remains required to prevent overlapping PGlite database owners during development reloads. Removal depends on a released replacement passing the real reload and shutdown checks.
 
 ## AWS demo refresh
 

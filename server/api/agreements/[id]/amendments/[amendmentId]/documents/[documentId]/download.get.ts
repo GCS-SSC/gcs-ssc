@@ -1,4 +1,4 @@
-import { setResponseHeader } from 'h3'
+import { defineEventHandler, getRouterParam, setResponseHeader } from 'h3'
 import { create as contentDisposition } from 'content-disposition'
 import { badRequest } from '~~/server/utils/api-errors'
 import { authorizeAmendmentDocumentResource } from '~~/server/utils/amendment-document-generation'

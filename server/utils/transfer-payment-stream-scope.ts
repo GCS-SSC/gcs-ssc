@@ -64,8 +64,7 @@ const routeNotFound = async (
   code: string,
   key: string
 ) => {
-  const notFoundHandler = (globalThis as { notFound?: typeof notFound }).notFound ?? notFound
-  return await notFoundHandler(event, code, key)
+  return await notFound(event, code, key)
 }
 
 export const resolveTransferPaymentStreamScopeContextForRoute = async (

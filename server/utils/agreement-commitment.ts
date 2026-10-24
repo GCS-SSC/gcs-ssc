@@ -32,11 +32,7 @@ const hasKey = <TKey extends string>(
 ): value is Record<TKey, unknown> => value !== null && typeof value === 'object' && key in value
 
 const readCommitmentLinePatchBody = async (event: H3Event) => {
-  const bodyReader = (globalThis as typeof globalThis & {
-    readValidatedBodyI18n?: typeof readValidatedBodyI18n
-  }).readValidatedBodyI18n ?? readValidatedBodyI18n
-
-  return await bodyReader(event, FundingCaseAgreementCommitmentLinePatchSchema)
+  return await readValidatedBodyI18n(event, FundingCaseAgreementCommitmentLinePatchSchema)
 }
 
 export const prepareAgreementCommitmentRoute = async (

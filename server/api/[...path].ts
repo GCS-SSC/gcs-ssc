@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { notFound } from '~~/server/utils/api-errors'
 
 // eslint-disable-next-line local/require-authorize

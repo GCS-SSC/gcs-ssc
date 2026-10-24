@@ -74,7 +74,6 @@ const links: LinkSpec[] = [
   })),
   { link: 'tooling/gcs-ssc/host-scripts', target: 'scripts', kind: 'dir' },
   ...[
-    'vitest.config.ts',
     'vitest.extension-lifecycle-runtime.config.ts',
     'vitest.host-critical-base.ts',
     'vitest.workflow-runtime.config.ts'

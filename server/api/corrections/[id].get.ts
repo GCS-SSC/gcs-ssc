@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { authorizeCorrection, getCorrectionDetail } from '~~/server/utils/correction'
 
 export default defineEventHandler(async event => {

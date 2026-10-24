@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import en from '~~/i18n/locales/en.json'
 import fr from '~~/i18n/locales/fr.json'
 import { sql } from 'kysely'

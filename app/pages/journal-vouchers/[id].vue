@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { appRouteLocations } from '~/utils/route-locations'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
@@ -130,11 +131,11 @@ const accountingColumnDefinitions: TableColumnInput<AccountingRow>[] = [
 ]
 const accountingColumns = useTableColumns(accountingColumnDefinitions)
 const deleteDraft = async () => {
-  if (await confirmDeleteRequest(`/api/journal-vouchers/${id}`)) await navigateTo(localePath('/journal-vouchers'))
+  if (await confirmDeleteRequest(`/api/journal-vouchers/${id}`)) await navigateTo(localePath(appRouteLocations.journalVouchers()))
 }
 const breadcrumbs = computed(() => [
-  { label: t('journal_voucher.title'), to: localePath('/journal-vouchers') },
-  { label: voucher.value?.egcs_fc_agreementnumber ?? '', to: voucher.value?.egcs_fc_sourcereadable ? localePath(`/agreements/${voucher.value.egcs_fc_fundingagreement}`) : undefined },
+  { label: t('journal_voucher.title'), to: localePath(appRouteLocations.journalVouchers()) },
+  { label: voucher.value?.egcs_fc_agreementnumber ?? '', to: voucher.value?.egcs_fc_sourcereadable ? localePath(appRouteLocations.agreementDetail(voucher.value.egcs_fc_fundingagreement)) : undefined },
   { label: `${t('journal_voucher.number')} ${voucher.value?.egcs_fc_number ?? ''}` }
 ])
 const refreshPage = async () => {
@@ -172,7 +173,7 @@ const prepareLinked = async (kind: 'reversal' | 'replacement') => {
     const created = kind === 'reversal'
       ? await sendJson<{ id: string }>(`/api/journal-vouchers/${id}/reversal`, 'POST', header)
       : await sendJson<{ id: string }>('/api/journal-vouchers', 'POST', { ...header, egcs_fc_payment: voucher.value.egcs_fc_payment, egcs_fc_replacementof: id })
-    await navigateTo(localePath(`/journal-vouchers/${created.id}`))
+    await navigateTo(localePath(appRouteLocations.journalVoucherDetail(created.id)))
   } catch (failure) {
     showError(failure)
   } finally { saving.value = false }
@@ -228,7 +229,7 @@ const applyAllocation = (line: JournalVoucherAllocationDraft) => {
                       {{ t('journal_voucher.source_payment') }}
                     </dt>
                     <dd>
-                      <NuxtLink v-if="voucher.egcs_fc_sourcereadable" class="font-semibold text-primary hover:underline" :to="localePath(`/agreements/${voucher.egcs_fc_fundingagreement}/payments/${voucher.egcs_fc_payment}`)">{{ `${t('assignments.entity_types.fundingcasepayment')} ${voucher.egcs_fc_payment}` }}</NuxtLink>
+                      <NuxtLink v-if="voucher.egcs_fc_sourcereadable" class="font-semibold text-primary hover:underline" :to="localePath(appRouteLocations.agreementPaymentDetail(voucher.egcs_fc_fundingagreement, voucher.egcs_fc_payment))">{{ `${t('assignments.entity_types.fundingcasepayment')} ${voucher.egcs_fc_payment}` }}</NuxtLink>
                       <span v-else class="font-semibold text-highlighted">{{ `${t('assignments.entity_types.fundingcasepayment')} ${voucher.egcs_fc_payment}` }}</span>
                     </dd>
                   </div>

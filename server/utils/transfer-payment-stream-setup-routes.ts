@@ -1,4 +1,4 @@
-import type { H3Event } from 'h3'
+import { getRouterParam, type H3Event } from 'h3'
 import type { Kysely } from 'kysely'
 import type { z } from 'zod'
 import type { Database } from '~~/shared/types/database'

@@ -1,3 +1,5 @@
+import { setResponseHeader } from 'h3'
+import { defineNitroPlugin } from 'nitropack/runtime'
 import { randomUUID } from 'node:crypto'
 import { getMigrationPromise } from '../utils/migration-readiness'
 import type { AccessLogRequest } from '../utils/access-log-queue'

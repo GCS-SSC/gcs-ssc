@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import { executeEntityAssignmentManagement } from '~~/server/utils/entity-assignment-write'
 import { EntityAssignmentPromoteSchema, EntityAssignmentTargetSchema } from '~~/shared/types/schemas'

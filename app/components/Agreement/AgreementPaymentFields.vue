@@ -124,7 +124,7 @@ const monthOptions = computed(() => ['apr', 'may', 'jun', 'jul', 'aug', 'sep', '
       :period-end="state.egcs_fc_periodend" />
 
     <UFormField :label="t('common.comment')" name="egcs_fc_comment">
-      <UTextarea v-model="state.egcs_fc_comment" :disabled="pending" class="w-full" />
+      <UTextarea v-model.nullable="state.egcs_fc_comment" :disabled="pending" class="w-full" />
     </UFormField>
   </div>
 </template>

@@ -1,5 +1,5 @@
 import { withAnonymousAudit } from '~~/server/utils/audit-context'
-import { toWebRequest } from 'h3'
+import { defineEventHandler, toWebRequest } from 'h3'
 
 /**
  *  * Event handler for this server API route. Handles the incoming request payload, performs necessary business logic and authorization operations, and returns the expected endpoint response array or object.
@@ -9,5 +9,5 @@ import { toWebRequest } from 'h3'
  */
 // eslint-disable-next-line local/require-authorize -- Better Auth owns this delegated authentication protocol surface.
 export default defineEventHandler((event) => {
-  return withAnonymousAudit(event.context.auditRequestId ?? null, () => auth.handler(toWebRequest(event)))
+  return withAnonymousAudit(event.context.auditRequestId ?? null, () => auth.handler(toWebRequest(event)), event.context.accessLogRequest)
 })

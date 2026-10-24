@@ -1,5 +1,5 @@
 /* eslint-disable jsdoc/require-jsdoc -- Bounded Stream picker projections have focused route coverage. */
-import type { H3Event } from 'h3'
+import { getRouterParam, type H3Event } from 'h3'
 import { z } from 'zod'
 import { PaginationSchema, PositivePostgresBigintIdSchema } from '~~/shared/types/schemas'
 import { authorizeTransferPaymentStreamResource } from './transfer-payment-route-authorization'

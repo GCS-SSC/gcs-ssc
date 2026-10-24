@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { GroupPatchSchema } from '~~/shared/types/schemas/group'
 import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import { authorizeGroup, authorizeFreshGroup } from '~~/server/utils/groups'

@@ -55,11 +55,12 @@ useSeoMeta({
 </script>
 
 <template>
-  <UApp :locale="uiLocale">
+  <UApp :locale="uiLocale" :toaster="null">
     <NuxtLoadingIndicator />
 
     <NuxtLayout>
       <NuxtPage />
     </NuxtLayout>
+    <CommonNotifications />
   </UApp>
 </template>

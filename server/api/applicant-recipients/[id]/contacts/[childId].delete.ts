@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { authorize, requireAuthContext } from '~~/server/utils/authorize'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import {

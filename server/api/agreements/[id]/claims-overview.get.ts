@@ -1,5 +1,5 @@
 import { sql } from 'kysely'
-import type { H3Event } from 'h3'
+import { defineEventHandler, type H3Event } from 'h3'
 import { budgetFiscalYearStableId, budgetLineItemStableId } from '~~/server/utils/agreement-budget-lineage'
 import { prepareAgreementClaimRoute } from '~~/server/utils/agreement-claim'
 import { canReadEntityAssignments } from '~~/server/utils/entity-assignment'

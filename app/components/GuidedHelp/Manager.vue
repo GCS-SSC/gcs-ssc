@@ -195,7 +195,7 @@ const persistGuide = async (): Promise<boolean> => {
   if (request !== generation) return false
   selected.value = result
   document.value = structuredClone(result.egcs_cn_document)
-  if (route.params.guideId === 'new') await router.replace(localePath({ ...appRouteLocations.guidedHelpDetail(result.id), query: { context: context.value, section: selectedTab.value } }))
+  if (('guideId' in route.params ? route.params.guideId : undefined) === 'new') await router.replace(localePath({ ...appRouteLocations.guidedHelpDetail(result.id), query: { context: context.value, section: selectedTab.value } }))
   const index = guides.value.findIndex(guide => guide.id === result.id)
   if (index < 0) guides.value.push(result)
   else guides.value[index] = result
@@ -335,7 +335,7 @@ const cloneInto = (ownerContext: string, versionId: string) => mutate('clone', a
 })
 const loadRouteSelection = async () => {
   if (!detail || !context.value) return
-  const id = String(route.params.guideId)
+  const id = String(('guideId' in route.params ? route.params.guideId : undefined))
   if (route.query.mode === 'catalog') {
     if (typeof route.query.catalog === 'string') {
       const entry = catalogs.value.find(item => item.id === route.query.catalog)
@@ -388,7 +388,7 @@ const secondaryActions = computed<DropdownMenuItem[][]>(() => [
     ...(!isCatalog.value && canDelete.value && selected.value?.capabilities?.canDelete ? [{ label: t('common.delete'), icon: 'i-lucide-trash', color: 'error' as const, disabled: pending.value, onSelect: () => guideAction('delete') }] : [])
   ]
 ].filter(items => items.length > 0))
-watch([() => route.params.guideId, () => route.query.catalog, () => route.query.mode], () => {
+watch([() => ('guideId' in route.params ? route.params.guideId : undefined), () => route.query.catalog, () => route.query.mode], () => {
   if (context.value) void loadRouteSelection().catch(showError)
 })
 </script>

@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { GroupCreateSchema } from '~~/shared/types/schemas/group'
 import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import { authorize, authorizeFresh } from '~~/server/utils/authorize'

@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { z } from 'zod'
 import { notFound, unauthorized } from '~~/server/utils/api-errors'
 import { getValidatedQueryI18n, readValidatedBodyI18n } from '~~/server/utils/api-validate'

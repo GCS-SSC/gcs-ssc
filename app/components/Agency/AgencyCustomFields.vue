@@ -276,10 +276,10 @@ const remove = async (path: string) => {
             <UInput v-model="optionModal.selected.value.egcs_ay_name_fr" class="w-full" />
           </UFormField>
           <UFormField :label="t('custom_fields.category_en')" name="egcs_ay_category_en" :required="Boolean(optionModal.selected.value.egcs_ay_category_fr)">
-            <UInput v-model="optionModal.selected.value.egcs_ay_category_en" class="w-full" />
+            <UInput v-model.nullable="optionModal.selected.value.egcs_ay_category_en" class="w-full" />
           </UFormField>
           <UFormField :label="t('custom_fields.category_fr')" name="egcs_ay_category_fr" :required="Boolean(optionModal.selected.value.egcs_ay_category_en)">
-            <UInput v-model="optionModal.selected.value.egcs_ay_category_fr" class="w-full" />
+            <UInput v-model.nullable="optionModal.selected.value.egcs_ay_category_fr" class="w-full" />
           </UFormField>
           <UCheckbox v-model="optionModal.selected.value.egcs_ay_active" :label="t('custom_fields.active')" />
           <UFormField :label="t('custom_fields.order')" name="egcs_ay_displayorder">

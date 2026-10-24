@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { sql } from 'kysely'
 import { authorizeGroup, authorizeFreshGroup } from '~~/server/utils/groups'
 import { badRequest, notFound } from '~~/server/utils/api-errors'

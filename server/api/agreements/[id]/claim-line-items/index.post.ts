@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { sql } from 'kysely'
 import { FundingCaseAgreementClaimLineItemCreateSchema } from '~~/shared/types/schemas'

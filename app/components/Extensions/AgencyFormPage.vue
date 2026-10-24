@@ -6,7 +6,7 @@ import { appRouteLocations } from '~/utils/route-locations'
 
 const { flowOnly = false } = defineProps<{ flowOnly?: boolean }>()
 
-const route = useRoute()
+const route = useRoute<'extension-id-agencies-agencyId-forms-formId___en' | 'extension-id-agencies-agencyId-forms-formId___fr' | 'extension-id-agencies-agencyId-forms-formId-flow___en' | 'extension-id-agencies-agencyId-forms-formId-flow___fr'>()
 const localePath = useLocalePath()
 const { t, locale } = useI18n()
 const extensionKey = computed(() => String(route.params.id))

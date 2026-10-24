@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 import type { Scope } from '~~/shared/utils/scopes'
 import { sql } from 'kysely'

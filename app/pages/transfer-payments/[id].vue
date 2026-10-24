@@ -22,8 +22,8 @@ const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { getBilingualValue } = useBilingualValue()
 const route = useRoute()
-const id = route.params.id as string
-const isStreamRoute = computed(() => typeof route.params.streamId === 'string')
+const id = route.params.id
+const isStreamRoute = computed(() => 'streamId' in route.params && typeof route.params.streamId === 'string')
 const { toDateInput } = useDateHelpers()
 
 const {

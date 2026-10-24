@@ -26,7 +26,7 @@ const changeMode = (value: string | undefined) => {
   </UFormField>
   <template v-if="state.egcs_ay_calculationmode && state.egcs_ay_calculationmode !== 'manual'">
     <UFormField :label="t('budget_calculation.percentage')" name="egcs_ay_percentage" required>
-      <UInput v-model.number="state.egcs_ay_percentage" type="number" min="0" max="100" step="0.01" />
+      <UInput v-model.number.nullable="state.egcs_ay_percentage" type="number" min="0" max="100" step="0.01" />
     </UFormField>
     <UFormField v-if="state.egcs_ay_calculationmode === 'category'" :label="t('budget_calculation.source')" name="egcs_ay_sourcecategory" required>
       <CommonServerLookupSelect :model-value="state.egcs_ay_sourcecategory ?? undefined" :fetch-url="`/api/agency/cost-categories/${categoryId}/calculation-sources`" selected-values-query-key="selected_ids" value-key="id" label-en-key="label_en" label-fr-key="label_fr" @update:model-value="state.egcs_ay_sourcecategory = $event ?? null" />

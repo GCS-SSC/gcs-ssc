@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { prepareAgreementCommitmentRoute } from '~~/server/utils/agreement-commitment'

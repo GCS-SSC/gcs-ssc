@@ -71,7 +71,7 @@ const update = (id: string, value: unknown) => {
           </div>
           <UTextarea v-else-if="field.egcs_ay_kind === 'text' && field.egcs_ay_presentation === 'multiline'" :model-value="String(model[field.id] ?? '')" class="w-full" @update:model-value="update(field.id, $event)" />
           <UInput v-else-if="field.egcs_ay_kind === 'text'" :model-value="String(model[field.id] ?? '')" class="w-full" @update:model-value="update(field.id, $event)" />
-          <UInput v-else-if="field.egcs_ay_kind === 'number'" type="number" step="any" :model-value="typeof model[field.id] === 'number' ? model[field.id] as number : ''" class="w-full" @update:model-value="update(field.id, $event === '' ? null : Number($event))" />
+          <UInput v-else-if="field.egcs_ay_kind === 'number'" type="number" step="any" :model-value="String(model[field.id] ?? '')" class="w-full" @update:model-value="update(field.id, $event === '' ? null : Number($event))" />
           <CommonBilingualSelectMenu v-else-if="!field.egcs_ay_multiple" label-en-key="egcs_ay_name_en" label-fr-key="egcs_ay_name_fr" :model-value="customFieldOptionIds(model[field.id])[0] ?? null" :items="options(field)" category-en-key="egcs_ay_category_en" category-fr-key="egcs_ay_category_fr" :aria-label="label(field)" class="w-full" @update:model-value="update(field.id, $event ? [$event] : null)" />
           <CommonBilingualMultiSelectMenu v-else label-en-key="egcs_ay_name_en" label-fr-key="egcs_ay_name_fr" :model-value="customFieldOptionIds(model[field.id])" :items="options(field)" category-en-key="egcs_ay_category_en" category-fr-key="egcs_ay_category_fr" :aria-label="label(field)" class="w-full" @update:model-value="update(field.id, $event)" />
         </UFormField>

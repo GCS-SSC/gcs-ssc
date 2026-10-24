@@ -8,6 +8,7 @@ type WorkItem = AssignedWorkItem
 const { items, compact = false, emptyMessage } = defineProps<{ items: WorkItem[], compact?: boolean, emptyMessage?: string }>()
 const { t } = useI18n()
 const localePath = useLocalePath()
+const router = useRouter()
 const { getBilingualValue } = useBilingualValue()
 /**
  * Resolves work navigation through its independently owned localized route.
@@ -19,7 +20,7 @@ const itemUrl = (item: WorkItem) => {
     if (!item.proponent_id) throw new Error('Missing Proponent route context for Credit Memo')
     return localePath(appRouteLocations.proponentCreditMemoDetail(item.proponent_id, item.entity_id))
   }
-  return localePath(buildAssignedWorkRoute(item.entity_type, item.entity_id, item.agreement_id, item.variant))
+  return localePath(router.resolve(localePath(router.resolve(buildAssignedWorkRoute(item.entity_type, item.entity_id, item.agreement_id, item.variant)), 'en')))
 }
 const monthKeys = ['apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec', 'jan', 'feb', 'mar'] as const
 /**

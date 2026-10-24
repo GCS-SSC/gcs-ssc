@@ -99,8 +99,8 @@ const readView = () => {
       if (parsed.success) context = parsed.data
     } catch { /* An incomplete render cannot prove a loaded business context. */ }
   }
-  const routeReviewId = typeof route.value.params.reviewId === 'string' ? route.value.params.reviewId : null
-  const routeAgreementId = typeof route.value.params.id === 'string' && /\/(?:agreements|ententes)\//.test(route.value.path) ? route.value.params.id : null
+  const routeReviewId = 'reviewId' in route.value.params && typeof route.value.params.reviewId === 'string' ? route.value.params.reviewId : null
+  const routeAgreementId = 'id' in route.value.params && typeof route.value.params.id === 'string' && /\/(?:agreements|ententes)\//.test(route.value.path) ? route.value.params.id : null
   const matchesRoute = routeReviewId
     ? viewReviewId.value === routeReviewId
     : routeAgreementId ? viewAgreementId.value === routeAgreementId : Boolean(view)

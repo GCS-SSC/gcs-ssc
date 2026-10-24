@@ -42,8 +42,7 @@ export const resolveLocalePreference = (
  * @returns The supported English or French locale.
  */
 export const resolveRequestLocale = (event: H3Event, defaultLocale = 'en'): 'en' | 'fr' => {
-  const explicitLocale = (event as H3Event & { locale?: unknown }).locale
+  const explicitLocale = 'locale' in event ? event.locale : undefined
   if (explicitLocale === 'en' || explicitLocale === 'fr') return explicitLocale
-  if (!event.node?.req) return resolveLocalePreference(undefined, undefined, defaultLocale)
   return resolveLocalePreference(getCookie(event, 'i18n_redirected'), getHeader(event, 'accept-language'), defaultLocale)
 }

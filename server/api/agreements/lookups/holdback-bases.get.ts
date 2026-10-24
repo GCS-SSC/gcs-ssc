@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { authorize } from '~~/server/utils/authorize'
 import { authorizeAgreementStreamLookupRoute, prepareAgreementStreamLookupRoute } from '~~/server/utils/agreement-stream-lookup-routes'
 import { buildListRouteResponse } from '~~/server/utils/list-route-response'

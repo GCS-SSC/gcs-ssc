@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { AgencyProfileSchema } from '~~/shared/types/schemas'
 import {
   authorize,

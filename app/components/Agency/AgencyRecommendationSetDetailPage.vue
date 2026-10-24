@@ -24,7 +24,7 @@ type SetupDetail = TransferPaymentStreamRecommendationSetupItem & {
   publicationVersion: number | null
   hasUnpublishedChanges: boolean
 }
-const route = useRoute()
+const route = useRoute<'agencies-id-recommendation-sets-recommendationSetId___en' | 'agencies-id-recommendation-sets-recommendationSetId___fr'>()
 const router = useRouter()
 const localePath = useLocalePath()
 const { t } = useI18n()

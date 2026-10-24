@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { requireAuthContext } from '~~/server/utils/authorize'
 import { z } from 'zod'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'

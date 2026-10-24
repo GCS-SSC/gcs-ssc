@@ -3,7 +3,7 @@ import { assertAgreementCurrency } from '~~/server/utils/agreement-currency'
 import { fetchAgreementBudgetCostCategory } from '~~/server/utils/cost-configuration-integrity'
 import { prepareBudgetCalculation, recalculateAgreementBudget } from '~~/server/utils/agreement-budget-calculation'
 /* eslint-disable jsdoc/require-jsdoc -- Budget line-item route behavior is covered by focused route tests. */
-import type { H3Event } from 'h3'
+import { defineEventHandler, getRouterParam, type H3Event } from 'h3'
 import { authorize } from '~~/server/utils/authorize'
 import { badRequest } from '~~/server/utils/api-errors'
 import { FundingCaseAgreementBudgetLineItemPatchSchema, type FundingCaseAgreementBudgetLineItemPatch } from '~~/shared/types/schemas'

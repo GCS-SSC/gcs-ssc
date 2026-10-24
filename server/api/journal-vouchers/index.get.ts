@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { sql } from 'kysely'
 import { requireAuthContext } from '~~/server/utils/authorize'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'

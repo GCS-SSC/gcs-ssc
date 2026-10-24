@@ -13,35 +13,46 @@ const resolveSource = (path: string) => {
   return match ?? path
 }
 
-const result = await Bun.build({
-  entrypoints: [resolve(repositoryRoot, 'server/workers/storage-cleanup-drain.ts')],
-  define: {
-    'import.meta.dev': 'false',
-    'process.env.NODE_ENV': JSON.stringify('production')
-  },
-  external: ['@electric-sql/*', 'kysely', 'kysely-pglite'],
-  format: 'esm',
-  outdir: resolve(repositoryRoot, '.output/server'),
-  naming: 'storage-cleanup-drain.mjs',
-  plugins: [{
-    name: 'nuxt-worker-aliases',
-    /**
-     * Registers aliases that Nuxt normally supplies at runtime.
-     * @param build - Bun plugin builder.
-     */
-    setup: build => {
-      build.onResolve({ filter: /^~~\// }, args => ({
-        path: resolveSource(resolve(repositoryRoot, args.path.slice(3)))
-      }))
-      build.onResolve({ filter: /^#gcs-extensions\/server-registry$/ }, () => ({
-        path: resolve(repositoryRoot, '.nuxt/gcs-extensions/server-registry.mjs')
-      }))
-    }
-  }],
-  target: 'node'
-})
+/**
+ * Bundles the real standalone worker into Nitro output or an isolated verification directory.
+ * @param outputDirectory - Destination for the executable bundle.
+ * @returns Completion after successful bundle emission.
+ */
+export const buildStorageCleanupWorker = async (
+  outputDirectory = resolve(repositoryRoot, '.output/server')
+): Promise<void> => {
+  const result = await Bun.build({
+    entrypoints: [resolve(repositoryRoot, 'server/workers/storage-cleanup-drain.ts')],
+    define: {
+      'import.meta.dev': 'false',
+      'process.env.NODE_ENV': JSON.stringify('production')
+    },
+    external: ['@electric-sql/*', 'kysely-pglite'],
+    format: 'esm',
+    outdir: outputDirectory,
+    naming: 'storage-cleanup-drain.mjs',
+    plugins: [{
+      name: 'nuxt-worker-aliases',
+      /**
+       * Registers aliases that Nuxt normally supplies at runtime.
+       * @param build - Bun plugin builder.
+       */
+      setup: build => {
+        build.onResolve({ filter: /^~~\// }, args => ({
+          path: resolveSource(resolve(repositoryRoot, args.path.slice(3)))
+        }))
+        build.onResolve({ filter: /^#gcs-extensions\/server-registry$/ }, () => ({
+          path: resolve(repositoryRoot, '.nuxt/gcs-extensions/server-registry.mjs')
+        }))
+      }
+    }],
+    target: 'node'
+  })
 
-if (!result.success) {
-  for (const log of result.logs) console.error(log)
-  process.exitCode = 1
+  if (!result.success) {
+    for (const log of result.logs) console.error(log)
+    throw new Error('Standalone storage cleanup worker build failed')
+  }
 }
+
+if (import.meta.main) await buildStorageCleanupWorker()

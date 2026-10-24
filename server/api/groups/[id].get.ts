@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { authorizeGroup } from '~~/server/utils/groups'
 
 // eslint-disable-next-line local/require-authorize -- authorizeGroup applies the agency-scoped group grant.

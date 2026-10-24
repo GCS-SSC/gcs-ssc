@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'
 import { deleteStoredFile } from '~~/server/utils/file-storage'

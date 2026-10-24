@@ -1,5 +1,5 @@
 /* eslint-disable jsdoc/require-jsdoc -- Stream picker projections are covered by focused route tests. */
-import type { H3Event } from 'h3'
+import { getRouterParam, type H3Event } from 'h3'
 import { z } from 'zod'
 import { sql } from 'kysely'
 import { PaginationSchema, PositivePostgresBigintIdSchema } from '~~/shared/types/schemas'

@@ -1,6 +1,6 @@
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 /* eslint-disable jsdoc/require-jsdoc -- Query-construction callbacks are local and covered by route tests. */
-import type { H3Event } from 'h3'
+import { defineEventHandler, type H3Event } from 'h3'
 import { PaginationSchema } from '~~/shared/types/schemas'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { authorize, resolveAnyAgency } from '~~/server/utils/authorize'

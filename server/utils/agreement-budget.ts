@@ -37,8 +37,7 @@ const routeBadRequest = async (
   code: string,
   key: string
 ) => {
-  const badRequestHandler = (globalThis as { badRequest?: typeof badRequest }).badRequest ?? badRequest
-  return await badRequestHandler(event, code, key)
+  return await badRequest(event, code, key)
 }
 
 export interface AgreementBudgetProgramFundingCapacity {
@@ -324,8 +323,7 @@ export const patchAgreementBudgetFiscalYear = async (
     return existing
   }
 
-  const readBody = (globalThis as { readValidatedBodyI18n?: typeof readValidatedBodyI18n }).readValidatedBodyI18n ?? readValidatedBodyI18n
-  const validated = await readBody(event, FundingCaseAgreementBudgetFiscalYearPatchSchema)
+  const validated = await readValidatedBodyI18n(event, FundingCaseAgreementBudgetFiscalYearPatchSchema)
   if (!Object.hasOwn(validated, 'egcs_fc_fiscalyear') || String(validated.egcs_fc_fiscalyear) === String(existing.egcs_fc_fiscalyear)) {
     const fiscalYear = await resolveRetainedAgreementBudgetFiscalYear(db, streamId, existing.egcs_fc_fiscalyear)
     if (!fiscalYear) {
@@ -437,8 +435,7 @@ export const createAgreementBudgetLineItem = async (
   agreementId: string,
   initialContext: AgreementScopeContext
 ) => {
-  const readBody = (globalThis as { readValidatedBodyI18n?: typeof readValidatedBodyI18n }).readValidatedBodyI18n ?? readValidatedBodyI18n
-  const validated = await readBody(event, FundingCaseAgreementBudgetLineItemCreateSchema)
+  const validated = await readValidatedBodyI18n(event, FundingCaseAgreementBudgetLineItemCreateSchema)
 
   return await executeFreshAuthorizedAgreementWrite(event, db, agreementId, initialContext, async (trx, currentContext) => {
     const fiscalYear = await assertAgreementBudgetFiscalYearForAgreement(

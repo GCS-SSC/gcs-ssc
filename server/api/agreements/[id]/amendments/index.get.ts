@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { sql } from 'kysely'
 import { badRequest } from '~~/server/utils/api-errors'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'

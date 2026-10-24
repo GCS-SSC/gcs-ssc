@@ -58,7 +58,7 @@ type AgencyNameResponse = {
  */
 /** Coordinates assessment-schema detail fetching, editing, and save flows. */
 export const useAssessmentSchemaDetailPage = async () => {
-  const route = useRoute()
+  const route = useRoute<'agencies-id-review-schemas-schemaId___en' | 'agencies-id-review-schemas-schemaId___fr'>()
   const localePath = useLocalePath()
   const toast = useLocalizedToast()
   const { showError } = useApiErrorToast()

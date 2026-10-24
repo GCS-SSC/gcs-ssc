@@ -1,4 +1,4 @@
-import type { H3Event } from 'h3'
+import { getRouterParam, type H3Event } from 'h3'
 import type { Transaction } from 'kysely'
 import { authorizeTransferPaymentStreamResource } from './transfer-payment-route-authorization'
 import { executeFreshAuthorizedTransferPaymentStreamRead, executeFreshAuthorizedTransferPaymentStreamWrite } from './transfer-payment-write-transaction'

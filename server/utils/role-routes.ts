@@ -44,8 +44,7 @@ const routeBadRequest = async (
   code: string,
   key: string
 ) => {
-  const badRequestHandler = (globalThis as { badRequest?: typeof badRequest }).badRequest ?? badRequest
-  return await badRequestHandler(event, code, key)
+  return await badRequest(event, code, key)
 }
 
 const routeNotFound = async (
@@ -53,8 +52,7 @@ const routeNotFound = async (
   code: string,
   key: string
 ) => {
-  const notFoundHandler = (globalThis as { notFound?: typeof notFound }).notFound ?? notFound
-  return await notFoundHandler(event, code, key)
+  return await notFound(event, code, key)
 }
 
 /** Deduplicates role permissions by subject. */

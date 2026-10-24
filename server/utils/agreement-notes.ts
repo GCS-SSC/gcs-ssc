@@ -1,5 +1,5 @@
 /* eslint-disable jsdoc/require-jsdoc -- Agreement note route helpers. */
-import type { H3Event } from 'h3'
+import { getRouterParam, type H3Event } from 'h3'
 import { authorizeAgreementResource } from './agreement'
 import { executeFreshAuthorizedAgreementWrite } from './agreement-write-transaction'
 import { assertAgreementExists } from './agreement-child-resources'

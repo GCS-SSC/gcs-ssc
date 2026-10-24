@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { authorize, resolveAnyAgency } from '~~/server/utils/authorize'
 
 export default defineEventHandler(async event => {

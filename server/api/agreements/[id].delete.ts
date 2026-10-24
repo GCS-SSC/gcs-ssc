@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { authorize } from '~~/server/utils/authorize'
 import { canAccessAgreement, resolveAgreementScopeContext } from '~~/server/utils/agreement'
 import { executeFreshAuthorizedAgreementWrite } from '~~/server/utils/agreement-write-transaction'

@@ -1,3 +1,4 @@
+import { defineNitroPlugin } from 'nitropack/runtime'
 import { statusCatalogService } from '../utils/status-catalog'
 
 export default defineNitroPlugin(nitroApp => {

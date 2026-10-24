@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { TransferPaymentListQuerySchema } from '~~/shared/types/schemas'
 import { authorize, resolveTransferPaymentVisibility } from '~~/server/utils/authorize'
 import { listTransferPayments } from '~~/server/utils/transfer-payment-list-routes'

@@ -290,7 +290,7 @@ export const requireAuthContext = async (event: H3Event): Promise<AuthContext> =
     return event.context.$authContext
   }
 
-  const userId = await withAnonymousAudit(event.context.auditRequestId ?? null, () => requireSessionUserId(event))
+  const userId = await withAnonymousAudit(event.context.auditRequestId ?? null, () => requireSessionUserId(event), event.context.accessLogRequest)
   await requireActiveUser(event, userId, event.context.$db)
   event.context.auditActorUserId = userId
 
@@ -315,7 +315,7 @@ export const requireFreshAuthContext = async (
   db: Kysely<Database>,
   options: FreshAuthorizationOptions = {}
 ): Promise<AuthContext> => {
-  const userId = await withAnonymousAudit(event.context.auditRequestId ?? null, () => requireSessionUserId(event))
+  const userId = await withAnonymousAudit(event.context.auditRequestId ?? null, () => requireSessionUserId(event), event.context.accessLogRequest)
   await lockFreshAuthorizationRows(
     event,
     db,
@@ -339,7 +339,7 @@ export const requireFreshReadAuthContext = async (
   event: H3Event,
   db: Kysely<Database>
 ): Promise<AuthContext> => {
-  const userId = await withAnonymousAudit(event.context.auditRequestId ?? null, () => requireSessionUserId(event))
+  const userId = await withAnonymousAudit(event.context.auditRequestId ?? null, () => requireSessionUserId(event), event.context.accessLogRequest)
   await requireActiveUser(event, userId, db)
   return {
     userId,
@@ -380,7 +380,7 @@ const authorizeWithContext = async <A extends AbilityAction, T = undefined>(
  * required. Calling `authorizeFresh` after entity or extension locks would
  * invert the protected-write lock order.
  */
-export const authorizeWithFreshAuthContext = async <A extends AbilityAction, T = undefined>(
+const authorizeWithFreshAuthContext = async <A extends AbilityAction, T = undefined>(
   event: H3Event,
   context: AuthContext,
   subject: AuthorizationSubject,
@@ -393,6 +393,7 @@ export const authorizeWithFreshAuthContext = async <A extends AbilityAction, T =
   action,
   scopeOrResolver
 )
+export { authorizeWithFreshAuthContext }
 
 /**
  * Authorizes an action on a subject within a specific scope.
@@ -404,7 +405,7 @@ export const authorizeWithFreshAuthContext = async <A extends AbilityAction, T =
  * @returns The authorization result containing context and scope data.
  * @throws ForbiddenError if authorization fails.
  */
-export const authorize = async <A extends AbilityAction, T = undefined>(
+const authorize = async <A extends AbilityAction, T = undefined>(
   event: H3Event,
   subject: AuthorizationSubject,
   action: A,
@@ -413,11 +414,12 @@ export const authorize = async <A extends AbilityAction, T = undefined>(
   const context = await requireAuthContext(event)
   return await authorizeWithContext(event, context, subject, action, scopeOrResolver)
 }
+export { authorize }
 
 /**
  * Authorizes with a freshly rebuilt, transaction-locked grant context.
  */
-export const authorizeFresh = async <A extends AbilityAction, T = undefined>(
+const authorizeFresh = async <A extends AbilityAction, T = undefined>(
   event: H3Event,
   subject: AuthorizationSubject,
   action: A,
@@ -428,6 +430,7 @@ export const authorizeFresh = async <A extends AbilityAction, T = undefined>(
   const context = await requireFreshAuthContext(event, db, options)
   return await authorizeWithContext(event, context, subject, action, scopeOrResolver)
 }
+export { authorizeFresh }
 
 /**
  * Resolves the agencies where an authorization context can perform an action.

@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { sql } from 'kysely'
 import { AttachmentTypeLookupQuerySchema } from '~~/shared/types/schemas'
 import { RequiredStringId } from '~~/shared/types/schemas/common'

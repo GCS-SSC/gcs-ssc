@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { throwIfApplicantRecipientUniqueConstraintError } from '~~/server/utils/applicant-recipient-unique-constraint-errors'
 import { authorize, requireAuthContext } from '~~/server/utils/authorize'
 import { ApplicantRecipientContactPatchSchema } from '~~/shared/types/schemas'

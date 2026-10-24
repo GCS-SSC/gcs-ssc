@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { authorize, requireAuthContext } from '~~/server/utils/authorize'
 import { getValidatedQueryI18n, parseI18n } from '~~/server/utils/api-validate'
 import { notFound } from '~~/server/utils/api-errors'

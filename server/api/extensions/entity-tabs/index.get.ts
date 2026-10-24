@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { H3Event } from 'h3'
+import { defineEventHandler, getQuery, type H3Event } from 'h3'
 import type { Kysely } from 'kysely'
 import type { ExtensionEntityTabItem, ExtensionEntityTabsResponse } from '~~/shared/types/schemas/extensions'
 import type { GcsExtensionJsonConfig } from '~~/shared/utils/extensions'

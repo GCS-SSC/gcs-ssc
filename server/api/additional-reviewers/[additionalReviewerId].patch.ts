@@ -14,7 +14,7 @@ import {
   executeFreshAuthorizedReviewAdditionalReviewerWrite
 } from '~~/server/utils/review-runtime-access'
 import { assertReviewNotLocked } from '~~/server/utils/review-runtime-state'
-import type { H3Event } from 'h3'
+import { defineEventHandler, getRouterParam, type H3Event } from 'h3'
 import type { Kysely } from 'kysely'
 import type { Database } from '~~/shared/types/database'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'

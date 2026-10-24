@@ -2,8 +2,8 @@ import BilingualFieldHost from '~/components/Extension/BilingualFieldHost.vue'
 import { useBilingualFieldControl } from './bilingual-field-context'
 import { Fragment, computed, defineComponent, h, inject, provide, shallowRef, onMounted, onUpdated, nextTick, unref, watch } from 'vue'
 import type { Component, ComponentPublicInstance } from 'vue'
-import { formFieldInjectionKey, formOptionsInjectionKey } from '@nuxt/ui/composables/useFormField'
-import { fieldLabelKey, fieldRequirementKey } from './form-requirement-context'
+import { formFieldInjectionKey } from '@nuxt/ui/composables/useFormField'
+import { fieldLabelKey, fieldRequirementKey, formRequirementKey } from './form-requirement-context'
 
 /**
  * Converts an explicitly supplied Boolean attribute to its Vue Boolean value.
@@ -36,14 +36,14 @@ export const createRequiredControl = <T>(component: T, kind: 'standard' | 'selec
    */
   setup: (props, { attrs, slots, expose }) => {
     const labelId = inject(fieldLabelKey, undefined)
-    const formOptions = inject(formOptionsInjectionKey, undefined)
+    const form = inject(formRequirementKey, undefined)
     const formField = inject(formFieldInjectionKey, undefined)
     const inherited = inject(fieldRequirementKey, undefined)
     // Search inputs and option controls inside a composite must not inherit its requirement.
     provide(fieldRequirementKey, computed(() => false))
     const control = shallowRef<ComponentPublicInstance | null>(null)
     const isRequired = computed(() => props.required === undefined ? inherited?.value ?? false : booleanAttribute(props.required))
-    const isEnabled = computed(() => !formOptions?.value.disabled && !booleanAttribute(props.disabled) && !booleanAttribute(props.readonly))
+    const isEnabled = computed(() => !form?.disabled.value && !booleanAttribute(props.disabled) && !booleanAttribute(props.readonly))
     let bilingualElement: HTMLElement | undefined
     const bilingual = options.bilingualText
       ? useBilingualFieldControl(
@@ -136,7 +136,6 @@ export const createRequiredControl = <T>(component: T, kind: 'standard' | 'selec
         if (descriptions) target.setAttribute('aria-describedby', descriptions)
         else target.removeAttribute('aria-describedby')
       }
-      // Reka's fully-hidden form proxies duplicate the visible control's name/state.
       const root = elementOf(exposed.$el) ?? targets[0]?.parentElement
       // Reka caches radio label text; reference the live title instead.
       if (kind === 'radio-group' && root) {
@@ -150,10 +149,6 @@ export const createRequiredControl = <T>(component: T, kind: 'standard' | 'selec
           radio.setAttribute('aria-labelledby', label.id)
           radio.removeAttribute('aria-label')
         }
-      }
-      if (targets.length) for (const proxy of root?.querySelectorAll<HTMLInputElement>('input[data-hidden][tabindex="-1"]') ?? []) {
-        proxy.setAttribute('aria-hidden', 'true')
-        proxy.hidden = true
       }
     }
     onMounted(() => {

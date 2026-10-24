@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { streamWorkflowRoute } from '~~/server/utils/stream-workflow-routes'
 
 // eslint-disable-next-line local/require-authorize -- Shared route authorizes the Stream scope.

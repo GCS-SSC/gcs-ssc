@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import { FundingCaseAgreementAmendmentCreateSchema } from '~~/shared/types/schemas'

@@ -1,3 +1,4 @@
+import { useNitroApp } from 'nitropack/runtime'
 /* eslint-disable jsdoc/require-param -- Integration staging shares the locked outcome transaction and never delivers externally. */
 import type { Transaction } from 'kysely'
 import type { Database } from '~~/shared/types/database'
@@ -5,8 +6,6 @@ import { GCS_EXTENSION_CORRECTION_OUTCOME_HOOK, type GcsExtensionCorrectionOutco
 import { getExtensionConfigurationForEntity, getRegisteredExtensions } from './extensions'
 import { resolveCorrectionRuntimeContext } from './correction-context'
 import { formatCorrectionReference } from '~~/shared/utils/correction'
-
-declare const useNitroApp: typeof import('nitropack/runtime').useNitroApp
 
 /** Enabled integrations may insert their durable delivery requests using this transaction; workers deliver after commit. */
 export const stageCorrectionOutcomeIntegrations = async (

@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { createAgreementNote } from '~~/server/utils/agreement-notes'
 
 // Authorization is enforced by the note service before accessing the parent or note.

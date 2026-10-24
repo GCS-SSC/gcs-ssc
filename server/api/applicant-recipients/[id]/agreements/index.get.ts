@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { assignedEntityIdsQuery } from '@gcs-ssc/authorization/server'
 import { AssignedListViewSchema } from '~~/shared/types/schemas/assigned-list-view'
 import { authorizeWithFreshAuthContext, requireFreshAuthContext, type AuthContext } from '~~/server/utils/authorize'

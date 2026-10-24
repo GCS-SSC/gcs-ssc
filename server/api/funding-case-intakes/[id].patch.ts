@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { FundingCaseIntakePatchSchema } from '~~/shared/types/schemas'
 import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import { requireAuthContext, requireFreshAuthContext } from '~~/server/utils/authorize'

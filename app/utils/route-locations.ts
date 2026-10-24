@@ -1,3 +1,5 @@
+import type { RouteNamedMapI18n } from 'vue-router/auto-routes'
+
 /* eslint-disable jsdoc/require-jsdoc */
 export const authorizedRouteLocation = <T>(authorized: boolean | undefined, location: T): T | undefined => {
   if (authorized) return location
@@ -117,6 +119,8 @@ export const appRouteLocations = {
   }),
   roles: () => ({ name: 'roles' }),
   groups: () => ({ name: 'groups' }),
+  journalVouchers: () => ({ name: 'journal-vouchers' }),
+  journalVoucherDetail: (id: string) => ({ name: 'journal-vouchers-id', params: { id } }),
   roleDetail: (id: string) => ({ name: 'roles-id', params: { id } }),
   transferPayments: () => ({ name: 'transfer-payments' }),
   fundingOpportunities: () => ({ name: 'funding-opportunities' }),
@@ -155,4 +159,4 @@ export const appRouteLocations = {
   }),
   users: () => ({ name: 'users' }),
   userDetail: (id: string) => ({ name: 'users-id', params: { id } })
-} as const
+} satisfies Record<string, (...args: never[]) => { name: keyof RouteNamedMapI18n }>

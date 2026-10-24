@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import { authorizeAmendmentDocumentResource } from '~~/server/utils/amendment-document-generation'
 import { assertDraftAgreementAmendment } from '~~/server/utils/agreement-amendment'

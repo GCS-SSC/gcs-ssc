@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { CorrectionCancelSchema } from '~~/shared/types/schemas/correction'
 import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import { authorizeCorrection } from '~~/server/utils/correction'

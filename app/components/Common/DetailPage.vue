@@ -10,9 +10,13 @@ const { id, breadcrumbItems, helpReturnTarget, helpReturnEnabled = true } = defi
 }>()
 const collapsed = defineModel<boolean>('collapsed', { required: true })
 const { t } = useI18n()
-const renderedBreadcrumbItems = computed(() => breadcrumbItems.map((item, index) =>
-  index === 0 && helpReturnEnabled && helpReturnTarget && item.to ? { ...item, to: undefined, slot: 'help-return', ui: { ...item.ui, item: [item.ui?.item, 'shrink-0 max-w-full'] } } : item
-))
+const renderedBreadcrumbItems = computed<BreadcrumbItem[]>(() => breadcrumbItems.map((item, index) => {
+  if (index === 0 && helpReturnEnabled && helpReturnTarget && item.to) {
+    return { ...item, to: undefined, slot: 'help-return', ui: { ...item.ui, item: (defaults: string) => [typeof item.ui?.item === 'function' ? item.ui.item(defaults) : [defaults, item.ui?.item], 'shrink-0 max-w-full'] } }
+  }
+  if (index === breadcrumbItems.length - 1 && !item.to && !item.href) return { ...item, active: item.active ?? true }
+  return item
+}))
 </script>
 
 <template>

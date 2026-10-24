@@ -24,13 +24,13 @@ const { t } = useI18n()
 const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { getBilingualValue } = useBilingualValue()
-const id = route.params.id as string
-const streamId = route.params.streamId as string
+const id = route.params.id
+const streamId = route.params.streamId
 provideBilingualFieldScope(() => ({ subject: 'transfer_payment', streamId, permissionAction: 'update' }))
 
-const isNestedAssessmentSchemaRoute = computed(() => typeof route.params.schemaId === 'string')
-const isNestedApprovalTemplateRoute = computed(() => typeof route.params.templateId === 'string')
-const isNestedRecommendationSetupRoute = computed(() => typeof route.params.recommendationSetupId === 'string')
+const isNestedAssessmentSchemaRoute = computed(() => 'schemaId' in route.params && typeof route.params.schemaId === 'string')
+const isNestedApprovalTemplateRoute = computed(() => 'templateId' in route.params && typeof route.params.templateId === 'string')
+const isNestedRecommendationSetupRoute = computed(() => 'recommendationSetupId' in route.params && typeof route.params.recommendationSetupId === 'string')
 const isNestedDetailRoute = computed(() => (
   isNestedAssessmentSchemaRoute.value
   || isNestedApprovalTemplateRoute.value

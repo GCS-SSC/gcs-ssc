@@ -38,7 +38,7 @@ type ReviewSetupDetail = Omit<TransferPaymentStreamReviewSetupItem, 'members'> &
   hasUnpublishedChanges: boolean
 }
 
-const route = useRoute()
+const route = useRoute<'agencies-id-review-sets-reviewSetId___en' | 'agencies-id-review-sets-reviewSetId___fr'>()
 const router = useRouter()
 const localePath = useLocalePath()
 const { t } = useI18n()

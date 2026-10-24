@@ -56,7 +56,7 @@ type WorkflowMember = {
 type WorkflowMemberForm = Omit<WorkflowMember, 'id'> & { id?: string }
 type NestedMember = { id: string, egcs_cn_order?: number, egcs_cn_name_en?: string, egcs_cn_name_fr?: string }
 
-const route = useRoute()
+const route = useRoute<'agencies-id-workflows-workflowSetupId___en' | 'agencies-id-workflows-workflowSetupId___fr'>()
 const localePath = useLocalePath()
 const { t } = useI18n()
 const { can } = useCan()

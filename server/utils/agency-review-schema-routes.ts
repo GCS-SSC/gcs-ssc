@@ -1,5 +1,5 @@
 /* eslint-disable jsdoc/require-jsdoc -- Agency Review Schema route adapter. */
-import type { H3Event } from 'h3'
+import { getRouterParam, type H3Event } from 'h3'
 import { sql } from 'kysely'
 import { z } from 'zod'
 import type { JsonValue } from '~~/shared/types/database'

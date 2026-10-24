@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { badRequest, notFound, throwApiError } from '~~/server/utils/api-errors'
 import type { PublishedReviewSchemaDefinition, ReviewSchemaContentSource } from '~~/server/utils/review-schema-versioning'
 import {

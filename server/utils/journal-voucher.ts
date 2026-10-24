@@ -20,9 +20,10 @@ import { withBusinessRecordState } from './business-record-state'
 import { journalVoucherPaymentIsFinal } from './journal-voucher-source'
 import { readAgreementPaymentAccountingSource, requireAgreementPaymentSourceRead } from './agreement-payment-source'
 
-export const journalVoucherError = async (event: H3Event, code: string) => await throwApiError(event, {
+const journalVoucherError = async (event: H3Event, code: string) => await throwApiError(event, {
   statusCode: 409, code, key: 'apiErrors.journal_voucher.invalid_entry'
 })
+export { journalVoucherError }
 
 export const authorizeJournalVoucher = async (event: H3Event, journalVoucherId: string, action: 'read' | 'update' | 'delete' = 'read') => {
   const context = await resolveJournalVoucherRuntimeContext(event.context.$db, journalVoucherId)
@@ -45,7 +46,7 @@ export const readJournalVoucherLines = async (db: Kysely<Database>, journalVouch
   }))
 }
 
-export const persistJournalVoucherLines = async (trx: Transaction<Database>, id: string, paymentId: string,
+const persistJournalVoucherLines = async (trx: Transaction<Database>, id: string, paymentId: string,
   kind: 'original' | 'corrected' | 'adjustment', lines: JournalVoucherAccountingLine[]) => {
   if (!lines.length) return
   await trx.insertInto('Funding_Case_Agreement_Journal_Voucher_Line').values(lines.map(line => ({
@@ -56,6 +57,7 @@ export const persistJournalVoucherLines = async (trx: Transaction<Database>, id:
     egcs_fc_amount: databaseMoneyValue(line.egcs_fc_amount)
   }))).execute()
 }
+export { persistJournalVoucherLines }
 
 /** Agency/Stream/fiscal-year choices are authorized by the JV root, without a Program read grant. */
 export const readJournalVoucherCodingChoices = async (db: Kysely<Database>, context: NonNullable<Awaited<ReturnType<typeof resolveJournalVoucherRuntimeContext>>>, fiscalYearId: string, currency: Database['Funding_Case_Agreement_Journal_Voucher']['egcs_fc_currency']) =>

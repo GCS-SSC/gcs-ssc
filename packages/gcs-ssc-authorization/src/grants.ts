@@ -1,10 +1,10 @@
 /* eslint-disable jsdoc/require-jsdoc -- Grant types and evaluator methods are documented by their explicit authorization vocabulary. */
-import type { AuthorizationAction, StaticGrantAction } from './actions'
-import type { AuthorizationSubject, RoleAbilitySubject } from './abilities'
-import { isRoleAbility, ROLE_PERMISSION_SUBJECTS } from './abilities'
-import { canSubjectManageAssignments, isAbilityAllowedForRoleScope } from './role-scopes'
-import type { AuthorizationScope, RoleScope } from './scopes'
-import { isAuthorizationScopeCovered } from './scopes'
+import type { AuthorizationAction, StaticGrantAction } from './actions.ts'
+import type { AuthorizationSubject, RoleAbilitySubject } from './abilities.ts'
+import { isRoleAbility, ROLE_PERMISSION_SUBJECTS } from './abilities.ts'
+import { canSubjectManageAssignments, isAbilityAllowedForRoleScope } from './role-scopes.ts'
+import type { AuthorizationScope, RoleScope } from './scopes.ts'
+import { isAuthorizationScopeCovered } from './scopes.ts'
 
 export type StaticAuthorizationGrantSource = 'role'
 

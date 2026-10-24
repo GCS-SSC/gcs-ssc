@@ -1,3 +1,4 @@
+import { useRuntimeConfig } from 'nitropack/runtime'
 import { auditScope } from './audit-context'
 import { betterAuth } from 'better-auth'
 import { APIError } from 'better-auth/api'

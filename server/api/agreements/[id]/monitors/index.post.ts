@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import type { Insertable } from 'kysely'
 import { FundingCaseAgreementMonitorCreateSchema } from '~~/shared/types/schemas'
 import type { FundingCaseAgreementMonitorTable } from '~~/shared/types/database'

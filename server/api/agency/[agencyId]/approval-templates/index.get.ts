@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { authorizeApprovalTemplateScope } from '~~/server/utils/approval-template-scope'
 import { listApprovalTemplates } from '~~/server/utils/approval-templates'

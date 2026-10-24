@@ -1,4 +1,10 @@
+FROM node:24.22.1-bookworm-slim AS node-base
+
 FROM oven/bun:1.3.13 AS build
+
+COPY --from=node-base /usr/local/bin/node /usr/local/bin/node
+RUN node --version \
+  && bun -e 'const child = Bun.spawnSync(["node", "-p", "process.versions.bun || process.versions.node"]); const version = new TextDecoder().decode(child.stdout).trim(); if (child.exitCode !== 0 || version !== "24.22.1") throw new Error("Bun must launch real Node 24.22.1"); console.log("Bun child Node: " + version)'
 
 WORKDIR /app
 
@@ -39,17 +45,17 @@ RUN set -eux; \
     git -C "$destination" checkout --detach FETCH_HEAD; \
     rm -rf "$destination/.git"; \
   }; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-ssc-extensions.git packages/gcs-ssc-extensions 7e0113c8be319f769a928dbf75faba590ebef8ef; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-agreement-number.git extensions/gcs-agreement-number 41721b21f970cc68ad8b1de299ae5f0d6e07ff15; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-automated-payments.git extensions/gcs-automated-payments 4f807d4346a4b5a87d9e61965bc3be2d52f9dbd9; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-gcforms-integration.git extensions/gcs-gcforms-integration 6997fcd7a668b9532b46d53d8562b7c072fc0b03; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-machine-translation.git extensions/gcs-machine-translation c2e07936bd727815a1dbf613df53eff8cb606cd0; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-narrative-quality.git extensions/gcs-narrative-quality 562115bd7e175fbd592ff8b85b5dd923d004e4a8; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-narrative-tags.git extensions/gcs-narrative-tags d0be536d3f9d5c8219a013c8289dfb48bc9887bd; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-outcome-cost-allocation.git extensions/gcs-outcome-cost-allocation e1cc5fde944a21797b8190370dd5889ab776c87a; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-ssc-portal-connector.git extensions/gcs-ssc-portal-connector 7138854311346212686910a3335ec4b785f7a507; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-storage-local.git extensions/gcs-storage-local a34e36a5fcd9dd6c4b02028ffa664ada83531dfc; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-storage-s3.git extensions/gcs-storage-s3 c2b7a74a0cca68b6e794e709f509a1ae994375ae
+  fetch_workspace https://github.com/GCS-SSC/gcs-ssc-extensions.git packages/gcs-ssc-extensions 51979aff733b0a538285c24cb09fb1e250b52f5a; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-agreement-number.git extensions/gcs-agreement-number 96d8f2fc0c0906b3fa0f47f683bf92f11c24b37d; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-automated-payments.git extensions/gcs-automated-payments d209a366c62e7618459ff12382f4afb2136966e2; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-gcforms-integration.git extensions/gcs-gcforms-integration 589f297eb93a19b01f819e21fda59bbba348c298; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-machine-translation.git extensions/gcs-machine-translation 01c05f3f95c87f0876f669bcdd258e374e065b8c; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-narrative-quality.git extensions/gcs-narrative-quality ee656051e8093d6c101abef69622a5c7046c711c; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-narrative-tags.git extensions/gcs-narrative-tags 05828f8271e33bdb9b2aca27a7b0d1c4fd40644a; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-outcome-cost-allocation.git extensions/gcs-outcome-cost-allocation 1b0cca32c32fb402a05f809b304914c00a877dc9; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-ssc-portal-connector.git extensions/gcs-ssc-portal-connector 427f9a3c2fe3c351f939c4efdf9c5ef2405a091c; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-storage-local.git extensions/gcs-storage-local 0c2029c93a52bfd4f88c2ef188cc62d4def2d2b1; \
+  fetch_workspace https://github.com/GCS-SSC/gcs-storage-s3.git extensions/gcs-storage-s3 365708f3fb63c28114af3dadb434d5135addcf65
 
 RUN bun install --frozen-lockfile
 
@@ -75,7 +81,7 @@ RUN if [ "$ENVIRONMENT_TYPE" = "demo" ]; then \
     && cp "demo-assets/Contribution Agreement.docx" ".output/demo-assets/Contribution Agreement.docx"; \
   fi
 
-FROM node:24-bookworm-slim AS runtime
+FROM node-base AS runtime
 
 ARG ENVIRONMENT_TYPE
 
@@ -89,21 +95,13 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY --from=build --chown=node:node /app/.output ./.output
-COPY --from=build --chown=node:node /app/node_modules ./node_modules
-COPY --from=build --chown=node:node /app/node_modules/.bun/ws@8.20.1/node_modules/ws /app/.output/server/node_modules/ws
-
-RUN node -e 'const fs = require("node:fs"); const path = require("node:path"); const walk = (dir) => { for (const entry of fs.readdirSync(dir, { withFileTypes: true })) if (entry.isDirectory()) walk(path.join(dir, entry.name)); if (fs.readdirSync(dir).join() === "package.json") fs.rmSync(dir, { recursive: true }); }; walk("/app/.output/server/node_modules");' \
-  && node -e 'const fs = require("node:fs"); const path = require("node:path"); const deps = require("/app/.output/server/package.json").dependencies; for (const [name, version] of Object.entries(deps)) { const target = path.join("/app/node_modules", name); const stored = path.join("/app/node_modules/.bun", name.replace("/", "+") + "@" + version, "node_modules", name); if (!fs.existsSync(target) && fs.existsSync(stored)) { fs.mkdirSync(path.dirname(target), { recursive: true }); fs.symlinkSync(stored, target, "dir"); } }' \
-  && if [ "$ENVIRONMENT_TYPE" = "demo" ]; then \
+RUN if [ "$ENVIRONMENT_TYPE" = "demo" ]; then \
     mkdir -p /app/demo-assets \
     && cp "/app/.output/demo-assets/Contribution Agreement.docx" "/app/demo-assets/Contribution Agreement.docx"; \
   fi \
-  && chown -R node:node /app/.output \
   && if [ -d /app/demo-assets ]; then chown -R node:node /app/demo-assets; fi \
   && mkdir -p /app/.data/pglite \
   && chown -R node:node /app/.data
-
-COPY --from=build --chown=node:node /app/extensions/gcs-ssc-portal-connector/vendor/survey /app/.output/server/node_modules/@gcs-ssc/survey
 
 ENV NODE_ENV=production
 ENV ENVIRONMENT_TYPE=${ENVIRONMENT_TYPE}

@@ -1,3 +1,4 @@
+import { useNitroApp } from 'nitropack/runtime'
 import { assertAgreementFinancialId } from './agreement-financial-ids'
 import { assertAgreementProponentType } from './agreement-proponent-type'
 import { captureParsedAuditRequestBody } from './audit-request'
@@ -44,10 +45,7 @@ import {
 } from '~~/server/utils/funding-history'
 
 const readAgreementProfilePatchBody = async (event: H3Event) => {
-  const bodyReader = (globalThis as typeof globalThis & {
-    readBody?: typeof readBody
-  }).readBody ?? readBody
-  const rawBody = await bodyReader<Record<string, unknown>>(event) as Record<string, unknown>
+  const rawBody = await readBody<Record<string, unknown>>(event)
   await captureParsedAuditRequestBody(event, rawBody)
   const validated = await parseI18n(event, FundingCaseAgreementProfilePatchSchema, rawBody)
 

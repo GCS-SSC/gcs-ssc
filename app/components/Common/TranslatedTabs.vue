@@ -49,7 +49,6 @@ const mobilePanelId = `translated-tabs-mobile-panel-${useId()}`
 const mobileTabs = ref<ComponentPublicInstance | null>(null)
 const desktopTabs = ref<ComponentPublicInstance | null>(null)
 const inlineTabs = ref<ComponentPublicInstance | null>(null)
-const nativePanelIds = new WeakMap<HTMLElement, string | null>()
 
 /** Associates content-free Nuxt tab triggers with the owner's rendered section.
  * @returns Resolves after Nuxt UI has rendered the triggers.
@@ -63,16 +62,10 @@ const associateExternalPanel = async () => {
       if (!(element instanceof HTMLElement)) continue
       if (helpNavigationTarget && translatedItems.value[index]?.value === helpNavigationValue) element.setAttribute('data-help-target', helpNavigationTarget)
       else element.removeAttribute('data-help-target')
-      const panelId = content ? undefined : translatedItems.value[index]?.panelId ?? externalPanelId
-      if (panelId) {
-        if (!nativePanelIds.has(element)) nativePanelIds.set(element, element.getAttribute('aria-controls'))
-        element.setAttribute('aria-controls', panelId)
-      } else if (nativePanelIds.has(element)) {
-        const nativeId = nativePanelIds.get(element)
-        if (nativeId) element.setAttribute('aria-controls', nativeId)
-        else element.removeAttribute('aria-controls')
-        nativePanelIds.delete(element)
-      }
+      if (content) continue
+      const panelId = translatedItems.value[index]?.panelId ?? externalPanelId
+      if (panelId) element.setAttribute('aria-controls', panelId)
+      else element.removeAttribute('aria-controls')
     }
   }
 }

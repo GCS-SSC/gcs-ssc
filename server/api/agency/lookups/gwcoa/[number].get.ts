@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { z } from 'zod'
 import { parseI18n } from '~~/server/utils/api-validate'
 import { authorize } from '~~/server/utils/authorize'

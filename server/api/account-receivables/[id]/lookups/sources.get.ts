@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { z } from 'zod'
 import { PaginationSchema } from '~~/shared/types/schemas'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'

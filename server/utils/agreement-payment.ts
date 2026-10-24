@@ -533,11 +533,7 @@ export const assertPaymentLineWithinCommitmentBalance = async (
 }
 
 const readAgreementPaymentLinePatchBody = async (event: H3Event) => {
-  const bodyReader = (globalThis as typeof globalThis & {
-    readValidatedBodyI18n?: typeof readValidatedBodyI18n
-  }).readValidatedBodyI18n ?? readValidatedBodyI18n
-
-  return await bodyReader(event, FundingCaseAgreementPaymentLinePatchSchema)
+  return await readValidatedBodyI18n(event, FundingCaseAgreementPaymentLinePatchSchema)
 }
 
 /** Ensures the requested payment line belongs to the specified agreement. */

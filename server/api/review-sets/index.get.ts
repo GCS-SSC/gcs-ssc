@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { sql } from 'kysely'
 import { assignedEntityIdsQuery } from '@gcs-ssc/authorization/server'
 import { PaginationSchema } from '~~/shared/types/schemas'

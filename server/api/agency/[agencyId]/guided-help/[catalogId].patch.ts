@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { requireAuthContext } from '~~/server/utils/authorize'
 import { updateGuidedHelpCatalog } from '~~/server/utils/guided-help'
 import { GuidedHelpCatalogSettingsSchema } from '~~/shared/types/schemas/guided-help'

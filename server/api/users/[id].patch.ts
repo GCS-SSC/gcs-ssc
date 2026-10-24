@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { UserProfilePatchSchema } from '~~/shared/types/schemas/user'
 import { sql } from 'kysely'
 import { authorize, authorizeFresh, requireAuthContext, resolveUserScopes } from '~~/server/utils/authorize'

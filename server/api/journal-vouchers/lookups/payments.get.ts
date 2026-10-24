@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { sql } from 'kysely'
 import { requireAuthContext } from '~~/server/utils/authorize'
 import { databaseMoneyText, parseDatabaseMoney } from '~~/server/utils/database-money'

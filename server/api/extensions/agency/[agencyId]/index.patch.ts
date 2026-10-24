@@ -1,3 +1,6 @@
+import { loadFileStorageProvider } from '~~/server/utils/file-storage-extensions'
+import { defineEventHandler, getRouterParam } from 'h3'
+import { useNitroApp } from 'nitropack/runtime'
 /* eslint-disable jsdoc/require-jsdoc -- Temporary coverage while this route receives complete API documentation. */
 import type { Scope } from '~~/shared/utils/scopes'
 import type { Transaction } from 'kysely'
@@ -10,7 +13,6 @@ import {
 } from '~~/server/utils/authorize'
 import {
   getRegisteredExtensions,
-  loadFileStorageProvider,
   lockExtensionLifecycleScope,
   runExtensionConfigurationGuards,
   runExtensionDisableGuards,

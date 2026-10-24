@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { sql } from 'kysely'
 import { UserRoleAssignmentSchema } from '~~/shared/types/schemas/rbac'
 import { authorize, authorizeFresh, requireAuthContext } from '~~/server/utils/authorize'

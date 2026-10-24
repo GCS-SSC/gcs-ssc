@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { authorize, authorizeFresh, requireAuthContext, resolveUserScopes } from '~~/server/utils/authorize'
 import { recordSecurityAuditEvent } from '~~/server/utils/security-audit'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'

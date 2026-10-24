@@ -1,6 +1,6 @@
 /* eslint-disable jsdoc/require-jsdoc -- Role-scope functions retain descriptive exported names and explicit types. */
-import type { RoleAbilitySubject } from './abilities'
-import type { RoleScope } from './scopes'
+import type { RoleAbilitySubject } from './abilities.ts'
+import type { RoleScope } from './scopes.ts'
 
 export const ROLE_SCOPE_TYPES = ['global', 'agency', 'program'] as const
 export type RoleScopeType = (typeof ROLE_SCOPE_TYPES)[number]

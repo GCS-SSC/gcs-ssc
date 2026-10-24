@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { authorize, authorizeFresh, requireAuthContext } from '~~/server/utils/authorize'
 import { lockRoleParentRows } from '~~/server/utils/role-routes'
 import { getActiveStructuralRoles } from '~~/server/utils/active-user-scopes'

@@ -1,11 +1,8 @@
+import { useNitroApp } from 'nitropack/runtime'
 import type { Kysely, Transaction } from 'kysely'
 import type { CompletionHookPayload } from '~~/shared/types/completion'
 import type { CompletionDisposition } from '~~/shared/constants/system-lifecycle'
 import type { Database, Entity_Type } from '~~/shared/types/database'
-
-declare const useNitroApp: () => {
-  hooks: { callHook: (name: 'common:completion:completed', payload: CompletionHookPayload) => Promise<void> }
-}
 
 export type CompletionRecord = {
   id: string

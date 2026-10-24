@@ -92,7 +92,7 @@ type AssessmentCalculationExpression =
     args: AssessmentCalculationExpression[]
   }
 
-export const AssessmentCalculationExpressionSchema: z.ZodType<AssessmentCalculationExpression> = z.lazy(() => z.discriminatedUnion('kind', [
+const AssessmentCalculationExpressionSchema: z.ZodType<AssessmentCalculationExpression> = z.lazy(() => z.discriminatedUnion('kind', [
   AssessmentCalculationNumberLiteralSchema,
   AssessmentCalculationBooleanLiteralSchema,
   AssessmentCalculationAnswerReferenceSchema,
@@ -120,6 +120,7 @@ export const AssessmentCalculationExpressionSchema: z.ZodType<AssessmentCalculat
     }
   })
 ]))
+export { AssessmentCalculationExpressionSchema }
 
 export const AssessmentCalculationFormulaSchema = AssessmentCalculationExpressionSchema.refine(
   value => value.kind === 'operation',

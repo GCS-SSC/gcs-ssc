@@ -1,8 +1,8 @@
 /* eslint-disable jsdoc/require-param, jsdoc/require-returns -- Decision inputs and outputs are expressed by discriminated unions. */
-import type { AuthorizationAction } from './actions'
-import type { AuthorizationSubject } from './abilities'
-import type { UserAbilities } from './grants'
-import type { AuthorizationScope } from './scopes'
+import type { AuthorizationAction } from './actions.ts'
+import type { AuthorizationSubject } from './abilities.ts'
+import type { UserAbilities } from './grants.ts'
+import type { AuthorizationScope } from './scopes.ts'
 
 export type AuthorizationResolution<T = undefined> =
   | { denied: true; data?: T }

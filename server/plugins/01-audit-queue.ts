@@ -1,3 +1,4 @@
+import { defineNitroPlugin } from 'nitropack/runtime'
 import { acquireDbLease } from '../utils/db'
 import { registerAuditQueueHandlers } from '../utils/audit-queue'
 

@@ -1,4 +1,5 @@
-import { setHeader } from 'h3'
+import { useNitroApp } from 'nitropack/runtime'
+import { defineEventHandler, setHeader } from 'h3'
 import { authorize } from '~~/server/utils/authorize'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 import { readQueueSnapshot } from '~~/server/utils/queue-registry'

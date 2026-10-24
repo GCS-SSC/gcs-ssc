@@ -58,7 +58,7 @@ type ChecklistDetailResponse = {
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-returns -- concise local state helpers are self-documenting */
 /** Coordinates checklist runtime loading, editing, and persistence. */
 export const useChecklistDetailPage = () => {
-  const route = useRoute()
+  const route = useRoute<'checklists-reviewId___en' | 'checklists-reviewId___fr'>()
   const returnRouter = useRouter()
   const { t, locale } = useI18n()
   const localePath = useLocalePath()

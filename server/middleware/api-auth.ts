@@ -1,3 +1,4 @@
+import { defineEventHandler, getRequestURL } from 'h3'
 import { requireAuthContext } from '~~/server/utils/authorize'
 import { getMigrationReadiness } from '~~/server/utils/migration-readiness'
 import { startupUnavailable } from '~~/server/utils/startup-unavailable'

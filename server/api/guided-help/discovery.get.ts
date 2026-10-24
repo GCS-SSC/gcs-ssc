@@ -1,3 +1,4 @@
+import { defineEventHandler, getQuery } from 'h3'
 import { discoverCollectionGuidedHelp } from '~~/server/utils/guided-help'
 
 // eslint-disable-next-line local/require-authorize -- collection discovery filters canonical business visibility and published role audiences

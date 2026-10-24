@@ -3,7 +3,7 @@ import type { Insertable, Kysely, Transaction } from 'kysely'
 import type { Database, JsonValue, StorageCleanupOutboxTable } from '~~/shared/types/database'
 import { deleteProviderObject, resolveAgencyStorageProvider } from './file-storage-provider'
 import type { GcsFileStorageProviderManagedMetadataAdapter, GcsFileStorageTarget } from '@gcs-ssc/extensions/server'
-import { createFileStorageSecretReader } from './extensions'
+import { createFileStorageSecretReader } from './file-storage-extensions'
 import { runBoundedExtensionOperation } from './extension-admission'
 
 const BASE_RETRY_MS = 30_000

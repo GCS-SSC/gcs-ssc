@@ -1,14 +1,16 @@
+import { withSystemAudit } from '../utils/audit-context'
 import { nanoid } from 'nanoid'
-import { acquireDbLease, type DatabaseLease } from '../utils/db'
+import { acquireDatabaseLease, environmentDatabaseRuntimeConfig, type DatabaseLease } from '../database/runtime'
 import { assertAgencyAuditReady, auditControls, initializeAuditRuntime } from '../utils/audit-runtime'
 import { processStorageCleanupBatch, pruneCompletedStorageCleanupJobs } from '../utils/storage-cleanup-outbox'
 
 /**
  * Runs one standalone cleanup lifecycle against an audit-ready database.
  * @param providedLease - Testable pre-acquired lease; production acquires its own.
+ * @returns Completion after capture flush and generation release.
  */
-export const drainStorageCleanup = async (providedLease?: DatabaseLease): Promise<void> => {
-  const lease = providedLease ?? await acquireDbLease()
+export const drainStorageCleanup = async (providedLease?: DatabaseLease): Promise<void> => withSystemAudit(async () => {
+  const lease = providedLease ?? await acquireDatabaseLease({ config: environmentDatabaseRuntimeConfig, context: { type: 'standalone' } })
   let auditControl: ReturnType<typeof auditControls.get>
   const workerId = process.env.GCS_STORAGE_CLEANUP_WORKER_ID?.trim() || `cli:${process.pid}:${nanoid()}`
   const batchLimit = Math.max(1, Math.min(100, Number.parseInt(process.env.GCS_STORAGE_CLEANUP_BATCH_SIZE ?? '20', 10) || 20))
@@ -45,6 +47,6 @@ export const drainStorageCleanup = async (providedLease?: DatabaseLease): Promis
       await lease.release()
     }
   }
-}
+})
 
 if (import.meta.main) await drainStorageCleanup()

@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { sql } from 'kysely'
 import { FundingCaseIntakeCreateSchema } from '~~/shared/types/schemas'
 import { readValidatedBodyI18n } from '~~/server/utils/api-validate'

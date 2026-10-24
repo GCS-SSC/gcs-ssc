@@ -156,8 +156,7 @@ export const patchAgreementAddress = async (
     return existing
   }
 
-  const readBody = (globalThis as { readValidatedBodyI18n?: typeof readValidatedBodyI18n }).readValidatedBodyI18n ?? readValidatedBodyI18n
-  const validated = await readBody(event, AgreementAddressPatchRequestSchema)
+  const validated = await readValidatedBodyI18n(event, AgreementAddressPatchRequestSchema)
   const values = Object.fromEntries(Object.entries(validated).filter(([, value]) => value !== undefined))
 
   if (!Object.keys(values).length) {

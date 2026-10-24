@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { FundingCaseAgreementClaimCreateSchema } from '~~/shared/types/schemas'
 import {
   createAgreementClaimAggregate,

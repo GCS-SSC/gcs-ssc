@@ -39,13 +39,43 @@ jobs:
       - name: Install browser for artifact verification
         run: bun x playwright install --with-deps chromium
 
-      - name: Build, stage, and verify WebContainer Preview
+      - name: Build and stage WebContainer Preview
         run: |
           bun run build:demo
           bun run scripts/webcontainer.ts --from-output --stage-demo .output webcontainer-preview
-          bun run scripts/test-webcontainer-artifact.ts .agent/reports/webcontainer-output webcontainer-preview
         env:
           NITRO_PRESET: node-server
+
+      - name: Require private verification credential
+        env:
+          PRIVATE_TOOLING_READ_TOKEN: ${{ secrets.PRIVATE_TOOLING_READ_TOKEN }}
+        run: |
+          if [ -z "$PRIVATE_TOOLING_READ_TOKEN" ]; then
+            echo '::error::Configure PRIVATE_TOOLING_READ_TOKEN with Contents: read access to GCS-SSC/gcs-ssc-tooling for artifact verification.' >&2
+            exit 1
+          fi
+
+      - name: Resolve pinned verification tooling
+        id: verification-tooling
+        run: |
+          commit=$(git ls-tree HEAD tooling/gcs-ssc | awk '{print $3}')
+          if [[ ! "$commit" =~ ^[0-9a-f]{40}$ ]]; then
+            echo '::error::The host commit must pin tooling/gcs-ssc to an immutable gitlink.' >&2
+            exit 1
+          fi
+          printf 'commit=%s\n' "$commit" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout pinned private verification tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: GCS-SSC/gcs-ssc-tooling
+          ref: ${{ steps.verification-tooling.outputs.commit }}
+          path: tooling/gcs-ssc
+          token: ${{ secrets.PRIVATE_TOOLING_READ_TOKEN }}
+          persist-credentials: false
+
+      - name: Verify the staged WebContainer Preview
+        run: bun run scripts/test-webcontainer-artifact.ts .agent/reports/webcontainer-output webcontainer-preview
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

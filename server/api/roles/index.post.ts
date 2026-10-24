@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { RoleSchema } from '~~/shared/types/schemas/rbac'
 import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import { authorize, authorizeFresh, requireAuthContext } from '~~/server/utils/authorize'

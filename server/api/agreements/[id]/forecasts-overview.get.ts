@@ -1,6 +1,6 @@
 import { getAgreementFinancialBudgetViolation } from '~~/server/utils/agreement-financial-budget-controls'
 import { sql } from 'kysely'
-import type { H3Event } from 'h3'
+import { defineEventHandler, type H3Event } from 'h3'
 import { prepareAgreementForecastRoute } from '~~/server/utils/agreement-forecast'
 import { budgetFiscalYearStableId, budgetLineItemStableId } from '~~/server/utils/agreement-budget-lineage'
 import { withBusinessRecordState } from '~~/server/utils/business-record-state'

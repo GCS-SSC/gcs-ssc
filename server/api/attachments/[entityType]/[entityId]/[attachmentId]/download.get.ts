@@ -1,5 +1,5 @@
 import { create as contentDisposition } from 'content-disposition'
-import { getRouterParam, setResponseHeader } from 'h3'
+import { defineEventHandler, getRouterParam, setResponseHeader } from 'h3'
 import { authorizeAttachmentTarget, authorizeFreshAttachmentTarget } from '~~/server/utils/attachment-target'
 import { getAttachmentRouteTarget } from '~~/server/utils/attachment-route'
 import { loadTargetAttachment } from '~~/server/utils/attachment-record'

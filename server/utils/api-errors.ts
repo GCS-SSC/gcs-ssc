@@ -1,4 +1,4 @@
-import type { H3Event } from 'h3'
+import { createError, type H3Event } from 'h3'
 import { useTranslation } from '@intlify/h3'
 import type { ZodError } from 'zod'
 import { resolveZodIssuePresentation, localizeBilingualIssueParams } from '../../shared/utils/zod-i18n'
@@ -20,10 +20,6 @@ export interface ApiErrorData {
   warnings?: unknown[]
 }
 
-type ServerTranslationFn = (
-  event: H3Event
-) => Promise<(key: string, params?: Record<string, unknown>) => string>
-
 interface ThrowApiErrorOptions {
   statusCode: number
   code: string
@@ -35,19 +31,15 @@ interface ThrowApiErrorOptions {
 }
 
 /**
- * Resolves a localized message when translation utilities are available.
+ * Resolves a message through the request translation service.
  *
  * @param event - Current H3 event.
  * @param key - Translation key.
  * @param params - Optional translation params.
- * @returns Localized message or the raw key when translation is unavailable.
+ * @returns The localized message.
  */
 const translate = async (event: H3Event, key: string, params?: Record<string, unknown>): Promise<string> => {
-  const translationLoader = (globalThis as typeof globalThis & {
-    useTranslation?: ServerTranslationFn
-  }).useTranslation ?? useTranslation
-
-  const t = await translationLoader(event)
+  const t = await useTranslation(event)
   return t(key, params ?? {})
 }
 
@@ -158,11 +150,7 @@ export const notFound = async (
  * @returns Never returns.
  */
 export const validationError = async (event: H3Event, error: ZodError): Promise<never> => {
-  const translationLoader = (globalThis as typeof globalThis & {
-    useTranslation?: ServerTranslationFn
-  }).useTranslation ?? useTranslation
-
-  const t = await translationLoader(event)
+  const t = await useTranslation(event)
   const locale = resolveRequestLocale(event)
   const details = error.issues.map(issue => ({
     path: issue.path.join('.'),

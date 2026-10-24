@@ -1,11 +1,7 @@
-diff --git a/node_modules/nitropack/.bun-tag-2476f47e63785585 b/.bun-tag-2476f47e63785585
-new file mode 100644
-index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
 diff --git a/dist/core/index.mjs b/dist/core/index.mjs
-index 5433d5a2c4e1570ad0db3eab0dea11beaae9d1ba..d2ba3f6189aa510f9173596225e3b16718521b0b 100644
 --- a/dist/core/index.mjs
 +++ b/dist/core/index.mjs
-@@ -2239,6 +2239,7 @@ function createHTTPProxy(defaults = {}) {
+@@ -2298,6 +2298,7 @@
  
  class NodeDevWorker {
    closed = false;
@@ -13,7 +9,7 @@ index 5433d5a2c4e1570ad0db3eab0dea11beaae9d1ba..d2ba3f6189aa510f9173596225e3b167
    #id;
    #workerDir;
    #hooks;
-@@ -2304,17 +2305,18 @@ class NodeDevWorker {
+@@ -2363,17 +2364,18 @@
      });
      this.#worker = worker;
    }
@@ -42,7 +38,7 @@ index 5433d5a2c4e1570ad0db3eab0dea11beaae9d1ba..d2ba3f6189aa510f9173596225e3b167
    }
    async #closeProxy() {
      this.#proxy?.proxy?.close(() => {
-@@ -2334,7 +2336,7 @@ class NodeDevWorker {
+@@ -2393,7 +2395,7 @@
        return;
      }
      this.#worker.postMessage({ event: "shutdown" });
@@ -51,9 +47,9 @@ index 5433d5a2c4e1570ad0db3eab0dea11beaae9d1ba..d2ba3f6189aa510f9173596225e3b167
        await new Promise((resolve) => {
          const gracefulShutdownTimeoutSec = Number.parseInt(process.env.NITRO_SHUTDOWN_TIMEOUT || "", 10) || 5;
          const timeout = setTimeout(() => {
-@@ -2342,11 +2344,13 @@ class NodeDevWorker {
-             consola.warn(`force closing dev worker...`);
+@@ -2402,11 +2404,13 @@
            }
+           resolve();
          }, gracefulShutdownTimeoutSec * 1e3);
 +        const finish = () => {
 +          clearTimeout(timeout);
@@ -69,15 +65,15 @@ index 5433d5a2c4e1570ad0db3eab0dea11beaae9d1ba..d2ba3f6189aa510f9173596225e3b167
          });
        });
      }
-@@ -2662,6 +2666,7 @@ class DevServer {
+@@ -2751,6 +2755,7 @@
    app;
    listeners = [];
    reloadPromise;
 +  closing = false;
    watcher;
    workers = [];
-   workerError;
-@@ -2710,6 +2715,8 @@ class DevServer {
+   wsProxies = [];
+@@ -2801,6 +2806,8 @@
      return listener;
    }
    async close() {
@@ -86,7 +82,7 @@ index 5433d5a2c4e1570ad0db3eab0dea11beaae9d1ba..d2ba3f6189aa510f9173596225e3b167
      await Promise.all(
        [
          Promise.all(this.listeners.map((l) => l.close())).then(() => {
-@@ -2729,9 +2736,17 @@ class DevServer {
+@@ -2820,9 +2827,17 @@
      );
    }
    reload() {

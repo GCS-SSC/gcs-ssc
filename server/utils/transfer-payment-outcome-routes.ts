@@ -1,4 +1,4 @@
-import type { H3Event } from 'h3'
+import { getRouterParam, type H3Event } from 'h3'
 import type { Kysely, Transaction } from 'kysely'
 import { badRequest, notFound } from './api-errors'
 import { authorize, authorizeWithFreshAuthContext } from './authorize'

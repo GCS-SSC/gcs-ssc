@@ -25,7 +25,7 @@ type RecommendationSchemaPayload = {
   egcs_cn_result: Record<string, unknown>
   egcs_cn_recommendationschema: RecommendationDefinition
 }
-const route = useRoute()
+const route = useRoute<'agencies-id-recommendation-schemas-schemaId___en' | 'agencies-id-recommendation-schemas-schemaId___fr'>()
 const localePath = useLocalePath()
 const { t } = useI18n()
 const { getBilingualValue } = useBilingualValue()

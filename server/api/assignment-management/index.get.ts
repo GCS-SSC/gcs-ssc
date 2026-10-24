@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { buildAssignedWorkExtensionSources } from '~~/server/utils/assigned-work-extension-sources'
 import { sql, type RawBuilder } from 'kysely'
 import { escapeLikePattern } from '~~/server/utils/sql-like'

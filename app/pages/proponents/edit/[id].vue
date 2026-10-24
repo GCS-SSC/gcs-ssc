@@ -34,8 +34,8 @@ const toast = useLocalizedToast()
 const { showError } = useApiErrorToast()
 const { getBilingualValue } = useBilingualValue()
 const route = useRoute()
-const id = route.params.id as string
-const isChildDetailRoute = computed(() => typeof route.params.creditMemoId === 'string')
+const id = route.params.id
+const isChildDetailRoute = computed(() => 'creditMemoId' in route.params && typeof route.params.creditMemoId === 'string')
 const {
   profile,
   error,

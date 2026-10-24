@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { requireAuthContext, requireFreshAuthContext } from '~~/server/utils/authorize'
 import { queryAssignedWorkDashboard } from '~~/server/utils/assigned-work-query'
 import { AssignedWorkQuerySchema } from '~~/shared/types/schemas'

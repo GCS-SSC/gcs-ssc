@@ -8,7 +8,7 @@ definePageMeta({
   } },
   middleware: to => {
     const localePath = useLocalePath()
-    return navigateTo(localePath(appRouteLocations.agreementCorrectionCollection(String(to.params.id))), { replace: true })
+    return navigateTo(localePath(appRouteLocations.agreementCorrectionCollection(String('id' in to.params ? to.params.id : undefined))), { replace: true })
   }
 })
 </script>

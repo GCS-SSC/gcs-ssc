@@ -1,4 +1,4 @@
-import lucideIcons from '@iconify-json/lucide/icons.json'
+import lucideIcons from '@iconify-json/lucide/icons.json' with { type: 'json' }
 
 export default defineNuxtConfig({
   modules: ['./modules/gcs-extensions', '@nuxt/eslint', '@nuxt/ui', './modules/form-requirements', '@vueuse/nuxt', '@nuxtjs/i18n'],
@@ -41,17 +41,21 @@ export default defineNuxtConfig({
     ? false
     : undefined,
   future: {
-    compatibilityVersion: 4
+    compatibilityVersion: 5
   },
 
   experimental: {
-    scanPageMeta: true
+    scanPageMeta: true,
+    nitroAutoImports: true
   },
 
   compatibilityDate: '2024-07-11',
 
   nitro: {
-    experimental: { asyncContext: true }
+    experimental: { asyncContext: true },
+    externals: {
+      external: ['docxtemplater', 'pizzip', 'puppeteer', 'libreoffice-convert', 'kysely-pglite']
+    }
   },
 
   vite: {
@@ -62,6 +66,7 @@ export default defineNuxtConfig({
       'import.meta.env.VITE_GCS_DEMO': JSON.stringify(process.env.VITE_GCS_DEMO === 'true' ? 'true' : 'false')
     }
   },
+
   hooks: {
     /**
      * Allow explicit TypeScript imports used by extension workspaces.

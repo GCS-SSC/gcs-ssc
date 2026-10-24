@@ -1,3 +1,5 @@
+import { defineNitroPlugin, useNitroApp } from 'nitropack/runtime'
+import { withSystemAudit } from '../utils/audit-context'
 import { initializeAuditRuntime } from '../utils/audit-runtime'
 import { assertReferencedFileStorageProvidersRegistered } from '../utils/extensions'
 import {
@@ -60,7 +62,7 @@ const runMigrations = async (db: DatabaseLease['database']): Promise<void> => {
   }
 }
 
-export default defineNitroPlugin(async () => {
+export default defineNitroPlugin(async () => withSystemAudit(async () => {
   const dbLease = await acquireDbLease()
   try {
     const existingMigration = getMigrationPromise(dbLease.generationId)
@@ -83,4 +85,4 @@ export default defineNitroPlugin(async () => {
   } finally {
     await dbLease.release()
   }
-})
+}))

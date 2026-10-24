@@ -7,6 +7,7 @@ import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { useAgreementChildActionPrerequisites } from '~/composables/useAgreementChildActionPrerequisites'
 import type { Ref } from 'vue'
+import type { RouteParamsGeneric } from 'vue-router'
 import { appRouteLocations } from '~/utils/route-locations'
 import type { FundingCaseAgreementProfileForm, FundingCaseAgreementProfileRow } from '~~/shared/types/funding-case-agreement-ui'
 import type { RuntimeState } from '~~/shared/constants/system-lifecycle'
@@ -33,9 +34,17 @@ import { useAgreementRiskSource } from '~/composables/useAgreementRiskSource'
 import { useUrlTabState } from '~/composables/useUrlTabState'
 
 definePageMeta({
-  key: route => ['extensionKey', 'tabId', 'recordId'].every(key => typeof route.params[key] === 'string')
-    ? JSON.stringify([route.params.id, route.params.extensionKey, route.params.tabId, route.params.recordId])
-    : route.path,
+  /**
+   * Keeps extension record pages distinct while using the route path for other Agreement pages.
+   * @param route - Resolved Agreement page route.
+   * @returns The extension record identity or the route path.
+   */
+  key: route => {
+    const params: RouteParamsGeneric = route.params
+    return ['extensionKey', 'tabId', 'recordId'].every(key => typeof params[key] === 'string')
+      ? JSON.stringify([params.id, params.extensionKey, params.tabId, params.recordId])
+      : route.path
+  },
   i18n: {
     paths: {
       en: '/agreements/[id]',

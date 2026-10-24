@@ -27,7 +27,7 @@ type DataCollectionPayload = {
   egcs_cn_approvaltemplate: string | null
   egcs_cn_schema: DataCollectionDefinition
 }
-const route = useRoute()
+const route = useRoute<'agencies-id-data-collections-dataCollectionSetupId___en' | 'agencies-id-data-collections-dataCollectionSetupId___fr'>()
 const localePath = useLocalePath()
 const { t } = useI18n()
 const { getBilingualValue } = useBilingualValue()

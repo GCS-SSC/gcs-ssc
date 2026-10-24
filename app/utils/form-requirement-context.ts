@@ -3,6 +3,8 @@ import type { FormFieldRequirement } from '~~/shared/utils/form-requirements'
 
 /** The current form contract, shared across arbitrarily nested field components. */
 export interface FormRequirementContext {
+  state: ComputedRef<unknown>
+  disabled: ComputedRef<boolean>
   resolve: (path: string) => FormFieldRequirement
 }
 

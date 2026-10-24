@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import {
   assertDirectCompletionRuntimeEntitySupported,

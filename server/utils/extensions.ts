@@ -1,3 +1,4 @@
+import { useNitroApp } from 'nitropack/runtime'
 import { readAgencyCodingCatalog } from './agreement-coding-allocator'
 import { createExtensionAgreementFinancials } from './extension-agreement-financials'
 import { assertAgreementCorrectionFinancialWriteAllowed } from './correction-lock'
@@ -16,15 +17,10 @@ import {
   GCS_EXTENSION_DISABLE_GUARD_HOOK,
   GCS_EXTENSION_CONFIGURATION_GUARD_HOOK,
   GCS_EXTENSION_STATUS_REFERENCE_GUARD_HOOK,
-  getEncryptedExtensionSecret,
   isGcsExtensionUserError,
   lockGcsExtensionLifecycleScope,
   resolveExtensionStreamContext as resolveSdkExtensionStreamContext,
   type GcsExtensionLifecycleEntityAdapter,
-  type GcsFileStorageMetadataValidator,
-  type GcsFileStorageProviderAdapter,
-  type GcsFileStorageProviderManagedMetadataAdapter,
-  type GcsFileStorageSecretReader,
   type GcsExtensionAgreementLifecycleLockHookPayload,
   type GcsExtensionAgreementDeleteGuardHookPayload,
   type GcsExtensionCreateOperationHookPayload,
@@ -69,8 +65,6 @@ import type { AbilityAction, AbilitySubject } from '~~/shared/utils/abilities'
 import type { Scope } from '~~/shared/utils/scopes'
 import { getExtensionEntityAuthorizationSubject } from '~~/shared/utils/extensions'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
-
-declare const useNitroApp: typeof import('nitropack/runtime').useNitroApp
 
 /** Loads a stream with its transfer payment and agency identifiers for extension scoping. */
 export const resolveExtensionStreamContext = async (
@@ -132,54 +126,6 @@ type ExtensionLifecycleEntityAdapterModule = {
   default?: GcsExtensionLifecycleEntityAdapter
 }
 
-type FileStorageAdapterModule = { default?: GcsFileStorageProviderAdapter }
-type FileStorageMetadataValidatorModule = { default?: GcsFileStorageMetadataValidator }
-
-export interface LoadedFileStorageProvider {
-  extension: GcsRegisteredExtension
-  adapter: GcsFileStorageProviderAdapter
-  metadataValidator?: GcsFileStorageMetadataValidator
-}
-
-const FILE_STORAGE_ADAPTER_METHODS = ['writeObject', 'readObject', 'deleteObject'] as const
-
-/** Loads and validates a registered provider's server-only modules. */
-export const loadFileStorageProvider = async (
-  extensionKey: string
-): Promise<LoadedFileStorageProvider | null> => {
-  const extension = getGcsExtensionByKey(extensionKey)
-  const contribution = extension?.fileStorageProvider
-  if (!extension || !contribution) return null
-  const loaded = await loadGcsExtensionModule(contribution.adapter.id) as FileStorageAdapterModule
-  const adapter = loaded.default
-  if (!adapter || typeof adapter !== 'object') {
-    throw new Error(`File storage adapter for "${extensionKey}" is unavailable`)
-  }
-  for (const method of FILE_STORAGE_ADAPTER_METHODS) {
-    if (typeof adapter[method] !== 'function') {
-      throw new Error(`File storage adapter for "${extensionKey}" must export ${method}()`)
-    }
-  }
-  const metadata = contribution.metadata
-  if (metadata?.persistence === 'provider' && metadata.mutability === 'editable') {
-    const editableAdapter = adapter as Partial<GcsFileStorageProviderManagedMetadataAdapter>
-    if (typeof editableAdapter.readProviderMetadata !== 'function' || typeof editableAdapter.updateProviderMetadata !== 'function') {
-      throw new Error(
-        `File storage adapter for "${extensionKey}" requires readProviderMetadata() and updateProviderMetadata()`
-      )
-    }
-  }
-  let metadataValidator: GcsFileStorageMetadataValidator | undefined
-  if (metadata) {
-    const validatorModule = await loadGcsExtensionModule(metadata.validator.id) as FileStorageMetadataValidatorModule
-    if (typeof validatorModule.default !== 'function') {
-      throw new Error(`File storage metadata validator for "${extensionKey}" is unavailable`)
-    }
-    metadataValidator = validatorModule.default
-  }
-  return { extension, adapter, metadataValidator }
-}
-
 /** Fails startup when persisted storage state references a provider package that is no longer installed. */
 export const assertReferencedFileStorageProvidersRegistered = async (db: Kysely<Database>): Promise<void> => {
   const extensions = await getRegisteredExtensions()
@@ -199,22 +145,6 @@ export const assertReferencedFileStorageProvidersRegistered = async (db: Kysely<
     throw new Error(`Referenced file storage providers are not installed: ${missing.join(', ')}`)
   }
 }
-
-/** Creates a server-only encrypted secret reader scoped to one provider and agency. */
-export const createFileStorageSecretReader = (
-  db: Kysely<Database> | Transaction<Database>,
-  extensionKey: string,
-  agencyId: string,
-  rootKey: string
-): GcsFileStorageSecretReader => ({
-  get: async key => await getEncryptedExtensionSecret(db, {
-    extensionKey,
-    ownerType: 'agency',
-    ownerId: agencyId,
-    secretKey: key,
-    rootKey
-  })
-})
 
 export type LoadedExtensionLifecycleEntity = {
   extension: GcsRegisteredExtension

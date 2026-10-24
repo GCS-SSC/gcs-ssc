@@ -101,7 +101,7 @@ export const useTransferPaymentDetailState = (id: string) => {
   const { tabs, selectedTab, selectedTabKey, activeTabComponent, activeTabProps } = useRouteTabMap({
     tabMap,
     defaultTabId: 'general',
-    enabled: computed(() => Boolean(profile.value) && typeof route.params.streamId !== 'string'),
+    enabled: computed(() => Boolean(profile.value) && (!('streamId' in route.params) || typeof route.params.streamId !== 'string')),
     queryKey: 'section'
   })
 

@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 /* eslint-disable jsdoc/require-jsdoc -- route-local query helpers are clear from their names and types */
 import { PaginationSchema } from '~~/shared/types/schemas'

@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { forbidden, notFound } from '~~/server/utils/api-errors'
 import {
   canReadEntityAssignments,

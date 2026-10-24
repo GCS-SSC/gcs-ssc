@@ -23,13 +23,13 @@ import type {
   GcsExtensionServerHandlerDefinition,
   GcsExtensionPaymentAmountCalculatorDefinition,
   GcsExtensionHostCapability
-} from '../shared/utils/extensions'
+} from '../shared/utils/extensions.ts'
 import {
   GCS_EXTENSION_SDK_VERSION,
   getExtensionEntityAuthorizationSubject
-} from '../shared/utils/extensions'
-import { AUTHORIZATION_SUBJECTS } from '../shared/utils/abilities'
-import { sdkAliases } from '../shared/utils/extension-sdk-aliases'
+} from '../shared/utils/extensions.ts'
+import { AUTHORIZATION_SUBJECTS } from '../shared/utils/abilities.ts'
+import { sdkAliases } from '../shared/utils/extension-sdk-aliases.ts'
 
 const EXTENSION_KEY_PATTERN = /^[a-z][a-z0-9-]*$/
 const EXTENSION_LIFECYCLE_NAMESPACE_PATTERN = /^[a-z][a-z0-9-]{0,62}$/
@@ -1601,9 +1601,7 @@ const addExtensionTemplates = (
     write: true,
     getContents: () => extensions.map(extension => `@source "${extension.rootDir.replaceAll('\\', '/')}/**/*.{vue,ts,js}";`).join('\n')
   })
-  if (extensions.length > 0) {
-    nuxt.options.css.push(sourceTemplate.dst)
-  }
+  nuxt.options.alias['#gcs-extensions/tailwind-sources.css'] = sourceTemplate.dst
 
   return serverRegistryTemplate.dst
 }

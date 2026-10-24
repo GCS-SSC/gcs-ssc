@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { authorize, authorizeFresh, requireAuthContext, resolveRoleScope } from '~~/server/utils/authorize'
 import { parseI18n } from '~~/server/utils/api-validate'
 import { recordSecurityAuditEvent } from '~~/server/utils/security-audit'

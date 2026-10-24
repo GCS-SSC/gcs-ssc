@@ -595,7 +595,8 @@ const buildRegularDirectoryShard = async (
 ): Promise<WebContainerMountPayload[]> => [{
   mountPoint: `${mountPoint}/${entryName}`,
   tree: await buildFileSystemTree(fullPath, {
-    context
+    context,
+    includeNodeModules: true
   })
 }]
 
@@ -829,34 +830,6 @@ const buildRequiredContainedFileNode = async (
   }
 }
 
-/** Rejects missing, non-directory, or escaped standalone runtime directories. */
-const assertRequiredContainedDirectory = async (
-  directoryPath: string,
-  context: ArtifactTraversalContext
-): Promise<void> => {
-  let directoryRealPath: string
-  try {
-    directoryRealPath = await fs.realpath(directoryPath)
-  } catch {
-    throw new Error(
-      `Required WebContainer server directory "${normalizePathSeparators(directoryPath)}" is missing or has a broken link.`
-    )
-  }
-
-  if (!isWithinArtifactRoot(context.artifactRootRealPath, directoryRealPath)) {
-    throw new Error(
-      `Required WebContainer server directory "${normalizePathSeparators(directoryPath)}" resolves outside the standalone artifact root.`
-    )
-  }
-
-  const stats = await fs.stat(directoryPath)
-  if (!stats.isDirectory()) {
-    throw new Error(
-      `Required WebContainer server directory "${normalizePathSeparators(directoryPath)}" must be a directory.`
-    )
-  }
-}
-
 const sortPayloads = (payloads: WebContainerMountPayload[]): WebContainerMountPayload[] => {
   return payloads.sort((left, right) => compareNames(left.mountPoint, right.mountPoint))
 }
@@ -904,29 +877,29 @@ export const buildOutputPayloads = async (
 ): Promise<WebContainerMountPayload[]> => {
   const context = await createArtifactTraversalContext(outputDir)
   const serverDir = path.join(outputDir, 'server')
-  const chunksDir = path.join(serverDir, 'chunks')
-  const nodeModulesDir = path.join(serverDir, 'node_modules')
-  const serverTree: Record<string, WebContainerTreeNode> = {}
-  const serverFiles = ['index.mjs', 'package.json'].sort(compareNames)
-
-  await assertRequiredContainedDirectory(chunksDir, context)
-  await assertRequiredContainedDirectory(nodeModulesDir, context)
-
-  for (const serverFile of serverFiles) {
-    const fileNode = await buildRequiredContainedFileNode(
-      path.join(serverDir, serverFile),
-      context
-    )
-    serverTree[serverFile] = fileNode
+  // Validate the launch and demo entrypoints, then serialize what Nitro actually emitted.
+  for (const serverFile of ['index.mjs', 'package.json', 'demo-migrations/demo.mjs']) {
+    await buildRequiredContainedFileNode(path.join(serverDir, serverFile), context)
   }
-  serverTree['demo-migrations'] = {
-    directory: {
-      'demo.mjs': await buildRequiredContainedFileNode(
-        path.join(serverDir, 'demo-migrations', 'demo.mjs'),
-        context
+  const outputPayloads = await buildShardsFromDirectory(
+    outputDir,
+    '.output',
+    async (entryName, fullPath, mountPoint, traversalContext) => {
+      if (entryName === 'webcontainer') return []
+      if (entryName !== 'server') {
+        return await buildDirectoryShards(fullPath, `${mountPoint}/${entryName}`, traversalContext)
+      }
+      return await buildShardsFromDirectory(
+        fullPath,
+        `${mountPoint}/${entryName}`,
+        async (serverEntryName, serverEntryPath, serverMountPoint, serverContext) => serverEntryName === 'node_modules'
+          ? await buildNodeModulesShards(serverEntryPath, `${serverMountPoint}/${serverEntryName}`, serverContext)
+          : await buildDirectoryShards(serverEntryPath, `${serverMountPoint}/${serverEntryName}`, serverContext),
+        traversalContext
       )
-    }
-  }
+    },
+    context
+  )
 
   const demoDocumentNode = await buildRequiredContainedFileNode(
     path.join(outputDir, 'webcontainer', 'demo-assets', 'Contribution Agreement.docx'),
@@ -934,25 +907,7 @@ export const buildOutputPayloads = async (
   )
 
   return sortPayloads([
-    ...(await buildDirectoryShards(
-      path.join(outputDir, 'public'),
-      '.output/public',
-      context
-    )),
-    ...(await buildDirectoryShards(
-      chunksDir,
-      '.output/server/chunks',
-      context
-    )),
-    ...(await buildNodeModulesShards(
-      nodeModulesDir,
-      '.output/server/node_modules',
-      context
-    )),
-    {
-      mountPoint: '.output/server',
-      tree: serverTree
-    },
+    ...outputPayloads,
     {
       mountPoint: 'demo-assets',
       tree: {
@@ -1092,7 +1047,7 @@ export const generateWebContainerPreview = async (
         function treeForMountPoint(mountPoint, tree) {
             if (
                 typeof mountPoint !== 'string'
-                || (!mountPoint.startsWith('.output/') && mountPoint !== 'demo-assets')
+                || (mountPoint !== '.output' && !mountPoint.startsWith('.output/') && mountPoint !== 'demo-assets')
                 || mountPoint.includes('\\\\')
             ) {
                 throw new Error('Unsafe WebContainer mount point: ' + String(mountPoint));
@@ -1121,12 +1076,7 @@ export const generateWebContainerPreview = async (
                     '.output': {
                         directory: {
                             public: { directory: {} },
-                            server: {
-                                directory: {
-                                    chunks: { directory: {} },
-                                    node_modules: { directory: {} }
-                                }
-                            }
+                            server: { directory: {} }
                         }
                     },
                     'demo-assets': { directory: {} }

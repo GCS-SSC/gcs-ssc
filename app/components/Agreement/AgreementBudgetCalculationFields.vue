@@ -16,7 +16,7 @@ const { t, locale } = useI18n()
       {{ t('budget_calculation.source') }} {{ locale === 'fr' ? state.calculation_source_name_fr : state.calculation_source_name_en }}
     </p>
     <UFormField :label="t('budget_calculation.percentage')" name="egcs_fc_percentage">
-      <UInput v-model.number="state.egcs_fc_percentage" type="number" min="0" max="100" step="0.01" :readonly="!state.egcs_fc_allowpercentageoverride" />
+      <UInput v-model.number.nullable="state.egcs_fc_percentage" type="number" min="0" max="100" step="0.01" :readonly="!state.egcs_fc_allowpercentageoverride" />
     </UFormField>
     <p aria-live="polite">
       {{ t('budget_calculation.preview', { amount: preview !== null && state.egcs_fc_currency ? formatMoneyText(preview, locale, state.egcs_fc_currency) : t('common.not_available') }) }}

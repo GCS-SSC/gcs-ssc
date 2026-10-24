@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { withAuditCreationOwner } from '~~/server/utils/audit-context'
 import { authorizeAttachmentTarget, executeFreshAuthorizedAttachmentWrite } from '~~/server/utils/attachment-target'
 import { getAttachmentRouteTarget } from '~~/server/utils/attachment-route'

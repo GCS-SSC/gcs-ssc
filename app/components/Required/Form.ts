@@ -1,12 +1,11 @@
 import { provideBilingualFieldControls } from '~/utils/bilingual-field-context'
 import OriginalForm from '@nuxt/ui/components/Form.vue'
-import { defineComponent, h, provide, shallowRef, inject, computed, watch } from 'vue'
+import { defineComponent, h, provide, shallowRef, inject, computed, watch, unref } from 'vue'
 import type { Component, ComponentPublicInstance } from 'vue'
 import type { Form, FormSchema } from '@nuxt/ui'
 import type { z } from 'zod'
 import { LOCALIZED_VALIDATION_ISSUE, useZodI18n } from '~/composables/useZodI18n'
 import { getFormValidatorSchema, resolveFormFieldRequirement } from '~~/shared/utils/form-requirements'
-import { formStateInjectionKey } from '@nuxt/ui/composables/useFormField'
 import { booleanAttribute } from '~/utils/required-control'
 import { fieldRequirementKey, formRequirementKey } from '~/utils/form-requirement-context'
 
@@ -25,17 +24,20 @@ export default defineComponent({
    */
   setup: (props, { attrs, slots, expose }) => {
     const parentRequirement = inject(formRequirementKey, undefined)
-    const parentState = inject(formStateInjectionKey, undefined)
+    const form = shallowRef<(ComponentPublicInstance & Pick<Form<FormSchema>, 'getErrors' | 'setErrors' | 'disabled'>) | null>(null)
     provide(fieldRequirementKey, computed(() => false))
     const nested = () => booleanAttribute(attrs.nested)
     const prefix = () => typeof attrs.name === 'string' || typeof attrs.name === 'number' ? String(attrs.name) : ''
     const state = computed(() => {
-      if (!nested() || !parentState?.value) return props.state
+      const parentState = parentRequirement?.state.value
+      if (!nested() || !parentState) return props.state
       return prefix().split('.').filter(Boolean).reduce<unknown>((value, key) =>
-        value && typeof value === 'object' ? (value as Record<string, unknown>)[key] : undefined, parentState.value)
+        value && typeof value === 'object' ? Reflect.get(value, key) : undefined, parentState)
     })
     provideBilingualFieldControls(() => state.value)
     provide(formRequirementKey, {
+      state,
+      disabled: computed(() => booleanAttribute(attrs.disabled) || Boolean(unref(form.value?.disabled))),
       /** Resolves own or inherited nested schema requirements.
        * @param path Field path relative to this form.
        * @returns Required, optional or unresolved requirement.
@@ -46,7 +48,6 @@ export default defineComponent({
         return nested() && parentRequirement ? parentRequirement.resolve([prefix(), path].filter(Boolean).join('.')) : 'unknown'
       }
     })
-    const form = shallowRef<(ComponentPublicInstance & Pick<Form<FormSchema>, 'getErrors' | 'setErrors'>) | null>(null)
     const { locale } = useI18n({ useScope: 'global' })
     const { translateMessage } = useZodI18n()
     watch(locale, () => {

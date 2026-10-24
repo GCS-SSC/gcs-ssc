@@ -1,4 +1,4 @@
-import { defineCriticalCoverageProject } from './vitest.host-critical-base'
+import { defineCriticalCoverageProject } from './vitest.host-critical-base.ts'
 
 export const WORKFLOW_RUNTIME_COVERAGE_INCLUDE = [
   'server/utils/workflow-runtime.ts',

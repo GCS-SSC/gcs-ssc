@@ -1,3 +1,4 @@
+import { useRuntimeConfig } from 'nitropack/runtime'
 /* eslint-disable jsdoc/require-jsdoc -- Payment creation retains an explicit, exact, user-reviewed offset coding plan. */
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import type { H3Event } from 'h3'

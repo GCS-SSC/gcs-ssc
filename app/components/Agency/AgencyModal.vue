@@ -12,7 +12,7 @@ const { title, submitLabel, pending = false } = defineProps<{
 }>()
 
 const open = defineModel<boolean>('open', { default: false })
-const state = defineModel<Partial<AgencyProfileItem>>('state', { required: true, default: {} })
+const state = defineModel<Partial<AgencyProfileItem>>('state', { required: true })
 
 const emit = defineEmits(['submit'])
 

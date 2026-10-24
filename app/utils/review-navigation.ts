@@ -1,5 +1,7 @@
 import { appRouteLocations } from '~/utils/route-locations'
-import type { RouteLocationRaw, Router } from 'vue-router'
+import type { RouteLocationResolvedGeneric } from 'vue-router'
+
+type ReturnRouteResolver = { resolve: (path: string) => RouteLocationResolvedGeneric }
 
 /* eslint-disable jsdoc/require-jsdoc */
 export const getReviewReturnPath = (value: unknown): string | null => {
@@ -8,12 +10,12 @@ export const getReviewReturnPath = (value: unknown): string | null => {
   return value
 }
 
-export const resolveReviewReturnLocation = (value: unknown, router: Pick<Router, 'resolve'>): RouteLocationRaw | null => {
+export const resolveReviewReturnLocation = (value: unknown, router: ReturnRouteResolver) => {
   const path = getReviewReturnPath(value)
   if (!path) return null
   const resolved = router.resolve(path)
-  if (typeof resolved.name !== 'string') return path
-  return { name: resolved.name, params: resolved.params, query: resolved.query, hash: resolved.hash }
+  if (typeof resolved.name !== 'string') return { path: resolved.path, query: resolved.query, hash: resolved.hash }
+  return { path: resolved.path, name: resolved.name, params: resolved.params, query: resolved.query, hash: resolved.hash }
 }
 
 /** Keeps an Agreement review's ordinary return link on its loaded owner.
@@ -24,14 +26,15 @@ export const resolveReviewReturnLocation = (value: unknown, router: Pick<Router,
  */
 export const resolveOwnedReviewReturnLocation = (
   value: unknown,
-  router: Pick<Router, 'resolve'>,
+  router: ReturnRouteResolver,
   owner: { type: string; id: string } | null
-): RouteLocationRaw | null => {
+) => {
   const requested = resolveReviewReturnLocation(value, router)
   if (owner?.type !== 'fundingcaseagreement') return requested
-  if (requested) {
-    const resolved = router.resolve(requested)
-    if (typeof resolved.name === 'string' && resolved.name.split('___')[0] === 'agreements-id' && resolved.params.id === owner.id) return requested
+  const path = getReviewReturnPath(value)
+  if (requested && path) {
+    const resolved = router.resolve(path)
+    if (typeof resolved.name === 'string' && resolved.name.split('___')[0] === 'agreements-id' && 'id' in resolved.params && resolved.params.id === owner.id) return requested
   }
   return appRouteLocations.agreementDetail(owner.id, { section: 'risk-rating' })
 }

@@ -27,8 +27,7 @@ const routeBadRequest = async (
   code: string,
   key: string
 ): Promise<unknown> => {
-  const badRequestHandler = (globalThis as { badRequest?: typeof badRequestApiError }).badRequest ?? badRequestApiError
-  return await badRequestHandler(event, code, key)
+  return await badRequestApiError(event, code, key)
 }
 
 /** Checks whether a lookup result missed at least one requested id. */

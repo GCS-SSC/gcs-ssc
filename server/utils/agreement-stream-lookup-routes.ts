@@ -41,8 +41,7 @@ const routeBadRequest = async (
   code: string,
   key: string
 ) => {
-  const badRequestHandler = (globalThis as { badRequest?: typeof badRequest }).badRequest ?? badRequest
-  return await badRequestHandler(event, code, key)
+  return await badRequest(event, code, key)
 }
 
 export const prepareAgreementStreamLookupRoute = async (

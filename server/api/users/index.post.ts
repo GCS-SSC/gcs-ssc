@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { UserProfileSchema } from '~~/shared/types/schemas'
 import { authorize, authorizeWithFreshAuthContext, requireFreshAuthContext } from '~~/server/utils/authorize'
 import { syncCommonUser } from '~~/server/utils/common-user-sync'

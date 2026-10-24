@@ -1,3 +1,5 @@
+import { loadFileStorageProvider } from '~~/server/utils/file-storage-extensions'
+import { defineEventHandler, getRouterParam } from 'h3'
 import type { Scope } from '~~/shared/utils/scopes'
 import type { GcsExtensionJsonConfig } from '@gcs-ssc/extensions'
 import { AgencyStorageProviderSelectionSchema } from '~~/shared/types/schemas'
@@ -5,7 +7,6 @@ import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import { authorize, authorizeWithFreshAuthContext, requireFreshAuthContext } from '~~/server/utils/authorize'
 import {
   getRegisteredExtensions,
-  loadFileStorageProvider,
   lockExtensionLifecycleScope
 } from '~~/server/utils/extensions'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'

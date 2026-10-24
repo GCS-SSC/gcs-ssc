@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { sql } from 'kysely'
 import { parseI18n, readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import { RoleIdSchema, RoleProfilePatchSchema } from '~~/shared/types/schemas/rbac'

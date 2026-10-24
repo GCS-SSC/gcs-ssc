@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { assignedEntityIdsQuery } from '@gcs-ssc/authorization/server'
 import { AssignedListViewSchema } from '~~/shared/types/schemas/assigned-list-view'
 import { z } from 'zod'

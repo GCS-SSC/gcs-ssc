@@ -1,4 +1,4 @@
-import { setHeader } from 'h3'
+import { defineEventHandler, getRouterParam, setHeader } from 'h3'
 import { useTranslation } from '@intlify/h3'
 import { authorizeCorrectionAgreement, readCorrectionLines } from '~~/server/utils/correction'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'

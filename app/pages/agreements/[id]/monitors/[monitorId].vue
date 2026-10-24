@@ -847,10 +847,10 @@ const handleCompleted = async () => {
               <UInput v-model="selectedItem.egcs_fc_plannedend" type="date" />
             </UFormField>
             <UFormField :label="t('agreement.monitors.items.actual_start')" name="egcs_fc_actualstart">
-              <UInput v-model="selectedItem.egcs_fc_actualstart" type="date" />
+              <UInput v-model.nullable="selectedItem.egcs_fc_actualstart" type="date" />
             </UFormField>
             <UFormField :label="t('agreement.monitors.items.actual_end')" name="egcs_fc_actualend">
-              <UInput v-model="selectedItem.egcs_fc_actualend" type="date" />
+              <UInput v-model.nullable="selectedItem.egcs_fc_actualend" type="date" />
             </UFormField>
           </div>
           <UFormField :label="t('agreement.monitors.items.monitored')" name="egcs_fc_monitored">

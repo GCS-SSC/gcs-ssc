@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config'
 
-import rootConfig from './vitest.config'
+import rootConfig from './vitest.config.ts'
 
 export const CRITICAL_COVERAGE_THRESHOLDS = {
   lines: 80,

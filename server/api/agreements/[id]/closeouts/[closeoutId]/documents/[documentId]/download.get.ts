@@ -1,7 +1,7 @@
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { create as contentDisposition } from 'content-disposition'
-import { setResponseHeader } from 'h3'
+import { defineEventHandler, getRouterParam, setResponseHeader } from 'h3'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import { badRequest, notFound } from '~~/server/utils/api-errors'
 import { readAgreementGeneratedDocument } from '~~/server/utils/document-generation'

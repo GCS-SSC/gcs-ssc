@@ -630,27 +630,15 @@ const hasKey = <TKey extends string>(
 ): value is Record<TKey, unknown> => value !== null && typeof value === 'object' && key in value
 
 const readAgreementClaimLineItemPatchBody = async (event: H3Event) => {
-  const bodyReader = (globalThis as typeof globalThis & {
-    readValidatedBodyI18n?: typeof readValidatedBodyI18n
-  }).readValidatedBodyI18n ?? readValidatedBodyI18n
-
-  return await bodyReader(event, FundingCaseAgreementClaimLineItemPatchSchema)
+  return await readValidatedBodyI18n(event, FundingCaseAgreementClaimLineItemPatchSchema)
 }
 
 const readAgreementClaimReconcileLineItemPatchBody = async (event: H3Event) => {
-  const bodyReader = (globalThis as typeof globalThis & {
-    readValidatedBodyI18n?: typeof readValidatedBodyI18n
-  }).readValidatedBodyI18n ?? readValidatedBodyI18n
-
-  return await bodyReader(event, FundingCaseAgreementClaimReconcileLineItemPatchSchema)
+  return await readValidatedBodyI18n(event, FundingCaseAgreementClaimReconcileLineItemPatchSchema)
 }
 
 const readAgreementClaimReconcilePatchBody = async (event: H3Event) => {
-  const bodyReader = (globalThis as typeof globalThis & {
-    readValidatedBodyI18n?: typeof readValidatedBodyI18n
-  }).readValidatedBodyI18n ?? readValidatedBodyI18n
-
-  return await bodyReader(event, FundingCaseAgreementClaimReconcilePatchSchema)
+  return await readValidatedBodyI18n(event, FundingCaseAgreementClaimReconcilePatchSchema)
 }
 
 const validateAgreementClaimLineItemPatchReferences = async (

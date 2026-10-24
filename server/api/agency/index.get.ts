@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { PaginationSchema } from '~~/shared/types/schemas'
 import { authorize, resolveAnyAgency } from '~~/server/utils/authorize'
 import { listAgenciesForRoute } from '~~/server/utils/agency-list-route'

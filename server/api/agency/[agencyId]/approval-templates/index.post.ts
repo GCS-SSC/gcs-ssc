@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import { ApprovalTemplateCreateSchema } from '~~/shared/types/schemas'
 import { authorizeApprovalTemplateScope, executeApprovalTemplateScopeWrite } from '~~/server/utils/approval-template-scope'

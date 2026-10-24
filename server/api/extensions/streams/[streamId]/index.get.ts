@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import type { ExtensionStreamRegistryItem } from '~~/shared/types/schemas/extensions'
 import { authorizeWithFreshAuthContext, requireAuthContext, requireFreshAuthContext } from '~~/server/utils/authorize'
 import { getRegisteredExtensions, resolveExtensionStreamContext, toClientExtensionManifest } from '~~/server/utils/extensions'

@@ -1,5 +1,5 @@
-/* eslint-disable jsdoc/require-jsdoc -- Request capture never reads the stream or changes validation. */
-import { getQuery, getRouterParams, type H3Event } from 'h3'
+/* eslint-disable jsdoc/require-jsdoc -- Request capture follows the existing reader without changing validation. */
+import { getHeader, getQuery, getRouterParams, readRawBody, type H3Event } from 'h3'
 import { getGcsExtensionByKey } from '#gcs-extensions/server-registry'
 import type { GcsRegisteredExtension } from '../../shared/utils/extensions'
 import { sanitizeAuditInput } from './audit-inputs'
@@ -59,16 +59,14 @@ export const captureAuditRequestBody = (event: H3Event, body: unknown): void => 
   event.context.auditRequestBody = requestInputsRestricted(event) ? { state: 'restricted' } : sanitizeAuditInput(body)
 }
 
-/** Uses H3's already-consumed raw-body cache; never opens or rereads a stream.
+/** Uses H3's public raw-body reader after the existing body reader has completed.
  * @param event - Request whose host or SDK reader has completed.
  * @param body - Parsed body used by existing validation.
  */
 export const captureParsedAuditRequestBody = async (event: H3Event, body: unknown): Promise<void> => {
-  const request = event.node?.req
-  const cached: unknown = request ? Reflect.get(request, Symbol.for('h3RawBody')) : undefined
-  const raw = cached === undefined ? undefined : await cached
-  const isJson = String(request?.headers?.['content-type'] ?? '').includes('json')
-  captureAuditRequestBody(event, isJson && (typeof raw === 'string' || Buffer.isBuffer(raw)) ? raw.toString() : body)
+  const isJson = getHeader(event, 'content-type')?.includes('json')
+  const raw = isJson ? await readRawBody(event) : undefined
+  captureAuditRequestBody(event, raw ?? body)
 }
 
 export const auditRequestSnapshot = (event: H3Event) => {

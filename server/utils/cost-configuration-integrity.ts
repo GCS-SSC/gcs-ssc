@@ -5,8 +5,7 @@ import type { Database } from '~~/shared/types/database'
 import { badRequest } from '~~/server/utils/api-errors'
 
 const routeBadRequest = async (event: H3Event, code: string, key: string) => {
-  const handler = (globalThis as { badRequest?: typeof badRequest }).badRequest ?? badRequest
-  return await handler(event, code, key)
+  return await badRequest(event, code, key)
 }
 
 export const assertAgencyCostCategoryNotInUse = async (

@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { hashPassword } from 'better-auth/crypto'
 import { nanoid } from 'nanoid'
 import { UserActivationSchema } from '~~/shared/types/schemas/user'

@@ -1,9 +1,10 @@
+import { defineNitroPlugin } from 'nitropack/runtime'
 import { acquireDbLease, type DatabaseLease } from '../utils/db'
 import { getMigrationPromise } from '../utils/migration-readiness'
 import { activateEnabledExtensionNitroPlugins } from '../utils/extension-nitro-plugins'
 import { getRegisteredExtensions } from '../utils/extensions'
 import { createScheduledExtensionWriteAuthorization } from '../utils/extension-scheduled-import'
-import { withAuditExecution, withoutAccessLogCapture } from '../utils/audit-context'
+import { withAuditExecution, withSystemAudit, withoutAccessLogCapture } from '../utils/audit-context'
 import { prepareQueueSchedules, runQueueHandler } from '../utils/queue'
 import { getRegisteredQueueHandlers, getQueueEnabledExtensionKeys } from '../utils/queue-registry'
 import type { HostQueueContext } from '../utils/queue-registry'
@@ -59,8 +60,11 @@ export default defineNitroPlugin(app => {
     }
   }
 
-  /** A single housekeeping timer offers every process and cluster queue level. */
-  const poll = (): void => {
+  /**
+   * Offers every process and cluster queue level through one timer.
+   * @returns After dispatching work and scheduling the next polling cycle.
+   */
+  const poll = (): void => withSystemAudit(() => {
     if (stopped) return
     for (const handler of getRegisteredQueueHandlers(app)) {
       if (handler.executionScope !== 'process' || running.has(handler.id)) continue
@@ -75,7 +79,7 @@ export default defineNitroPlugin(app => {
     }
     timer = setTimeout(poll, 5000)
     timer.unref?.()
-  }
+  })
 
   app.hooks.hookOnce('close', async () => {
     stopped = true

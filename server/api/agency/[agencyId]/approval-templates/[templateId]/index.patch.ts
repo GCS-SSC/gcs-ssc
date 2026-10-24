@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { badRequest, notFound, throwApiError } from '~~/server/utils/api-errors'
 import { parseI18n, readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import { ApprovalTemplatePatchSchema, ApprovalTemplatePersistenceSchema } from '~~/shared/types/schemas'

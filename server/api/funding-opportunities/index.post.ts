@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { FundingOpportunityCreateSchema } from '~~/shared/types/schemas'
 import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import { authorize, authorizeWithFreshAuthContext, requireFreshAuthContext } from '~~/server/utils/authorize'

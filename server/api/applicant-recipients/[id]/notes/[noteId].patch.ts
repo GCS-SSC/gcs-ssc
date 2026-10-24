@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { updateProponentNote } from '~~/server/utils/proponent-notes'
 
 // Authorization is enforced by the note service before accessing the parent or note.

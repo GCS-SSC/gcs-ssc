@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { z } from 'zod'
 import { authorize, requireAuthContext } from '~~/server/utils/authorize'
 import { authorizeAgreementResource, canAccessAgreementStream, resolveAgreementStreamScopeContext } from '~~/server/utils/agreement'

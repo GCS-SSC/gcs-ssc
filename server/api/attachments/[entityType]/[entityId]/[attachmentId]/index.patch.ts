@@ -1,4 +1,4 @@
-import { getRouterParam } from 'h3'
+import { defineEventHandler, getRouterParam } from 'h3'
 import { nanoid } from 'nanoid'
 import type {
   GcsFileStorageJsonObject,
@@ -11,7 +11,7 @@ import { executeFreshAuthorizedAttachmentWrite } from '~~/server/utils/attachmen
 import { getAttachmentRouteTarget } from '~~/server/utils/attachment-route'
 import { loadTargetAttachment } from '~~/server/utils/attachment-record'
 import { namespaceProviderMetadata, normalizeStorageProviderMetadata, resolveAgencyStorageProvider } from '~~/server/utils/file-storage-provider'
-import { createFileStorageSecretReader } from '~~/server/utils/extensions'
+import { createFileStorageSecretReader } from '~~/server/utils/file-storage-extensions'
 import { runBoundedExtensionOperation } from '~~/server/utils/extension-admission'
 import {
   completeReservedStorageCleanup,

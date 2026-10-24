@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import type { Insertable, Kysely } from 'kysely'
 import { ApplicantRecipientProfileSchema } from '~~/shared/types/schemas'
 import type { ApplicantRecipientProfileTable, Database } from '~~/shared/types/database'

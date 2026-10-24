@@ -20,7 +20,7 @@ import {
 
 const guidedHelpActions = useGuidedHelpActions()
 const helpRoot = ref<HTMLElement | null>(null)
-const route = useRoute()
+const route = useRoute<'checklists-reviewId___en' | 'checklists-reviewId___fr'>()
 const { t } = useI18n()
 const { getBilingualValue } = useBilingualValue()
 const approvalsRefreshKey: Ref<number> = ref(0)

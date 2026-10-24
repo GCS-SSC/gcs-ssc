@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 import { sql } from 'kysely'
 import { z } from 'zod'

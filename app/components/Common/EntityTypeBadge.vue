@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import type { RouteLocationRaw } from 'vue-router'
-
 const ENTITY_TYPE_ICON_MAP: Record<string, string> = {
   fundingopportunity: 'i-lucide-briefcase',
   fundingcaseagreement: 'i-lucide-file-signature',
@@ -37,7 +35,7 @@ const {
   icon?: string
   labelEn?: string
   labelFr?: string
-  to?: RouteLocationRaw
+  to?: string
   interactive?: boolean
   highlighted?: boolean
   selected?: boolean

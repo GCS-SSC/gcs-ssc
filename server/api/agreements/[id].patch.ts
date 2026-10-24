@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { authorize } from '~~/server/utils/authorize'
 import { resolveAgreementScopeContext } from '~~/server/utils/agreement'
 import { handleExtensionCreateOperationError } from '~~/server/utils/extensions'

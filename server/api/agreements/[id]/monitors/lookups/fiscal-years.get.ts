@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 import { z } from 'zod'

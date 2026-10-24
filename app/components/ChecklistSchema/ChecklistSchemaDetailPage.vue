@@ -56,7 +56,7 @@ type AgencyNameResponse = {
   egcs_ay_name_fr: string
 }
 
-const route = useRoute()
+const route = useRoute<'agencies-id-review-schemas-schemaId___en' | 'agencies-id-review-schemas-schemaId___fr'>()
 const localePath = useLocalePath()
 const { t, locale } = useI18n()
 const { getBilingualValue } = useBilingualValue()

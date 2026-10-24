@@ -197,7 +197,7 @@ const createCloseout = async () => {
               {{ t(`enums.follow_up_status.${item.status}`) }} · {{ formatDate(item.dueDate) }}
             </p>
           </div>
-          <UButton :to="localePath(item.route)" color="neutral" variant="soft" size="sm" icon="i-lucide-external-link" :label="t('agreement.closeout.open_monitor')" />
+          <UButton :to="localePath(router.resolve(localePath(router.resolve(item.route), 'en')))" color="neutral" variant="soft" size="sm" icon="i-lucide-external-link" :label="t('agreement.closeout.open_monitor')" />
         </div>
       </div>
       <p v-else class="rounded-lg border border-default px-4 py-5 text-sm text-muted">
@@ -216,7 +216,7 @@ const createCloseout = async () => {
               {{ t(`assignments.entity_types.${blocker.entityType}`) }} · {{ blockerStatusLabel(blocker) }} · {{ t(`agreement.closeout.blocker_reasons.${blocker.reason}`) }}
             </p>
           </div>
-          <UButton :to="localePath(blocker.route)" color="neutral" variant="soft" size="sm" icon="i-lucide-arrow-right" :label="t('common.view_details')" />
+          <UButton :to="localePath(router.resolve(localePath(router.resolve(blocker.route), 'en')))" color="neutral" variant="soft" size="sm" icon="i-lucide-arrow-right" :label="t('common.view_details')" />
         </div>
       </div>
       <p v-else class="rounded-lg border border-default px-4 py-5 text-sm text-muted">

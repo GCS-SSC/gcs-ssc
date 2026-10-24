@@ -1,5 +1,5 @@
 import { create as contentDisposition } from 'content-disposition'
-import { setResponseHeader } from 'h3'
+import { defineEventHandler, getRouterParam, setResponseHeader } from 'h3'
 import { z } from 'zod'
 import { authorize } from '~~/server/utils/authorize'
 import { badRequest, notFound, throwApiError } from '~~/server/utils/api-errors'

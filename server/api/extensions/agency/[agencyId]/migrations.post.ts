@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 /* eslint-disable jsdoc/require-jsdoc */
 import type { MigrationResult } from 'kysely'
 import type { Scope } from '~~/shared/utils/scopes'

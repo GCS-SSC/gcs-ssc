@@ -13,7 +13,7 @@ import CommonCompletionSection from '~/components/Common/Completions/Section.vue
 import { beginGuidedHelpAction } from '~/utils/guided-help-actions'
 import { scrollReviewPageToTop } from '~/utils/scrollReviewPageToTop'
 
-const route = useRoute()
+const route = useRoute<'assessments-reviewId___en' | 'assessments-reviewId___fr'>()
 const { locale, t } = useI18n()
 const { getBilingualValue } = useBilingualValue()
 

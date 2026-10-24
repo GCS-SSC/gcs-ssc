@@ -1,5 +1,5 @@
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
-import { setResponseHeader } from 'h3'
+import { defineEventHandler, getRouterParam, setResponseHeader } from 'h3'
 import { create as contentDisposition } from 'content-disposition'
 import { authorizeAgreementResource } from '~~/server/utils/agreement'
 import { readAgreementGeneratedDocument } from '~~/server/utils/document-generation'

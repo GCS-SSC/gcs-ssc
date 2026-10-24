@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { requireAuthContext } from '~~/server/utils/authorize'
 import { executeEntityAssignmentManagement } from '~~/server/utils/entity-assignment-write'
 import { notFound } from '~~/server/utils/api-errors'

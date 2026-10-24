@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { authorizeReviewRuntimeAction } from '~~/server/utils/review-runtime-access'
 import {

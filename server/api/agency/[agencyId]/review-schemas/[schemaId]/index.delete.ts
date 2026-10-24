@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { agencyReviewSchemaRoute } from '~~/server/utils/agency-review-schema-routes'
 
 // eslint-disable-next-line local/require-authorize -- Shared route authorizes Agency ownership.

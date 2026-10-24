@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { TransferPaymentPerformanceIndicatorSchema } from '~~/shared/types/schemas'
 import { throwIfTransferPaymentUniqueConstraintError } from '~~/server/utils/transfer-payment-unique-constraint-errors'
 import { badRequest } from '~~/server/utils/api-errors'

@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { authorize, authorizeWithFreshAuthContext, requireFreshAuthContext } from '~~/server/utils/authorize'
 import { badRequest } from '~~/server/utils/api-errors'
 import { resolveApplicantRecipientAuthorization } from '~~/server/utils/applicant-recipient-auth'

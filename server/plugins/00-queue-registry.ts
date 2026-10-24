@@ -1,3 +1,4 @@
+import { defineNitroPlugin } from 'nitropack/runtime'
 import { getRegisteredExtensions } from '../utils/extensions'
 import { initializeQueueRegistry } from '../utils/queue-registry'
 

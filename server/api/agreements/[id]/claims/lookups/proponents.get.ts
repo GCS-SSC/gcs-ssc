@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
 import { sql } from 'kysely'

@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { sql, type RawBuilder } from 'kysely'
 import { z } from 'zod'
 import { requireAuthContext, requireFreshAuthContext } from '~~/server/utils/authorize'

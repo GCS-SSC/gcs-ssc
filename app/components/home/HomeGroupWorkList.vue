@@ -10,6 +10,7 @@ const { items, claimable = false, busyKey = null } = defineProps<{ items: GroupI
 const emit = defineEmits<{ claim: [item: GroupItem] }>()
 const { t } = useI18n()
 const localePath = useLocalePath()
+const router = useRouter()
 const { getBilingualValue } = useBilingualValue()
 /**
  * Builds the group item's main line with its owning business identity.
@@ -52,7 +53,7 @@ const itemUrl = (item: GroupItem): string | null => {
   if (item.entity_type === 'fundingcaseagreement') return localePath(appRouteLocations.agreementDetail(item.entity_id))
   if (item.entity_type === 'applicantrecipient') return localePath(appRouteLocations.proponentEdit(item.entity_id))
   if (item.entity_type === 'fundingclaimreconcile') return localePath(appRouteLocations.claimReconciliationDetail(item.entity_id))
-  if (item.agreement_id && ASSIGNABLE_ENTITY_TYPE_ENUM.includes(item.entity_type as AssignableEntityType)) return localePath(buildAssignedWorkRoute(item.entity_type as AssignableEntityType, item.entity_id, item.agreement_id, item.variant))
+  if (item.agreement_id && ASSIGNABLE_ENTITY_TYPE_ENUM.includes(item.entity_type as AssignableEntityType)) return localePath(router.resolve(localePath(router.resolve(buildAssignedWorkRoute(item.entity_type as AssignableEntityType, item.entity_id, item.agreement_id, item.variant)), 'en')))
   return null
 }
 </script>

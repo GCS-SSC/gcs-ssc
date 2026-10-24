@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { getValidatedQueryI18n, readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import { executeFreshAuthorizedCurrentRecommendationWrite } from '~~/server/utils/review-runtime-access'
 import { resolveCompletionRuntimeEntityFromEntity, respondCompletionRuntimeEntityNotFound } from '~~/server/utils/completion-runtime'

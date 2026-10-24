@@ -40,7 +40,7 @@ const mappedItems = computed(() => {
   }
   if (!categoryEnKey && !categoryFrKey) return [...groups.values()].flat()
   return [...groups.entries()].map(([category, options]) => category
-    ? [{ type: 'label' as const, label: category }, ...options]
+    ? [{ type: 'label' as const, label: category, value: undefined }, ...options]
     : options)
 })
 </script>

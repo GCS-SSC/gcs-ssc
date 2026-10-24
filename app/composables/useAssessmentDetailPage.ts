@@ -90,7 +90,7 @@ const getCurrentOverallResultOption = (
  * Coordinates assessment detail page state, persistence, and runtime derivations.
  */
 export const useAssessmentDetailPage = () => {
-  const route = useRoute()
+  const route = useRoute<'assessments-reviewId___en' | 'assessments-reviewId___fr'>()
   const returnRouter = useRouter()
   const localePath = useLocalePath()
   const toast = useLocalizedToast()

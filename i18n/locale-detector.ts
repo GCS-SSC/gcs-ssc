@@ -1,3 +1,4 @@
+import { getCookie, getHeader } from 'h3'
 import { resolveLocalePreference } from '../server/utils/request-locale'
 
 export default defineI18nLocaleDetector((event, config) => {

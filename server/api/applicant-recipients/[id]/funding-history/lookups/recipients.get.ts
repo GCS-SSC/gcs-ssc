@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { z } from 'zod'
 import { authorize, requireAuthContext } from '~~/server/utils/authorize'
 import { badRequest } from '~~/server/utils/api-errors'

@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { isActiveGroupMember } from '~~/server/utils/groups'
 import { notFound } from '~~/server/utils/api-errors'
 import {

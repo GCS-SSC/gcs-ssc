@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 /* eslint-disable jsdoc/require-jsdoc -- Temporary coverage while this route receives complete API documentation. */
 import { ExtensionStreamConfigurationSchema } from '~~/shared/types/schemas/extensions'
 import type { Kysely, Transaction } from 'kysely'

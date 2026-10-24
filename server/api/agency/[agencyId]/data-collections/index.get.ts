@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { listAgencyDataCollections } from '~~/server/utils/data-collection-agency-routes'
 
 // eslint-disable-next-line local/require-authorize -- Agency authorization is enforced by the domain adapter.

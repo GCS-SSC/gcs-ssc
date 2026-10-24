@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { notFound, throwApiError } from '~~/server/utils/api-errors'
 import { requireAuthContext } from '~~/server/utils/authorize'
 import { DataCollectionDefinitionInvalidError, fetchRuntimeDataCollection } from '~~/server/utils/data-collection-runtime'

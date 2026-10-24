@@ -1,3 +1,4 @@
+import { defineEventHandler, getQuery } from 'h3'
 import { z } from 'zod'
 import type { ExtensionCreateActionsResponse } from '~~/shared/types/schemas/extensions'
 import { parseI18n } from '~~/server/utils/api-validate'

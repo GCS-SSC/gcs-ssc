@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { PaginationSchema, PositivePostgresBigintIdSchema } from '~~/shared/types/schemas'
 import { authorize, requireAuthContext } from '~~/server/utils/authorize'
 import { canAccessApplicantRecipient, resolveApplicantRecipientVisibility, type ApplicantRecipientVisibility } from '~~/server/utils/applicant-recipient-auth'

@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { sql } from 'kysely'
 import { AdminCommonListQuerySchema } from '~~/shared/types/schemas'
 import { authorize } from '~~/server/utils/authorize'

@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import type { Scope } from '~~/shared/utils/scopes'
 import type { ExtensionAgencyRegistryItem } from '~~/shared/types/schemas/extensions'
 import { authorizeWithFreshAuthContext, requireAuthContext, requireFreshAuthContext } from '~~/server/utils/authorize'

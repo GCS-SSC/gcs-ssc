@@ -1,4 +1,4 @@
-import type { H3Event } from 'h3'
+import { defineEventHandler, type H3Event } from 'h3'
 import { authorize } from '~~/server/utils/authorize'
 import { dispatchExtensionServerRoute } from '~~/server/utils/extension-dispatch-route'
 

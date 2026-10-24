@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import { badRequest } from '~~/server/utils/api-errors'
 import { PaginationSchema } from '~~/shared/types/schemas'
 import { sql } from 'kysely'

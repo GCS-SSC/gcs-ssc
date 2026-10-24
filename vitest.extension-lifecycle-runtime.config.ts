@@ -1,4 +1,4 @@
-import { defineCriticalCoverageProject } from './vitest.host-critical-base'
+import { defineCriticalCoverageProject } from './vitest.host-critical-base.ts'
 
 export const EXTENSION_LIFECYCLE_RUNTIME_COVERAGE_INCLUDE = [
   'server/utils/extension-lifecycle-runtime.ts'

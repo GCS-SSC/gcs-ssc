@@ -90,12 +90,12 @@ const openForm = (formId: string) => navigateTo(localePath(appRouteLocations.ext
 const { selectedTab } = useUrlTabState({
   tabs,
   defaultTab: 'connection',
-  enabled: computed(() => listStatus.value === 'success' && registryStatus.value === 'success' && !route.params.formId)
+  enabled: computed(() => listStatus.value === 'success' && registryStatus.value === 'success' && !('formId' in route.params && route.params.formId))
 })
 </script>
 
 <template>
-  <NuxtPage v-if="route.params.formId" />
+  <NuxtPage v-if="'formId' in route.params && route.params.formId" />
   <UDashboardPanel v-else id="extension-agency-workspace">
     <template #header>
       <UDashboardNavbar>

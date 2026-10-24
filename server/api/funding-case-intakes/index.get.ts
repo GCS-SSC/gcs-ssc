@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { requireAuthContext } from '~~/server/utils/authorize'
 import { PaginationSchema, PositivePostgresBigintIdSchema } from '~~/shared/types/schemas'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'

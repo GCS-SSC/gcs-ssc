@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { resolveAuditReadAccess } from '~~/server/utils/audit-browser'
 import { authorize } from '~~/server/utils/authorize'
 import { resolveAuditRetention } from '~~/server/utils/audit-runtime'

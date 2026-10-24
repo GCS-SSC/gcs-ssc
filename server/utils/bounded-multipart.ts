@@ -1,5 +1,6 @@
 import { captureAuditRequestBody } from './audit-request'
 /* eslint-disable jsdoc/require-jsdoc -- Typed multipart primitives use descriptive names. */
+import { once } from 'node:events'
 import Busboy from '@fastify/busboy'
 import type { BusboyInstance } from '@fastify/busboy'
 import type { H3Event, MultiPartData } from 'h3'
@@ -94,28 +95,32 @@ export const readBoundedMultipartFormData = async (
     limitExceeded = true
   })
 
-  const completed = new Promise<void>((resolve, reject) => {
+  let parserError: unknown
+  const completed = new Promise<void>(resolve => {
     parser.once('finish', resolve)
-    parser.once('error', reject)
+    parser.once('error', error => {
+      parserError = error
+      resolve()
+    })
   })
   let totalBytes = 0
   try {
-    for await (const rawChunk of event.node.req) {
+    // Returning a size error must leave the socket available for its HTTP response.
+    for await (const rawChunk of event.node.req.iterator({ destroyOnReturn: false })) {
       const chunk = Buffer.isBuffer(rawChunk) ? rawChunk : Buffer.from(rawChunk)
       totalBytes += chunk.byteLength
       if (totalBytes > options.maxTotalBytes) {
         limitExceeded = true
         break
       }
-      if (!parser.write(chunk)) await new Promise<void>(resolve => parser.once('drain', resolve))
+      if (!parser.write(chunk)) await once(parser, 'drain')
+      if (limitExceeded || parserError) break
     }
-    if (limitExceeded) {
-      event.node.req.resume()
-      parser.destroy()
-      throw new MultipartLimitError()
-    }
+    if (limitExceeded) throw new MultipartLimitError()
+    if (parserError) throw new MultipartParseError()
     parser.end()
     await completed
+    if (parserError) throw new MultipartParseError()
     if (limitExceeded) throw new MultipartLimitError()
     if (fileStreamError) throw new MultipartParseError()
     const capturedParts = new Map<string, unknown[]>()
@@ -131,6 +136,8 @@ export const readBoundedMultipartFormData = async (
       [name, values.length === 1 ? values[0] : values])))
     return parts
   } catch (error: unknown) {
+    parser.destroy()
+    if (!event.node.req.destroyed) event.node.req.resume()
     if (limitExceeded) throw new MultipartLimitError()
     if (error instanceof MultipartParseError) throw error
     throw new MultipartParseError()

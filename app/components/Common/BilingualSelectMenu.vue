@@ -63,13 +63,13 @@ const mappedItems = computed(() => {
     groups.set(category, [...(groups.get(category) ?? []), option])
   }
   return [...groups.entries()].map(([category, entries]) => category
-    ? [{ type: 'label' as const, label: category }, ...entries]
+    ? [{ type: 'label' as const, label: category, value: undefined }, ...entries]
     : entries)
 })
 </script>
 
 <template>
   <div @keydown.enter.prevent.stop>
-    <USelectMenu ref="selectMenuRef" v-model="model" :items="mappedItems" value-key="value" v-bind="$attrs" />
+    <USelectMenu ref="selectMenuRef" v-model.nullable="model" :items="mappedItems" value-key="value" v-bind="$attrs" />
   </div>
 </template>

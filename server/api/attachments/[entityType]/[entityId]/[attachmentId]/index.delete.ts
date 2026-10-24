@@ -1,4 +1,4 @@
-import { getRouterParam } from 'h3'
+import { defineEventHandler, getRouterParam } from 'h3'
 import { nanoid } from 'nanoid'
 import { executeFreshAuthorizedAttachmentWrite } from '~~/server/utils/attachment-target'
 import { getAttachmentRouteTarget } from '~~/server/utils/attachment-route'

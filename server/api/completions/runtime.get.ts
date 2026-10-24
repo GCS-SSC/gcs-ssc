@@ -9,7 +9,7 @@ import { authorizeReviewRuntimeAction } from '~~/server/utils/review-runtime-acc
 import { CompletionRuntimeQuerySchema } from '~~/shared/types/schemas/completion'
 import { authorizeExtensionLifecycleRead, resolveExtensionLifecycleRuntime } from '~~/server/utils/extension-lifecycle-runtime'
 import { resolveActiveWorkflowSetup } from '~~/server/utils/workflow-runtime'
-import type { H3Event } from 'h3'
+import { defineEventHandler, type H3Event } from 'h3'
 import type { Entity_Type } from '~~/shared/types/database'
 import { isCoreEntityType, requiresApprovalSubmissionAtCompletion } from '~~/shared/constants/entity-registry'
 import { requireAuthContext } from '~~/server/utils/authorize'

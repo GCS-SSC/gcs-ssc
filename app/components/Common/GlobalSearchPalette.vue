@@ -56,11 +56,9 @@ const typeLabel = (type: string): string => {
 }
 const resultDestination = (url: string): string => {
   // Custom French paths require a registered route name, resolved from the API's English URL.
-  const destination = router.resolve(localePath(url, 'en'))
+  const destination = router.resolve(localePath(router.resolve(url), 'en'))
   if (!destination.name) throw new Error('Search destination is not registered')
-  return localePath({
-    name: destination.name, params: destination.params, query: destination.query, hash: destination.hash
-  })
+  return localePath(destination)
 }
 const resultItem = (result: SearchResult): PaletteItem => {
   const identity = getBilingualValue(result, 'name', result.reference ?? `#${result.id}`)

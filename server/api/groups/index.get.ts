@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { authorize, resolveAnyAgency } from '~~/server/utils/authorize'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { PaginationSchema } from '~~/shared/types/schemas'

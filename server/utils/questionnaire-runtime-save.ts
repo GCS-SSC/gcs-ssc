@@ -20,7 +20,7 @@ export type QuestionnaireRuntimeSaveAdapter<Record extends RuntimeQuestionnaireR
   conflict: RuntimeQuestionnaireError
 }
 
-export const saveQuestionnaireRuntimeInTransaction = async <Record extends RuntimeQuestionnaireRecord, Response, Persisted, Submitted>(
+const saveQuestionnaireRuntimeInTransaction = async <Record extends RuntimeQuestionnaireRecord, Response, Persisted, Submitted>(
   event: H3Event,
   trx: Transaction<Database>,
   input: {
@@ -41,3 +41,4 @@ export const saveQuestionnaireRuntimeInTransaction = async <Record extends Runti
   const updated = await input.adapter.persist(trx, record, input.responses, record.revision + 1, input.submit)
   return input.submit ? await input.adapter.submit(trx, record, updated) : updated
 }
+export { saveQuestionnaireRuntimeInTransaction }

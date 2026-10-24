@@ -1,7 +1,7 @@
 import { classifyExtensionAuditInputs } from './audit-request'
 import { withAuditExecution } from './audit-context'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param, jsdoc/require-returns -- Temporary coverage while extension dispatch helpers receive complete documentation. */
-import type { H3Event } from 'h3'
+import { getRouterParam, type H3Event } from 'h3'
 import { getMethod, getQuery, isError } from 'h3'
 import {
   isGcsExtensionUserError,

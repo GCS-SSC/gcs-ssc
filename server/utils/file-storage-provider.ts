@@ -9,7 +9,7 @@ import {
   type GcsFileStorageTarget
 } from '@gcs-ssc/extensions/server'
 import type { Database } from '~~/shared/types/database'
-import { createFileStorageSecretReader, loadFileStorageProvider, type LoadedFileStorageProvider } from './extensions'
+import { createFileStorageSecretReader, loadFileStorageProvider, type LoadedFileStorageProvider } from './file-storage-extensions'
 
 const MAX_LOCATOR_BYTES = 32 * 1024
 const MAX_PROVIDER_METADATA_BYTES = 15 * 1024

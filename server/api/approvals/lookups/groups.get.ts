@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { ApprovalRuntimeQuerySchema } from '~~/shared/types/schemas/review-approval'
 import { requireAuthContext } from '~~/server/utils/authorize'

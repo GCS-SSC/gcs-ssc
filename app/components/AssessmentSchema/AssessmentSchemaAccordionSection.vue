@@ -15,7 +15,7 @@ const route = useRoute()
 const localValue = ref<string[]>(defaultOpen ? ['content'] : [])
 const persistedExpansion = useState<Record<string, boolean>>('authoring-accordion-expansion', () => ({}))
 const scopedPersistenceKey = computed(() => persistenceKey
-  ? `${String(route.params.schemaId ?? 'shared')}:${persistenceKey}`
+  ? `${String(('schemaId' in route.params ? route.params.schemaId : undefined) ?? 'shared')}:${persistenceKey}`
   : null)
 const accordionValue = computed<string[]>({
   /** @returns The locally or route-persisted expanded item value. */

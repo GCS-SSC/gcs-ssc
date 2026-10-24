@@ -1,5 +1,5 @@
 /* eslint-disable jsdoc/require-jsdoc -- Route helpers express the note authorization boundary. */
-import type { H3Event } from 'h3'
+import { getRouterParam, type H3Event } from 'h3'
 import { sql } from 'kysely'
 import { authorize, requireAuthContext } from './authorize'
 import { notFound } from './api-errors'

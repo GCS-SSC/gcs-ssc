@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { getValidatedQueryI18n } from '~~/server/utils/api-validate'
 import { forbidden, throwApiError } from '~~/server/utils/api-errors'
 import { canAccessAgreement, resolveAgreementScopeContext } from '~~/server/utils/agreement'

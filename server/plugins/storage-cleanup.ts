@@ -1,3 +1,4 @@
+import { defineNitroPlugin } from 'nitropack/runtime'
 import { nanoid } from 'nanoid'
 import type { Kysely } from 'kysely'
 import type { Database } from '../../shared/types/database'

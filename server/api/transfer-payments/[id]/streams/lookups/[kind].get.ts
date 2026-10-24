@@ -1,3 +1,4 @@
+import { defineEventHandler, getRouterParam } from 'h3'
 import enMessages from '~~/i18n/locales/en.json'
 import frMessages from '~~/i18n/locales/fr.json'
 import { z } from 'zod'

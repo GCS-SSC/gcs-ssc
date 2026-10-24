@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3'
 import { badRequest } from '~~/server/utils/api-errors'
 import { readValidatedBodyI18n } from '~~/server/utils/api-validate'
 import {

@@ -1,6 +1,6 @@
 /* eslint-disable jsdoc/require-param, jsdoc/require-returns -- Public signatures fully describe these narrow guards. */
-import type { AuthorizationAction } from './actions'
-import { isAuthorizationAction } from './actions'
+import type { AuthorizationAction } from './actions.ts'
+import { isAuthorizationAction } from './actions.ts'
 
 /** Subjects that may be stored on a role permission. */
 export const ROLE_PERMISSION_SUBJECTS = [

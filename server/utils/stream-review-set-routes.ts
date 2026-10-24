@@ -1,5 +1,5 @@
 /* eslint-disable jsdoc/require-jsdoc */
-import type { H3Event } from 'h3'
+import { getRouterParam, type H3Event } from 'h3'
 import { z } from 'zod'
 import { authorize } from './authorize'
 import { badRequest, notFound, throwApiError } from './api-errors'
