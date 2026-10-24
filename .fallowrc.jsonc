@@ -12,9 +12,8 @@
     "extensions/*/server/migrations/**/*.ts",
     "extensions/*/server/runtime.ts",
     "extensions/*/server/nitro-plugin.ts",
-    // Nuxt i18n and the admin SQL dump route load these files by configured path.
-    "i18n/locale-detector.ts",
-    "scripts/admin-sql-dump.ts"
+    // Nuxt i18n loads this file by configured path.
+    "i18n/locale-detector.ts"
   ],
   "ignoreDependencies": [
     // Nuxt UI resolves icon collections from string icon names.

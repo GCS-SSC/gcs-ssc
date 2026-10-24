@@ -11,7 +11,7 @@ const { t } = useI18n()
 const toast = useLocalizedToast()
 const localePath = useLocalePath()
 const abilityHelpers = useCan()
-const { can, canAny, permissionsReady } = abilityHelpers
+const { canAny, permissionsReady } = abilityHelpers
 const { user, signOut, permissionRevision } = useAuth()
 const canLoadAgencyWorkspaces = computed(() => permissionsReady.value && canAny('agency', 'read'))
 const route = useRoute()
@@ -36,7 +36,6 @@ const loadAgencyWorkspaces = async () => {
 }
 watch([() => route.fullPath, canLoadAgencyWorkspaces, permissionRevision], loadAgencyWorkspaces, { immediate: true })
 
-const canViewAdminGwcoa = computed(() => can('system', 'read', { type: 'global' }))
 const { items, pages } = useNavigationCatalog(agencyWorkspaces)
 const userDisplayName = computed(() => {
   if (!user.value) return ''
@@ -68,21 +67,8 @@ const handleLogout = async () => {
   }
 }
 
-const downloadAdminSqlDump = () => {
-  globalThis.location.assign('/api/admin/dump')
-}
-
 const userMenuItems = computed<DropdownMenuItem[][]>(() => [
   [
-    ...(canViewAdminGwcoa.value
-      ? [
-          {
-            label: t('common.download_sql_dump'),
-            icon: 'i-lucide-database-backup',
-            onSelect: downloadAdminSqlDump
-          }
-        ]
-      : []),
     {
       label: t('common.logout'),
       icon: 'i-lucide-log-out',

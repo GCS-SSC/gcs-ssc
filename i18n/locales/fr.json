@@ -415,7 +415,6 @@
     "open": "Ouvrir",
     "save": "Enregistrer",
     "download": "Télécharger",
-    "download_sql_dump": "Télécharger le dump SQL",
     "logout": "Déconnexion",
     "logout_failed": "La déconnexion n’a pas pu être effectuée. Veuillez réessayer.",
     "confirm": "Confirmer",

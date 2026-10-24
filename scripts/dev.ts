@@ -1,4 +1,4 @@
-import { mkdir, rm } from 'node:fs/promises'
+import { rm } from 'node:fs/promises'
 import path from 'node:path'
 
 type DevChildProcess = {
@@ -139,29 +139,6 @@ const formatOriginHost = (host: string): string => {
 }
 
 /**
- * Bundles the explicit source worker outside Nuxt's generated development tree.
- *
- * @param repositoryRoot - Repository root containing the worker source.
- * @returns Absolute path to the executable development worker.
- */
-export const buildDevAdminSqlDumpWorker = async (repositoryRoot: string): Promise<string> => {
-  const workerOutputDir = path.resolve(repositoryRoot, '.data/dev-workers')
-  await mkdir(workerOutputDir, { recursive: true })
-  const result = await Bun.build({
-    entrypoints: [path.resolve(repositoryRoot, 'server/workers/admin-sql-dump.ts')],
-    external: ['@electric-sql/*', 'kysely'],
-    format: 'esm',
-    naming: 'admin-sql-dump-worker.mjs',
-    outdir: workerOutputDir,
-    target: 'bun'
-  })
-  if (!result.success) {
-    throw new AggregateError(result.logs, 'Failed to build the development admin SQL dump worker')
-  }
-  return path.resolve(workerOutputDir, 'admin-sql-dump-worker.mjs')
-}
-
-/**
  * Builds the dev-mode Better Auth origin list from the active host and port.
  *
  * @param host - Resolved dev host.
@@ -258,7 +235,6 @@ const main = async (): Promise<void> => {
   const host = resolveDevHost(forwardedArgs)
   const devAuthOrigins = buildDevAuthOrigins(host, port)
   const authUrl = devAuthOrigins[0] ?? `http://localhost:${port}`
-  const devAdminSqlDumpWorkerPath = await buildDevAdminSqlDumpWorker(process.cwd())
   const proc = Bun.spawn(['bun', 'x', 'nuxt', 'dev', ...forwardedArgs], {
     cwd: process.cwd(),
     env: {
@@ -267,7 +243,6 @@ const main = async (): Promise<void> => {
       NUXT_DISABLE_SOURCEMAPS: resolveDevSourceMapSetting(process.env.NUXT_DISABLE_SOURCEMAPS),
       BETTER_AUTH_URL: authUrl,
       BETTER_AUTH_BASE_URL: authUrl,
-      GCS_DEV_ADMIN_SQL_DUMP_WORKER_PATH: devAdminSqlDumpWorkerPath,
       BETTER_AUTH_TRUSTED_ORIGINS: Array.from(new Set([
         ...devAuthOrigins,
         ...(process.env.BETTER_AUTH_TRUSTED_ORIGINS?.split(',').map(origin => origin.trim()).filter(Boolean) ?? []),

@@ -415,7 +415,6 @@
     "open": "Open",
     "save": "Save",
     "download": "Download",
-    "download_sql_dump": "Download SQL dump",
     "logout": "Logout",
     "logout_failed": "Sign out could not be completed. Please try again.",
     "confirm": "Confirm",

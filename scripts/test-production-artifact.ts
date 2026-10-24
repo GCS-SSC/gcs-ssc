@@ -14,7 +14,6 @@ import {
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
-import { Worker } from 'node:worker_threads'
 import { join, resolve } from 'node:path'
 import assert from 'node:assert/strict'
 import { PGlite } from '@electric-sql/pglite'
@@ -153,19 +152,6 @@ interface ArtifactRuntimeConfig {
 interface MigrationRow {
   name: string
 }
-
-interface RestoredRelationRow {
-  table_schema: string
-  table_name: string
-}
-
-const EXPECTED_ADMIN_DUMP_RELATIONS: RestoredRelationRow[] = [
-  { table_schema: 'extensions', table_name: 'agency_enablement' },
-  { table_schema: 'public', table_name: 'Agency_Profile' },
-  { table_schema: 'public', table_name: 'Common_Entity' },
-  { table_schema: 'public', table_name: 'Funding_Case_Agreement_Profile' },
-  { table_schema: 'public', table_name: 'Transfer_Payment_Profile' }
-]
 
 const delay = async (durationMs: number): Promise<void> => {
   await new Promise(resolveDelay => setTimeout(resolveDelay, durationMs))
@@ -379,63 +365,6 @@ export const createDocxContentDigest = (bytes: Buffer): string => {
     digest.update(entryBytes)
   }
   return digest.digest('hex')
-}
-
-/**
- * Removes the psql-only safety wrappers emitted by newer pg_dump versions.
- *
- * The SQL inside the wrappers remains unchanged and is executed by PGlite.
- *
- * @param dump - Plain-text PostgreSQL dump.
- * @returns SQL accepted by PGlite's protocol executor.
- */
-export const prepareAdminSqlDumpForRestore = (dump: string): string => {
-  return dump
-    .split(/\r?\n/)
-    .filter(line => !/^\\(?:restrict|unrestrict)\s+\S+\s*$/.test(line))
-    .join('\n')
-}
-
-/**
- * Restores an admin dump into a blank database and verifies representative schema.
- *
- * @param dump - Plain-text PostgreSQL dump returned by the admin endpoint.
- */
-export const verifyAdminSqlDumpRestorable = async (dump: string): Promise<void> => {
-  const pg = new PGlite('memory://', {
-    extensions: { citext, pg_trgm }
-  })
-
-  try {
-    await pg.exec(prepareAdminSqlDumpForRestore(dump))
-    const migrations = await pg.query<MigrationRow>(
-      'select name from public.kysely_migration order by name'
-    )
-    assert.deepEqual(
-      migrations.rows.map(row => row.name),
-      PRODUCTION_CORE_MIGRATIONS
-    )
-
-    const relations = await pg.query<RestoredRelationRow>(`
-      select table_schema, table_name
-      from information_schema.tables
-      where
-        (table_schema = 'extensions' and table_name = 'agency_enablement')
-        or (
-          table_schema = 'public'
-          and table_name in (
-            'Agency_Profile',
-            'Common_Entity',
-            'Funding_Case_Agreement_Profile',
-            'Transfer_Payment_Profile'
-          )
-        )
-      order by table_schema, table_name
-    `)
-    assert.deepEqual(relations.rows, EXPECTED_ADMIN_DUMP_RELATIONS)
-  } finally {
-    await pg.close()
-  }
 }
 
 /**
@@ -738,56 +667,6 @@ const stopArtifact = async (artifact: RunningArtifact): Promise<void> => {
 }
 
 /**
- * Verifies route authorization and validates the exact packaged dump worker.
- *
- * @param baseUrl - Production artifact base URL.
- * @param artifactDir - Copied artifact root.
- * @param artifact - Running process used to include server diagnostics on failure.
- */
-const verifyAdminDump = async (
-  baseUrl: string,
-  artifactDir: string,
-  artifact: RunningArtifact
-): Promise<void> => {
-  const unauthorizedResponse = await fetch(`${baseUrl}/api/admin/dump`, {
-    signal: AbortSignal.timeout(DEFAULT_REQUEST_TIMEOUT_MS)
-  })
-  assert.equal(
-    unauthorizedResponse.status,
-    401,
-    `Admin dump route did not reject anonymous access.\n${artifact.output()}`
-  )
-
-  const worker = new Worker(join(artifactDir, 'server', 'admin-sql-dump-worker.mjs'))
-  const dump = await new Promise<string>((resolveDump, rejectDump) => {
-    const timer = setTimeout(() => {
-      void worker.terminate().finally(() => rejectDump(new Error('Packaged admin dump worker timed out')))
-    }, DEFAULT_REQUEST_TIMEOUT_MS)
-    worker.once('message', (message: unknown) => {
-      clearTimeout(timer)
-      if (typeof message === 'object' && message !== null && 'ok' in message
-        && message.ok === true && 'sql' in message && typeof message.sql === 'string') {
-        resolveDump(message.sql)
-      } else {
-        rejectDump(new Error(`Packaged admin dump worker failed: ${JSON.stringify(message)}`))
-      }
-    })
-    worker.once('error', rejectDump)
-  }).finally(async () => {
-    await worker.terminate()
-  })
-
-  const dumpMigrations = Array.from(
-    dump.matchAll(/INSERT INTO public\.kysely_migration VALUES \('([^']+)'/g),
-    match => match[1]
-  )
-  assert.deepEqual(dumpMigrations, PRODUCTION_CORE_MIGRATIONS)
-  assert.doesNotMatch(dump, /0240_seed|root@example\.com|agency@example\.com/)
-  assert.doesNotMatch(dump, / OWNER TO |\n(?:GRANT|REVOKE) /)
-  await verifyAdminSqlDumpRestorable(dump)
-}
-
-/**
  * Verifies representative filtered extension assets are served by Nitro.
  *
  * @param baseUrl - Production artifact base URL.
@@ -918,8 +797,6 @@ export const runProductionArtifactTest = async (
     console.info('[artifact] Production migrations completed without demo seed data.')
 
     await verifyExtensionPublicAssets(baseUrl)
-    await verifyAdminDump(baseUrl, artifactDir, artifact)
-    console.info('[artifact] Packaged production admin dump restored into a blank database.')
 
     await stopArtifact(artifact)
     artifact = null
