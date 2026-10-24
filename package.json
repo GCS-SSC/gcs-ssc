@@ -161,6 +161,7 @@
     "@vue/test-utils": "^2.4.6",
     "dependency-cruiser": "^17.4.0",
     "eslint": "^10.0.0",
+    "esbuild": "0.28.2",
     "eslint-plugin-jsdoc": "^62.7.1",
     "eslint-plugin-prefer-arrow": "^1.2.3",
     "fallow": "^2.74.0",

@@ -18,16 +18,31 @@ const {
 }>()
 
 const isDisabled = computed(() => loading || disabled)
+
+/**
+ * Keeps a pending Save focused while blocking mouse and keyboard activation.
+ * @param event - The activation that would otherwise submit or invoke a caller.
+ */
+const preventDisabledActivation = (event: MouseEvent) => {
+  if (!isDisabled.value) return
+  event.preventDefault()
+  event.stopImmediatePropagation()
+}
 </script>
 
 <template>
   <UButton
     :type="type"
     :label="label"
-    :loading="loading"
-    :disabled="isDisabled"
+    :loading="false"
+    :loading-auto="false"
+    :disabled="disabled && !loading"
+    :aria-disabled="isDisabled || undefined"
+    :aria-busy="loading || undefined"
     :color="color"
     :variant="variant"
-    :icon="loading ? undefined : 'i-lucide-save'"
-    class="cursor-default" />
+    :icon="loading ? 'i-lucide-loader-circle' : 'i-lucide-save'"
+    :class="{ '[&_[data-slot=leadingIcon]]:animate-spin': loading }"
+    class="cursor-default"
+    @click.capture="preventDisabledActivation" />
 </template>

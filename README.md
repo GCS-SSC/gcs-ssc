@@ -6,7 +6,7 @@ GCS-SSC is an internal grants and contributions system designed to manage the li
 
 Experience the application immediately: **[Launch Demo](https://gcs-ssc.github.io/gcs-ssc/)**
 
-Browser-hosted startup failed during migration verification; see [Known issues](#known-issues).
+Browser-demo builds use an isolated WebContainer compatibility shim; see [Known issues](#known-issues).
 
 Credentials:
 
@@ -31,7 +31,6 @@ These observations and verification limits were recorded during pre-Nuxt 5 prepa
 
 ### Observed behavior
 
-- Saving a User disables the Save button and can move focus to the page body before the error toast appears. No comparative runtime baseline establishes that the migration introduced this behavior.
 - Query-access history is best effort. Its queue drops new events at 2,000 events or 32 MiB of estimated payload. Separate test runs dropped 17,198, 18,360, and 46,671 events; these are separate observations, not one total. Query-access history is distinct from transactional change auditing. No loss-free capacity or comparative performance baseline is established.
 - One Chromium test process crashed with `SIGBUS` alongside transient disk consumption and core-dump staging. The cause remains unproven; a later passing run does not establish a root-cause fix.
 
@@ -43,7 +42,7 @@ These observations and verification limits were recorded during pre-Nuxt 5 prepa
 
 ### Deferred compatibility work
 
-- The tested browser-hosted WebContainer started but returned HTTP 503 for health and HTTP 500 for login when asynchronous audit context was lost. Resolution is deferred to separate work. Native artifact and container checks passed, but this verification did not establish a working browser-hosted demo.
+- Removing the WebContainer compatibility shim depends on upstream support for asynchronous request context. The shim applies only to serialized browser-demo server modules. English/French login, authorization denials, and concurrent audited writes passed in an actual WebContainer; standard Node.js and Docker artifacts remain unchanged.
 - `future.compatibilityVersion: 5` remains enabled with `experimental.nitroAutoImports: true`. Disabling Nitro auto-imports is deferred until the i18n integration supports it without a dependency patch.
 - The inherited, version-pinned Nitro 2.13.5 lifecycle patch remains required to prevent overlapping PGlite database owners during development reloads. Removal depends on a released replacement passing the real reload and shutdown checks.
 

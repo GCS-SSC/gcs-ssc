@@ -6,6 +6,7 @@ import { isUtf8 } from 'node:buffer'
 import path from 'node:path'
 import { execSync } from 'node:child_process'
 import crypto from 'node:crypto'
+import { lowerWebContainerAsync } from './webcontainer-async.ts'
 import { pathToFileURL } from 'node:url'
 import {
   assertArtifactContentsDoNotLeakHostPaths,
@@ -340,11 +341,11 @@ export const encodeFileContents = (filePath: string, contents: Buffer): WebConta
 }
 
 /** Normalizes text paths and rejects raw host paths before binary encoding. */
-const encodeArtifactFileContents = (
+const encodeArtifactFileContents = async (
   filePath: string,
   contents: Buffer,
   context: ArtifactTraversalContext
-): WebContainerFileNode['file'] => {
+): Promise<WebContainerFileNode['file']> => {
   const extension = path.extname(filePath).toLowerCase()
   const hasBinaryExtension = BINARY_EXTENSIONS.has(extension)
   const hasUtf8Contents = isUtf8(contents)
@@ -362,8 +363,14 @@ const encodeArtifactFileContents = (
     return encodeFileContents(filePath, contents)
   }
 
+  const relativePath = getArtifactRelativePath(context.artifactRootPath, filePath)
+  const source = normalizeHostPaths(contents.toString('utf-8'), context.hostRootPaths)
+  const webContainerSource = relativePath?.startsWith('server/') && relativePath !== 'server/storage-cleanup-drain.mjs'
+    && ['.js', '.mjs', '.cjs'].includes(extension)
+    ? await lowerWebContainerAsync(source, relativePath)
+    : source
   const normalizedContents = Buffer.from(
-    normalizeHostPaths(contents.toString('utf-8'), context.hostRootPaths),
+    webContainerSource,
     'utf-8'
   )
   assertArtifactContentsDoNotLeakHostPaths(
@@ -571,7 +578,7 @@ const buildFileSystemTree = async (
       if (!openedFile) continue
 
       tree[entry.name] = {
-        file: encodeArtifactFileContents(fullPath, openedFile.contents, options.context)
+        file: await encodeArtifactFileContents(fullPath, openedFile.contents, options.context)
       }
     }
   }
@@ -648,7 +655,7 @@ const buildShardsFromDirectory = async (
       if (!openedFile) continue
 
       rootTree[entry.name] = {
-        file: encodeArtifactFileContents(fullPath, openedFile.contents, context)
+        file: await encodeArtifactFileContents(fullPath, openedFile.contents, context)
       }
     }
   }
@@ -823,7 +830,7 @@ const buildRequiredContainedFileNode = async (
     }
 
     return {
-      file: encodeArtifactFileContents(filePath, await handle.readFile(), context)
+      file: await encodeArtifactFileContents(filePath, await handle.readFile(), context)
     }
   } finally {
     await handle.close()
