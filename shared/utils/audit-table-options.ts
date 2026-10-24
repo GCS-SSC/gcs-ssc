@@ -22,6 +22,7 @@ export const AUDIT_TABLE_NAMES: readonly string[] = [
   'public.Agency_Custom_Field',
   'public.Agency_Custom_Field_Option',
   'public.Agency_Document_Template',
+  'public.Agency_Field_Tooltip',
   'public.Agency_Fiscal_Year',
   'public.Agency_Funding_Subtype',
   'public.Agency_Funding_Type',
