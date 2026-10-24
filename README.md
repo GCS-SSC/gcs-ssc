@@ -44,7 +44,7 @@ These observations and verification limits were recorded during pre-Nuxt 5 prepa
 
 - Removing the WebContainer compatibility shim depends on upstream support for asynchronous request context. The shim applies only to serialized browser-demo server modules. English/French login, authorization denials, and concurrent audited writes passed in an actual WebContainer; standard Node.js and Docker artifacts remain unchanged.
 - `future.compatibilityVersion: 5` remains enabled with `experimental.nitroAutoImports: true`. Disabling Nitro auto-imports is deferred until the i18n integration supports it without a dependency patch.
-- The inherited, version-pinned Nitro 2.13.5 lifecycle patch remains required to prevent overlapping PGlite database owners during development reloads. Removal depends on a released replacement passing the real reload and shutdown checks.
+- The version-pinned Nitro 2.13.5 lifecycle patch executes only in the development server, preventing overlapping PGlite database owners during reloads. It does not change production server or demo runtime behavior. Removal depends on a released replacement passing the real reload and shutdown checks.
 
 ## AWS demo refresh
 
