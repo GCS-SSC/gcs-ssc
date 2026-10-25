@@ -72,7 +72,7 @@ for setup and recovery.
 
 ## 🛠 Tech Stack
 
-- **Runtime:** Bun
+- **Runtime:** Node.js 24.22.1 LTS (server); Bun 1.3.13 (package manager and builds)
 - **Framework:** Nuxt 4 + Vue 3 (Composition API)
 - **UI:** Nuxt UI v4 (Tailwind-based)
 - **Database:** PostgreSQL (PGlite in dev) + Kysely
@@ -84,7 +84,8 @@ for setup and recovery.
 
 ### Prerequisites
 
-- [Bun](https://bun.sh/) must be installed.
+- [Node.js](https://nodejs.org/) 24.22.1 LTS and [Bun](https://bun.sh/) 1.3.13 must be installed.
+- With [nvm](https://github.com/nvm-sh/nvm), run `nvm install` and `nvm use` from the repository root to select the pinned Node version.
 
 ### Installation
 

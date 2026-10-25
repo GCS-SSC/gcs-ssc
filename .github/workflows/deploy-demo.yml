@@ -28,6 +28,12 @@ jobs:
           )
           git submodule update --init --recursive -- "${workspace_submodules[@]}"
 
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
