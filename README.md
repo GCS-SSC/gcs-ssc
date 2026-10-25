@@ -85,7 +85,16 @@ for setup and recovery.
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) 24.22.1 LTS and [Bun](https://bun.sh/) 1.3.13 must be installed.
-- With [nvm](https://github.com/nvm-sh/nvm), run `nvm install` and `nvm use` from the repository root to select the pinned Node version.
+- In Bash with [nvm](https://github.com/nvm-sh/nvm) loaded, run `nvm install` and `nvm use` from the repository root to select the pinned Node version.
+
+For fish, select the Node binary already installed by nvm using fish's built-in path helper. Run this in fish after installing Node 24.22.1 through nvm in Bash; do not source `nvm.sh` in fish:
+
+```fish
+fish_add_path --universal --move "$HOME/.nvm/versions/node/v24.22.1/bin"
+node --version
+```
+
+This selection persists for future fish sessions.
 
 ### Installation
 
