@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-jsdoc -- page-local callbacks are self-descriptive */
 import { computed, onMounted, ref } from 'vue'
@@ -86,6 +87,8 @@ const tabs = [
   { key: 'assignments.title', value: 'assignments', icon: 'i-lucide-users' }
 ]
 const { selectedTab } = useUrlTabState({ tabs, defaultTab: 'workflow' })
+
+useFieldTooltipProvider(() => closeout.value && String(closeout.value.id) === String(route.params.closeoutId) ? { entityType: 'fundingcaseagreementcloseout', entityId: closeout.value.id } : null)
 </script>
 
 <template>
@@ -111,7 +114,7 @@ const { selectedTab } = useUrlTabState({ tabs, defaultTab: 'workflow' })
             isCompleted: closeout.isCompleted
           }]" />
 
-        <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="agreement-closeout-detail-content">
+        <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-closeout-detail-content">
           <section v-if="selectedTab === 'workflow'" class="space-y-6">
             <CommonCompletionWorkflowPreAction
               mode="completion"

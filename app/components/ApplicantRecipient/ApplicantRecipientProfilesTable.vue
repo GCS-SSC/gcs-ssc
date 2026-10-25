@@ -90,11 +90,11 @@ const canDeleteProfile = (profile: ApplicantRecipientProfileRow) => {
     :pagination-options="{ getPaginationRowModel: getPaginationRowModel() }"
     :button-label="t('applicant_recipient.new')"
     :show-button="canCreate"
-    @add="emit('add')"
-    @retry="emit('retry')">
+    data-field-scope="applicant-recipient.profiles-table"
+    @add="emit('add')" @retry="emit('retry')">
     <template #filters>
       <slot name="filters" />
-      <USelect v-model="statusFilter" :items="availabilityItems" :aria-label="t('common.status_filter')" class="min-w-40" />
+      <USelect v-model="statusFilter" :items="availabilityItems" :aria-label="t('common.status_filter')" class="min-w-40" data-ui-target="applicant-recipient.profiles-table.statusFilter" />
     </template>
     <template #id-cell="{ row }">
       <span class="font-mono text-xs font-bold text-zinc-400 dark:text-zinc-500">

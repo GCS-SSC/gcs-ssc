@@ -366,9 +366,9 @@ watch([selectedSubtype, subtypeStatus], ([value, lookupStatus]) => {
 </script>
 
 <template>
-  <CommonSection :title="t('agreement.sections.classification')" badge="01" :grid-cols="1">
+  <CommonSection :title="t('agreement.sections.classification')" badge="01" :grid-cols="1" data-field-tooltip-context="agreement" data-field-scope="agreement.fields.profile-fields" data-scope-label-en="Agreements > General" data-scope-label-fr="Ententes > Général">
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <UFormField :label="t('agreement.program')" :required="permissionAction === 'create'">
+      <UFormField :label="t('agreement.program')" :required="permissionAction === 'create'" data-ui-target="agreement.fields.profile-fields.agreement.program">
         <CommonServerLookupSelect
           :model-value="selectedProgramId"
           :disabled="permissionAction === 'update'"
@@ -482,7 +482,7 @@ watch([selectedSubtype, subtypeStatus], ([value, lookupStatus]) => {
     </div>
   </CommonSection>
 
-  <CommonSection :title="t('agreement.sections.profile')" badge="02" :grid-cols="1">
+  <CommonSection :title="t('agreement.sections.profile')" badge="02" :grid-cols="1" data-field-tooltip-context="agreement" data-field-scope="agreement.fields.profile-fields" data-scope-label-en="Agreements > General" data-scope-label-fr="Ententes > Général">
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
       <UFormField :label="t('agreement.title_en')" :name="field('egcs_fc_title_en')">
         <UInput v-model="model.egcs_fc_title_en" :placeholder="t('agreement.title_en_placeholder')" />
@@ -534,7 +534,7 @@ watch([selectedSubtype, subtypeStatus], ([value, lookupStatus]) => {
     </div>
   </CommonSection>
 
-  <CommonSection :title="t('agreement.sections.risk_management')" badge="03" :grid-cols="1">
+  <CommonSection :title="t('agreement.sections.risk_management')" badge="03" :grid-cols="1" data-field-tooltip-context="agreement" data-field-scope="agreement.fields.profile-fields" data-scope-label-en="Agreements > General" data-scope-label-fr="Ententes > Général">
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
       <UFormField :label="t('agreement.holdback')" :name="field('egcs_fc_holdback')">
         <UInput
@@ -632,12 +632,13 @@ watch([selectedSubtype, subtypeStatus], ([value, lookupStatus]) => {
     slot-name="agreement.profile.sections.after"
     :stream-id="selectedStreamId"
     :permission-action="permissionAction"
-    :context="agreementProfileExtensionContext" />
+    :context="agreementProfileExtensionContext" data-field-tooltip-context="agreement" data-field-scope="agreement.fields.profile-fields" data-scope-label-en="Agreements > General" data-scope-label-fr="Ententes > Général" />
   <AgreementFieldsCustomFields
     v-if="selectedStreamId"
     :key="`${agreementId ?? 'new'}:${selectedStreamId}`"
     v-model="model.egcs_fc_customfields"
+    data-field-container="Composite editor; its individual field declarations own their identities."
     :stream-id="selectedStreamId"
     :agreement-id="agreementId"
-    :permission-action="permissionAction" />
+    :permission-action="permissionAction" data-field-tooltip-context="agreement" data-field-scope="agreement.fields.profile-fields" data-scope-label-en="Agreements > General" data-scope-label-fr="Ententes > Général" />
 </template>

@@ -13,7 +13,7 @@ const field = useFormFieldPath(() => namePrefix)
 </script>
 
 <template>
-  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }">
+  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }" data-field-scope="transfer-payment.fields.area-of-expertise-fields">
     <UFormField :label="t('transfer_payment.area_of_expertise_name_en')" :name="field('egcs_tp_name_en')">
       <UInput v-model="model.egcs_tp_name_en" />
     </UFormField>
@@ -21,7 +21,7 @@ const field = useFormFieldPath(() => namePrefix)
       <UInput v-model="model.egcs_tp_name_fr" />
     </UFormField>
   </div>
-  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }">
+  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }" data-field-scope="transfer-payment.fields.area-of-expertise-fields">
     <UFormField :label="t('transfer_payment.area_of_expertise_description_en')" :name="field('egcs_tp_description_en')">
       <CommonTextarea v-model="model.egcs_tp_description_en" :rows="2" />
     </UFormField>

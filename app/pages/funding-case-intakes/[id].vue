@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import CommonSubmittedApplication from '~/components/Common/Submitted/Application.vue'
 import { appRouteLocations } from '~/utils/route-locations'
@@ -74,6 +75,8 @@ const breadcrumbs = computed(() => [
   { label: t('funding_case_intake.title'), to: localePath(appRouteLocations.fundingCaseIntakes()) },
   { label: profile.value ? String(profile.value.id) : id }
 ])
+
+useFieldTooltipProvider(() => profile.value && String(profile.value.id) === String(route.params.id) ? { entityType: 'funding_case_intake', entityId: profile.value.id } : null)
 </script>
 
 <template>
@@ -89,7 +92,7 @@ const breadcrumbs = computed(() => [
       </UAlert>
       <div v-else-if="profile" class="flex flex-1 flex-col">
         <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-inbox" :title="`${t('funding_case_intake.singular')} ${profile.id}`" :meta-items="[`${t('funding_case_intake.opportunity')}: ${getBilingualValue(profile, 'opportunity_name', profile.egcs_fi_fundingopportunity)}`, `${t('funding_case_intake.proponent')}: ${getBilingualValue(profile, 'proponent_name', profile.egcs_fi_applicantrecipient)}`]" :badges="[{ statusId: profile.egcs_fi_status }]" :actions="[{ label: t('common.delete'), icon: 'i-lucide-trash', visible: canDelete, onClick: remove }]" />
-        <CommonDetailWorkspace v-model="selectedTab" content-test-id="funding-case-intake-detail-content" :items="tabs">
+        <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." content-test-id="funding-case-intake-detail-content" :items="tabs">
           <CommonSection v-if="selectedTab === 'general'" :show-header="false" :title="t('funding_case_intake.details')" :grid-cols="1">
             <dl class="grid gap-4 md:grid-cols-2">
               <div>

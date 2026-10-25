@@ -199,7 +199,7 @@ watch(selectedSection, value => {
 </script>
 
 <template>
-  <CommonDetailPage id="approval-template-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems">
+  <CommonDetailPage id="approval-template-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" data-field-scope="common.approval-templates.detail-page">
     <template #body>
       <div class="flex flex-1 flex-col">
         <CommonApprovalTemplatesDetailHero
@@ -224,6 +224,7 @@ watch(selectedSection, value => {
             <AssessmentSchemaDetailSidebar
               v-if="canEdit"
               v-model="selectedSection"
+              data-field-container="Composite editor; its individual field declarations own their identities."
               :section-tabs="sectionTabs"
               :is-saving="isSaving"
               :disabled="mutation.isPending.value"
@@ -233,7 +234,7 @@ watch(selectedSection, value => {
               @save="saveTemplate" />
             <aside v-else class="w-full shrink-0 lg:sticky lg:top-6 lg:self-start lg:w-72 lg:border-r lg:border-zinc-200 lg:pr-4 dark:lg:border-zinc-800">
               <div class="pt-6">
-                <CommonRouteTabs v-model="selectedSection" :items="sectionTabs" orientation="vertical" />
+                <CommonRouteTabs v-model="selectedSection" data-field-container="Page navigation state, not a business input field." :items="sectionTabs" orientation="vertical" />
               </div>
             </aside>
           </template>

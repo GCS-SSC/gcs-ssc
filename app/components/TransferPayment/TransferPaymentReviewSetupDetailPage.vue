@@ -322,6 +322,7 @@ const runMemberMutation: EditorMutationRunner = async request => {
             <AssessmentSchemaDetailSidebar
               v-if="canUpdate"
               v-model="selectedSection"
+              data-field-container="Composite editor; its individual field declarations own their identities."
               :section-tabs="sectionTabs"
               :is-saving="isSavingSet"
               :disabled="mutation.isPending.value"
@@ -329,7 +330,7 @@ const runMemberMutation: EditorMutationRunner = async request => {
               @save="saveSet" />
             <aside v-else class="w-full shrink-0 lg:sticky lg:top-6 lg:self-start lg:w-72 lg:border-r lg:border-zinc-200 lg:pr-4 dark:lg:border-zinc-800">
               <div class="pt-6">
-                <CommonRouteTabs v-model="selectedSection" :items="sectionTabs" orientation="vertical" />
+                <CommonRouteTabs v-model="selectedSection" data-field-container="Page navigation state, not a business input field." :items="sectionTabs" orientation="vertical" />
               </div>
             </aside>
           </template>

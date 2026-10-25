@@ -120,7 +120,7 @@ const getLocalizedText = (value: { en?: string, fr?: string }) => {
     v-model:open="open"
     :dismissible="!isSubmittingAction"
     :title="t('assessment.approvals.action_step')"
-    :description="t('assessment.approvals.action_step_description')">
+    :description="t('assessment.approvals.action_step_description')" data-field-exclude="Runtime approval actions are outside configurable field help.">
     <template #body>
       <div
         v-if="state && step"

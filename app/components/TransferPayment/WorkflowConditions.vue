@@ -81,7 +81,7 @@ const badges = computed(() => model.value.map(condition => {
 </script>
 
 <template>
-  <div v-if="readonly" class="flex flex-wrap gap-2" role="group" :aria-label="t('custom_fields.conditions')">
+  <div v-if="readonly" class="flex flex-wrap gap-2" role="group" :aria-label="t('custom_fields.conditions')" data-field-scope="transfer-payment.workflow-conditions">
     <UBadge v-for="badge in badges" :key="badge.key" color="neutral" variant="subtle" class="whitespace-normal">
       <span>{{ badge.text }}</span>
       <template v-if="badge.option">
@@ -93,24 +93,24 @@ const badges = computed(() => model.value.map(condition => {
     <span v-if="!badges.length" class="text-sm text-muted">{{ t('workflow.conditions.unconditional') }}</span>
     <UButton v-if="loadError" :label="t('common.retry')" color="neutral" variant="ghost" @click="emit('retry')" />
   </div>
-  <CommonSection v-else :title="t('custom_fields.conditions')" :grid-cols="1">
+  <CommonSection v-else :title="t('custom_fields.conditions')" :grid-cols="1" data-field-scope="transfer-payment.workflow-conditions">
     <UButton v-if="loadError" :label="t('common.retry')" @click="emit('retry')" />
     <p class="text-sm text-muted">
       {{ t('custom_fields.conditions_help') }}
     </p>
     <template v-if="entityType !== 'applicantrecipient'">
       <div v-if="sourceItems.length" class="flex items-end gap-2">
-        <UFormField :label="t('workflow.conditions.field')" :required="false" class="min-w-0 flex-1">
+        <UFormField :label="t('workflow.conditions.field')" :required="false" class="min-w-0 flex-1" data-ui-target="transfer-payment.workflow-conditions.workflow.conditions.field">
           <CommonBilingualSelectMenu :model-value="pendingSource ?? undefined" :items="sourceItems" class="w-full" @update:model-value="pendingSource = ($event as Source) ?? null" />
         </UFormField>
         <UButton icon="i-lucide-plus" :label="t('workflow.conditions.add')" :disabled="!pendingSource" @click="addCondition(pendingSource)" />
       </div>
       <div v-for="{ condition, index } in profileRows" :key="condition.source" class="space-y-3">
-        <UFormField v-if="'value' in condition" :name="`conditions.${index}.value`" :label="t(`workflow.conditions.${condition.source}`)" required>
+        <UFormField v-if="'value' in condition" data-field-label-en="Condition value" data-field-label-fr="Valeur de la condition" :name="`conditions.${index}.value`" :label="t(`workflow.conditions.${condition.source}`)" required data-ui-target="transfer-payment.workflow-conditions.conditions.value">
           <CommonBilingualSelectMenu :model-value="String(condition.value)" :items="booleanItems" class="w-full" @update:model-value="condition.value = $event === 'true'" />
         </UFormField>
         <template v-else>
-          <UFormField :name="`conditions.${index}.optionIds`" :label="t(`workflow.conditions.${condition.source}`)" required>
+          <UFormField data-field-label-en="Condition choices" data-field-label-fr="Choix de la condition" :name="`conditions.${index}.optionIds`" :label="t(`workflow.conditions.${condition.source}`)" required data-ui-target="transfer-payment.workflow-conditions.conditions.optionIds">
             <CommonBilingualMultiSelectMenu
               v-model="condition.optionIds"
               :items="choices?.[condition.source] ?? []"
@@ -118,14 +118,14 @@ const badges = computed(() => model.value.map(condition => {
               :category-fr-key="condition.source === 'amendment_subtype' ? 'category_fr' : undefined"
               class="w-full" />
           </UFormField>
-          <UFormField v-if="condition.source === 'recipient_subtype'" :name="`conditions.${index}.quantifier`" :label="t('workflow.conditions.quantifier')" required>
+          <UFormField v-if="condition.source === 'recipient_subtype'" :name="`conditions.${index}.quantifier`" :label="t('workflow.conditions.quantifier')" required data-ui-target="transfer-payment.workflow-conditions.conditions.quantifier">
             <CommonBilingualSelectMenu v-model="condition.quantifier" :items="quantifierItems" class="w-full" />
           </UFormField>
         </template>
         <UButton :label="t('common.remove')" color="neutral" variant="ghost" @click="removeCondition(index)" />
       </div>
     </template>
-    <UFormField v-for="field in fields" :key="field.id" :label="label(field)" :required="false">
+    <UFormField v-for="field in fields" :key="field.id" data-field-label-en="Custom field choices" data-field-label-fr="Choix du champ personnalisé" :label="label(field)" :required="false" data-ui-target="transfer-payment.workflow-conditions.field-options">
       <USelectMenu :model-value="selectedOptionIds(field.id)" :items="options(field)" value-key="value" multiple class="w-full" @update:model-value="update(field.id, $event)" />
     </UFormField>
   </CommonSection>

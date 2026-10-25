@@ -144,7 +144,7 @@ const deleteLine = async (line: AccountReceivableCreditMemoLine) => {
 </script>
 
 <template>
-  <div class="min-w-0 space-y-4" data-testid="credit-memo-lines">
+  <div class="min-w-0 space-y-4" data-testid="credit-memo-lines" data-field-scope="account-receivable.credit-memo-lines">
     <CommonResourceLayoutCard
       v-model:search="search" v-model:pagination="pagination" :data="filtered" :columns="columns"
       :total-records="filtered.length" :pagination-options="{ manualPagination: false }"

@@ -153,7 +153,7 @@ const retryLoad = async () => {
               onClick: openUpdateStream
             }]" />
 
-          <CommonDetailWorkspace v-model="selectedTab" :items="tabs">
+          <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs">
             <div v-if="activeTabComponent" class="space-y-6">
               <component :is="activeTabComponent" v-bind="activeTabProps" />
             </div>

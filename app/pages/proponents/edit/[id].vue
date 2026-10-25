@@ -169,7 +169,7 @@ const retryProfile = async () => {
             show-status
             show-lead-agency />
 
-          <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="proponent-detail-content">
+          <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="proponent-detail-content">
             <ApplicantRecipientProfileFormPage
               v-if="isGeneralTab && selectedProfile && profile.can_update_role"
               v-model:model="selectedProfile"

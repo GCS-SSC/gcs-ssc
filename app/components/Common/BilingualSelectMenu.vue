@@ -69,7 +69,7 @@ const mappedItems = computed(() => {
 </script>
 
 <template>
-  <div @keydown.enter.prevent.stop>
+  <div data-field-exclude="Composite control internals; configurable help belongs to the owning business field." @keydown.enter.prevent.stop>
     <USelectMenu ref="selectMenuRef" v-model.nullable="model" :items="mappedItems" value-key="value" v-bind="$attrs" />
   </div>
 </template>

@@ -33,7 +33,7 @@ const columns: TableColumnInput<{ id: string } & Record<string, unknown>>[] = [
     :show-button="canCreate"
     :modal-title="t('applicant_recipient.other_names.add')"
     :update-title="t('applicant_recipient.other_names.edit')"
-    :search-placeholder="t('applicant_recipient.other_names.search')">
+    :search-placeholder="t('applicant_recipient.other_names.search')" data-field-scope="applicant-recipient.other-names-tab">
     <template #form="{ state }">
       <UFormField :label="t('applicant_recipient.other_names.other_name')" name="egcs_ar_othername">
         <UInput

@@ -138,7 +138,7 @@ const saveConfiguration = async (item: ExtensionStreamTableRow, enabled = item.s
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6" data-field-scope="extension.stream-extensions-tab">
     <CommonResourceLayoutCard
       v-model:search="search"
       v-model:pagination="pagination"
@@ -173,7 +173,7 @@ const saveConfiguration = async (item: ExtensionStreamTableRow, enabled = item.s
             :model-value="row.original.streamEnabled"
             :disabled="!canConfigure(row.original) || isRowBusy(row.original)"
             :aria-label="t('extensions.enable_extension')"
-            @update:model-value="value => saveConfiguration(row.original, value)" />
+            data-ui-target="extension.stream-extensions-tab.row.original.streamEnabled" @update:model-value="value => saveConfiguration(row.original, value)" />
           <UTooltip :text="t('extensions.configure')">
             <UButton
               icon="i-lucide-settings"
@@ -206,6 +206,7 @@ const saveConfiguration = async (item: ExtensionStreamTableRow, enabled = item.s
                 :is="selectedConfigComponent"
                 v-if="selectedConfigComponent"
                 v-model="draftConfig"
+                data-field-container="Composite editor; its individual field declarations own their identities."
                 :extension="selectedItem.extension"
                 :stream-id="streamId"
                 :transfer-payment-id="transferPaymentId"
@@ -218,7 +219,7 @@ const saveConfiguration = async (item: ExtensionStreamTableRow, enabled = item.s
                 :aria-describedby="fallbackConfigError ? 'extension-config-error' : undefined"
                 :rows="18"
                 class="w-full"
-                @update:model-value="updateFallbackConfig" />
+                data-ui-target="extension.stream-extensions-tab.fallbackConfigText" @update:model-value="updateFallbackConfig" />
               <p v-if="fallbackConfigError" id="extension-config-error" class="text-sm text-error">
                 {{ fallbackConfigError }}
               </p>

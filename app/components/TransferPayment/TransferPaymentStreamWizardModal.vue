@@ -92,7 +92,7 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentStreamPolymorphicWizard>
     :title="t('transfer_payment.stream_wizard.title')"
     :description="t('transfer_payment.stream_wizard.description')"
     fullscreen
-    :ui="{ content: 'rounded-none shadow-none ring-0' }">
+    :ui="{ content: 'rounded-none shadow-none ring-0' }" data-field-scope="transfer-payment.stream-wizard-modal">
     <template #body>
       <UForm
         v-if="state"
@@ -259,7 +259,7 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentStreamPolymorphicWizard>
                 :key="chartOfAccount.tempId"
                 class="border-default relative space-y-4 rounded-xl border bg-zinc-50/50 p-4 dark:bg-zinc-900/50">
                 <CommonActionButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" @click="removeChartOfAccount(index)" />
-                <UFormField :label="t('transfer_payment.chart_of_accounts.title')" :name="`chartOfAccounts.${index}.egcs_tp_agencychartofaccount`" required>
+                <UFormField :label="t('transfer_payment.chart_of_accounts.title')" :name="`chartOfAccounts.${index}.egcs_tp_agencychartofaccount`" required data-ui-target="transfer-payment.stream-wizard-modal.chartOfAccounts.egcs_tp_agencychartofaccount">
                   <CommonServerLookupSelect
                     v-model="chartOfAccount.egcs_tp_agencychartofaccount"
                     :fetch-url="`/api/transfer-payments/${programId}/streams/lookups/chart-of-accounts`"
@@ -288,7 +288,7 @@ const onSubmit = (event: FormSubmitEvent<TransferPaymentStreamPolymorphicWizard>
                 :key="commitmentType.tempId"
                 class="border-default relative space-y-4 rounded-xl border bg-zinc-50/50 p-4 dark:bg-zinc-900/50">
                 <CommonActionButton icon="i-lucide-x" color="error" variant="ghost" class="absolute top-2 right-2 cursor-default" type="button" :aria-label="t('common.remove')" @click="removeCommitmentType(index)" />
-                <UFormField :label="t('transfer_payment.commitment_types.title')" :name="`commitmentTypes.${index}.egcs_tp_agencycommitmenttype`" required>
+                <UFormField :label="t('transfer_payment.commitment_types.title')" :name="`commitmentTypes.${index}.egcs_tp_agencycommitmenttype`" required data-ui-target="transfer-payment.stream-wizard-modal.commitmentTypes.egcs_tp_agencycommitmenttype">
                   <CommonServerLookupSelect
                     v-model="commitmentType.egcs_tp_agencycommitmenttype"
                     :fetch-url="`/api/transfer-payments/${programId}/streams/lookups/commitment-types`"

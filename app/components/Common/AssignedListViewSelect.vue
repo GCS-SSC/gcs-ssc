@@ -19,5 +19,5 @@ const options = computed(() => [
     :show-value-in-label="false"
     :prepend-items="options"
     :aria-label="t(`${resource}.list_views.label`)"
-    class="min-w-56" />
+    class="min-w-56" data-field-exclude="Composite control internals; configurable help belongs to the owning business field." />
 </template>

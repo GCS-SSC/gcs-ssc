@@ -141,6 +141,7 @@ const onMobilePanelClick = async (event: MouseEvent) => {
         <UTabs
           ref="mobileTabs"
           :key="itemsIdentity"
+          data-field-container="Page navigation state, not a business input field."
           activation-mode="manual"
           :model-value="modelValue"
           :items="translatedItems"
@@ -165,6 +166,7 @@ const onMobilePanelClick = async (event: MouseEvent) => {
         ref="desktopTabs"
         :key="itemsIdentity"
         v-model="modelValue"
+        data-field-container="Page navigation state, not a business input field."
         activation-mode="manual"
         :items="translatedItems"
         :variant="variant"
@@ -187,6 +189,7 @@ const onMobilePanelClick = async (event: MouseEvent) => {
     ref="inlineTabs"
     :key="itemsIdentity"
     v-model="modelValue"
+    data-field-container="Page navigation state, not a business input field."
     activation-mode="manual"
     :items="translatedItems"
     :variant="variant"

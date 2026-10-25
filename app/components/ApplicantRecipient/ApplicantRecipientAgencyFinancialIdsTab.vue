@@ -190,7 +190,7 @@ const getAgencyLookupUrl = (state: ApplicantRecipientAgencyFinancialIdForm) => {
     :show-button="canCreateRole"
     :modal-title="t('applicant_recipient.agency_financial_ids.add')"
     :update-title="t('applicant_recipient.agency_financial_ids.edit')"
-    :search-placeholder="t('applicant_recipient.agency_financial_ids.search')">
+    :search-placeholder="t('applicant_recipient.agency_financial_ids.search')" data-field-scope="applicant-recipient.agency-financial-ids-tab">
     <template #egcs_ar_active-cell="{ row }">
       <CommonStatusBadge
         :variant="row.original.egcs_ar_active ? 'active' : 'inactive'"
@@ -229,7 +229,7 @@ const getAgencyLookupUrl = (state: ApplicantRecipientAgencyFinancialIdForm) => {
     v-model:open="warningOpen"
     :title="t(warning?.operation === 'delete' ? 'applicant_recipient.agency_financial_ids.delete_warning_title' : 'applicant_recipient.agency_financial_ids.disable_warning_title')"
     :description="t('applicant_recipient.agency_financial_ids.retained_agreements_notice')"
-    :dismissible="false">
+    :dismissible="false" data-field-scope="applicant-recipient.agency-financial-ids-tab">
     <template #body>
       <p class="mb-3 text-sm">
         {{ t('applicant_recipient.agency_financial_ids.affected_agreements') }}

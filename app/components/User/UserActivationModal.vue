@@ -15,7 +15,7 @@ const validate = createValidator(UserActivationSchema)
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="t('user.activate_title')" :description="t('user.activate_description')">
+  <UModal v-model:open="open" :title="t('user.activate_title')" :description="t('user.activate_description')" data-field-scope="user.activation-modal" data-field-tooltip-unavailable="No owning agency is resolved for this administration screen.">
     <template #body>
       <UForm v-if="state" :state="state" :validate="validate" class="space-y-4" @submit="emit('submit')">
         <p class="text-sm text-zinc-600 dark:text-zinc-300">

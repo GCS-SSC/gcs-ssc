@@ -41,7 +41,7 @@ const removeScoringRow = (rowIndex: number) => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6" data-field-scope="assessment-schema.impactor-fields">
     <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
       <UFormField :label="t('common.weight')" name="impactor.weight">
         <UInput v-model.number="impactor.weight" type="number" />
@@ -55,6 +55,7 @@ const removeScoringRow = (rowIndex: number) => {
     </div>
 
     <AssessmentSchemaDependencyTargetField
+      data-field-container="Composite editor; its individual field declarations own their identities."
       :model-value="impactor.on as DependencyTarget"
       :answer-path-tree="answerPathTree"
       @update:model-value="value => (impactor.on = value)" />
@@ -69,11 +70,11 @@ const removeScoringRow = (rowIndex: number) => {
           v-for="(scoreRow, scoreIndex) in impactor.scoringMatrix"
           :key="scoreRow._key"
           class="border-default grid grid-cols-1 gap-4 border-t pt-4 md:grid-cols-3">
-          <UFormField :label="t('common.max')" :name="`impactor.scoringMatrix.${scoreIndex}.max`">
+          <UFormField :label="t('common.max')" :name="`impactor.scoringMatrix.${scoreIndex}.max`" data-ui-target="assessment-schema.impactor-fields.impactor.scoringMatrix.max">
             <UInput v-model.number="scoreRow.max" type="number" />
           </UFormField>
 
-          <UFormField :label="t('common.value')" :name="`impactor.scoringMatrix.${scoreIndex}.value`">
+          <UFormField :label="t('common.value')" :name="`impactor.scoringMatrix.${scoreIndex}.value`" data-ui-target="assessment-schema.impactor-fields.impactor.scoringMatrix.value">
             <UInput v-model.number="scoreRow.value" type="number" />
           </UFormField>
 

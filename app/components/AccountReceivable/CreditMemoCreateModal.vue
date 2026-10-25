@@ -104,7 +104,7 @@ const save = async () => {
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="t('account_receivable.create_credit_memo')" :description="t('account_receivable.credit_memo_credit_instruction')" :ui="{ content: 'sm:max-w-2xl', header: 'shrink-0' }">
+  <UModal v-model:open="open" :title="t('account_receivable.create_credit_memo')" :description="t('account_receivable.credit_memo_credit_instruction')" :ui="{ content: 'sm:max-w-2xl', header: 'shrink-0' }" data-field-scope="account-receivable.credit-memo-create-modal">
     <template #body>
       <UForm v-if="state" :state="state" :validate="createValidator(AccountReceivableCreditMemoCreateSchema)" class="space-y-4" @submit="save">
         <dl class="text-sm">

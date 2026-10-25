@@ -97,9 +97,9 @@ const getFieldText = (key: ApplicantRecipientFieldKey) => ({
 </script>
 
 <template>
-  <CommonSection :title="t('applicant_recipient.sections.classification')" badge="01" :grid-cols="1">
+  <CommonSection :title="t('applicant_recipient.sections.classification')" badge="01" :grid-cols="1" data-field-scope="applicant-recipient.fields.profile-fields">
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-12">
-      <UFormField class="xl:col-span-6" :name="field('egcs_ar_leadagency')">
+      <UFormField data-field-label-en="Lead agency" data-field-label-fr="Organisme responsable" class="xl:col-span-6" :name="field('egcs_ar_leadagency')">
         <template #label>
           <CommonFormFieldLabel
             :label="getFieldText('lead_agency').fieldName"
@@ -126,7 +126,7 @@ const getFieldText = (key: ApplicantRecipientFieldKey) => ({
     </div>
   </CommonSection>
 
-  <CommonSection :title="t('applicant_recipient.sections.identity')" badge="02" :grid-cols="1">
+  <CommonSection :title="t('applicant_recipient.sections.identity')" badge="02" :grid-cols="1" data-field-scope="applicant-recipient.fields.profile-fields">
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-12">
       <p
         :id="`${requirementId}-legal-name`"
@@ -135,6 +135,7 @@ const getFieldText = (key: ApplicantRecipientFieldKey) => ({
         {{ t('applicant_recipient.requirements.legal_name') }}
       </p>
       <UFormField
+        data-field-label-en="Legal name (English)" data-field-label-fr="Dénomination légale (anglais)"
         class="xl:col-span-6"
         :name="field('egcs_ar_legalname_en')"
         :error-pattern="bilingualErrorPattern('egcs_ar_legalname')">
@@ -146,6 +147,7 @@ const getFieldText = (key: ApplicantRecipientFieldKey) => ({
         <UInput v-model="model.egcs_ar_legalname_en" :aria-describedby="`${requirementId}-legal-name`" :placeholder="getFieldText('legal_name_en').placeholder" />
       </UFormField>
       <UFormField
+        data-field-label-en="Legal name (French)" data-field-label-fr="Dénomination légale (français)"
         class="xl:col-span-6"
         :name="field('egcs_ar_legalname_fr')"
         :error="false"
@@ -164,6 +166,7 @@ const getFieldText = (key: ApplicantRecipientFieldKey) => ({
         {{ t('applicant_recipient.requirements.operating_name') }}
       </p>
       <UFormField
+        data-field-label-en="Operating name (English)" data-field-label-fr="Nom usuel (anglais)"
         class="xl:col-span-6"
         :name="field('egcs_ar_operatingname_en')"
         :error-pattern="bilingualErrorPattern('egcs_ar_operatingname')">
@@ -175,6 +178,7 @@ const getFieldText = (key: ApplicantRecipientFieldKey) => ({
         <UInput v-model="model.egcs_ar_operatingname_en" :aria-describedby="`${requirementId}-operating-name`" :placeholder="getFieldText('operating_name_en').placeholder" />
       </UFormField>
       <UFormField
+        data-field-label-en="Operating name (French)" data-field-label-fr="Nom usuel (français)"
         class="xl:col-span-6"
         :name="field('egcs_ar_operatingname_fr')"
         :error="false"
@@ -187,6 +191,7 @@ const getFieldText = (key: ApplicantRecipientFieldKey) => ({
         <UInput v-model="model.egcs_ar_operatingname_fr" :aria-describedby="`${requirementId}-operating-name`" :placeholder="getFieldText('operating_name_fr').placeholder" />
       </UFormField>
       <UFormField
+        data-field-label-en="Research organization (English)" data-field-label-fr="Organisme de recherche (anglais)"
         class="xl:col-span-6"
         :name="field('egcs_ar_researchorganization_en')">
         <template #label>
@@ -197,6 +202,7 @@ const getFieldText = (key: ApplicantRecipientFieldKey) => ({
         <UInput v-model="model.egcs_ar_researchorganization_en" :placeholder="getFieldText('research_organization_en').placeholder" />
       </UFormField>
       <UFormField
+        data-field-label-en="Research organization (French)" data-field-label-fr="Organisme de recherche (français)"
         class="xl:col-span-6"
         :name="field('egcs_ar_researchorganization_fr')">
         <template #label>
@@ -213,6 +219,7 @@ const getFieldText = (key: ApplicantRecipientFieldKey) => ({
         {{ t('applicant_recipient.requirements.description') }}
       </p>
       <UFormField
+        data-field-label-en="Description (English)" data-field-label-fr="Description (anglais)"
         class="xl:col-span-6"
         :name="field('egcs_ar_description_en')"
         :error-pattern="bilingualErrorPattern('egcs_ar_description')">
@@ -227,6 +234,7 @@ const getFieldText = (key: ApplicantRecipientFieldKey) => ({
           :rows="4" />
       </UFormField>
       <UFormField
+        data-field-label-en="Description (French)" data-field-label-fr="Description (français)"
         class="xl:col-span-6"
         :name="field('egcs_ar_description_fr')"
         :error="false"

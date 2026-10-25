@@ -915,7 +915,6 @@
       "manager": "Manager"
     },
     "subjects": {
-      "guided_help": "Guided Help",
       "audit": "Audit",
       "system": "System",
       "agency": "Agency",
@@ -928,7 +927,8 @@
       "applicant_recipient": "Proponents",
       "journal_voucher": "Journal Vouchers",
       "correction": "Corrections",
-      "account_receivable": "Accounts receivable"
+      "account_receivable": "Accounts receivable",
+      "help": "Help"
     },
     "unknown_ability": "Unknown ability ({action}:{subject})",
     "scope": {
@@ -4955,6 +4955,7 @@
     "role_count": "{count} audience roles configured",
     "configured_screens": "Configured screens",
     "create_in": "Create guide in {name}",
+    "all_owners": "All owners",
     "owners": "owners",
     "no_owned_guides": "No guides in this group.",
     "inspect_step": "Inspect step {name}",
@@ -4993,5 +4994,40 @@
     "journey_branch_conflict": "Remove branching routes before selecting a workflow journey.",
     "journey_template": "Task instructions",
     "journey_template_generic": "General task instructions"
+  },
+  "field_tooltips": {
+    "all_screens": "All screens",
+    "title": "Field help",
+    "description": "Configure field tooltips for this agency. The field list updates automatically when the app changes. Unavailable entries are preserved so you can retarget or delete them.",
+    "field": "Field",
+    "screen": "Screen",
+    "add": "Add field help",
+    "edit": "Field help",
+    "inspect": "View field help",
+    "retarget": "Field / retarget",
+    "choose_field": "Search for a screen or field",
+    "text_en": "Tooltip text (English)",
+    "text_fr": "Tooltip text (French)",
+    "enabled": "Enabled",
+    "enabled_help": "Complete both languages before enabling. Disabled tooltips are saved as drafts.",
+    "preview": "Text preview",
+    "unavailable_help": "This field is unavailable in this version. It may have been removed or its identifier changed. Your tooltip is preserved. Choose another field to retarget it, or delete the saved entry.",
+    "extension_disabled_help": "The extension that owns this field is disabled for this agency. Your tooltip is preserved and will appear when the extension is enabled again.",
+    "help_for_field": "Help for {field}",
+    "status": {
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "available": "Available",
+      "unavailable": "Field unavailable",
+      "extension_disabled": "Extension disabled"
+    },
+    "api": {
+      "not_found": "The field tooltip was not found.",
+      "conflict": "A tooltip already exists for this field. Edit or delete it before retargeting.",
+      "invalid": "Select an available field.",
+      "forbidden": "You do not have permission to manage these tooltips."
+    },
+    "agency": "Agency",
+    "no_agencies": "You do not have Help access to any agency."
   }
 }

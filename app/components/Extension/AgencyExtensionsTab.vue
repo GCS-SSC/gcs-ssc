@@ -158,7 +158,7 @@ const selectStorageProvider = async (item: ExtensionAgencyRegistryItem) => {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="space-y-4" data-field-scope="extension.agency-extensions-tab">
     <div>
       <h2 class="text-lg font-semibold text-zinc-900 dark:text-white">
         {{ t('extensions.agency_title') }}
@@ -245,7 +245,7 @@ const selectStorageProvider = async (item: ExtensionAgencyRegistryItem) => {
             :model-value="row.original.enabled"
             :disabled="!canConfigure(row.original) || isRowBusy(row.original) || row.original.storageProvider?.selected"
             :aria-label="`${t('extensions.enable_extension')}: ${extensionName(row.original)}`"
-            @update:model-value="value => updateEnablement(row.original, value)" />
+            data-ui-target="extension.agency-extensions-tab.row.original.enabled" @update:model-value="value => updateEnablement(row.original, value)" />
           <UTooltip
             v-if="row.original.extension.fileStorageProvider && !row.original.storageProvider?.selected"
             :text="t('extensions.select_storage_provider')">
@@ -297,6 +297,7 @@ const selectStorageProvider = async (item: ExtensionAgencyRegistryItem) => {
                 :is="selectedConfigComponent"
                 v-if="selectedConfigComponent"
                 v-model="draftConfig"
+                data-field-container="Composite editor; its individual field declarations own their identities."
                 :extension="selectedItem.extension"
                 :agency-id="agencyId"
                 :enabled="selectedItem.enabled"
@@ -312,7 +313,7 @@ const selectStorageProvider = async (item: ExtensionAgencyRegistryItem) => {
                 :rows="18"
                 class="w-full"
                 :disabled="!canConfigure(selectedItem)"
-                @update:model-value="updateFallbackConfig" />
+                data-ui-target="extension.agency-extensions-tab.fallbackConfigText" @update:model-value="updateFallbackConfig" />
               <p v-if="fallbackConfigError" id="extension-config-error" class="text-sm text-error">
                 {{ fallbackConfigError }}
               </p>

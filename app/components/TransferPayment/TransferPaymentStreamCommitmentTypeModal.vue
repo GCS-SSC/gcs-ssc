@@ -46,7 +46,7 @@ const onSubmit = async (event: FormSubmitEvent<z.infer<typeof TransferPaymentStr
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="t('transfer_payment.commitment_types.create')">
+  <UModal v-model:open="open" :title="t('transfer_payment.commitment_types.create')" data-field-scope="transfer-payment.stream-commitment-type-modal">
     <template #body>
       <UForm v-if="state" :state="state" :validate="createValidator(TransferPaymentStreamCommitmentTypeSchema)" class="space-y-4" @submit="onSubmit">
         <UFormField :label="t('transfer_payment.commitment_types.title')" name="egcs_tp_agencycommitmenttype" required>

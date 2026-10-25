@@ -36,7 +36,7 @@ const approvalTemplateValue = computed(() => {
 </script>
 
 <template>
-  <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+  <div class="grid grid-cols-1 gap-4 md:grid-cols-2" data-field-scope="review.set-setup-fields">
     <UFormField :label="t('transfer_payment.entity_type')" name="egcs_cn_entitytype">
       <CommonEnumSelect
         :model-value="entityTypeValue"
@@ -54,26 +54,26 @@ const approvalTemplateValue = computed(() => {
     </UFormField>
   </div>
 
-  <UFormField :label="t('transfer_payment.name_en')" name="egcs_cn_name_en">
+  <UFormField :label="t('transfer_payment.name_en')" name="egcs_cn_name_en" data-field-scope="review.set-setup-fields">
     <UInput
       :model-value="String(state.egcs_cn_name_en ?? '')"
       @update:model-value="value => (state.egcs_cn_name_en = value)" />
   </UFormField>
 
-  <UFormField :label="t('transfer_payment.name_fr')" name="egcs_cn_name_fr">
+  <UFormField :label="t('transfer_payment.name_fr')" name="egcs_cn_name_fr" data-field-scope="review.set-setup-fields">
     <UInput
       :model-value="String(state.egcs_cn_name_fr ?? '')"
       @update:model-value="value => (state.egcs_cn_name_fr = value)" />
   </UFormField>
 
-  <UFormField :label="t('transfer_payment.description_en')" name="egcs_cn_description_en">
+  <UFormField :label="t('transfer_payment.description_en')" name="egcs_cn_description_en" data-field-scope="review.set-setup-fields">
     <UTextarea
       :model-value="String(state.egcs_cn_description_en ?? '')"
       :rows="3"
       @update:model-value="value => (state.egcs_cn_description_en = value)" />
   </UFormField>
 
-  <UFormField :label="t('transfer_payment.description_fr')" name="egcs_cn_description_fr">
+  <UFormField :label="t('transfer_payment.description_fr')" name="egcs_cn_description_fr" data-field-scope="review.set-setup-fields">
     <UTextarea
       :model-value="String(state.egcs_cn_description_fr ?? '')"
       :rows="3"
@@ -81,7 +81,8 @@ const approvalTemplateValue = computed(() => {
   </UFormField>
 
   <AdminCommonLookupField
-    v-if="approvalTemplateFetchUrl"
+    v-if="approvalTemplateFetchUrl" data-field-label-en="Approval template"
+    data-field-label-fr="Modèle d’approbation"
     :model-value="approvalTemplateValue"
     :label="t(approvalTemplateLabelKey)"
     name="egcs_cn_approvaltemplate"
@@ -89,9 +90,9 @@ const approvalTemplateValue = computed(() => {
     value-key="id"
     label-en-key="egcs_cn_name_en"
     label-fr-key="egcs_cn_name_fr"
-    @update:model-value="value => (state.egcs_cn_approvaltemplate = value)" />
+    data-field-scope="review.set-setup-fields" @update:model-value="value => (state.egcs_cn_approvaltemplate = value)" />
 
-  <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+  <div class="grid grid-cols-1 gap-4 md:grid-cols-2" data-field-scope="review.set-setup-fields">
     <UFormField
       :label="t('reviews.direct_review')"
       :description="t('reviews.direct_review_help')"

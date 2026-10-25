@@ -35,7 +35,7 @@ const columns: TableColumnInput<{ id: string } & Record<string, unknown>>[] = [
     :show-button="canCreate"
     :modal-title="t('applicant_recipient.contacts.add')"
     :update-title="t('applicant_recipient.contacts.edit')"
-    :search-placeholder="t('applicant_recipient.contacts.search')">
+    :search-placeholder="t('applicant_recipient.contacts.search')" data-field-scope="applicant-recipient.contacts-tab">
     <template #form="{ state }">
       <UFormField :label="t('admin_common.fields.egcs_cn_title')" name="egcs_cn_title">
         <UInput :model-value="String((state as ApplicantRecipientContactForm).egcs_cn_title ?? '')" @update:model-value="value => (state as ApplicantRecipientContactForm).egcs_cn_title = value" />

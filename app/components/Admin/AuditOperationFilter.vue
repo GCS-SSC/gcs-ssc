@@ -15,7 +15,7 @@ watch(() => kind, () => {
 </script>
 
 <template>
-  <UFormField :label="t(kind === 'access' ? 'audit.outcome' : 'audit.operation')">
+  <UFormField data-field-label-en="Operation or outcome" data-field-label-fr="Opération ou résultat" :label="t(kind === 'access' ? 'audit.outcome' : 'audit.operation')" data-ui-target="admin.audit-operation-filter.operation" data-field-scope="admin.audit-operation-filter">
     <CommonBilingualSelectMenu
       :model-value="model || 'all'" :items="items" value-key="value" label-key="label"
       :category-en-key="kind === 'events' ? 'category' : undefined"

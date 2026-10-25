@@ -27,9 +27,9 @@ const selectDecidingQuestion = (questionKey: string) => {
 </script>
 
 <template>
-  <CommonQuestionnaireDefinitionEditor :model-value="definition" persistence-key="recommendation" :question-factory="questionFactory" @update:model-value="value => { definition = value as RecommendationDefinition }">
+  <CommonQuestionnaireDefinitionEditor data-field-container="Composite editor; its individual field declarations own their identities." :model-value="definition" persistence-key="recommendation" :question-factory="questionFactory" @update:model-value="value => { definition = value as RecommendationDefinition }">
     <template #question-fields="{ question, updateQuestion }">
-      <RecommendationSchemaRecommendationQuestionFields :model-value="question as RecommendationQuestion" @update:model-value="updateQuestion" @deciding-selected="selectDecidingQuestion" />
+      <RecommendationSchemaRecommendationQuestionFields data-field-container="Composite editor; its individual field declarations own their identities." :model-value="question as RecommendationQuestion" @update:model-value="updateQuestion" @deciding-selected="selectDecidingQuestion" />
     </template>
   </CommonQuestionnaireDefinitionEditor>
 </template>

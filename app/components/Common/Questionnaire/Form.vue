@@ -60,7 +60,7 @@ const updateComment = (questionKey: string, comment: string) => {
 </script>
 
 <template>
-  <div v-if="definition" class="space-y-12">
+  <div v-if="definition" class="space-y-12" data-field-scope="common.questionnaire.form">
     <section v-for="(section, sectionIndex) in definition.sections" :key="section.key" class="space-y-8">
       <AssessmentSchemaPageSection
         :section-id="`questionnaire-${section.key}`"
@@ -78,6 +78,7 @@ const updateComment = (questionKey: string, comment: string) => {
             <ReviewRuntimeQuestionCard
               v-for="(question, questionIndex) in subSection.questions"
               :key="question.key"
+              data-field-exclude="Authored runtime questions retain their own help and are outside static field help."
               :question-number="`${subSectionIndex + 1}.${questionIndex + 1}`"
               :question-label="localized(question.question)"
               :question-required="question.required"
@@ -115,7 +116,7 @@ const updateComment = (questionKey: string, comment: string) => {
                     :aria-invalid="invalid || undefined"
                     :required="question.required"
                     class="w-full"
-                    @update:model-value="value => updateResponse(question.key, String(value))" />
+                    data-field-exclude="Runtime recommendation and data collection answers use authored help and are outside configurable field help." @update:model-value="value => updateResponse(question.key, String(value))" />
                 </div>
               </template>
             </ReviewRuntimeQuestionCard>

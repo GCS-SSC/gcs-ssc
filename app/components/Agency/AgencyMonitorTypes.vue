@@ -33,7 +33,7 @@ const bilingualColumns: BilingualColumnConfig<AgencyMonitorTypeItem>[] = [
     :schema="AgencyMonitorTypeSchema"
     :initial-new-item="{ egcs_ay_receivableeligible: false }"
     :columns="columns"
-    :bilingual-columns="bilingualColumns">
+    :bilingual-columns="bilingualColumns" data-field-scope="agency.monitor-types">
     <template #name-cell="{ row }">
       <CommonBilingualName :name-en="row.original.egcs_ay_name_en" :name-fr="row.original.egcs_ay_name_fr" />
     </template>

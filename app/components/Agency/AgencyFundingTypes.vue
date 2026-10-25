@@ -266,7 +266,7 @@ const deleteSubtype = async (typeId: string, id: string) => {
 </script>
 
 <template>
-  <div class="w-full">
+  <div class="w-full" data-field-scope="agency.funding-types">
     <CommonResourceLayoutCard
       v-model:search="search" v-model:pagination="pagination"
       :data="rows" :columns="columns" :grouping="grouping" :grouping-options="groupingOptions"
@@ -343,7 +343,7 @@ const deleteSubtype = async (typeId: string, id: string) => {
 
     <UModal v-if="selectedType" v-model:open="typeModalOpen" :title="t('agency.funding_types.type')">
       <template #body>
-        <UForm :state="selectedType" :validate="createValidator(AgencyFundingTypeBaseSchema)" :validate-on="[]" class="space-y-4" @submit="saveType">
+        <UForm data-field-scope="agency.funding-type" :state="selectedType" :validate="createValidator(AgencyFundingTypeBaseSchema)" :validate-on="[]" class="space-y-4" @submit="saveType">
           <UFormField :label="t('agency.name_en')" name="egcs_ay_name_en" required>
             <UInput v-model="selectedType.egcs_ay_name_en" />
           </UFormField>
@@ -365,7 +365,7 @@ const deleteSubtype = async (typeId: string, id: string) => {
     </UModal>
     <UModal v-if="selectedSubtype" v-model:open="subtypeModalOpen" :title="t('agency.funding_types.subtypes_for', { name: selectedSubtypeTypeName })">
       <template #body>
-        <UForm :state="selectedSubtype" :validate="createValidator(AgencyFundingSubtypeBaseSchema)" :validate-on="[]" class="space-y-4" @submit="saveSubtype">
+        <UForm data-field-scope="agency.funding-subtype" :state="selectedSubtype" :validate="createValidator(AgencyFundingSubtypeBaseSchema)" :validate-on="[]" class="space-y-4" @submit="saveSubtype">
           <UFormField :label="t('agency.name_en')" name="egcs_ay_name_en" required>
             <UInput v-model="selectedSubtype.egcs_ay_name_en" />
           </UFormField>

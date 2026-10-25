@@ -58,7 +58,7 @@ const getOptionName = (option: AssessmentOptionRow) => getAssessmentLocaleLabel(
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6" data-field-scope="assessment-schema.item-fields">
     <AssessmentSchemaAccordionSection :title="t('agency.tabs.general')" :default-open="true">
       <div class="space-y-6">
         <UFormField :label="t('transfer_payment.language_independent_code')" name="item.name" required>
@@ -126,15 +126,15 @@ const getOptionName = (option: AssessmentOptionRow) => getAssessmentLocaleLabel(
             :key="getOptionKey(option)"
             class="border-default space-y-4 border-t pt-4">
             <div class="grid grid-cols-1 gap-4 xl:grid-cols-[140px_minmax(0,1fr)_minmax(0,1fr)_auto]">
-              <UFormField :label="t('common.value')" :name="`item.options.${optionIndex}.value`">
+              <UFormField :label="t('common.value')" :name="`item.options.${optionIndex}.value`" data-ui-target="assessment-schema.item-fields.item.options.value">
                 <UInput v-model.number="option.value" type="number" />
               </UFormField>
 
-              <UFormField :label="t('transfer_payment.name_en')" :name="`item.options.${optionIndex}.label.en`">
+              <UFormField :label="t('transfer_payment.name_en')" :name="`item.options.${optionIndex}.label.en`" data-ui-target="assessment-schema.item-fields.item.options.label.en">
                 <UInput v-model="option.label.en" />
               </UFormField>
 
-              <UFormField :label="t('transfer_payment.name_fr')" :name="`item.options.${optionIndex}.label.fr`">
+              <UFormField :label="t('transfer_payment.name_fr')" :name="`item.options.${optionIndex}.label.fr`" data-ui-target="assessment-schema.item-fields.item.options.label.fr">
                 <UInput v-model="option.label.fr" />
               </UFormField>
 
@@ -149,11 +149,11 @@ const getOptionName = (option: AssessmentOptionRow) => getAssessmentLocaleLabel(
               </div>
             </div>
 
-            <UFormField :label="t('transfer_payment.description_en')" :name="`item.options.${optionIndex}.description.en`">
+            <UFormField :label="t('transfer_payment.description_en')" :name="`item.options.${optionIndex}.description.en`" data-ui-target="assessment-schema.item-fields.item.options.description.en">
               <CommonTextarea v-model="option.description.en" :rows="3" />
             </UFormField>
 
-            <UFormField :label="t('transfer_payment.description_fr')" :name="`item.options.${optionIndex}.description.fr`">
+            <UFormField :label="t('transfer_payment.description_fr')" :name="`item.options.${optionIndex}.description.fr`" data-ui-target="assessment-schema.item-fields.item.options.description.fr">
               <CommonTextarea v-model="option.description.fr" :rows="3" />
             </UFormField>
           </div>
@@ -161,6 +161,6 @@ const getOptionName = (option: AssessmentOptionRow) => getAssessmentLocaleLabel(
       </AssessmentSchemaAccordionSection>
     </div>
 
-    <ReviewSchemaHelpEditor v-model="item.help" />
+    <ReviewSchemaHelpEditor v-model="item.help" data-field-container="Composite editor; its individual field declarations own their identities." />
   </div>
 </template>

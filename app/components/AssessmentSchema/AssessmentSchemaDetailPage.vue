@@ -93,6 +93,7 @@ provideAssessmentSchemaHelperDefinitions(helperDefinitions)
             <AssessmentSchemaDetailSidebar
               v-if="canEdit"
               v-model="selectedSection"
+              data-field-container="Composite editor; its individual field declarations own their identities."
               :section-tabs="sectionTabs"
               :is-saving="isSaving"
               :disabled="isMutationPending"
@@ -102,7 +103,7 @@ provideAssessmentSchemaHelperDefinitions(helperDefinitions)
               @save="saveAll" />
             <aside v-else class="w-full shrink-0 lg:sticky lg:top-6 lg:self-start lg:w-72 lg:border-r lg:border-zinc-200 lg:pr-4 dark:lg:border-zinc-800">
               <div class="pt-6">
-                <CommonRouteTabs v-model="selectedSection" :items="sectionTabs" orientation="vertical" />
+                <CommonRouteTabs v-model="selectedSection" data-field-container="Page navigation state, not a business input field." :items="sectionTabs" orientation="vertical" />
               </div>
             </aside>
           </template>
@@ -116,8 +117,9 @@ provideAssessmentSchemaHelperDefinitions(helperDefinitions)
               <AssessmentSchemaMatrices
                 v-if="assessmentDefinitionState"
                 v-model="assessmentDefinitionState"
-                v-model:overall-scoring-matrix="overallScoringMatrixState" />
-              <AssessmentSchemaSectionsEditor v-if="assessmentDefinitionState" v-model="assessmentDefinitionState" />
+                v-model:overall-scoring-matrix="overallScoringMatrixState"
+                data-field-container="Composite editor; its individual field declarations own their identities." />
+              <AssessmentSchemaSectionsEditor v-if="assessmentDefinitionState" v-model="assessmentDefinitionState" data-field-container="Composite editor; its individual field declarations own their identities." />
               <AssessmentSchemaPageSection :section-id="'schema-outcomes'" :title="t('transfer_payment.outcomes')" role="tabpanel" :aria-label="t('transfer_payment.outcomes')">
                 <template #actions>
                   <UButton
@@ -131,7 +133,8 @@ provideAssessmentSchemaHelperDefinitions(helperDefinitions)
                 <AssessmentSchemaMitigationsEditor
                   v-if="assessmentDefinitionState"
                   ref="outcomesEditor"
-                  v-model="assessmentDefinitionState" />
+                  v-model="assessmentDefinitionState"
+                  data-field-container="Composite editor; its individual field declarations own their identities." />
               </AssessmentSchemaPageSection>
 
               <AssessmentSchemaPageSection :section-id="'schema-impactors'" :title="t('transfer_payment.impactors')" role="tabpanel" :aria-label="t('transfer_payment.impactors')">
@@ -147,7 +150,8 @@ provideAssessmentSchemaHelperDefinitions(helperDefinitions)
                 <AssessmentSchemaImpactorsEditor
                   v-if="assessmentDefinitionState"
                   ref="impactorsEditor"
-                  v-model="assessmentDefinitionState" />
+                  v-model="assessmentDefinitionState"
+                  data-field-container="Composite editor; its individual field declarations own their identities." />
               </AssessmentSchemaPageSection>
             </CommonDesignTimeEditorSections>
           </fieldset>

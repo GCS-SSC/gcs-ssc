@@ -60,7 +60,7 @@ const retainedOption = (source: FundingSource) => {
 </script>
 
 <template>
-  <div class="space-y-3">
+  <div class="space-y-3" data-field-tooltip-context="agreement" data-field-scope="agreement.funding-sources-editor" data-scope-label-en="Agreements > Budget > Funding sources" data-scope-label-fr="Ententes > Budget > Sources de financement">
     <div class="flex items-center justify-between gap-3">
       <h3 class="font-semibold">
         {{ t('agreement.funding_sources.title') }}
@@ -71,7 +71,7 @@ const retainedOption = (source: FundingSource) => {
       {{ t('agreement.funding_sources.none') }}
     </p>
     <div v-for="(source, index) in draftSources" :key="rowKeys[index]" class="grid gap-3 rounded-lg border border-default p-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto]">
-      <UFormField :label="t('agreement.funding_sources.subtype')" :name="`egcs_fc_fundingsources.${index}.egcs_fc_fundingsubtype`" :required="!disabled">
+      <UFormField :label="t('agreement.funding_sources.subtype')" :name="`egcs_fc_fundingsources.${index}.egcs_fc_fundingsubtype`" :required="!disabled" data-ui-target="agreement.funding-sources-editor.egcs_fc_fundingsources.egcs_fc_fundingsubtype">
         <CommonServerLookupSelect
           :model-value="source.egcs_fc_fundingsubtype"
           :fetch-url="`/api/agreements/${agreementId}/funding-subtypes`"
@@ -90,7 +90,7 @@ const retainedOption = (source: FundingSource) => {
           @update:model-value="value => updateSource(index, { egcs_fc_fundingsubtype: String(value ?? '') })"
         />
       </UFormField>
-      <UFormField :label="t('agreement.funding_sources.amount')" :name="`egcs_fc_fundingsources.${index}.egcs_fc_amount`" :required="!disabled">
+      <UFormField :label="t('agreement.funding_sources.amount')" :name="`egcs_fc_fundingsources.${index}.egcs_fc_amount`" :required="!disabled" data-ui-target="agreement.funding-sources-editor.egcs_fc_fundingsources.egcs_fc_amount">
         <CommonCurrencyInput
           :model-value="source.egcs_fc_amount"
           :currency="currency"
@@ -104,7 +104,7 @@ const retainedOption = (source: FundingSource) => {
       </UFormField>
       <CommonActionButton v-if="!disabled" type="button" icon="i-lucide-trash" color="error" variant="ghost" :aria-label="t('agreement.funding_sources.remove')" @click="removeSource(index)" />
       <div v-if="allowDescription" class="grid gap-3 md:col-span-3 md:grid-cols-2">
-        <UFormField :label="t('agreement.funding_sources.description_en')" :name="`egcs_fc_fundingsources.${index}.egcs_fc_description_en`">
+        <UFormField :label="t('agreement.funding_sources.description_en')" :name="`egcs_fc_fundingsources.${index}.egcs_fc_description_en`" data-ui-target="agreement.funding-sources-editor.egcs_fc_fundingsources.egcs_fc_description_en">
           <CommonTextarea
             :model-value="source.egcs_fc_description_en ?? ''"
             :disabled="disabled"
@@ -113,7 +113,7 @@ const retainedOption = (source: FundingSource) => {
             class="w-full"
             @update:model-value="value => updateSource(index, { egcs_fc_description_en: value })" />
         </UFormField>
-        <UFormField :label="t('agreement.funding_sources.description_fr')" :name="`egcs_fc_fundingsources.${index}.egcs_fc_description_fr`">
+        <UFormField :label="t('agreement.funding_sources.description_fr')" :name="`egcs_fc_fundingsources.${index}.egcs_fc_description_fr`" data-ui-target="agreement.funding-sources-editor.egcs_fc_fundingsources.egcs_fc_description_fr">
           <CommonTextarea
             :model-value="source.egcs_fc_description_fr ?? ''"
             :disabled="disabled"

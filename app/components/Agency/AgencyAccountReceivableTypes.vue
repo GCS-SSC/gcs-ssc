@@ -46,7 +46,7 @@ const selectSource = (state: Partial<AgencyAccountReceivableTypeItem>, value: st
     :delete-url-base="canDelete ? `/api/agency/${agencyId}/account-receivable-types` : undefined"
     :can-create="canCreate" :can-update="canUpdate" :can-delete="canDelete"
     :schema="AgencyAccountReceivableTypeSchema" :initial-new-item="initialNewItem"
-    :columns="columns" :bilingual-columns="bilingualColumns">
+    :columns="columns" :bilingual-columns="bilingualColumns" data-field-scope="agency.account-receivable-types">
     <template #name-cell="{ row }">
       <CommonBilingualName :name-en="row.original.egcs_ay_name_en" :name-fr="row.original.egcs_ay_name_fr" />
     </template>

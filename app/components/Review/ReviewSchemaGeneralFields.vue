@@ -7,7 +7,7 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+  <div class="grid grid-cols-1 gap-4 md:grid-cols-2" data-field-scope="review.schema-general-fields">
     <UFormField :label="t('transfer_payment.name_en')" name="egcs_cn_name_en" required>
       <UInput
         :model-value="String(state.egcs_cn_name_en ?? '')"
@@ -21,7 +21,7 @@ const { t } = useI18n()
     </UFormField>
   </div>
 
-  <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+  <div class="grid grid-cols-1 gap-4 md:grid-cols-2" data-field-scope="review.schema-general-fields">
     <UFormField :label="t('admin_common.fields.egcs_cn_outcomename_en')" name="egcs_cn_outcomename_en" required>
       <UInput
         :model-value="String(state.egcs_cn_outcomename_en ?? '')"
@@ -35,7 +35,7 @@ const { t } = useI18n()
     </UFormField>
   </div>
 
-  <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+  <div class="grid grid-cols-1 gap-4 md:grid-cols-3" data-field-scope="review.schema-general-fields">
     <UFormField :label="t('transfer_payment.disable_custom_outcomes')" name="egcs_cn_disablecustomoutcomes">
       <USwitch
         :model-value="Boolean(state.egcs_cn_disablecustomoutcomes)"

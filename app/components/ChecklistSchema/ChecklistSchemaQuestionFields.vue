@@ -33,7 +33,7 @@ const commentPolicyOptions = computed(() => CHECKLIST_COMMENT_POLICIES.filter(va
 </script>
 
 <template>
-  <div v-if="question" class="space-y-6">
+  <div v-if="question" class="space-y-6" data-field-scope="checklist-schema.question-fields">
     <AssessmentSchemaAccordionSection :title="t('checklist_schema.question_details')">
       <div class="space-y-4">
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -54,8 +54,8 @@ const commentPolicyOptions = computed(() => CHECKLIST_COMMENT_POLICIES.filter(va
           </UFormField>
         </div>
 
-        <UCheckbox :model-value="allowsNotApplicable" :label="t('checklist_schema.allow_na')" @update:model-value="setAllowsNotApplicable" />
-        <UCheckbox v-model="question.required" :label="t('checklist_schema.required_question')" />
+        <UCheckbox :model-value="allowsNotApplicable" :label="t('checklist_schema.allow_na')" data-ui-target="checklist-schema.question-fields.allowsNotApplicable" @update:model-value="setAllowsNotApplicable" />
+        <UCheckbox v-model="question.required" :label="t('checklist_schema.required_question')" data-ui-target="checklist-schema.question-fields.question.required" />
       </div>
     </AssessmentSchemaAccordionSection>
 
@@ -68,16 +68,16 @@ const commentPolicyOptions = computed(() => CHECKLIST_COMMENT_POLICIES.filter(va
           <div class="text-sm font-semibold text-zinc-900 dark:text-white">
             {{ t(`checklist.answer.${option.value}`) }}
           </div>
-          <UFormField :label="t('transfer_payment.description_en')" :name="`options.${optionIndex}.description.en`" required>
+          <UFormField :label="t('transfer_payment.description_en')" :name="`options.${optionIndex}.description.en`" required data-ui-target="checklist-schema.question-fields.options.description.en">
             <CommonTextarea v-model="option.description.en" :rows="3" />
           </UFormField>
-          <UFormField :label="t('transfer_payment.description_fr')" :name="`options.${optionIndex}.description.fr`" required>
+          <UFormField :label="t('transfer_payment.description_fr')" :name="`options.${optionIndex}.description.fr`" required data-ui-target="checklist-schema.question-fields.options.description.fr">
             <CommonTextarea v-model="option.description.fr" :rows="3" />
           </UFormField>
         </div>
       </div>
     </AssessmentSchemaAccordionSection>
 
-    <ReviewSchemaHelpEditor v-model="question.help" />
+    <ReviewSchemaHelpEditor v-model="question.help" data-field-container="Composite editor; its individual field declarations own their identities." />
   </div>
 </template>

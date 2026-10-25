@@ -201,7 +201,7 @@ const deleteMonitor = async (monitorId: string) => {
 </script>
 
 <template>
-  <div class="w-full">
+  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.monitors-tab" data-scope-label-en="Agreements > Monitors" data-scope-label-fr="Ententes > Surveillances">
     <CommonResourceLayoutCard
       v-model:search="search"
       v-model:pagination="pagination"
@@ -267,7 +267,7 @@ const deleteMonitor = async (monitorId: string) => {
 
     <UModal
       v-if="selectedMonitor"
-      v-model:open="isMonitorModalOpen"
+      v-model:open="isMonitorModalOpen" data-field-scope="agreement.monitors-tab" data-scope-label-en="Agreements > Monitors > Create or update Monitor" data-scope-label-fr="Ententes > Surveillances > Créer ou mettre à jour la surveillance"
       :title="selectedMonitor.id ? t('agreement.monitors.edit') : t('agreement.monitors.add')">
       <template #body>
         <UForm :state="selectedMonitor" :validate="validateMonitor" :validate-on="[]" class="space-y-4" @submit="saveMonitor">

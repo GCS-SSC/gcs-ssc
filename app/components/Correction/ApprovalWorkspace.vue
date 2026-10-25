@@ -114,7 +114,7 @@ const breadcrumbs = computed(() => [
       <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-file-diff" :title="context.reference" :description="t('correction.approval_workspace_description')" :meta-items="[`${t('correction.agreement')}: ${context.agreementNumber}`]" :badges="[{ lifecycleEngine: 'runtime', lifecycleState: context.runtimeState }]" />
       <CommonEntityEditorWorkspace content-test-id="correction-approval-workspace">
         <template #sidebar>
-          <CommonRouteTabs v-model="selectedTab" :items="tabs" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
+          <CommonRouteTabs v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
         </template>
         <CommonWorkflowSection entity-type="fundingcasecorrection" :entity-id="correctionId" purpose="approval_submission" :can-edit="false" @changed="refresh" />
       </CommonEntityEditorWorkspace>

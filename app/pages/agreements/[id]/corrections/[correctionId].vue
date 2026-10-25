@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-jsdoc -- Independent Correction page callbacks have focused request and financial tests. */
 import { computed, nextTick, ref, watch } from 'vue'
@@ -146,10 +147,12 @@ const heroActions = computed(() => [
 const linkedCreated = async (id: string) => {
   await navigateTo(localePath(appRouteLocations.agreementCorrectionDetail(agreementId.value, id)))
 }
+
+useFieldTooltipProvider(() => correction.value && String(correction.value.id) === String(route.params.correctionId) ? { entityType: 'fundingcasecorrection', entityId: correction.value.id } : null)
 </script>
 
 <template>
-  <div ref="detailContent" tabindex="-1" class="flex w-full min-w-0 flex-col">
+  <div ref="detailContent" data-field-tooltip-context="agreement" data-field-scope="agreements.corrections" data-scope-label-en="Agreements > Corrections > Financial lines" data-scope-label-fr="Ententes > Corrections > Lignes financières" tabindex="-1" class="flex w-full min-w-0 flex-col">
     <CorrectionApprovalWorkspace v-if="approvalOnly" :agreement-id="agreementId" :correction-id="correctionId" />
     <UAlert v-else-if="status === 'error'" color="error" icon="i-lucide-circle-alert" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
       <template #actions>
@@ -163,7 +166,7 @@ const linkedCreated = async (id: string) => {
       <template #body>
         <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-file-diff" :title="formatCorrectionReference(correction)" :meta-items="[`${t('correction.agreement')}: ${correction.egcs_fc_agreementnumber}`, formatDate(correction.egcs_fc_requesteddate)]" :badges="[{ statusId: correction.egcs_fc_status }]" :actions="heroActions" />
         <ULink v-if="correction.egcs_fc_linkedcorrection" :to="localePath(appRouteLocations.agreementCorrectionDetail(agreementId, correction.egcs_fc_linkedcorrection))" class="mb-4 text-sm">{{ t('correction.linked_correction') }}</ULink>
-        <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="agreement-correction-detail-content">
+        <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-correction-detail-content">
           <UForm v-if="selectedTab === 'lines'" :state="state" :validate="createValidator(CorrectionEditSchema)" class="space-y-8" @submit="save">
             <CommonSection :show-header="false" :title="t('correction.financial_lines')" :grid-cols="1">
               <p id="correction-line-instruction" class="text-sm text-muted">
@@ -208,7 +211,7 @@ const linkedCreated = async (id: string) => {
                 :remaining="line.balance?.remaining ?? null"
                 :invalid="line.balance !== null && !line.balance.withinCommitment">
                 <template v-if="correction.egcs_fc_canedit" #adjustment>
-                  <UFormField :name="`egcs_fc_lines.${line.index}.egcs_fc_adjustment`" :label="`${t('correction.adjustment')} ${line.egcs_fc_commitmentlinenumber}`">
+                  <UFormField data-ui-target="agreements.corrections.correction.adjustment" :name="`egcs_fc_lines.${line.index}.egcs_fc_adjustment`" :label="`${t('correction.adjustment')} ${line.egcs_fc_commitmentlinenumber}`">
                     <CommonCurrencyInput v-model="state.egcs_fc_lines[line.index]!.egcs_fc_adjustment" :currency="correction.egcs_fc_currency" aria-describedby="correction-line-instruction" :disabled="saving" class="w-full" />
                   </UFormField>
                 </template>

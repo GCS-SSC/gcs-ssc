@@ -27,7 +27,7 @@ const model = defineModel<string | undefined>()
 </script>
 
 <template>
-  <UFormField :label="label" :name="name">
+  <UFormField :label="label" :name="name" data-field-forward="Composite lookup field; the resource declaration supplies its target identity.">
     <CommonServerLookupSelect
       v-model="model"
       :fetch-url="fetchUrl"

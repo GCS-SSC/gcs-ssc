@@ -30,7 +30,7 @@ const removeRow = (index: number) => {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="space-y-4" data-field-scope="assessment.scoring-band-array-editor">
     <div class="flex items-center justify-between gap-3">
       <h3 class="text-base font-semibold">
         {{ title }}
@@ -44,19 +44,19 @@ const removeRow = (index: number) => {
 
     <div v-for="(row, index) in rows" :key="row._key" class="border-default space-y-3 border-t pt-4">
       <div class="grid grid-cols-1 gap-3 md:grid-cols-[160px_1fr_1fr_220px_auto]">
-        <UFormField :label="t('common.max')" :name="`${fieldPath}.${index}.max`">
+        <UFormField :label="t('common.max')" :name="`${fieldPath}.${index}.max`" data-ui-target="assessment.scoring-band-array-editor.max">
           <UInput v-model.number="row.max" type="number" />
         </UFormField>
 
-        <UFormField :label="t('transfer_payment.name_en')" :name="`${fieldPath}.${index}.label.en`">
+        <UFormField :label="t('transfer_payment.name_en')" :name="`${fieldPath}.${index}.label.en`" data-ui-target="assessment.scoring-band-array-editor.label.en">
           <UInput v-model="row.label.en" />
         </UFormField>
 
-        <UFormField :label="t('transfer_payment.name_fr')" :name="`${fieldPath}.${index}.label.fr`">
+        <UFormField :label="t('transfer_payment.name_fr')" :name="`${fieldPath}.${index}.label.fr`" data-ui-target="assessment.scoring-band-array-editor.label.fr">
           <UInput v-model="row.label.fr" />
         </UFormField>
 
-        <UFormField :label="t('transfer_payment.indicator_color')" :name="`${fieldPath}.${index}.indicator`" required>
+        <UFormField :label="t('transfer_payment.indicator_color')" :name="`${fieldPath}.${index}.indicator`" required data-ui-target="assessment.scoring-band-array-editor.indicator">
           <UPopover>
             <UButton color="neutral" variant="outline" class="w-full cursor-default justify-start" :aria-label="`${t('transfer_payment.indicator_color')}: ${row.indicator} (${t('validation.required')})`">
               <template #leading>

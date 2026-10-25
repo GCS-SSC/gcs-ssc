@@ -40,12 +40,12 @@ watch(() => state.value, next => {
 </script>
 
 <template>
-  <UModal v-model:open="open" :dismissible="!pending" :close="pending ? false : undefined" :title="t(state.id ? 'funding_opportunity.edit' : 'funding_opportunity.create')" :description="t('common.form_dialog_description')" :ui="{ content: 'sm:max-w-4xl' }">
+  <UModal v-model:open="open" :dismissible="!pending" :close="pending ? false : undefined" :title="t(state.id ? 'funding_opportunity.edit' : 'funding_opportunity.create')" :description="t('common.form_dialog_description')" :ui="{ content: 'sm:max-w-4xl' }" data-field-scope="funding-opportunity.opportunity-modal">
     <template #body>
       <UForm v-if="open" :state="state" :validate="validate" class="space-y-5" @submit="emit('submit')">
         <CommonSection :title="t('funding_opportunity.details')" :grid-cols="1">
           <div class="grid gap-4 md:grid-cols-2">
-            <UFormField :label="t('funding_opportunity.program')" required>
+            <UFormField :label="t('funding_opportunity.program')" required data-ui-target="funding-opportunity.opportunity-modal.funding_opportunity.program">
               <CommonServerLookupSelect :model-value="selectedProgramId" fetch-url="/api/funding-opportunities/lookups/streams" selected-values-query-key="ids" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :query="{ group_by: 'program' }" :disabled="pending || Boolean(state.id)" close-on-select searchable @update:model-value="selectProgram" />
             </UFormField>
             <UFormField :label="t('funding_opportunity.streams')" name="egcs_fo_transferpaymentstreams" required>

@@ -43,7 +43,7 @@ const addDimension = (state: Partial<AgencyChartOfAccountItem>) => {
     :schema="AgencyChartOfAccountSchema"
     :initial-new-item="initialNewItem"
     :columns="columns"
-    modal-fullscreen>
+    modal-fullscreen data-field-scope="agency.chart-of-accounts">
     <template #egcs_ay_currency-cell="{ row }">
       {{ row.original.egcs_ay_currency.toUpperCase() }}
     </template>
@@ -113,13 +113,13 @@ const addDimension = (state: Partial<AgencyChartOfAccountItem>) => {
         <div
           v-for="(dimension, index) in state.egcs_ay_accountingdimensions" :key="index"
           class="grid gap-3 rounded-lg border border-default p-3 md:grid-cols-[1fr_1fr_1fr_auto]">
-          <UFormField :label="t('transfer_payment.chart_of_accounts.label_en')" :name="`egcs_ay_accountingdimensions.${index}.label_en`" required>
+          <UFormField :label="t('transfer_payment.chart_of_accounts.label_en')" :name="`egcs_ay_accountingdimensions.${index}.label_en`" required data-ui-target="agency.chart-of-accounts.egcs_ay_accountingdimensions.label_en">
             <UInput v-model="dimension.label_en" required />
           </UFormField>
-          <UFormField :label="t('transfer_payment.chart_of_accounts.label_fr')" :name="`egcs_ay_accountingdimensions.${index}.label_fr`" required>
+          <UFormField :label="t('transfer_payment.chart_of_accounts.label_fr')" :name="`egcs_ay_accountingdimensions.${index}.label_fr`" required data-ui-target="agency.chart-of-accounts.egcs_ay_accountingdimensions.label_fr">
             <UInput v-model="dimension.label_fr" required />
           </UFormField>
-          <UFormField :label="t('transfer_payment.chart_of_accounts.value')" :name="`egcs_ay_accountingdimensions.${index}.value`" required>
+          <UFormField :label="t('transfer_payment.chart_of_accounts.value')" :name="`egcs_ay_accountingdimensions.${index}.value`" required data-ui-target="agency.chart-of-accounts.egcs_ay_accountingdimensions.value">
             <UInput v-model="dimension.value" required />
           </UFormField>
           <CommonActionButton

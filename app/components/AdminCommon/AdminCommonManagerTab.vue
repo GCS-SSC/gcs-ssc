@@ -5,10 +5,11 @@ import type { BilingualColumnConfig, TableColumnInput } from '~/composables/useT
 import type { AdminCommonField, AdminCommonGenericItem } from '~~/shared/types/admin-common-ui'
 import type { RecommendationDefinition } from '~~/shared/types/schemas/recommendation/recommendation'
 
-const { title, icon, resource, schema, columns, fields, readOnly = false, fetchUrl, postUrl, updateUrlBase, initialNewItem } = defineProps<{
+const { title, icon, resource, fieldScope, schema, columns, fields, readOnly = false, fetchUrl, postUrl, updateUrlBase, initialNewItem } = defineProps<{
   title: string
   icon: string
   resource: string
+  fieldScope: string
   schema: z.ZodTypeAny
   columns: TableColumnInput<AdminCommonGenericItem>[]
   bilingualColumns?: BilingualColumnConfig<AdminCommonGenericItem>[]
@@ -58,9 +59,9 @@ const canCreateResource = computed(() => !readOnly)
     :show-button="canCreateResource"
     :modal-title="title"
     :update-title="t('common.update')"
+    data-field-scope="admin-common.manager-tab"
     @added="emit('added')"
-    @updated="emit('updated')"
-    @deleted="emit('deleted')">
+    @updated="emit('updated')" @deleted="emit('deleted')">
     <template #filters>
       <USelect
         v-model="deletedFilter"
@@ -68,7 +69,7 @@ const canCreateResource = computed(() => !readOnly)
         :aria-label="t('common.status_filter')"
         value-key="value"
         label-key="label"
-        class="min-w-40" />
+        class="min-w-40" data-ui-target="admin-common.manager-tab.deletedFilter" />
     </template>
 
     <template #_deleted-cell="{ row }">
@@ -104,26 +105,26 @@ const canCreateResource = computed(() => !readOnly)
 
     <template #form="{ state }">
       <template v-for="field in fields" :key="field.key">
-        <UFormField v-if="field.type === 'text'" :label="t(field.labelKey)" :name="field.key">
+        <UFormField v-if="field.type === 'text'" :label="t(field.labelKey)" :name="field.key" :data-ui-target="`${fieldScope}.${field.key}`" data-field-schema="admin-common">
           <UInput
             :model-value="String(state[field.key] ?? '')"
             @update:model-value="value => (state[field.key] = value)" />
         </UFormField>
 
-        <UFormField v-else-if="field.type === 'number'" :label="t(field.labelKey)" :name="field.key">
+        <UFormField v-else-if="field.type === 'number'" :label="t(field.labelKey)" :name="field.key" :data-ui-target="`${fieldScope}.${field.key}`" data-field-schema="admin-common">
           <UInput
             type="number"
             :model-value="toNumberInputValue(state[field.key])"
             @update:model-value="value => (state[field.key] = value)" />
         </UFormField>
 
-        <UFormField v-else-if="field.type === 'date'" :label="t(field.labelKey)" :name="field.key">
+        <UFormField v-else-if="field.type === 'date'" :label="t(field.labelKey)" :name="field.key" :data-ui-target="`${fieldScope}.${field.key}`" data-field-schema="admin-common">
           <CommonDatePicker
             :model-value="toDateInputValue(state[field.key])"
             @update:model-value="value => (state[field.key] = value)" />
         </UFormField>
 
-        <UFormField v-else-if="field.type === 'textarea'" :label="t(field.labelKey)" :name="field.key">
+        <UFormField v-else-if="field.type === 'textarea'" :label="t(field.labelKey)" :name="field.key" :data-ui-target="`${fieldScope}.${field.key}`" data-field-schema="admin-common">
           <CommonTextarea
             :model-value="String(state[field.key] ?? '')"
             @update:model-value="value => (state[field.key] = value)" />
@@ -132,6 +133,7 @@ const canCreateResource = computed(() => !readOnly)
         <template v-else-if="field.type === 'json' && resource === 'recommendation-schemas' && field.key === 'egcs_cn_recommendationschema'">
           <RecommendationSchemaRecommendationDefinitionEditor
             v-if="state[field.key]"
+            data-field-container="Composite editor; its individual field declarations own their identities."
             :model-value="state[field.key] as RecommendationDefinition"
             @update:model-value="value => (state[field.key] = value)" />
           <UButton
@@ -143,7 +145,7 @@ const canCreateResource = computed(() => !readOnly)
             @click="state[field.key] = { sections: [] }" />
         </template>
 
-        <UFormField v-else-if="field.type === 'json'" :label="t(field.labelKey)" :name="field.key">
+        <UFormField v-else-if="field.type === 'json'" :label="t(field.labelKey)" :name="field.key" :data-ui-target="`${fieldScope}.${field.key}`" data-field-schema="admin-common">
           <CommonTextarea
             :model-value="toJsonTextareaValue(state[field.key])"
             @update:model-value="value => (state[field.key] = parseJsonTextareaValue(value))" />
@@ -153,14 +155,14 @@ const canCreateResource = computed(() => !readOnly)
           v-else-if="field.type === 'boolean'"
           :label="t(field.labelKey)"
           :name="field.key"
-          class="flex items-center justify-between">
+          class="flex items-center justify-between" :data-ui-target="`${fieldScope}.${field.key}`" data-field-schema="admin-common">
           <USwitch :model-value="Boolean(state[field.key])" @update:model-value="value => (state[field.key] = value)" />
         </UFormField>
 
         <UFormField
           v-else-if="field.type === 'enum' && resource === 'addresses' && field.key === 'egcs_cn_addresscountry'"
           :label="t(field.labelKey)"
-          :name="field.key">
+          :name="field.key" :data-ui-target="`${fieldScope}.${field.key}`" data-field-schema="admin-common">
           <CommonEnumSelect
             :model-value="String(state[field.key] ?? '')"
             :name="field.enumName"
@@ -171,7 +173,7 @@ const canCreateResource = computed(() => !readOnly)
         <UFormField
           v-else-if="field.type === 'enum' && resource === 'addresses' && field.key === 'egcs_cn_addresssubdivision'"
           :label="t(field.labelKey)"
-          :name="field.key">
+          :name="field.key" :data-ui-target="`${fieldScope}.${field.key}`" data-field-schema="admin-common">
           <CommonEnumSelect
             v-if="isCanadianAddress(state)"
             :model-value="String(state[field.key] ?? '')"
@@ -184,7 +186,7 @@ const canCreateResource = computed(() => !readOnly)
             @update:model-value="value => (state[field.key] = value)" />
         </UFormField>
 
-        <UFormField v-else-if="field.type === 'enum'" :label="t(field.labelKey)" :name="field.key">
+        <UFormField v-else-if="field.type === 'enum'" :label="t(field.labelKey)" :name="field.key" :data-ui-target="`${fieldScope}.${field.key}`" data-field-schema="admin-common">
           <CommonEnumSelect
             :model-value="String(state[field.key] ?? '')"
             :name="field.enumName"
@@ -194,6 +196,8 @@ const canCreateResource = computed(() => !readOnly)
 
         <AdminCommonLookupField
           v-else-if="field.type === 'lookup' && field.lookup"
+          :data-ui-target="`${fieldScope}.${field.key}`"
+          data-field-schema="admin-common"
           :model-value="getOptionalString(state[field.key])"
           :label="t(field.labelKey)"
           :name="field.key"

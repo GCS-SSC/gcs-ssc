@@ -160,7 +160,7 @@ watch(baseUrl, () => {
 </script>
 
 <template>
-  <div>
+  <div data-field-scope="transfer-payment.custom-fields-tab">
     <div v-if="canUpdateChild" class="mb-4 flex justify-end">
       <UButton icon="i-lucide-plus" color="neutral" variant="outline" :label="t('custom_fields.assign_field')" @click="openAssignment(null)" />
     </div>
@@ -234,7 +234,7 @@ watch(baseUrl, () => {
     </CommonResourceLayoutCard>
     <UModal v-model:open="sectionModal.isOpen.value" :title="t('custom_fields.section')">
       <template #body>
-        <UForm v-if="sectionModal.selected.value" :state="sectionModal.selected.value" :validate="createValidator(StreamFieldSectionCreateSchema)" class="space-y-4" @submit="saveSection">
+        <UForm v-if="sectionModal.selected.value" data-field-scope="transfer-payment.custom-field-section" :state="sectionModal.selected.value" :validate="createValidator(StreamFieldSectionCreateSchema)" class="space-y-4" @submit="saveSection">
           <UFormField :label="t('custom_fields.name_en')" name="egcs_tp_name_en" required>
             <UInput v-model="sectionModal.selected.value.egcs_tp_name_en" class="w-full" />
           </UFormField>
@@ -250,15 +250,15 @@ watch(baseUrl, () => {
     </UModal>
     <UModal v-model:open="assignmentModal.isOpen.value" :title="t('custom_fields.assign_field')">
       <template #body>
-        <UForm v-if="assignmentModal.selected.value" :state="assignmentModal.selected.value" :validate="createValidator(StreamFieldAssignmentCreateSchema)" class="space-y-4" @submit="saveAssignment">
+        <UForm v-if="assignmentModal.selected.value" data-field-scope="transfer-payment.custom-field-assignment" :state="assignmentModal.selected.value" :validate="createValidator(StreamFieldAssignmentCreateSchema)" class="space-y-4" @submit="saveAssignment">
           <UFormField :label="t('custom_fields.agency_field')" name="egcs_tp_agencyfield" required>
             <CommonServerLookupSelect v-model="assignmentModal.selected.value.egcs_tp_agencyfield" :fetch-url="`${baseUrl}/lookups/custom-fields`" :include-deleted-query="false" selected-values-query-key="ids" :exclude-values="(data?.items ?? []).filter(field => field.id !== assignmentModal.selected.value?.egcs_tp_agencyfield).map(field => field.id)" label-en-key="egcs_ay_name_en" label-fr-key="egcs_ay_name_fr" value-key="id" :disabled="Boolean(editingAssignmentId)" />
           </UFormField>
           <UFormField :label="t('custom_fields.section')" name="egcs_tp_section">
             <CommonBilingualSelectMenu v-model="assignmentModal.selected.value.egcs_tp_section" :items="data?.sections ?? []" :prepend-options="[{ label: t('custom_fields.unsectioned'), value: null }]" label-en-key="egcs_tp_name_en" label-fr-key="egcs_tp_name_fr" value-key="id" />
           </UFormField>
-          <UCheckbox v-model="assignmentModal.selected.value.egcs_tp_active" :label="t('custom_fields.active')" />
-          <UCheckbox v-model="assignmentModal.selected.value.egcs_tp_required" :label="t('custom_fields.required')" />
+          <UCheckbox v-model="assignmentModal.selected.value.egcs_tp_active" :label="t('custom_fields.active')" data-ui-target="transfer-payment.custom-field-assignment.egcs_tp_active" />
+          <UCheckbox v-model="assignmentModal.selected.value.egcs_tp_required" :label="t('custom_fields.required')" data-ui-target="transfer-payment.custom-field-assignment.egcs_tp_required" />
           <UFormField :label="t('custom_fields.order')" name="egcs_tp_displayorder">
             <UInput v-model.number="assignmentModal.selected.value.egcs_tp_displayorder" type="number" min="0" />
           </UFormField>

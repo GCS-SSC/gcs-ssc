@@ -43,7 +43,7 @@ const lookupUrl = (state: Partial<Note>) => `/api/applicant-recipients/${applica
     :schema="ApplicantRecipientNoteCreateSchema"
     :columns="columns" :bilingual-columns="bilingualColumns"
     :button-label="t('common.add')" :modal-title="t('notes.add')" :update-title="t('notes.edit')"
-    :search-placeholder="t('notes.search')" :modal-ui="{ content: 'sm:max-w-2xl' }">
+    :search-placeholder="t('notes.search')" :modal-ui="{ content: 'sm:max-w-2xl' }" data-field-scope="applicant-recipient.notes-tab">
     <template #subject-cell="{ row }">
       {{ locale === 'fr' ? row.original.egcs_ar_subject_fr || row.original.egcs_ar_subject_en : row.original.egcs_ar_subject_en || row.original.egcs_ar_subject_fr }}
     </template>

@@ -201,7 +201,7 @@ const columns: TableColumnInput<UserListItem>[] = [
 </script>
 
 <template>
-  <UDashboardPanel id="users">
+  <UDashboardPanel id="users" data-field-tooltip-unavailable="No owning agency exists for global user administration or authentication.">
     <template #header>
       <UDashboardNavbar :title="t('nav.users')">
         <template #leading>

@@ -64,7 +64,7 @@ const columns: TableColumnInput<Row>[] = [
 </script>
 
 <template>
-  <UDashboardPanel id="assignment-management">
+  <UDashboardPanel id="assignment-management" data-field-scope="assignment-management">
     <template #header>
       <UDashboardNavbar :title="t('assignment_management.title')">
         <template #leading>

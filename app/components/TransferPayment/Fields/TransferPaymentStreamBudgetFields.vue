@@ -43,7 +43,7 @@ const selectedBudgetFetchUrl = computed<string | undefined>(() => {
 </script>
 
 <template>
-  <UFormField :label="t('transfer_payment.program_budget')" :name="field('egcs_tp_transferpaymentbudget')">
+  <UFormField :label="t('transfer_payment.program_budget')" :name="field('egcs_tp_transferpaymentbudget')" data-field-scope="transfer-payment.fields.stream-budget-fields">
     <CommonServerLookupSelect
       v-model="model.egcs_tp_transferpaymentbudget"
       :fetch-url="budgetFetchUrl"
@@ -56,12 +56,12 @@ const selectedBudgetFetchUrl = computed<string | undefined>(() => {
       :selected-fetch-url="selectedBudgetFetchUrl"
       @resolved-items="resolveBudget" />
   </UFormField>
-  <UFormField :label="t('transfer_payment.total_budget')" :name="field('egcs_tp_totalbudget')">
+  <UFormField :label="t('transfer_payment.total_budget')" :name="field('egcs_tp_totalbudget')" data-field-scope="transfer-payment.fields.stream-budget-fields">
     <CommonCurrencyInput
       v-model="model.egcs_tp_totalbudget"
       :currency="currency" />
   </UFormField>
-  <UFormField :label="t('transfer_payment.overcommit_threshold')" :name="field('egcs_tp_overcommitthreshold')" required>
+  <UFormField :label="t('transfer_payment.overcommit_threshold')" :name="field('egcs_tp_overcommitthreshold')" required data-field-scope="transfer-payment.fields.stream-budget-fields">
     <UInputNumber
       v-model="model.egcs_tp_overcommitthreshold"
       :step="0.01"

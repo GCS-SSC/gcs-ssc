@@ -45,7 +45,7 @@ const apply = () => {
 <template>
   <UModal
     v-model:open="open" :title="t(editing ? 'journal_voucher.edit_split' : 'journal_voucher.add_split')"
-    :description="t('journal_voucher.split_description')" :ui="{ content: 'sm:max-w-2xl' }">
+    :description="t('journal_voucher.split_description')" :ui="{ content: 'sm:max-w-2xl' }" data-field-tooltip-context="agreement" data-field-scope="journal-voucher.allocation-modal" data-scope-label-en="Agreements > Journal Vouchers > Allocation" data-scope-label-fr="Ententes > Pièces de journal > Répartition">
     <template #body>
       <UForm
         v-if="state" :state="state" :validate="createValidator(JournalVoucherAllocationSchema)"

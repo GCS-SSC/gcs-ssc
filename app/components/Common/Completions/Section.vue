@@ -224,7 +224,7 @@ const submitCompletion = async () => {
   <div
     ref="helpRoot"
     class="space-y-6"
-    :class="showHeader && showDivider ? 'border-t border-primary-500 pt-8 dark:border-primary-600' : ''">
+    :class="showHeader && showDivider ? 'border-t border-primary-500 pt-8 dark:border-primary-600' : ''" data-field-tooltip-context="agreement-or-intake" data-field-scope="common.completions.section" data-scope-label-en="Agreements or Intakes > Completion" data-scope-label-fr="Ententes ou dossiers de demande > Achèvement">
     <div v-if="showHeader" class="space-y-3">
       <AssessmentSchemaSectionTitle :title="resolvedLabels.title" variant="indicator" />
     </div>
@@ -319,7 +319,7 @@ const submitCompletion = async () => {
           :title="resolvedLabels.statusLocked" />
 
         <template v-if="actionRoleAllowed === true || (actionRoleAllowed === undefined && !completionResponse?.blocker && !isLocked)">
-          <UFormField :label="t('assessment.completion.comment')">
+          <UFormField :label="t('assessment.completion.comment')" data-ui-target="common.completions.section.assessment.completion.comment">
             <CommonTextarea
               v-model="state.comments"
               :rows="4"

@@ -248,7 +248,7 @@ const runMemberMutation: EditorMutationRunner = async request => {
 </script>
 
 <template>
-  <CommonDetailPage id="transfer-payment-recommendation-setup-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems">
+  <CommonDetailPage id="transfer-payment-recommendation-setup-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" data-field-scope="agency.recommendation-set-detail-page">
     <template #body>
       <div
         v-if="loadError"
@@ -286,10 +286,10 @@ const runMemberMutation: EditorMutationRunner = async request => {
         <UForm ref="recommendationSetupForm" :state="state" :validate="validate" class="flex min-h-0 flex-1 flex-col" @submit="save">
           <CommonDesignTimeEditorShell>
             <template #sidebar>
-              <AssessmentSchemaDetailSidebar v-if="canUpdate" v-model="selectedSection" :section-tabs="sectionTabs" :is-saving="isSaving" :disabled="mutation.isPending.value" :ui="{ trigger: 'w-full justify-start whitespace-normal break-words text-left' }" @save="save" />
+              <AssessmentSchemaDetailSidebar v-if="canUpdate" v-model="selectedSection" data-field-container="Composite editor; its individual field declarations own their identities." :section-tabs="sectionTabs" :is-saving="isSaving" :disabled="mutation.isPending.value" :ui="{ trigger: 'w-full justify-start whitespace-normal break-words text-left' }" @save="save" />
               <aside v-else class="w-full shrink-0 lg:sticky lg:top-6 lg:self-start lg:w-72 lg:border-r lg:border-zinc-200 lg:pr-4 dark:lg:border-zinc-800">
                 <div class="pt-6">
-                  <CommonRouteTabs v-model="selectedSection" :items="sectionTabs" orientation="vertical" />
+                  <CommonRouteTabs v-model="selectedSection" data-field-container="Page navigation state, not a business input field." :items="sectionTabs" orientation="vertical" />
                 </div>
               </aside>
             </template>

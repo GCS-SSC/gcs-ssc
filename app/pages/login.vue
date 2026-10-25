@@ -80,7 +80,7 @@ const onLogin = async () => {
 </script>
 
 <template>
-  <div class="flex min-h-screen items-center justify-center bg-(--ui-bg)">
+  <div data-field-tooltip-unavailable="No owning agency exists for global user administration or authentication." data-field-scope="login" class="flex min-h-screen items-center justify-center bg-(--ui-bg)">
     <UCard class="w-full max-w-sm">
       <template #header>
         <div class="flex flex-col items-center gap-2">
@@ -92,10 +92,10 @@ const onLogin = async () => {
       </template>
 
       <form class="space-y-4" @submit.prevent="onLogin">
-        <UFormField :label="t('login.email')" required>
+        <UFormField data-ui-target="login.login.email" :label="t('login.email')" required>
           <UInput v-model="email" type="email" autocomplete="username" :placeholder="t('login.email_placeholder')" :disabled="loading" />
         </UFormField>
-        <UFormField :label="t('login.password')" required>
+        <UFormField data-ui-target="login.login.password" :label="t('login.password')" required>
           <UInput
             v-model="password"
             type="password"

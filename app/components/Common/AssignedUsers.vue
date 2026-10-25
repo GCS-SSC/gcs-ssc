@@ -190,7 +190,7 @@ const remove = async (userId: string, name: string) => {
 </script>
 
 <template>
-  <section class="space-y-5" :aria-labelledby="showHeader ? `assigned-users-${entityType}-${entityId}` : undefined" :aria-label="showHeader ? undefined : t('assignments.title')">
+  <section class="space-y-5" :aria-labelledby="showHeader ? `assigned-users-${entityType}-${entityId}` : undefined" :aria-label="showHeader ? undefined : t('assignments.title')" data-field-scope="common.assigned-users">
     <div class="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-200 pb-4 dark:border-zinc-800">
       <div class="space-y-1">
         <div class="flex items-center gap-2">
@@ -282,7 +282,7 @@ const remove = async (userId: string, name: string) => {
       </template>
     </UAlert>
     <div v-if="canManage" class="flex flex-col gap-3 rounded-sm bg-elevated p-4 sm:flex-row sm:items-end">
-      <UFormField :label="t('assignments.add_assignee')" required class="min-w-0 flex-1">
+      <UFormField :label="t('assignments.add_assignee')" required class="min-w-0 flex-1" data-ui-target="common.assigned-users.assignments.add_assignee">
         <USelectMenu
           :model-value="selectedUserId ?? undefined"
           :items="availableUsers"
@@ -303,7 +303,7 @@ const remove = async (userId: string, name: string) => {
         @click="addUser" />
     </div>
     <div v-if="(entityType === 'commonreview' || entityType === 'fundingcaseintake') && rosterStatus === 'success'" class="flex flex-col gap-3 rounded-sm bg-slate-200/60 p-4 dark:bg-slate-700/35 sm:flex-row sm:items-end">
-      <UFormField v-if="canManage" :label="t('groups.group')" :name="entityType === 'commonreview' ? 'egcs_cn_group' : 'egcs_fi_group'" class="min-w-0 flex-1">
+      <UFormField v-if="canManage" :label="t('groups.group')" :name="entityType === 'commonreview' ? 'egcs_cn_group' : 'egcs_fi_group'" class="min-w-0 flex-1" data-ui-target="common.assigned-users.assigned-group">
         <USelectMenu
           :model-value="currentGroupId ?? ''"
           :items="groupOptions"

@@ -420,7 +420,7 @@ const deleteRow = async (rowId: string) => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6" data-field-tooltip-context="agreement-or-intake" data-field-scope="assessment.additional-reviewers-tab" data-scope-label-en="Reviews > Additional reviewers" data-scope-label-fr="Examens > Examinateurs additionnels">
     <div class="space-y-3">
       <AssessmentSchemaSectionTitle :title="t('assessment.additional_reviewers.title')" variant="indicator">
         <template #actions>
@@ -547,7 +547,7 @@ const deleteRow = async (rowId: string) => {
           :validate="validate"
           class="space-y-4"
           @submit="saveReviewer">
-          <UFormField :label="t('groups.assignee_type')" required>
+          <UFormField :label="t('groups.assignee_type')" required data-ui-target="assessment.additional-reviewers-tab.groups.assignee_type">
             <USelect v-model="assigneeKind" :items="[{ label: t('groups.user'), value: 'user' }, { label: t('groups.group'), value: 'group' }]" />
           </UFormField>
           <UFormField v-if="assigneeKind === 'user'" :label="t('assessment.additional_reviewers.assigned_to')" name="egcs_cn_user" required>

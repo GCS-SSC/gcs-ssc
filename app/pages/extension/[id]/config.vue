@@ -202,6 +202,7 @@ await refresh()
           :is="configComponent"
           v-else-if="item && configComponent"
           v-model="draftConfig"
+          data-field-container="Composite editor; its individual field declarations own their identities."
           :extension="item.extension"
           :stream-id="streamId"
           :transfer-payment-id="transferPaymentId || undefined"

@@ -426,7 +426,7 @@ const updateExpandedRows = (value: ExpandedState) => {
 </script>
 
 <template>
-  <div>
+  <div data-field-scope="agency.review-sets">
     <CommonResourceLayoutCard
       v-model:search="search"
       v-model:pagination="pagination"

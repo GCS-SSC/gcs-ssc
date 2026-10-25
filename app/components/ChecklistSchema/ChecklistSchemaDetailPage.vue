@@ -373,7 +373,7 @@ const retire = async () => {
 </script>
 
 <template>
-  <CommonDetailPage id="checklist-schema-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems">
+  <CommonDetailPage id="checklist-schema-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" data-field-scope="checklist-schema.detail-page">
     <template #body>
       <div
         v-if="contextLoadError"
@@ -435,6 +435,7 @@ const retire = async () => {
             <AssessmentSchemaDetailSidebar
               v-if="canEdit"
               v-model="selectedSection"
+              data-field-container="Composite editor; its individual field declarations own their identities."
               :section-tabs="sectionTabs"
               :is-saving="isSaving"
               :disabled="mutation.isPending.value"
@@ -442,7 +443,7 @@ const retire = async () => {
               @save="save" />
             <aside v-else class="w-full shrink-0 lg:sticky lg:top-6 lg:self-start lg:w-72 lg:border-r lg:border-zinc-200 lg:pr-4 dark:lg:border-zinc-800">
               <div class="pt-6">
-                <CommonRouteTabs v-model="selectedSection" :items="sectionTabs" orientation="vertical" />
+                <CommonRouteTabs v-model="selectedSection" data-field-container="Page navigation state, not a business input field." :items="sectionTabs" orientation="vertical" />
               </div>
             </aside>
           </template>
@@ -465,7 +466,7 @@ const retire = async () => {
                       <UInput v-model="state.egcs_cn_outcomename_fr" class="w-full" />
                     </UFormField>
                   </div>
-                  <UCheckbox v-model="state.egcs_cn_disablereviewers" :label="t('checklist_schema.disable_reviewers')" />
+                  <UCheckbox v-model="state.egcs_cn_disablereviewers" :label="t('checklist_schema.disable_reviewers')" data-ui-target="checklist-schema.detail-page.state.egcs_cn_disablereviewers" />
                 </AssessmentSchemaPageSection>
 
                 <AssessmentSchemaPageSection section-id="checklist-sections" :title="t('checklist_schema.sections')" role="tabpanel" :aria-label="t('checklist_schema.sections')">
@@ -486,13 +487,13 @@ const retire = async () => {
                           <CommonActionButton icon="i-lucide-trash" color="error" variant="ghost" class="cursor-default" :aria-label="`${t('checklist_schema.remove_section')}: ${getNavigationLabel(section.label, section.key)}`" @click="removeSection(sectionIndex)" />
                         </div>
                         <div class="grid gap-4 md:grid-cols-2">
-                          <UFormField :label="t('checklist_schema.section_name_en')" required>
+                          <UFormField :label="t('checklist_schema.section_name_en')" required data-ui-target="checklist-schema.detail-page.checklist_schema.section_name_en">
                             <UInput v-model="section.label.en" />
                           </UFormField>
-                          <UFormField :label="t('checklist_schema.section_name_fr')" required>
+                          <UFormField :label="t('checklist_schema.section_name_fr')" required data-ui-target="checklist-schema.detail-page.checklist_schema.section_name_fr">
                             <UInput v-model="section.label.fr" />
                           </UFormField>
-                          <UFormField :label="t('checklist_schema.language_independent_code')" required>
+                          <UFormField :label="t('checklist_schema.language_independent_code')" required data-ui-target="checklist-schema.detail-page.checklist_schema.language_independent_code">
                             <UInput v-model="section.key" class="font-mono" />
                           </UFormField>
                         </div>
@@ -519,13 +520,13 @@ const retire = async () => {
                                   <CommonActionButton icon="i-lucide-trash" color="error" variant="ghost" class="cursor-default" :aria-label="`${t('checklist_schema.remove_subsection')}: ${getNavigationLabel(subSection.label, subSection.key)}`" @click="removeSubSection(section, subSectionIndex)" />
                                 </div>
                                 <div class="grid gap-4 md:grid-cols-2">
-                                  <UFormField :label="t('checklist_schema.subsection_name_en')" required>
+                                  <UFormField :label="t('checklist_schema.subsection_name_en')" required data-ui-target="checklist-schema.detail-page.checklist_schema.subsection_name_en">
                                     <UInput v-model="subSection.label.en" />
                                   </UFormField>
-                                  <UFormField :label="t('checklist_schema.subsection_name_fr')" required>
+                                  <UFormField :label="t('checklist_schema.subsection_name_fr')" required data-ui-target="checklist-schema.detail-page.checklist_schema.subsection_name_fr">
                                     <UInput v-model="subSection.label.fr" />
                                   </UFormField>
-                                  <UFormField :label="t('checklist_schema.language_independent_code')" required>
+                                  <UFormField :label="t('checklist_schema.language_independent_code')" required data-ui-target="checklist-schema.detail-page.result-group.code">
                                     <UInput v-model="subSection.key" class="font-mono" />
                                   </UFormField>
                                 </div>
@@ -558,6 +559,7 @@ const retire = async () => {
                   </p>
                   <ChecklistSchemaResultPolicyEditor
                     v-model="definition.resultPolicy"
+                    data-field-container="Composite editor; its individual field declarations own their identities."
                     :question-options="questionOptions" />
                 </AssessmentSchemaPageSection>
               </CommonDesignTimeEditorSections>

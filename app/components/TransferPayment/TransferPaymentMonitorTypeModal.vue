@@ -67,7 +67,7 @@ const onSubmit = async (event: FormSubmitEvent<z.infer<typeof schema>>) => {
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="t('transfer_payment.monitor_type_create')">
+  <UModal v-model:open="open" :title="t('transfer_payment.monitor_type_create')" data-field-scope="transfer-payment.monitor-type-modal">
     <template #body>
       <UForm :state="state" :validate="validate" class="space-y-4" @submit="onSubmit">
         <UFormField :label="t('transfer_payment.monitor_types')" name="egcs_tp_agencymonitortype" required>

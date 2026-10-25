@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import type { LocalizedToastText } from '~/composables/useLocalizedToast'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import { parseOptionalMoneyInput } from '~/utils/optional-money-input'
@@ -1146,10 +1147,12 @@ const cancelReconciliation = async () => {
     isCancellingReconcile.value = false
   }
 }
+
+useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) === String(route.params.claimId) ? { entityType: 'fundingcaseagreementclaim', entityId: activeClaim.value.id } : null)
 </script>
 
 <template>
-  <div class="flex w-full flex-col">
+  <div data-field-tooltip-context="agreement" data-field-scope="agreements.claims" data-scope-label-en="Agreements > Claims > Reconciliation" data-scope-label-fr="Ententes > Demandes de remboursement > Rapprochement" class="flex w-full flex-col">
     <UAlert v-if="hasLoadError" color="error" icon="i-lucide-circle-alert" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
       <template #actions>
         <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" :loading="isLoadingDetail" @click="retryLoad" />
@@ -1169,7 +1172,7 @@ const cancelReconciliation = async () => {
             :meta-items="claimHeroMetaItems"
             :badges="claimHeroBadges" />
 
-          <CommonDetailWorkspace v-model="selectedClaimTab" :items="claimTabs" content-test-id="agreement-claim-detail-content">
+          <CommonDetailWorkspace v-model="selectedClaimTab" data-field-container="Page navigation state, not a business input field." :items="claimTabs" content-test-id="agreement-claim-detail-content">
             <div v-if="selectedClaimTab === 'submission'" class="w-full min-w-0">
               <div class="space-y-8">
                 <div class="space-y-4">
@@ -1260,7 +1263,7 @@ const cancelReconciliation = async () => {
                             :disabled="isLoadingDetail || isSavingFunding"
                             @click="openFundingEditor(row.original.claimLine)" />
                           <div v-if="row.original.isUnallocated && row.original.claimLine && canAllocateClaimLines" class="flex flex-wrap items-end gap-2 pt-1">
-                            <UFormField :label="t('agreement.claims.allocate_to_budget_line')" :name="`allocation-${row.original.claimLine.id}`" required class="min-w-72">
+                            <UFormField data-ui-target="agreements.claims.claims.allocate_to_budget_line" :label="t('agreement.claims.allocate_to_budget_line')" :name="`allocation-${row.original.claimLine.id}`" required class="min-w-72">
                               <CommonBilingualSelectMenu
                                 :model-value="draftAllocations[String(row.original.claimLine.id)]"
                                 :items="allocationOptions"
@@ -1534,6 +1537,7 @@ const cancelReconciliation = async () => {
                     </div>
                     <div class="rounded-sm border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
                       <UCheckbox
+                        data-ui-target="agreements.claims.claims.mark_reconcile_final"
                         :model-value="draftReconcileIsFinal"
                         :label="t('agreement.claims.mark_reconcile_final')"
                         :description="t('agreement.claims.mark_reconcile_final_description')"
@@ -1623,7 +1627,7 @@ const cancelReconciliation = async () => {
 
     <UModal
       v-if="selectedSubmissionLine"
-      v-model:open="isSubmissionModalOpen"
+      v-model:open="isSubmissionModalOpen" data-field-scope="agreements.claims" data-scope-label-en="Agreements > Claims > Submission > Budget line" data-scope-label-fr="Ententes > Demandes de remboursement > Présentation > Ligne budgétaire"
       :title="t('agreement.claims.edit_submitted_amount')"
       :description="locale === 'fr' ? selectedSubmissionLine.lineItemNameFr : selectedSubmissionLine.lineItemNameEn"
       :dismissible="!isSavingSubmission">
@@ -1660,12 +1664,12 @@ const cancelReconciliation = async () => {
           </p>
 
           <div class="grid gap-4 sm:grid-cols-2">
-            <UFormField :label="t('agreement.claims.submitted_amount')">
+            <UFormField data-ui-target="agreements.claims.claims.submitted_amount" :label="t('agreement.claims.submitted_amount')">
               <div class="w-full rounded-md bg-muted px-3 py-2">
                 {{ formatMoney(selectedReconcileLine.submittedAmount) }}
               </div>
             </UFormField>
-            <UFormField :label="t('agreement.claims.balance')">
+            <UFormField data-ui-target="agreements.claims.claims.balance" :label="t('agreement.claims.balance')">
               <div class="w-full rounded-md bg-muted px-3 py-2">
                 {{ formatMoney(selectedReconcileLineBalance) }}
               </div>
@@ -1673,7 +1677,7 @@ const cancelReconciliation = async () => {
           </div>
 
           <div class="grid gap-4 sm:grid-cols-2">
-            <UFormField :label="t('agreement.claims.reconciled_amount')" required>
+            <UFormField data-ui-target="agreements.claims.claims.reconciled_amount" :label="t('agreement.claims.reconciled_amount')" required>
               <CommonCurrencyInput
                 v-model="selectedReconcileLine.reconciledAmount"
                 :currency="profile?.egcs_fc_currency"
@@ -1681,7 +1685,7 @@ const cancelReconciliation = async () => {
                 class="w-full"
                 @update:model-value="updateSelectedReconciledAmount" />
             </UFormField>
-            <UFormField :label="t('agreement.claims.sampled_amount')">
+            <UFormField data-ui-target="agreements.claims.claims.sampled_amount" :label="t('agreement.claims.sampled_amount')">
               <CommonCurrencyInput
                 v-model="selectedReconcileLine.sampledAmount"
                 :currency="profile?.egcs_fc_currency"
@@ -1690,7 +1694,7 @@ const cancelReconciliation = async () => {
             </UFormField>
           </div>
 
-          <UFormField :label="t('agreement.claims.rationale')">
+          <UFormField data-ui-target="agreements.claims.claims.rationale" :label="t('agreement.claims.rationale')">
             <CommonTextarea
               v-model="selectedReconcileLine.rationale"
               :rows="6"
@@ -1717,16 +1721,16 @@ const cancelReconciliation = async () => {
         </form>
       </template>
     </UModal>
-    <UModal v-if="profile" v-model:open="fundingEditorOpen" :title="t('agreement.funding_sources.edit_line')" :ui="{ content: 'sm:max-w-2xl' }">
+    <UModal v-if="profile" v-model:open="fundingEditorOpen" data-field-scope="agreements.claims" data-scope-label-en="Agreements > Claims > Submission > Funding sources" data-scope-label-fr="Ententes > Demandes de remboursement > Présentation > Sources de financement" :title="t('agreement.funding_sources.edit_line')" :ui="{ content: 'sm:max-w-2xl' }">
       <template #body>
         <div class="space-y-4">
-          <UFormField :label="t('agreement.claims.submitted_amount')" name="egcs_fc_amount" required>
+          <UFormField data-ui-target="agreements.claims.funding-source.program-amount" :label="t('agreement.claims.submitted_amount')" name="egcs_fc_amount" required>
             <CommonCurrencyInput v-model="fundingEditorProgramAmount" :currency="profile?.egcs_fc_currency" required aria-required="true" class="w-full" />
           </UFormField>
           <UFormField :label="t('agreement.funding_sources.total_cost')" name="egcs_fc_totalamount" required>
             <CommonCurrencyInput v-model="fundingEditorTotalAmount" :currency="profile?.egcs_fc_currency" required aria-required="true" class="w-full" />
           </UFormField>
-          <AgreementFundingSourcesEditor v-model="fundingEditorSources" :agreement-id="agreementId" :currency="profile.egcs_fc_currency" :identity="`${fundingEditorLine?.id ?? ''}:${fundingEditorSession}`" />
+          <AgreementFundingSourcesEditor v-model="fundingEditorSources" data-field-container="Composite editor; its individual field declarations own their identities." :agreement-id="agreementId" :currency="profile.egcs_fc_currency" :identity="`${fundingEditorLine?.id ?? ''}:${fundingEditorSession}`" />
           <div class="flex justify-end gap-2">
             <UButton color="neutral" variant="ghost" :label="t('common.cancel')" @click="fundingEditorOpen = false" />
             <CommonSaveButton :label="t('agreement.funding_sources.save')" :loading="isSavingFunding" :disabled="isLoadingDetail || isSavingFunding" @click="saveFundingEditor" />

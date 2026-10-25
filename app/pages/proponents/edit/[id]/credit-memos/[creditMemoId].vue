@@ -150,7 +150,7 @@ const save = async () => {
 </script>
 
 <template>
-  <div ref="content" tabindex="-1" class="flex w-full min-w-0 flex-col">
+  <div ref="content" data-field-scope="proponents.edit.credit-memos" tabindex="-1" class="flex w-full min-w-0 flex-col">
     <AccountReceivableCreditMemoApprovalWorkspace v-if="approvalOnly" :proponent-id="proponentId" :credit-memo-id="creditMemoId" />
     <UAlert v-else-if="status === 'error'" color="error" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
       <template #actions>
@@ -163,7 +163,7 @@ const save = async () => {
     <CommonDetailPage v-if="creditMemo && state" id="proponent-credit-memo-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbs" class="min-w-0 flex-1">
       <template #body>
         <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-banknote-arrow-down" :title="reference" :meta-items="[getBilingualValue(creditMemo, 'egcs_fc_debtorname', t('common.not_available')), getBilingualValue(creditMemo, 'egcs_fc_agencyname', t('common.not_available')), creditMemo.egcs_fc_currency.toUpperCase()]" :badges="[{ statusId: creditMemo.egcs_fc_status }]" :actions="creditMemo.egcs_fc_canedit ? [{ label: t('common.edit'), icon: 'i-lucide-edit-3', onClick: openEdit }] : []" />
-        <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="proponent-credit-memo-detail-content">
+        <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="proponent-credit-memo-detail-content">
           <div v-if="selectedTab === 'summary'" class="space-y-8" data-testid="credit-memo-summary">
             <CommonSection :title="t('account_receivable.credit_memo')" badge="01">
               <CommonValueCard :label="t('account_receivable.received_date')" :value="formatDate(creditMemo.egcs_fc_receiveddate)" />

@@ -325,7 +325,7 @@ const deleteForecast = (forecastId: string) => runAction(async isCurrent => {
 </script>
 
 <template>
-  <div class="w-full">
+  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.forecasts-tab" data-scope-label-en="Agreements > Forecasts" data-scope-label-fr="Ententes > Prévisions">
     <UAlert
       v-for="forecast in forecastsRequiringRevision"
       :key="forecast.id"

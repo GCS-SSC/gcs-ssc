@@ -194,7 +194,7 @@ const removeMember = async (group: Group, member: Member) => {
 </script>
 
 <template>
-  <UDashboardPanel id="groups">
+  <UDashboardPanel id="groups" data-field-scope="groups">
     <template #header>
       <UDashboardNavbar :title="t('groups.title')">
         <template #leading>
@@ -213,7 +213,7 @@ const removeMember = async (group: Group, member: Member) => {
         <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-users" :title="t('groups.title')" :description="t('groups.description')" :stats="heroStats" />
         <CommonResourceLayoutPage v-model:search="search" v-model:pagination="pagination" :data="rows" :columns="columns" :total-records="totalRecords" :request-status="status" :show-button="canCreate" :button-label="t('common.add')" :get-row-id="(row: GroupRow) => row.id" @add="openCreate" @retry="refreshGroups">
           <template #filters>
-            <USelect v-model="selectedAgency" :items="agencyOptions" :aria-label="t('groups.agency_filter')" class="min-w-48" />
+            <USelect v-model="selectedAgency" data-ui-target="groups.selected-agency" :items="agencyOptions" :aria-label="t('groups.agency_filter')" class="min-w-48" />
           </template>
           <template #name-cell="{ row }">
             <div v-if="row.original.member || row.original.placeholder" :id="row.original.placeholder || membersByGroup[row.original.group.id]?.[0]?.egcs_cn_user === row.original.member?.egcs_cn_user ? getGroupedDisclosureControlsId(`group:${row.original.group.id}`) : undefined" class="flex items-center gap-2 pl-8">

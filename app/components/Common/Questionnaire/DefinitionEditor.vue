@@ -55,7 +55,7 @@ const addQuestion = (sectionIndex: number, subSectionIndex: number) => {
 </script>
 
 <template>
-  <div v-if="definition" class="space-y-5">
+  <div v-if="definition" class="space-y-5" data-field-scope="common.questionnaire.definition-editor">
     <div class="flex items-center justify-between border-default border-b pb-3">
       <h3 class="font-semibold text-highlighted">
         {{ t('recommendation_schema.form_sections') }}
@@ -70,10 +70,10 @@ const addQuestion = (sectionIndex: number, subSectionIndex: number) => {
       :title="getNavigationLabel(section.label, section.key)">
       <div class="space-y-5">
         <div class="grid gap-4 md:grid-cols-2">
-          <UFormField :label="t('transfer_payment.name_en')" required>
+          <UFormField :label="t('transfer_payment.name_en')" required data-ui-target="common.questionnaire.definition-editor.section.label.en">
             <UInput v-model="section.label.en" class="w-full" />
           </UFormField>
-          <UFormField :label="t('transfer_payment.name_fr')" required>
+          <UFormField :label="t('transfer_payment.name_fr')" required data-ui-target="common.questionnaire.definition-editor.section.label.fr">
             <UInput v-model="section.label.fr" class="w-full" />
           </UFormField>
         </div>
@@ -90,10 +90,10 @@ const addQuestion = (sectionIndex: number, subSectionIndex: number) => {
           level="sub">
           <div class="space-y-5">
             <div class="grid gap-4 md:grid-cols-2">
-              <UFormField :label="t('transfer_payment.name_en')" required>
+              <UFormField :label="t('transfer_payment.name_en')" required data-ui-target="common.questionnaire.definition-editor.subsection.label.en">
                 <UInput v-model="subSection.label.en" class="w-full" />
               </UFormField>
-              <UFormField :label="t('transfer_payment.name_fr')" required>
+              <UFormField :label="t('transfer_payment.name_fr')" required data-ui-target="common.questionnaire.definition-editor.subsection.label.fr">
                 <UInput v-model="subSection.label.fr" class="w-full" />
               </UFormField>
             </div>
@@ -108,7 +108,7 @@ const addQuestion = (sectionIndex: number, subSectionIndex: number) => {
               :title="getNavigationLabel(question.question, question.key)"
               level="sub">
               <slot name="question-fields" :question="question" :update-question="(value: QuestionnaireQuestion) => { subSection.questions[questionIndex] = value }">
-                <CommonQuestionnaireQuestionFields v-model="subSection.questions[questionIndex]!" />
+                <CommonQuestionnaireQuestionFields v-model="subSection.questions[questionIndex]!" data-field-container="Composite editor; its individual field declarations own their identities." />
               </slot>
               <div class="mt-4 flex justify-end">
                 <UButton icon="i-lucide-trash" color="error" variant="ghost" :label="t('recommendation_schema.remove_question')" class="cursor-default" @click="subSection.questions.splice(questionIndex, 1)" />

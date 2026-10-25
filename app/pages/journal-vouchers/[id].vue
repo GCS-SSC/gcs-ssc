@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { appRouteLocations } from '~/utils/route-locations'
+import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
@@ -189,10 +190,12 @@ const applyAllocation = (line: JournalVoucherAllocationDraft) => {
   else state.value.egcs_fc_allocations.splice(index, 1, line)
   allocationModal.close()
 }
+
+useFieldTooltipProvider(() => voucher.value && String(voucher.value.id) === String(route.params.id) ? { entityType: 'journal_voucher', entityId: voucher.value.id } : null)
 </script>
 
 <template>
-  <div class="flex w-full min-w-0 flex-col">
+  <div data-field-tooltip-context="agreement" data-field-scope="journal-vouchers" data-scope-label-en="Agreements > Journal Vouchers > General" data-scope-label-fr="Ententes > Pièces de journal > Général" class="flex w-full min-w-0 flex-col">
     <UAlert v-if="error" color="error" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
       <template #actions>
         <UButton :label="t('common.retry')" :loading="status === 'pending'" @click="refresh()" />
@@ -204,7 +207,7 @@ const applyAllocation = (line: JournalVoucherAllocationDraft) => {
     <CommonDetailPage v-if="voucher && !error" id="journal-voucher-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbs" class="w-full">
       <template #body>
         <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-book-open-check" :title="`${t('journal_voucher.number')} ${voucher.egcs_fc_number}`" :meta-items="[voucher.egcs_fc_agreementnumber, voucher.egcs_fc_fiscalyeardisplay, voucher.egcs_fc_currency.toUpperCase()]" :badges="[{ statusId: voucher.egcs_fc_status, isCompleted: voucher.isCompleted }]" />
-        <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="journal-voucher-detail-content">
+        <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="journal-voucher-detail-content">
           <UForm
             v-if="selectedTab === 'entry' && state"
             :state="state"
@@ -375,7 +378,8 @@ const applyAllocation = (line: JournalVoucherAllocationDraft) => {
       </template>
     </CommonDetailPage>
     <JournalVoucherAllocationModal
-      v-if="voucher && state" v-model:open="allocationModal.isOpen.value" v-model="allocationModal.selected.value"
+      v-if="voucher && state"
+      v-model:open="allocationModal.isOpen.value" v-model="allocationModal.selected.value" data-field-container="Composite editor; its individual field declarations own their identities."
       :voucher-id="id" :currency="voucher.egcs_fc_currency" :original="original" :editing="isEditingAllocation" @save="applyAllocation" />
   </div>
 </template>

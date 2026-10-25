@@ -38,7 +38,7 @@ const initialNewItem = { ...AgencyCostCategoryLineItemInitial }
     :schema="AgencyCostCategoryLineItemSchema"
     :initial-new-item="initialNewItem"
     :columns="columns"
-    table-class="ring-default overflow-hidden rounded-lg bg-white shadow-sm ring-1 dark:bg-zinc-900">
+    table-class="ring-default overflow-hidden rounded-lg bg-white shadow-sm ring-1 dark:bg-zinc-900" data-field-scope="agency.cost-category-line-items">
     <template #name-cell="{ row }">
       <CommonBilingualName :name-en="row.original.egcs_ay_name_en" :name-fr="row.original.egcs_ay_name_fr" />
     </template>
@@ -50,7 +50,7 @@ const initialNewItem = { ...AgencyCostCategoryLineItemInitial }
       <UFormField :label="t('agency.name_fr')" name="egcs_ay_name_fr">
         <UInput v-model="state.egcs_ay_name_fr" />
       </UFormField>
-      <AgencyBudgetCalculationFields :model-value="state" :category-id="categoryId" />
+      <AgencyBudgetCalculationFields data-field-container="Composite editor; its individual field declarations own their identities." :model-value="state" :category-id="categoryId" />
     </template>
   </CommonResourceCrud>
 </template>

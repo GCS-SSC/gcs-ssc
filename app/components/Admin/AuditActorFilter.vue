@@ -4,7 +4,7 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <UFormField :label="t('audit.actor')">
+  <UFormField :label="t('audit.actor')" data-ui-target="admin.audit-actor-filter.audit.actor" data-field-scope="admin.audit-actor-filter">
     <CommonServerLookupSelect
       :model-value="model || 'all'"
       fetch-url="/api/admin/audit/actors"

@@ -328,7 +328,7 @@ const peakShare = (progress: FinancialProgress): string | null => {
 </script>
 
 <template>
-  <section data-testid="agreement-financial-summary" class="space-y-6">
+  <section data-testid="agreement-financial-summary" class="space-y-6" data-field-tooltip-context="agreement" data-field-scope="agreement.financial-summary-tab" data-scope-label-en="Agreements > Financial summary" data-scope-label-fr="Ententes > Sommaire financier">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div class="space-y-1">
         <h2 class="text-xl font-semibold text-highlighted">
@@ -347,7 +347,7 @@ const peakShare = (progress: FinancialProgress): string | null => {
           value-key="id"
           label-en-key="label_en"
           label-fr-key="label_fr"
-          :aria-label="t('agreement.financial_summary.fiscal_year')" />
+          :aria-label="t('agreement.financial_summary.fiscal_year')" data-ui-target="agreement.financial-summary-tab.selectedYearId" />
       </div>
     </div>
 

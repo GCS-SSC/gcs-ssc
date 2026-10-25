@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import type { LocalizedToastText } from '~/composables/useLocalizedToast'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 import type { FetchError } from 'ofetch'
@@ -707,10 +708,12 @@ const saveForecastBreakdown = async () => {
     isSavingBreakdown.value = false
   }
 }
+
+useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.value.id) === String(route.params.forecastId) ? { entityType: 'fundingcaseforecast', entityId: activeForecast.value.id } : null)
 </script>
 
 <template>
-  <div class="flex w-full flex-col">
+  <div data-field-tooltip-context="agreement" data-field-scope="agreements.forecasts" data-scope-label-en="Agreements > Forecasts > Breakdown" data-scope-label-fr="Ententes > Prévisions > Ventilation" class="flex w-full flex-col">
     <UAlert v-if="hasLoadError" color="error" icon="i-lucide-circle-alert" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
       <template #actions>
         <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" :loading="isLoadingDetail" @click="retryLoad" />
@@ -729,7 +732,7 @@ const saveForecastBreakdown = async () => {
             :meta-items="forecastHeroMetaItems"
             :badges="forecastHeroBadges" />
 
-          <CommonDetailWorkspace v-model="selectedTab" :items="tabs" content-test-id="agreement-forecast-detail-content">
+          <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-forecast-detail-content">
             <CommonSection v-if="selectedTab === 'breakdown'" :show-header="false" :title="t('agreement.forecasts.breakdown_title')" :grid-cols="1">
               <div class="space-y-4">
                 <div class="flex flex-wrap items-end justify-between gap-3">
@@ -940,7 +943,7 @@ const saveForecastBreakdown = async () => {
                 </span>
               </legend>
               <div class="grid grid-cols-1 gap-4 pt-3 sm:grid-cols-3">
-                <UFormField v-for="month in quarter.months" :key="month" :label="t(`agreement.forecasts.months.${MONTH_KEYS[month]}`)" :name="`month-${month}`" required>
+                <UFormField v-for="month in quarter.months" :key="month" data-field-label-en="Monthly amount" data-field-label-fr="Montant mensuel" data-ui-target="agreements.forecasts.month-amount" :label="t(`agreement.forecasts.months.${MONTH_KEYS[month]}`)" :name="`month-${month}`" required>
                   <CommonCurrencyInput
                     :model-value="monthlyEditorAmounts[month]"
                     :currency="profile?.egcs_fc_currency"

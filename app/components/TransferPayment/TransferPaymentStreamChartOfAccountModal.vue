@@ -48,7 +48,7 @@ const onSubmit = async (event: FormSubmitEvent<z.infer<typeof TransferPaymentStr
 </script>
 
 <template>
-  <UModal v-model:open="isOpen" :title="t('transfer_payment.chart_of_accounts.create')">
+  <UModal v-model:open="isOpen" :title="t('transfer_payment.chart_of_accounts.create')" data-field-scope="transfer-payment.stream-chart-of-account-modal">
     <template #body>
       <UForm :state="state" :validate="createValidator(TransferPaymentStreamChartOfAccountSchema)" class="space-y-4" @submit="onSubmit">
         <UFormField :label="t('transfer_payment.chart_of_accounts.title')" name="egcs_tp_agencychartofaccount" required>

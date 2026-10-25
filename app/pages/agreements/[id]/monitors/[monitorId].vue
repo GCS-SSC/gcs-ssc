@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-jsdoc, jsdoc/require-param-description, jsdoc/require-returns -- page-local callbacks use self-descriptive signatures */
 import type { FetchError } from 'ofetch'
@@ -485,10 +486,12 @@ const handleCompleted = async () => {
   await refreshMonitor()
   approvalsRefreshKey.value += 1
 }
+
+useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === String(route.params.monitorId) ? { entityType: 'fundingcasemonitor', entityId: monitor.value.id } : null)
 </script>
 
 <template>
-  <div class="flex w-full flex-col">
+  <div data-field-tooltip-context="agreement" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors" data-scope-label-fr="Ententes > Surveillances" class="flex w-full flex-col">
     <UAlert v-if="hasLoadError" color="error" icon="i-lucide-circle-alert" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
       <template #actions>
         <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" :loading="isLoadingDetail" @click="retryLoad" />
@@ -511,7 +514,7 @@ const handleCompleted = async () => {
               isCompleted: monitor.isCompleted
             }]" />
 
-          <CommonDetailWorkspace v-model="selectedMonitorTab" :items="monitorTabs" content-test-id="agreement-monitor-detail-content" :priority-values="['planning', 'items', 'findings', 'followups', 'promising-practices']">
+          <CommonDetailWorkspace v-model="selectedMonitorTab" data-field-container="Page navigation state, not a business input field." :items="monitorTabs" content-test-id="agreement-monitor-detail-content" :priority-values="['planning', 'items', 'findings', 'followups', 'promising-practices']">
             <div v-if="selectedMonitorTab === 'planning'" class="w-full min-w-0">
               <div class="space-y-6">
                 <CommonResourceLayoutCard
@@ -749,7 +752,7 @@ const handleCompleted = async () => {
       </template>
     </CommonDetailPage>
 
-    <UModal v-if="monitor" v-model:open="isMetadataModalOpen" :title="t('agreement.monitors.edit')" :description="t('common.form_dialog_description')">
+    <UModal v-if="monitor" v-model:open="isMetadataModalOpen" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > General" data-scope-label-fr="Ententes > Surveillances > Général" :title="t('agreement.monitors.edit')" :description="t('common.form_dialog_description')">
       <template #body>
         <UForm
           v-if="monitorMetadata"
@@ -817,7 +820,7 @@ const handleCompleted = async () => {
       </template>
     </UModal>
 
-    <UModal v-if="selectedPlanning" v-model:open="isPlanningModalOpen" :title="selectedPlanning.id ? t('agreement.monitors.planning.edit') : t('agreement.monitors.planning.add')" :description="t('common.form_dialog_description')">
+    <UModal v-if="selectedPlanning" v-model:open="isPlanningModalOpen" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > Planning" data-scope-label-fr="Ententes > Surveillances > Planification" :title="selectedPlanning.id ? t('agreement.monitors.planning.edit') : t('agreement.monitors.planning.add')" :description="t('common.form_dialog_description')">
       <template #body>
         <UForm :state="selectedPlanning" :validate="validatePlanning" :validate-on="[]" class="space-y-4" @submit="savePlanning">
           <UFormField :label="t('agreement.monitors.planning.objective')" name="egcs_fc_objective">
@@ -830,7 +833,7 @@ const handleCompleted = async () => {
       </template>
     </UModal>
 
-    <UModal v-if="selectedItem" v-model:open="isItemModalOpen" :title="selectedItem.id ? t('agreement.monitors.items.edit') : t('agreement.monitors.items.add')" :description="t('common.form_dialog_description')">
+    <UModal v-if="selectedItem" v-model:open="isItemModalOpen" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > Monitor items" data-scope-label-fr="Ententes > Surveillances > Éléments de surveillance" :title="selectedItem.id ? t('agreement.monitors.items.edit') : t('agreement.monitors.items.add')" :description="t('common.form_dialog_description')">
       <template #body>
         <UForm :state="selectedItem" :validate="validateItem" :validate-on="[]" class="space-y-4" @submit="saveItem">
           <UFormField :label="t('agreement.monitors.items.item')" name="egcs_fc_item">
@@ -866,7 +869,7 @@ const handleCompleted = async () => {
       </template>
     </UModal>
 
-    <UModal v-if="selectedFinding" v-model:open="isFindingModalOpen" :title="selectedFinding.id ? t('agreement.monitors.findings.edit') : t('agreement.monitors.findings.add')" :description="t('common.form_dialog_description')">
+    <UModal v-if="selectedFinding" v-model:open="isFindingModalOpen" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > Findings" data-scope-label-fr="Ententes > Surveillances > Constatations" :title="selectedFinding.id ? t('agreement.monitors.findings.edit') : t('agreement.monitors.findings.add')" :description="t('common.form_dialog_description')">
       <template #body>
         <UForm :state="selectedFinding" :validate="validateFinding" :validate-on="[]" class="space-y-4" @submit="saveFinding">
           <UFormField :label="t('agreement.monitors.findings.item_link')" name="egcs_fc_monitoritem">
@@ -881,7 +884,7 @@ const handleCompleted = async () => {
           <UFormField :label="t('agreement.monitors.responsible_party')" name="egcs_fc_responsibleparty">
             <CommonEnumSelect v-model="selectedFinding.egcs_fc_responsibleparty" name="monitor_responsible_party" />
           </UFormField>
-          <UFormField :label="t('common.description')" name="egcs_fc_detail">
+          <UFormField data-ui-target="agreements.monitors.common.description" :label="t('common.description')" name="egcs_fc_detail">
             <UTextarea v-model="selectedFinding.egcs_fc_detail" />
           </UFormField>
           <div class="flex justify-end gap-2">
@@ -891,7 +894,7 @@ const handleCompleted = async () => {
       </template>
     </UModal>
 
-    <UModal v-if="selectedFollowup" v-model:open="isFollowupModalOpen" :title="selectedFollowup.id ? t('agreement.monitors.followups.edit') : t('agreement.monitors.followups.add')" :description="t('common.form_dialog_description')">
+    <UModal v-if="selectedFollowup" v-model:open="isFollowupModalOpen" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > Follow-ups" data-scope-label-fr="Ententes > Surveillances > Suivis" :title="selectedFollowup.id ? t('agreement.monitors.followups.edit') : t('agreement.monitors.followups.add')" :description="t('common.form_dialog_description')">
       <template #body>
         <UForm :state="selectedFollowup" :validate="validateFollowup" :validate-on="[]" class="space-y-4" @submit="saveFollowup">
           <UFormField :label="t('agreement.monitors.followups.finding_link')" name="egcs_fc_monitorfinding">
@@ -900,7 +903,7 @@ const handleCompleted = async () => {
           <UFormField :label="t('agreement.monitors.followups.name')" name="egcs_fc_followupname">
             <UInput v-model="selectedFollowup.egcs_fc_followupname" />
           </UFormField>
-          <UFormField :label="t('agreement.monitors.responsible_party')" name="egcs_fc_responsibleparty">
+          <UFormField data-ui-target="agreements.monitors.monitors.responsible_party" :label="t('agreement.monitors.responsible_party')" name="egcs_fc_responsibleparty">
             <CommonEnumSelect v-model="selectedFollowup.egcs_fc_responsibleparty" name="monitor_responsible_party" />
           </UFormField>
           <UFormField v-if="monitor?.egcs_ay_receivableeligible" :label="t('account_receivable.monitor_requirement')" name="egcs_fc_requiresreceivable" :description="t('account_receivable.monitor_requirement_description')">
@@ -916,7 +919,7 @@ const handleCompleted = async () => {
       </template>
     </UModal>
 
-    <UModal v-if="selectedUpdate" v-model:open="isUpdateModalOpen" :title="selectedUpdate.id ? t('agreement.monitors.followups.edit_update') : t('agreement.monitors.followups.add_update')" :description="t('common.form_dialog_description')">
+    <UModal v-if="selectedUpdate" v-model:open="isUpdateModalOpen" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > Follow-up updates" data-scope-label-fr="Ententes > Surveillances > Mises à jour des suivis" :title="selectedUpdate.id ? t('agreement.monitors.followups.edit_update') : t('agreement.monitors.followups.add_update')" :description="t('common.form_dialog_description')">
       <template #body>
         <UForm :state="selectedUpdate" :validate="validateUpdate" :validate-on="[]" class="space-y-4" @submit="saveUpdate">
           <UFormField :label="t('agreement.monitors.followups.update')" name="egcs_fc_update">
@@ -969,7 +972,7 @@ const handleCompleted = async () => {
       </template>
     </UModal>
 
-    <UModal v-if="selectedPractice" v-model:open="isPracticeModalOpen" :title="selectedPractice.id ? t('agreement.monitors.promising_practices.edit') : t('agreement.monitors.promising_practices.add')" :description="t('common.form_dialog_description')">
+    <UModal v-if="selectedPractice" v-model:open="isPracticeModalOpen" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > Promising practices" data-scope-label-fr="Ententes > Surveillances > Pratiques prometteuses" :title="selectedPractice.id ? t('agreement.monitors.promising_practices.edit') : t('agreement.monitors.promising_practices.add')" :description="t('common.form_dialog_description')">
       <template #body>
         <UForm :state="selectedPractice" :validate="validatePractice" :validate-on="[]" class="space-y-4" @submit="savePractice">
           <UFormField :label="t('agreement.monitors.promising_practices.practice')" name="egcs_fc_practice">

@@ -104,7 +104,7 @@ const removeLink = async (link: ReviewSetLink) => {
 </script>
 
 <template>
-  <section class="space-y-4">
+  <section class="space-y-4" data-field-scope="transfer-payment.review-setups-tab">
     <h2 v-if="showHeader" class="text-lg font-semibold">
       {{ t('transfer_payment.review_setups') }}
     </h2>

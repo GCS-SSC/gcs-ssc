@@ -588,7 +588,7 @@ const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', 
 </script>
 
 <template>
-  <div class="w-full">
+  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.payments-tab" data-scope-label-en="Agreements > Payments > Update Payment" data-scope-label-fr="Ententes > Paiements > Mettre à jour le paiement">
     <CommonResourceLayoutCard
       v-model:search="search"
       v-model:pagination="pagination"
@@ -889,12 +889,12 @@ const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', 
                   :data-testid="`payment-offset-line-${memoIndex}-${lineIndex}`"
                   class="grid items-start gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)_auto]">
                   <template v-if="currentStep === 'credit-memos' && offsetPreview.egcs_fc_creditmemos[memoIndex]?.egcs_fc_allocationmode === 'manual'">
-                    <UFormField :label="t('account_receivable.credit_memo_coding')" :name="`egcs_fc_offsetcreditmemos.${memoIndex}.egcs_fc_lines.${lineIndex}.egcs_fc_codingaccount`">
+                    <UFormField :label="t('account_receivable.credit_memo_coding')" :name="`egcs_fc_offsetcreditmemos.${memoIndex}.egcs_fc_lines.${lineIndex}.egcs_fc_codingaccount`" data-ui-target="agreement.payments-tab.egcs_fc_offsetcreditmemos.egcs_fc_lines.egcs_fc_codingaccount">
                       <USelectMenu
                         v-model="line.egcs_fc_codingaccount" :items="memoCodingOptions(memoIndex)" value-key="value"
                         :disabled="isSavingPayment" :placeholder="t('common.select')" class="w-full" />
                     </UFormField>
-                    <UFormField :label="t('account_receivable.credit_memo_amount')" :name="`egcs_fc_offsetcreditmemos.${memoIndex}.egcs_fc_lines.${lineIndex}.egcs_fc_amount`">
+                    <UFormField :label="t('account_receivable.credit_memo_amount')" :name="`egcs_fc_offsetcreditmemos.${memoIndex}.egcs_fc_lines.${lineIndex}.egcs_fc_amount`" data-ui-target="agreement.payments-tab.egcs_fc_offsetcreditmemos.egcs_fc_lines.egcs_fc_amount">
                       <CommonCurrencyInput v-model="line.egcs_fc_amount" :currency="agreementCurrency" :disabled="isSavingPayment" class="w-full" />
                     </UFormField>
                     <CommonActionButton

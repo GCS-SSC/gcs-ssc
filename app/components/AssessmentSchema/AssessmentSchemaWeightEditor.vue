@@ -373,20 +373,20 @@ watch(
 </script>
 
 <template>
-  <div class="space-y-4 border-y border-zinc-200 py-3 dark:border-zinc-700">
-    <UFormField :label="t('transfer_payment.weight_shape')">
+  <div class="space-y-4 border-y border-zinc-200 py-3 dark:border-zinc-700" data-field-scope="assessment-schema.weight-editor">
+    <UFormField :label="t('transfer_payment.weight_shape')" data-ui-target="assessment-schema.weight-editor.transfer_payment.weight_shape">
       <USelect v-model="weightMode" :items="weightModeItems" value-key="value" label-key="label" />
     </UFormField>
 
     <div v-if="weightMode === 'fixed'" class="grid grid-cols-1 gap-3 md:grid-cols-2">
-      <UFormField :label="t('common.weight')">
+      <UFormField :label="t('common.weight')" data-ui-target="assessment-schema.weight-editor.fixed.weight">
         <UInput v-model.number="getFixedWeight().weight" type="number" />
       </UFormField>
     </div>
 
     <div v-else-if="weightMode === 'adjustable'" class="space-y-4">
       <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <UFormField :label="t('transfer_payment.dependency_type')" required>
+        <UFormField :label="t('transfer_payment.dependency_type')" required data-ui-target="assessment-schema.weight-editor.transfer_payment.dependency_type">
           <USelect
             :model-value="getAdjustableWeight().on.type"
             :items="[
@@ -400,13 +400,13 @@ watch(
 
         <UFormField
           v-if="getAdjustableWeight().on.type === 'helpers'"
-          :label="t('transfer_payment.helper_field')" required>
+          :label="t('transfer_payment.helper_field')" required data-ui-target="assessment-schema.weight-editor.transfer_payment.helper_field">
           <AssessmentSchemaHelperFieldSelect v-model="getAdjustableWeight().on.field" />
         </UFormField>
       </div>
 
       <div v-if="getAdjustableWeight().on.type === 'answers'" class="grid grid-cols-1 gap-3">
-        <UFormField :label="t('transfer_payment.assessment_item')" required>
+        <UFormField :label="t('transfer_payment.assessment_item')" required data-ui-target="assessment-schema.weight-editor.transfer_payment.assessment_item">
           <AssessmentSchemaAnswerPathTreeSelect
             :model-value="getAnswersDependencyValue(getAdjustableWeight().on)"
             :tree="answerPathTree"
@@ -430,10 +430,10 @@ watch(
           v-for="(row, rowIndex) in adjustableWeightRows"
           :key="row.id"
           class="grid grid-cols-[1fr_1fr_auto] gap-2">
-          <UFormField :label="t('transfer_payment.score_key')">
+          <UFormField :label="t('transfer_payment.score_key')" data-ui-target="assessment-schema.weight-editor.transfer_payment.score_key">
             <UInput v-model="row.score" />
           </UFormField>
-          <UFormField :label="t('common.weight')">
+          <UFormField :label="t('common.weight')" data-ui-target="assessment-schema.weight-editor.adjustable.score-weight">
             <UInput v-model.number="row.value" type="number" />
           </UFormField>
           <CommonActionButton
@@ -446,7 +446,7 @@ watch(
 
     <div v-else class="space-y-4">
       <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <UFormField :label="t('transfer_payment.base_weight')">
+        <UFormField :label="t('transfer_payment.base_weight')" data-ui-target="assessment-schema.weight-editor.transfer_payment.base_weight">
           <UInput v-model.number="getAdjustableArrayWeight()[0]" type="number" />
         </UFormField>
 
@@ -472,7 +472,7 @@ watch(
         </div>
 
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <UFormField :label="t('transfer_payment.dependency_type')" required>
+          <UFormField :label="t('transfer_payment.dependency_type')" required data-ui-target="assessment-schema.weight-editor.scenario.dependency-type">
             <USelect
               :model-value="scenario.on.type"
               :items="[
@@ -484,13 +484,13 @@ watch(
               @update:model-value="value => updateScenarioAdjustableType(scenarioIndex, value)" />
           </UFormField>
 
-          <UFormField v-if="scenario.on.type === 'helpers'" :label="t('transfer_payment.helper_field')" required>
+          <UFormField v-if="scenario.on.type === 'helpers'" :label="t('transfer_payment.helper_field')" required data-ui-target="assessment-schema.weight-editor.scenario.helper-field">
             <AssessmentSchemaHelperFieldSelect v-model="scenario.on.field" />
           </UFormField>
         </div>
 
         <div v-if="scenario.on.type === 'answers'" class="grid grid-cols-1 gap-3">
-          <UFormField :label="t('transfer_payment.assessment_item')" required>
+          <UFormField :label="t('transfer_payment.assessment_item')" required data-ui-target="assessment-schema.weight-editor.scenario.assessment-item">
             <AssessmentSchemaAnswerPathTreeSelect
               :model-value="getAnswersDependencyValue(scenario.on)"
               :tree="answerPathTree"
@@ -515,10 +515,10 @@ watch(
             v-for="(row, rowIndex) in ensureScenarioRows(scenario)"
             :key="row.id"
             class="grid grid-cols-[1fr_1fr_auto] gap-2">
-            <UFormField :label="t('transfer_payment.score_key')">
+            <UFormField :label="t('transfer_payment.score_key')" data-ui-target="assessment-schema.weight-editor.scenario.score-key">
               <UInput v-model="row.score" @update:model-value="updateArrayWeightRows(scenario)" />
             </UFormField>
-            <UFormField :label="t('common.weight')">
+            <UFormField :label="t('common.weight')" data-ui-target="assessment-schema.weight-editor.scenario.score-weight">
               <UInput v-model.number="row.value" type="number" @update:model-value="updateArrayWeightRows(scenario)" />
             </UFormField>
             <CommonActionButton

@@ -13,7 +13,7 @@ const field = useFormFieldPath(() => namePrefix)
 </script>
 
 <template>
-  <UFormField :label="t('transfer_payment.agency_holdback_basis')" :name="field('egcs_tp_agencyholdback')" required>
+  <UFormField :label="t('transfer_payment.agency_holdback_basis')" :name="field('egcs_tp_agencyholdback')" required data-field-scope="transfer-payment.fields.stream-holdback-basis-fields">
     <CommonServerLookupSelect
       v-model="model.egcs_tp_agencyholdback"
       :fetch-url="lookupUrl"

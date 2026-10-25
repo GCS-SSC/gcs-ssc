@@ -62,7 +62,7 @@ const selectedGroup = computed({
 </script>
 
 <template>
-  <div v-if="step" class="space-y-6">
+  <div v-if="step" class="space-y-6" data-field-scope="common.approval-templates.step-fields">
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
       <UFormField :label="t('common.order')" name="step.egcs_cn_sequence">
         <UInput v-model="step.egcs_cn_sequence" type="number" />
@@ -82,7 +82,7 @@ const selectedGroup = computed({
       <UFormField :label="t('admin_common.fields.egcs_cn_description_fr')" name="step.egcs_cn_description_fr" required>
         <CommonTextarea v-model="step.egcs_cn_description_fr" :rows="3" />
       </UFormField>
-      <UFormField :label="t('groups.assignee_type')" required>
+      <UFormField :label="t('groups.assignee_type')" required data-ui-target="common.approval-templates.step-fields.groups.assignee_type">
         <USelect v-model="assigneeKind" :items="[{ label: t('groups.user'), value: 'user' }, { label: t('groups.group'), value: 'group' }]" />
       </UFormField>
       <UFormField v-if="assigneeKind === 'user'" :label="t('admin_common.fields.egcs_cn_defaultuser')" name="step.egcs_cn_defaultuser" required>
@@ -120,14 +120,14 @@ const selectedGroup = computed({
           level="sub">
           <div class="space-y-6">
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <UFormField :label="t('common.order')" :name="`step.certifications.${sourceIndex}.egcs_cn_order`">
+              <UFormField :label="t('common.order')" :name="`step.certifications.${sourceIndex}.egcs_cn_order`" data-ui-target="common.approval-templates.step-fields.step.certifications.egcs_cn_order">
                 <UInput v-model="certification.egcs_cn_order" type="number" />
               </UFormField>
               <div class="flex items-end gap-3">
                 <UFormField
                   class="flex-1"
                   :label="t('admin_common.fields.egcs_cn_optional')"
-                  :name="`step.certifications.${sourceIndex}.egcs_cn_optional`">
+                  :name="`step.certifications.${sourceIndex}.egcs_cn_optional`" data-ui-target="common.approval-templates.step-fields.step.certifications.egcs_cn_optional">
                   <USwitch v-model="certification.egcs_cn_optional" />
                 </UFormField>
                 <CommonActionButton
@@ -141,22 +141,22 @@ const selectedGroup = computed({
             </div>
 
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <UFormField :label="t('admin_common.fields.egcs_cn_name_en')" :name="`step.certifications.${sourceIndex}.egcs_cn_name_en`" required>
+              <UFormField :label="t('admin_common.fields.egcs_cn_name_en')" :name="`step.certifications.${sourceIndex}.egcs_cn_name_en`" required data-ui-target="common.approval-templates.step-fields.step.certifications.egcs_cn_name_en">
                 <UInput v-model="certification.egcs_cn_name_en" />
               </UFormField>
-              <UFormField :label="t('admin_common.fields.egcs_cn_name_fr')" :name="`step.certifications.${sourceIndex}.egcs_cn_name_fr`" required>
+              <UFormField :label="t('admin_common.fields.egcs_cn_name_fr')" :name="`step.certifications.${sourceIndex}.egcs_cn_name_fr`" required data-ui-target="common.approval-templates.step-fields.step.certifications.egcs_cn_name_fr">
                 <UInput v-model="certification.egcs_cn_name_fr" />
               </UFormField>
-              <UFormField :label="t('admin_common.fields.egcs_cn_description_en')" :name="`step.certifications.${sourceIndex}.egcs_cn_description_en`" required>
+              <UFormField :label="t('admin_common.fields.egcs_cn_description_en')" :name="`step.certifications.${sourceIndex}.egcs_cn_description_en`" required data-ui-target="common.approval-templates.step-fields.step.certifications.egcs_cn_description_en">
                 <CommonTextarea v-model="certification.egcs_cn_description_en" :rows="2" />
               </UFormField>
-              <UFormField :label="t('admin_common.fields.egcs_cn_description_fr')" :name="`step.certifications.${sourceIndex}.egcs_cn_description_fr`" required>
+              <UFormField :label="t('admin_common.fields.egcs_cn_description_fr')" :name="`step.certifications.${sourceIndex}.egcs_cn_description_fr`" required data-ui-target="common.approval-templates.step-fields.step.certifications.egcs_cn_description_fr">
                 <CommonTextarea v-model="certification.egcs_cn_description_fr" :rows="2" />
               </UFormField>
-              <UFormField :label="t('admin_common.fields.egcs_cn_certification_en')" :name="`step.certifications.${sourceIndex}.egcs_cn_certification_en`" required>
+              <UFormField :label="t('admin_common.fields.egcs_cn_certification_en')" :name="`step.certifications.${sourceIndex}.egcs_cn_certification_en`" required data-ui-target="common.approval-templates.step-fields.step.certifications.egcs_cn_certification_en">
                 <CommonTextarea v-model="certification.egcs_cn_certification_en" :rows="3" />
               </UFormField>
-              <UFormField :label="t('admin_common.fields.egcs_cn_certification_fr')" :name="`step.certifications.${sourceIndex}.egcs_cn_certification_fr`" required>
+              <UFormField :label="t('admin_common.fields.egcs_cn_certification_fr')" :name="`step.certifications.${sourceIndex}.egcs_cn_certification_fr`" required data-ui-target="common.approval-templates.step-fields.step.certifications.egcs_cn_certification_fr">
                 <CommonTextarea v-model="certification.egcs_cn_certification_fr" :rows="3" />
               </UFormField>
             </div>

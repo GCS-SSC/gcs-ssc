@@ -389,7 +389,7 @@ const save = async (_event: FormSubmitEvent<FundingHistoryFormState>) => {
     v-model:open="open"
     :title="t(history ? 'applicant_recipient.funding_history.wizard.edit_title' : 'applicant_recipient.funding_history.wizard.create_title')"
     fullscreen
-    :ui="{ content: 'rounded-none shadow-none ring-0' }">
+    :ui="{ content: 'rounded-none shadow-none ring-0' }" data-field-scope="applicant-recipient.funding-history-wizard-modal">
     <template #body>
       <UForm v-if="state" :state="state" :validate="validate" class="flex h-full flex-col lg:flex-row" @submit="save">
         <CommonWizardShell
@@ -427,7 +427,7 @@ const save = async (_event: FormSubmitEvent<FundingHistoryFormState>) => {
               </div>
 
               <div v-for="(_recipientId, index) in state.recipientIds.slice(1)" :key="index" class="flex items-end gap-2">
-                <UFormField class="min-w-0 flex-1" :label="t('applicant_recipient.funding_history.fields.additional_recipient')" :name="`recipientIds.${index + 1}`">
+                <UFormField class="min-w-0 flex-1" :label="t('applicant_recipient.funding_history.fields.additional_recipient')" :name="`recipientIds.${index + 1}`" data-ui-target="applicant-recipient.funding-history-wizard-modal.recipientIds">
                   <CommonServerLookupSelect
                     v-model="state.recipientIds[index + 1]"
                     :fetch-url="`/api/applicant-recipients/${applicantRecipientId}/funding-history/lookups/recipients`"
@@ -588,6 +588,6 @@ const save = async (_event: FormSubmitEvent<FundingHistoryFormState>) => {
   <ApplicantRecipientFundingHistorySimilarityDialog
     v-model:open="isWarningOpen"
     :warnings="warnings"
-    @confirm="confirmWarnings"
-    @back="continueAfterWarning = null" />
+    data-field-scope="applicant-recipient.funding-history-wizard-modal"
+    @confirm="confirmWarnings" @back="continueAfterWarning = null" />
 </template>

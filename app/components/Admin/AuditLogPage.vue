@@ -112,7 +112,7 @@ const isHeroCollapsed = getHeroCollapsed(panelId.value)
       </div>
       <AdminAuditAccessHistory v-if="kind === 'access'" :query="query" :context-key="permissionRevision" @select="openDetail">
         <template #filters>
-          <AdminAuditLogFilters v-model="filters" :kind="kind" />
+          <AdminAuditLogFilters v-model="filters" data-field-container="Composite editor; its individual field declarations own their identities." :kind="kind" />
         </template>
       </AdminAuditAccessHistory>
       <CommonResourceLayoutPage
@@ -120,7 +120,7 @@ const isHeroCollapsed = getHeroCollapsed(panelId.value)
         v-model:pagination="pagination"
         :data="rows" :columns="columns" :total-records="totalRecords" :request-status="status" :show-search="false" :show-button="false" @retry="refresh()">
         <template #filters>
-          <AdminAuditLogFilters v-model="filters" :kind="kind" />
+          <AdminAuditLogFilters v-model="filters" data-field-container="Composite editor; its individual field declarations own their identities." :kind="kind" />
         </template>
         <template #actions-cell="{ row }">
           <div class="flex justify-end gap-2">

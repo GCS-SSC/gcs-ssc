@@ -10,7 +10,7 @@ watch([() => kind, data], () => {
 </script>
 
 <template>
-  <UFormField :label="showLabel ? t('audit.table') : undefined">
+  <UFormField :label="showLabel ? t('audit.table') : undefined" data-ui-target="admin.audit-table-filter.audit.table" data-field-scope="admin.audit-table-filter">
     <CommonBilingualSelectMenu
       :model-value="model || 'all'" :items="items" value-key="value" label-key="label"
       :aria-label="t('audit.table')"

@@ -271,7 +271,7 @@ const createAmendment = async () => {
 </script>
 
 <template>
-  <div class="w-full">
+  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.amendments-tab" data-scope-label-en="Agreements > Amendments" data-scope-label-fr="Ententes > Modifications">
     <UAlert
       v-if="canCreate && hasOpenAmendment"
       class="mb-4"
@@ -353,10 +353,10 @@ const createAmendment = async () => {
       <template #body>
         <form class="space-y-4" @submit.prevent="createAmendment">
           <div class="grid gap-4 md:grid-cols-2">
-            <UFormField :label="t('agreement.amendments.name_en')">
+            <UFormField :label="t('agreement.amendments.name_en')" data-ui-target="agreement.amendments-tab.agreement.amendments.name_en">
               <UInput v-model="amendmentNameEn" :aria-describedby="nameRequirementId" class="w-full" />
             </UFormField>
-            <UFormField :label="t('agreement.amendments.name_fr')">
+            <UFormField :label="t('agreement.amendments.name_fr')" data-ui-target="agreement.amendments-tab.agreement.amendments.name_fr">
               <UInput v-model="amendmentNameFr" :aria-describedby="nameRequirementId" class="w-full" />
             </UFormField>
           </div>
@@ -366,7 +366,7 @@ const createAmendment = async () => {
           <p class="text-sm text-zinc-600 dark:text-zinc-300">
             {{ t('agreement.amendments.type_help') }}
           </p>
-          <UFormField :label="t('agreement.amendments.type')" required>
+          <UFormField :label="t('agreement.amendments.type')" required data-ui-target="agreement.amendments-tab.agreement.amendments.type">
             <CommonServerLookupMultiSelect
               v-model="selectedTypeIds"
               :fetch-url="`/api/agreements/${agreementId}/amendments/lookups/types`"
@@ -379,7 +379,7 @@ const createAmendment = async () => {
           <UFormField
             v-if="selectedTypeIds.length > 0"
             :label="t('agreement.amendments.subtypes')"
-            :required="subtypeRequired">
+            :required="subtypeRequired" data-ui-target="agreement.amendments-tab.agreement.amendments.subtypes">
             <CommonServerLookupMultiSelect
               v-model="selectedSubtypeIds"
               :fetch-url="`/api/agreements/${agreementId}/amendments/lookups/subtypes`"

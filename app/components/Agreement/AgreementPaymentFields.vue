@@ -37,7 +37,7 @@ const monthOptions = computed(() => ['apr', 'may', 'jun', 'jul', 'aug', 'sep', '
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="space-y-4" data-field-tooltip-context="agreement" data-field-scope="agreement.payment-fields" data-scope-label-en="Agreements > Payments > General" data-scope-label-fr="Ententes > Paiements > Général">
     <UFormField :label="t('agreement.payments.payee')" name="egcs_fc_applicantrecipient" :description="t('agreement.payments.payee_description')">
       <CommonServerLookupSelect
         v-model="state.egcs_fc_applicantrecipient"

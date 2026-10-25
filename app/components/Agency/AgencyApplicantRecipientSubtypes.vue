@@ -27,7 +27,7 @@ const columns: TableColumnInput<AgencyApplicantRecipientSubtypeItem>[] = [
     :schema="AgencyApplicantRecipientSubtypeSchema"
     :columns="columns"
     status-enum-name="applicant_recipient_type"
-    :status-filter-label="t('common.all_subtypes')">
+    :status-filter-label="t('common.all_subtypes')" data-field-scope="agency.applicant-recipient-subtypes">
     <template #name-cell="{ row }">
       <CommonBilingualName :name-en="row.original.egcs_ay_name_en" :name-fr="row.original.egcs_ay_name_fr" />
     </template>

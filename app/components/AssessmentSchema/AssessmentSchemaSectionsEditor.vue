@@ -284,7 +284,7 @@ const getSortedSubSectionEntries = (section: SectionRow, sectionKey: string): Su
 </script>
 
 <template>
-  <AssessmentSchemaPageSection section-id="schema-sections" :title="t('transfer_payment.assessment_sections')" role="tabpanel" :aria-label="t('transfer_payment.assessment_sections')">
+  <AssessmentSchemaPageSection section-id="schema-sections" :title="t('transfer_payment.assessment_sections')" role="tabpanel" :aria-label="t('transfer_payment.assessment_sections')" data-field-scope="assessment-schema.sections-editor">
     <template #actions>
       <UButton
         icon="i-lucide-plus"
@@ -324,29 +324,29 @@ const getSortedSubSectionEntries = (section: SectionRow, sectionKey: string): Su
             </div>
 
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <UFormField :label="t('transfer_payment.name_en')" :name="`sections.${entry.sourceIndex}.label.en`">
+              <UFormField :label="t('transfer_payment.name_en')" :name="`sections.${entry.sourceIndex}.label.en`" data-ui-target="assessment-schema.sections-editor.sections.label.en">
                 <UInput v-model="entry.section.label.en" />
               </UFormField>
 
-              <UFormField :label="t('transfer_payment.name_fr')" :name="`sections.${entry.sourceIndex}.label.fr`">
+              <UFormField :label="t('transfer_payment.name_fr')" :name="`sections.${entry.sourceIndex}.label.fr`" data-ui-target="assessment-schema.sections-editor.sections.label.fr">
                 <UInput v-model="entry.section.label.fr" />
               </UFormField>
             </div>
 
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <UFormField :label="t('common.order')" :name="`sections.${entry.sourceIndex}.number`">
+              <UFormField :label="t('common.order')" :name="`sections.${entry.sourceIndex}.number`" data-ui-target="assessment-schema.sections-editor.sections.number">
                 <UInput v-model="entry.section.number" />
               </UFormField>
 
-              <UFormField :label="t('common.weight')" :name="`sections.${entry.sourceIndex}.weight`">
+              <UFormField :label="t('common.weight')" :name="`sections.${entry.sourceIndex}.weight`" data-ui-target="assessment-schema.sections-editor.sections.weight">
                 <UInput v-model.number="entry.section.weight" type="number" />
               </UFormField>
 
-              <UFormField :label="t('transfer_payment.language_independent_code')" :name="`sections.${entry.sourceIndex}.name`">
+              <UFormField :label="t('transfer_payment.language_independent_code')" :name="`sections.${entry.sourceIndex}.name`" data-ui-target="assessment-schema.sections-editor.sections.name">
                 <UInput v-model="entry.section.name" />
               </UFormField>
 
-              <UFormField :label="t('common.icon')" :name="`sections.${entry.sourceIndex}.icon`">
+              <UFormField :label="t('common.icon')" :name="`sections.${entry.sourceIndex}.icon`" data-ui-target="assessment-schema.sections-editor.sections.icon">
                 <UPopover>
                   <UButton color="neutral" variant="outline" class="w-full cursor-default justify-start">
                     <template #leading>

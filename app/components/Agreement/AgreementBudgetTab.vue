@@ -882,7 +882,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
 </script>
 
 <template>
-  <div class="w-full">
+  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.budget-tab" data-scope-label-en="Agreements > Budget" data-scope-label-fr="Ententes > Budget">
     <CommonResourceLayoutCard
       v-model:search="search"
       v-model:pagination="pagination"
@@ -1189,7 +1189,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
 
     <UModal
       v-if="selectedFiscalYear"
-      v-model:open="isFiscalYearModalOpen"
+      v-model:open="isFiscalYearModalOpen" data-field-scope="agreement.budget-tab" data-scope-label-en="Agreements > Budget > Fiscal years" data-scope-label-fr="Ententes > Budget > Exercices financiers"
       :title="selectedFiscalYear.id ? t('agreement.budget.edit_fiscal_year') : t('agreement.budget.add_fiscal_year')">
       <template #body>
         <UForm :state="selectedFiscalYear" :validate="validateFiscalYear" :validate-on="[]" class="space-y-4" @submit="saveFiscalYear">
@@ -1219,7 +1219,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
 
     <UModal
       v-if="selectedLineItem"
-      v-model:open="isLineItemModalOpen"
+      v-model:open="isLineItemModalOpen" data-field-scope="agreement.budget-tab" data-scope-label-en="Agreements > Budget > Line items" data-scope-label-fr="Ententes > Budget > Lignes budgétaires"
       :title="selectedLineItem.id ? t('agreement.budget.edit_line_item') : t('agreement.budget.add_line_item')"
       :ui="{ content: 'sm:max-w-4xl', body: 'max-h-[75vh] overflow-y-auto' }">
       <template #body>
@@ -1283,7 +1283,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
                 class="w-full" />
             </UFormField>
 
-            <AgreementBudgetCalculationFields v-model="selectedLineItem" :preview="calculationPreview" />
+            <AgreementBudgetCalculationFields v-model="selectedLineItem" data-field-container="Composite editor; its individual field declarations own their identities." :preview="calculationPreview" />
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:col-span-2">
               <UFormField :label="t('agreement.budget.total_amount')" name="egcs_fc_totalamount">
                 <CommonCurrencyInput
@@ -1301,6 +1301,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
             </div>
             <AgreementFundingSourcesEditor
               v-if="!selectedLineItem.id"
+              data-field-container="Composite editor; its individual field declarations own their identities."
               :model-value="selectedLineItem.egcs_fc_fundingsources ?? []"
               :agreement-id="agreementId"
               :currency="selectedLineItem.egcs_fc_currency!"

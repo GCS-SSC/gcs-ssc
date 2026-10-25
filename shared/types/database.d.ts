@@ -537,6 +537,7 @@ export interface Database extends ExtensionsDatabase, AuditDatabase {
   Common_Completion: CommonCompletionTable
   Common_Guided_Help: CommonGuidedHelpTable
   Agency_Guided_Help: AgencyGuidedHelpTable
+  Agency_Field_Tooltip: AgencyFieldTooltipTable
   Common_Publication: CommonPublicationTable
   Common_Publication_Version: CommonPublicationVersionTable
   Common_Publication_Version_Reference: CommonPublicationVersionReferenceTable
@@ -733,7 +734,7 @@ export interface RoleTable {
 export interface RolePermissionTable {
   id: Generated<string>
   role_id: string
-  subject: 'guided_help' | 'audit' | 'system' | 'agency' | 'transfer_payment' | 'role' | 'user' | 'group' | 'agreement' | 'applicant_recipient' | 'funding_case' | 'journal_voucher' | 'correction' | 'account_receivable'
+  subject: 'help' | 'audit' | 'system' | 'agency' | 'transfer_payment' | 'role' | 'user' | 'group' | 'agreement' | 'applicant_recipient' | 'funding_case' | 'journal_voucher' | 'correction' | 'account_receivable'
   access_level: 'viewer' | 'contributor' | 'manager' | null
   can_manage_assignments: Generated<boolean>
   _deleted: Generated<boolean>
@@ -2942,5 +2943,21 @@ export interface AgencyGuidedHelpTable {
   egcs_ay_discoveryscreens: JsonValue
   egcs_ay_roles: JsonValue
   egcs_ay_enabled: Generated<boolean>
+  _deleted: Generated<boolean>
+}
+
+/** Agency-authored plain text help; snapshots survive missing targets. */
+export interface AgencyFieldTooltipTable {
+  id: Generated<string>
+  egcs_ay_agency: string
+  egcs_ay_targetkey: string
+  egcs_ay_text_en: string
+  egcs_ay_text_fr: string
+  egcs_ay_enabled: boolean
+  egcs_ay_label_en: string
+  egcs_ay_label_fr: string
+  egcs_ay_screen_en: string
+  egcs_ay_screen_fr: string
+  egcs_ay_extension: string | null
   _deleted: Generated<boolean>
 }

@@ -30,6 +30,7 @@ const { t } = useI18n()
     <div class="space-y-5 pt-6">
       <CommonRouteTabs
         v-model="selectedSection"
+        data-field-container="Page navigation state, not a business input field."
         :items="sectionTabs"
         :sort="sort"
         orientation="vertical"

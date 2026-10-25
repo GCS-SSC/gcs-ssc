@@ -98,6 +98,7 @@ const onJumpToStep = (value: string) => {
   <div class="flex h-full w-full flex-col lg:flex-row" :aria-busy="pending">
     <div class="flex min-w-0 flex-1 flex-col overflow-hidden p-6">
       <UStepper
+        data-field-container="Page navigation state, not a business input field."
         :model-value="currentStep"
         :items="steps"
         :disabled="pending"

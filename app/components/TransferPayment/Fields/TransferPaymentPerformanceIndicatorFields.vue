@@ -32,7 +32,7 @@ const field = useFormFieldPath(() => namePrefix)
 </script>
 
 <template>
-  <UFormField v-if="outcomeField" :label="t('transfer_payment.outcomes')" :name="field(outcomeField)">
+  <UFormField v-if="outcomeField" :label="t('transfer_payment.outcomes')" :name="field(outcomeField)" data-ui-target="transfer-payment.fields.performance-indicator-fields.field-outcomeField" data-field-scope="transfer-payment.fields.performance-indicator-fields">
     <CommonBilingualSelectMenu
       v-model="model[outcomeField as keyof typeof model]"
       :items="outcomes"
@@ -42,7 +42,7 @@ const field = useFormFieldPath(() => namePrefix)
       searchable />
   </UFormField>
 
-  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }">
+  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }" data-field-scope="transfer-payment.fields.performance-indicator-fields">
     <UFormField :label="t('transfer_payment.name_en')" :name="field('egcs_tp_name_en')">
       <UInput v-model="model.egcs_tp_name_en" />
     </UFormField>
@@ -50,7 +50,7 @@ const field = useFormFieldPath(() => namePrefix)
       <UInput v-model="model.egcs_tp_name_fr" />
     </UFormField>
   </div>
-  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }">
+  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }" data-field-scope="transfer-payment.fields.performance-indicator-fields">
     <UFormField :label="t('transfer_payment.description_en')" :name="field('egcs_tp_description_en')">
       <CommonTextarea v-model="model.egcs_tp_description_en" :rows="2" />
     </UFormField>

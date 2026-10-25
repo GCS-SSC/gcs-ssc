@@ -8,7 +8,7 @@ const { t, locale } = useI18n()
 </script>
 
 <template>
-  <div v-if="state.egcs_fc_calculationmode && state.egcs_fc_calculationmode !== 'manual'" class="space-y-3 lg:col-span-2">
+  <div v-if="state.egcs_fc_calculationmode && state.egcs_fc_calculationmode !== 'manual'" class="space-y-3 lg:col-span-2" data-field-tooltip-context="agreement" data-field-scope="agreement.budget-calculation-fields" data-scope-label-en="Agreements > Budget > Calculation" data-scope-label-fr="Ententes > Budget > Calcul">
     <p class="text-sm text-muted">
       {{ t(`budget_calculation.${state.egcs_fc_calculationmode}`) }} {{ t('budget_calculation.program_only') }}
     </p>

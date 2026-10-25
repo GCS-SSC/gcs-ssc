@@ -191,7 +191,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-6" data-field-scope="transfer-payment.streams-tab">
     <CommonResourceLayoutCard
       v-model:search="streamSearch"
       v-model:status-filter="streamStatus"
@@ -211,7 +211,7 @@ onBeforeUnmount(() => {
           v-model="streamStatus"
           :items="availabilityItems"
           :aria-label="t('common.status_filter')"
-          class="min-w-40" />
+          class="min-w-40" data-ui-target="transfer-payment.streams-tab.streamStatus" />
       </template>
       <template #actions>
         <UButton

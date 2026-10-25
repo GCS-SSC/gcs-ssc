@@ -490,7 +490,7 @@ const deleteMember = async (member: WorkflowMember) => {
 </script>
 
 <template>
-  <CommonDetailPage id="agency-workflow-setup-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems">
+  <CommonDetailPage id="agency-workflow-setup-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" data-field-scope="agency.workflow-setup-detail-page">
     <template #body>
       <div
         v-if="loadError"
@@ -544,7 +544,8 @@ const deleteMember = async (member: WorkflowMember) => {
           <CommonDesignTimeEditorShell>
             <template #sidebar>
               <AssessmentSchemaDetailSidebar
-                v-model="selectedSection" :section-tabs="sectionTabs" :sort="false" :show-save="canUpdate && !flowOnly"
+                v-model="selectedSection"
+                data-field-container="Composite editor; its individual field declarations own their identities." :section-tabs="sectionTabs" :sort="false" :show-save="canUpdate && !flowOnly"
                 :is-saving="isSaving" :disabled="mutation.isPending.value"
                 :ui="{ trigger: 'h-8 min-h-8 justify-start py-1 whitespace-normal break-words text-left' }"
                 @save="save" />
@@ -626,6 +627,7 @@ const deleteMember = async (member: WorkflowMember) => {
                       </div>
                       <div class="mt-3 border-t border-zinc-200 pt-3 dark:border-zinc-800">
                         <TransferPaymentWorkflowConditions
+                          data-field-container="Composite editor; its individual field declarations own their identities."
                           :model-value="member.conditions ?? []" readonly
                           :entity-type="state.egcs_cn_entitytype" :custom-fields="conditionFields?.items ?? []"
                           :choices="conditionChoices ?? {}" :load-error="Boolean(conditionFieldsError || conditionChoicesError)"
@@ -685,7 +687,7 @@ const deleteMember = async (member: WorkflowMember) => {
     v-if="!loadError"
     v-model:open="isMemberOpen"
     :title="selectedMember?.id ? t('workflow.edit_member') : t('workflow.add_member')"
-    :ui="{ content: 'sm:max-w-4xl' }">
+    :ui="{ content: 'sm:max-w-4xl' }" data-field-scope="agency.workflow-setup-detail-page">
     <template #body>
       <UForm v-if="selectedMember" :state="selectedMember" :validate="validateMember" @submit="saveMember">
         <fieldset :disabled="mutation.isPending.value || isNestedMembersLoading" class="space-y-4">
@@ -742,7 +744,7 @@ const deleteMember = async (member: WorkflowMember) => {
             <div v-for="(nested, index) in nestedMembers" :key="nested.id" class="space-y-2" data-testid="workflow-default-owner">
               <UFormField
                 :label="t('workflow.default_owner')" :description="getBilingualValue(nested, 'egcs_cn_name') || `${t('workflow.step')} ${index + 1}`" :required="false"
-                :ui="{ label: 'text-sm font-medium normal-case tracking-normal text-default mb-1.5' }">
+                :ui="{ label: 'text-sm font-medium normal-case tracking-normal text-default mb-1.5' }" data-ui-target="agency.workflow-setup-detail-page.workflow.default_owner">
                 <USwitch
                   :model-value="groupOwnerModes[nested.id] === true" :label="t('workflow.assign_to_group')"
                   @update:model-value="setGroupOwnerMode(nested.id, index, $event)" />
@@ -750,7 +752,7 @@ const deleteMember = async (member: WorkflowMember) => {
               <UFormField
                 v-if="groupOwnerModes[nested.id]"
                 :label="t('groups.group')" :description="t('workflow.default_group_help')"
-                :name="`owners.${index}.egcs_cn_defaultgroup`" required>
+                :name="`owners.${index}.egcs_cn_defaultgroup`" required data-ui-target="agency.workflow-setup-detail-page.owners.egcs_cn_defaultgroup">
                 <CommonServerLookupSelect
                   v-model="selectedMember.owners![index]!.egcs_cn_defaultgroup"
                   :fetch-url="`/api/groups/lookups?workflowSetupId=${workflowSetupId}`"
@@ -759,7 +761,7 @@ const deleteMember = async (member: WorkflowMember) => {
               </UFormField>
               <UFormField
                 v-else :label="t('groups.user')" :description="t('workflow.default_owner_help')"
-                :name="`owners.${index}.egcs_cn_defaultowner`">
+                :name="`owners.${index}.egcs_cn_defaultowner`" data-ui-target="agency.workflow-setup-detail-page.owners.egcs_cn_defaultowner">
                 <CommonServerLookupSelect
                   v-model="selectedMember.owners![index]!.egcs_cn_defaultowner"
                   :fetch-url="`/api/users/lookups?workflowSetupId=${workflowSetupId}&status=active`"
@@ -780,12 +782,13 @@ const deleteMember = async (member: WorkflowMember) => {
     v-if="!loadError"
     v-model:open="isConditionsOpen"
     :title="t('workflow.conditions.edit_member', { sequence: selectedConditions?.sequence ?? '' })"
-    :ui="{ content: 'sm:max-w-2xl' }">
+    :ui="{ content: 'sm:max-w-2xl' }" data-field-scope="agency.workflow-setup-detail-page">
     <template #body>
       <UForm v-if="selectedConditions" :state="selectedConditions" :validate="validateConditions" @submit="saveConditions">
         <fieldset :disabled="mutation.isPending.value" class="space-y-4">
           <TransferPaymentWorkflowConditions
-            v-model="selectedConditions.conditions" :entity-type="state?.egcs_cn_entitytype ?? ''"
+            v-model="selectedConditions.conditions"
+            data-field-container="Composite editor; its individual field declarations own their identities." :entity-type="state?.egcs_cn_entitytype ?? ''"
             :custom-fields="conditionFields?.items ?? []" :choices="conditionChoices ?? {}"
             :load-error="Boolean(conditionFieldsError || conditionChoicesError)" @retry="retryConditionCatalogs" />
           <div class="flex justify-end gap-2">

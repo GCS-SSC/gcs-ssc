@@ -50,7 +50,7 @@ const canSubmit = computed(() => Boolean(state
     v-model:open="open"
     :dismissible="!isSubmitting"
     :title="t('assessment.approvals.reassign')"
-    :description="t('assessment.approvals.reassign_description')">
+    :description="t('assessment.approvals.reassign_description')" data-field-exclude="Runtime approval assignments are outside configurable field help.">
     <template #content>
       <div
         v-if="state && step"

@@ -333,7 +333,7 @@ const deleteCommitment = (recordId: string) => runRecordAction(recordId, 'delete
 </script>
 
 <template>
-  <div class="w-full">
+  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.commitments-tab" data-scope-label-en="Agreements > Commitments" data-scope-label-fr="Ententes > Engagements">
     <CommonResourceLayoutCard
       v-model:search="search"
       v-model:pagination="pagination"

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import type { Ref } from 'vue'
@@ -64,6 +65,10 @@ const createForm = (): FundingCaseAgreementProfileForm => ({
 })
 
 const form: Ref<FundingCaseAgreementProfileForm | null> = ref(null)
+useFieldTooltipProvider(() => form.value?.egcs_fc_transferpaymentstream
+  ? { entityType: 'agreement_create', entityId: form.value.egcs_fc_transferpaymentstream }
+  : null)
+
 const isSaving: Ref<boolean> = ref(false)
 const numberMode: Ref<'manual' | 'generated' | null> = ref(null)
 const numberModeFailed: Ref<boolean> = ref(false)

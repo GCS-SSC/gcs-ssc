@@ -20,7 +20,7 @@ import { clearHelpPicker, readHelpPicker, saveHelpPicker } from '~/utils/guided-
 import { appRouteLocations } from '~/utils/route-locations'
 import { GuideObservedContextSchema } from '@gcs-ssc/guided-help/runtime'
 import type { GuideActionSignal, GuideObservedContext, GuidePresentation, GuideTargetRef } from '@gcs-ssc/guided-help/runtime'
-import { guidedHelpLedger } from '~~/shared/guided-help/catalog'
+import { guidedHelpLedger } from '#ui-targets'
 
 const { t, locale } = useI18n()
 const { user } = useAuth()

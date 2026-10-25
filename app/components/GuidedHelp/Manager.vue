@@ -11,7 +11,7 @@ import type { HelpAttribution, HelpCatalog, HelpGuide, HelpOption, HelpVersion }
 import { clearHelpPicker, readHelpPicker, saveHelpPicker } from '~/utils/guided-help-picker'
 import { GuidedHelpCatalogSettingsSchema } from '~~/shared/types/schemas/guided-help'
 import { checkHostGuideCompatibility } from '~~/shared/guided-help/journeys'
-import { guidedHelpLedger } from '~~/shared/guided-help/catalog'
+import { guidedHelpLedger } from '#ui-targets'
 import type { PublisherGroup } from '~/utils/guided-help-publisher'
 import { appRouteLocations } from '~/utils/route-locations'
 
@@ -59,10 +59,10 @@ const pending = computed(() => pendingAction.value !== null)
 const loadError = ref(false)
 let generation = 0
 const scope = computed(() => context.value === 'system' ? { type: 'global' as const } : { type: 'agency' as const, agencyId: context.value })
-const canEdit = computed(() => Boolean(context.value) && can('guided_help', 'update', scope.value))
+const canEdit = computed(() => Boolean(context.value) && can('help', 'update', scope.value))
 const guideDirty = computed(() => Boolean(selected.value) && (JSON.stringify(GuideDraftSchema.safeParse(document.value).data) !== JSON.stringify(GuideDraftSchema.safeParse(selected.value?.egcs_cn_document).data) || sharedOffer.value !== selected.value?.egcs_cn_shared))
 const catalogDirty = computed(() => Boolean(selectedCatalog.value?.id) && JSON.stringify(settings.value) !== JSON.stringify(catalogDraft(selectedCatalog.value!)))
-const canDelete = computed(() => Boolean(context.value) && can('guided_help', 'delete', scope.value))
+const canDelete = computed(() => Boolean(context.value) && can('help', 'delete', scope.value))
 const agencyId = computed(() => context.value && context.value !== 'system' ? context.value : null)
 const ownedEndpoint = computed(() => `/api/guided-help${agencyId.value ? `?agencyId=${agencyId.value}` : ''}`)
 const catalogEndpoint = computed(() => `/api/agency/${agencyId.value}/guided-help`)
@@ -120,7 +120,7 @@ const initialize = async () => {
     contexts.value = options.items
     canSystem.value = options.canSystem
     if (!detail) {
-      groups.value = [...(options.canSystem ? [{ id: 'system', name: { en: '', fr: '' } }] : []), ...options.items].map(item => ({ ...item, guides: [], catalogs: [], loaded: false, loading: false, error: false, canEdit: can('guided_help', 'update', item.id === 'system' ? { type: 'global' } : { type: 'agency', agencyId: item.id }) }))
+      groups.value = [...(options.canSystem ? [{ id: 'system', name: { en: '', fr: '' } }] : []), ...options.items].map(item => ({ ...item, guides: [], catalogs: [], loaded: false, loading: false, error: false, canEdit: can('help', 'update', item.id === 'system' ? { type: 'global' } : { type: 'agency', agencyId: item.id }) }))
       const agency = options.items[0]
       offers.value = agency ? (await helpRequest<{ items: { id: string, document: GuideDraft, sourceVersionId: string, version: number, sourceAttribution?: HelpAttribution }[] }>(`/api/guided-help/shared?agencyId=${agency.id}`)).items.map(item => ({ id: item.id, sourceAttribution: item.sourceAttribution, egcs_cn_document: item.document, egcs_cn_shared: true, publicationState: 'published', versions: [{ id: item.sourceVersionId, version: item.version, document: item.document as HelpVersion['document'] }] })) : []
     }
@@ -394,7 +394,7 @@ watch([() => ('guideId' in route.params ? route.params.guideId : undefined), () 
 </script>
 
 <template>
-  <CommonDetailPage id="guided-help" v-model:collapsed="collapsed" :breadcrumb-items="breadcrumbItems">
+  <CommonDetailPage id="guided-help" v-model:collapsed="collapsed" :breadcrumb-items="breadcrumbItems" data-field-scope="guided-help.manager" data-field-tooltip-unavailable="No owning agency is resolved for this administration screen.">
     <template #body>
       <CommonPublicationDetailHero v-if="detail" :name="selectedTitle" :description="heroDescription" icon="i-lucide-book-open" :type-label-key="isCatalog ? 'guided_help.catalog' : 'guided_help.help'" :publication-state="state ?? 'draft'" :publication-version="publicationVersion" version-label-key="guided_help.version" :has-unpublished-changes="hasUnpublishedChanges" :is-collapsed="collapsed" :is-mutation-pending="pending" :is-publishing="pendingAction === 'publish'" :is-retiring="pendingAction === 'retire'" :can-manage="canEdit && Boolean(document || settings)" :can-retire="!isCatalog && canDelete" publish-label-key="common.publish" retire-label-key="common.retire" @publish="publishCurrent" @retire="guideAction('retire')">
         <template #actions>
@@ -421,7 +421,7 @@ watch([() => ('guideId' in route.params ? route.params.guideId : undefined), () 
         <template #sidebar>
           <aside class="w-full shrink-0 lg:sticky lg:top-6 lg:self-start lg:w-72 lg:border-r lg:border-default lg:pr-4">
             <div class="space-y-6 pt-6">
-              <CommonRouteTabs v-model="selectedTab" :items="tabs" :sort="false" orientation="vertical" external-panel-id="help-editor-panel" />
+              <CommonRouteTabs v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" :sort="false" orientation="vertical" external-panel-id="help-editor-panel" />
               <div class="space-y-3">
                 <p v-if="document" class="text-sm text-muted">
                   {{ t('guided_help.draft_explanation') }}
@@ -438,15 +438,15 @@ watch([() => ('guideId' in route.params ? route.params.guideId : undefined), () 
             <div v-if="document" class="space-y-8">
               <CommonDetailSection v-if="document && selectedTab === 'general'" :title="t(selectedTabKey)">
                 <UForm ref="guideForm" :state="document" :validate="validateDraft" novalidate @submit="saveGuide" @error="focusDraftError">
-                  <GuidedHelpPublisherFields v-model="document" section="general" :disabled="!canEdit || pending || state === 'retired'" @pick="pick">
+                  <GuidedHelpPublisherFields v-model="document" data-field-container="Composite editor; its individual field declarations own their identities." section="general" :disabled="!canEdit || pending || state === 'retired'" @pick="pick">
                     <template #sharing>
-                      <USwitch v-model="sharedOffer" :required="false" :label="t('guided_help.share_all')" :disabled="!canEdit || pending || state === 'retired'" />
+                      <USwitch v-model="sharedOffer" :required="false" :label="t('guided_help.share_all')" :disabled="!canEdit || pending || state === 'retired'" data-ui-target="guided-help.manager.sharedOffer" />
                     </template>
                   </GuidedHelpPublisherFields>
                 </UForm>
               </CommonDetailSection>
               <CommonDetailSection v-if="document && selectedTab === 'flow'" :title="t('guided_help.flow')" :description="t('guided_help.flow_description')">
-                <GuidedHelpPublisherFlow v-model="document" v-model:selected-step="selectedStep" :disabled="!canEdit || pending || state === 'retired'" @pick="pick" />
+                <GuidedHelpPublisherFlow v-model="document" v-model:selected-step="selectedStep" data-field-container="Composite editor; its individual field declarations own their identities." :disabled="!canEdit || pending || state === 'retired'" @pick="pick" />
               </CommonDetailSection>
               <CommonDetailSection v-if="selectedTab === 'history'" :title="t('guided_help.version_history')">
                 <GuidedHelpPublisherHistory :versions="selected?.versions ?? []" @preview="preview" />

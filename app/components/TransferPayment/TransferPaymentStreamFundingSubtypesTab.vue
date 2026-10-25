@@ -104,7 +104,7 @@ const remove = async (row: LinkedSubtype) => {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="space-y-4" data-field-scope="transfer-payment.stream-funding-subtypes-tab">
     <CommonResourceLayoutCard
       v-model:search="search"
       v-model:pagination="pagination"

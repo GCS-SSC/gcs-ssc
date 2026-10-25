@@ -52,7 +52,7 @@ const completeActiveHelp = async () => {
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="title" :description="t('common.form_dialog_description')">
+  <UModal v-model:open="open" :title="title" :description="t('common.form_dialog_description')" data-field-scope="agency.modal">
     <template #body>
       <UForm ref="helpForm" :data-help-context="JSON.stringify(helpContext)" :state="state" :validate="validate" class="space-y-4" data-help-view="agency.edit" @submit="onSubmit">
         <UFormField :label="t('agency.gwcoa_number')" name="egcs_ay_gwcoanumber">

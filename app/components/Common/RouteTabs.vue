@@ -60,6 +60,7 @@ const sortedItems = computed(() => {
 <template>
   <CommonTranslatedTabs
     v-model="modelValue"
+    data-field-container="Page navigation state, not a business input field."
     :items="sortedItems"
     :variant="variant"
     :size="size"

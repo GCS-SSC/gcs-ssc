@@ -16,7 +16,7 @@ const initialNewItem = { ...AgencyAgreementTypeInitial }
 </script>
 
 <template>
-  <section data-help-view="agency.agreement-types">
+  <section data-help-view="agency.agreement-types" data-field-scope="agency.agreement-types">
     <CommonResourceCrud
       help-add-target="agency.agreement-types.add"
       help-save-target="agency.agreement-types.save"

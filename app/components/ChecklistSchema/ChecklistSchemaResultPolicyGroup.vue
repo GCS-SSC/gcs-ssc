@@ -146,7 +146,7 @@ const questionLabel = (questionKey: string) => {
     class="border-default border-l-2 pl-4"
     :class="depth === 1 ? 'border-l-primary-500' : ''"
     data-testid="checklist-policy-group"
-    :data-depth="depth">
+    :data-depth="depth" data-field-scope="checklist-schema.result-policy-group">
     <header class="flex flex-wrap items-start justify-between gap-3 py-3">
       <button
         type="button"
@@ -179,21 +179,21 @@ const questionLabel = (questionKey: string) => {
 
     <div v-if="isExpanded" class="space-y-5 pb-6">
       <div class="grid gap-4 md:grid-cols-2">
-        <UFormField :label="t('checklist_schema.policy.group_name_en')" required>
+        <UFormField :label="t('checklist_schema.policy.group_name_en')" required data-ui-target="checklist-schema.result-policy-group.checklist_schema.policy.group_name_en">
           <UInput v-model="currentGroup.label.en" class="w-full" @blur="updateLabel('en', currentGroup.label.en)" />
         </UFormField>
-        <UFormField :label="t('checklist_schema.policy.group_name_fr')" required>
+        <UFormField :label="t('checklist_schema.policy.group_name_fr')" required data-ui-target="checklist-schema.result-policy-group.checklist_schema.policy.group_name_fr">
           <UInput v-model="currentGroup.label.fr" class="w-full" @blur="updateLabel('fr', currentGroup.label.fr)" />
         </UFormField>
-        <UFormField :label="t('checklist_schema.policy.result')" required>
+        <UFormField :label="t('checklist_schema.policy.result')" required data-ui-target="checklist-schema.result-policy-group.checklist_schema.policy.result">
           <CommonEnumSelect :model-value="currentGroup.result" name="review_type" :items="resultOptions" class="w-full" @update:model-value="updateResult($event)" />
         </UFormField>
-        <UFormField :label="t('checklist_schema.policy.mode')" required>
+        <UFormField :label="t('checklist_schema.policy.mode')" required data-ui-target="checklist-schema.result-policy-group.checklist_schema.policy.mode">
           <CommonEnumSelect :model-value="currentGroup.mode" name="review_type" :items="modeOptions" class="w-full" @update:model-value="updateMode($event)" />
         </UFormField>
         <UFormField
           v-if="currentGroup.mode === 'at_least_count' || currentGroup.mode === 'at_least_rate'"
-          :label="currentGroup.mode === 'at_least_rate' ? t('checklist_schema.policy.rate_threshold') : t('checklist_schema.policy.count_threshold')" required>
+          :label="currentGroup.mode === 'at_least_rate' ? t('checklist_schema.policy.rate_threshold') : t('checklist_schema.policy.count_threshold')" required data-ui-target="checklist-schema.result-policy-group.checklist_schema.policy.rate_threshold">
           <UInput
             :model-value="currentGroup.threshold"
             type="number"
@@ -205,7 +205,7 @@ const questionLabel = (questionKey: string) => {
       </div>
 
       <div class="flex flex-col gap-3 border-y border-zinc-200 py-4 sm:flex-row sm:items-end dark:border-zinc-800">
-        <UFormField :label="t('checklist_schema.policy.add_question')" class="min-w-0 flex-1">
+        <UFormField :label="t('checklist_schema.policy.add_question')" class="min-w-0 flex-1" data-ui-target="checklist-schema.result-policy-group.checklist_schema.policy.add_question">
           <CommonBilingualSelectMenu
             v-model="selectedQuestionKey"
             :items="availableQuestionOptions"
@@ -254,6 +254,7 @@ const questionLabel = (questionKey: string) => {
               <CommonActionButton icon="i-lucide-arrow-down" color="neutral" variant="ghost" class="cursor-default" :disabled="itemIndex === currentGroup.items.length - 1" :aria-label="t('checklist_schema.policy.move_group_down')" @click="moveItem(itemIndex, 1)" />
             </div>
             <ChecklistSchemaResultPolicyGroup
+              data-field-container="Composite editor; its individual field declarations own their identities."
               :model-value="nestedGroup(item)"
               :depth="depth + 1"
               :question-options="questionOptions"

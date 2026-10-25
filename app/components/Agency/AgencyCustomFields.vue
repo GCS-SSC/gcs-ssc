@@ -171,7 +171,7 @@ const remove = async (path: string) => {
 </script>
 
 <template>
-  <section class="space-y-4">
+  <section class="space-y-4" data-field-scope="agency.custom-fields">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <h2 v-if="showHeader" class="text-xl font-semibold">
         {{ t('custom_fields.title') }}
@@ -247,7 +247,7 @@ const remove = async (path: string) => {
 
     <UModal v-model:open="fieldModal.isOpen.value" :title="t('custom_fields.title')" :ui="{ content: 'sm:max-w-2xl' }">
       <template #body>
-        <UForm v-if="fieldModal.selected.value" :state="fieldModal.selected.value" :validate="createValidator(AgencyCustomFieldCreateSchema.strip())" class="space-y-4" @submit="saveField">
+        <UForm v-if="fieldModal.selected.value" data-field-scope="agency.custom-field" :state="fieldModal.selected.value" :validate="createValidator(AgencyCustomFieldCreateSchema.strip())" class="space-y-4" @submit="saveField">
           <UFormField :label="t('custom_fields.name_en')" name="egcs_ay_name_en" required>
             <UInput v-model="fieldModal.selected.value.egcs_ay_name_en" class="w-full" />
           </UFormField>
@@ -260,15 +260,15 @@ const remove = async (path: string) => {
           <UFormField v-if="fieldModal.selected.value.egcs_ay_kind === 'text'" :label="t('custom_fields.presentation')" name="egcs_ay_presentation">
             <USelect v-model="fieldModal.selected.value.egcs_ay_presentation" :items="[{ value: 'single_line', label: t('custom_fields.single_line') }, { value: 'multiline', label: t('custom_fields.multiline') }]" />
           </UFormField>
-          <UCheckbox v-if="fieldModal.selected.value.egcs_ay_kind === 'relational'" v-model="fieldModal.selected.value.egcs_ay_multiple" :disabled="multipleSelectionLocked" :label="t('custom_fields.allow_multiple')" :description="t('custom_fields.multiple_help')" />
-          <UCheckbox v-if="fieldModal.selected.value.egcs_ay_kind === 'relational'" v-model="fieldModal.selected.value.egcs_ay_discriminator" :label="t('custom_fields.discriminator')" />
+          <UCheckbox v-if="fieldModal.selected.value.egcs_ay_kind === 'relational'" v-model="fieldModal.selected.value.egcs_ay_multiple" :disabled="multipleSelectionLocked" :label="t('custom_fields.allow_multiple')" :description="t('custom_fields.multiple_help')" data-ui-target="agency.custom-field.egcs_ay_multiple" />
+          <UCheckbox v-if="fieldModal.selected.value.egcs_ay_kind === 'relational'" v-model="fieldModal.selected.value.egcs_ay_discriminator" :label="t('custom_fields.discriminator')" data-ui-target="agency.custom-field.egcs_ay_discriminator" />
           <CommonSaveButton :label="t('common.save')" :loading="saving" />
         </UForm>
       </template>
     </UModal>
     <UModal v-model:open="optionModal.isOpen.value" :title="t('custom_fields.add_option')" :ui="{ content: 'sm:max-w-2xl' }">
       <template #body>
-        <UForm v-if="optionModal.selected.value" :state="optionModal.selected.value" :validate="createValidator(AgencyCustomFieldOptionCreateSchema.strip())" class="space-y-4" @submit="saveOption">
+        <UForm v-if="optionModal.selected.value" data-field-scope="agency.custom-field-option" :state="optionModal.selected.value" :validate="createValidator(AgencyCustomFieldOptionCreateSchema.strip())" class="space-y-4" @submit="saveOption">
           <UFormField :label="t('custom_fields.name_en')" name="egcs_ay_name_en" required>
             <UInput v-model="optionModal.selected.value.egcs_ay_name_en" class="w-full" />
           </UFormField>
@@ -281,7 +281,7 @@ const remove = async (path: string) => {
           <UFormField :label="t('custom_fields.category_fr')" name="egcs_ay_category_fr" :required="Boolean(optionModal.selected.value.egcs_ay_category_en)">
             <UInput v-model.nullable="optionModal.selected.value.egcs_ay_category_fr" class="w-full" />
           </UFormField>
-          <UCheckbox v-model="optionModal.selected.value.egcs_ay_active" :label="t('custom_fields.active')" />
+          <UCheckbox v-model="optionModal.selected.value.egcs_ay_active" :label="t('custom_fields.active')" data-ui-target="agency.custom-field-option.egcs_ay_active" />
           <UFormField :label="t('custom_fields.order')" name="egcs_ay_displayorder">
             <UInput v-model.number="optionModal.selected.value.egcs_ay_displayorder" type="number" min="0" />
           </UFormField>

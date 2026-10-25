@@ -94,6 +94,10 @@ export const createRequiredControl = <T>(component: T, kind: 'standard' | 'selec
         : []
       return [...new Set([...explicit, ...generated])].filter(Boolean).join(' ')
     }
+    /** Keeps caller validation and field validation visible to assistive technology.
+     * @returns Whether either owning validation contract marks this control invalid.
+     */
+    const isInvalid = () => booleanAttribute(attrs['aria-invalid']) || Boolean(formField?.value.error)
     /** Applies accessibility where the original component's props cannot reach it.
      * @returns Resolves after Vue has applied the original control's DOM updates.
      */
@@ -135,6 +139,7 @@ export const createRequiredControl = <T>(component: T, kind: 'standard' | 'selec
       for (const target of targets) {
         if (descriptions) target.setAttribute('aria-describedby', descriptions)
         else target.removeAttribute('aria-describedby')
+        if (attrs['aria-invalid'] !== undefined || formField?.value) target.setAttribute('aria-invalid', String(isInvalid()))
       }
       const root = elementOf(exposed.$el) ?? targets[0]?.parentElement
       // Reka caches radio label text; reference the live title instead.
@@ -158,6 +163,9 @@ export const createRequiredControl = <T>(component: T, kind: 'standard' | 'selec
       void updateAccessibility()
     })
     watch(descriptionIds, () => {
+      void updateAccessibility()
+    }, { flush: 'post' })
+    watch(isInvalid, () => {
       void updateAccessibility()
     }, { flush: 'post' })
     expose(new Proxy({}, {

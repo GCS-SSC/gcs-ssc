@@ -16,7 +16,7 @@ const field = useFormFieldPath(() => namePrefix)
 </script>
 
 <template>
-  <UFormField :label="t('transfer_payment.agreement_subtype')" :name="field('egcs_tp_agreementtype')">
+  <UFormField :label="t('transfer_payment.agreement_subtype')" :name="field('egcs_tp_agreementtype')" data-field-scope="transfer-payment.fields.agreement-subtype-fields">
     <CommonBilingualSelectMenu
       v-model="model.egcs_tp_agreementtype"
       :items="agreementTypes"

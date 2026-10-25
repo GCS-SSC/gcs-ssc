@@ -16,7 +16,7 @@ const field = useFormFieldPath(() => namePrefix)
 </script>
 
 <template>
-  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }">
+  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }" data-field-scope="transfer-payment.fields.financial-limit-fields">
     <UFormField
       :label="t('transfer_payment.financial_limit_max_allowable_per_recipient')"
       :description="t('transfer_payment.financial_limit_max_allowable_currency_help')"
@@ -38,7 +38,7 @@ const field = useFormFieldPath(() => namePrefix)
     </UFormField>
   </div>
 
-  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }">
+  <div class="grid grid-cols-1 gap-4" :class="{ 'md:grid-cols-2': isStacked }" data-field-scope="transfer-payment.fields.financial-limit-fields">
     <UFormField
       :label="t('transfer_payment.financial_limit_max_percent_retroactive_costs')"
       :name="field('egcs_tp_maxpercentofretroactivecostsallowable')"
@@ -62,7 +62,7 @@ const field = useFormFieldPath(() => namePrefix)
     </UFormField>
   </div>
 
-  <UFormField :label="t('common.active')" :name="field('egcs_tp_active')">
+  <UFormField :label="t('common.active')" :name="field('egcs_tp_active')" data-field-scope="transfer-payment.fields.financial-limit-fields">
     <USwitch v-model="model.egcs_tp_active" :label="t('common.active')" />
   </UFormField>
 </template>

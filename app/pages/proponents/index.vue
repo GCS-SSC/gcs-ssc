@@ -150,7 +150,7 @@ const canDeleteProfile = (profile: ApplicantRecipientProfileRow) => {
 </script>
 
 <template>
-  <UDashboardPanel id="applicant-recipients">
+  <UDashboardPanel id="applicant-recipients" data-field-scope="proponents">
     <template #header>
       <UDashboardNavbar :title="t('applicant_recipient.title')">
         <template #leading>
@@ -197,7 +197,7 @@ const canDeleteProfile = (profile: ApplicantRecipientProfileRow) => {
           @edit="openUpdateProfile"
           @delete="deleteProfile">
           <template #filters>
-            <CommonAssignedListViewSelect v-model="listView" resource="applicant_recipient" />
+            <CommonAssignedListViewSelect v-model="listView" data-field-label-en="List view" data-field-label-fr="Vue de la liste" data-ui-target="proponents.list-view" resource="applicant_recipient" />
           </template>
         </ApplicantRecipientProfilesTable>
       </div>

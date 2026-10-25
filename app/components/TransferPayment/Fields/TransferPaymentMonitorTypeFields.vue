@@ -13,7 +13,7 @@ const field = useFormFieldPath(() => namePrefix)
 </script>
 
 <template>
-  <UFormField :label="t('transfer_payment.monitor_types')" :name="field('egcs_tp_agencymonitortype')" required>
+  <UFormField :label="t('transfer_payment.monitor_types')" :name="field('egcs_tp_agencymonitortype')" required data-field-scope="transfer-payment.fields.monitor-type-fields">
     <CommonServerLookupSelect
       v-model="model.egcs_tp_agencymonitortype"
       :fetch-url="lookupUrl"

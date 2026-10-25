@@ -24,7 +24,7 @@ const field = useFormFieldPath(() => namePrefix)
 </script>
 
 <template>
-  <UFormField :label="t('transfer_payment.fiscal_year')" :name="field('egcs_tp_fiscalyear')">
+  <UFormField :label="t('transfer_payment.fiscal_year')" :name="field('egcs_tp_fiscalyear')" data-field-scope="transfer-payment.fields.budget-fields">
     <CommonServerLookupSelect
       v-if="agencyId"
       v-model="model.egcs_tp_fiscalyear"
@@ -38,15 +38,15 @@ const field = useFormFieldPath(() => namePrefix)
       :aria-label="t('transfer_payment.fiscal_year')"
       @resolved-items="items => emit('fiscal-year-resolved', { agencyId, items })" />
   </UFormField>
-  <UFormField :label="t('common.currency')" :name="field('egcs_tp_currency')">
+  <UFormField :label="t('common.currency')" :name="field('egcs_tp_currency')" data-field-scope="transfer-payment.fields.budget-fields">
     <CommonEnumSelect v-model="model.egcs_tp_currency" name="currency_codes" :disabled="Boolean(model.id)" />
   </UFormField>
-  <UFormField :label="t('transfer_payment.total_budget')" :name="field('egcs_tp_totalbudget')">
+  <UFormField :label="t('transfer_payment.total_budget')" :name="field('egcs_tp_totalbudget')" data-field-scope="transfer-payment.fields.budget-fields">
     <CommonCurrencyInput
       v-model="model.egcs_tp_totalbudget"
       :currency="model.egcs_tp_currency" />
   </UFormField>
-  <UFormField :label="t('transfer_payment.overcommit_threshold')" :name="field('egcs_tp_overcommitthreshold')" required>
+  <UFormField :label="t('transfer_payment.overcommit_threshold')" :name="field('egcs_tp_overcommitthreshold')" required data-field-scope="transfer-payment.fields.budget-fields">
     <UInputNumber
       v-model="model.egcs_tp_overcommitthreshold"
       :step="0.01"
