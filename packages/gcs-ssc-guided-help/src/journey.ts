@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import type { BilingualText, GuideDocument } from './contracts'
-import type { GuideExecution, GuideTargetRef } from './actions'
+import type { BilingualText, GuideDocument } from './contracts.ts'
+import type { GuideExecution, GuideTargetRef } from './actions.ts'
 
 /** The host derives these tasks from current business state; help never records completion. */
 export type GuideJourneyTask = {

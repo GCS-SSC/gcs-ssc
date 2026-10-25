@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { addTemplate, addVitePlugin, addTypeTemplate, defineNuxtModule, updateTemplates } from '@nuxt/kit'
-import { guidedHelpLedger as approvedLedger } from '../shared/guided-help/catalog'
-import { buildUiTargetCatalog, collectUiTargetSources, scanUiTargetSource } from './ui-targets/source'
+import { guidedHelpLedger as approvedLedger } from '../shared/guided-help/catalog.ts'
+import { buildUiTargetCatalog, collectUiTargetSources, scanUiTargetSource } from './ui-targets/source.ts'
 
 /** The build and the browser use identities derived from the same public declarations. */
 export default defineNuxtModule({
@@ -49,7 +49,7 @@ export const guidedHelpLedger = ${JSON.stringify(catalog.guidedHelpLedger)}
   export const uiTargetRegistry: import(${JSON.stringify(resolve(root, 'shared/ui-targets/types'))}).UiTargetRegistry
   export const guidedHelpLedger: import('@gcs-ssc/guided-help/contracts').TargetLedger
 }`
-    })
+    }, { nuxt: true, nitro: true })
     nuxt.options.alias['#ui-targets'] = template.dst
     nuxt.hook('nitro:config', config => {
       config.alias = { ...config.alias, '#ui-targets': template.dst }

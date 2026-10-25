@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { GuideJourneySchema } from './journey'
+import { GuideJourneySchema } from './journey.ts'
 
 const invalid = { error: 'validation.guided_help_document_invalid' }
 
@@ -141,7 +141,7 @@ export const checkGuideCompatibility = (document: GuideDocument, ledger: TargetL
   }
   return diagnostics
 }
-export { renderSafeMarkdown } from './markdown'
+export { renderSafeMarkdown } from './markdown.ts'
 
 /** List legal declarative outgoing destinations, including the linear default.
  * @param document Published guide.

@@ -5,7 +5,7 @@ import { parse as parseSfc } from '@vue/compiler-sfc'
 import { parse, NodeTypes } from '@vue/compiler-dom'
 import type { ElementNode, TemplateChildNode } from '@vue/compiler-dom'
 import { z } from 'zod'
-import type { UiTargetSource } from './source'
+import type { UiTargetSource } from './source.ts'
 
 const escapeAttribute = (value: string): string => value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
 const staticAttribute = (node: ElementNode, name: string): string | undefined => {

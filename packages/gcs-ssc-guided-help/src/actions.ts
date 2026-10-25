@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import type { BilingualText } from './contracts'
-import { GuideJourneyBindingSchema } from './journey'
+import type { BilingualText } from './contracts.ts'
+import { GuideJourneyBindingSchema } from './journey.ts'
 
 const identity = z.string().min(1).max(160)
 export const GuideTargetRefSchema = z.discriminatedUnion('kind', [

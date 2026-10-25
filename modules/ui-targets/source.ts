@@ -4,11 +4,11 @@ import { parse as parseSfc } from '@vue/compiler-sfc'
 import { parse, NodeTypes } from '@vue/compiler-dom'
 import type { ElementNode, TemplateChildNode } from '@vue/compiler-dom'
 import type { TargetKind, TargetLedger } from '@gcs-ssc/guided-help/contracts'
-import { collectUiTargetSourceTranslations, inferUiTargetSourceLabel, uiTargetTranslationLabel } from './labels'
-import type { UiTargetTranslatorCatalogs } from './labels'
-import { collectSchemaFieldSources, extractSchemaFieldSources } from './schema-fields'
-import { resolveUiFieldTargetKey } from '../../shared/ui-targets/identity'
-import type { UiTarget, UiTargetCatalog, UiTargetLabel, UiTargetOwner } from '../../shared/ui-targets/types'
+import { collectUiTargetSourceTranslations, inferUiTargetSourceLabel, uiTargetTranslationLabel } from './labels.ts'
+import type { UiTargetTranslatorCatalogs } from './labels.ts'
+import { collectSchemaFieldSources, extractSchemaFieldSources } from './schema-fields.ts'
+import { resolveUiFieldTargetKey } from '../../shared/ui-targets/identity.ts'
+import type { UiTarget, UiTargetCatalog, UiTargetLabel, UiTargetOwner } from '../../shared/ui-targets/types.ts'
 
 export interface UiTargetSource { filename: string; source: string; owner: UiTargetOwner; translations?: UiTargetTranslatorCatalogs }
 export interface UiTargetDiagnostic { filename: string; line: number; code: string; message: string }
