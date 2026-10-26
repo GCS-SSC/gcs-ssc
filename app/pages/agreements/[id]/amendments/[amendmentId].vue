@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { usePageResourceError } from '~/composables/usePageResourceError'
+import { useCatalogCacheRefresh } from '~/composables/useCatalogCacheRefresh'
+import { getCatalogRequestUrl } from '~/utils/catalog-request-url'
 import { useId, computed, onUnmounted, ref, watch } from 'vue'
 import CommonCompletionPanel from '~/components/Common/Completions/Panel.vue'
 /* eslint-disable jsdoc/require-jsdoc -- concise detail-page actions are covered by focused tests. */
@@ -93,7 +95,7 @@ type AmendmentTypeLookupResponse = {
   limit: number
 }
 const amendmentTypesLookupEndpoint: string = `/api/agreements/${agreementId}/amendments/lookups/types?amendmentId=${amendmentId}`
-const amendmentTypesLookup = useFetch<AmendmentTypeLookupResponse, FetchError, string>(
+const amendmentTypesLookup = useCatalogFetch<AmendmentTypeLookupResponse, FetchError, string>(
   amendmentTypesLookupEndpoint,
   { default: () => ({ items: [], total: 0, limit: 10 }) }
 )
@@ -380,6 +382,15 @@ const loadRequiredScopeSubtypes = async () => {
   }
 }
 watch(requiredScopeTypeIds, loadRequiredScopeSubtypes, { immediate: true })
+const { check: checkCatalogVersions } = useCatalogCacheRefresh(() => [amendmentTypesLookupEndpoint, ...requiredScopeTypeIds.value.map(id => getCatalogRequestUrl(
+  `/api/agreements/${agreementId}/amendments/lookups/subtypes`, { amendment_type_ids: id, amendmentId }
+))], change => {
+  scopeSubtypeFilterRequest += 1
+  scopeSubtypeRequirementRequest += 1
+  requiredSubtypeIdsByType.value = {}
+  resolvedScopeTypeMetadata.value = []
+  if (!change.securityContextChanged) return loadRequiredScopeSubtypes()
+}, showError)
 
 const saveScope = async () => {
   if (!ownsAmendmentPage()
@@ -498,7 +509,7 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
 </script>
 
 <template>
-  <CommonDetailPage id="agreement-amendment-detail" v-model:collapsed="isHeroCollapsed" data-field-tooltip-context="agreement" data-field-scope="agreements.amendments" data-scope-label-en="Agreements > Amendments > General" data-scope-label-fr="Ententes > Modifications > Général" :breadcrumb-items="breadcrumbItems" class="w-full">
+  <CommonDetailPage id="agreement-amendment-detail" v-model:collapsed="isHeroCollapsed" data-field-tooltip-context="agreement" data-field-scope="agreements.amendments" data-scope-label-en="Agreements > Amendments > General" data-scope-label-fr="Ententes > Modifications > Général" :breadcrumb-items="breadcrumbItems" class="w-full" @focusin="checkCatalogVersions">
     <template #body>
       <div v-if="amendment" class="flex flex-1 flex-col">
         <CommonEntityHero

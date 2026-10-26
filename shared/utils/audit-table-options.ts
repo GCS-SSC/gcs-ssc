@@ -15,6 +15,7 @@ export const AUDIT_TABLE_NAMES: readonly string[] = [
   'public.Agency_Agreement_Type',
   'public.Agency_Applicant_Recipient_Subtype',
   'public.Agency_Approval_Behalf_Type',
+  'public.Agency_Catalog_Revision',
   'public.Agency_Chart_of_Account',
   'public.Agency_Commitment_Type',
   'public.Agency_Cost_Category',

@@ -15,6 +15,7 @@ import {
 } from '~~/server/utils/agreement'
 import type { AgreementScopeContext } from '~~/server/utils/agreement'
 import { escapeLikePattern } from '~~/server/utils/sql-like'
+import { setCatalogCacheAgencies } from './catalog-cache'
 
 export const AgreementStreamLookupQuerySchema = PaginationSchema.extend({
   agreement_id: z.preprocess(value => {
@@ -67,6 +68,8 @@ export const prepareAgreementStreamLookupRoute = async (
   if (permission_action !== 'create' && agreement_id && !agreementContext) {
     return await routeBadRequest(event, 'AGREEMENT_NOT_FOUND', 'apiErrors.agreement.not_found')
   }
+
+  setCatalogCacheAgencies(event, [streamContext.agencyId])
 
   return {
     page,

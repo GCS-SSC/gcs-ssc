@@ -4,6 +4,7 @@ import { throwFetchResponseError } from '~/utils/fetch-error'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { computed, onBeforeUnmount, watch } from 'vue'
 import { useBusinessStatusState } from '~/composables/useBusinessStatusState'
+import { useCatalogCacheRefresh } from '~/composables/useCatalogCacheRefresh'
 import type { FundingCaseAgreementProfileRow, FundingCaseAgreementAmendmentRow } from '~~/shared/types/funding-case-agreement-ui'
 import type { Ref } from 'vue'
 import type { TableColumnInput } from '~/composables/useTableColumns'
@@ -42,6 +43,7 @@ const {
 })
 
 const templates: Ref<TransferPaymentStreamDocumentTemplateItem[]> = ref([])
+const historicalTemplate: Ref<TransferPaymentStreamDocumentTemplateItem | null> = ref(null)
 const templatesStatus: Ref<'pending' | 'success' | 'error'> = ref('pending')
 let templateGeneration = 0
 let operationGeneration = 0
@@ -67,6 +69,8 @@ const refreshTemplates = async () => {
     if (!response.ok) await throwFetchResponseError(response)
     const data = await response.json() as { items: TransferPaymentStreamDocumentTemplateItem[] }
     if (generation !== templateGeneration || requestedApiBase !== apiBase.value) return
+    const previousSelection = templates.value.find(template => template.id === generateState.value?.templateId)
+    if (previousSelection) historicalTemplate.value = previousSelection
     templates.value = data.items
     templatesStatus.value = 'success'
   } catch (error: unknown) {
@@ -74,6 +78,18 @@ const refreshTemplates = async () => {
     templatesStatus.value = 'error'
     showError(error)
   }
+}
+const { check: checkCatalogVersions, checking: checkingCatalog, failed: catalogCheckFailed } = useCatalogCacheRefresh(() => `${apiBase.value}/document-templates`, change => {
+  if (change.securityContextChanged) {
+    templateGeneration++
+    templates.value = []
+    historicalTemplate.value = null
+    return
+  }
+  return refreshTemplates().then(() => templatesStatus.value !== 'error')
+}, showError)
+const retryTemplates = async () => {
+  if (await checkCatalogVersions() && templatesStatus.value !== 'success') await refreshTemplates()
 }
 watch(apiBase, () => {
   ownerGeneration++
@@ -83,6 +99,7 @@ watch(apiBase, () => {
   isGenerateOpen.value = false
   generateState.value = null
   templates.value = []
+  historicalTemplate.value = null
   void refreshTemplates()
 }, { immediate: true, flush: 'sync' })
 
@@ -94,7 +111,14 @@ const columns: TableColumnInput<AgreementGeneratedDocumentItem>[] = [
   { id: 'actions', headerKey: 'common.actions' }
 ]
 
-const selectedTemplate = computed(() => templates.value.find(template => template.id === generateState.value?.templateId))
+const selectedTemplate = computed(() => templates.value.find(template => template.id === generateState.value?.templateId)
+  ?? (historicalTemplate.value?.id === generateState.value?.templateId ? historicalTemplate.value : undefined))
+const templateOptions = computed(() => {
+  const selected = selectedTemplate.value
+  return selected && !templates.value.some(template => template.id === selected.id)
+    ? [...templates.value, { ...selected, disabled: true }]
+    : templates.value
+})
 const outputFormatItems = computed(() => (selectedTemplate.value?.egcs_ay_outputformats || []).map(format => ({
   label: t(`enums.transfer_payment_document_template_output_format.${format}`),
   value: format
@@ -140,6 +164,7 @@ const openGenerate = async () => {
   const current = () => generation === operationGeneration && requestedBase === apiBase.value
   try {
     isOpeningGenerate.value = true
+    if (!await checkCatalogVersions() || !current()) return
     if (!await checkDocumentPrerequisites('create', current) || !current()) return
     const initialTemplate = templates.value[0]
     generateState.value = {
@@ -237,15 +262,15 @@ const deleteDocument = async (generatedDocument: AgreementGeneratedDocumentItem)
 </script>
 
 <template>
-  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.documents-tab" data-scope-label-en="Agreements > Documents" data-scope-label-fr="Ententes > Documents">
+  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.documents-tab" data-scope-label-en="Agreements > Documents" data-scope-label-fr="Ententes > Documents" @focusin="checkCatalogVersions">
     <UAlert
-      v-if="templatesStatus === 'error'"
+      v-if="templatesStatus === 'error' || catalogCheckFailed"
       color="error"
       icon="i-lucide-circle-alert"
       :title="t('common.error')"
       class="mb-4">
       <template #actions>
-        <UButton color="error" variant="soft" size="sm" icon="i-lucide-refresh-cw" :label="t('common.retry')" @click="refreshTemplates" />
+        <UButton color="error" variant="soft" size="sm" icon="i-lucide-refresh-cw" :label="t('common.retry')" @click="retryTemplates" />
       </template>
     </UAlert>
     <CommonResourceLayoutCard
@@ -306,12 +331,14 @@ const deleteDocument = async (generatedDocument: AgreementGeneratedDocumentItem)
           <UFormField :label="t('transfer_payment.document_templates.title')" name="templateId">
             <CommonBilingualSelectMenu
               v-model="generateState.templateId"
-              :items="templates"
+              :items="templateOptions"
               value-key="id"
               label-en-key="egcs_ay_name_en"
               label-fr-key="egcs_ay_name_fr"
               :searchable="templates.length > 5"
-              class="w-full" />
+              :disabled="checkingCatalog || catalogCheckFailed"
+              class="w-full"
+              @update:open="(open: boolean) => open && checkCatalogVersions()" />
           </UFormField>
           <p v-if="selectedTemplate" class="text-sm leading-5 text-muted">
             {{ locale === 'fr' ? selectedTemplate.egcs_ay_description_fr : selectedTemplate.egcs_ay_description_en }}

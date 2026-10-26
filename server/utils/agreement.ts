@@ -27,6 +27,7 @@ import type { ExactEntityTarget } from '@gcs-ssc/authorization'
 import { resolveAssignmentTargetAgreementId } from './agreement-assignment-target'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { dateOnlySql } from './database-date'
+import { setCatalogCacheAgencies } from './catalog-cache'
 
 type AgreementAction = Extract<AbilityAction, 'create' | 'read' | 'update' | 'delete'>
 type AgreementDb = Kysely<Database> | Transaction<Database>
@@ -138,6 +139,7 @@ export const authorizeAgreementResource = async (
         resolver
       )
 
+  if (result.data) setCatalogCacheAgencies(event, [result.data.agencyId])
   return result.data ?? null
 }
 

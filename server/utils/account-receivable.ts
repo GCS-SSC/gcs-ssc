@@ -23,6 +23,7 @@ import { resolveAssignedItemTargetGrant } from './rbac'
 import { assignedEntityIdsQuery } from '@gcs-ssc/authorization/server'
 import { accountReceivableSourceUsage, accountReceivableAdvanceUsage, executeFreshAccountReceivableWrite, resolveAccountReceivableRuntimeContext } from './account-receivable-context'
 import { accountReceivableError, readAccountReceivableSources, requireAccountReceivableSourceRead, type CapturedAccountReceivableSource } from './account-receivable-source'
+import { setCatalogCacheAgencies } from './catalog-cache'
 
 const ZERO = parseMoney('0.00')
 const json = (value: unknown): JsonValue => JSON.parse(JSON.stringify(value)) as JsonValue
@@ -37,6 +38,7 @@ export const authorizeAccountReceivableAgreement = async (event: H3Event, agreem
   )
   const context = result.data
   if (!context) return await notFound(event, 'ACCOUNT_RECEIVABLE_NOT_FOUND', 'apiErrors.account_receivable.not_found')
+  setCatalogCacheAgencies(event, [context.agencyId])
   return context
 }
 
@@ -44,6 +46,7 @@ export const authorizeAccountReceivable = async (event: H3Event, id: string, act
   const context = await resolveAccountReceivableRuntimeContext(event.context.$db, id)
   if (!context) return await notFound(event, 'ACCOUNT_RECEIVABLE_NOT_FOUND', 'apiErrors.account_receivable.not_found')
   await authorize(event, 'account_receivable', action, context.scope)
+  setCatalogCacheAgencies(event, [context.agencyId])
   return context
 }
 

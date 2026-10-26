@@ -3,6 +3,7 @@ import { getQuery, readBody, type H3Event } from 'h3'
 import type { z } from 'zod'
 import { ZodError } from 'zod'
 import { validationError } from './api-errors'
+import { stripCatalogCacheRequestMetadata } from './catalog-cache'
 
 /**
  * Parses and validates input data against a Zod schema with i18n support.
@@ -58,6 +59,7 @@ export const getValidatedQueryI18n = async <TSchema extends z.ZodTypeAny>(
   event: H3Event,
   schema: TSchema
 ): Promise<z.infer<TSchema>> => {
+  stripCatalogCacheRequestMetadata(event)
   const query = getQuery(event)
   return await parseI18n(event, schema, query)
 }

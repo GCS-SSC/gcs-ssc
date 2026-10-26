@@ -8,12 +8,14 @@ import type { CloseoutDocumentPersistence } from '~~/shared/types/agreement-clos
 import type { EntityAssignmentContext } from '~~/shared/types/schemas/entity-assignment'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { throwFetchResponseError } from '~/utils/fetch-error'
+import { useCatalogCacheRefresh } from '~/composables/useCatalogCacheRefresh'
 
 const { agreementId, closeoutId, canPersist } = defineProps<{ agreementId: string, closeoutId: string, canPersist: boolean }>()
 const { t, locale } = useI18n()
 const { showError } = useApiErrorToast()
 const toast = useLocalizedToast()
 const templates: Ref<TransferPaymentStreamDocumentTemplateItem[]> = ref([])
+const historicalTemplate: Ref<TransferPaymentStreamDocumentTemplateItem | null> = ref(null)
 const documents: Ref<AgreementGeneratedDocumentItem[]> = ref([])
 const selectedTemplateId: Ref<string | undefined> = ref(undefined)
 const language: Ref<'eng' | 'fra'> = ref(locale.value === 'fr' ? 'fra' : 'eng')
@@ -21,22 +23,57 @@ const outputFormat: Ref<TransferPaymentDocumentTemplateOutputFormat> = ref('docx
 const isGenerating: Ref<boolean> = ref(false)
 const loadStatus: Ref<'pending' | 'success' | 'error'> = ref('pending')
 let loadGeneration = 0
+let templateGeneration = 0
 let ownerGeneration = 0
 onBeforeUnmount(() => {
   loadGeneration++
+  templateGeneration++
   ownerGeneration++
 })
-const selectedTemplate = computed(() => templates.value.find(template => template.id === selectedTemplateId.value))
+const selectedTemplate = computed(() => templates.value.find(template => template.id === selectedTemplateId.value)
+  ?? (historicalTemplate.value?.id === selectedTemplateId.value ? historicalTemplate.value : undefined))
+const templateOptions = computed(() => {
+  const selected = selectedTemplate.value
+  return selected && !templates.value.some(template => template.id === selected.id)
+    ? [...templates.value, { ...selected, disabled: true }]
+    : templates.value
+})
 const outputFormats = computed(() => selectedTemplate.value?.egcs_ay_outputformats ?? [])
-watch(outputFormats, formats => {
+watch(selectedTemplateId, () => {
+  const formats = outputFormats.value
   if (!formats.includes(outputFormat.value)) {
     outputFormat.value = formats[0] ?? 'docx'
   }
 })
 
 const baseUrl = computed(() => `/api/agreements/${agreementId}/closeouts/${closeoutId}`)
+const acceptTemplates = (items: TransferPaymentStreamDocumentTemplateItem[]) => {
+  const previousSelection = selectedTemplate.value
+  const next = items.map(template => ({ ...template, id: String(template.id) }))
+  if (previousSelection) historicalTemplate.value = previousSelection
+  templates.value = next
+  if (selectedTemplateId.value === undefined) selectedTemplateId.value = templates.value[0]?.id
+}
+const refreshCatalogTemplates = async () => {
+  const generation = ++templateGeneration
+  const requestedBase = baseUrl.value
+  const response = await fetch(getClientRequestUrl(`${requestedBase}/document-templates`))
+  if (!response.ok) await throwFetchResponseError(response)
+  const payload = await response.json() as { items: TransferPaymentStreamDocumentTemplateItem[] }
+  if (generation === templateGeneration && requestedBase === baseUrl.value) acceptTemplates(payload.items)
+}
+const { check: checkCatalogVersions, checking: checkingCatalog, failed: catalogCheckFailed } = useCatalogCacheRefresh(() => `${baseUrl.value}/document-templates`, change => {
+  if (change.securityContextChanged) {
+    templateGeneration++
+    templates.value = []
+    historicalTemplate.value = null
+    return
+  }
+  return refreshCatalogTemplates()
+}, showError)
 const refresh = async () => {
   const generation = ++loadGeneration
+  const requestedTemplateGeneration = ++templateGeneration
   const requestedBaseUrl = baseUrl.value
   loadStatus.value = 'pending'
   const [templateResponse, documentResponse] = await Promise.all([
@@ -48,14 +85,8 @@ const refresh = async () => {
   const templateItems = (await templateResponse.json() as { items: TransferPaymentStreamDocumentTemplateItem[] }).items
   const documentItems = (await documentResponse.json() as { items: AgreementGeneratedDocumentItem[] }).items
   if (generation !== loadGeneration || requestedBaseUrl !== baseUrl.value) return false
-  templates.value = templateItems.map(template => ({ ...template, id: String(template.id) }))
+  if (requestedTemplateGeneration === templateGeneration) acceptTemplates(templateItems)
   documents.value = documentItems
-  if (!templates.value.some(template => template.id === selectedTemplateId.value)) {
-    selectedTemplateId.value = templates.value[0]?.id
-  }
-  if (!outputFormats.value.includes(outputFormat.value)) {
-    outputFormat.value = outputFormats.value[0] ?? 'docx'
-  }
   loadStatus.value = 'success'
   return true
 }
@@ -71,10 +102,14 @@ const load = async () => {
     showError(error)
   }
 }
+const retryTemplates = async () => {
+  if (await checkCatalogVersions() && loadStatus.value !== 'success') await load()
+}
 watch(baseUrl, () => {
   ownerGeneration++
   isGenerating.value = false
   templates.value = []
+  historicalTemplate.value = null
   documents.value = []
   selectedTemplateId.value = undefined
   void load()
@@ -125,6 +160,7 @@ const generate = async (persist: boolean) => {
   const current = () => generation === ownerGeneration
   try {
     isGenerating.value = true
+    if (!await checkCatalogVersions() || !current()) return
     if (persist && (!canPersist || !await checkPersistencePrerequisites(requestedBase, current))) return
     if (!current()) return
     const response = await fetch(getClientRequestUrl(`${requestedBase}/documents/${persist ? 'generate' : 'preview'}`), {
@@ -167,15 +203,15 @@ const download = async (item: AgreementGeneratedDocumentItem) => {
 </script>
 
 <template>
-  <div class="space-y-6" data-field-tooltip-context="agreement" data-field-scope="agreement.closeout-documents" data-scope-label-en="Agreements > Closeouts > Documents" data-scope-label-fr="Ententes > Clôtures > Documents">
-    <UAlert v-if="loadStatus === 'error'" color="error" icon="i-lucide-circle-alert" :title="t('common.error')">
+  <div class="space-y-6" data-field-tooltip-context="agreement" data-field-scope="agreement.closeout-documents" data-scope-label-en="Agreements > Closeouts > Documents" data-scope-label-fr="Ententes > Clôtures > Documents" @focusin="checkCatalogVersions">
+    <UAlert v-if="loadStatus === 'error' || catalogCheckFailed" color="error" icon="i-lucide-circle-alert" :title="t('common.error')">
       <template #actions>
-        <UButton color="error" variant="soft" size="sm" icon="i-lucide-refresh-cw" :label="t('common.retry')" @click="load" />
+        <UButton color="error" variant="soft" size="sm" icon="i-lucide-refresh-cw" :label="t('common.retry')" @click="retryTemplates" />
       </template>
     </UAlert>
-    <div v-if="templates.length" class="grid gap-4 rounded-lg border border-default p-4 md:grid-cols-[minmax(0,2fr)_1fr_1fr_auto] md:items-end">
+    <div v-if="templateOptions.length" class="grid gap-4 rounded-lg border border-default p-4 md:grid-cols-[minmax(0,2fr)_1fr_1fr_auto] md:items-end">
       <UFormField :label="t('transfer_payment.document_templates.title')" required data-ui-target="agreement.closeout-documents.transfer_payment.document_templates.title">
-        <CommonBilingualSelectMenu v-model="selectedTemplateId" :items="templates" value-key="id" label-en-key="egcs_ay_name_en" label-fr-key="egcs_ay_name_fr" class="w-full" />
+        <CommonBilingualSelectMenu v-model="selectedTemplateId" :items="templateOptions" value-key="id" label-en-key="egcs_ay_name_en" label-fr-key="egcs_ay_name_fr" :disabled="checkingCatalog || catalogCheckFailed" class="w-full" @update:open="(open: boolean) => open && checkCatalogVersions()" />
       </UFormField>
       <UFormField :label="t('agency.detail.language')" required data-ui-target="agreement.closeout-documents.agency.detail.language">
         <CommonEnumSelect v-model="language" name="language_preference" class="w-full" />

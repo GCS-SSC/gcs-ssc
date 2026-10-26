@@ -1,6 +1,8 @@
 <script setup lang="ts">
 /* eslint-disable jsdoc/require-jsdoc -- concise amendment UI callbacks are covered by focused tests. */
 import { computed, onUnmounted, ref, useId, watch } from 'vue'
+import { getCatalogRequestUrl } from '~/utils/catalog-request-url'
+import { useCatalogCacheRefresh } from '~/composables/useCatalogCacheRefresh'
 import type { Ref } from 'vue'
 import type { FetchError } from 'ofetch'
 import type { TableColumnInput } from '~/composables/useTableColumns'
@@ -62,7 +64,7 @@ onUnmounted(() => {
 type AmendmentTypeMetadata = { id: string, egcs_tp_amended: string, egcs_tp_requiresamendmentsubtype: boolean }
 type AmendmentTypeLookupResponse = { items: AmendmentTypeMetadata[] }
 const amendmentTypesEndpoint = computed(() => `/api/agreements/${agreementId}/amendments/lookups/types`)
-const amendmentTypesLookup = useFetch<AmendmentTypeLookupResponse, FetchError, string>(
+const amendmentTypesLookup = useCatalogFetch<AmendmentTypeLookupResponse, FetchError, string>(
   amendmentTypesEndpoint,
   { default: () => ({ items: [] }) }
 )
@@ -177,6 +179,15 @@ const loadRequiredSubtypes = async () => {
   }
 }
 watch(requiredTypeIds, loadRequiredSubtypes)
+const { check: checkCatalogVersions } = useCatalogCacheRefresh(() => [amendmentTypesEndpoint.value, ...requiredTypeIds.value.map(id => getCatalogRequestUrl(
+  `/api/agreements/${agreementId}/amendments/lookups/subtypes`, { amendment_type_ids: id }
+))], change => {
+  subtypeFilterRequest += 1
+  subtypeRequirementRequest += 1
+  requiredSubtypeIdsByType.value = {}
+  resolvedTypeMetadata.value = []
+  if (!change.securityContextChanged) return loadRequiredSubtypes()
+}, showError)
 watch(isCreateOpen, open => {
   if (open) return
   subtypeFilterRequest += 1
@@ -271,7 +282,7 @@ const createAmendment = async () => {
 </script>
 
 <template>
-  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.amendments-tab" data-scope-label-en="Agreements > Amendments" data-scope-label-fr="Ententes > Modifications">
+  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.amendments-tab" data-scope-label-en="Agreements > Amendments" data-scope-label-fr="Ententes > Modifications" @focusin="checkCatalogVersions">
     <UAlert
       v-if="canCreate && hasOpenAmendment"
       class="mb-4"

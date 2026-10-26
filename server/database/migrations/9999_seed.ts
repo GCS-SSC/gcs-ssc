@@ -4,6 +4,7 @@ import type { Database } from '~~/shared/types/database'
 import { restoreNciaTemplateObjects } from '../ncia-template-objects'
 import { seedGuidedHelpExample } from '../guided-help-seed'
 import { seedFieldTooltipExamples } from '../field-tooltip-seed'
+import { initializeCatalogCacheRevisions } from '../catalog-cache-revisions'
 
 type DemoSnapshot = Record<string, Array<Record<string, unknown>>> & { user: Array<{ id: number }> }
 
@@ -82,6 +83,7 @@ const restoreSnapshot = async <DB>(db: Kysely<DB>): Promise<void> => {
   await seedGuidedHelpExample(db as unknown as import('kysely').Transaction<Database>)
   await seedFieldTooltipExamples(db as unknown as import('kysely').Transaction<Database>)
   await sql`SET CONSTRAINTS ALL IMMEDIATE`.execute(db)
+  await initializeCatalogCacheRevisions(db)
 }
 
 export const up: Migration['up'] = async db => {

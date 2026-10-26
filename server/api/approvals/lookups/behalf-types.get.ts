@@ -10,6 +10,7 @@ import {
 import { authorizeReviewRuntimeAction } from '~~/server/utils/review-runtime-access'
 import { ApprovalRuntimeQuerySchema } from '~~/shared/types/schemas/review-approval'
 import { requireAuthContext } from '~~/server/utils/authorize'
+import { setCatalogCacheAgencies } from '~~/server/utils/catalog-cache'
 
 export default defineEventHandler(async event => {
   await requireAuthContext(event)
@@ -30,6 +31,7 @@ export default defineEventHandler(async event => {
   }
 
   await authorizeReviewRuntimeAction(event, 'read_review_approval', projectedRuntimeEntity)
+  setCatalogCacheAgencies(event, projectedRuntimeEntity.schemaAgencyId ? [projectedRuntimeEntity.schemaAgencyId] : [])
   const result = await listApprovalLookupBehalfTypesPage(
     event.context.$db,
     projectedRuntimeEntity,

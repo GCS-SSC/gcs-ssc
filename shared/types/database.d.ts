@@ -413,6 +413,7 @@ export interface AuditDatabase {
 }
 
 export interface Database extends ExtensionsDatabase, AuditDatabase {
+  Agency_Catalog_Revision: AgencyCatalogRevisionTable
   Agency_Profile: AgencyProfileTable
   Agency_Custom_Field: AgencyCustomFieldTable
   Agency_Custom_Field_Option: AgencyCustomFieldOptionTable
@@ -787,6 +788,14 @@ export interface AgencyProfileTable {
   egcs_ay_active: Generated<boolean>
   egcs_ay_claimreconciliationstartstatus?: StatusId | null
   egcs_ay_claimreconciliationfinalstatus?: StatusId | null
+  _deleted: Generated<boolean>
+}
+
+export interface AgencyCatalogRevisionTable {
+  id: Generated<string>
+  egcs_ay_agency: string
+  egcs_ay_cataloggroup: import('../utils/catalog-cache').CatalogGroup
+  egcs_ay_revision: string
   _deleted: Generated<boolean>
 }
 

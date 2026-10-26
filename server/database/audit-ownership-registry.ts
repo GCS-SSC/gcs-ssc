@@ -45,6 +45,7 @@ export const AUDIT_TABLE_OWNERSHIP: Readonly<Record<string, AuditOwnershipRule>>
   'public.Agency_Guided_Help': agency('egcs_ay_agency'),
   'public.Agency_Field_Tooltip': agency('egcs_ay_agency'),
   'public.Agency_Address_Type': parent('egcs_ay_organizationagency', 'public.Agency_Profile'),
+  'public.Agency_Catalog_Revision': parent('egcs_ay_agency', 'public.Agency_Profile'),
   'public.Agency_Agreement_Type': parent('egcs_ay_organizationagency', 'public.Agency_Profile'),
   'public.Agency_Custom_Field': parent('egcs_ay_agency', 'public.Agency_Profile'),
   'public.Agency_Custom_Field_Option': parent('egcs_ay_field', 'public.Agency_Custom_Field'),

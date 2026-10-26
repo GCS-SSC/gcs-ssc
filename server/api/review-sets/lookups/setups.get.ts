@@ -11,6 +11,7 @@ import { listEligibleRuntimeReviewSetSetupAgencyIds } from '~~/server/utils/revi
 import { authorizeExtensionLifecycleRead, resolveExtensionLifecycleRuntime } from '~~/server/utils/extension-lifecycle-runtime'
 import { requireAuthContext } from '~~/server/utils/authorize'
 import { resolveApplicantRecipientVisibility } from '~~/server/utils/applicant-recipient-auth'
+import { setCatalogCacheAgencies } from '~~/server/utils/catalog-cache'
 
 const ReviewSetupLookupQuerySchema = PaginationSchema.safeExtend(CoreOrExtensionEntityTargetSchema.shape)
   .superRefine(validateCoreOrExtensionEntityTarget)
@@ -41,6 +42,7 @@ export default defineEventHandler(async event => {
     const ownerAgencyId = getReviewRuntimeOwnerAgencyId(runtimeEntity)
     agencyIds = ownerAgencyId ? [ownerAgencyId] : []
   }
+  setCatalogCacheAgencies(event, agencyIds)
   if (agencyIds.length === 0) return { items: [], total: 0, stats: { total: 0 }, page, limit }
 
   const setupScopes = await resolveReviewRuntimeSetupScopes(db, runtimeEntity)

@@ -10,6 +10,7 @@ import { escapeLikePattern } from '~~/server/utils/sql-like'
 import { PaginationSchema, PositivePostgresBigintIdSchema } from '~~/shared/types/schemas'
 import { isPositivePostgresBigintText } from '~~/shared/utils/database-id'
 import { executeFreshReadSnapshot } from '~~/server/utils/fresh-read-snapshot'
+import { getCatalogCacheRequestUrl, setCatalogCacheAgencies } from '~~/server/utils/catalog-cache'
 
 const QuerySchema = PaginationSchema.extend({
   agreement_id: PositivePostgresBigintIdSchema.optional(),
@@ -68,6 +69,24 @@ const readRoute = defineEventHandler(async event => {
 
     return { scope: { type: 'global' } }
   })
+
+  if (getCatalogCacheRequestUrl(event) && access) {
+    let owners = db.selectFrom('Agency_Profile').select('Agency_Profile.id')
+      .where('Agency_Profile._deleted', '=', false)
+    if (!access.visibility.hasGlobalAccess) {
+      owners = owners.where(eb => eb.or([
+        ...(access.visibility.agencyIds.length ? [eb('Agency_Profile.id', 'in', access.visibility.agencyIds)] : []),
+        ...(access.visibility.transferPaymentIds.length
+          ? [eb.exists(
+              eb.selectFrom('Transfer_Payment_Profile').select('id')
+                .whereRef('Transfer_Payment_Profile.egcs_tp_agency', '=', 'Agency_Profile.id')
+                .where('Transfer_Payment_Profile.id', 'in', access.visibility.transferPaymentIds)
+            )]
+          : [])
+      ]))
+    }
+    setCatalogCacheAgencies(event, (await owners.execute()).map(row => String(row.id)))
+  }
 
   let baseQuery = db
     .selectFrom('Transfer_Payment_Stream')

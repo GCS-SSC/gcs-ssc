@@ -2,6 +2,7 @@
 import { provideBilingualFieldScope } from '~/utils/bilingual-field-context'
 import { getClientRequestUrl } from '~/utils/client-request-url'
 import { computed, ref, watch } from 'vue'
+import { useCatalogCacheRefresh } from '~/composables/useCatalogCacheRefresh'
 import type { Ref } from 'vue'
 import type { AdminCommonLookupResponseItem } from '~~/shared/types/admin-common-ui'
 import type { GcsAgreementDescriptionsExtensionContext, GcsAgreementProfileExtensionContext } from '~~/shared/utils/extensions'
@@ -185,6 +186,15 @@ const agreementDescriptionFrExtensionContext = computed(() => ({
 
 const subtypeResponse: Ref<{ items: FundingCaseAgreementSubtypeLookupItem[] }> = ref({ items: [] })
 const subtypeStatus: Ref<'idle' | 'pending' | 'success' | 'error'> = ref('idle')
+const subtypeCatalogUrl = computed(() => {
+  const requestUrl = getClientRequestUrl('/api/agreements/lookups/agreement-subtypes')
+  requestUrl.searchParams.set('page', '1')
+  requestUrl.searchParams.set('limit', '100')
+  requestUrl.searchParams.set('permission_action', permissionAction)
+  requestUrl.searchParams.set('stream_id', selectedStreamId.value ?? '')
+  if (agreementId) requestUrl.searchParams.set('agreement_id', agreementId)
+  return requestUrl
+})
 /**
  *
  */
@@ -199,15 +209,7 @@ const refreshSubtypeOptions = async () => {
 
   try {
     subtypeStatus.value = 'pending'
-    const requestUrl = getClientRequestUrl('/api/agreements/lookups/agreement-subtypes')
-    requestUrl.searchParams.set('page', '1')
-    requestUrl.searchParams.set('limit', '100')
-    requestUrl.searchParams.set('permission_action', permissionAction)
-    requestUrl.searchParams.set('stream_id', requestedStreamId)
-    if (agreementId) {
-      requestUrl.searchParams.set('agreement_id', agreementId)
-    }
-    const response = await fetch(requestUrl)
+    const response = await fetch(subtypeCatalogUrl.value)
     const payload = response.ok ? await response.json() as { items: FundingCaseAgreementSubtypeLookupItem[] } : { items: [] }
     if (requestGeneration !== subtypeRequestGeneration || requestedStreamId !== selectedStreamId.value) return
     subtypeResponse.value = payload
@@ -218,6 +220,15 @@ const refreshSubtypeOptions = async () => {
     subtypeStatus.value = 'error'
   }
 }
+useCatalogCacheRefresh(subtypeCatalogUrl, change => {
+  if (change.securityContextChanged) {
+    subtypeRequestGeneration += 1
+    subtypeResponse.value = { items: [] }
+    subtypeStatus.value = 'idle'
+    return
+  }
+  return refreshSubtypeOptions()
+})
 
 /** Refreshes whether the selected Stream delegates risk scoring to a published Workflow. */
 const refreshRiskManagement = async () => {

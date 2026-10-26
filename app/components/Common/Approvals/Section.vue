@@ -2,6 +2,8 @@
 /* eslint-disable jsdoc/require-param-description, jsdoc/require-returns -- legacy approval helpers remain concise during request hardening */
 /* eslint-disable @stylistic/comma-dangle -- generic Vue arrows need parser-disambiguating commas */
 import { useBilingualValue } from '~/composables/useBilingualValue'
+import { useCatalogCacheRefresh } from '~/composables/useCatalogCacheRefresh'
+import { getCatalogRequestUrl } from '~/utils/catalog-request-url'
 import { getGroupedRowModel } from '@tanstack/vue-table'
 import type { ExpandedState } from '@tanstack/vue-table'
 import type { FetchError } from 'ofetch'
@@ -61,6 +63,7 @@ const runtimeQuery = computed(() => ({
   entityType,
   entityId
 }))
+const historicalBehalfType: Ref<ApprovalLookupBehalfType | null> = ref(null)
 
 /**
  *
@@ -96,11 +99,31 @@ const {
 })
 
 const {
-  data: behalfTypeResponse
+  data: behalfTypeResponse,
+  status: behalfTypeStatus,
+  error: behalfTypeError,
+  refresh: refreshBehalfTypes,
+  clear: clearBehalfTypes
 } = useFetch<ListResponse<ApprovalLookupBehalfType>, FetchError, string>('/api/approvals/lookups/behalf-types', {
   query: runtimeQuery,
   default: () => emptyListResponse<ApprovalLookupBehalfType>()
 })
+const { check: checkCatalogVersions, checking: checkingCatalog, failed: catalogCheckFailed } = useCatalogCacheRefresh(
+  () => getCatalogRequestUrl('/api/approvals/lookups/behalf-types', runtimeQuery.value),
+  change => {
+    if (change.securityContextChanged) {
+      clearBehalfTypes()
+      historicalBehalfType.value = null
+      return
+    }
+    return refreshBehalfTypes({ dedupe: 'cancel' }).then(() => !behalfTypeError.value)
+  },
+  showError
+)
+/** Checks the current versions and retries a failed initial choice load. */
+const checkBehalfTypes = async () => {
+  if (await checkCatalogVersions() && behalfTypeStatus.value === 'error') await refreshBehalfTypes({ dedupe: 'cancel' })
+}
 
 const search: Ref<string> = ref('')
 const pagination: Ref<{ pageIndex: number, pageSize: number }> = ref({
@@ -113,6 +136,9 @@ const columnVisibility: Ref<Record<string, boolean>> = ref({
   [ROUTING_SLIP_GROUP_COLUMN_ID]: false
 })
 const isActionModalOpen: Ref<boolean> = ref(false)
+watch(isActionModalOpen, open => {
+  if (open) void checkBehalfTypes()
+}, { flush: 'sync' })
 const isReassignModalOpen: Ref<boolean> = ref(false)
 const isAddStepModalOpen: Ref<boolean> = ref(false)
 const selectedActionStep: Ref<ApprovalStepItem | null> = ref(null)
@@ -192,7 +218,18 @@ const selectedReassignUserOptions = computed(() => {
   return options
 })
 
-const behalfTypeOptions = computed(() => behalfTypeResponse.value?.items ?? [])
+watch(behalfTypeResponse, (current, previous) => {
+  const selectedId = selectedActionState.value?.egcs_cn_onbehalf
+  const selected = current?.items.find(item => item.id === selectedId) ?? previous?.items.find(item => item.id === selectedId)
+  if (selected) historicalBehalfType.value = selected
+}, { flush: 'sync' })
+const behalfTypeOptions = computed(() => {
+  const current = behalfTypeResponse.value?.items ?? []
+  const historical = historicalBehalfType.value
+  return historical && historical.id === selectedActionState.value?.egcs_cn_onbehalf && !current.some(item => item.id === historical.id)
+    ? [...current, { ...historical, disabled: true }]
+    : current
+})
 
 const tableRows = computed<ApprovalTableRow[]>(() => routingSlips.value.flatMap((routingSlip: ApprovalRoutingSlipItem) => {
   if (routingSlip.steps.length === 0) {
@@ -1186,6 +1223,8 @@ const submitReassign = async () => {
       :open="isActionModalOpen"
       :step="selectedActionStep"
       :behalf-type-options="behalfTypeOptions"
+      :catalog-choices-loading="checkingCatalog || behalfTypeStatus === 'pending'"
+      :catalog-choices-failed="catalogCheckFailed || behalfTypeStatus === 'error'"
       :requires-actual="requiresActual"
       :approve-disabled="approveDisabled"
       :deny-disabled="denyDisabled"
@@ -1194,6 +1233,7 @@ const submitReassign = async () => {
       :assigned-approver-display="assignedApproverDisplay"
       :assigned-approver-position-title="assignedApproverPositionTitle"
       @update:open="handleActionModalOpenUpdate"
+      @check-catalog="checkBehalfTypes"
       @close="closeActionModal"
       @submit="submitAction" />
 

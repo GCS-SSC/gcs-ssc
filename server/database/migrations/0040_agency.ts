@@ -1,11 +1,23 @@
 import { sql, type Kysely } from 'kysely'
 import type { Database } from '../../../shared/types/database'
+import { installCatalogCacheFunctions, installCatalogCacheTriggers } from '../catalog-cache-revisions'
 
 // Clean-cutover baseline: agency. Edit this subject directly.
 
 /** Installs the current up definitions for this subject on a fresh database. */
 export const up = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
+CREATE TABLE "Agency_Catalog_Revision" (
+  id bigserial PRIMARY KEY,
+  egcs_ay_agency bigint NOT NULL,
+  egcs_ay_cataloggroup text NOT NULL,
+  egcs_ay_revision varchar(21) NOT NULL,
+  _deleted boolean NOT NULL DEFAULT false,
+  CONSTRAINT ay_uq_catalogrevisionagencygroup UNIQUE (egcs_ay_agency, egcs_ay_cataloggroup),
+  CONSTRAINT ay_chk_catalogrevisionformat CHECK (egcs_ay_revision ~ '^[A-Za-z0-9_-]{21}$'),
+  CONSTRAINT ay_chk_catalogrevisionactive CHECK (NOT _deleted)
+);
+
 CREATE SEQUENCE "Agency_Account_Receivable_Type_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
 
 CREATE SEQUENCE "Agency_Address_Type_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
@@ -446,6 +458,7 @@ END $baseline$`.execute(db)
 
 /** Installs the current installFunctions definitions for this subject on a fresh database. */
 export const installFunctions = async (db: Kysely<Database>): Promise<void> => {
+  await installCatalogCacheFunctions(db)
   await sql`DO $baseline$ BEGIN
 CREATE FUNCTION create_default_agency_statuses()
  RETURNS trigger
@@ -692,6 +705,7 @@ END $baseline$`.execute(db)
 /** Installs the current installForeignKeys definitions for this subject on a fresh database. */
 export const installForeignKeys = async (db: Kysely<Database>): Promise<void> => {
   await sql`DO $baseline$ BEGIN
+ALTER TABLE "Agency_Catalog_Revision" ADD CONSTRAINT ay_fk_catalogrevisionagency FOREIGN KEY (egcs_ay_agency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
 ALTER TABLE "Agency_Account_Receivable_Type" ADD CONSTRAINT "Agency_Account_Receivable_Type_egcs_ay_organizationagency_fkey" FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
 
 ALTER TABLE "Agency_Address_Type" ADD CONSTRAINT "Agency_Address_Type_egcs_ay_organizationagency_fkey" FOREIGN KEY (egcs_ay_organizationagency) REFERENCES "Agency_Profile"(id) ON DELETE RESTRICT;
@@ -751,6 +765,7 @@ END $baseline$`.execute(db)
 
 /** Installs the current installTriggers definitions for this subject on a fresh database. */
 export const installTriggers = async (db: Kysely<Database>): Promise<void> => {
+  await installCatalogCacheTriggers(db)
   await sql`DO $baseline$ BEGIN
 CREATE TRIGGER protect_workflow_profile_conditions AFTER DELETE OR UPDATE OF _deleted, egcs_ay_organizationagency ON "Agency_Agreement_Type" FOR EACH ROW EXECUTE FUNCTION validate_workflow_profile_references();
 

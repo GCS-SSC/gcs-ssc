@@ -7,6 +7,8 @@ import type { ActionModalState, ApprovalLookupBehalfType, ApprovalStepItem } fro
 const {
   step,
   behalfTypeOptions,
+  catalogChoicesLoading = false,
+  catalogChoicesFailed = false,
   requiresActual,
   approveDisabled,
   denyDisabled,
@@ -17,6 +19,8 @@ const {
 } = defineProps<{
   step: ApprovalStepItem | null
   behalfTypeOptions: ApprovalLookupBehalfType[]
+  catalogChoicesLoading?: boolean
+  catalogChoicesFailed?: boolean
   requiresActual: boolean
   approveDisabled: boolean
   denyDisabled: boolean
@@ -30,8 +34,9 @@ const state = defineModel<ActionModalState | null>('state', { required: true })
 const open = defineModel<boolean>('open', { required: true })
 
 const emit = defineEmits<{
-  close: []
-  submit: [decision: 'approve' | 'deny']
+  'check-catalog': []
+  'close': []
+  'submit': [decision: 'approve' | 'deny']
 }>()
 
 const { locale, t } = useI18n()
@@ -172,11 +177,17 @@ const getLocalizedText = (value: { en?: string, fr?: string }) => {
               :items="behalfTypeOptions"
               label-en-key="egcs_ay_name_en"
               label-fr-key="egcs_ay_name_fr"
-              :disabled="isSubmittingAction"
+              :disabled="isSubmittingAction || catalogChoicesLoading || catalogChoicesFailed"
               required
               aria-required="true"
+              @update:open="(value: boolean) => value && emit('check-catalog')"
               @update:model-value="value => updateState('egcs_cn_onbehalf', value === undefined ? null : value)" />
           </UFormField>
+          <UAlert v-if="catalogChoicesFailed" color="error" :title="t('common.lookup_load_failed')">
+            <template #actions>
+              <UButton :label="t('common.retry')" @click="emit('check-catalog')" />
+            </template>
+          </UAlert>
 
           <UFormField v-if="requiresActual" :label="t('assessment.approvals.approver_name')" name="egcs_cn_approvername" required>
             <UInput v-model="approverNameModel" name="egcs_cn_approvername" :disabled="isSubmittingAction" required aria-required="true" />

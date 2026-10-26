@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { ComputedRef, Ref, WritableComputedRef } from 'vue'
+import { getCatalogRequestUrl } from '~/utils/catalog-request-url'
 import type {
   AdminCommonLookupResponse,
   AdminCommonLookupResponseItem,
   AdminCommonSelectOption
 } from '~~/shared/types/admin-common-ui'
 import { useSelectMenuTriggerName } from '~/composables/useSelectMenuTriggerName'
+import { useCatalogCacheRefresh } from '~/composables/useCatalogCacheRefresh'
 import { toAdminLookupOption } from '~/utils/admin-common-lookup'
 
 defineOptions({ inheritAttrs: false })
@@ -77,8 +79,11 @@ const debouncedSearchTerm: Readonly<Ref<string>> = refDebounced(searchTerm, 250)
 const selectedItemsByValue: Ref<Record<string, AdminCommonLookupResponseItem>> = ref({})
 const unavailableSelectedValues: Ref<Set<string>> = ref(new Set())
 const isHydratingSelectedItem: Ref<boolean> = ref(false)
+const isCheckingCatalogVersions: Ref<boolean> = ref(false)
+const catalogCheckFailed: Ref<boolean> = ref(false)
 const autoSelectionAvailable: Ref<boolean> = ref(autoSelectSingle)
 const selectedItemSequenceByValue = new Map<string, number>()
+const staleSelectedValues = new Set<string>()
 let operationSequence = 0
 let hydrateRequestId = 0
 let disposed = false
@@ -113,6 +118,7 @@ const normalizedValues: ComputedRef<string[]> = computed(() => normalizeValues(m
  * @param value - Selected lookup id value or values.
  */
 const onModelUpdate = (value: LookupModelValue) => {
+  if (isCheckingCatalogVersions.value || catalogCheckFailed.value) return
   autoSelectionAvailable.value = false
   const normalized = normalizeValues(value)
   if (closeOnSelect) menuOpen.value = false
@@ -151,7 +157,7 @@ const selectedHydrationSignature = computed(() => JSON.stringify({
   scope: selectedHydrationScopeSignature.value,
   values: normalizedValues.value
 }))
-const fetchState = useFetch<LookupResponse, Error, string>(() => fetchUrl, {
+const fetchState = useCatalogFetch<LookupResponse, Error, string>(() => fetchUrl, {
   query: requestQuery,
   default: () => ({ items: [] })
 })
@@ -165,7 +171,7 @@ const collectionSettlementGeneration: Ref<number> = ref(-1)
 const collectionPendingGeneration: Ref<number> = ref(status.value === 'pending' ? 0 : -1)
 const collectionSequenceByGeneration = new Map<number, number>([[0, ++operationSequence]])
 const currentResponseItems = computed<AdminCommonLookupResponseItem[]>(() => {
-  return responseGeneration.value === queryGeneration.value
+  return !isCheckingCatalogVersions.value && !catalogCheckFailed.value && responseGeneration.value === queryGeneration.value
     ? response.value?.items ?? []
     : []
 })
@@ -194,16 +200,22 @@ const mergeSelectedItems = (
     const storedSequence = selectedItemSequenceByValue.get(value)
     if (storedSequence !== undefined && storedSequence > requestSequence) continue
     nextItems[value] = item
+    staleSelectedValues.delete(value)
     selectedItemSequenceByValue.set(value, requestSequence)
   }
 
   selectedItemsByValue.value = nextItems
 }
 
+/**
+ * Finds selected values whose labels need an authoritative request.
+ * @returns Selected ids with absent or stale labels.
+ */
 const unresolvedSelectedValues = () => normalizedValues.value.filter(value =>
   !isPrependedValue(value)
-  && !selectedItemsByValue.value[value]
-  && !findLookupItemByValue(currentResponseItems.value, value))
+  && (staleSelectedValues.has(value)
+    || (!selectedItemsByValue.value[value]
+      && !findLookupItemByValue(currentResponseItems.value, value))))
 
 /**
  * Cancels current selected-item hydration and invalidates its results.
@@ -404,6 +416,7 @@ const applyAutomaticSingleSelection = () => {
  */
 const retryLookup = async () => {
   if (disposed) return
+  if (!await ensureCatalogVersions()) return
   const signature = selectedHydrationSignature.value
   try {
     await refreshCollection()
@@ -417,6 +430,48 @@ const retryLookup = async () => {
   await hydrateSelectedItems(normalizedValues.value)
 }
 
+const { check: checkCatalogVersions } = useCatalogCacheRefresh(
+  () => getCatalogRequestUrl(fetchUrl, requestQuery.value),
+  change => {
+    cancelSelectedItemHydration()
+    queryGeneration.value += 1
+    responseGeneration.value = -1
+    collectionSequenceByGeneration.set(queryGeneration.value, ++operationSequence)
+    collectionPendingGeneration.value = status.value === 'pending' ? queryGeneration.value : -1
+    selectedItemSequenceByValue.clear()
+    staleSelectedValues.clear()
+    if (change.securityContextChanged) {
+      selectedItemsByValue.value = {}
+      unavailableSelectedValues.value = new Set()
+      return
+    }
+    normalizedValues.value.forEach(value => staleSelectedValues.add(value))
+    // Keep historical selected labels until a fresh collection or hydration replaces them.
+    return hydrateSelectedItems(normalizedValues.value)
+  },
+  error => {
+    catalogCheckFailed.value = true
+    showError(error)
+  }
+)
+/**
+ * Holds choices until the version check settles without changing selected values.
+ * @returns Whether the current catalog versions are available.
+ */
+const ensureCatalogVersions = async (): Promise<boolean> => {
+  isCheckingCatalogVersions.value = true
+  try {
+    const success = await checkCatalogVersions()
+    if (!disposed) catalogCheckFailed.value = !success
+    return success
+  } finally {
+    if (!disposed) isCheckingCatalogVersions.value = false
+  }
+}
+watch(menuOpen, open => {
+  if (open) void ensureCatalogVersions()
+}, { flush: 'sync' })
+
 watch(collectionRequestSignature, () => {
   queryGeneration.value += 1
   collectionSequenceByGeneration.set(queryGeneration.value, ++operationSequence)
@@ -428,6 +483,7 @@ watch(selectedHydrationScopeSignature, () => {
   selectedItemsByValue.value = {}
   unavailableSelectedValues.value = new Set()
   selectedItemSequenceByValue.clear()
+  staleSelectedValues.clear()
   autoSelectionAvailable.value = autoSelectSingle && normalizedValues.value.length === 0
 }, { flush: 'sync' })
 
@@ -526,14 +582,14 @@ const resolvedSelectedItems = computed(() => normalizedValues.value.flatMap(valu
 }))
 watch(resolvedSelectedItems, items => emit('resolved-items', items), { immediate: true, flush: 'sync' })
 const hasUnavailableSelection = computed(() => unavailableSelectedValues.value.size > 0)
-const isCollectionError = computed(() => status.value === 'error' || Boolean(collectionError.value))
+const isCollectionError = computed(() => catalogCheckFailed.value || status.value === 'error' || Boolean(collectionError.value))
 const showEmptyState = computed(() =>
   status.value === 'success'
   && currentResponseItems.value.length === 0
   && normalizedValues.value.length === 0
   && debouncedSearchTerm.value.length === 0)
 const statusMessage = computed(() => {
-  if (status.value === 'pending' || isHydratingSelectedItem.value) return t('common.loading')
+  if (status.value === 'pending' || isHydratingSelectedItem.value || isCheckingCatalogVersions.value) return t('common.loading')
   if (isCollectionError.value) return t('common.lookup_load_failed')
   if (showEmptyState.value) return t('common.no_options')
   return t('common.selected_count', { count: normalizedValues.value.length })
@@ -558,8 +614,8 @@ const removeSelectedValue = (value: string) => {
         label-key="label"
         :multiple="multiple"
         :ignore-filter="true"
-        :loading="status === 'pending' || isHydratingSelectedItem"
-        :disabled="disabled || isCollectionError"
+        :loading="status === 'pending' || isHydratingSelectedItem || isCheckingCatalogVersions"
+        :disabled="disabled || isCollectionError || isCheckingCatalogVersions"
         :search-input="{ placeholder: t('common.search') }"
         v-bind="$attrs"
         @update:model-value="onModelUpdate"
