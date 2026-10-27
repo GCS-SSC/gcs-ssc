@@ -102,7 +102,7 @@ useFieldTooltipProvider(() => closeout.value && String(closeout.value.id) === St
         </UAlert>
       </div>
 
-      <div v-else-if="closeout" class="flex flex-1 flex-col">
+      <div v-else-if="closeout" data-help-target="casework.closeouts.detail.content" data-help-kind="section" data-help-view="casework.closeouts.detail" class="flex flex-1 flex-col">
         <CommonEntityHero
           :is-collapsed="isHeroCollapsed"
           icon="i-lucide-package-check"
@@ -114,8 +114,8 @@ useFieldTooltipProvider(() => closeout.value && String(closeout.value.id) === St
             isCompleted: closeout.isCompleted
           }]" />
 
-        <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-closeout-detail-content">
-          <section v-if="selectedTab === 'workflow'" class="space-y-6">
+        <CommonDetailWorkspace v-model="selectedTab" help-navigation-group-target="casework.closeouts.detail.section-navigation" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-closeout-detail-content">
+          <section v-if="selectedTab === 'workflow'" data-help-view="casework.closeouts.workflow" data-help-target="casework.closeouts.detail.workflow" data-help-kind="section" class="space-y-6">
             <CommonCompletionWorkflowPreAction
               mode="completion"
               entity-type="fundingcaseagreementcloseout"
@@ -132,6 +132,7 @@ useFieldTooltipProvider(() => closeout.value && String(closeout.value.id) === St
 
           <CommonReviewsTab
             v-else-if="selectedTab === 'reviews'"
+            data-help-view="casework.closeouts.reviews"
             entity-type="fundingcaseagreementcloseout"
             :entity-id="closeoutId"
             :can-update="isAssigned && !isRecordLocked(closeout)"
@@ -139,26 +140,29 @@ useFieldTooltipProvider(() => closeout.value && String(closeout.value.id) === St
 
           <CommonWorkflowSection
             v-else-if="selectedTab === 'workflows'"
+            data-help-view="casework.closeouts.workflows"
             entity-type="fundingcaseagreementcloseout"
             :entity-id="closeoutId"
             purpose="standard"
             :can-edit="isAssigned"
             @changed="refresh" />
 
-          <CommonWorkflowSupplementaryInformation
-            v-else-if="selectedTab === 'supplementary-information'"
-            :show-header="false"
-            entity-type="fundingcaseagreementcloseout"
-            :entity-id="closeoutId" />
+          <section v-else-if="selectedTab === 'supplementary-information'" data-help-view="casework.closeouts.supplementary-information" data-help-target="casework.closeouts.supplementary-information.content">
+            <CommonWorkflowSupplementaryInformation
 
-          <section v-else-if="selectedTab === 'documents'" class="space-y-6">
+              :show-header="false"
+              entity-type="fundingcaseagreementcloseout"
+              :entity-id="closeoutId" />
+          </section>
+
+          <section v-else-if="selectedTab === 'documents'" data-help-view="casework.closeouts.documents" data-help-target="casework.closeouts.detail.documents" data-help-kind="section" class="space-y-6">
             <AgreementCloseoutDocuments
               :agreement-id="agreementId"
               :closeout-id="closeoutId"
               :can-persist="canPersistDocument" />
           </section>
 
-          <section v-else-if="selectedTab === 'snapshots'" class="space-y-6">
+          <section v-else-if="selectedTab === 'snapshots'" data-help-view="casework.closeouts.snapshots" data-help-target="casework.closeouts.detail.snapshots" data-help-kind="section" class="space-y-6">
             <div>
               <p class="text-sm text-zinc-500 dark:text-zinc-400">
                 {{ t('agreement.closeout.snapshot_history_help') }}
@@ -177,11 +181,13 @@ useFieldTooltipProvider(() => closeout.value && String(closeout.value.id) === St
 
           <CommonAttachmentsTab
             v-else-if="selectedTab === 'attachments'"
+            data-help-view="casework.closeouts.attachments"
             entity-type="fundingcaseagreementcloseout"
             :entity-id="closeoutId" />
 
           <CommonAssignedUsers
             v-else-if="selectedTab === 'assignments'"
+            data-help-view="casework.closeouts.assignments"
             :show-header="false"
             entity-type="fundingcaseagreementcloseout"
             :entity-id="closeoutId" />

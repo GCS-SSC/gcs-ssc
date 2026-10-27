@@ -8,8 +8,11 @@ const { applicantRecipientId, canUpdate = false } = defineProps<{
 </script>
 
 <template>
-  <CommonReviewsTab
-    entity-type="applicantrecipient"
-    :entity-id="applicantRecipientId"
-    :can-update="canUpdate" />
+  <section data-help-target="proponent.reviews.content" data-help-kind="section" data-help-view="proponent.reviews" class="flex w-full min-w-0 flex-col">
+    <CommonReviewsTab
+
+      entity-type="applicantrecipient"
+      :entity-id="applicantRecipientId"
+      :can-update="canUpdate" />
+  </section>
 </template>

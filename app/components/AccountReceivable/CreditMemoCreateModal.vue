@@ -104,7 +104,7 @@ const save = async () => {
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="t('account_receivable.create_credit_memo')" :description="t('account_receivable.credit_memo_credit_instruction')" :ui="{ content: 'sm:max-w-2xl', header: 'shrink-0' }" data-field-scope="account-receivable.credit-memo-create-modal">
+  <UModal v-model:open="open" data-help-view="casework.account-receivable.credit-memo-create-modal.open" :title="t('account_receivable.create_credit_memo')" :description="t('account_receivable.credit_memo_credit_instruction')" :ui="{ content: 'sm:max-w-2xl', header: 'shrink-0' }" data-field-scope="account-receivable.credit-memo-create-modal">
     <template #body>
       <UForm v-if="state" :state="state" :validate="createValidator(AccountReceivableCreditMemoCreateSchema)" class="space-y-4" @submit="save">
         <dl class="text-sm">
@@ -139,8 +139,8 @@ const save = async () => {
           <UTextarea v-model="state.egcs_fc_reason" :disabled="pending" class="w-full" />
         </UFormField>
         <div class="flex flex-wrap justify-end gap-2">
-          <UButton type="button" color="neutral" variant="ghost" :label="t('common.cancel')" :disabled="pending" @click="open = false" />
-          <CommonSaveButton :label="t('account_receivable.create_credit_memo')" :loading="pending" :disabled="pending" />
+          <UButton data-help-target="casework.account-receivable.credit-memo-create-modal.open.common-cancel" type="button" color="neutral" variant="ghost" :label="t('common.cancel')" :disabled="pending" @click="open = false" />
+          <CommonSaveButton data-help-target="casework.account-receivable.credit-memo-create-modal.open.account-receivable-create-credit-memo" :label="t('account_receivable.create_credit_memo')" :loading="pending" :disabled="pending" />
         </div>
       </UForm>
     </template>

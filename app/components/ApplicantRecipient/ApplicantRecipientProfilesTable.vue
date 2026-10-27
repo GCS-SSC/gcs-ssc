@@ -29,6 +29,7 @@ const emit = defineEmits<{
   (event: 'edit' | 'delete', profile: ApplicantRecipientProfileRow): void
 }>()
 
+const listView = defineModel<string>('listView', { default: 'all' })
 const search = defineModel<string>('search', { default: '' })
 const statusFilter = defineModel<string>('statusFilter', { default: 'all' })
 const pagination = defineModel<{ pageIndex: number; pageSize: number }>('pagination', { required: true })
@@ -77,70 +78,73 @@ const canDeleteProfile = (profile: ApplicantRecipientProfileRow) => {
 </script>
 
 <template>
-  <CommonResourceLayoutPage
-    v-model:search="search"
-    v-model:status-filter="statusFilter"
-    v-model:pagination="pagination"
-    :data="profiles"
-    :columns="columns"
-    :bilingual-columns="bilingualColumns"
-    :total-records="totalRecords"
-    :loading="loading"
-    :request-status="requestStatus"
-    :pagination-options="{ getPaginationRowModel: getPaginationRowModel() }"
-    :button-label="t('applicant_recipient.new')"
-    :show-button="canCreate"
-    data-field-scope="applicant-recipient.profiles-table"
-    @add="emit('add')" @retry="emit('retry')">
-    <template #filters>
-      <slot name="filters" />
-      <USelect v-model="statusFilter" :items="availabilityItems" :aria-label="t('common.status_filter')" class="min-w-40" data-ui-target="applicant-recipient.profiles-table.statusFilter" />
-    </template>
-    <template #id-cell="{ row }">
-      <span class="font-mono text-xs font-bold text-zinc-400 dark:text-zinc-500">
-        {{ row.original.id }}
-      </span>
-    </template>
+  <section data-help-view="proponents.list" data-help-target="proponents.list.records" data-help-kind="section" class="flex w-full min-w-0 flex-col">
+    <CommonResourceLayoutPage
+      v-model:search="search" v-model:status-filter="statusFilter" v-model:pagination="pagination" help-search-target="proponents.list.search"
+      help-add-target="proponents.list.add"
 
-    <template #name-cell="{ row }">
-      <NuxtLink
-        :to="localePath(appRouteLocations.proponentEdit(String(row.original.id)))"
-        class="font-bold text-zinc-900 transition-colors hover:text-primary dark:text-white">
-        {{ getDisplayName(row.original) }}
-      </NuxtLink>
-    </template>
+      :data="profiles"
+      :columns="columns"
+      :bilingual-columns="bilingualColumns"
+      :total-records="totalRecords"
+      :loading="loading"
+      :request-status="requestStatus"
+      :pagination-options="{ getPaginationRowModel: getPaginationRowModel() }"
+      :button-label="t('applicant_recipient.new')"
+      :show-button="canCreate"
+      data-field-scope="applicant-recipient.profiles-table"
+      @add="emit('add')" @retry="emit('retry')">
+      <template #filters>
+        <slot name="filters" />
+        <CommonAssignedListViewSelect v-model="listView" data-field-label-en="List view" data-field-label-fr="Vue de la liste" data-ui-target="proponents.list-view" resource="applicant_recipient" />
+        <USelect v-model="statusFilter" :items="availabilityItems" :aria-label="t('common.status_filter')" class="min-w-40" data-ui-target="applicant-recipient.profiles-table.statusFilter" />
+      </template>
+      <template #id-cell="{ row }">
+        <span class="font-mono text-xs font-bold text-zinc-400 dark:text-zinc-500">
+          {{ row.original.id }}
+        </span>
+      </template>
 
-    <template #lead_agency-cell="{ row }">
-      <span class="font-semibold text-zinc-700 dark:text-zinc-300">
-        {{ getBilingualValue(row.original, 'lead_agency_name', '-') }}
-      </span>
-    </template>
+      <template #name-cell="{ row }">
+        <NuxtLink
+          :to="localePath(appRouteLocations.proponentEdit(String(row.original.id)))"
+          class="font-bold text-zinc-900 transition-colors hover:text-primary dark:text-white">
+          {{ getDisplayName(row.original) }}
+        </NuxtLink>
+      </template>
 
-    <template #egcs_ar_active-cell="{ row }">
-      <CommonStatusBadge :variant="row.original.egcs_ar_active ? 'active' : 'inactive'" />
-    </template>
+      <template #lead_agency-cell="{ row }">
+        <span class="font-semibold text-zinc-700 dark:text-zinc-300">
+          {{ getBilingualValue(row.original, 'lead_agency_name', '-') }}
+        </span>
+      </template>
 
-    <template #actions-cell="{ row }">
-      <div class="flex items-center gap-2">
-        <CommonActionButton
-          v-if="canUpdateProfile(row.original)"
-          icon="i-lucide-edit-3"
-          color="neutral"
-          variant="ghost"
-          size="sm"
-          :aria-label="`${t('common.edit')}: ${getDisplayName(row.original)}`"
-          :disabled="loading || requestStatus === 'pending'"
-          @click="emit('edit', row.original)" />
-        <CommonActionButton
-          v-if="canDeleteProfile(row.original)"
-          icon="i-lucide-trash"
-          color="error"
-          variant="ghost"
-          size="sm"
-          :aria-label="`${t('common.delete')}: ${getDisplayName(row.original)}`"
-          :disabled="loading || requestStatus === 'pending'"
-          @click="emit('delete', row.original)" />
-      </div>
-    </template>
-  </CommonResourceLayoutPage>
+      <template #egcs_ar_active-cell="{ row }">
+        <CommonStatusBadge :variant="row.original.egcs_ar_active ? 'active' : 'inactive'" />
+      </template>
+
+      <template #actions-cell="{ row }">
+        <div class="flex items-center gap-2">
+          <CommonActionButton
+            v-if="canUpdateProfile(row.original)"
+            icon="i-lucide-edit-3"
+            color="neutral"
+            variant="ghost"
+            size="sm"
+            :aria-label="`${t('common.edit')}: ${getDisplayName(row.original)}`"
+            :disabled="loading || requestStatus === 'pending'"
+            @click="emit('edit', row.original)" />
+          <CommonActionButton
+            v-if="canDeleteProfile(row.original)"
+            icon="i-lucide-trash"
+            color="error"
+            variant="ghost"
+            size="sm"
+            :aria-label="`${t('common.delete')}: ${getDisplayName(row.original)}`"
+            :disabled="loading || requestStatus === 'pending'"
+            @click="emit('delete', row.original)" />
+        </div>
+      </template>
+    </CommonResourceLayoutPage>
+  </section>
 </template>

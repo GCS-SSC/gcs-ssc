@@ -325,7 +325,7 @@ const deleteForecast = (forecastId: string) => runAction(async isCurrent => {
 </script>
 
 <template>
-  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.forecasts-tab" data-scope-label-en="Agreements > Forecasts" data-scope-label-fr="Ententes > Prévisions">
+  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.forecasts-tab" data-scope-label-en="Agreements > Forecasts" data-scope-label-fr="Ententes > Prévisions" data-help-view="agreement.forecasts" data-help-label-en="Agreements — Forecasts" data-help-label-fr="Ententes — Prévisions" data-help-target="agreement.forecasts.content" data-help-kind="section">
     <UAlert
       v-for="forecast in forecastsRequiringRevision"
       :key="forecast.id"
@@ -351,9 +351,9 @@ const deleteForecast = (forecastId: string) => runAction(async isCurrent => {
       :show-button="canCreateRole"
       :button-disabled="Boolean(pendingAction)"
       :search-placeholder="t('agreement.forecasts.search')"
-      @add="openCreateForecast"
-      @retry="refreshOverview"
-      @update:expanded="updateExpandedRows">
+      help-add-target="agreement.forecasts.add"
+      help-search-target="agreement.forecasts.search"
+      @add="openCreateForecast" @retry="refreshOverview" @update:expanded="updateExpandedRows">
       <template #version-cell="{ row }">
         <div :id="getGroupedDisclosureContentId(row as ForecastGroupedRow)" class="contents">
           <div v-if="isFiscalYearGroupRow(row as ForecastGroupedRow)" class="flex w-full items-center gap-3 py-1">
@@ -448,7 +448,7 @@ const deleteForecast = (forecastId: string) => runAction(async isCurrent => {
       v-model:open="isForecastModalOpen"
       :title="t('agreement.forecasts.add')">
       <template #body>
-        <UForm :state="selectedForecast" :validate="validateForecast" :validate-on="[]" class="space-y-4" @submit="saveForecast">
+        <UForm :state="selectedForecast" :validate="validateForecast" :validate-on="[]" class="space-y-4" data-help-view="agreement.forecasts.forecast-dialog" data-help-label-en="Agreements — Forecast editor" data-help-label-fr="Ententes — Éditeur de prévision" @submit="saveForecast">
           <UFormField :label="t('agreement.forecasts.fiscal_year')" name="egcs_fc_fiscalyear" required>
             <CommonBilingualSelectMenu
               v-model="selectedForecast.egcs_fc_fiscalyear"
@@ -461,11 +461,11 @@ const deleteForecast = (forecastId: string) => runAction(async isCurrent => {
               searchable />
           </UFormField>
           <div class="flex justify-end gap-2 pt-4">
-            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isForecastModalOpen = false" />
+            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" data-help-target="agreement.forecasts.forecast-dialog.cancel" data-help-kind="button" data-help-label-en="Cancel" data-help-label-fr="Annuler" @click="isForecastModalOpen = false" />
             <CommonSaveButton
               :label="t('common.add')"
               :loading="isSavingForecast"
-              :disabled="isSavingForecast" />
+              :disabled="isSavingForecast" data-help-target="agreement.forecasts.forecast-dialog.save" data-help-kind="button" data-help-label-en="Save" data-help-label-fr="Enregistrer" />
           </div>
         </UForm>
       </template>

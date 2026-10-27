@@ -290,7 +290,7 @@ useFieldTooltipProvider(() => payment.value && String(payment.value.id) === Stri
     <div v-else-if="isLoadingDetail && (!profile || !payment)" role="status" aria-live="polite" class="sr-only">
       <span>{{ t('common.loading_records') }}</span>
     </div>
-    <CommonDetailPage v-if="payment" id="agreement-payment-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" class="w-full">
+    <CommonDetailPage v-if="payment" id="agreement-payment-detail" v-model:collapsed="isHeroCollapsed" data-help-view="casework.payments.detail" :breadcrumb-items="breadcrumbItems" class="w-full">
       <template #body>
         <div class="flex flex-1 flex-col">
           <CommonEntityHero
@@ -310,23 +310,24 @@ useFieldTooltipProvider(() => payment.value && String(payment.value.id) === Stri
               isCompleted: payment.isCompleted
             }]" />
 
-          <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-payment-detail-content">
+          <CommonDetailWorkspace v-model="selectedTab" help-navigation-group-target="casework.payments.detail.section-navigation" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-payment-detail-content">
             <template #notices>
               <p v-if="extensionTabsStatus === 'pending'" role="status" aria-live="polite" class="sr-only">
                 {{ t('extensions.entity_tabs_loading') }}
               </p>
               <UAlert v-else-if="extensionTabsError" color="error" icon="i-lucide-circle-alert" :title="t('extensions.entity_tabs_load_failed')" :description="t('extensions.entity_tabs_load_failed_description')">
                 <template #actions>
-                  <UButton color="error" variant="soft" :label="t('common.retry')" icon="i-lucide-refresh-cw" @click="refreshExtensionTabs" />
+                  <UButton data-help-target="casework.payments.detail.common-retry" color="error" variant="soft" :label="t('common.retry')" icon="i-lucide-refresh-cw" @click="refreshExtensionTabs" />
                 </template>
               </UAlert>
             </template>
-            <CommonSection v-if="selectedTab === 'lines'" :show-header="false" :title="t('agreement.payments.lines_title')" :grid-cols="1">
+            <CommonSection v-if="selectedTab === 'lines'" data-help-view="casework.payments.lines" :show-header="false" :title="t('agreement.payments.lines_title')" :grid-cols="1">
               <AgreementPaymentRecoverySummary :payment="payment" />
               <div class="space-y-4">
                 <div class="flex justify-end">
                   <UButton
                     v-if="canCreatePaymentLine"
+                    data-help-target="casework.payments.detail.open-create-line"
                     color="primary"
                     icon="i-lucide-plus"
                     class="cursor-default"
@@ -335,39 +336,42 @@ useFieldTooltipProvider(() => payment.value && String(payment.value.id) === Stri
                   </UButton>
                 </div>
 
-                <CommonResourceLayoutCard
-                  v-model:search="search"
-                  v-model:pagination="pagination"
-                  :data="lines"
-                  :columns="columns"
-                  :total-records="lines.length"
-                  :button-label="t('agreement.payments.add_line')"
-                  :show-button="false"
-                  :search-placeholder="t('agreement.payments.search_lines')">
-                  <template #coding-cell="{ row }">
-                    <div class="flex min-w-0 max-w-full flex-col gap-1">
-                      <span class="text-sm font-semibold text-zinc-900 dark:text-white">
-                        {{ getCodingPrimaryText(row.original) }}
-                      </span>
-                      <span class="truncate text-xs text-zinc-500 dark:text-zinc-400">
-                        {{ getCodingSecondaryText(row.original) }}
-                      </span>
-                    </div>
-                  </template>
+                <section data-help-target="casework.payments.lines.records">
+                  <CommonResourceLayoutCard
+                    v-model:search="search"
+                    v-model:pagination="pagination"
+                    help-search-target="casework.payments.lines.search"
+                    :data="lines"
+                    :columns="columns"
+                    :total-records="lines.length"
+                    :button-label="t('agreement.payments.add_line')"
+                    :show-button="false"
+                    :search-placeholder="t('agreement.payments.search_lines')">
+                    <template #coding-cell="{ row }">
+                      <div class="flex min-w-0 max-w-full flex-col gap-1">
+                        <span class="text-sm font-semibold text-zinc-900 dark:text-white">
+                          {{ getCodingPrimaryText(row.original) }}
+                        </span>
+                        <span class="truncate text-xs text-zinc-500 dark:text-zinc-400">
+                          {{ getCodingSecondaryText(row.original) }}
+                        </span>
+                      </div>
+                    </template>
 
-                  <template #amount-cell="{ row }">
-                    <span class="font-medium text-zinc-700 dark:text-zinc-200">
-                      {{ formatMoney(row.original.egcs_fc_amount) }}
-                    </span>
-                  </template>
+                    <template #amount-cell="{ row }">
+                      <span class="font-medium text-zinc-700 dark:text-zinc-200">
+                        {{ formatMoney(row.original.egcs_fc_amount) }}
+                      </span>
+                    </template>
 
-                  <template #actions-cell="{ row }">
-                    <div v-if="canUpdatePayment || canDeletePaymentLine" class="flex items-center justify-end gap-2">
-                      <CommonActionButton v-if="canUpdatePayment" icon="i-lucide-pencil" color="neutral" variant="ghost" class="cursor-default" :aria-label="`${t('common.edit')}: ${row.original.commitment_line_number ?? row.original.id}`" @click="openUpdateLine(row.original)" />
-                      <CommonActionButton v-if="canDeletePaymentLine" icon="i-lucide-trash" color="error" variant="ghost" class="cursor-default" :aria-label="`${t('common.delete')}: ${row.original.commitment_line_number ?? row.original.id}`" @click="deleteLine(String(row.original.id))" />
-                    </div>
-                  </template>
-                </CommonResourceLayoutCard>
+                    <template #actions-cell="{ row }">
+                      <div v-if="canUpdatePayment || canDeletePaymentLine" class="flex items-center justify-end gap-2">
+                        <CommonActionButton v-if="canUpdatePayment" icon="i-lucide-pencil" color="neutral" variant="ghost" class="cursor-default" :aria-label="`${t('common.edit')}: ${row.original.commitment_line_number ?? row.original.id}`" @click="openUpdateLine(row.original)" />
+                        <CommonActionButton v-if="canDeletePaymentLine" icon="i-lucide-trash" color="error" variant="ghost" class="cursor-default" :aria-label="`${t('common.delete')}: ${row.original.commitment_line_number ?? row.original.id}`" @click="deleteLine(String(row.original.id))" />
+                      </div>
+                    </template>
+                  </CommonResourceLayoutCard>
+                </section>
 
                 <div class="flex justify-end">
                   <div class="rounded-sm border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm font-semibold text-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white">
@@ -377,13 +381,15 @@ useFieldTooltipProvider(() => payment.value && String(payment.value.id) === Stri
               </div>
             </CommonSection>
 
-            <AgreementPaymentEvidence
-              v-else-if="selectedTab === 'payment-evidence'"
-              :agreement-id="agreementId"
-              :payment-id="paymentId"
-              :evidence="payment.egcs_fc_evidence" />
+            <section v-else-if="selectedTab === 'payment-evidence'" data-help-view="casework.payments.payment-evidence" data-help-target="casework.payments.payment-evidence.content">
+              <AgreementPaymentEvidence
 
-            <section v-else-if="selectedTab === 'completion'" id="payment-completion" class="space-y-6">
+                :agreement-id="agreementId"
+                :payment-id="paymentId"
+                :evidence="payment.egcs_fc_evidence" />
+            </section>
+
+            <section v-else-if="selectedTab === 'completion'" id="payment-completion" data-help-view="casework.payments.completion" data-help-target="casework.payments.detail.completion" data-help-kind="section" class="space-y-6">
               <AgreementPaymentRecoverySummary :payment="payment" />
               <CommonCompletionPanel
                 entity-type="fundingcasepayment"
@@ -405,22 +411,25 @@ useFieldTooltipProvider(() => payment.value && String(payment.value.id) === Stri
 
             <CommonReviewsTab
               v-else-if="selectedTab === 'reviews'"
+              data-help-view="casework.payments.reviews"
               entity-type="fundingcasepayment"
               :entity-id="paymentId"
               :can-update="canUpdatePayment"
               @changed="refreshPage" />
 
-            <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcasepayment" :entity-id="paymentId" purpose="standard" :can-edit="canEditWorkflow" :refresh-key="approvalsRefreshKey" @changed="refreshPage" />
-            <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" :show-header="false" entity-type="fundingcasepayment" :entity-id="paymentId" />
-            <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcasepayment" :entity-id="paymentId" />
-            <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" :show-header="false" entity-type="fundingcasepayment" :entity-id="paymentId" />
+            <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" data-help-view="casework.payments.workflows" entity-type="fundingcasepayment" :entity-id="paymentId" purpose="standard" :can-edit="canEditWorkflow" :refresh-key="approvalsRefreshKey" @changed="refreshPage" />
+            <section v-else-if="selectedTab === 'supplementary-information'" data-help-view="casework.payments.supplementary-information" data-help-target="casework.payments.supplementary-information.content">
+              <CommonWorkflowSupplementaryInformation :show-header="false" entity-type="fundingcasepayment" :entity-id="paymentId" />
+            </section>
+            <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" data-help-view="casework.payments.attachments" entity-type="fundingcasepayment" :entity-id="paymentId" />
+            <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" data-help-view="casework.payments.assignments" :show-header="false" entity-type="fundingcasepayment" :entity-id="paymentId" />
             <ExtensionEntityTabPanel v-else-if="selectedExtensionTab" :item="selectedExtensionTab" />
           </CommonDetailWorkspace>
         </div>
       </template>
     </CommonDetailPage>
 
-    <UModal v-if="selectedLine" v-model:open="isLineModalOpen" :title="selectedLine.id ? t('agreement.payments.edit_line') : t('agreement.payments.add_line')" :description="t('common.form_dialog_description')">
+    <UModal v-if="selectedLine" v-model:open="isLineModalOpen" data-help-view="casework.payments.detail.is-line-modal-open" :title="selectedLine.id ? t('agreement.payments.edit_line') : t('agreement.payments.add_line')" :description="t('common.form_dialog_description')">
       <template #body>
         <UForm :state="selectedLine" :validate="validateLine" :validate-on="[]" class="space-y-4" @submit="saveLine">
           <UFormField :label="t('agreement.payments.commitment_line')" name="egcs_fc_fundingagreementcommitmentline">
@@ -441,8 +450,8 @@ useFieldTooltipProvider(() => payment.value && String(payment.value.id) === Stri
           </UFormField>
 
           <div class="flex justify-end gap-2 pt-4">
-            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isLineModalOpen = false" />
-            <CommonSaveButton :label="selectedLine.id ? t('common.update') : t('common.add')" :loading="isSavingLine" :disabled="isSavingLine" />
+            <UButton data-help-target="casework.payments.detail.is-line-modal-open.common-cancel" :label="t('common.cancel')" color="neutral" variant="ghost" @click="isLineModalOpen = false" />
+            <CommonSaveButton data-help-target="casework.payments.detail.is-line-modal-open.common-update" :label="selectedLine.id ? t('common.update') : t('common.add')" :loading="isSavingLine" :disabled="isSavingLine" />
           </div>
         </UForm>
       </template>

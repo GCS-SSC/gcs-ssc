@@ -171,59 +171,62 @@ const getAgencyLookupUrl = (state: ApplicantRecipientAgencyFinancialIdForm) => {
 </script>
 
 <template>
-  <CommonResourceCrud
-    class="w-full"
-    :title="t('applicant_recipient.agency_financial_ids.title')"
-    icon="i-lucide-landmark"
-    :fetch-url="`/api/applicant-recipients/${applicantRecipientId}/agency-financial-ids`"
-    :post-url="canCreateRole ? `/api/applicant-recipients/${applicantRecipientId}/agency-financial-ids` : undefined"
-    :update-url-base="canUpdateRole ? `/api/applicant-recipients/${applicantRecipientId}/agency-financial-ids` : undefined"
-    :delete-url-base="canDeleteRole ? `/api/applicant-recipients/${applicantRecipientId}/agency-financial-ids` : undefined"
-    :schema="ApplicantRecipientAgencyFinancialIdCreateSchema"
-    :initial-new-item="{ egcs_ar_active: true }"
-    :before-open="beforeOpen"
-    :before-save="beforeSave"
-    :before-delete="beforeDelete"
-    :columns="columns"
-    :bilingual-columns="bilingualColumns"
-    :button-label="t('common.add')"
-    :show-button="canCreateRole"
-    :modal-title="t('applicant_recipient.agency_financial_ids.add')"
-    :update-title="t('applicant_recipient.agency_financial_ids.edit')"
-    :search-placeholder="t('applicant_recipient.agency_financial_ids.search')" data-field-scope="applicant-recipient.agency-financial-ids-tab">
-    <template #egcs_ar_active-cell="{ row }">
-      <CommonStatusBadge
-        :variant="row.original.egcs_ar_active ? 'active' : 'inactive'"
-        :label-key="row.original.egcs_ar_active ? 'common.active' : 'applicant_recipient.agency_financial_ids.disabled'" />
-    </template>
+  <section data-help-target="proponent.agency-financial-ids.content" data-help-kind="section" data-help-view="proponent.agency-financial-ids" class="flex w-full min-w-0 flex-col">
+    <CommonResourceCrud
+      help-search-target="proponent.agency-financial-ids.search" help-save-target="proponent.agency-financial-ids.save" help-add-target="proponent.agency-financial-ids.add"
+      class="w-full"
+      :title="t('applicant_recipient.agency_financial_ids.title')"
+      icon="i-lucide-landmark"
+      :fetch-url="`/api/applicant-recipients/${applicantRecipientId}/agency-financial-ids`"
+      :post-url="canCreateRole ? `/api/applicant-recipients/${applicantRecipientId}/agency-financial-ids` : undefined"
+      :update-url-base="canUpdateRole ? `/api/applicant-recipients/${applicantRecipientId}/agency-financial-ids` : undefined"
+      :delete-url-base="canDeleteRole ? `/api/applicant-recipients/${applicantRecipientId}/agency-financial-ids` : undefined"
+      :schema="ApplicantRecipientAgencyFinancialIdCreateSchema"
+      :initial-new-item="{ egcs_ar_active: true }"
+      :before-open="beforeOpen"
+      :before-save="beforeSave"
+      :before-delete="beforeDelete"
+      :columns="columns"
+      :bilingual-columns="bilingualColumns"
+      :button-label="t('common.add')"
+      :show-button="canCreateRole"
+      :modal-title="t('applicant_recipient.agency_financial_ids.add')"
+      :update-title="t('applicant_recipient.agency_financial_ids.edit')"
+      :search-placeholder="t('applicant_recipient.agency_financial_ids.search')" data-field-scope="applicant-recipient.agency-financial-ids-tab">
+      <template #egcs_ar_active-cell="{ row }">
+        <CommonStatusBadge
+          :variant="row.original.egcs_ar_active ? 'active' : 'inactive'"
+          :label-key="row.original.egcs_ar_active ? 'common.active' : 'applicant_recipient.agency_financial_ids.disabled'" />
+      </template>
 
-    <template #form="{ state }">
-      <UFormField :label="t('applicant_recipient.agency_financial_ids.agency')" name="egcs_ar_agency">
-        <CommonServerLookupSelect
-          :model-value="(state as ApplicantRecipientAgencyFinancialIdForm).egcs_ar_agency"
-          :fetch-url="getAgencyLookupUrl(state as ApplicantRecipientAgencyFinancialIdForm)"
-          value-key="id"
-          label-en-key="egcs_ay_name_en"
-          label-fr-key="egcs_ay_name_fr"
-          :placeholder="t('applicant_recipient.agency_financial_ids.agency_placeholder')"
-          searchable
-          @update:model-value="value => (state as ApplicantRecipientAgencyFinancialIdForm).egcs_ar_agency = value as string | undefined" />
-      </UFormField>
+      <template #form="{ state }">
+        <UFormField :label="t('applicant_recipient.agency_financial_ids.agency')" name="egcs_ar_agency">
+          <CommonServerLookupSelect
+            :model-value="(state as ApplicantRecipientAgencyFinancialIdForm).egcs_ar_agency"
+            :fetch-url="getAgencyLookupUrl(state as ApplicantRecipientAgencyFinancialIdForm)"
+            value-key="id"
+            label-en-key="egcs_ay_name_en"
+            label-fr-key="egcs_ay_name_fr"
+            :placeholder="t('applicant_recipient.agency_financial_ids.agency_placeholder')"
+            searchable
+            @update:model-value="value => (state as ApplicantRecipientAgencyFinancialIdForm).egcs_ar_agency = value as string | undefined" />
+        </UFormField>
 
-      <UFormField :label="t('applicant_recipient.agency_financial_ids.financial_system_id')" name="egcs_ar_financialsystemid">
-        <UInput
-          :model-value="String((state as ApplicantRecipientAgencyFinancialIdForm).egcs_ar_financialsystemid ?? '')"
-          type="text"
-          @update:model-value="value => (state as ApplicantRecipientAgencyFinancialIdForm).egcs_ar_financialsystemid = value === '' ? undefined : String(value)" />
-      </UFormField>
+        <UFormField :label="t('applicant_recipient.agency_financial_ids.financial_system_id')" name="egcs_ar_financialsystemid">
+          <UInput
+            :model-value="String((state as ApplicantRecipientAgencyFinancialIdForm).egcs_ar_financialsystemid ?? '')"
+            type="text"
+            @update:model-value="value => (state as ApplicantRecipientAgencyFinancialIdForm).egcs_ar_financialsystemid = value === '' ? undefined : String(value)" />
+        </UFormField>
 
-      <UFormField
-        :description="t('applicant_recipient.agency_financial_ids.active_help')"
-        name="egcs_ar_active">
-        <USwitch v-model="(state as ApplicantRecipientAgencyFinancialIdForm).egcs_ar_active" :label="t('common.active')" />
-      </UFormField>
-    </template>
-  </CommonResourceCrud>
+        <UFormField
+          :description="t('applicant_recipient.agency_financial_ids.active_help')"
+          name="egcs_ar_active">
+          <USwitch v-model="(state as ApplicantRecipientAgencyFinancialIdForm).egcs_ar_active" :label="t('common.active')" />
+        </UFormField>
+      </template>
+    </CommonResourceCrud>
+  </section>
 
   <UModal
     v-model:open="warningOpen"

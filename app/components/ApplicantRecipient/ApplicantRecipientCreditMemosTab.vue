@@ -131,7 +131,7 @@ const memoDetailPath = (memo: ProponentCreditMemoRow): string | undefined => {
 </script>
 
 <template>
-  <div class="min-w-0 space-y-6" data-testid="proponent-credit-memos">
+  <div data-help-target="proponent.credit-memos.content" data-help-kind="section" data-help-view="proponent.credit-memos" class="min-w-0 space-y-6" data-testid="proponent-credit-memos">
     <ApplicantRecipientAccountBalances :applicant-recipient-id="applicantRecipientId" />
     <CommonSection :show-header="false" :title="t('account_receivable.credit_memos_title')" :grid-cols="1">
       <p class="text-sm text-muted">
@@ -139,6 +139,7 @@ const memoDetailPath = (memo: ProponentCreditMemoRow): string | undefined => {
       </p>
       <CommonResourceLayoutCard
         v-model:search="search" v-model:pagination="pagination"
+        help-add-target="proponent.credit-memos.add" help-search-target="proponent.credit-memos.search"
         :data="items" :columns="columns" :total-records="totalRecords"
         :loading="status === 'pending'" :request-status="status" :show-button="canCreate"
         :button-label="t('account_receivable.create_credit_memo')"

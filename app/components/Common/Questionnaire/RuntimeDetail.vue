@@ -2,7 +2,7 @@
 import { useFieldTooltipProvider } from '~/composables/useFieldTooltipProvider'
 import { usePageResourceError } from '~/composables/usePageResourceError'
 /* eslint-disable jsdoc/require-jsdoc -- concise page-local interaction handlers are self-documenting */
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, defineComponent, Fragment, h, onBeforeUnmount, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import type { GuideObservedContext } from '@gcs-ssc/guided-help/runtime'
 import type { JsonValue } from '~~/shared/types/database'
@@ -56,6 +56,10 @@ const { entityId, configuration, embedded = false, helpContext } = defineProps<{
   embedded?: boolean
   helpContext?: GuideObservedContext
 }>()
+const QuestionnaireHelpView = defineComponent({
+  inheritAttrs: false,
+  setup: (_props, { attrs, slots }) => () => embedded ? h(Fragment, slots.default?.()) : h('div', attrs, slots.default?.())
+})
 const emit = defineEmits<{ changed: [] }>()
 const guidedHelpActions = useGuidedHelpActions()
 const route = useRoute()
@@ -298,87 +302,96 @@ const save = async (submit: boolean) => {
 <template>
   <QuestionnaireRuntimeShell v-model:collapsed="isHeroCollapsed" :embedded="embedded" :panel-id="configuration.panelId" :breadcrumb-items="breadcrumbItems">
     <template #default>
-      <div v-if="data" class="flex flex-1 flex-col">
-        <CommonEntityHero
-          v-if="!embedded"
-          :is-collapsed="isHeroCollapsed"
-          :icon="configuration.icon"
-          :title="title"
-          :meta-items="[t(`${configuration.messagePrefix}.identifier`, { id: entityId })]"
-          :badges="heroBadges" />
-        <div :class="embedded ? 'min-w-0 space-y-8' : 'mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-6 py-6'">
-          <UButton
-            v-if="data.can_claim"
-            icon="i-lucide-user-plus" :label="t('groups.claim')"
-            :loading="isClaiming" :disabled="isClaiming" class="self-start" @click="claim" />
+      <div v-if="data && String(data.id) === entityId" class="flex flex-1 flex-col">
+        <QuestionnaireHelpView data-help-view="casework.questionnaire" class="flex flex-1 flex-col">
+          <CommonEntityHero
+            v-if="!embedded"
+            :is-collapsed="isHeroCollapsed"
+            :icon="configuration.icon"
+            :title="title"
+            :meta-items="[t(`${configuration.messagePrefix}.identifier`, { id: entityId })]"
+            :badges="heroBadges" />
+          <div :class="embedded ? 'min-w-0 space-y-8' : 'mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-6 py-6'">
+            <UButton
+              v-if="data.can_claim" data-help-target="casework.questionnaire.claim" data-help-kind="button"
+              icon="i-lucide-user-plus" :label="t('groups.claim')"
+              :loading="isClaiming" :disabled="isClaiming" class="self-start" @click="claim" />
 
-          <UAlert
-            v-if="!isEditable"
-            color="neutral"
-            variant="soft"
-            icon="i-lucide-eye"
-            :title="t('assignments.read_only_title')"
-            :description="readOnlyDescription" />
+            <UAlert
+              v-if="!isEditable"
+              color="neutral"
+              variant="soft"
+              icon="i-lucide-eye"
+              :title="t('assignments.read_only_title')"
+              :description="readOnlyDescription" />
 
-          <UAlert
-            v-if="validationIssues.length > 0"
-            color="error"
-            variant="soft"
-            icon="i-lucide-circle-alert"
-            :title="t(`${configuration.messagePrefix}.validation_title`)"
-            :description="t('questionnaire.validation_description')" />
+            <UAlert
+              v-if="validationIssues.length > 0"
+              color="error"
+              variant="soft"
+              icon="i-lucide-circle-alert"
+              :title="t(`${configuration.messagePrefix}.validation_title`)"
+              :description="t('questionnaire.validation_description')" />
 
-          <UAlert v-if="hasRevisionConflict" color="warning" icon="i-lucide-refresh-cw" :title="t('questionnaire.revision_conflict')" :description="t('questionnaire.revision_conflict_description')">
-            <template #actions>
-              <UButton color="warning" variant="soft" :label="t('questionnaire.reload_responses')" @click="reloadResponses" />
-            </template>
-          </UAlert>
+            <UAlert v-if="hasRevisionConflict" color="warning" icon="i-lucide-refresh-cw" :title="t('questionnaire.revision_conflict')" :description="t('questionnaire.revision_conflict_description')">
+              <template #actions>
+                <UButton color="warning" variant="soft" :label="t('questionnaire.reload_responses')" @click="reloadResponses" />
+              </template>
+            </UAlert>
 
-          <CommonWorkflowApprovalPacket
-            v-if="data.approval_submission_packet && data.approval_submission_hash && data.approval_submission_submitted_at"
-            :submission="{
-              egcs_fc_packet: data.approval_submission_packet,
-              egcs_fc_canonicalhash: data.approval_submission_hash,
-              egcs_fc_submittedat: data.approval_submission_submitted_at
-            }" />
+            <CommonWorkflowApprovalPacket
+              v-if="data.approval_submission_packet && data.approval_submission_hash && data.approval_submission_submitted_at"
+              :submission="{
+                egcs_fc_packet: data.approval_submission_packet,
+                egcs_fc_canonicalhash: data.approval_submission_hash,
+                egcs_fc_submittedat: data.approval_submission_submitted_at
+              }" />
 
-          <CommonSection :title="t(`${configuration.messagePrefix}.responses`)" badge="01" :grid-cols="1">
-            <div class="space-y-6">
-              <CommonQuestionnaireForm
-                v-model:responses="responses"
-                :definition="data.definition"
-                :issues="validationIssues"
-                :readonly="!isEditable || mutation.isActionPending('submit')" />
-              <div v-if="showMutationActions" class="flex flex-wrap justify-end gap-2 border-t border-zinc-200 pt-5 dark:border-zinc-800">
-                <CommonSaveButton
-                  :label="t('common.save')"
-                  variant="outline"
-                  :loading="isSaving"
-                  :disabled="isSaving || (configuration.entityType !== 'commondatacollection' && hasRevisionConflict)"
-                  @click="save(false)" />
-                <UButton
-                  icon="i-lucide-send"
-                  :label="t('common.submit')"
-                  :loading="isSaving"
-                  :disabled="isSaving || (configuration.entityType !== 'commondatacollection' && hasRevisionConflict)"
-                  @click="save(true)" />
-              </div>
-            </div>
-          </CommonSection>
+            <section data-help-target="casework.questionnaire.responses" data-help-kind="section" class="flex w-full min-w-0 flex-col">
+              <CommonSection :title="t(`${configuration.messagePrefix}.responses`)" badge="01" :grid-cols="1">
+                <div class="space-y-6">
+                  <CommonQuestionnaireForm
+                    v-model:responses="responses"
+                    :definition="data.definition"
+                    :issues="validationIssues"
+                    :readonly="!isEditable || mutation.isActionPending('submit')" />
+                  <div v-if="showMutationActions" class="flex flex-wrap justify-end gap-2 border-t border-zinc-200 pt-5 dark:border-zinc-800">
+                    <CommonSaveButton
+                      data-help-target="casework.questionnaire.save" data-help-kind="button"
+                      :label="t('common.save')"
+                      variant="outline"
+                      :loading="isSaving"
+                      :disabled="isSaving || (configuration.entityType !== 'commondatacollection' && hasRevisionConflict)"
+                      @click="save(false)" />
+                    <UButton
+                      icon="i-lucide-send" data-help-target="casework.questionnaire.submit" data-help-kind="button"
+                      :label="t('common.submit')"
+                      :loading="isSaving"
+                      :disabled="isSaving || (configuration.entityType !== 'commondatacollection' && hasRevisionConflict)"
+                      @click="save(true)" />
+                  </div>
+                </div>
+              </CommonSection>
+            </section>
 
-          <CommonSection v-if="data.approvalRuntimeId" :title="t('assessment.approvals.title')" badge="02" :grid-cols="1">
-            <AssessmentApprovalsSection
-              :entity-type="configuration.entityType"
-              :entity-id="entityId"
-              :routing-slip-id="data.routingSlipId"
-              hide-title
-              @changed="handleRuntimeChanged" />
-          </CommonSection>
+            <section v-if="data.approvalRuntimeId" data-help-target="casework.questionnaire.approvals" data-help-kind="section" class="flex w-full min-w-0 flex-col">
+              <CommonSection :title="t('assessment.approvals.title')" badge="02" :grid-cols="1">
+                <AssessmentApprovalsSection
+                  :entity-type="configuration.entityType"
+                  :entity-id="entityId"
+                  :routing-slip-id="data.routingSlipId"
+                  hide-title
+                  @changed="handleRuntimeChanged" />
+              </CommonSection>
+            </section>
 
-          <CommonSection v-if="data.can_read_assignments !== false" :title="t('assignments.title')" :badge="assignmentSectionBadge" :grid-cols="1">
-            <CommonAssignedUsers :key="`${runtimeIdentity}:${assignmentRosterVersion}`" :show-header="false" :entity-type="configuration.entityType" :entity-id="entityId" @changed="handleRuntimeChanged" />
-          </CommonSection>
-        </div>
+            <section v-if="data.can_read_assignments !== false" data-help-target="casework.questionnaire.assignments" data-help-kind="section" class="flex w-full min-w-0 flex-col">
+              <CommonSection :title="t('assignments.title')" :badge="assignmentSectionBadge" :grid-cols="1">
+                <CommonAssignedUsers :key="`${runtimeIdentity}:${assignmentRosterVersion}`" :show-header="false" :entity-type="configuration.entityType" :entity-id="entityId" @changed="handleRuntimeChanged" />
+              </CommonSection>
+            </section>
+          </div>
+        </QuestionnaireHelpView>
       </div>
 
       <div v-else-if="status === 'pending'" class="sr-only" role="status" aria-live="polite">

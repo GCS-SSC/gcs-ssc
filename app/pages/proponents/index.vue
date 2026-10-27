@@ -181,6 +181,7 @@ const canDeleteProfile = (profile: ApplicantRecipientProfileRow) => {
 
         <ApplicantRecipientProfilesTable
           v-model:search="search"
+          v-model:list-view="listView"
           v-model:status-filter="statusFilter"
           v-model:pagination="pagination"
           v-model:column-filters="columnFilters"
@@ -195,11 +196,7 @@ const canDeleteProfile = (profile: ApplicantRecipientProfileRow) => {
           @retry="retry"
           @add="openCreateProfile"
           @edit="openUpdateProfile"
-          @delete="deleteProfile">
-          <template #filters>
-            <CommonAssignedListViewSelect v-model="listView" data-field-label-en="List view" data-field-label-fr="Vue de la liste" data-ui-target="proponents.list-view" resource="applicant_recipient" />
-          </template>
-        </ApplicantRecipientProfilesTable>
+          @delete="deleteProfile" />
       </div>
     </template>
   </UDashboardPanel>

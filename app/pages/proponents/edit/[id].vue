@@ -158,7 +158,7 @@ const retryProfile = async () => {
       </template>
     </UAlert>
 
-    <CommonDetailPage v-else-if="profile" id="applicant-recipient-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" class="min-w-0 flex-1">
+    <CommonDetailPage v-else-if="profile" id="applicant-recipient-detail" v-model:collapsed="isHeroCollapsed" data-help-view="proponent.detail" :breadcrumb-items="breadcrumbItems" class="min-w-0 flex-1">
       <template #body>
         <div class="flex flex-1 flex-col">
           <ApplicantRecipientProfileHero
@@ -169,7 +169,7 @@ const retryProfile = async () => {
             show-status
             show-lead-agency />
 
-          <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="proponent-detail-content">
+          <CommonDetailWorkspace v-model="selectedTab" help-navigation-group-target="proponent.detail.section-navigation" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="proponent-detail-content">
             <ApplicantRecipientProfileFormPage
               v-if="isGeneralTab && selectedProfile && profile.can_update_role"
               v-model:model="selectedProfile"

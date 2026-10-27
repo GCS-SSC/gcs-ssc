@@ -201,7 +201,7 @@ const deleteMonitor = async (monitorId: string) => {
 </script>
 
 <template>
-  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.monitors-tab" data-scope-label-en="Agreements > Monitors" data-scope-label-fr="Ententes > Surveillances">
+  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.monitors-tab" data-scope-label-en="Agreements > Monitors" data-scope-label-fr="Ententes > Surveillances" data-help-view="agreement.monitors" data-help-label-en="Agreements — Monitors" data-help-label-fr="Ententes — Surveillances" data-help-target="agreement.monitors.content" data-help-kind="section">
     <CommonResourceLayoutCard
       v-model:search="search"
       v-model:pagination="pagination"
@@ -214,8 +214,8 @@ const deleteMonitor = async (monitorId: string) => {
       :show-button="canCreate"
       :button-disabled="pendingMonitorActions.has('create')"
       :search-placeholder="t('agreement.monitors.search')"
-      @add="openMonitor()"
-      @retry="refreshOverview">
+      help-add-target="agreement.monitors.add"
+      help-search-target="agreement.monitors.search" @add="openMonitor()" @retry="refreshOverview">
       <template #type-cell="{ row }">
         <ULink
           :to="localePath(appRouteLocations.agreementMonitorDetail(agreementId, String(row.original.id)))"
@@ -270,7 +270,7 @@ const deleteMonitor = async (monitorId: string) => {
       v-model:open="isMonitorModalOpen" data-field-scope="agreement.monitors-tab" data-scope-label-en="Agreements > Monitors > Create or update Monitor" data-scope-label-fr="Ententes > Surveillances > Créer ou mettre à jour la surveillance"
       :title="selectedMonitor.id ? t('agreement.monitors.edit') : t('agreement.monitors.add')">
       <template #body>
-        <UForm :state="selectedMonitor" :validate="validateMonitor" :validate-on="[]" class="space-y-4" @submit="saveMonitor">
+        <UForm :state="selectedMonitor" :validate="validateMonitor" :validate-on="[]" class="space-y-4" data-help-view="agreement.monitors.monitor-dialog" data-help-label-en="Agreements — Monitor editor" data-help-label-fr="Ententes — Éditeur de surveillance" @submit="saveMonitor">
           <UFormField :label="t('agreement.monitors.type')" name="egcs_fc_type">
             <CommonServerLookupSelect
               v-model="selectedMonitor.egcs_fc_type"
@@ -302,8 +302,8 @@ const deleteMonitor = async (monitorId: string) => {
             <USwitch v-model="selectedMonitor.egcs_fc_onsite" />
           </UFormField>
           <div class="flex justify-end gap-2 pt-4">
-            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isMonitorModalOpen = false" />
-            <CommonSaveButton :label="selectedMonitor.id ? t('common.update') : t('common.add')" :loading="isSavingMonitor" :disabled="isSavingMonitor" />
+            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" data-help-target="agreement.monitors.monitor-dialog.cancel" data-help-kind="button" data-help-label-en="Cancel" data-help-label-fr="Annuler" @click="isMonitorModalOpen = false" />
+            <CommonSaveButton :label="selectedMonitor.id ? t('common.update') : t('common.add')" :loading="isSavingMonitor" :disabled="isSavingMonitor" data-help-target="agreement.monitors.monitor-dialog.save" data-help-kind="button" data-help-label-en="Save" data-help-label-fr="Enregistrer" />
           </div>
         </UForm>
       </template>

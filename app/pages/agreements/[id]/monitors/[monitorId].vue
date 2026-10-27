@@ -500,7 +500,7 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
     <div v-else-if="isLoadingDetail && (!profile || !monitor)" role="status" aria-live="polite" class="sr-only">
       <span>{{ t('common.loading_records') }}</span>
     </div>
-    <CommonDetailPage v-if="monitor" id="agreement-monitor-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" class="w-full">
+    <CommonDetailPage v-if="monitor" id="agreement-monitor-detail" v-model:collapsed="isHeroCollapsed" data-help-view="casework.monitors.detail" :breadcrumb-items="breadcrumbItems" class="w-full">
       <template #body>
         <div class="flex flex-1 flex-col">
           <CommonEntityHero
@@ -514,180 +514,195 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
               isCompleted: monitor.isCompleted
             }]" />
 
-          <CommonDetailWorkspace v-model="selectedMonitorTab" data-field-container="Page navigation state, not a business input field." :items="monitorTabs" content-test-id="agreement-monitor-detail-content" :priority-values="['planning', 'items', 'findings', 'followups', 'promising-practices']">
-            <div v-if="selectedMonitorTab === 'planning'" class="w-full min-w-0">
+          <CommonDetailWorkspace v-model="selectedMonitorTab" help-navigation-group-target="casework.monitors.detail.section-navigation" data-field-container="Page navigation state, not a business input field." :items="monitorTabs" content-test-id="agreement-monitor-detail-content" :priority-values="['planning', 'items', 'findings', 'followups', 'promising-practices']">
+            <div v-if="selectedMonitorTab === 'planning'" data-help-view="casework.monitors.planning" data-help-target="casework.monitors.detail.planning" data-help-kind="section" class="w-full min-w-0">
               <div class="space-y-6">
-                <CommonResourceLayoutCard
-                  v-model:search="planningSearch"
-                  v-model:pagination="planningPagination"
-                  :data="planningRows"
-                  :columns="[
-                    { id: 'objective', accessorKey: 'egcs_fc_objective', headerKey: 'agreement.monitors.planning.objective' },
-                    { id: 'actions', headerKey: 'common.actions' }
-                  ]"
-                  :total-records="planningRows.length"
-                  :button-label="t('agreement.monitors.planning.add')"
-                  :show-button="canCreateMonitorResource"
-                  :button-disabled="isLoadingDetail"
-                  @add="openResourceEditor('create', () => planningModal.openCreate())">
-                  <template #actions-cell="{ row }">
-                    <div v-if="canUpdateMonitorRole || canDeleteMonitorResource" class="flex justify-end gap-2">
-                      <CommonActionButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asPlanningRow(row.original).id}`" @click="openResourceEditor('update', () => planningModal.openUpdate(asPlanningRow(row.original)))" />
-                      <CommonActionButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-planning', asPlanningRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asPlanningRow(row.original).id}`" @click="deleteResource('monitor-planning', String(asPlanningRow(row.original).id))" />
-                    </div>
-                  </template>
-                </CommonResourceLayoutCard>
+                <section data-help-target="casework.monitors.planning.records">
+                  <CommonResourceLayoutCard
+                    v-model:search="planningSearch" v-model:pagination="planningPagination"
+                    help-add-target="casework.monitors.planning.add"
+                    help-search-target="casework.monitors.planning.search"
+                    :data="planningRows"
+                    :columns="[
+                      { id: 'objective', accessorKey: 'egcs_fc_objective', headerKey: 'agreement.monitors.planning.objective' },
+                      { id: 'actions', headerKey: 'common.actions' }
+                    ]"
+                    :total-records="planningRows.length"
+                    :button-label="t('agreement.monitors.planning.add')"
+                    :show-button="canCreateMonitorResource"
+                    :button-disabled="isLoadingDetail"
+                    @add="openResourceEditor('create', () => planningModal.openCreate())">
+                    <template #actions-cell="{ row }">
+                      <div v-if="canUpdateMonitorRole || canDeleteMonitorResource" class="flex justify-end gap-2">
+                        <CommonActionButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asPlanningRow(row.original).id}`" @click="openResourceEditor('update', () => planningModal.openUpdate(asPlanningRow(row.original)))" />
+                        <CommonActionButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-planning', asPlanningRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asPlanningRow(row.original).id}`" @click="deleteResource('monitor-planning', String(asPlanningRow(row.original).id))" />
+                      </div>
+                    </template>
+                  </CommonResourceLayoutCard>
+                </section>
               </div>
             </div>
 
-            <div v-else-if="selectedMonitorTab === 'items'" class="w-full min-w-0">
+            <div v-else-if="selectedMonitorTab === 'items'" data-help-view="casework.monitors.items" data-help-target="casework.monitors.detail.items" data-help-kind="section" class="w-full min-w-0">
               <div class="space-y-3">
                 <div class="flex justify-end">
-                  <UButton v-if="canCreateMonitorResource" :disabled="isLoadingDetail" icon="i-lucide-plus" :label="t('agreement.monitors.items.add')" @click="openResourceEditor('create', () => itemModal.openCreate())" />
+                  <UButton v-if="canCreateMonitorResource" data-help-target="casework.monitors.detail.items-add" :disabled="isLoadingDetail" icon="i-lucide-plus" :label="t('agreement.monitors.items.add')" @click="openResourceEditor('create', () => itemModal.openCreate())" />
                 </div>
-                <CommonResourceLayoutCard
-                  v-model:search="itemSearch"
-                  v-model:pagination="itemPagination"
-                  :data="itemRows"
-                  :columns="[
-                    { id: 'item', accessorKey: 'egcs_fc_item', headerKey: 'agreement.monitors.items.item' },
-                    { id: 'planning', headerKey: 'agreement.monitors.planning.title' },
-                    { id: 'planned', headerKey: 'agreement.monitors.items.planned' },
-                    { id: 'actual', headerKey: 'agreement.monitors.items.actual' },
-                    { id: 'monitored', accessorKey: 'egcs_fc_monitored', headerKey: 'agreement.monitors.items.monitored' },
-                    { id: 'actions', headerKey: 'common.actions' }
-                  ]" :total-records="itemRows.length" :show-button="false">
-                  <template #planning-cell="{ row }">
-                    {{ linkedLabel(planningOptions, asItemRow(row.original).egcs_fc_monitorplanning) }}
-                  </template>
-                  <template #planned-cell="{ row }">
-                    {{ formatMonitorDateRange(asItemRow(row.original).egcs_fc_plannedstart, asItemRow(row.original).egcs_fc_plannedend) }}
-                  </template>
-                  <template #actual-cell="{ row }">
-                    {{ formatMonitorDateRange(asItemRow(row.original).egcs_fc_actualstart, asItemRow(row.original).egcs_fc_actualend) }}
-                  </template>
-                  <template #monitored-cell="{ row }">
-                    {{ asItemRow(row.original).egcs_fc_monitored ? t('common.yes') : t('common.no') }}
-                  </template>
-                  <template #actions-cell="{ row }">
-                    <div v-if="canUpdateMonitorRole || canDeleteMonitorResource" class="flex justify-end gap-2">
-                      <CommonActionButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asItemRow(row.original).id}`" @click="openResourceEditor('update', () => itemModal.openUpdate(asItemRow(row.original)))" />
-                      <CommonActionButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-items', asItemRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asItemRow(row.original).id}`" @click="deleteResource('monitor-items', String(asItemRow(row.original).id))" />
-                    </div>
-                  </template>
-                </CommonResourceLayoutCard>
+                <section data-help-target="casework.monitors.items.records">
+                  <CommonResourceLayoutCard
+                    v-model:search="itemSearch"
+                    v-model:pagination="itemPagination"
+                    help-search-target="casework.monitors.items.search"
+                    :data="itemRows"
+                    :columns="[
+                      { id: 'item', accessorKey: 'egcs_fc_item', headerKey: 'agreement.monitors.items.item' },
+                      { id: 'planning', headerKey: 'agreement.monitors.planning.title' },
+                      { id: 'planned', headerKey: 'agreement.monitors.items.planned' },
+                      { id: 'actual', headerKey: 'agreement.monitors.items.actual' },
+                      { id: 'monitored', accessorKey: 'egcs_fc_monitored', headerKey: 'agreement.monitors.items.monitored' },
+                      { id: 'actions', headerKey: 'common.actions' }
+                    ]" :total-records="itemRows.length" :show-button="false">
+                    <template #planning-cell="{ row }">
+                      {{ linkedLabel(planningOptions, asItemRow(row.original).egcs_fc_monitorplanning) }}
+                    </template>
+                    <template #planned-cell="{ row }">
+                      {{ formatMonitorDateRange(asItemRow(row.original).egcs_fc_plannedstart, asItemRow(row.original).egcs_fc_plannedend) }}
+                    </template>
+                    <template #actual-cell="{ row }">
+                      {{ formatMonitorDateRange(asItemRow(row.original).egcs_fc_actualstart, asItemRow(row.original).egcs_fc_actualend) }}
+                    </template>
+                    <template #monitored-cell="{ row }">
+                      {{ asItemRow(row.original).egcs_fc_monitored ? t('common.yes') : t('common.no') }}
+                    </template>
+                    <template #actions-cell="{ row }">
+                      <div v-if="canUpdateMonitorRole || canDeleteMonitorResource" class="flex justify-end gap-2">
+                        <CommonActionButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asItemRow(row.original).id}`" @click="openResourceEditor('update', () => itemModal.openUpdate(asItemRow(row.original)))" />
+                        <CommonActionButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-items', asItemRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asItemRow(row.original).id}`" @click="deleteResource('monitor-items', String(asItemRow(row.original).id))" />
+                      </div>
+                    </template>
+                  </CommonResourceLayoutCard>
+                </section>
               </div>
             </div>
 
-            <div v-else-if="selectedMonitorTab === 'findings'" class="w-full min-w-0">
+            <div v-else-if="selectedMonitorTab === 'findings'" data-help-view="casework.monitors.findings" data-help-target="casework.monitors.detail.findings" data-help-kind="section" class="w-full min-w-0">
               <div class="space-y-3">
                 <div class="flex justify-end">
-                  <UButton v-if="canCreateMonitorResource" :disabled="isLoadingDetail" icon="i-lucide-plus" :label="t('agreement.monitors.findings.add')" @click="openResourceEditor('create', () => findingModal.openCreate())" />
+                  <UButton v-if="canCreateMonitorResource" data-help-target="casework.monitors.detail.findings-add" :disabled="isLoadingDetail" icon="i-lucide-plus" :label="t('agreement.monitors.findings.add')" @click="openResourceEditor('create', () => findingModal.openCreate())" />
                 </div>
-                <CommonResourceLayoutCard
-                  v-model:search="findingSearch"
-                  v-model:pagination="findingPagination"
-                  :data="findingRows"
-                  :columns="[
-                    { id: 'name', accessorKey: 'egcs_fc_findingname', headerKey: 'agreement.monitors.findings.name' },
-                    { id: 'monitorItem', headerKey: 'agreement.monitors.items.title' },
-                    { id: 'type', accessorKey: 'egcs_fc_recommendationtype', headerKey: 'agreement.monitors.findings.recommendation_type' },
-                    { id: 'responsible', accessorKey: 'egcs_fc_responsibleparty', headerKey: 'agreement.monitors.responsible_party' },
-                    { id: 'actions', headerKey: 'common.actions' }
-                  ]" :total-records="findingRows.length" :show-button="false">
-                  <template #monitorItem-cell="{ row }">
-                    {{ linkedLabel(itemOptions, asFindingRow(row.original).egcs_fc_monitoritem) }}
-                  </template>
-                  <template #type-cell="{ row }">
-                    {{ t(`enums.monitor_action_type.${asFindingRow(row.original).egcs_fc_recommendationtype}`) }}
-                  </template>
-                  <template #responsible-cell="{ row }">
-                    {{ t(`enums.monitor_responsible_party.${asFindingRow(row.original).egcs_fc_responsibleparty}`) }}
-                  </template>
-                  <template #actions-cell="{ row }">
-                    <div v-if="canUpdateMonitorRole || canDeleteMonitorResource" class="flex justify-end gap-2">
-                      <CommonActionButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asFindingRow(row.original).id}`" @click="openResourceEditor('update', () => findingModal.openUpdate(asFindingRow(row.original)))" />
-                      <CommonActionButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-findings', asFindingRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asFindingRow(row.original).id}`" @click="deleteResource('monitor-findings', String(asFindingRow(row.original).id))" />
-                    </div>
-                  </template>
-                </CommonResourceLayoutCard>
+                <section data-help-target="casework.monitors.findings.records">
+                  <CommonResourceLayoutCard
+                    v-model:search="findingSearch"
+                    v-model:pagination="findingPagination"
+                    help-search-target="casework.monitors.findings.search"
+                    :data="findingRows"
+                    :columns="[
+                      { id: 'name', accessorKey: 'egcs_fc_findingname', headerKey: 'agreement.monitors.findings.name' },
+                      { id: 'monitorItem', headerKey: 'agreement.monitors.items.title' },
+                      { id: 'type', accessorKey: 'egcs_fc_recommendationtype', headerKey: 'agreement.monitors.findings.recommendation_type' },
+                      { id: 'responsible', accessorKey: 'egcs_fc_responsibleparty', headerKey: 'agreement.monitors.responsible_party' },
+                      { id: 'actions', headerKey: 'common.actions' }
+                    ]" :total-records="findingRows.length" :show-button="false">
+                    <template #monitorItem-cell="{ row }">
+                      {{ linkedLabel(itemOptions, asFindingRow(row.original).egcs_fc_monitoritem) }}
+                    </template>
+                    <template #type-cell="{ row }">
+                      {{ t(`enums.monitor_action_type.${asFindingRow(row.original).egcs_fc_recommendationtype}`) }}
+                    </template>
+                    <template #responsible-cell="{ row }">
+                      {{ t(`enums.monitor_responsible_party.${asFindingRow(row.original).egcs_fc_responsibleparty}`) }}
+                    </template>
+                    <template #actions-cell="{ row }">
+                      <div v-if="canUpdateMonitorRole || canDeleteMonitorResource" class="flex justify-end gap-2">
+                        <CommonActionButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asFindingRow(row.original).id}`" @click="openResourceEditor('update', () => findingModal.openUpdate(asFindingRow(row.original)))" />
+                        <CommonActionButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-findings', asFindingRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asFindingRow(row.original).id}`" @click="deleteResource('monitor-findings', String(asFindingRow(row.original).id))" />
+                      </div>
+                    </template>
+                  </CommonResourceLayoutCard>
+                </section>
               </div>
             </div>
 
-            <div v-else-if="selectedMonitorTab === 'followups'" class="w-full min-w-0">
+            <div v-else-if="selectedMonitorTab === 'followups'" data-help-view="casework.monitors.followups" data-help-target="casework.monitors.detail.followups" data-help-kind="section" class="w-full min-w-0">
               <div class="space-y-3">
                 <div class="flex justify-end">
-                  <UButton v-if="canCreateMonitorResource" :disabled="isLoadingDetail" icon="i-lucide-plus" :label="t('agreement.monitors.followups.add')" @click="openResourceEditor('create', () => followupModal.openCreate())" />
+                  <UButton v-if="canCreateMonitorResource" data-help-target="casework.monitors.detail.followups-add" :disabled="isLoadingDetail" icon="i-lucide-plus" :label="t('agreement.monitors.followups.add')" @click="openResourceEditor('create', () => followupModal.openCreate())" />
                 </div>
-                <CommonResourceLayoutCard
-                  v-model:search="followupSearch"
-                  v-model:pagination="followupPagination"
-                  :data="followupRows"
-                  :columns="[
-                    { id: 'name', accessorKey: 'egcs_fc_followupname', headerKey: 'agreement.monitors.followups.name' },
-                    { id: 'finding', headerKey: 'agreement.monitors.findings.title' },
-                    { id: 'responsible', accessorKey: 'egcs_fc_responsibleparty', headerKey: 'agreement.monitors.responsible_party' },
-                    { id: 'status', accessorKey: 'egcs_fc_status', headerKey: 'common.status' },
-                    { id: 'dueDate', accessorKey: 'egcs_fc_duedate', headerKey: 'agreement.monitors.followups.due_date' },
-                    { id: 'updates', headerKey: 'agreement.monitors.followups.updates' },
-                    { id: 'actions', headerKey: 'common.actions' }
-                  ]" :total-records="followupRows.length" :show-button="false">
-                  <template #finding-cell="{ row }">
-                    {{ linkedLabel(findingOptions, asFollowupRow(row.original).egcs_fc_monitorfinding) }}
-                  </template>
-                  <template #responsible-cell="{ row }">
-                    {{ t(`enums.monitor_responsible_party.${asFollowupRow(row.original).egcs_fc_responsibleparty}`) }}
-                  </template>
-                  <template #status-cell="{ row }">
-                    <CommonStatusBadge
-                      enum-name="follow_up_status"
-                      :status="asFollowupRow(row.original).egcs_fc_status"
-                      class="w-fit cursor-default" />
-                  </template>
-                  <template #dueDate-cell="{ row }">
-                    {{ formatDate(asFollowupRow(row.original).egcs_fc_duedate) }}
-                  </template>
-                  <template #updates-cell="{ row }">
-                    <CommonStatusBadge variant="message" :label="t('agreement.monitors.followups.updates_count', { count: getFollowupUpdates(asFollowupRow(row.original).id).length })" />
-                  </template>
-                  <template #actions-cell="{ row }">
-                    <div class="flex justify-end gap-2">
-                      <CommonActionButton icon="i-lucide-eye" color="neutral" variant="ghost" :aria-label="t('agreement.monitors.followups.view_updates')" @click="openViewUpdates(asFollowupRow(row.original))" />
-                      <CommonActionButton v-if="canCreateMonitorResource" :disabled="isLoadingDetail" icon="i-lucide-message-square-plus" color="neutral" variant="ghost" :aria-label="`${t('agreement.monitors.followups.add_update')}: ${asFollowupRow(row.original).id}`" @click="openCreateUpdate(asFollowupRow(row.original))" />
-                      <CommonActionButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asFollowupRow(row.original).id}`" @click="openResourceEditor('update', () => followupModal.openUpdate(asFollowupRow(row.original)))" />
-                      <CommonActionButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-followups', asFollowupRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asFollowupRow(row.original).id}`" @click="deleteResource('monitor-followups', String(asFollowupRow(row.original).id))" />
-                    </div>
-                  </template>
-                </CommonResourceLayoutCard>
+                <section data-help-target="casework.monitors.followups.records">
+                  <CommonResourceLayoutCard
+                    v-model:search="followupSearch"
+                    v-model:pagination="followupPagination"
+                    help-search-target="casework.monitors.followups.search"
+                    :data="followupRows"
+                    :columns="[
+                      { id: 'name', accessorKey: 'egcs_fc_followupname', headerKey: 'agreement.monitors.followups.name' },
+                      { id: 'finding', headerKey: 'agreement.monitors.findings.title' },
+                      { id: 'responsible', accessorKey: 'egcs_fc_responsibleparty', headerKey: 'agreement.monitors.responsible_party' },
+                      { id: 'status', accessorKey: 'egcs_fc_status', headerKey: 'common.status' },
+                      { id: 'dueDate', accessorKey: 'egcs_fc_duedate', headerKey: 'agreement.monitors.followups.due_date' },
+                      { id: 'updates', headerKey: 'agreement.monitors.followups.updates' },
+                      { id: 'actions', headerKey: 'common.actions' }
+                    ]" :total-records="followupRows.length" :show-button="false">
+                    <template #finding-cell="{ row }">
+                      {{ linkedLabel(findingOptions, asFollowupRow(row.original).egcs_fc_monitorfinding) }}
+                    </template>
+                    <template #responsible-cell="{ row }">
+                      {{ t(`enums.monitor_responsible_party.${asFollowupRow(row.original).egcs_fc_responsibleparty}`) }}
+                    </template>
+                    <template #status-cell="{ row }">
+                      <CommonStatusBadge
+                        enum-name="follow_up_status"
+                        :status="asFollowupRow(row.original).egcs_fc_status"
+                        class="w-fit cursor-default" />
+                    </template>
+                    <template #dueDate-cell="{ row }">
+                      {{ formatDate(asFollowupRow(row.original).egcs_fc_duedate) }}
+                    </template>
+                    <template #updates-cell="{ row }">
+                      <CommonStatusBadge variant="message" :label="t('agreement.monitors.followups.updates_count', { count: getFollowupUpdates(asFollowupRow(row.original).id).length })" />
+                    </template>
+                    <template #actions-cell="{ row }">
+                      <div class="flex justify-end gap-2">
+                        <CommonActionButton icon="i-lucide-eye" color="neutral" variant="ghost" :aria-label="t('agreement.monitors.followups.view_updates')" @click="openViewUpdates(asFollowupRow(row.original))" />
+                        <CommonActionButton v-if="canCreateMonitorResource" :disabled="isLoadingDetail" icon="i-lucide-message-square-plus" color="neutral" variant="ghost" :aria-label="`${t('agreement.monitors.followups.add_update')}: ${asFollowupRow(row.original).id}`" @click="openCreateUpdate(asFollowupRow(row.original))" />
+                        <CommonActionButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asFollowupRow(row.original).id}`" @click="openResourceEditor('update', () => followupModal.openUpdate(asFollowupRow(row.original)))" />
+                        <CommonActionButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-followups', asFollowupRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asFollowupRow(row.original).id}`" @click="deleteResource('monitor-followups', String(asFollowupRow(row.original).id))" />
+                      </div>
+                    </template>
+                  </CommonResourceLayoutCard>
+                </section>
               </div>
             </div>
 
-            <div v-else-if="selectedMonitorTab === 'promising-practices'" class="w-full min-w-0">
+            <div v-else-if="selectedMonitorTab === 'promising-practices'" data-help-target="casework.monitors.promising-practices.content" data-help-kind="section" data-help-view="casework.monitors.promising-practices" class="w-full min-w-0">
               <div class="space-y-3">
-                <CommonResourceLayoutCard
-                  v-model:search="practiceSearch"
-                  v-model:pagination="practicePagination"
-                  :data="practiceRows"
-                  :columns="[
-                    { id: 'practice', accessorKey: 'egcs_fc_practice', headerKey: 'agreement.monitors.promising_practices.practice' },
-                    { id: 'actions', headerKey: 'common.actions' }
-                  ]"
-                  :total-records="practiceRows.length"
-                  :button-label="t('agreement.monitors.promising_practices.add')"
-                  :show-button="canCreateMonitorResource"
-                  :button-disabled="isLoadingDetail"
-                  @add="openResourceEditor('create', () => practiceModal.openCreate())">
-                  <template #actions-cell="{ row }">
-                    <div v-if="canUpdateMonitorRole || canDeleteMonitorResource" class="flex justify-end gap-2">
-                      <CommonActionButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asPracticeRow(row.original).id}`" @click="openResourceEditor('update', () => practiceModal.openUpdate(asPracticeRow(row.original)))" />
-                      <CommonActionButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-promising-practices', asPracticeRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asPracticeRow(row.original).id}`" @click="deleteResource('monitor-promising-practices', String(asPracticeRow(row.original).id))" />
-                    </div>
-                  </template>
-                </CommonResourceLayoutCard>
+                <section data-help-target="casework.monitors.promising-practices.records">
+                  <CommonResourceLayoutCard
+                    v-model:search="practiceSearch" v-model:pagination="practicePagination"
+                    help-add-target="casework.monitors.promising-practices.add"
+                    help-search-target="casework.monitors.promising-practices.search"
+                    :data="practiceRows"
+                    :columns="[
+                      { id: 'practice', accessorKey: 'egcs_fc_practice', headerKey: 'agreement.monitors.promising_practices.practice' },
+                      { id: 'actions', headerKey: 'common.actions' }
+                    ]"
+                    :total-records="practiceRows.length"
+                    :button-label="t('agreement.monitors.promising_practices.add')"
+                    :show-button="canCreateMonitorResource"
+                    :button-disabled="isLoadingDetail"
+                    @add="openResourceEditor('create', () => practiceModal.openCreate())">
+                    <template #actions-cell="{ row }">
+                      <div v-if="canUpdateMonitorRole || canDeleteMonitorResource" class="flex justify-end gap-2">
+                        <CommonActionButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" :aria-label="`${t('common.edit')}: ${asPracticeRow(row.original).id}`" @click="openResourceEditor('update', () => practiceModal.openUpdate(asPracticeRow(row.original)))" />
+                        <CommonActionButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" :disabled="isLoadingDetail || isResourceDeleting('monitor-promising-practices', asPracticeRow(row.original).id)" :aria-label="`${t('common.delete')}: ${asPracticeRow(row.original).id}`" @click="deleteResource('monitor-promising-practices', String(asPracticeRow(row.original).id))" />
+                      </div>
+                    </template>
+                  </CommonResourceLayoutCard>
+                </section>
               </div>
             </div>
 
-            <section v-else-if="selectedMonitorTab === 'workflow'" class="w-full min-w-0 space-y-6">
+            <section v-else-if="selectedMonitorTab === 'workflow'" data-help-view="casework.monitors.workflow" data-help-target="casework.monitors.detail.workflow" data-help-kind="section" class="w-full min-w-0 space-y-6">
               <CommonCompletionPanel
                 entity-type="fundingcasemonitor"
                 :entity-id="monitorId"
@@ -711,6 +726,7 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
 
             <CommonReviewsTab
               v-else-if="selectedMonitorTab === 'reviews'"
+              data-help-view="casework.monitors.reviews"
               entity-type="fundingcasemonitor"
               :entity-id="monitorId"
               :can-update="canUpdateMonitor"
@@ -718,6 +734,7 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
 
             <CommonWorkflowSection
               v-else-if="selectedMonitorTab === 'workflows'"
+              data-help-view="casework.monitors.workflows"
               entity-type="fundingcasemonitor"
               :entity-id="monitorId"
               purpose="standard"
@@ -727,20 +744,24 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
               :refresh-key="approvalsRefreshKey"
               @changed="handleCompleted" />
 
-            <CommonWorkflowSupplementaryInformation
-              v-else-if="selectedMonitorTab === 'supplementary-information'"
-              :show-header="false"
-              entity-type="fundingcasemonitor"
-              :entity-id="monitorId" />
+            <section v-else-if="selectedMonitorTab === 'supplementary-information'" data-help-view="casework.monitors.supplementary-information" data-help-target="casework.monitors.supplementary-information.content">
+              <CommonWorkflowSupplementaryInformation
+
+                :show-header="false"
+                entity-type="fundingcasemonitor"
+                :entity-id="monitorId" />
+            </section>
 
             <CommonAssignedUsers
               v-else-if="selectedMonitorTab === 'assignments'"
+              data-help-view="casework.monitors.assignments"
               :show-header="false"
               entity-type="fundingcasemonitor"
               :entity-id="monitorId" />
 
             <CommonAttachmentsTab
               v-else-if="selectedMonitorTab === 'attachments'"
+              data-help-view="casework.monitors.attachments"
               entity-type="fundingcasemonitor"
               :entity-id="monitorId" />
 
@@ -752,7 +773,7 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
       </template>
     </CommonDetailPage>
 
-    <UModal v-if="monitor" v-model:open="isMetadataModalOpen" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > General" data-scope-label-fr="Ententes > Surveillances > Général" :title="t('agreement.monitors.edit')" :description="t('common.form_dialog_description')">
+    <UModal v-if="monitor" v-model:open="isMetadataModalOpen" data-help-view="casework.monitors.detail.is-metadata-modal-open" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > General" data-scope-label-fr="Ententes > Surveillances > Général" :title="t('agreement.monitors.edit')" :description="t('common.form_dialog_description')">
       <template #body>
         <UForm
           v-if="monitorMetadata"
@@ -809,9 +830,10 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
             </UFormField>
           </div>
           <div class="flex justify-end gap-2">
-            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isMetadataModalOpen = false" />
+            <UButton data-help-target="casework.monitors.detail.is-metadata-modal-open.common-cancel" :label="t('common.cancel')" color="neutral" variant="ghost" @click="isMetadataModalOpen = false" />
             <CommonSaveButton
               v-if="canUpdateMonitorRole && !monitor.isCompleted"
+              data-help-target="casework.monitors.detail.is-metadata-modal-open.common-save"
               :label="t('common.save')"
               :loading="isSavingMonitorMetadata"
               :disabled="isLoadingDetail || isSavingMonitorMetadata" />
@@ -820,20 +842,20 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
       </template>
     </UModal>
 
-    <UModal v-if="selectedPlanning" v-model:open="isPlanningModalOpen" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > Planning" data-scope-label-fr="Ententes > Surveillances > Planification" :title="selectedPlanning.id ? t('agreement.monitors.planning.edit') : t('agreement.monitors.planning.add')" :description="t('common.form_dialog_description')">
+    <UModal v-if="selectedPlanning" v-model:open="isPlanningModalOpen" data-help-view="casework.monitors.detail.is-planning-modal-open" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > Planning" data-scope-label-fr="Ententes > Surveillances > Planification" :title="selectedPlanning.id ? t('agreement.monitors.planning.edit') : t('agreement.monitors.planning.add')" :description="t('common.form_dialog_description')">
       <template #body>
         <UForm :state="selectedPlanning" :validate="validatePlanning" :validate-on="[]" class="space-y-4" @submit="savePlanning">
           <UFormField :label="t('agreement.monitors.planning.objective')" name="egcs_fc_objective">
             <UTextarea v-model="selectedPlanning.egcs_fc_objective" class="w-full" />
           </UFormField>
           <div class="flex justify-end gap-2">
-            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isPlanningModalOpen = false" /><CommonSaveButton :label="t('common.save')" :loading="isResourceSaving('planning', planningModal)" :disabled="isLoadingDetail || isResourceSaving('planning', planningModal)" />
+            <UButton data-help-target="casework.monitors.detail.is-planning-modal-open.common-cancel" :label="t('common.cancel')" color="neutral" variant="ghost" @click="isPlanningModalOpen = false" /><CommonSaveButton data-help-target="casework.monitors.detail.is-planning-modal-open.common-save" :label="t('common.save')" :loading="isResourceSaving('planning', planningModal)" :disabled="isLoadingDetail || isResourceSaving('planning', planningModal)" />
           </div>
         </UForm>
       </template>
     </UModal>
 
-    <UModal v-if="selectedItem" v-model:open="isItemModalOpen" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > Monitor items" data-scope-label-fr="Ententes > Surveillances > Éléments de surveillance" :title="selectedItem.id ? t('agreement.monitors.items.edit') : t('agreement.monitors.items.add')" :description="t('common.form_dialog_description')">
+    <UModal v-if="selectedItem" v-model:open="isItemModalOpen" data-help-view="casework.monitors.detail.is-item-modal-open" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > Monitor items" data-scope-label-fr="Ententes > Surveillances > Éléments de surveillance" :title="selectedItem.id ? t('agreement.monitors.items.edit') : t('agreement.monitors.items.add')" :description="t('common.form_dialog_description')">
       <template #body>
         <UForm :state="selectedItem" :validate="validateItem" :validate-on="[]" class="space-y-4" @submit="saveItem">
           <UFormField :label="t('agreement.monitors.items.item')" name="egcs_fc_item">
@@ -863,13 +885,13 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
             <CommonBilingualSelectMenu v-model="selectedItem.egcs_fc_monitorplanning" :items="planningOptions" label-en-key="label_en" label-fr-key="label_fr" :prepend-options="[{ label: t('common.none'), value: null }]" searchable class="w-full" />
           </UFormField>
           <div class="flex justify-end gap-2">
-            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isItemModalOpen = false" /><CommonSaveButton :label="t('common.save')" :loading="isResourceSaving('item', itemModal)" :disabled="isLoadingDetail || isResourceSaving('item', itemModal)" />
+            <UButton data-help-target="casework.monitors.detail.is-item-modal-open.common-cancel" :label="t('common.cancel')" color="neutral" variant="ghost" @click="isItemModalOpen = false" /><CommonSaveButton data-help-target="casework.monitors.detail.is-item-modal-open.common-save" :label="t('common.save')" :loading="isResourceSaving('item', itemModal)" :disabled="isLoadingDetail || isResourceSaving('item', itemModal)" />
           </div>
         </UForm>
       </template>
     </UModal>
 
-    <UModal v-if="selectedFinding" v-model:open="isFindingModalOpen" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > Findings" data-scope-label-fr="Ententes > Surveillances > Constatations" :title="selectedFinding.id ? t('agreement.monitors.findings.edit') : t('agreement.monitors.findings.add')" :description="t('common.form_dialog_description')">
+    <UModal v-if="selectedFinding" v-model:open="isFindingModalOpen" data-help-view="casework.monitors.detail.is-finding-modal-open" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > Findings" data-scope-label-fr="Ententes > Surveillances > Constatations" :title="selectedFinding.id ? t('agreement.monitors.findings.edit') : t('agreement.monitors.findings.add')" :description="t('common.form_dialog_description')">
       <template #body>
         <UForm :state="selectedFinding" :validate="validateFinding" :validate-on="[]" class="space-y-4" @submit="saveFinding">
           <UFormField :label="t('agreement.monitors.findings.item_link')" name="egcs_fc_monitoritem">
@@ -888,13 +910,13 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
             <UTextarea v-model="selectedFinding.egcs_fc_detail" />
           </UFormField>
           <div class="flex justify-end gap-2">
-            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isFindingModalOpen = false" /><CommonSaveButton :label="t('common.save')" :loading="isResourceSaving('finding', findingModal)" :disabled="isLoadingDetail || isResourceSaving('finding', findingModal)" />
+            <UButton data-help-target="casework.monitors.detail.is-finding-modal-open.common-cancel" :label="t('common.cancel')" color="neutral" variant="ghost" @click="isFindingModalOpen = false" /><CommonSaveButton data-help-target="casework.monitors.detail.is-finding-modal-open.common-save" :label="t('common.save')" :loading="isResourceSaving('finding', findingModal)" :disabled="isLoadingDetail || isResourceSaving('finding', findingModal)" />
           </div>
         </UForm>
       </template>
     </UModal>
 
-    <UModal v-if="selectedFollowup" v-model:open="isFollowupModalOpen" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > Follow-ups" data-scope-label-fr="Ententes > Surveillances > Suivis" :title="selectedFollowup.id ? t('agreement.monitors.followups.edit') : t('agreement.monitors.followups.add')" :description="t('common.form_dialog_description')">
+    <UModal v-if="selectedFollowup" v-model:open="isFollowupModalOpen" data-help-view="casework.monitors.detail.is-followup-modal-open" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > Follow-ups" data-scope-label-fr="Ententes > Surveillances > Suivis" :title="selectedFollowup.id ? t('agreement.monitors.followups.edit') : t('agreement.monitors.followups.add')" :description="t('common.form_dialog_description')">
       <template #body>
         <UForm :state="selectedFollowup" :validate="validateFollowup" :validate-on="[]" class="space-y-4" @submit="saveFollowup">
           <UFormField :label="t('agreement.monitors.followups.finding_link')" name="egcs_fc_monitorfinding">
@@ -913,13 +935,13 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
             <UInput v-model="selectedFollowup.egcs_fc_duedate" type="date" />
           </UFormField>
           <div class="flex justify-end gap-2">
-            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isFollowupModalOpen = false" /><CommonSaveButton :label="t('common.save')" :loading="isResourceSaving('followup', followupModal)" :disabled="isLoadingDetail || isResourceSaving('followup', followupModal)" />
+            <UButton data-help-target="casework.monitors.detail.is-followup-modal-open.common-cancel" :label="t('common.cancel')" color="neutral" variant="ghost" @click="isFollowupModalOpen = false" /><CommonSaveButton data-help-target="casework.monitors.detail.is-followup-modal-open.common-save" :label="t('common.save')" :loading="isResourceSaving('followup', followupModal)" :disabled="isLoadingDetail || isResourceSaving('followup', followupModal)" />
           </div>
         </UForm>
       </template>
     </UModal>
 
-    <UModal v-if="selectedUpdate" v-model:open="isUpdateModalOpen" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > Follow-up updates" data-scope-label-fr="Ententes > Surveillances > Mises à jour des suivis" :title="selectedUpdate.id ? t('agreement.monitors.followups.edit_update') : t('agreement.monitors.followups.add_update')" :description="t('common.form_dialog_description')">
+    <UModal v-if="selectedUpdate" v-model:open="isUpdateModalOpen" data-help-view="casework.monitors.detail.is-update-modal-open" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > Follow-up updates" data-scope-label-fr="Ententes > Surveillances > Mises à jour des suivis" :title="selectedUpdate.id ? t('agreement.monitors.followups.edit_update') : t('agreement.monitors.followups.add_update')" :description="t('common.form_dialog_description')">
       <template #body>
         <UForm :state="selectedUpdate" :validate="validateUpdate" :validate-on="[]" class="space-y-4" @submit="saveUpdate">
           <UFormField :label="t('agreement.monitors.followups.update')" name="egcs_fc_update">
@@ -932,54 +954,56 @@ useFieldTooltipProvider(() => monitor.value && String(monitor.value.id) === Stri
             <CommonDatePicker v-model="selectedUpdate.egcs_fc_updatedate" />
           </UFormField>
           <div class="flex justify-end gap-2">
-            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isUpdateModalOpen = false" /><CommonSaveButton :label="t('common.save')" :loading="isResourceSaving('update', updateModal)" :disabled="isLoadingDetail || isResourceSaving('update', updateModal)" />
+            <UButton data-help-target="casework.monitors.detail.is-update-modal-open.common-cancel" :label="t('common.cancel')" color="neutral" variant="ghost" @click="isUpdateModalOpen = false" /><CommonSaveButton data-help-target="casework.monitors.detail.is-update-modal-open.common-save" :label="t('common.save')" :loading="isResourceSaving('update', updateModal)" :disabled="isLoadingDetail || isResourceSaving('update', updateModal)" />
           </div>
         </UForm>
       </template>
     </UModal>
 
-    <UModal v-if="viewedFollowup" v-model:open="isUpdatesViewModalOpen" :title="t('agreement.monitors.followups.updates_for', { name: viewedFollowup.egcs_fc_followupname })" :description="t('common.view_dialog_description')">
+    <UModal v-if="viewedFollowup" v-model:open="isUpdatesViewModalOpen" data-help-view="casework.monitors.detail.is-updates-view-modal-open" :title="t('agreement.monitors.followups.updates_for', { name: viewedFollowup.egcs_fc_followupname })" :description="t('common.view_dialog_description')">
       <template #body>
-        <div class="space-y-3">
-          <div v-if="viewedFollowupUpdates.length === 0" class="text-sm text-muted">
-            {{ t('agreement.monitors.followups.no_updates') }}
-          </div>
+        <section data-help-target="casework.monitors.detail.is-updates-view-modal-open.content">
+          <div class="space-y-3">
+            <div v-if="viewedFollowupUpdates.length === 0" class="text-sm text-muted">
+              {{ t('agreement.monitors.followups.no_updates') }}
+            </div>
 
-          <div
-            v-for="update in viewedFollowupUpdates"
-            :key="update.id"
-            class="border-default flex items-start justify-between gap-4 border-b pb-3">
-            <div class="min-w-0 space-y-2">
-              <div class="flex flex-wrap items-center gap-2">
-                <CommonStatusBadge
-                  enum-name="follow_up_status"
-                  :status="update.egcs_fc_status"
-                  class="w-fit cursor-default" />
-                <span class="text-xs font-medium text-muted">
-                  {{ formatDate(update.egcs_fc_updatedate) }}
-                </span>
+            <div
+              v-for="update in viewedFollowupUpdates"
+              :key="update.id"
+              class="border-default flex items-start justify-between gap-4 border-b pb-3">
+              <div class="min-w-0 space-y-2">
+                <div class="flex flex-wrap items-center gap-2">
+                  <CommonStatusBadge
+                    enum-name="follow_up_status"
+                    :status="update.egcs_fc_status"
+                    class="w-fit cursor-default" />
+                  <span class="text-xs font-medium text-muted">
+                    {{ formatDate(update.egcs_fc_updatedate) }}
+                  </span>
+                </div>
+                <p class="text-sm">
+                  {{ update.egcs_fc_update }}
+                </p>
               </div>
-              <p class="text-sm">
-                {{ update.egcs_fc_update }}
-              </p>
-            </div>
-            <div v-if="canUpdateMonitorRole || canDeleteMonitorResource" class="flex shrink-0 gap-2">
-              <CommonActionButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" size="xs" :aria-label="`${t('common.edit')}: ${update.id}`" @click="openResourceEditor('update', () => updateModal.openUpdate(update))" />
-              <CommonActionButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" size="xs" :disabled="isLoadingDetail || isResourceDeleting('monitor-followup-updates', update.id)" :aria-label="`${t('common.delete')}: ${update.id}`" @click="deleteResource('monitor-followup-updates', String(update.id))" />
+              <div v-if="canUpdateMonitorRole || canDeleteMonitorResource" class="flex shrink-0 gap-2">
+                <CommonActionButton v-if="canUpdateMonitorRole" :disabled="isLoadingDetail" icon="i-lucide-pencil" color="neutral" variant="ghost" size="xs" :aria-label="`${t('common.edit')}: ${update.id}`" @click="openResourceEditor('update', () => updateModal.openUpdate(update))" />
+                <CommonActionButton v-if="canDeleteMonitorResource" icon="i-lucide-trash" color="error" variant="ghost" size="xs" :disabled="isLoadingDetail || isResourceDeleting('monitor-followup-updates', update.id)" :aria-label="`${t('common.delete')}: ${update.id}`" @click="deleteResource('monitor-followup-updates', String(update.id))" />
+              </div>
             </div>
           </div>
-        </div>
+        </section>
       </template>
     </UModal>
 
-    <UModal v-if="selectedPractice" v-model:open="isPracticeModalOpen" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > Promising practices" data-scope-label-fr="Ententes > Surveillances > Pratiques prometteuses" :title="selectedPractice.id ? t('agreement.monitors.promising_practices.edit') : t('agreement.monitors.promising_practices.add')" :description="t('common.form_dialog_description')">
+    <UModal v-if="selectedPractice" v-model:open="isPracticeModalOpen" data-help-view="casework.monitors.detail.is-practice-modal-open" data-field-scope="agreements.monitors" data-scope-label-en="Agreements > Monitors > Promising practices" data-scope-label-fr="Ententes > Surveillances > Pratiques prometteuses" :title="selectedPractice.id ? t('agreement.monitors.promising_practices.edit') : t('agreement.monitors.promising_practices.add')" :description="t('common.form_dialog_description')">
       <template #body>
         <UForm :state="selectedPractice" :validate="validatePractice" :validate-on="[]" class="space-y-4" @submit="savePractice">
           <UFormField :label="t('agreement.monitors.promising_practices.practice')" name="egcs_fc_practice">
             <UTextarea v-model="selectedPractice.egcs_fc_practice" />
           </UFormField>
           <div class="flex justify-end gap-2">
-            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isPracticeModalOpen = false" /><CommonSaveButton :label="t('common.save')" :loading="isResourceSaving('practice', practiceModal)" :disabled="isLoadingDetail || isResourceSaving('practice', practiceModal)" />
+            <UButton data-help-target="casework.monitors.detail.is-practice-modal-open.common-cancel" :label="t('common.cancel')" color="neutral" variant="ghost" @click="isPracticeModalOpen = false" /><CommonSaveButton data-help-target="casework.monitors.detail.is-practice-modal-open.common-save" :label="t('common.save')" :loading="isResourceSaving('practice', practiceModal)" :disabled="isLoadingDetail || isResourceSaving('practice', practiceModal)" />
           </div>
         </UForm>
       </template>

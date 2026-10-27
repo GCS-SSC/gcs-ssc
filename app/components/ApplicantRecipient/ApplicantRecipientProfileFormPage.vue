@@ -31,7 +31,7 @@ const onSubmit = () => {
 </script>
 
 <template>
-  <div class="w-full">
+  <div data-help-view="proponent.profile" class="w-full">
     <UForm :state="model" :validate="validate" class="space-y-8" @submit="onSubmit">
       <ApplicantRecipientFieldsApplicantRecipientProfileFields
         v-model:model="model"
@@ -40,12 +40,13 @@ const onSubmit = () => {
 
       <div class="flex flex-col-reverse justify-end gap-3 border-t border-zinc-200 pt-6 sm:flex-row dark:border-zinc-800">
         <UButton
+          data-help-target="proponent.profile.cancel" data-help-kind="button"
           color="neutral"
           variant="ghost"
           :label="cancelLabel"
           :disabled="pending"
           @click="emit('cancel')" />
-        <CommonSaveButton :label="submitLabel" :loading="pending" :disabled="pending" />
+        <CommonSaveButton data-help-target="proponent.profile.save" data-help-kind="button" :label="submitLabel" :loading="pending" :disabled="pending" />
       </div>
     </UForm>
   </div>

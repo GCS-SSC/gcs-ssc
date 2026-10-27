@@ -192,13 +192,13 @@ useFieldTooltipProvider(() => receivable.value && String(receivable.value.id) ==
     <div v-else-if="!receivable && status === 'pending'" role="status" aria-live="polite" class="sr-only">
       <span>{{ t('common.loading_records') }}</span>
     </div>
-    <CommonDetailPage v-if="receivable && state" id="agreement-account-receivable-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbs" class="min-w-0 flex-1">
+    <CommonDetailPage v-if="receivable && state" id="agreement-account-receivable-detail" v-model:collapsed="isHeroCollapsed" data-help-view="casework.account-receivables.detail" :breadcrumb-items="breadcrumbs" class="min-w-0 flex-1">
       <template #body>
         <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-hand-coins" :title="accountReceivableReference(receivable)" :meta-items="[getBilingualValue(receivable, 'egcs_fc_debtorname', t('common.not_available')), receivable.egcs_fc_fiscalyeardisplay, receivable.egcs_fc_currency.toUpperCase()]" :badges="heroBadges" :actions="heroActions" />
         <ULink v-if="receivable.egcs_fc_linkedreceivable && receivable.egcs_fc_parentreadable" :to="localePath(appRouteLocations.agreementAccountReceivableDetail(agreementId, receivable.egcs_fc_linkedreceivable))" class="mb-4 text-sm">{{ t('account_receivable.linked_receivable') }}</ULink>
-        <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-account-receivable-detail-content">
-          <AccountReceivableDetailLines v-if="selectedTab === 'lines'" :account-receivable-id="accountReceivableId" :lines="receivable.egcs_fc_lines" :currency="receivable.egcs_fc_currency" :fiscal-year-id="receivable.egcs_fc_agencyfiscalyear" :is-adjustment="Boolean(receivable.egcs_fc_linkedreceivable)" :can-edit="!receivable.egcs_fc_automaticcoding && receivable.egcs_fc_canedit && !saving && status === 'success'" :can-delete="receivable.egcs_fc_candeletelines && !saving && status === 'success'" :can-update="!receivable.egcs_fc_automaticcoding && receivable.egcs_fc_caneditrole" @changed="refreshPage" />
-          <div v-else-if="selectedTab === 'summary'" class="space-y-8" data-testid="receivable-summary">
+        <CommonDetailWorkspace v-model="selectedTab" help-navigation-group-target="casework.account-receivables.detail.section-navigation" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-account-receivable-detail-content">
+          <AccountReceivableDetailLines v-if="selectedTab === 'lines'" data-help-view="casework.account-receivables.lines" :account-receivable-id="accountReceivableId" :lines="receivable.egcs_fc_lines" :currency="receivable.egcs_fc_currency" :fiscal-year-id="receivable.egcs_fc_agencyfiscalyear" :is-adjustment="Boolean(receivable.egcs_fc_linkedreceivable)" :can-edit="!receivable.egcs_fc_automaticcoding && receivable.egcs_fc_canedit && !saving && status === 'success'" :can-delete="receivable.egcs_fc_candeletelines && !saving && status === 'success'" :can-update="!receivable.egcs_fc_automaticcoding && receivable.egcs_fc_caneditrole" @changed="refreshPage" />
+          <div v-else-if="selectedTab === 'summary'" data-help-target="casework.account-receivables.summary.content" data-help-kind="section" data-help-view="casework.account-receivables.summary" class="space-y-8" data-testid="receivable-summary">
             <CommonSection :title="t('account_receivable.financial_summary')" badge="01">
               <CommonValueCard :label="t('account_receivable.type')" :value="getBilingualValue(receivable, 'egcs_fc_typename', t('common.not_available'))" :sub-value="getBilingualValue(receivable, 'egcs_fc_typedescription', '')" />
               <CommonValueCard v-if="receivable.egcs_fc_postedat" :label="t('account_receivable.recovery_kind')" :value="receivable.egcs_fc_effectiverecoverymethod ? t(`enums.account_receivable_recovery_method.${receivable.egcs_fc_effectiverecoverymethod}`) : t('common.none')" />
@@ -224,7 +224,7 @@ useFieldTooltipProvider(() => receivable.value && String(receivable.value.id) ==
               </template>
             </CommonSection>
           </div>
-          <CommonSection v-else-if="selectedTab === 'adjustments'" :show-header="false" :title="t('account_receivable.receivable_adjustments')" :grid-cols="1">
+          <CommonSection v-else-if="selectedTab === 'adjustments'" data-help-view="casework.account-receivables.adjustments" :show-header="false" :title="t('account_receivable.receivable_adjustments')" :grid-cols="1">
             <p v-if="receivable.egcs_fc_canadjust" class="text-sm text-muted">
               {{ t('account_receivable.adjust_receivable_description') }}
             </p>
@@ -234,7 +234,7 @@ useFieldTooltipProvider(() => receivable.value && String(receivable.value.id) ==
                 <h3 class="font-semibold">
                   {{ t('account_receivable.credit_memos') }}
                 </h3>
-                <UButton v-if="receivable.egcs_fc_cancreditmemo" :label="t('account_receivable.create_credit_memo')" icon="i-lucide-plus" @click="creditMemoOpen = true" />
+                <UButton v-if="receivable.egcs_fc_cancreditmemo" data-help-target="casework.account-receivables.detail.account-receivable-create-credit-memo" :label="t('account_receivable.create_credit_memo')" icon="i-lucide-plus" @click="creditMemoOpen = true" />
               </div>
               <div v-for="memo in receivable.egcs_fc_creditmemos" :key="`${memo.egcs_fc_kind}:${memo.id}`" class="flex items-center justify-between gap-4 text-sm">
                 <ULink v-if="memo.egcs_fc_kind === 'cash'" :to="localePath(appRouteLocations.proponentCreditMemoDetail(receivable.egcs_fc_applicantrecipient, memo.id))">{{ memo.egcs_fc_reference }}</ULink>
@@ -245,19 +245,21 @@ useFieldTooltipProvider(() => receivable.value && String(receivable.value.id) ==
             </div>
             <ULink v-if="receivable.egcs_fc_proponentreadable" :to="localePath(appRouteLocations.proponentCreditMemoCollection(receivable.egcs_fc_applicantrecipient))" class="text-sm">{{ t('account_receivable.view_proponent_financial_activity') }}</ULink>
           </CommonSection>
-          <section v-else-if="selectedTab === 'completion'" class="space-y-6">
+          <section v-else-if="selectedTab === 'completion'" data-help-view="casework.account-receivables.completion" data-help-target="casework.account-receivables.detail.completion" data-help-kind="section" class="space-y-6">
             <UAlert v-if="dirty" color="warning" :title="t('account_receivable.save_before_completion')" /><CommonCompletionPanel :entity-type="entityType" :entity-id="accountReceivableId" :can-complete="receivable.egcs_fc_canedit && !dirty && !saving && status === 'success'" :can-work-workflow="receivable.egcs_fc_canwork" :show-header="false" :show-divider="false" title-key="account_receivable.completion.title" description-key="account_receivable.completion.description" status-complete-key="account_receivable.completion.status_complete" status-locked-key="account_receivable.completion.status_locked" comment-placeholder-key="account_receivable.completion.comment_placeholder" complete-action-key="account_receivable.completion.complete" completed-success-key="account_receivable.completion.completed_success" :refresh-key="refreshKey" @changed="refreshPage" />
           </section>
-          <AccountReceivableClaimReductions v-else-if="selectedTab === 'claim-reductions' && receivable.egcs_fc_claimrelated && !receivable.egcs_fc_linkedreceivable" :account-receivable-id="accountReceivableId" :currency="receivable.egcs_fc_currency" :declared-amount="receivable.egcs_fc_amount" :reductions="receivable.egcs_fc_claimreductions ?? []" :can-edit="receivable.egcs_fc_canedit" :can-update="receivable.egcs_fc_caneditrole" :read-only="receivable.egcs_fc_claimreductionlocked" @changed="refreshPage" />
-          <CommonReviewsTab v-else-if="selectedTab === 'reviews'" :entity-type="entityType" :entity-id="accountReceivableId" :can-update="receivable.egcs_fc_canedit" @changed="refreshPage" />
-          <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" :entity-type="entityType" :entity-id="accountReceivableId" purpose="standard" :can-edit="receivable.egcs_fc_canwork" :refresh-key="refreshKey" @changed="refreshPage" />
-          <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" :show-header="false" :entity-type="entityType" :entity-id="accountReceivableId" />
-          <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" :entity-type="entityType" :entity-id="accountReceivableId" />
-          <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" :show-header="false" :entity-type="entityType" :entity-id="accountReceivableId" />
+          <AccountReceivableClaimReductions v-else-if="selectedTab === 'claim-reductions' && receivable.egcs_fc_claimrelated && !receivable.egcs_fc_linkedreceivable" data-help-view="casework.account-receivables.claim-reductions" :account-receivable-id="accountReceivableId" :currency="receivable.egcs_fc_currency" :declared-amount="receivable.egcs_fc_amount" :reductions="receivable.egcs_fc_claimreductions ?? []" :can-edit="receivable.egcs_fc_canedit" :can-update="receivable.egcs_fc_caneditrole" :read-only="receivable.egcs_fc_claimreductionlocked" @changed="refreshPage" />
+          <CommonReviewsTab v-else-if="selectedTab === 'reviews'" data-help-view="casework.account-receivables.reviews" :entity-type="entityType" :entity-id="accountReceivableId" :can-update="receivable.egcs_fc_canedit" @changed="refreshPage" />
+          <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" data-help-view="casework.account-receivables.workflows" :entity-type="entityType" :entity-id="accountReceivableId" purpose="standard" :can-edit="receivable.egcs_fc_canwork" :refresh-key="refreshKey" @changed="refreshPage" />
+          <section v-else-if="selectedTab === 'supplementary-information'" data-help-view="casework.account-receivables.supplementary-information" data-help-target="casework.account-receivables.supplementary-information.content">
+            <CommonWorkflowSupplementaryInformation :show-header="false" :entity-type="entityType" :entity-id="accountReceivableId" />
+          </section>
+          <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" data-help-view="casework.account-receivables.attachments" :entity-type="entityType" :entity-id="accountReceivableId" />
+          <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" data-help-view="casework.account-receivables.assignments" :show-header="false" :entity-type="entityType" :entity-id="accountReceivableId" />
         </CommonDetailWorkspace>
       </template>
     </CommonDetailPage>
-    <UModal v-if="isEditOpen && receivable && state" v-model:open="isEditOpen" :title="t('common.edit')" :description="t('common.form_dialog_description')" :dismissible="!saving" :close="{ disabled: saving }" :ui="{ content: 'sm:max-w-4xl' }">
+    <UModal v-if="isEditOpen && receivable && state" v-model:open="isEditOpen" data-help-view="casework.account-receivables.detail.is-edit-open" :title="t('common.edit')" :description="t('common.form_dialog_description')" :dismissible="!saving" :close="{ disabled: saving }" :ui="{ content: 'sm:max-w-4xl' }">
       <template #body>
         <UForm :state="state" :validate="createValidator(AccountReceivableSummaryEditSchema)" class="space-y-6" @submit="save">
           <UFormField v-if="receivable.egcs_fc_linkedreceivable" name="egcs_fc_agencyfinancialid" :label="t('account_receivable.financial_id')" required>
@@ -278,7 +280,7 @@ useFieldTooltipProvider(() => receivable.value && String(receivable.value.id) ==
             </UFormField>
             <UFormField name="egcs_fc_recoverymethod" :label="t('account_receivable.recovery_method')">
               <CommonEnumSelect v-model="state.egcs_fc_recoverymethod" name="account_receivable_recovery_method" :disabled="saving || !receivable.egcs_fc_canedit" class="w-full" />
-              <UButton v-if="state.egcs_fc_recoverymethod && receivable.egcs_fc_canedit" type="button" icon="i-lucide-x" color="neutral" variant="ghost" :label="t('account_receivable.clear_recovery_method')" :disabled="saving" @click="state.egcs_fc_recoverymethod = undefined" />
+              <UButton v-if="state.egcs_fc_recoverymethod && receivable.egcs_fc_canedit" data-help-target="casework.account-receivables.detail.is-edit-open.account-receivable-clear-recovery-method" type="button" icon="i-lucide-x" color="neutral" variant="ghost" :label="t('account_receivable.clear_recovery_method')" :disabled="saving" @click="state.egcs_fc_recoverymethod = undefined" />
             </UFormField>
             <UFormField name="egcs_fc_narrative_en" :label="t('account_receivable.narrative_en')">
               <UTextarea v-model="state.egcs_fc_narrative_en" :readonly="!receivable.egcs_fc_canedit" :disabled="saving" aria-describedby="account-receivable-rationale-instruction" class="w-full" :rows="4" />
@@ -289,7 +291,7 @@ useFieldTooltipProvider(() => receivable.value && String(receivable.value.id) ==
           </div>
           <UFormField name="egcs_fc_recipientpreference" :label="t('account_receivable.recipient_preference')" :description="t('account_receivable.preference_description')">
             <CommonEnumSelect v-model="state.egcs_fc_recipientpreference" name="account_receivable_recovery_method" :disabled="saving || !receivable.egcs_fc_canedit" class="w-full" />
-            <UButton v-if="state.egcs_fc_recipientpreference && receivable.egcs_fc_canedit" type="button" icon="i-lucide-x" color="neutral" variant="ghost" :label="t('account_receivable.clear_preference')" :disabled="saving" @click="state.egcs_fc_recipientpreference = undefined" />
+            <UButton v-if="state.egcs_fc_recipientpreference && receivable.egcs_fc_canedit" data-help-target="casework.account-receivables.detail.is-edit-open.account-receivable-clear-preference" type="button" icon="i-lucide-x" color="neutral" variant="ghost" :label="t('account_receivable.clear_preference')" :disabled="saving" @click="state.egcs_fc_recipientpreference = undefined" />
           </UFormField>
           <template v-if="state.egcs_fc_recoverymethod && state.egcs_fc_recipientpreference && state.egcs_fc_recipientpreference !== state.egcs_fc_recoverymethod">
             <p id="account-receivable-override-instruction" class="text-sm text-muted">
@@ -304,8 +306,8 @@ useFieldTooltipProvider(() => receivable.value && String(receivable.value.id) ==
             </div>
           </template>
           <div class="flex justify-end gap-2">
-            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" :disabled="saving" @click="isEditOpen = false" />
-            <CommonSaveButton :label="t('common.save')" :loading="saving" :disabled="saving || !receivable.egcs_fc_canedit || status !== 'success'" />
+            <UButton data-help-target="casework.account-receivables.detail.is-edit-open.common-cancel" :label="t('common.cancel')" color="neutral" variant="ghost" :disabled="saving" @click="isEditOpen = false" />
+            <CommonSaveButton data-help-target="casework.account-receivables.detail.is-edit-open.common-save" :label="t('common.save')" :loading="saving" :disabled="saving || !receivable.egcs_fc_canedit || status !== 'success'" />
           </div>
         </UForm>
       </template>

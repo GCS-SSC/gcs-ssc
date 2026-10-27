@@ -328,7 +328,7 @@ const peakShare = (progress: FinancialProgress): string | null => {
 </script>
 
 <template>
-  <section data-testid="agreement-financial-summary" class="space-y-6" data-field-tooltip-context="agreement" data-field-scope="agreement.financial-summary-tab" data-scope-label-en="Agreements > Financial summary" data-scope-label-fr="Ententes > Sommaire financier">
+  <section data-testid="agreement-financial-summary" class="space-y-6" data-field-tooltip-context="agreement" data-field-scope="agreement.financial-summary-tab" data-scope-label-en="Agreements > Financial summary" data-scope-label-fr="Ententes > Sommaire financier" data-help-view="agreement.financial-summary" data-help-label-en="Agreements — Financial summary" data-help-label-fr="Ententes — Sommaire financier" data-help-target="agreement.financial-summary.content" data-help-kind="section">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div class="space-y-1">
         <h2 class="text-xl font-semibold text-highlighted">
@@ -361,7 +361,7 @@ const peakShare = (progress: FinancialProgress): string | null => {
       :title="t('agreement.financial_summary.load_failed')"
       :description="t('common.resource_table_load_failed_description')">
       <template #actions>
-        <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" @click="() => { void refreshOverview() }" />
+        <UButton color="error" variant="soft" icon="i-lucide-refresh-cw" :label="t('common.retry')" data-help-target="agreement.financial-summary.retry" data-help-kind="button" data-help-label-en="Retry" data-help-label-fr="Réessayer" @click="() => { void refreshOverview() }" />
       </template>
     </UAlert>
     <div v-else-if="overviewStatus === 'success' && !selectedYear" class="rounded-xl border border-dashed border-default px-6 py-10 text-center text-sm text-muted">

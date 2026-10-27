@@ -391,6 +391,7 @@ const save = async (_event: FormSubmitEvent<FundingHistoryFormState>) => {
 <template>
   <UModal
     v-model:open="open"
+    data-help-view="proponent.funding-history-editor"
     :title="t(history ? 'applicant_recipient.funding_history.wizard.edit_title' : 'applicant_recipient.funding_history.wizard.create_title')"
     fullscreen
     :ui="{ content: 'rounded-none shadow-none ring-0' }" data-field-scope="applicant-recipient.funding-history-wizard-modal">

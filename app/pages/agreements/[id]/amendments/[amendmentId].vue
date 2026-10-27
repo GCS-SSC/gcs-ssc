@@ -511,7 +511,7 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
 <template>
   <CommonDetailPage id="agreement-amendment-detail" v-model:collapsed="isHeroCollapsed" data-field-tooltip-context="agreement" data-field-scope="agreements.amendments" data-scope-label-en="Agreements > Amendments > General" data-scope-label-fr="Ententes > Modifications > Général" :breadcrumb-items="breadcrumbItems" class="w-full" @focusin="checkCatalogVersions">
     <template #body>
-      <div v-if="amendment" class="flex flex-1 flex-col">
+      <div v-if="amendment" data-help-target="casework.amendments.detail.content" data-help-kind="section" data-help-view="casework.amendments.detail" class="flex flex-1 flex-col">
         <CommonEntityHero
           :is-collapsed="isHeroCollapsed"
           icon="i-lucide-file-pen-line"
@@ -522,8 +522,8 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
             isCompleted: amendment.isCompleted
           }]" />
 
-        <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-amendment-detail-content">
-          <section v-if="selectedTab === 'general'" class="space-y-8">
+        <CommonDetailWorkspace v-model="selectedTab" help-navigation-group-target="casework.amendments.detail.section-navigation" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-amendment-detail-content">
+          <section v-if="selectedTab === 'general'" data-help-target="casework.amendments.general.content" data-help-kind="section" data-help-view="casework.amendments.general" class="space-y-8">
             <CommonSection :title="t('agreement.amendments.sections.details')" badge="01" :grid-cols="1">
               <div class="space-y-4">
                 <div class="grid gap-4 md:grid-cols-2">
@@ -582,7 +582,7 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
                     :disabled="!canEditAmendmentScope"
                     :required="scopeSubtypeRequired" />
                 </UFormField>
-                <UButton v-if="scopeSubtypeRequirementFailed" :label="t('common.retry')" color="neutral" variant="ghost" @click="loadRequiredScopeSubtypes" />
+                <UButton v-if="scopeSubtypeRequirementFailed" data-help-target="casework.amendments.detail.common-retry" :label="t('common.retry')" color="neutral" variant="ghost" @click="loadRequiredScopeSubtypes" />
               </div>
             </CommonSection>
 
@@ -651,6 +651,7 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
                     :placeholder="t('agreement.risk_score_placeholder')" />
                   <UButton
                     v-if="canEditRisk && changeRisk && proposedRiskScoreSelection !== undefined"
+                    data-help-target="casework.amendments.detail.common-clear"
                     type="button"
                     color="neutral"
                     variant="link"
@@ -662,6 +663,7 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
                 </UFormField>
                 <CommonSaveButton
                   v-if="canEditRisk"
+                  data-help-target="casework.amendments.detail.amendments-save-risk"
                   type="button"
                   :label="t('agreement.amendments.save_risk')"
                   :loading="isSavingRisk"
@@ -672,6 +674,7 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
             <div v-if="canEditAmendmentScope || canCancelAmendment" class="flex items-center justify-between gap-3 border-t border-zinc-200 pt-6 dark:border-zinc-800">
               <UButton
                 v-if="canCancelAmendment"
+                data-help-target="casework.amendments.detail.amendments-cancel"
                 icon="i-lucide-ban"
                 color="error"
                 variant="outline"
@@ -680,6 +683,7 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
                 @click="isCancelModalOpen = true" />
               <CommonSaveButton
                 v-if="canEditAmendmentScope"
+                data-help-target="casework.amendments.detail.common-save"
                 :label="t('common.save')"
                 :loading="isSavingScope"
                 :disabled="!isScopeLookupReady || isSavingScope || !hasAmendmentName || scopeTypeIds.length === 0 || !hasRequiredScopeSubtypes || (scopeIncludesDuration && !durationDatesValid)"
@@ -687,7 +691,7 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
             </div>
           </section>
 
-          <section v-else-if="selectedTab === 'budget'" class="w-full min-w-0 space-y-6">
+          <section v-else-if="selectedTab === 'budget'" data-help-target="casework.amendments.budget.content" data-help-kind="section" data-help-view="casework.amendments.budget" class="w-full min-w-0 space-y-6">
             <CommonPreActionReport
               v-if="!amendment.has_budget_snapshot"
               :show-header="false"
@@ -696,6 +700,7 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
               <template #action>
                 <UButton
                   v-if="canCreateAmendmentSnapshot"
+                  data-help-target="casework.amendments.detail.amendments-create-budget-snapshot"
                   icon="i-lucide-copy-plus"
                   :label="t('agreement.amendments.create_budget_snapshot')"
                   class="cursor-default"
@@ -720,7 +725,7 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
               :allow-delete-fiscal-year-with-lines="isBudgetAmendment || isDurationAmendment" />
           </section>
 
-          <section v-else-if="selectedTab === 'activities'" class="w-full min-w-0 space-y-6">
+          <section v-else-if="selectedTab === 'activities'" data-help-target="casework.amendments.activities.content" data-help-kind="section" data-help-view="casework.amendments.activities" class="w-full min-w-0 space-y-6">
             <CommonPreActionReport
               v-if="!amendment.has_activity_snapshot"
               :show-header="false"
@@ -729,6 +734,7 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
               <template #action>
                 <UButton
                   v-if="canCreateAmendmentSnapshot"
+                  data-help-target="casework.amendments.detail.amendments-create-activity-snapshot"
                   icon="i-lucide-copy-plus"
                   :label="t('agreement.amendments.create_activity_snapshot')"
                   class="cursor-default"
@@ -747,7 +753,7 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
               :can-delete="profile?.can_delete_agreement_role === true" />
           </section>
 
-          <section v-else-if="selectedTab === 'recommendation'" class="space-y-6">
+          <section v-else-if="selectedTab === 'recommendation'" data-help-target="casework.amendments.recommendation.content" data-help-kind="section" data-help-view="casework.amendments.recommendation" class="space-y-6">
             <CommonCompletionPanel
               entity-type="fundingcaseamendment"
               :entity-id="amendmentId"
@@ -766,7 +772,7 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
               @changed="refreshPage" />
           </section>
 
-          <div v-else-if="selectedTab === 'risk-rating'" class="space-y-4">
+          <div v-else-if="selectedTab === 'risk-rating'" data-help-target="casework.amendments.risk-rating.content" data-help-kind="section" data-help-view="casework.amendments.risk-rating" class="space-y-4">
             <UAlert
               :title="t('agreement.risk_rating_workflow')"
               :description="amendment.isCompleted ? t('agreement.amendments.risk_frozen_help') : amendment.risk_workflow_managed ? t('agreement.amendments.risk_managed_help') : t('agreement.amendments.risk_manual_help')"
@@ -829,6 +835,7 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
 
           <CommonReviewsTab
             v-else-if="selectedTab === 'reviews'"
+            data-help-view="casework.amendments.reviews"
             entity-type="fundingcaseamendment"
             :entity-id="amendmentId"
             :can-update="canEditAmendment"
@@ -836,6 +843,7 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
 
           <CommonWorkflowSection
             v-else-if="selectedTab === 'workflows'"
+            data-help-view="casework.amendments.workflows"
             entity-type="fundingcaseamendment"
             :entity-id="amendmentId"
             purpose="standard"
@@ -843,25 +851,31 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
             :refresh-key="approvalsRefreshKey"
             @changed="refreshPage" />
 
-          <CommonWorkflowSupplementaryInformation
-            v-else-if="selectedTab === 'supplementary-information'"
-            :show-header="false"
-            entity-type="fundingcaseamendment"
-            :entity-id="amendmentId" />
+          <section v-else-if="selectedTab === 'supplementary-information'" data-help-view="casework.amendments.supplementary-information" data-help-target="casework.amendments.supplementary-information.content">
+            <CommonWorkflowSupplementaryInformation
+
+              :show-header="false"
+              entity-type="fundingcaseamendment"
+              :entity-id="amendmentId" />
+          </section>
 
           <CommonAssignedUsers
             v-else-if="selectedTab === 'assignments'"
+            data-help-view="casework.amendments.assignments"
             :show-header="false"
             entity-type="fundingcaseamendment"
             :entity-id="amendmentId" />
-          <AgreementDocumentsTab
-            v-else-if="selectedTab === 'documents' && profile?.can_read_agreement"
-            :agreement-id="agreementId"
-            :amendment-id="amendmentId"
-            :can-create="profile?.can_create_agreement_role === true"
-            :can-delete="profile?.can_delete_agreement_role === true" />
+          <section v-else-if="selectedTab === 'documents' && profile?.can_read_agreement" data-help-view="casework.amendments.documents" data-help-target="casework.amendments.documents.content">
+            <AgreementDocumentsTab
+
+              :agreement-id="agreementId"
+              :amendment-id="amendmentId"
+              :can-create="profile?.can_create_agreement_role === true"
+              :can-delete="profile?.can_delete_agreement_role === true" />
+          </section>
           <CommonAttachmentsTab
             v-else-if="selectedTab === 'attachments'"
+            data-help-view="casework.amendments.attachments"
             entity-type="fundingcaseamendment"
             :entity-id="amendmentId" />
         </CommonDetailWorkspace>
@@ -881,12 +895,14 @@ useFieldTooltipProvider(() => amendment.value && String(amendment.value.id) === 
 
       <UModal
         v-model:open="isCancelModalOpen"
+        data-help-view="casework.amendments.detail.is-cancel-modal-open"
         :title="t('agreement.amendments.cancel_title')"
         :description="t('agreement.amendments.cancel_confirm')">
         <template #body>
           <div class="flex justify-end gap-2 pt-4">
-            <UButton color="neutral" variant="ghost" :label="t('common.cancel')" @click="isCancelModalOpen = false" />
+            <UButton data-help-target="casework.amendments.detail.is-cancel-modal-open.common-cancel" color="neutral" variant="ghost" :label="t('common.cancel')" @click="isCancelModalOpen = false" />
             <UButton
+              data-help-target="casework.amendments.detail.is-cancel-modal-open.amendments-cancel"
               color="error"
               icon="i-lucide-ban"
               :label="t('agreement.amendments.cancel')"

@@ -31,74 +31,77 @@ const lookupUrl = (state: Partial<Note>) => `/api/applicant-recipients/${applica
 </script>
 
 <template>
-  <CommonResourceCrud
-    class="w-full"
-    :title="t('notes.title')"
-    icon="i-lucide-sticky-note"
-    :fetch-url="`/api/applicant-recipients/${applicantRecipientId}/notes`"
-    :post-url="`/api/applicant-recipients/${applicantRecipientId}/notes`"
-    :update-url-base="`/api/applicant-recipients/${applicantRecipientId}/notes`"
-    :delete-url-base="`/api/applicant-recipients/${applicantRecipientId}/notes`"
-    :can-create="canCreate" :can-update="canUpdate" :can-delete="canDelete"
-    :schema="ApplicantRecipientNoteCreateSchema"
-    :columns="columns" :bilingual-columns="bilingualColumns"
-    :button-label="t('common.add')" :modal-title="t('notes.add')" :update-title="t('notes.edit')"
-    :search-placeholder="t('notes.search')" :modal-ui="{ content: 'sm:max-w-2xl' }" data-field-scope="applicant-recipient.notes-tab">
-    <template #subject-cell="{ row }">
-      {{ locale === 'fr' ? row.original.egcs_ar_subject_fr || row.original.egcs_ar_subject_en : row.original.egcs_ar_subject_en || row.original.egcs_ar_subject_fr }}
-    </template>
-    <template #body-cell="{ row }">
-      <p class="max-w-lg whitespace-pre-wrap">
-        {{ locale === 'fr' ? row.original.egcs_ar_body_fr || row.original.egcs_ar_body_en : row.original.egcs_ar_body_en || row.original.egcs_ar_body_fr }}
-      </p>
-    </template>
-    <template #agency-cell="{ row }">
-      {{ locale === 'fr' ? row.original.agency_name_fr || row.original.agency_name_en : row.original.agency_name_en || row.original.agency_name_fr }}
-    </template>
-    <template #egcs_ar_createdat-cell="{ row }">
-      {{ formatDate(row.original.egcs_ar_createdat) }}
-    </template>
-    <template #egcs_ar_updatedat-cell="{ row }">
-      {{ formatDate(row.original.egcs_ar_updatedat) }}
-    </template>
-    <template #form="{ state }">
-      <UFormField v-if="!state.id" :label="t('notes.agency')" name="egcs_ar_agency" required>
-        <CommonServerLookupSelect
-          :model-value="state.egcs_ar_agency" :fetch-url="lookupUrl(state)"
-          value-key="id" label-en-key="egcs_ay_name_en" label-fr-key="egcs_ay_name_fr" searchable
-          :placeholder="t('notes.agency_placeholder')" @update:model-value="value => state.egcs_ar_agency = value" />
-      </UFormField>
-      <p v-else class="text-sm text-muted">
-        {{ t('notes.agency_immutable') }}
-      </p>
-      <fieldset class="space-y-4" aria-describedby="proponent-note-subject-instruction">
-        <legend class="font-medium">
-          {{ t('notes.subject') }} <span aria-hidden="true" class="text-error">*</span> <span class="text-sm text-muted">({{ t('common.field_required') }})</span>
-        </legend>
-        <p id="proponent-note-subject-instruction" class="text-sm text-muted">
-          {{ t('notes.subject_instruction') }}
+  <section data-help-target="proponent.notes.content" data-help-kind="section" data-help-view="proponent.notes" class="flex w-full min-w-0 flex-col">
+    <CommonResourceCrud
+      help-search-target="proponent.notes.search" help-save-target="proponent.notes.save" help-add-target="proponent.notes.add"
+      class="w-full"
+      :title="t('notes.title')"
+      icon="i-lucide-sticky-note"
+      :fetch-url="`/api/applicant-recipients/${applicantRecipientId}/notes`"
+      :post-url="`/api/applicant-recipients/${applicantRecipientId}/notes`"
+      :update-url-base="`/api/applicant-recipients/${applicantRecipientId}/notes`"
+      :delete-url-base="`/api/applicant-recipients/${applicantRecipientId}/notes`"
+      :can-create="canCreate" :can-update="canUpdate" :can-delete="canDelete"
+      :schema="ApplicantRecipientNoteCreateSchema"
+      :columns="columns" :bilingual-columns="bilingualColumns"
+      :button-label="t('common.add')" :modal-title="t('notes.add')" :update-title="t('notes.edit')"
+      :search-placeholder="t('notes.search')" :modal-ui="{ content: 'sm:max-w-2xl' }" data-field-scope="applicant-recipient.notes-tab">
+      <template #subject-cell="{ row }">
+        {{ locale === 'fr' ? row.original.egcs_ar_subject_fr || row.original.egcs_ar_subject_en : row.original.egcs_ar_subject_en || row.original.egcs_ar_subject_fr }}
+      </template>
+      <template #body-cell="{ row }">
+        <p class="max-w-lg whitespace-pre-wrap">
+          {{ locale === 'fr' ? row.original.egcs_ar_body_fr || row.original.egcs_ar_body_en : row.original.egcs_ar_body_en || row.original.egcs_ar_body_fr }}
         </p>
-        <UFormField :label="t('notes.subject_en')" name="egcs_ar_subject_en">
-          <UInput v-model="state.egcs_ar_subject_en" aria-describedby="proponent-note-subject-instruction" />
+      </template>
+      <template #agency-cell="{ row }">
+        {{ locale === 'fr' ? row.original.agency_name_fr || row.original.agency_name_en : row.original.agency_name_en || row.original.agency_name_fr }}
+      </template>
+      <template #egcs_ar_createdat-cell="{ row }">
+        {{ formatDate(row.original.egcs_ar_createdat) }}
+      </template>
+      <template #egcs_ar_updatedat-cell="{ row }">
+        {{ formatDate(row.original.egcs_ar_updatedat) }}
+      </template>
+      <template #form="{ state }">
+        <UFormField v-if="!state.id" :label="t('notes.agency')" name="egcs_ar_agency" required>
+          <CommonServerLookupSelect
+            :model-value="state.egcs_ar_agency" :fetch-url="lookupUrl(state)"
+            value-key="id" label-en-key="egcs_ay_name_en" label-fr-key="egcs_ay_name_fr" searchable
+            :placeholder="t('notes.agency_placeholder')" @update:model-value="value => state.egcs_ar_agency = value" />
         </UFormField>
-        <UFormField :label="t('notes.subject_fr')" name="egcs_ar_subject_fr">
-          <UInput v-model="state.egcs_ar_subject_fr" aria-describedby="proponent-note-subject-instruction" />
-        </UFormField>
-      </fieldset>
-      <fieldset class="space-y-4" aria-describedby="proponent-note-body-instruction">
-        <legend class="font-medium">
-          {{ t('notes.body') }} <span aria-hidden="true" class="text-error">*</span> <span class="text-sm text-muted">({{ t('common.field_required') }})</span>
-        </legend>
-        <p id="proponent-note-body-instruction" class="text-sm text-muted">
-          {{ t('notes.body_instruction') }}
+        <p v-else class="text-sm text-muted">
+          {{ t('notes.agency_immutable') }}
         </p>
-        <UFormField :label="t('notes.body_en')" name="egcs_ar_body_en">
-          <UTextarea v-model="state.egcs_ar_body_en" aria-describedby="proponent-note-body-instruction" />
-        </UFormField>
-        <UFormField :label="t('notes.body_fr')" name="egcs_ar_body_fr">
-          <UTextarea v-model="state.egcs_ar_body_fr" aria-describedby="proponent-note-body-instruction" />
-        </UFormField>
-      </fieldset>
-    </template>
-  </CommonResourceCrud>
+        <fieldset class="space-y-4" aria-describedby="proponent-note-subject-instruction">
+          <legend class="font-medium">
+            {{ t('notes.subject') }} <span aria-hidden="true" class="text-error">*</span> <span class="text-sm text-muted">({{ t('common.field_required') }})</span>
+          </legend>
+          <p id="proponent-note-subject-instruction" class="text-sm text-muted">
+            {{ t('notes.subject_instruction') }}
+          </p>
+          <UFormField :label="t('notes.subject_en')" name="egcs_ar_subject_en">
+            <UInput v-model="state.egcs_ar_subject_en" aria-describedby="proponent-note-subject-instruction" />
+          </UFormField>
+          <UFormField :label="t('notes.subject_fr')" name="egcs_ar_subject_fr">
+            <UInput v-model="state.egcs_ar_subject_fr" aria-describedby="proponent-note-subject-instruction" />
+          </UFormField>
+        </fieldset>
+        <fieldset class="space-y-4" aria-describedby="proponent-note-body-instruction">
+          <legend class="font-medium">
+            {{ t('notes.body') }} <span aria-hidden="true" class="text-error">*</span> <span class="text-sm text-muted">({{ t('common.field_required') }})</span>
+          </legend>
+          <p id="proponent-note-body-instruction" class="text-sm text-muted">
+            {{ t('notes.body_instruction') }}
+          </p>
+          <UFormField :label="t('notes.body_en')" name="egcs_ar_body_en">
+            <UTextarea v-model="state.egcs_ar_body_en" aria-describedby="proponent-note-body-instruction" />
+          </UFormField>
+          <UFormField :label="t('notes.body_fr')" name="egcs_ar_body_fr">
+            <UTextarea v-model="state.egcs_ar_body_fr" aria-describedby="proponent-note-body-instruction" />
+          </UFormField>
+        </fieldset>
+      </template>
+    </CommonResourceCrud>
+  </section>
 </template>

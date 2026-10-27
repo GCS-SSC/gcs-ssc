@@ -89,57 +89,61 @@ const exportCorrections = async () => {
 </script>
 
 <template>
-  <div class="correction-collection min-w-0 space-y-4" data-field-tooltip-context="agreement" data-field-scope="correction.collection" data-scope-label-en="Agreements > Corrections" data-scope-label-fr="Ententes > Corrections">
+  <div data-help-target="casework.correction.collection.content" data-help-kind="section" data-help-view="casework.correction.collection" class="correction-collection min-w-0 space-y-4" data-field-tooltip-context="agreement" data-field-scope="correction.collection" data-scope-label-en="Agreements > Corrections" data-scope-label-fr="Ententes > Corrections">
     <p v-if="showDescription" class="text-sm text-muted">
       {{ t('correction.description') }}
     </p>
-    <CommonResourceLayoutCard
-      v-model:search="search"
-      v-model:pagination="pagination"
-      :data="items"
-      :columns="columns"
-      :total-records="totalRecords"
-      :request-status="status"
-      :loading="status === 'pending'"
-      :button-label="t('correction.create')"
-      :show-button="canCreate"
-      :search-placeholder="t('correction.search')"
-      @add="createOpen = true"
-      @retry="retry">
-      <template #filters>
-        <div class="flex w-full flex-col gap-3 sm:w-auto sm:shrink-0 sm:flex-row">
-          <UFormField :label="t('correction.outcome')" :required="false" :ui="{ label: 'sr-only' }" data-ui-target="correction.collection.correction.outcome">
-            <CommonEnumSelect v-model="outcome" name="correction_outcome" show-all-option :all-option-label="t('correction.all_outcomes')" />
-          </UFormField>
-          <UFormField class="correction-fiscal-filter" :label="t('agreement.payments.fiscal_year')" :required="false" :ui="{ label: 'sr-only' }" data-ui-target="correction.collection.agreement.payments.fiscal_year">
-            <CommonBilingualSelectMenu v-model="fiscalYear" :items="fiscalYears" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :prepend-options="[{ label: t('correction.all_fiscal_years'), value: null }]" :placeholder="t('correction.all_fiscal_years')" />
-          </UFormField>
-        </div>
-      </template>
-      <template #actions>
-        <CommonActionButton icon="i-lucide-download" color="neutral" variant="outline" :aria-label="t('correction.export_label')" :loading="exporting" :disabled="status !== 'success'" @click="exportCorrections" />
-      </template>
-      <template #egcs_fc_number-cell="{ row }">
-        {{ formatCorrectionReference(row.original) }}
-      </template>
-      <template #status-cell="{ row }">
-        <CommonStatusBadge :status-id="row.original.egcs_fc_status" />
-      </template>
-      <template #outcome-cell="{ row }">
-        {{ row.original.egcs_fc_outcome ? t(`correction.outcomes.${row.original.egcs_fc_outcome}`) : t('common.none') }}
-      </template>
-      <template #created-cell="{ row }">
-        {{ formatDate(row.original.egcs_fc_createdat) }}
-      </template>
-      <template #actions-cell="{ row }">
-        <div class="flex justify-end gap-2">
-          <CommonActionButton
-            icon="i-lucide-arrow-right" color="neutral" variant="ghost"
-            :aria-label="`${t('common.view_details')}: ${formatCorrectionReference(row.original)}`"
-            :to="localePath(appRouteLocations.agreementCorrectionDetail(agreementId, String(row.original.id)))" />
-        </div>
-      </template>
-    </CommonResourceLayoutCard>
+    <section data-help-target="casework.correction.collection.records">
+      <CommonResourceLayoutCard
+        v-model:search="search" v-model:pagination="pagination"
+        help-add-target="casework.correction.collection.add"
+        help-search-target="casework.correction.collection.search"
+        :data="items"
+        :columns="columns"
+        :total-records="totalRecords"
+        :request-status="status"
+        :loading="status === 'pending'"
+        :button-label="t('correction.create')"
+        :show-button="canCreate"
+        :search-placeholder="t('correction.search')"
+        @add="createOpen = true"
+        @retry="retry">
+        <template #filters>
+          <div class="flex w-full flex-col gap-3 sm:w-auto sm:shrink-0 sm:flex-row">
+            <UFormField :label="t('correction.outcome')" :required="false" :ui="{ label: 'sr-only' }" data-ui-target="correction.collection.correction.outcome">
+              <CommonEnumSelect v-model="outcome" name="correction_outcome" show-all-option :all-option-label="t('correction.all_outcomes')" />
+            </UFormField>
+            <UFormField class="correction-fiscal-filter" :label="t('agreement.payments.fiscal_year')" :required="false" :ui="{ label: 'sr-only' }" data-ui-target="correction.collection.agreement.payments.fiscal_year">
+              <CommonBilingualSelectMenu v-model="fiscalYear" :items="fiscalYears" value-key="id" label-en-key="label_en" label-fr-key="label_fr" :prepend-options="[{ label: t('correction.all_fiscal_years'), value: null }]" :placeholder="t('correction.all_fiscal_years')" />
+            </UFormField>
+          </div>
+        </template>
+        <template #actions>
+          <CommonActionButton data-help-target="casework.correction.collection.correction-export-label" icon="i-lucide-download" color="neutral" variant="outline" :aria-label="t('correction.export_label')" :loading="exporting" :disabled="status !== 'success'" @click="exportCorrections" />
+        </template>
+        <template #egcs_fc_number-cell="{ row }">
+          {{ formatCorrectionReference(row.original) }}
+        </template>
+        <template #status-cell="{ row }">
+          <CommonStatusBadge :status-id="row.original.egcs_fc_status" />
+        </template>
+        <template #outcome-cell="{ row }">
+          {{ row.original.egcs_fc_outcome ? t(`correction.outcomes.${row.original.egcs_fc_outcome}`) : t('common.none') }}
+        </template>
+        <template #created-cell="{ row }">
+          {{ formatDate(row.original.egcs_fc_createdat) }}
+        </template>
+        <template #actions-cell="{ row }">
+          <div class="flex justify-end gap-2">
+            <CommonActionButton
+
+              icon="i-lucide-arrow-right" color="neutral" variant="ghost"
+              :aria-label="`${t('common.view_details')}: ${formatCorrectionReference(row.original)}`"
+              :to="localePath(appRouteLocations.agreementCorrectionDetail(agreementId, String(row.original.id)))" />
+          </div>
+        </template>
+      </CommonResourceLayoutCard>
+    </section>
     <CorrectionCreateModal v-model:open="createOpen" :agreement-id="agreementId" @created="created" />
   </div>
 </template>

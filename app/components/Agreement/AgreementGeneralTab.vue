@@ -64,8 +64,8 @@ const displayValue = (value: string | number | boolean | null | undefined) => {
 </script>
 
 <template>
-  <div class="space-y-8">
-    <CommonSection :title="t('agreement.sections.classification')" badge="01">
+  <div class="space-y-8" data-help-view="agreement.general" data-help-label-en="Agreements — General" data-help-label-fr="Ententes — Général" data-help-target="agreement.general.content" data-help-kind="section">
+    <CommonSection :title="t('agreement.sections.classification')" badge="01" data-help-target="agreement.general.sections-classification" data-help-kind="section" data-help-label-en="Classification" data-help-label-fr="Classification">
       <CommonValueCard :label="t('agreement.agency')" :value="getBilingualValue(profile, 'agency_name', '-')" />
       <CommonValueCard :label="t('agreement.program')" :value="getBilingualValue(profile, 'program_name', '-')" />
       <CommonValueCard :label="t('agreement.stream')" :value="getBilingualValue(profile, 'stream_name', '-')" />
@@ -78,7 +78,7 @@ const displayValue = (value: string | number | boolean | null | undefined) => {
       <CommonValueCard :label="t('agreement.authorized_assistance_end_date')" :value="formatDate(agreementCalendarDate(profile.egcs_fc_authorizedassistanceenddate))" />
       <NuxtLink
         :to="localePath(appRouteLocations.transferPaymentDetail(String(profile.program_id)))"
-        class="rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+        class="rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" data-help-target="agreement.general.open" data-help-kind="navigation" data-help-label-en="Open record" data-help-label-fr="Ouvrir le dossier">
         <CommonValueCard :label="t('agreement.program_link')" :value="getBilingualValue(profile, 'program_name', '-')" />
       </NuxtLink>
       <NuxtLink
@@ -94,7 +94,7 @@ const displayValue = (value: string | number | boolean | null | undefined) => {
         :context="agreementProfileExtensionContext" />
     </CommonSection>
 
-    <CommonSection :title="t('agreement.sections.profile')" badge="02">
+    <CommonSection :title="t('agreement.sections.profile')" badge="02" data-help-target="agreement.general.sections-profile" data-help-kind="section" data-help-label-en="Profile" data-help-label-fr="Profil">
       <CommonValueCard :label="t('agreement.title_en')" :value="displayValue(profile.egcs_fc_title_en)" :value-lang="profile.egcs_fc_title_en ? 'en' : undefined" />
       <CommonValueCard :label="t('agreement.title_fr')" :value="displayValue(profile.egcs_fc_title_fr)" :value-lang="profile.egcs_fc_title_fr ? 'fr' : undefined" />
       <CommonValueCard :label="t('agreement.description_en')" :value="displayValue(profile.egcs_fc_description_en)" :value-lang="profile.egcs_fc_description_en ? 'en' : undefined" />
@@ -107,7 +107,7 @@ const displayValue = (value: string | number | boolean | null | undefined) => {
         :context="agreementProfileExtensionContext" />
     </CommonSection>
 
-    <CommonSection :title="t('agreement.sections.risk_management')" badge="03">
+    <CommonSection :title="t('agreement.sections.risk_management')" badge="03" data-help-target="agreement.general.sections-risk-management" data-help-kind="section" data-help-label-en="Risk Management" data-help-label-fr="Gestion des risques">
       <CommonValueCard :label="t('agreement.holdback')" :value="formatPercent(profile.egcs_fc_holdback)" />
       <CommonValueCard :label="t('agreement.holdback_basis')" :value="getBilingualValue(profile, 'holdback_basis_name', '-')" />
       <CommonValueCard :label="t('agreement.risk_score')" :value="riskRatingLabel" />

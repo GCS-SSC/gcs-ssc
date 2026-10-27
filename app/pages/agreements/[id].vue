@@ -422,7 +422,7 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
             :subtitle="t('agreement.update_title')"
             show-context />
 
-          <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." content-test-id="agreement-detail-content" :items="tabs" help-navigation-target="agreement.detail.risk-navigation" help-navigation-value="risk-rating">
+          <CommonDetailWorkspace v-model="selectedTab" help-navigation-group-target="agreement.detail.section-navigation" data-field-container="Page navigation state, not a business input field." content-test-id="agreement-detail-content" :items="tabs" help-navigation-target="agreement.detail.risk-navigation" help-navigation-value="risk-rating">
             <template #notices>
               <p v-if="extensionTabsStatus === 'pending'" role="status" aria-live="polite" class="sr-only">
                 {{ t('extensions.entity_tabs_loading') }}
@@ -446,7 +446,7 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
 
             <div v-else-if="selectedTab === 'general'" class="space-y-4">
               <div v-if="canUpdateFinancialChildRole" class="flex justify-end">
-                <UButton :label="t('common.edit')" :loading="isCheckingProfileEdit" :disabled="isCheckingProfileEdit || isSaving" @click="requestProfileEdit" />
+                <UButton data-help-target="agreement.detail.edit-profile" data-help-kind="button" :label="t('common.edit')" :loading="isCheckingProfileEdit" :disabled="isCheckingProfileEdit || isSaving" @click="requestProfileEdit" />
               </div>
               <AgreementGeneralTab :profile="profile" />
             </div>
@@ -492,6 +492,7 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
 
             <CommonCompletionWorkflowPreAction
               v-else-if="selectedTab === 'recommendation'"
+              data-help-view="agreement.recommendation" data-help-label-en="Agreements — Recommendation" data-help-label-fr="Ententes — Recommandation" data-help-target="agreement.recommendation.content" data-help-kind="section"
               mode="recommendation_submission"
               :show-header="false"
               show-when-unconfigured
@@ -589,6 +590,7 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
 
             <CommonReviewsTab
               v-else-if="selectedTab === 'reviews'"
+              data-help-view="agreement.reviews" data-help-label-en="Agreements — Reviews" data-help-label-fr="Ententes — Examens" data-help-target="agreement.reviews.content" data-help-kind="section"
               entity-type="fundingcaseagreement"
               :entity-id="id"
               :can-update="canUpdateBusinessRecord"
@@ -596,6 +598,7 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
 
             <CommonWorkflowSection
               v-else-if="selectedTab === 'workflows'"
+              data-help-view="agreement.workflows" data-help-label-en="Agreements — Workflows" data-help-label-fr="Ententes — Processus" data-help-target="agreement.workflows.content" data-help-kind="section"
               entity-type="fundingcaseagreement"
               :entity-id="id"
               purpose="standard"
@@ -604,6 +607,7 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
 
             <CommonWorkflowSupplementaryInformation
               v-else-if="selectedTab === 'supplementary-information'"
+              data-help-view="agreement.supplementary-information" data-help-label-en="Agreements — Supplementary information" data-help-label-fr="Ententes — Renseignements supplémentaires" data-help-target="agreement.supplementary-information.content" data-help-kind="section"
               :show-header="false"
               entity-type="fundingcaseagreement"
               :entity-id="id" />
@@ -673,6 +677,7 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
 
             <CommonAttachmentsTab
               v-else-if="selectedTab === 'attachments'"
+              data-help-view="agreement.attachments" data-help-label-en="Agreements — Attachments" data-help-label-fr="Ententes — Pièces jointes" data-help-target="agreement.attachments.content" data-help-kind="section"
               entity-type="fundingcaseagreement"
               :entity-id="id" />
 
@@ -684,6 +689,7 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
 
             <CommonAssignedUsers
               v-else-if="selectedTab === 'assignments'"
+              data-help-view="agreement.assignments" data-help-label-en="Agreements — Assignments" data-help-label-fr="Ententes — Affectations" data-help-target="agreement.assignments.content" data-help-kind="section"
               :show-header="false"
               entity-type="fundingcaseagreement"
               :entity-id="id" />

@@ -78,57 +78,59 @@ const openAgreement = async (agreement: FundingCaseAgreementProfileRow) => {
 </script>
 
 <template>
-  <CommonResourceLayoutCard
-    v-model:search="search"
-    v-model:pagination="pagination"
-    class="w-full"
-    :data="agreements"
-    :columns="columns"
-    :total-records="totalRecords"
-    :loading="status === 'pending'"
-    :request-status="status"
-    :pagination-options="{ getPaginationRowModel: getPaginationRowModel() }"
-    :button-label="t('agreement.new')"
-    :show-button="canCreateAgreement"
-    :search-placeholder="t('applicant_recipient.agreements.search')"
-    data-field-scope="applicant-recipient.agreements-tab"
-    @add="openCreateAgreement" @retry="refresh">
-    <template #filters>
-      <CommonAssignedListViewSelect v-model="listView" data-field-label-en="List view" data-field-label-fr="Vue de la liste" resource="agreement" data-ui-target="applicant-recipient.agreements-tab.listView" />
-    </template>
-    <template #egcs_fc_title_en-cell="{ row }">
-      <CommonBilingualName
-        :name-en="row.original.egcs_fc_title_en"
-        :name-fr="row.original.egcs_fc_title_fr"
-        :to="localePath(appRouteLocations.agreementDetail(String(row.original.id)))" />
-    </template>
+  <section data-help-target="proponent.agreements.content" data-help-kind="section" data-help-view="proponent.agreements" class="flex w-full min-w-0 flex-col">
+    <CommonResourceLayoutCard
+      v-model:search="search" v-model:pagination="pagination" help-add-target="proponent.agreements.add" help-search-target="proponent.agreements.search"
 
-    <template #program-cell="{ row }">
-      <span class="font-semibold text-zinc-700 dark:text-zinc-300">
-        {{ getBilingualValue(row.original, 'program_name', '-') }}
-      </span>
-    </template>
+      class="w-full"
+      :data="agreements"
+      :columns="columns"
+      :total-records="totalRecords"
+      :loading="status === 'pending'"
+      :request-status="status"
+      :pagination-options="{ getPaginationRowModel: getPaginationRowModel() }"
+      :button-label="t('agreement.new')"
+      :show-button="canCreateAgreement"
+      :search-placeholder="t('applicant_recipient.agreements.search')"
+      data-field-scope="applicant-recipient.agreements-tab"
+      @add="openCreateAgreement" @retry="refresh">
+      <template #filters>
+        <CommonAssignedListViewSelect v-model="listView" data-field-label-en="List view" data-field-label-fr="Vue de la liste" resource="agreement" data-ui-target="applicant-recipient.agreements-tab.listView" />
+      </template>
+      <template #egcs_fc_title_en-cell="{ row }">
+        <CommonBilingualName
+          :name-en="row.original.egcs_fc_title_en"
+          :name-fr="row.original.egcs_fc_title_fr"
+          :to="localePath(appRouteLocations.agreementDetail(String(row.original.id)))" />
+      </template>
 
-    <template #stream-cell="{ row }">
-      <span class="font-semibold text-zinc-700 dark:text-zinc-300">
-        {{ getBilingualValue(row.original, 'stream_name', '-') }}
-      </span>
-    </template>
+      <template #program-cell="{ row }">
+        <span class="font-semibold text-zinc-700 dark:text-zinc-300">
+          {{ getBilingualValue(row.original, 'program_name', '-') }}
+        </span>
+      </template>
 
-    <template #egcs_fc_agreementtype-cell="{ row }">
-      <span class="font-semibold text-zinc-700 dark:text-zinc-300">
-        {{ getAgreementTypeLabel(row.original.egcs_fc_agreementtype) }}
-      </span>
-    </template>
+      <template #stream-cell="{ row }">
+        <span class="font-semibold text-zinc-700 dark:text-zinc-300">
+          {{ getBilingualValue(row.original, 'stream_name', '-') }}
+        </span>
+      </template>
 
-    <template #actions-cell="{ row }">
-      <CommonActionButton
-        icon="i-lucide-arrow-right"
-        color="neutral"
-        variant="ghost"
-        size="sm"
-        :aria-label="t('common.open')"
-        @click="openAgreement(row.original)" />
-    </template>
-  </CommonResourceLayoutCard>
+      <template #egcs_fc_agreementtype-cell="{ row }">
+        <span class="font-semibold text-zinc-700 dark:text-zinc-300">
+          {{ getAgreementTypeLabel(row.original.egcs_fc_agreementtype) }}
+        </span>
+      </template>
+
+      <template #actions-cell="{ row }">
+        <CommonActionButton
+          icon="i-lucide-arrow-right"
+          color="neutral"
+          variant="ghost"
+          size="sm"
+          :aria-label="t('common.open')"
+          @click="openAgreement(row.original)" />
+      </template>
+    </CommonResourceLayoutCard>
+  </section>
 </template>

@@ -43,6 +43,7 @@ const confirm = () => {
 <template>
   <UModal
     v-model:open="open"
+    data-help-view="proponent.funding-history-similarity"
     :title="t('applicant_recipient.funding_history.similarity.title')"
     :description="t('applicant_recipient.funding_history.similarity.description')"
     :dismissible="false">
@@ -77,11 +78,13 @@ const confirm = () => {
           variant="outline"
           icon="i-lucide-arrow-left"
           :label="t('applicant_recipient.funding_history.similarity.go_back')"
+          data-help-target="proponent.funding-history-similarity.back" data-help-kind="button"
           @click="goBack" />
         <UButton
           color="warning"
           icon="i-lucide-check-check"
           :label="t('applicant_recipient.funding_history.similarity.confirm')"
+          data-help-target="proponent.funding-history-similarity.confirm" data-help-kind="button"
           @click="confirm" />
       </div>
     </template>

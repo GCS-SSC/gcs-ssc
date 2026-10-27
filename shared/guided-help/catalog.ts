@@ -1,3 +1,6 @@
+import { agreementCaseworkLedger } from './agreement-casework.ts'
+import { financialCaseworkLedger } from './financial-casework.ts'
+import { otherCaseworkHelpViews } from './other-casework.ts'
 import type { TargetLedger } from '@gcs-ssc/guided-help/contracts'
 
 /** Approved application contract; edits require explicit guided-help contract task scope. */
@@ -95,4 +98,12 @@ export const guidedHelpLedger: TargetLedger = {
       ]
     }
   ]
+}
+
+// Casework screens are available to instruction authoring. New launch screens require
+// their own resource-aware discovery authorization before publication can offer them.
+for (const declaration of [...agreementCaseworkLedger.views, ...financialCaseworkLedger.views, ...otherCaseworkHelpViews]) {
+  const existing = guidedHelpLedger.views.find(view => view.key === declaration.key)
+  if (existing) existing.targets.push(...declaration.targets)
+  else guidedHelpLedger.views.push({ ...declaration, discoverable: false })
 }

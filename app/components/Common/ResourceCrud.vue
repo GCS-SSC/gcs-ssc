@@ -26,6 +26,7 @@ const {
   bilingualColumns,
   buttonLabel,
   helpAddTarget,
+  helpSearchTarget,
   helpSaveTarget,
   showButton = true,
   canCreate: createAllowed = true,
@@ -60,6 +61,7 @@ const {
   bilingualColumns?: BilingualColumnConfig<T>[]
   helpSaveTarget?: string
   helpAddTarget?: string
+  helpSearchTarget?: string
   buttonLabel?: string
   showButton?: boolean
   canCreate?: boolean
@@ -199,6 +201,7 @@ defineExpose({
       :status-filter-label="statusFilterLabel"
       :button-label="buttonLabel"
       :help-add-target="helpAddTarget"
+      :help-search-target="helpSearchTarget"
       :show-button="showButton && createAllowed && !staticMode"
       :search-placeholder="searchPlaceholder"
       :data="items"

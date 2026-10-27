@@ -1161,7 +1161,7 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
     <div v-else-if="isLoadingDetail && (!profile || !activeClaim)" role="status" aria-live="polite" class="sr-only">
       <span>{{ t('common.loading_records') }}</span>
     </div>
-    <CommonDetailPage v-if="profile && activeClaim" id="agreement-claim-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" class="w-full">
+    <CommonDetailPage v-if="profile && activeClaim" id="agreement-claim-detail" v-model:collapsed="isHeroCollapsed" data-help-view="casework.claims.detail" :breadcrumb-items="breadcrumbItems" class="w-full">
       <template #body>
         <div class="flex flex-1 flex-col">
           <CommonEntityHero
@@ -1172,162 +1172,168 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
             :meta-items="claimHeroMetaItems"
             :badges="claimHeroBadges" />
 
-          <CommonDetailWorkspace v-model="selectedClaimTab" data-field-container="Page navigation state, not a business input field." :items="claimTabs" content-test-id="agreement-claim-detail-content">
-            <div v-if="selectedClaimTab === 'submission'" class="w-full min-w-0">
+          <CommonDetailWorkspace v-model="selectedClaimTab" help-navigation-group-target="casework.claims.detail.section-navigation" data-field-container="Page navigation state, not a business input field." :items="claimTabs" content-test-id="agreement-claim-detail-content">
+            <div v-if="selectedClaimTab === 'submission'" data-help-target="casework.claims.submission.content" data-help-kind="section" data-help-view="casework.claims.submission" class="w-full min-w-0">
               <div class="space-y-8">
                 <div class="space-y-4">
-                  <CommonResourceLayoutCard
-                    v-model:search="submissionSearch"
-                    v-model:pagination="submissionPagination"
-                    :data="filteredClaimSubmissionRows"
-                    :columns="submissionColumns"
-                    :grouping="submissionGrouping"
-                    :grouping-options="submissionGroupingOptions"
-                    :expanded-options="submissionExpandedOptions"
-                    :column-visibility="submissionColumnVisibility"
-                    :expanded="submissionExpandedRows"
-                    :total-records="filteredClaimSubmissionRows.length"
-                    :loading="overviewStatus === 'pending'"
-                    table-class="agreement-claim-submission-table"
-                    :show-button="false"
-                    :show-column-toggle="false"
-                    :search-placeholder="t('agreement.budget.search')"
-                    @update:expanded="updateSubmissionExpandedRows">
-                    <template #name-cell="{ row }">
-                      <div :id="getGroupedDisclosureContentId(row as GroupedClaimSubmissionRow)" class="contents">
-                        <div v-if="isSubmissionCostCategoryGroupRow(row as GroupedClaimSubmissionRow)" class="flex w-full items-center gap-3 py-1">
-                          <CommonGroupedDisclosureButton
-                            v-if="canExpandSubmissionGroupedRow(row as GroupedClaimSubmissionRow)"
-                            class="group flex min-w-0 items-center gap-3 text-left"
-                            :expanded="row.getIsExpanded?.() === true"
-                            :controls="getGroupedDisclosureControlsId(row.id)"
-                            :label="row.original.costCategoryLabel"
-                            @toggle="row.toggleExpanded?.()">
-                            <UIcon
-                              :name="row.getIsExpanded?.() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
-                              class="size-4 text-zinc-400 transition-colors group-hover:text-primary" />
-                            <span class="text-sm font-semibold text-zinc-900 dark:text-white">
-                              {{ row.original.costCategoryLabel }}
-                            </span>
-                            <CommonStatusBadge variant="count" size="sm" :label="String(getSubmissionGroupedRowCount(row as GroupedClaimSubmissionRow))" />
-                          </CommonGroupedDisclosureButton>
-                        </div>
-
-                        <div v-else-if="isSubmissionCostSubsectionGroupRow(row as GroupedClaimSubmissionRow)" class="flex w-full items-center gap-3 py-1 pl-6">
-                          <CommonGroupedDisclosureButton
-                            v-if="canExpandSubmissionGroupedRow(row as GroupedClaimSubmissionRow)"
-                            class="group flex min-w-0 items-center gap-3 text-left"
-                            :expanded="row.getIsExpanded?.() === true"
-                            :controls="getGroupedDisclosureControlsId(row.id)"
-                            :label="row.original.costSubsectionLabel"
-                            @toggle="row.toggleExpanded?.()">
-                            <UIcon
-                              :name="row.getIsExpanded?.() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
-                              class="size-4 text-zinc-400 transition-colors group-hover:text-primary" />
-                            <span class="text-sm font-medium text-zinc-700 dark:text-zinc-200">
-                              {{ row.original.costSubsectionLabel }}
-                            </span>
-                            <CommonStatusBadge variant="count" size="sm" :label="String(getSubmissionGroupedRowCount(row as GroupedClaimSubmissionRow))" />
-                          </CommonGroupedDisclosureButton>
-                        </div>
-
-                        <div v-else class="flex min-w-0 max-w-full flex-col gap-2 pl-12">
-                          <div class="flex flex-wrap items-center gap-2">
-                            <CommonStatusBadge v-if="row.original.isUnallocated" variant="warning" :label="t('agreement.claims.unallocated')" />
-                            <CommonBilingualName
-                              :name-en="row.original.lineItemNameEn"
-                              :name-fr="row.original.lineItemNameFr" />
+                  <section data-help-target="casework.claims.submission.records">
+                    <CommonResourceLayoutCard
+                      v-model:search="submissionSearch"
+                      v-model:pagination="submissionPagination"
+                      help-search-target="casework.claims.submission.search"
+                      :data="filteredClaimSubmissionRows"
+                      :columns="submissionColumns"
+                      :grouping="submissionGrouping"
+                      :grouping-options="submissionGroupingOptions"
+                      :expanded-options="submissionExpandedOptions"
+                      :column-visibility="submissionColumnVisibility"
+                      :expanded="submissionExpandedRows"
+                      :total-records="filteredClaimSubmissionRows.length"
+                      :loading="overviewStatus === 'pending'"
+                      table-class="agreement-claim-submission-table"
+                      :show-button="false"
+                      :show-column-toggle="false"
+                      :search-placeholder="t('agreement.budget.search')"
+                      @update:expanded="updateSubmissionExpandedRows">
+                      <template #name-cell="{ row }">
+                        <div :id="getGroupedDisclosureContentId(row as GroupedClaimSubmissionRow)" class="contents">
+                          <div v-if="isSubmissionCostCategoryGroupRow(row as GroupedClaimSubmissionRow)" class="flex w-full items-center gap-3 py-1">
+                            <CommonGroupedDisclosureButton
+                              v-if="canExpandSubmissionGroupedRow(row as GroupedClaimSubmissionRow)"
+                              class="group flex min-w-0 items-center gap-3 text-left"
+                              :expanded="row.getIsExpanded?.() === true"
+                              :controls="getGroupedDisclosureControlsId(row.id)"
+                              :label="row.original.costCategoryLabel"
+                              @toggle="row.toggleExpanded?.()">
+                              <UIcon
+                                :name="row.getIsExpanded?.() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+                                class="size-4 text-zinc-400 transition-colors group-hover:text-primary" />
+                              <span class="text-sm font-semibold text-zinc-900 dark:text-white">
+                                {{ row.original.costCategoryLabel }}
+                              </span>
+                              <CommonStatusBadge variant="count" size="sm" :label="String(getSubmissionGroupedRowCount(row as GroupedClaimSubmissionRow))" />
+                            </CommonGroupedDisclosureButton>
                           </div>
-                          <p v-if="row.original.isHistorical" class="text-sm text-muted">
-                            {{ t('agreement.claims.historical_budget_line_read_only') }}
-                          </p>
-                          <p v-if="row.original.description" class="min-w-0 max-w-full whitespace-normal break-words text-sm text-zinc-500 dark:text-zinc-400">
-                            {{ row.original.description }}
-                          </p>
-                          <dl v-if="row.original.isHistorical && row.original.claimLine" data-testid="claim-historical-funding" class="space-y-1 text-sm text-muted">
-                            <div class="flex flex-wrap gap-x-2">
-                              <dt>{{ t('agreement.funding_sources.total_cost') }}</dt>
-                              <dd>{{ formatMoney(row.original.claimLine.egcs_fc_totalamount) }}</dd>
+
+                          <div v-else-if="isSubmissionCostSubsectionGroupRow(row as GroupedClaimSubmissionRow)" class="flex w-full items-center gap-3 py-1 pl-6">
+                            <CommonGroupedDisclosureButton
+                              v-if="canExpandSubmissionGroupedRow(row as GroupedClaimSubmissionRow)"
+                              class="group flex min-w-0 items-center gap-3 text-left"
+                              :expanded="row.getIsExpanded?.() === true"
+                              :controls="getGroupedDisclosureControlsId(row.id)"
+                              :label="row.original.costSubsectionLabel"
+                              @toggle="row.toggleExpanded?.()">
+                              <UIcon
+                                :name="row.getIsExpanded?.() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+                                class="size-4 text-zinc-400 transition-colors group-hover:text-primary" />
+                              <span class="text-sm font-medium text-zinc-700 dark:text-zinc-200">
+                                {{ row.original.costSubsectionLabel }}
+                              </span>
+                              <CommonStatusBadge variant="count" size="sm" :label="String(getSubmissionGroupedRowCount(row as GroupedClaimSubmissionRow))" />
+                            </CommonGroupedDisclosureButton>
+                          </div>
+
+                          <div v-else class="flex min-w-0 max-w-full flex-col gap-2 pl-12">
+                            <div class="flex flex-wrap items-center gap-2">
+                              <CommonStatusBadge v-if="row.original.isUnallocated" variant="warning" :label="t('agreement.claims.unallocated')" />
+                              <CommonBilingualName
+                                :name-en="row.original.lineItemNameEn"
+                                :name-fr="row.original.lineItemNameFr" />
                             </div>
-                            <div v-for="source in row.original.claimLine.egcs_fc_fundingsources" :key="source.egcs_fc_fundingsubtype" class="flex flex-wrap gap-x-2">
-                              <dt>{{ t('agreement.funding_sources.title') }}: {{ getBilingualValue(source, 'funding_subtype_name', t('common.unavailable')) }}</dt>
-                              <dd>{{ formatMoney(source.egcs_fc_amount) }}</dd>
-                            </div>
-                          </dl>
-                          <UButton
-                            v-if="row.original.claimLine && canUpdateClaim"
-                            color="neutral"
-                            variant="link"
-                            size="xs"
-                            :label="t('agreement.funding_sources.edit_line')"
-                            :disabled="isLoadingDetail || isSavingFunding"
-                            @click="openFundingEditor(row.original.claimLine)" />
-                          <div v-if="row.original.isUnallocated && row.original.claimLine && canAllocateClaimLines" class="flex flex-wrap items-end gap-2 pt-1">
-                            <UFormField data-ui-target="agreements.claims.claims.allocate_to_budget_line" :label="t('agreement.claims.allocate_to_budget_line')" :name="`allocation-${row.original.claimLine.id}`" required class="min-w-72">
-                              <CommonBilingualSelectMenu
-                                :model-value="draftAllocations[String(row.original.claimLine.id)]"
-                                :items="allocationOptions"
-                                value-key="id"
-                                label-en-key="label_en"
-                                label-fr-key="label_fr"
-                                searchable
-                                :disabled="!claimEditReady"
-                                @update:model-value="value => setDraftAllocation(String(row.original.claimLine!.id), value)" />
-                            </UFormField>
+                            <p v-if="row.original.isHistorical" class="text-sm text-muted">
+                              {{ t('agreement.claims.historical_budget_line_read_only') }}
+                            </p>
+                            <p v-if="row.original.description" class="min-w-0 max-w-full whitespace-normal break-words text-sm text-zinc-500 dark:text-zinc-400">
+                              {{ row.original.description }}
+                            </p>
+                            <dl v-if="row.original.isHistorical && row.original.claimLine" data-testid="claim-historical-funding" class="space-y-1 text-sm text-muted">
+                              <div class="flex flex-wrap gap-x-2">
+                                <dt>{{ t('agreement.funding_sources.total_cost') }}</dt>
+                                <dd>{{ formatMoney(row.original.claimLine.egcs_fc_totalamount) }}</dd>
+                              </div>
+                              <div v-for="source in row.original.claimLine.egcs_fc_fundingsources" :key="source.egcs_fc_fundingsubtype" class="flex flex-wrap gap-x-2">
+                                <dt>{{ t('agreement.funding_sources.title') }}: {{ getBilingualValue(source, 'funding_subtype_name', t('common.unavailable')) }}</dt>
+                                <dd>{{ formatMoney(source.egcs_fc_amount) }}</dd>
+                              </div>
+                            </dl>
                             <UButton
-                              color="primary"
-                              icon="i-lucide-link"
-                              class="cursor-default"
-                              :loading="allocatingClaimLineId === String(row.original.claimLine.id)"
-                              :disabled="isLoadingDetail || allocatingClaimLineId !== null"
-                              @click="allocateClaimLine(row.original.claimLine)">
-                              {{ t('agreement.claims.allocate') }}
-                            </UButton>
+                              v-if="row.original.claimLine && canUpdateClaim"
+
+                              color="neutral"
+                              variant="link"
+                              size="xs"
+                              :label="t('agreement.funding_sources.edit_line')"
+                              :disabled="isLoadingDetail || isSavingFunding"
+                              @click="openFundingEditor(row.original.claimLine)" />
+                            <div v-if="row.original.isUnallocated && row.original.claimLine && canAllocateClaimLines" class="flex flex-wrap items-end gap-2 pt-1">
+                              <UFormField data-ui-target="agreements.claims.claims.allocate_to_budget_line" :label="t('agreement.claims.allocate_to_budget_line')" :name="`allocation-${row.original.claimLine.id}`" required class="min-w-72">
+                                <CommonBilingualSelectMenu
+                                  :model-value="draftAllocations[String(row.original.claimLine.id)]"
+                                  :items="allocationOptions"
+                                  value-key="id"
+                                  label-en-key="label_en"
+                                  label-fr-key="label_fr"
+                                  searchable
+                                  :disabled="!claimEditReady"
+                                  @update:model-value="value => setDraftAllocation(String(row.original.claimLine!.id), value)" />
+                              </UFormField>
+                              <UButton
+
+                                color="primary"
+                                icon="i-lucide-link"
+                                class="cursor-default"
+                                :loading="allocatingClaimLineId === String(row.original.claimLine.id)"
+                                :disabled="isLoadingDetail || allocatingClaimLineId !== null"
+                                @click="allocateClaimLine(row.original.claimLine)">
+                                {{ t('agreement.claims.allocate') }}
+                              </UButton>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </template>
+                      </template>
 
-                    <template #submittedAmount-cell="{ row }">
-                      <span class="font-medium text-zinc-700 dark:text-zinc-200">
-                        {{ formatMoney(isGroupedSubmissionRow(row as GroupedClaimSubmissionRow) ? getSubmissionGroupedTotal(row as GroupedClaimSubmissionRow, 'submittedAmount') : row.original.submittedAmount) }}
-                      </span>
-                    </template>
+                      <template #submittedAmount-cell="{ row }">
+                        <span class="font-medium text-zinc-700 dark:text-zinc-200">
+                          {{ formatMoney(isGroupedSubmissionRow(row as GroupedClaimSubmissionRow) ? getSubmissionGroupedTotal(row as GroupedClaimSubmissionRow, 'submittedAmount') : row.original.submittedAmount) }}
+                        </span>
+                      </template>
 
-                    <template #actions-cell="{ row }">
-                      <div class="flex justify-end gap-2">
-                        <CommonActionButton
-                          v-if="!isGroupedSubmissionRow(row as GroupedClaimSubmissionRow) && row.original.budgetLineId && canEditClaimSubmissionAmount(row.original.budgetLineId)"
-                          icon="i-lucide-pencil"
-                          color="neutral"
-                          variant="ghost"
-                          size="sm"
-                          :aria-label="t('agreement.claims.edit_submitted_amount_for', { name: locale === 'fr' ? row.original.lineItemNameFr : row.original.lineItemNameEn })"
-                          :disabled="isLoadingDetail || isSavingSubmission"
-                          @click="openSubmissionEditor(row.original)" />
-                      </div>
-                    </template>
+                      <template #actions-cell="{ row }">
+                        <div class="flex justify-end gap-2">
+                          <CommonActionButton
+                            v-if="!isGroupedSubmissionRow(row as GroupedClaimSubmissionRow) && row.original.budgetLineId && canEditClaimSubmissionAmount(row.original.budgetLineId)"
 
-                    <template #reconciledAmount-cell="{ row }">
-                      <span class="font-medium text-zinc-700 dark:text-zinc-200">
-                        {{ formatMoney(isGroupedSubmissionRow(row as GroupedClaimSubmissionRow) ? getSubmissionGroupedTotal(row as GroupedClaimSubmissionRow, 'reconciledAmount') : row.original.reconciledAmount) }}
-                      </span>
-                    </template>
+                            icon="i-lucide-pencil"
+                            color="neutral"
+                            variant="ghost"
+                            size="sm"
+                            :aria-label="t('agreement.claims.edit_submitted_amount_for', { name: locale === 'fr' ? row.original.lineItemNameFr : row.original.lineItemNameEn })"
+                            :disabled="isLoadingDetail || isSavingSubmission"
+                            @click="openSubmissionEditor(row.original)" />
+                        </div>
+                      </template>
 
-                    <template #balance-cell="{ row }">
-                      <span class="font-bold text-primary">
-                        {{ formatMoney(isGroupedSubmissionRow(row as GroupedClaimSubmissionRow) ? getSubmissionGroupedTotal(row as GroupedClaimSubmissionRow, 'balance') : row.original.balance) }}
-                      </span>
-                    </template>
+                      <template #reconciledAmount-cell="{ row }">
+                        <span class="font-medium text-zinc-700 dark:text-zinc-200">
+                          {{ formatMoney(isGroupedSubmissionRow(row as GroupedClaimSubmissionRow) ? getSubmissionGroupedTotal(row as GroupedClaimSubmissionRow, 'reconciledAmount') : row.original.reconciledAmount) }}
+                        </span>
+                      </template>
 
-                    <template #footer-left>
-                      <div data-testid="claim-submission-totals" class="flex flex-wrap gap-x-5 gap-y-1">
-                        <span>{{ t('agreement.claims.total') }}: {{ formatMoney(totalSubmitted) }}</span>
-                        <span>{{ t('agreement.claims.reconciled_amount') }}: {{ formatMoney(totalReconciledAll) }}</span>
-                        <span class="text-primary">{{ t('agreement.claims.balance') }}: {{ formatMoney(balanceAll) }}</span>
-                      </div>
-                    </template>
-                  </CommonResourceLayoutCard>
+                      <template #balance-cell="{ row }">
+                        <span class="font-bold text-primary">
+                          {{ formatMoney(isGroupedSubmissionRow(row as GroupedClaimSubmissionRow) ? getSubmissionGroupedTotal(row as GroupedClaimSubmissionRow, 'balance') : row.original.balance) }}
+                        </span>
+                      </template>
+
+                      <template #footer-left>
+                        <div data-testid="claim-submission-totals" class="flex flex-wrap gap-x-5 gap-y-1">
+                          <span>{{ t('agreement.claims.total') }}: {{ formatMoney(totalSubmitted) }}</span>
+                          <span>{{ t('agreement.claims.reconciled_amount') }}: {{ formatMoney(totalReconciledAll) }}</span>
+                          <span class="text-primary">{{ t('agreement.claims.balance') }}: {{ formatMoney(balanceAll) }}</span>
+                        </div>
+                      </template>
+                    </CommonResourceLayoutCard>
+                  </section>
                 </div>
 
                 <div class="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 pt-6 dark:border-zinc-800">
@@ -1337,6 +1343,7 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
                   <div class="flex flex-wrap justify-end gap-2">
                     <UButton
                       v-if="canWithdrawClaim"
+                      data-help-target="casework.claims.detail.withdraw-claim"
                       color="neutral"
                       variant="outline"
                       icon="i-lucide-undo-2"
@@ -1348,6 +1355,7 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
                     </UButton>
                     <UButton
                       v-if="canCancelClaim"
+                      data-help-target="casework.claims.detail.cancel-claim"
                       color="error"
                       variant="outline"
                       icon="i-lucide-ban"
@@ -1364,6 +1372,7 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
 
             <CommonReviewsTab
               v-else-if="selectedClaimTab === 'reviews'"
+              data-help-view="casework.claims.reviews"
               entity-type="fundingcaseagreementclaim"
               :entity-id="claimId"
               :can-update="isAssigned && !activeClaimIsLocked"
@@ -1371,6 +1380,7 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
 
             <CommonWorkflowSection
               v-else-if="selectedClaimTab === 'workflows'"
+              data-help-view="casework.claims.workflows"
               entity-type="fundingcaseagreementclaim"
               :entity-id="claimId"
               purpose="standard"
@@ -1380,15 +1390,18 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
               :refresh-key="approvalsRefreshKey"
               @changed="refreshPage" />
 
-            <CommonWorkflowSupplementaryInformation
-              v-else-if="selectedClaimTab === 'supplementary-information'"
-              :show-header="false"
-              entity-type="fundingcaseagreementclaim"
-              :entity-id="claimId" />
+            <section v-else-if="selectedClaimTab === 'supplementary-information'" data-help-view="casework.claims.supplementary-information" data-help-target="casework.claims.supplementary-information.content">
+              <CommonWorkflowSupplementaryInformation
 
-            <div v-else-if="selectedClaimTab === 'reconciliation'" class="w-full min-w-0">
+                :show-header="false"
+                entity-type="fundingcaseagreementclaim"
+                :entity-id="claimId" />
+            </section>
+
+            <div v-else-if="selectedClaimTab === 'reconciliation'" data-help-view="casework.claims.reconciliation" data-help-target="casework.claims.detail.reconciliation" data-help-kind="section" class="w-full min-w-0">
               <div v-if="canStartReconcile" class="mb-6 flex justify-end">
                 <UButton
+                  data-help-target="casework.claims.detail.claims-new-reconcile-with-context"
                   color="primary"
                   icon="i-lucide-plus"
                   class="cursor-default"
@@ -1484,6 +1497,7 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
                           <div class="flex items-center justify-end gap-1">
                             <UButton
                               v-if="selectable"
+
                               color="neutral"
                               variant="ghost"
                               size="sm"
@@ -1519,6 +1533,7 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
                       <div class="flex flex-wrap items-center gap-2">
                         <UButton
                           v-if="canUpdateReconcileRole"
+                          data-help-target="casework.claims.detail.claims-cancel-reconcile"
                           color="error"
                           variant="outline"
                           icon="i-lucide-ban"
@@ -1528,6 +1543,7 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
                           @click="cancelReconciliation" />
                         <CommonSaveButton
                           v-if="canUpdateReconcileRole"
+                          data-help-target="casework.claims.detail.claims-save-reconcile"
                           type="button"
                           :label="t('agreement.claims.save_reconcile')"
                           :loading="isSavingReconcile"
@@ -1608,12 +1624,14 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
 
             <CommonAssignedUsers
               v-else-if="selectedClaimTab === 'assignments'"
+              data-help-view="casework.claims.assignments"
               :show-header="false"
               entity-type="fundingcaseagreementclaim"
               :entity-id="claimId" />
 
             <CommonAttachmentsTab
               v-else-if="selectedClaimTab === 'attachments'"
+              data-help-view="casework.claims.attachments"
               entity-type="fundingcaseagreementclaim"
               :entity-id="claimId" />
 
@@ -1627,7 +1645,8 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
 
     <UModal
       v-if="selectedSubmissionLine"
-      v-model:open="isSubmissionModalOpen" data-field-scope="agreements.claims" data-scope-label-en="Agreements > Claims > Submission > Budget line" data-scope-label-fr="Ententes > Demandes de remboursement > Présentation > Ligne budgétaire"
+      v-model:open="isSubmissionModalOpen"
+      data-help-view="casework.claims.detail.is-submission-modal-open" data-field-scope="agreements.claims" data-scope-label-en="Agreements > Claims > Submission > Budget line" data-scope-label-fr="Ententes > Demandes de remboursement > Présentation > Ligne budgétaire"
       :title="t('agreement.claims.edit_submitted_amount')"
       :description="locale === 'fr' ? selectedSubmissionLine.lineItemNameFr : selectedSubmissionLine.lineItemNameEn"
       :dismissible="!isSavingSubmission">
@@ -1644,8 +1663,8 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
               class="w-full" />
           </UFormField>
           <div class="flex justify-end gap-2">
-            <UButton type="button" color="neutral" variant="ghost" :label="t('common.cancel')" :disabled="isLoadingDetail || isSavingSubmission" @click="submissionModal.close" />
-            <CommonSaveButton type="submit" :label="t('common.save')" :loading="isSavingSubmission" :disabled="isLoadingDetail || isSavingSubmission" />
+            <UButton data-help-target="casework.claims.detail.is-submission-modal-open.common-cancel" type="button" color="neutral" variant="ghost" :label="t('common.cancel')" :disabled="isLoadingDetail || isSavingSubmission" @click="submissionModal.close" />
+            <CommonSaveButton data-help-target="casework.claims.detail.is-submission-modal-open.common-save" type="submit" :label="t('common.save')" :loading="isSavingSubmission" :disabled="isLoadingDetail || isSavingSubmission" />
           </div>
         </UForm>
       </template>
@@ -1654,6 +1673,7 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
     <UModal
       v-if="selectedReconcileLine"
       v-model:open="isReconcileLineModalOpen"
+      data-help-view="casework.claims.detail.is-reconcile-line-modal-open"
       :title="t('agreement.claims.reconcile_line_details')"
       :description="selectedReconcileLine.name"
       :ui="{ content: 'sm:max-w-2xl' }">
@@ -1705,6 +1725,7 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
 
           <div class="flex justify-end gap-2 pt-2">
             <UButton
+              data-help-target="casework.claims.detail.is-reconcile-line-modal-open.common-cancel"
               type="button"
               color="neutral"
               variant="ghost"
@@ -1713,6 +1734,7 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
               @click="reconcileLineModal.close" />
             <CommonSaveButton
               v-if="selectedReconcileLine.editable"
+              data-help-target="casework.claims.detail.is-reconcile-line-modal-open.common-save"
               type="submit"
               :label="t('common.save')"
               :loading="isSavingReconcileLine"
@@ -1721,7 +1743,7 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
         </form>
       </template>
     </UModal>
-    <UModal v-if="profile" v-model:open="fundingEditorOpen" data-field-scope="agreements.claims" data-scope-label-en="Agreements > Claims > Submission > Funding sources" data-scope-label-fr="Ententes > Demandes de remboursement > Présentation > Sources de financement" :title="t('agreement.funding_sources.edit_line')" :ui="{ content: 'sm:max-w-2xl' }">
+    <UModal v-if="profile" v-model:open="fundingEditorOpen" data-help-view="casework.claims.detail.funding-editor-open" data-field-scope="agreements.claims" data-scope-label-en="Agreements > Claims > Submission > Funding sources" data-scope-label-fr="Ententes > Demandes de remboursement > Présentation > Sources de financement" :title="t('agreement.funding_sources.edit_line')" :ui="{ content: 'sm:max-w-2xl' }">
       <template #body>
         <div class="space-y-4">
           <UFormField data-ui-target="agreements.claims.funding-source.program-amount" :label="t('agreement.claims.submitted_amount')" name="egcs_fc_amount" required>
@@ -1732,8 +1754,8 @@ useFieldTooltipProvider(() => activeClaim.value && String(activeClaim.value.id) 
           </UFormField>
           <AgreementFundingSourcesEditor v-model="fundingEditorSources" data-field-container="Composite editor; its individual field declarations own their identities." :agreement-id="agreementId" :currency="profile.egcs_fc_currency" :identity="`${fundingEditorLine?.id ?? ''}:${fundingEditorSession}`" />
           <div class="flex justify-end gap-2">
-            <UButton color="neutral" variant="ghost" :label="t('common.cancel')" @click="fundingEditorOpen = false" />
-            <CommonSaveButton :label="t('agreement.funding_sources.save')" :loading="isSavingFunding" :disabled="isLoadingDetail || isSavingFunding" @click="saveFundingEditor" />
+            <UButton data-help-target="casework.claims.detail.funding-editor-open.common-cancel" color="neutral" variant="ghost" :label="t('common.cancel')" @click="fundingEditorOpen = false" />
+            <CommonSaveButton data-help-target="casework.claims.detail.funding-editor-open.funding-sources-save" :label="t('agreement.funding_sources.save')" :loading="isSavingFunding" :disabled="isLoadingDetail || isSavingFunding" @click="saveFundingEditor" />
           </div>
         </div>
       </template>

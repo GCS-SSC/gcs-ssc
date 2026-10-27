@@ -72,60 +72,65 @@ const created = async (id: string) => {
 </script>
 
 <template>
-  <div class="min-w-0 space-y-4">
+  <div data-help-target="casework.account-receivable.collection.content" data-help-kind="section" data-help-view="casework.account-receivable.collection" class="min-w-0 space-y-4">
     <p class="text-sm text-muted">
       {{ t('account_receivable.description') }}
     </p>
-    <CommonResourceLayoutCard
-      v-model:search="search" v-model:pagination="pagination"
-      :data="tableRows" :columns="columns" :total-records="totalRecords"
-      :request-status="status" :loading="status === 'pending'"
-      :button-label="t('account_receivable.create')" :show-button="canCreate"
-      :search-placeholder="t('account_receivable.search')"
-      @add="createOpen = true" @retry="retry">
-      <template #reference-cell="{ row }">
-        <div class="flex min-w-0 flex-col gap-1">
-          <ULink
-            :to="localePath(appRouteLocations.agreementAccountReceivableDetail(agreementId, row.original.id))"
-            class="text-sm font-bold text-zinc-900 transition-colors hover:text-primary dark:text-white">
-            {{ accountReceivableReference(row.original) }}
-          </ULink>
-          <span class="text-xs text-muted">{{ locale === 'fr' ? row.original.egcs_fc_debtorname_fr : row.original.egcs_fc_debtorname_en }}</span>
-        </div>
-      </template>
-      <template #status-cell="{ row }">
-        <CommonStatusBadge :status-id="row.original.egcs_fc_status" />
-      </template>
-      <template #type-cell="{ row }">
-        <CommonBilingualName :name-en="row.original.egcs_fc_typename_en" :name-fr="row.original.egcs_fc_typename_fr" />
-      </template>
-      <template #amount-cell="{ row }">
-        <div class="flex flex-col gap-1 tabular-nums">
-          <span class="text-sm font-semibold">{{ amount(row.original.egcs_fc_outcome === 'posted' ? row.original.egcs_fc_approvedamount : row.original.originalAmount, row.original.egcs_fc_currency) }}</span>
-          <span class="text-xs text-muted">{{ t('account_receivable.original_amount') }}: {{ amount(row.original.originalAmount, row.original.egcs_fc_currency) }}</span>
-        </div>
-      </template>
-      <template #year-cell="{ row }">
-        {{ row.original.egcs_fc_fiscalyeardisplay }}
-      </template>
-      <template #method-cell="{ row }">
-        {{ row.original.egcs_fc_effectiverecoverymethod ? t(`enums.account_receivable_recovery_method.${row.original.egcs_fc_effectiverecoverymethod}`) : t('common.none') }}
-      </template>
-      <template #actions-cell="{ row }">
-        <div class="flex justify-end gap-2">
-          <CommonActionButton
-            v-if="row.original.egcs_fc_candeleterole"
-            icon="i-lucide-trash" color="error" variant="ghost"
-            :aria-label="`${t('common.delete')}: ${accountReceivableReference(row.original)}`"
-            :loading="deletingId === row.original.id" :disabled="deletingId !== null || status !== 'success'"
-            @click="deleteDraft(row.original)" />
-          <CommonActionButton
-            icon="i-lucide-arrow-right" color="neutral" variant="ghost"
-            :aria-label="`${t('common.view_details')}: ${accountReceivableReference(row.original)}`"
-            :to="localePath(appRouteLocations.agreementAccountReceivableDetail(agreementId, row.original.id))" />
-        </div>
-      </template>
-    </CommonResourceLayoutCard>
+    <section data-help-target="casework.account-receivable.collection.records">
+      <CommonResourceLayoutCard
+        v-model:search="search" v-model:pagination="pagination"
+        help-add-target="casework.account-receivable.collection.add" help-search-target="casework.account-receivable.collection.search"
+        :data="tableRows" :columns="columns" :total-records="totalRecords"
+        :request-status="status" :loading="status === 'pending'"
+        :button-label="t('account_receivable.create')" :show-button="canCreate"
+        :search-placeholder="t('account_receivable.search')"
+        @add="createOpen = true" @retry="retry">
+        <template #reference-cell="{ row }">
+          <div class="flex min-w-0 flex-col gap-1">
+            <ULink
+              :to="localePath(appRouteLocations.agreementAccountReceivableDetail(agreementId, row.original.id))"
+              class="text-sm font-bold text-zinc-900 transition-colors hover:text-primary dark:text-white">
+              {{ accountReceivableReference(row.original) }}
+            </ULink>
+            <span class="text-xs text-muted">{{ locale === 'fr' ? row.original.egcs_fc_debtorname_fr : row.original.egcs_fc_debtorname_en }}</span>
+          </div>
+        </template>
+        <template #status-cell="{ row }">
+          <CommonStatusBadge :status-id="row.original.egcs_fc_status" />
+        </template>
+        <template #type-cell="{ row }">
+          <CommonBilingualName :name-en="row.original.egcs_fc_typename_en" :name-fr="row.original.egcs_fc_typename_fr" />
+        </template>
+        <template #amount-cell="{ row }">
+          <div class="flex flex-col gap-1 tabular-nums">
+            <span class="text-sm font-semibold">{{ amount(row.original.egcs_fc_outcome === 'posted' ? row.original.egcs_fc_approvedamount : row.original.originalAmount, row.original.egcs_fc_currency) }}</span>
+            <span class="text-xs text-muted">{{ t('account_receivable.original_amount') }}: {{ amount(row.original.originalAmount, row.original.egcs_fc_currency) }}</span>
+          </div>
+        </template>
+        <template #year-cell="{ row }">
+          {{ row.original.egcs_fc_fiscalyeardisplay }}
+        </template>
+        <template #method-cell="{ row }">
+          {{ row.original.egcs_fc_effectiverecoverymethod ? t(`enums.account_receivable_recovery_method.${row.original.egcs_fc_effectiverecoverymethod}`) : t('common.none') }}
+        </template>
+        <template #actions-cell="{ row }">
+          <div class="flex justify-end gap-2">
+            <CommonActionButton
+              v-if="row.original.egcs_fc_candeleterole"
+
+              icon="i-lucide-trash" color="error" variant="ghost"
+              :aria-label="`${t('common.delete')}: ${accountReceivableReference(row.original)}`"
+              :loading="deletingId === row.original.id" :disabled="deletingId !== null || status !== 'success'"
+              @click="deleteDraft(row.original)" />
+            <CommonActionButton
+
+              icon="i-lucide-arrow-right" color="neutral" variant="ghost"
+              :aria-label="`${t('common.view_details')}: ${accountReceivableReference(row.original)}`"
+              :to="localePath(appRouteLocations.agreementAccountReceivableDetail(agreementId, row.original.id))" />
+          </div>
+        </template>
+      </CommonResourceLayoutCard>
+    </section>
     <AccountReceivableCreateModal v-model:open="createOpen" :agreement-id="agreementId" @created="created" />
   </div>
 </template>

@@ -343,7 +343,7 @@ useFieldTooltipProvider(() => data.value && String(data.value.reconciliation.id)
 <template>
   <CommonDetailPage id="claim-reconciliation-detail" v-model:collapsed="isHeroCollapsed" data-field-tooltip-context="agreement" data-field-scope="claim-reconciliations" data-scope-label-en="Agreements > Claim reconciliations > General" data-scope-label-fr="Ententes > Rapprochements des demandes de remboursement > Général" :breadcrumb-items="breadcrumbItems">
     <template #body>
-      <div v-if="data" ref="recoveryFocusTarget" tabindex="-1" class="flex flex-1 flex-col outline-none">
+      <div v-if="data" ref="recoveryFocusTarget" data-help-target="casework.claim-reconciliations.detail.content" data-help-kind="section" data-help-view="casework.claim-reconciliations.detail" tabindex="-1" class="flex flex-1 flex-col outline-none">
         <CommonEntityHero
           :is-collapsed="isHeroCollapsed"
           icon="i-lucide-scale"
@@ -361,7 +361,7 @@ useFieldTooltipProvider(() => data.value && String(data.value.reconciliation.id)
             ...(data.is_primary ? [{ variant: 'meta' as const, label: t('assignments.primary') }] : [])
           ]" />
 
-        <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="claim-reconciliation-detail-content">
+        <CommonDetailWorkspace v-model="selectedTab" help-navigation-group-target="casework.claim-reconciliations.detail.section-navigation" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="claim-reconciliation-detail-content">
           <UAlert
             v-if="selectedTab === 'reconciliation' && !data.can_update"
             color="neutral"
@@ -370,47 +370,50 @@ useFieldTooltipProvider(() => data.value && String(data.value.reconciliation.id)
             :title="t('assignments.read_only_title')"
             :description="t(data.is_assigned ? 'agreement.claims.reconcile_locked_description' : 'assignments.read_only_description')" />
 
-          <CommonSection v-if="selectedTab === 'reconciliation'" :show-header="false" :title="t('agreement.claims.reconcile_selected_title')" :grid-cols="1">
-            <div class="space-y-5">
-              <div class="flex flex-wrap items-center justify-between gap-4 rounded-sm border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-950">
-                <UCheckbox
-                  data-ui-target="claim-reconciliations.claims.mark_reconcile_final"
-                  :model-value="data.reconciliation.egcs_fc_isfinal"
-                  :label="t('agreement.claims.mark_reconcile_final')"
-                  :description="t('agreement.claims.mark_reconcile_final_description')"
-                  :disabled="!canUpdateRole || status !== 'success' || isMutationPending"
-                  @update:model-value="saveFinalState" />
-                <CommonSaveButton
-                  v-if="canUpdateRole"
-                  type="button"
-                  :label="t('agreement.claims.save_reconcile')"
-                  :loading="isSaving"
-                  :disabled="status !== 'success' || isMutationPending"
-                  @click="saveLines" />
-                <UButton
-                  v-if="canUpdateRole"
-                  color="error"
-                  variant="outline"
-                  icon="i-lucide-ban"
-                  :label="t('agreement.claims.cancel_reconcile')"
-                  :loading="isCancelling"
-                  :disabled="status !== 'success' || isMutationPending"
-                  @click="cancelReconciliation" />
+          <section v-if="selectedTab === 'reconciliation'" data-help-view="casework.claim-reconciliations.reconciliation" data-help-target="casework.claim-reconciliations.reconciliation.content">
+            <CommonSection :show-header="false" :title="t('agreement.claims.reconcile_selected_title')" :grid-cols="1">
+              <div class="space-y-5">
+                <div class="flex flex-wrap items-center justify-between gap-4 rounded-sm border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-950">
+                  <UCheckbox
+                    data-ui-target="claim-reconciliations.claims.mark_reconcile_final"
+                    :model-value="data.reconciliation.egcs_fc_isfinal"
+                    :label="t('agreement.claims.mark_reconcile_final')"
+                    :description="t('agreement.claims.mark_reconcile_final_description')"
+                    :disabled="!canUpdateRole || status !== 'success' || isMutationPending"
+                    @update:model-value="saveFinalState" />
+                  <CommonSaveButton
+                    v-if="canUpdateRole"
+                    data-help-target="casework.claim-reconciliations.detail.claims-save-reconcile"
+                    type="button"
+                    :label="t('agreement.claims.save_reconcile')"
+                    :loading="isSaving"
+                    :disabled="status !== 'success' || isMutationPending"
+                    @click="saveLines" />
+                  <UButton
+                    v-if="canUpdateRole"
+                    data-help-target="casework.claim-reconciliations.detail.claims-cancel-reconcile"
+                    color="error"
+                    variant="outline"
+                    icon="i-lucide-ban"
+                    :label="t('agreement.claims.cancel_reconcile')"
+                    :loading="isCancelling"
+                    :disabled="status !== 'success' || isMutationPending"
+                    @click="cancelReconciliation" />
+                </div>
+
+                <AgreementClaimReconciliationLinesTable
+                  :lines="reconciliationTableLines"
+                  :currency="data.reconciliation.egcs_fc_currency"
+                  :total-submitted="totalSubmitted"
+                  :total-reconciled="totalReconciled"
+                  :total-sampled="totalSampled"
+                  @update:reconciled="updateDraftReconciled"
+                  @update:sampled="updateDraftSampled"
+                  @update:rationale="updateDraftRationale" />
               </div>
-
-              <AgreementClaimReconciliationLinesTable
-                :lines="reconciliationTableLines"
-                :currency="data.reconciliation.egcs_fc_currency"
-                :total-submitted="totalSubmitted"
-                :total-reconciled="totalReconciled"
-                :total-sampled="totalSampled"
-                @update:reconciled="updateDraftReconciled"
-                @update:sampled="updateDraftSampled"
-                @update:rationale="updateDraftRationale" />
-            </div>
-          </CommonSection>
-
-          <CommonSection v-else-if="selectedTab === 'completion'" :show-header="false" :title="t('agreement.claims.reconcile_completion.title')" :grid-cols="1">
+            </CommonSection>
+          </section>
+          <CommonSection v-else-if="selectedTab === 'completion'" data-help-view="casework.claim-reconciliations.completion" :show-header="false" :title="t('agreement.claims.reconcile_completion.title')" :grid-cols="1">
             <fieldset :disabled="status !== 'success' || isMutationPending" class="space-y-8">
               <CommonCompletionSection
                 entity-type="fundingclaimreconcile"
@@ -442,12 +445,13 @@ useFieldTooltipProvider(() => data.value && String(data.value.reconciliation.id)
 
           <CommonReviewsTab
             v-else-if="selectedTab === 'reviews'"
+            data-help-view="casework.claim-reconciliations.reviews"
             entity-type="fundingclaimreconcile"
             :entity-id="reconcileId"
             :can-update="data.can_update"
             @changed="handleRuntimeChanged" />
 
-          <fieldset v-else-if="selectedTab === 'workflows'" :disabled="status !== 'success' || isMutationPending">
+          <fieldset v-else-if="selectedTab === 'workflows'" data-help-view="casework.claim-reconciliations.workflows" data-help-target="casework.claim-reconciliations.detail.workflows" data-help-kind="section" :disabled="status !== 'success' || isMutationPending">
             <CommonWorkflowSection
               entity-type="fundingclaimreconcile"
               :entity-id="reconcileId"
@@ -458,9 +462,11 @@ useFieldTooltipProvider(() => data.value && String(data.value.reconciliation.id)
               :refresh-key="approvalsRefreshKey"
               @changed="handleRuntimeChanged" />
           </fieldset>
-          <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" :show-header="false" entity-type="fundingclaimreconcile" :entity-id="reconcileId" />
-          <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingclaimreconcile" :entity-id="reconcileId" />
-          <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" :show-header="false" entity-type="fundingclaimreconcile" :entity-id="reconcileId" />
+          <section v-else-if="selectedTab === 'supplementary-information'" data-help-view="casework.claim-reconciliations.supplementary-information" data-help-target="casework.claim-reconciliations.supplementary-information.content">
+            <CommonWorkflowSupplementaryInformation :show-header="false" entity-type="fundingclaimreconcile" :entity-id="reconcileId" />
+          </section>
+          <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" data-help-view="casework.claim-reconciliations.attachments" entity-type="fundingclaimreconcile" :entity-id="reconcileId" />
+          <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" data-help-view="casework.claim-reconciliations.assignments" :show-header="false" entity-type="fundingclaimreconcile" :entity-id="reconcileId" />
         </CommonDetailWorkspace>
       </div>
 

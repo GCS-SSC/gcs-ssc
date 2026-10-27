@@ -162,12 +162,12 @@ useFieldTooltipProvider(() => correction.value && String(correction.value.id) ==
     <div v-else-if="!correction && status === 'pending'" role="status" aria-live="polite" class="sr-only">
       <span>{{ t('common.loading_records') }}</span>
     </div>
-    <CommonDetailPage v-if="correction && state" id="agreement-correction-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbs" class="min-w-0 flex-1">
+    <CommonDetailPage v-if="correction && state" id="agreement-correction-detail" v-model:collapsed="isHeroCollapsed" data-help-view="casework.corrections.detail" :breadcrumb-items="breadcrumbs" class="min-w-0 flex-1">
       <template #body>
         <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-file-diff" :title="formatCorrectionReference(correction)" :meta-items="[`${t('correction.agreement')}: ${correction.egcs_fc_agreementnumber}`, formatDate(correction.egcs_fc_requesteddate)]" :badges="[{ statusId: correction.egcs_fc_status }]" :actions="heroActions" />
         <ULink v-if="correction.egcs_fc_linkedcorrection" :to="localePath(appRouteLocations.agreementCorrectionDetail(agreementId, correction.egcs_fc_linkedcorrection))" class="mb-4 text-sm">{{ t('correction.linked_correction') }}</ULink>
-        <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-correction-detail-content">
-          <UForm v-if="selectedTab === 'lines'" :state="state" :validate="createValidator(CorrectionEditSchema)" class="space-y-8" @submit="save">
+        <CommonDetailWorkspace v-model="selectedTab" help-navigation-group-target="casework.corrections.detail.section-navigation" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-correction-detail-content">
+          <UForm v-if="selectedTab === 'lines'" data-help-view="casework.corrections.lines" :state="state" :validate="createValidator(CorrectionEditSchema)" class="space-y-8" @submit="save">
             <CommonSection :show-header="false" :title="t('correction.financial_lines')" :grid-cols="1">
               <p id="correction-line-instruction" class="text-sm text-muted">
                 {{ t('correction.lines_instruction') }}
@@ -236,25 +236,29 @@ useFieldTooltipProvider(() => correction.value && String(correction.value.id) ==
                 </UFormField>
               </div>
               <div v-if="correction.egcs_fc_canedit" class="flex justify-end gap-2">
-                <CommonSaveButton :label="t('common.save')" :loading="saving" :disabled="saving || status !== 'success'" />
+                <CommonSaveButton data-help-target="casework.corrections.detail.common-save" :label="t('common.save')" :loading="saving" :disabled="saving || status !== 'success'" />
               </div>
             </CommonSection>
           </UForm>
-          <CommonSection v-else-if="selectedTab === 'basis'" :show-header="false" :title="t('correction.financial_basis')" :grid-cols="1">
-            <p class="text-sm text-muted">
-              {{ t('correction.financial_basis_description') }}
-            </p>
-            <CorrectionSourcePayments :sources="correction.egcs_fc_sources" :agreement-id="agreementId" :can-open="correction.egcs_fc_sourcereadable" />
-          </CommonSection>
-          <section v-else-if="selectedTab === 'completion'" class="space-y-6">
+          <section v-else-if="selectedTab === 'basis'" data-help-view="casework.corrections.basis" data-help-target="casework.corrections.basis.content">
+            <CommonSection :show-header="false" :title="t('correction.financial_basis')" :grid-cols="1">
+              <p class="text-sm text-muted">
+                {{ t('correction.financial_basis_description') }}
+              </p>
+              <CorrectionSourcePayments :sources="correction.egcs_fc_sources" :agreement-id="agreementId" :can-open="correction.egcs_fc_sourcereadable" />
+            </CommonSection>
+          </section>
+          <section v-else-if="selectedTab === 'completion'" data-help-view="casework.corrections.completion" data-help-target="casework.corrections.detail.completion" data-help-kind="section" class="space-y-6">
             <UAlert v-if="dirty" color="warning" :title="t('correction.save_before_completion')" />
             <CommonCompletionPanel entity-type="fundingcasecorrection" :entity-id="correctionId" :can-complete="correction.egcs_fc_canedit && completionReady && !dirty && !saving && status === 'success'" :can-work-workflow="correction.egcs_fc_canwork" :show-header="false" :show-divider="false" title-key="correction.completion.title" description-key="correction.completion.description" status-complete-key="correction.completion.status_complete" status-locked-key="correction.completion.status_locked" comment-placeholder-key="correction.completion.comment_placeholder" complete-action-key="correction.completion.complete" completed-success-key="correction.completion.completed_success" :refresh-key="refreshKey" @changed="refreshPage" />
           </section>
-          <CommonReviewsTab v-else-if="selectedTab === 'reviews'" entity-type="fundingcasecorrection" :entity-id="correctionId" :can-update="correction.egcs_fc_canedit" @changed="refreshPage" />
-          <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcasecorrection" :entity-id="correctionId" purpose="standard" :can-edit="correction.egcs_fc_canwork" :refresh-key="refreshKey" @changed="refreshPage" />
-          <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" :show-header="false" entity-type="fundingcasecorrection" :entity-id="correctionId" />
-          <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcasecorrection" :entity-id="correctionId" />
-          <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" :show-header="false" entity-type="fundingcasecorrection" :entity-id="correctionId" />
+          <CommonReviewsTab v-else-if="selectedTab === 'reviews'" data-help-view="casework.corrections.reviews" entity-type="fundingcasecorrection" :entity-id="correctionId" :can-update="correction.egcs_fc_canedit" @changed="refreshPage" />
+          <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" data-help-view="casework.corrections.workflows" entity-type="fundingcasecorrection" :entity-id="correctionId" purpose="standard" :can-edit="correction.egcs_fc_canwork" :refresh-key="refreshKey" @changed="refreshPage" />
+          <section v-else-if="selectedTab === 'supplementary-information'" data-help-view="casework.corrections.supplementary-information" data-help-target="casework.corrections.supplementary-information.content">
+            <CommonWorkflowSupplementaryInformation :show-header="false" entity-type="fundingcasecorrection" :entity-id="correctionId" />
+          </section>
+          <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" data-help-view="casework.corrections.attachments" entity-type="fundingcasecorrection" :entity-id="correctionId" />
+          <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" data-help-view="casework.corrections.assignments" :show-header="false" entity-type="fundingcasecorrection" :entity-id="correctionId" />
         </CommonDetailWorkspace>
       </template>
     </CommonDetailPage>

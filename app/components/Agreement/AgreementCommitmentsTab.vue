@@ -333,7 +333,7 @@ const deleteCommitment = (recordId: string) => runRecordAction(recordId, 'delete
 </script>
 
 <template>
-  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.commitments-tab" data-scope-label-en="Agreements > Commitments" data-scope-label-fr="Ententes > Engagements">
+  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.commitments-tab" data-scope-label-en="Agreements > Commitments" data-scope-label-fr="Ententes > Engagements" data-help-view="agreement.commitments" data-help-label-en="Agreements — Commitments" data-help-label-fr="Ententes — Engagements" data-help-target="agreement.commitments.content" data-help-kind="section">
     <CommonResourceLayoutCard
       v-model:search="search"
       v-model:pagination="pagination"
@@ -346,8 +346,8 @@ const deleteCommitment = (recordId: string) => runRecordAction(recordId, 'delete
       :show-button="(canCreateRole ?? canCreate) && (!canCreate || (!hasExtensionCreateReplacement && !hasExtensionCreateConflict))"
       :button-disabled="isOpeningCreate"
       :search-placeholder="t('agreement.commitments.search')"
-      @add="openCreateCommitment"
-      @retry="refreshOverview">
+      help-add-target="agreement.commitments.add"
+      help-search-target="agreement.commitments.search" @add="openCreateCommitment" @retry="refreshOverview">
       <template #actions>
         <UAlert
           v-if="(canCreateRole ?? canCreate) && extensionCreateError"
@@ -456,7 +456,7 @@ const deleteCommitment = (recordId: string) => runRecordAction(recordId, 'delete
       :title="selectedCommitment.id ? t('agreement.commitments.edit') : t('agreement.commitments.add')"
       :description="t('common.form_dialog_description')">
       <template #body>
-        <UForm :state="selectedCommitment" :validate="validateCommitment" :validate-on="[]" class="space-y-4" @submit="saveCommitment">
+        <UForm :state="selectedCommitment" :validate="validateCommitment" :validate-on="[]" class="space-y-4" data-help-view="agreement.commitments.commitment-dialog" data-help-label-en="Agreements — Commitment editor" data-help-label-fr="Ententes — Éditeur d’engagement" @submit="saveCommitment">
           <UFormField :label="t('agreement.commitments.type')" name="egcs_fc_type">
             <CommonServerLookupSelect
               v-model="selectedCommitment.egcs_fc_type"
@@ -478,11 +478,11 @@ const deleteCommitment = (recordId: string) => runRecordAction(recordId, 'delete
             <CommonCurrencyInput v-model="selectedCommitment.egcs_fc_totalamount" :currency="selectedCommitment.egcs_fc_currency ?? agreementCurrency" />
           </UFormField>
           <div class="flex justify-end gap-2 pt-4">
-            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isCommitmentModalOpen = false" />
+            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" data-help-target="agreement.commitments.commitment-dialog.cancel" data-help-kind="button" data-help-label-en="Cancel" data-help-label-fr="Annuler" @click="isCommitmentModalOpen = false" />
             <CommonSaveButton
               :label="selectedCommitment.id ? t('common.update') : t('common.add')"
               :loading="isSavingCommitment"
-              :disabled="isSavingCommitment" />
+              :disabled="isSavingCommitment" data-help-target="agreement.commitments.commitment-dialog.save" data-help-kind="button" data-help-label-en="Save" data-help-label-fr="Enregistrer" />
           </div>
         </UForm>
       </template>

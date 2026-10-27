@@ -40,15 +40,15 @@ const cancel = async () => {
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="t('correction.cancel')" :description="t('correction.cancel_description')" :ui="{ content: 'sm:max-w-2xl' }" data-field-tooltip-context="agreement" data-field-scope="correction.cancel-modal" data-scope-label-en="Agreements > Corrections > Cancel" data-scope-label-fr="Ententes > Corrections > Annuler">
+  <UModal v-model:open="open" data-help-view="casework.correction.cancel-modal.open" :title="t('correction.cancel')" :description="t('correction.cancel_description')" :ui="{ content: 'sm:max-w-2xl' }" data-field-tooltip-context="agreement" data-field-scope="correction.cancel-modal" data-scope-label-en="Agreements > Corrections > Cancel" data-scope-label-fr="Ententes > Corrections > Annuler">
     <template #body>
       <UForm v-if="state" :state="state" :validate="createValidator(CorrectionCancelSchema)" class="space-y-4" @submit="cancel">
         <UFormField name="egcs_fc_reason" :label="t('correction.cancellation_reason')">
           <UTextarea v-model="state.egcs_fc_reason" class="w-full" :rows="4" />
         </UFormField>
         <div class="flex justify-end gap-2">
-          <UButton type="button" color="neutral" variant="ghost" :label="t('correction.dismiss_cancellation')" :disabled="pending" @click="open = false" />
-          <CommonSaveButton :label="t('correction.cancel')" :loading="pending" :disabled="pending" />
+          <UButton data-help-target="casework.correction.cancel-modal.open.correction-dismiss-cancellation" type="button" color="neutral" variant="ghost" :label="t('correction.dismiss_cancellation')" :disabled="pending" @click="open = false" />
+          <CommonSaveButton data-help-target="casework.correction.cancel-modal.open.correction-cancel" :label="t('correction.cancel')" :loading="pending" :disabled="pending" />
         </div>
       </UForm>
     </template>

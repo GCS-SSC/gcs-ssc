@@ -98,9 +98,10 @@ export const createGuideRuntime = (options: GuideRuntimeOptions) => {
   const receipts = new Map<string, GuideActionSource>()
   let releaseChannel: (() => void) | null = null
   const root = options.root ?? window.document
+  const definition = (step: GuideStep) => options.ledger?.views.find(view => view.key === step.view)?.targets.find(candidate => candidate.key === step.target)
   const requested = options.document.steps.find(step => step.id === options.initialStepId) ?? options.document.steps[0]
   const requestedPath = requested && isGuidePath(options.document, options.initialPath, requested.id) ? options.initialPath : options.document.steps.every(step => !step.flow) ? options.document.steps.slice(0, options.document.steps.indexOf(requested!) + 1).map(step => step.id) : [options.document.steps[0]?.id ?? '']
-  const initial = requestedPath.map(id => options.document.steps.find(step => step.id === id)!).find(step => step.kind === 'button' && step !== requested) ?? options.document.steps.find(step => step.id === requestedPath.at(-1))
+  const initial = requestedPath.map(id => options.document.steps.find(step => step.id === id)!).find(step => step.kind === 'button' && step !== requested && (!options.ledger || definition(step)?.completion)) ?? options.document.steps.find(step => step.id === requestedPath.at(-1))
   let path = requestedPath.slice(0, requestedPath.indexOf(initial?.id ?? '') + 1)
   if (!initial) throw new Error('A guide requires at least one step')
   const state = shallowRef<GuideRuntimeState>({ step: initial, status: 'unavailable' })
@@ -124,7 +125,6 @@ export const createGuideRuntime = (options: GuideRuntimeOptions) => {
   let deferredDialog: HTMLElement | null = null
   let automaticFocusStepId: string | null = null
   let revisitedStepId: string | null = null
-  const definition = (step: GuideStep) => options.ledger?.views.find(view => view.key === step.view)?.targets.find(candidate => candidate.key === step.target)
   const stepTarget = (step: GuideStep): GuideTargetRef => definition(step)?.scope === 'instance' && observedContext.kind === 'task'
     ? { kind: 'instance', key: step.target, instance: observedContext.taskId }
     : { kind: 'unique', key: step.target }
@@ -139,16 +139,16 @@ export const createGuideRuntime = (options: GuideRuntimeOptions) => {
     if (rule.kind === 'location') return (observedContext.kind === 'owner' || observedContext.kind === 'task') && observedContext.facts.includes(rule.fact)
     return receipts.has(actionKey({ target: stepTarget(step), action: rule.action, context: observedContext }))
   }
-  const isBlocked = (step: GuideStep) => observedContext.kind === 'pending' || Boolean(presentation) || ((Boolean(definition(step)?.completion) || step.kind === 'button') && !proven(step))
+  const isBlocked = (step: GuideStep) => observedContext.kind === 'pending' || Boolean(presentation) || ((Boolean(definition(step)?.completion) || (!options.ledger && step.kind === 'button')) && !proven(step))
   /** Read a known structured value from the active view, never authored code.
    * @param key Stable target reference.
    * @param view Required view for the condition.
    * @returns Typed value, or undefined when unavailable.
    */
   const readValue = (key: string, view: string): GuideTargetValue => {
-    if (view !== currentView) return undefined
+    if (!supportsView(view)) return undefined
     const matches = Array.from(root.querySelectorAll<HTMLElement>('[data-help-target]')).filter(element => element.dataset.helpTarget === key)
-    if (matches.length !== 1 || !isVisible(matches[0]!)) return undefined
+    if (matches.length !== 1 || !isVisible(matches[0]!) || !targetBelongsToView(matches[0]!, view)) return undefined
     return options.readTargetValue ? options.readTargetValue(key) : readGuideTargetValue(root, key)
   }
   /** Evaluate all conditions before choosing a deterministic outgoing edge.
@@ -276,16 +276,46 @@ export const createGuideRuntime = (options: GuideRuntimeOptions) => {
     }
     return true
   }
+  /** Find the active screen's visible owning view without crossing a dialog boundary.
+   * @param view Required instruction view.
+   * @returns Its unique ancestor of the active screen, when present.
+   */
+  const ancestorView = (view: string): HTMLElement | undefined => {
+    const active = Array.from(root.querySelectorAll<HTMLElement>('[data-help-view]'))
+      .filter(element => element.dataset.helpView === currentView && isVisible(element))
+    if (active.length !== 1) return undefined
+    const current = active[0]!
+    const dialog = current.closest('[role="dialog"], dialog[open]')
+    let ancestor = current.parentElement?.closest<HTMLElement>('[data-help-view]')
+    while (ancestor) {
+      if (ancestor.closest('[role="dialog"], dialog[open]') !== dialog) return undefined
+      if (ancestor.dataset.helpView === view && isVisible(ancestor)) return ancestor
+      ancestor = ancestor.parentElement?.closest<HTMLElement>('[data-help-view]')
+    }
+    return undefined
+  }
+  /** Check the active screen and its owning views.
+   * @param view Required instruction view.
+   * @returns Whether the active screen owns that view.
+   */
+  const supportsView = (view: string) => view === currentView || Boolean(ancestorView(view))
+  /** Keep ancestor targets within their exact owning view.
+   * @param element Candidate target.
+   * @param view Required instruction view.
+   * @returns Whether an ancestor target belongs to that exact owning view.
+   */
+  const targetBelongsToView = (element: HTMLElement, view: string) => view === currentView
+    || element.closest('[data-help-view]') === ancestorView(view)
   /** Resolve a unique currently visible target.
    * @returns The eligible control, if available.
    */
   const resolveTarget = () => {
-    if (suspended || observedContext.kind === 'pending' || (presentation?.view ?? state.value.step.view) !== currentView) return undefined
+    if (suspended || observedContext.kind === 'pending' || !supportsView(presentation?.view ?? state.value.step.view)) return undefined
     const reference = presentation ? presentation.target : stepTarget(state.value.step)
     const references = Array.isArray(reference) ? reference : reference ? [reference] : []
     for (const ref of references) {
       const matches = Array.from(root.querySelectorAll<HTMLElement>('[data-help-target]')).filter(element => {
-        if (element.dataset.helpTarget !== ref.key || (ref.kind === 'instance' && element.dataset.helpInstance !== ref.instance) || !isVisible(element)) return false
+        if (element.dataset.helpTarget !== ref.key || (ref.kind === 'instance' && element.dataset.helpInstance !== ref.instance) || !isVisible(element) || !targetBelongsToView(element, presentation?.view ?? state.value.step.view)) return false
         const contextRoot = element.closest<HTMLElement>('[data-help-context]')
         if (!contextRoot) return ref.kind === 'unique'
         if (observedContext.kind === 'elsewhere' || observedContext.kind === 'pending') return ref.kind === 'unique'
@@ -598,11 +628,11 @@ export const createGuideRuntime = (options: GuideRuntimeOptions) => {
         return
       }
       const next = resolveTarget()
-      const nextStatus = (presentation?.view ?? state.value.step.view) !== currentView ? 'wrong-view' : next ? 'ready' : 'unavailable'
+      const nextStatus = !supportsView(presentation?.view ?? state.value.step.view) ? 'wrong-view' : next ? 'ready' : 'unavailable'
       if (next !== target || nextStatus !== state.value.status || records.some(record => ['aria-checked', 'data-help-value'].includes(record.attributeName ?? ''))) retry()
       else refreshPageGeometry()
     })
-    observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-help-context', 'data-help-instance', 'hidden', 'aria-hidden', 'data-state', 'aria-invalid', 'aria-checked', 'data-help-value', 'class', 'style'] })
+    observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-help-context', 'data-help-instance', 'data-help-view', 'hidden', 'aria-hidden', 'data-state', 'aria-invalid', 'aria-checked', 'data-help-value', 'class', 'style'] })
   }
   /** Rebuild the selected popover against the current visible controls. */
   const retry = () => {
@@ -617,7 +647,7 @@ export const createGuideRuntime = (options: GuideRuntimeOptions) => {
     releaseModalHost()
     const step = state.value.step
     target = resolveTarget()
-    const status = (presentation?.view ?? step.view) !== currentView ? 'wrong-view' : target ? 'ready' : 'unavailable'
+    const status = !supportsView(presentation?.view ?? step.view) ? 'wrong-view' : target ? 'ready' : 'unavailable'
     state.value = { step, status }
     const index = options.document.steps.indexOf(step)
     const text = labels()

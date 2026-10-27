@@ -103,3 +103,11 @@ it('accepts only registered step appearances and retains the anchor requirement'
   expect(GuideDocumentSchema.safeParse({ ...guide, steps: [{ ...guide.steps[0], appearance: 'overlay-free' }] }).success).toBe(false)
   expect(GuideDocumentSchema.safeParse({ ...guide, steps: [{ ...guide.steps[0], appearance: 'anchor-only', target: '' }] }).success).toBe(false)
 })
+
+it('shares one consistent field identity between consuming screens without allowing duplicates within a screen', () => {
+  const target = { key: 'profile.title', label: { en: 'Title', fr: 'Titre' }, kind: 'text' }
+  const views = ['profile.create', 'profile.edit'].map(key => ({ key, label: { en: key, fr: key }, targets: [target] }))
+  expect(TargetLedgerSchema.safeParse({ formatVersion: 1, views }).success).toBe(true)
+  expect(TargetLedgerSchema.safeParse({ formatVersion: 1, views: [{ ...views[0], targets: [target, target] }] }).success).toBe(false)
+  expect(TargetLedgerSchema.safeParse({ formatVersion: 1, views: [views[0], { ...views[1], targets: [{ ...target, kind: 'checkbox' }] }] }).success).toBe(false)
+})

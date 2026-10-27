@@ -2,10 +2,11 @@
 import { computed, useId } from 'vue'
 import type { TranslatedTabItem } from '~~/shared/types/ui'
 
-const { items, contentTestId, priorityValues = [], sectionDescription, helpNavigationTarget, helpNavigationValue } = defineProps<{
+const { items, contentTestId, priorityValues = [], sectionDescription, helpNavigationTarget, helpNavigationValue, helpNavigationGroupTarget } = defineProps<{
   items: TranslatedTabItem[]
   contentTestId?: string
   priorityValues?: string[]
+  helpNavigationGroupTarget?: string
   helpNavigationTarget?: string
   helpNavigationValue?: string
   sectionDescription?: string
@@ -20,7 +21,7 @@ const title = computed(() => selectedItem.value?.label ?? (selectedItem.value ? 
 <template>
   <CommonEntityEditorWorkspace :content-test-id="contentTestId">
     <template #sidebar>
-      <div>
+      <div :data-help-target="helpNavigationGroupTarget" data-help-kind="section">
         <CommonRouteTabs v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="items" :help-navigation-target="helpNavigationTarget" :help-navigation-value="helpNavigationValue" :priority-values="priorityValues" :external-panel-id="panelId" orientation="vertical" :ui="{ root: 'w-full', list: 'w-full flex-col items-stretch p-0', trigger: 'w-full justify-start' }" />
       </div>
     </template>

@@ -540,6 +540,7 @@ const deleteRow = async (rowId: string) => {
     <UModal
       v-if="selectedReviewer"
       v-model:open="isReviewerModalOpen"
+      data-help-view="review.additional-reviewer-editor"
       :title="selectedReviewer.id ? t('assessment.additional_reviewers.update_title') : t('assessment.additional_reviewers.create_title')">
       <template #body>
         <UForm
@@ -590,8 +591,11 @@ const deleteRow = async (rowId: string) => {
               color="neutral"
               variant="ghost"
               class="cursor-default"
+              data-help-target="review.additional-reviewer-editor.cancel"
+              data-help-kind="button"
               @click="isReviewerModalOpen = false" />
             <CommonSaveButton
+              data-help-target="review.additional-reviewer-editor.save" data-help-kind="button"
               :label="selectedReviewer.id ? t('common.save') : t('common.add')"
               :loading="isReviewerSaving"
               :disabled="isReviewerSaving || !canSaveReviewer" />

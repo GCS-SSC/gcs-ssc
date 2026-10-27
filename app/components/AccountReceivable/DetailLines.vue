@@ -222,7 +222,7 @@ const deleteLine = async (line: AccountReceivableLine) => {
         {{ formatAccountReceivableAmount(total, locale, currency) ?? t('common.not_available') }}
       </dd>
     </dl>
-    <UModal v-model:open="isOpen" :title="t(recodeMode ? 'account_receivable.move_coding' : selectedLineId ? 'account_receivable.edit_line' : 'account_receivable.add_line')" :ui="{ content: 'sm:max-w-2xl' }">
+    <UModal v-model:open="isOpen" data-help-view="casework.account-receivable.detail-lines.is-open" :title="t(recodeMode ? 'account_receivable.move_coding' : selectedLineId ? 'account_receivable.edit_line' : 'account_receivable.add_line')" :ui="{ content: 'sm:max-w-2xl' }">
       <template #body>
         <UForm v-if="selected" :state="selected" :validate="lineValidator" class="space-y-4" @submit="save">
           <p v-if="recodeMode" class="text-sm text-muted">
@@ -244,8 +244,8 @@ const deleteLine = async (line: AccountReceivableLine) => {
             <CommonCurrencyInput v-model="selected.egcs_fc_amount" :currency="currency" :disabled="isPending" class="w-full" />
           </UFormField>
           <div class="flex justify-end gap-2">
-            <UButton type="button" color="neutral" variant="ghost" :label="t('common.cancel')" :disabled="isPending" @click="modal.close()" />
-            <CommonSaveButton :label="t(recodeMode ? 'account_receivable.move_coding' : selectedLineId ? 'common.update' : 'common.add')" :loading="isPending" :disabled="isPending || !canEdit" />
+            <UButton data-help-target="casework.account-receivable.detail-lines.is-open.common-cancel" type="button" color="neutral" variant="ghost" :label="t('common.cancel')" :disabled="isPending" @click="modal.close()" />
+            <CommonSaveButton data-help-target="casework.account-receivable.detail-lines.is-open.save" :label="t(recodeMode ? 'account_receivable.move_coding' : selectedLineId ? 'common.update' : 'common.add')" :loading="isPending" :disabled="isPending || !canEdit" />
           </div>
         </UForm>
       </template>
