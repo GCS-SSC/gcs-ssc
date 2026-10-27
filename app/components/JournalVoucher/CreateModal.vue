@@ -36,7 +36,7 @@ const save = async () => {
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="t('journal_voucher.create')" :description="t('journal_voucher.description')" :ui="{ content: 'sm:max-w-2xl' }" data-field-tooltip-context="agreement" data-field-scope="journal-voucher.create-modal" data-scope-label-en="Agreements > Journal Vouchers > Create" data-scope-label-fr="Ententes > Pièces de journal > Créer">
+  <UModal v-model:open="open" data-help-view="casework.journal-voucher.create-modal.open" :title="t('journal_voucher.create')" :description="t('journal_voucher.description')" :ui="{ content: 'sm:max-w-2xl' }" data-field-tooltip-context="agreement" data-field-scope="journal-voucher.create-modal" data-scope-label-en="Agreements > Journal Vouchers > Create" data-scope-label-fr="Ententes > Pièces de journal > Créer">
     <template #body>
       <UForm v-if="state" :state="state" :validate="createValidator(JournalVoucherCreateSchema)" class="space-y-4" @submit="save">
         <UFormField name="egcs_fc_payment" :label="t('journal_voucher.source_payment')">
@@ -54,8 +54,8 @@ const save = async () => {
           </UFormField>
         </div>
         <div class="flex justify-end gap-2">
-          <UButton type="button" :label="t('common.cancel')" color="neutral" variant="ghost" :disabled="pending" @click="open = false" />
-          <CommonSaveButton :label="t('common.save')" :loading="pending" :disabled="pending" />
+          <UButton data-help-target="casework.journal-voucher.create-modal.open.common-cancel" type="button" :label="t('common.cancel')" color="neutral" variant="ghost" :disabled="pending" @click="open = false" />
+          <CommonSaveButton data-help-target="casework.journal-voucher.create-modal.open.common-save" :label="t('common.save')" :loading="pending" :disabled="pending" />
         </div>
       </UForm>
     </template>

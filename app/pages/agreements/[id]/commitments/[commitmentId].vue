@@ -287,7 +287,7 @@ useFieldTooltipProvider(() => commitment.value && String(commitment.value.id) ==
     <div v-else-if="isLoadingDetail && (!profile || !commitment)" role="status" aria-live="polite" class="sr-only">
       <span>{{ t('common.loading_records') }}</span>
     </div>
-    <CommonDetailPage v-if="profile && commitment" id="agreement-commitment-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" class="w-full">
+    <CommonDetailPage v-if="profile && commitment" id="agreement-commitment-detail" v-model:collapsed="isHeroCollapsed" data-help-view="casework.commitments.detail" :breadcrumb-items="breadcrumbItems" class="w-full">
       <template #body>
         <div class="flex flex-1 flex-col">
           <CommonEntityHero
@@ -301,8 +301,8 @@ useFieldTooltipProvider(() => commitment.value && String(commitment.value.id) ==
               prefixLabel: t('common.status')
             }]" />
 
-          <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-commitment-detail-content">
-            <CommonSection v-if="selectedTab === 'lines'" :show-header="false" :title="t('agreement.commitments.lines_title')" :grid-cols="1">
+          <CommonDetailWorkspace v-model="selectedTab" help-navigation-group-target="casework.commitments.detail.section-navigation" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-commitment-detail-content">
+            <CommonSection v-if="selectedTab === 'lines'" data-help-view="casework.commitments.lines" :show-header="false" :title="t('agreement.commitments.lines_title')" :grid-cols="1">
               <div class="space-y-4">
                 <UAlert
                   v-if="!hasBalancedCoding"
@@ -310,66 +310,71 @@ useFieldTooltipProvider(() => commitment.value && String(commitment.value.id) ==
                   icon="i-lucide-triangle-alert"
                   :title="t('agreement.commitments.allocation_required')"
                   :description="t('agreement.commitments.allocation_total_help', { total: formatMoney(commitment.egcs_fc_totalamount), allocated: formatMoney(totalAmount) })" />
-                <CommonResourceLayoutCard
-                  v-model:search="search"
-                  v-model:pagination="pagination"
-                  :data="lines"
-                  :columns="columns"
-                  :total-records="lines.length"
-                  :button-label="t('agreement.commitments.add_line')"
-                  :show-button="canCreateCommitmentLine"
-                  :search-placeholder="t('agreement.commitments.search_lines')"
-                  @add="openCreateLine">
-                  <template #coding-cell="{ row }">
-                    <div class="flex min-w-0 max-w-full flex-col gap-1">
-                      <span class="text-sm font-semibold text-zinc-900 dark:text-white">
-                        {{ getCodingPrimaryText(row.original) }}
+                <section data-help-target="casework.commitments.lines.records">
+                  <CommonResourceLayoutCard
+                    v-model:search="search" v-model:pagination="pagination"
+                    help-add-target="casework.commitments.lines.add"
+                    help-search-target="casework.commitments.lines.search"
+                    :data="lines"
+                    :columns="columns"
+                    :total-records="lines.length"
+                    :button-label="t('agreement.commitments.add_line')"
+                    :show-button="canCreateCommitmentLine"
+                    :search-placeholder="t('agreement.commitments.search_lines')"
+                    @add="openCreateLine">
+                    <template #coding-cell="{ row }">
+                      <div class="flex min-w-0 max-w-full flex-col gap-1">
+                        <span class="text-sm font-semibold text-zinc-900 dark:text-white">
+                          {{ getCodingPrimaryText(row.original) }}
+                        </span>
+                        <span class="truncate text-xs text-zinc-500 dark:text-zinc-400">
+                          {{ getCodingSecondaryText(row.original) }}
+                        </span>
+                      </div>
+                    </template>
+
+                    <template #amount-cell="{ row }">
+                      <span class="font-medium text-zinc-700 dark:text-zinc-200">
+                        {{ formatMoney(row.original.egcs_fc_amount) }}
                       </span>
-                      <span class="truncate text-xs text-zinc-500 dark:text-zinc-400">
-                        {{ getCodingSecondaryText(row.original) }}
-                      </span>
-                    </div>
-                  </template>
+                    </template>
 
-                  <template #amount-cell="{ row }">
-                    <span class="font-medium text-zinc-700 dark:text-zinc-200">
-                      {{ formatMoney(row.original.egcs_fc_amount) }}
-                    </span>
-                  </template>
+                    <template #paid-cell="{ row }">
+                      {{ formatMoney(row.original.egcs_fc_paidamount) }}
+                    </template>
 
-                  <template #paid-cell="{ row }">
-                    {{ formatMoney(row.original.egcs_fc_paidamount) }}
-                  </template>
+                    <template #credited-cell="{ row }">
+                      {{ formatMoney(row.original.egcs_fc_creditmemoamount) }}
+                    </template>
 
-                  <template #credited-cell="{ row }">
-                    {{ formatMoney(row.original.egcs_fc_creditmemoamount) }}
-                  </template>
+                    <template #balance-cell="{ row }">
+                      {{ formatMoney(row.original.egcs_fc_balance) }}
+                    </template>
 
-                  <template #balance-cell="{ row }">
-                    {{ formatMoney(row.original.egcs_fc_balance) }}
-                  </template>
+                    <template #actions-cell="{ row }">
+                      <div v-if="canUpdateCommitment || canDeleteCommitmentLine" class="flex items-center justify-end gap-2">
+                        <CommonActionButton
+                          v-if="canUpdateCommitment"
 
-                  <template #actions-cell="{ row }">
-                    <div v-if="canUpdateCommitment || canDeleteCommitmentLine" class="flex items-center justify-end gap-2">
-                      <CommonActionButton
-                        v-if="canUpdateCommitment"
-                        icon="i-lucide-pencil"
-                        color="neutral"
-                        variant="ghost"
-                        class="cursor-default"
-                        :aria-label="`${t('common.edit')}: ${row.original.egcs_fc_commitmentlinenumber ?? row.original.id}`"
-                        @click="openUpdateLine(row.original)" />
-                      <CommonActionButton
-                        v-if="canDeleteCommitmentLine"
-                        icon="i-lucide-trash"
-                        color="error"
-                        variant="ghost"
-                        class="cursor-default"
-                        :aria-label="`${t('common.delete')}: ${row.original.egcs_fc_commitmentlinenumber ?? row.original.id}`"
-                        @click="deleteLine(String(row.original.id))" />
-                    </div>
-                  </template>
-                </CommonResourceLayoutCard>
+                          icon="i-lucide-pencil"
+                          color="neutral"
+                          variant="ghost"
+                          class="cursor-default"
+                          :aria-label="`${t('common.edit')}: ${row.original.egcs_fc_commitmentlinenumber ?? row.original.id}`"
+                          @click="openUpdateLine(row.original)" />
+                        <CommonActionButton
+                          v-if="canDeleteCommitmentLine"
+
+                          icon="i-lucide-trash"
+                          color="error"
+                          variant="ghost"
+                          class="cursor-default"
+                          :aria-label="`${t('common.delete')}: ${row.original.egcs_fc_commitmentlinenumber ?? row.original.id}`"
+                          @click="deleteLine(String(row.original.id))" />
+                      </div>
+                    </template>
+                  </CommonResourceLayoutCard>
+                </section>
 
                 <div class="flex justify-end">
                   <div class="rounded-sm border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm font-semibold text-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white">
@@ -379,7 +384,7 @@ useFieldTooltipProvider(() => commitment.value && String(commitment.value.id) ==
               </div>
             </CommonSection>
 
-            <section v-else-if="selectedTab === 'completion'" class="space-y-6">
+            <section v-else-if="selectedTab === 'completion'" data-help-view="casework.commitments.completion" data-help-target="casework.commitments.detail.completion" data-help-kind="section" class="space-y-6">
               <CommonCompletionPanel
                 entity-type="fundingcaseagreementcommitment"
                 :entity-id="commitmentId"
@@ -400,15 +405,18 @@ useFieldTooltipProvider(() => commitment.value && String(commitment.value.id) ==
 
             <CommonReviewsTab
               v-else-if="selectedTab === 'reviews'"
+              data-help-view="casework.commitments.reviews"
               entity-type="fundingcaseagreementcommitment"
               :entity-id="commitmentId"
               :can-update="canUpdateCommitment"
               @changed="refreshPage" />
 
-            <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcaseagreementcommitment" :entity-id="commitmentId" purpose="standard" :can-edit="isAssigned" :refresh-key="approvalsRefreshKey" @changed="refreshPage" />
-            <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" :show-header="false" entity-type="fundingcaseagreementcommitment" :entity-id="commitmentId" />
-            <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcaseagreementcommitment" :entity-id="commitmentId" />
-            <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" :show-header="false" entity-type="fundingcaseagreementcommitment" :entity-id="commitmentId" />
+            <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" data-help-view="casework.commitments.workflows" entity-type="fundingcaseagreementcommitment" :entity-id="commitmentId" purpose="standard" :can-edit="isAssigned" :refresh-key="approvalsRefreshKey" @changed="refreshPage" />
+            <section v-else-if="selectedTab === 'supplementary-information'" data-help-view="casework.commitments.supplementary-information" data-help-target="casework.commitments.supplementary-information.content">
+              <CommonWorkflowSupplementaryInformation :show-header="false" entity-type="fundingcaseagreementcommitment" :entity-id="commitmentId" />
+            </section>
+            <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" data-help-view="casework.commitments.attachments" entity-type="fundingcaseagreementcommitment" :entity-id="commitmentId" />
+            <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" data-help-view="casework.commitments.assignments" :show-header="false" entity-type="fundingcaseagreementcommitment" :entity-id="commitmentId" />
           </CommonDetailWorkspace>
         </div>
       </template>
@@ -417,6 +425,7 @@ useFieldTooltipProvider(() => commitment.value && String(commitment.value.id) ==
     <UModal
       v-if="selectedLine"
       v-model:open="isLineModalOpen"
+      data-help-view="casework.commitments.detail.is-line-modal-open"
       :title="selectedLine.id ? t('agreement.commitments.edit_line') : t('agreement.commitments.add_line')"
       :description="t('common.form_dialog_description')">
       <template #body>
@@ -445,8 +454,9 @@ useFieldTooltipProvider(() => commitment.value && String(commitment.value.id) ==
           </UFormField>
 
           <div class="flex justify-end gap-2 pt-4">
-            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isLineModalOpen = false" />
+            <UButton data-help-target="casework.commitments.detail.is-line-modal-open.common-cancel" :label="t('common.cancel')" color="neutral" variant="ghost" @click="isLineModalOpen = false" />
             <CommonSaveButton
+              data-help-target="casework.commitments.detail.is-line-modal-open.common-update"
               :label="selectedLine.id ? t('common.update') : t('common.add')"
               :loading="isSavingLine"
               :disabled="isSavingLine" />

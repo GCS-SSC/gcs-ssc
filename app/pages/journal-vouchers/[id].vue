@@ -204,12 +204,13 @@ useFieldTooltipProvider(() => voucher.value && String(voucher.value.id) === Stri
     <div v-else-if="!voucher && status === 'pending'" role="status" aria-live="polite" class="p-6">
       {{ t('common.loading_records') }}
     </div>
-    <CommonDetailPage v-if="voucher && !error" id="journal-voucher-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbs" class="w-full">
+    <CommonDetailPage v-if="voucher && !error" id="journal-voucher-detail" v-model:collapsed="isHeroCollapsed" data-help-view="casework.journal-vouchers.detail" :breadcrumb-items="breadcrumbs" class="w-full">
       <template #body>
         <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-book-open-check" :title="`${t('journal_voucher.number')} ${voucher.egcs_fc_number}`" :meta-items="[voucher.egcs_fc_agreementnumber, voucher.egcs_fc_fiscalyeardisplay, voucher.egcs_fc_currency.toUpperCase()]" :badges="[{ statusId: voucher.egcs_fc_status, isCompleted: voucher.isCompleted }]" />
-        <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="journal-voucher-detail-content">
+        <CommonDetailWorkspace v-model="selectedTab" help-navigation-group-target="casework.journal-vouchers.detail.section-navigation" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="journal-voucher-detail-content">
           <UForm
             v-if="selectedTab === 'entry' && state"
+            data-help-view="casework.journal-vouchers.entry"
             :state="state"
             :validate="createValidator(JournalVoucherEditSchema)"
             :validate-on="[]"
@@ -222,8 +223,8 @@ useFieldTooltipProvider(() => voucher.value && String(voucher.value.id) === Stri
                     {{ t('journal_voucher.prepared_transaction') }}
                   </p>
                   <div v-if="voucher.egcs_fc_canreverse || voucher.egcs_fc_canreplace" class="flex flex-wrap gap-2">
-                    <UButton v-if="voucher.egcs_fc_canreverse" type="button" icon="i-lucide-undo-2" variant="outline" :label="t('journal_voucher.reverse')" :loading="saving" @click="prepareLinked('reversal')" />
-                    <UButton v-if="voucher.egcs_fc_canreplace" type="button" icon="i-lucide-copy-plus" variant="outline" :label="t('journal_voucher.replace')" :loading="saving" @click="prepareLinked('replacement')" />
+                    <UButton v-if="voucher.egcs_fc_canreverse" data-help-target="casework.journal-vouchers.detail.journal-voucher-reverse" type="button" icon="i-lucide-undo-2" variant="outline" :label="t('journal_voucher.reverse')" :loading="saving" @click="prepareLinked('reversal')" />
+                    <UButton v-if="voucher.egcs_fc_canreplace" data-help-target="casework.journal-vouchers.detail.journal-voucher-replace" type="button" icon="i-lucide-copy-plus" variant="outline" :label="t('journal_voucher.replace')" :loading="saving" @click="prepareLinked('replacement')" />
                   </div>
                 </div>
                 <dl class="grid gap-4 text-sm sm:grid-cols-2">
@@ -281,7 +282,8 @@ useFieldTooltipProvider(() => voucher.value && String(voucher.value.id) === Stri
                     {{ t('journal_voucher.balance_instruction') }}
                   </p>
                   <UButton
-                    v-if="canEditAllocations" type="button" icon="i-lucide-plus" variant="outline"
+                    v-if="canEditAllocations"
+                    data-help-target="casework.journal-vouchers.detail.journal-voucher-add-split" type="button" icon="i-lucide-plus" variant="outline"
                     :label="t('journal_voucher.add_split')" :aria-label="t('journal_voucher.add_split')"
                     :disabled="!original.length || state.egcs_fc_allocations.length >= 500"
                     @click="allocationModal.openCreate()" />
@@ -334,10 +336,12 @@ useFieldTooltipProvider(() => voucher.value && String(voucher.value.id) === Stri
                         :label="t(row.original.balanced ? 'journal_voucher.balanced' : 'journal_voucher.unbalanced')" />
                       <template v-else-if="row.original.kind === 'corrected' && canEditAllocations">
                         <CommonActionButton
+
                           type="button" icon="i-lucide-pencil" color="neutral" variant="ghost"
                           :aria-label="`${t('common.edit')}: ${t('journal_voucher.commitment_line')} ${row.original.number}, ${row.original.index + 1}`"
                           @click="allocationModal.openUpdate(row.original.line)" />
                         <CommonActionButton
+
                           type="button" icon="i-lucide-trash" color="error" variant="ghost"
                           :aria-label="`${t('common.delete')}: ${t('journal_voucher.commitment_line')} ${row.original.number}, ${row.original.index + 1}`"
                           @click="state.egcs_fc_allocations.splice(row.original.index, 1)" />
@@ -362,18 +366,20 @@ useFieldTooltipProvider(() => voucher.value && String(voucher.value.id) === Stri
               <div>
                 <UButton v-if="voucher.egcs_fc_candelete" type="button" icon="i-lucide-trash" color="error" variant="ghost" :label="t('common.delete')" @click="deleteDraft" />
               </div>
-              <CommonSaveButton v-if="voucher.egcs_fc_canedit" :label="t('common.save')" :loading="saving" :disabled="saving" />
+              <CommonSaveButton v-if="voucher.egcs_fc_canedit" data-help-target="casework.journal-vouchers.detail.common-save" :label="t('common.save')" :loading="saving" :disabled="saving" />
             </div>
           </UForm>
-          <div v-else-if="selectedTab === 'completion'" class="space-y-4">
+          <div v-else-if="selectedTab === 'completion'" data-help-view="casework.journal-vouchers.completion" data-help-target="casework.journal-vouchers.detail.completion" data-help-kind="section" class="space-y-4">
             <UAlert v-if="dirty" color="warning" :title="t('journal_voucher.save_before_completion')" />
             <CommonCompletionPanel entity-type="fundingcasejournalvoucher" :entity-id="id" :can-complete="voucher.egcs_fc_canwork && !voucher.isCompleted && !dirty && !saving && status === 'success'" :can-work-workflow="voucher.egcs_fc_canwork" :show-header="false" :show-divider="false" title-key="journal_voucher.completion.title" description-key="journal_voucher.completion.description" status-complete-key="journal_voucher.completion.status_complete" status-locked-key="journal_voucher.completion.status_locked" comment-placeholder-key="journal_voucher.completion.comment_placeholder" complete-action-key="journal_voucher.completion.complete" completed-success-key="journal_voucher.completion.completed_success" :refresh-key="refreshKey" @changed="refreshPage" />
           </div>
-          <CommonReviewsTab v-else-if="selectedTab === 'reviews'" entity-type="fundingcasejournalvoucher" :entity-id="id" :can-update="voucher.egcs_fc_canwork" @changed="refreshPage" />
-          <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcasejournalvoucher" :entity-id="id" purpose="standard" :can-edit="voucher.egcs_fc_canwork" :refresh-key="refreshKey" @changed="refreshPage" />
-          <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" :show-header="false" entity-type="fundingcasejournalvoucher" :entity-id="id" />
-          <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcasejournalvoucher" :entity-id="id" />
-          <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" :show-header="false" entity-type="fundingcasejournalvoucher" :entity-id="id" />
+          <CommonReviewsTab v-else-if="selectedTab === 'reviews'" data-help-view="casework.journal-vouchers.reviews" entity-type="fundingcasejournalvoucher" :entity-id="id" :can-update="voucher.egcs_fc_canwork" @changed="refreshPage" />
+          <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" data-help-view="casework.journal-vouchers.workflows" entity-type="fundingcasejournalvoucher" :entity-id="id" purpose="standard" :can-edit="voucher.egcs_fc_canwork" :refresh-key="refreshKey" @changed="refreshPage" />
+          <section v-else-if="selectedTab === 'supplementary-information'" data-help-view="casework.journal-vouchers.supplementary-information" data-help-target="casework.journal-vouchers.supplementary-information.content">
+            <CommonWorkflowSupplementaryInformation :show-header="false" entity-type="fundingcasejournalvoucher" :entity-id="id" />
+          </section>
+          <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" data-help-view="casework.journal-vouchers.attachments" entity-type="fundingcasejournalvoucher" :entity-id="id" />
+          <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" data-help-view="casework.journal-vouchers.assignments" :show-header="false" entity-type="fundingcasejournalvoucher" :entity-id="id" />
         </CommonDetailWorkspace>
       </template>
     </CommonDetailPage>

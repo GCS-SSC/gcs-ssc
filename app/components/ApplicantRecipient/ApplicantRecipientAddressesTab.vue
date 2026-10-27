@@ -50,66 +50,69 @@ const updateNumericFieldValue = (state: ApplicantRecipientAddressForm, key: Nume
 </script>
 
 <template>
-  <CommonResourceCrud
-    class="w-full"
-    :title="t('applicant_recipient.addresses.title')"
-    icon="i-lucide-map-pinned"
-    :fetch-url="`/api/applicant-recipients/${applicantRecipientId}/addresses`"
-    :post-url="canCreate ? `/api/applicant-recipients/${applicantRecipientId}/addresses` : undefined"
-    :update-url-base="canUpdate ? `/api/applicant-recipients/${applicantRecipientId}/addresses` : undefined"
-    :delete-url-base="canDelete ? `/api/applicant-recipients/${applicantRecipientId}/addresses` : undefined"
-    :can-create="canCreate"
-    :can-update="canUpdate"
-    :can-delete="canDelete"
-    :schema="ApplicantRecipientAddressCreateSchema"
-    :columns="columns"
-    :button-label="t('common.add')"
-    :show-button="canCreate"
-    :modal-title="t('applicant_recipient.addresses.add')"
-    :update-title="t('applicant_recipient.addresses.edit')"
-    :search-placeholder="t('applicant_recipient.addresses.search')" data-field-scope="applicant-recipient.addresses-tab">
-    <template #form="{ state }">
-      <UFormField :label="t('admin_common.fields.egcs_cn_street1')" name="egcs_cn_street1">
-        <UInput :model-value="String((state as ApplicantRecipientAddressForm).egcs_cn_street1 ?? '')" @update:model-value="value => (state as ApplicantRecipientAddressForm).egcs_cn_street1 = value" />
-      </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_street2')" name="egcs_cn_street2">
-        <UInput :model-value="String((state as ApplicantRecipientAddressForm).egcs_cn_street2 ?? '')" @update:model-value="value => (state as ApplicantRecipientAddressForm).egcs_cn_street2 = value" />
-      </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_street3')" name="egcs_cn_street3">
-        <UInput :model-value="String((state as ApplicantRecipientAddressForm).egcs_cn_street3 ?? '')" @update:model-value="value => (state as ApplicantRecipientAddressForm).egcs_cn_street3 = value" />
-      </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_addresscity')" name="egcs_cn_addresscity">
-        <UInput :model-value="String((state as ApplicantRecipientAddressForm).egcs_cn_addresscity ?? '')" @update:model-value="value => (state as ApplicantRecipientAddressForm).egcs_cn_addresscity = value" />
-      </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_addresscountry')" name="egcs_cn_addresscountry">
-        <CommonEnumSelect v-model="(state as ApplicantRecipientAddressForm).egcs_cn_addresscountry" name="countries" />
-      </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_addresssubdivision')" name="egcs_cn_addresssubdivision">
-        <CommonEnumSelect
-          v-if="isCanadianAddress(state as ApplicantRecipientAddressForm)"
-          v-model="(state as ApplicantRecipientAddressForm).egcs_cn_addresssubdivision"
-          name="jurisdiction"
-          :items="jurisdictionItems" />
-        <UInput
-          v-else
-          :model-value="String((state as ApplicantRecipientAddressForm).egcs_cn_addresssubdivision ?? '')"
-          @update:model-value="value => (state as ApplicantRecipientAddressForm).egcs_cn_addresssubdivision = value" />
-      </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_gcaddressid')" name="egcs_cn_gcaddressid">
-        <UInput :model-value="getNumericFieldModelValue(state as ApplicantRecipientAddressForm, 'egcs_cn_gcaddressid')" type="text" inputmode="numeric" @update:model-value="value => updateNumericFieldValue(state as ApplicantRecipientAddressForm, 'egcs_cn_gcaddressid', value)" />
-      </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_federalridingid')" name="egcs_cn_federalridingid">
-        <UInput :model-value="getNumericFieldModelValue(state as ApplicantRecipientAddressForm, 'egcs_cn_federalridingid')" type="number" @update:model-value="value => updateNumericFieldValue(state as ApplicantRecipientAddressForm, 'egcs_cn_federalridingid', value)" />
-      </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_mainphone')" name="egcs_cn_mainphone">
-        <UInput :model-value="getNumericFieldModelValue(state as ApplicantRecipientAddressForm, 'egcs_cn_mainphone')" type="text" inputmode="numeric" @update:model-value="value => updateNumericFieldValue(state as ApplicantRecipientAddressForm, 'egcs_cn_mainphone', value)" />
-      </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_mainphoneextension')" name="egcs_cn_mainphoneextension">
-        <UInput :model-value="getNumericFieldModelValue(state as ApplicantRecipientAddressForm, 'egcs_cn_mainphoneextension')" type="number" @update:model-value="value => updateNumericFieldValue(state as ApplicantRecipientAddressForm, 'egcs_cn_mainphoneextension', value)" />
-      </UFormField>
-      <UFormField :label="t('admin_common.fields.egcs_cn_postalcodezipcode')" name="egcs_cn_postalcodezipcode">
-        <UInput :model-value="String((state as ApplicantRecipientAddressForm).egcs_cn_postalcodezipcode ?? '')" @update:model-value="value => (state as ApplicantRecipientAddressForm).egcs_cn_postalcodezipcode = value" />
-      </UFormField>
-    </template>
-  </CommonResourceCrud>
+  <section data-help-target="proponent.addresses.content" data-help-kind="section" data-help-view="proponent.addresses" class="flex w-full min-w-0 flex-col">
+    <CommonResourceCrud
+      help-search-target="proponent.addresses.search" help-save-target="proponent.addresses.save" help-add-target="proponent.addresses.add"
+      class="w-full"
+      :title="t('applicant_recipient.addresses.title')"
+      icon="i-lucide-map-pinned"
+      :fetch-url="`/api/applicant-recipients/${applicantRecipientId}/addresses`"
+      :post-url="canCreate ? `/api/applicant-recipients/${applicantRecipientId}/addresses` : undefined"
+      :update-url-base="canUpdate ? `/api/applicant-recipients/${applicantRecipientId}/addresses` : undefined"
+      :delete-url-base="canDelete ? `/api/applicant-recipients/${applicantRecipientId}/addresses` : undefined"
+      :can-create="canCreate"
+      :can-update="canUpdate"
+      :can-delete="canDelete"
+      :schema="ApplicantRecipientAddressCreateSchema"
+      :columns="columns"
+      :button-label="t('common.add')"
+      :show-button="canCreate"
+      :modal-title="t('applicant_recipient.addresses.add')"
+      :update-title="t('applicant_recipient.addresses.edit')"
+      :search-placeholder="t('applicant_recipient.addresses.search')" data-field-scope="applicant-recipient.addresses-tab">
+      <template #form="{ state }">
+        <UFormField :label="t('admin_common.fields.egcs_cn_street1')" name="egcs_cn_street1">
+          <UInput :model-value="String((state as ApplicantRecipientAddressForm).egcs_cn_street1 ?? '')" @update:model-value="value => (state as ApplicantRecipientAddressForm).egcs_cn_street1 = value" />
+        </UFormField>
+        <UFormField :label="t('admin_common.fields.egcs_cn_street2')" name="egcs_cn_street2">
+          <UInput :model-value="String((state as ApplicantRecipientAddressForm).egcs_cn_street2 ?? '')" @update:model-value="value => (state as ApplicantRecipientAddressForm).egcs_cn_street2 = value" />
+        </UFormField>
+        <UFormField :label="t('admin_common.fields.egcs_cn_street3')" name="egcs_cn_street3">
+          <UInput :model-value="String((state as ApplicantRecipientAddressForm).egcs_cn_street3 ?? '')" @update:model-value="value => (state as ApplicantRecipientAddressForm).egcs_cn_street3 = value" />
+        </UFormField>
+        <UFormField :label="t('admin_common.fields.egcs_cn_addresscity')" name="egcs_cn_addresscity">
+          <UInput :model-value="String((state as ApplicantRecipientAddressForm).egcs_cn_addresscity ?? '')" @update:model-value="value => (state as ApplicantRecipientAddressForm).egcs_cn_addresscity = value" />
+        </UFormField>
+        <UFormField :label="t('admin_common.fields.egcs_cn_addresscountry')" name="egcs_cn_addresscountry">
+          <CommonEnumSelect v-model="(state as ApplicantRecipientAddressForm).egcs_cn_addresscountry" name="countries" />
+        </UFormField>
+        <UFormField :label="t('admin_common.fields.egcs_cn_addresssubdivision')" name="egcs_cn_addresssubdivision">
+          <CommonEnumSelect
+            v-if="isCanadianAddress(state as ApplicantRecipientAddressForm)"
+            v-model="(state as ApplicantRecipientAddressForm).egcs_cn_addresssubdivision"
+            name="jurisdiction"
+            :items="jurisdictionItems" />
+          <UInput
+            v-else
+            :model-value="String((state as ApplicantRecipientAddressForm).egcs_cn_addresssubdivision ?? '')"
+            @update:model-value="value => (state as ApplicantRecipientAddressForm).egcs_cn_addresssubdivision = value" />
+        </UFormField>
+        <UFormField :label="t('admin_common.fields.egcs_cn_gcaddressid')" name="egcs_cn_gcaddressid">
+          <UInput :model-value="getNumericFieldModelValue(state as ApplicantRecipientAddressForm, 'egcs_cn_gcaddressid')" type="text" inputmode="numeric" @update:model-value="value => updateNumericFieldValue(state as ApplicantRecipientAddressForm, 'egcs_cn_gcaddressid', value)" />
+        </UFormField>
+        <UFormField :label="t('admin_common.fields.egcs_cn_federalridingid')" name="egcs_cn_federalridingid">
+          <UInput :model-value="getNumericFieldModelValue(state as ApplicantRecipientAddressForm, 'egcs_cn_federalridingid')" type="number" @update:model-value="value => updateNumericFieldValue(state as ApplicantRecipientAddressForm, 'egcs_cn_federalridingid', value)" />
+        </UFormField>
+        <UFormField :label="t('admin_common.fields.egcs_cn_mainphone')" name="egcs_cn_mainphone">
+          <UInput :model-value="getNumericFieldModelValue(state as ApplicantRecipientAddressForm, 'egcs_cn_mainphone')" type="text" inputmode="numeric" @update:model-value="value => updateNumericFieldValue(state as ApplicantRecipientAddressForm, 'egcs_cn_mainphone', value)" />
+        </UFormField>
+        <UFormField :label="t('admin_common.fields.egcs_cn_mainphoneextension')" name="egcs_cn_mainphoneextension">
+          <UInput :model-value="getNumericFieldModelValue(state as ApplicantRecipientAddressForm, 'egcs_cn_mainphoneextension')" type="number" @update:model-value="value => updateNumericFieldValue(state as ApplicantRecipientAddressForm, 'egcs_cn_mainphoneextension', value)" />
+        </UFormField>
+        <UFormField :label="t('admin_common.fields.egcs_cn_postalcodezipcode')" name="egcs_cn_postalcodezipcode">
+          <UInput :model-value="String((state as ApplicantRecipientAddressForm).egcs_cn_postalcodezipcode ?? '')" @update:model-value="value => (state as ApplicantRecipientAddressForm).egcs_cn_postalcodezipcode = value" />
+        </UFormField>
+      </template>
+    </CommonResourceCrud>
+  </section>
 </template>

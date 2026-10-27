@@ -118,7 +118,7 @@ const bilingualColumns: BilingualColumnConfig<AgreementActivityCrudRow>[] = [
     :update-title="t('agreement.activities.edit')"
     modal-fullscreen
     :modal-ui="{ content: 'rounded-none shadow-none ring-0' }"
-    :search-placeholder="t('agreement.activities.search')" data-field-tooltip-context="agreement" data-field-scope="agreement.activities-tab" data-scope-label-en="Agreements > Activities" data-scope-label-fr="Ententes > Activités">
+    :search-placeholder="t('agreement.activities.search')" data-field-tooltip-context="agreement" data-field-scope="agreement.activities-tab" data-scope-label-en="Agreements > Activities" data-scope-label-fr="Ententes > Activités" data-help-view="agreement.activities" data-help-label-en="Agreements — Activities" data-help-label-fr="Ententes — Activités" data-help-target="agreement.activities.content" data-help-kind="section" help-save-target="agreement.activities.save" help-add-target="agreement.activities.add" help-search-target="agreement.activities.search">
     <template #name-cell="{ row }">
       <div class="space-y-1 py-1">
         <CommonBilingualName

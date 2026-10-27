@@ -282,7 +282,7 @@ const createAmendment = async () => {
 </script>
 
 <template>
-  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.amendments-tab" data-scope-label-en="Agreements > Amendments" data-scope-label-fr="Ententes > Modifications" @focusin="checkCatalogVersions">
+  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.amendments-tab" data-scope-label-en="Agreements > Amendments" data-scope-label-fr="Ententes > Modifications" data-help-view="agreement.amendments" data-help-label-en="Agreements — Amendments" data-help-label-fr="Ententes — Modifications" data-help-target="agreement.amendments.content" data-help-kind="section" @focusin="checkCatalogVersions">
     <UAlert
       v-if="canCreate && hasOpenAmendment"
       class="mb-4"
@@ -300,8 +300,8 @@ const createAmendment = async () => {
       :button-label="t('agreement.amendments.add')"
       :show-button="canCreate"
       :search-placeholder="t('agreement.amendments.search')"
-      @add="openCreate"
-      @retry="refresh">
+      help-add-target="agreement.amendments.add"
+      help-search-target="agreement.amendments.search" @add="openCreate" @retry="refresh">
       <template #number-cell="{ row }">
         {{ row.original.egcs_fc_amendmentnumber === null ? t('agreement.amendments.working') : row.original.egcs_fc_amendmentnumber }}
       </template>
@@ -362,7 +362,7 @@ const createAmendment = async () => {
       :title="t('agreement.amendments.add')"
       :description="t('common.form_dialog_description')">
       <template #body>
-        <form class="space-y-4" @submit.prevent="createAmendment">
+        <form class="space-y-4" data-help-view="agreement.amendments.create-dialog" data-help-label-en="Agreements — Create amendment" data-help-label-fr="Ententes — Créer une modification" @submit.prevent="createAmendment">
           <div class="grid gap-4 md:grid-cols-2">
             <UFormField :label="t('agreement.amendments.name_en')" data-ui-target="agreement.amendments-tab.agreement.amendments.name_en">
               <UInput v-model="amendmentNameEn" :aria-describedby="nameRequirementId" class="w-full" />
@@ -400,13 +400,13 @@ const createAmendment = async () => {
               :query="subtypeQuery"
               :required="subtypeRequired" />
           </UFormField>
-          <UButton v-if="subtypeRequirementFailed" :label="t('common.retry')" color="neutral" variant="ghost" @click="loadRequiredSubtypes" />
+          <UButton v-if="subtypeRequirementFailed" :label="t('common.retry')" color="neutral" variant="ghost" data-help-target="agreement.amendments.create-dialog.retry" data-help-kind="button" data-help-label-en="Retry" data-help-label-fr="Réessayer" @click="loadRequiredSubtypes" />
           <div class="flex justify-end gap-2 pt-4">
-            <UButton class="cursor-default" color="neutral" variant="ghost" :label="t('common.cancel')" @click="isCreateOpen = false" />
+            <UButton class="cursor-default" color="neutral" variant="ghost" :label="t('common.cancel')" data-help-target="agreement.amendments.create-dialog.cancel" data-help-kind="button" data-help-label-en="Cancel" data-help-label-fr="Annuler" @click="isCreateOpen = false" />
             <CommonSaveButton
               :label="t('common.add')"
               :loading="isSaving"
-              :disabled="isSaving || !hasAmendmentName || selectedTypeIds.length === 0 || (!typeMetadataReady || !hasRequiredSubtypes)" />
+              :disabled="isSaving || !hasAmendmentName || selectedTypeIds.length === 0 || (!typeMetadataReady || !hasRequiredSubtypes)" data-help-target="agreement.amendments.create-dialog.save" data-help-kind="button" data-help-label-en="Save" data-help-label-fr="Enregistrer" />
           </div>
         </form>
       </template>

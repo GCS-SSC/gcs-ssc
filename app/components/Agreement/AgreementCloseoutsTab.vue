@@ -128,14 +128,14 @@ const createCloseout = async () => {
   <CommonPreActionReport
     :show-header="showHeader"
     :title="t('agreement.closeout.title')"
-    :description="t('agreement.closeout.description')">
+    :description="t('agreement.closeout.description')" data-help-view="agreement.closeouts" data-help-label-en="Agreements — Closeout" data-help-label-fr="Ententes — Clôture" data-help-target="agreement.closeouts.content" data-help-kind="section">
     <template #action>
       <UButton
         v-if="canCreate"
         icon="i-lucide-package-check"
         :label="t('agreement.closeout.create')"
         :loading="isCreating"
-        @click="createCloseout" />
+        data-help-target="agreement.closeouts.closeout-create" data-help-kind="button" data-help-label-en="Create Closeout" data-help-label-fr="Créer une clôture" @click="createCloseout" />
     </template>
 
     <template #notices>
@@ -145,7 +145,7 @@ const createCloseout = async () => {
         icon="i-lucide-circle-alert"
         :title="t('agreement.closeout.load_failed')">
         <template #actions>
-          <UButton color="error" variant="soft" size="sm" icon="i-lucide-refresh-cw" :label="t('common.retry')" @click="() => { void refreshAll() }" />
+          <UButton color="error" variant="soft" size="sm" icon="i-lucide-refresh-cw" :label="t('common.retry')" data-help-target="agreement.closeouts.retry" data-help-kind="button" data-help-label-en="Retry" data-help-label-fr="Réessayer" @click="() => { void refreshAll() }" />
         </template>
       </UAlert>
       <UAlert

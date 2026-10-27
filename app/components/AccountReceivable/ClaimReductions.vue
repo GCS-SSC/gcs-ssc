@@ -257,7 +257,8 @@ const save = async () => {
       </CommonResourceLayoutCard>
     </div>
     <UModal
-      v-if="selectedLine && selectedChoice" v-model:open="isModalOpen"
+      v-if="selectedLine && selectedChoice"
+      v-model:open="isModalOpen" data-help-view="casework.account-receivable.claim-reductions.is-modal-open"
       :title="t('account_receivable.edit_claim_reduction')" :description="t('common.form_dialog_description')"
       :dismissible="!pending">
       <template #body>
@@ -266,7 +267,7 @@ const save = async () => {
         </p>
         <UAlert v-if="loadError" color="error" :title="t('common.resource_table_load_failed')" :description="t('common.resource_table_load_failed_description')">
           <template #actions>
-            <UButton :label="t('common.retry')" @click="load" />
+            <UButton data-help-target="casework.account-receivable.claim-reductions.is-modal-open.common-retry" :label="t('common.retry')" @click="load" />
           </template>
         </UAlert>
         <UForm :state="selectedLine" :validate="createValidator(draftSchema)" class="space-y-4" @submit="save">
@@ -282,8 +283,8 @@ const save = async () => {
             <CommonCurrencyInput v-model="selectedLine.egcs_fc_amount" :currency="currency" :disabled="pending" />
           </UFormField>
           <div class="flex justify-end gap-2">
-            <UButton type="button" :label="t('common.cancel')" color="neutral" variant="ghost" :disabled="pending" @click="lineModal.close()" />
-            <CommonSaveButton :label="t('common.save')" :loading="pending" :disabled="pending || loadStatus !== 'success'" />
+            <UButton data-help-target="casework.account-receivable.claim-reductions.is-modal-open.common-cancel" type="button" :label="t('common.cancel')" color="neutral" variant="ghost" :disabled="pending" @click="lineModal.close()" />
+            <CommonSaveButton data-help-target="casework.account-receivable.claim-reductions.is-modal-open.common-save" :label="t('common.save')" :loading="pending" :disabled="pending || loadStatus !== 'success'" />
           </div>
         </UForm>
       </template>

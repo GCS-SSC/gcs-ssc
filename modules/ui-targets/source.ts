@@ -7,12 +7,13 @@ import type { TargetKind, TargetLedger } from '@gcs-ssc/guided-help/contracts'
 import { collectUiTargetSourceTranslations, inferUiTargetSourceLabel, uiTargetTranslationLabel } from './labels.ts'
 import type { UiTargetTranslatorCatalogs } from './labels.ts'
 import { collectSchemaFieldSources, extractSchemaFieldSources } from './schema-fields.ts'
+import { collectInheritedHelpViews } from './composition.ts'
 import { resolveUiFieldTargetKey } from '../../shared/ui-targets/identity.ts'
 import type { UiTarget, UiTargetCatalog, UiTargetLabel, UiTargetOwner } from '../../shared/ui-targets/types.ts'
 
 export interface UiTargetSource { filename: string; source: string; owner: UiTargetOwner; translations?: UiTargetTranslatorCatalogs }
 export interface UiTargetDiagnostic { filename: string; line: number; code: string; message: string }
-interface SourceOptions { source: UiTargetSource; locales: { en: unknown; fr: unknown } }
+interface SourceOptions { source: UiTargetSource; locales: { en: unknown; fr: unknown }; inheritedView?: string }
 interface SourceResult { targets: UiTarget[]; diagnostics: UiTargetDiagnostic[]; code: string }
 const fieldTags = new Set(['UFormField', 'FormField', 'UInput', 'UInputNumber', 'UInputDate', 'UInputTime', 'UInputMenu', 'UInputTags', 'UTextarea', 'USelect', 'USelectMenu', 'URadioGroup', 'UCheckbox', 'UCheckboxGroup', 'USwitch', 'UFileUpload', 'USlider', 'input', 'textarea', 'select', 'CommonCurrencyInput', 'CommonDatePicker', 'CommonEnumSelect', 'CommonServerLookupSelect', 'CommonBilingualSelectMenu', 'CommonBilingualMultiSelectMenu', 'CommonTextarea', 'CommonStatusSelect', 'CommonAssignedListViewSelect', 'CommonLucideIconPicker', 'AssessmentSchemaHelperFieldSelect', 'AdminCommonLookupField', 'UColorPicker', 'ExtensionFormField', 'ExtensionInput', 'ExtensionInputNumber', 'ExtensionInputTags', 'ExtensionTextarea', 'ExtensionRawTextarea', 'ExtensionSelect', 'ExtensionSelectMenu', 'ExtensionCheckbox', 'ExtensionCheckboxGroup', 'ExtensionSwitch', 'ExtensionRadioGroup', 'ExtensionDatePicker', 'ExtensionCurrencyInput'])
 const wrapperTags = new Set(['UFormField', 'FormField', 'ExtensionFormField', 'AdminCommonLookupField'])
@@ -117,9 +118,10 @@ const openingEnd = (text: string, start: number): number => {
  * @param root0 Source catalog inputs.
  * @param root0.source The owning Vue source and its public identity.
  * @param root0.locales English and French message catalogs.
+ * @param root0.inheritedView Actual consuming screen for a reusable component.
  * @returns Discovered targets, identity diagnostics and annotated Vue source.
  */
-export const scanUiTargetSource = ({ source, locales }: SourceOptions): SourceResult => {
+export const scanUiTargetSource = ({ source, locales, inheritedView }: SourceOptions): SourceResult => {
   const targets: UiTarget[] = []
   const diagnostics: UiTargetDiagnostic[] = []
   const { descriptor } = parseSfc(source.source, { filename: source.filename })
@@ -152,6 +154,14 @@ export const scanUiTargetSource = ({ source, locales }: SourceOptions): SourceRe
       const scope = attr(node, 'data-field-scope') ?? context.scope
       const declaredView = attr(node, 'data-help-view')
       const runtimeView = declaredView ?? context.runtimeView
+      // Nuxt UI's modal root is renderless; its content prop reaches the portalled dialog.
+      if (node.tag === 'UModal' && declaredView) {
+        const content = expression(node, 'content')
+        const forwarded = node.props.filter(prop => (prop.type === NodeTypes.ATTRIBUTE && prop.name === 'data-help-view')
+          || (prop.type === NodeTypes.DIRECTIVE && prop.name === 'bind' && prop.arg?.type === NodeTypes.SIMPLE_EXPRESSION && prop.arg.content === 'content'))
+        for (const prop of forwarded) edits.push({ offset: template.loc.start.offset + prop.loc.start.offset, remove: prop.loc.end.offset - prop.loc.start.offset, value: '' })
+        addAttribute(node, ':content', `{ ...(${content ?? '{}'}), 'data-help-view': ${JSON.stringify(declaredView)} }`)
+      }
       const declaredTooltipContext = attr(node, 'data-field-tooltip-context')
       if (declaredTooltipContext && !['agreement', 'intake', 'agreement-or-intake'].includes(declaredTooltipContext)) {
         diagnostics.push({ filename: source.filename, line: template.loc.start.line + node.loc.start.line - 1, code: 'tooltip-context', message: 'Tooltip fields require an operational agreement, intake, or agreement-or-intake context.' })
@@ -198,7 +208,7 @@ export const scanUiTargetSource = ({ source, locales }: SourceOptions): SourceRe
       visit(node.children, { scope, view, viewLabel, runtimeView, tooltipContext, tooltipUnavailable, wrapped: context.wrapped || wrapped, excluded })
     }
   }
-  visit(tree.children, {})
+  visit(tree.children, { view: inheritedView, runtimeView: inheritedView })
   if (needsTooltipWrapper) {
     if (descriptor.scriptSetup) edits.push({ offset: descriptor.scriptSetup.loc.start.offset, value: '\nimport { FieldHelpTarget } from \'#components\'\n' })
     else edits.push({ offset: 0, value: '<script setup>\nimport { FieldHelpTarget } from \'#components\'\n</script>\n' })
@@ -236,6 +246,7 @@ export const buildUiTargetCatalog = ({ sources, locales, ledger }: {
       targets.set(target.key, { key: target.key, viewKey: view.key, label: target.label, viewLabel: view.label, kind: target.kind, owner: { kind: 'host' }, tooltip: false, guidedHelp: true })
     }
   }
+  const inheritedViews = collectInheritedHelpViews(sources)
   const declarations = new Map<string, string>()
   for (const source of sources) {
     const scanned = scanUiTargetSource({ source, locales })
@@ -246,13 +257,21 @@ export const buildUiTargetCatalog = ({ sources, locales, ledger }: {
       declarations.set(target.key, source.filename)
       const approved = targets.get(target.key)
       targets.set(target.key, approved ? { ...target, viewKey: approved.viewKey, label: approved.label, viewLabel: target.tooltip ? target.viewLabel : approved.viewLabel } : target)
-      if (approved || !target.guidedHelp) continue
+    }
+    // A reusable field keeps one tooltip identity while belonging to each actual consuming screen.
+    const memberships = [scanned, ...[...(inheritedViews.get(source.filename) ?? [])].map(inheritedView => scanUiTargetSource({ source, locales, inheritedView }))]
+    for (const membership of memberships) for (const target of membership.targets) {
+      if (!target.guidedHelp) continue
+      const registered = targets.get(target.key)
+      if (registered) registered.guidedHelp = true
+      const approved = ledger.views.find(view => view.targets.some(item => item.key === target.key))
+      if (approved) continue
       let view = guidedHelpLedger.views.find(item => item.key === target.viewKey)
       if (!view) {
         view = { key: target.viewKey, label: target.viewLabel, discoverable: false, targets: [] }
         guidedHelpLedger.views.push(view)
       }
-      view.targets.push({ key: target.key, label: target.label, kind: target.kind })
+      if (!view.targets.some(item => item.key === target.key)) view.targets.push({ key: target.key, label: target.label, kind: target.kind })
     }
   }
   return { uiTargetRegistry: { formatVersion: 1, targets: [...targets.values()].sort((left, right) => left.key.localeCompare(right.key)) }, guidedHelpLedger, diagnostics }

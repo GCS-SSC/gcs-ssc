@@ -139,7 +139,7 @@ const getApplicantRecipientLookupUrl = (state: FundingCaseAgreementApplicantReci
     :show-button="canCreate"
     :modal-title="t('agreement.applicant_recipients.add')"
     :update-title="t('agreement.applicant_recipients.edit')"
-    :search-placeholder="t('agreement.applicant_recipients.search')" data-field-tooltip-context="agreement" data-field-scope="agreement.applicant-recipients-tab" data-scope-label-en="Agreements > Proponents" data-scope-label-fr="Ententes > Promoteurs">
+    :search-placeholder="t('agreement.applicant_recipients.search')" data-field-tooltip-context="agreement" data-field-scope="agreement.applicant-recipients-tab" data-scope-label-en="Agreements > Proponents" data-scope-label-fr="Ententes > Promoteurs" data-help-view="agreement.applicant-recipients" data-help-label-en="Agreements — Proponents" data-help-label-fr="Ententes — Promoteurs" data-help-target="agreement.applicant-recipients.content" data-help-kind="section" help-save-target="agreement.applicant-recipients.save" help-add-target="agreement.applicant-recipients.add" help-search-target="agreement.applicant-recipients.search">
     <template #subtype-cell="{ row }">
       {{ getBilingualValue(row.original, 'subtype_name', t('agreement.applicant_recipients.not_selected')) }}
     </template>

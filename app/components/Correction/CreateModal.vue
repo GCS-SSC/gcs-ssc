@@ -61,7 +61,7 @@ const save = async () => {
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="t(linkedCorrectionId ? 'correction.create_linked' : 'correction.create')" :description="t('correction.description')" :ui="{ content: 'sm:max-w-4xl' }" data-field-tooltip-context="agreement" data-field-scope="correction.create-modal" data-scope-label-en="Agreements > Corrections > Create" data-scope-label-fr="Ententes > Corrections > Créer">
+  <UModal v-model:open="open" data-help-view="casework.correction.create-modal.open" :title="t(linkedCorrectionId ? 'correction.create_linked' : 'correction.create')" :description="t('correction.description')" :ui="{ content: 'sm:max-w-4xl' }" data-field-tooltip-context="agreement" data-field-scope="correction.create-modal" data-scope-label-en="Agreements > Corrections > Create" data-scope-label-fr="Ententes > Corrections > Créer">
     <template #body>
       <UForm v-if="state" :state="state" :validate="createValidator(CorrectionCreateSchema)" class="space-y-4" @submit="save">
         <UFormField name="egcs_fc_commitment" :label="t('correction.commitment')">
@@ -85,8 +85,8 @@ const save = async () => {
           </UFormField>
         </div>
         <div class="flex justify-end gap-2">
-          <UButton type="button" :label="t('common.cancel')" color="neutral" variant="ghost" :disabled="pending" @click="open = false" />
-          <CommonSaveButton :label="t('correction.create')" :loading="pending" :disabled="pending" />
+          <UButton data-help-target="casework.correction.create-modal.open.common-cancel" type="button" :label="t('common.cancel')" color="neutral" variant="ghost" :disabled="pending" @click="open = false" />
+          <CommonSaveButton data-help-target="casework.correction.create-modal.open.correction-create" :label="t('correction.create')" :loading="pending" :disabled="pending" />
         </div>
       </UForm>
     </template>

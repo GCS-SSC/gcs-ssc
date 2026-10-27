@@ -882,7 +882,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
 </script>
 
 <template>
-  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.budget-tab" data-scope-label-en="Agreements > Budget" data-scope-label-fr="Ententes > Budget">
+  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.budget-tab" data-scope-label-en="Agreements > Budget" data-scope-label-fr="Ententes > Budget" data-help-view="agreement.budget" data-help-label-en="Agreements — Budget" data-help-label-fr="Ententes — Budget" data-help-target="agreement.budget.content" data-help-kind="section">
     <CommonResourceLayoutCard
       v-model:search="search"
       v-model:pagination="pagination"
@@ -902,9 +902,9 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
       :button-label="t('agreement.budget.add_fiscal_year')"
       :show-button="canCreateFiscalYear && !staticMode"
       :search-placeholder="t('agreement.budget.search')"
-      @add="openCreateFiscalYear"
-      @retry="refreshOverview"
-      @update:expanded="updateTableExpandedRows">
+      help-add-target="agreement.budget.add"
+      help-search-target="agreement.budget.search"
+      @add="openCreateFiscalYear" @retry="refreshOverview" @update:expanded="updateTableExpandedRows">
       <template #name-cell="{ row }">
         <div :id="getGroupedDisclosureContentId(row as GroupedBudgetRow)" class="contents">
           <div v-if="isFiscalYearGroupRow(row as GroupedBudgetRow)" class="flex w-full items-center gap-3 py-1">
@@ -1192,7 +1192,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
       v-model:open="isFiscalYearModalOpen" data-field-scope="agreement.budget-tab" data-scope-label-en="Agreements > Budget > Fiscal years" data-scope-label-fr="Ententes > Budget > Exercices financiers"
       :title="selectedFiscalYear.id ? t('agreement.budget.edit_fiscal_year') : t('agreement.budget.add_fiscal_year')">
       <template #body>
-        <UForm :state="selectedFiscalYear" :validate="validateFiscalYear" :validate-on="[]" class="space-y-4" @submit="saveFiscalYear">
+        <UForm :state="selectedFiscalYear" :validate="validateFiscalYear" :validate-on="[]" class="space-y-4" data-help-view="agreement.budget.fiscal-year-dialog" data-help-label-en="Agreements — Fiscal year editor" data-help-label-fr="Ententes — Éditeur d’exercice financier" @submit="saveFiscalYear">
           <UFormField :label="t('agreement.budget.fiscal_year')" name="egcs_fc_fiscalyear">
             <CommonServerLookupSelect
               v-model="selectedFiscalYear.egcs_fc_fiscalyear"
@@ -1207,11 +1207,11 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
           </UFormField>
 
           <div class="flex justify-end gap-2 pt-4">
-            <UButton class="cursor-default" :label="t('common.cancel')" color="neutral" variant="ghost" @click="isFiscalYearModalOpen = false" />
+            <UButton class="cursor-default" :label="t('common.cancel')" color="neutral" variant="ghost" data-help-target="agreement.budget.fiscal-year-dialog.cancel" data-help-kind="button" data-help-label-en="Cancel" data-help-label-fr="Annuler" @click="isFiscalYearModalOpen = false" />
             <CommonSaveButton
               :label="selectedFiscalYear.id ? t('common.update') : t('common.add')"
               :loading="isSavingFiscalYear"
-              :disabled="isSavingFiscalYear || !canSaveFiscalYear" />
+              :disabled="isSavingFiscalYear || !canSaveFiscalYear" data-help-target="agreement.budget.fiscal-year-dialog.save" data-help-kind="button" data-help-label-en="Save" data-help-label-fr="Enregistrer" />
           </div>
         </UForm>
       </template>
@@ -1228,7 +1228,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
           :validate="validateLineItem"
           :validate-on="[]"
           class="space-y-6"
-          @submit="saveLineItem">
+          data-help-view="agreement.budget.line-item-dialog" data-help-label-en="Agreements — Line item editor" data-help-label-fr="Ententes — Éditeur de ligne budgétaire" @submit="saveLineItem">
           <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <UFormField :label="t('agreement.budget.fiscal_year')" name="egcs_fc_fundingagreementbudgetfiscalyear">
               <CommonBilingualSelectMenu
@@ -1319,11 +1319,11 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
           </div>
 
           <div class="flex justify-end gap-2 pt-4">
-            <UButton class="cursor-default" :label="t('common.cancel')" color="neutral" variant="ghost" @click="isLineItemModalOpen = false" />
+            <UButton class="cursor-default" :label="t('common.cancel')" color="neutral" variant="ghost" data-help-target="agreement.budget.line-item-dialog.cancel" data-help-kind="button" data-help-label-en="Cancel" data-help-label-fr="Annuler" @click="isLineItemModalOpen = false" />
             <CommonSaveButton
               :label="selectedLineItem.id ? t('common.update') : t('common.add')"
               :loading="isSavingLineItem"
-              :disabled="isSavingLineItem" />
+              :disabled="isSavingLineItem" data-help-target="agreement.budget.line-item-dialog.save" data-help-kind="button" data-help-label-en="Save" data-help-label-fr="Enregistrer" />
           </div>
         </UForm>
       </template>
@@ -1334,7 +1334,7 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
       v-model:open="isFundingSourceModalOpen"
       :title="selectedFundingSource.originalSubtype === null ? t('agreement.funding_sources.add') : `${t('common.edit')}: ${t('agreement.funding_sources.title')}`">
       <template #body>
-        <UForm :state="selectedFundingSource.source" :validate="validateFundingSource" :validate-on="[]" class="space-y-6" @submit="saveFundingSource">
+        <UForm :state="selectedFundingSource.source" :validate="validateFundingSource" :validate-on="[]" class="space-y-6" data-help-view="agreement.budget.funding-source-dialog" data-help-label-en="Agreements — Funding source editor" data-help-label-fr="Ententes — Éditeur de source de financement" @submit="saveFundingSource">
           <div class="space-y-4">
             <UFormField :label="t('agreement.funding_sources.subtype')" name="egcs_fc_fundingsubtype" required>
               <CommonServerLookupSelect
@@ -1361,8 +1361,8 @@ const formatSignedBudgetDifference = (value: Money, currency: string) => {
             </UFormField>
           </div>
           <div class="flex justify-end gap-2 pt-4">
-            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="fundingSourceModal.close()" />
-            <CommonSaveButton :label="selectedFundingSource.originalSubtype === null ? t('common.add') : t('common.update')" :loading="fundingSourcePending.isPending.value" :disabled="fundingSourcePending.isPending.value || !canUpdate || staticMode" />
+            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" data-help-target="agreement.budget.funding-source-dialog.cancel" data-help-kind="button" data-help-label-en="Cancel" data-help-label-fr="Annuler" @click="fundingSourceModal.close()" />
+            <CommonSaveButton :label="selectedFundingSource.originalSubtype === null ? t('common.add') : t('common.update')" :loading="fundingSourcePending.isPending.value" :disabled="fundingSourcePending.isPending.value || !canUpdate || staticMode" data-help-target="agreement.budget.funding-source-dialog.save" data-help-kind="button" data-help-label-en="Save" data-help-label-fr="Enregistrer" />
           </div>
         </UForm>
       </template>

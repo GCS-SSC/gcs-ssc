@@ -160,11 +160,11 @@ const save = async () => {
     <div v-else-if="!creditMemo && status === 'pending'" role="status" aria-live="polite" class="sr-only">
       <span>{{ t('common.loading_records') }}</span>
     </div>
-    <CommonDetailPage v-if="creditMemo && state" id="proponent-credit-memo-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbs" class="min-w-0 flex-1">
+    <CommonDetailPage v-if="creditMemo && state" id="proponent-credit-memo-detail" v-model:collapsed="isHeroCollapsed" data-help-view="proponent.credit-memo.detail" :breadcrumb-items="breadcrumbs" class="min-w-0 flex-1">
       <template #body>
         <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-banknote-arrow-down" :title="reference" :meta-items="[getBilingualValue(creditMemo, 'egcs_fc_debtorname', t('common.not_available')), getBilingualValue(creditMemo, 'egcs_fc_agencyname', t('common.not_available')), creditMemo.egcs_fc_currency.toUpperCase()]" :badges="[{ statusId: creditMemo.egcs_fc_status }]" :actions="creditMemo.egcs_fc_canedit ? [{ label: t('common.edit'), icon: 'i-lucide-edit-3', onClick: openEdit }] : []" />
-        <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="proponent-credit-memo-detail-content">
-          <div v-if="selectedTab === 'summary'" class="space-y-8" data-testid="credit-memo-summary">
+        <CommonDetailWorkspace v-model="selectedTab" help-navigation-group-target="proponent.credit-memo.detail.section-navigation" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="proponent-credit-memo-detail-content">
+          <div v-if="selectedTab === 'summary'" class="space-y-8" data-testid="credit-memo-summary" data-help-target="proponent.credit-memo.summary" data-help-kind="section">
             <CommonSection :title="t('account_receivable.credit_memo')" badge="01">
               <CommonValueCard :label="t('account_receivable.received_date')" :value="formatDate(creditMemo.egcs_fc_receiveddate)" />
               <CommonValueCard :label="t('account_receivable.credit_memo_amount')" :value="formatMoneyText(creditMemo.egcs_fc_totalamount, locale, creditMemo.egcs_fc_currency.toUpperCase())" />
@@ -209,7 +209,7 @@ const save = async () => {
             :lines="creditMemo.egcs_fc_lines" :currency="creditMemo.egcs_fc_currency"
             :can-edit="!creditMemo.egcs_fc_automaticcoding && creditMemo.egcs_fc_canedit && status === 'success' && !saving" :can-delete="creditMemo.egcs_fc_candeletelines && status === 'success' && !saving"
             @changed="refreshPage" />
-          <section v-else-if="selectedTab === 'completion'" class="space-y-6">
+          <section v-else-if="selectedTab === 'completion'" data-help-target="proponent.credit-memo.completion" data-help-kind="section" class="space-y-6">
             <UAlert v-if="dirty" color="warning" :title="t('account_receivable.save_before_completion')" /><CommonCompletionPanel entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" :can-complete="creditMemo.egcs_fc_cancomplete && !dirty && !saving && status === 'success'" :can-work-workflow="creditMemo.egcs_fc_canwork" :show-header="false" :show-divider="false" title-key="account_receivable.credit_memo_completion.title" description-key="account_receivable.credit_memo_completion.description" status-complete-key="account_receivable.credit_memo_completion.status_complete" status-locked-key="account_receivable.credit_memo_completion.status_locked" comment-placeholder-key="account_receivable.credit_memo_completion.comment_placeholder" complete-action-key="account_receivable.credit_memo_completion.complete" completed-success-key="account_receivable.credit_memo_completion.completed_success" :refresh-key="refreshKey" @changed="refreshPage" />
           </section>
           <CommonReviewsTab v-else-if="selectedTab === 'reviews'" entity-type="fundingcaseaccountreceivablecreditmemo" :entity-id="creditMemoId" :can-update="creditMemo.egcs_fc_canwork" @changed="refreshPage" />
@@ -223,6 +223,7 @@ const save = async () => {
     <UModal
       v-if="isEditOpen && creditMemo && state"
       v-model:open="isEditOpen"
+      data-help-view="proponent.credit-memo.edit"
       :title="t('common.edit')"
       :description="t('common.form_dialog_description')"
       :dismissible="!saving"
@@ -239,8 +240,8 @@ const save = async () => {
             <UTextarea v-model="state.egcs_fc_reason" :readonly="!creditMemo.egcs_fc_canedit" :disabled="saving" class="w-full" />
           </UFormField>
           <div class="flex justify-end gap-2">
-            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" :disabled="saving" @click="isEditOpen = false" />
-            <CommonSaveButton :label="t('common.save')" :loading="saving" :disabled="saving || !creditMemo.egcs_fc_canedit || status !== 'success'" />
+            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" :disabled="saving" data-help-target="proponent.credit-memo.edit.cancel" data-help-kind="button" @click="isEditOpen = false" />
+            <CommonSaveButton data-help-target="proponent.credit-memo.edit.save" data-help-kind="button" :label="t('common.save')" :loading="saving" :disabled="saving || !creditMemo.egcs_fc_canedit || status !== 'success'" />
           </div>
         </UForm>
       </template>

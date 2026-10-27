@@ -42,7 +42,7 @@ const onSubmit = () => {
 </script>
 
 <template>
-  <div :class="[compact ? 'mx-auto w-full max-w-4xl' : 'w-full']">
+  <div data-help-view="agreement.profile-edit" data-help-label-en="Agreements — Profile editor" data-help-label-fr="Ententes — Éditeur du profil" :class="[compact ? 'mx-auto w-full max-w-4xl' : 'w-full']">
     <UForm
       :state="model"
       :validate="validate"
@@ -62,12 +62,13 @@ const onSubmit = () => {
 
       <div class="flex flex-col-reverse justify-end gap-3 border-t border-zinc-200 pt-6 sm:flex-row dark:border-zinc-800">
         <UButton
+          data-help-target="agreement.profile-edit.cancel" data-help-kind="button"
           color="neutral"
           variant="ghost"
           :label="cancelLabel"
           :disabled="pending"
           @click="emit('cancel')" />
-        <CommonSaveButton :label="submitLabel" :loading="pending" :disabled="pending || (permissionAction === 'create' && !!model.egcs_fc_transferpaymentstream && !numberMode)" />
+        <CommonSaveButton data-help-target="agreement.profile-edit.save" data-help-kind="button" :label="submitLabel" :loading="pending" :disabled="pending || (permissionAction === 'create' && !!model.egcs_fc_transferpaymentstream && !numberMode)" />
       </div>
     </UForm>
   </div>

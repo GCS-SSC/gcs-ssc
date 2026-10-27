@@ -76,6 +76,18 @@ watch(() => Boolean(document.value), (value, previous) => {
 watch(loading, value => {
   discoveryLoading.value = value
 })
+const readDeclaredContext = (element: HTMLElement | null | undefined): GuideObservedContext | null => {
+  try {
+    const parsed = GuideObservedContextSchema.safeParse(JSON.parse(element?.dataset.helpContext ?? ''))
+    return parsed.success ? parsed.data : null
+  } catch { return null }
+}
+const contextMatchesRecord = (context: GuideObservedContext | null, agreementId: string | null, reviewId: string | null) => {
+  if (!context || (context.kind !== 'owner' && context.kind !== 'task')) return false
+  if (reviewId) return context.kind === 'task' && context.taskId === `review:${reviewId}`
+  const binding = context.kind === 'owner' ? context.binding : context.execution.binding
+  return Boolean(agreementId && binding?.resourceType === 'fundingcaseagreement' && binding.resourceId === agreementId)
+}
 const readView = () => {
   const views = [...window.document.querySelectorAll<HTMLElement>('[data-help-view]')]
     .filter(view => view.getClientRects().length > 0)
@@ -86,27 +98,39 @@ const readView = () => {
   const view = modalView ?? views.find(candidate => !views.some(other => candidate !== other && candidate.contains(other)))
   currentView.value = view?.dataset.helpView ?? ''
   viewAgencyId.value = view?.closest<HTMLElement>('[data-help-agency]')?.dataset.helpAgency ?? ''
-  viewReviewId.value = view?.dataset.helpReviewId ?? ''
-  viewAgreementId.value = view?.dataset.helpAgreementId ?? ''
+  viewReviewId.value = view?.closest<HTMLElement>('[data-help-review-id]')?.dataset.helpReviewId ?? ''
+  viewAgreementId.value = view?.closest<HTMLElement>('[data-help-agreement-id]')?.dataset.helpAgreementId ?? ''
   const contexts = [...(view?.querySelectorAll<HTMLElement>('[data-help-context]') ?? [])]
     .filter(element => element.getClientRects().length > 0)
   const renderedContext = contexts.find(element => !contexts.some(other => element !== other && element.contains(other)))
     ?? view?.closest<HTMLElement>('[data-help-context]')
-  let context: GuideObservedContext | null = null
-  if (renderedContext?.dataset.helpContext) {
-    try {
-      const parsed = GuideObservedContextSchema.safeParse(JSON.parse(renderedContext.dataset.helpContext))
-      if (parsed.success) context = parsed.data
-    } catch { /* An incomplete render cannot prove a loaded business context. */ }
-  }
+  let context = readDeclaredContext(renderedContext)
   const routeReviewId = 'reviewId' in route.value.params && typeof route.value.params.reviewId === 'string' ? route.value.params.reviewId : null
-  const routeAgreementId = 'id' in route.value.params && typeof route.value.params.id === 'string' && /\/(?:agreements|ententes)\//.test(route.value.path) ? route.value.params.id : null
+  const isAgreementDetail = typeof route.value.name === 'string' && route.value.name.replace(/___(?:en|fr)$/, '') === 'agreements-id'
+  const routeAgreementId = isAgreementDetail && 'id' in route.value.params && typeof route.value.params.id === 'string' ? route.value.params.id : null
+  if (modalView && !viewReviewId.value && !viewAgreementId.value && !renderedContext && (routeAgreementId || routeReviewId)) {
+    const owners = views.flatMap(candidate => {
+      if (candidate.closest('[role="dialog"]')) return []
+      if (routeReviewId ? candidate.dataset.helpReviewId !== routeReviewId : candidate.dataset.helpAgreementId !== routeAgreementId) return []
+      const loaded = readDeclaredContext(candidate)
+      return contextMatchesRecord(loaded, routeAgreementId, routeReviewId) ? [{ element: candidate, context: loaded }] : []
+    })
+    const owner = owners.length === 1 ? owners[0] : undefined
+    const ownerAgency = owner?.element.closest<HTMLElement>('[data-help-agency]')?.dataset.helpAgency ?? ''
+    if (owner && (!viewAgencyId.value || viewAgencyId.value === ownerAgency)) {
+      viewAgencyId.value = ownerAgency
+      viewReviewId.value = owner.element.dataset.helpReviewId ?? ''
+      viewAgreementId.value = owner.element.dataset.helpAgreementId ?? ''
+      context = owner.context
+    }
+  }
+  const conflictingModalContext = Boolean(modalView && (routeAgreementId || routeReviewId) && !contextMatchesRecord(context, routeAgreementId, routeReviewId))
   const matchesRoute = routeReviewId
     ? viewReviewId.value === routeReviewId
     : routeAgreementId ? viewAgreementId.value === routeAgreementId : Boolean(view)
   const requiresLoadedContext = Boolean(routeReviewId || routeAgreementId)
   const staleContextlessView = !context && loadedView !== null && loadedView.route !== routeIdentity() && view === loadedView.element && currentView.value === loadedView.key
-  if (!matchesRoute || (requiresLoadedContext && !context) || staleContextlessView) {
+  if (!matchesRoute || conflictingModalContext || (requiresLoadedContext && !context) || staleContextlessView) {
     setObservedContext({ kind: 'pending' })
     setReturnTarget(null)
     return

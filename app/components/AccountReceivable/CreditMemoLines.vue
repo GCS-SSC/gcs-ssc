@@ -175,7 +175,7 @@ const deleteLine = async (line: AccountReceivableCreditMemoLine) => {
         {{ formatAccountReceivableAmount(total, locale, currency) ?? t('common.not_available') }}
       </dd>
     </dl>
-    <UModal v-model:open="isOpen" :title="t(selectedLineId ? 'account_receivable.credit_memo_edit_line' : 'account_receivable.credit_memo_add_line')" :ui="{ content: 'sm:max-w-2xl' }">
+    <UModal v-model:open="isOpen" data-help-view="casework.account-receivable.credit-memo-lines.is-open" :title="t(selectedLineId ? 'account_receivable.credit_memo_edit_line' : 'account_receivable.credit_memo_add_line')" :ui="{ content: 'sm:max-w-2xl' }">
       <template #body>
         <UForm v-if="selected" :state="selected" :validate="createValidator(AccountReceivableCreditMemoLineCreateSchema)" class="space-y-4" @submit="save">
           <UFormField name="egcs_fc_receivable" :label="t('account_receivable.credit_memo_receivable')">
@@ -199,8 +199,8 @@ const deleteLine = async (line: AccountReceivableCreditMemoLine) => {
             <CommonCurrencyInput v-model="selected.egcs_fc_amount" :currency="currency" :disabled="isPending" class="w-full" />
           </UFormField>
           <div class="flex justify-end gap-2">
-            <UButton type="button" color="neutral" variant="ghost" :label="t('common.cancel')" :disabled="isPending" @click="modal.close()" />
-            <CommonSaveButton :label="t(selectedLineId ? 'common.update' : 'common.add')" :loading="isPending" :disabled="isPending || !canEdit" />
+            <UButton data-help-target="casework.account-receivable.credit-memo-lines.is-open.common-cancel" type="button" color="neutral" variant="ghost" :label="t('common.cancel')" :disabled="isPending" @click="modal.close()" />
+            <CommonSaveButton data-help-target="casework.account-receivable.credit-memo-lines.is-open.save" :label="t(selectedLineId ? 'common.update' : 'common.add')" :loading="isPending" :disabled="isPending || !canEdit" />
           </div>
         </UForm>
       </template>

@@ -262,7 +262,7 @@ const deleteDocument = async (generatedDocument: AgreementGeneratedDocumentItem)
 </script>
 
 <template>
-  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.documents-tab" data-scope-label-en="Agreements > Documents" data-scope-label-fr="Ententes > Documents" @focusin="checkCatalogVersions">
+  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.documents-tab" data-scope-label-en="Agreements > Documents" data-scope-label-fr="Ententes > Documents" data-help-view="agreement.documents" data-help-label-en="Agreements — Documents" data-help-label-fr="Ententes — Documents" data-help-target="agreement.documents.content" data-help-kind="section" @focusin="checkCatalogVersions">
     <UAlert
       v-if="templatesStatus === 'error' || catalogCheckFailed"
       color="error"
@@ -270,7 +270,7 @@ const deleteDocument = async (generatedDocument: AgreementGeneratedDocumentItem)
       :title="t('common.error')"
       class="mb-4">
       <template #actions>
-        <UButton color="error" variant="soft" size="sm" icon="i-lucide-refresh-cw" :label="t('common.retry')" @click="retryTemplates" />
+        <UButton color="error" variant="soft" size="sm" icon="i-lucide-refresh-cw" :label="t('common.retry')" data-help-target="agreement.documents.retry" data-help-kind="button" data-help-label-en="Retry" data-help-label-fr="Réessayer" @click="retryTemplates" />
       </template>
     </UAlert>
     <CommonResourceLayoutCard
@@ -286,8 +286,8 @@ const deleteDocument = async (generatedDocument: AgreementGeneratedDocumentItem)
       :request-status="status"
       search-placeholder=""
       table-class="agreement-documents-table"
-      @add="openGenerate"
-      @retry="refresh">
+      help-add-target="agreement.documents.add"
+      help-search-target="agreement.documents.search" @add="openGenerate" @retry="refresh">
       <template #name-cell="{ row }">
         {{ locale === 'fr' ? row.original.egcs_fc_name_fr : row.original.egcs_fc_name_en }}
       </template>
@@ -327,7 +327,7 @@ const deleteDocument = async (generatedDocument: AgreementGeneratedDocumentItem)
 
     <UModal v-if="canCreate && generateState" v-model:open="isGenerateOpen" :title="t('agreement.documents.generate')">
       <template #body>
-        <UForm :state="generateState" :validate="validateGenerate" class="space-y-4" @submit="generateDocument">
+        <UForm :state="generateState" :validate="validateGenerate" class="space-y-4" data-help-view="agreement.documents.generate-dialog" data-help-label-en="Agreements — Generate document" data-help-label-fr="Ententes — Générer un document" @submit="generateDocument">
           <UFormField :label="t('transfer_payment.document_templates.title')" name="templateId">
             <CommonBilingualSelectMenu
               v-model="generateState.templateId"
@@ -354,8 +354,8 @@ const deleteDocument = async (generatedDocument: AgreementGeneratedDocumentItem)
               class="w-full" />
           </UFormField>
           <div class="flex justify-end gap-2 pt-4">
-            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isGenerateOpen = false" />
-            <CommonSaveButton :label="t('agreement.documents.generate')" :loading="isGenerating" :disabled="isGenerating || !generateState.templateId || !generateState.outputFormat" />
+            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" data-help-target="agreement.documents.generate-dialog.cancel" data-help-kind="button" data-help-label-en="Cancel" data-help-label-fr="Annuler" @click="isGenerateOpen = false" />
+            <CommonSaveButton :label="t('agreement.documents.generate')" :loading="isGenerating" :disabled="isGenerating || !generateState.templateId || !generateState.outputFormat" data-help-target="agreement.documents.generate-dialog.save" data-help-kind="button" data-help-label-en="Save" data-help-label-fr="Enregistrer" />
           </div>
         </UForm>
       </template>

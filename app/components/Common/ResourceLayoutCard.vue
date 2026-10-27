@@ -15,6 +15,7 @@ const {
   statusFilterLabel,
   buttonLabel,
   helpAddTarget,
+  helpSearchTarget,
   buttonDisabled = false,
   showButton = true,
   showToolbar = true,
@@ -34,6 +35,7 @@ const {
   statusEnumName?: EnumKey
   statusFilterLabel?: string
   helpAddTarget?: string
+  helpSearchTarget?: string
   buttonLabel?: string
   buttonDisabled?: boolean
   showButton?: boolean
@@ -79,6 +81,7 @@ defineExpose({
       :status-filter-label="statusFilterLabel"
       :button-label="buttonLabel"
       :help-add-target="helpAddTarget"
+      :help-search-target="helpSearchTarget"
       :button-disabled="buttonDisabled"
       :show-button="showButton"
       :show-search="showSearch"

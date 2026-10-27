@@ -25,14 +25,15 @@ const amount = (value: string, currency: string) =>
 </script>
 
 <template>
-  <div class="min-w-0 space-y-4" data-testid="proponent-account-receivables">
+  <div data-help-target="proponent.account-receivables.content" data-help-kind="section" data-help-view="proponent.account-receivables" class="min-w-0 space-y-4" data-testid="proponent-account-receivables">
     <ApplicantRecipientAccountBalances :applicant-recipient-id="applicantRecipientId" />
     <CommonSection :show-header="false" :title="t('account_receivable.title')" :grid-cols="1">
       <p class="text-sm text-muted">
         {{ t('account_receivable.proponent_description') }}
       </p>
       <CommonResourceLayoutCard
-        v-model:search="search" v-model:pagination="pagination"
+        v-model:search="search"
+        v-model:pagination="pagination" help-search-target="proponent.account-receivables.search"
         :data="items" :columns="columns" :total-records="totalRecords"
         :loading="status === 'pending'" :request-status="status" :show-button="false"
         :search-placeholder="t('account_receivable.search')" @retry="retry">

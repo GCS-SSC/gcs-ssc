@@ -194,7 +194,7 @@ const visibleRows = computed(() => items.value)
 </script>
 
 <template>
-  <div class="w-full min-w-0 max-w-full space-y-4 overflow-hidden" data-field-scope="applicant-recipient.funding-history-tab">
+  <div data-help-target="proponent.funding-history.content" data-help-kind="section" data-help-view="proponent.funding-history" class="w-full min-w-0 max-w-full space-y-4 overflow-hidden" data-field-scope="applicant-recipient.funding-history-tab">
     <div class="flex items-start gap-3 rounded-lg border border-zinc-200 bg-zinc-50/70 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/40">
       <UIcon name="i-lucide-history" class="mt-0.5 size-5 shrink-0 text-zinc-500" />
       <p class="text-sm leading-6 text-zinc-600 dark:text-zinc-400">
@@ -203,8 +203,9 @@ const visibleRows = computed(() => items.value)
     </div>
 
     <CommonResourceLayoutCard
-      v-model:search="search"
-      v-model:pagination="pagination"
+      v-model:search="search" v-model:pagination="pagination"
+      help-add-target="proponent.funding-history.add"
+      help-search-target="proponent.funding-history.search"
       :data="visibleRows"
       :columns="columns"
       :total-records="totalRecords"

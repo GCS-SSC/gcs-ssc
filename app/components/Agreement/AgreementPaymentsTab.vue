@@ -588,7 +588,7 @@ const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', 
 </script>
 
 <template>
-  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.payments-tab" data-scope-label-en="Agreements > Payments > Update Payment" data-scope-label-fr="Ententes > Paiements > Mettre à jour le paiement">
+  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.payments-tab" data-scope-label-en="Agreements > Payments > Update Payment" data-scope-label-fr="Ententes > Paiements > Mettre à jour le paiement" data-help-view="agreement.payments" data-help-label-en="Agreements — Payments" data-help-label-fr="Ententes — Paiements" data-help-target="agreement.payments.content" data-help-kind="section">
     <CommonResourceLayoutCard
       v-model:search="search"
       v-model:pagination="pagination"
@@ -603,8 +603,8 @@ const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', 
       :show-button="(canCreateRole ?? canCreate) && (!canCreate || (!hasExtensionCreateReplacement && !hasExtensionCreateConflict && !hasPaymentAmountCalculatorConflict))"
       :button-disabled="isOpeningCreate"
       :search-placeholder="t('agreement.payments.search')"
-      @add="openCreatePayment"
-      @retry="refreshOverview">
+      help-add-target="agreement.payments.add"
+      help-search-target="agreement.payments.search" @add="openCreatePayment" @retry="refreshOverview">
       <template #actions>
         <UAlert
           v-if="(canCreateRole ?? canCreate) && extensionCreateError"
@@ -771,7 +771,7 @@ const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', 
       :ui="{ content: 'rounded-none shadow-none ring-0' }"
       :description="t('common.form_dialog_description')">
       <template #body>
-        <UForm :state="selectedPayment" :validate="validatePayment" :validate-on="[]" class="flex h-full flex-col" @submit="savePayment">
+        <UForm :state="selectedPayment" :validate="validatePayment" :validate-on="[]" class="flex h-full flex-col" data-help-view="agreement.payments.payment-dialog" data-help-label-en="Agreements — Payment editor" data-help-label-fr="Ententes — Éditeur de paiement" @submit="savePayment">
           <CommonWizardShell
             data-testid="payment-create-wizard"
             :current-step="currentStep" :steps="steps" :is-first-step="isFirstStep" :is-last-step="isLastStep"
@@ -918,7 +918,7 @@ const deletePayment = (recordId: string) => runRecordAction(recordId, 'delete', 
               <p v-if="offsetPreview.egcs_fc_creditmemos.length" class="text-sm text-muted">
                 {{ t('agreement.payments.offset_approval_description') }}
               </p>
-              <UButton type="button" icon="i-lucide-refresh-cw" color="neutral" variant="outline" :label="t('agreement.payments.wizard.recheck')" :disabled="isSavingPayment" @click="() => void preparePaymentOffset()" />
+              <UButton type="button" icon="i-lucide-refresh-cw" color="neutral" variant="outline" :label="t('agreement.payments.wizard.recheck')" :disabled="isSavingPayment" data-help-target="agreement.payments.payment-dialog.payments-wizard-recheck" data-help-kind="button" data-help-label-en="Recheck offset credit memos" data-help-label-fr="Revérifier les notes de crédit par compensation" @click="() => void preparePaymentOffset()" />
             </div>
           </CommonWizardShell>
         </UForm>

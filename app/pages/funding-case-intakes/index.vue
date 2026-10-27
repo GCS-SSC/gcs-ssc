@@ -8,7 +8,7 @@ const canCreate = computed(() => canAny('funding_case', 'create'))
 </script>
 
 <template>
-  <UDashboardPanel id="funding-case-intakes">
+  <UDashboardPanel id="funding-case-intakes" data-help-view="intakes.list">
     <template #header>
       <UDashboardNavbar :title="t('funding_case_intake.title')">
         <template #leading>
@@ -24,7 +24,9 @@ const canCreate = computed(() => canAny('funding_case', 'create'))
     </template>
     <template #body>
       <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-inbox" :title="t('funding_case_intake.title')" :description="t('funding_case_intake.description')" />
-      <FundingCaseIntakeApplicationsTable :can-create="canCreate" />
+      <section data-help-target="intakes.list.records" data-help-kind="section" class="flex w-full min-w-0 flex-col">
+        <FundingCaseIntakeApplicationsTable :can-create="canCreate" />
+      </section>
     </template>
   </UDashboardPanel>
 </template>

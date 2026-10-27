@@ -121,7 +121,7 @@ watch([() => state.value.egcs_fi_fundingopportunity, open], async ([opportunityI
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="t(lockOpportunity ? 'funding_opportunity.add_application' : 'funding_case_intake.create')" :description="t('common.form_dialog_description')" :dismissible="!pending" :close="pending ? false : undefined" :ui="{ content: 'sm:max-w-4xl' }" data-field-tooltip-context="intake" data-field-scope="funding-case-intake.intake-modal" data-scope-label-en="Intakes > General" data-scope-label-fr="Dossiers de demande > Général">
+  <UModal v-model:open="open" data-help-view="intake.create" :title="t(lockOpportunity ? 'funding_opportunity.add_application' : 'funding_case_intake.create')" :description="t('common.form_dialog_description')" :dismissible="!pending" :close="pending ? false : undefined" :ui="{ content: 'sm:max-w-4xl' }" data-field-tooltip-context="intake" data-field-scope="funding-case-intake.intake-modal" data-scope-label-en="Intakes > General" data-scope-label-fr="Dossiers de demande > Général">
     <template #body>
       <UForm v-if="open" :state="state" :validate="validate" class="space-y-5" @submit="emit('submit')">
         <CommonSection :title="t('funding_case_intake.details')" :grid-cols="1">
@@ -172,8 +172,8 @@ watch([() => state.value.egcs_fi_fundingopportunity, open], async ([opportunityI
           </div>
         </CommonSection>
         <div class="flex justify-end gap-2">
-          <UButton :label="t('common.cancel')" color="neutral" variant="ghost" :disabled="pending" @click="open = false" />
-          <CommonSaveButton :label="t('common.add')" :loading="pending" :disabled="pending || Boolean(fileError)" />
+          <UButton data-help-target="intake.create.cancel" data-help-kind="button" :label="t('common.cancel')" color="neutral" variant="ghost" :disabled="pending" @click="open = false" />
+          <CommonSaveButton data-help-target="intake.create.save" data-help-kind="button" :label="t('common.add')" :loading="pending" :disabled="pending || Boolean(fileError)" />
         </div>
       </UForm>
     </template>

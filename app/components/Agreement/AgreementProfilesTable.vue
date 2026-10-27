@@ -82,8 +82,8 @@ const getAgreementActionTarget = (agreement: FundingCaseAgreementProfileRow) => 
       :search-placeholder="t('agreement.search_placeholder')"
       help-search-target="agreements.list.search"
       v-bind="$attrs"
-      @add="emit('add')"
-      @retry="emit('retry')">
+      help-add-target="agreements.list.add"
+      @add="emit('add')" @retry="emit('retry')">
       <template #filters>
         <slot name="filters" />
       </template>

@@ -97,7 +97,7 @@ const breadcrumbs = computed(() => [
       <UButton color="error" variant="soft" :label="t('common.retry')" icon="i-lucide-refresh-cw" @click="refresh" />
     </template>
   </UAlert>
-  <UDashboardPanel v-else-if="context" id="agreement-account-receivable-approval" class="min-w-0 flex-1">
+  <UDashboardPanel v-else-if="context" id="agreement-account-receivable-approval" data-help-view="casework.account-receivable.approval" class="min-w-0 flex-1">
     <template #header>
       <UDashboardNavbar>
         <template #leading>

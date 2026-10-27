@@ -19,27 +19,30 @@ const columns: TableColumnInput<{ id: string } & Record<string, unknown>>[] = [
 </script>
 
 <template>
-  <CommonResourceCrud
-    class="w-full"
-    :title="t('applicant_recipient.other_names.title')"
-    icon="i-lucide-badge-info"
-    :fetch-url="`/api/applicant-recipients/${applicantRecipientId}/other-names`"
-    :post-url="canCreate ? `/api/applicant-recipients/${applicantRecipientId}/other-names` : undefined"
-    :update-url-base="canUpdate ? `/api/applicant-recipients/${applicantRecipientId}/other-names` : undefined"
-    :delete-url-base="canDelete ? `/api/applicant-recipients/${applicantRecipientId}/other-names` : undefined"
-    :schema="ApplicantRecipientOtherNameCreateSchema"
-    :columns="columns"
-    :button-label="t('common.add')"
-    :show-button="canCreate"
-    :modal-title="t('applicant_recipient.other_names.add')"
-    :update-title="t('applicant_recipient.other_names.edit')"
-    :search-placeholder="t('applicant_recipient.other_names.search')" data-field-scope="applicant-recipient.other-names-tab">
-    <template #form="{ state }">
-      <UFormField :label="t('applicant_recipient.other_names.other_name')" name="egcs_ar_othername">
-        <UInput
-          :model-value="String((state as ApplicantRecipientOtherNameForm).egcs_ar_othername ?? '')"
-          @update:model-value="value => (state as ApplicantRecipientOtherNameForm).egcs_ar_othername = value" />
-      </UFormField>
-    </template>
-  </CommonResourceCrud>
+  <section data-help-target="proponent.other-names.content" data-help-kind="section" data-help-view="proponent.other-names" class="flex w-full min-w-0 flex-col">
+    <CommonResourceCrud
+      help-search-target="proponent.other-names.search" help-save-target="proponent.other-names.save" help-add-target="proponent.other-names.add"
+      class="w-full"
+      :title="t('applicant_recipient.other_names.title')"
+      icon="i-lucide-badge-info"
+      :fetch-url="`/api/applicant-recipients/${applicantRecipientId}/other-names`"
+      :post-url="canCreate ? `/api/applicant-recipients/${applicantRecipientId}/other-names` : undefined"
+      :update-url-base="canUpdate ? `/api/applicant-recipients/${applicantRecipientId}/other-names` : undefined"
+      :delete-url-base="canDelete ? `/api/applicant-recipients/${applicantRecipientId}/other-names` : undefined"
+      :schema="ApplicantRecipientOtherNameCreateSchema"
+      :columns="columns"
+      :button-label="t('common.add')"
+      :show-button="canCreate"
+      :modal-title="t('applicant_recipient.other_names.add')"
+      :update-title="t('applicant_recipient.other_names.edit')"
+      :search-placeholder="t('applicant_recipient.other_names.search')" data-field-scope="applicant-recipient.other-names-tab">
+      <template #form="{ state }">
+        <UFormField :label="t('applicant_recipient.other_names.other_name')" name="egcs_ar_othername">
+          <UInput
+            :model-value="String((state as ApplicantRecipientOtherNameForm).egcs_ar_othername ?? '')"
+            @update:model-value="value => (state as ApplicantRecipientOtherNameForm).egcs_ar_othername = value" />
+        </UFormField>
+      </template>
+    </CommonResourceCrud>
+  </section>
 </template>

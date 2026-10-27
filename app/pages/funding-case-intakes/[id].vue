@@ -90,40 +90,56 @@ useFieldTooltipProvider(() => profile.value && String(profile.value.id) === Stri
           <UButton :label="t('common.retry')" @click="() => refresh()" />
         </template>
       </UAlert>
-      <div v-else-if="profile" class="flex flex-1 flex-col">
+      <div v-else-if="profile && String(profile.id) === String(route.params.id)" data-help-view="intake.detail" :data-help-agency="profile.agency_id" class="flex flex-1 flex-col">
         <CommonEntityHero :is-collapsed="isHeroCollapsed" icon="i-lucide-inbox" :title="`${t('funding_case_intake.singular')} ${profile.id}`" :meta-items="[`${t('funding_case_intake.opportunity')}: ${getBilingualValue(profile, 'opportunity_name', profile.egcs_fi_fundingopportunity)}`, `${t('funding_case_intake.proponent')}: ${getBilingualValue(profile, 'proponent_name', profile.egcs_fi_applicantrecipient)}`]" :badges="[{ statusId: profile.egcs_fi_status }]" :actions="[{ label: t('common.delete'), icon: 'i-lucide-trash', visible: canDelete, onClick: remove }]" />
-        <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." content-test-id="funding-case-intake-detail-content" :items="tabs">
-          <CommonSection v-if="selectedTab === 'general'" :show-header="false" :title="t('funding_case_intake.details')" :grid-cols="1">
-            <dl class="grid gap-4 md:grid-cols-2">
-              <div>
-                <dt class="text-sm text-muted">
-                  {{ t('funding_case_intake.application_id') }}
-                </dt><dd>{{ profile.id }}</dd>
-              </div>
-              <div v-if="profile.egcs_fi_externalsourceid">
-                <dt class="text-sm text-muted">
-                  {{ t('funding_case_intake.external_source_id') }}
-                </dt><dd>{{ profile.egcs_fi_externalsourceid }}</dd>
-              </div>
-              <div>
-                <dt class="text-sm text-muted">
-                  {{ t('funding_case_intake.opportunity') }}
-                </dt><dd><UButton variant="link" :label="getBilingualValue(profile, 'opportunity_name', profile.egcs_fi_fundingopportunity)" :to="localePath(appRouteLocations.fundingOpportunityDetail(profile.egcs_fi_fundingopportunity))" /></dd>
-              </div>
-              <div>
-                <dt class="text-sm text-muted">
-                  {{ t('funding_case_intake.proponent') }}
-                </dt><dd>{{ getBilingualValue(profile, 'proponent_name', profile.egcs_fi_applicantrecipient) }}</dd>
-              </div>
-            </dl>
-          </CommonSection>
-          <CommonSubmittedApplication v-else-if="selectedTab === 'application'" :snapshot="profile.egcs_fi_sourceexport ?? profile.egcs_fi_application" :external-source-id="profile.egcs_fi_externalsourceid" />
-          <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcaseintake" :entity-id="id" />
-          <CommonReviewsTab v-else-if="selectedTab === 'reviews'" entity-type="fundingcaseintake" :entity-id="id" :can-update="canEdit" :action-prerequisite-warning="workWarning" @changed="refresh" />
-          <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcaseintake" :entity-id="id" purpose="standard" :can-edit="canEdit" :action-role-allowed="canEditRole" :action-prerequisite-warning="workWarning" @changed="refresh" />
-          <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" :show-header="false" entity-type="fundingcaseintake" :entity-id="id" />
-          <CommonWorkflowSection v-else-if="selectedTab === 'approval'" entity-type="fundingcaseintake" :entity-id="id" purpose="approval_submission" :can-edit="canEdit" :action-role-allowed="canEditRole" :action-prerequisite-warning="workWarning" @changed="refresh" />
-          <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" :show-header="false" entity-type="fundingcaseintake" :entity-id="id" />
+        <CommonDetailWorkspace v-model="selectedTab" help-navigation-group-target="intake.detail.section-navigation" data-field-container="Page navigation state, not a business input field." content-test-id="funding-case-intake-detail-content" :items="tabs">
+          <section v-if="selectedTab === 'general'" data-help-target="intake.detail.general" data-help-kind="section" class="flex w-full min-w-0 flex-col">
+            <CommonSection :show-header="false" :title="t('funding_case_intake.details')" :grid-cols="1">
+              <dl class="grid gap-4 md:grid-cols-2">
+                <div>
+                  <dt class="text-sm text-muted">
+                    {{ t('funding_case_intake.application_id') }}
+                  </dt><dd>{{ profile.id }}</dd>
+                </div>
+                <div v-if="profile.egcs_fi_externalsourceid">
+                  <dt class="text-sm text-muted">
+                    {{ t('funding_case_intake.external_source_id') }}
+                  </dt><dd>{{ profile.egcs_fi_externalsourceid }}</dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-muted">
+                    {{ t('funding_case_intake.opportunity') }}
+                  </dt><dd><UButton variant="link" :label="getBilingualValue(profile, 'opportunity_name', profile.egcs_fi_fundingopportunity)" :to="localePath(appRouteLocations.fundingOpportunityDetail(profile.egcs_fi_fundingopportunity))" /></dd>
+                </div>
+                <div>
+                  <dt class="text-sm text-muted">
+                    {{ t('funding_case_intake.proponent') }}
+                  </dt><dd>{{ getBilingualValue(profile, 'proponent_name', profile.egcs_fi_applicantrecipient) }}</dd>
+                </div>
+              </dl>
+            </CommonSection>
+          </section>
+          <section v-else-if="selectedTab === 'application'" data-help-target="intake.detail.application" data-help-kind="section" class="flex w-full min-w-0 flex-col">
+            <CommonSubmittedApplication :snapshot="profile.egcs_fi_sourceexport ?? profile.egcs_fi_application" :external-source-id="profile.egcs_fi_externalsourceid" />
+          </section>
+          <section v-else-if="selectedTab === 'attachments'" data-help-target="intake.detail.attachments" data-help-kind="section" class="flex w-full min-w-0 flex-col">
+            <CommonAttachmentsTab entity-type="fundingcaseintake" :entity-id="id" />
+          </section>
+          <section v-else-if="selectedTab === 'reviews'" data-help-target="intake.detail.reviews" data-help-kind="section" class="flex w-full min-w-0 flex-col">
+            <CommonReviewsTab entity-type="fundingcaseintake" :entity-id="id" :can-update="canEdit" :action-prerequisite-warning="workWarning" @changed="refresh" />
+          </section>
+          <section v-else-if="selectedTab === 'workflows'" data-help-target="intake.detail.workflow" data-help-kind="section" class="flex w-full min-w-0 flex-col">
+            <CommonWorkflowSection entity-type="fundingcaseintake" :entity-id="id" purpose="standard" :can-edit="canEdit" :action-role-allowed="canEditRole" :action-prerequisite-warning="workWarning" @changed="refresh" />
+          </section>
+          <section v-else-if="selectedTab === 'supplementary-information'" data-help-target="intake.detail.supplementary-information" data-help-kind="section" class="flex w-full min-w-0 flex-col">
+            <CommonWorkflowSupplementaryInformation :show-header="false" entity-type="fundingcaseintake" :entity-id="id" />
+          </section>
+          <section v-else-if="selectedTab === 'approval'" data-help-target="intake.detail.approval" data-help-kind="section" class="flex w-full min-w-0 flex-col">
+            <CommonWorkflowSection entity-type="fundingcaseintake" :entity-id="id" purpose="approval_submission" :can-edit="canEdit" :action-role-allowed="canEditRole" :action-prerequisite-warning="workWarning" @changed="refresh" />
+          </section>
+          <section v-else-if="selectedTab === 'assignments'" data-help-target="intake.detail.assignments" data-help-kind="section" class="flex w-full min-w-0 flex-col">
+            <CommonAssignedUsers :show-header="false" entity-type="fundingcaseintake" :entity-id="id" />
+          </section>
         </CommonDetailWorkspace>
       </div>
     </template>

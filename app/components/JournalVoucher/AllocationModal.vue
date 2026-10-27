@@ -44,7 +44,8 @@ const apply = () => {
 
 <template>
   <UModal
-    v-model:open="open" :title="t(editing ? 'journal_voucher.edit_split' : 'journal_voucher.add_split')"
+    v-model:open="open"
+    data-help-view="casework.journal-voucher.allocation-modal.open" :title="t(editing ? 'journal_voucher.edit_split' : 'journal_voucher.add_split')"
     :description="t('journal_voucher.split_description')" :ui="{ content: 'sm:max-w-2xl' }" data-field-tooltip-context="agreement" data-field-scope="journal-voucher.allocation-modal" data-scope-label-en="Agreements > Journal Vouchers > Allocation" data-scope-label-fr="Ententes > Pièces de journal > Répartition">
     <template #body>
       <UForm
@@ -76,8 +77,8 @@ const apply = () => {
           {{ t('journal_voucher.balance_instruction') }}
         </p>
         <div class="flex flex-wrap justify-end gap-2">
-          <UButton type="button" :label="t('common.cancel')" color="neutral" variant="ghost" @click="open = false" />
-          <CommonSaveButton :label="t('journal_voucher.apply_split')" :disabled="!dimensions.success" />
+          <UButton data-help-target="casework.journal-voucher.allocation-modal.open.common-cancel" type="button" :label="t('common.cancel')" color="neutral" variant="ghost" @click="open = false" />
+          <CommonSaveButton data-help-target="casework.journal-voucher.allocation-modal.open.journal-voucher-apply-split" :label="t('journal_voucher.apply_split')" :disabled="!dimensions.success" />
         </div>
       </UForm>
     </template>

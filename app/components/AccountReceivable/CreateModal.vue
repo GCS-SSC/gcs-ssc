@@ -126,7 +126,7 @@ const save = async () => {
 </script>
 
 <template>
-  <UModal v-model:open="open" :title="t(adjustment ? 'account_receivable.adjust_receivable' : 'account_receivable.create')" :description="t(adjustment ? 'account_receivable.adjust_receivable_description' : 'account_receivable.description')" :ui="{ content: 'sm:max-w-4xl', header: 'shrink-0' }" data-field-tooltip-context="agreement" data-field-scope="account-receivable.create-modal" data-scope-label-en="Agreements > Receivables > Create or adjust" data-scope-label-fr="Ententes > Créances > Créer ou ajuster">
+  <UModal v-model:open="open" data-help-view="casework.account-receivable.create-modal.open" :title="t(adjustment ? 'account_receivable.adjust_receivable' : 'account_receivable.create')" :description="t(adjustment ? 'account_receivable.adjust_receivable_description' : 'account_receivable.description')" :ui="{ content: 'sm:max-w-4xl', header: 'shrink-0' }" data-field-tooltip-context="agreement" data-field-scope="account-receivable.create-modal" data-scope-label-en="Agreements > Receivables > Create or adjust" data-scope-label-fr="Ententes > Créances > Créer ou ajuster">
     <template #body>
       <UForm v-if="state" :state="state" :validate="createValidator(createSchema)" class="space-y-4" @submit="save">
         <UFormField v-if="!adjustment" name="egcs_fc_amount" :label="t('account_receivable.requested_amount')" required>
@@ -148,7 +148,7 @@ const save = async () => {
           </UFormField>
           <UFormField name="egcs_fc_recoverymethod" :label="t('account_receivable.recovery_method')">
             <CommonEnumSelect v-model="state.egcs_fc_recoverymethod" name="account_receivable_recovery_method" :disabled="pending" class="w-full" />
-            <UButton v-if="state.egcs_fc_recoverymethod" type="button" icon="i-lucide-x" color="neutral" variant="ghost" :label="t('account_receivable.clear_recovery_method')" :disabled="pending" class="max-w-full [&_[data-slot=label]]:whitespace-normal [&_[data-slot=label]]:text-left" @click="state.egcs_fc_recoverymethod = undefined" />
+            <UButton v-if="state.egcs_fc_recoverymethod" data-help-target="casework.account-receivable.create-modal.open.account-receivable-clear-recovery-method" type="button" icon="i-lucide-x" color="neutral" variant="ghost" :label="t('account_receivable.clear_recovery_method')" :disabled="pending" class="max-w-full [&_[data-slot=label]]:whitespace-normal [&_[data-slot=label]]:text-left" @click="state.egcs_fc_recoverymethod = undefined" />
           </UFormField>
         </div>
         <UFormField v-if="!adjustment && claimRelated" name="egcs_fc_sourceclaim" required :label="t('account_receivable.source_claim')" :description="t(sourceEntry ? 'account_receivable.source_context_locked' : 'account_receivable.source_claim_description')">
@@ -182,7 +182,7 @@ const save = async () => {
         </UFormField>
         <UFormField name="egcs_fc_recipientpreference" :label="t('account_receivable.recipient_preference')" :description="t('account_receivable.preference_description')">
           <CommonEnumSelect v-model="state.egcs_fc_recipientpreference" name="account_receivable_recovery_method" :disabled="pending" class="w-full" />
-          <UButton v-if="state.egcs_fc_recipientpreference" type="button" icon="i-lucide-x" color="neutral" variant="ghost" :label="t('account_receivable.clear_preference')" :disabled="pending" class="max-w-full [&_[data-slot=label]]:whitespace-normal [&_[data-slot=label]]:text-left" @click="state.egcs_fc_recipientpreference = undefined" />
+          <UButton v-if="state.egcs_fc_recipientpreference" data-help-target="casework.account-receivable.create-modal.open.account-receivable-clear-preference" type="button" icon="i-lucide-x" color="neutral" variant="ghost" :label="t('account_receivable.clear_preference')" :disabled="pending" class="max-w-full [&_[data-slot=label]]:whitespace-normal [&_[data-slot=label]]:text-left" @click="state.egcs_fc_recipientpreference = undefined" />
         </UFormField>
         <template v-if="state.egcs_fc_recoverymethod && state.egcs_fc_recipientpreference && state.egcs_fc_recipientpreference !== state.egcs_fc_recoverymethod">
           <p id="account-receivable-create-override" class="text-sm text-muted">
@@ -201,8 +201,8 @@ const save = async () => {
           {{ t(adjustment ? 'account_receivable.adjustment_instruction' : 'account_receivable.create_amount_instruction') }}
         </p>
         <div class="flex flex-wrap justify-end gap-2">
-          <UButton type="button" :label="t('common.cancel')" color="neutral" variant="ghost" :disabled="pending" @click="open = false" />
-          <CommonSaveButton :label="t(adjustment ? 'account_receivable.create_adjustment' : 'account_receivable.create')" :loading="pending" :disabled="pending || (!adjustment && !selectedType)" class="max-w-full [&_[data-slot=label]]:whitespace-normal [&_[data-slot=label]]:text-left" />
+          <UButton data-help-target="casework.account-receivable.create-modal.open.common-cancel" type="button" :label="t('common.cancel')" color="neutral" variant="ghost" :disabled="pending" @click="open = false" />
+          <CommonSaveButton data-help-target="casework.account-receivable.create-modal.open.save" :label="t(adjustment ? 'account_receivable.create_adjustment' : 'account_receivable.create')" :loading="pending" :disabled="pending || (!adjustment && !selectedType)" class="max-w-full [&_[data-slot=label]]:whitespace-normal [&_[data-slot=label]]:text-left" />
         </div>
       </UForm>
     </template>

@@ -44,6 +44,32 @@ describe('target recovery', () => {
     expect(runtime.state.value.step.id).toBe('name')
     runtime.destroy()
   })
+  it('highlights an owning screen target while a nested screen is active', () => {
+    document.body.innerHTML = '<main data-help-view="agency.general"><input data-help-target="agency.name"><section data-help-view="agency.addresses">Addresses</section></main>'
+    const runtime = createGuideRuntime({ document: guide, locale: 'en', currentView: 'agency.addresses' })
+    expect(runtime.state.value.status).toBe('ready')
+    expect(document.querySelector('input')?.classList.contains('driver-active-element')).toBe(true)
+    runtime.destroy()
+  })
+  it('keeps a sibling or hidden screen separate from the current screen', () => {
+    document.body.innerHTML = '<main data-help-view="agency.general"><input data-help-target="agency.name"></main><section data-help-view="agency.addresses">Addresses</section>'
+    const runtime = createGuideRuntime({ document: guide, locale: 'en', currentView: 'agency.addresses' })
+    expect(runtime.state.value.status).toBe('wrong-view')
+    const active = document.querySelector('section')!
+    document.querySelector('main')!.append(active)
+    document.querySelector('main')!.hidden = true
+    runtime.retry()
+    expect(runtime.state.value.status).toBe('wrong-view')
+    runtime.destroy()
+  })
+  it('keeps background ancestor targets outside an active dialog view', () => {
+    document.body.innerHTML = '<main data-help-view="agency.general"><input data-help-target="agency.name"><div role="dialog" data-state="open"><section data-help-view="agency.addresses">Address editor</section></div></main>'
+    const runtime = createGuideRuntime({ document: guide, locale: 'en', currentView: 'agency.addresses' })
+    expect(runtime.state.value.status).toBe('wrong-view')
+    expect(document.querySelector('input')?.classList.contains('driver-active-element')).toBe(false)
+    expect(document.querySelector('.driver-popover')).toBeNull()
+    runtime.destroy()
+  })
   it('treats hidden targets as unavailable and keeps manual recovery possible', () => {
     document.body.innerHTML = '<main data-help-view="agency.general"><div hidden><input data-help-target="agency.name"></div></main>'
     const runtime = createGuideRuntime({ document: guide, locale: 'en', currentView: 'agency.general' })
@@ -662,4 +688,21 @@ it('prefers native side placement for a section when bottom placement would cove
   geometry.mockRestore()
   Object.defineProperty(window, 'innerWidth', { value: viewportWidth, configurable: true })
   Object.defineProperty(window, 'innerHeight', { value: viewportHeight, configurable: true })
+})
+
+it.each([undefined, 'manual' as const])('allows explicit Next for an ordinary catalog action with advanceOn=%s without treating clicks as success', advanceOn => {
+  document.body.innerHTML = '<main data-help-view="agency.general"><button data-help-target="agency.save">Save</button><input data-help-target="agency.name"></main>'
+  const actionGuide = { ...guide, steps: [{ ...guide.steps[1]!, advanceOn }, guide.steps[0]!] }
+  const ledger = { formatVersion: 1 as const, views: [{ key: 'agency.general', label: { en: 'Agency', fr: 'Organisme' }, targets: [{ key: 'agency.save', kind: 'button' as const, label: { en: 'Save', fr: 'Enregistrer' } }, { key: 'agency.name', kind: 'text' as const, label: { en: 'Name', fr: 'Nom' } }] }] }
+  const runtime = createGuideRuntime({ document: actionGuide, ledger, locale: 'en', currentView: 'agency.general' })
+  document.querySelector<HTMLButtonElement>('[data-help-target="agency.save"]')!.click()
+  expect(runtime.state.value.step.id).toBe('save')
+  expect(document.querySelector<HTMLButtonElement>('.driver-popover-next-btn')!.disabled).toBe(false)
+  expect(document.querySelector<HTMLOptionElement>('.gcs-guide-step-select option[value="name"]')!.disabled).toBe(false)
+  document.querySelector<HTMLButtonElement>('.driver-popover-next-btn')!.click()
+  expect(runtime.state.value.step.id).toBe('name')
+  runtime.destroy()
+  const restored = createGuideRuntime({ document: actionGuide, ledger, locale: 'en', currentView: 'agency.general', initialStepId: 'name', initialPath: ['save', 'name'] })
+  expect(restored.state.value.step.id).toBe('name')
+  restored.destroy()
 })

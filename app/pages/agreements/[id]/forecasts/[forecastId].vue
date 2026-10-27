@@ -722,7 +722,7 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
     <div v-else-if="isLoadingDetail && (!profile || !activeForecast)" role="status" aria-live="polite" class="sr-only">
       <span>{{ t('common.loading_records') }}</span>
     </div>
-    <CommonDetailPage v-if="profile && activeForecast" id="agreement-forecast-detail" v-model:collapsed="isHeroCollapsed" :breadcrumb-items="breadcrumbItems" class="w-full">
+    <CommonDetailPage v-if="profile && activeForecast" id="agreement-forecast-detail" v-model:collapsed="isHeroCollapsed" data-help-view="casework.forecasts.detail" :breadcrumb-items="breadcrumbItems" class="w-full">
       <template #body>
         <div class="flex flex-1 flex-col">
           <CommonEntityHero
@@ -732,12 +732,13 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
             :meta-items="forecastHeroMetaItems"
             :badges="forecastHeroBadges" />
 
-          <CommonDetailWorkspace v-model="selectedTab" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-forecast-detail-content">
-            <CommonSection v-if="selectedTab === 'breakdown'" :show-header="false" :title="t('agreement.forecasts.breakdown_title')" :grid-cols="1">
+          <CommonDetailWorkspace v-model="selectedTab" help-navigation-group-target="casework.forecasts.detail.section-navigation" data-field-container="Page navigation state, not a business input field." :items="tabs" content-test-id="agreement-forecast-detail-content">
+            <CommonSection v-if="selectedTab === 'breakdown'" data-help-view="casework.forecasts.breakdown" :show-header="false" :title="t('agreement.forecasts.breakdown_title')" :grid-cols="1">
               <div class="space-y-4">
                 <div class="flex flex-wrap items-end justify-between gap-3">
                   <CommonSaveButton
                     v-if="canEditForecastBreakdown"
+                    data-help-target="casework.forecasts.detail.forecasts-save-breakdown"
                     type="button"
                     :label="t('agreement.forecasts.save_breakdown')"
                     :loading="isSavingBreakdown"
@@ -745,153 +746,157 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
                     @click="saveForecastBreakdown" />
                 </div>
 
-                <CommonResourceLayoutCard
-                  v-model:search="breakdownSearch"
-                  v-model:pagination="breakdownPagination"
-                  :data="filteredBreakdownRows"
-                  :columns="breakdownColumns"
-                  :grouping="breakdownGrouping"
-                  :grouping-options="breakdownGroupingOptions"
-                  :expanded-options="breakdownExpandedOptions"
-                  :column-visibility="breakdownTableColumnVisibility"
-                  :expanded="breakdownTableExpanded"
-                  :total-records="filteredBreakdownRows.length"
-                  :loading="overviewStatus === 'pending'"
-                  table-class="agreement-forecast-breakdown-table"
-                  :show-button="false"
-                  :show-column-toggle="false"
-                  :search-placeholder="t('agreement.budget.search')"
-                  @update:expanded="updateBreakdownTableExpanded">
-                  <template #name-cell="{ row }">
-                    <div :id="getGroupedDisclosureContentId(row as GroupedForecastBreakdownRow)" class="contents">
-                      <div v-if="isBreakdownCostCategoryGroupRow(row as GroupedForecastBreakdownRow)" class="flex w-full items-center gap-3 py-1">
-                        <CommonGroupedDisclosureButton
-                          v-if="canExpandBreakdownGroupedRow(row as GroupedForecastBreakdownRow)"
-                          class="group flex min-w-0 items-center gap-3 text-left"
-                          :expanded="row.getIsExpanded?.() === true"
-                          :controls="getGroupedDisclosureControlsId(row.id)"
-                          :label="row.original.costCategoryLabel"
-                          @toggle="row.toggleExpanded?.()">
-                          <UIcon
-                            :name="row.getIsExpanded?.() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
-                            class="size-4 text-zinc-400 transition-colors group-hover:text-primary" />
-                          <span class="text-sm font-semibold text-zinc-900 dark:text-white">
-                            {{ row.original.costCategoryLabel }}
-                          </span>
-                          <CommonStatusBadge variant="count" size="sm" :label="String(getBreakdownGroupedRowCount(row as GroupedForecastBreakdownRow))" />
-                        </CommonGroupedDisclosureButton>
-                      </div>
+                <section data-help-target="casework.forecasts.breakdown.records">
+                  <CommonResourceLayoutCard
+                    v-model:search="breakdownSearch"
+                    v-model:pagination="breakdownPagination"
+                    help-search-target="casework.forecasts.breakdown.search"
+                    :data="filteredBreakdownRows"
+                    :columns="breakdownColumns"
+                    :grouping="breakdownGrouping"
+                    :grouping-options="breakdownGroupingOptions"
+                    :expanded-options="breakdownExpandedOptions"
+                    :column-visibility="breakdownTableColumnVisibility"
+                    :expanded="breakdownTableExpanded"
+                    :total-records="filteredBreakdownRows.length"
+                    :loading="overviewStatus === 'pending'"
+                    table-class="agreement-forecast-breakdown-table"
+                    :show-button="false"
+                    :show-column-toggle="false"
+                    :search-placeholder="t('agreement.budget.search')"
+                    @update:expanded="updateBreakdownTableExpanded">
+                    <template #name-cell="{ row }">
+                      <div :id="getGroupedDisclosureContentId(row as GroupedForecastBreakdownRow)" class="contents">
+                        <div v-if="isBreakdownCostCategoryGroupRow(row as GroupedForecastBreakdownRow)" class="flex w-full items-center gap-3 py-1">
+                          <CommonGroupedDisclosureButton
+                            v-if="canExpandBreakdownGroupedRow(row as GroupedForecastBreakdownRow)"
+                            class="group flex min-w-0 items-center gap-3 text-left"
+                            :expanded="row.getIsExpanded?.() === true"
+                            :controls="getGroupedDisclosureControlsId(row.id)"
+                            :label="row.original.costCategoryLabel"
+                            @toggle="row.toggleExpanded?.()">
+                            <UIcon
+                              :name="row.getIsExpanded?.() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+                              class="size-4 text-zinc-400 transition-colors group-hover:text-primary" />
+                            <span class="text-sm font-semibold text-zinc-900 dark:text-white">
+                              {{ row.original.costCategoryLabel }}
+                            </span>
+                            <CommonStatusBadge variant="count" size="sm" :label="String(getBreakdownGroupedRowCount(row as GroupedForecastBreakdownRow))" />
+                          </CommonGroupedDisclosureButton>
+                        </div>
 
-                      <div v-else-if="isBreakdownCostSubsectionGroupRow(row as GroupedForecastBreakdownRow)" class="flex w-full items-center gap-3 py-1 pl-6">
-                        <CommonGroupedDisclosureButton
-                          v-if="canExpandBreakdownGroupedRow(row as GroupedForecastBreakdownRow)"
-                          class="group flex min-w-0 items-center gap-3 text-left"
-                          :expanded="row.getIsExpanded?.() === true"
-                          :controls="getGroupedDisclosureControlsId(row.id)"
-                          :label="row.original.costSubsectionLabel"
-                          @toggle="row.toggleExpanded?.()">
-                          <UIcon
-                            :name="row.getIsExpanded?.() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
-                            class="size-4 text-zinc-400 transition-colors group-hover:text-primary" />
-                          <span class="text-sm font-medium text-zinc-700 dark:text-zinc-200">
-                            {{ row.original.costSubsectionLabel }}
-                          </span>
-                          <CommonStatusBadge variant="count" size="sm" :label="String(getBreakdownGroupedRowCount(row as GroupedForecastBreakdownRow))" />
-                        </CommonGroupedDisclosureButton>
-                      </div>
+                        <div v-else-if="isBreakdownCostSubsectionGroupRow(row as GroupedForecastBreakdownRow)" class="flex w-full items-center gap-3 py-1 pl-6">
+                          <CommonGroupedDisclosureButton
+                            v-if="canExpandBreakdownGroupedRow(row as GroupedForecastBreakdownRow)"
+                            class="group flex min-w-0 items-center gap-3 text-left"
+                            :expanded="row.getIsExpanded?.() === true"
+                            :controls="getGroupedDisclosureControlsId(row.id)"
+                            :label="row.original.costSubsectionLabel"
+                            @toggle="row.toggleExpanded?.()">
+                            <UIcon
+                              :name="row.getIsExpanded?.() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'"
+                              class="size-4 text-zinc-400 transition-colors group-hover:text-primary" />
+                            <span class="text-sm font-medium text-zinc-700 dark:text-zinc-200">
+                              {{ row.original.costSubsectionLabel }}
+                            </span>
+                            <CommonStatusBadge variant="count" size="sm" :label="String(getBreakdownGroupedRowCount(row as GroupedForecastBreakdownRow))" />
+                          </CommonGroupedDisclosureButton>
+                        </div>
 
-                      <div v-else-if="row.original.funding" class="pl-20 text-sm text-zinc-700 dark:text-zinc-200">
-                        {{ row.original.funding.kind === 'program' ? t('agreement.budget.program_funding') : getBilingualValue({ name_en: row.original.lineItemNameEn, name_fr: row.original.lineItemNameFr }, 'name', '') }}
-                      </div>
-                      <div v-else class="flex min-w-0 max-w-full items-start gap-3 pl-12">
-                        <CommonGroupedDisclosureButton
-                          class="mt-0.5 shrink-0"
-                          :expanded="row.getIsExpanded?.() === true"
-                          :controls="getGroupedDisclosureControlsId(row.id)"
-                          :label="getBilingualValue({ name_en: row.original.lineItemNameEn, name_fr: row.original.lineItemNameFr }, 'name', '')"
-                          @toggle="row.toggleExpanded?.()">
-                          <UIcon :name="row.getIsExpanded?.() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" class="size-4 text-zinc-400" />
-                        </CommonGroupedDisclosureButton>
-                        <div class="flex min-w-0 flex-col gap-1">
-                          <CommonBilingualName
-                            :name-en="row.original.lineItemNameEn"
-                            :name-fr="row.original.lineItemNameFr" />
-                          <p v-if="row.original.description" class="min-w-0 max-w-full whitespace-normal break-words text-sm text-zinc-500 dark:text-zinc-400">
-                            {{ row.original.description }}
-                          </p>
-                          <p v-if="row.original.historical" class="text-sm text-muted">
-                            {{ t('agreement.forecasts.historical_budget_line_read_only') }}
-                          </p>
+                        <div v-else-if="row.original.funding" class="pl-20 text-sm text-zinc-700 dark:text-zinc-200">
+                          {{ row.original.funding.kind === 'program' ? t('agreement.budget.program_funding') : getBilingualValue({ name_en: row.original.lineItemNameEn, name_fr: row.original.lineItemNameFr }, 'name', '') }}
+                        </div>
+                        <div v-else class="flex min-w-0 max-w-full items-start gap-3 pl-12">
+                          <CommonGroupedDisclosureButton
+                            class="mt-0.5 shrink-0"
+                            :expanded="row.getIsExpanded?.() === true"
+                            :controls="getGroupedDisclosureControlsId(row.id)"
+                            :label="getBilingualValue({ name_en: row.original.lineItemNameEn, name_fr: row.original.lineItemNameFr }, 'name', '')"
+                            @toggle="row.toggleExpanded?.()">
+                            <UIcon :name="row.getIsExpanded?.() ? 'i-lucide-chevron-down' : 'i-lucide-chevron-right'" class="size-4 text-zinc-400" />
+                          </CommonGroupedDisclosureButton>
+                          <div class="flex min-w-0 flex-col gap-1">
+                            <CommonBilingualName
+                              :name-en="row.original.lineItemNameEn"
+                              :name-fr="row.original.lineItemNameFr" />
+                            <p v-if="row.original.description" class="min-w-0 max-w-full whitespace-normal break-words text-sm text-zinc-500 dark:text-zinc-400">
+                              {{ row.original.description }}
+                            </p>
+                            <p v-if="row.original.historical" class="text-sm text-muted">
+                              {{ t('agreement.forecasts.historical_budget_line_read_only') }}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </template>
+                    </template>
 
-                  <template v-for="period in allBreakdownPeriods" :key="period.columnId" #[`${period.columnId}-header`]>
-                    <button
-                      v-if="period.type === 'quarter'"
-                      type="button"
-                      class="inline-flex cursor-default items-center gap-2 rounded-sm bg-primary px-3 py-1.5 text-sm font-semibold text-white"
-                      :aria-label="`${period.label} ${t('common.expand')}`"
-                      :aria-expanded="false"
-                      @click.stop="toggleQuarter(period.quarter)">
-                      {{ period.label }}
-                      <UIcon name="i-lucide-between-horizontal-start" class="size-4" />
-                    </button>
-                    <button
-                      v-else
-                      type="button"
-                      class="group inline-flex cursor-default items-center gap-2 rounded-sm border border-transparent px-2 py-1 text-xs font-semibold tracking-wide text-zinc-500 uppercase transition-colors hover:border-primary/30 hover:text-primary dark:text-zinc-400"
-                      :aria-label="`${period.label} ${t('common.collapse')}`"
-                      :aria-expanded="true"
-                      @click.stop="toggleQuarter(period.quarter)">
-                      {{ period.label }}
-                      <UIcon name="i-lucide-between-horizontal-end" class="size-4 text-zinc-400 transition-colors group-hover:text-primary" />
-                    </button>
-                  </template>
+                    <template v-for="period in allBreakdownPeriods" :key="period.columnId" #[`${period.columnId}-header`]>
+                      <button
+                        v-if="period.type === 'quarter'"
+                        type="button"
+                        class="inline-flex cursor-default items-center gap-2 rounded-sm bg-primary px-3 py-1.5 text-sm font-semibold text-white"
+                        :aria-label="`${period.label} ${t('common.expand')}`"
+                        :aria-expanded="false"
+                        @click.stop="toggleQuarter(period.quarter)">
+                        {{ period.label }}
+                        <UIcon name="i-lucide-between-horizontal-start" class="size-4" />
+                      </button>
+                      <button
+                        v-else
+                        type="button"
+                        class="group inline-flex cursor-default items-center gap-2 rounded-sm border border-transparent px-2 py-1 text-xs font-semibold tracking-wide text-zinc-500 uppercase transition-colors hover:border-primary/30 hover:text-primary dark:text-zinc-400"
+                        :aria-label="`${period.label} ${t('common.collapse')}`"
+                        :aria-expanded="true"
+                        @click.stop="toggleQuarter(period.quarter)">
+                        {{ period.label }}
+                        <UIcon name="i-lucide-between-horizontal-end" class="size-4 text-zinc-400 transition-colors group-hover:text-primary" />
+                      </button>
+                    </template>
 
-                  <template v-for="period in allBreakdownPeriods" :key="`${period.columnId}:cell`" #[`${period.columnId}-cell`]="{ row }">
-                    <span v-if="isGroupedBreakdownRow(row as GroupedForecastBreakdownRow)" class="font-medium text-zinc-700 dark:text-zinc-200">
-                      {{ formatMoney(getBreakdownGroupedTotal(row as GroupedForecastBreakdownRow, period.columnId)) }}
-                    </span>
-                    <span v-else class="font-medium text-zinc-700 dark:text-zinc-200">
-                      {{ formatMoney(row.original.periodTotals[period.columnId] ?? ZERO_MONEY) }}
-                    </span>
-                  </template>
-
-                  <template #total-cell="{ row }">
-                    <span class="font-bold text-primary">
-                      {{ formatMoney(isGroupedBreakdownRow(row as GroupedForecastBreakdownRow) ? getBreakdownGroupedTotal(row as GroupedForecastBreakdownRow, 'total') : row.original.total) }}
-                    </span>
-                  </template>
-
-                  <template #actions-cell="{ row }">
-                    <CommonActionButton
-                      v-if="!isGroupedBreakdownRow(row as GroupedForecastBreakdownRow) && row.original.funding?.kind !== 'program' && MONTH_KEYS.some((_key, month) => canEditForecastAmount(row.original.budgetLineId, month))"
-                      icon="i-lucide-pencil"
-                      color="neutral"
-                      variant="ghost"
-                      size="sm"
-                      :disabled="isLoadingDetail || isSavingBreakdown"
-                      :aria-label="`${t('common.edit')}: ${getBilingualValue({ name_en: row.original.lineItemNameEn, name_fr: row.original.lineItemNameFr }, 'name', '')}`"
-                      @click="openMonthlyEditor(row.original)" />
-                  </template>
-
-                  <template #footer-left>
-                    <div class="flex flex-wrap gap-x-5 gap-y-1">
-                      <span
-                        v-for="period in visiblePeriods"
-                        :key="`footer:${period.columnId}`">
-                        {{ period.label }}: {{ formatMoney(getColumnTotal(period.months)) }}
+                    <template v-for="period in allBreakdownPeriods" :key="`${period.columnId}:cell`" #[`${period.columnId}-cell`]="{ row }">
+                      <span v-if="isGroupedBreakdownRow(row as GroupedForecastBreakdownRow)" class="font-medium text-zinc-700 dark:text-zinc-200">
+                        {{ formatMoney(getBreakdownGroupedTotal(row as GroupedForecastBreakdownRow, period.columnId)) }}
                       </span>
-                      <span class="text-primary">{{ t('agreement.forecasts.total') }}: {{ formatMoney(getGrandDraftTotal()) }}</span>
-                    </div>
-                  </template>
-                </CommonResourceLayoutCard>
+                      <span v-else class="font-medium text-zinc-700 dark:text-zinc-200">
+                        {{ formatMoney(row.original.periodTotals[period.columnId] ?? ZERO_MONEY) }}
+                      </span>
+                    </template>
+
+                    <template #total-cell="{ row }">
+                      <span class="font-bold text-primary">
+                        {{ formatMoney(isGroupedBreakdownRow(row as GroupedForecastBreakdownRow) ? getBreakdownGroupedTotal(row as GroupedForecastBreakdownRow, 'total') : row.original.total) }}
+                      </span>
+                    </template>
+
+                    <template #actions-cell="{ row }">
+                      <CommonActionButton
+                        v-if="!isGroupedBreakdownRow(row as GroupedForecastBreakdownRow) && row.original.funding?.kind !== 'program' && MONTH_KEYS.some((_key, month) => canEditForecastAmount(row.original.budgetLineId, month))"
+                        :data-help-instance="row.original.id"
+                        icon="i-lucide-pencil"
+                        color="neutral"
+                        variant="ghost"
+                        size="sm"
+                        :disabled="isLoadingDetail || isSavingBreakdown"
+                        :aria-label="`${t('common.edit')}: ${getBilingualValue({ name_en: row.original.lineItemNameEn, name_fr: row.original.lineItemNameFr }, 'name', '')}`"
+                        @click="openMonthlyEditor(row.original)" />
+                    </template>
+
+                    <template #footer-left>
+                      <div class="flex flex-wrap gap-x-5 gap-y-1">
+                        <span
+                          v-for="period in visiblePeriods"
+                          :key="`footer:${period.columnId}`">
+                          {{ period.label }}: {{ formatMoney(getColumnTotal(period.months)) }}
+                        </span>
+                        <span class="text-primary">{{ t('agreement.forecasts.total') }}: {{ formatMoney(getGrandDraftTotal()) }}</span>
+                      </div>
+                    </template>
+                  </CommonResourceLayoutCard>
+                </section>
               </div>
             </CommonSection>
 
-            <section v-else-if="selectedTab === 'completion'" class="space-y-6">
+            <section v-else-if="selectedTab === 'completion'" data-help-view="casework.forecasts.completion" data-help-target="casework.forecasts.detail.completion" data-help-kind="section" class="space-y-6">
               <CommonCompletionPanel
                 entity-type="fundingcaseforecast"
                 :entity-id="forecastId"
@@ -915,15 +920,18 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
 
             <CommonReviewsTab
               v-else-if="selectedTab === 'reviews'"
+              data-help-view="casework.forecasts.reviews"
               entity-type="fundingcaseforecast"
               :entity-id="forecastId"
               :can-update="canUpdateForecast && isAssigned && !activeForecastIsLocked"
               @changed="refreshPage" />
 
-            <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" entity-type="fundingcaseforecast" :entity-id="forecastId" purpose="standard" :can-edit="isAssigned" :action-role-allowed="canUpdateForecast" :action-prerequisite-warning="workflowPrerequisiteWarning" :refresh-key="approvalsRefreshKey" @changed="refreshPage" />
-            <CommonWorkflowSupplementaryInformation v-else-if="selectedTab === 'supplementary-information'" :show-header="false" entity-type="fundingcaseforecast" :entity-id="forecastId" />
-            <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" entity-type="fundingcaseforecast" :entity-id="forecastId" />
-            <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" :show-header="false" entity-type="fundingcaseforecast" :entity-id="forecastId" />
+            <CommonWorkflowSection v-else-if="selectedTab === 'workflows'" data-help-view="casework.forecasts.workflows" entity-type="fundingcaseforecast" :entity-id="forecastId" purpose="standard" :can-edit="isAssigned" :action-role-allowed="canUpdateForecast" :action-prerequisite-warning="workflowPrerequisiteWarning" :refresh-key="approvalsRefreshKey" @changed="refreshPage" />
+            <section v-else-if="selectedTab === 'supplementary-information'" data-help-view="casework.forecasts.supplementary-information" data-help-target="casework.forecasts.supplementary-information.content">
+              <CommonWorkflowSupplementaryInformation :show-header="false" entity-type="fundingcaseforecast" :entity-id="forecastId" />
+            </section>
+            <CommonAttachmentsTab v-else-if="selectedTab === 'attachments'" data-help-view="casework.forecasts.attachments" entity-type="fundingcaseforecast" :entity-id="forecastId" />
+            <CommonAssignedUsers v-else-if="selectedTab === 'assignments'" data-help-view="casework.forecasts.assignments" :show-header="false" entity-type="fundingcaseforecast" :entity-id="forecastId" />
           </CommonDetailWorkspace>
         </div>
       </template>
@@ -931,6 +939,7 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
     <UModal
       v-if="monthlyEditorRow"
       v-model:open="monthlyEditorOpen"
+      data-help-view="casework.forecasts.detail.monthly-editor-open"
       :title="`${t('common.edit')}: ${getBilingualValue({ name_en: monthlyEditorRow.lineItemNameEn, name_fr: monthlyEditorRow.lineItemNameFr }, 'name', '')}`"
       :ui="{ content: 'sm:max-w-2xl', body: 'max-h-[75vh] overflow-y-auto' }">
       <template #body>
@@ -962,8 +971,9 @@ useFieldTooltipProvider(() => activeForecast.value && String(activeForecast.valu
             </fieldset>
           </div>
           <div class="flex justify-end gap-2">
-            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="monthlyEditorOpen = false" />
+            <UButton data-help-target="casework.forecasts.detail.monthly-editor-open.common-cancel" :label="t('common.cancel')" color="neutral" variant="ghost" @click="monthlyEditorOpen = false" />
             <UButton
+              data-help-target="casework.forecasts.detail.monthly-editor-open.common-update"
               data-testid="apply-forecast-months"
               :label="t('common.update')"
               :disabled="isLoadingDetail || isSavingBreakdown || MONTH_KEYS.some((_key, month) => isMonthlyEditorAmountInvalid(month))"

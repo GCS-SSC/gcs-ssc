@@ -363,7 +363,7 @@ const deleteClaim = (recordId: string) => runRecordAction(recordId, 'delete', as
 </script>
 
 <template>
-  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.claims-tab" data-scope-label-en="Agreements > Claims" data-scope-label-fr="Ententes > Demandes de remboursement">
+  <div class="w-full" data-field-tooltip-context="agreement" data-field-scope="agreement.claims-tab" data-scope-label-en="Agreements > Claims" data-scope-label-fr="Ententes > Demandes de remboursement" data-help-view="agreement.claims" data-help-label-en="Agreements — Claims" data-help-label-fr="Ententes — Demandes de remboursement" data-help-target="agreement.claims.content" data-help-kind="section">
     <CommonResourceLayoutCard
       v-model:search="search"
       v-model:pagination="pagination"
@@ -381,9 +381,9 @@ const deleteClaim = (recordId: string) => runRecordAction(recordId, 'delete', as
       :show-button="canCreateRole ?? canCreate"
       :button-disabled="isOpeningCreate"
       :search-placeholder="t('agreement.claims.search')"
-      @add="openCreateClaim"
-      @retry="refreshOverview"
-      @update:expanded="updateExpandedRows">
+      help-add-target="agreement.claims.add"
+      help-search-target="agreement.claims.search"
+      @add="openCreateClaim" @retry="refreshOverview" @update:expanded="updateExpandedRows">
       <template #claim-cell="{ row }">
         <div :id="getGroupedDisclosureContentId(row as ClaimGroupedRow)" class="contents">
           <div v-if="isFiscalYearGroupRow(row as ClaimGroupedRow)" class="flex w-full items-center gap-3 py-1">
@@ -476,7 +476,7 @@ const deleteClaim = (recordId: string) => runRecordAction(recordId, 'delete', as
 
     <UModal v-if="selectedClaim" v-model:open="isClaimModalOpen" :description="t('common.form_dialog_description')" :title="selectedClaim.id ? t('agreement.claims.edit') : t('agreement.claims.add')">
       <template #body>
-        <UForm :state="selectedClaim" :validate="validateClaim" :validate-on="[]" class="space-y-4" @submit="saveClaim">
+        <UForm :state="selectedClaim" :validate="validateClaim" :validate-on="[]" class="space-y-4" data-help-view="agreement.claims.claim-dialog" data-help-label-en="Agreements — Claim editor" data-help-label-fr="Ententes — Éditeur de demande de remboursement" @submit="saveClaim">
           <UFormField :label="t('agreement.claims.submitting_proponent')" name="egcs_fc_applicantrecipient" :description="t('agreement.claims.submitting_proponent_description')">
             <CommonServerLookupSelect
               v-model="selectedClaim.egcs_fc_applicantrecipient"
@@ -502,8 +502,8 @@ const deleteClaim = (recordId: string) => runRecordAction(recordId, 'delete', as
           </div>
           <UCheckbox v-model="selectedClaim.egcs_fc_isfinalforyear" :label="t('agreement.claims.final_for_year')" data-ui-target="agreement.claims-tab.selectedClaim.egcs_fc_isfinalforyear" />
           <div class="flex justify-end gap-2 pt-4">
-            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" @click="isClaimModalOpen = false" />
-            <CommonSaveButton :label="selectedClaim.id ? t('common.update') : t('common.add')" :loading="isSavingClaim" :disabled="isSavingClaim" />
+            <UButton :label="t('common.cancel')" color="neutral" variant="ghost" data-help-target="agreement.claims.claim-dialog.cancel" data-help-kind="button" data-help-label-en="Cancel" data-help-label-fr="Annuler" @click="isClaimModalOpen = false" />
+            <CommonSaveButton :label="selectedClaim.id ? t('common.update') : t('common.add')" :loading="isSavingClaim" :disabled="isSavingClaim" data-help-target="agreement.claims.claim-dialog.save" data-help-kind="button" data-help-label-en="Save" data-help-label-fr="Enregistrer" />
           </div>
         </UForm>
       </template>

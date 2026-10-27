@@ -182,7 +182,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <UDashboardPanel id="agreement-create" class="w-full">
+  <UDashboardPanel id="agreement-create" class="w-full" data-help-view="agreement.create" data-help-label-en="Agreements — Create agreement" data-help-label-fr="Ententes — Créer une entente" data-help-target="agreement.create.content" data-help-kind="section">
     <template #header>
       <UDashboardNavbar>
         <template #leading>

@@ -99,13 +99,18 @@ export const TargetLedgerSchema = z.strictObject({
   views: z.array(z.strictObject({ key, label, discoverable: z.boolean(invalid).optional(), targets: z.array(z.strictObject({ key, label, kind: TargetKindSchema, scope: z.literal('instance', invalid).optional(), completion: GuideCompletionRuleSchema.optional(), choices: z.array(z.strictObject({ value: key, label }, invalid), invalid).min(1, invalid).max(500, invalid).optional() }, invalid), invalid).max(500, invalid) }, invalid), invalid).max(500, invalid)
 }, invalid).superRefine((value, ctx) => {
   const views = new Set<string>()
-  const targets = new Set<string>()
+  const definitions = new Map<string, string>()
   value.views.forEach((view, index) => {
     if (views.has(view.key)) ctx.addIssue({ code: 'custom', path: ['views', index, 'key'], message: 'validation.guided_help_duplicate_key' })
     views.add(view.key)
+    const targets = new Set<string>()
     view.targets.forEach((target, targetIndex) => {
       if (targets.has(target.key)) ctx.addIssue({ code: 'custom', path: ['views', index, 'targets', targetIndex, 'key'], message: 'validation.guided_help_duplicate_key' })
       targets.add(target.key)
+      const definition = JSON.stringify(target)
+      const previous = definitions.get(target.key)
+      if (previous && previous !== definition) ctx.addIssue({ code: 'custom', path: ['views', index, 'targets', targetIndex], message: 'validation.guided_help_reference_invalid' })
+      definitions.set(target.key, definition)
       if (target.choices) {
         const values = new Set<string>()
         if (target.kind !== 'select') ctx.addIssue({ code: 'custom', path: ['views', index, 'targets', targetIndex, 'choices'], message: 'validation.guided_help_reference_invalid' })
