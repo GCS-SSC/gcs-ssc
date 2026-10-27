@@ -1,3 +1,5 @@
+import { NOTIFICATION_NOTIFIERS } from '~~/shared/utils/notification-notifiers'
+import { loadNotificationProvider } from './notification-provider'
 import { useNitroApp } from 'nitropack/runtime'
 import { readAgencyCodingCatalog } from './agreement-coding-allocator'
 import { createExtensionAgreementFinancials } from './extension-agreement-financials'
@@ -45,7 +47,8 @@ import { resolveAgreementClaimRuntimeContext } from './agreement-claim'
 import { resolveAgreementPaymentRuntimeContext } from './agreement-payment'
 import { resolveAgreementMonitorRuntimeContext } from './agreement-monitor'
 import { resolveFundingOpportunityScope } from './funding-case'
-import { badRequest, throwApiError } from './api-errors'
+import { badRequest, throwApiError, validationError } from './api-errors'
+import { ZodError } from 'zod'
 import type { AuthContext } from './authorize'
 import type { Currency_Codes, Database, JsonValue } from '~~/shared/types/database'
 import type {
@@ -339,6 +342,7 @@ export const toClientExtensionManifest = (
   sdkVersion: extension.sdkVersion,
   admin: extension.admin,
   client: extension.client,
+  notificationProvider: extension.notificationProvider ? {} : undefined,
   fileStorageProvider: extension.fileStorageProvider
     ? {
         ...(extension.fileStorageProvider.metadata
@@ -861,11 +865,23 @@ export const runExtensionStatusReferenceGuards = async (
 export const runExtensionConfigurationGuards = async (
   event: H3Event,
   db: Transaction<Database>,
-  context: Omit<GcsExtensionConfigurationGuardHookPayload, 'event' | 'db'>
-): Promise<void> => {
+  context: Omit<GcsExtensionConfigurationGuardHookPayload, 'event' | 'db' | 'config'> & { config: GcsExtensionJsonConfig }
+): Promise<GcsExtensionJsonConfig> => {
   try {
+    let config = context.config
+    const extension = getGcsExtensionByKey(context.targetExtensionKey)
+    if (extension?.notificationProvider) {
+      const provider = await loadNotificationProvider(extension.key)
+      if (!provider) throw new Error('Notification provider adapter unavailable')
+      const validateConfig = context.scope === 'stream'
+        ? provider.adapter.validateStreamConfig
+        : provider.adapter.validateAgencyConfig
+      if (validateConfig) config = await validateConfig(config)
+    }
     await useNitroApp().hooks.callHook(GCS_EXTENSION_CONFIGURATION_GUARD_HOOK, {
       ...context,
+      config,
+      notificationNotifiers: context.scope === 'stream' && extension?.notificationProvider ? NOTIFICATION_NOTIFIERS : undefined,
       event,
       db: db as unknown as Transaction<unknown>,
       codingAccounts: { list: async input => await readAgencyCodingCatalog(db, {
@@ -873,8 +889,57 @@ export const runExtensionConfigurationGuards = async (
         agencyFiscalYearId: input.agencyFiscalYearId
       }) }
     })
+    if (extension?.notificationProvider && context.scope === 'stream' && context.streamId) {
+      const provider = await loadNotificationProvider(extension.key)
+      if (!provider) throw new Error('Notification provider adapter unavailable')
+      const agency = await getExtensionAgencyConfiguration(db, extension.key, context.agencyId)
+      for (const notifier of NOTIFICATION_NOTIFIERS) {
+        const mapping = provider.adapter.resolveMapping({
+          agencyConfig: agency.config, streamId: context.streamId, streamConfig: config, notifierId: notifier.id
+        })
+        if (mapping && !notifier.fields.some(field => field.id === mapping.recipientEmail && field.type === 'email')) {
+          await validationError(event, new ZodError([{
+            path: ['recipientEmail'], code: 'custom', message: 'validation.notification_recipient_invalid'
+          }]))
+        }
+        for (const [placeholder, binding] of Object.entries(mapping?.personalisation ?? {})) {
+          const fieldId = typeof binding === 'string' ? binding : binding.fieldId
+          const field = notifier.fields.find(candidate => candidate.id === fieldId)
+          const fieldPath = `personalisation.${placeholder}`
+          let path = fieldPath
+          let valid = Boolean(field) && (field?.type === 'text' || field?.type === 'email' ? typeof binding === 'string' : typeof binding !== 'string')
+          if (field && field.type !== 'text' && field.type !== 'email') {
+            if (field.type === 'localized-text') {
+              if (typeof binding !== 'string' && 'timeZone' in binding) valid = false
+            } else {
+              path = `${fieldPath}.timeZone`
+              try {
+                valid = typeof binding !== 'string' && 'timeZone' in binding
+                  && Boolean(binding.timeZone) && !/^[+-]/.test(binding.timeZone)
+                if (valid && typeof binding !== 'string' && 'timeZone' in binding) {
+                  new Intl.DateTimeFormat('en', { timeZone: binding.timeZone }).format()
+                }
+              } catch {
+                valid = false
+              }
+            }
+            if (valid || (field.type === 'localized-text' && typeof binding === 'string')) {
+              path = `${fieldPath}.locale`
+              valid = typeof binding !== 'string' && 'locale' in binding && (binding.locale === 'en' || binding.locale === 'fr')
+            }
+          }
+          const message = path.endsWith('.timeZone')
+            ? 'validation.notification_timezone_invalid'
+            : path.endsWith('.locale') ? 'validation.notification_locale_invalid' : 'validation.notification_field_binding_invalid'
+          if (!valid) await validationError(event, new ZodError([{
+            path: path.split('.'), code: 'custom', message
+          }]))
+        }
+      }
+    }
+    return config
   } catch (error: unknown) {
-    await handleExtensionCreateOperationError(event, error)
+    return await handleExtensionCreateOperationError(event, error)
   }
 }
 

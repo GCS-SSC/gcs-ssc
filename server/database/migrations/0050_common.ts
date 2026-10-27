@@ -5,6 +5,42 @@ import type { Database } from '../../../shared/types/database'
 
 /** Installs the current up definitions for this subject on a fresh database. */
 export const up = async (db: Kysely<Database>): Promise<void> => {
+  await sql`CREATE TABLE "Common_Notification" (
+    id bigserial PRIMARY KEY,
+    egcs_cn_agency bigint NOT NULL,
+    egcs_cn_stream bigint NOT NULL,
+    egcs_cn_approval bigint NOT NULL,
+    egcs_cn_runtimeitem bigint NOT NULL,
+    egcs_cn_activation text NOT NULL,
+    egcs_cn_providerkey varchar(120) NOT NULL,
+    egcs_cn_notifier varchar(120) NOT NULL,
+    egcs_cn_recipientkind varchar(20) NOT NULL,
+    egcs_cn_recipientid bigint NOT NULL,
+    egcs_cn_recipientemail varchar(320) NOT NULL,
+    egcs_cn_recipientname text NOT NULL,
+    egcs_cn_payload jsonb NOT NULL,
+    egcs_cn_deliverycontext jsonb,
+    egcs_cn_reference varchar(240) NOT NULL,
+    egcs_cn_status varchar(20) NOT NULL DEFAULT 'pending',
+    egcs_cn_attempts integer NOT NULL DEFAULT 0,
+    egcs_cn_nextattempt timestamptz NOT NULL DEFAULT now(),
+    egcs_cn_leaseowner varchar(160),
+    egcs_cn_leaseexpiry timestamptz,
+    egcs_cn_lasterror varchar(1000),
+    egcs_cn_created timestamptz NOT NULL DEFAULT now(),
+    egcs_cn_updated timestamptz NOT NULL DEFAULT now(),
+    egcs_cn_firstsendat timestamptz,
+    egcs_cn_completedat timestamptz,
+    _deleted boolean NOT NULL DEFAULT false,
+    CONSTRAINT cn_uq_notification_reference UNIQUE (egcs_cn_reference),
+    CONSTRAINT cn_uq_notification_activation UNIQUE (egcs_cn_approval, egcs_cn_activation, egcs_cn_recipientkind, egcs_cn_recipientid),
+    CONSTRAINT cn_chk_notification_recipientkind CHECK (egcs_cn_recipientkind IN ('user', 'group')),
+    CONSTRAINT cn_chk_notification_status CHECK (egcs_cn_status IN ('pending', 'processing', 'uncertain', 'completed', 'cancelled', 'unresolved')),
+    CONSTRAINT cn_chk_notification_attempts CHECK (egcs_cn_attempts >= 0),
+    CONSTRAINT cn_chk_notification_lease CHECK ((egcs_cn_leaseowner IS NULL) = (egcs_cn_leaseexpiry IS NULL))
+);`.execute(db)
+  await sql`CREATE INDEX cn_idx_notification_claim ON "Common_Notification"
+    (egcs_cn_status, egcs_cn_nextattempt, egcs_cn_leaseexpiry, id) WHERE _deleted = false`.execute(db)
   await sql`DO $baseline$ BEGIN
 CREATE SEQUENCE "Common_Additional_Reviewers_id_seq" AS bigint START WITH 1 INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE;
 
@@ -3972,6 +4008,11 @@ END $baseline$`.execute(db)
 
 /** Installs the current installForeignKeys definitions for this subject on a fresh database. */
 export const installForeignKeys = async (db: Kysely<Database>): Promise<void> => {
+  await sql`ALTER TABLE "Common_Notification"
+    ADD CONSTRAINT cn_fk_notification_agency FOREIGN KEY (egcs_cn_agency) REFERENCES "Agency_Profile" (id) ON DELETE RESTRICT,
+    ADD CONSTRAINT cn_fk_notification_stream FOREIGN KEY (egcs_cn_stream) REFERENCES "Transfer_Payment_Stream" (id) ON DELETE RESTRICT,
+    ADD CONSTRAINT cn_fk_notification_approval FOREIGN KEY (egcs_cn_approval) REFERENCES "Common_Approval" (id) ON DELETE RESTRICT,
+    ADD CONSTRAINT cn_fk_notification_runtimeitem FOREIGN KEY (egcs_cn_runtimeitem) REFERENCES "Common_Runtime_Item" (id) ON DELETE RESTRICT`.execute(db)
   await sql`DO $baseline$ BEGIN
 ALTER TABLE "Common_Additional_Reviewers" ADD CONSTRAINT "cn_ref_additionalreviewersentityidentitytype" FOREIGN KEY (egcs_cn_entityid, egcs_cn_entitytype) REFERENCES "Common_Entity"(id, egcs_cn_entitytype);
 

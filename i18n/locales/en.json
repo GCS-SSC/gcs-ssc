@@ -1365,6 +1365,12 @@
       "stream_disabled": "This extension is disabled for this program stream.",
       "entity_disabled": "This extension is disabled for this record."
     },
+    "notifications": {
+      "provider_not_found": "The notification provider was not found.",
+      "provider_not_enabled": "Enable and configure this notification provider before selecting it.",
+      "provider_unavailable": "The notification provider is unavailable. Try again.",
+      "provider_not_configured": "Configure this notification provider before selecting it."
+    },
     "attachments": {
       "target_not_found": "The attachment target was not found.",
       "not_found": "Attachment not found.",
@@ -2223,6 +2229,10 @@
     }
   },
   "validation": {
+    "notification_field_binding_invalid": "Select a supported variable. Text variables use a field binding; date and time variables require a timezone.",
+    "notification_recipient_invalid": "Select an email variable for the notification recipient.",
+    "notification_locale_invalid": "Select English or French for this variable.",
+    "notification_timezone_invalid": "Select an explicit IANA timezone, such as America/Toronto.",
     "invalid_agreement_financial_id": "Select an active financial ID for this Proponent from the Agreement’s agency.",
     "invalid_json": "Enter a valid JSON object.",
     "note_subject_required": "Enter a subject in English or French",
@@ -3525,6 +3535,9 @@
     "entity_tabs_load_failed_description": "Try again to load the available extension views.",
     "workspace_agencies_description": "Choose an agency where this extension is enabled.",
     "select_storage_provider": "Select storage provider",
+    "notification_provider_selected": "The agency notification provider was selected.",
+    "notification_provider_selected_status": "Selected notification provider",
+    "select_notification_provider": "Select notification provider",
     "storage_provider_selected": "The agency storage provider was selected.",
     "storage_provider_selected_status": "Selected storage provider",
     "tab": "Extensions",

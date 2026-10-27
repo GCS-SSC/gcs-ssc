@@ -6,6 +6,7 @@
 export const AUDIT_TABLE_NAMES: readonly string[] = [
   'audit.capture_policy',
   'extensions.agency_enablement',
+  'extensions.agency_notification_selection',
   'extensions.agency_storage_selection',
   'extensions.kv_entry',
   'extensions.secret_entry',
@@ -70,6 +71,7 @@ export const AUDIT_TABLE_NAMES: readonly string[] = [
   'public.Common_Group',
   'public.Common_Group_Member',
   'public.Common_Guided_Help',
+  'public.Common_Notification',
   'public.Common_Publication',
   'public.Common_Publication_Transition',
   'public.Common_Publication_Version',

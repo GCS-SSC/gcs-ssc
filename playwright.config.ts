@@ -37,6 +37,7 @@ export default defineConfig({
   testDir: './tooling/gcs-ssc/tests/e2e',
   testIgnore: [
     ...(process.env.E2E_REVIEW_SCRATCH === '1' ? [] : ['**/*.tmp.spec.ts']),
+    ...(process.env.GCS_E2E_NOTIFICATION_FIXTURE === '1' ? [] : ['**/notification-provider-editor-host.spec.ts']),
     ...(process.env.GCS_E2E_PROFILE_FIXTURE === '1' ? [] : ['**/agreement-extension-persistence.spec.ts'])
   ],
   // Constrain local resource usage by default; can be overridden per run.

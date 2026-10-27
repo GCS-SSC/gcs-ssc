@@ -74,7 +74,7 @@ export default defineEventHandler(async event => {
       .where('_deleted', '=', false)
       .executeTakeFirst()
 
-    await runExtensionConfigurationGuards(event, writeDb, {
+    const config = await runExtensionConfigurationGuards(event, writeDb, {
       targetExtensionKey: body.extensionKey,
       scope: 'agency',
       agencyId,
@@ -82,9 +82,7 @@ export default defineEventHandler(async event => {
       config: (normalizedConfig ?? existing?.config ?? {}) as GcsExtensionJsonConfig
     })
 
-    const values = normalizedConfig === undefined
-      ? { enabled: body.enabled }
-      : { enabled: body.enabled, config: normalizedConfig }
+    const values = { enabled: body.enabled, config }
 
     const row = existing
       ? await writeDb
@@ -99,7 +97,7 @@ export default defineEventHandler(async event => {
             agency_id: agencyId,
             extension_key: body.extensionKey,
             enabled: body.enabled,
-            config: normalizedConfig ?? {}
+            config
           })
           .returningAll()
           .executeTakeFirst()

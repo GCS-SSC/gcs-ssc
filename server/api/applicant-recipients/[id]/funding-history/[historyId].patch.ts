@@ -13,9 +13,7 @@ import {
   assertFundingHistoryExistsForRecipient,
   assertFundingHistoryRecipientAccess,
   assertNoExactFundingHistoryConflicts,
-  collectFundingHistorySimilarityWarnings,
-  listFundingHistoryRecipientIds,
-  requireFundingHistorySimilarityConfirmation
+  listFundingHistoryRecipientIds
 } from '~~/server/utils/funding-history'
 import { throwIfFundingHistoryConstraintError } from '~~/server/utils/funding-history-constraint-errors'
 import { isValidFundingHistoryId } from '~~/server/utils/funding-history-id'
@@ -92,13 +90,6 @@ export default defineEventHandler(async event => {
       }
       if (identityChanged) {
         await assertNoExactFundingHistoryConflicts(event, mergedIdentity, trx, historyId)
-        const warnings = await collectFundingHistorySimilarityWarnings(
-          context,
-          mergedIdentity,
-          trx,
-          { excludeHistoryId: historyId }
-        )
-        await requireFundingHistorySimilarityConfirmation(event, warnings, validated.confirmations || [])
       }
 
       if (Array.isArray(validated.recipientIds)) {

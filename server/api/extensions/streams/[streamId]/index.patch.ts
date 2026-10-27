@@ -51,6 +51,7 @@ export default defineEventHandler(async event => {
   if (!extension || extension.configurationScope === 'agency') {
     return await notFound(event, 'EXTENSION_NOT_FOUND', 'apiErrors.extensions.not_found')
   }
+  let config = body.config
   const configurationAction = getExtensionConfigurationAction(extension)
   await authorize(event, 'transfer_payment', configurationAction, streamContext.scope)
 
@@ -70,7 +71,7 @@ export default defineEventHandler(async event => {
           .updateTable('extensions.stream_configuration')
           .set({
             enabled: body.enabled,
-            config: body.config
+            config
           })
           .where('id', '=', existing.id)
           .returningAll()
@@ -81,7 +82,7 @@ export default defineEventHandler(async event => {
             stream_id: streamId,
             extension_key: body.extensionKey,
             enabled: body.enabled,
-            config: body.config
+            config
           })
           .returningAll()
           .executeTakeFirst()
@@ -141,13 +142,13 @@ export default defineEventHandler(async event => {
       })
     }
 
-    await runExtensionConfigurationGuards(event, trx, {
+    config = await runExtensionConfigurationGuards(event, trx, {
       targetExtensionKey: body.extensionKey,
       scope: 'stream',
       agencyId: currentStreamContext.agencyId,
       streamId,
       enabled: body.enabled,
-      config: body.config
+      config
     })
 
     return await persistConfiguration(trx)

@@ -778,7 +778,7 @@ export const reassignCanonicalApproval = async (
     .innerJoin('Common_Routing_Slip', 'Common_Routing_Slip.id', 'Common_Approval.egcs_cn_routingslip')
     .innerJoin('Common_Runtime_Item as Routing_Item', 'Routing_Item.id', 'Common_Routing_Slip.egcs_cn_runtimeitem')
     .select([
-      'Common_Approval.id', 'Common_Approval.egcs_cn_defaultuser', 'Common_Approval.egcs_cn_defaultgroup', 'Common_Approval.egcs_cn_approvalvalue',
+      'Common_Approval.id', 'Common_Approval.egcs_cn_runtimeitem', 'Common_Approval.egcs_cn_assigneduser', 'Common_Approval.egcs_cn_assignedgroup', 'Common_Approval.egcs_cn_defaultuser', 'Common_Approval.egcs_cn_defaultgroup', 'Common_Approval.egcs_cn_approvalvalue',
       'Approval_Item.egcs_cn_state as approvalState', 'Routing_Item.egcs_cn_state as routingState'
     ])
     .where('Common_Approval.id', '=', approvalId)
@@ -813,5 +813,11 @@ export const reassignCanonicalApproval = async (
     egcs_cn_comment: sql`null`,
     egcs_cn_attachment: sql`null`
   }).where('id', '=', approvalId).executeTakeFirstOrThrow()
+  if (approval.approvalState === 'awaiting_action'
+    && (approval.egcs_cn_assigneduser !== (body.egcs_cn_assigneduser ?? null)
+      || approval.egcs_cn_assignedgroup !== (body.egcs_cn_assignedgroup ?? null))) {
+    const { enqueueApprovalNotification } = await import('./notification-runtime')
+    await enqueueApprovalNotification(trx, String(approval.egcs_cn_runtimeitem))
+  }
   return { id: approvalId }
 }

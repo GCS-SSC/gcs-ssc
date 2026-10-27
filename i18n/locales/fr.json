@@ -1365,6 +1365,12 @@
       "stream_disabled": "Cette extension est désactivée pour ce volet de programme.",
       "entity_disabled": "Cette extension est désactivée pour cet enregistrement."
     },
+    "notifications": {
+      "provider_not_found": "Le fournisseur de notifications est introuvable.",
+      "provider_not_enabled": "Activez et configurez ce fournisseur de notifications avant de le sélectionner.",
+      "provider_unavailable": "Le fournisseur de notifications est indisponible. Réessayez.",
+      "provider_not_configured": "Configurez ce fournisseur de notifications avant de le sélectionner."
+    },
     "attachments": {
       "target_not_found": "La cible de la pièce jointe est introuvable.",
       "not_found": "Pièce jointe introuvable.",
@@ -2223,6 +2229,10 @@
     }
   },
   "validation": {
+    "notification_field_binding_invalid": "Sélectionnez une variable prise en charge. Les variables texte utilisent un champ; les dates et les heures nécessitent un fuseau horaire.",
+    "notification_recipient_invalid": "Sélectionnez une variable de courriel pour le destinataire de la notification.",
+    "notification_locale_invalid": "Sélectionnez l’anglais ou le français pour cette variable.",
+    "notification_timezone_invalid": "Sélectionnez un fuseau horaire IANA explicite, comme America/Toronto.",
     "invalid_agreement_financial_id": "Sélectionnez un identifiant financier actif pour ce promoteur auprès de l'organisme de l'entente.",
     "invalid_json": "Saisissez un objet JSON valide.",
     "note_subject_required": "Saisissez un sujet en anglais ou en français",
@@ -3525,6 +3535,9 @@
     "entity_tabs_load_failed_description": "Réessayez pour charger les vues d’extension disponibles.",
     "workspace_agencies_description": "Choisissez un organisme où cette extension est activée.",
     "select_storage_provider": "Sélectionner le fournisseur de stockage",
+    "notification_provider_selected": "Le fournisseur de notifications de l’organisme a été sélectionné.",
+    "notification_provider_selected_status": "Fournisseur de notifications sélectionné",
+    "select_notification_provider": "Sélectionner le fournisseur de notifications",
     "storage_provider_selected": "Le fournisseur de stockage de l'organisme a été sélectionné.",
     "storage_provider_selected_status": "Fournisseur de stockage sélectionné",
     "tab": "Extensions",
