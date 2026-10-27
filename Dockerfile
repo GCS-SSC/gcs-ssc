@@ -56,7 +56,7 @@ RUN set -eux; \
   fetch_workspace https://github.com/GCS-SSC/gcs-ssc-portal-connector.git extensions/gcs-ssc-portal-connector 3a93dedda43999d27b39121bac0f5c895afa4c12; \
   fetch_workspace https://github.com/GCS-SSC/gcs-storage-local.git extensions/gcs-storage-local 0c2029c93a52bfd4f88c2ef188cc62d4def2d2b1; \
   fetch_workspace https://github.com/GCS-SSC/gcs-storage-s3.git extensions/gcs-storage-s3 acae67eda302e00c2b85eb3bcd8b1e714a59a9b2; \
-  fetch_workspace https://github.com/GCS-SSC/gcs-ssc-gcnotify.git extensions/gcs-ssc-gcnotify 6a96c7eadea3280f74531beb65fad8dd453c83a5
+  fetch_workspace https://github.com/GCS-SSC/gcs-ssc-gcnotify.git extensions/gcs-ssc-gcnotify 9cb57474b5b60490abcff3de422a2dfccf4f4eb6
 
 RUN bun install --frozen-lockfile
 
